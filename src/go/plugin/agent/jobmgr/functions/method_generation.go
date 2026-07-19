@@ -93,40 +93,40 @@ func newMethodGeneration(
 	return generation, nil
 }
 
-func (generation *methodGeneration) declaration() *HandlerGenerationDeclaration {
+func (mg *methodGeneration) declaration() *HandlerGenerationDeclaration {
 	return &HandlerGenerationDeclaration{
-		ID: generation.id, Handler: generation.handle, Cleanup: generation.cleanup,
+		ID: mg.id, Handler: mg.handle, Cleanup: mg.cleanup,
 	}
 }
 
-func (generation *methodGeneration) wait(ctx context.Context) error {
-	if generation == nil {
+func (mg *methodGeneration) wait(ctx context.Context) error {
+	if mg == nil {
 		return nil
 	}
 	select {
-	case <-generation.done:
-		return generation.cleanupErr
+	case <-mg.done:
+		return mg.cleanupErr
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func (generation *methodGeneration) cleanup(ctx context.Context) error {
-	generation.cleanupOnce.Do(func() {
-		names := make([]string, 0, len(generation.handlers))
-		for name := range generation.handlers {
+func (mg *methodGeneration) cleanup(ctx context.Context) error {
+	mg.cleanupOnce.Do(func() {
+		names := make([]string, 0, len(mg.handlers))
+		for name := range mg.handlers {
 			names = append(names, name)
 		}
 		sort.Strings(names)
 		for _, name := range names {
-			generation.cleanupErr = errors.Join(
-				generation.cleanupErr,
-				callMethodCleanup(ctx, generation.handlers[name]),
+			mg.cleanupErr = errors.Join(
+				mg.cleanupErr,
+				callMethodCleanup(ctx, mg.handlers[name]),
 			)
 		}
-		close(generation.done)
+		close(mg.done)
 	})
-	return generation.cleanupErr
+	return mg.cleanupErr
 }
 
 func callMethodCleanup(ctx context.Context, handler funcapi.MethodHandler) (err error) {
@@ -143,18 +143,18 @@ func callMethodCleanup(ctx context.Context, handler funcapi.MethodHandler) (err 
 	return nil
 }
 
-func (generation *methodGeneration) handle(
+func (mg *methodGeneration) handle(
 	ctx context.Context,
 	input HandlerInput,
 ) (lifecycle.SealedResult, error) {
-	method, ok := generation.methods[input.Method]
+	method, ok := mg.methods[input.Method]
 	if !ok {
 		return functionErrorResult(404, "unknown method %q", input.Method)
 	}
 	if slices.Contains(input.Args, "info") && !method.RawRequest {
-		return generation.infoResult(method)
+		return mg.infoResult(method)
 	}
-	jobName, job, handler, err := generation.resolveTarget(method, input)
+	jobName, job, handler, err := mg.resolveTarget(method, input)
 	if err != nil {
 		return functionResponseError(err)
 	}
@@ -167,7 +167,7 @@ func (generation *methodGeneration) handle(
 			return functionErrorResult(
 				500,
 				"module %q method %q requires raw request handling",
-				generation.module,
+				mg.module,
 				method.ID,
 			)
 		}
@@ -178,7 +178,7 @@ func (generation *methodGeneration) handle(
 			ContentType: input.ContentType, Timeout: input.Timeout,
 			Permissions: input.Permissions, Source: input.CallerSource,
 		})
-		return generation.responseResult(method, nil, response)
+		return mg.responseResult(method, nil, response)
 	}
 
 	params, err := handler.MethodParams(ctx, method.ID)
@@ -196,42 +196,42 @@ func (generation *methodGeneration) handle(
 		values[param.ID] = methodParamValues(arguments, payload, param.ID)
 	}
 	resolved := funcapi.ResolveParams(params, values)
-	if generation.kind == methodGenerationShared &&
-		generation.creator.InstancePolicy != collectorapi.InstancePolicySingle {
+	if mg.kind == methodGenerationShared &&
+		mg.creator.InstancePolicy != collectorapi.InstancePolicySingle {
 		resolved[functionJobParameter] = funcapi.ResolvedParam{IDs: []string{jobName}}
 	}
 	response := handler.Handle(ctx, method.ID, resolved)
 	if job != nil && !job.IsRunning() {
 		return functionErrorResult(503, "job %q stopped during request", jobName)
 	}
-	return generation.responseResult(method, params, response)
+	return mg.responseResult(method, params, response)
 }
 
-func (generation *methodGeneration) resolveTarget(
+func (mg *methodGeneration) resolveTarget(
 	method funcapi.FunctionConfig,
 	input HandlerInput,
 ) (string, collectorapi.RuntimeJob, funcapi.MethodHandler, error) {
-	switch generation.kind {
+	switch mg.kind {
 	case methodGenerationAgent:
-		return "", nil, generation.handlers[""], nil
+		return "", nil, mg.handlers[""], nil
 	case methodGenerationInstance:
-		names := generation.availableJobNames(method.ID)
+		names := mg.availableJobNames(method.ID)
 		if len(names) != 1 {
 			return "", nil, nil, functionStatusError{
 				status: 404, message: fmt.Sprintf("unknown function %q", method.ID),
 			}
 		}
 		name := names[0]
-		return name, generation.jobs[name], generation.handlers[name], nil
+		return name, mg.jobs[name], mg.handlers[name], nil
 	case methodGenerationShared:
-		names := generation.availableJobNames(method.ID)
+		names := mg.availableJobNames(method.ID)
 		if len(names) == 0 {
 			return "", nil, nil, functionStatusError{
-				status: 404, message: fmt.Sprintf("no %s instances available", generation.module),
+				status: 404, message: fmt.Sprintf("no %s instances available", mg.module),
 			}
 		}
 		name := names[0]
-		if generation.creator.InstancePolicy != collectorapi.InstancePolicySingle {
+		if mg.creator.InstancePolicy != collectorapi.InstancePolicySingle {
 			values := methodParamValues(
 				parseMethodArguments(input.Args),
 				parseMethodPayload(input.Payload),
@@ -246,20 +246,20 @@ func (generation *methodGeneration) resolveTarget(
 				name = values[0]
 			}
 		}
-		job := generation.jobs[name]
+		job := mg.jobs[name]
 		if job == nil || !slices.Contains(names, name) {
 			return "", nil, nil, functionStatusError{
 				status: 404, message: fmt.Sprintf("unknown job %q, available: %v", name, names),
 			}
 		}
-		return name, job, generation.handlers[name], nil
+		return name, job, mg.handlers[name], nil
 	}
 	return "", nil, nil, errors.New("jobmgr Function method generation: invalid target")
 }
 
-func (generation *methodGeneration) availableJobNames(methodID string) []string {
-	names := make([]string, 0, len(generation.jobs))
-	for name, job := range generation.jobs {
+func (mg *methodGeneration) availableJobNames(methodID string) []string {
+	names := make([]string, 0, len(mg.jobs))
+	for name, job := range mg.jobs {
 		if jobBackedFunctionAvailable(job, methodID) {
 			names = append(names, name)
 		}
@@ -291,20 +291,20 @@ func functionResponseError(err error) (lifecycle.SealedResult, error) {
 	return lifecycle.SealedResult{}, err
 }
 
-func (generation *methodGeneration) infoResult(
+func (mg *methodGeneration) infoResult(
 	method funcapi.FunctionConfig,
 ) (lifecycle.SealedResult, error) {
 	params := append([]funcapi.ParamConfig(nil), method.RequiredParams...)
-	includeJob := generation.kind == methodGenerationShared &&
-		generation.creator.InstancePolicy != collectorapi.InstancePolicySingle
+	includeJob := mg.kind == methodGenerationShared &&
+		mg.creator.InstancePolicy != collectorapi.InstancePolicySingle
 	if includeJob {
 		params = append([]funcapi.ParamConfig{buildFunctionJobParam(
-			generation.availableJobNames(method.ID),
+			mg.availableJobNames(method.ID),
 		)}, params...)
 	}
 	help := method.Help
 	if help == "" {
-		help = fmt.Sprintf("%s %s data function", generation.module, method.ID)
+		help = fmt.Sprintf("%s %s data function", mg.module, method.ID)
 	}
 	response := map[string]any{
 		"v": 3, "update_every": max(method.UpdateEvery, 1), "status": 200,
@@ -318,7 +318,7 @@ func (generation *methodGeneration) infoResult(
 	return functionJSONResult(200, response)
 }
 
-func (generation *methodGeneration) responseResult(
+func (mg *methodGeneration) responseResult(
 	method funcapi.FunctionConfig,
 	params []funcapi.ParamConfig,
 	response *funcapi.FunctionResponse,
@@ -342,10 +342,10 @@ func (generation *methodGeneration) responseResult(
 	if len(response.RequiredParams) != 0 {
 		params = funcapi.MergeParamConfigs(params, response.RequiredParams)
 	}
-	if generation.kind == methodGenerationShared &&
-		generation.creator.InstancePolicy != collectorapi.InstancePolicySingle {
+	if mg.kind == methodGenerationShared &&
+		mg.creator.InstancePolicy != collectorapi.InstancePolicySingle {
 		params = append([]funcapi.ParamConfig{
-			buildFunctionJobParam(generation.availableJobNames(method.ID)),
+			buildFunctionJobParam(mg.availableJobNames(method.ID)),
 		}, params...)
 	}
 	payload := map[string]any{

@@ -25,23 +25,23 @@ type dynCfgJobBinding struct {
 	controller atomic.Pointer[joboutput.DynCfgJobController]
 }
 
-func (binding *dynCfgJobBinding) bind(
+func (dcjb *dynCfgJobBinding) bind(
 	controller *joboutput.DynCfgJobController,
 ) error {
-	if binding == nil || controller == nil {
+	if dcjb == nil || controller == nil {
 		return errors.New("jobmgr composition: invalid DynCfg job binding")
 	}
-	if !binding.controller.CompareAndSwap(nil, controller) {
+	if !dcjb.controller.CompareAndSwap(nil, controller) {
 		return errors.New("jobmgr composition: duplicate DynCfg job binding")
 	}
 	return nil
 }
 
-func (binding *dynCfgJobBinding) handle(
+func (dcjb *dynCfgJobBinding) handle(
 	ctx context.Context,
 	input functionadapter.HandlerInput,
 ) (lifecycle.SealedResult, error) {
-	controller := binding.controller.Load()
+	controller := dcjb.controller.Load()
 	if controller == nil {
 		return lifecycle.SealedResult{},
 			errors.New("jobmgr composition: unbound DynCfg job handler")
@@ -49,14 +49,14 @@ func (binding *dynCfgJobBinding) handle(
 	return controller.Handle(ctx, dynCfgJobRequest(input))
 }
 
-func (binding *dynCfgJobBinding) prepare(
+func (dcjb *dynCfgJobBinding) prepare(
 	ctx context.Context,
 	input functionadapter.HandlerInput,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	controller := binding.controller.Load()
+	controller := dcjb.controller.Load()
 	if controller == nil {
 		return nil, errors.New(
 			"jobmgr composition: unbound DynCfg job transaction",

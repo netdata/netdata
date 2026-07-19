@@ -57,7 +57,7 @@ func NewConfigModuleFactory(
 	return &ConfigModuleFactory{config: config}, nil
 }
 
-func (factory *ConfigModuleFactory) Configuration(
+func (cmf *ConfigModuleFactory) Configuration(
 	ctx context.Context,
 	config confgroup.Config,
 ) (payload []byte, err error) {
@@ -66,7 +66,7 @@ func (factory *ConfigModuleFactory) Configuration(
 			"job output: invalid config-module configuration request",
 		)
 	}
-	attempt, err := factory.construct(config.Module())
+	attempt, err := cmf.construct(config.Module())
 	if err != nil {
 		return nil, err
 	}
@@ -98,14 +98,14 @@ func (factory *ConfigModuleFactory) Configuration(
 	return payload, nil
 }
 
-func (factory *ConfigModuleFactory) Test(
+func (cmf *ConfigModuleFactory) Test(
 	ctx context.Context,
 	config confgroup.Config,
 ) (err error) {
 	if ctx == nil || config == nil {
 		return errors.New("job output: invalid config-module test")
 	}
-	attempt, err := factory.construct(config.Module())
+	attempt, err := cmf.construct(config.Module())
 	if err != nil {
 		return err
 	}
@@ -118,10 +118,10 @@ func (factory *ConfigModuleFactory) Test(
 	if named, ok := attempt.module.(interface{ SetJobName(string) }); ok {
 		named.SetJobName(config.Name())
 	}
-	if err := factory.applyResolved(ctx, config, attempt.module); err != nil {
+	if err := cmf.applyResolved(ctx, config, attempt.module); err != nil {
 		return err
 	}
-	attempt.module.GetBase().Logger = factory.config.Logger.With(
+	attempt.module.GetBase().Logger = cmf.config.Logger.With(
 		slog.String("collector", config.Module()),
 		slog.String("job", config.Name()),
 	)
@@ -134,14 +134,14 @@ func (factory *ConfigModuleFactory) Test(
 	return nil
 }
 
-func (factory *ConfigModuleFactory) Validate(
+func (cmf *ConfigModuleFactory) Validate(
 	ctx context.Context,
 	config confgroup.Config,
 ) (err error) {
 	if ctx == nil || config == nil {
 		return errors.New("job output: invalid config-module validation")
 	}
-	attempt, err := factory.construct(config.Module())
+	attempt, err := cmf.construct(config.Module())
 	if err != nil {
 		return err
 	}
@@ -154,17 +154,17 @@ func (factory *ConfigModuleFactory) Validate(
 	if named, ok := attempt.module.(interface{ SetJobName(string) }); ok {
 		named.SetJobName(config.Name())
 	}
-	return factory.applyResolved(ctx, config, attempt.module)
+	return cmf.applyResolved(ctx, config, attempt.module)
 }
 
-func (factory *ConfigModuleFactory) construct(
+func (cmf *ConfigModuleFactory) construct(
 	module string,
 ) (attempt configModuleAttempt, err error) {
-	if factory == nil || module == "" {
+	if cmf == nil || module == "" {
 		return configModuleAttempt{},
 			errors.New("job output: invalid config-module construction")
 	}
-	creator, ok := factory.config.Modules.Lookup(module)
+	creator, ok := cmf.config.Modules.Lookup(module)
 	if !ok {
 		return configModuleAttempt{},
 			fmt.Errorf("job output: module %q is not registered", module)
@@ -200,15 +200,15 @@ func (factory *ConfigModuleFactory) construct(
 	return configModuleAttempt{module: constructed}, nil
 }
 
-func (factory *ConfigModuleFactory) applyResolved(
+func (cmf *ConfigModuleFactory) applyResolved(
 	ctx context.Context,
 	config confgroup.Config,
 	module configModule,
 ) error {
-	resolved, err := factory.config.Resolver.Resolve(
+	resolved, err := cmf.config.Resolver.Resolve(
 		ctx,
 		map[string]any(config),
-		factory.config.StoreScope,
+		cmf.config.StoreScope,
 	)
 	if err != nil {
 		return fmt.Errorf(
@@ -243,20 +243,20 @@ type configModuleAttempt struct {
 	err    error
 }
 
-func (attempt *configModuleAttempt) cleanup(ctx context.Context) error {
-	if attempt == nil || attempt.module == nil {
+func (cma *configModuleAttempt) cleanup(ctx context.Context) error {
+	if cma == nil || cma.module == nil {
 		return nil
 	}
-	attempt.once.Do(func() {
-		attempt.err = callJobLifecycle(
+	cma.once.Do(func() {
+		cma.err = callJobLifecycle(
 			"config-module Cleanup",
 			func() error {
-				attempt.module.Cleanup(ctx)
+				cma.module.Cleanup(ctx)
 				return nil
 			},
 		)
 	})
-	return attempt.err
+	return cma.err
 }
 
 func applyConfigModuleRaw(

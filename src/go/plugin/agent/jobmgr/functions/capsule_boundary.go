@@ -47,323 +47,323 @@ func newCapsuleBoundary(target *ProcessIngress) (*capsuleBoundary, error) {
 	}, nil
 }
 
-func (boundary *capsuleBoundary) signalLocked() {
-	if boundary.idleWaiters == 0 {
+func (cb *capsuleBoundary) signalLocked() {
+	if cb.idleWaiters == 0 {
 		return
 	}
-	close(boundary.idle)
-	boundary.idle = make(chan struct{})
-	boundary.idleWaiters = 0
+	close(cb.idle)
+	cb.idle = make(chan struct{})
+	cb.idleWaiters = 0
 }
 
 // waitLocked releases and reacquires mu. The caller holds mu on entry and exit.
-func (boundary *capsuleBoundary) waitLocked(ctx context.Context) error {
-	idle := boundary.idle
-	boundary.idleWaiters++
-	boundary.mu.Unlock()
+func (cb *capsuleBoundary) waitLocked(ctx context.Context) error {
+	idle := cb.idle
+	cb.idleWaiters++
+	cb.mu.Unlock()
 	var err error
 	select {
 	case <-idle:
 	case <-ctx.Done():
 		err = ctx.Err()
 	}
-	boundary.mu.Lock()
-	if idle == boundary.idle {
-		boundary.idleWaiters--
+	cb.mu.Lock()
+	if idle == cb.idle {
+		cb.idleWaiters--
 	}
 	return err
 }
 
-func (boundary *capsuleBoundary) SealPause() error {
-	boundary.mu.Lock()
-	defer boundary.mu.Unlock()
-	if boundary.state != ProcessIngressLive || boundary.contained {
+func (cb *capsuleBoundary) SealPause() error {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	if cb.state != ProcessIngressLive || cb.contained {
 		return errors.New("Function process ingress: capsule pause outside live state")
 	}
-	boundary.state = ProcessIngressPaused
-	boundary.signalLocked()
+	cb.state = ProcessIngressPaused
+	cb.signalLocked()
 	return nil
 }
 
-func (boundary *capsuleBoundary) DrainPause(ctx context.Context) error {
-	boundary.mu.Lock()
-	if boundary.state != ProcessIngressPaused || boundary.contained || boundary.adopting {
-		boundary.mu.Unlock()
+func (cb *capsuleBoundary) DrainPause(ctx context.Context) error {
+	cb.mu.Lock()
+	if cb.state != ProcessIngressPaused || cb.contained || cb.adopting {
+		cb.mu.Unlock()
 		return errors.New("Function process ingress: capsule drain outside sealed pause")
 	}
-	for boundary.active != 0 || boundary.parsing {
-		if err := boundary.waitLocked(ctx); err != nil {
-			boundary.mu.Unlock()
+	for cb.active != 0 || cb.parsing {
+		if err := cb.waitLocked(ctx); err != nil {
+			cb.mu.Unlock()
 			return err
 		}
 	}
-	boundary.mu.Unlock()
+	cb.mu.Unlock()
 	return nil
 }
 
-func (boundary *capsuleBoundary) RollbackPause() error {
-	boundary.mu.Lock()
-	defer boundary.mu.Unlock()
-	if boundary.state != ProcessIngressPaused || boundary.contained || boundary.adopting {
+func (cb *capsuleBoundary) RollbackPause() error {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	if cb.state != ProcessIngressPaused || cb.contained || cb.adopting {
 		return errors.New("Function process ingress: capsule pause rollback outside pause")
 	}
-	boundary.state = ProcessIngressLive
-	boundary.signalLocked()
+	cb.state = ProcessIngressLive
+	cb.signalLocked()
 	return nil
 }
 
-func (boundary *capsuleBoundary) PrepareAdopt(ctx context.Context) error {
-	boundary.mu.Lock()
-	if boundary.state != ProcessIngressPaused || boundary.contained || boundary.adopting {
-		boundary.mu.Unlock()
+func (cb *capsuleBoundary) PrepareAdopt(ctx context.Context) error {
+	cb.mu.Lock()
+	if cb.state != ProcessIngressPaused || cb.contained || cb.adopting {
+		cb.mu.Unlock()
 		return errors.New("Function process ingress: capsule adopt preparation outside pause")
 	}
-	boundary.adopting = true
-	boundary.signalLocked()
-	for boundary.active != 0 || boundary.parsing {
-		if err := boundary.waitLocked(ctx); err != nil {
-			boundary.adopting = false
-			boundary.signalLocked()
-			boundary.mu.Unlock()
+	cb.adopting = true
+	cb.signalLocked()
+	for cb.active != 0 || cb.parsing {
+		if err := cb.waitLocked(ctx); err != nil {
+			cb.adopting = false
+			cb.signalLocked()
+			cb.mu.Unlock()
 			return err
 		}
 	}
-	boundary.mu.Unlock()
+	cb.mu.Unlock()
 	return nil
 }
 
-func (boundary *capsuleBoundary) CommitAdopt() {
-	boundary.mu.Lock()
-	boundary.adopting = false
-	boundary.state = ProcessIngressLive
-	boundary.signalLocked()
-	boundary.mu.Unlock()
+func (cb *capsuleBoundary) CommitAdopt() {
+	cb.mu.Lock()
+	cb.adopting = false
+	cb.state = ProcessIngressLive
+	cb.signalLocked()
+	cb.mu.Unlock()
 }
 
-func (boundary *capsuleBoundary) AbortAdopt() {
-	boundary.mu.Lock()
-	if boundary.state == ProcessIngressPaused && boundary.adopting && !boundary.contained {
-		boundary.adopting = false
-		boundary.signalLocked()
+func (cb *capsuleBoundary) AbortAdopt() {
+	cb.mu.Lock()
+	if cb.state == ProcessIngressPaused && cb.adopting && !cb.contained {
+		cb.adopting = false
+		cb.signalLocked()
 	}
-	boundary.mu.Unlock()
+	cb.mu.Unlock()
 }
 
-func (boundary *capsuleBoundary) Resume() error {
-	boundary.mu.Lock()
-	defer boundary.mu.Unlock()
-	if boundary.state != ProcessIngressPaused ||
-		boundary.contained ||
-		boundary.adopting ||
-		boundary.active != 0 ||
-		boundary.parsing {
+func (cb *capsuleBoundary) Resume() error {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	if cb.state != ProcessIngressPaused ||
+		cb.contained ||
+		cb.adopting ||
+		cb.active != 0 ||
+		cb.parsing {
 		return errors.New("Function process ingress: capsule resume outside drained pause")
 	}
-	boundary.state = ProcessIngressLive
-	boundary.signalLocked()
+	cb.state = ProcessIngressLive
+	cb.signalLocked()
 	return nil
 }
 
-func (boundary *capsuleBoundary) Fence(ctx context.Context) error {
-	boundary.mu.Lock()
-	if boundary.state != ProcessIngressPaused || boundary.contained || boundary.adopting {
-		boundary.mu.Unlock()
+func (cb *capsuleBoundary) Fence(ctx context.Context) error {
+	cb.mu.Lock()
+	if cb.state != ProcessIngressPaused || cb.contained || cb.adopting {
+		cb.mu.Unlock()
 		return errors.New("Function process ingress: capsule fence outside drained pause")
 	}
-	for boundary.active != 0 || boundary.parsing {
-		if err := boundary.waitLocked(ctx); err != nil {
-			boundary.mu.Unlock()
+	for cb.active != 0 || cb.parsing {
+		if err := cb.waitLocked(ctx); err != nil {
+			cb.mu.Unlock()
 			return err
 		}
 	}
-	boundary.target = nil
-	boundary.contained = true
-	boundary.state = ProcessIngressContained
-	boundary.signalLocked()
-	for boundary.waitingReads != 0 {
-		if err := boundary.waitLocked(ctx); err != nil {
-			boundary.mu.Unlock()
+	cb.target = nil
+	cb.contained = true
+	cb.state = ProcessIngressContained
+	cb.signalLocked()
+	for cb.waitingReads != 0 {
+		if err := cb.waitLocked(ctx); err != nil {
+			cb.mu.Unlock()
 			return err
 		}
 	}
-	boundary.mu.Unlock()
+	cb.mu.Unlock()
 	return nil
 }
 
-func (boundary *capsuleBoundary) acquire() (*ProcessIngress, bool) {
-	boundary.mu.Lock()
-	defer boundary.mu.Unlock()
-	if boundary.contained ||
-		boundary.target == nil ||
-		(boundary.state != ProcessIngressLive && !boundary.parsing) {
+func (cb *capsuleBoundary) acquire() (*ProcessIngress, bool) {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	if cb.contained ||
+		cb.target == nil ||
+		(cb.state != ProcessIngressLive && !cb.parsing) {
 		return nil, false
 	}
-	boundary.active++
-	return boundary.target, true
+	cb.active++
+	return cb.target, true
 }
 
-func (boundary *capsuleBoundary) AcquireInputRead(ctx context.Context, bufferFull bool) (bool, error) {
-	boundary.mu.Lock()
-	boundary.readReturns++
-	if boundary.contained || boundary.target == nil {
-		boundary.discardedReads++
-		boundary.mu.Unlock()
+func (cb *capsuleBoundary) AcquireInputRead(ctx context.Context, bufferFull bool) (bool, error) {
+	cb.mu.Lock()
+	cb.readReturns++
+	if cb.contained || cb.target == nil {
+		cb.discardedReads++
+		cb.mu.Unlock()
 		return false, nil
 	}
-	waiting := boundary.state == ProcessIngressPaused
+	waiting := cb.state == ProcessIngressPaused
 	if waiting {
-		boundary.waitingReads++
+		cb.waitingReads++
 	}
-	if (waiting || bufferFull) && !boundary.adopting {
-		target := boundary.target
-		boundary.active++
-		boundary.mu.Unlock()
+	if (waiting || bufferFull) && !cb.adopting {
+		target := cb.target
+		cb.active++
+		cb.mu.Unlock()
 		observeErr := target.observeReadReturn()
-		boundary.mu.Lock()
-		boundary.active--
-		boundary.signalLocked()
-		boundary.mu.Unlock()
+		cb.mu.Lock()
+		cb.active--
+		cb.signalLocked()
+		cb.mu.Unlock()
 		if observeErr != nil {
-			boundary.mu.Lock()
+			cb.mu.Lock()
 			if waiting {
-				boundary.waitingReads--
+				cb.waitingReads--
 			}
-			boundary.signalLocked()
-			boundary.mu.Unlock()
+			cb.signalLocked()
+			cb.mu.Unlock()
 			return false, observeErr
 		}
 	} else {
-		boundary.mu.Unlock()
+		cb.mu.Unlock()
 	}
 
-	boundary.mu.Lock()
+	cb.mu.Lock()
 	for {
-		if boundary.contained {
+		if cb.contained {
 			if waiting {
-				boundary.waitingReads--
+				cb.waitingReads--
 			}
-			boundary.discardedReads++
-			boundary.signalLocked()
-			boundary.mu.Unlock()
+			cb.discardedReads++
+			cb.signalLocked()
+			cb.mu.Unlock()
 			return false, nil
 		}
-		if boundary.state == ProcessIngressLive && !boundary.parsing {
+		if cb.state == ProcessIngressLive && !cb.parsing {
 			if waiting {
-				boundary.waitingReads--
+				cb.waitingReads--
 			}
-			boundary.parsing = true
-			boundary.signalLocked()
-			boundary.mu.Unlock()
+			cb.parsing = true
+			cb.signalLocked()
+			cb.mu.Unlock()
 			return true, nil
 		}
-		if boundary.state != ProcessIngressPaused || boundary.parsing {
-			boundary.mu.Unlock()
+		if cb.state != ProcessIngressPaused || cb.parsing {
+			cb.mu.Unlock()
 			return false, errors.New("Function process ingress: invalid read-return gate state")
 		}
 		if !waiting {
 			waiting = true
-			boundary.waitingReads++
-			boundary.signalLocked()
+			cb.waitingReads++
+			cb.signalLocked()
 		}
-		if err := boundary.waitLocked(ctx); err != nil {
+		if err := cb.waitLocked(ctx); err != nil {
 			if waiting {
-				boundary.waitingReads--
+				cb.waitingReads--
 			}
-			boundary.signalLocked()
-			boundary.mu.Unlock()
+			cb.signalLocked()
+			cb.mu.Unlock()
 			return false, err
 		}
 	}
 }
 
-func (boundary *capsuleBoundary) Census() capsuleBoundaryCensus {
-	boundary.mu.Lock()
-	defer boundary.mu.Unlock()
+func (cb *capsuleBoundary) Census() capsuleBoundaryCensus {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
 	return capsuleBoundaryCensus{
-		ReadReturns:        boundary.readReturns,
-		WaitingReadReturns: boundary.waitingReads,
-		DiscardedReads:     boundary.discardedReads,
-		CapabilityAttached: boundary.target != nil,
+		ReadReturns:        cb.readReturns,
+		WaitingReadReturns: cb.waitingReads,
+		DiscardedReads:     cb.discardedReads,
+		CapabilityAttached: cb.target != nil,
 	}
 }
 
-func (boundary *capsuleBoundary) ReleaseInputRead() {
-	boundary.mu.Lock()
-	if !boundary.parsing {
-		boundary.mu.Unlock()
+func (cb *capsuleBoundary) ReleaseInputRead() {
+	cb.mu.Lock()
+	if !cb.parsing {
+		cb.mu.Unlock()
 		return
 	}
-	boundary.parsing = false
-	boundary.signalLocked()
-	boundary.mu.Unlock()
+	cb.parsing = false
+	cb.signalLocked()
+	cb.mu.Unlock()
 }
 
-func (boundary *capsuleBoundary) release() {
-	boundary.mu.Lock()
-	boundary.active--
-	boundary.signalLocked()
-	boundary.mu.Unlock()
+func (cb *capsuleBoundary) release() {
+	cb.mu.Lock()
+	cb.active--
+	cb.signalLocked()
+	cb.mu.Unlock()
 }
 
-func (boundary *capsuleBoundary) HandleCall(ctx context.Context, call functionwire.Call) error {
-	target, ok := boundary.acquire()
+func (cb *capsuleBoundary) HandleCall(ctx context.Context, call functionwire.Call) error {
+	target, ok := cb.acquire()
 	if !ok {
 		return nil
 	}
-	defer boundary.release()
+	defer cb.release()
 	return target.HandleCall(ctx, call)
 }
 
-func (boundary *capsuleBoundary) HandleCancel(ctx context.Context, uid string) error {
-	target, ok := boundary.acquire()
+func (cb *capsuleBoundary) HandleCancel(ctx context.Context, uid string) error {
+	target, ok := cb.acquire()
 	if !ok {
 		return nil
 	}
-	defer boundary.release()
+	defer cb.release()
 	return target.HandleCancel(ctx, uid)
 }
 
-func (boundary *capsuleBoundary) HandleReject(ctx context.Context, uid string, status int) error {
-	target, ok := boundary.acquire()
+func (cb *capsuleBoundary) HandleReject(ctx context.Context, uid string, status int) error {
+	target, ok := cb.acquire()
 	if !ok {
 		return nil
 	}
-	defer boundary.release()
+	defer cb.release()
 	return target.HandleReject(ctx, uid, status)
 }
 
-func (boundary *capsuleBoundary) HandleQuit(ctx context.Context) error {
-	target, ok := boundary.acquire()
+func (cb *capsuleBoundary) HandleQuit(ctx context.Context) error {
+	target, ok := cb.acquire()
 	if !ok {
 		return nil
 	}
-	defer boundary.release()
+	defer cb.release()
 	return target.HandleQuit(ctx)
 }
 
-func (boundary *capsuleBoundary) GrowInputBody(ctx context.Context, token uint64, nextCapacity int64) (uint64, error) {
-	target, ok := boundary.acquire()
+func (cb *capsuleBoundary) GrowInputBody(ctx context.Context, token uint64, nextCapacity int64) (uint64, error) {
+	target, ok := cb.acquire()
 	if !ok {
 		return 0, errProcessInputContained
 	}
-	defer boundary.release()
+	defer cb.release()
 	return target.GrowInputBody(ctx, token, nextCapacity)
 }
 
-func (boundary *capsuleBoundary) CommitInputBodyGrowth(token uint64, capacity int64) error {
-	target, ok := boundary.acquire()
+func (cb *capsuleBoundary) CommitInputBodyGrowth(token uint64, capacity int64) error {
+	target, ok := cb.acquire()
 	if !ok {
 		return errProcessInputContained
 	}
-	defer boundary.release()
+	defer cb.release()
 	return target.CommitInputBodyGrowth(token, capacity)
 }
 
-func (boundary *capsuleBoundary) ReleaseInputBody(token uint64) error {
-	target, ok := boundary.acquire()
+func (cb *capsuleBoundary) ReleaseInputBody(token uint64) error {
+	target, ok := cb.acquire()
 	if !ok {
 		return nil
 	}
-	defer boundary.release()
+	defer cb.release()
 	return target.ReleaseInputBody(token)
 }

@@ -534,19 +534,19 @@ func (*handoffMutationCatalog) CompleteCleanup(
 	return nil
 }
 
-func (catalog *handoffMutationCatalog) BeginMutation(
+func (hmc *handoffMutationCatalog) BeginMutation(
 	jobmgr.FunctionCatalogMutation,
 ) error {
-	catalog.active.Store(true)
-	close(catalog.begun)
+	hmc.active.Store(true)
+	close(hmc.begun)
 	return nil
 }
 
-func (catalog *handoffMutationCatalog) AdvanceMutationQuiesce(
+func (hmc *handoffMutationCatalog) AdvanceMutationQuiesce(
 	int,
 ) (jobmgr.FunctionCatalogMutationProgress, error) {
 	select {
-	case <-catalog.allow:
+	case <-hmc.allow:
 		return jobmgr.FunctionCatalogMutationProgress{
 			CompletedNodes: 1,
 			TotalNodes:     1,
@@ -567,11 +567,11 @@ func (*handoffMutationCatalog) ResumeMutation(
 	return nil
 }
 
-func (catalog *handoffMutationCatalog) AdvanceMutation(
+func (hmc *handoffMutationCatalog) AdvanceMutation(
 	int,
 	*[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan,
 ) (jobmgr.FunctionCatalogMutationProgress, int, error) {
-	catalog.active.Store(false)
+	hmc.active.Store(false)
 	return jobmgr.FunctionCatalogMutationProgress{
 		CompletedNodes: 1,
 		TotalNodes:     1,
@@ -580,15 +580,15 @@ func (catalog *handoffMutationCatalog) AdvanceMutation(
 	}, 0, nil
 }
 
-func (catalog *handoffMutationCatalog) AbortMutation(
+func (hmc *handoffMutationCatalog) AbortMutation(
 	*[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan,
 ) (int, error) {
-	catalog.active.Store(false)
+	hmc.active.Store(false)
 	return 0, nil
 }
 
-func (catalog *handoffMutationCatalog) BeginClose() error {
-	catalog.closed.Store(true)
+func (hmc *handoffMutationCatalog) BeginClose() error {
+	hmc.closed.Store(true)
 	return nil
 }
 
@@ -599,11 +599,11 @@ func (*handoffMutationCatalog) CloseStep(
 	return 0, false, nil
 }
 
-func (catalog *handoffMutationCatalog) LifecycleCensus() jobmgr.FunctionCatalogCensus {
+func (hmc *handoffMutationCatalog) LifecycleCensus() jobmgr.FunctionCatalogCensus {
 	return jobmgr.FunctionCatalogCensus{
 		Version:        2,
-		MutationActive: catalog.active.Load(),
-		Closed:         catalog.closed.Load(),
+		MutationActive: hmc.active.Load(),
+		Closed:         hmc.closed.Load(),
 	}
 }
 

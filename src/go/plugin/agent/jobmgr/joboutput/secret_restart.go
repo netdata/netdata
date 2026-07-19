@@ -20,20 +20,20 @@ type SecretDependentStop struct {
 	stopped bool
 }
 
-func (stop *SecretDependentStop) Stopped() (bool, error) {
-	if stop == nil {
+func (sds *SecretDependentStop) Stopped() (bool, error) {
+	if sds == nil {
 		return false,
 			errors.New("job output: nil dependent stop")
 	}
-	stop.mu.Lock()
-	defer stop.mu.Unlock()
-	return stop.stopped, nil
+	sds.mu.Lock()
+	defer sds.mu.Unlock()
+	return sds.stopped, nil
 }
 
-func (stop *SecretDependentStop) markStopped() {
-	stop.mu.Lock()
-	stop.stopped = true
-	stop.mu.Unlock()
+func (sds *SecretDependentStop) markStopped() {
+	sds.mu.Lock()
+	sds.stopped = true
+	sds.mu.Unlock()
 }
 
 // SecretDependentStart records a collector-construction failure that was
@@ -43,25 +43,25 @@ type SecretDependentStart struct {
 	err error
 }
 
-func (start *SecretDependentStart) Err() error {
-	if start == nil {
+func (sds *SecretDependentStart) Err() error {
+	if sds == nil {
 		return errors.New("job output: nil dependent start")
 	}
-	start.mu.Lock()
-	defer start.mu.Unlock()
-	return start.err
+	sds.mu.Lock()
+	defer sds.mu.Unlock()
+	return sds.err
 }
 
-func (start *SecretDependentStart) setError(err error) {
-	start.mu.Lock()
-	start.err = err
-	start.mu.Unlock()
+func (sds *SecretDependentStart) setError(err error) {
+	sds.mu.Lock()
+	sds.err = err
+	sds.mu.Unlock()
 }
 
-func (controller *DynCfgJobController) PlanSecretDependentStop(
+func (dcjc *DynCfgJobController) PlanSecretDependentStop(
 	id string,
 ) (jobmgr.WorkPlan, *SecretDependentStop, error) {
-	if controller == nil || id == "" {
+	if dcjc == nil || id == "" {
 		return jobmgr.WorkPlan{}, nil,
 			errors.New("job output: invalid dependent stop")
 	}
@@ -83,10 +83,10 @@ func (controller *DynCfgJobController) PlanSecretDependentStop(
 						"job output: invalid dependent stop scope",
 					)
 				}
-				record, exists := controller.graph.Lookup(id)
+				record, exists := dcjc.graph.Lookup(id)
 				if !exists ||
 					record.Status != dyncfg.StatusRunning.String() {
-					return controller.noop(
+					return dcjc.noop(
 						scope,
 						current,
 						lifecycle.LongLivedPermit{},
@@ -113,10 +113,10 @@ func (controller *DynCfgJobController) PlanSecretDependentStop(
 	}, state, nil
 }
 
-func (controller *DynCfgJobController) PlanSecretDependentStart(
+func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 	id string,
 ) (jobmgr.WorkPlan, *SecretDependentStart, error) {
-	if controller == nil || id == "" {
+	if dcjc == nil || id == "" {
 		return jobmgr.WorkPlan{}, nil,
 			errors.New("job output: invalid dependent start")
 	}
@@ -146,9 +146,9 @@ func (controller *DynCfgJobController) PlanSecretDependentStart(
 						"job output: invalid dependent start scope",
 					)
 				}
-				record, exists := controller.graph.Lookup(id)
+				record, exists := dcjc.graph.Lookup(id)
 				if !exists {
-					return controller.noop(
+					return dcjc.noop(
 						scope,
 						nil,
 						permit,
@@ -164,7 +164,7 @@ func (controller *DynCfgJobController) PlanSecretDependentStart(
 						"job output: dependent start identity differs",
 					)
 				}
-				successor, prepareErr := controller.factory.Prepare(
+				successor, prepareErr := dcjc.factory.Prepare(
 					ctx,
 					cloned,
 					scope.Successor,
@@ -179,7 +179,7 @@ func (controller *DynCfgJobController) PlanSecretDependentStart(
 						record,
 						dyncfg.StatusFailed,
 					)
-					return controller.prepareMutation(
+					return dcjc.prepareMutation(
 						scope,
 						nil,
 						nil,
@@ -187,7 +187,7 @@ func (controller *DynCfgJobController) PlanSecretDependentStart(
 						lifecycle.ResourceTransactionUnchanged,
 						&postimage,
 						mustDynCfgMessage(204, ""),
-						controller.configStatusCleanup(
+						dcjc.configStatusCleanup(
 							id,
 							dyncfg.StatusFailed,
 						),
@@ -197,7 +197,7 @@ func (controller *DynCfgJobController) PlanSecretDependentStart(
 					record,
 					dyncfg.StatusRunning,
 				)
-				return controller.prepareMutation(
+				return dcjc.prepareMutation(
 					scope,
 					nil,
 					successor,
@@ -205,7 +205,7 @@ func (controller *DynCfgJobController) PlanSecretDependentStart(
 					lifecycle.ResourceTransactionInstalled,
 					&postimage,
 					mustDynCfgMessage(204, ""),
-					controller.configStatusCleanup(
+					dcjc.configStatusCleanup(
 						id,
 						dyncfg.StatusRunning,
 					),

@@ -92,23 +92,23 @@ type transactionTestCarrier struct {
 	released  bool
 }
 
-func (carrier *transactionTestCarrier) Valid() bool {
-	return carrier != nil && !carrier.released
+func (ttc *transactionTestCarrier) Valid() bool {
+	return ttc != nil && !ttc.released
 }
 
-func (carrier *transactionTestCarrier) Activate() error {
-	if !carrier.Valid() || carrier.activated {
+func (ttc *transactionTestCarrier) Activate() error {
+	if !ttc.Valid() || ttc.activated {
 		return errors.New("invalid activation")
 	}
-	carrier.activated = true
+	ttc.activated = true
 	return nil
 }
 
-func (carrier *transactionTestCarrier) Release() error {
-	if !carrier.Valid() {
+func (ttc *transactionTestCarrier) Release() error {
+	if !ttc.Valid() {
 		return errors.New("invalid release")
 	}
-	carrier.released = true
+	ttc.released = true
 	return nil
 }
 
@@ -118,23 +118,23 @@ type transactionTestStore struct {
 	}
 }
 
-func (store *transactionTestStore) Configuration() any {
-	return &store.config
+func (tts *transactionTestStore) Configuration() any {
+	return &tts.config
 }
 
 func (*transactionTestStore) Init(context.Context) error {
 	return nil
 }
 
-func (store *transactionTestStore) Publish() secretstore.PublishedStore {
-	return transactionTestPublished(store.config.Value)
+func (tts *transactionTestStore) Publish() secretstore.PublishedStore {
+	return transactionTestPublished(tts.config.Value)
 }
 
 type transactionTestPublished string
 
-func (published transactionTestPublished) Resolve(
+func (ttp transactionTestPublished) Resolve(
 	context.Context,
 	secretstore.ResolveRequest,
 ) (string, error) {
-	return string(published), nil
+	return string(ttp), nil
 }

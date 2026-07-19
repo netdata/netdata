@@ -163,14 +163,14 @@ func newTestProcessInput(generation uint64) *testProcessInput {
 	}
 }
 
-func (input *testProcessInput) Generation() uint64 { return input.generation }
+func (tpi *testProcessInput) Generation() uint64 { return tpi.generation }
 
 func (*testProcessInput) SuspendInputBody(uint64, uint64) error { return nil }
 func (*testProcessInput) AdoptInputBody(uint64) error           { return nil }
 
-func (input *testProcessInput) HandleCall(_ context.Context, call functionwire.Call) error {
-	input.calls <- call
-	<-input.release
+func (tpi *testProcessInput) HandleCall(_ context.Context, call functionwire.Call) error {
+	tpi.calls <- call
+	<-tpi.release
 	return nil
 }
 

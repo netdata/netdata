@@ -85,36 +85,36 @@ func NewSecretStoreReplacementLongLivedPlan(bytes int64) (LongLivedPlan, error) 
 	return plan, plan.Validate()
 }
 
-func (plan *LongLivedPlan) setResourceBytes(bytes int64) error {
-	if plan == nil || bytes <= 0 || bytes >= OrdinaryBudgetBytes {
+func (llp *LongLivedPlan) setResourceBytes(bytes int64) error {
+	if llp == nil || bytes <= 0 || bytes >= OrdinaryBudgetBytes {
 		return errors.New("jobmgr long-lived permit: invalid retained byte charge")
 	}
-	plan.bytes = bytes
+	llp.bytes = bytes
 	return nil
 }
 
-func (plan LongLivedPlan) Validate() error {
-	if plan.bytes < 0 || plan.bytes >= OrdinaryBudgetBytes {
+func (llp LongLivedPlan) Validate() error {
+	if llp.bytes < 0 || llp.bytes >= OrdinaryBudgetBytes {
 		return errors.New("jobmgr long-lived permit: invalid retained byte charge")
 	}
-	switch plan.class {
+	switch llp.class {
 	case LongLivedPipeline:
-		if plan.replacementOverlap ||
-			!validPipelineProviderKeys(plan.providerKeys) ||
-			plan.e != LongLivedEProvider ||
-			plan.bytes != 0 {
+		if llp.replacementOverlap ||
+			!validPipelineProviderKeys(llp.providerKeys) ||
+			llp.e != LongLivedEProvider ||
+			llp.bytes != 0 {
 			return errors.New("jobmgr long-lived permit: invalid pipeline facets")
 		}
 	case LongLivedJob:
-		if plan.bytes <= 0 ||
-			len(plan.providerKeys) != 0 ||
-			plan.e != LongLivedEJobResources {
+		if llp.bytes <= 0 ||
+			len(llp.providerKeys) != 0 ||
+			llp.e != LongLivedEJobResources {
 			return errors.New("jobmgr long-lived permit: invalid job facets")
 		}
 	case LongLivedSecretStore:
-		if plan.bytes <= 0 ||
-			len(plan.providerKeys) != 0 ||
-			plan.e != LongLivedESecretStore {
+		if llp.bytes <= 0 ||
+			len(llp.providerKeys) != 0 ||
+			llp.e != LongLivedESecretStore {
 			return errors.New("jobmgr long-lived permit: invalid SecretStore facets")
 		}
 	default:
@@ -136,19 +136,19 @@ func validPipelineProviderKeys(keys []string) bool {
 	return true
 }
 
-func (plan LongLivedPlan) forReplacement() (LongLivedPlan, error) {
-	switch plan.class {
+func (llp LongLivedPlan) forReplacement() (LongLivedPlan, error) {
+	switch llp.class {
 	case LongLivedJob, LongLivedSecretStore:
-		plan.replacementOverlap = true
+		llp.replacementOverlap = true
 	default:
 		return LongLivedPlan{},
 			errors.New("jobmgr long-lived permit: class has no replacement overlap")
 	}
-	return plan, plan.Validate()
+	return llp, llp.Validate()
 }
 
-func (plan LongLivedPlan) Class() LongLivedClass { return plan.class }
-func (plan LongLivedPlan) Bytes() int64          { return plan.bytes }
+func (llp LongLivedPlan) Class() LongLivedClass { return llp.class }
+func (llp LongLivedPlan) Bytes() int64          { return llp.bytes }
 
 type LongLivedCarrier interface {
 	Valid() bool
@@ -177,77 +177,77 @@ type LongLivedPermit struct {
 	bytes      int64
 }
 
-func (permit LongLivedPermit) Valid() bool {
-	if permit.supervisor == nil || !permit.ref.valid() || !permit.owner.Valid() {
+func (llp LongLivedPermit) Valid() bool {
+	if llp.supervisor == nil || !llp.ref.valid() || !llp.owner.Valid() {
 		return false
 	}
-	switch permit.class {
+	switch llp.class {
 	case LongLivedPipeline:
-		return permit.bytes == 0
+		return llp.bytes == 0
 	case LongLivedJob, LongLivedSecretStore:
-		return permit.bytes > 0
+		return llp.bytes > 0
 	default:
 		return false
 	}
 }
 
-func (permit LongLivedPermit) Owner() ResourceIdentity { return permit.owner }
-func (permit LongLivedPermit) Class() LongLivedClass   { return permit.class }
+func (llp LongLivedPermit) Owner() ResourceIdentity { return llp.owner }
+func (llp LongLivedPermit) Class() LongLivedClass   { return llp.class }
 
-func (permit LongLivedPermit) ActivateExternal(facet LongLivedExternalFacet) error {
-	if !permit.Valid() {
+func (llp LongLivedPermit) ActivateExternal(facet LongLivedExternalFacet) error {
+	if !llp.Valid() {
 		return errors.New("jobmgr long-lived permit: invalid external activation")
 	}
-	return permit.supervisor.activateLongLivedExternal(permit.ref, permit.owner, facet)
+	return llp.supervisor.activateLongLivedExternal(llp.ref, llp.owner, facet)
 }
 
-func (permit LongLivedPermit) ReleaseExternal(facet LongLivedExternalFacet) error {
-	if !permit.Valid() {
+func (llp LongLivedPermit) ReleaseExternal(facet LongLivedExternalFacet) error {
+	if !llp.Valid() {
 		return errors.New("jobmgr long-lived permit: invalid external release")
 	}
-	return permit.supervisor.releaseLongLivedExternal(permit.ref, permit.owner, facet)
+	return llp.supervisor.releaseLongLivedExternal(llp.ref, llp.owner, facet)
 }
 
-func (permit LongLivedPermit) ReleaseUnusedInherited(
+func (llp LongLivedPermit) ReleaseUnusedInherited(
 	role InheritedTaskRole,
 	key string,
 ) error {
-	if !permit.Valid() {
+	if !llp.Valid() {
 		return errors.New("jobmgr long-lived permit: invalid unused G release")
 	}
-	return permit.supervisor.releaseUnusedLongLivedG(
-		permit.ref,
-		permit.owner,
+	return llp.supervisor.releaseUnusedLongLivedG(
+		llp.ref,
+		llp.owner,
 		role,
 		key,
 	)
 }
 
-func (permit LongLivedPermit) ReleaseBytes() error {
-	if !permit.Valid() {
+func (llp LongLivedPermit) ReleaseBytes() error {
+	if !llp.Valid() {
 		return errors.New("jobmgr long-lived permit: invalid byte release")
 	}
-	return permit.supervisor.releaseLongLivedBytes(permit.ref, permit.owner)
+	return llp.supervisor.releaseLongLivedBytes(llp.ref, llp.owner)
 }
 
-func (permit LongLivedPermit) Return() error {
-	if !permit.Valid() {
+func (llp LongLivedPermit) Return() error {
+	if !llp.Valid() {
 		return errors.New("jobmgr long-lived permit: invalid return")
 	}
-	return permit.supervisor.returnLongLivedPermit(permit.ref, permit.owner)
+	return llp.supervisor.returnLongLivedPermit(llp.ref, llp.owner)
 }
 
-func (permit LongLivedPermit) AbortUnused() error {
-	if !permit.Valid() {
+func (llp LongLivedPermit) AbortUnused() error {
+	if !llp.Valid() {
 		return errors.New("jobmgr long-lived permit: invalid unused abort")
 	}
-	if err := permit.supervisor.releaseReservedLongLivedFacets(permit.ref, permit.owner); err != nil {
+	if err := llp.supervisor.releaseReservedLongLivedFacets(llp.ref, llp.owner); err != nil {
 		return err
 	}
-	if err := permit.ReleaseBytes(); err != nil {
+	if err := llp.ReleaseBytes(); err != nil {
 		return err
 	}
-	return permit.Return()
+	return llp.Return()
 }
 
 type longLivedRegistry struct {
@@ -345,12 +345,12 @@ func longLivedGClaimsActive(
 	return false
 }
 
-func (registry *longLivedRegistry) initialize() {
-	registry.owners = make(map[ResourceIdentity]LongLivedPermitRef)
+func (llr *longLivedRegistry) initialize() {
+	llr.owners = make(map[ResourceIdentity]LongLivedPermitRef)
 }
 
-func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedger, admissionRef AdmissionRef, owner ResourceIdentity, plan LongLivedPlan) (LongLivedPermit, error) {
-	if supervisor == nil || admission == nil || !admissionRef.Valid() || !owner.Valid() {
+func (ts *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedger, admissionRef AdmissionRef, owner ResourceIdentity, plan LongLivedPlan) (LongLivedPermit, error) {
+	if ts == nil || admission == nil || !admissionRef.Valid() || !owner.Valid() {
 		return LongLivedPermit{}, errors.New("jobmgr long-lived permit: invalid issue")
 	}
 	if err := plan.Validate(); err != nil {
@@ -365,11 +365,11 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 		return LongLivedPermit{}, err
 	}
 
-	registry := &supervisor.longLived
+	registry := &ts.longLived
 	registry.mu.Lock()
 	if _, exists := registry.owners[owner]; registry.sealed || exists {
 		registry.mu.Unlock()
-		releaseErr := supervisor.releaseLongLivedAdmission(admission, admissionRef, plan.bytes)
+		releaseErr := ts.releaseLongLivedAdmission(admission, admissionRef, plan.bytes)
 		return LongLivedPermit{}, errors.Join(
 			errors.New(
 				"jobmgr long-lived permit: activation sealed or duplicate owner",
@@ -379,7 +379,7 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 	}
 	if longLivedClassFull(registry.classes[plan.class], plan) {
 		registry.mu.Unlock()
-		releaseErr := supervisor.releaseLongLivedAdmission(
+		releaseErr := ts.releaseLongLivedAdmission(
 			admission,
 			admissionRef,
 			plan.bytes,
@@ -394,7 +394,7 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 	if registry.freeHead == 0 {
 		if uint64(len(registry.slots)) > uint64(^uint32(0)) {
 			registry.mu.Unlock()
-			releaseErr := supervisor.releaseLongLivedAdmission(
+			releaseErr := ts.releaseLongLivedAdmission(
 				admission,
 				admissionRef,
 				plan.bytes,
@@ -412,7 +412,7 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 		slot = registry.slots[index]
 		if slot == nil {
 			registry.mu.Unlock()
-			releaseErr := supervisor.releaseLongLivedAdmission(
+			releaseErr := ts.releaseLongLivedAdmission(
 				admission,
 				admissionRef,
 				plan.bytes,
@@ -432,7 +432,7 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 		}
 		registry.freeHead = uint32(index + 1)
 		registry.mu.Unlock()
-		releaseErr := supervisor.releaseLongLivedAdmission(admission, admissionRef, plan.bytes)
+		releaseErr := ts.releaseLongLivedAdmission(admission, admissionRef, plan.bytes)
 		return LongLivedPermit{}, errors.Join(errors.New("jobmgr long-lived permit: generation wrapped"), releaseErr)
 	}
 	*slot = longLivedSlot{
@@ -458,24 +458,24 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 		registry.census.FinalizerOwnedBytes += plan.bytes
 	}
 	registry.mu.Unlock()
-	return LongLivedPermit{supervisor: supervisor, ref: ref, owner: owner, class: plan.class, bytes: plan.bytes}, nil
+	return LongLivedPermit{supervisor: ts, ref: ref, owner: owner, class: plan.class, bytes: plan.bytes}, nil
 }
 
-func (supervisor *TaskSupervisor) LongLivedCensus() LongLivedCensus {
-	if supervisor == nil {
+func (ts *TaskSupervisor) LongLivedCensus() LongLivedCensus {
+	if ts == nil {
 		return LongLivedCensus{}
 	}
-	registry := &supervisor.longLived
+	registry := &ts.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	return registry.census
 }
 
-func (supervisor *TaskSupervisor) activateLongLivedExternal(ref LongLivedPermitRef, owner ResourceIdentity, facet LongLivedExternalFacet) error {
+func (ts *TaskSupervisor) activateLongLivedExternal(ref LongLivedPermitRef, owner ResourceIdentity, facet LongLivedExternalFacet) error {
 	if !singleExternalFacet(facet) {
 		return errors.New("jobmgr long-lived permit: invalid external facet")
 	}
-	registry := &supervisor.longLived
+	registry := &ts.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	slot, err := registry.slot(ref, owner)
@@ -492,11 +492,11 @@ func (supervisor *TaskSupervisor) activateLongLivedExternal(ref LongLivedPermitR
 	return nil
 }
 
-func (supervisor *TaskSupervisor) releaseLongLivedExternal(ref LongLivedPermitRef, owner ResourceIdentity, facet LongLivedExternalFacet) error {
+func (ts *TaskSupervisor) releaseLongLivedExternal(ref LongLivedPermitRef, owner ResourceIdentity, facet LongLivedExternalFacet) error {
 	if !singleExternalFacet(facet) {
 		return errors.New("jobmgr long-lived permit: invalid external facet")
 	}
-	registry := &supervisor.longLived
+	registry := &ts.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	slot, err := registry.slot(ref, owner)
@@ -516,8 +516,8 @@ func (supervisor *TaskSupervisor) releaseLongLivedExternal(ref LongLivedPermitRe
 	return errors.New("jobmgr long-lived permit: external facet already released or absent")
 }
 
-func (supervisor *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, owner ResourceIdentity) error {
-	registry := &supervisor.longLived
+func (ts *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, owner ResourceIdentity) error {
+	registry := &ts.longLived
 	registry.mu.Lock()
 	slot, err := registry.slot(ref, owner)
 	if err != nil {
@@ -555,7 +555,7 @@ func (supervisor *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, 
 	admission, admissionRef, byteCount := slot.admission, slot.admissionRef, slot.bytes
 	registry.mu.Unlock()
 
-	releaseErr := supervisor.releaseLongLivedAdmission(admission, admissionRef, byteCount)
+	releaseErr := ts.releaseLongLivedAdmission(admission, admissionRef, byteCount)
 
 	registry.mu.Lock()
 	slot, lookupErr := registry.slot(ref, owner)
@@ -579,13 +579,13 @@ func (supervisor *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, 
 	return nil
 }
 
-func (supervisor *TaskSupervisor) releaseLongLivedAdmission(admission *AdmissionLedger, ref AdmissionRef, bytes int64) error {
+func (ts *TaskSupervisor) releaseLongLivedAdmission(admission *AdmissionLedger, ref AdmissionRef, bytes int64) error {
 	if bytes == 0 {
 		return nil
 	}
 	wake, err := admission.releaseLongLived(ref, bytes)
 	if wake {
-		supervisor.notifyAdmissionReady()
+		ts.notifyAdmissionReady()
 	}
 	return err
 }
@@ -606,8 +606,8 @@ func reserveLongLivedAdmission(
 	return admission.transferLongLived(ref, plan.bytes)
 }
 
-func (supervisor *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, owner ResourceIdentity) error {
-	registry := &supervisor.longLived
+func (ts *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, owner ResourceIdentity) error {
+	registry := &ts.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	slot, err := registry.slot(ref, owner)
@@ -649,30 +649,30 @@ func longLivedClassFull(count int, plan LongLivedPlan) bool {
 	}
 }
 
-func (registry *longLivedRegistry) incrementClassCensus(class LongLivedClass) {
+func (llr *longLivedRegistry) incrementClassCensus(class LongLivedClass) {
 	switch class {
 	case LongLivedPipeline:
-		registry.census.Pipelines++
+		llr.census.Pipelines++
 	case LongLivedJob:
-		registry.census.Jobs++
+		llr.census.Jobs++
 	case LongLivedSecretStore:
-		registry.census.SecretStores++
+		llr.census.SecretStores++
 	}
 }
 
-func (registry *longLivedRegistry) decrementClassCensus(class LongLivedClass) {
+func (llr *longLivedRegistry) decrementClassCensus(class LongLivedClass) {
 	switch class {
 	case LongLivedPipeline:
-		registry.census.Pipelines--
+		llr.census.Pipelines--
 	case LongLivedJob:
-		registry.census.Jobs--
+		llr.census.Jobs--
 	case LongLivedSecretStore:
-		registry.census.SecretStores--
+		llr.census.SecretStores--
 	}
 }
 
-func (supervisor *TaskSupervisor) releaseReservedLongLivedFacets(ref LongLivedPermitRef, owner ResourceIdentity) error {
-	registry := &supervisor.longLived
+func (ts *TaskSupervisor) releaseReservedLongLivedFacets(ref LongLivedPermitRef, owner ResourceIdentity) error {
+	registry := &ts.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	slot, err := registry.slot(ref, owner)
@@ -695,14 +695,14 @@ func (supervisor *TaskSupervisor) releaseReservedLongLivedFacets(ref LongLivedPe
 	return nil
 }
 
-func (registry *longLivedRegistry) slot(ref LongLivedPermitRef, owner ResourceIdentity) (*longLivedSlot, error) {
+func (llr *longLivedRegistry) slot(ref LongLivedPermitRef, owner ResourceIdentity) (*longLivedSlot, error) {
 	if !ref.valid() || !owner.Valid() {
 		return nil, errors.New("jobmgr long-lived permit: invalid reference")
 	}
-	if uint64(ref.Slot) >= uint64(len(registry.slots)) {
+	if uint64(ref.Slot) >= uint64(len(llr.slots)) {
 		return nil, errors.New("jobmgr long-lived permit: invalid reference")
 	}
-	slot := registry.slots[ref.Slot]
+	slot := llr.slots[ref.Slot]
 	if slot == nil {
 		return nil, errors.New("jobmgr long-lived permit: invalid reference")
 	}
@@ -735,7 +735,7 @@ func longLivedGKeyForInherited(
 	return longLivedGKey{role: role, key: key}, true
 }
 
-func (supervisor *TaskSupervisor) activateLongLivedG(
+func (ts *TaskSupervisor) activateLongLivedG(
 	ref LongLivedPermitRef,
 	owner ResourceIdentity,
 	role InheritedTaskRole,
@@ -745,7 +745,7 @@ func (supervisor *TaskSupervisor) activateLongLivedG(
 	if !ok {
 		return errors.New("jobmgr long-lived permit: invalid G facet")
 	}
-	registry := &supervisor.longLived
+	registry := &ts.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	slot, err := registry.slot(ref, owner)
@@ -761,7 +761,7 @@ func (supervisor *TaskSupervisor) activateLongLivedG(
 	return nil
 }
 
-func (supervisor *TaskSupervisor) releaseUnusedLongLivedG(
+func (ts *TaskSupervisor) releaseUnusedLongLivedG(
 	ref LongLivedPermitRef,
 	owner ResourceIdentity,
 	role InheritedTaskRole,
@@ -771,7 +771,7 @@ func (supervisor *TaskSupervisor) releaseUnusedLongLivedG(
 	if !ok {
 		return errors.New("jobmgr long-lived permit: invalid G facet")
 	}
-	registry := &supervisor.longLived
+	registry := &ts.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	slot, err := registry.slot(ref, owner)
@@ -786,7 +786,7 @@ func (supervisor *TaskSupervisor) releaseUnusedLongLivedG(
 	return nil
 }
 
-func (supervisor *TaskSupervisor) restoreLongLivedG(
+func (ts *TaskSupervisor) restoreLongLivedG(
 	ref LongLivedPermitRef,
 	owner ResourceIdentity,
 	role InheritedTaskRole,
@@ -796,7 +796,7 @@ func (supervisor *TaskSupervisor) restoreLongLivedG(
 	if !ok {
 		return errors.New("jobmgr long-lived permit: invalid G facet")
 	}
-	registry := &supervisor.longLived
+	registry := &ts.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	slot, err := registry.slot(ref, owner)
@@ -812,7 +812,7 @@ func (supervisor *TaskSupervisor) restoreLongLivedG(
 	return nil
 }
 
-func (supervisor *TaskSupervisor) releaseLongLivedG(
+func (ts *TaskSupervisor) releaseLongLivedG(
 	ref LongLivedPermitRef,
 	owner ResourceIdentity,
 	role InheritedTaskRole,
@@ -822,7 +822,7 @@ func (supervisor *TaskSupervisor) releaseLongLivedG(
 	if !ok {
 		return errors.New("jobmgr long-lived permit: invalid G facet")
 	}
-	registry := &supervisor.longLived
+	registry := &ts.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
 	slot, err := registry.slot(ref, owner)

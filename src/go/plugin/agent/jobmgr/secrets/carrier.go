@@ -32,65 +32,65 @@ func newStoreGenerationCarrier(
 	return &storeGenerationCarrier{permit: permit}, nil
 }
 
-func (carrier *storeGenerationCarrier) Valid() bool {
-	if carrier == nil {
+func (sgc *storeGenerationCarrier) Valid() bool {
+	if sgc == nil {
 		return false
 	}
-	carrier.mu.Lock()
-	defer carrier.mu.Unlock()
-	return carrier.permit.Valid() && !carrier.returned
+	sgc.mu.Lock()
+	defer sgc.mu.Unlock()
+	return sgc.permit.Valid() && !sgc.returned
 }
 
-func (carrier *storeGenerationCarrier) Activate() error {
-	if carrier == nil {
+func (sgc *storeGenerationCarrier) Activate() error {
+	if sgc == nil {
 		return errors.New(
 			"jobmgr secrets: nil Store-generation carrier",
 		)
 	}
-	carrier.mu.Lock()
-	defer carrier.mu.Unlock()
-	if carrier.externalReleased ||
-		carrier.bytesReleased ||
-		carrier.returned {
+	sgc.mu.Lock()
+	defer sgc.mu.Unlock()
+	if sgc.externalReleased ||
+		sgc.bytesReleased ||
+		sgc.returned {
 		return errors.New(
 			"jobmgr secrets: Store-generation carrier cannot activate",
 		)
 	}
-	return carrier.permit.ActivateExternal(
+	return sgc.permit.ActivateExternal(
 		lifecycle.LongLivedESecretStore,
 	)
 }
 
-func (carrier *storeGenerationCarrier) Release() error {
-	if carrier == nil {
+func (sgc *storeGenerationCarrier) Release() error {
+	if sgc == nil {
 		return errors.New(
 			"jobmgr secrets: nil Store-generation carrier",
 		)
 	}
-	carrier.mu.Lock()
-	defer carrier.mu.Unlock()
-	if carrier.returned {
+	sgc.mu.Lock()
+	defer sgc.mu.Unlock()
+	if sgc.returned {
 		return errors.New(
 			"jobmgr secrets: Store-generation carrier released twice",
 		)
 	}
-	if !carrier.externalReleased {
-		if err := carrier.permit.ReleaseExternal(
+	if !sgc.externalReleased {
+		if err := sgc.permit.ReleaseExternal(
 			lifecycle.LongLivedESecretStore,
 		); err != nil {
 			return err
 		}
-		carrier.externalReleased = true
+		sgc.externalReleased = true
 	}
-	if !carrier.bytesReleased {
-		if err := carrier.permit.ReleaseBytes(); err != nil {
+	if !sgc.bytesReleased {
+		if err := sgc.permit.ReleaseBytes(); err != nil {
 			return err
 		}
-		carrier.bytesReleased = true
+		sgc.bytesReleased = true
 	}
-	if err := carrier.permit.Return(); err != nil {
+	if err := sgc.permit.Return(); err != nil {
 		return err
 	}
-	carrier.returned = true
+	sgc.returned = true
 	return nil
 }

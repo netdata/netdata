@@ -81,36 +81,36 @@ func NewController(config ControllerConfig) (*Controller, error) {
 	}, nil
 }
 
-func (controller *Controller) Bind(
+func (c *Controller) Bind(
 	jobs DependentJobPort,
 ) error {
-	if controller == nil || jobs == nil {
+	if c == nil || jobs == nil {
 		return errors.New("jobmgr secrets: invalid controller binding")
 	}
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
-	if controller.restarts != nil || controller.published {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.restarts != nil || c.published {
 		return errors.New(
 			"jobmgr secrets: duplicate or late controller binding",
 		)
 	}
 	restarts, err := NewSecretRestartCommand(
-		controller.epoch,
-		controller.dependencies,
+		c.epoch,
+		c.dependencies,
 		jobs,
 	)
 	if err != nil {
 		return err
 	}
-	controller.restarts = restarts
+	c.restarts = restarts
 	return nil
 }
 
-func (controller *Controller) Prefix() string {
-	if controller == nil {
+func (c *Controller) Prefix() string {
+	if c == nil {
 		return ""
 	}
-	return controller.prefix
+	return c.prefix
 }
 
 func MutationPermit(
@@ -123,23 +123,23 @@ func MutationPermit(
 	return lifecycle.NewSecretStoreLongLivedPlan(retained)
 }
 
-func (controller *Controller) Prepare(
+func (c *Controller) Prepare(
 	ctx context.Context,
 	input CommandInput,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if controller == nil || ctx == nil || !scope.Valid() {
+	if c == nil || ctx == nil || !scope.Valid() {
 		return nil, errors.New(
 			"jobmgr secrets: invalid transaction preparation",
 		)
 	}
-	controller.mu.Lock()
-	published := controller.published
-	controller.mu.Unlock()
+	c.mu.Lock()
+	published := c.published
+	c.mu.Unlock()
 	if !published {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			permit,
@@ -151,9 +151,9 @@ func (controller *Controller) Prepare(
 			nil,
 		)
 	}
-	target, failure := controller.resolveTarget(input)
+	target, failure := c.resolveTarget(input)
 	if failure != nil {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			permit,
@@ -164,18 +164,18 @@ func (controller *Controller) Prepare(
 	}
 	switch target.command {
 	case dyncfg.CommandSchema:
-		return controller.prepareSchema(scope, current, target)
+		return c.prepareSchema(scope, current, target)
 	case dyncfg.CommandGet:
-		return controller.prepareGet(scope, current, target)
+		return c.prepareGet(scope, current, target)
 	case dyncfg.CommandUserconfig:
-		return controller.prepareUserConfig(
+		return c.prepareUserConfig(
 			scope,
 			current,
 			input,
 			target,
 		)
 	case dyncfg.CommandTest:
-		return controller.prepareTest(
+		return c.prepareTest(
 			ctx,
 			scope,
 			current,
@@ -183,7 +183,7 @@ func (controller *Controller) Prepare(
 			target,
 		)
 	case dyncfg.CommandAdd:
-		return controller.prepareAdd(
+		return c.prepareAdd(
 			ctx,
 			scope,
 			current,
@@ -192,7 +192,7 @@ func (controller *Controller) Prepare(
 			target,
 		)
 	case dyncfg.CommandUpdate:
-		return controller.prepareUpdate(
+		return c.prepareUpdate(
 			ctx,
 			scope,
 			current,
@@ -201,13 +201,13 @@ func (controller *Controller) Prepare(
 			target,
 		)
 	case dyncfg.CommandRemove:
-		return controller.prepareRemove(
+		return c.prepareRemove(
 			scope,
 			current,
 			target,
 		)
 	default:
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			permit,
@@ -238,7 +238,7 @@ type targetFailure struct {
 	message string
 }
 
-func (controller *Controller) resolveTarget(
+func (c *Controller) resolveTarget(
 	input CommandInput,
 ) (secretTarget, *targetFailure) {
 	if len(input.Args) < 2 {
@@ -251,7 +251,7 @@ func (controller *Controller) resolveTarget(
 		}
 	}
 	id := input.Args[0]
-	rest, ok := strings.CutPrefix(id, controller.prefix)
+	rest, ok := strings.CutPrefix(id, c.prefix)
 	if !ok || rest == "" {
 		return secretTarget{}, &targetFailure{
 			code: 400, message: "invalid config ID format.",
@@ -277,7 +277,7 @@ func (controller *Controller) resolveTarget(
 		}
 		target.kind = secretstore.StoreKind(rest)
 		target.name = input.Args[2]
-		if _, ok := controller.creators.Lookup(target.kind); !ok {
+		if _, ok := c.creators.Lookup(target.kind); !ok {
 			return secretTarget{}, &targetFailure{
 				code: 404,
 				message: fmt.Sprintf(
@@ -306,7 +306,7 @@ func (controller *Controller) resolveTarget(
 		kind := secretstore.StoreKind(rest)
 		if command == dyncfg.CommandSchema ||
 			command == dyncfg.CommandUserconfig {
-			if _, ok := controller.creators.Lookup(kind); ok {
+			if _, ok := c.creators.Lookup(kind); ok {
 				target.kind = kind
 				return target, nil
 			}
@@ -326,34 +326,34 @@ func (controller *Controller) resolveTarget(
 	return target, nil
 }
 
-func (controller *Controller) entry(
+func (c *Controller) entry(
 	key string,
 ) (secretEntry, bool) {
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
-	entry, ok := controller.entries[key]
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, ok := c.entries[key]
 	if ok {
-		entry.config, _, _ = controller.store.Config(key)
+		entry.config, _, _ = c.store.Config(key)
 		if entry.config == nil {
 			entry.config = cloneSecretConfig(
-				controller.entries[key].config,
+				c.entries[key].config,
 			)
 		}
 	}
 	return entry, ok
 }
 
-func (controller *Controller) commitEntry(
+func (c *Controller) commitEntry(
 	key string,
 	entry *secretEntry,
 ) {
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if entry == nil {
-		delete(controller.entries, key)
+		delete(c.entries, key)
 		return
 	}
-	controller.entries[key] = secretEntry{
+	c.entries[key] = secretEntry{
 		config: cloneSecretConfig(entry.config),
 		status: entry.status,
 	}
@@ -396,10 +396,10 @@ func mustSecretMessage(
 	return result
 }
 
-func (controller *Controller) protocolCleanup(
+func (c *Controller) protocolCleanup(
 	build func(*netdataapi.API),
 ) lifecycle.TaskCleanup {
-	if controller == nil || build == nil {
+	if c == nil || build == nil {
 		return func() error {
 			return errors.New(
 				"jobmgr secrets: invalid protocol cleanup",
@@ -413,11 +413,11 @@ func (controller *Controller) protocolCleanup(
 		return func() error { return err }
 	}
 	return func() error {
-		return controller.frames.CommitPreparedProtocolFrame(prepared)
+		return c.frames.CommitPreparedProtocolFrame(prepared)
 	}
 }
 
-func (controller *Controller) configCreateCleanup(
+func (c *Controller) configCreateCleanup(
 	entry secretEntry,
 ) lifecycle.TaskCleanup {
 	commands := dyncfg.JoinCommands(
@@ -430,12 +430,12 @@ func (controller *Controller) configCreateCleanup(
 	if entry.config.SourceType() == confgroup.TypeDyncfg {
 		commands += " " + string(dyncfg.CommandRemove)
 	}
-	return controller.protocolCleanup(func(api *netdataapi.API) {
+	return c.protocolCleanup(func(api *netdataapi.API) {
 		api.CONFIGCREATE(netdataapi.ConfigOpts{
-			ID:                controller.prefix + entry.config.ExposedKey(),
+			ID:                c.prefix + entry.config.ExposedKey(),
 			Status:            entry.status.String(),
 			ConfigType:        dyncfg.ConfigTypeJob.String(),
-			Path:              controller.path,
+			Path:              c.path,
 			SourceType:        entry.config.SourceType(),
 			Source:            entry.config.Source(),
 			SupportedCommands: commands,
@@ -443,26 +443,26 @@ func (controller *Controller) configCreateCleanup(
 	})
 }
 
-func (controller *Controller) configDeleteCleanup(
+func (c *Controller) configDeleteCleanup(
 	key string,
 ) lifecycle.TaskCleanup {
-	return controller.protocolCleanup(func(api *netdataapi.API) {
-		api.CONFIGDELETE(controller.prefix + key)
+	return c.protocolCleanup(func(api *netdataapi.API) {
+		api.CONFIGDELETE(c.prefix + key)
 	})
 }
 
-func (controller *Controller) templateCleanup() lifecycle.TaskCleanup {
-	kinds := controller.creators.Kinds()
+func (c *Controller) templateCleanup() lifecycle.TaskCleanup {
+	kinds := c.creators.Kinds()
 	if len(kinds) == 0 {
 		return func() error { return nil }
 	}
-	return controller.protocolCleanup(func(api *netdataapi.API) {
+	return c.protocolCleanup(func(api *netdataapi.API) {
 		for _, kind := range kinds {
 			api.CONFIGCREATE(netdataapi.ConfigOpts{
-				ID:         controller.prefix + string(kind),
+				ID:         c.prefix + string(kind),
 				Status:     dyncfg.StatusAccepted.String(),
 				ConfigType: dyncfg.ConfigTypeTemplate.String(),
-				Path:       controller.path,
+				Path:       c.path,
 				SourceType: "internal",
 				Source:     "internal",
 				SupportedCommands: dyncfg.JoinCommands(

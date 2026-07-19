@@ -49,107 +49,107 @@ func NewRunSupervisor(generation uint64, clock Clock, shutdownTimeout time.Durat
 	return &RunSupervisor{generation: generation, clock: clock, timeout: shutdownTimeout}, nil
 }
 
-func (supervisor *RunSupervisor) BindRuntimeObserver(
+func (rs *RunSupervisor) BindRuntimeObserver(
 	observer RuntimeObserver,
 ) error {
-	if supervisor == nil || observer == nil {
+	if rs == nil || observer == nil {
 		return errors.New("jobmgr run supervisor: invalid runtime observer")
 	}
-	supervisor.mu.Lock()
-	defer supervisor.mu.Unlock()
-	if supervisor.observer != nil || supervisor.admission ||
-		supervisor.shutdown != nil || supervisor.terminal ||
-		supervisor.dirty != nil {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.observer != nil || rs.admission ||
+		rs.shutdown != nil || rs.terminal ||
+		rs.dirty != nil {
 		return errors.New("jobmgr run supervisor: runtime observer bound after activation")
 	}
-	supervisor.observer = observer
+	rs.observer = observer
 	return nil
 }
 
-func (supervisor *RunSupervisor) OpenAdmission() error {
-	supervisor.mu.Lock()
-	defer supervisor.mu.Unlock()
-	if supervisor.terminal || supervisor.dirty != nil || supervisor.admission || supervisor.shutdown != nil {
+func (rs *RunSupervisor) OpenAdmission() error {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.terminal || rs.dirty != nil || rs.admission || rs.shutdown != nil {
 		return errors.New("jobmgr run supervisor: cannot open admission")
 	}
-	supervisor.admission = true
+	rs.admission = true
 	return nil
 }
 
-func (supervisor *RunSupervisor) BeginShutdown() (*ShutdownBudget, error) {
-	supervisor.mu.Lock()
-	defer supervisor.mu.Unlock()
-	if supervisor.shutdown != nil {
-		return supervisor.shutdown, nil
+func (rs *RunSupervisor) BeginShutdown() (*ShutdownBudget, error) {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.shutdown != nil {
+		return rs.shutdown, nil
 	}
-	if supervisor.terminal {
+	if rs.terminal {
 		return nil, errors.New("jobmgr run supervisor: shutdown after terminal")
 	}
-	supervisor.admission = false
-	budget, err := newShutdownBudget(supervisor.clock, supervisor.timeout)
+	rs.admission = false
+	budget, err := newShutdownBudget(rs.clock, rs.timeout)
 	if err != nil {
 		return nil, err
 	}
-	supervisor.shutdown = budget
+	rs.shutdown = budget
 	return budget, nil
 }
 
-func (supervisor *RunSupervisor) FinishShutdown() error {
-	supervisor.mu.Lock()
-	budget := supervisor.shutdown
-	supervisor.mu.Unlock()
+func (rs *RunSupervisor) FinishShutdown() error {
+	rs.mu.Lock()
+	budget := rs.shutdown
+	rs.mu.Unlock()
 	if budget == nil {
 		return errors.New("jobmgr run supervisor: shutdown was not started")
 	}
 	return budget.close()
 }
 
-func (supervisor *RunSupervisor) CloseAdmission() {
-	supervisor.mu.Lock()
-	supervisor.admission = false
-	supervisor.mu.Unlock()
+func (rs *RunSupervisor) CloseAdmission() {
+	rs.mu.Lock()
+	rs.admission = false
+	rs.mu.Unlock()
 }
 
-func (supervisor *RunSupervisor) Admitting() bool {
-	supervisor.mu.Lock()
-	defer supervisor.mu.Unlock()
-	return supervisor.admission && supervisor.dirty == nil && !supervisor.terminal
+func (rs *RunSupervisor) Admitting() bool {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	return rs.admission && rs.dirty == nil && !rs.terminal
 }
 
-func (supervisor *RunSupervisor) Dirty(cause error) error {
+func (rs *RunSupervisor) Dirty(cause error) error {
 	if cause == nil {
 		cause = errors.New("jobmgr run supervisor: unspecified dirty cause")
 	}
-	supervisor.mu.Lock()
-	defer supervisor.mu.Unlock()
-	if supervisor.terminal {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.terminal {
 		return errors.Join(ErrRunTerminalReached, cause)
 	}
-	first := supervisor.dirty == nil
+	first := rs.dirty == nil
 	if first {
-		supervisor.dirty = cause
+		rs.dirty = cause
 	}
-	supervisor.admission = false
-	observer := supervisor.observer
+	rs.admission = false
+	observer := rs.observer
 	if first && observer != nil {
 		observer.AddRuntimeCounter(RuntimeCounterDirtyRuns, 1)
 	}
 	return nil
 }
 
-func (supervisor *RunSupervisor) DirtyCause() error {
-	supervisor.mu.Lock()
-	defer supervisor.mu.Unlock()
-	return supervisor.dirty
+func (rs *RunSupervisor) DirtyCause() error {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	return rs.dirty
 }
 
-func (supervisor *RunSupervisor) Terminal(census RunCensus) error {
-	supervisor.mu.Lock()
-	defer supervisor.mu.Unlock()
-	if supervisor.terminal {
-		return errors.Join(ErrRunTerminalReached, supervisor.state.Dirty)
+func (rs *RunSupervisor) Terminal(census RunCensus) error {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	if rs.terminal {
+		return errors.Join(ErrRunTerminalReached, rs.state.Dirty)
 	}
-	if supervisor.admission {
+	if rs.admission {
 		return errors.New("jobmgr run supervisor: terminal while admitting")
 	}
 	frameDrained := !census.Frame.Poisoned && !census.Frame.Busy &&
@@ -159,57 +159,57 @@ func (supervisor *RunSupervisor) Terminal(census RunCensus) error {
 		census.LongLived == (LongLivedCensus{}) && frameDrained &&
 		census.RunFinalizerComplete
 	if !quiescent {
-		first := supervisor.dirty == nil
-		supervisor.dirty = errors.Join(
-			supervisor.dirty,
+		first := rs.dirty == nil
+		rs.dirty = errors.Join(
+			rs.dirty,
 			fmt.Errorf(
 				"jobmgr run supervisor: terminal with nonzero process census: %+v",
 				census,
 			),
 		)
-		if first && supervisor.observer != nil {
-			supervisor.observer.AddRuntimeCounter(
+		if first && rs.observer != nil {
+			rs.observer.AddRuntimeCounter(
 				RuntimeCounterDirtyRuns,
 				1,
 			)
 		}
 	}
-	supervisor.terminal = true
-	supervisor.state = RunTerminalState{Reached: true, Quiescent: quiescent, Dirty: supervisor.dirty}
-	return supervisor.dirty
+	rs.terminal = true
+	rs.state = RunTerminalState{Reached: true, Quiescent: quiescent, Dirty: rs.dirty}
+	return rs.dirty
 }
 
-func (supervisor *RunSupervisor) TerminalState() RunTerminalState {
-	supervisor.mu.Lock()
-	defer supervisor.mu.Unlock()
-	return supervisor.state
+func (rs *RunSupervisor) TerminalState() RunTerminalState {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	return rs.state
 }
 
-func (supervisor *RunSupervisor) Generation() uint64 {
-	return supervisor.generation
+func (rs *RunSupervisor) Generation() uint64 {
+	return rs.generation
 }
 
 // NewRollbackContext returns one run-owned context bounded by the configured
 // shutdown budget. It deliberately does not inherit a cancelled command
 // context.
-func (supervisor *RunSupervisor) NewRollbackContext() (
+func (rs *RunSupervisor) NewRollbackContext() (
 	context.Context,
 	context.CancelFunc,
 	error,
 ) {
-	if supervisor == nil {
+	if rs == nil {
 		return nil, nil,
 			errors.New("jobmgr run supervisor: nil rollback owner")
 	}
-	supervisor.mu.Lock()
-	if supervisor.terminal {
-		supervisor.mu.Unlock()
+	rs.mu.Lock()
+	if rs.terminal {
+		rs.mu.Unlock()
 		return nil, nil,
 			errors.New("jobmgr run supervisor: rollback after terminal")
 	}
-	timeout := supervisor.timeout
-	shutdown := supervisor.shutdown
-	supervisor.mu.Unlock()
+	timeout := rs.timeout
+	shutdown := rs.shutdown
+	rs.mu.Unlock()
 	if shutdown != nil {
 		ctx, cancel := context.WithDeadline(
 			context.Background(),

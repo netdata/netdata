@@ -367,20 +367,20 @@ type recordingPreparedResourceTransaction struct {
 	events  *[]string
 }
 
-func (transaction *recordingPreparedResourceTransaction) Scope() ResourceTransactionScope {
-	return transaction.scope
+func (rprt *recordingPreparedResourceTransaction) Scope() ResourceTransactionScope {
+	return rprt.scope
 }
 
-func (transaction *recordingPreparedResourceTransaction) Apply(
+func (rprt *recordingPreparedResourceTransaction) Apply(
 	context.Context,
 ) (AppliedResourceTransaction, error) {
-	*transaction.events = append(*transaction.events, "apply")
-	return transaction.applied, nil
+	*rprt.events = append(*rprt.events, "apply")
+	return rprt.applied, nil
 }
 
-func (transaction *recordingPreparedResourceTransaction) Dispose(
+func (rprt *recordingPreparedResourceTransaction) Dispose(
 	context.Context,
 ) (ReadyResource, error) {
-	*transaction.events = append(*transaction.events, "dispose")
-	return transaction.current, nil
+	*rprt.events = append(*rprt.events, "dispose")
+	return rprt.current, nil
 }

@@ -22,20 +22,20 @@ type restartTestCommandScope struct {
 	rollbackCalls int
 }
 
-func (scope *restartTestCommandScope) SubmitPreparedAndWait(
+func (rtcs *restartTestCommandScope) SubmitPreparedAndWait(
 	context.Context,
 	jobmgr.Request,
 	jobmgr.WorkPlan,
 ) error {
-	return scope.normalErr
+	return rtcs.normalErr
 }
 
-func (scope *restartTestCommandScope) SubmitRollbackAndWait(
+func (rtcs *restartTestCommandScope) SubmitRollbackAndWait(
 	jobmgr.Request,
 	jobmgr.WorkPlan,
 ) error {
-	scope.rollbackCalls++
-	return scope.rollbackErr
+	rtcs.rollbackCalls++
+	return rtcs.rollbackErr
 }
 
 func (*restartTestCommandScope) RollbackContext() (
@@ -49,16 +49,16 @@ type restartTestStop struct {
 	stopped bool
 }
 
-func (stop restartTestStop) Stopped() (bool, error) {
-	return stop.stopped, nil
+func (rts restartTestStop) Stopped() (bool, error) {
+	return rts.stopped, nil
 }
 
 type restartTestStart struct {
 	err error
 }
 
-func (start restartTestStart) Err() error {
-	return start.err
+func (rts restartTestStart) Err() error {
+	return rts.err
 }
 
 type restartTestJobs struct {
@@ -66,22 +66,22 @@ type restartTestJobs struct {
 	restoreError error
 }
 
-func (jobs restartTestJobs) PlanDependentStop(
+func (rtj restartTestJobs) PlanDependentStop(
 	id string,
 ) (jobmgr.WorkPlan, DependentStopResult, error) {
 	if id == "module_two" {
-		return jobmgr.WorkPlan{}, nil, jobs.stopError
+		return jobmgr.WorkPlan{}, nil, rtj.stopError
 	}
 	return jobmgr.WorkPlan{},
 		restartTestStop{stopped: true},
 		nil
 }
 
-func (jobs restartTestJobs) PlanDependentStart(
+func (rtj restartTestJobs) PlanDependentStart(
 	string,
 ) (jobmgr.WorkPlan, DependentStartResult, error) {
 	return jobmgr.WorkPlan{},
-		restartTestStart{err: jobs.restoreError},
+		restartTestStart{err: rtj.restoreError},
 		nil
 }
 

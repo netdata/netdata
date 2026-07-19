@@ -730,8 +730,8 @@ type processRecordingWriter struct {
 	record func([]byte)
 }
 
-func (writer processRecordingWriter) Write(payload []byte) (int, error) {
-	writer.record(payload)
+func (prw processRecordingWriter) Write(payload []byte) (int, error) {
+	prw.record(payload)
 	return len(payload), nil
 }
 
@@ -747,24 +747,24 @@ func newProcessSynchronizedBuffer() *processSynchronizedBuffer {
 	}
 }
 
-func (buffer *processSynchronizedBuffer) Write(payload []byte) (int, error) {
-	buffer.mu.Lock()
-	count, err := buffer.buffer.Write(payload)
-	buffer.mu.Unlock()
+func (psb *processSynchronizedBuffer) Write(payload []byte) (int, error) {
+	psb.mu.Lock()
+	count, err := psb.buffer.Write(payload)
+	psb.mu.Unlock()
 	select {
-	case buffer.writes <- struct{}{}:
+	case psb.writes <- struct{}{}:
 	default:
 	}
 	return count, err
 }
 
-func (buffer *processSynchronizedBuffer) String() string {
-	buffer.mu.Lock()
-	defer buffer.mu.Unlock()
-	return buffer.buffer.String()
+func (psb *processSynchronizedBuffer) String() string {
+	psb.mu.Lock()
+	defer psb.mu.Unlock()
+	return psb.buffer.String()
 }
 
-func (buffer *processSynchronizedBuffer) waitContains(
+func (psb *processSynchronizedBuffer) waitContains(
 	t *testing.T,
 	want string,
 ) {
@@ -772,16 +772,16 @@ func (buffer *processSynchronizedBuffer) waitContains(
 	timeout := time.NewTimer(3 * time.Second)
 	defer timeout.Stop()
 	for {
-		if strings.Contains(buffer.String(), want) {
+		if strings.Contains(psb.String(), want) {
 			return
 		}
 		select {
-		case <-buffer.writes:
+		case <-psb.writes:
 		case <-timeout.C:
 			t.Fatalf(
 				"process output does not contain %q: %q",
 				want,
-				buffer.String(),
+				psb.String(),
 			)
 		}
 	}
@@ -831,20 +831,20 @@ type processNoncooperativeDiscovery struct {
 	release <-chan struct{}
 }
 
-func (discovery processNoncooperativeDiscovery) Run(
+func (pnd processNoncooperativeDiscovery) Run(
 	context.Context,
 	chan<- []*confgroup.Group,
 ) {
-	close(discovery.started)
-	<-discovery.release
+	close(pnd.started)
+	<-pnd.release
 }
 
-func (discovery processServiceDiscovery) Run(
+func (psd processServiceDiscovery) Run(
 	ctx context.Context,
 	_ chan<- []*confgroup.Group,
 ) {
-	api := netdataapi.New(discovery.output)
-	discovery.registry.RegisterPrefix(
+	api := netdataapi.New(psd.output)
+	psd.registry.RegisterPrefix(
 		"config",
 		"go.d:sd:",
 		func(function frameworkfunctions.Function) {
@@ -868,7 +868,7 @@ func (discovery processServiceDiscovery) Run(
 		SupportedCommands: "get",
 	})
 	<-ctx.Done()
-	discovery.registry.UnregisterPrefix("config", "go.d:sd:")
+	psd.registry.UnregisterPrefix("config", "go.d:sd:")
 }
 
 func waitProcessEvent(t *testing.T, events <-chan string, want string) {

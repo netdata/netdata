@@ -34,19 +34,19 @@ func newRealClockTimer() *realClockTimer {
 	return &realClockTimer{timer: timer}
 }
 
-func (timer *realClockTimer) Arm(delay time.Duration) <-chan time.Time {
-	timer.Stop()
-	timer.timer.Reset(delay)
-	return timer.timer.C
+func (rct *realClockTimer) Arm(delay time.Duration) <-chan time.Time {
+	rct.Stop()
+	rct.timer.Reset(delay)
+	return rct.timer.C
 }
 
-func (timer *realClockTimer) Stop() {
-	if timer == nil || timer.timer == nil {
+func (rct *realClockTimer) Stop() {
+	if rct == nil || rct.timer == nil {
 		return
 	}
-	if !timer.timer.Stop() {
+	if !rct.timer.Stop() {
 		select {
-		case <-timer.timer.C:
+		case <-rct.timer.C:
 		default:
 		}
 	}

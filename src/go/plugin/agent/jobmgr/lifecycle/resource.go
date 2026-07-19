@@ -118,131 +118,131 @@ func readyResourceOutcome(resource ReadyResource, identity ResourceIdentity) (Ta
 	return TaskOutcome{kind: TaskOutcomeReadyResource, ready: resource, identity: identity}, nil
 }
 
-func (outcome TaskOutcome) Kind() TaskOutcomeKind {
-	return outcome.kind
+func (to TaskOutcome) Kind() TaskOutcomeKind {
+	return to.kind
 }
 
-func (outcome TaskOutcome) ReadyResource() (ReadyResource, bool) {
-	return outcome.ready, outcome.kind == TaskOutcomeReadyResource && outcome.ready != nil
+func (to TaskOutcome) ReadyResource() (ReadyResource, bool) {
+	return to.ready, to.kind == TaskOutcomeReadyResource && to.ready != nil
 }
 
-func (outcome TaskOutcome) ResourceIdentity() (ResourceIdentity, bool) {
-	return outcome.identity, (outcome.kind == TaskOutcomePreparedResource ||
-		outcome.kind == TaskOutcomeReadyResource ||
-		outcome.kind == TaskOutcomePreparedCapability ||
-		outcome.kind == TaskOutcomeAppliedResourceTransaction) &&
-		outcome.identity.Valid()
+func (to TaskOutcome) ResourceIdentity() (ResourceIdentity, bool) {
+	return to.identity, (to.kind == TaskOutcomePreparedResource ||
+		to.kind == TaskOutcomeReadyResource ||
+		to.kind == TaskOutcomePreparedCapability ||
+		to.kind == TaskOutcomeAppliedResourceTransaction) &&
+		to.identity.Valid()
 }
 
-func (outcome TaskOutcome) validate() error {
-	switch outcome.kind {
+func (to TaskOutcome) validate() error {
+	switch to.kind {
 	case TaskOutcomeNone:
-		if !emptySealedResult(outcome.frame) ||
-			outcome.prepared != nil ||
-			outcome.ready != nil ||
-			outcome.capability != nil ||
-			outcome.transaction != nil ||
-			outcome.scopeSet ||
-			outcome.disposition != 0 ||
-			outcome.identity.Valid() {
+		if !emptySealedResult(to.frame) ||
+			to.prepared != nil ||
+			to.ready != nil ||
+			to.capability != nil ||
+			to.transaction != nil ||
+			to.scopeSet ||
+			to.disposition != 0 ||
+			to.identity.Valid() {
 			return errors.New("jobmgr lifecycle: nonempty no-value outcome")
 		}
 	case TaskOutcomeFrame:
-		if outcome.prepared != nil ||
-			outcome.ready != nil ||
-			outcome.capability != nil ||
-			outcome.transaction != nil ||
-			outcome.scopeSet ||
-			outcome.disposition != 0 ||
-			outcome.identity.Valid() {
+		if to.prepared != nil ||
+			to.ready != nil ||
+			to.capability != nil ||
+			to.transaction != nil ||
+			to.scopeSet ||
+			to.disposition != 0 ||
+			to.identity.Valid() {
 			return errors.New("jobmgr lifecycle: mixed frame outcome")
 		}
-		return outcome.frame.validate()
+		return to.frame.validate()
 	case TaskOutcomePreparedResource:
-		if !emptySealedResult(outcome.frame) ||
-			outcome.prepared == nil ||
-			outcome.ready != nil ||
-			outcome.capability != nil ||
-			outcome.transaction != nil ||
-			outcome.scopeSet ||
-			outcome.disposition != 0 ||
-			!outcome.identity.Valid() {
+		if !emptySealedResult(to.frame) ||
+			to.prepared == nil ||
+			to.ready != nil ||
+			to.capability != nil ||
+			to.transaction != nil ||
+			to.scopeSet ||
+			to.disposition != 0 ||
+			!to.identity.Valid() {
 			return errors.New("jobmgr lifecycle: invalid prepared resource outcome")
 		}
 	case TaskOutcomeReadyResource:
-		if !emptySealedResult(outcome.frame) ||
-			outcome.prepared != nil ||
-			outcome.ready == nil ||
-			outcome.capability != nil ||
-			outcome.transaction != nil ||
-			outcome.scopeSet ||
-			outcome.disposition != 0 ||
-			!outcome.identity.Valid() {
+		if !emptySealedResult(to.frame) ||
+			to.prepared != nil ||
+			to.ready == nil ||
+			to.capability != nil ||
+			to.transaction != nil ||
+			to.scopeSet ||
+			to.disposition != 0 ||
+			!to.identity.Valid() {
 			return errors.New("jobmgr lifecycle: invalid ready resource outcome")
 		}
 	case TaskOutcomePreparedCapability:
-		if !emptySealedResult(outcome.frame) ||
-			outcome.prepared != nil ||
-			outcome.ready != nil ||
-			outcome.capability == nil ||
-			outcome.transaction != nil ||
-			outcome.scopeSet ||
-			outcome.disposition != 0 ||
-			!outcome.identity.Valid() {
+		if !emptySealedResult(to.frame) ||
+			to.prepared != nil ||
+			to.ready != nil ||
+			to.capability == nil ||
+			to.transaction != nil ||
+			to.scopeSet ||
+			to.disposition != 0 ||
+			!to.identity.Valid() {
 			return errors.New("jobmgr lifecycle: invalid prepared capability outcome")
 		}
 	case TaskOutcomePreparedResourceTransaction:
-		if !emptySealedResult(outcome.frame) ||
-			outcome.prepared != nil ||
-			outcome.ready != nil ||
-			outcome.capability != nil ||
-			outcome.transaction == nil ||
-			!outcome.scopeSet ||
-			!outcome.scope.Valid() ||
-			outcome.disposition != 0 ||
-			outcome.identity.Valid() {
+		if !emptySealedResult(to.frame) ||
+			to.prepared != nil ||
+			to.ready != nil ||
+			to.capability != nil ||
+			to.transaction == nil ||
+			!to.scopeSet ||
+			!to.scope.Valid() ||
+			to.disposition != 0 ||
+			to.identity.Valid() {
 			return errors.New("jobmgr lifecycle: invalid prepared resource transaction outcome")
 		}
 	case TaskOutcomeAppliedResourceTransaction:
-		if outcome.prepared != nil ||
-			outcome.capability != nil ||
-			outcome.transaction != nil ||
-			!outcome.scopeSet ||
-			!outcome.scope.Valid() ||
-			!outcome.disposition.Valid() {
+		if to.prepared != nil ||
+			to.capability != nil ||
+			to.transaction != nil ||
+			!to.scopeSet ||
+			!to.scope.Valid() ||
+			!to.disposition.Valid() {
 			return errors.New("jobmgr lifecycle: invalid applied resource transaction outcome")
 		}
-		if err := outcome.frame.validate(); err != nil {
+		if err := to.frame.validate(); err != nil {
 			return err
 		}
-		switch outcome.disposition {
+		switch to.disposition {
 		case ResourceTransactionUnchanged:
-			if outcome.scope.Current.Valid() {
-				if outcome.ready == nil || outcome.identity != outcome.scope.Current {
+			if to.scope.Current.Valid() {
+				if to.ready == nil || to.identity != to.scope.Current {
 					return errors.New("jobmgr lifecycle: unchanged transaction lost current resource")
 				}
-			} else if outcome.ready != nil || outcome.identity.Valid() {
+			} else if to.ready != nil || to.identity.Valid() {
 				return errors.New("jobmgr lifecycle: empty unchanged transaction installed a resource")
 			}
 		case ResourceTransactionRemoved:
-			if !outcome.scope.Current.Valid() ||
-				outcome.scope.Successor.Valid() ||
-				outcome.ready != nil ||
-				outcome.identity.Valid() {
+			if !to.scope.Current.Valid() ||
+				to.scope.Successor.Valid() ||
+				to.ready != nil ||
+				to.identity.Valid() {
 				return errors.New("jobmgr lifecycle: invalid removed transaction result")
 			}
 		case ResourceTransactionInstalled:
-			if outcome.scope.Current.Valid() ||
-				!outcome.scope.Successor.Valid() ||
-				outcome.ready == nil ||
-				outcome.identity != outcome.scope.Successor {
+			if to.scope.Current.Valid() ||
+				!to.scope.Successor.Valid() ||
+				to.ready == nil ||
+				to.identity != to.scope.Successor {
 				return errors.New("jobmgr lifecycle: invalid installed transaction result")
 			}
 		case ResourceTransactionReplaced:
-			if !outcome.scope.Current.Valid() ||
-				!outcome.scope.Successor.Valid() ||
-				outcome.ready == nil ||
-				outcome.identity != outcome.scope.Successor {
+			if !to.scope.Current.Valid() ||
+				!to.scope.Successor.Valid() ||
+				to.ready == nil ||
+				to.identity != to.scope.Successor {
 				return errors.New("jobmgr lifecycle: invalid replaced transaction result")
 			}
 		}
@@ -252,16 +252,16 @@ func (outcome TaskOutcome) validate() error {
 	return nil
 }
 
-func (outcome TaskOutcome) empty() bool {
-	return outcome.kind == TaskOutcomeNone &&
-		emptySealedResult(outcome.frame) &&
-		outcome.prepared == nil &&
-		outcome.ready == nil &&
-		outcome.capability == nil &&
-		outcome.transaction == nil &&
-		!outcome.scopeSet &&
-		outcome.disposition == 0 &&
-		!outcome.identity.Valid()
+func (to TaskOutcome) empty() bool {
+	return to.kind == TaskOutcomeNone &&
+		emptySealedResult(to.frame) &&
+		to.prepared == nil &&
+		to.ready == nil &&
+		to.capability == nil &&
+		to.transaction == nil &&
+		!to.scopeSet &&
+		to.disposition == 0 &&
+		!to.identity.Valid()
 }
 
 func preparedCapabilityIdentity(capability PreparedCapability) (identity ResourceIdentity, err error) {

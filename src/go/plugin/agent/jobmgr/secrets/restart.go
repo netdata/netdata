@@ -42,7 +42,7 @@ func NewSecretRestartCommand(
 	}, nil
 }
 
-func (command *SecretRestartCommand) Apply(
+func (src *SecretRestartCommand) Apply(
 	ctx context.Context,
 	commands jobmgr.CompositeCommandScope,
 	storeKey string,
@@ -51,14 +51,14 @@ func (command *SecretRestartCommand) Apply(
 		error,
 	),
 ) (secretstore.SecretMutationResult, string, bool, error) {
-	if command == nil ||
+	if src == nil ||
 		ctx == nil ||
 		storeKey == "" ||
 		commit == nil {
 		return secretstore.SecretMutationResult{}, "", false,
 			errors.New("jobmgr secrets: invalid restart command")
 	}
-	refs := command.dependencies.Affected(storeKey, true)
+	refs := src.dependencies.Affected(storeKey, true)
 	if len(refs) == 0 {
 		result, err := commit(ctx)
 		return result, "", !result.Retained, err
@@ -74,14 +74,14 @@ func (command *SecretRestartCommand) Apply(
 	for _, ref := range refs {
 		displayByID[ref.ID] = ref.Display
 		plan, state, err :=
-			command.jobs.PlanDependentStop(ref.ID)
+			src.jobs.PlanDependentStop(ref.ID)
 		if err != nil {
-			restoreErr := command.restore(commands, stopped)
+			restoreErr := src.restore(commands, stopped)
 			return secretstore.SecretMutationResult{}, "",
 				restoreErr == nil,
 				errors.Join(err, restoreErr)
 		}
-		submitErr := command.submit(
+		submitErr := src.submit(
 			ctx,
 			commands,
 			ref.ID,
@@ -94,7 +94,7 @@ func (command *SecretRestartCommand) Apply(
 			stopped = append(stopped, ref.ID)
 		}
 		if submitErr != nil || stateErr != nil {
-			restoreErr := command.restore(commands, stopped)
+			restoreErr := src.restore(commands, stopped)
 			return secretstore.SecretMutationResult{}, "",
 				stateErr == nil && restoreErr == nil,
 				errors.Join(submitErr, stateErr, restoreErr)
@@ -103,13 +103,13 @@ func (command *SecretRestartCommand) Apply(
 
 	result, commitErr := commit(ctx)
 	if !result.Applied {
-		restoreErr := command.restore(commands, stopped)
+		restoreErr := src.restore(commands, stopped)
 		return result, "",
 			!result.Retained && restoreErr == nil,
 			errors.Join(commitErr, restoreErr)
 	}
 
-	failures, startErr, _ := command.start(
+	failures, startErr, _ := src.start(
 		commands,
 		stopped,
 		displayByID,
@@ -123,16 +123,16 @@ func (command *SecretRestartCommand) Apply(
 		errors.Join(commitErr, startErr)
 }
 
-func (command *SecretRestartCommand) restore(
+func (src *SecretRestartCommand) restore(
 	commands jobmgr.CompositeCommandScope,
 	ids []string,
 ) error {
 	_, integrityErr, operationalErr :=
-		command.start(commands, ids, nil)
+		src.start(commands, ids, nil)
 	return errors.Join(integrityErr, operationalErr)
 }
 
-func (command *SecretRestartCommand) start(
+func (src *SecretRestartCommand) start(
 	commands jobmgr.CompositeCommandScope,
 	ids []string,
 	displayByID map[string]string,
@@ -146,13 +146,13 @@ func (command *SecretRestartCommand) start(
 			display = id
 		}
 		plan, state, err :=
-			command.jobs.PlanDependentStart(id)
+			src.jobs.PlanDependentStart(id)
 		if err != nil {
 			integrityErr = errors.Join(integrityErr, err)
 			failures = append(failures, display)
 			continue
 		}
-		if err := command.submit(
+		if err := src.submit(
 			context.Background(),
 			commands,
 			id,
@@ -175,7 +175,7 @@ func (command *SecretRestartCommand) start(
 	return failures, integrityErr, operationalErr
 }
 
-func (command *SecretRestartCommand) submit(
+func (src *SecretRestartCommand) submit(
 	ctx context.Context,
 	commands jobmgr.CompositeCommandScope,
 	id string,
@@ -183,10 +183,10 @@ func (command *SecretRestartCommand) submit(
 	plan jobmgr.WorkPlan,
 	rollback bool,
 ) error {
-	command.mu.Lock()
-	command.nextUID++
-	sequence := command.nextUID
-	command.mu.Unlock()
+	src.mu.Lock()
+	src.nextUID++
+	sequence := src.nextUID
+	src.mu.Unlock()
 	if sequence == 0 {
 		return errors.New(
 			"jobmgr secrets: restart command identity wrapped",
@@ -195,7 +195,7 @@ func (command *SecretRestartCommand) submit(
 	request := jobmgr.Request{
 		UID: fmt.Sprintf(
 			"jobmgr-secret-%d-%d",
-			command.epoch,
+			src.epoch,
 			sequence,
 		),
 		LaneKey: id,

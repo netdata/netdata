@@ -30,79 +30,79 @@ func newKernelCompositeScope(
 	return &kernelCompositeScope{kernel: kernel, parent: parent}
 }
 
-func (scope *kernelCompositeScope) SubmitPreparedAndWait(
+func (kcs *kernelCompositeScope) SubmitPreparedAndWait(
 	ctx context.Context,
 	request Request,
 	plan WorkPlan,
 ) error {
-	return scope.submitAndWait(ctx, request, plan, false)
+	return kcs.submitAndWait(ctx, request, plan, false)
 }
 
-func (scope *kernelCompositeScope) SubmitRollbackAndWait(
+func (kcs *kernelCompositeScope) SubmitRollbackAndWait(
 	request Request,
 	plan WorkPlan,
 ) error {
-	ctx, err := scope.RollbackContext()
+	ctx, err := kcs.RollbackContext()
 	if err != nil {
 		return err
 	}
-	return scope.submitAndWait(ctx, request, plan, true)
+	return kcs.submitAndWait(ctx, request, plan, true)
 }
 
-func (scope *kernelCompositeScope) RollbackContext() (
+func (kcs *kernelCompositeScope) RollbackContext() (
 	context.Context,
 	error,
 ) {
-	if scope == nil ||
-		scope.kernel == nil ||
-		scope.parent == nil ||
-		scope.closed.Load() {
+	if kcs == nil ||
+		kcs.kernel == nil ||
+		kcs.parent == nil ||
+		kcs.closed.Load() {
 		return nil, errors.New(
 			"jobmgr composite: rollback outside active parent",
 		)
 	}
-	scope.rollbackMu.Lock()
-	defer scope.rollbackMu.Unlock()
-	if scope.closed.Load() {
+	kcs.rollbackMu.Lock()
+	defer kcs.rollbackMu.Unlock()
+	if kcs.closed.Load() {
 		return nil, errors.New(
 			"jobmgr composite: rollback outside active parent",
 		)
 	}
-	if scope.rollbackCtx != nil {
-		return scope.rollbackCtx, nil
+	if kcs.rollbackCtx != nil {
+		return kcs.rollbackCtx, nil
 	}
-	ctx, cancel, err := scope.kernel.run.NewRollbackContext()
+	ctx, cancel, err := kcs.kernel.run.NewRollbackContext()
 	if err != nil {
 		return nil, err
 	}
-	scope.rollbackCtx = ctx
-	scope.rollbackCancel = cancel
+	kcs.rollbackCtx = ctx
+	kcs.rollbackCancel = cancel
 	return ctx, nil
 }
 
-func (scope *kernelCompositeScope) close() {
-	if scope == nil || !scope.closed.CompareAndSwap(false, true) {
+func (kcs *kernelCompositeScope) close() {
+	if kcs == nil || !kcs.closed.CompareAndSwap(false, true) {
 		return
 	}
-	scope.rollbackMu.Lock()
-	if scope.rollbackCancel != nil {
-		scope.rollbackCancel()
+	kcs.rollbackMu.Lock()
+	if kcs.rollbackCancel != nil {
+		kcs.rollbackCancel()
 	}
-	scope.rollbackCtx = nil
-	scope.rollbackCancel = nil
-	scope.rollbackMu.Unlock()
+	kcs.rollbackCtx = nil
+	kcs.rollbackCancel = nil
+	kcs.rollbackMu.Unlock()
 }
 
-func (scope *kernelCompositeScope) submitAndWait(
+func (kcs *kernelCompositeScope) submitAndWait(
 	ctx context.Context,
 	request Request,
 	plan WorkPlan,
 	rollback bool,
 ) error {
-	if scope == nil ||
-		scope.kernel == nil ||
-		scope.parent == nil ||
-		scope.closed.Load() ||
+	if kcs == nil ||
+		kcs.kernel == nil ||
+		kcs.parent == nil ||
+		kcs.closed.Load() ||
 		ctx == nil {
 		return errors.New("jobmgr composite: invalid child submission")
 	}
@@ -122,13 +122,13 @@ func (scope *kernelCompositeScope) submitAndWait(
 	if !rollback {
 		request.Deadline = earliestDeadline(
 			request.Deadline,
-			scope.parent.request.Deadline,
+			kcs.parent.request.Deadline,
 		)
 	}
 	if err := request.Validate(); err != nil {
 		return errors.Join(
 			err,
-			scope.kernel.abortRequestInputBody(request),
+			kcs.kernel.abortRequestInputBody(request),
 		)
 	}
 	request.Args = append([]string(nil), request.Args...)
@@ -136,19 +136,19 @@ func (scope *kernelCompositeScope) submitAndWait(
 	if err != nil {
 		return errors.Join(
 			err,
-			scope.kernel.abortRequestInputBody(request),
+			kcs.kernel.abortRequestInputBody(request),
 		)
 	}
 	result := make(chan error, 1)
 	terminal := make(chan error, 1)
-	if err := scope.kernel.enqueueSubmission(
+	if err := kcs.kernel.enqueueSubmission(
 		ctx,
 		request.Source,
 		submission{
 			request:   request,
 			plan:      owned,
 			context:   ctx,
-			composite: scope,
+			composite: kcs,
 			rollback:  rollback,
 			result:    result,
 			terminal:  terminal,
@@ -156,11 +156,11 @@ func (scope *kernelCompositeScope) submitAndWait(
 	); err != nil {
 		return errors.Join(
 			err,
-			scope.kernel.abortRequestInputBody(request),
+			kcs.kernel.abortRequestInputBody(request),
 		)
 	}
 
-	accepted, err := scope.waitChildAdmission(
+	accepted, err := kcs.waitChildAdmission(
 		ctx,
 		request.UID,
 		result,
@@ -170,7 +170,7 @@ func (scope *kernelCompositeScope) submitAndWait(
 	}
 	return errors.Join(
 		err,
-		scope.waitChildTerminal(
+		kcs.waitChildTerminal(
 			ctx,
 			request.UID,
 			terminal,
@@ -179,7 +179,7 @@ func (scope *kernelCompositeScope) submitAndWait(
 	)
 }
 
-func (scope *kernelCompositeScope) waitChildAdmission(
+func (kcs *kernelCompositeScope) waitChildAdmission(
 	ctx context.Context,
 	uid string,
 	result <-chan error,
@@ -190,24 +190,24 @@ func (scope *kernelCompositeScope) waitChildAdmission(
 	case <-ctx.Done():
 		cause := context.Cause(ctx)
 		select {
-		case scope.kernel.cancel <- uid:
+		case kcs.kernel.cancel <- uid:
 		case err := <-result:
 			return err == nil, errors.Join(cause, err)
-		case <-scope.kernel.done:
+		case <-kcs.kernel.done:
 			return false, errors.Join(cause, ErrStopped)
 		}
 		select {
 		case err := <-result:
 			return err == nil, errors.Join(cause, err)
-		case <-scope.kernel.done:
+		case <-kcs.kernel.done:
 			return false, errors.Join(cause, ErrStopped)
 		}
-	case <-scope.kernel.done:
+	case <-kcs.kernel.done:
 		return false, ErrStopped
 	}
 }
 
-func (scope *kernelCompositeScope) waitChildTerminal(
+func (kcs *kernelCompositeScope) waitChildTerminal(
 	ctx context.Context,
 	uid string,
 	terminal <-chan error,
@@ -223,7 +223,7 @@ func (scope *kernelCompositeScope) waitChildTerminal(
 			cancellation = context.Cause(ctx)
 			done = nil
 			if rollback {
-				_ = scope.kernel.run.Dirty(
+				_ = kcs.kernel.run.Dirty(
 					errors.Join(
 						errors.New(
 							"jobmgr composite: rollback deadline exceeded",
@@ -231,16 +231,16 @@ func (scope *kernelCompositeScope) waitChildTerminal(
 						cancellation,
 					),
 				)
-				scope.kernel.NotifyControlReady()
+				kcs.kernel.NotifyControlReady()
 			}
 			select {
-			case scope.kernel.cancel <- uid:
+			case kcs.kernel.cancel <- uid:
 			case err := <-terminal:
 				return errors.Join(cancellation, err)
-			case <-scope.kernel.done:
+			case <-kcs.kernel.done:
 				return errors.Join(cancellation, ErrStopped)
 			}
-		case <-scope.kernel.done:
+		case <-kcs.kernel.done:
 			return errors.Join(cancellation, ErrStopped)
 		}
 	}
@@ -275,49 +275,49 @@ type compositeFenceClaimUse struct {
 	writers int
 }
 
-func (bridge *preparedCompositeBridge) Scope() (
+func (pcb *preparedCompositeBridge) Scope() (
 	scope lifecycle.ResourceTransactionScope,
 ) {
-	if bridge == nil || bridge.transaction == nil {
+	if pcb == nil || pcb.transaction == nil {
 		return lifecycle.ResourceTransactionScope{}
 	}
-	return bridge.transaction.Scope()
+	return pcb.transaction.Scope()
 }
 
-func (bridge *preparedCompositeBridge) Apply(
+func (pcb *preparedCompositeBridge) Apply(
 	ctx context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	if bridge == nil ||
-		bridge.transaction == nil ||
-		bridge.scope == nil {
+	if pcb == nil ||
+		pcb.transaction == nil ||
+		pcb.scope == nil {
 		return lifecycle.AppliedResourceTransaction{},
 			errors.New("jobmgr composite: invalid prepared bridge")
 	}
-	defer bridge.scope.close()
-	return bridge.transaction.ApplyComposite(ctx, bridge.scope)
+	defer pcb.scope.close()
+	return pcb.transaction.ApplyComposite(ctx, pcb.scope)
 }
 
-func (bridge *preparedCompositeBridge) Dispose(
+func (pcb *preparedCompositeBridge) Dispose(
 	ctx context.Context,
 ) (lifecycle.ReadyResource, error) {
-	if bridge == nil ||
-		bridge.transaction == nil ||
-		bridge.scope == nil {
+	if pcb == nil ||
+		pcb.transaction == nil ||
+		pcb.scope == nil {
 		return nil, errors.New(
 			"jobmgr composite: invalid prepared bridge",
 		)
 	}
-	defer bridge.scope.close()
-	return bridge.transaction.Dispose(ctx)
+	defer pcb.scope.close()
+	return pcb.transaction.Dispose(ctx)
 }
 
-func (kernel *CommandKernel) validateCompositeAdmission(
+func (ck *CommandKernel) validateCompositeAdmission(
 	scope *kernelCompositeScope,
 	plan WorkPlan,
 	rollback bool,
 ) (*commandOperation, error) {
 	if scope == nil ||
-		scope.kernel != kernel ||
+		scope.kernel != ck ||
 		scope.parent == nil ||
 		scope.closed.Load() {
 		return nil, errors.New(
@@ -325,7 +325,7 @@ func (kernel *CommandKernel) validateCompositeAdmission(
 		)
 	}
 	parent := scope.parent
-	if kernel.operations[parent.UID] != parent ||
+	if ck.operations[parent.UID] != parent ||
 		parent.composite != scope ||
 		parent.activeChild != nil ||
 		!parent.claimsHeld ||
@@ -378,12 +378,12 @@ func claimsCoveredByParent(
 	return true
 }
 
-func (kernel *CommandKernel) insertCompositeOperation(
+func (ck *CommandKernel) insertCompositeOperation(
 	lane *commandLane,
 	operation *commandOperation,
 ) {
 	if lane == nil || operation == nil || operation.parent == nil {
-		kernel.run.Dirty(
+		ck.run.Dirty(
 			errors.New("jobmgr composite: invalid lane insertion"),
 		)
 		return
@@ -414,10 +414,10 @@ func (kernel *CommandKernel) insertCompositeOperation(
 	lane.continuationTail = operation
 }
 
-func (kernel *CommandKernel) beginCompositeFence(
+func (ck *CommandKernel) beginCompositeFence(
 	parent *commandOperation,
 ) error {
-	if kernel == nil || parent == nil || parent.composite == nil ||
+	if ck == nil || parent == nil || parent.composite == nil ||
 		parent.composite.parent != parent {
 		return errors.New("jobmgr composite: invalid admission fence parent")
 	}
@@ -425,27 +425,27 @@ func (kernel *CommandKernel) beginCompositeFence(
 		return nil
 	}
 	for _, claim := range parent.claims {
-		use := kernel.compositeFenceClaims[claim.key]
+		use := ck.compositeFenceClaims[claim.key]
 		if claim.mode == authorityClaimRead {
 			use.readers++
 		} else {
 			use.writers++
 		}
-		kernel.compositeFenceClaims[claim.key] = use
+		ck.compositeFenceClaims[claim.key] = use
 	}
 	parent.composite.fenced = true
 	return nil
 }
 
-func (kernel *CommandKernel) endCompositeFence(
+func (ck *CommandKernel) endCompositeFence(
 	parent *commandOperation,
 ) error {
-	if kernel == nil || parent == nil || parent.composite == nil ||
+	if ck == nil || parent == nil || parent.composite == nil ||
 		!parent.composite.fenced {
 		return nil
 	}
 	for _, claim := range parent.claims {
-		use := kernel.compositeFenceClaims[claim.key]
+		use := ck.compositeFenceClaims[claim.key]
 		if claim.mode == authorityClaimRead {
 			use.readers--
 		} else {
@@ -457,27 +457,27 @@ func (kernel *CommandKernel) endCompositeFence(
 			)
 		}
 		if use.readers == 0 && use.writers == 0 {
-			delete(kernel.compositeFenceClaims, claim.key)
+			delete(ck.compositeFenceClaims, claim.key)
 		} else {
-			kernel.compositeFenceClaims[claim.key] = use
+			ck.compositeFenceClaims[claim.key] = use
 		}
 	}
 	parent.composite.fenced = false
-	kernel.compositeFenceGeneration++
-	if kernel.compositeFenceGeneration == 0 {
+	ck.compositeFenceGeneration++
+	if ck.compositeFenceGeneration == 0 {
 		return errors.New(
 			"jobmgr composite: admission fence generation wrapped",
 		)
 	}
-	kernel.compositeFenceRecheck = kernel.compositeFenceHead != nil
+	ck.compositeFenceRecheck = ck.compositeFenceHead != nil
 	return nil
 }
 
-func (kernel *CommandKernel) compositeFenceConflicts(
+func (ck *CommandKernel) compositeFenceConflicts(
 	claims []authorityClaim,
 ) bool {
 	for _, claim := range claims {
-		use := kernel.compositeFenceClaims[claim.key]
+		use := ck.compositeFenceClaims[claim.key]
 		if claim.mode == authorityClaimRead {
 			if use.writers != 0 {
 				return true
@@ -489,36 +489,36 @@ func (kernel *CommandKernel) compositeFenceConflicts(
 	return false
 }
 
-func (kernel *CommandKernel) blockOnCompositeFence(
+func (ck *CommandKernel) blockOnCompositeFence(
 	operation *commandOperation,
 ) error {
 	if operation == nil || operation.parent != nil ||
 		operation.admitted || !operation.admission.Valid() ||
 		operation.fenceBlocked ||
-		!kernel.compositeFenceConflicts(operation.claims) {
+		!ck.compositeFenceConflicts(operation.claims) {
 		return errors.New(
 			"jobmgr composite: invalid admission fence block",
 		)
 	}
-	operation.fencePrevious = kernel.compositeFenceTail
+	operation.fencePrevious = ck.compositeFenceTail
 	operation.fenceNext = nil
 	operation.fenceBlocked = true
-	operation.fenceChecked = kernel.compositeFenceGeneration
-	if kernel.compositeFenceTail != nil {
-		kernel.compositeFenceTail.fenceNext = operation
+	operation.fenceChecked = ck.compositeFenceGeneration
+	if ck.compositeFenceTail != nil {
+		ck.compositeFenceTail.fenceNext = operation
 	} else {
-		kernel.compositeFenceHead = operation
+		ck.compositeFenceHead = operation
 	}
-	kernel.compositeFenceTail = operation
-	kernel.compositeFenceCount++
+	ck.compositeFenceTail = operation
+	ck.compositeFenceCount++
 	return nil
 }
 
-func (kernel *CommandKernel) removeCompositeFenceBlocked(
+func (ck *CommandKernel) removeCompositeFenceBlocked(
 	operation *commandOperation,
 ) error {
 	if operation == nil || !operation.fenceBlocked ||
-		kernel.compositeFenceCount <= 0 {
+		ck.compositeFenceCount <= 0 {
 		return errors.New(
 			"jobmgr composite: invalid admission fence removal",
 		)
@@ -526,69 +526,69 @@ func (kernel *CommandKernel) removeCompositeFenceBlocked(
 	if operation.fencePrevious != nil {
 		operation.fencePrevious.fenceNext = operation.fenceNext
 	} else {
-		kernel.compositeFenceHead = operation.fenceNext
+		ck.compositeFenceHead = operation.fenceNext
 	}
 	if operation.fenceNext != nil {
 		operation.fenceNext.fencePrevious = operation.fencePrevious
 	} else {
-		kernel.compositeFenceTail = operation.fencePrevious
+		ck.compositeFenceTail = operation.fencePrevious
 	}
 	operation.fencePrevious = nil
 	operation.fenceNext = nil
 	operation.fenceBlocked = false
-	kernel.compositeFenceCount--
-	if kernel.compositeFenceCount == 0 {
-		kernel.compositeFenceHead = nil
-		kernel.compositeFenceTail = nil
-		kernel.compositeFenceRecheck = false
+	ck.compositeFenceCount--
+	if ck.compositeFenceCount == 0 {
+		ck.compositeFenceHead = nil
+		ck.compositeFenceTail = nil
+		ck.compositeFenceRecheck = false
 	}
 	return nil
 }
 
-func (kernel *CommandKernel) serviceCompositeFenceBlocked(
+func (ck *CommandKernel) serviceCompositeFenceBlocked(
 	quantum int,
 ) bool {
-	if !kernel.compositeFenceRecheck || quantum <= 0 {
+	if !ck.compositeFenceRecheck || quantum <= 0 {
 		return false
 	}
 	for serviced := 0; serviced < quantum; serviced++ {
-		operation := kernel.compositeFenceHead
+		operation := ck.compositeFenceHead
 		if operation == nil {
-			kernel.compositeFenceRecheck = false
+			ck.compositeFenceRecheck = false
 			return false
 		}
 		if operation.fenceChecked ==
-			kernel.compositeFenceGeneration {
-			kernel.compositeFenceRecheck = false
+			ck.compositeFenceGeneration {
+			ck.compositeFenceRecheck = false
 			return false
 		}
-		if err := kernel.removeCompositeFenceBlocked(
+		if err := ck.removeCompositeFenceBlocked(
 			operation,
 		); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return false
 		}
-		operation.fenceChecked = kernel.compositeFenceGeneration
-		if kernel.compositeFenceConflicts(operation.claims) {
-			if err := kernel.blockOnCompositeFence(
+		operation.fenceChecked = ck.compositeFenceGeneration
+		if ck.compositeFenceConflicts(operation.claims) {
+			if err := ck.blockOnCompositeFence(
 				operation,
 			); err != nil {
-				kernel.run.Dirty(err)
+				ck.run.Dirty(err)
 				return false
 			}
 			continue
 		}
-		if err := kernel.admission.ResumeOrdinary(
+		if err := ck.admission.ResumeOrdinary(
 			operation.admission,
 		); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return false
 		}
 	}
-	return kernel.compositeFenceRecheck
+	return ck.compositeFenceRecheck
 }
 
-func (kernel *CommandKernel) completeCompositeChild(
+func (ck *CommandKernel) completeCompositeChild(
 	child *commandOperation,
 ) {
 	if child == nil || child.parent == nil {
@@ -597,7 +597,7 @@ func (kernel *CommandKernel) completeCompositeChild(
 	parent := child.parent
 	child.parent = nil
 	if parent.activeChild != child {
-		kernel.run.Dirty(
+		ck.run.Dirty(
 			errors.New(
 				"jobmgr composite: terminal child differs from parent ownership",
 			),
@@ -608,7 +608,7 @@ func (kernel *CommandKernel) completeCompositeChild(
 	if parent.deferredCompletion != nil {
 		completion := *parent.deferredCompletion
 		parent.deferredCompletion = nil
-		kernel.completeTask(completion)
+		ck.completeTask(completion)
 	}
-	kernel.tryDispose(parent)
+	ck.tryDispose(parent)
 }

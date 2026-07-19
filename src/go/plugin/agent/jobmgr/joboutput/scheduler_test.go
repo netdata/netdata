@@ -191,18 +191,18 @@ type schedulerTestReconciler struct {
 	modules []string
 }
 
-func (reconciler *schedulerTestReconciler) ReconcileModule(
+func (str *schedulerTestReconciler) ReconcileModule(
 	_ context.Context,
 	module string,
 ) error {
-	reconciler.mu.Lock()
-	reconciler.modules = append(reconciler.modules, module)
-	reconciler.mu.Unlock()
+	str.mu.Lock()
+	str.modules = append(str.modules, module)
+	str.mu.Unlock()
 	return nil
 }
 
-func (reconciler *schedulerTestReconciler) snapshot() []string {
-	reconciler.mu.Lock()
-	defer reconciler.mu.Unlock()
-	return append([]string(nil), reconciler.modules...)
+func (str *schedulerTestReconciler) snapshot() []string {
+	str.mu.Lock()
+	defer str.mu.Unlock()
+	return append([]string(nil), str.modules...)
 }

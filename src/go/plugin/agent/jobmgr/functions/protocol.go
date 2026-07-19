@@ -36,10 +36,10 @@ func NewFramePublicationPort(
 	}, nil
 }
 
-func (port *FramePublicationPort) Publish(
+func (fpp *FramePublicationPort) Publish(
 	record PublicationRecord,
 ) (PublicationHandle, error) {
-	if port == nil {
+	if fpp == nil {
 		return PublicationHandle{}, errors.New("jobmgr Function protocol: nil publication port")
 	}
 	payload, err := encodeFunctionRegistration(record)
@@ -50,26 +50,26 @@ func (port *FramePublicationPort) Publish(
 	if err != nil {
 		return PublicationHandle{}, err
 	}
-	port.mu.Lock()
-	defer port.mu.Unlock()
-	nextID := port.nextID + 1
+	fpp.mu.Lock()
+	defer fpp.mu.Unlock()
+	nextID := fpp.nextID + 1
 	if nextID == 0 {
 		return PublicationHandle{}, errors.New("jobmgr Function protocol: handle identity wrapped")
 	}
-	if err := port.frames.CommitPreparedProtocolFrame(prepared); err != nil {
+	if err := fpp.frames.CommitPreparedProtocolFrame(prepared); err != nil {
 		return PublicationHandle{}, err
 	}
-	port.nextID = nextID
+	fpp.nextID = nextID
 	handle := PublicationHandle{
-		ID: nextID, Epoch: port.epoch,
+		ID: nextID, Epoch: fpp.epoch,
 		Generation: record.Generation, Name: record.Name,
 	}
-	port.active[handle.ID] = handle
+	fpp.active[handle.ID] = handle
 	return handle, nil
 }
 
-func (port *FramePublicationPort) Withdraw(handle PublicationHandle) error {
-	if port == nil || handle.ID == 0 || handle.Epoch != port.epoch ||
+func (fpp *FramePublicationPort) Withdraw(handle PublicationHandle) error {
+	if fpp == nil || handle.ID == 0 || handle.Epoch != fpp.epoch ||
 		handle.Generation == 0 || handle.Name == "" {
 		return errors.New("jobmgr Function protocol: invalid withdrawal")
 	}
@@ -81,16 +81,16 @@ func (port *FramePublicationPort) Withdraw(handle PublicationHandle) error {
 	if err != nil {
 		return err
 	}
-	port.mu.Lock()
-	defer port.mu.Unlock()
-	current, exists := port.active[handle.ID]
+	fpp.mu.Lock()
+	defer fpp.mu.Unlock()
+	current, exists := fpp.active[handle.ID]
 	if !exists || current != handle {
 		return errors.New("jobmgr Function protocol: stale or cross-generation withdrawal")
 	}
-	if err := port.frames.CommitPreparedProtocolFrame(prepared); err != nil {
+	if err := fpp.frames.CommitPreparedProtocolFrame(prepared); err != nil {
 		return err
 	}
-	delete(port.active, handle.ID)
+	delete(fpp.active, handle.ID)
 	return nil
 }
 

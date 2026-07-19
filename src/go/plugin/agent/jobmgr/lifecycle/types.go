@@ -80,34 +80,34 @@ func validateFunctionPayloadSize(size int) error {
 	return nil
 }
 
-func (result SealedResult) validate() error {
-	if result.status < 100 || result.status > 599 {
+func (sr SealedResult) validate() error {
+	if sr.status < 100 || sr.status > 599 {
 		return errors.New("jobmgr lifecycle: invalid result status")
 	}
-	if result.contentType == "" || strings.ContainsAny(result.contentType, " \t\r\n\x00") {
+	if sr.contentType == "" || strings.ContainsAny(sr.contentType, " \t\r\n\x00") {
 		return errors.New("jobmgr lifecycle: invalid result content type")
 	}
-	switch result.payloadKind {
+	switch sr.payloadKind {
 	case sealedPayloadRaw:
-		if len(result.payload) != result.payloadBytes || result.planBytes != int64(len(result.payload)) {
+		if len(sr.payload) != sr.payloadBytes || sr.planBytes != int64(len(sr.payload)) {
 			return errors.New("jobmgr lifecycle: raw result size differs")
 		}
 	case sealedPayloadValue:
-		if result.value.kind == valueInvalid || result.payload != nil || result.planBytes != result.value.charge {
+		if sr.value.kind == valueInvalid || sr.payload != nil || sr.planBytes != sr.value.charge {
 			return errors.New("jobmgr lifecycle: invalid closed Value result")
 		}
 	default:
 		return errors.New("jobmgr lifecycle: unknown sealed payload variant")
 	}
-	return validateFunctionPayloadSize(result.payloadBytes)
+	return validateFunctionPayloadSize(sr.payloadBytes)
 }
 
-func (result SealedResult) appendPayload(dst []byte) ([]byte, error) {
-	switch result.payloadKind {
+func (sr SealedResult) appendPayload(dst []byte) ([]byte, error) {
+	switch sr.payloadKind {
 	case sealedPayloadRaw:
-		return append(dst, result.payload...), nil
+		return append(dst, sr.payload...), nil
 	case sealedPayloadValue:
-		return appendValueJSON(dst, result.value, 0)
+		return appendValueJSON(dst, sr.value, 0)
 	default:
 		return nil, errors.New("jobmgr lifecycle: unknown sealed payload variant")
 	}
@@ -316,89 +316,89 @@ func NewReadyResourceTaskPlan(source Source, deadline time.Time, maxPhaseTransit
 	return plan, nil
 }
 
-func (plan TaskPlan) Validate() error {
-	if !plan.Source.Valid() {
+func (tp TaskPlan) Validate() error {
+	if !tp.Source.Valid() {
 		return errors.New("jobmgr lifecycle: invalid task source")
 	}
-	if plan.drainDependent && plan.initialReady == nil {
+	if tp.drainDependent && tp.initialReady == nil {
 		return errors.New("jobmgr lifecycle: drain-dependent task has no ready resource")
 	}
 	workSources := 0
-	if plan.Work != nil {
+	if tp.Work != nil {
 		workSources++
 	}
-	if plan.Runner != nil {
+	if tp.Runner != nil {
 		workSources++
 	}
-	if plan.permitWork != nil {
+	if tp.permitWork != nil {
 		workSources++
 	}
-	if plan.capabilityPermitWork != nil {
+	if tp.capabilityPermitWork != nil {
 		workSources++
 	}
-	if plan.transactionWork != nil {
+	if tp.transactionWork != nil {
 		workSources++
-	} else if plan.initialReady != nil {
+	} else if tp.initialReady != nil {
 		workSources++
 	}
 	if workSources != 1 {
 		return errors.New("jobmgr lifecycle: task must have exactly one work source")
 	}
-	if plan.InitialCancellation != nil {
-		if plan.InitialCancellation != context.Canceled && plan.InitialCancellation != context.DeadlineExceeded {
+	if tp.InitialCancellation != nil {
+		if tp.InitialCancellation != context.Canceled && tp.InitialCancellation != context.DeadlineExceeded {
 			return errors.New("jobmgr lifecycle: invalid initial task cancellation")
 		}
-		if plan.InitialCancellation == context.DeadlineExceeded && plan.Deadline.IsZero() {
+		if tp.InitialCancellation == context.DeadlineExceeded && tp.Deadline.IsZero() {
 			return errors.New("jobmgr lifecycle: initial deadline cancellation has no deadline")
 		}
 	}
-	if plan.initialReady != nil && !plan.initialIdentity.Valid() {
+	if tp.initialReady != nil && !tp.initialIdentity.Valid() {
 		return errors.New("jobmgr lifecycle: initial ready resource has invalid identity")
 	}
-	if (plan.Work != nil ||
-		plan.Runner != nil ||
-		plan.permitWork != nil ||
-		plan.capabilityPermitWork != nil) &&
-		plan.initialIdentity.Valid() {
+	if (tp.Work != nil ||
+		tp.Runner != nil ||
+		tp.permitWork != nil ||
+		tp.capabilityPermitWork != nil) &&
+		tp.initialIdentity.Valid() {
 		return errors.New("jobmgr lifecycle: work task has an unexpected resource identity")
 	}
-	if plan.transactionWork != nil {
-		if !plan.transactionScopeSet ||
-			!plan.transactionScope.Valid() ||
-			(plan.initialReady == nil) != !plan.transactionScope.Current.Valid() ||
-			plan.initialIdentity != plan.transactionScope.Current {
+	if tp.transactionWork != nil {
+		if !tp.transactionScopeSet ||
+			!tp.transactionScope.Valid() ||
+			(tp.initialReady == nil) != !tp.transactionScope.Current.Valid() ||
+			tp.initialIdentity != tp.transactionScope.Current {
 			return errors.New("jobmgr lifecycle: invalid resource transaction scope")
 		}
-	} else if plan.transactionScopeSet ||
-		plan.transactionScope != (ResourceTransactionScope{}) {
+	} else if tp.transactionScopeSet ||
+		tp.transactionScope != (ResourceTransactionScope{}) {
 		return errors.New("jobmgr lifecycle: unexpected resource transaction scope")
 	}
-	if plan.taskContext != nil {
-		if !plan.Deadline.IsZero() || plan.InitialCancellation != nil || (plan.initialReady == nil) == plan.preserveDisposeContext {
+	if tp.taskContext != nil {
+		if !tp.Deadline.IsZero() || tp.InitialCancellation != nil || (tp.initialReady == nil) == tp.preserveDisposeContext {
 			return errors.New("jobmgr lifecycle: invalid shutdown task context")
 		}
-	} else if plan.preserveDisposeContext {
+	} else if tp.preserveDisposeContext {
 		return errors.New("jobmgr lifecycle: unexpected preserved disposal context")
 	}
-	if plan.permitWork != nil ||
-		plan.capabilityPermitWork != nil ||
-		(plan.transactionWork != nil && plan.transactionScope.Successor.Valid()) {
-		if plan.permitAdmission == nil || !plan.permitAdmissionRef.Valid() || !plan.permitOwner.Valid() {
+	if tp.permitWork != nil ||
+		tp.capabilityPermitWork != nil ||
+		(tp.transactionWork != nil && tp.transactionScope.Successor.Valid()) {
+		if tp.permitAdmission == nil || !tp.permitAdmissionRef.Valid() || !tp.permitOwner.Valid() {
 			return errors.New("jobmgr lifecycle: incomplete prepared-resource permit work")
 		}
-		if err := plan.permitPlan.Validate(); err != nil {
+		if err := tp.permitPlan.Validate(); err != nil {
 			return err
 		}
-		if plan.transactionWork != nil &&
-			plan.permitOwner != plan.transactionScope.Successor {
+		if tp.transactionWork != nil &&
+			tp.permitOwner != tp.transactionScope.Successor {
 			return errors.New("jobmgr lifecycle: transaction permit owner differs from successor")
 		}
-	} else if plan.permitAdmission != nil || plan.permitAdmissionRef.Valid() || plan.permitOwner.Valid() || plan.permitPlan.class != 0 {
+	} else if tp.permitAdmission != nil || tp.permitAdmissionRef.Valid() || tp.permitOwner.Valid() || tp.permitPlan.class != 0 {
 		return errors.New("jobmgr lifecycle: unexpected prepared-resource permit terms")
 	}
-	limit := plan.MaxPhaseTransitions
+	limit := tp.MaxPhaseTransitions
 	if limit == 0 {
-		if plan.Source == SourceFunction {
+		if tp.Source == SourceFunction {
 			limit = FunctionTaskPhases
 		} else {
 			limit = TransactionTaskPhases
@@ -410,11 +410,11 @@ func (plan TaskPlan) Validate() error {
 	return nil
 }
 
-func (plan TaskPlan) phaseLimit() uint8 {
-	if plan.MaxPhaseTransitions != 0 {
-		return plan.MaxPhaseTransitions
+func (tp TaskPlan) phaseLimit() uint8 {
+	if tp.MaxPhaseTransitions != 0 {
+		return tp.MaxPhaseTransitions
 	}
-	if plan.Source == SourceFunction {
+	if tp.Source == SourceFunction {
 		return FunctionTaskPhases
 	}
 	return TransactionTaskPhases

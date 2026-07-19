@@ -44,61 +44,61 @@ func newFunctionProtocolCaptureWithDirectFrames(
 	return capture, nil
 }
 
-func (capture *functionProtocolCapture) Write(payload []byte) (int, error) {
-	if capture == nil {
+func (fpc *functionProtocolCapture) Write(payload []byte) (int, error) {
+	if fpc == nil {
 		return 0, errors.New("jobmgr composition: nil Function protocol writer")
 	}
-	capture.mu.Lock()
-	defer capture.mu.Unlock()
-	if capture.active != nil {
-		return capture.active.Write(payload)
+	fpc.mu.Lock()
+	defer fpc.mu.Unlock()
+	if fpc.active != nil {
+		return fpc.active.Write(payload)
 	}
-	if !capture.direct {
+	if !fpc.direct {
 		return 0, errors.New(
 			"jobmgr composition: Function protocol write outside invocation",
 		)
 	}
-	if err := capture.frames.CommitBorrowedProtocolFrame(payload); err != nil {
+	if err := fpc.frames.CommitBorrowedProtocolFrame(payload); err != nil {
 		return 0, err
 	}
 	return len(payload), nil
 }
 
-func (capture *functionProtocolCapture) invoke(
+func (fpc *functionProtocolCapture) invoke(
 	uid string,
 	call func(),
 ) (lifecycle.SealedResult, lifecycle.TaskCleanup, error) {
-	if capture == nil || lifecycle.ValidateUID(uid) != nil || call == nil {
+	if fpc == nil || lifecycle.ValidateUID(uid) != nil || call == nil {
 		return lifecycle.SealedResult{}, nil,
 			errors.New("jobmgr composition: invalid Function protocol invocation")
 	}
-	capture.mu.Lock()
-	if capture.active != nil {
-		capture.mu.Unlock()
+	fpc.mu.Lock()
+	if fpc.active != nil {
+		fpc.mu.Unlock()
 		return lifecycle.SealedResult{}, nil,
 			errors.New("jobmgr composition: concurrent Function protocol invocation")
 	}
 	var output bytes.Buffer
-	capture.active = &output
-	capture.mu.Unlock()
+	fpc.active = &output
+	fpc.mu.Unlock()
 
 	callErr := callFunctionProtocol(call)
 
-	capture.mu.Lock()
-	if capture.active != &output {
-		capture.mu.Unlock()
+	fpc.mu.Lock()
+	if fpc.active != &output {
+		fpc.mu.Unlock()
 		return lifecycle.SealedResult{}, nil,
 			errors.Join(
 				callErr,
 				errors.New("jobmgr composition: Function protocol capture changed"),
 			)
 	}
-	capture.active = nil
-	capture.mu.Unlock()
+	fpc.active = nil
+	fpc.mu.Unlock()
 	if callErr != nil {
 		return lifecycle.SealedResult{}, nil, callErr
 	}
-	return splitFunctionProtocol(uid, output.Bytes(), capture.frames)
+	return splitFunctionProtocol(uid, output.Bytes(), fpc.frames)
 }
 
 func callFunctionProtocol(call func()) (err error) {

@@ -766,12 +766,12 @@ type processSecretStore struct {
 	}
 }
 
-func (store *processSecretStore) Configuration() any {
-	return &store.config
+func (pss *processSecretStore) Configuration() any {
+	return &pss.config
 }
 
-func (store *processSecretStore) Init(context.Context) error {
-	if store.config.Value == "backend-sensitive-detail" {
+func (pss *processSecretStore) Init(context.Context) error {
+	if pss.config.Value == "backend-sensitive-detail" {
 		return errors.New(
 			"backend rejected backend-sensitive-detail",
 		)
@@ -779,15 +779,15 @@ func (store *processSecretStore) Init(context.Context) error {
 	return nil
 }
 
-func (store *processSecretStore) Publish() secretstore.PublishedStore {
-	return processPublishedSecret(store.config.Value)
+func (pss *processSecretStore) Publish() secretstore.PublishedStore {
+	return processPublishedSecret(pss.config.Value)
 }
 
 type processPublishedSecret string
 
-func (secret processPublishedSecret) Resolve(
+func (pps processPublishedSecret) Resolve(
 	context.Context,
 	secretstore.ResolveRequest,
 ) (string, error) {
-	return string(secret), nil
+	return string(pps), nil
 }

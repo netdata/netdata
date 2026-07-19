@@ -466,18 +466,18 @@ type publicationTestDiscoverer struct {
 	groups  []*confgroup.Group
 }
 
-func (discoverer publicationTestDiscoverer) Run(
+func (ptd publicationTestDiscoverer) Run(
 	ctx context.Context,
 	out chan<- []*confgroup.Group,
 ) {
-	if discoverer.entered != nil {
-		close(discoverer.entered)
+	if ptd.entered != nil {
+		close(ptd.entered)
 	}
-	if discoverer.groups != nil {
+	if ptd.groups != nil {
 		select {
 		case <-ctx.Done():
 			return
-		case out <- discoverer.groups:
+		case out <- ptd.groups:
 		}
 	}
 	<-ctx.Done()

@@ -45,11 +45,11 @@ func NewSecretDependencyIndex() *SecretDependencyIndex {
 	}
 }
 
-func (index *SecretDependencyIndex) PrepareJobChange(
+func (sdi *SecretDependencyIndex) PrepareJobChange(
 	id string,
 	postimage *dyncfg.GraphConfig,
 ) (func(), error) {
-	if index == nil || id == "" {
+	if sdi == nil || id == "" {
 		return nil, errors.New("jobmgr secrets: invalid dependency change")
 	}
 	var next *jobDependency
@@ -82,22 +82,22 @@ func (index *SecretDependencyIndex) PrepareJobChange(
 		next = &dependency
 	}
 	return func() {
-		index.commitJobChange(id, next)
+		sdi.commitJobChange(id, next)
 	}, nil
 }
 
-func (index *SecretDependencyIndex) Affected(
+func (sdi *SecretDependencyIndex) Affected(
 	storeKey string,
 	runningOnly bool,
 ) []secretstore.JobRef {
-	if index == nil || storeKey == "" {
+	if sdi == nil || storeKey == "" {
 		return nil
 	}
-	index.mu.RLock()
-	jobs := index.byStore[storeKey]
+	sdi.mu.RLock()
+	jobs := sdi.byStore[storeKey]
 	refs := make([]secretstore.JobRef, 0, len(jobs))
 	for id := range jobs {
-		dependency, ok := index.jobs[id]
+		dependency, ok := sdi.jobs[id]
 		if !ok || runningOnly && !dependency.running {
 			continue
 		}
@@ -105,7 +105,7 @@ func (index *SecretDependencyIndex) Affected(
 			ID: id, Display: dependency.display,
 		})
 	}
-	index.mu.RUnlock()
+	sdi.mu.RUnlock()
 	sort.Slice(refs, func(i, j int) bool {
 		if refs[i].ID == refs[j].ID {
 			return refs[i].Display < refs[j].Display
@@ -115,52 +115,52 @@ func (index *SecretDependencyIndex) Affected(
 	return refs
 }
 
-func (index *SecretDependencyIndex) Census() SecretDependencyCensus {
-	if index == nil {
+func (sdi *SecretDependencyIndex) Census() SecretDependencyCensus {
+	if sdi == nil {
 		return SecretDependencyCensus{}
 	}
-	index.mu.RLock()
-	defer index.mu.RUnlock()
+	sdi.mu.RLock()
+	defer sdi.mu.RUnlock()
 	census := SecretDependencyCensus{
-		Jobs: len(index.jobs), StoreKeys: len(index.byStore),
-		Commits: index.commits,
+		Jobs: len(sdi.jobs), StoreKeys: len(sdi.byStore),
+		Commits: sdi.commits,
 	}
-	for _, jobs := range index.byStore {
+	for _, jobs := range sdi.byStore {
 		census.References += len(jobs)
 	}
 	return census
 }
 
-func (index *SecretDependencyIndex) commitJobChange(
+func (sdi *SecretDependencyIndex) commitJobChange(
 	id string,
 	next *jobDependency,
 ) {
-	index.mu.Lock()
-	defer index.mu.Unlock()
-	if previous, ok := index.jobs[id]; ok {
+	sdi.mu.Lock()
+	defer sdi.mu.Unlock()
+	if previous, ok := sdi.jobs[id]; ok {
 		for _, key := range previous.storeKeys {
-			jobs := index.byStore[key]
+			jobs := sdi.byStore[key]
 			delete(jobs, id)
 			if len(jobs) == 0 {
-				delete(index.byStore, key)
+				delete(sdi.byStore, key)
 			}
 		}
-		delete(index.jobs, id)
+		delete(sdi.jobs, id)
 	}
 	if next != nil {
 		cloned := jobDependency{
 			display: next.display, running: next.running,
 			storeKeys: append([]string(nil), next.storeKeys...),
 		}
-		index.jobs[id] = cloned
+		sdi.jobs[id] = cloned
 		for _, key := range cloned.storeKeys {
-			jobs := index.byStore[key]
+			jobs := sdi.byStore[key]
 			if jobs == nil {
 				jobs = make(map[string]struct{})
-				index.byStore[key] = jobs
+				sdi.byStore[key] = jobs
 			}
 			jobs[id] = struct{}{}
 		}
 	}
-	index.commits++
+	sdi.commits++
 }

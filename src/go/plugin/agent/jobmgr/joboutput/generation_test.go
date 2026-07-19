@@ -381,16 +381,16 @@ type recordingHandlerLifecycle struct {
 	cleanup       func(context.Context) error
 }
 
-func (lifecycle *recordingHandlerLifecycle) Publish() error {
-	return lifecycle.publish()
+func (rhl *recordingHandlerLifecycle) Publish() error {
+	return rhl.publish()
 }
 
-func (lifecycle *recordingHandlerLifecycle) CloseAndDrain(ctx context.Context) error {
-	return lifecycle.closeAndDrain(ctx)
+func (rhl *recordingHandlerLifecycle) CloseAndDrain(ctx context.Context) error {
+	return rhl.closeAndDrain(ctx)
 }
 
-func (lifecycle *recordingHandlerLifecycle) Cleanup(ctx context.Context) error {
-	return lifecycle.cleanup(ctx)
+func (rhl *recordingHandlerLifecycle) Cleanup(ctx context.Context) error {
+	return rhl.cleanup(ctx)
 }
 
 type testJobCarrier struct {
@@ -409,53 +409,53 @@ func newTestJobCarrier(id string, generation uint64, events *jobEventLog) *testJ
 	}
 }
 
-func (carrier *testJobCarrier) Valid() bool {
-	return carrier != nil && carrier.owner.Valid()
+func (tjc *testJobCarrier) Valid() bool {
+	return tjc != nil && tjc.owner.Valid()
 }
 
-func (carrier *testJobCarrier) Owner() lifecycle.ResourceIdentity { return carrier.owner }
-func (carrier *testJobCarrier) Class() lifecycle.LongLivedClass   { return lifecycle.LongLivedJob }
-func (carrier *testJobCarrier) ActivateExternal(facet lifecycle.LongLivedExternalFacet) error {
-	if facet != lifecycle.LongLivedEJobResources || !carrier.externalReserved || carrier.externalActive {
+func (tjc *testJobCarrier) Owner() lifecycle.ResourceIdentity { return tjc.owner }
+func (tjc *testJobCarrier) Class() lifecycle.LongLivedClass   { return lifecycle.LongLivedJob }
+func (tjc *testJobCarrier) ActivateExternal(facet lifecycle.LongLivedExternalFacet) error {
+	if facet != lifecycle.LongLivedEJobResources || !tjc.externalReserved || tjc.externalActive {
 		return errors.New("test job carrier: invalid external activation")
 	}
-	carrier.externalReserved = false
-	carrier.externalActive = true
+	tjc.externalReserved = false
+	tjc.externalActive = true
 	return nil
 }
 
-func (carrier *testJobCarrier) ReleaseExternal(facet lifecycle.LongLivedExternalFacet) error {
+func (tjc *testJobCarrier) ReleaseExternal(facet lifecycle.LongLivedExternalFacet) error {
 	if facet != lifecycle.LongLivedEJobResources {
 		return errors.New("test job carrier: invalid external facet")
 	}
-	if carrier.externalActive {
-		carrier.externalActive = false
-		carrier.events.add("external")
+	if tjc.externalActive {
+		tjc.externalActive = false
+		tjc.events.add("external")
 		return nil
 	}
-	if carrier.externalReserved {
-		carrier.externalReserved = false
-		carrier.events.add("external")
+	if tjc.externalReserved {
+		tjc.externalReserved = false
+		tjc.events.add("external")
 		return nil
 	}
 	return errors.New("test job carrier: external facet already released")
 }
 
-func (carrier *testJobCarrier) ReleaseBytes() error {
-	if carrier.externalReserved || carrier.externalActive || !carrier.bytes {
+func (tjc *testJobCarrier) ReleaseBytes() error {
+	if tjc.externalReserved || tjc.externalActive || !tjc.bytes {
 		return errors.New("test job carrier: invalid byte release")
 	}
-	carrier.bytes = false
-	carrier.events.add("bytes")
+	tjc.bytes = false
+	tjc.events.add("bytes")
 	return nil
 }
 
-func (carrier *testJobCarrier) Return() error {
-	if carrier.externalReserved || carrier.externalActive || carrier.bytes || carrier.returned {
+func (tjc *testJobCarrier) Return() error {
+	if tjc.externalReserved || tjc.externalActive || tjc.bytes || tjc.returned {
 		return errors.New("test job carrier: invalid return")
 	}
-	carrier.returned = true
-	carrier.events.add("permit")
+	tjc.returned = true
+	tjc.events.add("permit")
 	return nil
 }
 
@@ -467,30 +467,30 @@ type recordingJobRuntime struct {
 	panicStop bool
 }
 
-func (runtime *recordingJobRuntime) Start(context.Context) error {
-	runtime.events.add("runtime-start")
-	return runtime.startErr
+func (rjr *recordingJobRuntime) Start(context.Context) error {
+	rjr.events.add("runtime-start")
+	return rjr.startErr
 }
 
-func (runtime *recordingJobRuntime) Abort(context.Context) error {
-	runtime.events.add("runtime-abort")
-	return runtime.abortErr
+func (rjr *recordingJobRuntime) Abort(context.Context) error {
+	rjr.events.add("runtime-abort")
+	return rjr.abortErr
 }
 
-func (runtime *recordingJobRuntime) Stop(context.Context) error {
-	if runtime.stopGate != nil {
-		runtime.events.add("runtime-stop-enter")
-		<-runtime.stopGate
+func (rjr *recordingJobRuntime) Stop(context.Context) error {
+	if rjr.stopGate != nil {
+		rjr.events.add("runtime-stop-enter")
+		<-rjr.stopGate
 	}
-	if runtime.panicStop {
+	if rjr.panicStop {
 		panic("stop panic")
 	}
-	runtime.events.add("runtime-stop")
+	rjr.events.add("runtime-stop")
 	return nil
 }
 
-func (runtime *recordingJobRuntime) ReleaseAfterCleanup(context.Context) error {
-	runtime.events.add("runtime-release")
+func (rjr *recordingJobRuntime) ReleaseAfterCleanup(context.Context) error {
+	rjr.events.add("runtime-release")
 	return nil
 }
 
@@ -498,8 +498,8 @@ var _ jobruntime.Runtime = (*recordingJobRuntime)(nil)
 
 type jobEventWriter struct{ events *jobEventLog }
 
-func (writer jobEventWriter) Write(payload []byte) (int, error) {
-	writer.events.add("write")
+func (jew jobEventWriter) Write(payload []byte) (int, error) {
+	jew.events.add("write")
 	return len(payload), nil
 }
 

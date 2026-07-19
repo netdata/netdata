@@ -35,20 +35,20 @@ type resultPlan struct {
 	sealed SealedResult
 }
 
-func (plan resultPlan) Size() int {
-	return plan.sealed.payloadBytes
+func (rp resultPlan) Size() int {
+	return rp.sealed.payloadBytes
 }
 
-func (plan resultPlan) Append(dst []byte) []byte {
-	appended, err := plan.sealed.appendPayload(dst)
+func (rp resultPlan) Append(dst []byte) []byte {
+	appended, err := rp.sealed.appendPayload(dst)
 	if err != nil {
 		panic(err)
 	}
 	return appended
 }
 
-func (plan resultPlan) validate() error {
-	return plan.sealed.validate()
+func (rp resultPlan) validate() error {
+	return rp.sealed.validate()
 }
 
 func validateResultPlanSize(status int, contentType string, payloadBytes int) error {
@@ -84,7 +84,7 @@ func NewErrorResult(status int, message string) (ErrorResult, error) {
 	return ErrorResult{resultPlan{sealed: sealed}}, nil
 }
 
-func (result ErrorResult) functionResultPlan() resultPlan { return result.resultPlan }
+func (er ErrorResult) functionResultPlan() resultPlan { return er.resultPlan }
 
 type valueKind uint8
 
@@ -203,7 +203,7 @@ func NewTableResult(status int, table Value) (TableResult, error) {
 	return TableResult{plan}, nil
 }
 
-func (result TableResult) functionResultPlan() resultPlan { return result.resultPlan }
+func (tr TableResult) functionResultPlan() resultPlan { return tr.resultPlan }
 
 type TopologyResult struct{ resultPlan }
 
@@ -215,7 +215,7 @@ func NewTopologyResult(status int, topology Value) (TopologyResult, error) {
 	return TopologyResult{plan}, nil
 }
 
-func (result TopologyResult) functionResultPlan() resultPlan { return result.resultPlan }
+func (tr TopologyResult) functionResultPlan() resultPlan { return tr.resultPlan }
 
 func newClosedValuePlan(status int, value Value) (resultPlan, error) {
 	if status < 100 || status > 599 || value.kind == valueInvalid {
@@ -463,7 +463,7 @@ func NewCompleteRawEnvelope(status int, schema ReviewedBodySchema, body []byte) 
 	return CompleteRawEnvelope{resultPlan{sealed: sealed}}, nil
 }
 
-func (result CompleteRawEnvelope) functionResultPlan() resultPlan { return result.resultPlan }
+func (cre CompleteRawEnvelope) functionResultPlan() resultPlan { return cre.resultPlan }
 
 func SealFunctionResult(result FunctionResult) (SealedResult, error) {
 	if result == nil {

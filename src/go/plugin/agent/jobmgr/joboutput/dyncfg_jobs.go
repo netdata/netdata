@@ -104,22 +104,22 @@ func DynCfgJobPrefix(pluginName string) string {
 	return fmt.Sprintf(dynCfgCollectorPrefixFormat, pluginName)
 }
 
-func (controller *DynCfgJobController) Prefix() string {
-	if controller == nil {
+func (dcjc *DynCfgJobController) Prefix() string {
+	if dcjc == nil {
 		return ""
 	}
-	return controller.prefix
+	return dcjc.prefix
 }
 
-func (controller *DynCfgJobController) Handle(
+func (dcjc *DynCfgJobController) Handle(
 	ctx context.Context,
 	request DynCfgJobRequest,
 ) (lifecycle.SealedResult, error) {
-	if controller == nil || ctx == nil {
+	if dcjc == nil || ctx == nil {
 		return lifecycle.SealedResult{},
 			errors.New("job output: invalid DynCfg request")
 	}
-	target, result := controller.resolveRequest(request, false)
+	target, result := dcjc.resolveRequest(request, false)
 	if result.valid {
 		return result.result, nil
 	}
@@ -140,9 +140,9 @@ func (controller *DynCfgJobController) Handle(
 			[]byte(target.creator.JobConfigSchema),
 		)
 	case dyncfg.CommandUserconfig:
-		return controller.userConfig(request, target)
+		return dcjc.userConfig(request, target)
 	case dyncfg.CommandTest:
-		config, failure := controller.parseConfig(
+		config, failure := dcjc.parseConfig(
 			request,
 			target.module,
 			target.name,
@@ -150,12 +150,12 @@ func (controller *DynCfgJobController) Handle(
 		if failure.valid {
 			return failure.result, nil
 		}
-		if err := controller.configModules.Test(ctx, config); err != nil {
+		if err := dcjc.configModules.Test(ctx, config); err != nil {
 			return dynCfgMessage(422, err.Error())
 		}
 		return dynCfgMessage(200, "")
 	case dyncfg.CommandGet:
-		record, ok := controller.graph.Lookup(target.resourceID)
+		record, ok := dcjc.graph.Lookup(target.resourceID)
 		if !ok {
 			return dynCfgMessage(
 				404,
@@ -170,7 +170,7 @@ func (controller *DynCfgJobController) Handle(
 		if err != nil {
 			return lifecycle.SealedResult{}, err
 		}
-		payload, err := controller.configModules.Configuration(
+		payload, err := dcjc.configModules.Configuration(
 			ctx,
 			config,
 		)
@@ -194,28 +194,28 @@ func (controller *DynCfgJobController) Handle(
 	}
 }
 
-func (controller *DynCfgJobController) Prepare(
+func (dcjc *DynCfgJobController) Prepare(
 	ctx context.Context,
 	request DynCfgJobRequest,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if controller == nil || ctx == nil || !scope.Valid() {
+	if dcjc == nil || ctx == nil || !scope.Valid() {
 		return nil, errors.New(
 			"job output: invalid DynCfg transaction preparation",
 		)
 	}
-	target, failure := controller.resolveRequest(request, true)
+	target, failure := dcjc.resolveRequest(request, true)
 	if failure.valid {
-		return controller.noop(scope, current, permit, failure.result)
+		return dcjc.noop(scope, current, permit, failure.result)
 	}
 	if target.resourceID != scope.ID {
 		return nil, errors.New(
 			"job output: DynCfg target differs from transaction scope",
 		)
 	}
-	record, exists := controller.graph.Lookup(target.resourceID)
+	record, exists := dcjc.graph.Lookup(target.resourceID)
 	if err := validateGraphResourcePair(
 		record,
 		exists,
@@ -227,7 +227,7 @@ func (controller *DynCfgJobController) Prepare(
 
 	switch target.command {
 	case dyncfg.CommandAdd:
-		return controller.prepareAdd(
+		return dcjc.prepareAdd(
 			ctx,
 			request,
 			target,
@@ -237,7 +237,7 @@ func (controller *DynCfgJobController) Prepare(
 			scope,
 		)
 	case dyncfg.CommandUpdate:
-		return controller.prepareUpdate(
+		return dcjc.prepareUpdate(
 			ctx,
 			request,
 			target,
@@ -248,7 +248,7 @@ func (controller *DynCfgJobController) Prepare(
 			permit,
 		)
 	case dyncfg.CommandEnable:
-		return controller.prepareEnable(
+		return dcjc.prepareEnable(
 			ctx,
 			target,
 			record,
@@ -258,7 +258,7 @@ func (controller *DynCfgJobController) Prepare(
 			permit,
 		)
 	case dyncfg.CommandRestart:
-		return controller.prepareRestart(
+		return dcjc.prepareRestart(
 			ctx,
 			target,
 			record,
@@ -268,7 +268,7 @@ func (controller *DynCfgJobController) Prepare(
 			permit,
 		)
 	case dyncfg.CommandDisable:
-		return controller.prepareDisable(
+		return dcjc.prepareDisable(
 			target,
 			record,
 			exists,
@@ -276,7 +276,7 @@ func (controller *DynCfgJobController) Prepare(
 			scope,
 		)
 	case dyncfg.CommandRemove:
-		return controller.prepareRemove(
+		return dcjc.prepareRemove(
 			target,
 			record,
 			exists,
@@ -284,7 +284,7 @@ func (controller *DynCfgJobController) Prepare(
 			scope,
 		)
 	default:
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
@@ -300,7 +300,7 @@ func (controller *DynCfgJobController) Prepare(
 	}
 }
 
-func (controller *DynCfgJobController) prepareAdd(
+func (dcjc *DynCfgJobController) prepareAdd(
 	ctx context.Context,
 	request DynCfgJobRequest,
 	target dynCfgTarget,
@@ -310,7 +310,7 @@ func (controller *DynCfgJobController) prepareAdd(
 	scope lifecycle.ResourceTransactionScope,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if target.creator.InstancePolicy == collectorapi.InstancePolicySingle {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -323,21 +323,21 @@ func (controller *DynCfgJobController) prepareAdd(
 			),
 		)
 	}
-	config, failure := controller.parseConfig(
+	config, failure := dcjc.parseConfig(
 		request,
 		target.module,
 		target.name,
 	)
 	if failure.valid {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
 			failure.result,
 		)
 	}
-	if err := controller.factory.ValidateConfig(ctx, config); err != nil {
-		return controller.noop(
+	if err := dcjc.factory.ValidateConfig(ctx, config); err != nil {
+		return dcjc.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -358,7 +358,7 @@ func (controller *DynCfgJobController) prepareAdd(
 	}
 	_ = record
 	_ = exists
-	return controller.prepareMutation(
+	return dcjc.prepareMutation(
 		scope,
 		current,
 		nil,
@@ -366,7 +366,7 @@ func (controller *DynCfgJobController) prepareAdd(
 		disposition,
 		&postimage,
 		mustDynCfgMessage(202, ""),
-		controller.configCreateCleanup(
+		dcjc.configCreateCleanup(
 			postimage,
 			confgroup.TypeDyncfg,
 			request.CallerSource,
@@ -375,7 +375,7 @@ func (controller *DynCfgJobController) prepareAdd(
 	)
 }
 
-func (controller *DynCfgJobController) prepareUpdate(
+func (dcjc *DynCfgJobController) prepareUpdate(
 	ctx context.Context,
 	request DynCfgJobRequest,
 	target dynCfgTarget,
@@ -386,40 +386,40 @@ func (controller *DynCfgJobController) prepareUpdate(
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
 			mustDynCfgMessage(404, "config not found."),
 		)
 	}
-	config, failure := controller.parseConfig(
+	config, failure := dcjc.parseConfig(
 		request,
 		target.module,
 		target.name,
 	)
 	if failure.valid {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
 			failure.result,
 		)
 	}
-	if err := controller.factory.ValidateConfig(ctx, config); err != nil {
-		return controller.noop(
+	if err := dcjc.factory.ValidateConfig(ctx, config); err != nil {
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
 			mustDynCfgMessage(400, err.Error()),
-			controller.configStatusCleanup(
+			dcjc.configStatusCleanup(
 				target.resourceID,
 				dyncfg.Status(record.Status),
 			),
 		)
 	}
 	if record.Status == dyncfg.StatusAccepted.String() {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
@@ -427,7 +427,7 @@ func (controller *DynCfgJobController) prepareUpdate(
 				403,
 				"updating is not allowed in 'accepted' state.",
 			),
-			controller.configStatusCleanup(
+			dcjc.configStatusCleanup(
 				target.resourceID,
 				dyncfg.StatusAccepted,
 			),
@@ -440,12 +440,12 @@ func (controller *DynCfgJobController) prepareUpdate(
 	if record.Status == dyncfg.StatusRunning.String() &&
 		oldConfig.SourceType() == confgroup.TypeDyncfg &&
 		oldConfig.Hash() == config.Hash() {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
 			mustDynCfgMessage(200, ""),
-			controller.configStatusCleanup(
+			dcjc.configStatusCleanup(
 				target.resourceID,
 				dyncfg.StatusRunning,
 			),
@@ -460,19 +460,19 @@ func (controller *DynCfgJobController) prepareUpdate(
 		Status: record.Status, Payload: payload,
 	}
 	if record.Status == dyncfg.StatusDisabled.String() {
-		cleanup := controller.configStatusCleanup(
+		cleanup := dcjc.configStatusCleanup(
 			target.resourceID,
 			dyncfg.StatusDisabled,
 		)
 		if oldConfig.SourceType() != confgroup.TypeDyncfg {
-			cleanup = controller.configCreateCleanup(
+			cleanup = dcjc.configCreateCleanup(
 				postimage,
 				confgroup.TypeDyncfg,
 				request.CallerSource,
-				controller.configType(target.creator),
+				dcjc.configType(target.creator),
 			)
 		}
-		return controller.prepareMutation(
+		return dcjc.prepareMutation(
 			scope,
 			current,
 			nil,
@@ -483,7 +483,7 @@ func (controller *DynCfgJobController) prepareUpdate(
 			cleanup,
 		)
 	}
-	successor, err := controller.factory.Prepare(
+	successor, err := dcjc.factory.Prepare(
 		ctx,
 		config,
 		scope.Successor,
@@ -493,12 +493,12 @@ func (controller *DynCfgJobController) prepareUpdate(
 		if ctx.Err() != nil {
 			return nil, err
 		}
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
 			mustDynCfgMessage(200, err.Error()),
-			controller.configStatusCleanup(
+			dcjc.configStatusCleanup(
 				target.resourceID,
 				dyncfg.Status(record.Status),
 			),
@@ -509,19 +509,19 @@ func (controller *DynCfgJobController) prepareUpdate(
 	if current != nil {
 		disposition = lifecycle.ResourceTransactionReplaced
 	}
-	cleanup := controller.configStatusCleanup(
+	cleanup := dcjc.configStatusCleanup(
 		target.resourceID,
 		dyncfg.StatusRunning,
 	)
 	if oldConfig.SourceType() != confgroup.TypeDyncfg {
-		cleanup = controller.configCreateCleanup(
+		cleanup = dcjc.configCreateCleanup(
 			postimage,
 			confgroup.TypeDyncfg,
 			request.CallerSource,
-			controller.configType(target.creator),
+			dcjc.configType(target.creator),
 		)
 	}
-	return controller.prepareMutation(
+	return dcjc.prepareMutation(
 		scope,
 		current,
 		successor,
@@ -533,7 +533,7 @@ func (controller *DynCfgJobController) prepareUpdate(
 	)
 }
 
-func (controller *DynCfgJobController) prepareEnable(
+func (dcjc *DynCfgJobController) prepareEnable(
 	ctx context.Context,
 	target dynCfgTarget,
 	record dyncfg.GraphRecord,
@@ -543,7 +543,7 @@ func (controller *DynCfgJobController) prepareEnable(
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
@@ -551,12 +551,12 @@ func (controller *DynCfgJobController) prepareEnable(
 		)
 	}
 	if record.Status == dyncfg.StatusRunning.String() {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
 			mustDynCfgMessage(200, ""),
-			controller.configStatusCleanup(
+			dcjc.configStatusCleanup(
 				target.resourceID,
 				dyncfg.StatusRunning,
 			),
@@ -566,7 +566,7 @@ func (controller *DynCfgJobController) prepareEnable(
 	if err != nil {
 		return nil, err
 	}
-	successor, err := controller.factory.Prepare(
+	successor, err := dcjc.factory.Prepare(
 		ctx,
 		config,
 		scope.Successor,
@@ -576,7 +576,7 @@ func (controller *DynCfgJobController) prepareEnable(
 		if ctx.Err() != nil {
 			return nil, err
 		}
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
@@ -584,7 +584,7 @@ func (controller *DynCfgJobController) prepareEnable(
 		)
 	}
 	postimage := graphConfig(record, dyncfg.StatusRunning)
-	return controller.prepareMutation(
+	return dcjc.prepareMutation(
 		scope,
 		current,
 		successor,
@@ -592,14 +592,14 @@ func (controller *DynCfgJobController) prepareEnable(
 		lifecycle.ResourceTransactionInstalled,
 		&postimage,
 		mustDynCfgMessage(200, ""),
-		controller.configStatusCleanup(
+		dcjc.configStatusCleanup(
 			target.resourceID,
 			dyncfg.StatusRunning,
 		),
 	)
 }
 
-func (controller *DynCfgJobController) prepareRestart(
+func (dcjc *DynCfgJobController) prepareRestart(
 	ctx context.Context,
 	target dynCfgTarget,
 	record dyncfg.GraphRecord,
@@ -609,7 +609,7 @@ func (controller *DynCfgJobController) prepareRestart(
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
@@ -618,7 +618,7 @@ func (controller *DynCfgJobController) prepareRestart(
 	}
 	status := dyncfg.Status(record.Status)
 	if status != dyncfg.StatusRunning && status != dyncfg.StatusFailed {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
@@ -629,7 +629,7 @@ func (controller *DynCfgJobController) prepareRestart(
 					status,
 				),
 			),
-			controller.configStatusCleanup(
+			dcjc.configStatusCleanup(
 				target.resourceID,
 				status,
 			),
@@ -639,7 +639,7 @@ func (controller *DynCfgJobController) prepareRestart(
 	if err != nil {
 		return nil, err
 	}
-	successor, err := controller.factory.Prepare(
+	successor, err := dcjc.factory.Prepare(
 		ctx,
 		config,
 		scope.Successor,
@@ -649,7 +649,7 @@ func (controller *DynCfgJobController) prepareRestart(
 		if ctx.Err() != nil {
 			return nil, err
 		}
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
@@ -657,7 +657,7 @@ func (controller *DynCfgJobController) prepareRestart(
 				422,
 				fmt.Sprintf("config restart failed: %v", err),
 			),
-			controller.configStatusCleanup(
+			dcjc.configStatusCleanup(
 				target.resourceID,
 				status,
 			),
@@ -668,7 +668,7 @@ func (controller *DynCfgJobController) prepareRestart(
 	if current != nil {
 		disposition = lifecycle.ResourceTransactionReplaced
 	}
-	return controller.prepareMutation(
+	return dcjc.prepareMutation(
 		scope,
 		current,
 		successor,
@@ -676,14 +676,14 @@ func (controller *DynCfgJobController) prepareRestart(
 		disposition,
 		&postimage,
 		mustDynCfgMessage(200, ""),
-		controller.configStatusCleanup(
+		dcjc.configStatusCleanup(
 			target.resourceID,
 			dyncfg.StatusRunning,
 		),
 	)
 }
 
-func (controller *DynCfgJobController) prepareDisable(
+func (dcjc *DynCfgJobController) prepareDisable(
 	target dynCfgTarget,
 	record dyncfg.GraphRecord,
 	exists bool,
@@ -691,7 +691,7 @@ func (controller *DynCfgJobController) prepareDisable(
 	scope lifecycle.ResourceTransactionScope,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -699,12 +699,12 @@ func (controller *DynCfgJobController) prepareDisable(
 		)
 	}
 	if record.Status == dyncfg.StatusDisabled.String() {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
 			mustDynCfgMessage(200, ""),
-			controller.configStatusCleanup(
+			dcjc.configStatusCleanup(
 				target.resourceID,
 				dyncfg.StatusDisabled,
 			),
@@ -715,7 +715,7 @@ func (controller *DynCfgJobController) prepareDisable(
 	if current != nil {
 		disposition = lifecycle.ResourceTransactionRemoved
 	}
-	return controller.prepareMutation(
+	return dcjc.prepareMutation(
 		scope,
 		current,
 		nil,
@@ -723,14 +723,14 @@ func (controller *DynCfgJobController) prepareDisable(
 		disposition,
 		&postimage,
 		mustDynCfgMessage(200, ""),
-		controller.configStatusCleanup(
+		dcjc.configStatusCleanup(
 			target.resourceID,
 			dyncfg.StatusDisabled,
 		),
 	)
 }
 
-func (controller *DynCfgJobController) prepareRemove(
+func (dcjc *DynCfgJobController) prepareRemove(
 	target dynCfgTarget,
 	record dyncfg.GraphRecord,
 	exists bool,
@@ -738,7 +738,7 @@ func (controller *DynCfgJobController) prepareRemove(
 	scope lifecycle.ResourceTransactionScope,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -750,7 +750,7 @@ func (controller *DynCfgJobController) prepareRemove(
 		return nil, err
 	}
 	if config.SourceType() != confgroup.TypeDyncfg {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -764,7 +764,7 @@ func (controller *DynCfgJobController) prepareRemove(
 		)
 	}
 	if target.creator.InstancePolicy == collectorapi.InstancePolicySingle {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -778,7 +778,7 @@ func (controller *DynCfgJobController) prepareRemove(
 	if current != nil {
 		disposition = lifecycle.ResourceTransactionRemoved
 	}
-	return controller.prepareMutation(
+	return dcjc.prepareMutation(
 		scope,
 		current,
 		nil,
@@ -786,13 +786,13 @@ func (controller *DynCfgJobController) prepareRemove(
 		disposition,
 		nil,
 		mustDynCfgMessage(200, ""),
-		controller.configDeleteCleanup(
-			controller.configID(record.Module, record.Name),
+		dcjc.configDeleteCleanup(
+			dcjc.configID(record.Module, record.Name),
 		),
 	)
 }
 
-func (controller *DynCfgJobController) prepareMutation(
+func (dcjc *DynCfgJobController) prepareMutation(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -803,9 +803,9 @@ func (controller *DynCfgJobController) prepareMutation(
 	cleanup lifecycle.TaskCleanup,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	var dependencyCommit func()
-	if controller.dependencies != nil {
+	if dcjc.dependencies != nil {
 		var err error
-		dependencyCommit, err = controller.dependencies.PrepareJobChange(
+		dependencyCommit, err = dcjc.dependencies.PrepareJobChange(
 			scopeResourceID(scope),
 			postimage,
 		)
@@ -821,7 +821,7 @@ func (controller *DynCfgJobController) prepareMutation(
 			return nil, err
 		}
 	}
-	mutation, err := controller.graph.PrepareMutation(
+	mutation, err := dcjc.graph.PrepareMutation(
 		[]dyncfg.GraphChange{{
 			ID: scopeResourceID(scope), Config: postimage,
 		}},
@@ -836,7 +836,7 @@ func (controller *DynCfgJobController) prepareMutation(
 				},
 			)
 		}
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			unusedPermit,
@@ -860,14 +860,14 @@ func (controller *DynCfgJobController) prepareMutation(
 			Scope: scope, Disposition: disposition,
 			Current: current, Successor: successor,
 			UnusedPermit: unusedPermit,
-			Graph:        controller.graph, Mutation: mutation,
+			Graph:        dcjc.graph, Mutation: mutation,
 			AfterGraphCommit: dependencyCommit,
 			Result:           result, Cleanup: cleanup,
 		},
 	)
 }
 
-func (controller *DynCfgJobController) noop(
+func (dcjc *DynCfgJobController) noop(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	permit lifecycle.LongLivedPermit,
@@ -884,7 +884,7 @@ func (controller *DynCfgJobController) noop(
 	)
 }
 
-func (controller *DynCfgJobController) resolveRequest(
+func (dcjc *DynCfgJobController) resolveRequest(
 	request DynCfgJobRequest,
 	mutation bool,
 ) (dynCfgTarget, dynCfgFailure) {
@@ -898,14 +898,14 @@ func (controller *DynCfgJobController) resolveRequest(
 		)
 	}
 	id := request.Args[0]
-	if !strings.HasPrefix(id, controller.prefix) {
+	if !strings.HasPrefix(id, dcjc.prefix) {
 		return dynCfgTarget{}, newDynCfgFailure(
 			400,
 			"invalid config ID format.",
 		)
 	}
 	command := dyncfg.Command(strings.ToLower(request.Args[1]))
-	target := strings.TrimPrefix(id, controller.prefix)
+	target := strings.TrimPrefix(id, dcjc.prefix)
 	module, name, hasName := strings.Cut(target, ":")
 	if module == "" {
 		return dynCfgTarget{}, newDynCfgFailure(
@@ -913,7 +913,7 @@ func (controller *DynCfgJobController) resolveRequest(
 			"invalid config ID format.",
 		)
 	}
-	creator, ok := controller.modules.Lookup(module)
+	creator, ok := dcjc.modules.Lookup(module)
 	if !ok {
 		return dynCfgTarget{}, newDynCfgFailure(
 			404,
@@ -936,13 +936,13 @@ func (controller *DynCfgJobController) resolveRequest(
 		name = dynCfgJobNameReplacer.Replace(request.Args[2])
 		hasName = name != ""
 	} else if creator.InstancePolicy == collectorapi.InstancePolicySingle {
-		if id != controller.prefix+module {
+		if id != dcjc.prefix+module {
 			return dynCfgTarget{}, newDynCfgFailure(
 				400,
 				fmt.Sprintf(
 					"Single-instance collector %s must use config ID %s.",
 					module,
-					controller.prefix+module,
+					dcjc.prefix+module,
 				),
 			)
 		}
@@ -1012,7 +1012,7 @@ func (controller *DynCfgJobController) resolveRequest(
 	}, dynCfgFailure{}
 }
 
-func (controller *DynCfgJobController) parseConfig(
+func (dcjc *DynCfgJobController) parseConfig(
 	request DynCfgJobRequest,
 	module string,
 	name string,
@@ -1059,13 +1059,13 @@ func (controller *DynCfgJobController) parseConfig(
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetModule(module)
 	config.SetName(name)
-	if defaults, ok := controller.defaults.Lookup(module); ok {
+	if defaults, ok := dcjc.defaults.Lookup(module); ok {
 		config.ApplyDefaults(defaults)
 	}
 	return config, dynCfgFailure{}
 }
 
-func (controller *DynCfgJobController) userConfig(
+func (dcjc *DynCfgJobController) userConfig(
 	request DynCfgJobRequest,
 	target dynCfgTarget,
 ) (lifecycle.SealedResult, error) {
@@ -1126,13 +1126,13 @@ func (controller *DynCfgJobController) userConfig(
 	)
 }
 
-func (controller *DynCfgJobController) configCreateCleanup(
+func (dcjc *DynCfgJobController) configCreateCleanup(
 	config dyncfg.GraphConfig,
 	sourceType string,
 	source string,
 	configType dyncfg.ConfigType,
 ) lifecycle.TaskCleanup {
-	id := controller.configID(config.Module, config.Name)
+	id := dcjc.configID(config.Module, config.Name)
 	commands := dyncfg.JoinCommands(
 		dyncfg.CommandSchema,
 		dyncfg.CommandGet,
@@ -1147,11 +1147,11 @@ func (controller *DynCfgJobController) configCreateCleanup(
 		configType == dyncfg.ConfigTypeJob {
 		commands += " " + string(dyncfg.CommandRemove)
 	}
-	return controller.protocolCleanup(func(api *netdataapi.API) {
+	return dcjc.protocolCleanup(func(api *netdataapi.API) {
 		api.CONFIGCREATE(
 			netdataapi.ConfigOpts{
 				ID: id, Status: config.Status,
-				ConfigType: configType.String(), Path: controller.path,
+				ConfigType: configType.String(), Path: dcjc.path,
 				SourceType: sourceType, Source: source,
 				SupportedCommands: commands,
 			},
@@ -1159,30 +1159,30 @@ func (controller *DynCfgJobController) configCreateCleanup(
 	})
 }
 
-func (controller *DynCfgJobController) configStatusCleanup(
+func (dcjc *DynCfgJobController) configStatusCleanup(
 	id string,
 	status dyncfg.Status,
 ) lifecycle.TaskCleanup {
-	return controller.protocolCleanup(func(api *netdataapi.API) {
+	return dcjc.protocolCleanup(func(api *netdataapi.API) {
 		api.CONFIGSTATUS(
-			controller.externalID(id),
+			dcjc.externalID(id),
 			status.String(),
 		)
 	})
 }
 
-func (controller *DynCfgJobController) configDeleteCleanup(
+func (dcjc *DynCfgJobController) configDeleteCleanup(
 	externalID string,
 ) lifecycle.TaskCleanup {
-	return controller.protocolCleanup(func(api *netdataapi.API) {
+	return dcjc.protocolCleanup(func(api *netdataapi.API) {
 		api.CONFIGDELETE(externalID)
 	})
 }
 
-func (controller *DynCfgJobController) protocolCleanup(
+func (dcjc *DynCfgJobController) protocolCleanup(
 	build func(*netdataapi.API),
 ) lifecycle.TaskCleanup {
-	if controller == nil || build == nil {
+	if dcjc == nil || build == nil {
 		return func() error {
 			return errors.New(
 				"job output: invalid DynCfg protocol cleanup",
@@ -1196,31 +1196,31 @@ func (controller *DynCfgJobController) protocolCleanup(
 		return func() error { return err }
 	}
 	return func() error {
-		return controller.frames.CommitPreparedProtocolFrame(prepared)
+		return dcjc.frames.CommitPreparedProtocolFrame(prepared)
 	}
 }
 
-func (controller *DynCfgJobController) configID(
+func (dcjc *DynCfgJobController) configID(
 	module string,
 	name string,
 ) string {
 	if module == name ||
-		controller.modules[module].InstancePolicy ==
+		dcjc.modules[module].InstancePolicy ==
 			collectorapi.InstancePolicySingle {
-		return controller.prefix + module
+		return dcjc.prefix + module
 	}
-	return controller.prefix + module + ":" + name
+	return dcjc.prefix + module + ":" + name
 }
 
-func (controller *DynCfgJobController) externalID(resourceID string) string {
-	record, ok := controller.graph.Lookup(resourceID)
+func (dcjc *DynCfgJobController) externalID(resourceID string) string {
+	record, ok := dcjc.graph.Lookup(resourceID)
 	if ok {
-		return controller.configID(record.Module, record.Name)
+		return dcjc.configID(record.Module, record.Name)
 	}
 	return ""
 }
 
-func (controller *DynCfgJobController) configType(
+func (dcjc *DynCfgJobController) configType(
 	creator collectorapi.Creator,
 ) dyncfg.ConfigType {
 	if creator.InstancePolicy == collectorapi.InstancePolicySingle {

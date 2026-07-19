@@ -87,24 +87,24 @@ func (*recordingRuntimeObserver) AddRuntimeGauge(RuntimeGauge, int) {}
 func (*recordingRuntimeObserver) SetRuntimeTimestamp(RuntimeTimestamp, time.Time) {
 }
 
-func (observer *recordingRuntimeObserver) AddRuntimeCounter(
+func (rro *recordingRuntimeObserver) AddRuntimeCounter(
 	kind RuntimeCounter,
 	delta uint64,
 ) {
-	observer.mu.Lock()
-	defer observer.mu.Unlock()
-	if observer.counters == nil {
-		observer.counters = make(map[RuntimeCounter]uint64)
+	rro.mu.Lock()
+	defer rro.mu.Unlock()
+	if rro.counters == nil {
+		rro.counters = make(map[RuntimeCounter]uint64)
 	}
-	observer.counters[kind] += delta
+	rro.counters[kind] += delta
 }
 
-func (observer *recordingRuntimeObserver) counter(
+func (rro *recordingRuntimeObserver) counter(
 	kind RuntimeCounter,
 ) uint64 {
-	observer.mu.Lock()
-	defer observer.mu.Unlock()
-	return observer.counters[kind]
+	rro.mu.Lock()
+	defer rro.mu.Unlock()
+	return rro.counters[kind]
 }
 
 func TestInheritedTaskMissedJoinRetainsRecord(t *testing.T) {

@@ -34,51 +34,51 @@ func NewIngress(kernel jobmgr.AdmissionCommandPort, clock lifecycle.Clock, quit 
 	return &Ingress{kernel: kernel, clock: clock, quit: quit}, nil
 }
 
-func (budget *inputBodyBudget) GrowInputBody(ctx context.Context, token uint64, nextCapacity int64) (uint64, error) {
-	token, err := budget.admission.RequestInputBodyGrowth(budget.runGeneration, token, nextCapacity)
+func (ibb *inputBodyBudget) GrowInputBody(ctx context.Context, token uint64, nextCapacity int64) (uint64, error) {
+	token, err := ibb.admission.RequestInputBodyGrowth(ibb.runGeneration, token, nextCapacity)
 	if err != nil {
 		return 0, err
 	}
-	budget.kernel.NotifyControlReady()
+	ibb.kernel.NotifyControlReady()
 	select {
-	case grant := <-budget.grants:
+	case grant := <-ibb.grants:
 		if grant.Kind != lifecycle.ReservationInputBodyGrowth || grant.InputBodyToken != token {
-			_, _ = budget.admission.AbortInputBody(token)
+			_, _ = ibb.admission.AbortInputBody(token)
 			return 0, errors.New("Function ingress adapter: mismatched input body grant")
 		}
 		return token, nil
 	case <-ctx.Done():
-		_, abortErr := budget.admission.AbortInputBody(token)
+		_, abortErr := ibb.admission.AbortInputBody(token)
 		return 0, errors.Join(ctx.Err(), abortErr)
-	case <-budget.kernel.Done():
-		_, abortErr := budget.admission.AbortInputBody(token)
+	case <-ibb.kernel.Done():
+		_, abortErr := ibb.admission.AbortInputBody(token)
 		return 0, errors.Join(jobmgr.ErrStopped, abortErr)
 	}
 }
 
-func (budget *inputBodyBudget) CommitInputBodyGrowth(token uint64, capacity int64) error {
-	wake, err := budget.admission.CommitInputBodyGrowth(token, capacity)
+func (ibb *inputBodyBudget) CommitInputBodyGrowth(token uint64, capacity int64) error {
+	wake, err := ibb.admission.CommitInputBodyGrowth(token, capacity)
 	if wake {
-		budget.kernel.NotifyControlReady()
+		ibb.kernel.NotifyControlReady()
 	}
 	return err
 }
 
-func (budget *inputBodyBudget) ReleaseInputBody(token uint64) error {
-	wake, err := budget.admission.AbortInputBody(token)
+func (ibb *inputBodyBudget) ReleaseInputBody(token uint64) error {
+	wake, err := ibb.admission.AbortInputBody(token)
 	if wake {
-		budget.kernel.NotifyControlReady()
+		ibb.kernel.NotifyControlReady()
 	}
 	return err
 }
 
-func (ingress *Ingress) HandleCall(ctx context.Context, call functionwire.Call) error {
-	now := ingress.clock.Now()
+func (i *Ingress) HandleCall(ctx context.Context, call functionwire.Call) error {
+	now := i.clock.Now()
 	deadline := now.Add(call.Timeout)
 	if call.Timeout == 0 {
 		deadline = now
 	}
-	return ingress.kernel.Submit(ctx, jobmgr.Request{
+	return i.kernel.Submit(ctx, jobmgr.Request{
 		UID: call.UID, Source: lifecycle.SourceFunction, Route: call.Method,
 		Args: append([]string(nil), call.Args...), Payload: call.Payload, ContentType: call.ContentType,
 		Permissions: call.Access, CallerSource: call.Source, Timeout: call.Timeout,
@@ -87,15 +87,15 @@ func (ingress *Ingress) HandleCall(ctx context.Context, call functionwire.Call) 
 	})
 }
 
-func (ingress *Ingress) HandleCancel(ctx context.Context, uid string) error {
-	return ingress.kernel.Cancel(ctx, uid)
+func (i *Ingress) HandleCancel(ctx context.Context, uid string) error {
+	return i.kernel.Cancel(ctx, uid)
 }
 
-func (ingress *Ingress) HandleReject(ctx context.Context, uid string, status int) error {
-	return ingress.kernel.Reject(ctx, uid, lifecycle.ControlStatus(status))
+func (i *Ingress) HandleReject(ctx context.Context, uid string, status int) error {
+	return i.kernel.Reject(ctx, uid, lifecycle.ControlStatus(status))
 }
 
-func (ingress *Ingress) HandleQuit(context.Context) error {
-	ingress.once.Do(ingress.quit)
+func (i *Ingress) HandleQuit(context.Context) error {
+	i.once.Do(i.quit)
 	return nil
 }

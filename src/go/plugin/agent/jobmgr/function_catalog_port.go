@@ -85,15 +85,15 @@ type FunctionCatalogCensus struct {
 	MutationActive     bool
 }
 
-func (plan FunctionCleanupPlan) validate() error {
+func (fcp FunctionCleanupPlan) validate() error {
 	workKinds := 0
-	if plan.Work != nil {
+	if fcp.Work != nil {
 		workKinds++
 	}
-	if plan.Runner != nil {
+	if fcp.Runner != nil {
 		workKinds++
 	}
-	if plan.Ref.Valid() != (workKinds == 1) {
+	if fcp.Ref.Valid() != (workKinds == 1) {
 		return errors.New("jobmgr kernel: invalid Function cleanup plan")
 	}
 	return nil
@@ -115,36 +115,36 @@ type FunctionCatalogDecision struct {
 	Rejected   lifecycle.ControlStatus
 }
 
-func (decision FunctionCatalogDecision) validate() error {
-	if len(decision.ResourceID) > maximumRequestMetadataBytes {
+func (fcd FunctionCatalogDecision) validate() error {
+	if len(fcd.ResourceID) > maximumRequestMetadataBytes {
 		return errors.New("jobmgr kernel: invalid Function resource identity")
 	}
-	if decision.Rejected != 0 {
-		if !decision.Rejected.Valid() || decision.Lease.Valid() ||
-			decision.ResourceID != "" ||
-			decision.Plan.Work != nil || decision.Plan.Runner != nil || decision.Plan.Resource != nil ||
-			decision.Plan.Transaction != nil || decision.Plan.Capability != nil ||
-			len(decision.Plan.Claims) != 0 ||
-			len(decision.Plan.ReadClaims) != 0 || decision.Plan.OwnedBytes != 0 ||
-			decision.Plan.NoResponse || decision.Plan.Cleanup != nil ||
-			decision.Plan.CooperativeCancel || decision.Plan.CooperativeDeadline {
+	if fcd.Rejected != 0 {
+		if !fcd.Rejected.Valid() || fcd.Lease.Valid() ||
+			fcd.ResourceID != "" ||
+			fcd.Plan.Work != nil || fcd.Plan.Runner != nil || fcd.Plan.Resource != nil ||
+			fcd.Plan.Transaction != nil || fcd.Plan.Capability != nil ||
+			len(fcd.Plan.Claims) != 0 ||
+			len(fcd.Plan.ReadClaims) != 0 || fcd.Plan.OwnedBytes != 0 ||
+			fcd.Plan.NoResponse || fcd.Plan.Cleanup != nil ||
+			fcd.Plan.CooperativeCancel || fcd.Plan.CooperativeDeadline {
 			return errors.New("jobmgr kernel: invalid Function rejection")
 		}
 		return nil
 	}
-	if !decision.Lease.Valid() {
+	if !fcd.Lease.Valid() {
 		return errors.New("jobmgr kernel: resolved Function has no invocation lease")
 	}
-	if decision.Plan.Resource != nil ||
-		decision.Plan.Capability != nil ||
-		decision.Plan.NoResponse {
+	if fcd.Plan.Resource != nil ||
+		fcd.Plan.Capability != nil ||
+		fcd.Plan.NoResponse {
 		return errors.New("jobmgr kernel: Function catalog returned internal work")
 	}
-	if decision.Plan.Transaction != nil &&
-		decision.Plan.Transaction.ID != decision.ResourceID {
+	if fcd.Plan.Transaction != nil &&
+		fcd.Plan.Transaction.ID != fcd.ResourceID {
 		return errors.New("jobmgr kernel: Function transaction resource identity differs")
 	}
-	return decision.Plan.validate()
+	return fcd.Plan.validate()
 }
 
 // FunctionCatalogPort is implemented by the Function adapter. Every method is

@@ -84,18 +84,18 @@ type boundProcessInput struct {
 	inputBodyBudget
 }
 
-func (input *boundProcessInput) Generation() uint64 { return input.runGeneration }
+func (bpi *boundProcessInput) Generation() uint64 { return bpi.runGeneration }
 
-func (input *boundProcessInput) SuspendInputBody(nextGeneration, token uint64) error {
-	if err := input.admission.SuspendInputBody(input.runGeneration, nextGeneration, token); err != nil {
+func (bpi *boundProcessInput) SuspendInputBody(nextGeneration, token uint64) error {
+	if err := bpi.admission.SuspendInputBody(bpi.runGeneration, nextGeneration, token); err != nil {
 		return err
 	}
-	input.inputBodyBudget.kernel.NotifyControlReady()
+	bpi.inputBodyBudget.kernel.NotifyControlReady()
 	return nil
 }
 
-func (input *boundProcessInput) AdoptInputBody(token uint64) error {
-	return input.admission.AdoptInputBody(input.runGeneration, token)
+func (bpi *boundProcessInput) AdoptInputBody(token uint64) error {
+	return bpi.admission.AdoptInputBody(bpi.runGeneration, token)
 }
 
 // ProcessIngress owns the one process-lifetime Function reader and swaps only
@@ -144,282 +144,282 @@ func NewProcessIngress(reader io.Reader, admission *lifecycle.AdmissionLedger) (
 	return ingress, nil
 }
 
-func (ingress *ProcessIngress) Run(ctx context.Context) error {
+func (pi *ProcessIngress) Run(ctx context.Context) error {
 	if ctx == nil {
 		return errors.New("Function process ingress: nil reader context")
 	}
-	ingress.mu.Lock()
-	if ingress.readerStarts != 0 || ingress.state == ProcessIngressContained {
-		ingress.mu.Unlock()
+	pi.mu.Lock()
+	if pi.readerStarts != 0 || pi.state == ProcessIngressContained {
+		pi.mu.Unlock()
 		return errors.New("Function process ingress: reader already started or contained")
 	}
-	ingress.readerStarts++
-	ingress.mu.Unlock()
-	return ingress.capsule.Run(ctx, ingress.boundary)
+	pi.readerStarts++
+	pi.mu.Unlock()
+	return pi.capsule.Run(ctx, pi.boundary)
 }
 
 // SetObserver installs a pre-reader test/diagnostic observer for process input
 // state transitions.
-func (ingress *ProcessIngress) SetObserver(observer func(ProcessIngressCensus) error) error {
+func (pi *ProcessIngress) SetObserver(observer func(ProcessIngressCensus) error) error {
 	if observer == nil {
 		return errors.New("Function process ingress: nil observer")
 	}
-	ingress.mu.Lock()
-	defer ingress.mu.Unlock()
-	if ingress.readerStarts != 0 || ingress.observer != nil {
+	pi.mu.Lock()
+	defer pi.mu.Unlock()
+	if pi.readerStarts != 0 || pi.observer != nil {
 		return errors.New("Function process ingress: observer changed after reader start")
 	}
-	ingress.observer = observer
+	pi.observer = observer
 	return nil
 }
 
 // SetReadReturnObserver installs a pre-reader test/diagnostic observer for the
 // process read-return boundary.
-func (ingress *ProcessIngress) SetReadReturnObserver(observer func(ProcessIngressCensus) error) error {
+func (pi *ProcessIngress) SetReadReturnObserver(observer func(ProcessIngressCensus) error) error {
 	if observer == nil {
 		return errors.New("Function process ingress: nil read-return observer")
 	}
-	ingress.mu.Lock()
-	defer ingress.mu.Unlock()
-	if ingress.readerStarts != 0 || ingress.readObserver != nil {
+	pi.mu.Lock()
+	defer pi.mu.Unlock()
+	if pi.readerStarts != 0 || pi.readObserver != nil {
 		return errors.New("Function process ingress: read-return observer changed after reader start")
 	}
-	ingress.readObserver = observer
+	pi.readObserver = observer
 	return nil
 }
 
-func (ingress *ProcessIngress) Adopt(ctx context.Context, binding ProcessBinding) error {
+func (pi *ProcessIngress) Adopt(ctx context.Context, binding ProcessBinding) error {
 	if ctx == nil ||
 		binding.port == nil ||
 		binding.admission == nil ||
-		binding.admission != ingress.admission ||
+		binding.admission != pi.admission ||
 		binding.port.Generation() == 0 {
 		return errors.New("Function process ingress: invalid binding")
 	}
-	ingress.mu.Lock()
-	if ingress.state != ProcessIngressPaused ||
-		ingress.active != nil ||
-		ingress.deliveries != 0 ||
-		ingress.budgetOps != 0 ||
-		ingress.growth {
-		ingress.mu.Unlock()
+	pi.mu.Lock()
+	if pi.state != ProcessIngressPaused ||
+		pi.active != nil ||
+		pi.deliveries != 0 ||
+		pi.budgetOps != 0 ||
+		pi.growth {
+		pi.mu.Unlock()
 		return errors.New("Function process ingress: adopt outside drained pause")
 	}
-	if ingress.pauseNext != 0 && binding.port.Generation() != ingress.pauseNext {
-		ingress.mu.Unlock()
+	if pi.pauseNext != 0 && binding.port.Generation() != pi.pauseNext {
+		pi.mu.Unlock()
 		return errors.New("Function process ingress: adopted generation differs from pause target")
 	}
-	ingress.mu.Unlock()
-	if err := ingress.boundary.PrepareAdopt(ctx); err != nil {
+	pi.mu.Unlock()
+	if err := pi.boundary.PrepareAdopt(ctx); err != nil {
 		return err
 	}
 	committed := false
 	defer func() {
 		if !committed {
-			ingress.boundary.AbortAdopt()
+			pi.boundary.AbortAdopt()
 		}
 	}()
-	ingress.mu.Lock()
-	defer ingress.mu.Unlock()
-	if ingress.state != ProcessIngressPaused ||
-		ingress.active != nil ||
-		ingress.deliveries != 0 ||
-		ingress.budgetOps != 0 ||
-		ingress.growth {
+	pi.mu.Lock()
+	defer pi.mu.Unlock()
+	if pi.state != ProcessIngressPaused ||
+		pi.active != nil ||
+		pi.deliveries != 0 ||
+		pi.budgetOps != 0 ||
+		pi.growth {
 		return errors.New("Function process ingress: adopt state changed during preparation")
 	}
-	ingress.active = binding.port
-	previousGeneration := ingress.runGeneration
-	ingress.runGeneration = binding.port.Generation()
-	if ingress.body != nil || ingress.bodySuspended {
-		if ingress.bodyToken == 0 {
-			ingress.active = nil
-			ingress.runGeneration = previousGeneration
+	pi.active = binding.port
+	previousGeneration := pi.runGeneration
+	pi.runGeneration = binding.port.Generation()
+	if pi.body != nil || pi.bodySuspended {
+		if pi.bodyToken == 0 {
+			pi.active = nil
+			pi.runGeneration = previousGeneration
 			return errors.New("Function process ingress: adopted body has no token")
 		}
-		if ingress.body != nil || !ingress.bodySuspended {
-			ingress.active = nil
-			ingress.runGeneration = previousGeneration
+		if pi.body != nil || !pi.bodySuspended {
+			pi.active = nil
+			pi.runGeneration = previousGeneration
 			return errors.New("Function process ingress: adopted body retained its old run binding")
 		}
-		if err := binding.port.AdoptInputBody(ingress.bodyToken); err != nil {
-			ingress.active = nil
-			ingress.runGeneration = previousGeneration
+		if err := binding.port.AdoptInputBody(pi.bodyToken); err != nil {
+			pi.active = nil
+			pi.runGeneration = previousGeneration
 			return err
 		}
-		ingress.body = binding.port
-		ingress.bodySuspended = false
+		pi.body = binding.port
+		pi.bodySuspended = false
 	}
-	ingress.pauseNext = 0
-	ingress.state = ProcessIngressLive
-	ingress.boundary.CommitAdopt()
+	pi.pauseNext = 0
+	pi.state = ProcessIngressLive
+	pi.boundary.CommitAdopt()
 	committed = true
-	ingress.idle.Broadcast()
+	pi.idle.Broadcast()
 	return nil
 }
 
-func (ingress *ProcessIngress) SealPause() error {
-	ingress.mu.Lock()
-	if ingress.state != ProcessIngressLive || ingress.active == nil {
-		ingress.mu.Unlock()
+func (pi *ProcessIngress) SealPause() error {
+	pi.mu.Lock()
+	if pi.state != ProcessIngressLive || pi.active == nil {
+		pi.mu.Unlock()
 		return errors.New("Function process ingress: pause outside live state")
 	}
-	if ingress.pauseSealed {
-		ingress.mu.Unlock()
+	if pi.pauseSealed {
+		pi.mu.Unlock()
 		return nil
 	}
-	ingress.mu.Unlock()
-	if err := ingress.boundary.SealPause(); err != nil {
+	pi.mu.Unlock()
+	if err := pi.boundary.SealPause(); err != nil {
 		return err
 	}
-	ingress.mu.Lock()
-	if ingress.state != ProcessIngressLive || ingress.active == nil || ingress.pauseSealed {
-		ingress.mu.Unlock()
-		_ = ingress.boundary.RollbackPause()
+	pi.mu.Lock()
+	if pi.state != ProcessIngressLive || pi.active == nil || pi.pauseSealed {
+		pi.mu.Unlock()
+		_ = pi.boundary.RollbackPause()
 		return errors.New("Function process ingress: state changed while sealing pause")
 	}
-	ingress.pauseSealed = true
-	ingress.mu.Unlock()
+	pi.pauseSealed = true
+	pi.mu.Unlock()
 	return nil
 }
 
-func (ingress *ProcessIngress) DrainPause(ctx context.Context, nextGeneration uint64) error {
+func (pi *ProcessIngress) DrainPause(ctx context.Context, nextGeneration uint64) error {
 	if ctx == nil {
 		return errors.New("Function process ingress: nil pause context")
 	}
-	ingress.mu.Lock()
-	valid := ingress.state == ProcessIngressLive && ingress.active != nil && ingress.pauseSealed
-	ingress.mu.Unlock()
+	pi.mu.Lock()
+	valid := pi.state == ProcessIngressLive && pi.active != nil && pi.pauseSealed
+	pi.mu.Unlock()
 	if !valid {
 		return errors.New("Function process ingress: drain outside sealed pause")
 	}
-	if err := ingress.boundary.DrainPause(ctx); err != nil {
+	if err := pi.boundary.DrainPause(ctx); err != nil {
 		return err
 	}
-	ingress.mu.Lock()
-	if ingress.state != ProcessIngressLive ||
-		ingress.active == nil ||
-		ingress.deliveries != 0 ||
-		ingress.budgetOps != 0 ||
-		ingress.growth {
-		ingress.state = ProcessIngressPaused
-		ingress.active = nil
-		ingress.pauseSealed = false
-		ingress.pauseNext = 0
-		ingress.idle.Broadcast()
-		ingress.mu.Unlock()
+	pi.mu.Lock()
+	if pi.state != ProcessIngressLive ||
+		pi.active == nil ||
+		pi.deliveries != 0 ||
+		pi.budgetOps != 0 ||
+		pi.growth {
+		pi.state = ProcessIngressPaused
+		pi.active = nil
+		pi.pauseSealed = false
+		pi.pauseNext = 0
+		pi.idle.Broadcast()
+		pi.mu.Unlock()
 		return errors.New("Function process ingress: pause did not drain process input")
 	}
 	var pauseErr error
-	if ingress.body != nil {
-		if ingress.bodyToken == 0 {
+	if pi.body != nil {
+		if pi.bodyToken == 0 {
 			pauseErr = errors.New("Function process ingress: partial payload has no admission token")
 		} else {
-			pauseErr = ingress.body.SuspendInputBody(nextGeneration, ingress.bodyToken)
+			pauseErr = pi.body.SuspendInputBody(nextGeneration, pi.bodyToken)
 			if pauseErr == nil {
-				ingress.body = nil
-				ingress.bodySuspended = true
+				pi.body = nil
+				pi.bodySuspended = true
 			}
 		}
-	} else if ingress.bodySuspended {
+	} else if pi.bodySuspended {
 		pauseErr = errors.New("Function process ingress: body was already suspended")
 	}
-	ingress.state = ProcessIngressPaused
-	ingress.active = nil
-	ingress.pauseSealed = false
+	pi.state = ProcessIngressPaused
+	pi.active = nil
+	pi.pauseSealed = false
 	if pauseErr == nil {
-		ingress.pauseNext = nextGeneration
+		pi.pauseNext = nextGeneration
 	} else {
-		ingress.pauseNext = 0
+		pi.pauseNext = 0
 	}
-	ingress.idle.Broadcast()
-	ingress.mu.Unlock()
+	pi.idle.Broadcast()
+	pi.mu.Unlock()
 	return pauseErr
 }
 
-func (ingress *ProcessIngress) Pause(ctx context.Context, nextGeneration uint64) error {
-	if err := ingress.SealPause(); err != nil {
+func (pi *ProcessIngress) Pause(ctx context.Context, nextGeneration uint64) error {
+	if err := pi.SealPause(); err != nil {
 		return err
 	}
-	if err := ingress.DrainPause(ctx, nextGeneration); err != nil {
-		ingress.mu.Lock()
-		rollback := ingress.state == ProcessIngressLive && ingress.pauseSealed
+	if err := pi.DrainPause(ctx, nextGeneration); err != nil {
+		pi.mu.Lock()
+		rollback := pi.state == ProcessIngressLive && pi.pauseSealed
 		if rollback {
-			ingress.pauseSealed = false
+			pi.pauseSealed = false
 		}
-		ingress.mu.Unlock()
+		pi.mu.Unlock()
 		if rollback {
-			_ = ingress.boundary.RollbackPause()
+			_ = pi.boundary.RollbackPause()
 		}
 		return err
 	}
 	return nil
 }
 
-func (ingress *ProcessIngress) Fence(ctx context.Context) error {
+func (pi *ProcessIngress) Fence(ctx context.Context) error {
 	if ctx == nil {
 		return errors.New("Function process ingress: nil fence context")
 	}
-	ingress.mu.Lock()
-	if ingress.state != ProcessIngressPaused ||
-		ingress.active != nil ||
-		ingress.deliveries != 0 ||
-		ingress.budgetOps != 0 ||
-		ingress.growth {
-		ingress.mu.Unlock()
+	pi.mu.Lock()
+	if pi.state != ProcessIngressPaused ||
+		pi.active != nil ||
+		pi.deliveries != 0 ||
+		pi.budgetOps != 0 ||
+		pi.growth {
+		pi.mu.Unlock()
 		return errors.New("Function process ingress: final fence outside drained pause")
 	}
-	body := ingress.body
-	bodySuspended := ingress.bodySuspended
-	token := ingress.bodyToken
-	discardErr := ingress.capsule.DiscardPausedPayload(token)
-	ingress.body = nil
-	ingress.bodySuspended = false
-	ingress.bodyToken = 0
-	ingress.fencedToken = token
-	ingress.observer = nil
-	ingress.readObserver = nil
-	ingress.idle.Broadcast()
-	ingress.mu.Unlock()
+	body := pi.body
+	bodySuspended := pi.bodySuspended
+	token := pi.bodyToken
+	discardErr := pi.capsule.DiscardPausedPayload(token)
+	pi.body = nil
+	pi.bodySuspended = false
+	pi.bodyToken = 0
+	pi.fencedToken = token
+	pi.observer = nil
+	pi.readObserver = nil
+	pi.idle.Broadcast()
+	pi.mu.Unlock()
 
 	var releaseErr error
 	if body != nil {
 		releaseErr = body.ReleaseInputBody(token)
 	} else if bodySuspended {
-		wake, err := ingress.admission.AbortInputBody(token)
+		wake, err := pi.admission.AbortInputBody(token)
 		releaseErr = err
 		if err == nil && wake {
 			releaseErr = errors.New("Function process ingress: suspended body release exposed unrelated grantable work")
 		}
 	}
-	fenceErr := ingress.boundary.Fence(ctx)
-	boundary := ingress.boundary.Census()
+	fenceErr := pi.boundary.Fence(ctx)
+	boundary := pi.boundary.Census()
 	if !boundary.CapabilityAttached {
-		ingress.mu.Lock()
-		ingress.state = ProcessIngressContained
-		ingress.runGeneration = 0
-		ingress.idle.Broadcast()
-		ingress.mu.Unlock()
+		pi.mu.Lock()
+		pi.state = ProcessIngressContained
+		pi.runGeneration = 0
+		pi.idle.Broadcast()
+		pi.mu.Unlock()
 	}
 	return errors.Join(discardErr, releaseErr, fenceErr)
 }
 
-func (ingress *ProcessIngress) Census() ProcessIngressCensus {
-	ingress.mu.Lock()
-	defer ingress.mu.Unlock()
-	return ingress.censusLocked()
+func (pi *ProcessIngress) Census() ProcessIngressCensus {
+	pi.mu.Lock()
+	defer pi.mu.Unlock()
+	return pi.censusLocked()
 }
 
-func (ingress *ProcessIngress) censusLocked() ProcessIngressCensus {
-	boundary := ingress.boundary.Census()
+func (pi *ProcessIngress) censusLocked() ProcessIngressCensus {
+	boundary := pi.boundary.Census()
 	var contained functionwire.ContainedInputCensus
-	if ingress.state == ProcessIngressContained {
-		contained = ingress.capsule.ContainedCensus()
+	if pi.state == ProcessIngressContained {
+		contained = pi.capsule.ContainedCensus()
 	}
 	return ProcessIngressCensus{
-		State:                  ingress.state,
-		RunGeneration:          ingress.runGeneration,
-		ReaderStarts:           ingress.readerStarts,
+		State:                  pi.state,
+		RunGeneration:          pi.runGeneration,
+		ReaderStarts:           pi.readerStarts,
 		ReadReturns:            boundary.ReadReturns,
 		WaitingReadReturns:     boundary.WaitingReadReturns,
 		DiscardedReads:         boundary.DiscardedReads,
@@ -428,218 +428,218 @@ func (ingress *ProcessIngress) censusLocked() ProcessIngressCensus {
 		CapsulePayloadBytes:    contained.PayloadBytes,
 		CapsulePayloadCapacity: contained.PayloadCapacity,
 		CapsuleDiscardingLine:  contained.DiscardingLine,
-		ActiveDeliveries:       ingress.deliveries,
-		BudgetOperations:       ingress.budgetOps,
-		PendingBody:            ingress.body != nil || ingress.bodySuspended,
-		BodyBindingAttached:    ingress.body != nil,
-		BodySuspended:          ingress.bodySuspended,
+		ActiveDeliveries:       pi.deliveries,
+		BudgetOperations:       pi.budgetOps,
+		PendingBody:            pi.body != nil || pi.bodySuspended,
+		BodyBindingAttached:    pi.body != nil,
+		BodySuspended:          pi.bodySuspended,
 	}
 }
 
-func (ingress *ProcessIngress) observeReadReturn() error {
-	ingress.mu.Lock()
-	observer := ingress.readObserver
-	census := ingress.censusLocked()
-	ingress.mu.Unlock()
+func (pi *ProcessIngress) observeReadReturn() error {
+	pi.mu.Lock()
+	observer := pi.readObserver
+	census := pi.censusLocked()
+	pi.mu.Unlock()
 	if observer == nil {
 		return nil
 	}
 	return observer(census)
 }
 
-func (ingress *ProcessIngress) HandleCall(ctx context.Context, call functionwire.Call) error {
-	port, ok := ingress.acquireDelivery()
+func (pi *ProcessIngress) HandleCall(ctx context.Context, call functionwire.Call) error {
+	port, ok := pi.acquireDelivery()
 	if !ok {
-		return ingress.discardCall(call)
+		return pi.discardCall(call)
 	}
-	defer ingress.releaseDelivery()
+	defer pi.releaseDelivery()
 	err := port.HandleCall(ctx, call)
 	if call.InputBodyToken != 0 {
-		ingress.mu.Lock()
-		if ingress.body == port {
-			ingress.body = nil
-			ingress.bodyToken = 0
+		pi.mu.Lock()
+		if pi.body == port {
+			pi.body = nil
+			pi.bodyToken = 0
 		}
-		ingress.mu.Unlock()
+		pi.mu.Unlock()
 	}
-	return ingress.dispositionDeliveryError(port, err)
+	return pi.dispositionDeliveryError(port, err)
 }
 
-func (ingress *ProcessIngress) HandleCancel(ctx context.Context, uid string) error {
-	port, ok := ingress.acquireDelivery()
+func (pi *ProcessIngress) HandleCancel(ctx context.Context, uid string) error {
+	port, ok := pi.acquireDelivery()
 	if !ok {
 		return nil
 	}
-	defer ingress.releaseDelivery()
-	return ingress.dispositionDeliveryError(port, port.HandleCancel(ctx, uid))
+	defer pi.releaseDelivery()
+	return pi.dispositionDeliveryError(port, port.HandleCancel(ctx, uid))
 }
 
-func (ingress *ProcessIngress) HandleReject(ctx context.Context, uid string, status int) error {
-	port, ok := ingress.acquireDelivery()
+func (pi *ProcessIngress) HandleReject(ctx context.Context, uid string, status int) error {
+	port, ok := pi.acquireDelivery()
 	if !ok {
 		return nil
 	}
-	defer ingress.releaseDelivery()
-	return ingress.dispositionDeliveryError(port, port.HandleReject(ctx, uid, status))
+	defer pi.releaseDelivery()
+	return pi.dispositionDeliveryError(port, port.HandleReject(ctx, uid, status))
 }
 
-func (ingress *ProcessIngress) HandleQuit(ctx context.Context) error {
-	port, ok := ingress.acquireDelivery()
+func (pi *ProcessIngress) HandleQuit(ctx context.Context) error {
+	port, ok := pi.acquireDelivery()
 	if !ok {
 		return nil
 	}
-	defer ingress.releaseDelivery()
+	defer pi.releaseDelivery()
 	return port.HandleQuit(ctx)
 }
 
-func (ingress *ProcessIngress) GrowInputBody(ctx context.Context, token uint64, nextCapacity int64) (uint64, error) {
-	ingress.mu.Lock()
-	for ingress.state == ProcessIngressPaused {
-		ingress.idle.Wait()
+func (pi *ProcessIngress) GrowInputBody(ctx context.Context, token uint64, nextCapacity int64) (uint64, error) {
+	pi.mu.Lock()
+	for pi.state == ProcessIngressPaused {
+		pi.idle.Wait()
 	}
-	if ingress.state != ProcessIngressLive || ingress.active == nil || ingress.growth {
-		ingress.mu.Unlock()
+	if pi.state != ProcessIngressLive || pi.active == nil || pi.growth {
+		pi.mu.Unlock()
 		return 0, errors.New("Function process ingress: payload growth outside live state")
 	}
-	port := ingress.body
+	port := pi.body
 	if token == 0 {
-		if ingress.body != nil || ingress.bodySuspended {
-			ingress.mu.Unlock()
+		if pi.body != nil || pi.bodySuspended {
+			pi.mu.Unlock()
 			return 0, errors.New("Function process ingress: payload started outside live state")
 		}
-		port = ingress.active
-		ingress.body = port
-	} else if port == nil || token != ingress.bodyToken {
-		ingress.mu.Unlock()
+		port = pi.active
+		pi.body = port
+	} else if port == nil || token != pi.bodyToken {
+		pi.mu.Unlock()
 		return 0, errors.New("Function process ingress: stale payload growth")
 	}
-	ingress.budgetOps++
-	ingress.mu.Unlock()
+	pi.budgetOps++
+	pi.mu.Unlock()
 	result, err := port.GrowInputBody(ctx, token, nextCapacity)
-	ingress.mu.Lock()
+	pi.mu.Lock()
 	if err != nil {
-		ingress.budgetOps--
-		if token == 0 && ingress.body == port {
-			ingress.body = nil
+		pi.budgetOps--
+		if token == 0 && pi.body == port {
+			pi.body = nil
 		}
-		ingress.idle.Broadcast()
-		ingress.mu.Unlock()
+		pi.idle.Broadcast()
+		pi.mu.Unlock()
 		return 0, err
 	}
-	ingress.bodyToken = result
-	ingress.growth = true
-	ingress.mu.Unlock()
+	pi.bodyToken = result
+	pi.growth = true
+	pi.mu.Unlock()
 	return result, nil
 }
 
-func (ingress *ProcessIngress) CommitInputBodyGrowth(token uint64, capacity int64) error {
-	ingress.mu.Lock()
-	port := ingress.body
+func (pi *ProcessIngress) CommitInputBodyGrowth(token uint64, capacity int64) error {
+	pi.mu.Lock()
+	port := pi.body
 	if port == nil ||
 		token == 0 ||
-		token != ingress.bodyToken ||
-		!ingress.growth ||
-		ingress.budgetOps == 0 {
-		ingress.mu.Unlock()
+		token != pi.bodyToken ||
+		!pi.growth ||
+		pi.budgetOps == 0 {
+		pi.mu.Unlock()
 		return errors.New("Function process ingress: payload commit has no pending growth")
 	}
-	ingress.mu.Unlock()
+	pi.mu.Unlock()
 	err := port.CommitInputBodyGrowth(token, capacity)
-	ingress.mu.Lock()
-	ingress.growth = false
-	ingress.budgetOps--
-	census := ingress.censusLocked()
-	observer := ingress.observer
-	ingress.idle.Broadcast()
-	ingress.mu.Unlock()
+	pi.mu.Lock()
+	pi.growth = false
+	pi.budgetOps--
+	census := pi.censusLocked()
+	observer := pi.observer
+	pi.idle.Broadcast()
+	pi.mu.Unlock()
 	if err == nil && observer != nil {
 		err = observer(census)
 	}
 	return err
 }
 
-func (ingress *ProcessIngress) ReleaseInputBody(token uint64) error {
-	ingress.mu.Lock()
-	for ingress.state == ProcessIngressPaused {
-		ingress.idle.Wait()
+func (pi *ProcessIngress) ReleaseInputBody(token uint64) error {
+	pi.mu.Lock()
+	for pi.state == ProcessIngressPaused {
+		pi.idle.Wait()
 	}
-	if ingress.state == ProcessIngressContained && token != 0 && token == ingress.fencedToken {
-		ingress.mu.Unlock()
+	if pi.state == ProcessIngressContained && token != 0 && token == pi.fencedToken {
+		pi.mu.Unlock()
 		return nil
 	}
-	port := ingress.body
-	if ingress.state != ProcessIngressLive ||
+	port := pi.body
+	if pi.state != ProcessIngressLive ||
 		port == nil ||
 		token == 0 ||
-		token != ingress.bodyToken ||
-		ingress.growth {
-		ingress.mu.Unlock()
+		token != pi.bodyToken ||
+		pi.growth {
+		pi.mu.Unlock()
 		return errors.New("Function process ingress: payload release has no live run binding")
 	}
-	ingress.budgetOps++
-	ingress.mu.Unlock()
+	pi.budgetOps++
+	pi.mu.Unlock()
 	err := port.ReleaseInputBody(token)
-	ingress.mu.Lock()
-	ingress.budgetOps--
-	if err == nil && ingress.body == port && ingress.bodyToken == token {
-		ingress.body = nil
-		ingress.bodyToken = 0
+	pi.mu.Lock()
+	pi.budgetOps--
+	if err == nil && pi.body == port && pi.bodyToken == token {
+		pi.body = nil
+		pi.bodyToken = 0
 	}
-	ingress.idle.Broadcast()
-	ingress.mu.Unlock()
+	pi.idle.Broadcast()
+	pi.mu.Unlock()
 	return err
 }
 
-func (ingress *ProcessIngress) acquireDelivery() (processInputPort, bool) {
-	ingress.mu.Lock()
-	defer ingress.mu.Unlock()
-	for ingress.state == ProcessIngressPaused {
-		ingress.idle.Wait()
+func (pi *ProcessIngress) acquireDelivery() (processInputPort, bool) {
+	pi.mu.Lock()
+	defer pi.mu.Unlock()
+	for pi.state == ProcessIngressPaused {
+		pi.idle.Wait()
 	}
-	if ingress.state != ProcessIngressLive || ingress.active == nil {
+	if pi.state != ProcessIngressLive || pi.active == nil {
 		return nil, false
 	}
-	ingress.deliveries++
-	return ingress.active, true
+	pi.deliveries++
+	return pi.active, true
 }
 
-func (ingress *ProcessIngress) releaseDelivery() {
-	ingress.mu.Lock()
-	ingress.deliveries--
-	if ingress.deliveries == 0 {
-		ingress.idle.Broadcast()
+func (pi *ProcessIngress) releaseDelivery() {
+	pi.mu.Lock()
+	pi.deliveries--
+	if pi.deliveries == 0 {
+		pi.idle.Broadcast()
 	}
-	ingress.mu.Unlock()
+	pi.mu.Unlock()
 }
 
-func (ingress *ProcessIngress) dispositionDeliveryError(port processInputPort, err error) error {
+func (pi *ProcessIngress) dispositionDeliveryError(port processInputPort, err error) error {
 	if err == nil || !errors.Is(err, jobmgr.ErrStopped) {
 		return err
 	}
-	ingress.mu.Lock()
-	expected := ingress.state == ProcessIngressLive && ingress.pauseSealed && ingress.active == port
-	ingress.mu.Unlock()
+	pi.mu.Lock()
+	expected := pi.state == ProcessIngressLive && pi.pauseSealed && pi.active == port
+	pi.mu.Unlock()
 	if expected {
 		return nil
 	}
 	return err
 }
 
-func (ingress *ProcessIngress) discardCall(call functionwire.Call) error {
+func (pi *ProcessIngress) discardCall(call functionwire.Call) error {
 	if call.InputBodyToken == 0 {
 		return nil
 	}
-	ingress.mu.Lock()
-	if ingress.state == ProcessIngressContained && call.InputBodyToken == ingress.fencedToken {
-		ingress.mu.Unlock()
+	pi.mu.Lock()
+	if pi.state == ProcessIngressContained && call.InputBodyToken == pi.fencedToken {
+		pi.mu.Unlock()
 		return nil
 	}
-	port := ingress.body
+	port := pi.body
 	if port != nil {
-		ingress.body = nil
-		ingress.bodyToken = 0
+		pi.body = nil
+		pi.bodyToken = 0
 	}
-	ingress.mu.Unlock()
+	pi.mu.Unlock()
 	if port == nil {
 		return errors.New("Function process ingress: discarded payload has no run binding")
 	}

@@ -121,81 +121,81 @@ func runtimeAgeGauge(
 	)
 }
 
-func (metrics *runMetrics) SetRuntimeGauge(
+func (rm *runMetrics) SetRuntimeGauge(
 	kind lifecycle.RuntimeGauge,
 	value int,
 ) {
-	if metrics == nil ||
+	if rm == nil ||
 		kind < lifecycle.RuntimeGaugeOperationsActive ||
-		int(kind) >= len(metrics.gauges) {
+		int(kind) >= len(rm.gauges) {
 		return
 	}
-	metrics.gaugeValues[kind].Store(int64(value))
+	rm.gaugeValues[kind].Store(int64(value))
 }
 
-func (metrics *runMetrics) AddRuntimeGauge(
+func (rm *runMetrics) AddRuntimeGauge(
 	kind lifecycle.RuntimeGauge,
 	delta int,
 ) {
-	if metrics == nil ||
+	if rm == nil ||
 		kind < lifecycle.RuntimeGaugeOperationsActive ||
-		int(kind) >= len(metrics.gauges) {
+		int(kind) >= len(rm.gauges) {
 		return
 	}
-	metrics.gaugeValues[kind].Add(int64(delta))
+	rm.gaugeValues[kind].Add(int64(delta))
 }
 
-func (metrics *runMetrics) AddRuntimeCounter(
+func (rm *runMetrics) AddRuntimeCounter(
 	kind lifecycle.RuntimeCounter,
 	delta uint64,
 ) {
-	if metrics == nil ||
+	if rm == nil ||
 		kind < lifecycle.RuntimeCounterOperationsAdmitted ||
-		int(kind) >= len(metrics.counters) {
+		int(kind) >= len(rm.counters) {
 		return
 	}
-	metrics.counterValues[kind].Add(delta)
+	rm.counterValues[kind].Add(delta)
 }
 
-func (metrics *runMetrics) SetRuntimeTimestamp(
+func (rm *runMetrics) SetRuntimeTimestamp(
 	kind lifecycle.RuntimeTimestamp,
 	value time.Time,
 ) {
-	if metrics == nil ||
+	if rm == nil ||
 		kind < lifecycle.RuntimeTimestampOldestOperation ||
-		int(kind) >= len(metrics.timestamps) {
+		int(kind) >= len(rm.timestamps) {
 		return
 	}
 	if value.IsZero() {
-		metrics.timestamps[kind].Store(0)
+		rm.timestamps[kind].Store(0)
 		return
 	}
-	metrics.timestamps[kind].Store(value.UnixNano())
+	rm.timestamps[kind].Store(value.UnixNano())
 }
 
-func (metrics *runMetrics) refreshProjection() error {
-	if metrics == nil {
+func (rm *runMetrics) refreshProjection() error {
+	if rm == nil {
 		return nil
 	}
-	metrics.projectionUpdateMu.Lock()
-	defer metrics.projectionUpdateMu.Unlock()
+	rm.projectionUpdateMu.Lock()
+	defer rm.projectionUpdateMu.Unlock()
 
 	for kind := lifecycle.RuntimeGaugeOperationsActive; kind <= lifecycle.RuntimeGaugeJobsActive; kind++ {
-		metrics.gauges[kind].Set(
-			float64(metrics.gaugeValues[kind].Load()),
+		rm.gauges[kind].Set(
+			float64(rm.gaugeValues[kind].Load()),
 		)
 	}
 	for kind := lifecycle.RuntimeCounterOperationsAdmitted; kind <= lifecycle.RuntimeCounterDirtyRuns; kind++ {
-		current := metrics.counterValues[kind].Load()
-		previous := metrics.counterPublished[kind]
+		current := rm.counterValues[kind].Load()
+		previous := rm.counterPublished[kind]
 		if current > previous {
-			metrics.counters[kind].Add(float64(current - previous))
+			rm.counters[kind].Add(float64(current - previous))
 		}
-		metrics.counterPublished[kind] = current
+		rm.counterPublished[kind] = current
 	}
 	now := time.Now()
 	for kind := lifecycle.RuntimeTimestampOldestOperation; kind <= lifecycle.RuntimeTimestampOldestTaskWait; kind++ {
-		since := metrics.timestamps[kind].Load()
+		since := rm.timestamps[kind].Load()
 		age := float64(0)
 		if since != 0 {
 			age = now.Sub(time.Unix(0, since)).Seconds()
@@ -203,18 +203,18 @@ func (metrics *runMetrics) refreshProjection() error {
 				age = 0
 			}
 		}
-		metrics.ages[kind].Set(age)
+		rm.ages[kind].Set(age)
 	}
 	return nil
 }
 
-func (metrics *runMetrics) register(service runtimecomp.Service) error {
-	if metrics == nil || service == nil {
+func (rm *runMetrics) register(service runtimecomp.Service) error {
+	if rm == nil || service == nil {
 		return nil
 	}
 	if err := service.RegisterComponent(runtimecomp.ComponentConfig{
 		Name:        runtimeComponentName,
-		Store:       metrics.store,
+		Store:       rm.store,
 		UpdateEvery: 1,
 		Autogen: runtimecomp.AutogenPolicy{
 			Enabled: true,
@@ -229,7 +229,7 @@ func (metrics *runMetrics) register(service runtimecomp.Service) error {
 	}
 	if err := service.RegisterProducer(
 		runtimeProducerName,
-		metrics.refreshProjection,
+		rm.refreshProjection,
 	); err != nil {
 		service.UnregisterComponent(runtimeComponentName)
 		return errors.Join(
@@ -240,12 +240,12 @@ func (metrics *runMetrics) register(service runtimecomp.Service) error {
 	return nil
 }
 
-func (metrics *runMetrics) unregister(service runtimecomp.Service) error {
-	if metrics == nil || service == nil {
+func (rm *runMetrics) unregister(service runtimecomp.Service) error {
+	if rm == nil || service == nil {
 		return nil
 	}
 	service.UnregisterProducer(runtimeProducerName)
-	if err := metrics.refreshProjection(); err != nil {
+	if err := rm.refreshProjection(); err != nil {
 		service.QuarantineComponent(runtimeComponentName)
 		return err
 	}

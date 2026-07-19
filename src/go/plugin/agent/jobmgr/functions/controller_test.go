@@ -370,18 +370,18 @@ type controllerTestMutationPort struct {
 	catalog *Catalog
 }
 
-func (port *controllerTestMutationPort) QuiesceFunctions(
+func (ctmp *controllerTestMutationPort) QuiesceFunctions(
 	_ context.Context,
 	mutation jobmgr.FunctionCatalogMutation,
 ) error {
-	if port == nil || port.catalog == nil {
+	if ctmp == nil || ctmp.catalog == nil {
 		return errors.New("nil mutation port")
 	}
-	if err := port.catalog.BeginMutation(mutation); err != nil {
+	if err := ctmp.catalog.BeginMutation(mutation); err != nil {
 		return err
 	}
 	for {
-		progress, err := port.catalog.AdvanceMutationQuiesce(
+		progress, err := ctmp.catalog.AdvanceMutationQuiesce(
 			jobmgr.MaximumFunctionMutationQuantum,
 		)
 		if err != nil {
@@ -393,19 +393,19 @@ func (port *controllerTestMutationPort) QuiesceFunctions(
 	}
 }
 
-func (port *controllerTestMutationPort) CommitFunctions(
+func (ctmp *controllerTestMutationPort) CommitFunctions(
 	_ context.Context,
 	mutation jobmgr.FunctionCatalogMutation,
 ) (uint64, error) {
-	if port == nil || port.catalog == nil {
+	if ctmp == nil || ctmp.catalog == nil {
 		return 0, errors.New("nil mutation port")
 	}
-	if err := port.catalog.ResumeMutation(mutation); err != nil {
+	if err := ctmp.catalog.ResumeMutation(mutation); err != nil {
 		return 0, err
 	}
 	for {
 		var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-		progress, count, err := port.catalog.AdvanceMutation(
+		progress, count, err := ctmp.catalog.AdvanceMutation(
 			jobmgr.MaximumFunctionMutationQuantum,
 			&cleanups,
 		)
@@ -415,7 +415,7 @@ func (port *controllerTestMutationPort) CommitFunctions(
 		for index := 0; index < count; index++ {
 			cleanup := cleanups[index]
 			_, cleanupErr := cleanup.Runner.RunTask(context.Background())
-			if err := port.catalog.CompleteCleanup(cleanup.Ref, cleanupErr); err != nil {
+			if err := ctmp.catalog.CompleteCleanup(cleanup.Ref, cleanupErr); err != nil {
 				return 0, errors.Join(cleanupErr, err)
 			}
 		}
@@ -425,25 +425,25 @@ func (port *controllerTestMutationPort) CommitFunctions(
 	}
 }
 
-func (port *controllerTestMutationPort) AbortFunctions(
+func (ctmp *controllerTestMutationPort) AbortFunctions(
 	_ context.Context,
 	mutation jobmgr.FunctionCatalogMutation,
 ) error {
-	if port == nil || port.catalog == nil {
+	if ctmp == nil || ctmp.catalog == nil {
 		return errors.New("nil mutation port")
 	}
-	if err := port.catalog.ResumeMutation(mutation); err != nil {
+	if err := ctmp.catalog.ResumeMutation(mutation); err != nil {
 		return err
 	}
 	var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-	count, err := port.catalog.AbortMutation(&cleanups)
+	count, err := ctmp.catalog.AbortMutation(&cleanups)
 	if err != nil {
 		return err
 	}
 	for index := 0; index < count; index++ {
 		cleanup := cleanups[index]
 		_, cleanupErr := cleanup.Runner.RunTask(context.Background())
-		if err := port.catalog.CompleteCleanup(
+		if err := ctmp.catalog.CompleteCleanup(
 			cleanup.Ref,
 			cleanupErr,
 		); err != nil {
@@ -479,22 +479,22 @@ type blockingWithdrawPublicationPort struct {
 	release chan struct{}
 }
 
-func (port *blockingWithdrawPublicationPort) Withdraw(
+func (bwpp *blockingWithdrawPublicationPort) Withdraw(
 	handle PublicationHandle,
 ) error {
-	close(port.entered)
-	<-port.release
-	return port.recordingPublicationPort.Withdraw(handle)
+	close(bwpp.entered)
+	<-bwpp.release
+	return bwpp.recordingPublicationPort.Withdraw(handle)
 }
 
-func (handler *controllerTestHandler) MethodParams(
+func (cth *controllerTestHandler) MethodParams(
 	context.Context,
 	string,
 ) ([]funcapi.ParamConfig, error) {
 	return nil, nil
 }
 
-func (handler *controllerTestHandler) Handle(
+func (cth *controllerTestHandler) Handle(
 	context.Context,
 	string,
 	funcapi.ResolvedParams,
@@ -502,30 +502,30 @@ func (handler *controllerTestHandler) Handle(
 	return &funcapi.FunctionResponse{Status: 200}
 }
 
-func (handler *controllerTestHandler) HandleRaw(
+func (cth *controllerTestHandler) HandleRaw(
 	_ context.Context,
 	request funcapi.RawMethodRequest,
 ) *funcapi.FunctionResponse {
-	handler.mu.Lock()
-	handler.raw = request
-	handler.mu.Unlock()
+	cth.mu.Lock()
+	cth.raw = request
+	cth.mu.Unlock()
 	return &funcapi.FunctionResponse{Status: 200}
 }
 
-func (handler *controllerTestHandler) Cleanup(context.Context) {
-	handler.mu.Lock()
-	handler.cleanups++
-	handler.mu.Unlock()
+func (cth *controllerTestHandler) Cleanup(context.Context) {
+	cth.mu.Lock()
+	cth.cleanups++
+	cth.mu.Unlock()
 }
 
-func (handler *controllerTestHandler) rawRequest() funcapi.RawMethodRequest {
-	handler.mu.Lock()
-	defer handler.mu.Unlock()
-	return handler.raw
+func (cth *controllerTestHandler) rawRequest() funcapi.RawMethodRequest {
+	cth.mu.Lock()
+	defer cth.mu.Unlock()
+	return cth.raw
 }
 
-func (handler *controllerTestHandler) cleanupCount() int {
-	handler.mu.Lock()
-	defer handler.mu.Unlock()
-	return handler.cleanups
+func (cth *controllerTestHandler) cleanupCount() int {
+	cth.mu.Lock()
+	defer cth.mu.Unlock()
+	return cth.cleanups
 }

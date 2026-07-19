@@ -84,21 +84,21 @@ func NewPublication(epoch uint64, port PublicationPort) (*Publication, error) {
 // ApplyInitialSnapshot installs one complete catalog-backed snapshot before
 // Function ingress is published. Catalog storage, rather than the steady
 // mutation quantum, bounds the snapshot.
-func (publication *Publication) ApplyInitialSnapshot(
+func (p *Publication) ApplyInitialSnapshot(
 	epoch, version uint64,
 	digest [32]byte,
 	catalogStorageBytes int64,
 	changes []PublicationChange,
 ) error {
-	if publication == nil {
+	if p == nil {
 		return errors.New("jobmgr Function publication: invalid initial snapshot")
 	}
-	if publication.version != 0 ||
-		len(publication.published) != 0 ||
+	if p.version != 0 ||
+		len(p.published) != 0 ||
 		catalogStorageBytes < 0 ||
 		catalogStorageBytes > MaximumCatalogStorageBytes ||
 		int64(len(changes)) > catalogStorageBytes {
-		return publication.poison(
+		return p.poison(
 			errors.New(
 				"jobmgr Function publication: invalid initial snapshot",
 			),
@@ -106,14 +106,14 @@ func (publication *Publication) ApplyInitialSnapshot(
 	}
 	for _, change := range changes {
 		if change.Record == nil {
-			return publication.poison(
+			return p.poison(
 				errors.New(
 					"jobmgr Function publication: initial snapshot contains a withdrawal",
 				),
 			)
 		}
 	}
-	return publication.applyTransition(epoch, version, digest, changes, 0, func() error {
+	return p.applyTransition(epoch, version, digest, changes, 0, func() error {
 		return nil
 	}, nil, nil)
 }
@@ -122,7 +122,7 @@ func (publication *Publication) ApplyInitialSnapshot(
 // commits the private catalog transition, and only then publishes successors.
 // The caller must serialize this method with all other publication and catalog
 // mutations.
-func (publication *Publication) ApplyTransition(
+func (p *Publication) ApplyTransition(
 	epoch, version uint64,
 	digest [32]byte,
 	changes []PublicationChange,
@@ -130,7 +130,7 @@ func (publication *Publication) ApplyTransition(
 	commit func() error,
 	abort func() error,
 ) error {
-	return publication.applyTransition(
+	return p.applyTransition(
 		epoch,
 		version,
 		digest,
@@ -142,7 +142,7 @@ func (publication *Publication) ApplyTransition(
 	)
 }
 
-func (publication *Publication) applyTransition(
+func (p *Publication) applyTransition(
 	epoch, version uint64,
 	digest [32]byte,
 	changes []PublicationChange,
@@ -157,7 +157,7 @@ func (publication *Publication) applyTransition(
 	if maximumChanges != 0 && (quiesce == nil || abort == nil) {
 		return errors.New("jobmgr Function publication: incomplete transition boundary")
 	}
-	if err := publication.validateTransition(
+	if err := p.validateTransition(
 		epoch,
 		version,
 		changes,
@@ -167,165 +167,165 @@ func (publication *Publication) applyTransition(
 	}
 	if quiesce != nil {
 		if err := quiesce(); err != nil {
-			return publication.poison(err)
+			return p.poison(err)
 		}
 	}
 	for _, change := range changes {
-		current, exists := publication.published[change.Name]
+		current, exists := p.published[change.Name]
 		if !exists || (change.Record != nil && current.record == *change.Record) {
 			continue
 		}
-		if err := publication.port.Withdraw(current.handle); err != nil {
-			return publication.poison(errors.Join(err, abort()))
+		if err := p.port.Withdraw(current.handle); err != nil {
+			return p.poison(errors.Join(err, abort()))
 		}
-		delete(publication.published, change.Name)
+		delete(p.published, change.Name)
 	}
 	if err := commit(); err != nil {
-		return publication.poison(err)
+		return p.poison(err)
 	}
 	for _, change := range changes {
 		if change.Record == nil {
 			continue
 		}
-		current, exists := publication.published[change.Name]
+		current, exists := p.published[change.Name]
 		if exists && current.record == *change.Record {
 			continue
 		}
-		handle, err := publication.port.Publish(*change.Record)
+		handle, err := p.port.Publish(*change.Record)
 		if err != nil {
-			return publication.poison(err)
+			return p.poison(err)
 		}
-		if err := publication.validateHandle(handle, *change.Record); err != nil {
+		if err := p.validateHandle(handle, *change.Record); err != nil {
 			if handle.ID != 0 {
-				publication.retained = append(publication.retained, handle)
+				p.retained = append(p.retained, handle)
 			}
-			return publication.poison(err)
+			return p.poison(err)
 		}
 		next := publishedRoute{record: *change.Record, handle: handle}
-		publication.published[change.Name] = next
+		p.published[change.Name] = next
 	}
-	publication.version = version
-	publication.digest = digest
+	p.version = version
+	p.digest = digest
 	return nil
 }
 
-func (publication *Publication) validateTransition(
+func (p *Publication) validateTransition(
 	epoch, version uint64,
 	changes []PublicationChange,
 	maximumChanges int,
 ) error {
-	if publication == nil || publication.port == nil {
+	if p == nil || p.port == nil {
 		return errors.New("jobmgr Function publication: invalid state")
 	}
-	if publication.dirty != nil {
-		return publication.dirty
+	if p.dirty != nil {
+		return p.dirty
 	}
-	if publication.stopped {
+	if p.stopped {
 		return errors.New("jobmgr Function publication: apply after stop")
 	}
-	if epoch != publication.epoch ||
+	if epoch != p.epoch ||
 		version == 0 ||
-		version != publication.version+1 ||
+		version != p.version+1 ||
 		maximumChanges < 0 ||
 		maximumChanges != 0 && len(changes) > maximumChanges {
-		return publication.poison(errors.New("jobmgr Function publication: stale or invalid transition"))
+		return p.poison(errors.New("jobmgr Function publication: stale or invalid transition"))
 	}
 	seen := make(map[string]struct{}, len(changes))
 	for _, change := range changes {
 		if change.Name == "" {
-			return publication.poison(errors.New("jobmgr Function publication: empty route name"))
+			return p.poison(errors.New("jobmgr Function publication: empty route name"))
 		}
 		if _, ok := seen[change.Name]; ok {
-			return publication.poison(errors.New("jobmgr Function publication: duplicate route change"))
+			return p.poison(errors.New("jobmgr Function publication: duplicate route change"))
 		}
 		seen[change.Name] = struct{}{}
-		_, exists := publication.published[change.Name]
+		_, exists := p.published[change.Name]
 		if change.Record == nil {
 			if !exists {
-				return publication.poison(errors.New("jobmgr Function publication: withdraw of unpublished route"))
+				return p.poison(errors.New("jobmgr Function publication: withdraw of unpublished route"))
 			}
 			continue
 		}
 		if change.Record.Name != change.Name || change.Record.Generation == 0 ||
 			change.Record.Timeout < 0 || change.Record.Priority < 0 ||
 			change.Record.Version < 0 || change.Record.Access == "" {
-			return publication.poison(errors.New("jobmgr Function publication: invalid desired record"))
+			return p.poison(errors.New("jobmgr Function publication: invalid desired record"))
 		}
 	}
 	return nil
 }
 
-func (publication *Publication) validateHandle(handle PublicationHandle, record PublicationRecord) error {
-	if handle.ID == 0 || handle.Epoch != publication.epoch ||
+func (p *Publication) validateHandle(handle PublicationHandle, record PublicationRecord) error {
+	if handle.ID == 0 || handle.Epoch != p.epoch ||
 		handle.Generation != record.Generation || handle.Name != record.Name {
 		return errors.New("jobmgr Function publication: mismatched acknowledgement handle")
 	}
 	return nil
 }
 
-func (publication *Publication) Poll(epoch, version uint64, digest [32]byte) error {
-	if publication == nil {
+func (p *Publication) Poll(epoch, version uint64, digest [32]byte) error {
+	if p == nil {
 		return errors.New("jobmgr Function publication: nil poll")
 	}
-	if publication.dirty != nil {
-		return publication.dirty
+	if p.dirty != nil {
+		return p.dirty
 	}
-	if publication.stopped {
+	if p.stopped {
 		return errors.New("jobmgr Function publication: poll after stop")
 	}
-	if epoch != publication.epoch || version != publication.version || digest != publication.digest {
-		return publication.poison(errors.New("jobmgr Function publication: stale availability poll"))
+	if epoch != p.epoch || version != p.version || digest != p.digest {
+		return p.poison(errors.New("jobmgr Function publication: stale availability poll"))
 	}
 	return nil
 }
 
-func (publication *Publication) Stop(epoch uint64) error {
-	if publication == nil {
+func (p *Publication) Stop(epoch uint64) error {
+	if p == nil {
 		return nil
 	}
-	if publication.stopped && len(publication.published) == 0 && len(publication.retained) == 0 {
-		return publication.dirty
+	if p.stopped && len(p.published) == 0 && len(p.retained) == 0 {
+		return p.dirty
 	}
-	publication.stopped = true
+	p.stopped = true
 	var stopErr error
-	if epoch != publication.epoch {
-		stopErr = publication.poison(errors.New("jobmgr Function publication: stop epoch mismatch"))
+	if epoch != p.epoch {
+		stopErr = p.poison(errors.New("jobmgr Function publication: stop epoch mismatch"))
 	}
-	for name, current := range publication.published {
-		if err := publication.port.Withdraw(current.handle); err != nil {
+	for name, current := range p.published {
+		if err := p.port.Withdraw(current.handle); err != nil {
 			stopErr = errors.Join(stopErr, err)
 			continue
 		}
-		delete(publication.published, name)
+		delete(p.published, name)
 	}
-	retained := publication.retained[:0]
-	for _, handle := range publication.retained {
-		if err := publication.port.Withdraw(handle); err != nil {
+	retained := p.retained[:0]
+	for _, handle := range p.retained {
+		if err := p.port.Withdraw(handle); err != nil {
 			stopErr = errors.Join(stopErr, err)
 			retained = append(retained, handle)
 		}
 	}
-	publication.retained = retained
-	return errors.Join(publication.dirty, stopErr)
+	p.retained = retained
+	return errors.Join(p.dirty, stopErr)
 }
 
-func (publication *Publication) Census() PublicationCensus {
-	if publication == nil {
+func (p *Publication) Census() PublicationCensus {
+	if p == nil {
 		return PublicationCensus{}
 	}
 	return PublicationCensus{
-		Epoch: publication.epoch, Version: publication.version,
-		Published: len(publication.published), RetainedHandles: len(publication.retained),
-		Stopped: publication.stopped, Dirty: publication.dirty != nil,
+		Epoch: p.epoch, Version: p.version,
+		Published: len(p.published), RetainedHandles: len(p.retained),
+		Stopped: p.stopped, Dirty: p.dirty != nil,
 	}
 }
 
-func (publication *Publication) poison(err error) error {
+func (p *Publication) poison(err error) error {
 	if err == nil {
-		return publication.dirty
+		return p.dirty
 	}
-	publication.dirty = errors.Join(publication.dirty, err)
-	return publication.dirty
+	p.dirty = errors.Join(p.dirty, err)
+	return p.dirty
 }
 
 func DigestSortedPublications(records []PublicationRecord) ([32]byte, error) {

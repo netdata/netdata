@@ -43,62 +43,62 @@ func newStoreGenerationResource(
 	}, nil
 }
 
-func (resource *storeGenerationResource) Identity() lifecycle.ResourceIdentity {
-	if resource == nil {
+func (sgr *storeGenerationResource) Identity() lifecycle.ResourceIdentity {
+	if sgr == nil {
 		return lifecycle.ResourceIdentity{}
 	}
-	return resource.identity
+	return sgr.identity
 }
 
 func (*storeGenerationResource) Publish() error { return nil }
 
-func (resource *storeGenerationResource) AbortReady(
+func (sgr *storeGenerationResource) AbortReady(
 	ctx context.Context,
 ) error {
-	return resource.retire(ctx)
+	return sgr.retire(ctx)
 }
 
 func (*storeGenerationResource) Stop(context.Context) error { return nil }
 
-func (resource *storeGenerationResource) Finalize() error {
-	return resource.retire(context.Background())
+func (sgr *storeGenerationResource) Finalize() error {
+	return sgr.retire(context.Background())
 }
 
-func (resource *storeGenerationResource) supersede() error {
-	if resource == nil {
+func (sgr *storeGenerationResource) supersede() error {
+	if sgr == nil {
 		return errors.New(
 			"jobmgr secrets: nil superseded Store resource",
 		)
 	}
-	resource.mu.Lock()
-	defer resource.mu.Unlock()
-	if resource.retired {
+	sgr.mu.Lock()
+	defer sgr.mu.Unlock()
+	if sgr.retired {
 		return errors.New(
 			"jobmgr secrets: Store resource already retired",
 		)
 	}
-	resource.retired = true
+	sgr.retired = true
 	return nil
 }
 
-func (resource *storeGenerationResource) retire(
+func (sgr *storeGenerationResource) retire(
 	ctx context.Context,
 ) error {
-	if resource == nil || ctx == nil {
+	if sgr == nil || ctx == nil {
 		return errors.New(
 			"jobmgr secrets: invalid Store resource retirement",
 		)
 	}
-	resource.mu.Lock()
-	if resource.retired {
-		resource.mu.Unlock()
+	sgr.mu.Lock()
+	if sgr.retired {
+		sgr.mu.Unlock()
 		return errors.New(
 			"jobmgr secrets: Store resource retired twice",
 		)
 	}
-	resource.retired = true
+	sgr.retired = true
 	store, key, generation :=
-		resource.store, resource.key, resource.storeGen
-	resource.mu.Unlock()
+		sgr.store, sgr.key, sgr.storeGen
+	sgr.mu.Unlock()
 	return store.Retire(ctx, key, generation)
 }

@@ -44,17 +44,17 @@ func NewPlannerFromDeclarations(declarations []JobDeclaration) (*Planner, error)
 	return NewPlanner(graph)
 }
 
-func (planner *Planner) IDs() []string {
-	return planner.graph.IDs()
+func (p *Planner) IDs() []string {
+	return p.graph.IDs()
 }
 
-func (planner *Planner) Plan(request jobmgr.Request) (jobmgr.WorkPlan, error) {
+func (p *Planner) Plan(request jobmgr.Request) (jobmgr.WorkPlan, error) {
 	route := request.Route
 	args := request.Args
 	if route != "config" || len(args) != 2 || args[1] != "get" {
 		return jobmgr.RejectionPlan(lifecycle.ControlBadRequest), nil
 	}
-	config, ok := planner.graph.Lookup(args[0])
+	config, ok := p.graph.Lookup(args[0])
 	if !ok {
 		return jobmgr.RejectionPlan(lifecycle.ControlNotFound, "job:"+args[0]), nil
 	}

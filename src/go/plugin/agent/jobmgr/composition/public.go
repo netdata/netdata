@@ -209,92 +209,92 @@ func NewProcess(config Config) (*Process, error) {
 	}, nil
 }
 
-func (process *Process) Run(ctx context.Context) error {
-	if process == nil || ctx == nil {
+func (p *Process) Run(ctx context.Context) error {
+	if p == nil || ctx == nil {
 		return errors.New("jobmgr composition: invalid production run")
 	}
-	process.mu.Lock()
-	if process.attempted {
-		process.mu.Unlock()
+	p.mu.Lock()
+	if p.attempted {
+		p.mu.Unlock()
 		return errors.New("jobmgr composition: production run already attempted")
 	}
-	process.attempted = true
-	process.running = true
-	close(process.started)
-	process.mu.Unlock()
+	p.attempted = true
+	p.running = true
+	close(p.started)
+	p.mu.Unlock()
 
-	if process.runtime != nil {
-		process.runtime.Start(
-			process.pluginName,
-			processFrameWriter{frames: process.core.frames},
+	if p.runtime != nil {
+		p.runtime.Start(
+			p.pluginName,
+			processFrameWriter{frames: p.core.frames},
 		)
 	}
-	result := process.core.run(ctx, process.commands)
-	process.mu.Lock()
-	process.result = result
-	process.running = false
-	close(process.done)
-	process.mu.Unlock()
+	result := p.core.run(ctx, p.commands)
+	p.mu.Lock()
+	p.result = result
+	p.running = false
+	close(p.done)
+	p.mu.Unlock()
 	return result
 }
 
-func (process *Process) Restart(ctx context.Context) error {
-	return process.send(ctx, processRestart)
+func (p *Process) Restart(ctx context.Context) error {
+	return p.send(ctx, processRestart)
 }
 
-func (process *Process) Terminate(ctx context.Context) error {
-	return process.send(ctx, processTerminate)
+func (p *Process) Terminate(ctx context.Context) error {
+	return p.send(ctx, processTerminate)
 }
 
-func (process *Process) Done() <-chan struct{} {
-	if process == nil {
+func (p *Process) Done() <-chan struct{} {
+	if p == nil {
 		closed := make(chan struct{})
 		close(closed)
 		return closed
 	}
-	return process.done
+	return p.done
 }
 
-func (process *Process) Wait(ctx context.Context) error {
-	if process == nil || ctx == nil {
+func (p *Process) Wait(ctx context.Context) error {
+	if p == nil || ctx == nil {
 		return errors.New("jobmgr composition: invalid production wait")
 	}
 	select {
-	case <-process.done:
-		process.mu.Lock()
-		defer process.mu.Unlock()
-		return process.result
+	case <-p.done:
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return p.result
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func (process *Process) send(
+func (p *Process) send(
 	ctx context.Context,
 	command processCommand,
 ) error {
-	if process == nil || ctx == nil {
+	if p == nil || ctx == nil {
 		return errors.New("jobmgr composition: invalid process command")
 	}
 	select {
-	case <-process.done:
+	case <-p.done:
 		return ErrProcessStopped
 	default:
 	}
 	select {
-	case <-process.started:
-	case <-process.done:
+	case <-p.started:
+	case <-p.done:
 		return ErrProcessStopped
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 	result := make(chan error, 1)
 	select {
-	case process.commands <- processControl{
+	case p.commands <- processControl{
 		command: command,
 		result:  result,
 	}:
-	case <-process.done:
+	case <-p.done:
 		return ErrProcessStopped
 	case <-ctx.Done():
 		return ctx.Err()
@@ -302,15 +302,15 @@ func (process *Process) send(
 	select {
 	case err := <-result:
 		return err
-	case <-process.done:
+	case <-p.done:
 		select {
 		case err := <-result:
 			return err
 		default:
 		}
-		process.mu.Lock()
-		defer process.mu.Unlock()
-		return process.result
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		return p.result
 	}
 }
 
@@ -371,14 +371,14 @@ type processFrameWriter struct {
 	frames *lifecycle.FrameOwner
 }
 
-func (writer processFrameWriter) Write(payload []byte) (int, error) {
-	if writer.frames == nil {
+func (pfw processFrameWriter) Write(payload []byte) (int, error) {
+	if pfw.frames == nil {
 		return 0, errors.New("jobmgr composition: runtime output has no frame owner")
 	}
 	if len(payload) == 0 {
 		return 0, nil
 	}
-	if err := writer.frames.CommitBorrowedProtocolFrame(payload); err != nil {
+	if err := pfw.frames.CommitBorrowedProtocolFrame(payload); err != nil {
 		return 0, err
 	}
 	return len(payload), nil

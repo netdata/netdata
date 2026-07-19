@@ -111,41 +111,41 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 	}, nil
 }
 
-func (process *processCore) run(
+func (pc *processCore) run(
 	ctx context.Context,
 	commands <-chan processControl,
 ) error {
-	if process == nil || ctx == nil || commands == nil {
+	if pc == nil || ctx == nil || commands == nil {
 		return errors.New("jobmgr composition: invalid process run")
 	}
-	process.mu.Lock()
-	if process.started {
-		process.mu.Unlock()
+	pc.mu.Lock()
+	if pc.started {
+		pc.mu.Unlock()
 		return errors.New("jobmgr composition: process already started")
 	}
-	process.started = true
-	process.mu.Unlock()
+	pc.started = true
+	pc.mu.Unlock()
 
-	generationID := process.config.FirstGeneration
-	generation, err := process.newRun(generationID)
+	generationID := pc.config.FirstGeneration
+	generation, err := pc.newRun(generationID)
 	if err != nil {
-		return process.finalize(nil, generationID, err)
+		return pc.finalize(nil, generationID, err)
 	}
 	if err := generation.Start(ctx); err != nil {
-		return process.finalize(generation, generationID, err)
+		return pc.finalize(generation, generationID, err)
 	}
-	binding, err := process.binding(generation)
+	binding, err := pc.binding(generation)
 	if err != nil {
-		return process.finalize(generation, generationID, err)
+		return pc.finalize(generation, generationID, err)
 	}
-	if err := process.ingress.Adopt(ctx, binding); err != nil {
-		return process.finalize(generation, generationID, err)
+	if err := pc.ingress.Adopt(ctx, binding); err != nil {
+		return pc.finalize(generation, generationID, err)
 	}
 	inputDone := make(chan processInputCompletion, 1)
 	go func() {
 		inputDone <- processInputCompletion{
-			err:  process.ingress.Run(ctx),
-			quit: process.quit.Load(),
+			err:  pc.ingress.Run(ctx),
+			quit: pc.quit.Load(),
 		}
 	}()
 	ticks := ticker.New(time.Second)
@@ -155,9 +155,9 @@ func (process *processCore) run(
 		select {
 		case input := <-inputDone:
 			if input.quit {
-				return process.finalize(generation, generationID, input.err)
+				return pc.finalize(generation, generationID, input.err)
 			}
-			return process.finalize(
+			return pc.finalize(
 				generation,
 				generationID,
 				errors.Join(
@@ -166,7 +166,7 @@ func (process *processCore) run(
 				),
 			)
 		case <-generation.kernel.Done():
-			return process.finalize(
+			return pc.finalize(
 				generation,
 				generationID,
 				errors.Join(
@@ -175,20 +175,20 @@ func (process *processCore) run(
 				),
 			)
 		case <-ctx.Done():
-			return process.finalize(generation, generationID, ctx.Err())
+			return pc.finalize(generation, generationID, ctx.Err())
 		case clock := <-ticks.C:
 			if err := generation.scheduler.Tick(ctx, clock); err != nil {
 				_ = generation.run.Dirty(err)
 				generation.Stop()
 				continue
 			}
-			if process.config.KeepAlive {
-				if err := process.frames.CommitProtocolFrame(
+			if pc.config.KeepAlive {
+				if err := pc.frames.CommitProtocolFrame(
 					[]byte{'\n'},
 				); err == nil {
 					continue
 				} else {
-					return process.finalize(
+					return pc.finalize(
 						generation,
 						generationID,
 						errors.Join(
@@ -202,7 +202,7 @@ func (process *processCore) run(
 			}
 		case control := <-commands:
 			if control.result == nil {
-				return process.finalize(
+				return pc.finalize(
 					generation,
 					generationID,
 					errors.New("jobmgr composition: invalid process control"),
@@ -212,7 +212,7 @@ func (process *processCore) run(
 			case processRestart:
 				nextID := generationID + 1
 				if nextID == 0 {
-					finalErr := process.finalize(
+					finalErr := pc.finalize(
 						generation,
 						generationID,
 						errors.New("jobmgr composition: run generation wrapped"),
@@ -220,14 +220,14 @@ func (process *processCore) run(
 					control.result <- finalErr
 					return finalErr
 				}
-				next, finalGeneration, rotateErr := process.rotate(
+				next, finalGeneration, rotateErr := pc.rotate(
 					ctx,
 					generation,
 					generationID,
 					nextID,
 				)
 				if rotateErr != nil {
-					finalErr := process.finalize(next, finalGeneration, rotateErr)
+					finalErr := pc.finalize(next, finalGeneration, rotateErr)
 					control.result <- finalErr
 					return finalErr
 				}
@@ -235,11 +235,11 @@ func (process *processCore) run(
 				generationID = nextID
 				control.result <- nil
 			case processTerminate:
-				finalErr := process.finalize(generation, generationID, nil)
+				finalErr := pc.finalize(generation, generationID, nil)
 				control.result <- finalErr
 				return finalErr
 			default:
-				finalErr := process.finalize(
+				finalErr := pc.finalize(
 					generation,
 					generationID,
 					errors.New("jobmgr composition: invalid process command"),
@@ -251,46 +251,46 @@ func (process *processCore) run(
 	}
 }
 
-func (process *processCore) newRun(
+func (pc *processCore) newRun(
 	generation uint64,
 ) (*runGeneration, error) {
 	return newRunGeneration(runGenerationConfig{
-		Generation: generation, ShutdownTimeout: process.config.ShutdownTimeout,
-		Clock: process.config.Clock, Admission: process.admission,
-		UIDs: process.uids, Frames: process.frames,
-		Modules: process.config.Modules, Jobs: process.config.Jobs,
-		Secrets:   process.config.Secrets,
-		Discovery: process.config.Discovery,
-		Planner:   process.config.Planner,
+		Generation: generation, ShutdownTimeout: pc.config.ShutdownTimeout,
+		Clock: pc.config.Clock, Admission: pc.admission,
+		UIDs: pc.uids, Frames: pc.frames,
+		Modules: pc.config.Modules, Jobs: pc.config.Jobs,
+		Secrets:   pc.config.Secrets,
+		Discovery: pc.config.Discovery,
+		Planner:   pc.config.Planner,
 	})
 }
 
-func (process *processCore) binding(
+func (pc *processCore) binding(
 	generation *runGeneration,
 ) (functionadapter.ProcessBinding, error) {
-	if process == nil || generation == nil {
+	if pc == nil || generation == nil {
 		return functionadapter.ProcessBinding{},
 			errors.New("jobmgr composition: invalid process binding")
 	}
 	return functionadapter.NewProcessBinding(
 		generation.kernel,
-		process.admission,
+		pc.admission,
 		generation.run.Generation(),
 		generation.inputBodyGrants,
-		process.config.Clock,
+		pc.config.Clock,
 		func() {
-			process.quit.Store(true)
+			pc.quit.Store(true)
 		},
 	)
 }
 
-func (process *processCore) rotate(
+func (pc *processCore) rotate(
 	ctx context.Context,
 	current *runGeneration,
 	currentID uint64,
 	nextID uint64,
 ) (*runGeneration, uint64, error) {
-	if err := process.ingress.SealPause(); err != nil {
+	if err := pc.ingress.SealPause(); err != nil {
 		return current, currentID, err
 	}
 	current.Stop()
@@ -299,36 +299,36 @@ func (process *processCore) rotate(
 		return current, currentID, err
 	}
 	shutdownCtx := budget.Context()
-	if err := process.ingress.DrainPause(shutdownCtx, nextID); err != nil {
+	if err := pc.ingress.DrainPause(shutdownCtx, nextID); err != nil {
 		return current, currentID, err
 	}
-	if err := process.retireRun(shutdownCtx, current); err != nil {
+	if err := pc.retireRun(shutdownCtx, current); err != nil {
 		return current, currentID, err
 	}
 	if err := current.run.FinishShutdown(); err != nil {
 		return current, currentID, err
 	}
-	if err := process.admission.ReopenDrained(currentID, nextID); err != nil {
+	if err := pc.admission.ReopenDrained(currentID, nextID); err != nil {
 		return current, currentID, err
 	}
-	next, err := process.newRun(nextID)
+	next, err := pc.newRun(nextID)
 	if err != nil {
 		return nil, nextID, err
 	}
 	if err := next.Start(ctx); err != nil {
 		return next, nextID, err
 	}
-	binding, err := process.binding(next)
+	binding, err := pc.binding(next)
 	if err != nil {
 		return next, nextID, err
 	}
-	if err := process.ingress.Adopt(ctx, binding); err != nil {
+	if err := pc.ingress.Adopt(ctx, binding); err != nil {
 		return next, nextID, err
 	}
 	return next, nextID, nil
 }
 
-func (process *processCore) finalize(
+func (pc *processCore) finalize(
 	current *runGeneration,
 	generation uint64,
 	cause error,
@@ -336,13 +336,13 @@ func (process *processCore) finalize(
 	finalErr := cause
 	shutdownCtx, cancel := context.WithTimeout(
 		context.Background(),
-		process.config.ShutdownTimeout,
+		pc.config.ShutdownTimeout,
 	)
 	defer cancel()
 	var finishRun *lifecycle.RunSupervisor
 	if current != nil && current.Started() {
-		if process.ingress.Census().State == functionadapter.ProcessIngressLive {
-			if err := process.ingress.SealPause(); err != nil {
+		if pc.ingress.Census().State == functionadapter.ProcessIngressLive {
+			if err := pc.ingress.SealPause(); err != nil {
 				finalErr = errors.Join(finalErr, err)
 			}
 		}
@@ -354,21 +354,21 @@ func (process *processCore) finalize(
 			shutdownCtx = budget.Context()
 			finishRun = current.run
 		}
-		if census := process.ingress.Census(); census.State == functionadapter.ProcessIngressLive {
-			if err := process.ingress.DrainPause(shutdownCtx, 0); err != nil {
+		if census := pc.ingress.Census(); census.State == functionadapter.ProcessIngressLive {
+			if err := pc.ingress.DrainPause(shutdownCtx, 0); err != nil {
 				finalErr = errors.Join(finalErr, err)
 			}
 		}
-		if err := process.retireRun(shutdownCtx, current); err != nil {
+		if err := pc.retireRun(shutdownCtx, current); err != nil {
 			finalErr = errors.Join(finalErr, err)
 		}
 	} else if current != nil {
 		finalErr = errors.Join(finalErr, current.abortConstruction())
 	}
-	ingress := process.ingress.Census()
+	ingress := pc.ingress.Census()
 	switch ingress.State {
 	case functionadapter.ProcessIngressPaused:
-		finalErr = errors.Join(finalErr, process.ingress.Fence(shutdownCtx))
+		finalErr = errors.Join(finalErr, pc.ingress.Fence(shutdownCtx))
 	case functionadapter.ProcessIngressContained:
 	case functionadapter.ProcessIngressLive:
 		finalErr = errors.Join(
@@ -381,17 +381,17 @@ func (process *processCore) finalize(
 			errors.New("jobmgr composition: invalid final Function ingress state"),
 		)
 	}
-	if err := closeProcessUIDs(shutdownCtx, process.uids); err != nil {
+	if err := closeProcessUIDs(shutdownCtx, pc.uids); err != nil {
 		finalErr = errors.Join(finalErr, err)
 	}
-	switch census := process.admission.Census(); census.Phase {
+	switch census := pc.admission.Census(); census.Phase {
 	case "ordinary-open":
-		if err := process.admission.BeginCleanupOnly(generation); err != nil {
+		if err := pc.admission.BeginCleanupOnly(generation); err != nil {
 			finalErr = errors.Join(finalErr, err)
 		}
 		fallthrough
 	case "cleanup-only":
-		if err := process.admission.CloseDrained(generation); err != nil {
+		if err := pc.admission.CloseDrained(generation); err != nil {
 			finalErr = errors.Join(finalErr, err)
 		}
 	case "closed":
@@ -406,24 +406,24 @@ func (process *processCore) finalize(
 			finalErr = errors.Join(finalErr, err)
 		}
 	}
-	if err := process.admission.ReleaseProcessBytes(
+	if err := pc.admission.ReleaseProcessBytes(
 		processAdmissionBytes,
 	); err != nil {
 		finalErr = errors.Join(finalErr, err)
 	}
-	if process.ingress.Census().State != functionadapter.ProcessIngressContained {
+	if pc.ingress.Census().State != functionadapter.ProcessIngressContained {
 		finalErr = errors.Join(
 			finalErr,
 			errors.New("jobmgr composition: Function ingress was not contained"),
 		)
 	}
-	if process.config.FinalizeOutput != nil {
-		process.config.FinalizeOutput()
+	if pc.config.FinalizeOutput != nil {
+		pc.config.FinalizeOutput()
 	}
 	return finalErr
 }
 
-func (process *processCore) retireRun(
+func (pc *processCore) retireRun(
 	ctx context.Context,
 	generation *runGeneration,
 ) error {

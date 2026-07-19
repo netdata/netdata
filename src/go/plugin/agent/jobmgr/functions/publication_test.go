@@ -23,33 +23,33 @@ func newRecordingPublicationPort() *recordingPublicationPort {
 	return &recordingPublicationPort{active: make(map[uint64]PublicationHandle)}
 }
 
-func (port *recordingPublicationPort) Publish(record PublicationRecord) (PublicationHandle, error) {
-	if port.publishErr != nil {
-		return PublicationHandle{}, port.publishErr
+func (rpp *recordingPublicationPort) Publish(record PublicationRecord) (PublicationHandle, error) {
+	if rpp.publishErr != nil {
+		return PublicationHandle{}, rpp.publishErr
 	}
-	port.nextID++
+	rpp.nextID++
 	handle := PublicationHandle{
-		ID: port.nextID, Epoch: 1, Generation: record.Generation, Name: record.Name,
+		ID: rpp.nextID, Epoch: 1, Generation: record.Generation, Name: record.Name,
 	}
-	if port.badHandle {
+	if rpp.badHandle {
 		handle.Generation++
 	}
-	port.published = append(port.published, record)
-	port.events = append(port.events, "publish:"+record.Name)
-	port.active[handle.ID] = handle
+	rpp.published = append(rpp.published, record)
+	rpp.events = append(rpp.events, "publish:"+record.Name)
+	rpp.active[handle.ID] = handle
 	return handle, nil
 }
 
-func (port *recordingPublicationPort) Withdraw(handle PublicationHandle) error {
-	if port.withdrawErr != nil {
-		return port.withdrawErr
+func (rpp *recordingPublicationPort) Withdraw(handle PublicationHandle) error {
+	if rpp.withdrawErr != nil {
+		return rpp.withdrawErr
 	}
-	if _, ok := port.active[handle.ID]; !ok {
+	if _, ok := rpp.active[handle.ID]; !ok {
 		return errors.New("duplicate or unknown withdraw")
 	}
-	delete(port.active, handle.ID)
-	port.withdrawn = append(port.withdrawn, handle)
-	port.events = append(port.events, "withdraw:"+handle.Name)
+	delete(rpp.active, handle.ID)
+	rpp.withdrawn = append(rpp.withdrawn, handle)
+	rpp.events = append(rpp.events, "withdraw:"+handle.Name)
 	return nil
 }
 

@@ -30,8 +30,8 @@ const (
 )
 
 // Valid reports whether source is a known scheduling source.
-func (source Source) Valid() bool {
-	return source == SourceJobManager || source == SourceFunction
+func (s Source) Valid() bool {
+	return s == SourceJobManager || s == SourceFunction
 }
 
 // TaskClass identifies an independent TaskSupervisor pending queue.
@@ -43,9 +43,9 @@ const (
 )
 
 // Valid reports whether class is a known task scheduling class.
-func (class TaskClass) Valid() bool {
-	return class == TaskClassFrameworkControl ||
-		class == TaskClassGenericFunction
+func (tc TaskClass) Valid() bool {
+	return tc == TaskClassFrameworkControl ||
+		tc == TaskClassGenericFunction
 }
 
 // OperationID uniquely identifies an operation within one run generation.
@@ -58,8 +58,8 @@ type ResourceIdentity struct {
 }
 
 // Valid reports whether identity names a concrete resource generation.
-func (identity ResourceIdentity) Valid() bool {
-	return identity.ID != "" && identity.Generation != 0
+func (ri ResourceIdentity) Valid() bool {
+	return ri.ID != "" && ri.Generation != 0
 }
 
 // PreparedResource owns an unpublished resource until it is accepted or
@@ -89,8 +89,8 @@ const (
 )
 
 // Valid reports whether disposition is a terminal capability disposition.
-func (disposition CapabilityDisposition) Valid() bool {
-	switch disposition {
+func (cd CapabilityDisposition) Valid() bool {
+	switch cd {
 	case CapabilityApplied, CapabilityDisposed, CapabilityRetained:
 		return true
 	default:
@@ -121,8 +121,8 @@ const (
 )
 
 // Valid reports whether status belongs to the closed control-status set.
-func (status ControlStatus) Valid() bool {
-	switch status {
+func (cs ControlStatus) Valid() bool {
+	switch cs {
 	case ControlBadRequest, ControlNotFound, ControlPayloadTooLarge,
 		ControlCancelled, ControlInternal, ControlUnavailable, ControlDeadline:
 		return true
@@ -141,14 +141,14 @@ type ControlFramePlan struct {
 
 // Validate checks that a control frame can be encoded without consulting
 // domain state.
-func (plan ControlFramePlan) Validate() error {
-	if ValidateUID(plan.UID) != nil {
+func (cfp ControlFramePlan) Validate() error {
+	if ValidateUID(cfp.UID) != nil {
 		return errors.New("jobmgr lifecycle: invalid control UID")
 	}
-	if !plan.Status.Valid() {
+	if !cfp.Status.Valid() {
 		return errors.New("jobmgr lifecycle: invalid control status")
 	}
-	if plan.Expiry <= 0 {
+	if cfp.Expiry <= 0 {
 		return errors.New("jobmgr lifecycle: invalid control expiry")
 	}
 	return nil

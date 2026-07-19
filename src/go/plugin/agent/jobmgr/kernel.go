@@ -70,15 +70,15 @@ type CapabilityPlan struct {
 	Prepare func(context.Context, uint64, lifecycle.LongLivedPermit) (lifecycle.PreparedCapability, error)
 }
 
-func (plan WorkPlan) validate() error {
-	if plan.OwnedBytes < 0 {
+func (wp WorkPlan) validate() error {
+	if wp.OwnedBytes < 0 {
 		return errors.New("jobmgr kernel: negative plan-owned bytes")
 	}
-	if len(plan.Claims) > maximumPlanClaims-len(plan.ReadClaims) {
+	if len(wp.Claims) > maximumPlanClaims-len(wp.ReadClaims) {
 		return errors.New("jobmgr kernel: too many plan claims")
 	}
 	claimBytes := 0
-	for _, claims := range [][]string{plan.Claims, plan.ReadClaims} {
+	for _, claims := range [][]string{wp.Claims, wp.ReadClaims} {
 		for _, key := range claims {
 			if key == "" || len(key) > maximumClaimKeyBytes ||
 				len(key) > maximumPlanClaimBytes-claimBytes {
@@ -88,80 +88,80 @@ func (plan WorkPlan) validate() error {
 		}
 	}
 	workKinds := 0
-	if plan.Work != nil {
+	if wp.Work != nil {
 		workKinds++
 	}
-	if plan.Runner != nil {
+	if wp.Runner != nil {
 		workKinds++
 	}
-	if plan.Resource != nil {
+	if wp.Resource != nil {
 		workKinds++
 	}
-	if plan.Transaction != nil {
+	if wp.Transaction != nil {
 		workKinds++
 	}
-	if plan.Capability != nil {
+	if wp.Capability != nil {
 		workKinds++
 	}
 	if workKinds != 1 {
 		return errors.New("jobmgr kernel: plan must have exactly one work kind")
 	}
-	if plan.Work != nil || plan.Runner != nil {
-		if plan.NoResponse {
+	if wp.Work != nil || wp.Runner != nil {
+		if wp.NoResponse {
 			return errors.New("jobmgr kernel: frame work cannot suppress its response")
 		}
 		return nil
 	}
-	if plan.Transaction != nil {
-		if plan.Cleanup != nil {
+	if wp.Transaction != nil {
+		if wp.Cleanup != nil {
 			return errors.New("jobmgr kernel: resource transaction cleanup must be sealed by apply")
 		}
-		if plan.Transaction.ID == "" ||
-			(plan.Transaction.Prepare == nil) ==
-				(plan.Transaction.PrepareComposite == nil) {
+		if wp.Transaction.ID == "" ||
+			(wp.Transaction.Prepare == nil) ==
+				(wp.Transaction.PrepareComposite == nil) {
 			return errors.New("jobmgr kernel: invalid resource transaction plan")
 		}
-		if plan.Transaction.AllocateSuccessor {
-			if err := plan.Transaction.Permit.Validate(); err != nil {
+		if wp.Transaction.AllocateSuccessor {
+			if err := wp.Transaction.Permit.Validate(); err != nil {
 				return errors.Join(
 					errors.New("jobmgr kernel: transaction successor has no long-lived permit"),
 					err,
 				)
 			}
-		} else if plan.Transaction.Permit.Class() != 0 ||
-			plan.Transaction.Permit.Bytes() != 0 {
+		} else if wp.Transaction.Permit.Class() != 0 ||
+			wp.Transaction.Permit.Bytes() != 0 {
 			return errors.New("jobmgr kernel: transaction without successor has a permit")
 		}
 		return nil
 	}
-	if !plan.NoResponse {
+	if !wp.NoResponse {
 		return errors.New("jobmgr kernel: invalid internal resource plan")
 	}
-	if plan.Cleanup != nil {
+	if wp.Cleanup != nil {
 		return errors.New("jobmgr kernel: resource plan cannot add an unrelated task cleanup")
 	}
-	if plan.Capability != nil {
-		if plan.Capability.ID == "" || plan.Capability.Prepare == nil {
+	if wp.Capability != nil {
+		if wp.Capability.ID == "" || wp.Capability.Prepare == nil {
 			return errors.New("jobmgr kernel: invalid prepared capability plan")
 		}
-		if err := plan.Capability.Permit.Validate(); err != nil {
+		if err := wp.Capability.Permit.Validate(); err != nil {
 			return errors.Join(errors.New("jobmgr kernel: capability plan has no long-lived permit"), err)
 		}
 		return nil
 	}
-	if plan.Resource.ID == "" {
+	if wp.Resource.ID == "" {
 		return errors.New("jobmgr kernel: invalid internal resource plan")
 	}
-	switch plan.Resource.Action {
+	switch wp.Resource.Action {
 	case ResourceInstall:
-		if plan.Resource.Prepare == nil {
+		if wp.Resource.Prepare == nil {
 			return errors.New("jobmgr kernel: install resource plan has no factory")
 		}
-		if err := plan.Resource.Permit.Validate(); err != nil {
+		if err := wp.Resource.Permit.Validate(); err != nil {
 			return errors.Join(errors.New("jobmgr kernel: install resource plan has no long-lived permit"), err)
 		}
 	case ResourceStop:
-		if plan.Resource.Prepare != nil || plan.Resource.Permit.Class() != 0 || plan.Resource.Permit.Bytes() != 0 {
+		if wp.Resource.Prepare != nil || wp.Resource.Permit.Class() != 0 || wp.Resource.Permit.Bytes() != 0 {
 			return errors.New("jobmgr kernel: stop resource plan has a factory")
 		}
 	default:
@@ -253,49 +253,49 @@ type functionCleanupQueue struct {
 	count int
 }
 
-func (queue *functionCleanupQueue) push(plan FunctionCleanupPlan) error {
+func (fcq *functionCleanupQueue) push(plan FunctionCleanupPlan) error {
 	if err := plan.validate(); err != nil {
 		return err
 	}
 	if !plan.Ref.Valid() {
 		return nil
 	}
-	if queue.tail == nil ||
-		queue.tail.tail == functionCleanupChunkCapacity {
+	if fcq.tail == nil ||
+		fcq.tail.tail == functionCleanupChunkCapacity {
 		chunk := &functionCleanupChunk{}
-		if queue.tail == nil {
-			queue.head = chunk
+		if fcq.tail == nil {
+			fcq.head = chunk
 		} else {
-			queue.tail.next = chunk
+			fcq.tail.next = chunk
 		}
-		queue.tail = chunk
+		fcq.tail = chunk
 	}
-	queue.tail.plans[queue.tail.tail] = plan
-	queue.tail.tail++
-	queue.count++
+	fcq.tail.plans[fcq.tail.tail] = plan
+	fcq.tail.tail++
+	fcq.count++
 	return nil
 }
 
-func (queue *functionCleanupQueue) front() FunctionCleanupPlan {
-	if queue.count == 0 {
+func (fcq *functionCleanupQueue) front() FunctionCleanupPlan {
+	if fcq.count == 0 {
 		return FunctionCleanupPlan{}
 	}
-	return queue.head.plans[queue.head.head]
+	return fcq.head.plans[fcq.head.head]
 }
 
-func (queue *functionCleanupQueue) pop() {
-	if queue.count == 0 {
+func (fcq *functionCleanupQueue) pop() {
+	if fcq.count == 0 {
 		return
 	}
-	chunk := queue.head
+	chunk := fcq.head
 	chunk.plans[chunk.head] = FunctionCleanupPlan{}
 	chunk.head++
-	queue.count--
+	fcq.count--
 	if chunk.head == chunk.tail {
-		queue.head = chunk.next
+		fcq.head = chunk.next
 		chunk.next = nil
-		if queue.head == nil {
-			queue.tail = nil
+		if fcq.head == nil {
+			fcq.tail = nil
 		}
 	}
 }
@@ -324,12 +324,12 @@ type preAdmissionControl struct {
 	cause  error
 }
 
-func (control preAdmissionControl) Error() string {
-	return control.cause.Error()
+func (pac preAdmissionControl) Error() string {
+	return pac.cause.Error()
 }
 
-func (control preAdmissionControl) Unwrap() error {
-	return control.cause
+func (pac preAdmissionControl) Unwrap() error {
+	return pac.cause
 }
 
 type commandOperation struct {
@@ -431,57 +431,57 @@ type readyRing struct {
 	len  int
 }
 
-func (ring *readyRing) push(lane *commandLane) {
+func (rr *readyRing) push(lane *commandLane) {
 	if lane.ready {
 		return
 	}
 	lane.ready = true
-	lane.readyPrev = ring.tail
-	if ring.tail != nil {
-		ring.tail.readyNext = lane
+	lane.readyPrev = rr.tail
+	if rr.tail != nil {
+		rr.tail.readyNext = lane
 	} else {
-		ring.head = lane
+		rr.head = lane
 	}
-	ring.tail = lane
-	ring.len++
+	rr.tail = lane
+	rr.len++
 }
 
-func (ring *readyRing) pop() *commandLane {
-	lane := ring.head
+func (rr *readyRing) pop() *commandLane {
+	lane := rr.head
 	if lane == nil {
 		return nil
 	}
-	ring.head = lane.readyNext
-	if ring.head != nil {
-		ring.head.readyPrev = nil
+	rr.head = lane.readyNext
+	if rr.head != nil {
+		rr.head.readyPrev = nil
 	} else {
-		ring.tail = nil
+		rr.tail = nil
 	}
 	lane.ready = false
 	lane.readyPrev = nil
 	lane.readyNext = nil
-	ring.len--
+	rr.len--
 	return lane
 }
 
-func (ring *readyRing) remove(lane *commandLane) {
+func (rr *readyRing) remove(lane *commandLane) {
 	if !lane.ready {
 		return
 	}
 	if lane.readyPrev != nil {
 		lane.readyPrev.readyNext = lane.readyNext
 	} else {
-		ring.head = lane.readyNext
+		rr.head = lane.readyNext
 	}
 	if lane.readyNext != nil {
 		lane.readyNext.readyPrev = lane.readyPrev
 	} else {
-		ring.tail = lane.readyPrev
+		rr.tail = lane.readyPrev
 	}
 	lane.ready = false
 	lane.readyPrev = nil
 	lane.readyNext = nil
-	ring.len--
+	rr.len--
 }
 
 type deadlineEntry struct {
@@ -492,24 +492,24 @@ type deadlineEntry struct {
 
 type deadlineHeap []*deadlineEntry
 
-func (entries deadlineHeap) Len() int           { return len(entries) }
-func (entries deadlineHeap) Less(i, j int) bool { return entries[i].when.Before(entries[j].when) }
-func (entries deadlineHeap) Swap(i, j int) {
-	entries[i], entries[j] = entries[j], entries[i]
-	entries[i].index = i
-	entries[j].index = j
+func (dh deadlineHeap) Len() int           { return len(dh) }
+func (dh deadlineHeap) Less(i, j int) bool { return dh[i].when.Before(dh[j].when) }
+func (dh deadlineHeap) Swap(i, j int) {
+	dh[i], dh[j] = dh[j], dh[i]
+	dh[i].index = i
+	dh[j].index = j
 }
-func (entries *deadlineHeap) Push(value any) {
+func (dh *deadlineHeap) Push(value any) {
 	entry := value.(*deadlineEntry)
-	entry.index = len(*entries)
-	*entries = append(*entries, entry)
+	entry.index = len(*dh)
+	*dh = append(*dh, entry)
 }
-func (entries *deadlineHeap) Pop() any {
-	old := *entries
+func (dh *deadlineHeap) Pop() any {
+	old := *dh
 	last := old[len(old)-1]
 	old[len(old)-1] = nil
 	last.index = -1
-	*entries = old[:len(old)-1]
+	*dh = old[:len(old)-1]
 	return last
 }
 
@@ -640,34 +640,34 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 	return kernel, nil
 }
 
-func (kernel *CommandKernel) BindRuntimeObserver(
+func (ck *CommandKernel) BindRuntimeObserver(
 	observer lifecycle.RuntimeObserver,
 ) error {
-	if kernel == nil || observer == nil {
+	if ck == nil || observer == nil {
 		return errors.New("jobmgr kernel: invalid runtime observer")
 	}
-	if kernel.runtimeObserver != nil {
+	if ck.runtimeObserver != nil {
 		return errors.New("jobmgr kernel: runtime observer already bound")
 	}
 	select {
-	case <-kernel.done:
+	case <-ck.done:
 		return errors.New("jobmgr kernel: runtime observer bound after terminal")
 	default:
 	}
-	if err := kernel.run.BindRuntimeObserver(observer); err != nil {
+	if err := ck.run.BindRuntimeObserver(observer); err != nil {
 		return err
 	}
-	if err := kernel.tasks.BindRuntimeObserver(observer); err != nil {
+	if err := ck.tasks.BindRuntimeObserver(observer); err != nil {
 		return err
 	}
-	if err := kernel.claims.BindRuntimeObserver(
+	if err := ck.claims.BindRuntimeObserver(
 		observer,
-		kernel.clock.Now,
+		ck.clock.Now,
 	); err != nil {
 		return err
 	}
-	kernel.runtimeObserver = observer
-	kernel.observeRuntimeOperations()
+	ck.runtimeObserver = observer
+	ck.observeRuntimeOperations()
 	return nil
 }
 
@@ -682,53 +682,53 @@ func NewKernelLoop(kernel *CommandKernel) (*KernelLoop, error) {
 	return &KernelLoop{kernel: kernel}, nil
 }
 
-func (loop *KernelLoop) Start(ctx context.Context) error {
-	if loop == nil || ctx == nil {
+func (kl *KernelLoop) Start(ctx context.Context) error {
+	if kl == nil || ctx == nil {
 		return errors.New("jobmgr kernel loop: invalid start")
 	}
 	started := false
-	loop.kernel.startOnce.Do(func() {
+	kl.kernel.startOnce.Do(func() {
 		started = true
-		loop.kernel.startErr = loop.kernel.bindRunNotifications()
-		if loop.kernel.startErr != nil {
+		kl.kernel.startErr = kl.kernel.bindRunNotifications()
+		if kl.kernel.startErr != nil {
 			return
 		}
-		go loop.kernel.runLoop(ctx)
+		go kl.kernel.runLoop(ctx)
 	})
 	if !started {
 		return errors.New("jobmgr kernel loop: already started")
 	}
-	return loop.kernel.startErr
+	return kl.kernel.startErr
 }
 
-func (kernel *CommandKernel) bindRunNotifications() error {
-	if err := kernel.frames.BindRunNotifications(
-		kernel.run.Generation(),
-		kernel.NotifyControlReady,
+func (ck *CommandKernel) bindRunNotifications() error {
+	if err := ck.frames.BindRunNotifications(
+		ck.run.Generation(),
+		ck.NotifyControlReady,
 		func(err error) {
-			_ = kernel.run.Dirty(err)
-			kernel.NotifyControlReady()
+			_ = ck.run.Dirty(err)
+			ck.NotifyControlReady()
 		},
-		kernel.runtimeObserver,
+		ck.runtimeObserver,
 	); err != nil {
 		return err
 	}
-	if err := kernel.tasks.BindAdmissionReady(kernel.NotifyControlReady); err != nil {
+	if err := ck.tasks.BindAdmissionReady(ck.NotifyControlReady); err != nil {
 		return errors.Join(
 			err,
-			kernel.frames.ReleaseRunNotifications(kernel.run.Generation()),
+			ck.frames.ReleaseRunNotifications(ck.run.Generation()),
 		)
 	}
 	return nil
 }
 
-func (kernel *CommandKernel) Submit(ctx context.Context, request Request) error {
-	return kernel.submit(ctx, request, nil)
+func (ck *CommandKernel) Submit(ctx context.Context, request Request) error {
+	return ck.submit(ctx, request, nil)
 }
 
-func (kernel *CommandKernel) SubmitAndWait(ctx context.Context, request Request) error {
+func (ck *CommandKernel) SubmitAndWait(ctx context.Context, request Request) error {
 	terminal := make(chan error, 1)
-	if err := kernel.submit(ctx, request, terminal); err != nil {
+	if err := ck.submit(ctx, request, terminal); err != nil {
 		return err
 	}
 	select {
@@ -736,16 +736,16 @@ func (kernel *CommandKernel) SubmitAndWait(ctx context.Context, request Request)
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-kernel.done:
-		return kernel.Wait(context.Background())
+	case <-ck.done:
+		return ck.Wait(context.Background())
 	}
 }
 
-func (kernel *CommandKernel) QuiesceFunctions(
+func (ck *CommandKernel) QuiesceFunctions(
 	ctx context.Context,
 	mutation FunctionCatalogMutation,
 ) error {
-	_, err := kernel.submitFunctionMutation(
+	_, err := ck.submitFunctionMutation(
 		ctx,
 		functionMutationQuiesce,
 		mutation,
@@ -753,22 +753,22 @@ func (kernel *CommandKernel) QuiesceFunctions(
 	return err
 }
 
-func (kernel *CommandKernel) CommitFunctions(
+func (ck *CommandKernel) CommitFunctions(
 	ctx context.Context,
 	mutation FunctionCatalogMutation,
 ) (uint64, error) {
-	return kernel.submitFunctionMutation(ctx, functionMutationCommit, mutation)
+	return ck.submitFunctionMutation(ctx, functionMutationCommit, mutation)
 }
 
-func (kernel *CommandKernel) AbortFunctions(
+func (ck *CommandKernel) AbortFunctions(
 	ctx context.Context,
 	mutation FunctionCatalogMutation,
 ) error {
-	_, err := kernel.submitFunctionMutation(ctx, functionMutationAbort, mutation)
+	_, err := ck.submitFunctionMutation(ctx, functionMutationAbort, mutation)
 	return err
 }
 
-func (kernel *CommandKernel) submitFunctionMutation(
+func (ck *CommandKernel) submitFunctionMutation(
 	ctx context.Context,
 	action functionMutationAction,
 	mutation FunctionCatalogMutation,
@@ -784,43 +784,43 @@ func (kernel *CommandKernel) submitFunctionMutation(
 		action:   action,
 	}
 	select {
-	case kernel.functionMutations <- submission:
-		kernel.NotifyControlReady()
-	case <-kernel.submissionStopped:
+	case ck.functionMutations <- submission:
+		ck.NotifyControlReady()
+	case <-ck.submissionStopped:
 		return 0, ErrStopped
 	case <-ctx.Done():
 		return 0, ctx.Err()
-	case <-kernel.done:
+	case <-ck.done:
 		return 0, ErrStopped
 	}
 	select {
 	case completed := <-result:
 		return completed.version, completed.err
-	case <-kernel.done:
+	case <-ck.done:
 		select {
 		case completed := <-result:
 			return completed.version, completed.err
 		default:
-			return 0, errors.Join(ErrStopped, kernel.doneErr)
+			return 0, errors.Join(ErrStopped, ck.doneErr)
 		}
 	}
 }
 
-func (kernel *CommandKernel) SubmitPrepared(
+func (ck *CommandKernel) SubmitPrepared(
 	ctx context.Context,
 	request Request,
 	plan WorkPlan,
 ) error {
-	return kernel.submitPrepared(ctx, request, plan, nil)
+	return ck.submitPrepared(ctx, request, plan, nil)
 }
 
-func (kernel *CommandKernel) SubmitPreparedAndWait(
+func (ck *CommandKernel) SubmitPreparedAndWait(
 	ctx context.Context,
 	request Request,
 	plan WorkPlan,
 ) error {
 	terminal := make(chan error, 1)
-	if err := kernel.submitPrepared(ctx, request, plan, terminal); err != nil {
+	if err := ck.submitPrepared(ctx, request, plan, terminal); err != nil {
 		return err
 	}
 	var cancellation error
@@ -833,42 +833,42 @@ func (kernel *CommandKernel) SubmitPreparedAndWait(
 			cancellation = context.Cause(ctx)
 			done = nil
 			select {
-			case kernel.cancel <- request.UID:
+			case ck.cancel <- request.UID:
 			case err := <-terminal:
 				return errors.Join(cancellation, err)
-			case <-kernel.done:
+			case <-ck.done:
 				return errors.Join(
 					cancellation,
-					kernel.Wait(context.Background()),
+					ck.Wait(context.Background()),
 				)
 			}
-		case <-kernel.done:
+		case <-ck.done:
 			return errors.Join(
 				cancellation,
-				kernel.Wait(context.Background()),
+				ck.Wait(context.Background()),
 			)
 		}
 	}
 }
 
-func (kernel *CommandKernel) submit(
+func (ck *CommandKernel) submit(
 	ctx context.Context,
 	request Request,
 	terminal chan error,
 ) error {
-	return kernel.submitWithPlan(ctx, request, WorkPlan{}, false, terminal)
+	return ck.submitWithPlan(ctx, request, WorkPlan{}, false, terminal)
 }
 
-func (kernel *CommandKernel) submitPrepared(
+func (ck *CommandKernel) submitPrepared(
 	ctx context.Context,
 	request Request,
 	plan WorkPlan,
 	terminal chan error,
 ) error {
-	return kernel.submitWithPlan(ctx, request, plan, true, terminal)
+	return ck.submitWithPlan(ctx, request, plan, true, terminal)
 }
 
-func (kernel *CommandKernel) submitWithPlan(
+func (ck *CommandKernel) submitWithPlan(
 	ctx context.Context,
 	request Request,
 	plan WorkPlan,
@@ -876,18 +876,18 @@ func (kernel *CommandKernel) submitWithPlan(
 	terminal chan error,
 ) error {
 	if ctx == nil {
-		return errors.Join(errors.New("jobmgr kernel: nil submission context"), kernel.abortRequestInputBody(request))
+		return errors.Join(errors.New("jobmgr kernel: nil submission context"), ck.abortRequestInputBody(request))
 	}
 	if err := ctx.Err(); err != nil {
-		return errors.Join(err, kernel.abortRequestInputBody(request))
+		return errors.Join(err, ck.abortRequestInputBody(request))
 	}
 	if err := request.Validate(); err != nil {
-		return errors.Join(err, kernel.abortRequestInputBody(request))
+		return errors.Join(err, ck.abortRequestInputBody(request))
 	}
 	if prepared && request.Source != lifecycle.SourceJobManager {
 		return errors.Join(
 			errors.New("jobmgr kernel: only Job Manager commands accept prepared plans"),
-			kernel.abortRequestInputBody(request),
+			ck.abortRequestInputBody(request),
 		)
 	}
 	request.Args = append([]string(nil), request.Args...)
@@ -895,66 +895,66 @@ func (kernel *CommandKernel) submitWithPlan(
 		var err error
 		plan, err = prepareOwnedJobPlan(request, plan)
 		if err != nil {
-			return errors.Join(err, kernel.abortRequestInputBody(request))
+			return errors.Join(err, ck.abortRequestInputBody(request))
 		}
 	} else if request.Source == lifecycle.SourceJobManager {
 		var err error
-		plan, err = kernel.prepareJobPlan(request)
+		plan, err = ck.prepareJobPlan(request)
 		if err != nil {
-			return errors.Join(err, kernel.abortRequestInputBody(request))
+			return errors.Join(err, ck.abortRequestInputBody(request))
 		}
 	}
 	result := make(chan error, 1)
-	if err := kernel.enqueueSubmission(ctx, request.Source, submission{
+	if err := ck.enqueueSubmission(ctx, request.Source, submission{
 		request:  request,
 		plan:     plan,
 		context:  ctx,
 		result:   result,
 		terminal: terminal,
 	}); err != nil {
-		return errors.Join(err, kernel.abortRequestInputBody(request))
+		return errors.Join(err, ck.abortRequestInputBody(request))
 	}
 	select {
 	case err := <-result:
 		return err
 	case <-ctx.Done():
 		select {
-		case kernel.cancel <- request.UID:
+		case ck.cancel <- request.UID:
 		case err := <-result:
 			return err
-		case <-kernel.done:
+		case <-ck.done:
 			return ErrStopped
 		}
 		select {
 		case err := <-result:
 			return err
-		case <-kernel.done:
+		case <-ck.done:
 			return ErrStopped
 		}
-	case <-kernel.done:
+	case <-ck.done:
 		return ErrStopped
 	}
 }
 
-func (kernel *CommandKernel) enqueueSubmission(ctx context.Context, source lifecycle.Source, submitted submission) error {
+func (ck *CommandKernel) enqueueSubmission(ctx context.Context, source lifecycle.Source, submitted submission) error {
 	index := sourceIndex(source)
 	for {
-		kernel.submissionMu.Lock()
-		if kernel.submissionClosed {
-			kernel.submissionMu.Unlock()
+		ck.submissionMu.Lock()
+		if ck.submissionClosed {
+			ck.submissionMu.Unlock()
 			return ErrStopped
 		}
 		select {
-		case kernel.submissions[index] <- submitted:
-			kernel.submissionMu.Unlock()
-			kernel.NotifyControlReady()
+		case ck.submissions[index] <- submitted:
+			ck.submissionMu.Unlock()
+			ck.NotifyControlReady()
 			return nil
 		default:
-			kernel.submissionMu.Unlock()
+			ck.submissionMu.Unlock()
 		}
 		select {
-		case <-kernel.submissionSpace[index]:
-		case <-kernel.submissionStopped:
+		case <-ck.submissionSpace[index]:
+		case <-ck.submissionStopped:
 			return ErrStopped
 		case <-ctx.Done():
 			return ctx.Err()
@@ -962,23 +962,23 @@ func (kernel *CommandKernel) enqueueSubmission(ctx context.Context, source lifec
 	}
 }
 
-func (kernel *CommandKernel) closeSubmissionIngress() {
-	kernel.submissionMu.Lock()
-	if !kernel.submissionClosed {
-		kernel.submissionClosed = true
-		close(kernel.submissionStopped)
+func (ck *CommandKernel) closeSubmissionIngress() {
+	ck.submissionMu.Lock()
+	if !ck.submissionClosed {
+		ck.submissionClosed = true
+		close(ck.submissionStopped)
 	}
-	kernel.submissionMu.Unlock()
+	ck.submissionMu.Unlock()
 }
 
-func (kernel *CommandKernel) notifySubmissionSpace(source int) {
+func (ck *CommandKernel) notifySubmissionSpace(source int) {
 	select {
-	case kernel.submissionSpace[source] <- struct{}{}:
+	case ck.submissionSpace[source] <- struct{}{}:
 	default:
 	}
 }
 
-func (kernel *CommandKernel) Reject(ctx context.Context, uid string, status lifecycle.ControlStatus) error {
+func (ck *CommandKernel) Reject(ctx context.Context, uid string, status lifecycle.ControlStatus) error {
 	if ctx == nil {
 		return errors.New("jobmgr kernel: nil submission context")
 	}
@@ -989,7 +989,7 @@ func (kernel *CommandKernel) Reject(ctx context.Context, uid string, status life
 		return errors.New("jobmgr kernel: invalid pre-admission control status")
 	}
 	result := make(chan error, 1)
-	if err := kernel.enqueueSubmission(ctx, lifecycle.SourceFunction, submission{
+	if err := ck.enqueueSubmission(ctx, lifecycle.SourceFunction, submission{
 		controlStatus: status,
 		request:       Request{UID: uid, Source: lifecycle.SourceFunction},
 		result:        result,
@@ -1001,61 +1001,61 @@ func (kernel *CommandKernel) Reject(ctx context.Context, uid string, status life
 		return err
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-kernel.done:
+	case <-ck.done:
 		return ErrStopped
 	}
 }
 
-func (kernel *CommandKernel) Cancel(ctx context.Context, uid string) error {
+func (ck *CommandKernel) Cancel(ctx context.Context, uid string) error {
 	select {
-	case kernel.cancel <- uid:
+	case ck.cancel <- uid:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-kernel.done:
+	case <-ck.done:
 		return ErrStopped
 	}
 }
 
-func (kernel *CommandKernel) NotifyControlReady() {
+func (ck *CommandKernel) NotifyControlReady() {
 	select {
-	case kernel.wake <- struct{}{}:
+	case ck.wake <- struct{}{}:
 	default:
 	}
 }
 
-func (kernel *CommandKernel) Stop() {
-	kernel.stopOnce.Do(func() {
-		kernel.closeSubmissionIngress()
-		close(kernel.stop)
+func (ck *CommandKernel) Stop() {
+	ck.stopOnce.Do(func() {
+		ck.closeSubmissionIngress()
+		close(ck.stop)
 	})
 }
 
-func (kernel *CommandKernel) Done() <-chan struct{} {
-	return kernel.done
+func (ck *CommandKernel) Done() <-chan struct{} {
+	return ck.done
 }
 
-func (kernel *CommandKernel) Wait(ctx context.Context) error {
+func (ck *CommandKernel) Wait(ctx context.Context) error {
 	select {
-	case <-kernel.done:
-		return kernel.doneErr
+	case <-ck.done:
+		return ck.doneErr
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func (kernel *CommandKernel) WaitShutdownStarted(ctx context.Context) error {
+func (ck *CommandKernel) WaitShutdownStarted(ctx context.Context) error {
 	select {
-	case <-kernel.shutdownStarted:
+	case <-ck.shutdownStarted:
 		return nil
 	default:
 	}
 	select {
-	case <-kernel.shutdownStarted:
+	case <-ck.shutdownStarted:
 		return nil
-	case <-kernel.done:
+	case <-ck.done:
 		select {
-		case <-kernel.shutdownStarted:
+		case <-ck.shutdownStarted:
 			return nil
 		default:
 			return ErrStopped
@@ -1065,12 +1065,12 @@ func (kernel *CommandKernel) WaitShutdownStarted(ctx context.Context) error {
 	}
 }
 
-func (kernel *CommandKernel) runLoop(ctx context.Context) {
+func (ck *CommandKernel) runLoop(ctx context.Context) {
 	var terminal error
 	var shutdownBudget *lifecycle.ShutdownBudget
 	var shutdownC <-chan struct{}
 	var deadlineTimer lifecycle.ReusableTimer
-	if clock, ok := kernel.clock.(lifecycle.ReusableTimerClock); ok {
+	if clock, ok := ck.clock.(lifecycle.ReusableTimerClock); ok {
 		deadlineTimer = clock.NewTimer(lifecycle.TimerKindDeadline)
 	}
 	var deadlineC <-chan time.Time
@@ -1085,7 +1085,7 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 		armedDeadline = time.Time{}
 	}
 	armDeadline := func() {
-		deadline := kernel.nextDeadline()
+		deadline := ck.nextDeadline()
 		if deadline.IsZero() {
 			stopDeadline()
 			return
@@ -1094,7 +1094,7 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			return
 		}
 		stopDeadline()
-		delay := deadline.Sub(kernel.clock.Now())
+		delay := deadline.Sub(ck.clock.Now())
 		if delay < 0 {
 			delay = 0
 		}
@@ -1102,11 +1102,11 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			deadlineC = deadlineTimer.Arm(delay)
 			cancelDeadline = deadlineTimer.Stop
 		} else {
-			deadlineC, cancelDeadline = kernel.clock.Arm(lifecycle.TimerKindDeadline, delay)
+			deadlineC, cancelDeadline = ck.clock.Arm(lifecycle.TimerKindDeadline, delay)
 		}
 		armedDeadline = deadline
 	}
-	stopC := (<-chan struct{})(kernel.stop)
+	stopC := (<-chan struct{})(ck.stop)
 	contextC := ctx.Done()
 	shuttingDown := false
 	beginShutdown := func(cause error) {
@@ -1114,68 +1114,68 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			terminal = errors.Join(terminal, cause)
 			return
 		}
-		kernel.closeSubmissionIngress()
+		ck.closeSubmissionIngress()
 		shuttingDown = true
 		stopDeadline()
 		terminal = errors.Join(terminal, cause)
-		budget, err := kernel.run.BeginShutdown()
+		budget, err := ck.run.BeginShutdown()
 		if err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			terminal = errors.Join(terminal, err)
 			return
 		}
 		shutdownBudget = budget
-		if err := kernel.beginShutdown(budget.Deadline()); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.beginShutdown(budget.Deadline()); err != nil {
+			ck.run.Dirty(err)
 		}
-		kernel.shutdownStartOnce.Do(func() { close(kernel.shutdownStarted) })
+		ck.shutdownStartOnce.Do(func() { close(ck.shutdownStarted) })
 		shutdownC = budget.Context().Done()
 		stopC = nil
 		contextC = nil
 	}
 	defer func() {
 		stopDeadline()
-		if err := kernel.frames.ReleaseRunNotifications(
-			kernel.run.Generation(),
+		if err := ck.frames.ReleaseRunNotifications(
+			ck.run.Generation(),
 		); err != nil {
 			terminal = errors.Join(terminal, err)
 		}
-		kernel.doneErr = terminal
-		close(kernel.done)
+		ck.doneErr = terminal
+		close(ck.done)
 	}()
 	for {
 		if !shuttingDown {
-			if cause := kernel.run.DirtyCause(); cause != nil {
+			if cause := ck.run.DirtyCause(); cause != nil {
 				beginShutdown(cause)
 			}
 		}
 		if shuttingDown {
 			if shutdownBudget.ExpireIfDue() {
-				terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), kernel.run.Terminal(kernel.runCensus()))
+				terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), ck.run.Terminal(ck.runCensus()))
 				return
 			}
 		}
 		moreDeadlines := false
 		if !shuttingDown {
-			if deadline := kernel.nextDeadline(); !deadline.IsZero() && !deadline.After(kernel.clock.Now()) {
-				moreDeadlines = kernel.serviceDeadlines(kernel.clock.Now(), 4)
+			if deadline := ck.nextDeadline(); !deadline.IsZero() && !deadline.After(ck.clock.Now()) {
+				moreDeadlines = ck.serviceDeadlines(ck.clock.Now(), 4)
 			}
 		}
-		moreControls := kernel.serviceControls(4)
-		moreSubmissions := kernel.serviceSubmissions(4)
-		moreFunctionCleanups := kernel.serviceFunctionCleanupBacklog(4)
+		moreControls := ck.serviceControls(4)
+		moreSubmissions := ck.serviceSubmissions(4)
+		moreFunctionCleanups := ck.serviceFunctionCleanupBacklog(4)
 		moreFunctionMutation := false
 		moreFunctionClose := false
 		if !shuttingDown {
-			moreFunctionMutation = kernel.serviceFunctionMutation(16)
-			if cause := kernel.run.DirtyCause(); cause != nil {
+			moreFunctionMutation = ck.serviceFunctionMutation(16)
+			if cause := ck.run.DirtyCause(); cause != nil {
 				beginShutdown(cause)
 			}
-		} else if kernel.shutdownBarrierDone {
-			moreFunctionClose = kernel.serviceFunctionCatalogClose(MaximumFunctionCloseQuantum)
+		} else if ck.shutdownBarrierDone {
+			moreFunctionClose = ck.serviceFunctionCatalogClose(MaximumFunctionCloseQuantum)
 		}
-		moreFunctionCleanups = moreFunctionCleanups || kernel.functionCleanupBacklog.count != 0
-		moreClaimSettlements := kernel.serviceClaimSettlements(
+		moreFunctionCleanups = moreFunctionCleanups || ck.functionCleanupBacklog.count != 0
+		moreClaimSettlements := ck.serviceClaimSettlements(
 			maximumClaimSettlementQuantum,
 		)
 		moreAdmissions := false
@@ -1187,65 +1187,65 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 		moreShutdownLanes := false
 		if !shuttingDown {
 			moreCompositeFenceRechecks =
-				kernel.serviceCompositeFenceBlocked(4)
-			moreAdmissions = kernel.serviceAdmissions(4)
-			moreTasks = kernel.scheduleTasks(4)
+				ck.serviceCompositeFenceBlocked(4)
+			moreAdmissions = ck.serviceAdmissions(4)
+			moreTasks = ck.scheduleTasks(4)
 		}
-		servicedAsyncEvents := kernel.serviceAsyncEvents(
+		servicedAsyncEvents := ck.serviceAsyncEvents(
 			asyncEventServiceQuantum,
 		)
 		if !shuttingDown {
-			moreTaskStarts = kernel.serviceTaskStarts(
+			moreTaskStarts = ck.serviceTaskStarts(
 				lifecycle.TaskStartServiceQuantum,
 			)
-			if cause := kernel.run.DirtyCause(); cause != nil {
+			if cause := ck.run.DirtyCause(); cause != nil {
 				beginShutdown(cause)
 			}
 		} else {
-			if err := kernel.advanceShutdownAdmission(); err != nil {
-				kernel.run.Dirty(err)
+			if err := ck.advanceShutdownAdmission(); err != nil {
+				ck.run.Dirty(err)
 			}
 			var shutdownErr error
 			moreShutdownOperations, shutdownErr =
-				kernel.serviceShutdownOperations(4)
+				ck.serviceShutdownOperations(4)
 			if shutdownErr != nil {
-				kernel.run.Dirty(shutdownErr)
+				ck.run.Dirty(shutdownErr)
 			}
 			_, moreInheritedCancellations, shutdownErr =
-				kernel.tasks.CancelInheritedBatch(
+				ck.tasks.CancelInheritedBatch(
 					lifecycle.InheritedCancellationServiceQuantum,
 				)
 			if shutdownErr != nil {
-				kernel.run.Dirty(shutdownErr)
+				ck.run.Dirty(shutdownErr)
 			}
-			if err := kernel.advanceShutdownBarrier(); err != nil {
-				kernel.run.Dirty(err)
+			if err := ck.advanceShutdownBarrier(); err != nil {
+				ck.run.Dirty(err)
 			}
-			if kernel.shutdownBarrierDone {
+			if ck.shutdownBarrierDone {
 				moreShutdownLanes, shutdownErr =
-					kernel.serviceShutdownStops(4)
+					ck.serviceShutdownStops(4)
 				if shutdownErr != nil {
-					kernel.run.Dirty(shutdownErr)
+					ck.run.Dirty(shutdownErr)
 				}
 			}
-			if err := kernel.advanceRunFinalizer(); err != nil {
-				kernel.run.Dirty(err)
+			if err := ck.advanceRunFinalizer(); err != nil {
+				ck.run.Dirty(err)
 			}
-			if kernel.shutdownOperationsDone {
-				moreTaskStarts = kernel.serviceTaskStarts(
+			if ck.shutdownOperationsDone {
+				moreTaskStarts = ck.serviceTaskStarts(
 					lifecycle.TaskStartServiceQuantum,
 				)
 			}
 		}
 		if shuttingDown {
 			if shutdownBudget.ExpireIfDue() {
-				terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), kernel.run.Terminal(kernel.runCensus()))
+				terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), ck.run.Terminal(ck.runCensus()))
 				return
 			}
-			if kernel.shutdownQuiescent() ||
-				kernel.runShutdownBarrierFailedTerminal() ||
-				kernel.runFinalizerFailedTerminal() {
-				terminal = errors.Join(terminal, kernel.run.Terminal(kernel.runCensus()))
+			if ck.shutdownQuiescent() ||
+				ck.runShutdownBarrierFailedTerminal() ||
+				ck.runFinalizerFailedTerminal() {
+				terminal = errors.Join(terminal, ck.run.Terminal(ck.runCensus()))
 				return
 			}
 		}
@@ -1255,8 +1255,8 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			moreTasks || moreTaskStarts ||
 			servicedAsyncEvents > 0 || moreShutdownOperations ||
 			moreInheritedCancellations || moreShutdownLanes ||
-			kernel.claims.PendingSettlements() ||
-			kernel.hasRunnableSubmissions() {
+			ck.claims.PendingSettlements() ||
+			ck.hasRunnableSubmissions() {
 			if !shuttingDown {
 				select {
 				case <-stopC:
@@ -1272,7 +1272,7 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 				}
 			} else {
 				if shutdownBudget.ExpireIfDue() {
-					terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), kernel.run.Terminal(kernel.runCensus()))
+					terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), ck.run.Terminal(ck.runCensus()))
 					return
 				}
 			}
@@ -1281,85 +1281,85 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 		if !shuttingDown {
 			armDeadline()
 		}
-		functionMutationC := (<-chan functionMutationSubmission)(kernel.functionMutations)
-		if shuttingDown || kernel.functionMutationActive {
+		functionMutationC := (<-chan functionMutationSubmission)(ck.functionMutations)
+		if shuttingDown || ck.functionMutationActive {
 			functionMutationC = nil
 		}
 		select {
-		case uid := <-kernel.cancel:
-			kernel.cancelOperation(uid)
+		case uid := <-ck.cancel:
+			ck.cancelOperation(uid)
 		case submitted := <-functionMutationC:
-			kernel.beginFunctionMutation(submitted)
-		case completion := <-kernel.tasks.CompletionCh():
-			kernel.completeTask(completion)
-		case acknowledgement := <-kernel.tasks.AcknowledgementCh():
-			kernel.acknowledgeTask(acknowledgement)
+			ck.beginFunctionMutation(submitted)
+		case completion := <-ck.tasks.CompletionCh():
+			ck.completeTask(completion)
+		case acknowledgement := <-ck.tasks.AcknowledgementCh():
+			ck.acknowledgeTask(acknowledgement)
 		case <-deadlineC:
 			deadlineC = nil
 			cancelDeadline = nil
 			armedDeadline = time.Time{}
-			kernel.serviceDeadlines(kernel.clock.Now(), 4)
-		case <-kernel.wake:
+			ck.serviceDeadlines(ck.clock.Now(), 4)
+		case <-ck.wake:
 		case <-stopC:
 			beginShutdown(nil)
 		case <-contextC:
 			beginShutdown(ctx.Err())
 		case <-shutdownC:
-			terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), kernel.run.Terminal(kernel.runCensus()))
+			terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), ck.run.Terminal(ck.runCensus()))
 			return
 		}
 	}
 }
 
-func (kernel *CommandKernel) serviceClaimSettlements(quantum int) bool {
-	granted, more, err := kernel.claims.ServiceSettlements(quantum)
+func (ck *CommandKernel) serviceClaimSettlements(quantum int) bool {
+	granted, more, err := ck.claims.ServiceSettlements(quantum)
 	if err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return false
 	}
 	for _, operation := range granted {
-		kernel.markReady(operation.lane)
+		ck.markReady(operation.lane)
 	}
 	return more
 }
 
-func (kernel *CommandKernel) serviceOneAsyncEvent() bool {
+func (ck *CommandKernel) serviceOneAsyncEvent() bool {
 	const sources = 4
 	for offset := 0; offset < sources; offset++ {
-		source := (int(kernel.nextAsyncEvent) + offset) % sources
+		source := (int(ck.nextAsyncEvent) + offset) % sources
 		switch source {
 		case 0:
 			select {
-			case uid := <-kernel.cancel:
-				kernel.cancelOperation(uid)
-				kernel.nextAsyncEvent = 1
+			case uid := <-ck.cancel:
+				ck.cancelOperation(uid)
+				ck.nextAsyncEvent = 1
 				return true
 			default:
 			}
 		case 1:
 			select {
-			case completion := <-kernel.tasks.CompletionCh():
-				kernel.completeTask(completion)
-				kernel.nextAsyncEvent = 2
+			case completion := <-ck.tasks.CompletionCh():
+				ck.completeTask(completion)
+				ck.nextAsyncEvent = 2
 				return true
 			default:
 			}
 		case 2:
 			select {
-			case acknowledgement := <-kernel.tasks.AcknowledgementCh():
-				kernel.acknowledgeTask(acknowledgement)
-				kernel.nextAsyncEvent = 3
+			case acknowledgement := <-ck.tasks.AcknowledgementCh():
+				ck.acknowledgeTask(acknowledgement)
+				ck.nextAsyncEvent = 3
 				return true
 			default:
 			}
 		case 3:
-			if kernel.functionMutationActive || kernel.functionCatalogClosing {
+			if ck.functionMutationActive || ck.functionCatalogClosing {
 				continue
 			}
 			select {
-			case submitted := <-kernel.functionMutations:
-				kernel.beginFunctionMutation(submitted)
-				kernel.nextAsyncEvent = 0
+			case submitted := <-ck.functionMutations:
+				ck.beginFunctionMutation(submitted)
+				ck.nextAsyncEvent = 0
 				return true
 			default:
 			}
@@ -1368,67 +1368,67 @@ func (kernel *CommandKernel) serviceOneAsyncEvent() bool {
 	return false
 }
 
-func (kernel *CommandKernel) serviceAsyncEvents(
+func (ck *CommandKernel) serviceAsyncEvents(
 	quantum int,
 ) int {
 	count := 0
-	for count < quantum && kernel.serviceOneAsyncEvent() {
+	for count < quantum && ck.serviceOneAsyncEvent() {
 		count++
 	}
 	return count
 }
 
-func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
+func (ck *CommandKernel) serviceSubmissions(quantum int) bool {
 	for quantum > 0 {
-		first := sourceIndex(kernel.nextExternalSource)
+		first := sourceIndex(ck.nextExternalSource)
 		second := 1 - first
 		var submitted submission
 		selected := -1
 		wasBlocked := false
 		dequeued := false
-		if kernel.blockedSubmission[first] {
-			submitted = kernel.blockedSubmissions[first]
+		if ck.blockedSubmission[first] {
+			submitted = ck.blockedSubmissions[first]
 			selected = first
 			wasBlocked = true
 		} else {
 			select {
-			case submitted = <-kernel.submissions[first]:
+			case submitted = <-ck.submissions[first]:
 				selected = first
 				dequeued = true
 			default:
 			}
 		}
 		if selected < 0 {
-			if kernel.blockedSubmission[second] {
-				submitted = kernel.blockedSubmissions[second]
+			if ck.blockedSubmission[second] {
+				submitted = ck.blockedSubmissions[second]
 				selected = second
 				wasBlocked = true
 			} else {
 				select {
-				case submitted = <-kernel.submissions[second]:
+				case submitted = <-ck.submissions[second]:
 					selected = second
 					dequeued = true
 				default:
-					return kernel.hasRunnableSubmissions()
+					return ck.hasRunnableSubmissions()
 				}
 			}
 		}
 		if dequeued {
-			kernel.notifySubmissionSpace(selected)
+			ck.notifySubmissionSpace(selected)
 		}
 		var err error
 		if submitted.controlStatus != 0 {
-			err = kernel.frames.TryCommitControl(lifecycle.ControlFramePlan{
-				UID: submitted.request.UID, Status: submitted.controlStatus, Expiry: lifecycle.ExpiryAt(kernel.clock.Now()),
+			err = ck.frames.TryCommitControl(lifecycle.ControlFramePlan{
+				UID: submitted.request.UID, Status: submitted.controlStatus, Expiry: lifecycle.ExpiryAt(ck.clock.Now()),
 			})
 			if err != nil && !errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
-				kernel.run.Dirty(err)
+				ck.run.Dirty(err)
 			}
 		} else {
 			if submitted.context != nil && submitted.context.Err() != nil {
-				err = errors.Join(context.Cause(submitted.context), kernel.abortRequestInputBody(submitted.request))
+				err = errors.Join(context.Cause(submitted.context), ck.abortRequestInputBody(submitted.request))
 			} else {
-				err = kernel.admitSubmission(
+				err = ck.admitSubmission(
 					submitted.request,
 					submitted.plan,
 					submitted.context,
@@ -1442,28 +1442,28 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 		var control preAdmissionControl
 		if errors.As(err, &control) {
 			submitted.controlStatus = control.status
-			err = kernel.frames.TryCommitControl(lifecycle.ControlFramePlan{
+			err = ck.frames.TryCommitControl(lifecycle.ControlFramePlan{
 				UID:    submitted.request.UID,
 				Status: control.status,
-				Expiry: lifecycle.ExpiryAt(kernel.clock.Now()),
+				Expiry: lifecycle.ExpiryAt(ck.clock.Now()),
 			})
 			if err != nil && !errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
-				kernel.run.Dirty(err)
+				ck.run.Dirty(err)
 			}
 		}
 		if errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
 			if !wasBlocked {
-				kernel.blockedSubmissions[selected] = submitted
-				kernel.blockedSubmission[selected] = true
+				ck.blockedSubmissions[selected] = submitted
+				ck.blockedSubmission[selected] = true
 			}
 		} else {
 			if wasBlocked {
-				kernel.blockedSubmissions[selected] = submission{}
-				kernel.blockedSubmission[selected] = false
+				ck.blockedSubmissions[selected] = submission{}
+				ck.blockedSubmission[selected] = false
 			}
 			if submitted.controlStatus != 0 || err != nil {
-				if kernel.runtimeObserver != nil {
-					kernel.runtimeObserver.AddRuntimeCounter(
+				if ck.runtimeObserver != nil {
+					ck.runtimeObserver.AddRuntimeCounter(
 						lifecycle.RuntimeCounterOperationsRejected,
 						1,
 					)
@@ -1474,23 +1474,23 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 				}
 			}
 		}
-		kernel.nextExternalSource = otherSource(sourceForIndex(selected))
+		ck.nextExternalSource = otherSource(sourceForIndex(selected))
 		quantum--
 	}
-	return kernel.hasRunnableSubmissions()
+	return ck.hasRunnableSubmissions()
 }
 
-func (kernel *CommandKernel) hasRunnableSubmissions() bool {
-	for source := range kernel.submissions {
-		if !kernel.blockedSubmission[source] && len(kernel.submissions[source]) != 0 {
+func (ck *CommandKernel) hasRunnableSubmissions() bool {
+	for source := range ck.submissions {
+		if !ck.blockedSubmission[source] && len(ck.submissions[source]) != 0 {
 			return true
 		}
 	}
 	return false
 }
 
-func (kernel *CommandKernel) prepareJobPlan(request Request) (WorkPlan, error) {
-	plan, err := kernel.jobPlanner.Plan(request)
+func (ck *CommandKernel) prepareJobPlan(request Request) (WorkPlan, error) {
+	plan, err := ck.jobPlanner.Plan(request)
 	if err != nil {
 		return WorkPlan{}, err
 	}
@@ -1527,14 +1527,14 @@ func prepareOwnedJobPlan(request Request, plan WorkPlan) (WorkPlan, error) {
 	return plan, nil
 }
 
-func (kernel *CommandKernel) admit(
+func (ck *CommandKernel) admit(
 	request Request,
 	plan WorkPlan,
 	submissionContext context.Context,
 	submissionResult,
 	terminalResult chan error,
 ) error {
-	return kernel.admitSubmission(
+	return ck.admitSubmission(
 		request,
 		plan,
 		submissionContext,
@@ -1545,7 +1545,7 @@ func (kernel *CommandKernel) admit(
 	)
 }
 
-func (kernel *CommandKernel) admitSubmission(
+func (ck *CommandKernel) admitSubmission(
 	request Request,
 	plan WorkPlan,
 	submissionContext context.Context,
@@ -1554,13 +1554,13 @@ func (kernel *CommandKernel) admitSubmission(
 	composite *kernelCompositeScope,
 	rollback bool,
 ) error {
-	if !kernel.run.Admitting() {
-		return kernel.rejectClosedAdmission(request)
+	if !ck.run.Admitting() {
+		return ck.rejectClosedAdmission(request)
 	}
 	var parent *commandOperation
 	if composite != nil {
 		var err error
-		parent, err = kernel.validateCompositeAdmission(
+		parent, err = ck.validateCompositeAdmission(
 			composite,
 			plan,
 			rollback,
@@ -1568,7 +1568,7 @@ func (kernel *CommandKernel) admitSubmission(
 		if err != nil {
 			return errors.Join(
 				err,
-				kernel.abortRequestInputBody(request),
+				ck.abortRequestInputBody(request),
 			)
 		}
 		if request.InputBodyToken != 0 {
@@ -1576,52 +1576,52 @@ func (kernel *CommandKernel) admitSubmission(
 				errors.New(
 					"jobmgr composite: child cannot own parser input",
 				),
-				kernel.abortRequestInputBody(request),
+				ck.abortRequestInputBody(request),
 			)
 		}
 	} else if rollback {
 		return errors.Join(
 			errors.New("jobmgr kernel: rollback child has no parent"),
-			kernel.abortRequestInputBody(request),
+			ck.abortRequestInputBody(request),
 		)
 	}
-	now := kernel.clock.Now()
-	if err := kernel.uids.Admit(request.UID, now); err != nil {
-		if kernel.runtimeObserver != nil {
-			kernel.runtimeObserver.AddRuntimeCounter(
+	now := ck.clock.Now()
+	if err := ck.uids.Admit(request.UID, now); err != nil {
+		if ck.runtimeObserver != nil {
+			ck.runtimeObserver.AddRuntimeCounter(
 				lifecycle.RuntimeCounterDuplicateUIDRejected,
 				1,
 			)
 		}
-		return errors.Join(err, kernel.abortRequestInputBody(request))
+		return errors.Join(err, ck.abortRequestInputBody(request))
 	}
 	var functionInvocation FunctionInvocationRef
 	var functionResourceID string
 	var laneID commandLaneKey
 	if request.Source == lifecycle.SourceFunction {
-		decision, err := kernel.functionCatalog.ResolveAndAcquire(FunctionLookup{
+		decision, err := ck.functionCatalog.ResolveAndAcquire(FunctionLookup{
 			UID: request.UID, Route: request.Route, Args: request.Args,
 			Payload: request.Payload, ContentType: request.ContentType,
 			Permissions: request.Permissions, CallerSource: request.CallerSource,
 			Timeout: request.Timeout, HasPayload: request.HasPayload,
 		})
 		if err != nil {
-			_ = kernel.uids.Complete(request.UID, false, now)
-			_ = kernel.abortRequestInputBody(request)
+			_ = ck.uids.Complete(request.UID, false, now)
+			_ = ck.abortRequestInputBody(request)
 			return err
 		}
 		if err := decision.validate(); err != nil {
 			if decision.Lease.Valid() {
-				err = errors.Join(err, kernel.releaseFunctionInvocation(decision.Lease))
+				err = errors.Join(err, ck.releaseFunctionInvocation(decision.Lease))
 			}
-			_ = kernel.uids.Complete(request.UID, false, now)
-			_ = kernel.abortRequestInputBody(request)
+			_ = ck.uids.Complete(request.UID, false, now)
+			_ = ck.abortRequestInputBody(request)
 			return err
 		}
 		if decision.Rejected != 0 {
 			if err := errors.Join(
-				kernel.uids.Complete(request.UID, false, now),
-				kernel.abortRequestInputBody(request),
+				ck.uids.Complete(request.UID, false, now),
+				ck.abortRequestInputBody(request),
 			); err != nil {
 				return err
 			}
@@ -1647,15 +1647,15 @@ func (kernel *CommandKernel) admitSubmission(
 	releaseFunctionInvocation := functionInvocation.Valid()
 	defer func() {
 		if releaseFunctionInvocation {
-			if err := kernel.releaseFunctionInvocation(functionInvocation); err != nil {
-				kernel.run.Dirty(err)
+			if err := ck.releaseFunctionInvocation(functionInvocation); err != nil {
+				ck.run.Dirty(err)
 			}
 		}
 	}()
 	claims, err := normalizeAuthorityClaimModes(plan.Claims, plan.ReadClaims)
 	if err != nil {
-		_ = kernel.uids.Complete(request.UID, false, now)
-		_ = kernel.abortRequestInputBody(request)
+		_ = ck.uids.Complete(request.UID, false, now)
+		_ = ck.abortRequestInputBody(request)
 		return err
 	}
 	if request.Source == lifecycle.SourceJobManager {
@@ -1678,15 +1678,15 @@ func (kernel *CommandKernel) admitSubmission(
 			errors.New(
 				"jobmgr composite: child cannot use its active parent lane",
 			),
-			kernel.uids.Complete(request.UID, false, now),
-			kernel.abortRequestInputBody(request),
+			ck.uids.Complete(request.UID, false, now),
+			ck.abortRequestInputBody(request),
 		)
 	}
-	lane := kernel.lanes[laneID]
+	lane := ck.lanes[laneID]
 	if resource := plan.Resource; resource != nil {
 		if lane != nil && lane.transactionPlanned != 0 {
-			_ = kernel.uids.Complete(request.UID, false, now)
-			_ = kernel.abortRequestInputBody(request)
+			_ = ck.uids.Complete(request.UID, false, now)
+			_ = ck.abortRequestInputBody(request)
 			return errors.New(
 				"jobmgr kernel: internal resource plan overlaps a public resource transaction",
 			)
@@ -1694,14 +1694,14 @@ func (kernel *CommandKernel) admitSubmission(
 		switch resource.Action {
 		case ResourceInstall:
 			if lane != nil && (lane.installPlanned || ((lane.current != nil || lane.currentIdentity.Valid()) && !lane.stopPlanned && !lane.currentStopping && !lane.retiringIdentity.Valid())) {
-				_ = kernel.uids.Complete(request.UID, false, now)
-				_ = kernel.abortRequestInputBody(request)
+				_ = ck.uids.Complete(request.UID, false, now)
+				_ = ck.abortRequestInputBody(request)
 				return errors.New("jobmgr kernel: install is not sequenced after an exact stop")
 			}
 		case ResourceStop:
 			if lane == nil || lane.stopPlanned || lane.currentStopping || lane.retiringIdentity.Valid() ||
 				(lane.current == nil && !lane.currentIdentity.Valid() && !lane.installPlanned) {
-				err := errors.Join(kernel.uids.Complete(request.UID, false, now), kernel.abortRequestInputBody(request))
+				err := errors.Join(ck.uids.Complete(request.UID, false, now), ck.abortRequestInputBody(request))
 				if err == nil {
 					if submissionResult != nil {
 						submissionResult <- nil
@@ -1719,63 +1719,63 @@ func (kernel *CommandKernel) admitSubmission(
 			lane.stopPlanned ||
 			lane.currentStopping ||
 			lane.retiringIdentity.Valid()) {
-		_ = kernel.uids.Complete(request.UID, false, now)
-		_ = kernel.abortRequestInputBody(request)
+		_ = ck.uids.Complete(request.UID, false, now)
+		_ = ck.abortRequestInputBody(request)
 		return errors.New(
 			"jobmgr kernel: resource transaction overlaps internal resource authority",
 		)
 	}
 	if lane == nil {
-		lane, err = kernel.allocateLane(laneID, request)
+		lane, err = ck.allocateLane(laneID, request)
 		if err != nil {
-			_ = kernel.uids.Complete(request.UID, false, now)
-			_ = kernel.abortRequestInputBody(request)
+			_ = ck.uids.Complete(request.UID, false, now)
+			_ = ck.abortRequestInputBody(request)
 			return err
 		}
 	}
-	kernel.nextID++
-	operationGeneration, err := lifecycle.NewOperation(kernel.nextID, request.UID, request.Source, request.LaneKey, !plan.NoResponse)
+	ck.nextID++
+	operationGeneration, err := lifecycle.NewOperation(ck.nextID, request.UID, request.Source, request.LaneKey, !plan.NoResponse)
 	if err != nil {
-		_ = kernel.uids.Complete(request.UID, false, now)
-		kernel.releaseUnusedLane(lane)
-		_ = kernel.abortRequestInputBody(request)
+		_ = ck.uids.Complete(request.UID, false, now)
+		ck.releaseUnusedLane(lane)
+		_ = ck.abortRequestInputBody(request)
 		return err
 	}
 	charge, err := operationAdmissionBytes(request, plan)
 	if err != nil {
-		_ = kernel.uids.Complete(request.UID, false, now)
-		kernel.releaseUnusedLane(lane)
-		_ = kernel.abortRequestInputBody(request)
+		_ = ck.uids.Complete(request.UID, false, now)
+		ck.releaseUnusedLane(lane)
+		_ = ck.abortRequestInputBody(request)
 		return err
 	}
 	admissionLane := lifecycle.AdmissionLaneRef{Slot: lane.slot, Generation: lane.generation}
 	requested := lifecycle.AdmissionRequestResult{}
 	if request.InputBodyToken != 0 {
-		requested = kernel.admission.TransferInputBody(kernel.run.Generation(), request.InputBodyToken, admissionLane, charge, request.PayloadCapacity)
+		requested = ck.admission.TransferInputBody(ck.run.Generation(), request.InputBodyToken, admissionLane, charge, request.PayloadCapacity)
 	} else if parent != nil {
-		if err := kernel.beginCompositeFence(parent); err != nil {
-			kernel.releaseUnusedLane(lane)
+		if err := ck.beginCompositeFence(parent); err != nil {
+			ck.releaseUnusedLane(lane)
 			return errors.Join(
 				err,
-				kernel.uids.Complete(request.UID, false, now),
-				kernel.abortRequestInputBody(request),
+				ck.uids.Complete(request.UID, false, now),
+				ck.abortRequestInputBody(request),
 			)
 		}
-		requested = kernel.admission.GrantCompositeProgress(
-			kernel.run.Generation(),
+		requested = ck.admission.GrantCompositeProgress(
+			ck.run.Generation(),
 			parent.admission,
 			admissionLane,
 			charge,
 		)
 	} else {
-		requested = kernel.admission.RequestOrdinary(kernel.run.Generation(), admissionLane, charge)
+		requested = ck.admission.RequestOrdinary(ck.run.Generation(), admissionLane, charge)
 	}
 	if requested.Rejected != nil {
-		kernel.releaseUnusedLane(lane)
+		ck.releaseUnusedLane(lane)
 		return errors.Join(
 			requested.Rejected,
-			kernel.uids.Complete(request.UID, false, now),
-			kernel.abortRequestInputBody(request),
+			ck.uids.Complete(request.UID, false, now),
+			ck.abortRequestInputBody(request),
 		)
 	}
 	request.InputBodyToken = 0
@@ -1790,17 +1790,17 @@ func (kernel *CommandKernel) admitSubmission(
 	}
 	if parent == nil {
 		prepareClaimEdges(operation, claims)
-		if err := kernel.claims.Register(operation); err != nil {
-			_ = kernel.admission.CancelWaiting(requested.Ref)
-			_ = kernel.uids.Complete(request.UID, false, now)
-			kernel.releaseUnusedLane(lane)
+		if err := ck.claims.Register(operation); err != nil {
+			_ = ck.admission.CancelWaiting(requested.Ref)
+			_ = ck.uids.Complete(request.UID, false, now)
+			ck.releaseUnusedLane(lane)
 			return err
 		}
 	}
 	operation.lane = lane
 	lane.owners++
 	if parent != nil {
-		kernel.insertCompositeOperation(lane, operation)
+		ck.insertCompositeOperation(lane, operation)
 		parent.activeChild = operation
 	} else if lane.tail != nil {
 		lane.tail.next = operation
@@ -1811,20 +1811,20 @@ func (kernel *CommandKernel) admitSubmission(
 		lane.tail = operation
 	}
 	_ = operation.Advance(lifecycle.OperationQueued)
-	kernel.operations[request.UID] = operation
-	kernel.appendOperation(operation)
-	kernel.appendRuntimeOperation(operation)
+	ck.operations[request.UID] = operation
+	ck.appendOperation(operation)
+	ck.appendRuntimeOperation(operation)
 	if request.Source == lifecycle.SourceFunction {
-		kernel.functionOperations++
+		ck.functionOperations++
 	}
-	if kernel.runtimeObserver != nil {
-		kernel.runtimeObserver.AddRuntimeCounter(
+	if ck.runtimeObserver != nil {
+		ck.runtimeObserver.AddRuntimeCounter(
 			lifecycle.RuntimeCounterOperationsAdmitted,
 			1,
 		)
 	}
-	kernel.observeRuntimeOperations()
-	kernel.byAdmission[requested.Ref] = operation
+	ck.observeRuntimeOperations()
+	ck.byAdmission[requested.Ref] = operation
 	releaseFunctionInvocation = false
 	if resource := plan.Resource; resource != nil {
 		switch resource.Action {
@@ -1839,110 +1839,110 @@ func (kernel *CommandKernel) admitSubmission(
 	}
 	if plan.Transaction != nil &&
 		plan.Transaction.PrepareComposite != nil {
-		operation.composite = newKernelCompositeScope(kernel, operation)
+		operation.composite = newKernelCompositeScope(ck, operation)
 	}
 	if !request.Deadline.IsZero() {
 		operation.deadline = deadlineEntry{when: request.Deadline, operation: operation, index: -1}
-		heap.Push(&kernel.deadlines, &operation.deadline)
+		heap.Push(&ck.deadlines, &operation.deadline)
 	}
 	if parent != nil {
 		operation.admitted = true
-		kernel.settleSubmission(operation, nil)
+		ck.settleSubmission(operation, nil)
 	}
 	if operation.admitted && lane.active == nil && lane.head == operation {
-		kernel.markReady(lane)
+		ck.markReady(lane)
 	}
 	return nil
 }
 
-func (kernel *CommandKernel) rejectClosedAdmission(request Request) error {
-	if kernel.runtimeObserver != nil {
-		kernel.runtimeObserver.AddRuntimeCounter(
+func (ck *CommandKernel) rejectClosedAdmission(request Request) error {
+	if ck.runtimeObserver != nil {
+		ck.runtimeObserver.AddRuntimeCounter(
 			lifecycle.RuntimeCounterShutdownRejected,
 			1,
 		)
 	}
 	closedErr := errors.New("jobmgr kernel: admission closed")
-	if err := kernel.abortRequestInputBody(request); err != nil {
-		kernel.run.Dirty(err)
+	if err := ck.abortRequestInputBody(request); err != nil {
+		ck.run.Dirty(err)
 		return errors.Join(closedErr, err)
 	}
 	select {
-	case <-kernel.shutdownStarted:
+	case <-ck.shutdownStarted:
 		return errors.Join(ErrStopped, closedErr)
 	default:
 		return closedErr
 	}
 }
 
-func (kernel *CommandKernel) serviceAdmissions(quantum int) bool {
-	if kernel.admissionServiceGate != nil {
+func (ck *CommandKernel) serviceAdmissions(quantum int) bool {
+	if ck.admissionServiceGate != nil {
 		select {
-		case <-kernel.admissionServiceGate:
+		case <-ck.admissionServiceGate:
 		default:
 			return false
 		}
 	}
 	var grants [4]lifecycle.AdmissionGrant
-	count, more, err := kernel.admission.TakeGrants(quantum, &grants)
+	count, more, err := ck.admission.TakeGrants(quantum, &grants)
 	if err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return false
 	}
 	for _, grant := range grants[:count] {
 		if grant.Kind == lifecycle.ReservationInputBodyGrowth {
 			select {
-			case kernel.inputBodyGrants <- grant:
+			case ck.inputBodyGrants <- grant:
 			default:
-				kernel.run.Dirty(errors.New("jobmgr kernel: input body grant gate is full"))
+				ck.run.Dirty(errors.New("jobmgr kernel: input body grant gate is full"))
 				return false
 			}
 			continue
 		}
-		operation := kernel.byAdmission[grant.Ref]
+		operation := ck.byAdmission[grant.Ref]
 		if operation == nil || operation.admission != grant.Ref {
-			kernel.run.Dirty(errors.New("jobmgr kernel: invalid admission grant"))
+			ck.run.Dirty(errors.New("jobmgr kernel: invalid admission grant"))
 			return false
 		}
 		switch grant.Kind {
 		case lifecycle.ReservationOrdinary:
 			if operation.admitted {
-				kernel.run.Dirty(errors.New("jobmgr kernel: duplicate initial admission grant"))
+				ck.run.Dirty(errors.New("jobmgr kernel: duplicate initial admission grant"))
 				return false
 			}
-			if kernel.compositeFenceConflicts(operation.claims) {
+			if ck.compositeFenceConflicts(operation.claims) {
 				wake, suspendErr :=
-					kernel.admission.SuspendOrdinary(
+					ck.admission.SuspendOrdinary(
 						grant.Ref,
 						operation.request.PayloadCapacity,
 					)
 				if suspendErr != nil {
-					kernel.run.Dirty(suspendErr)
+					ck.run.Dirty(suspendErr)
 					return false
 				}
-				if err := kernel.blockOnCompositeFence(
+				if err := ck.blockOnCompositeFence(
 					operation,
 				); err != nil {
-					kernel.run.Dirty(err)
+					ck.run.Dirty(err)
 					return false
 				}
 				more = more || wake
 				continue
 			}
 			operation.admitted = true
-			kernel.settleSubmission(operation, nil)
+			ck.settleSubmission(operation, nil)
 			if operation.lane.active == nil && operation.lane.head == operation {
-				kernel.markReady(operation.lane)
+				ck.markReady(operation.lane)
 			}
 		case lifecycle.ReservationOrdinaryGrowth:
 			if !operation.admitted ||
 				operation.Child !=
 					lifecycle.ChildResultReady {
-				kernel.run.Dirty(errors.New("jobmgr kernel: invalid result growth grant"))
+				ck.run.Dirty(errors.New("jobmgr kernel: invalid result growth grant"))
 				return false
 			}
 			if !operation.resultGrowthWaiting {
-				kernel.run.Dirty(
+				ck.run.Dirty(
 					errors.New(
 						"jobmgr kernel: unowned ordinary growth grant",
 					),
@@ -1950,19 +1950,19 @@ func (kernel *CommandKernel) serviceAdmissions(quantum int) bool {
 				return false
 			}
 			operation.resultGrowthWaiting = false
-			if err := kernel.sendEncodeAction(operation); err != nil {
-				kernel.run.Dirty(err)
+			if err := ck.sendEncodeAction(operation); err != nil {
+				ck.run.Dirty(err)
 				return false
 			}
 		default:
-			kernel.run.Dirty(errors.New("jobmgr kernel: unexpected admission grant kind"))
+			ck.run.Dirty(errors.New("jobmgr kernel: unexpected admission grant kind"))
 			return false
 		}
 	}
 	return more
 }
 
-func (kernel *CommandKernel) settleSubmission(operation *commandOperation, err error) {
+func (ck *CommandKernel) settleSubmission(operation *commandOperation, err error) {
 	if operation == nil || operation.submissionResult == nil {
 		return
 	}
@@ -1981,16 +1981,16 @@ func taskClassForOperation(
 	return lifecycle.TaskClassGenericFunction
 }
 
-func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
+func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 	for quantum > 0 {
-		lane := kernel.nextReadyLane()
+		lane := ck.nextReadyLane()
 		if lane == nil {
 			return false
 		}
 		quantum--
 		operation := lane.head
 		if operation == nil || !operation.admitted || lane.active != nil {
-			kernel.run.Dirty(errors.New("jobmgr kernel: invalid ready lane"))
+			ck.run.Dirty(errors.New("jobmgr kernel: invalid ready lane"))
 			return false
 		}
 		if !operation.claimsHeld {
@@ -2000,9 +2000,9 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 				if operation.State < lifecycle.OperationAcquiringClaims {
 					_ = operation.Advance(lifecycle.OperationAcquiringClaims)
 				}
-				granted, err := kernel.claims.Acquire(operation)
+				granted, err := ck.claims.Acquire(operation)
 				if err != nil {
-					kernel.run.Dirty(err)
+					ck.run.Dirty(err)
 					return false
 				}
 				if !granted {
@@ -2029,13 +2029,13 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 			switch resource.Action {
 			case ResourceInstall:
 				if lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || lane.retiringIdentity.Valid() {
-					kernel.run.Dirty(errors.New("jobmgr kernel: install encountered a live or retiring resource"))
+					ck.run.Dirty(errors.New("jobmgr kernel: install encountered a live or retiring resource"))
 					return false
 				}
-				kernel.nextResourceGeneration++
-				generation := kernel.nextResourceGeneration
+				ck.nextResourceGeneration++
+				generation := ck.nextResourceGeneration
 				if generation == 0 {
-					kernel.run.Dirty(errors.New("jobmgr kernel: resource generation wrapped"))
+					ck.run.Dirty(errors.New("jobmgr kernel: resource generation wrapped"))
 					return false
 				}
 				operation.resourceGeneration = generation
@@ -2043,19 +2043,19 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 				identity := lifecycle.ResourceIdentity{ID: resource.ID, Generation: generation}
 				permitTaskPlan, err := lifecycle.NewPreparedResourcePermitTaskPlan(
 					operation.Source, operation.request.Deadline, phaseLimit,
-					kernel.admission, operation.admission, identity, resource.Permit,
+					ck.admission, operation.admission, identity, resource.Permit,
 					func(ctx context.Context, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResource, error) {
 						return prepare(ctx, generation, permit)
 					},
 				)
 				if err != nil {
-					kernel.run.Dirty(err)
+					ck.run.Dirty(err)
 					return false
 				}
 				taskPlan = permitTaskPlan
 			case ResourceStop:
 				if lane.current == nil || !lane.currentIdentity.Valid() || lane.currentIdentity.ID != resource.ID || lane.currentStopping || lane.retiringIdentity.Valid() {
-					kernel.run.Dirty(errors.New("jobmgr kernel: stop encountered no exact current resource"))
+					ck.run.Dirty(errors.New("jobmgr kernel: stop encountered no exact current resource"))
 					return false
 				}
 				operation.resourceGeneration = lane.currentIdentity.Generation
@@ -2063,12 +2063,12 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 					operation.Source, operation.request.Deadline, phaseLimit, lane.current, lane.currentIdentity,
 				)
 				if err != nil {
-					kernel.run.Dirty(err)
+					ck.run.Dirty(err)
 					return false
 				}
 				taskPlan = readyPlan
 			default:
-				kernel.run.Dirty(errors.New("jobmgr kernel: unknown resource action at dispatch"))
+				ck.run.Dirty(errors.New("jobmgr kernel: unknown resource action at dispatch"))
 				return false
 			}
 		}
@@ -2076,7 +2076,7 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 			if lane.currentStopping ||
 				lane.retiringIdentity.Valid() ||
 				(lane.current == nil) != !lane.currentIdentity.Valid() {
-				kernel.run.Dirty(
+				ck.run.Dirty(
 					errors.New(
 						"jobmgr kernel: transaction encountered an invalid current resource slot",
 					),
@@ -2088,10 +2088,10 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 				Current: lane.currentIdentity,
 			}
 			if transaction.AllocateSuccessor {
-				kernel.nextResourceGeneration++
-				generation := kernel.nextResourceGeneration
+				ck.nextResourceGeneration++
+				generation := ck.nextResourceGeneration
 				if generation == 0 {
-					kernel.run.Dirty(
+					ck.run.Dirty(
 						errors.New(
 							"jobmgr kernel: transaction successor generation wrapped",
 						),
@@ -2136,7 +2136,7 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 					operation.Source,
 					operation.request.Deadline,
 					lifecycle.TransactionTaskPhases,
-					kernel.admission,
+					ck.admission,
 					operation.admission,
 					lane.current,
 					scope,
@@ -2154,15 +2154,15 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 				)
 			}
 			if err != nil {
-				kernel.run.Dirty(err)
+				ck.run.Dirty(err)
 				return false
 			}
 		}
 		if capability := operation.plan.Capability; capability != nil {
-			kernel.nextResourceGeneration++
-			generation := kernel.nextResourceGeneration
+			ck.nextResourceGeneration++
+			generation := ck.nextResourceGeneration
 			if generation == 0 {
-				kernel.run.Dirty(errors.New("jobmgr kernel: capability generation wrapped"))
+				ck.run.Dirty(errors.New("jobmgr kernel: capability generation wrapped"))
 				return false
 			}
 			operation.resourceGeneration = generation
@@ -2170,26 +2170,26 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 			prepare := capability.Prepare
 			capabilityPlan, err := lifecycle.NewPreparedCapabilityPermitTaskPlan(
 				operation.Source, operation.request.Deadline, phaseLimit,
-				kernel.admission, operation.admission, identity, capability.Permit,
+				ck.admission, operation.admission, identity, capability.Permit,
 				func(ctx context.Context, permit lifecycle.LongLivedPermit) (lifecycle.PreparedCapability, error) {
 					return prepare(ctx, generation, permit)
 				},
 			)
 			if err != nil {
-				kernel.run.Dirty(err)
+				ck.run.Dirty(err)
 				return false
 			}
 			taskPlan = capabilityPlan
 		}
-		requestRef, err := kernel.tasks.Enqueue(
+		requestRef, err := ck.tasks.Enqueue(
 			taskClassForOperation(operation, lane),
 			taskPlan,
 		)
 		if err != nil {
-			for _, grantedOperation := range kernel.releaseClaims(operation) {
-				kernel.markReady(grantedOperation.lane)
+			for _, grantedOperation := range ck.releaseClaims(operation) {
+				ck.markReady(grantedOperation.lane)
 			}
-			kernel.markReady(lane)
+			ck.markReady(lane)
 			return false
 		}
 		if operation.plan.Resource != nil && operation.plan.Resource.Action == ResourceStop {
@@ -2202,169 +2202,169 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 		}
 		operation.taskRequest = requestRef
 		lane.active = operation
-		kernel.tasksByRequest[requestRef] = operation
+		ck.tasksByRequest[requestRef] = operation
 	}
-	return kernel.ready[0].len != 0 || kernel.ready[1].len != 0
+	return ck.ready[0].len != 0 || ck.ready[1].len != 0
 }
 
-func (kernel *CommandKernel) serviceTaskStarts(quantum int) bool {
+func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
 	var started [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
-	count, more, dispatchErr := kernel.tasks.Dispatch(
+	count, more, dispatchErr := ck.tasks.Dispatch(
 		context.Background(),
 		quantum,
 		&started,
 	)
 	for _, start := range started[:count] {
 		if start.Err != nil {
-			kernel.rejectTaskStart(start)
+			ck.rejectTaskStart(start)
 			continue
 		}
-		if cleanupRef, ok := kernel.functionCleanupRequests[start.Request]; ok {
-			if _, exists := kernel.functionCleanupTasks[start.Task]; exists {
-				kernel.run.Dirty(errors.New("jobmgr kernel: duplicate Function cleanup task slot"))
+		if cleanupRef, ok := ck.functionCleanupRequests[start.Request]; ok {
+			if _, exists := ck.functionCleanupTasks[start.Task]; exists {
+				ck.run.Dirty(errors.New("jobmgr kernel: duplicate Function cleanup task slot"))
 				return more
 			}
-			delete(kernel.functionCleanupRequests, start.Request)
-			kernel.functionCleanupTasks[start.Task] = functionCleanupTask{ref: cleanupRef}
+			delete(ck.functionCleanupRequests, start.Request)
+			ck.functionCleanupTasks[start.Task] = functionCleanupTask{ref: cleanupRef}
 			continue
 		}
-		if kernel.shutdownBarrierRequest.Valid() &&
-			start.Request == kernel.shutdownBarrierRequest {
-			if kernel.shutdownBarrierTask.Valid() ||
-				kernel.shutdownBarrierDone ||
-				kernel.shutdownBarrierFailed {
-				kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier start acknowledgement"))
+		if ck.shutdownBarrierRequest.Valid() &&
+			start.Request == ck.shutdownBarrierRequest {
+			if ck.shutdownBarrierTask.Valid() ||
+				ck.shutdownBarrierDone ||
+				ck.shutdownBarrierFailed {
+				ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier start acknowledgement"))
 				return more
 			}
-			kernel.shutdownBarrierRequest = lifecycle.TaskRequestRef{}
-			kernel.shutdownBarrierTask = start.Task
+			ck.shutdownBarrierRequest = lifecycle.TaskRequestRef{}
+			ck.shutdownBarrierTask = start.Task
 			continue
 		}
-		if kernel.finalizerRequest.Valid() && start.Request == kernel.finalizerRequest {
-			if kernel.finalizerTask.Valid() || kernel.finalizerDone || kernel.finalizerFailed {
-				kernel.run.Dirty(errors.New("jobmgr kernel: invalid run finalizer start acknowledgement"))
+		if ck.finalizerRequest.Valid() && start.Request == ck.finalizerRequest {
+			if ck.finalizerTask.Valid() || ck.finalizerDone || ck.finalizerFailed {
+				ck.run.Dirty(errors.New("jobmgr kernel: invalid run finalizer start acknowledgement"))
 				return more
 			}
-			kernel.finalizerRequest = lifecycle.TaskRequestRef{}
-			kernel.finalizerTask = start.Task
+			ck.finalizerRequest = lifecycle.TaskRequestRef{}
+			ck.finalizerTask = start.Task
 			continue
 		}
-		operation := kernel.tasksByRequest[start.Request]
+		operation := ck.tasksByRequest[start.Request]
 		if operation == nil {
-			lane := kernel.shutdownRequests[start.Request]
+			lane := ck.shutdownRequests[start.Request]
 			if lane == nil || lane.shutdownRequest != start.Request ||
-				lane.shutdownTask.Valid() || kernel.shutdownTasks[start.Task] != nil {
-				kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown task start acknowledgement"))
+				lane.shutdownTask.Valid() || ck.shutdownTasks[start.Task] != nil {
+				ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown task start acknowledgement"))
 				return more
 			}
-			delete(kernel.shutdownRequests, start.Request)
+			delete(ck.shutdownRequests, start.Request)
 			lane.shutdownRequest = lifecycle.TaskRequestRef{}
 			lane.shutdownTask = start.Task
-			kernel.shutdownTasks[start.Task] = lane
+			ck.shutdownTasks[start.Task] = lane
 			continue
 		}
 		if operation == nil || operation.taskRequest != start.Request ||
 			(operation.Child != lifecycle.ChildNotStarted && operation.Child != lifecycle.ChildDeadlineStartPending) {
-			kernel.run.Dirty(errors.New("jobmgr kernel: invalid task start acknowledgement"))
+			ck.run.Dirty(errors.New("jobmgr kernel: invalid task start acknowledgement"))
 			return more
 		}
-		delete(kernel.tasksByRequest, start.Request)
+		delete(ck.tasksByRequest, start.Request)
 		operation.taskRequest = lifecycle.TaskRequestRef{}
 		if err := operation.Advance(lifecycle.OperationRunning); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return more
 		}
 		if err := operation.StartChild(start.Task); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return more
 		}
-		kernel.tasksByRef[start.Task] = operation
+		ck.tasksByRef[start.Task] = operation
 	}
 	if dispatchErr != nil {
-		kernel.run.Dirty(dispatchErr)
+		ck.run.Dirty(dispatchErr)
 	}
 	return more
 }
 
-func (kernel *CommandKernel) rejectTaskStart(start lifecycle.TaskStart) {
-	if cleanupRef, ok := kernel.functionCleanupRequests[start.Request]; ok {
-		delete(kernel.functionCleanupRequests, start.Request)
+func (ck *CommandKernel) rejectTaskStart(start lifecycle.TaskStart) {
+	if cleanupRef, ok := ck.functionCleanupRequests[start.Request]; ok {
+		delete(ck.functionCleanupRequests, start.Request)
 		completeErr := errors.Join(errors.New("jobmgr kernel: Function cleanup task start rejected"), start.Err)
-		kernel.run.Dirty(errors.Join(completeErr, kernel.functionCatalog.CompleteCleanup(cleanupRef, completeErr)))
+		ck.run.Dirty(errors.Join(completeErr, ck.functionCatalog.CompleteCleanup(cleanupRef, completeErr)))
 		return
 	}
-	if kernel.shutdownBarrierRequest.Valid() &&
-		start.Request == kernel.shutdownBarrierRequest {
-		kernel.shutdownBarrierRequest = lifecycle.TaskRequestRef{}
-		kernel.shutdownBarrierFailed = true
-		kernel.run.Dirty(errors.Join(
+	if ck.shutdownBarrierRequest.Valid() &&
+		start.Request == ck.shutdownBarrierRequest {
+		ck.shutdownBarrierRequest = lifecycle.TaskRequestRef{}
+		ck.shutdownBarrierFailed = true
+		ck.run.Dirty(errors.Join(
 			errors.New("jobmgr kernel: shutdown barrier task start rejected"),
 			start.Err,
 		))
 		return
 	}
-	operation := kernel.tasksByRequest[start.Request]
+	operation := ck.tasksByRequest[start.Request]
 	if !errors.Is(start.Err, lifecycle.ErrLongLivedRecordCapacity) || operation == nil ||
 		operation.taskRequest != start.Request || operation.Child != lifecycle.ChildNotStarted {
-		kernel.run.Dirty(errors.Join(errors.New("jobmgr kernel: invalid task start rejection"), start.Err))
+		ck.run.Dirty(errors.Join(errors.New("jobmgr kernel: invalid task start rejection"), start.Err))
 		return
 	}
 	if operation.plan.Transaction != nil {
-		if err := kernel.restoreTransactionOutcome(operation, start.Outcome); err != nil {
-			kernel.run.Dirty(errors.Join(
+		if err := ck.restoreTransactionOutcome(operation, start.Outcome); err != nil {
+			ck.run.Dirty(errors.Join(
 				errors.New("jobmgr kernel: rejected transaction start lost current resource"),
 				err,
 			))
 			return
 		}
 	} else if start.Outcome.Kind() != lifecycle.TaskOutcomeNone {
-		kernel.run.Dirty(
+		ck.run.Dirty(
 			errors.New("jobmgr kernel: rejected non-transaction start returned an outcome"),
 		)
 		return
 	}
-	delete(kernel.tasksByRequest, start.Request)
+	delete(ck.tasksByRequest, start.Request)
 	operation.taskRequest = lifecycle.TaskRequestRef{}
 	operation.terminalErr = errors.Join(operation.terminalErr, start.Err)
-	kernel.unlinkQueued(operation, start.Err)
+	ck.unlinkQueued(operation, start.Err)
 	if operation.Response != lifecycle.ResponseNotRequired {
-		kernel.enqueueControl(operation, lifecycle.ControlUnavailable)
+		ck.enqueueControl(operation, lifecycle.ControlUnavailable)
 	}
-	kernel.tryDispose(operation)
+	ck.tryDispose(operation)
 }
 
-func (kernel *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
-	if cleanup, ok := kernel.functionCleanupTasks[completion.Ref]; ok {
+func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
+	if cleanup, ok := ck.functionCleanupTasks[completion.Ref]; ok {
 		if completion.Sequence != 1 || completion.Kind != lifecycle.TaskOutcomeNone {
 			completion.Err = errors.Join(completion.Err, errors.New("jobmgr kernel: invalid Function cleanup completion"))
 		}
 		cleanup.err = completion.Err
-		kernel.functionCleanupTasks[completion.Ref] = cleanup
-		if err := kernel.tasks.SendAction(lifecycle.TaskAction{
+		ck.functionCleanupTasks[completion.Ref] = cleanup
+		if err := ck.tasks.SendAction(lifecycle.TaskAction{
 			Ref: completion.Ref, Sequence: 2, Kind: lifecycle.TaskActionTerminate,
 		}); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 		}
 		return
 	}
-	if kernel.finalizerTask.Valid() && completion.Ref == kernel.finalizerTask {
-		kernel.completeRunFinalizer(completion)
+	if ck.finalizerTask.Valid() && completion.Ref == ck.finalizerTask {
+		ck.completeRunFinalizer(completion)
 		return
 	}
-	if kernel.shutdownBarrierTask.Valid() &&
-		completion.Ref == kernel.shutdownBarrierTask {
-		kernel.completeShutdownBarrier(completion)
+	if ck.shutdownBarrierTask.Valid() &&
+		completion.Ref == ck.shutdownBarrierTask {
+		ck.completeShutdownBarrier(completion)
 		return
 	}
-	operation := kernel.tasksByRef[completion.Ref]
+	operation := ck.tasksByRef[completion.Ref]
 	if operation == nil {
-		kernel.completeShutdownTask(completion)
+		ck.completeShutdownTask(completion)
 		return
 	}
 	if operation.composite != nil &&
 		operation.activeChild != nil {
 		if operation.deferredCompletion != nil {
-			kernel.run.Dirty(
+			ck.run.Dirty(
 				errors.New(
 					"jobmgr composite: parent completed twice with a live child",
 				),
@@ -2375,8 +2375,8 @@ func (kernel *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		operation.deferredCompletion = &pending
 		return
 	}
-	if _, err := kernel.tasks.ClearRetainedTimeout(operation.Task); err != nil {
-		kernel.run.Dirty(err)
+	if _, err := ck.tasks.ClearRetainedTimeout(operation.Task); err != nil {
+		ck.run.Dirty(err)
 		return
 	}
 	var resultErr error
@@ -2392,48 +2392,48 @@ func (kernel *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		)
 	}
 	if resultErr != nil {
-		kernel.run.Dirty(resultErr)
+		ck.run.Dirty(resultErr)
 		return
 	}
-	kernel.markOperationDeadlineIfDue(operation)
+	ck.markOperationDeadlineIfDue(operation)
 	if operation.plan.Transaction != nil {
-		kernel.completeResourceTransactionTask(operation, completion)
+		ck.completeResourceTransactionTask(operation, completion)
 		return
 	}
 	if operation.plan.Resource != nil {
-		kernel.completeResourceTask(operation, completion)
+		ck.completeResourceTask(operation, completion)
 		return
 	}
 	if operation.plan.Capability != nil {
-		kernel.completeCapabilityTask(operation, completion)
+		ck.completeCapabilityTask(operation, completion)
 		return
 	}
 	if operation.cancelled &&
 		operation.Response == lifecycle.ResponseOpen &&
 		!operation.controlQueued {
-		kernel.enqueueControl(
+		ck.enqueueControl(
 			operation,
 			cancellationControl(operation),
 		)
 	}
 	action := lifecycle.TaskAction{Ref: completion.Ref, Sequence: completion.Sequence + 1, Kind: lifecycle.TaskActionDispose}
 	if completion.Err == nil && operation.Response == lifecycle.ResponseOpen && !operation.controlQueued {
-		expiry := lifecycle.ExpiryAt(kernel.clock.Now())
-		preflight, err := kernel.tasks.PreflightResult(completion.Ref, operation.UID, expiry)
+		expiry := lifecycle.ExpiryAt(ck.clock.Now())
+		preflight, err := ck.tasks.PreflightResult(completion.Ref, operation.UID, expiry)
 		if err != nil {
 			status := lifecycle.ControlInternal
 			if errors.Is(err, lifecycle.ErrFunctionResultTooLarge) {
 				status = lifecycle.ControlPayloadTooLarge
 			}
-			kernel.enqueueControl(operation, status)
+			ck.enqueueControl(operation, status)
 		} else {
 			total, sizeErr := operationResultAdmissionBytes(operation.admissionBase, preflight)
 			if sizeErr != nil {
-				kernel.enqueueControl(operation, lifecycle.ControlPayloadTooLarge)
+				ck.enqueueControl(operation, lifecycle.ControlPayloadTooLarge)
 			} else {
-				ready, _, resizeErr := kernel.admission.ResizeOrdinary(operation.admission, total)
+				ready, _, resizeErr := ck.admission.ResizeOrdinary(operation.admission, total)
 				if resizeErr != nil {
-					kernel.run.Dirty(resizeErr)
+					ck.run.Dirty(resizeErr)
 					return
 				}
 				operation.resultExpiry = expiry
@@ -2441,8 +2441,8 @@ func (kernel *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 					operation.resultGrowthWaiting = true
 					return
 				}
-				if err := kernel.sendEncodeAction(operation); err != nil {
-					kernel.run.Dirty(err)
+				if err := ck.sendEncodeAction(operation); err != nil {
+					ck.run.Dirty(err)
 				}
 				return
 			}
@@ -2455,93 +2455,93 @@ func (kernel *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		} else if errors.Is(completion.Err, lifecycle.ErrTaskPanic) {
 			status = lifecycle.ControlInternal
 		}
-		kernel.enqueueControl(operation, status)
+		ck.enqueueControl(operation, status)
 	}
 	if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return
 	}
-	if err := kernel.tasks.SendAction(action); err != nil {
-		kernel.run.Dirty(err)
+	if err := ck.tasks.SendAction(action); err != nil {
+		ck.run.Dirty(err)
 	}
 }
 
-func (kernel *CommandKernel) completeCapabilityTask(operation *commandOperation, completion lifecycle.TaskCompletion) {
+func (ck *CommandKernel) completeCapabilityTask(operation *commandOperation, completion lifecycle.TaskCompletion) {
 	kind := lifecycle.TaskActionDispose
 	if completion.Err == nil && !operation.cancelled && !operation.TimedOut() {
 		if completion.Kind != lifecycle.TaskOutcomePreparedCapability {
-			kernel.dirtyCapability(operation, errors.New("jobmgr kernel: capability task returned the wrong outcome"))
+			ck.dirtyCapability(operation, errors.New("jobmgr kernel: capability task returned the wrong outcome"))
 			return
 		}
 		kind = lifecycle.TaskActionCommitCapability
 	}
 	if completion.Err != nil {
-		kernel.dirtyCapability(operation, completion.Err)
+		ck.dirtyCapability(operation, completion.Err)
 	}
 	action := lifecycle.TaskAction{Ref: completion.Ref, Sequence: completion.Sequence + 1, Kind: kind}
 	if kind == lifecycle.TaskActionCommitCapability {
 		action.ExpectedGeneration = operation.resourceGeneration
 	}
 	if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return
 	}
-	if err := kernel.tasks.SendAction(action); err != nil {
-		kernel.run.Dirty(err)
+	if err := ck.tasks.SendAction(action); err != nil {
+		ck.run.Dirty(err)
 	}
 }
 
-func (kernel *CommandKernel) completeResourceTask(operation *commandOperation, completion lifecycle.TaskCompletion) {
+func (ck *CommandKernel) completeResourceTask(operation *commandOperation, completion lifecycle.TaskCompletion) {
 	kind := lifecycle.TaskActionDispose
 	if completion.Err == nil && !operation.TimedOut() {
 		switch operation.plan.Resource.Action {
 		case ResourceInstall:
 			if completion.Kind != lifecycle.TaskOutcomePreparedResource {
-				kernel.run.Dirty(errors.New("jobmgr kernel: install task returned the wrong outcome"))
+				ck.run.Dirty(errors.New("jobmgr kernel: install task returned the wrong outcome"))
 				return
 			}
 			kind = lifecycle.TaskActionAcceptStart
 		case ResourceStop:
 			if completion.Kind != lifecycle.TaskOutcomeReadyResource {
-				kernel.run.Dirty(errors.New("jobmgr kernel: stop task returned the wrong outcome"))
+				ck.run.Dirty(errors.New("jobmgr kernel: stop task returned the wrong outcome"))
 				return
 			}
 			kind = lifecycle.TaskActionStopResource
 		default:
-			kernel.run.Dirty(errors.New("jobmgr kernel: unknown resource completion"))
+			ck.run.Dirty(errors.New("jobmgr kernel: unknown resource completion"))
 			return
 		}
 	}
 	if completion.Err != nil {
-		kernel.run.Dirty(completion.Err)
+		ck.run.Dirty(completion.Err)
 	}
 	action := lifecycle.TaskAction{Ref: completion.Ref, Sequence: completion.Sequence + 1, Kind: kind}
 	if kind == lifecycle.TaskActionAcceptStart {
 		action.ExpectedGeneration = operation.resourceGeneration
 	}
 	if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return
 	}
-	if err := kernel.tasks.SendAction(action); err != nil {
-		kernel.run.Dirty(err)
+	if err := ck.tasks.SendAction(action); err != nil {
+		ck.run.Dirty(err)
 	}
 }
 
-func (kernel *CommandKernel) completeResourceTransactionTask(
+func (ck *CommandKernel) completeResourceTransactionTask(
 	operation *commandOperation,
 	completion lifecycle.TaskCompletion,
 ) {
 	switch completion.Sequence {
 	case 1:
 		if completion.Err != nil {
-			current, err := kernel.tasks.TakeDisposedResourceTransaction(
+			current, err := ck.tasks.TakeDisposedResourceTransaction(
 				completion.Ref,
 				completion.Sequence,
 				operation.transactionScope,
 			)
 			if err != nil {
-				kernel.run.Dirty(errors.Join(
+				ck.run.Dirty(errors.Join(
 					errors.New(
 						"jobmgr kernel: failed transaction preparation lost current resource",
 					),
@@ -2550,8 +2550,8 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 				))
 				return
 			}
-			if err := kernel.restoreTransactionCurrent(operation, current); err != nil {
-				kernel.run.Dirty(errors.Join(completion.Err, err))
+			if err := ck.restoreTransactionCurrent(operation, current); err != nil {
+				ck.run.Dirty(errors.Join(completion.Err, err))
 				return
 			}
 			status := lifecycle.ControlUnavailable
@@ -2560,9 +2560,9 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 			}
 			if operation.Response == lifecycle.ResponseOpen &&
 				!operation.controlQueued {
-				kernel.enqueueControl(operation, status)
+				ck.enqueueControl(operation, status)
 			}
-			kernel.sendTransactionAction(
+			ck.sendTransactionAction(
 				operation,
 				completion.Ref,
 				completion.Sequence+1,
@@ -2571,7 +2571,7 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 			return
 		}
 		if completion.Kind != lifecycle.TaskOutcomePreparedResourceTransaction {
-			kernel.run.Dirty(
+			ck.run.Dirty(
 				errors.New(
 					"jobmgr kernel: transaction preparation returned the wrong outcome",
 				),
@@ -2586,7 +2586,7 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 			operation.controlQueued {
 			action = lifecycle.TaskActionDispose
 		}
-		kernel.sendTransactionAction(
+		ck.sendTransactionAction(
 			operation,
 			completion.Ref,
 			completion.Sequence+1,
@@ -2598,7 +2598,7 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 				operation.terminalErr,
 				completion.Err,
 			)
-			kernel.run.Dirty(errors.Join(
+			ck.run.Dirty(errors.Join(
 				errors.New(
 					"jobmgr kernel: resource transaction apply left unprovable state",
 				),
@@ -2607,7 +2607,7 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 			return
 		}
 		if completion.Kind != lifecycle.TaskOutcomeAppliedResourceTransaction {
-			kernel.run.Dirty(
+			ck.run.Dirty(
 				errors.New(
 					"jobmgr kernel: transaction apply returned the wrong outcome",
 				),
@@ -2615,21 +2615,21 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 			return
 		}
 		disposition, current, err :=
-			kernel.tasks.TakeAppliedResourceTransaction(
+			ck.tasks.TakeAppliedResourceTransaction(
 				completion.Ref,
 				completion.Sequence,
 				operation.transactionScope,
 			)
 		if err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return
 		}
-		if err := kernel.applyTransactionDisposition(
+		if err := ck.applyTransactionDisposition(
 			operation,
 			disposition,
 			current,
 		); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return
 		}
 		operation.transactionApplied = true
@@ -2639,15 +2639,15 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 			operation.Response ==
 				lifecycle.ResponseOpen &&
 			!operation.controlQueued {
-			kernel.enqueueControl(
+			ck.enqueueControl(
 				operation,
 				cancellationControl(operation),
 			)
 		}
 		if operation.Response == lifecycle.ResponseOpen &&
 			!operation.controlQueued {
-			expiry := lifecycle.ExpiryAt(kernel.clock.Now())
-			preflight, preflightErr := kernel.tasks.PreflightResult(
+			expiry := lifecycle.ExpiryAt(ck.clock.Now())
+			preflight, preflightErr := ck.tasks.PreflightResult(
 				completion.Ref,
 				operation.UID,
 				expiry,
@@ -2660,24 +2660,24 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 				) {
 					status = lifecycle.ControlPayloadTooLarge
 				}
-				kernel.enqueueControl(operation, status)
+				ck.enqueueControl(operation, status)
 			} else {
 				total, sizeErr := operationResultAdmissionBytes(
 					operation.admissionBase,
 					preflight,
 				)
 				if sizeErr != nil {
-					kernel.enqueueControl(
+					ck.enqueueControl(
 						operation,
 						lifecycle.ControlPayloadTooLarge,
 					)
 				} else {
-					ready, _, resizeErr := kernel.admission.ResizeOrdinary(
+					ready, _, resizeErr := ck.admission.ResizeOrdinary(
 						operation.admission,
 						total,
 					)
 					if resizeErr != nil {
-						kernel.run.Dirty(resizeErr)
+						ck.run.Dirty(resizeErr)
 						return
 					}
 					operation.resultExpiry = expiry
@@ -2685,27 +2685,27 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 						operation.resultGrowthWaiting = true
 						return
 					}
-					if err := kernel.sendEncodeAction(operation); err != nil {
-						kernel.run.Dirty(err)
+					if err := ck.sendEncodeAction(operation); err != nil {
+						ck.run.Dirty(err)
 					}
 					return
 				}
 			}
 		}
-		kernel.sendTransactionAction(
+		ck.sendTransactionAction(
 			operation,
 			completion.Ref,
 			completion.Sequence+1,
 			lifecycle.TaskActionDispose,
 		)
 	default:
-		kernel.run.Dirty(
+		ck.run.Dirty(
 			errors.New("jobmgr kernel: unexpected transaction completion"),
 		)
 	}
 }
 
-func (kernel *CommandKernel) sendTransactionAction(
+func (ck *CommandKernel) sendTransactionAction(
 	operation *commandOperation,
 	ref lifecycle.TaskRef,
 	sequence uint8,
@@ -2715,15 +2715,15 @@ func (kernel *CommandKernel) sendTransactionAction(
 		Ref: ref, Sequence: sequence, Kind: kind,
 	}
 	if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return
 	}
-	if err := kernel.tasks.SendAction(action); err != nil {
-		kernel.run.Dirty(err)
+	if err := ck.tasks.SendAction(action); err != nil {
+		ck.run.Dirty(err)
 	}
 }
 
-func (kernel *CommandKernel) restoreTransactionOutcome(
+func (ck *CommandKernel) restoreTransactionOutcome(
 	operation *commandOperation,
 	outcome lifecycle.TaskOutcome,
 ) error {
@@ -2736,17 +2736,17 @@ func (kernel *CommandKernel) restoreTransactionOutcome(
 				"jobmgr kernel: transaction outcome differs from exact current resource",
 			)
 		}
-		return kernel.restoreTransactionCurrent(operation, current)
+		return ck.restoreTransactionCurrent(operation, current)
 	}
 	if outcome.Kind() != lifecycle.TaskOutcomeNone {
 		return errors.New(
 			"jobmgr kernel: graph-only transaction returned a current resource",
 		)
 	}
-	return kernel.restoreTransactionCurrent(operation, nil)
+	return ck.restoreTransactionCurrent(operation, nil)
 }
 
-func (kernel *CommandKernel) restoreTransactionCurrent(
+func (ck *CommandKernel) restoreTransactionCurrent(
 	operation *commandOperation,
 	current lifecycle.ReadyResource,
 ) error {
@@ -2786,7 +2786,7 @@ func (kernel *CommandKernel) restoreTransactionCurrent(
 	return nil
 }
 
-func (kernel *CommandKernel) applyTransactionDisposition(
+func (ck *CommandKernel) applyTransactionDisposition(
 	operation *commandOperation,
 	disposition lifecycle.ResourceTransactionDisposition,
 	current lifecycle.ReadyResource,
@@ -2850,36 +2850,36 @@ func (kernel *CommandKernel) applyTransactionDisposition(
 	return nil
 }
 
-func (kernel *CommandKernel) completeShutdownTask(completion lifecycle.TaskCompletion) {
+func (ck *CommandKernel) completeShutdownTask(completion lifecycle.TaskCompletion) {
 	if !completion.Ref.Valid() {
-		kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown task completion"))
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown task completion"))
 		return
 	}
-	lane := kernel.shutdownTasks[completion.Ref]
+	lane := ck.shutdownTasks[completion.Ref]
 	if lane == nil || lane.shutdownTask != completion.Ref || lane.shutdownAction != 0 || completion.Sequence != 1 ||
 		!lane.currentStopping || lane.current != nil || !lane.currentIdentity.Valid() || lane.retiringIdentity.Valid() {
-		kernel.run.Dirty(errors.New("jobmgr kernel: completion for unknown or invalid shutdown task"))
+		ck.run.Dirty(errors.New("jobmgr kernel: completion for unknown or invalid shutdown task"))
 		return
 	}
 	if completion.Err != nil {
-		kernel.run.Dirty(completion.Err)
+		ck.run.Dirty(completion.Err)
 		return
 	}
 	if completion.Kind != lifecycle.TaskOutcomeReadyResource {
-		kernel.run.Dirty(errors.New("jobmgr kernel: shutdown Stop task returned the wrong outcome"))
+		ck.run.Dirty(errors.New("jobmgr kernel: shutdown Stop task returned the wrong outcome"))
 		return
 	}
-	kernel.sendShutdownAction(lane, lifecycle.TaskActionStopResource, 2)
+	ck.sendShutdownAction(lane, lifecycle.TaskActionStopResource, 2)
 }
 
-func (kernel *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowledgement) {
+func (ck *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowledgement) {
 	if !ack.Ref.Valid() {
-		kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown task acknowledgement"))
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown task acknowledgement"))
 		return
 	}
-	lane := kernel.shutdownTasks[ack.Ref]
+	lane := ck.shutdownTasks[ack.Ref]
 	if lane == nil || lane.shutdownTask != ack.Ref || lane.shutdownAction != ack.Kind {
-		kernel.run.Dirty(errors.New("jobmgr kernel: acknowledgement for unknown or invalid shutdown task"))
+		ck.run.Dirty(errors.New("jobmgr kernel: acknowledgement for unknown or invalid shutdown task"))
 		return
 	}
 	wantSequence := uint8(0)
@@ -2891,15 +2891,15 @@ func (kernel *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowled
 	case lifecycle.TaskActionTerminate:
 		wantSequence = 4
 	default:
-		kernel.run.Dirty(errors.New("jobmgr kernel: unexpected shutdown task action"))
+		ck.run.Dirty(errors.New("jobmgr kernel: unexpected shutdown task action"))
 		return
 	}
 	if ack.Sequence != wantSequence {
-		kernel.run.Dirty(errors.New("jobmgr kernel: stale shutdown task acknowledgement"))
+		ck.run.Dirty(errors.New("jobmgr kernel: stale shutdown task acknowledgement"))
 		return
 	}
 	if ack.Err != nil && ack.Kind != lifecycle.TaskActionTerminate {
-		kernel.run.Dirty(ack.Err)
+		ck.run.Dirty(ack.Err)
 		return
 	}
 	lane.shutdownAction = 0
@@ -2907,48 +2907,48 @@ func (kernel *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowled
 	case lifecycle.TaskActionStopResource:
 		identity := lane.currentIdentity
 		if !lane.currentStopping || lane.current != nil || !identity.Valid() || lane.retiringIdentity.Valid() {
-			kernel.run.Dirty(errors.New("jobmgr kernel: shutdown stopped resource differs from current slot"))
+			ck.run.Dirty(errors.New("jobmgr kernel: shutdown stopped resource differs from current slot"))
 			return
 		}
 		lane.currentIdentity = lifecycle.ResourceIdentity{}
 		lane.currentStopping = false
 		lane.retiringIdentity = identity
-		kernel.sendShutdownAction(lane, lifecycle.TaskActionFinalizeResource, 3)
+		ck.sendShutdownAction(lane, lifecycle.TaskActionFinalizeResource, 3)
 	case lifecycle.TaskActionFinalizeResource:
 		if lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || !lane.retiringIdentity.Valid() {
-			kernel.run.Dirty(errors.New("jobmgr kernel: shutdown finalized resource differs from retiring slot"))
+			ck.run.Dirty(errors.New("jobmgr kernel: shutdown finalized resource differs from retiring slot"))
 			return
 		}
 		lane.retiringIdentity = lifecycle.ResourceIdentity{}
 		lane.resourceSource = 0
-		kernel.sendShutdownAction(lane, lifecycle.TaskActionTerminate, 4)
+		ck.sendShutdownAction(lane, lifecycle.TaskActionTerminate, 4)
 	case lifecycle.TaskActionTerminate:
 		if ack.Err != nil {
-			kernel.run.Dirty(ack.Err)
+			ck.run.Dirty(ack.Err)
 		}
-		if err := kernel.tasks.Release(ack.Ref); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.tasks.Release(ack.Ref); err != nil {
+			ck.run.Dirty(err)
 			return
 		}
-		delete(kernel.shutdownTasks, ack.Ref)
+		delete(ck.shutdownTasks, ack.Ref)
 		lane.shutdownTask = lifecycle.TaskRef{}
 		lane.shutdownAction = 0
-		kernel.releaseUnusedLane(lane)
+		ck.releaseUnusedLane(lane)
 	}
 }
 
-func (kernel *CommandKernel) sendShutdownAction(lane *commandLane, kind lifecycle.TaskActionKind, sequence uint8) {
+func (ck *CommandKernel) sendShutdownAction(lane *commandLane, kind lifecycle.TaskActionKind, sequence uint8) {
 	if lane == nil || !lane.shutdownTask.Valid() || lane.shutdownAction != 0 {
-		kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown action transition"))
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown action transition"))
 		return
 	}
 	lane.shutdownAction = kind
-	if err := kernel.tasks.SendAction(lifecycle.TaskAction{Ref: lane.shutdownTask, Sequence: sequence, Kind: kind}); err != nil {
-		kernel.run.Dirty(err)
+	if err := ck.tasks.SendAction(lifecycle.TaskAction{Ref: lane.shutdownTask, Sequence: sequence, Kind: kind}); err != nil {
+		ck.run.Dirty(err)
 	}
 }
 
-func (kernel *CommandKernel) sendEncodeAction(operation *commandOperation) error {
+func (ck *CommandKernel) sendEncodeAction(operation *commandOperation) error {
 	if operation == nil || operation.Child != lifecycle.ChildResultReady || operation.resultExpiry <= 0 {
 		return errors.New("jobmgr kernel: invalid result encode transition")
 	}
@@ -2971,88 +2971,88 @@ func (kernel *CommandKernel) sendEncodeAction(operation *commandOperation) error
 	if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
 		return err
 	}
-	return kernel.tasks.SendAction(action)
+	return ck.tasks.SendAction(action)
 }
 
-func (kernel *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
-	if cleanup, ok := kernel.functionCleanupTasks[ack.Ref]; ok {
+func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
+	if cleanup, ok := ck.functionCleanupTasks[ack.Ref]; ok {
 		if ack.Kind != lifecycle.TaskActionTerminate || ack.Sequence != 2 {
-			kernel.run.Dirty(errors.New("jobmgr kernel: invalid Function cleanup acknowledgement"))
+			ck.run.Dirty(errors.New("jobmgr kernel: invalid Function cleanup acknowledgement"))
 			return
 		}
-		if err := kernel.tasks.Release(ack.Ref); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.tasks.Release(ack.Ref); err != nil {
+			ck.run.Dirty(err)
 			return
 		}
-		delete(kernel.functionCleanupTasks, ack.Ref)
+		delete(ck.functionCleanupTasks, ack.Ref)
 		completeErr := errors.Join(cleanup.err, ack.Err)
-		catalogErr := kernel.functionCatalog.CompleteCleanup(cleanup.ref, completeErr)
+		catalogErr := ck.functionCatalog.CompleteCleanup(cleanup.ref, completeErr)
 		if completeErr != nil || catalogErr != nil {
-			kernel.run.Dirty(errors.Join(completeErr, catalogErr))
+			ck.run.Dirty(errors.Join(completeErr, catalogErr))
 		}
 		return
 	}
-	if kernel.finalizerTask.Valid() && ack.Ref == kernel.finalizerTask {
-		kernel.acknowledgeRunFinalizer(ack)
+	if ck.finalizerTask.Valid() && ack.Ref == ck.finalizerTask {
+		ck.acknowledgeRunFinalizer(ack)
 		return
 	}
-	if kernel.shutdownBarrierTask.Valid() &&
-		ack.Ref == kernel.shutdownBarrierTask {
-		kernel.acknowledgeShutdownBarrier(ack)
+	if ck.shutdownBarrierTask.Valid() &&
+		ack.Ref == ck.shutdownBarrierTask {
+		ck.acknowledgeShutdownBarrier(ack)
 		return
 	}
-	operation := kernel.tasksByRef[ack.Ref]
+	operation := ck.tasksByRef[ack.Ref]
 	if operation == nil {
-		kernel.acknowledgeShutdownTask(ack)
+		ck.acknowledgeShutdownTask(ack)
 		return
 	}
 	if ack.Kind == lifecycle.TaskActionTerminate {
 		if err := operation.ChildExited(ack.Ref, ack.Sequence); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return
 		}
 		if ack.Err != nil {
 			operation.PoisonResponse()
-			kernel.run.Dirty(ack.Err)
+			ck.run.Dirty(ack.Err)
 		}
-		if err := kernel.tasks.Release(ack.Ref); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.tasks.Release(ack.Ref); err != nil {
+			ck.run.Dirty(err)
 			return
 		}
-		delete(kernel.tasksByRef, ack.Ref)
-		kernel.tryDispose(operation)
+		delete(ck.tasksByRef, ack.Ref)
+		ck.tryDispose(operation)
 		return
 	}
-	kernel.markOperationDeadlineIfDue(operation)
+	ck.markOperationDeadlineIfDue(operation)
 	if err := operation.ActionAcknowledged(ack.Ref, ack.Sequence); err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return
 	}
 	if operation.plan.Transaction != nil {
-		kernel.acknowledgeResourceTransactionTask(operation, ack)
+		ck.acknowledgeResourceTransactionTask(operation, ack)
 		return
 	}
 	if operation.plan.Resource != nil {
-		kernel.acknowledgeResourceTask(operation, ack)
+		ck.acknowledgeResourceTask(operation, ack)
 		return
 	}
 	if operation.plan.Capability != nil {
-		kernel.acknowledgeCapabilityTask(operation, ack)
+		ck.acknowledgeCapabilityTask(operation, ack)
 		return
 	}
 	if ack.Err != nil {
 		operation.PoisonResponse()
-		kernel.run.Dirty(ack.Err)
+		ck.run.Dirty(ack.Err)
 	} else if ack.Kind == lifecycle.TaskActionEncodeWrite {
 		if err := operation.CommitResponse(); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 		}
-		if _, _, err := kernel.admission.ResizeOrdinary(operation.admission, operation.admissionBase); err != nil {
-			kernel.run.Dirty(err)
+		if _, _, err := ck.admission.ResizeOrdinary(operation.admission, operation.admissionBase); err != nil {
+			ck.run.Dirty(err)
 			return
 		}
-		if err := kernel.completeOperationUID(operation, false); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.completeOperationUID(operation, false); err != nil {
+			ck.run.Dirty(err)
 			return
 		}
 	}
@@ -3062,25 +3062,25 @@ func (kernel *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) 
 	if operation.plan.Cleanup != nil && !operation.cleanupDone {
 		cleanup := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionCleanup}
 		if err := operation.ActionPending(cleanup.Ref, cleanup.Sequence); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return
 		}
-		if err := kernel.tasks.SendAction(cleanup); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.tasks.SendAction(cleanup); err != nil {
+			ck.run.Dirty(err)
 		}
 		return
 	}
 	termination := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionTerminate}
 	if err := operation.TerminationPending(termination.Ref, termination.Sequence); err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return
 	}
-	if err := kernel.tasks.SendAction(termination); err != nil {
-		kernel.run.Dirty(err)
+	if err := ck.tasks.SendAction(termination); err != nil {
+		ck.run.Dirty(err)
 	}
 }
 
-func (kernel *CommandKernel) acknowledgeResourceTransactionTask(
+func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 	operation *commandOperation,
 	ack lifecycle.TaskAcknowledgement,
 ) {
@@ -3089,7 +3089,7 @@ func (kernel *CommandKernel) acknowledgeResourceTransactionTask(
 		if ack.Kind == lifecycle.TaskActionEncodeWrite {
 			operation.PoisonResponse()
 		}
-		kernel.run.Dirty(ack.Err)
+		ck.run.Dirty(ack.Err)
 		if ack.Kind == lifecycle.TaskActionDispose &&
 			!operation.transactionApplied {
 			return
@@ -3103,24 +3103,24 @@ func (kernel *CommandKernel) acknowledgeResourceTransactionTask(
 				return
 			}
 			if !operation.transactionRestored {
-				current, err := kernel.tasks.TakeDisposedResourceTransaction(
+				current, err := ck.tasks.TakeDisposedResourceTransaction(
 					ack.Ref,
 					ack.Sequence,
 					operation.transactionScope,
 				)
 				if err != nil {
-					kernel.run.Dirty(err)
+					ck.run.Dirty(err)
 					return
 				}
-				if err := kernel.restoreTransactionCurrent(
+				if err := ck.restoreTransactionCurrent(
 					operation,
 					current,
 				); err != nil {
-					kernel.run.Dirty(err)
+					ck.run.Dirty(err)
 					return
 				}
 			}
-			kernel.sendResourceTermination(
+			ck.sendResourceTermination(
 				operation,
 				ack.Ref,
 				ack.Sequence+1,
@@ -3130,28 +3130,28 @@ func (kernel *CommandKernel) acknowledgeResourceTransactionTask(
 	case lifecycle.TaskActionEncodeWrite:
 		if ack.Err == nil {
 			if err := operation.CommitResponse(); err != nil {
-				kernel.run.Dirty(err)
+				ck.run.Dirty(err)
 				return
 			}
-			if _, _, err := kernel.admission.ResizeOrdinary(
+			if _, _, err := ck.admission.ResizeOrdinary(
 				operation.admission,
 				operation.admissionBase,
 			); err != nil {
-				kernel.run.Dirty(err)
+				ck.run.Dirty(err)
 				return
 			}
-			if err := kernel.completeOperationUID(
+			if err := ck.completeOperationUID(
 				operation,
 				false,
 			); err != nil {
-				kernel.run.Dirty(err)
+				ck.run.Dirty(err)
 				return
 			}
 		}
 	case lifecycle.TaskActionCleanup:
 		operation.cleanupDone = true
 	default:
-		kernel.run.Dirty(
+		ck.run.Dirty(
 			errors.New(
 				"jobmgr kernel: unexpected resource transaction acknowledgement",
 			),
@@ -3169,80 +3169,80 @@ func (kernel *CommandKernel) acknowledgeResourceTransactionTask(
 			cleanup.Ref,
 			cleanup.Sequence,
 		); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return
 		}
-		if err := kernel.tasks.SendAction(cleanup); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.tasks.SendAction(cleanup); err != nil {
+			ck.run.Dirty(err)
 		}
 		return
 	}
-	kernel.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
+	ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 }
 
-func (kernel *CommandKernel) acknowledgeCapabilityTask(operation *commandOperation, ack lifecycle.TaskAcknowledgement) {
+func (ck *CommandKernel) acknowledgeCapabilityTask(operation *commandOperation, ack lifecycle.TaskAcknowledgement) {
 	switch ack.Kind {
 	case lifecycle.TaskActionCommitCapability:
 		switch ack.CapabilityDisposition {
 		case lifecycle.CapabilityApplied:
 			if ack.Err != nil {
-				kernel.dirtyCapability(operation, ack.Err)
+				ck.dirtyCapability(operation, ack.Err)
 			}
 		case lifecycle.CapabilityDisposed:
 			if ack.Err == nil {
-				kernel.dirtyCapability(operation, errors.New("jobmgr kernel: capability was disposed without a commit error"))
+				ck.dirtyCapability(operation, errors.New("jobmgr kernel: capability was disposed without a commit error"))
 			} else {
-				kernel.dirtyCapability(operation, ack.Err)
+				ck.dirtyCapability(operation, ack.Err)
 			}
 		case lifecycle.CapabilityRetained:
-			kernel.dirtyCapability(operation, errors.Join(errors.New("jobmgr kernel: capability commit retained ambiguous ownership"), ack.Err))
+			ck.dirtyCapability(operation, errors.Join(errors.New("jobmgr kernel: capability commit retained ambiguous ownership"), ack.Err))
 			return
 		default:
-			kernel.dirtyCapability(operation, errors.New("jobmgr kernel: invalid capability commit disposition"))
+			ck.dirtyCapability(operation, errors.New("jobmgr kernel: invalid capability commit disposition"))
 			return
 		}
 	case lifecycle.TaskActionDispose:
 		if ack.CapabilityDisposition != 0 {
-			kernel.dirtyCapability(operation, errors.New("jobmgr kernel: dispose acknowledged a capability disposition"))
+			ck.dirtyCapability(operation, errors.New("jobmgr kernel: dispose acknowledged a capability disposition"))
 			return
 		}
 		if ack.Err != nil {
-			kernel.dirtyCapability(operation, ack.Err)
+			ck.dirtyCapability(operation, ack.Err)
 			return
 		}
 	default:
-		kernel.dirtyCapability(operation, errors.New("jobmgr kernel: unexpected capability acknowledgement"))
+		ck.dirtyCapability(operation, errors.New("jobmgr kernel: unexpected capability acknowledgement"))
 		return
 	}
-	kernel.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
+	ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 }
 
-func (kernel *CommandKernel) dirtyCapability(operation *commandOperation, err error) {
+func (ck *CommandKernel) dirtyCapability(operation *commandOperation, err error) {
 	if err == nil {
 		err = errors.New("jobmgr kernel: unspecified capability failure")
 	}
 	operation.terminalErr = errors.Join(operation.terminalErr, err)
-	kernel.run.Dirty(err)
+	ck.run.Dirty(err)
 }
 
-func (kernel *CommandKernel) acknowledgeResourceTask(operation *commandOperation, ack lifecycle.TaskAcknowledgement) {
+func (ck *CommandKernel) acknowledgeResourceTask(operation *commandOperation, ack lifecycle.TaskAcknowledgement) {
 	if ack.Err != nil {
-		kernel.run.Dirty(ack.Err)
+		ck.run.Dirty(ack.Err)
 		if ack.Kind == lifecycle.TaskActionStopResource || ack.Kind == lifecycle.TaskActionFinalizeResource || ack.Kind == lifecycle.TaskActionDispose {
 			return
 		}
 		if ack.Kind == lifecycle.TaskActionAcceptStart || ack.Kind == lifecycle.TaskActionPublishResource {
 			action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionDispose}
 			if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
-				kernel.run.Dirty(err)
+				ck.run.Dirty(err)
 				return
 			}
-			if err := kernel.tasks.SendAction(action); err != nil {
-				kernel.run.Dirty(err)
+			if err := ck.tasks.SendAction(action); err != nil {
+				ck.run.Dirty(err)
 			}
 			return
 		}
-		kernel.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
+		ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 		return
 	}
 	lane := operation.lane
@@ -3251,42 +3251,42 @@ func (kernel *CommandKernel) acknowledgeResourceTask(operation *commandOperation
 		if operation.cancelled || operation.TimedOut() {
 			action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionDispose}
 			if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
-				kernel.run.Dirty(err)
+				ck.run.Dirty(err)
 				return
 			}
-			if err := kernel.tasks.SendAction(action); err != nil {
-				kernel.run.Dirty(err)
+			if err := ck.tasks.SendAction(action); err != nil {
+				ck.run.Dirty(err)
 			}
 			return
 		}
 		if lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || lane.retiringIdentity.Valid() {
-			kernel.run.Dirty(errors.New("jobmgr kernel: resource publication found a nonempty current slot"))
+			ck.run.Dirty(errors.New("jobmgr kernel: resource publication found a nonempty current slot"))
 			return
 		}
 		action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionPublishResource}
 		if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return
 		}
-		if err := kernel.tasks.SendAction(action); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.tasks.SendAction(action); err != nil {
+			ck.run.Dirty(err)
 		}
 	case lifecycle.TaskActionPublishResource:
 		if lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || lane.retiringIdentity.Valid() {
-			kernel.run.Dirty(errors.New("jobmgr kernel: resource publication found a nonempty current slot"))
+			ck.run.Dirty(errors.New("jobmgr kernel: resource publication found a nonempty current slot"))
 			return
 		}
 		expected := lifecycle.ResourceIdentity{ID: operation.plan.Resource.ID, Generation: operation.resourceGeneration}
-		resource, err := kernel.tasks.TakePublishedReadyResource(ack.Ref, ack.Sequence, expected)
+		resource, err := ck.tasks.TakePublishedReadyResource(ack.Ref, ack.Sequence, expected)
 		if err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionDispose}
 			if actionErr := operation.ActionPending(action.Ref, action.Sequence); actionErr != nil {
-				kernel.run.Dirty(actionErr)
+				ck.run.Dirty(actionErr)
 				return
 			}
-			if actionErr := kernel.tasks.SendAction(action); actionErr != nil {
-				kernel.run.Dirty(actionErr)
+			if actionErr := ck.tasks.SendAction(action); actionErr != nil {
+				ck.run.Dirty(actionErr)
 			}
 			return
 		}
@@ -3295,11 +3295,11 @@ func (kernel *CommandKernel) acknowledgeResourceTask(operation *commandOperation
 		lane.currentIdentity = identity
 		lane.resourceGeneration = identity.Generation
 		lane.resourceSource = operation.Source
-		kernel.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
+		ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 	case lifecycle.TaskActionStopResource:
 		identity := lane.currentIdentity
 		if !lane.currentStopping || lane.current != nil || identity.ID != operation.plan.Resource.ID || identity.Generation != operation.resourceGeneration || lane.retiringIdentity.Valid() {
-			kernel.run.Dirty(errors.New("jobmgr kernel: stopped resource differs from current slot"))
+			ck.run.Dirty(errors.New("jobmgr kernel: stopped resource differs from current slot"))
 			return
 		}
 		lane.currentIdentity = lifecycle.ResourceIdentity{}
@@ -3307,45 +3307,45 @@ func (kernel *CommandKernel) acknowledgeResourceTask(operation *commandOperation
 		lane.retiringIdentity = identity
 		action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionFinalizeResource}
 		if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return
 		}
-		if err := kernel.tasks.SendAction(action); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.tasks.SendAction(action); err != nil {
+			ck.run.Dirty(err)
 		}
 	case lifecycle.TaskActionFinalizeResource:
 		identity := lane.retiringIdentity
 		if lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || identity.ID != operation.plan.Resource.ID || identity.Generation != operation.resourceGeneration {
-			kernel.run.Dirty(errors.New("jobmgr kernel: finalized resource differs from retiring slot"))
+			ck.run.Dirty(errors.New("jobmgr kernel: finalized resource differs from retiring slot"))
 			return
 		}
 		lane.retiringIdentity = lifecycle.ResourceIdentity{}
 		lane.resourceSource = 0
-		kernel.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
+		ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 	case lifecycle.TaskActionDispose:
-		kernel.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
+		ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 	default:
-		kernel.run.Dirty(errors.New("jobmgr kernel: unexpected resource acknowledgement"))
+		ck.run.Dirty(errors.New("jobmgr kernel: unexpected resource acknowledgement"))
 	}
 }
 
-func (kernel *CommandKernel) sendResourceTermination(operation *commandOperation, ref lifecycle.TaskRef, sequence uint8) {
+func (ck *CommandKernel) sendResourceTermination(operation *commandOperation, ref lifecycle.TaskRef, sequence uint8) {
 	termination := lifecycle.TaskAction{Ref: ref, Sequence: sequence, Kind: lifecycle.TaskActionTerminate}
 	if err := operation.TerminationPending(termination.Ref, termination.Sequence); err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return
 	}
-	if err := kernel.tasks.SendAction(termination); err != nil {
-		kernel.run.Dirty(err)
+	if err := ck.tasks.SendAction(termination); err != nil {
+		ck.run.Dirty(err)
 	}
 }
 
-func (kernel *CommandKernel) cancelOperation(uid string) {
-	operation := kernel.operations[uid]
+func (ck *CommandKernel) cancelOperation(uid string) {
+	operation := ck.operations[uid]
 	if operation != nil &&
 		operation.activeChild != nil &&
 		!operation.activeChild.compositeRollback {
-		kernel.cancelOperation(operation.activeChild.UID)
+		ck.cancelOperation(operation.activeChild.UID)
 	}
 	if operation == nil || operation.Response == lifecycle.ResponseCommitted || operation.Response == lifecycle.ResponsePoisoned {
 		return
@@ -3355,9 +3355,9 @@ func (kernel *CommandKernel) cancelOperation(uid string) {
 	}
 	operation.cancelled = true
 	if operation.Child == lifecycle.ChildExecuting {
-		_ = kernel.tasks.Cancel(operation.Task)
+		_ = ck.tasks.Cancel(operation.Task)
 		if operation.Response != lifecycle.ResponseNotRequired && !operation.plan.CooperativeCancel {
-			kernel.enqueueControl(operation, lifecycle.ControlCancelled)
+			ck.enqueueControl(operation, lifecycle.ControlCancelled)
 		}
 		return
 	}
@@ -3372,36 +3372,36 @@ func (kernel *CommandKernel) cancelOperation(uid string) {
 		if cause == nil {
 			cause = context.Canceled
 		}
-		kernel.unlinkQueued(operation, cause)
+		ck.unlinkQueued(operation, cause)
 		if operation.Response != lifecycle.ResponseNotRequired {
-			kernel.enqueueControl(operation, lifecycle.ControlCancelled)
+			ck.enqueueControl(operation, lifecycle.ControlCancelled)
 		} else {
-			kernel.tryDispose(operation)
+			ck.tryDispose(operation)
 		}
 		return
 	}
 	if operation.Child == lifecycle.ChildResultReady &&
 		operation.resultGrowthWaiting {
-		if err := kernel.admission.CancelWaiting(operation.admission); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.admission.CancelWaiting(operation.admission); err != nil {
+			ck.run.Dirty(err)
 			return
 		}
 		operation.resultGrowthWaiting = false
 		if operation.Response != lifecycle.ResponseNotRequired {
-			kernel.enqueueControl(
+			ck.enqueueControl(
 				operation,
 				lifecycle.ControlCancelled,
 			)
 		}
-		kernel.sendDisposeAction(operation)
+		ck.sendDisposeAction(operation)
 		return
 	}
 	if operation.Child == lifecycle.ChildActionPending && cancellablePendingAction(operation) {
-		_ = kernel.tasks.Cancel(operation.Task)
+		_ = ck.tasks.Cancel(operation.Task)
 	}
 }
 
-func (kernel *CommandKernel) sendDisposeAction(operation *commandOperation) {
+func (ck *CommandKernel) sendDisposeAction(operation *commandOperation) {
 	sequence := uint8(2)
 	if operation.plan.Transaction != nil && operation.transactionApplied {
 		sequence = 3
@@ -3412,76 +3412,76 @@ func (kernel *CommandKernel) sendDisposeAction(operation *commandOperation) {
 		Kind:     lifecycle.TaskActionDispose,
 	}
 	if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return
 	}
-	if err := kernel.tasks.SendAction(action); err != nil {
-		kernel.run.Dirty(err)
+	if err := ck.tasks.SendAction(action); err != nil {
+		ck.run.Dirty(err)
 	}
 }
 
-func (kernel *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
-	for quantum > 0 && kernel.deadlines.Len() > 0 {
-		entry := kernel.deadlines[0]
+func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
+	for quantum > 0 && ck.deadlines.Len() > 0 {
+		entry := ck.deadlines[0]
 		if entry.when.After(now) {
 			return false
 		}
-		heap.Pop(&kernel.deadlines)
+		heap.Pop(&ck.deadlines)
 		quantum--
 		operation := entry.operation
 		if operation.State == lifecycle.OperationDisposedTerminal ||
 			(operation.Response != lifecycle.ResponseOpen && operation.Response != lifecycle.ResponseNotRequired) {
 			continue
 		}
-		kernel.markOperationTimedOut(operation)
+		ck.markOperationTimedOut(operation)
 		if operation.activeChild != nil &&
 			!operation.activeChild.compositeRollback {
-			kernel.cancelOperation(operation.activeChild.UID)
+			ck.cancelOperation(operation.activeChild.UID)
 		}
 		deferControl := requiresCooperativeDeadlineStart(operation) &&
 			(operation.Child == lifecycle.ChildNotStarted || operation.Child == lifecycle.ChildExecuting)
 		if operation.Child == lifecycle.ChildExecuting {
-			_ = kernel.tasks.CancelWithCause(operation.Task, context.DeadlineExceeded)
+			_ = ck.tasks.CancelWithCause(operation.Task, context.DeadlineExceeded)
 			if operation.Response == lifecycle.ResponseNotRequired {
-				if err := kernel.markRetainedTimeout(operation, true); err != nil {
-					kernel.run.Dirty(err)
+				if err := ck.markRetainedTimeout(operation, true); err != nil {
+					ck.run.Dirty(err)
 				}
 			}
 		} else if operation.Child == lifecycle.ChildNotStarted {
 			if requiresCooperativeDeadlineStart(operation) {
 				if err := operation.RequireDeadlineStart(); err != nil {
-					kernel.run.Dirty(err)
+					ck.run.Dirty(err)
 					return false
 				}
 				if operation.taskRequest.Valid() {
-					if err := kernel.tasks.SetPendingCancellation(operation.taskRequest, context.DeadlineExceeded); err != nil {
-						kernel.run.Dirty(err)
+					if err := ck.tasks.SetPendingCancellation(operation.taskRequest, context.DeadlineExceeded); err != nil {
+						ck.run.Dirty(err)
 						return false
 					}
 				}
 			} else {
-				kernel.unlinkQueued(operation, context.DeadlineExceeded)
+				ck.unlinkQueued(operation, context.DeadlineExceeded)
 				if operation.Response == lifecycle.ResponseNotRequired {
-					kernel.tryDispose(operation)
+					ck.tryDispose(operation)
 				}
 			}
 		} else if operation.Child ==
 			lifecycle.ChildResultReady &&
 			operation.resultGrowthWaiting {
-			if err := kernel.admission.CancelWaiting(operation.admission); err != nil {
-				kernel.run.Dirty(err)
+			if err := ck.admission.CancelWaiting(operation.admission); err != nil {
+				ck.run.Dirty(err)
 				return false
 			}
 			operation.resultGrowthWaiting = false
-			kernel.sendDisposeAction(operation)
+			ck.sendDisposeAction(operation)
 		} else if operation.Child == lifecycle.ChildActionPending && cancellablePendingAction(operation) {
-			_ = kernel.tasks.CancelWithCause(operation.Task, context.DeadlineExceeded)
+			_ = ck.tasks.CancelWithCause(operation.Task, context.DeadlineExceeded)
 		}
 		if operation.Response != lifecycle.ResponseNotRequired && !deferControl {
-			kernel.enqueueControl(operation, lifecycle.ControlDeadline)
+			ck.enqueueControl(operation, lifecycle.ControlDeadline)
 		}
 	}
-	return kernel.deadlines.Len() > 0 && !kernel.deadlines[0].when.After(now)
+	return ck.deadlines.Len() > 0 && !ck.deadlines[0].when.After(now)
 }
 
 func cancellablePendingAction(operation *commandOperation) bool {
@@ -3497,92 +3497,92 @@ func requiresCooperativeDeadlineStart(operation *commandOperation) bool {
 		operation.plan.CooperativeDeadline
 }
 
-func (kernel *CommandKernel) markOperationDeadlineIfDue(operation *commandOperation) {
+func (ck *CommandKernel) markOperationDeadlineIfDue(operation *commandOperation) {
 	if operation == nil || operation.request.Deadline.IsZero() ||
 		(operation.Response != lifecycle.ResponseOpen && operation.Response != lifecycle.ResponseNotRequired) {
 		return
 	}
 	if operation.TimedOut() {
 		if operation.Response == lifecycle.ResponseOpen {
-			kernel.enqueueControl(operation, lifecycle.ControlDeadline)
+			ck.enqueueControl(operation, lifecycle.ControlDeadline)
 		}
 		return
 	}
-	if operation.request.Deadline.After(kernel.clock.Now()) {
+	if operation.request.Deadline.After(ck.clock.Now()) {
 		return
 	}
-	kernel.markOperationTimedOut(operation)
+	ck.markOperationTimedOut(operation)
 	if operation.Response == lifecycle.ResponseOpen {
-		kernel.enqueueControl(operation, lifecycle.ControlDeadline)
+		ck.enqueueControl(operation, lifecycle.ControlDeadline)
 	}
 }
 
-func (kernel *CommandKernel) markOperationTimedOut(
+func (ck *CommandKernel) markOperationTimedOut(
 	operation *commandOperation,
 ) {
 	if operation == nil || operation.TimedOut() {
 		return
 	}
 	operation.MarkTimedOut()
-	if kernel.runtimeObserver != nil {
-		kernel.runtimeObserver.AddRuntimeCounter(
+	if ck.runtimeObserver != nil {
+		ck.runtimeObserver.AddRuntimeCounter(
 			lifecycle.RuntimeCounterOperationTimeouts,
 			1,
 		)
 	}
 }
 
-func (kernel *CommandKernel) enqueueControl(operation *commandOperation, status lifecycle.ControlStatus) {
+func (ck *CommandKernel) enqueueControl(operation *commandOperation, status lifecycle.ControlStatus) {
 	if operation == nil || operation.Response != lifecycle.ResponseOpen || operation.controlQueued {
 		return
 	}
 	operation.control = status
 	operation.controlQueued = true
-	kernel.controls = append(kernel.controls, operation)
+	ck.controls = append(ck.controls, operation)
 }
 
-func (kernel *CommandKernel) serviceControls(quantum int) bool {
-	for quantum > 0 && len(kernel.controls) > 0 {
-		operation := kernel.controls[0]
+func (ck *CommandKernel) serviceControls(quantum int) bool {
+	for quantum > 0 && len(ck.controls) > 0 {
+		operation := ck.controls[0]
 		if operation.Response == lifecycle.ResponseOpen {
 			_ = operation.MarkResponsePending()
 		}
-		err := kernel.frames.TryCommitControl(lifecycle.ControlFramePlan{UID: operation.UID, Status: operation.control, Expiry: lifecycle.ExpiryAt(kernel.clock.Now())})
+		err := ck.frames.TryCommitControl(lifecycle.ControlFramePlan{UID: operation.UID, Status: operation.control, Expiry: lifecycle.ExpiryAt(ck.clock.Now())})
 		if errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
 			return false
 		}
-		kernel.controls = kernel.controls[1:]
+		ck.controls = ck.controls[1:]
 		operation.controlQueued = false
 		quantum--
 		if err != nil {
 			operation.PoisonResponse()
-			kernel.run.Dirty(err)
-			kernel.tryDispose(operation)
+			ck.run.Dirty(err)
+			ck.tryDispose(operation)
 			continue
 		}
 		if err := operation.CommitResponse(); err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			continue
 		}
-		if err := kernel.completeOperationUID(operation, true); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.completeOperationUID(operation, true); err != nil {
+			ck.run.Dirty(err)
 			return false
 		}
 		if operation.TimedOut() && operation.Child == lifecycle.ChildExecuting {
-			if err := kernel.markRetainedTimeout(operation, false); err != nil {
-				kernel.run.Dirty(err)
+			if err := ck.markRetainedTimeout(operation, false); err != nil {
+				ck.run.Dirty(err)
 			}
 		}
-		kernel.tryDispose(operation)
+		ck.tryDispose(operation)
 	}
-	return len(kernel.controls) > 0
+	return len(ck.controls) > 0
 }
 
-func (kernel *CommandKernel) markRetainedTimeout(operation *commandOperation, background bool) error {
+func (ck *CommandKernel) markRetainedTimeout(operation *commandOperation, background bool) error {
 	if operation == nil || !operation.TimedOut() || operation.Child != lifecycle.ChildExecuting || !operation.Task.Valid() {
 		return errors.New("jobmgr kernel: invalid retained-timeout mark")
 	}
-	saturated, err := kernel.tasks.MarkRetainedTimeout(operation.Task)
+	saturated, err := ck.tasks.MarkRetainedTimeout(operation.Task)
 	if err != nil {
 		return err
 	}
@@ -3595,7 +3595,7 @@ func (kernel *CommandKernel) markRetainedTimeout(operation *commandOperation, ba
 	return nil
 }
 
-func (kernel *CommandKernel) tryDispose(operation *commandOperation) {
+func (ck *CommandKernel) tryDispose(operation *commandOperation) {
 	if operation == nil ||
 		operation.activeChild != nil ||
 		operation.deferredCompletion != nil {
@@ -3605,67 +3605,67 @@ func (kernel *CommandKernel) tryDispose(operation *commandOperation) {
 		return
 	}
 	if operation.taskRequest.Valid() {
-		kernel.run.Dirty(errors.New("jobmgr kernel: terminal operation retained a pending task request"))
+		ck.run.Dirty(errors.New("jobmgr kernel: terminal operation retained a pending task request"))
 		return
 	}
 	if operation.State < lifecycle.OperationDisposing {
 		_ = operation.Advance(lifecycle.OperationDisposing)
 	}
-	if err := kernel.endCompositeFence(operation); err != nil {
-		kernel.run.Dirty(err)
+	if err := ck.endCompositeFence(operation); err != nil {
+		ck.run.Dirty(err)
 		return
 	}
 	if operation.Response == lifecycle.ResponseNotRequired {
-		if err := kernel.completeOperationUID(operation, false); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.completeOperationUID(operation, false); err != nil {
+			ck.run.Dirty(err)
 			return
 		}
 	}
 	if operation.functionInvocation.Valid() {
 		ref := operation.functionInvocation
 		operation.functionInvocation = FunctionInvocationRef{}
-		if err := kernel.releaseFunctionInvocation(ref); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.releaseFunctionInvocation(ref); err != nil {
+			ck.run.Dirty(err)
 		}
 	}
 	if operation.deadline.index >= 0 {
-		heap.Remove(&kernel.deadlines, operation.deadline.index)
+		heap.Remove(&ck.deadlines, operation.deadline.index)
 	}
-	for _, granted := range kernel.releaseClaims(operation) {
-		kernel.markReady(granted.lane)
+	for _, granted := range ck.releaseClaims(operation) {
+		ck.markReady(granted.lane)
 	}
 	lane := operation.lane
 	if lane.active == operation {
 		lane.active = nil
 	}
 	if lane.head == operation {
-		kernel.removeHead(lane)
+		ck.removeHead(lane)
 	} else if operation.previous != nil || operation.next != nil {
-		kernel.unlink(operation)
+		ck.unlink(operation)
 	}
 	if operation.admission.Valid() {
 		if !operation.admitted {
-			kernel.run.Dirty(errors.New("jobmgr kernel: terminal operation retained an ungranted admission"))
+			ck.run.Dirty(errors.New("jobmgr kernel: terminal operation retained an ungranted admission"))
 			return
 		}
-		if _, err := kernel.admission.ReleaseOrdinary(operation.admission); err != nil {
-			kernel.run.Dirty(err)
+		if _, err := ck.admission.ReleaseOrdinary(operation.admission); err != nil {
+			ck.run.Dirty(err)
 			return
 		}
-		delete(kernel.byAdmission, operation.admission)
+		delete(ck.byAdmission, operation.admission)
 		operation.admission = lifecycle.AdmissionRef{}
 	}
 	if resource := operation.plan.Resource; resource != nil {
 		switch resource.Action {
 		case ResourceInstall:
 			if !lane.installPlanned {
-				kernel.run.Dirty(errors.New("jobmgr kernel: install plan marker cleared twice"))
+				ck.run.Dirty(errors.New("jobmgr kernel: install plan marker cleared twice"))
 				return
 			}
 			lane.installPlanned = false
 		case ResourceStop:
 			if !lane.stopPlanned {
-				kernel.run.Dirty(errors.New("jobmgr kernel: stop plan marker cleared twice"))
+				ck.run.Dirty(errors.New("jobmgr kernel: stop plan marker cleared twice"))
 				return
 			}
 			lane.stopPlanned = false
@@ -3673,7 +3673,7 @@ func (kernel *CommandKernel) tryDispose(operation *commandOperation) {
 	}
 	if operation.plan.Transaction != nil {
 		if lane.transactionPlanned <= 0 {
-			kernel.run.Dirty(
+			ck.run.Dirty(
 				errors.New(
 					"jobmgr kernel: transaction plan marker cleared twice",
 				),
@@ -3684,22 +3684,22 @@ func (kernel *CommandKernel) tryDispose(operation *commandOperation) {
 	}
 	lane.owners--
 	if lane.owners < 0 {
-		kernel.run.Dirty(errors.New("jobmgr kernel: negative lane ownership"))
+		ck.run.Dirty(errors.New("jobmgr kernel: negative lane ownership"))
 		return
 	}
-	if kernel.shutdownActive && kernel.shutdownBarrierDone &&
+	if ck.shutdownActive && ck.shutdownBarrierDone &&
 		lane.shutdownVisited && lane.owners == 0 {
-		if err := kernel.enqueueShutdownStop(lane); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.enqueueShutdownStop(lane); err != nil {
+			ck.run.Dirty(err)
 			return
 		}
 	}
 	_ = operation.Advance(lifecycle.OperationDisposedTerminal)
-	delete(kernel.operations, operation.UID)
+	delete(ck.operations, operation.UID)
 	if operation.Source == lifecycle.SourceFunction {
-		kernel.functionOperations--
-		if kernel.functionOperations < 0 {
-			kernel.run.Dirty(
+		ck.functionOperations--
+		if ck.functionOperations < 0 {
+			ck.run.Dirty(
 				errors.New(
 					"jobmgr kernel: negative Function operation count",
 				),
@@ -3707,61 +3707,61 @@ func (kernel *CommandKernel) tryDispose(operation *commandOperation) {
 			return
 		}
 	}
-	kernel.unlinkRuntimeOperation(operation)
-	kernel.observeRuntimeOperations()
-	if !kernel.shutdownActive || operation.shutdownVisited {
-		kernel.unlinkOperation(operation)
+	ck.unlinkRuntimeOperation(operation)
+	ck.observeRuntimeOperations()
+	if !ck.shutdownActive || operation.shutdownVisited {
+		ck.unlinkOperation(operation)
 	}
-	kernel.completeCompositeChild(operation)
+	ck.completeCompositeChild(operation)
 	if operation.terminalResult != nil {
 		operation.terminalResult <- operation.terminalErr
 		operation.terminalResult = nil
 	}
 	if lane.active == nil && lane.head != nil {
-		kernel.markReady(lane)
+		ck.markReady(lane)
 	}
-	kernel.releaseUnusedLane(lane)
+	ck.releaseUnusedLane(lane)
 }
 
-func (kernel *CommandKernel) appendOperation(operation *commandOperation) {
+func (ck *CommandKernel) appendOperation(operation *commandOperation) {
 	if operation == nil || operation.allListed {
-		kernel.run.Dirty(errors.New("jobmgr kernel: invalid operation-list append"))
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid operation-list append"))
 		return
 	}
-	operation.allPrevious = kernel.operationTail
-	if kernel.operationTail != nil {
-		kernel.operationTail.allNext = operation
+	operation.allPrevious = ck.operationTail
+	if ck.operationTail != nil {
+		ck.operationTail.allNext = operation
 	} else {
-		kernel.operationHead = operation
+		ck.operationHead = operation
 	}
-	kernel.operationTail = operation
+	ck.operationTail = operation
 	operation.allListed = true
 }
 
-func (kernel *CommandKernel) appendRuntimeOperation(
+func (ck *CommandKernel) appendRuntimeOperation(
 	operation *commandOperation,
 ) {
 	if operation == nil || operation.runtimeListed {
-		kernel.run.Dirty(
+		ck.run.Dirty(
 			errors.New("jobmgr kernel: invalid runtime operation append"),
 		)
 		return
 	}
-	operation.runtimePrevious = kernel.runtimeTail
-	if kernel.runtimeTail != nil {
-		kernel.runtimeTail.runtimeNext = operation
+	operation.runtimePrevious = ck.runtimeTail
+	if ck.runtimeTail != nil {
+		ck.runtimeTail.runtimeNext = operation
 	} else {
-		kernel.runtimeHead = operation
+		ck.runtimeHead = operation
 	}
-	kernel.runtimeTail = operation
+	ck.runtimeTail = operation
 	operation.runtimeListed = true
 }
 
-func (kernel *CommandKernel) unlinkRuntimeOperation(
+func (ck *CommandKernel) unlinkRuntimeOperation(
 	operation *commandOperation,
 ) {
 	if operation == nil || !operation.runtimeListed {
-		kernel.run.Dirty(
+		ck.run.Dirty(
 			errors.New("jobmgr kernel: invalid runtime operation removal"),
 		)
 		return
@@ -3769,91 +3769,91 @@ func (kernel *CommandKernel) unlinkRuntimeOperation(
 	if operation.runtimePrevious != nil {
 		operation.runtimePrevious.runtimeNext = operation.runtimeNext
 	} else {
-		kernel.runtimeHead = operation.runtimeNext
+		ck.runtimeHead = operation.runtimeNext
 	}
 	if operation.runtimeNext != nil {
 		operation.runtimeNext.runtimePrevious =
 			operation.runtimePrevious
 	} else {
-		kernel.runtimeTail = operation.runtimePrevious
+		ck.runtimeTail = operation.runtimePrevious
 	}
 	operation.runtimePrevious = nil
 	operation.runtimeNext = nil
 	operation.runtimeListed = false
 }
 
-func (kernel *CommandKernel) observeRuntimeOperations() {
-	if kernel == nil || kernel.runtimeObserver == nil {
+func (ck *CommandKernel) observeRuntimeOperations() {
+	if ck == nil || ck.runtimeObserver == nil {
 		return
 	}
-	kernel.runtimeObserver.SetRuntimeGauge(
+	ck.runtimeObserver.SetRuntimeGauge(
 		lifecycle.RuntimeGaugeOperationsActive,
-		len(kernel.operations),
+		len(ck.operations),
 	)
-	kernel.runtimeObserver.SetRuntimeGauge(
+	ck.runtimeObserver.SetRuntimeGauge(
 		lifecycle.RuntimeGaugeFunctionInvocationsActive,
-		kernel.functionOperations,
+		ck.functionOperations,
 	)
 	var oldest time.Time
-	if kernel.runtimeHead != nil {
-		oldest = kernel.runtimeHead.runtimeStarted
+	if ck.runtimeHead != nil {
+		oldest = ck.runtimeHead.runtimeStarted
 	}
-	kernel.runtimeObserver.SetRuntimeTimestamp(
+	ck.runtimeObserver.SetRuntimeTimestamp(
 		lifecycle.RuntimeTimestampOldestOperation,
 		oldest,
 	)
 }
 
-func (kernel *CommandKernel) unlinkOperation(operation *commandOperation) {
+func (ck *CommandKernel) unlinkOperation(operation *commandOperation) {
 	if operation == nil || !operation.allListed {
-		kernel.run.Dirty(errors.New("jobmgr kernel: invalid operation-list removal"))
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid operation-list removal"))
 		return
 	}
 	if operation.allPrevious != nil {
 		operation.allPrevious.allNext = operation.allNext
 	} else {
-		kernel.operationHead = operation.allNext
+		ck.operationHead = operation.allNext
 	}
 	if operation.allNext != nil {
 		operation.allNext.allPrevious = operation.allPrevious
 	} else {
-		kernel.operationTail = operation.allPrevious
+		ck.operationTail = operation.allPrevious
 	}
 	operation.allPrevious = nil
 	operation.allNext = nil
 	operation.allListed = false
 }
 
-func (kernel *CommandKernel) completeOperationUID(operation *commandOperation, tombstone bool) error {
+func (ck *CommandKernel) completeOperationUID(operation *commandOperation, tombstone bool) error {
 	if operation.uidCompleted {
 		return errors.New("jobmgr kernel: operation UID completed twice")
 	}
-	if err := kernel.uids.Complete(operation.UID, tombstone, kernel.clock.Now()); err != nil {
+	if err := ck.uids.Complete(operation.UID, tombstone, ck.clock.Now()); err != nil {
 		return err
 	}
 	operation.uidCompleted = true
 	return nil
 }
 
-func (kernel *CommandKernel) unlinkQueued(operation *commandOperation, submissionErr error) {
+func (ck *CommandKernel) unlinkQueued(operation *commandOperation, submissionErr error) {
 	if operation.Child == lifecycle.ChildDeadlineStartPending {
-		kernel.run.Dirty(errors.New("jobmgr kernel: required deadline start was unlinked without abandonment"))
+		ck.run.Dirty(errors.New("jobmgr kernel: required deadline start was unlinked without abandonment"))
 		return
 	}
 	lane := operation.lane
 	if lane.ready {
-		kernel.ready[sourceIndex(lane.source)].remove(lane)
+		ck.ready[sourceIndex(lane.source)].remove(lane)
 	}
 	if operation.fenceBlocked {
-		if err := kernel.removeCompositeFenceBlocked(operation); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.removeCompositeFenceBlocked(operation); err != nil {
+			ck.run.Dirty(err)
 		}
 	}
 	if operation.admission.Valid() && !operation.admitted {
-		if err := kernel.admission.CancelWaiting(operation.admission); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.admission.CancelWaiting(operation.admission); err != nil {
+			ck.run.Dirty(err)
 		} else {
-			delete(kernel.byAdmission, operation.admission)
+			delete(ck.byAdmission, operation.admission)
 			operation.admission = lifecycle.AdmissionRef{}
 			operation.request.Args = nil
 			operation.request.Payload = nil
@@ -3864,14 +3864,14 @@ func (kernel *CommandKernel) unlinkQueued(operation *commandOperation, submissio
 			operation.plan.Cleanup = nil
 			operation.claims = nil
 			operation.authorityClaimEdges = nil
-			kernel.settleSubmission(operation, submissionErr)
+			ck.settleSubmission(operation, submissionErr)
 		}
 	}
 	if operation.taskRequest.Valid() {
 		var err error
 		if operation.plan.Resource != nil && operation.plan.Resource.Action == ResourceStop {
 			var outcome lifecycle.TaskOutcome
-			outcome, err = kernel.tasks.CancelPendingOutcome(operation.taskRequest)
+			outcome, err = ck.tasks.CancelPendingOutcome(operation.taskRequest)
 			if err == nil {
 				resource, ok := outcome.ReadyResource()
 				identity, identityOK := outcome.ResourceIdentity()
@@ -3884,58 +3884,58 @@ func (kernel *CommandKernel) unlinkQueued(operation *commandOperation, submissio
 			}
 		} else if operation.plan.Transaction != nil {
 			var outcome lifecycle.TaskOutcome
-			outcome, err = kernel.tasks.CancelPendingOutcome(
+			outcome, err = ck.tasks.CancelPendingOutcome(
 				operation.taskRequest,
 			)
 			if err == nil {
-				err = kernel.restoreTransactionOutcome(
+				err = ck.restoreTransactionOutcome(
 					operation,
 					outcome,
 				)
 			}
 		} else {
-			err = kernel.tasks.CancelPending(operation.taskRequest)
+			err = ck.tasks.CancelPending(operation.taskRequest)
 		}
 		if err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 		} else {
-			delete(kernel.tasksByRequest, operation.taskRequest)
+			delete(ck.tasksByRequest, operation.taskRequest)
 			operation.taskRequest = lifecycle.TaskRequestRef{}
 		}
 	}
 	if operation.claimsInherited {
 		operation.claimsHeld = false
 	} else if operation.claimsHeld {
-		for _, granted := range kernel.releaseClaims(operation) {
-			kernel.markReady(granted.lane)
+		for _, granted := range ck.releaseClaims(operation) {
+			ck.markReady(granted.lane)
 		}
-	} else if kernel.claims.Waiting(operation) {
-		granted, err := kernel.claims.Cancel(operation)
+	} else if ck.claims.Waiting(operation) {
+		granted, err := ck.claims.Cancel(operation)
 		if err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 		}
 		for _, grantedOperation := range granted {
-			kernel.markReady(grantedOperation.lane)
+			ck.markReady(grantedOperation.lane)
 		}
 	} else if operation.claimRegistered {
-		if err := kernel.claims.Abandon(operation); err != nil {
-			kernel.run.Dirty(err)
+		if err := ck.claims.Abandon(operation); err != nil {
+			ck.run.Dirty(err)
 		}
 	}
 	if lane.head == operation {
-		kernel.removeHead(lane)
+		ck.removeHead(lane)
 	} else {
-		kernel.unlink(operation)
+		ck.unlink(operation)
 	}
 	if operation.State < lifecycle.OperationDisposing {
 		_ = operation.Advance(lifecycle.OperationDisposing)
 	}
 	if lane.active == nil && lane.head != nil {
-		kernel.markReady(lane)
+		ck.markReady(lane)
 	}
 }
 
-func (kernel *CommandKernel) releaseClaims(operation *commandOperation) []*commandOperation {
+func (ck *CommandKernel) releaseClaims(operation *commandOperation) []*commandOperation {
 	if operation.claimsInherited {
 		operation.claimsHeld = false
 		return nil
@@ -3943,20 +3943,20 @@ func (kernel *CommandKernel) releaseClaims(operation *commandOperation) []*comma
 	if !operation.claimsHeld {
 		return nil
 	}
-	granted, err := kernel.claims.Release(operation)
+	granted, err := ck.claims.Release(operation)
 	if err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return nil
 	}
 	return granted
 }
 
-func (kernel *CommandKernel) removeHead(lane *commandLane) {
+func (ck *CommandKernel) removeHead(lane *commandLane) {
 	operation := lane.head
 	if operation == nil {
 		return
 	}
-	kernel.removingLaneOperation(lane, operation)
+	ck.removingLaneOperation(lane, operation)
 	lane.head = operation.next
 	if lane.head != nil {
 		lane.head.previous = nil
@@ -3967,8 +3967,8 @@ func (kernel *CommandKernel) removeHead(lane *commandLane) {
 	operation.next = nil
 }
 
-func (kernel *CommandKernel) unlink(operation *commandOperation) {
-	kernel.removingLaneOperation(operation.lane, operation)
+func (ck *CommandKernel) unlink(operation *commandOperation) {
+	ck.removingLaneOperation(operation.lane, operation)
 	if operation.previous != nil {
 		operation.previous.next = operation.next
 	}
@@ -3982,7 +3982,7 @@ func (kernel *CommandKernel) unlink(operation *commandOperation) {
 	operation.next = nil
 }
 
-func (kernel *CommandKernel) removingLaneOperation(
+func (ck *CommandKernel) removingLaneOperation(
 	lane *commandLane,
 	operation *commandOperation,
 ) {
@@ -3998,99 +3998,99 @@ func (kernel *CommandKernel) removingLaneOperation(
 	}
 }
 
-func (kernel *CommandKernel) markReady(lane *commandLane) {
+func (ck *CommandKernel) markReady(lane *commandLane) {
 	if lane == nil ||
 		lane.active != nil ||
 		lane.head == nil ||
 		!lane.head.admitted ||
-		kernel.claims.Waiting(lane.head) {
+		ck.claims.Waiting(lane.head) {
 		return
 	}
 	lane.source = lane.head.Source
 	index := sourceIndex(lane.source)
-	kernel.ready[index].push(lane)
+	ck.ready[index].push(lane)
 }
 
-func (kernel *CommandKernel) nextReadyLane() *commandLane {
-	first := sourceIndex(kernel.nextSource)
+func (ck *CommandKernel) nextReadyLane() *commandLane {
+	first := sourceIndex(ck.nextSource)
 	second := 1 - first
-	if lane := kernel.ready[first].pop(); lane != nil {
-		kernel.nextSource = otherSource(kernel.nextSource)
+	if lane := ck.ready[first].pop(); lane != nil {
+		ck.nextSource = otherSource(ck.nextSource)
 		return lane
 	}
-	if lane := kernel.ready[second].pop(); lane != nil {
-		kernel.nextSource = otherSource(lane.source)
+	if lane := ck.ready[second].pop(); lane != nil {
+		ck.nextSource = otherSource(lane.source)
 		return lane
 	}
 	return nil
 }
 
-func (kernel *CommandKernel) nextDeadline() time.Time {
-	if kernel.deadlines.Len() == 0 {
+func (ck *CommandKernel) nextDeadline() time.Time {
+	if ck.deadlines.Len() == 0 {
 		return time.Time{}
 	}
-	return kernel.deadlines[0].when
+	return ck.deadlines[0].when
 }
 
-func (kernel *CommandKernel) beginShutdown(deadline time.Time) error {
+func (ck *CommandKernel) beginShutdown(deadline time.Time) error {
 	if deadline.IsZero() {
 		return errors.New("jobmgr kernel: zero shutdown deadline")
 	}
-	if kernel.functionMutationActive || kernel.functionMutationPaused {
+	if ck.functionMutationActive || ck.functionMutationPaused {
 		var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-		count, abortErr := kernel.functionCatalog.AbortMutation(&cleanups)
-		pushErr := kernel.pushFunctionCleanupBatch(&cleanups, count)
+		count, abortErr := ck.functionCatalog.AbortMutation(&cleanups)
+		pushErr := ck.pushFunctionCleanupBatch(&cleanups, count)
 		terminalErr := errors.Join(ErrStopped, abortErr, pushErr)
-		if kernel.functionMutation.result != nil {
-			kernel.functionMutation.result <- functionMutationResult{
+		if ck.functionMutation.result != nil {
+			ck.functionMutation.result <- functionMutationResult{
 				err: terminalErr,
 			}
 		}
-		kernel.functionMutation = functionMutationSubmission{}
-		kernel.functionMutationActive = false
-		kernel.functionMutationPaused = false
+		ck.functionMutation = functionMutationSubmission{}
+		ck.functionMutationActive = false
+		ck.functionMutationPaused = false
 		if abortErr != nil || pushErr != nil {
 			return errors.Join(abortErr, pushErr)
 		}
 	}
-	kernel.shutdownActive = true
-	kernel.shutdownOperationCursor = kernel.operationHead
-	kernel.shutdownOperationsDone = kernel.shutdownOperationCursor == nil
-	kernel.shutdownLaneCursor = kernel.laneHead
-	kernel.shutdownLanesDone = kernel.shutdownLaneCursor == nil
-	if err := kernel.tasks.SealInherited(); err != nil {
+	ck.shutdownActive = true
+	ck.shutdownOperationCursor = ck.operationHead
+	ck.shutdownOperationsDone = ck.shutdownOperationCursor == nil
+	ck.shutdownLaneCursor = ck.laneHead
+	ck.shutdownLanesDone = ck.shutdownLaneCursor == nil
+	if err := ck.tasks.SealInherited(); err != nil {
 		return err
 	}
-	if err := kernel.advanceShutdownAdmission(); err != nil {
+	if err := ck.advanceShutdownAdmission(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (kernel *CommandKernel) serviceShutdownOperations(
+func (ck *CommandKernel) serviceShutdownOperations(
 	quantum int,
 ) (bool, error) {
-	if !kernel.shutdownActive || quantum <= 0 {
+	if !ck.shutdownActive || quantum <= 0 {
 		return false, errors.New("jobmgr kernel: invalid shutdown operation service")
 	}
 	for visited := 0; visited < quantum &&
-		kernel.shutdownOperationCursor != nil; visited++ {
-		operation := kernel.shutdownOperationCursor
-		kernel.shutdownOperationCursor = operation.allNext
+		ck.shutdownOperationCursor != nil; visited++ {
+		operation := ck.shutdownOperationCursor
+		ck.shutdownOperationCursor = operation.allNext
 		operation.shutdownVisited = true
 		if operation.State == lifecycle.OperationDisposedTerminal {
-			kernel.unlinkOperation(operation)
+			ck.unlinkOperation(operation)
 			continue
 		}
-		if err := kernel.cancelOperationForShutdown(operation); err != nil {
+		if err := ck.cancelOperationForShutdown(operation); err != nil {
 			return false, err
 		}
 	}
-	kernel.shutdownOperationsDone = kernel.shutdownOperationCursor == nil
-	return !kernel.shutdownOperationsDone, nil
+	ck.shutdownOperationsDone = ck.shutdownOperationCursor == nil
+	return !ck.shutdownOperationsDone, nil
 }
 
-func (kernel *CommandKernel) cancelOperationForShutdown(
+func (ck *CommandKernel) cancelOperationForShutdown(
 	operation *commandOperation,
 ) error {
 	if operation == nil ||
@@ -4102,44 +4102,44 @@ func (kernel *CommandKernel) cancelOperationForShutdown(
 	case lifecycle.ChildExecuting:
 		if operation.plan.Resource == nil ||
 			operation.plan.Resource.Action != ResourceStop {
-			_ = kernel.tasks.Cancel(operation.Task)
+			_ = ck.tasks.Cancel(operation.Task)
 		}
 		if operation.Response != lifecycle.ResponseNotRequired &&
 			!operation.plan.CooperativeCancel &&
 			!(operation.TimedOut() &&
 				requiresCooperativeDeadlineStart(operation)) {
-			kernel.enqueueControl(operation, cancellationControl(operation))
+			ck.enqueueControl(operation, cancellationControl(operation))
 		}
 	case lifecycle.ChildNotStarted:
-		kernel.unlinkQueued(operation, ErrStopped)
+		ck.unlinkQueued(operation, ErrStopped)
 		if operation.Response != lifecycle.ResponseNotRequired {
-			kernel.enqueueControl(operation, cancellationControl(operation))
+			ck.enqueueControl(operation, cancellationControl(operation))
 		} else {
-			kernel.tryDispose(operation)
+			ck.tryDispose(operation)
 		}
 	case lifecycle.ChildDeadlineStartPending:
 		if !operation.taskRequest.Valid() {
 			if err := operation.AbandonDeadlineStart(); err != nil {
 				return err
 			}
-			kernel.unlinkQueued(operation, ErrStopped)
+			ck.unlinkQueued(operation, ErrStopped)
 			if operation.Response == lifecycle.ResponseOpen {
-				kernel.enqueueControl(operation, lifecycle.ControlDeadline)
+				ck.enqueueControl(operation, lifecycle.ControlDeadline)
 			} else {
-				kernel.tryDispose(operation)
+				ck.tryDispose(operation)
 			}
 		}
 	case lifecycle.ChildResultReady:
 		if operation.resultGrowthWaiting {
-			if err := kernel.admission.CancelWaiting(
+			if err := ck.admission.CancelWaiting(
 				operation.admission,
 			); err != nil {
 				return err
 			}
 			operation.resultGrowthWaiting = false
-			kernel.sendDisposeAction(operation)
+			ck.sendDisposeAction(operation)
 			if operation.Response != lifecycle.ResponseNotRequired {
-				kernel.enqueueControl(
+				ck.enqueueControl(
 					operation,
 					cancellationControl(operation),
 				)
@@ -4147,7 +4147,7 @@ func (kernel *CommandKernel) cancelOperationForShutdown(
 		}
 	case lifecycle.ChildActionPending:
 		if shutdownCancellablePendingAction(operation) {
-			_ = kernel.tasks.Cancel(operation.Task)
+			_ = ck.tasks.Cancel(operation.Task)
 		}
 	}
 	return nil
@@ -4168,14 +4168,14 @@ func cancellationControl(operation *commandOperation) lifecycle.ControlStatus {
 	return lifecycle.ControlCancelled
 }
 
-func (kernel *CommandKernel) advanceShutdownAdmission() error {
-	grant, waiting, err := kernel.admission.TakeShutdownInputBodyGrant(kernel.run.Generation())
+func (ck *CommandKernel) advanceShutdownAdmission() error {
+	grant, waiting, err := ck.admission.TakeShutdownInputBodyGrant(ck.run.Generation())
 	if err != nil {
 		return err
 	}
 	if grant.Kind == lifecycle.ReservationInputBodyGrowth {
 		select {
-		case kernel.inputBodyGrants <- grant:
+		case ck.inputBodyGrants <- grant:
 		default:
 			return errors.New("jobmgr kernel: input body grant gate is full during shutdown")
 		}
@@ -4183,33 +4183,33 @@ func (kernel *CommandKernel) advanceShutdownAdmission() error {
 	if waiting {
 		return nil
 	}
-	if !kernel.shutdownOperationsDone {
+	if !ck.shutdownOperationsDone {
 		return nil
 	}
-	return kernel.admission.BeginCleanupOnly(kernel.run.Generation())
+	return ck.admission.BeginCleanupOnly(ck.run.Generation())
 }
 
-func (kernel *CommandKernel) serviceShutdownStops(
+func (ck *CommandKernel) serviceShutdownStops(
 	quantum int,
 ) (bool, error) {
-	if !kernel.shutdownActive || !kernel.shutdownBarrierDone || quantum <= 0 {
+	if !ck.shutdownActive || !ck.shutdownBarrierDone || quantum <= 0 {
 		return false, errors.New("jobmgr kernel: invalid shutdown lane service")
 	}
 	for visited := 0; visited < quantum &&
-		kernel.shutdownLaneCursor != nil; visited++ {
-		lane := kernel.shutdownLaneCursor
-		kernel.shutdownLaneCursor = lane.allNext
+		ck.shutdownLaneCursor != nil; visited++ {
+		lane := ck.shutdownLaneCursor
+		ck.shutdownLaneCursor = lane.allNext
 		lane.shutdownVisited = true
-		if err := kernel.enqueueShutdownStop(lane); err != nil {
+		if err := ck.enqueueShutdownStop(lane); err != nil {
 			return false, err
 		}
-		kernel.releaseUnusedLane(lane)
+		ck.releaseUnusedLane(lane)
 	}
-	kernel.shutdownLanesDone = kernel.shutdownLaneCursor == nil
-	return !kernel.shutdownLanesDone, nil
+	ck.shutdownLanesDone = ck.shutdownLaneCursor == nil
+	return !ck.shutdownLanesDone, nil
 }
 
-func (kernel *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
+func (ck *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
 	if lane == nil || !lane.allListed {
 		return errors.New("jobmgr kernel: invalid shutdown resource lane")
 	}
@@ -4250,7 +4250,7 @@ func (kernel *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
 	if !identity.Valid() || identity.ID != lane.key {
 		return errors.New("jobmgr kernel: shutdown found an invalid current resource")
 	}
-	budget, err := kernel.run.BeginShutdown()
+	budget, err := ck.run.BeginShutdown()
 	if err != nil {
 		return err
 	}
@@ -4269,15 +4269,15 @@ func (kernel *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
 	if err != nil {
 		return err
 	}
-	request, err := kernel.tasks.Enqueue(
+	request, err := ck.tasks.Enqueue(
 		lifecycle.TaskClassFrameworkControl,
 		plan,
 	)
 	if err != nil {
 		return err
 	}
-	if owner := kernel.shutdownRequests[request]; owner != nil {
-		outcome, cancelErr := kernel.tasks.CancelPendingOutcome(request)
+	if owner := ck.shutdownRequests[request]; owner != nil {
+		outcome, cancelErr := ck.tasks.CancelPendingOutcome(request)
 		_, ok := outcome.ReadyResource()
 		returnedIdentity, identityOK := outcome.ResourceIdentity()
 		if cancelErr != nil || !ok || !identityOK ||
@@ -4292,23 +4292,23 @@ func (kernel *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
 	lane.current = nil
 	lane.currentStopping = true
 	lane.shutdownRequest = request
-	kernel.shutdownRequests[request] = lane
+	ck.shutdownRequests[request] = lane
 	return nil
 }
 
-func (kernel *CommandKernel) advanceShutdownBarrier() error {
-	if kernel.shutdownBarrier == nil ||
-		kernel.shutdownBarrierDone ||
-		kernel.shutdownBarrierFailed ||
-		kernel.shutdownBarrierRequest.Valid() ||
-		kernel.shutdownBarrierTask.Valid() {
+func (ck *CommandKernel) advanceShutdownBarrier() error {
+	if ck.shutdownBarrier == nil ||
+		ck.shutdownBarrierDone ||
+		ck.shutdownBarrierFailed ||
+		ck.shutdownBarrierRequest.Valid() ||
+		ck.shutdownBarrierTask.Valid() {
 		return nil
 	}
-	if !kernel.shutdownOperationsDone ||
-		kernel.tasks.InheritedCancellationPending() {
+	if !ck.shutdownOperationsDone ||
+		ck.tasks.InheritedCancellationPending() {
 		return nil
 	}
-	budget, err := kernel.run.BeginShutdown()
+	budget, err := ck.run.BeginShutdown()
 	if err != nil {
 		return err
 	}
@@ -4318,23 +4318,23 @@ func (kernel *CommandKernel) advanceShutdownBarrier() error {
 		3,
 		func(ctx context.Context) (lifecycle.TaskOutcome, error) {
 			return lifecycle.NoValueOutcome(),
-				kernel.shutdownBarrier.BeforeFunctionCatalogClose(
+				ck.shutdownBarrier.BeforeFunctionCatalogClose(
 					ctx,
-					kernel.run.Generation(),
+					ck.run.Generation(),
 				)
 		},
 	)
 	if err != nil {
 		return err
 	}
-	request, err := kernel.tasks.Enqueue(
+	request, err := ck.tasks.Enqueue(
 		lifecycle.TaskClassFrameworkControl,
 		plan,
 	)
 	if err != nil {
 		return err
 	}
-	kernel.shutdownBarrierRequest = request
+	ck.shutdownBarrierRequest = request
 	return nil
 }
 
@@ -4343,132 +4343,132 @@ func isNoopRunShutdownBarrier(barrier RunShutdownBarrier) bool {
 	return ok
 }
 
-func (kernel *CommandKernel) completeShutdownBarrier(
+func (ck *CommandKernel) completeShutdownBarrier(
 	completion lifecycle.TaskCompletion,
 ) {
 	if completion.Sequence != 1 ||
 		completion.Kind != lifecycle.TaskOutcomeNone ||
-		kernel.shutdownBarrierAction != 0 ||
-		kernel.shutdownBarrierDone ||
-		kernel.shutdownBarrierFailed {
-		kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier completion"))
+		ck.shutdownBarrierAction != 0 ||
+		ck.shutdownBarrierDone ||
+		ck.shutdownBarrierFailed {
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier completion"))
 		return
 	}
 	if completion.Err != nil {
-		kernel.shutdownBarrierFailed = true
-		kernel.run.Dirty(completion.Err)
+		ck.shutdownBarrierFailed = true
+		ck.run.Dirty(completion.Err)
 	}
-	kernel.shutdownBarrierAction = lifecycle.TaskActionTerminate
-	if err := kernel.tasks.SendAction(lifecycle.TaskAction{
+	ck.shutdownBarrierAction = lifecycle.TaskActionTerminate
+	if err := ck.tasks.SendAction(lifecycle.TaskAction{
 		Ref: completion.Ref, Sequence: 2, Kind: lifecycle.TaskActionTerminate,
 	}); err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 	}
 }
 
-func (kernel *CommandKernel) acknowledgeShutdownBarrier(
+func (ck *CommandKernel) acknowledgeShutdownBarrier(
 	ack lifecycle.TaskAcknowledgement,
 ) {
 	if ack.Sequence != 2 ||
 		ack.Kind != lifecycle.TaskActionTerminate ||
-		kernel.shutdownBarrierAction != lifecycle.TaskActionTerminate ||
-		kernel.shutdownBarrierDone {
-		kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier acknowledgement"))
+		ck.shutdownBarrierAction != lifecycle.TaskActionTerminate ||
+		ck.shutdownBarrierDone {
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier acknowledgement"))
 		return
 	}
 	if ack.Err != nil {
-		kernel.shutdownBarrierFailed = true
-		kernel.run.Dirty(ack.Err)
+		ck.shutdownBarrierFailed = true
+		ck.run.Dirty(ack.Err)
 	}
-	if err := kernel.tasks.Release(ack.Ref); err != nil {
-		kernel.shutdownBarrierFailed = true
-		kernel.run.Dirty(err)
+	if err := ck.tasks.Release(ack.Ref); err != nil {
+		ck.shutdownBarrierFailed = true
+		ck.run.Dirty(err)
 		return
 	}
-	kernel.shutdownBarrierTask = lifecycle.TaskRef{}
-	kernel.shutdownBarrierAction = 0
-	if !kernel.shutdownBarrierFailed {
-		kernel.shutdownBarrierDone = true
+	ck.shutdownBarrierTask = lifecycle.TaskRef{}
+	ck.shutdownBarrierAction = 0
+	if !ck.shutdownBarrierFailed {
+		ck.shutdownBarrierDone = true
 	}
 }
 
-func (kernel *CommandKernel) runShutdownBarrierFailedTerminal() bool {
-	return kernel.shutdownBarrierFailed &&
-		!kernel.shutdownBarrierRequest.Valid() &&
-		!kernel.shutdownBarrierTask.Valid() &&
-		kernel.shutdownBarrierAction == 0
+func (ck *CommandKernel) runShutdownBarrierFailedTerminal() bool {
+	return ck.shutdownBarrierFailed &&
+		!ck.shutdownBarrierRequest.Valid() &&
+		!ck.shutdownBarrierTask.Valid() &&
+		ck.shutdownBarrierAction == 0
 }
 
-func (kernel *CommandKernel) advanceRunFinalizer() error {
-	if kernel.finalizer == nil || kernel.finalizerDone || kernel.finalizerFailed || kernel.finalizerRequest.Valid() || kernel.finalizerTask.Valid() {
+func (ck *CommandKernel) advanceRunFinalizer() error {
+	if ck.finalizer == nil || ck.finalizerDone || ck.finalizerFailed || ck.finalizerRequest.Valid() || ck.finalizerTask.Valid() {
 		return nil
 	}
-	if !kernel.shutdownReadyForFinalizer() {
+	if !ck.shutdownReadyForFinalizer() {
 		return nil
 	}
-	budget, err := kernel.run.BeginShutdown()
+	budget, err := ck.run.BeginShutdown()
 	if err != nil {
 		return err
 	}
 	plan, err := lifecycle.NewShutdownWorkTaskPlan(
 		lifecycle.SourceJobManager, budget, 3,
 		func(ctx context.Context) (lifecycle.TaskOutcome, error) {
-			return lifecycle.NoValueOutcome(), kernel.finalizer.FinalizeRun(ctx, kernel.run.Generation())
+			return lifecycle.NoValueOutcome(), ck.finalizer.FinalizeRun(ctx, ck.run.Generation())
 		},
 	)
 	if err != nil {
 		return err
 	}
-	request, err := kernel.tasks.Enqueue(
+	request, err := ck.tasks.Enqueue(
 		lifecycle.TaskClassFrameworkControl,
 		plan,
 	)
 	if err != nil {
 		return err
 	}
-	kernel.finalizerRequest = request
+	ck.finalizerRequest = request
 	return nil
 }
 
-func (kernel *CommandKernel) shutdownReadyForFinalizer() bool {
-	if !kernel.shutdownBarrierDone || kernel.shutdownBarrierFailed ||
-		kernel.shutdownBarrierRequest.Valid() ||
-		kernel.shutdownBarrierTask.Valid() ||
-		kernel.shutdownBarrierAction != 0 {
+func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
+	if !ck.shutdownBarrierDone || ck.shutdownBarrierFailed ||
+		ck.shutdownBarrierRequest.Valid() ||
+		ck.shutdownBarrierTask.Valid() ||
+		ck.shutdownBarrierAction != 0 {
 		return false
 	}
-	inherited := kernel.tasks.InheritedCensus()
-	longLived := kernel.tasks.LongLivedCensus()
-	if !kernel.shutdownOperationsDone || !kernel.shutdownLanesDone ||
-		kernel.tasks.InheritedCancellationPending() ||
-		len(kernel.operations) != 0 || len(kernel.tasksByRef) != 0 ||
-		len(kernel.tasksByRequest) != 0 ||
-		kernel.runtimeHead != nil || kernel.runtimeTail != nil ||
-		kernel.functionOperations != 0 ||
-		kernel.operationHead != nil || kernel.operationTail != nil ||
-		kernel.laneHead != nil || kernel.laneTail != nil ||
-		len(kernel.functionCleanupTasks) != 0 || len(kernel.functionCleanupRequests) != 0 ||
-		kernel.functionCleanupBacklog.count != 0 ||
-		kernel.functionMutationActive || kernel.functionMutationPaused ||
-		len(kernel.byAdmission) != 0 || len(kernel.lanes) != 0 ||
-		len(kernel.compositeFenceClaims) != 0 ||
-		kernel.compositeFenceHead != nil ||
-		kernel.compositeFenceTail != nil ||
-		kernel.compositeFenceCount != 0 ||
-		kernel.compositeFenceRecheck ||
-		kernel.tasks.Active() != 0 || kernel.tasks.Pending() != 0 || inherited.Active != 0 ||
-		len(kernel.shutdownRequests) != 0 || len(kernel.shutdownTasks) != 0 || len(kernel.controls) != 0 || kernel.deadlines.Len() != 0 ||
-		len(kernel.submissions[0]) != 0 || len(kernel.submissions[1]) != 0 || kernel.blockedSubmission[0] || kernel.blockedSubmission[1] ||
-		kernel.ready[0].len != 0 || kernel.ready[1].len != 0 || kernel.claims.WaitingCount() != 0 || len(kernel.claims.keys) != 0 {
+	inherited := ck.tasks.InheritedCensus()
+	longLived := ck.tasks.LongLivedCensus()
+	if !ck.shutdownOperationsDone || !ck.shutdownLanesDone ||
+		ck.tasks.InheritedCancellationPending() ||
+		len(ck.operations) != 0 || len(ck.tasksByRef) != 0 ||
+		len(ck.tasksByRequest) != 0 ||
+		ck.runtimeHead != nil || ck.runtimeTail != nil ||
+		ck.functionOperations != 0 ||
+		ck.operationHead != nil || ck.operationTail != nil ||
+		ck.laneHead != nil || ck.laneTail != nil ||
+		len(ck.functionCleanupTasks) != 0 || len(ck.functionCleanupRequests) != 0 ||
+		ck.functionCleanupBacklog.count != 0 ||
+		ck.functionMutationActive || ck.functionMutationPaused ||
+		len(ck.byAdmission) != 0 || len(ck.lanes) != 0 ||
+		len(ck.compositeFenceClaims) != 0 ||
+		ck.compositeFenceHead != nil ||
+		ck.compositeFenceTail != nil ||
+		ck.compositeFenceCount != 0 ||
+		ck.compositeFenceRecheck ||
+		ck.tasks.Active() != 0 || ck.tasks.Pending() != 0 || inherited.Active != 0 ||
+		len(ck.shutdownRequests) != 0 || len(ck.shutdownTasks) != 0 || len(ck.controls) != 0 || ck.deadlines.Len() != 0 ||
+		len(ck.submissions[0]) != 0 || len(ck.submissions[1]) != 0 || ck.blockedSubmission[0] || ck.blockedSubmission[1] ||
+		ck.ready[0].len != 0 || ck.ready[1].len != 0 || ck.claims.WaitingCount() != 0 || len(ck.claims.keys) != 0 {
 		return false
 	}
-	if !kernel.functionCatalogDrained() {
+	if !ck.functionCatalogDrained() {
 		return false
 	}
 	if longLived.Active != longLived.FinalizerOwnedActive || longLived.Bytes != longLived.FinalizerOwnedBytes {
 		return false
 	}
-	return kernel.admission.RunFinalizerReady(kernel.run.Generation(), longLived.FinalizerOwnedRecords, longLived.FinalizerOwnedBytes)
+	return ck.admission.RunFinalizerReady(ck.run.Generation(), longLived.FinalizerOwnedRecords, longLived.FinalizerOwnedBytes)
 }
 
 func isNoopRunFinalizer(finalizer RunFinalizer) bool {
@@ -4476,114 +4476,114 @@ func isNoopRunFinalizer(finalizer RunFinalizer) bool {
 	return ok
 }
 
-func (kernel *CommandKernel) completeRunFinalizer(completion lifecycle.TaskCompletion) {
-	if completion.Sequence != 1 || completion.Kind != lifecycle.TaskOutcomeNone || kernel.finalizerAction != 0 || kernel.finalizerDone || kernel.finalizerFailed {
-		kernel.run.Dirty(errors.New("jobmgr kernel: invalid run finalizer completion"))
+func (ck *CommandKernel) completeRunFinalizer(completion lifecycle.TaskCompletion) {
+	if completion.Sequence != 1 || completion.Kind != lifecycle.TaskOutcomeNone || ck.finalizerAction != 0 || ck.finalizerDone || ck.finalizerFailed {
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid run finalizer completion"))
 		return
 	}
 	if completion.Err != nil {
-		kernel.finalizerFailed = true
-		kernel.run.Dirty(completion.Err)
+		ck.finalizerFailed = true
+		ck.run.Dirty(completion.Err)
 	}
-	kernel.finalizerAction = lifecycle.TaskActionTerminate
-	if err := kernel.tasks.SendAction(lifecycle.TaskAction{Ref: completion.Ref, Sequence: 2, Kind: lifecycle.TaskActionTerminate}); err != nil {
-		kernel.run.Dirty(err)
+	ck.finalizerAction = lifecycle.TaskActionTerminate
+	if err := ck.tasks.SendAction(lifecycle.TaskAction{Ref: completion.Ref, Sequence: 2, Kind: lifecycle.TaskActionTerminate}); err != nil {
+		ck.run.Dirty(err)
 	}
 }
 
-func (kernel *CommandKernel) acknowledgeRunFinalizer(ack lifecycle.TaskAcknowledgement) {
-	if ack.Sequence != 2 || ack.Kind != lifecycle.TaskActionTerminate || kernel.finalizerAction != lifecycle.TaskActionTerminate || kernel.finalizerDone {
-		kernel.run.Dirty(errors.New("jobmgr kernel: invalid run finalizer acknowledgement"))
+func (ck *CommandKernel) acknowledgeRunFinalizer(ack lifecycle.TaskAcknowledgement) {
+	if ack.Sequence != 2 || ack.Kind != lifecycle.TaskActionTerminate || ck.finalizerAction != lifecycle.TaskActionTerminate || ck.finalizerDone {
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid run finalizer acknowledgement"))
 		return
 	}
 	if ack.Err != nil {
-		kernel.finalizerFailed = true
-		kernel.run.Dirty(ack.Err)
+		ck.finalizerFailed = true
+		ck.run.Dirty(ack.Err)
 	}
-	if err := kernel.tasks.Release(ack.Ref); err != nil {
-		kernel.finalizerFailed = true
-		kernel.run.Dirty(err)
+	if err := ck.tasks.Release(ack.Ref); err != nil {
+		ck.finalizerFailed = true
+		ck.run.Dirty(err)
 		return
 	}
-	kernel.finalizerTask = lifecycle.TaskRef{}
-	kernel.finalizerAction = 0
-	if !kernel.finalizerFailed {
-		kernel.finalizerDone = true
+	ck.finalizerTask = lifecycle.TaskRef{}
+	ck.finalizerAction = 0
+	if !ck.finalizerFailed {
+		ck.finalizerDone = true
 	}
 }
 
-func (kernel *CommandKernel) runFinalizerFailedTerminal() bool {
-	return kernel.finalizerFailed && !kernel.finalizerRequest.Valid() && !kernel.finalizerTask.Valid() && kernel.finalizerAction == 0
+func (ck *CommandKernel) runFinalizerFailedTerminal() bool {
+	return ck.finalizerFailed && !ck.finalizerRequest.Valid() && !ck.finalizerTask.Valid() && ck.finalizerAction == 0
 }
 
-func (kernel *CommandKernel) shutdownQuiescent() bool {
-	if !kernel.shutdownBarrierDone || kernel.shutdownBarrierFailed ||
-		kernel.shutdownBarrierRequest.Valid() ||
-		kernel.shutdownBarrierTask.Valid() ||
-		kernel.shutdownBarrierAction != 0 {
+func (ck *CommandKernel) shutdownQuiescent() bool {
+	if !ck.shutdownBarrierDone || ck.shutdownBarrierFailed ||
+		ck.shutdownBarrierRequest.Valid() ||
+		ck.shutdownBarrierTask.Valid() ||
+		ck.shutdownBarrierAction != 0 {
 		return false
 	}
-	inherited := kernel.tasks.InheritedCensus()
-	longLived := kernel.tasks.LongLivedCensus()
-	frame := kernel.frames.Census()
-	if !kernel.shutdownOperationsDone || !kernel.shutdownLanesDone ||
-		kernel.tasks.InheritedCancellationPending() ||
-		len(kernel.operations) != 0 || len(kernel.tasksByRef) != 0 ||
-		len(kernel.tasksByRequest) != 0 ||
-		kernel.operationHead != nil || kernel.operationTail != nil ||
-		kernel.laneHead != nil || kernel.laneTail != nil ||
-		len(kernel.functionCleanupTasks) != 0 || len(kernel.functionCleanupRequests) != 0 ||
-		kernel.functionCleanupBacklog.count != 0 ||
-		kernel.functionMutationActive || kernel.functionMutationPaused ||
-		len(kernel.byAdmission) != 0 || len(kernel.lanes) != 0 ||
-		len(kernel.compositeFenceClaims) != 0 ||
-		kernel.compositeFenceHead != nil ||
-		kernel.compositeFenceTail != nil ||
-		kernel.compositeFenceCount != 0 ||
-		kernel.compositeFenceRecheck ||
-		kernel.tasks.Active() != 0 || kernel.tasks.Pending() != 0 || len(kernel.shutdownRequests) != 0 || len(kernel.shutdownTasks) != 0 || len(kernel.controls) != 0 || kernel.deadlines.Len() != 0 ||
-		len(kernel.submissions[0]) != 0 || len(kernel.submissions[1]) != 0 || kernel.blockedSubmission[0] || kernel.blockedSubmission[1] ||
-		kernel.ready[0].len != 0 || kernel.ready[1].len != 0 || kernel.claims.WaitingCount() != 0 || len(kernel.claims.keys) != 0 {
+	inherited := ck.tasks.InheritedCensus()
+	longLived := ck.tasks.LongLivedCensus()
+	frame := ck.frames.Census()
+	if !ck.shutdownOperationsDone || !ck.shutdownLanesDone ||
+		ck.tasks.InheritedCancellationPending() ||
+		len(ck.operations) != 0 || len(ck.tasksByRef) != 0 ||
+		len(ck.tasksByRequest) != 0 ||
+		ck.operationHead != nil || ck.operationTail != nil ||
+		ck.laneHead != nil || ck.laneTail != nil ||
+		len(ck.functionCleanupTasks) != 0 || len(ck.functionCleanupRequests) != 0 ||
+		ck.functionCleanupBacklog.count != 0 ||
+		ck.functionMutationActive || ck.functionMutationPaused ||
+		len(ck.byAdmission) != 0 || len(ck.lanes) != 0 ||
+		len(ck.compositeFenceClaims) != 0 ||
+		ck.compositeFenceHead != nil ||
+		ck.compositeFenceTail != nil ||
+		ck.compositeFenceCount != 0 ||
+		ck.compositeFenceRecheck ||
+		ck.tasks.Active() != 0 || ck.tasks.Pending() != 0 || len(ck.shutdownRequests) != 0 || len(ck.shutdownTasks) != 0 || len(ck.controls) != 0 || ck.deadlines.Len() != 0 ||
+		len(ck.submissions[0]) != 0 || len(ck.submissions[1]) != 0 || ck.blockedSubmission[0] || ck.blockedSubmission[1] ||
+		ck.ready[0].len != 0 || ck.ready[1].len != 0 || ck.claims.WaitingCount() != 0 || len(ck.claims.keys) != 0 {
 		return false
 	}
-	return kernel.functionCatalogDrained() &&
-		kernel.admission.RunDrained(kernel.run.Generation()) && inherited.Active == 0 &&
+	return ck.functionCatalogDrained() &&
+		ck.admission.RunDrained(ck.run.Generation()) && inherited.Active == 0 &&
 		longLived == (lifecycle.LongLivedCensus{}) && !frame.Poisoned &&
 		!frame.Busy && !frame.PendingControl && frame.RetainedBytes == 0 &&
-		kernel.finalizerDone && !kernel.finalizerFailed
+		ck.finalizerDone && !ck.finalizerFailed
 }
 
-func (kernel *CommandKernel) functionCatalogDrained() bool {
-	census := kernel.functionCatalog.LifecycleCensus()
+func (ck *CommandKernel) functionCatalogDrained() bool {
+	census := ck.functionCatalog.LifecycleCensus()
 	return census.Closed && !census.MutationActive && census.Routes == 0 &&
 		census.CloseRoutesPending == 0 && census.InvocationLeases == 0 &&
 		census.PendingCleanups == 0
 }
 
-func (kernel *CommandKernel) runCensus() lifecycle.RunCensus {
+func (ck *CommandKernel) runCensus() lifecycle.RunCensus {
 	return lifecycle.RunCensus{
-		AdmissionRunDrained: kernel.admission.RunDrained(kernel.run.Generation()),
-		Admission:           kernel.admission.Census(), TransientActive: kernel.tasks.Active(), TransientPending: kernel.tasks.Pending(),
-		Inherited: kernel.tasks.InheritedCensus(), LongLived: kernel.tasks.LongLivedCensus(),
-		Frame:                kernel.frames.Census(),
-		RunFinalizerComplete: kernel.finalizerDone && !kernel.finalizerFailed,
+		AdmissionRunDrained: ck.admission.RunDrained(ck.run.Generation()),
+		Admission:           ck.admission.Census(), TransientActive: ck.tasks.Active(), TransientPending: ck.tasks.Pending(),
+		Inherited: ck.tasks.InheritedCensus(), LongLived: ck.tasks.LongLivedCensus(),
+		Frame:                ck.frames.Census(),
+		RunFinalizerComplete: ck.finalizerDone && !ck.finalizerFailed,
 	}
 }
 
-func (kernel *CommandKernel) releaseFunctionInvocation(ref FunctionInvocationRef) error {
-	cleanup, err := kernel.functionCatalog.ReleaseInvocation(ref)
+func (ck *CommandKernel) releaseFunctionInvocation(ref FunctionInvocationRef) error {
+	cleanup, err := ck.functionCatalog.ReleaseInvocation(ref)
 	if err != nil {
 		return err
 	}
-	return kernel.functionCleanupBacklog.push(cleanup)
+	return ck.functionCleanupBacklog.push(cleanup)
 }
 
-func (kernel *CommandKernel) pushFunctionCleanupBatch(cleanups *[MaximumFunctionCleanupBatch]FunctionCleanupPlan, count int) error {
+func (ck *CommandKernel) pushFunctionCleanupBatch(cleanups *[MaximumFunctionCleanupBatch]FunctionCleanupPlan, count int) error {
 	if cleanups == nil || count < 0 || count > len(cleanups) {
 		return errors.New("jobmgr kernel: invalid Function cleanup batch")
 	}
 	for index := 0; index < count; index++ {
-		if err := kernel.functionCleanupBacklog.push(cleanups[index]); err != nil {
+		if err := ck.functionCleanupBacklog.push(cleanups[index]); err != nil {
 			return err
 		}
 		cleanups[index] = FunctionCleanupPlan{}
@@ -4591,13 +4591,13 @@ func (kernel *CommandKernel) pushFunctionCleanupBatch(cleanups *[MaximumFunction
 	return nil
 }
 
-func (kernel *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
+func (ck *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 	if quantum <= 0 {
-		return kernel.functionCleanupBacklog.count != 0
+		return ck.functionCleanupBacklog.count != 0
 	}
-	for quantum > 0 && kernel.functionCleanupBacklog.count != 0 {
-		cleanup := kernel.functionCleanupBacklog.front()
-		request, err := kernel.tasks.Enqueue(
+	for quantum > 0 && ck.functionCleanupBacklog.count != 0 {
+		cleanup := ck.functionCleanupBacklog.front()
+		request, err := ck.tasks.Enqueue(
 			lifecycle.TaskClassFrameworkControl,
 			lifecycle.TaskPlan{
 				Source: lifecycle.SourceFunction,
@@ -4606,26 +4606,26 @@ func (kernel *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 			},
 		)
 		if err != nil {
-			kernel.run.Dirty(err)
+			ck.run.Dirty(err)
 			return true
 		}
-		if _, exists := kernel.functionCleanupRequests[request]; exists {
-			kernel.run.Dirty(errors.New("jobmgr kernel: duplicate Function cleanup request"))
+		if _, exists := ck.functionCleanupRequests[request]; exists {
+			ck.run.Dirty(errors.New("jobmgr kernel: duplicate Function cleanup request"))
 			return true
 		}
-		kernel.functionCleanupRequests[request] = cleanup.Ref
-		kernel.functionCleanupBacklog.pop()
+		ck.functionCleanupRequests[request] = cleanup.Ref
+		ck.functionCleanupBacklog.pop()
 		quantum--
 	}
-	return kernel.functionCleanupBacklog.count != 0
+	return ck.functionCleanupBacklog.count != 0
 }
 
-func (kernel *CommandKernel) beginFunctionMutation(submitted functionMutationSubmission) {
+func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmission) {
 	if submitted.mutation == nil || submitted.result == nil ||
 		submitted.action < functionMutationQuiesce ||
 		submitted.action > functionMutationAbort ||
-		kernel.functionMutationActive || kernel.functionCatalogClosing ||
-		!kernel.run.Admitting() {
+		ck.functionMutationActive || ck.functionCatalogClosing ||
+		!ck.run.Admitting() {
 		if submitted.result != nil {
 			submitted.result <- functionMutationResult{err: errors.New("jobmgr kernel: Function mutation admission closed")}
 		}
@@ -4633,7 +4633,7 @@ func (kernel *CommandKernel) beginFunctionMutation(submitted functionMutationSub
 	}
 	switch submitted.action {
 	case functionMutationQuiesce:
-		if kernel.functionMutationPaused {
+		if ck.functionMutationPaused {
 			submitted.result <- functionMutationResult{
 				err: errors.New(
 					"jobmgr kernel: Function mutation already quiesced",
@@ -4641,14 +4641,14 @@ func (kernel *CommandKernel) beginFunctionMutation(submitted functionMutationSub
 			}
 			return
 		}
-		if err := kernel.functionCatalog.BeginMutation(
+		if err := ck.functionCatalog.BeginMutation(
 			submitted.mutation,
 		); err != nil {
 			submitted.result <- functionMutationResult{err: err}
 			return
 		}
 	case functionMutationCommit:
-		if !kernel.functionMutationPaused {
+		if !ck.functionMutationPaused {
 			submitted.result <- functionMutationResult{
 				err: errors.New(
 					"jobmgr kernel: Function mutation is not quiesced",
@@ -4656,15 +4656,15 @@ func (kernel *CommandKernel) beginFunctionMutation(submitted functionMutationSub
 			}
 			return
 		}
-		if err := kernel.functionCatalog.ResumeMutation(
+		if err := ck.functionCatalog.ResumeMutation(
 			submitted.mutation,
 		); err != nil {
 			submitted.result <- functionMutationResult{err: err}
 			return
 		}
-		kernel.functionMutationPaused = false
+		ck.functionMutationPaused = false
 	case functionMutationAbort:
-		if !kernel.functionMutationPaused {
+		if !ck.functionMutationPaused {
 			submitted.result <- functionMutationResult{
 				err: errors.New(
 					"jobmgr kernel: Function mutation is not quiesced",
@@ -4672,174 +4672,174 @@ func (kernel *CommandKernel) beginFunctionMutation(submitted functionMutationSub
 			}
 			return
 		}
-		if err := kernel.functionCatalog.ResumeMutation(
+		if err := ck.functionCatalog.ResumeMutation(
 			submitted.mutation,
 		); err != nil {
 			submitted.result <- functionMutationResult{err: err}
 			return
 		}
 		var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-		count, abortErr := kernel.functionCatalog.AbortMutation(&cleanups)
-		pushErr := kernel.pushFunctionCleanupBatch(&cleanups, count)
+		count, abortErr := ck.functionCatalog.AbortMutation(&cleanups)
+		pushErr := ck.pushFunctionCleanupBatch(&cleanups, count)
 		submitted.result <- functionMutationResult{
 			err: errors.Join(abortErr, pushErr),
 		}
-		kernel.functionMutation = functionMutationSubmission{}
-		kernel.functionMutationPaused = false
+		ck.functionMutation = functionMutationSubmission{}
+		ck.functionMutationPaused = false
 		if abortErr != nil || pushErr != nil {
-			kernel.run.Dirty(errors.Join(abortErr, pushErr))
+			ck.run.Dirty(errors.Join(abortErr, pushErr))
 		}
 		return
 	}
-	kernel.functionMutation = submitted
-	kernel.functionMutationActive = true
+	ck.functionMutation = submitted
+	ck.functionMutationActive = true
 }
 
-func (kernel *CommandKernel) serviceFunctionMutation(quantum int) bool {
-	if !kernel.functionMutationActive {
+func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
+	if !ck.functionMutationActive {
 		return false
 	}
-	if kernel.functionMutation.action == functionMutationQuiesce {
-		progress, err := kernel.functionCatalog.AdvanceMutationQuiesce(
+	if ck.functionMutation.action == functionMutationQuiesce {
+		progress, err := ck.functionCatalog.AdvanceMutationQuiesce(
 			quantum,
 		)
 		if err != nil {
 			var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-			abortCount, abortErr := kernel.functionCatalog.AbortMutation(
+			abortCount, abortErr := ck.functionCatalog.AbortMutation(
 				&cleanups,
 			)
-			if pushErr := kernel.pushFunctionCleanupBatch(
+			if pushErr := ck.pushFunctionCleanupBatch(
 				&cleanups,
 				abortCount,
 			); pushErr != nil {
 				abortErr = errors.Join(abortErr, pushErr)
 			}
-			kernel.functionMutation.result <- functionMutationResult{
+			ck.functionMutation.result <- functionMutationResult{
 				err: errors.Join(err, abortErr),
 			}
-			kernel.functionMutation = functionMutationSubmission{}
-			kernel.functionMutationActive = false
+			ck.functionMutation = functionMutationSubmission{}
+			ck.functionMutationActive = false
 			if abortErr != nil {
-				kernel.run.Dirty(abortErr)
+				ck.run.Dirty(abortErr)
 			}
 			return false
 		}
 		if !progress.Quiesced {
 			return true
 		}
-		kernel.functionMutation.result <- functionMutationResult{
+		ck.functionMutation.result <- functionMutationResult{
 			version: progress.Version,
 		}
-		kernel.functionMutation.result = nil
-		kernel.functionMutationActive = false
-		kernel.functionMutationPaused = true
+		ck.functionMutation.result = nil
+		ck.functionMutationActive = false
+		ck.functionMutationPaused = true
 		return false
 	}
-	if kernel.functionMutation.action != functionMutationCommit {
+	if ck.functionMutation.action != functionMutationCommit {
 		invariantErr := errors.New(
 			"jobmgr kernel: invalid active Function mutation",
 		)
 		var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-		abortCount, abortErr := kernel.functionCatalog.AbortMutation(&cleanups)
-		if pushErr := kernel.pushFunctionCleanupBatch(
+		abortCount, abortErr := ck.functionCatalog.AbortMutation(&cleanups)
+		if pushErr := ck.pushFunctionCleanupBatch(
 			&cleanups,
 			abortCount,
 		); pushErr != nil {
 			abortErr = errors.Join(abortErr, pushErr)
 		}
-		kernel.functionMutation.result <- functionMutationResult{
+		ck.functionMutation.result <- functionMutationResult{
 			err: errors.Join(invariantErr, abortErr),
 		}
-		kernel.functionMutation = functionMutationSubmission{}
-		kernel.functionMutationActive = false
-		kernel.run.Dirty(errors.Join(invariantErr, abortErr))
+		ck.functionMutation = functionMutationSubmission{}
+		ck.functionMutationActive = false
+		ck.run.Dirty(errors.Join(invariantErr, abortErr))
 		return false
 	}
 	var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-	progress, count, err := kernel.functionCatalog.AdvanceMutation(quantum, &cleanups)
+	progress, count, err := ck.functionCatalog.AdvanceMutation(quantum, &cleanups)
 	if err != nil {
-		abortCount, abortErr := kernel.functionCatalog.AbortMutation(&cleanups)
-		if pushErr := kernel.pushFunctionCleanupBatch(&cleanups, abortCount); pushErr != nil {
+		abortCount, abortErr := ck.functionCatalog.AbortMutation(&cleanups)
+		if pushErr := ck.pushFunctionCleanupBatch(&cleanups, abortCount); pushErr != nil {
 			abortErr = errors.Join(abortErr, pushErr)
 		}
-		kernel.functionMutation.result <- functionMutationResult{err: errors.Join(err, abortErr)}
-		kernel.functionMutation = functionMutationSubmission{}
-		kernel.functionMutationActive = false
+		ck.functionMutation.result <- functionMutationResult{err: errors.Join(err, abortErr)}
+		ck.functionMutation = functionMutationSubmission{}
+		ck.functionMutationActive = false
 		if abortErr != nil {
-			kernel.run.Dirty(abortErr)
+			ck.run.Dirty(abortErr)
 		}
 		return false
 	}
-	if err := kernel.pushFunctionCleanupBatch(&cleanups, count); err != nil {
-		kernel.functionMutation.result <- functionMutationResult{err: err}
-		kernel.functionMutation = functionMutationSubmission{}
-		kernel.functionMutationActive = false
-		kernel.run.Dirty(err)
+	if err := ck.pushFunctionCleanupBatch(&cleanups, count); err != nil {
+		ck.functionMutation.result <- functionMutationResult{err: err}
+		ck.functionMutation = functionMutationSubmission{}
+		ck.functionMutationActive = false
+		ck.run.Dirty(err)
 		return false
 	}
 	if !progress.Done {
 		return true
 	}
-	kernel.functionMutation.result <- functionMutationResult{version: progress.Version}
-	kernel.functionMutation = functionMutationSubmission{}
-	kernel.functionMutationActive = false
+	ck.functionMutation.result <- functionMutationResult{version: progress.Version}
+	ck.functionMutation = functionMutationSubmission{}
+	ck.functionMutationActive = false
 	return false
 }
 
-func (kernel *CommandKernel) serviceFunctionCatalogClose(quantum int) bool {
-	if !kernel.shutdownBarrierDone || kernel.shutdownBarrierFailed {
+func (ck *CommandKernel) serviceFunctionCatalogClose(quantum int) bool {
+	if !ck.shutdownBarrierDone || ck.shutdownBarrierFailed {
 		return false
 	}
-	if !kernel.functionCatalogClosing {
-		if err := kernel.functionCatalog.BeginClose(); err != nil {
-			kernel.run.Dirty(err)
+	if !ck.functionCatalogClosing {
+		if err := ck.functionCatalog.BeginClose(); err != nil {
+			ck.run.Dirty(err)
 			return false
 		}
-		kernel.functionCatalogClosing = true
-		kernel.functionCatalogCloseMore = true
+		ck.functionCatalogClosing = true
+		ck.functionCatalogCloseMore = true
 	}
-	if !kernel.functionCatalogCloseMore {
+	if !ck.functionCatalogCloseMore {
 		return false
 	}
 	var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-	count, more, err := kernel.functionCatalog.CloseStep(quantum, &cleanups)
+	count, more, err := ck.functionCatalog.CloseStep(quantum, &cleanups)
 	if err != nil {
-		kernel.run.Dirty(err)
+		ck.run.Dirty(err)
 		return false
 	}
-	if err := kernel.pushFunctionCleanupBatch(&cleanups, count); err != nil {
-		kernel.run.Dirty(err)
+	if err := ck.pushFunctionCleanupBatch(&cleanups, count); err != nil {
+		ck.run.Dirty(err)
 		return false
 	}
-	kernel.functionCatalogCloseMore = more
+	ck.functionCatalogCloseMore = more
 	return more
 }
 
-func (kernel *CommandKernel) allocateLane(mapKey commandLaneKey, request Request) (*commandLane, error) {
-	slot := kernel.freeLane
+func (ck *CommandKernel) allocateLane(mapKey commandLaneKey, request Request) (*commandLane, error) {
+	slot := ck.freeLane
 	if slot == 0 {
-		if uint64(len(kernel.laneSlots)) > uint64(^uint32(0)) {
+		if uint64(len(ck.laneSlots)) > uint64(^uint32(0)) {
 			return nil, errors.New("jobmgr kernel: lane reference space exhausted")
 		}
-		slot = uint32(len(kernel.laneSlots))
-		kernel.laneSlots = append(kernel.laneSlots, &commandLane{slot: slot})
+		slot = uint32(len(ck.laneSlots))
+		ck.laneSlots = append(ck.laneSlots, &commandLane{slot: slot})
 	}
-	lane := kernel.laneSlots[slot]
-	if kernel.freeLane != 0 {
-		kernel.freeLane = lane.freeNext
+	lane := ck.laneSlots[slot]
+	if ck.freeLane != 0 {
+		ck.freeLane = lane.freeNext
 	}
 	generation := lane.generation + 1
 	if generation == 0 {
-		lane.freeNext = kernel.freeLane
-		kernel.freeLane = slot
+		lane.freeNext = ck.freeLane
+		ck.freeLane = slot
 		return nil, errors.New("jobmgr kernel: lane generation wrapped")
 	}
 	*lane = commandLane{
 		slot: slot, generation: generation, mapKey: mapKey,
 		key: request.LaneKey, source: request.Source,
 	}
-	kernel.lanes[mapKey] = lane
-	kernel.appendLane(lane)
+	ck.lanes[mapKey] = lane
+	ck.appendLane(lane)
 	return lane, nil
 }
 
@@ -4847,7 +4847,7 @@ func resourceCommandLaneKey(id string) commandLaneKey {
 	return commandLaneKey{key: id, resource: true}
 }
 
-func (kernel *CommandKernel) releaseUnusedLane(lane *commandLane) {
+func (ck *CommandKernel) releaseUnusedLane(lane *commandLane) {
 	if lane == nil || lane.owners != 0 || lane.head != nil ||
 		lane.tail != nil || lane.active != nil ||
 		lane.continuationTail != nil || lane.ready ||
@@ -4856,46 +4856,46 @@ func (kernel *CommandKernel) releaseUnusedLane(lane *commandLane) {
 		lane.shutdownRequest.Valid() || lane.shutdownTask.Valid() || lane.shutdownAction != 0 {
 		return
 	}
-	if kernel.shutdownActive && !lane.shutdownVisited {
+	if ck.shutdownActive && !lane.shutdownVisited {
 		return
 	}
-	delete(kernel.lanes, lane.mapKey)
-	kernel.unlinkLane(lane)
+	delete(ck.lanes, lane.mapKey)
+	ck.unlinkLane(lane)
 	slot := lane.slot
 	generation := lane.generation
-	*lane = commandLane{slot: slot, generation: generation, freeNext: kernel.freeLane}
-	kernel.freeLane = slot
+	*lane = commandLane{slot: slot, generation: generation, freeNext: ck.freeLane}
+	ck.freeLane = slot
 }
 
-func (kernel *CommandKernel) appendLane(lane *commandLane) {
+func (ck *CommandKernel) appendLane(lane *commandLane) {
 	if lane == nil || lane.allListed {
-		kernel.run.Dirty(errors.New("jobmgr kernel: invalid lane-list append"))
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid lane-list append"))
 		return
 	}
-	lane.allPrevious = kernel.laneTail
-	if kernel.laneTail != nil {
-		kernel.laneTail.allNext = lane
+	lane.allPrevious = ck.laneTail
+	if ck.laneTail != nil {
+		ck.laneTail.allNext = lane
 	} else {
-		kernel.laneHead = lane
+		ck.laneHead = lane
 	}
-	kernel.laneTail = lane
+	ck.laneTail = lane
 	lane.allListed = true
 }
 
-func (kernel *CommandKernel) unlinkLane(lane *commandLane) {
+func (ck *CommandKernel) unlinkLane(lane *commandLane) {
 	if lane == nil || !lane.allListed {
-		kernel.run.Dirty(errors.New("jobmgr kernel: invalid lane-list removal"))
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid lane-list removal"))
 		return
 	}
 	if lane.allPrevious != nil {
 		lane.allPrevious.allNext = lane.allNext
 	} else {
-		kernel.laneHead = lane.allNext
+		ck.laneHead = lane.allNext
 	}
 	if lane.allNext != nil {
 		lane.allNext.allPrevious = lane.allPrevious
 	} else {
-		kernel.laneTail = lane.allPrevious
+		ck.laneTail = lane.allPrevious
 	}
 	lane.allPrevious = nil
 	lane.allNext = nil
@@ -5013,13 +5013,13 @@ func AdmissionFootprint(request Request, plan WorkPlan) (int64, error) {
 	return operationAdmissionBytes(request, plan)
 }
 
-func (kernel *CommandKernel) abortRequestInputBody(request Request) error {
+func (ck *CommandKernel) abortRequestInputBody(request Request) error {
 	if request.InputBodyToken == 0 {
 		return nil
 	}
-	wake, err := kernel.admission.AbortInputBody(request.InputBodyToken)
+	wake, err := ck.admission.AbortInputBody(request.InputBodyToken)
 	if wake {
-		kernel.NotifyControlReady()
+		ck.NotifyControlReady()
 	}
 	return err
 }

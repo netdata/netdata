@@ -82,46 +82,46 @@ func NewDecisionIndex(config DecisionConfig) (*DecisionIndex, error) {
 	}, nil
 }
 
-func (index *DecisionIndex) Apply(
+func (di *DecisionIndex) Apply(
 	ctx context.Context,
 	batch []*confgroup.Group,
 ) error {
-	if index == nil || ctx == nil || batch == nil {
+	if di == nil || ctx == nil || batch == nil {
 		return errors.New("jobmgr discovery: invalid decision batch")
 	}
 	for _, group := range batch {
-		if err := index.applyGroup(ctx, group); err != nil {
+		if err := di.applyGroup(ctx, group); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (index *DecisionIndex) applyGroup(
+func (di *DecisionIndex) applyGroup(
 	ctx context.Context,
 	group *confgroup.Group,
 ) error {
-	if index == nil || ctx == nil ||
+	if di == nil || ctx == nil ||
 		group == nil || group.Source == "" {
 		return errors.New("jobmgr discovery: invalid group")
 	}
 	affected := make(map[string]struct{})
-	for hash, config := range index.sources[group.Source] {
+	for hash, config := range di.sources[group.Source] {
 		fullName := config.FullName()
 		affected[fullName] = struct{}{}
-		candidates := index.candidates[fullName]
+		candidates := di.candidates[fullName]
 		delete(candidates, decisionCandidateKey{
 			source: group.Source,
 			hash:   hash,
 		})
 		if len(candidates) == 0 {
-			delete(index.candidates, fullName)
+			delete(di.candidates, fullName)
 		}
 	}
 
 	next := make(map[uint64]confgroup.Config, len(group.Configs))
 	for _, config := range group.Configs {
-		if config == nil || !index.allowed(config) {
+		if config == nil || !di.allowed(config) {
 			continue
 		}
 		cloned, err := config.Clone()
@@ -132,12 +132,12 @@ func (index *DecisionIndex) applyGroup(
 		next[hash] = cloned
 		fullName := cloned.FullName()
 		affected[fullName] = struct{}{}
-		candidates := index.candidates[fullName]
+		candidates := di.candidates[fullName]
 		if candidates == nil {
 			candidates = make(
 				map[decisionCandidateKey]confgroup.Config,
 			)
-			index.candidates[fullName] = candidates
+			di.candidates[fullName] = candidates
 		}
 		candidates[decisionCandidateKey{
 			source: group.Source,
@@ -145,9 +145,9 @@ func (index *DecisionIndex) applyGroup(
 		}] = cloned
 	}
 	if len(next) == 0 {
-		delete(index.sources, group.Source)
+		delete(di.sources, group.Source)
 	} else {
-		index.sources[group.Source] = next
+		di.sources[group.Source] = next
 	}
 
 	names := make([]string, 0, len(affected))
@@ -156,27 +156,27 @@ func (index *DecisionIndex) applyGroup(
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		if err := index.reconcile(ctx, name); err != nil {
+		if err := di.reconcile(ctx, name); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (index *DecisionIndex) allowed(config confgroup.Config) bool {
-	if len(index.runJob) == 0 {
+func (di *DecisionIndex) allowed(config confgroup.Config) bool {
+	if len(di.runJob) == 0 {
 		return true
 	}
-	_, ok := index.runJob[config.Name()]
+	_, ok := di.runJob[config.Name()]
 	return ok
 }
 
-func (index *DecisionIndex) reconcile(
+func (di *DecisionIndex) reconcile(
 	ctx context.Context,
 	fullName string,
 ) error {
-	current, hasCurrent := index.acknowledged[fullName]
-	next, hasNext := index.selectConfig(
+	current, hasCurrent := di.acknowledged[fullName]
+	next, hasNext := di.selectConfig(
 		fullName,
 		current.config,
 		hasCurrent,
@@ -189,29 +189,29 @@ func (index *DecisionIndex) reconcile(
 	if hasNext {
 		change.Config = next
 		change.Status = dyncfg.StatusAccepted
-		if index.autoEnable {
+		if di.autoEnable {
 			change.Status = dyncfg.StatusRunning
 		}
 	} else {
 		change.Config = current.config
 		change.Remove = true
 	}
-	plan, err := index.plan(change)
+	plan, err := di.plan(change)
 	if err != nil {
 		return err
 	}
-	if index.revision == ^uint64(0) {
+	if di.revision == ^uint64(0) {
 		return errors.New(
 			"jobmgr discovery: decision revision wrapped",
 		)
 	}
-	revision := index.revision + 1
-	if err := index.commands.SubmitPreparedAndWait(
+	revision := di.revision + 1
+	if err := di.commands.SubmitPreparedAndWait(
 		ctx,
 		jobmgr.Request{
 			UID: fmt.Sprintf(
 				"jobmgr-discovery-%d-%d",
-				index.generation,
+				di.generation,
 				revision,
 			),
 			LaneKey: fullName,
@@ -222,24 +222,24 @@ func (index *DecisionIndex) reconcile(
 	); err != nil {
 		return err
 	}
-	index.revision = revision
+	di.revision = revision
 	if hasNext {
-		index.acknowledged[fullName] = acknowledgedConfig{
+		di.acknowledged[fullName] = acknowledgedConfig{
 			config:   next,
 			revision: revision,
 		}
 	} else {
-		delete(index.acknowledged, fullName)
+		delete(di.acknowledged, fullName)
 	}
 	return nil
 }
 
-func (index *DecisionIndex) selectConfig(
+func (di *DecisionIndex) selectConfig(
 	fullName string,
 	current confgroup.Config,
 	hasCurrent bool,
 ) (confgroup.Config, bool) {
-	candidates := index.candidates[fullName]
+	candidates := di.candidates[fullName]
 	if len(candidates) == 0 {
 		return nil, false
 	}
@@ -272,16 +272,16 @@ type DecisionCensus struct {
 	Revision     uint64
 }
 
-func (index *DecisionIndex) Census() DecisionCensus {
-	if index == nil {
+func (di *DecisionIndex) Census() DecisionCensus {
+	if di == nil {
 		return DecisionCensus{}
 	}
 	census := DecisionCensus{
-		Sources:      len(index.sources),
-		Acknowledged: len(index.acknowledged),
-		Revision:     index.revision,
+		Sources:      len(di.sources),
+		Acknowledged: len(di.acknowledged),
+		Revision:     di.revision,
 	}
-	for _, candidates := range index.candidates {
+	for _, candidates := range di.candidates {
 		census.Candidates += len(candidates)
 	}
 	return census

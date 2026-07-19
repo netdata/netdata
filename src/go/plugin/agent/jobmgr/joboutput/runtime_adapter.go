@@ -77,57 +77,57 @@ type scheduledJobSupport struct {
 	released  bool
 }
 
-func (support *scheduledJobSupport) Start(context.Context) error {
-	if support == nil {
+func (sjs *scheduledJobSupport) Start(context.Context) error {
+	if sjs == nil {
 		return errors.New("job output: nil scheduler support")
 	}
-	support.mu.Lock()
-	defer support.mu.Unlock()
-	if support.started || support.stopped || support.released {
+	sjs.mu.Lock()
+	defer sjs.mu.Unlock()
+	if sjs.started || sjs.stopped || sjs.released {
 		return errors.New("job output: invalid scheduler support start")
 	}
-	if err := support.scheduler.Register(
-		support.identity,
-		support.job,
+	if err := sjs.scheduler.Register(
+		sjs.identity,
+		sjs.job,
 	); err != nil {
 		return err
 	}
-	support.started = true
+	sjs.started = true
 	return nil
 }
 
-func (support *scheduledJobSupport) Stop(context.Context) error {
-	if support == nil {
+func (sjs *scheduledJobSupport) Stop(context.Context) error {
+	if sjs == nil {
 		return errors.New("job output: nil scheduler support")
 	}
-	support.mu.Lock()
-	defer support.mu.Unlock()
-	if !support.started || support.released {
+	sjs.mu.Lock()
+	defer sjs.mu.Unlock()
+	if !sjs.started || sjs.released {
 		return errors.New("job output: invalid scheduler support stop")
 	}
-	if support.stopped {
+	if sjs.stopped {
 		return nil
 	}
-	if err := support.scheduler.Unregister(
-		support.identity,
-		support.job,
+	if err := sjs.scheduler.Unregister(
+		sjs.identity,
+		sjs.job,
 	); err != nil {
 		return err
 	}
-	support.stopped = true
+	sjs.stopped = true
 	return nil
 }
 
-func (support *scheduledJobSupport) Release(context.Context) error {
-	if support == nil {
+func (sjs *scheduledJobSupport) Release(context.Context) error {
+	if sjs == nil {
 		return errors.New("job output: nil scheduler support")
 	}
-	support.mu.Lock()
-	defer support.mu.Unlock()
-	if !support.started || !support.stopped || support.released {
+	sjs.mu.Lock()
+	defer sjs.mu.Unlock()
+	if !sjs.started || !sjs.stopped || sjs.released {
 		return errors.New("job output: invalid scheduler support release")
 	}
-	support.released = true
+	sjs.released = true
 	return nil
 }
 
@@ -143,53 +143,53 @@ type managedLoopSupport struct {
 	joined   bool
 }
 
-func (support *managedLoopSupport) Start(ctx context.Context) error {
-	if support == nil || ctx == nil {
+func (mls *managedLoopSupport) Start(ctx context.Context) error {
+	if mls == nil || ctx == nil {
 		return errors.New("job output: invalid managed loop start")
 	}
-	support.mu.Lock()
-	defer support.mu.Unlock()
-	if support.started {
+	mls.mu.Lock()
+	defer mls.mu.Unlock()
+	if mls.started {
 		return errors.New("job output: managed loop already started")
 	}
 	ready := make(chan struct{})
 	exited := make(chan struct{})
-	ref, err := support.tasks.StartInherited(
+	ref, err := mls.tasks.StartInherited(
 		context.WithoutCancel(ctx),
-		support.identity,
-		support.role,
+		mls.identity,
+		mls.role,
 		func(context.Context) error {
 			defer close(exited)
-			support.job.StartManaged(ready)
+			mls.job.StartManaged(ready)
 			return nil
 		},
 	)
 	if err != nil {
 		return err
 	}
-	support.ref = ref
-	support.started = true
-	support.mu.Unlock()
+	mls.ref = ref
+	mls.started = true
+	mls.mu.Unlock()
 
 	select {
 	case <-ready:
-		support.mu.Lock()
+		mls.mu.Lock()
 		return nil
 	case <-exited:
-		cleanupErr := support.abortStart(ref)
-		support.mu.Lock()
+		cleanupErr := mls.abortStart(ref)
+		mls.mu.Lock()
 		return errors.Join(errors.New("job output: managed loop exited before readiness"), cleanupErr)
 	case <-ctx.Done():
-		cleanupErr := support.abortStart(ref)
-		support.mu.Lock()
+		cleanupErr := mls.abortStart(ref)
+		mls.mu.Lock()
 		return errors.Join(ctx.Err(), cleanupErr)
 	}
 }
 
-func (support *managedLoopSupport) abortStart(ref lifecycle.InheritedTaskRef) error {
-	cancelErr := support.tasks.CancelInherited(ref, support.identity)
-	support.job.Stop()
-	joined, joinErr := support.tasks.JoinInherited(context.Background(), ref, support.identity)
+func (mls *managedLoopSupport) abortStart(ref lifecycle.InheritedTaskRef) error {
+	cancelErr := mls.tasks.CancelInherited(ref, mls.identity)
+	mls.job.Stop()
+	joined, joinErr := mls.tasks.JoinInherited(context.Background(), ref, mls.identity)
 	if !joined {
 		joinErr = errors.Join(joinErr, errors.New("job output: managed loop did not join after failed start"))
 		return errors.Join(cancelErr, joinErr)
@@ -197,55 +197,55 @@ func (support *managedLoopSupport) abortStart(ref lifecycle.InheritedTaskRef) er
 	return errors.Join(
 		cancelErr,
 		joinErr,
-		support.tasks.ReleaseInherited(ref, support.identity),
+		mls.tasks.ReleaseInherited(ref, mls.identity),
 	)
 }
 
-func (support *managedLoopSupport) Stop(ctx context.Context) error {
-	if support == nil || ctx == nil {
+func (mls *managedLoopSupport) Stop(ctx context.Context) error {
+	if mls == nil || ctx == nil {
 		return errors.New("job output: invalid managed loop stop")
 	}
-	support.mu.Lock()
-	if !support.started {
-		support.mu.Unlock()
+	mls.mu.Lock()
+	if !mls.started {
+		mls.mu.Unlock()
 		return errors.New("job output: managed loop was not started")
 	}
-	if support.joined {
-		support.mu.Unlock()
+	if mls.joined {
+		mls.mu.Unlock()
 		return nil
 	}
-	ref := support.ref
-	support.mu.Unlock()
+	ref := mls.ref
+	mls.mu.Unlock()
 
-	if err := support.tasks.CancelInherited(ref, support.identity); err != nil {
+	if err := mls.tasks.CancelInherited(ref, mls.identity); err != nil {
 		return err
 	}
-	support.job.Stop()
-	joined, err := support.tasks.JoinInherited(ctx, ref, support.identity)
+	mls.job.Stop()
+	joined, err := mls.tasks.JoinInherited(ctx, ref, mls.identity)
 	if err != nil {
 		return err
 	}
 	if !joined {
 		return errors.New("job output: managed loop did not join")
 	}
-	support.mu.Lock()
-	support.joined = true
-	support.mu.Unlock()
+	mls.mu.Lock()
+	mls.joined = true
+	mls.mu.Unlock()
 	return nil
 }
 
-func (support *managedLoopSupport) Release(context.Context) error {
-	if support == nil {
+func (mls *managedLoopSupport) Release(context.Context) error {
+	if mls == nil {
 		return errors.New("job output: nil managed loop release")
 	}
-	support.mu.Lock()
-	if !support.joined {
-		support.mu.Unlock()
+	mls.mu.Lock()
+	if !mls.joined {
+		mls.mu.Unlock()
 		return errors.New("job output: managed loop release before join")
 	}
-	ref := support.ref
-	support.mu.Unlock()
-	return support.tasks.ReleaseInherited(ref, support.identity)
+	ref := mls.ref
+	mls.mu.Unlock()
+	return mls.tasks.ReleaseInherited(ref, mls.identity)
 }
 
 // FrameWriter is the only collector-output writer used by the new graph.
@@ -254,21 +254,21 @@ type FrameWriter struct {
 	Owner *lifecycle.FrameOwner
 }
 
-func (writer FrameWriter) Write(payload []byte) (int, error) {
-	if writer.Owner == nil {
+func (fw FrameWriter) Write(payload []byte) (int, error) {
+	if fw.Owner == nil {
 		return 0, errors.New("job output: nil FrameOwner writer")
 	}
 	if len(payload) == 0 {
 		return 0, nil
 	}
-	if err := writer.Owner.CommitBorrowedProtocolFrame(payload); err != nil {
+	if err := fw.Owner.CommitBorrowedProtocolFrame(payload); err != nil {
 		return 0, err
 	}
 	return len(payload), nil
 }
 
-func (writer FrameWriter) PoisonOutput(err error) {
-	if writer.Owner != nil {
-		writer.Owner.Poison(err)
+func (fw FrameWriter) PoisonOutput(err error) {
+	if fw.Owner != nil {
+		fw.Owner.Poison(err)
 	}
 }

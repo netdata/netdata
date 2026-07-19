@@ -47,21 +47,21 @@ func newServiceDiscoveryBinding(
 	}, nil
 }
 
-func (binding *serviceDiscoveryBinding) prefix() string {
-	return binding.pluginName + ":sd:"
+func (sdb *serviceDiscoveryBinding) prefix() string {
+	return sdb.pluginName + ":sd:"
 }
 
-func (binding *serviceDiscoveryBinding) Register(
+func (sdb *serviceDiscoveryBinding) Register(
 	name string,
 	fn func(frameworkfunctions.Function),
 ) {
 	if fn == nil {
-		binding.recordRegistrationError(
+		sdb.recordRegistrationError(
 			errors.New("nil exact service discovery Function"),
 		)
 		return
 	}
-	binding.recordRegistrationError(
+	sdb.recordRegistrationError(
 		fmt.Errorf(
 			"unexpected exact service discovery Function registration %q",
 			name,
@@ -69,8 +69,8 @@ func (binding *serviceDiscoveryBinding) Register(
 	)
 }
 
-func (binding *serviceDiscoveryBinding) Unregister(name string) {
-	binding.recordRegistrationError(
+func (sdb *serviceDiscoveryBinding) Unregister(name string) {
+	sdb.recordRegistrationError(
 		fmt.Errorf(
 			"unexpected exact service discovery Function withdrawal %q",
 			name,
@@ -78,17 +78,17 @@ func (binding *serviceDiscoveryBinding) Unregister(name string) {
 	)
 }
 
-func (binding *serviceDiscoveryBinding) RegisterWithContext(
+func (sdb *serviceDiscoveryBinding) RegisterWithContext(
 	name string,
 	fn frameworkfunctions.Handler,
 ) {
 	if fn == nil {
-		binding.recordRegistrationError(
+		sdb.recordRegistrationError(
 			errors.New("nil exact service discovery Function"),
 		)
 		return
 	}
-	binding.recordRegistrationError(
+	sdb.recordRegistrationError(
 		fmt.Errorf(
 			"unexpected exact service discovery Function registration %q",
 			name,
@@ -96,18 +96,18 @@ func (binding *serviceDiscoveryBinding) RegisterWithContext(
 	)
 }
 
-func (binding *serviceDiscoveryBinding) RegisterPrefix(
+func (sdb *serviceDiscoveryBinding) RegisterPrefix(
 	name string,
 	prefix string,
 	fn func(frameworkfunctions.Function),
 ) {
 	if fn == nil {
-		binding.recordRegistrationError(
+		sdb.recordRegistrationError(
 			errors.New("nil service discovery prefix Function"),
 		)
 		return
 	}
-	binding.registerPrefixWithContext(
+	sdb.registerPrefixWithContext(
 		name,
 		prefix,
 		func(_ context.Context, input frameworkfunctions.Function) {
@@ -116,78 +116,78 @@ func (binding *serviceDiscoveryBinding) RegisterPrefix(
 	)
 }
 
-func (binding *serviceDiscoveryBinding) RegisterPrefixWithContext(
+func (sdb *serviceDiscoveryBinding) RegisterPrefixWithContext(
 	name string,
 	prefix string,
 	fn frameworkfunctions.Handler,
 ) {
-	binding.registerPrefixWithContext(name, prefix, fn)
+	sdb.registerPrefixWithContext(name, prefix, fn)
 }
 
-func (binding *serviceDiscoveryBinding) registerPrefixWithContext(
+func (sdb *serviceDiscoveryBinding) registerPrefixWithContext(
 	name string,
 	prefix string,
 	fn frameworkfunctions.Handler,
 ) {
-	binding.mu.Lock()
-	defer binding.mu.Unlock()
-	if binding.dirty != nil {
+	sdb.mu.Lock()
+	defer sdb.mu.Unlock()
+	if sdb.dirty != nil {
 		return
 	}
 	if name != joboutput.DynCfgFunctionName ||
-		prefix != binding.prefix() ||
+		prefix != sdb.prefix() ||
 		fn == nil ||
-		binding.registered {
-		binding.dirty = errors.New(
+		sdb.registered {
+		sdb.dirty = errors.New(
 			"jobmgr composition: invalid service discovery Function registration",
 		)
 		return
 	}
-	binding.handler = fn
-	binding.registered = true
+	sdb.handler = fn
+	sdb.registered = true
 }
 
-func (binding *serviceDiscoveryBinding) UnregisterPrefix(
+func (sdb *serviceDiscoveryBinding) UnregisterPrefix(
 	name string,
 	prefix string,
 ) {
-	binding.mu.Lock()
-	defer binding.mu.Unlock()
-	if binding.dirty != nil {
+	sdb.mu.Lock()
+	defer sdb.mu.Unlock()
+	if sdb.dirty != nil {
 		return
 	}
 	if name != joboutput.DynCfgFunctionName ||
-		prefix != binding.prefix() ||
-		!binding.registered {
-		binding.dirty = errors.New(
+		prefix != sdb.prefix() ||
+		!sdb.registered {
+		sdb.dirty = errors.New(
 			"jobmgr composition: invalid service discovery Function withdrawal",
 		)
 		return
 	}
-	binding.handler = nil
-	binding.registered = false
+	sdb.handler = nil
+	sdb.registered = false
 }
 
-func (binding *serviceDiscoveryBinding) TerminalFinalizer() frameworkfunctions.TerminalFinalizer {
+func (sdb *serviceDiscoveryBinding) TerminalFinalizer() frameworkfunctions.TerminalFinalizer {
 	return frameworkfunctions.DirectTerminalFinalizer
 }
 
-func (binding *serviceDiscoveryBinding) recordRegistrationError(err error) {
-	binding.mu.Lock()
-	defer binding.mu.Unlock()
-	if binding.dirty == nil {
-		binding.dirty = err
+func (sdb *serviceDiscoveryBinding) recordRegistrationError(err error) {
+	sdb.mu.Lock()
+	defer sdb.mu.Unlock()
+	if sdb.dirty == nil {
+		sdb.dirty = err
 	}
 }
 
-func (binding *serviceDiscoveryBinding) prepare(
+func (sdb *serviceDiscoveryBinding) prepare(
 	ctx context.Context,
 	input functionadapter.HandlerInput,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if binding == nil || ctx == nil || current != nil ||
+	if sdb == nil || ctx == nil || current != nil ||
 		scope.Current.Valid() ||
 		scope.Successor.Valid() ||
 		permit.Valid() ||
@@ -196,9 +196,9 @@ func (binding *serviceDiscoveryBinding) prepare(
 			"jobmgr composition: invalid service discovery transaction scope",
 		)
 	}
-	binding.mu.Lock()
-	handler, dirty := binding.handler, binding.dirty
-	binding.mu.Unlock()
+	sdb.mu.Lock()
+	handler, dirty := sdb.handler, sdb.dirty
+	sdb.mu.Unlock()
 	if dirty != nil {
 		return nil, dirty
 	}
@@ -221,7 +221,7 @@ func (binding *serviceDiscoveryBinding) prepare(
 		Permissions: input.Permissions, Source: input.CallerSource,
 		ContentType: input.ContentType,
 	}
-	result, cleanup, err := binding.capture.invoke(
+	result, cleanup, err := sdb.capture.invoke(
 		input.UID,
 		func() { handler(ctx, function) },
 	)

@@ -16,25 +16,25 @@ import (
 
 const secretBootResourceID = "\x00jobmgr-secret-boot"
 
-func (controller *Controller) PublishInitial(
+func (c *Controller) PublishInitial(
 	ctx context.Context,
 	commands CommandPort,
 ) error {
-	if controller == nil || ctx == nil || commands == nil {
+	if c == nil || ctx == nil || commands == nil {
 		return errors.New(
 			"jobmgr secrets: invalid initial publication",
 		)
 	}
-	controller.mu.Lock()
-	if controller.restarts == nil || controller.published {
-		controller.mu.Unlock()
+	c.mu.Lock()
+	if c.restarts == nil || c.published {
+		c.mu.Unlock()
 		return errors.New(
 			"jobmgr secrets: unbound or duplicate initial publication",
 		)
 	}
-	initial := sortedInitialConfigs(controller.initial)
-	controller.mu.Unlock()
-	if err := controller.publishTemplates(ctx, commands); err != nil {
+	initial := sortedInitialConfigs(c.initial)
+	c.mu.Unlock()
+	if err := c.publishTemplates(ctx, commands); err != nil {
 		return err
 	}
 	for index, config := range initial {
@@ -46,7 +46,7 @@ func (controller *Controller) PublishInitial(
 				index,
 			)
 		}
-		plan, err := controller.planInitial(config)
+		plan, err := c.planInitial(config)
 		if err != nil {
 			return err
 		}
@@ -55,7 +55,7 @@ func (controller *Controller) PublishInitial(
 			jobmgr.Request{
 				UID: fmt.Sprintf(
 					"jobmgr-secrets-%d-%d",
-					controller.epoch,
+					c.epoch,
 					index+1,
 				),
 				LaneKey: secretResourceID(config.ExposedKey()),
@@ -67,14 +67,14 @@ func (controller *Controller) PublishInitial(
 			return err
 		}
 	}
-	controller.mu.Lock()
-	controller.initial = nil
-	controller.published = true
-	controller.mu.Unlock()
+	c.mu.Lock()
+	c.initial = nil
+	c.published = true
+	c.mu.Unlock()
 	return nil
 }
 
-func (controller *Controller) publishTemplates(
+func (c *Controller) publishTemplates(
 	ctx context.Context,
 	commands CommandPort,
 ) error {
@@ -98,13 +98,13 @@ func (controller *Controller) publishTemplates(
 						"jobmgr secrets: invalid template publication scope",
 					)
 				}
-				return controller.noop(
+				return c.noop(
 					scope,
 					nil,
 					lifecycle.LongLivedPermit{},
 					mustSecretMessage(204, ""),
 					nil,
-					controller.templateCleanup(),
+					c.templateCleanup(),
 				)
 			},
 		},
@@ -114,7 +114,7 @@ func (controller *Controller) publishTemplates(
 		jobmgr.Request{
 			UID: fmt.Sprintf(
 				"jobmgr-secret-templates-%d",
-				controller.epoch,
+				c.epoch,
 			),
 			LaneKey: secretBootResourceID,
 			Source:  lifecycle.SourceJobManager,
@@ -124,7 +124,7 @@ func (controller *Controller) publishTemplates(
 	)
 }
 
-func (controller *Controller) planInitial(
+func (c *Controller) planInitial(
 	config secretstore.Config,
 ) (jobmgr.WorkPlan, error) {
 	payload, err := yaml.Marshal(config)
@@ -155,7 +155,7 @@ func (controller *Controller) planInitial(
 						"jobmgr secrets: initial Store scope differs",
 					)
 				}
-				if existing, ok := controller.entry(key); ok {
+				if existing, ok := c.entry(key); ok {
 					existingPriority :=
 						existing.config.SourceTypePriority()
 					nextPriority := config.SourceTypePriority()
@@ -163,18 +163,18 @@ func (controller *Controller) planInitial(
 						existingPriority == nextPriority &&
 							existing.status ==
 								dyncfg.StatusRunning {
-						return controller.noop(
+						return c.noop(
 							scope,
 							current,
 							permit,
 							mustSecretMessage(204, ""),
 							nil,
-							controller.configCreateCleanup(existing),
+							c.configCreateCleanup(existing),
 						)
 					}
 				}
-				expected := controller.store.Generation(key)
-				return controller.prepareStoreMutation(
+				expected := c.store.Generation(key)
+				return c.prepareStoreMutation(
 					ctx,
 					scope,
 					current,
@@ -190,19 +190,19 @@ func (controller *Controller) planInitial(
 	}, nil
 }
 
-func (controller *Controller) Close(ctx context.Context) error {
-	if controller == nil || ctx == nil {
+func (c *Controller) Close(ctx context.Context) error {
+	if c == nil || ctx == nil {
 		return errors.New("jobmgr secrets: invalid controller close")
 	}
-	controller.mu.Lock()
-	controller.published = false
-	controller.mu.Unlock()
-	return controller.store.Close(ctx)
+	c.mu.Lock()
+	c.published = false
+	c.mu.Unlock()
+	return c.store.Close(ctx)
 }
 
-func (controller *Controller) ConfigStatus(
+func (c *Controller) ConfigStatus(
 	key string,
 ) (secretstore.Config, dyncfg.Status, bool) {
-	entry, ok := controller.entry(key)
+	entry, ok := c.entry(key)
 	return entry.config, entry.status, ok
 }

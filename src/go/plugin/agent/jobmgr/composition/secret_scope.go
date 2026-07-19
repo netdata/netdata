@@ -35,30 +35,30 @@ func acquireRunOwnedStoreScope(
 	}, nil
 }
 
-func (scope *runOwnedAtomicScope) Resolve(
+func (roas *runOwnedAtomicScope) Resolve(
 	ctx context.Context,
 	reference,
 	original string,
 ) ([]byte, error) {
-	if scope == nil || scope.scope == nil {
+	if roas == nil || roas.scope == nil {
 		return nil, errors.New(
 			"jobmgr composition: invalid run-owned Store scope",
 		)
 	}
-	return scope.scope.Resolve(ctx, reference, original)
+	return roas.scope.Resolve(ctx, reference, original)
 }
 
-func (scope *runOwnedAtomicScope) Release(
+func (roas *runOwnedAtomicScope) Release(
 	ctx context.Context,
 ) error {
-	if scope == nil || scope.run == nil || scope.scope == nil {
+	if roas == nil || roas.run == nil || roas.scope == nil {
 		return errors.New(
 			"jobmgr composition: invalid run-owned Store scope",
 		)
 	}
-	err := scope.scope.Release(ctx)
+	err := roas.scope.Release(ctx)
 	if err != nil {
-		_ = scope.run.Dirty(err)
+		_ = roas.run.Dirty(err)
 	}
 	return err
 }

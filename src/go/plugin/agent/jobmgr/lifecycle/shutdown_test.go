@@ -27,42 +27,42 @@ func newShutdownTestClock() *shutdownTestClock {
 	return &shutdownTestClock{now: time.Unix(100, 0)}
 }
 
-func (clock *shutdownTestClock) Now() time.Time {
-	clock.mu.Lock()
-	defer clock.mu.Unlock()
-	return clock.now
+func (stc *shutdownTestClock) Now() time.Time {
+	stc.mu.Lock()
+	defer stc.mu.Unlock()
+	return stc.now
 }
 
-func (clock *shutdownTestClock) Arm(kind string, delay time.Duration) (<-chan time.Time, func()) {
-	clock.mu.Lock()
-	clock.arms++
-	clock.kind = kind
-	clock.delay = delay
-	clock.ready = make(chan time.Time, 1)
-	ready := clock.ready
-	clock.mu.Unlock()
+func (stc *shutdownTestClock) Arm(kind string, delay time.Duration) (<-chan time.Time, func()) {
+	stc.mu.Lock()
+	stc.arms++
+	stc.kind = kind
+	stc.delay = delay
+	stc.ready = make(chan time.Time, 1)
+	ready := stc.ready
+	stc.mu.Unlock()
 	var once sync.Once
 	return ready, func() {
 		once.Do(func() {
-			clock.mu.Lock()
-			clock.cancels++
-			clock.mu.Unlock()
+			stc.mu.Lock()
+			stc.cancels++
+			stc.mu.Unlock()
 		})
 	}
 }
 
-func (clock *shutdownTestClock) expire() {
-	clock.mu.Lock()
-	clock.now = clock.now.Add(clock.delay)
-	ready, now := clock.ready, clock.now
-	clock.mu.Unlock()
+func (stc *shutdownTestClock) expire() {
+	stc.mu.Lock()
+	stc.now = stc.now.Add(stc.delay)
+	ready, now := stc.ready, stc.now
+	stc.mu.Unlock()
 	ready <- now
 }
 
-func (clock *shutdownTestClock) advanceWithoutSignal() {
-	clock.mu.Lock()
-	clock.now = clock.now.Add(clock.delay)
-	clock.mu.Unlock()
+func (stc *shutdownTestClock) advanceWithoutSignal() {
+	stc.mu.Lock()
+	stc.now = stc.now.Add(stc.delay)
+	stc.mu.Unlock()
 }
 
 func TestRunSupervisorOwnsOneBroadcastShutdownBudget(t *testing.T) {

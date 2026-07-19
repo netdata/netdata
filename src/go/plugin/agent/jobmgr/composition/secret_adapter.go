@@ -19,18 +19,18 @@ type secretDependentJobBinding struct {
 	controller *joboutput.DynCfgJobController
 }
 
-func (binding secretDependentJobBinding) PlanDependentStop(
+func (sdjb secretDependentJobBinding) PlanDependentStop(
 	id string,
 ) (
 	plan jobmgr.WorkPlan,
 	result secretadapter.DependentStopResult,
 	err error,
 ) {
-	plan, result, err = binding.controller.PlanSecretDependentStop(id)
+	plan, result, err = sdjb.controller.PlanSecretDependentStop(id)
 	return plan, result, err
 }
 
-func (binding secretDependentJobBinding) PlanDependentStart(
+func (sdjb secretDependentJobBinding) PlanDependentStart(
 	id string,
 ) (
 	plan jobmgr.WorkPlan,
@@ -38,7 +38,7 @@ func (binding secretDependentJobBinding) PlanDependentStart(
 	err error,
 ) {
 	plan, result, err =
-		binding.controller.PlanSecretDependentStart(id)
+		sdjb.controller.PlanSecretDependentStart(id)
 	return plan, result, err
 }
 

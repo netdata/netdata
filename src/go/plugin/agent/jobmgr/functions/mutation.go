@@ -74,11 +74,11 @@ func (*Mutation) FunctionCatalogMutation() {}
 
 // NewMutation validates and owns one bounded route-change batch. The returned
 // value may be admitted to exactly this Catalog.
-func (catalog *Catalog) NewMutation(
+func (c *Catalog) NewMutation(
 	expectedVersion uint64,
 	changes []RouteChange,
 ) (*Mutation, error) {
-	if catalog == nil {
+	if c == nil {
 		return nil, errors.New("jobmgr Function catalog: nil mutation catalog")
 	}
 	if expectedVersion == 0 || len(changes) == 0 || len(changes) > MaximumMutationChanges {
@@ -176,10 +176,10 @@ func (catalog *Catalog) NewMutation(
 		)
 	}
 	totalStorageBytes := storageBytes + cleanupStorageBytes
-	if err := catalog.storage.reservePreparation(totalStorageBytes); err != nil {
+	if err := c.storage.reservePreparation(totalStorageBytes); err != nil {
 		return nil, err
 	}
-	mutation.storage = &catalog.storage
+	mutation.storage = &c.storage
 	mutation.storageBytes = totalStorageBytes
 	mutation.pathStorageBytes = storageBytes
 	mutation.cleanupStorageBytes = cleanupStorageBytes
@@ -226,22 +226,22 @@ const (
 )
 
 // Discard releases a prepared mutation that was not accepted by the catalog.
-func (mutation *Mutation) Discard() error {
-	if mutation == nil {
+func (m *Mutation) Discard() error {
+	if m == nil {
 		return nil
 	}
-	if !mutation.storageState.CompareAndSwap(
+	if !m.storageState.CompareAndSwap(
 		mutationStorageReserved,
 		mutationStorageReleased,
 	) {
 		return nil
 	}
-	return mutation.storage.discardPreparation(mutation.storageBytes)
+	return m.storage.discardPreparation(m.storageBytes)
 }
 
-func (mutation *Mutation) claim(storage *catalogStorage) error {
-	if mutation == nil || mutation.storage != storage ||
-		!mutation.storageState.CompareAndSwap(
+func (m *Mutation) claim(storage *catalogStorage) error {
+	if m == nil || m.storage != storage ||
+		!m.storageState.CompareAndSwap(
 			mutationStorageReserved,
 			mutationStorageClaimed,
 		) {
@@ -250,33 +250,33 @@ func (mutation *Mutation) claim(storage *catalogStorage) error {
 	return nil
 }
 
-func (mutation *Mutation) abortStorage(retainedCleanupBytes int64) error {
-	if mutation == nil ||
+func (m *Mutation) abortStorage(retainedCleanupBytes int64) error {
+	if m == nil ||
 		retainedCleanupBytes < 0 ||
-		retainedCleanupBytes > mutation.cleanupStorageBytes ||
-		!mutation.storageState.CompareAndSwap(
+		retainedCleanupBytes > m.cleanupStorageBytes ||
+		!m.storageState.CompareAndSwap(
 			mutationStorageClaimed,
 			mutationStorageReleased,
 		) {
 		return errors.New("jobmgr Function catalog: stale mutation abort")
 	}
-	return mutation.storage.abortPreparation(
-		mutation.storageBytes,
+	return m.storage.abortPreparation(
+		m.storageBytes,
 		retainedCleanupBytes,
 	)
 }
 
-func (mutation *Mutation) publishStorage(published int64) error {
-	if mutation == nil ||
-		!mutation.storageState.CompareAndSwap(
+func (m *Mutation) publishStorage(published int64) error {
+	if m == nil ||
+		!m.storageState.CompareAndSwap(
 			mutationStorageClaimed,
 			mutationStorageReleased,
 		) {
 		return errors.New("jobmgr Function catalog: stale mutation publication")
 	}
-	return mutation.storage.publishPreparation(
-		mutation.pathStorageBytes,
-		mutation.cleanupStorageBytes,
+	return m.storage.publishPreparation(
+		m.pathStorageBytes,
+		m.cleanupStorageBytes,
 		published,
 	)
 }
@@ -375,9 +375,9 @@ type MutationPostimage struct {
 }
 
 // BeginMutation transfers one prepared mutation to the loop-owned catalog.
-func (catalog *Catalog) startMutation(mutation *Mutation) (*MutationBuilder, error) {
-	if catalog == nil || catalog.closed || mutation == nil ||
-		catalog.mutation != nil || mutation.expectedVersion != catalog.version {
+func (c *Catalog) startMutation(mutation *Mutation) (*MutationBuilder, error) {
+	if c == nil || c.closed || mutation == nil ||
+		c.mutation != nil || mutation.expectedVersion != c.version {
 		if mutation != nil {
 			_ = mutation.Discard()
 		}
@@ -389,144 +389,144 @@ func (catalog *Catalog) startMutation(mutation *Mutation) (*MutationBuilder, err
 			additions++
 		}
 	}
-	if uint64(additions) > math.MaxUint64-catalog.nextRouteID ||
-		uint64(len(mutation.generations)) > uint64(math.MaxUint32-catalog.nextGenerationID) {
+	if uint64(additions) > math.MaxUint64-c.nextRouteID ||
+		uint64(len(mutation.generations)) > uint64(math.MaxUint32-c.nextGenerationID) {
 		_ = mutation.Discard()
 		return nil, errors.New("jobmgr Function catalog: mutation identity exhausted")
 	}
-	if err := mutation.claim(&catalog.storage); err != nil {
+	if err := mutation.claim(&c.storage); err != nil {
 		return nil, err
 	}
 	builder := &mutation.builder
 	*builder = MutationBuilder{
-		catalog: catalog, mutation: mutation, phase: mutationTopology,
-		root: catalog.routes, transitions: mutation.transitions,
+		catalog: c, mutation: mutation, phase: mutationTopology,
+		root: c.routes, transitions: mutation.transitions,
 		removals: mutation.removals, removalIndex: mutation.removalIndex,
-		pathBytes: catalog.storage.published.Load(),
+		pathBytes: c.storage.published.Load(),
 	}
-	catalog.mutation = builder
+	c.mutation = builder
 	return builder, nil
 }
 
 // PrepareStep advances private postimage construction. The visible catalog is
 // unchanged until CommitMutation swaps the completed root.
-func (builder *MutationBuilder) PrepareStep(quantum int) (*MutationPostimage, bool, error) {
-	if builder == nil || builder.catalog == nil || builder.mutation == nil ||
-		builder.finished || builder.failed || builder.postimage != nil ||
+func (mb *MutationBuilder) PrepareStep(quantum int) (*MutationPostimage, bool, error) {
+	if mb == nil || mb.catalog == nil || mb.mutation == nil ||
+		mb.finished || mb.failed || mb.postimage != nil ||
 		quantum <= 0 || quantum > MaximumMutationQuantum {
 		return nil, false, errors.New("jobmgr Function catalog: invalid mutation preparation step")
 	}
-	builder.lastStep = 0
-	for builder.lastStep < quantum && builder.phase != mutationReady {
-		progressed, err := builder.advanceOne()
+	mb.lastStep = 0
+	for mb.lastStep < quantum && mb.phase != mutationReady {
+		progressed, err := mb.advanceOne()
 		if err != nil {
-			builder.failed = true
+			mb.failed = true
 			return nil, false, err
 		}
 		if progressed {
-			builder.lastStep++
-			builder.completed++
+			mb.lastStep++
+			mb.completed++
 		}
 	}
-	if builder.phase == mutationReady {
-		if builder.completed != builder.mutation.totalNodes {
-			builder.failed = true
+	if mb.phase == mutationReady {
+		if mb.completed != mb.mutation.totalNodes {
+			mb.failed = true
 			return nil, false, errors.New("jobmgr Function catalog: mutation work accounting differs")
 		}
-		builder.postimage = &MutationPostimage{
-			builder:   builder,
-			root:      builder.root,
-			pathBytes: builder.pathBytes,
+		mb.postimage = &MutationPostimage{
+			builder:   mb,
+			root:      mb.root,
+			pathBytes: mb.pathBytes,
 		}
-		return builder.postimage, true, nil
+		return mb.postimage, true, nil
 	}
 	return nil, false, nil
 }
 
 // PrepareQuiesceStep validates route topology and closes predecessor admission
 // without making the private postimage visible.
-func (builder *MutationBuilder) PrepareQuiesceStep(quantum int) (bool, error) {
-	if builder == nil || builder.catalog == nil || builder.mutation == nil ||
-		builder.finished || builder.failed || builder.postimage != nil ||
-		builder.phase != mutationTopology ||
+func (mb *MutationBuilder) PrepareQuiesceStep(quantum int) (bool, error) {
+	if mb == nil || mb.catalog == nil || mb.mutation == nil ||
+		mb.finished || mb.failed || mb.postimage != nil ||
+		mb.phase != mutationTopology ||
 		quantum <= 0 || quantum > MaximumMutationQuantum {
 		return false, errors.New("jobmgr Function catalog: invalid mutation quiesce step")
 	}
-	builder.lastStep = 0
-	for builder.lastStep < quantum && builder.phase == mutationTopology {
-		progressed, err := builder.advanceOne()
+	mb.lastStep = 0
+	for mb.lastStep < quantum && mb.phase == mutationTopology {
+		progressed, err := mb.advanceOne()
 		if err != nil {
-			builder.failed = true
+			mb.failed = true
 			return false, err
 		}
 		if progressed {
-			builder.lastStep++
-			builder.completed++
+			mb.lastStep++
+			mb.completed++
 		}
 	}
-	return builder.phase == mutationGenerations, nil
+	return mb.phase == mutationGenerations, nil
 }
 
-func (builder *MutationBuilder) advanceOne() (bool, error) {
+func (mb *MutationBuilder) advanceOne() (bool, error) {
 	for {
-		switch builder.phase {
+		switch mb.phase {
 		case mutationTopology, mutationMaterialize:
-			if builder.change == len(builder.mutation.changes) {
-				if builder.phase == mutationTopology {
-					builder.finishTopology()
+			if mb.change == len(mb.mutation.changes) {
+				if mb.phase == mutationTopology {
+					mb.finishTopology()
 					return false, nil
 				}
-				builder.phase = mutationReady
+				mb.phase = mutationReady
 				return false, nil
 			}
-			if builder.step.change == nil {
-				builder.startRouteStep()
+			if mb.step.change == nil {
+				mb.startRouteStep()
 			}
-			done, err := builder.step.advance()
+			done, err := mb.step.advance()
 			if err != nil {
 				return false, err
 			}
 			if done {
-				index := builder.change
-				if builder.phase == mutationTopology {
-					builder.transitions[index].oldRoute = builder.step.oldRoute
-					if builder.step.oldRoute != nil {
-						generation := builder.step.oldRoute.handler
-						removal, ok := builder.removalIndex[generation]
+				index := mb.change
+				if mb.phase == mutationTopology {
+					mb.transitions[index].oldRoute = mb.step.oldRoute
+					if mb.step.oldRoute != nil {
+						generation := mb.step.oldRoute.handler
+						removal, ok := mb.removalIndex[generation]
 						if !ok {
-							removal = builder.removalCount
-							builder.removalIndex[generation] = removal
-							builder.removals[removal].generation = generation
-							builder.removalCount++
+							removal = mb.removalCount
+							mb.removalIndex[generation] = removal
+							mb.removals[removal].generation = generation
+							mb.removalCount++
 						}
-						builder.removals[removal].references++
+						mb.removals[removal].references++
 					}
-				} else if builder.step.oldRoute != builder.transitions[index].oldRoute {
+				} else if mb.step.oldRoute != mb.transitions[index].oldRoute {
 					return false, errors.New("jobmgr Function catalog: validated mutation topology changed")
 				}
-				builder.root = builder.step.updatedName
-				if builder.phase == mutationMaterialize {
-					builder.pathBytes += builder.step.pathByteDelta
-					if builder.pathBytes < 0 ||
-						builder.pathBytes > MaximumCatalogStorageBytes {
+				mb.root = mb.step.updatedName
+				if mb.phase == mutationMaterialize {
+					mb.pathBytes += mb.step.pathByteDelta
+					if mb.pathBytes < 0 ||
+						mb.pathBytes > MaximumCatalogStorageBytes {
 						return false, errors.New(
 							"jobmgr Function catalog: mutation postimage storage exceeds process bound",
 						)
 					}
 				}
-				builder.step = routeMutationStep{}
-				builder.change++
+				mb.step = routeMutationStep{}
+				mb.change++
 			}
 			return true, nil
 		case mutationGenerations:
-			if builder.generation == len(builder.mutation.generations) {
-				builder.phase = mutationMaterialize
-				builder.change = 0
-				builder.root = builder.catalog.routes
+			if mb.generation == len(mb.mutation.generations) {
+				mb.phase = mutationMaterialize
+				mb.change = 0
+				mb.root = mb.catalog.routes
 				continue
 			}
-			prepared := &builder.mutation.generations[builder.generation]
-			refSlot := builder.catalog.nextGenerationID + uint32(builder.generation) + 1
+			prepared := &mb.mutation.generations[mb.generation]
+			refSlot := mb.catalog.nextGenerationID + uint32(mb.generation) + 1
 			*prepared.generation = handlerGeneration{
 				cleanupRef: jobmgr.FunctionCleanupRef{Slot: refSlot, Generation: 1},
 				id:         prepared.declaration.ID, handler: prepared.declaration.Handler,
@@ -534,7 +534,7 @@ func (builder *MutationBuilder) advanceOne() (bool, error) {
 				retentionCharged: prepared.declaration.Cleanup != nil,
 			}
 			prepared.initialized = true
-			builder.generation++
+			mb.generation++
 			return true, nil
 		default:
 			return false, errors.New("jobmgr Function catalog: invalid mutation phase")
@@ -542,34 +542,34 @@ func (builder *MutationBuilder) advanceOne() (bool, error) {
 	}
 }
 
-func (builder *MutationBuilder) finishTopology() {
-	for index := range builder.transitions {
-		transition := &builder.transitions[index]
+func (mb *MutationBuilder) finishTopology() {
+	for index := range mb.transitions {
+		transition := &mb.transitions[index]
 		if transition.oldRoute == nil {
 			continue
 		}
 		transition.oldAdmissionClosed = transition.oldRoute.admissionClosed
 		transition.oldRoute.admissionClosed = true
 	}
-	builder.phase = mutationGenerations
-	builder.change = 0
-	builder.root = builder.catalog.routes
-	builder.quiesced = true
+	mb.phase = mutationGenerations
+	mb.change = 0
+	mb.root = mb.catalog.routes
+	mb.quiesced = true
 }
 
-func (builder *MutationBuilder) startRouteStep() {
-	change := &builder.mutation.changes[builder.change]
+func (mb *MutationBuilder) startRouteStep() {
+	change := &mb.mutation.changes[mb.change]
 	phaseIndex := 0
 	replacement := change.placeholder
-	if builder.phase == mutationMaterialize {
+	if mb.phase == mutationMaterialize {
 		phaseIndex = 1
 		replacement = nil
-		transition := &builder.transitions[builder.change]
+		transition := &mb.transitions[mb.change]
 		if change.declaration != nil {
-			preparedGeneration := &builder.mutation.generations[change.generation-1]
-			builder.routeOrdinal++
+			preparedGeneration := &mb.mutation.generations[change.generation-1]
+			mb.routeOrdinal++
 			*change.resolved = route{
-				id:         builder.catalog.nextRouteID + builder.routeOrdinal,
+				id:         mb.catalog.nextRouteID + mb.routeOrdinal,
 				publicName: change.publicName, prefix: change.prefix,
 				method: change.declaration.ID, handler: preparedGeneration.generation,
 				resource:            change.declaration.Resource,
@@ -590,28 +590,28 @@ func (builder *MutationBuilder) startRouteStep() {
 			replacement.retiringPrefixPath = change.prefixPath
 		}
 	}
-	builder.step = routeMutationStep{
+	mb.step = routeMutationStep{
 		change: change, phaseIndex: phaseIndex, state: routeStepNameDescend,
-		nameNode: builder.root, replacement: replacement,
+		nameNode: mb.root, replacement: replacement,
 	}
 }
 
-func (step *routeMutationStep) advance() (bool, error) {
-	switch step.state {
+func (rms *routeMutationStep) advance() (bool, error) {
+	switch rms.state {
 	case routeStepNameDescend:
-		return step.advanceNameDescend()
+		return rms.advanceNameDescend()
 	case routeStepRoute:
-		return step.advanceDirectRoute()
+		return rms.advanceDirectRoute()
 	case routeStepPrefixDescend:
-		return step.advancePrefixDescend()
+		return rms.advancePrefixDescend()
 	case routeStepPrefixTerminal:
-		return step.advancePrefixTerminal()
+		return rms.advancePrefixTerminal()
 	case routeStepPrefixUnwind:
-		return step.advancePrefixUnwind()
+		return rms.advancePrefixUnwind()
 	case routeStepNameLeaf:
-		return step.advanceNameLeaf()
+		return rms.advanceNameLeaf()
 	case routeStepNameUnwind:
-		return step.advanceNameUnwind()
+		return rms.advanceNameUnwind()
 	case routeStepDone:
 		return true, nil
 	default:
@@ -619,194 +619,194 @@ func (step *routeMutationStep) advance() (bool, error) {
 	}
 }
 
-func (step *routeMutationStep) advanceNameDescend() (bool, error) {
-	bits := len(step.change.publicName) * 8
-	step.change.namePath[step.nameDepth] = step.nameNode
-	if step.nameDepth == bits {
-		if step.nameNode != nil && step.nameNode.present {
-			step.set = step.nameNode.routes
+func (rms *routeMutationStep) advanceNameDescend() (bool, error) {
+	bits := len(rms.change.publicName) * 8
+	rms.change.namePath[rms.nameDepth] = rms.nameNode
+	if rms.nameDepth == bits {
+		if rms.nameNode != nil && rms.nameNode.present {
+			rms.set = rms.nameNode.routes
 		}
-		if step.change.prefix == "" {
-			step.state = routeStepRoute
+		if rms.change.prefix == "" {
+			rms.state = routeStepRoute
 		} else {
-			step.state = routeStepPrefixDescend
-			step.prefixNode = step.set.prefixes
+			rms.state = routeStepPrefixDescend
+			rms.prefixNode = rms.set.prefixes
 		}
 		return false, nil
 	}
-	branch := keyBit(step.change.publicName, step.nameDepth)
-	step.change.nameBranches[step.nameDepth] = branch
-	if step.nameNode != nil {
-		step.nameNode = step.nameNode.child[branch]
+	branch := keyBit(rms.change.publicName, rms.nameDepth)
+	rms.change.nameBranches[rms.nameDepth] = branch
+	if rms.nameNode != nil {
+		rms.nameNode = rms.nameNode.child[branch]
 	}
-	step.nameDepth++
+	rms.nameDepth++
 	return false, nil
 }
 
-func (step *routeMutationStep) advanceDirectRoute() (bool, error) {
-	step.oldRoute = step.set.direct
-	step.hadRoute = step.oldRoute != nil
-	if step.oldRoute != nil && step.oldRoute.retiring {
-		step.oldRoute = nil
+func (rms *routeMutationStep) advanceDirectRoute() (bool, error) {
+	rms.oldRoute = rms.set.direct
+	rms.hadRoute = rms.oldRoute != nil
+	if rms.oldRoute != nil && rms.oldRoute.retiring {
+		rms.oldRoute = nil
 	}
-	if step.replacement == nil && step.oldRoute == nil {
+	if rms.replacement == nil && rms.oldRoute == nil {
 		return false, errors.New("jobmgr Function catalog: mutation removes missing direct route")
 	}
-	step.set.direct = step.replacement
-	step.state = routeStepNameLeaf
+	rms.set.direct = rms.replacement
+	rms.state = routeStepNameLeaf
 	return false, nil
 }
 
-func (step *routeMutationStep) advancePrefixDescend() (bool, error) {
-	bits := len(step.change.prefix) * 8
-	step.change.prefixPath[step.prefixDepth] = step.prefixNode
-	if step.prefixDepth == bits {
-		step.state = routeStepPrefixTerminal
+func (rms *routeMutationStep) advancePrefixDescend() (bool, error) {
+	bits := len(rms.change.prefix) * 8
+	rms.change.prefixPath[rms.prefixDepth] = rms.prefixNode
+	if rms.prefixDepth == bits {
+		rms.state = routeStepPrefixTerminal
 		return false, nil
 	}
-	if step.prefixNode != nil && step.prefixNode.resolved != nil {
+	if rms.prefixNode != nil && rms.prefixNode.resolved != nil {
 		return false, errors.New("jobmgr Function catalog: prefix overlaps a shorter prefix")
 	}
-	branch := keyBit(step.change.prefix, step.prefixDepth)
-	step.change.prefixBranches[step.prefixDepth] = branch
-	if step.prefixNode != nil {
-		step.prefixNode = step.prefixNode.child[branch]
+	branch := keyBit(rms.change.prefix, rms.prefixDepth)
+	rms.change.prefixBranches[rms.prefixDepth] = branch
+	if rms.prefixNode != nil {
+		rms.prefixNode = rms.prefixNode.child[branch]
 	}
-	step.prefixDepth++
+	rms.prefixDepth++
 	return false, nil
 }
 
-func (step *routeMutationStep) advancePrefixTerminal() (bool, error) {
-	original := step.change.prefixPath[step.prefixDepth]
+func (rms *routeMutationStep) advancePrefixTerminal() (bool, error) {
+	original := rms.change.prefixPath[rms.prefixDepth]
 	if original != nil {
-		step.oldRoute = original.resolved
+		rms.oldRoute = original.resolved
 	}
-	step.hadRoute = step.oldRoute != nil
-	if step.oldRoute != nil && step.oldRoute.retiring {
-		step.oldRoute = nil
+	rms.hadRoute = rms.oldRoute != nil
+	if rms.oldRoute != nil && rms.oldRoute.retiring {
+		rms.oldRoute = nil
 	}
-	if step.replacement == nil && step.oldRoute == nil {
+	if rms.replacement == nil && rms.oldRoute == nil {
 		return false, errors.New("jobmgr Function catalog: mutation removes missing prefix route")
 	}
-	if step.replacement != nil && original != nil &&
+	if rms.replacement != nil && original != nil &&
 		(original.child[0] != nil || original.child[1] != nil) {
 		return false, errors.New("jobmgr Function catalog: prefix overlaps a longer prefix")
 	}
-	copyNode := step.change.prefixCopies[step.phaseIndex][step.prefixDepth]
+	copyNode := rms.change.prefixCopies[rms.phaseIndex][rms.prefixDepth]
 	*copyNode = prefixNode{}
 	if original != nil {
 		*copyNode = *original
 	}
-	copyNode.resolved = step.replacement
+	copyNode.resolved = rms.replacement
 	if copyNode.resolved == nil && copyNode.child[0] == nil && copyNode.child[1] == nil {
-		step.updatedPrefix = nil
+		rms.updatedPrefix = nil
 	} else {
-		step.updatedPrefix = copyNode
+		rms.updatedPrefix = copyNode
 	}
-	step.updatePathStorage(
+	rms.updatePathStorage(
 		original != nil,
-		step.updatedPrefix != nil,
+		rms.updatedPrefix != nil,
 		prefixNodeStorageBytes,
 	)
-	if !step.hadRoute && step.replacement != nil {
-		step.set.prefixCount++
+	if !rms.hadRoute && rms.replacement != nil {
+		rms.set.prefixCount++
 	}
-	if step.hadRoute && step.replacement == nil {
-		step.set.prefixCount--
+	if rms.hadRoute && rms.replacement == nil {
+		rms.set.prefixCount--
 	}
-	step.state = routeStepPrefixUnwind
+	rms.state = routeStepPrefixUnwind
 	return false, nil
 }
 
-func (step *routeMutationStep) advancePrefixUnwind() (bool, error) {
-	if step.prefixDepth == 0 {
-		step.set.prefixes = step.updatedPrefix
-		step.state = routeStepNameLeaf
+func (rms *routeMutationStep) advancePrefixUnwind() (bool, error) {
+	if rms.prefixDepth == 0 {
+		rms.set.prefixes = rms.updatedPrefix
+		rms.state = routeStepNameLeaf
 		return false, nil
 	}
-	step.prefixDepth--
-	original := step.change.prefixPath[step.prefixDepth]
-	copyNode := step.change.prefixCopies[step.phaseIndex][step.prefixDepth]
+	rms.prefixDepth--
+	original := rms.change.prefixPath[rms.prefixDepth]
+	copyNode := rms.change.prefixCopies[rms.phaseIndex][rms.prefixDepth]
 	*copyNode = prefixNode{}
 	if original != nil {
 		*copyNode = *original
 	}
-	copyNode.child[step.change.prefixBranches[step.prefixDepth]] = step.updatedPrefix
+	copyNode.child[rms.change.prefixBranches[rms.prefixDepth]] = rms.updatedPrefix
 	if copyNode.resolved == nil && copyNode.child[0] == nil && copyNode.child[1] == nil {
-		step.updatedPrefix = nil
+		rms.updatedPrefix = nil
 	} else {
-		step.updatedPrefix = copyNode
+		rms.updatedPrefix = copyNode
 	}
-	step.updatePathStorage(
+	rms.updatePathStorage(
 		original != nil,
-		step.updatedPrefix != nil,
+		rms.updatedPrefix != nil,
 		prefixNodeStorageBytes,
 	)
 	return false, nil
 }
 
-func (step *routeMutationStep) advanceNameLeaf() (bool, error) {
-	original := step.change.namePath[step.nameDepth]
-	copyNode := step.change.nameCopies[step.phaseIndex][step.nameDepth]
+func (rms *routeMutationStep) advanceNameLeaf() (bool, error) {
+	original := rms.change.namePath[rms.nameDepth]
+	copyNode := rms.change.nameCopies[rms.phaseIndex][rms.nameDepth]
 	*copyNode = catalogNode{}
 	if original != nil {
 		*copyNode = *original
 	}
-	copyNode.routes = step.set
-	copyNode.present = !step.set.empty()
+	copyNode.routes = rms.set
+	copyNode.present = !rms.set.empty()
 	if !copyNode.present && copyNode.child[0] == nil && copyNode.child[1] == nil {
-		step.updatedName = nil
+		rms.updatedName = nil
 	} else {
-		step.updatedName = copyNode
+		rms.updatedName = copyNode
 	}
-	step.updatePathStorage(
+	rms.updatePathStorage(
 		original != nil,
-		step.updatedName != nil,
+		rms.updatedName != nil,
 		catalogNodeStorageBytes,
 	)
-	step.state = routeStepNameUnwind
+	rms.state = routeStepNameUnwind
 	return false, nil
 }
 
-func (step *routeMutationStep) advanceNameUnwind() (bool, error) {
-	if step.nameDepth == 0 {
-		step.state = routeStepDone
+func (rms *routeMutationStep) advanceNameUnwind() (bool, error) {
+	if rms.nameDepth == 0 {
+		rms.state = routeStepDone
 		return true, nil
 	}
-	step.nameDepth--
-	original := step.change.namePath[step.nameDepth]
-	copyNode := step.change.nameCopies[step.phaseIndex][step.nameDepth]
+	rms.nameDepth--
+	original := rms.change.namePath[rms.nameDepth]
+	copyNode := rms.change.nameCopies[rms.phaseIndex][rms.nameDepth]
 	*copyNode = catalogNode{}
 	if original != nil {
 		*copyNode = *original
 	}
-	copyNode.child[step.change.nameBranches[step.nameDepth]] = step.updatedName
+	copyNode.child[rms.change.nameBranches[rms.nameDepth]] = rms.updatedName
 	if !copyNode.present && copyNode.child[0] == nil && copyNode.child[1] == nil {
-		step.updatedName = nil
+		rms.updatedName = nil
 	} else {
-		step.updatedName = copyNode
+		rms.updatedName = copyNode
 	}
-	step.updatePathStorage(
+	rms.updatePathStorage(
 		original != nil,
-		step.updatedName != nil,
+		rms.updatedName != nil,
 		catalogNodeStorageBytes,
 	)
 	return false, nil
 }
 
-func (step *routeMutationStep) updatePathStorage(
+func (rms *routeMutationStep) updatePathStorage(
 	hadOriginal bool,
 	hasReplacement bool,
 	bytes int64,
 ) {
-	if step.phaseIndex != 1 {
+	if rms.phaseIndex != 1 {
 		return
 	}
 	if hadOriginal {
-		step.pathByteDelta -= bytes
+		rms.pathByteDelta -= bytes
 	}
 	if hasReplacement {
-		step.pathByteDelta += bytes
+		rms.pathByteDelta += bytes
 	}
 }
 
@@ -815,24 +815,24 @@ func keyBit(key string, depth int) uint8 {
 	return (value >> uint(7-depth%8)) & 1
 }
 
-func (builder *MutationBuilder) Progress() MutationProgress {
-	if builder == nil || builder.mutation == nil {
+func (mb *MutationBuilder) Progress() MutationProgress {
+	if mb == nil || mb.mutation == nil {
 		return MutationProgress{}
 	}
 	return MutationProgress{
-		CompletedNodes: builder.completed,
-		TotalNodes:     builder.mutation.totalNodes,
-		LastStepNodes:  builder.lastStep,
+		CompletedNodes: mb.completed,
+		TotalNodes:     mb.mutation.totalNodes,
+		LastStepNodes:  mb.lastStep,
 	}
 }
 
 // CommitMutation performs the one visible root swap and returns cleanup work
 // for old generations that became drained in the same turn.
-func (catalog *Catalog) commitMutation(postimage *MutationPostimage, cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (int, error) {
-	if catalog == nil || catalog.closed || postimage == nil || postimage.finished ||
+func (c *Catalog) commitMutation(postimage *MutationPostimage, cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (int, error) {
+	if c == nil || c.closed || postimage == nil || postimage.finished ||
 		postimage.builder == nil || postimage.builder.postimage != postimage ||
-		catalog.mutation != postimage.builder || postimage.builder.failed ||
-		postimage.builder.mutation.expectedVersion != catalog.version || cleanups == nil {
+		c.mutation != postimage.builder || postimage.builder.failed ||
+		postimage.builder.mutation.expectedVersion != c.version || cleanups == nil {
 		return 0, errors.New("jobmgr Function catalog: invalid mutation commit")
 	}
 	builder := postimage.builder
@@ -846,7 +846,7 @@ func (catalog *Catalog) commitMutation(postimage *MutationPostimage, cleanups *[
 	for index := range builder.mutation.generations {
 		prepared := &builder.mutation.generations[index]
 		if !prepared.initialized || prepared.references <= 0 ||
-			prepared.generation.cleanupRef.Slot != catalog.nextGenerationID+uint32(index)+1 {
+			prepared.generation.cleanupRef.Slot != c.nextGenerationID+uint32(index)+1 {
 			return 0, errors.New("jobmgr Function catalog: invalid prepared handler generation")
 		}
 	}
@@ -857,28 +857,28 @@ func (catalog *Catalog) commitMutation(postimage *MutationPostimage, cleanups *[
 	for index := range builder.mutation.generations {
 		prepared := &builder.mutation.generations[index]
 		prepared.generation.routeReferences = prepared.references
-		catalog.generations[prepared.generation.cleanupRef] = prepared.generation
+		c.generations[prepared.generation.cleanupRef] = prepared.generation
 	}
 	for _, transition := range builder.transitions {
 		if transition.oldRoute != nil {
-			catalog.unlinkCloseRoute(transition.oldRoute)
+			c.unlinkCloseRoute(transition.oldRoute)
 			transition.oldRoute.handler.routeReferences--
-			catalog.routeCount--
+			c.routeCount--
 		}
 		if transition.newRoute != nil {
-			catalog.appendCloseRoute(transition.newRoute)
-			catalog.routeCount++
+			c.appendCloseRoute(transition.newRoute)
+			c.routeCount++
 		}
 		if transition.tombstone {
 			retired := transition.oldRoute
 			retired.retiring = true
-			catalog.retireDrainedRoute(retired)
+			c.retireDrainedRoute(retired)
 		}
 	}
-	catalog.routes = postimage.root
-	deferred := catalog.deferredPrune
-	catalog.deferredPrune = nil
-	catalog.pruneRetiringRoutes(deferred)
+	c.routes = postimage.root
+	deferred := c.deferredPrune
+	c.deferredPrune = nil
+	c.pruneRetiringRoutes(deferred)
 	cleanupCount := 0
 	for index := 0; index < builder.removalCount; index++ {
 		generation := builder.removals[index].generation
@@ -889,16 +889,16 @@ func (catalog *Catalog) commitMutation(postimage *MutationPostimage, cleanups *[
 		if generation.invocationLeases != 0 {
 			continue
 		}
-		cleanup := catalog.cleanupDrainedGeneration(generation)
+		cleanup := c.cleanupDrainedGeneration(generation)
 		if cleanup.Ref.Valid() {
 			cleanups[cleanupCount] = cleanup
 			cleanupCount++
 		}
 	}
-	catalog.nextRouteID += postimage.builder.routeOrdinal
-	catalog.nextGenerationID += uint32(len(builder.mutation.generations))
-	catalog.version++
-	catalog.mutation = nil
+	c.nextRouteID += postimage.builder.routeOrdinal
+	c.nextGenerationID += uint32(len(builder.mutation.generations))
+	c.version++
+	c.mutation = nil
 	builder.finished = true
 	postimage.finished = true
 	return cleanupCount, nil
@@ -906,14 +906,14 @@ func (catalog *Catalog) commitMutation(postimage *MutationPostimage, cleanups *[
 
 // Abort releases ownership of every private generation initialized after
 // topology validation. Cleanup work remains off-loop.
-func (builder *MutationBuilder) Abort(cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (int, error) {
-	if builder == nil || builder.catalog == nil || builder.finished || cleanups == nil {
+func (mb *MutationBuilder) Abort(cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (int, error) {
+	if mb == nil || mb.catalog == nil || mb.finished || cleanups == nil {
 		return 0, errors.New("jobmgr Function catalog: invalid mutation abort")
 	}
 	count := 0
 	retainedCleanupBytes := int64(0)
-	for index := range builder.mutation.generations {
-		prepared := &builder.mutation.generations[index]
+	for index := range mb.mutation.generations {
+		prepared := &mb.mutation.generations[index]
 		if !prepared.initialized {
 			continue
 		}
@@ -922,84 +922,84 @@ func (builder *MutationBuilder) Abort(cleanups *[jobmgr.MaximumFunctionCleanupBa
 			retainedCleanupBytes += catalogGenerationRetentionBytes
 		}
 		if generation.cleanupRef.Valid() {
-			builder.catalog.generations[generation.cleanupRef] = generation
+			mb.catalog.generations[generation.cleanupRef] = generation
 		}
 		generation.admissionClosed = true
-		cleanup := builder.catalog.cleanupDrainedGeneration(generation)
+		cleanup := mb.catalog.cleanupDrainedGeneration(generation)
 		if cleanup.Ref.Valid() {
 			cleanups[count] = cleanup
 			count++
 		}
 	}
-	if builder.catalog.mutation == builder {
-		builder.catalog.mutation = nil
+	if mb.catalog.mutation == mb {
+		mb.catalog.mutation = nil
 	}
-	if builder.quiesced {
-		for index := range builder.transitions {
-			transition := &builder.transitions[index]
+	if mb.quiesced {
+		for index := range mb.transitions {
+			transition := &mb.transitions[index]
 			if transition.oldRoute != nil {
 				transition.oldRoute.admissionClosed =
 					transition.oldAdmissionClosed
 			}
 		}
 	}
-	deferred := builder.catalog.deferredPrune
-	builder.catalog.deferredPrune = nil
-	builder.catalog.pruneRetiringRoutes(deferred)
-	builder.finished = true
-	if builder.postimage != nil {
-		builder.postimage.finished = true
+	deferred := mb.catalog.deferredPrune
+	mb.catalog.deferredPrune = nil
+	mb.catalog.pruneRetiringRoutes(deferred)
+	mb.finished = true
+	if mb.postimage != nil {
+		mb.postimage.finished = true
 	}
-	return count, builder.mutation.abortStorage(retainedCleanupBytes)
+	return count, mb.mutation.abortStorage(retainedCleanupBytes)
 }
 
-func (catalog *Catalog) BeginMutation(mutation jobmgr.FunctionCatalogMutation) error {
+func (c *Catalog) BeginMutation(mutation jobmgr.FunctionCatalogMutation) error {
 	prepared, ok := mutation.(*Mutation)
 	if !ok {
 		return errors.New("jobmgr Function catalog: foreign mutation")
 	}
-	_, err := catalog.startMutation(prepared)
+	_, err := c.startMutation(prepared)
 	return err
 }
 
-func (catalog *Catalog) AdvanceMutationQuiesce(quantum int) (jobmgr.FunctionCatalogMutationProgress, error) {
-	if catalog == nil || catalog.mutation == nil {
+func (c *Catalog) AdvanceMutationQuiesce(quantum int) (jobmgr.FunctionCatalogMutationProgress, error) {
+	if c == nil || c.mutation == nil {
 		return jobmgr.FunctionCatalogMutationProgress{}, errors.New("jobmgr Function catalog: no active mutation")
 	}
-	builder := catalog.mutation
+	builder := c.mutation
 	quiesced, err := builder.PrepareQuiesceStep(quantum)
 	progress := builder.Progress()
 	result := jobmgr.FunctionCatalogMutationProgress{
 		CompletedNodes: progress.CompletedNodes,
 		TotalNodes:     progress.TotalNodes,
-		Version:        catalog.version,
+		Version:        c.version,
 		Quiesced:       quiesced,
 	}
 	return result, err
 }
 
-func (catalog *Catalog) ResumeMutation(mutation jobmgr.FunctionCatalogMutation) error {
+func (c *Catalog) ResumeMutation(mutation jobmgr.FunctionCatalogMutation) error {
 	prepared, ok := mutation.(*Mutation)
-	if catalog == nil || !ok || catalog.mutation == nil ||
-		catalog.mutation != &prepared.builder ||
-		catalog.mutation.phase != mutationGenerations ||
-		catalog.mutation.failed || catalog.mutation.finished {
+	if c == nil || !ok || c.mutation == nil ||
+		c.mutation != &prepared.builder ||
+		c.mutation.phase != mutationGenerations ||
+		c.mutation.failed || c.mutation.finished {
 		return errors.New("jobmgr Function catalog: invalid mutation resume")
 	}
 	return nil
 }
 
-func (catalog *Catalog) AdvanceMutation(quantum int, cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (jobmgr.FunctionCatalogMutationProgress, int, error) {
-	if catalog == nil || catalog.mutation == nil {
+func (c *Catalog) AdvanceMutation(quantum int, cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (jobmgr.FunctionCatalogMutationProgress, int, error) {
+	if c == nil || c.mutation == nil {
 		return jobmgr.FunctionCatalogMutationProgress{}, 0, errors.New("jobmgr Function catalog: no active mutation")
 	}
-	builder := catalog.mutation
+	builder := c.mutation
 	postimage, done, err := builder.PrepareStep(quantum)
 	progress := builder.Progress()
 	result := jobmgr.FunctionCatalogMutationProgress{
 		CompletedNodes: progress.CompletedNodes,
 		TotalNodes:     progress.TotalNodes,
-		Version:        catalog.version,
+		Version:        c.version,
 	}
 	if err != nil {
 		return result, 0, err
@@ -1007,18 +1007,18 @@ func (catalog *Catalog) AdvanceMutation(quantum int, cleanups *[jobmgr.MaximumFu
 	if !done {
 		return result, 0, nil
 	}
-	count, err := catalog.commitMutation(postimage, cleanups)
+	count, err := c.commitMutation(postimage, cleanups)
 	if err != nil {
 		return result, 0, err
 	}
-	result.Version = catalog.version
+	result.Version = c.version
 	result.Done = true
 	return result, count, nil
 }
 
-func (catalog *Catalog) AbortMutation(cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (int, error) {
-	if catalog == nil || catalog.mutation == nil {
+func (c *Catalog) AbortMutation(cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (int, error) {
+	if c == nil || c.mutation == nil {
 		return 0, errors.New("jobmgr Function catalog: no active mutation")
 	}
-	return catalog.mutation.Abort(cleanups)
+	return c.mutation.Abort(cleanups)
 }

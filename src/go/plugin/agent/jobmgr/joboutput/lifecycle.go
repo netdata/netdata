@@ -58,25 +58,25 @@ func NewLifecycleSubsystem(
 	}, nil
 }
 
-func (subsystem *LifecycleSubsystem) Plan(request jobmgr.Request) (jobmgr.WorkPlan, error) {
-	if subsystem == nil {
+func (ls *LifecycleSubsystem) Plan(request jobmgr.Request) (jobmgr.WorkPlan, error) {
+	if ls == nil {
 		return jobmgr.WorkPlan{}, errors.New("job output: nil lifecycle subsystem")
 	}
 	switch request.Route {
 	case jobInstallRoute:
-		return subsystem.planInstall(request)
+		return ls.planInstall(request)
 	case jobStopRoute:
-		return subsystem.planStop(request)
+		return ls.planStop(request)
 	default:
 		return jobmgr.WorkPlan{}, errors.New("job output: unsupported lifecycle route")
 	}
 }
 
-func (subsystem *LifecycleSubsystem) planInstall(request jobmgr.Request) (jobmgr.WorkPlan, error) {
+func (ls *LifecycleSubsystem) planInstall(request jobmgr.Request) (jobmgr.WorkPlan, error) {
 	if len(request.Args) != 0 || request.LaneKey == "" {
 		return jobmgr.WorkPlan{}, errors.New("job output: invalid install request")
 	}
-	permit, err := lifecycle.NewJobLongLivedPlan(subsystem.retainedBytes)
+	permit, err := lifecycle.NewJobLongLivedPlan(ls.retainedBytes)
 	if err != nil {
 		return jobmgr.WorkPlan{}, err
 	}
@@ -98,7 +98,7 @@ func (subsystem *LifecycleSubsystem) planInstall(request jobmgr.Request) (jobmgr
 					generation,
 					carrier,
 					func(ctx context.Context) (ConstructedJob, error) {
-						return subsystem.factory(ctx, request.LaneKey, generation)
+						return ls.factory(ctx, request.LaneKey, generation)
 					},
 				)
 			},
@@ -106,7 +106,7 @@ func (subsystem *LifecycleSubsystem) planInstall(request jobmgr.Request) (jobmgr
 	}, nil
 }
 
-func (subsystem *LifecycleSubsystem) planStop(request jobmgr.Request) (jobmgr.WorkPlan, error) {
+func (ls *LifecycleSubsystem) planStop(request jobmgr.Request) (jobmgr.WorkPlan, error) {
 	if len(request.Args) != 0 || request.LaneKey == "" {
 		return jobmgr.WorkPlan{}, errors.New("job output: invalid stop request")
 	}
@@ -135,31 +135,31 @@ func NewManager(kernel CommandPort) (*Manager, error) {
 	return &Manager{kernel: kernel}, nil
 }
 
-func (manager *Manager) Start(ctx context.Context, key string) error {
-	return manager.submit(ctx, key, jobInstallRoute)
+func (m *Manager) Start(ctx context.Context, key string) error {
+	return m.submit(ctx, key, jobInstallRoute)
 }
 
-func (manager *Manager) Restart(ctx context.Context, key string) error {
-	if err := manager.submit(ctx, key, jobStopRoute); err != nil {
+func (m *Manager) Restart(ctx context.Context, key string) error {
+	if err := m.submit(ctx, key, jobStopRoute); err != nil {
 		return err
 	}
-	return manager.submit(ctx, key, jobInstallRoute)
+	return m.submit(ctx, key, jobInstallRoute)
 }
 
-func (manager *Manager) Stop(ctx context.Context, key string) error {
-	return manager.submit(ctx, key, jobStopRoute)
+func (m *Manager) Stop(ctx context.Context, key string) error {
+	return m.submit(ctx, key, jobStopRoute)
 }
 
-func (manager *Manager) submit(ctx context.Context, key, route string) error {
-	if manager == nil || manager.kernel == nil || key == "" || ctx == nil {
+func (m *Manager) submit(ctx context.Context, key, route string) error {
+	if m == nil || m.kernel == nil || key == "" || ctx == nil {
 		return errors.New("job output: invalid manager request")
 	}
-	manager.mu.Lock()
-	manager.nextUID++
-	uid := fmt.Sprintf("job:%d", manager.nextUID)
-	manager.mu.Unlock()
+	m.mu.Lock()
+	m.nextUID++
+	uid := fmt.Sprintf("job:%d", m.nextUID)
+	m.mu.Unlock()
 	deadline, _ := ctx.Deadline()
-	return manager.kernel.Submit(ctx, jobmgr.Request{
+	return m.kernel.Submit(ctx, jobmgr.Request{
 		UID: uid, LaneKey: key, Source: lifecycle.SourceJobManager,
 		Route: route, Deadline: deadline,
 	})

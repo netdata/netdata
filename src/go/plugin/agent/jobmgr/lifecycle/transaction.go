@@ -16,18 +16,18 @@ type ResourceTransactionScope struct {
 	Successor ResourceIdentity
 }
 
-func (scope ResourceTransactionScope) Valid() bool {
-	if scope.ID == "" ||
-		!scope.Current.Valid() && scope.Current != (ResourceIdentity{}) {
+func (rts ResourceTransactionScope) Valid() bool {
+	if rts.ID == "" ||
+		!rts.Current.Valid() && rts.Current != (ResourceIdentity{}) {
 		return false
 	}
-	if !scope.Successor.Valid() && scope.Successor != (ResourceIdentity{}) {
+	if !rts.Successor.Valid() && rts.Successor != (ResourceIdentity{}) {
 		return false
 	}
-	if scope.Current.Valid() && scope.Current.ID != scope.ID {
+	if rts.Current.Valid() && rts.Current.ID != rts.ID {
 		return false
 	}
-	if scope.Successor.Valid() && scope.Successor.ID != scope.ID {
+	if rts.Successor.Valid() && rts.Successor.ID != rts.ID {
 		return false
 	}
 	return true
@@ -42,8 +42,8 @@ const (
 	ResourceTransactionReplaced
 )
 
-func (disposition ResourceTransactionDisposition) Valid() bool {
-	switch disposition {
+func (rtd ResourceTransactionDisposition) Valid() bool {
+	switch rtd {
 	case ResourceTransactionUnchanged,
 		ResourceTransactionRemoved,
 		ResourceTransactionInstalled,

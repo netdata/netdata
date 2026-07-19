@@ -28,83 +28,83 @@ type runMetricsService struct {
 	producerErr        error
 }
 
-func (service *runMetricsService) RegisterComponent(
+func (rms *runMetricsService) RegisterComponent(
 	config runtimecomp.ComponentConfig,
 ) error {
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	service.components = append(service.components, config)
+	rms.mu.Lock()
+	defer rms.mu.Unlock()
+	rms.components = append(rms.components, config)
 	return nil
 }
 
-func (service *runMetricsService) UnregisterComponent(name string) {
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	service.componentRemovals = append(service.componentRemovals, name)
+func (rms *runMetricsService) UnregisterComponent(name string) {
+	rms.mu.Lock()
+	defer rms.mu.Unlock()
+	rms.componentRemovals = append(rms.componentRemovals, name)
 }
 
 func (*runMetricsService) QuarantineComponent(string) {}
 
-func (service *runMetricsService) FinalizeComponent(name string) {
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	service.componentFinalized = append(service.componentFinalized, name)
+func (rms *runMetricsService) FinalizeComponent(name string) {
+	rms.mu.Lock()
+	defer rms.mu.Unlock()
+	rms.componentFinalized = append(rms.componentFinalized, name)
 }
 
-func (service *runMetricsService) RegisterProducer(
+func (rms *runMetricsService) RegisterProducer(
 	name string,
 	producer func() error,
 ) error {
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	if service.producerErr != nil {
-		return service.producerErr
+	rms.mu.Lock()
+	defer rms.mu.Unlock()
+	if rms.producerErr != nil {
+		return rms.producerErr
 	}
-	if service.producers == nil {
-		service.producers = make(map[string]func() error)
+	if rms.producers == nil {
+		rms.producers = make(map[string]func() error)
 	}
-	service.producers[name] = producer
+	rms.producers[name] = producer
 	return nil
 }
 
-func (service *runMetricsService) UnregisterProducer(name string) {
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	service.producerRemovals = append(service.producerRemovals, name)
-	delete(service.producers, name)
+func (rms *runMetricsService) UnregisterProducer(name string) {
+	rms.mu.Lock()
+	defer rms.mu.Unlock()
+	rms.producerRemovals = append(rms.producerRemovals, name)
+	delete(rms.producers, name)
 }
 
-func (service *runMetricsService) snapshot() (
+func (rms *runMetricsService) snapshot() (
 	[]runtimecomp.ComponentConfig,
 	[]string,
 	map[string]func() error,
 	[]string,
 ) {
-	service.mu.Lock()
-	defer service.mu.Unlock()
+	rms.mu.Lock()
+	defer rms.mu.Unlock()
 	components := append(
 		[]runtimecomp.ComponentConfig(nil),
-		service.components...,
+		rms.components...,
 	)
 	componentRemovals := append(
 		[]string(nil),
-		service.componentRemovals...,
+		rms.componentRemovals...,
 	)
-	producers := make(map[string]func() error, len(service.producers))
-	for name, producer := range service.producers {
+	producers := make(map[string]func() error, len(rms.producers))
+	for name, producer := range rms.producers {
 		producers[name] = producer
 	}
 	producerRemovals := append(
 		[]string(nil),
-		service.producerRemovals...,
+		rms.producerRemovals...,
 	)
 	return components, componentRemovals, producers, producerRemovals
 }
 
-func (service *runMetricsService) finalized() []string {
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	return append([]string(nil), service.componentFinalized...)
+func (rms *runMetricsService) finalized() []string {
+	rms.mu.Lock()
+	defer rms.mu.Unlock()
+	return append([]string(nil), rms.componentFinalized...)
 }
 
 func TestRunMetricsProjection(t *testing.T) {

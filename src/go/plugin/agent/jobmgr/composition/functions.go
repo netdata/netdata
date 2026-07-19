@@ -72,151 +72,151 @@ func NewFunctionAssembly(
 
 // Catalog returns the exact catalog that must be injected into CommandKernel
 // before Bind supplies the kernel's mutation capability back to the assembly.
-func (assembly *FunctionAssembly) Catalog() jobmgr.FunctionCatalogPort {
-	if assembly == nil {
+func (fa *FunctionAssembly) Catalog() jobmgr.FunctionCatalogPort {
+	if fa == nil {
 		return nil
 	}
-	return assembly.catalog
+	return fa.catalog
 }
 
 // JobHooks returns the exact-handle bridge consumed by the job factory.
-func (assembly *FunctionAssembly) JobHooks() joboutput.JobHooks {
-	if assembly == nil {
+func (fa *FunctionAssembly) JobHooks() joboutput.JobHooks {
+	if fa == nil {
 		return nil
 	}
-	return assembly.hooks
+	return fa.hooks
 }
 
-func (assembly *FunctionAssembly) ReconcileModule(
+func (fa *FunctionAssembly) ReconcileModule(
 	ctx context.Context,
 	module string,
 ) error {
-	if assembly == nil {
+	if fa == nil {
 		return errors.New("jobmgr composition: nil Function reconciliation")
 	}
-	return assembly.controller.ReconcileModule(ctx, module)
+	return fa.controller.ReconcileModule(ctx, module)
 }
 
-func (assembly *FunctionAssembly) Bind(mutations jobmgr.FunctionMutationPort) error {
-	if assembly == nil || mutations == nil {
+func (fa *FunctionAssembly) Bind(mutations jobmgr.FunctionMutationPort) error {
+	if fa == nil || mutations == nil {
 		return errors.New("jobmgr composition: invalid Function binding")
 	}
-	assembly.mu.Lock()
-	defer assembly.mu.Unlock()
-	if assembly.bound || assembly.active || assembly.draining || assembly.stopped {
+	fa.mu.Lock()
+	defer fa.mu.Unlock()
+	if fa.bound || fa.active || fa.draining || fa.stopped {
 		return errors.New("jobmgr composition: duplicate or late Function binding")
 	}
-	if err := assembly.controller.Bind(mutations, assembly.publication); err != nil {
+	if err := fa.controller.Bind(mutations, fa.publication); err != nil {
 		return err
 	}
-	assembly.bound = true
+	fa.bound = true
 	return nil
 }
 
-func (assembly *FunctionAssembly) abortConstruction() error {
-	if assembly == nil {
+func (fa *FunctionAssembly) abortConstruction() error {
+	if fa == nil {
 		return nil
 	}
-	assembly.mu.Lock()
-	defer assembly.mu.Unlock()
-	if assembly.active || assembly.draining || assembly.stopped {
+	fa.mu.Lock()
+	defer fa.mu.Unlock()
+	if fa.active || fa.draining || fa.stopped {
 		return errors.New("jobmgr composition: Function construction abort after activation")
 	}
-	assembly.stopped = true
-	return assembly.controller.AbortConstruction(context.Background())
+	fa.stopped = true
+	return fa.controller.AbortConstruction(context.Background())
 }
 
 // Activate publishes static Function routes after KernelLoop is running and
 // before the process-fixed ingress capability is adopted.
-func (assembly *FunctionAssembly) Activate() error {
-	if assembly == nil {
+func (fa *FunctionAssembly) Activate() error {
+	if fa == nil {
 		return errors.New("jobmgr composition: nil Function activation")
 	}
-	assembly.mu.Lock()
-	defer assembly.mu.Unlock()
-	if !assembly.bound || assembly.active || assembly.draining || assembly.stopped {
+	fa.mu.Lock()
+	defer fa.mu.Unlock()
+	if !fa.bound || fa.active || fa.draining || fa.stopped {
 		return errors.New("jobmgr composition: invalid Function activation")
 	}
-	if err := assembly.controller.Activate(); err != nil {
+	if err := fa.controller.Activate(); err != nil {
 		return err
 	}
-	assembly.active = true
+	fa.active = true
 	return nil
 }
 
 // BeforeFunctionCatalogClose is CommandKernel's supervised shutdown barrier.
 // It withdraws every externally published route before the loop begins catalog
 // close and before resource stop tasks can invoke their exact job handles.
-func (assembly *FunctionAssembly) BeforeFunctionCatalogClose(
+func (fa *FunctionAssembly) BeforeFunctionCatalogClose(
 	_ context.Context,
 	generation uint64,
 ) error {
-	if assembly == nil {
+	if fa == nil {
 		return nil
 	}
-	assembly.mu.Lock()
-	defer assembly.mu.Unlock()
-	if generation != assembly.epoch ||
-		!assembly.bound ||
-		assembly.stopped {
+	fa.mu.Lock()
+	defer fa.mu.Unlock()
+	if generation != fa.epoch ||
+		!fa.bound ||
+		fa.stopped {
 		return errors.New("jobmgr composition: invalid Function shutdown barrier")
 	}
-	if assembly.draining {
-		return assembly.controller.BeginShutdown(assembly.epoch)
+	if fa.draining {
+		return fa.controller.BeginShutdown(fa.epoch)
 	}
-	assembly.draining = true
-	return assembly.controller.BeginShutdown(assembly.epoch)
+	fa.draining = true
+	return fa.controller.BeginShutdown(fa.epoch)
 }
 
 // FinalizeRun terminalizes composition-side Function state after the kernel has
 // drained the catalog and every job handle.
-func (assembly *FunctionAssembly) FinalizeRun(
+func (fa *FunctionAssembly) FinalizeRun(
 	_ context.Context,
 	generation uint64,
 ) error {
-	if assembly == nil {
+	if fa == nil {
 		return nil
 	}
-	assembly.mu.Lock()
-	defer assembly.mu.Unlock()
-	if generation != assembly.epoch ||
-		!assembly.draining ||
-		assembly.stopped {
+	fa.mu.Lock()
+	defer fa.mu.Unlock()
+	if generation != fa.epoch ||
+		!fa.draining ||
+		fa.stopped {
 		return errors.New("jobmgr composition: invalid Function finalization")
 	}
-	assembly.stopped = true
-	return assembly.controller.Stop(assembly.epoch)
+	fa.stopped = true
+	return fa.controller.Stop(fa.epoch)
 }
 
 // Stop is the direct construction-abort helper. Active production runs use the
 // kernel-owned barrier and finalizer methods above.
-func (assembly *FunctionAssembly) Stop() error {
-	if assembly == nil {
+func (fa *FunctionAssembly) Stop() error {
+	if fa == nil {
 		return nil
 	}
-	if err := assembly.BeforeFunctionCatalogClose(
+	if err := fa.BeforeFunctionCatalogClose(
 		context.Background(),
-		assembly.epoch,
+		fa.epoch,
 	); err != nil {
 		return err
 	}
-	return assembly.FinalizeRun(context.Background(), assembly.epoch)
+	return fa.FinalizeRun(context.Background(), fa.epoch)
 }
 
 type functionJobHooks struct {
 	controller *functionadapter.Controller
 }
 
-func (hooks functionJobHooks) Prepare(
+func (fjh functionJobHooks) Prepare(
 	published joboutput.PublishedJob,
 ) (joboutput.HandlerLifecycle, error) {
-	if hooks.controller == nil ||
+	if fjh.controller == nil ||
 		published.Identity.ID == "" ||
 		published.Identity.Generation == 0 ||
 		published.Job == nil {
 		return nil, errors.New("jobmgr composition: invalid Function job preparation")
 	}
-	return hooks.controller.PrepareJob(
+	return fjh.controller.PrepareJob(
 		functionadapter.JobIdentity{
 			ID:         published.Identity.ID,
 			Generation: published.Identity.Generation,

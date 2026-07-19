@@ -64,125 +64,125 @@ func NewOperation(id OperationID, uid string, source Source, laneKey string, res
 	return &OperationGeneration{ID: id, UID: uid, Source: source, LaneKey: laneKey, State: OperationAdmitted, Response: response, Child: ChildNotStarted}, nil
 }
 
-func (operation *OperationGeneration) Advance(state OperationState) error {
-	if state <= operation.State || state > OperationDisposedTerminal {
+func (og *OperationGeneration) Advance(state OperationState) error {
+	if state <= og.State || state > OperationDisposedTerminal {
 		return errors.New("jobmgr operation: non-monotonic operation transition")
 	}
-	operation.State = state
+	og.State = state
 	return nil
 }
 
-func (operation *OperationGeneration) StartChild(ref TaskRef) error {
-	if (operation.Child != ChildNotStarted && operation.Child != ChildDeadlineStartPending) || !ref.Valid() {
+func (og *OperationGeneration) StartChild(ref TaskRef) error {
+	if (og.Child != ChildNotStarted && og.Child != ChildDeadlineStartPending) || !ref.Valid() {
 		return errors.New("jobmgr operation: invalid child start")
 	}
-	operation.Task = ref
-	operation.Child = ChildExecuting
+	og.Task = ref
+	og.Child = ChildExecuting
 	return nil
 }
 
-func (operation *OperationGeneration) RequireDeadlineStart() error {
-	if operation.Child != ChildNotStarted {
+func (og *OperationGeneration) RequireDeadlineStart() error {
+	if og.Child != ChildNotStarted {
 		return errors.New("jobmgr operation: invalid required deadline start")
 	}
-	operation.Child = ChildDeadlineStartPending
+	og.Child = ChildDeadlineStartPending
 	return nil
 }
 
-func (operation *OperationGeneration) AbandonDeadlineStart() error {
-	if operation.Child != ChildDeadlineStartPending {
+func (og *OperationGeneration) AbandonDeadlineStart() error {
+	if og.Child != ChildDeadlineStartPending {
 		return errors.New("jobmgr operation: invalid deadline-start abandonment")
 	}
-	operation.Child = ChildAbandonedBeforeStart
+	og.Child = ChildAbandonedBeforeStart
 	return nil
 }
 
-func (operation *OperationGeneration) ResultReady(ref TaskRef, sequence uint8) error {
-	if operation.Child != ChildExecuting || operation.Task != ref || sequence != 1 || operation.childPhase != 0 {
+func (og *OperationGeneration) ResultReady(ref TaskRef, sequence uint8) error {
+	if og.Child != ChildExecuting || og.Task != ref || sequence != 1 || og.childPhase != 0 {
 		return errors.New("jobmgr operation: stale child result")
 	}
-	operation.Child = ChildResultReady
-	operation.childPhase = sequence
+	og.Child = ChildResultReady
+	og.childPhase = sequence
 	return nil
 }
 
-func (operation *OperationGeneration) PhaseResultReady(
+func (og *OperationGeneration) PhaseResultReady(
 	ref TaskRef,
 	sequence uint8,
 ) error {
-	if operation.Child != ChildActionPending ||
-		operation.Task != ref ||
-		sequence != operation.childPhase {
+	if og.Child != ChildActionPending ||
+		og.Task != ref ||
+		sequence != og.childPhase {
 		return errors.New("jobmgr operation: stale child phase result")
 	}
-	operation.Child = ChildResultReady
+	og.Child = ChildResultReady
 	return nil
 }
 
-func (operation *OperationGeneration) ActionPending(ref TaskRef, sequence uint8) error {
-	if (operation.Child != ChildResultReady && operation.Child != ChildActionAcknowledged) || operation.Task != ref || sequence != operation.childPhase+1 {
+func (og *OperationGeneration) ActionPending(ref TaskRef, sequence uint8) error {
+	if (og.Child != ChildResultReady && og.Child != ChildActionAcknowledged) || og.Task != ref || sequence != og.childPhase+1 {
 		return errors.New("jobmgr operation: action without result")
 	}
-	operation.Child = ChildActionPending
-	operation.childPhase = sequence
+	og.Child = ChildActionPending
+	og.childPhase = sequence
 	return nil
 }
 
-func (operation *OperationGeneration) ActionAcknowledged(ref TaskRef, sequence uint8) error {
-	if operation.Child != ChildActionPending || operation.Task != ref || sequence != operation.childPhase {
+func (og *OperationGeneration) ActionAcknowledged(ref TaskRef, sequence uint8) error {
+	if og.Child != ChildActionPending || og.Task != ref || sequence != og.childPhase {
 		return errors.New("jobmgr operation: stale phase acknowledgement")
 	}
-	operation.Child = ChildActionAcknowledged
+	og.Child = ChildActionAcknowledged
 	return nil
 }
 
-func (operation *OperationGeneration) TerminationPending(ref TaskRef, sequence uint8) error {
-	if operation.Child != ChildActionAcknowledged || operation.Task != ref || sequence != operation.childPhase+1 {
+func (og *OperationGeneration) TerminationPending(ref TaskRef, sequence uint8) error {
+	if og.Child != ChildActionAcknowledged || og.Task != ref || sequence != og.childPhase+1 {
 		return errors.New("jobmgr operation: invalid termination action")
 	}
-	operation.Child = ChildTerminationPending
-	operation.childPhase = sequence
+	og.Child = ChildTerminationPending
+	og.childPhase = sequence
 	return nil
 }
 
-func (operation *OperationGeneration) ChildExited(ref TaskRef, sequence uint8) error {
-	if operation.Child != ChildTerminationPending || operation.Task != ref || sequence != operation.childPhase {
+func (og *OperationGeneration) ChildExited(ref TaskRef, sequence uint8) error {
+	if og.Child != ChildTerminationPending || og.Task != ref || sequence != og.childPhase {
 		return errors.New("jobmgr operation: stale child exit")
 	}
-	operation.Child = ChildExitAcknowledged
+	og.Child = ChildExitAcknowledged
 	return nil
 }
 
-func (operation *OperationGeneration) MarkResponsePending() error {
-	if operation.Response != ResponseOpen {
+func (og *OperationGeneration) MarkResponsePending() error {
+	if og.Response != ResponseOpen {
 		return errors.New("jobmgr operation: response is not open")
 	}
-	operation.Response = ResponsePending
+	og.Response = ResponsePending
 	return nil
 }
 
-func (operation *OperationGeneration) CommitResponse() error {
-	if operation.Response != ResponseOpen && operation.Response != ResponsePending {
+func (og *OperationGeneration) CommitResponse() error {
+	if og.Response != ResponseOpen && og.Response != ResponsePending {
 		return errors.New("jobmgr operation: response cannot commit")
 	}
-	operation.Response = ResponseCommitted
+	og.Response = ResponseCommitted
 	return nil
 }
 
-func (operation *OperationGeneration) PoisonResponse() {
-	operation.Response = ResponsePoisoned
+func (og *OperationGeneration) PoisonResponse() {
+	og.Response = ResponsePoisoned
 }
 
-func (operation *OperationGeneration) MarkTimedOut() {
-	operation.timedOut = true
+func (og *OperationGeneration) MarkTimedOut() {
+	og.timedOut = true
 }
 
-func (operation *OperationGeneration) TimedOut() bool {
-	return operation.timedOut
+func (og *OperationGeneration) TimedOut() bool {
+	return og.timedOut
 }
 
-func (operation *OperationGeneration) CanDisposeTerminal() bool {
-	responseTerminal := operation.Response == ResponseNotRequired || operation.Response == ResponseCommitted || operation.Response == ResponsePoisoned
-	childTerminal := operation.Child == ChildNotStarted || operation.Child == ChildAbandonedBeforeStart || operation.Child == ChildExitAcknowledged
+func (og *OperationGeneration) CanDisposeTerminal() bool {
+	responseTerminal := og.Response == ResponseNotRequired || og.Response == ResponseCommitted || og.Response == ResponsePoisoned
+	childTerminal := og.Child == ChildNotStarted || og.Child == ChildAbandonedBeforeStart || og.Child == ChildExitAcknowledged
 	return responseTerminal && childTerminal
 }

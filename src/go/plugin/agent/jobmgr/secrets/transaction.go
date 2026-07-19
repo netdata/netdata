@@ -62,25 +62,25 @@ func newPreparedSecretTransaction(
 	return &preparedSecretTransaction{spec: spec}, nil
 }
 
-func (transaction *preparedSecretTransaction) Scope() lifecycle.ResourceTransactionScope {
-	if transaction == nil {
+func (pst *preparedSecretTransaction) Scope() lifecycle.ResourceTransactionScope {
+	if pst == nil {
 		return lifecycle.ResourceTransactionScope{}
 	}
-	transaction.mu.Lock()
-	defer transaction.mu.Unlock()
-	if transaction.consumed {
+	pst.mu.Lock()
+	defer pst.mu.Unlock()
+	if pst.consumed {
 		return lifecycle.ResourceTransactionScope{}
 	}
-	return transaction.spec.scope
+	return pst.spec.scope
 }
 
-func (transaction *preparedSecretTransaction) Apply(
+func (pst *preparedSecretTransaction) Apply(
 	ctx context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	return transaction.apply(ctx, nil)
+	return pst.apply(ctx, nil)
 }
 
-func (transaction *preparedSecretTransaction) ApplyComposite(
+func (pst *preparedSecretTransaction) ApplyComposite(
 	ctx context.Context,
 	commands jobmgr.CompositeCommandScope,
 ) (lifecycle.AppliedResourceTransaction, error) {
@@ -88,14 +88,14 @@ func (transaction *preparedSecretTransaction) ApplyComposite(
 		return lifecycle.AppliedResourceTransaction{},
 			errors.New("jobmgr secrets: nil composite command scope")
 	}
-	return transaction.apply(ctx, commands)
+	return pst.apply(ctx, commands)
 }
 
-func (transaction *preparedSecretTransaction) apply(
+func (pst *preparedSecretTransaction) apply(
 	ctx context.Context,
 	commands jobmgr.CompositeCommandScope,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	spec, err := transaction.take()
+	spec, err := pst.take()
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
@@ -261,10 +261,10 @@ func (transaction *preparedSecretTransaction) apply(
 	)
 }
 
-func (transaction *preparedSecretTransaction) Dispose(
+func (pst *preparedSecretTransaction) Dispose(
 	ctx context.Context,
 ) (lifecycle.ReadyResource, error) {
-	spec, err := transaction.take()
+	spec, err := pst.take()
 	if err != nil {
 		return nil, err
 	}
@@ -281,24 +281,24 @@ func (transaction *preparedSecretTransaction) Dispose(
 	return spec.current, err
 }
 
-func (transaction *preparedSecretTransaction) take() (
+func (pst *preparedSecretTransaction) take() (
 	preparedSecretSpec,
 	error,
 ) {
-	if transaction == nil {
+	if pst == nil {
 		return preparedSecretSpec{},
 			errors.New("jobmgr secrets: nil prepared transaction")
 	}
-	transaction.mu.Lock()
-	defer transaction.mu.Unlock()
-	if transaction.consumed {
+	pst.mu.Lock()
+	defer pst.mu.Unlock()
+	if pst.consumed {
 		return preparedSecretSpec{},
 			errors.New(
 				"jobmgr secrets: prepared transaction consumed",
 			)
 	}
-	transaction.consumed = true
-	spec := transaction.spec
-	transaction.spec = preparedSecretSpec{}
+	pst.consumed = true
+	spec := pst.spec
+	pst.spec = preparedSecretSpec{}
 	return spec, nil
 }

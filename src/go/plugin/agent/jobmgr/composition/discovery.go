@@ -24,18 +24,18 @@ type runDiscoveryServices struct {
 	AutoEnable   bool
 }
 
-func (services runDiscoveryServices) valid() bool {
-	return services.Providers != nil && services.Providers.Len() > 0
+func (rds runDiscoveryServices) valid() bool {
+	return rds.Providers != nil && rds.Providers.Len() > 0
 }
 
-func (generation *runGeneration) startDiscovery(ctx context.Context) error {
-	if generation == nil || ctx == nil || !generation.discovery.valid() {
+func (rg *runGeneration) startDiscovery(ctx context.Context) error {
+	if rg == nil || ctx == nil || !rg.discovery.valid() {
 		return errors.New("jobmgr composition: invalid discovery start")
 	}
 	pipeline, err := agentdiscovery.NewPipelineGeneration(
 		agentdiscovery.PipelineConfig{
-			BuildContext: generation.discovery.BuildContext,
-			Providers:    generation.discovery.Providers,
+			BuildContext: rg.discovery.BuildContext,
+			Providers:    rg.discovery.Providers,
 		},
 	)
 	if err != nil {
@@ -43,14 +43,14 @@ func (generation *runGeneration) startDiscovery(ctx context.Context) error {
 	}
 	decisions, err := jobmgrdiscovery.NewDecisionIndex(
 		jobmgrdiscovery.DecisionConfig{
-			Generation: generation.run.Generation(),
-			RunJob:     generation.discovery.RunJob,
-			AutoEnable: generation.discovery.AutoEnable,
-			Commands:   generation.kernel,
+			Generation: rg.run.Generation(),
+			RunJob:     rg.discovery.RunJob,
+			AutoEnable: rg.discovery.AutoEnable,
+			Commands:   rg.kernel,
 			Plan: func(
 				change jobmgrdiscovery.DiscoveredChange,
 			) (jobmgr.WorkPlan, error) {
-				return generation.dyncfg.PlanDiscovered(
+				return rg.dyncfg.PlanDiscovered(
 					joboutput.DiscoveredJobChange{
 						Config: change.Config,
 						Status: change.Status,
@@ -64,7 +64,7 @@ func (generation *runGeneration) startDiscovery(ctx context.Context) error {
 		return err
 	}
 	permitPlan, err := lifecycle.NewPipelineLongLivedPlan(
-		generation.discovery.Providers.Names(),
+		rg.discovery.Providers.Names(),
 	)
 	if err != nil {
 		return err
@@ -104,15 +104,15 @@ func (generation *runGeneration) startDiscovery(ctx context.Context) error {
 		prepared, err := newPreparedDiscovery(
 			pipeline,
 			decisions,
-			generation.tasks,
+			rg.tasks,
 			scope.Successor,
 			permit,
 			func(cause error) {
 				if cause == nil {
 					return
 				}
-				_ = generation.run.Dirty(cause)
-				generation.kernel.Stop()
+				_ = rg.run.Dirty(cause)
+				rg.kernel.Stop()
 			},
 		)
 		if err != nil {
@@ -128,12 +128,12 @@ func (generation *runGeneration) startDiscovery(ctx context.Context) error {
 			},
 		)
 	}
-	return generation.kernel.SubmitPreparedAndWait(
+	return rg.kernel.SubmitPreparedAndWait(
 		ctx,
 		jobmgr.Request{
 			UID: fmt.Sprintf(
 				"jobmgr-discovery-%d",
-				generation.run.Generation(),
+				rg.run.Generation(),
 			),
 			LaneKey: discoveryResourceID,
 			Source:  lifecycle.SourceJobManager,
@@ -173,26 +173,26 @@ func newPreparedDiscovery(
 	}, nil
 }
 
-func (prepared *preparedDiscovery) Identity() lifecycle.ResourceIdentity {
-	if prepared == nil {
+func (pd *preparedDiscovery) Identity() lifecycle.ResourceIdentity {
+	if pd == nil {
 		return lifecycle.ResourceIdentity{}
 	}
-	return prepared.identity
+	return pd.identity
 }
 
-func (prepared *preparedDiscovery) AcceptStart(
+func (pd *preparedDiscovery) AcceptStart(
 	ctx context.Context,
 	expected uint64,
 ) (lifecycle.ReadyResource, error) {
-	if prepared == nil || ctx == nil || expected != prepared.identity.Generation {
+	if pd == nil || ctx == nil || expected != pd.identity.Generation {
 		return nil, errors.New("jobmgr composition: invalid discovery acceptance")
 	}
 	resource := &readyDiscovery{
-		pipeline: prepared.pipeline, decisions: prepared.decisions,
-		tasks: prepared.tasks, identity: prepared.identity,
-		permit: prepared.permit, fail: prepared.fail,
-		providerNames:    prepared.pipeline.ProviderNames(),
-		disabledNames:    prepared.pipeline.DisabledProviderNames(),
+		pipeline: pd.pipeline, decisions: pd.decisions,
+		tasks: pd.tasks, identity: pd.identity,
+		permit: pd.permit, fail: pd.fail,
+		providerNames:    pd.pipeline.ProviderNames(),
+		disabledNames:    pd.pipeline.DisabledProviderNames(),
 		providerRefs:     make(map[string]lifecycle.InheritedTaskRef),
 		providerReleased: make(map[string]bool),
 		published:        make(chan struct{}),
@@ -207,11 +207,11 @@ func (prepared *preparedDiscovery) AcceptStart(
 	return resource, nil
 }
 
-func (prepared *preparedDiscovery) Dispose(context.Context) error {
-	if prepared == nil {
+func (pd *preparedDiscovery) Dispose(context.Context) error {
+	if pd == nil {
 		return nil
 	}
-	return prepared.permit.AbortUnused()
+	return pd.permit.AbortUnused()
 }
 
 type readyDiscovery struct {
@@ -241,25 +241,25 @@ type readyDiscovery struct {
 	permitReturned     bool
 }
 
-func (resource *readyDiscovery) Identity() lifecycle.ResourceIdentity {
-	if resource == nil {
+func (rd *readyDiscovery) Identity() lifecycle.ResourceIdentity {
+	if rd == nil {
 		return lifecycle.ResourceIdentity{}
 	}
-	return resource.identity
+	return rd.identity
 }
 
-func (resource *readyDiscovery) start(ctx context.Context) error {
-	resource.mu.Lock()
-	defer resource.mu.Unlock()
-	if resource.started {
+func (rd *readyDiscovery) start(ctx context.Context) error {
+	rd.mu.Lock()
+	defer rd.mu.Unlock()
+	if rd.started {
 		return errors.New("jobmgr composition: discovery already started")
 	}
-	if err := resource.permit.ActivateExternal(lifecycle.LongLivedEProvider); err != nil {
+	if err := rd.permit.ActivateExternal(lifecycle.LongLivedEProvider); err != nil {
 		return err
 	}
-	resource.externalActivated = true
-	for _, name := range resource.disabledNames {
-		if err := resource.permit.ReleaseUnusedInherited(
+	rd.externalActivated = true
+	for _, name := range rd.disabledNames {
+		if err := rd.permit.ReleaseUnusedInherited(
 			lifecycle.InheritedPipelineProvider,
 			name,
 		); err != nil {
@@ -267,64 +267,64 @@ func (resource *readyDiscovery) start(ctx context.Context) error {
 		}
 	}
 	supervisorReady := make(chan struct{})
-	supervisorRef, err := resource.tasks.StartInheritedWithPermit(
+	supervisorRef, err := rd.tasks.StartInheritedWithPermit(
 		context.WithoutCancel(ctx),
-		resource.identity,
+		rd.identity,
 		lifecycle.InheritedPipelineSupervisor,
-		resource.permit,
+		rd.permit,
 		func(runCtx context.Context) error {
 			close(supervisorReady)
 			if !waitDiscoveryPublication(
 				runCtx,
-				resource.published,
+				rd.published,
 			) {
 				return nil
 			}
 			return runDiscoverySupervisor(
 				runCtx,
-				resource.pipeline,
-				resource.decisions,
-				resource.fail,
+				rd.pipeline,
+				rd.decisions,
+				rd.fail,
 			)
 		},
 	)
 	if err != nil {
 		return err
 	}
-	resource.supervisorRef = supervisorRef
+	rd.supervisorRef = supervisorRef
 	<-supervisorReady
-	for _, name := range resource.providerNames {
+	for _, name := range rd.providerNames {
 		name := name
 		providerReady := make(chan struct{})
-		ref, err := resource.tasks.StartInheritedWithPermitKey(
+		ref, err := rd.tasks.StartInheritedWithPermitKey(
 			context.WithoutCancel(ctx),
-			resource.identity,
+			rd.identity,
 			lifecycle.InheritedPipelineProvider,
 			name,
-			resource.permit,
+			rd.permit,
 			func(runCtx context.Context) error {
 				close(providerReady)
 				if !waitDiscoveryPublication(
 					runCtx,
-					resource.published,
+					rd.published,
 				) {
 					return nil
 				}
 				return runDiscoveryProvider(
 					runCtx,
-					resource.pipeline,
+					rd.pipeline,
 					name,
-					resource.fail,
+					rd.fail,
 				)
 			},
 		)
 		if err != nil {
 			return err
 		}
-		resource.providerRefs[name] = ref
+		rd.providerRefs[name] = ref
 		<-providerReady
 	}
-	resource.started = true
+	rd.started = true
 	return nil
 }
 
@@ -389,22 +389,22 @@ func runDiscoveryProvider(
 	return pipeline.RunProvider(ctx, name)
 }
 
-func (resource *readyDiscovery) abortStart() error {
-	if resource == nil {
+func (rd *readyDiscovery) abortStart() error {
+	if rd == nil {
 		return errors.New("jobmgr composition: invalid discovery start abort")
 	}
-	resource.mu.Lock()
-	supervisorRef := resource.supervisorRef
-	providerNames := append([]string(nil), resource.providerNames...)
+	rd.mu.Lock()
+	supervisorRef := rd.supervisorRef
+	providerNames := append([]string(nil), rd.providerNames...)
 	providerRefs := make(
 		map[string]lifecycle.InheritedTaskRef,
-		len(resource.providerRefs),
+		len(rd.providerRefs),
 	)
-	for name, ref := range resource.providerRefs {
+	for name, ref := range rd.providerRefs {
 		providerRefs[name] = ref
 	}
-	externalActivated := resource.externalActivated
-	resource.mu.Unlock()
+	externalActivated := rd.externalActivated
+	rd.mu.Unlock()
 
 	// Publication is still closed, so every started child is a framework gate
 	// waiter and must terminate when its inherited context is canceled.
@@ -412,9 +412,9 @@ func (resource *readyDiscovery) abortStart() error {
 	if supervisorRef.Generation != 0 {
 		cleanupErr = errors.Join(
 			cleanupErr,
-			resource.tasks.CancelInherited(
+			rd.tasks.CancelInherited(
 				supervisorRef,
-				resource.identity,
+				rd.identity,
 			),
 		)
 	}
@@ -422,9 +422,9 @@ func (resource *readyDiscovery) abortStart() error {
 		if ref := providerRefs[name]; ref.Generation != 0 {
 			cleanupErr = errors.Join(
 				cleanupErr,
-				resource.tasks.CancelInherited(
+				rd.tasks.CancelInherited(
 					ref,
-					resource.identity,
+					rd.identity,
 				),
 			)
 		}
@@ -434,10 +434,10 @@ func (resource *readyDiscovery) abortStart() error {
 		if ref.Generation == 0 {
 			continue
 		}
-		joined, err := resource.tasks.JoinInherited(
+		joined, err := rd.tasks.JoinInherited(
 			context.Background(),
 			ref,
-			resource.identity,
+			rd.identity,
 		)
 		if !joined {
 			cleanupErr = errors.Join(cleanupErr, err)
@@ -445,26 +445,26 @@ func (resource *readyDiscovery) abortStart() error {
 		}
 		cleanupErr = errors.Join(
 			cleanupErr,
-			resource.tasks.ReleaseInherited(
+			rd.tasks.ReleaseInherited(
 				ref,
-				resource.identity,
+				rd.identity,
 			),
 		)
 	}
 	if supervisorRef.Generation != 0 {
-		joined, err := resource.tasks.JoinInherited(
+		joined, err := rd.tasks.JoinInherited(
 			context.Background(),
 			supervisorRef,
-			resource.identity,
+			rd.identity,
 		)
 		if !joined {
 			cleanupErr = errors.Join(cleanupErr, err)
 		} else {
 			cleanupErr = errors.Join(
 				cleanupErr,
-				resource.tasks.ReleaseInherited(
+				rd.tasks.ReleaseInherited(
 					supervisorRef,
-					resource.identity,
+					rd.identity,
 				),
 			)
 		}
@@ -472,66 +472,66 @@ func (resource *readyDiscovery) abortStart() error {
 	if externalActivated {
 		cleanupErr = errors.Join(
 			cleanupErr,
-			resource.permit.ReleaseExternal(
+			rd.permit.ReleaseExternal(
 				lifecycle.LongLivedEProvider,
 			),
 		)
 	}
 	cleanupErr = errors.Join(
 		cleanupErr,
-		resource.permit.AbortUnused(),
+		rd.permit.AbortUnused(),
 	)
 	return cleanupErr
 }
 
-func (resource *readyDiscovery) Publish() error {
-	if resource == nil {
+func (rd *readyDiscovery) Publish() error {
+	if rd == nil {
 		return errors.New("jobmgr composition: nil discovery publication")
 	}
-	resource.mu.Lock()
-	defer resource.mu.Unlock()
-	if !resource.started || resource.isPublished ||
-		resource.stopped || resource.finalized {
+	rd.mu.Lock()
+	defer rd.mu.Unlock()
+	if !rd.started || rd.isPublished ||
+		rd.stopped || rd.finalized {
 		return errors.New(
 			"jobmgr composition: invalid discovery publication",
 		)
 	}
-	resource.isPublished = true
-	close(resource.published)
+	rd.isPublished = true
+	close(rd.published)
 	return nil
 }
 
-func (resource *readyDiscovery) AbortReady(ctx context.Context) error {
-	return errors.Join(resource.Stop(ctx), resource.Finalize())
+func (rd *readyDiscovery) AbortReady(ctx context.Context) error {
+	return errors.Join(rd.Stop(ctx), rd.Finalize())
 }
 
-func (resource *readyDiscovery) Stop(ctx context.Context) error {
-	if resource == nil || ctx == nil {
+func (rd *readyDiscovery) Stop(ctx context.Context) error {
+	if rd == nil || ctx == nil {
 		return errors.New("jobmgr composition: invalid discovery stop")
 	}
-	resource.mu.Lock()
-	if !resource.started {
-		resource.mu.Unlock()
+	rd.mu.Lock()
+	if !rd.started {
+		rd.mu.Unlock()
 		return errors.New("jobmgr composition: discovery was not started")
 	}
-	if resource.stopped {
-		resource.mu.Unlock()
+	if rd.stopped {
+		rd.mu.Unlock()
 		return nil
 	}
-	supervisorRef := resource.supervisorRef
-	providerNames := append([]string(nil), resource.providerNames...)
+	supervisorRef := rd.supervisorRef
+	providerNames := append([]string(nil), rd.providerNames...)
 	providerRefs := make(
 		map[string]lifecycle.InheritedTaskRef,
-		len(resource.providerRefs),
+		len(rd.providerRefs),
 	)
-	for name, ref := range resource.providerRefs {
+	for name, ref := range rd.providerRefs {
 		providerRefs[name] = ref
 	}
-	resource.mu.Unlock()
+	rd.mu.Unlock()
 
 	cancelErr := cancelDiscoveryTasks(
-		resource.tasks.CancelInherited,
-		resource.identity,
+		rd.tasks.CancelInherited,
+		rd.identity,
 		supervisorRef,
 		providerNames,
 		providerRefs,
@@ -539,10 +539,10 @@ func (resource *readyDiscovery) Stop(ctx context.Context) error {
 	var joinErr error
 	for _, name := range providerNames {
 		ref := providerRefs[name]
-		joined, err := resource.tasks.JoinInherited(
+		joined, err := rd.tasks.JoinInherited(
 			ctx,
 			ref,
-			resource.identity,
+			rd.identity,
 		)
 		if !joined {
 			err = errors.Join(
@@ -555,10 +555,10 @@ func (resource *readyDiscovery) Stop(ctx context.Context) error {
 		}
 		joinErr = errors.Join(joinErr, err)
 	}
-	supervisorJoined, supervisorErr := resource.tasks.JoinInherited(
+	supervisorJoined, supervisorErr := rd.tasks.JoinInherited(
 		ctx,
 		supervisorRef,
-		resource.identity,
+		rd.identity,
 	)
 	if !supervisorJoined {
 		supervisorErr = errors.Join(
@@ -571,9 +571,9 @@ func (resource *readyDiscovery) Stop(ctx context.Context) error {
 	if err := errors.Join(cancelErr, joinErr, supervisorErr); err != nil {
 		return err
 	}
-	resource.mu.Lock()
-	resource.stopped = true
-	resource.mu.Unlock()
+	rd.mu.Lock()
+	rd.stopped = true
+	rd.mu.Unlock()
 	return nil
 }
 
@@ -600,66 +600,66 @@ func cancelDiscoveryTasks(
 	return err
 }
 
-func (resource *readyDiscovery) Finalize() error {
-	if resource == nil {
+func (rd *readyDiscovery) Finalize() error {
+	if rd == nil {
 		return errors.New("jobmgr composition: nil discovery finalization")
 	}
-	resource.mu.Lock()
-	if !resource.stopped {
-		resource.mu.Unlock()
+	rd.mu.Lock()
+	if !rd.stopped {
+		rd.mu.Unlock()
 		return errors.New("jobmgr composition: discovery finalized before stop")
 	}
-	if resource.finalized {
-		resource.mu.Unlock()
+	if rd.finalized {
+		rd.mu.Unlock()
 		return nil
 	}
-	for _, name := range resource.providerNames {
-		if resource.providerReleased[name] {
+	for _, name := range rd.providerNames {
+		if rd.providerReleased[name] {
 			continue
 		}
-		if err := resource.tasks.ReleaseInherited(
-			resource.providerRefs[name],
-			resource.identity,
+		if err := rd.tasks.ReleaseInherited(
+			rd.providerRefs[name],
+			rd.identity,
 		); err != nil {
-			resource.mu.Unlock()
+			rd.mu.Unlock()
 			return err
 		}
-		resource.providerReleased[name] = true
+		rd.providerReleased[name] = true
 	}
-	if !resource.supervisorReleased {
-		if err := resource.tasks.ReleaseInherited(
-			resource.supervisorRef,
-			resource.identity,
+	if !rd.supervisorReleased {
+		if err := rd.tasks.ReleaseInherited(
+			rd.supervisorRef,
+			rd.identity,
 		); err != nil {
-			resource.mu.Unlock()
+			rd.mu.Unlock()
 			return err
 		}
-		resource.supervisorReleased = true
+		rd.supervisorReleased = true
 	}
-	if !resource.externalReleased {
-		if err := resource.permit.ReleaseExternal(
+	if !rd.externalReleased {
+		if err := rd.permit.ReleaseExternal(
 			lifecycle.LongLivedEProvider,
 		); err != nil {
-			resource.mu.Unlock()
+			rd.mu.Unlock()
 			return err
 		}
-		resource.externalReleased = true
+		rd.externalReleased = true
 	}
-	if !resource.bytesReleased {
-		if err := resource.permit.ReleaseBytes(); err != nil {
-			resource.mu.Unlock()
+	if !rd.bytesReleased {
+		if err := rd.permit.ReleaseBytes(); err != nil {
+			rd.mu.Unlock()
 			return err
 		}
-		resource.bytesReleased = true
+		rd.bytesReleased = true
 	}
-	if !resource.permitReturned {
-		if err := resource.permit.Return(); err != nil {
-			resource.mu.Unlock()
+	if !rd.permitReturned {
+		if err := rd.permit.Return(); err != nil {
+			rd.mu.Unlock()
 			return err
 		}
-		resource.permitReturned = true
+		rd.permitReturned = true
 	}
-	resource.finalized = true
-	resource.mu.Unlock()
+	rd.finalized = true
+	rd.mu.Unlock()
 	return nil
 }

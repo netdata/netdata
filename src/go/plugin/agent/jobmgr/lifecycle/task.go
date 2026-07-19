@@ -149,53 +149,53 @@ func NewTaskSupervisor(frame *FrameOwner) (*TaskSupervisor, error) {
 	return supervisor, nil
 }
 
-func (supervisor *TaskSupervisor) BindRuntimeObserver(
+func (ts *TaskSupervisor) BindRuntimeObserver(
 	observer RuntimeObserver,
 ) error {
-	if supervisor == nil || observer == nil {
+	if ts == nil || observer == nil {
 		return errors.New("jobmgr task supervisor: invalid runtime observer")
 	}
-	if supervisor.observer != nil || supervisor.active != 0 ||
-		supervisor.Pending() != 0 {
+	if ts.observer != nil || ts.active != 0 ||
+		ts.Pending() != 0 {
 		return errors.New("jobmgr task supervisor: runtime observer bound after activation")
 	}
-	supervisor.observer = observer
-	supervisor.observeRuntimeState()
+	ts.observer = observer
+	ts.observeRuntimeState()
 	return nil
 }
 
-func (supervisor *TaskSupervisor) BindAdmissionReady(notify func()) error {
-	if supervisor == nil || notify == nil {
+func (ts *TaskSupervisor) BindAdmissionReady(notify func()) error {
+	if ts == nil || notify == nil {
 		return errors.New("jobmgr task supervisor: invalid admission-ready binding")
 	}
-	supervisor.admissionReadyMu.Lock()
-	if supervisor.onAdmissionReady != nil {
-		supervisor.admissionReadyMu.Unlock()
+	ts.admissionReadyMu.Lock()
+	if ts.onAdmissionReady != nil {
+		ts.admissionReadyMu.Unlock()
 		return errors.New("jobmgr task supervisor: admission-ready notifier already bound")
 	}
-	supervisor.onAdmissionReady = notify
-	pending := supervisor.admissionReadyPending
-	supervisor.admissionReadyPending = false
-	supervisor.admissionReadyMu.Unlock()
+	ts.onAdmissionReady = notify
+	pending := ts.admissionReadyPending
+	ts.admissionReadyPending = false
+	ts.admissionReadyMu.Unlock()
 	if pending {
 		notify()
 	}
 	return nil
 }
 
-func (supervisor *TaskSupervisor) notifyAdmissionReady() {
-	supervisor.admissionReadyMu.Lock()
-	notify := supervisor.onAdmissionReady
+func (ts *TaskSupervisor) notifyAdmissionReady() {
+	ts.admissionReadyMu.Lock()
+	notify := ts.onAdmissionReady
 	if notify == nil {
-		supervisor.admissionReadyPending = true
+		ts.admissionReadyPending = true
 	}
-	supervisor.admissionReadyMu.Unlock()
+	ts.admissionReadyMu.Unlock()
 	if notify != nil {
 		notify()
 	}
 }
 
-func (supervisor *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskRequestRef, error) {
+func (ts *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskRequestRef, error) {
 	if !class.Valid() {
 		return TaskRequestRef{}, errors.New("jobmgr task supervisor: invalid scheduling class")
 	}
@@ -212,23 +212,23 @@ func (supervisor *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskR
 		plan.initialReady = nil
 		plan.initialIdentity = ResourceIdentity{}
 	}
-	slot := supervisor.freeRequest
+	slot := ts.freeRequest
 	reused := slot != 0
 	if slot == 0 {
-		if uint64(len(supervisor.requests)) > uint64(^uint32(0)) {
+		if uint64(len(ts.requests)) > uint64(^uint32(0)) {
 			return TaskRequestRef{}, errors.New("jobmgr task supervisor: request reference space exhausted")
 		}
-		slot = uint32(len(supervisor.requests))
-		supervisor.requests = append(supervisor.requests, &taskRequest{slot: slot})
+		slot = uint32(len(ts.requests))
+		ts.requests = append(ts.requests, &taskRequest{slot: slot})
 	}
-	record := supervisor.requests[slot]
+	record := ts.requests[slot]
 	if reused {
-		supervisor.freeRequest = record.freeNext
+		ts.freeRequest = record.freeNext
 	}
 	generation := record.generation + 1
 	if generation == 0 {
-		record.freeNext = supervisor.freeRequest
-		supervisor.freeRequest = slot
+		record.freeNext = ts.freeRequest
+		ts.freeRequest = slot
 		return TaskRequestRef{}, errors.New("jobmgr task supervisor: request generation wrapped")
 	}
 	*record = taskRequest{
@@ -236,33 +236,33 @@ func (supervisor *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskR
 		class: class, plan: plan, initial: initial,
 		queuedAt: time.Now(),
 	}
-	queue := &supervisor.pending[taskClassIndex(class)]
+	queue := &ts.pending[taskClassIndex(class)]
 	record.previous = queue.tail
 	if queue.tail != 0 {
-		supervisor.requests[queue.tail].next = slot
+		ts.requests[queue.tail].next = slot
 	} else {
 		queue.head = slot
 	}
 	queue.tail = slot
 	queue.count++
-	supervisor.observeRuntimeState()
+	ts.observeRuntimeState()
 	return TaskRequestRef{Slot: slot, Generation: generation}, nil
 }
 
-func (supervisor *TaskSupervisor) CancelPending(ref TaskRequestRef) error {
-	record, err := supervisor.request(ref)
+func (ts *TaskSupervisor) CancelPending(ref TaskRequestRef) error {
+	record, err := ts.request(ref)
 	if err != nil {
 		return err
 	}
 	if !record.initial.empty() {
 		return errors.New("jobmgr task supervisor: pending ready resource requires transfer-aware cancellation")
 	}
-	supervisor.removeRequest(record)
+	ts.removeRequest(record)
 	return nil
 }
 
-func (supervisor *TaskSupervisor) SetPendingCancellation(ref TaskRequestRef, cause error) error {
-	record, err := supervisor.request(ref)
+func (ts *TaskSupervisor) SetPendingCancellation(ref TaskRequestRef, cause error) error {
+	record, err := ts.request(ref)
 	if err != nil {
 		return err
 	}
@@ -279,8 +279,8 @@ func (supervisor *TaskSupervisor) SetPendingCancellation(ref TaskRequestRef, cau
 	return nil
 }
 
-func (supervisor *TaskSupervisor) CancelPendingOutcome(ref TaskRequestRef) (TaskOutcome, error) {
-	record, err := supervisor.request(ref)
+func (ts *TaskSupervisor) CancelPendingOutcome(ref TaskRequestRef) (TaskOutcome, error) {
+	record, err := ts.request(ref)
 	if err != nil {
 		return TaskOutcome{}, err
 	}
@@ -289,58 +289,58 @@ func (supervisor *TaskSupervisor) CancelPendingOutcome(ref TaskRequestRef) (Task
 		outcome = record.initial
 		record.initial = TaskOutcome{}
 	}
-	supervisor.removeRequest(record)
+	ts.removeRequest(record)
 	return outcome, nil
 }
 
-func (supervisor *TaskSupervisor) Dispatch(parent context.Context, quantum int, started *[TaskStartServiceQuantum]TaskStart) (int, bool, error) {
+func (ts *TaskSupervisor) Dispatch(parent context.Context, quantum int, started *[TaskStartServiceQuantum]TaskStart) (int, bool, error) {
 	if parent == nil || started == nil || quantum < 0 || quantum > len(started) {
-		return 0, supervisor.Pending() > 0, errors.New("jobmgr task supervisor: invalid dispatch")
+		return 0, ts.Pending() > 0, errors.New("jobmgr task supervisor: invalid dispatch")
 	}
 	count := 0
 	for count < quantum {
-		first := taskClassIndex(supervisor.nextClass)
+		first := taskClassIndex(ts.nextClass)
 		second := 1 - first
 		selected := first
-		if supervisor.pending[selected].head == 0 {
+		if ts.pending[selected].head == 0 {
 			selected = second
 		}
-		queue := &supervisor.pending[selected]
+		queue := &ts.pending[selected]
 		if queue.head == 0 {
 			break
 		}
-		record := supervisor.requests[queue.head]
+		record := ts.requests[queue.head]
 		requestRef := TaskRequestRef{Slot: record.slot, Generation: record.generation}
-		taskRef, err := supervisor.start(parent, record.plan, record.initial)
+		taskRef, err := ts.start(parent, record.plan, record.initial)
 		if err != nil {
 			if errors.Is(err, ErrLongLivedRecordCapacity) {
 				outcome := record.initial
 				record.initial = TaskOutcome{}
-				supervisor.removeRequest(record)
+				ts.removeRequest(record)
 				started[count] = TaskStart{
 					Request: requestRef,
 					Outcome: outcome,
 					Err:     err,
 				}
 				count++
-				supervisor.nextClass = otherTaskClass(classForTaskIndex(selected))
+				ts.nextClass = otherTaskClass(classForTaskIndex(selected))
 				continue
 			}
 			return count, true, err
 		}
-		supervisor.removeRequest(record)
+		ts.removeRequest(record)
 		started[count] = TaskStart{Request: requestRef, Task: taskRef}
 		count++
-		supervisor.nextClass = otherTaskClass(classForTaskIndex(selected))
+		ts.nextClass = otherTaskClass(classForTaskIndex(selected))
 	}
-	return count, supervisor.Pending() > 0, nil
+	return count, ts.Pending() > 0, nil
 }
 
-func (supervisor *TaskSupervisor) Pending() int {
-	return supervisor.pending[0].count + supervisor.pending[1].count
+func (ts *TaskSupervisor) Pending() int {
+	return ts.pending[0].count + ts.pending[1].count
 }
 
-func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial TaskOutcome) (TaskRef, error) {
+func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial TaskOutcome) (TaskRef, error) {
 	hasDirectWork := plan.Work != nil ||
 		plan.Runner != nil ||
 		plan.permitWork != nil ||
@@ -359,18 +359,18 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 		(initial.empty() == plan.transactionScope.Current.Valid()) {
 		return TaskRef{}, errors.New("jobmgr task supervisor: invalid sealed task request")
 	}
-	index, slot, err := supervisor.allocateSlot()
+	index, slot, err := ts.allocateSlot()
 	if err != nil {
 		return TaskRef{}, err
 	}
 	launched := false
 	defer func() {
 		if !launched {
-			supervisor.recycleUnusedSlot(index, slot)
+			ts.recycleUnusedSlot(index, slot)
 		}
 	}()
 	if plan.permitWork != nil {
-		permit, err := supervisor.IssueLongLivedPermit(plan.permitAdmission, plan.permitAdmissionRef, plan.permitOwner, plan.permitPlan)
+		permit, err := ts.IssueLongLivedPermit(plan.permitAdmission, plan.permitAdmissionRef, plan.permitOwner, plan.permitPlan)
 		if err != nil {
 			return TaskRef{}, err
 		}
@@ -411,7 +411,7 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 		plan.permitWork = nil
 	}
 	if plan.capabilityPermitWork != nil {
-		permit, err := supervisor.IssueLongLivedPermit(plan.permitAdmission, plan.permitAdmissionRef, plan.permitOwner, plan.permitPlan)
+		permit, err := ts.IssueLongLivedPermit(plan.permitAdmission, plan.permitAdmissionRef, plan.permitOwner, plan.permitPlan)
 		if err != nil {
 			return TaskRef{}, err
 		}
@@ -470,7 +470,7 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 		initial = TaskOutcome{}
 		var permit LongLivedPermit
 		if plan.transactionScope.Successor.Valid() {
-			issued, err := supervisor.IssueLongLivedPermit(
+			issued, err := ts.IssueLongLivedPermit(
 				plan.permitAdmission,
 				plan.permitAdmissionRef,
 				plan.permitOwner,
@@ -573,30 +573,30 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 	slot.preserveDisposeContext = plan.preserveDisposeContext
 	slot.maxPhaseTransitions = plan.phaseLimit()
 	ref := TaskRef{Slot: index, Generation: slot.generation}
-	supervisor.active++
-	supervisor.observeRuntimeState()
+	ts.active++
+	ts.observeRuntimeState()
 	launched = true
-	go supervisor.runChild(ctx, ref, slot, plan, initial)
+	go ts.runChild(ctx, ref, slot, plan, initial)
 	return ref, nil
 }
 
-func (supervisor *TaskSupervisor) allocateSlot() (uint32, *taskSlot, error) {
+func (ts *TaskSupervisor) allocateSlot() (uint32, *taskSlot, error) {
 	var index uint32
 	var slot *taskSlot
-	if supervisor.freeSlot == 0 {
-		if uint64(len(supervisor.slots)) > uint64(^uint32(0)) {
+	if ts.freeSlot == 0 {
+		if uint64(len(ts.slots)) > uint64(^uint32(0)) {
 			return 0, nil, errors.New("jobmgr task supervisor: reference space exhausted")
 		}
-		index = uint32(len(supervisor.slots))
+		index = uint32(len(ts.slots))
 		slot = &taskSlot{action: make(chan TaskAction, 1)}
-		supervisor.slots = append(supervisor.slots, slot)
+		ts.slots = append(ts.slots, slot)
 	} else {
-		index = supervisor.freeSlot - 1
-		slot = supervisor.slots[index]
+		index = ts.freeSlot - 1
+		slot = ts.slots[index]
 		if slot == nil {
 			return 0, nil, errors.New("jobmgr task supervisor: nil reusable slot")
 		}
-		supervisor.freeSlot = slot.freeNext
+		ts.freeSlot = slot.freeNext
 		slot.freeNext = 0
 	}
 	if slot.active || slot.cancel != nil || slot.cleanup != nil ||
@@ -612,13 +612,13 @@ func (supervisor *TaskSupervisor) allocateSlot() (uint32, *taskSlot, error) {
 	return index, slot, nil
 }
 
-func (supervisor *TaskSupervisor) recycleUnusedSlot(index uint32, slot *taskSlot) {
-	if slot == nil || slot.active || uint64(index) >= uint64(len(supervisor.slots)) ||
-		supervisor.slots[index] != slot {
+func (ts *TaskSupervisor) recycleUnusedSlot(index uint32, slot *taskSlot) {
+	if slot == nil || slot.active || uint64(index) >= uint64(len(ts.slots)) ||
+		ts.slots[index] != slot {
 		panic("jobmgr task supervisor: invalid unused slot recycle")
 	}
-	slot.freeNext = supervisor.freeSlot
-	supervisor.freeSlot = index + 1
+	slot.freeNext = ts.freeSlot
+	ts.freeSlot = index + 1
 }
 
 type taskChildContext struct {
@@ -651,19 +651,19 @@ func newTaskChildContext(parent context.Context, deadline time.Time) (context.Co
 	return taskChildContext{Context: ctx, deadline: deadline}, cancel
 }
 
-func (supervisor *TaskSupervisor) CompletionCh() <-chan TaskCompletion {
-	return supervisor.completions
+func (ts *TaskSupervisor) CompletionCh() <-chan TaskCompletion {
+	return ts.completions
 }
 
-func (supervisor *TaskSupervisor) AcknowledgementCh() <-chan TaskAcknowledgement {
-	return supervisor.acks
+func (ts *TaskSupervisor) AcknowledgementCh() <-chan TaskAcknowledgement {
+	return ts.acks
 }
 
-func (supervisor *TaskSupervisor) SendAction(action TaskAction) error {
+func (ts *TaskSupervisor) SendAction(action TaskAction) error {
 	if !action.Ref.Valid() || action.Kind < TaskActionEncodeWrite || action.Kind > TaskActionTerminate {
 		return errors.New("jobmgr task supervisor: invalid task action")
 	}
-	slot, err := supervisor.slot(action.Ref)
+	slot, err := ts.slot(action.Ref)
 	if err != nil {
 		return err
 	}
@@ -694,15 +694,15 @@ func (supervisor *TaskSupervisor) SendAction(action TaskAction) error {
 	}
 }
 
-func (supervisor *TaskSupervisor) Cancel(ref TaskRef) error {
-	return supervisor.CancelWithCause(ref, context.Canceled)
+func (ts *TaskSupervisor) Cancel(ref TaskRef) error {
+	return ts.CancelWithCause(ref, context.Canceled)
 }
 
-func (supervisor *TaskSupervisor) CancelWithCause(ref TaskRef, cause error) error {
+func (ts *TaskSupervisor) CancelWithCause(ref TaskRef, cause error) error {
 	if cause == nil {
 		return errors.New("jobmgr task supervisor: nil cancellation cause")
 	}
-	slot, err := supervisor.slot(ref)
+	slot, err := ts.slot(ref)
 	if err != nil {
 		return err
 	}
@@ -710,8 +710,8 @@ func (supervisor *TaskSupervisor) CancelWithCause(ref TaskRef, cause error) erro
 	return nil
 }
 
-func (supervisor *TaskSupervisor) Release(ref TaskRef) error {
-	slot, err := supervisor.slot(ref)
+func (ts *TaskSupervisor) Release(ref TaskRef) error {
+	slot, err := ts.slot(ref)
 	if err != nil {
 		return err
 	}
@@ -723,21 +723,21 @@ func (supervisor *TaskSupervisor) Release(ref TaskRef) error {
 	action := slot.action
 	*slot = taskSlot{
 		generation: generation,
-		freeNext:   supervisor.freeSlot,
+		freeNext:   ts.freeSlot,
 		action:     action,
 	}
-	supervisor.freeSlot = ref.Slot + 1
-	supervisor.active--
-	supervisor.observeRuntimeState()
+	ts.freeSlot = ref.Slot + 1
+	ts.active--
+	ts.observeRuntimeState()
 	return nil
 }
 
-func (supervisor *TaskSupervisor) Active() int {
-	return supervisor.active
+func (ts *TaskSupervisor) Active() int {
+	return ts.active
 }
 
-func (supervisor *TaskSupervisor) MarkRetainedTimeout(ref TaskRef) (bool, error) {
-	slot, err := supervisor.slot(ref)
+func (ts *TaskSupervisor) MarkRetainedTimeout(ref TaskRef) (bool, error) {
+	slot, err := ts.slot(ref)
 	if err != nil {
 		return false, err
 	}
@@ -745,16 +745,16 @@ func (supervisor *TaskSupervisor) MarkRetainedTimeout(ref TaskRef) (bool, error)
 		return false, errors.New("jobmgr task supervisor: duplicate retained timeout")
 	}
 	slot.retainedTimeout = true
-	supervisor.retained++
-	justSaturated := supervisor.retained == RetainedTimeoutFailStopThreshold && !supervisor.saturated
+	ts.retained++
+	justSaturated := ts.retained == RetainedTimeoutFailStopThreshold && !ts.saturated
 	if justSaturated {
-		supervisor.saturated = true
+		ts.saturated = true
 	}
 	return justSaturated, nil
 }
 
-func (supervisor *TaskSupervisor) ClearRetainedTimeout(ref TaskRef) (bool, error) {
-	slot, err := supervisor.slot(ref)
+func (ts *TaskSupervisor) ClearRetainedTimeout(ref TaskRef) (bool, error) {
+	slot, err := ts.slot(ref)
 	if err != nil {
 		return false, err
 	}
@@ -762,15 +762,15 @@ func (supervisor *TaskSupervisor) ClearRetainedTimeout(ref TaskRef) (bool, error
 		return false, nil
 	}
 	slot.retainedTimeout = false
-	supervisor.retained--
-	if supervisor.retained < 0 {
+	ts.retained--
+	if ts.retained < 0 {
 		return false, errors.New("jobmgr task supervisor: negative retained-timeout count")
 	}
 	return true, nil
 }
 
-func (supervisor *TaskSupervisor) RetainedTimeouts() (int, bool) {
-	return supervisor.retained, supervisor.saturated
+func (ts *TaskSupervisor) RetainedTimeouts() (int, bool) {
+	return ts.retained, ts.saturated
 }
 
 type ResultPreflight struct {
@@ -778,8 +778,8 @@ type ResultPreflight struct {
 	FrameBytes int64
 }
 
-func (supervisor *TaskSupervisor) PreflightResult(ref TaskRef, uid string, expiry int64) (ResultPreflight, error) {
-	slot, err := supervisor.slot(ref)
+func (ts *TaskSupervisor) PreflightResult(ref TaskRef, uid string, expiry int64) (ResultPreflight, error) {
+	slot, err := ts.slot(ref)
 	if err != nil {
 		return ResultPreflight{}, err
 	}
@@ -797,8 +797,8 @@ func (supervisor *TaskSupervisor) PreflightResult(ref TaskRef, uid string, expir
 	return ResultPreflight{PlanBytes: slot.outcome.frame.planBytes, FrameBytes: int64(encodedBytes)}, nil
 }
 
-func (supervisor *TaskSupervisor) TakePublishedReadyResource(ref TaskRef, sequence uint8, expected ResourceIdentity) (ReadyResource, error) {
-	slot, err := supervisor.slot(ref)
+func (ts *TaskSupervisor) TakePublishedReadyResource(ref TaskRef, sequence uint8, expected ResourceIdentity) (ReadyResource, error) {
+	slot, err := ts.slot(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -813,12 +813,12 @@ func (supervisor *TaskSupervisor) TakePublishedReadyResource(ref TaskRef, sequen
 	return resource, nil
 }
 
-func (supervisor *TaskSupervisor) TakeAppliedResourceTransaction(
+func (ts *TaskSupervisor) TakeAppliedResourceTransaction(
 	ref TaskRef,
 	sequence uint8,
 	expected ResourceTransactionScope,
 ) (ResourceTransactionDisposition, ReadyResource, error) {
-	slot, err := supervisor.slot(ref)
+	slot, err := ts.slot(ref)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -839,12 +839,12 @@ func (supervisor *TaskSupervisor) TakeAppliedResourceTransaction(
 	return outcome.disposition, outcome.ready, nil
 }
 
-func (supervisor *TaskSupervisor) TakeDisposedResourceTransaction(
+func (ts *TaskSupervisor) TakeDisposedResourceTransaction(
 	ref TaskRef,
 	sequence uint8,
 	expected ResourceTransactionScope,
 ) (ReadyResource, error) {
-	slot, err := supervisor.slot(ref)
+	slot, err := ts.slot(ref)
 	if err != nil {
 		return nil, err
 	}
@@ -873,7 +873,7 @@ func (supervisor *TaskSupervisor) TakeDisposedResourceTransaction(
 	return nil, nil
 }
 
-func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskSlot, plan TaskPlan, outcome TaskOutcome) {
+func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskSlot, plan TaskPlan, outcome TaskOutcome) {
 	var err error
 	if outcome.empty() {
 		if plan.Runner != nil {
@@ -889,13 +889,13 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slo
 	}
 	outcome = TaskOutcome{}
 	slot.sequence = 1
-	supervisor.completions <- TaskCompletion{
+	ts.completions <- TaskCompletion{
 		Ref:      ref,
 		Sequence: 1,
 		Kind:     slot.outcome.kind,
 		Err:      err,
 	}
-	supervisor.observeTaskPanic(err)
+	ts.observeTaskPanic(err)
 	for {
 		action := <-slot.action
 		ack := TaskAcknowledgement{Ref: ref, Sequence: action.Sequence, Kind: action.Kind}
@@ -903,7 +903,7 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slo
 			ack.Err = errors.New("jobmgr task child: stale or wrong-sequence phase action")
 			slot.actionPending = false
 			slot.joined = true
-			supervisor.acks <- ack
+			ts.acks <- ack
 			return
 		}
 		switch action.Kind {
@@ -915,7 +915,7 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slo
 				if prepareErr != nil {
 					ack.Err = prepareErr
 				} else {
-					ack.Err = supervisor.frame.Commit(frame)
+					ack.Err = ts.frame.Commit(frame)
 				}
 			}
 			slot.outcome = TaskOutcome{}
@@ -1018,13 +1018,13 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slo
 			}
 			slot.sequence = action.Sequence
 			slot.actionPending = false
-			supervisor.completions <- TaskCompletion{
+			ts.completions <- TaskCompletion{
 				Ref:      ref,
 				Sequence: action.Sequence,
 				Kind:     slot.outcome.kind,
 				Err:      ack.Err,
 			}
-			supervisor.observeTaskPanic(ack.Err)
+			ts.observeTaskPanic(ack.Err)
 			continue
 		case TaskActionDispose:
 			if slot.outcome.kind == TaskOutcomePreparedResourceTransaction &&
@@ -1080,25 +1080,25 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slo
 		slot.actionPending = false
 		if action.Kind == TaskActionTerminate {
 			slot.joined = true
-			supervisor.acks <- ack
+			ts.acks <- ack
 			return
 		}
 		if action.Kind == TaskActionDispose &&
 			ack.Err == nil &&
-			supervisor.observer != nil {
-			supervisor.observer.AddRuntimeCounter(
+			ts.observer != nil {
+			ts.observer.AddRuntimeCounter(
 				RuntimeCounterResultsDisposed,
 				1,
 			)
 		}
-		supervisor.observeTaskPanic(ack.Err)
-		supervisor.acks <- ack
+		ts.observeTaskPanic(ack.Err)
+		ts.acks <- ack
 	}
 }
 
-func (supervisor *TaskSupervisor) observeTaskPanic(err error) {
-	if errors.Is(err, ErrTaskPanic) && supervisor.observer != nil {
-		supervisor.observer.AddRuntimeCounter(RuntimeCounterTaskPanics, 1)
+func (ts *TaskSupervisor) observeTaskPanic(err error) {
+	if errors.Is(err, ErrTaskPanic) && ts.observer != nil {
+		ts.observer.AddRuntimeCounter(RuntimeCounterTaskPanics, 1)
 	}
 }
 
@@ -1229,80 +1229,80 @@ func runTaskCleanup(cleanup TaskCleanup) (err error) {
 	return cleanup()
 }
 
-func (supervisor *TaskSupervisor) slot(ref TaskRef) (*taskSlot, error) {
+func (ts *TaskSupervisor) slot(ref TaskRef) (*taskSlot, error) {
 	if !ref.Valid() {
 		return nil, errors.New("jobmgr task supervisor: invalid task reference")
 	}
-	if uint64(ref.Slot) >= uint64(len(supervisor.slots)) ||
-		supervisor.slots[ref.Slot] == nil {
+	if uint64(ref.Slot) >= uint64(len(ts.slots)) ||
+		ts.slots[ref.Slot] == nil {
 		return nil, errors.New("jobmgr task supervisor: stale task reference")
 	}
-	slot := supervisor.slots[ref.Slot]
+	slot := ts.slots[ref.Slot]
 	if !slot.active || slot.generation != ref.Generation {
 		return nil, errors.New("jobmgr task supervisor: stale task reference")
 	}
 	return slot, nil
 }
 
-func (supervisor *TaskSupervisor) request(ref TaskRequestRef) (*taskRequest, error) {
+func (ts *TaskSupervisor) request(ref TaskRequestRef) (*taskRequest, error) {
 	if !ref.Valid() {
 		return nil, errors.New("jobmgr task supervisor: invalid request reference")
 	}
-	if uint64(ref.Slot) >= uint64(len(supervisor.requests)) ||
-		supervisor.requests[ref.Slot] == nil {
+	if uint64(ref.Slot) >= uint64(len(ts.requests)) ||
+		ts.requests[ref.Slot] == nil {
 		return nil, errors.New("jobmgr task supervisor: stale request reference")
 	}
-	record := supervisor.requests[ref.Slot]
+	record := ts.requests[ref.Slot]
 	if !record.active || record.generation != ref.Generation {
 		return nil, errors.New("jobmgr task supervisor: stale request reference")
 	}
 	return record, nil
 }
 
-func (supervisor *TaskSupervisor) removeRequest(record *taskRequest) {
-	queue := &supervisor.pending[taskClassIndex(record.class)]
+func (ts *TaskSupervisor) removeRequest(record *taskRequest) {
+	queue := &ts.pending[taskClassIndex(record.class)]
 	if record.previous != 0 {
-		supervisor.requests[record.previous].next = record.next
+		ts.requests[record.previous].next = record.next
 	} else {
 		queue.head = record.next
 	}
 	if record.next != 0 {
-		supervisor.requests[record.next].previous = record.previous
+		ts.requests[record.next].previous = record.previous
 	} else {
 		queue.tail = record.previous
 	}
 	queue.count--
 	slot := record.slot
 	generation := record.generation
-	*record = taskRequest{slot: slot, generation: generation, freeNext: supervisor.freeRequest}
-	supervisor.freeRequest = slot
-	supervisor.observeRuntimeState()
+	*record = taskRequest{slot: slot, generation: generation, freeNext: ts.freeRequest}
+	ts.freeRequest = slot
+	ts.observeRuntimeState()
 }
 
-func (supervisor *TaskSupervisor) observeRuntimeState() {
-	if supervisor == nil || supervisor.observer == nil {
+func (ts *TaskSupervisor) observeRuntimeState() {
+	if ts == nil || ts.observer == nil {
 		return
 	}
-	supervisor.observer.SetRuntimeGauge(
+	ts.observer.SetRuntimeGauge(
 		RuntimeGaugeTasksActive,
-		supervisor.active,
+		ts.active,
 	)
-	supervisor.observer.SetRuntimeGauge(
+	ts.observer.SetRuntimeGauge(
 		RuntimeGaugeTasksQueued,
-		supervisor.Pending(),
+		ts.Pending(),
 	)
 	var oldest time.Time
-	for index := range supervisor.pending {
-		head := supervisor.pending[index].head
+	for index := range ts.pending {
+		head := ts.pending[index].head
 		if head == 0 {
 			continue
 		}
-		queuedAt := supervisor.requests[head].queuedAt
+		queuedAt := ts.requests[head].queuedAt
 		if oldest.IsZero() || queuedAt.Before(oldest) {
 			oldest = queuedAt
 		}
 	}
-	supervisor.observer.SetRuntimeTimestamp(
+	ts.observer.SetRuntimeTimestamp(
 		RuntimeTimestampOldestTaskWait,
 		oldest,
 	)

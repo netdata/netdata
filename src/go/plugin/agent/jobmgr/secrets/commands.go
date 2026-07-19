@@ -22,14 +22,14 @@ const (
 	secretJobSummaryContentBytes = 7 * 512
 )
 
-func (controller *Controller) prepareSchema(
+func (c *Controller) prepareSchema(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if target.key != "" {
-		if _, ok := controller.entry(target.key); !ok {
-			return controller.noop(
+		if _, ok := c.entry(target.key); !ok {
+			return c.noop(
 				scope,
 				current,
 				lifecycle.LongLivedPermit{},
@@ -45,9 +45,9 @@ func (controller *Controller) prepareSchema(
 			)
 		}
 	}
-	schema, ok := controller.creators.Schema(target.kind)
+	schema, ok := c.creators.Schema(target.kind)
 	if !ok {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -70,7 +70,7 @@ func (controller *Controller) prepareSchema(
 	if err != nil {
 		return nil, err
 	}
-	return controller.noop(
+	return c.noop(
 		scope,
 		current,
 		lifecycle.LongLivedPermit{},
@@ -80,14 +80,14 @@ func (controller *Controller) prepareSchema(
 	)
 }
 
-func (controller *Controller) prepareGet(
+func (c *Controller) prepareGet(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	entry, ok := controller.entry(target.key)
+	entry, ok := c.entry(target.key)
 	if !ok {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -103,7 +103,7 @@ func (controller *Controller) prepareGet(
 		)
 	}
 	typed, err := typedSecretConfig(
-		controller.creators,
+		c.creators,
 		entry.config.Kind(),
 	)
 	if err == nil {
@@ -114,7 +114,7 @@ func (controller *Controller) prepareGet(
 		}
 	}
 	if err != nil {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -138,7 +138,7 @@ func (controller *Controller) prepareGet(
 	if err != nil {
 		return nil, err
 	}
-	return controller.noop(
+	return c.noop(
 		scope,
 		current,
 		lifecycle.LongLivedPermit{},
@@ -148,21 +148,21 @@ func (controller *Controller) prepareGet(
 	)
 }
 
-func (controller *Controller) prepareUserConfig(
+func (c *Controller) prepareUserConfig(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	input CommandInput,
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	typed, err := typedSecretConfig(
-		controller.creators,
+		c.creators,
 		target.kind,
 	)
 	if err == nil {
 		err = parseSecretPayload(input, typed)
 	}
 	if err != nil {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -186,7 +186,7 @@ func (controller *Controller) prepareUserConfig(
 	if err != nil {
 		return nil, err
 	}
-	return controller.noop(
+	return c.noop(
 		scope,
 		current,
 		lifecycle.LongLivedPermit{},
@@ -196,16 +196,16 @@ func (controller *Controller) prepareUserConfig(
 	)
 }
 
-func (controller *Controller) prepareTest(
+func (c *Controller) prepareTest(
 	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	input CommandInput,
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	entry, ok := controller.entry(target.key)
+	entry, ok := c.entry(target.key)
 	if !ok {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -224,9 +224,9 @@ func (controller *Controller) prepareTest(
 	validationOnly := true
 	if input.HasPayload {
 		var err error
-		config, err = controller.configFromPayload(input, target)
+		config, err = c.configFromPayload(input, target)
 		if err != nil {
-			return controller.noop(
+			return c.noop(
 				scope,
 				current,
 				lifecycle.LongLivedPermit{},
@@ -240,12 +240,12 @@ func (controller *Controller) prepareTest(
 		}
 		validationOnly = false
 	}
-	if err := controller.store.Validate(
+	if err := c.store.Validate(
 		ctx,
-		controller.creators,
+		c.creators,
 		config,
 	); err != nil {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -258,7 +258,7 @@ func (controller *Controller) prepareTest(
 		)
 	}
 	if !validationOnly && config.Hash() == entry.config.Hash() {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -271,12 +271,12 @@ func (controller *Controller) prepareTest(
 		)
 	}
 	affected := formatSecretJobs(
-		controller.dependencies.Affected(target.key, false),
+		c.dependencies.Affected(target.key, false),
 	)
 	restartable := formatSecretJobs(
-		controller.dependencies.Affected(target.key, true),
+		c.dependencies.Affected(target.key, true),
 	)
-	return controller.noop(
+	return c.noop(
 		scope,
 		current,
 		lifecycle.LongLivedPermit{},
@@ -293,7 +293,7 @@ func (controller *Controller) prepareTest(
 	)
 }
 
-func (controller *Controller) prepareAdd(
+func (c *Controller) prepareAdd(
 	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
@@ -302,7 +302,7 @@ func (controller *Controller) prepareAdd(
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if current != nil || scope.Current.Valid() {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			permit,
@@ -317,8 +317,8 @@ func (controller *Controller) prepareAdd(
 			nil,
 		)
 	}
-	if _, exists := controller.entry(target.key); exists {
-		return controller.noop(
+	if _, exists := c.entry(target.key); exists {
+		return c.noop(
 			scope,
 			current,
 			permit,
@@ -333,9 +333,9 @@ func (controller *Controller) prepareAdd(
 			nil,
 		)
 	}
-	config, err := controller.configFromPayload(input, target)
+	config, err := c.configFromPayload(input, target)
 	if err != nil {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			permit,
@@ -347,7 +347,7 @@ func (controller *Controller) prepareAdd(
 			nil,
 		)
 	}
-	return controller.prepareStoreMutation(
+	return c.prepareStoreMutation(
 		ctx,
 		scope,
 		current,
@@ -358,7 +358,7 @@ func (controller *Controller) prepareAdd(
 	)
 }
 
-func (controller *Controller) prepareUpdate(
+func (c *Controller) prepareUpdate(
 	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
@@ -366,9 +366,9 @@ func (controller *Controller) prepareUpdate(
 	input CommandInput,
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	entry, exists := controller.entry(target.key)
+	entry, exists := c.entry(target.key)
 	if !exists {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			permit,
@@ -383,9 +383,9 @@ func (controller *Controller) prepareUpdate(
 			nil,
 		)
 	}
-	config, err := controller.configFromPayload(input, target)
+	config, err := c.configFromPayload(input, target)
 	if err != nil {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			permit,
@@ -399,18 +399,18 @@ func (controller *Controller) prepareUpdate(
 	}
 	config.SetSource(confgroup.TypeDyncfg)
 	config.SetSourceType(confgroup.TypeDyncfg)
-	expected := controller.store.Generation(target.key)
+	expected := c.store.Generation(target.key)
 	if expected != 0 && entry.config.Hash() == config.Hash() {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			permit,
 			mustSecretMessage(200, ""),
 			nil,
-			controller.configCreateCleanup(entry),
+			c.configCreateCleanup(entry),
 		)
 	}
-	return controller.prepareStoreMutation(
+	return c.prepareStoreMutation(
 		ctx,
 		scope,
 		current,
@@ -421,14 +421,14 @@ func (controller *Controller) prepareUpdate(
 	)
 }
 
-func (controller *Controller) prepareRemove(
+func (c *Controller) prepareRemove(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	entry, exists := controller.entry(target.key)
+	entry, exists := c.entry(target.key)
 	if !exists {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -444,9 +444,9 @@ func (controller *Controller) prepareRemove(
 		)
 	}
 	if affected := formatSecretJobs(
-		controller.dependencies.Affected(target.key, false),
+		c.dependencies.Affected(target.key, false),
 	); affected != "" {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -463,7 +463,7 @@ func (controller *Controller) prepareRemove(
 		)
 	}
 	if entry.config.SourceType() != confgroup.TypeDyncfg {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -478,9 +478,9 @@ func (controller *Controller) prepareRemove(
 			nil,
 		)
 	}
-	expected := controller.store.Generation(target.key)
+	expected := c.store.Generation(target.key)
 	if expected == 0 || current == nil || !scope.Current.Valid() {
-		return controller.noop(
+		return c.noop(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
@@ -492,7 +492,7 @@ func (controller *Controller) prepareRemove(
 			nil,
 		)
 	}
-	mutation, err := controller.store.PrepareRemoval(
+	mutation, err := c.store.PrepareRemoval(
 		target.key,
 		expected,
 	)
@@ -502,16 +502,16 @@ func (controller *Controller) prepareRemove(
 	return newPreparedSecretTransaction(
 		preparedSecretSpec{
 			scope: scope, current: current,
-			store: controller.store, storeKey: target.key,
+			store: c.store, storeKey: target.key,
 			mutation: &mutation, remove: true,
 			result:     mustSecretMessage(200, ""),
-			cleanup:    controller.configDeleteCleanup(target.key),
-			controller: controller, removeEntry: true,
+			cleanup:    c.configDeleteCleanup(target.key),
+			controller: c, removeEntry: true,
 		},
 	)
 }
 
-func (controller *Controller) configFromPayload(
+func (c *Controller) configFromPayload(
 	input CommandInput,
 	target secretTarget,
 ) (secretstore.Config, error) {
@@ -532,7 +532,7 @@ func (controller *Controller) configFromPayload(
 	return config, nil
 }
 
-func (controller *Controller) prepareStoreMutation(
+func (c *Controller) prepareStoreMutation(
 	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
@@ -555,9 +555,9 @@ func (controller *Controller) prepareStoreMutation(
 	if err != nil {
 		return nil, err
 	}
-	mutation, prepareErr := controller.store.PrepareMutation(
+	mutation, prepareErr := c.store.PrepareMutation(
 		ctx,
-		controller.creators,
+		c.creators,
 		carrier,
 		config,
 		expected,
@@ -573,14 +573,14 @@ func (controller *Controller) prepareStoreMutation(
 			cleanup := func() error { return nil }
 			var storedEntry *secretEntry
 			if installFailure {
-				cleanup = controller.configCreateCleanup(entry)
+				cleanup = c.configCreateCleanup(entry)
 				storedEntry = &entry
 			}
 			return newPreparedSecretTransaction(
 				preparedSecretSpec{
 					scope: scope, current: current,
 					permit:   permit,
-					store:    controller.store,
+					store:    c.store,
 					storeKey: config.ExposedKey(),
 					mutation: &mutation,
 					abort:    true,
@@ -589,7 +589,7 @@ func (controller *Controller) prepareStoreMutation(
 						"Secretstore configuration validation failed.",
 					),
 					cleanup:    cleanup,
-					controller: controller,
+					controller: c,
 					entry:      storedEntry,
 				},
 			)
@@ -599,14 +599,14 @@ func (controller *Controller) prepareStoreMutation(
 				preparedSecretSpec{
 					scope: scope, current: current,
 					permit:   permit,
-					store:    controller.store,
+					store:    c.store,
 					storeKey: config.ExposedKey(),
 					result: mustSecretMessage(
 						400,
 						"Secretstore configuration validation failed.",
 					),
 					cleanup:    func() error { return nil },
-					controller: controller,
+					controller: c,
 				},
 			)
 		}
@@ -615,14 +615,14 @@ func (controller *Controller) prepareStoreMutation(
 			preparedSecretSpec{
 				scope: scope, current: current,
 				permit:   permit,
-				store:    controller.store,
+				store:    c.store,
 				storeKey: config.ExposedKey(),
 				result: mustSecretMessage(
 					400,
 					"Secretstore configuration validation failed.",
 				),
-				cleanup:    controller.configCreateCleanup(entry),
-				controller: controller, entry: &entry,
+				cleanup:    c.configCreateCleanup(entry),
+				controller: c, entry: &entry,
 			},
 		)
 	}
@@ -630,24 +630,24 @@ func (controller *Controller) prepareStoreMutation(
 		preparedSecretSpec{
 			scope: scope, current: current,
 			permit:     permit,
-			store:      controller.store,
+			store:      c.store,
 			storeKey:   config.ExposedKey(),
 			mutation:   &mutation,
 			result:     mustSecretMessage(200, ""),
-			cleanup:    controller.configCreateCleanup(entry),
-			controller: controller, entry: &entry,
-			restarts: controller.restartCommand(),
+			cleanup:    c.configCreateCleanup(entry),
+			controller: c, entry: &entry,
+			restarts: c.restartCommand(),
 		},
 	)
 }
 
-func (controller *Controller) restartCommand() *SecretRestartCommand {
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
-	return controller.restarts
+func (c *Controller) restartCommand() *SecretRestartCommand {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.restarts
 }
 
-func (controller *Controller) noop(
+func (c *Controller) noop(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	permit lifecycle.LongLivedPermit,
@@ -662,7 +662,7 @@ func (controller *Controller) noop(
 		preparedSecretSpec{
 			scope: scope, current: current,
 			permit: permit, result: result, cleanup: cleanup,
-			controller: controller, entry: entry,
+			controller: c, entry: entry,
 		},
 	)
 }

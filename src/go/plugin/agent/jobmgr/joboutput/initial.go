@@ -24,16 +24,16 @@ const dynCfgJobBootResourceID = "\x00jobmgr-job-boot"
 // configured initial job through the same transaction path used by
 // discovery. The graph starts empty, so a running initial record cannot exist
 // without its matching current resource.
-func (controller *DynCfgJobController) PublishInitial(
+func (dcjc *DynCfgJobController) PublishInitial(
 	ctx context.Context,
 	commands jobmgr.PreparedCommandPort,
 	epoch uint64,
 	initial []dyncfg.GraphConfig,
 ) error {
-	if controller == nil || ctx == nil || commands == nil || epoch == 0 {
+	if dcjc == nil || ctx == nil || commands == nil || epoch == 0 {
 		return errors.New("job output: invalid initial DynCfg publication")
 	}
-	if err := controller.publishInitialTemplates(
+	if err := dcjc.publishInitialTemplates(
 		ctx,
 		commands,
 		epoch,
@@ -45,11 +45,11 @@ func (controller *DynCfgJobController) PublishInitial(
 		return configs[i].ID < configs[j].ID
 	})
 	for index, record := range configs {
-		config, status, err := controller.initialConfiguration(record)
+		config, status, err := dcjc.initialConfiguration(record)
 		if err != nil {
 			return err
 		}
-		plan, err := controller.PlanDiscovered(DiscoveredJobChange{
+		plan, err := dcjc.PlanDiscovered(DiscoveredJobChange{
 			Config: config,
 			Status: status,
 		})
@@ -76,7 +76,7 @@ func (controller *DynCfgJobController) PublishInitial(
 	return nil
 }
 
-func (controller *DynCfgJobController) publishInitialTemplates(
+func (dcjc *DynCfgJobController) publishInitialTemplates(
 	ctx context.Context,
 	commands jobmgr.PreparedCommandPort,
 	epoch uint64,
@@ -114,7 +114,7 @@ func (controller *DynCfgJobController) publishInitialTemplates(
 					nil,
 					lifecycle.LongLivedPermit{},
 					result,
-					controller.templatePublicationCleanup(),
+					dcjc.templatePublicationCleanup(),
 				)
 			},
 		},
@@ -131,9 +131,9 @@ func (controller *DynCfgJobController) publishInitialTemplates(
 	)
 }
 
-func (controller *DynCfgJobController) templatePublicationCleanup() lifecycle.TaskCleanup {
-	names := make([]string, 0, len(controller.modules))
-	for name, creator := range controller.modules {
+func (dcjc *DynCfgJobController) templatePublicationCleanup() lifecycle.TaskCleanup {
+	names := make([]string, 0, len(dcjc.modules))
+	for name, creator := range dcjc.modules {
 		if creator.InstancePolicy == collectorapi.InstancePolicyPerJob {
 			names = append(names, name)
 		}
@@ -146,10 +146,10 @@ func (controller *DynCfgJobController) templatePublicationCleanup() lifecycle.Ta
 	api := netdataapi.New(&payload)
 	for _, name := range names {
 		api.CONFIGCREATE(netdataapi.ConfigOpts{
-			ID:         controller.prefix + name,
+			ID:         dcjc.prefix + name,
 			Status:     dyncfg.StatusAccepted.String(),
 			ConfigType: dyncfg.ConfigTypeTemplate.String(),
-			Path:       controller.path, SourceType: "internal",
+			Path:       dcjc.path, SourceType: "internal",
 			Source: "internal",
 			SupportedCommands: dyncfg.JoinCommands(
 				dyncfg.CommandAdd,
@@ -166,11 +166,11 @@ func (controller *DynCfgJobController) templatePublicationCleanup() lifecycle.Ta
 		return func() error { return err }
 	}
 	return func() error {
-		return controller.frames.CommitPreparedProtocolFrame(prepared)
+		return dcjc.frames.CommitPreparedProtocolFrame(prepared)
 	}
 }
 
-func (controller *DynCfgJobController) initialConfiguration(
+func (dcjc *DynCfgJobController) initialConfiguration(
 	record dyncfg.GraphConfig,
 ) (confgroup.Config, dyncfg.Status, error) {
 	status := dyncfg.Status(record.Status)

@@ -167,18 +167,18 @@ type assemblyMutationPort struct {
 	catalog *functionadapter.Catalog
 }
 
-func (port *assemblyMutationPort) QuiesceFunctions(
+func (amp *assemblyMutationPort) QuiesceFunctions(
 	_ context.Context,
 	mutation jobmgr.FunctionCatalogMutation,
 ) error {
-	if port == nil || port.catalog == nil {
+	if amp == nil || amp.catalog == nil {
 		return errors.New("nil mutation port")
 	}
-	if err := port.catalog.BeginMutation(mutation); err != nil {
+	if err := amp.catalog.BeginMutation(mutation); err != nil {
 		return err
 	}
 	for {
-		progress, err := port.catalog.AdvanceMutationQuiesce(
+		progress, err := amp.catalog.AdvanceMutationQuiesce(
 			jobmgr.MaximumFunctionMutationQuantum,
 		)
 		if err != nil {
@@ -190,19 +190,19 @@ func (port *assemblyMutationPort) QuiesceFunctions(
 	}
 }
 
-func (port *assemblyMutationPort) CommitFunctions(
+func (amp *assemblyMutationPort) CommitFunctions(
 	_ context.Context,
 	mutation jobmgr.FunctionCatalogMutation,
 ) (uint64, error) {
-	if port == nil || port.catalog == nil {
+	if amp == nil || amp.catalog == nil {
 		return 0, errors.New("nil mutation port")
 	}
-	if err := port.catalog.ResumeMutation(mutation); err != nil {
+	if err := amp.catalog.ResumeMutation(mutation); err != nil {
 		return 0, err
 	}
 	for {
 		var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-		progress, count, err := port.catalog.AdvanceMutation(
+		progress, count, err := amp.catalog.AdvanceMutation(
 			jobmgr.MaximumFunctionMutationQuantum,
 			&cleanups,
 		)
@@ -212,7 +212,7 @@ func (port *assemblyMutationPort) CommitFunctions(
 		for index := 0; index < count; index++ {
 			cleanup := cleanups[index]
 			_, cleanupErr := cleanup.Runner.RunTask(context.Background())
-			if err := port.catalog.CompleteCleanup(cleanup.Ref, cleanupErr); err != nil {
+			if err := amp.catalog.CompleteCleanup(cleanup.Ref, cleanupErr); err != nil {
 				return 0, errors.Join(cleanupErr, err)
 			}
 		}
@@ -222,25 +222,25 @@ func (port *assemblyMutationPort) CommitFunctions(
 	}
 }
 
-func (port *assemblyMutationPort) AbortFunctions(
+func (amp *assemblyMutationPort) AbortFunctions(
 	_ context.Context,
 	mutation jobmgr.FunctionCatalogMutation,
 ) error {
-	if port == nil || port.catalog == nil {
+	if amp == nil || amp.catalog == nil {
 		return errors.New("nil mutation port")
 	}
-	if err := port.catalog.ResumeMutation(mutation); err != nil {
+	if err := amp.catalog.ResumeMutation(mutation); err != nil {
 		return err
 	}
 	var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-	count, err := port.catalog.AbortMutation(&cleanups)
+	count, err := amp.catalog.AbortMutation(&cleanups)
 	if err != nil {
 		return err
 	}
 	for index := 0; index < count; index++ {
 		cleanup := cleanups[index]
 		_, cleanupErr := cleanup.Runner.RunTask(context.Background())
-		if err := port.catalog.CompleteCleanup(
+		if err := amp.catalog.CompleteCleanup(
 			cleanup.Ref,
 			cleanupErr,
 		); err != nil {

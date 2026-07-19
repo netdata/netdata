@@ -127,6 +127,6 @@ type failingFunctionFrameWriter struct {
 	err error
 }
 
-func (writer *failingFunctionFrameWriter) Write(payload []byte) (int, error) {
-	return 0, writer.err
+func (fffw *failingFunctionFrameWriter) Write(payload []byte) (int, error) {
+	return 0, fffw.err
 }

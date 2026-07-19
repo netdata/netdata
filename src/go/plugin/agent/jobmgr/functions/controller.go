@@ -27,8 +27,8 @@ type JobIdentity struct {
 	Generation uint64
 }
 
-func (identity JobIdentity) valid() bool {
-	return identity.ID != "" && identity.Generation != 0
+func (ji JobIdentity) valid() bool {
+	return ji.ID != "" && ji.Generation != 0
 }
 
 type RuntimeJob interface {
@@ -111,77 +111,77 @@ type JobHandle struct {
 	cleaned    bool
 }
 
-func (controller *Controller) PrepareJob(
+func (c *Controller) PrepareJob(
 	identity JobIdentity,
 	job RuntimeJob,
 ) (*JobHandle, error) {
-	if controller == nil || !identity.valid() || job == nil ||
+	if c == nil || !identity.valid() || job == nil ||
 		identity.ID != job.FullName() || job.ModuleName() == "" || job.Name() == "" {
 		return nil, errors.New("jobmgr Function controller: invalid job preparation")
 	}
-	if _, ok := controller.modules.Lookup(job.ModuleName()); !ok {
+	if _, ok := c.modules.Lookup(job.ModuleName()); !ok {
 		return nil, errors.New("jobmgr Function controller: job module is not registered")
 	}
-	return &JobHandle{controller: controller, identity: identity, job: job}, nil
+	return &JobHandle{controller: c, identity: identity, job: job}, nil
 }
 
-func (handle *JobHandle) Publish() error {
-	if handle == nil {
+func (jh *JobHandle) Publish() error {
+	if jh == nil {
 		return errors.New("jobmgr Function controller: nil job handle")
 	}
-	handle.mu.Lock()
-	defer handle.mu.Unlock()
-	if handle.published || handle.closed || handle.cleaned {
+	jh.mu.Lock()
+	defer jh.mu.Unlock()
+	if jh.published || jh.closed || jh.cleaned {
 		return errors.New("jobmgr Function controller: invalid job-handle publication")
 	}
-	if err := handle.controller.PublishJob(
+	if err := jh.controller.PublishJob(
 		context.Background(),
-		handle.identity,
-		handle.job,
+		jh.identity,
+		jh.job,
 	); err != nil {
 		return err
 	}
-	handle.published = true
+	jh.published = true
 	return nil
 }
 
-func (handle *JobHandle) CloseAndDrain(ctx context.Context) error {
-	if handle == nil || ctx == nil {
+func (jh *JobHandle) CloseAndDrain(ctx context.Context) error {
+	if jh == nil || ctx == nil {
 		return errors.New("jobmgr Function controller: invalid job-handle close")
 	}
-	handle.mu.Lock()
-	defer handle.mu.Unlock()
-	if handle.closed {
+	jh.mu.Lock()
+	defer jh.mu.Unlock()
+	if jh.closed {
 		return nil
 	}
-	if handle.cleaned {
+	if jh.cleaned {
 		return errors.New("jobmgr Function controller: close after cleanup")
 	}
-	if handle.published {
-		if err := handle.controller.CloseAndDrainJob(ctx, handle.identity, handle.job); err != nil {
+	if jh.published {
+		if err := jh.controller.CloseAndDrainJob(ctx, jh.identity, jh.job); err != nil {
 			return err
 		}
 	}
-	handle.closed = true
+	jh.closed = true
 	return nil
 }
 
-func (handle *JobHandle) Cleanup(ctx context.Context) error {
-	if handle == nil || ctx == nil {
+func (jh *JobHandle) Cleanup(ctx context.Context) error {
+	if jh == nil || ctx == nil {
 		return errors.New("jobmgr Function controller: invalid job-handle cleanup")
 	}
-	handle.mu.Lock()
-	defer handle.mu.Unlock()
-	if handle.cleaned {
+	jh.mu.Lock()
+	defer jh.mu.Unlock()
+	if jh.cleaned {
 		return nil
 	}
-	if !handle.closed {
+	if !jh.closed {
 		return errors.New("jobmgr Function controller: cleanup before close")
 	}
 	// Catalog-owned cleanup plans execute the exact MethodHandler cleanup before
 	// CloseAndDrain returns. This acknowledgement makes the per-job lifecycle
 	// explicit without re-resolving the job through a second owner.
-	handle.cleaned = true
+	jh.cleaned = true
 	return nil
 }
 
@@ -310,63 +310,63 @@ func NewController(
 	return controller, catalog, nil
 }
 
-func (controller *Controller) Bind(
+func (c *Controller) Bind(
 	mutations jobmgr.FunctionMutationPort,
 	publication *Publication,
 ) error {
-	if controller == nil || mutations == nil || publication == nil {
+	if c == nil || mutations == nil || publication == nil {
 		return errors.New("jobmgr Function controller: invalid binding")
 	}
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
-	if controller.mutations != nil || controller.publication != nil ||
-		controller.activated || controller.terminated {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.mutations != nil || c.publication != nil ||
+		c.activated || c.terminated {
 		return errors.New("jobmgr Function controller: duplicate binding")
 	}
-	controller.mutations = mutations
-	controller.publication = publication
+	c.mutations = mutations
+	c.publication = publication
 	return nil
 }
 
 // AbortConstruction cleans handler generations that never became externally
 // visible. A private kernel may already hold the catalog and mutation port, but
 // its loop must not have started.
-func (controller *Controller) AbortConstruction(ctx context.Context) error {
-	if controller == nil {
+func (c *Controller) AbortConstruction(ctx context.Context) error {
+	if c == nil {
 		return nil
 	}
 	if ctx == nil {
 		return errors.New("jobmgr Function controller: nil construction abort context")
 	}
-	controller.mu.Lock()
-	if controller.activated ||
-		controller.draining ||
-		controller.terminated {
-		controller.mu.Unlock()
+	c.mu.Lock()
+	if c.activated ||
+		c.draining ||
+		c.terminated {
+		c.mu.Unlock()
 		return errors.New("jobmgr Function controller: construction abort after activation")
 	}
-	controller.terminated = true
-	groups := controller.groups
-	fixed := controller.fixedRoute
-	controller.groups = nil
-	controller.routes = nil
-	controller.fixedRoute = nil
-	controller.mu.Unlock()
-	controller.cleanupUnpublishedGroups(ctx, groups)
-	return controller.cleanupInitialRoutes(ctx, fixed)
+	c.terminated = true
+	groups := c.groups
+	fixed := c.fixedRoute
+	c.groups = nil
+	c.routes = nil
+	c.fixedRoute = nil
+	c.mu.Unlock()
+	c.cleanupUnpublishedGroups(ctx, groups)
+	return c.cleanupInitialRoutes(ctx, fixed)
 }
 
-func (controller *Controller) Activate() error {
-	if controller == nil {
+func (c *Controller) Activate() error {
+	if c == nil {
 		return errors.New("jobmgr Function controller: nil activation")
 	}
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
-	if controller.mutations == nil || controller.publication == nil ||
-		controller.activated || controller.terminated {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.mutations == nil || c.publication == nil ||
+		c.activated || c.terminated {
 		return errors.New("jobmgr Function controller: invalid activation")
 	}
-	records := controller.publicationRecordsLocked(controller.routes)
+	records := c.publicationRecordsLocked(c.routes)
 	digest, err := DigestSortedPublications(records)
 	if err != nil {
 		return err
@@ -376,21 +376,21 @@ func (controller *Controller) Activate() error {
 		record := records[index]
 		changes = append(changes, PublicationChange{Name: record.Name, Record: &record})
 	}
-	if err := controller.publication.ApplyInitialSnapshot(
-		controller.epoch,
-		controller.version,
+	if err := c.publication.ApplyInitialSnapshot(
+		c.epoch,
+		c.version,
 		digest,
-		controller.catalog.storage.published.Load(),
+		c.catalog.storage.published.Load(),
 		changes,
 	); err != nil {
-		controller.dirty = errors.Join(controller.dirty, err)
+		c.dirty = errors.Join(c.dirty, err)
 		return err
 	}
-	controller.activated = true
+	c.activated = true
 	return nil
 }
 
-func (controller *Controller) PublishJob(
+func (c *Controller) PublishJob(
 	ctx context.Context,
 	identity JobIdentity,
 	job RuntimeJob,
@@ -399,19 +399,19 @@ func (controller *Controller) PublishJob(
 		identity.ID != job.FullName() || job.ModuleName() == "" || job.Name() == "" {
 		return errors.New("jobmgr Function controller: invalid job publication")
 	}
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
-	if err := controller.usableLocked(); err != nil {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err := c.usableLocked(); err != nil {
 		return err
 	}
-	creator, ok := controller.modules.Lookup(job.ModuleName())
+	creator, ok := c.modules.Lookup(job.ModuleName())
 	if !ok {
 		return errors.New("jobmgr Function controller: job module is not registered")
 	}
-	moduleJobs := controller.jobs[job.ModuleName()]
+	moduleJobs := c.jobs[job.ModuleName()]
 	if moduleJobs == nil {
 		moduleJobs = make(map[string]controllerJob)
-		controller.jobs[job.ModuleName()] = moduleJobs
+		c.jobs[job.ModuleName()] = moduleJobs
 	}
 	if _, exists := moduleJobs[job.Name()]; exists {
 		return errors.New("jobmgr Function controller: job is already published")
@@ -423,11 +423,11 @@ func (controller *Controller) PublishJob(
 	moduleJobs[job.Name()] = controllerJob{
 		identity: identity, job: job, methods: methods,
 	}
-	if _, err := controller.reconcileModuleLocked(ctx, job.ModuleName(), creator); err != nil {
-		if controller.dirty == nil {
+	if _, err := c.reconcileModuleLocked(ctx, job.ModuleName(), creator); err != nil {
+		if c.dirty == nil {
 			delete(moduleJobs, job.Name())
 			if len(moduleJobs) == 0 {
-				delete(controller.jobs, job.ModuleName())
+				delete(c.jobs, job.ModuleName())
 			}
 		}
 		return err
@@ -435,7 +435,7 @@ func (controller *Controller) PublishJob(
 	return nil
 }
 
-func (controller *Controller) CloseAndDrainJob(
+func (c *Controller) CloseAndDrainJob(
 	ctx context.Context,
 	identity JobIdentity,
 	job RuntimeJob,
@@ -443,29 +443,29 @@ func (controller *Controller) CloseAndDrainJob(
 	if ctx == nil || !identity.valid() || job == nil {
 		return errors.New("jobmgr Function controller: invalid job close")
 	}
-	controller.mu.Lock()
-	if controller.draining {
-		moduleJobs := controller.jobs[job.ModuleName()]
+	c.mu.Lock()
+	if c.draining {
+		moduleJobs := c.jobs[job.ModuleName()]
 		current, exists := moduleJobs[job.Name()]
 		if !exists {
-			controller.mu.Unlock()
+			c.mu.Unlock()
 			return nil
 		}
 		if current.identity != identity || current.job != job {
-			controller.mu.Unlock()
+			c.mu.Unlock()
 			return errors.New("jobmgr Function controller: stale draining job close")
 		}
 		delete(moduleJobs, job.Name())
 		if len(moduleJobs) == 0 {
-			delete(controller.jobs, job.ModuleName())
+			delete(c.jobs, job.ModuleName())
 		}
-		retired := make([]*methodGeneration, 0, len(controller.groups))
-		for _, group := range controller.groups {
+		retired := make([]*methodGeneration, 0, len(c.groups))
+		for _, group := range c.groups {
 			if generationReferencesJob(group.generation, job) {
 				retired = append(retired, group.generation)
 			}
 		}
-		controller.mu.Unlock()
+		c.mu.Unlock()
 		for _, generation := range retired {
 			if err := generation.wait(ctx); err != nil {
 				return err
@@ -473,39 +473,39 @@ func (controller *Controller) CloseAndDrainJob(
 		}
 		return nil
 	}
-	if err := controller.usableLocked(); err != nil {
-		controller.mu.Unlock()
+	if err := c.usableLocked(); err != nil {
+		c.mu.Unlock()
 		return err
 	}
-	moduleJobs := controller.jobs[job.ModuleName()]
+	moduleJobs := c.jobs[job.ModuleName()]
 	current, exists := moduleJobs[job.Name()]
 	if !exists {
-		controller.mu.Unlock()
+		c.mu.Unlock()
 		return nil
 	}
 	if current.identity != identity || current.job != job {
-		controller.mu.Unlock()
+		c.mu.Unlock()
 		return errors.New("jobmgr Function controller: stale job close")
 	}
-	creator := controller.modules[job.ModuleName()]
+	creator := c.modules[job.ModuleName()]
 	delete(moduleJobs, job.Name())
 	if len(moduleJobs) == 0 {
-		delete(controller.jobs, job.ModuleName())
+		delete(c.jobs, job.ModuleName())
 	}
-	retired, err := controller.reconcileModuleLocked(ctx, job.ModuleName(), creator)
+	retired, err := c.reconcileModuleLocked(ctx, job.ModuleName(), creator)
 	if err != nil {
-		if controller.dirty == nil {
-			moduleJobs = controller.jobs[job.ModuleName()]
+		if c.dirty == nil {
+			moduleJobs = c.jobs[job.ModuleName()]
 			if moduleJobs == nil {
 				moduleJobs = make(map[string]controllerJob)
-				controller.jobs[job.ModuleName()] = moduleJobs
+				c.jobs[job.ModuleName()] = moduleJobs
 			}
 			moduleJobs[job.Name()] = current
 		}
-		controller.mu.Unlock()
+		c.mu.Unlock()
 		return err
 	}
-	controller.mu.Unlock()
+	c.mu.Unlock()
 	for _, generation := range retired {
 		if generationReferencesJob(generation, job) {
 			if err := generation.wait(ctx); err != nil {
@@ -516,7 +516,7 @@ func (controller *Controller) CloseAndDrainJob(
 	return nil
 }
 
-func (controller *Controller) ReconcileJob(
+func (c *Controller) ReconcileJob(
 	ctx context.Context,
 	identity JobIdentity,
 	job RuntimeJob,
@@ -524,125 +524,125 @@ func (controller *Controller) ReconcileJob(
 	if ctx == nil || !identity.valid() || job == nil {
 		return errors.New("jobmgr Function controller: invalid job reconcile")
 	}
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
-	if err := controller.usableLocked(); err != nil {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err := c.usableLocked(); err != nil {
 		return err
 	}
-	current, ok := controller.jobs[job.ModuleName()][job.Name()]
+	current, ok := c.jobs[job.ModuleName()][job.Name()]
 	if !ok || current.identity != identity || current.job != job {
 		return errors.New("jobmgr Function controller: stale job reconcile")
 	}
-	_, err := controller.reconcileModuleLocked(
+	_, err := c.reconcileModuleLocked(
 		ctx,
 		job.ModuleName(),
-		controller.modules[job.ModuleName()],
+		c.modules[job.ModuleName()],
 	)
 	return err
 }
 
-func (controller *Controller) ReconcileModule(
+func (c *Controller) ReconcileModule(
 	ctx context.Context,
 	module string,
 ) error {
-	if controller == nil || ctx == nil || module == "" {
+	if c == nil || ctx == nil || module == "" {
 		return errors.New("jobmgr Function controller: invalid module reconcile")
 	}
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
-	if err := controller.usableLocked(); err != nil {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if err := c.usableLocked(); err != nil {
 		return err
 	}
-	creator, ok := controller.modules.Lookup(module)
+	creator, ok := c.modules.Lookup(module)
 	if !ok {
 		return errors.New("jobmgr Function controller: module is not registered")
 	}
-	if !controller.moduleAvailabilityChangedLocked(module) {
+	if !c.moduleAvailabilityChangedLocked(module) {
 		return nil
 	}
-	_, err := controller.reconcileModuleLocked(ctx, module, creator)
+	_, err := c.reconcileModuleLocked(ctx, module, creator)
 	return err
 }
 
-func (controller *Controller) Stop(epoch uint64) error {
-	if controller == nil {
+func (c *Controller) Stop(epoch uint64) error {
+	if c == nil {
 		return nil
 	}
-	beginErr := controller.BeginShutdown(epoch)
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
-	if controller.terminated {
-		return errors.Join(beginErr, controller.dirty)
+	beginErr := c.BeginShutdown(epoch)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.terminated {
+		return errors.Join(beginErr, c.dirty)
 	}
-	controller.terminated = true
-	return errors.Join(beginErr, controller.dirty)
+	c.terminated = true
+	return errors.Join(beginErr, c.dirty)
 }
 
 // BeginShutdown withdraws external routes before CommandKernel closes the
 // catalog. Job handles may still close afterward; in that mode they wait for
 // catalog-owned generation cleanup without submitting another mutation.
-func (controller *Controller) BeginShutdown(epoch uint64) error {
-	if controller == nil {
+func (c *Controller) BeginShutdown(epoch uint64) error {
+	if c == nil {
 		return nil
 	}
-	controller.mu.Lock()
-	defer controller.mu.Unlock()
-	if controller.terminated {
-		return controller.dirty
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.terminated {
+		return c.dirty
 	}
-	if controller.draining {
-		return controller.dirty
+	if c.draining {
+		return c.dirty
 	}
-	controller.draining = true
-	if controller.publication == nil {
-		controller.dirty = errors.Join(
-			controller.dirty,
+	c.draining = true
+	if c.publication == nil {
+		c.dirty = errors.Join(
+			c.dirty,
 			errors.New("jobmgr Function controller: shutdown before binding"),
 		)
-		return controller.dirty
+		return c.dirty
 	}
-	controller.dirty = errors.Join(
-		controller.dirty,
-		controller.publication.Stop(epoch),
+	c.dirty = errors.Join(
+		c.dirty,
+		c.publication.Stop(epoch),
 	)
-	return controller.dirty
+	return c.dirty
 }
 
-func (controller *Controller) usableLocked() error {
-	if controller.dirty != nil {
-		return controller.dirty
+func (c *Controller) usableLocked() error {
+	if c.dirty != nil {
+		return c.dirty
 	}
-	if !controller.activated || controller.draining || controller.terminated ||
-		controller.mutations == nil || controller.publication == nil {
+	if !c.activated || c.draining || c.terminated ||
+		c.mutations == nil || c.publication == nil {
 		return errors.New("jobmgr Function controller: not active")
 	}
 	return nil
 }
 
-func (controller *Controller) reconcileModuleLocked(
+func (c *Controller) reconcileModuleLocked(
 	ctx context.Context,
 	module string,
 	creator collectorapi.Creator,
 ) ([]*methodGeneration, error) {
-	desired, unpublished, err := controller.buildModuleGroups(module, creator)
+	desired, unpublished, err := c.buildModuleGroups(module, creator)
 	if err != nil {
 		return nil, err
 	}
 	cleanupUnpublished := true
 	defer func() {
 		if cleanupUnpublished {
-			controller.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished)
+			c.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished)
 		}
 	}()
 
-	nextGroups := make(map[string]*controllerGroup, len(controller.groups)+len(desired))
-	for key, group := range controller.groups {
+	nextGroups := make(map[string]*controllerGroup, len(c.groups)+len(desired))
+	for key, group := range c.groups {
 		if group.module != module {
 			nextGroups[key] = group
 		}
 	}
 	for key, group := range desired {
-		if current := controller.groups[key]; current != nil &&
+		if current := c.groups[key]; current != nil &&
 			current.signature == group.signature {
 			nextGroups[key] = current
 			delete(unpublished, key)
@@ -654,23 +654,23 @@ func (controller *Controller) reconcileModuleLocked(
 	if err != nil {
 		return nil, err
 	}
-	for name := range controller.fixed {
+	for name := range c.fixed {
 		if _, exists := nextRoutes[name]; exists {
 			return nil, errors.New(
 				"jobmgr Function controller: collector Function collides with initial route",
 			)
 		}
 	}
-	routeChanges := controllerRouteChanges(controller.routes, nextRoutes)
+	routeChanges := controllerRouteChanges(c.routes, nextRoutes)
 	if len(routeChanges) == 0 {
-		controller.groups = nextGroups
+		c.groups = nextGroups
 		cleanupUnpublished = false
-		controller.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished)
-		controller.refreshModuleAvailabilityLocked(module)
+		c.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished)
+		c.refreshModuleAvailabilityLocked(module)
 		return nil, nil
 	}
-	mutation, err := controller.catalog.NewMutation(
-		controller.version,
+	mutation, err := c.catalog.NewMutation(
+		c.version,
 		routeChanges,
 	)
 	if err != nil {
@@ -679,25 +679,25 @@ func (controller *Controller) reconcileModuleLocked(
 	defer func() {
 		_ = mutation.Discard()
 	}()
-	retired := retiredMethodGenerations(controller.groups, nextGroups)
-	publicationChanges := controllerPublicationChanges(controller.routes, nextRoutes)
-	records := controller.publicationRecordsLocked(nextRoutes)
+	retired := retiredMethodGenerations(c.groups, nextGroups)
+	publicationChanges := controllerPublicationChanges(c.routes, nextRoutes)
+	records := c.publicationRecordsLocked(nextRoutes)
 	digest, err := DigestSortedPublications(records)
 	if err != nil {
 		return nil, errors.Join(err, mutation.Discard())
 	}
-	expectedVersion := controller.version + 1
+	expectedVersion := c.version + 1
 	transitionCtx := context.WithoutCancel(ctx)
-	err = controller.publication.ApplyTransition(
-		controller.epoch,
+	err = c.publication.ApplyTransition(
+		c.epoch,
 		expectedVersion,
 		digest,
 		publicationChanges,
 		func() error {
-			return controller.mutations.QuiesceFunctions(ctx, mutation)
+			return c.mutations.QuiesceFunctions(ctx, mutation)
 		},
 		func() error {
-			version, mutationErr := controller.mutations.CommitFunctions(
+			version, mutationErr := c.mutations.CommitFunctions(
 				transitionCtx,
 				mutation,
 			)
@@ -707,9 +707,9 @@ func (controller *Controller) reconcileModuleLocked(
 			// The catalog commit transfers ownership of every new generation
 			// and retires the predecessors. No later publication failure may
 			// roll that transition back or clean catalog-owned handlers.
-			controller.version = version
-			controller.groups = nextGroups
-			controller.routes = nextRoutes
+			c.version = version
+			c.groups = nextGroups
+			c.routes = nextRoutes
 			cleanupUnpublished = false
 			if version != expectedVersion {
 				return errors.New("jobmgr Function controller: mutation version mismatch")
@@ -717,7 +717,7 @@ func (controller *Controller) reconcileModuleLocked(
 			return nil
 		},
 		func() error {
-			return controller.mutations.AbortFunctions(
+			return c.mutations.AbortFunctions(
 				transitionCtx,
 				mutation,
 			)
@@ -725,15 +725,15 @@ func (controller *Controller) reconcileModuleLocked(
 	)
 	err = errors.Join(err, mutation.Discard())
 	if err != nil {
-		controller.dirty = errors.Join(controller.dirty, err)
+		c.dirty = errors.Join(c.dirty, err)
 		return nil, err
 	}
-	controller.refreshModuleAvailabilityLocked(module)
+	c.refreshModuleAvailabilityLocked(module)
 	return retired, nil
 }
 
-func (controller *Controller) moduleAvailabilityChangedLocked(module string) bool {
-	state, ok := controller.availability[module]
+func (c *Controller) moduleAvailabilityChangedLocked(module string) bool {
+	state, ok := c.availability[module]
 	if !ok {
 		return true
 	}
@@ -752,9 +752,9 @@ func (controller *Controller) moduleAvailabilityChangedLocked(module string) boo
 	return false
 }
 
-func (controller *Controller) refreshModuleAvailabilityLocked(module string) {
-	plan := controller.plans[module]
-	jobs := controller.jobs[module]
+func (c *Controller) refreshModuleAvailabilityLocked(module string) {
+	plan := c.plans[module]
+	jobs := c.jobs[module]
 	capacity := len(plan.agent) + len(plan.shared)*len(jobs)
 	for _, job := range jobs {
 		capacity += len(job.methods)
@@ -762,7 +762,7 @@ func (controller *Controller) refreshModuleAvailabilityLocked(module string) {
 	state := controllerModuleAvailability{
 		probes: make([]controllerAvailabilityProbe, 0, capacity),
 	}
-	currentAgent := controller.groups[module+"/agent"]
+	currentAgent := c.groups[module+"/agent"]
 	for _, method := range plan.agent {
 		if method.Available == nil {
 			continue
@@ -794,10 +794,10 @@ func (controller *Controller) refreshModuleAvailabilityLocked(module string) {
 			})
 		}
 	}
-	controller.availability[module] = state
+	c.availability[module] = state
 }
 
-func (controller *Controller) buildModuleGroups(
+func (c *Controller) buildModuleGroups(
 	module string,
 	creator collectorapi.Creator,
 ) (
@@ -817,35 +817,35 @@ func (controller *Controller) buildModuleGroups(
 		}
 		return nil
 	}
-	if err := add(controller.buildAgentGroup(module, creator)); err != nil {
+	if err := add(c.buildAgentGroup(module, creator)); err != nil {
 		return nil, unpublished, err
 	}
-	if err := add(controller.buildSharedGroup(module, creator)); err != nil {
+	if err := add(c.buildSharedGroup(module, creator)); err != nil {
 		return nil, unpublished, err
 	}
-	jobs := controller.jobs[module]
+	jobs := c.jobs[module]
 	names := make([]string, 0, len(jobs))
 	for name := range jobs {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		if err := add(controller.buildInstanceGroup(module, creator, jobs[name])); err != nil {
+		if err := add(c.buildInstanceGroup(module, creator, jobs[name])); err != nil {
 			return nil, unpublished, err
 		}
 	}
 	return desired, unpublished, nil
 }
 
-func (controller *Controller) buildAgentGroup(
+func (c *Controller) buildAgentGroup(
 	module string,
 	creator collectorapi.Creator,
 ) (*controllerGroup, error) {
 	if creator.AgentFunctions == nil {
 		return nil, nil
 	}
-	methods := controller.availableAgentMethods(module)
-	return controller.buildGroup(
+	methods := c.availableAgentMethods(module)
+	return c.buildGroup(
 		module+"/agent",
 		module,
 		methodGenerationAgent,
@@ -856,29 +856,29 @@ func (controller *Controller) buildAgentGroup(
 	)
 }
 
-func (controller *Controller) buildSharedGroup(
+func (c *Controller) buildSharedGroup(
 	module string,
 	creator collectorapi.Creator,
 ) (*controllerGroup, error) {
-	if creator.SharedFunctions == nil || len(controller.jobs[module]) == 0 {
+	if creator.SharedFunctions == nil || len(c.jobs[module]) == 0 {
 		return nil, nil
 	}
-	jobs := make(map[string]collectorapi.RuntimeJob, len(controller.jobs[module]))
-	for name, job := range controller.jobs[module] {
+	jobs := make(map[string]collectorapi.RuntimeJob, len(c.jobs[module]))
+	for name, job := range c.jobs[module] {
 		jobs[name] = job.job
 	}
-	return controller.buildGroup(
+	return c.buildGroup(
 		module+"/shared",
 		module,
 		methodGenerationShared,
 		creator,
-		controller.plans[module].shared,
+		c.plans[module].shared,
 		jobs,
 		true,
 	)
 }
 
-func (controller *Controller) buildInstanceGroup(
+func (c *Controller) buildInstanceGroup(
 	module string,
 	creator collectorapi.Creator,
 	job controllerJob,
@@ -886,7 +886,7 @@ func (controller *Controller) buildInstanceGroup(
 	if creator.InstanceFunctions == nil {
 		return nil, nil
 	}
-	return controller.buildGroup(
+	return c.buildGroup(
 		module+"/instance/"+job.job.Name(),
 		module,
 		methodGenerationInstance,
@@ -897,7 +897,7 @@ func (controller *Controller) buildInstanceGroup(
 	)
 }
 
-func (controller *Controller) buildGroup(
+func (c *Controller) buildGroup(
 	key string,
 	module string,
 	kind methodGenerationKind,
@@ -918,14 +918,14 @@ func (controller *Controller) buildGroup(
 	if err != nil {
 		return nil, err
 	}
-	if current := controller.groups[key]; current != nil && current.signature == signature {
+	if current := c.groups[key]; current != nil && current.signature == signature {
 		return current, nil
 	}
-	controller.nextID++
-	if controller.nextID == 0 {
+	c.nextID++
+	if c.nextID == 0 {
 		return nil, errors.New("jobmgr Function controller: generation wrapped")
 	}
-	id := module + "/" + strconv.FormatUint(controller.nextID, 10)
+	id := module + "/" + strconv.FormatUint(c.nextID, 10)
 	generation, err := newMethodGeneration(id, module, kind, creator, methods, jobs)
 	if err != nil {
 		return nil, err
@@ -960,7 +960,7 @@ func (controller *Controller) buildGroup(
 					name,
 					module,
 					method,
-					controller.nextID,
+					c.nextID,
 				),
 			}
 		}
@@ -968,12 +968,12 @@ func (controller *Controller) buildGroup(
 	return group, nil
 }
 
-func (controller *Controller) availableAgentMethods(
+func (c *Controller) availableAgentMethods(
 	module string,
 ) []funcapi.FunctionConfig {
-	current := controller.groups[module+"/agent"]
-	methods := make([]funcapi.FunctionConfig, 0, len(controller.plans[module].agent))
-	for _, method := range controller.plans[module].agent {
+	current := c.groups[module+"/agent"]
+	methods := make([]funcapi.FunctionConfig, 0, len(c.plans[module].agent))
+	for _, method := range c.plans[module].agent {
 		published := false
 		if current != nil && current.generation != nil {
 			_, published = current.generation.methods[method.ID]
@@ -1235,12 +1235,12 @@ func sortedControllerRouteNames(routes map[string]controllerRoute) []string {
 	return names
 }
 
-func (controller *Controller) publicationRecordsLocked(
+func (c *Controller) publicationRecordsLocked(
 	routes map[string]controllerRoute,
 ) []PublicationRecord {
 	names := sortedControllerRouteNames(routes)
-	fixedNames := make([]string, 0, len(controller.fixed))
-	for name := range controller.fixed {
+	fixedNames := make([]string, 0, len(c.fixed))
+	for name := range c.fixed {
 		fixedNames = append(fixedNames, name)
 	}
 	sort.Strings(fixedNames)
@@ -1250,7 +1250,7 @@ func (controller *Controller) publicationRecordsLocked(
 		len(fixedNames)+len(names),
 	)
 	for _, name := range fixedNames {
-		records = append(records, controller.fixed[name])
+		records = append(records, c.fixed[name])
 	}
 	for _, name := range names {
 		records = append(records, routes[name].publication)
@@ -1276,7 +1276,7 @@ func validateInitialRoute(route InitialRoute) error {
 	return nil
 }
 
-func (controller *Controller) cleanupInitialRoutes(
+func (c *Controller) cleanupInitialRoutes(
 	ctx context.Context,
 	generations []*HandlerGenerationDeclaration,
 ) (err error) {
@@ -1336,7 +1336,7 @@ func generationReferencesJob(
 	return false
 }
 
-func (controller *Controller) cleanupUnpublishedGroups(
+func (c *Controller) cleanupUnpublishedGroups(
 	ctx context.Context,
 	groups map[string]*controllerGroup,
 ) {
@@ -1353,6 +1353,6 @@ func (controller *Controller) cleanupUnpublishedGroups(
 	}
 }
 
-func (identity JobIdentity) String() string {
-	return identity.ID + "@" + strconv.FormatUint(identity.Generation, 10)
+func (ji JobIdentity) String() string {
+	return ji.ID + "@" + strconv.FormatUint(ji.Generation, 10)
 }

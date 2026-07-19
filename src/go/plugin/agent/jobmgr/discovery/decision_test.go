@@ -426,13 +426,13 @@ type decisionTestCommands struct {
 	requests []jobmgr.Request
 }
 
-func (commands *decisionTestCommands) SubmitPreparedAndWait(
+func (dtc *decisionTestCommands) SubmitPreparedAndWait(
 	_ context.Context,
 	request jobmgr.Request,
 	_ jobmgr.WorkPlan,
 ) error {
-	commands.requests = append(commands.requests, request)
-	return commands.err
+	dtc.requests = append(dtc.requests, request)
+	return dtc.err
 }
 
 type decisionBenchmarkCommands struct{}

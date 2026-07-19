@@ -503,27 +503,27 @@ type recordingPreparedResource struct {
 	disposeContextErr error
 }
 
-func (resource *recordingPreparedResource) Identity() ResourceIdentity { return resource.identity }
+func (rpr *recordingPreparedResource) Identity() ResourceIdentity { return rpr.identity }
 
-func (resource *recordingPreparedResource) AcceptStart(context.Context, uint64) (ReadyResource, error) {
-	if resource.panicAccept {
+func (rpr *recordingPreparedResource) AcceptStart(context.Context, uint64) (ReadyResource, error) {
+	if rpr.panicAccept {
 		panic("accept panic")
 	}
-	if resource.consumed {
+	if rpr.consumed {
 		return nil, errors.New("prepared resource consumed")
 	}
-	resource.consumed = true
-	*resource.events = append(*resource.events, "accept-start")
-	return resource.ready, resource.acceptErr
+	rpr.consumed = true
+	*rpr.events = append(*rpr.events, "accept-start")
+	return rpr.ready, rpr.acceptErr
 }
 
-func (resource *recordingPreparedResource) Dispose(ctx context.Context) error {
-	resource.disposeContextErr = ctx.Err()
-	if resource.consumed {
+func (rpr *recordingPreparedResource) Dispose(ctx context.Context) error {
+	rpr.disposeContextErr = ctx.Err()
+	if rpr.consumed {
 		return errors.New("prepared resource consumed")
 	}
-	resource.consumed = true
-	*resource.events = append(*resource.events, "dispose")
+	rpr.consumed = true
+	*rpr.events = append(*rpr.events, "dispose")
 	return nil
 }
 
@@ -540,34 +540,34 @@ type recordingReadyResource struct {
 	panicAfterIdentity bool
 }
 
-func (resource *recordingReadyResource) Identity() ResourceIdentity {
-	resource.identityCalls++
-	if resource.panicAfterIdentity && resource.identityCalls > 1 {
+func (rrr *recordingReadyResource) Identity() ResourceIdentity {
+	rrr.identityCalls++
+	if rrr.panicAfterIdentity && rrr.identityCalls > 1 {
 		panic("ready identity called more than once")
 	}
-	return resource.identity
+	return rrr.identity
 }
-func (resource *recordingReadyResource) Publish() error {
-	*resource.events = append(*resource.events, "publish")
-	return resource.publishErr
+func (rrr *recordingReadyResource) Publish() error {
+	*rrr.events = append(*rrr.events, "publish")
+	return rrr.publishErr
 }
-func (resource *recordingReadyResource) AbortReady(ctx context.Context) error {
-	resource.abortContextErr = ctx.Err()
-	resource.abortDeadline, _ = ctx.Deadline()
-	*resource.events = append(*resource.events, "abort-ready")
-	return resource.abortErr
+func (rrr *recordingReadyResource) AbortReady(ctx context.Context) error {
+	rrr.abortContextErr = ctx.Err()
+	rrr.abortDeadline, _ = ctx.Deadline()
+	*rrr.events = append(*rrr.events, "abort-ready")
+	return rrr.abortErr
 }
-func (resource *recordingReadyResource) Stop(context.Context) error {
-	*resource.events = append(*resource.events, "stop")
+func (rrr *recordingReadyResource) Stop(context.Context) error {
+	*rrr.events = append(*rrr.events, "stop")
 	return nil
 }
-func (resource *recordingReadyResource) Finalize() error {
-	*resource.events = append(*resource.events, "finalize")
-	if resource.finalizeEntered != nil {
-		close(resource.finalizeEntered)
+func (rrr *recordingReadyResource) Finalize() error {
+	*rrr.events = append(*rrr.events, "finalize")
+	if rrr.finalizeEntered != nil {
+		close(rrr.finalizeEntered)
 	}
-	if resource.finalizeGate != nil {
-		<-resource.finalizeGate
+	if rrr.finalizeGate != nil {
+		<-rrr.finalizeGate
 	}
 	return nil
 }

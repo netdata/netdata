@@ -137,25 +137,25 @@ type transactionTestPreparedResource struct {
 	events   *[]string
 }
 
-func (resource *transactionTestPreparedResource) Identity() lifecycle.ResourceIdentity {
-	return resource.identity
+func (ttpr *transactionTestPreparedResource) Identity() lifecycle.ResourceIdentity {
+	return ttpr.identity
 }
 
-func (resource *transactionTestPreparedResource) AcceptStart(
+func (ttpr *transactionTestPreparedResource) AcceptStart(
 	_ context.Context,
 	expected uint64,
 ) (lifecycle.ReadyResource, error) {
-	*resource.events = append(*resource.events, "successor-accept")
-	if expected != resource.identity.Generation {
+	*ttpr.events = append(*ttpr.events, "successor-accept")
+	if expected != ttpr.identity.Generation {
 		return nil, ErrJobGenerationMismatch
 	}
-	return resource.ready, nil
+	return ttpr.ready, nil
 }
 
-func (resource *transactionTestPreparedResource) Dispose(
+func (ttpr *transactionTestPreparedResource) Dispose(
 	context.Context,
 ) error {
-	*resource.events = append(*resource.events, "successor-dispose")
+	*ttpr.events = append(*ttpr.events, "successor-dispose")
 	return nil
 }
 
@@ -165,42 +165,42 @@ type transactionTestReadyResource struct {
 	events   *[]string
 }
 
-func (resource *transactionTestReadyResource) Identity() lifecycle.ResourceIdentity {
-	return resource.identity
+func (ttrr *transactionTestReadyResource) Identity() lifecycle.ResourceIdentity {
+	return ttrr.identity
 }
 
-func (resource *transactionTestReadyResource) Publish() error {
-	*resource.events = append(
-		*resource.events,
-		resource.prefix+"-publish",
+func (ttrr *transactionTestReadyResource) Publish() error {
+	*ttrr.events = append(
+		*ttrr.events,
+		ttrr.prefix+"-publish",
 	)
 	return nil
 }
 
-func (resource *transactionTestReadyResource) AbortReady(
+func (ttrr *transactionTestReadyResource) AbortReady(
 	context.Context,
 ) error {
-	*resource.events = append(
-		*resource.events,
-		resource.prefix+"-abort",
+	*ttrr.events = append(
+		*ttrr.events,
+		ttrr.prefix+"-abort",
 	)
 	return nil
 }
 
-func (resource *transactionTestReadyResource) Stop(
+func (ttrr *transactionTestReadyResource) Stop(
 	context.Context,
 ) error {
-	*resource.events = append(
-		*resource.events,
-		resource.prefix+"-stop",
+	*ttrr.events = append(
+		*ttrr.events,
+		ttrr.prefix+"-stop",
 	)
 	return nil
 }
 
-func (resource *transactionTestReadyResource) Finalize() error {
-	*resource.events = append(
-		*resource.events,
-		resource.prefix+"-finalize",
+func (ttrr *transactionTestReadyResource) Finalize() error {
+	*ttrr.events = append(
+		*ttrr.events,
+		ttrr.prefix+"-finalize",
 	)
 	return nil
 }

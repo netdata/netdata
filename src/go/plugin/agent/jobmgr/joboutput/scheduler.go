@@ -53,128 +53,128 @@ func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {
 	}, nil
 }
 
-func (scheduler *Scheduler) Register(
+func (s *Scheduler) Register(
 	identity lifecycle.ResourceIdentity,
 	job RuntimeJob,
 ) error {
-	if scheduler == nil || !identity.Valid() || job == nil ||
+	if s == nil || !identity.Valid() || job == nil ||
 		identity.ID != job.FullName() || job.ModuleName() == "" {
 		return errors.New("job output: invalid scheduler registration")
 	}
-	scheduler.mu.Lock()
-	defer scheduler.mu.Unlock()
-	if scheduler.jobs[identity] != nil {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.jobs[identity] != nil {
 		return errors.New("job output: duplicate scheduler registration")
 	}
 	record := &scheduledJob{
 		identity: identity,
 		job:      job,
-		previous: scheduler.jobTail,
+		previous: s.jobTail,
 	}
-	if scheduler.jobTail == nil {
-		scheduler.jobHead = record
+	if s.jobTail == nil {
+		s.jobHead = record
 	} else {
-		scheduler.jobTail.next = record
+		s.jobTail.next = record
 	}
-	scheduler.jobTail = record
-	scheduler.jobs[identity] = record
+	s.jobTail = record
+	s.jobs[identity] = record
 
-	module := scheduler.modules[job.ModuleName()]
+	module := s.modules[job.ModuleName()]
 	if module == nil {
 		module = &scheduledModule{
 			name:     job.ModuleName(),
-			previous: scheduler.moduleTail,
+			previous: s.moduleTail,
 		}
-		if scheduler.moduleTail == nil {
-			scheduler.moduleHead = module
+		if s.moduleTail == nil {
+			s.moduleHead = module
 		} else {
-			scheduler.moduleTail.next = module
+			s.moduleTail.next = module
 		}
-		scheduler.moduleTail = module
-		scheduler.modules[module.name] = module
+		s.moduleTail = module
+		s.modules[module.name] = module
 	}
 	module.jobs++
 	return nil
 }
 
-func (scheduler *Scheduler) Unregister(
+func (s *Scheduler) Unregister(
 	identity lifecycle.ResourceIdentity,
 	job RuntimeJob,
 ) error {
-	if scheduler == nil || !identity.Valid() || job == nil {
+	if s == nil || !identity.Valid() || job == nil {
 		return errors.New("job output: invalid scheduler unregistration")
 	}
-	scheduler.mu.Lock()
-	defer scheduler.mu.Unlock()
-	record := scheduler.jobs[identity]
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record := s.jobs[identity]
 	if record == nil || record.job != job {
 		return errors.New("job output: stale scheduler unregistration")
 	}
-	module := scheduler.modules[job.ModuleName()]
+	module := s.modules[job.ModuleName()]
 	if module == nil || module.jobs <= 0 {
 		return errors.New("job output: scheduler module census differs")
 	}
 	if record.previous == nil {
-		scheduler.jobHead = record.next
+		s.jobHead = record.next
 	} else {
 		record.previous.next = record.next
 	}
 	if record.next == nil {
-		scheduler.jobTail = record.previous
+		s.jobTail = record.previous
 	} else {
 		record.next.previous = record.previous
 	}
-	delete(scheduler.jobs, identity)
+	delete(s.jobs, identity)
 
 	module.jobs--
 	if module.jobs == 0 {
 		if module.previous == nil {
-			scheduler.moduleHead = module.next
+			s.moduleHead = module.next
 		} else {
 			module.previous.next = module.next
 		}
 		if module.next == nil {
-			scheduler.moduleTail = module.previous
+			s.moduleTail = module.previous
 		} else {
 			module.next.previous = module.previous
 		}
-		delete(scheduler.modules, module.name)
+		delete(s.modules, module.name)
 	}
 	return nil
 }
 
-func (scheduler *Scheduler) Tick(ctx context.Context, clock int) error {
-	if scheduler == nil || ctx == nil {
+func (s *Scheduler) Tick(ctx context.Context, clock int) error {
+	if s == nil || ctx == nil {
 		return errors.New("job output: invalid scheduler tick")
 	}
-	scheduler.tickMu.Lock()
-	defer scheduler.tickMu.Unlock()
-	scheduler.mu.Lock()
-	for record := scheduler.jobHead; record != nil; record = record.next {
+	s.tickMu.Lock()
+	defer s.tickMu.Unlock()
+	s.mu.Lock()
+	for record := s.jobHead; record != nil; record = record.next {
 		record.job.Tick(clock)
 	}
-	scheduler.moduleTick = scheduler.moduleTick[:0]
-	for module := scheduler.moduleHead; module != nil; module = module.next {
-		scheduler.moduleTick = append(scheduler.moduleTick, module.name)
+	s.moduleTick = s.moduleTick[:0]
+	for module := s.moduleHead; module != nil; module = module.next {
+		s.moduleTick = append(s.moduleTick, module.name)
 	}
-	scheduler.mu.Unlock()
+	s.mu.Unlock()
 
 	var result error
-	for index, module := range scheduler.moduleTick {
-		scheduler.moduleTick[index] = ""
-		if err := scheduler.reconciler.ReconcileModule(ctx, module); err != nil {
+	for index, module := range s.moduleTick {
+		s.moduleTick[index] = ""
+		if err := s.reconciler.ReconcileModule(ctx, module); err != nil {
 			result = errors.Join(result, err)
 		}
 	}
-	scheduler.moduleTick = scheduler.moduleTick[:0]
+	s.moduleTick = s.moduleTick[:0]
 	return result
 }
 
-func (scheduler *Scheduler) Census() int {
-	if scheduler == nil {
+func (s *Scheduler) Census() int {
+	if s == nil {
 		return 0
 	}
-	scheduler.mu.Lock()
-	defer scheduler.mu.Unlock()
-	return len(scheduler.jobs)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.jobs)
 }

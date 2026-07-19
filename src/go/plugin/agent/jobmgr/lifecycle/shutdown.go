@@ -46,46 +46,46 @@ func newShutdownBudget(clock Clock, timeout time.Duration) (*ShutdownBudget, err
 	return budget, nil
 }
 
-func (budget *ShutdownBudget) Context() context.Context {
-	if budget == nil {
+func (sb *ShutdownBudget) Context() context.Context {
+	if sb == nil {
 		return nil
 	}
-	return budget.ctx
+	return sb.ctx
 }
 
-func (budget *ShutdownBudget) Deadline() time.Time {
-	if budget == nil {
+func (sb *ShutdownBudget) Deadline() time.Time {
+	if sb == nil {
 		return time.Time{}
 	}
-	return budget.deadline
+	return sb.deadline
 }
 
-func (budget *ShutdownBudget) Expired() bool {
-	return budget != nil && errors.Is(budget.ctx.Err(), context.DeadlineExceeded)
+func (sb *ShutdownBudget) Expired() bool {
+	return sb != nil && errors.Is(sb.ctx.Err(), context.DeadlineExceeded)
 }
 
-func (budget *ShutdownBudget) ExpireIfDue() bool {
-	if budget == nil {
+func (sb *ShutdownBudget) ExpireIfDue() bool {
+	if sb == nil {
 		return false
 	}
-	if !budget.clock.Now().Before(budget.deadline) {
-		budget.ctx.finish(context.DeadlineExceeded)
+	if !sb.clock.Now().Before(sb.deadline) {
+		sb.ctx.finish(context.DeadlineExceeded)
 	}
-	return budget.Expired()
+	return sb.Expired()
 }
 
-func (budget *ShutdownBudget) close() error {
-	if budget == nil {
+func (sb *ShutdownBudget) close() error {
+	if sb == nil {
 		return nil
 	}
-	budget.finish.Do(func() {
-		budget.ExpireIfDue()
-		budget.cancel()
-		close(budget.stop)
-		<-budget.done
-		budget.ctx.finish(context.Canceled)
+	sb.finish.Do(func() {
+		sb.ExpireIfDue()
+		sb.cancel()
+		close(sb.stop)
+		<-sb.done
+		sb.ctx.finish(context.Canceled)
 	})
-	if budget.Expired() {
+	if sb.Expired() {
 		return context.DeadlineExceeded
 	}
 	return nil

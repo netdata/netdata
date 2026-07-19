@@ -426,9 +426,9 @@ type runRecordingWriter struct {
 	record func([]byte)
 }
 
-func (writer runRecordingWriter) Write(payload []byte) (int, error) {
-	writer.record(payload)
-	return writer.target.Write(payload)
+func (rrw runRecordingWriter) Write(payload []byte) (int, error) {
+	rrw.record(payload)
+	return rrw.target.Write(payload)
 }
 
 type runTestHandler struct {
@@ -447,8 +447,8 @@ func (*runTestHandler) Handle(
 	return &funcapi.FunctionResponse{Status: 200}
 }
 
-func (handler *runTestHandler) Cleanup(context.Context) {
-	handler.cleanup()
+func (rth *runTestHandler) Cleanup(context.Context) {
+	rth.cleanup()
 }
 
 type runRejectingPlanner struct{}

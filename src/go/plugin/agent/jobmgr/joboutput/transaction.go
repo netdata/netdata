@@ -77,22 +77,22 @@ func PrepareNoopResourceTransaction(
 	}, nil
 }
 
-func (transaction *PreparedNoopResourceTransaction) Scope() lifecycle.ResourceTransactionScope {
-	if transaction == nil {
+func (pnrt *PreparedNoopResourceTransaction) Scope() lifecycle.ResourceTransactionScope {
+	if pnrt == nil {
 		return lifecycle.ResourceTransactionScope{}
 	}
-	transaction.mu.Lock()
-	defer transaction.mu.Unlock()
-	if transaction.consumed {
+	pnrt.mu.Lock()
+	defer pnrt.mu.Unlock()
+	if pnrt.consumed {
 		return lifecycle.ResourceTransactionScope{}
 	}
-	return transaction.scope
+	return pnrt.scope
 }
 
-func (transaction *PreparedNoopResourceTransaction) Apply(
+func (pnrt *PreparedNoopResourceTransaction) Apply(
 	context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	scope, current, permit, result, cleanup, err := transaction.take()
+	scope, current, permit, result, cleanup, err := pnrt.take()
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
@@ -110,10 +110,10 @@ func (transaction *PreparedNoopResourceTransaction) Apply(
 	)
 }
 
-func (transaction *PreparedNoopResourceTransaction) Dispose(
+func (pnrt *PreparedNoopResourceTransaction) Dispose(
 	context.Context,
 ) (lifecycle.ReadyResource, error) {
-	_, current, permit, _, _, err := transaction.take()
+	_, current, permit, _, _, err := pnrt.take()
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (transaction *PreparedNoopResourceTransaction) Dispose(
 	return current, err
 }
 
-func (transaction *PreparedNoopResourceTransaction) take() (
+func (pnrt *PreparedNoopResourceTransaction) take() (
 	lifecycle.ResourceTransactionScope,
 	lifecycle.ReadyResource,
 	lifecycle.LongLivedPermit,
@@ -131,7 +131,7 @@ func (transaction *PreparedNoopResourceTransaction) take() (
 	lifecycle.TaskCleanup,
 	error,
 ) {
-	if transaction == nil {
+	if pnrt == nil {
 		return lifecycle.ResourceTransactionScope{},
 			nil,
 			lifecycle.LongLivedPermit{},
@@ -139,9 +139,9 @@ func (transaction *PreparedNoopResourceTransaction) take() (
 			nil,
 			errors.New("job output: nil no-op transaction")
 	}
-	transaction.mu.Lock()
-	defer transaction.mu.Unlock()
-	if transaction.consumed {
+	pnrt.mu.Lock()
+	defer pnrt.mu.Unlock()
+	if pnrt.consumed {
 		return lifecycle.ResourceTransactionScope{},
 			nil,
 			lifecycle.LongLivedPermit{},
@@ -149,12 +149,12 @@ func (transaction *PreparedNoopResourceTransaction) take() (
 			nil,
 			errors.New("job output: no-op transaction consumed")
 	}
-	transaction.consumed = true
-	return transaction.scope,
-		transaction.current,
-		transaction.permit,
-		transaction.result,
-		transaction.cleanup,
+	pnrt.consumed = true
+	return pnrt.scope,
+		pnrt.current,
+		pnrt.permit,
+		pnrt.result,
+		pnrt.cleanup,
 		nil
 }
 
@@ -167,22 +167,22 @@ func PrepareResourceTransaction(
 	return &PreparedResourceTransaction{spec: spec}, nil
 }
 
-func (transaction *PreparedResourceTransaction) Scope() lifecycle.ResourceTransactionScope {
-	if transaction == nil {
+func (prt *PreparedResourceTransaction) Scope() lifecycle.ResourceTransactionScope {
+	if prt == nil {
 		return lifecycle.ResourceTransactionScope{}
 	}
-	transaction.mu.Lock()
-	defer transaction.mu.Unlock()
-	if transaction.consumed {
+	prt.mu.Lock()
+	defer prt.mu.Unlock()
+	if prt.consumed {
 		return lifecycle.ResourceTransactionScope{}
 	}
-	return transaction.spec.Scope
+	return prt.spec.Scope
 }
 
-func (transaction *PreparedResourceTransaction) Apply(
+func (prt *PreparedResourceTransaction) Apply(
 	ctx context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	spec, err := transaction.take()
+	spec, err := prt.take()
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
@@ -248,10 +248,10 @@ func (transaction *PreparedResourceTransaction) Apply(
 	return applied, nil
 }
 
-func (transaction *PreparedResourceTransaction) Dispose(
+func (prt *PreparedResourceTransaction) Dispose(
 	ctx context.Context,
 ) (lifecycle.ReadyResource, error) {
-	spec, err := transaction.take()
+	spec, err := prt.take()
 	if err != nil {
 		return nil, err
 	}
@@ -271,23 +271,23 @@ func (transaction *PreparedResourceTransaction) Dispose(
 	return spec.Current, errors.Join(abortErr, successorErr)
 }
 
-func (transaction *PreparedResourceTransaction) take() (
+func (prt *PreparedResourceTransaction) take() (
 	ResourceTransactionSpec,
 	error,
 ) {
-	if transaction == nil {
+	if prt == nil {
 		return ResourceTransactionSpec{},
 			errors.New("job output: nil prepared resource transaction")
 	}
-	transaction.mu.Lock()
-	defer transaction.mu.Unlock()
-	if transaction.consumed {
+	prt.mu.Lock()
+	defer prt.mu.Unlock()
+	if prt.consumed {
 		return ResourceTransactionSpec{},
 			errors.New("job output: prepared resource transaction consumed")
 	}
-	transaction.consumed = true
-	spec := transaction.spec
-	transaction.spec = ResourceTransactionSpec{}
+	prt.consumed = true
+	spec := prt.spec
+	prt.spec = ResourceTransactionSpec{}
 	return spec, nil
 }
 

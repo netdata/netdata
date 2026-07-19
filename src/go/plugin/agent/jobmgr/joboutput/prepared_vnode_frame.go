@@ -45,11 +45,11 @@ func PrepareVNodeFrame(
 	}}, nil
 }
 
-func (prepared PreparedVNodeFrame) Transfer(owner *lifecycle.FrameOwner) error {
+func (pvf PreparedVNodeFrame) Transfer(owner *lifecycle.FrameOwner) error {
 	if owner == nil {
 		return errors.New("job output: nil FrameOwner")
 	}
-	state, err := prepared.take()
+	state, err := pvf.take()
 	if err != nil {
 		return err
 	}
@@ -60,37 +60,37 @@ func (prepared PreparedVNodeFrame) Transfer(owner *lifecycle.FrameOwner) error {
 	)
 }
 
-func (prepared PreparedVNodeFrame) Abort() error {
-	state, err := prepared.take()
+func (pvf PreparedVNodeFrame) Abort() error {
+	state, err := pvf.take()
 	if err != nil {
 		return err
 	}
 	return errors.Join(state.frame.Abort(), state.abort())
 }
 
-func (prepared PreparedVNodeFrame) Generation() uint64 {
-	if prepared.state == nil {
+func (pvf PreparedVNodeFrame) Generation() uint64 {
+	if pvf.state == nil {
 		return 0
 	}
-	return prepared.state.generation
+	return pvf.state.generation
 }
 
-func (prepared PreparedVNodeFrame) Revision() uint64 {
-	if prepared.state == nil {
+func (pvf PreparedVNodeFrame) Revision() uint64 {
+	if pvf.state == nil {
 		return 0
 	}
-	return prepared.state.revision
+	return pvf.state.revision
 }
 
-func (prepared PreparedVNodeFrame) take() (*preparedVNodeFrameState, error) {
-	if prepared.state == nil {
+func (pvf PreparedVNodeFrame) take() (*preparedVNodeFrameState, error) {
+	if pvf.state == nil {
 		return nil, errors.New("job output: unprepared vnode frame")
 	}
-	prepared.state.mu.Lock()
-	defer prepared.state.mu.Unlock()
-	if prepared.state.consumed {
+	pvf.state.mu.Lock()
+	defer pvf.state.mu.Unlock()
+	if pvf.state.consumed {
 		return nil, ErrPreparedVNodeFrameConsumed
 	}
-	prepared.state.consumed = true
-	return prepared.state, nil
+	pvf.state.consumed = true
+	return pvf.state, nil
 }

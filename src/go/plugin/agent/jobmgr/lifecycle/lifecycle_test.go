@@ -1800,10 +1800,10 @@ func newStepWriter() *stepWriter {
 	return &stepWriter{offered: make(chan []byte), release: make(chan struct{})}
 }
 
-func (writer *stepWriter) Write(payload []byte) (int, error) {
+func (sw *stepWriter) Write(payload []byte) (int, error) {
 	copy := append([]byte(nil), payload...)
-	writer.offered <- copy
-	<-writer.release
+	sw.offered <- copy
+	<-sw.release
 	return len(payload), nil
 }
 

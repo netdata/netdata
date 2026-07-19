@@ -395,118 +395,118 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	}, nil
 }
 
-func (generation *runGeneration) Start(ctx context.Context) error {
-	if generation == nil || ctx == nil {
+func (rg *runGeneration) Start(ctx context.Context) error {
+	if rg == nil || ctx == nil {
 		return errors.New("jobmgr composition: invalid run start")
 	}
-	generation.mu.Lock()
-	if generation.startedAttempted {
-		generation.mu.Unlock()
+	rg.mu.Lock()
+	if rg.startedAttempted {
+		rg.mu.Unlock()
 		return errors.New("jobmgr composition: run already started")
 	}
-	generation.startedAttempted = true
-	generation.mu.Unlock()
-	if err := generation.loop.Start(ctx); err != nil {
-		return errors.Join(err, generation.abortConstruction())
+	rg.startedAttempted = true
+	rg.mu.Unlock()
+	if err := rg.loop.Start(ctx); err != nil {
+		return errors.Join(err, rg.abortConstruction())
 	}
-	generation.mu.Lock()
-	generation.started = true
-	generation.mu.Unlock()
-	if err := generation.run.OpenAdmission(); err != nil {
-		generation.run.Dirty(err)
-		generation.kernel.Stop()
+	rg.mu.Lock()
+	rg.started = true
+	rg.mu.Unlock()
+	if err := rg.run.OpenAdmission(); err != nil {
+		rg.run.Dirty(err)
+		rg.kernel.Stop()
 		return err
 	}
-	if err := generation.functions.Activate(); err != nil {
-		generation.run.Dirty(err)
-		generation.kernel.Stop()
+	if err := rg.functions.Activate(); err != nil {
+		rg.run.Dirty(err)
+		rg.kernel.Stop()
 		return err
 	}
-	if err := generation.vnodes.publishInitial(ctx, generation.kernel); err != nil {
-		generation.run.Dirty(err)
-		generation.kernel.Stop()
+	if err := rg.vnodes.publishInitial(ctx, rg.kernel); err != nil {
+		rg.run.Dirty(err)
+		rg.kernel.Stop()
 		return err
 	}
-	if err := generation.secrets.PublishInitial(ctx, generation.kernel); err != nil {
-		generation.run.Dirty(err)
-		generation.kernel.Stop()
+	if err := rg.secrets.PublishInitial(ctx, rg.kernel); err != nil {
+		rg.run.Dirty(err)
+		rg.kernel.Stop()
 		return err
 	}
-	if err := generation.dyncfg.PublishInitial(
+	if err := rg.dyncfg.PublishInitial(
 		ctx,
-		generation.kernel,
-		generation.run.Generation(),
-		generation.initialJobs,
+		rg.kernel,
+		rg.run.Generation(),
+		rg.initialJobs,
 	); err != nil {
-		generation.run.Dirty(err)
-		generation.kernel.Stop()
+		rg.run.Dirty(err)
+		rg.kernel.Stop()
 		return err
 	}
-	if err := generation.startDiscovery(ctx); err != nil {
-		generation.run.Dirty(err)
-		generation.kernel.Stop()
+	if err := rg.startDiscovery(ctx); err != nil {
+		rg.run.Dirty(err)
+		rg.kernel.Stop()
 		return err
 	}
 	return nil
 }
 
-func (generation *runGeneration) Started() bool {
-	if generation == nil {
+func (rg *runGeneration) Started() bool {
+	if rg == nil {
 		return false
 	}
-	generation.mu.Lock()
-	defer generation.mu.Unlock()
-	return generation.started
+	rg.mu.Lock()
+	defer rg.mu.Unlock()
+	return rg.started
 }
 
-func (generation *runGeneration) abortConstruction() error {
-	if generation == nil {
+func (rg *runGeneration) abortConstruction() error {
+	if rg == nil {
 		return nil
 	}
-	generation.mu.Lock()
-	started := generation.started
-	generation.mu.Unlock()
+	rg.mu.Lock()
+	started := rg.started
+	rg.mu.Unlock()
 	if started {
 		return errors.New("jobmgr composition: run construction abort after start")
 	}
 	return errors.Join(
-		generation.releaseRuntimeMetrics(),
-		generation.functions.abortConstruction(),
+		rg.releaseRuntimeMetrics(),
+		rg.functions.abortConstruction(),
 	)
 }
 
-func (generation *runGeneration) Stop() {
-	if generation != nil && generation.kernel != nil {
-		generation.kernel.Stop()
+func (rg *runGeneration) Stop() {
+	if rg != nil && rg.kernel != nil {
+		rg.kernel.Stop()
 	}
 }
 
-func (generation *runGeneration) Wait(ctx context.Context) error {
-	if generation == nil || generation.kernel == nil {
+func (rg *runGeneration) Wait(ctx context.Context) error {
+	if rg == nil || rg.kernel == nil {
 		return errors.New("jobmgr composition: invalid run wait")
 	}
-	waitErr := generation.kernel.Wait(ctx)
+	waitErr := rg.kernel.Wait(ctx)
 	select {
-	case <-generation.kernel.Done():
-		return errors.Join(waitErr, generation.releaseRuntimeMetrics())
+	case <-rg.kernel.Done():
+		return errors.Join(waitErr, rg.releaseRuntimeMetrics())
 	default:
 		return waitErr
 	}
 }
 
-func (generation *runGeneration) releaseRuntimeMetrics() error {
-	if generation == nil {
+func (rg *runGeneration) releaseRuntimeMetrics() error {
+	if rg == nil {
 		return nil
 	}
-	generation.mu.Lock()
-	if !generation.runtimeRegistered {
-		generation.mu.Unlock()
+	rg.mu.Lock()
+	if !rg.runtimeRegistered {
+		rg.mu.Unlock()
 		return nil
 	}
-	generation.runtimeRegistered = false
-	metrics := generation.metrics
-	service := generation.runtime
-	generation.mu.Unlock()
+	rg.runtimeRegistered = false
+	metrics := rg.metrics
+	service := rg.runtime
+	rg.mu.Unlock()
 	return metrics.unregister(service)
 }
 
@@ -516,18 +516,18 @@ type joinedRunFinalizer struct {
 	next      jobmgr.RunFinalizer
 }
 
-func (finalizer joinedRunFinalizer) FinalizeRun(
+func (jrf joinedRunFinalizer) FinalizeRun(
 	ctx context.Context,
 	generation uint64,
 ) error {
-	if finalizer.functions == nil ||
-		finalizer.secrets == nil ||
-		finalizer.next == nil {
+	if jrf.functions == nil ||
+		jrf.secrets == nil ||
+		jrf.next == nil {
 		return errors.New("jobmgr composition: incomplete run finalizer")
 	}
 	return errors.Join(
-		finalizer.functions.FinalizeRun(ctx, generation),
-		finalizer.secrets.Close(ctx),
-		finalizer.next.FinalizeRun(ctx, generation),
+		jrf.functions.FinalizeRun(ctx, generation),
+		jrf.secrets.Close(ctx),
+		jrf.next.FinalizeRun(ctx, generation),
 	)
 }

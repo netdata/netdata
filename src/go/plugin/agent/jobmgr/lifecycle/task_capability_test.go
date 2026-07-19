@@ -225,30 +225,30 @@ type testPreparedCapability struct {
 	panicCommit   bool
 }
 
-func (capability *testPreparedCapability) Identity() ResourceIdentity {
-	if capability.panicIdentity {
+func (tpc *testPreparedCapability) Identity() ResourceIdentity {
+	if tpc.panicIdentity {
 		panic("identity panic")
 	}
-	return capability.identity
+	return tpc.identity
 }
 
-func (capability *testPreparedCapability) Commit(context.Context, uint64) (CapabilityDisposition, error) {
-	if capability.panicCommit {
+func (tpc *testPreparedCapability) Commit(context.Context, uint64) (CapabilityDisposition, error) {
+	if tpc.panicCommit {
 		panic("commit panic")
 	}
 	return CapabilityApplied, nil
 }
 
-func (capability *testPreparedCapability) Dispose(context.Context) error {
-	return capability.releaseCarrier()
+func (tpc *testPreparedCapability) Dispose(context.Context) error {
+	return tpc.releaseCarrier()
 }
 
-func (capability *testPreparedCapability) releaseCarrier() error {
-	if err := capability.permit.ReleaseExternal(LongLivedESecretStore); err != nil {
+func (tpc *testPreparedCapability) releaseCarrier() error {
+	if err := tpc.permit.ReleaseExternal(LongLivedESecretStore); err != nil {
 		return err
 	}
-	if err := capability.permit.ReleaseBytes(); err != nil {
+	if err := tpc.permit.ReleaseBytes(); err != nil {
 		return err
 	}
-	return capability.permit.Return()
+	return tpc.permit.Return()
 }

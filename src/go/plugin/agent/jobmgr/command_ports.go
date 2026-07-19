@@ -41,42 +41,42 @@ type Request struct {
 
 // Validate checks the bounded admission invariants independent of mutable
 // orchestration state.
-func (request Request) Validate() error {
-	if lifecycle.ValidateUID(request.UID) != nil ||
-		request.Route == "" ||
-		!request.Source.Valid() {
+func (r Request) Validate() error {
+	if lifecycle.ValidateUID(r.UID) != nil ||
+		r.Route == "" ||
+		!r.Source.Valid() {
 		return errors.New("jobmgr: invalid request")
 	}
-	if (request.Source == lifecycle.SourceJobManager && request.LaneKey == "") ||
-		(request.Source == lifecycle.SourceFunction && request.LaneKey != "") {
+	if (r.Source == lifecycle.SourceJobManager && r.LaneKey == "") ||
+		(r.Source == lifecycle.SourceFunction && r.LaneKey != "") {
 		return errors.New("jobmgr: invalid request")
 	}
-	if len(request.LaneKey) > maximumRequestMetadataBytes ||
-		len(request.Route) > maximumRequestMetadataBytes ||
-		len(request.ContentType) > maximumRequestMetadataBytes ||
-		len(request.Permissions) > maximumRequestMetadataBytes ||
-		len(request.CallerSource) > maximumRequestMetadataBytes ||
-		request.Timeout < 0 ||
-		len(request.Args) > maximumRequestArguments {
+	if len(r.LaneKey) > maximumRequestMetadataBytes ||
+		len(r.Route) > maximumRequestMetadataBytes ||
+		len(r.ContentType) > maximumRequestMetadataBytes ||
+		len(r.Permissions) > maximumRequestMetadataBytes ||
+		len(r.CallerSource) > maximumRequestMetadataBytes ||
+		r.Timeout < 0 ||
+		len(r.Args) > maximumRequestArguments {
 		return errors.New("jobmgr: request metadata exceeds bounds")
 	}
 	argumentBytes := 0
-	for _, argument := range request.Args {
+	for _, argument := range r.Args {
 		if len(argument) > maximumRequestArgumentBytes-argumentBytes {
 			return errors.New("jobmgr: request arguments exceed bounds")
 		}
 		argumentBytes += len(argument)
 	}
-	if request.InputBodyToken == 0 {
-		if request.PayloadCapacity != 0 || cap(request.Payload) != 0 {
+	if r.InputBodyToken == 0 {
+		if r.PayloadCapacity != 0 || cap(r.Payload) != 0 {
 			return errors.New("jobmgr: unreserved input payload")
 		}
 		return nil
 	}
-	if !request.HasPayload ||
-		request.PayloadCapacity <= 0 ||
-		int64(cap(request.Payload)) != request.PayloadCapacity ||
-		int64(len(request.Payload)) > request.PayloadCapacity {
+	if !r.HasPayload ||
+		r.PayloadCapacity <= 0 ||
+		int64(cap(r.Payload)) != r.PayloadCapacity ||
+		int64(len(r.Payload)) > r.PayloadCapacity {
 		return errors.New("jobmgr: invalid input payload reservation")
 	}
 	return nil

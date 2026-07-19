@@ -28,10 +28,10 @@ type DiscoveredJobChange struct {
 // PlanDiscovered builds one typed, response-free graph/job reconciliation
 // plan. The caller submits it through jobmgr.PreparedCommandPort, so no
 // object-token registry is needed to carry confgroup.Config through Request.
-func (controller *DynCfgJobController) PlanDiscovered(
+func (dcjc *DynCfgJobController) PlanDiscovered(
 	change DiscoveredJobChange,
 ) (jobmgr.WorkPlan, error) {
-	if controller == nil || change.Config == nil {
+	if dcjc == nil || change.Config == nil {
 		return jobmgr.WorkPlan{},
 			errors.New("job output: invalid discovered job change")
 	}
@@ -39,7 +39,7 @@ func (controller *DynCfgJobController) PlanDiscovered(
 	if err != nil {
 		return jobmgr.WorkPlan{}, err
 	}
-	creator, ok := controller.modules.Lookup(config.Module())
+	creator, ok := dcjc.modules.Lookup(config.Module())
 	if !ok {
 		return jobmgr.WorkPlan{},
 			errors.New("job output: discovered module is not registered")
@@ -91,7 +91,7 @@ func (controller *DynCfgJobController) PlanDiscovered(
 				scope lifecycle.ResourceTransactionScope,
 				permit lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
-				return controller.prepareDiscovered(
+				return dcjc.prepareDiscovered(
 					ctx,
 					DiscoveredJobChange{
 						Config:  config,
@@ -108,14 +108,14 @@ func (controller *DynCfgJobController) PlanDiscovered(
 	}, nil
 }
 
-func (controller *DynCfgJobController) prepareDiscovered(
+func (dcjc *DynCfgJobController) prepareDiscovered(
 	ctx context.Context,
 	change DiscoveredJobChange,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	record, exists := controller.graph.Lookup(scope.ID)
+	record, exists := dcjc.graph.Lookup(scope.ID)
 	if err := validateGraphResourcePair(
 		record,
 		exists,
@@ -130,7 +130,7 @@ func (controller *DynCfgJobController) prepareDiscovered(
 		if current != nil {
 			disposition = lifecycle.ResourceTransactionRemoved
 		}
-		return controller.prepareMutation(
+		return dcjc.prepareMutation(
 			scope,
 			current,
 			nil,
@@ -138,8 +138,8 @@ func (controller *DynCfgJobController) prepareDiscovered(
 			disposition,
 			nil,
 			result,
-			controller.configDeleteCleanup(
-				controller.configID(
+			dcjc.configDeleteCleanup(
+				dcjc.configID(
 					change.Config.Module(),
 					change.Config.Name(),
 				),
@@ -156,18 +156,18 @@ func (controller *DynCfgJobController) prepareDiscovered(
 		Name: change.Config.Name(), Status: change.Status.String(),
 		Payload: payload,
 	}
-	cleanup := controller.configCreateCleanup(
+	cleanup := dcjc.configCreateCleanup(
 		postimage,
 		change.Config.SourceType(),
 		change.Config.Source(),
-		controller.configType(controller.modules[change.Config.Module()]),
+		dcjc.configType(dcjc.modules[change.Config.Module()]),
 	)
 	if change.Status == dyncfg.StatusAccepted {
 		disposition := lifecycle.ResourceTransactionUnchanged
 		if current != nil {
 			disposition = lifecycle.ResourceTransactionRemoved
 		}
-		return controller.prepareMutation(
+		return dcjc.prepareMutation(
 			scope,
 			current,
 			nil,
@@ -182,7 +182,7 @@ func (controller *DynCfgJobController) prepareDiscovered(
 		record.Status == dyncfg.StatusRunning.String() &&
 		record.Payload() == string(payload) &&
 		!change.Restart {
-		return controller.noop(
+		return dcjc.noop(
 			scope,
 			current,
 			permit,
@@ -190,7 +190,7 @@ func (controller *DynCfgJobController) prepareDiscovered(
 			cleanup,
 		)
 	}
-	successor, err := controller.factory.Prepare(
+	successor, err := dcjc.factory.Prepare(
 		ctx,
 		change.Config,
 		scope.Successor,
@@ -203,7 +203,7 @@ func (controller *DynCfgJobController) prepareDiscovered(
 	if current != nil {
 		disposition = lifecycle.ResourceTransactionReplaced
 	}
-	return controller.prepareMutation(
+	return dcjc.prepareMutation(
 		scope,
 		current,
 		successor,

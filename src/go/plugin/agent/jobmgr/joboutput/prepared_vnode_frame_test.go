@@ -211,13 +211,13 @@ type countingProtocolWriter struct {
 	writes int
 }
 
-func (writer *countingProtocolWriter) Write(payload []byte) (int, error) {
-	writer.writes++
+func (cpw *countingProtocolWriter) Write(payload []byte) (int, error) {
+	cpw.writes++
 	return len(payload), nil
 }
 
-func (writer *countingProtocolWriter) Writes() int {
-	return writer.writes
+func (cpw *countingProtocolWriter) Writes() int {
+	return cpw.writes
 }
 
 func BenchmarkBVnodeFrame(b *testing.B) {

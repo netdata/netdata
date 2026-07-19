@@ -106,15 +106,15 @@ func ScopedDynCfgJobResource(index uint16, prefix, scopePrefix string) ResourceP
 	}
 }
 
-func (policy ResourcePolicy) validate() error {
-	if policy == (ResourcePolicy{}) {
+func (rp ResourcePolicy) validate() error {
+	if rp == (ResourcePolicy{}) {
 		return nil
 	}
-	if policy.Argument >= 1_024 ||
-		policy.Prefix == "" ||
-		len(policy.Prefix)+len(policy.ScopePrefix) >
+	if rp.Argument >= 1_024 ||
+		rp.Prefix == "" ||
+		len(rp.Prefix)+len(rp.ScopePrefix) >
 			maximumDeclarationMetadataBytes ||
-		strings.TrimSpace(policy.ScopePrefix) != policy.ScopePrefix {
+		strings.TrimSpace(rp.ScopePrefix) != rp.ScopePrefix {
 		return errors.New(
 			"jobmgr Function catalog: invalid resource policy",
 		)
@@ -122,13 +122,13 @@ func (policy ResourcePolicy) validate() error {
 	return nil
 }
 
-func (policy ResourcePolicy) resolve(arguments []string) string {
-	if policy == (ResourcePolicy{}) {
+func (rp ResourcePolicy) resolve(arguments []string) string {
+	if rp == (ResourcePolicy{}) {
 		return ""
 	}
-	resourceID := resolveDynCfgJobResource(policy, arguments)
+	resourceID := resolveDynCfgJobResource(rp, arguments)
 	if resourceID != "" {
-		resourceID = policy.ScopePrefix + resourceID
+		resourceID = rp.ScopePrefix + resourceID
 	}
 	return resourceID
 }
@@ -211,22 +211,22 @@ type handlerGeneration struct {
 	retentionCharged bool
 }
 
-func (generation *handlerGeneration) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
-	if generation == nil || !generation.cleanupPending || generation.cleanup == nil {
+func (hg *handlerGeneration) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
+	if hg == nil || !hg.cleanupPending || hg.cleanup == nil {
 		return lifecycle.NoValueOutcome(), errors.New("jobmgr Function handler: invalid cleanup work")
 	}
-	return lifecycle.NoValueOutcome(), generation.cleanup(ctx)
+	return lifecycle.NoValueOutcome(), hg.cleanup(ctx)
 }
 
-func (generation *handlerGeneration) census() HandlerGenerationCensus {
-	if generation == nil {
+func (hg *handlerGeneration) census() HandlerGenerationCensus {
+	if hg == nil {
 		return HandlerGenerationCensus{}
 	}
 	return HandlerGenerationCensus{
-		ID: generation.id, RouteReferences: generation.routeReferences,
-		InvocationLeases: generation.invocationLeases, AdmissionClosed: generation.admissionClosed,
-		CleanupPending: generation.cleanupPending, Cleaned: generation.cleaned,
-		CleanupFailed: generation.cleanupFailed,
+		ID: hg.id, RouteReferences: hg.routeReferences,
+		InvocationLeases: hg.invocationLeases, AdmissionClosed: hg.admissionClosed,
+		CleanupPending: hg.cleanupPending, Cleaned: hg.cleaned,
+		CleanupFailed: hg.cleanupFailed,
 	}
 }
 
@@ -365,65 +365,65 @@ type invocationSlot struct {
 	transactionPlan jobmgr.ResourceTransactionPlan
 }
 
-func (slot *invocationSlot) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
-	if slot == nil || slot.resolved == nil || slot.resolved.handler == nil {
+func (is *invocationSlot) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
+	if is == nil || is.resolved == nil || is.resolved.handler == nil {
 		return lifecycle.NoValueOutcome(), errors.New("jobmgr Function catalog: invalid invocation work")
 	}
-	if slot.input.HasPayload && len(slot.input.Payload) != 0 && !slot.resolved.rawPayload &&
-		!json.Valid(slot.input.Payload) {
+	if is.input.HasPayload && len(is.input.Payload) != 0 && !is.resolved.rawPayload &&
+		!json.Valid(is.input.Payload) {
 		result, err := lifecycle.NewControlResult(lifecycle.ControlBadRequest)
 		if err != nil {
 			return lifecycle.NoValueOutcome(), err
 		}
 		return lifecycle.NewFrameOutcome(result)
 	}
-	result, err := slot.resolved.handler.handler(ctx, slot.input)
+	result, err := is.resolved.handler.handler(ctx, is.input)
 	if err != nil {
 		return lifecycle.NoValueOutcome(), err
 	}
 	return lifecycle.NewFrameOutcome(result)
 }
 
-func (slot *invocationSlot) prepareResourceTransaction(
+func (is *invocationSlot) prepareResourceTransaction(
 	ctx context.Context,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if slot == nil ||
-		slot.resolved == nil ||
-		slot.resolved.transaction == nil ||
-		slot.resolved.transaction.Prepare == nil {
+	if is == nil ||
+		is.resolved == nil ||
+		is.resolved.transaction == nil ||
+		is.resolved.transaction.Prepare == nil {
 		return nil, errors.New(
 			"jobmgr Function catalog: invalid resource transaction invocation",
 		)
 	}
-	return slot.resolved.transaction.Prepare(
+	return is.resolved.transaction.Prepare(
 		ctx,
-		slot.input,
+		is.input,
 		current,
 		scope,
 		permit,
 	)
 }
 
-func (slot *invocationSlot) prepareCompositeResourceTransaction(
+func (is *invocationSlot) prepareCompositeResourceTransaction(
 	ctx context.Context,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (jobmgr.PreparedCompositeResourceTransaction, error) {
-	if slot == nil ||
-		slot.resolved == nil ||
-		slot.resolved.transaction == nil ||
-		slot.resolved.transaction.PrepareComposite == nil {
+	if is == nil ||
+		is.resolved == nil ||
+		is.resolved.transaction == nil ||
+		is.resolved.transaction.PrepareComposite == nil {
 		return nil, errors.New(
 			"jobmgr Function catalog: invalid composite transaction invocation",
 		)
 	}
-	return slot.resolved.transaction.PrepareComposite(
+	return is.resolved.transaction.PrepareComposite(
 		ctx,
-		slot.input,
+		is.input,
 		current,
 		scope,
 		permit,
@@ -537,22 +537,22 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 	return catalog, nil
 }
 
-func (catalog *Catalog) addInitial(declaration Declaration, generation *handlerGeneration) error {
-	set, _ := catalogRouteSet(catalog.routes, declaration.PublicName)
+func (c *Catalog) addInitial(declaration Declaration, generation *handlerGeneration) error {
+	set, _ := catalogRouteSet(c.routes, declaration.PublicName)
 	if !generation.cleanupRef.Valid() {
-		catalog.nextGenerationID++
-		if catalog.nextGenerationID == 0 {
+		c.nextGenerationID++
+		if c.nextGenerationID == 0 {
 			return errors.New("jobmgr Function catalog: handler generation wrapped")
 		}
-		generation.cleanupRef = jobmgr.FunctionCleanupRef{Slot: catalog.nextGenerationID, Generation: 1}
-		catalog.generations[generation.cleanupRef] = generation
+		generation.cleanupRef = jobmgr.FunctionCleanupRef{Slot: c.nextGenerationID, Generation: 1}
+		c.generations[generation.cleanupRef] = generation
 	}
-	catalog.nextRouteID++
-	if catalog.nextRouteID == 0 {
+	c.nextRouteID++
+	if c.nextRouteID == 0 {
 		return errors.New("jobmgr Function catalog: route identity wrapped")
 	}
 	resolved := &route{
-		id: catalog.nextRouteID, publicName: declaration.PublicName,
+		id: c.nextRouteID, publicName: declaration.PublicName,
 		prefix: declaration.Prefix, method: declaration.ID,
 		handler: generation, resource: declaration.Resource,
 		cooperativeCancel:   declaration.CooperativeCancel,
@@ -571,9 +571,9 @@ func (catalog *Catalog) addInitial(declaration Declaration, generation *handlerG
 		set.prefixCount++
 	}
 	generation.routeReferences++
-	catalog.routes = setInitialCatalogRouteSet(catalog.routes, declaration.PublicName, set)
-	catalog.appendCloseRoute(resolved)
-	catalog.routeCount++
+	c.routes = setInitialCatalogRouteSet(c.routes, declaration.PublicName, set)
+	c.appendCloseRoute(resolved)
+	c.routeCount++
 	return nil
 }
 
@@ -730,13 +730,13 @@ func resourceTransactionCommand(
 	return ResourceTransactionCommand{}, false
 }
 
-func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.FunctionCatalogDecision, error) {
-	if catalog == nil || catalog.closed {
+func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.FunctionCatalogDecision, error) {
+	if c == nil || c.closed {
 		return jobmgr.FunctionCatalogDecision{
 			Rejected: lifecycle.ControlUnavailable,
 		}, nil
 	}
-	set, ok := catalogRouteSet(catalog.routes, lookup.Route)
+	set, ok := catalogRouteSet(c.routes, lookup.Route)
 	if !ok {
 		return jobmgr.FunctionCatalogDecision{
 			Rejected: lifecycle.ControlNotFound,
@@ -781,28 +781,28 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 		}
 	}
 
-	slotIndex := catalog.freeLease
+	slotIndex := c.freeLease
 	var slot *invocationSlot
 	if slotIndex == 0 {
-		if uint64(len(catalog.invocations)) > uint64(^uint32(0)) {
+		if uint64(len(c.invocations)) > uint64(^uint32(0)) {
 			return jobmgr.FunctionCatalogDecision{},
 				errors.New("jobmgr Function catalog: invocation reference exhausted")
 		}
-		slotIndex = uint32(len(catalog.invocations))
+		slotIndex = uint32(len(c.invocations))
 		slot = &invocationSlot{}
-		catalog.invocations = append(catalog.invocations, slot)
+		c.invocations = append(c.invocations, slot)
 	} else {
-		slot = catalog.invocations[slotIndex]
+		slot = c.invocations[slotIndex]
 		if slot == nil {
 			return jobmgr.FunctionCatalogDecision{},
 				errors.New("jobmgr Function catalog: invalid free invocation slot")
 		}
-		catalog.freeLease = slot.freeNext
+		c.freeLease = slot.freeNext
 	}
 	nextGeneration := slot.generation + 1
 	if nextGeneration == 0 {
-		slot.freeNext = catalog.freeLease
-		catalog.freeLease = slotIndex
+		slot.freeNext = c.freeLease
+		c.freeLease = slotIndex
 		return jobmgr.FunctionCatalogDecision{}, errors.New("jobmgr Function catalog: invocation generation wrapped")
 	}
 	*slot = invocationSlot{
@@ -811,7 +811,7 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 	}
 	resolved.invocationLeases++
 	generation.invocationLeases++
-	catalog.invocationCount++
+	c.invocationCount++
 	plan := jobmgr.WorkPlan{
 		Runner:              slot,
 		CooperativeCancel:   resolved.cooperativeCancel,
@@ -861,11 +861,11 @@ func handlerInput(
 	}
 }
 
-func (catalog *Catalog) ReleaseInvocation(ref jobmgr.FunctionInvocationRef) (jobmgr.FunctionCleanupPlan, error) {
-	if catalog == nil || !ref.Valid() || uint64(ref.Slot) >= uint64(len(catalog.invocations)) {
+func (c *Catalog) ReleaseInvocation(ref jobmgr.FunctionInvocationRef) (jobmgr.FunctionCleanupPlan, error) {
+	if c == nil || !ref.Valid() || uint64(ref.Slot) >= uint64(len(c.invocations)) {
 		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: invalid invocation release")
 	}
-	slot := catalog.invocations[ref.Slot]
+	slot := c.invocations[ref.Slot]
 	if slot == nil {
 		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: invalid invocation release")
 	}
@@ -875,21 +875,21 @@ func (catalog *Catalog) ReleaseInvocation(ref jobmgr.FunctionInvocationRef) (job
 	generation := slot.resolved.handler
 	if slot.resolved.invocationLeases <= 0 ||
 		generation.invocationLeases <= 0 ||
-		catalog.invocationCount <= 0 {
+		c.invocationCount <= 0 {
 		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: invocation lease underflow")
 	}
 	resolved := slot.resolved
 	resolved.invocationLeases--
 	generation.invocationLeases--
-	catalog.invocationCount--
+	c.invocationCount--
 	slotGeneration := slot.generation
-	*slot = invocationSlot{generation: slotGeneration, freeNext: catalog.freeLease}
-	catalog.freeLease = ref.Slot
-	catalog.retireDrainedRoute(resolved)
-	return catalog.maybeCleanup(generation)
+	*slot = invocationSlot{generation: slotGeneration, freeNext: c.freeLease}
+	c.freeLease = ref.Slot
+	c.retireDrainedRoute(resolved)
+	return c.maybeCleanup(generation)
 }
 
-func (catalog *Catalog) maybeCleanup(generation *handlerGeneration) (jobmgr.FunctionCleanupPlan, error) {
+func (c *Catalog) maybeCleanup(generation *handlerGeneration) (jobmgr.FunctionCleanupPlan, error) {
 	if generation == nil || generation.routeReferences < 0 || generation.invocationLeases < 0 {
 		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: invalid handler generation")
 	}
@@ -897,33 +897,33 @@ func (catalog *Catalog) maybeCleanup(generation *handlerGeneration) (jobmgr.Func
 		generation.invocationLeases != 0 || generation.cleanupPending || generation.cleaned {
 		return jobmgr.FunctionCleanupPlan{}, nil
 	}
-	return catalog.cleanupDrainedGeneration(generation), nil
+	return c.cleanupDrainedGeneration(generation), nil
 }
 
-func (catalog *Catalog) retireDrainedRoute(retired *route) {
-	if catalog == nil || retired == nil || !retired.retiring ||
+func (c *Catalog) retireDrainedRoute(retired *route) {
+	if c == nil || retired == nil || !retired.retiring ||
 		retired.retiringDrained || retired.invocationLeases != 0 {
 		return
 	}
 	retired.retiringDrained = true
-	if catalog.mutation != nil {
-		retired.retiringNext = catalog.deferredPrune
-		catalog.deferredPrune = retired
+	if c.mutation != nil {
+		retired.retiringNext = c.deferredPrune
+		c.deferredPrune = retired
 		return
 	}
-	catalog.pruneRetiringRoutes(retired)
+	c.pruneRetiringRoutes(retired)
 }
 
-func (catalog *Catalog) pruneRetiringRoutes(routes *route) {
+func (c *Catalog) pruneRetiringRoutes(routes *route) {
 	var released int64
 	for route := routes; route != nil; {
 		next := route.retiringNext
 		route.retiringNext = nil
 		route.retiringDrained = true
-		released += pruneRetiringRoute(&catalog.routes, route)
+		released += pruneRetiringRoute(&c.routes, route)
 		route = next
 	}
-	catalog.storage.releasePublishedPaths(released)
+	c.storage.releasePublishedPaths(released)
 }
 
 func pruneRetiringRoute(
@@ -1016,23 +1016,23 @@ func pruneRetiringRoute(
 	return released
 }
 
-func (catalog *Catalog) cleanupDrainedGeneration(generation *handlerGeneration) jobmgr.FunctionCleanupPlan {
+func (c *Catalog) cleanupDrainedGeneration(generation *handlerGeneration) jobmgr.FunctionCleanupPlan {
 	if generation.cleanup == nil {
 		generation.cleaned = true
-		catalog.completedCleanup++
-		delete(catalog.generations, generation.cleanupRef)
+		c.completedCleanup++
+		delete(c.generations, generation.cleanupRef)
 		return jobmgr.FunctionCleanupPlan{}
 	}
 	generation.cleanupPending = true
-	catalog.pendingCleanups++
+	c.pendingCleanups++
 	return jobmgr.FunctionCleanupPlan{Ref: generation.cleanupRef, Runner: generation}
 }
 
-func (catalog *Catalog) CompleteCleanup(ref jobmgr.FunctionCleanupRef, cleanupErr error) error {
-	if catalog == nil || !ref.Valid() {
+func (c *Catalog) CompleteCleanup(ref jobmgr.FunctionCleanupRef, cleanupErr error) error {
+	if c == nil || !ref.Valid() {
 		return errors.New("jobmgr Function catalog: invalid cleanup completion")
 	}
-	generation := catalog.generations[ref]
+	generation := c.generations[ref]
 	if generation == nil || generation.cleanupRef != ref || !generation.cleanupPending ||
 		generation.cleaned || generation.routeReferences != 0 || generation.invocationLeases != 0 {
 		return errors.New("jobmgr Function catalog: stale cleanup completion")
@@ -1042,7 +1042,7 @@ func (catalog *Catalog) CompleteCleanup(ref jobmgr.FunctionCleanupRef, cleanupEr
 			"jobmgr Function catalog: cleanup has no generation retention",
 		)
 	}
-	if err := catalog.storage.releaseCleanup(
+	if err := c.storage.releaseCleanup(
 		catalogGenerationRetentionBytes,
 	); err != nil {
 		return err
@@ -1051,31 +1051,31 @@ func (catalog *Catalog) CompleteCleanup(ref jobmgr.FunctionCleanupRef, cleanupEr
 	generation.cleanupPending = false
 	generation.cleaned = true
 	generation.cleanupFailed = cleanupErr != nil
-	catalog.pendingCleanups--
-	catalog.completedCleanup++
+	c.pendingCleanups--
+	c.completedCleanup++
 	if cleanupErr != nil {
-		catalog.failedCleanup++
+		c.failedCleanup++
 	}
-	delete(catalog.generations, ref)
+	delete(c.generations, ref)
 	return nil
 }
 
-func (catalog *Catalog) BeginClose() error {
-	if catalog == nil || catalog.closed || catalog.mutation != nil {
+func (c *Catalog) BeginClose() error {
+	if c == nil || c.closed || c.mutation != nil {
 		return errors.New("jobmgr Function catalog: duplicate close")
 	}
-	catalog.closed = true
+	c.closed = true
 	return nil
 }
 
-func (catalog *Catalog) CloseStep(quantum int, cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (int, bool, error) {
-	if catalog == nil || !catalog.closed || quantum <= 0 || quantum > MaximumCloseQuantum || cleanups == nil {
+func (c *Catalog) CloseStep(quantum int, cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (int, bool, error) {
+	if c == nil || !c.closed || quantum <= 0 || quantum > MaximumCloseQuantum || cleanups == nil {
 		return 0, false, errors.New("jobmgr Function catalog: invalid close step")
 	}
 	count := 0
-	for quantum > 0 && catalog.closeHead != nil {
-		resolved := catalog.closeHead
-		catalog.unlinkCloseRoute(resolved)
+	for quantum > 0 && c.closeHead != nil {
+		resolved := c.closeHead
+		c.unlinkCloseRoute(resolved)
 		generation := resolved.handler
 		if generation == nil || generation.routeReferences <= 0 {
 			return count, true, errors.New("jobmgr Function catalog: route reference underflow")
@@ -1083,7 +1083,7 @@ func (catalog *Catalog) CloseStep(quantum int, cleanups *[jobmgr.MaximumFunction
 		generation.routeReferences--
 		if generation.routeReferences == 0 {
 			generation.admissionClosed = true
-			cleanup, err := catalog.maybeCleanup(generation)
+			cleanup, err := c.maybeCleanup(generation)
 			if err != nil {
 				return count, true, err
 			}
@@ -1092,64 +1092,64 @@ func (catalog *Catalog) CloseStep(quantum int, cleanups *[jobmgr.MaximumFunction
 				count++
 			}
 		}
-		catalog.routeCount--
+		c.routeCount--
 		quantum--
 	}
-	more := catalog.closeHead != nil
+	more := c.closeHead != nil
 	if !more {
-		catalog.routes = nil
-		if err := catalog.storage.releasePublished(); err != nil {
+		c.routes = nil
+		if err := c.storage.releasePublished(); err != nil {
 			return count, false, err
 		}
 	}
 	return count, more, nil
 }
 
-func (catalog *Catalog) appendCloseRoute(resolved *route) {
-	resolved.closePrevious = catalog.closeTail
-	if catalog.closeTail != nil {
-		catalog.closeTail.closeNext = resolved
+func (c *Catalog) appendCloseRoute(resolved *route) {
+	resolved.closePrevious = c.closeTail
+	if c.closeTail != nil {
+		c.closeTail.closeNext = resolved
 	} else {
-		catalog.closeHead = resolved
+		c.closeHead = resolved
 	}
-	catalog.closeTail = resolved
+	c.closeTail = resolved
 }
 
-func (catalog *Catalog) unlinkCloseRoute(resolved *route) {
+func (c *Catalog) unlinkCloseRoute(resolved *route) {
 	if resolved.closePrevious != nil {
 		resolved.closePrevious.closeNext = resolved.closeNext
 	} else {
-		catalog.closeHead = resolved.closeNext
+		c.closeHead = resolved.closeNext
 	}
 	if resolved.closeNext != nil {
 		resolved.closeNext.closePrevious = resolved.closePrevious
 	} else {
-		catalog.closeTail = resolved.closePrevious
+		c.closeTail = resolved.closePrevious
 	}
 	resolved.closePrevious = nil
 	resolved.closeNext = nil
 }
 
-func (catalog *Catalog) Census() CatalogCensus {
-	if catalog == nil {
+func (c *Catalog) Census() CatalogCensus {
+	if c == nil {
 		return CatalogCensus{}
 	}
 	return CatalogCensus{
-		Version: catalog.version, Routes: catalog.routeCount,
-		InvocationLeases: catalog.invocationCount, PendingCleanups: catalog.pendingCleanups,
-		CompletedCleanups: catalog.completedCleanup, FailedCleanups: catalog.failedCleanup,
-		Closed: catalog.closed, CloseRoutesPending: catalog.routeCount,
-		MutationActive: catalog.mutation != nil,
+		Version: c.version, Routes: c.routeCount,
+		InvocationLeases: c.invocationCount, PendingCleanups: c.pendingCleanups,
+		CompletedCleanups: c.completedCleanup, FailedCleanups: c.failedCleanup,
+		Closed: c.closed, CloseRoutesPending: c.routeCount,
+		MutationActive: c.mutation != nil,
 	}
 }
 
-func (catalog *Catalog) LifecycleCensus() jobmgr.FunctionCatalogCensus {
-	return catalog.Census()
+func (c *Catalog) LifecycleCensus() jobmgr.FunctionCatalogCensus {
+	return c.Census()
 }
 
-func (catalog *Catalog) HandlerCensus(ref jobmgr.FunctionCleanupRef) HandlerGenerationCensus {
-	if catalog == nil {
+func (c *Catalog) HandlerCensus(ref jobmgr.FunctionCleanupRef) HandlerGenerationCensus {
+	if c == nil {
 		return HandlerGenerationCensus{}
 	}
-	return catalog.generations[ref].census()
+	return c.generations[ref].census()
 }

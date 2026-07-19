@@ -76,11 +76,11 @@ type recordingIngressPort struct {
 	done     chan struct{}
 }
 
-func (port *recordingIngressPort) Submit(
+func (rip *recordingIngressPort) Submit(
 	_ context.Context,
 	request jobmgr.Request,
 ) error {
-	port.requests = append(port.requests, request)
+	rip.requests = append(rip.requests, request)
 	return nil
 }
 
@@ -98,6 +98,6 @@ func (*recordingIngressPort) Cancel(context.Context, string) error {
 
 func (*recordingIngressPort) NotifyControlReady() {}
 
-func (port *recordingIngressPort) Done() <-chan struct{} {
-	return port.done
+func (rip *recordingIngressPort) Done() <-chan struct{} {
+	return rip.done
 }

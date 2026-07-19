@@ -48,31 +48,31 @@ type authorityClaimEdge struct {
 
 type authorityClaimHeap []*authorityClaimKey
 
-func (states authorityClaimHeap) Len() int { return len(states) }
+func (ach authorityClaimHeap) Len() int { return len(ach) }
 
-func (states authorityClaimHeap) Less(left, right int) bool {
-	return states[left].waiterHead.operation.claimTicket <
-		states[right].waiterHead.operation.claimTicket
+func (ach authorityClaimHeap) Less(left, right int) bool {
+	return ach[left].waiterHead.operation.claimTicket <
+		ach[right].waiterHead.operation.claimTicket
 }
 
-func (states authorityClaimHeap) Swap(left, right int) {
-	states[left], states[right] = states[right], states[left]
-	states[left].settlementIndex = left
-	states[right].settlementIndex = right
+func (ach authorityClaimHeap) Swap(left, right int) {
+	ach[left], ach[right] = ach[right], ach[left]
+	ach[left].settlementIndex = left
+	ach[right].settlementIndex = right
 }
 
-func (states *authorityClaimHeap) Push(value any) {
+func (ach *authorityClaimHeap) Push(value any) {
 	state := value.(*authorityClaimKey)
-	state.settlementIndex = len(*states)
-	*states = append(*states, state)
+	state.settlementIndex = len(*ach)
+	*ach = append(*ach, state)
 }
 
-func (states *authorityClaimHeap) Pop() any {
-	old := *states
+func (ach *authorityClaimHeap) Pop() any {
+	old := *ach
 	last := old[len(old)-1]
 	old[len(old)-1] = nil
 	last.settlementIndex = -1
-	*states = old[:len(old)-1]
+	*ach = old[:len(old)-1]
 	return last
 }
 
@@ -95,20 +95,20 @@ func newClaimAuthority() *claimAuthority {
 	}
 }
 
-func (authority *claimAuthority) BindRuntimeObserver(
+func (ca *claimAuthority) BindRuntimeObserver(
 	observer lifecycle.RuntimeObserver,
 	now func() time.Time,
 ) error {
-	if authority == nil || observer == nil || now == nil {
+	if ca == nil || observer == nil || now == nil {
 		return errors.New("jobmgr claims: invalid runtime observer")
 	}
-	if authority.observer != nil || len(authority.keys) != 0 ||
-		authority.waiterCount != 0 {
+	if ca.observer != nil || len(ca.keys) != 0 ||
+		ca.waiterCount != 0 {
 		return errors.New("jobmgr claims: runtime observer bound after activation")
 	}
-	authority.observer = observer
-	authority.now = now
-	authority.observeRuntime()
+	ca.observer = observer
+	ca.now = now
+	ca.observeRuntime()
 	return nil
 }
 
@@ -148,116 +148,116 @@ func prepareClaimEdges(operation *commandOperation, claims []authorityClaim) {
 	operation.claimPrepared = true
 }
 
-func (authority *claimAuthority) Register(operation *commandOperation) error {
+func (ca *claimAuthority) Register(operation *commandOperation) error {
 	if operation == nil || !operation.claimPrepared || operation.claimRegistered {
 		return errors.New("jobmgr claims: invalid operation registration")
 	}
 	for index := range operation.authorityClaimEdges {
 		edge := &operation.authorityClaimEdges[index]
-		edge.key = authority.key(edge.claim.key)
+		edge.key = ca.key(edge.claim.key)
 		edge.key.references++
 	}
 	operation.claimRegistered = true
-	authority.observeRuntime()
+	ca.observeRuntime()
 	return nil
 }
 
-func (authority *claimAuthority) Acquire(operation *commandOperation) (bool, error) {
+func (ca *claimAuthority) Acquire(operation *commandOperation) (bool, error) {
 	if operation == nil || !operation.claimRegistered || operation.claimWaiting || operation.claimsHeld || operation.claimCursor != 0 {
 		return false, errors.New("jobmgr claims: invalid acquire")
 	}
-	authority.nextTicket++
-	if authority.nextTicket == 0 {
+	ca.nextTicket++
+	if ca.nextTicket == 0 {
 		return false, errors.New("jobmgr claims: ticket wrapped")
 	}
-	operation.claimTicket = authority.nextTicket
-	granted, err := authority.acquireFromCursor(operation)
+	operation.claimTicket = ca.nextTicket
+	granted, err := ca.acquireFromCursor(operation)
 	if err == nil && !granted {
-		authority.beginRuntimeWait(operation)
+		ca.beginRuntimeWait(operation)
 	}
-	authority.observeRuntime()
+	ca.observeRuntime()
 	return granted, err
 }
 
-func (authority *claimAuthority) Cancel(operation *commandOperation) ([]*commandOperation, error) {
+func (ca *claimAuthority) Cancel(operation *commandOperation) ([]*commandOperation, error) {
 	if operation == nil || !operation.claimRegistered || !operation.claimWaiting || operation.claimsHeld {
 		return nil, errors.New("jobmgr claims: operation is not waiting")
 	}
 	edge := &operation.authorityClaimEdges[operation.claimCursor]
-	if err := authority.removeWaiter(edge); err != nil {
+	if err := ca.removeWaiter(edge); err != nil {
 		return nil, err
 	}
 	operation.claimWaiting = false
 	for index := operation.claimCursor - 1; index >= 0; index-- {
-		if err := authority.releaseEdge(&operation.authorityClaimEdges[index]); err != nil {
+		if err := ca.releaseEdge(&operation.authorityClaimEdges[index]); err != nil {
 			return nil, err
 		}
 	}
 	operation.claimCursor = 0
-	if err := authority.forget(operation); err != nil {
+	if err := ca.forget(operation); err != nil {
 		return nil, err
 	}
-	authority.endRuntimeWait(operation)
-	granted, _, err := authority.ServiceSettlements(
+	ca.endRuntimeWait(operation)
+	granted, _, err := ca.ServiceSettlements(
 		maximumClaimSettlementQuantum,
 	)
-	authority.observeRuntime()
+	ca.observeRuntime()
 	return granted, err
 }
 
-func (authority *claimAuthority) Release(operation *commandOperation) ([]*commandOperation, error) {
+func (ca *claimAuthority) Release(operation *commandOperation) ([]*commandOperation, error) {
 	if operation == nil || !operation.claimRegistered || !operation.claimsHeld || operation.claimWaiting || operation.claimCursor != len(operation.authorityClaimEdges) {
 		return nil, errors.New("jobmgr claims: release without complete held claims")
 	}
 	for index := len(operation.authorityClaimEdges) - 1; index >= 0; index-- {
-		if err := authority.releaseEdge(&operation.authorityClaimEdges[index]); err != nil {
+		if err := ca.releaseEdge(&operation.authorityClaimEdges[index]); err != nil {
 			return nil, err
 		}
 	}
 	operation.claimsHeld = false
 	operation.claimCursor = 0
-	if err := authority.forget(operation); err != nil {
+	if err := ca.forget(operation); err != nil {
 		return nil, err
 	}
-	granted, _, err := authority.ServiceSettlements(
+	granted, _, err := ca.ServiceSettlements(
 		maximumClaimSettlementQuantum,
 	)
-	authority.observeRuntime()
+	ca.observeRuntime()
 	return granted, err
 }
 
-func (authority *claimAuthority) Abandon(operation *commandOperation) error {
+func (ca *claimAuthority) Abandon(operation *commandOperation) error {
 	if operation == nil || !operation.claimRegistered || operation.claimWaiting || operation.claimsHeld || operation.claimCursor != 0 {
 		return errors.New("jobmgr claims: abandon outside idle prepared state")
 	}
-	err := authority.forget(operation)
-	authority.observeRuntime()
+	err := ca.forget(operation)
+	ca.observeRuntime()
 	return err
 }
 
-func (authority *claimAuthority) Waiting(operation *commandOperation) bool {
+func (ca *claimAuthority) Waiting(operation *commandOperation) bool {
 	return operation != nil && operation.claimWaiting
 }
 
-func (authority *claimAuthority) WaitingCount() int { return authority.waiterCount }
+func (ca *claimAuthority) WaitingCount() int { return ca.waiterCount }
 
-func (authority *claimAuthority) PendingSettlements() bool {
-	return authority != nil && len(authority.settlements) != 0
+func (ca *claimAuthority) PendingSettlements() bool {
+	return ca != nil && len(ca.settlements) != 0
 }
 
-func (authority *claimAuthority) acquireFromCursor(operation *commandOperation) (bool, error) {
+func (ca *claimAuthority) acquireFromCursor(operation *commandOperation) (bool, error) {
 	for operation.claimCursor < len(operation.authorityClaimEdges) {
 		edge := &operation.authorityClaimEdges[operation.claimCursor]
 		if edge.held || edge.waiting || edge.key == nil {
 			return false, errors.New("jobmgr claims: invalid acquisition edge")
 		}
 		if edge.key.waiterHead != nil || !canHold(edge.key, edge.claim.mode) {
-			authority.enqueueWaiter(edge)
+			ca.enqueueWaiter(edge)
 			operation.claimWaiting = true
 			return false, nil
 		}
 		holdEdge(edge)
-		authority.refreshSettlement(edge.key)
+		ca.refreshSettlement(edge.key)
 		operation.claimCursor++
 	}
 	operation.claimsHeld = true
@@ -286,7 +286,7 @@ func holdEdge(edge *authorityClaimEdge) {
 	edge.key.readerTail = edge
 }
 
-func (authority *claimAuthority) releaseEdge(edge *authorityClaimEdge) error {
+func (ca *claimAuthority) releaseEdge(edge *authorityClaimEdge) error {
 	if edge == nil || !edge.held || edge.waiting || edge.key == nil {
 		return errors.New("jobmgr claims: release of unheld edge")
 	}
@@ -314,11 +314,11 @@ func (authority *claimAuthority) releaseEdge(edge *authorityClaimEdge) error {
 	edge.held = false
 	edge.prev = nil
 	edge.next = nil
-	authority.refreshSettlement(edge.key)
+	ca.refreshSettlement(edge.key)
 	return nil
 }
 
-func (authority *claimAuthority) enqueueWaiter(edge *authorityClaimEdge) {
+func (ca *claimAuthority) enqueueWaiter(edge *authorityClaimEdge) {
 	edge.waiting = true
 	edge.prev = edge.key.waiterTail
 	if edge.key.waiterTail != nil {
@@ -327,11 +327,11 @@ func (authority *claimAuthority) enqueueWaiter(edge *authorityClaimEdge) {
 		edge.key.waiterHead = edge
 	}
 	edge.key.waiterTail = edge
-	authority.waiterCount++
-	authority.refreshSettlement(edge.key)
+	ca.waiterCount++
+	ca.refreshSettlement(edge.key)
 }
 
-func (authority *claimAuthority) removeWaiter(edge *authorityClaimEdge) error {
+func (ca *claimAuthority) removeWaiter(edge *authorityClaimEdge) error {
 	if edge == nil || !edge.waiting || edge.held || edge.key == nil {
 		return errors.New("jobmgr claims: remove of non-waiter edge")
 	}
@@ -352,22 +352,22 @@ func (authority *claimAuthority) removeWaiter(edge *authorityClaimEdge) error {
 	edge.waiting = false
 	edge.prev = nil
 	edge.next = nil
-	authority.waiterCount--
-	authority.refreshSettlement(edge.key)
+	ca.waiterCount--
+	ca.refreshSettlement(edge.key)
 	return nil
 }
 
-func (authority *claimAuthority) ServiceSettlements(
+func (ca *claimAuthority) ServiceSettlements(
 	quantum int,
 ) ([]*commandOperation, bool, error) {
-	if authority == nil || quantum <= 0 ||
-		quantum > len(authority.settlementGrants) {
+	if ca == nil || quantum <= 0 ||
+		quantum > len(ca.settlementGrants) {
 		return nil, false, errors.New("jobmgr claims: invalid settlement quantum")
 	}
-	clear(authority.settlementGrants[:])
+	clear(ca.settlementGrants[:])
 	grantCount := 0
-	for visited := 0; visited < quantum && len(authority.settlements) != 0; visited++ {
-		key := heap.Pop(&authority.settlements).(*authorityClaimKey)
+	for visited := 0; visited < quantum && len(ca.settlements) != 0; visited++ {
+		key := heap.Pop(&ca.settlements).(*authorityClaimKey)
 		if !claimSettlementEligible(key) {
 			return nil, false, errors.New("jobmgr claims: ineligible settlement key")
 		}
@@ -380,64 +380,64 @@ func (authority *claimAuthority) ServiceSettlements(
 			!canHold(key, edge.claim.mode) {
 			return nil, false, errors.New("jobmgr claims: settlement head differs")
 		}
-		if err := authority.removeWaiter(edge); err != nil {
+		if err := ca.removeWaiter(edge); err != nil {
 			return nil, false, err
 		}
 		operation.claimWaiting = false
 		holdEdge(edge)
-		authority.refreshSettlement(key)
+		ca.refreshSettlement(key)
 		operation.claimCursor++
-		granted, err := authority.acquireFromCursor(operation)
+		granted, err := ca.acquireFromCursor(operation)
 		if err != nil {
 			return nil, false, err
 		}
 		if granted {
-			authority.endRuntimeWait(operation)
-			authority.settlementGrants[grantCount] = operation
+			ca.endRuntimeWait(operation)
+			ca.settlementGrants[grantCount] = operation
 			grantCount++
 		}
 	}
-	authority.observeRuntime()
-	return authority.settlementGrants[:grantCount:grantCount],
-		len(authority.settlements) != 0,
+	ca.observeRuntime()
+	return ca.settlementGrants[:grantCount:grantCount],
+		len(ca.settlements) != 0,
 		nil
 }
 
-func (authority *claimAuthority) beginRuntimeWait(
+func (ca *claimAuthority) beginRuntimeWait(
 	operation *commandOperation,
 ) {
-	if authority.observer == nil || operation == nil ||
+	if ca.observer == nil || operation == nil ||
 		operation.claimWaitListed {
 		return
 	}
-	operation.claimWaitStarted = authority.now()
-	operation.claimWaitPrevious = authority.waitTail
-	if authority.waitTail != nil {
-		authority.waitTail.claimWaitNext = operation
+	operation.claimWaitStarted = ca.now()
+	operation.claimWaitPrevious = ca.waitTail
+	if ca.waitTail != nil {
+		ca.waitTail.claimWaitNext = operation
 	} else {
-		authority.waitHead = operation
+		ca.waitHead = operation
 	}
-	authority.waitTail = operation
+	ca.waitTail = operation
 	operation.claimWaitListed = true
 }
 
-func (authority *claimAuthority) endRuntimeWait(
+func (ca *claimAuthority) endRuntimeWait(
 	operation *commandOperation,
 ) {
-	if authority.observer == nil || operation == nil ||
+	if ca.observer == nil || operation == nil ||
 		!operation.claimWaitListed {
 		return
 	}
 	if operation.claimWaitPrevious != nil {
 		operation.claimWaitPrevious.claimWaitNext = operation.claimWaitNext
 	} else {
-		authority.waitHead = operation.claimWaitNext
+		ca.waitHead = operation.claimWaitNext
 	}
 	if operation.claimWaitNext != nil {
 		operation.claimWaitNext.claimWaitPrevious =
 			operation.claimWaitPrevious
 	} else {
-		authority.waitTail = operation.claimWaitPrevious
+		ca.waitTail = operation.claimWaitPrevious
 	}
 	operation.claimWaitStarted = time.Time{}
 	operation.claimWaitPrevious = nil
@@ -445,40 +445,40 @@ func (authority *claimAuthority) endRuntimeWait(
 	operation.claimWaitListed = false
 }
 
-func (authority *claimAuthority) observeRuntime() {
-	if authority == nil || authority.observer == nil {
+func (ca *claimAuthority) observeRuntime() {
+	if ca == nil || ca.observer == nil {
 		return
 	}
-	authority.observer.SetRuntimeGauge(
+	ca.observer.SetRuntimeGauge(
 		lifecycle.RuntimeGaugeClaimKeysTracked,
-		len(authority.keys),
+		len(ca.keys),
 	)
-	authority.observer.SetRuntimeGauge(
+	ca.observer.SetRuntimeGauge(
 		lifecycle.RuntimeGaugeClaimWaiters,
-		authority.waiterCount,
+		ca.waiterCount,
 	)
 	var oldest time.Time
-	if authority.waitHead != nil {
-		oldest = authority.waitHead.claimWaitStarted
+	if ca.waitHead != nil {
+		oldest = ca.waitHead.claimWaitStarted
 	}
-	authority.observer.SetRuntimeTimestamp(
+	ca.observer.SetRuntimeTimestamp(
 		lifecycle.RuntimeTimestampOldestClaimWait,
 		oldest,
 	)
 }
 
-func (authority *claimAuthority) refreshSettlement(key *authorityClaimKey) {
+func (ca *claimAuthority) refreshSettlement(key *authorityClaimKey) {
 	if key == nil {
 		return
 	}
 	eligible := claimSettlementEligible(key)
 	switch {
 	case eligible && key.settlementIndex < 0:
-		heap.Push(&authority.settlements, key)
+		heap.Push(&ca.settlements, key)
 	case eligible:
-		heap.Fix(&authority.settlements, key.settlementIndex)
+		heap.Fix(&ca.settlements, key.settlementIndex)
 	case key.settlementIndex >= 0:
-		heap.Remove(&authority.settlements, key.settlementIndex)
+		heap.Remove(&ca.settlements, key.settlementIndex)
 	}
 }
 
@@ -492,7 +492,7 @@ func claimSettlementEligible(key *authorityClaimKey) bool {
 	return true
 }
 
-func (authority *claimAuthority) forget(operation *commandOperation) error {
+func (ca *claimAuthority) forget(operation *commandOperation) error {
 	if operation == nil || !operation.claimRegistered || operation.claimWaiting || operation.claimsHeld || operation.claimCursor != 0 {
 		return errors.New("jobmgr claims: forget outside terminal claim state")
 	}
@@ -506,7 +506,7 @@ func (authority *claimAuthority) forget(operation *commandOperation) error {
 			if edge.key.settlementIndex >= 0 {
 				return errors.New("jobmgr claims: terminal key remains settlement-eligible")
 			}
-			delete(authority.keys, edge.claim.key)
+			delete(ca.keys, edge.claim.key)
 		}
 		edge.key = nil
 	}
@@ -514,11 +514,11 @@ func (authority *claimAuthority) forget(operation *commandOperation) error {
 	return nil
 }
 
-func (authority *claimAuthority) key(name string) *authorityClaimKey {
-	state := authority.keys[name]
+func (ca *claimAuthority) key(name string) *authorityClaimKey {
+	state := ca.keys[name]
 	if state == nil {
 		state = &authorityClaimKey{settlementIndex: -1}
-		authority.keys[name] = state
+		ca.keys[name] = state
 	}
 	return state
 }

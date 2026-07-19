@@ -204,12 +204,12 @@ type factoryTestV2 struct {
 
 func (*factoryTestV2) Init(context.Context) error { return nil }
 
-func (module *factoryTestV2) Check(context.Context) error { return module.checkErr }
+func (ft2 *factoryTestV2) Check(context.Context) error { return ft2.checkErr }
 
 func (*factoryTestV2) Collect(context.Context) error { return nil }
 
-func (module *factoryTestV2) Cleanup(context.Context) {
-	module.state.collectorCleanup++
+func (ft2 *factoryTestV2) Cleanup(context.Context) {
+	ft2.state.collectorCleanup++
 }
 
 func (*factoryTestV2) Configuration() any { return struct{}{} }
@@ -220,14 +220,14 @@ func (*factoryTestV2) MetricStore() metrix.CollectorStore { return nil }
 
 func (*factoryTestV2) ChartTemplateYAML() string { return "" }
 
-func (state *factoryTestState) module(
+func (fts *factoryTestState) module(
 	check func(context.Context) error,
 	panicCleanup bool,
 ) *collectorapi.MockCollectorV1 {
 	return &collectorapi.MockCollectorV1{
 		CheckFunc: check,
 		CleanupFunc: func(context.Context) {
-			state.collectorCleanup++
+			fts.collectorCleanup++
 			if panicCleanup {
 				panic("cleanup failed")
 			}
@@ -239,8 +239,8 @@ type factoryTestHooks struct {
 	prepare func(PublishedJob) (HandlerLifecycle, error)
 }
 
-func (hooks factoryTestHooks) Prepare(job PublishedJob) (HandlerLifecycle, error) {
-	return hooks.prepare(job)
+func (fth factoryTestHooks) Prepare(job PublishedJob) (HandlerLifecycle, error) {
+	return fth.prepare(job)
 }
 
 type factoryTestHandlers struct {
@@ -249,13 +249,13 @@ type factoryTestHandlers struct {
 
 func (*factoryTestHandlers) Publish() error { return nil }
 
-func (handlers *factoryTestHandlers) CloseAndDrain(context.Context) error {
-	handlers.state.handlerClose++
+func (fth *factoryTestHandlers) CloseAndDrain(context.Context) error {
+	fth.state.handlerClose++
 	return nil
 }
 
-func (handlers *factoryTestHandlers) Cleanup(context.Context) error {
-	handlers.state.handlerCleanup++
+func (fth *factoryTestHandlers) Cleanup(context.Context) error {
+	fth.state.handlerCleanup++
 	return nil
 }
 

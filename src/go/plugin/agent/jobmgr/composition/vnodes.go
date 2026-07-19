@@ -56,15 +56,15 @@ func newVNodeBinding(
 	return binding, nil
 }
 
-func (binding *vnodeBinding) prefix() string {
-	return binding.pluginName + ":vnode"
+func (vb *vnodeBinding) prefix() string {
+	return vb.pluginName + ":vnode"
 }
 
-func (binding *vnodeBinding) path() string {
-	return fmt.Sprintf("/collectors/%s/Vnodes", binding.pluginName)
+func (vb *vnodeBinding) path() string {
+	return fmt.Sprintf("/collectors/%s/Vnodes", vb.pluginName)
 }
 
-func (binding *vnodeBinding) handle(
+func (vb *vnodeBinding) handle(
 	_ context.Context,
 	input functionadapter.HandlerInput,
 ) (lifecycle.SealedResult, error) {
@@ -77,11 +77,11 @@ func (binding *vnodeBinding) handle(
 			[]byte(vnodes.ConfigSchema),
 		)
 	case dyncfg.CommandUserconfig:
-		return binding.userConfig(input)
+		return vb.userConfig(input)
 	case dyncfg.CommandGet:
-		return binding.get(input)
+		return vb.get(input)
 	case dyncfg.CommandTest:
-		return binding.test(input)
+		return vb.test(input)
 	default:
 		return vnodeMessage(
 			501,
@@ -94,14 +94,14 @@ func (binding *vnodeBinding) handle(
 	}
 }
 
-func (binding *vnodeBinding) prepare(
+func (vb *vnodeBinding) prepare(
 	_ context.Context,
 	input functionadapter.HandlerInput,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if binding == nil || current != nil || scope.Current.Valid() ||
+	if vb == nil || current != nil || scope.Current.Valid() ||
 		scope.Successor.Valid() || permit.Valid() ||
 		!scope.Valid() ||
 		!strings.HasPrefix(scope.ID, "vnode:") {
@@ -111,13 +111,13 @@ func (binding *vnodeBinding) prepare(
 	}
 	switch vnodeCommand(input) {
 	case dyncfg.CommandAdd:
-		return binding.prepareAdd(input, scope)
+		return vb.prepareAdd(input, scope)
 	case dyncfg.CommandUpdate:
-		return binding.prepareUpdate(input, scope)
+		return vb.prepareUpdate(input, scope)
 	case dyncfg.CommandRemove:
-		return binding.prepareRemove(input, scope)
+		return vb.prepareRemove(input, scope)
 	default:
-		return binding.noop(
+		return vb.noop(
 			scope,
 			mustVNodeMessage(501, "Vnode command is not implemented."),
 			nil,
@@ -165,12 +165,12 @@ func newVNodeInitialRoute(
 	}, nil
 }
 
-func (binding *vnodeBinding) prepareAdd(
+func (vb *vnodeBinding) prepareAdd(
 	input functionadapter.HandlerInput,
 	scope lifecycle.ResourceTransactionScope,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if len(input.Args) < 3 {
-		return binding.noop(
+		return vb.noop(
 			scope,
 			mustVNodeMessage(
 				400,
@@ -184,14 +184,14 @@ func (binding *vnodeBinding) prepareAdd(
 	}
 	name := vnodeJobName(input.Args[2])
 	if name == "" {
-		return binding.noop(
+		return vb.noop(
 			scope,
 			mustVNodeMessage(400, "Missing vnode name."),
 			nil,
 		)
 	}
 	if err := dyncfg.JobNameRuleAllowDots(name); err != nil {
-		return binding.noop(
+		return vb.noop(
 			scope,
 			mustVNodeMessage(
 				400,
@@ -200,25 +200,25 @@ func (binding *vnodeBinding) prepareAdd(
 			nil,
 		)
 	}
-	next, failure := binding.parseVNode(input, name)
+	next, failure := vb.parseVNode(input, name)
 	if failure != nil {
-		return binding.noop(scope, *failure, nil)
+		return vb.noop(scope, *failure, nil)
 	}
-	current, exists := binding.config.Lookup(name)
+	current, exists := vb.config.Lookup(name)
 	expected := uint64(0)
 	if exists {
 		expected = current.Revision
 	}
-	prepared, err := binding.config.PrepareUpsert(
+	prepared, err := vb.config.PrepareUpsert(
 		name,
 		expected,
 		next,
 	)
 	if errors.Is(err, agentdiscovery.ErrVNodeNoChange) {
-		return binding.noop(
+		return vb.noop(
 			scope,
 			mustVNodeMessage(202, ""),
-			binding.configCreateCleanup(next),
+			vb.configCreateCleanup(next),
 		)
 	}
 	if err != nil {
@@ -228,25 +228,25 @@ func (binding *vnodeBinding) prepareAdd(
 		scope,
 		prepared,
 		mustVNodeMessage(202, ""),
-		binding.configCreateCleanup(next),
+		vb.configCreateCleanup(next),
 	)
 }
 
-func (binding *vnodeBinding) prepareUpdate(
+func (vb *vnodeBinding) prepareUpdate(
 	input functionadapter.HandlerInput,
 	scope lifecycle.ResourceTransactionScope,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	name, ok := binding.configName(input)
+	name, ok := vb.configName(input)
 	if !ok {
-		return binding.noop(
+		return vb.noop(
 			scope,
 			mustVNodeMessage(400, "invalid config ID format."),
 			nil,
 		)
 	}
-	current, exists := binding.config.Lookup(name)
+	current, exists := vb.config.Lookup(name)
 	if !exists {
-		return binding.noop(
+		return vb.noop(
 			scope,
 			mustVNodeMessage(
 				404,
@@ -255,17 +255,17 @@ func (binding *vnodeBinding) prepareUpdate(
 			nil,
 		)
 	}
-	next, failure := binding.parseVNode(input, name)
+	next, failure := vb.parseVNode(input, name)
 	if failure != nil {
-		return binding.noop(scope, *failure, nil)
+		return vb.noop(scope, *failure, nil)
 	}
-	prepared, err := binding.config.PrepareUpsert(
+	prepared, err := vb.config.PrepareUpsert(
 		name,
 		current.Revision,
 		next,
 	)
 	if errors.Is(err, agentdiscovery.ErrVNodeNoChange) {
-		return binding.noop(
+		return vb.noop(
 			scope,
 			mustVNodeMessage(202, ""),
 			nil,
@@ -278,25 +278,25 @@ func (binding *vnodeBinding) prepareUpdate(
 		scope,
 		prepared,
 		mustVNodeMessage(202, ""),
-		binding.configCreateCleanup(next),
+		vb.configCreateCleanup(next),
 	)
 }
 
-func (binding *vnodeBinding) prepareRemove(
+func (vb *vnodeBinding) prepareRemove(
 	input functionadapter.HandlerInput,
 	scope lifecycle.ResourceTransactionScope,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	name, ok := binding.configName(input)
+	name, ok := vb.configName(input)
 	if !ok {
-		return binding.noop(
+		return vb.noop(
 			scope,
 			mustVNodeMessage(400, "invalid config ID format."),
 			nil,
 		)
 	}
-	current, exists := binding.config.Lookup(name)
+	current, exists := vb.config.Lookup(name)
 	if !exists {
-		return binding.noop(
+		return vb.noop(
 			scope,
 			mustVNodeMessage(
 				404,
@@ -306,7 +306,7 @@ func (binding *vnodeBinding) prepareRemove(
 		)
 	}
 	if current.Vnode.SourceType != confgroup.TypeDyncfg {
-		return binding.noop(
+		return vb.noop(
 			scope,
 			mustVNodeMessage(
 				405,
@@ -318,8 +318,8 @@ func (binding *vnodeBinding) prepareRemove(
 			nil,
 		)
 	}
-	if affected := binding.affectedJobs(name); len(affected) != 0 {
-		return binding.noop(
+	if affected := vb.affectedJobs(name); len(affected) != 0 {
+		return vb.noop(
 			scope,
 			mustVNodeMessage(
 				409,
@@ -332,7 +332,7 @@ func (binding *vnodeBinding) prepareRemove(
 			nil,
 		)
 	}
-	prepared, err := binding.config.PrepareRemove(
+	prepared, err := vb.config.PrepareRemove(
 		name,
 		current.Revision,
 	)
@@ -343,18 +343,18 @@ func (binding *vnodeBinding) prepareRemove(
 		scope,
 		prepared,
 		mustVNodeMessage(200, ""),
-		binding.configDeleteCleanup(name),
+		vb.configDeleteCleanup(name),
 	)
 }
 
-func (binding *vnodeBinding) get(
+func (vb *vnodeBinding) get(
 	input functionadapter.HandlerInput,
 ) (lifecycle.SealedResult, error) {
-	name, ok := binding.configName(input)
+	name, ok := vb.configName(input)
 	if !ok {
 		return vnodeMessage(400, "invalid config ID format.")
 	}
-	snapshot, exists := binding.config.Lookup(name)
+	snapshot, exists := vb.config.Lookup(name)
 	if !exists {
 		return vnodeMessage(
 			404,
@@ -368,7 +368,7 @@ func (binding *vnodeBinding) get(
 	return lifecycle.NewSealedResult(200, "application/json", payload)
 }
 
-func (binding *vnodeBinding) userConfig(
+func (vb *vnodeBinding) userConfig(
 	input functionadapter.HandlerInput,
 ) (lifecycle.SealedResult, error) {
 	var config vnodes.VirtualNode
@@ -395,7 +395,7 @@ func (binding *vnodeBinding) userConfig(
 	return lifecycle.NewSealedResult(200, "application/yaml", payload)
 }
 
-func (binding *vnodeBinding) test(
+func (vb *vnodeBinding) test(
 	input functionadapter.HandlerInput,
 ) (lifecycle.SealedResult, error) {
 	if len(input.Args) < 3 {
@@ -408,11 +408,11 @@ func (binding *vnodeBinding) test(
 		)
 	}
 	name := vnodeJobName(input.Args[2])
-	next, failure := binding.parseVNode(input, name)
+	next, failure := vb.parseVNode(input, name)
 	if failure != nil {
 		return *failure, nil
 	}
-	affected := binding.affectedJobs(next.Name)
+	affected := vb.affectedJobs(next.Name)
 	if len(affected) != 0 {
 		return vnodeMessage(
 			202,
@@ -426,7 +426,7 @@ func (binding *vnodeBinding) test(
 	)
 }
 
-func (binding *vnodeBinding) parseVNode(
+func (vb *vnodeBinding) parseVNode(
 	input functionadapter.HandlerInput,
 	name string,
 ) (*vnodes.VirtualNode, *lifecycle.SealedResult) {
@@ -463,7 +463,7 @@ func (binding *vnodeBinding) parseVNode(
 		return nil, &result
 	}
 	normalizeVNode(&config, name, input.CallerSource)
-	if err := binding.validateUnique(&config); err != nil {
+	if err := vb.validateUnique(&config); err != nil {
 		result := mustVNodeMessage(
 			400,
 			fmt.Sprintf(
@@ -476,7 +476,7 @@ func (binding *vnodeBinding) parseVNode(
 	return &config, nil
 }
 
-func (binding *vnodeBinding) configName(
+func (vb *vnodeBinding) configName(
 	input functionadapter.HandlerInput,
 ) (string, bool) {
 	if len(input.Args) == 0 {
@@ -484,15 +484,15 @@ func (binding *vnodeBinding) configName(
 	}
 	name, ok := strings.CutPrefix(
 		input.Args[0],
-		binding.prefix()+":",
+		vb.prefix()+":",
 	)
 	return name, ok && name != ""
 }
 
-func (binding *vnodeBinding) validateUnique(
+func (vb *vnodeBinding) validateUnique(
 	next *vnodes.VirtualNode,
 ) error {
-	for _, entry := range binding.config.Entries() {
+	for _, entry := range vb.config.Entries() {
 		current := entry.Snapshot.Vnode
 		if entry.ID == next.Name {
 			continue
@@ -513,10 +513,10 @@ func (binding *vnodeBinding) validateUnique(
 	return nil
 }
 
-func (binding *vnodeBinding) validateInitial() error {
+func (vb *vnodeBinding) validateInitial() error {
 	seenHostnames := make(map[string]string)
 	seenGUIDs := make(map[string]string)
-	for _, entry := range binding.config.Entries() {
+	for _, entry := range vb.config.Entries() {
 		vnode := entry.Snapshot.Vnode
 		if vnode == nil || vnode.Name != entry.ID ||
 			vnode.Hostname == "" ||
@@ -549,10 +549,10 @@ func (binding *vnodeBinding) validateInitial() error {
 	return nil
 }
 
-func (binding *vnodeBinding) affectedJobs(name string) []string {
+func (vb *vnodeBinding) affectedJobs(name string) []string {
 	var affected []string
-	for _, id := range binding.graph.IDs() {
-		record, ok := binding.graph.Lookup(id)
+	for _, id := range vb.graph.IDs() {
+		record, ok := vb.graph.Lookup(id)
 		if !ok {
 			continue
 		}
@@ -570,7 +570,7 @@ func (binding *vnodeBinding) affectedJobs(name string) []string {
 	return affected
 }
 
-func (binding *vnodeBinding) noop(
+func (vb *vnodeBinding) noop(
 	scope lifecycle.ResourceTransactionScope,
 	result lifecycle.SealedResult,
 	cleanup lifecycle.TaskCleanup,
@@ -587,10 +587,10 @@ func (binding *vnodeBinding) noop(
 	)
 }
 
-func (binding *vnodeBinding) configCreateCleanup(
+func (vb *vnodeBinding) configCreateCleanup(
 	vnode *vnodes.VirtualNode,
 ) lifecycle.TaskCleanup {
-	return binding.protocolCleanup(func(api *netdataapi.API) {
+	return vb.protocolCleanup(func(api *netdataapi.API) {
 		commands := dyncfg.JoinCommands(
 			dyncfg.CommandUserconfig,
 			dyncfg.CommandSchema,
@@ -602,30 +602,30 @@ func (binding *vnodeBinding) configCreateCleanup(
 			commands += " " + string(dyncfg.CommandRemove)
 		}
 		api.CONFIGCREATE(netdataapi.ConfigOpts{
-			ID:         binding.prefix() + ":" + vnode.Name,
+			ID:         vb.prefix() + ":" + vnode.Name,
 			Status:     dyncfg.StatusRunning.String(),
 			ConfigType: dyncfg.ConfigTypeJob.String(),
-			Path:       binding.path(), SourceType: vnode.SourceType,
+			Path:       vb.path(), SourceType: vnode.SourceType,
 			Source: vnode.Source, SupportedCommands: commands,
 		})
 	})
 }
 
-func (binding *vnodeBinding) configDeleteCleanup(
+func (vb *vnodeBinding) configDeleteCleanup(
 	name string,
 ) lifecycle.TaskCleanup {
-	return binding.protocolCleanup(func(api *netdataapi.API) {
-		api.CONFIGDELETE(binding.prefix() + ":" + name)
+	return vb.protocolCleanup(func(api *netdataapi.API) {
+		api.CONFIGDELETE(vb.prefix() + ":" + name)
 	})
 }
 
-func (binding *vnodeBinding) initialCleanup() lifecycle.TaskCleanup {
-	return binding.protocolCleanup(func(api *netdataapi.API) {
+func (vb *vnodeBinding) initialCleanup() lifecycle.TaskCleanup {
+	return vb.protocolCleanup(func(api *netdataapi.API) {
 		api.CONFIGCREATE(netdataapi.ConfigOpts{
-			ID:         binding.prefix(),
+			ID:         vb.prefix(),
 			Status:     dyncfg.StatusAccepted.String(),
 			ConfigType: dyncfg.ConfigTypeTemplate.String(),
-			Path:       binding.path(), SourceType: "internal",
+			Path:       vb.path(), SourceType: "internal",
 			Source: "internal",
 			SupportedCommands: dyncfg.JoinCommands(
 				dyncfg.CommandAdd,
@@ -634,7 +634,7 @@ func (binding *vnodeBinding) initialCleanup() lifecycle.TaskCleanup {
 				dyncfg.CommandTest,
 			),
 		})
-		for _, entry := range binding.config.Entries() {
+		for _, entry := range vb.config.Entries() {
 			vnode := entry.Snapshot.Vnode
 			commands := dyncfg.JoinCommands(
 				dyncfg.CommandUserconfig,
@@ -647,17 +647,17 @@ func (binding *vnodeBinding) initialCleanup() lifecycle.TaskCleanup {
 				commands += " " + string(dyncfg.CommandRemove)
 			}
 			api.CONFIGCREATE(netdataapi.ConfigOpts{
-				ID:         binding.prefix() + ":" + vnode.Name,
+				ID:         vb.prefix() + ":" + vnode.Name,
 				Status:     dyncfg.StatusRunning.String(),
 				ConfigType: dyncfg.ConfigTypeJob.String(),
-				Path:       binding.path(), SourceType: vnode.SourceType,
+				Path:       vb.path(), SourceType: vnode.SourceType,
 				Source: vnode.Source, SupportedCommands: commands,
 			})
 		}
 	})
 }
 
-func (binding *vnodeBinding) protocolCleanup(
+func (vb *vnodeBinding) protocolCleanup(
 	build func(*netdataapi.API),
 ) lifecycle.TaskCleanup {
 	var payload bytes.Buffer
@@ -667,15 +667,15 @@ func (binding *vnodeBinding) protocolCleanup(
 		return func() error { return err }
 	}
 	return func() error {
-		return binding.frames.CommitPreparedProtocolFrame(prepared)
+		return vb.frames.CommitPreparedProtocolFrame(prepared)
 	}
 }
 
-func (binding *vnodeBinding) publishInitial(
+func (vb *vnodeBinding) publishInitial(
 	ctx context.Context,
 	commands jobmgr.PreparedCommandPort,
 ) error {
-	if binding == nil || ctx == nil || commands == nil {
+	if vb == nil || ctx == nil || commands == nil {
 		return errors.New(
 			"jobmgr composition: invalid vnode initial publication",
 		)
@@ -713,7 +713,7 @@ func (binding *vnodeBinding) publishInitial(
 					nil,
 					lifecycle.LongLivedPermit{},
 					result,
-					binding.initialCleanup(),
+					vb.initialCleanup(),
 				)
 			},
 		},
@@ -723,7 +723,7 @@ func (binding *vnodeBinding) publishInitial(
 		jobmgr.Request{
 			UID: fmt.Sprintf(
 				"jobmgr-vnodes-%d",
-				binding.epoch,
+				vb.epoch,
 			),
 			LaneKey: vnodeBootResourceID,
 			Source:  lifecycle.SourceJobManager,
@@ -769,22 +769,22 @@ func newPreparedVNodeTransaction(
 	}, nil
 }
 
-func (transaction *preparedVNodeTransaction) Scope() lifecycle.ResourceTransactionScope {
-	if transaction == nil {
+func (pvt *preparedVNodeTransaction) Scope() lifecycle.ResourceTransactionScope {
+	if pvt == nil {
 		return lifecycle.ResourceTransactionScope{}
 	}
-	transaction.mu.Lock()
-	defer transaction.mu.Unlock()
-	if transaction.consumed {
+	pvt.mu.Lock()
+	defer pvt.mu.Unlock()
+	if pvt.consumed {
 		return lifecycle.ResourceTransactionScope{}
 	}
-	return transaction.scope
+	return pvt.scope
 }
 
-func (transaction *preparedVNodeTransaction) Apply(
+func (pvt *preparedVNodeTransaction) Apply(
 	context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	scope, prepared, result, cleanup, err := transaction.take()
+	scope, prepared, result, cleanup, err := pvt.take()
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
@@ -801,44 +801,44 @@ func (transaction *preparedVNodeTransaction) Apply(
 	)
 }
 
-func (transaction *preparedVNodeTransaction) Dispose(
+func (pvt *preparedVNodeTransaction) Dispose(
 	context.Context,
 ) (lifecycle.ReadyResource, error) {
-	_, prepared, _, _, err := transaction.take()
+	_, prepared, _, _, err := pvt.take()
 	if err != nil {
 		return nil, err
 	}
 	return nil, prepared.Abort()
 }
 
-func (transaction *preparedVNodeTransaction) take() (
+func (pvt *preparedVNodeTransaction) take() (
 	lifecycle.ResourceTransactionScope,
 	agentdiscovery.PreparedVNode,
 	lifecycle.SealedResult,
 	lifecycle.TaskCleanup,
 	error,
 ) {
-	if transaction == nil {
+	if pvt == nil {
 		return lifecycle.ResourceTransactionScope{},
 			agentdiscovery.PreparedVNode{},
 			lifecycle.SealedResult{},
 			nil,
 			errors.New("jobmgr composition: nil vnode transaction")
 	}
-	transaction.mu.Lock()
-	defer transaction.mu.Unlock()
-	if transaction.consumed {
+	pvt.mu.Lock()
+	defer pvt.mu.Unlock()
+	if pvt.consumed {
 		return lifecycle.ResourceTransactionScope{},
 			agentdiscovery.PreparedVNode{},
 			lifecycle.SealedResult{},
 			nil,
 			errors.New("jobmgr composition: vnode transaction consumed")
 	}
-	transaction.consumed = true
-	return transaction.scope,
-		transaction.prepared,
-		transaction.result,
-		transaction.cleanup,
+	pvt.consumed = true
+	return pvt.scope,
+		pvt.prepared,
+		pvt.result,
+		pvt.cleanup,
 		nil
 }
 

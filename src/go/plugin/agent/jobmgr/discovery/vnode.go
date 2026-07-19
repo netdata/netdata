@@ -106,12 +106,12 @@ func NewVNodeConfigurationWithInitial(
 	return configuration, nil
 }
 
-func (configuration *VNodeConfiguration) PrepareUpsert(
+func (vc *VNodeConfiguration) PrepareUpsert(
 	id string,
 	expected uint64,
 	vnode *vnodes.VirtualNode,
 ) (PreparedVNode, error) {
-	if configuration == nil || id == "" || id != strings.TrimSpace(id) ||
+	if vc == nil || id == "" || id != strings.TrimSpace(id) ||
 		expected == ^uint64(0) || vnode == nil {
 		return PreparedVNode{}, errors.New("vnode configuration: invalid preparation")
 	}
@@ -120,13 +120,13 @@ func (configuration *VNodeConfiguration) PrepareUpsert(
 	if err != nil {
 		return PreparedVNode{}, err
 	}
-	configuration.mu.Lock()
-	defer configuration.mu.Unlock()
-	current := configuration.records[id]
+	vc.mu.Lock()
+	defer vc.mu.Unlock()
+	current := vc.records[id]
 	if current.snapshot.Revision != expected {
 		return PreparedVNode{}, ErrVNodeRevision
 	}
-	if configuration.pending[id] != nil {
+	if vc.pending[id] != nil {
 		return PreparedVNode{}, errors.New("vnode configuration: update already pending")
 	}
 	if current.snapshot.Vnode != nil && vnodeConfigurationEqual(current.snapshot.Vnode, nextVNode) {
@@ -134,10 +134,10 @@ func (configuration *VNodeConfiguration) PrepareUpsert(
 	}
 	newRecord := current.snapshot.Vnode == nil
 	if newRecord &&
-		len(configuration.records)+configuration.pendingNew == MaximumVNodeConfigurationRecords {
+		len(vc.records)+vc.pendingNew == MaximumVNodeConfigurationRecords {
 		return PreparedVNode{}, ErrVNodeCapacity
 	}
-	if nextBytes > MaximumVNodeConfigurationBytes-configuration.bytes-configuration.pendingBytes {
+	if nextBytes > MaximumVNodeConfigurationBytes-vc.bytes-vc.pendingBytes {
 		return PreparedVNode{}, ErrVNodeCapacity
 	}
 	metadataRevision := uint64(1)
@@ -151,54 +151,54 @@ func (configuration *VNodeConfiguration) PrepareUpsert(
 		}
 	}
 	state := &preparedVNodeState{
-		owner: configuration, id: strings.Clone(id), expected: expected,
+		owner: vc, id: strings.Clone(id), expected: expected,
 		next: jobruntime.VnodeSnapshot{
 			Vnode: nextVNode, Revision: expected + 1,
 			MetadataRevision: metadataRevision,
 		},
 		bytes: nextBytes, newRecord: newRecord,
 	}
-	configuration.pending[state.id] = state
-	configuration.pendingBytes += nextBytes
+	vc.pending[state.id] = state
+	vc.pendingBytes += nextBytes
 	if newRecord {
-		configuration.pendingNew++
+		vc.pendingNew++
 	}
 	return PreparedVNode{state: state}, nil
 }
 
-func (configuration *VNodeConfiguration) PrepareRemove(
+func (vc *VNodeConfiguration) PrepareRemove(
 	id string,
 	expected uint64,
 ) (PreparedVNode, error) {
-	if configuration == nil || id == "" || id != strings.TrimSpace(id) ||
+	if vc == nil || id == "" || id != strings.TrimSpace(id) ||
 		expected == 0 || expected == ^uint64(0) {
 		return PreparedVNode{}, errors.New("vnode configuration: invalid removal")
 	}
-	configuration.mu.Lock()
-	defer configuration.mu.Unlock()
-	current, ok := configuration.records[id]
+	vc.mu.Lock()
+	defer vc.mu.Unlock()
+	current, ok := vc.records[id]
 	if !ok || current.snapshot.Revision != expected {
 		return PreparedVNode{}, ErrVNodeRevision
 	}
-	if configuration.pending[id] != nil {
+	if vc.pending[id] != nil {
 		return PreparedVNode{}, errors.New("vnode configuration: update already pending")
 	}
 	state := &preparedVNodeState{
-		owner: configuration, id: strings.Clone(id), expected: expected,
+		owner: vc, id: strings.Clone(id), expected: expected,
 		next: jobruntime.VnodeSnapshot{
 			Revision: expected + 1, MetadataRevision: current.snapshot.MetadataRevision,
 		},
 		remove: true,
 	}
-	configuration.pending[state.id] = state
+	vc.pending[state.id] = state
 	return PreparedVNode{state: state}, nil
 }
 
-func (prepared PreparedVNode) Commit() (jobruntime.VnodeSnapshot, error) {
-	if prepared.state == nil {
+func (pv PreparedVNode) Commit() (jobruntime.VnodeSnapshot, error) {
+	if pv.state == nil {
 		return jobruntime.VnodeSnapshot{}, ErrVNodePreparedConsumed
 	}
-	state := prepared.state
+	state := pv.state
 	state.mu.Lock()
 	defer state.mu.Unlock()
 	if state.consumed {
@@ -233,11 +233,11 @@ func (prepared PreparedVNode) Commit() (jobruntime.VnodeSnapshot, error) {
 	return state.next.Copy(), nil
 }
 
-func (prepared PreparedVNode) Abort() error {
-	if prepared.state == nil {
+func (pv PreparedVNode) Abort() error {
+	if pv.state == nil {
 		return ErrVNodePreparedConsumed
 	}
-	state := prepared.state
+	state := pv.state
 	state.mu.Lock()
 	defer state.mu.Unlock()
 	if state.consumed {
@@ -258,31 +258,31 @@ func (prepared PreparedVNode) Abort() error {
 	return nil
 }
 
-func (configuration *VNodeConfiguration) Lookup(
+func (vc *VNodeConfiguration) Lookup(
 	id string,
 ) (jobruntime.VnodeSnapshot, bool) {
-	if configuration == nil {
+	if vc == nil {
 		return jobruntime.VnodeSnapshot{}, false
 	}
-	configuration.mu.Lock()
-	defer configuration.mu.Unlock()
-	record, ok := configuration.records[id]
+	vc.mu.Lock()
+	defer vc.mu.Unlock()
+	record, ok := vc.records[id]
 	return record.snapshot.Copy(), ok
 }
 
-func (configuration *VNodeConfiguration) Entries() []ConfiguredVNode {
-	if configuration == nil {
+func (vc *VNodeConfiguration) Entries() []ConfiguredVNode {
+	if vc == nil {
 		return nil
 	}
-	configuration.mu.Lock()
-	entries := make([]ConfiguredVNode, 0, len(configuration.records))
-	for id, record := range configuration.records {
+	vc.mu.Lock()
+	entries := make([]ConfiguredVNode, 0, len(vc.records))
+	for id, record := range vc.records {
 		entries = append(entries, ConfiguredVNode{
 			ID:       id,
 			Snapshot: record.snapshot.Copy(),
 		})
 	}
-	configuration.mu.Unlock()
+	vc.mu.Unlock()
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].ID < entries[j].ID
 	})
@@ -296,15 +296,15 @@ type VNodeConfigurationCensus struct {
 	PendingBytes int
 }
 
-func (configuration *VNodeConfiguration) Census() VNodeConfigurationCensus {
-	if configuration == nil {
+func (vc *VNodeConfiguration) Census() VNodeConfigurationCensus {
+	if vc == nil {
 		return VNodeConfigurationCensus{}
 	}
-	configuration.mu.Lock()
-	defer configuration.mu.Unlock()
+	vc.mu.Lock()
+	defer vc.mu.Unlock()
 	return VNodeConfigurationCensus{
-		Records: len(configuration.records), Pending: len(configuration.pending),
-		Bytes: configuration.bytes, PendingBytes: configuration.pendingBytes,
+		Records: len(vc.records), Pending: len(vc.pending),
+		Bytes: vc.bytes, PendingBytes: vc.pendingBytes,
 	}
 }
 

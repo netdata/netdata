@@ -2053,10 +2053,10 @@ type kernelDeadlineRunner struct {
 	observed chan<- error
 }
 
-func (runner kernelDeadlineRunner) RunTask(
+func (kdr kernelDeadlineRunner) RunTask(
 	ctx context.Context,
 ) (lifecycle.TaskOutcome, error) {
-	runner.observed <- context.Cause(ctx)
+	kdr.observed <- context.Cause(ctx)
 	result, err := lifecycle.NewControlResult(lifecycle.ControlDeadline)
 	if err != nil {
 		return lifecycle.TaskOutcome{}, err
@@ -2549,35 +2549,35 @@ type deadlineCommitCapability struct {
 	entered chan<- context.Context
 }
 
-func (capability *deadlineCommitCapability) Commit(ctx context.Context, _ uint64) (lifecycle.CapabilityDisposition, error) {
-	capability.entered <- ctx
+func (dcc *deadlineCommitCapability) Commit(ctx context.Context, _ uint64) (lifecycle.CapabilityDisposition, error) {
+	dcc.entered <- ctx
 	<-ctx.Done()
-	return lifecycle.CapabilityDisposed, errors.Join(ctx.Err(), capability.release())
+	return lifecycle.CapabilityDisposed, errors.Join(ctx.Err(), dcc.release())
 }
 
-func (capability *latePreparedCapability) Identity() lifecycle.ResourceIdentity {
-	return capability.identity
+func (lpc *latePreparedCapability) Identity() lifecycle.ResourceIdentity {
+	return lpc.identity
 }
 
-func (capability *latePreparedCapability) Commit(context.Context, uint64) (lifecycle.CapabilityDisposition, error) {
-	capability.committed.Store(true)
-	return lifecycle.CapabilityApplied, capability.release()
+func (lpc *latePreparedCapability) Commit(context.Context, uint64) (lifecycle.CapabilityDisposition, error) {
+	lpc.committed.Store(true)
+	return lifecycle.CapabilityApplied, lpc.release()
 }
 
-func (capability *latePreparedCapability) Dispose(context.Context) error {
-	capability.disposed.Store(true)
-	return capability.release()
+func (lpc *latePreparedCapability) Dispose(context.Context) error {
+	lpc.disposed.Store(true)
+	return lpc.release()
 }
 
-func (capability *latePreparedCapability) release() error {
-	capability.once.Do(func() {
-		capability.releaseErr = errors.Join(
-			capability.permit.ReleaseExternal(lifecycle.LongLivedESecretStore),
-			capability.permit.ReleaseBytes(),
-			capability.permit.Return(),
+func (lpc *latePreparedCapability) release() error {
+	lpc.once.Do(func() {
+		lpc.releaseErr = errors.Join(
+			lpc.permit.ReleaseExternal(lifecycle.LongLivedESecretStore),
+			lpc.permit.ReleaseBytes(),
+			lpc.permit.Return(),
 		)
 	})
-	return capability.releaseErr
+	return lpc.releaseErr
 }
 
 func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
@@ -3562,9 +3562,9 @@ type holdingFrameWriter struct {
 	release chan struct{}
 }
 
-func (writer *holdingFrameWriter) Write(payload []byte) (int, error) {
-	writer.offered <- bytes.Clone(payload)
-	<-writer.release
+func (hfw *holdingFrameWriter) Write(payload []byte) (int, error) {
+	hfw.offered <- bytes.Clone(payload)
+	<-hfw.release
 	return len(payload), nil
 }
 
@@ -3574,10 +3574,10 @@ type firstHoldingFrameWriter struct {
 	release chan struct{}
 }
 
-func (writer *firstHoldingFrameWriter) Write(payload []byte) (int, error) {
-	writer.once.Do(func() {
-		writer.offered <- bytes.Clone(payload)
-		<-writer.release
+func (fhfw *firstHoldingFrameWriter) Write(payload []byte) (int, error) {
+	fhfw.once.Do(func() {
+		fhfw.offered <- bytes.Clone(payload)
+		<-fhfw.release
 	})
 	return len(payload), nil
 }
@@ -3991,61 +3991,61 @@ func newKernelFinalizerClock() *kernelFinalizerClock {
 	return &kernelFinalizerClock{now: time.Unix(100, 0), deadlineArmed: make(chan struct{}, 1)}
 }
 
-func (clock *kernelFinalizerClock) Now() time.Time {
-	clock.mu.Lock()
-	defer clock.mu.Unlock()
-	return clock.now
+func (kfc *kernelFinalizerClock) Now() time.Time {
+	kfc.mu.Lock()
+	defer kfc.mu.Unlock()
+	return kfc.now
 }
 
-func (clock *kernelFinalizerClock) Arm(kind string, delay time.Duration) (<-chan time.Time, func()) {
+func (kfc *kernelFinalizerClock) Arm(kind string, delay time.Duration) (<-chan time.Time, func()) {
 	ready := make(chan time.Time, 1)
-	clock.mu.Lock()
+	kfc.mu.Lock()
 	if kind == lifecycle.TimerKindShutdown {
-		clock.shutdown = ready
+		kfc.shutdown = ready
 	} else if kind == lifecycle.TimerKindDeadline {
-		clock.deadlineArms++
+		kfc.deadlineArms++
 		select {
-		case clock.deadlineArmed <- struct{}{}:
+		case kfc.deadlineArmed <- struct{}{}:
 		default:
 		}
 	}
-	clock.mu.Unlock()
+	kfc.mu.Unlock()
 	return ready, func() {}
 }
 
-func (clock *kernelFinalizerClock) deadlineArmCount() int {
-	clock.mu.Lock()
-	defer clock.mu.Unlock()
-	return clock.deadlineArms
+func (kfc *kernelFinalizerClock) deadlineArmCount() int {
+	kfc.mu.Lock()
+	defer kfc.mu.Unlock()
+	return kfc.deadlineArms
 }
 
-func (clock *kernelFinalizerClock) expireShutdown(t *testing.T) {
+func (kfc *kernelFinalizerClock) expireShutdown(t *testing.T) {
 	t.Helper()
-	clock.mu.Lock()
-	ready := clock.shutdown
-	clock.now = clock.now.Add(time.Second)
-	now := clock.now
-	clock.mu.Unlock()
+	kfc.mu.Lock()
+	ready := kfc.shutdown
+	kfc.now = kfc.now.Add(time.Second)
+	now := kfc.now
+	kfc.mu.Unlock()
 	if ready == nil {
 		t.Fatal("shutdown timer was not armed")
 	}
 	ready <- now
 }
 
-func (clock *kernelFinalizerClock) advanceShutdownWithoutSignal(t *testing.T) {
+func (kfc *kernelFinalizerClock) advanceShutdownWithoutSignal(t *testing.T) {
 	t.Helper()
-	clock.mu.Lock()
-	defer clock.mu.Unlock()
-	if clock.shutdown == nil {
+	kfc.mu.Lock()
+	defer kfc.mu.Unlock()
+	if kfc.shutdown == nil {
 		t.Fatal("shutdown timer was not armed")
 	}
-	clock.now = clock.now.Add(time.Second)
+	kfc.now = kfc.now.Add(time.Second)
 }
 
-func (clock *kernelFinalizerClock) advance(delay time.Duration) {
-	clock.mu.Lock()
-	clock.now = clock.now.Add(delay)
-	clock.mu.Unlock()
+func (kfc *kernelFinalizerClock) advance(delay time.Duration) {
+	kfc.mu.Lock()
+	kfc.now = kfc.now.Add(delay)
+	kfc.mu.Unlock()
 }
 
 func closeUIDLedger(t *testing.T, ledger *lifecycle.UIDLedger) {
@@ -4067,11 +4067,11 @@ func (fn plannerFunc) Plan(request Request) (WorkPlan, error) {
 	return fn(context.Background(), request.Route, request.Args)
 }
 
-func (kernel *CommandKernel) prepareSubmissionPlanForTest(request Request) (WorkPlan, error) {
+func (ck *CommandKernel) prepareSubmissionPlanForTest(request Request) (WorkPlan, error) {
 	if request.Source == lifecycle.SourceFunction {
 		return WorkPlan{}, nil
 	}
-	return kernel.prepareJobPlan(request)
+	return ck.prepareJobPlan(request)
 }
 
 type testFunctionCatalog struct {
@@ -4089,19 +4089,19 @@ type functionCatalogPortStub struct {
 	complete func(FunctionCleanupRef, error) error
 }
 
-func (catalog functionCatalogPortStub) ResolveAndAcquire(lookup FunctionLookup) (FunctionCatalogDecision, error) {
-	return catalog.resolve(lookup)
+func (fcps functionCatalogPortStub) ResolveAndAcquire(lookup FunctionLookup) (FunctionCatalogDecision, error) {
+	return fcps.resolve(lookup)
 }
 
-func (catalog functionCatalogPortStub) ReleaseInvocation(ref FunctionInvocationRef) (FunctionCleanupPlan, error) {
-	return catalog.release(ref)
+func (fcps functionCatalogPortStub) ReleaseInvocation(ref FunctionInvocationRef) (FunctionCleanupPlan, error) {
+	return fcps.release(ref)
 }
 
-func (catalog functionCatalogPortStub) CompleteCleanup(ref FunctionCleanupRef, err error) error {
-	if catalog.complete == nil {
+func (fcps functionCatalogPortStub) CompleteCleanup(ref FunctionCleanupRef, err error) error {
+	if fcps.complete == nil {
 		return nil
 	}
-	return catalog.complete(ref, err)
+	return fcps.complete(ref, err)
 }
 
 func (functionCatalogPortStub) BeginMutation(FunctionCatalogMutation) error {
@@ -4143,8 +4143,8 @@ func newTestFunctionCatalog(planner Planner) *testFunctionCatalog {
 	}
 }
 
-func (catalog *testFunctionCatalog) ResolveAndAcquire(lookup FunctionLookup) (FunctionCatalogDecision, error) {
-	plan, err := catalog.planner.Plan(Request{
+func (tfc *testFunctionCatalog) ResolveAndAcquire(lookup FunctionLookup) (FunctionCatalogDecision, error) {
+	plan, err := tfc.planner.Plan(Request{
 		UID: lookup.UID, Source: lifecycle.SourceFunction, Route: lookup.Route,
 		Args: lookup.Args, Payload: lookup.Payload, ContentType: lookup.ContentType,
 		Permissions: lookup.Permissions, CallerSource: lookup.CallerSource,
@@ -4153,15 +4153,15 @@ func (catalog *testFunctionCatalog) ResolveAndAcquire(lookup FunctionLookup) (Fu
 	if err != nil {
 		return FunctionCatalogDecision{}, err
 	}
-	catalog.next++
-	ref := FunctionInvocationRef{Slot: 1, Generation: catalog.next}
-	catalog.leases[ref] = struct{}{}
-	if len(catalog.leases) > catalog.peak {
-		catalog.peak = len(catalog.leases)
+	tfc.next++
+	ref := FunctionInvocationRef{Slot: 1, Generation: tfc.next}
+	tfc.leases[ref] = struct{}{}
+	if len(tfc.leases) > tfc.peak {
+		tfc.peak = len(tfc.leases)
 	}
 	resourceID := ""
-	if catalog.resource != nil {
-		resourceID = catalog.resource(lookup)
+	if tfc.resource != nil {
+		resourceID = tfc.resource(lookup)
 	}
 	return FunctionCatalogDecision{
 		ResourceID: resourceID,
@@ -4170,12 +4170,12 @@ func (catalog *testFunctionCatalog) ResolveAndAcquire(lookup FunctionLookup) (Fu
 	}, nil
 }
 
-func (catalog *testFunctionCatalog) ReleaseInvocation(ref FunctionInvocationRef) (FunctionCleanupPlan, error) {
-	if _, ok := catalog.leases[ref]; !ok {
+func (tfc *testFunctionCatalog) ReleaseInvocation(ref FunctionInvocationRef) (FunctionCleanupPlan, error) {
+	if _, ok := tfc.leases[ref]; !ok {
 		return FunctionCleanupPlan{}, errors.New("test Function catalog: unknown invocation lease")
 	}
-	delete(catalog.leases, ref)
-	catalog.release++
+	delete(tfc.leases, ref)
+	tfc.release++
 	return FunctionCleanupPlan{}, nil
 }
 
@@ -4253,11 +4253,11 @@ type kernelTestResourceSetPlanner struct {
 	resources  map[string]*kernelTestReadyResource
 }
 
-func (planner kernelTestResourceSetPlanner) Plan(request Request) (WorkPlan, error) {
+func (ktrsp kernelTestResourceSetPlanner) Plan(request Request) (WorkPlan, error) {
 	if request.Route != "install" {
 		return WorkPlan{}, errors.New("unexpected kernel resource-set route")
 	}
-	resource := planner.resources[request.LaneKey]
+	resource := ktrsp.resources[request.LaneKey]
 	if resource == nil {
 		return WorkPlan{}, errors.New("unexpected kernel resource-set identity")
 	}
@@ -4266,7 +4266,7 @@ func (planner kernelTestResourceSetPlanner) Plan(request Request) (WorkPlan, err
 		Resource: &ResourcePlan{
 			Action: ResourceInstall,
 			ID:     request.LaneKey,
-			Permit: planner.permitPlan,
+			Permit: ktrsp.permitPlan,
 			Prepare: func(
 				_ context.Context,
 				generation uint64,
@@ -4296,7 +4296,7 @@ type kernelTestTransactionPlanner struct {
 	events              *[]string
 }
 
-func (planner kernelTestTransactionPlanner) Plan(
+func (kttp kernelTestTransactionPlanner) Plan(
 	request Request,
 ) (WorkPlan, error) {
 	switch request.Route {
@@ -4306,7 +4306,7 @@ func (planner kernelTestTransactionPlanner) Plan(
 			Resource: &ResourcePlan{
 				Action: ResourceInstall,
 				ID:     request.LaneKey,
-				Permit: planner.permitPlan,
+				Permit: kttp.permitPlan,
 				Prepare: func(
 					_ context.Context,
 					generation uint64,
@@ -4316,11 +4316,11 @@ func (planner kernelTestTransactionPlanner) Plan(
 						ID:         request.LaneKey,
 						Generation: generation,
 					}
-					planner.current.identity = identity
+					kttp.current.identity = identity
 					return &kernelTestPreparedResource{
 						identity: identity,
 						permit:   permit,
-						ready:    planner.current,
+						ready:    kttp.current,
 					}, nil
 				},
 			},
@@ -4330,33 +4330,33 @@ func (planner kernelTestTransactionPlanner) Plan(
 			Transaction: &ResourceTransactionPlan{
 				ID:                request.LaneKey,
 				AllocateSuccessor: true,
-				Permit:            planner.permitPlan,
+				Permit:            kttp.permitPlan,
 				Prepare: func(
 					ctx context.Context,
 					current lifecycle.ReadyResource,
 					scope lifecycle.ResourceTransactionScope,
 					permit lifecycle.LongLivedPermit,
 				) (lifecycle.PreparedResourceTransaction, error) {
-					*planner.events = append(*planner.events, "prepare")
-					if current != planner.current ||
-						scope.Current != planner.current.identity ||
+					*kttp.events = append(*kttp.events, "prepare")
+					if current != kttp.current ||
+						scope.Current != kttp.current.identity ||
 						!scope.Successor.Valid() {
 						return nil, errors.New(
 							"kernel test transaction scope differs",
 						)
 					}
-					if planner.waitForCancellation {
+					if kttp.waitForCancellation {
 						<-ctx.Done()
 					}
-					if planner.prepareErr != nil {
-						return nil, planner.prepareErr
+					if kttp.prepareErr != nil {
+						return nil, kttp.prepareErr
 					}
 					return &kernelTestPreparedResourceTransaction{
 						scope:     scope,
-						current:   planner.current,
-						successor: planner.successor,
+						current:   kttp.current,
+						successor: kttp.successor,
 						permit:    permit,
-						events:    planner.events,
+						events:    kttp.events,
 					}, nil
 				},
 			},
@@ -4376,28 +4376,28 @@ type kernelTestPreparedResourceTransaction struct {
 	events    *[]string
 }
 
-func (transaction *kernelTestPreparedResourceTransaction) Scope() lifecycle.ResourceTransactionScope {
-	return transaction.scope
+func (ktprt *kernelTestPreparedResourceTransaction) Scope() lifecycle.ResourceTransactionScope {
+	return ktprt.scope
 }
 
-func (transaction *kernelTestPreparedResourceTransaction) Apply(
+func (ktprt *kernelTestPreparedResourceTransaction) Apply(
 	ctx context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	*transaction.events = append(*transaction.events, "apply")
-	if err := transaction.current.Stop(ctx); err != nil {
+	*ktprt.events = append(*ktprt.events, "apply")
+	if err := ktprt.current.Stop(ctx); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
-	if err := transaction.current.Finalize(); err != nil {
+	if err := ktprt.current.Finalize(); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
-	if err := transaction.permit.ActivateExternal(
+	if err := ktprt.permit.ActivateExternal(
 		lifecycle.LongLivedEJobResources,
 	); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
-	transaction.successor.identity = transaction.scope.Successor
-	transaction.successor.permit = transaction.permit
-	if err := transaction.successor.Publish(); err != nil {
+	ktprt.successor.identity = ktprt.scope.Successor
+	ktprt.successor.permit = ktprt.permit
+	if err := ktprt.successor.Publish(); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
 	result, err := lifecycle.NewSealedResult(
@@ -4409,25 +4409,25 @@ func (transaction *kernelTestPreparedResourceTransaction) Apply(
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
 	return lifecycle.NewAppliedResourceTransaction(
-		transaction.scope,
+		ktprt.scope,
 		lifecycle.ResourceTransactionReplaced,
-		transaction.successor,
+		ktprt.successor,
 		result,
 		func() error {
-			*transaction.events = append(*transaction.events, "cleanup")
+			*ktprt.events = append(*ktprt.events, "cleanup")
 			return nil
 		},
 	)
 }
 
-func (transaction *kernelTestPreparedResourceTransaction) Dispose(
+func (ktprt *kernelTestPreparedResourceTransaction) Dispose(
 	context.Context,
 ) (lifecycle.ReadyResource, error) {
-	*transaction.events = append(*transaction.events, "dispose")
-	return transaction.current, transaction.permit.AbortUnused()
+	*ktprt.events = append(*ktprt.events, "dispose")
+	return ktprt.current, ktprt.permit.AbortUnused()
 }
 
-func (planner kernelTestResourcePlanner) Plan(request Request) (WorkPlan, error) {
+func (ktrp kernelTestResourcePlanner) Plan(request Request) (WorkPlan, error) {
 	switch request.Route {
 	case "install":
 		return WorkPlan{
@@ -4435,14 +4435,14 @@ func (planner kernelTestResourcePlanner) Plan(request Request) (WorkPlan, error)
 			Resource: &ResourcePlan{
 				Action: ResourceInstall,
 				ID:     request.LaneKey,
-				Permit: planner.permitPlan,
+				Permit: ktrp.permitPlan,
 				Prepare: func(_ context.Context, generation uint64, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResource, error) {
 					identity := lifecycle.ResourceIdentity{ID: request.LaneKey, Generation: generation}
-					planner.resource.identity = identity
+					ktrp.resource.identity = identity
 					return &kernelTestPreparedResource{
 						identity: identity,
 						permit:   permit,
-						ready:    planner.resource,
+						ready:    ktrp.resource,
 					}, nil
 				},
 			},
@@ -4450,11 +4450,11 @@ func (planner kernelTestResourcePlanner) Plan(request Request) (WorkPlan, error)
 	case "use":
 		return WorkPlan{
 			Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
-				if planner.workEntered != nil {
-					close(planner.workEntered)
+				if ktrp.workEntered != nil {
+					close(ktrp.workEntered)
 				}
-				if planner.workRelease != nil {
-					<-planner.workRelease
+				if ktrp.workRelease != nil {
+					<-ktrp.workRelease
 				}
 				return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 			}),
@@ -4480,23 +4480,23 @@ type kernelTestPreparedResource struct {
 	ready    *kernelTestReadyResource
 }
 
-func (resource *kernelTestPreparedResource) Identity() lifecycle.ResourceIdentity {
-	return resource.identity
+func (ktpr *kernelTestPreparedResource) Identity() lifecycle.ResourceIdentity {
+	return ktpr.identity
 }
 
-func (resource *kernelTestPreparedResource) AcceptStart(_ context.Context, expected uint64) (lifecycle.ReadyResource, error) {
-	if expected != resource.identity.Generation {
+func (ktpr *kernelTestPreparedResource) AcceptStart(_ context.Context, expected uint64) (lifecycle.ReadyResource, error) {
+	if expected != ktpr.identity.Generation {
 		return nil, errors.New("kernel test resource generation differs")
 	}
-	if err := resource.permit.ActivateExternal(lifecycle.LongLivedEJobResources); err != nil {
+	if err := ktpr.permit.ActivateExternal(lifecycle.LongLivedEJobResources); err != nil {
 		return nil, err
 	}
-	resource.ready.permit = resource.permit
-	return resource.ready, nil
+	ktpr.ready.permit = ktpr.permit
+	return ktpr.ready, nil
 }
 
-func (resource *kernelTestPreparedResource) Dispose(context.Context) error {
-	return resource.permit.AbortUnused()
+func (ktpr *kernelTestPreparedResource) Dispose(context.Context) error {
+	return ktpr.permit.AbortUnused()
 }
 
 type kernelTestReadyResource struct {
@@ -4510,36 +4510,36 @@ type kernelTestReadyResource struct {
 	stopOnce       sync.Once
 }
 
-func (resource *kernelTestReadyResource) Identity() lifecycle.ResourceIdentity {
-	return resource.identity
+func (ktrr *kernelTestReadyResource) Identity() lifecycle.ResourceIdentity {
+	return ktrr.identity
 }
 
-func (resource *kernelTestReadyResource) Publish() error {
-	resource.publishOnce.Do(func() { close(resource.publishEntered) })
-	if resource.publishRelease != nil {
-		<-resource.publishRelease
+func (ktrr *kernelTestReadyResource) Publish() error {
+	ktrr.publishOnce.Do(func() { close(ktrr.publishEntered) })
+	if ktrr.publishRelease != nil {
+		<-ktrr.publishRelease
 	}
 	return nil
 }
 
-func (resource *kernelTestReadyResource) AbortReady(context.Context) error {
+func (ktrr *kernelTestReadyResource) AbortReady(context.Context) error {
 	return errors.Join(
-		resource.permit.ReleaseExternal(lifecycle.LongLivedEJobResources),
-		resource.permit.ReleaseBytes(),
-		resource.permit.Return(),
+		ktrr.permit.ReleaseExternal(lifecycle.LongLivedEJobResources),
+		ktrr.permit.ReleaseBytes(),
+		ktrr.permit.Return(),
 	)
 }
 
-func (resource *kernelTestReadyResource) Stop(context.Context) error {
-	resource.stopOnce.Do(func() { close(resource.stopEntered) })
-	if resource.stopRelease != nil {
-		<-resource.stopRelease
+func (ktrr *kernelTestReadyResource) Stop(context.Context) error {
+	ktrr.stopOnce.Do(func() { close(ktrr.stopEntered) })
+	if ktrr.stopRelease != nil {
+		<-ktrr.stopRelease
 	}
-	return resource.permit.ReleaseExternal(lifecycle.LongLivedEJobResources)
+	return ktrr.permit.ReleaseExternal(lifecycle.LongLivedEJobResources)
 }
 
-func (resource *kernelTestReadyResource) Finalize() error {
-	return errors.Join(resource.permit.ReleaseBytes(), resource.permit.Return())
+func (ktrr *kernelTestReadyResource) Finalize() error {
+	return errors.Join(ktrr.permit.ReleaseBytes(), ktrr.permit.Return())
 }
 
 type stoppedKernelPlanner struct{}

@@ -15,7 +15,7 @@ type releaseErrorAtomicScope struct {
 	err error
 }
 
-func (scope releaseErrorAtomicScope) Resolve(
+func (reas releaseErrorAtomicScope) Resolve(
 	context.Context,
 	string,
 	string,
@@ -23,10 +23,10 @@ func (scope releaseErrorAtomicScope) Resolve(
 	return nil, nil
 }
 
-func (scope releaseErrorAtomicScope) Release(
+func (reas releaseErrorAtomicScope) Release(
 	context.Context,
 ) error {
-	return scope.err
+	return reas.err
 }
 
 func TestRunOwnedAtomicScopeDirtiesRunOnReleaseFailure(

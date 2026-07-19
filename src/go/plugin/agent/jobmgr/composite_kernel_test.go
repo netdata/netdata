@@ -111,23 +111,23 @@ func waitForCompositeRecords(
 	}
 }
 
-func (transaction *compositeTestTransaction) Scope() lifecycle.ResourceTransactionScope {
-	return transaction.scope
+func (ctt *compositeTestTransaction) Scope() lifecycle.ResourceTransactionScope {
+	return ctt.scope
 }
 
-func (transaction *compositeTestTransaction) ApplyComposite(
+func (ctt *compositeTestTransaction) ApplyComposite(
 	ctx context.Context,
 	commands CompositeCommandScope,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	if transaction.apply != nil {
-		if err := transaction.apply(ctx, commands); err != nil {
+	if ctt.apply != nil {
+		if err := ctt.apply(ctx, commands); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
 		}
 	}
-	return compositeTestApplied(transaction.scope)
+	return compositeTestApplied(ctt.scope)
 }
 
-func (transaction *compositeTestTransaction) Dispose(
+func (ctt *compositeTestTransaction) Dispose(
 	context.Context,
 ) (lifecycle.ReadyResource, error) {
 	return nil, nil
@@ -138,20 +138,20 @@ type simpleCompositeChildTransaction struct {
 	apply func()
 }
 
-func (transaction *simpleCompositeChildTransaction) Scope() lifecycle.ResourceTransactionScope {
-	return transaction.scope
+func (scct *simpleCompositeChildTransaction) Scope() lifecycle.ResourceTransactionScope {
+	return scct.scope
 }
 
-func (transaction *simpleCompositeChildTransaction) Apply(
+func (scct *simpleCompositeChildTransaction) Apply(
 	context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	if transaction.apply != nil {
-		transaction.apply()
+	if scct.apply != nil {
+		scct.apply()
 	}
-	return compositeTestApplied(transaction.scope)
+	return compositeTestApplied(scct.scope)
 }
 
-func (transaction *simpleCompositeChildTransaction) Dispose(
+func (scct *simpleCompositeChildTransaction) Dispose(
 	context.Context,
 ) (lifecycle.ReadyResource, error) {
 	return nil, nil
