@@ -60,3 +60,37 @@ func (catalog *CreatorCatalog) Creators() []Creator {
 	}
 	return creators
 }
+
+func (catalog *CreatorCatalog) Kinds() []StoreKind {
+	creators := catalog.Creators()
+	kinds := make([]StoreKind, 0, len(creators))
+	for _, creator := range creators {
+		kinds = append(kinds, creator.Kind)
+	}
+	return kinds
+}
+
+func (catalog *CreatorCatalog) DisplayName(
+	kind StoreKind,
+) (string, bool) {
+	creator, ok := catalog.Lookup(kind)
+	return creator.DisplayName, ok
+}
+
+func (catalog *CreatorCatalog) Schema(
+	kind StoreKind,
+) (string, bool) {
+	creator, ok := catalog.Lookup(kind)
+	return creator.Schema, ok
+}
+
+func (catalog *CreatorCatalog) New(
+	kind StoreKind,
+) (Store, bool) {
+	creator, ok := catalog.Lookup(kind)
+	if !ok || creator.Create == nil {
+		return nil, false
+	}
+	store := creator.Create()
+	return store, store != nil
+}

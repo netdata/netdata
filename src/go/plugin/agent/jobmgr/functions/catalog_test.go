@@ -4,6 +4,7 @@ package functions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -268,12 +269,20 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 	tests := map[string]struct {
 		command           string
 		allocateSuccessor bool
+		wantClaims        []string
 	}{
 		"update allocates successor": {
 			command: "update", allocateSuccessor: true,
+			wantClaims: []string{
+				"dyncfg:graph",
+				"dyncfg:jobs",
+			},
 		},
 		"remove has no successor": {
 			command: "remove",
+			wantClaims: []string{
+				"dyncfg:graph",
+			},
 		},
 	}
 
@@ -300,7 +309,10 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 				CommandArgument: 1,
 				GlobalClaim:     "dyncfg:graph",
 				Commands: []ResourceTransactionCommand{
-					{Name: "update", AllocateSuccessor: true},
+					{
+						Name: "update", AllocateSuccessor: true,
+						Claims: []string{"dyncfg:jobs"},
+					},
 					{Name: "remove"},
 				},
 			}
@@ -324,8 +336,10 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 				decision.Plan.Runner != nil ||
 				plan.ID != "mysql" ||
 				plan.AllocateSuccessor != test.allocateSuccessor ||
-				len(decision.Plan.Claims) != 1 ||
-				decision.Plan.Claims[0] != "dyncfg:graph" {
+				!reflect.DeepEqual(
+					decision.Plan.Claims,
+					test.wantClaims,
+				) {
 				t.Fatalf("transaction decision=%+v", decision)
 			}
 			if test.allocateSuccessor {
@@ -348,6 +362,97 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 				!reflect.DeepEqual(preparedInput.Args, lookup.Args) ||
 				!reflect.DeepEqual(preparedInput.Payload, lookup.Payload) {
 				t.Fatalf("prepared input=%+v, lookup=%+v", preparedInput, lookup)
+			}
+			if _, err := catalog.ReleaseInvocation(decision.Lease); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestFunctionCatalogDerivesSuccessorPermitFromInvocation(t *testing.T) {
+	tests := map[string]struct {
+		payload      []byte
+		factoryError error
+		wantBytes    int64
+		wantError    bool
+	}{
+		"payload sizes the permit": {
+			payload:   []byte(`{"option":"value"}`),
+			wantBytes: 4_096 + lifecycle.TaskChildExecutionBytes,
+		},
+		"factory rejection owns no invocation": {
+			payload:      []byte(`{"option":"value"}`),
+			factoryError: errors.New("rejected permit"),
+			wantError:    true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			declaration := testDeclaration(
+				"config",
+				"job:",
+				DynCfgJobResource(0, "job:"),
+			)
+			declaration.Transaction = &ResourceTransactionDeclaration{
+				Prepare: func(
+					context.Context,
+					HandlerInput,
+					lifecycle.ReadyResource,
+					lifecycle.ResourceTransactionScope,
+					lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResourceTransaction, error) {
+					return nil, nil
+				},
+				PermitFor: func(input HandlerInput) (
+					lifecycle.LongLivedPlan,
+					error,
+				) {
+					if !reflect.DeepEqual(input.Payload, test.payload) {
+						t.Fatalf("permit input=%q want=%q", input.Payload, test.payload)
+					}
+					if test.factoryError != nil {
+						return lifecycle.LongLivedPlan{},
+							test.factoryError
+					}
+					return lifecycle.NewJobLongLivedPlan(
+						test.wantBytes -
+							lifecycle.TaskChildExecutionBytes,
+					)
+				},
+				CommandArgument: 1,
+				GlobalClaim:     "dyncfg:graph",
+				Commands: []ResourceTransactionCommand{
+					{Name: "update", AllocateSuccessor: true},
+				},
+			}
+			catalog, err := NewCatalog([]Declaration{declaration})
+			if err != nil {
+				t.Fatal(err)
+			}
+			decision, err := catalog.ResolveAndAcquire(
+				jobmgr.FunctionLookup{
+					UID: "transaction", Route: "config",
+					Args:    []string{"job:mysql", "update"},
+					Payload: test.payload, HasPayload: true,
+				},
+			)
+			if test.wantError {
+				if !errors.Is(err, test.factoryError) {
+					t.Fatalf("resolve error=%v want=%v", err, test.factoryError)
+				}
+				if census := catalog.LifecycleCensus(); census.InvocationLeases != 0 {
+					t.Fatalf("failed permit factory retained lease: %+v", census)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if decision.Plan.Transaction == nil ||
+				decision.Plan.Transaction.Permit.Bytes() !=
+					test.wantBytes {
+				t.Fatalf("transaction decision=%+v", decision)
 			}
 			if _, err := catalog.ReleaseInvocation(decision.Lease); err != nil {
 				t.Fatal(err)
@@ -1477,6 +1582,10 @@ func TestFunctionCatalogBoundedMutationTurns(t *testing.T) {
 }
 
 func TestCatalogRejectsInvalidDeclarations(t *testing.T) {
+	permit, err := lifecycle.NewJobLongLivedPlan(1)
+	if err != nil {
+		t.Fatal(err)
+	}
 	tests := map[string]Declaration{
 		"missing handler": {
 			ID: "method", Generation: &HandlerGenerationDeclaration{ID: "generation"},
@@ -1508,6 +1617,79 @@ func TestCatalogRejectsInvalidDeclarations(t *testing.T) {
 				},
 				GlobalClaim: "claim",
 				Commands:    []ResourceTransactionCommand{{Name: "get"}},
+			},
+		},
+		"successor transaction with two permit sources": {
+			ID:         "method",
+			Generation: testGeneration("generation"),
+			PublicName: "config",
+			Prefix:     "job:",
+			Resource:   DynCfgJobResource(0, "job:"),
+			Transaction: &ResourceTransactionDeclaration{
+				Prepare: func(
+					context.Context,
+					HandlerInput,
+					lifecycle.ReadyResource,
+					lifecycle.ResourceTransactionScope,
+					lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResourceTransaction, error) {
+					return nil, nil
+				},
+				Permit: permit,
+				PermitFor: func(HandlerInput) (
+					lifecycle.LongLivedPlan,
+					error,
+				) {
+					return permit, nil
+				},
+				GlobalClaim: "claim",
+				Commands: []ResourceTransactionCommand{
+					{Name: "update", AllocateSuccessor: true},
+				},
+			},
+		},
+		"successor transaction without permit source": {
+			ID:         "method",
+			Generation: testGeneration("generation"),
+			PublicName: "config",
+			Prefix:     "job:",
+			Resource:   DynCfgJobResource(0, "job:"),
+			Transaction: &ResourceTransactionDeclaration{
+				Prepare: func(
+					context.Context,
+					HandlerInput,
+					lifecycle.ReadyResource,
+					lifecycle.ResourceTransactionScope,
+					lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResourceTransaction, error) {
+					return nil, nil
+				},
+				GlobalClaim: "claim",
+				Commands: []ResourceTransactionCommand{
+					{Name: "update", AllocateSuccessor: true},
+				},
+			},
+		},
+		"command repeats global claim": {
+			ID:         "method",
+			Generation: testGeneration("generation"),
+			PublicName: "config",
+			Prefix:     "job:",
+			Resource:   DynCfgJobResource(0, "job:"),
+			Transaction: &ResourceTransactionDeclaration{
+				Prepare: func(
+					context.Context,
+					HandlerInput,
+					lifecycle.ReadyResource,
+					lifecycle.ResourceTransactionScope,
+					lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResourceTransaction, error) {
+					return nil, nil
+				},
+				GlobalClaim: "claim",
+				Commands: []ResourceTransactionCommand{{
+					Name: "get", Claims: []string{"claim"},
+				}},
 			},
 		},
 		"duplicate direct": testDeclaration("direct", "", ResourcePolicy{}),

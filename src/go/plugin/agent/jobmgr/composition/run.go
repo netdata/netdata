@@ -13,6 +13,7 @@ import (
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	secretadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -44,6 +45,10 @@ type runJobServices struct {
 	Graph         []dyncfg.GraphConfig
 }
 
+type runSecretServices struct {
+	Initial []secretstore.Config
+}
+
 type runGenerationConfig struct {
 	Generation           uint64
 	ShutdownTimeout      time.Duration
@@ -68,7 +73,7 @@ type runGeneration struct {
 	dyncfg           *joboutput.DynCfgJobController
 	graph            *dyncfg.Graph
 	initialJobs      []dyncfg.GraphConfig
-	secrets          *secretBinding
+	secrets          *secretadapter.Controller
 	vnodes           *vnodeBinding
 	vnodeConfig      *agentdiscovery.VNodeConfiguration
 	serviceDiscovery *serviceDiscoveryBinding
@@ -80,6 +85,21 @@ type runGeneration struct {
 	mu               sync.Mutex
 	started          bool
 	startedAttempted bool
+}
+
+func dynCfgPublication(
+	epoch uint64,
+) functionadapter.PublicationRecord {
+	return functionadapter.PublicationRecord{
+		Name:       joboutput.DynCfgFunctionName,
+		Generation: epoch,
+		Timeout:    120,
+		Help:       "dynamic configuration",
+		Tags:       "top",
+		Access:     "0x0013",
+		Priority:   100,
+		Version:    3,
+	}
 }
 
 func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
@@ -115,9 +135,8 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	if err != nil {
 		return nil, err
 	}
-	stores := secretstore.NewService(
-		config.Jobs.StoreCreators.Creators()...,
-	)
+	stores := secretstore.NewSecretStore()
+	dependencies := secretadapter.NewSecretDependencyIndex()
 	vnodeConfig, err := agentdiscovery.NewVNodeConfigurationWithInitial(
 		config.Jobs.InitialVnodes,
 	)
@@ -150,17 +169,23 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretBinding, err := newSecretBinding(
-		config.Generation,
-		config.Jobs.PluginName,
-		config.Frames,
+	secretController, err := secretadapter.NewController(
+		secretadapter.ControllerConfig{
+			Epoch:        config.Generation,
+			PluginName:   config.Jobs.PluginName,
+			Frames:       config.Frames,
+			Store:        stores,
+			Creators:     config.Jobs.StoreCreators,
+			Dependencies: dependencies,
+			Initial:      config.Secrets.Initial,
+		},
 	)
 	if err != nil {
 		return nil, err
 	}
 	secretRoute, err := newSecretInitialRoute(
 		config.Generation,
-		secretBinding,
+		secretController,
 	)
 	if err != nil {
 		return nil, err
@@ -216,12 +241,16 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		Tasks:      tasks,
 		Frames:     config.Frames,
 		Resolver:   config.Jobs.Resolver,
-		Stores:     stores,
-		Runtime:    config.Jobs.Runtime,
-		Vnodes:     config.Jobs.Vnodes,
-		Vnode:      vnodeConfig.Lookup,
-		Hooks:      functions.JobHooks(),
-		Scheduler:  scheduler,
+		StoreScope: func(
+			keys []string,
+		) (secretresolver.AtomicScope, error) {
+			return stores.AcquireScope(keys)
+		},
+		Runtime:   config.Jobs.Runtime,
+		Vnodes:    config.Jobs.Vnodes,
+		Vnode:     vnodeConfig.Lookup,
+		Hooks:     functions.JobHooks(),
+		Scheduler: scheduler,
 	})
 	if err != nil {
 		return nil, errors.Join(err, functions.abortConstruction())
@@ -230,7 +259,11 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		joboutput.ConfigModuleFactoryConfig{
 			Modules:  config.Modules,
 			Resolver: config.Jobs.Resolver,
-			Stores:   stores,
+			StoreScope: func(
+				keys []string,
+			) (secretresolver.AtomicScope, error) {
+				return stores.AcquireScope(keys)
+			},
 		},
 	)
 	if err != nil {
@@ -245,20 +278,13 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 			ConfigModules: configModules,
 			Graph:         graph,
 			Frames:        config.Frames,
+			Dependencies:  dependencies,
 		},
 	)
 	if err != nil {
 		return nil, errors.Join(err, functions.abortConstruction())
 	}
 	if err := dynCfgBinding.bind(dynCfgJobs); err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
-	}
-	if err := secretBinding.bind(
-		stores,
-		config.Secrets.Initial,
-		dynCfgJobs,
-		graph,
-	); err != nil {
 		return nil, errors.Join(err, functions.abortConstruction())
 	}
 	planner, finalizer, err := config.Planner(runPlannerCapabilities{
@@ -285,7 +311,11 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		inputBodyGrants,
 		config.AdmissionServiceGate,
 		functions,
-		joinedRunFinalizer{functions: functions, next: finalizer},
+		joinedRunFinalizer{
+			functions: functions,
+			secrets:   secretController,
+			next:      finalizer,
+		},
 		planner,
 		functions.Catalog(),
 	)
@@ -299,7 +329,10 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	if err := functions.Bind(kernel); err != nil {
 		return nil, errors.Join(err, functions.abortConstruction())
 	}
-	if err := secretBinding.bindCommands(kernel); err != nil {
+	if err := secretController.Bind(
+		secretDependentJobBinding{controller: dynCfgJobs},
+		kernel,
+	); err != nil {
 		return nil, errors.Join(err, functions.abortConstruction())
 	}
 	return &runGeneration{
@@ -310,7 +343,7 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 			[]dyncfg.GraphConfig(nil),
 			config.Jobs.Graph...,
 		),
-		secrets: secretBinding,
+		secrets: secretController,
 		vnodes:  vnodeBinding, vnodeConfig: vnodeConfig,
 		serviceDiscovery: serviceDiscovery,
 		discovery:        config.Discovery,
@@ -350,7 +383,7 @@ func (generation *runGeneration) Start(ctx context.Context) error {
 		generation.kernel.Stop()
 		return err
 	}
-	if err := generation.secrets.publishInitial(ctx, generation.kernel); err != nil {
+	if err := generation.secrets.PublishInitial(ctx, generation.kernel); err != nil {
 		generation.run.Dirty(err)
 		generation.kernel.Stop()
 		return err
@@ -410,6 +443,7 @@ func (generation *runGeneration) Wait(ctx context.Context) error {
 
 type joinedRunFinalizer struct {
 	functions *FunctionAssembly
+	secrets   *secretadapter.Controller
 	next      jobmgr.RunFinalizer
 }
 
@@ -417,11 +451,14 @@ func (finalizer joinedRunFinalizer) FinalizeRun(
 	ctx context.Context,
 	generation uint64,
 ) error {
-	if finalizer.functions == nil || finalizer.next == nil {
+	if finalizer.functions == nil ||
+		finalizer.secrets == nil ||
+		finalizer.next == nil {
 		return errors.New("jobmgr composition: incomplete run finalizer")
 	}
 	return errors.Join(
 		finalizer.functions.FinalizeRun(ctx, generation),
+		finalizer.secrets.Close(ctx),
 		finalizer.next.FinalizeRun(ctx, generation),
 	)
 }

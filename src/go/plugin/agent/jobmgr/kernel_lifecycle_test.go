@@ -2642,7 +2642,7 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 	}
 }
 
-func TestKernelLongLivedBoundaryAllowsReplacementAndRejectsSteadyAddition(t *testing.T) {
+func TestKernelLongLivedBoundaryAllowsReplacementAndSteadyAddition(t *testing.T) {
 	var seeded []lifecycle.LongLivedPermit
 	finalizer := RunFinalizerFunc(func(context.Context, uint64) error {
 		var result error
@@ -2736,14 +2736,14 @@ func TestKernelLongLivedBoundaryAllowsReplacementAndRejectsSteadyAddition(t *tes
 	err = kernel.SubmitAndWait(ctx, Request{
 		UID: "boundary-addition", LaneKey: "secret-store:addition", Source: lifecycle.SourceJobManager, Route: "addition",
 	})
-	if !errors.Is(err, lifecycle.ErrLongLivedRecordCapacity) {
-		t.Fatalf("steady addition capacity result differs: %v", err)
+	if err != nil {
+		t.Fatalf("steady addition failed: %v", err)
 	}
-	if additionPrepared.Load() != 0 {
-		t.Fatalf("capacity-rejected addition reached Prepare: calls=%d", additionPrepared.Load())
+	if additionPrepared.Load() != 1 {
+		t.Fatalf("steady addition prepare calls=%d want=1", additionPrepared.Load())
 	}
 	if !run.Admitting() || run.DirtyCause() != nil {
-		t.Fatalf("steady capacity rejection poisoned Kernel: admitting=%v dirty=%v", run.Admitting(), run.DirtyCause())
+		t.Fatalf("steady addition poisoned Kernel: admitting=%v dirty=%v", run.Admitting(), run.DirtyCause())
 	}
 	if census := admission.Census(); census.ActiveRecords != 0 ||
 		census.LongLivedRecords != 1 ||

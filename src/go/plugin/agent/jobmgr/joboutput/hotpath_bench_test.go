@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -24,8 +23,8 @@ func BenchmarkBConfigFactoryCold(b *testing.B) {
 					},
 				},
 			},
-			Resolver: resolver,
-			Stores:   secretstore.NewService(),
+			Resolver:   resolver,
+			StoreScope: unavailableStoreScope,
 		},
 	)
 	if err != nil {

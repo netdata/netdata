@@ -262,6 +262,103 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 	}
 }
 
+func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
+	t *testing.T,
+) {
+	reader, writer := io.Pipe()
+	defer writer.Close()
+	events := make(chan string, 8)
+	output := processRecordingWriter{
+		record: func(payload []byte) {
+			switch {
+			case bytes.HasPrefix(payload, []byte("FUNCTION GLOBAL")) &&
+				bytes.Contains(payload, []byte(`"module:method"`)):
+				events <- "publish"
+			case bytes.HasPrefix(payload, []byte("FUNCTION_DEL")) &&
+				bytes.Contains(payload, []byte(`"module:method"`)):
+				events <- "withdraw"
+			}
+		},
+	}
+	unquiesced := errors.New("predecessor finalizer did not quiesce")
+	plannerCalls := 0
+	process, err := newProcessCore(processCoreConfig{
+		Input: reader, Output: output, FirstGeneration: 1,
+		ShutdownTimeout: time.Second, Clock: lifecycle.RealClock{},
+		Modules: collectorapi.Registry{
+			"module": {
+				AgentFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{ID: "method"}}
+				},
+				MethodHandler: func(
+					collectorapi.RuntimeJob,
+				) funcapi.MethodHandler {
+					return &runTestHandler{
+						cleanup: func() {},
+					}
+				},
+			},
+		},
+		Jobs:      testRunJobServices(t),
+		Discovery: testRunDiscoveryServices(t),
+		Planner: func(
+			runPlannerCapabilities,
+		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
+			plannerCalls++
+			return runRejectingPlanner{},
+				jobmgr.RunFinalizerFunc(
+					func(context.Context, uint64) error {
+						return unquiesced
+					},
+				),
+				nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	commands := make(chan processControl, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), commands)
+	}()
+	waitProcessEvent(t, events, "publish")
+	control := testProcessControl(processRestart)
+	commands <- control
+	waitProcessEvent(t, events, "withdraw")
+	select {
+	case err := <-control.result:
+		if !errors.Is(err, unquiesced) {
+			t.Fatalf("restart error=%v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("restart did not reject unquiesced predecessor")
+	}
+	select {
+	case err := <-done:
+		if !errors.Is(err, unquiesced) {
+			t.Fatalf("process error=%v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("process did not exit after rejected publication")
+	}
+	if plannerCalls != 1 {
+		t.Fatalf(
+			"successor construction reached planner: calls=%d",
+			plannerCalls,
+		)
+	}
+	select {
+	case event := <-events:
+		t.Fatalf("successor produced event %q", event)
+	default:
+	}
+	if census := process.ingress.Census(); census.State != "contained" ||
+		census.RunGeneration != 0 {
+		t.Fatalf("process ingress census=%+v", census)
+	}
+}
+
 func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 	cases := map[string]struct {
 		failAt          int

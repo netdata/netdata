@@ -12,17 +12,16 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"gopkg.in/yaml.v2"
 )
 
 type ConfigModuleFactoryConfig struct {
-	Modules  ModuleCatalog
-	Resolver *secretresolver.AtomicResolver
-	Stores   secretstore.Service
-	Logger   *logger.Logger
+	Modules    ModuleCatalog
+	Resolver   *secretresolver.AtomicResolver
+	StoreScope secretresolver.AtomicScopeAcquirer
+	Logger     *logger.Logger
 }
 
 type configModule interface {
@@ -44,7 +43,7 @@ func NewConfigModuleFactory(
 ) (*ConfigModuleFactory, error) {
 	if config.Modules == nil ||
 		config.Resolver == nil ||
-		config.Stores == nil {
+		config.StoreScope == nil {
 		return nil, errors.New(
 			"job output: incomplete config-module factory configuration",
 		)
@@ -207,12 +206,7 @@ func (factory *ConfigModuleFactory) applyResolved(
 	resolved, err := factory.config.Resolver.Resolve(
 		ctx,
 		map[string]any(config),
-		func([]string) (secretresolver.AtomicScope, error) {
-			return &factoryStoreScope{
-				service:  factory.config.Stores,
-				snapshot: factory.config.Stores.Capture(),
-			}, nil
-		},
+		factory.config.StoreScope,
 	)
 	if err != nil {
 		return fmt.Errorf(

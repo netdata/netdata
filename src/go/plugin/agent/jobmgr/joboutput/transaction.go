@@ -12,15 +12,16 @@ import (
 )
 
 type ResourceTransactionSpec struct {
-	Scope        lifecycle.ResourceTransactionScope
-	Disposition  lifecycle.ResourceTransactionDisposition
-	Current      lifecycle.ReadyResource
-	Successor    lifecycle.PreparedResource
-	UnusedPermit lifecycle.LongLivedPermit
-	Graph        *dyncfg.Graph
-	Mutation     dyncfg.GraphMutation
-	Result       lifecycle.SealedResult
-	Cleanup      lifecycle.TaskCleanup
+	Scope            lifecycle.ResourceTransactionScope
+	Disposition      lifecycle.ResourceTransactionDisposition
+	Current          lifecycle.ReadyResource
+	Successor        lifecycle.PreparedResource
+	UnusedPermit     lifecycle.LongLivedPermit
+	Graph            *dyncfg.Graph
+	Mutation         dyncfg.GraphMutation
+	AfterGraphCommit func()
+	Result           lifecycle.SealedResult
+	Cleanup          lifecycle.TaskCleanup
 }
 
 // PreparedResourceTransaction owns one unpublished graph postimage and the
@@ -225,6 +226,9 @@ func (transaction *PreparedResourceTransaction) Apply(
 	if spec.Graph != nil {
 		if err := spec.Graph.Commit(spec.Mutation); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
+		}
+		if spec.AfterGraphCommit != nil {
+			spec.AfterGraphCommit()
 		}
 	}
 	return lifecycle.NewAppliedResourceTransaction(

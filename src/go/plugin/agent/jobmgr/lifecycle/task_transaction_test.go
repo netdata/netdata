@@ -216,12 +216,11 @@ func TestTaskSupervisorDisposesPreparedTransactionAndRestoresCurrent(t *testing.
 	}
 }
 
-func TestTaskSupervisorRejectsSecondSteadyServiceTransaction(t *testing.T) {
+func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 	tests := map[string]struct {
 		permitPlan func(int64) (LongLivedPlan, error)
 	}{
-		"pipeline":    {permitPlan: NewPipelineLongLivedPlan},
-		"SecretStore": {permitPlan: NewSecretStoreLongLivedPlan},
+		"pipeline": {permitPlan: NewPipelineLongLivedPlan},
 	}
 
 	for name, test := range tests {

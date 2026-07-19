@@ -13,21 +13,26 @@ import (
 
 type acknowledgedCommandPort struct{}
 
-func (*acknowledgedCommandPort) Submit(context.Context, jobmgr.Request) error {
+func (*acknowledgedCommandPort) SubmitPrepared(
+	context.Context,
+	jobmgr.Request,
+	jobmgr.WorkPlan,
+) error {
 	return nil
 }
 
-func (*acknowledgedCommandPort) SubmitAndWait(
+func (*acknowledgedCommandPort) SubmitPreparedAndWait(
 	context.Context,
 	jobmgr.Request,
+	jobmgr.WorkPlan,
 ) error {
 	return nil
 }
 
 var _ CommandPort = (*acknowledgedCommandPort)(nil)
 
-func TestCommandPortRequiresAcknowledgedSubmission(t *testing.T) {
+func TestCommandPortRequiresAcknowledgedPreparedSubmission(t *testing.T) {
 	portType := reflect.TypeOf((*CommandPort)(nil)).Elem()
-	_, ok := portType.MethodByName("SubmitAndWait")
+	_, ok := portType.MethodByName("SubmitPreparedAndWait")
 	assert.True(t, ok)
 }

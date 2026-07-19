@@ -44,6 +44,14 @@ type DynCfgJobControllerConfig struct {
 	ConfigModules *ConfigModuleFactory
 	Graph         *dyncfg.Graph
 	Frames        *lifecycle.FrameOwner
+	Dependencies  JobDependencyIndex
+}
+
+type JobDependencyIndex interface {
+	PrepareJobChange(
+		string,
+		*dyncfg.GraphConfig,
+	) (func(), error)
 }
 
 // DynCfgJobController prepares collector configuration graph/resource
@@ -58,6 +66,7 @@ type DynCfgJobController struct {
 	configModules *ConfigModuleFactory
 	graph         *dyncfg.Graph
 	frames        *lifecycle.FrameOwner
+	dependencies  JobDependencyIndex
 }
 
 func NewDynCfgJobController(
@@ -84,6 +93,7 @@ func NewDynCfgJobController(
 		modules: config.Modules, defaults: config.Defaults,
 		factory: config.Factory, configModules: config.ConfigModules,
 		graph: config.Graph, frames: config.Frames,
+		dependencies: config.Dependencies,
 	}, nil
 }
 
@@ -792,6 +802,25 @@ func (controller *DynCfgJobController) prepareMutation(
 	result lifecycle.SealedResult,
 	cleanup lifecycle.TaskCleanup,
 ) (lifecycle.PreparedResourceTransaction, error) {
+	var dependencyCommit func()
+	if controller.dependencies != nil {
+		var err error
+		dependencyCommit, err = controller.dependencies.PrepareJobChange(
+			scopeResourceID(scope),
+			postimage,
+		)
+		if err != nil {
+			if successor != nil {
+				err = errors.Join(
+					err,
+					successor.Dispose(context.Background()),
+				)
+			} else if unusedPermit.Valid() {
+				err = errors.Join(err, unusedPermit.AbortUnused())
+			}
+			return nil, err
+		}
+	}
 	mutation, err := controller.graph.PrepareMutation(
 		[]dyncfg.GraphChange{{
 			ID: scopeResourceID(scope), Config: postimage,
@@ -832,7 +861,8 @@ func (controller *DynCfgJobController) prepareMutation(
 			Current: current, Successor: successor,
 			UnusedPermit: unusedPermit,
 			Graph:        controller.graph, Mutation: mutation,
-			Result: result, Cleanup: cleanup,
+			AfterGraphCommit: dependencyCommit,
+			Result:           result, Cleanup: cleanup,
 		},
 	)
 }

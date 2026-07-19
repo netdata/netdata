@@ -494,7 +494,7 @@ func longLivedClassFull(count int, plan LongLivedPlan) bool {
 	case LongLivedJob:
 		return false
 	case LongLivedSecretStore:
-		return count >= 1
+		return false
 	default:
 		return true
 	}

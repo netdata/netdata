@@ -43,14 +43,20 @@ type ResourceTransactionHandler func(
 	lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error)
 
+type ResourcePermitFactory func(
+	HandlerInput,
+) (lifecycle.LongLivedPlan, error)
+
 type ResourceTransactionCommand struct {
 	Name              string
 	AllocateSuccessor bool
+	Claims            []string
 }
 
 type ResourceTransactionDeclaration struct {
 	Prepare         ResourceTransactionHandler
 	Permit          lifecycle.LongLivedPlan
+	PermitFor       ResourcePermitFactory
 	CommandArgument uint16
 	GlobalClaim     string
 	Commands        []ResourceTransactionCommand
@@ -344,7 +350,7 @@ type invocationSlot struct {
 	freeNext        uint32
 	resolved        *route
 	input           HandlerInput
-	claims          [1]string
+	claims          [17]string
 	transactionPlan jobmgr.ResourceTransactionPlan
 }
 
@@ -580,10 +586,29 @@ func validateResourceTransactionDeclaration(
 	hasSuccessor := false
 	for index, command := range declaration.Commands {
 		if command.Name == "" ||
-			len(command.Name) > maximumDeclarationMetadataBytes {
+			len(command.Name) > maximumDeclarationMetadataBytes ||
+			len(command.Claims) > len(
+				(invocationSlot{}).claims,
+			)-1 {
 			return errors.New(
 				"jobmgr Function catalog: invalid resource transaction command",
 			)
+		}
+		for claimIndex, claim := range command.Claims {
+			if claim == "" ||
+				len(claim) > maximumDeclarationMetadataBytes ||
+				claim == declaration.GlobalClaim {
+				return errors.New(
+					"jobmgr Function catalog: invalid command claim",
+				)
+			}
+			for previous := 0; previous < claimIndex; previous++ {
+				if command.Claims[previous] == claim {
+					return errors.New(
+						"jobmgr Function catalog: duplicate command claim",
+					)
+				}
+			}
 		}
 		hasSuccessor = hasSuccessor || command.AllocateSuccessor
 		for previous := 0; previous < index; previous++ {
@@ -598,11 +623,21 @@ func validateResourceTransactionDeclaration(
 		}
 	}
 	if hasSuccessor {
-		if err := declaration.Permit.Validate(); err != nil {
-			return err
+		hasStaticPermit := declaration.Permit.Class() != 0 ||
+			declaration.Permit.Bytes() != 0
+		if hasStaticPermit == (declaration.PermitFor != nil) {
+			return errors.New(
+				"jobmgr Function catalog: successor transaction must declare exactly one permit source",
+			)
+		}
+		if hasStaticPermit {
+			if err := declaration.Permit.Validate(); err != nil {
+				return err
+			}
 		}
 	} else if declaration.Permit.Class() != 0 ||
-		declaration.Permit.Bytes() != 0 {
+		declaration.Permit.Bytes() != 0 ||
+		declaration.PermitFor != nil {
 		return errors.New(
 			"jobmgr Function catalog: transaction without successor has a permit",
 		)
@@ -628,6 +663,12 @@ func cloneResourceTransactionDeclaration(
 		[]ResourceTransactionCommand(nil),
 		declaration.Commands...,
 	)
+	for index := range cloned.Commands {
+		cloned.Commands[index].Claims = append(
+			[]string(nil),
+			declaration.Commands[index].Claims...,
+		)
+	}
 	return &cloned
 }
 
@@ -671,6 +712,26 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 	if resolved.admissionClosed || generation.admissionClosed {
 		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlUnavailable}, nil
 	}
+	command, transactionCommand := resourceTransactionCommand(
+		resolved.transaction,
+		lookup.Args,
+	)
+	var transactionPermit lifecycle.LongLivedPlan
+	if transactionCommand && command.AllocateSuccessor {
+		transactionPermit = resolved.transaction.Permit
+		if resolved.transaction.PermitFor != nil {
+			var err error
+			transactionPermit, err = resolved.transaction.PermitFor(
+				handlerInput(lookup, resolved.method),
+			)
+			if err != nil {
+				return jobmgr.FunctionCatalogDecision{}, err
+			}
+			if err := transactionPermit.Validate(); err != nil {
+				return jobmgr.FunctionCatalogDecision{}, err
+			}
+		}
+	}
 
 	slotIndex := catalog.freeLease
 	var slot *invocationSlot
@@ -698,12 +759,7 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 	}
 	*slot = invocationSlot{
 		generation: nextGeneration, resolved: resolved,
-		input: HandlerInput{
-			UID: lookup.UID, Method: resolved.method, Args: lookup.Args,
-			Payload: lookup.Payload, ContentType: lookup.ContentType,
-			Permissions: lookup.Permissions, CallerSource: lookup.CallerSource,
-			Timeout: lookup.Timeout, HasPayload: lookup.HasPayload,
-		},
+		input: handlerInput(lookup, resolved.method),
 	}
 	resolved.invocationLeases++
 	generation.invocationLeases++
@@ -713,21 +769,22 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 		CooperativeCancel:   resolved.cooperativeCancel,
 		CooperativeDeadline: resolved.cooperativeDeadline,
 	}
-	if command, ok := resourceTransactionCommand(
-		resolved.transaction,
-		lookup.Args,
-	); ok {
+	if transactionCommand {
 		slot.claims[0] = resolved.transaction.GlobalClaim
+		claimCount := 1 + copy(
+			slot.claims[1:],
+			command.Claims,
+		)
 		slot.transactionPlan = jobmgr.ResourceTransactionPlan{
 			ID:                resourceID,
 			AllocateSuccessor: command.AllocateSuccessor,
 			Prepare:           slot.prepareResourceTransaction,
 		}
 		if command.AllocateSuccessor {
-			slot.transactionPlan.Permit = resolved.transaction.Permit
+			slot.transactionPlan.Permit = transactionPermit
 		}
 		plan = jobmgr.WorkPlan{
-			Claims:      slot.claims[:],
+			Claims:      slot.claims[:claimCount],
 			Transaction: &slot.transactionPlan,
 		}
 	}
@@ -736,6 +793,18 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 		Plan:       plan,
 		Lease:      jobmgr.FunctionInvocationRef{Slot: slotIndex, Generation: nextGeneration},
 	}, nil
+}
+
+func handlerInput(
+	lookup jobmgr.FunctionLookup,
+	method string,
+) HandlerInput {
+	return HandlerInput{
+		UID: lookup.UID, Method: method, Args: lookup.Args,
+		Payload: lookup.Payload, ContentType: lookup.ContentType,
+		Permissions: lookup.Permissions, CallerSource: lookup.CallerSource,
+		Timeout: lookup.Timeout, HasPayload: lookup.HasPayload,
+	}
 }
 
 func (catalog *Catalog) ReleaseInvocation(ref jobmgr.FunctionInvocationRef) (jobmgr.FunctionCleanupPlan, error) {

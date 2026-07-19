@@ -10,7 +10,6 @@ import (
 	"time"
 
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -305,12 +304,11 @@ func newDynCfgJobTestHarness(
 	if err != nil {
 		t.Fatal(err)
 	}
-	stores := secretstore.NewService()
 	factory, err := NewFactory(
 		FactoryConfig{
 			PluginName: "go.d", Modules: modules,
 			Tasks: supervisor, Frames: frames,
-			Resolver: resolver, Stores: stores,
+			Resolver: resolver, StoreScope: unavailableStoreScope,
 			Vnodes:    vnoderegistry.New(),
 			Scheduler: newTestScheduler(t),
 		},
@@ -320,7 +318,8 @@ func newDynCfgJobTestHarness(
 	}
 	configModules, err := NewConfigModuleFactory(
 		ConfigModuleFactoryConfig{
-			Modules: modules, Resolver: resolver, Stores: stores,
+			Modules: modules, Resolver: resolver,
+			StoreScope: unavailableStoreScope,
 		},
 	)
 	if err != nil {

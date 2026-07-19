@@ -1,4 +1,9 @@
+//go:build ignore
+
 // SPDX-License-Identifier: GPL-3.0-or-later
+
+// This B-M-002 bridge is retained as deletion evidence until B-M-005. It is
+// not part of any production build after the B-M-003 authority cut.
 
 package composition
 

@@ -289,6 +289,50 @@ func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T)
 	}
 }
 
+func TestSecretStoreSteadyPermitsHaveNoConfiguredStoreCountLimit(t *testing.T) {
+	const stores = 9
+
+	admission := NewAdmissionLedger()
+	supervisor := newLongLivedTestSupervisor(t)
+	plan, err := NewSecretStoreLongLivedPlan(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	permits := make([]LongLivedPermit, 0, stores)
+	for index := range stores {
+		ref := grantLongLivedTestAdmission(t, admission, 2)
+		permit, issueErr := supervisor.IssueLongLivedPermit(
+			admission,
+			ref,
+			ResourceIdentity{
+				ID:         fmt.Sprintf("secret-store-%02d", index),
+				Generation: 1,
+			},
+			plan,
+		)
+		if issueErr != nil {
+			t.Fatal(issueErr)
+		}
+		if _, releaseErr := admission.ReleaseOrdinary(ref); releaseErr != nil {
+			t.Fatal(releaseErr)
+		}
+		permits = append(permits, permit)
+	}
+	if census := supervisor.LongLivedCensus(); census.Active != stores ||
+		census.SecretStores != stores ||
+		census.Bytes != stores*plan.Bytes() {
+		t.Fatalf("steady Store permit census=%+v", census)
+	}
+	for _, permit := range permits {
+		if err := permit.AbortUnused(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
+		t.Fatalf("final Store permit census=%+v", census)
+	}
+}
+
 func TestLongLivedSecretStorePermitRejectsByteReleaseBeforeExternalRelease(t *testing.T) {
 	admission := NewAdmissionLedger()
 	ref := grantLongLivedTestAdmission(t, admission, 100)

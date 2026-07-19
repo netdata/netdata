@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/token"
 	"os"
@@ -139,6 +140,18 @@ var checkpointOwnerDeclarations = map[string]ownerDeclaration{
 	"secret creator catalog": {
 		packagePath: "plugin/agent/secrets/secretstore", typeName: "CreatorCatalog",
 	},
+	"secret store authority": {
+		packagePath: "plugin/agent/secrets/secretstore", typeName: "SecretStore",
+	},
+	"prepared secret mutation": {
+		packagePath: "plugin/agent/secrets/secretstore", typeName: "PreparedSecretMutation",
+	},
+	"secret dependency index": {
+		packagePath: "plugin/agent/jobmgr/secrets", typeName: "SecretDependencyIndex",
+	},
+	"secret restart command": {
+		packagePath: "plugin/agent/jobmgr/secrets", typeName: "SecretRestartCommand",
+	},
 	"discovery provider catalog": {
 		packagePath: "plugin/agent/discovery", typeName: "ProviderCatalog",
 	},
@@ -193,7 +206,7 @@ func TestActiveArchitecturePackages(t *testing.T) {
 }
 
 func TestCheckpointOwnerManifestHasConcreteDeclarations(t *testing.T) {
-	const checkpointOwnerCount = 31
+	const checkpointOwnerCount = 35
 	if len(checkpointOwnerDeclarations) != checkpointOwnerCount {
 		t.Fatalf(
 			"checkpoint owner declarations=%d want=%d",
@@ -505,6 +518,82 @@ func TestProductionConstructionChain(t *testing.T) {
 	}
 }
 
+func TestProductionCompositionConstructsOneSecretAuthoritySet(
+	t *testing.T,
+) {
+	root := filepath.Clean(
+		filepath.Join(jobmgrSourceRoot(t), "../../.."),
+	)
+	files, err := productionGoFiles(
+		filepath.Join(
+			root,
+			"plugin/agent/jobmgr/composition",
+		),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := map[string]struct {
+		importPath string
+		function   string
+		want       int
+	}{
+		"Store authority": {
+			importPath: pluginsImportRoot +
+				"plugin/agent/secrets/secretstore",
+			function: "NewSecretStore", want: 1,
+		},
+		"dependency authority": {
+			importPath: jobmgrImportPath + "/secrets",
+			function:   "NewSecretDependencyIndex", want: 1,
+		},
+		"secret controller": {
+			importPath: jobmgrImportPath + "/secrets",
+			function:   "NewController", want: 1,
+		},
+	}
+	for name, call := range calls {
+		t.Run(name, func(t *testing.T) {
+			got, err := countImportedCalls(
+				files,
+				call.importPath,
+				call.function,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != call.want {
+				t.Fatalf(
+					"%s.%s calls=%d want=%d",
+					call.importPath,
+					call.function,
+					got,
+					call.want,
+				)
+			}
+		})
+	}
+	for _, path := range files {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		source := string(data)
+		for _, forbidden := range []string{
+			jobmgrImportPath + "/secretsctl",
+			"secretstore.NewService(",
+		} {
+			if strings.Contains(source, forbidden) {
+				t.Fatalf(
+					"active composition %s retains %q",
+					path,
+					forbidden,
+				)
+			}
+		}
+	}
+}
+
 func TestProductionConstructionGuardRejectsAdversarialSources(t *testing.T) {
 	tests := map[string]struct {
 		source   string
@@ -587,12 +676,80 @@ func productionGoFiles(dir string) ([]string, error) {
 			strings.HasSuffix(entry.Name(), "_test.go") {
 			continue
 		}
+		matched, err := build.Default.MatchFile(dir, entry.Name())
+		if err != nil {
+			return nil, err
+		}
+		if !matched {
+			continue
+		}
 		paths = append(paths, filepath.Join(dir, entry.Name()))
 	}
 	if len(paths) == 0 {
 		return nil, errors.New("architecture guard: no production Go files")
 	}
 	return paths, nil
+}
+
+func countImportedCalls(
+	paths []string,
+	importPath string,
+	function string,
+) (int, error) {
+	total := 0
+	for _, path := range paths {
+		file, err := parser.ParseFile(
+			token.NewFileSet(),
+			path,
+			nil,
+			0,
+		)
+		if err != nil {
+			return 0, err
+		}
+		qualifiers := make(map[string]struct{})
+		for _, imported := range file.Imports {
+			path, err := strconv.Unquote(imported.Path.Value)
+			if err != nil {
+				return 0, err
+			}
+			if path != importPath {
+				continue
+			}
+			name := filepath.Base(path)
+			if imported.Name != nil {
+				name = imported.Name.Name
+			}
+			if name == "." {
+				return 0, fmt.Errorf(
+					"architecture guard: dot import %q",
+					importPath,
+				)
+			}
+			if name != "_" {
+				qualifiers[name] = struct{}{}
+			}
+		}
+		ast.Inspect(file, func(node ast.Node) bool {
+			call, ok := node.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			selector, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || selector.Sel.Name != function {
+				return true
+			}
+			qualifier, ok := selector.X.(*ast.Ident)
+			if !ok {
+				return true
+			}
+			if _, ok := qualifiers[qualifier.Name]; ok {
+				total++
+			}
+			return true
+		})
+	}
+	return total, nil
 }
 
 func inspectConstructionFiles(paths []string) (constructionCounts, error) {

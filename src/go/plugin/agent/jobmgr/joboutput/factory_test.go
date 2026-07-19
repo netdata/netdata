@@ -12,7 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
@@ -285,7 +284,7 @@ func newFactoryTestHarness(
 		Tasks:      tasks,
 		Frames:     frames,
 		Resolver:   resolver,
-		Stores:     secretstore.NewService(),
+		StoreScope: unavailableStoreScope,
 		Vnodes:     vnoderegistry.New(),
 		Hooks:      hooks,
 		Scheduler:  newTestScheduler(t),
@@ -294,6 +293,12 @@ func newFactoryTestHarness(
 		t.Fatal(err)
 	}
 	return factory, output
+}
+
+func unavailableStoreScope(
+	[]string,
+) (secretresolver.AtomicScope, error) {
+	return nil, errors.New("test Store scope is unavailable")
 }
 
 func factoryTestConfig(functionOnly bool) confgroup.Config {

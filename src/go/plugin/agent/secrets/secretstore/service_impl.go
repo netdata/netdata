@@ -311,8 +311,19 @@ func newCreatorRegistry(creators ...Creator) creatorRegistry {
 }
 
 func (s *inMemoryService) prepareConfig(ctx context.Context, cfg Config) (preparedStore, error) {
+	return preparePublishedConfig(ctx, cfg, s.New)
+}
+
+func preparePublishedConfig(
+	ctx context.Context,
+	cfg Config,
+	newStore func(StoreKind) (Store, bool),
+) (preparedStore, error) {
 	if cfg == nil {
 		return preparedStore{}, fmt.Errorf("store config is nil")
+	}
+	if newStore == nil {
+		return preparedStore{}, fmt.Errorf("store creator is nil")
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -336,7 +347,7 @@ func (s *inMemoryService) prepareConfig(ctx context.Context, cfg Config) (prepar
 	name := raw.Name()
 	key := raw.ExposedKey()
 
-	store, ok := s.New(kind)
+	store, ok := newStore(kind)
 	if !ok {
 		return preparedStore{}, fmt.Errorf("store kind '%s' is not supported", kind)
 	}

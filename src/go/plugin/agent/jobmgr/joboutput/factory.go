@@ -12,7 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
@@ -57,7 +56,7 @@ type FactoryConfig struct {
 	Tasks      *lifecycle.TaskSupervisor
 	Frames     *lifecycle.FrameOwner
 	Resolver   *secretresolver.AtomicResolver
-	Stores     secretstore.Service
+	StoreScope secretresolver.AtomicScopeAcquirer
 	Runtime    runtimecomp.Service
 	Vnodes     *vnoderegistry.Registry
 	Vnode      func(string) (jobruntime.VnodeSnapshot, bool)
@@ -78,7 +77,7 @@ func NewFactory(config FactoryConfig) (*Factory, error) {
 		config.Tasks == nil ||
 		config.Frames == nil ||
 		config.Resolver == nil ||
-		config.Stores == nil ||
+		config.StoreScope == nil ||
 		config.Vnodes == nil ||
 		config.Scheduler == nil {
 		return nil, errors.New("job output: incomplete factory configuration")
@@ -121,7 +120,8 @@ func (factory *Factory) ValidateConfig(
 	configModules, err := NewConfigModuleFactory(
 		ConfigModuleFactoryConfig{
 			Modules: factory.config.Modules, Resolver: factory.config.Resolver,
-			Stores: factory.config.Stores, Logger: factory.config.Logger,
+			StoreScope: factory.config.StoreScope,
+			Logger:     factory.config.Logger,
 		},
 	)
 	if err != nil {
@@ -428,12 +428,7 @@ func (factory *Factory) applyConfig(
 	resolved, err := factory.config.Resolver.Resolve(
 		resolveCtx,
 		map[string]any(config),
-		func([]string) (secretresolver.AtomicScope, error) {
-			return &factoryStoreScope{
-				service:  factory.config.Stores,
-				snapshot: factory.config.Stores.Capture(),
-			}, nil
-		},
+		factory.config.StoreScope,
 	)
 	if err != nil {
 		return fmt.Errorf("job output: resolving configuration secrets: %w", err)
@@ -472,27 +467,6 @@ func (factory *Factory) lookupVNode(
 	}
 	return vnode, nil
 }
-
-type factoryStoreScope struct {
-	service  secretstore.Service
-	snapshot *secretstore.Snapshot
-}
-
-func (scope *factoryStoreScope) Resolve(
-	ctx context.Context,
-	storeKey string,
-	secretKey string,
-) ([]byte, error) {
-	value, err := scope.service.Resolve(
-		ctx,
-		scope.snapshot,
-		storeKey+":"+secretKey,
-		"${store:"+storeKey+":"+secretKey+"}",
-	)
-	return []byte(value), err
-}
-
-func (*factoryStoreScope) Release(context.Context) error { return nil }
 
 func validateFactoryConfigIdentity(
 	config confgroup.Config,
