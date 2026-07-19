@@ -1188,7 +1188,7 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 		t.Fatalf("active shutdown tasks=%d, want %d", active, population)
 	}
 	wantLongLivedBytes := int64(population) *
-		(512 + lifecycle.TaskChildExecutionBytes)
+		512
 	if census := tasks.LongLivedCensus(); census.Active != population ||
 		census.Bytes != wantLongLivedBytes {
 		t.Fatalf(
@@ -3397,14 +3397,67 @@ func TestOperationAdmissionBytesIncludesSealedRequestMetadata(t *testing.T) {
 	}
 }
 
-func TestOperationAdmissionBytesIncludesTaskChildExecutionAllowance(t *testing.T) {
+func TestOperationAdmissionBytesUsesAggregateFrameworkOverhead(t *testing.T) {
 	got, err := operationAdmissionBytes(Request{}, WorkPlan{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := operationRecordAdmissionBytes + lifecycle.TaskChildExecutionBytes
+	const want = int64(4_608)
 	if got != want {
 		t.Fatalf("empty operation admission=%d, want %d", got, want)
+	}
+}
+
+func TestOperationAdmissionBytesChargesDeclaredLongLivedBytes(t *testing.T) {
+	pipeline, err := lifecycle.NewPipelineLongLivedPlan(
+		[]string{"provider"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := lifecycle.NewJobLongLivedPlan(73)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secretStore, err := lifecycle.NewSecretStoreLongLivedPlan(91)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := map[string]struct {
+		permit lifecycle.LongLivedPlan
+		want   int64
+	}{
+		"charge-free Pipeline": {
+			permit: pipeline,
+			want:   operationFrameworkAdmissionBytes,
+		},
+		"Job retained bytes": {
+			permit: job,
+			want:   operationFrameworkAdmissionBytes + 73,
+		},
+		"SecretStore retained bytes": {
+			permit: secretStore,
+			want:   operationFrameworkAdmissionBytes + 91,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := operationAdmissionBytes(
+				Request{},
+				WorkPlan{
+					Resource: &ResourcePlan{
+						Action: ResourceInstall,
+						Permit: test.permit,
+					},
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != test.want {
+				t.Fatalf("operation admission=%d, want %d", got, test.want)
+			}
+		})
 	}
 }
 

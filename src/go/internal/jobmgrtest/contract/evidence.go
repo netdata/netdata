@@ -377,12 +377,14 @@ var componentProofByCase = map[string][]ComponentProof{
 	"F24.14-b-hotpath-envelope": {
 		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogLookupAndHandlerLeaseAllocateNothing"},
 	},
-	"F24.15-b-cleanup-capacity-execution": {
+	"F24.15-b-cleanup-capacity-retention": {
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelRunsTaskCleanupBeforeSlotRelease"},
-		{Package: "./plugin/agent/jobmgr", Test: "TestOperationAdmissionBytesIncludesTaskChildExecutionAllowance"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestOperationAdmissionBytesUsesAggregateFrameworkOverhead"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestFunctionCleanupQueuePreservesFIFOAndReleasesChunks"},
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelShutdownTracksDynamicTaskPopulation"},
-		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogRetainsCleanupExecutionStorageUntilCompletion"},
-		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogAbortRetainsInitializedCleanupExecutionStorage"},
+		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogRetainsGenerationStorageUntilCleanupCompletion"},
+		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogAbortRetainsInitializedGenerationStorage"},
+		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle"},
 		{Package: "./plugin/agent/jobmgr/composition", Test: "TestProductionProcessChargesCatalogStorageUntilFinalClose"},
 	},
 	"F24.16-b-shutdown-complexity": {

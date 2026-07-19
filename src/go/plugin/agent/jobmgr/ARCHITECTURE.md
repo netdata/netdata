@@ -100,6 +100,25 @@ The main stages are:
 8. Every lease, claim, admission reservation, task, and prepared value is
    released or transferred to an explicit long-lived generation.
 
+### Admission accounting
+
+Admission charges ownership classes, not goroutines:
+
+- every ordinary operation carries one 4,608-byte aggregate framework charge,
+  plus its request, plan, result, and retained-resource bytes;
+- process construction reserves the Function catalog bound and no synthetic
+  finalizer or discovery-provider charge;
+- Job and SecretStore generations charge their declared retained bytes;
+- the singleton discovery Pipeline owns TaskSupervisor lifecycle records and
+  G/E facets with zero AdmissionLedger bytes;
+- every cleanup-capable Function generation carries a private 4-KiB catalog
+  retention allowance until its cleanup Task is acknowledged and
+  `Catalog.CompleteCleanup` releases catalog ownership.
+
+The Function allowance bounds generations that may accumulate behind delayed
+invocations or cleanup. It is not a reusable Task entitlement or a
+framework-wide execution limit.
+
 ## Ownership and synchronization
 
 KernelLoop is the sole mutator of command lanes, command operations, deadlines,

@@ -41,11 +41,6 @@ func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
 		return LongLivedPlan{},
 			errors.New("jobmgr long-lived permit: invalid pipeline provider keys")
 	}
-	if int64(len(providerKeys)) >=
-		OrdinaryBudgetBytes/TaskChildExecutionBytes {
-		return LongLivedPlan{},
-			errors.New("jobmgr long-lived permit: invalid byte entitlement")
-	}
 	keys := append([]string(nil), providerKeys...)
 	sort.Strings(keys)
 	for index, key := range keys {
@@ -60,7 +55,6 @@ func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
 		providerKeys: keys,
 		e:            LongLivedEProvider,
 	}
-	plan.bytes = int64(len(keys)+1) * TaskChildExecutionBytes
 	return plan, plan.Validate()
 }
 
@@ -92,33 +86,35 @@ func NewSecretStoreReplacementLongLivedPlan(bytes int64) (LongLivedPlan, error) 
 }
 
 func (plan *LongLivedPlan) setResourceBytes(bytes int64) error {
-	if plan == nil || bytes <= 0 ||
-		bytes >= OrdinaryBudgetBytes-TaskChildExecutionBytes {
-		return errors.New("jobmgr long-lived permit: invalid byte entitlement")
+	if plan == nil || bytes <= 0 || bytes >= OrdinaryBudgetBytes {
+		return errors.New("jobmgr long-lived permit: invalid retained byte charge")
 	}
-	plan.bytes = bytes + TaskChildExecutionBytes
+	plan.bytes = bytes
 	return nil
 }
 
 func (plan LongLivedPlan) Validate() error {
-	if plan.bytes <= TaskChildExecutionBytes ||
-		plan.bytes >= OrdinaryBudgetBytes {
-		return errors.New("jobmgr long-lived permit: invalid byte entitlement")
+	if plan.bytes < 0 || plan.bytes >= OrdinaryBudgetBytes {
+		return errors.New("jobmgr long-lived permit: invalid retained byte charge")
 	}
 	switch plan.class {
 	case LongLivedPipeline:
 		if plan.replacementOverlap ||
 			!validPipelineProviderKeys(plan.providerKeys) ||
 			plan.e != LongLivedEProvider ||
-			plan.bytes != int64(len(plan.providerKeys)+1)*TaskChildExecutionBytes {
+			plan.bytes != 0 {
 			return errors.New("jobmgr long-lived permit: invalid pipeline facets")
 		}
 	case LongLivedJob:
-		if len(plan.providerKeys) != 0 || plan.e != LongLivedEJobResources {
+		if plan.bytes <= 0 ||
+			len(plan.providerKeys) != 0 ||
+			plan.e != LongLivedEJobResources {
 			return errors.New("jobmgr long-lived permit: invalid job facets")
 		}
 	case LongLivedSecretStore:
-		if len(plan.providerKeys) != 0 || plan.e != LongLivedESecretStore {
+		if plan.bytes <= 0 ||
+			len(plan.providerKeys) != 0 ||
+			plan.e != LongLivedESecretStore {
 			return errors.New("jobmgr long-lived permit: invalid SecretStore facets")
 		}
 	default:
@@ -182,7 +178,17 @@ type LongLivedPermit struct {
 }
 
 func (permit LongLivedPermit) Valid() bool {
-	return permit.supervisor != nil && permit.ref.valid() && permit.owner.Valid() && permit.class != 0 && permit.bytes > 0
+	if permit.supervisor == nil || !permit.ref.valid() || !permit.owner.Valid() {
+		return false
+	}
+	switch permit.class {
+	case LongLivedPipeline:
+		return permit.bytes == 0
+	case LongLivedJob, LongLivedSecretStore:
+		return permit.bytes > 0
+	default:
+		return false
+	}
 }
 
 func (permit LongLivedPermit) Owner() ResourceIdentity { return permit.owner }
@@ -351,7 +357,11 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 		return LongLivedPermit{}, err
 	}
 	gClaims := longLivedGClaims(plan)
-	if err := admission.transferLongLived(admissionRef, plan.bytes); err != nil {
+	if err := reserveLongLivedAdmission(
+		admission,
+		admissionRef,
+		plan,
+	); err != nil {
 		return LongLivedPermit{}, err
 	}
 
@@ -427,8 +437,12 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 	}
 	*slot = longLivedSlot{
 		generation: generation, active: true, owner: owner, class: plan.class,
-		admission: admission, admissionRef: admissionRef, bytes: plan.bytes,
+		bytes:   plan.bytes,
 		gClaims: gClaims, eReserved: plan.e,
+	}
+	if plan.bytes > 0 {
+		slot.admission = admission
+		slot.admissionRef = admissionRef
 	}
 	ref := LongLivedPermitRef{Slot: uint32(index), Generation: generation}
 	registry.owners[owner] = ref
@@ -510,7 +524,7 @@ func (supervisor *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, 
 		registry.mu.Unlock()
 		return err
 	}
-	if slot.bytes <= 0 || slot.bytesReleasing {
+	if slot.bytesReleasing {
 		registry.mu.Unlock()
 		return errors.New("jobmgr long-lived permit: bytes already released")
 	}
@@ -518,6 +532,24 @@ func (supervisor *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, 
 		slot.eReserved != 0 || slot.eActive != 0 {
 		registry.mu.Unlock()
 		return errors.New("jobmgr long-lived permit: byte release before G/E facets")
+	}
+	if slot.bytes == 0 {
+		if slot.class != LongLivedPipeline ||
+			slot.admission != nil ||
+			slot.admissionRef.Valid() {
+			registry.mu.Unlock()
+			return errors.New(
+				"jobmgr long-lived permit: invalid charge-free ownership",
+			)
+		}
+		registry.mu.Unlock()
+		return nil
+	}
+	if slot.bytes < 0 ||
+		slot.admission == nil ||
+		!slot.admissionRef.Valid() {
+		registry.mu.Unlock()
+		return errors.New("jobmgr long-lived permit: invalid byte ownership")
 	}
 	slot.bytesReleasing = true
 	admission, admissionRef, byteCount := slot.admission, slot.admissionRef, slot.bytes
@@ -548,11 +580,30 @@ func (supervisor *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, 
 }
 
 func (supervisor *TaskSupervisor) releaseLongLivedAdmission(admission *AdmissionLedger, ref AdmissionRef, bytes int64) error {
+	if bytes == 0 {
+		return nil
+	}
 	wake, err := admission.releaseLongLived(ref, bytes)
 	if wake {
 		supervisor.notifyAdmissionReady()
 	}
 	return err
+}
+
+func reserveLongLivedAdmission(
+	admission *AdmissionLedger,
+	ref AdmissionRef,
+	plan LongLivedPlan,
+) error {
+	if plan.bytes == 0 {
+		if plan.class != LongLivedPipeline {
+			return errors.New(
+				"jobmgr long-lived permit: invalid charge-free class",
+			)
+		}
+		return admission.validateChargeFreeLongLived(ref)
+	}
+	return admission.transferLongLived(ref, plan.bytes)
 }
 
 func (supervisor *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, owner ResourceIdentity) error {

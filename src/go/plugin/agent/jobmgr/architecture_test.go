@@ -274,6 +274,7 @@ func assertExactJobManagerTree(t *testing.T) {
 		"kernel.go":                                {},
 		"kernel_fairness_test.go":                  {},
 		"kernel_function_catalog_external_test.go": {},
+		"kernel_function_cleanup_queue_test.go":    {},
 		"kernel_hotpath_bench_test.go":             {},
 		"kernel_lifecycle_test.go":                 {},
 		"kernel_prepared_wait_test.go":             {},

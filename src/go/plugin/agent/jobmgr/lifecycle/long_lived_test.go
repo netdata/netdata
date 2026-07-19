@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestLongLivedPermitConservesAdmittedBGEFacets(t *testing.T) {
+func TestPipelinePermitConservesLifecycleFacetsWithoutAdmissionCharge(t *testing.T) {
 	admission := NewAdmissionLedger()
 	supervisor := newLongLivedTestSupervisor(t)
 	plan, err := NewPipelineLongLivedPlan(
@@ -24,16 +24,25 @@ func TestLongLivedPermitConservesAdmittedBGEFacets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if census := admission.Census(); census.OrdinaryBytes != plan.Bytes()+TaskChildExecutionBytes ||
-		census.LongLivedRecords != 1 ||
-		census.LongLivedBytes != plan.Bytes() {
+	if census := admission.Census(); census.OrdinaryBytes != 1 ||
+		census.LongLivedRecords != 0 ||
+		census.LongLivedBytes != 0 {
 		t.Fatalf("admission after transfer=%+v", census)
 	}
 	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{
-		Active: 1, Pipelines: 1, Bytes: plan.Bytes(),
+		Active: 1, Pipelines: 1,
 		GReserved: 3, ExternalReserved: 1,
 	}) {
 		t.Fatalf("permit after transfer=%+v", census)
+	}
+	slot := supervisor.longLived.slots[permit.ref.Slot]
+	if slot.admission != nil || slot.admissionRef.Valid() || slot.bytes != 0 {
+		t.Fatalf(
+			"charge-free Pipeline retained admission authority: admission=%p ref=%+v bytes=%d",
+			slot.admission,
+			slot.admissionRef,
+			slot.bytes,
+		)
 	}
 	if err := permit.Return(); err == nil {
 		t.Fatal("permit returned with retained facets")
@@ -127,7 +136,8 @@ func TestLongLivedPermitConservesAdmittedBGEFacets(t *testing.T) {
 	if err := permit.ReleaseBytes(); err != nil {
 		t.Fatal(err)
 	}
-	if census := admission.Census(); census.OrdinaryBytes != TaskChildExecutionBytes || census.LongLivedRecords != 0 || census.LongLivedBytes != 0 {
+	if census := admission.Census(); census.OrdinaryBytes != 1 ||
+		census.LongLivedRecords != 0 || census.LongLivedBytes != 0 {
 		t.Fatalf("admission after persistent release=%+v", census)
 	}
 	if census := supervisor.LongLivedCensus(); census.Active != 1 || census.Bytes != 0 || census.GActive != 0 || census.ExternalActive != 0 {
@@ -151,10 +161,6 @@ func TestLongLivedPermitConservesAdmittedBGEFacets(t *testing.T) {
 }
 
 func TestPipelineLongLivedPlanProviderKeys(t *testing.T) {
-	overflow := make(
-		[]string,
-		int(OrdinaryBudgetBytes/TaskChildExecutionBytes),
-	)
 	tests := map[string]struct {
 		keys      []string
 		wantBytes int64
@@ -162,11 +168,11 @@ func TestPipelineLongLivedPlanProviderKeys(t *testing.T) {
 	}{
 		"one provider": {
 			keys:      []string{"file"},
-			wantBytes: 2 * TaskChildExecutionBytes,
+			wantBytes: 0,
 		},
 		"several providers": {
 			keys:      []string{"service-discovery", "file", "dummy"},
-			wantBytes: 4 * TaskChildExecutionBytes,
+			wantBytes: 0,
 		},
 		"empty": {
 			wantErr: true,
@@ -181,10 +187,6 @@ func TestPipelineLongLivedPlanProviderKeys(t *testing.T) {
 		},
 		"duplicate": {
 			keys:    []string{"file", "file"},
-			wantErr: true,
-		},
-		"does not self fit": {
-			keys:    overflow,
 			wantErr: true,
 		},
 	}
@@ -206,6 +208,140 @@ func TestPipelineLongLivedPlanProviderKeys(t *testing.T) {
 					plan.Bytes(),
 					test.wantBytes,
 				)
+			}
+		})
+	}
+}
+
+func TestLongLivedResourcePlansChargeDeclaredBytes(t *testing.T) {
+	tests := map[string]struct {
+		newPlan func(int64) (LongLivedPlan, error)
+	}{
+		"job": {
+			newPlan: NewJobLongLivedPlan,
+		},
+		"secret store": {
+			newPlan: NewSecretStoreLongLivedPlan,
+		},
+		"secret store replacement": {
+			newPlan: NewSecretStoreReplacementLongLivedPlan,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			const retainedBytes = int64(73)
+			plan, err := test.newPlan(retainedBytes)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if plan.Bytes() != retainedBytes {
+				t.Fatalf(
+					"retained bytes=%d, want %d",
+					plan.Bytes(),
+					retainedBytes,
+				)
+			}
+			if plan, err := test.newPlan(0); err == nil {
+				t.Fatalf("zero-byte resource plan was accepted: %+v", plan)
+			}
+		})
+	}
+}
+
+func TestZeroChargePipelinePermitRequiresLiveAdmissionAuthority(t *testing.T) {
+	tests := map[string]struct {
+		ref     func(*testing.T, *AdmissionLedger) AdmissionRef
+		cleanup func(*testing.T, *AdmissionLedger, AdmissionRef)
+	}{
+		"fabricated reference": {
+			ref: func(*testing.T, *AdmissionLedger) AdmissionRef {
+				return AdmissionRef{Slot: inputBodyRecordSlot + 1, Generation: 1}
+			},
+		},
+		"waiting reference": {
+			ref: func(t *testing.T, admission *AdmissionLedger) AdmissionRef {
+				t.Helper()
+				requested := admission.RequestOrdinary(
+					1,
+					AdmissionLaneRef{Slot: 1, Generation: 1},
+					1,
+				)
+				if requested.Rejected != nil {
+					t.Fatal(requested.Rejected)
+				}
+				return requested.Ref
+			},
+			cleanup: func(
+				t *testing.T,
+				admission *AdmissionLedger,
+				ref AdmissionRef,
+			) {
+				t.Helper()
+				if err := admission.CancelWaiting(ref); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		"stale reference": {
+			ref: func(t *testing.T, admission *AdmissionLedger) AdmissionRef {
+				t.Helper()
+				ref := grantLongLivedTestAdmission(t, admission, 0)
+				if _, err := admission.ReleaseOrdinary(ref); err != nil {
+					t.Fatal(err)
+				}
+				return ref
+			},
+		},
+		"already transferred reference": {
+			ref: func(t *testing.T, admission *AdmissionLedger) AdmissionRef {
+				t.Helper()
+				ref := grantLongLivedTestAdmission(t, admission, 1)
+				if err := admission.transferLongLived(ref, 1); err != nil {
+					t.Fatal(err)
+				}
+				return ref
+			},
+			cleanup: func(
+				t *testing.T,
+				admission *AdmissionLedger,
+				ref AdmissionRef,
+			) {
+				t.Helper()
+				if _, err := admission.releaseLongLived(ref, 1); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := admission.ReleaseOrdinary(ref); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			admission := NewAdmissionLedger()
+			supervisor := newLongLivedTestSupervisor(t)
+			plan, err := NewPipelineLongLivedPlan([]string{"provider"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ref := test.ref(t, admission)
+			if _, err := supervisor.IssueLongLivedPermit(
+				admission,
+				ref,
+				ResourceIdentity{ID: "pipeline", Generation: 1},
+				plan,
+			); err == nil {
+				t.Fatal("zero-charge Pipeline accepted invalid admission authority")
+			}
+			if test.cleanup != nil {
+				test.cleanup(t, admission, ref)
+			}
+			if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
+				t.Fatalf("failed issue retained lifecycle ownership: %+v", census)
+			}
+			if census := admission.Census(); census.ActiveRecords != 0 ||
+				census.OrdinaryBytes != 0 {
+				t.Fatalf("failed issue retained admission: %+v", census)
 			}
 		})
 	}
@@ -353,8 +489,8 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 	}
 
 	if census := admission.Census(); census.ActiveRecords != 0 ||
-		census.LongLivedRecords != jobs+1 ||
-		census.OrdinaryBytes != pipelinePlan.Bytes()+int64(jobs)*jobPlan.Bytes() {
+		census.LongLivedRecords != jobs ||
+		census.OrdinaryBytes != int64(jobs)*jobPlan.Bytes() {
 		t.Fatalf("separated admission census=%+v", census)
 	}
 	if census := supervisor.LongLivedCensus(); census.Active != jobs+1 {
@@ -553,7 +689,7 @@ func grantLongLivedTestAdmission(t *testing.T, ledger *AdmissionLedger, byteCoun
 	requested := ledger.RequestOrdinary(
 		1,
 		AdmissionLaneRef{Slot: 1, Generation: 1},
-		byteCount+TaskChildExecutionBytes,
+		byteCount+1,
 	)
 	if requested.Rejected != nil {
 		t.Fatal(requested.Rejected)

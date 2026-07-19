@@ -208,7 +208,7 @@ type handlerGeneration struct {
 	cleanupPending   bool
 	cleaned          bool
 	cleanupFailed    bool
-	executionCharged bool
+	retentionCharged bool
 }
 
 func (generation *handlerGeneration) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
@@ -483,7 +483,7 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 			generation = &handlerGeneration{
 				id: declaration.Generation.ID, handler: declaration.Generation.Handler,
 				cleanup:          declaration.Generation.Cleanup,
-				executionCharged: declaration.Generation.Cleanup != nil,
+				retentionCharged: declaration.Generation.Cleanup != nil,
 			}
 			generationByDeclaration[declaration.Generation] = generation
 		}
@@ -518,11 +518,11 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 	}
 	var cleanupBytes int64
 	for _, generation := range generationByDeclaration {
-		if generation.executionCharged {
+		if generation.retentionCharged {
 			if err := addStorageProduct(
 				&cleanupBytes,
 				1,
-				lifecycle.TaskChildExecutionBytes,
+				catalogGenerationRetentionBytes,
 			); err != nil {
 				return nil, err
 			}
@@ -1037,17 +1037,17 @@ func (catalog *Catalog) CompleteCleanup(ref jobmgr.FunctionCleanupRef, cleanupEr
 		generation.cleaned || generation.routeReferences != 0 || generation.invocationLeases != 0 {
 		return errors.New("jobmgr Function catalog: stale cleanup completion")
 	}
-	if !generation.executionCharged {
+	if !generation.retentionCharged {
 		return errors.New(
-			"jobmgr Function catalog: cleanup has no execution storage",
+			"jobmgr Function catalog: cleanup has no generation retention",
 		)
 	}
 	if err := catalog.storage.releaseCleanup(
-		lifecycle.TaskChildExecutionBytes,
+		catalogGenerationRetentionBytes,
 	); err != nil {
 		return err
 	}
-	generation.executionCharged = false
+	generation.retentionCharged = false
 	generation.cleanupPending = false
 	generation.cleaned = true
 	generation.cleanupFailed = cleanupErr != nil

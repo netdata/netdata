@@ -818,6 +818,29 @@ func (ledger *AdmissionLedger) transferLongLived(ref AdmissionRef, bytes int64) 
 	return nil
 }
 
+func (ledger *AdmissionLedger) validateChargeFreeLongLived(ref AdmissionRef) error {
+	if ledger == nil {
+		return errors.New(
+			"jobmgr admission: invalid charge-free long-lived authority",
+		)
+	}
+	ledger.mu.Lock()
+	defer ledger.mu.Unlock()
+	record, err := ledger.record(ref)
+	if err != nil {
+		return err
+	}
+	if record.state != admissionOrdinaryGranted ||
+		!record.ordinaryHeld ||
+		record.heldBytes <= 0 ||
+		record.longLivedBytes != 0 {
+		return errors.New(
+			"jobmgr admission: charge-free long-lived authority requires an untransferred granted record",
+		)
+	}
+	return nil
+}
+
 func (ledger *AdmissionLedger) releaseLongLived(ref AdmissionRef, bytes int64) (bool, error) {
 	if ledger == nil || !ref.Valid() || bytes <= 0 {
 		return false, errors.New("jobmgr admission: invalid long-lived release")

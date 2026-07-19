@@ -14,6 +14,8 @@ const (
 	MaximumCatalogStorageBytes = int64(
 		lifecycle.OrdinaryBudgetBytes - lifecycle.MaximumFunctionFrameBytes,
 	)
+	// Retired generations remain catalog-owned until cleanup acknowledgement.
+	catalogGenerationRetentionBytes = int64(4 * 1024)
 	// The node charge includes a conservative allowance for one individually
 	// allocated object's allocator metadata and alignment.
 	catalogNodeStorageBytes = int64(unsafe.Sizeof(catalogNode{})) + 16

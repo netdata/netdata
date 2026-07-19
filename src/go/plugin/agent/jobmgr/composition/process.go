@@ -61,8 +61,7 @@ type processCore struct {
 	started bool
 }
 
-const processAdmissionBytes = functionadapter.MaximumCatalogStorageBytes +
-	lifecycle.TaskChildExecutionBytes
+const processAdmissionBytes = functionadapter.MaximumCatalogStorageBytes
 
 func newProcessCore(config processCoreConfig) (*processCore, error) {
 	if config.Input == nil ||

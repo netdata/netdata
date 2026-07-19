@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
 const (
@@ -166,7 +165,7 @@ func (catalog *Catalog) NewMutation(
 		if err := addStorageProduct(
 			&cleanupStorageBytes,
 			1,
-			lifecycle.TaskChildExecutionBytes,
+			catalogGenerationRetentionBytes,
 		); err != nil {
 			return nil, err
 		}
@@ -532,7 +531,7 @@ func (builder *MutationBuilder) advanceOne() (bool, error) {
 				cleanupRef: jobmgr.FunctionCleanupRef{Slot: refSlot, Generation: 1},
 				id:         prepared.declaration.ID, handler: prepared.declaration.Handler,
 				cleanup:          prepared.declaration.Cleanup,
-				executionCharged: prepared.declaration.Cleanup != nil,
+				retentionCharged: prepared.declaration.Cleanup != nil,
 			}
 			prepared.initialized = true
 			builder.generation++
@@ -919,8 +918,8 @@ func (builder *MutationBuilder) Abort(cleanups *[jobmgr.MaximumFunctionCleanupBa
 			continue
 		}
 		generation := prepared.generation
-		if generation.executionCharged {
-			retainedCleanupBytes += lifecycle.TaskChildExecutionBytes
+		if generation.retentionCharged {
+			retainedCleanupBytes += catalogGenerationRetentionBytes
 		}
 		if generation.cleanupRef.Valid() {
 			builder.catalog.generations[generation.cleanupRef] = generation

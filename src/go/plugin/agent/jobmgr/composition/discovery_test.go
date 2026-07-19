@@ -127,6 +127,69 @@ func TestDiscoveryChildrenWaitForPublication(t *testing.T) {
 	}
 }
 
+func TestDiscoveryZeroChargePermitFailurePaths(t *testing.T) {
+	tests := map[string]struct {
+		fail func(*testing.T, *preparedDiscovery)
+	}{
+		"prepared disposal": {
+			fail: func(t *testing.T, prepared *preparedDiscovery) {
+				t.Helper()
+				if err := prepared.Dispose(context.Background()); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		"partial start": {
+			fail: func(t *testing.T, prepared *preparedDiscovery) {
+				t.Helper()
+				if err := prepared.tasks.SealInherited(); err != nil {
+					t.Fatal(err)
+				}
+				ready, err := prepared.AcceptStart(context.Background(), 1)
+				if err == nil || ready != nil {
+					t.Fatalf(
+						"sealed inherited registry accepted discovery start: ready=%T err=%v",
+						ready,
+						err,
+					)
+				}
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			prepared, admission, admissionRef := newPublicationTestDiscovery(
+				t,
+				publicationTestDiscoverer{},
+			)
+			test.fail(t, prepared)
+			if census := prepared.tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{}) {
+				t.Fatalf(
+					"failed discovery retained lifecycle ownership: %+v",
+					census,
+				)
+			}
+			if census := admission.Census(); census.ActiveRecords != 1 ||
+				census.OrdinaryGranted != 1 ||
+				census.OrdinaryBytes != 1 ||
+				census.LongLivedRecords != 0 ||
+				census.LongLivedBytes != 0 {
+				t.Fatalf(
+					"failed discovery changed charge-free admission: %+v",
+					census,
+				)
+			}
+			if _, err := admission.ReleaseOrdinary(admissionRef); err != nil {
+				t.Fatal(err)
+			}
+			if census := admission.Census(); census.ActiveRecords != 0 ||
+				census.OrdinaryBytes != 0 {
+				t.Fatalf("failed discovery retained admission: %+v", census)
+			}
+		})
+	}
+}
+
 func TestDiscoverySupervisorPanicFailsRun(t *testing.T) {
 	config := confgroup.Config{}.
 		SetName("job").
@@ -257,7 +320,6 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 	if census := generation.tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{
 		Active:         1,
 		Pipelines:      1,
-		Bytes:          3 * lifecycle.TaskChildExecutionBytes,
 		GActive:        2,
 		ExternalActive: 1,
 	}) {
@@ -322,7 +384,7 @@ func newPublicationTestDiscovery(
 	requested := admission.RequestOrdinary(
 		1,
 		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
-		plan.Bytes()+lifecycle.TaskChildExecutionBytes,
+		plan.Bytes()+1,
 	)
 	if requested.Rejected != nil {
 		t.Fatal(requested.Rejected)

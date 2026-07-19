@@ -107,7 +107,7 @@ var bmM002CaseRows = [...]ProductionCase{
 	{ID: "F24.12-b-catalog-loop-lookup", Suite: SuiteAgent, Proof: ProofComponent},
 	{ID: "F24.13-b-catalog-atomic-mutation", Suite: SuiteAgent, Proof: ProofComponent},
 	{ID: "F24.14-b-hotpath-envelope", Suite: SuiteAgent, Proof: ProofComponent},
-	{ID: "F24.15-b-cleanup-capacity-execution", Suite: SuiteAgent, Proof: ProofComponent},
+	{ID: "F24.15-b-cleanup-capacity-retention", Suite: SuiteAgent, Proof: ProofComponent},
 	{ID: "F24.16-b-shutdown-complexity", Suite: SuiteProcess, Proof: ProofComponent},
 	{ID: "F24.18-b-ready-lane-fairness", Suite: SuiteAgent, Proof: ProofComponent},
 	{ID: "F24.19-b-oldest-fitting-admission", Suite: SuiteAgent, Proof: ProofComponent},

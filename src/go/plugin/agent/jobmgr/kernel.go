@@ -237,9 +237,19 @@ type functionCleanupTask struct {
 	err error
 }
 
-type functionCleanupQueue struct {
-	plans []FunctionCleanupPlan
+// Fixed chunks keep each KernelLoop queue operation worst-case O(1).
+const functionCleanupChunkCapacity = 64
+
+type functionCleanupChunk struct {
+	plans [functionCleanupChunkCapacity]FunctionCleanupPlan
 	head  int
+	tail  int
+	next  *functionCleanupChunk
+}
+
+type functionCleanupQueue struct {
+	head  *functionCleanupChunk
+	tail  *functionCleanupChunk
 	count int
 }
 
@@ -250,15 +260,18 @@ func (queue *functionCleanupQueue) push(plan FunctionCleanupPlan) error {
 	if !plan.Ref.Valid() {
 		return nil
 	}
-	if queue.head > 0 &&
-		queue.head >= 64 &&
-		queue.head >= queue.count {
-		copy(queue.plans, queue.plans[queue.head:queue.head+queue.count])
-		clear(queue.plans[queue.count:])
-		queue.plans = queue.plans[:queue.count]
-		queue.head = 0
+	if queue.tail == nil ||
+		queue.tail.tail == functionCleanupChunkCapacity {
+		chunk := &functionCleanupChunk{}
+		if queue.tail == nil {
+			queue.head = chunk
+		} else {
+			queue.tail.next = chunk
+		}
+		queue.tail = chunk
 	}
-	queue.plans = append(queue.plans, plan)
+	queue.tail.plans[queue.tail.tail] = plan
+	queue.tail.tail++
 	queue.count++
 	return nil
 }
@@ -267,19 +280,23 @@ func (queue *functionCleanupQueue) front() FunctionCleanupPlan {
 	if queue.count == 0 {
 		return FunctionCleanupPlan{}
 	}
-	return queue.plans[queue.head]
+	return queue.head.plans[queue.head.head]
 }
 
 func (queue *functionCleanupQueue) pop() {
 	if queue.count == 0 {
 		return
 	}
-	queue.plans[queue.head] = FunctionCleanupPlan{}
-	queue.head++
+	chunk := queue.head
+	chunk.plans[chunk.head] = FunctionCleanupPlan{}
+	chunk.head++
 	queue.count--
-	if queue.count == 0 {
-		queue.plans = queue.plans[:0]
-		queue.head = 0
+	if chunk.head == chunk.tail {
+		queue.head = chunk.next
+		chunk.next = nil
+		if queue.head == nil {
+			queue.tail = nil
+		}
 	}
 }
 
@@ -4886,11 +4903,12 @@ func (kernel *CommandKernel) unlinkLane(lane *commandLane) {
 }
 
 const (
-	operationRecordAdmissionBytes = int64(512)
+	// This covers aggregate framework ownership for one ordinary operation.
+	operationFrameworkAdmissionBytes = int64(4_608)
 )
 
 func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
-	bytes := operationRecordAdmissionBytes + lifecycle.TaskChildExecutionBytes
+	bytes := operationFrameworkAdmissionBytes
 	if request.PayloadCapacity < 0 || request.PayloadCapacity > lifecycle.MaximumInputBodyBytes || request.PayloadCapacity > lifecycle.OrdinaryBudgetBytes-bytes {
 		return 0, errors.New("jobmgr kernel: input body does not self-fit admission")
 	}
@@ -4901,15 +4919,20 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 	bytes += plan.OwnedBytes
 	if plan.Resource != nil && plan.Resource.Action == ResourceInstall {
 		persistent := plan.Resource.Permit.Bytes()
-		if persistent <= 0 || persistent > lifecycle.OrdinaryBudgetBytes-bytes {
+		if !validPersistentAdmission(
+			plan.Resource.Permit,
+			lifecycle.OrdinaryBudgetBytes-bytes,
+		) {
 			return 0, errors.New("jobmgr kernel: long-lived resource does not self-fit admission")
 		}
 		bytes += persistent
 	}
 	if plan.Transaction != nil && plan.Transaction.AllocateSuccessor {
 		persistent := plan.Transaction.Permit.Bytes()
-		if persistent <= 0 ||
-			persistent > lifecycle.OrdinaryBudgetBytes-bytes {
+		if !validPersistentAdmission(
+			plan.Transaction.Permit,
+			lifecycle.OrdinaryBudgetBytes-bytes,
+		) {
 			return 0, errors.New(
 				"jobmgr kernel: transaction successor does not self-fit admission",
 			)
@@ -4918,7 +4941,10 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 	}
 	if plan.Capability != nil {
 		persistent := plan.Capability.Permit.Bytes()
-		if persistent <= 0 || persistent > lifecycle.OrdinaryBudgetBytes-bytes {
+		if !validPersistentAdmission(
+			plan.Capability.Permit,
+			lifecycle.OrdinaryBudgetBytes-bytes,
+		) {
 			return 0, errors.New("jobmgr kernel: long-lived capability does not self-fit admission")
 		}
 		bytes += persistent
@@ -4953,6 +4979,23 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 	}
 	bytes += authorityClaimEdges * authorityClaimEdgeAdmissionBytes
 	return bytes, nil
+}
+
+func validPersistentAdmission(
+	plan lifecycle.LongLivedPlan,
+	available int64,
+) bool {
+	if available < 0 {
+		return false
+	}
+	switch plan.Class() {
+	case lifecycle.LongLivedPipeline:
+		return plan.Bytes() == 0
+	case lifecycle.LongLivedJob, lifecycle.LongLivedSecretStore:
+		return plan.Bytes() > 0 && plan.Bytes() <= available
+	default:
+		return false
+	}
 }
 
 func AdmissionFootprint(request Request, plan WorkPlan) (int64, error) {

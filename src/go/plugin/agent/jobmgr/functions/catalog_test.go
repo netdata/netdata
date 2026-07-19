@@ -375,12 +375,11 @@ func TestFunctionCatalogDerivesSuccessorPermitFromInvocation(t *testing.T) {
 		wantBytes int64
 	}{
 		"payload sizes the permit": {
-			payload: []byte(`{"option":"value"}`),
-			wantBytes: int64(len(`{"option":"value"}`)) +
-				lifecycle.TaskChildExecutionBytes,
+			payload:   []byte(`{"option":"value"}`),
+			wantBytes: int64(len(`{"option":"value"}`)),
 		},
 		"empty payload retains minimum byte": {
-			wantBytes: 1 + lifecycle.TaskChildExecutionBytes,
+			wantBytes: 1,
 		},
 	}
 	for name, test := range tests {
@@ -1204,7 +1203,7 @@ func TestHandlerCleanupOnce(t *testing.T) {
 	}
 }
 
-func TestFunctionCatalogRetainsCleanupExecutionStorageUntilCompletion(
+func TestFunctionCatalogRetainsGenerationStorageUntilCleanupCompletion(
 	t *testing.T,
 ) {
 	const population = 9
@@ -1301,16 +1300,16 @@ func TestFunctionCatalogRetainsCleanupExecutionStorageUntilCompletion(
 					population,
 				)
 			}
-			wantExecutionBytes := int64(population) *
-				lifecycle.TaskChildExecutionBytes
+			wantRetentionBytes := int64(population) *
+				catalogGenerationRetentionBytes
 			if published := catalog.storage.published.Load(); published != 0 {
 				t.Fatalf("closed catalog retained %d published path bytes", published)
 			}
-			if total := catalog.storage.total.Load(); total != wantExecutionBytes {
+			if total := catalog.storage.total.Load(); total != wantRetentionBytes {
 				t.Fatalf(
 					"pending cleanup storage=%d, want %d",
 					total,
-					wantExecutionBytes,
+					wantRetentionBytes,
 				)
 			}
 			for _, cleanup := range cleanups[:count] {
@@ -1323,7 +1322,7 @@ func TestFunctionCatalogRetainsCleanupExecutionStorageUntilCompletion(
 	}
 }
 
-func TestFunctionCatalogAbortRetainsInitializedCleanupExecutionStorage(
+func TestFunctionCatalogAbortRetainsInitializedGenerationStorage(
 	t *testing.T,
 ) {
 	const (
@@ -1370,13 +1369,13 @@ func TestFunctionCatalogAbortRetainsInitializedCleanupExecutionStorage(
 	if count != initialized {
 		t.Fatalf("aborted initialized cleanup count=%d, want %d", count, initialized)
 	}
-	wantExecutionBytes := int64(initialized) *
-		lifecycle.TaskChildExecutionBytes
-	if total := catalog.storage.total.Load(); total != wantExecutionBytes {
+	wantRetentionBytes := int64(initialized) *
+		catalogGenerationRetentionBytes
+	if total := catalog.storage.total.Load(); total != wantRetentionBytes {
 		t.Fatalf(
 			"aborted cleanup storage=%d, want %d",
 			total,
-			wantExecutionBytes,
+			wantRetentionBytes,
 		)
 	}
 	for _, cleanup := range cleanups[:count] {
