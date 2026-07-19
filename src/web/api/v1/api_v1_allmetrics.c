@@ -127,6 +127,46 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
 
 // ----------------------------------------------------------------------------
 
+static void allmetrics_json_chart_begin(
+    BUFFER *wb,
+    bool prepend_comma,
+    const char *id,
+    const char *name,
+    const char *family,
+    const char *context,
+    const char *units,
+    int64_t last_updated) {
+    buffer_strcat(wb, prepend_comma ? ",\n\t\"" : "\n\t\"");
+    buffer_json_strcat(wb, id);
+    buffer_strcat(wb, "\": {\n\t\t\"name\":\"");
+    buffer_json_strcat(wb, name);
+    buffer_strcat(wb, "\",\n\t\t\"family\":\"");
+    buffer_json_strcat(wb, family);
+    buffer_strcat(wb, "\",\n\t\t\"context\":\"");
+    buffer_json_strcat(wb, context);
+    buffer_strcat(wb, "\",\n\t\t\"units\":\"");
+    buffer_json_strcat(wb, units);
+    buffer_sprintf(
+        wb,
+        "\",\n"
+        "\t\t\"last_updated\": %" PRId64 ",\n"
+        "\t\t\"dimensions\": {",
+        last_updated);
+}
+
+static void allmetrics_json_dimension_begin(
+    BUFFER *wb, bool prepend_comma, const char *id, const char *name) {
+    buffer_strcat(wb, prepend_comma ? ",\n\t\t\t\"" : "\n\t\t\t\"");
+    buffer_json_strcat(wb, id);
+    buffer_strcat(wb, "\": {\n\t\t\t\t\"name\": \"");
+    buffer_json_strcat(wb, name);
+    buffer_strcat(wb, "\",\n\t\t\t\t\"value\": ");
+}
+
+static void allmetrics_json_value(BUFFER *wb, NETDATA_DOUBLE value) {
+    buffer_print_netdata_double_fixed(wb, value);
+}
+
 void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_json();
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
@@ -143,17 +183,9 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
             continue;
 
         if(rrdset_is_available_for_viewers(st)) {
-            buffer_sprintf(
+            allmetrics_json_chart_begin(
                 wb,
-                "%s\n"
-                "\t\"%s\": {\n"
-                "\t\t\"name\":\"%s\",\n"
-                "\t\t\"family\":\"%s\",\n"
-                "\t\t\"context\":\"%s\",\n"
-                "\t\t\"units\":\"%s\",\n"
-                "\t\t\"last_updated\": %"PRId64",\n"
-                "\t\t\"dimensions\": {",
-                chart_counter ? "," : "",
+                chart_counter != 0,
                 rrdset_id(st),
                 rrdset_name(st),
                 rrdset_family(st),
@@ -168,20 +200,13 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
                 if(rd->collector.counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
-                    buffer_sprintf(
+                    allmetrics_json_dimension_begin(
                         wb,
-                        "%s\n"
-                        "\t\t\t\"%s\": {\n"
-                        "\t\t\t\t\"name\": \"%s\",\n"
-                        "\t\t\t\t\"value\": ",
-                        dimension_counter ? "," : "",
+                        dimension_counter != 0,
                         rrddim_id(rd),
                         rrddim_name(rd));
 
-                    if(isnan(rd->collector.last_stored_value))
-                        buffer_strcat(wb, "null");
-                    else
-                        buffer_sprintf(wb, NETDATA_DOUBLE_FORMAT, rd->collector.last_stored_value);
+                    allmetrics_json_value(wb, rd->collector.last_stored_value);
 
                     buffer_strcat(wb, "\n\t\t\t}");
 
@@ -197,6 +222,199 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
 
     buffer_strcat(wb, "\n}");
     simple_pattern_free(filter);
+}
+
+static int allmetrics_json_unittest_case(
+    const char *description,
+    const char *chart_id,
+    const char *chart_name,
+    const char *family,
+    const char *context,
+    const char *units,
+    const char *dimension_id,
+    const char *dimension_name,
+    const char *expected) {
+    int errors = 0;
+    BUFFER *wb = buffer_create(0, NULL);
+
+    buffer_strcat(wb, "{");
+    allmetrics_json_chart_begin(wb, false, chart_id, chart_name, family, context, units, 42);
+    allmetrics_json_dimension_begin(wb, false, dimension_id, dimension_name);
+    allmetrics_json_value(wb, 1.5);
+    buffer_strcat(wb, "\n\t\t\t}\n\t\t}\n\t}\n}");
+
+    if(strcmp(buffer_tostring(wb), expected) != 0) {
+        fprintf(stderr, "allmetrics JSON %s output mismatch\nexpected: %s\nactual:   %s\n",
+                description, expected, buffer_tostring(wb));
+        errors++;
+    }
+
+    json_object *root = json_tokener_parse(buffer_tostring(wb));
+    json_object *chart = NULL, *member = NULL, *dimensions = NULL, *dimension = NULL;
+    if(!root || !json_object_is_type(root, json_type_object) || json_object_object_length(root) != 1 ||
+       !json_object_object_get_ex(root, chart_id, &chart) || !json_object_is_type(chart, json_type_object) ||
+       json_object_object_length(chart) != 6 ||
+       !json_object_object_get_ex(chart, "name", &member) || strcmp(json_object_get_string(member), chart_name) != 0 ||
+       !json_object_object_get_ex(chart, "family", &member) || strcmp(json_object_get_string(member), family) != 0 ||
+       !json_object_object_get_ex(chart, "context", &member) || strcmp(json_object_get_string(member), context) != 0 ||
+       !json_object_object_get_ex(chart, "units", &member) || strcmp(json_object_get_string(member), units) != 0 ||
+       !json_object_object_get_ex(chart, "last_updated", &member) || json_object_get_int64(member) != 42 ||
+       !json_object_object_get_ex(chart, "dimensions", &dimensions) ||
+       !json_object_is_type(dimensions, json_type_object) || json_object_object_length(dimensions) != 1 ||
+       !json_object_object_get_ex(dimensions, dimension_id, &dimension) ||
+       !json_object_is_type(dimension, json_type_object) || json_object_object_length(dimension) != 2 ||
+       !json_object_object_get_ex(dimension, "name", &member) ||
+       strcmp(json_object_get_string(member), dimension_name) != 0 ||
+       !json_object_object_get_ex(dimension, "value", &member) || json_object_get_double(member) != 1.5) {
+        fprintf(stderr, "allmetrics JSON %s schema or value mismatch\n", description);
+        errors++;
+    }
+
+    if(root)
+        json_object_put(root);
+    buffer_free(wb);
+    return errors;
+}
+
+static int allmetrics_json_value_unittest_case(
+    const char *description, NETDATA_DOUBLE value, bool expect_null) {
+    int errors = 0;
+    BUFFER *actual = buffer_create(0, NULL);
+    BUFFER *expected = buffer_create(0, NULL);
+    BUFFER *document = buffer_create(0, NULL);
+
+    allmetrics_json_value(actual, value);
+    if(expect_null)
+        buffer_strcat(expected, "null");
+    else
+        buffer_sprintf(expected, NETDATA_DOUBLE_FORMAT, value);
+
+    if(strcmp(buffer_tostring(actual), buffer_tostring(expected)) != 0) {
+        fprintf(
+            stderr,
+            "allmetrics JSON %s numeric output mismatch\nexpected: %s\nactual:   %s\n",
+            description,
+            buffer_tostring(expected),
+            buffer_tostring(actual));
+        errors++;
+    }
+
+    buffer_sprintf(document, "{\"value\":%s}", buffer_tostring(actual));
+    json_object *root = json_tokener_parse(buffer_tostring(document));
+    json_object *member = NULL;
+    if(!root || !json_object_is_type(root, json_type_object) || json_object_object_length(root) != 1 ||
+       !json_object_object_get_ex(root, "value", &member)) {
+        fprintf(stderr, "allmetrics JSON %s numeric output is not valid JSON\n", description);
+        errors++;
+    }
+
+    if(root)
+        json_object_put(root);
+    buffer_free(document);
+    buffer_free(expected);
+    buffer_free(actual);
+    return errors;
+}
+
+int api_v1_allmetrics_json_unittest(void) {
+    int errors = 0;
+
+    errors += allmetrics_json_unittest_case(
+        "ordinary metadata",
+        "chart.id", "chart.name", "family", "context", "units", "dimension.id", "dimension.name",
+        "{\n"
+        "\t\"chart.id\": {\n"
+        "\t\t\"name\":\"chart.name\",\n"
+        "\t\t\"family\":\"family\",\n"
+        "\t\t\"context\":\"context\",\n"
+        "\t\t\"units\":\"units\",\n"
+        "\t\t\"last_updated\": 42,\n"
+        "\t\t\"dimensions\": {\n"
+        "\t\t\t\"dimension.id\": {\n"
+        "\t\t\t\t\"name\": \"dimension.name\",\n"
+        "\t\t\t\t\"value\": 1.5000000\n"
+        "\t\t\t}\n"
+        "\t\t}\n"
+        "\t}\n"
+        "}");
+
+    errors += allmetrics_json_unittest_case(
+        "hostile metadata",
+        "chart\"\\\x01 \xCE\xA9", "chart\"name", "family\\name", "context\nname", "units\tname",
+        "dimension\rkey", "dimension\bname \xCE\xA9",
+        "{\n"
+        "\t\"chart\\\"\\\\\\u0001 \xCE\xA9\": {\n"
+        "\t\t\"name\":\"chart\\\"name\",\n"
+        "\t\t\"family\":\"family\\\\name\",\n"
+        "\t\t\"context\":\"context\\nname\",\n"
+        "\t\t\"units\":\"units\\tname\",\n"
+        "\t\t\"last_updated\": 42,\n"
+        "\t\t\"dimensions\": {\n"
+        "\t\t\t\"dimension\\rkey\": {\n"
+        "\t\t\t\t\"name\": \"dimension\\bname \xCE\xA9\",\n"
+        "\t\t\t\t\"value\": 1.5000000\n"
+        "\t\t\t}\n"
+        "\t\t}\n"
+        "\t}\n"
+        "}");
+
+    BUFFER *wb = buffer_create(0, NULL);
+    allmetrics_json_chart_begin(wb, true, "chart", "name", "family", "context", "units", 42);
+    if(strcmp(
+           buffer_tostring(wb),
+           ",\n\t\"chart\": {\n"
+           "\t\t\"name\":\"name\",\n"
+           "\t\t\"family\":\"family\",\n"
+           "\t\t\"context\":\"context\",\n"
+           "\t\t\"units\":\"units\",\n"
+           "\t\t\"last_updated\": 42,\n"
+           "\t\t\"dimensions\": {") != 0) {
+        fprintf(stderr, "allmetrics JSON subsequent chart prefix mismatch\n");
+        errors++;
+    }
+
+    buffer_flush(wb);
+    allmetrics_json_dimension_begin(wb, true, "dimension", "name");
+    if(strcmp(
+           buffer_tostring(wb),
+           ",\n\t\t\t\"dimension\": {\n"
+           "\t\t\t\t\"name\": \"name\",\n"
+           "\t\t\t\t\"value\": ") != 0) {
+        fprintf(stderr, "allmetrics JSON subsequent dimension prefix mismatch\n");
+        errors++;
+    }
+    buffer_free(wb);
+
+#ifdef NETDATA_WITH_LONG_DOUBLE
+    const NETDATA_DOUBLE minimum_normal = LDBL_MIN;
+    const NETDATA_DOUBLE minimum_subnormal = nextafterl(0.0L, 1.0L);
+#else
+    const NETDATA_DOUBLE minimum_normal = DBL_MIN;
+    const NETDATA_DOUBLE minimum_subnormal = nextafter(0.0, 1.0);
+#endif
+    const struct {
+        const char *description;
+        NETDATA_DOUBLE value;
+        bool expect_null;
+    } number_cases[] = {
+        { "positive zero", 0.0, false },
+        { "negative zero", copysignndd(0.0, -1.0), false },
+        { "maximum finite", NETDATA_DOUBLE_MAX, false },
+        { "minimum finite", -NETDATA_DOUBLE_MAX, false },
+        { "minimum positive normal", minimum_normal, false },
+        { "minimum negative normal", -minimum_normal, false },
+        { "minimum positive subnormal", minimum_subnormal, false },
+        { "minimum negative subnormal", -minimum_subnormal, false },
+        { "NaN", NAN, true },
+        { "positive infinity", INFINITY, true },
+        { "negative infinity", -INFINITY, true },
+    };
+
+    for(size_t i = 0; i < _countof(number_cases); i++)
+        errors += allmetrics_json_value_unittest_case(
+            number_cases[i].description, number_cases[i].value, number_cases[i].expect_null);
+
+    return errors;
 }
 
 int api_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {

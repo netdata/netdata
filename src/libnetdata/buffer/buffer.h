@@ -693,6 +693,14 @@ static void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_overflow_check(wb);
 }
 
+ALWAYS_INLINE
+static void buffer_print_netdata_double_fixed(BUFFER *wb, NETDATA_DOUBLE value) {
+    if(unlikely(!netdata_double_isnumber(value)))
+        buffer_fast_strcat(wb, "null", 4);
+    else
+        buffer_sprintf(wb, NETDATA_DOUBLE_FORMAT, value);
+}
+
 #define DOUBLE_HEX_MAX_LENGTH ((sizeof(IEEE754_DOUBLE_HEX_PREFIX) - 1) + (sizeof(uint64_t) * 2) + 1)
 ALWAYS_INLINE
 static void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DOUBLE value) {

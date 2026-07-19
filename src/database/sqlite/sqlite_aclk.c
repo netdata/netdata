@@ -405,10 +405,8 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
     if (ok_to_send) {
         if (client)
             send_bin_msg(client, query);
-        else {
-            freez(query->data.bin_payload.payload);
+        else
             nd_log_daemon(NDLP_ERR, "No client to send message %u", query->type);
-        }
     }
 
     aclk_query_free(query);

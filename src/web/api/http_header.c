@@ -250,6 +250,26 @@ static void http_header_sec_websocket_protocol(struct web_client *w, const char 
     w->websocket.protocol = WEBSOCKET_PROTOCOL_2id(v);
 }
 
+static bool http_header_parse_websocket_window_bits(const char *value, uint8_t *window_bits) {
+    while(isspace((uint8_t)*value))
+        value++;
+
+    unsigned int parsed = 0;
+    while(*value >= '0' && *value <= '9') {
+        unsigned int digit = (unsigned int)(*value++ - '0');
+        if(parsed > (15U - digit) / 10U)
+            return false;
+
+        parsed = parsed * 10U + digit;
+    }
+
+    if(parsed < 8U)
+        return false;
+
+    *window_bits = (uint8_t)parsed;
+    return true;
+}
+
 static void http_header_sec_websocket_extensions(struct web_client *w, const char *v, size_t len __maybe_unused) {
     // Reset extension flags
     w->websocket.ext_flags = WS_EXTENSION_NONE;
@@ -266,9 +286,9 @@ static void http_header_sec_websocket_extensions(struct web_client *w, const cha
         while (token) {
             // Trim leading/trailing spaces
             char *ext = token;
-            while (*ext && isspace(*ext)) ext++;
+            while (*ext && isspace((uint8_t)*ext)) ext++;
             char *end = ext + strlen(ext) - 1;
-            while (end > ext && isspace(*end)) *end-- = '\0';
+            while (end > ext && isspace((uint8_t)*end)) *end-- = '\0';
 
             // Check if this is permessage-deflate extension
             if (strncmp(ext, "permessage-deflate", 18) == 0) {
@@ -284,9 +304,9 @@ static void http_header_sec_websocket_extensions(struct web_client *w, const cha
 
                     while (param) {
                         // Trim leading/trailing spaces
-                        while (*param && isspace(*param)) param++;
+                        while (*param && isspace((uint8_t)*param)) param++;
                         end = param + strlen(param) - 1;
-                        while (end > param && isspace(*end)) *end-- = '\0';
+                        while (end > param && isspace((uint8_t)*end)) *end-- = '\0';
 
                         // Client no context takeover
                         if (strcmp(param, "client_no_context_takeover") == 0)
@@ -298,8 +318,8 @@ static void http_header_sec_websocket_extensions(struct web_client *w, const cha
 
                         // Server max window bits
                         else if (strncmp(param, "server_max_window_bits=", 23) == 0) {
-                            w->websocket.server_max_window_bits = str2u(param + 23);
-                            if(w->websocket.server_max_window_bits >= 8 && w->websocket.server_max_window_bits <= 15)
+                            if(http_header_parse_websocket_window_bits(
+                                    param + 23, &w->websocket.server_max_window_bits))
                                 w->websocket.ext_flags |= WS_EXTENSION_SERVER_MAX_WINDOW_BITS;
                         }
                         // Server max window bits without value
@@ -310,8 +330,8 @@ static void http_header_sec_websocket_extensions(struct web_client *w, const cha
 
                         // Client max window bits with value
                         else if (strncmp(param, "client_max_window_bits=", 23) == 0) {
-                            w->websocket.client_max_window_bits = str2u(param + 23);
-                            if(w->websocket.client_max_window_bits >= 8 && w->websocket.client_max_window_bits <= 15)
+                            if(http_header_parse_websocket_window_bits(
+                                    param + 23, &w->websocket.client_max_window_bits))
                                 w->websocket.ext_flags |= WS_EXTENSION_CLIENT_MAX_WINDOW_BITS;
                         }
                         // Client max window bits without value

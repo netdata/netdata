@@ -28,7 +28,10 @@ static inline void stream_circular_buffer_stats_update_unsafe(STREAM_CIRCULAR_BU
     scb->stats.bytes_max_size = scb->cb->max_size;
     scb->stats.bytes_outstanding = cbuffer_next_unsafe(scb->cb, NULL);
     scb->stats.bytes_available = cbuffer_available_size_unsafe(scb->cb);
-    scb->stats.buffer_ratio = (double)(scb->cb->max_size -  scb->stats.bytes_available) * 100.0 / (double)scb->cb->max_size;
+    if(unlikely(!scb->cb->max_size))
+        scb->stats.buffer_ratio = 0.0;
+    else
+        scb->stats.buffer_ratio = (double)(scb->cb->max_size -  scb->stats.bytes_available) * 100.0 / (double)scb->cb->max_size;
 
     __atomic_store_n(&((scb)->atomic.buffer_ratio), (size_t)round(scb->stats.buffer_ratio), __ATOMIC_RELAXED);
 }

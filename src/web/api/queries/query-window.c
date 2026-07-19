@@ -23,7 +23,7 @@
 bool query_target_calculate_window(QUERY_TARGET *qt) {
     if (unlikely(!qt)) return false;
 
-    size_t points_requested = (long)qt->request.points;
+    size_t points_requested = qt->request.points;
     time_t after_requested = qt->request.after;
     time_t before_requested = qt->request.before;
     RRDR_TIME_GROUPING group_method = qt->request.time_group_method;

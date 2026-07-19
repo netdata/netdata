@@ -47,33 +47,51 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
             rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
         } else {
             rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
-            netdata_log_debug(
-                D_EXPORTING,
-                "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
-                rrdset_id(st),
-                rrdhost_hostname(host));
+#ifdef NETDATA_INTERNAL_CHECKS
+            if(unlikely(debug_flags & D_EXPORTING)) {
+                RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+                netdata_log_debug(
+                    D_EXPORTING,
+                    "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
+                    rrdset_id(st),
+                    string2str(identity.hostname));
+                rrdhost_identity_release(&identity);
+            }
+#endif
             return 0;
         }
     }
 
     if (unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
-        netdata_log_debug(
-            D_EXPORTING,
-            "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.",
-            rrdset_id(st),
-            rrdhost_hostname(host));
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_EXPORTING)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(
+                D_EXPORTING,
+                "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.",
+                rrdset_id(st),
+                string2str(identity.hostname));
+            rrdhost_identity_release(&identity);
+        }
+#endif
         return 0;
     }
 
     if (unlikely(
             st->rrd_memory_mode == RRD_DB_MODE_NONE &&
             !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
-        netdata_log_debug(
-            D_EXPORTING,
-            "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
-            rrdset_id(st),
-            rrdhost_hostname(host),
-            rrd_memory_mode_name(host->rrd_memory_mode));
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_EXPORTING)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(
+                D_EXPORTING,
+                "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
+                rrdset_id(st),
+                string2str(identity.hostname),
+                rrd_memory_mode_name(host->rrd_memory_mode));
+            rrdhost_identity_release(&identity);
+        }
+#endif
         return 0;
     }
 
@@ -241,7 +259,7 @@ inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int sh
     for (n = 1; *s && n < usable; d++, s++, n++) {
         register char c = *s;
 
-        if (!isalnum(c))
+        if (!isalnum((uint8_t)c))
             *d = '_';
         else
             *d = c;
@@ -514,7 +532,7 @@ static void generate_as_collected_from_metric(BUFFER *wb,
 
 static void prometheus_print_os_info(
     BUFFER *wb,
-    RRDHOST *host,
+    const char *hostname,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
     FILE *fp;
@@ -532,7 +550,7 @@ static void prometheus_print_os_info(
         return;
     }
 
-    buffer_sprintf(wb, "netdata_os_info{instance=\"%s\"", rrdhost_hostname(host));
+    buffer_sprintf(wb, "netdata_os_info{instance=\"%s\"", hostname);
 
     while (fgets(buf, BUFSIZ, fp)) {
       char *in, *sanitized;
@@ -846,10 +864,11 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     PROMETHEUS_OUTPUT_OPTIONS output_options,
     PROM_CONTEXT_OPTIONS_JudyLSet *context_options)
 {
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_label_copy(hostname, rrdhost_hostname(host), sizeof(hostname));
+    prometheus_label_copy(hostname, string2str(identity.hostname), sizeof(hostname));
 
     format_host_labels_prometheus(instance, host);
 
@@ -857,8 +876,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         wb,
         "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"",
         hostname,
-        rrdhost_program_name(host),
-        rrdhost_program_version(host));
+        string2str(identity.prog_name),
+        string2str(identity.prog_version));
 
     if (instance->labels_buffer && *buffer_tostring(instance->labels_buffer)) {
         buffer_sprintf(wb, ",%s", buffer_tostring(instance->labels_buffer));
@@ -878,7 +897,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         buffer_flush(instance->labels_buffer);
 
     if (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS)
-        prometheus_print_os_info(wb, host, output_options);
+        prometheus_print_os_info(wb, string2str(identity.hostname), output_options);
 
 
     BUFFER *plabels_buffer = buffer_create(0, NULL);
@@ -906,7 +925,10 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     // for each context
     if (!host->rrdctx.contexts) {
-        netdata_log_error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
+        netdata_log_error(
+            "%s(): request for host '%s' that does not have rrdcontexts initialized.",
+            __FUNCTION__,
+            string2str(identity.hostname));
         goto allmetrics_cleanup;
     }
 
@@ -916,6 +938,7 @@ allmetrics_cleanup:
     simple_pattern_free(filter);
     buffer_free(plabels_buffer);
     string_freez(opts.prometheus);
+    rrdhost_identity_release(&identity);
 }
 
 /**
