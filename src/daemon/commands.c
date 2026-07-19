@@ -420,7 +420,7 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
         send_node_update_with_wait(host, 0, 0);
 
         unregister_node(host->machine_guid);
-        host->node_id = UUID_ZERO;
+        rrdhost_node_id_set(host, NULL);
         buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been unregistered",
                        rrdhost_hostname(host), host->machine_guid);
         rrdhost_free___consume_metadata_lifetime_writelock(host);

@@ -477,6 +477,10 @@ int netdata_main(int argc, char **argv) {
                             if (exporting_graphite_unittest()) return 1;
                             if (exporting_opentsdb_http_unittest()) return 1;
                             if (exporting_opentsdb_telnet_unittest()) return 1;
+                            if (url_unittest()) return 1;
+                            if (web_client_request_target_unittest()) return 1;
+                            if (simple_pattern_index_unittest()) return 1;
+                            if (rrdhost_identity_index_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
                             if (log_stack_unittest()) return 1;
                             if (clocks_unittest()) return 1;
@@ -606,6 +610,19 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "ringbuffertest") == 0) {
                             unittest_running = true;
                             return ringbuffer_unittest();
+                        }
+                        else if(strcmp(optarg, "simplepatternindextest") == 0) {
+                            unittest_running = true;
+                            return simple_pattern_index_unittest();
+                        }
+                        else if(strcmp(optarg, "rrdhostidentityindextest") == 0) {
+                            unittest_running = true;
+                            return rrdhost_identity_index_unittest();
+                        }
+                        else if(strcmp(optarg, "webrequesttargettest") == 0) {
+                            unittest_running = true;
+                            if(url_unittest()) return 1;
+                            return web_client_request_target_unittest();
                         }
                         else if(strcmp(optarg, "wsclienttest") == 0) {
                             unittest_running = true;

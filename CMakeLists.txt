@@ -1085,6 +1085,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/simple_hashtable/simple_hashtable_undef.h
         src/libnetdata/simple_pattern/simple_pattern.c
         src/libnetdata/simple_pattern/simple_pattern.h
+        src/libnetdata/simple_pattern/simple_pattern_index.c
+        src/libnetdata/simple_pattern/simple_pattern_internals.h
         src/libnetdata/socket/socket.c
         src/libnetdata/socket/socket.h
         src/libnetdata/statistical/statistical.c

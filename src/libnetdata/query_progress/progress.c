@@ -179,10 +179,10 @@ static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, 
     qp->response_code = 0;
 
     if(query && *query && !buffer_strlen(qp->query))
-        buffer_strcat(qp->query, query);
+        buffer_content_summary(qp->query, query, strlen(query));
 
     if(payload && !buffer_strlen(qp->payload))
-        buffer_copy(qp->payload, payload);
+        buffer_content_summary(qp->payload, buffer_tostring(payload), buffer_strlen(payload));
 
     if(client && *client && !buffer_strlen(qp->client))
         buffer_strcat(qp->client, client);
@@ -618,6 +618,30 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 int progress_unittest(void) {
     enum { PROGRESS_UNITTEST_PERMANENT = 100 };
     nd_uuid_t valid[PROGRESS_UNITTEST_PERMANENT];
+    int errors = 0;
+
+    {
+        const size_t large_size = 1024 * 1024;
+        const size_t retained_capacity_limit = 64 * 1024;
+        nd_uuid_t transaction;
+        uuid_generate_random(transaction);
+        QUERY_PROGRESS *qp = query_progress_alloc(&transaction);
+        CLEAN_CHAR_P *large = mallocz(large_size + 1);
+        memset(large, 'x', large_size);
+        CLEAN_BUFFER *payload = buffer_create(large_size + 1, NULL);
+        buffer_strncat(payload, large, large_size);
+
+        query_progress_update(qp, 0, HTTP_REQUEST_MODE_GET, HTTP_ACL_ACLK, large, payload, "test");
+        if(buffer_strlen(qp->query) <= BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH ||
+           buffer_strlen(qp->payload) <= BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH ||
+           qp->query->size > retained_capacity_limit ||
+           qp->payload->size > retained_capacity_limit ||
+           !strstr(buffer_tostring(qp->query), "original_length=1048576") ||
+           !strstr(buffer_tostring(qp->payload), "original_length=1048576"))
+            errors++;
+
+        query_progress_free(qp);
+    }
 
     usec_t started = now_monotonic_usec();
 
@@ -651,5 +675,5 @@ int progress_unittest(void) {
     double d = (double)duration / USEC_PER_SEC;
     printf("hashtable ops: %0.2f / sec\n", (double)progress.hashtable.searches / d);
 
-    return 0;
+    return errors;
 }

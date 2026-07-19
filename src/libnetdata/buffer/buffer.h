@@ -40,6 +40,8 @@ typedef struct web_buffer_json_node {
 
 #define BUFFER_QUOTE_MAX_SIZE 7
 
+#define BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH (4 * 1024)
+
 typedef enum __attribute__ ((__packed__)) {
     WB_CONTENT_CACHEABLE = (1 << 0),
     WB_CONTENT_NO_CACHEABLE = (1 << 1),
@@ -128,6 +130,8 @@ void buffer_json_add_array_item_sprintf(BUFFER *wb, const char *fmt, ...) PRINTF
 void buffer_strcat_htmlescape(BUFFER *wb, const char *txt);
 
 void buffer_char_replace(BUFFER *wb, char from, char to);
+
+void buffer_content_summary(BUFFER *wb, const char *content, size_t content_length);
 
 void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit);
 

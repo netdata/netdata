@@ -1,18 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../libnetdata.h"
-
-struct simple_pattern {
-    const char *match;
-    uint32_t len;
-
-    SIMPLE_PREFIX_MODE mode;
-    bool negative;
-    bool case_sensitive;
-
-    struct simple_pattern *child;
-    struct simple_pattern *next;
-};
+#include "simple_pattern_internals.h"
 
 static struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE default_mode, size_t count) {
     if(unlikely(count >= 1000))

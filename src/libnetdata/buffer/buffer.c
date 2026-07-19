@@ -31,6 +31,22 @@ void buffer_char_replace(BUFFER *wb, char from, char to) {
     buffer_overflow_check(wb);
 }
 
+void buffer_content_summary(BUFFER *wb, const char *content, size_t content_length) {
+    buffer_flush(wb);
+
+    if(!content || !content_length)
+        return;
+
+    if(content_length <= BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH) {
+        buffer_contents_replace(wb, content, content_length);
+        return;
+    }
+
+    buffer_contents_replace(wb, content, BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH);
+    buffer_sprintf(wb, "... [truncated, original_length=%zu, xxh3=%016" PRIx64 "]",
+                   content_length, XXH3_64bits(content, content_length));
+}
+
 ALWAYS_INLINE void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit) {
     if(unlikely(flags == SN_EMPTY_SLOT)) {
         buffer_fast_strcat(wb, "E", 1);
@@ -598,6 +614,23 @@ int buffer_unittest(void) {
     buffer_double_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 9.12345678901234567890123456789e+45, "9.123456789012346128e+45");
     buffer_double_roundtrip(wb, NUMBER_ENCODING_HEX, 9.12345678901234567890123456789e+45, "%497991C25C9E4309");
     buffer_double_roundtrip(wb, NUMBER_ENCODING_BASE64, 9.12345678901234567890123456789e+45, "@El5kcJcnkMJ");
+
+    buffer_flush(wb);
+
+    {
+        char content[BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH + 2];
+        memset(content, 'x', sizeof(content));
+        buffer_content_summary(wb, content, sizeof(content));
+
+        char suffix[128];
+        snprintfz(suffix, sizeof(suffix), "... [truncated, original_length=%zu, xxh3=%016" PRIx64 "]",
+                  sizeof(content), XXH3_64bits(content, sizeof(content)));
+
+        if(buffer_strlen(wb) != BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH + strlen(suffix) ||
+           memcmp(buffer_tostring(wb), content, BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH) != 0 ||
+           strcmp(buffer_tostring(wb) + BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH, suffix) != 0)
+            errors++;
+    }
 
     buffer_flush(wb);
 

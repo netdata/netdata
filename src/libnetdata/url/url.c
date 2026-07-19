@@ -52,31 +52,7 @@ char *url_encode(const char *str) {
     return pbuf;
 }
 
-/**
- *  Percentage escape decode
- *
- *  Decode %XX character or return 0 if cannot
- *
- *  @param s the string to decode
- *
- *  @return The character decoded on success and 0 otherwise
- */
-char url_percent_escape_decode(const char *s) {
-    if(likely(s[1] && s[2]))
-        return (char)(((uint8_t)from_hex(s[1]) << 4) | (uint8_t)from_hex(s[2]));
-    return 0;
-}
-
-/**
- * Get byte length
- *
- * This (utf8 string related) should be moved in separate file in future
- *
- * @param c is the utf8 character
- *  *
- * @return It returns the length of the specific character.
- */
-char url_utf8_get_byte_length(char c) {
+static inline char url_utf8_get_byte_length(char c) {
     uint8_t byte = (uint8_t)c;
 
     if(!IS_UTF8_BYTE(byte))
@@ -93,45 +69,6 @@ char url_utf8_get_byte_length(char c) {
         return -1;
 
     return length;
-}
-
-/**
- * Decode Multibyte UTF8
- *
- * Decode % encoded UTF-8 characters and copy them to *d
- *
- * @param s first address
- * @param d
- * @param d_end last address
- *
- * @return count of bytes written to *d
- */
-char url_decode_multibyte_utf8(const char *s, char *d, const char *d_end) {
-    char first_byte = url_percent_escape_decode(s);
-
-    if(unlikely(!first_byte || !IS_UTF8_STARTBYTE(first_byte)))
-        return 0;
-
-    char byte_length = url_utf8_get_byte_length(first_byte);
-
-    if(unlikely(byte_length <= 0 || d+byte_length >= d_end))
-        return 0;
-
-    char to_read = byte_length;
-    while(to_read > 0) {
-        char c = url_percent_escape_decode(s);
-
-        if(unlikely( !IS_UTF8_BYTE(c) ))
-            return 0;
-        if((to_read != byte_length) && IS_UTF8_STARTBYTE(c)) 
-            return 0;
-
-        *d++ = c;
-        s+=3;
-        to_read--;
-    }
-
-    return byte_length;
 }
 
 /*
@@ -197,54 +134,145 @@ unsigned char *utf8_check(unsigned char *s)
     return NULL;
 }
 
-char *url_decode_r(char *to, const char *url, size_t size) {
-    if(unlikely(!size))
-        return NULL;
+static inline bool url_decode_percent_byte(const char *s, const char *end, uint8_t *byte) {
+    if(unlikely(end - s < 3 || s[0] != '%' || !isxdigit((uint8_t)s[1]) || !isxdigit((uint8_t)s[2])))
+        return false;
 
-    const char *s = url;     // source
-    char *d = to,            // destination
-         *e = &to[size - 1]; // destination end
+    *byte = ((uint8_t)from_hex(s[1]) << 4) | (uint8_t)from_hex(s[2]);
+    return true;
+}
 
-    while(*s && d < e) {
+URL_DECODE_STATUS url_decode_r_len(char *to, size_t size, const char *url, size_t url_length, size_t *decoded_length) {
+    if(decoded_length)
+        *decoded_length = 0;
+
+    if(unlikely(!to || !size))
+        return URL_DECODE_DESTINATION_TOO_SMALL;
+
+    if(unlikely(!url))
+        return URL_DECODE_MALFORMED;
+
+    const char *s = url;
+    const char *end = url + url_length;
+    char *d = to;
+    char *d_end = &to[size - 1];
+
+    while(s < end) {
         if(unlikely(*s == '%')) {
-            char t = url_percent_escape_decode(s);
-            if(IS_UTF8_BYTE(t)) {
-                char bytes_written = url_decode_multibyte_utf8(s, d, e);
-                if(likely(bytes_written)){
-                    d += bytes_written;
-                    s += (bytes_written * 3)-1;
-                }
-                else {
-                    goto fail_cleanup;
+            uint8_t first_byte;
+            if(unlikely(!url_decode_percent_byte(s, end, &first_byte) || !first_byte))
+                goto malformed;
+
+            if(IS_UTF8_BYTE(first_byte)) {
+                char byte_length = url_utf8_get_byte_length((char)first_byte);
+                if(unlikely(byte_length <= 0 || end - s < byte_length * 3))
+                    goto malformed;
+
+                if(unlikely(d_end - d < byte_length))
+                    goto too_small;
+
+                for(char i = 0; i < byte_length; i++) {
+                    uint8_t byte;
+                    if(unlikely(!url_decode_percent_byte(s, end, &byte) ||
+                                (i == 0 && !IS_UTF8_STARTBYTE(byte)) ||
+                                (i != 0 && (byte & 0xc0) != 0x80)))
+                        goto malformed;
+
+                    *d++ = (char)byte;
+                    s += 3;
                 }
             }
-            else if(likely(t) && isprint(t)) {
-                // avoid HTTP header injection
-                *d++ = t;
-                s += 2;
+            else {
+                if(unlikely(!isprint(first_byte)))
+                    goto malformed;
+
+                if(unlikely(d == d_end))
+                    goto too_small;
+
+                *d++ = (char)first_byte;
+                s += 3;
             }
-            else
-                goto fail_cleanup;
         }
-        else if(unlikely(*s == '+'))
-            *d++ = ' ';
+        else {
+            if(unlikely(!*s))
+                goto malformed;
 
-        else
-            *d++ = *s;
+            if(unlikely(d == d_end))
+                goto too_small;
 
-        s++;
+            *d++ = (*s == '+') ? ' ' : *s;
+            s++;
+        }
     }
 
     *d = '\0';
 
-    if(unlikely( utf8_check((unsigned  char *)to) )) //NULL means success here
+    if(unlikely(utf8_check((unsigned char *)to)))
+        goto malformed;
+
+    if(decoded_length)
+        *decoded_length = (size_t)(d - to);
+
+    return URL_DECODE_OK;
+
+too_small:
+    *d = '\0';
+    return URL_DECODE_DESTINATION_TOO_SMALL;
+
+malformed:
+    *d = '\0';
+    return URL_DECODE_MALFORMED;
+}
+
+char *url_decode_r(char *to, const char *url, size_t size) {
+    if(unlikely(!url || url_decode_r_len(to, size, url, strlen(url), NULL) != URL_DECODE_OK))
         return NULL;
 
     return to;
+}
 
-fail_cleanup:
-    *d = '\0';
-    return NULL;
+int url_unittest(void) {
+    int errors = 0;
+    char decoded[64];
+    size_t decoded_length = 0;
+
+    if(url_decode_r_len(decoded, 1, "", 0, &decoded_length) != URL_DECODE_OK ||
+       decoded_length != 0 || decoded[0] != '\0')
+        errors++;
+
+    if(url_decode_r_len(decoded, sizeof(decoded), "hello+world%21", 14, &decoded_length) != URL_DECODE_OK ||
+       decoded_length != 12 || strcmp(decoded, "hello world!") != 0)
+        errors++;
+
+    if(url_decode_r_len(decoded, sizeof(decoded), "%E2%82%AC", 9, &decoded_length) != URL_DECODE_OK ||
+       decoded_length != 3 || memcmp(decoded, "\xE2\x82\xAC", 3) != 0)
+        errors++;
+
+    static const char *malformed[] = { "%", "%GG", "%00", "%0A", "%80", "%C0%AF", "%F4%90%80%80" };
+    for(size_t i = 0; i < _countof(malformed); i++) {
+        if(url_decode_r_len(decoded, sizeof(decoded), malformed[i], strlen(malformed[i]), NULL) != URL_DECODE_MALFORMED)
+            errors++;
+    }
+
+    const char embedded_nul[] = { 'a', '\0', 'b' };
+    if(url_decode_r_len(decoded, sizeof(decoded), embedded_nul, sizeof(embedded_nul), NULL) != URL_DECODE_MALFORMED)
+        errors++;
+
+    const char invalid_utf8[] = { (char)0x80 };
+    if(url_decode_r_len(decoded, sizeof(decoded), invalid_utf8, sizeof(invalid_utf8), NULL) != URL_DECODE_MALFORMED)
+        errors++;
+
+    if(url_decode_r_len(decoded, 5, "abcd", 4, &decoded_length) != URL_DECODE_OK ||
+       decoded_length != 4 || strcmp(decoded, "abcd") != 0 ||
+       url_decode_r_len(decoded, 4, "abcd", 4, NULL) != URL_DECODE_DESTINATION_TOO_SMALL ||
+       url_decode_r_len(decoded, 2, "%41", 3, &decoded_length) != URL_DECODE_OK ||
+       decoded_length != 1 || strcmp(decoded, "A") != 0)
+        errors++;
+
+    if(errors)
+        fprintf(stderr, "URL: %d test(s) failed\n", errors);
+
+    return errors;
 }
 
 inline bool

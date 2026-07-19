@@ -335,10 +335,23 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     }
 
     web_client_timeout_checkpoint_set(w, 0);
-    web_client_decode_path_and_query_string(w, path);
-    path = (char *)buffer_tostring(w->url_path_decoded);
-
-    w->response.code = (short)web_client_api_request_with_node_selection(localhost, w, path);
+    size_t path_offset = (size_t)(path - request);
+    size_t path_length = path_offset < size ? strnlen(path, size - path_offset) : 0;
+    HTTP_VALIDATION validation = web_client_decode_path_and_query_string(w, path, path_length);
+    if(unlikely(validation != HTTP_VALIDATION_OK)) {
+        buffer_flush(w->response.data);
+        if(validation == HTTP_VALIDATION_URL_TOO_LONG) {
+            buffer_strcat(w->response.data, "Request target is too long.");
+        }
+        else {
+            buffer_strcat(w->response.data, "Malformed URL.");
+        }
+        w->response.code = http_validation_error_to_response_code(validation);
+    }
+    else {
+        path = (char *)buffer_tostring(w->url_path_decoded);
+        w->response.code = (short)web_client_api_request_with_node_selection(localhost, w, path);
+    }
     web_client_timeout_checkpoint_response_ready(w, NULL);
 
     size_t sent_bytes = 0;
