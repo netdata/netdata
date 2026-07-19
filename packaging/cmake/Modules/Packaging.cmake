@@ -58,6 +58,61 @@ set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Netdata Builder <bot@netdata.cloud>")
 
 #
+# RPM options
+#
+# The RPM configuration mirrors netdata.spec.in package for package; the spec
+# stays authoritative for the rpmbuild (v1 builder) path until CI flips to
+# this one.
+#
+
+set(CPACK_RPM_COMPONENT_INSTALL YES)
+set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
+
+# RPM forbids dashes in Version; the spec receives a pre-sanitized version
+# (nightly 2.10.0-809-nightly becomes 2.10.0.809.nightly).
+string(REPLACE "-" "." CPACK_RPM_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")
+set(CPACK_RPM_PACKAGE_RELEASE 1)
+set(CPACK_RPM_PACKAGE_RELEASE_DIST ON)
+
+set(CPACK_RPM_PACKAGE_LICENSE "GPLv3+")
+set(CPACK_RPM_PACKAGE_GROUP "Applications/System")
+set(CPACK_RPM_PACKAGE_URL "http://my-netdata.io")
+set(CPACK_RPM_CHANGELOG_FILE "${PKG_FILES_PATH}/rpm/changelog")
+
+# The spec disables all of __os_install_post (no stripping, no debuginfo
+# extraction, no brp scripts) and tolerates Go binaries without RPM build ids.
+set(CPACK_RPM_SPEC_MORE_DEFINE "%global __os_install_post %{nil}
+%global _missing_build_ids_terminate_build 0")
+
+# /usr/lib/netdata/system ships reference service files for many init systems;
+# the spec excludes them from automatic dependency scanning so their
+# interpreters do not become package requirements.
+set(CPACK_RPM_REQUIRES_EXCLUDE_FROM "^/usr/lib/netdata/system/.*$")
+
+# Shared system directories the packages must not claim ownership of, on top
+# of CPack's builtin list (/etc, /usr, /usr/lib, /usr/share, ...). The staged
+# custom-plugins.d and ssl dirs are unpackaged in the spec build and are
+# excluded for parity with it.
+set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
+    /etc/netdata
+    /etc/netdata/custom-plugins.d
+    /etc/netdata/ssl
+    /etc/logrotate.d
+    /usr/libexec
+    /usr/sbin
+    /usr/lib/systemd
+    /usr/lib/systemd/system
+    /usr/lib/systemd/system-preset
+    /usr/lib/systemd/journald@netdata.conf.d
+    /usr/lib/sysusers.d
+    /usr/lib/tmpfiles.d
+    /usr/share/netdata
+    /var
+    /var/cache
+    /var/lib
+    /var/log)
+
+#
 # netdata
 #
 
