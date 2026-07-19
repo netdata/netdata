@@ -143,6 +143,33 @@ set(CPACK_RPM_NETDATA_POST_UNINSTALL_SCRIPT_FILE
 set(CPACK_RPM_USER_POST_INSTALL_SCRIPT_FILE
     "${PKG_FILES_PATH}/rpm/user/${NETDATA_RPM_USER_POST}")
 
+# Dependency predicates mirroring the spec's user handling: on sysusers
+# platforms the account comes from the shipped sysusers file, elsewhere every
+# payload package needs netdata-user installed first.
+if(NETDATA_DISTRO_SUSE OR
+   (NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 10) OR
+   (NETDATA_DISTRO_FEDORA AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 43))
+  set(NETDATA_RPM_HAVE_SYSUSER TRUE)
+else()
+  set(NETDATA_RPM_HAVE_SYSUSER FALSE)
+endif()
+
+# rpm on EL 7 and Amazon Linux 2 has no weak dependencies; the spec turns the
+# load-bearing Recommends into hard Requires there and drops the Suggests.
+if((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7) OR
+   (NETDATA_DISTRO_AMZN AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 2))
+  set(NETDATA_RPM_HAVE_WEAK_DEPS FALSE)
+else()
+  set(NETDATA_RPM_HAVE_WEAK_DEPS TRUE)
+endif()
+
+set(NETDATA_RPM_VERSION "${CPACK_RPM_PACKAGE_VERSION}")
+if(NOT NETDATA_RPM_HAVE_SYSUSER)
+  set(NETDATA_RPM_USER_PREDEP "netdata-user >= ${NETDATA_RPM_VERSION}")
+else()
+  set(NETDATA_RPM_USER_PREDEP "")
+endif()
+
 #
 # netdata
 #
@@ -218,6 +245,92 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE Off)
 
+set(CPACK_RPM_NETDATA_PACKAGE_NAME "netdata")
+set(CPACK_RPM_NETDATA_PACKAGE_SUMMARY "Netdata - X-Ray Vision for your infrastructure!")
+set(CPACK_RPM_NETDATA_PACKAGE_OBSOLETES "netdata-conf, netdata-data, netdata-plugin-logs-management")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_NETDATA_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+
+# Mirrors the spec's main-package dependency block, quirks included: the
+# netdata-dashboard dependency is unversioned there.
+unset(_rpm_main_requires)
+unset(_rpm_main_recommends)
+unset(_rpm_main_suggests)
+
+if(ENABLE_DASHBOARD)
+  list(APPEND _rpm_main_requires "netdata-dashboard")
+endif()
+if(ENABLE_PLUGIN_EBPF)
+  list(APPEND _rpm_main_requires "netdata-plugin-ebpf = ${NETDATA_RPM_VERSION}")
+endif()
+if(ENABLE_PLUGIN_OTEL)
+  list(APPEND _rpm_main_requires "netdata-plugin-otel = ${NETDATA_RPM_VERSION}")
+endif()
+if(ENABLE_PLUGIN_APPS)
+  list(APPEND _rpm_main_requires "netdata-plugin-apps = ${NETDATA_RPM_VERSION}")
+endif()
+if(ENABLE_PLUGIN_PYTHON)
+  list(APPEND _rpm_main_requires "netdata-plugin-pythond = ${NETDATA_RPM_VERSION}")
+endif()
+if(ENABLE_PLUGIN_GO)
+  list(APPEND _rpm_main_requires "netdata-plugin-go = ${NETDATA_RPM_VERSION}")
+endif()
+if(ENABLE_PLUGIN_DEBUGFS)
+  list(APPEND _rpm_main_requires "netdata-plugin-debugfs = ${NETDATA_RPM_VERSION}")
+endif()
+if(ENABLE_PLUGIN_CHARTS)
+  list(APPEND _rpm_main_requires "netdata-plugin-chartsd = ${NETDATA_RPM_VERSION}")
+endif()
+if(ENABLE_PLUGIN_SLABINFO)
+  list(APPEND _rpm_main_requires "netdata-plugin-slabinfo = ${NETDATA_RPM_VERSION}")
+endif()
+if(ENABLE_PLUGIN_PERF)
+  list(APPEND _rpm_main_requires "netdata-plugin-perf = ${NETDATA_RPM_VERSION}")
+endif()
+if(ENABLE_PLUGIN_NFACCT)
+  list(APPEND _rpm_main_requires "netdata-plugin-nfacct = ${NETDATA_RPM_VERSION}")
+endif()
+
+if(NETDATA_RPM_HAVE_WEAK_DEPS)
+  if(ENABLE_PLUGIN_IBM)
+    list(APPEND _rpm_main_suggests "netdata-plugin-ibm = ${NETDATA_RPM_VERSION}")
+  endif()
+  if(ENABLE_PLUGIN_FREEIPMI)
+    list(APPEND _rpm_main_suggests "netdata-plugin-freeipmi = ${NETDATA_RPM_VERSION}")
+  endif()
+  if(ENABLE_PLUGIN_CUPS)
+    list(APPEND _rpm_main_suggests "netdata-plugin-cups = ${NETDATA_RPM_VERSION}")
+  endif()
+  if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
+    list(APPEND _rpm_main_recommends "netdata-plugin-systemd-journal = ${NETDATA_RPM_VERSION}")
+  endif()
+  if(ENABLE_PLUGIN_SYSTEMD_UNITS)
+    list(APPEND _rpm_main_recommends "netdata-plugin-systemd-units = ${NETDATA_RPM_VERSION}")
+  endif()
+  if(ENABLE_PLUGIN_NETWORK_VIEWER)
+    list(APPEND _rpm_main_recommends "netdata-plugin-network-viewer = ${NETDATA_RPM_VERSION}")
+  endif()
+  if(ENABLE_PLUGIN_SCRIPTS)
+    list(APPEND _rpm_main_recommends "netdata-plugin-scripts = ${NETDATA_RPM_VERSION}")
+  endif()
+else()
+  if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
+    list(APPEND _rpm_main_requires "netdata-plugin-systemd-journal = ${NETDATA_RPM_VERSION}")
+  endif()
+  if(ENABLE_PLUGIN_NETWORK_VIEWER)
+    list(APPEND _rpm_main_requires "netdata-plugin-network-viewer = ${NETDATA_RPM_VERSION}")
+  endif()
+endif()
+
+list(JOIN _rpm_main_requires ", " CPACK_RPM_NETDATA_PACKAGE_REQUIRES)
+if(_rpm_main_recommends)
+  list(JOIN _rpm_main_recommends ", " CPACK_RPM_NETDATA_PACKAGE_RECOMMENDS)
+endif()
+if(_rpm_main_suggests)
+  list(JOIN _rpm_main_suggests ", " CPACK_RPM_NETDATA_PACKAGE_SUGGESTS)
+endif()
+
 #
 # user
 #
@@ -235,6 +348,17 @@ set(CPACK_DEBIAN_USER_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_USER_DEBUGINFO_PACKAGE Off)
 
+set(CPACK_RPM_USER_PACKAGE_NAME "netdata-user")
+set(CPACK_RPM_USER_PACKAGE_SUMMARY "User and group accounts for the Netdata Agent")
+if(NETDATA_RPM_HAVE_SYSUSER)
+  set(CPACK_RPM_USER_PACKAGE_REQUIRES "systemd")
+  if(NETDATA_DISTRO_SUSE)
+    set(CPACK_RPM_USER_PACKAGE_PROVIDES "user(netdata), group(netdata)")
+  endif()
+else()
+  set(CPACK_RPM_USER_PACKAGE_REQUIRES "/usr/sbin/useradd, /usr/sbin/groupadd")
+endif()
+
 #
 # dashboard
 #
@@ -250,6 +374,14 @@ set(CPACK_DEBIAN_DASHBOARD_PACKAGE_CONFLICTS "netdata (<< ${CPACK_PACKAGE_VERSIO
 set(CPACK_DEBIAN_DASHBOARD_PACKAGE_PREDEPENDS "netdata-user")
 
 set(CPACK_DEBIAN_DASHBOARD_DEBUGINFO_PACKAGE Off)
+
+set(CPACK_RPM_DASHBOARD_PACKAGE_NAME "netdata-dashboard")
+set(CPACK_RPM_DASHBOARD_PACKAGE_SUMMARY "The local dashboard for the Netdata Agent")
+set(CPACK_RPM_DASHBOARD_PACKAGE_REQUIRES "netdata >= ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_DASHBOARD_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_DASHBOARD_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # apps.plugin
@@ -270,6 +402,14 @@ set(CPACK_DEBIAN_PLUGIN-APPS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-apps/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-APPS_DEBUGINFO_PACKAGE On)
+
+set(CPACK_RPM_PLUGIN-APPS_PACKAGE_NAME "netdata-plugin-apps")
+set(CPACK_RPM_PLUGIN-APPS_PACKAGE_SUMMARY "The per-application metrics collection plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-APPS_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-APPS_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-APPS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # charts.d.plugin
@@ -295,6 +435,17 @@ set(CPACK_DEBIAN_PLUGIN-CHARTSD_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_PLUGIN-CHARTSD_DEBUGINFO_PACKAGE Off)
 
+set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_NAME "netdata-plugin-chartsd")
+set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_SUMMARY "The charts.d metrics collection plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_REQUIRES "bash, netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_HAVE_WEAK_DEPS)
+  set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_SUGGESTS "apcupsd, iw, sudo")
+endif()
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+
 #
 # cups.plugin
 #
@@ -311,6 +462,13 @@ set(CPACK_DEBIAN_PLUGIN-CUPS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-cups/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-CUPS_DEBUGINFO_PACKAGE On)
+
+set(CPACK_RPM_PLUGIN-CUPS_PACKAGE_NAME "netdata-plugin-cups")
+set(CPACK_RPM_PLUGIN-CUPS_PACKAGE_SUMMARY "The CUPS metrics collection plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-CUPS_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-CUPS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # debugfs.plugin
@@ -330,6 +488,14 @@ set(CPACK_DEBIAN_PLUGIN-DEBUGFS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-debugfs/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-DEBUGFS_DEBUGINFO_PACKAGE On)
+
+set(CPACK_RPM_PLUGIN-DEBUGFS_PACKAGE_NAME "netdata-plugin-debugfs")
+set(CPACK_RPM_PLUGIN-DEBUGFS_PACKAGE_SUMMARY "The debugfs metrics collector for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-DEBUGFS_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-DEBUGFS_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-DEBUGFS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # ebpf.plugin
@@ -351,9 +517,20 @@ set(CPACK_DEBIAN_PLUGIN-EBPF_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-ebpf/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-EBPF_DEBUGINFO_PACKAGE On)
-if(ENABLE_PLUGIN_EBPF_GO)
-        set(CPACK_RPM_PLUGIN-EBPF_USER_FILELIST
-                "%{_libexecdir}/%{name}/plugins.d/ebpf-go.plugin")
+
+set(CPACK_RPM_PLUGIN-EBPF_PACKAGE_NAME "netdata-plugin-ebpf")
+set(CPACK_RPM_PLUGIN-EBPF_PACKAGE_SUMMARY "The eBPF metrics collection plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-EBPF_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-EBPF_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_HAVE_WEAK_DEPS)
+  set(CPACK_RPM_PLUGIN-EBPF_PACKAGE_RECOMMENDS
+      "netdata-plugin-apps = ${NETDATA_RPM_VERSION}, netdata-ebpf-legacy-code >= ${NETDATA_RPM_VERSION}")
+else()
+  string(APPEND CPACK_RPM_PLUGIN-EBPF_PACKAGE_REQUIRES
+         ", netdata-plugin-apps = ${NETDATA_RPM_VERSION}, netdata-ebpf-legacy-code >= ${NETDATA_RPM_VERSION}")
+endif()
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-EBPF_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
 
 #
@@ -379,6 +556,16 @@ set(CPACK_DEBIAN_EBPF-CODE-LEGACY_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_EBPF-CODE-LEGACY_DEBUGINFO_PACKAGE Off)
 
+# The RPM package name predates the DEB one and is reversed relative to it;
+# both are shipped public names and must stay as they are.
+set(CPACK_RPM_EBPF-CODE-LEGACY_PACKAGE_NAME "netdata-ebpf-legacy-code")
+set(CPACK_RPM_EBPF-CODE-LEGACY_PACKAGE_SUMMARY "Compiled eBPF legacy code for the Netdata eBPF plugin")
+set(CPACK_RPM_EBPF-CODE-LEGACY_PACKAGE_REQUIRES "netdata-plugin-ebpf = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_EBPF-CODE-LEGACY_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_EBPF-CODE-LEGACY_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+
 #
 # freeipmi.plugin
 #
@@ -397,6 +584,13 @@ set(CPACK_DEBIAN_PLUGIN-FREEIPMI_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-freeipmi/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-FREEIPMI_DEBUGINFO_PACKAGE On)
+
+set(CPACK_RPM_PLUGIN-FREEIPMI_PACKAGE_NAME "netdata-plugin-freeipmi")
+set(CPACK_RPM_PLUGIN-FREEIPMI_PACKAGE_SUMMARY "The FreeIPMI metrics collection plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-FREEIPMI_PACKAGE_REQUIRES "freeipmi, netdata = ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-FREEIPMI_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # go.plugin
@@ -421,6 +615,17 @@ set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 
+set(CPACK_RPM_PLUGIN-GO_PACKAGE_NAME "netdata-plugin-go")
+set(CPACK_RPM_PLUGIN-GO_PACKAGE_SUMMARY "The go.d metrics collection plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-GO_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-GO_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_HAVE_WEAK_DEPS)
+  set(CPACK_RPM_PLUGIN-GO_PACKAGE_SUGGESTS "nvme-cli, sudo")
+endif()
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-GO_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+
 #
 # scripts.d.plugin
 #
@@ -442,6 +647,14 @@ set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-scripts/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-SCRIPTS_DEBUGINFO_PACKAGE Off)
+
+set(CPACK_RPM_PLUGIN-SCRIPTS_PACKAGE_NAME "netdata-plugin-scripts")
+set(CPACK_RPM_PLUGIN-SCRIPTS_PACKAGE_SUMMARY "The scripts metrics collection plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-SCRIPTS_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-SCRIPTS_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-SCRIPTS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # ibm.plugin
@@ -467,6 +680,19 @@ set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_PLUGIN-IBM_DEBUGINFO_PACKAGE Off)
 
+set(CPACK_RPM_PLUGIN-IBM_PACKAGE_NAME "netdata-plugin-ibm")
+set(CPACK_RPM_PLUGIN-IBM_PACKAGE_SUMMARY "The IBM ecosystem metrics collection plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-IBM_PACKAGE_REQUIRES
+    "netdata = ${NETDATA_RPM_VERSION}, netdata-plugin-ibm-libs = ${NETDATA_RPM_VERSION}, unixODBC")
+set(CPACK_RPM_PLUGIN-IBM_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+# The vendored IBM MQ client must not generate automatic provides/requires.
+set(CPACK_RPM_PLUGIN-IBM_PACKAGE_AUTOREQPROV "no")
+if(NETDATA_RPM_HAVE_SYSUSER)
+  set(CPACK_RPM_PLUGIN-IBM_PACKAGE_REQUIRES_PRE "user(netdata), group(netdata)")
+elseif(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-IBM_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+
 set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_DESCRIPTION
 		"IBM MQ client libraries for the Netdata IBM ecosystem metrics collection plugin.
  This package provides the IBM MQ client libraries needed by Netdata IBM
@@ -479,6 +705,17 @@ set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_PACKAGE_PREDEPENDS "netdata-user")
 
 set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_DEBUGINFO_PACKAGE Off)
 set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_PACKAGE_SHLIBDEPS Off)
+
+set(CPACK_RPM_PLUGIN-IBM-LIBS_PACKAGE_NAME "netdata-plugin-ibm-libs")
+set(CPACK_RPM_PLUGIN-IBM-LIBS_PACKAGE_SUMMARY "IBM MQ client libraries for the Netdata IBM ecosystem metrics collection plugin.")
+set(CPACK_RPM_PLUGIN-IBM-LIBS_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-IBM-LIBS_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-IBM-LIBS_PACKAGE_AUTOREQPROV "no")
+if(NETDATA_RPM_HAVE_SYSUSER)
+  set(CPACK_RPM_PLUGIN-IBM-LIBS_PACKAGE_REQUIRES_PRE "user(netdata), group(netdata)")
+elseif(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-IBM-LIBS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # network-viewer.plugin
@@ -499,6 +736,22 @@ set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-network-viewer/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_DEBUGINFO_PACKAGE On)
+
+set(CPACK_RPM_PLUGIN-NETWORK-VIEWER_PACKAGE_NAME "netdata-plugin-network-viewer")
+set(CPACK_RPM_PLUGIN-NETWORK-VIEWER_PACKAGE_SUMMARY "The network viewer plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-NETWORK-VIEWER_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-NETWORK-VIEWER_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(ENABLE_PLUGIN_EBPF)
+  if(NETDATA_RPM_HAVE_WEAK_DEPS)
+    set(CPACK_RPM_PLUGIN-NETWORK-VIEWER_PACKAGE_RECOMMENDS "netdata-plugin-ebpf = ${NETDATA_RPM_VERSION}")
+  else()
+    string(APPEND CPACK_RPM_PLUGIN-NETWORK-VIEWER_PACKAGE_REQUIRES
+           ", netdata-plugin-ebpf = ${NETDATA_RPM_VERSION}")
+  endif()
+endif()
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-NETWORK-VIEWER_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # otel.plugin
@@ -522,6 +775,15 @@ set(CPACK_DEBIAN_PLUGIN-OTEL_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_PLUGIN-OTEL_DEBUGINFO_PACKAGE Off)
 
+set(CPACK_RPM_PLUGIN-OTEL_PACKAGE_NAME "netdata-plugin-otel")
+set(CPACK_RPM_PLUGIN-OTEL_PACKAGE_SUMMARY "The Open Telemetry plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-OTEL_PACKAGE_REQUIRES "netdata >= ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-OTEL_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-OTEL_PACKAGE_OBSOLETES "netdata-plugin-otel-signal-viewer")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-OTEL_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+
 #
 # netflow.plugin
 #
@@ -540,6 +802,14 @@ set(CPACK_DEBIAN_PLUGIN-NETFLOW_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-netflow/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-NETFLOW_DEBUGINFO_PACKAGE Off)
+
+set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_NAME "netdata-plugin-netflow")
+set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_SUMMARY "The NetFlow/IPFIX/sFlow flow analysis plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # nfacct.plugin
@@ -561,6 +831,14 @@ set(CPACK_DEBIAN_PLUGIN-NFACCT_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_PLUGIN-NFACCT_DEBUGINFO_PACKAGE On)
 
+set(CPACK_RPM_PLUGIN-NFACCT_PACKAGE_NAME "netdata-plugin-nfacct")
+set(CPACK_RPM_PLUGIN-NFACCT_PACKAGE_SUMMARY "The NFACCT metrics collection plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-NFACCT_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-NFACCT_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-NFACCT_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+
 #
 # perf.plugin
 #
@@ -580,6 +858,14 @@ set(CPACK_DEBIAN_PLUGIN-PERF_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-perf/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-PERF_DEBUGINFO_PACKAGE On)
+
+set(CPACK_RPM_PLUGIN-PERF_PACKAGE_NAME "netdata-plugin-perf")
+set(CPACK_RPM_PLUGIN-PERF_PACKAGE_SUMMARY "The perf metrics collector for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-PERF_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-PERF_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-PERF_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # pythond.plugin
@@ -605,6 +891,21 @@ set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_DEBUGINFO_PACKAGE Off)
 
+set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_NAME "netdata-plugin-pythond")
+set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_SUMMARY "The python.d metrics collection plugin for the Netdata Agent")
+if(NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS 8)
+  set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}, python")
+else()
+  set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}, python3")
+endif()
+set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_HAVE_WEAK_DEPS)
+  set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_SUGGESTS "sudo")
+endif()
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+
 #
 # slabinfo.plugin
 #
@@ -625,6 +926,14 @@ set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_PLUGIN-SLABINFO-DEBUGINFO_PACKAGE On)
 
+set(CPACK_RPM_PLUGIN-SLABINFO_PACKAGE_NAME "netdata-plugin-slabinfo")
+set(CPACK_RPM_PLUGIN-SLABINFO_PACKAGE_SUMMARY "The slabinfo metrics collector for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-SLABINFO_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-SLABINFO_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-SLABINFO_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+
 #
 # systemd-journal.plugin
 #
@@ -644,6 +953,14 @@ set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD-JOURNAL_DEBUGINFO_PACKAGE On)
 
+set(CPACK_RPM_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_NAME "netdata-plugin-systemd-journal")
+set(CPACK_RPM_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_SUMMARY "The systemd-journal plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+
 set(CPACK_COMPONENT_PLUGIN-JOURNAL-VIEWER_DESCRIPTION
 		"Transitional dummy package.
  This package simply ensures a clean upgrade to the renamed
@@ -653,6 +970,10 @@ set(CPACK_COMPONENT_PLUGIN-JOURNAL-VIEWER_DESCRIPTION
 set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_NAME "netdata-plugin-journal-viewer")
 set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-JOURNAL-VIEWER_DEPENDS "netdata-plugin-systemd-journal (= ${CPACK_PACKAGE_VERSION})")
+
+set(CPACK_RPM_PLUGIN-JOURNAL-VIEWER_PACKAGE_NAME "netdata-plugin-journal-viewer")
+set(CPACK_RPM_PLUGIN-JOURNAL-VIEWER_PACKAGE_SUMMARY "Transitional dummy package")
+set(CPACK_RPM_PLUGIN-JOURNAL-VIEWER_PACKAGE_REQUIRES "netdata-plugin-systemd-journal")
 
 #
 # systemd-units.plugin
@@ -671,6 +992,14 @@ set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-systemd-units/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD_UNITS_DEBUGINFO_PACKAGE On)
+
+set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_PACKAGE_NAME "netdata-plugin-systemd-units")
+set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_PACKAGE_SUMMARY "The systemd units plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # xenstat.plugin
@@ -691,6 +1020,17 @@ set(CPACK_DEBIAN_PLUGIN-XENSTAT_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/plugin-xenstat/postinst")
 
 set(CPACK_DEBIAN_PLUGIN-XENSTAT_DEBUGINFO_PACKAGE On)
+
+# The spec's xenstat gating is dead code (a typo makes it always disabled),
+# so no RPM ever ships this package today; the configuration exists for the
+# day ENABLE_PLUGIN_XENSTAT is turned on for RPM builds.
+set(CPACK_RPM_PLUGIN-XENSTAT_PACKAGE_NAME "netdata-plugin-xenstat")
+set(CPACK_RPM_PLUGIN-XENSTAT_PACKAGE_SUMMARY "The xenstat plugin for the Netdata Agent")
+set(CPACK_RPM_PLUGIN-XENSTAT_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
+set(CPACK_RPM_PLUGIN-XENSTAT_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
+if(NETDATA_RPM_USER_PREDEP)
+  set(CPACK_RPM_PLUGIN-XENSTAT_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
 
 #
 # CPack components
@@ -716,7 +1056,7 @@ endif()
 if(ENABLE_PLUGIN_EBPF)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-ebpf")
 endif()
-if(ENABLE_EBPF_LEGACY_PROGRAMS)
+if(ENABLE_LEGACY_EBPF_PROGRAMS)
         list(APPEND CPACK_COMPONENTS_ALL "ebpf-code-legacy")
 endif()
 if(ENABLE_PLUGIN_FREEIPMI)
