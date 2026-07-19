@@ -223,12 +223,21 @@ case "${PKG_TYPE}" in
         # CMakeLists.txt defaults an unset/empty CMAKE_BUILD_TYPE to
         # RelWithDebInfo for every configure — the spec's included — so both
         # paths build RelWithDebInfo either way.
-        CFLAGS="${CFLAGS:-$(rpm -E '%{?build_cflags}')}"
-        [ -n "${CFLAGS}" ] || CFLAGS="$(rpm -E '%{?optflags}')"
-        CXXFLAGS="${CXXFLAGS:-$(rpm -E '%{?build_cxxflags}')}"
-        [ -n "${CXXFLAGS}" ] || CXXFLAGS="${CFLAGS}"
-        LDFLAGS="${LDFLAGS:-$(rpm -E '%{?build_ldflags}')}"
-        export CFLAGS CXXFLAGS LDFLAGS
+        #
+        # EL 7 and Amazon Linux 2 are the exception: there the spec redefines
+        # %cmake to a bare /cmake/bin/cmake invocation (netdata.spec.in, the
+        # "%global __cmake" blocks), bypassing the distro macro and its flag
+        # exports entirely, so exporting %{optflags} here would over-harden
+        # the binaries relative to the spec build (extra fortified-symbol
+        # requires on every plugin).
+        if [ "${is_legacy_rpm}" = 0 ]; then
+            CFLAGS="${CFLAGS:-$(rpm -E '%{?build_cflags}')}"
+            [ -n "${CFLAGS}" ] || CFLAGS="$(rpm -E '%{?optflags}')"
+            CXXFLAGS="${CXXFLAGS:-$(rpm -E '%{?build_cxxflags}')}"
+            [ -n "${CXXFLAGS}" ] || CXXFLAGS="${CFLAGS}"
+            LDFLAGS="${LDFLAGS:-$(rpm -E '%{?build_ldflags}')}"
+            export CFLAGS CXXFLAGS LDFLAGS
+        fi
 
         # The distro %cmake macros also pass BUILD_SHARED_LIBS=ON, but the
         # top-level CMakeLists.txt unconditionally overwrites that variable
