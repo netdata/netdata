@@ -133,13 +133,13 @@ fn facet_field_spec_for_name(field: &'static str) -> Option<FacetFieldSpec> {
             FacetValueKind::IpAddr
         }
         "EXPORTER_PORT" | "ETYPE" | "SRC_PORT" | "DST_PORT" | "SRC_PORT_NAT" | "DST_PORT_NAT"
-        | "SRC_VLAN" | "DST_VLAN" | "IP_FRAGMENT_ID" | "IP_FRAGMENT_OFFSET" => {
-            FacetValueKind::DenseU16
-        }
+        | "SRC_VLAN" | "DST_VLAN" | "IP_FRAGMENT_OFFSET" => FacetValueKind::DenseU16,
         "PROTOCOL" | "FORWARDING_STATUS" | "DIRECTION" | "SRC_MASK" | "DST_MASK"
         | "IN_IF_BOUNDARY" | "OUT_IF_BOUNDARY" | "IPTTL" | "IPTOS" | "TCP_FLAGS"
         | "ICMPV4_TYPE" | "ICMPV4_CODE" | "ICMPV6_TYPE" | "ICMPV6_CODE" => FacetValueKind::DenseU8,
-        "SRC_AS" | "DST_AS" | "IN_IF" | "OUT_IF" | "IPV6_FLOW_LABEL" => FacetValueKind::SparseU32,
+        "SRC_AS" | "DST_AS" | "IN_IF" | "OUT_IF" | "IPV6_FLOW_LABEL" | "IP_FRAGMENT_ID" => {
+            FacetValueKind::SparseU32
+        }
         "IN_IF_SPEED" | "OUT_IF_SPEED" => FacetValueKind::SparseU64,
         _ => FacetValueKind::Text,
     };
@@ -167,7 +167,7 @@ fn facet_field_spec_for_name(field: &'static str) -> Option<FacetFieldSpec> {
 
 #[cfg(test)]
 mod tests {
-    use super::facet_field_spec;
+    use super::{FacetValueKind, facet_field_spec};
 
     #[test]
     fn facet_field_spec_trims_and_matches_case_insensitively() {
@@ -187,5 +187,13 @@ mod tests {
         assert!(facet_field_spec("FLOW_START_USEC").is_none());
         assert!(facet_field_spec("FLOW_END_USEC").is_none());
         assert!(facet_field_spec("OBSERVATION_TIME_MILLIS").is_none());
+    }
+
+    #[test]
+    fn fragment_id_uses_its_full_u32_width() {
+        assert_eq!(
+            facet_field_spec("IP_FRAGMENT_ID").map(|spec| spec.kind),
+            Some(FacetValueKind::SparseU32)
+        );
     }
 }

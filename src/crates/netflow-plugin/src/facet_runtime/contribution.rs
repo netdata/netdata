@@ -542,6 +542,7 @@ mod tests {
             dst_port: 443,
             ipttl: 64,
             ipv6_flow_label: 1234,
+            ip_fragment_id: 70_000,
             mpls_labels: "100-200".to_string(),
             ..FlowRecord::default()
         };
@@ -569,6 +570,11 @@ mod tests {
         assert_eq!(
             contribution_strings(&direct),
             contribution_strings(&encoded)
+        );
+        assert_eq!(
+            contribution_strings(&direct).get("IP_FRAGMENT_ID"),
+            Some(&vec!["70000".to_string()]),
+            "fragment IDs above u16::MAX must survive direct and encoded contribution paths"
         );
         assert_eq!(
             contribution_strings(&direct).get("PROTOCOL"),

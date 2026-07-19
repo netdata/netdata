@@ -33,7 +33,10 @@ pub(crate) use contribution::{
 use sidecar::{delete_sidecar_files, search_sidecar, sidecar_path, write_sidecar_files};
 use store::{FacetStore, FacetStoreValueRef, PersistedFacetStore};
 
-const FACET_STATE_VERSION: u32 = 5;
+// Version 6 invalidates state built with the old 16-bit IP_FRAGMENT_ID catalog.
+// Archived per-file contributions are not persisted, so retained journals must
+// be rescanned to reconstruct the global value set and its sidecars correctly.
+const FACET_STATE_VERSION: u32 = 6;
 const FACET_STATE_FILE_NAME: &str = "facet-state.bin";
 const FACET_STATE_MAGIC: &[u8; 4] = b"NFFS";
 const FACET_STATE_SCHEMA_VERSION: u32 = 1;
@@ -1321,6 +1324,10 @@ mod tests {
     use super::*;
     use crate::flow::FlowFields;
     use allocative::size_of_unique_allocated_data;
+    use journal_sdk_core::file::{JournalState, Mmap};
+    use journal_sdk_core::repository::File as JournalRepositoryFile;
+    use journal_sdk_core::{JournalFile, JournalFileOptions, JournalWriter};
+    use journal_sdk_registry::TimeRange;
     use std::sync::Arc;
     use std::sync::MutexGuard;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1355,6 +1362,63 @@ mod tests {
         let mut fields = FlowFields::new();
         fields.insert("PROTOCOL", protocol.to_string());
         fields
+    }
+
+    fn write_archived_fragment_journal(base_dir: &Path, fragment_ids: &[u32]) -> FileInfo {
+        let machine_dir = base_dir.join("11111111-1111-1111-1111-111111111111");
+        fs::create_dir_all(&machine_dir).expect("create journal machine directory");
+        let path = machine_dir.join(
+            "system@22222222222222222222222222222222-0000000000000001-00000000000f4240.journal",
+        );
+        let repository_file =
+            JournalRepositoryFile::from_path(&path).expect("parse archived journal path");
+        let test_uuid = |seed: u8| uuid::Uuid::from_bytes([seed; 16]);
+        let mut journal_file = JournalFile::create(
+            &repository_file,
+            JournalFileOptions::new(test_uuid(1), test_uuid(2), test_uuid(3)),
+        )
+        .expect("create archived fragment journal");
+        let mut writer = JournalWriter::new(&mut journal_file, 1, test_uuid(4))
+            .expect("create archived fragment journal writer");
+        let mut encoded = Vec::new();
+        let mut fields = Vec::new();
+
+        for (index, fragment_id) in fragment_ids.iter().copied().enumerate() {
+            let record = FlowRecord {
+                flow_version: "netflow9",
+                protocol: 17,
+                ip_fragment_id: fragment_id,
+                ..FlowRecord::default()
+            };
+            record.encode_to_journal_buf(&mut encoded, &mut fields);
+            let realtime_usec = 1_000_000 + index as u64;
+            let source_realtime = format!("_SOURCE_REALTIME_TIMESTAMP={realtime_usec}");
+            let mut payloads = fields
+                .iter()
+                .map(|field| &encoded[field.clone()])
+                .collect::<Vec<_>>();
+            payloads.push(source_realtime.as_bytes());
+            writer
+                .add_entry(
+                    &mut journal_file,
+                    &payloads,
+                    realtime_usec,
+                    1 + index as u64,
+                )
+                .expect("write archived fragment journal entry");
+        }
+        drop(writer);
+        journal_file.journal_header_mut().state = JournalState::Archived as u8;
+        journal_file
+            .sync()
+            .expect("sync archived fragment journal state");
+        drop(journal_file);
+
+        FileInfo {
+            file: journal_sdk_registry::repository::File::from_path(&path)
+                .expect("parse archived registry path"),
+            time_range: TimeRange::Unknown,
+        }
     }
 
     #[test]
@@ -1859,6 +1923,49 @@ mod tests {
     }
 
     #[test]
+    fn runtime_persists_full_width_fragment_id_to_state_and_sidecar() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let archived_path = tmp.path().join("flows-fragment-id.journal");
+        let active_path = tmp.path().join("flows-fragment-id-next.journal");
+        let record = FlowRecord {
+            ip_fragment_id: 70_000,
+            ..FlowRecord::default()
+        };
+
+        runtime
+            .observe_active_record(&archived_path, &record)
+            .expect("observe fragment ID");
+        runtime
+            .observe_rotation(&archived_path, &active_path)
+            .expect("rotate fragment ID journal");
+
+        let sidecar = sidecar_path(&archived_path, "IP_FRAGMENT_ID");
+        assert!(sidecar.exists(), "fragment ID sidecar must be written");
+        assert_eq!(
+            search_sidecar(
+                &archived_path,
+                "IP_FRAGMENT_ID",
+                "70000",
+                10,
+                AutocompleteMatchKind::Prefix,
+            )
+            .expect("search fragment ID sidecar"),
+            vec!["70000".to_string()]
+        );
+
+        let reloaded = FacetRuntime::new(tmp.path());
+        let field = reloaded
+            .snapshot()
+            .fields
+            .get("IP_FRAGMENT_ID")
+            .cloned()
+            .expect("reloaded fragment ID field");
+        assert_eq!(field.total_values, 1);
+        assert_eq!(field.values, vec!["70000".to_string()]);
+    }
+
+    #[test]
     fn runtime_preserves_zero_protocol_from_active_record_through_rotation() {
         let tmp = tempfile::tempdir().expect("create temp dir");
         let runtime = FacetRuntime::new(tmp.path());
@@ -1895,6 +2002,144 @@ mod tests {
                 .expect("archived protocol field")
                 .values,
             vec!["0".to_string()]
+        );
+    }
+
+    #[test]
+    fn runtime_rebuilds_legacy_fragment_facets_once() {
+        const LEGACY_FACET_STATE_VERSION: u32 = 5;
+
+        assert_eq!(
+            FACET_STATE_VERSION,
+            LEGACY_FACET_STATE_VERSION + 1,
+            "the fixture must represent the immediately preceding facet-state format"
+        );
+
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let file_info = write_archived_fragment_journal(tmp.path(), &[42, 70_000]);
+        let archived_journal =
+            JournalFile::<Mmap>::open(&file_info.file, FACET_CACHE_JOURNAL_WINDOW_SIZE)
+                .expect("open archived fragment journal");
+        assert_eq!(
+            archived_journal.journal_header_ref().state,
+            JournalState::Archived as u8,
+            "the upgrade fixture must exercise a genuinely archived journal"
+        );
+        drop(archived_journal);
+        let archived_path = file_info.file.path().to_string();
+        let state_path = tmp.path().join(FACET_STATE_FILE_NAME);
+        let legacy_state = PersistedFacetState {
+            version: LEGACY_FACET_STATE_VERSION,
+            indexed_archived_paths: BTreeSet::from([archived_path.clone()]),
+            archived_fields: BTreeMap::from([
+                (
+                    "IP_FRAGMENT_ID".to_string(),
+                    PersistedFacetStore::DenseU16(vec![42]),
+                ),
+                (
+                    "PROTOCOL".to_string(),
+                    PersistedFacetStore::DenseU8(vec![17]),
+                ),
+            ]),
+            published: BTreeMap::from([
+                (
+                    "IP_FRAGMENT_ID".to_string(),
+                    FacetPublishedField {
+                        total_values: 1,
+                        autocomplete: false,
+                        values: vec!["42".to_string()],
+                    },
+                ),
+                (
+                    "PROTOCOL".to_string(),
+                    FacetPublishedField {
+                        total_values: 1,
+                        autocomplete: false,
+                        values: vec!["17".to_string()],
+                    },
+                ),
+            ]),
+        };
+        persist_state_snapshot(
+            &state_path,
+            &encode_persisted_facet_state(&legacy_state).expect("encode legacy facet state"),
+        )
+        .expect("persist legacy facet state");
+
+        let first_start = FacetRuntime::new(tmp.path());
+        assert!(
+            !first_start.is_ready(),
+            "legacy state must not mark the corrected catalog ready"
+        );
+        let first_plan = first_start.build_reconcile_plan(std::slice::from_ref(&file_info));
+        assert_eq!(
+            first_plan.archived_files_to_scan.len(),
+            1,
+            "the retained journal marked indexed by v5 must be rescanned"
+        );
+        let contribution = scan_registry_file_contribution(&first_plan.archived_files_to_scan[0])
+            .expect("rescan retained fragment journal");
+        first_start
+            .apply_reconcile_plan(
+                first_plan,
+                BTreeMap::from([(archived_path.clone(), contribution)]),
+                BTreeMap::new(),
+            )
+            .expect("apply corrected facet rebuild");
+
+        let rebuilt = first_start.snapshot();
+        let fragment_ids = rebuilt
+            .fields
+            .get("IP_FRAGMENT_ID")
+            .expect("rebuilt fragment ID field");
+        assert_eq!(fragment_ids.total_values, 2);
+        assert_eq!(
+            fragment_ids.values,
+            vec!["42".to_string(), "70000".to_string()]
+        );
+        assert_eq!(
+            rebuilt
+                .fields
+                .get("PROTOCOL")
+                .expect("rebuilt protocol field")
+                .values,
+            vec!["17".to_string()],
+            "unaffected facets must be reconstructed from the same retained journal"
+        );
+        assert_eq!(
+            search_sidecar(
+                Path::new(&archived_path),
+                "IP_FRAGMENT_ID",
+                "",
+                10,
+                AutocompleteMatchKind::Prefix,
+            )
+            .expect("search rebuilt fragment sidecar"),
+            vec!["42".to_string(), "70000".to_string()]
+        );
+
+        let persisted = load_persisted_state(&state_path).expect("load rebuilt facet state");
+        assert_eq!(persisted.version, FACET_STATE_VERSION);
+        assert!(persisted.indexed_archived_paths.contains(&archived_path));
+        drop(first_start);
+
+        let second_start = FacetRuntime::new(tmp.path());
+        assert!(second_start.is_ready());
+        let second_plan = second_start.build_reconcile_plan(&[file_info]);
+        assert!(
+            second_plan.archived_files_to_scan.is_empty(),
+            "the upgraded state must not rescan the retained journal again"
+        );
+        assert!(second_plan.active_files_to_scan.is_empty());
+        assert!(!second_plan.rebuild_archived);
+        assert_eq!(
+            second_start
+                .snapshot()
+                .fields
+                .get("IP_FRAGMENT_ID")
+                .expect("reloaded fragment ID field")
+                .values,
+            vec!["42".to_string(), "70000".to_string()]
         );
     }
 
