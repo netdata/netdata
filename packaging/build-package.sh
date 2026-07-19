@@ -192,7 +192,9 @@ case "${PKG_TYPE}" in
             add_cmake_option ENABLE_EXPORTER_MONGODB On
         fi
 
-        if [ "${is_suse}" = 1 ] || { [ "${is_el}" = 1 ] && [ "${distro_major}" -le 7 ]; }; then
+        # openSUSE plus the EL7 era, Amazon Linux 2 included — the spec's
+        # condition remaps AL2's %rhel 7 into centos_ver.
+        if [ "${is_suse}" = 1 ] || [ "${is_legacy_rpm}" = 1 ]; then
             add_cmake_option ENABLE_BUNDLED_PROTOBUF On
         fi
 
@@ -210,7 +212,11 @@ case "${PKG_TYPE}" in
             add_cmake_option USE_LTO Off
         fi
 
-        if [ "${is_el}" = 1 ] && [ "${distro_major}" -le 7 ]; then
+        # The spec keys these on centos_ver < 8, which fires on Amazon
+        # Linux 2 too (it defines %rhel 7, remapped to centos_ver by the
+        # spec); modern libbpf does not compile against the AL2/EL7
+        # toolchain and kernel headers.
+        if [ "${is_legacy_rpm}" = 1 ]; then
             add_cmake_option USE_CXX_11 On
             add_cmake_option FORCE_LEGACY_LIBBPF On
         fi
