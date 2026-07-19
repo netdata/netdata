@@ -200,10 +200,13 @@ else()
   set(NETDATA_RPM_USER_PREDEP "")
 endif()
 
-# The spec gates the per-plugin Suggests on EL 7 only (Amazon Linux 2 keeps
-# them even though its main-package weak deps are downgraded), so this is
-# deliberately narrower than NOT NETDATA_RPM_HAVE_WEAK_DEPS.
-if(NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7)
+# The spec gates the per-plugin Suggests on centos_ver == 7, which covers
+# Amazon Linux 2 as well: AL2 defines %rhel 7 and the spec remaps that into
+# centos_ver. (AL2's rpm 4.11 drops Suggests tags at build time anyway, so
+# the emitted packages are identical either way; this keeps the predicate
+# aligned with the spec's actual semantics.)
+if((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7) OR
+   (NETDATA_DISTRO_AMZN AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 2))
   set(NETDATA_RPM_PLUGIN_SUGGESTS FALSE)
 else()
   set(NETDATA_RPM_PLUGIN_SUGGESTS TRUE)
@@ -1060,7 +1063,10 @@ set(CPACK_DEBIAN_PLUGIN-PYTHOND_DEBUGINFO_PACKAGE Off)
 
 set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_NAME "netdata-plugin-pythond")
 set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_SUMMARY "The python.d metrics collection plugin for the Netdata Agent")
-if(NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS 8)
+# python2 on the EL7 era: the spec's centos_ver == 7 test also covers
+# Amazon Linux 2 through its %rhel 7 remap.
+if((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS 8) OR
+   (NETDATA_DISTRO_AMZN AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 2))
   set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}, python")
 else()
   set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}, python3")
