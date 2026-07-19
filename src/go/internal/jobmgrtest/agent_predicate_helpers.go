@@ -642,7 +642,7 @@ func runAgentHeldFunctionPopulation(
 	}); err != nil {
 		return err
 	}
-	for index := 0; index < admitted; index++ {
+	for index := range admitted {
 		if err := writeFunctionCall(
 			fixture.input,
 			fmt.Sprintf("jobmgrtest-held-%03d", index),
@@ -674,7 +674,7 @@ func runAgentHeldFunctionPopulation(
 	if err != nil {
 		return err
 	}
-	for index := 0; index < admitted; index++ {
+	for index := range admitted {
 		uid := fmt.Sprintf("jobmgrtest-held-%03d", index)
 		if statuses[uid] != 200 {
 			return fmt.Errorf(
@@ -689,7 +689,7 @@ func runAgentHeldFunctionPopulation(
 
 func heldFunctionStatuses(output []byte) (map[string]int, error) {
 	statuses := make(map[string]int)
-	for _, line := range bytes.Split(output, []byte{'\n'}) {
+	for line := range bytes.SplitSeq(output, []byte{'\n'}) {
 		fields := bytes.Fields(line)
 		if len(fields) < 4 ||
 			string(fields[0]) != "FUNCTION_RESULT_BEGIN" ||

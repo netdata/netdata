@@ -1169,7 +1169,7 @@ func (al *AdmissionLedger) insertOrdinary(slot uint32) error {
 	record := &al.records[slot]
 	nodeIndex := uint32(1)
 	value := uint32(record.bytes)
-	for depth := 0; depth < admissionRadixBits; depth++ {
+	for depth := range admissionRadixBits {
 		bit := uint8((value >> uint(admissionRadixBits-1-depth)) & 1)
 		node := &al.nodes[nodeIndex]
 		child := node.children[bit]
@@ -1298,7 +1298,7 @@ func (al *AdmissionLedger) oldestFitting(available int64) (slot uint32, visited 
 	value := uint32(available)
 	nodeIndex := uint32(1)
 	visited = 1
-	for depth := 0; depth < admissionRadixBits; depth++ {
+	for depth := range admissionRadixBits {
 		node := &al.nodes[nodeIndex]
 		bit := uint8((value >> uint(admissionRadixBits-1-depth)) & 1)
 		if bit == 1 {

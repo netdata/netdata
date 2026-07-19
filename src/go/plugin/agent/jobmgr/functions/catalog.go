@@ -637,7 +637,7 @@ func validateResourceTransactionDeclaration(
 					"jobmgr Function catalog: invalid command claim",
 				)
 			}
-			for previous := 0; previous < claimIndex; previous++ {
+			for previous := range claimIndex {
 				if command.Claims[previous] == claim {
 					return errors.New(
 						"jobmgr Function catalog: duplicate command claim",
@@ -646,7 +646,7 @@ func validateResourceTransactionDeclaration(
 			}
 		}
 		hasSuccessor = hasSuccessor || command.AllocateSuccessor
-		for previous := 0; previous < index; previous++ {
+		for previous := range index {
 			if strings.EqualFold(
 				declaration.Commands[previous].Name,
 				command.Name,

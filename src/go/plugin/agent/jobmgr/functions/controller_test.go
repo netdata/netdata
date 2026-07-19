@@ -343,7 +343,7 @@ func (ctmp *controllerTestMutationPort) CommitFunctions(
 		if err != nil {
 			return 0, err
 		}
-		for index := 0; index < count; index++ {
+		for index := range count {
 			cleanup := cleanups[index]
 			_, cleanupErr := cleanup.Runner.RunTask(context.Background())
 			if err := ctmp.catalog.CompleteCleanup(cleanup.Ref, cleanupErr); err != nil {
@@ -371,7 +371,7 @@ func (ctmp *controllerTestMutationPort) AbortFunctions(
 	if err != nil {
 		return err
 	}
-	for index := 0; index < count; index++ {
+	for index := range count {
 		cleanup := cleanups[index]
 		_, cleanupErr := cleanup.Runner.RunTask(context.Background())
 		if err := ctmp.catalog.CompleteCleanup(cleanup.Ref, cleanupErr); err != nil {

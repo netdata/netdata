@@ -132,10 +132,10 @@ func testUIDGrowth(t *testing.T) {
 	ledger := NewUIDLedger()
 	const population = formerFixedUIDPopulation + 1
 	now := time.Unix(1, 0)
-	for index := 0; index < population; index++ {
+	for index := range population {
 		require.NoError(t, ledger.Admit(fmt.Sprintf("uid-%05d", index), now))
 	}
-	for index := 0; index < population; index++ {
+	for index := range population {
 		require.NoError(t, ledger.Complete(fmt.Sprintf("uid-%05d", index), false, now))
 	}
 }

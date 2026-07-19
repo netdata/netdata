@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -483,12 +484,7 @@ func (log *jobEventLog) snapshot() []string {
 }
 
 func (log *jobEventLog) contains(want string) bool {
-	for _, event := range log.snapshot() {
-		if event == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(log.snapshot(), want)
 }
 
 func (log *jobEventLog) waitFor(t *testing.T, want string) {

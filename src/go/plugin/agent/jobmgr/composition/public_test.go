@@ -62,7 +62,7 @@ func TestProductionProcessIsSingleUse(t *testing.T) {
 }
 
 func TestProductionProcessQuitHasOneCleanTerminalDisposition(t *testing.T) {
-	for iteration := 0; iteration < 32; iteration++ {
+	for range 32 {
 		process, err := NewProcess(testProductionProcessConfig(strings.NewReader("QUIT\n"), io.Discard))
 		require.NoError(t, err)
 

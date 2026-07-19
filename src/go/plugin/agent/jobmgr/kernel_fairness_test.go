@@ -30,7 +30,7 @@ func TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress(
 			return "cold"
 		},
 	)
-	for index := 0; index < hotLanePopulation; index++ {
+	for index := range hotLanePopulation {
 		request := Request{
 			UID:    fmt.Sprintf("hot-%02d", index),
 			Source: lifecycle.SourceFunction,
@@ -66,7 +66,7 @@ func TestKernelReadyLaneFairnessAtBoundaries(t *testing.T) {
 				lifecycle.SourceJobManager,
 				lifecycle.SourceFunction,
 			} {
-				for index := 0; index < population; index++ {
+				for index := range population {
 					uid := fmt.Sprintf("%d-%03d", sourceIndex, index)
 					generation, err := lifecycle.NewOperation(
 						lifecycle.OperationID(index+1),

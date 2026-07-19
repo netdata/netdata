@@ -165,7 +165,7 @@ func TestFunctionCatalogInvocationPopulationGrowsBeyondFormerLimit(t *testing.T)
 			require.NoError(t, err)
 			const population = 257
 			leases := make([]jobmgr.FunctionInvocationRef, 0, population)
-			for index := 0; index < population; index++ {
+			for index := range population {
 				decision, resolveErr := catalog.ResolveAndAcquire(test.lookup(index))
 				require.NoError(t, resolveErr)
 				require.False(t, decision.Rejected != 0 || !decision.Lease.Valid())
@@ -828,7 +828,7 @@ func TestRetiredRouteDrainDuringUnrelatedMutationDefersPhysicalPrune(t *testing.
 	}
 	count, err := catalog.commitMutation(unrelatedPostimage, &cleanups)
 	require.NoError(t, err)
-	for index := 0; index < count; index++ {
+	for index := range count {
 		runCleanupPlan(t, catalog, cleanups[index])
 	}
 	require.Nil(t, catalog.deferredPrune)
@@ -1088,7 +1088,7 @@ func TestFunctionCatalogBoundedMutationTurns(t *testing.T) {
 	run := func(t *testing.T, population int) result {
 		t.Helper()
 		declarations := make([]Declaration, 0, population)
-		for index := 0; index < population; index++ {
+		for index := range population {
 			name := fmt.Sprintf("unrelated-%03d", index)
 			declarations = append(declarations, testDeclaration(name, "", ResourcePolicy{}))
 		}
@@ -1258,7 +1258,7 @@ func TestCatalogRejectsPathStorageBeyondProcessBudgetBeforePublication(t *testin
 	tests := map[string]func() error{
 		"initial catalog": func() error {
 			var declarations []Declaration
-			for index := 0; index < 5; index++ {
+			for index := range 5 {
 				name := fmt.Sprintf("%d%s", index, strings.Repeat("n", maximumDeclarationMetadataBytes-1))
 				declarations = append(
 					declarations,
@@ -1274,7 +1274,7 @@ func TestCatalogRejectsPathStorageBeyondProcessBudgetBeforePublication(t *testin
 				return err
 			}
 			var changes []RouteChange
-			for index := 0; index < 3; index++ {
+			for index := range 3 {
 				name := fmt.Sprintf("%d%s", index, strings.Repeat("n", maximumDeclarationMetadataBytes-1))
 				declaration := testDeclaration(
 					name,
@@ -1324,12 +1324,12 @@ func TestCatalogPathStorageReturnsToPublishedPostimageAcrossChurn(t *testing.T) 
 		var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
 		count, err := catalog.commitMutation(postimage, &cleanups)
 		require.NoError(t, err)
-		for index := 0; index < count; index++ {
+		for index := range count {
 			runCleanupPlan(t, catalog, cleanups[index])
 		}
 	}
 
-	for iteration := 0; iteration < 8; iteration++ {
+	for range 8 {
 		declaration := testDeclaration(
 			publicName,
 			prefix,
@@ -1417,7 +1417,7 @@ func testGeneration(id string) *HandlerGenerationDeclaration {
 
 func testCleanupDeclarations(population int) []Declaration {
 	declarations := make([]Declaration, 0, population)
-	for index := 0; index < population; index++ {
+	for index := range population {
 		generation := testGeneration(fmt.Sprintf("cleanup-%02d", index))
 		generation.Cleanup = func(context.Context) error { return nil }
 		declarations = append(

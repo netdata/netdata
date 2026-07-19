@@ -40,7 +40,7 @@ func (tracker *setupTracker) Feed(payload []byte) (bool, error) {
 		}
 		frame := tracker.pending[:end]
 		tracker.pending = tracker.pending[end+2:]
-		for _, line := range bytes.Split(frame, []byte{'\n'}) {
+		for line := range bytes.SplitSeq(frame, []byte{'\n'}) {
 			if err := tracker.observeLine(string(line)); err != nil {
 				return false, err
 			}
@@ -80,11 +80,11 @@ func (tracker *setupTracker) observeLine(line string) error {
 	const functionPrefix = `FUNCTION GLOBAL "`
 	if strings.HasPrefix(line, functionPrefix) {
 		rest := line[len(functionPrefix):]
-		end := strings.IndexByte(rest, '"')
-		if end < 0 {
+		before, _, ok := strings.Cut(rest, "\"")
+		if !ok {
 			return errors.New("wire evaluator: malformed Function setup record")
 		}
-		name := rest[:end]
+		name := before
 		if strings.HasPrefix(name, "perf:work-") {
 			ordinal, err := setupOrdinal(name, "perf:work-")
 			if err != nil {
@@ -104,11 +104,11 @@ func (tracker *setupTracker) observeLine(line string) error {
 		return nil
 	}
 	rest := line[len(configPrefix):]
-	space := strings.IndexByte(rest, ' ')
-	if space < 0 {
+	before, after, ok := strings.Cut(rest, " ")
+	if !ok {
 		return nil
 	}
-	id := rest[:space]
+	id := before
 	const fixturePrefix = "poc:collector:perf:job-"
 	if !strings.HasPrefix(id, fixturePrefix) {
 		return nil
@@ -117,7 +117,7 @@ func (tracker *setupTracker) observeLine(line string) error {
 	if err != nil {
 		return err
 	}
-	action := rest[space+1:]
+	action := after
 	switch {
 	case strings.HasPrefix(action, "create accepted "):
 		if tracker.configCreated[ordinal] {

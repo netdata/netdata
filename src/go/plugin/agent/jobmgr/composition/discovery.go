@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"sync"
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
@@ -294,7 +295,6 @@ func (rd *readyDiscovery) start(ctx context.Context) error {
 	rd.supervisorRef = supervisorRef
 	<-supervisorReady
 	for _, name := range rd.providerNames {
-		name := name
 		providerReady := make(chan struct{})
 		ref, err := rd.tasks.StartInheritedWithPermitKey(
 			context.WithoutCancel(ctx),
@@ -400,9 +400,7 @@ func (rd *readyDiscovery) abortStart() error {
 		map[string]lifecycle.InheritedTaskRef,
 		len(rd.providerRefs),
 	)
-	for name, ref := range rd.providerRefs {
-		providerRefs[name] = ref
-	}
+	maps.Copy(providerRefs, rd.providerRefs)
 	externalActivated := rd.externalActivated
 	rd.mu.Unlock()
 
@@ -524,9 +522,7 @@ func (rd *readyDiscovery) Stop(ctx context.Context) error {
 		map[string]lifecycle.InheritedTaskRef,
 		len(rd.providerRefs),
 	)
-	for name, ref := range rd.providerRefs {
-		providerRefs[name] = ref
-	}
+	maps.Copy(providerRefs, rd.providerRefs)
 	rd.mu.Unlock()
 
 	cancelErr := cancelDiscoveryTasks(

@@ -126,7 +126,7 @@ func TestVNodeConfigBounds(t *testing.T) {
 	}{
 		"record count": {
 			prepare: func(configuration *VNodeConfiguration) error {
-				for index := 0; index < MaximumVNodeConfigurationRecords; index++ {
+				for index := range MaximumVNodeConfigurationRecords {
 					id := strconv.Itoa(index)
 					commitVNode(t, configuration, id, 0, testVNode(id, "source"))
 				}

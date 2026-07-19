@@ -32,7 +32,7 @@ func (*acknowledgedCommandPort) SubmitPreparedAndWait(
 var _ CommandPort = (*acknowledgedCommandPort)(nil)
 
 func TestCommandPortRequiresAcknowledgedPreparedSubmission(t *testing.T) {
-	portType := reflect.TypeOf((*CommandPort)(nil)).Elem()
+	portType := reflect.TypeFor[CommandPort]()
 	_, ok := portType.MethodByName("SubmitPreparedAndWait")
 	assert.True(t, ok)
 }

@@ -363,7 +363,7 @@ func buildValidRun(t *testing.T) RunObservation {
 		if err != nil {
 			t.Fatal(err)
 		}
-		raw := []byte(fmt.Sprintf("FUNCTION_RESULT_BEGIN %s %d %s 100\n", uid, want.Status, want.ContentType))
+		raw := fmt.Appendf(nil, "FUNCTION_RESULT_BEGIN %s %d %s 100\n", uid, want.Status, want.ContentType)
 		raw = append(raw, want.Deferred...)
 		raw = append(raw, []byte("FUNCTION_RESULT_END\n\n")...)
 		results, noise, err := decoder.Feed(raw, t0+10)

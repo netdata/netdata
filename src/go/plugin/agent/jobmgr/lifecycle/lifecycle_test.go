@@ -110,7 +110,7 @@ func TestAdmissionProcessBytesCanUnwindPristineConstruction(t *testing.T) {
 func TestAdmissionLongLivedTransferDetachesOperationRecords(t *testing.T) {
 	ledger := NewAdmissionLedger()
 	longLived := make([]AdmissionRef, 0, formerFixedPopulation)
-	for index := 0; index < formerFixedPopulation; index++ {
+	for index := range formerFixedPopulation {
 		lane := AdmissionLaneRef{Slot: uint32(index + 1), Generation: 1}
 		request := ledger.RequestOrdinary(1, lane, 2)
 		require.Nil(t, request.Rejected)
@@ -264,7 +264,7 @@ func TestAdmissionShutdownSettlesOnlyPendingInputBodyGrowth(t *testing.T) {
 func TestUIDLedgerAdmissionAndCloseWorkAreBatched(t *testing.T) {
 	now := time.Unix(2_000, 0)
 	uids := NewUIDLedger()
-	for index := 0; index < UIDReturnBatch+1; index++ {
+	for index := range UIDReturnBatch + 1 {
 		uid := fmt.Sprintf("u-%d", index)
 
 		require.NoError(t, uids.Admit(uid, now))
@@ -298,10 +298,10 @@ func TestUIDLedgerGrowsAndCloseWorkRemainsBatched(t *testing.T) {
 	now := time.Unix(3_000, 0)
 	uids := NewUIDLedger()
 	const population = formerFixedUIDPopulation + 1
-	for index := 0; index < population; index++ {
+	for index := range population {
 		require.NoError(t, uids.Admit(fmt.Sprintf("active-%d", index), now))
 	}
-	for index := 0; index < population; index++ {
+	for index := range population {
 		require.NoError(t, uids.Complete(fmt.Sprintf("active-%d", index), true, now))
 	}
 	wantBatches := (population + UIDReturnBatch - 1) / UIDReturnBatch

@@ -353,10 +353,7 @@ func (queue *outputQueue) push(payload []byte, readReturnMonoNS int64, writeActi
 	for len(payload) > 0 {
 		tail := (queue.head + queue.count) % outputQueueSlots
 		block := outputBlock{payload: make([]byte, 0, readBufferBytes), readReturnMonoNS: readReturnMonoNS}
-		count := len(payload)
-		if count > readBufferBytes {
-			count = readBufferBytes
-		}
+		count := min(len(payload), readBufferBytes)
 		block.payload = append(block.payload, payload[:count]...)
 		queue.blocks[tail] = block
 		queue.count++

@@ -109,7 +109,7 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 	})
 	require.NoError(t, err)
 	kernel, run, admission, uids := newExternalKernel(t, catalog)
-	for index := 0; index < calls; index++ {
+	for index := range calls {
 		if err := kernel.Submit(context.Background(), jobmgr.Request{
 			UID: fmt.Sprintf("same-route-%d", index), Source: lifecycle.SourceFunction,
 			Route: "direct",

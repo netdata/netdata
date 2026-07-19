@@ -138,7 +138,7 @@ func TestKernelTerminalRejectsWithoutRetainingSubmissions(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			kernel := newStoppedKernel(t)
-			for index := 0; index < externalSourceQueueDepth*4; index++ {
+			for index := range externalSourceQueueDepth * 4 {
 				err := test.call(context.Background(), kernel, index)
 				require.ErrorIs(t, err, ErrStopped)
 			}
@@ -987,7 +987,7 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 
 	stopRelease := make(chan struct{})
 	resources := make(map[string]*kernelTestReadyResource, population)
-	for index := 0; index < population; index++ {
+	for index := range population {
 		id := fmt.Sprintf("resource-%02d", index)
 		resources[id] = newKernelTestReadyResource(id, nil, stopRelease)
 	}
@@ -1087,12 +1087,12 @@ func TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta(t *testing.T) {
 			Slot: slot, Generation: 1,
 		}
 	}
-	for index := 0; index < genericPopulation; index++ {
+	for index := range genericPopulation {
 		enqueueCleanup(uint32(index + 1))
 	}
 
 	startKernelLoop(t, kernel)
-	for index := 0; index < genericPopulation; index++ {
+	for index := range genericPopulation {
 		select {
 		case <-genericEntered:
 		case <-time.After(time.Second):
@@ -1149,7 +1149,7 @@ func TestKernelAsyncEventServiceQuantumIsPhaseBalancedAndBounded(
 
 	kernel := newStoppedKernel(t)
 	kernel.cancel = make(chan string, population)
-	for index := 0; index < population; index++ {
+	for index := range population {
 		kernel.cancel <- fmt.Sprintf("unknown-cancel-%02d", index)
 	}
 
@@ -1186,7 +1186,7 @@ func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 		_ = kernel.Wait(waitCtx)
 	})
 	entered := make(chan string, population)
-	for index := 0; index < population; index++ {
+	for index := range population {
 		uid := fmt.Sprintf("shutdown-fence-%02d", index)
 		plan := WorkPlan{
 			NoResponse: true,
@@ -1219,7 +1219,7 @@ func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 
 	kernel.Stop()
 	startKernelLoop(t, kernel)
-	for index := 0; index < lifecycle.TaskStartServiceQuantum; index++ {
+	for index := range lifecycle.TaskStartServiceQuantum {
 		select {
 		case <-entered:
 		case <-time.After(time.Second):
@@ -1478,7 +1478,7 @@ func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "Kernel did not arm the deadline timer")
 	}
-	for index := 0; index < 32; index++ {
+	for index := range 32 {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		err := kernel.Cancel(ctx, fmt.Sprintf("absent-%d", index))
 		cancel()
@@ -2081,7 +2081,7 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 	startKernelLoop(t, kernel)
 	deadline := clock.Now().Add(time.Second)
 	terminals := make([]chan error, lifecycle.RetainedTimeoutFailStopThreshold)
-	for index := 0; index < lifecycle.RetainedTimeoutFailStopThreshold; index++ {
+	for index := range lifecycle.RetainedTimeoutFailStopThreshold {
 		terminals[index] = make(chan error, 1)
 		request := Request{
 			UID:    fmt.Sprintf("mixed-retained-%d", index),
@@ -2093,7 +2093,7 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 
 		require.NoError(t, kernel.submit(context.Background(), request, terminals[index]))
 	}
-	for index := 0; index < lifecycle.RetainedTimeoutFailStopThreshold; index++ {
+	for range lifecycle.RetainedTimeoutFailStopThreshold {
 		select {
 		case <-entered:
 		case <-time.After(time.Second):
@@ -2173,7 +2173,7 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 	startKernelLoop(t, kernel)
 	deadline := clock.Now().Add(time.Second)
 	terminals := make([]chan error, lifecycle.RetainedTimeoutFailStopThreshold)
-	for index := 0; index < lifecycle.RetainedTimeoutFailStopThreshold; index++ {
+	for index := range lifecycle.RetainedTimeoutFailStopThreshold {
 		id := fmt.Sprintf("job:background-%d", index)
 		terminals[index] = make(chan error, 1)
 
@@ -2183,7 +2183,7 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 		}, terminals[index]),
 		)
 	}
-	for index := 0; index < lifecycle.RetainedTimeoutFailStopThreshold; index++ {
+	for range lifecycle.RetainedTimeoutFailStopThreshold {
 		select {
 		case <-entered:
 		case <-time.After(time.Second):
@@ -3188,7 +3188,7 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 
 	require.NoError(t, run.OpenAdmission())
 
-	for index := 0; index < 9; index++ {
+	for index := range 9 {
 		request := Request{
 			UID:    fmt.Sprintf("claim-%d", index),
 			Source: lifecycle.SourceFunction,
@@ -3258,7 +3258,7 @@ func TestKernelSubmissionBacklogCannotStarveStop(t *testing.T) {
 
 	require.NoError(t, run.OpenAdmission())
 
-	for index := 0; index < externalSourceQueueDepth; index++ {
+	for index := range externalSourceQueueDepth {
 		request := Request{
 			UID:    fmt.Sprintf("backlog-%d", index),
 			Source: lifecycle.SourceFunction, Route: "route",
@@ -3298,7 +3298,7 @@ func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 
 	require.NoError(t, kernel.admit(request, plan, nil, nil, nil))
 
-	for index := 0; index < externalSourceQueueDepth; index++ {
+	for index := range externalSourceQueueDepth {
 		request := Request{
 			UID:    fmt.Sprintf("backlog-%d", index),
 			Source: lifecycle.SourceFunction, Route: "route",
@@ -3351,7 +3351,7 @@ func TestKernelPreAdmissionRejectionCommitsWithoutUIDOrAdmissionRecord(t *testin
 func TestKernelDeadlineServiceHasFixedQuantum(t *testing.T) {
 	kernel, _ := newKernel(t)
 	now := time.Now()
-	for index := 0; index < 9; index++ {
+	for index := range 9 {
 		id := lifecycle.OperationID(index + 1)
 		generation, err := lifecycle.NewOperation(id, fmt.Sprintf("u%d", index), lifecycle.SourceFunction, fmt.Sprintf("lane%d", index), true)
 		require.NoError(t, err)

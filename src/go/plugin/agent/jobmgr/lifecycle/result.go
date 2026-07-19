@@ -480,7 +480,7 @@ func validateReviewedYAML(body []byte) error {
 	if len(body) == 0 {
 		return errors.New("jobmgr Function result: empty reviewed YAML")
 	}
-	for _, line := range strings.Split(strings.ReplaceAll(string(body), "\r\n", "\n"), "\n") {
+	for line := range strings.SplitSeq(strings.ReplaceAll(string(body), "\r\n", "\n"), "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "FUNCTION_RESULT_END" {
 			return errors.New("jobmgr Function result: unsafe reviewed YAML")

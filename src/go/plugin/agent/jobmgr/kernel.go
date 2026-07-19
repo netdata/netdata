@@ -1094,10 +1094,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 			return
 		}
 		stopDeadline()
-		delay := deadline.Sub(ck.clock.Now())
-		if delay < 0 {
-			delay = 0
-		}
+		delay := max(deadline.Sub(ck.clock.Now()), 0)
 		if deadlineTimer != nil {
 			deadlineC = deadlineTimer.Arm(delay)
 			cancelDeadline = deadlineTimer.Stop
@@ -1325,7 +1322,7 @@ func (ck *CommandKernel) serviceClaimSettlements(quantum int) bool {
 
 func (ck *CommandKernel) serviceOneAsyncEvent() bool {
 	const sources = 4
-	for offset := 0; offset < sources; offset++ {
+	for offset := range sources {
 		source := (int(ck.nextAsyncEvent) + offset) % sources
 		switch source {
 		case 0:
@@ -4582,7 +4579,7 @@ func (ck *CommandKernel) pushFunctionCleanupBatch(cleanups *[MaximumFunctionClea
 	if cleanups == nil || count < 0 || count > len(cleanups) {
 		return errors.New("jobmgr kernel: invalid Function cleanup batch")
 	}
-	for index := 0; index < count; index++ {
+	for index := range count {
 		if err := ck.functionCleanupBacklog.push(cleanups[index]); err != nil {
 			return err
 		}

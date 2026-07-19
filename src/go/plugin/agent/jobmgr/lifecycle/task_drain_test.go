@@ -14,7 +14,7 @@ func TestDrainDependentTasksDoNotConsumeGlobalExecutionCapacity(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
 	drainRequests := make(map[TaskRequestRef]struct{}, TaskStartServiceQuantum+1)
-	for index := 0; index < TaskStartServiceQuantum+1; index++ {
+	for index := range TaskStartServiceQuantum + 1 {
 		resource := &recordingReadyResource{
 			identity: ResourceIdentity{
 				ID: "job", Generation: uint64(index + 1),

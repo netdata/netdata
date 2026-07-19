@@ -232,7 +232,7 @@ func validateOperation(run RunObservation, operation reducer.CompletedOperation,
 	if err != nil {
 		return err
 	}
-	wantNormalized := []byte(fmt.Sprintf("FUNCTION_RESULT_BEGIN %s %d %s @EXPIRY@\n", wantUID, wantResult.Status, wantResult.ContentType))
+	wantNormalized := fmt.Appendf(nil, "FUNCTION_RESULT_BEGIN %s %d %s @EXPIRY@\n", wantUID, wantResult.Status, wantResult.ContentType)
 	wantNormalized = append(wantNormalized, wantResult.Deferred...)
 	wantNormalized = append(wantNormalized, []byte("FUNCTION_RESULT_END\n\n")...)
 	if !bytes.Equal(normalized, wantNormalized) {

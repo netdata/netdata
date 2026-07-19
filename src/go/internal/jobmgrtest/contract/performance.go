@@ -116,7 +116,7 @@ func PerformanceRequest(class PerformanceClass, uid, key string) ([]byte, error)
 	default:
 		return nil, fmt.Errorf("unknown performance class %q", class)
 	}
-	return []byte(fmt.Sprintf("FUNCTION %s %d %q 0xFFFF %q\n", uid, timeout, call, "method=api,role=test")), nil
+	return fmt.Appendf(nil, "FUNCTION %s %d %q 0xFFFF %q\n", uid, timeout, call, "method=api,role=test"), nil
 }
 
 func PerformanceFollowup(class PerformanceClass, uid string) ([]byte, error) {

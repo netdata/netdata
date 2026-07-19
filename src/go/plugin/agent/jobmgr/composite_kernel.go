@@ -551,7 +551,7 @@ func (ck *CommandKernel) serviceCompositeFenceBlocked(
 	if !ck.compositeFenceRecheck || quantum <= 0 {
 		return false
 	}
-	for serviced := 0; serviced < quantum; serviced++ {
+	for range quantum {
 		operation := ck.compositeFenceHead
 		if operation == nil {
 			ck.compositeFenceRecheck = false

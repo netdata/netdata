@@ -157,7 +157,7 @@ func TestFunctionPublicationInitialSnapshotExceedsMutationQuantum(t *testing.T) 
 	require.NoError(t, err)
 	records := make([]PublicationRecord, 0, MaximumMutationPublicationChanges+3)
 	changes := make([]PublicationChange, 0, MaximumMutationPublicationChanges+3)
-	for index := 0; index < MaximumMutationPublicationChanges+3; index++ {
+	for index := range MaximumMutationPublicationChanges + 3 {
 		record := publicationRecord(fmt.Sprintf("work-%03d", index), 1)
 		records = append(records, record)
 		changes = append(
@@ -187,7 +187,7 @@ func TestFunctionPublicationMutationCannotExceedQuantum(t *testing.T) {
 	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, publicationDigest(t), 0, nil))
 
 	changes := make([]PublicationChange, 0, MaximumMutationPublicationChanges+1)
-	for index := 0; index < MaximumMutationPublicationChanges+1; index++ {
+	for index := range MaximumMutationPublicationChanges + 1 {
 		record := publicationRecord(fmt.Sprintf("work-%03d", index), 1)
 		changes = append(
 			changes,

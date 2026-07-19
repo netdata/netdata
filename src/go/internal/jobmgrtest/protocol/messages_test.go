@@ -67,8 +67,8 @@ func TestProtocolDTOsExposeNoEvaluationIdentity(t *testing.T) {
 		"workload": {}, "population": {}, "threshold": {},
 	}
 	for _, typ := range []reflect.Type{reflect.TypeFor[Control](), reflect.TypeFor[Ack](), reflect.TypeFor[Event]()} {
-		for index := range typ.NumField() {
-			name := strings.Split(typ.Field(index).Tag.Get("json"), ",")[0]
+		for field := range typ.Fields() {
+			name := strings.Split(field.Tag.Get("json"), ",")[0]
 			if _, exists := forbidden[name]; exists {
 				t.Fatalf("%s exposes evaluator-owned identity field %q", typ.Name(), name)
 			}

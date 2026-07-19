@@ -173,7 +173,7 @@ func TestDecisionIndexReconcilesOnlyChangedSourceRecords(t *testing.T) {
 		},
 	)
 	groups := make([]*confgroup.Group, 0, population)
-	for ordinal := 0; ordinal < population; ordinal++ {
+	for ordinal := range population {
 		source := fmt.Sprintf("source-%03d", ordinal)
 		groups = append(groups, &confgroup.Group{
 			Source: source,
@@ -218,7 +218,7 @@ func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
 		"many configs from one source": {
 			batch: func() []*confgroup.Group {
 				group := &confgroup.Group{Source: "source"}
-				for ordinal := 0; ordinal < population; ordinal++ {
+				for ordinal := range population {
 					group.Configs = append(
 						group.Configs,
 						decisionTestConfig(fmt.Sprintf("job-%d", ordinal), confgroup.TypeStock, "source"),
@@ -231,7 +231,7 @@ func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
 		"many independent sources": {
 			batch: func() []*confgroup.Group {
 				groups := make([]*confgroup.Group, 0, population)
-				for ordinal := 0; ordinal < population; ordinal++ {
+				for ordinal := range population {
 					source := fmt.Sprintf("source-%d", ordinal)
 					groups = append(groups, &confgroup.Group{
 						Source: source,

@@ -1217,7 +1217,7 @@ func runAgentFunctionBurst(ctx context.Context) error {
 		return err
 	}
 	const requests = 32
-	for index := 0; index < requests; index++ {
+	for index := range requests {
 		uid := fmt.Sprintf("jobmgrtest-burst-%02d", index)
 		line := fmt.Sprintf(
 			"FUNCTION %s 30 %q 0xFFFF %q\n",
@@ -1230,7 +1230,7 @@ func runAgentFunctionBurst(ctx context.Context) error {
 			return err
 		}
 	}
-	for index := 0; index < requests; index++ {
+	for index := range requests {
 		uid := fmt.Sprintf("jobmgrtest-burst-%02d", index)
 		if err := waitUntil(ctx, func() bool {
 			return fixture.output.contains(

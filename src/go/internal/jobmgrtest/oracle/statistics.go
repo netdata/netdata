@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"sort"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest/contract"
 )
@@ -50,7 +50,7 @@ func nearestRanks(samples []int64, percentiles ...int) ([]int64, error) {
 			return nil, fmt.Errorf("percentile %d outside 1..100", percentile)
 		}
 	}
-	sort.Slice(ordered, func(i, j int) bool { return ordered[i] < ordered[j] })
+	slices.Sort(ordered)
 	values := make([]int64, len(percentiles))
 	for index, percentile := range percentiles {
 		rank := (percentile*len(ordered) + 99) / 100

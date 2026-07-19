@@ -17,13 +17,11 @@ func TestEmitterSerializesConcurrentPassiveEvents(t *testing.T) {
 	const count = 32
 	var wait sync.WaitGroup
 	for range count {
-		wait.Add(1)
-		go func() {
-			defer wait.Done()
+		wait.Go(func() {
 			if err := emitter.Event(protocol.EventWriteAttempt, "u00000000000000000000000000000000", "writer", nil); err != nil {
 				t.Errorf("emit: %v", err)
 			}
-		}()
+		})
 	}
 	wait.Wait()
 	for sequence := uint64(1); sequence <= count; sequence++ {

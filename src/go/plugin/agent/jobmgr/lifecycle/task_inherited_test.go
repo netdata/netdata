@@ -128,7 +128,7 @@ func TestInheritedTasksGrowBeyondFormerDerivedLimit(t *testing.T) {
 	const population = 2*formerFixedPopulation + 1
 	supervisor := newResourceTaskSupervisor(t)
 	refs := make([]InheritedTaskRef, 0, population)
-	for index := 0; index < population; index++ {
+	for index := range population {
 		owner := ResourceIdentity{ID: "pipeline", Generation: uint64(index + 1)}
 		ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV1Runtime, func(ctx context.Context) error {
 			<-ctx.Done()

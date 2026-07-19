@@ -397,7 +397,7 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 		ResourceIdentity{ID: "discovery", Generation: 1},
 		pipelinePlan,
 	)
-	for index := 0; index < jobs; index++ {
+	for index := range jobs {
 		issue(
 			ResourceIdentity{
 				ID:         fmt.Sprintf("job-%03d", index),
@@ -458,7 +458,7 @@ func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T)
 		ResourceIdentity{ID: "secret-store", Generation: 1},
 		steadyPlan,
 	)
-	for index := 0; index < replacements; index++ {
+	for index := range replacements {
 		issue(
 			ResourceIdentity{
 				ID:         fmt.Sprintf("secret-store-replacement-%02d", index),

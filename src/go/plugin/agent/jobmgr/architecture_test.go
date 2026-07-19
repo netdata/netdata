@@ -1322,19 +1322,19 @@ func validateConstructionContract(
 }
 
 func TestWorkPlanCannotCarryKernelLoopAbandonCallback(t *testing.T) {
-	_, found := reflect.TypeOf(jobmgr.WorkPlan{}).FieldByName("Abandon")
+	_, found := reflect.TypeFor[jobmgr.WorkPlan]().FieldByName("Abandon")
 	require.False(t, found)
 }
 
 func TestCommandKernelUsesSourceSpecificPlanningPorts(t *testing.T) {
-	constructor := reflect.TypeOf(jobmgr.NewCommandKernel)
-	planner := reflect.TypeOf((*jobmgr.Planner)(nil)).Elem()
-	functionCatalog := reflect.TypeOf((*jobmgr.FunctionCatalogPort)(nil)).Elem()
+	constructor := reflect.ValueOf(jobmgr.NewCommandKernel).Type()
+	planner := reflect.TypeFor[jobmgr.Planner]()
+	functionCatalog := reflect.TypeFor[jobmgr.FunctionCatalogPort]()
 	require.False(t, constructor.NumIn() < 2 ||
 		constructor.In(constructor.NumIn()-2) != planner ||
 		constructor.In(constructor.NumIn()-1) != functionCatalog)
-	for index := 0; index < constructor.NumIn(); index++ {
-		require.NotEqualValues(t, reflect.Map, constructor.In(index).Kind())
+	for in := range constructor.Ins() {
+		require.NotEqualValues(t, reflect.Map, in.Kind())
 	}
 
 	data, err := os.ReadFile(filepath.Join(jobmgrSourceRoot(t), "kernel.go"))

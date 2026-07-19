@@ -698,7 +698,7 @@ func formatBoundedSecretNames(
 	}
 	var builder strings.Builder
 	builder.Grow(maximumSecretJobSummaryBytes)
-	for index := 0; index < count; index++ {
+	for index := range count {
 		value := name(index)
 		separatorBytes := 0
 		if builder.Len() != 0 {

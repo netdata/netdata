@@ -608,7 +608,7 @@ func verifyNamedGates(
 
 func parseGoTestList(output string) map[string]struct{} {
 	listed := make(map[string]struct{})
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 0 {
 			continue

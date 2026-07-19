@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"maps"
 	"sync"
 	"testing"
 	"time"
@@ -86,9 +87,7 @@ func (rms *runMetricsService) snapshot() (
 	components := append([]runtimecomp.ComponentConfig(nil), rms.components...)
 	componentRemovals := append([]string(nil), rms.componentRemovals...)
 	producers := make(map[string]func() error, len(rms.producers))
-	for name, producer := range rms.producers {
-		producers[name] = producer
-	}
+	maps.Copy(producers, rms.producers)
 	producerRemovals := append([]string(nil), rms.producerRemovals...)
 	return components, componentRemovals, producers, producerRemovals
 }

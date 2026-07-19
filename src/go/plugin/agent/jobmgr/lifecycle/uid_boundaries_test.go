@@ -135,7 +135,7 @@ func seedUIDTombstones(
 	now time.Time,
 ) {
 	t.Helper()
-	for index := 0; index < count; index++ {
+	for index := range count {
 		uid := fmt.Sprintf("uid-%05d", index)
 
 		require.NoError(t, ledger.Admit(uid, now))
