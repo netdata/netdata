@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -19,6 +20,95 @@ type compositeTestTransaction struct {
 		context.Context,
 		CompositeCommandScope,
 	) error
+}
+
+func compositeTestPlan(
+	id string,
+	claims []string,
+	onApply func(),
+) WorkPlan {
+	return WorkPlan{
+		Claims:     claims,
+		NoResponse: true,
+		Transaction: &ResourceTransactionPlan{
+			ID: id,
+			Prepare: func(
+				context.Context,
+				lifecycle.ReadyResource,
+				lifecycle.ResourceTransactionScope,
+				lifecycle.LongLivedPermit,
+			) (lifecycle.PreparedResourceTransaction, error) {
+				return &simpleCompositeChildTransaction{
+					scope: lifecycle.ResourceTransactionScope{ID: id},
+					apply: onApply,
+				}, nil
+			},
+		},
+	}
+}
+
+func compositeParentTestPlan(
+	id string,
+	claims []string,
+	apply func(context.Context, CompositeCommandScope) error,
+) WorkPlan {
+	return WorkPlan{
+		Claims:     claims,
+		NoResponse: true,
+		Transaction: &ResourceTransactionPlan{
+			ID: id,
+			PrepareComposite: func(
+				_ context.Context,
+				_ lifecycle.ReadyResource,
+				scope lifecycle.ResourceTransactionScope,
+				_ lifecycle.LongLivedPermit,
+			) (PreparedCompositeResourceTransaction, error) {
+				return &compositeTestTransaction{
+					scope: scope,
+					apply: apply,
+				}, nil
+			},
+		},
+	}
+}
+
+func stopCompositeTestKernel(
+	t *testing.T,
+	kernel *CommandKernel,
+) {
+	t.Helper()
+	kernel.Stop()
+	waitCtx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancel()
+	if err := kernel.Wait(waitCtx); err != nil &&
+		!errors.Is(err, ErrStopped) {
+		t.Fatal(err)
+	}
+}
+
+func waitForCompositeRecords(
+	t *testing.T,
+	admission *lifecycle.AdmissionLedger,
+	count int,
+) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for {
+		if census := admission.Census(); census.ActiveRecords >= count {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf(
+				"active admission records did not reach %d: %+v",
+				count,
+				admission.Census(),
+			)
+		}
+		time.Sleep(time.Millisecond)
+	}
 }
 
 func (transaction *compositeTestTransaction) Scope() lifecycle.ResourceTransactionScope {
@@ -254,4 +344,378 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 		!errors.Is(err, ErrStopped) {
 		t.Fatal(err)
 	}
+}
+
+func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
+	kernel, run, _, _, _ := newKernelWithPlanner(
+		t,
+		stoppedKernelPlanner{},
+	)
+	startKernelLoop(t, kernel)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+
+	childErr := make(chan error, 1)
+	parentPlan := compositeParentTestPlan(
+		"parent",
+		[]string{"graph"},
+		func(
+			ctx context.Context,
+			commands CompositeCommandScope,
+		) error {
+			childErr <- commands.SubmitPreparedAndWait(
+				ctx,
+				Request{
+					UID:     "same-lane-child",
+					LaneKey: "parent",
+					Source:  lifecycle.SourceJobManager,
+					Route:   "internal/test/same-lane-child",
+				},
+				compositeTestPlan(
+					"parent",
+					[]string{"graph"},
+					nil,
+				),
+			)
+			return nil
+		},
+	)
+	parentDone := make(chan error, 1)
+	go func() {
+		parentDone <- kernel.SubmitPreparedAndWait(
+			t.Context(),
+			Request{
+				UID:     "same-lane-parent",
+				LaneKey: "parent",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test/same-lane-parent",
+			},
+			parentPlan,
+		)
+	}()
+
+	select {
+	case err := <-childErr:
+		if err == nil ||
+			!strings.Contains(err.Error(), "active parent lane") {
+			t.Fatalf("same-lane child error=%v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("same-lane child was not rejected promptly")
+	}
+	select {
+	case err := <-parentDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("parent did not complete after same-lane rejection")
+	}
+	if err := run.DirtyCause(); err != nil {
+		t.Fatalf("same-lane rejection dirtied run: %v", err)
+	}
+	stopCompositeTestKernel(t, kernel)
+}
+
+func TestCompositeChildPreservesRunnableTargetLaneFIFO(
+	t *testing.T,
+) {
+	kernel, run, admission, _, _ := newKernelWithPlanner(
+		t,
+		stoppedKernelPlanner{},
+	)
+	startKernelLoop(t, kernel)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+
+	var mu sync.Mutex
+	var applied []string
+	blockerEntered := make(chan struct{})
+	blockerRelease := make(chan struct{})
+	blockerDone := make(chan error, 1)
+	go func() {
+		blockerDone <- kernel.SubmitPreparedAndWait(
+			t.Context(),
+			Request{
+				UID:     "fifo-blocker",
+				LaneKey: "job",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test/fifo-blocker",
+			},
+			compositeTestPlan("job", nil, func() {
+				close(blockerEntered)
+				<-blockerRelease
+			}),
+		)
+	}()
+	select {
+	case <-blockerEntered:
+	case <-time.After(time.Second):
+		t.Fatal("target-lane blocker did not start")
+	}
+
+	parentEntered := make(chan struct{})
+	submitChild := make(chan struct{})
+	parentDone := make(chan error, 1)
+	go func() {
+		parentDone <- kernel.SubmitPreparedAndWait(
+			t.Context(),
+			Request{
+				UID:     "fifo-parent",
+				LaneKey: "parent",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test/fifo-parent",
+			},
+			compositeParentTestPlan(
+				"parent",
+				[]string{"graph"},
+				func(
+					ctx context.Context,
+					commands CompositeCommandScope,
+				) error {
+					close(parentEntered)
+					<-submitChild
+					return commands.SubmitPreparedAndWait(
+						ctx,
+						Request{
+							UID:     "fifo-child",
+							LaneKey: "job",
+							Source:  lifecycle.SourceJobManager,
+							Route:   "internal/test/fifo-child",
+						},
+						compositeTestPlan(
+							"job",
+							[]string{"graph"},
+							func() {
+								mu.Lock()
+								applied = append(
+									applied,
+									"child",
+								)
+								mu.Unlock()
+							},
+						),
+					)
+				},
+			),
+		)
+	}()
+	select {
+	case <-parentEntered:
+	case <-time.After(time.Second):
+		t.Fatal("FIFO parent did not enter apply")
+	}
+
+	if err := kernel.SubmitPrepared(
+		t.Context(),
+		Request{
+			UID:     "fifo-normal",
+			LaneKey: "job",
+			Source:  lifecycle.SourceJobManager,
+			Route:   "internal/test/fifo-normal",
+		},
+		compositeTestPlan("job", nil, func() {
+			mu.Lock()
+			applied = append(applied, "normal")
+			mu.Unlock()
+		}),
+	); err != nil {
+		t.Fatal(err)
+	}
+	close(submitChild)
+	waitForCompositeRecords(t, admission, 4)
+	close(blockerRelease)
+
+	select {
+	case err := <-blockerDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("target-lane blocker did not finish")
+	}
+	select {
+	case err := <-parentDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("FIFO parent did not finish")
+	}
+	mu.Lock()
+	got := append([]string(nil), applied...)
+	mu.Unlock()
+	if want := []string{"normal", "child"}; !reflect.DeepEqual(
+		got,
+		want,
+	) {
+		t.Fatalf("target-lane apply order=%v want=%v", got, want)
+	}
+	if err := run.DirtyCause(); err != nil {
+		t.Fatalf("FIFO run dirtied: %v", err)
+	}
+	stopCompositeTestKernel(t, kernel)
+}
+
+func TestCompositeChildGetsParentLinkedProgressAdmission(
+	t *testing.T,
+) {
+	kernel, run, admission, _, _ := newKernelWithPlanner(
+		t,
+		stoppedKernelPlanner{},
+	)
+	startKernelLoop(t, kernel)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+
+	parentEntered := make(chan struct{})
+	submitChild := make(chan struct{})
+	childEntered := make(chan struct{})
+	childRelease := make(chan struct{})
+	parentDone := make(chan error, 1)
+	go func() {
+		parentDone <- kernel.SubmitPreparedAndWait(
+			t.Context(),
+			Request{
+				UID:     "progress-parent",
+				LaneKey: "parent",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test/progress-parent",
+			},
+			compositeParentTestPlan(
+				"parent",
+				[]string{"graph"},
+				func(
+					ctx context.Context,
+					commands CompositeCommandScope,
+				) error {
+					close(parentEntered)
+					<-submitChild
+					return commands.SubmitPreparedAndWait(
+						ctx,
+						Request{
+							UID:     "progress-child",
+							LaneKey: "child",
+							Source:  lifecycle.SourceJobManager,
+							Route:   "internal/test/progress-child",
+						},
+						compositeTestPlan(
+							"child",
+							[]string{"graph"},
+							func() {
+								close(childEntered)
+								<-childRelease
+							},
+						),
+					)
+				},
+			),
+		)
+	}()
+	select {
+	case <-parentEntered:
+	case <-time.After(time.Second):
+		t.Fatal("progress parent did not enter apply")
+	}
+
+	beforeBlocker := admission.Census()
+	capacity := lifecycle.OrdinaryBudgetBytes -
+		beforeBlocker.ProcessBytes
+	blockerRequest := Request{
+		UID:     "progress-blocker",
+		LaneKey: "blocker",
+		Source:  lifecycle.SourceJobManager,
+		Route:   "internal/test/progress-blocker",
+	}
+	blockerEntered := make(chan struct{})
+	blockerRelease := make(chan struct{})
+	blockerPlan := compositeTestPlan(
+		"blocker",
+		nil,
+		func() {
+			close(blockerEntered)
+			<-blockerRelease
+		},
+	)
+	base, err := operationAdmissionBytes(
+		blockerRequest,
+		blockerPlan,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blockerPlan.OwnedBytes =
+		capacity - beforeBlocker.OrdinaryBytes - base
+	if blockerPlan.OwnedBytes <= 0 {
+		t.Fatalf(
+			"invalid blocker byte calculation: capacity=%d census=%+v base=%d",
+			capacity,
+			beforeBlocker,
+			base,
+		)
+	}
+	blockerDone := make(chan error, 1)
+	go func() {
+		blockerDone <- kernel.SubmitPreparedAndWait(
+			t.Context(),
+			blockerRequest,
+			blockerPlan,
+		)
+	}()
+	select {
+	case <-blockerEntered:
+	case <-time.After(time.Second):
+		t.Fatal("ordinary-budget blocker did not start")
+	}
+	if census := admission.Census(); census.OrdinaryBytes != capacity {
+		t.Fatalf(
+			"ordinary budget not fully held: capacity=%d census=%+v",
+			capacity,
+			census,
+		)
+	}
+
+	close(submitChild)
+	select {
+	case <-childEntered:
+	case <-time.After(time.Second):
+		t.Fatal(
+			"composite child did not receive parent-linked progress admission",
+		)
+	}
+	if census := admission.Census(); census.OrdinaryBytes <= capacity {
+		t.Fatalf(
+			"composite progress was not represented as bounded overcommit: %+v",
+			census,
+		)
+	}
+	close(childRelease)
+	select {
+	case err := <-parentDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("progress parent did not finish")
+	}
+	close(blockerRelease)
+	select {
+	case err := <-blockerDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("ordinary-budget blocker did not finish")
+	}
+	if census := admission.Census(); census.ActiveRecords != 0 ||
+		census.OrdinaryBytes != 0 {
+		t.Fatalf("composite progress admission leaked: %+v", census)
+	}
+	if err := run.DirtyCause(); err != nil {
+		t.Fatalf("progress run dirtied: %v", err)
+	}
+	stopCompositeTestKernel(t, kernel)
 }

@@ -46,13 +46,6 @@ type publishedStore struct {
 	regionValue string
 }
 
-func (s *publishedStore) RetainedBytes() int64 {
-	if s == nil {
-		return 0
-	}
-	return int64(4_096 + len(s.mode) + len(s.regionValue))
-}
-
 func New() secretstore.Creator {
 	return secretstore.Creator{
 		Kind:        secretstore.KindAWSSM,

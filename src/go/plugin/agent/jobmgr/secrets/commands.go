@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -565,10 +566,39 @@ func (controller *Controller) prepareStoreMutation(
 		config: config, status: dyncfg.StatusRunning,
 	}
 	if prepareErr != nil {
+		if mutation.Valid() {
+			if installFailure {
+				entry.status = dyncfg.StatusFailed
+			}
+			cleanup := func() error { return nil }
+			var storedEntry *secretEntry
+			if installFailure {
+				cleanup = controller.configCreateCleanup(entry)
+				storedEntry = &entry
+			}
+			return newPreparedSecretTransaction(
+				preparedSecretSpec{
+					scope: scope, current: current,
+					permit:   permit,
+					store:    controller.store,
+					storeKey: config.ExposedKey(),
+					mutation: &mutation,
+					abort:    true,
+					result: mustSecretMessage(
+						400,
+						"Secretstore configuration validation failed.",
+					),
+					cleanup:    cleanup,
+					controller: controller,
+					entry:      storedEntry,
+				},
+			)
+		}
 		if !installFailure {
 			return newPreparedSecretTransaction(
 				preparedSecretSpec{
 					scope: scope, current: current,
+					permit:   permit,
 					store:    controller.store,
 					storeKey: config.ExposedKey(),
 					result: mustSecretMessage(
@@ -584,6 +614,7 @@ func (controller *Controller) prepareStoreMutation(
 		return newPreparedSecretTransaction(
 			preparedSecretSpec{
 				scope: scope, current: current,
+				permit:   permit,
 				store:    controller.store,
 				storeKey: config.ExposedKey(),
 				result: mustSecretMessage(
@@ -700,32 +731,45 @@ func secretImpactMessage(
 	restartable string,
 	validationOnly bool,
 ) string {
+	var message string
 	if validationOnly {
 		if affected == "" {
-			return "Stored configuration is valid. No jobs are currently using this secretstore."
-		}
-		if restartable == "" {
-			return "Stored configuration is valid. This secretstore is used by jobs: " +
+			message = "Stored configuration is valid. No jobs are currently using this secretstore."
+		} else if restartable == "" {
+			message = "Stored configuration is valid. This secretstore is used by jobs: " +
 				affected +
 				". No running jobs would be restarted automatically by a change."
+		} else {
+			message = "Stored configuration is valid. This secretstore is used by jobs: " +
+				affected +
+				". Running jobs that would be restarted automatically by a change: " +
+				restartable + "."
 		}
-		return "Stored configuration is valid. This secretstore is used by jobs: " +
-			affected +
-			". Running jobs that would be restarted automatically by a change: " +
-			restartable + "."
-	}
-	if affected == "" {
-		return "No jobs currently use this secretstore."
-	}
-	if restartable == "" {
-		return "Updated configuration is used by jobs: " +
+	} else if affected == "" {
+		message = "No jobs currently use this secretstore."
+	} else if restartable == "" {
+		message = "Updated configuration is used by jobs: " +
 			affected +
 			". No running jobs would be restarted automatically."
+	} else {
+		message = "Updated configuration is used by jobs: " +
+			affected +
+			". Running jobs that would be restarted automatically: " +
+			restartable + "."
 	}
-	return "Updated configuration is used by jobs: " +
-		affected +
-		". Running jobs that would be restarted automatically: " +
-		restartable + "."
+	return boundSecretMessage(message)
+}
+
+func boundSecretMessage(message string) string {
+	if len(message) <= maximumSecretJobSummaryBytes {
+		return message
+	}
+	const suffix = "... [truncated]"
+	end := maximumSecretJobSummaryBytes - len(suffix)
+	for end > 0 && !utf8.RuneStart(message[end]) {
+		end--
+	}
+	return message[:end] + suffix
 }
 
 func jsonMarshal(value any) ([]byte, error) {

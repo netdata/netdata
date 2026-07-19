@@ -43,13 +43,6 @@ type publishedStore struct {
 	tokenProvider *cloudauth.TokenProvider
 }
 
-func (s *publishedStore) RetainedBytes() int64 {
-	if s == nil {
-		return 0
-	}
-	return 4_096
-}
-
 func New() secretstore.Creator {
 	return secretstore.Creator{
 		Kind:        secretstore.KindAzureKV,

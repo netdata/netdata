@@ -11,8 +11,6 @@ import (
 
 type testPublishedStore struct{}
 
-func (testPublishedStore) RetainedBytes() int64 { return 512 }
-
 func (testPublishedStore) Resolve(_ context.Context, _ ResolveRequest) (string, error) {
 	return "", nil
 }

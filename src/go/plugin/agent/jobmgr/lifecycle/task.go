@@ -38,11 +38,10 @@ func (ref TaskRef) Valid() bool {
 }
 
 type TaskCompletion struct {
-	Ref                    TaskRef
-	Sequence               uint8
-	Kind                   TaskOutcomeKind
-	LongLivedResourceBytes int64
-	Err                    error
+	Ref      TaskRef
+	Sequence uint8
+	Kind     TaskOutcomeKind
+	Err      error
 }
 
 type TaskActionKind uint8
@@ -749,45 +748,6 @@ func (supervisor *TaskSupervisor) ClearRetainedTimeout(ref TaskRef) (bool, error
 	return true, nil
 }
 
-func (supervisor *TaskSupervisor) ResizePreparedTransactionPermit(
-	ref TaskRef,
-	sequence uint8,
-	expected ResourceTransactionScope,
-	nextResourceBytes int64,
-) error {
-	slot, err := supervisor.slot(ref)
-	if err != nil {
-		return err
-	}
-	if slot.actionPending ||
-		slot.sequence != sequence ||
-		slot.outcome.kind !=
-			TaskOutcomePreparedResourceTransaction ||
-		!slot.outcome.scopeSet ||
-		slot.outcome.scope != expected ||
-		!expected.Successor.Valid() ||
-		slot.outcome.longLivedResourceBytes !=
-			nextResourceBytes {
-		return errors.New(
-			"jobmgr task supervisor: invalid prepared transaction permit resize",
-		)
-	}
-	registry := &supervisor.longLived
-	registry.mu.Lock()
-	permitRef, ok := registry.owners[expected.Successor]
-	registry.mu.Unlock()
-	if !ok {
-		return errors.New(
-			"jobmgr task supervisor: prepared transaction permit is absent",
-		)
-	}
-	return supervisor.resizeLongLivedPermit(
-		permitRef,
-		expected.Successor,
-		nextResourceBytes+TaskChildExecutionBytes,
-	)
-}
-
 func (supervisor *TaskSupervisor) RetainedTimeouts() (int, bool) {
 	return supervisor.retained, supervisor.saturated
 }
@@ -909,11 +869,10 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slo
 	outcome = TaskOutcome{}
 	slot.sequence = 1
 	supervisor.completions <- TaskCompletion{
-		Ref:                    ref,
-		Sequence:               1,
-		Kind:                   slot.outcome.kind,
-		LongLivedResourceBytes: slot.outcome.longLivedResourceBytes,
-		Err:                    err,
+		Ref:      ref,
+		Sequence: 1,
+		Kind:     slot.outcome.kind,
+		Err:      err,
 	}
 	for {
 		action := <-slot.action
@@ -1038,11 +997,10 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slo
 			slot.sequence = action.Sequence
 			slot.actionPending = false
 			supervisor.completions <- TaskCompletion{
-				Ref:                    ref,
-				Sequence:               action.Sequence,
-				Kind:                   slot.outcome.kind,
-				LongLivedResourceBytes: slot.outcome.longLivedResourceBytes,
-				Err:                    ack.Err,
+				Ref:      ref,
+				Sequence: action.Sequence,
+				Kind:     slot.outcome.kind,
+				Err:      ack.Err,
 			}
 			continue
 		case TaskActionDispose:

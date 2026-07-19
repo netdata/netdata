@@ -785,8 +785,6 @@ func (store *processSecretStore) Publish() secretstore.PublishedStore {
 
 type processPublishedSecret string
 
-func (processPublishedSecret) RetainedBytes() int64 { return 512 }
-
 func (secret processPublishedSecret) Resolve(
 	context.Context,
 	secretstore.ResolveRequest,

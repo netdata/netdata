@@ -19,7 +19,7 @@ func TestPreparedResourceTransactionCommitsOrRestoresWholePostimage(t *testing.T
 	}{
 		"apply graph and replacement": {
 			apply:       true,
-			wantEvents:  []string{"current-stop", "current-finalize", "successor-accept", "successor-publish"},
+			wantEvents:  []string{"current-stop", "current-finalize", "successor-accept", "successor-publish", "after-apply"},
 			wantPayload: `{"version":2}`,
 		},
 		"dispose keeps graph and current": {
@@ -88,8 +88,11 @@ func TestPreparedResourceTransactionCommitsOrRestoresWholePostimage(t *testing.T
 					Successor:   successor,
 					Graph:       graph,
 					Mutation:    mutation,
-					Result:      result,
-					Cleanup:     func() error { return nil },
+					AfterApply: func() {
+						events = append(events, "after-apply")
+					},
+					Result:  result,
+					Cleanup: func() error { return nil },
 				},
 			)
 			if err != nil {

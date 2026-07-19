@@ -317,53 +317,50 @@ func (control preAdmissionControl) Unwrap() error {
 
 type commandOperation struct {
 	*lifecycle.OperationGeneration
-	request                      Request
-	plan                         WorkPlan
-	claims                       []authorityClaim
-	authorityClaimEdges          []authorityClaimEdge
-	claimCursor                  int
-	claimTicket                  uint64
-	claimPrepared                bool
-	claimRegistered              bool
-	claimWaiting                 bool
-	claimsHeld                   bool
-	lane                         *commandLane
-	previous                     *commandOperation
-	next                         *commandOperation
-	allPrevious                  *commandOperation
-	allNext                      *commandOperation
-	allListed                    bool
-	shutdownVisited              bool
-	control                      lifecycle.ControlStatus
-	controlQueued                bool
-	cleanupDone                  bool
-	uidCompleted                 bool
-	cancelled                    bool
-	functionInvocation           FunctionInvocationRef
-	resourceGeneration           uint64
-	transactionScope             lifecycle.ResourceTransactionScope
-	transactionApplied           bool
-	transactionRestored          bool
-	deadline                     deadlineEntry
-	admission                    lifecycle.AdmissionRef
-	admissionBase                int64
-	admitted                     bool
-	resultGrowthWaiting          bool
-	longLivedGrowthWaiting       bool
-	longLivedGrowthResourceBytes int64
-	longLivedGrowthTotalBytes    int64
-	resultExpiry                 int64
-	taskRequest                  lifecycle.TaskRequestRef
-	submissionContext            context.Context
-	submissionResult             chan error
-	terminalResult               chan error
-	terminalErr                  error
-	parent                       *commandOperation
-	composite                    *kernelCompositeScope
-	activeChild                  *commandOperation
-	deferredCompletion           *lifecycle.TaskCompletion
-	claimsInherited              bool
-	compositeRollback            bool
+	request             Request
+	plan                WorkPlan
+	claims              []authorityClaim
+	authorityClaimEdges []authorityClaimEdge
+	claimCursor         int
+	claimTicket         uint64
+	claimPrepared       bool
+	claimRegistered     bool
+	claimWaiting        bool
+	claimsHeld          bool
+	lane                *commandLane
+	previous            *commandOperation
+	next                *commandOperation
+	allPrevious         *commandOperation
+	allNext             *commandOperation
+	allListed           bool
+	shutdownVisited     bool
+	control             lifecycle.ControlStatus
+	controlQueued       bool
+	cleanupDone         bool
+	uidCompleted        bool
+	cancelled           bool
+	functionInvocation  FunctionInvocationRef
+	resourceGeneration  uint64
+	transactionScope    lifecycle.ResourceTransactionScope
+	transactionApplied  bool
+	transactionRestored bool
+	deadline            deadlineEntry
+	admission           lifecycle.AdmissionRef
+	admissionBase       int64
+	admitted            bool
+	resultGrowthWaiting bool
+	resultExpiry        int64
+	taskRequest         lifecycle.TaskRequestRef
+	submissionContext   context.Context
+	submissionResult    chan error
+	terminalResult      chan error
+	terminalErr         error
+	parent              *commandOperation
+	composite           *kernelCompositeScope
+	activeChild         *commandOperation
+	deferredCompletion  *lifecycle.TaskCompletion
+	claimsInherited     bool
+	compositeRollback   bool
 }
 
 type commandLane struct {
@@ -1491,6 +1488,14 @@ func (kernel *CommandKernel) admitSubmission(
 				kernel.abortRequestInputBody(request),
 			)
 		}
+		if request.InputBodyToken != 0 {
+			return errors.Join(
+				errors.New(
+					"jobmgr composite: child cannot own parser input",
+				),
+				kernel.abortRequestInputBody(request),
+			)
+		}
 	} else if rollback {
 		return errors.Join(
 			errors.New("jobmgr kernel: rollback child has no parent"),
@@ -1577,6 +1582,17 @@ func (kernel *CommandKernel) admitSubmission(
 	if plan.Resource != nil || plan.Transaction != nil {
 		laneID = resourceCommandLaneKey(request.LaneKey)
 	}
+	if parent != nil &&
+		parent.lane != nil &&
+		parent.lane.mapKey == laneID {
+		return errors.Join(
+			errors.New(
+				"jobmgr composite: child cannot use its active parent lane",
+			),
+			kernel.uids.Complete(request.UID, false, now),
+			kernel.abortRequestInputBody(request),
+		)
+	}
 	lane := kernel.lanes[laneID]
 	if resource := plan.Resource; resource != nil {
 		if lane != nil && lane.transactionPlanned != 0 {
@@ -1647,6 +1663,13 @@ func (kernel *CommandKernel) admitSubmission(
 	requested := lifecycle.AdmissionRequestResult{}
 	if request.InputBodyToken != 0 {
 		requested = kernel.admission.TransferInputBody(kernel.run.Generation(), request.InputBodyToken, admissionLane, charge, request.PayloadCapacity)
+	} else if parent != nil {
+		requested = kernel.admission.GrantCompositeProgress(
+			kernel.run.Generation(),
+			parent.admission,
+			admissionLane,
+			charge,
+		)
 	} else {
 		requested = kernel.admission.RequestOrdinary(kernel.run.Generation(), admissionLane, charge)
 	}
@@ -1712,6 +1735,10 @@ func (kernel *CommandKernel) admitSubmission(
 	if !request.Deadline.IsZero() {
 		operation.deadline = deadlineEntry{when: request.Deadline, operation: operation, index: -1}
 		heap.Push(&kernel.deadlines, &operation.deadline)
+	}
+	if parent != nil {
+		operation.admitted = true
+		kernel.settleSubmission(operation, nil)
 	}
 	if operation.admitted && lane.active == nil && lane.head == operation {
 		kernel.markReady(lane)
@@ -1780,49 +1807,17 @@ func (kernel *CommandKernel) serviceAdmissions(quantum int) bool {
 				kernel.run.Dirty(errors.New("jobmgr kernel: invalid result growth grant"))
 				return false
 			}
-			switch {
-			case operation.longLivedGrowthWaiting:
-				resourceBytes :=
-					operation.longLivedGrowthResourceBytes
-				totalBytes :=
-					operation.longLivedGrowthTotalBytes
-				operation.longLivedGrowthWaiting = false
-				operation.longLivedGrowthResourceBytes = 0
-				operation.longLivedGrowthTotalBytes = 0
-				if err := kernel.resizePreparedTransactionPermit(
-					operation,
-					resourceBytes,
-					totalBytes,
-				); err != nil {
-					kernel.run.Dirty(err)
-					return false
-				}
-				action := lifecycle.TaskActionApplyResourceTransaction
-				if operation.cancelled ||
-					operation.TimedOut() ||
-					(operation.Response != lifecycle.ResponseOpen &&
-						operation.Response != lifecycle.ResponseNotRequired) ||
-					operation.controlQueued {
-					action = lifecycle.TaskActionDispose
-				}
-				kernel.sendTransactionAction(
-					operation,
-					operation.Task,
-					2,
-					action,
-				)
-			case operation.resultGrowthWaiting:
-				operation.resultGrowthWaiting = false
-				if err := kernel.sendEncodeAction(operation); err != nil {
-					kernel.run.Dirty(err)
-					return false
-				}
-			default:
+			if !operation.resultGrowthWaiting {
 				kernel.run.Dirty(
 					errors.New(
 						"jobmgr kernel: unowned ordinary growth grant",
 					),
 				)
+				return false
+			}
+			operation.resultGrowthWaiting = false
+			if err := kernel.sendEncodeAction(operation); err != nil {
+				kernel.run.Dirty(err)
 				return false
 			}
 		default:
@@ -2457,20 +2452,6 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 			operation.controlQueued {
 			action = lifecycle.TaskActionDispose
 		}
-		if action == lifecycle.TaskActionApplyResourceTransaction &&
-			completion.LongLivedResourceBytes > 0 {
-			waiting, err := kernel.prepareTransactionPermitResize(
-				operation,
-				completion.LongLivedResourceBytes,
-			)
-			if err != nil {
-				kernel.run.Dirty(err)
-				return
-			}
-			if waiting {
-				return
-			}
-		}
 		kernel.sendTransactionAction(
 			operation,
 			completion.Ref,
@@ -2588,94 +2569,6 @@ func (kernel *CommandKernel) completeResourceTransactionTask(
 			errors.New("jobmgr kernel: unexpected transaction completion"),
 		)
 	}
-}
-
-func (kernel *CommandKernel) prepareTransactionPermitResize(
-	operation *commandOperation,
-	resourceBytes int64,
-) (bool, error) {
-	if operation == nil ||
-		operation.plan.Transaction == nil ||
-		!operation.transactionScope.Successor.Valid() ||
-		resourceBytes <= 0 {
-		return false, errors.New(
-			"jobmgr kernel: invalid prepared transaction permit adjustment",
-		)
-	}
-	currentPlan := operation.plan.Transaction.Permit
-	nextPlan, err := currentPlan.WithResourceBytes(
-		resourceBytes,
-	)
-	if err != nil {
-		return false, err
-	}
-	delta := nextPlan.Bytes() - currentPlan.Bytes()
-	if delta == 0 {
-		return false, nil
-	}
-	total := operation.admissionBase + delta
-	if total <= nextPlan.Bytes() {
-		return false, errors.New(
-			"jobmgr kernel: adjusted transaction admission lost ordinary remainder",
-		)
-	}
-	if delta < 0 {
-		return false, kernel.resizePreparedTransactionPermit(
-			operation,
-			resourceBytes,
-			total,
-		)
-	}
-	ready, _, err := kernel.admission.ResizeOrdinary(
-		operation.admission,
-		total,
-	)
-	if err != nil {
-		return false, err
-	}
-	if !ready {
-		operation.longLivedGrowthWaiting = true
-		operation.longLivedGrowthResourceBytes =
-			resourceBytes
-		operation.longLivedGrowthTotalBytes = total
-		return true, nil
-	}
-	return false, kernel.resizePreparedTransactionPermit(
-		operation,
-		resourceBytes,
-		total,
-	)
-}
-
-func (kernel *CommandKernel) resizePreparedTransactionPermit(
-	operation *commandOperation,
-	resourceBytes,
-	totalBytes int64,
-) error {
-	if operation == nil ||
-		operation.plan.Transaction == nil {
-		return errors.New(
-			"jobmgr kernel: invalid prepared transaction permit resize",
-		)
-	}
-	nextPlan, err :=
-		operation.plan.Transaction.Permit.WithResourceBytes(
-			resourceBytes,
-		)
-	if err != nil {
-		return err
-	}
-	if err := kernel.tasks.ResizePreparedTransactionPermit(
-		operation.Task,
-		1,
-		operation.transactionScope,
-		resourceBytes,
-	); err != nil {
-		return err
-	}
-	operation.plan.Transaction.Permit = nextPlan
-	operation.admissionBase = totalBytes
-	return nil
 }
 
 func (kernel *CommandKernel) sendTransactionAction(
@@ -3354,16 +3247,12 @@ func (kernel *CommandKernel) cancelOperation(uid string) {
 		return
 	}
 	if operation.Child == lifecycle.ChildResultReady &&
-		(operation.resultGrowthWaiting ||
-			operation.longLivedGrowthWaiting) {
+		operation.resultGrowthWaiting {
 		if err := kernel.admission.CancelWaiting(operation.admission); err != nil {
 			kernel.run.Dirty(err)
 			return
 		}
 		operation.resultGrowthWaiting = false
-		operation.longLivedGrowthWaiting = false
-		operation.longLivedGrowthResourceBytes = 0
-		operation.longLivedGrowthTotalBytes = 0
 		if operation.Response != lifecycle.ResponseNotRequired {
 			kernel.enqueueControl(
 				operation,
@@ -3444,16 +3333,12 @@ func (kernel *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 			}
 		} else if operation.Child ==
 			lifecycle.ChildResultReady &&
-			(operation.resultGrowthWaiting ||
-				operation.longLivedGrowthWaiting) {
+			operation.resultGrowthWaiting {
 			if err := kernel.admission.CancelWaiting(operation.admission); err != nil {
 				kernel.run.Dirty(err)
 				return false
 			}
 			operation.resultGrowthWaiting = false
-			operation.longLivedGrowthWaiting = false
-			operation.longLivedGrowthResourceBytes = 0
-			operation.longLivedGrowthTotalBytes = 0
 			kernel.sendDisposeAction(operation)
 		} else if operation.Child == lifecycle.ChildActionPending && cancellablePendingAction(operation) {
 			_ = kernel.tasks.CancelWithCause(operation.Task, context.DeadlineExceeded)
@@ -3990,17 +3875,13 @@ func (kernel *CommandKernel) cancelOperationForShutdown(
 			}
 		}
 	case lifecycle.ChildResultReady:
-		if operation.resultGrowthWaiting ||
-			operation.longLivedGrowthWaiting {
+		if operation.resultGrowthWaiting {
 			if err := kernel.admission.CancelWaiting(
 				operation.admission,
 			); err != nil {
 				return err
 			}
 			operation.resultGrowthWaiting = false
-			operation.longLivedGrowthWaiting = false
-			operation.longLivedGrowthResourceBytes = 0
-			operation.longLivedGrowthTotalBytes = 0
 			kernel.sendDisposeAction(operation)
 			if operation.Response != lifecycle.ResponseNotRequired {
 				kernel.enqueueControl(

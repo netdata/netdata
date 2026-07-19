@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"math"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -24,12 +23,11 @@ type storeRecord struct {
 }
 
 type preparedStore struct {
-	key           string
-	rawConfig     Config
-	configHash    uint64
-	status        StoreStatus
-	published     PublishedStore
-	retainedBytes int64
+	key        string
+	rawConfig  Config
+	configHash uint64
+	status     StoreStatus
+	published  PublishedStore
 }
 
 type serviceState struct {
@@ -353,19 +351,7 @@ func preparePublishedConfig(
 	}
 	rawConfig := cloneConfig(raw)
 	rawHash := raw.Hash()
-	rawBytes, err := secretresolver.EstimateRetainedBytes(
-		map[string]any(raw),
-	)
-	if err != nil {
-		return preparedStore{}, err
-	}
 	resolvedPayload, err := resolveProviderPayload(ctx, resolver, raw)
-	if err != nil {
-		return preparedStore{}, err
-	}
-	resolvedBytes, err := secretresolver.EstimateRetainedBytes(
-		map[string]any(resolvedPayload),
-	)
 	if err != nil {
 		return preparedStore{}, err
 	}
@@ -405,23 +391,6 @@ func preparePublishedConfig(
 	if published == nil {
 		return preparedStore{}, fmt.Errorf("store '%s': published resolver state is nil", key)
 	}
-	backendBytes := published.RetainedBytes()
-	if backendBytes <= 0 {
-		return preparedStore{}, fmt.Errorf(
-			"store '%s': invalid published retained-byte estimate",
-			key,
-		)
-	}
-	const generationRetainedBytes = int64(512)
-	if backendBytes >
-		math.MaxInt64-rawBytes-resolvedBytes-generationRetainedBytes {
-		return preparedStore{}, fmt.Errorf(
-			"store '%s': published retained-byte estimate overflows",
-			key,
-		)
-	}
-	retainedBytes := rawBytes + resolvedBytes +
-		backendBytes + generationRetainedBytes
 
 	return preparedStore{
 		key:        key,
@@ -431,8 +400,7 @@ func preparePublishedConfig(
 			Name: name,
 			Kind: kind,
 		},
-		published:     published,
-		retainedBytes: retainedBytes,
+		published: published,
 	}, nil
 }
 

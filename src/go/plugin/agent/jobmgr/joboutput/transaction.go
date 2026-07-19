@@ -20,6 +20,7 @@ type ResourceTransactionSpec struct {
 	Graph            *dyncfg.Graph
 	Mutation         dyncfg.GraphMutation
 	AfterGraphCommit func()
+	AfterApply       func()
 	Result           lifecycle.SealedResult
 	Cleanup          lifecycle.TaskCleanup
 }
@@ -231,13 +232,20 @@ func (transaction *PreparedResourceTransaction) Apply(
 			spec.AfterGraphCommit()
 		}
 	}
-	return lifecycle.NewAppliedResourceTransaction(
+	applied, err := lifecycle.NewAppliedResourceTransaction(
 		spec.Scope,
 		spec.Disposition,
 		current,
 		spec.Result,
 		spec.Cleanup,
 	)
+	if err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	if spec.AfterApply != nil {
+		spec.AfterApply()
+	}
+	return applied, nil
 }
 
 func (transaction *PreparedResourceTransaction) Dispose(

@@ -56,20 +56,6 @@ type publishedStore struct {
 	tlsSkipVerify  bool
 }
 
-func (s *publishedStore) RetainedBytes() int64 {
-	if s == nil {
-		return 0
-	}
-	return int64(
-		4_096 +
-			len(s.mode) +
-			len(s.tokenValue) +
-			len(s.tokenFilePath) +
-			len(s.addr) +
-			len(s.namespaceValue),
-	)
-}
-
 func New() secretstore.Creator {
 	return secretstore.Creator{
 		Kind:        secretstore.KindVault,

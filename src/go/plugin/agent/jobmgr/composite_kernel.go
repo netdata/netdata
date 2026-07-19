@@ -62,6 +62,11 @@ func (scope *kernelCompositeScope) RollbackContext() (
 	}
 	scope.rollbackMu.Lock()
 	defer scope.rollbackMu.Unlock()
+	if scope.closed.Load() {
+		return nil, errors.New(
+			"jobmgr composite: rollback outside active parent",
+		)
+	}
 	if scope.rollbackCtx != nil {
 		return scope.rollbackCtx, nil
 	}
@@ -273,22 +278,6 @@ func (bridge *preparedCompositeBridge) Scope() (
 	return bridge.transaction.Scope()
 }
 
-func (bridge *preparedCompositeBridge) LongLivedResourceBytes() (
-	int64,
-	error,
-) {
-	if bridge == nil || bridge.transaction == nil {
-		return 0, errors.New(
-			"jobmgr composite: invalid prepared bridge",
-		)
-	}
-	sizer, ok := bridge.transaction.(lifecycle.PreparedLongLivedResourceSizer)
-	if !ok {
-		return 0, nil
-	}
-	return sizer.LongLivedResourceBytes()
-}
-
 func (bridge *preparedCompositeBridge) Apply(
 	ctx context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
@@ -394,15 +383,20 @@ func (kernel *CommandKernel) insertCompositeOperation(
 		return
 	}
 	anchor := lane.active
-	if anchor == nil {
-		for cursor := lane.head; cursor != nil &&
-			cursor.parent != nil; cursor = cursor.next {
+	cursor := lane.head
+	if anchor != nil {
+		cursor = anchor.next
+	}
+	for ; cursor != nil; cursor = cursor.next {
+		if cursor.parent != nil ||
+			!authorityClaimsConflict(
+				operation.parent.claims,
+				cursor.claims,
+			) {
 			anchor = cursor
+			continue
 		}
-	} else {
-		for anchor.next != nil && anchor.next.parent != nil {
-			anchor = anchor.next
-		}
+		break
 	}
 	if anchor == nil {
 		operation.next = lane.head
@@ -422,6 +416,29 @@ func (kernel *CommandKernel) insertCompositeOperation(
 		lane.tail = operation
 	}
 	anchor.next = operation
+}
+
+func authorityClaimsConflict(left, right []authorityClaim) bool {
+	leftIndex := 0
+	rightIndex := 0
+	for leftIndex < len(left) && rightIndex < len(right) {
+		leftClaim := left[leftIndex]
+		rightClaim := right[rightIndex]
+		switch {
+		case leftClaim.key < rightClaim.key:
+			leftIndex++
+		case rightClaim.key < leftClaim.key:
+			rightIndex++
+		default:
+			if leftClaim.mode != authorityClaimRead ||
+				rightClaim.mode != authorityClaimRead {
+				return true
+			}
+			leftIndex++
+			rightIndex++
+		}
+	}
+	return false
 }
 
 func (kernel *CommandKernel) completeCompositeChild(

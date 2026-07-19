@@ -5,7 +5,6 @@ package secretstore
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
@@ -15,7 +14,6 @@ import (
 // one configured Store generation.
 type GenerationCarrier interface {
 	Valid() bool
-	ResourceCapacityBytes() int64
 	Activate() error
 	Release() error
 }
@@ -54,9 +52,11 @@ const (
 )
 
 type generationRecord struct {
-	key      string
-	current  *StoreGeneration
-	retiring *StoreGeneration
+	key          string
+	stateVersion uint64
+	preparations int
+	current      *StoreGeneration
+	retiring     *StoreGeneration
 }
 
 // StoreGeneration is one immutable published provider generation.
@@ -179,6 +179,7 @@ func (store *SecretStore) Retire(
 	retiring := record.current
 	record.current = nil
 	record.retiring = retiring
+	record.stateVersion++
 	release := retiring.readers == 0
 	store.mu.Unlock()
 	if release {
@@ -234,8 +235,9 @@ func (store *SecretStore) releaseGeneration(
 		return store.dirty
 	}
 	record.retiring = nil
+	record.stateVersion++
 	store.unlinkGeneration(generation)
-	if record.current == nil {
+	if record.current == nil && record.preparations == 0 {
 		delete(store.records, record.key)
 	}
 	return nil
@@ -278,21 +280,6 @@ func callGenerationCarrierActivate(carrier GenerationCarrier) (err error) {
 		}
 	}()
 	return carrier.Activate()
-}
-
-func callGenerationCarrierCapacity(
-	carrier GenerationCarrier,
-) (capacity int64, err error) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			capacity = 0
-			err = fmt.Errorf(
-				"secretstore: generation carrier capacity panic: %v",
-				recovered,
-			)
-		}
-	}()
-	return carrier.ResourceCapacityBytes(), nil
 }
 
 func callGenerationCarrierRelease(carrier GenerationCarrier) (err error) {

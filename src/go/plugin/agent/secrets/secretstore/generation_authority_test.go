@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
@@ -189,17 +188,6 @@ func TestPreparedSecretMutationMatrix(t *testing.T) {
 					"preparation activated the generation carrier before commit",
 				)
 			}
-			retainedBytes, err :=
-				mutation.RetainedResourceBytes()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if retainedBytes <= 1_024 {
-				t.Fatalf(
-					"retained-byte estimate=%d is not conservative",
-					retainedBytes,
-				)
-			}
 			switch test.action {
 			case "abort":
 				err = mutation.Abort(t.Context())
@@ -258,7 +246,7 @@ func TestSecretStorePreparationOwnershipRegressions(t *testing.T) {
 	tests := map[string]struct {
 		run func(*testing.T)
 	}{
-		"rejected reservation releases supplied carrier": {
+		"rejected reservation leaves supplied carrier with caller": {
 			run: func(t *testing.T) {
 				store := newGenerationTestSecretStore(t)
 				if err := store.Close(t.Context()); err != nil {
@@ -274,8 +262,127 @@ func TestSecretStorePreparationOwnershipRegressions(t *testing.T) {
 				); err == nil {
 					t.Fatal("closed Store accepted mutation preparation")
 				}
+				if carrier.released {
+					t.Fatal("rejected mutation consumed the caller's carrier")
+				}
+				if err := carrier.Release(); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		"accepted preparation failure returns owned abort token": {
+			run: func(t *testing.T) {
+				store := newGenerationTestSecretStore(t)
+				carrier := &generationTestCarrier{}
+				mutation, err := store.PrepareMutation(
+					t.Context(),
+					newGenerationTestCatalog(t),
+					carrier,
+					generationTestConfig("main", "invalid"),
+					0,
+				)
+				if err == nil || !mutation.Valid() {
+					t.Fatalf(
+						"failed preparation mutation valid=%v error=%v",
+						mutation.Valid(),
+						err,
+					)
+				}
+				if carrier.released {
+					t.Fatal(
+						"accepted failed preparation released its owned carrier",
+					)
+				}
+				if census := store.Census(); census.Preparations != 1 {
+					t.Fatalf("failed preparation census=%+v", census)
+				}
+				if err := mutation.Abort(t.Context()); err != nil {
+					t.Fatal(err)
+				}
 				if !carrier.released {
-					t.Fatal("rejected mutation retained the supplied carrier")
+					t.Fatal("aborted failed preparation retained carrier")
+				}
+				if err := store.Close(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		"activation failure releases preparation ownership": {
+			run: func(t *testing.T) {
+				store := newGenerationTestSecretStore(t)
+				carrier := &generationTestCarrier{
+					activateErr: errors.New("activation failed"),
+				}
+				mutation, err := store.PrepareMutation(
+					t.Context(),
+					newGenerationTestCatalog(t),
+					carrier,
+					generationTestConfig("main", "value"),
+					0,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				result, err := mutation.Commit(t.Context())
+				if err == nil ||
+					result.Applied ||
+					result.Retained ||
+					!carrier.released {
+					t.Fatalf(
+						"activation failure result=%+v carrier=%+v error=%v",
+						result,
+						carrier,
+						err,
+					)
+				}
+				if census := store.Census(); census !=
+					(SecretStoreCensus{}) {
+					t.Fatalf(
+						"activation failure retained ownership: %+v",
+						census,
+					)
+				}
+				if err := store.Close(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		"failed activation cleanup reports retained ownership": {
+			run: func(t *testing.T) {
+				store := newGenerationTestSecretStore(t)
+				carrier := &generationTestCarrier{
+					activateErr: errors.New("activation failed"),
+					releaseErr:  errors.New("release failed"),
+				}
+				mutation, err := store.PrepareMutation(
+					t.Context(),
+					newGenerationTestCatalog(t),
+					carrier,
+					generationTestConfig("main", "value"),
+					0,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				result, err := mutation.Commit(t.Context())
+				if err == nil || result.Applied || !result.Retained {
+					t.Fatalf(
+						"retained activation failure result=%+v error=%v",
+						result,
+						err,
+					)
+				}
+				if census := store.Census(); !census.Dirty ||
+					census.Preparations != 1 {
+					t.Fatalf(
+						"retained activation failure census=%+v",
+						census,
+					)
+				}
+				if err := store.Close(t.Context()); err == nil {
+					t.Fatal(
+						"close acknowledged failed carrier release",
+					)
 				}
 			},
 		},
@@ -404,6 +511,59 @@ func TestSecretStorePreparationOwnershipRegressions(t *testing.T) {
 				}
 			},
 		},
+		"absent delete recreate cannot satisfy stale preparation": {
+			run: func(t *testing.T) {
+				store := newGenerationTestSecretStore(t)
+				catalog := newGenerationTestCatalog(t)
+				staleCarrier := &generationTestCarrier{}
+				stale, err := store.PrepareMutation(
+					t.Context(),
+					catalog,
+					staleCarrier,
+					generationTestConfig("main", "stale"),
+					0,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				intermediateCarrier := &generationTestCarrier{}
+				intermediate, err := store.PrepareMutation(
+					t.Context(),
+					catalog,
+					intermediateCarrier,
+					generationTestConfig("main", "intermediate"),
+					0,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				intermediateResult, err := intermediate.Commit(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := store.Retire(
+					t.Context(),
+					StoreKey(KindVault, "main"),
+					intermediateResult.Generation,
+				); err != nil {
+					t.Fatal(err)
+				}
+				result, err := stale.Commit(t.Context())
+				if err == nil || result.Applied {
+					t.Fatalf(
+						"absent-state stale mutation result=%+v error=%v",
+						result,
+						err,
+					)
+				}
+				if !staleCarrier.released {
+					t.Fatal("rejected stale carrier was not released")
+				}
+				if err := store.Close(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, test.run)
@@ -449,59 +609,6 @@ func TestSecretStoreCloseRejectsRetainedScope(t *testing.T) {
 	}
 	if err := scope.Release(t.Context()); err != nil {
 		t.Fatal(err)
-	}
-	if err := store.Close(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestSecretStoreCommitRejectsUnderCapacityCarrier(t *testing.T) {
-	store := newGenerationTestSecretStore(t)
-	carrier := &generationTestCarrier{capacity: 1}
-	mutation, err := store.PrepareMutation(
-		t.Context(),
-		newGenerationTestCatalog(t),
-		carrier,
-		generationTestConfig("main", "value"),
-		0,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	required, err := mutation.RetainedResourceBytes()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if required <= carrier.capacity {
-		t.Fatalf(
-			"retained bytes=%d do not exceed carrier capacity=%d",
-			required,
-			carrier.capacity,
-		)
-	}
-	result, err := mutation.Commit(t.Context())
-	if err == nil ||
-		!strings.Contains(
-			err.Error(),
-			"below retained state",
-		) {
-		t.Fatalf("under-capacity commit result=%+v error=%v", result, err)
-	}
-	if result.Applied || result.Retained ||
-		carrier.activated ||
-		!carrier.released {
-		t.Fatalf(
-			"under-capacity carrier result=%+v carrier=%+v",
-			result,
-			carrier,
-		)
-	}
-	if census := store.Census(); census !=
-		(SecretStoreCensus{}) {
-		t.Fatalf(
-			"under-capacity rejection retained ownership: %+v",
-			census,
-		)
 	}
 	if err := store.Close(t.Context()); err != nil {
 		t.Fatal(err)
@@ -559,28 +666,22 @@ func BenchmarkBSecretMutationControl(b *testing.B) {
 }
 
 type generationTestCarrier struct {
-	activated bool
-	released  bool
-	capacity  int64
+	activated   bool
+	released    bool
+	activateErr error
+	releaseErr  error
 }
 
 func (carrier *generationTestCarrier) Valid() bool {
 	return carrier != nil && !carrier.released
 }
 
-func (carrier *generationTestCarrier) ResourceCapacityBytes() int64 {
-	if carrier == nil {
-		return 0
-	}
-	if carrier.capacity != 0 {
-		return carrier.capacity
-	}
-	return 1 << 30
-}
-
 func (carrier *generationTestCarrier) Activate() error {
 	if !carrier.Valid() || carrier.activated {
 		return errors.New("invalid activation")
+	}
+	if carrier.activateErr != nil {
+		return carrier.activateErr
 	}
 	carrier.activated = true
 	return nil
@@ -589,6 +690,9 @@ func (carrier *generationTestCarrier) Activate() error {
 func (carrier *generationTestCarrier) Release() error {
 	if !carrier.Valid() {
 		return errors.New("invalid release")
+	}
+	if carrier.releaseErr != nil {
+		return carrier.releaseErr
 	}
 	carrier.released = true
 	return nil
@@ -604,15 +708,18 @@ func (store *generationTestStore) Configuration() any {
 	return &store.config
 }
 
-func (*generationTestStore) Init(context.Context) error { return nil }
+func (store *generationTestStore) Init(context.Context) error {
+	if store.config.Value == "invalid" {
+		return errors.New("invalid Store value")
+	}
+	return nil
+}
 
 func (store *generationTestStore) Publish() PublishedStore {
 	return generationTestPublished(store.config.Value)
 }
 
 type generationTestPublished string
-
-func (generationTestPublished) RetainedBytes() int64 { return 512 }
 
 func (published generationTestPublished) Resolve(
 	context.Context,

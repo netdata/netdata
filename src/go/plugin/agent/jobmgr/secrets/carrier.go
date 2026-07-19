@@ -41,19 +41,6 @@ func (carrier *storeGenerationCarrier) Valid() bool {
 	return carrier.permit.Valid() && !carrier.returned
 }
 
-func (carrier *storeGenerationCarrier) ResourceCapacityBytes() int64 {
-	if carrier == nil {
-		return 0
-	}
-	carrier.mu.Lock()
-	defer carrier.mu.Unlock()
-	capacity := carrier.permit.CapacityBytes()
-	if capacity <= lifecycle.TaskChildExecutionBytes {
-		return 0
-	}
-	return capacity - lifecycle.TaskChildExecutionBytes
-}
-
 func (carrier *storeGenerationCarrier) Activate() error {
 	if carrier == nil {
 		return errors.New(

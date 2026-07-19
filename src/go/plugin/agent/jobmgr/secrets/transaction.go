@@ -20,6 +20,7 @@ type preparedSecretSpec struct {
 	store    *secretstore.SecretStore
 	storeKey string
 	mutation *secretstore.PreparedSecretMutation
+	abort    bool
 	remove   bool
 	restarts *SecretRestartCommand
 
@@ -73,31 +74,6 @@ func (transaction *preparedSecretTransaction) Scope() lifecycle.ResourceTransact
 	return transaction.spec.scope
 }
 
-func (transaction *preparedSecretTransaction) LongLivedResourceBytes() (
-	int64,
-	error,
-) {
-	if transaction == nil {
-		return 0, errors.New(
-			"jobmgr secrets: nil prepared transaction",
-		)
-	}
-	transaction.mu.Lock()
-	defer transaction.mu.Unlock()
-	if transaction.consumed {
-		return 0, errors.New(
-			"jobmgr secrets: prepared transaction consumed",
-		)
-	}
-	spec := transaction.spec
-	if spec.mutation == nil ||
-		spec.remove ||
-		!spec.permit.Valid() {
-		return 0, nil
-	}
-	return spec.mutation.RetainedResourceBytes()
-}
-
 func (transaction *preparedSecretTransaction) Apply(
 	ctx context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
@@ -127,8 +103,20 @@ func (transaction *preparedSecretTransaction) apply(
 		return lifecycle.AppliedResourceTransaction{},
 			errors.New("jobmgr secrets: nil transaction apply context")
 	}
+	if spec.abort {
+		if spec.mutation == nil {
+			return lifecycle.AppliedResourceTransaction{},
+				errors.New(
+					"jobmgr secrets: validation transaction lost its mutation",
+				)
+		}
+		if err := spec.mutation.Abort(ctx); err != nil {
+			return lifecycle.AppliedResourceTransaction{}, err
+		}
+		spec.mutation = nil
+	}
 	if spec.mutation == nil {
-		if spec.permit.Valid() {
+		if spec.permit.Valid() && !spec.abort {
 			if err := spec.permit.AbortUnused(); err != nil {
 				return lifecycle.AppliedResourceTransaction{}, err
 			}
@@ -183,6 +171,7 @@ func (transaction *preparedSecretTransaction) apply(
 			)
 	} else {
 		result, postCommitErr = commit(ctx)
+		predecessorRestored = !result.Retained
 	}
 	if !result.Applied {
 		var abortErr error

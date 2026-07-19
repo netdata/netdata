@@ -264,7 +264,7 @@ func TestSecretRestartCommandRedactsAppliedRestartFailure(
 			}, nil
 		},
 	)
-	if !result.Applied || !errors.Is(err, sensitive) {
+	if !result.Applied || err != nil {
 		t.Fatalf(
 			"restart result=%+v error=%v",
 			result,

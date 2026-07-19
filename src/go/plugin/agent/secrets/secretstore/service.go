@@ -37,5 +37,4 @@ type Store interface {
 
 type PublishedStore interface {
 	Resolve(ctx context.Context, req ResolveRequest) (string, error)
-	RetainedBytes() int64
 }

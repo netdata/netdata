@@ -30,6 +30,12 @@ func (stop *SecretDependentStop) Stopped() (bool, error) {
 	return stop.stopped, nil
 }
 
+func (stop *SecretDependentStop) markStopped() {
+	stop.mu.Lock()
+	stop.stopped = true
+	stop.mu.Unlock()
+}
+
 // SecretDependentStart records a collector-construction failure that was
 // truthfully committed as a failed DynCfg graph status.
 type SecretDependentStart struct {
@@ -92,14 +98,12 @@ func (controller *DynCfgJobController) PlanSecretDependentStop(
 						"job output: running dependent has no current resource",
 					)
 				}
-				state.mu.Lock()
-				state.stopped = true
-				state.mu.Unlock()
 				return PrepareResourceTransaction(
 					ResourceTransactionSpec{
 						Scope:       scope,
 						Disposition: lifecycle.ResourceTransactionRemoved,
 						Current:     current,
+						AfterApply:  state.markStopped,
 						Result:      mustDynCfgMessage(204, ""),
 						Cleanup:     func() error { return nil },
 					},

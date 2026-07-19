@@ -34,8 +34,6 @@ func (p *fakePublished) Resolve(ctx context.Context, req secretstore.ResolveRequ
 	return req.Operand, nil
 }
 
-func (*fakePublished) RetainedBytes() int64 { return 512 }
-
 type fakeConfig struct {
 	Auth map[string]any `json:"auth,omitempty" yaml:"auth,omitempty"`
 }

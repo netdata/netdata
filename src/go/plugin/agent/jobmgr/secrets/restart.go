@@ -107,7 +107,7 @@ func (command *SecretRestartCommand) Apply(
 			errors.Join(commitErr, restoreErr)
 	}
 
-	failures, startErr := command.start(
+	failures, startErr, _ := command.start(
 		commands,
 		stopped,
 		displayByID,
@@ -125,17 +125,19 @@ func (command *SecretRestartCommand) restore(
 	commands jobmgr.CompositeCommandScope,
 	ids []string,
 ) error {
-	_, err := command.start(commands, ids, nil)
-	return err
+	_, integrityErr, operationalErr :=
+		command.start(commands, ids, nil)
+	return errors.Join(integrityErr, operationalErr)
 }
 
 func (command *SecretRestartCommand) start(
 	commands jobmgr.CompositeCommandScope,
 	ids []string,
 	displayByID map[string]string,
-) ([]string, error) {
+) ([]string, error, error) {
 	failures := make([]string, 0)
-	var result error
+	var integrityErr error
+	var operationalErr error
 	for _, id := range ids {
 		display := displayByID[id]
 		if display == "" {
@@ -144,7 +146,7 @@ func (command *SecretRestartCommand) start(
 		plan, state, err :=
 			command.jobs.PlanDependentStart(id)
 		if err != nil {
-			result = errors.Join(result, err)
+			integrityErr = errors.Join(integrityErr, err)
 			failures = append(failures, display)
 			continue
 		}
@@ -156,16 +158,19 @@ func (command *SecretRestartCommand) start(
 			plan,
 			true,
 		); err != nil {
-			result = errors.Join(result, err)
+			integrityErr = errors.Join(integrityErr, err)
 			failures = append(failures, display)
 			continue
 		}
 		if startErr := state.Err(); startErr != nil {
-			result = errors.Join(result, startErr)
+			operationalErr = errors.Join(
+				operationalErr,
+				startErr,
+			)
 			failures = append(failures, display)
 		}
 	}
-	return failures, result
+	return failures, integrityErr, operationalErr
 }
 
 func (command *SecretRestartCommand) submit(

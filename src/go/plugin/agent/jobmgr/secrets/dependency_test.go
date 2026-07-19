@@ -57,6 +57,36 @@ func TestSecretJobSummariesAreBounded(t *testing.T) {
 	}
 }
 
+func TestSecretImpactMessageHasOneCombinedBound(t *testing.T) {
+	names := make([]string, 1_000)
+	for index := range names {
+		names[index] = fmt.Sprintf("module:job-%04d", index)
+	}
+	summary := formatSecretJobNames(names)
+	tests := map[string]struct {
+		validationOnly bool
+	}{
+		"validation": {validationOnly: true},
+		"update":     {},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			message := secretImpactMessage(
+				summary,
+				summary,
+				test.validationOnly,
+			)
+			if len(message) > maximumSecretJobSummaryBytes {
+				t.Fatalf(
+					"impact message bytes=%d exceed cap=%d",
+					len(message),
+					maximumSecretJobSummaryBytes,
+				)
+			}
+		})
+	}
+}
+
 func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 	index := NewSecretDependencyIndex()
 	tests := map[string]struct {

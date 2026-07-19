@@ -389,8 +389,6 @@ func (carrier *testJobCarrier) Valid() bool {
 
 func (carrier *testJobCarrier) Owner() lifecycle.ResourceIdentity { return carrier.owner }
 func (carrier *testJobCarrier) Class() lifecycle.LongLivedClass   { return lifecycle.LongLivedJob }
-func (carrier *testJobCarrier) CapacityBytes() int64              { return 64 }
-
 func (carrier *testJobCarrier) ActivateExternal(facet lifecycle.LongLivedExternalFacet) error {
 	if facet != lifecycle.LongLivedEJobResources || !carrier.externalReserved || carrier.externalActive {
 		return errors.New("test job carrier: invalid external activation")
