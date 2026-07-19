@@ -221,6 +221,7 @@ func (supervisor *TaskSupervisor) startInherited(parent context.Context, owner R
 	go func() {
 		close(started)
 		err := runInheritedTask(ctx, work)
+		supervisor.observeTaskPanic(err)
 		registry.complete(ref, err)
 	}()
 	<-started

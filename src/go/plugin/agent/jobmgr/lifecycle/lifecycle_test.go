@@ -1664,7 +1664,7 @@ func TestFrameOwnerRunNotificationLeaseCanMoveAfterExactRelease(t *testing.T) {
 	}
 	notify := func() {}
 	poison := func(error) {}
-	if err := owner.BindRunNotifications(1, notify, poison); err != nil {
+	if err := owner.BindRunNotifications(1, notify, poison, nil); err != nil {
 		t.Fatal(err)
 	}
 	tests := map[string]struct {
@@ -1672,7 +1672,7 @@ func TestFrameOwnerRunNotificationLeaseCanMoveAfterExactRelease(t *testing.T) {
 	}{
 		"duplicate live bind": {
 			run: func() error {
-				return owner.BindRunNotifications(2, notify, poison)
+				return owner.BindRunNotifications(2, notify, poison, nil)
 			},
 		},
 		"stale release": {
@@ -1691,7 +1691,7 @@ func TestFrameOwnerRunNotificationLeaseCanMoveAfterExactRelease(t *testing.T) {
 	if err := owner.ReleaseRunNotifications(1); err != nil {
 		t.Fatal(err)
 	}
-	if err := owner.BindRunNotifications(2, notify, poison); err != nil {
+	if err := owner.BindRunNotifications(2, notify, poison, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := owner.ReleaseRunNotifications(2); err != nil {

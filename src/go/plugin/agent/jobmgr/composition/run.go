@@ -69,22 +69,25 @@ type runGenerationConfig struct {
 }
 
 type runGeneration struct {
-	run              *lifecycle.RunSupervisor
-	tasks            *lifecycle.TaskSupervisor
-	functions        *FunctionAssembly
-	jobs             *joboutput.Factory
-	scheduler        *joboutput.Scheduler
-	dyncfg           *joboutput.DynCfgJobController
-	graph            *dyncfg.Graph
-	initialJobs      []dyncfg.GraphConfig
-	secrets          *secretadapter.Controller
-	vnodes           *vnodeBinding
-	vnodeConfig      *agentdiscovery.VNodeConfiguration
-	serviceDiscovery *serviceDiscoveryBinding
-	discovery        runDiscoveryServices
-	kernel           *jobmgr.CommandKernel
-	loop             *jobmgr.KernelLoop
-	inputBodyGrants  chan lifecycle.AdmissionGrant
+	run               *lifecycle.RunSupervisor
+	tasks             *lifecycle.TaskSupervisor
+	functions         *FunctionAssembly
+	jobs              *joboutput.Factory
+	scheduler         *joboutput.Scheduler
+	dyncfg            *joboutput.DynCfgJobController
+	graph             *dyncfg.Graph
+	initialJobs       []dyncfg.GraphConfig
+	secrets           *secretadapter.Controller
+	vnodes            *vnodeBinding
+	vnodeConfig       *agentdiscovery.VNodeConfiguration
+	serviceDiscovery  *serviceDiscoveryBinding
+	discovery         runDiscoveryServices
+	kernel            *jobmgr.CommandKernel
+	loop              *jobmgr.KernelLoop
+	inputBodyGrants   chan lifecycle.AdmissionGrant
+	metrics           *runMetrics
+	runtime           runtimecomp.Service
+	runtimeRegistered bool
 
 	mu               sync.Mutex
 	started          bool
@@ -130,6 +133,10 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	)
 	if err != nil {
 		return nil, err
+	}
+	var metrics *runMetrics
+	if config.Jobs.Runtime != nil {
+		metrics = newRunMetrics()
 	}
 	tasks, err := lifecycle.NewTaskSupervisor(config.Frames)
 	if err != nil {
@@ -264,6 +271,7 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		Vnode:     vnodeConfig.Lookup,
 		Hooks:     functions.JobHooks(),
 		Scheduler: scheduler,
+		Observer:  metrics,
 	})
 	if err != nil {
 		return nil, errors.Join(err, functions.abortConstruction())
@@ -361,6 +369,14 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	); err != nil {
 		return nil, errors.Join(err, functions.abortConstruction())
 	}
+	if metrics != nil {
+		if err := kernel.BindRuntimeObserver(metrics); err != nil {
+			return nil, errors.Join(err, functions.abortConstruction())
+		}
+		if err := metrics.register(config.Jobs.Runtime); err != nil {
+			return nil, errors.Join(err, functions.abortConstruction())
+		}
+	}
 	return &runGeneration{
 		run: run, tasks: tasks, functions: functions,
 		jobs: jobs, dyncfg: dynCfgJobs, graph: graph,
@@ -374,6 +390,8 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		serviceDiscovery: serviceDiscovery,
 		discovery:        config.Discovery,
 		kernel:           kernel, loop: loop, inputBodyGrants: inputBodyGrants,
+		metrics: metrics, runtime: config.Jobs.Runtime,
+		runtimeRegistered: metrics != nil,
 	}, nil
 }
 
@@ -451,7 +469,10 @@ func (generation *runGeneration) abortConstruction() error {
 	if started {
 		return errors.New("jobmgr composition: run construction abort after start")
 	}
-	return generation.functions.abortConstruction()
+	return errors.Join(
+		generation.releaseRuntimeMetrics(),
+		generation.functions.abortConstruction(),
+	)
 }
 
 func (generation *runGeneration) Stop() {
@@ -464,7 +485,30 @@ func (generation *runGeneration) Wait(ctx context.Context) error {
 	if generation == nil || generation.kernel == nil {
 		return errors.New("jobmgr composition: invalid run wait")
 	}
-	return generation.kernel.Wait(ctx)
+	waitErr := generation.kernel.Wait(ctx)
+	select {
+	case <-generation.kernel.Done():
+		return errors.Join(waitErr, generation.releaseRuntimeMetrics())
+	default:
+		return waitErr
+	}
+}
+
+func (generation *runGeneration) releaseRuntimeMetrics() error {
+	if generation == nil {
+		return nil
+	}
+	generation.mu.Lock()
+	if !generation.runtimeRegistered {
+		generation.mu.Unlock()
+		return nil
+	}
+	generation.runtimeRegistered = false
+	metrics := generation.metrics
+	service := generation.runtime
+	generation.mu.Unlock()
+	metrics.unregister(service)
+	return nil
 }
 
 type joinedRunFinalizer struct {

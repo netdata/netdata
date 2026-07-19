@@ -65,6 +65,7 @@ type ConstructedJob struct {
 	ReleaseVNode     func() error
 	CollectorCleanup func(context.Context) error
 	Carrier          lifecycle.LongLivedCarrier
+	Observer         lifecycle.RuntimeObserver
 }
 
 func (constructed ConstructedJob) validate() error {
@@ -229,15 +230,16 @@ type JobGeneration struct {
 	Generation uint64
 	Variant    JobVariant
 
-	mu           sync.Mutex
-	resources    ConstructedJob
-	state        JobState
-	terminalErr  error
-	done         chan struct{}
-	finished     bool
-	stopDone     chan struct{}
-	stopErr      error
-	stopFinished bool
+	mu             sync.Mutex
+	resources      ConstructedJob
+	state          JobState
+	terminalErr    error
+	done           chan struct{}
+	finished       bool
+	stopDone       chan struct{}
+	stopErr        error
+	stopFinished   bool
+	observedActive bool
 }
 
 func (generation *JobGeneration) Identity() lifecycle.ResourceIdentity {
@@ -301,7 +303,15 @@ func (generation *JobGeneration) Publish() error {
 	}
 	generation.mu.Lock()
 	generation.state = JobActive
+	observer := generation.resources.Observer
+	generation.observedActive = true
 	generation.mu.Unlock()
+	if observer != nil {
+		observer.AddRuntimeGauge(
+			lifecycle.RuntimeGaugeJobsActive,
+			1,
+		)
+	}
 	return nil
 }
 
@@ -353,7 +363,16 @@ func (generation *JobGeneration) Stop(ctx context.Context) error {
 		}
 	case JobActive:
 		generation.state = JobStopping
+		observer := generation.resources.Observer
+		wasActive := generation.observedActive
+		generation.observedActive = false
 		generation.mu.Unlock()
+		if wasActive && observer != nil {
+			observer.AddRuntimeGauge(
+				lifecycle.RuntimeGaugeJobsActive,
+				-1,
+			)
+		}
 	default:
 		state := generation.state
 		generation.mu.Unlock()

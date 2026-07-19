@@ -327,12 +327,20 @@ type commandOperation struct {
 	claimRegistered     bool
 	claimWaiting        bool
 	claimsHeld          bool
+	claimWaitStarted    time.Time
+	claimWaitPrevious   *commandOperation
+	claimWaitNext       *commandOperation
+	claimWaitListed     bool
 	lane                *commandLane
 	previous            *commandOperation
 	next                *commandOperation
 	allPrevious         *commandOperation
 	allNext             *commandOperation
 	allListed           bool
+	runtimeStarted      time.Time
+	runtimePrevious     *commandOperation
+	runtimeNext         *commandOperation
+	runtimeListed       bool
 	shutdownVisited     bool
 	control             lifecycle.ControlStatus
 	controlQueued       bool
@@ -570,6 +578,10 @@ type CommandKernel struct {
 	functionCatalog          FunctionCatalogPort
 	inputBodyGrants          chan<- lifecycle.AdmissionGrant
 	admissionServiceGate     <-chan struct{}
+	runtimeObserver          lifecycle.RuntimeObserver
+	runtimeHead              *commandOperation
+	runtimeTail              *commandOperation
+	functionOperations       int
 }
 
 func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.AdmissionLedger, uids *lifecycle.UIDLedger, tasks *lifecycle.TaskSupervisor, frames *lifecycle.FrameOwner, clock lifecycle.Clock, inputBodyGrants chan<- lifecycle.AdmissionGrant, admissionServiceGate <-chan struct{}, shutdownBarrier RunShutdownBarrier, finalizer RunFinalizer, jobPlanner Planner, functionCatalog FunctionCatalogPort) (*CommandKernel, error) {
@@ -611,6 +623,37 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 	return kernel, nil
 }
 
+func (kernel *CommandKernel) BindRuntimeObserver(
+	observer lifecycle.RuntimeObserver,
+) error {
+	if kernel == nil || observer == nil {
+		return errors.New("jobmgr kernel: invalid runtime observer")
+	}
+	if kernel.runtimeObserver != nil {
+		return errors.New("jobmgr kernel: runtime observer already bound")
+	}
+	select {
+	case <-kernel.done:
+		return errors.New("jobmgr kernel: runtime observer bound after terminal")
+	default:
+	}
+	if err := kernel.run.BindRuntimeObserver(observer); err != nil {
+		return err
+	}
+	if err := kernel.tasks.BindRuntimeObserver(observer); err != nil {
+		return err
+	}
+	if err := kernel.claims.BindRuntimeObserver(
+		observer,
+		kernel.clock.Now,
+	); err != nil {
+		return err
+	}
+	kernel.runtimeObserver = observer
+	kernel.observeRuntimeOperations()
+	return nil
+}
+
 type KernelLoop struct {
 	kernel *CommandKernel
 }
@@ -649,6 +692,7 @@ func (kernel *CommandKernel) bindRunNotifications() error {
 			_ = kernel.run.Dirty(err)
 			kernel.NotifyControlReady()
 		},
+		kernel.runtimeObserver,
 	); err != nil {
 		return err
 	}
@@ -1401,6 +1445,12 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 				kernel.blockedSubmission[selected] = false
 			}
 			if submitted.controlStatus != 0 || err != nil {
+				if kernel.runtimeObserver != nil {
+					kernel.runtimeObserver.AddRuntimeCounter(
+						lifecycle.RuntimeCounterOperationsRejected,
+						1,
+					)
+				}
 				submitted.result <- err
 				if submitted.controlStatus != 0 && submitted.terminal != nil {
 					submitted.terminal <- err
@@ -1520,6 +1570,12 @@ func (kernel *CommandKernel) admitSubmission(
 	}
 	now := kernel.clock.Now()
 	if err := kernel.uids.Admit(request.UID, now); err != nil {
+		if kernel.runtimeObserver != nil {
+			kernel.runtimeObserver.AddRuntimeCounter(
+				lifecycle.RuntimeCounterDuplicateUIDRejected,
+				1,
+			)
+		}
 		return errors.Join(err, kernel.abortRequestInputBody(request))
 	}
 	var functionInvocation FunctionInvocationRef
@@ -1713,6 +1769,7 @@ func (kernel *CommandKernel) admitSubmission(
 		submissionContext: submissionContext, submissionResult: submissionResult, terminalResult: terminalResult,
 		parent: parent, claimsInherited: parent != nil,
 		compositeRollback: rollback,
+		runtimeStarted:    now,
 	}
 	if parent == nil {
 		prepareClaimEdges(operation, claims)
@@ -1739,6 +1796,17 @@ func (kernel *CommandKernel) admitSubmission(
 	_ = operation.Advance(lifecycle.OperationQueued)
 	kernel.operations[request.UID] = operation
 	kernel.appendOperation(operation)
+	kernel.appendRuntimeOperation(operation)
+	if request.Source == lifecycle.SourceFunction {
+		kernel.functionOperations++
+	}
+	if kernel.runtimeObserver != nil {
+		kernel.runtimeObserver.AddRuntimeCounter(
+			lifecycle.RuntimeCounterOperationsAdmitted,
+			1,
+		)
+	}
+	kernel.observeRuntimeOperations()
 	kernel.byAdmission[requested.Ref] = operation
 	releaseFunctionInvocation = false
 	if resource := plan.Resource; resource != nil {
@@ -1771,6 +1839,12 @@ func (kernel *CommandKernel) admitSubmission(
 }
 
 func (kernel *CommandKernel) rejectClosedAdmission(request Request) error {
+	if kernel.runtimeObserver != nil {
+		kernel.runtimeObserver.AddRuntimeCounter(
+			lifecycle.RuntimeCounterShutdownRejected,
+			1,
+		)
+	}
 	closedErr := errors.New("jobmgr kernel: admission closed")
 	if err := kernel.abortRequestInputBody(request); err != nil {
 		kernel.run.Dirty(err)
@@ -3324,6 +3398,12 @@ func (kernel *CommandKernel) sendDisposeAction(operation *commandOperation) {
 		kernel.run.Dirty(err)
 		return
 	}
+	if kernel.runtimeObserver != nil {
+		kernel.runtimeObserver.AddRuntimeCounter(
+			lifecycle.RuntimeCounterResultsDisposed,
+			1,
+		)
+	}
 	if err := kernel.tasks.SendAction(action); err != nil {
 		kernel.run.Dirty(err)
 	}
@@ -3342,7 +3422,7 @@ func (kernel *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 			(operation.Response != lifecycle.ResponseOpen && operation.Response != lifecycle.ResponseNotRequired) {
 			continue
 		}
-		operation.MarkTimedOut()
+		kernel.markOperationTimedOut(operation)
 		if operation.activeChild != nil &&
 			!operation.activeChild.compositeRollback {
 			kernel.cancelOperation(operation.activeChild.UID)
@@ -3420,9 +3500,24 @@ func (kernel *CommandKernel) markOperationDeadlineIfDue(operation *commandOperat
 	if operation.request.Deadline.After(kernel.clock.Now()) {
 		return
 	}
-	operation.MarkTimedOut()
+	kernel.markOperationTimedOut(operation)
 	if operation.Response == lifecycle.ResponseOpen {
 		kernel.enqueueControl(operation, lifecycle.ControlDeadline)
+	}
+}
+
+func (kernel *CommandKernel) markOperationTimedOut(
+	operation *commandOperation,
+) {
+	if operation == nil || operation.TimedOut() {
+		return
+	}
+	operation.MarkTimedOut()
+	if kernel.runtimeObserver != nil {
+		kernel.runtimeObserver.AddRuntimeCounter(
+			lifecycle.RuntimeCounterOperationTimeouts,
+			1,
+		)
 	}
 }
 
@@ -3590,6 +3685,19 @@ func (kernel *CommandKernel) tryDispose(operation *commandOperation) {
 	}
 	_ = operation.Advance(lifecycle.OperationDisposedTerminal)
 	delete(kernel.operations, operation.UID)
+	if operation.Source == lifecycle.SourceFunction {
+		kernel.functionOperations--
+		if kernel.functionOperations < 0 {
+			kernel.run.Dirty(
+				errors.New(
+					"jobmgr kernel: negative Function operation count",
+				),
+			)
+			return
+		}
+	}
+	kernel.unlinkRuntimeOperation(operation)
+	kernel.observeRuntimeOperations()
 	if !kernel.shutdownActive || operation.shutdownVisited {
 		kernel.unlinkOperation(operation)
 	}
@@ -3617,6 +3725,72 @@ func (kernel *CommandKernel) appendOperation(operation *commandOperation) {
 	}
 	kernel.operationTail = operation
 	operation.allListed = true
+}
+
+func (kernel *CommandKernel) appendRuntimeOperation(
+	operation *commandOperation,
+) {
+	if operation == nil || operation.runtimeListed {
+		kernel.run.Dirty(
+			errors.New("jobmgr kernel: invalid runtime operation append"),
+		)
+		return
+	}
+	operation.runtimePrevious = kernel.runtimeTail
+	if kernel.runtimeTail != nil {
+		kernel.runtimeTail.runtimeNext = operation
+	} else {
+		kernel.runtimeHead = operation
+	}
+	kernel.runtimeTail = operation
+	operation.runtimeListed = true
+}
+
+func (kernel *CommandKernel) unlinkRuntimeOperation(
+	operation *commandOperation,
+) {
+	if operation == nil || !operation.runtimeListed {
+		kernel.run.Dirty(
+			errors.New("jobmgr kernel: invalid runtime operation removal"),
+		)
+		return
+	}
+	if operation.runtimePrevious != nil {
+		operation.runtimePrevious.runtimeNext = operation.runtimeNext
+	} else {
+		kernel.runtimeHead = operation.runtimeNext
+	}
+	if operation.runtimeNext != nil {
+		operation.runtimeNext.runtimePrevious =
+			operation.runtimePrevious
+	} else {
+		kernel.runtimeTail = operation.runtimePrevious
+	}
+	operation.runtimePrevious = nil
+	operation.runtimeNext = nil
+	operation.runtimeListed = false
+}
+
+func (kernel *CommandKernel) observeRuntimeOperations() {
+	if kernel == nil || kernel.runtimeObserver == nil {
+		return
+	}
+	kernel.runtimeObserver.SetRuntimeGauge(
+		lifecycle.RuntimeGaugeOperationsActive,
+		len(kernel.operations),
+	)
+	kernel.runtimeObserver.SetRuntimeGauge(
+		lifecycle.RuntimeGaugeFunctionInvocationsActive,
+		kernel.functionOperations,
+	)
+	var oldest time.Time
+	if kernel.runtimeHead != nil {
+		oldest = kernel.runtimeHead.runtimeStarted
+	}
+	kernel.runtimeObserver.SetRuntimeTimestamp(
+		lifecycle.RuntimeTimestampOldestOperation,
+		oldest,
+	)
 }
 
 func (kernel *CommandKernel) unlinkOperation(operation *commandOperation) {
@@ -4258,6 +4432,8 @@ func (kernel *CommandKernel) shutdownReadyForFinalizer() bool {
 		kernel.tasks.InheritedCancellationPending() ||
 		len(kernel.operations) != 0 || len(kernel.tasksByRef) != 0 ||
 		len(kernel.tasksByRequest) != 0 ||
+		kernel.runtimeHead != nil || kernel.runtimeTail != nil ||
+		kernel.functionOperations != 0 ||
 		kernel.operationHead != nil || kernel.operationTail != nil ||
 		kernel.laneHead != nil || kernel.laneTail != nil ||
 		len(kernel.functionCleanupTasks) != 0 || len(kernel.functionCleanupRequests) != 0 ||

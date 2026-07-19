@@ -102,6 +102,7 @@ type taskRequest struct {
 	class      TaskClass
 	plan       TaskPlan
 	initial    TaskOutcome
+	queuedAt   time.Time
 }
 
 type taskRequestQueue struct {
@@ -125,6 +126,7 @@ type TaskSupervisor struct {
 	active      int
 	retained    int
 	saturated   bool
+	observer    RuntimeObserver
 
 	admissionReadyMu      sync.Mutex
 	onAdmissionReady      func()
@@ -145,6 +147,21 @@ func NewTaskSupervisor(frame *FrameOwner) (*TaskSupervisor, error) {
 	supervisor.longLived.initialize()
 	supervisor.nextClass = TaskClassFrameworkControl
 	return supervisor, nil
+}
+
+func (supervisor *TaskSupervisor) BindRuntimeObserver(
+	observer RuntimeObserver,
+) error {
+	if supervisor == nil || observer == nil {
+		return errors.New("jobmgr task supervisor: invalid runtime observer")
+	}
+	if supervisor.observer != nil || supervisor.active != 0 ||
+		supervisor.Pending() != 0 {
+		return errors.New("jobmgr task supervisor: runtime observer bound after activation")
+	}
+	supervisor.observer = observer
+	supervisor.observeRuntimeState()
+	return nil
 }
 
 func (supervisor *TaskSupervisor) BindAdmissionReady(notify func()) error {
@@ -217,6 +234,7 @@ func (supervisor *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskR
 	*record = taskRequest{
 		slot: slot, generation: generation, active: true,
 		class: class, plan: plan, initial: initial,
+		queuedAt: time.Now(),
 	}
 	queue := &supervisor.pending[taskClassIndex(class)]
 	record.previous = queue.tail
@@ -227,6 +245,7 @@ func (supervisor *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskR
 	}
 	queue.tail = slot
 	queue.count++
+	supervisor.observeRuntimeState()
 	return TaskRequestRef{Slot: slot, Generation: generation}, nil
 }
 
@@ -555,6 +574,7 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 	slot.maxPhaseTransitions = plan.phaseLimit()
 	ref := TaskRef{Slot: index, Generation: slot.generation}
 	supervisor.active++
+	supervisor.observeRuntimeState()
 	launched = true
 	go supervisor.runChild(ctx, ref, slot, plan, initial)
 	return ref, nil
@@ -708,6 +728,7 @@ func (supervisor *TaskSupervisor) Release(ref TaskRef) error {
 	}
 	supervisor.freeSlot = ref.Slot + 1
 	supervisor.active--
+	supervisor.observeRuntimeState()
 	return nil
 }
 
@@ -874,6 +895,7 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slo
 		Kind:     slot.outcome.kind,
 		Err:      err,
 	}
+	supervisor.observeTaskPanic(err)
 	for {
 		action := <-slot.action
 		ack := TaskAcknowledgement{Ref: ref, Sequence: action.Sequence, Kind: action.Kind}
@@ -1002,6 +1024,7 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slo
 				Kind:     slot.outcome.kind,
 				Err:      ack.Err,
 			}
+			supervisor.observeTaskPanic(ack.Err)
 			continue
 		case TaskActionDispose:
 			if slot.outcome.kind == TaskOutcomePreparedResourceTransaction &&
@@ -1060,7 +1083,14 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slo
 			supervisor.acks <- ack
 			return
 		}
+		supervisor.observeTaskPanic(ack.Err)
 		supervisor.acks <- ack
+	}
+}
+
+func (supervisor *TaskSupervisor) observeTaskPanic(err error) {
+	if errors.Is(err, ErrTaskPanic) && supervisor.observer != nil {
+		supervisor.observer.AddRuntimeCounter(RuntimeCounterTaskPanics, 1)
 	}
 }
 
@@ -1238,6 +1268,36 @@ func (supervisor *TaskSupervisor) removeRequest(record *taskRequest) {
 	generation := record.generation
 	*record = taskRequest{slot: slot, generation: generation, freeNext: supervisor.freeRequest}
 	supervisor.freeRequest = slot
+	supervisor.observeRuntimeState()
+}
+
+func (supervisor *TaskSupervisor) observeRuntimeState() {
+	if supervisor == nil || supervisor.observer == nil {
+		return
+	}
+	supervisor.observer.SetRuntimeGauge(
+		RuntimeGaugeTasksActive,
+		supervisor.active,
+	)
+	supervisor.observer.SetRuntimeGauge(
+		RuntimeGaugeTasksQueued,
+		supervisor.Pending(),
+	)
+	var oldest time.Time
+	for index := range supervisor.pending {
+		head := supervisor.pending[index].head
+		if head == 0 {
+			continue
+		}
+		queuedAt := supervisor.requests[head].queuedAt
+		if oldest.IsZero() || queuedAt.Before(oldest) {
+			oldest = queuedAt
+		}
+	}
+	supervisor.observer.SetRuntimeTimestamp(
+		RuntimeTimestampOldestTaskWait,
+		oldest,
+	)
 }
 
 func taskClassIndex(class TaskClass) int {

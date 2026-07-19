@@ -22,7 +22,7 @@ type serviceDiscoveryBinding struct {
 
 	epoch      uint64
 	pluginName string
-	capture    *legacyProtocolCapture
+	capture    *functionProtocolCapture
 	handler    frameworkfunctions.Handler
 	registered bool
 	dirty      error
@@ -38,7 +38,7 @@ func newServiceDiscoveryBinding(
 			"jobmgr composition: invalid service discovery binding",
 		)
 	}
-	capture, err := newLegacyProtocolCaptureWithDirectFrames(frames)
+	capture, err := newFunctionProtocolCaptureWithDirectFrames(frames)
 	if err != nil {
 		return nil, err
 	}

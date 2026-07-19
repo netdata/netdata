@@ -56,18 +56,19 @@ type FrameCensus struct {
 }
 
 type FrameOwner struct {
-	stateMu        sync.Mutex
-	available      *sync.Cond
-	writer         io.Writer
-	busy           bool
-	pendingControl bool
-	poisoned       bool
-	retained       []byte
-	commits        uint64
-	onControlReady func()
-	onPoisoned     func(error)
-	runBinding     uint64
-	controlBuffer  [ControlFrameBytes]byte
+	stateMu         sync.Mutex
+	available       *sync.Cond
+	writer          io.Writer
+	busy            bool
+	pendingControl  bool
+	poisoned        bool
+	retained        []byte
+	commits         uint64
+	onControlReady  func()
+	onPoisoned      func(error)
+	runtimeObserver RuntimeObserver
+	runBinding      uint64
+	controlBuffer   [ControlFrameBytes]byte
 }
 
 func NewFrameOwner(writer io.Writer) (*FrameOwner, error) {
@@ -122,8 +123,10 @@ func (owner *FrameOwner) BindRunNotifications(
 	generation uint64,
 	controlReady func(),
 	poisoned func(error),
+	observer RuntimeObserver,
 ) error {
-	if owner == nil || generation == 0 || controlReady == nil || poisoned == nil {
+	if owner == nil || generation == 0 || controlReady == nil ||
+		poisoned == nil {
 		return errors.New("jobmgr frame owner: invalid run notification binding")
 	}
 	owner.stateMu.Lock()
@@ -136,6 +139,7 @@ func (owner *FrameOwner) BindRunNotifications(
 	owner.runBinding = generation
 	owner.onControlReady = controlReady
 	owner.onPoisoned = poisoned
+	owner.runtimeObserver = observer
 	pending := owner.pendingControl && !owner.busy
 	isPoisoned := owner.poisoned
 	owner.stateMu.Unlock()
@@ -162,6 +166,7 @@ func (owner *FrameOwner) ReleaseRunNotifications(generation uint64) error {
 	owner.runBinding = 0
 	owner.onControlReady = nil
 	owner.onPoisoned = nil
+	owner.runtimeObserver = nil
 	return nil
 }
 
@@ -402,8 +407,12 @@ func (owner *FrameOwner) writeAndRelease(
 	owner.commits++
 	pending := owner.pendingControl
 	notify := owner.onControlReady
+	observer := owner.runtimeObserver
 	owner.available.Broadcast()
 	owner.stateMu.Unlock()
+	if observer != nil {
+		observer.AddRuntimeCounter(RuntimeCounterFramesCommitted, 1)
+	}
 	if pending && notify != nil {
 		notify()
 	}
@@ -433,6 +442,7 @@ func callFrameTransition(name string, transition func() error) (err error) {
 func (owner *FrameOwner) poison(payload []byte, cause error) {
 	owner.stateMu.Lock()
 	notify := owner.onPoisoned
+	observer := owner.runtimeObserver
 	first := !owner.poisoned
 	owner.poisoned = true
 	owner.busy = false
@@ -441,6 +451,9 @@ func (owner *FrameOwner) poison(payload []byte, cause error) {
 	}
 	owner.available.Broadcast()
 	owner.stateMu.Unlock()
+	if first && observer != nil {
+		observer.AddRuntimeCounter(RuntimeCounterFrameFailures, 1)
+	}
 	if first && notify != nil {
 		notify(errors.Join(ErrFrameOwnerPoisoned, cause))
 	}

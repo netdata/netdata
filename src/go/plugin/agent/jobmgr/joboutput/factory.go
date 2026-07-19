@@ -62,6 +62,7 @@ type FactoryConfig struct {
 	Vnode      func(string) (jobruntime.VnodeSnapshot, bool)
 	Hooks      JobHooks
 	Scheduler  *Scheduler
+	Observer   lifecycle.RuntimeObserver
 	Logger     *logger.Logger
 }
 
@@ -220,6 +221,7 @@ func (factory *Factory) Build(
 		constructed.Handlers = handlers
 	}
 	constructed.CollectorCleanup = cleanup.final
+	constructed.Observer = factory.config.Observer
 	return constructed, nil
 }
 

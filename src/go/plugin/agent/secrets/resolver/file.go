@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func (r *Resolver) resolveFile(ctx context.Context, path, original string) (string, error) {
+func resolveFile(ctx context.Context, path, original string) (string, error) {
 	if !filepath.IsAbs(path) {
 		return "", fmt.Errorf("resolving secret '%s': file path must be absolute, got '%s'", original, path)
 	}

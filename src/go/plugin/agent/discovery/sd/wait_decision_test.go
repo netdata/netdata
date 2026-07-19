@@ -129,7 +129,7 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 		Logger:         logger.New(),
 		confProv:       confProv,
 		pluginName:     testPluginName,
-		fnReg:          functions.NewManager(),
+		fnReg:          waitTestFunctionRegistry{},
 		discoverers:    testDiscovererRegistry(),
 		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))),
 		seen:           dyncfg.NewSeenCache[sdConfig](),
@@ -177,6 +177,13 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 
 	return sd, confProv.ch, cancel, done
 }
+
+type waitTestFunctionRegistry struct{}
+
+func (waitTestFunctionRegistry) Register(string, func(functions.Function))               {}
+func (waitTestFunctionRegistry) Unregister(string)                                       {}
+func (waitTestFunctionRegistry) RegisterPrefix(string, string, func(functions.Function)) {}
+func (waitTestFunctionRegistry) UnregisterPrefix(string, string)                         {}
 
 func stopWaitTestServiceDiscovery(t *testing.T, sd *ServiceDiscovery, cancel context.CancelFunc, done <-chan struct{}) {
 	t.Helper()

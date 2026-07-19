@@ -7,52 +7,79 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestProviderBackedRuntimeResolverOperandValidation(t *testing.T) {
-	svc := secretstore.NewService(backends.Creators()...)
-	for _, entry := range providerBackedConfigs() {
-		err := svc.Add(context.Background(), newStoreFromConfig(t, svc, entry.kind, entry.config))
+func TestProviderBackedGenerationScopeOperandValidation(t *testing.T) {
+	store, catalog := newProviderAuthority(t)
+	generations := make(map[string]uint64)
+	keys := make([]string, 0, len(providerConfigs()))
+	for _, provider := range providerConfigs() {
+		mutation, err := store.PrepareMutation(
+			context.Background(),
+			catalog,
+			&providerGenerationCarrier{},
+			providerStoreConfig(t, provider.kind, provider.config),
+			0,
+		)
 		require.NoError(t, err)
+		result, err := mutation.Commit(context.Background())
+		require.NoError(t, err)
+		require.True(t, result.Applied)
+		key := secretstore.StoreKey(provider.kind, provider.name)
+		keys = append(keys, key)
+		generations[key] = result.Generation
 	}
-
-	snapshot := svc.Capture()
+	scope, err := store.AcquireScope(keys)
+	require.NoError(t, err)
 
 	tests := map[string]struct {
-		ref             string
-		original        string
+		storeKey        string
+		operand         string
 		wantErrContains string
 	}{
 		"aws": {
-			ref:             "aws-sm:aws_prod:#jsonKey",
-			original:        "${store:aws-sm:aws_prod:#jsonKey}",
+			storeKey:        "aws-sm:aws_prod",
+			operand:         "#jsonKey",
 			wantErrContains: "secret name is empty",
 		},
 		"azure": {
-			ref:             "azure-kv:azure_prod:not-a-secret-ref",
-			original:        "${store:azure-kv:azure_prod:not-a-secret-ref}",
+			storeKey:        "azure-kv:azure_prod",
+			operand:         "not-a-secret-ref",
 			wantErrContains: "operand must be in format 'vault-name/secret-name'",
 		},
 		"gcp": {
-			ref:             "gcp-sm:gcp_prod:not-a-secret-ref",
-			original:        "${store:gcp-sm:gcp_prod:not-a-secret-ref}",
+			storeKey:        "gcp-sm:gcp_prod",
+			operand:         "not-a-secret-ref",
 			wantErrContains: "operand must be in format 'project/secret' or 'project/secret/version'",
 		},
 		"vault": {
-			ref:             "vault:vault_prod:not-a-vault-ref",
-			original:        "${store:vault:vault_prod:not-a-vault-ref}",
+			storeKey:        "vault:vault_prod",
+			operand:         "not-a-vault-ref",
 			wantErrContains: "operand must be in format 'path#key'",
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := svc.Resolve(context.Background(), snapshot, tc.ref, tc.original)
+			_, err := scope.Resolve(
+				context.Background(),
+				tc.storeKey,
+				tc.operand,
+			)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantErrContains)
 		})
 	}
+
+	require.NoError(t, scope.Release(context.Background()))
+	for _, key := range keys {
+		require.NoError(t, store.Retire(
+			context.Background(),
+			key,
+			generations[key],
+		))
+	}
+	require.NoError(t, store.Close(context.Background()))
 }

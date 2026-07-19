@@ -7,6 +7,9 @@ import (
 	"errors"
 	"slices"
 	"sort"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
 type authorityClaimMode uint8
@@ -79,6 +82,10 @@ type claimAuthority struct {
 	waiterCount      int
 	settlements      authorityClaimHeap
 	settlementGrants [maximumClaimSettlementQuantum]*commandOperation
+	observer         lifecycle.RuntimeObserver
+	now              func() time.Time
+	waitHead         *commandOperation
+	waitTail         *commandOperation
 }
 
 func newClaimAuthority() *claimAuthority {
@@ -86,6 +93,23 @@ func newClaimAuthority() *claimAuthority {
 		keys:        make(map[string]*authorityClaimKey),
 		settlements: make(authorityClaimHeap, 0, maximumPlanClaims),
 	}
+}
+
+func (authority *claimAuthority) BindRuntimeObserver(
+	observer lifecycle.RuntimeObserver,
+	now func() time.Time,
+) error {
+	if authority == nil || observer == nil || now == nil {
+		return errors.New("jobmgr claims: invalid runtime observer")
+	}
+	if authority.observer != nil || len(authority.keys) != 0 ||
+		authority.waiterCount != 0 {
+		return errors.New("jobmgr claims: runtime observer bound after activation")
+	}
+	authority.observer = observer
+	authority.now = now
+	authority.observeRuntime()
+	return nil
 }
 
 func normalizeAuthorityClaims(writeClaims []string) ([]authorityClaim, error) {
@@ -134,6 +158,7 @@ func (authority *claimAuthority) Register(operation *commandOperation) error {
 		edge.key.references++
 	}
 	operation.claimRegistered = true
+	authority.observeRuntime()
 	return nil
 }
 
@@ -146,7 +171,12 @@ func (authority *claimAuthority) Acquire(operation *commandOperation) (bool, err
 		return false, errors.New("jobmgr claims: ticket wrapped")
 	}
 	operation.claimTicket = authority.nextTicket
-	return authority.acquireFromCursor(operation)
+	granted, err := authority.acquireFromCursor(operation)
+	if err == nil && !granted {
+		authority.beginRuntimeWait(operation)
+	}
+	authority.observeRuntime()
+	return granted, err
 }
 
 func (authority *claimAuthority) Cancel(operation *commandOperation) ([]*commandOperation, error) {
@@ -167,9 +197,11 @@ func (authority *claimAuthority) Cancel(operation *commandOperation) ([]*command
 	if err := authority.forget(operation); err != nil {
 		return nil, err
 	}
+	authority.endRuntimeWait(operation)
 	granted, _, err := authority.ServiceSettlements(
 		maximumClaimSettlementQuantum,
 	)
+	authority.observeRuntime()
 	return granted, err
 }
 
@@ -190,6 +222,7 @@ func (authority *claimAuthority) Release(operation *commandOperation) ([]*comman
 	granted, _, err := authority.ServiceSettlements(
 		maximumClaimSettlementQuantum,
 	)
+	authority.observeRuntime()
 	return granted, err
 }
 
@@ -197,7 +230,9 @@ func (authority *claimAuthority) Abandon(operation *commandOperation) error {
 	if operation == nil || !operation.claimRegistered || operation.claimWaiting || operation.claimsHeld || operation.claimCursor != 0 {
 		return errors.New("jobmgr claims: abandon outside idle prepared state")
 	}
-	return authority.forget(operation)
+	err := authority.forget(operation)
+	authority.observeRuntime()
+	return err
 }
 
 func (authority *claimAuthority) Waiting(operation *commandOperation) bool {
@@ -357,13 +392,79 @@ func (authority *claimAuthority) ServiceSettlements(
 			return nil, false, err
 		}
 		if granted {
+			authority.endRuntimeWait(operation)
 			authority.settlementGrants[grantCount] = operation
 			grantCount++
 		}
 	}
+	authority.observeRuntime()
 	return authority.settlementGrants[:grantCount:grantCount],
 		len(authority.settlements) != 0,
 		nil
+}
+
+func (authority *claimAuthority) beginRuntimeWait(
+	operation *commandOperation,
+) {
+	if authority.observer == nil || operation == nil ||
+		operation.claimWaitListed {
+		return
+	}
+	operation.claimWaitStarted = authority.now()
+	operation.claimWaitPrevious = authority.waitTail
+	if authority.waitTail != nil {
+		authority.waitTail.claimWaitNext = operation
+	} else {
+		authority.waitHead = operation
+	}
+	authority.waitTail = operation
+	operation.claimWaitListed = true
+}
+
+func (authority *claimAuthority) endRuntimeWait(
+	operation *commandOperation,
+) {
+	if authority.observer == nil || operation == nil ||
+		!operation.claimWaitListed {
+		return
+	}
+	if operation.claimWaitPrevious != nil {
+		operation.claimWaitPrevious.claimWaitNext = operation.claimWaitNext
+	} else {
+		authority.waitHead = operation.claimWaitNext
+	}
+	if operation.claimWaitNext != nil {
+		operation.claimWaitNext.claimWaitPrevious =
+			operation.claimWaitPrevious
+	} else {
+		authority.waitTail = operation.claimWaitPrevious
+	}
+	operation.claimWaitStarted = time.Time{}
+	operation.claimWaitPrevious = nil
+	operation.claimWaitNext = nil
+	operation.claimWaitListed = false
+}
+
+func (authority *claimAuthority) observeRuntime() {
+	if authority == nil || authority.observer == nil {
+		return
+	}
+	authority.observer.SetRuntimeGauge(
+		lifecycle.RuntimeGaugeClaimKeysTracked,
+		len(authority.keys),
+	)
+	authority.observer.SetRuntimeGauge(
+		lifecycle.RuntimeGaugeClaimWaiters,
+		authority.waiterCount,
+	)
+	var oldest time.Time
+	if authority.waitHead != nil {
+		oldest = authority.waitHead.claimWaitStarted
+	}
+	authority.observer.SetRuntimeTimestamp(
+		lifecycle.RuntimeTimestampOldestClaimWait,
+		oldest,
+	)
 }
 
 func (authority *claimAuthority) refreshSettlement(key *authorityClaimKey) {

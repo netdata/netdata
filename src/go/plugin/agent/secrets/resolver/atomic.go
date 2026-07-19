@@ -102,21 +102,19 @@ func NewAtomicResolver(providers map[string]AtomicProvider) (*AtomicResolver, er
 	return &AtomicResolver{providers: cloned}, nil
 }
 
-// NewDefaultAtomicResolver preserves the shipped env/file/cmd schemes behind
-// the new atomic call boundary.
+// NewDefaultAtomicResolver provides the shipped env/file/cmd schemes.
 func NewDefaultAtomicResolver() (*AtomicResolver, error) {
-	legacy := New()
 	return NewAtomicResolver(map[string]AtomicProvider{
 		"env": AtomicProviderFunc(func(ctx context.Context, operand string) ([]byte, error) {
-			value, err := legacy.resolveEnv(ctx, operand, "${env:"+operand+"}")
+			value, err := resolveEnv(ctx, operand, "${env:"+operand+"}")
 			return []byte(value), err
 		}),
 		"file": AtomicProviderFunc(func(ctx context.Context, operand string) ([]byte, error) {
-			value, err := legacy.resolveFile(ctx, operand, "${file:"+operand+"}")
+			value, err := resolveFile(ctx, operand, "${file:"+operand+"}")
 			return []byte(value), err
 		}),
 		"cmd": AtomicProviderFunc(func(ctx context.Context, operand string) ([]byte, error) {
-			value, err := legacy.resolveCmd(ctx, operand, "${cmd:"+operand+"}")
+			value, err := resolveCmd(ctx, operand, "${cmd:"+operand+"}", defaultCommandTimeout)
 			return []byte(value), err
 		}),
 	})

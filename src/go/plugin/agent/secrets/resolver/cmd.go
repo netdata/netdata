@@ -13,7 +13,9 @@ import (
 	"time"
 )
 
-func (r *Resolver) resolveCmd(ctx context.Context, cmdLine, original string) (string, error) {
+const defaultCommandTimeout = 10 * time.Second
+
+func resolveCmd(ctx context.Context, cmdLine, original string, timeout time.Duration) (string, error) {
 	parts := strings.Fields(cmdLine)
 	if len(parts) == 0 {
 		return "", fmt.Errorf("resolving secret '%s': empty command", original)
@@ -25,9 +27,8 @@ func (r *Resolver) resolveCmd(ctx context.Context, cmdLine, original string) (st
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	timeout := r.cmdTimeout
 	if timeout <= 0 {
-		timeout = 10 * time.Second
+		timeout = defaultCommandTimeout
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

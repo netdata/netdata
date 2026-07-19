@@ -58,7 +58,7 @@ var requiredLifecycleOwners = map[string]struct{}{
 	"UIDLedger":           {},
 }
 
-var checkpointOwnerDeclarations = map[string]ownerDeclaration{
+var productionOwnerDeclarations = map[string]ownerDeclaration{
 	"admission authority": {
 		packagePath: "plugin/agent/jobmgr/lifecycle", typeName: "AdmissionLedger",
 	},
@@ -211,17 +211,17 @@ func TestActiveArchitecturePackages(t *testing.T) {
 	}
 }
 
-func TestCheckpointOwnerManifestHasConcreteDeclarations(t *testing.T) {
-	const checkpointOwnerCount = 37
-	if len(checkpointOwnerDeclarations) != checkpointOwnerCount {
+func TestProductionOwnerManifestHasConcreteDeclarations(t *testing.T) {
+	const productionOwnerCount = 37
+	if len(productionOwnerDeclarations) != productionOwnerCount {
 		t.Fatalf(
-			"checkpoint owner declarations=%d want=%d",
-			len(checkpointOwnerDeclarations),
-			checkpointOwnerCount,
+			"production owner declarations=%d want=%d",
+			len(productionOwnerDeclarations),
+			productionOwnerCount,
 		)
 	}
 	root := filepath.Clean(filepath.Join(jobmgrSourceRoot(t), "../../.."))
-	for role, owner := range checkpointOwnerDeclarations {
+	for role, owner := range productionOwnerDeclarations {
 		t.Run(role, func(t *testing.T) {
 			found, err := findOwnerDeclaration(
 				filepath.Join(root, owner.packagePath),
@@ -238,6 +238,177 @@ func TestCheckpointOwnerManifestHasConcreteDeclarations(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestProductionSourceClosure(t *testing.T) {
+	tests := map[string]func(t *testing.T){
+		"exact Job Manager tree": assertExactJobManagerTree,
+		"no ignored Go source":   assertNoIgnoredJobManagerSource,
+		"retired owners absent":  assertRetiredOwnersAbsent,
+	}
+	for name, run := range tests {
+		t.Run(name, run)
+	}
+}
+
+func assertExactJobManagerTree(t *testing.T) {
+	t.Helper()
+	allowed := map[string]struct{}{
+		"ARCHITECTURE.md":                          {},
+		"architecture_test.go":                     {},
+		"claim_authority.go":                       {},
+		"claim_authority_test.go":                  {},
+		"command_ports.go":                         {},
+		"command_ports_test.go":                    {},
+		"composite.go":                             {},
+		"composite_kernel.go":                      {},
+		"composite_kernel_test.go":                 {},
+		"composition":                              {},
+		"discovery":                                {},
+		"doc.go":                                   {},
+		"function_catalog_port.go":                 {},
+		"function_catalog_port_test.go":            {},
+		"functions":                                {},
+		"joboutput":                                {},
+		"kernel.go":                                {},
+		"kernel_fairness_test.go":                  {},
+		"kernel_function_catalog_external_test.go": {},
+		"kernel_hotpath_bench_test.go":             {},
+		"kernel_lifecycle_test.go":                 {},
+		"kernel_prepared_wait_test.go":             {},
+		"lifecycle":                                {},
+		"plan.go":                                  {},
+		"production_cases_test.go":                 {},
+		"secrets":                                  {},
+	}
+	entries, err := os.ReadDir(jobmgrSourceRoot(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if _, ok := allowed[entry.Name()]; !ok {
+			t.Errorf("unexpected Job Manager root entry %q", entry.Name())
+		}
+	}
+	for name := range allowed {
+		if _, err := os.Stat(filepath.Join(jobmgrSourceRoot(t), name)); err != nil {
+			t.Errorf("required Job Manager root entry %q: %v", name, err)
+		}
+	}
+}
+
+func assertNoIgnoredJobManagerSource(t *testing.T) {
+	t.Helper()
+	err := filepath.WalkDir(
+		jobmgrSourceRoot(t),
+		func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if strings.Contains(string(data), "//go:build "+"ignore") {
+				t.Errorf("ignored Job Manager source remains: %s", path)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertRetiredOwnersAbsent(t *testing.T) {
+	t.Helper()
+	root := filepath.Clean(filepath.Join(jobmgrSourceRoot(t), "../../.."))
+	tests := map[string]struct {
+		path      string
+		types     map[string]struct{}
+		functions map[string]struct{}
+	}{
+		"Functions Manager": {
+			path: "plugin/framework/functions",
+			types: map[string]struct{}{
+				"Manager": {}, "LaneKeyDeriver": {}, "inputParser": {},
+				"keyScheduler": {},
+			},
+			functions: map[string]struct{}{"NewManager": {}},
+		},
+		"SecretStore Service": {
+			path: "plugin/agent/secrets/secretstore",
+			types: map[string]struct{}{
+				"Service": {}, "Snapshot": {}, "inMemoryService": {},
+				"runtimeResolver": {},
+			},
+			functions: map[string]struct{}{"NewService": {}},
+		},
+		"recursive resolver": {
+			path:      "plugin/agent/secrets/resolver",
+			types:     map[string]struct{}{"Resolver": {}},
+			functions: map[string]struct{}{"New": {}},
+		},
+		"file persister lifecycle": {
+			path: "plugin/framework/filepersister",
+			types: map[string]struct{}{
+				"Persister": {}, "Data": {},
+			},
+			functions: map[string]struct{}{"New": {}},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assertNoDeclarations(
+				t,
+				filepath.Join(root, test.path),
+				test.types,
+				test.functions,
+			)
+		})
+	}
+}
+
+func assertNoDeclarations(
+	t *testing.T,
+	dir string,
+	types map[string]struct{},
+	functions map[string]struct{},
+) {
+	t.Helper()
+	files, err := productionGoFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range files {
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, declaration := range file.Decls {
+			switch declaration := declaration.(type) {
+			case *ast.FuncDecl:
+				if declaration.Recv == nil {
+					if _, banned := functions[declaration.Name.Name]; banned {
+						t.Errorf("%s declares retired function %s", path, declaration.Name.Name)
+					}
+				}
+			case *ast.GenDecl:
+				for _, specification := range declaration.Specs {
+					typeSpec, ok := specification.(*ast.TypeSpec)
+					if !ok {
+						continue
+					}
+					if _, banned := types[typeSpec.Name.Name]; banned {
+						t.Errorf("%s declares retired type %s", path, typeSpec.Name.Name)
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -451,7 +622,7 @@ type constructionCounts struct {
 	agentNew      int
 	hostRun       int
 	processNew    int
-	legacyNew     int
+	retiredNew    int
 	commandKernel int
 }
 
@@ -459,7 +630,7 @@ type constructionContract struct {
 	agentNew      int
 	hostRun       int
 	processNew    int
-	legacyNew     int
+	retiredNew    int
 	commandKernel int
 }
 
@@ -677,7 +848,7 @@ func TestProductionConstructionGuardRejectsAdversarialSources(t *testing.T) {
 				}`,
 			contract: constructionContract{agentNew: 1, hostRun: 1},
 		},
-		"legacy manager beside process": {
+		"retired manager beside process": {
 			source: `package agent
 				import (
 					"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -821,7 +992,7 @@ func inspectConstructionFiles(paths []string) (constructionCounts, error) {
 		total.agentNew += counts.agentNew
 		total.hostRun += counts.hostRun
 		total.processNew += counts.processNew
-		total.legacyNew += counts.legacyNew
+		total.retiredNew += counts.retiredNew
 		total.commandKernel += counts.commandKernel
 	}
 	return total, nil
@@ -894,7 +1065,7 @@ func inspectConstructionSource(
 		case jobmgrImportPath:
 			switch selector.Sel.Name {
 			case "New":
-				counts.legacyNew++
+				counts.retiredNew++
 			case "NewCommandKernel":
 				counts.commandKernel++
 			}
@@ -942,11 +1113,11 @@ func validateConstructionContract(
 			want.processNew,
 		))
 	}
-	if counts.legacyNew != want.legacyNew {
+	if counts.retiredNew != want.retiredNew {
 		result = errors.Join(result, fmt.Errorf(
-			"legacy jobmgr.New calls=%d want=%d",
-			counts.legacyNew,
-			want.legacyNew,
+			"retired jobmgr.New calls=%d want=%d",
+			counts.retiredNew,
+			want.retiredNew,
 		))
 	}
 	if counts.commandKernel != want.commandKernel {

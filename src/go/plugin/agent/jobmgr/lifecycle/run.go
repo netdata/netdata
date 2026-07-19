@@ -22,6 +22,7 @@ type RunSupervisor struct {
 	timeout    time.Duration
 	shutdown   *ShutdownBudget
 	state      RunTerminalState
+	observer   RuntimeObserver
 }
 
 type RunCensus struct {
@@ -46,6 +47,23 @@ func NewRunSupervisor(generation uint64, clock Clock, shutdownTimeout time.Durat
 		return nil, errors.New("jobmgr run supervisor: invalid generation or shutdown budget")
 	}
 	return &RunSupervisor{generation: generation, clock: clock, timeout: shutdownTimeout}, nil
+}
+
+func (supervisor *RunSupervisor) BindRuntimeObserver(
+	observer RuntimeObserver,
+) error {
+	if supervisor == nil || observer == nil {
+		return errors.New("jobmgr run supervisor: invalid runtime observer")
+	}
+	supervisor.mu.Lock()
+	defer supervisor.mu.Unlock()
+	if supervisor.observer != nil || supervisor.admission ||
+		supervisor.shutdown != nil || supervisor.terminal ||
+		supervisor.dirty != nil {
+		return errors.New("jobmgr run supervisor: runtime observer bound after activation")
+	}
+	supervisor.observer = observer
+	return nil
 }
 
 func (supervisor *RunSupervisor) OpenAdmission() error {
@@ -107,10 +125,15 @@ func (supervisor *RunSupervisor) Dirty(cause error) error {
 	if supervisor.terminal {
 		return errors.Join(ErrRunTerminalReached, cause)
 	}
-	if supervisor.dirty == nil {
+	first := supervisor.dirty == nil
+	if first {
 		supervisor.dirty = cause
 	}
 	supervisor.admission = false
+	observer := supervisor.observer
+	if first && observer != nil {
+		observer.AddRuntimeCounter(RuntimeCounterDirtyRuns, 1)
+	}
 	return nil
 }
 

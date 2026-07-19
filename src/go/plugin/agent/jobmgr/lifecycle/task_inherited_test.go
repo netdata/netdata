@@ -5,6 +5,7 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 )
@@ -44,6 +45,10 @@ func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 
 func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
+	observer := &inheritedTaskRuntimeObserver{}
+	if err := supervisor.BindRuntimeObserver(observer); err != nil {
+		t.Fatal(err)
+	}
 	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
 	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV2Runner, func(context.Context) error {
 		panic("boom")
@@ -64,9 +69,42 @@ func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {
 	if err := supervisor.ReleaseInherited(ref, owner); err != nil {
 		t.Fatal(err)
 	}
+	if got := observer.counter(RuntimeCounterTaskPanics); got != 1 {
+		t.Fatalf("task panics=%d want=1", got)
+	}
 	if _, err := supervisor.StartInherited(context.Background(), owner, 0, func(context.Context) error { return nil }); err == nil {
 		t.Fatal("invalid inherited role was accepted")
 	}
+}
+
+type inheritedTaskRuntimeObserver struct {
+	mu       sync.Mutex
+	counters map[RuntimeCounter]uint64
+}
+
+func (*inheritedTaskRuntimeObserver) SetRuntimeGauge(RuntimeGauge, int) {}
+func (*inheritedTaskRuntimeObserver) AddRuntimeGauge(RuntimeGauge, int) {}
+func (*inheritedTaskRuntimeObserver) SetRuntimeTimestamp(RuntimeTimestamp, time.Time) {
+}
+
+func (observer *inheritedTaskRuntimeObserver) AddRuntimeCounter(
+	kind RuntimeCounter,
+	delta uint64,
+) {
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	if observer.counters == nil {
+		observer.counters = make(map[RuntimeCounter]uint64)
+	}
+	observer.counters[kind] += delta
+}
+
+func (observer *inheritedTaskRuntimeObserver) counter(
+	kind RuntimeCounter,
+) uint64 {
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	return observer.counters[kind]
 }
 
 func TestInheritedTaskMissedJoinRetainsRecord(t *testing.T) {
