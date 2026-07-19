@@ -490,7 +490,7 @@ set(CPACK_COMPONENT_PLUGIN-NETWORK-VIEWER_DESCRIPTION
  This plugin allows the Netdata Agent to provide network connection
  mapping functionality for use in Netdata Cloud.")
 
-set(CPACK_DEBIAN_PLUGIN-NETWORK_VIEWER_PACKAGE_NAME "netdata-plugin-network-viewer")
+set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_NAME "netdata-plugin-network-viewer")
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_PREDEPENDS "libcap2-bin, adduser")
 set(CPACK_DEBIAN_PLUGIN-NETWORK-VIEWER_PACKAGE_RECOMMENDS "netdata-plugin-ebpf (= ${CPACK_PACKAGE_VERSION})")
