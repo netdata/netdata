@@ -65,7 +65,11 @@ UI configuration requires paid Netdata Cloud plan.
 
 ### Prerequisites
 
-No action required.
+#### Log file permissions
+
+The user running Netdata must have read access to every configured web server log file.
+
+
 
 ### Configuration
 
@@ -135,9 +139,9 @@ Notes:
 <a id="option-target-path"></a>
 ##### path
 
-Each `web_log` job follows a **single** log file. `path` accepts a shell glob pattern, but when a glob matches multiple files the collector reads only **one** of them at a time (the last in name order) — it does not merge data from every match into one stream.
+Each `web_log` job follows a **single** log file. `path` accepts a shell glob pattern, but when a glob matches multiple files the collector follows only **one** match — it does not merge data from every match into one stream.
 
-To monitor several log files, add a separate job for each one. For example, cPanel/WHM writes a separate Apache access log per user at `/var/lib/apache2/domlogs/<user>-ssl_log`. Collect every user's traffic with one job per file:
+To monitor several log files, add a separate job for each one. For example, if your server stores one Apache access log per account at `/var/lib/apache2/domlogs/<user>-ssl_log`, collect every account's traffic with one job per file:
 
 ```yaml
 jobs:
@@ -148,8 +152,6 @@ jobs:
 ```
 
 A glob such as `/var/lib/apache2/domlogs/*-ssl_log` will **not** follow every matching log — only one file is read, so the remaining traffic is silently missing. Use one job per file to cover every log you need.
-
-See the [web log collection guide](https://github.com/netdata/netdata/blob/master/docs/developer-and-contributor-corner/collect-apache-nginx-web-logs#monitor-multiple-log-files) for details.
 
 
 <a id="option-customization-url-patterns"></a>

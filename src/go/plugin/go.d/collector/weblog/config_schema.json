@@ -12,7 +12,7 @@
       },
       "path": {
         "title": "Log file",
-        "description": "The file path or shell glob pattern of the Webserver log file. When a glob matches multiple files, only one is read at a time (the last in name order); use a separate job per file to monitor more than one.",
+        "description": "The file path or shell glob pattern of the web server log file. If a glob matches multiple files, the collector follows only one match. Use a separate job for each file to monitor multiple files.",
         "type": "string",
         "default": "/var/log/nginx/access.log"
       },
