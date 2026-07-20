@@ -87,6 +87,7 @@ RRDR *rrd2rrdr_legacy(
 
     QUERY_TARGET_REQUEST qtr = {
             .version = 1,
+            .owa = owa,
             .st = st,
             .points = points,
             .after = after,

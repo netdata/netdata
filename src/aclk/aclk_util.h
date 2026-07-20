@@ -125,6 +125,7 @@ int aclk_proxy_negotiation_connect(int sockfd, enum mqtt_wss_proxy_type proxy_ty
                                    const char *target_host, int target_port, int timeout_ms);
 void aclk_sensitive_memzero(void *ptr, size_t len);
 void aclk_sensitive_free(char **ptr);
+int aclk_util_unittest(void);
 
 // True once at least budget_ut has elapsed since start_ut. Inclusive: the budget is spent when
 // exactly that much has passed. Single predicate for every monotonic deadline in ACLK - the

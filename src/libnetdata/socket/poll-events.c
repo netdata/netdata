@@ -167,6 +167,49 @@ void poll_default_tmr_callback(void *timer_data) {
     (void)timer_data;
 }
 
+static time_t poll_cleanup_check_every(time_t complete_request_timeout, time_t idle_timeout) {
+    time_t shortest = 0;
+
+    if(complete_request_timeout > 0)
+        shortest = complete_request_timeout;
+
+    if(idle_timeout > 0 && (!shortest || idle_timeout < shortest))
+        shortest = idle_timeout;
+
+    return (shortest / 3) + 1;
+}
+
+static bool poll_request_ingress_timed_out(POLLINFO *pi, time_t complete_request_timeout, time_t now) {
+    return (pi->flags & POLLINFO_FLAG_REQUEST_INGRESS) &&
+           complete_request_timeout > 0 &&
+           now - pi->request_ingress_t >= complete_request_timeout;
+}
+
+int poll_events_unittest(void) {
+    int errors = 0;
+    POLLINFO pi = {
+        .flags = POLLINFO_FLAG_REQUEST_INGRESS,
+        .request_ingress_t = 100,
+    };
+
+    if(poll_request_ingress_timed_out(&pi, 5, 104) ||
+       !poll_request_ingress_timed_out(&pi, 5, 105) ||
+       poll_request_ingress_timed_out(&pi, 0, 200))
+        errors++;
+
+    pi.flags &= ~POLLINFO_FLAG_REQUEST_INGRESS;
+    if(poll_request_ingress_timed_out(&pi, 5, 200))
+        errors++;
+
+    if(poll_cleanup_check_every(5, 60) != 2 ||
+       poll_cleanup_check_every(60, 5) != 2 ||
+       poll_cleanup_check_every(0, 60) != 21 ||
+       poll_cleanup_check_every(0, 0) != 1)
+        errors++;
+
+    return errors;
+}
+
 static void poll_events_cleanup(void *pptr) {
     POLLJOB *p = CLEANUP_FUNCTION_GET_PTR(pptr);
     if(!p) return;
@@ -354,7 +397,7 @@ void poll_events(LISTEN_SOCKETS *sockets
 
         .complete_request_timeout = tcp_request_timeout_seconds,
         .idle_timeout = tcp_idle_timeout_seconds,
-        .checks_every = (tcp_idle_timeout_seconds / 3) + 1,
+        .checks_every = poll_cleanup_check_every(tcp_request_timeout_seconds, tcp_idle_timeout_seconds),
 
         .access_list = access_list,
         .allow_dns   = allow_dns,
@@ -553,7 +596,19 @@ void poll_events(LISTEN_SOCKETS *sockets
                 next = pi->next;
 
                 if(likely(pi->flags & POLLINFO_FLAG_CLIENT_SOCKET)) {
-                    if (unlikely(
+                    if (unlikely(poll_request_ingress_timed_out(
+                            pi, p.complete_request_timeout, now))) {
+                        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                               "POLLFD: LISTENER: client slot %zu (fd %d) from %s port %s has not completed its current request in %zu seconds - closing it. "
+                               , i
+                               , pi->fd
+                               , pi->client_ip ? pi->client_ip : "<undefined-ip>"
+                               , pi->client_port ? pi->client_port : "<undefined-port>"
+                               , (size_t) p.complete_request_timeout
+                        );
+                        poll_close_fd(pi, "poll_events4");
+                    }
+                    else if (unlikely(
                         !(pi->flags & POLLINFO_FLAG_FIRST_REQUEST_RECEIVED) &&
                         pi->send_count == 0 &&
                         p.complete_request_timeout > 0 &&

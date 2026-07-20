@@ -10,15 +10,13 @@ struct web_client;
 
 extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 
-#define HTTP_REQ_MAX_HEADER_FETCH_TRIES 100
-
 extern int respect_web_browser_do_not_track_policy;
 extern const char *web_x_frame_options;
 
 typedef enum __attribute__((packed)) {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
-    HTTP_VALIDATION_TOO_MANY_READ_RETRIES,
+    HTTP_VALIDATION_REQUEST_TIMEOUT,
     HTTP_VALIDATION_MALFORMED_URL,
     HTTP_VALIDATION_URL_TOO_LONG,
     HTTP_VALIDATION_INCOMPLETE,
@@ -26,7 +24,14 @@ typedef enum __attribute__((packed)) {
 } HTTP_VALIDATION;
 
 static inline short http_validation_error_to_response_code(HTTP_VALIDATION validation) {
-    return validation == HTTP_VALIDATION_URL_TOO_LONG ? HTTP_RESP_URI_TOO_LONG : HTTP_RESP_BAD_REQUEST;
+    switch(validation) {
+        case HTTP_VALIDATION_URL_TOO_LONG:
+            return HTTP_RESP_URI_TOO_LONG;
+        case HTTP_VALIDATION_REQUEST_TIMEOUT:
+            return HTTP_RESP_REQUEST_TIMEOUT;
+        default:
+            return HTTP_RESP_BAD_REQUEST;
+    }
 }
 
 typedef enum __attribute__((packed)) {
@@ -197,6 +202,7 @@ struct web_client {
     HTTP_ACCESS access;                 // the access permissions of the client
     size_t header_parse_tries;
     size_t header_parse_last_size;
+    usec_t request_ingress_started_ut;
 
     int fd;
 
@@ -274,6 +280,7 @@ void web_client_request_done(struct web_client *w);
 
 void web_client_build_http_header(struct web_client *w);
 
+void web_client_reset_allocations_for_reuse(struct web_client *w);
 void web_client_reuse_from_cache(struct web_client *w);
 struct web_client *web_client_create(size_t *statistics_memory_accounting);
 void web_client_free(struct web_client *w);
@@ -283,6 +290,7 @@ void web_client_free(struct web_client *w);
 #include "database/rrd.h"
 
 HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string, size_t length);
+int web_client_cache_unittest(void);
 int web_client_request_target_unittest(void);
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);
 int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path);

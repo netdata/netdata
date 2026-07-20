@@ -1,7 +1,7 @@
 #ifndef ONEWAYALLOC_H
 #define ONEWAYALLOC_H 1
 
-#include "../libnetdata.h"
+#include <stddef.h>
 
 typedef void ONEWAYALLOC;
 

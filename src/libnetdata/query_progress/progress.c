@@ -150,6 +150,52 @@ static void query_progress_free(QUERY_PROGRESS *qp) {
     freez(qp);
 }
 
+typedef struct query_progress_content {
+    BUFFER *query;
+    BUFFER *payload;
+    BUFFER *client;
+} QUERY_PROGRESS_CONTENT;
+
+static QUERY_PROGRESS_CONTENT query_progress_content_prepare(
+    const char *query, BUFFER *payload, const char *client)
+{
+    QUERY_PROGRESS_CONTENT content = { 0 };
+
+    if(query && *query) {
+        content.query = buffer_create(0, NULL);
+        buffer_content_summary(content.query, query, strlen(query));
+    }
+
+    if(payload && buffer_strlen(payload)) {
+        content.payload = buffer_create(0, NULL);
+        buffer_content_summary(
+            content.payload, buffer_tostring(payload), buffer_strlen(payload));
+    }
+
+    if(client && *client) {
+        content.client = buffer_create(0, NULL);
+        buffer_strcat(content.client, client);
+    }
+
+    return content;
+}
+
+static void query_progress_content_cleanup(QUERY_PROGRESS_CONTENT *content) {
+    buffer_free(content->query);
+    buffer_free(content->payload);
+    buffer_free(content->client);
+}
+
+static inline void query_progress_content_take_if_empty(BUFFER **destination, BUFFER **prepared) {
+    if(!*prepared || buffer_strlen(*destination))
+        return;
+
+    // Transfer the prepared content and return the old empty buffer for cleanup.
+    BUFFER *old = *destination;
+    *destination = *prepared;
+    *prepared = old;
+}
+
 static void query_progress_cleanup_to_reuse(QUERY_PROGRESS *qp, nd_uuid_t *transaction) {
     assert(qp && qp->prev == NULL && qp->next == NULL);
     assert(!transaction || !qp->indexed);
@@ -168,7 +214,10 @@ static void query_progress_cleanup_to_reuse(QUERY_PROGRESS *qp, nd_uuid_t *trans
         uuid_copy(qp->transaction, *transaction);
 }
 
-static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, BUFFER *payload, const char *client) {
+static inline void query_progress_update(
+    QUERY_PROGRESS *qp, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl,
+    QUERY_PROGRESS_CONTENT *content)
+{
     qp->mode = mode;
     qp->acl = acl;
     qp->started_ut = started_ut ? started_ut : now_realtime_usec();
@@ -178,14 +227,9 @@ static inline void query_progress_update(QUERY_PROGRESS *qp, usec_t started_ut, 
     qp->sent_size = 0;
     qp->response_code = 0;
 
-    if(query && *query && !buffer_strlen(qp->query))
-        buffer_content_summary(qp->query, query, strlen(query));
-
-    if(payload && !buffer_strlen(qp->payload))
-        buffer_content_summary(qp->payload, buffer_tostring(payload), buffer_strlen(payload));
-
-    if(client && *client && !buffer_strlen(qp->client))
-        buffer_strcat(qp->client, client);
+    query_progress_content_take_if_empty(&qp->query, &content->query);
+    query_progress_content_take_if_empty(&qp->payload, &content->payload);
+    query_progress_content_take_if_empty(&qp->client, &content->client);
 }
 
 // ----------------------------------------------------------------------------
@@ -208,6 +252,8 @@ static inline void query_progress_unlink_from_cache_unsafe(QUERY_PROGRESS *qp) {
 void query_progress_start_or_update(nd_uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, BUFFER *payload, const char *client) {
     if(!transaction)
         return;
+
+    QUERY_PROGRESS_CONTENT content = query_progress_content_prepare(query, payload, client);
 
     spinlock_lock(&progress.spinlock);
     query_progress_init_unsafe();
@@ -233,12 +279,13 @@ void query_progress_start_or_update(nd_uuid_t *transaction, usec_t started_ut, H
         qp = query_progress_alloc(transaction);
     }
 
-    query_progress_update(qp, started_ut, mode, acl, query, payload, client);
+    query_progress_update(qp, started_ut, mode, acl, &content);
 
     if(!qp->indexed)
         query_progress_add_to_hashtable_unsafe(qp);
 
     spinlock_unlock(&progress.spinlock);
+    query_progress_content_cleanup(&content);
 }
 
 void query_progress_set_finish_line(nd_uuid_t *transaction, size_t all) {
@@ -631,7 +678,9 @@ int progress_unittest(void) {
         CLEAN_BUFFER *payload = buffer_create(large_size + 1, NULL);
         buffer_strncat(payload, large, large_size);
 
-        query_progress_update(qp, 0, HTTP_REQUEST_MODE_GET, HTTP_ACL_ACLK, large, payload, "test");
+        QUERY_PROGRESS_CONTENT content = query_progress_content_prepare(large, payload, "test");
+        query_progress_update(qp, 0, HTTP_REQUEST_MODE_GET, HTTP_ACL_ACLK, &content);
+        query_progress_content_cleanup(&content);
         if(buffer_strlen(qp->query) <= BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH ||
            buffer_strlen(qp->payload) <= BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH ||
            qp->query->size > retained_capacity_limit ||

@@ -15,6 +15,7 @@ extern "C" {
 #include "libnetdata/exit/exit_initiated.h"
 #include "log/nd_log-fatal.h"
 #include "atomics/atomics.h"
+#include "onewayalloc/onewayalloc.h"
 
 // NETDATA_TRACE_ALLOCATIONS does not work under musl libc, so don't enable it
 //#if defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_TRACE_ALLOCATIONS)
@@ -132,7 +133,6 @@ struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int
 #include "yaml/yaml.h"
 #include "string/utf8.h"
 #include "libnetdata/aral/aral.h"
-#include "onewayalloc/onewayalloc.h"
 #include "worker_utilization/worker_utilization.h"
 #include "http/http_defs.h"
 #include "gorilla/gorilla.h"
