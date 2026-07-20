@@ -769,12 +769,15 @@ static SPINLOCK perflib_giveup_spinlock = SPINLOCK_INITIALIZER;
 static DICTIONARY *perflib_giveup_logged = NULL;
 
 static bool perflib_giveup_log_should(const char *key) {
+    // A non-NULL marker value is required: dictionary_set(..., NULL, 0) stores a
+    // NULL value, which dictionary_get() cannot distinguish from "absent".
+    static const uint8_t marker = 1;
     bool should = false;
     spinlock_lock(&perflib_giveup_spinlock);
     if(unlikely(!perflib_giveup_logged))
         perflib_giveup_logged = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     if(!dictionary_get(perflib_giveup_logged, key)) {
-        dictionary_set(perflib_giveup_logged, key, NULL, 0);
+        dictionary_set(perflib_giveup_logged, key, (void *)&marker, sizeof(marker));
         should = true;
     }
     spinlock_unlock(&perflib_giveup_spinlock);
@@ -792,23 +795,68 @@ static bool perflib_giveup_log_clear(const char *key) {
     return cleared;
 }
 
+// ----------------------------------------------------------------------------
+// Park / re-probe accounting, shared by instance- and object-counter lookups.
+//
+// After PERFLIB_MAX_FAILURES_TO_FIND_METRIC consecutive misses we stop scanning
+// counter definitions every cycle, but we re-probe every PERFLIB_REPROBE_INTERVAL
+// collections so a transiently-missing counter resumes on its own (no restart).
+
+// Returns true when the metric is parked and still inside its backoff window
+// (the caller should skip the search this cycle). On the re-probe cycle it also
+// forgets the cached counter id, so a counter that came back under a new
+// CounterNameTitleIndex is resolved again by name.
+static bool perflib_counter_backoff_skip(COUNTER_DATA *cd) {
+    if(likely(cd->failures < PERFLIB_MAX_FAILURES_TO_FIND_METRIC))
+        return false;
+
+    // `--cd->backoff` is only evaluated while backoff > 0, so it never underflows;
+    // re-probing when it reaches 0 makes the period exactly PERFLIB_REPROBE_INTERVAL.
+    if(cd->backoff && --cd->backoff)
+        return true;
+
+    cd->id = 0;
+    return false;
+}
+
+// Record a successful read; if the metric had been parked, log recovery once.
+static void perflib_counter_record_success(COUNTER_DATA *cd, bool parked) {
+    if(unlikely(parked) && perflib_giveup_log_clear(cd->key))
+        nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
+               "WINDOWS: PERFLIB: Metric '%s' is available again; resuming collection.", cd->key);
+    cd->updated = true;
+    cd->failures = 0;
+    cd->backoff = 0;
+}
+
+// Record a failed read; on the transition to parked, log give-up once per key.
+static void perflib_counter_record_failure(COUNTER_DATA *cd, bool parked) {
+    if(parked) {
+        // the re-probe failed; keep it parked until the next re-probe window
+        cd->backoff = PERFLIB_REPROBE_INTERVAL;
+        return;
+    }
+
+    cd->failures++;
+    if(cd->failures >= PERFLIB_MAX_FAILURES_TO_FIND_METRIC) {
+        if(perflib_giveup_log_should(cd->key))
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "WINDOWS: PERFLIB: Giving up on metric '%s' after %u attempts; "
+                   "will re-probe every %u collections.",
+                   cd->key, cd->failures, PERFLIB_REPROBE_INTERVAL);
+        cd->backoff = PERFLIB_REPROBE_INTERVAL;
+    }
+}
+
 bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd) {
-    DWORD id = cd->id;
     const char *key = cd->key;
     internal_fatal(key == NULL, "You have to set a key for this call.");
 
-    // We stop scanning counter definitions and string-comparing every cycle once
-    // a metric has been missing PERFLIB_MAX_FAILURES_TO_FIND_METRIC times, but we
-    // re-probe periodically so collection recovers on its own (no restart needed).
     bool parked = cd->failures >= PERFLIB_MAX_FAILURES_TO_FIND_METRIC;
-    if(unlikely(parked)) {
-        if(cd->backoff) {
-            cd->backoff--;
-            goto failed;
-        }
-        // backoff elapsed: fall through and attempt a single re-probe this cycle
-    }
+    if(unlikely(perflib_counter_backoff_skip(cd)))
+        goto failed;
 
+    DWORD id = cd->id; // read after backoff_skip, which may reset it on a re-probe
     PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
     for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
         pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
@@ -837,32 +885,15 @@ bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pO
 
         cd->previous = cd->current;
         if(likely(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current))) {
-            if(unlikely(parked) && perflib_giveup_log_clear(cd->key))
-                nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
-                       "WINDOWS: PERFLIB: Metric '%s' is available again; resuming collection.", cd->key);
-            cd->updated = true;
-            cd->failures = 0;
-            cd->backoff = 0;
+            perflib_counter_record_success(cd, parked);
             return true;
         }
+
+        // counter matched but was unreadable: stop scanning and count it as a miss
+        break;
     }
 
-    // not found / not readable this cycle
-    if(parked) {
-        // the re-probe failed; keep it parked until the next re-probe window
-        cd->backoff = PERFLIB_REPROBE_INTERVAL;
-    }
-    else {
-        cd->failures++;
-        if(cd->failures >= PERFLIB_MAX_FAILURES_TO_FIND_METRIC) {
-            if(perflib_giveup_log_should(cd->key))
-                nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                       "WINDOWS: PERFLIB: Giving up on metric '%s' after %u attempts; "
-                       "will re-probe every %u collections.",
-                       cd->key, cd->failures, PERFLIB_REPROBE_INTERVAL);
-            cd->backoff = PERFLIB_REPROBE_INTERVAL;
-        }
-    }
+    perflib_counter_record_failure(cd, parked);
 
 failed:
     cd->previous = cd->current;
@@ -873,8 +904,15 @@ failed:
 
 bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, COUNTER_DATA *cd) {
     if (unlikely(!pObjectType))
+        goto cleanup; // missing object (not a missing counter) — do not park on it
+
+    internal_fatal(cd->key == NULL, "You have to set a key for this call.");
+
+    bool parked = cd->failures >= PERFLIB_MAX_FAILURES_TO_FIND_METRIC;
+    if(unlikely(perflib_counter_backoff_skip(cd)))
         goto cleanup;
 
+    DWORD id = cd->id; // read after backoff_skip, which may reset it on a re-probe
     PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
     for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
         pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
@@ -886,8 +924,8 @@ bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObj
             break;
         }
 
-        if(cd->id) {
-            if(cd->id != pCounterDefinition->CounterNameTitleIndex)
+        if(id) {
+            if(id != pCounterDefinition->CounterNameTitleIndex)
                 continue;
         }
         else {
@@ -901,9 +939,16 @@ bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObj
         PERF_COUNTER_BLOCK *pCounterBlock = getObjectTypeCounterBlock(pDataBlock, pObjectType);
 
         cd->previous = cd->current;
-        cd->updated = getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current);
-        return cd->updated;
+        if(likely(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current))) {
+            perflib_counter_record_success(cd, parked);
+            return true;
+        }
+
+        // counter matched but was unreadable: stop scanning and count it as a miss
+        break;
     }
+
+    perflib_counter_record_failure(cd, parked);
 
 cleanup:
     cd->previous = cd->current;
