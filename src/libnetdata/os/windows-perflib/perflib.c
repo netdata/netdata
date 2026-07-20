@@ -848,11 +848,13 @@ static void perflib_counter_record_failure(COUNTER_DATA *cd, bool parked) {
     }
 }
 
-// Shared implementation for instance- and object-counter lookups. They differ
-// only in how the counter block is located: pass the instance for an instance
-// counter, or NULL for an object-level (single-instance) counter.
-static bool perflib_get_counter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd) {
+// Shared implementation for instance- and object-counter lookups. The scope is
+// explicit (object_scope), not inferred from pInstance: an instance lookup must
+// never silently fall back to the object-level counter block and return
+// object-scoped data through the instance API.
+static bool perflib_get_counter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, bool object_scope, COUNTER_DATA *cd) {
     internal_fatal(cd->key == NULL, "You have to set a key for this call.");
+    internal_fatal(!object_scope && pInstance == NULL, "Instance counter lookup requires an instance.");
 
     if(unlikely(!pObjectType))
         goto failed; // missing object (not a missing counter) — do not park on it
@@ -885,9 +887,9 @@ static bool perflib_get_counter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
         }
 
         cd->current.CounterType = cd->OverwriteCounterType ? cd->OverwriteCounterType : pCounterDefinition->CounterType;
-        PERF_COUNTER_BLOCK *pCounterBlock = pInstance ?
-            getInstanceCounterBlock(pDataBlock, pObjectType, pInstance) :
-            getObjectTypeCounterBlock(pDataBlock, pObjectType);
+        PERF_COUNTER_BLOCK *pCounterBlock = object_scope ?
+            getObjectTypeCounterBlock(pDataBlock, pObjectType) :
+            getInstanceCounterBlock(pDataBlock, pObjectType, pInstance);
 
         cd->previous = cd->current;
         if(likely(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current))) {
@@ -909,11 +911,11 @@ failed:
 }
 
 bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd) {
-    return perflib_get_counter(pDataBlock, pObjectType, pInstance, cd);
+    return perflib_get_counter(pDataBlock, pObjectType, pInstance, false, cd);
 }
 
 bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, COUNTER_DATA *cd) {
-    return perflib_get_counter(pDataBlock, pObjectType, NULL, cd);
+    return perflib_get_counter(pDataBlock, pObjectType, NULL, true, cd);
 }
 
 PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id) {
