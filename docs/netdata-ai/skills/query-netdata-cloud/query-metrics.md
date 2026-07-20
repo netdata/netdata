@@ -1,4 +1,4 @@
-# Query time-series metrics from Netdata Cloud via the REST API.
+# Query time-series metrics from Netdata Cloud via the REST API
 
 ## Mandatory Requirements (READ FIRST)
 
@@ -51,7 +51,7 @@ Relevant scopes: `scope:all` (full access), `scope:grafana-plugin` (data endpoin
 ## API Endpoints
 
 Base URL: `https://app.netdata.cloud`
-Swagger online: https://app.netdata.cloud/api/docs/
+Swagger online: <https://app.netdata.cloud/api/docs/>
 
 All endpoints use **POST** with a JSON body and require:
 
@@ -60,10 +60,10 @@ Authorization: Bearer YOUR_API_TOKEN
 Content-Type: application/json
 ```
 
-| Endpoint | Purpose |
-|----------|---------|
-| `/api/v3/spaces/{spaceID}/rooms/{roomID}/data` | Query time-series data |
-| `/api/v3/spaces/{spaceID}/rooms/{roomID}/nodes` | List nodes in the room |
+| Endpoint                                           | Purpose                        |
+|----------------------------------------------------|--------------------------------|
+| `/api/v3/spaces/{spaceID}/rooms/{roomID}/data`     | Query time-series data         |
+| `/api/v3/spaces/{spaceID}/rooms/{roomID}/nodes`    | List nodes in the room         |
 | `/api/v3/spaces/{spaceID}/rooms/{roomID}/contexts` | List available metric contexts |
 
 ---
@@ -75,18 +75,18 @@ Content-Type: application/json
 
 Response fields per node:
 
-| JSON field | Description |
-|------------|-------------|
-| `nd` | **Node UUID** — required for `scope.nodes` in data queries |
-| `nm` | Hostname |
-| `mg` | Machine GUID |
-| `state` | `reachable` (live) or `stale` (disconnected) |
-| `v` | Agent version |
-| `labels` | All node labels as key-value pairs |
-| `hw` | Hardware: `cpus`, `memory`, `disk_space`, `architecture` |
-| `os` | OS: `nm` (name), `v` (version), `kernel` |
-| `health` | Alert summary: `status`, `alerts.warning`, `alerts.critical` |
-| `capabilities` | Supported features: `ml`, `funcs`, `health`, etc. |
+| JSON field     | Description                                                  |
+|----------------|--------------------------------------------------------------|
+| `nd`           | **Node UUID** — required for `scope.nodes` in data queries   |
+| `nm`           | Hostname                                                     |
+| `mg`           | Machine GUID                                                 |
+| `state`        | `reachable` (live) or `stale` (disconnected)                 |
+| `v`            | Agent version                                                |
+| `labels`       | All node labels as key-value pairs                           |
+| `hw`           | Hardware: `cpus`, `memory`, `disk_space`, `architecture`     |
+| `os`           | OS: `nm` (name), `v` (version), `kernel`                     |
+| `health`       | Alert summary: `status`, `alerts.warning`, `alerts.critical` |
+| `capabilities` | Supported features: `ml`, `funcs`, `health`, etc.            |
 
 Example:
 
@@ -181,13 +181,13 @@ Scope controls **both data and metadata** in the response. Use scope fields for 
 
 **WARNING**: The default scope (when fields are omitted) is **all nodes and all contexts in the room**. This can produce multi-megabyte responses with metadata for thousands of metrics. `scope.contexts` MUST always be set to avoid this metadata explosion.
 
-| Field | Type | Accepts | Default (if omitted) |
-|-------|------|---------|---------------------|
-| `nodes` | `string[]` | **Node UUIDs only** (the `nd` field from `/nodes`) | All nodes in the room |
-| `contexts` | `string[]` | Exact names or patterns (`system.*`, `*cpu*`) | **REQUIRED** — always set to avoid metadata explosion |
-| `instances` | `string[]` | Exact names or patterns (`disk_space./@NODE_UUID`) | All instances |
-| `dimensions` | `string[]` | Exact names or patterns (`*user*`, `sent`) | All dimensions |
-| `labels` | `string[]` | `key:value` pairs (`filesystem:btrfs`, `mount_point:/`) | No label filter |
+| Field        | Type       | Accepts                                                 | Default (if omitted)                                  |
+|--------------|------------|---------------------------------------------------------|-------------------------------------------------------|
+| `nodes`      | `string[]` | **Node UUIDs only** (the `nd` field from `/nodes`)      | All nodes in the room                                 |
+| `contexts`   | `string[]` | Exact names or patterns (`system.*`, `*cpu*`)           | **REQUIRED** — always set to avoid metadata explosion |
+| `instances`  | `string[]` | Exact names or patterns (`disk_space./@NODE_UUID`)      | All instances                                         |
+| `dimensions` | `string[]` | Exact names or patterns (`*user*`, `sent`)              | All dimensions                                        |
+| `labels`     | `string[]` | `key:value` pairs (`filesystem:btrfs`, `mount_point:/`) | No label filter                                       |
 
 Multiple entries in the same field are OR-combined. Multiple `labels` entries with different keys are AND-combined.
 
@@ -205,14 +205,14 @@ Selectors filter **data only** — response metadata still reflects the full sco
 
 Selectors exist for the Netdata dashboard, which needs full metadata to show context ("the whole") while displaying a filtered subset.
 
-| Field | Type | Checked against | Supports |
-|-------|------|----------------|----------|
-| `nodes` | `string[]` | Machine GUID, node ID, **hostname** | Simple patterns, positive and negative |
-| `contexts` | `string[]` | Context ID | Simple patterns, positive and negative |
-| `instances` | `string[]` | Instance ID, instance name, `instance@machine_guid` | Simple patterns, positive and negative |
-| `dimensions` | `string[]` | Dimension ID and dimension name | Simple patterns, positive and negative |
-| `labels` | `string[]` | `name:value` of all labels | Simple patterns (negative not recommended) |
-| `alerts` | `string[]` | Alert name, `name:status` (CLEAR, WARNING, CRITICAL, REMOVED, UNDEFINED, UNINITIALIZED) | Simple patterns; negative excludes instances |
+| Field        | Type       | Checked against                                                                         | Supports                                     |
+|--------------|------------|-----------------------------------------------------------------------------------------|----------------------------------------------|
+| `nodes`      | `string[]` | Machine GUID, node ID, **hostname**                                                     | Simple patterns, positive and negative       |
+| `contexts`   | `string[]` | Context ID                                                                              | Simple patterns, positive and negative       |
+| `instances`  | `string[]` | Instance ID, instance name, `instance@machine_guid`                                     | Simple patterns, positive and negative       |
+| `dimensions` | `string[]` | Dimension ID and dimension name                                                         | Simple patterns, positive and negative       |
+| `labels`     | `string[]` | `name:value` of all labels                                                              | Simple patterns (negative not recommended)   |
+| `alerts`     | `string[]` | Alert name, `name:status` (CLEAR, WARNING, CRITICAL, REMOVED, UNDEFINED, UNINITIALIZED) | Simple patterns; negative excludes instances |
 
 **`selectors.nodes` is the preferred way to filter by node.** It accepts hostname patterns (e.g., `["web*", "!staging*"]`), making it simpler than looking up UUIDs for `scope.nodes`. Metadata will include all nodes in scope, but data is filtered correctly.
 
@@ -222,16 +222,22 @@ CRITICAL: `scope.contexts` MUST always be set to avoid metadata explosion.
 
 ### window — Time Range
 
-| Field | Type | Description | Default |
-|-------|------|-------------|---------|
-| `after` | `int` | Start time. Negative = relative seconds from `before` (max -94608000 = 3 years). Positive = Unix epoch. | `-600` |
-| `before` | `int` | End time. Negative = relative seconds from now (max -94608000). Positive = Unix epoch. | `0` (now) |
-| `points` | `int` | Number of data points to return. `0` or omitted = all available points. | `0` |
-| `duration` | `int` | Alternative to after/before. Duration in seconds. | `0` |
-| `tier` | `int?` | Force a specific dbengine storage tier (0 = per-second, 1 = per-minute, 2 = per-hour). `null` = auto-select. | `null` |
-| `baseline` | `object?` | Baseline window for comparison queries. Same fields as window: `after`, `before`, `points`, `duration`. | `null` |
+| Field      | Type      | Description                                                                                                            | Default   |
+|------------|-----------|------------------------------------------------------------------------------------------------------------------------|-----------|
+| `after`    | `int`     | Start time. Negative = relative seconds from `before` (max -94608000 = 3 years). Positive = Unix epoch.                | `-600`    |
+| `before`   | `int`     | End time. Negative = relative seconds from now (max -94608000). Positive = Unix epoch.                                 | `0` (now) |
+| `points`   | `int`     | Number of data points to return. `0` or omitted leaves the target to the Agent query planner.                          | `0`       |
+| `duration` | `int`     | Alternative to after/before. Duration in seconds.                                                                      | `0`       |
+| `tier`     | `int?`    | Request a dbengine storage tier (0 = native resolution; higher tiers are progressively coarser). `null` = auto-select. | `null`    |
+| `baseline` | `object?` | Baseline window for comparison queries. Same fields as window: `after`, `before`, `points`, `duration`.                | `null`    |
 
-Max points requested: approximately **500** (`ScopeDataRequestMaxPoints`). The Cloud clamps the request to 500 before forwarding to agents, but the actual number returned may vary slightly due to time alignment.
+For requests that Cloud must aggregate across multiple Agent routes,
+Cloud clamps explicit `points` values above **500** to exactly 500
+(`ScopeDataRequestMaxPoints`) before forwarding them. A request that
+resolves to one Agent route is passed through without this clamp, and
+`points: 0` does not satisfy the `points > 500` condition. The final
+number returned can still vary because of Agent-side window alignment
+and normalization.
 
 The time range is divided into `points` equal intervals. Each interval is aggregated using the `time_group` function.
 
@@ -245,22 +251,42 @@ This is the most common assistant mistake. The number of `points` does NOT mean 
 seconds_per_point = abs(duration) ÷ points
 ```
 
-**To get per-second data, set `points` equal to the duration in seconds.**
+**To request per-second buckets, set `points` equal to the duration in
+seconds.** The matched metrics must also have a one-second native
+collection interval covering that window; asking for more points
+cannot create samples the database does not hold.
 
 Examples:
 
-| You want | Set `after` | Set `points` | Result |
-|---|---|---|---|
-| Per-second resolution, last 2 minutes | `-120` | `120` | 1 second per point |
-| Per-second resolution, last 5 minutes | `-300` | `300` | 1 second per point |
-| 10-second buckets, last 10 minutes | `-600` | `60` | 10 seconds per point |
-| Per-minute resolution, last hour | `-3600` | `60` | 60 seconds per point |
+| You want                              | Set `after` | Set `points` | Result               |
+|---------------------------------------|-------------|--------------|----------------------|
+| Per-second resolution, last 2 minutes | `-120`      | `120`        | 1 second per point   |
+| Per-second resolution, last 5 minutes | `-300`      | `300`        | 1 second per point   |
+| 10-second buckets, last 10 minutes    | `-600`      | `60`         | 10 seconds per point |
+| Per-minute resolution, last hour      | `-3600`     | `60`         | 60 seconds per point |
 
-**Common mistake**: requesting `after: -600, points: 30` and expecting per-second data. Result: 600 ÷ 30 = **20 seconds per point** (heavily aggregated). Per-second data over 10 minutes requires `after: -600, points: 600` (which is at the 500-point cap; either request 8 minutes 20 seconds at 500 points, or accept a slightly coarser resolution).
+**Common mistake**: requesting `after: -600, points: 30` and expecting
+per-second data. Result: 600 ÷ 30 = **20 seconds per point** (heavily
+aggregated). Per-second buckets over 10 minutes require
+`after: -600, points: 600`. Cloud reduces that to 500 only when the
+query spans multiple Agent routes; a single-route request is passed
+through.
 
-**Per-second data also requires that the dbengine tier 0 (per-second storage) covers the requested time range.** If the agent's tier 0 retention is shorter than `abs(after)`, the engine auto-selects a coarser tier (per-minute or per-hour). Force tier 0 with `"tier": 0` in the window if you need to assert per-second data is actually available -- the query will fail rather than silently downsample.
+**Native-resolution data also requires dbengine tier 0 to cover the
+requested time range.** Tier 0 is per-second only for metrics
+collected every second. Requesting `"tier": 0` is not an availability
+assertion. A valid tier with partial overlap returns only that overlap,
+without gap-filling; a valid tier with no overlap returns no data for
+that metric; and a structurally invalid tier request can fall back to
+automatic tier selection. Check `db.per_tier` to confirm which tier
+supplied data. Add `debug` to `options` when you also need
+`view.partial_data_trimming` details.
 
-**`points: 0` (the default) is NOT "per-second"** -- it requests "all available points", which is whatever the engine returns within its 500-point cap and the storage tier's natural granularity. For a 1-hour query against tier-0 storage, the engine still aggregates because 3600 > 500.
+**`points: 0` (the default) is NOT "per-second" or "all available
+points"** -- it leaves the point target to each Agent's default
+virtual-point query planning. It does not trigger Cloud's explicit
+`points > 500` clamp. Agent-side grouping and window normalization
+determine the final resolution and row count.
 
 ---
 
@@ -287,22 +313,22 @@ The query engine is a pipeline with two aggregation stages:
 
 #### Choosing time_group Based on What the User Wants
 
-| User intent | time_group | Why |
-|-------------|-----------|-----|
-| Average resource consumption (rate metrics: CPU, I/O, bandwidth) | `average` | Rate metrics represent per-second rates; averaging preserves the rate |
-| Average resource consumption (gauge metrics: memory, disk space, connections) | `average` or `max` | Gauges represent current state; max shows peak usage |
-| Find spikes or peaks (any metric type) | `max` | Captures the highest value within each interval |
-| Total volume transferred (counters: bytes, packets) | `sum` | Sums the actual volume |
-| Count events matching a condition | `countif` | Counts samples matching a threshold |
+| User intent                                                                   | time_group         | Why                                                                   |
+|-------------------------------------------------------------------------------|--------------------|-----------------------------------------------------------------------|
+| Average resource consumption (rate metrics: CPU, I/O, bandwidth)              | `average`          | Rate metrics represent per-second rates; averaging preserves the rate |
+| Average resource consumption (gauge metrics: memory, disk space, connections) | `average` or `max` | Gauges represent current state; max shows peak usage                  |
+| Find spikes or peaks (any metric type)                                        | `max`              | Captures the highest value within each interval                       |
+| Total volume transferred (counters: bytes, packets)                           | `sum`              | Sums the actual volume                                                |
+| Count events matching a condition                                             | `countif`          | Counts samples matching a threshold                                   |
 
 #### Choosing aggregation Based on How to Combine Series
 
-| User intent | aggregation | Why |
-|-------------|------------|-----|
-| Total across all series (e.g., total CPU across all containers) | `sum` | Adds up all contributions |
-| Average across series | `avg` | Mean of the group |
-| Worst case across series | `max` | Highest value in the group |
-| Best case across series | `min` | Lowest value in the group |
+| User intent                                                     | aggregation | Why                        |
+|-----------------------------------------------------------------|-------------|----------------------------|
+| Total across all series (e.g., total CPU across all containers) | `sum`       | Adds up all contributions  |
+| Average across series                                           | `avg`       | Mean of the group          |
+| Worst case across series                                        | `max`       | Highest value in the group |
+| Best case across series                                         | `min`       | Lowest value in the group  |
 
 #### Mapping User Questions to Parameters
 
@@ -325,51 +351,51 @@ Before constructing a query for a user, you should understand the metric context
 
 Controls how raw data points within each time interval are combined into one value per series.
 
-| Field | Type | Description | Default |
-|-------|------|-------------|---------|
-| `time_group` | `string` | Aggregation function (see table below) | `average` |
-| `time_group_options` | `string?` | Additional parameter for the function | `null` |
-| `time_resampling` | `int?` | Resample "per-second" values to "per-minute" (60) or "per-hour" (3600). Only works with `time_group=average`. | `null` |
+| Field                | Type      | Description                                                                                                   | Default   |
+|----------------------|-----------|---------------------------------------------------------------------------------------------------------------|-----------|
+| `time_group`         | `string`  | Aggregation function (see table below)                                                                        | `average` |
+| `time_group_options` | `string?` | Additional parameter for the function                                                                         | `null`    |
+| `time_resampling`    | `int?`    | Resample "per-second" values to "per-minute" (60) or "per-hour" (3600). Only works with `time_group=average`. | `null`    |
 
 #### time_group values
 
-| Value | Aliases | Description |
-|-------|---------|-------------|
-| `average` | `avg` | Mean value **(default)** |
-| `min` | | Minimum value |
-| `max` | | Maximum value |
-| `sum` | | Sum of values |
-| `median` | | Median value |
-| `stddev` | | Standard deviation |
-| `cv` | | Coefficient of variation (stddev/mean) |
-| `ses` | | Single exponential smoothing |
-| `des` | | Double exponential smoothing |
-| `incremental-sum` | | Difference between last and first value in interval |
-| `countif` | | Count values matching condition. Set condition in `time_group_options`: `">0"`, `"=0"`, `"!=0"`, `"<=10"` |
-| `percentile` | | Percentile. Set percentile value in `time_group_options`: `"95"`, `"99"` |
-| `trimmed-mean` | | Mean after trimming outliers. Set trim % in `time_group_options` |
-| `trimmed-median` | | Median after trimming outliers. Set trim % in `time_group_options` |
+| Value             | Aliases | Description                                                                                               |
+|-------------------|---------|-----------------------------------------------------------------------------------------------------------|
+| `average`         | `avg`   | Mean value **(default)**                                                                                  |
+| `min`             |         | Minimum value                                                                                             |
+| `max`             |         | Maximum value                                                                                             |
+| `sum`             |         | Sum of values                                                                                             |
+| `median`          |         | Median value                                                                                              |
+| `stddev`          |         | Standard deviation                                                                                        |
+| `cv`              |         | Coefficient of variation (stddev/mean)                                                                    |
+| `ses`             |         | Single exponential smoothing                                                                              |
+| `des`             |         | Double exponential smoothing                                                                              |
+| `incremental-sum` |         | Difference between last and first value in interval                                                       |
+| `countif`         |         | Count values matching condition. Set condition in `time_group_options`: `">0"`, `"=0"`, `"!=0"`, `"<=10"` |
+| `percentile`      |         | Percentile. Set percentile value in `time_group_options`: `"95"`, `"99"`                                  |
+| `trimmed-mean`    |         | Mean after trimming outliers. Set trim % in `time_group_options`                                          |
+| `trimmed-median`  |         | Median after trimming outliers. Set trim % in `time_group_options`                                        |
 
 :::important
 
-When using `time_group` values other than `min`, `max`, `average`, or `sum`, you MUST specify `"tier": 0` in the `window` object to ensure a non-aggregated storage tier is used. Without it, the query may use a pre-aggregated tier (per-minute or per-hour) where advanced functions like `median`, `stddev`, `ses`, `des`, `percentile`, `countif`, `trimmed-mean`, `trimmed-median`, and `extremes` cannot work correctly.
+When using `time_group` values other than `min`, `max`, `average`, or
+`sum`, request `"tier": 0` in the `window` object and verify in
+`db.per_tier` that tier 0 actually supplied the data. Do not use the
+result if the planner fell back to a coarser tier: advanced functions
+such as `median`, `stddev`, `ses`, `des`, `percentile`, `countif`,
+`trimmed-mean`, `trimmed-median`, and `extremes` require native
+samples to work correctly.
 
 :::
 
 #### time_group_options values
 
-| Used with | Value format | Example |
-|-----------|-------------|---------|
-| `countif` | Comparison operator + value | `">0"`, `"=0"`, `"!=0"`, `"<=100"` |
-| `percentile` | Percentile value (0-100) | `"95"`, `"99.5"` |
-| `trimmed-mean` | Trim percentage | `"5"`, `"10"` |
-| `trimmed-median` | Trim percentage | `"5"`, `"10"` |
-
-:::important
-
-When using `time_group` values other than `min`, `max`, `average`, or `sum`, you MUST specify `"tier": 0` in the `window` object to ensure a non-aggregated storage tier is used. Without it, the query may use a pre-aggregated tier (per-minute or per-hour) where advanced functions like `median`, `stddev`, `ses`, `des`, `percentile`, `countif`, `trimmed-mean`, `trimmed-median`, and `extremes` cannot work correctly.
-
-:::
+| Used with        | Value format                | Example                            |
+|------------------|-----------------------------|------------------------------------|
+| `countif`        | Comparison operator + value | `">0"`, `"=0"`, `"!=0"`, `"<=100"` |
+| `percentile`     | Percentile value (0-100)    | `"95"`, `"99.5"`                   |
+| `trimmed-mean`   | Trim percentage             | `"5"`, `"10"`                      |
+| `trimmed-median` | Trim percentage             | `"5"`, `"10"`                      |
 
 ---
 
@@ -377,39 +403,39 @@ When using `time_group` values other than `min`, `max`, `average`, or `sum`, you
 
 Controls how multiple time-series are combined. Each entry defines a grouping pass. At least one is required.
 
-| Field | Type | Description | Default |
-|-------|------|-------------|---------|
-| `group_by` | `string[]` | What to group by (see table below) | (required) |
-| `group_by_label` | `string[]` | Label keys to group by. Required when `group_by` includes `label`. Order is respected. | `[]` |
-| `aggregation` | `string` | How to combine grouped values (see table below) | `average` |
+| Field            | Type       | Description                                                                            | Default    |
+|------------------|------------|----------------------------------------------------------------------------------------|------------|
+| `group_by`       | `string[]` | What to group by (see table below)                                                     | (required) |
+| `group_by_label` | `string[]` | Label keys to group by. Required when `group_by` includes `label`. Order is respected. | `[]`       |
+| `aggregation`    | `string`   | How to combine grouped values (see table below)                                        | `average`  |
 
 #### group_by values
 
-All values can be combined together **except** `selected` (if `selected` is present, all others are ignored).
+All values can be combined together **except** `selected` and `percentage-of-instance` (if either is present, all others are ignored; verified live -- `group_by=percentage-of-instance,dimension,node` collapses to `percentage-of-instance` alone).
 
-| Value | Result columns represent | Use case |
-|-------|------------------------|----------|
-| `selected` | Single column: all matched data combined into one series | Total/aggregate value across everything |
-| `dimension` | One column per unique dimension name | Break down by metric component (user/system/iowait for CPU) |
-| `node` | One column per node | Compare nodes side by side |
-| `instance` | One column per instance (`context@hostname`) | Compare instances across nodes |
-| `label` | One column per unique label value | Group by label (requires `group_by_label`) |
-| `context` | One column per context | Compare different metric types |
-| `units` | One column per unit type | Group by measurement unit |
-| `percentage-of-instance` | Percentages per dimension within each instance | Show proportions instead of absolutes |
+| Value                    | Result columns represent                                 | Use case                                                    |
+|--------------------------|----------------------------------------------------------|-------------------------------------------------------------|
+| `selected`               | Single column: all matched data combined into one series | Total/aggregate value across everything                     |
+| `dimension`              | One column per unique dimension name                     | Break down by metric component (user/system/iowait for CPU) |
+| `node`                   | One column per node                                      | Compare nodes side by side                                  |
+| `instance`               | One column per instance (`context@hostname`)             | Compare instances across nodes                              |
+| `label`                  | One column per unique label value                        | Group by label (requires `group_by_label`)                  |
+| `context`                | One column per context                                   | Compare different metric types                              |
+| `units`                  | One column per unit type                                 | Group by measurement unit                                   |
+| `percentage-of-instance` | Percentages per dimension within each instance           | Show proportions instead of absolutes                       |
 
 Combination example: `"group_by": ["node", "dimension"]` creates one column per node+dimension combination.
 
 #### aggregation values
 
-| Value | Aliases | Description |
-|-------|---------|-------------|
-| `avg` | `average` | Mean of grouped values **(default)** |
-| `sum` | | Sum of grouped values |
-| `min` | | Minimum of grouped values |
-| `max` | | Maximum of grouped values |
-| `median` | | Median of grouped values |
-| `percentage` | | Express as percentage of total |
+| Value        | Aliases   | Description                          |
+|--------------|-----------|--------------------------------------|
+| `avg`        | `average` | Mean of grouped values **(default)** |
+| `sum`        |           | Sum of grouped values                |
+| `min`        |           | Minimum of grouped values            |
+| `max`        |           | Maximum of grouped values            |
+| `median`     |           | Median of grouped values             |
+| `percentage` |           | Express as percentage of total       |
 
 ---
 
@@ -423,30 +449,30 @@ Only `json2` is supported by Netdata Cloud.
 
 Array of strings. Each option modifies the response behavior.
 
-| Option | Description |
-|--------|-------------|
-| `jsonwrap` | **Recommended.** Wraps the result with metadata (summary, view, db, timings) |
-| `minify` | **Recommended.** Minimizes JSON output size |
-| `unaligned` | **Recommended for API queries.** Without this, time intervals are aligned to wall-clock boundaries based on the requested period (e.g., 1-hour queries snap to 00:00–01:00). This is useful for dashboards (prevents charts from "dancing" on refresh) but confusing for API users who expect data for the exact time range they requested. Always use `unaligned` for programmatic queries. |
-| `nonzero` | Exclude dimensions that have only zero values |
-| `null2zero` | Replace null values with zero |
-| `abs` | Return the absolute value of all data |
-| `absolute` | Same as `abs` |
-| `display-absolute` | Display absolute values |
-| `flip` | Flip the sign of values (multiply by -1) |
-| `reversed` | Reverse the order of data points (oldest last) |
-| `min2max` | Show the range (max - min) instead of the value |
-| `percentage` | Convert values to percentages |
-| `seconds` | Return timestamps as seconds |
-| `ms` | Return timestamps as milliseconds |
-| `milliseconds` | Same as `ms` |
-| `match-ids` | Match dimensions by ID only (not name) |
-| `match-names` | Match dimensions by name only (not ID) |
-| `anomaly-bit` | Return anomaly rate instead of metric values |
-| `natural-points` | Return natural data points (one per collection interval) |
-| `virtual-points` | Return virtual (interpolated) data points |
-| `objectrows` | Return data rows as objects instead of arrays |
-| `google_json` | Format compatible with Google Charts |
+| Option             | Description                                                                                                                                                                                                                                                                                                                                                                                  |
+|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `jsonwrap`         | **Recommended.** Wraps the result with metadata (summary, view, db, timings)                                                                                                                                                                                                                                                                                                                 |
+| `minify`           | **Recommended.** Minimizes JSON output size                                                                                                                                                                                                                                                                                                                                                  |
+| `unaligned`        | **Recommended for API queries.** Without this, time intervals are aligned to wall-clock boundaries based on the requested period (e.g., 1-hour queries snap to 00:00–01:00). This is useful for dashboards (prevents charts from "dancing" on refresh) but confusing for API users who expect data for the exact time range they requested. Always use `unaligned` for programmatic queries. |
+| `nonzero`          | Exclude dimensions that have only zero values                                                                                                                                                                                                                                                                                                                                                |
+| `null2zero`        | Replace null values with zero                                                                                                                                                                                                                                                                                                                                                                |
+| `abs`              | Return the absolute value of all data                                                                                                                                                                                                                                                                                                                                                        |
+| `absolute`         | Same as `abs`                                                                                                                                                                                                                                                                                                                                                                                |
+| `display-absolute` | Display absolute values                                                                                                                                                                                                                                                                                                                                                                      |
+| `flip`             | Flip the sign of values (multiply by -1)                                                                                                                                                                                                                                                                                                                                                     |
+| `reversed`         | Reverse the order of data points (oldest last)                                                                                                                                                                                                                                                                                                                                               |
+| `min2max`          | Show the range (max - min) instead of the value                                                                                                                                                                                                                                                                                                                                              |
+| `percentage`       | Convert values to percentages                                                                                                                                                                                                                                                                                                                                                                |
+| `seconds`          | Return timestamps as seconds                                                                                                                                                                                                                                                                                                                                                                 |
+| `ms`               | Return timestamps as milliseconds                                                                                                                                                                                                                                                                                                                                                            |
+| `milliseconds`     | Same as `ms`                                                                                                                                                                                                                                                                                                                                                                                 |
+| `match-ids`        | Match dimensions by ID only (not name)                                                                                                                                                                                                                                                                                                                                                       |
+| `match-names`      | Match dimensions by name only (not ID)                                                                                                                                                                                                                                                                                                                                                       |
+| `anomaly-bit`      | Return anomaly rate instead of metric values                                                                                                                                                                                                                                                                                                                                                 |
+| `natural-points`   | Request natural data points. The v3 data endpoint defaults to `virtual-points`, which takes precedence if both are set.                                                                                                                                                                                                                                                                      |
+| `virtual-points`   | Return virtual (interpolated) data points                                                                                                                                                                                                                                                                                                                                                    |
+| `objectrows`       | Return data rows as objects instead of arrays                                                                                                                                                                                                                                                                                                                                                |
+| `google_json`      | Format compatible with Google Charts                                                                                                                                                                                                                                                                                                                                                         |
 
 Recommended minimum: `["jsonwrap", "minify", "unaligned"]`
 
@@ -468,18 +494,18 @@ With `jsonwrap` option, the response contains:
 
 ### Top-level fields
 
-| Field | Description |
-|-------|-------------|
-| `api` | API version (integer) |
-| `agents` | List of agents consulted |
-| `versions` | Hash values to detect database changes |
-| `summary` | Metadata about nodes, contexts, instances, dimensions, labels, alerts |
-| `totals` | Counts of selected/excluded/queried items |
-| `functions` | List of supported functions |
-| `db` | Database info (tiers, retention, update frequency) |
-| `view` | Presentation metadata (title, units, dimensions, time range) |
-| `result` | **The actual time-series data** |
-| `timings` | Query performance metrics |
+| Field       | Description                                                           |
+|-------------|-----------------------------------------------------------------------|
+| `api`       | API version (integer)                                                 |
+| `agents`    | List of agents consulted                                              |
+| `versions`  | Hash values to detect database changes                                |
+| `summary`   | Metadata about nodes, contexts, instances, dimensions, labels, alerts |
+| `totals`    | Counts of selected/excluded/queried items                             |
+| `functions` | List of supported functions                                           |
+| `db`        | Database info (tiers, retention, update frequency)                    |
+| `view`      | Presentation metadata (title, units, dimensions, time range)          |
+| `result`    | **The actual time-series data**                                       |
+| `timings`   | Query performance metrics                                             |
 
 ### summary
 
@@ -500,24 +526,24 @@ ItemsCount fields: `sl` (selected), `ex` (excluded), `qr` (query success), `fl` 
 
 ### view
 
-| Field | Description |
-|-------|-------------|
-| `title` | Chart title |
-| `update_every` | Data collection interval (seconds) |
-| `after` | Actual start timestamp of returned data |
-| `before` | Actual end timestamp of returned data |
-| `points` | Number of data points returned |
-| `units` | Unit of measurement |
-| `chart_type` | Default chart type (line, area, stacked) |
-| `min` | Minimum value across all data |
-| `max` | Maximum value across all data |
-| `dimensions.grouped_by` | Array confirming the `group_by` used |
-| `dimensions.ids` | Unique dimension IDs |
-| `dimensions.names` | Human-readable dimension names (column headers) |
-| `dimensions.units` | Units per dimension |
-| `dimensions.priorities` | Display priority per dimension |
-| `dimensions.aggregated` | Number of source metrics aggregated into each dimension |
-| `dimensions.sts` | Stats arrays per dimension: `min[]`, `max[]`, `avg[]`, `arp[]`, `con[]` |
+| Field                   | Description                                                             |
+|-------------------------|-------------------------------------------------------------------------|
+| `title`                 | Chart title                                                             |
+| `update_every`          | Data collection interval (seconds)                                      |
+| `after`                 | Actual start timestamp of returned data                                 |
+| `before`                | Actual end timestamp of returned data                                   |
+| `points`                | Number of data points returned                                          |
+| `units`                 | Unit of measurement                                                     |
+| `chart_type`            | Default chart type (line, area, stacked)                                |
+| `min`                   | Minimum value across all data                                           |
+| `max`                   | Maximum value across all data                                           |
+| `dimensions.grouped_by` | Array confirming the `group_by` used                                    |
+| `dimensions.ids`        | Unique dimension IDs                                                    |
+| `dimensions.names`      | Human-readable dimension names (column headers)                         |
+| `dimensions.units`      | Units per dimension                                                     |
+| `dimensions.priorities` | Display priority per dimension                                          |
+| `dimensions.aggregated` | Number of source metrics aggregated into each dimension                 |
+| `dimensions.sts`        | Stats arrays per dimension: `min[]`, `max[]`, `avg[]`, `arp[]`, `con[]` |
 
 ### result — The Time-Series Data
 
@@ -537,44 +563,45 @@ ItemsCount fields: `sl` (selected), `ex` (excluded), `qr` (query success), `fl` 
 - `result.data` — array of rows: `[timestamp, [col1_values], [col2_values], ...]`
 
 Each value array contains 3 elements:
+
 - **Index 0 (`value`)**: The metric value
 - **Index 1 (`arp`)**: Anomaly rate (0-100). Percentage of raw samples in this interval flagged as anomalous by ML
 - **Index 2 (`pa`)**: Point annotations bitmap. Values can be combined (OR'd):
 
-| Bit | Value | Meaning |
-|-----|-------|---------|
-| (none) | `0` | Normal data point — no issues |
-| bit 0 | `1` | **Empty** — no data was collected for this interval |
-| bit 1 | `2` | **Reset** — a counter reset/overflow was detected |
-| bit 2 | `4` | **Partial** — not all expected sources contributed to this point (e.g., in group-by queries, some series had no data) |
+| Bit    | Value | Meaning                                                                                                               |
+|--------|-------|-----------------------------------------------------------------------------------------------------------------------|
+| (none) | `0`   | Normal data point — no issues                                                                                         |
+| bit 0  | `1`   | **Empty** — no data was collected for this interval                                                                   |
+| bit 1  | `2`   | **Reset** — a counter reset/overflow was detected                                                                     |
+| bit 2  | `4`   | **Partial** — not all expected sources contributed to this point (e.g., in group-by queries, some series had no data) |
 
 Values combine: e.g., `5` = empty + partial, `6` = reset + partial.
 
 ### db
 
-| Field | Description |
-|-------|-------------|
-| `tiers` | Number of database tiers |
-| `update_every` | Maximum update interval across nodes |
-| `first_entry` | Earliest data timestamp |
-| `last_entry` | Latest data timestamp |
-| `per_tier[]` | Per-tier info: `tier`, `queries`, `points`, `update_every`, `first_entry`, `last_entry` |
-| `units` | Database units |
-| `dimensions.ids` | Database dimension IDs |
-| `dimensions.units` | Database dimension units |
-| `dimensions.sts` | Database-level stats |
+| Field              | Description                                                                             |
+|--------------------|-----------------------------------------------------------------------------------------|
+| `tiers`            | Number of database tiers                                                                |
+| `update_every`     | Maximum update interval across nodes                                                    |
+| `first_entry`      | Earliest data timestamp                                                                 |
+| `last_entry`       | Latest data timestamp                                                                   |
+| `per_tier[]`       | Per-tier info: `tier`, `queries`, `points`, `update_every`, `first_entry`, `last_entry` |
+| `units`            | Database units                                                                          |
+| `dimensions.ids`   | Database dimension IDs                                                                  |
+| `dimensions.units` | Database dimension units                                                                |
+| `dimensions.sts`   | Database-level stats                                                                    |
 
 ### timings
 
-| Field | Description |
-|-------|-------------|
-| `total_ms` | Total query time |
-| `routing_ms` | Time to route to agents |
-| `prep_ms` | Preparation time (per agent) |
-| `query_ms` | Query execution time (per agent) |
-| `output_ms` | Output formatting time (per agent) |
-| `node_max_ms` | Slowest node response time |
-| `cloud_ms` | Cloud processing time |
+| Field         | Description                        |
+|---------------|------------------------------------|
+| `total_ms`    | Total query time                   |
+| `routing_ms`  | Time to route to agents            |
+| `prep_ms`     | Preparation time (per agent)       |
+| `query_ms`    | Query execution time (per agent)   |
+| `output_ms`   | Output formatting time (per agent) |
+| `node_max_ms` | Slowest node response time         |
+| `cloud_ms`    | Cloud processing time              |
 
 ---
 
@@ -905,7 +932,11 @@ Then inspect `summary.labels` in the response:
 1. **`scope.contexts` MUST always be set** — without it, the response includes metadata for every metric in the room (hundreds of contexts, thousands of instances). This causes multi-megabyte responses.
 2. **`scope.nodes` accepts only node UUIDs** — use `selectors.nodes` with hostname patterns instead (simpler). Only use `scope.nodes` when you need tight metadata scoping.
 3. **Only `json2` format** is supported by the Cloud API. Other formats (csv, ssv, etc.) are not reliably supported through the Cloud proxy.
-4. **Max ~500 data points** per query. The Cloud clamps requests to 500 before forwarding to agents; actual returned count may vary slightly due to time alignment.
+4. **Conditional 500-point clamp.** Cloud clamps explicit requests
+   above 500 only when aggregating multiple Agent routes. Single-route
+   requests are passed through, and `points: 0` is not clamped by
+   this condition. Agent-side alignment can still change the returned
+   row count.
 5. **Default timeout is 10 seconds** (10000ms). Increase for large/slow queries.
 6. **Stale nodes** appear in `/nodes` but return no data. Check `state` field.
 7. **Always use `unaligned` option** for API queries — without it, time intervals snap to wall-clock boundaries, which is confusing for programmatic use.
@@ -936,7 +967,11 @@ A: The context name is shown next to the chart title on every Netdata chart (e.g
 A: An `arp` of 0 means either no anomalies were detected (normal for healthy systems) or ML-based anomaly detection is disabled on the agent. Anomaly detection runs on every metric at collection time using ML (k-means clustering). Non-zero values indicate the percentage of raw samples in the interval that were flagged as anomalous. If `arp` is 0 across all metrics and all time ranges, the agent may have ML disabled.
 
 **Q: `countif` or `percentile` time_group returns unexpected values.**
-A: These functions require raw per-second data. Add `"tier": 0` to the `window` object to force the use of the non-aggregated storage tier. Without it, the query may use a pre-aggregated tier (per-minute or per-hour) where these functions cannot work correctly.
+A: These functions require native samples. Request `"tier": 0`, then
+verify under `db.per_tier` that tier 0 supplied the data; a
+structurally invalid tier request can fall back to automatic tier
+selection. Do not use an advanced aggregation result produced from a
+coarser tier.
 
 **Q: I see non-zero `pa` values in the data — what do they mean?**
 A: `pa` is a point annotations bitmap: `1` = empty (no data collected), `2` = counter reset/overflow detected, `4` = partial (not all sources contributed in a group-by query). Values combine: e.g., `5` = empty + partial. Non-zero `pa` values are common at query boundaries and during agent restarts.
@@ -951,7 +986,13 @@ A: Yes. Set `scope.contexts` to multiple contexts, e.g., `["system.cpu", "system
 A: The default timeout is 10 seconds (10000ms). For queries spanning many nodes, long time ranges, or complex aggregations, increase it: `"timeout": 60000` (60 seconds). Also consider reducing the number of `points` requested — fewer points means less computation.
 
 **Q: I requested 1000 points but only got ~500.**
-A: The Cloud clamps point requests to approximately 500 (`ScopeDataRequestMaxPoints`). The actual number may vary slightly due to time alignment. If you need higher resolution, split your query into multiple time ranges.
+A: This is expected when Cloud aggregates multiple Agent routes: it
+clamps an explicit request to exactly 500
+(`ScopeDataRequestMaxPoints`) before forwarding it. A single-route
+request is passed through without that Cloud clamp. Agent-side time
+alignment can make the returned count differ from the requested
+count. If you need higher resolution from a multi-route query, split
+it into multiple time ranges.
 
 ---
 
