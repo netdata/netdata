@@ -30,10 +30,11 @@ import (
 )
 
 // l6Pass1 accumulates one pass-1 group for row i per the add_metric
-// mechanics: sums for average/sum, champions for min/max/extremes.
-// Returns the accumulator, the contribution count and whether any member
-// contributed.
-func l6Pass1(agg string, group []l5Member, i int) (acc float64, gbc int) {
+// mechanics: sums for average/sum, champions for min/max/extremes; the
+// anomaly rate always accumulates raw (sum of member ARPs, no division
+// before the final finalize). Returns the accumulator, the accumulated
+// anomaly rate and the contribution count.
+func l6Pass1(agg string, group []l5Member, i int) (acc, ar float64, gbc int) {
 	first := true
 	for _, m := range group {
 		if m.gap(i) {
@@ -57,23 +58,34 @@ func l6Pass1(agg string, group []l5Member, i int) (acc float64, gbc int) {
 			}
 		}
 		first = false
+		if m.anomalous(i) {
+			ar += 100
+		}
 		gbc++
 	}
-	return acc, gbc
+	return acc, ar, gbc
 }
 
 // l6Expected computes the CURRENT two-pass mechanics for a final group
 // (the pass-1 groups it contains) at row i: pass-1 accumulators flow
-// unconverted into the pass-2 aggregation; a final AVERAGE divides by the
-// number of contributing pass-1 groups.
-func l6Expected(agg1, agg2 string, pass1Groups [][]l5Member, i int) (val float64, partial, empty bool) {
-	var acc float64
+// unconverted into the pass-2 aggregation; a final AVERAGE divides by
+// the number of contributing pass-1 groups. The anomaly rate accumulates
+// RAW through both passes and divides ONCE by the final contribution
+// count (query-group-by-finalize.c:421) — so non-raw two-pass ARP is
+// sum(member ARPs)/groups, INFLATED by members-per-group for every
+// chain (the ar analog of the avg-of-sums family; pinned as current
+// mechanics). In raw mode nothing divides: the value stays the pass-2
+// accumulator, ar the total, and the point count is the number of
+// contributing pass-1 GROUPS (not members) — the pin the cloud layers
+// depend on.
+func l6Expected(agg1, agg2 string, pass1Groups [][]l5Member, i int, raw bool) (val, ar float64, gbc int, partial, empty bool) {
+	var acc, arTotal float64
 	groups := 0
 	expectedGroups := 0
 	first := true
 	for _, g := range pass1Groups {
 		expectedGroups++
-		a1, gbc1 := l6Pass1(agg1, g, i)
+		a1, ar1, gbc1 := l6Pass1(agg1, g, i)
 		if gbc1 == 0 {
 			continue
 		}
@@ -97,26 +109,33 @@ func l6Expected(agg1, agg2 string, pass1Groups [][]l5Member, i int) (val float64
 			}
 		}
 		first = false
+		arTotal += ar1
 		groups++
 	}
 	if groups == 0 {
-		return 0, false, true
+		return 0, 0, 0, false, true
 	}
 	if groups < expectedGroups {
 		partial = true
 	}
+	if raw {
+		return acc, arTotal, groups, partial, false
+	}
 	if agg2 == "average" {
 		acc /= float64(groups)
 	}
-	return acc, partial, false
+	return acc, arTotal / float64(groups), groups, partial, false
 }
 
 // l6Groups builds the two-pass structure: final groups (by key2) of
-// pass-1 groups (by key1).
+// pass-1 groups. The engine merges every later pass's keys into the
+// earlier passes (query-group-by-init.c:263-302), so pass 1 partitions
+// by the UNION of key1 and key2 — every pass-1 group maps into exactly
+// one final group by construction.
 func l6Groups(key1, key2 string, members []l5Member) map[string][][]l5Member {
 	pass1 := map[string][]l5Member{}
 	for _, m := range members {
-		k := l5GroupKey(key1, m)
+		k := l5GroupKey(key1, m) + "\x00" + l5GroupKey(key2, m)
 		pass1[k] = append(pass1[k], m)
 	}
 	out := map[string][][]l5Member{}
@@ -141,56 +160,87 @@ func TestLayer6TwoPassMatrix(t *testing.T) {
 		{"instance", "node"},
 		{"dimension", "selected"},
 		{"node", "selected"},
+		// cross-key chains: pass 1 partitions by the UNION of both keys
+		{"dimension", "node"},
+		{"dimension", "instance"},
+		{"dimension", "label"},
+		{"label", "node"},
+		{"instance", "label"},
+		{"instance", "units"},
 	}
 	aggCombos := []struct{ agg1, agg2 string }{
 		{"sum", "sum"}, {"min", "min"}, {"max", "max"},
 		{"extremes", "extremes"}, {"sum", "average"},
+		// mixed chains: pass 2 consumes pass-1 accumulators as-is
+		{"sum", "min"}, {"max", "sum"}, {"min", "extremes"},
 	}
 
-	for _, kc := range keyCombos {
-		groups := l6Groups(kc.key1, kc.key2, members)
-		for _, ac := range aggCombos {
-			t.Run(kc.key1+"-"+ac.agg1+"/"+kc.key2+"-"+ac.agg2, func(t *testing.T) {
-				params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
-				params.Set("group_by[0]", kc.key1)
-				params.Set("aggregation[0]", ac.agg1)
-				params.Set("group_by[1]", kc.key2)
-				params.Set("aggregation[1]", ac.agg2)
-				doc, err := td.DataV3All(params)
-				if err != nil {
-					t.Fatal(err)
-				}
-				cols, err := canon.Columns(doc)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if len(cols) != len(groups) {
-					t.Fatalf("got %d final groups %v, want %d %v", len(cols), keys2(cols), len(groups), keys2(groups))
-				}
-				for gname, pass1Groups := range groups {
-					col, ok := cols[gname]
-					if !ok {
-						t.Errorf("final group %q missing (have %v)", gname, keys2(cols))
-						continue
+	for _, mode := range []string{"non-raw", "raw"} {
+		raw := mode == "raw"
+		for _, kc := range keyCombos {
+			groups := l6Groups(kc.key1, kc.key2, members)
+			for _, ac := range aggCombos {
+				t.Run(mode+"/"+kc.key1+"-"+ac.agg1+"/"+kc.key2+"-"+ac.agg2, func(t *testing.T) {
+					params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
+					params.Set("group_by[0]", kc.key1)
+					params.Set("aggregation[0]", ac.agg1)
+					params.Set("group_by[1]", kc.key2)
+					params.Set("aggregation[1]", ac.agg2)
+					if kc.key1 == "label" {
+						params.Set("group_by_label[0]", "team")
 					}
-					for _, pt := range col {
-						i := int(pt.T - fixture.T0)
-						want, wantPartial, wantEmpty := l6Expected(ac.agg1, ac.agg2, pass1Groups, i)
-						switch {
-						case wantEmpty && pt.Value != nil:
-							t.Errorf("%q row %d: value %v, want null", gname, i, *pt.Value)
-						case !wantEmpty && pt.Value == nil:
-							t.Errorf("%q row %d: null, want %v", gname, i, want)
-						case !wantEmpty && !tierValueMatch(*pt.Value, want, 1e-9):
-							t.Errorf("%q row %d: value %v, want %v", gname, i, *pt.Value, want)
+					if kc.key2 == "label" {
+						params.Set("group_by_label[1]", "team")
+					}
+					if raw {
+						params.Set("options", "jsonwrap|raw")
+					}
+					doc, err := td.DataV3All(params)
+					if err != nil {
+						t.Fatal(err)
+					}
+					cols, err := canon.Columns(doc)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(cols) != len(groups) {
+						t.Fatalf("got %d final groups %v, want %d %v", len(cols), keys2(cols), len(groups), keys2(groups))
+					}
+					for gname, pass1Groups := range groups {
+						col, ok := cols[gname]
+						if !ok {
+							t.Errorf("final group %q missing (have %v)", gname, keys2(cols))
+							continue
 						}
-						gotPartial := pt.PA&canon.AnnotationPartial != 0
-						if gotPartial != wantPartial {
-							t.Errorf("%q row %d: partial %v, want %v (pa %d)", gname, i, gotPartial, wantPartial, pt.PA)
+						for _, pt := range col {
+							i := int(pt.T - fixture.T0)
+							want, wantAR, wantGbc, wantPartial, wantEmpty := l6Expected(ac.agg1, ac.agg2, pass1Groups, i, raw)
+							switch {
+							case wantEmpty && pt.Value != nil:
+								t.Errorf("%q row %d: value %v, want null", gname, i, *pt.Value)
+							case !wantEmpty && pt.Value == nil:
+								t.Errorf("%q row %d: null, want %v", gname, i, want)
+							case !wantEmpty && !tierValueMatch(*pt.Value, want, 1e-9):
+								t.Errorf("%q row %d: value %v, want %v", gname, i, *pt.Value, want)
+							}
+							if !wantEmpty && !tierValueMatch(pt.ARP, wantAR, 1e-9) {
+								t.Errorf("%q row %d: arp %v, want %v", gname, i, pt.ARP, wantAR)
+							}
+							if raw && !wantEmpty {
+								if pt.Count == nil {
+									t.Errorf("%q row %d: raw point has no count", gname, i)
+								} else if *pt.Count != int64(wantGbc) {
+									t.Errorf("%q row %d: count %d, want %d pass-1 groups", gname, i, *pt.Count, wantGbc)
+								}
+							}
+							gotPartial := pt.PA&canon.AnnotationPartial != 0
+							if gotPartial != wantPartial {
+								t.Errorf("%q row %d: partial %v, want %v (pa %d)", gname, i, gotPartial, wantPartial, pt.PA)
+							}
 						}
 					}
-				}
-			})
+				})
+			}
 		}
 	}
 }
@@ -236,7 +286,7 @@ func TestCase018MultipassAverage(t *testing.T) {
 		// what a mean of the group AVERAGES would be
 		var meanOfAvgs float64
 		for _, g := range groups {
-			sum, gbc := l6Pass1("average", g, i)
+			sum, _, gbc := l6Pass1("average", g, i)
 			if gbc == 0 {
 				continue
 			}
