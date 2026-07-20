@@ -103,24 +103,30 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
     ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
     ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
 
-    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
+    /* Do NOT sem_unlink here.  Unlinking followed by O_CREAT creates a new
+     * semaphore object.  Consumers only reopen the semaphore when the SHM
+     * inode changes; because close() preserves the SHM inode, a restart
+     * with sem_unlink leaves consumers holding a stale handle to the old
+     * object while the writer uses the new one — mutual exclusion gone.
+     * Opening the existing semaphore (O_CREAT opens it if it already exists,
+     * ignoring the initial value) keeps writer and all consumers on the same
+     * underlying object. */
     ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
     if (ctx->sem == SEM_FAILED)
         goto fail;
 
     if (reused) {
         /* Zero the segment under the semaphore so a reader that survived the
-         * crash cannot observe a torn copy.  Zeroing last_publish_ut in the
-         * header causes any in-flight reader to reject the data via is_live.
-         * If sem_wait times out (crashed writer held it), zero anyway: the
-         * zeroed last_publish_ut self-heals on the reader's next refresh.
-         * POSIX guarantees a newly-created segment is zero-filled, so the
-         * memset only fires on the reuse path (preserving the per-startup
-         * 17.5 MB page-fault saving on first run). */
+         * crash cannot observe a torn copy.  Zeroing last_publish_ut causes
+         * any in-flight reader to reject the data via is_live.
+         * Always call sem_post after zeroing: if the previous writer crashed
+         * while holding the semaphore (value=0), sem_timedwait times out and
+         * locked=false; the unconditional sem_post resets the value to 1 so
+         * the first publish cycle and all consumers can proceed. */
         bool locked = ebpfgo_shm_sem_wait(ctx->sem);
         memset(ctx->mapping, 0, length);
-        if (locked)
-            sem_post(ctx->sem);
+        (void)locked;
+        sem_post(ctx->sem);
     }
     return ctx;
 

@@ -69,19 +69,23 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         goto fail;
     }
 
-    (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
+    /* Do NOT sem_unlink here — same reason as shared_pid_memory_linux.c:
+     * unlinking creates a new semaphore object, leaving consumers with a
+     * stale handle and no mutual exclusion.  O_CREAT opens the existing
+     * semaphore when it already exists, keeping all parties on the same
+     * underlying object. */
     ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0660, 1);
     if (ctx->sem == SEM_FAILED)
         goto fail;
 
     if (reused) {
-        /* Zero the segment under the semaphore so a reader that survived the
-         * crash cannot observe a torn copy.  See shared_pid_memory_linux.c for
-         * the rationale; the same race and fix apply to this DNS segment. */
+        /* Zero and unconditionally release — see shared_pid_memory_linux.c
+         * for the full rationale.  The sem_post resets a semaphore stuck at 0
+         * from a crashed writer so the first publish and consumers can proceed. */
         bool locked = ebpfgo_shm_sem_wait(ctx->sem);
         memset(ctx->data, 0, sizeof(struct ebpfgo_dns_shared));
-        if (locked)
-            sem_post(ctx->sem);
+        (void)locked;
+        sem_post(ctx->sem);
     }
 
     return ctx;
