@@ -2,14 +2,13 @@ use std::collections::HashMap;
 use std::process::Stdio;
 use std::time::Duration;
 
-use std::path::PathBuf;
-
 use anyhow::{Context, bail};
-use bridge::config::{LegacyLogsConfig, PluginConfig};
-use bridge::{
-    IngestorRequest, IngestorResponse, LedgerRequest, LedgerResponse, LegacyLogsRequest,
-    LegacyLogsResponse,
-};
+use bridge::config::PluginConfig;
+#[cfg(unix)]
+use bridge::config::LegacyLogsConfig;
+use bridge::{IngestorRequest, IngestorResponse, LedgerRequest, LedgerResponse};
+#[cfg(unix)]
+use bridge::{LegacyLogsRequest, LegacyLogsResponse};
 use ferryboat::{Connection, Endpoint, Listener};
 use file_registry::{Identity, InstanceId, MachineId};
 use netdata_plugin_protocol::{Message, MessageReader, MessageWriter};
@@ -86,6 +85,7 @@ impl Drop for ChildGuard {
 enum Worker {
     Ingestor,
     Ledger,
+    #[cfg(unix)]
     LegacyLogs,
 }
 
@@ -95,6 +95,7 @@ impl Worker {
         match self {
             Worker::Ingestor => "ingestor",
             Worker::Ledger => "ledger",
+            #[cfg(unix)]
             Worker::LegacyLogs => "legacy-logs",
         }
     }
@@ -114,15 +115,17 @@ struct Supervisor {
     ledger: Connection<LedgerRequest, LedgerResponse>,
     #[allow(dead_code)] // drop-only: SIGKILL fallback for the ledger worker
     ledger_child: ChildGuard,
+    #[cfg(unix)]
     legacy: Connection<LegacyLogsRequest, LegacyLogsResponse>,
+    #[cfg(unix)]
     #[allow(dead_code)] // drop-only: SIGKILL fallback for the legacy-logs worker
     legacy_child: ChildGuard,
-    /// Whether the legacy-logs worker is usable. The legacy viewer is a
-    /// best-effort backward-compat surface and is fully decoupled from the new
+    /// Whether the legacy-logs worker is usable (Unix only). The legacy viewer
+    /// is a best-effort backward-compat surface fully decoupled from the new
     /// pipeline: a configure failure or a runtime crash flips this to `false`
-    /// and the supervisor keeps serving ingestor + ledger. The
-    /// ingestor/ledger remain fatal on failure by design. Monotonic: once
+    /// and the supervisor keeps serving ingestor + ledger. Monotonic: once
     /// `false` it stays `false` — workers are never restarted (see `run`).
+    #[cfg(unix)]
     legacy_alive: bool,
     /// Maps function name → owning worker.
     routing: HashMap<String, Worker>,
@@ -136,9 +139,10 @@ struct Supervisor {
     transactions: HashMap<String, Worker>,
     reader: MessageReader<tokio::io::Stdin>,
     writer: MessageWriter<tokio::io::Stdout>,
-    /// Removes socket files on drop.
+    /// Removes socket files on drop. Vec so its length varies by platform
+    /// (3 on non-Unix, 4 on Unix where the legacy-logs socket is also present).
     #[allow(dead_code)]
-    sockets: [SocketGuard; 4],
+    sockets: Vec<SocketGuard>,
 }
 
 impl Supervisor {
@@ -207,6 +211,7 @@ impl Supervisor {
     }
 
     /// Send Configure to the legacy-logs worker and register the functions it reports.
+    #[cfg(unix)]
     async fn configure_legacy(&mut self, config: LegacyLogsConfig) -> anyhow::Result<()> {
         self.legacy
             .send(LegacyLogsRequest::Configure(config))
@@ -229,6 +234,7 @@ impl Supervisor {
     /// times out, but the supervisor no longer attempts dead sends or logs an
     /// error per post-crash call. Idempotent and a no-op when nothing is routed
     /// to legacy (e.g. a configure failure before any declaration registered).
+    #[cfg(unix)]
     fn disable_legacy(&mut self) {
         self.legacy_alive = false;
         self.routing.retain(|_, w| !matches!(w, Worker::LegacyLogs));
@@ -268,6 +274,7 @@ impl Supervisor {
                 };
                 self.ledger.send(req).await.map_err(|e| ("ledger", e))
             }
+            #[cfg(unix)]
             Worker::LegacyLogs => {
                 let req = LegacyLogsRequest::Call {
                     transaction: call.transaction.clone(),
@@ -295,6 +302,7 @@ impl Supervisor {
         if let Err(e) = self.ledger.send(LedgerRequest::Shutdown).await {
             tracing::warn!("failed to send Shutdown to ledger: {e}");
         }
+        #[cfg(unix)]
         if let Err(e) = self.legacy.send(LegacyLogsRequest::Shutdown).await {
             tracing::warn!("failed to send Shutdown to legacy-logs: {e}");
         }
@@ -303,19 +311,25 @@ impl Supervisor {
         // Use 2 seconds here to leave headroom for the supervisor's own cleanup.
         let timeout = std::time::Duration::from_secs(2);
         let _ = tokio::time::timeout(timeout, async {
-            let (r1, r2, r3) = tokio::join!(
-                self.ingestor_child.child.wait(),
-                self.ledger_child.child.wait(),
-                self.legacy_child.child.wait(),
-            );
-            if let Ok(status) = r1 {
-                tracing::info!("ingestor exited: {status}");
+            #[cfg(unix)]
+            {
+                let (r1, r2, r3) = tokio::join!(
+                    self.ingestor_child.child.wait(),
+                    self.ledger_child.child.wait(),
+                    self.legacy_child.child.wait(),
+                );
+                if let Ok(status) = r1 { tracing::info!("ingestor exited: {status}"); }
+                if let Ok(status) = r2 { tracing::info!("ledger exited: {status}"); }
+                if let Ok(status) = r3 { tracing::info!("legacy-logs exited: {status}"); }
             }
-            if let Ok(status) = r2 {
-                tracing::info!("ledger exited: {status}");
-            }
-            if let Ok(status) = r3 {
-                tracing::info!("legacy-logs exited: {status}");
+            #[cfg(not(unix))]
+            {
+                let (r1, r2) = tokio::join!(
+                    self.ingestor_child.child.wait(),
+                    self.ledger_child.child.wait(),
+                );
+                if let Ok(status) = r1 { tracing::info!("ingestor exited: {status}"); }
+                if let Ok(status) = r2 { tracing::info!("ledger exited: {status}"); }
             }
         })
         .await;
@@ -343,6 +357,7 @@ impl Supervisor {
                     tracing::error!("failed to send cancel to ledger: {e}");
                 }
             }
+            #[cfg(unix)]
             Worker::LegacyLogs => {
                 let req = LegacyLogsRequest::Cancel { transaction };
                 if let Err(e) = self.legacy.send(req).await {
@@ -425,7 +440,8 @@ impl Supervisor {
         }
     }
 
-    /// Translate a legacy-logs response into agent-facing output.
+    /// Translate a legacy-logs response into agent-facing output (Unix only).
+    #[cfg(unix)]
     async fn handle_legacy_response(&mut self, resp: LegacyLogsResponse) {
         match resp {
             LegacyLogsResponse::Result(result) => {
@@ -469,16 +485,20 @@ impl Supervisor {
     /// responsible for restarting the entire plugin.
     async fn run(&mut self) -> anyhow::Result<&'static str> {
         let mut keepalive = tokio::time::interval(tokio::time::Duration::from_secs(60));
+        #[cfg(unix)]
         let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
             .context("failed to register SIGINT handler")?;
+        #[cfg(unix)]
         let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
             .context("failed to register SIGTERM handler")?;
 
         loop {
             tokio::select! {
+                #[cfg(unix)]
                 _ = sigint.recv() => {
                     return Ok("received SIGINT");
                 }
+                #[cfg(unix)]
                 _ = sigterm.recv() => {
                     return Ok("received SIGTERM");
                 }
@@ -505,10 +525,11 @@ impl Supervisor {
                     let r = resp.context("ledger disconnected")?;
                     self.handle_ledger_response(r).await;
                 }
-                // Decoupled from the new pipeline: a legacy-logs
-                // crash disables the worker and logs, but never tears down the
-                // plugin. The `if self.legacy_alive` guard also stops a closed
-                // connection from busy-looping the select once disabled.
+                // Decoupled from the new pipeline: a legacy-logs crash disables
+                // the worker and logs, but never tears down the plugin.
+                // The `if self.legacy_alive` guard stops a closed connection
+                // from busy-looping the select once disabled. Unix only.
+                #[cfg(unix)]
                 resp = self.legacy.recv(), if self.legacy_alive => {
                     match resp {
                         Ok(r) => self.handle_legacy_response(r).await,
@@ -567,7 +588,7 @@ fn socket_dir() -> anyhow::Result<std::path::PathBuf> {
     let env = rt::NetdataEnv::from_environment();
     let dir = match env.run_dir {
         Some(run_dir) => run_dir.join("otel-plugin"),
-        None => std::path::PathBuf::from("/tmp"),
+        None => std::env::temp_dir(),
     };
     std::fs::create_dir_all(&dir)
         .with_context(|| format!("failed to create socket directory {}", dir.display()))?;
@@ -630,6 +651,8 @@ pub async fn run() -> anyhow::Result<()> {
     let writer_sock = SocketGuard::new(&sock_dir, "writer");
     let ledger_sock = SocketGuard::new(&sock_dir, "ledger");
     let ingestor_sock = SocketGuard::new(&sock_dir, "ingestor");
+    // Legacy-logs worker is Unix only (depends on systemd journal).
+    #[cfg(unix)]
     let legacy_sock = SocketGuard::new(&sock_dir, "legacy-logs");
 
     plugin_config.writer_socket_path = writer_sock.path().to_string();
@@ -669,17 +692,18 @@ pub async fn run() -> anyhow::Result<()> {
         }
     }
 
-    // Resolve the former otel plugin's read-only journal directory (read
-    // `logs.journal_dir` in place from otel.yaml, falling back to
-    // <NETDATA_LOG_DIR>/otel/v1 or /var/log/netdata/otel/v1) and a private
-    // viewer cache dir under the agent cache directory.
-    let legacy_journal_dir = config::resolve_legacy_journal_dir();
-    let legacy_cache_dir = nd_env
-        .cache_dir
-        .clone()
-        .unwrap_or_else(|| PathBuf::from("/var/cache/netdata"))
-        .join("otel-legacy-logs");
-    let legacy_config = LegacyLogsConfig::new(legacy_journal_dir, legacy_cache_dir);
+    // Resolve the former otel plugin's read-only journal directory and a
+    // private viewer cache dir. Unix only: legacy logs depend on journald.
+    #[cfg(unix)]
+    let legacy_config = {
+        let legacy_journal_dir = config::resolve_legacy_journal_dir();
+        let legacy_cache_dir = nd_env
+            .cache_dir
+            .clone()
+            .unwrap_or_else(|| std::path::PathBuf::from("/var/cache/netdata"))
+            .join("otel-legacy-logs");
+        LegacyLogsConfig::new(legacy_journal_dir, legacy_cache_dir)
+    };
 
     // Spawn the ledger first: it listens on the writer socket, and on startup
     // the ingestor connects to that socket to stream records to it. Reversing
@@ -687,8 +711,12 @@ pub async fn run() -> anyhow::Result<()> {
     let (ledger_conn, ledger_child) = spawn_worker(&self_exe, &ledger_sock, "ledger").await?;
     let (ingestor_conn, ingestor_child) =
         spawn_worker(&self_exe, &ingestor_sock, "ingestor").await?;
+    #[cfg(unix)]
     let (legacy_conn, legacy_child) = spawn_worker(&self_exe, &legacy_sock, "legacy-logs").await?;
 
+    // Build the supervisor. On Unix the legacy-logs worker is included;
+    // on Windows only ingestor + ledger run.
+    #[cfg(unix)]
     let mut supervisor = Supervisor {
         ingestor: ingestor_conn,
         ingestor_child,
@@ -701,7 +729,19 @@ pub async fn run() -> anyhow::Result<()> {
         transactions: HashMap::new(),
         reader: MessageReader::new(tokio::io::stdin()),
         writer: MessageWriter::new(tokio::io::stdout()),
-        sockets: [writer_sock, ledger_sock, ingestor_sock, legacy_sock],
+        sockets: vec![writer_sock, ledger_sock, ingestor_sock, legacy_sock],
+    };
+    #[cfg(not(unix))]
+    let mut supervisor = Supervisor {
+        ingestor: ingestor_conn,
+        ingestor_child,
+        ledger: ledger_conn,
+        ledger_child,
+        routing: HashMap::new(),
+        transactions: HashMap::new(),
+        reader: MessageReader::new(tokio::io::stdin()),
+        writer: MessageWriter::new(tokio::io::stdout()),
+        sockets: vec![writer_sock, ledger_sock, ingestor_sock],
     };
 
     supervisor
@@ -722,6 +762,8 @@ pub async fn run() -> anyhow::Result<()> {
 
     // The legacy-logs viewer is best-effort and decoupled from the new pipeline:
     // a configure failure disables it but MUST NOT take down the new pipeline.
+    // Unix only: the legacy viewer depends on systemd journal.
+    #[cfg(unix)]
     if let Err(e) = supervisor.configure_legacy(legacy_config).await {
         tracing::error!("legacy-logs configuration failed, disabling it: {e:#}");
         supervisor.disable_legacy();

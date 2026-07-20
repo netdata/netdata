@@ -22,7 +22,6 @@ netdata-plugin-protocol = { workspace = true }
 netdata-plugin-types = { workspace = true }
 otel-ledger = { workspace = true }
 otel-ingestor = { workspace = true }
-otel-legacy-logs = { workspace = true }
 rt = { workspace = true }
 sfsq-cli = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -32,6 +31,9 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
 file-registry = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+otel-legacy-logs = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

@@ -78,16 +78,19 @@ pub fn init_tracing_with_identifier(syslog_identifier: &str) {
     // Build the registry with base layers
     let registry = tracing_subscriber::registry().with(env_filter);
 
-    // Add output layer based on log method
+    // Add output layer based on log method.
+    // On non-Unix platforms there is no journald, so Journal falls through to
+    // the stderr branch below.
     match log_method {
+        #[cfg(unix)]
         LogMethod::Journal => {
             let journald_layer = tracing_journald::layer()
                 .expect("failed to connect to journald")
                 .with_syslog_identifier(syslog_identifier.to_string());
             registry.with(journald_layer).init();
         }
-        LogMethod::Stderr | LogMethod::Syslog | LogMethod::None => {
-            // For now, stderr is used for Stderr, Syslog (not implemented), and None (fallback)
+        _ => {
+            // Stderr, Syslog (not yet implemented), None, and on non-Unix also Journal.
             let fmt_layer = tracing_subscriber::fmt::layer()
                 .with_writer(std::io::stderr)
                 .with_target(true)

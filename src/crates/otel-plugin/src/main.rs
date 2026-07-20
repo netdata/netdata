@@ -18,7 +18,8 @@ enum WorkerKind {
         #[arg(long)]
         socket: String,
     },
-    /// Run the read-only legacy OTel logs viewer worker.
+    /// Run the read-only legacy OTel logs viewer worker (Unix only).
+    #[cfg(unix)]
     LegacyLogs {
         /// IPC socket path for communication with the supervisor.
         #[arg(long)]
@@ -55,9 +56,12 @@ struct Cli {
 
 async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
     // Workers are shut down via IPC (Shutdown message) from the supervisor.
-    // Register signal handlers that do nothing, preventing the default
-    // process termination when the process group receives SIGINT/SIGTERM.
+    // On Unix, register no-op signal handlers so the default process
+    // termination on SIGINT/SIGTERM does not fire when the process group
+    // is interrupted; Windows has no equivalent need.
+    #[cfg(unix)]
     let _sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt());
+    #[cfg(unix)]
     let _sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate());
 
     match kind {
@@ -67,6 +71,7 @@ async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
         WorkerKind::Ledger { socket } => otel_ledger::run_worker(&socket)
             .await
             .context("ledger worker failed"),
+        #[cfg(unix)]
         WorkerKind::LegacyLogs { socket } => otel_legacy_logs::run_worker(&socket)
             .await
             .context("legacy-logs worker failed"),
@@ -103,6 +108,7 @@ async fn main() {
             let syslog_id = match &kind {
                 WorkerKind::Ingestor { .. } => "otel-plugin/ingestor",
                 WorkerKind::Ledger { .. } => "otel-plugin/ledger",
+                #[cfg(unix)]
                 WorkerKind::LegacyLogs { .. } => "otel-plugin/legacy-logs",
             };
             rt::init_tracing_with_identifier(syslog_id);
