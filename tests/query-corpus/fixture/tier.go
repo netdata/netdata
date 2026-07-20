@@ -37,6 +37,13 @@ type TierPoint struct {
 // pre-quantization value (rrddim-collection.c builds the tier STORAGE_POINT
 // from the collected double, not from the tier0 storage_number), unlike the
 // tier0 oracle which applies SNRoundTrip.
+// Point times must already sit on the absolute update_every grid
+// (t % ue == 0): storage keeps off-grid sample times as pushed, but
+// every query re-grids to absolute ue multiples (the update_every
+// sweep's TestOffGridTimestamps pins this), so an oracle fed off-grid
+// fixture times would key the windows wrong. On the aligned grid,
+// window boundaries coincide with sample ends and end-assignment is
+// exact.
 func (d Dimension) TierWindows(granularity int64) map[int64]TierPoint {
 	out := make(map[int64]TierPoint)
 	for _, p := range d.Points {

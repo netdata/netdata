@@ -193,6 +193,14 @@ var manifest = map[string]ManifestCase{
 		Proves: "a tier>0 query whose after equals a stored tier point end keeps that point out of the first bucket (was: absorbed, leaking pre-window data into (after, before] — the backward-expanded storage scan met the inclusive bucket-start check); tier0 control stays clean",
 		Agent:  Green, FixedBy: "#23127",
 	},
+	"L2/update-every-sweep": {
+		Proves: "ue {10,30,60,600,3600} over the backdated v2 protocol: tier0 identity, tier1 windows on the scaled grid (gran = ue x 60, absolute alignment, partial counts, stored-empty family, fractional anomaly rates), time-group buckets in BOTH grid modes (default: bucket ends snap to absolute multiples of group x ue with `after` rounded UP; unaligned: grid anchored at `after`); paced v1 rate contract extended to ue=10",
+		Agent:  Green,
+	},
+	"L1/off-grid-timestamps": {
+		Proves: "samples pushed OFF the absolute ue grid: STORAGE keeps the pushed timestamps exactly (retention proves it), while every VIEW re-grids to absolute ue multiples and serves boundary-INTERPOLATED values (envelope-pinned; the exact virtual-point oracle is layer-9 work)",
+		Agent:  Green,
+	},
 	"CASE-016/fresh-host-forgotten-on-restart": {
 		Proves: "a child first connected < one metadata scan cycle (5s) before a graceful restart is forgotten: pending host metadata is not flushed at shutdown (sqlite_metadata.c metasync shutdown path), host 404s after boot, dbengine data orphaned",
 		Agent:  Red,
