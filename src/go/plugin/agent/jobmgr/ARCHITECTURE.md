@@ -44,6 +44,7 @@ Each run generation owns:
 - Function catalog, handler generations, and publications;
 - dynamic-configuration graph and controllers;
 - Job, discovery-pipeline, vnode, and SecretStore generations;
+- the scheduler-owned autodetection retry index;
 - the secret dependency index;
 - the `jobmgr.runtime` metrics projection.
 
@@ -128,8 +129,8 @@ Other authorities own their state behind explicit APIs:
 
 - `TaskSupervisor` owns task requests, active children, and class queues.
 - `FrameOwner` serializes every stdout protocol frame.
-- `RunSupervisor` owns admission state, shutdown budget, and dirty/fail-stop
-  state.
+- `RunSupervisor` owns admission state, the generation-bound stopping cut,
+  shutdown budget, and dirty/fail-stop state.
 - Function catalog owns publication and handler-generation leases.
 - Job factory owns constructed Job generations.
 - SecretStore owns immutable published provider generations and lexical reader
@@ -226,6 +227,25 @@ implementations:
 - Function methods and static Functions publish through the Function catalog.
 - Job output is fenced by its acknowledged Job generation.
 
+Collector construction is non-disruptive: the factory validates configuration
+and allocates the candidate while the current generation is still live.
+Managed autodetection runs later in the transaction's `AcceptStart` phase,
+after the prior generation has stopped and finalized. A clean autodetection
+failure commits the truthful failed/removal graph state and schedules an
+eligible retry; it is not reported as an uncommitted success.
+
+Autodetection retries are owned by one per-run map/heap serviced by the
+scheduler tick. They carry the exact configuration UID and retry generation,
+submit without waiting for terminal completion, and are invalidated by success,
+replacement, disable, removal, or run shutdown. They do not create per-Job
+goroutines, timers, channels, or a fixed population limit.
+
+`TaskSupervisor` retains the concrete long-lived Job permit until the whole
+prepared transaction exists. Clean rejection before that transfer cleans
+external resources while leaving the framework record and permit for the one
+supervisor abort. Ambiguous cleanup failure retains all ownership evidence and
+fails closed.
+
 The chart engine, chart templates, SNMP profiles, and other collector framework
 internals are outside the kernel design. Their only relevance here is the
 public factory/runtime contract they implement.
@@ -235,7 +255,8 @@ public factory/runtime contract they implement.
 Run rotation is an acknowledged sequence:
 
 1. seal process ingress returns;
-2. stop active run admission;
+2. publish the active run's generation-bound stopping cut before closing
+   command transport and admission;
 3. begin the one run shutdown budget;
 4. drain or contain the current input payload;
 5. cancel and join supervised work;
@@ -248,6 +269,14 @@ Run rotation is an acknowledged sequence:
 Termination follows the same retirement path without constructing a successor.
 Construction failure, release failure, retained ownership, or an invalid
 lifecycle transition marks the run dirty and makes shutdown fail closed.
+
+Post-cut command rejection and cancellation of already accepted work use the
+same typed current-generation cause. `TaskSupervisor` normalizes inherited
+completion only when every error-tree leaf is that exact cause; stale,
+unrecognized, over-deep, or mixed real errors remain fatal. A genuine
+spontaneous inherited failure dirties and wakes the run immediately. A
+pipeline provider may complete successfully after its finite publication;
+that clean provider completion is not a failure.
 
 Collector work that remains blocked at process exit is considered safe enough
 because process termination removes it; Job Manager does not add a second

@@ -156,6 +156,10 @@ type PreparedResourceTransactionWork func(
 ) (PreparedResourceTransaction, error)
 
 func canonicalCancellationCause(cause error) (error, bool, bool) {
+	if stopping, ok := cause.(*StoppingRejection); ok &&
+		stopping.Generation != 0 {
+		return stopping, false, true
+	}
 	cancelled := errors.Is(cause, context.Canceled)
 	deadline := errors.Is(cause, context.DeadlineExceeded)
 	if cancelled == deadline {
@@ -165,6 +169,67 @@ func canonicalCancellationCause(cause error) (error, bool, bool) {
 		return context.DeadlineExceeded, true, true
 	}
 	return context.Canceled, false, true
+}
+
+const strictErrorTreeLimit = 32
+
+func allErrorLeavesMatch(
+	err error,
+	match func(error) bool,
+) bool {
+	if err == nil || match == nil {
+		return false
+	}
+	pending := [strictErrorTreeLimit]error{err}
+	count := 1
+	leaves := 0
+	visited := 0
+	for count > 0 {
+		visited++
+		if visited > strictErrorTreeLimit {
+			return false
+		}
+		count--
+		current := pending[count]
+		if current == nil {
+			continue
+		}
+		if joined, ok := current.(interface {
+			Unwrap() []error
+		}); ok {
+			children := joined.Unwrap()
+			if len(children) == 0 ||
+				count+len(children) >
+					strictErrorTreeLimit {
+				return false
+			}
+			for _, child := range children {
+				if child == nil {
+					continue
+				}
+				pending[count] = child
+				count++
+			}
+			continue
+		}
+		if wrapped, ok := current.(interface {
+			Unwrap() error
+		}); ok {
+			child := wrapped.Unwrap()
+			if child == nil ||
+				count == strictErrorTreeLimit {
+				return false
+			}
+			pending[count] = child
+			count++
+			continue
+		}
+		if !match(current) {
+			return false
+		}
+		leaves++
+	}
+	return leaves > 0
 }
 
 type TaskPlan struct {

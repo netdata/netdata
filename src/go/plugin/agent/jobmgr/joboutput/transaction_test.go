@@ -73,11 +73,12 @@ func TestPreparedResourceTransactionCommitsOrRestoresWholePostimage(t *testing.T
 						ID:      "job",
 						Current: currentIdentity, Successor: successorIdentity,
 					},
-					Disposition: lifecycle.ResourceTransactionReplaced,
-					Current:     current,
-					Successor:   successor,
-					Graph:       graph,
-					Mutation:    mutation,
+					Disposition:      lifecycle.ResourceTransactionReplaced,
+					Current:          current,
+					Successor:        successor,
+					Graph:            graph,
+					Mutation:         mutation,
+					MutationPrepared: true,
 					AfterApply: func() {
 						events = append(events, "after-apply")
 					},

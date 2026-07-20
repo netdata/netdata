@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 )
 
@@ -16,6 +17,22 @@ var (
 	ErrPreparedJobConsumed   = errors.New("job output: prepared job consumed")
 	ErrJobGenerationMismatch = errors.New("job output: job generation mismatch")
 )
+
+type autoDetectionFailure struct {
+	cause      error
+	retry      bool
+	retryAfter int
+	coded      bool
+	code       int
+}
+
+func (adf *autoDetectionFailure) Error() string {
+	return adf.cause.Error()
+}
+
+func (adf *autoDetectionFailure) Unwrap() error {
+	return adf.cause
+}
 
 type JobVariant uint8
 
@@ -56,25 +73,25 @@ const (
 )
 
 type ConstructedJob struct {
-	Runtime          jobruntime.Runtime
-	Handlers         HandlerLifecycle
-	Carrier          lifecycle.LongLivedCarrier
-	Observer         lifecycle.RuntimeObserver
-	FrameOwner       *lifecycle.FrameOwner
-	PrepareCleanup   func(uint64) (PreparedVNodeFrame, error)
-	ReleaseVNode     func() error
-	CollectorCleanup func(context.Context) error
-	Variant          JobVariant
-	SuppressCleanup  bool
+	Runtime            jobruntime.Runtime
+	Handlers           HandlerLifecycle
+	Observer           lifecycle.RuntimeObserver
+	FrameOwner         *lifecycle.FrameOwner
+	PrepareCleanup     func(uint64) (PreparedVNodeFrame, error)
+	ReleaseVNode       func() error
+	CollectorCleanup   func(context.Context) error
+	Variant            JobVariant
+	SuppressCleanup    bool
+	autoDetection      func(context.Context) error
+	autoDetectionEvery func() int
+	finalCleanup       func(context.Context) error
+	retryAutoDetection func() bool
 }
 
 func (cj ConstructedJob) validate() error {
 	if !cj.Variant.Valid() ||
 		cj.Runtime == nil ||
-		cj.CollectorCleanup == nil ||
-		cj.Carrier == nil ||
-		!cj.Carrier.Valid() ||
-		cj.Carrier.Class() != lifecycle.LongLivedJob {
+		cj.CollectorCleanup == nil {
 		return errors.New("job output: incomplete constructed job")
 	}
 	if (cj.PrepareCleanup == nil) == !cj.SuppressCleanup {
@@ -96,42 +113,54 @@ type preparedJobState struct {
 	id          string
 	generation  uint64
 	constructed ConstructedJob
+	permit      lifecycle.LongLivedPermit
 }
 
-func PrepareJob(
+func prepareJob(
 	ctx context.Context,
 	id string,
 	generation uint64,
-	carrier lifecycle.LongLivedCarrier,
+	permit lifecycle.LongLivedPermit,
 	build func(context.Context) (ConstructedJob, error),
 ) (PreparedJob, error) {
 	identity := lifecycle.ResourceIdentity{ID: id, Generation: generation}
 	if ctx == nil ||
 		id == "" ||
 		generation == 0 ||
-		carrier == nil ||
-		!carrier.Valid() ||
-		carrier.Owner() != identity ||
-		carrier.Class() != lifecycle.LongLivedJob ||
+		!permit.Valid() ||
+		permit.Owner() != identity ||
+		permit.Class() != lifecycle.LongLivedJob ||
 		build == nil {
 		return PreparedJob{}, errors.New("job output: invalid construction attempt")
 	}
-	constructed, err := build(ctx)
-	constructed.Carrier = carrier
-	cleanupCtx := context.WithoutCancel(ctx)
-	if hasConstructedJobResources(constructed) {
-		if activateErr := carrier.ActivateExternal(lifecycle.LongLivedEJobResources); activateErr != nil {
-			return PreparedJob{}, errors.Join(err, activateErr, disposeConstructed(cleanupCtx, constructed))
-		}
+	if err := permit.ValidateLive(); err != nil {
+		return PreparedJob{}, err
 	}
+	if err := permit.ActivateExternal(
+		lifecycle.LongLivedEJobResources,
+	); err != nil {
+		return PreparedJob{}, err
+	}
+	constructed, err, returned := callConstructJob(ctx, build)
+	if !returned {
+		return PreparedJob{}, err
+	}
+	cleanupCtx := context.WithoutCancel(ctx)
 	if err != nil {
-		return PreparedJob{}, errors.Join(err, disposeConstructed(cleanupCtx, constructed))
+		return PreparedJob{}, errors.Join(
+			err,
+			rejectConstructed(cleanupCtx, constructed, permit),
+		)
 	}
 	if err := constructed.validate(); err != nil {
-		return PreparedJob{}, errors.Join(err, disposeConstructed(cleanupCtx, constructed))
+		return PreparedJob{}, errors.Join(
+			err,
+			rejectConstructed(cleanupCtx, constructed, permit),
+		)
 	}
 	return PreparedJob{state: &preparedJobState{
 		id: id, generation: generation, constructed: constructed,
+		permit: permit,
 	}}, nil
 }
 
@@ -179,28 +208,56 @@ func (pj PreparedJob) AcceptStart(
 }
 
 func (pj PreparedJob) Accept(
-	_ context.Context,
+	ctx context.Context,
 	generation uint64,
 ) (*JobGeneration, error) {
-	if pj.state == nil {
-		return nil, errors.New("job output: unprepared job")
+	if ctx == nil {
+		return nil, errors.New("job output: nil job acceptance context")
 	}
-	pj.state.mu.Lock()
-	if pj.state.consumed {
-		pj.state.mu.Unlock()
-		return nil, ErrPreparedJobConsumed
+	state, err := pj.takeForGeneration(generation)
+	if err != nil {
+		return nil, err
 	}
-	if generation != pj.state.generation {
-		pj.state.mu.Unlock()
-		return nil, ErrJobGenerationMismatch
+	if state.constructed.autoDetection != nil {
+		if err := callJobLifecycle("collector autodetection", func() error {
+			return state.constructed.autoDetection(ctx)
+		}); err != nil {
+			failure := &autoDetectionFailure{cause: err}
+			if state.constructed.retryAutoDetection != nil {
+				failure.retry =
+					state.constructed.retryAutoDetection()
+			}
+			if state.constructed.autoDetectionEvery != nil {
+				failure.retryAfter =
+					state.constructed.autoDetectionEvery()
+			}
+			if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
+				failure.coded = true
+				failure.code = coded.DyncfgCode()
+				if !dyncfg.IsRetryableError(err) {
+					failure.retry = false
+				}
+			}
+			cleanupErr := disposeConstructed(
+				context.WithoutCancel(ctx),
+				state.constructed,
+				state.permit,
+			)
+			if cleanupErr != nil || ctx.Err() != nil {
+				return nil, errors.Join(err, cleanupErr)
+			}
+			return nil, failure
+		}
 	}
-	pj.state.consumed = true
-	state := pj.state
-	pj.state.mu.Unlock()
+	if state.constructed.finalCleanup != nil {
+		state.constructed.CollectorCleanup =
+			state.constructed.finalCleanup
+	}
 	return &JobGeneration{
 		ID: state.id, Generation: state.generation, Variant: state.constructed.Variant,
 		resources: state.constructed, state: JobAllocated,
 		done: make(chan struct{}), stopDone: make(chan struct{}),
+		permit: state.permit,
 	}, nil
 }
 
@@ -209,7 +266,27 @@ func (pj PreparedJob) Dispose(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return disposeConstructed(ctx, state.constructed)
+	return disposeConstructed(ctx, state.constructed, state.permit)
+}
+
+func (pj PreparedJob) reject(ctx context.Context) error {
+	state, err := pj.take()
+	if err != nil {
+		return err
+	}
+	return rejectConstructed(ctx, state.constructed, state.permit)
+}
+
+func (pj PreparedJob) validateLivePermit() error {
+	if pj.state == nil {
+		return errors.New("job output: unprepared job")
+	}
+	pj.state.mu.Lock()
+	defer pj.state.mu.Unlock()
+	if pj.state.consumed {
+		return ErrPreparedJobConsumed
+	}
+	return pj.state.permit.ValidateLive()
 }
 
 func (pj PreparedJob) take() (*preparedJobState, error) {
@@ -225,8 +302,27 @@ func (pj PreparedJob) take() (*preparedJobState, error) {
 	return pj.state, nil
 }
 
+func (pj PreparedJob) takeForGeneration(
+	generation uint64,
+) (*preparedJobState, error) {
+	if pj.state == nil {
+		return nil, errors.New("job output: unprepared job")
+	}
+	pj.state.mu.Lock()
+	defer pj.state.mu.Unlock()
+	if pj.state.consumed {
+		return nil, ErrPreparedJobConsumed
+	}
+	if generation != pj.state.generation {
+		return nil, ErrJobGenerationMismatch
+	}
+	pj.state.consumed = true
+	return pj.state, nil
+}
+
 type JobGeneration struct {
 	resources      ConstructedJob
+	permit         lifecycle.LongLivedPermit
 	stopErr        error
 	terminalErr    error
 	stopDone       chan struct{}
@@ -266,7 +362,11 @@ func (jg *JobGeneration) Start(ctx context.Context) error {
 	if err := callJobLifecycle("runtime Start", func() error {
 		return jg.resources.Runtime.Start(ctx)
 	}); err != nil {
-		cleanupErr := disposeConstructed(context.WithoutCancel(ctx), jg.resources)
+		cleanupErr := disposeConstructed(
+			context.WithoutCancel(ctx),
+			jg.resources,
+			jg.permit,
+		)
 		state := JobAborted
 		if cleanupErr != nil {
 			state = JobRetained
@@ -326,7 +426,7 @@ func (jg *JobGeneration) AbortReady(ctx context.Context) error {
 	}
 	jg.state = JobStopping
 	jg.mu.Unlock()
-	err := disposeConstructed(ctx, jg.resources)
+	err := disposeConstructed(ctx, jg.resources, jg.permit)
 	state := JobAborted
 	if err != nil {
 		state = JobRetained
@@ -433,11 +533,11 @@ func (jg *JobGeneration) Stop(ctx context.Context) error {
 		return jg.finishStop(JobRetained, err)
 	}
 	if err := callJobLifecycle("job external facet release", func() error {
-		return jg.resources.Carrier.ReleaseExternal(lifecycle.LongLivedEJobResources)
+		return jg.permit.ReleaseExternal(lifecycle.LongLivedEJobResources)
 	}); err != nil {
 		return jg.finishStop(JobRetained, err)
 	}
-	if err := callJobLifecycle("job byte facet release", jg.resources.Carrier.ReleaseBytes); err != nil {
+	if err := callJobLifecycle("job byte facet release", jg.permit.ReleaseBytes); err != nil {
 		return jg.finishStop(JobRetained, err)
 	}
 	return jg.finishStop(JobStopped, nil)
@@ -465,7 +565,7 @@ func (jg *JobGeneration) Finalize() error {
 		jg.mu.Unlock()
 		return fmt.Errorf("job output: finalize from state %d", state)
 	}
-	if err := jg.resources.Carrier.Return(); err != nil {
+	if err := jg.permit.Return(); err != nil {
 		return jg.finish(JobRetained, err)
 	}
 	return jg.finish(JobTerminal, nil)
@@ -511,7 +611,11 @@ func (jg *JobGeneration) finishStop(state JobState, err error) error {
 	return err
 }
 
-func disposeConstructed(ctx context.Context, constructed ConstructedJob) error {
+func rejectConstructed(
+	ctx context.Context,
+	constructed ConstructedJob,
+	permit lifecycle.LongLivedPermit,
+) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -548,28 +652,47 @@ func disposeConstructed(ctx context.Context, constructed ConstructedJob) error {
 			return err
 		}
 	}
-	if constructed.Carrier != nil {
-		if err := callJobLifecycle("job external facet release", func() error {
-			return constructed.Carrier.ReleaseExternal(lifecycle.LongLivedEJobResources)
-		}); err != nil {
-			return err
-		}
-		if err := callJobLifecycle("job byte facet release", constructed.Carrier.ReleaseBytes); err != nil {
-			return err
-		}
-		if err := callJobLifecycle("permit return", constructed.Carrier.Return); err != nil {
-			return err
-		}
+	if err := callJobLifecycle("job external facet release", func() error {
+		return permit.ReleaseExternal(lifecycle.LongLivedEJobResources)
+	}); err != nil {
+		return err
 	}
 	return nil
 }
 
-func hasConstructedJobResources(constructed ConstructedJob) bool {
-	return constructed.Runtime != nil ||
-		constructed.PrepareCleanup != nil ||
-		constructed.Handlers != nil ||
-		constructed.ReleaseVNode != nil ||
-		constructed.CollectorCleanup != nil
+func disposeConstructed(
+	ctx context.Context,
+	constructed ConstructedJob,
+	permit lifecycle.LongLivedPermit,
+) error {
+	if err := rejectConstructed(ctx, constructed, permit); err != nil {
+		return err
+	}
+	if err := callJobLifecycle(
+		"job byte facet release",
+		permit.ReleaseBytes,
+	); err != nil {
+		return err
+	}
+	return callJobLifecycle("permit return", permit.Return)
+}
+
+func callConstructJob(
+	ctx context.Context,
+	build func(context.Context) (ConstructedJob, error),
+) (constructed ConstructedJob, err error, returned bool) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			constructed = ConstructedJob{}
+			err = fmt.Errorf(
+				"%w in job construction: %v",
+				lifecycle.ErrTaskPanic,
+				recovered,
+			)
+		}
+	}()
+	constructed, err = build(ctx)
+	return constructed, err, true
 }
 
 func callPreparedCleanup(

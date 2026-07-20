@@ -5,6 +5,7 @@ package joboutput
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 )
 
 func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
@@ -199,6 +201,210 @@ func TestResourceOnlyTransactionReplacesWithoutGraphMutation(t *testing.T) {
 	require.EqualValues(t, strings.Join(want, ","), strings.Join(events, ","))
 }
 
+func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
+	t *testing.T,
+) {
+	controller, graph, _, _, state :=
+		newDynCfgJobTestHarness(t)
+	var events []string
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		return state.module(func(context.Context) error {
+			events = append(events, "autodetection")
+			return errors.New("check failed")
+		}, false)
+	}
+	controller.modules["module"] = creator
+	commands := &autoDetectionRetryTestCommands{}
+	require.NoError(t, controller.BindAutoDetectionRetries(
+		commands,
+		1,
+	))
+	config := factoryTestConfig(false)
+	config.Set("autodetection_retry", 1)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider("test")
+	payload, err := yaml.Marshal(config)
+	require.NoError(t, err)
+	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{
+		ID: config.FullName(),
+		Config: &dyncfg.GraphConfig{
+			ID: config.FullName(), Module: config.Module(),
+			Name:    config.Name(),
+			Status:  dyncfg.StatusRunning.String(),
+			Payload: payload,
+		},
+	}})
+	require.NoError(t, err)
+	require.NoError(t, graph.Commit(mutation))
+	currentIdentity := lifecycle.ResourceIdentity{
+		ID: config.FullName(), Generation: 1,
+	}
+	current := &transactionTestReadyResource{
+		identity: currentIdentity,
+		prefix:   "current",
+		events:   &events,
+	}
+	permit, tasks, admission, admissionRef :=
+		issueTestJobPermit(t, config.FullName(), 2)
+	scope := lifecycle.ResourceTransactionScope{
+		ID:      config.FullName(),
+		Current: currentIdentity,
+		Successor: lifecycle.ResourceIdentity{
+			ID: config.FullName(), Generation: 2,
+		},
+	}
+
+	transaction, err := controller.prepareDiscovered(
+		context.Background(),
+		DiscoveredJobChange{
+			Config: config, Status: dyncfg.StatusRunning,
+			Restart: true,
+		},
+		current,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	_, err = transaction.Apply(context.Background())
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		[]string{
+			"current-stop",
+			"current-finalize",
+			"autodetection",
+		},
+		events,
+	)
+
+	record, ok := graph.Lookup(config.FullName())
+	require.True(t, ok)
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	require.EqualValues(t, 1, state.collectorCleanup)
+	require.EqualValues(
+		t,
+		lifecycle.LongLivedCensus{},
+		tasks.LongLivedCensus(),
+	)
+
+	require.NoError(t, controller.scheduler.Tick(
+		context.Background(),
+		1,
+	))
+	require.Len(t, commands.submitted, 1)
+	require.Len(t, commands.plans, 1)
+	require.False(t, commands.waited)
+
+	replacement, err := config.Clone()
+	require.NoError(t, err)
+	replacement.Set("option", "replacement")
+	replacementPayload, err := yaml.Marshal(replacement)
+	require.NoError(t, err)
+	replacementMutation, err := graph.PrepareMutation(
+		[]dyncfg.GraphChange{{
+			ID: replacement.FullName(),
+			Config: &dyncfg.GraphConfig{
+				ID:      replacement.FullName(),
+				Module:  replacement.Module(),
+				Name:    replacement.Name(),
+				Status:  dyncfg.StatusFailed.String(),
+				Payload: replacementPayload,
+			},
+		}},
+	)
+	require.NoError(t, err)
+	require.NoError(t, graph.Commit(replacementMutation))
+	retryPermit, retryTasks, retryAdmission, retryAdmissionRef :=
+		issueTestJobPermit(t, config.FullName(), 3)
+	retryScope := lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+		Successor: lifecycle.ResourceIdentity{
+			ID: config.FullName(), Generation: 3,
+		},
+	}
+	retryTransaction, err :=
+		commands.plans[0].Transaction.Prepare(
+			context.Background(),
+			nil,
+			retryScope,
+			retryPermit,
+		)
+	require.NoError(t, err)
+	_, err = retryTransaction.Apply(context.Background())
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		[]string{
+			"current-stop",
+			"current-finalize",
+			"autodetection",
+		},
+		events,
+	)
+	require.EqualValues(
+		t,
+		lifecycle.LongLivedCensus{},
+		retryTasks.LongLivedCensus(),
+	)
+
+	releaseTestJobAdmission(t, admission, admissionRef)
+	releaseTestJobAdmission(
+		t,
+		retryAdmission,
+		retryAdmissionRef,
+	)
+}
+
+func TestDependencyPreparationFailureLeavesPermitForTaskSupervisor(
+	t *testing.T,
+) {
+	controller, _, _, _, state := newDynCfgJobTestHarness(t)
+	sentinel := errors.New("dependency preparation failed")
+	controller.dependencies = jobDependencyIndexFunc(
+		func(
+			string,
+			*dyncfg.GraphConfig,
+		) (func(), error) {
+			return nil, sentinel
+		},
+	)
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider("test")
+	permit, tasks, admission, admissionRef :=
+		issueTestJobPermit(t, config.FullName(), 1)
+	scope := lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+		Successor: lifecycle.ResourceIdentity{
+			ID: config.FullName(), Generation: 1,
+		},
+	}
+
+	transaction, err := controller.prepareDiscovered(
+		context.Background(),
+		DiscoveredJobChange{
+			Config: config, Status: dyncfg.StatusRunning,
+		},
+		nil,
+		scope,
+		permit,
+	)
+	require.Nil(t, transaction)
+	require.ErrorIs(t, err, sentinel)
+	require.EqualValues(t, 1, state.collectorCleanup)
+
+	require.NoError(t, permit.AbortUnused())
+	require.EqualValues(
+		t,
+		lifecycle.LongLivedCensus{},
+		tasks.LongLivedCensus(),
+	)
+	releaseTestJobAdmission(t, admission, admissionRef)
+}
+
 func newDynCfgJobTestHarness(
 	t *testing.T,
 ) (
@@ -261,6 +467,18 @@ func newDynCfgJobTestHarness(
 	)
 	require.NoError(t, err)
 	return controller, graph, supervisor, output, state
+}
+
+type jobDependencyIndexFunc func(
+	string,
+	*dyncfg.GraphConfig,
+) (func(), error)
+
+func (fn jobDependencyIndexFunc) PrepareJobChange(
+	id string,
+	postimage *dyncfg.GraphConfig,
+) (func(), error) {
+	return fn(id, postimage)
 }
 
 func startDynCfgJobTestTask(

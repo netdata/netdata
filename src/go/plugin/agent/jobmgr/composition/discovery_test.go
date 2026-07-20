@@ -159,7 +159,7 @@ func TestDiscoveryZeroChargePermitFailurePaths(t *testing.T) {
 	}
 }
 
-func TestDiscoverySupervisorPanicFailsRun(t *testing.T) {
+func TestDiscoverySupervisorReturnsContainedPanic(t *testing.T) {
 	config := confgroup.Config{}.SetName("job").SetModule("module").SetProvider("test").SetSourceType(confgroup.TypeStock).
 		SetSource("source")
 	pipeline := newDiscoveryTestPipeline(
@@ -189,20 +189,12 @@ func TestDiscoverySupervisorPanicFailsRun(t *testing.T) {
 	go func() {
 		providerErr <- pipeline.RunProvider(ctx, "provider")
 	}()
-	failed := make(chan error, 1)
 	err = runDiscoverySupervisor(
 		ctx,
 		pipeline,
 		decisions,
-		func(err error) { failed <- err },
 	)
 	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
-	select {
-	case failErr := <-failed:
-		require.ErrorIs(t, failErr, lifecycle.ErrTaskPanic)
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "supervisor panic did not fail-stop the run")
-	}
 	cancel()
 
 	require.NoError(t, <-providerErr)
@@ -345,7 +337,6 @@ func newPublicationTestDiscovery(
 		tasks,
 		identity,
 		permit,
-		func(error) {},
 	)
 	require.NoError(t, err)
 	return prepared, admission, requested.Ref

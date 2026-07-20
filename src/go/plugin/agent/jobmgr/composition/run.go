@@ -364,6 +364,12 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	if err := functions.Bind(kernel); err != nil {
 		return nil, errors.Join(err, functions.abortConstruction())
 	}
+	if err := dynCfgJobs.BindAutoDetectionRetries(
+		kernel,
+		run.Generation(),
+	); err != nil {
+		return nil, errors.Join(err, functions.abortConstruction())
+	}
 	if err := secretController.Bind(
 		secretDependentJobBinding{controller: dynCfgJobs},
 	); err != nil {
@@ -477,6 +483,7 @@ func (rg *runGeneration) abortConstruction() error {
 
 func (rg *runGeneration) Stop() {
 	if rg != nil && rg.kernel != nil {
+		rg.scheduler.CloseAutoDetectionRetries()
 		rg.kernel.Stop()
 	}
 }

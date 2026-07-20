@@ -12,6 +12,17 @@ import (
 
 var ErrRunTerminalReached = errors.New("jobmgr run supervisor: terminal already reached")
 
+type StoppingRejection struct {
+	Generation uint64
+}
+
+func (sr *StoppingRejection) Error() string {
+	return fmt.Sprintf(
+		"jobmgr run %d is stopping",
+		sr.Generation,
+	)
+}
+
 type RunSupervisor struct {
 	mu         sync.Mutex
 	generation uint64
@@ -23,6 +34,9 @@ type RunSupervisor struct {
 	shutdown   *ShutdownBudget
 	state      RunTerminalState
 	observer   RuntimeObserver
+	stopping   chan struct{}
+	stopCause  *StoppingRejection
+	stopped    bool
 }
 
 type RunCensus struct {
@@ -46,7 +60,15 @@ func NewRunSupervisor(generation uint64, clock Clock, shutdownTimeout time.Durat
 	if generation == 0 || clock == nil || shutdownTimeout <= 0 {
 		return nil, errors.New("jobmgr run supervisor: invalid generation or shutdown budget")
 	}
-	return &RunSupervisor{generation: generation, clock: clock, timeout: shutdownTimeout}, nil
+	return &RunSupervisor{
+		generation: generation,
+		clock:      clock,
+		timeout:    shutdownTimeout,
+		stopping:   make(chan struct{}),
+		stopCause: &StoppingRejection{
+			Generation: generation,
+		},
+	}, nil
 }
 
 func (rs *RunSupervisor) BindRuntimeObserver(
@@ -58,7 +80,7 @@ func (rs *RunSupervisor) BindRuntimeObserver(
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	if rs.observer != nil || rs.admission ||
-		rs.shutdown != nil || rs.terminal ||
+		rs.shutdown != nil || rs.stopped || rs.terminal ||
 		rs.dirty != nil {
 		return errors.New("jobmgr run supervisor: runtime observer bound after activation")
 	}
@@ -69,7 +91,11 @@ func (rs *RunSupervisor) BindRuntimeObserver(
 func (rs *RunSupervisor) OpenAdmission() error {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	if rs.terminal || rs.dirty != nil || rs.admission || rs.shutdown != nil {
+	if rs.terminal ||
+		rs.stopped ||
+		rs.dirty != nil ||
+		rs.admission ||
+		rs.shutdown != nil {
 		return errors.New("jobmgr run supervisor: cannot open admission")
 	}
 	rs.admission = true
@@ -85,7 +111,7 @@ func (rs *RunSupervisor) BeginShutdown() (*ShutdownBudget, error) {
 	if rs.terminal {
 		return nil, errors.New("jobmgr run supervisor: shutdown after terminal")
 	}
-	rs.admission = false
+	rs.publishStoppingLocked()
 	budget, err := newShutdownBudget(rs.clock, rs.timeout)
 	if err != nil {
 		return nil, err
@@ -107,7 +133,10 @@ func (rs *RunSupervisor) FinishShutdown() error {
 func (rs *RunSupervisor) Admitting() bool {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	return rs.admission && rs.dirty == nil && !rs.terminal
+	return rs.admission &&
+		!rs.stopped &&
+		rs.dirty == nil &&
+		!rs.terminal
 }
 
 func (rs *RunSupervisor) Dirty(cause error) {
@@ -123,11 +152,42 @@ func (rs *RunSupervisor) Dirty(cause error) {
 	if first {
 		rs.dirty = cause
 	}
-	rs.admission = false
+	rs.publishStoppingLocked()
 	observer := rs.observer
 	if first && observer != nil {
 		observer.AddRuntimeCounter(RuntimeCounterDirtyRuns, 1)
 	}
+}
+
+func (rs *RunSupervisor) BeginStopping() {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	rs.publishStoppingLocked()
+}
+
+func (rs *RunSupervisor) StoppingCause() *StoppingRejection {
+	if rs == nil {
+		return nil
+	}
+	return rs.stopCause
+}
+
+func (rs *RunSupervisor) IsStopping() bool {
+	if rs == nil {
+		return false
+	}
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	return rs.stopped
+}
+
+func (rs *RunSupervisor) publishStoppingLocked() {
+	rs.admission = false
+	if rs.stopped {
+		return
+	}
+	rs.stopped = true
+	close(rs.stopping)
 }
 
 func (rs *RunSupervisor) DirtyCause() error {
@@ -145,6 +205,7 @@ func (rs *RunSupervisor) Terminal(census RunCensus) error {
 	if rs.admission {
 		return errors.New("jobmgr run supervisor: terminal while admitting")
 	}
+	rs.publishStoppingLocked()
 	frameDrained := !census.Frame.Poisoned && !census.Frame.Busy &&
 		!census.Frame.PendingControl && census.Frame.RetainedBytes == 0
 	quiescent := census.AdmissionRunDrained && census.TransientActive == 0 &&

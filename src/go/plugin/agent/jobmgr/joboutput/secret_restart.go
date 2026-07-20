@@ -9,6 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
@@ -197,6 +198,10 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 					record,
 					dyncfg.StatusRunning,
 				)
+				failedPostimage := graphConfig(
+					record,
+					dyncfg.StatusFailed,
+				)
 				return dcjc.prepareMutation(
 					scope,
 					nil,
@@ -209,6 +214,32 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 						id,
 						dyncfg.StatusRunning,
 					),
+					successorFailurePlan{
+						postimage: failedPostimage,
+						failedCleanup: dcjc.configStatusCleanup(
+							id,
+							dyncfg.StatusFailed,
+						),
+						removedCleanup: dcjc.configDeleteCleanup(
+							dcjc.externalID(id),
+						),
+						result: func(
+							*autoDetectionFailure,
+						) lifecycle.SealedResult {
+							return mustDynCfgMessage(204, "")
+						},
+						afterApply: func(
+							failure *autoDetectionFailure,
+						) {
+							state.setError(failure.cause)
+							dcjc.scheduleAutoDetectionRetry(
+								cloned,
+								failure,
+							)
+						},
+						removePlainStock: cloned.SourceType() ==
+							confgroup.TypeStock,
+					},
 				)
 			},
 		},

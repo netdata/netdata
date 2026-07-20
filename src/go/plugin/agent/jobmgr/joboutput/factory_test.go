@@ -24,6 +24,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 		configure          func(*factoryTestState, *collectorapi.Creator) JobHooks
 		wantClose          int
 		wantHandlerCleanup int
+		wantRetained       bool
 	}{
 		"autodetection failure": {
 			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
@@ -54,6 +55,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				}
 				return nil
 			},
+			wantRetained: true,
 		},
 		"function-bearing job without hooks": {
 			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
@@ -86,12 +88,36 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			creator := collectorapi.Creator{}
 			hooks := test.configure(state, &creator)
 			factory, output := newFactoryTestHarness(t, creator, hooks)
-			constructed, err := factory.Build(context.Background(), factoryTestConfig(creator.FunctionOnly), 1)
+			permit, tasks, admission, admissionRef := issueTestJobPermit(
+				t,
+				"module_job",
+				1,
+			)
+			prepared, err := factory.Prepare(
+				context.Background(),
+				factoryTestConfig(creator.FunctionOnly),
+				lifecycle.ResourceIdentity{
+					ID: "module_job", Generation: 1,
+				},
+				permit,
+			)
+			if err == nil {
+				_, err = prepared.AcceptStart(context.Background(), 1)
+			} else {
+				err = errors.Join(err, permit.AbortUnused())
+			}
 			require.Error(t, err)
-			require.Nil(t, constructed.Runtime)
 			require.EqualValues(t, 1, state.collectorCleanup)
 			require.False(t, state.handlerClose != test.wantClose || state.handlerCleanup != test.wantHandlerCleanup)
 			require.EqualValues(t, 0, output.Len())
+			require.Equal(
+				t,
+				test.wantRetained,
+				tasks.LongLivedCensus().Active != 0,
+			)
+			if !test.wantRetained {
+				releaseTestJobAdmission(t, admission, admissionRef)
+			}
 		})
 	}
 }
@@ -124,14 +150,74 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				creator.SharedFunctions = func() []funcapi.FunctionConfig { return nil }
 			}
 			factory, output := newFactoryTestHarness(t, creator, test.hooks)
+			permit, tasks, admission, admissionRef := issueTestJobPermit(
+				t,
+				"module_job",
+				1,
+			)
 
-			_, err := factory.Build(context.Background(), factoryTestConfig(test.functionOnly), 1)
+			prepared, err := factory.Prepare(
+				context.Background(),
+				factoryTestConfig(test.functionOnly),
+				lifecycle.ResourceIdentity{
+					ID: "module_job", Generation: 1,
+				},
+				permit,
+			)
+			if err == nil {
+				_, err = prepared.AcceptStart(context.Background(), 1)
+			} else {
+				err = errors.Join(err, permit.AbortUnused())
+			}
 			require.Error(t, err)
 
 			require.EqualValues(t, 1, state.collectorCleanup)
 			require.EqualValues(t, 0, output.Len())
+			require.EqualValues(
+				t,
+				lifecycle.LongLivedCensus{},
+				tasks.LongLivedCensus(),
+			)
+			releaseTestJobAdmission(t, admission, admissionRef)
 		})
 	}
+}
+
+func TestFactoryDefersAutoDetectionUntilPreparedJobAcceptance(t *testing.T) {
+	state := &factoryTestState{}
+	creator := collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return state.module(func(context.Context) error {
+				state.autoDetection++
+				return errors.New("check failed")
+			}, false)
+		},
+	}
+	factory, _ := newFactoryTestHarness(t, creator, nil)
+	permit, tasks, admission, admissionRef := issueTestJobPermit(
+		t,
+		"module_job",
+		1,
+	)
+
+	prepared, err := factory.Prepare(
+		context.Background(),
+		factoryTestConfig(false),
+		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		permit,
+	)
+	require.NoError(t, err)
+	require.Zero(t, state.autoDetection)
+	require.Zero(t, state.collectorCleanup)
+
+	_, err = prepared.AcceptStart(context.Background(), 1)
+	require.Error(t, err)
+	require.EqualValues(t, 1, state.autoDetection)
+	require.EqualValues(t, 1, state.collectorCleanup)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+
+	_, err = admission.ReleaseOrdinary(admissionRef)
+	require.NoError(t, err)
 }
 
 func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
@@ -145,18 +231,36 @@ func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
 		},
 	}
 	factory, _ := newFactoryTestHarness(t, creator, nil)
-	constructed, err := factory.Build(context.Background(), factoryTestConfig(false), 1)
+	permit, tasks, admission, admissionRef := issueTestJobPermit(
+		t,
+		"module_job",
+		1,
+	)
+	prepared, err := factory.Prepare(
+		context.Background(),
+		factoryTestConfig(false),
+		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		permit,
+	)
 	require.NoError(t, err)
 	for range 2 {
-		require.NoError(t, constructed.CollectorCleanup(context.Background()))
+		err = prepared.Dispose(context.Background())
 	}
+	require.Error(t, err)
 	require.EqualValues(t, 1, state.collectorCleanup)
+	require.EqualValues(
+		t,
+		lifecycle.LongLivedCensus{},
+		tasks.LongLivedCensus(),
+	)
+	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 type factoryTestState struct {
 	collectorCleanup int
 	handlerClose     int
 	handlerCleanup   int
+	autoDetection    int
 }
 
 type factoryTestV2 struct {

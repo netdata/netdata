@@ -155,6 +155,10 @@ func (*schedulerTestJob) AutoDetection(context.Context) error { return nil }
 func (*schedulerTestJob) AutoDetectionManaged(context.Context) error {
 	return nil
 }
+func (*schedulerTestJob) AutoDetectionEvery() int { return 0 }
+func (*schedulerTestJob) RetryAutoDetection() bool {
+	return false
+}
 func (*schedulerTestJob) CleanupRejected() {}
 func (job *schedulerTestJob) Tick(clock int) {
 	job.ticks++

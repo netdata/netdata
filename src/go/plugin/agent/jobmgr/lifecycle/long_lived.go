@@ -161,16 +161,6 @@ func (llp LongLivedPlan) forReplacement() (LongLivedPlan, error) {
 func (llp LongLivedPlan) Class() LongLivedClass { return llp.class }
 func (llp LongLivedPlan) Bytes() int64          { return llp.bytes }
 
-type LongLivedCarrier interface {
-	Valid() bool
-	Owner() ResourceIdentity
-	Class() LongLivedClass
-	ActivateExternal(LongLivedExternalFacet) error
-	ReleaseExternal(LongLivedExternalFacet) error
-	ReleaseBytes() error
-	Return() error
-}
-
 type LongLivedPermitRef struct {
 	Slot       uint32
 	Generation uint32
@@ -204,6 +194,21 @@ func (llp LongLivedPermit) Valid() bool {
 
 func (llp LongLivedPermit) Owner() ResourceIdentity { return llp.owner }
 func (llp LongLivedPermit) Class() LongLivedClass   { return llp.class }
+
+// ValidateLive verifies cold-path ownership against the permit registry.
+func (llp LongLivedPermit) ValidateLive() error {
+	if !llp.Valid() {
+		return errors.New("jobmgr long-lived permit: invalid live validation")
+	}
+	registry := &llp.supervisor.longLived
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	if registry.sealed {
+		return errors.New("jobmgr long-lived permit: registry is sealed")
+	}
+	_, err := registry.slot(llp.ref, llp.owner)
+	return err
+}
 
 func (llp LongLivedPermit) ActivateExternal(facet LongLivedExternalFacet) error {
 	if !llp.Valid() {

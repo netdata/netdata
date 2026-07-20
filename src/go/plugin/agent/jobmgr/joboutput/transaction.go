@@ -19,6 +19,18 @@ type ResourceTransactionSpec struct {
 	UnusedPermit     lifecycle.LongLivedPermit
 	Graph            *dyncfg.Graph
 	Mutation         dyncfg.GraphMutation
+	MutationPrepared bool
+	AfterGraphCommit func()
+	AfterApply       func()
+	Result           lifecycle.SealedResult
+	Cleanup          lifecycle.TaskCleanup
+	SuccessorFailure func(
+		*autoDetectionFailure,
+	) (SuccessorFailureResolution, error)
+}
+
+type SuccessorFailureResolution struct {
+	Postimage        *dyncfg.GraphConfig
 	AfterGraphCommit func()
 	AfterApply       func()
 	Result           lifecycle.SealedResult
@@ -65,6 +77,9 @@ func PrepareNoopResourceTransaction(
 			return nil, errors.New(
 				"job output: no-op transaction has invalid successor permit",
 			)
+		}
+		if err := permit.ValidateLive(); err != nil {
+			return nil, err
 		}
 	} else if permit.Valid() {
 		return nil, errors.New(
@@ -208,6 +223,11 @@ func (prt *PreparedResourceTransaction) Apply(
 	}
 
 	var current lifecycle.ReadyResource
+	disposition := spec.Disposition
+	result := spec.Result
+	cleanup := spec.Cleanup
+	afterApply := spec.AfterApply
+	graphCommitted := false
 	switch spec.Disposition {
 	case lifecycle.ResourceTransactionUnchanged:
 		if spec.UnusedPermit.Valid() {
@@ -223,7 +243,73 @@ func (prt *PreparedResourceTransaction) Apply(
 			spec.Scope.Successor.Generation,
 		)
 		if err != nil {
-			return lifecycle.AppliedResourceTransaction{}, err
+			var failure *autoDetectionFailure
+			if !errors.As(err, &failure) ||
+				spec.SuccessorFailure == nil {
+				return lifecycle.AppliedResourceTransaction{}, err
+			}
+			if spec.Graph != nil && spec.MutationPrepared {
+				if abortErr := spec.Graph.Abort(
+					spec.Mutation,
+				); abortErr != nil {
+					return lifecycle.AppliedResourceTransaction{},
+						errors.Join(err, abortErr)
+				}
+			}
+			resolution, resolveErr :=
+				spec.SuccessorFailure(failure)
+			if resolveErr != nil {
+				return lifecycle.AppliedResourceTransaction{},
+					errors.Join(err, resolveErr)
+			}
+			if resolution.Cleanup == nil {
+				return lifecycle.AppliedResourceTransaction{},
+					errors.Join(
+						err,
+						errors.New(
+							"job output: autodetection failure has no cleanup",
+						),
+					)
+			}
+			if spec.Graph != nil {
+				mutation, prepareErr := spec.Graph.PrepareMutation(
+					[]dyncfg.GraphChange{{
+						ID:     spec.Scope.ID,
+						Config: resolution.Postimage,
+					}},
+				)
+				if errors.Is(
+					prepareErr,
+					dyncfg.ErrGraphNoChange,
+				) {
+					graphCommitted = true
+				} else if prepareErr != nil {
+					return lifecycle.AppliedResourceTransaction{},
+						errors.Join(err, prepareErr)
+				} else {
+					if commitErr := spec.Graph.Commit(
+						mutation,
+					); commitErr != nil {
+						return lifecycle.AppliedResourceTransaction{},
+							errors.Join(err, commitErr)
+					}
+					graphCommitted = true
+					if resolution.AfterGraphCommit != nil {
+						resolution.AfterGraphCommit()
+					}
+				}
+			}
+			if spec.Scope.Current.Valid() {
+				disposition =
+					lifecycle.ResourceTransactionRemoved
+			} else {
+				disposition =
+					lifecycle.ResourceTransactionUnchanged
+			}
+			result = resolution.Result
+			cleanup = resolution.Cleanup
+			afterApply = resolution.AfterApply
+			break
 		}
 		if err := current.Publish(); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
@@ -233,7 +319,9 @@ func (prt *PreparedResourceTransaction) Apply(
 		return lifecycle.AppliedResourceTransaction{},
 			errors.New("job output: invalid transaction disposition")
 	}
-	if spec.Graph != nil {
+	if spec.Graph != nil &&
+		spec.MutationPrepared &&
+		!graphCommitted {
 		if err := spec.Graph.Commit(spec.Mutation); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
 		}
@@ -243,16 +331,16 @@ func (prt *PreparedResourceTransaction) Apply(
 	}
 	applied, err := lifecycle.NewAppliedResourceTransaction(
 		spec.Scope,
-		spec.Disposition,
+		disposition,
 		current,
-		spec.Result,
-		spec.Cleanup,
+		result,
+		cleanup,
 	)
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
-	if spec.AfterApply != nil {
-		spec.AfterApply()
+	if afterApply != nil {
+		afterApply()
 	}
 	return applied, nil
 }
@@ -268,7 +356,7 @@ func (prt *PreparedResourceTransaction) Dispose(
 		return nil, errors.New("job output: nil transaction dispose context")
 	}
 	var abortErr error
-	if spec.Graph != nil {
+	if spec.Graph != nil && spec.MutationPrepared {
 		abortErr = spec.Graph.Abort(spec.Mutation)
 	}
 	var successorErr error
@@ -316,12 +404,24 @@ func validateResourceTransactionSpec(spec ResourceTransactionSpec) error {
 			"job output: transaction successor differs from scope",
 		)
 	}
+	if successor, ok := spec.Successor.(interface {
+		validateLivePermit() error
+	}); ok {
+		if err := successor.validateLivePermit(); err != nil {
+			return err
+		}
+	}
 	if spec.UnusedPermit.Valid() &&
 		(spec.UnusedPermit.Owner() != spec.Scope.Successor ||
 			spec.UnusedPermit.Class() != lifecycle.LongLivedJob) {
 		return errors.New(
 			"job output: transaction unused permit differs from scope",
 		)
+	}
+	if spec.UnusedPermit.Valid() {
+		if err := spec.UnusedPermit.ValidateLive(); err != nil {
+			return err
+		}
 	}
 	if spec.Successor != nil && spec.UnusedPermit.Valid() {
 		return errors.New(

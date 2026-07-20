@@ -242,6 +242,8 @@ func (*assemblyTestJob) AutoDetection(context.Context) error {
 	return nil
 }
 func (*assemblyTestJob) AutoDetectionManaged(context.Context) error { return nil }
+func (*assemblyTestJob) AutoDetectionEvery() int                    { return 0 }
+func (*assemblyTestJob) RetryAutoDetection() bool                   { return false }
 func (*assemblyTestJob) CleanupRejected()                           {}
 func (*assemblyTestJob) Tick(int)                                   {}
 func (*assemblyTestJob) Cleanup()                                   {}

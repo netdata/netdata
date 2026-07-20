@@ -28,7 +28,7 @@ func TestJobFactoryRejectCleanup(t *testing.T) {
 			build: func(t *testing.T, events *jobEventLog) (ConstructedJob, error) {
 				return testConstructedJob(t, JobVariantV1, events, &bytes.Buffer{}), errors.New("construction failed")
 			},
-			want: []string{"handler-close", "runtime-abort", "handler", "vnode", "collector", "external", "bytes", "permit"},
+			want: []string{"handler-close", "runtime-abort", "handler", "vnode", "collector"},
 		},
 		"invalid construction": {
 			build: func(_ *testing.T, events *jobEventLog) (ConstructedJob, error) {
@@ -41,17 +41,22 @@ func TestJobFactoryRejectCleanup(t *testing.T) {
 					},
 				}, nil
 			},
-			want: []string{"runtime-abort", "collector", "external", "bytes", "permit"},
+			want: []string{"runtime-abort", "collector"},
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			events := &jobEventLog{}
-			prepared, err := PrepareJob(
+			permit, tasks, admission, admissionRef := issueTestJobPermit(
+				t,
+				"job",
+				1,
+			)
+			prepared, err := prepareJob(
 				context.Background(),
 				"job",
 				1,
-				newTestJobCarrier("job", 1, events),
+				permit,
 				func(context.Context) (ConstructedJob, error) {
 					return test.build(t, events)
 				},
@@ -61,8 +66,66 @@ func TestJobFactoryRejectCleanup(t *testing.T) {
 
 			got := events.snapshot()
 			require.Equal(t, test.want, got)
+
+			require.NoError(t, permit.AbortUnused())
+			require.EqualValues(
+				t,
+				lifecycle.LongLivedCensus{},
+				tasks.LongLivedCensus(),
+			)
+			releaseTestJobAdmission(t, admission, admissionRef)
 		})
 	}
+}
+
+func TestJobPreparationLeavesCleanRejectedPermitWithTaskSupervisor(t *testing.T) {
+	permit, tasks, admission, admissionRef := issueTestJobPermit(t, "job", 1)
+	events := &jobEventLog{}
+
+	prepared, err := prepareJob(
+		context.Background(),
+		"job",
+		1,
+		permit,
+		func(context.Context) (ConstructedJob, error) {
+			return testConstructedJob(
+				t,
+				JobVariantV1,
+				events,
+				&bytes.Buffer{},
+			), errors.New("construction failed")
+		},
+	)
+	require.Error(t, err)
+	require.False(t, prepared.Valid())
+
+	require.NoError(t, permit.AbortUnused())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+
+	releaseTestJobAdmission(t, admission, admissionRef)
+}
+
+func TestPreparedTransactionRejectsStaleUnusedPermitAtConstruction(t *testing.T) {
+	permit, _, admission, admissionRef := issueTestJobPermit(t, "job", 1)
+	require.NoError(t, permit.AbortUnused())
+	result, err := lifecycle.NewSealedResult(204, "application/json", nil)
+	require.NoError(t, err)
+
+	_, err = PrepareNoopResourceTransaction(
+		lifecycle.ResourceTransactionScope{
+			ID: "job",
+			Successor: lifecycle.ResourceIdentity{
+				ID: "job", Generation: 1,
+			},
+		},
+		nil,
+		permit,
+		result,
+		func() error { return nil },
+	)
+	require.Error(t, err)
+
+	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 func TestJobGenerationV1V2(t *testing.T) {
@@ -75,11 +138,16 @@ func TestJobGenerationV1V2(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			events := &jobEventLog{}
-			prepared, err := PrepareJob(
+			permit, tasks, admission, admissionRef := issueTestJobPermit(
+				t,
+				"job",
+				7,
+			)
+			prepared, err := prepareJob(
 				context.Background(),
 				"job",
 				7,
-				newTestJobCarrier("job", 7, events),
+				permit,
 				func(context.Context) (ConstructedJob, error) {
 					return testConstructedJob(t, test.variant, events, jobEventWriter{events: events}), nil
 				},
@@ -105,13 +173,19 @@ func TestJobGenerationV1V2(t *testing.T) {
 			want := []string{
 				"runtime-start", "handler-publish", "handler-close", "runtime-stop", "prepare-cleanup",
 				"write", "metadata-commit", "runtime-release", "vnode", "handler",
-				"collector", "external", "bytes", "permit",
+				"collector",
 			}
 
 			got := events.snapshot()
 			require.Equal(t, want, got)
 
 			require.EqualValues(t, JobTerminal, generation.State())
+			require.EqualValues(
+				t,
+				lifecycle.LongLivedCensus{},
+				tasks.LongLivedCensus(),
+			)
+			releaseTestJobAdmission(t, admission, admissionRef)
 		})
 	}
 }
@@ -119,11 +193,12 @@ func TestJobGenerationV1V2(t *testing.T) {
 func TestJobGenerationPermitReturnLast(t *testing.T) {
 	events := &jobEventLog{}
 	release := make(chan struct{})
-	prepared, err := PrepareJob(
+	permit, tasks, admission, admissionRef := issueTestJobPermit(t, "job", 1)
+	prepared, err := prepareJob(
 		context.Background(),
 		"job",
 		1,
-		newTestJobCarrier("job", 1, events),
+		permit,
 		func(context.Context) (ConstructedJob, error) {
 			constructed := testConstructedJob(t, JobVariantV1, events, &bytes.Buffer{})
 			constructed.Runtime = &recordingJobRuntime{events: events, stopGate: release}
@@ -142,18 +217,24 @@ func TestJobGenerationPermitReturnLast(t *testing.T) {
 	go func() { done <- generation.Stop(context.Background()) }()
 	events.waitFor(t, "runtime-stop-enter")
 	require.EqualValues(t, JobStopping, generation.State())
-	require.False(t, events.contains("permit"))
+	require.EqualValues(t, 1, tasks.LongLivedCensus().Active)
 	close(release)
 
 	require.NoError(t, <-done)
 
 	require.EqualValues(t, JobStopped, generation.State())
-	require.False(t, events.contains("permit"))
+	census := tasks.LongLivedCensus()
+	require.EqualValues(t, 1, census.Active)
+	require.Zero(t, census.Bytes)
+	require.Zero(t, census.ExternalActive)
 
 	require.NoError(t, generation.Finalize())
-
-	got := events.snapshot()
-	require.EqualValues(t, "permit", got[len(got)-1])
+	require.EqualValues(
+		t,
+		lifecycle.LongLivedCensus{},
+		tasks.LongLivedCensus(),
+	)
+	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
@@ -193,11 +274,12 @@ func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			events := &jobEventLog{}
-			prepared, err := PrepareJob(
+			permit, tasks, _, _ := issueTestJobPermit(t, "job", 1)
+			prepared, err := prepareJob(
 				context.Background(),
 				"job",
 				1,
-				newTestJobCarrier("job", 1, events),
+				permit,
 				func(context.Context) (ConstructedJob, error) {
 					constructed := testConstructedJob(t, JobVariantV2, events, &bytes.Buffer{})
 					test.configure(&constructed)
@@ -218,7 +300,7 @@ func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
 				require.Error(t, generation.Stop(context.Background()))
 			}
 			require.EqualValues(t, JobRetained, generation.State())
-			require.False(t, events.contains("permit"))
+			require.NotZero(t, tasks.LongLivedCensus().Active)
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
@@ -255,11 +337,16 @@ func TestJobLifecyclePanicsPreserveTaskClassification(t *testing.T) {
 func BenchmarkBJobFactoryCold(b *testing.B) {
 	for b.Loop() {
 		events := &jobEventLog{}
-		prepared, err := PrepareJob(
+		permit, _, admission, admissionRef := issueTestJobPermit(
+			b,
+			"job",
+			1,
+		)
+		prepared, err := prepareJob(
 			context.Background(),
 			"job",
 			1,
-			newTestJobCarrier("job", 1, events),
+			permit,
 			func(context.Context) (ConstructedJob, error) {
 				return testConstructedJob(b, JobVariantV1, events, &bytes.Buffer{}), nil
 			},
@@ -270,6 +357,7 @@ func BenchmarkBJobFactoryCold(b *testing.B) {
 		if err := prepared.Dispose(context.Background()); err != nil {
 			require.FailNow(b, "benchmark failed", err)
 		}
+		releaseTestJobAdmission(b, admission, admissionRef)
 	}
 }
 
@@ -347,70 +435,53 @@ func (rhl *recordingHandlerLifecycle) Cleanup(ctx context.Context) error {
 	return rhl.cleanup(ctx)
 }
 
-type testJobCarrier struct {
-	owner            lifecycle.ResourceIdentity
-	events           *jobEventLog
-	externalReserved bool
-	externalActive   bool
-	bytes            bool
-	returned         bool
+func issueTestJobPermit(
+	t testingHelper,
+	id string,
+	generation uint64,
+) (
+	lifecycle.LongLivedPermit,
+	*lifecycle.TaskSupervisor,
+	*lifecycle.AdmissionLedger,
+	lifecycle.AdmissionRef,
+) {
+	t.Helper()
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	tasks, err := lifecycle.NewTaskSupervisor(frames)
+	require.NoError(t, err)
+	admission := lifecycle.NewAdmissionLedger()
+	plan, err := lifecycle.NewJobLongLivedPlan(DefaultJobRetainedBytes)
+	require.NoError(t, err)
+	requested := admission.RequestOrdinary(
+		1,
+		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
+		plan.Bytes()+1,
+	)
+	require.Nil(t, requested.Rejected)
+	var grants [4]lifecycle.AdmissionGrant
+	count, _, err := admission.TakeGrants(1, &grants)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+	require.Equal(t, requested.Ref, grants[0].Ref)
+	permit, err := tasks.IssueLongLivedPermit(
+		admission,
+		requested.Ref,
+		lifecycle.ResourceIdentity{ID: id, Generation: generation},
+		plan,
+	)
+	require.NoError(t, err)
+	return permit, tasks, admission, requested.Ref
 }
 
-func newTestJobCarrier(id string, generation uint64, events *jobEventLog) *testJobCarrier {
-	return &testJobCarrier{
-		owner:  lifecycle.ResourceIdentity{ID: id, Generation: generation},
-		events: events, externalReserved: true, bytes: true,
-	}
-}
-
-func (tjc *testJobCarrier) Valid() bool {
-	return tjc != nil && tjc.owner.Valid()
-}
-
-func (tjc *testJobCarrier) Owner() lifecycle.ResourceIdentity { return tjc.owner }
-func (tjc *testJobCarrier) Class() lifecycle.LongLivedClass   { return lifecycle.LongLivedJob }
-func (tjc *testJobCarrier) ActivateExternal(facet lifecycle.LongLivedExternalFacet) error {
-	if facet != lifecycle.LongLivedEJobResources || !tjc.externalReserved || tjc.externalActive {
-		return errors.New("test job carrier: invalid external activation")
-	}
-	tjc.externalReserved = false
-	tjc.externalActive = true
-	return nil
-}
-
-func (tjc *testJobCarrier) ReleaseExternal(facet lifecycle.LongLivedExternalFacet) error {
-	if facet != lifecycle.LongLivedEJobResources {
-		return errors.New("test job carrier: invalid external facet")
-	}
-	if tjc.externalActive {
-		tjc.externalActive = false
-		tjc.events.add("external")
-		return nil
-	}
-	if tjc.externalReserved {
-		tjc.externalReserved = false
-		tjc.events.add("external")
-		return nil
-	}
-	return errors.New("test job carrier: external facet already released")
-}
-
-func (tjc *testJobCarrier) ReleaseBytes() error {
-	if tjc.externalReserved || tjc.externalActive || !tjc.bytes {
-		return errors.New("test job carrier: invalid byte release")
-	}
-	tjc.bytes = false
-	tjc.events.add("bytes")
-	return nil
-}
-
-func (tjc *testJobCarrier) Return() error {
-	if tjc.externalReserved || tjc.externalActive || tjc.bytes || tjc.returned {
-		return errors.New("test job carrier: invalid return")
-	}
-	tjc.returned = true
-	tjc.events.add("permit")
-	return nil
+func releaseTestJobAdmission(
+	t testingHelper,
+	admission *lifecycle.AdmissionLedger,
+	ref lifecycle.AdmissionRef,
+) {
+	t.Helper()
+	_, err := admission.ReleaseOrdinary(ref)
+	require.NoError(t, err)
 }
 
 type recordingJobRuntime struct {

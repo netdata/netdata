@@ -210,7 +210,6 @@ func (to TaskOutcome) validate() error {
 			}
 		case ResourceTransactionRemoved:
 			if !to.scope.Current.Valid() ||
-				to.scope.Successor.Valid() ||
 				to.ready != nil ||
 				to.identity.Valid() {
 				return errors.New("jobmgr lifecycle: invalid removed transaction result")

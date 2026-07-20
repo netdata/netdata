@@ -178,6 +178,10 @@ func (*recordingManagedJob) AutoDetection(context.Context) error {
 func (*recordingManagedJob) AutoDetectionManaged(context.Context) error {
 	return nil
 }
+func (*recordingManagedJob) AutoDetectionEvery() int { return 0 }
+func (*recordingManagedJob) RetryAutoDetection() bool {
+	return false
+}
 func (*recordingManagedJob) CleanupRejected() {}
 func (*recordingManagedJob) Tick(int)         {}
 

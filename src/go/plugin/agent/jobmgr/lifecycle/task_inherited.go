@@ -53,7 +53,7 @@ type inheritedTaskSlot struct {
 	owner          ResourceIdentity
 	role           InheritedTaskRole
 	key            string
-	cancel         context.CancelFunc
+	cancel         context.CancelCauseFunc
 	done           chan struct{}
 	cancelled      bool
 	finished       bool
@@ -167,6 +167,10 @@ func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceI
 	registry.mu.Lock()
 	if registry.sealed {
 		registry.mu.Unlock()
+		if ts.run != nil && ts.run.IsStopping() {
+			return InheritedTaskRef{},
+				ts.run.StoppingCause()
+		}
 		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: inherited activation is sealed")
 	}
 	ownerKey := inheritedOwnerRole{owner: owner, role: role, key: key}
@@ -197,7 +201,7 @@ func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceI
 		registry.mu.Unlock()
 		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: inherited task generation wrapped")
 	}
-	ctx, cancel := context.WithCancel(parent)
+	ctx, cancel := context.WithCancelCause(parent)
 	done := make(chan struct{})
 	started := make(chan struct{})
 	*slot = inheritedTaskSlot{
@@ -222,7 +226,7 @@ func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceI
 		close(started)
 		err := runInheritedTask(ctx, work)
 		ts.observeTaskPanic(err)
-		registry.complete(ref, err)
+		ts.completeInherited(ref, err)
 	}()
 	<-started
 	return ref, nil
@@ -251,7 +255,7 @@ func (ts *TaskSupervisor) CancelInherited(ref InheritedTaskRef, owner ResourceId
 	registry.census.Cancelled++
 	cancel := slot.cancel
 	registry.mu.Unlock()
-	cancel()
+	cancel(context.Canceled)
 	return nil
 }
 
@@ -397,7 +401,7 @@ func (ts *TaskSupervisor) CancelInheritedBatch(
 			errors.New("jobmgr task supervisor: invalid inherited cancellation batch")
 	}
 	registry := &ts.inherited
-	var cancels [InheritedCancellationServiceQuantum]context.CancelFunc
+	var cancels [InheritedCancellationServiceQuantum]context.CancelCauseFunc
 	cancelCount := 0
 	var census ShutdownCancellationCensus
 	registry.mu.Lock()
@@ -423,8 +427,12 @@ func (ts *TaskSupervisor) CancelInheritedBatch(
 	}
 	more := registry.shutdownCursor != 0
 	registry.mu.Unlock()
+	cause := error(context.Canceled)
+	if ts.run != nil && ts.run.IsStopping() {
+		cause = ts.run.StoppingCause()
+	}
 	for index := 0; index < cancelCount; index++ {
-		cancels[index]()
+		cancels[index](cause)
 	}
 	return census, more, nil
 }
@@ -472,24 +480,81 @@ func (itr *inheritedTaskRegistry) slot(ref InheritedTaskRef, owner ResourceIdent
 	return slot, nil
 }
 
-func (itr *inheritedTaskRegistry) complete(ref InheritedTaskRef, taskErr error) {
+func (ts *TaskSupervisor) completeInherited(
+	ref InheritedTaskRef,
+	taskErr error,
+) {
+	if ts == nil {
+		return
+	}
+	cleanStop := false
+	normalized := taskErr
+	if ts.run != nil &&
+		ts.run.IsStopping() &&
+		onlyCurrentStoppingRejections(
+			taskErr,
+			ts.run.Generation(),
+		) {
+		cleanStop = true
+		normalized = nil
+	}
+	spontaneousFailure, normalized :=
+		ts.inherited.complete(ref, normalized, cleanStop)
+	if !spontaneousFailure || cleanStop {
+		return
+	}
+	if ts.run != nil {
+		ts.run.Dirty(normalized)
+	}
+	if ts.wake != nil {
+		ts.wake()
+	}
+}
+
+func (itr *inheritedTaskRegistry) complete(
+	ref InheritedTaskRef,
+	taskErr error,
+	cleanStop bool,
+) (bool, error) {
 	itr.mu.Lock()
 	defer itr.mu.Unlock()
 	if !ref.valid() {
-		return
+		return false, taskErr
 	}
 	if uint64(ref.Slot) >= uint64(len(itr.slots)) ||
 		itr.slots[ref.Slot] == nil {
-		return
+		return false, taskErr
 	}
 	slot := itr.slots[ref.Slot]
 	if !slot.active || slot.generation != ref.Generation || slot.finished {
-		return
+		return false, taskErr
+	}
+	spontaneousFailure := !slot.cancelled &&
+		(taskErr != nil ||
+			slot.role != InheritedPipelineProvider)
+	if spontaneousFailure && taskErr == nil && !cleanStop {
+		taskErr = errors.New(
+			"jobmgr task supervisor: inherited task exited before cancellation",
+		)
 	}
 	slot.err = taskErr
 	slot.finished = true
 	itr.census.Finished++
 	close(slot.done)
+	return spontaneousFailure, taskErr
+}
+
+func onlyCurrentStoppingRejections(
+	err error,
+	generation uint64,
+) bool {
+	if generation == 0 {
+		return false
+	}
+	return allErrorLeavesMatch(err, func(leaf error) bool {
+		stopping, ok := leaf.(*StoppingRejection)
+		return ok && stopping.Generation == generation
+	})
 }
 
 func runInheritedTask(ctx context.Context, work InheritedTaskWork) (err error) {

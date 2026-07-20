@@ -30,6 +30,8 @@ type RuntimeJob interface {
 
 	AutoDetection(context.Context) error
 	AutoDetectionManaged(context.Context) error
+	AutoDetectionEvery() int
+	RetryAutoDetection() bool
 	CleanupRejected()
 	Tick(int)
 }
@@ -131,7 +133,7 @@ func (f *Factory) ValidateConfig(
 	return configModules.Validate(ctx, config)
 }
 
-func (f *Factory) Build(
+func (f *Factory) build(
 	ctx context.Context,
 	config confgroup.Config,
 	generation uint64,
@@ -176,12 +178,6 @@ func (f *Factory) Build(
 		return ConstructedJob{}, err
 	}
 	cleanup := &factoryJobCleanup{job: job}
-	if err := job.AutoDetectionManaged(ctx); err != nil {
-		return ConstructedJob{}, errors.Join(
-			err,
-			cleanup.reject(context.WithoutCancel(ctx)),
-		)
-	}
 	constructed, err := NewManagedJob(
 		variant,
 		job,
@@ -190,38 +186,33 @@ func (f *Factory) Build(
 		f.config.Scheduler,
 	)
 	if err != nil {
-		return ConstructedJob{}, errors.Join(
-			err,
-			cleanup.reject(context.WithoutCancel(ctx)),
-		)
+		return ConstructedJob{
+			Variant: variant, SuppressCleanup: true,
+			CollectorCleanup: cleanup.reject,
+		}, err
 	}
 	constructed.CollectorCleanup = cleanup.reject
 	if hasFunctions && f.config.Hooks == nil {
-		return ConstructedJob{}, errors.Join(
-			errors.New("job output: function-bearing job has no handler lifecycle"),
-			disposeConstructed(context.WithoutCancel(ctx), constructed),
-		)
+		return constructed,
+			errors.New("job output: function-bearing job has no handler lifecycle")
 	}
 	if hooks := f.config.Hooks; hasFunctions {
 		published := PublishedJob{Identity: identity, Variant: variant, Job: job}
 		handlers, prepareErr := callPrepareHandlers(hooks, published)
+		constructed.Handlers = handlers
 		if prepareErr != nil {
-			return ConstructedJob{}, errors.Join(
-				prepareErr,
-				disposeHandlers(context.WithoutCancel(ctx), handlers),
-				disposeConstructed(context.WithoutCancel(ctx), constructed),
-			)
+			return constructed, prepareErr
 		}
 		if handlers == nil {
-			return ConstructedJob{}, errors.Join(
-				errors.New("job output: nil prepared handler lifecycle"),
-				disposeConstructed(context.WithoutCancel(ctx), constructed),
-			)
+			return constructed,
+				errors.New("job output: nil prepared handler lifecycle")
 		}
-		constructed.Handlers = handlers
 	}
-	constructed.CollectorCleanup = cleanup.final
 	constructed.Observer = f.config.Observer
+	constructed.autoDetection = job.AutoDetectionManaged
+	constructed.autoDetectionEvery = job.AutoDetectionEvery
+	constructed.retryAutoDetection = job.RetryAutoDetection
+	constructed.finalCleanup = cleanup.final
 	return constructed, nil
 }
 
@@ -236,13 +227,13 @@ func (f *Factory) Prepare(
 		identity.ID != config.FullName() {
 		return nil, errors.New("job output: invalid factory preparation")
 	}
-	return PrepareJob(
+	return prepareJob(
 		ctx,
 		identity.ID,
 		identity.Generation,
 		permit,
 		func(buildCtx context.Context) (ConstructedJob, error) {
-			return f.Build(
+			return f.build(
 				buildCtx,
 				config,
 				identity.Generation,
@@ -292,20 +283,6 @@ func callPrepareHandlers(
 		}
 	}()
 	return hooks.Prepare(published)
-}
-
-func disposeHandlers(ctx context.Context, handlers HandlerLifecycle) error {
-	if handlers == nil {
-		return nil
-	}
-	return errors.Join(
-		callJobLifecycle("prepared handler close/drain", func() error {
-			return handlers.CloseAndDrain(ctx)
-		}),
-		callJobLifecycle("prepared handler Cleanup", func() error {
-			return handlers.Cleanup(ctx)
-		}),
-	)
 }
 
 func (f *Factory) buildV1(

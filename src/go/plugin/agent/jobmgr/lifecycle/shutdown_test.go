@@ -103,6 +103,58 @@ func TestRunSupervisorOwnsOneBroadcastShutdownBudget(t *testing.T) {
 	require.EqualValues(t, 1, cancels)
 }
 
+func TestRunSupervisorPublishesOneGenerationStoppingCut(t *testing.T) {
+	tests := map[string]struct {
+		stop func(*testing.T, *RunSupervisor)
+	}{
+		"explicit stop": {
+			stop: func(_ *testing.T, run *RunSupervisor) {
+				run.BeginStopping()
+			},
+		},
+		"first dirty transition": {
+			stop: func(_ *testing.T, run *RunSupervisor) {
+				run.Dirty(errors.New("run failed"))
+			},
+		},
+		"shutdown budget": {
+			stop: func(t *testing.T, run *RunSupervisor) {
+				_, err := run.BeginShutdown()
+				require.NoError(t, err)
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			run, err := NewRunSupervisor(
+				7,
+				RealClock{},
+				time.Second,
+			)
+			require.NoError(t, err)
+			require.NoError(t, run.OpenAdmission())
+			stopping := run.stopping
+			cause := run.StoppingCause()
+
+			test.stop(t, run)
+
+			select {
+			case <-stopping:
+			default:
+				require.FailNow(
+					t,
+					"test failed",
+					"stopping cut was not published",
+				)
+			}
+			require.True(t, run.IsStopping())
+			require.False(t, run.Admitting())
+			require.Same(t, cause, run.StoppingCause())
+			require.EqualValues(t, 7, cause.Generation)
+		})
+	}
+}
+
 func TestShutdownBudgetPublishesDueClockWithoutTimerBridge(t *testing.T) {
 	clock := newShutdownTestClock()
 	run, err := NewRunSupervisor(7, clock, 10*time.Second)

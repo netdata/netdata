@@ -5,6 +5,7 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -35,6 +36,267 @@ func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 	require.EqualValues(t, 0, supervisor.InheritedActive())
 
 	require.Error(t, supervisor.ReleaseInherited(ref, owner))
+}
+
+func TestInheritedShutdownNormalizesOnlyCurrentStoppingCause(t *testing.T) {
+	cleanupErr := errors.New("cleanup failed")
+	tests := map[string]struct {
+		result  func(context.Context) error
+		wantErr error
+	}{
+		"exact stopping cause": {
+			result: func(ctx context.Context) error {
+				return context.Cause(ctx)
+			},
+		},
+		"stopping cause joined with real error": {
+			result: func(ctx context.Context) error {
+				return errors.Join(
+					context.Cause(ctx),
+					cleanupErr,
+				)
+			},
+			wantErr: cleanupErr,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			supervisor := newResourceTaskSupervisor(t)
+			run, err := NewRunSupervisor(
+				11,
+				RealClock{},
+				time.Second,
+			)
+			require.NoError(t, err)
+			require.NoError(t, supervisor.BindRun(run, func() {}))
+			owner := ResourceIdentity{
+				ID:         "pipeline",
+				Generation: 1,
+			}
+			ref, err := supervisor.StartInherited(
+				context.Background(),
+				owner,
+				InheritedV1Runtime,
+				func(ctx context.Context) error {
+					<-ctx.Done()
+					return test.result(ctx)
+				},
+			)
+			require.NoError(t, err)
+
+			run.BeginStopping()
+			require.NoError(t, supervisor.SealInherited())
+			_, more, err := supervisor.CancelInheritedBatch(
+				InheritedCancellationServiceQuantum,
+			)
+			require.NoError(t, err)
+			require.False(t, more)
+
+			joined, err := supervisor.JoinInherited(
+				context.Background(),
+				ref,
+				owner,
+			)
+			require.True(t, joined)
+			if test.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, test.wantErr)
+			}
+			require.NoError(
+				t,
+				supervisor.ReleaseInherited(ref, owner),
+			)
+		})
+	}
+}
+
+func TestInheritedSpontaneousFailureDirtiesAndWakesRun(t *testing.T) {
+	supervisor := newResourceTaskSupervisor(t)
+	run, err := NewRunSupervisor(
+		13,
+		RealClock{},
+		time.Second,
+	)
+	require.NoError(t, err)
+	wake := make(chan struct{}, 1)
+	require.NoError(t, supervisor.BindRun(run, func() {
+		select {
+		case wake <- struct{}{}:
+		default:
+		}
+	}))
+	owner := ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 1,
+	}
+	release := make(chan struct{})
+	failure := errors.New("provider failed")
+	ref, err := supervisor.StartInherited(
+		context.Background(),
+		owner,
+		InheritedV1Runtime,
+		func(context.Context) error {
+			<-release
+			return failure
+		},
+	)
+	require.NoError(t, err)
+
+	close(release)
+	select {
+	case <-wake:
+	case <-time.After(time.Second):
+		require.FailNow(
+			t,
+			"test failed",
+			"spontaneous failure did not wake the run",
+		)
+	}
+	require.ErrorIs(t, run.DirtyCause(), failure)
+	require.True(t, run.IsStopping())
+
+	require.NoError(t, supervisor.CancelInherited(ref, owner))
+	joined, err := supervisor.JoinInherited(
+		context.Background(),
+		ref,
+		owner,
+	)
+	require.True(t, joined)
+	require.ErrorIs(t, err, failure)
+	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
+}
+
+func TestInheritedFiniteProviderCompletionDoesNotDirtyRun(t *testing.T) {
+	supervisor := newResourceTaskSupervisor(t)
+	run, err := NewRunSupervisor(
+		19,
+		RealClock{},
+		time.Second,
+	)
+	require.NoError(t, err)
+	wake := make(chan struct{}, 1)
+	require.NoError(t, supervisor.BindRun(run, func() {
+		select {
+		case wake <- struct{}{}:
+		default:
+		}
+	}))
+	owner := ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 1,
+	}
+	plan, err := NewPipelineLongLivedPlan([]string{"finite"})
+	require.NoError(t, err)
+	admission := NewAdmissionLedger()
+	requested := admission.RequestOrdinary(
+		1,
+		AdmissionLaneRef{Slot: 1, Generation: 1},
+		plan.Bytes()+1,
+	)
+	require.Nil(t, requested.Rejected)
+	var grants [4]AdmissionGrant
+	count, _, err := admission.TakeGrants(1, &grants)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
+	permit, err := supervisor.IssueLongLivedPermit(
+		admission,
+		requested.Ref,
+		owner,
+		plan,
+	)
+	require.NoError(t, err)
+	finished := make(chan struct{})
+	ref, err := supervisor.StartInheritedWithPermitKey(
+		context.Background(),
+		owner,
+		InheritedPipelineProvider,
+		"finite",
+		permit,
+		func(context.Context) error {
+			close(finished)
+			return nil
+		},
+	)
+	require.NoError(t, err)
+	<-finished
+
+	select {
+	case <-wake:
+		require.FailNow(
+			t,
+			"test failed",
+			"finite provider completion woke the run",
+		)
+	case <-time.After(25 * time.Millisecond):
+	}
+	require.NoError(t, run.DirtyCause())
+	require.False(t, run.IsStopping())
+
+	require.NoError(t, supervisor.CancelInherited(ref, owner))
+	joined, err := supervisor.JoinInherited(
+		context.Background(),
+		ref,
+		owner,
+	)
+	require.True(t, joined)
+	require.NoError(t, err)
+	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
+	require.NoError(t, permit.AbortUnused())
+	_, err = admission.ReleaseOrdinary(requested.Ref)
+	require.NoError(t, err)
+}
+
+func TestStoppingErrorTreeMatchingIsStrictAndBounded(t *testing.T) {
+	current := &StoppingRejection{Generation: 17}
+	deep := error(current)
+	for range strictErrorTreeLimit {
+		deep = fmt.Errorf("wrapped: %w", deep)
+	}
+	tests := map[string]struct {
+		err  error
+		want bool
+	}{
+		"exact": {
+			err:  current,
+			want: true,
+		},
+		"wrapped exact": {
+			err:  fmt.Errorf("wrapped: %w", current),
+			want: true,
+		},
+		"joined exact": {
+			err:  errors.Join(current, current),
+			want: true,
+		},
+		"wrong generation": {
+			err: &StoppingRejection{Generation: 18},
+		},
+		"mixed real error": {
+			err: errors.Join(
+				current,
+				errors.New("cleanup failed"),
+			),
+		},
+		"generic cancellation": {
+			err: context.Canceled,
+		},
+		"tree over bound": {
+			err: deep,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(
+				t,
+				test.want,
+				onlyCurrentStoppingRejections(
+					test.err,
+					current.Generation,
+				),
+			)
+		})
+	}
 }
 
 func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {

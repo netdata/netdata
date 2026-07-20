@@ -108,13 +108,6 @@ func (rg *runGeneration) startDiscovery(ctx context.Context) error {
 			rg.tasks,
 			scope.Successor,
 			permit,
-			func(cause error) {
-				if cause == nil {
-					return
-				}
-				rg.run.Dirty(cause)
-				rg.kernel.Stop()
-			},
 		)
 		if err != nil {
 			return nil, err
@@ -150,7 +143,6 @@ type preparedDiscovery struct {
 	tasks     *lifecycle.TaskSupervisor
 	identity  lifecycle.ResourceIdentity
 	permit    lifecycle.LongLivedPermit
-	fail      func(error)
 }
 
 func newPreparedDiscovery(
@@ -159,18 +151,17 @@ func newPreparedDiscovery(
 	tasks *lifecycle.TaskSupervisor,
 	identity lifecycle.ResourceIdentity,
 	permit lifecycle.LongLivedPermit,
-	fail func(error),
 ) (*preparedDiscovery, error) {
 	if pipeline == nil || decisions == nil ||
 		len(pipeline.ProviderNames()) == 0 ||
 		tasks == nil || !identity.Valid() ||
 		!permit.Valid() || permit.Owner() != identity ||
-		permit.Class() != lifecycle.LongLivedPipeline || fail == nil {
+		permit.Class() != lifecycle.LongLivedPipeline {
 		return nil, errors.New("jobmgr composition: invalid prepared discovery")
 	}
 	return &preparedDiscovery{
 		pipeline: pipeline, decisions: decisions, tasks: tasks,
-		identity: identity, permit: permit, fail: fail,
+		identity: identity, permit: permit,
 	}, nil
 }
 
@@ -191,7 +182,7 @@ func (pd *preparedDiscovery) AcceptStart(
 	resource := &readyDiscovery{
 		pipeline: pd.pipeline, decisions: pd.decisions,
 		tasks: pd.tasks, identity: pd.identity,
-		permit: pd.permit, fail: pd.fail,
+		permit:           pd.permit,
 		providerNames:    pd.pipeline.ProviderNames(),
 		disabledNames:    pd.pipeline.DisabledProviderNames(),
 		providerRefs:     make(map[string]lifecycle.InheritedTaskRef),
@@ -223,7 +214,6 @@ type readyDiscovery struct {
 	tasks         *lifecycle.TaskSupervisor
 	identity      lifecycle.ResourceIdentity
 	permit        lifecycle.LongLivedPermit
-	fail          func(error)
 	providerNames []string
 	disabledNames []string
 	published     chan struct{}
@@ -285,7 +275,6 @@ func (rd *readyDiscovery) start(ctx context.Context) error {
 				runCtx,
 				rd.pipeline,
 				rd.decisions,
-				rd.fail,
 			)
 		},
 	)
@@ -314,7 +303,6 @@ func (rd *readyDiscovery) start(ctx context.Context) error {
 					runCtx,
 					rd.pipeline,
 					name,
-					rd.fail,
 				)
 			},
 		)
@@ -344,7 +332,6 @@ func runDiscoverySupervisor(
 	ctx context.Context,
 	pipeline *agentdiscovery.PipelineGeneration,
 	decisions *jobmgrdiscovery.DecisionIndex,
-	fail func(error),
 ) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -353,9 +340,6 @@ func runDiscoverySupervisor(
 				lifecycle.ErrTaskPanic,
 				recovered,
 			)
-		}
-		if err != nil && ctx.Err() == nil {
-			fail(err)
 		}
 	}()
 	err = pipeline.Run(ctx, decisions.Apply)
@@ -371,7 +355,6 @@ func runDiscoveryProvider(
 	ctx context.Context,
 	pipeline *agentdiscovery.PipelineGeneration,
 	name string,
-	fail func(error),
 ) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -381,9 +364,6 @@ func runDiscoveryProvider(
 				name,
 				recovered,
 			)
-		}
-		if err != nil && ctx.Err() == nil {
-			fail(err)
 		}
 	}()
 	return pipeline.RunProvider(ctx, name)

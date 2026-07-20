@@ -127,10 +127,35 @@ type TaskSupervisor struct {
 	retained    int
 	saturated   bool
 	observer    RuntimeObserver
+	run         *RunSupervisor
+	wake        func()
 
 	admissionReadyMu      sync.Mutex
 	onAdmissionReady      func()
 	admissionReadyPending bool
+}
+
+func (ts *TaskSupervisor) BindRun(
+	run *RunSupervisor,
+	wake func(),
+) error {
+	if ts == nil || run == nil || wake == nil {
+		return errors.New(
+			"jobmgr task supervisor: invalid run binding",
+		)
+	}
+	if ts.run != nil ||
+		ts.wake != nil ||
+		ts.active != 0 ||
+		ts.Pending() != 0 ||
+		ts.InheritedActive() != 0 {
+		return errors.New(
+			"jobmgr task supervisor: run bound after activation",
+		)
+	}
+	ts.run = run
+	ts.wake = wake
+	return nil
 }
 
 func NewTaskSupervisor(frame *FrameOwner) (*TaskSupervisor, error) {
@@ -889,6 +914,12 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 			outcome, err = runTaskWork(ctx, plan.Work)
 		}
 	}
+	if err != nil {
+		err = normalizeStoppingCancellation(
+			err,
+			context.Cause(ctx),
+		)
+	}
 	if publishErr := outcome.validate(); publishErr != nil {
 		err = errors.Join(err, publishErr)
 	} else if !outcome.empty() {
@@ -1023,6 +1054,13 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 					}
 				}
 			}
+			if ack.Err != nil {
+				ack.Err = normalizeStoppingActionCancellation(
+					action.Kind,
+					ack.Err,
+					context.Cause(ctx),
+				)
+			}
 			slot.sequence = action.Sequence
 			slot.actionPending = false
 			ts.completions <- TaskCompletion{
@@ -1083,6 +1121,13 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 		default:
 			ack.Err = errors.New("jobmgr task child: unsupported phase action")
 		}
+		if ack.Err != nil {
+			ack.Err = normalizeStoppingActionCancellation(
+				action.Kind,
+				ack.Err,
+				context.Cause(ctx),
+			)
+		}
 		slot.sequence = action.Sequence
 		slot.actionPending = false
 		if action.Kind == TaskActionTerminate {
@@ -1101,6 +1146,38 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 		ts.observeTaskPanic(ack.Err)
 		ts.acks <- ack
 	}
+}
+
+func normalizeStoppingActionCancellation(
+	action TaskActionKind,
+	err error,
+	cause error,
+) error {
+	switch action {
+	case TaskActionAcceptStart,
+		TaskActionCommitCapability,
+		TaskActionStopResource,
+		TaskActionApplyResourceTransaction:
+		return normalizeStoppingCancellation(err, cause)
+	default:
+		return err
+	}
+}
+
+func normalizeStoppingCancellation(
+	err error,
+	cause error,
+) error {
+	stopping, ok := cause.(*StoppingRejection)
+	if !ok {
+		return err
+	}
+	if !allErrorLeavesMatch(err, func(leaf error) bool {
+		return leaf == context.Canceled
+	}) {
+		return err
+	}
+	return stopping
 }
 
 func (ts *TaskSupervisor) observeTaskPanic(err error) {

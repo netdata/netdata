@@ -5,6 +5,7 @@ package jobmgr_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -409,7 +410,14 @@ func TestFunctionCatalogPausedMutationAbortsDuringShutdown(t *testing.T) {
 	require.False(t, catalog.active.Load() || !catalog.closed.Load())
 
 	_, err := kernel.CommitFunctions(context.Background(), mutation)
-	require.Error(t, err)
+	stopping, ok :=
+		errors.AsType[*lifecycle.StoppingRejection](err)
+	require.True(t, ok)
+	require.EqualValues(
+		t,
+		run.Generation(),
+		stopping.Generation,
+	)
 
 	require.NoError(t, admission.CloseDrained(run.Generation()))
 

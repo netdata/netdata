@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
@@ -19,6 +20,7 @@ type Scheduler struct {
 	tickMu sync.Mutex
 
 	reconciler ModuleReconciler
+	retries    *autoDetectionRetryIndex
 	jobs       map[lifecycle.ResourceIdentity]*scheduledJob
 	modules    map[string]*scheduledModule
 	jobHead    *scheduledJob
@@ -48,9 +50,29 @@ func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {
 	}
 	return &Scheduler{
 		reconciler: reconciler,
+		retries:    newAutoDetectionRetryIndex(),
 		jobs:       make(map[lifecycle.ResourceIdentity]*scheduledJob),
 		modules:    make(map[string]*scheduledModule),
 	}, nil
+}
+
+func (s *Scheduler) bindAutoDetectionRetries(
+	commands jobmgr.PreparedCommandPort,
+	plan autoDetectionRetryPlanner,
+	run uint64,
+) error {
+	if s == nil {
+		return errors.New(
+			"job output: nil autodetection retry scheduler",
+		)
+	}
+	return s.retries.bind(commands, plan, run)
+}
+
+func (s *Scheduler) CloseAutoDetectionRetries() {
+	if s != nil {
+		s.retries.close()
+	}
 }
 
 func (s *Scheduler) Register(
@@ -149,6 +171,9 @@ func (s *Scheduler) Tick(ctx context.Context, clock int) error {
 	}
 	s.tickMu.Lock()
 	defer s.tickMu.Unlock()
+	if err := s.retries.dispatchDue(ctx, clock); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	for record := s.jobHead; record != nil; record = record.next {
 		record.job.Tick(clock)

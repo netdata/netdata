@@ -37,7 +37,9 @@ func TestKernelCompletionBroadcastsToAllCallers(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 		err := kernel.Submit(ctx, Request{UID: "after-stop", Source: lifecycle.SourceFunction, Route: "route"})
-		require.False(t, err == nil || errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "stopped"))
+		stopping, ok := errors.AsType[*lifecycle.StoppingRejection](err)
+		require.True(t, ok)
+		require.EqualValues(t, 1, stopping.Generation)
 		require.False(t, catalog.next != 0 || catalog.release != 0 || len(catalog.leases) != 0)
 	})
 
@@ -46,8 +48,34 @@ func TestKernelCompletionBroadcastsToAllCallers(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 		err := kernel.Cancel(ctx, "after-stop")
-		require.False(t, err == nil || errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "stopped"))
+		stopping, ok := errors.AsType[*lifecycle.StoppingRejection](err)
+		require.True(t, ok)
+		require.EqualValues(t, 1, stopping.Generation)
 	})
+}
+
+func TestKernelStopCutRejectsCancellationBeforeShutdownCompletes(
+	t *testing.T,
+) {
+	kernel, run := newKernel(t)
+	require.NoError(t, run.OpenAdmission())
+	startKernelLoop(t, kernel)
+
+	kernel.Stop()
+
+	err := kernel.Cancel(
+		context.Background(),
+		"after-stop-cut",
+	)
+	stopping, ok :=
+		errors.AsType[*lifecycle.StoppingRejection](err)
+	require.True(t, ok)
+	require.EqualValues(
+		t,
+		run.Generation(),
+		stopping.Generation,
+	)
+	require.NoError(t, kernel.Wait(context.Background()))
 }
 
 func TestKernelLoopStartsExactlyOnce(t *testing.T) {
@@ -140,7 +168,9 @@ func TestKernelTerminalRejectsWithoutRetainingSubmissions(t *testing.T) {
 			kernel := newStoppedKernel(t)
 			for index := range externalSourceQueueDepth * 4 {
 				err := test.call(context.Background(), kernel, index)
-				require.ErrorIs(t, err, ErrStopped)
+				stopping, ok := errors.AsType[*lifecycle.StoppingRejection](err)
+				require.True(t, ok)
+				require.EqualValues(t, 1, stopping.Generation)
 			}
 
 			retained := len(kernel.submissions[sourceIndex(test.source)])
@@ -654,7 +684,7 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 				uid = "replace-success"
 			}
 
-			require.NoError(t, kernel.SubmitAndWait(
+			err = kernel.SubmitAndWait(
 				context.Background(),
 				Request{
 					UID:     uid,
@@ -662,8 +692,12 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 					Source:  lifecycle.SourceJobManager,
 					Route:   "replace",
 				},
-			),
 			)
+			if test.prepareErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, test.prepareErr)
+			}
 
 			lane := kernel.lanes[resourceCommandLaneKey("resource")]
 			require.NotNil(t, lane)
@@ -3265,7 +3299,9 @@ func TestKernelShutdownDrainsMoreThanTwoSubmissionQuantaWithoutAnotherWake(t *te
 	for index, result := range results {
 		select {
 		case err := <-result:
-			require.False(t, err == nil || !strings.Contains(err.Error(), "admission closed"))
+			stopping, ok := errors.AsType[*lifecycle.StoppingRejection](err)
+			require.True(t, ok)
+			require.EqualValues(t, 1, stopping.Generation)
 		default:
 			require.FailNowf(t, "test failed", "submission %d was not drained", index)
 		}

@@ -636,6 +636,9 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		kernel.submissions[index] = make(chan submission, externalSourceQueueDepth)
 		kernel.submissionSpace[index] = make(chan struct{}, 1)
 	}
+	if err := tasks.BindRun(run, kernel.NotifyControlReady); err != nil {
+		return nil, err
+	}
 	heap.Init(&kernel.deadlines)
 	return kernel, nil
 }
@@ -777,6 +780,9 @@ func (ck *CommandKernel) submitFunctionMutation(
 		action < functionMutationQuiesce || action > functionMutationAbort {
 		return 0, errors.New("jobmgr kernel: invalid Function mutation")
 	}
+	if ck.run.IsStopping() {
+		return 0, ck.run.StoppingCause()
+	}
 	result := make(chan functionMutationResult, 1)
 	submission := functionMutationSubmission{
 		mutation: mutation,
@@ -787,11 +793,11 @@ func (ck *CommandKernel) submitFunctionMutation(
 	case ck.functionMutations <- submission:
 		ck.NotifyControlReady()
 	case <-ck.submissionStopped:
-		return 0, ErrStopped
+		return 0, ck.stoppingError()
 	case <-ctx.Done():
 		return 0, ctx.Err()
 	case <-ck.done:
-		return 0, ErrStopped
+		return 0, ck.stoppingError()
 	}
 	select {
 	case completed := <-result:
@@ -801,7 +807,10 @@ func (ck *CommandKernel) submitFunctionMutation(
 		case completed := <-result:
 			return completed.version, completed.err
 		default:
-			return 0, errors.Join(ErrStopped, ck.doneErr)
+			return 0, errors.Join(
+				ck.stoppingError(),
+				ck.doneErr,
+			)
 		}
 	}
 }
@@ -923,16 +932,16 @@ func (ck *CommandKernel) submitWithPlan(
 		case err := <-result:
 			return err
 		case <-ck.done:
-			return ErrStopped
+			return ck.stoppingError()
 		}
 		select {
 		case err := <-result:
 			return err
 		case <-ck.done:
-			return ErrStopped
+			return ck.stoppingError()
 		}
 	case <-ck.done:
-		return ErrStopped
+		return ck.stoppingError()
 	}
 }
 
@@ -942,7 +951,7 @@ func (ck *CommandKernel) enqueueSubmission(ctx context.Context, source lifecycle
 		ck.submissionMu.Lock()
 		if ck.submissionClosed {
 			ck.submissionMu.Unlock()
-			return ErrStopped
+			return ck.stoppingError()
 		}
 		select {
 		case ck.submissions[index] <- submitted:
@@ -955,7 +964,7 @@ func (ck *CommandKernel) enqueueSubmission(ctx context.Context, source lifecycle
 		select {
 		case <-ck.submissionSpace[index]:
 		case <-ck.submissionStopped:
-			return ErrStopped
+			return ck.stoppingError()
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -1002,18 +1011,21 @@ func (ck *CommandKernel) Reject(ctx context.Context, uid string, status lifecycl
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-ck.done:
-		return ErrStopped
+		return ck.stoppingError()
 	}
 }
 
 func (ck *CommandKernel) Cancel(ctx context.Context, uid string) error {
+	if ck.run.IsStopping() {
+		return ck.run.StoppingCause()
+	}
 	select {
 	case ck.cancel <- uid:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-ck.done:
-		return ErrStopped
+		return ck.stoppingError()
 	}
 }
 
@@ -1026,9 +1038,17 @@ func (ck *CommandKernel) NotifyControlReady() {
 
 func (ck *CommandKernel) Stop() {
 	ck.stopOnce.Do(func() {
+		ck.run.BeginStopping()
 		ck.closeSubmissionIngress()
 		close(ck.stop)
 	})
+}
+
+func (ck *CommandKernel) stoppingError() error {
+	if ck != nil && ck.run != nil && ck.run.IsStopping() {
+		return ck.run.StoppingCause()
+	}
+	return ErrStopped
 }
 
 func (ck *CommandKernel) Done() <-chan struct{} {
@@ -1058,7 +1078,7 @@ func (ck *CommandKernel) WaitShutdownStarted(ctx context.Context) error {
 		case <-ck.shutdownStarted:
 			return nil
 		default:
-			return ErrStopped
+			return ck.stoppingError()
 		}
 	case <-ctx.Done():
 		return ctx.Err()
@@ -1111,6 +1131,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 			terminal = errors.Join(terminal, cause)
 			return
 		}
+		ck.run.BeginStopping()
 		ck.closeSubmissionIngress()
 		shuttingDown = true
 		stopDeadline()
@@ -1861,14 +1882,12 @@ func (ck *CommandKernel) rejectClosedAdmission(request Request) error {
 	closedErr := errors.New("jobmgr kernel: admission closed")
 	if err := ck.abortRequestInputBody(request); err != nil {
 		ck.run.Dirty(err)
-		return errors.Join(closedErr, err)
+		return errors.Join(ck.stoppingError(), err)
 	}
-	select {
-	case <-ck.shutdownStarted:
-		return errors.Join(ErrStopped, closedErr)
-	default:
-		return closedErr
+	if ck.run.IsStopping() {
+		return ck.run.StoppingCause()
 	}
+	return closedErr
 }
 
 func (ck *CommandKernel) serviceAdmissions(quantum int) bool {
@@ -2550,6 +2569,10 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 				ck.run.Dirty(errors.Join(completion.Err, err))
 				return
 			}
+			operation.terminalErr = errors.Join(
+				operation.terminalErr,
+				completion.Err,
+			)
 			status := lifecycle.ControlUnavailable
 			if errors.Is(completion.Err, lifecycle.ErrTaskPanic) {
 				status = lifecycle.ControlInternal
@@ -4038,7 +4061,14 @@ func (ck *CommandKernel) beginShutdown(deadline time.Time) error {
 		var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
 		count, abortErr := ck.functionCatalog.AbortMutation(&cleanups)
 		pushErr := ck.pushFunctionCleanupBatch(&cleanups, count)
-		terminalErr := errors.Join(ErrStopped, abortErr, pushErr)
+		terminalErr := error(ck.run.StoppingCause())
+		if abortErr != nil || pushErr != nil {
+			terminalErr = errors.Join(
+				terminalErr,
+				abortErr,
+				pushErr,
+			)
+		}
 		if ck.functionMutation.result != nil {
 			ck.functionMutation.result <- functionMutationResult{
 				err: terminalErr,
@@ -4100,7 +4130,12 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 	case lifecycle.ChildExecuting:
 		if operation.plan.Resource == nil ||
 			operation.plan.Resource.Action != ResourceStop {
-			_ = ck.tasks.Cancel(operation.Task)
+			if err := ck.tasks.CancelWithCause(
+				operation.Task,
+				ck.run.StoppingCause(),
+			); err != nil {
+				return err
+			}
 		}
 		if operation.Response != lifecycle.ResponseNotRequired &&
 			!operation.plan.CooperativeCancel &&
@@ -4109,7 +4144,10 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 			ck.enqueueControl(operation, cancellationControl(operation))
 		}
 	case lifecycle.ChildNotStarted:
-		ck.unlinkQueued(operation, ErrStopped)
+		ck.unlinkQueued(
+			operation,
+			ck.run.StoppingCause(),
+		)
 		if operation.Response != lifecycle.ResponseNotRequired {
 			ck.enqueueControl(operation, cancellationControl(operation))
 		} else {
@@ -4120,7 +4158,10 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 			if err := operation.AbandonDeadlineStart(); err != nil {
 				return err
 			}
-			ck.unlinkQueued(operation, ErrStopped)
+			ck.unlinkQueued(
+				operation,
+				ck.run.StoppingCause(),
+			)
 			if operation.Response == lifecycle.ResponseOpen {
 				ck.enqueueControl(operation, lifecycle.ControlDeadline)
 			} else {

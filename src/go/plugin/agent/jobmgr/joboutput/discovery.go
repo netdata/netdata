@@ -23,6 +23,17 @@ type DiscoveredJobChange struct {
 	Status  dyncfg.Status
 	Remove  bool
 	Restart bool
+	retry   autoDetectionRetryToken
+}
+
+func (dcjc *DynCfgJobController) planAutoDetectionRetry(
+	config confgroup.Config,
+	token autoDetectionRetryToken,
+) (jobmgr.WorkPlan, error) {
+	return dcjc.PlanDiscovered(DiscoveredJobChange{
+		Config: config, Status: dyncfg.StatusRunning,
+		Restart: true, retry: token,
+	})
 }
 
 // PlanDiscovered builds one typed, response-free graph/job reconciliation
@@ -98,6 +109,7 @@ func (dcjc *DynCfgJobController) PlanDiscovered(
 						Status:  change.Status,
 						Remove:  change.Remove,
 						Restart: change.Restart,
+						retry:   change.retry,
 					},
 					current,
 					scope,
@@ -125,6 +137,20 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		return nil, err
 	}
 	result := mustDynCfgMessage(204, "")
+	if change.retry.generation != 0 {
+		config, err := graphRecordConfig(record)
+		if err != nil ||
+			!exists ||
+			record.Status != dyncfg.StatusFailed.String() ||
+			config.UID() != change.retry.uid {
+			return dcjc.noop(
+				scope,
+				current,
+				permit,
+				result,
+			)
+		}
+	}
 	if change.Remove {
 		disposition := lifecycle.ResourceTransactionUnchanged
 		if current != nil {
@@ -203,6 +229,8 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	if current != nil {
 		disposition = lifecycle.ResourceTransactionReplaced
 	}
+	failedPostimage := postimage
+	failedPostimage.Status = dyncfg.StatusFailed.String()
 	return dcjc.prepareMutation(
 		scope,
 		current,
@@ -212,5 +240,37 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		&postimage,
 		result,
 		cleanup,
+		successorFailurePlan{
+			postimage: failedPostimage,
+			failedCleanup: dcjc.configCreateCleanup(
+				failedPostimage,
+				change.Config.SourceType(),
+				change.Config.Source(),
+				dcjc.configType(
+					dcjc.modules[change.Config.Module()],
+				),
+			),
+			removedCleanup: dcjc.configDeleteCleanup(
+				dcjc.configID(
+					change.Config.Module(),
+					change.Config.Name(),
+				),
+			),
+			result: func(
+				*autoDetectionFailure,
+			) lifecycle.SealedResult {
+				return result
+			},
+			afterApply: func(
+				failure *autoDetectionFailure,
+			) {
+				dcjc.scheduleAutoDetectionRetry(
+					change.Config,
+					failure,
+				)
+			},
+			removePlainStock: change.Config.SourceType() ==
+				confgroup.TypeStock,
+		},
 	)
 }
