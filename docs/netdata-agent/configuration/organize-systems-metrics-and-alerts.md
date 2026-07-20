@@ -79,12 +79,12 @@ Host labels help you:
 
 Netdata automatically generates host labels when it starts, capturing:
 
-| Label Category | Information Captured                                |
-|----------------|-----------------------------------------------------|
-| System Info    | Kernel version, OS name and version                 |
+| Label Category | Information Captured                                                                        |
+|----------------|---------------------------------------------------------------------------------------------|
+| System Info    | Kernel version, OS name and version                                                         |
 | Hardware       | CPU architecture, cores, frequency, RAM, disk space, product ID, product name, product type |
-| Environment    | Container details, Kubernetes node status           |
-| Infrastructure | Virtualization layer, Parent-child streaming status |
+| Environment    | Container details, Kubernetes node status                                                   |
+| Infrastructure | Virtualization layer, Parent-child streaming status                                         |
 
 View your automatic labels at `http://HOST-IP:19999/api/v1/info`:
 
@@ -108,25 +108,9 @@ Add your own labels to categorize systems by any criteria you need.
     ```bash
     cd /etc/netdata   # Replace with your Netdata config directory
     sudo ./edit-config netdata.conf
-    ```
-
     :::note
-    On Windows, Netdata configuration lives at `C:\Program Files\Netdata\etc\netdata` (default install location) and there is no `sudo`. Open the bundled MSYS2 shell — for example `Win + R`, then `"C:\Program Files\Netdata\msys2.exe"` — and edit `netdata.conf`:
 
-    ```bash
-    cd /etc/netdata
-    ./edit-config netdata.conf
-    ```
-
-    `edit-config` opens the file in the `nano` editor. Add your `[host labels]` section and save it — the label naming rules, the `[host labels]` example, and the environment variable expansion in steps 2 and 3 work identically on Windows.
-
-    Reload labels without restarting the Agent, from an elevated PowerShell:
-
-    ```powershell
-    & "C:\Program Files\Netdata\usr\bin\netdatacli.exe" reload-labels
-    ```
-
-    Verify your labels at `http://HOST-IP:19999/api/v1/info`. See [editing configuration files on Windows](/packaging/windows/WINDOWS_INSTALLER.md#editing-configuration-files) for the full MSYS2 environment workflow.
+    On Windows, follow [Edit Configuration Files](/docs/netdata-agent/configuration/README.md#edit-configuration-files) instead. The `[host labels]` example, naming rules, and environment variable expansion in steps 2 and 3 below work identically on Windows.
     :::
 
 2. Add a `[host labels]` section:
@@ -154,10 +138,10 @@ Add your own labels to categorize systems by any criteria you need.
         location = ${DC}-${RACK:-default}
     ```
 
-    | Syntax | Behavior |
-    |--------|----------|
-    | `${VAR}` | Replaced with the value of `VAR`. If unset or empty, the label value becomes `[none]` |
-    | `${VAR:-default}` | Replaced with the value of `VAR`. If unset or empty, uses `default` |
+    | Syntax            | Behavior                                                                              |
+    |-------------------|---------------------------------------------------------------------------------------|
+    | `${VAR}`          | Replaced with the value of `VAR`. If unset or empty, the label value becomes `[none]` |
+    | `${VAR:-default}` | Replaced with the value of `VAR`. If unset or empty, uses `default`                   |
 
     Environment variables are resolved when labels are loaded or reloaded. You can mix them with literal text (e.g., `${DC}-${RACK}`).
 
@@ -166,6 +150,8 @@ Add your own labels to categorize systems by any criteria you need.
     ```bash
     netdatacli reload-labels
     ```
+
+    On Windows, run this through `netdatacli.exe` — see [Using netdatacli](/docs/netdata-agent/start-stop-restart.md#windows).
 
 5. Verify your labels at `http://HOST-IP:19999/api/v1/info`
 
@@ -182,6 +168,8 @@ Remove a custom label you no longer need.
     sudo ./edit-config netdata.conf
     ```
 
+    On Windows, follow [Edit Configuration Files](/docs/netdata-agent/configuration/README.md#edit-configuration-files) instead.
+
 2. In the `[host labels]` section, delete the line for the label you want to remove.
 3. Save the file.
 4. Apply the change without restarting Netdata:
@@ -189,6 +177,8 @@ Remove a custom label you no longer need.
     ```bash
     netdatacli reload-labels
     ```
+
+    On Windows, run this through `netdatacli.exe` — see [Using netdatacli](/docs/netdata-agent/start-stop-restart.md#windows).
 
 5. Confirm the label is gone at `http://HOST-IP:19999/api/v1/info`
 
