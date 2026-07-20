@@ -8,6 +8,7 @@ typedef struct {
     size_t index;                // Original index in the array
     NETDATA_DOUBLE contribution; // Sorting metric (usually volume contribution)
     const char *name;           // Name for display
+    RRDHOST_IDENTITY identity;
 } CARDINALITY_ITEM;
 
 // Comparison function for sorting items by contribution
@@ -42,7 +43,8 @@ void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key
         for (size_t c = 0; c < count; c++) {
             QUERY_NODE *qn = query_node(qt, c);
             items[c].index = c;
-            items[c].name = rrdhost_hostname(qn->rrdhost);
+            items[c].identity = rrdhost_identity_acquire(qn->rrdhost);
+            items[c].name = string2str(items[c].identity.hostname);
 
             // Use query points as the metric for contribution
             if (qt->query_points.sum > 0)
@@ -69,7 +71,7 @@ void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key
                 QUERY_NODE *qn = query_node(qt, items[i].index);
                 RRDHOST *host = qn->rrdhost;
                 buffer_json_add_array_item_object(wb);
-                buffer_json_node_add_v2(wb, host, qn->slot, qn->duration_ut, show_node_status);
+                buffer_json_node_add_v2(wb, host, &items[i].identity, qn->slot, qn->duration_ut, show_node_status);
 
                 // Only include detailed statistics if MINIMAL_STATS option is not set
                 if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {
@@ -123,14 +125,19 @@ void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key
             buffer_json_object_close(wb);
         }
 
+        for (size_t c = 0; c < count; c++)
+            rrdhost_identity_release(&items[c].identity);
+
         freez(items);
     } else {
         // No limiting needed, output all nodes
         for (size_t c = 0; c < count; c++) {
             QUERY_NODE *qn = query_node(qt, c);
             RRDHOST *host = qn->rrdhost;
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
             buffer_json_add_array_item_object(wb);
-            buffer_json_node_add_v2(wb, host, qn->slot, qn->duration_ut, show_node_status);
+            buffer_json_node_add_v2(wb, host, &identity, qn->slot, qn->duration_ut, show_node_status);
+            rrdhost_identity_release(&identity);
 
             // Only include detailed statistics if MINIMAL_STATS option is not set
             if (!(qt->window.options & RRDR_OPTION_MINIMAL_STATS)) {

@@ -763,6 +763,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
         if(unlikely(rc)) {
             if (rrdcalc_isrepeating(rc)) {
                 rc->last_repeat = last_repeat;
+                rrdcalc_runtime_snapshot_publish_repeat_state(rc);
                 // We iterate through repeating alarm entries only to
                 // find the latest last_repeat timestamp. Otherwise,
                 // there is no need to keep them in memory.

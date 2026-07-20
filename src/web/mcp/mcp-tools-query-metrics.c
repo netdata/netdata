@@ -632,7 +632,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
             // Add a warning about potentially misleading aggregation
             bool warn_aggregation = false;
             // Only warn if using average without dimension grouping AND multiple dimensions selected
-            int dimensions_count = (int)json_object_array_length(dimensions_obj);
+            size_t dimensions_count = json_object_array_length(dimensions_obj);
             if (dimensions_count > 1 &&
                 group_by[0].aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE && 
                 !(group_by[0].group_by & RRDR_GROUP_BY_DIMENSION)) {

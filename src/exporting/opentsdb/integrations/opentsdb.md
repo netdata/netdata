@@ -49,7 +49,7 @@ The following options can be defined for this exporter.
 | password | Password for HTTP authentication | my_password | no |
 | data source | Selects the kind of data that will be sent to the external database. (as collected/average/sum) |  | no |
 | hostname | The hostname to be used for sending data to the external database server. | [global].hostname | no |
-| prefix | The prefix to add to all metrics. | Netdata | no |
+| prefix | The prefix to add to all metrics. | netdata | no |
 | [update every](#option-update-every) | Frequency of sending sending data to the external database, in seconds. | 10 | no |
 | [buffer on failures](#option-buffer-on-failures) | The number of iterations (`update every` seconds) to buffer data, when the external database server is not available. | 10 | no |
 | timeout ms | The timeout in milliseconds to wait for the external database server to process the data. | 2 * update_every * 1000 | no |

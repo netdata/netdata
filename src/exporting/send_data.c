@@ -36,7 +36,7 @@ int exporting_discard_response(BUFFER *buffer, struct instance *instance) {
 
     for(; *s && d < e ;s++) {
         char c = *s;
-        if(unlikely(!isprint(c))) c = ' ';
+        if(unlikely(!isprint((uint8_t)c))) c = ' ';
         *d++ = c;
     }
     *d = '\0';

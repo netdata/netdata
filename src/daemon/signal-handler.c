@@ -45,8 +45,17 @@ static struct {
     { SIGXFSZ, "SIGXFSZ", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXFSZ },
 };
 
-static void (*original_handlers[NSIG])(int) = {0};
-static void (*original_sigactions[NSIG])(int, siginfo_t *, void *) = {0};
+typedef void (*SIGNAL_HANDLER)(int);
+typedef void (*SIGNAL_SIGACTION)(int, siginfo_t *, void *);
+
+static SIGNAL_HANDLER original_handlers[NSIG] = {0};
+static SIGNAL_SIGACTION original_sigactions[NSIG] = {0};
+
+// Signal-handler atomics must never fall back to a locking runtime helper.
+_Static_assert(__atomic_always_lock_free(sizeof(original_handlers[0]), original_handlers),
+               "signal handler pointers must be lock-free");
+_Static_assert(__atomic_always_lock_free(sizeof(original_sigactions[0]), original_sigactions),
+               "signal sigaction pointers must be lock-free");
 
 NEVER_INLINE
 void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused) {
@@ -59,7 +68,12 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
         __atomic_fetch_add(&signals_waiting[i].count, 1, __ATOMIC_RELAXED);
 
         if(signals_waiting[i].action == NETDATA_SIGNAL_DEADLY) {
-            bool chained_handler = original_sigactions[signo] || (original_handlers[signo] && original_handlers[signo] != SIG_IGN && original_handlers[signo] != SIG_DFL);
+            SIGNAL_SIGACTION original_sigaction =
+                __atomic_load_n(&original_sigactions[signo], __ATOMIC_ACQUIRE);
+            SIGNAL_HANDLER original_handler =
+                __atomic_load_n(&original_handlers[signo], __ATOMIC_ACQUIRE);
+            bool chained_handler = original_sigaction ||
+                (original_handler && original_handler != SIG_IGN && original_handler != SIG_DFL);
 
             // Update the status file
             SIGNAL_CODE sc = info ? signal_code(signo, info->si_code) : 0;
@@ -105,13 +119,13 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
 
             // Chain to the original handler if it exists
             if(chained_handler) {
-                if (original_sigactions[signo]) {
-                    original_sigactions[signo](signo, info, context);
+                if (original_sigaction) {
+                    original_sigaction(signo, info, context);
                     return; // Original handler should handle the signal
                 }
 
-                if (original_handlers[signo]) {
-                    original_handlers[signo](signo);
+                if (original_handler) {
+                    original_handler(signo);
                     return; // Original handler should handle the signal
                 }
             }
@@ -162,8 +176,10 @@ void nd_cleanup_deadly_signals(void) {
             netdata_log_error("SIGNAL: Failed to cleanup signal handler for: %s", signals_waiting[i].name);
     }
 
-    memset(original_handlers, 0, sizeof(original_handlers));
-    memset(original_sigactions, 0, sizeof(original_sigactions));
+    for(size_t signo = 0; signo < NSIG; signo++) {
+        __atomic_store_n(&original_handlers[signo], (SIGNAL_HANDLER)0, __ATOMIC_RELEASE);
+        __atomic_store_n(&original_sigactions[signo], (SIGNAL_SIGACTION)0, __ATOMIC_RELEASE);
+    }
 }
 
 void nd_initialize_signals(bool chain_existing) {
@@ -190,9 +206,9 @@ void nd_initialize_signals(bool chain_existing) {
             (uintptr_t)old_act.sa_handler != (uintptr_t)nd_signal_handler) {
             // Save the original handlers for chaining
             if (old_act.sa_flags & SA_SIGINFO)
-                original_sigactions[signo] = old_act.sa_sigaction;
+                __atomic_store_n(&original_sigactions[signo], old_act.sa_sigaction, __ATOMIC_RELEASE);
             else
-                original_handlers[signo] = old_act.sa_handler;
+                __atomic_store_n(&original_handlers[signo], old_act.sa_handler, __ATOMIC_RELEASE);
         }
 
         switch (signals_waiting[i].action) {

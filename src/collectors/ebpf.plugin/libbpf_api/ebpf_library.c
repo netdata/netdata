@@ -638,7 +638,7 @@ static void ebpf_link_hostnames(const char *parse)
     char *clean = move;
     while (likely(move)) {
         // Find the first valid value
-        while (isspace(*move))
+        while (isspace((uint8_t)*move))
             move++;
 
         // No valid value found
@@ -714,7 +714,7 @@ static inline in_addr_t ebpf_netmask(int prefix)
     if (prefix == 0)
         return (~((in_addr_t)-1));
     else
-        return (in_addr_t)(~((1 << (32 - prefix)) - 1));
+        return (in_addr_t)(~((1U << (32 - prefix)) - 1));
 }
 
 /**
@@ -842,6 +842,18 @@ static inline int ebpf_ip2nl(uint8_t *dst, const char *ip, int domain, char *sou
     return 0;
 }
 
+static bool ebpf_parse_cidr_prefix(const char *text, int minimum, int maximum, int *prefix)
+{
+    char *end;
+    long value = strtol(text, &end, 10);
+
+    if (end == text || *end || value < minimum || value > maximum)
+        return false;
+
+    *prefix = (int)value;
+    return true;
+}
+
 /**
  * Clean IP structure
  *
@@ -926,12 +938,12 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
         }
 
         if (!select) { // CIDR
-            select = ebpf_ip2nl(first.addr8, ip, AF_INET, ipdup);
+            select = ebpf_ip2nl(first.addr8, clean_end, AF_INET, ipdup);
             if (select)
                 goto cleanipdup;
 
-            select = (int)str2i(end);
-            if (select < NETDATA_MINIMUM_IPV4_CIDR || select > NETDATA_MAXIMUM_IPV4_CIDR) {
+            if (!ebpf_parse_cidr_prefix(
+                    end, NETDATA_MINIMUM_IPV4_CIDR, NETDATA_MAXIMUM_IPV4_CIDR, &select)) {
                 netdata_log_info("The specified CIDR %s is not valid, the IP %s will be ignored.", end, ip);
                 goto cleanipdup;
             }
@@ -948,7 +960,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
 
             last.addr32[0] = htonl(ebpf_broadcast(ntohl(first.addr32[0]), select));
         } else { // Range
-            select = ebpf_ip2nl(first.addr8, ip, AF_INET, ipdup);
+            select = ebpf_ip2nl(first.addr8, clean_end, AF_INET, ipdup);
             if (select)
                 goto cleanipdup;
 
@@ -978,7 +990,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
                 goto cleanipdup;
             }
 
-            select = ebpf_ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            select = ebpf_ip2nl(first.addr8, clean_end, AF_INET6, ipdup);
             if (select)
                 goto cleanipdup;
 
@@ -993,14 +1005,13 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
                 goto cleanipdup;
             }
 
-            select = str2i(end);
-            if (select < 0 || select > 128) {
+            if (!ebpf_parse_cidr_prefix(end, 0, 128, &select)) {
                 netdata_log_info("The CIDR %s is not valid, the address %s will be ignored.", end, ip);
                 goto cleanipdup;
             }
 
             uint64_t prefix = (uint64_t)select;
-            select = ebpf_ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            select = ebpf_ip2nl(first.addr8, clean_end, AF_INET6, ipdup);
             if (select)
                 goto cleanipdup;
 
@@ -1036,6 +1047,8 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
 
         memcpy(last.addr8, first.addr8, sizeof(first.addr8));
     }
+
+    freez(clean_end);
 
     ebpf_network_viewer_ip_list_t *store;
 
@@ -1154,17 +1167,20 @@ void ebpf_fill_ip_list_unsafe(
  *
  * Parse the IP ranges given and create Network Viewer IP Structure
  *
- * @param ptr  is a pointer with the text to parse.
+ * @param source  is a pointer with the text to parse.
  */
-void ebpf_parse_ips_unsafe(const char *ptr)
+void ebpf_parse_ips_unsafe(const char *source)
 {
     // No value
-    if (unlikely(!ptr))
+    if (unlikely(!source))
         return;
+
+    CLEAN_CHAR_P *input = strdupz(source);
+    char *ptr = input;
 
     while (likely(ptr)) {
         // Move forward until next valid character
-        while (isspace(*ptr))
+        while (isspace((uint8_t)*ptr))
             ptr++;
 
         // No valid value found
@@ -1351,8 +1367,11 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
                     cmp_last);
                 freez(move->value);
                 move->value = in->value;
+                move->hash = in->hash;
                 move->first = in->first;
                 move->last = in->last;
+                move->cmp_first = in->cmp_first;
+                move->cmp_last = in->cmp_last;
                 freez(in);
                 return;
             }
@@ -1371,8 +1390,8 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
     netdata_log_info(
         "Adding values %s( %u, %u) to %s port list used on network viewer",
         in->value,
-        in->first,
-        in->last,
+        ntohs(in->first),
+        ntohs(in->last),
         (*out == network_viewer_opt.included_port) ? "included" : "excluded");
 #endif
 }
@@ -1400,6 +1419,7 @@ static void ebpf_parse_service_list(void **out, const char *service)
     w->hash = simple_hash(service);
 
     w->first = w->last = (uint16_t)serv->s_port;
+    w->cmp_first = w->cmp_last = ntohs((uint16_t)serv->s_port);
 
     fill_port_list(list, w);
 }
@@ -1480,8 +1500,8 @@ fillenvpl:
     w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
     w->value = copied;
     w->hash = simple_hash(copied);
-    w->first = (uint16_t)first;
-    w->last = (uint16_t)last;
+    w->first = htons((uint16_t)first);
+    w->last = htons((uint16_t)last);
     w->cmp_first = (uint16_t)first;
     w->cmp_last = (uint16_t)last;
 
@@ -1494,17 +1514,20 @@ fillenvpl:
  *
  * Parse the port ranges given and create Network Viewer Port Structure
  *
- * @param ptr  is a pointer with the text to parse.
+ * @param source  is a pointer with the text to parse.
  */
-void ebpf_parse_ports(const char *ptr)
+void ebpf_parse_ports(const char *source)
 {
     // No value
-    if (unlikely(!ptr))
+    if (unlikely(!source))
         return;
+
+    CLEAN_CHAR_P *input = strdupz(source);
+    char *ptr = input;
 
     while (likely(ptr)) {
         // Move forward until next valid character
-        while (isspace(*ptr))
+        while (isspace((uint8_t)*ptr))
             ptr++;
 
         // No valid value found
@@ -1523,10 +1546,10 @@ void ebpf_parse_ports(const char *ptr)
             ptr++;
         }
 
-        if (isdigit(*ptr)) { // Parse port
+        if (isdigit((uint8_t)*ptr)) { // Parse port
             ebpf_parse_port_list(
                 neg ? (void **)&network_viewer_opt.excluded_port : (void **)&network_viewer_opt.included_port, ptr);
-        } else if (isalpha(*ptr)) { // Parse service
+        } else if (isalpha((uint8_t)*ptr)) { // Parse service
             ebpf_parse_service_list(
                 neg ? (void **)&network_viewer_opt.excluded_port : (void **)&network_viewer_opt.included_port, ptr);
         } else if (*ptr == '*') { // All

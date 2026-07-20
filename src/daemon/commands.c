@@ -354,19 +354,42 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
-static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, bool unregister)
+static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool report_error, bool unregister)
 {
+    rrd_rdlock();
+    RRDHOST *host = rrdhost_find_by_guid(machine_guid);
+    if (!host) {
+        rrd_rdunlock();
+        return 0;
+    }
+
     if (host == localhost) {
         if (report_error)
             buffer_sprintf(wb, "Node '%s' (machine guid: %s) is our localhost - not changing it",
                            rrdhost_hostname(host), host->machine_guid);
+        rrd_rdunlock();
         return 0;
     }
+
+    bool locked = unregister ? rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)
+                             : rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
+    if (!locked) {
+        if (report_error)
+            buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
+                           rrdhost_hostname(host), host->machine_guid);
+        rrd_rdunlock();
+        return -1;
+    }
+    rrd_rdunlock();
 
     if (rrdhost_is_online(host)) {
         if (report_error)
             buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
                            rrdhost_hostname(host), host->machine_guid);
+        if (unregister)
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+        else
+            rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
         return 0;
     }
 
@@ -389,13 +412,14 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
         host->node_id = UUID_ZERO;
         buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been unregistered",
                        rrdhost_hostname(host), host->machine_guid);
-        rrdhost_free___without_having_rrd_wrlock(host);
+        rrdhost_free___consume_metadata_lifetime_writelock(host);
         return 1;
     }
 
     if (marked) {
         buffer_sprintf(wb, "Node '%s' (machine guid: %s) has been marked ephemeral",
                        rrdhost_hostname(host), host->machine_guid);
+        rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
         return 1;
     }
 
@@ -404,6 +428,7 @@ static int remove_ephemeral_host(BUFFER *wb, RRDHOST *host, bool report_error, b
                        rrdhost_hostname(host), host->machine_guid);
     }
 
+    rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
     return 0;
 }
 
@@ -419,12 +444,16 @@ static cmd_status_t cmd_remove_stale_node_internal(char *args, char **message, b
         goto done;
     }
 
-    RRDHOST *host = NULL;
-    host = rrdhost_find_by_guid(args);
+    char machine_guid[UUID_STR_LEN] = "";
+    rrd_rdlock();
+    RRDHOST *host = rrdhost_find_by_guid(args);
     if (!host)
         host = rrdhost_find_by_node_id(args);
+    if (host)
+        strncpyz(machine_guid, host->machine_guid, sizeof(machine_guid));
+    rrd_rdunlock();
 
-    if (!host) {
+    if (!machine_guid[0]) {
         sqlite3_stmt *res = NULL;
 
         bool report_error = strcmp(args, "ALL_NODES") != 0;
@@ -439,31 +468,36 @@ static cmd_status_t cmd_remove_stale_node_internal(char *args, char **message, b
 
         param = 0;
         int cnt = 0;
+        int busy = 0;
         while (sqlite3_step_monitored(res) == SQLITE_ROW) {
             char guid[UUID_STR_LEN];
             if (!sqlite3_column_uuid_unparse_lower(res, 0, guid))
                 continue;
-            host = rrdhost_find_by_guid(guid);
-            if (host) {
-                int rc = remove_ephemeral_host(wb, host, report_error, unregister);
-                if(rc) {
-                    cnt += rc;
+            int rc = remove_ephemeral_host(wb, guid, report_error, unregister);
+            if (rc > 0) {
+                cnt += rc;
+                buffer_fast_strcat(wb, "\n", 1);
+            }
+            else if (rc < 0) {
+                busy++;
+                if (report_error)
                     buffer_fast_strcat(wb, "\n", 1);
-                }
             }
         }
-        if (!cnt && buffer_strlen(wb) == 0) {
+        if (!cnt && !busy && buffer_strlen(wb) == 0) {
             if (report_error)
                 buffer_sprintf(wb, "No match for \"%s\"", args);
             else
                 buffer_sprintf(wb, "No stale nodes found");
         }
+        else if (busy && !report_error)
+            buffer_sprintf(wb, "%d node%s %s busy - try again", busy, busy == 1 ? "" : "s", busy == 1 ? "is" : "are");
     done0:
         REPORT_BIND_FAIL(res, param);
         SQLITE_FINALIZE(res);
     }
     else
-        (void) remove_ephemeral_host(wb, host, true, unregister);
+        (void) remove_ephemeral_host(wb, machine_guid, true, unregister);
 
 done:
     *message = strdupz(buffer_tostring(wb));

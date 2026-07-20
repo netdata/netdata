@@ -212,13 +212,17 @@ void rrdhost_tz_free(RRDHOST_TZ *tz) {
     tz->utc_offset = 0;
 }
 
-RRDHOST_IDENTITY rrdhost_identity_acquire(RRDHOST *host) {
-    RRDHOST_IDENTITY identity;
+static inline RRDHOST_IDENTITY rrdhost_identity_acquire_unsafe(RRDHOST *host) {
+    return (RRDHOST_IDENTITY) {
+        .hostname = string_dup(host->hostname),
+        .prog_name = string_dup(host->program_name),
+        .prog_version = string_dup(host->program_version),
+    };
+}
 
+RRDHOST_IDENTITY rrdhost_identity_acquire(RRDHOST *host) {
     spinlock_lock(&host->rrdhost_update_lock);
-    identity.hostname = string_dup(host->hostname);
-    identity.prog_name = string_dup(host->program_name);
-    identity.prog_version = string_dup(host->program_version);
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire_unsafe(host);
     spinlock_unlock(&host->rrdhost_update_lock);
 
     return identity;
@@ -231,6 +235,26 @@ void rrdhost_identity_release(RRDHOST_IDENTITY *identity) {
     identity->hostname = NULL;
     identity->prog_name = NULL;
     identity->prog_version = NULL;
+}
+
+RRDHOST_METADATA_IDENTITY rrdhost_metadata_identity_acquire(RRDHOST *host) {
+    spinlock_lock(&host->rrdhost_update_lock);
+    RRDHOST_METADATA_IDENTITY identity = {
+        .common = rrdhost_identity_acquire_unsafe(host),
+        .registry_hostname = string_dup(host->registry_hostname),
+        .os = string_dup(host->os),
+    };
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    return identity;
+}
+
+void rrdhost_metadata_identity_release(RRDHOST_METADATA_IDENTITY *identity) {
+    rrdhost_identity_release(&identity->common);
+    string_freez(identity->registry_hostname);
+    string_freez(identity->os);
+    identity->registry_hostname = NULL;
+    identity->os = NULL;
 }
 
 // ----------------------------------------------------------------------------
@@ -382,6 +406,7 @@ RRDHOST *rrdhost_create(
 
     spinlock_init(&host->receiver_lock);
     spinlock_init(&host->rrdhost_update_lock);
+    rw_spinlock_init(&host->metadata_lifetime_lock);
     rw_spinlock_init(&host->ml_host_rwlock);
     __atomic_store_n(&host->ml_running, false, __ATOMIC_RELAXED);
     spinlock_init(&host->aclk.spinlock);
@@ -707,16 +732,30 @@ RRDHOST *rrdhost_find_or_create(
         if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
             return host;
 
-        /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
-        nd_log(NDLS_DAEMON, NDLP_INFO,
-               "Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
-               rrdhost_hostname(host),
-               rrd_memory_mode_name(host->rrd_memory_mode),
-               rrd_memory_mode_name(mode));
-
         rrd_wrlock();
-        rrdhost_free___while_having_rrd_wrlock(host);
-        host = NULL;
+        host = rrdhost_find_by_guid(guid);
+        if (host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+            if (likely(!archived && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+                rrd_wrunlock();
+                return host;
+            }
+
+            if (!rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)) {
+                rrd_wrunlock();
+                return NULL;
+            }
+
+            /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
+            nd_log(NDLS_DAEMON, NDLP_INFO,
+                   "Archived host '%s' has memory mode '%s', but the wanted one is '%s'. Discarding archived state.",
+                   rrdhost_hostname(host),
+                   rrd_memory_mode_name(host->rrd_memory_mode),
+                   rrd_memory_mode_name(mode));
+
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+            rrdhost_free___while_having_rrd_wrlock(host);
+            host = NULL;
+        }
         rrd_wrunlock();
     }
 
@@ -888,11 +927,12 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host) {
     rrdhost_free_unlinked(host);
 }
 
-void rrdhost_free___without_having_rrd_wrlock(RRDHOST *host) {
+void rrdhost_free___consume_metadata_lifetime_writelock(RRDHOST *host) {
     if(!host) return;
 
     rrd_wrlock();
     rrdhost_unlink___while_having_rrd_wrlock(host);
+    rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
     rrd_wrunlock();
 
     rrdhost_free_unlinked(host);

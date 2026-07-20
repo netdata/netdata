@@ -11,12 +11,14 @@ static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
         if(st->alerts.base) {
             buffer_json_member_add_object(wb, "alerts");
             for(RRDCALC *rc = st->alerts.base; rc ;rc = rc->next) {
-                if(rc->status < RRDCALC_STATUS_CLEAR)
+                RRDCALC_RUNTIME_SNAPSHOT snapshot;
+                rrdcalc_runtime_snapshot_get(rc, &snapshot);
+                if(snapshot.status < RRDCALC_STATUS_CLEAR)
                     continue;
 
                 buffer_json_member_add_object(wb, string2str(rc->config.name));
-                buffer_json_member_add_string(wb, JSKEY(status), rrdcalc_status2string(rc->status));
-                buffer_json_member_add_double(wb, JSKEY(value), rc->value);
+                buffer_json_member_add_string(wb, JSKEY(status), rrdcalc_status2string(snapshot.status));
+                buffer_json_member_add_double(wb, JSKEY(value), snapshot.value);
                 buffer_json_member_add_string(wb, JSKEY(units), string2str(rc->config.units));
                 buffer_json_object_close(wb);
             }
@@ -90,7 +92,9 @@ void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS option
                         if(qn->node_id[0])
                             buffer_json_member_add_string(wb, JSKEY(node_id), qn->node_id);
                         buffer_json_member_add_uint64(wb, JSKEY(node_index), qn->slot);
-                        buffer_json_member_add_string(wb, JSKEY(hostname), rrdhost_hostname(host));
+                        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+                        buffer_json_member_add_string(wb, JSKEY(hostname), string2str(identity.hostname));
+                        rrdhost_identity_release(&identity);
                         buffer_json_member_add_object(wb, "contexts");
 
                         last_host = host;

@@ -64,14 +64,27 @@ void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str
 
 // ----------------------------------------------------------------------------
 
+static ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_internal(
+    struct rrdengine_journalfile *journalfile, size_t *data_size,
+    time_t wanted_first_time_s, time_t wanted_last_time_s,
+    JOURNALFILE_V2_ACCESS_HINT hint, bool cleanup_on_failure);
+static bool journalfile_v2_data_needs_permanent_unmap(struct rrdengine_journalfile *journalfile);
+static bool journalfile_v2_data_unmap_permanently_if_indexed(struct rrdengine_journalfile *journalfile);
+
 ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJFV2IDX_FIND_STATE *s) {
     if (unlikely(!s)) return NULL;
 
     struct rrdengine_datafile *datafile = NULL;
+    struct rrdengine_datafile *cleanup_datafile = NULL;
+    Pvoid_t *PValue = NULL;
+
+restart:
+    datafile = NULL;
+    cleanup_datafile = NULL;
+    PValue = NULL;
+    s->j2_header_acquired = NULL;
 
     rw_spinlock_read_lock(&s->ctx->njfv2idx.spinlock);
-
-    Pvoid_t *PValue = NULL;
 
     if(unlikely(!s->init)) {
         s->init = true;
@@ -128,11 +141,18 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
                                                       s->wanted_end_time_s);
 
         if(rc == PAGE_IS_IN_RANGE) {
-            s->j2_header_acquired = journalfile_v2_data_acquire(journalfile, NULL,
-                                                                s->wanted_start_time_s,
-                                                                s->wanted_end_time_s);
+            // This scan holds the index read lock, so write-side cleanup must be deferred.
+            s->j2_header_acquired = journalfile_v2_data_acquire_internal(
+                journalfile, NULL, s->wanted_start_time_s, s->wanted_end_time_s,
+                JOURNALFILE_V2_ACCESS_AUTO, false);
             if(s->j2_header_acquired) {
                 // this is good to return
+                break;
+            }
+
+            if(journalfile_v2_data_needs_permanent_unmap(journalfile)) {
+                cleanup_datafile = datafile;
+                datafile = NULL;
                 break;
             }
 
@@ -161,6 +181,12 @@ ALWAYS_INLINE struct rrdengine_datafile *njfv2idx_find_and_acquire_j2_header(NJF
         s->j2_header_acquired = NULL;
 
     rw_spinlock_read_unlock(&s->ctx->njfv2idx.spinlock);
+
+    if(cleanup_datafile) {
+        journalfile_v2_data_unmap_permanently_if_indexed(cleanup_datafile->journalfile);
+        datafile_release(cleanup_datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
+        goto restart;
+    }
 
     return datafile;
 }
@@ -203,11 +229,16 @@ static void njfv2idx_add(struct rrdengine_datafile *datafile) {
     rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
 }
 
-static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
-    internal_fatal(!datafile->journalfile->njfv2idx.indexed_as, "DBENGINE: NJFV2IDX journalfile to remove is not indexed");
-
+static bool njfv2idx_remove_internal(struct rrdengine_datafile *datafile, bool required) {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
     rw_spinlock_write_lock(&ctx->njfv2idx.spinlock);
+
+    if(!datafile->journalfile->njfv2idx.indexed_as) {
+        if(required)
+            internal_fatal(true, "DBENGINE: NJFV2IDX journalfile to remove is not indexed");
+        rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
+        return false;
+    }
 
     int rc = JudyLDel(&ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
     (void)rc;
@@ -216,6 +247,15 @@ static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
     datafile->journalfile->njfv2idx.indexed_as = 0;
 
     rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
+    return true;
+}
+
+static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
+    (void)njfv2idx_remove_internal(datafile, true);
+}
+
+static bool njfv2idx_remove_if_indexed(struct rrdengine_datafile *datafile) {
+    return njfv2idx_remove_internal(datafile, false);
 }
 
 // ----------------------------------------------------------------------------
@@ -356,8 +396,39 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     }
 }
 
-ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct rrdengine_journalfile *journalfile,
-    size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint)
+static bool journalfile_v2_data_release_failed_acquire(struct rrdengine_journalfile *journalfile) {
+    bool needs_permanent_unmap = false;
+
+    spinlock_tracked_lock(&journalfile->data_spinlock);
+
+    internal_fatal(journalfile->v2.refcount < 1, "trying to release a non-acquired journalfile");
+
+    if(likely(journalfile->v2.refcount > 0)) {
+        journalfile->v2.refcount--;
+
+        if(!journalfile->v2.refcount) {
+            journalfile->v2.not_needed_since_s = 0;
+            needs_permanent_unmap = !(journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE);
+        }
+    }
+
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
+
+    return needs_permanent_unmap;
+}
+
+static bool journalfile_v2_data_needs_permanent_unmap(struct rrdengine_journalfile *journalfile) {
+    spinlock_tracked_lock(&journalfile->data_spinlock);
+    bool needs_permanent_unmap = !journalfile->v2.refcount &&
+        !(journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE);
+    spinlock_tracked_unlock(&journalfile->data_spinlock);
+
+    return needs_permanent_unmap;
+}
+
+static ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_internal(struct rrdengine_journalfile *journalfile,
+    size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s,
+    JOURNALFILE_V2_ACCESS_HINT hint, bool cleanup_on_failure)
 {
     spinlock_tracked_lock(&journalfile->data_spinlock);
 
@@ -399,10 +470,22 @@ ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_with_hint(st
     }
     spinlock_tracked_unlock(&journalfile->data_spinlock);
 
-    if(do_we_need_it)
-        return journalfile_v2_mounted_data_get(journalfile, data_size);
+    if(do_we_need_it) {
+        struct journal_v2_header *j2_header = journalfile_v2_mounted_data_get(journalfile, data_size);
+        if(unlikely(!j2_header) && journalfile_v2_data_release_failed_acquire(journalfile) && cleanup_on_failure)
+            journalfile_v2_data_unmap_permanently_if_indexed(journalfile);
+
+        return j2_header;
+    }
 
     return NULL;
+}
+
+ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire_with_hint(struct rrdengine_journalfile *journalfile,
+    size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s, JOURNALFILE_V2_ACCESS_HINT hint)
+{
+    return journalfile_v2_data_acquire_internal(
+        journalfile, data_size, wanted_first_time_s, wanted_last_time_s, hint, true);
 }
 
 ALWAYS_INLINE struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s) {
@@ -471,7 +554,7 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
     struct journal_v2_header *j2_header = journalfile->mmap.data;
     journalfile->v2.first_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
     journalfile->v2.last_time_s = (time_t)(j2_header->end_time_ut / USEC_PER_SEC);
-    journalfile->v2.size_of_directory = j2_header->metric_offset + j2_header->metric_count * sizeof(struct journal_metric_list);
+    journalfile->v2.size_of_directory = MIN(j2_header->metric_trailer_offset, journalfile->mmap.size);
 
     journalfile_v2_mounted_data_unmount(journalfile, true, true);
 
@@ -480,9 +563,7 @@ void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, 
     njfv2idx_add(journalfile->datafile);
 }
 
-static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *journalfile) {
-    njfv2idx_remove(journalfile->datafile);
-
+static void journalfile_v2_data_clear_unmapped_state(struct rrdengine_journalfile *journalfile) {
     bool has_references = false;
     char path_v2[RRDENG_PATH_MAX];
 
@@ -515,6 +596,19 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
         spinlock_tracked_unlock(&journalfile->data_spinlock);
 
     } while(has_references);
+}
+
+static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *journalfile) {
+    njfv2idx_remove(journalfile->datafile);
+    journalfile_v2_data_clear_unmapped_state(journalfile);
+}
+
+static bool journalfile_v2_data_unmap_permanently_if_indexed(struct rrdengine_journalfile *journalfile) {
+    if(!njfv2idx_remove_if_indexed(journalfile->datafile))
+        return false;
+
+    journalfile_v2_data_clear_unmapped_state(journalfile);
+    return true;
 }
 
 struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafile *datafile)
@@ -1227,7 +1321,7 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     journalfile_v2_data_release(journalfile);
 
     if (unlikely(failed)) {
-        journalfile_v2_data_unmap_permanently(journalfile);
+        journalfile_v2_data_unmap_permanently_if_indexed(journalfile);
         return;
     }
 
@@ -1564,7 +1658,8 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         return false;
     }
 
-    struct journal_metric_list_to_sort *uuid_list = NULL;
+    // Recovery cleanup reads this after siglongjmp(), including after allocation.
+    struct journal_metric_list_to_sort * volatile uuid_list = NULL;
 
     PROTECTED_ACCESS_SETUP(data_start, total_file_size, path, "migrate");
     if(no_signal_received) {

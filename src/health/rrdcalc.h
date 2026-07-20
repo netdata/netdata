@@ -42,6 +42,24 @@ void rrdcalc_flags_to_json_array(BUFFER *wb, const char *key, RRDCALC_FLAGS flag
 
 #define RRDCALC_ALL_OPTIONS_EXCLUDING_THE_RRDR_ONES (RRDCALC_OPTION_NO_CLEAR_NOTIFICATION)
 
+typedef struct rrdcalc_runtime_snapshot {
+    RRDCALC_STATUS status;
+    RRDCALC_FLAGS run_flags;
+    NETDATA_DOUBLE value;
+    time_t last_updated;
+    time_t last_status_change;
+    NETDATA_DOUBLE last_status_change_value;
+    usec_t global_id;
+    nd_uuid_t last_transition_id;
+    time_t next_update;
+    time_t db_after;
+    time_t db_before;
+    time_t delay_up_to_timestamp;
+    time_t last_repeat;
+    int delay_last;
+    uint32_t times_repeat;
+} RRDCALC_RUNTIME_SNAPSHOT;
+
 struct rrdcalc {
     uint32_t id;                    // the unique id of this alarm
     uint32_t next_event_id;         // the next event id that will be used for this alarm
@@ -79,6 +97,11 @@ struct rrdcalc {
     int delay_up_current;           // the current up notification delay duration
     int delay_down_current;         // the current down notification delay duration
     int delay_last;                 // the last delay we used
+
+    struct {
+        RW_SPINLOCK spinlock;
+        RRDCALC_RUNTIME_SNAPSHOT state;
+    } runtime_snapshot;
 
     // ------------------------------------------------------------------------
     // the chart this alarm it is linked to
@@ -175,6 +198,12 @@ void rrdcalc_from_rrdset_release(RRDSET *st, const RRDCALC_ACQUIRED *rca);
 RRDCALC *rrdcalc_acquired_to_rrdcalc(const RRDCALC_ACQUIRED *rca);
 
 const char *rrdcalc_status2string(RRDCALC_STATUS status);
+
+void rrdcalc_runtime_snapshot_publish(RRDCALC *rc, usec_t global_id, const nd_uuid_t *transition_id);
+void rrdcalc_runtime_snapshot_publish_run_flags(RRDCALC *rc);
+void rrdcalc_runtime_snapshot_publish_repeat_state(RRDCALC *rc);
+void rrdcalc_runtime_snapshot_get(RRDCALC *rc, RRDCALC_RUNTIME_SNAPSHOT *snapshot);
+void rrdcalc_runtime_strings_acquire(RRDCALC *rc, STRING **summary, STRING **info);
 
 uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, nd_uuid_t *config_hash_id);
 

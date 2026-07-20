@@ -162,7 +162,7 @@ static bool variable_lookup_context(struct variable_lookup_job *vbd, const char 
     return found;
 }
 
-bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd) {
+static bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd, bool snapshot_values) {
     bool found = false;
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(vbd->host, rc) {
@@ -172,7 +172,16 @@ bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd) {
             if(!rsa)
                 continue;
 
-            variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, st, "alarm value");
+            NETDATA_DOUBLE value;
+            if(snapshot_values) {
+                RRDCALC_RUNTIME_SNAPSHOT snapshot;
+                rrdcalc_runtime_snapshot_get(rc, &snapshot);
+                value = snapshot.value;
+            }
+            else
+                value = rc->value;
+
+            variable_lookup_add_result_with_score(vbd, value, st, "alarm value");
             rrdset_acquired_release(rsa);
             found = true;
         }
@@ -410,7 +419,7 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
     }
 
     // alert names
-    if(alert_variable_from_running_alerts(&vbd)) {
+    if(alert_variable_from_running_alerts(&vbd, wb != NULL)) {
         found = true;
         goto find_best_scored;
     }

@@ -108,7 +108,7 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
                 end = begin = begin + strlen(SYSTEMD_HIERARCHY_STRING);
                 if (!*begin)
                     break;
-                while (isalpha(*end))
+                while (isalpha((uint8_t)*end))
                     end++;
                 *end = 0;
                 for (int i = 0; cgroups_systemd_options[i].name; i++) {

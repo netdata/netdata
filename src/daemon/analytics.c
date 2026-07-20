@@ -519,7 +519,9 @@ void analytics_alarms(void)
             continue;
         }
 
-        switch (rc->status) {
+        RRDCALC_RUNTIME_SNAPSHOT snapshot;
+        rrdcalc_runtime_snapshot_get(rc, &snapshot);
+        switch (snapshot.status) {
             case RRDCALC_STATUS_WARNING:
                 alarm_warn++;
                 break;

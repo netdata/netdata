@@ -37,17 +37,15 @@ procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t path_buf
         if (stat(path_buf, &buf) == 0) {
             procfile *ff = cgroup_ebpfgo_open_procfile_fd(path_buf);
             if (ff) {
-                procfile *read = procfile_readall(ff);
-                if (read) {
-                    size_t lines = procfile_lines(read);
+                ff = procfile_readall(ff);
+                if (ff) {
+                    size_t lines = procfile_lines(ff);
                     if (lines > 0) {
                         snprintfz(best_path, sizeof(best_path) - 1, "%s", path_buf);
-                        best = read;
+                        best = ff;
                     } else {
-                        procfile_close(read);
+                        procfile_close(ff);
                     }
-                } else {
-                    procfile_close(ff);
                 }
             }
         }
@@ -75,26 +73,24 @@ procfile *cgroup_ebpfgo_open_nonempty_procs_file(char *path_buf, size_t path_buf
         if (!ff)
             continue;
 
-        procfile *read = procfile_readall(ff);
-        if (!read) {
-            procfile_close(ff);
+        ff = procfile_readall(ff);
+        if (!ff)
             continue;
-        }
 
-        size_t lines = procfile_lines(read);
+        size_t lines = procfile_lines(ff);
         if (lines == 0) {
-            procfile_close(read);
+            procfile_close(ff);
             continue;
         }
 
         if (!best || lines > best_lines) {
             if (best)
                 procfile_close(best);
-            best = read;
+            best = ff;
             best_lines = lines;
             snprintfz(best_path, sizeof(best_path) - 1, "%s", path_buf);
         } else {
-            procfile_close(read);
+            procfile_close(ff);
         }
     }
 

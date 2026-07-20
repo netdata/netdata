@@ -313,13 +313,13 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     return 1;
 }
 
-void buffer_json_node_add_v2_mcp(BUFFER *wb, RRDHOST *host, size_t ni __maybe_unused) {
+void buffer_json_node_add_v2_mcp(BUFFER *wb, RRDHOST *host, const RRDHOST_IDENTITY *identity, size_t ni __maybe_unused) {
     buffer_json_member_add_string(wb, "machine_guid", host->machine_guid);
 
     if(!UUIDiszero(host->node_id))
         buffer_json_member_add_uuid(wb, "node_id", host->node_id.uuid);
 
-    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+    buffer_json_member_add_string(wb, "hostname", string2str(identity->hostname));
 
     buffer_json_member_add_string(wb, "relationship",
                                   host == localhost ? "localhost" :
@@ -475,12 +475,14 @@ static inline void rrdhost_health_to_json_v2(BUFFER *wb, const char *key, RRDHOS
 }
 
 static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdcontext_to_json_v2_data *ctl, size_t node_id) {
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+
     buffer_json_add_array_item_object(wb); // this node
 
     if(ctl->options & CONTEXTS_OPTION_MCP)
-        buffer_json_node_add_v2_mcp(wb, host, node_id);
+        buffer_json_node_add_v2_mcp(wb, host, &identity, node_id);
     else
-        buffer_json_node_add_v2(wb, host, node_id, 0,
+        buffer_json_node_add_v2(wb, host, &identity, node_id, 0,
                             (ctl->mode & CONTEXTS_V2_AGENTS) && !(ctl->mode & CONTEXTS_V2_NODE_INSTANCES));
 
     if(ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH | CONTEXTS_V2_NODE_INSTANCES)) {
@@ -488,7 +490,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
         rrdhost_status(host, ctl->now, &s, RRDHOST_STATUS_ALL);
 
         if (ctl->mode & (CONTEXTS_V2_NODES_INFO | CONTEXTS_V2_NODES_STREAM_PATH)) {
-            buffer_json_member_add_string(wb, "v", rrdhost_program_version(host));
+            buffer_json_member_add_string(wb, "v", string2str(identity.prog_version));
 
             host_labels2json(host, wb, "labels");
             spinlock_lock(&host->rrdhost_update_lock);
@@ -565,6 +567,7 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
         }
     }
     buffer_json_object_close(wb); // this node
+    rrdhost_identity_release(&identity);
 }
 
 static bool rrdhost_alert_status_snapshot_read(RRDHOST *host, struct health_alert_status_counts *snapshot) {
