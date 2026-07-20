@@ -362,7 +362,14 @@ If the service still won't start, check the Windows Services manager to ensure t
 
 **Impact**: The driver is an optional component used only for CPU temperature metrics via hardware MSR (Model Specific Register) reads. All other Netdata monitoring — CPU usage, memory, disk, network, and process metrics — works normally. Only the hardware-level CPU temperature chart (`cpu.temperature`) is unavailable.
 
-**What to do**: Reinstalling Netdata will not fix this — the driver has the same signature status in every release. You have two options:
+**What to do**: First, rule out a corrupted installer by redownloading Netdata from the official source and reinstalling:
+
+```powershell
+Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile "$env:TEMP\netdata-x64.msi"
+msiexec /qn /i "$env:TEMP\netdata-x64.msi" TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
+```
+
+If the error persists, it reflects the driver's signature status: `netdata_driver.sys` ships with a standard code-signing certificate rather than a Microsoft WHQL signature, so its behavior is identical across releases and reinstalling will not change it. You then have two options:
 
 1. **Continue without the driver** (recommended for most users): No action needed. Netdata collects all metrics except hardware-level CPU temperature.
 
