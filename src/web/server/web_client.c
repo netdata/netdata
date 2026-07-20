@@ -1877,6 +1877,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                            request_length,
                            (size_t)NETDATA_WEB_REQUEST_MAX_SIZE);
             w->response.code = http_validation_error_to_response_code(HTTP_VALIDATION_REQUEST_TOO_LARGE);
+            web_client_disable_keepalive(w);
             break;
         }
 
@@ -1923,6 +1924,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "Request timeout while receiving request.\r\n");
             w->response.code = HTTP_RESP_REQUEST_TIMEOUT;
+            web_client_disable_keepalive(w);
             break;
         case HTTP_VALIDATION_NOT_SUPPORTED:
             web_client_prepare_request_summary(w, "unsupported request method");
@@ -2720,10 +2722,11 @@ int web_client_request_unittest(void) {
         web_client_request_size_validation(buffer_strlen(w->response.data)) != HTTP_VALIDATION_OK;
 #endif
 
+    web_client_enable_keepalive(w);
     web_client_process_request_from_web_server(w);
     if(w->response.code != HTTP_RESP_CONTENT_TOO_LARGE ||
        !strstr(buffer_tostring(w->response.data), "received at least 1048577 bytes") ||
-       w->request_too_large || web_client_has_wait_receive(w))
+       w->request_too_large || web_client_has_wait_receive(w) || web_client_has_keepalive(w))
         errors++;
 
 #ifndef OS_WINDOWS
@@ -2743,9 +2746,12 @@ int web_client_request_unittest(void) {
     if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE)
         errors++;
     w->request_ingress_started_ut -= 2 * USEC_PER_SEC;
-    if(http_request_validate(w) != HTTP_VALIDATION_REQUEST_TIMEOUT || web_client_has_wait_receive(w))
+    web_client_enable_keepalive(w);
+    web_client_process_request_from_web_server(w);
+    if(w->response.code != HTTP_RESP_REQUEST_TIMEOUT || web_client_has_wait_receive(w) ||
+       web_client_has_keepalive(w) ||
+       !strstr(buffer_tostring(w->response.data), "Request timeout while receiving request"))
         errors++;
-    web_client_prepare_request_summary(w, "request timeout");
     if(!strstr(buffer_tostring(w->url_for_logging), "/partial") ||
        strstr(buffer_tostring(w->url_for_logging), "sentinel-auth-value") ||
        strstr(buffer_tostring(w->url_for_logging), "Authorization"))
