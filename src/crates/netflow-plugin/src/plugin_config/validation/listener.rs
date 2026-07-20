@@ -31,5 +31,20 @@ pub(super) fn validate_listener_and_protocols(cfg: &PluginConfig) -> Result<()> 
         anyhow::bail!("at least one protocol must be enabled");
     }
 
+    if cfg
+        .protocols
+        .v9_template_lifetime
+        .get()
+        .is_some_and(|lifetime| lifetime.is_zero())
+    {
+        anyhow::bail!("protocols.v9_template_lifetime must be greater than 0 or null");
+    }
+    if cfg.protocols.sampling_cache_max_entries == 0 {
+        anyhow::bail!("protocols.sampling_cache_max_entries must be greater than 0");
+    }
+    if cfg.protocols.sampling_cache_max_entries_per_stream == 0 {
+        anyhow::bail!("protocols.sampling_cache_max_entries_per_stream must be greater than 0");
+    }
+
     Ok(())
 }

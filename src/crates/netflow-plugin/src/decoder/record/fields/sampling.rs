@@ -15,14 +15,13 @@ fn decode_v9_scope_sampler_id(
 }
 
 pub(crate) fn observe_v9_sampling_options(
-    exporter_ip: IpAddr,
+    exporter_source: SocketAddr,
     version: u16,
     observation_domain_id: u32,
     sampling: &mut SamplingState,
-    namespace: &mut DecoderStateNamespace,
     options_data: &V9OptionsData,
-) -> bool {
-    let mut changed = false;
+) -> Vec<DecoderStateNamespaceKey> {
+    let mut dirty = Vec::new();
     for record in &options_data.fields {
         let mut sampler_id = record
             .scope_fields
@@ -47,28 +46,30 @@ pub(crate) fn observe_v9_sampling_options(
         }
 
         if let Some(rate) = rate.filter(|rate| *rate > 0) {
-            sampling.set(
-                exporter_ip,
+            for key in sampling.set(
+                exporter_source,
                 version,
                 observation_domain_id,
                 sampler_id,
                 rate,
-            );
-            changed |= namespace.set_sampling_rate(version, sampler_id, rate);
+            ) {
+                if !dirty.contains(&key) {
+                    dirty.push(key);
+                }
+            }
         }
     }
-    changed
+    dirty
 }
 
 pub(crate) fn observe_ipfix_sampling_options(
-    exporter_ip: IpAddr,
+    exporter_source: SocketAddr,
     version: u16,
     observation_domain_id: u32,
     sampling: &mut SamplingState,
-    namespace: &mut DecoderStateNamespace,
     options_data: &IPFixOptionsData,
-) -> bool {
-    let mut changed = false;
+) -> Vec<DecoderStateNamespaceKey> {
+    let mut dirty = Vec::new();
     for record in &options_data.fields {
         let mut sampler_id = 0_u64;
         let mut rate: Option<u64> = None;
@@ -105,17 +106,20 @@ pub(crate) fn observe_ipfix_sampling_options(
         }
 
         if let Some(rate) = rate.filter(|rate| *rate > 0) {
-            sampling.set(
-                exporter_ip,
+            for key in sampling.set(
+                exporter_source,
                 version,
                 observation_domain_id,
                 sampler_id,
                 rate,
-            );
-            changed |= namespace.set_sampling_rate(version, sampler_id, rate);
+            ) {
+                if !dirty.contains(&key) {
+                    dirty.push(key);
+                }
+            }
         }
     }
-    changed
+    dirty
 }
 
 #[cfg(test)]
@@ -127,7 +131,6 @@ mod tests {
     #[test]
     fn v9_sampling_options_use_scope_sampler_id_when_present() {
         let mut sampling = SamplingState::default();
-        let mut namespace = DecoderStateNamespace::default();
         let options = V9OptionsData {
             fields: vec![OptionsDataFields {
                 scope_fields: vec![ScopeDataField::System(vec![0, 7])],
@@ -138,25 +141,23 @@ mod tests {
             }],
         };
 
-        observe_v9_sampling_options(
-            IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)),
+        let dirty = observe_v9_sampling_options(
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)), 2055),
             9,
             42,
             &mut sampling,
-            &mut namespace,
             &options,
         );
 
         assert_eq!(
-            sampling.get(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)), 9, 42, 7),
+            sampling.get(
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)), 2055),
+                9,
+                42,
+                7
+            ),
             Some(4000)
         );
-        assert_eq!(
-            namespace
-                .sampling_rates
-                .get(&(9, 7))
-                .map(|row| row.sampling_rate),
-            Some(4000)
-        );
+        assert_eq!(dirty.len(), 1);
     }
 }

@@ -180,7 +180,9 @@ impl IngestService {
         self.metrics
             .update_decoder_scope_snapshot(self.decoders.decoder_scope_snapshot());
         self.metrics.apply_decode_stats(&batch.stats);
-
+        if batch.stats.parser_source_evictions > 0 {
+            self.persist_decoder_state();
+        }
         for flow in batch.flows {
             if self.ingest_decoded_record(receive_time_usec, &flow) {
                 entries_since_sync += 1;

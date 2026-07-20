@@ -205,6 +205,10 @@ fn ingest_service_restores_decoder_state_from_disk_after_restart() {
     );
 
     let mut second = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    assert!(
+        second.decoders.decoder_state_namespace_keys().is_empty(),
+        "restart must load decoder state only when that exporter sends traffic"
+    );
 
     let v9_flows = decode_fixture_sequence(&mut second, &["data.pcap"]);
     assert_eq!(
@@ -319,7 +323,7 @@ fn ingest_service_persist_decoder_state_skips_clean_namespaces() {
 }
 
 #[test]
-fn ingest_service_preload_decoder_state_skips_oversized_namespace_file() {
+fn ingest_service_startup_preserves_oversized_namespace_file() {
     let tmp = tempfile::tempdir().expect("create temp dir");
     let service = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
     let decoder_state_dir = service.decoder_state_dir.clone();
@@ -333,8 +337,67 @@ fn ingest_service_preload_decoder_state_skips_oversized_namespace_file() {
     let reloaded = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
     assert!(
         reloaded.decoders.decoder_state_namespace_keys().is_empty(),
-        "oversized decoder-state file should be skipped during preload"
+        "startup must not preload decoder-state files"
     );
+    assert!(path.is_file(), "oversized unknown state must be preserved");
+}
+
+#[test]
+fn ingest_service_startup_removes_only_schema_two_and_three_state() {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let service = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let dir = service.decoder_state_dir.clone();
+    drop(service);
+
+    let state_header = |version: u32| {
+        let mut bytes = b"NDFS".to_vec();
+        bytes.extend_from_slice(&version.to_le_bytes());
+        bytes
+    };
+    let obsolete_two = dir.join("schema-two.bin");
+    let obsolete_three = dir.join("schema-three.bin");
+    let current = dir.join("schema-four.bin");
+    let future = dir.join("schema-five.bin");
+    let unrelated = dir.join("unrelated.bin");
+    std::fs::write(&obsolete_two, state_header(2)).unwrap();
+    std::fs::write(&obsolete_three, state_header(3)).unwrap();
+    std::fs::write(&current, state_header(4)).unwrap();
+    std::fs::write(&future, state_header(5)).unwrap();
+    std::fs::write(&unrelated, b"not decoder state").unwrap();
+
+    let _reloaded = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+
+    assert!(!obsolete_two.exists());
+    assert!(!obsolete_three.exists());
+    assert!(current.exists());
+    assert!(future.exists());
+    assert!(unrelated.exists());
+}
+
+#[test]
+fn ingest_service_never_overwrites_an_unreadable_current_state_file() {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let mut first = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let _ = decode_fixture_sequence(&mut first, &["template.pcap"]);
+    first.persist_decoder_state();
+    let key = first
+        .decoders
+        .decoder_state_namespace_keys()
+        .into_iter()
+        .next()
+        .expect("expected persisted namespace");
+    let path = first
+        .decoder_state_dir
+        .join(FlowDecoders::decoder_state_namespace_filename(&key));
+    drop(first);
+
+    let corrupt = b"NDFS\x04\x00broken";
+    std::fs::write(&path, corrupt).unwrap();
+    let mut second = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let _ = decode_fixture_sequence(&mut second, &["template.pcap"]);
+    second.persist_decoder_state();
+
+    assert_eq!(std::fs::read(path).unwrap(), corrupt);
 }
 
 #[test]

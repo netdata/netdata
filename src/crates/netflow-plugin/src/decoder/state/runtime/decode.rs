@@ -40,8 +40,14 @@ impl FlowDecoders {
         };
         let packet_context = packet_context.or(computed_context.as_ref());
         let mut template_state_changed = false;
+        let mut parser_source_evictions = 0_u64;
+        let is_sflow = is_sflow_payload(payload);
 
-        let mut batch = if is_sflow_payload(payload) && self.enable_sflow {
+        if let Some(context) = packet_context {
+            self.expire_v9_templates(context, input_realtime_usec);
+        }
+
+        let mut batch = if is_sflow && self.enable_sflow {
             decode_sflow(
                 source,
                 payload,
@@ -53,37 +59,26 @@ impl FlowDecoders {
             let parser_source = packet_context
                 .map(|context| context.parser_source)
                 .unwrap_or_else(|| normalize_template_scope_source(source));
-            let mut parse_attempts = 1;
-            let mut result = self.netflow.parse_from_source(parser_source, payload);
-            let missing_ids = missing_template_ids(&result.packets);
-
-            if let Some(context) = packet_context
-                && !missing_ids.is_empty()
-                && let Some(namespace) = self.decoder_state_namespaces.get(&context.key)
-            {
-                let subset = namespace.template_subset(context.version, &missing_ids);
-                if !subset.is_empty() {
-                    match self.replay_namespace_packets(&context.key, &subset, parser_source) {
-                        Ok(()) => {
-                            result = self.netflow.parse_from_source(parser_source, payload);
-                            parse_attempts = 2;
-                        }
-                        Err(err) => {
-                            tracing::warn!(
-                                "failed to recover NetFlow templates for {} / {} from {}: {}",
-                                context.key.exporter_ip,
-                                context.key.observation_domain_id,
-                                parser_source,
-                                err
-                            );
-                        }
-                    }
-                }
+            let mut removals = Vec::new();
+            let result = self.netflow.parse_from_source_with_reporter(
+                parser_source,
+                payload,
+                &mut |removal| {
+                    removals.push(removal.source);
+                    Ok(())
+                },
+            );
+            parser_source_evictions = removals.len() as u64;
+            for removal in removals {
+                self.remove_evicted_parser_source(removal);
             }
 
             if let Some(context) = packet_context {
-                template_state_changed =
-                    self.observe_decoder_state_from_packets(context, &result.packets);
+                template_state_changed = self.observe_decoder_state_from_packets(
+                    context,
+                    &result.packets,
+                    input_realtime_usec,
+                );
             }
 
             decode_netflow_result(
@@ -97,9 +92,16 @@ impl FlowDecoders {
                 self.enable_v7,
                 self.enable_v9,
                 self.enable_ipfix,
-                parse_attempts,
+                1,
             )
         };
+
+        if !is_sflow {
+            batch.stats.parser_source_evictions = batch
+                .stats
+                .parser_source_evictions
+                .saturating_add(parser_source_evictions);
+        }
 
         for flow in &mut batch.flows {
             apply_missing_flow_time_fallback(flow, input_realtime_usec);

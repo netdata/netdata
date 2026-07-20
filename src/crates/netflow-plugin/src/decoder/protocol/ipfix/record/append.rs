@@ -11,7 +11,6 @@ pub(crate) fn append_ipfix_records(
 ) -> u64 {
     let mut partial_counter_records = 0_u64;
     let export_usec = unix_timestamp_to_usec(packet.header.export_time as u64, 0);
-    let exporter_ip = canonicalize_ip_addr(source.ip());
     let observation_domain_id = packet.header.observation_domain_id;
     let version = 10_u16;
 
@@ -36,7 +35,7 @@ pub(crate) fn append_ipfix_records(
                     let Some((forward, reverse, partial_counter_record)) = finalize_ipfix_record(
                         rec,
                         state,
-                        exporter_ip,
+                        source,
                         version,
                         observation_domain_id,
                         sampling,

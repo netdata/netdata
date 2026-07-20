@@ -14,6 +14,14 @@ impl IngestService {
     pub(crate) fn persist_decoder_state(&mut self) {
         for key in self.decoders.dirty_decoder_state_namespaces() {
             let path = self.decoder_state_namespace_path(&key);
+            if self.protected_decoder_state_namespaces.contains(&key) {
+                tracing::warn!(
+                    "preserving unreadable netflow decoder state {}; updates for this stream will remain memory-only until restart",
+                    path.display()
+                );
+                self.decoders.mark_decoder_state_namespace_persisted(&key);
+                continue;
+            }
             let data = match self.decoders.export_decoder_state_namespace(&key) {
                 Ok(Some(data)) => data,
                 Ok(None) => {
@@ -99,11 +107,82 @@ impl IngestService {
             .decoders
             .is_decoder_state_namespace_loaded(&context.key)
         {
-            self.decoders
-                .mark_decoder_state_namespace_absent_for_normalized_source(
-                    context.key.clone(),
-                    context.parser_source,
-                );
+            let path = self.decoder_state_namespace_path(&context.key);
+            match fs::metadata(&path) {
+                Ok(metadata)
+                    if metadata.len() > crate::decoder::MAX_DECODER_STATE_FILE_LEN as u64 =>
+                {
+                    tracing::warn!(
+                        "preserving oversized netflow decoder state namespace {} (max {} bytes, got {})",
+                        path.display(),
+                        crate::decoder::MAX_DECODER_STATE_FILE_LEN,
+                        metadata.len()
+                    );
+                    self.protected_decoder_state_namespaces
+                        .insert(context.key.clone());
+                    self.decoders
+                        .mark_decoder_state_namespace_absent_for_normalized_source(
+                            context.key.clone(),
+                            context.parser_source,
+                        );
+                }
+                Ok(_) => match fs::read(&path) {
+                    Ok(data) => {
+                        if let Err(err) = self.decoders.import_decoder_state_namespace(
+                            context.key.clone(),
+                            context.parser_source,
+                            &data,
+                        ) {
+                            tracing::warn!(
+                                "preserving unreadable netflow decoder state namespace {}: {}",
+                                path.display(),
+                                err
+                            );
+                            self.protected_decoder_state_namespaces
+                                .insert(context.key.clone());
+                            self.decoders
+                                .mark_decoder_state_namespace_absent_for_normalized_source(
+                                    context.key.clone(),
+                                    context.parser_source,
+                                );
+                        }
+                    }
+                    Err(err) => {
+                        tracing::warn!(
+                            "failed to read netflow decoder state namespace {}: {}",
+                            path.display(),
+                            err
+                        );
+                        self.protected_decoder_state_namespaces
+                            .insert(context.key.clone());
+                        self.decoders
+                            .mark_decoder_state_namespace_absent_for_normalized_source(
+                                context.key.clone(),
+                                context.parser_source,
+                            );
+                    }
+                },
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => self
+                    .decoders
+                    .mark_decoder_state_namespace_absent_for_normalized_source(
+                        context.key.clone(),
+                        context.parser_source,
+                    ),
+                Err(err) => {
+                    tracing::warn!(
+                        "failed to inspect netflow decoder state namespace {}: {}",
+                        path.display(),
+                        err
+                    );
+                    self.protected_decoder_state_namespaces
+                        .insert(context.key.clone());
+                    self.decoders
+                        .mark_decoder_state_namespace_absent_for_normalized_source(
+                            context.key.clone(),
+                            context.parser_source,
+                        );
+                }
+            }
             return Some(context);
         }
 
@@ -128,10 +207,7 @@ impl IngestService {
         Some(context)
     }
 
-    pub(super) fn preload_decoder_state_namespaces(
-        decoders: &mut FlowDecoders,
-        decoder_state_dir: &Path,
-    ) {
+    pub(super) fn cleanup_obsolete_decoder_state_namespaces(decoder_state_dir: &Path) {
         let read_dir = match fs::read_dir(decoder_state_dir) {
             Ok(entries) => entries,
             Err(err) => {
@@ -144,51 +220,31 @@ impl IngestService {
             }
         };
 
-        let mut paths = read_dir
-            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-            .filter(|path| path.is_file())
-            .collect::<Vec<_>>();
-        paths.sort();
-
-        for path in paths {
-            let file_len = match fs::metadata(&path) {
-                Ok(metadata) => metadata.len(),
-                Err(err) => {
-                    tracing::warn!(
-                        "failed to stat netflow decoder state namespace {}: {}",
-                        path.display(),
-                        err
-                    );
-                    continue;
-                }
+        for entry in read_dir {
+            let Ok(entry) = entry else {
+                continue;
             };
-            if file_len > crate::decoder::MAX_DECODER_STATE_FILE_LEN as u64 {
-                tracing::warn!(
-                    "skipping oversized netflow decoder state namespace {} (max {} bytes, got {})",
-                    path.display(),
-                    crate::decoder::MAX_DECODER_STATE_FILE_LEN,
-                    file_len
-                );
+            let path = entry.path();
+            if !path.is_file() {
                 continue;
             }
-
-            match fs::read(&path) {
-                Ok(data) => {
-                    if let Err(err) = decoders.preload_decoder_state_namespace(&data) {
-                        tracing::warn!(
-                            "failed to preload netflow decoder state namespace {}: {}",
-                            path.display(),
-                            err
-                        );
-                    }
-                }
-                Err(err) => {
-                    tracing::warn!(
-                        "failed to read netflow decoder state namespace {}: {}",
-                        path.display(),
-                        err
-                    );
-                }
+            let mut header = [0_u8; 8];
+            let Ok(mut file) = fs::File::open(&path) else {
+                continue;
+            };
+            if file.read_exact(&mut header).is_err() {
+                continue;
+            }
+            if matches!(
+                crate::decoder::decoder_state_schema_version(&header),
+                Some(2 | 3)
+            ) && let Err(err) = fs::remove_file(&path)
+            {
+                tracing::warn!(
+                    "failed to remove obsolete netflow decoder state namespace {}: {}",
+                    path.display(),
+                    err
+                );
             }
         }
     }

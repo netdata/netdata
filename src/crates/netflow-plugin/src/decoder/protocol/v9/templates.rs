@@ -1,14 +1,17 @@
 use super::super::*;
 
 pub(crate) fn observe_v9_decoder_state_from_packet(
-    exporter_ip: IpAddr,
+    exporter_source: SocketAddr,
+    key: &DecoderStateNamespaceKey,
     packet: &V9,
     sampling: &mut SamplingState,
+    template_state: &mut TemplateState,
     namespace: &mut DecoderStateNamespace,
+    received_at_usec: u64,
 ) -> DecoderStateObservation {
     let observation_domain_id = packet.header.source_id;
     let mut template_state_changed = false;
-    let mut sampling_state_changed = false;
+    let mut dirty_sampling_namespaces = Vec::new();
 
     for flowset in &packet.flowsets {
         match &flowset.body {
@@ -22,8 +25,18 @@ pub(crate) fn observe_v9_decoder_state_from_packet(
                             field_length: field.field_length,
                         })
                         .collect();
-                    template_state_changed |=
-                        namespace.set_v9_template(template.template_id, fields);
+                    template_state_changed |= namespace.set_v9_template(
+                        template.template_id,
+                        fields,
+                        received_at_usec,
+                        false,
+                    );
+                    template_state.install(
+                        key,
+                        PersistedTemplateKind::V9Data,
+                        template.template_id,
+                        namespace,
+                    );
                 }
             }
             V9FlowSetBody::OptionsTemplate(templates) => {
@@ -48,25 +61,46 @@ pub(crate) fn observe_v9_decoder_state_from_packet(
                         template.template_id,
                         scope_fields,
                         option_fields,
+                        received_at_usec,
+                    );
+                    template_state.install(
+                        key,
+                        PersistedTemplateKind::V9Options,
+                        template.template_id,
+                        namespace,
                     );
                 }
             }
             V9FlowSetBody::OptionsData(options_data) => {
-                sampling_state_changed |= observe_v9_sampling_options(
-                    exporter_ip,
+                template_state.touch(
+                    key,
+                    PersistedTemplateKind::V9Options,
+                    flowset.header.flowset_id,
+                );
+                for key in observe_v9_sampling_options(
+                    exporter_source,
                     9,
                     observation_domain_id,
                     sampling,
-                    namespace,
                     options_data,
-                );
+                ) {
+                    if !dirty_sampling_namespaces.contains(&key) {
+                        dirty_sampling_namespaces.push(key);
+                    }
+                }
             }
+            V9FlowSetBody::Data(_) => template_state.touch(
+                key,
+                PersistedTemplateKind::V9Data,
+                flowset.header.flowset_id,
+            ),
             _ => {}
         }
     }
 
     DecoderStateObservation {
-        namespace_state_changed: template_state_changed || sampling_state_changed,
+        namespace_state_changed: template_state_changed,
         template_state_changed,
+        dirty_sampling_namespaces,
     }
 }

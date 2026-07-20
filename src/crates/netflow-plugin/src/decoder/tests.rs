@@ -1238,7 +1238,7 @@ fn icmp_fallback_uses_dst_port_when_src_port_missing() {
 
 #[test]
 fn sampling_state_is_scoped_by_version_and_observation_domain() {
-    let exporter = "203.0.113.10".parse().unwrap();
+    let exporter = "203.0.113.10:2055".parse().unwrap();
     let mut sampling = SamplingState::default();
     sampling.set(exporter, 9, 11, 7, 100);
     sampling.set(exporter, 9, 12, 7, 200);
@@ -3108,25 +3108,14 @@ fn persisted_decoder_state_restores_ipfix_sampling_after_restart() {
     assert_eq!(decoded.stats.parse_errors, 0);
 
     let key = FlowDecoders::decoder_state_namespace_key(source, &template).unwrap();
-    assert_eq!(
-        warm.decoder_state_namespaces[&key]
-            .sampling_rates
-            .get(&(10, 0))
-            .map(|row| row.sampling_rate),
-        Some(1_000)
-    );
+    assert_eq!(warm.sampling.get(source, 10, 42, 0), Some(1_000));
     let persisted = warm.export_decoder_state_namespace(&key).unwrap().unwrap();
 
     let mut restored = FlowDecoders::new();
     restored
         .import_decoder_state_namespace(key, source, &persisted)
         .unwrap();
-    assert_eq!(
-        restored
-            .sampling
-            .get(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10, 42, 0),
-        Some(1_000)
-    );
+    assert_eq!(restored.sampling.get(source, 10, 42, 0), Some(1_000));
 }
 
 #[test]
@@ -3159,10 +3148,11 @@ fn persisted_decoder_state_keeps_latest_effective_template_only() {
         .v9_templates
         .get(&256)
         .expect("expected latest v9 template");
-    assert_eq!(template.fields.len(), 3);
-    assert_eq!(template.fields[2].field_type, 104);
+    let fields = template.data_fields().expect("expected data template");
+    assert_eq!(fields.len(), 3);
+    assert_eq!(fields[2].field_type, 104);
     assert_eq!(
-        template.fields[2].field_length, 128,
+        fields[2].field_length, 128,
         "latest template definition should replace the earlier one"
     );
 }
@@ -3187,8 +3177,9 @@ fn parsed_v9_template_persists_raw_iana_field_id() {
         .v9_templates
         .get(&256)
         .unwrap();
-    assert_eq!(template.fields[0].field_type, 231);
-    assert_eq!(template.fields[0].field_length, 8);
+    let fields = template.data_fields().expect("expected data template");
+    assert_eq!(fields[0].field_type, 231);
+    assert_eq!(fields[0].field_length, 8);
 }
 
 #[test]
@@ -3214,9 +3205,10 @@ fn parsed_ipfix_template_persists_enterprise_identity() {
         .ipfix_templates
         .get(&256)
         .unwrap();
-    assert_eq!(template.fields[0].field_type, 137);
-    assert_eq!(template.fields[0].field_length, 2);
-    assert_eq!(template.fields[0].enterprise_number, Some(2636));
+    let fields = template.data_fields().expect("expected data template");
+    assert_eq!(fields[0].field_type, 137);
+    assert_eq!(fields[0].field_length, 2);
+    assert_eq!(fields[0].enterprise_number, Some(2636));
 }
 
 #[test]
@@ -3234,12 +3226,14 @@ fn decoder_packet_context_reuses_scope_and_normalized_source() {
     assert_eq!(context.observation_domain_id, 42);
     assert_eq!(
         context.parser_source,
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)), 0)
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)), 2055)
     );
     assert_eq!(
         context.key,
         super::DecoderStateNamespaceKey {
+            protocol: super::DecoderStateProtocol::V9,
             exporter_ip: "192.0.2.10".to_string(),
+            source_port: 2055,
             observation_domain_id: 42,
         }
     );
@@ -3260,22 +3254,22 @@ fn decoder_scope_snapshot_tracks_context_reused_namespace_and_hydration() {
     assert_eq!(snapshot.v9_sources, 1);
 
     let decoded = decoders.decode_udp_payload(alternate_source, &data);
-    assert_eq!(decoded.flows.len(), 1);
+    assert!(decoded.flows.is_empty());
 
     let snapshot = decoders.decoder_scope_snapshot();
-    assert_eq!(snapshot.namespaces, 1);
+    assert_eq!(snapshot.namespaces, 2);
     assert_eq!(
         snapshot.hydrated_sources, 1,
-        "source-port churn must keep one normalized hydrated source"
+        "a stream that has not supplied a template is tracked but not hydrated"
     );
     assert_eq!(
-        snapshot.v9_sources, 1,
-        "source-port churn must keep one parser source"
+        snapshot.v9_sources, 2,
+        "each v9 UDP transport stream must have an independent parser source"
     );
 }
 
 #[test]
-fn v9_parser_scope_reuses_templates_across_source_port_churn() {
+fn v9_parser_scope_isolates_templates_by_source_port() {
     let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
     let alternate_source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9999);
     let template = synthetic_v9_datalink_template_packet(256, 42, 96);
@@ -3287,19 +3281,18 @@ fn v9_parser_scope_reuses_templates_across_source_port_churn() {
 
     assert_eq!(
         decoders.netflow.v9_source_count(),
-        1,
-        "source-port churn from one exporter IP must not create new parser scopes"
+        2,
+        "different source ports are different v9 transport streams"
     );
     assert_eq!(
         decoded.flows.len(),
-        1,
-        "alternate source port should reuse the template"
+        0,
+        "a template learned on one source port must not decode another stream"
     );
-    assert_eq!(decoded.flows[0].record.exporter_port, 9999);
 }
 
 #[test]
-fn v9_parser_source_eviction_recovers_only_the_missing_template_once() {
+fn v9_parser_source_eviction_does_not_restore_evicted_state() {
     let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
     let other_source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 2055);
     let frame = synthetic_vlan_ipv4_udp_frame();
@@ -3310,18 +3303,19 @@ fn v9_parser_source_eviction_recovers_only_the_missing_template_once() {
     let mut decoders = FlowDecoders::new();
     decoders.set_parser_source_limit_for_test(1);
     let _ = decoders.decode_udp_payload(source, &template);
-    let _ = decoders.decode_udp_payload(other_source, &eviction_template);
+    let eviction = decoders.decode_udp_payload(other_source, &eviction_template);
+    assert_eq!(eviction.stats.parser_source_evictions, 1);
 
     let decoded = decoders.decode_udp_payload(source, &data);
 
-    assert_eq!(decoded.stats.parse_attempts, 2);
-    assert_eq!(decoded.stats.template_errors, 0);
-    assert_eq!(decoded.flows.len(), 1);
-    assert_eq!(decoded.flows[0].record.in_if, 582);
+    assert_eq!(decoded.stats.parse_attempts, 1);
+    assert_eq!(decoded.stats.parser_source_evictions, 1);
+    assert_eq!(decoded.stats.template_errors, 1);
+    assert!(decoded.flows.is_empty());
 }
 
 #[test]
-fn ipfix_parser_source_eviction_recovers_only_the_missing_template_once() {
+fn ipfix_parser_source_eviction_does_not_restore_evicted_state() {
     let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
     let other_source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 2055);
     let frame = synthetic_vlan_ipv4_udp_frame();
@@ -3332,14 +3326,15 @@ fn ipfix_parser_source_eviction_recovers_only_the_missing_template_once() {
     let mut decoders = FlowDecoders::new();
     decoders.set_parser_source_limit_for_test(1);
     let _ = decoders.decode_udp_payload(source, &template);
-    let _ = decoders.decode_udp_payload(other_source, &eviction_template);
+    let eviction = decoders.decode_udp_payload(other_source, &eviction_template);
+    assert_eq!(eviction.stats.parser_source_evictions, 1);
 
     let decoded = decoders.decode_udp_payload(source, &data);
 
-    assert_eq!(decoded.stats.parse_attempts, 2);
-    assert_eq!(decoded.stats.template_errors, 0);
-    assert_eq!(decoded.flows.len(), 1);
-    assert_eq!(decoded.flows[0].record.in_if, 582);
+    assert_eq!(decoded.stats.parse_attempts, 1);
+    assert_eq!(decoded.stats.parser_source_evictions, 1);
+    assert_eq!(decoded.stats.template_errors, 1);
+    assert!(decoded.flows.is_empty());
 }
 
 #[test]
@@ -3355,7 +3350,7 @@ fn genuinely_unknown_v9_template_is_not_retried() {
 }
 
 #[test]
-fn persisted_decoder_state_reuses_loaded_namespace_for_new_source_port() {
+fn persisted_v9_state_is_not_reused_by_another_source_port() {
     let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
     let alternate_source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9999);
     let template = synthetic_v9_datalink_template_packet(256, 42, 96);
@@ -3374,28 +3369,143 @@ fn persisted_decoder_state_reuses_loaded_namespace_for_new_source_port() {
     restored
         .import_decoder_state_namespace(key.clone(), source, &persisted)
         .expect("failed to restore decoder namespace state");
-    assert!(
-        !restored.decoder_state_source_needs_hydration(&key, alternate_source),
-        "a source-port change on the same exporter IP must reuse the loaded namespace"
-    );
+    assert!(restored.decoder_state_source_needs_hydration(&key, alternate_source));
 
     let decoded = restored.decode_udp_payload(alternate_source, &data);
     assert_eq!(
         decoded.flows.len(),
-        1,
-        "alternate source port should decode without extra hydration"
+        0,
+        "persisted state belongs only to the original v9 transport stream"
     );
-    let flow = decoded.flows[0].record.to_fields();
-    assert_eq!(flow.get("IN_IF").map(String::as_str), Some("582"));
-    assert_eq!(flow.get("SRC_VLAN").map(String::as_str), Some("231"));
-    assert_eq!(flow.get("DST_VLAN").map(String::as_str), Some("231"));
+}
+
+#[test]
+fn v9_and_ipfix_state_keys_are_protocol_discriminated() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 25)), 2055);
+    let v9 = synthetic_v9_datalink_template_packet(256, 42, 96);
+    let ipfix = synthetic_ipfix_datalink_template_packet(256, 42, 96);
+
+    let v9_key = FlowDecoders::decoder_state_namespace_key(source, &v9).unwrap();
+    let ipfix_key = FlowDecoders::decoder_state_namespace_key(source, &ipfix).unwrap();
+
+    assert_ne!(v9_key, ipfix_key);
+}
+
+#[test]
+fn decoder_state_schema_is_four() {
+    assert_eq!(DECODER_STATE_SCHEMA_VERSION, 4);
+}
+
+#[test]
+fn v9_template_lifetime_uses_collector_receive_time_and_data_does_not_refresh_it() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 2055);
+    let template = synthetic_v9_datalink_template_packet(256, 42, 96);
+    let data = synthetic_v9_datalink_data_packet(256, 42, 582, 0, &synthetic_vlan_ipv4_udp_frame());
+    let mut decoders = FlowDecoders::new();
+    decoders.set_v9_template_lifetime_for_test(Some(std::time::Duration::from_secs(10)));
+
+    let learned_at = 1_000_000;
+    let _ = decoders.decode_udp_payload_at(source, &template, learned_at);
+    assert_eq!(
+        decoders
+            .decode_udp_payload_at(source, &data, learned_at + 9_000_000)
+            .flows
+            .len(),
+        1
+    );
+    let expired = decoders.decode_udp_payload_at(source, &data, learned_at + 10_000_000);
+    assert!(expired.flows.is_empty());
+    assert_eq!(expired.stats.template_errors, 1);
+}
+
+#[test]
+fn identical_v9_template_refresh_extends_lifetime_and_null_disables_expiry() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 2055);
+    let template = synthetic_v9_datalink_template_packet(256, 42, 96);
+    let data = synthetic_v9_datalink_data_packet(256, 42, 582, 0, &synthetic_vlan_ipv4_udp_frame());
+    let learned_at = 1_000_000;
+
+    let mut expiring = FlowDecoders::new();
+    expiring.set_v9_template_lifetime_for_test(Some(std::time::Duration::from_secs(10)));
+    let _ = expiring.decode_udp_payload_at(source, &template, learned_at);
+    let _ = expiring.decode_udp_payload_at(source, &template, learned_at + 9_000_000);
+    assert_eq!(
+        expiring
+            .decode_udp_payload_at(source, &data, learned_at + 18_000_000)
+            .flows
+            .len(),
+        1
+    );
+    assert!(
+        expiring
+            .decode_udp_payload_at(source, &data, learned_at + 19_000_000)
+            .flows
+            .is_empty(),
+        "the identical template refresh must move, not remove, the persisted owner"
+    );
+
+    let mut disabled = FlowDecoders::new();
+    disabled.set_v9_template_lifetime_for_test(None);
+    let _ = disabled.decode_udp_payload_at(source, &template, learned_at);
+    assert_eq!(
+        disabled
+            .decode_udp_payload_at(source, &data, learned_at + 100_000_000)
+            .flows
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn persisted_v9_template_lifetime_survives_restart() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 2055);
+    let template = synthetic_v9_datalink_template_packet(256, 42, 96);
+    let data = synthetic_v9_datalink_data_packet(256, 42, 582, 0, &synthetic_vlan_ipv4_udp_frame());
+    let learned_at = 1_000_000;
+
+    let mut warm = FlowDecoders::new();
+    warm.set_v9_template_lifetime_for_test(Some(std::time::Duration::from_secs(10)));
+    let _ = warm.decode_udp_payload_at(source, &template, learned_at);
+    let key = FlowDecoders::decoder_state_namespace_key(source, &template).unwrap();
+    let persisted = warm.export_decoder_state_namespace(&key).unwrap().unwrap();
+
+    let mut restored = FlowDecoders::new();
+    restored.set_v9_template_lifetime_for_test(Some(std::time::Duration::from_secs(10)));
+    restored
+        .import_decoder_state_namespace(key, source, &persisted)
+        .unwrap();
+
+    let expired = restored.decode_udp_payload_at(source, &data, learned_at + 10_000_000);
+    assert!(expired.flows.is_empty());
+    assert_eq!(expired.stats.template_errors, 1);
+}
+
+#[test]
+fn future_v9_template_receive_time_does_not_expire_early() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 2055);
+    let template = synthetic_v9_datalink_template_packet(256, 42, 96);
+    let data = synthetic_v9_datalink_data_packet(256, 42, 582, 0, &synthetic_vlan_ipv4_udp_frame());
+
+    let mut decoders = FlowDecoders::new();
+    decoders.set_v9_template_lifetime_for_test(Some(std::time::Duration::from_secs(10)));
+    let _ = decoders.decode_udp_payload_at(source, &template, 20_000_000);
+
+    assert_eq!(
+        decoders
+            .decode_udp_payload_at(source, &data, 10_000_000)
+            .flows
+            .len(),
+        1
+    );
 }
 
 #[test]
 fn v9_restore_packet_keeps_options_template_descriptor_lengths() {
     let exporter_ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
     let key = super::DecoderStateNamespaceKey {
+        protocol: super::DecoderStateProtocol::V9,
         exporter_ip: exporter_ip.to_string(),
+        source_port: 2055,
         observation_domain_id: 42,
     };
     let mut namespace = DecoderStateNamespace::default();
@@ -3413,7 +3523,7 @@ fn v9_restore_packet_keeps_options_template_descriptor_lengths() {
             field_length: 2,
         },
     ];
-    namespace.set_v9_options_template(256, scope_fields, option_fields);
+    namespace.set_v9_options_template(256, scope_fields, option_fields, 0);
 
     let packets = super::build_namespace_restore_packets(&key, &namespace)
         .expect("failed to build restore packets");
@@ -3440,7 +3550,9 @@ fn v9_restore_packet_keeps_options_template_descriptor_lengths() {
 fn ipfix_v9_restore_packet_keeps_options_template_descriptor_lengths() {
     let exporter_ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
     let key = super::DecoderStateNamespaceKey {
+        protocol: super::DecoderStateProtocol::Ipfix,
         exporter_ip: exporter_ip.to_string(),
+        source_port: 0,
         observation_domain_id: 42,
     };
     let mut namespace = DecoderStateNamespace::default();
@@ -3458,7 +3570,7 @@ fn ipfix_v9_restore_packet_keeps_options_template_descriptor_lengths() {
             field_length: 2,
         },
     ];
-    namespace.set_ipfix_v9_options_template(256, scope_fields, option_fields);
+    namespace.set_ipfix_v9_options_template(256, scope_fields, option_fields, 0);
 
     let packets = super::build_namespace_restore_packets(&key, &namespace)
         .expect("failed to build restore packets");
@@ -3933,13 +4045,9 @@ fn decode_synthetic_counter_record(
     };
     let mut decoders = FlowDecoders::new();
     if let Some(rate) = sampling_rate {
-        decoders.sampling.set(
-            source.ip(),
-            protocol.version(),
-            OBSERVATION_DOMAIN_ID,
-            0,
-            rate,
-        );
+        decoders
+            .sampling
+            .set(source, protocol.version(), OBSERVATION_DOMAIN_ID, 0, rate);
     }
 
     let template_batch = decoders.decode_udp_payload(source, &template);
@@ -3990,7 +4098,7 @@ fn decode_synthetic_ipfix_raw_counter_flows_with_sampling(
     let mut decoders = FlowDecoders::new();
     if let Some(rate) = sampling_rate {
         decoders.sampling.set(
-            source.ip(),
+            source,
             SyntheticCounterProtocol::Ipfix.version(),
             OBSERVATION_DOMAIN_ID,
             0,

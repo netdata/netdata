@@ -1,16 +1,6 @@
 use super::*;
 
 impl FlowDecoders {
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) fn hydrate_loaded_decoder_state_namespace(
-        &mut self,
-        key: &DecoderStateNamespaceKey,
-        source: SocketAddr,
-    ) -> Result<(), String> {
-        let source = normalize_template_scope_source(source);
-        self.hydrate_loaded_decoder_state_namespace_for_normalized_source(key, source)
-    }
-
     pub(crate) fn hydrate_loaded_decoder_state_namespace_for_normalized_source(
         &mut self,
         key: &DecoderStateNamespaceKey,
@@ -30,7 +20,6 @@ impl FlowDecoders {
         Self::replay_namespace_packets_into(&mut validation_parser, key, &namespace, source)?;
 
         self.replay_namespace_packets(key, &namespace, source)?;
-        self.sampling.apply_decoder_state_namespace(key, &namespace);
         self.hydrated_namespace_sources
             .entry(key.clone())
             .or_default()
@@ -38,7 +27,6 @@ impl FlowDecoders {
         Ok(())
     }
 
-    #[cfg(test)]
     pub(crate) fn import_decoder_state_namespace(
         &mut self,
         expected_key: DecoderStateNamespaceKey,
@@ -56,42 +44,56 @@ impl FlowDecoders {
             ));
         }
 
+        let parser_source = expected_key.parser_source(source);
+        let mut validation_parser = super::init::new_netflow_parser(self.max_records_per_flowset);
+        Self::replay_namespace_packets_into(
+            &mut validation_parser,
+            &expected_key,
+            &persisted.namespace,
+            parser_source,
+        )?;
+        Self::replay_namespace_packets_into(
+            &mut self.netflow,
+            &expected_key,
+            &persisted.namespace,
+            parser_source,
+        )?;
+
         self.loaded_decoder_namespaces.insert(expected_key.clone());
         self.decoder_state_namespaces
             .insert(expected_key.clone(), persisted.namespace.clone());
+        if let Some(namespace) = self.decoder_state_namespaces.get_mut(&expected_key) {
+            self.templates.load_namespace(&expected_key, namespace);
+        }
+        self.sampling
+            .replace_namespace(&expected_key, &persisted.sampling_rates);
         self.dirty_decoder_namespaces.remove(&expected_key);
         self.hydrated_namespace_sources.remove(&expected_key);
-        self.hydrate_loaded_decoder_state_namespace(&expected_key, source)
-    }
-
-    pub(crate) fn preload_decoder_state_namespace(
-        &mut self,
-        data: &[u8],
-    ) -> Result<DecoderStateNamespaceKey, String> {
-        let persisted = decode_persisted_namespace_file(data)?;
-        let key = persisted.key.clone();
-        self.loaded_decoder_namespaces.insert(key.clone());
-        self.decoder_state_namespaces
-            .insert(key.clone(), persisted.namespace);
-        self.dirty_decoder_namespaces.remove(&key);
-        self.hydrated_namespace_sources.remove(&key);
-        Ok(key)
+        self.hydrated_namespace_sources
+            .entry(expected_key)
+            .or_default()
+            .insert(parser_source);
+        Ok(())
     }
 
     pub(crate) fn export_decoder_state_namespace(
         &self,
         key: &DecoderStateNamespaceKey,
     ) -> Result<Option<Vec<u8>>, String> {
-        let Some(namespace) = self.decoder_state_namespaces.get(key) else {
-            return Ok(None);
-        };
-        if namespace.is_empty() {
+        let namespace = self
+            .decoder_state_namespaces
+            .get(key)
+            .cloned()
+            .unwrap_or_default();
+        let sampling_rates = self.sampling.snapshot_namespace(key);
+        if namespace.is_empty() && sampling_rates.is_empty() {
             return Ok(None);
         }
 
         encode_persisted_namespace_file(&PersistedDecoderNamespaceFile {
             key: key.clone(),
-            namespace: namespace.clone(),
+            namespace,
+            sampling_rates,
         })
         .map(Some)
     }
@@ -113,6 +115,7 @@ impl FlowDecoders {
     ) -> Result<(), String> {
         let mut observed_namespace = DecoderStateNamespace::default();
         let mut observed_sampling = SamplingState::default();
+        let mut observed_templates = TemplateState::default();
 
         for (packet_index, packet) in build_namespace_restore_packets(key, namespace)?
             .into_iter()
@@ -130,18 +133,24 @@ impl FlowDecoders {
                 match packet {
                     NetflowPacket::V9(packet) => {
                         observe_v9_decoder_state_from_packet(
-                            source.ip(),
+                            source,
+                            key,
                             packet,
                             &mut observed_sampling,
+                            &mut observed_templates,
                             &mut observed_namespace,
+                            0,
                         );
                     }
                     NetflowPacket::IPFix(packet) => {
                         observe_ipfix_decoder_state_from_packet(
-                            source.ip(),
+                            source,
+                            key,
                             packet,
                             &mut observed_sampling,
+                            &mut observed_templates,
                             &mut observed_namespace,
+                            0,
                         );
                     }
                     _ => {}
@@ -150,41 +159,17 @@ impl FlowDecoders {
         }
 
         let mut mismatches = Vec::new();
-        record_template_mismatch(
+        record_v9_template_mismatch(
             &mut mismatches,
             "v9 templates",
             &namespace.v9_templates,
             &observed_namespace.v9_templates,
         );
-        record_template_mismatch(
-            &mut mismatches,
-            "v9 options templates",
-            &namespace.v9_options_templates,
-            &observed_namespace.v9_options_templates,
-        );
-        record_template_mismatch(
+        record_ipfix_template_mismatch(
             &mut mismatches,
             "IPFIX templates",
             &namespace.ipfix_templates,
             &observed_namespace.ipfix_templates,
-        );
-        record_template_mismatch(
-            &mut mismatches,
-            "IPFIX options templates",
-            &namespace.ipfix_options_templates,
-            &observed_namespace.ipfix_options_templates,
-        );
-        record_template_mismatch(
-            &mut mismatches,
-            "IPFIX v9 templates",
-            &namespace.ipfix_v9_templates,
-            &observed_namespace.ipfix_v9_templates,
-        );
-        record_template_mismatch(
-            &mut mismatches,
-            "IPFIX v9 options templates",
-            &namespace.ipfix_v9_options_templates,
-            &observed_namespace.ipfix_v9_options_templates,
         );
 
         if !mismatches.is_empty() {
@@ -200,13 +185,41 @@ impl FlowDecoders {
     }
 }
 
-fn record_template_mismatch<T: PartialEq>(
+fn record_v9_template_mismatch(
     mismatches: &mut Vec<String>,
     label: &str,
-    expected: &BTreeMap<u16, T>,
-    observed: &BTreeMap<u16, T>,
+    expected: &BTreeMap<u16, PersistedV9Template>,
+    observed: &BTreeMap<u16, PersistedV9Template>,
 ) {
-    if expected != observed {
+    let matches = expected.len() == observed.len()
+        && expected.iter().all(|(id, template)| {
+            observed
+                .get(id)
+                .is_some_and(|other| template.definition == other.definition)
+        });
+    if !matches {
+        mismatches.push(format!(
+            "{} expected IDs {:?}, observed IDs {:?}",
+            label,
+            expected.keys().copied().collect::<Vec<_>>(),
+            observed.keys().copied().collect::<Vec<_>>()
+        ));
+    }
+}
+
+fn record_ipfix_template_mismatch(
+    mismatches: &mut Vec<String>,
+    label: &str,
+    expected: &BTreeMap<u16, PersistedIPFixTemplate>,
+    observed: &BTreeMap<u16, PersistedIPFixTemplate>,
+) {
+    let matches = expected.len() == observed.len()
+        && expected.iter().all(|(id, template)| {
+            observed
+                .get(id)
+                .is_some_and(|other| template.definition == other.definition)
+        });
+    if !matches {
         mismatches.push(format!(
             "{} expected IDs {:?}, observed IDs {:?}",
             label,

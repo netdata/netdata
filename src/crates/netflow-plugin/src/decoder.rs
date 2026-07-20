@@ -18,7 +18,10 @@ use netflow_parser::variable_versions::v9::{
     OptionsTemplates as NetflowV9OptionsTemplates, Template as NetflowV9Template,
     TemplateField as NetflowV9TemplateField, Templates as NetflowV9Templates, V9,
 };
-use netflow_parser::{DataNumber, FieldValue, NetflowPacket, NetflowParser, ParseResult, V9Field};
+use netflow_parser::{
+    AutoSourceKey, DataNumber, FieldValue, NetflowPacket, NetflowParser, ParseResult, V9Field,
+    V9SourceKey,
+};
 use serde::{Deserialize, Serialize};
 use sflow_parser::models::{
     Address, FlowData, FlowRecord as SFlowRecord, HeaderProtocol, SFlowDatagram, SampleData,
@@ -27,7 +30,7 @@ use sflow_parser::parse_datagram;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use twox_hash::XxHash64;
 
 mod common;
@@ -60,7 +63,7 @@ const SFLOW_INTERFACE_LOCAL: u32 = 0x3fff_ffff;
 const SFLOW_INTERFACE_FORMAT_INDEX: u32 = 0;
 const SFLOW_INTERFACE_FORMAT_DISCARD: u32 = 1;
 const VXLAN_UDP_PORT: u16 = 4789;
-const DECODER_STATE_SCHEMA_VERSION: u32 = 3;
+const DECODER_STATE_SCHEMA_VERSION: u32 = 4;
 const DECODER_STATE_MAGIC: &[u8; 4] = b"NDFS";
 const DECODER_STATE_HEADER_LEN: usize = 4 + 4 + 8 + 8;
 pub(crate) use crate::flow::*;
@@ -76,7 +79,8 @@ pub(crate) fn canonicalize_ip_addr(ip: IpAddr) -> IpAddr {
 }
 
 pub(crate) fn normalize_template_scope_source(source: SocketAddr) -> SocketAddr {
-    // Parser/template scope should follow exporter identity, not ephemeral UDP source ports.
+    // Legacy NetFlow and the existing IPFIX path intentionally use exporter
+    // identity without the UDP source port. NetFlow v9 is scoped separately.
     SocketAddr::new(canonicalize_ip_addr(source.ip()), 0)
 }
 
@@ -99,6 +103,7 @@ pub(crate) struct DecodeStats {
     pub(crate) parsed_packets: u64,
     pub(crate) parse_errors: u64,
     pub(crate) template_errors: u64,
+    pub(crate) parser_source_evictions: u64,
     pub(crate) partial_counter_records: u64,
     pub(crate) netflow_v5_packets: u64,
     pub(crate) netflow_v7_packets: u64,
@@ -113,6 +118,7 @@ impl DecodeStats {
         self.parsed_packets += other.parsed_packets;
         self.parse_errors += other.parse_errors;
         self.template_errors += other.template_errors;
+        self.parser_source_evictions += other.parser_source_evictions;
         self.partial_counter_records += other.partial_counter_records;
         self.netflow_v5_packets += other.netflow_v5_packets;
         self.netflow_v7_packets += other.netflow_v7_packets;

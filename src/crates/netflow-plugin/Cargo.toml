@@ -37,6 +37,7 @@ humantime = { workspace = true }
 humantime-serde = { workspace = true }
 hashbrown = { workspace = true }
 libc = { workspace = true }
+lru = { workspace = true }
 ipnet = { workspace = true }
 ipnet-trie = { workspace = true }
 itoa = { workspace = true }

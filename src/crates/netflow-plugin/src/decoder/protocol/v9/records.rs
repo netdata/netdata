@@ -11,7 +11,6 @@ pub(crate) fn append_v9_records(
 ) -> u64 {
     let mut partial_counter_records = 0_u64;
     let export_usec = unix_timestamp_to_usec(packet.header.unix_secs as u64, 0);
-    let exporter_ip = canonicalize_ip_addr(source.ip());
     let observation_domain_id = packet.header.source_id;
     let version = 9_u16;
     let system_init_usec = netflow_v9_system_init_usec(
@@ -106,7 +105,7 @@ pub(crate) fn append_v9_records(
 
                     apply_sampling_state_record(
                         &mut rec,
-                        exporter_ip,
+                        source,
                         version,
                         observation_domain_id,
                         sampler_id,

@@ -43,7 +43,7 @@ fn build_reverse_ipfix_flow(
 pub(crate) fn finalize_ipfix_record(
     mut rec: FlowRecord,
     mut state: IPFixRecordBuildState,
-    exporter_ip: IpAddr,
+    exporter_source: SocketAddr,
     version: u16,
     observation_domain_id: u32,
     sampling: &mut SamplingState,
@@ -54,7 +54,7 @@ pub(crate) fn finalize_ipfix_record(
     state.apply_sampling_packet_ratio();
     apply_sampling_state_record(
         &mut rec,
-        exporter_ip,
+        exporter_source,
         version,
         observation_domain_id,
         state.sampler_id,
@@ -190,7 +190,7 @@ mod tests {
         let (forward, reverse, partial) = finalize_ipfix_record(
             rec,
             state,
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            "127.0.0.1:2055".parse().unwrap(),
             10,
             42,
             &mut sampling,
@@ -228,7 +228,7 @@ mod tests {
         let (_, reverse, partial) = finalize_ipfix_record(
             rec,
             state,
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            "127.0.0.1:2055".parse().unwrap(),
             10,
             42,
             &mut sampling,
@@ -267,7 +267,7 @@ mod tests {
         let (_, reverse, _) = finalize_ipfix_record(
             rec,
             state,
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            "127.0.0.1:2055".parse().unwrap(),
             10,
             42,
             &mut sampling,
@@ -302,7 +302,7 @@ mod tests {
         let (_, reverse, _) = finalize_ipfix_record(
             rec,
             state,
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            "127.0.0.1:2055".parse().unwrap(),
             10,
             42,
             &mut sampling,
@@ -323,7 +323,7 @@ mod tests {
         let decoded = finalize_ipfix_record(
             rec,
             IPFixRecordBuildState::default(),
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            "127.0.0.1:2055".parse().unwrap(),
             10,
             42,
             &mut sampling,
@@ -348,7 +348,7 @@ mod tests {
         let decoded = finalize_ipfix_record(
             rec,
             state,
-            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            "127.0.0.1:2055".parse().unwrap(),
             10,
             42,
             &mut sampling,
