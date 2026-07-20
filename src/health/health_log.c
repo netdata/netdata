@@ -207,8 +207,9 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     STRING *recipient = rc->config.recipient;
     STRING *source = rc->config.source;
     STRING *units = rc->config.units;
-    STRING *summary = rc->summary;
-    STRING *info = rc->info;
+    STRING *summary = NULL;
+    STRING *info = NULL;
+    rrdcalc_runtime_strings_acquire(rc, &summary, &info);
 
     if (duration < 0)
         duration = 0;
@@ -242,8 +243,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->old_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae_units(ae), -1));
     ae->new_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae_units(ae), -1));
 
-    ae->summary = string_dup(summary);
-    ae->info = string_dup(info);
+    ae->summary = summary;
+    ae->info = info;
     ae->old_status = old_status;
     ae->new_status = new_status;
     ae->duration = duration;

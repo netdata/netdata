@@ -88,7 +88,7 @@ jobs:
         if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
       - name: Install Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.version }}
       - name: Checkout
@@ -170,7 +170,7 @@ jobs:
         if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
       - name: Install Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.version }}
       - name: Checkout

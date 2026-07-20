@@ -60,10 +60,14 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
-    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
-    buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
-    buffer_json_member_add_string(wb, "release_channel", get_release_channel());
-    buffer_json_member_add_string(wb, "os", rrdhost_os(host));
+    {
+        RRDHOST_METADATA_IDENTITY identity = rrdhost_metadata_identity_acquire(host);
+        buffer_json_member_add_string(wb, "hostname", string2str(identity.common.hostname));
+        buffer_json_member_add_string(wb, "version", string2str(identity.common.prog_version));
+        buffer_json_member_add_string(wb, "release_channel", get_release_channel());
+        buffer_json_member_add_string(wb, "os", string2str(identity.os));
+        rrdhost_metadata_identity_release(&identity);
+    }
     {
         RRDHOST_TZ host_tz = rrdhost_tz_get(host);
         buffer_json_member_add_string(wb, "timezone", host_tz.timezone);
@@ -108,7 +112,9 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
         rrdhost_foreach_read(h) {
             if(!rrdhost_should_be_cleaned_up(h, host, now) /*&& !rrdhost_flag_check(h, RRDHOST_FLAG_ARCHIVED) */) {
                 buffer_json_add_array_item_object(wb);
-                buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(h));
+                RRDHOST_IDENTITY identity = rrdhost_identity_acquire(h);
+                buffer_json_member_add_string(wb, "hostname", string2str(identity.hostname));
+                rrdhost_identity_release(&identity);
                 buffer_json_object_close(wb);
             }
         }

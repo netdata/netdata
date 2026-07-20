@@ -125,9 +125,11 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
                         // so that the decompressor will have a whole line to work with
 
                         const char *t = &src[COMPRESSION_MAX_MSG_SIZE];
-                        while (--t >= src)
+                        while (t > src) {
+                            t--;
                             if (unlikely(*t == '\n'))
                                 break;
+                        }
 
                         if (t <= src)
                             size_to_compress = COMPRESSION_MAX_MSG_SIZE;

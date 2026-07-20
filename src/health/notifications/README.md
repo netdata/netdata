@@ -99,11 +99,7 @@ Use the `edit-config` script to safely edit configuration files. It automaticall
 
 3. Define recipients per **role** (see below).
 
-4. Restart the Agent for changes to take effect:
-
-   ```bash
-   sudo systemctl restart netdata
-   ```
+4. Changes take effect immediately. The next alarm will use the updated configuration, so no restart or reload is required.
 
 ## Example: Alert with Role-Based Routing
 
@@ -485,7 +481,7 @@ Here are solutions for common alert notification issues:
 1. Verify your service key:
 
    ```bash
-   grep -E "PAGERDUTY_SERVICE_KEY" /etc/netdata/health_alarm_notify.conf
+   grep -E "DEFAULT_RECIPIENT_PD|SEND_PD" /etc/netdata/health_alarm_notify.conf
    ```
 
 2. Test the PagerDuty API directly:
@@ -498,9 +494,7 @@ Here are solutions for common alert notification issues:
 
 If notifications seem delayed:
 
-1. Check the `delay` parameter in your alarm configuration
-2. Verify your `health.d/*.conf` files for delay settings
-3. Check the `ALARM_NOTIFY_DELAY` setting in health_alarm_notify.conf
+- Check the `delay` parameter in your alarm definitions in `health.d/*.conf` — this is the only per-alert delay setting for notifications; there is no global delay setting in `health_alarm_notify.conf`.
 
 ## Related Docs
 

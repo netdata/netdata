@@ -327,6 +327,7 @@ struct rrdhost {
     // locks
 
     SPINLOCK rrdhost_update_lock;
+    RW_SPINLOCK metadata_lifetime_lock;
 
     // ------------------------------------------------------------------------
     // ML handle
@@ -516,7 +517,7 @@ RRDHOST *rrdhost_find_or_create(
 void rrdhost_free_all(void);
 
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host);
-void rrdhost_free___without_having_rrd_wrlock(RRDHOST *host);
+void rrdhost_free___consume_metadata_lifetime_writelock(RRDHOST *host);
 void rrdhost_cleanup_data_collection_and_health(RRDHOST *host);
 
 bool rrdhost_should_be_cleaned_up(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
@@ -538,6 +539,15 @@ typedef struct {
 
 RRDHOST_IDENTITY rrdhost_identity_acquire(RRDHOST *host);
 void rrdhost_identity_release(RRDHOST_IDENTITY *identity);
+
+typedef struct {
+    RRDHOST_IDENTITY common;
+    STRING *registry_hostname;
+    STRING *os;
+} RRDHOST_METADATA_IDENTITY;
+
+RRDHOST_METADATA_IDENTITY rrdhost_metadata_identity_acquire(RRDHOST *host);
+void rrdhost_metadata_identity_release(RRDHOST_METADATA_IDENTITY *identity);
 
 // Thread-safe timezone snapshot from an RRDHOST.
 // The returned struct owns strdup'd copies; release with rrdhost_tz_free().

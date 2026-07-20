@@ -101,7 +101,7 @@ static int debugfs_am_i_running_as_root()
 void debugfs2lower(char *name)
 {
     while (*name) {
-        *name = tolower(*name);
+        *name = tolower((uint8_t)*name);
         name++;
     }
 }

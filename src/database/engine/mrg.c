@@ -47,7 +47,9 @@ static bool mrg_destroy_claim_metric(METRIC *metric, METRIC ***claimed, size_t *
 }
 
 static MRG *mrg_create_internal(bool load_from_db) {
-    MRG *mrg = callocz(1, sizeof(MRG));
+    MRG *mrg;
+    (void)posix_memalignz((void **)&mrg, _Alignof(MRG), sizeof(*mrg));
+    memset(mrg, 0, sizeof(*mrg));
 
     for(size_t i = 0; i < _countof(mrg->index) ; i++) {
         rw_spinlock_init(&mrg->index[i].rw_spinlock);
@@ -182,7 +184,7 @@ size_t mrg_destroy(MRG *mrg) {
     pulse_aral_unregister_statistics(&mrg_aral_statistics);
 
     // Free the MRG structure
-    freez(mrg);
+    posix_memalign_freez(mrg);
 
     return referenced;
 }

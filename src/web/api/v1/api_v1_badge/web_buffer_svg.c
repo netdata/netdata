@@ -1072,8 +1072,11 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
         else
             buffer_no_cacheable(w->response.data);
 
+        RRDCALC_RUNTIME_SNAPSHOT snapshot;
+        rrdcalc_runtime_snapshot_get(rc, &snapshot);
+
         if(!value_color) {
-            switch(rc->status) {
+            switch(snapshot.status) {
                 case RRDCALC_STATUS_CRITICAL:
                     value_color = "red";
                     break;
@@ -1102,7 +1105,8 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
 
         buffer_svg(w->response.data,
                 label,
-                (isnan(rc->value)||isinf(rc->value)) ? rc->value : rc->value * multiply / divide,
+                (isnan(snapshot.value)||isinf(snapshot.value)) ?
+                    snapshot.value : snapshot.value * multiply / divide,
                 units,
                 label_color,
                 value_color,

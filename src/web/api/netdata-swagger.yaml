@@ -5715,10 +5715,14 @@ paths:
         Maximum settings file size: 20 MiB
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
-        - **No Authentication:** Cannot be restricted by any configuration
-        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: file
           in: query
@@ -5847,7 +5851,7 @@ paths:
         - MUST be valid JSON
         - MUST include `version` field with current file version
         - MAY include any additional fields
-        - Maximum size: 20 MiB
+        - Maximum size: 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
 
         **Version Management:**
         - Client provides current version in payload
@@ -5860,6 +5864,16 @@ paths:
         - Update user preferences
         - Store UI state
         - Persist alert customizations
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: file
           in: query
@@ -5896,7 +5910,7 @@ paths:
           - Any user-defined fields
 
           **Size Limit:**
-          Maximum 20 MiB
+          Maximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
 
           **Version Rules:**
           - New file: version can be 0 or 1
@@ -5948,7 +5962,6 @@ paths:
             - Missing `version` field in payload
             - Invalid JSON payload
             - Empty payload
-            - Payload exceeds 20 MiB
             - Anonymous user trying to access non-default file
         "409":
           description: |
@@ -5968,6 +5981,8 @@ paths:
                   message:
                     type: string
                     example: "Payload version does not match the version of the stored object"
+        "413":
+          description: Payload too large. The PUT payload exceeds the 20 MiB (20,971,520-byte) maximum.
         "500":
           description: Internal server error during settings update.
   /api/v3/stream_info:
@@ -6544,6 +6559,7 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [cloud]
                 properties:
                   success:
                     type: boolean
@@ -6557,16 +6573,56 @@ paths:
                       Result message. Present only for claim action responses.
                       - Success: "ok"
                       - Failure: Reason for failure (e.g., "invalid key", "invalid parameters", cloud connection error)
-                  cloud_status:
-                    type: string
-                    enum: [available, offline, indirect, online, banned]
-                    description: |
-                      Current cloud connection status of the agent.
-                      - available: Not claimed yet, can be claimed
-                      - offline: Claimed but currently disconnected
-                      - indirect: Connected through parent agent
-                      - online: Claimed and connected (cannot re-claim)
-                      - banned: Banned from cloud (cannot claim)
+                  cloud:
+                    type: object
+                    description: Current Netdata Cloud connection state.
+                    required: [id, status, since, age, url, reason]
+                    properties:
+                      id:
+                        type: integer
+                        minimum: 0
+                        description: Cloud connection ID counter.
+                      status:
+                        type: string
+                        enum: [available, offline, indirect, online, banned]
+                        description: |
+                          Current cloud connection status of the agent.
+                          - available: Not claimed yet, can be claimed
+                          - offline: Claimed but currently disconnected
+                          - indirect: Connected through parent agent
+                          - online: Claimed and connected (cannot re-claim)
+                          - banned: Banned from cloud (cannot claim)
+                      since:
+                        type: integer
+                        format: int64
+                        description: Unix timestamp of the latest cloud connection state change.
+                      age:
+                        type: integer
+                        format: int64
+                        description: Signed difference in seconds between response generation time and `since`; may be negative after a backward system-clock adjustment.
+                      url:
+                        type: string
+                        nullable: true
+                        description: |
+                          Netdata Cloud URL. Emitted for every status and may be null when the active ACLK URL is unavailable.
+                          For banned status, the current runtime emits this member twice from two URL sources; OpenAPI represents it as one logical property.
+                      reason:
+                        type: string
+                        description: Status explanation or connection error; an empty string when online.
+                      claim_id:
+                        type: string
+                        description: |
+                          Present for banned, offline, online, and indirect statuses.
+                          Contains the canonical claim UUID when one is available; it can be empty when no claim ID is available.
+                      next_check:
+                        type: integer
+                        format: int64
+                        description: Unix timestamp of the next connection attempt; present only for offline status when scheduled in the future.
+                      next_in:
+                        type: integer
+                        format: int64
+                        minimum: 1
+                        description: Seconds until `next_check`; present only when `next_check` is present.
                   can_be_claimed:
                     type: boolean
                     description: |
@@ -6576,13 +6632,14 @@ paths:
                     type: string
                     description: |
                       Full path to the file containing the verification key.
-                      Present in info and error responses (not present after successful claim).
+                      Present in info and error responses after the verification key file has been published successfully at least once.
+                      Not present after a successful claim or if no verification key file has ever been published successfully.
                       Platform-specific path (Linux: /var/lib/netdata/..., Windows: C:\...).
                   cmd:
                     type: string
                     description: |
                       OS-specific command to retrieve the verification key.
-                      Present in info and error responses.
+                      Present in info and error responses after the verification key file has been published successfully at least once.
                       - Linux: "sudo cat /var/lib/netdata/netdata_random_session_id"
                       - Docker: "docker exec netdata cat /var/lib/netdata/netdata_random_session_id"
                       - Windows: "more C:\path\to\netdata_random_session_id"
@@ -6590,7 +6647,7 @@ paths:
                     type: string
                     description: |
                       Human-readable instructions for obtaining the verification key.
-                      Present in info and error responses.
+                      Present in info and error responses after the verification key file has been published successfully at least once.
                   agents:
                     type: array
                     description: Agent information for the claimed node(s)
@@ -6599,7 +6656,13 @@ paths:
               examples:
                 info_response:
                   value:
-                    cloud_status: available
+                    cloud:
+                      id: 0
+                      status: available
+                      since: 1720000000
+                      age: 120
+                      url: "https://app.netdata.cloud"
+                      reason: "Agent is not claimed yet"
                     can_be_claimed: true
                     key_filename: "/var/lib/netdata/netdata_random_session_id"
                     cmd: "sudo cat /var/lib/netdata/netdata_random_session_id"
@@ -6612,7 +6675,14 @@ paths:
                   value:
                     success: true
                     message: "ok"
-                    cloud_status: online
+                    cloud:
+                      id: 1
+                      status: online
+                      since: 1720000120
+                      age: 0
+                      url: "https://app.netdata.cloud"
+                      reason: ""
+                      claim_id: "12345678-1234-1234-1234-123456789abc"
                     agents:
                       - hostname: "my-server"
                         machine_guid: "12345678-1234-1234-1234-123456789abc"
@@ -6622,7 +6692,13 @@ paths:
                   value:
                     success: false
                     message: "invalid key"
-                    cloud_status: available
+                    cloud:
+                      id: 0
+                      status: available
+                      since: 1720000000
+                      age: 120
+                      url: "https://app.netdata.cloud"
+                      reason: "Agent is not claimed yet"
                     can_be_claimed: true
                     key_filename: "/var/lib/netdata/netdata_random_session_id"
                     cmd: "sudo cat /var/lib/netdata/netdata_random_session_id"

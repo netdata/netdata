@@ -115,6 +115,78 @@ static inline size_t settings_get_version(const char *path, bool have_lock) {
     return settings_extract_json_version(buffer_tostring(wb));
 }
 
+static FILE *settings_open_tmp_file(const char *filename) {
+    struct stat before;
+    bool reuse = lstat(filename, &before) == 0;
+    if(reuse && !S_ISREG(before.st_mode)) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    if(!reuse && errno != ENOENT)
+        return NULL;
+
+    int flags = O_WRONLY | O_CLOEXEC | O_NONBLOCK;
+#ifdef O_NOFOLLOW
+    flags |= O_NOFOLLOW;
+#endif
+    if(!reuse)
+        flags |= O_CREAT | O_EXCL;
+
+    int fd = open(filename, flags, 0666);
+    if(fd == -1)
+        return NULL;
+
+    struct stat after;
+    if(fstat(fd, &after) != 0) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if(!S_ISREG(after.st_mode) ||
+       (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))) {
+        close(fd);
+        errno = EINVAL;
+        return NULL;
+    }
+
+    if(reuse && ftruncate(fd, 0) != 0) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    FILE *fp = fdopen(fd, "w");
+    if(!fp) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+    }
+
+    return fp;
+}
+
+static bool settings_write_tmp_file(FILE *fp, const char *data, size_t len) {
+    size_t written = fwrite(data, 1, len, fp);
+    int saved_errno = errno;
+    bool failed = ferror(fp) || written != len;
+
+    if(fclose(fp) != 0) {
+        if(!failed)
+            saved_errno = errno;
+
+        failed = true;
+    }
+
+    if(failed)
+        errno = saved_errno;
+
+    return !failed;
+}
+
 static inline int settings_put(struct web_client *w, char *file) {
     rw_spinlock_write_lock(&settings_spinlock);
 
@@ -169,7 +241,7 @@ static inline int settings_put(struct web_client *w, char *file) {
     settings_filename(tmp_filename, file, "new");
 
     // Save the updated JSON string to a file
-    FILE *fp = fopen(tmp_filename, "w");
+    FILE *fp = settings_open_tmp_file(tmp_filename);
     if (fp == NULL) {
         rw_spinlock_write_unlock(&settings_spinlock);
         nd_log(NDLS_DAEMON, NDLP_ERR, "cannot open/create settings file '%s'", tmp_filename);
@@ -178,18 +250,17 @@ static inline int settings_put(struct web_client *w, char *file) {
             "Cannot create payload file",
             HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
-    size_t len = strlen(updated_json_str);
-    if(fwrite(updated_json_str, 1, len, fp) != len) {
-        fclose(fp);
+    if(!settings_write_tmp_file(fp, updated_json_str, strlen(updated_json_str))) {
+        int saved_errno = errno;
         unlink(tmp_filename);
         rw_spinlock_write_unlock(&settings_spinlock);
+        errno = saved_errno;
         nd_log(NDLS_DAEMON, NDLP_ERR, "cannot save settings to file '%s'", tmp_filename);
         return rrd_call_function_error(
             w->response.data,
             "Cannot save payload to file",
             HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
-    fclose(fp);
 
     char filename[FILENAME_MAX];
     settings_filename(filename, file, NULL);

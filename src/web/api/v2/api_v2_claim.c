@@ -21,21 +21,46 @@ static bool netdata_random_session_id_generate_unlocked(void) {
     (void)unlink(filename);
 
     // save it
-    int fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 640);
+    int saved_errno = 0;
+    int fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0640);
     if(fd == -1) {
+        saved_errno = errno;
         netdata_log_error("Cannot create random session id file '%s'.", filename);
         ret = false;
     }
     else {
-        if (write(fd, guid, UUID_STR_LEN - 1) != UUID_STR_LEN - 1) {
+        ssize_t bytes = write(fd, guid, UUID_STR_LEN - 1);
+        if(bytes != UUID_STR_LEN - 1) {
+            if(bytes >= 0)
+                errno = EIO;
+
+            saved_errno = errno;
             netdata_log_error("Cannot write the random session id file '%s'.", filename);
             ret = false;
-        } else {
-            ssize_t bytes = write(fd, "\n", 1);
-            UNUSED(bytes);
         }
-        close(fd);
+        else {
+            bytes = write(fd, "\n", 1);
+            if(bytes != 1) {
+                if(bytes >= 0)
+                    errno = EIO;
+
+                saved_errno = errno;
+                netdata_log_error("Cannot write the random session id file '%s'.", filename);
+                ret = false;
+            }
+        }
+
+        if(close(fd) == -1) {
+            if(ret)
+                saved_errno = errno;
+
+            netdata_log_error("Cannot close the random session id file '%s'.", filename);
+            ret = false;
+        }
     }
+
+    if(!ret)
+        errno = saved_errno;
 
     if(ret && (!netdata_random_session_id_filename || strcmp(netdata_random_session_id_filename, filename) != 0)) {
         freez(netdata_random_session_id_filename);
@@ -118,6 +143,9 @@ typedef enum {
 
 static void claim_add_user_info_command(BUFFER *wb) {
     CLEAN_CHAR_P *filename = netdata_random_session_id_filename_strdupz();
+    if(!filename)
+        return;
+
     CLEAN_BUFFER *os_cmd = buffer_create(0, NULL);
 
     const char *os_filename;

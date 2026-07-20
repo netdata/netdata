@@ -2506,6 +2506,16 @@ endif()
 #
 
 add_library(libnetdata STATIC ${LIBNETDATA_FILES})
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "(arm64)|(aarch64)|(ARM64)|(AARCH64)")
+    check_c_compiler_flag("-mno-outline-atomics" HAVE_C_MNO_OUTLINE_ATOMICS)
+    if(HAVE_C_MNO_OUTLINE_ATOMICS)
+        # This source is reached from raw signal handlers and cannot call atomic runtime helpers.
+        set_source_files_properties(src/libnetdata/exit/exit_initiated.c PROPERTIES
+                                    COMPILE_OPTIONS "-mno-outline-atomics")
+    endif()
+endif()
+
 set_source_files_properties(src/libnetdata/gorilla/gorilla.cc PROPERTIES COMPILE_OPTIONS "-Wno-attributes")
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)

@@ -206,6 +206,7 @@ struct instance {
     int skip_chart;
 
     BUFFER *labels_buffer;
+    BUFFER *metric_prefix_buffer;
 
     time_t after;
     time_t before;

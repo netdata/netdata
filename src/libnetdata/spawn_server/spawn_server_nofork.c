@@ -24,8 +24,8 @@ extern char **environ;
 #endif
 
 static size_t spawn_server_id = 0;
-static volatile bool spawn_server_exit = false;
-static volatile bool spawn_server_sigchld = false;
+static volatile sig_atomic_t spawn_server_exit = false;
+static volatile sig_atomic_t spawn_server_sigchld = false;
 static SPAWN_REQUEST *spawn_server_requests = NULL;
 
 #define SPAWN_SERVER_IOV_MAX 10

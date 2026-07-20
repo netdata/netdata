@@ -37,9 +37,19 @@ bool claimed_id_save_to_file(const char *claimed_id_str) {
     const char *filename = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "claimed_id");
     FILE *fp = fopen(filename, "w");
     if(fp) {
-        fprintf(fp, "%s", claimed_id_str);
-        fclose(fp);
-        ret = true;
+        int written = fprintf(fp, "%s", claimed_id_str);
+        int saved_errno = errno;
+        if(fclose(fp) != 0 || written < 0) {
+            if(written >= 0)
+                saved_errno = errno;
+
+            errno = saved_errno;
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "CLAIM: cannot save file '%s'.", filename);
+            ret = false;
+        }
+        else
+            ret = true;
     }
     else {
         nd_log(NDLS_DAEMON, NDLP_ERR,

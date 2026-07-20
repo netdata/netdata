@@ -89,7 +89,9 @@ static void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host,
             continue;
         }
 
-        switch(rc->status) {
+        RRDCALC_RUNTIME_SNAPSHOT snapshot;
+        rrdcalc_runtime_snapshot_get(rc, &snapshot);
+        switch(snapshot.status) {
             case RRDCALC_STATUS_WARNING:
                 warning++;
                 break;

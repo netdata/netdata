@@ -437,7 +437,7 @@ static void ebpf_function_socket_manipulation(
             rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
             ebpf_clean_ip_structure(&network_viewer_opt.included_ips);
             ebpf_clean_ip_structure(&network_viewer_opt.excluded_ips);
-            ebpf_parse_ips_unsafe((char *)name);
+            ebpf_parse_ips_unsafe(name);
             rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
 
             ebpf_socket_clean_judy_array_unsafe();
@@ -446,7 +446,7 @@ static void ebpf_function_socket_manipulation(
             rw_spinlock_write_lock(&network_viewer_opt.rw_spinlock);
             ebpf_clean_port_structure(&network_viewer_opt.included_port);
             ebpf_clean_port_structure(&network_viewer_opt.excluded_port);
-            ebpf_parse_ports((char *)name);
+            ebpf_parse_ports(name);
             rw_spinlock_write_unlock(&network_viewer_opt.rw_spinlock);
 
             ebpf_socket_clean_judy_array_unsafe();

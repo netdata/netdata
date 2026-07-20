@@ -58,6 +58,116 @@ static DAEMON_STATUS_FILE session_status = {
     },
 };
 
+// Normal writers publish into the inactive slot until a deadly signal freezes slot reuse.
+static DAEMON_STATUS_FILE session_status_for_signals[2] = {
+    {
+        .v = STATUS_FILE_VERSION,
+        .fatal = {
+            .spinlock = SPINLOCK_INITIALIZER,
+        },
+    },
+    {
+        .v = STATUS_FILE_VERSION,
+        .fatal = {
+            .spinlock = SPINLOCK_INITIALIZER,
+        },
+    },
+};
+#define SIGNAL_SNAPSHOT_SLOT_MASK UINT32_C(1)
+#define SIGNAL_SNAPSHOT_FROZEN (UINT32_C(1) << 1)
+#define SIGNAL_SNAPSHOT_STATUS_SHIFT 2
+static uint32_t session_status_for_signals_state =
+    (uint32_t)DAEMON_STATUS_NONE << SIGNAL_SNAPSHOT_STATUS_SHIFT;
+static SPINLOCK session_status_for_signals_spinlock = SPINLOCK_INITIALIZER;
+
+// Writers remain concurrent with each other. The high bit only excludes the short snapshot copy.
+#define SESSION_STATUS_SNAPSHOT_COPYING (UINT32_C(1) << 31)
+static uint32_t session_status_snapshot_source_state = 0;
+
+static void daemon_status_file_session_status_writer_enter(void) {
+    uint32_t state = __atomic_load_n(&session_status_snapshot_source_state, __ATOMIC_ACQUIRE);
+
+    for(;;) {
+        if(state & SESSION_STATUS_SNAPSHOT_COPYING) {
+            state = __atomic_load_n(&session_status_snapshot_source_state, __ATOMIC_ACQUIRE);
+            continue;
+        }
+
+        if(__atomic_compare_exchange_n(&session_status_snapshot_source_state, &state, state + 1,
+                                       false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+            return;
+    }
+}
+
+static void daemon_status_file_session_status_writer_leave(void) {
+    __atomic_sub_fetch(&session_status_snapshot_source_state, 1, __ATOMIC_RELEASE);
+}
+
+static bool daemon_status_file_signal_snapshot_source_acquire(void) {
+    uint32_t expected = 0;
+    return __atomic_compare_exchange_n(&session_status_snapshot_source_state, &expected,
+                                       SESSION_STATUS_SNAPSHOT_COPYING, false,
+                                       __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
+}
+
+static void daemon_status_file_signal_snapshot_source_release(void) {
+    __atomic_store_n(&session_status_snapshot_source_state, 0, __ATOMIC_RELEASE);
+}
+
+_Static_assert(offsetof(DAEMON_STATUS_FILE, fatal.line) ==
+                   ((offsetof(DAEMON_STATUS_FILE, fatal.spinlock) + sizeof(SPINLOCK) + _Alignof(long) - 1) /
+                    _Alignof(long)) * _Alignof(long),
+               "fatal.line must be the first payload field after fatal.spinlock");
+_Static_assert(offsetof(DAEMON_STATUS_FILE, fatal) + sizeof(((DAEMON_STATUS_FILE *)0)->fatal) ==
+                   sizeof(DAEMON_STATUS_FILE),
+               "fatal must remain the last DAEMON_STATUS_FILE member");
+
+static void daemon_status_file_copy_signal_snapshot(DAEMON_STATUS_FILE *dst, const DAEMON_STATUS_FILE *src) {
+    const size_t fatal_payload_offset = offsetof(DAEMON_STATUS_FILE, fatal.line);
+
+    // Keep each slot's synchronization object initialized and private to that slot.
+    memcpy(dst, src, offsetof(DAEMON_STATUS_FILE, fatal));
+    memcpy((char *)dst + fatal_payload_offset, (const char *)src + fatal_payload_offset,
+           sizeof(*dst) - fatal_payload_offset);
+}
+
+static bool daemon_status_file_signal_snapshots_frozen(void) {
+    return (__atomic_load_n(&session_status_for_signals_state, __ATOMIC_ACQUIRE) &
+            SIGNAL_SNAPSHOT_FROZEN) != 0;
+}
+
+static void daemon_status_file_freeze_signal_snapshots(void) {
+    __atomic_fetch_or(&session_status_for_signals_state, SIGNAL_SNAPSHOT_FROZEN, __ATOMIC_ACQ_REL);
+}
+
+static void daemon_status_file_publish_session_status_for_signals(void) {
+    if(daemon_status_file_signal_snapshots_frozen())
+        return;
+
+    spinlock_lock(&session_status_for_signals_spinlock);
+
+    uint32_t current_state = __atomic_load_n(&session_status_for_signals_state, __ATOMIC_ACQUIRE);
+    if(!(current_state & SIGNAL_SNAPSHOT_FROZEN) && daemon_status_file_signal_snapshot_source_acquire()) {
+        uint32_t next_slot = (current_state & SIGNAL_SNAPSHOT_SLOT_MASK) ^ SIGNAL_SNAPSHOT_SLOT_MASK;
+        DAEMON_STATUS_FILE *next = &session_status_for_signals[next_slot];
+
+        daemon_status_file_copy_signal_snapshot(next, &session_status);
+
+        uint32_t next_state = ((uint32_t)next->status << SIGNAL_SNAPSHOT_STATUS_SHIFT) | next_slot;
+        // A concurrent freeze wins this CAS and keeps the previously active slot immutable.
+        __atomic_compare_exchange_n(&session_status_for_signals_state, &current_state, next_state,
+                                    false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+        daemon_status_file_signal_snapshot_source_release();
+    }
+
+    spinlock_unlock(&session_status_for_signals_spinlock);
+}
+
+static DAEMON_STATUS_FILE *daemon_status_file_signal_status(void) {
+    uint32_t state = __atomic_load_n(&session_status_for_signals_state, __ATOMIC_ACQUIRE);
+    return &session_status_for_signals[state & SIGNAL_SNAPSHOT_SLOT_MASK];
+}
+
 typedef struct daemon_status_fatal_snapshot {
     char filename[sizeof(session_status.fatal.filename)];
     char function[sizeof(session_status.fatal.function)];
@@ -107,22 +217,22 @@ static const char *fatal_snapshot_load_string(const char *src, char *dst, size_t
     return dst;
 }
 
-static void daemon_status_file_publish_fatal_snapshot(void) {
+static void daemon_status_file_publish_fatal_snapshot(DAEMON_STATUS_FILE *ds) {
     fatal_snapshot_store_string(
-        fatal_snapshot.filename, session_status.fatal.filename, sizeof(fatal_snapshot.filename));
+        fatal_snapshot.filename, ds->fatal.filename, sizeof(fatal_snapshot.filename));
     fatal_snapshot_store_string(
-        fatal_snapshot.function, session_status.fatal.function, sizeof(fatal_snapshot.function));
+        fatal_snapshot.function, ds->fatal.function, sizeof(fatal_snapshot.function));
     fatal_snapshot_store_string(
-        fatal_snapshot.message, session_status.fatal.message, sizeof(fatal_snapshot.message));
+        fatal_snapshot.message, ds->fatal.message, sizeof(fatal_snapshot.message));
     fatal_snapshot_store_string(
-        fatal_snapshot.errno_str, session_status.fatal.errno_str, sizeof(fatal_snapshot.errno_str));
+        fatal_snapshot.errno_str, ds->fatal.errno_str, sizeof(fatal_snapshot.errno_str));
     fatal_snapshot_store_string(
-        fatal_snapshot.stack_trace, session_status.fatal.stack_trace, sizeof(fatal_snapshot.stack_trace));
-    fatal_snapshot_store_string(fatal_snapshot.thread, session_status.fatal.thread, sizeof(fatal_snapshot.thread));
+        fatal_snapshot.stack_trace, ds->fatal.stack_trace, sizeof(fatal_snapshot.stack_trace));
+    fatal_snapshot_store_string(fatal_snapshot.thread, ds->fatal.thread, sizeof(fatal_snapshot.thread));
 
-    __atomic_store_n(&fatal_snapshot.thread_id, session_status.fatal.thread_id, __ATOMIC_RELEASE);
-    __atomic_store_n(&fatal_snapshot.line, session_status.fatal.line, __ATOMIC_RELEASE);
-    __atomic_store_n(&fatal_snapshot.worker_job_id, session_status.fatal.worker_job_id, __ATOMIC_RELEASE);
+    __atomic_store_n(&fatal_snapshot.thread_id, ds->fatal.thread_id, __ATOMIC_RELEASE);
+    __atomic_store_n(&fatal_snapshot.line, ds->fatal.line, __ATOMIC_RELEASE);
+    __atomic_store_n(&fatal_snapshot.worker_job_id, ds->fatal.worker_job_id, __ATOMIC_RELEASE);
 }
 
 static void copy_and_clean_thread_name_if_empty(DAEMON_STATUS_FILE *ds, const char *name) {
@@ -738,6 +848,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
 static void daemon_status_file_migrate_once(void) {
     FUNCTION_RUN_ONCE();
 
+    daemon_status_file_session_status_writer_enter();
     dsf_acquire(last_session_status);
     dsf_acquire(session_status);
 
@@ -809,11 +920,13 @@ static void daemon_status_file_migrate_once(void) {
 
     dsf_release(last_session_status);
     dsf_release(session_status);
+    daemon_status_file_session_status_writer_leave();
 }
 
 static void daemon_status_file_refresh(DAEMON_STATUS status) {
     usec_t now_ut = now_realtime_usec();
 
+    daemon_status_file_session_status_writer_enter();
     dsf_acquire(session_status);
 
 #if defined(OS_LINUX)
@@ -953,6 +1066,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     }
 
     dsf_release(session_status);
+    daemon_status_file_session_status_writer_leave();
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -988,6 +1102,10 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
     // wb should have enough space to hold the JSON content, to avoid any allocations
+
+    // Signal callers pass the published snapshot, so this normal-context publisher is skipped there.
+    if(ds == &session_status)
+        daemon_status_file_publish_session_status_for_signals();
 
     buffer_flush(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
@@ -1054,7 +1172,10 @@ static void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_uint64(wb, "agent_pid_now", getpid());
     buffer_json_member_add_boolean(wb, "host_memory_critical",
                                    OS_SYSTEM_MEMORY_OK(d->status->memory) && d->status->memory.ram_available_bytes <= d->status->oom_protection);
-    buffer_json_member_add_uint64(wb, "host_memory_free_percent", (uint64_t)round(os_system_memory_available_percent(d->status->memory)));
+    uint64_t host_memory_free_percent;
+    if(!parser_round_number_to_uint64(os_system_memory_available_percent(d->status->memory), &host_memory_free_percent))
+        host_memory_free_percent = UINT64_MAX;
+    buffer_json_member_add_uint64(wb, "host_memory_free_percent", host_memory_free_percent);
     buffer_json_member_add_string(wb, "agent_health", agent_health(d->status));
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);
@@ -1087,7 +1208,9 @@ static void post_status_file(struct post_status_file_thread_data *d) {
     CURLcode rc = curl_easy_perform(curl);
     if(rc == CURLE_OK) {
         daemon_status_file_startup_step("startup(crash reports dedup)");
+        daemon_status_file_session_status_writer_enter();
         session_status.posts++;
+        daemon_status_file_session_status_writer_leave();
         nd_log(NDLS_DAEMON, NDLP_INFO, "Posted last status to agent-events successfully.");
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
         dedup_keep_hash(&session_status, hash, false, DEDUP_RELOAD_FROM_DISK);
@@ -1175,6 +1298,7 @@ void daemon_status_file_init(void) {
                             last_session_status.disk_footprint.last_updated_ut, 2, true);
 
     daemon_status_file_migrate_once();
+    daemon_status_file_publish_session_status_for_signals();
 }
 
 void daemon_status_file_check_crash(void) {
@@ -1431,13 +1555,20 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
+    bool live_session_status = ds == &session_status;
+    if(live_session_status)
+        daemon_status_file_session_status_writer_enter();
+
 #ifdef HAVE_LIBBACKTRACE
     if(stacktrace_available())
-        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "will now attempt to get stack trace - if you see this message, we couldn't get it.");
+        set_stack_trace_message_if_empty(ds, STACK_TRACE_INFO_PREFIX "will now attempt to get stack trace - if you see this message, we couldn't get it.");
     else
 #endif
-        set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
-    daemon_status_file_publish_fatal_snapshot();
+        set_stack_trace_message_if_empty(ds, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
+    daemon_status_file_publish_fatal_snapshot(ds);
+
+    if(live_session_status)
+        daemon_status_file_session_status_writer_leave();
 
     // save it without a stack trace to be sure we will have the event
     daemon_status_file_save(wb, ds, false);
@@ -1452,18 +1583,30 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
 
     // Store the first netdata function from the stack trace if available
     const char *first_nd_fn = stacktrace_root_cause_function();
+
+    if(live_session_status)
+        daemon_status_file_session_status_writer_enter();
+
     if (first_nd_fn && *first_nd_fn &&
         (!ds->fatal.function[0] || strncmp(ds->fatal.function, "thread:", 7) == 0))
         safecpy(ds->fatal.function, first_nd_fn);
+    daemon_status_file_publish_fatal_snapshot(ds);
+#else
+    if(live_session_status)
+        daemon_status_file_session_status_writer_enter();
 #endif
-    daemon_status_file_publish_fatal_snapshot();
 
     if(buffer_strlen(wb) > 0) {
         safecpy(ds->fatal.stack_trace, buffer_tostring(wb));
-        daemon_status_file_publish_fatal_snapshot();
+        daemon_status_file_publish_fatal_snapshot(ds);
+
+        if(live_session_status)
+            daemon_status_file_session_status_writer_leave();
 
         daemon_status_file_save(wb, ds, false);
     }
+    else if(live_session_status)
+        daemon_status_file_session_status_writer_leave();
 
     errno_clear();
 }
@@ -1475,6 +1618,7 @@ NEVER_INLINE
 void daemon_status_file_register_fatal(const char *filename, const char *function, const char *message, const char *errno_str, const char *stack_trace, long line) {
     FUNCTION_RUN_ONCE();
 
+    daemon_status_file_session_status_writer_enter();
     dsf_acquire(session_status);
     spinlock_lock(&session_status.fatal.spinlock);
 
@@ -1507,10 +1651,11 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
     if(line)
         session_status.fatal.line = line;
 
-    daemon_status_file_publish_fatal_snapshot();
+    daemon_status_file_publish_fatal_snapshot(&session_status);
 
     spinlock_unlock(&session_status.fatal.spinlock);
     dsf_release(session_status);
+    daemon_status_file_session_status_writer_leave();
 
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     daemon_status_file_save_twice_if_we_can_get_stack_trace(wb, &session_status, false);
@@ -1544,10 +1689,12 @@ static void daemon_status_file_out_of_memory(void) {
     // the buffer should already be allocated, so this should normally do nothing
     static_save_buffer_init();
 
+    daemon_status_file_session_status_writer_enter();
     dsf_acquire(session_status);
     exit_initiated_add(EXIT_REASON_OUT_OF_MEMORY);
     session_status.exit_reason |= EXIT_REASON_OUT_OF_MEMORY;
     dsf_release(session_status);
+    daemon_status_file_session_status_writer_leave();
 
     daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
 }
@@ -1559,43 +1706,46 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
-    dsf_acquire(session_status);
+    daemon_status_file_freeze_signal_snapshots();
+    DAEMON_STATUS_FILE *ds = daemon_status_file_signal_status();
+
+    dsf_acquire(*ds);
 
     exit_initiated_add(reason);
-    session_status.exit_reason |= reason;
-    session_status.fatal.sentry = chained_handler;
+    ds->exit_reason |= reason;
+    ds->fatal.sentry = chained_handler;
 
     if(code)
-        session_status.fatal.signal_code = code;
+        ds->fatal.signal_code = code;
 
     if(fault_address)
-        session_status.fatal.fault_address = (uintptr_t)fault_address;
+        ds->fatal.fault_address = (uintptr_t)fault_address;
 
-    if(!session_status.fatal.thread_id)
-        session_status.fatal.thread_id = gettid_cached();
+    if(!ds->fatal.thread_id)
+        ds->fatal.thread_id = gettid_cached();
 
-    if(!session_status.fatal.worker_job_id)
-        session_status.fatal.worker_job_id = workers_get_last_job_id();
+    if(!ds->fatal.worker_job_id)
+        ds->fatal.worker_job_id = workers_get_last_job_id();
 
-    copy_and_clean_thread_name_if_empty(&session_status, nd_thread_tag_async_safe());
+    copy_and_clean_thread_name_if_empty(ds, nd_thread_tag_async_safe());
 
-    if(!session_status.fatal.function[0] ||
-        strncmp(session_status.fatal.function, "startup(", 8) == 0 ||
-        strncmp(session_status.fatal.function, "shutdown(", 9) == 0) {
+    if(!ds->fatal.function[0] ||
+        strncmp(ds->fatal.function, "startup(", 8) == 0 ||
+        strncmp(ds->fatal.function, "shutdown(", 9) == 0) {
         size_t len = 0;
-        len = strcatz(session_status.fatal.function, len, "thread:", sizeof(session_status.fatal.function));
-        len = strcatz(session_status.fatal.function, len, session_status.fatal.thread, sizeof(session_status.fatal.function));
-        if(session_status.fatal.worker_job_id <= WORKER_UTILIZATION_MAX_JOB_TYPES) {
-            len = strcatz(session_status.fatal.function, len, ":", sizeof(session_status.fatal.function));
+        len = strcatz(ds->fatal.function, len, "thread:", sizeof(ds->fatal.function));
+        len = strcatz(ds->fatal.function, len, ds->fatal.thread, sizeof(ds->fatal.function));
+        if(ds->fatal.worker_job_id <= WORKER_UTILIZATION_MAX_JOB_TYPES) {
+            len = strcatz(ds->fatal.function, len, ":", sizeof(ds->fatal.function));
             char worker_job_id[UINT64_MAX_LENGTH];
-            print_uint64(worker_job_id, session_status.fatal.worker_job_id);
-            len = strcatz(session_status.fatal.function, len, worker_job_id, sizeof(session_status.fatal.function));
+            print_uint64(worker_job_id, ds->fatal.worker_job_id);
+            strcatz(ds->fatal.function, len, worker_job_id, sizeof(ds->fatal.function));
         }
     }
 
-    daemon_status_file_publish_fatal_snapshot();
+    daemon_status_file_publish_fatal_snapshot(ds);
 
-    dsf_release(session_status);
+    dsf_release(*ds);
 
     // the buffer should already be allocated, so this should normally do nothing
     static_save_buffer_init();
@@ -1603,12 +1753,12 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     // deduplicate the crash for sentry
     bool duplicate = false;
     if(chained_handler) {
-        uint64_t hash = daemon_status_file_hash(&session_status, NULL, NULL);
+        uint64_t hash = daemon_status_file_hash(ds, NULL, NULL);
         // Loading from disk is not async-signal-safe; use the table loaded during normal startup.
-        duplicate = dedup_already_posted(&session_status, hash, true, DEDUP_USE_LOADED);
+        duplicate = dedup_already_posted(ds, hash, true, DEDUP_USE_LOADED);
         if (!duplicate) {
             // save this hash, so that we won't post it again to sentry
-            dedup_keep_hash(&session_status, hash, true, DEDUP_USE_LOADED);
+            dedup_keep_hash(ds, hash, true, DEDUP_USE_LOADED);
         }
     }
 
@@ -1619,20 +1769,20 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     // The code is commented out to prevent the deadlock, at the cost of not saving the status file on a crash.
 #else
     bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT && stacktrace_capture_is_async_signal_safe();
-    bool get_stack_trace = stacktrace_available() && safe_to_get_stack_trace && stack_trace_is_empty(&session_status);
+    bool get_stack_trace = stacktrace_available() && safe_to_get_stack_trace && stack_trace_is_empty(ds);
 
     // save it
     if(get_stack_trace)
-        daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
+        daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, ds, true);
     else {
         if (!stacktrace_available())
-            set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
+            set_stack_trace_message_if_empty(ds, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
         else if(reason == EXIT_REASON_SIGABRT)
-            set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "fatal handler already captured the stack trace");
+            set_stack_trace_message_if_empty(ds, STACK_TRACE_INFO_PREFIX "fatal handler already captured the stack trace");
         else
-            set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "not safe to get a stack trace for this signal using this backend");
+            set_stack_trace_message_if_empty(ds, STACK_TRACE_INFO_PREFIX "not safe to get a stack trace for this signal using this backend");
 
-        daemon_status_file_save(static_save_buffer, &session_status, false);
+        daemon_status_file_save(static_save_buffer, ds, false);
     }
 #endif // defined(OS_WINDOWS)
 #endif // HAVE_LIBBACKTRACE
@@ -1646,20 +1796,37 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 static SPINLOCK shutdown_timeout_spinlock = SPINLOCK_INITIALIZER;
 
 NEVER_INLINE
-void daemon_status_file_shutdown_timeout(BUFFER *trace) {
+void daemon_status_file_shutdown_timeout(const char *step, BUFFER *trace) {
     FUNCTION_RUN_ONCE();
 
     spinlock_lock(&shutdown_timeout_spinlock);
 
+    daemon_status_file_session_status_writer_enter();
     dsf_acquire(session_status);
     exit_initiated_add(EXIT_REASON_SHUTDOWN_TIMEOUT);
     session_status.exit_reason |= EXIT_REASON_SHUTDOWN_TIMEOUT;
-    if(trace && buffer_strlen(trace) && stack_trace_is_empty(&session_status))
-        safecpy(session_status.fatal.stack_trace, buffer_tostring(trace));
-    dsf_release(session_status);
+    if(trace && buffer_strlen(trace) && stack_trace_is_empty(&session_status)) {
+        const char *timings = buffer_tostring(trace);
+        size_t rolling_header_length = strlen(DAEMON_STATUS_FILE_ROLLING_SHUTDOWN_TIMINGS_HEADER);
+
+        if(strncmp(timings, DAEMON_STATUS_FILE_ROLLING_SHUTDOWN_TIMINGS_HEADER, rolling_header_length) == 0)
+            snprintfz(session_status.fatal.stack_trace, sizeof(session_status.fatal.stack_trace),
+                      "shutdown timings:%s", &timings[rolling_header_length]);
+        else if(strncmp(timings, STACK_TRACE_INFO_PREFIX, strlen(STACK_TRACE_INFO_PREFIX)) == 0)
+            snprintfz(session_status.fatal.stack_trace, sizeof(session_status.fatal.stack_trace),
+                      "shutdown timings: %s", &timings[strlen(STACK_TRACE_INFO_PREFIX)]);
+        else
+            safecpy(session_status.fatal.stack_trace, timings);
+    }
+
+    if(step && *step && !session_status.fatal.message[0])
+        snprintfz(session_status.fatal.message, sizeof(session_status.fatal.message),
+                  "shutdown timed out at step: %s", step);
 
     safecpy(session_status.fatal.function, "shutdown_timeout");
-    daemon_status_file_publish_fatal_snapshot();
+    dsf_release(session_status);
+    daemon_status_file_publish_fatal_snapshot(&session_status);
+    daemon_status_file_session_status_writer_leave();
 
     static_save_buffer_init();
     daemon_status_file_save(static_save_buffer, &session_status, false);
@@ -1672,6 +1839,8 @@ void daemon_status_file_shutdown_step(const char *step, const char *step_timings
         // we have a fatal logged
         return;
 
+    daemon_status_file_session_status_writer_enter();
+
     if(step != NULL)
         snprintfz(session_status.fatal.function, sizeof(session_status.fatal.function), "shutdown(%s)", step);
     else
@@ -1680,7 +1849,8 @@ void daemon_status_file_shutdown_step(const char *step, const char *step_timings
     if(step_timings && *step_timings && stack_trace_is_empty(&session_status))
         safecpy(session_status.fatal.stack_trace, step_timings);
 
-    daemon_status_file_publish_fatal_snapshot();
+    daemon_status_file_publish_fatal_snapshot(&session_status);
+    daemon_status_file_session_status_writer_leave();
 
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
 
@@ -1708,12 +1878,15 @@ void daemon_status_file_startup_step(const char *step) {
         // we have a fatal logged
         return;
 
+    daemon_status_file_session_status_writer_enter();
+
     if(step != NULL)
         safecpy(session_status.fatal.function, step);
     else
         session_status.fatal.function[0] = '\0';
 
-    daemon_status_file_publish_fatal_snapshot();
+    daemon_status_file_publish_fatal_snapshot(&session_status);
+    daemon_status_file_session_status_writer_leave();
 
     daemon_status_file_update_status(DAEMON_STATUS_INITIALIZING);
 }
@@ -1828,7 +2001,8 @@ long daemon_status_file_get_fatal_line(void) {
 }
 
 DAEMON_STATUS daemon_status_file_get_status(void) {
-    return session_status.status;
+    uint32_t state = __atomic_load_n(&session_status_for_signals_state, __ATOMIC_ACQUIRE);
+    return (DAEMON_STATUS)(state >> SIGNAL_SNAPSHOT_STATUS_SHIFT);
 }
 
 size_t daemon_status_file_get_restarts(void) {

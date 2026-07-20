@@ -1240,7 +1240,7 @@ static time_t find_uuid_first_time(
     struct uuid_first_time_s *uuid_first_entry_list,
     size_t count)
 {
-    time_t global_first_time_s = LONG_MAX;
+    volatile time_t global_first_time_s = LONG_MAX;
 
     // acquire the datafile to work with it
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
@@ -1253,8 +1253,8 @@ static time_t find_uuid_first_time(
         return global_first_time_s;
 
     unsigned journalfile_count = 0;
-    size_t binary_match = 0;
-    size_t not_matching_bsearches = 0;
+    volatile size_t binary_match = 0;
+    volatile size_t not_matching_bsearches = 0;
 
     bool agent_shutdown = false;
     while (datafile) {
