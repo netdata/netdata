@@ -60,9 +60,8 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Netdata Builder <bot@netdata.cloud>")
 #
 # RPM options
 #
-# The RPM configuration mirrors netdata.spec.in package for package; the spec
-# stays authoritative for the rpmbuild (v1 builder) path until CI flips to
-# this one.
+# The RPM configuration mirrors netdata.spec.in package for package,
+# deliberately including its quirks; deviations are commented in place.
 #
 
 set(CPACK_RPM_COMPONENT_INSTALL YES)
@@ -77,6 +76,8 @@ set(CPACK_RPM_PACKAGE_RELEASE_DIST ON)
 set(CPACK_RPM_PACKAGE_LICENSE "GPLv3+")
 set(CPACK_RPM_PACKAGE_GROUP "Applications/System")
 set(CPACK_RPM_PACKAGE_URL "http://my-netdata.io")
+# The changelog is the spec's, verbatim — historical typos included; the
+# parity check compares it byte for byte.
 set(CPACK_RPM_CHANGELOG_FILE "${PKG_FILES_PATH}/rpm/changelog")
 
 # The spec disables all of __os_install_post (no stripping, no debuginfo
@@ -94,8 +95,8 @@ set(CPACK_RPM_REQUIRES_EXCLUDE_FROM "^/usr/lib/netdata/system/.*$")
 # custom-plugins.d and ssl dirs are unpackaged in the spec build and are
 # excluded for parity with it.
 set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
-    # an install-rule-less component (plugin-journal-viewer) degenerates to a
-    # lone "/" entry
+    # plugin-journal-viewer has no install rules; CPack would otherwise
+    # reduce its filelist to a lone "/" entry
     /
     /etc/netdata
     /etc/netdata/custom-plugins.d
@@ -148,6 +149,9 @@ endif()
 # handles the shipped sysusers file natively (EL >= 10, Fedora >= 43) the
 # netdata-user %post only manages supplemental groups; elsewhere it also
 # creates the user and group, exactly like the spec.
+#
+# CPack generates one spec per component whose Name: is the subpackage's
+# own, so the scriptlet files spell values out instead of using %{name}.
 if(NETDATA_DISTRO_SUSE)
   set(NETDATA_RPM_SCRIPTLET_FAMILY "suse")
 else()
@@ -1063,8 +1067,7 @@ set(CPACK_DEBIAN_PLUGIN-PYTHOND_DEBUGINFO_PACKAGE Off)
 
 set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_NAME "netdata-plugin-pythond")
 set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_SUMMARY "The python.d metrics collection plugin for the Netdata Agent")
-# python2 on the EL7 era: the spec's centos_ver == 7 test also covers
-# Amazon Linux 2 through its %rhel 7 remap.
+# python2 on the legacy tier (EL 7 era, Amazon Linux 2 included).
 if((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS 8) OR
    (NETDATA_DISTRO_AMZN AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 2))
   set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}, python")

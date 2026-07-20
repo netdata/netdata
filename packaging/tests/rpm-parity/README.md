@@ -6,6 +6,8 @@ RPM`, used by the `v2` package-builder images) match the RPMs produced from
 set, header metadata, dependencies (including weak dependencies), per-file
 modes/ownership/flags/capabilities, scriptlets, and changelog.
 
+The check is run manually; no CI workflow invokes it.
+
 ## Usage
 
 Build both sets from the same source tree and version, each inside its
@@ -28,9 +30,15 @@ packaging/tests/rpm-parity/compare-rpms.sh ref-rpms cpack-rpms \
     packaging/tests/rpm-parity/allowlist
 ```
 
+The `<distro>` tags come from the package-builder image matrix (see
+`.github/data/distros.yml`).
+
 The comparison itself only needs the `rpm` binary on the host. It must be
 rpm >= 4.12: older rpm silently returns nothing for `--recommends` and
 `--suggests`, which would make the weak-dependency comparison vacuous.
+
+Exit status: 0 on parity, 1 on any mismatch, 2 on an environment error
+(missing rpm, unreadable packages, an empty input directory).
 
 ## Limitations
 

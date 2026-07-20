@@ -62,3 +62,6 @@ elseif(OS_DISTRO_ID MATCHES "^(rhel|centos|almalinux|rocky|ol|oraclelinux)$"
        OR OS_DISTRO_ID_LIKE MATCHES "rhel|centos")
   set(NETDATA_DISTRO_EL TRUE)
 endif()
+
+# Keep this classification in sync with the distro case in
+# packaging/build-package.sh (RPM section).

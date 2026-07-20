@@ -133,6 +133,8 @@ case "${PKG_TYPE}" in
         distro_major="$(printf '%s' "${VERSION_ID%%.*}" | tr -cd '0-9')"
         [ -n "${distro_major}" ] || distro_major=0
 
+        # Keep this classification in sync with the NETDATA_DISTRO_*
+        # predicates in packaging/cmake/Modules/NetdataOSRelease.cmake.
         is_el=0
         is_suse=0
         case "${ID}" in
@@ -140,10 +142,10 @@ case "${PKG_TYPE}" in
             *suse*|sles) is_suse=1 ;;
         esac
 
-        # "Legacy" here means EL <= 7 or Amazon Linux 2, the targets the
-        # spec treats as the pre-weak-deps generation. Deliberate deviations
-        # from the spec: EL 6 and i386 are not distinguished (both are dead
-        # targets the v2 builder matrix does not contain).
+        # "Legacy" is the spec's centos_ver == 7 tier: EL <= 7 plus Amazon
+        # Linux 2, which lands there because it defines %rhel 7 and the spec
+        # remaps %rhel into centos_ver. EL 6 and i386 are not distinguished
+        # (end-of-life, not part of the RPM build matrix).
         is_legacy_rpm=0
         if { [ "${is_el}" = 1 ] && [ "${distro_major}" -le 7 ]; } || \
            { [ "${ID}" = "amzn" ] && [ "${distro_major}" -le 2 ]; }; then
@@ -192,8 +194,7 @@ case "${PKG_TYPE}" in
             add_cmake_option ENABLE_EXPORTER_MONGODB On
         fi
 
-        # openSUSE plus the EL7 era, Amazon Linux 2 included — the spec's
-        # condition remaps AL2's %rhel 7 into centos_ver.
+        # openSUSE plus the legacy tier, matching the spec.
         if [ "${is_suse}" = 1 ] || [ "${is_legacy_rpm}" = 1 ]; then
             add_cmake_option ENABLE_BUNDLED_PROTOBUF On
         fi
@@ -212,9 +213,7 @@ case "${PKG_TYPE}" in
             add_cmake_option USE_LTO Off
         fi
 
-        # The spec keys these on centos_ver < 8, which fires on Amazon
-        # Linux 2 too (it defines %rhel 7, remapped to centos_ver by the
-        # spec); modern libbpf does not compile against the AL2/EL7
+        # Modern libbpf does not compile against the legacy tier's
         # toolchain and kernel headers.
         if [ "${is_legacy_rpm}" = 1 ]; then
             add_cmake_option USE_CXX_11 On
@@ -223,19 +222,15 @@ case "${PKG_TYPE}" in
 
         # The spec builds through the distro %cmake macro. Reproduce its
         # build environment, or the binaries differ (missing hardening and
-        # fortified symbols, extra sonames without --as-needed). The build
-        # type needs no per-distro handling: the redhat macro family sets
-        # none and SUSE's sets RelWithDebInfo, but the top-level
-        # CMakeLists.txt defaults an unset/empty CMAKE_BUILD_TYPE to
-        # RelWithDebInfo for every configure — the spec's included — so both
-        # paths build RelWithDebInfo either way.
+        # fortified symbols, extra sonames without --as-needed).
+        # CMAKE_BUILD_TYPE needs no handling: the top-level CMakeLists.txt
+        # defaults an unset value to RelWithDebInfo on every configure.
         #
-        # EL 7 and Amazon Linux 2 are the exception: there the spec redefines
-        # %cmake to a bare /cmake/bin/cmake invocation (netdata.spec.in, the
-        # "%global __cmake" blocks), bypassing the distro macro and its flag
-        # exports entirely, so exporting %{optflags} here would over-harden
-        # the binaries relative to the spec build (extra fortified-symbol
-        # requires on every plugin).
+        # The legacy tier is the exception: there the spec redefines %cmake
+        # to a bare /cmake/bin/cmake invocation (netdata.spec.in, the
+        # "%global __cmake" blocks) with no flag exports, so exporting
+        # %{optflags} here would over-harden the binaries relative to the
+        # spec build.
         if [ "${is_legacy_rpm}" = 0 ]; then
             CFLAGS="${CFLAGS:-$(rpm -E '%{?build_cflags}')}"
             [ -n "${CFLAGS}" ] || CFLAGS="$(rpm -E '%{?optflags}')"
@@ -245,10 +240,8 @@ case "${PKG_TYPE}" in
             export CFLAGS CXXFLAGS LDFLAGS
         fi
 
-        # The distro %cmake macros also pass BUILD_SHARED_LIBS=ON, but the
-        # top-level CMakeLists.txt unconditionally overwrites that variable
-        # from STATIC_BUILD, so passing it here would be inert (it is equally
-        # inert for the spec path, so parity holds without it).
+        # BUILD_SHARED_LIBS is not passed: the top-level CMakeLists.txt
+        # overwrites it from STATIC_BUILD.
 
         if [ "${is_suse}" = 1 ]; then
             # SUSE's %cmake passes the linker flags as cmake arguments
