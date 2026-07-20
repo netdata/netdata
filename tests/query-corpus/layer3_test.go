@@ -57,6 +57,15 @@ func tgBuckets(d fixture.Dimension, group int) [][]float64 {
 // given bucket size and asserts every bucket against the oracle.
 func verifyTimeGroup(t *testing.T, host string, ch fixture.Chart, name, options string, group int) {
 	t.Helper()
+	verifyTimeGroupAs(t, host, ch, name, options, name, options, group)
+}
+
+// verifyTimeGroupAs sends name/options to the engine but asserts against
+// the oracle of oracleName/oracleOptions. The split exists for the
+// registry alias rows (alias == oracle-verified canonical) and for the
+// silent-fallback pin (an unknown time_group parses to average).
+func verifyTimeGroupAs(t *testing.T, host string, ch fixture.Chart, name, options, oracleName, oracleOptions string, group int) {
+	t.Helper()
 
 	d := ch.Dimensions[0]
 	n := int64(len(d.Points))
@@ -80,7 +89,7 @@ func verifyTimeGroup(t *testing.T, host string, ch fixture.Chart, name, options 
 		t.Fatalf("%s%s: got %d buckets, want %d", name, optSuffix(options), len(col), points)
 	}
 
-	exp := fixture.TGOracle(name, options, tgBuckets(d, group), group, int(points))
+	exp := fixture.TGOracle(oracleName, oracleOptions, tgBuckets(d, group), group, int(points))
 	for i, pt := range col {
 		want := exp[i]
 		bucketT := fixture.T0 + int64((i+1)*group)
