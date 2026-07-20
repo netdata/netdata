@@ -701,6 +701,24 @@ if (Test-Path $NetdataExe) {
     Save-Cmd '07-runtime\buildinfo.txt' 'netdata -W buildinfo (verbatim; works with daemon down)' { & $using:NetdataExe -W buildinfo 2>&1 } 'netdata.exe -W buildinfo'
     Save-CmdRaw '07-runtime\buildinfo.json' 'netdata -W buildinfojson (machine-readable; no header so it parses as JSON)' { & $using:NetdataExe -W buildinfojson 2>&1 } 'netdata.exe -W buildinfojson'
     Save-Cmd '07-runtime\cmakecache.txt' 'netdata -W cmakecache: authoritative build config (flags, plugins, paths) - superset of buildinfo' { & $using:NetdataExe -W cmakecache 2>&1 } 'netdata.exe -W cmakecache'
+    # Windows performance-library dump: counter/instance metadata used to
+    # diagnose Windows collector issues (e.g. PerflibSMB). Written to a file via
+    # -perflibfile (not a capped stdout capture) so a large dump is not
+    # truncated; sanitized like any other file (instance names can include
+    # share/host names). Bounded by the per-command timeout and a size ceiling.
+    $perfPath = Join-Path $Work '07-runtime\perflib.json'
+    New-Item -ItemType Directory -Path (Split-Path $perfPath) -Force | Out-Null
+    $pjob = Start-Job -ScriptBlock { & $using:NetdataExe -W perflibdump -perflibfile $using:perfPath 2>$null }
+    $null = Wait-Job $pjob -Timeout $TimeoutSeconds
+    Stop-Job $pjob -ErrorAction SilentlyContinue
+    Remove-Job $pjob -Force
+    if ((Test-Path $perfPath) -and (Get-Item $perfPath).Length -gt 0) {
+        if ((Get-Item $perfPath).Length -gt 16MB) { Write-Utf8 $perfPath '{"error":"perflib dump exceeded 16 MB and was withheld"}' }
+        Invoke-SanitizeFile $perfPath
+        Add-Manifest '07-runtime\perflib.json' 'cmd' 'netdata.exe -W perflibdump -perflibfile' 'Windows performance-library dump: counter/instance metadata for Windows collector diagnosis (e.g. PerflibSMB)'
+    } elseif (Test-Path $perfPath) {
+        Remove-Item $perfPath -Force
+    }
 }
 if ((Test-Path $NetdataCli) -and $NetdataProc) {
     Save-CmdRaw '07-runtime\aclk-state.json' 'Cloud connectivity state (netdatacli aclk-state json; no header so it parses as JSON)' { & $using:NetdataCli aclk-state json 2>&1 } 'netdatacli.exe aclk-state json'
