@@ -9,7 +9,13 @@ import (
 )
 
 const (
-	admissionRadixBits  = 28
+	// The radix indexes ordinary byte requests directly, so it must represent
+	// every value admitted by OrdinaryBudgetBytes without truncating high bits.
+	admissionRadixBits         = 28
+	admissionRadixMaximumBytes = 1<<admissionRadixBits - 1
+	// Fail compilation if a future ordinary budget no longer fits the radix key.
+	_ uint64 = admissionRadixMaximumBytes - OrdinaryBudgetBytes
+
 	inputBodyRecordSlot = 1
 )
 
@@ -971,18 +977,26 @@ func (al *AdmissionLedger) Census() AdmissionCensus {
 	al.mu.Lock()
 	defer al.mu.Unlock()
 	return AdmissionCensus{
-		Phase: al.phase.String(), ProcessBytes: al.processBytes, ActiveRecords: al.activeRecords,
-		OrdinaryWaiting: al.ordinaryWaiting, OrdinaryGranted: al.ordinaryGranted, OrdinarySuspended: al.ordinarySuspended, OrdinaryBytes: al.ordinaryBytes,
-		LongLivedRecords: al.longLivedRecords, LongLivedBytes: al.longLivedBytes,
-		CleanupWaiting: al.cleanupWaiting, CleanupGranted: al.cleanupGrant != 0, CleanupRetained: al.cleanupRetained,
-		InputBodyActive:  al.records[inputBodyRecordSlot].state != admissionRecordFree,
-		InputBodyWaiting: al.records[inputBodyRecordSlot].state == admissionInputBodyWaiting || al.records[inputBodyRecordSlot].state == admissionInputBodyGrowing,
-		InputBodyCarried: al.inputBodyCarried,
-		InputBodyBytes:   al.records[inputBodyRecordSlot].heldBytes,
-		AllocatedRadix:   len(al.nodes) - 2 - al.freeNodes,
-		FreeRecords:      al.freeRecords,
-		FreeRadixNodes:   al.freeNodes,
-		RunGeneration:    al.runGeneration,
+		Phase:             al.phase.String(),
+		ProcessBytes:      al.processBytes,
+		ActiveRecords:     al.activeRecords,
+		OrdinaryWaiting:   al.ordinaryWaiting,
+		OrdinaryGranted:   al.ordinaryGranted,
+		OrdinarySuspended: al.ordinarySuspended,
+		OrdinaryBytes:     al.ordinaryBytes,
+		LongLivedRecords:  al.longLivedRecords,
+		LongLivedBytes:    al.longLivedBytes,
+		CleanupWaiting:    al.cleanupWaiting,
+		CleanupGranted:    al.cleanupGrant != 0,
+		CleanupRetained:   al.cleanupRetained,
+		InputBodyActive:   al.records[inputBodyRecordSlot].state != admissionRecordFree,
+		InputBodyWaiting:  al.records[inputBodyRecordSlot].state == admissionInputBodyWaiting || al.records[inputBodyRecordSlot].state == admissionInputBodyGrowing,
+		InputBodyCarried:  al.inputBodyCarried,
+		InputBodyBytes:    al.records[inputBodyRecordSlot].heldBytes,
+		AllocatedRadix:    len(al.nodes) - 2 - al.freeNodes,
+		FreeRecords:       al.freeRecords,
+		FreeRadixNodes:    al.freeNodes,
+		RunGeneration:     al.runGeneration,
 	}
 }
 

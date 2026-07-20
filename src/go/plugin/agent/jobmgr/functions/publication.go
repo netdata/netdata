@@ -4,9 +4,7 @@ package functions
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
 	"errors"
-	"hash"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 )
@@ -349,15 +347,4 @@ func DigestSortedPublications(records []PublicationRecord) ([32]byte, error) {
 	var result [32]byte
 	copy(result[:], digest.Sum(nil))
 	return result, nil
-}
-
-func writeDigestString(digest hash.Hash, value string) {
-	writeDigestUint64(digest, uint64(len(value)))
-	_, _ = digest.Write([]byte(value))
-}
-
-func writeDigestUint64(digest hash.Hash, value uint64) {
-	var encoded [8]byte
-	binary.BigEndian.PutUint64(encoded[:], value)
-	_, _ = digest.Write(encoded[:])
 }

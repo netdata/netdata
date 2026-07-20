@@ -40,9 +40,7 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 			plan.Transaction.Permit,
 			lifecycle.OrdinaryBudgetBytes-bytes,
 		) {
-			return 0, errors.New(
-				"jobmgr kernel: transaction successor does not self-fit admission",
-			)
+			return 0, errors.New("jobmgr kernel: transaction successor does not self-fit admission")
 		}
 		bytes += persistent
 	}
@@ -56,22 +54,35 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 		}
 		bytes += persistent
 	}
-	fields := []string{
-		request.UID,
-		request.LaneKey,
-		request.Route,
-		request.ContentType,
-		request.Permissions,
-		request.CallerSource,
-	}
-	fields = append(fields, request.Args...)
-	fields = append(fields, plan.Claims...)
-	fields = append(fields, plan.ReadClaims...)
-	for _, field := range fields {
+	addField := func(field string) bool {
 		if int64(len(field)) > lifecycle.OrdinaryBudgetBytes-bytes {
-			return 0, errors.New("jobmgr kernel: operation does not self-fit admission")
+			return false
 		}
 		bytes += int64(len(field))
+		return true
+	}
+	if !addField(request.UID) ||
+		!addField(request.LaneKey) ||
+		!addField(request.Route) ||
+		!addField(request.ContentType) ||
+		!addField(request.Permissions) ||
+		!addField(request.CallerSource) {
+		return 0, errors.New("jobmgr kernel: operation does not self-fit admission")
+	}
+	for _, field := range request.Args {
+		if !addField(field) {
+			return 0, errors.New("jobmgr kernel: operation does not self-fit admission")
+		}
+	}
+	for _, field := range plan.Claims {
+		if !addField(field) {
+			return 0, errors.New("jobmgr kernel: operation does not self-fit admission")
+		}
+	}
+	for _, field := range plan.ReadClaims {
+		if !addField(field) {
+			return 0, errors.New("jobmgr kernel: operation does not self-fit admission")
+		}
 	}
 	const requestArgumentAdmissionBytes = int64(16)
 	arguments := int64(len(request.Args))

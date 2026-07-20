@@ -780,6 +780,14 @@ const (
 	injectedEPIPE
 )
 
+type outputFaultWaitResult uint8
+
+const (
+	outputFaultInjectionObserved outputFaultWaitResult = iota + 1
+	outputFaultFixtureTerminated
+	outputFaultContextDone
+)
+
 type predicateFaultWriter struct {
 	target   *synchronizedBuffer
 	match    func([]byte) bool
@@ -917,9 +925,9 @@ func runAgentOutputFaultMode(
 			_ = fixture.terminate(terminationCtx)
 		}()
 	}
-	select {
-	case <-injected:
-	case <-fixture.done:
+	switch waitForOutputFault(injected, fixture.done, ctx.Done()) {
+	case outputFaultInjectionObserved:
+	case outputFaultFixtureTerminated:
 		runErr := fixture.wait(context.Background())
 		return fmt.Errorf(
 			"output fault cut %d terminated before injection: %w; events=%v; output=%s",
@@ -928,7 +936,7 @@ func runAgentOutputFaultMode(
 			state.snapshot(),
 			fixture.output.String(),
 		)
-	case <-ctx.Done():
+	case outputFaultContextDone:
 		return fmt.Errorf(
 			"output fault cut %d was not reached: %w; events=%v; output=%s",
 			cut,
@@ -936,6 +944,8 @@ func runAgentOutputFaultMode(
 			state.snapshot(),
 			fixture.output.String(),
 		)
+	default:
+		return errors.New("invalid output fault wait result")
 	}
 	runErr := fixture.wait(ctx)
 	if ctx.Err() != nil {
@@ -947,6 +957,41 @@ func runAgentOutputFaultMode(
 		)
 	}
 	return nil
+}
+
+func waitForOutputFault(
+	injected <-chan struct{},
+	fixtureDone <-chan struct{},
+	contextDone <-chan struct{},
+) outputFaultWaitResult {
+	// The writer records injection before its error can terminate the fixture.
+	// Rechecking makes that causal order win when both channels are ready.
+	if outputFaultInjectionReady(injected) {
+		return outputFaultInjectionObserved
+	}
+	select {
+	case <-injected:
+		return outputFaultInjectionObserved
+	case <-fixtureDone:
+		if outputFaultInjectionReady(injected) {
+			return outputFaultInjectionObserved
+		}
+		return outputFaultFixtureTerminated
+	case <-contextDone:
+		if outputFaultInjectionReady(injected) {
+			return outputFaultInjectionObserved
+		}
+		return outputFaultContextDone
+	}
+}
+
+func outputFaultInjectionReady(injected <-chan struct{}) bool {
+	select {
+	case <-injected:
+		return true
+	default:
+		return false
+	}
 }
 
 func outputFaultMatcher(cut outputFaultCut) func([]byte) bool {

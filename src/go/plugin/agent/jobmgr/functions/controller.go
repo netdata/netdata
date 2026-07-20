@@ -993,34 +993,34 @@ func controllerGroupSignature(
 	digest := sha256.New()
 	_ = binary.Write(digest, binary.BigEndian, uint8(kind))
 	for _, method := range methods {
-		writeControllerDigestString(digest, method.ID)
-		writeControllerDigestString(digest, method.FunctionName)
-		writeControllerDigestString(digest, method.Name)
-		writeControllerDigestUint64(digest, uint64(method.UpdateEvery))
-		writeControllerDigestString(digest, method.Help)
-		writeControllerDigestBool(digest, method.RequireCloud)
-		writeControllerDigestString(digest, method.Tags)
-		writeControllerDigestString(digest, method.ResponseType)
-		writeControllerDigestBool(digest, method.RawRequest)
+		writeDigestString(digest, method.ID)
+		writeDigestString(digest, method.FunctionName)
+		writeDigestString(digest, method.Name)
+		writeDigestUint64(digest, uint64(method.UpdateEvery))
+		writeDigestString(digest, method.Help)
+		writeDigestBool(digest, method.RequireCloud)
+		writeDigestString(digest, method.Tags)
+		writeDigestString(digest, method.ResponseType)
+		writeDigestBool(digest, method.RawRequest)
 		for _, alias := range method.Aliases {
-			writeControllerDigestString(digest, alias)
+			writeDigestString(digest, alias)
 		}
 		for _, parameter := range method.RequiredParams {
-			writeControllerDigestString(digest, parameter.ID)
-			writeControllerDigestString(digest, parameter.Name)
-			writeControllerDigestString(digest, parameter.Help)
-			writeControllerDigestUint64(digest, uint64(parameter.Selection))
-			writeControllerDigestBool(digest, parameter.UniqueView)
+			writeDigestString(digest, parameter.ID)
+			writeDigestString(digest, parameter.Name)
+			writeDigestString(digest, parameter.Help)
+			writeDigestUint64(digest, uint64(parameter.Selection))
+			writeDigestBool(digest, parameter.UniqueView)
 			for _, option := range parameter.Options {
-				writeControllerDigestString(digest, option.ID)
-				writeControllerDigestString(digest, option.Name)
-				writeControllerDigestBool(digest, option.Default)
-				writeControllerDigestBool(digest, option.Disabled)
-				writeControllerDigestString(digest, option.Column)
+				writeDigestString(digest, option.ID)
+				writeDigestString(digest, option.Name)
+				writeDigestBool(digest, option.Default)
+				writeDigestBool(digest, option.Disabled)
+				writeDigestString(digest, option.Column)
 				if option.Sort != nil {
-					writeControllerDigestString(digest, option.Sort.String())
+					writeDigestString(digest, option.Sort.String())
 				} else {
-					writeControllerDigestString(digest, "")
+					writeDigestString(digest, "")
 				}
 			}
 		}
@@ -1032,7 +1032,7 @@ func controllerGroupSignature(
 				err,
 			)
 		}
-		writeControllerDigestString(digest, string(presentation))
+		writeDigestString(digest, string(presentation))
 	}
 	names := make([]string, 0, len(jobs))
 	for name := range jobs {
@@ -1041,38 +1041,13 @@ func controllerGroupSignature(
 	slices.Sort(names)
 	for _, name := range names {
 		job := jobs[name]
-		writeControllerDigestString(digest, name)
-		writeControllerDigestString(digest, job.FullName())
+		writeDigestString(digest, name)
+		writeDigestString(digest, job.FullName())
 		for _, method := range methods {
-			writeControllerDigestBool(digest, jobBackedFunctionAvailable(job, method.ID))
+			writeDigestBool(digest, jobBackedFunctionAvailable(job, method.ID))
 		}
 	}
 	return fmt.Sprintf("%x", digest.Sum(nil)), nil
-}
-
-type controllerDigestWriter interface {
-	Write([]byte) (int, error)
-}
-
-func writeControllerDigestString(writer controllerDigestWriter, value string) {
-	var size [8]byte
-	binary.BigEndian.PutUint64(size[:], uint64(len(value)))
-	_, _ = writer.Write(size[:])
-	_, _ = writer.Write([]byte(value))
-}
-
-func writeControllerDigestUint64(writer controllerDigestWriter, value uint64) {
-	var encoded [8]byte
-	binary.BigEndian.PutUint64(encoded[:], value)
-	_, _ = writer.Write(encoded[:])
-}
-
-func writeControllerDigestBool(writer controllerDigestWriter, value bool) {
-	if value {
-		_, _ = writer.Write([]byte{1})
-		return
-	}
-	_, _ = writer.Write([]byte{0})
 }
 
 func methodPublicationRecord(

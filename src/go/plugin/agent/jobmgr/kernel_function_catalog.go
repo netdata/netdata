@@ -29,6 +29,12 @@ func (ck *CommandKernel) pushFunctionCleanupBatch(cleanups *[MaximumFunctionClea
 	return nil
 }
 
+func (ck *CommandKernel) abortMutationCleanups() error {
+	var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
+	count, abortErr := ck.functionCatalog.AbortMutation(&cleanups)
+	return errors.Join(abortErr, ck.pushFunctionCleanupBatch(&cleanups, count))
+}
+
 func (ck *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 	if quantum <= 0 {
 		return ck.functionCleanupBacklog.count != 0
@@ -130,16 +136,14 @@ func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmiss
 			submitted.result <- functionMutationResult{err: err}
 			return
 		}
-		var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-		count, abortErr := ck.functionCatalog.AbortMutation(&cleanups)
-		pushErr := ck.pushFunctionCleanupBatch(&cleanups, count)
+		abortErr := ck.abortMutationCleanups()
 		submitted.result <- functionMutationResult{
-			err: errors.Join(abortErr, pushErr),
+			err: abortErr,
 		}
 		ck.functionMutation = functionMutationSubmission{}
 		ck.functionMutationPaused = false
-		if abortErr != nil || pushErr != nil {
-			ck.run.Dirty(errors.Join(abortErr, pushErr))
+		if abortErr != nil {
+			ck.run.Dirty(abortErr)
 		}
 		return
 	}
@@ -156,16 +160,7 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 			quantum,
 		)
 		if err != nil {
-			var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-			abortCount, abortErr := ck.functionCatalog.AbortMutation(
-				&cleanups,
-			)
-			if pushErr := ck.pushFunctionCleanupBatch(
-				&cleanups,
-				abortCount,
-			); pushErr != nil {
-				abortErr = errors.Join(abortErr, pushErr)
-			}
+			abortErr := ck.abortMutationCleanups()
 			ck.functionMutation.result <- functionMutationResult{
 				err: errors.Join(err, abortErr),
 			}
@@ -191,14 +186,7 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 		invariantErr := errors.New(
 			"jobmgr kernel: invalid active Function mutation",
 		)
-		var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-		abortCount, abortErr := ck.functionCatalog.AbortMutation(&cleanups)
-		if pushErr := ck.pushFunctionCleanupBatch(
-			&cleanups,
-			abortCount,
-		); pushErr != nil {
-			abortErr = errors.Join(abortErr, pushErr)
-		}
+		abortErr := ck.abortMutationCleanups()
 		ck.functionMutation.result <- functionMutationResult{
 			err: errors.Join(invariantErr, abortErr),
 		}
@@ -210,10 +198,7 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 	var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
 	progress, count, err := ck.functionCatalog.AdvanceMutation(quantum, &cleanups)
 	if err != nil {
-		abortCount, abortErr := ck.functionCatalog.AbortMutation(&cleanups)
-		if pushErr := ck.pushFunctionCleanupBatch(&cleanups, abortCount); pushErr != nil {
-			abortErr = errors.Join(abortErr, pushErr)
-		}
+		abortErr := ck.abortMutationCleanups()
 		ck.functionMutation.result <- functionMutationResult{err: errors.Join(err, abortErr)}
 		ck.functionMutation = functionMutationSubmission{}
 		ck.functionMutationActive = false

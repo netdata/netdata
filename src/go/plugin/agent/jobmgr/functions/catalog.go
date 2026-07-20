@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	maximumDeclarationMetadataBytes = 15_487
+	maximumDeclarationMetadataBytes = jobmgr.MaximumPluginSDLineBytes
 	MaximumCloseQuantum             = jobmgr.MaximumFunctionCloseQuantum
 	invalidDynCfgResourceID         = "\x00dyncfg-invalid"
 )
@@ -276,12 +276,9 @@ func (set routeSet) resolve(arguments []string) *route {
 	}
 	node := set.prefixes
 	argument := arguments[0]
-	for byteIndex := 0; byteIndex < len(argument) && node != nil; byteIndex++ {
-		value := argument[byteIndex]
-		for bitIndex := 7; bitIndex >= 0 && node != nil; bitIndex-- {
-			node = node.child[(value>>uint(bitIndex))&1]
-		}
-		if node != nil && node.resolved != nil {
+	for depth := 0; depth < len(argument)*8 && node != nil; depth++ {
+		node = node.child[keyBit(argument, depth)]
+		if (depth+1)%8 == 0 && node != nil && node.resolved != nil {
 			return node.resolved
 		}
 	}
@@ -293,13 +290,12 @@ func insertInitialPrefix(root *prefixNode, prefix string, resolved *route) (*pre
 		root = &prefixNode{}
 	}
 	node := root
-	for byteIndex := 0; byteIndex < len(prefix); byteIndex++ {
+	for byteIndex := range len(prefix) {
 		if node.resolved != nil {
 			return nil, errors.New("jobmgr Function catalog: prefix overlaps a shorter prefix")
 		}
-		value := prefix[byteIndex]
-		for bitIndex := 7; bitIndex >= 0; bitIndex-- {
-			branch := (value >> uint(bitIndex)) & 1
+		for depth := byteIndex * 8; depth < (byteIndex+1)*8; depth++ {
+			branch := keyBit(prefix, depth)
 			if node.child[branch] == nil {
 				node.child[branch] = &prefixNode{}
 			}
@@ -324,11 +320,8 @@ type catalogNode struct {
 
 func catalogRouteSet(root *catalogNode, name string) (routeSet, bool) {
 	node := root
-	for byteIndex := 0; byteIndex < len(name) && node != nil; byteIndex++ {
-		value := name[byteIndex]
-		for bitIndex := 7; bitIndex >= 0 && node != nil; bitIndex-- {
-			node = node.child[(value>>uint(bitIndex))&1]
-		}
+	for depth := 0; depth < len(name)*8 && node != nil; depth++ {
+		node = node.child[keyBit(name, depth)]
 	}
 	if node == nil || !node.present {
 		return routeSet{}, false
@@ -341,15 +334,12 @@ func setInitialCatalogRouteSet(root *catalogNode, name string, set routeSet) *ca
 		root = &catalogNode{}
 	}
 	node := root
-	for byteIndex := 0; byteIndex < len(name); byteIndex++ {
-		value := name[byteIndex]
-		for bitIndex := 7; bitIndex >= 0; bitIndex-- {
-			branch := (value >> uint(bitIndex)) & 1
-			if node.child[branch] == nil {
-				node.child[branch] = &catalogNode{}
-			}
-			node = node.child[branch]
+	for depth := range len(name) * 8 {
+		branch := keyBit(name, depth)
+		if node.child[branch] == nil {
+			node.child[branch] = &catalogNode{}
 		}
+		node = node.child[branch]
 	}
 	node.routes = set
 	node.present = !set.empty()

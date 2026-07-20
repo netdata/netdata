@@ -19,6 +19,9 @@ import (
 )
 
 const (
+	// A rendered response is capped at 4096 bytes. Each job-name list gets a
+	// 3584-byte content budget, reserving 512 bytes for surrounding prose and its
+	// truncation marker; boundSecretMessage enforces the total after lists combine.
 	maximumSecretJobSummaryBytes = 4 * 1024
 	secretJobSummaryContentBytes = 7 * 512
 )
@@ -30,37 +33,27 @@ func (c *Controller) prepareSchema(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if target.key != "" {
 		if _, ok := c.entry(target.key); !ok {
-			return c.noop(
+			return c.noopMessage(
 				scope,
 				current,
-				lifecycle.LongLivedPermit{},
-				mustSecretMessage(
-					404,
-					fmt.Sprintf(
-						"The specified secretstore '%s' is not configured.",
-						target.key,
-					),
+				404,
+				fmt.Sprintf(
+					"The specified secretstore '%s' is not configured.",
+					target.key,
 				),
-				nil,
-				nil,
 			)
 		}
 	}
 	schema, ok := c.creators.Schema(target.kind)
 	if !ok {
-		return c.noop(
+		return c.noopMessage(
 			scope,
 			current,
-			lifecycle.LongLivedPermit{},
-			mustSecretMessage(
-				404,
-				fmt.Sprintf(
-					"The specified secretstore kind '%s' is not supported.",
-					target.kind,
-				),
+			404,
+			fmt.Sprintf(
+				"The specified secretstore kind '%s' is not supported.",
+				target.kind,
 			),
-			nil,
-			nil,
 		)
 	}
 	result, err := lifecycle.NewSealedResult(
@@ -88,19 +81,14 @@ func (c *Controller) prepareGet(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	entry, ok := c.entry(target.key)
 	if !ok {
-		return c.noop(
+		return c.noopMessage(
 			scope,
 			current,
-			lifecycle.LongLivedPermit{},
-			mustSecretMessage(
-				404,
-				fmt.Sprintf(
-					"The specified secretstore '%s' is not configured.",
-					target.key,
-				),
+			404,
+			fmt.Sprintf(
+				"The specified secretstore '%s' is not configured.",
+				target.key,
 			),
-			nil,
-			nil,
 		)
 	}
 	typed, err := typedSecretConfig(
@@ -115,16 +103,11 @@ func (c *Controller) prepareGet(
 		}
 	}
 	if err != nil {
-		return c.noop(
+		return c.noopMessage(
 			scope,
 			current,
-			lifecycle.LongLivedPermit{},
-			mustSecretMessage(
-				500,
-				"Failed to materialize secretstore configuration.",
-			),
-			nil,
-			nil,
+			500,
+			"Failed to materialize secretstore configuration.",
 		)
 	}
 	payload, err := json.Marshal(typed)
@@ -163,16 +146,11 @@ func (c *Controller) prepareUserConfig(
 		err = parseSecretPayload(input, typed)
 	}
 	if err != nil {
-		return c.noop(
+		return c.noopMessage(
 			scope,
 			current,
-			lifecycle.LongLivedPermit{},
-			mustSecretMessage(
-				400,
-				"Invalid secretstore configuration.",
-			),
-			nil,
-			nil,
+			400,
+			"Invalid secretstore configuration.",
 		)
 	}
 	payload, err := yaml.Marshal(typed)
@@ -206,19 +184,14 @@ func (c *Controller) prepareTest(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	entry, ok := c.entry(target.key)
 	if !ok {
-		return c.noop(
+		return c.noopMessage(
 			scope,
 			current,
-			lifecycle.LongLivedPermit{},
-			mustSecretMessage(
-				404,
-				fmt.Sprintf(
-					"The specified secretstore '%s' is not configured.",
-					target.key,
-				),
+			404,
+			fmt.Sprintf(
+				"The specified secretstore '%s' is not configured.",
+				target.key,
 			),
-			nil,
-			nil,
 		)
 	}
 	config := entry.config
@@ -227,16 +200,11 @@ func (c *Controller) prepareTest(
 		var err error
 		config, err = c.configFromPayload(input, target)
 		if err != nil {
-			return c.noop(
+			return c.noopMessage(
 				scope,
 				current,
-				lifecycle.LongLivedPermit{},
-				mustSecretMessage(
-					400,
-					"Invalid secretstore configuration.",
-				),
-				nil,
-				nil,
+				400,
+				"Invalid secretstore configuration.",
 			)
 		}
 		validationOnly = false
@@ -246,29 +214,19 @@ func (c *Controller) prepareTest(
 		c.creators,
 		config,
 	); err != nil {
-		return c.noop(
+		return c.noopMessage(
 			scope,
 			current,
-			lifecycle.LongLivedPermit{},
-			mustSecretMessage(
-				400,
-				"Secretstore configuration validation failed.",
-			),
-			nil,
-			nil,
+			400,
+			"Secretstore configuration validation failed.",
 		)
 	}
 	if !validationOnly && config.Hash() == entry.config.Hash() {
-		return c.noop(
+		return c.noopMessage(
 			scope,
 			current,
-			lifecycle.LongLivedPermit{},
-			mustSecretMessage(
-				202,
-				"Submitted configuration does not change the active secretstore.",
-			),
-			nil,
-			nil,
+			202,
+			"Submitted configuration does not change the active secretstore.",
 		)
 	}
 	affected := formatSecretJobs(
@@ -277,20 +235,15 @@ func (c *Controller) prepareTest(
 	restartable := formatSecretJobs(
 		c.dependencies.Affected(target.key, true),
 	)
-	return c.noop(
+	return c.noopMessage(
 		scope,
 		current,
-		lifecycle.LongLivedPermit{},
-		mustSecretMessage(
-			202,
-			secretImpactMessage(
-				affected,
-				restartable,
-				validationOnly,
-			),
+		202,
+		secretImpactMessage(
+			affected,
+			restartable,
+			validationOnly,
 		),
-		nil,
-		nil,
 	)
 }
 
@@ -429,68 +382,48 @@ func (c *Controller) prepareRemove(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	entry, exists := c.entry(target.key)
 	if !exists {
-		return c.noop(
+		return c.noopMessage(
 			scope,
 			current,
-			lifecycle.LongLivedPermit{},
-			mustSecretMessage(
-				404,
-				fmt.Sprintf(
-					"The specified secretstore '%s' is not configured.",
-					target.key,
-				),
+			404,
+			fmt.Sprintf(
+				"The specified secretstore '%s' is not configured.",
+				target.key,
 			),
-			nil,
-			nil,
 		)
 	}
 	if affected := formatSecretJobs(
 		c.dependencies.Affected(target.key, false),
 	); affected != "" {
-		return c.noop(
+		return c.noopMessage(
 			scope,
 			current,
-			lifecycle.LongLivedPermit{},
-			mustSecretMessage(
-				409,
-				fmt.Sprintf(
-					"The specified secretstore '%s' is used by jobs (%s).",
-					target.key,
-					affected,
-				),
+			409,
+			fmt.Sprintf(
+				"The specified secretstore '%s' is used by jobs (%s).",
+				target.key,
+				affected,
 			),
-			nil,
-			nil,
 		)
 	}
 	if entry.config.SourceType() != confgroup.TypeDyncfg {
-		return c.noop(
+		return c.noopMessage(
 			scope,
 			current,
-			lifecycle.LongLivedPermit{},
-			mustSecretMessage(
-				405,
-				fmt.Sprintf(
-					"removing configurations of source type '%s' is not supported, only 'dyncfg' configurations can be removed.",
-					entry.config.SourceType(),
-				),
+			405,
+			fmt.Sprintf(
+				"removing configurations of source type '%s' is not supported, only 'dyncfg' configurations can be removed.",
+				entry.config.SourceType(),
 			),
-			nil,
-			nil,
 		)
 	}
 	expected := c.store.Generation(target.key)
 	if expected == 0 || current == nil || !scope.Current.Valid() {
-		return c.noop(
+		return c.noopMessage(
 			scope,
 			current,
-			lifecycle.LongLivedPermit{},
-			mustSecretMessage(
-				409,
-				"Secretstore has no active generation.",
-			),
-			nil,
-			nil,
+			409,
+			"Secretstore has no active generation.",
 		)
 	}
 	mutation, err := c.store.PrepareRemoval(
@@ -665,6 +598,22 @@ func (c *Controller) noop(
 			permit: permit, result: result, cleanup: cleanup,
 			controller: c, entry: entry,
 		},
+	)
+}
+
+func (c *Controller) noopMessage(
+	scope lifecycle.ResourceTransactionScope,
+	current lifecycle.ReadyResource,
+	code int,
+	message string,
+) (lifecycle.PreparedResourceTransaction, error) {
+	return c.noop(
+		scope,
+		current,
+		lifecycle.LongLivedPermit{},
+		mustSecretMessage(code, message),
+		nil,
+		nil,
 	)
 }
 

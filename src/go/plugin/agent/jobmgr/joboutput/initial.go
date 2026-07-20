@@ -19,6 +19,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// The leading NUL reserves an internal-only identity that cannot collide with
+// DynCfg-valid module or module_name job resource IDs.
 const dynCfgJobBootResourceID = "\x00jobmgr-job-boot"
 
 // PublishInitial publishes deterministic module templates and reconciles every

@@ -357,24 +357,17 @@ func valueJSONSize(value Value, depth int) (int, error) {
 }
 
 func checkedResultSize(values ...int) (int, error) {
-	total := 0
-	maximum := int(^uint(0) >> 1)
-	for _, value := range values {
-		if value < 0 || total > maximum-value {
-			return 0, fmt.Errorf("%w: result size overflow", ErrFunctionResultTooLarge)
-		}
-		total += value
+	total, ok := checkedSum(int(^uint(0)>>1), values...)
+	if !ok {
+		return 0, fmt.Errorf("%w: result size overflow", ErrFunctionResultTooLarge)
 	}
 	return total, nil
 }
 
 func checkedCharge(values ...int64) (int64, error) {
-	var total int64
-	for _, value := range values {
-		if value < 0 || total > math.MaxInt64-value {
-			return 0, fmt.Errorf("%w: plan charge overflow", ErrFunctionResultTooLarge)
-		}
-		total += value
+	total, ok := checkedSum(int64(math.MaxInt64), values...)
+	if !ok {
+		return 0, fmt.Errorf("%w: plan charge overflow", ErrFunctionResultTooLarge)
 	}
 	return total, nil
 }

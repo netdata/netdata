@@ -1672,16 +1672,10 @@ func (ck *CommandKernel) abortFunctionMutationForShutdown() error {
 	if !ck.functionMutationActive && !ck.functionMutationPaused {
 		return nil
 	}
-	var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-	count, abortErr := ck.functionCatalog.AbortMutation(&cleanups)
-	pushErr := ck.pushFunctionCleanupBatch(&cleanups, count)
+	abortErr := ck.abortMutationCleanups()
 	terminalErr := error(ck.run.StoppingCause())
-	if abortErr != nil || pushErr != nil {
-		terminalErr = errors.Join(
-			terminalErr,
-			abortErr,
-			pushErr,
-		)
+	if abortErr != nil {
+		terminalErr = errors.Join(terminalErr, abortErr)
 	}
 	if ck.functionMutation.result != nil {
 		ck.functionMutation.result <- functionMutationResult{
@@ -1691,7 +1685,7 @@ func (ck *CommandKernel) abortFunctionMutationForShutdown() error {
 	ck.functionMutation = functionMutationSubmission{}
 	ck.functionMutationActive = false
 	ck.functionMutationPaused = false
-	return errors.Join(abortErr, pushErr)
+	return abortErr
 }
 
 func (ck *CommandKernel) serviceShutdownStops(
@@ -1944,27 +1938,10 @@ func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
 	}
 	inherited := ck.tasks.InheritedCensus()
 	longLived := ck.tasks.LongLivedCensus()
-	if !ck.shutdownCancelDone || !ck.shutdownLanesDone ||
-		ck.tasks.InheritedCancellationPending() ||
-		len(ck.operations) != 0 || len(ck.tasksByRef) != 0 ||
-		len(ck.tasksByRequest) != 0 ||
+	if !ck.kernelStateDrained() ||
 		ck.runtimeHead != nil || ck.runtimeTail != nil ||
 		ck.functionOperations != 0 ||
-		ck.operationHead != nil || ck.operationTail != nil ||
-		ck.laneHead != nil || ck.laneTail != nil ||
-		len(ck.functionCleanupTasks) != 0 || len(ck.functionCleanupRequests) != 0 ||
-		ck.functionCleanupBacklog.count != 0 ||
-		ck.functionMutationActive || ck.functionMutationPaused ||
-		len(ck.byAdmission) != 0 || len(ck.lanes) != 0 ||
-		len(ck.compositeFenceClaims) != 0 ||
-		ck.compositeFenceHead != nil ||
-		ck.compositeFenceTail != nil ||
-		ck.compositeFenceCount != 0 ||
-		ck.compositeFenceRecheck ||
-		ck.tasks.Active() != 0 || ck.tasks.Pending() != 0 || inherited.Active != 0 ||
-		len(ck.shutdownRequests) != 0 || len(ck.shutdownTasks) != 0 || len(ck.controls) != 0 || ck.deadlines.Len() != 0 ||
-		len(ck.submissions[0]) != 0 || len(ck.submissions[1]) != 0 || ck.hasBlockedSubmission[0] || ck.hasBlockedSubmission[1] ||
-		ck.ready[0].len != 0 || ck.ready[1].len != 0 || ck.claims.waitingCount() != 0 || len(ck.claims.keys) != 0 {
+		inherited.Active != 0 {
 		return false
 	}
 	if !ck.functionCatalogDrained() {
@@ -2028,6 +2005,14 @@ func (ck *CommandKernel) shutdownQuiescent() bool {
 	inherited := ck.tasks.InheritedCensus()
 	longLived := ck.tasks.LongLivedCensus()
 	frame := ck.frames.Census()
+	return ck.kernelStateDrained() && ck.functionCatalogDrained() &&
+		ck.admission.RunDrained(ck.run.Generation()) && inherited.Active == 0 &&
+		longLived == (lifecycle.LongLivedCensus{}) && !frame.Poisoned &&
+		!frame.Busy && !frame.PendingControl && frame.RetainedBytes == 0 &&
+		ck.finalizerDone && !ck.finalizerFailed
+}
+
+func (ck *CommandKernel) kernelStateDrained() bool {
 	if !ck.shutdownCancelDone || !ck.shutdownLanesDone ||
 		ck.tasks.InheritedCancellationPending() ||
 		len(ck.operations) != 0 || len(ck.tasksByRef) != 0 ||
@@ -2048,11 +2033,7 @@ func (ck *CommandKernel) shutdownQuiescent() bool {
 		ck.ready[0].len != 0 || ck.ready[1].len != 0 || ck.claims.waitingCount() != 0 || len(ck.claims.keys) != 0 {
 		return false
 	}
-	return ck.functionCatalogDrained() &&
-		ck.admission.RunDrained(ck.run.Generation()) && inherited.Active == 0 &&
-		longLived == (lifecycle.LongLivedCensus{}) && !frame.Poisoned &&
-		!frame.Busy && !frame.PendingControl && frame.RetainedBytes == 0 &&
-		ck.finalizerDone && !ck.finalizerFailed
+	return true
 }
 
 func (ck *CommandKernel) functionCatalogDrained() bool {

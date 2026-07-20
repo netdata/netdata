@@ -287,6 +287,7 @@ func assertExactJobManagerTree(t *testing.T) {
 		"kernel_lanes.go":                          {},
 		"kernel_runloop.go":                        {},
 		"kernel_admission_bytes.go":                {},
+		"kernel_admission_bytes_test.go":           {},
 		"kernel_plan.go":                           {},
 		"kernel_runports.go":                       {},
 		"kernel_structures.go":                     {},

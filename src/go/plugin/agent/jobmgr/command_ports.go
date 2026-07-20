@@ -11,8 +11,11 @@ import (
 )
 
 const (
-	// These match the existing plugins.d command-line and parameter ceilings.
-	maximumRequestArgumentBytes = 15_487
+	// MaximumPluginSDLineBytes mirrors the C plugins.d parser line ceiling,
+	// PLUGINSD_LINE_MAX: 0x4000 - 128 - 1 - 768 = 15,487 bytes.
+	MaximumPluginSDLineBytes = 15_487
+
+	maximumRequestArgumentBytes = MaximumPluginSDLineBytes
 	maximumRequestArguments     = 1_024
 	maximumRequestMetadataBytes = maximumRequestArgumentBytes
 )

@@ -527,15 +527,7 @@ func resultFrameSize(uid string, status int, contentType string, expiry int64, p
 }
 
 func checkedSizeSum(values ...int) (int, bool) {
-	total := 0
-	maximum := int(^uint(0) >> 1)
-	for _, value := range values {
-		if value < 0 || total > maximum-value {
-			return 0, false
-		}
-		total += value
-	}
-	return total, true
+	return checkedSum(int(^uint(0)>>1), values...)
 }
 
 func decimalBytes(value uint64) int {
