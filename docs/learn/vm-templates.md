@@ -157,6 +157,7 @@ The Netdata cleanup commands are the same for all hypervisors. The difference is
 |------------|------------------|---------------|------------|
 | **Proxmox** | Convert to Template | Before conversion | cloud-init scripts |
 | **VMware/vSphere** | VM Templates | Before conversion | Guest customization |
+| **Hyper-V** | Checkpoints/Templates | Before checkpoint/export | PowerShell scripts |
 | **libvirt/KVM** | virt-sysprep | During sysprep | `--delete` flags |
 | **AWS** | AMI | Before image creation | user-data scripts |
 | **Azure** | Managed Image | Before capture | cloud-init |
@@ -204,7 +205,7 @@ Each instance installs fresh with unique identity.
 
 Cause: [GUID recovered from status backup](/docs/learn/node-identities.md#status-file-backups). Netdata checks multiple backup locations before generating a new GUID.
 
-Solution: Delete **all** status file locations, not just the primary GUID file. See the cleanup commands in [Step 2](#2-delete-all-identity-and-data-files).
+Solution: Delete **all** status file locations, not just the primary GUID file. See the cleanup commands in [Step 2](#2-delete-all-identity-and-data-files). The same fix applies on Windows — run the equivalent PowerShell commands in [Fixing Already-Deployed Clones](#fixing-already-deployed-clones).
 
 ### Clones don't connect to Parent
 
@@ -241,7 +242,9 @@ Solution: Create `/etc/netdata/claim.conf` with your Space token.
 
 ### Fixing Already-Deployed Clones
 
-If clones were deployed with identity files:
+If clones were deployed with identity files, run the cleanup on each affected clone.
+
+#### Linux
 
 ```bash
 # On each affected clone
@@ -266,6 +269,32 @@ sudo rm -f /var/cache/netdata/context-meta.db*
 sudo rm -rf /var/cache/netdata/dbengine*
 
 sudo systemctl start netdata
+```
+
+#### Windows (PowerShell)
+
+Run the following in an elevated PowerShell session on each affected clone. Paths assume the default Windows install location (`C:\Program Files\Netdata`).
+
+```powershell
+# On each affected clone
+Stop-Service netdata
+
+# Machine GUID
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\registry\netdata.public.unique.id" -Force -ErrorAction SilentlyContinue
+
+# Status file backups (all locations)
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\status-netdata.json" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\status-netdata.json" -Force -ErrorAction SilentlyContinue
+
+# ACLK authentication (if re-claiming to Cloud)
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\cloud.d\*" -Recurse -Force -ErrorAction SilentlyContinue
+
+# Databases and metrics
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\netdata-meta.db*" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\context-meta.db*" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\dbengine*" -Recurse -Force -ErrorAction SilentlyContinue
+
+Start-Service netdata
 ```
 
 :::warning
