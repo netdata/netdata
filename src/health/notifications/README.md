@@ -99,11 +99,7 @@ Use the `edit-config` script to safely edit configuration files. It automaticall
 
 3. Define recipients per **role** (see below).
 
-4. Restart the Agent for changes to take effect:
-
-   ```bash
-   sudo systemctl restart netdata
-   ```
+4. Changes take effect immediately. The next alarm will use the updated configuration, so no restart or reload is required.
 
 ## Example: Alert with Role-Based Routing
 
