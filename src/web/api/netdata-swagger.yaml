@@ -41,7 +41,7 @@ info:
 
     ### Agent Request Limit
 
-    The Agent accepts a complete encoded HTTP request of up to 1,048,576 bytes, including the request line, headers, and body. It returns HTTP `413 Content Too Long` for a larger request. Intermediaries may enforce lower limits before the request reaches the Agent.
+    The Agent accepts a complete encoded HTTP request of up to 1,048,576 bytes, including the request line, headers, and body. It returns HTTP `413 Content Too Large` for a larger request. Intermediaries may enforce lower limits before the request reaches the Agent.
 
     **Note:** V1 and V2 APIs are deprecated and maintained for backwards compatibility only. New integrations should use V3 exclusively.
   version: "v1-rolling"
@@ -2320,6 +2320,10 @@ paths:
           description: |
             Filter transitions to only include specific nodes using simple pattern matching.
 
+            Matching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.
+            A node requires a positive match, and a negative match on any identity vetoes it even if another
+            identity matches positively.
+
             This parameter defines which nodes to include in the search using Netdata's simple pattern syntax (not regex).
 
             **Pattern Syntax:**
@@ -2354,6 +2358,10 @@ paths:
           in: query
           description: |
             Filter transitions to specific nodes using the same simple-pattern syntax as `scope_nodes`. Literal lists use fast exact lookup; wildcard rules are also supported. Multiple rules are separated by comma or pipe.
+
+            Matching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.
+            A node requires a positive match, and a negative match on any identity vetoes it even if another
+            identity matches positively.
 
             **Examples:**
             - `nodes=web-server-01` - Single specific node
@@ -3586,6 +3594,10 @@ paths:
           description: |
             Filter to specific nodes using simple pattern matching.
 
+            Matching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.
+            A node requires a positive match, and a negative match on any identity vetoes it even if another
+            identity matches positively.
+
             **Pattern Syntax:**
             - `*` matches any characters
             - Comma or pipe-separated list for multiple patterns
@@ -3611,6 +3623,10 @@ paths:
           in: query
           description: |
             Filter to specific nodes using the same simple-pattern syntax as `scope_nodes`.
+
+            Matching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.
+            A node requires a positive match, and a negative match on any identity vetoes it even if another
+            identity matches positively.
 
             **Format:** Comma or pipe-separated rules
 
@@ -3900,6 +3916,10 @@ paths:
           description: |
             Filter to specific nodes using pattern matching.
 
+            Matching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.
+            A node requires a positive match, and a negative match on any identity vetoes it even if another
+            identity matches positively.
+
             **Pattern Syntax:**
             - `*` matches any characters
             - Comma or pipe-separated for multiple patterns
@@ -3920,6 +3940,10 @@ paths:
           in: query
           description: |
             Filter to specific nodes using simple-pattern rules.
+
+            Matching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.
+            A node requires a positive match, and a negative match on any identity vetoes it even if another
+            identity matches positively.
 
             **Format:** Comma or pipe-separated rules
 
@@ -4197,6 +4221,10 @@ paths:
             Simple pattern to filter which nodes to include in the streaming path response.
             After scope is determined, this filters the results. Uses the same pattern syntax as scope_nodes.
 
+            Matching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.
+            A node requires a positive match, and a negative match on any identity vetoes it even if another
+            identity matches positively.
+
             **Difference from scope_nodes:**
             - `scope_nodes` defines what nodes to analyze for relationships
             - `nodes` filters which nodes to include in the output
@@ -4396,6 +4424,10 @@ paths:
           description: |
             Simple pattern to filter which nodes to include in the version information response.
             After scope is determined, this filters the results. Uses the same pattern syntax as scope_nodes.
+
+            Matching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.
+            A node requires a positive match, and a negative match on any identity vetoes it even if another
+            identity matches positively.
 
             **Difference from scope_nodes:**
             - `scope_nodes` defines what nodes to analyze
@@ -5111,6 +5143,10 @@ paths:
           description: |
             Simple pattern to filter which nodes to include in the functions list.
             After scope is determined, this filters the results. Uses the same pattern syntax as scope_nodes.
+
+            Matching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.
+            A node requires a positive match, and a negative match on any identity vetoes it even if another
+            identity matches positively.
 
             **Difference from scope_nodes:**
             - `scope_nodes` defines what nodes to query for functions
@@ -5869,7 +5905,7 @@ paths:
         - MUST be valid JSON
         - MUST include `version` field with current file version
         - MAY include any additional fields
-        - Maximum size: 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
+        - Maximum size: 20 MiB (20,971,520 bytes); larger payloads return 413 Content Too Large
 
         **Version Management:**
         - Client provides current version in payload
@@ -5928,7 +5964,7 @@ paths:
           - Any user-defined fields
 
           **Size Limit:**
-          Maximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
+          Maximum 20 MiB (20,971,520 bytes); larger payloads return 413 Content Too Large
 
           **Version Rules:**
           - New file: version can be 0 or 1
@@ -8950,7 +8986,7 @@ components:
       name: scope_nodes
       in: query
       description: |
-        A simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked independently against each node's machine GUID, node ID, and hostname. A node requires a positive match, and a negative match on any of its identities vetoes it even if another identity matches positively. The default nodes scope is all nodes for which this Agent has data. Put exclusions before a broad positive fallback because simple-pattern rules use first-match order for each identity, for example `!test*|*`. Both positive and negative expressions are supported.
+        A case-sensitive simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked independently against each node's machine GUID, node ID, and hostname. A node requires a positive match, and a negative match on any of its identities vetoes it even if another identity matches positively. The default nodes scope is all nodes for which this Agent has data. Put exclusions before a broad positive fallback because simple-pattern rules use first-match order for each identity, for example `!test*|*`. Both positive and negative expressions are supported.
       required: false
       schema:
         type: string
@@ -9000,7 +9036,7 @@ components:
       name: nodes
       in: query
       description: |
-        A simple pattern matching the nodes to be queried. This only controls the data response, not the metadata. The pattern is checked independently against each node's machine GUID, node ID, and hostname. A node requires a positive match, and a negative match on any identity vetoes it even if another identity matches positively. The default selector is all nodes matched by the nodes scope. Both positive and negative expressions are supported.
+        A case-sensitive simple pattern matching the nodes to be queried. This only controls the data response, not the metadata. The pattern is checked independently against each node's machine GUID, node ID, and hostname. A node requires a positive match, and a negative match on any identity vetoes it even if another identity matches positively. The default selector is all nodes matched by the nodes scope. Both positive and negative expressions are supported.
       required: false
       schema:
         type: string

@@ -352,7 +352,7 @@ int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
                 return nrpc_call_error(
                     w->response.data,
                     "Settings API PUT payload exceeds the maximum allowed size.",
-                    HTTP_RESP_CONTENT_TOO_LONG);
+                    HTTP_RESP_CONTENT_TOO_LARGE);
 
             return settings_put(w, file);
 

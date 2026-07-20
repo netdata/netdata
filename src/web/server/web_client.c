@@ -878,7 +878,7 @@ static void web_client_parse_content_metadata(struct web_client *w, const char *
     w->request_content_length_valid = false;
     w->request_content_type = CT_TEXT_PLAIN;
 
-    const char content_length_header[] = "Content-Length: ";
+    const char content_length_header[] = "Content-Length:";
     const char *value_end = NULL;
     const char *cl = web_client_find_header_value(
         request, w->request_header_length, content_length_header, sizeof(content_length_header) - 1, &value_end);
@@ -907,7 +907,7 @@ static void web_client_parse_content_metadata(struct web_client *w, const char *
     w->request_content_length = content_length;
     w->request_content_length_valid = true;
 
-    const char content_type_header[] = "Content-Type: ";
+    const char content_type_header[] = "Content-Type:";
     value_end = NULL;
     const char *ct = web_client_find_header_value(
         request, w->request_header_length, content_type_header, sizeof(content_type_header) - 1, &value_end);
@@ -2431,7 +2431,8 @@ int web_client_request_unittest(void) {
        web_client_request_size_validation(NETDATA_WEB_REQUEST_MAX_SIZE) != HTTP_VALIDATION_OK ||
        web_client_request_size_validation(NETDATA_WEB_REQUEST_MAX_SIZE + 1) !=
            HTTP_VALIDATION_REQUEST_TOO_LARGE ||
-       http_validation_error_to_response_code(HTTP_VALIDATION_REQUEST_TOO_LARGE) != HTTP_RESP_CONTENT_TOO_LONG ||
+       http_validation_error_to_response_code(HTTP_VALIDATION_REQUEST_TOO_LARGE) != HTTP_RESP_CONTENT_TOO_LARGE ||
+       strcmp(http_response_code2string(HTTP_RESP_CONTENT_TOO_LARGE), "Content Too Large") != 0 ||
        http_validation_error_to_response_code(HTTP_VALIDATION_REQUEST_TIMEOUT) != HTTP_RESP_REQUEST_TIMEOUT ||
        http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_URL) != HTTP_RESP_BAD_REQUEST)
         errors++;
@@ -2457,8 +2458,8 @@ int web_client_request_unittest(void) {
         "payload-value";
     static const char put_request[] =
         "PUT /api/v3/test HTTP/1.1\r\n"
-        "Content-Length: 13\r\n"
-        "Content-Type: application/json; charset=utf-8\r\n\r\n"
+        "Content-Length:13\r\n"
+        "Content-Type:application/json; charset=utf-8\r\n\r\n"
         "payload-value";
     static const struct {
         const char *request;
@@ -2525,7 +2526,7 @@ int web_client_request_unittest(void) {
     web_client_reuse_from_cache(w);
     buffer_strcat(
         w->response.data,
-        "POST /?Content-Length:%2099 HTTP/1.1\r\nX-Content-Length: 99\r\ncontent-length: 0\r\n\r\n");
+        "POST /?Content-Length:%2099 HTTP/1.1\r\nX-Content-Length: 99\r\ncontent-length:0\r\n\r\n");
     if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->payload || buffer_strlen(w->payload))
         errors++;
 
@@ -2611,7 +2612,7 @@ int web_client_request_unittest(void) {
 #endif
 
     web_client_process_request_from_web_server(w);
-    if(w->response.code != HTTP_RESP_CONTENT_TOO_LONG ||
+    if(w->response.code != HTTP_RESP_CONTENT_TOO_LARGE ||
        !strstr(buffer_tostring(w->response.data), "received at least 1048577 bytes") ||
        w->request_too_large || web_client_has_wait_receive(w))
         errors++;
