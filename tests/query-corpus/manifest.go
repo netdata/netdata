@@ -137,6 +137,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "per-group view statistics (D-B SETTLED, #23097 verified numerically): non-average aggregations average over view ROWS (mean plotted value, row-extreme min/max); AVERAGE keeps the weighted (pre-division sum, contributions) pair; raw keeps (sum, count) untouched for the cloud",
 		Agent:  Green, FixedBy: "#23097",
 	},
+	"L5/multi-key-group-by": {
+		Proves: "multi-key group_by: groups are attribute TUPLES, ids join in the FIXED engine order (dimension, instance, label, node, context, units) regardless of request order; instance drops @node when node is in the mask; selected and percentage-of-instance collapse rules; avg alias; unknown aggregation silently parses to average",
+		Agent:  Green,
+	},
 	"L6/two-pass-matrix": {
 		Proves: "two-pass group-by chains whose pass-1 accumulator IS the group value (sum→sum, min→min, max→max, extremes→extremes, sum→average) match the mechanics oracle, incl. PARTIAL propagation through both passes",
 		Agent:  Green,
