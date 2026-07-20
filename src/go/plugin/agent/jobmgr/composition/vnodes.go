@@ -584,6 +584,7 @@ func (vb *vnodeBinding) noop(
 		lifecycle.LongLivedPermit{},
 		result,
 		cleanup,
+		nil,
 	)
 }
 
@@ -714,6 +715,7 @@ func (vb *vnodeBinding) publishInitial(
 					lifecycle.LongLivedPermit{},
 					result,
 					vb.initialCleanup(),
+					nil,
 				)
 			},
 		},

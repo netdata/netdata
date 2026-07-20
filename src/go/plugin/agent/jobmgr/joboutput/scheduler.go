@@ -60,19 +60,31 @@ func (s *Scheduler) bindAutoDetectionRetries(
 	commands jobmgr.PreparedCommandPort,
 	plan autoDetectionRetryPlanner,
 	run uint64,
+	failure func(error),
 ) error {
 	if s == nil {
 		return errors.New(
 			"job output: nil autodetection retry scheduler",
 		)
 	}
-	return s.retries.bind(commands, plan, run)
+	return s.retries.bind(commands, plan, run, failure)
 }
 
-func (s *Scheduler) CloseAutoDetectionRetries() {
+func (s *Scheduler) StopAutoDetectionRetries() {
 	if s != nil {
-		s.retries.close()
+		s.retries.stopWorker()
 	}
+}
+
+func (s *Scheduler) WaitAutoDetectionRetries(
+	ctx context.Context,
+) error {
+	if s == nil {
+		return errors.New(
+			"job output: nil autodetection retry scheduler",
+		)
+	}
+	return s.retries.wait(ctx)
 }
 
 func (s *Scheduler) Register(
@@ -171,9 +183,7 @@ func (s *Scheduler) Tick(ctx context.Context, clock int) error {
 	}
 	s.tickMu.Lock()
 	defer s.tickMu.Unlock()
-	if err := s.retries.dispatchDue(ctx, clock); err != nil {
-		return err
-	}
+	s.retries.advance(clock)
 	s.mu.Lock()
 	for record := s.jobHead; record != nil; record = record.next {
 		record.job.Tick(clock)

@@ -157,7 +157,7 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	require.EqualValues(t, 2, cleanups.Load())
 }
 
-func TestProcessCoreCancelledSecretUpdateRestoresStoppedDependent(
+func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 	t *testing.T,
 ) {
 	starts := make(chan string, 4)
@@ -301,7 +301,7 @@ func TestProcessCoreCancelledSecretUpdateRestoresStoppedDependent(
 	require.NoError(t, writeStringErr2)
 
 	releaseOnce.Do(func() { close(releaseStop) })
-	waitSecretStart(t, starts, "initial")
+	waitSecretStart(t, starts, "replacement")
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel 499 application/json")
 
 	key := secretstore.StoreKey(secretstore.KindVault, "main")
@@ -309,7 +309,7 @@ func TestProcessCoreCancelledSecretUpdateRestoresStoppedDependent(
 	require.NoError(t, err)
 	value, resolveErr := scope.Resolve(t.Context(), key, "key")
 	releaseErr := scope.Release(t.Context())
-	require.False(t, resolveErr != nil || releaseErr != nil || string(value) != "initial")
+	require.False(t, resolveErr != nil || releaseErr != nil || string(value) != "replacement")
 
 	census := storeCensus()
 	require.False(t, census.Current != 1 ||

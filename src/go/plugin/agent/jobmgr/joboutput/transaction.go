@@ -49,12 +49,13 @@ type PreparedResourceTransaction struct {
 type PreparedNoopResourceTransaction struct {
 	mu sync.Mutex
 
-	consumed bool
-	scope    lifecycle.ResourceTransactionScope
-	current  lifecycle.ReadyResource
-	permit   lifecycle.LongLivedPermit
-	result   lifecycle.SealedResult
-	cleanup  lifecycle.TaskCleanup
+	consumed   bool
+	scope      lifecycle.ResourceTransactionScope
+	current    lifecycle.ReadyResource
+	permit     lifecycle.LongLivedPermit
+	result     lifecycle.SealedResult
+	cleanup    lifecycle.TaskCleanup
+	afterApply func()
 }
 
 func PrepareNoopResourceTransaction(
@@ -63,6 +64,7 @@ func PrepareNoopResourceTransaction(
 	permit lifecycle.LongLivedPermit,
 	result lifecycle.SealedResult,
 	cleanup lifecycle.TaskCleanup,
+	afterApply func(),
 ) (*PreparedNoopResourceTransaction, error) {
 	if !scope.Valid() ||
 		(current == nil) != !scope.Current.Valid() ||
@@ -88,7 +90,7 @@ func PrepareNoopResourceTransaction(
 	}
 	return &PreparedNoopResourceTransaction{
 		scope: scope, current: current, permit: permit,
-		result: result, cleanup: cleanup,
+		result: result, cleanup: cleanup, afterApply: afterApply,
 	}, nil
 }
 
@@ -107,7 +109,7 @@ func (pnrt *PreparedNoopResourceTransaction) Scope() lifecycle.ResourceTransacti
 func (pnrt *PreparedNoopResourceTransaction) Apply(
 	context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	scope, current, permit, result, cleanup, err := pnrt.take()
+	scope, current, permit, result, cleanup, afterApply, err := pnrt.take()
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
@@ -116,19 +118,26 @@ func (pnrt *PreparedNoopResourceTransaction) Apply(
 			return lifecycle.AppliedResourceTransaction{}, err
 		}
 	}
-	return lifecycle.NewAppliedResourceTransaction(
+	applied, err := lifecycle.NewAppliedResourceTransaction(
 		scope,
 		lifecycle.ResourceTransactionUnchanged,
 		current,
 		result,
 		cleanup,
 	)
+	if err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	if afterApply != nil {
+		afterApply()
+	}
+	return applied, nil
 }
 
 func (pnrt *PreparedNoopResourceTransaction) Dispose(
 	context.Context,
 ) (lifecycle.ReadyResource, error) {
-	_, current, permit, _, _, err := pnrt.take()
+	_, current, permit, _, _, _, err := pnrt.take()
 	if err != nil {
 		return nil, err
 	}
@@ -144,6 +153,7 @@ func (pnrt *PreparedNoopResourceTransaction) take() (
 	lifecycle.LongLivedPermit,
 	lifecycle.SealedResult,
 	lifecycle.TaskCleanup,
+	func(),
 	error,
 ) {
 	if pnrt == nil {
@@ -151,6 +161,7 @@ func (pnrt *PreparedNoopResourceTransaction) take() (
 			nil,
 			lifecycle.LongLivedPermit{},
 			lifecycle.SealedResult{},
+			nil,
 			nil,
 			errors.New("job output: nil no-op transaction")
 	}
@@ -162,6 +173,7 @@ func (pnrt *PreparedNoopResourceTransaction) take() (
 			lifecycle.LongLivedPermit{},
 			lifecycle.SealedResult{},
 			nil,
+			nil,
 			errors.New("job output: no-op transaction consumed")
 	}
 	pnrt.consumed = true
@@ -170,6 +182,7 @@ func (pnrt *PreparedNoopResourceTransaction) take() (
 		pnrt.permit,
 		pnrt.result,
 		pnrt.cleanup,
+		pnrt.afterApply,
 		nil
 }
 
@@ -196,11 +209,23 @@ func (prt *PreparedResourceTransaction) Scope() lifecycle.ResourceTransactionSco
 
 func (prt *PreparedResourceTransaction) Apply(
 	ctx context.Context,
-) (lifecycle.AppliedResourceTransaction, error) {
+) (
+	applied lifecycle.AppliedResourceTransaction,
+	resultErr error,
+) {
 	spec, err := prt.take()
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
+	mutationOwned := spec.Graph != nil && spec.MutationPrepared
+	defer func() {
+		if resultErr != nil && mutationOwned {
+			resultErr = errors.Join(
+				resultErr,
+				spec.Graph.Abort(spec.Mutation),
+			)
+		}
+	}()
 	if ctx == nil {
 		return lifecycle.AppliedResourceTransaction{},
 			errors.New("job output: nil transaction apply context")
@@ -255,6 +280,7 @@ func (prt *PreparedResourceTransaction) Apply(
 					return lifecycle.AppliedResourceTransaction{},
 						errors.Join(err, abortErr)
 				}
+				mutationOwned = false
 			}
 			resolution, resolveErr :=
 				spec.SuccessorFailure(failure)
@@ -290,8 +316,9 @@ func (prt *PreparedResourceTransaction) Apply(
 					if commitErr := spec.Graph.Commit(
 						mutation,
 					); commitErr != nil {
+						abortErr := spec.Graph.Abort(mutation)
 						return lifecycle.AppliedResourceTransaction{},
-							errors.Join(err, commitErr)
+							errors.Join(err, commitErr, abortErr)
 					}
 					graphCommitted = true
 					if resolution.AfterGraphCommit != nil {
@@ -325,11 +352,12 @@ func (prt *PreparedResourceTransaction) Apply(
 		if err := spec.Graph.Commit(spec.Mutation); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
 		}
+		mutationOwned = false
 		if spec.AfterGraphCommit != nil {
 			spec.AfterGraphCommit()
 		}
 	}
-	applied, err := lifecycle.NewAppliedResourceTransaction(
+	applied, err = lifecycle.NewAppliedResourceTransaction(
 		spec.Scope,
 		disposition,
 		current,

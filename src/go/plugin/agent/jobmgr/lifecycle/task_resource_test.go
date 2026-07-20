@@ -91,6 +91,49 @@ func TestTaskSupervisorRetainsPreparedResourceReturnedWithPrepareError(t *testin
 	require.Equal(t, want, got)
 }
 
+func TestTaskSupervisorDoesNotRewriteActionCancellationAsStopping(t *testing.T) {
+	supervisor := newResourceTaskSupervisor(t)
+	var events []string
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	ready := &recordingReadyResource{
+		identity: ResourceIdentity{ID: "job", Generation: 1},
+		events:   &events,
+	}
+	prepared := &recordingPreparedResource{
+		identity:      ready.identity,
+		ready:         ready,
+		events:        &events,
+		acceptEntered: entered,
+		acceptGate:    release,
+	}
+	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
+		Source: SourceJobManager,
+		Work: PreparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
+			return prepared, nil
+		}),
+	})
+	require.NoError(t, (<-supervisor.CompletionCh()).Err)
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart,
+		ExpectedGeneration: 1,
+	}))
+	<-entered
+
+	stopping := &StoppingRejection{Generation: 7}
+	require.NoError(t, supervisor.CancelWithCause(ref, stopping))
+	close(release)
+	ack := <-supervisor.AcknowledgementCh()
+	require.ErrorIs(t, ack.Err, context.Canceled)
+	require.False(t, errors.As(ack.Err, new(*StoppingRejection)))
+
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref: ref, Sequence: 3, Kind: TaskActionTerminate,
+	}))
+	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
+	require.NoError(t, supervisor.Release(ref))
+}
+
 func TestTaskSupervisorRetainsReadyResourceAfterPublishFailureUntilAbort(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
@@ -409,14 +452,25 @@ type recordingPreparedResource struct {
 	consumed          bool
 	panicAccept       bool
 	acceptErr         error
+	acceptEntered     chan struct{}
+	acceptGate        <-chan struct{}
 	disposeContextErr error
 }
 
 func (rpr *recordingPreparedResource) Identity() ResourceIdentity { return rpr.identity }
 
-func (rpr *recordingPreparedResource) AcceptStart(context.Context, uint64) (ReadyResource, error) {
+func (rpr *recordingPreparedResource) AcceptStart(ctx context.Context, _ uint64) (ReadyResource, error) {
 	if rpr.panicAccept {
 		panic("accept panic")
+	}
+	if rpr.acceptEntered != nil {
+		close(rpr.acceptEntered)
+	}
+	if rpr.acceptGate != nil {
+		<-rpr.acceptGate
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 	if rpr.consumed {
 		return nil, errors.New("prepared resource consumed")

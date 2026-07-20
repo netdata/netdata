@@ -203,9 +203,6 @@ func (llp LongLivedPermit) ValidateLive() error {
 	registry := &llp.supervisor.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
-	if registry.sealed {
-		return errors.New("jobmgr long-lived permit: registry is sealed")
-	}
 	_, err := registry.slot(llp.ref, llp.owner)
 	return err
 }

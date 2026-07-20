@@ -143,10 +143,16 @@ func prepareJob(
 	}
 	constructed, err, returned := callConstructJob(ctx, build)
 	if !returned {
-		return PreparedJob{}, err
+		return PreparedJob{}, lifecycle.RetainOwnership(err)
 	}
 	cleanupCtx := context.WithoutCancel(ctx)
 	if err != nil {
+		if lifecycle.OwnershipRetained(err) {
+			return PreparedJob{}, lifecycle.RetainOwnership(errors.Join(
+				err,
+				cleanupConstructed(cleanupCtx, constructed),
+			))
+		}
 		return PreparedJob{}, errors.Join(
 			err,
 			rejectConstructed(cleanupCtx, constructed, permit),
@@ -616,6 +622,21 @@ func rejectConstructed(
 	constructed ConstructedJob,
 	permit lifecycle.LongLivedPermit,
 ) error {
+	if err := cleanupConstructed(ctx, constructed); err != nil {
+		return lifecycle.RetainOwnership(err)
+	}
+	if err := callJobLifecycle("job external facet release", func() error {
+		return permit.ReleaseExternal(lifecycle.LongLivedEJobResources)
+	}); err != nil {
+		return lifecycle.RetainOwnership(err)
+	}
+	return nil
+}
+
+func cleanupConstructed(
+	ctx context.Context,
+	constructed ConstructedJob,
+) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -652,11 +673,6 @@ func rejectConstructed(
 			return err
 		}
 	}
-	if err := callJobLifecycle("job external facet release", func() error {
-		return permit.ReleaseExternal(lifecycle.LongLivedEJobResources)
-	}); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -684,11 +700,11 @@ func callConstructJob(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			constructed = ConstructedJob{}
-			err = fmt.Errorf(
+			err = lifecycle.RetainOwnership(fmt.Errorf(
 				"%w in job construction: %v",
 				lifecycle.ErrTaskPanic,
 				recovered,
-			)
+			))
 		}
 	}()
 	constructed, err = build(ctx)

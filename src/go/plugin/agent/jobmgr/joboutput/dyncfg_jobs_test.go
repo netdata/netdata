@@ -157,6 +157,156 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 	}
 }
 
+func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
+	type prepareCommand func(
+		context.Context,
+		*DynCfgJobController,
+		dynCfgTarget,
+		dyncfg.GraphRecord,
+		lifecycle.ResourceTransactionScope,
+		lifecycle.LongLivedPermit,
+	) (lifecycle.PreparedResourceTransaction, error)
+	tests := map[string]struct {
+		status        dyncfg.Status
+		validateFirst bool
+		prepare       prepareCommand
+	}{
+		"enable": {
+			status: dyncfg.StatusDisabled,
+			prepare: func(
+				ctx context.Context,
+				controller *DynCfgJobController,
+				target dynCfgTarget,
+				record dyncfg.GraphRecord,
+				scope lifecycle.ResourceTransactionScope,
+				permit lifecycle.LongLivedPermit,
+			) (lifecycle.PreparedResourceTransaction, error) {
+				return controller.prepareEnable(
+					ctx,
+					target,
+					record,
+					true,
+					nil,
+					scope,
+					permit,
+				)
+			},
+		},
+		"restart": {
+			status: dyncfg.StatusFailed,
+			prepare: func(
+				ctx context.Context,
+				controller *DynCfgJobController,
+				target dynCfgTarget,
+				record dyncfg.GraphRecord,
+				scope lifecycle.ResourceTransactionScope,
+				permit lifecycle.LongLivedPermit,
+			) (lifecycle.PreparedResourceTransaction, error) {
+				return controller.prepareRestart(
+					ctx,
+					target,
+					record,
+					true,
+					nil,
+					scope,
+					permit,
+				)
+			},
+		},
+		"update": {
+			status:        dyncfg.StatusRunning,
+			validateFirst: true,
+			prepare: func(
+				ctx context.Context,
+				controller *DynCfgJobController,
+				target dynCfgTarget,
+				record dyncfg.GraphRecord,
+				scope lifecycle.ResourceTransactionScope,
+				permit lifecycle.LongLivedPermit,
+			) (lifecycle.PreparedResourceTransaction, error) {
+				return controller.prepareUpdate(
+					ctx,
+					DynCfgJobRequest{
+						Payload:      []byte(`{"option":"replacement"}`),
+						ContentType:  "application/json",
+						CallerSource: "user=test",
+						HasPayload:   true,
+					},
+					target,
+					record,
+					true,
+					nil,
+					scope,
+					permit,
+				)
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			controller, graph, _, _, state :=
+				newDynCfgJobTestHarness(t)
+			creator := controller.modules["module"]
+			var constructions int
+			creator.Create = func() collectorapi.CollectorV1 {
+				constructions++
+				if test.validateFirst && constructions == 1 {
+					return state.module(nil, false)
+				}
+				panic("construction failed")
+			}
+			controller.modules["module"] = creator
+			config := factoryTestConfig(false)
+			payload, err := yaml.Marshal(config)
+			require.NoError(t, err)
+			mutation, err := graph.PrepareMutation(
+				[]dyncfg.GraphChange{{
+					ID: config.FullName(),
+					Config: &dyncfg.GraphConfig{
+						ID: config.FullName(), Module: config.Module(),
+						Name: config.Name(), Status: test.status.String(),
+						Payload: payload,
+					},
+				}},
+			)
+			require.NoError(t, err)
+			require.NoError(t, graph.Commit(mutation))
+			record, exists := graph.Lookup(config.FullName())
+			require.True(t, exists)
+			permit, permitTasks, _, _ := issueTestJobPermit(
+				t,
+				config.FullName(),
+				1,
+			)
+			scope := lifecycle.ResourceTransactionScope{
+				ID: config.FullName(),
+				Successor: lifecycle.ResourceIdentity{
+					ID: config.FullName(), Generation: 1,
+				},
+			}
+			target := dynCfgTarget{
+				module: config.Module(), name: config.Name(),
+				resourceID: config.FullName(), creator: creator,
+			}
+
+			transaction, err := test.prepare(
+				context.Background(),
+				controller,
+				target,
+				record,
+				scope,
+				permit,
+			)
+			require.Nil(t, transaction)
+			require.True(t, lifecycle.OwnershipRetained(err))
+			census := permitTasks.LongLivedCensus()
+			require.EqualValues(t, 1, census.Active)
+			require.EqualValues(t, 1, census.Jobs)
+			require.EqualValues(t, 1, census.ExternalActive)
+		})
+	}
+}
+
 func TestResourceOnlyTransactionReplacesWithoutGraphMutation(t *testing.T) {
 	var events []string
 	currentIdentity := lifecycle.ResourceIdentity{
@@ -219,6 +369,7 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
 	require.NoError(t, controller.BindAutoDetectionRetries(
 		commands,
 		1,
+		func(error) {},
 	))
 	config := factoryTestConfig(false)
 	config.Set("autodetection_retry", 1)
@@ -291,11 +442,17 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
 
 	require.NoError(t, controller.scheduler.Tick(
 		context.Background(),
+		0,
+	))
+	require.NoError(t, controller.scheduler.Tick(
+		context.Background(),
 		1,
 	))
-	require.Len(t, commands.submitted, 1)
-	require.Len(t, commands.plans, 1)
-	require.False(t, commands.waited)
+	commands.waitForSubmissions(t, 1)
+	submitted, plans, waited := commands.snapshot()
+	require.Len(t, submitted, 1)
+	require.Len(t, plans, 1)
+	require.False(t, waited)
 
 	replacement, err := config.Clone()
 	require.NoError(t, err)
@@ -325,7 +482,7 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
 		},
 	}
 	retryTransaction, err :=
-		commands.plans[0].Transaction.Prepare(
+		plans[0].Transaction.Prepare(
 			context.Background(),
 			nil,
 			retryScope,
@@ -355,6 +512,195 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
 		retryAdmission,
 		retryAdmissionRef,
 	)
+	controller.scheduler.StopAutoDetectionRetries()
+	require.NoError(t, controller.scheduler.WaitAutoDetectionRetries(
+		context.Background(),
+	))
+}
+
+func TestManualNoChangeRemovalSettlesAutoDetectionRetry(t *testing.T) {
+	controller, _, _, _, _ := newDynCfgJobTestHarness(t)
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeStock)
+	config.SetSource("stock")
+	config.SetProvider("stock")
+	controller.scheduler.retries.schedule(config, 1)
+	controller.scheduler.retries.mu.Lock()
+	token := controller.scheduler.retries.entries[config.FullName()].token
+	controller.scheduler.retries.mu.Unlock()
+
+	transaction, err := controller.prepareDiscovered(
+		context.Background(),
+		DiscoveredJobChange{Config: config, Remove: true},
+		nil,
+		lifecycle.ResourceTransactionScope{ID: config.FullName()},
+		lifecycle.LongLivedPermit{},
+	)
+	require.NoError(t, err)
+	_, err = transaction.Apply(context.Background())
+	require.NoError(t, err)
+	require.False(t, controller.scheduler.retries.isCurrent(
+		config.FullName(),
+		token,
+	))
+}
+
+func TestPlainStockRetryCanRestartAfterFailedGraphRecordWasRemoved(t *testing.T) {
+	controller, graph, supervisor, _, state := newDynCfgJobTestHarness(t)
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		module := state.module(nil, false)
+		charts := collectorapi.Charts{}
+		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+		return module
+	}
+	controller.modules["module"] = creator
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeStock)
+	config.SetSource("stock")
+	config.SetProvider("stock")
+	controller.scheduler.retries.schedule(config, 1)
+	controller.scheduler.retries.mu.Lock()
+	token := controller.scheduler.retries.entries[config.FullName()].token
+	controller.scheduler.retries.mu.Unlock()
+	permitPlan, err := lifecycle.NewJobLongLivedPlan(DefaultJobRetainedBytes)
+	require.NoError(t, err)
+	admission := lifecycle.NewAdmissionLedger()
+	requested := admission.RequestOrdinary(
+		1,
+		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
+		permitPlan.Bytes()+1,
+	)
+	require.Nil(t, requested.Rejected)
+	var grants [lifecycle.TaskStartServiceQuantum]lifecycle.AdmissionGrant
+	count, _, err := admission.TakeGrants(1, &grants)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
+	scope := lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+		Successor: lifecycle.ResourceIdentity{
+			ID: config.FullName(), Generation: 1,
+		},
+	}
+	plan, err := lifecycle.NewResourceTransactionPermitTaskPlan(
+		lifecycle.SourceJobManager,
+		time.Time{},
+		lifecycle.TransactionTaskPhases,
+		admission,
+		requested.Ref,
+		nil,
+		scope,
+		permitPlan,
+		func(
+			ctx context.Context,
+			current lifecycle.ReadyResource,
+			taskScope lifecycle.ResourceTransactionScope,
+			permit lifecycle.LongLivedPermit,
+		) (lifecycle.PreparedResourceTransaction, error) {
+			return controller.prepareDiscovered(
+				ctx,
+				DiscoveredJobChange{
+					Config: config, Status: dyncfg.StatusRunning,
+					Restart: true, retry: token,
+				},
+				current,
+				taskScope,
+				permit,
+			)
+		},
+	)
+	require.NoError(t, err)
+	ref := startDynCfgJobTestTask(t, supervisor, plan)
+	first := <-supervisor.CompletionCh()
+	require.NoError(t, first.Err)
+	require.Equal(t, lifecycle.TaskOutcomePreparedResourceTransaction, first.Kind)
+	require.NoError(t, supervisor.SendAction(lifecycle.TaskAction{
+		Ref: ref, Sequence: 2,
+		Kind: lifecycle.TaskActionApplyResourceTransaction,
+	}))
+	second := <-supervisor.CompletionCh()
+	require.NoError(t, second.Err)
+	disposition, current, err := supervisor.TakeAppliedResourceTransaction(
+		ref,
+		2,
+		scope,
+	)
+	require.NoError(t, err)
+	require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
+	require.NotNil(t, current)
+	record, exists := graph.Lookup(config.FullName())
+	require.True(t, exists)
+	require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
+	require.False(t, controller.scheduler.retries.isCurrent(
+		config.FullName(),
+		token,
+	))
+
+	sendDynCfgJobTestAction(t, supervisor, lifecycle.TaskAction{
+		Ref: ref, Sequence: 3, Kind: lifecycle.TaskActionDispose,
+	})
+	sendDynCfgJobTestAction(t, supervisor, lifecycle.TaskAction{
+		Ref: ref, Sequence: 4, Kind: lifecycle.TaskActionCleanup,
+	})
+	sendDynCfgJobTestAction(t, supervisor, lifecycle.TaskAction{
+		Ref: ref, Sequence: 5, Kind: lifecycle.TaskActionTerminate,
+	})
+	require.NoError(t, supervisor.Release(ref))
+	require.NoError(t, current.Stop(context.Background()))
+	require.NoError(t, current.Finalize())
+	_, err = admission.ReleaseOrdinary(requested.Ref)
+	require.NoError(t, err)
+	require.EqualValues(
+		t,
+		lifecycle.LongLivedCensus{},
+		supervisor.LongLivedCensus(),
+	)
+}
+
+func TestRetryPreparationFailureSettlesExactToken(t *testing.T) {
+	controller, _, _, _, _ := newDynCfgJobTestHarness(t)
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 { return nil }
+	controller.modules["module"] = creator
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeStock)
+	config.SetSource("stock")
+	config.SetProvider("stock")
+	controller.scheduler.retries.schedule(config, 1)
+	controller.scheduler.retries.mu.Lock()
+	token := controller.scheduler.retries.entries[config.FullName()].token
+	controller.scheduler.retries.mu.Unlock()
+	permit, tasks, admission, admissionRef := issueTestJobPermit(
+		t,
+		config.FullName(),
+		1,
+	)
+	scope := lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+		Successor: lifecycle.ResourceIdentity{
+			ID: config.FullName(), Generation: 1,
+		},
+	}
+
+	transaction, err := controller.prepareDiscovered(
+		context.Background(),
+		DiscoveredJobChange{
+			Config: config, Status: dyncfg.StatusRunning,
+			Restart: true, retry: token,
+		},
+		nil,
+		scope,
+		permit,
+	)
+	require.Nil(t, transaction)
+	require.Error(t, err)
+	require.False(t, controller.scheduler.retries.isCurrent(
+		config.FullName(),
+		token,
+	))
+	require.NoError(t, permit.AbortUnused())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 func TestDependencyPreparationFailureLeavesPermitForTaskSupervisor(
@@ -403,6 +749,77 @@ func TestDependencyPreparationFailureLeavesPermitForTaskSupervisor(
 		tasks.LongLivedCensus(),
 	)
 	releaseTestJobAdmission(t, admission, admissionRef)
+}
+
+func TestPrepareMutationLeavesUnusedPermitForTaskSupervisor(t *testing.T) {
+	controller, _, _, _, _ := newDynCfgJobTestHarness(t)
+	sentinel := errors.New("dependency preparation failed")
+	controller.dependencies = jobDependencyIndexFunc(
+		func(string, *dyncfg.GraphConfig) (func(), error) {
+			return nil, sentinel
+		},
+	)
+	permit, tasks, admission, admissionRef := issueTestJobPermit(t, "module_job", 1)
+	scope := lifecycle.ResourceTransactionScope{
+		ID:        "module_job",
+		Successor: lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+	}
+
+	transaction, err := controller.prepareMutation(
+		scope,
+		nil,
+		nil,
+		permit,
+		lifecycle.ResourceTransactionUnchanged,
+		&dyncfg.GraphConfig{
+			ID: "module_job", Module: "module", Name: "job",
+		},
+		mustDynCfgMessage(200, ""),
+		func() error { return nil },
+	)
+	require.Nil(t, transaction)
+	require.ErrorIs(t, err, sentinel)
+	require.NoError(t, permit.AbortUnused())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+	releaseTestJobAdmission(t, admission, admissionRef)
+}
+
+func TestPrepareMutationRollsBackAfterTransactionValidationFailure(t *testing.T) {
+	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+	var events []string
+	successor := &transactionTestPreparedResource{
+		identity: lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		events:   &events,
+	}
+	scope := lifecycle.ResourceTransactionScope{
+		ID:        "module_job",
+		Successor: successor.identity,
+	}
+
+	transaction, err := controller.prepareMutation(
+		scope,
+		nil,
+		successor,
+		lifecycle.LongLivedPermit{},
+		lifecycle.ResourceTransactionRemoved,
+		&dyncfg.GraphConfig{
+			ID: "module_job", Module: "module", Name: "job",
+		},
+		mustDynCfgMessage(200, ""),
+		func() error { return nil },
+	)
+	require.Nil(t, transaction)
+	require.Error(t, err)
+	require.Equal(t, []string{"successor-dispose"}, events)
+
+	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{
+		ID: "module_job",
+		Config: &dyncfg.GraphConfig{
+			ID: "module_job", Module: "module", Name: "job",
+		},
+	}})
+	require.NoError(t, err)
+	require.NoError(t, graph.Abort(mutation))
 }
 
 func newDynCfgJobTestHarness(

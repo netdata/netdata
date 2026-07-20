@@ -115,6 +115,7 @@ func (dcjc *DynCfgJobController) publishInitialTemplates(
 					lifecycle.LongLivedPermit{},
 					result,
 					dcjc.templatePublicationCleanup(),
+					nil,
 				)
 			},
 		},

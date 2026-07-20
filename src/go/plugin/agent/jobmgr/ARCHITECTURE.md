@@ -234,11 +234,16 @@ after the prior generation has stopped and finalized. A clean autodetection
 failure commits the truthful failed/removal graph state and schedules an
 eligible retry; it is not reported as an uncommitted success.
 
-Autodetection retries are owned by one per-run map/heap serviced by the
-scheduler tick. They carry the exact configuration UID and retry generation,
-submit without waiting for terminal completion, and are invalidated by success,
-replacement, disable, removal, or run shutdown. They do not create per-Job
-goroutines, timers, channels, or a fixed population limit.
+Autodetection retries are owned by one per-run map/heap and one run-owned
+dispatcher. The scheduler tick advances a logical per-run clock and wakes the
+dispatcher without waiting for command admission. The dispatcher uses the
+ordinary blocking prepared-command port, submits without waiting for terminal
+completion, and retains exact configuration-UID/retry-generation authority
+until the resulting transaction settles. Success, replacement, disable,
+removal, or run shutdown invalidates that authority. Shutdown stops new retry
+work before the kernel and joins the dispatcher after the kernel drains. No
+per-Job goroutine, timer, channel, fixed population limit, or retry service
+quantum exists.
 
 `TaskSupervisor` retains the concrete long-lived Job permit until the whole
 prepared transaction exists. Clean rejection before that transfer cleans
@@ -277,6 +282,12 @@ unrecognized, over-deep, or mixed real errors remain fatal. A genuine
 spontaneous inherited failure dirties and wakes the run immediately. A
 pipeline provider may complete successfully after its finite publication;
 that clean provider completion is not a failure.
+
+Preparation remains cancellable. Once an ownership-changing lifecycle action
+starts, user cancellation, operation deadline, and shutdown no longer cancel
+that action. The response may report cancellation or deadline while the action
+finishes to a provable disposition; the existing run shutdown budget remains
+the fail-closed bound.
 
 Collector work that remains blocked at process exit is considered safe enough
 because process termination removes it; Job Manager does not add a second

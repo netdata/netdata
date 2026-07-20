@@ -275,11 +275,11 @@ func callPrepareHandlers(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			handlers = nil
-			err = fmt.Errorf(
+			err = lifecycle.RetainOwnership(fmt.Errorf(
 				"%w in handler preparation: %v",
 				lifecycle.ErrTaskPanic,
 				recovered,
-			)
+			))
 		}
 	}()
 	return hooks.Prepare(published)
@@ -299,17 +299,18 @@ func (f *Factory) buildV1(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			job = nil
-			err = fmt.Errorf(
+			err = lifecycle.RetainOwnership(fmt.Errorf(
 				"%w in V1 construction: %v",
 				lifecycle.ErrTaskPanic,
 				recovered,
-			)
+			))
 		}
 		if err != nil && module != nil {
-			err = errors.Join(
-				err,
-				callFactoryModuleCleanup(ctx, module.Cleanup),
-			)
+			cleanupErr := callFactoryModuleCleanup(ctx, module.Cleanup)
+			err = errors.Join(err, cleanupErr)
+			if cleanupErr != nil {
+				err = lifecycle.RetainOwnership(err)
+			}
 		}
 	}()
 	module = creator.Create()
@@ -352,17 +353,18 @@ func (f *Factory) buildV2(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			job = nil
-			err = fmt.Errorf(
+			err = lifecycle.RetainOwnership(fmt.Errorf(
 				"%w in V2 construction: %v",
 				lifecycle.ErrTaskPanic,
 				recovered,
-			)
+			))
 		}
 		if err != nil && module != nil {
-			err = errors.Join(
-				err,
-				callFactoryModuleCleanup(ctx, module.Cleanup),
-			)
+			cleanupErr := callFactoryModuleCleanup(ctx, module.Cleanup)
+			err = errors.Join(err, cleanupErr)
+			if cleanupErr != nil {
+				err = lifecycle.RetainOwnership(err)
+			}
 		}
 	}()
 	module = creator.CreateV2()

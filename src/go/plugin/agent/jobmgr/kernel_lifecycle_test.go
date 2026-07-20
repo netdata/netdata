@@ -1538,12 +1538,14 @@ func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
-func TestKernelDeadlineCancelsPendingCapabilityCommit(t *testing.T) {
+func TestKernelDeadlineDoesNotCancelPendingCapabilityCommit(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	commitEntered := make(chan context.Context, 1)
+	commitRelease := make(chan struct{})
 	permitPlan, err := lifecycle.NewSecretStoreLongLivedPlan(4096)
 	require.NoError(t, err)
 	const capabilityID = "secret-store:commit-deadline"
+	var capability *deadlineCommitCapability
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		return WorkPlan{
 			NoResponse: true, CooperativeDeadline: true,
@@ -1553,12 +1555,14 @@ func TestKernelDeadlineCancelsPendingCapabilityCommit(t *testing.T) {
 					if err := permit.ActivateExternal(lifecycle.LongLivedESecretStore); err != nil {
 						return nil, err
 					}
-					return &deadlineCommitCapability{
+					capability = &deadlineCommitCapability{
 						latePreparedCapability: latePreparedCapability{
 							identity: lifecycle.ResourceIdentity{ID: capabilityID, Generation: generation}, permit: permit,
 						},
 						entered: commitEntered,
-					}, nil
+						gate:    commitRelease,
+					}
+					return capability, nil
 				},
 			},
 		}, nil
@@ -1595,19 +1599,31 @@ func TestKernelDeadlineCancelsPendingCapabilityCommit(t *testing.T) {
 	kernel.NotifyControlReady()
 	select {
 	case <-commitCtx.Done():
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "pending capability commit did not observe authoritative deadline")
+		require.FailNowf(
+			t,
+			"started capability commit was cancelled",
+			"error: %v",
+			commitCtx.Err(),
+		)
+	case <-time.After(50 * time.Millisecond):
 	}
-	require.False(t, !errors.Is(commitCtx.Err(), context.DeadlineExceeded) || !errors.Is(context.Cause(commitCtx), context.DeadlineExceeded))
 	select {
 	case terminalErr := <-done:
-		require.False(t, terminalErr == nil || !errors.Is(terminalErr, context.DeadlineExceeded))
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "deadline-canceled capability did not reach terminal ownership")
+		require.FailNowf(
+			t,
+			"capability completed before commit release",
+			"error: %v",
+			terminalErr,
+		)
+	default:
 	}
+	close(commitRelease)
+	require.NoError(t, <-done)
+	require.True(t, capability.committed.Load())
+	require.False(t, capability.disposed.Load())
 
-	waitErr := kernel.Wait(context.Background())
-	require.False(t, waitErr == nil || !errors.Is(waitErr, context.DeadlineExceeded))
+	kernel.Stop()
+	require.NoError(t, kernel.Wait(context.Background()))
 
 	census := tasks.LongLivedCensus()
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, census)
@@ -2376,12 +2392,14 @@ type latePreparedCapability struct {
 type deadlineCommitCapability struct {
 	latePreparedCapability
 	entered chan<- context.Context
+	gate    <-chan struct{}
 }
 
 func (dcc *deadlineCommitCapability) Commit(ctx context.Context, _ uint64) (lifecycle.CapabilityDisposition, error) {
 	dcc.entered <- ctx
-	<-ctx.Done()
-	return lifecycle.CapabilityDisposed, errors.Join(ctx.Err(), dcc.release())
+	<-dcc.gate
+	dcc.committed.Store(true)
+	return lifecycle.CapabilityApplied, dcc.release()
 }
 
 func (lpc *latePreparedCapability) Identity() lifecycle.ResourceIdentity {

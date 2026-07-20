@@ -426,6 +426,29 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 	require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 }
 
+func TestLongLivedPermitRemainsLiveAfterIssuanceIsSealed(t *testing.T) {
+	admission := NewAdmissionLedger()
+	ref := grantLongLivedTestAdmission(t, admission, 40)
+	supervisor := newLongLivedTestSupervisor(t)
+	plan, err := NewJobLongLivedPlan(40)
+	require.NoError(t, err)
+	permit, err := supervisor.IssueLongLivedPermit(
+		admission,
+		ref,
+		ResourceIdentity{ID: "job", Generation: 1},
+		plan,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, supervisor.SealInherited())
+	require.NoError(t, permit.ValidateLive())
+	require.NoError(t, permit.AbortUnused())
+
+	_, err = admission.ReleaseOrdinary(ref)
+	require.NoError(t, err)
+	require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
+}
+
 func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T) {
 	const replacements = 9
 

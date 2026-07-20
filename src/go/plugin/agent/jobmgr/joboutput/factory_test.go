@@ -25,7 +25,15 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 		wantClose          int
 		wantHandlerCleanup int
 		wantRetained       bool
+		wantNoCleanup      bool
 	}{
+		"creator panic": {
+			configure: func(*factoryTestState, *collectorapi.Creator) JobHooks {
+				return nil
+			},
+			wantRetained:  true,
+			wantNoCleanup: true,
+		},
 		"autodetection failure": {
 			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
 				creator.Create = func() collectorapi.CollectorV1 {
@@ -81,11 +89,29 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			wantClose:          1,
 			wantHandlerCleanup: 1,
 		},
+		"handler preparation panic": {
+			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
+				creator.FunctionOnly = true
+				creator.SharedFunctions = func() []funcapi.FunctionConfig { return nil }
+				creator.Create = func() collectorapi.CollectorV1 {
+					return state.module(nil, false)
+				}
+				return factoryTestHooks{prepare: func(PublishedJob) (HandlerLifecycle, error) {
+					panic("prepare failed")
+				}}
+			},
+			wantRetained: true,
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			state := &factoryTestState{}
 			creator := collectorapi.Creator{}
+			if test.wantNoCleanup {
+				creator.Create = func() collectorapi.CollectorV1 {
+					panic("create failed")
+				}
+			}
 			hooks := test.configure(state, &creator)
 			factory, output := newFactoryTestHarness(t, creator, hooks)
 			permit, tasks, admission, admissionRef := issueTestJobPermit(
@@ -107,9 +133,14 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				err = errors.Join(err, permit.AbortUnused())
 			}
 			require.Error(t, err)
-			require.EqualValues(t, 1, state.collectorCleanup)
+			wantCollectorCleanup := 1
+			if test.wantNoCleanup {
+				wantCollectorCleanup = 0
+			}
+			require.EqualValues(t, wantCollectorCleanup, state.collectorCleanup)
 			require.False(t, state.handlerClose != test.wantClose || state.handlerCleanup != test.wantHandlerCleanup)
 			require.EqualValues(t, 0, output.Len())
+			require.Equal(t, test.wantRetained, lifecycle.OwnershipRetained(err))
 			require.Equal(
 				t,
 				test.wantRetained,

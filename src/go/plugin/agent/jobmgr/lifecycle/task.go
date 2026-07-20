@@ -1054,13 +1054,6 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 					}
 				}
 			}
-			if ack.Err != nil {
-				ack.Err = normalizeStoppingActionCancellation(
-					action.Kind,
-					ack.Err,
-					context.Cause(ctx),
-				)
-			}
 			slot.sequence = action.Sequence
 			slot.actionPending = false
 			ts.completions <- TaskCompletion{
@@ -1121,13 +1114,6 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 		default:
 			ack.Err = errors.New("jobmgr task child: unsupported phase action")
 		}
-		if ack.Err != nil {
-			ack.Err = normalizeStoppingActionCancellation(
-				action.Kind,
-				ack.Err,
-				context.Cause(ctx),
-			)
-		}
 		slot.sequence = action.Sequence
 		slot.actionPending = false
 		if action.Kind == TaskActionTerminate {
@@ -1145,22 +1131,6 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 		}
 		ts.observeTaskPanic(ack.Err)
 		ts.acks <- ack
-	}
-}
-
-func normalizeStoppingActionCancellation(
-	action TaskActionKind,
-	err error,
-	cause error,
-) error {
-	switch action {
-	case TaskActionAcceptStart,
-		TaskActionCommitCapability,
-		TaskActionStopResource,
-		TaskActionApplyResourceTransaction:
-		return normalizeStoppingCancellation(err, cause)
-	default:
-		return err
 	}
 }
 

@@ -126,7 +126,18 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
-) (lifecycle.PreparedResourceTransaction, error) {
+) (
+	transaction lifecycle.PreparedResourceTransaction,
+	resultErr error,
+) {
+	defer func() {
+		if resultErr != nil && change.retry.generation != 0 {
+			dcjc.scheduler.retries.cancelToken(
+				scope.ID,
+				change.retry,
+			)
+		}
+	}()
 	record, exists := dcjc.graph.Lookup(scope.ID)
 	if err := validateGraphResourcePair(
 		record,
@@ -138,16 +149,30 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	}
 	result := mustDynCfgMessage(204, "")
 	if change.retry.generation != 0 {
-		config, err := graphRecordConfig(record)
-		if err != nil ||
-			!exists ||
-			record.Status != dyncfg.StatusFailed.String() ||
-			config.UID() != change.retry.uid {
-			return dcjc.noop(
+		currentToken := dcjc.scheduler.retries.isCurrent(
+			scope.ID,
+			change.retry,
+		)
+		validRecord := true
+		if exists {
+			config, err := graphRecordConfig(record)
+			validRecord = err == nil &&
+				record.Status == dyncfg.StatusFailed.String() &&
+				config.UID() == change.retry.uid
+		} else {
+			validRecord = change.Config.SourceType() ==
+				confgroup.TypeStock
+		}
+		if !currentToken || !validRecord {
+			return dcjc.noopWithAfterApply(
 				scope,
 				current,
 				permit,
 				result,
+				dcjc.retrySettlement(
+					scope.ID,
+					change.retry,
+				),
 			)
 		}
 	}
@@ -156,7 +181,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		if current != nil {
 			disposition = lifecycle.ResourceTransactionRemoved
 		}
-		return dcjc.prepareMutation(
+		return dcjc.prepareMutationWithRetry(
 			scope,
 			current,
 			nil,
@@ -170,6 +195,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 					change.Config.Name(),
 				),
 			),
+			change.retry,
 		)
 	}
 
@@ -193,7 +219,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		if current != nil {
 			disposition = lifecycle.ResourceTransactionRemoved
 		}
-		return dcjc.prepareMutation(
+		return dcjc.prepareMutationWithRetry(
 			scope,
 			current,
 			nil,
@@ -202,17 +228,22 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			&postimage,
 			result,
 			cleanup,
+			change.retry,
 		)
 	}
 	if exists &&
 		record.Status == dyncfg.StatusRunning.String() &&
 		record.Payload() == string(payload) &&
 		!change.Restart {
-		return dcjc.noop(
+		return dcjc.noopWithAfterApply(
 			scope,
 			current,
 			permit,
 			result,
+			dcjc.retrySettlement(
+				scope.ID,
+				change.retry,
+			),
 			cleanup,
 		)
 	}
@@ -231,7 +262,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	}
 	failedPostimage := postimage
 	failedPostimage.Status = dyncfg.StatusFailed.String()
-	return dcjc.prepareMutation(
+	return dcjc.prepareMutationWithRetry(
 		scope,
 		current,
 		successor,
@@ -240,6 +271,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		&postimage,
 		result,
 		cleanup,
+		change.retry,
 		successorFailurePlan{
 			postimage: failedPostimage,
 			failedCleanup: dcjc.configCreateCleanup(

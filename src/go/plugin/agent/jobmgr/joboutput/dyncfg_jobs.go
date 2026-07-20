@@ -103,6 +103,7 @@ func NewDynCfgJobController(
 func (dcjc *DynCfgJobController) BindAutoDetectionRetries(
 	commands jobmgr.PreparedCommandPort,
 	run uint64,
+	failure func(error),
 ) error {
 	if dcjc == nil || dcjc.scheduler == nil {
 		return errors.New(
@@ -113,6 +114,7 @@ func (dcjc *DynCfgJobController) BindAutoDetectionRetries(
 		commands,
 		dcjc.planAutoDetectionRetry,
 		run,
+		failure,
 	)
 }
 
@@ -509,7 +511,8 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		permit,
 	)
 	if err != nil {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil ||
+			lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
 		return dcjc.noop(
@@ -632,7 +635,8 @@ func (dcjc *DynCfgJobController) prepareEnable(
 		permit,
 	)
 	if err != nil {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil ||
+			lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
 		return dcjc.noop(
@@ -738,7 +742,8 @@ func (dcjc *DynCfgJobController) prepareRestart(
 		permit,
 	)
 	if err != nil {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil ||
+			lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
 		return dcjc.noop(
@@ -928,6 +933,32 @@ func (dcjc *DynCfgJobController) prepareMutation(
 	cleanup lifecycle.TaskCleanup,
 	failurePlans ...successorFailurePlan,
 ) (lifecycle.PreparedResourceTransaction, error) {
+	return dcjc.prepareMutationWithRetry(
+		scope,
+		current,
+		successor,
+		unusedPermit,
+		disposition,
+		postimage,
+		result,
+		cleanup,
+		autoDetectionRetryToken{},
+		failurePlans...,
+	)
+}
+
+func (dcjc *DynCfgJobController) prepareMutationWithRetry(
+	scope lifecycle.ResourceTransactionScope,
+	current lifecycle.ReadyResource,
+	successor lifecycle.PreparedResource,
+	unusedPermit lifecycle.LongLivedPermit,
+	disposition lifecycle.ResourceTransactionDisposition,
+	postimage *dyncfg.GraphConfig,
+	result lifecycle.SealedResult,
+	cleanup lifecycle.TaskCleanup,
+	retry autoDetectionRetryToken,
+	failurePlans ...successorFailurePlan,
+) (lifecycle.PreparedResourceTransaction, error) {
 	if len(failurePlans) > 1 ||
 		len(failurePlans) == 1 && successor == nil {
 		return nil, errors.New(
@@ -949,15 +980,17 @@ func (dcjc *DynCfgJobController) prepareMutation(
 		)
 		if err != nil {
 			if successor != nil {
+				rollbackErr := rejectPreparedSuccessor(
+					context.Background(),
+					successor,
+				)
 				err = errors.Join(
 					err,
-					rejectPreparedSuccessor(
-						context.Background(),
-						successor,
-					),
+					rollbackErr,
 				)
-			} else if unusedPermit.Valid() {
-				err = errors.Join(err, unusedPermit.AbortUnused())
+				if rollbackErr != nil {
+					err = lifecycle.RetainOwnership(err)
+				}
 			}
 			return nil, err
 		}
@@ -976,13 +1009,18 @@ func (dcjc *DynCfgJobController) prepareMutation(
 					)
 			}
 			if err != nil {
-				return nil, errors.Join(
-					err,
-					rejectPreparedSuccessor(
-						context.Background(),
-						successor,
-					),
+				rollbackErr := rejectPreparedSuccessor(
+					context.Background(),
+					successor,
 				)
+				err = errors.Join(
+					err,
+					rollbackErr,
+				)
+				if rollbackErr != nil {
+					err = lifecycle.RetainOwnership(err)
+				}
+				return nil, err
 			}
 		}
 	}
@@ -993,17 +1031,16 @@ func (dcjc *DynCfgJobController) prepareMutation(
 	)
 	if errors.Is(err, dyncfg.ErrGraphNoChange) {
 		if successor != nil {
-			return PrepareResourceTransaction(
+			return dcjc.prepareResourceTransaction(
 				ResourceTransactionSpec{
 					Scope: scope, Disposition: disposition,
 					Current: current, Successor: successor,
 					Graph:            dcjc.graph,
 					AfterGraphCommit: dependencyCommit,
-					AfterApply: func() {
-						dcjc.scheduler.retries.cancel(
-							scope.ID,
-						)
-					},
+					AfterApply: dcjc.retrySettlement(
+						scope.ID,
+						retry,
+					),
 					Result: result, Cleanup: cleanup,
 					SuccessorFailure: successorFailureResolver(
 						failurePlan,
@@ -1013,29 +1050,32 @@ func (dcjc *DynCfgJobController) prepareMutation(
 				},
 			)
 		}
-		return dcjc.noop(
+		return dcjc.noopWithAfterApply(
 			scope,
 			current,
 			unusedPermit,
 			result,
+			dcjc.retrySettlement(scope.ID, retry),
 			cleanup,
 		)
 	}
 	if err != nil {
 		if successor != nil {
+			rollbackErr := rejectPreparedSuccessor(
+				context.Background(),
+				successor,
+			)
 			err = errors.Join(
 				err,
-				rejectPreparedSuccessor(
-					context.Background(),
-					successor,
-				),
+				rollbackErr,
 			)
-		} else if unusedPermit.Valid() {
-			err = errors.Join(err, unusedPermit.AbortUnused())
+			if rollbackErr != nil {
+				err = lifecycle.RetainOwnership(err)
+			}
 		}
 		return nil, err
 	}
-	return PrepareResourceTransaction(
+	return dcjc.prepareResourceTransaction(
 		ResourceTransactionSpec{
 			Scope: scope, Disposition: disposition,
 			Current: current, Successor: successor,
@@ -1043,10 +1083,8 @@ func (dcjc *DynCfgJobController) prepareMutation(
 			Graph:        dcjc.graph, Mutation: mutation,
 			MutationPrepared: true,
 			AfterGraphCommit: dependencyCommit,
-			AfterApply: func() {
-				dcjc.scheduler.retries.cancel(scope.ID)
-			},
-			Result: result, Cleanup: cleanup,
+			AfterApply:       dcjc.retrySettlement(scope.ID, retry),
+			Result:           result, Cleanup: cleanup,
 			SuccessorFailure: successorFailureResolver(
 				failurePlan,
 				failedDependencyCommit,
@@ -1054,6 +1092,44 @@ func (dcjc *DynCfgJobController) prepareMutation(
 			),
 		},
 	)
+}
+
+func (dcjc *DynCfgJobController) retrySettlement(
+	id string,
+	token autoDetectionRetryToken,
+) func() {
+	if token.generation == 0 {
+		return func() {
+			dcjc.scheduler.retries.cancel(id)
+		}
+	}
+	return func() {
+		dcjc.scheduler.retries.cancelToken(id, token)
+	}
+}
+
+func (dcjc *DynCfgJobController) prepareResourceTransaction(
+	spec ResourceTransactionSpec,
+) (lifecycle.PreparedResourceTransaction, error) {
+	transaction, err := PrepareResourceTransaction(spec)
+	if err == nil {
+		return transaction, nil
+	}
+	var rollbackErr error
+	if spec.Graph != nil && spec.MutationPrepared {
+		rollbackErr = spec.Graph.Abort(spec.Mutation)
+	}
+	if spec.Successor != nil {
+		rollbackErr = errors.Join(
+			rollbackErr,
+			rejectPreparedSuccessor(context.Background(), spec.Successor),
+		)
+	}
+	err = errors.Join(err, rollbackErr)
+	if rollbackErr != nil {
+		err = lifecycle.RetainOwnership(err)
+	}
+	return nil, err
 }
 
 func (dcjc *DynCfgJobController) scheduleAutoDetectionRetry(
@@ -1158,6 +1234,24 @@ func (dcjc *DynCfgJobController) noop(
 	result lifecycle.SealedResult,
 	cleanups ...lifecycle.TaskCleanup,
 ) (lifecycle.PreparedResourceTransaction, error) {
+	return dcjc.noopWithAfterApply(
+		scope,
+		current,
+		permit,
+		result,
+		nil,
+		cleanups...,
+	)
+}
+
+func (dcjc *DynCfgJobController) noopWithAfterApply(
+	scope lifecycle.ResourceTransactionScope,
+	current lifecycle.ReadyResource,
+	permit lifecycle.LongLivedPermit,
+	result lifecycle.SealedResult,
+	afterApply func(),
+	cleanups ...lifecycle.TaskCleanup,
+) (lifecycle.PreparedResourceTransaction, error) {
 	cleanup := joinDynCfgCleanups(cleanups...)
 	return PrepareNoopResourceTransaction(
 		scope,
@@ -1165,6 +1259,7 @@ func (dcjc *DynCfgJobController) noop(
 		permit,
 		result,
 		cleanup,
+		afterApply,
 	)
 }
 

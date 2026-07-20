@@ -364,12 +364,6 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	if err := functions.Bind(kernel); err != nil {
 		return nil, errors.Join(err, functions.abortConstruction())
 	}
-	if err := dynCfgJobs.BindAutoDetectionRetries(
-		kernel,
-		run.Generation(),
-	); err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
-	}
 	if err := secretController.Bind(
 		secretDependentJobBinding{controller: dynCfgJobs},
 	); err != nil {
@@ -418,24 +412,36 @@ func (rg *runGeneration) start(ctx context.Context) error {
 	rg.mu.Lock()
 	rg.started = true
 	rg.mu.Unlock()
-	if err := rg.run.OpenAdmission(); err != nil {
+	if err := rg.dyncfg.BindAutoDetectionRetries(
+		rg.kernel,
+		rg.run.Generation(),
+		func(err error) {
+			rg.run.Dirty(err)
+			rg.kernel.NotifyControlReady()
+		},
+	); err != nil {
 		rg.run.Dirty(err)
 		rg.kernel.Stop()
+		return err
+	}
+	if err := rg.run.OpenAdmission(); err != nil {
+		rg.run.Dirty(err)
+		rg.Stop()
 		return err
 	}
 	if err := rg.functions.Activate(); err != nil {
 		rg.run.Dirty(err)
-		rg.kernel.Stop()
+		rg.Stop()
 		return err
 	}
 	if err := rg.vnodes.publishInitial(ctx, rg.kernel); err != nil {
 		rg.run.Dirty(err)
-		rg.kernel.Stop()
+		rg.Stop()
 		return err
 	}
 	if err := rg.secrets.PublishInitial(ctx, rg.kernel); err != nil {
 		rg.run.Dirty(err)
-		rg.kernel.Stop()
+		rg.Stop()
 		return err
 	}
 	if err := rg.dyncfg.PublishInitial(
@@ -445,12 +451,12 @@ func (rg *runGeneration) start(ctx context.Context) error {
 		rg.initialJobs,
 	); err != nil {
 		rg.run.Dirty(err)
-		rg.kernel.Stop()
+		rg.Stop()
 		return err
 	}
 	if err := rg.startDiscovery(ctx); err != nil {
 		rg.run.Dirty(err)
-		rg.kernel.Stop()
+		rg.Stop()
 		return err
 	}
 	return nil
@@ -483,7 +489,7 @@ func (rg *runGeneration) abortConstruction() error {
 
 func (rg *runGeneration) Stop() {
 	if rg != nil && rg.kernel != nil {
-		rg.scheduler.CloseAutoDetectionRetries()
+		rg.scheduler.StopAutoDetectionRetries()
 		rg.kernel.Stop()
 	}
 }
@@ -495,9 +501,19 @@ func (rg *runGeneration) Wait(ctx context.Context) error {
 	waitErr := rg.kernel.Wait(ctx)
 	select {
 	case <-rg.kernel.Done():
-		return errors.Join(waitErr, rg.releaseRuntimeMetrics())
+		rg.scheduler.StopAutoDetectionRetries()
 	default:
-		return waitErr
+	}
+	retryErr := rg.scheduler.WaitAutoDetectionRetries(ctx)
+	select {
+	case <-rg.kernel.Done():
+		return errors.Join(
+			waitErr,
+			retryErr,
+			rg.releaseRuntimeMetrics(),
+		)
+	default:
+		return errors.Join(waitErr, retryErr)
 	}
 }
 

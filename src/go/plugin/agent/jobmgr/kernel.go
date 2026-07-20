@@ -2491,7 +2491,14 @@ func (ck *CommandKernel) completeCapabilityTask(operation *commandOperation, com
 		kind = lifecycle.TaskActionCommitCapability
 	}
 	if completion.Err != nil {
-		ck.dirtyCapability(operation, completion.Err)
+		if ck.cleanStoppingPreparation(operation, completion.Err) {
+			operation.terminalErr = errors.Join(
+				operation.terminalErr,
+				completion.Err,
+			)
+		} else {
+			ck.dirtyCapability(operation, completion.Err)
+		}
 	}
 	action := lifecycle.TaskAction{Ref: completion.Ref, Sequence: completion.Sequence + 1, Kind: kind}
 	if kind == lifecycle.TaskActionCommitCapability {
@@ -2515,7 +2522,9 @@ func (ck *CommandKernel) completeResourceTask(operation *commandOperation, compl
 				ck.run.Dirty(errors.New("jobmgr kernel: install task returned the wrong outcome"))
 				return
 			}
-			kind = lifecycle.TaskActionAcceptStart
+			if !operation.cancelled {
+				kind = lifecycle.TaskActionAcceptStart
+			}
 		case ResourceStop:
 			if completion.Kind != lifecycle.TaskOutcomeReadyResource {
 				ck.run.Dirty(errors.New("jobmgr kernel: stop task returned the wrong outcome"))
@@ -2528,7 +2537,13 @@ func (ck *CommandKernel) completeResourceTask(operation *commandOperation, compl
 		}
 	}
 	if completion.Err != nil {
-		ck.run.Dirty(completion.Err)
+		operation.terminalErr = errors.Join(
+			operation.terminalErr,
+			completion.Err,
+		)
+		if !ck.cleanStoppingPreparation(operation, completion.Err) {
+			ck.run.Dirty(completion.Err)
+		}
 	}
 	action := lifecycle.TaskAction{Ref: completion.Ref, Sequence: completion.Sequence + 1, Kind: kind}
 	if kind == lifecycle.TaskActionAcceptStart {
@@ -2541,6 +2556,16 @@ func (ck *CommandKernel) completeResourceTask(operation *commandOperation, compl
 	if err := ck.tasks.SendAction(action); err != nil {
 		ck.run.Dirty(err)
 	}
+}
+
+func (ck *CommandKernel) cleanStoppingPreparation(
+	operation *commandOperation,
+	err error,
+) bool {
+	return operation != nil &&
+		operation.cancelled &&
+		err != nil &&
+		err == ck.run.StoppingCause()
 }
 
 func (ck *CommandKernel) completeResourceTransactionTask(
@@ -2568,6 +2593,9 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 			if err := ck.restoreTransactionCurrent(operation, current); err != nil {
 				ck.run.Dirty(errors.Join(completion.Err, err))
 				return
+			}
+			if lifecycle.OwnershipRetained(completion.Err) {
+				ck.run.Dirty(completion.Err)
 			}
 			operation.terminalErr = errors.Join(
 				operation.terminalErr,
@@ -3417,9 +3445,6 @@ func (ck *CommandKernel) cancelOperation(uid string) {
 		ck.sendDisposeAction(operation)
 		return
 	}
-	if operation.Child == lifecycle.ChildActionPending && cancellablePendingAction(operation) {
-		_ = ck.tasks.Cancel(operation.Task)
-	}
 }
 
 func (ck *CommandKernel) sendDisposeAction(operation *commandOperation) {
@@ -3495,21 +3520,12 @@ func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 			}
 			operation.resultGrowthWaiting = false
 			ck.sendDisposeAction(operation)
-		} else if operation.Child == lifecycle.ChildActionPending && cancellablePendingAction(operation) {
-			_ = ck.tasks.CancelWithCause(operation.Task, context.DeadlineExceeded)
 		}
 		if operation.Response != lifecycle.ResponseNotRequired && !deferControl {
 			ck.enqueueControl(operation, lifecycle.ControlDeadline)
 		}
 	}
 	return ck.deadlines.Len() > 0 && !ck.deadlines[0].when.After(now)
-}
-
-func cancellablePendingAction(operation *commandOperation) bool {
-	return operation != nil &&
-		(operation.plan.Capability != nil ||
-			operation.plan.Resource != nil ||
-			operation.plan.Transaction != nil)
 }
 
 func requiresCooperativeDeadlineStart(operation *commandOperation) bool {
@@ -4185,9 +4201,6 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 			}
 		}
 	case lifecycle.ChildActionPending:
-		if shutdownCancellablePendingAction(operation) {
-			_ = ck.tasks.Cancel(operation.Task)
-		}
 	case lifecycle.ChildAbandonedBeforeStart,
 		lifecycle.ChildActionAcknowledged,
 		lifecycle.ChildTerminationPending,
@@ -4196,14 +4209,6 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 		return errors.New("jobmgr kernel: invalid shutdown child state")
 	}
 	return nil
-}
-
-func shutdownCancellablePendingAction(operation *commandOperation) bool {
-	return operation != nil &&
-		(operation.plan.Capability != nil ||
-			operation.plan.Transaction != nil ||
-			operation.plan.Resource != nil &&
-				operation.plan.Resource.Action == ResourceInstall)
 }
 
 func cancellationControl(operation *commandOperation) lifecycle.ControlStatus {

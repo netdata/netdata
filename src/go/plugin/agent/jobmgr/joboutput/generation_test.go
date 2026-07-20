@@ -122,6 +122,7 @@ func TestPreparedTransactionRejectsStaleUnusedPermitAtConstruction(t *testing.T)
 		permit,
 		result,
 		func() error { return nil },
+		nil,
 	)
 	require.Error(t, err)
 

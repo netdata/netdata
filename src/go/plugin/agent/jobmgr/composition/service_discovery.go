@@ -212,6 +212,7 @@ func (sdb *serviceDiscoveryBinding) prepare(
 				"Service discovery configuration is not available.",
 			),
 			func() error { return nil },
+			nil,
 		)
 	}
 	function := frameworkfunctions.Function{
@@ -234,6 +235,7 @@ func (sdb *serviceDiscoveryBinding) prepare(
 		lifecycle.LongLivedPermit{},
 		result,
 		cleanup,
+		nil,
 	)
 }
 

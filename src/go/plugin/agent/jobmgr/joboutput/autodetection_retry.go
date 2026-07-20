@@ -27,20 +27,29 @@ type autoDetectionRetryToken struct {
 type autoDetectionRetryIndex struct {
 	mu sync.Mutex
 
-	entries    map[string]*autoDetectionRetry
-	queue      autoDetectionRetryHeap
-	commands   jobmgr.PreparedCommandPort
-	plan       autoDetectionRetryPlanner
-	run        uint64
-	clock      int
-	generation uint64
-	closed     bool
+	entries          map[string]*autoDetectionRetry
+	queue            autoDetectionRetryHeap
+	commands         jobmgr.PreparedCommandPort
+	plan             autoDetectionRetryPlanner
+	failure          func(error)
+	run              uint64
+	logicalClock     int64
+	lastProcessClock int
+	clockInitialized bool
+	generation       uint64
+	bound            bool
+	closed           bool
+	failed           bool
+	wake             chan struct{}
+	stop             chan struct{}
+	done             chan struct{}
+	failOnce         sync.Once
 }
 
 type autoDetectionRetry struct {
 	config confgroup.Config
 	token  autoDetectionRetryToken
-	due    int
+	due    int64
 	index  int
 }
 
@@ -49,6 +58,9 @@ type autoDetectionRetryHeap []*autoDetectionRetry
 func newAutoDetectionRetryIndex() *autoDetectionRetryIndex {
 	return &autoDetectionRetryIndex{
 		entries: make(map[string]*autoDetectionRetry),
+		wake:    make(chan struct{}, 1),
+		stop:    make(chan struct{}),
+		done:    make(chan struct{}),
 	}
 }
 
@@ -56,25 +68,29 @@ func (adri *autoDetectionRetryIndex) bind(
 	commands jobmgr.PreparedCommandPort,
 	plan autoDetectionRetryPlanner,
 	run uint64,
+	failure func(error),
 ) error {
-	if adri == nil || commands == nil || plan == nil || run == 0 {
+	if adri == nil || commands == nil || plan == nil || run == 0 ||
+		failure == nil {
 		return errors.New(
 			"job output: invalid autodetection retry binding",
 		)
 	}
 	adri.mu.Lock()
-	defer adri.mu.Unlock()
 	if adri.closed ||
-		adri.commands != nil ||
-		adri.plan != nil ||
-		adri.run != 0 {
+		adri.bound {
+		adri.mu.Unlock()
 		return errors.New(
 			"job output: autodetection retries already bound",
 		)
 	}
 	adri.commands = commands
 	adri.plan = plan
+	adri.failure = failure
 	adri.run = run
+	adri.bound = true
+	adri.mu.Unlock()
+	go adri.runWorker()
 	return nil
 }
 
@@ -94,19 +110,23 @@ func (adri *autoDetectionRetryIndex) schedule(
 		return
 	}
 	adri.mu.Lock()
-	defer adri.mu.Unlock()
-	if adri.closed {
+	if adri.closed || adri.failed {
+		adri.mu.Unlock()
 		return
 	}
 	if current := adri.entries[config.FullName()]; current != nil {
-		heap.Remove(&adri.queue, current.index)
+		if current.index >= 0 {
+			heap.Remove(&adri.queue, current.index)
+		}
 		delete(adri.entries, config.FullName())
 	}
 	adri.generation++
 	if adri.generation == 0 {
-		adri.closed = true
-		adri.entries = make(map[string]*autoDetectionRetry)
-		adri.queue = nil
+		adri.failed = true
+		adri.mu.Unlock()
+		adri.fail(errors.New(
+			"job output: autodetection retry generation wrapped",
+		))
 		return
 	}
 	retry := &autoDetectionRetry{
@@ -115,11 +135,16 @@ func (adri *autoDetectionRetryIndex) schedule(
 			uid:        cloned.UID(),
 			generation: adri.generation,
 		},
-		due:   adri.clock + after,
+		due:   adri.logicalClock + int64(after),
 		index: -1,
 	}
 	adri.entries[cloned.FullName()] = retry
 	heap.Push(&adri.queue, retry)
+	due := retry.due <= adri.logicalClock
+	adri.mu.Unlock()
+	if due {
+		adri.notify()
+	}
 }
 
 func (adri *autoDetectionRetryIndex) cancel(id string) {
@@ -132,79 +157,195 @@ func (adri *autoDetectionRetryIndex) cancel(id string) {
 	if retry == nil {
 		return
 	}
-	heap.Remove(&adri.queue, retry.index)
+	if retry.index >= 0 {
+		heap.Remove(&adri.queue, retry.index)
+	}
 	delete(adri.entries, id)
 }
 
-func (adri *autoDetectionRetryIndex) close() {
+func (adri *autoDetectionRetryIndex) cancelToken(
+	id string,
+	token autoDetectionRetryToken,
+) {
+	if adri == nil || id == "" || token.generation == 0 {
+		return
+	}
+	adri.mu.Lock()
+	defer adri.mu.Unlock()
+	retry := adri.entries[id]
+	if retry == nil || retry.token != token {
+		return
+	}
+	if retry.index >= 0 {
+		heap.Remove(&adri.queue, retry.index)
+	}
+	delete(adri.entries, id)
+}
+
+func (adri *autoDetectionRetryIndex) isCurrent(
+	id string,
+	token autoDetectionRetryToken,
+) bool {
+	if adri == nil || id == "" || token.generation == 0 {
+		return false
+	}
+	adri.mu.Lock()
+	defer adri.mu.Unlock()
+	retry := adri.entries[id]
+	return retry != nil && retry.token == token
+}
+
+func (adri *autoDetectionRetryIndex) stopWorker() {
 	if adri == nil {
 		return
 	}
 	adri.mu.Lock()
+	if adri.closed {
+		adri.mu.Unlock()
+		return
+	}
 	adri.closed = true
 	adri.entries = make(map[string]*autoDetectionRetry)
 	adri.queue = nil
+	close(adri.stop)
 	adri.mu.Unlock()
+	adri.notify()
 }
 
-func (adri *autoDetectionRetryIndex) dispatchDue(
+func (adri *autoDetectionRetryIndex) wait(
 	ctx context.Context,
-	clock int,
 ) error {
 	if adri == nil || ctx == nil {
 		return errors.New(
-			"job output: invalid autodetection retry dispatch",
+			"job output: invalid autodetection retry wait",
 		)
 	}
 	adri.mu.Lock()
-	adri.clock = clock
-	if adri.closed {
-		adri.mu.Unlock()
-		return nil
-	}
-	commands := adri.commands
-	plan := adri.plan
-	run := adri.run
-	var due []*autoDetectionRetry
-	for len(adri.queue) > 0 &&
-		adri.queue[0].due <= clock {
-		retry := heap.Pop(&adri.queue).(*autoDetectionRetry)
-		delete(adri.entries, retry.config.FullName())
-		due = append(due, retry)
-	}
+	bound := adri.bound
+	done := adri.done
 	adri.mu.Unlock()
-
-	if len(due) == 0 {
+	if !bound {
 		return nil
 	}
-	if commands == nil || plan == nil || run == 0 {
-		return errors.New(
-			"job output: due autodetection retry is unbound",
-		)
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	var result error
-	for _, retry := range due {
-		work, err := plan(retry.config, retry.token)
-		if err == nil {
-			err = commands.SubmitPrepared(
-				ctx,
-				jobmgr.Request{
-					UID: fmt.Sprintf(
-						"jobmgr-autodetection-retry-%d-%d",
-						run,
-						retry.token.generation,
-					),
-					LaneKey: retry.config.FullName(),
-					Source:  lifecycle.SourceJobManager,
-					Route: "internal/jobs/" +
-						"autodetection-retry",
-				},
-				work,
-			)
+}
+
+func (adri *autoDetectionRetryIndex) advance(processClock int) {
+	if adri == nil {
+		return
+	}
+	adri.mu.Lock()
+	if adri.closed || adri.failed {
+		adri.mu.Unlock()
+		return
+	}
+	if !adri.clockInitialized {
+		adri.lastProcessClock = processClock
+		adri.clockInitialized = true
+		adri.mu.Unlock()
+		return
+	}
+	if processClock < adri.lastProcessClock {
+		adri.failed = true
+		adri.mu.Unlock()
+		adri.fail(errors.New(
+			"job output: autodetection retry process clock regressed",
+		))
+		return
+	}
+	adri.logicalClock += int64(processClock - adri.lastProcessClock)
+	adri.lastProcessClock = processClock
+	due := len(adri.queue) > 0 &&
+		adri.queue[0].due <= adri.logicalClock
+	adri.mu.Unlock()
+	if due {
+		adri.notify()
+	}
+}
+
+func (adri *autoDetectionRetryIndex) runWorker() {
+	defer close(adri.done)
+	for {
+		select {
+		case <-adri.stop:
+			return
+		case <-adri.wake:
 		}
-		result = errors.Join(result, err)
+		for {
+			retry := adri.takeDue()
+			if retry == nil {
+				break
+			}
+			if err := adri.dispatch(retry); err != nil {
+				if _, stopping := errors.AsType[*lifecycle.StoppingRejection](err); stopping {
+					return
+				}
+				adri.fail(err)
+				return
+			}
+		}
 	}
-	return result
+}
+
+func (adri *autoDetectionRetryIndex) takeDue() *autoDetectionRetry {
+	adri.mu.Lock()
+	defer adri.mu.Unlock()
+	if adri.closed || adri.failed ||
+		len(adri.queue) == 0 ||
+		adri.queue[0].due > adri.logicalClock {
+		return nil
+	}
+	return heap.Pop(&adri.queue).(*autoDetectionRetry)
+}
+
+func (adri *autoDetectionRetryIndex) dispatch(
+	retry *autoDetectionRetry,
+) error {
+	work, err := adri.plan(retry.config, retry.token)
+	if err != nil {
+		return err
+	}
+	return adri.commands.SubmitPrepared(
+		context.Background(),
+		jobmgr.Request{
+			UID: fmt.Sprintf(
+				"jobmgr-autodetection-retry-%d-%d",
+				adri.run,
+				retry.token.generation,
+			),
+			LaneKey: retry.config.FullName(),
+			Source:  lifecycle.SourceJobManager,
+			Route:   "internal/jobs/autodetection-retry",
+		},
+		work,
+	)
+}
+
+func (adri *autoDetectionRetryIndex) notify() {
+	select {
+	case adri.wake <- struct{}{}:
+	default:
+	}
+}
+
+func (adri *autoDetectionRetryIndex) fail(err error) {
+	if err == nil {
+		return
+	}
+	adri.failOnce.Do(func() {
+		adri.mu.Lock()
+		adri.failed = true
+		failure := adri.failure
+		adri.mu.Unlock()
+		if failure != nil {
+			failure(err)
+		}
+	})
 }
 
 func (h autoDetectionRetryHeap) Len() int {

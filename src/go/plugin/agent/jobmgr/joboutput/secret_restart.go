@@ -172,7 +172,8 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 					permit,
 				)
 				if prepareErr != nil {
-					if ctx.Err() != nil {
+					if ctx.Err() != nil ||
+						lifecycle.OwnershipRetained(prepareErr) {
 						return nil, prepareErr
 					}
 					state.setError(prepareErr)
