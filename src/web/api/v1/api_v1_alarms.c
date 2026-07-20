@@ -50,8 +50,6 @@ int api_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url) {
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 alarm_count query param '%s' with value '%s'", w->id, name, value);
-
         char* p = value;
         if(!strcmp(name, "status")) {
             while ((*p = (char)toupper((uint8_t)*p))) p++;
@@ -154,4 +152,3 @@ cleanup:
 int api_v1_alarm_variables(RRDHOST *host, struct web_client *w, char *url) {
     return api_v1_single_chart_helper(host, w, url, health_api_v1_chart_variables2json);
 }
-

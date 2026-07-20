@@ -312,8 +312,8 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     };
     ND_LOG_STACK_PUSH(lgs);
 
-    internal_error(true, "WEBRTC[%d],DC[%d]: got request '%s' of size %zu and type %s.",
-                   chan->conn->pc, chan->dc, request, size, binary?"binary":"text");
+    internal_error(true, "WEBRTC[%d],DC[%d]: got request of size %zu and type %s.",
+                   chan->conn->pc, chan->dc, size, binary ? "binary" : "text");
 
     struct web_client *w = web_client_get_from_cache();
     w->statistics.received_bytes = size;

@@ -397,27 +397,26 @@ unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int mins_ms
     return delay;
 }
 
-static inline int aclk_parse_userpass_pair(const char *src, const char c, char **a, char **b)
+static inline int aclk_parse_userpass_pair(const char *src, size_t src_length, const char c, char **a, char **b)
 {
-    const char *ptr = strchr(src, c);
+    const char *ptr = memchr(src, c, src_length);
     if (ptr == NULL)
         return 1;
 
-    char *tmp_a = callocz(1, ptr - src + 1);
-    memcpy(tmp_a, src, ptr - src);
-
-    char *decoded_a = callocz(1, ptr - src + 1);
-    bool decoded_a_ok = url_decode_r(decoded_a, tmp_a, ptr - src + 1) != NULL;
-    aclk_sensitive_free(&tmp_a);
+    size_t encoded_a_length = (size_t)(ptr - src);
+    char *decoded_a = callocz(1, encoded_a_length + 1);
+    bool decoded_a_ok =
+        url_decode_r_len(decoded_a, encoded_a_length + 1, src, encoded_a_length, NULL) == URL_DECODE_OK;
     if(!decoded_a_ok) {
         aclk_sensitive_free(&decoded_a);
         return 1;
     }
 
-    char *tmp_b = strdupz(ptr+1);
-    char *decoded_b = callocz(1, strlen(tmp_b) + 1);
-    bool decoded_b_ok = url_decode_r(decoded_b, tmp_b, strlen(tmp_b) + 1) != NULL;
-    aclk_sensitive_free(&tmp_b);
+    const char *encoded_b = ptr + 1;
+    size_t encoded_b_length = src_length - encoded_a_length - 1;
+    char *decoded_b = callocz(1, encoded_b_length + 1);
+    bool decoded_b_ok =
+        url_decode_r_len(decoded_b, encoded_b_length + 1, encoded_b, encoded_b_length, NULL) == URL_DECODE_OK;
     if(!decoded_b_ok) {
         aclk_sensitive_free(&decoded_a);
         aclk_sensitive_free(&decoded_b);
@@ -435,16 +434,34 @@ int aclk_util_unittest(void) {
     char *username = NULL;
     char *password = NULL;
 
-    if(aclk_parse_userpass_pair("user%40name:pass%21", ':', &username, &password) ||
+    if(aclk_parse_userpass_pair(
+           "user%40name:pass%21", sizeof("user%40name:pass%21") - 1, ':', &username, &password) ||
        !username || strcmp(username, "user@name") || !password || strcmp(password, "pass!"))
         errors++;
     aclk_sensitive_free(&username);
     aclk_sensitive_free(&password);
 
-    if(!aclk_parse_userpass_pair("user%GGname:password", ':', &username, &password) || username || password)
+    static const char bounded[] = "bounded:secret:ignored";
+    if(aclk_parse_userpass_pair(
+           bounded, sizeof("bounded:secret") - 1, ':', &username, &password) ||
+       !username || strcmp(username, "bounded") || !password || strcmp(password, "secret"))
+        errors++;
+    aclk_sensitive_free(&username);
+    aclk_sensitive_free(&password);
+
+    if(!aclk_parse_userpass_pair(
+           "username:password", sizeof("username") - 1, ':', &username, &password) ||
+       username || password)
         errors++;
 
-    if(!aclk_parse_userpass_pair("username:pass%", ':', &username, &password) || username || password)
+    if(!aclk_parse_userpass_pair(
+           "user%GGname:password", sizeof("user%GGname:password") - 1, ':', &username, &password) ||
+       username || password)
+        errors++;
+
+    if(!aclk_parse_userpass_pair(
+           "username:pass%", sizeof("username:pass%") - 1, ':', &username, &password) ||
+       username || password)
         errors++;
 
     if(errors)
@@ -504,8 +521,9 @@ void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd,
         ptr += strlen(prefix);
 
     if ((tmp = strchr(ptr, '@'))) {
+        size_t credentials_length = (size_t)(tmp - ptr);
         *tmp = 0;
-        if(aclk_parse_userpass_pair(ptr, ':', uname, pwd)) {
+        if(aclk_parse_userpass_pair(ptr, credentials_length, ':', uname, pwd)) {
             error_report("Failed to get username and password for proxy. Will attempt connection without authentication");
         }
         ptr = tmp+1;

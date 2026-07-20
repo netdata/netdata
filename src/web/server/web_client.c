@@ -689,6 +689,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
         web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
         query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
                                        buffer_tostring(w->url_as_received),
+                                       buffer_strlen(w->url_as_received),
                                        w->payload,
                                        w->user_auth.forwarded_for[0] ? w->user_auth.forwarded_for : w->user_auth.client_ip);
     }
@@ -1574,6 +1575,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
                 query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
                                                buffer_tostring(w->url_as_received),
+                                               buffer_strlen(w->url_as_received),
                                                w->payload,
                                                w->user_auth.forwarded_for[0] ? w->user_auth.forwarded_for : w->user_auth.client_ip);
             }

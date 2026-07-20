@@ -623,10 +623,11 @@ int buffer_unittest(void) {
         buffer_content_summary(wb, content, sizeof(content));
 
         char suffix[128];
-        snprintfz(suffix, sizeof(suffix), "... [truncated, original_length=%zu, xxh3=%016" PRIx64 "]",
-                  sizeof(content), XXH3_64bits(content, sizeof(content)));
+        size_t suffix_length = (size_t)snprintfz(
+            suffix, sizeof(suffix), "... [truncated, original_length=%zu, xxh3=%016" PRIx64 "]",
+            sizeof(content), XXH3_64bits(content, sizeof(content)));
 
-        if(buffer_strlen(wb) != BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH + strlen(suffix) ||
+        if(buffer_strlen(wb) != BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH + suffix_length ||
            memcmp(buffer_tostring(wb), content, BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH) != 0 ||
            strcmp(buffer_tostring(wb) + BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH, suffix) != 0)
             errors++;

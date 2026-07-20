@@ -3,7 +3,8 @@
 #include "api_v1_calls.h"
 
 int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
-    netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
+    netdata_log_debug(
+        D_WEB_CLIENT, "%llu: API v1 data request '%s'", w->id, buffer_tostring(w->url_for_logging));
 
     int ret = HTTP_RESP_BAD_REQUEST;
     BUFFER *dimensions = NULL;
@@ -44,8 +45,6 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
         char *name = strsep_skip_consecutive_separators(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
-
-        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
 
         // name and value are now the parameters
         // they are not null and not empty
@@ -208,16 +207,14 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
 
     if(outFileName && *outFileName) {
         buffer_sprintf(w->response.header, "Content-Disposition: attachment; filename=\"%s\"\r\n", outFileName);
-        netdata_log_debug(D_WEB_CLIENT, "%llu: generating outfilename header: '%s'", w->id, outFileName);
+        netdata_log_debug(D_WEB_CLIENT, "%llu: generating outfilename header", w->id);
     }
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(responseHandler == NULL)
             responseHandler = "google.visualization.Query.setResponse";
 
-        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP: version = '%s', reqId = '%s', sig = '%s', out = '%s', responseHandler = '%s', outFileName = '%s'",
-                          w->id, google_version, google_reqId, google_sig, google_out, responseHandler, outFileName
-        );
+        netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: GOOGLE JSON/JSONP request", w->id);
 
         buffer_sprintf(
             w->response.data,
