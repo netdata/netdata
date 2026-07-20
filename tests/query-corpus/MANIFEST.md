@@ -27,6 +27,8 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | L2/sn-vs-original | tiers aggregate ORIGINAL collected doubles, not tier0-quantized values (2^24+1 discriminates) | green | n/a | |
 | L2/update-every-5 | tier grid arithmetic scales with update_every (granularity ue×grouping) | green | n/a | |
 | L2/tier2 | second-level rollup (3600s windows) over replicated history incl. gap run; tier1 cross-checked on identical data | green | n/a | |
+| L2/update-every-sweep | ue {10,30,60,600,3600}: tier0 identity, tier1 windows on the scaled grid, time-group buckets in both grid modes (absolute-aligned + unaligned); v1 rate contract at ue=10 | green | n/a | |
+| L1/off-grid-timestamps | off-grid pushes: storage keeps pushed times exactly; views re-grid to absolute ue multiples with boundary interpolation (envelope-pinned; exact oracle = layer 9) | green | n/a | |
 | CASE-016/fresh-host-forgotten-on-restart | child connected <5s before a graceful restart is forgotten (pending host metadata never flushed at shutdown); its dbengine data orphaned | **red** | n/a | |
 | L3/families | every time_group equals its Go oracle over the mixed palette at group 10 (incl. stddev/cv Welford, median value-range trim + R-7, percentile/trimmed-mean slot-window means, ses/des running state, incremental-sum carry, countif grammar) | green | n/a | |
 | L3/sign-semantics | percentile/trimmed-mean top-walk on negative buckets; extremes champions by abs; all-negative + mixed fixtures | green | n/a | |
