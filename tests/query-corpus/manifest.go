@@ -142,7 +142,7 @@ var manifest = map[string]ManifestCase{
 		Agent:  Green,
 	},
 	"L6/two-pass-matrix": {
-		Proves: "two-pass group-by chains whose pass-1 accumulator IS the group value (sum→sum, min→min, max→max, extremes→extremes, sum→average) match the mechanics oracle, incl. PARTIAL propagation through both passes",
+		Proves: "two-pass mechanics oracle over 10 key-chains (incl. cross-key: pass 1 partitions by the UNION of both passes' keys) x 8 agg-chains (incl. mixed) x non-raw/raw: values, PARTIAL propagation, group_by_label[1]; ANOMALY RATE accumulates raw through both passes and divides ONCE by the final group count — inflated by members-per-group for EVERY chain (ar analog of the avg-of-sums family, pinned as current mechanics; rollup SOW evidence); raw pin: point count = number of pass-1 GROUPS, values/ar unconverted",
 		Agent:  Green,
 	},
 	"CASE-018/multipass-average": {
