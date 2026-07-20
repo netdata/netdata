@@ -776,6 +776,15 @@ static inline bool lqs_request_parse_and_validate(LOGS_QUERY_STATUS *lqs, BUFFER
        __builtin_sub_overflow(rq->before_s, (time_t)LQS_DEFAULT_QUERY_DURATION, &rq->after_s))
         rq->after_s = rq->before_s;
 
+    // extreme absolute inputs must not wrap the unsigned seconds->microseconds
+    // conversion below (pre-1970 seconds are unrepresentable here; usec_t caps
+    // the upper bound). saturate both endpoints into the representable range.
+    const usec_t lqs_max_time_s = (UINT64_MAX - (USEC_PER_SEC - 1)) / USEC_PER_SEC;
+    if(rq->after_s < 0) rq->after_s = 0;
+    if(rq->before_s < 0) rq->before_s = 0;
+    if((usec_t)rq->after_s > lqs_max_time_s) rq->after_s = (time_t)lqs_max_time_s;
+    if((usec_t)rq->before_s > lqs_max_time_s) rq->before_s = (time_t)lqs_max_time_s;
+
     rq->after_ut = rq->after_s * USEC_PER_SEC;
     rq->before_ut = (rq->before_s * USEC_PER_SEC) + USEC_PER_SEC - 1;
 
