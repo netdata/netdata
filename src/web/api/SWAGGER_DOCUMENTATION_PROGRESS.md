@@ -2949,7 +2949,7 @@ Per dimension:
 **Possible Error Scenarios:**
 - `400 Bad Request` - Invalid file parameter, invalid host, missing version in payload, invalid JSON payload, missing payload on PUT, unauthorized file access for anonymous users, invalid HTTP method
 - `409 Conflict` - Version mismatch (caller must reload and reapply changes)
-- `413 Payload Too Large` - PUT payload exceeds 20 MiB (20,971,520 bytes)
+- `413 Content Too Large` - PUT payload exceeds 20 MiB (20,971,520 bytes)
 - `500 Internal Server Error` - Settings path creation failure, file I/O errors
 
 ### SPECIAL BEHAVIORS

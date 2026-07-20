@@ -32,7 +32,7 @@ static inline HTTP_VALIDATION web_client_request_size_validation(size_t size) {
 static inline short http_validation_error_to_response_code(HTTP_VALIDATION validation) {
     switch(validation) {
         case HTTP_VALIDATION_REQUEST_TOO_LARGE:
-            return HTTP_RESP_CONTENT_TOO_LONG;
+            return HTTP_RESP_CONTENT_TOO_LARGE;
         case HTTP_VALIDATION_REQUEST_TIMEOUT:
             return HTTP_RESP_REQUEST_TIMEOUT;
         default:

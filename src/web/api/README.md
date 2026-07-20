@@ -20,7 +20,7 @@ Explore the Agent API using:
 
 The Agent accepts a complete encoded HTTP request of up to 1,048,576 bytes,
 including the request line, headers, and body. A larger request is rejected with
-HTTP `413 Content Too Long`. Proxies, load balancers, browsers, and Netdata Cloud
+HTTP `413 Content Too Large`. Proxies, load balancers, browsers, and Netdata Cloud
 paths may enforce lower limits before a request reaches the Agent.
 
 ## Cloud API

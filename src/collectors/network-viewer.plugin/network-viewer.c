@@ -240,7 +240,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_response_check(BUFFER *wb, NV_TOPOLOGY_
 static int topology_abort_http_code(NV_TOPOLOGY_ABORT_STATUS status)
 {
     if(status == NV_TOPOLOGY_ABORT_TOO_LARGE)
-        return HTTP_RESP_CONTENT_TOO_LONG;
+        return HTTP_RESP_CONTENT_TOO_LARGE;
 
     return status == NV_TOPOLOGY_ABORT_CANCELLED ?
         HTTP_RESP_CLIENT_CLOSED_REQUEST : HTTP_RESP_GATEWAY_TIMEOUT;
