@@ -887,7 +887,7 @@ jobs:
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Init python environment for publish release metadata
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         id: init-python
         with:
           python-version: "3.12"
