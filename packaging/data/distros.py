@@ -209,7 +209,7 @@ class BasicDistroEntry:
 class DistroData(BaseModel):
     model_config = PYDANTIC_CONFIG
 
-    _defaults: Annotated[dict[str, Any], Field(
+    anchors: Annotated[dict[str, Any], Field(
         title='Unparsed Values for YAML Anchors',
         description='Mapping used to hold YAML fragments that get reused throughout the file via anchors.',
         default_factory=dict,

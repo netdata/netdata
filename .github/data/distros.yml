@@ -45,7 +45,7 @@ docker_arches:  # Docker build archtiectures
   - amd64
   - armv7l
   - arm64
-_defaults:
+anchors:
   sentry: &default_sentry # Default configuration for Sentry usage
     amd64: false
     x86_64: false
