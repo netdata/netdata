@@ -7,6 +7,28 @@ static char *cached_run_dir = NULL;
 static bool cached_run_dir_available = false;
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
+static uid_t target_uid = (uid_t)-1;
+
+void os_run_dir_set_target_uid(uid_t uid) {
+    __atomic_store_n(&target_uid, uid, __ATOMIC_RELEASE);
+}
+
+// The accounts a run directory may belong to without it being somebody else's:
+// root, whoever we are now, and the uid we are about to become. getuid() is
+// checked as well as geteuid() because the setuid-root plugins (apps.plugin,
+// network-viewer.plugin, ...) run with euid 0 and the netdata uid as their real
+// uid, and must accept the same run dir the daemon created.
+static inline bool run_dir_owner_is_ours(uid_t owner) {
+    if (owner == 0 || owner == geteuid() || owner == getuid())
+        return true;
+
+    uid_t target = __atomic_load_n(&target_uid, __ATOMIC_ACQUIRE);
+    return target != (uid_t)-1 && owner == target;
+}
+
+// Parent-directory check. Follows symlinks intentionally: parents such as
+// /var/run are frequently a symlink to /run on modern systems, so rejecting a
+// symlinked parent would break the /var/run branch everywhere.
 static inline bool is_dir_accessible(const char *dir, bool rw) {
     struct stat st;
     if (stat(dir, &st) == -1)
@@ -22,30 +44,114 @@ static inline bool is_dir_accessible(const char *dir, bool rw) {
     return true;
 }
 
+// Run-directory (leaf) check. netdata binds its sockets here and chowns it while
+// still running as root, so this directory must not be one another local user
+// controls. Unlike the parent check above it uses lstat(),
+// so intermediate symlinks (/var/run -> /run) still resolve, but a symlink at
+// the final component is refused.
+bool os_run_dir_is_safe(const char *candidate, bool rw) {
+    // Trimmed here, not just in the callers: with a trailing slash the kernel
+    // resolves the final component as a directory, so lstat() would report a
+    // planted symlink's target and every check below would pass.
+    char dir[FILENAME_MAX + 1];
+    if (!os_dir_path_trim(candidate, dir, sizeof(dir)))
+        return false;
+
+    struct stat st;
+    if (lstat(dir, &st) == -1)
+        return false;
+
+    // S_ISLNK is implied by !S_ISDIR, but spell it out: this is the check that
+    // stops a pre-created /tmp/netdata -> /etc from becoming our run dir.
+    if (S_ISLNK(st.st_mode) || !S_ISDIR(st.st_mode))
+        return false;
+
+    if (access(dir, rw ? W_OK : R_OK) == -1)
+        return false;
+
+#if defined(OS_WINDOWS)
+    // Windows has no POSIX ownership: Cygwin synthesizes st_uid from the NTFS
+    // ACL (there is no uid 0) and never reports a sticky bit unless one was set
+    // explicitly, so the check below would refuse every candidate and leave the
+    // agent with no run dir at all. There is also no privilege drop here, so
+    // there is nothing for it to protect.
+    return true;
+#else
+    switch (os_dir_parent_trust(dir)) {
+        case OS_DIR_PARENT_EXCLUSIVE:
+            // Nobody else can create an entry here, so whoever owns the
+            // directory, we are the ones who put it there. Its ownership is
+            // therefore not our business - it legitimately differs per install:
+            // tmpfiles.d creates /run/netdata owned by the netdata user, while
+            // systemd's RuntimeDirectory= with User=root makes it root:netdata.
+            return true;
+
+        case OS_DIR_PARENT_STICKY:
+            // The /tmp fallback. Anyone can create entries here, but sticky
+            // means only the owner of an entry can rename or delete it, so
+            // requiring the directory to be ours also closes the window between
+            // this check and the privileged use that follows it (the temporary
+            // spawn server binds its socket here long before become_user()).
+            // "Ours" has to include the uid we will drop to, because the first
+            // run creates this directory as root and then chowns it.
+            if (run_dir_owner_is_ours(st.st_uid))
+                return true;
+
+            netdata_log_error(
+                "Refusing run directory '%s': owned by uid %u, inside a world-writable parent",
+                dir, (unsigned int)st.st_uid);
+            return false;
+
+        case OS_DIR_PARENT_UNKNOWN:
+            netdata_log_error("Refusing run directory '%s': cannot examine its parent directory", dir);
+            return false;
+
+        default:
+            netdata_log_error(
+                "Refusing run directory '%s': anyone can replace it, because its parent is neither "
+                "ours nor sticky. Set NETDATA_RUN_DIR to a directory only netdata can write into.",
+                dir);
+            return false;
+    }
+#endif
+}
+
 static inline bool netdata_dir_in_parent(const char *parent, char *out_path, size_t out_path_len, bool rw) {
     int ret = snprintf(out_path, out_path_len, "%s/netdata", parent);
     if (ret < 0 || (size_t)ret >= out_path_len)
         return false;
 
-    if (is_dir_accessible(out_path, rw))
+    if (os_run_dir_is_safe(out_path, rw))
         return true;
 
-    if (!is_dir_accessible(parent, rw))
+    // a read-only resolution reports what exists; it does not create anything
+    if (!rw || !is_dir_accessible(parent, rw))
         return false;
 
     if (mkdir(out_path, 0755) == -1 && errno != EEXIST)
         return false;
 
-    return is_dir_accessible(out_path, rw);
+    // Re-validate after mkdir(): on EEXIST the directory is one we did not
+    // create, so it could be a symlink or a directory planted by another user.
+    return os_run_dir_is_safe(out_path, rw);
 }
 
 static char *detect_run_dir(bool rw) {
     char path[FILENAME_MAX + 1];
 
+    // An operator-supplied run dir (e.g. a mounted tmpfs in a hardened,
+    // read-only-/run container) is honored, but gets the same validation as
+    // every other branch, since it is chowned as root.
     const char *env_dir = getenv("NETDATA_RUN_DIR");
     if (env_dir && *env_dir) {
-        if (is_dir_accessible(env_dir, rw))
-            return strdupz(env_dir);
+        // trim first: a trailing slash makes the kernel resolve the final
+        // component as a directory, which would defeat the symlink checks
+        if (os_dir_path_trim(env_dir, path, sizeof(path)) && os_run_dir_is_safe(path, rw))
+            return strdupz(path);
+
+        // an operator asked for this directory explicitly - never fall through
+        // to the built-in branches without saying why
+        netdata_log_error("Ignoring NETDATA_RUN_DIR='%s': not a usable run directory", env_dir);
     }
 
 #if defined(OS_LINUX)
@@ -96,16 +202,20 @@ static char *detect_run_dir(bool rw) {
 //    }
 //#endif
 
-    // Fallback to /tmp/netdata - force creation if needed
+    // Fallback to /tmp/netdata - force creation if needed.
+    // /tmp is world-writable, so this is the branch an unprivileged user can
+    // plant. os_run_dir_is_safe() requires the directory to be ours and /tmp to be
+    // sticky, so a planted one is refused instead of adopted.
     if (!is_dir_accessible("/tmp", rw)) {
         // Try to create /tmp with standard permissions (including sticky bit)
         if (rw && mkdir("/tmp", 01777) == -1 && errno != EEXIST)
             return NULL;
     }
 
-    snprintfz(path, sizeof(path), "/tmp/netdata");
-    if (rw && mkdir(path, 0755) == -1 && errno != EEXIST)
-        return NULL;
+    if (netdata_dir_in_parent("/tmp", path, sizeof(path), rw))
+        goto success;
+
+    return NULL;
 
 success:
     // Set the environment variable for child processes

@@ -1299,6 +1299,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/boottime.h
         src/libnetdata/os/boot_id.c
         src/libnetdata/os/boot_id.h
+        src/libnetdata/os/privileged_dir.c
+        src/libnetdata/os/privileged_dir.h
         src/libnetdata/os/run_dir.c
         src/libnetdata/os/run_dir.h
         src/libnetdata/os/file_lock.c
@@ -3161,6 +3163,10 @@ target_link_libraries(stream-receiver-hops-test libnetdata)
 add_executable(stream-replay-endpoints-test EXCLUDE_FROM_ALL
         src/streaming/tests/stream-replay-endpoints-test.c)
 target_link_libraries(stream-replay-endpoints-test libnetdata)
+
+add_executable(run-dir-safety-test EXCLUDE_FROM_ALL
+        src/libnetdata/os/tests/run-dir-safety-test.c)
+target_link_libraries(run-dir-safety-test libnetdata)
 
 if(OS_LINUX)
         add_executable(http-auth-bearer-test EXCLUDE_FROM_ALL
