@@ -2515,14 +2515,15 @@ func (ck *CommandKernel) completeCapabilityTask(operation *commandOperation, com
 
 func (ck *CommandKernel) completeResourceTask(operation *commandOperation, completion lifecycle.TaskCompletion) {
 	kind := lifecycle.TaskActionDispose
-	if completion.Err == nil && !operation.TimedOut() {
+	if completion.Err == nil {
 		switch operation.plan.Resource.Action {
 		case ResourceInstall:
 			if completion.Kind != lifecycle.TaskOutcomePreparedResource {
 				ck.run.Dirty(errors.New("jobmgr kernel: install task returned the wrong outcome"))
 				return
 			}
-			if !operation.cancelled {
+			if !operation.cancelled &&
+				!operation.TimedOut() {
 				kind = lifecycle.TaskActionAcceptStart
 			}
 		case ResourceStop:
@@ -3404,7 +3405,9 @@ func (ck *CommandKernel) cancelOperation(uid string) {
 	}
 	operation.cancelled = true
 	if operation.Child == lifecycle.ChildExecuting {
-		_ = ck.tasks.Cancel(operation.Task)
+		if !resourceStopOperation(operation) {
+			_ = ck.tasks.Cancel(operation.Task)
+		}
 		if operation.Response != lifecycle.ResponseNotRequired && !operation.plan.CooperativeCancel {
 			ck.enqueueControl(operation, lifecycle.ControlCancelled)
 		}
@@ -3487,7 +3490,12 @@ func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 		deferControl := requiresCooperativeDeadlineStart(operation) &&
 			(operation.Child == lifecycle.ChildNotStarted || operation.Child == lifecycle.ChildExecuting)
 		if operation.Child == lifecycle.ChildExecuting {
-			_ = ck.tasks.CancelWithCause(operation.Task, context.DeadlineExceeded)
+			if !resourceStopOperation(operation) {
+				_ = ck.tasks.CancelWithCause(
+					operation.Task,
+					context.DeadlineExceeded,
+				)
+			}
 			if operation.Response == lifecycle.ResponseNotRequired {
 				if err := ck.markRetainedTimeout(operation, true); err != nil {
 					ck.run.Dirty(err)
@@ -4144,8 +4152,7 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 	operation.cancelled = true
 	switch operation.Child {
 	case lifecycle.ChildExecuting:
-		if operation.plan.Resource == nil ||
-			operation.plan.Resource.Action != ResourceStop {
+		if !resourceStopOperation(operation) {
 			if err := ck.tasks.CancelWithCause(
 				operation.Task,
 				ck.run.StoppingCause(),
@@ -4209,6 +4216,12 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 		return errors.New("jobmgr kernel: invalid shutdown child state")
 	}
 	return nil
+}
+
+func resourceStopOperation(operation *commandOperation) bool {
+	return operation != nil &&
+		operation.plan.Resource != nil &&
+		operation.plan.Resource.Action == ResourceStop
 }
 
 func cancellationControl(operation *commandOperation) lifecycle.ControlStatus {

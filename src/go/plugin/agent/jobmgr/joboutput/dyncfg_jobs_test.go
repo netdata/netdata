@@ -518,6 +518,96 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
 	))
 }
 
+func TestNonRetryableAutoDetectionFailureSettlesExistingRetry(t *testing.T) {
+	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		return state.module(func(context.Context) error {
+			return nonRetryableAutoDetectionError{}
+		}, false)
+	}
+	controller.modules["module"] = creator
+	config := factoryTestConfig(false)
+	config.Set("autodetection_retry", 1)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider("test")
+	controller.scheduler.retries.schedule(config, 1)
+	controller.scheduler.retries.mu.Lock()
+	token := controller.scheduler.retries.entries[config.FullName()].token
+	controller.scheduler.retries.mu.Unlock()
+	payload, err := yaml.Marshal(config)
+	require.NoError(t, err)
+	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{
+		ID: config.FullName(),
+		Config: &dyncfg.GraphConfig{
+			ID: config.FullName(), Module: config.Module(),
+			Name: config.Name(), Status: dyncfg.StatusRunning.String(),
+			Payload: payload,
+		},
+	}})
+	require.NoError(t, err)
+	require.NoError(t, graph.Commit(mutation))
+	currentIdentity := lifecycle.ResourceIdentity{
+		ID: config.FullName(), Generation: 1,
+	}
+	var events []string
+	current := &transactionTestReadyResource{
+		identity: currentIdentity,
+		prefix:   "current",
+		events:   &events,
+	}
+	permit, tasks, admission, admissionRef := issueTestJobPermit(
+		t,
+		config.FullName(),
+		2,
+	)
+	scope := lifecycle.ResourceTransactionScope{
+		ID:      config.FullName(),
+		Current: currentIdentity,
+		Successor: lifecycle.ResourceIdentity{
+			ID: config.FullName(), Generation: 2,
+		},
+	}
+
+	transaction, err := controller.prepareDiscovered(
+		context.Background(),
+		DiscoveredJobChange{
+			Config: config, Status: dyncfg.StatusRunning,
+			Restart: true,
+		},
+		current,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	_, err = transaction.Apply(context.Background())
+	require.NoError(t, err)
+	require.False(t, controller.scheduler.retries.isCurrent(
+		config.FullName(),
+		token,
+	))
+	record, exists := graph.Lookup(config.FullName())
+	require.True(t, exists)
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	require.EqualValues(
+		t,
+		lifecycle.LongLivedCensus{},
+		tasks.LongLivedCensus(),
+	)
+	releaseTestJobAdmission(t, admission, admissionRef)
+}
+
+type nonRetryableAutoDetectionError struct{}
+
+func (nonRetryableAutoDetectionError) Error() string {
+	return "non-retryable autodetection failure"
+}
+
+func (nonRetryableAutoDetectionError) DyncfgCode() int {
+	return 422
+}
+
 func TestManualNoChangeRemovalSettlesAutoDetectionRetry(t *testing.T) {
 	controller, _, _, _, _ := newDynCfgJobTestHarness(t)
 	config := factoryTestConfig(false)

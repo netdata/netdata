@@ -442,6 +442,12 @@ func TestLongLivedPermitRemainsLiveAfterIssuanceIsSealed(t *testing.T) {
 
 	require.NoError(t, supervisor.SealInherited())
 	require.NoError(t, permit.ValidateLive())
+	require.NoError(t, permit.ActivateExternal(
+		LongLivedEJobResources,
+	))
+	require.NoError(t, permit.ReleaseExternal(
+		LongLivedEJobResources,
+	))
 	require.NoError(t, permit.AbortUnused())
 
 	_, err = admission.ReleaseOrdinary(ref)

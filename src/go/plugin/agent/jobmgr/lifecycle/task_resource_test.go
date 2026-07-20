@@ -91,7 +91,7 @@ func TestTaskSupervisorRetainsPreparedResourceReturnedWithPrepareError(t *testin
 	require.Equal(t, want, got)
 }
 
-func TestTaskSupervisorDoesNotRewriteActionCancellationAsStopping(t *testing.T) {
+func TestTaskSupervisorDoesNotCancelStartedOwnershipAction(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
 	entered := make(chan struct{})
@@ -124,11 +124,15 @@ func TestTaskSupervisorDoesNotRewriteActionCancellationAsStopping(t *testing.T) 
 	require.NoError(t, supervisor.CancelWithCause(ref, stopping))
 	close(release)
 	ack := <-supervisor.AcknowledgementCh()
-	require.ErrorIs(t, ack.Err, context.Canceled)
-	require.False(t, errors.As(ack.Err, new(*StoppingRejection)))
+	require.NoError(t, ack.Err)
+	require.Equal(t, []string{"accept-start"}, events)
 
 	require.NoError(t, supervisor.SendAction(TaskAction{
-		Ref: ref, Sequence: 3, Kind: TaskActionTerminate,
+		Ref: ref, Sequence: 3, Kind: TaskActionDispose,
+	}))
+	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref: ref, Sequence: 4, Kind: TaskActionTerminate,
 	}))
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
 	require.NoError(t, supervisor.Release(ref))
@@ -196,6 +200,46 @@ func TestTaskSupervisorStopsAndFinalizesInitialReadyResource(t *testing.T) {
 
 	got, want := events, []string{"stop", "finalize"}
 	require.Equal(t, want, got)
+}
+
+func TestTaskSupervisorStopsWithNonCancellableActionContext(t *testing.T) {
+	supervisor := newResourceTaskSupervisor(t)
+	var events []string
+	ready := &recordingReadyResource{
+		identity: ResourceIdentity{ID: "job", Generation: 3},
+		events:   &events,
+	}
+	_, ref := enqueueAndDispatchTask(
+		t,
+		supervisor,
+		readyTaskPlan(
+			t,
+			SourceJobManager,
+			time.Time{},
+			ready,
+		),
+	)
+	require.NoError(t, (<-supervisor.CompletionCh()).Err)
+	require.NoError(t, supervisor.CancelWithCause(
+		ref,
+		&StoppingRejection{Generation: 7},
+	))
+
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref: ref, Sequence: 2, Kind: TaskActionStopResource,
+	}))
+	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
+	require.NoError(t, ready.stopContextErr)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref: ref, Sequence: 3, Kind: TaskActionFinalizeResource,
+	}))
+	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref: ref, Sequence: 4, Kind: TaskActionTerminate,
+	}))
+	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
+	require.NoError(t, supervisor.Release(ref))
 }
 
 func TestTaskSupervisorFinalizesResourceOffLoop(t *testing.T) {
@@ -497,6 +541,7 @@ type recordingReadyResource struct {
 	abortErr           error
 	abortContextErr    error
 	abortDeadline      time.Time
+	stopContextErr     error
 	finalizeEntered    chan struct{}
 	finalizeGate       <-chan struct{}
 	identityCalls      int
@@ -520,7 +565,8 @@ func (rrr *recordingReadyResource) AbortReady(ctx context.Context) error {
 	*rrr.events = append(*rrr.events, "abort-ready")
 	return rrr.abortErr
 }
-func (rrr *recordingReadyResource) Stop(context.Context) error {
+func (rrr *recordingReadyResource) Stop(ctx context.Context) error {
+	rrr.stopContextErr = ctx.Err()
 	*rrr.events = append(*rrr.events, "stop")
 	return nil
 }

@@ -53,6 +53,12 @@ type runSecretServices struct {
 	Initial []secretstore.Config
 }
 
+type autoDetectionRetryWorker interface {
+	StopAutoDetectionRetries()
+	WaitAutoDetectionRetries(context.Context) error
+	AutoDetectionRetriesJoined() bool
+}
+
 type runGenerationConfig struct {
 	Generation           uint64
 	ShutdownTimeout      time.Duration
@@ -74,6 +80,7 @@ type runGeneration struct {
 	functions         *FunctionAssembly
 	jobs              *joboutput.Factory
 	scheduler         *joboutput.Scheduler
+	retryWorker       autoDetectionRetryWorker
 	dyncfg            *joboutput.DynCfgJobController
 	graph             *dyncfg.Graph
 	initialJobs       []dyncfg.GraphConfig
@@ -380,7 +387,7 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	return &runGeneration{
 		run: run, tasks: tasks, functions: functions,
 		jobs: jobs, dyncfg: dynCfgJobs, graph: graph,
-		scheduler: scheduler,
+		scheduler: scheduler, retryWorker: scheduler,
 		initialJobs: append(
 			[]dyncfg.GraphConfig(nil),
 			config.Jobs.Graph...,
@@ -489,7 +496,7 @@ func (rg *runGeneration) abortConstruction() error {
 
 func (rg *runGeneration) Stop() {
 	if rg != nil && rg.kernel != nil {
-		rg.scheduler.StopAutoDetectionRetries()
+		rg.retryWorker.StopAutoDetectionRetries()
 		rg.kernel.Stop()
 	}
 }
@@ -501,12 +508,16 @@ func (rg *runGeneration) Wait(ctx context.Context) error {
 	waitErr := rg.kernel.Wait(ctx)
 	select {
 	case <-rg.kernel.Done():
-		rg.scheduler.StopAutoDetectionRetries()
+		rg.retryWorker.StopAutoDetectionRetries()
 	default:
 	}
-	retryErr := rg.scheduler.WaitAutoDetectionRetries(ctx)
+	retryErr := rg.retryWorker.WaitAutoDetectionRetries(ctx)
+	retryJoined := rg.retryWorker.AutoDetectionRetriesJoined()
 	select {
 	case <-rg.kernel.Done():
+		if !retryJoined {
+			return errors.Join(waitErr, retryErr)
+		}
 		return errors.Join(
 			waitErr,
 			retryErr,

@@ -626,6 +626,114 @@ func TestKernelAbsentResourceStopSettlesWithoutAdmission(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
+func TestKernelResourceStopCompletesAfterOperationDeadline(t *testing.T) {
+	stopRelease := make(chan struct{})
+	resource := newKernelTestReadyResource("resource", nil, stopRelease)
+	kernel, run, admission, uids, tasks := newKernelWithPlanner(
+		t,
+		kernelResourcePlanner(t, resource, nil, nil),
+	)
+	observer := &kernelRuntimeObserver{}
+	require.NoError(t, kernel.BindRuntimeObserver(observer))
+	require.NoError(t, run.OpenAdmission())
+	startKernelLoop(t, kernel)
+	require.NoError(t, kernel.SubmitAndWait(
+		context.Background(),
+		Request{
+			UID: "install-before-deadline-stop", LaneKey: "resource",
+			Source: lifecycle.SourceJobManager, Route: "install",
+		},
+	))
+
+	result := make(chan error, 1)
+	go func() {
+		result <- kernel.SubmitAndWait(
+			context.Background(),
+			Request{
+				UID: "deadline-stop", LaneKey: "resource",
+				Source: lifecycle.SourceJobManager, Route: "stop",
+				Deadline: time.Now().Add(250 * time.Millisecond),
+			},
+		)
+	}()
+	select {
+	case <-resource.stopEntered:
+	case err := <-result:
+		require.FailNowf(
+			t,
+			"test failed",
+			"resource stop reached terminal before starting: %v",
+			err,
+		)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "resource stop did not start")
+	}
+
+	timeout := time.Now().Add(time.Second)
+	for observer.operationTimeouts.Load() != 1 {
+		if time.Now().After(timeout) {
+			close(stopRelease)
+			require.FailNow(
+				t,
+				"test failed",
+				"resource stop deadline was not observed",
+			)
+		}
+		runtime.Gosched()
+	}
+	close(stopRelease)
+
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(
+			t,
+			"test failed",
+			"resource stop did not finish after its deadline",
+		)
+	}
+	require.EqualValues(t, 0, tasks.Active())
+	retained, _ := tasks.RetainedTimeouts()
+	require.EqualValues(t, 0, retained)
+
+	kernel.Stop()
+	require.NoError(t, kernel.Wait(context.Background()))
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+	closeUIDLedger(t, uids)
+}
+
+type kernelRuntimeObserver struct {
+	operationTimeouts atomic.Uint64
+}
+
+func (*kernelRuntimeObserver) SetRuntimeGauge(
+	lifecycle.RuntimeGauge,
+	int,
+) {
+}
+
+func (*kernelRuntimeObserver) AddRuntimeGauge(
+	lifecycle.RuntimeGauge,
+	int,
+) {
+}
+
+func (kro *kernelRuntimeObserver) AddRuntimeCounter(
+	counter lifecycle.RuntimeCounter,
+	delta uint64,
+) {
+	if counter == lifecycle.RuntimeCounterOperationTimeouts {
+		kro.operationTimeouts.Add(delta)
+	}
+}
+
+func (*kernelRuntimeObserver) SetRuntimeTimestamp(
+	lifecycle.RuntimeTimestamp,
+	time.Time,
+) {
+}
+
 func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 	tests := map[string]struct {
 		prepareErr       error
@@ -1587,8 +1695,8 @@ func TestKernelDeadlineDoesNotCancelPendingCapabilityCommit(t *testing.T) {
 		require.FailNow(t, "test failed", "capability commit did not enter")
 	}
 
-	got, ok := commitCtx.Deadline()
-	require.False(t, !ok || !got.Equal(deadline))
+	_, ok := commitCtx.Deadline()
+	require.False(t, ok)
 
 	select {
 	case <-commitCtx.Done():
@@ -4052,6 +4160,14 @@ func (ktrp kernelTestResourcePlanner) Plan(request Request) (WorkPlan, error) {
 				}
 				return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 			}),
+		}, nil
+	case "stop":
+		return WorkPlan{
+			NoResponse: true,
+			Resource: &ResourcePlan{
+				Action: ResourceStop,
+				ID:     request.LaneKey,
+			},
 		}, nil
 	default:
 		return WorkPlan{}, errors.New("unexpected kernel resource route")

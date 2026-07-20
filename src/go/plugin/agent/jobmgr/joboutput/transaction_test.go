@@ -196,6 +196,60 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 	}
 }
 
+func TestPreparedResourceTransactionSettlesBeforeFailureResolution(t *testing.T) {
+	var events []string
+	successorIdentity := lifecycle.ResourceIdentity{
+		ID: "job", Generation: 1,
+	}
+	successor := &transactionTestPreparedResource{
+		identity: successorIdentity,
+		events:   &events,
+		acceptErr: &autoDetectionFailure{
+			cause: errors.New("autodetection failed"),
+		},
+	}
+	result, err := lifecycle.NewSealedResult(
+		422,
+		"application/json",
+		[]byte(`{"accepted":false}`),
+	)
+	require.NoError(t, err)
+	transaction, err := PrepareResourceTransaction(
+		ResourceTransactionSpec{
+			Scope: lifecycle.ResourceTransactionScope{
+				ID: "job", Successor: successorIdentity,
+			},
+			Disposition: lifecycle.ResourceTransactionInstalled,
+			Successor:   successor,
+			AfterApply: func() {
+				events = append(events, "settle")
+			},
+			Result:  result,
+			Cleanup: func() error { return nil },
+			SuccessorFailure: func(
+				*autoDetectionFailure,
+			) (SuccessorFailureResolution, error) {
+				return SuccessorFailureResolution{
+					Result:  result,
+					Cleanup: func() error { return nil },
+					AfterApply: func() {
+						events = append(events, "resolve")
+					},
+				}, nil
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	_, err = transaction.Apply(context.Background())
+	require.NoError(t, err)
+	require.Equal(
+		t,
+		[]string{"successor-accept", "settle", "resolve"},
+		events,
+	)
+}
+
 type transactionTestPreparedResource struct {
 	identity   lifecycle.ResourceIdentity
 	ready      lifecycle.ReadyResource

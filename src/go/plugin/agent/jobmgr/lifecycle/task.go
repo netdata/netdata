@@ -963,7 +963,11 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 			} else {
 				prepared := slot.outcome.prepared
 				identity := slot.outcome.identity
-				ready, acceptErr, panicked := runPreparedAcceptStart(ctx, prepared, action.ExpectedGeneration)
+				ready, acceptErr, panicked := runPreparedAcceptStart(
+					context.WithoutCancel(ctx),
+					prepared,
+					action.ExpectedGeneration,
+				)
 				if acceptErr != nil {
 					ack.Err = acceptErr
 					if ready != nil {
@@ -987,7 +991,11 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 			if slot.outcome.kind != TaskOutcomePreparedCapability || slot.outcome.capability == nil {
 				ack.Err = errors.New("jobmgr task child: commit without prepared capability")
 			} else {
-				disposition, commitErr, panicked := runPreparedCapabilityCommit(ctx, slot.outcome.capability, action.ExpectedGeneration)
+				disposition, commitErr, panicked := runPreparedCapabilityCommit(
+					context.WithoutCancel(ctx),
+					slot.outcome.capability,
+					action.ExpectedGeneration,
+				)
 				ack.CapabilityDisposition = disposition
 				ack.Err = commitErr
 				switch disposition {
@@ -1014,7 +1022,11 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 			if slot.outcome.kind != TaskOutcomeReadyResource || slot.outcome.ready == nil {
 				ack.Err = errors.New("jobmgr task child: stop without ready resource")
 			} else {
-				ack.Err = callReadyResource("stop", func() error { return slot.outcome.ready.Stop(ctx) })
+				ack.Err = callReadyResource("stop", func() error {
+					return slot.outcome.ready.Stop(
+						context.WithoutCancel(ctx),
+					)
+				})
 			}
 		case TaskActionFinalizeResource:
 			if slot.outcome.kind != TaskOutcomeReadyResource || slot.outcome.ready == nil {
@@ -1036,7 +1048,7 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 				transaction := slot.outcome.transaction
 				scope := slot.outcome.scope
 				applied, applyErr := runPreparedResourceTransactionApply(
-					ctx,
+					context.WithoutCancel(ctx),
 					transaction,
 				)
 				if applyErr != nil {

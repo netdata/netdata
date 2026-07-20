@@ -30,6 +30,26 @@ type runMetricsService struct {
 	producerErr        error
 }
 
+type runRetryWorker struct {
+	waitErr error
+	joined  bool
+	stops   int
+}
+
+func (rrw *runRetryWorker) StopAutoDetectionRetries() {
+	rrw.stops++
+}
+
+func (rrw *runRetryWorker) WaitAutoDetectionRetries(
+	context.Context,
+) error {
+	return rrw.waitErr
+}
+
+func (rrw *runRetryWorker) AutoDetectionRetriesJoined() bool {
+	return rrw.joined
+}
+
 func (rms *runMetricsService) RegisterComponent(
 	config runtimecomp.ComponentConfig,
 ) error {
@@ -253,5 +273,68 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 
 	require.NoError(t, admission.CloseDrained(1))
 
+	closeRunTestUIDs(t, uids)
+}
+
+func TestRunGenerationRetainsRuntimeMetricsUntilRetryWorkerJoins(
+	t *testing.T,
+) {
+	service := &runMetricsService{}
+	jobs := testRunJobServices(t)
+	jobs.Runtime = service
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	admission := lifecycle.NewAdmissionLedger()
+	uids := lifecycle.NewUIDLedger()
+	generation, err := newRunGeneration(runGenerationConfig{
+		Generation: 1, ShutdownTimeout: time.Second,
+		Clock: lifecycle.RealClock{}, Admission: admission, UIDs: uids,
+		Frames: frames, Modules: collectorapi.Registry{}, Jobs: jobs,
+		Discovery: testRunDiscoveryServices(t),
+		Planner: func(
+			runPlannerCapabilities,
+		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
+			return runRejectingPlanner{},
+				jobmgr.RunFinalizerFunc(
+					func(context.Context, uint64) error { return nil },
+				),
+				nil
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, generation.start(context.Background()))
+
+	generation.scheduler.StopAutoDetectionRetries()
+	require.NoError(t, generation.scheduler.WaitAutoDetectionRetries(
+		context.Background(),
+	))
+	generation.kernel.Stop()
+	require.NoError(t, generation.kernel.Wait(context.Background()))
+
+	worker := &runRetryWorker{
+		waitErr: context.Canceled,
+	}
+	generation.retryWorker = worker
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, generation.Wait(ctx), context.Canceled)
+	require.EqualValues(t, 1, worker.stops)
+	require.True(t, generation.runtimeRegistered)
+	_, _, producers, producerRemovals := service.snapshot()
+	require.Len(t, producers, 1)
+	require.Empty(t, producerRemovals)
+	require.Empty(t, service.finalized())
+
+	worker.waitErr = nil
+	worker.joined = true
+	require.NoError(t, generation.Wait(context.Background()))
+	require.EqualValues(t, 2, worker.stops)
+	require.False(t, generation.runtimeRegistered)
+	_, _, producers, producerRemovals = service.snapshot()
+	require.Empty(t, producers)
+	require.Equal(t, []string{runtimeProducerName}, producerRemovals)
+	require.Equal(t, []string{runtimeComponentName}, service.finalized())
+
+	require.NoError(t, admission.CloseDrained(1))
 	closeRunTestUIDs(t, uids)
 }

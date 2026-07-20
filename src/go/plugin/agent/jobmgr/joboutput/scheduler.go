@@ -87,6 +87,10 @@ func (s *Scheduler) WaitAutoDetectionRetries(
 	return s.retries.wait(ctx)
 }
 
+func (s *Scheduler) AutoDetectionRetriesJoined() bool {
+	return s == nil || s.retries.joined()
+}
+
 func (s *Scheduler) Register(
 	identity lifecycle.ResourceIdentity,
 	job RuntimeJob,

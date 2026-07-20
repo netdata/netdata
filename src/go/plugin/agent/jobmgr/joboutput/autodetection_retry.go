@@ -40,6 +40,7 @@ type autoDetectionRetryIndex struct {
 	bound            bool
 	closed           bool
 	failed           bool
+	terminalErr      error
 	wake             chan struct{}
 	stop             chan struct{}
 	done             chan struct{}
@@ -229,10 +230,45 @@ func (adri *autoDetectionRetryIndex) wait(
 	}
 	select {
 	case <-done:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
+		return adri.terminalError()
+	default:
 	}
+	select {
+	case <-done:
+		return adri.terminalError()
+	case <-ctx.Done():
+		select {
+		case <-done:
+			return adri.terminalError()
+		default:
+			return errors.Join(ctx.Err(), adri.terminalError())
+		}
+	}
+}
+
+func (adri *autoDetectionRetryIndex) joined() bool {
+	if adri == nil {
+		return true
+	}
+	adri.mu.Lock()
+	bound := adri.bound
+	done := adri.done
+	adri.mu.Unlock()
+	if !bound {
+		return true
+	}
+	select {
+	case <-done:
+		return true
+	default:
+		return false
+	}
+}
+
+func (adri *autoDetectionRetryIndex) terminalError() error {
+	adri.mu.Lock()
+	defer adri.mu.Unlock()
+	return adri.terminalErr
 }
 
 func (adri *autoDetectionRetryIndex) advance(processClock int) {
@@ -340,6 +376,7 @@ func (adri *autoDetectionRetryIndex) fail(err error) {
 	adri.failOnce.Do(func() {
 		adri.mu.Lock()
 		adri.failed = true
+		adri.terminalErr = errors.Join(adri.terminalErr, err)
 		failure := adri.failure
 		adri.mu.Unlock()
 		if failure != nil {

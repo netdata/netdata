@@ -335,7 +335,10 @@ func (prt *PreparedResourceTransaction) Apply(
 			}
 			result = resolution.Result
 			cleanup = resolution.Cleanup
-			afterApply = resolution.AfterApply
+			afterApply = composeAfterApply(
+				afterApply,
+				resolution.AfterApply,
+			)
 			break
 		}
 		if err := current.Publish(); err != nil {
@@ -371,6 +374,19 @@ func (prt *PreparedResourceTransaction) Apply(
 		afterApply()
 	}
 	return applied, nil
+}
+
+func composeAfterApply(first, second func()) func() {
+	if first == nil {
+		return second
+	}
+	if second == nil {
+		return first
+	}
+	return func() {
+		first()
+		second()
+	}
 }
 
 func (prt *PreparedResourceTransaction) Dispose(

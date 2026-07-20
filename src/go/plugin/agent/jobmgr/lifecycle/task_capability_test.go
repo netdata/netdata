@@ -33,11 +33,16 @@ func TestTaskSupervisorCommitsPreparedCapabilityWithoutReadyResource(t *testing.
 
 	completion := <-supervisor.CompletionCh()
 	require.False(t, completion.Ref != ref || completion.Kind != TaskOutcomePreparedCapability || completion.Err != nil)
+	require.NoError(t, supervisor.CancelWithCause(
+		ref,
+		&StoppingRejection{Generation: 7},
+	))
 
 	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionCommitCapability, ExpectedGeneration: 1}))
 
 	ack := <-supervisor.AcknowledgementCh()
 	require.False(t, ack.Err != nil || ack.CapabilityDisposition != CapabilityApplied)
+	require.NoError(t, capability.commitContextErr)
 
 	require.NoError(t, capability.releaseCarrier())
 
@@ -180,10 +185,11 @@ func dispatchCapabilityTask(t *testing.T, supervisor *TaskSupervisor, plan TaskP
 }
 
 type testPreparedCapability struct {
-	identity      ResourceIdentity
-	permit        LongLivedPermit
-	panicIdentity bool
-	panicCommit   bool
+	identity         ResourceIdentity
+	permit           LongLivedPermit
+	panicIdentity    bool
+	panicCommit      bool
+	commitContextErr error
 }
 
 func (tpc *testPreparedCapability) Identity() ResourceIdentity {
@@ -193,7 +199,8 @@ func (tpc *testPreparedCapability) Identity() ResourceIdentity {
 	return tpc.identity
 }
 
-func (tpc *testPreparedCapability) Commit(context.Context, uint64) (CapabilityDisposition, error) {
+func (tpc *testPreparedCapability) Commit(ctx context.Context, _ uint64) (CapabilityDisposition, error) {
+	tpc.commitContextErr = ctx.Err()
 	if tpc.panicCommit {
 		panic("commit panic")
 	}

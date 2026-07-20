@@ -495,7 +495,7 @@ func (ts *TaskSupervisor) activateLongLivedExternal(ref LongLivedPermitRef, owne
 	if err != nil {
 		return err
 	}
-	if registry.sealed || slot.eReserved&facet == 0 || slot.eActive&facet != 0 {
+	if slot.eReserved&facet == 0 || slot.eActive&facet != 0 {
 		return errors.New("jobmgr long-lived permit: external facet is not reserved")
 	}
 	slot.eReserved &^= facet

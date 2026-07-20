@@ -79,6 +79,10 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 			require.False(t, first.Ref != ref || first.Sequence != 1 ||
 				first.Kind != TaskOutcomePreparedResourceTransaction ||
 				first.Err != nil)
+			require.NoError(t, supervisor.CancelWithCause(
+				ref,
+				&StoppingRejection{Generation: 7},
+			))
 
 			require.NoError(t, supervisor.SendAction(TaskAction{
 				Ref: ref, Sequence: 2, Kind: TaskActionApplyResourceTransaction,
@@ -89,6 +93,7 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 			require.False(t, second.Ref != ref || second.Sequence != 2 ||
 				second.Kind != TaskOutcomeAppliedResourceTransaction ||
 				second.Err != nil)
+			require.NoError(t, prepared.applyContextErr)
 			disposition, current, err := supervisor.TakeAppliedResourceTransaction(ref, 2, test.scope)
 			require.NoError(t, err)
 			require.False(t, disposition != test.disposition || current != test.resulting)
@@ -274,10 +279,11 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 }
 
 type recordingPreparedResourceTransaction struct {
-	scope   ResourceTransactionScope
-	current ReadyResource
-	applied AppliedResourceTransaction
-	events  *[]string
+	scope           ResourceTransactionScope
+	current         ReadyResource
+	applied         AppliedResourceTransaction
+	events          *[]string
+	applyContextErr error
 }
 
 func (rprt *recordingPreparedResourceTransaction) Scope() ResourceTransactionScope {
@@ -285,8 +291,9 @@ func (rprt *recordingPreparedResourceTransaction) Scope() ResourceTransactionSco
 }
 
 func (rprt *recordingPreparedResourceTransaction) Apply(
-	context.Context,
+	ctx context.Context,
 ) (AppliedResourceTransaction, error) {
+	rprt.applyContextErr = ctx.Err()
 	*rprt.events = append(*rprt.events, "apply")
 	return rprt.applied, nil
 }

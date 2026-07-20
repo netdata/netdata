@@ -226,6 +226,7 @@ func TestSchedulerTickDoesNotBlockOnRetryAdmission(t *testing.T) {
 		1,
 		func(error) {},
 	))
+	require.False(t, scheduler.AutoDetectionRetriesJoined())
 	scheduler.retries.schedule(autoDetectionRetryTestConfig("job"), 1)
 	require.NoError(t, scheduler.Tick(context.Background(), 0))
 
@@ -244,6 +245,7 @@ func TestSchedulerTickDoesNotBlockOnRetryAdmission(t *testing.T) {
 	close(release)
 	scheduler.StopAutoDetectionRetries()
 	require.NoError(t, scheduler.WaitAutoDetectionRetries(context.Background()))
+	require.True(t, scheduler.AutoDetectionRetriesJoined())
 }
 
 func TestAutoDetectionRetryReportsStructuralDispatchFailure(t *testing.T) {
@@ -281,12 +283,12 @@ func TestAutoDetectionRetryReportsStructuralDispatchFailure(t *testing.T) {
 			index.advance(0)
 			index.advance(1)
 
+			wantErr := test.planningErr
+			if wantErr == nil {
+				wantErr = test.submitErr
+			}
 			select {
 			case err := <-failed:
-				wantErr := test.planningErr
-				if wantErr == nil {
-					wantErr = test.submitErr
-				}
 				require.ErrorIs(
 					t,
 					err,
@@ -299,9 +301,52 @@ func TestAutoDetectionRetryReportsStructuralDispatchFailure(t *testing.T) {
 					"retry dispatch failure was not reported",
 				)
 			}
-			require.NoError(t, index.wait(context.Background()))
+			require.ErrorIs(
+				t,
+				index.wait(context.Background()),
+				wantErr,
+			)
 			index.stopWorker()
 		})
+	}
+}
+
+func TestAutoDetectionRetryWaitRequiresWorkerJoin(t *testing.T) {
+	release := make(chan struct{})
+	commands := &autoDetectionRetryTestCommands{block: release}
+	index := newAutoDetectionRetryIndex()
+	require.NoError(t, index.bind(
+		commands,
+		func(
+			confgroup.Config,
+			autoDetectionRetryToken,
+		) (jobmgr.WorkPlan, error) {
+			return jobmgr.WorkPlan{}, nil
+		},
+		1,
+		func(error) {},
+	))
+	index.schedule(autoDetectionRetryTestConfig("job"), 1)
+	index.advance(0)
+	index.advance(1)
+	commands.waitForSubmissions(t, 1)
+	index.stopWorker()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, index.wait(ctx), context.Canceled)
+	select {
+	case <-index.done:
+		require.FailNow(t, "test failed", "retry worker joined while blocked")
+	default:
+	}
+
+	close(release)
+	require.NoError(t, index.wait(context.Background()))
+	select {
+	case <-index.done:
+	default:
+		require.FailNow(t, "test failed", "retry worker did not join")
 	}
 }
 
