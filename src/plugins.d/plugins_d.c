@@ -159,10 +159,11 @@ static void pluginsd_worker_thread(void *arg) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
+        bool retry = false;
         count = pluginsd_process(cd->host, cd,
                                  spawn_popen_read_fd(cd->unsafe.pi),
                                  spawn_popen_write_fd(cd->unsafe.pi),
-                                 0);
+                                 0, &retry);
 
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections.",
@@ -171,7 +172,9 @@ static void pluginsd_worker_thread(void *arg) {
         int worker_ret_code = spawn_popen_kill(cd->unsafe.pi, 3 * MSEC_PER_SEC);
         cd->unsafe.pi = NULL;
 
-        if(likely(worker_ret_code == 0))
+        if (retry && worker_ret_code != -1)
+            pluginsd_sleep(cd->update_every);
+        else if(likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);
         else
             pluginsd_worker_thread_handle_error(cd, worker_ret_code);

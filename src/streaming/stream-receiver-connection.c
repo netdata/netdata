@@ -201,10 +201,10 @@ static bool stream_receiver_send_first_response(struct receiver_state *rpt) {
         if(!host) {
             stream_receiver_log_status(
                 rpt,
-                "rejecting streaming connection; failed to find or create the required host structure",
-                STREAM_HANDSHAKE_PARENT_INTERNAL_ERROR, NDLP_ERR);
+                "rejecting streaming connection; host creation is busy, retry later",
+                STREAM_HANDSHAKE_PARENT_BUSY_TRY_LATER, NDLP_NOTICE);
 
-            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_INTERNAL_ERROR);
+            stream_send_error_on_taken_over_connection(rpt, START_STREAMING_ERROR_BUSY_TRY_LATER);
             return false;
         }
 

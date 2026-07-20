@@ -604,7 +604,7 @@ static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) 
 struct storage *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier);
 
 STRING *query_instance_id_fqdn(QUERY_INSTANCE *qi, size_t version);
-STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version);
+STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version, const STRING *host_hostname);
 
 void query_target_free(void);
 void query_target_release(QUERY_TARGET *qt);
@@ -682,7 +682,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
 void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array, CONTEXTS_OPTIONS options);
-void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status);
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, const RRDHOST_IDENTITY *identity, size_t ni, usec_t duration_ut, bool status);
 void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings *timings);
 void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings *timings);
 void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut);

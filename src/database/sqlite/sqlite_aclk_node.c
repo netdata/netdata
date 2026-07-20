@@ -72,9 +72,10 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
         host_version = stream_receiver_program_version_strdupz(host);
 
     RRDHOST_TZ host_tz = rrdhost_tz_get(host);
+    RRDHOST_METADATA_IDENTITY identity = rrdhost_metadata_identity_acquire(host);
 
-    node_info.data.name = rrdhost_hostname(host);
-    node_info.data.os = rrdhost_os(host);
+    node_info.data.name = string2str(identity.common.hostname);
+    node_info.data.os = string2str(identity.os);
     node_info.data.version = host_version ? host_version : NETDATA_VERSION;
     node_info.data.release_channel = get_release_channel();
     node_info.data.timezone = host_tz.abbrev_timezone;
@@ -95,10 +96,11 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
         NDLP_DEBUG,
         "ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)",
         aclk_host_config->node_id,
-        rrdhost_hostname(host),
+        string2str(identity.common.hostname),
         host->machine_guid,
         host == localhost ? "parent" : "child");
 
+    rrdhost_metadata_identity_release(&identity);
     rrd_rdunlock();
     rrdhost_tz_free(&host_tz);
     freez(node_info.node_instance_capabilities);
@@ -157,6 +159,16 @@ void send_node_update_with_wait(RRDHOST *host, int live, int queryable)
     // sc is automatically freed when both waiter and query release their references
 }
 
+static inline void hostname_snapshot_update(STRING **snapshot, RRDHOST *host)
+{
+    spinlock_lock(&host->rrdhost_update_lock);
+    STRING *hostname = string_dup(host->hostname);
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    string_freez(*snapshot);
+    *snapshot = hostname;
+}
+
 void aclk_check_node_info_and_collectors(void)
 {
     RRDHOST *host;
@@ -188,7 +200,7 @@ void aclk_check_node_info_and_collectors(void)
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
             internal_error(true, "ACLK SYNC: Context still pending for %s", rrdhost_hostname(host));
             context_loading++;
-            context_loading_host = host->hostname;
+            hostname_snapshot_update(&context_loading_host, host);
             continue;
         }
 
@@ -198,13 +210,13 @@ void aclk_check_node_info_and_collectors(void)
         if (unlikely(rrdhost_receiver_replicating_charts(host))) {
             internal_error(true, "ACLK SYNC: Host %s is still replicating in", rrdhost_hostname(host));
             replicating_rcv++;
-            replicating_rcv_host = host->hostname;
+            hostname_snapshot_update(&replicating_rcv_host, host);
         }
 
         if (unlikely(rrdhost_sender_replicating_charts(host))) {
             internal_error(true, "ACLK SYNC: Host %s is still replicating out", rrdhost_hostname(host));
             replicating_snd++;
-            replicating_snd_host = host->hostname;
+            hostname_snapshot_update(&replicating_snd_host, host);
         }
 
 #ifdef REPLICATION_TRACKING
@@ -218,7 +230,7 @@ void aclk_check_node_info_and_collectors(void)
 
         if (!pp_queue_empty && (aclk_host_config->node_info_send_time || aclk_host_config->node_collectors_send)) {
             context_pp++;
-            context_pp_host = host->hostname;
+            hostname_snapshot_update(&context_pp_host, host);
         }
 
         if (pp_queue_empty && aclk_host_config->node_info_send_time &&
@@ -289,4 +301,9 @@ void aclk_check_node_info_and_collectors(void)
                      replay_counters_txt
                      );
     }
+
+    string_freez(context_loading_host);
+    string_freez(replicating_rcv_host);
+    string_freez(replicating_snd_host);
+    string_freez(context_pp_host);
 }

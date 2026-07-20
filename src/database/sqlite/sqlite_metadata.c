@@ -235,7 +235,7 @@ struct meta_config_s {
     uv_loop_t loop;
     uv_async_t async;
     uv_timer_t timer_req;
-    time_t metadata_check_after;
+    time_t metadata_check_after __attribute__((aligned(8)));
     Pvoid_t ae_DelJudyL;
     bool initialized;
     bool ctx_load_running;
@@ -1093,14 +1093,16 @@ static int store_host_metadata(RRDHOST *host)
     RRDHOST_TZ host_tz = { 0 };
 
     if (!PREPARE_STATEMENT(db_meta, SQL_STORE_HOST_INFO, &res))
-        return false;
+        return 1;
+
+    RRDHOST_METADATA_IDENTITY identity = rrdhost_metadata_identity_acquire(host);
 
     int param = 0;
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_hostname(host), 0));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_registry_hostname(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, string2str(identity.common.hostname), 0));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, string2str(identity.registry_hostname), 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->rrd_update_every));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_os(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, string2str(identity.os), 1));
     host_tz = rrdhost_tz_get(host);
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, host_tz.timezone, 1));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, "", 1));
@@ -1108,8 +1110,8 @@ static int store_host_metadata(RRDHOST *host)
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->rrd_memory_mode));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, host_tz.abbrev_timezone, 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host_tz.utc_offset));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_program_name(host), 1));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_program_version(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, string2str(identity.common.prog_name), 1));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, string2str(identity.common.prog_version), 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int64(res, ++param, host->rrd_history_entries));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, (int)host->health.enabled));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int64(res, ++param, (sqlite3_int64) host->stream.snd.status.last_connected));
@@ -1117,9 +1119,10 @@ static int store_host_metadata(RRDHOST *host)
     int store_rc = sqlite3_step_monitored(res);
 
     if (unlikely(store_rc != SQLITE_DONE))
-        error_report("Failed to store host %s, rc = %d", rrdhost_hostname(host), store_rc);
+        error_report("Failed to store host %s, rc = %d", string2str(identity.common.hostname), store_rc);
 
     SQLITE_FINALIZE(res);
+    rrdhost_metadata_identity_release(&identity);
     rrdhost_tz_free(&host_tz);
 
     return store_rc != SQLITE_DONE;
@@ -1127,6 +1130,7 @@ static int store_host_metadata(RRDHOST *host)
 bind_fail:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    rrdhost_metadata_identity_release(&identity);
     rrdhost_tz_free(&host_tz);
     return 1;
 }
@@ -1470,7 +1474,7 @@ static bool run_cleanup_cycle(struct cleanup_cycle *c, struct meta_config_s *wc)
     time_t now = now_realtime_sec();
 
     if (!c->next_execution_t) {
-        c->next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
+        c->next_execution_t = nd_time_t_add_saturating(now, METADATA_MAINTENANCE_FIRST_CHECK);
         c->snapshot_pending = true;
     }
 
@@ -1493,7 +1497,7 @@ static bool run_cleanup_cycle(struct cleanup_cycle *c, struct meta_config_s *wc)
         if (c->complete_repeat_after) {
             // Re-arm for another full pass; the snapshot is deferred to the
             // next entry past the timer so it isn't stale by then.
-            c->next_execution_t = now + c->complete_repeat_after;
+            c->next_execution_t = nd_time_t_add_saturating(now, c->complete_repeat_after);
             c->last_row_id = 0;
             c->snapshot_pending = true;
         }
@@ -1529,7 +1533,7 @@ static bool run_cleanup_cycle(struct cleanup_cycle *c, struct meta_config_s *wc)
     SQLITE_FINALIZE(action_res);
 
     now = now_realtime_sec();
-    c->next_execution_t = now + c->repeat_after;
+    c->next_execution_t = nd_time_t_add_saturating(now, c->repeat_after);
 
     nd_log_daemon(NDLP_DEBUG,
                   "%s checked %u, deleted %u. Checks will resume in %d seconds",
@@ -1593,12 +1597,12 @@ static void cleanup_health_log(struct meta_config_s *config)
     time_t now = now_realtime_sec();
 
     if (!next_execution_t)
-        next_execution_t = now + METADATA_MAINTENANCE_FIRST_CHECK;
+        next_execution_t = nd_time_t_add_saturating(now, METADATA_MAINTENANCE_FIRST_CHECK);
 
     if (next_execution_t && next_execution_t > now)
         return;
 
-    next_execution_t = now + METADATA_HEALTH_LOG_INTERVAL;
+    next_execution_t = nd_time_t_add_saturating(now, METADATA_HEALTH_LOG_INTERVAL);
 
     RRDHOST *host;
     worker_is_busy(UV_EVENT_HEALTH_LOG_CLEANUP);
@@ -1656,9 +1660,9 @@ static void async_cb(uv_async_t *handle __maybe_unused)
 
 static void timer_cb(uv_timer_t *handle)
 {
-   struct meta_config_s *config = handle->data;
-   if (config->metadata_check_after <  now_realtime_sec())
-       config->store_metadata = true;
+    struct meta_config_s *config = handle->data;
+    if (__atomic_load_n(&config->metadata_check_after, __ATOMIC_RELAXED) < now_realtime_sec())
+        config->store_metadata = true;
 }
 
 void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int vacuum_pc, time_t *next_run)
@@ -1668,7 +1672,7 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
         return;
 
     if (next_run)
-        *next_run = now + DATABASE_VACUUM_FREQUENCY_SECONDS;
+        *next_run = nd_time_t_add_saturating(now, DATABASE_VACUUM_FREQUENCY_SECONDS);
 
     int free_pages = get_free_page_count(database);
     int total_pages = get_database_page_count(database);
@@ -1800,7 +1804,7 @@ void run_metadata_cleanup(struct meta_config_s *config)
     time_t now = now_realtime_sec();
 
     if (!next_context_list_cleanup)
-        next_context_list_cleanup = now + 5;
+        next_context_list_cleanup = nd_time_t_add_saturating(now, 5);
 
     if (next_context_list_cleanup < now && sql_metadata_wal_size_acceptable()) {
         RRDHOST *host;
@@ -1812,7 +1816,7 @@ void run_metadata_cleanup(struct meta_config_s *config)
         }
         dfe_done(host);
         worker_is_idle();
-        next_context_list_cleanup = now_realtime_sec() + METADATA_MAINTENANCE_CTX_CLEAN_REPEAT;
+        next_context_list_cleanup = nd_time_t_add_saturating(now_realtime_sec(), METADATA_MAINTENANCE_CTX_CLEAN_REPEAT);
     }
 
     if (unlikely(SHUTDOWN_REQUESTED(config)))
@@ -2496,34 +2500,63 @@ static void store_hosts_metadata(struct meta_config_s *config, bool is_worker, b
     BUFFER *work_buffer = buffer_create(1024, NULL);
 
     size_t count = 0;
-    dfe_start_reentrant(rrdhost_root_index, host)
-    {
-        count++;
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
-            continue;
+    DICTFE host_dfe = {
+        .dict = rrdhost_root_index,
+        .rw = DICTIONARY_LOCK_REENTRANT,
+    };
 
-        // check the shutdown BEFORE clearing the pending flag, so a host
-        // interrupted by shutdown keeps its pending status for the final scan
-        if (!final && SHUTDOWN_REQUESTED(config))
+    bool first = true;
+    bool stop = false;
+    while (!stop) {
+        // The global lock bridges the linked dictionary value to its per-host lifetime lock.
+        rrd_rdlock();
+        host = first ? dictionary_foreach_start_rw(&host_dfe) : dictionary_foreach_next(&host_dfe);
+        first = false;
+
+        if (!host_dfe.item && !host) {
+            rrd_rdunlock();
             break;
+        }
 
-        rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_UPDATE);
+        count++;
+        bool host_locked = false;
+        bool report_progress = false;
+        if (!rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) && rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE)) {
+            host_locked = rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
+            if (host_locked) {
+                // Check shutdown before clearing the pending flag so the final scan can pick it up.
+                if (!final && SHUTDOWN_REQUESTED(config))
+                    stop = true;
+                else {
+                    rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_UPDATE);
+                    report_progress = !is_worker;
+                }
+            }
+        }
 
-        if (is_worker)
-            worker_is_busy(UV_EVENT_STORE_HOST);
+        rrd_rdunlock();
 
-        // store labels, claim_id, host and system info (if needed)
-        store_host_info_and_metadata_with_buffer(host, work_buffer);
+        if (host_locked) {
+            if (!stop) {
+                if (is_worker)
+                    worker_is_busy(UV_EVENT_STORE_HOST);
 
-        if (is_worker)
-            worker_is_idle();
+                // store labels, claim_id, host and system info (if needed)
+                store_host_info_and_metadata_with_buffer(host, work_buffer);
 
-        metadata_scan_host(config, host, is_worker, final, work_buffer);
+                if (is_worker)
+                    worker_is_idle();
 
-        if (!is_worker)
+                metadata_scan_host(config, host, is_worker, final, work_buffer);
+            }
+
+            rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
+        }
+
+        if (report_progress)
             nd_log_daemon(NDLP_INFO, "METADATA: Progress of metadata storage: %6.2f%% completed", (100.0 * count / host_count));
     }
-    dfe_done(host);
+    dictionary_foreach_done(&host_dfe);
 
     buffer_free(work_buffer);
 
@@ -2549,7 +2582,7 @@ static void start_metadata_hosts(uv_work_t *req)
     time_t now = now_realtime_sec();
     if (now> next_maintenance_check) {
         run_maintenace();
-        next_maintenance_check = now + SERVICE_HEARTBEAT;
+        next_maintenance_check = nd_time_t_add_saturating(now, SERVICE_HEARTBEAT);
     }
 
     worker_data_t *worker = req->data;
@@ -2580,7 +2613,10 @@ static void start_metadata_hosts(uv_work_t *req)
         run_metadata_cleanup(config);
     }
 
-    config->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_INTERVAL;
+    __atomic_store_n(
+        &config->metadata_check_after,
+        nd_time_t_add_saturating(now_realtime_sec(), METADATA_HOST_CHECK_INTERVAL),
+        __ATOMIC_RELAXED);
     worker_is_idle();
 }
 
@@ -2619,7 +2655,10 @@ static void metadata_event_loop(void *arg)
     config->timer_req.data = config;
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Starting metadata sync thread");
-    config->metadata_check_after = now_realtime_sec() + METADATA_HOST_CHECK_FIRST_CHECK;
+    __atomic_store_n(
+        &config->metadata_check_after,
+        nd_time_t_add_saturating(now_realtime_sec(), METADATA_HOST_CHECK_FIRST_CHECK),
+        __ATOMIC_RELAXED);
 
     worker_data_t *worker;
     Pvoid_t *Pvalue;

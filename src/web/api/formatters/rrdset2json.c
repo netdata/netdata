@@ -84,9 +84,11 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         DOUBLE_LINKED_LIST_FOREACH_FORWARD(st->alerts.base, rc, prev, next)
         {
             {
+                RRDCALC_RUNTIME_SNAPSHOT snapshot;
+                rrdcalc_runtime_snapshot_get(rc, &snapshot);
                 buffer_json_member_add_object(wb, rrdcalc_name(rc));
                 buffer_json_member_add_string_or_empty(wb, "id", rrdcalc_name(rc));
-                buffer_json_member_add_string_or_empty(wb, "status", rrdcalc_status2string(rc->status));
+                buffer_json_member_add_string_or_empty(wb, "status", rrdcalc_status2string(snapshot.status));
                 buffer_json_member_add_string_or_empty(wb, "units", rrdcalc_units(rc));
                 buffer_json_member_add_int64(wb, "duration", (int64_t)rc->config.update_every);
                 buffer_json_object_close(wb);
