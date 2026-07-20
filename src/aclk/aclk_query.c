@@ -103,6 +103,11 @@ static bool aclk_web_client_interrupt_cb(struct web_client *w __maybe_unused, vo
     return __atomic_load_n(&req->canceled, __ATOMIC_RELAXED);
 }
 
+static HTTP_VALIDATION aclk_http_request_size_validation(const char *request, size_t *request_length) {
+    *request_length = strnlen(request, NETDATA_WEB_REQUEST_MAX_SIZE + 1);
+    return web_client_request_size_validation(*request_length);
+}
+
 int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
 {
     ND_LOG_STACK lgs[] = {
@@ -130,9 +135,15 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
     w->interrupt.callback_data = pending_req_list_add(query->msg_id);
 
     buffer_flush(w->response.data);
-    buffer_strcat(w->response.data, query->data.http_api_v2.payload);
+    size_t request_length;
+    HTTP_VALIDATION validation =
+        aclk_http_request_size_validation(query->data.http_api_v2.payload, &request_length);
+    if(validation == HTTP_VALIDATION_OK) {
+        buffer_contents_replace(w->response.data, query->data.http_api_v2.payload, request_length);
+        w->statistics.received_bytes = request_length;
+        validation = http_request_validate(w);
+    }
 
-    HTTP_VALIDATION validation = http_request_validate(w);
     if(validation != HTTP_VALIDATION_OK) {
         nd_log(NDLS_ACCESS, NDLP_ERR, "ACLK received request is not valid, code %d", validation);
         retval = 1;
@@ -213,6 +224,28 @@ cleanup:
 
     buffer_free(z_buffer);
     return retval;
+}
+
+int aclk_query_unittest(void) {
+    int errors = 0;
+    CLEAN_CHAR_P *request = mallocz(NETDATA_WEB_REQUEST_MAX_SIZE + 2);
+    memset(request, 'a', NETDATA_WEB_REQUEST_MAX_SIZE + 1);
+
+    size_t request_length;
+    request[NETDATA_WEB_REQUEST_MAX_SIZE] = '\0';
+    if(aclk_http_request_size_validation(request, &request_length) != HTTP_VALIDATION_OK ||
+       request_length != NETDATA_WEB_REQUEST_MAX_SIZE)
+        errors++;
+
+    request[NETDATA_WEB_REQUEST_MAX_SIZE] = 'a';
+    if(aclk_http_request_size_validation(request, &request_length) != HTTP_VALIDATION_REQUEST_TOO_LARGE ||
+       request_length != NETDATA_WEB_REQUEST_MAX_SIZE + 1)
+        errors++;
+
+    if(errors)
+        fprintf(stderr, "ACLK QUERY: %d test(s) failed\n", errors);
+
+    return errors;
 }
 
 int send_bin_msg(mqtt_wss_client client, aclk_query_t *query)

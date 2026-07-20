@@ -7,6 +7,8 @@
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
 #include "web/mcp/mcp.h"
+#include "web/rtc/webrtc.h"
+#include "aclk/aclk_query.h"
 #include "aclk/aclk_util.h"
 
 #include "database/engine/page_test.h"
@@ -479,7 +481,9 @@ int netdata_main(int argc, char **argv) {
                             if (exporting_opentsdb_http_unittest()) return 1;
                             if (exporting_opentsdb_telnet_unittest()) return 1;
                             if (url_unittest()) return 1;
-                            if (web_client_request_target_unittest()) return 1;
+                            if (web_client_request_unittest()) return 1;
+                            if (aclk_query_unittest()) return 1;
+                            if (webrtc_request_size_unittest()) return 1;
                             if (simple_pattern_index_unittest()) return 1;
                             if (rrdhost_identity_index_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
@@ -620,14 +624,17 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return rrdhost_identity_index_unittest();
                         }
-                        else if(strcmp(optarg, "webrequesttargettest") == 0) {
+                        else if(strcmp(optarg, "webrequesttest") == 0) {
                             unittest_running = true;
                             if(url_unittest()) return 1;
-                            return web_client_request_target_unittest();
+                            if(web_client_request_unittest()) return 1;
+                            if(aclk_query_unittest()) return 1;
+                            return webrtc_request_size_unittest();
                         }
                         else if(strcmp(optarg, "aclkutiltest") == 0) {
                             unittest_running = true;
-                            return aclk_util_unittest();
+                            if(aclk_util_unittest()) return 1;
+                            return aclk_query_unittest();
                         }
                         else if(strcmp(optarg, "wsclienttest") == 0) {
                             unittest_running = true;

@@ -13,20 +13,26 @@ extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 extern int respect_web_browser_do_not_track_policy;
 extern const char *web_x_frame_options;
 
+#define NETDATA_WEB_REQUEST_MAX_SIZE (1024 * 1024)
+
 typedef enum __attribute__((packed)) {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
     HTTP_VALIDATION_REQUEST_TIMEOUT,
     HTTP_VALIDATION_MALFORMED_URL,
-    HTTP_VALIDATION_URL_TOO_LONG,
+    HTTP_VALIDATION_REQUEST_TOO_LARGE,
     HTTP_VALIDATION_INCOMPLETE,
     HTTP_VALIDATION_REDIRECT
 } HTTP_VALIDATION;
 
+static inline HTTP_VALIDATION web_client_request_size_validation(size_t size) {
+    return size > NETDATA_WEB_REQUEST_MAX_SIZE ? HTTP_VALIDATION_REQUEST_TOO_LARGE : HTTP_VALIDATION_OK;
+}
+
 static inline short http_validation_error_to_response_code(HTTP_VALIDATION validation) {
     switch(validation) {
-        case HTTP_VALIDATION_URL_TOO_LONG:
-            return HTTP_RESP_URI_TOO_LONG;
+        case HTTP_VALIDATION_REQUEST_TOO_LARGE:
+            return HTTP_RESP_CONTENT_TOO_LONG;
         case HTTP_VALIDATION_REQUEST_TIMEOUT:
             return HTTP_RESP_REQUEST_TIMEOUT;
         default:
@@ -155,14 +161,11 @@ void web_client_set_conn_unix(struct web_client *w);
 void web_client_set_conn_cloud(struct web_client *w);
 void web_client_set_conn_webrtc(struct web_client *w);
 
-#define NETDATA_WEB_REQUEST_TARGET_MAX_SIZE (1024 * 1024)
-
 #define NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE 16384
 
 #define NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE 4096
 #define NETDATA_WEB_RESPONSE_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
-#define NETDATA_WEB_REQUEST_MAX_SIZE (128 * 1024)
 #define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512
 #define NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE (64 * 1024)
 
@@ -200,9 +203,13 @@ struct web_client {
     HTTP_ACL acl;                       // the access list of the client
     HTTP_ACL port_acl;                  // the operations permitted on the port the client connected to
     HTTP_ACCESS access;                 // the access permissions of the client
-    size_t header_parse_tries;
     size_t header_parse_last_size;
+    size_t request_header_length;
+    size_t request_content_length;
     usec_t request_ingress_started_ut;
+    HTTP_CONTENT_TYPE request_content_type;
+    bool request_content_length_valid;
+    bool request_too_large;
 
     int fd;
 
@@ -291,7 +298,7 @@ void web_client_free(struct web_client *w);
 
 HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string, size_t length);
 int web_client_cache_unittest(void);
-int web_client_request_target_unittest(void);
+int web_client_request_unittest(void);
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);
 int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path);
 

@@ -5,6 +5,16 @@
 #include "../server/web_client.h"
 #include "../server/web_client_cache.h"
 
+static inline HTTP_VALIDATION webrtc_request_size_validation(size_t size) {
+    return web_client_request_size_validation(size);
+}
+
+int webrtc_request_size_unittest(void) {
+    return webrtc_request_size_validation(NETDATA_WEB_REQUEST_MAX_SIZE) != HTTP_VALIDATION_OK ||
+           webrtc_request_size_validation(NETDATA_WEB_REQUEST_MAX_SIZE + 1) !=
+               HTTP_VALIDATION_REQUEST_TOO_LARGE;
+}
+
 #ifdef HAVE_LIBDATACHANNEL
 
 #include <limits.h>
@@ -305,7 +315,9 @@ static size_t webrtc_send_in_chunks(WEBRTC_DC *chan, const char *data, size_t si
     return sent_bytes;
 }
 
-static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, size_t size, bool binary) {
+static void webrtc_execute_api_request(
+    WEBRTC_DC *chan, const char *request, size_t size, bool binary, HTTP_VALIDATION validation)
+{
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "webrtc"),
             ND_LOG_FIELD_END(),
@@ -324,24 +336,28 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     w->port_acl = HTTP_ACL_WEBRTC | HTTP_ACL_ALL_FEATURES;
     w->acl = w->port_acl;
 
-    char *path = (char *)request;
-    if(strncmp(request, "POST ", 5) == 0) {
-        w->mode = HTTP_REQUEST_MODE_POST;
-        path += 10;
-    }
-    else if(strncmp(request, "GET ", 4) == 0) {
-        w->mode = HTTP_REQUEST_MODE_GET;
-        path += 4;
+    web_client_timeout_checkpoint_set(w, 0);
+    char *path = NULL;
+    if(validation == HTTP_VALIDATION_OK) {
+        path = (char *)request;
+        if(strncmp(request, "POST ", 5) == 0) {
+            w->mode = HTTP_REQUEST_MODE_POST;
+            path += 10;
+        }
+        else if(strncmp(request, "GET ", 4) == 0) {
+            w->mode = HTTP_REQUEST_MODE_GET;
+            path += 4;
+        }
+
+        size_t path_offset = (size_t)(path - request);
+        validation = path_offset > size ? HTTP_VALIDATION_MALFORMED_URL :
+            web_client_decode_path_and_query_string(w, path, size - path_offset);
     }
 
-    web_client_timeout_checkpoint_set(w, 0);
-    size_t path_offset = (size_t)(path - request);
-    HTTP_VALIDATION validation = path_offset > size ? HTTP_VALIDATION_MALFORMED_URL :
-        web_client_decode_path_and_query_string(w, path, size - path_offset);
     if(unlikely(validation != HTTP_VALIDATION_OK)) {
         buffer_flush(w->response.data);
-        if(validation == HTTP_VALIDATION_URL_TOO_LONG) {
-            buffer_strcat(w->response.data, "Request target is too long.");
+        if(validation == HTTP_VALIDATION_REQUEST_TOO_LARGE) {
+            buffer_strcat(w->response.data, "Request is too large.");
         }
         else {
             buffer_strcat(w->response.data, "Malformed URL.");
@@ -473,11 +489,17 @@ static void myMessageCallback(int id __maybe_unused, const char *message, int si
     }
 
     size_t request_size = (size_t)size;
+    HTTP_VALIDATION validation = webrtc_request_size_validation(request_size);
+    if(unlikely(validation != HTTP_VALIDATION_OK)) {
+        webrtc_execute_api_request(chan, NULL, request_size, binary, validation);
+        return;
+    }
+
     CLEAN_CHAR_P *request = mallocz(request_size + 1 + WEBRTC_REQUEST_PARSER_PADDING);
     memcpy(request, message, request_size);
     memset(&request[request_size], 0, 1 + WEBRTC_REQUEST_PARSER_PADDING);
 
-    webrtc_execute_api_request(chan, request, request_size, binary);
+    webrtc_execute_api_request(chan, request, request_size, binary, HTTP_VALIDATION_OK);
 }
 
 static bool webrtc_conn_is_linked_unsafe(WEBRTC_CONN *conn) {
@@ -506,7 +528,7 @@ static bool webrtc_conn_is_linked_unsafe(WEBRTC_CONN *conn) {
 //        if(size < 0)
 //            size = -size;
 //
-//        webrtc_execute_api_request(chan, message, size, binary);
+//        webrtc_execute_api_request(chan, message, size, binary, HTTP_VALIDATION_OK);
 //    }
 //}
 

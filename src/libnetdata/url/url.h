@@ -28,7 +28,6 @@ typedef enum {
 URL_DECODE_STATUS url_decode_r_len(char *to, size_t size, const char *url, size_t url_length, size_t *decoded_length);
 int url_unittest(void);
 
-bool url_is_request_complete_and_extract_payload(const char *begin, const char *end, size_t length, BUFFER **post_payload);
 char *url_find_protocol(char *s, const char *end);
 
 #endif /* NETDATA_URL_H */
