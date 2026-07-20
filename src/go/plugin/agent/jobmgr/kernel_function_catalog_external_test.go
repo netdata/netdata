@@ -424,6 +424,48 @@ func TestFunctionCatalogPausedMutationAbortsDuringShutdown(t *testing.T) {
 	closeExternalUIDLedger(t, uids)
 }
 
+func TestFunctionCatalogMutationAfterShutdownCutIsRejectedBeforeAdmission(
+	t *testing.T,
+) {
+	catalog := &handoffMutationCatalog{
+		begun: make(chan struct{}),
+		allow: make(chan struct{}),
+	}
+	kernel, run, admission, uids := newExternalKernel(t, catalog)
+
+	kernel.Stop()
+	shutdownCtx, cancelShutdown := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancelShutdown()
+	require.NoError(t, kernel.WaitShutdownStarted(shutdownCtx))
+
+	err := kernel.QuiesceFunctions(
+		context.Background(),
+		handoffMutation{},
+	)
+	stopping, ok :=
+		errors.AsType[*lifecycle.StoppingRejection](err)
+	require.True(t, ok)
+	require.EqualValues(t, run.Generation(), stopping.Generation)
+	require.False(t, catalog.active.Load())
+	select {
+	case <-catalog.begun:
+		require.FailNow(
+			t,
+			"test failed",
+			"post-cut Function mutation reached catalog admission",
+		)
+	default:
+	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+	require.True(t, catalog.closed.Load())
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+	closeExternalUIDLedger(t, uids)
+}
+
 type handoffMutation struct{}
 
 func (handoffMutation) FunctionCatalogMutation() {}

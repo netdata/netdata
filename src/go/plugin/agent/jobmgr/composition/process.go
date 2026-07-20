@@ -177,6 +177,9 @@ func (pc *processCore) run(
 		case <-ctx.Done():
 			return pc.finalize(generation, generationID, ctx.Err())
 		case clock := <-ticks.C:
+			if generation.run.IsStopping() {
+				continue
+			}
 			if err := generation.scheduler.Tick(ctx, clock); err != nil {
 				generation.run.Dirty(err)
 				generation.Stop()

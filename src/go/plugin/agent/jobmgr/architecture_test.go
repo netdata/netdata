@@ -220,6 +220,41 @@ func TestProductionOwnerManifestHasConcreteDeclarations(t *testing.T) {
 	}
 }
 
+func TestCommandKernelRoutesOperationActionsThroughOwnershipGate(
+	t *testing.T,
+) {
+	path := filepath.Join(jobmgrSourceRoot(t), "kernel.go")
+	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	require.NoError(t, err)
+
+	directSenders := make(map[string]int)
+	for _, declaration := range file.Decls {
+		function, ok := declaration.(*ast.FuncDecl)
+		if !ok || function.Body == nil {
+			continue
+		}
+		ast.Inspect(function.Body, func(node ast.Node) bool {
+			call, ok := node.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			selector, ok := call.Fun.(*ast.SelectorExpr)
+			if ok && selector.Sel.Name == "SendAction" {
+				directSenders[function.Name.Name]++
+			}
+			return true
+		})
+	}
+
+	require.Equal(t, map[string]int{
+		"completeRunFinalizer":    1,
+		"completeShutdownBarrier": 1,
+		"completeTask":            1,
+		"sendOperationAction":     1,
+		"sendShutdownAction":      1,
+	}, directSenders)
+}
+
 func TestProductionSourceClosure(t *testing.T) {
 	tests := map[string]func(t *testing.T){
 		"exact Job Manager tree": assertExactJobManagerTree,

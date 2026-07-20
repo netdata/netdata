@@ -350,40 +350,88 @@ func TestAutoDetectionRetryWaitRequiresWorkerJoin(t *testing.T) {
 	}
 }
 
-func TestAutoDetectionRetryDropsStoppingSubmission(t *testing.T) {
-	failed := make(chan error, 1)
-	index := newAutoDetectionRetryIndex()
-	require.NoError(t, index.bind(
-		&autoDetectionRetryTestCommands{
-			submitErr: &lifecycle.StoppingRejection{Generation: 1},
+func TestAutoDetectionRetryClassifiesStoppingSubmission(t *testing.T) {
+	sentinel := errors.New("structural failure")
+	tests := map[string]struct {
+		submitErr   error
+		wantFailure bool
+	}{
+		"exact current stopping token is clean": {
+			submitErr: &lifecycle.StoppingRejection{
+				Generation: 1,
+			},
 		},
-		func(
-			confgroup.Config,
-			autoDetectionRetryToken,
-		) (jobmgr.WorkPlan, error) {
-			return jobmgr.WorkPlan{}, nil
+		"wrong generation is structural": {
+			submitErr: &lifecycle.StoppingRejection{
+				Generation: 2,
+			},
+			wantFailure: true,
 		},
-		1,
-		func(err error) {
-			failed <- err
+		"joined structural error is not hidden": {
+			submitErr: errors.Join(
+				&lifecycle.StoppingRejection{
+					Generation: 1,
+				},
+				sentinel,
+			),
+			wantFailure: true,
 		},
-	))
-	index.schedule(autoDetectionRetryTestConfig("job"), 1)
-	index.advance(0)
-	index.advance(1)
-
-	require.NoError(t, index.wait(context.Background()))
-	select {
-	case err := <-failed:
-		require.FailNowf(
-			t,
-			"test failed",
-			"stopping submission was reported as a failure: %v",
-			err,
-		)
-	default:
 	}
-	index.stopWorker()
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			failed := make(chan error, 1)
+			index := newAutoDetectionRetryIndex()
+			require.NoError(t, index.bind(
+				&autoDetectionRetryTestCommands{
+					submitErr: test.submitErr,
+				},
+				func(
+					confgroup.Config,
+					autoDetectionRetryToken,
+				) (jobmgr.WorkPlan, error) {
+					return jobmgr.WorkPlan{}, nil
+				},
+				1,
+				func(err error) {
+					failed <- err
+				},
+			))
+			index.schedule(
+				autoDetectionRetryTestConfig("job"),
+				1,
+			)
+			index.advance(0)
+			index.advance(1)
+
+			waitErr := index.wait(context.Background())
+			if test.wantFailure {
+				require.ErrorIs(t, waitErr, test.submitErr)
+				select {
+				case err := <-failed:
+					require.ErrorIs(t, err, test.submitErr)
+				case <-time.After(time.Second):
+					require.FailNow(
+						t,
+						"test failed",
+						"retry failure was not reported",
+					)
+				}
+			} else {
+				require.NoError(t, waitErr)
+				select {
+				case err := <-failed:
+					require.FailNowf(
+						t,
+						"test failed",
+						"stopping submission was reported as a failure: %v",
+						err,
+					)
+				default:
+				}
+			}
+			index.stopWorker()
+		})
+	}
 }
 
 type autoDetectionRetryTestCommands struct {

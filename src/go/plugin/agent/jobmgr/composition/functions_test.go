@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -136,6 +137,289 @@ func TestFunctionAssemblyJobHookCapturesExactHandle(t *testing.T) {
 	require.NoError(t, handle.Cleanup(context.Background()))
 }
 
+func TestFunctionAssemblyCommitsProtectedTransactionAfterShutdownCut(
+	t *testing.T,
+) {
+	harness := newShutdownFunctionHarness(t)
+	applyEntered := make(chan struct{})
+	applyRelease := make(chan struct{})
+	submitted := make(chan error, 1)
+	go func() {
+		submitted <- harness.kernel.SubmitPreparedAndWait(
+			context.Background(),
+			jobmgr.Request{
+				UID:     "shutdown-function-transaction",
+				LaneKey: harness.job.FullName(),
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test",
+			},
+			jobmgr.WorkPlan{
+				NoResponse: true,
+				Transaction: &jobmgr.ResourceTransactionPlan{
+					ID:                harness.job.FullName(),
+					AllocateSuccessor: true,
+					Permit:            harness.permit,
+					Prepare: func(
+						_ context.Context,
+						_ lifecycle.ReadyResource,
+						scope lifecycle.ResourceTransactionScope,
+						permit lifecycle.LongLivedPermit,
+					) (lifecycle.PreparedResourceTransaction, error) {
+						return &shutdownFunctionPreparedTransaction{
+							scope:   scope,
+							permit:  permit,
+							handle:  harness.handle,
+							entered: applyEntered,
+							release: applyRelease,
+						}, nil
+					},
+				},
+			},
+		)
+	}()
+
+	waitShutdownFunctionGate(t, applyEntered, "transaction apply")
+	harness.kernel.Stop()
+	waitShutdownFunctionStart(t, harness.kernel)
+	close(applyRelease)
+	require.NoError(t, waitShutdownFunctionResult(
+		t,
+		submitted,
+		"protected transaction",
+	))
+	waitCtx, cancelWait := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancelWait()
+	require.NoError(t, harness.kernel.Wait(waitCtx))
+	require.NoError(t, harness.run.DirtyCause())
+	requireFunctionPublicationCycle(t, harness.output)
+	harness.requireDrained(t)
+}
+
+func TestFunctionAssemblyDrainsProtectedResourceStopAfterShutdownCut(
+	t *testing.T,
+) {
+	harness := newShutdownFunctionHarness(t)
+	stopEntered := make(chan struct{})
+	stopRelease := make(chan struct{})
+	require.NoError(t, harness.kernel.SubmitPreparedAndWait(
+		context.Background(),
+		jobmgr.Request{
+			UID:     "shutdown-function-stop-install",
+			LaneKey: harness.job.FullName(),
+			Source:  lifecycle.SourceJobManager,
+			Route:   "internal/test",
+		},
+		jobmgr.WorkPlan{
+			NoResponse: true,
+			Resource: &jobmgr.ResourcePlan{
+				Action: jobmgr.ResourceInstall,
+				ID:     harness.job.FullName(),
+				Permit: harness.permit,
+				Prepare: func(
+					_ context.Context,
+					generation uint64,
+					permit lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResource, error) {
+					return &shutdownFunctionPreparedResource{
+						identity: lifecycle.ResourceIdentity{
+							ID:         harness.job.FullName(),
+							Generation: generation,
+						},
+						permit:      permit,
+						handle:      harness.handle,
+						stopEntered: stopEntered,
+						stopRelease: stopRelease,
+					}, nil
+				},
+			},
+		},
+	))
+
+	submitted := make(chan error, 1)
+	go func() {
+		submitted <- harness.kernel.SubmitPreparedAndWait(
+			context.Background(),
+			jobmgr.Request{
+				UID:     "shutdown-function-stop",
+				LaneKey: harness.job.FullName(),
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test",
+			},
+			jobmgr.WorkPlan{
+				NoResponse: true,
+				Resource: &jobmgr.ResourcePlan{
+					Action: jobmgr.ResourceStop,
+					ID:     harness.job.FullName(),
+				},
+			},
+		)
+	}()
+
+	waitShutdownFunctionGate(t, stopEntered, "resource stop")
+	harness.kernel.Stop()
+	waitShutdownFunctionStart(t, harness.kernel)
+	close(stopRelease)
+	require.NoError(t, waitShutdownFunctionResult(
+		t,
+		submitted,
+		"protected resource stop",
+	))
+	waitCtx, cancelWait := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancelWait()
+	require.NoError(t, harness.kernel.Wait(waitCtx))
+	require.NoError(t, harness.run.DirtyCause())
+	requireFunctionPublicationCycle(t, harness.output)
+	harness.requireDrained(t)
+}
+
+type shutdownFunctionHarness struct {
+	kernel    *jobmgr.CommandKernel
+	run       *lifecycle.RunSupervisor
+	admission *lifecycle.AdmissionLedger
+	uids      *lifecycle.UIDLedger
+	tasks     *lifecycle.TaskSupervisor
+	output    *bytes.Buffer
+	job       *assemblyTestJob
+	handle    joboutput.HandlerLifecycle
+	permit    lifecycle.LongLivedPlan
+}
+
+func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
+	t.Helper()
+	output := &bytes.Buffer{}
+	frames, err := lifecycle.NewFrameOwner(output)
+	require.NoError(t, err)
+	modules := collectorapi.Registry{
+		"module": {
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "method"}}
+			},
+			MethodHandler: func(
+				collectorapi.RuntimeJob,
+			) funcapi.MethodHandler {
+				return &assemblyTestHandler{}
+			},
+		},
+	}
+	assembly, err := NewFunctionAssembly(1, modules, frames)
+	require.NoError(t, err)
+	clock := lifecycle.RealClock{}
+	run, err := lifecycle.NewRunSupervisor(1, clock, time.Second)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = run.FinishShutdown() })
+	admission := lifecycle.NewAdmissionLedger()
+	uids := lifecycle.NewUIDLedger()
+	tasks, err := lifecycle.NewTaskSupervisor(frames)
+	require.NoError(t, err)
+	kernel, err := jobmgr.NewCommandKernel(
+		run,
+		admission,
+		uids,
+		tasks,
+		frames,
+		clock,
+		make(chan lifecycle.AdmissionGrant, 1),
+		nil,
+		assembly,
+		assembly,
+		runRejectingPlanner{},
+		assembly.Catalog(),
+	)
+	require.NoError(t, err)
+	require.NoError(t, assembly.Bind(kernel))
+	loop, err := jobmgr.NewKernelLoop(kernel)
+	require.NoError(t, err)
+	require.NoError(t, run.OpenAdmission())
+	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, assembly.Activate())
+
+	job := &assemblyTestJob{}
+	handle, err := assembly.JobHooks().Prepare(joboutput.PublishedJob{
+		Identity: lifecycle.ResourceIdentity{
+			ID:         job.FullName(),
+			Generation: 1,
+		},
+		Variant: joboutput.JobVariantV1,
+		Job:     job,
+	})
+	require.NoError(t, err)
+	permit, err := lifecycle.NewJobLongLivedPlan(40)
+	require.NoError(t, err)
+	return shutdownFunctionHarness{
+		kernel: kernel, run: run, admission: admission, uids: uids,
+		tasks: tasks, output: output, job: job, handle: handle,
+		permit: permit,
+	}
+}
+
+func (sfh shutdownFunctionHarness) requireDrained(t *testing.T) {
+	t.Helper()
+	require.Equal(t, lifecycle.LongLivedCensus{}, sfh.tasks.LongLivedCensus())
+	require.NoError(t, sfh.admission.CloseDrained(sfh.run.Generation()))
+	closeRunTestUIDs(t, sfh.uids)
+}
+
+func waitShutdownFunctionGate(
+	t *testing.T,
+	entered <-chan struct{},
+	name string,
+) {
+	t.Helper()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		require.FailNowf(t, "test failed", "%s did not reach the shutdown gate", name)
+	}
+}
+
+func waitShutdownFunctionStart(
+	t *testing.T,
+	kernel *jobmgr.CommandKernel,
+) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	require.NoError(t, kernel.WaitShutdownStarted(ctx))
+}
+
+func waitShutdownFunctionResult(
+	t *testing.T,
+	result <-chan error,
+	name string,
+) error {
+	t.Helper()
+	select {
+	case err := <-result:
+		return err
+	case <-time.After(time.Second):
+		require.FailNowf(t, "test failed", "%s did not settle", name)
+		return nil
+	}
+}
+
+func requireFunctionPublicationCycle(
+	t *testing.T,
+	output *bytes.Buffer,
+) {
+	t.Helper()
+	publishedAt := bytes.Index(
+		output.Bytes(),
+		[]byte(`FUNCTION GLOBAL "module:method"`),
+	)
+	withdrawnAt := bytes.Index(
+		output.Bytes(),
+		[]byte(`FUNCTION_DEL GLOBAL "module:method"`),
+	)
+	require.GreaterOrEqual(t, publishedAt, 0)
+	require.Greater(t, withdrawnAt, publishedAt)
+}
+
 type assemblyMutationPort struct {
 	catalog *functionadapter.Catalog
 }
@@ -250,4 +534,174 @@ func (*assemblyTestJob) Cleanup()                                   {}
 func (*assemblyTestJob) Stop()                                      {}
 func (*assemblyTestJob) StartManaged(ready chan<- struct{}) {
 	close(ready)
+}
+
+type shutdownFunctionPreparedResource struct {
+	identity    lifecycle.ResourceIdentity
+	permit      lifecycle.LongLivedPermit
+	handle      joboutput.HandlerLifecycle
+	stopEntered chan<- struct{}
+	stopRelease <-chan struct{}
+}
+
+func (sfpr *shutdownFunctionPreparedResource) Identity() lifecycle.ResourceIdentity {
+	return sfpr.identity
+}
+
+func (sfpr *shutdownFunctionPreparedResource) AcceptStart(
+	_ context.Context,
+	expected uint64,
+) (lifecycle.ReadyResource, error) {
+	if expected != sfpr.identity.Generation {
+		return nil, errors.Join(
+			errors.New("test resource generation differs"),
+			sfpr.Dispose(context.Background()),
+		)
+	}
+	if err := sfpr.permit.ActivateExternal(
+		lifecycle.LongLivedEJobResources,
+	); err != nil {
+		return nil, errors.Join(
+			err,
+			sfpr.Dispose(context.Background()),
+		)
+	}
+	return &shutdownFunctionReadyResource{
+		identity:    sfpr.identity,
+		permit:      sfpr.permit,
+		handle:      sfpr.handle,
+		stopEntered: sfpr.stopEntered,
+		stopRelease: sfpr.stopRelease,
+	}, nil
+}
+
+func (sfpr *shutdownFunctionPreparedResource) Dispose(
+	ctx context.Context,
+) error {
+	return errors.Join(
+		sfpr.handle.CloseAndDrain(ctx),
+		sfpr.handle.Cleanup(ctx),
+		sfpr.permit.AbortUnused(),
+	)
+}
+
+type shutdownFunctionReadyResource struct {
+	identity    lifecycle.ResourceIdentity
+	permit      lifecycle.LongLivedPermit
+	handle      joboutput.HandlerLifecycle
+	stopEntered chan<- struct{}
+	stopRelease <-chan struct{}
+}
+
+func (sfrr *shutdownFunctionReadyResource) Identity() lifecycle.ResourceIdentity {
+	return sfrr.identity
+}
+
+func (sfrr *shutdownFunctionReadyResource) Publish() error {
+	return sfrr.handle.Publish()
+}
+
+func (sfrr *shutdownFunctionReadyResource) AbortReady(
+	ctx context.Context,
+) error {
+	return errors.Join(
+		sfrr.handle.CloseAndDrain(ctx),
+		sfrr.handle.Cleanup(ctx),
+		sfrr.permit.ReleaseExternal(
+			lifecycle.LongLivedEJobResources,
+		),
+		sfrr.permit.ReleaseBytes(),
+		sfrr.permit.Return(),
+	)
+}
+
+func (sfrr *shutdownFunctionReadyResource) Stop(
+	ctx context.Context,
+) error {
+	if sfrr.stopEntered != nil {
+		close(sfrr.stopEntered)
+		<-sfrr.stopRelease
+	}
+	return errors.Join(
+		sfrr.handle.CloseAndDrain(ctx),
+		sfrr.handle.Cleanup(ctx),
+		sfrr.permit.ReleaseExternal(
+			lifecycle.LongLivedEJobResources,
+		),
+		sfrr.permit.ReleaseBytes(),
+	)
+}
+
+func (sfrr *shutdownFunctionReadyResource) Finalize() error {
+	return sfrr.permit.Return()
+}
+
+type shutdownFunctionPreparedTransaction struct {
+	scope   lifecycle.ResourceTransactionScope
+	permit  lifecycle.LongLivedPermit
+	handle  joboutput.HandlerLifecycle
+	entered chan<- struct{}
+	release <-chan struct{}
+}
+
+func (sfpt *shutdownFunctionPreparedTransaction) Scope() lifecycle.ResourceTransactionScope {
+	return sfpt.scope
+}
+
+func (sfpt *shutdownFunctionPreparedTransaction) Apply(
+	ctx context.Context,
+) (lifecycle.AppliedResourceTransaction, error) {
+	close(sfpt.entered)
+	<-sfpt.release
+	if err := sfpt.permit.ActivateExternal(
+		lifecycle.LongLivedEJobResources,
+	); err != nil {
+		_, disposeErr := sfpt.Dispose(ctx)
+		return lifecycle.AppliedResourceTransaction{}, errors.Join(
+			err,
+			disposeErr,
+		)
+	}
+	ready := &shutdownFunctionReadyResource{
+		identity: sfpt.scope.Successor,
+		permit:   sfpt.permit,
+		handle:   sfpt.handle,
+	}
+	if err := ready.Publish(); err != nil {
+		return lifecycle.AppliedResourceTransaction{}, errors.Join(
+			err,
+			ready.AbortReady(ctx),
+		)
+	}
+	result, err := lifecycle.NewSealedResult(204, "text/plain", nil)
+	if err != nil {
+		return lifecycle.AppliedResourceTransaction{}, errors.Join(
+			err,
+			ready.AbortReady(ctx),
+		)
+	}
+	applied, err := lifecycle.NewAppliedResourceTransaction(
+		sfpt.scope,
+		lifecycle.ResourceTransactionInstalled,
+		ready,
+		result,
+		func() error { return nil },
+	)
+	if err != nil {
+		return lifecycle.AppliedResourceTransaction{}, errors.Join(
+			err,
+			ready.AbortReady(ctx),
+		)
+	}
+	return applied, nil
+}
+
+func (sfpt *shutdownFunctionPreparedTransaction) Dispose(
+	ctx context.Context,
+) (lifecycle.ReadyResource, error) {
+	return nil, errors.Join(
+		sfpt.handle.CloseAndDrain(ctx),
+		sfpt.handle.Cleanup(ctx),
+		sfpt.permit.AbortUnused(),
+	)
 }

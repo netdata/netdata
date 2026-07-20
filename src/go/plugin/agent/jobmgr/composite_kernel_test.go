@@ -318,6 +318,150 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 	require.False(t, err != nil && !errors.Is(err, ErrStopped))
 }
 
+func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
+	tests := map[string]struct {
+		suffix string
+		submit func(
+			context.Context,
+			CompositeCommandScope,
+			Request,
+			WorkPlan,
+		) error
+	}{
+		"normal child": {
+			suffix: "normal",
+			submit: func(
+				ctx context.Context,
+				commands CompositeCommandScope,
+				request Request,
+				plan WorkPlan,
+			) error {
+				return commands.SubmitPreparedAndWait(
+					ctx,
+					request,
+					plan,
+				)
+			},
+		},
+		"rollback child": {
+			suffix: "rollback",
+			submit: func(
+				_ context.Context,
+				commands CompositeCommandScope,
+				request Request,
+				plan WorkPlan,
+			) error {
+				return commands.SubmitRollbackAndWait(
+					request,
+					plan,
+				)
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			kernel, run, _, _, _ := newKernelWithPlanner(
+				t,
+				stoppedKernelPlanner{},
+			)
+			startKernelLoop(t, kernel)
+			require.NoError(t, run.OpenAdmission())
+
+			parentEntered := make(chan struct{})
+			submitChild := make(chan struct{})
+			childApplied := make(chan struct{})
+			parentDone := make(chan error, 1)
+			parentID := "shutdown-composite-parent-" + test.suffix
+			childID := "shutdown-composite-child-" + test.suffix
+			go func() {
+				parentDone <- kernel.SubmitPreparedAndWait(
+					context.Background(),
+					Request{
+						UID: parentID, LaneKey: parentID,
+						Source: lifecycle.SourceJobManager,
+						Route:  "internal/test/" + parentID,
+					},
+					compositeParentTestPlan(
+						parentID,
+						[]string{"graph"},
+						func(
+							ctx context.Context,
+							commands CompositeCommandScope,
+						) error {
+							close(parentEntered)
+							<-submitChild
+							return test.submit(
+								ctx,
+								commands,
+								Request{
+									UID: childID, LaneKey: childID,
+									Source: lifecycle.SourceJobManager,
+									Route:  "internal/test/" + childID,
+								},
+								compositeTestPlan(
+									childID,
+									[]string{"graph"},
+									func() {
+										close(childApplied)
+									},
+								),
+							)
+						},
+					),
+				)
+			}()
+			select {
+			case <-parentEntered:
+			case <-time.After(time.Second):
+				require.FailNow(
+					t,
+					"test failed",
+					"composite parent did not enter apply",
+				)
+			}
+
+			kernel.Stop()
+			shutdownCtx, cancelShutdown := context.WithTimeout(
+				context.Background(),
+				time.Second,
+			)
+			defer cancelShutdown()
+			require.NoError(
+				t,
+				kernel.WaitShutdownStarted(shutdownCtx),
+			)
+			close(submitChild)
+
+			select {
+			case <-childApplied:
+			case <-time.After(time.Second):
+				require.FailNow(
+					t,
+					"test failed",
+					"post-cut composite child did not apply",
+				)
+			}
+			select {
+			case err := <-parentDone:
+				require.NoError(t, err)
+			case <-time.After(time.Second):
+				require.FailNow(
+					t,
+					"test failed",
+					"post-cut composite parent did not settle",
+				)
+			}
+			waitCtx, cancelWait := context.WithTimeout(
+				context.Background(),
+				time.Second,
+			)
+			defer cancelWait()
+			require.NoError(t, kernel.Wait(waitCtx))
+			require.NoError(t, run.DirtyCause())
+		})
+	}
+}
+
 func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
 	kernel, run, _, _, _ := newKernelWithPlanner(
 		t,

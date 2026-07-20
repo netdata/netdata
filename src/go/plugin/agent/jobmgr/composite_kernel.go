@@ -335,7 +335,16 @@ func (ck *CommandKernel) validateCompositeAdmission(
 			"jobmgr composite: parent is not accepting a child",
 		)
 	}
-	if !rollback && (parent.cancelled || parent.TimedOut()) {
+	if ck.shutdownPhase == commandShutdownCleanupDrain ||
+		(ck.shutdownPhase == commandShutdownActionDrain &&
+			!parent.ownershipChain) {
+		return nil, errors.New(
+			"jobmgr composite: continuation authority is closed",
+		)
+	}
+	if !rollback &&
+		(parent.cancelled || parent.TimedOut()) &&
+		!parent.ownershipChain {
 		return nil, errors.New(
 			"jobmgr composite: cancelled parent rejected normal child",
 		)

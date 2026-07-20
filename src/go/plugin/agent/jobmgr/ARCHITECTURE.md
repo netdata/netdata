@@ -260,13 +260,18 @@ public factory/runtime contract they implement.
 Run rotation is an acknowledged sequence:
 
 1. seal process ingress returns;
-2. publish the active run's generation-bound stopping cut before closing
-   command transport and admission;
-3. begin the one run shutdown budget;
-4. drain or contain the current input payload;
-5. cancel and join supervised work;
-6. withdraw Function publications and long-lived resources;
-7. require exact-zero authority censuses;
+2. publish the active run's generation-bound stopping cut, close external
+   command ingress, and begin the one run shutdown budget;
+3. typed-cancel preparation while draining every ownership action already
+   admitted before the cut;
+4. keep inherited activation, Function mutation, and claim-covered private
+   composite commands available only to those protected action chains;
+5. after those chains and every accepted Function mutation settle, close
+   private continuation and Function-mutation ingress, seal inherited
+   activation, and enter cleanup-only admission;
+6. cancel and join inherited work, withdraw Function publications, close the
+   catalog, and stop long-lived resources;
+7. require exact-zero authority censuses and run the finalizer;
 8. finish the run and reopen the drained process ledgers for the next
    generation;
 9. construct, start, and adopt the next complete run.
@@ -285,9 +290,13 @@ that clean provider completion is not a failure.
 
 Preparation remains cancellable. Once an ownership-changing lifecycle action
 starts, user cancellation, operation deadline, and shutdown no longer cancel
-that action. The response may report cancellation or deadline while the action
-finishes to a provable disposition; the existing run shutdown budget remains
-the fail-closed bound.
+that action. KernelLoop tracks such chains from resource accept/start,
+capability commit, transaction apply, or an executing explicit resource stop
+until terminal disposal. The first shutdown cut preserves only the transitive
+inherited-task, Function-mutation, and private-composite authority those chains
+need. The response may report cancellation or deadline while the action
+finishes to a provable disposition; only then does the second cut revoke that
+authority. The existing run shutdown budget remains the fail-closed bound.
 
 Collector work that remains blocked at process exit is considered safe enough
 because process termination removes it; Job Manager does not add a second

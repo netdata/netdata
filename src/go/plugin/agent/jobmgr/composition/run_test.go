@@ -293,6 +293,157 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	closeRunTestUIDs(t, uids)
 }
 
+func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
+	t *testing.T,
+) {
+	checkEntered := make(chan struct{})
+	checkRelease := make(chan struct{})
+	var cleanupCalls atomic.Int32
+	modules := collectorapi.Registry{
+		"module": {
+			Create: func() collectorapi.CollectorV1 {
+				return &collectorapi.MockCollectorV1{
+					CheckFunc: func(context.Context) error {
+						close(checkEntered)
+						<-checkRelease
+						return nil
+					},
+					CleanupFunc: func(context.Context) {
+						cleanupCalls.Add(1)
+					},
+				}
+			},
+			Config: func() any {
+				return &collectorapi.MockConfiguration{}
+			},
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "method"}}
+			},
+			MethodHandler: func(
+				collectorapi.RuntimeJob,
+			) funcapi.MethodHandler {
+				return &runTestHandler{cleanup: func() {}}
+			},
+			JobConfigSchema: collectorapi.MockConfigSchema,
+		},
+	}
+	config := confgroup.Config{
+		"module": "module", "name": "job",
+		"update_every": 1, "function_only": true,
+		"option_str": "work", "option_int": 1,
+	}
+	config.SetProvider(confgroup.TypeDyncfg)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("test")
+	payload, err := yaml.Marshal(config)
+	require.NoError(t, err)
+	jobs := testRunJobServices(t)
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
+	jobs.Graph = []dyncfg.GraphConfig{{
+		ID: config.FullName(), Module: config.Module(),
+		Name: config.Name(), Status: dyncfg.StatusAccepted.String(),
+		Payload: payload,
+	}}
+
+	var output bytes.Buffer
+	frames, err := lifecycle.NewFrameOwner(&output)
+	require.NoError(t, err)
+	admission := lifecycle.NewAdmissionLedger()
+	uids := lifecycle.NewUIDLedger()
+	generation, err := newRunGeneration(runGenerationConfig{
+		Generation: 1, ShutdownTimeout: time.Second,
+		Clock: lifecycle.RealClock{}, Admission: admission, UIDs: uids,
+		Frames: frames, Modules: modules, Jobs: jobs,
+		Discovery: testRunDiscoveryServices(t),
+		Planner: func(
+			runPlannerCapabilities,
+		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
+			return runRejectingPlanner{},
+				jobmgr.RunFinalizerFunc(
+					func(context.Context, uint64) error { return nil },
+				),
+				nil
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, generation.start(context.Background()))
+
+	submitted := make(chan error, 1)
+	go func() {
+		submitted <- generation.kernel.SubmitAndWait(
+			context.Background(),
+			jobmgr.Request{
+				UID:    "shutdown-enable",
+				Source: lifecycle.SourceFunction,
+				Route:  "config",
+				Args: []string{
+					"go.d:collector:module:job",
+					string(dyncfg.CommandEnable),
+				},
+			},
+		)
+	}()
+	select {
+	case <-checkEntered:
+	case <-time.After(time.Second):
+		require.FailNow(
+			t,
+			"test failed",
+			"managed autodetection did not enter",
+		)
+	}
+
+	generation.Stop()
+	shutdownCtx, cancelShutdown := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancelShutdown()
+	require.NoError(
+		t,
+		generation.kernel.WaitShutdownStarted(shutdownCtx),
+	)
+	close(checkRelease)
+	select {
+	case err := <-submitted:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(
+			t,
+			"test failed",
+			"protected Job activation did not settle",
+		)
+	}
+	require.NoError(t, generation.Wait(context.Background()))
+	require.NoError(t, generation.run.DirtyCause())
+
+	publishedAt := bytes.Index(
+		output.Bytes(),
+		[]byte(`FUNCTION GLOBAL "module:method"`),
+	)
+	withdrawnAt := bytes.Index(
+		output.Bytes(),
+		[]byte(`FUNCTION_DEL GLOBAL "module:method"`),
+	)
+	require.GreaterOrEqual(t, publishedAt, 0)
+	require.Greater(t, withdrawnAt, publishedAt)
+	require.EqualValues(t, 1, cleanupCalls.Load())
+	require.Equal(
+		t,
+		lifecycle.InheritedTaskCensus{},
+		generation.tasks.InheritedCensus(),
+	)
+	require.Equal(
+		t,
+		lifecycle.LongLivedCensus{},
+		generation.tasks.LongLivedCensus(),
+	)
+	require.NoError(t, admission.CloseDrained(1))
+	closeRunTestUIDs(t, uids)
+}
+
 func fullCapacityInitialJobs(
 	t testing.TB,
 	count int,

@@ -2892,7 +2892,10 @@ func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing
 	token, err := admission.RequestInputBodyGrowth(run.Generation(), 0, capacity)
 	require.NoError(t, err)
 
+	run.BeginStopping()
 	require.NoError(t, kernel.beginShutdown(time.Now().Add(time.Second)))
+	require.NoError(t, kernel.advanceShutdownInputBody())
+	require.NoError(t, kernel.advanceShutdownAuthority())
 
 	select {
 	case grant := <-grants:
@@ -2940,7 +2943,7 @@ func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
 
 	for {
 		before := len(kernel.operations)
-		more, err := kernel.serviceShutdownOperations(quantum)
+		more, err := kernel.serviceShutdownCancellation(quantum)
 		require.NoError(t, err)
 		visited := before - len(kernel.operations)
 		require.False(t, visited < 0 || visited > quantum)
@@ -2950,7 +2953,8 @@ func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
 	}
 	require.False(t, len(kernel.operations) != 0 || kernel.operationHead != nil || kernel.operationTail != nil)
 
-	require.NoError(t, kernel.advanceShutdownAdmission())
+	require.NoError(t, kernel.advanceShutdownInputBody())
+	require.NoError(t, kernel.advanceShutdownAuthority())
 
 	_, err := kernel.serviceShutdownStops(quantum)
 	require.NoError(t, err)
@@ -2988,6 +2992,8 @@ func TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns(t *testing.T) {
 			}
 
 			require.NoError(t, kernel.beginShutdown(time.Now().Add(time.Second)))
+			require.NoError(t, kernel.advanceShutdownInputBody())
+			require.NoError(t, kernel.advanceShutdownAuthority())
 
 			for {
 				before := len(kernel.lanes)
