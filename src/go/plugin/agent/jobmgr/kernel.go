@@ -3427,7 +3427,7 @@ func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 		heap.Pop(&ck.deadlines)
 		quantum--
 		operation := entry.operation
-		if operation.State == lifecycle.OperationDisposedTerminal ||
+		if operation.State >= lifecycle.OperationDisposing ||
 			(operation.Response != lifecycle.ResponseOpen && operation.Response != lifecycle.ResponseNotRequired) {
 			continue
 		}

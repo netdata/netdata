@@ -75,7 +75,7 @@ var bmM002HotpathRows = [...]HotpathGate{
 			"TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch",
 			"TestPendingTaskRequestPopulationGrowsBeyondFormerLimit",
 			"TestLongLivedJobPermitPopulationGrowsBeyondFormerLimit",
-			"TestLongLivedPermitConservesAdmittedBGEFacets",
+			"TestPipelinePermitConservesLifecycleFacetsWithoutAdmissionCharge",
 		},
 		Benchmark: "BenchmarkBTaskSupervisorDispatch",
 	},

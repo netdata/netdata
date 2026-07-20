@@ -1902,6 +1902,110 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	closeUIDLedger(t, uids)
 }
 
+func TestKernelCancelBeforeQueuedCooperativeDeadlineDisposesOperation(t *testing.T) {
+	clock := newKernelFinalizerClock()
+	releaseHolder := make(chan struct{})
+	holderEntered := make(chan struct{}, 1)
+	var deadlineWorkStarted atomic.Bool
+	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
+		if route == "deadline" {
+			return WorkPlan{
+				CooperativeDeadline: true,
+				Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+					deadlineWorkStarted.Store(true)
+					return lifecycle.NewControlResult(lifecycle.ControlDeadline)
+				}),
+			}, nil
+		}
+		return WorkPlan{
+			Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+				holderEntered <- struct{}{}
+				<-releaseHolder
+				return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
+			}),
+		}, nil
+	})
+	var output bytes.Buffer
+	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(
+		t,
+		planner,
+		&output,
+		clock,
+		newNoopRunFinalizer(),
+		time.Second,
+	)
+	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
+		return "cancel-before-deadline"
+	})
+
+	require.NoError(t, run.OpenAdmission())
+
+	startKernelLoop(t, kernel)
+	t.Cleanup(func() {
+		kernel.Stop()
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		_ = kernel.Wait(ctx)
+	})
+	holderResult := make(chan error, 1)
+	require.NoError(t, kernel.submit(context.Background(), Request{
+		UID: "cancel-deadline-holder", Source: lifecycle.SourceFunction,
+		Route: "holder",
+	}, holderResult))
+	select {
+	case <-holderEntered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "same-lane holder did not start")
+	}
+
+	due := clock.Now().Add(time.Second)
+	deadlineResult := make(chan error, 1)
+	require.NoError(t, kernel.submit(context.Background(), Request{
+		UID: "cancel-before-deadline", Source: lifecycle.SourceFunction,
+		Route: "deadline", Deadline: due,
+	}, deadlineResult))
+	select {
+	case <-clock.deadlineArmed:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "queued cooperative deadline was not armed")
+	}
+
+	clock.advance(time.Second + time.Nanosecond)
+	require.NoError(t, kernel.Cancel(context.Background(), "cancel-before-deadline"))
+	close(releaseHolder)
+	select {
+	case err := <-holderResult:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "holder operation did not finish")
+	}
+	select {
+	case err := <-deadlineResult:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(
+			t,
+			"test failed",
+			"cancelled cooperative-deadline operation retained ownership",
+		)
+	}
+
+	require.False(t, deadlineWorkStarted.Load())
+
+	kernel.Stop()
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.Empty(t, kernel.operations)
+	require.Empty(t, kernel.lanes)
+	require.EqualValues(t, 0, tasks.Active())
+	require.EqualValues(t, 0, tasks.Pending())
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
+	closeUIDLedger(t, uids)
+}
+
 func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	releaseBlockers := make(chan struct{})
