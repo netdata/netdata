@@ -31,7 +31,7 @@ static inline void tg_max_free(RRDR *r) {
 static inline void tg_max_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_max *g = (struct tg_max *)r->time_grouping.data;
 
-    if(!g->count || fabsndd(value) > fabsndd(g->max)) {
+    if(!g->count || value > g->max) {
         g->max = value;
         g->count++;
     }

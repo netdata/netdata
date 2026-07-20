@@ -31,7 +31,7 @@ static inline void tg_min_free(RRDR *r) {
 static inline void tg_min_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_min *g = (struct tg_min *)r->time_grouping.data;
 
-    if(!g->count || fabsndd(value) < fabsndd(g->min)) {
+    if(!g->count || value < g->min) {
         g->min = value;
         g->count++;
     }
