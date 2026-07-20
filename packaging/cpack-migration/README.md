@@ -118,6 +118,48 @@ rebuilt locally and checked to report CMake 4.1.6 with rpmbuild present,
 and the branch went through three multi-model review rounds of its own
 before settling.
 
+## Two CMake versions, one tree: why this does not drift
+
+The previous section leaves the repository in a state worth being explicit
+about: the packaging builders run CMake 4.1.6 while the tree declares
+`cmake_minimum_required(VERSION 3.16...3.30)`. Nothing in CMake polices that
+gap by itself — the minimum-version declaration only fails when the
+*running* CMake is older than the floor; it does not detect a
+`CMakeLists.txt` that starts using features newer than the floor. If the
+bundled 4.1.6 were the only CMake that CI ever exercised, a 4.x-only
+construct could land unnoticed and break everyone building from source with
+their distro's CMake.
+
+What actually prevents that is that the packaging builders are not the only
+consumers CI runs. The `source-build` job in `.github/workflows/build.yml`
+builds the tree with `netdata-installer.sh` inside the stock container image
+of every distro in `.github/data/distros.yml` (minus the `skip-local-build`
+entries), and those environments install the distro's own cmake package
+through `install-required-packages.sh`. Any use of too-new CMake breaks the
+oldest such distro and turns the PR red before merge. The enforcement is
+therefore empirical, and the effective floor is the oldest distro cmake in
+that matrix. Today the gatekeeper is Debian 11, whose archive carries cmake
+3.18.4; Ubuntu 22.04 follows at 3.22.1 and Debian 12 at 3.25.1, so when
+Debian 11 rotates out of the matrix the role passes to Ubuntu 22.04 and the
+effective floor quietly rises.
+
+Two consequences of this model are worth keeping in mind. First, the
+declared 3.16 floor is nominal: nothing in CI runs a literal 3.16, so a
+construct introduced in 3.17 or 3.18 would pass every check while breaking
+a user on the declared minimum. Closing that gap — either a CI job pinning
+a literal 3.16 or raising the declared floor to match the tested one — is a
+decision beyond this branch. Second, the two distros excluded from the
+source-build matrix, centos7 and amazonlinux2, are exactly the ones whose
+package builds have never used the distro cmake in the first place: the
+spec redefines `%cmake` to the `/cmake/bin/cmake` shipped in their builder
+images, so there is no distro-cmake floor to guard there.
+
+The 4.1 requirement itself cannot leak into ordinary source builds: the
+CPack RPM configuration is only evaluated when `build-package.sh` requests
+the RPM format, and that path fails fast on anything older than CMake 4.1
+through the configure guard described above, so the 4.1-only variables
+never constrain a build from source.
+
 ## How we tested it
 
 The proof is a committed harness, `packaging/tests/rpm-parity/`, that builds
