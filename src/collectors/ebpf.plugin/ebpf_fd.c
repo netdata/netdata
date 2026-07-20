@@ -554,41 +554,6 @@ void ebpf_obsolete_fd_apps_charts(struct ebpf_module *em)
     netdata_mutex_unlock(&collect_data_mutex);
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-void ebpf_obsolete_fd_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_FILE_OPEN_CLOSE_COUNT,
-        "",
-        "Open and close calls",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_FILE_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_FS_FILEDESCRIPTOR_CONTEXT,
-        NETDATA_CHART_PRIO_EBPF_FD_CHARTS,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            NETDATA_FILESYSTEM_FAMILY,
-            NETDATA_FILE_OPEN_ERR_COUNT,
-            "",
-            "Open fails",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_FILE_GROUP,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            NETDATA_FS_FILEDESCRIPTOR_ERROR_CONTEXT,
-            NETDATA_CHART_PRIO_EBPF_FD_CHARTS + 1,
-            em->update_every);
-    }
-}
 
 /**
  * FD Exit

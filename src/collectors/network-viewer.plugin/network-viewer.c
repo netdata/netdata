@@ -191,9 +191,6 @@ typedef struct {
     NV_TOPOLOGY_OPTIONS options;
 } NV_TOPOLOGY_CONTEXT;
 
-typedef struct {
-    uint64_t ppid;
-} NV_PPID_CACHE_ENTRY;
 
 typedef struct {
     uint64_t starttime;
@@ -756,24 +753,6 @@ static inline bool topology_ip_belongs_to_self(const NV_TOPOLOGY_CONTEXT *ctx, c
     return false;
 }
 
-static inline void topology_process_parent_lookup_key(
-    char *dst,
-    size_t dst_size,
-    uint64_t pid,
-    uint64_t net_ns_inode,
-    bool include_ns
-) {
-    if(!dst || !dst_size)
-        return;
-
-    if(include_ns)
-        snprintf(dst, dst_size, "ns=%llu|pid=%llu",
-                 (unsigned long long)net_ns_inode,
-                 (unsigned long long)pid);
-    else
-        snprintf(dst, dst_size, "pid=%llu",
-                 (unsigned long long)pid);
-}
 
 static inline void topology_pid_lookup_key(char *dst, size_t dst_size, uint64_t pid) {
     if(!dst || !dst_size)
@@ -783,38 +762,6 @@ static inline void topology_pid_lookup_key(char *dst, size_t dst_size, uint64_t 
 }
 
 #if defined(OS_LINUX)
-static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
-    if(!pid || !ppid)
-        return false;
-
-    char filename[FILENAME_MAX + 1];
-    char status_buf[1024];
-    snprintfz(filename, sizeof(filename), "%s/proc/%llu/status",
-              netdata_configured_host_prefix ? netdata_configured_host_prefix : "",
-              (unsigned long long)pid);
-
-    if(read_txt_file(filename, status_buf, sizeof(status_buf)))
-        return false;
-
-    char *p = strstr(status_buf, "PPid:");
-    if(!p)
-        return false;
-
-    p += 5;
-    while(isspace((unsigned char)*p))
-        p++;
-
-    if(*p < '0' || *p > '9')
-        return false;
-
-    uint64_t parent = strtoull(p, NULL, 10);
-    if(parent == pid)
-        parent = 0;
-
-    *ppid = parent;
-    return true;
-}
-
 static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
     if(!pid || !starttime)
         return false;
@@ -865,25 +812,6 @@ static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
 #include <netinet/tcp_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
-static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
-    if(!pid || !ppid)
-        return false;
-
-    struct kinfo_proc kp;
-    size_t size = sizeof(kp);
-    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, (int)pid };
-
-    if(sysctl(mib, 4, &kp, &size, NULL, 0) != 0 || size == 0)
-        return false;
-
-    uint64_t parent = (uint64_t)kp.ki_ppid;
-    if(parent == pid)
-        parent = 0;
-
-    *ppid = parent;
-    return true;
-}
-
 static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
     if(starttime)
         *starttime = 0;
@@ -896,23 +824,6 @@ static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *
 #include <netinet/udp_var.h>
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
-
-static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
-    if(!pid || !ppid || pid > (uint64_t)INT_MAX)
-        return false;
-
-    struct proc_bsdinfo bsd;
-    int rc = proc_pidinfo((pid_t)pid, PROC_PIDTBSDINFO, 0, &bsd, sizeof(bsd));
-    if(rc != (int)sizeof(bsd))
-        return false;
-
-    uint64_t parent = (uint64_t)bsd.pbi_ppid;
-    if(parent == pid)
-        parent = 0;
-
-    *ppid = parent;
-    return true;
-}
 
 static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
     if(!pid || !starttime || pid > (uint64_t)INT_MAX)
@@ -930,12 +841,6 @@ static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
     return true;
 }
 #else
-static bool topology_read_proc_ppid(uint64_t pid __maybe_unused, uint64_t *ppid) {
-    if(ppid)
-        *ppid = 0;
-
-    return false;
-}
 
 
 static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
@@ -946,25 +851,6 @@ static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *
 }
 #endif
 
-static uint64_t topology_ppid_cache_get_or_load(DICTIONARY *ppid_cache, uint64_t pid) {
-    if(!ppid_cache || !pid)
-        return 0;
-
-    char pid_key[64];
-    topology_pid_lookup_key(pid_key, sizeof(pid_key), pid);
-
-    NV_PPID_CACHE_ENTRY *cached = dictionary_get(ppid_cache, pid_key);
-    if(cached)
-        return cached->ppid;
-
-    NV_PPID_CACHE_ENTRY tmp = { .ppid = 0 };
-    uint64_t ppid = 0;
-    if(topology_read_proc_ppid(pid, &ppid))
-        tmp.ppid = ppid;
-
-    cached = dictionary_set(ppid_cache, pid_key, &tmp, sizeof(tmp));
-    return cached ? cached->ppid : tmp.ppid;
-}
 
 static uint64_t topology_starttime_cache_get_or_load(DICTIONARY *pid_starttime_cache, uint64_t pid) {
     if(!pid_starttime_cache || !pid)
@@ -986,43 +872,6 @@ static uint64_t topology_starttime_cache_get_or_load(DICTIONARY *pid_starttime_c
     return cached ? cached->starttime : tmp.starttime;
 }
 
-NV_ENDPOINT_OWNER *topology_find_process_parent_actor(
-    uint64_t ppid,
-    uint64_t net_ns_inode,
-    DICTIONARY *process_parent_ns_lookup,
-    DICTIONARY *process_parent_any_lookup,
-    DICTIONARY *ppid_cache
-) {
-    if(!ppid || !process_parent_ns_lookup || !process_parent_any_lookup)
-        return NULL;
-
-    uint64_t current_pid = ppid;
-    for(size_t depth = 0; depth < NV_TOPOLOGY_MAX_PPID_DEPTH && current_pid; depth++) {
-        char parent_key_ns[NV_TOPOLOGY_KEY_MAX];
-        char parent_key_any[NV_TOPOLOGY_KEY_MAX];
-
-        topology_process_parent_lookup_key(parent_key_ns, sizeof(parent_key_ns), current_pid, net_ns_inode, true);
-        NV_ENDPOINT_OWNER *parent = dictionary_get(process_parent_ns_lookup, parent_key_ns);
-        if(!parent) {
-            topology_process_parent_lookup_key(parent_key_any, sizeof(parent_key_any), current_pid, 0, false);
-            parent = dictionary_get(process_parent_any_lookup, parent_key_any);
-        }
-
-        if(parent)
-            return parent;
-
-        if(!ppid_cache)
-            break;
-
-        uint64_t next_ppid = topology_ppid_cache_get_or_load(ppid_cache, current_pid);
-        if(!next_ppid || next_ppid == current_pid)
-            break;
-
-        current_pid = next_ppid;
-    }
-
-    return NULL;
-}
 
 // ip != NULL builds an exact key (ip+port); ip == NULL builds a service key (port only).
 static void topology_endpoint_owner_key(char *dst, size_t dst_size, uint64_t net_ns_inode, uint16_t protocol, const char *ip, uint16_t port, bool include_ns) {
@@ -6560,8 +6409,12 @@ static BUFFER *network_viewer_dns_result(void)
                 rcode_name = rcode_buf;
             }
 
+            char domain_buf[NETDATA_EBPFGO_DNS_DOMAIN_MAX];
+            memcpy(domain_buf, r->domain, sizeof(domain_buf));
+            domain_buf[sizeof(domain_buf) - 1] = '\0';
+
             buffer_json_add_array_item_array(wb);
-            buffer_json_add_array_item_string(wb, r->domain[0] ? r->domain : "(unknown)");
+            buffer_json_add_array_item_string(wb, domain_buf[0] ? domain_buf : "(unknown)");
             buffer_json_add_array_item_string(wb, qtype_name);
             buffer_json_add_array_item_string(wb, (r->protocol == 17) ? "UDP" : "TCP");
             buffer_json_add_array_item_string(wb, (r->ip_version == 4) ? "IPv4" : "IPv6");

@@ -151,5 +151,9 @@ void shared_dns_memory_close(struct shared_dns_memory *ctx)
         ctx->shm_fd = -1;
     }
 
+    /* Unlink the SHM name — see shared_pid_memory_linux.c for rationale.
+     * sem name is intentionally NOT unlinked here. */
+    (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
+
     free(ctx);
 }

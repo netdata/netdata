@@ -867,65 +867,6 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
     }
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-void ebpf_obsolete_process_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        NETDATA_PROCESS_SYSCALL,
-        "",
-        "Start process",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "system.process_thread",
-        21002,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        NETDATA_EXIT_SYSCALL,
-        "",
-        "Exit process",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "system.exit",
-        21003,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        NETDATA_PROCESS_STATUS_NAME,
-        "",
-        "Process not closed",
-        EBPF_COMMON_UNITS_CALLS,
-        NETDATA_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "system.process_status",
-        21004,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            NETDATA_EBPF_SYSTEM_GROUP,
-            NETDATA_PROCESS_ERROR_NAME,
-            "",
-            "Fails to create process",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_PROCESS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "system.task_error",
-            21005,
-            em->update_every);
-    }
-}
 
 /**
  * Process disable tracepoints

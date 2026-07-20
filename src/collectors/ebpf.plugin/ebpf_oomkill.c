@@ -83,38 +83,6 @@ static inline void ebpf_obsolete_oomkill_cgroup_charts(ebpf_module_t *em)
     netdata_mutex_unlock(&mutex_cgroup_shm);
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
-{
-    struct ebpf_target *w;
-    int update_every = em->update_every;
-    netdata_mutex_lock(&collect_data_mutex);
-    for (w = apps_groups_root_target; w; w = w->next) {
-        if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_OOMKILL_IDX))))
-            continue;
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            NETDATA_OOMKILL_CHART,
-            "Processes OOM kills.",
-            EBPF_OOMKILL_UNIT_KILLS,
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "ebpf.app_oomkill",
-            20072,
-            update_every);
-
-        w->charts_created &= ~(1 << EBPF_MODULE_OOMKILL_IDX);
-    }
-    netdata_mutex_unlock(&collect_data_mutex);
-}
 
 static void oomkill_cleanup(void *pptr)
 {

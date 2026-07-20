@@ -428,39 +428,6 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
     netdata_mutex_unlock(&collect_data_mutex);
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-void ebpf_obsolete_dc_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_DC_HIT_CHART,
-        "",
-        "Percentage of files inside directory cache",
-        EBPF_COMMON_UNITS_PERCENTAGE,
-        NETDATA_DIRECTORY_CACHE_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_FS_DC_HIT_RATIO_CONTEXT,
-        21200,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_DC_REFERENCE_CHART,
-        "",
-        "Variables used to calculate hit ratio.",
-        EBPF_COMMON_UNITS_FILES,
-        NETDATA_DIRECTORY_CACHE_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_FS_DC_REFERENCE_CONTEXT,
-        21201,
-        em->update_every);
-}
 
 /**
  * DCstat exit

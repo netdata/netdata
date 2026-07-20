@@ -383,27 +383,6 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
     netdata_mutex_unlock(&collect_data_mutex);
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-void ebpf_obsolete_swap_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_MEMORY_GROUP,
-        NETDATA_MEM_SWAP_CHART,
-        "",
-        "Calls to access swap memory",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_SYSTEM_SWAP_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "mem.swapcalls",
-        NETDATA_CHART_PRIO_MEM_SWAP_CALLS,
-        em->update_every);
-}
 
 /**
  * Swap exit

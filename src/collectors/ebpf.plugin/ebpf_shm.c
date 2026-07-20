@@ -422,27 +422,6 @@ void ebpf_obsolete_shm_apps_charts(struct ebpf_module *em)
     netdata_mutex_unlock(&collect_data_mutex);
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-void ebpf_obsolete_shm_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        NETDATA_SHM_GLOBAL_CHART,
-        "",
-        "Calls to shared memory system calls",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_SYSTEM_IPC_SHM_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "system.shared_memory_calls",
-        NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_CALLS,
-        em->update_every);
-}
 
 /**
  * SHM Exit

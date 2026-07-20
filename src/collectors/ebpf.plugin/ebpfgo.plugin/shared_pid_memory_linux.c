@@ -67,11 +67,11 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
     ctx->sem = SEM_FAILED;
     ctx->update_every_s = update_every_s;
 
-    /* A normal Close() only closes this process' handles; it does not unlink
-     * the SHM name.  Keeping the name present avoids a consumer refresh window
-     * where shm_open by name fails during graceful eBPFGo restarts.  The
-     * "reused" branch below fires when a prior segment still exists, either
-     * after a graceful close or after a crash.
+    /* Close() calls shm_unlink so /dev/shm is not littered, but this also
+     * means a graceful restart creates a fresh SHM object (new inode).
+     * Consumers detect the inode change on their next refresh and reconnect
+     * within one collection cycle.  The "reused" branch below fires only
+     * after a crash (unlink did not run), where the prior segment still exists.
      *
      * We probe the pre-truncate size with fstat() to detect the reused
      * case: a non-zero size means the prior publisher may have left rows in
@@ -193,6 +193,13 @@ void shared_pid_memory_close(struct shared_pid_memory *ctx)
 
     if (ctx->shm_fd >= 0)
         close(ctx->shm_fd);
+
+    /* Unlink the SHM name so /dev/shm is not littered across Netdata restarts
+     * or version-name bumps.  The sem name is intentionally NOT unlinked here:
+     * the sem object must outlive this process so consumers and the next writer
+     * instance both open the same underlying kernel object (P1 semaphore-desync
+     * lesson). */
+    (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
 
     free(ctx);
 }
