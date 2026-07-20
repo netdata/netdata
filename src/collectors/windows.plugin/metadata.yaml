@@ -1119,7 +1119,14 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Install the Netdata Driver (netdata_driver.sys)
+            description: |
+              CPU temperature monitoring on Windows requires the Netdata kernel driver (`netdata_driver.sys`) to be installed on the host. The driver is an optional component and is not installed by default.
+
+              When you install Netdata with the Windows MSI installer, select the **Netdata Driver: Hardware Metrics Collection** option on the feature selection screen. If Netdata is already installed, run the MSI installer again and enable that option to add the driver.
+
+              Editing `netdata.conf` alone is not enough. Without the driver, the `GetHardwareInfo` module cannot read the CPU `msr` register, so the `cpu.temperature` chart is never created and CPU temperature will not appear on the dashboard. The collector records an error in the Netdata log, but no temperature chart is produced.
       configuration:
         file:
           name: "netdata.conf"
