@@ -224,13 +224,6 @@ malformed:
     return URL_DECODE_MALFORMED;
 }
 
-char *url_decode_r(char *to, const char *url, size_t size) {
-    if(unlikely(!url || url_decode_r_len(to, size, url, strlen(url), NULL) != URL_DECODE_OK))
-        return NULL;
-
-    return to;
-}
-
 int url_unittest(void) {
     int errors = 0;
     char decoded[64];
@@ -248,9 +241,21 @@ int url_unittest(void) {
        decoded_length != 3 || memcmp(decoded, "\xE2\x82\xAC", 3) != 0)
         errors++;
 
-    static const char *malformed[] = { "%", "%GG", "%00", "%0A", "%80", "%C0%AF", "%F4%90%80%80" };
+    static const struct {
+        const char *encoded;
+        size_t length;
+    } malformed[] = {
+        { "%", sizeof("%") - 1 },
+        { "%GG", sizeof("%GG") - 1 },
+        { "%00", sizeof("%00") - 1 },
+        { "%0A", sizeof("%0A") - 1 },
+        { "%80", sizeof("%80") - 1 },
+        { "%C0%AF", sizeof("%C0%AF") - 1 },
+        { "%F4%90%80%80", sizeof("%F4%90%80%80") - 1 },
+    };
     for(size_t i = 0; i < _countof(malformed); i++) {
-        if(url_decode_r_len(decoded, sizeof(decoded), malformed[i], strlen(malformed[i]), NULL) != URL_DECODE_MALFORMED)
+        if(url_decode_r_len(decoded, sizeof(decoded), malformed[i].encoded, malformed[i].length, NULL) !=
+           URL_DECODE_MALFORMED)
             errors++;
     }
 

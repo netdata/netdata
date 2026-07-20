@@ -157,13 +157,13 @@ typedef struct query_progress_content {
 } QUERY_PROGRESS_CONTENT;
 
 static QUERY_PROGRESS_CONTENT query_progress_content_prepare(
-    const char *query, BUFFER *payload, const char *client)
+    const char *query, size_t query_length, BUFFER *payload, const char *client)
 {
     QUERY_PROGRESS_CONTENT content = { 0 };
 
-    if(query && *query) {
+    if(query && query_length && *query) {
         content.query = buffer_create(0, NULL);
-        buffer_content_summary(content.query, query, strlen(query));
+        buffer_content_summary(content.query, query, query_length);
     }
 
     if(payload && buffer_strlen(payload)) {
@@ -249,11 +249,14 @@ static inline void query_progress_unlink_from_cache_unsafe(QUERY_PROGRESS *qp) {
 // ----------------------------------------------------------------------------
 // Progress API
 
-void query_progress_start_or_update(nd_uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl, const char *query, BUFFER *payload, const char *client) {
+void query_progress_start_or_update(
+    nd_uuid_t *transaction, usec_t started_ut, HTTP_REQUEST_MODE mode, HTTP_ACL acl,
+    const char *query, size_t query_length, BUFFER *payload, const char *client)
+{
     if(!transaction)
         return;
 
-    QUERY_PROGRESS_CONTENT content = query_progress_content_prepare(query, payload, client);
+    QUERY_PROGRESS_CONTENT content = query_progress_content_prepare(query, query_length, payload, client);
 
     spinlock_lock(&progress.spinlock);
     query_progress_init_unsafe();
@@ -678,7 +681,7 @@ int progress_unittest(void) {
         CLEAN_BUFFER *payload = buffer_create(large_size + 1, NULL);
         buffer_strncat(payload, large, large_size);
 
-        QUERY_PROGRESS_CONTENT content = query_progress_content_prepare(large, payload, "test");
+        QUERY_PROGRESS_CONTENT content = query_progress_content_prepare(large, large_size, payload, "test");
         query_progress_update(qp, 0, HTTP_REQUEST_MODE_GET, HTTP_ACL_ACLK, &content);
         query_progress_content_cleanup(&content);
         if(buffer_strlen(qp->query) <= BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH ||
@@ -696,13 +699,17 @@ int progress_unittest(void) {
 
     for(size_t i = 0; i < PROGRESS_UNITTEST_PERMANENT ;i++) {
         uuid_generate_random(valid[i]);
-        query_progress_start_or_update(&valid[i], 0, HTTP_REQUEST_MODE_GET, HTTP_ACL_ACLK, "permanent", NULL, "test");
+        query_progress_start_or_update(
+            &valid[i], 0, HTTP_REQUEST_MODE_GET, HTTP_ACL_ACLK,
+            "permanent", sizeof("permanent") - 1, NULL, "test");
     }
 
     for(size_t n = 0; n < 5000000 ;n++) {
         nd_uuid_t t;
         uuid_generate_random(t);
-        query_progress_start_or_update(&t, 0, HTTP_REQUEST_MODE_OPTIONS, HTTP_ACL_WEBRTC, "ephemeral", NULL, "test");
+        query_progress_start_or_update(
+            &t, 0, HTTP_REQUEST_MODE_OPTIONS, HTTP_ACL_WEBRTC,
+            "ephemeral", sizeof("ephemeral") - 1, NULL, "test");
         query_progress_finished(&t, 0, 200, 1234, 123, 12);
 
         QUERY_PROGRESS *qp;

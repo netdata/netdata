@@ -59,8 +59,8 @@ static int cloud_to_agent_parse(JSON_ENTRY *e)
                 if (likely(e->data.string)) {
                     size_t len = strlen(e->data.string);
                     data->payload = mallocz(len+1);
-                    if (!url_decode_r(data->payload, e->data.string, len + 1))
-                        strcpy(data->payload, e->data.string);
+                    if(url_decode_r_len(data->payload, len + 1, e->data.string, len, NULL) != URL_DECODE_OK)
+                        memcpy(data->payload, e->data.string, len + 1);
                 }
                 break;
             }

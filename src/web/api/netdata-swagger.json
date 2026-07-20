@@ -1471,7 +1471,7 @@
                 "true",
                 "false"
               ],
-              "default": false
+              "default": "no"
             }
           },
           {
@@ -1489,7 +1489,7 @@
                 "true",
                 "false"
               ],
-              "default": true
+              "default": "yes"
             }
           },
           {
@@ -1507,7 +1507,7 @@
                 "true",
                 "false"
               ],
-              "default": true
+              "default": "yes"
             }
           },
           {
@@ -1525,7 +1525,7 @@
                 "true",
                 "false"
               ],
-              "default": true
+              "default": "yes"
             }
           },
           {
@@ -1543,7 +1543,7 @@
                 "true",
                 "false"
               ],
-              "default": true
+              "default": "yes"
             }
           },
           {
@@ -2579,7 +2579,7 @@
                 "summary": "All disk-related alerts"
               },
               "critical_systems": {
-                "value": "system.* disk.* net.*",
+                "value": "system.*|disk.*|net.*",
                 "summary": "System, disk, and network alerts"
               }
             }
@@ -4892,12 +4892,12 @@
             "schema": {
               "type": "string",
               "enum": [
-                true,
-                false,
-                true,
-                false,
-                true,
-                false
+                "on",
+                "off",
+                "true",
+                "false",
+                "yes",
+                "no"
               ]
             },
             "description": "**Whether to enable or disable bearer token authentication requirement.**\n\n**Valid Values:**\n- Enable: `on`, `true`, `yes`\n- Disable: `off`, `false`, `no`\n\n**Default Behavior:**\n- If omitted, maintains current bearer protection state\n- When agent is unclaimed, defaults to disabled\n- When agent is claimed, typically enabled by Netdata Cloud\n\n**Effect:**\n- When enabled: All API requests must include valid bearer token in Authorization header\n- When disabled: API requests work without bearer tokens (less secure)\n\nExample: `bearer_protection=on`\n"
@@ -5876,12 +5876,12 @@
             "schema": {
               "type": "string",
               "enum": [
-                true,
-                false,
-                true,
-                false,
-                true,
-                false
+                "on",
+                "off",
+                "true",
+                "false",
+                "yes",
+                "no"
               ]
             },
             "description": "Enable or disable bearer protection"
