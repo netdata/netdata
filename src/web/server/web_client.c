@@ -874,45 +874,96 @@ static const char *web_client_find_header_value(
     return NULL;
 }
 
-static void web_client_parse_content_metadata(struct web_client *w, const char *request) {
+static bool web_client_parse_content_length_field(
+    const char *value, const char *value_end, size_t *content_length, bool *content_length_found)
+{
+    while(value < value_end) {
+        while(value < value_end && (*value == ' ' || *value == '\t'))
+            value++;
+        if(value >= value_end || !isdigit((uint8_t)*value))
+            return false;
+
+        size_t parsed = 0;
+        while(value < value_end && isdigit((uint8_t)*value)) {
+            size_t digit = (size_t)(*value - '0');
+            if(parsed > (SIZE_MAX - digit) / 10)
+                return false;
+            parsed = parsed * 10 + digit;
+            value++;
+        }
+
+        while(value < value_end && (*value == ' ' || *value == '\t'))
+            value++;
+
+        if(*content_length_found && parsed != *content_length)
+            return false;
+
+        *content_length = parsed;
+        *content_length_found = true;
+
+        if(value == value_end)
+            return true;
+        if(*value != ',')
+            return false;
+
+        value++;
+    }
+
+    return false;
+}
+
+static HTTP_VALIDATION web_client_parse_content_metadata(struct web_client *w, const char *request) {
     w->request_content_length_valid = false;
     w->request_content_type = CT_TEXT_PLAIN;
 
     const char content_length_header[] = "Content-Length:";
-    const char *value_end = NULL;
-    const char *cl = web_client_find_header_value(
-        request, w->request_header_length, content_length_header, sizeof(content_length_header) - 1, &value_end);
-    if(!cl)
-        return;
-
-    while(cl < value_end && (*cl == ' ' || *cl == '\t'))
-        cl++;
-    if(cl >= value_end || !isdigit((uint8_t)*cl))
-        return;
-
+    const char transfer_encoding_header[] = "Transfer-Encoding:";
+    const char *header_end = request + w->request_header_length;
+    const char *line = request;
+    bool request_line = true;
+    bool content_length_found = false;
+    bool transfer_encoding_found = false;
     size_t content_length = 0;
-    while(cl < value_end && isdigit((uint8_t)*cl)) {
-        size_t digit = (size_t)(*cl - '0');
-        if(content_length > (SIZE_MAX - digit) / 10)
-            return;
-        content_length = content_length * 10 + digit;
-        cl++;
+
+    while(line + 1 < header_end) {
+        const char *line_end = line;
+        while(line_end + 1 < header_end && (line_end[0] != '\r' || line_end[1] != '\n'))
+            line_end++;
+        if(line_end + 1 >= header_end || (!request_line && line_end == line))
+            break;
+
+        if(!request_line &&
+           (size_t)(line_end - line) >= sizeof(content_length_header) - 1 &&
+           strncasecmp(line, content_length_header, sizeof(content_length_header) - 1) == 0) {
+            const char *value = line + sizeof(content_length_header) - 1;
+            if(!web_client_parse_content_length_field(
+                   value, line_end, &content_length, &content_length_found))
+                return HTTP_VALIDATION_MALFORMED_REQUEST;
+        }
+        else if(!request_line &&
+                (size_t)(line_end - line) >= sizeof(transfer_encoding_header) - 1 &&
+                strncasecmp(line, transfer_encoding_header, sizeof(transfer_encoding_header) - 1) == 0)
+            transfer_encoding_found = true;
+
+        request_line = false;
+        line = line_end + 2;
     }
 
-    while(cl < value_end && (*cl == ' ' || *cl == '\t'))
-        cl++;
-    if(cl != value_end)
-        return;
+    if(transfer_encoding_found && content_length_found)
+        return HTTP_VALIDATION_MALFORMED_REQUEST;
+
+    if(!content_length_found)
+        return HTTP_VALIDATION_OK;
 
     w->request_content_length = content_length;
     w->request_content_length_valid = true;
 
     const char content_type_header[] = "Content-Type:";
-    value_end = NULL;
+    const char *value_end = NULL;
     const char *ct = web_client_find_header_value(
         request, w->request_header_length, content_type_header, sizeof(content_type_header) - 1, &value_end);
     if(!ct)
-        return;
+        return HTTP_VALIDATION_OK;
 
     while(ct < value_end && isspace((uint8_t)*ct))
         ct++;
@@ -922,42 +973,46 @@ static void web_client_parse_content_metadata(struct web_client *w, const char *
 
     size_t content_type_length = (size_t)(ct_end - ct);
     if(!content_type_length)
-        return;
+        return HTTP_VALIDATION_OK;
 
     CLEAN_CHAR_P *content_type = mallocz(content_type_length + 1);
     memcpy(content_type, ct, content_type_length);
     content_type[content_type_length] = '\0';
     w->request_content_type = content_type_string2id(content_type);
+    return HTTP_VALIDATION_OK;
 }
 
-static bool web_client_request_complete_and_extract_payload(
+static HTTP_VALIDATION web_client_request_complete_and_extract_payload(
     struct web_client *w, const char *request, size_t length, size_t previous_length)
 {
     if(!w->request_header_length) {
         w->request_header_length = web_client_find_header_end(request, length, previous_length);
         if(!w->request_header_length)
-            return false;
+            return HTTP_VALIDATION_INCOMPLETE;
 
-        if(w->mode == HTTP_REQUEST_MODE_POST || w->mode == HTTP_REQUEST_MODE_PUT)
-            web_client_parse_content_metadata(w, request);
+        if(w->mode == HTTP_REQUEST_MODE_POST || w->mode == HTTP_REQUEST_MODE_PUT) {
+            HTTP_VALIDATION validation = web_client_parse_content_metadata(w, request);
+            if(validation != HTTP_VALIDATION_OK)
+                return validation;
+        }
     }
 
     if(w->mode != HTTP_REQUEST_MODE_POST && w->mode != HTTP_REQUEST_MODE_PUT)
-        return true;
+        return HTTP_VALIDATION_OK;
 
     if(!w->request_content_length_valid)
-        return false;
+        return HTTP_VALIDATION_INCOMPLETE;
 
     size_t payload_length = length - w->request_header_length;
     if(payload_length != w->request_content_length)
-        return false;
+        return HTTP_VALIDATION_INCOMPLETE;
 
     if(!w->payload)
         w->payload = buffer_create(payload_length + 1, NULL);
 
     buffer_contents_replace(w->payload, &request[w->request_header_length], payload_length);
     w->payload->content_type = w->request_content_type;
-    return true;
+    return HTTP_VALIDATION_OK;
 }
 
 static bool web_client_request_ingress_timed_out(struct web_client *w) {
@@ -1008,7 +1063,14 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
         return HTTP_VALIDATION_NOT_SUPPORTED;
     }
 
-    if(!web_client_request_complete_and_extract_payload(w, request, request_length, previous_length)) {
+    HTTP_VALIDATION completion =
+        web_client_request_complete_and_extract_payload(w, request, request_length, previous_length);
+    if(completion != HTTP_VALIDATION_OK) {
+        if(completion != HTTP_VALIDATION_INCOMPLETE) {
+            web_client_request_validation_end(w);
+            return completion;
+        }
+
         web_client_enable_wait_receive(w);
         return HTTP_VALIDATION_INCOMPLETE;
     }
@@ -1843,6 +1905,13 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             buffer_strcat(w->response.data, "Malformed URL...\r\n");
             w->response.code = http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_URL);
             break;
+        case HTTP_VALIDATION_MALFORMED_REQUEST:
+            web_client_prepare_request_summary(w, "malformed request framing");
+            buffer_flush(w->response.data);
+            buffer_strcat(w->response.data, "Malformed HTTP request framing.\r\n");
+            w->response.code = http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_REQUEST);
+            web_client_disable_keepalive(w);
+            break;
         case HTTP_VALIDATION_REQUEST_TIMEOUT:
             web_client_prepare_request_summary(w, "request timeout");
             netdata_log_debug(
@@ -2434,6 +2503,7 @@ int web_client_request_unittest(void) {
        http_validation_error_to_response_code(HTTP_VALIDATION_REQUEST_TOO_LARGE) != HTTP_RESP_CONTENT_TOO_LARGE ||
        strcmp(http_response_code2string(HTTP_RESP_CONTENT_TOO_LARGE), "Content Too Large") != 0 ||
        http_validation_error_to_response_code(HTTP_VALIDATION_REQUEST_TIMEOUT) != HTTP_RESP_REQUEST_TIMEOUT ||
+       http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_REQUEST) != HTTP_RESP_BAD_REQUEST ||
        http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_URL) != HTTP_RESP_BAD_REQUEST)
         errors++;
 
@@ -2530,25 +2600,64 @@ int web_client_request_unittest(void) {
     if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->payload || buffer_strlen(w->payload))
         errors++;
 
-    // Missing or invalid Content-Length is latched and is not reparsed for later body fragments.
+    static const char *equivalent_content_lengths[] = {
+        "POST / HTTP/1.1\r\nContent-Length: 5\r\nContent-Length: 005\r\n\r\nhello",
+        "POST / HTTP/1.1\r\nContent-Length: 5, 005, 5\r\n\r\nhello",
+        "POST / HTTP/1.1\r\nContent-Length: 5, 5\r\nContent-Length: 005\r\n\r\nhello",
+    };
+    for(size_t i = 0; i < _countof(equivalent_content_lengths); i++) {
+        web_client_reuse_from_cache(w);
+        buffer_strcat(w->response.data, equivalent_content_lengths[i]);
+        if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->payload ||
+           strcmp(buffer_tostring(w->payload), "hello"))
+            errors++;
+    }
+
+    // Missing Content-Length preserves the existing incomplete-request behavior.
+    web_client_reuse_from_cache(w);
+    buffer_strcat(w->response.data, "POST / HTTP/1.1\r\n\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE ||
+       !w->request_header_length || w->request_content_length_valid)
+        errors++;
+    size_t missing_length_header = w->request_header_length;
+    buffer_strcat(w->response.data, "body");
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE ||
+       w->request_header_length != missing_length_header || w->request_content_length_valid)
+        errors++;
+
     static const char *invalid_content_lengths[] = {
-        "POST / HTTP/1.1\r\n\r\n",
         "POST / HTTP/1.1\r\nContent-Length: invalid\r\n\r\n",
         "POST / HTTP/1.1\r\nContent-Length: -1\r\n\r\n",
         "POST / HTTP/1.1\r\nContent-Length: 184467440737095516160\r\n\r\n",
+        "POST / HTTP/1.1\r\nContent-Length: 5,\r\n\r\n",
+        "POST / HTTP/1.1\r\nContent-Length: 5, 6\r\n\r\n",
+        "POST / HTTP/1.1\r\nContent-Length: 5\r\nContent-Length: 6\r\n\r\n",
+        "POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\nContent-Length: 5\r\n\r\n",
     };
     for(size_t i = 0; i < _countof(invalid_content_lengths); i++) {
         web_client_reuse_from_cache(w);
         buffer_strcat(w->response.data, invalid_content_lengths[i]);
-        if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE ||
-           !w->request_header_length || w->request_content_length_valid)
-            errors++;
-        size_t header_length = w->request_header_length;
-        buffer_strcat(w->response.data, "body");
-        if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE ||
-           w->request_header_length != header_length || w->request_content_length_valid)
+        if(http_request_validate(w) != HTTP_VALIDATION_MALFORMED_REQUEST ||
+           w->request_header_length || w->request_content_length_valid || web_client_has_wait_receive(w))
             errors++;
     }
+
+    // Transfer-Encoding-only requests remain unsupported and incomplete.
+    web_client_reuse_from_cache(w);
+    buffer_strcat(w->response.data, "POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE ||
+       !w->request_header_length || w->request_content_length_valid)
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    web_client_enable_keepalive(w);
+    buffer_strcat(
+        w->response.data,
+        "POST / HTTP/1.1\r\nContent-Length: 5\r\nContent-Length: 6\r\n\r\nhello");
+    web_client_process_request_from_web_server(w);
+    if(w->response.code != HTTP_RESP_BAD_REQUEST || web_client_has_keepalive(w) ||
+       !strstr(buffer_tostring(w->response.data), "Malformed HTTP request framing"))
+        errors++;
 
     web_client_reuse_from_cache(w);
     buffer_strcat(w->response.data, "POST / HTTP/1.1\r\nContent-Length: 0\r\n\r\nx");
