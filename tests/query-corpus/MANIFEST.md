@@ -32,6 +32,8 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | L3/sparse-buckets | single-value buckets: stddev 0.0, pass-through families, incremental-sum all null (pinned contract) | green | n/a | |
 | L3/identity-smoothing | ses/des identity window = requested points capped 15; identity incremental-sum all null (pinned contract) | green | n/a | |
 | L3/registry-completeness | full time-grouping registry: all 46 names (variants + aliases), full countif grammar, option clamps, unknown-name fallback to average; pinned quirk: bare-number countif loses its first digit (ruling pending) | green | n/a | |
+| L3/anomaly-bit-option | options=anomaly-bit: values become anomaly rates pre-grouping (0/100 tier0, fractional tier>0); buckets aggregate the rates; group-by consumes them as values | green | n/a | |
+| L5/anomaly-statistics | jsonwrap-v2 per-dim anomaly arrays: view sts arp = mean row ARP, db sts arp = fetched-points rate; stored NAN gaps excluded from both | green | n/a | |
 | L4/family-tier-matrix | grouping families over forced tier1, 6 windows/bucket, fetch-aware oracles (avg-of-averages pinned); tier-count anomaly rates | green | n/a | |
 | L4/auto-tier-selection | auto tier = coarsest with acceptable density (>= half the wanted points, wanted floored at 10); tier2 unreachable under 5h windows with full coverage; per_tier points exclusive; values match the serving tier's oracle | green | n/a | |
 | L4/minmax-absolute-semantics | min = closest to zero, max = furthest from zero (fabs comparisons) — RULING PENDING | green | n/a | |
