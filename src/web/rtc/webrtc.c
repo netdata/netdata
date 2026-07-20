@@ -174,11 +174,11 @@ static void webrtc_config_ice_servers(void) {
     strcpy(tmp, servers);
     char *s = tmp, *e;
     while(*s) {
-        if(isspace(*s))
+        if(isspace((uint8_t)*s))
             s++;
 
         e = s;
-        while(*e && !isspace(*e))
+        while(*e && !isspace((uint8_t)*e))
             e++;
 
         if(s != e && webrtc_base.iceServersCount < WEBRTC_MAX_ICE_SERVERS) {

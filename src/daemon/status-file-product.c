@@ -371,7 +371,7 @@ static bool has_ecc_memory(void) {
 
     while ((entry = readdir(dir))) {
         // Look for "mc0", "mc1", etc. directories
-        if (strncmp(entry->d_name, "mc", 2) == 0 && isdigit(entry->d_name[2])) {
+        if (strncmp(entry->d_name, "mc", 2) == 0 && isdigit((uint8_t)entry->d_name[2])) {
             // Check for presence of ECC-related files in this mc directory
             char mc_path[FILENAME_MAX + 1];
             snprintfz(mc_path, FILENAME_MAX, "%s/%s/ce_count", edac_path, entry->d_name);
@@ -418,7 +418,7 @@ static bool has_multiple_cpu_sockets(void) {
 
     while ((entry = readdir(dir))) {
         // Check for cpu directories (cpu0, cpu1, etc.)
-        if (strncmp(entry->d_name, "cpu", 3) == 0 && isdigit(entry->d_name[3])) {
+        if (strncmp(entry->d_name, "cpu", 3) == 0 && isdigit((uint8_t)entry->d_name[3])) {
             char topology_path[FILENAME_MAX + 1];
             char physical_id[64];
 

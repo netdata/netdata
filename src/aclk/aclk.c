@@ -956,9 +956,10 @@ void aclk_create_node_instance_job(RRDHOST *host)
 
     aclk_query_t *query = aclk_query_new(REGISTER_NODE);
     int32_t hops =  rrdhost_ingestion_hops(host);
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
     node_instance_creation_t node_instance_creation = {
         .hops = hops,
-        .hostname = rrdhost_hostname(host),
+        .hostname = string2str(identity.hostname),
         .machine_guid = host->machine_guid,
         .claim_id = claim_id.str
     };
@@ -966,6 +967,7 @@ void aclk_create_node_instance_job(RRDHOST *host)
     query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
     query->data.bin_payload.msg_name = "CreateNodeInstance";
     query->data.bin_payload.payload = generate_node_instance_creation(&query->data.bin_payload.size, &node_instance_creation);
+    rrdhost_identity_release(&identity);
 
     nd_log_daemon(NDLP_DEBUG, "Queuing registration for host=%s, hops=%d", host->machine_guid, hops);
 

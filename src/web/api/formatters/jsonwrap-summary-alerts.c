@@ -18,7 +18,9 @@ void query_target_summary_alerts_v2(BUFFER *wb, QUERY_TARGET *qt, const char *ke
                 for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
                     z = dictionary_set(dict, string2str(rc->config.name), NULL, sizeof(*z));
 
-                    switch(rc->status) {
+                    RRDCALC_RUNTIME_SNAPSHOT snapshot;
+                    rrdcalc_runtime_snapshot_get(rc, &snapshot);
+                    switch(snapshot.status) {
                         case RRDCALC_STATUS_CLEAR:
                             z->clear++;
                             break;

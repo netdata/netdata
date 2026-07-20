@@ -34,6 +34,7 @@ void clean_instance(struct instance *instance)
 {
     clean_instance_config(&instance->config);
     buffer_free(instance->labels_buffer);
+    buffer_free(instance->metric_prefix_buffer);
 
     netdata_cond_destroy(&instance->cond_var);
 }

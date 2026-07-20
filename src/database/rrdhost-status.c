@@ -330,7 +330,9 @@ static void rrdhost_status_health_internal(RRDHOST_STATUS *s, RRDHOST_FLAGS flag
                 continue;
             }
 
-            switch (rc->status) {
+            RRDCALC_RUNTIME_SNAPSHOT snapshot;
+            rrdcalc_runtime_snapshot_get(rc, &snapshot);
+            switch (snapshot.status) {
                 default:
                 case RRDCALC_STATUS_REMOVED:
                     break;

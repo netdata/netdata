@@ -141,7 +141,10 @@ static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by
     }
 }
 
-static void query_group_by_make_dimension_name(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, GROUP_BY_HIDDEN_MODE hidden_mode) {
+static void query_group_by_make_dimension_name(
+    BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc,
+    QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, GROUP_BY_HIDDEN_MODE hidden_mode,
+    const STRING *host_hostname) {
     buffer_flush(key);
     if(unlikely(query_metric_hidden_bucket(qm, hidden_mode) && hidden_mode == GROUP_BY_HIDDEN_GLOBAL)) {
         buffer_strcat(key, "__hidden_dimensions__");
@@ -169,7 +172,7 @@ static void query_group_by_make_dimension_name(BUFFER *key, RRDR_GROUP_BY group_
             if (group_by & RRDR_GROUP_BY_NODE)
                 buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
             else
-                buffer_strcat(key, string2str(query_instance_name_fqdn(qi, qt->request.version)));
+                buffer_strcat(key, string2str(query_instance_name_fqdn(qi, qt->request.version, host_hostname)));
         }
 
         if (group_by & RRDR_GROUP_BY_LABEL) {
@@ -185,7 +188,7 @@ static void query_group_by_make_dimension_name(BUFFER *key, RRDR_GROUP_BY group_
             if (buffer_strlen(key) != 0)
                 buffer_fast_strcat(key, ",", 1);
 
-            buffer_strcat(key, rrdhost_hostname(qn->rrdhost));
+            buffer_strcat(key, string2str(host_hostname));
         }
 
         if (group_by & RRDR_GROUP_BY_CONTEXT) {
@@ -354,6 +357,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             label_keys = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
 
         QUERY_INSTANCE *last_qi = NULL;
+        RRDHOST *identity_host = NULL;
+        RRDHOST_IDENTITY host_identity = { 0 };
         size_t priority = 0;
         time_t update_every_max = 0;
         for (size_t d = 0; d < qt->query.used; d++) {
@@ -362,6 +367,13 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
             QUERY_CONTEXT *qc = query_context(qt, qm->link.query_context_id);
             QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
+
+            if((group_by & (RRDR_GROUP_BY_INSTANCE | RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE | RRDR_GROUP_BY_NODE)) &&
+               qn->rrdhost != identity_host) {
+                rrdhost_identity_release(&host_identity);
+                host_identity = rrdhost_identity_acquire(qn->rrdhost);
+                identity_host = qn->rrdhost;
+            }
 
             if (qi != last_qi) {
                 last_qi = qi;
@@ -399,7 +411,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 // ----------------------------------------------------------------
                 // generate the dimension name
 
-                query_group_by_make_dimension_name(key, group_by, g, qt, qn, qc, qi, qd, qm, hidden_mode);
+                query_group_by_make_dimension_name(
+                    key, group_by, g, qt, qn, qc, qi, qd, qm, hidden_mode, host_identity.hostname);
                 entries[pos].name = string_strdupz(buffer_tostring(key));
 
                 // add the rest of the info
@@ -453,6 +466,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 rrdlabels_walkthrough_read(rrdinstance_acquired_labels(qi->ria),
                                            rrdlabels_traversal_cb_to_group_by_label_key, entries[pos].dl);
         }
+
+        rrdhost_identity_release(&host_identity);
 
         RRDR *r = rrdr_create(owa, qt, added, qt->window.points);
         if (!r) {

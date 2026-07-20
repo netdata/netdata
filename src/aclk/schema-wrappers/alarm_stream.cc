@@ -202,6 +202,11 @@ alarm_snapshot_proto_ptr_t generate_alarm_snapshot_proto(struct alarm_snapshot *
     return msg;
 }
 
+void destroy_alarm_snapshot_proto(alarm_snapshot_proto_ptr_t snapshot)
+{
+    delete (AlarmSnapshot *)snapshot;
+}
+
 void add_alarm_log_entry2snapshot(alarm_snapshot_proto_ptr_t snapshot, struct alarm_log_entry *data)
 {
     AlarmSnapshot *alarm_snapshot = (AlarmSnapshot *)snapshot;
@@ -219,10 +224,10 @@ char *generate_alarm_snapshot_bin(size_t *len, alarm_snapshot_proto_ptr_t snapsh
     char *bin = (char*)mallocz(*len);
     if (!alarm_snapshot->SerializeToArray(bin, *len)) {
         freez(bin);
-        delete alarm_snapshot;
+        destroy_alarm_snapshot_proto(snapshot);
         return NULL;
     }
 
-    delete alarm_snapshot;
+    destroy_alarm_snapshot_proto(snapshot);
     return bin;
 }

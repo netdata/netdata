@@ -455,7 +455,7 @@ static void parse_args(int argc, char **argv)
             }
             i++;
             int64_t seconds = 0;
-            if(!duration_parse(argv[i], &seconds, "s", "s")) {
+            if(!duration_parse(argv[i], &seconds, "s", "s") || seconds > INT_MAX) {
                 fprintf(stderr, "Cannot parse '--pss' value '%s'.\n", argv[i]);
                 exit(1);
             }
@@ -464,8 +464,6 @@ static void parse_args(int argc, char **argv)
             }
             else {
                 pss_refresh_period = (int)seconds;
-                if(pss_refresh_period < 1)
-                    pss_refresh_period = 1;
             }
             continue;
         }

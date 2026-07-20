@@ -159,8 +159,12 @@ inline void sort_series(NETDATA_DOUBLE *series, size_t entries) {
 }
 
 inline NETDATA_DOUBLE *copy_series(const NETDATA_DOUBLE *series, size_t entries) {
-    NETDATA_DOUBLE *copy = mallocz(sizeof(NETDATA_DOUBLE) * entries);
-    memcpy(copy, series, sizeof(NETDATA_DOUBLE) * entries);
+    if(unlikely(entries > SIZE_MAX / sizeof(*series)))
+        fatal("copy_series() cannot copy %zu entries.", entries);
+
+    size_t size = sizeof(*series) * entries;
+    NETDATA_DOUBLE *copy = mallocz(size);
+    memcpy(copy, series, size);
     return copy;
 }
 

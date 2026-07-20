@@ -1477,6 +1477,13 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  *****************************************************************/
 
+static inline bool ebpf_ip_entry_matches_family(const ebpf_network_viewer_ip_list_t *entry, int family)
+{
+    // The parser tags "*" as AF_INET6, but its policy contract is dual-stack.
+    return entry->ver == family ||
+           (entry->value && entry->value[0] == '*' && entry->value[1] == '\0');
+}
+
 /**
  * Is specific ip inside the range
  *
@@ -1495,13 +1502,15 @@ static int ebpf_is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
     uint32_t ipv4_test = htonl(cmp->addr32[0]);
     ebpf_network_viewer_ip_list_t *move = network_viewer_opt.excluded_ips;
     while (move) {
-        if (family == AF_INET) {
-            if (move->first.addr32[0] <= ipv4_test && ipv4_test <= move->last.addr32[0])
-                return 0;
-        } else {
-            if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
-                memcmp(move->last.addr8, cmp->addr8, sizeof(union netdata_ip_t)) >= 0) {
-                return 0;
+        if (ebpf_ip_entry_matches_family(move, family)) {
+            if (family == AF_INET) {
+                if (move->first.addr32[0] <= ipv4_test && ipv4_test <= move->last.addr32[0])
+                    return 0;
+            } else {
+                if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
+                    memcmp(move->last.addr8, cmp->addr8, sizeof(union netdata_ip_t)) >= 0) {
+                    return 0;
+                }
             }
         }
         move = move->next;
@@ -1509,13 +1518,15 @@ static int ebpf_is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
 
     move = network_viewer_opt.included_ips;
     while (move) {
-        if (family == AF_INET && move->ver == AF_INET) {
-            if (move->first.addr32[0] <= ipv4_test && move->last.addr32[0] >= ipv4_test)
-                return 1;
-        } else {
-            if (move->ver == AF_INET6 && memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
-                memcmp(move->last.addr8, cmp->addr8, sizeof(union netdata_ip_t)) >= 0) {
-                return 1;
+        if (ebpf_ip_entry_matches_family(move, family)) {
+            if (family == AF_INET) {
+                if (move->first.addr32[0] <= ipv4_test && move->last.addr32[0] >= ipv4_test)
+                    return 1;
+            } else {
+                if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
+                    memcmp(move->last.addr8, cmp->addr8, sizeof(union netdata_ip_t)) >= 0) {
+                    return 1;
+                }
             }
         }
         move = move->next;
@@ -1528,7 +1539,7 @@ static int ebpf_is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
  * Is port inside range
  *
  * Verify if the cmp port is inside the range [first, last].
- * This function expects only the last parameter as big endian.
+ * The destination port is provided in network byte order and converted before comparison.
  *
  * @param cmp    the value to compare
  *
@@ -1539,6 +1550,8 @@ static int ebpf_is_port_inside_range(uint16_t cmp)
     // We do not have restrictions for ports.
     if (!network_viewer_opt.excluded_port && !network_viewer_opt.included_port)
         return 1;
+
+    cmp = ntohs(cmp);
 
     // Test if port is excluded
     ebpf_network_viewer_port_list_t *move = network_viewer_opt.excluded_port;
@@ -1605,6 +1618,9 @@ int hostname_matches_pattern(char *cmp)
 int ebpf_is_socket_allowed(netdata_socket_idx_t *key, netdata_socket_t *data)
 {
     int ret = 0;
+
+    rw_spinlock_read_lock(&network_viewer_opt.rw_spinlock);
+
     // If family is not AF_UNSPEC and it is different of specified
     if (network_viewer_opt.family && network_viewer_opt.family != data->family)
         goto endsocketallowed;
@@ -1615,6 +1631,7 @@ int ebpf_is_socket_allowed(netdata_socket_idx_t *key, netdata_socket_t *data)
     ret = ebpf_is_specific_ip_inside_range(&key->daddr, data->family);
 
 endsocketallowed:
+    rw_spinlock_read_unlock(&network_viewer_opt.rw_spinlock);
     return ret;
 }
 
@@ -2069,7 +2086,7 @@ void ebpf_read_socket_thread(void *ptr)
  * Fill the structure with values read from /proc or hash table.
  *
  * @param out   the structure where we will store data.
- * @param value the ports we are listen to.
+ * @param value the network-order port to store.
  * @param proto the protocol used for this connection.
  * @param in    the structure with values read form different sources.
  */
@@ -2088,12 +2105,14 @@ fill_nv_port_list(ebpf_network_viewer_port_list_t *out, uint16_t value, uint16_t
  *
  * Update link list when it is necessary.
  *
- * @param value the ports we are listen to.
+ * @param value the host-order port we are listening to.
  * @param proto the protocol used with port connection.
  * @param in    the structure with values read form different sources.
  */
 void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *in)
 {
+    value = htons(value);
+
     ebpf_network_viewer_port_list_t *w;
     if (likely(listen_ports)) {
         ebpf_network_viewer_port_list_t *move = listen_ports, *store = listen_ports;

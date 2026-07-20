@@ -111,6 +111,12 @@ static void RegistrySetData_unsafe(DWORD id, const char *key, const char *help) 
         if(entry->key) {
             // Only if the key actually changes, we need to update hash
             if(strcmp(entry->key, key) != 0) {
+                XXH64_hash_t old_hash = XXH3_64bits((void *)entry->key, strlen(entry->key));
+                SIMPLE_HASHTABLE_SLOT_PERFLIB *old_sl =
+                    simple_hashtable_get_slot_PERFLIB(&names_globals.hashtable, old_hash, entry->key, false);
+                if(SIMPLE_HASHTABLE_SLOT_DATA(old_sl) == entry)
+                    simple_hashtable_del_slot_PERFLIB(&names_globals.hashtable, old_sl);
+
                 RegistryRetireString_unsafe(entry->key);
                 entry->key = strdupz(key);
                 add_to_hash = true;

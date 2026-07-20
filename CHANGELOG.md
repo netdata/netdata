@@ -711,6 +711,19 @@
 - Build(deps): bump mcp from 1.27.2 to 1.28.1 in /packaging/tools/automation/mcp ([#23158](https://github.com/netdata/netdata/issues/23158))
 - Docs: Add Windows host label creation and reload guidance ([#23006](https://github.com/netdata/netdata/issues/23006))
 - Docs: Add metric naming comparison for OpenTSDB vs Prometheus exporters ([#23034](https://github.com/netdata/netdata/issues/23034))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.32.29 to 1.32.30 in /src/go ([#23173](https://github.com/netdata/netdata/issues/23173))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.63.0 to 1.63.1 in /src/go ([#23174](https://github.com/netdata/netdata/issues/23174))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.34.0 to 1.34.1 in /src/go ([#23177](https://github.com/netdata/netdata/issues/23177))
+- Build(deps): bump google.golang.org/grpc from 1.82.0 to 1.82.1 in /src/go ([#23180](https://github.com/netdata/netdata/issues/23180))
+- Build(deps): bump github.com/mattn/go-isatty from 0.0.22 to 0.0.23 in /src/go ([#23181](https://github.com/netdata/netdata/issues/23181))
+- Build(deps): bump github.com/aws/smithy-go from 1.27.3 to 1.27.4 in /src/go ([#23179](https://github.com/netdata/netdata/issues/23179))
+- Build(deps): bump github.com/go-ldap/ldap/v3 from 3.4.13 to 3.4.14 in /src/go ([#23182](https://github.com/netdata/netdata/issues/23182))
+- Netdata fixes part 70 ([#23141](https://github.com/netdata/netdata/issues/23141))
+- Netdata fixes part 65 ([#23136](https://github.com/netdata/netdata/issues/23136))
+- Agent-events: add optional OTLP log export of accepted events ([#23184](https://github.com/netdata/netdata/issues/23184))
+- Netdata fixes part 66 ([#23137](https://github.com/netdata/netdata/issues/23137))
+- Netdata fixes part 67 ([#23138](https://github.com/netdata/netdata/issues/23138))
+- Netdata fixes part 73 ([#23144](https://github.com/netdata/netdata/issues/23144))
 
 ## [2.10.0] - 2026-04-09
 

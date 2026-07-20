@@ -84,8 +84,9 @@ mints / caches / refreshes correctly for both.
 
 ## Metrics (direct)
 
-- **Q14** -- Use `POST /api/v3/data` to find the maximum
-  `system.cpu` user dimension over the last hour, points=60.
+- **Q14** -- Use `GET /api/v3/data` (query-string parameters, not a
+  JSON body) to find the maximum `system.cpu` user dimension over the
+  last hour, points=60.
 - **Q15** -- Use `GET /api/v3/contexts` to list every metric
   context the agent currently collects, sorted alphabetically.
 

@@ -14,6 +14,34 @@
 // helper: convert a bool to JSONC_REQUIRED / JSONC_OPTIONAL
 #define JSONC_REQUIRE_IF(cond) ((cond) ? JSONC_REQUIRED : JSONC_OPTIONAL)
 
+#define JSONC_INTEGER_DESTINATION_IS_UNSIGNED(dst) _Generic((dst), \
+    unsigned char: true,                                             \
+    unsigned short: true,                                            \
+    unsigned int: true,                                              \
+    unsigned long: true,                                             \
+    unsigned long long: true,                                        \
+    default: false)
+
+static inline bool jsonc_double_fits_integer_destination(double value, size_t size, bool is_unsigned) {
+    if(!size || size > sizeof(uint64_t))
+        return false;
+
+    unsigned bits = (unsigned)(size * CHAR_BIT);
+    double limit = (double)(UINT64_C(1) << (bits - 1)) * (is_unsigned ? 2.0 : 1.0);
+
+    if(!netdata_double_isnumber(value) || value >= limit)
+        return false;
+
+    if(is_unsigned)
+        return value > -1.0;
+
+    double minimum = -limit;
+    double below_minimum = minimum - 1.0;
+
+    // At 64 bits, double rounds minimum - 1 back to minimum.
+    return below_minimum == minimum ? value >= minimum : value > below_minimum;
+}
+
 #define JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, member, dst, error, flags) do {                     \
     json_object *_j;                                                                                            \
     if (json_object_object_get_ex(jobj, member, &_j)) {                                                         \
@@ -422,7 +450,13 @@
             dst = json_object_get_int64(_j);                                                                    \
         }                                                                                                       \
         else if (json_object_is_type(_j, json_type_double)) {                                                   \
-            dst = (typeof(dst))json_object_get_double(_j);                                                      \
+            double _val = json_object_get_double(_j);                                                           \
+            if (!jsonc_double_fits_integer_destination(                                                         \
+                    _val, sizeof(dst), JSONC_INTEGER_DESTINATION_IS_UNSIGNED(dst))) {                            \
+                buffer_sprintf(error, "cannot convert to int64 for '%s.%s'", path, member);                     \
+                return false;                                                                                   \
+            }                                                                                                   \
+            dst = (typeof(dst))_val;                                                                            \
         }                                                                                                       \
         else if (json_object_is_type(_j, json_type_boolean)) {                                                  \
             dst = json_object_get_boolean(_j) ? 1 : 0;                                                          \
@@ -458,7 +492,14 @@
             dst = json_object_get_uint64(_j);                                                                   \
         }                                                                                                       \
         else if (json_object_is_type(_j, json_type_double)) {                                                   \
-            dst = (typeof(dst))json_object_get_double(_j);                                                      \
+            double _val = json_object_get_double(_j);                                                           \
+            const double _limit = (double)(UINT64_C(1) << 63) * 2.0;                                            \
+            if (!netdata_double_isnumber(_val) || _val < 0.0 || _val >= _limit) {                              \
+                buffer_sprintf(error, "cannot convert to uint64 for '%s.%s'", path, member);                    \
+                return false;                                                                                   \
+            }                                                                                                   \
+            uint64_t _converted = (uint64_t)_val;                                                               \
+            dst = (typeof(dst))_converted;                                                                      \
         }                                                                                                       \
         else if (json_object_is_type(_j, json_type_boolean)) {                                                  \
             dst = json_object_get_boolean(_j) ? 1 : 0;                                                          \

@@ -318,6 +318,39 @@ bool gorilla_buffer_patch(gorilla_buffer_t *gbuf, size_t nbuffers, uint32_t *ent
     return true;
 }
 
+size_t gorilla_buffer_unpatched_nbuffers(const gorilla_buffer_t *gbuf) {
+    size_t nbuffers = 0;
+    while(gbuf) {
+        nbuffers++;
+
+        if(gbuf->header.next) {
+            const auto *buf = static_cast<const unsigned char *>(static_cast<const void *>(gbuf));
+            gbuf = static_cast<const gorilla_buffer_t *>(static_cast<const void *>(buf + RRDENG_GORILLA_32BIT_BUFFER_SIZE));
+        }
+        else
+            break;
+    }
+
+    return nbuffers;
+}
+
+size_t gorilla_buffer_unpatched_nbytes(const gorilla_buffer_t *gbuf) {
+    size_t nbytes = sizeof(gorilla_buffer_t);
+    while(gbuf) {
+        if(gbuf->header.next) {
+            nbytes += RRDENG_GORILLA_32BIT_BUFFER_SIZE;
+            const auto *buf = static_cast<const unsigned char *>(static_cast<const void *>(gbuf));
+            gbuf = static_cast<const gorilla_buffer_t *>(static_cast<const void *>(buf + RRDENG_GORILLA_32BIT_BUFFER_SIZE));
+        }
+        else {
+            nbytes += gorilla_buffer_nbytes(gbuf->header.nbits);
+            break;
+        }
+    }
+
+    return nbytes;
+}
+
 gorilla_reader_t gorilla_writer_get_reader(const gorilla_writer_t *gw)
 {
     const gorilla_buffer_t *buffer = __atomic_load_n(&gw->head_buffer, __ATOMIC_ACQUIRE);
