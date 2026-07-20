@@ -7,6 +7,7 @@
 #include "mcp.h"
 
 int mcp_jsonrpc_error_code(MCP_RETURN_CODE rc);
+struct json_object *mcp_jsonrpc_parse_request(const char *request, size_t length, enum json_tokener_error *error);
 BUFFER *mcp_jsonrpc_build_error_payload(struct json_object *id_obj, int code, const char *message,
                                         const struct mcp_response_chunk *chunks, size_t chunk_count);
 BUFFER *mcp_jsonrpc_build_success_payload(struct json_object *id_obj, const struct mcp_response_chunk *chunk);

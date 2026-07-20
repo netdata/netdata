@@ -222,8 +222,8 @@ bool websocket_jsonrpc_process_message(WS_CLIENT *wsc, const char *message, size
         // Batch request
         websocket_debug(wsc, "Processing JSON-RPC batch request");
 
-        int array_len = json_object_array_length(json);
-        for (int i = 0; i < array_len; i++) {
+        size_t array_len = json_object_array_length(json);
+        for (size_t i = 0; i < array_len; i++) {
             struct json_object *request = json_object_array_get_idx(json, i);
             process_jsonrpc_request(wsc, request);
         }

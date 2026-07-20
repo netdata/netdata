@@ -643,14 +643,14 @@ Comprehensive analysis of ACL (Access Control Lists) and HTTP_ACCESS permissions
    - `/api/v*/bearer_get_token` - Generate bearer tokens (requires: SIGNED_ID + SAME_SPACE)
    - ⚠️ These APIs are ONLY accessible via Netdata Cloud (ACLK), not via direct HTTP
 
-2. **Public Data APIs (47 total - No Authentication Required):**
+2. **Public Data APIs (48 total - No Authentication Required):**
    - Most metrics, alerts, and metadata APIs
    - Require `HTTP_ACCESS_ANONYMOUS_DATA`
    - Subject to IP-based ACL restrictions in netdata.conf
 
-3. **Public Info APIs (12 total - Unrestricted):**
+3. **Public Info APIs (11 total - Unrestricted):**
    - Have `HTTP_ACL_NOCHECK` - bypass ACL checking
-   - Includes: info, versions, progress, settings, me, claim, stream_info
+   - Includes: info, versions, progress, me, claim, stream_info
 
 4. **Special Permission Handling:**
    - `/api/v*/config` - Permissions checked per-action internally
@@ -694,15 +694,15 @@ All 68 APIs have security documentation in swagger.yaml based on ACL/ACCESS flag
    - Description: Detailed ACLK access requirements, permissions, and restrictions
    - APIs: rtc_offer, bearer_protection, bearer_get_token (v2 & v3)
 
-   **Public Data APIs (50 total):**
+   **Public Data APIs (51 total):**
    - Security field: `security: [{}, bearerAuth: []]` (no auth OR bearer auth)
    - Description: Bearer protection optional, IP ACL restrictions, access methods
    - APIs: data, weights, contexts, alerts, functions, badges, config, etc. (v1, v2, v3)
 
-   **Always Public APIs (12 total):**
+   **Always Public APIs (11 total):**
    - Security field: NONE (intentionally omitted - indicates always public)
    - Description: Always accessible, no restrictions, cannot be secured
-   - APIs: info, versions, progress, settings, claim, me, registry, manage
+   - APIs: info, versions, progress, claim, me, registry, manage
 
 3. **Security Section Format:**
    Each API's description includes a **Security & Access Control** section with:
@@ -715,8 +715,8 @@ All 68 APIs have security documentation in swagger.yaml based on ACL/ACCESS flag
 **Verification Status:**
 - ✅ 68/68 APIs have "Security & Access Control" in descriptions (based on registration flags)
 - ✅ 6 ACLK-only APIs have `aclkAuth` security scheme (verified from ACL flags)
-- ✅ 50 Public Data APIs have optional bearer auth `[{}, bearerAuth: []]` (verified from ACCESS flags)
-- ✅ 12 Always Public APIs have NO security field (verified from HTTP_ACL_NOCHECK)
+- ✅ 51 Public Data APIs have optional bearer auth `[{}, bearerAuth: []]` (verified from ACCESS flags)
+- ✅ 11 Always Public APIs have NO security field (verified from HTTP_ACL_NOCHECK)
 - ✅ All security flags match API_PERMISSIONS_ANALYSIS.md
 - ⚠️ **Actual endpoint behavior and parameter security NOT VERIFIED from implementation code**
 
@@ -2896,7 +2896,7 @@ Per dimension:
 - Implementation: `src/web/api/v3/api_v3_settings.c:230-285`
 
 **Security Configuration:**
-- ACL: `HTTP_ACL_NOCHECK`
+- ACL: `HTTP_ACL_DASHBOARD`
 - ACCESS: `HTTP_ACCESS_ANONYMOUS_DATA`
 
 ### PARAMETERS (1 total)
@@ -2930,6 +2930,7 @@ Per dimension:
 **Possible Error Scenarios:**
 - `400 Bad Request` - Invalid file parameter, invalid host, missing version in payload, invalid JSON payload, missing payload on PUT, unauthorized file access for anonymous users, invalid HTTP method
 - `409 Conflict` - Version mismatch (caller must reload and reapply changes)
+- `413 Payload Too Large` - PUT payload exceeds 20 MiB (20,971,520 bytes)
 - `500 Internal Server Error` - Settings path creation failure, file I/O errors
 
 ### SPECIAL BEHAVIORS
@@ -2946,8 +2947,8 @@ Per dimension:
 **Response Fields (GET):** 1 guaranteed + user-defined
 **Response Fields (PUT):** 1
 **Error Response Fields:** 1
-**Security:** ACL=HTTP_ACL_NOCHECK + ACCESS=HTTP_ACCESS_ANONYMOUS_DATA
-**Max Payload Size:** 20 MiB
+**Security:** ACL=HTTP_ACL_DASHBOARD + ACCESS=HTTP_ACCESS_ANONYMOUS_DATA
+**Max Payload Size:** 20 MiB (20,971,520 bytes); larger PUT payloads return 413
 **File Storage:** `{varlib}/settings/{file}`
 **Dual-Agent Agreement:** ✅ Agent confirmed optimistic locking settings storage structure
 
@@ -3099,19 +3100,19 @@ Per dimension:
 3. ✅ `cloud.id` - integer - Cloud connection ID counter
 4. ✅ `cloud.status` - string - Cloud connection status: "online", "offline", "available", "banned", "indirect"
 5. ✅ `cloud.since` - integer - Unix timestamp when status last changed
-6. ✅ `cloud.age` - integer - Seconds since last status change
-7. ✅ `cloud.url` - string - Netdata Cloud URL (present for AVAILABLE, BANNED, INDIRECT statuses)
+6. ✅ `cloud.age` - integer - Signed seconds from the last status change to response generation (may be negative after a backward system-clock adjustment)
+7. ✅ `cloud.url` - string or null - Netdata Cloud URL (present for every status; BANNED currently emits duplicate `url` members from two URL sources)
 8. ✅ `cloud.reason` - string - Status reason/error message (varies by status)
-9. ✅ `cloud.claim_id` - string - Claim ID when agent is claimed (present for BANNED, OFFLINE, ONLINE, INDIRECT statuses)
+9. ✅ `cloud.claim_id` - string - Claim ID (present for BANNED, OFFLINE, ONLINE, INDIRECT statuses; may be empty when no claim ID is available)
 10. ✅ `cloud.next_check` - integer - Unix timestamp of next connection attempt (only for OFFLINE status when scheduled)
 11. ✅ `cloud.next_in` - integer - Seconds until next connection attempt (only for OFFLINE status when scheduled)
 
 #### Claim Information Fields (present when `response != CLAIM_RESP_ACTION_OK`)
 
 12. ✅ `can_be_claimed` - boolean - Whether agent can currently be claimed
-13. ✅ `key_filename` - string - Full path to the session ID verification file
-14. ✅ `cmd` - string - OS-specific command to retrieve session ID (e.g., "sudo cat /path/to/file" or "docker exec netdata cat /path")
-15. ✅ `help` - string - Help message explaining how to verify server ownership
+13. ✅ `key_filename` - string - Full path to the session ID verification file; present after a filename was cached by a successful publication
+14. ✅ `cmd` - string - OS-specific command to retrieve session ID; present after a filename was cached by a successful publication (e.g., "sudo cat /path/to/file" or "docker exec netdata cat /path")
+15. ✅ `help` - string - Help message explaining how to verify server ownership; present after a filename was cached by a successful publication
 
 #### Agent Object (`agent`) - always present
 
@@ -3123,7 +3124,7 @@ Per dimension:
 ### RESPONSE SCENARIOS
 
 **Scenario 1: Info Request (no parameters or no key)**
-- Returns: Fields 3-19 (cloud status + can_be_claimed + user info + agent info)
+- Returns: Fields 3-12 and 16-19; fields 13-15 are also present after a verification key filename has been cached by a successful publication
 - HTTP Status: 200 OK
 
 **Scenario 2: Successful Claim**
@@ -3131,11 +3132,11 @@ Per dimension:
 - HTTP Status: 200 OK
 
 **Scenario 3: Failed Claim (invalid key/parameters)**
-- Returns: Fields 1-2 (success=false), 3-19 (cloud status + can_be_claimed + user info + agent info)
+- Returns: Fields 1-12 and 16-19; fields 13-15 are also present after a verification key filename has been cached by any successful publication
 - HTTP Status: 400 Bad Request
 
 **Scenario 4: Failed Claim (claim action failed)**
-- Returns: Fields 1-2 (success=false), 3-19 (cloud status + can_be_claimed + user info + agent info)
+- Returns: Fields 1-12 and 16-19; fields 13-15 are also present after a verification key filename has been cached by any successful publication
 - HTTP Status: 200 OK
 
 ### VERIFICATION SUMMARY
@@ -3148,6 +3149,7 @@ Per dimension:
 **Notes:**
 - V3 API always returns JSON (V2 could return plain text for errors)
 - Session ID is regenerated after each claim attempt (successful or failed) to prevent brute force attacks
+- `key_filename`, `cmd`, and `help` are omitted if no verification key filename has ever been cached by a successful publication
 - Agent can only be claimed when cloud status is AVAILABLE, OFFLINE, or INDIRECT
 - Parameter validation uses character whitelist: alphanumeric + `.,-:/_`
 
