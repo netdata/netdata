@@ -1106,6 +1106,7 @@ fi
 if [ -n "${NETDATA_BIN:-}" ]; then
   collect_cmd 07-runtime/buildinfo.txt "netdata -W buildinfo (verbatim - paths section matters; works with daemon down)" "$NETDATA_BIN" -W buildinfo
   collect_cmd_raw 07-runtime/buildinfo.json "netdata -W buildinfojson (machine-readable; no header so it parses as JSON)" "$NETDATA_BIN" -W buildinfojson
+  collect_cmd 07-runtime/cmakecache.txt "netdata -W cmakecache: authoritative build config (compiler flags, enabled plugins, configured paths) - superset of buildinfo" "$NETDATA_BIN" -W cmakecache
 fi
 if command -v netdatacli >/dev/null 2>&1 && [ -n "${NETDATA_PID:-}" ]; then
   collect_cmd_raw 07-runtime/aclk-state.json "Cloud connectivity state (netdatacli aclk-state json; no header so it parses as JSON)" netdatacli aclk-state json

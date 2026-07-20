@@ -178,6 +178,7 @@ Every item collected maps to a recurring support ask. That mapping is the
 | active alerts + alert instances | alert tickets are the single biggest Freshdesk theme |
 | `/api/v1/functions`, `/api/v1/ml_info` | which plugins expose what; ML state |
 | `netdata -W buildinfo` + `buildinfojson` | required by the bug template; the paths section proves which config dirs the binary uses; works with the daemon **down** |
+| `netdata -W cmakecache` | authoritative record of how the agent was built (compiler flags, enabled/disabled plugins, configured paths) — a superset of buildinfo; pinpoints build-time causes (a disabled plugin, a custom flag) that buildinfo alone can miss |
 | `netdatacli aclk-state json` | canned Freshdesk ask for cloud issues |
 | netdata self CPU/memory/clients CSVs (10 min, bounded) | replaces the "please send a screenshot of the Netdata memory charts" round trip |
 

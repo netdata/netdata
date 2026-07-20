@@ -700,6 +700,7 @@ if ($ApiOk) {
 if (Test-Path $NetdataExe) {
     Save-Cmd '07-runtime\buildinfo.txt' 'netdata -W buildinfo (verbatim; works with daemon down)' { & $using:NetdataExe -W buildinfo 2>&1 } 'netdata.exe -W buildinfo'
     Save-CmdRaw '07-runtime\buildinfo.json' 'netdata -W buildinfojson (machine-readable; no header so it parses as JSON)' { & $using:NetdataExe -W buildinfojson 2>&1 } 'netdata.exe -W buildinfojson'
+    Save-Cmd '07-runtime\cmakecache.txt' 'netdata -W cmakecache: authoritative build config (flags, plugins, paths) - superset of buildinfo' { & $using:NetdataExe -W cmakecache 2>&1 } 'netdata.exe -W cmakecache'
 }
 if ((Test-Path $NetdataCli) -and $NetdataProc) {
     Save-CmdRaw '07-runtime\aclk-state.json' 'Cloud connectivity state (netdatacli aclk-state json; no header so it parses as JSON)' { & $using:NetdataCli aclk-state json 2>&1 } 'netdatacli.exe aclk-state json'
