@@ -145,6 +145,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "two-pass mechanics oracle over 10 key-chains (incl. cross-key: pass 1 partitions by the UNION of both passes' keys) x 8 agg-chains (incl. mixed) x non-raw/raw: values, PARTIAL propagation, group_by_label[1]; ANOMALY RATE accumulates raw through both passes and divides ONCE by the final group count — inflated by members-per-group for EVERY chain (ar analog of the avg-of-sums family, pinned as current mechanics; rollup SOW evidence); raw pin: point count = number of pass-1 GROUPS, values/ar unconverted",
 		Agent:  Green,
 	},
+	"L6/two-pass-percentage": {
+		Proves: "percentage as the PASS-2 aggregation: pass 1 runs in SHADOW hidden mode (hidden dims accumulate in per-group shadow buckets), the pct pass folds them into the denominator of their normal group (v*100/(v+h)); an incomplete shadow bucket taints the point PARTIAL through hgbc; raw defers everything — visible sum as value, hidden on the wire, count = visible pass-1 groups",
+		Agent:  Green,
+	},
 	"CASE-018/multipass-average": {
 		Proves: "AVERAGE at pass 1 of a two-pass group-by feeds pass 2 the group SUMS (the per-group division never happens) — the final value is inflated by ~members-per-group (bug-list item 3 family; fix owned by SOW-20260701-query-rollup-hierarchical-correctness, in planning)",
 		Agent:  Red,
