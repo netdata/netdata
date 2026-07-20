@@ -140,6 +140,8 @@ int http_api_v2(mqtt_wss_client client, aclk_query_t *query)
         w->response.code = (short)aclk_http_msg_v2(client, query->callback_topic, query->msg_id,
                                                    dt_ut, query->created, w->response.code,
                                                    NULL, 0);
+        // The inbound request reused this response buffer, but the validation error response has no body.
+        buffer_flush(w->response.data);
         goto cleanup;
     }
 

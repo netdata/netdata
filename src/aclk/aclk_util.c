@@ -407,17 +407,50 @@ static inline int aclk_parse_userpass_pair(const char *src, const char c, char *
     memcpy(tmp_a, src, ptr - src);
 
     char *decoded_a = callocz(1, ptr - src + 1);
-    url_decode_r(decoded_a, tmp_a, ptr - src + 1);
-    freez(tmp_a);
-    *a = decoded_a;
+    bool decoded_a_ok = url_decode_r(decoded_a, tmp_a, ptr - src + 1) != NULL;
+    aclk_sensitive_free(&tmp_a);
+    if(!decoded_a_ok) {
+        aclk_sensitive_free(&decoded_a);
+        return 1;
+    }
 
     char *tmp_b = strdupz(ptr+1);
     char *decoded_b = callocz(1, strlen(tmp_b) + 1);
-    url_decode_r(decoded_b, tmp_b, strlen(tmp_b) + 1);
-    freez(tmp_b);
+    bool decoded_b_ok = url_decode_r(decoded_b, tmp_b, strlen(tmp_b) + 1) != NULL;
+    aclk_sensitive_free(&tmp_b);
+    if(!decoded_b_ok) {
+        aclk_sensitive_free(&decoded_a);
+        aclk_sensitive_free(&decoded_b);
+        return 1;
+    }
+
+    *a = decoded_a;
     *b = decoded_b;
 
     return 0;
+}
+
+int aclk_util_unittest(void) {
+    int errors = 0;
+    char *username = NULL;
+    char *password = NULL;
+
+    if(aclk_parse_userpass_pair("user%40name:pass%21", ':', &username, &password) ||
+       !username || strcmp(username, "user@name") || !password || strcmp(password, "pass!"))
+        errors++;
+    aclk_sensitive_free(&username);
+    aclk_sensitive_free(&password);
+
+    if(!aclk_parse_userpass_pair("user%GGname:password", ':', &username, &password) || username || password)
+        errors++;
+
+    if(!aclk_parse_userpass_pair("username:pass%", ':', &username, &password) || username || password)
+        errors++;
+
+    if(errors)
+        fprintf(stderr, "ACLK UTIL: %d test(s) failed\n", errors);
+
+    return errors;
 }
 
 #define HTTP_PROXY_PREFIX "http://"

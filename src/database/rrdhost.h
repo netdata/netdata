@@ -460,7 +460,7 @@ RRDHOST *rrdhost_find_by_hostname(const char *hostname);
 RRDHOST *rrdhost_find_by_guid(const char *guid);
 RRDHOST *rrdhost_find_by_node_id(const char *node_id);
 
-SIMPLE_PATTERN_INDEX_MATCHES *rrdhost_identity_index_search(SIMPLE_PATTERN *pattern);
+SIMPLE_PATTERN_INDEX_MATCHES *rrdhost_identity_index_search(SIMPLE_PATTERN *pattern, ONEWAYALLOC *owa);
 bool rrdhost_node_id_set(RRDHOST *host, const ND_UUID *node_id);
 int rrdhost_identity_index_unittest(void);
 

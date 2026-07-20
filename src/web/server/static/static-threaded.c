@@ -247,11 +247,19 @@ static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
         goto cleanup;
     }
 
+    bool starting_keepalive_request =
+        (pi->flags & POLLINFO_FLAG_FIRST_REQUEST_RECEIVED) && !w->request_ingress_started_ut;
+
     ssize_t bytes;
     bytes = web_client_receive(w);
 
     if (likely(bytes > 0)) {
         pulse_web_server_received_bytes(bytes);
+
+        if(unlikely(starting_keepalive_request && w->request_ingress_started_ut)) {
+            pi->request_ingress_t = pi->last_received_t;
+            pi->flags |= POLLINFO_FLAG_REQUEST_INGRESS;
+        }
 
         netdata_log_debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
         worker_is_idle();
@@ -264,10 +272,14 @@ static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
         // Refresh receive timestamp so idle timeout uses the actual return time.
         pi->last_received_t = now_boottime_sec();
 
-        // The first-request timeout protects request ingress only.
-        // Once we no longer wait to receive request bytes, the first request is complete.
-        if(unlikely(!(pi->flags & POLLINFO_FLAG_FIRST_REQUEST_RECEIVED) && !web_client_has_wait_receive(w)))
-            pi->flags |= POLLINFO_FLAG_FIRST_REQUEST_RECEIVED;
+        if(unlikely(!web_client_has_wait_receive(w))) {
+            // Request ingress is complete; response generation may continue independently.
+            pi->flags &= ~POLLINFO_FLAG_REQUEST_INGRESS;
+            pi->request_ingress_t = 0;
+
+            if(!(pi->flags & POLLINFO_FLAG_FIRST_REQUEST_RECEIVED))
+                pi->flags |= POLLINFO_FLAG_FIRST_REQUEST_RECEIVED;
+        }
 
         if (unlikely(w->mode == HTTP_REQUEST_MODE_STREAM)) {
             ssize_t rc = web_client_send(w);

@@ -7,6 +7,7 @@
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
 #include "web/mcp/mcp.h"
+#include "aclk/aclk_util.h"
 
 #include "database/engine/page_test.h"
 #include "database/rrdset-slots.h"
@@ -623,6 +624,10 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             if(url_unittest()) return 1;
                             return web_client_request_target_unittest();
+                        }
+                        else if(strcmp(optarg, "aclkutiltest") == 0) {
+                            unittest_running = true;
+                            return aclk_util_unittest();
                         }
                         else if(strcmp(optarg, "wsclienttest") == 0) {
                             unittest_running = true;

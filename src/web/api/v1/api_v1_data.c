@@ -166,6 +166,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
 
     QUERY_TARGET_REQUEST qtr = {
         .version = 1,
+        .owa = owa,
         .after = after,
         .before = before,
         .host = host,

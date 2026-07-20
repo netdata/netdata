@@ -61,6 +61,10 @@ static ARAL *judy_size_aral(Word_t Words) {
 
 static __thread int64_t judy_allocated = 0;
 
+static __thread struct {
+    ONEWAYALLOC *owa;
+} judy_allocator_state = { 0 };
+
 ALWAYS_INLINE void JudyAllocThreadPulseReset(void) {
     judy_allocated = 0;
 }
@@ -69,6 +73,16 @@ ALWAYS_INLINE int64_t JudyAllocThreadPulseGetAndReset(void) {
     int64_t rc = judy_allocated;
     judy_allocated = 0;
     return rc;
+}
+
+void JudyAllocThreadScopedOWA(ONEWAYALLOC *owa, JUDY_ALLOCATOR_SCOPED_CALLBACK callback, void *data) {
+    if(unlikely(!callback))
+        return;
+
+    typeof(judy_allocator_state) previous = judy_allocator_state;
+    judy_allocator_state.owa = owa;
+    callback(data);
+    judy_allocator_state = previous;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -110,6 +124,11 @@ inline Word_t JudyMalloc(Word_t Words)
 {
     Word_t Addr;
 
+    if(unlikely(judy_allocator_state.owa))
+        return (Word_t)onewayalloc_mallocz(
+            judy_allocator_state.owa,
+            onewayalloc_mul_or_fatal(Words, sizeof(Word_t), "Judy array"));
+
 #ifdef HAVE_JEMALLOC_ARENA_API
     if(jemalloc_initialized)
         Addr = (Word_t)jemalloc_malloc(Words);
@@ -129,6 +148,11 @@ inline Word_t JudyMalloc(Word_t Words)
 }
 
 inline void JudyFree(void * PWord, Word_t Words) {
+    if(unlikely(judy_allocator_state.owa)) {
+        onewayalloc_freez(judy_allocator_state.owa, PWord);
+        return;
+    }
+
 #ifdef HAVE_JEMALLOC_ARENA_API
     if(jemalloc_initialized)
         jemalloc_free(PWord, Words);
@@ -169,4 +193,3 @@ void libjudy_malloc_init(void) {
 #endif
         aral_judy_init();
 }
-

@@ -3,7 +3,17 @@
 #include "../libnetdata.h"
 #include "simple_pattern_internals.h"
 
-static struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE default_mode, size_t count) {
+static inline void *simple_pattern_calloc(ONEWAYALLOC *owa, size_t size) {
+    return owa ? onewayalloc_callocz(owa, 1, size) : callocz(1, size);
+}
+
+static inline char *simple_pattern_strdup(ONEWAYALLOC *owa, const char *s) {
+    return owa ? onewayalloc_strdupz(owa, s) : strdupz(s);
+}
+
+static struct simple_pattern *parse_pattern(
+    ONEWAYALLOC *owa, char *str, SIMPLE_PREFIX_MODE default_mode, size_t count, bool owner_root)
+{
     if(unlikely(count >= 1000))
         return NULL;
 
@@ -23,7 +33,7 @@ static struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE defaul
     // do we have an asterisk in the middle?
     if(*c == '*' && c[1] != '\0') {
         // yes, we have
-        child = parse_pattern(c, default_mode, count + 1);
+        child = parse_pattern(owa, c, default_mode, count + 1, false);
         c[1] = '\0';
     }
 
@@ -47,9 +57,17 @@ static struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE defaul
         mode = default_mode;
 
     // allocate the structure
-    struct simple_pattern *m = callocz(1, sizeof(struct simple_pattern));
+    struct simple_pattern *m;
+    if(owner_root) {
+        struct simple_pattern_owner *owner = simple_pattern_calloc(owa, sizeof(*owner));
+        owner->owa = owa;
+        m = &owner->root;
+    }
+    else
+        m = simple_pattern_calloc(owa, sizeof(*m));
+
     if(*s) {
-        m->match = strdupz(s);
+        m->match = simple_pattern_strdup(owa, s);
         m->len = strlen(m->match);
         m->mode = mode;
     }
@@ -62,7 +80,10 @@ static struct simple_pattern *parse_pattern(char *str, SIMPLE_PREFIX_MODE defaul
     return m;
 }
 
-SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode, bool case_sensitive) {
+static SIMPLE_PATTERN *simple_pattern_create_internal(
+    ONEWAYALLOC *owa, const char *list, const char *separators,
+    SIMPLE_PREFIX_MODE default_mode, bool case_sensitive)
+{
     struct simple_pattern *root = NULL, *last = NULL;
 
     if(unlikely(!list || !*list)) return root;
@@ -132,7 +153,7 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
             continue;
 
         // fprintf(stderr, "FOUND PATTERN: '%s'\n", buf);
-        struct simple_pattern *m = parse_pattern(buf, default_mode, 0);
+        struct simple_pattern *m = parse_pattern(owa, buf, default_mode, 0, root == NULL);
         m->negative = negative;
         m->case_sensitive = case_sensitive;
 
@@ -155,6 +176,22 @@ SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, 
 
     freez(buf);
     return (SIMPLE_PATTERN *)root;
+}
+
+SIMPLE_PATTERN *simple_pattern_create(
+    const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode, bool case_sensitive)
+{
+    return simple_pattern_create_internal(NULL, list, separators, default_mode, case_sensitive);
+}
+
+SIMPLE_PATTERN *simple_pattern_create_owa(
+    ONEWAYALLOC *owa, const char *list, const char *separators,
+    SIMPLE_PREFIX_MODE default_mode, bool case_sensitive)
+{
+    if(unlikely(!owa))
+        return simple_pattern_create(list, separators, default_mode, case_sensitive);
+
+    return simple_pattern_create_internal(owa, list, separators, default_mode, case_sensitive);
 }
 
 ALWAYS_INLINE
@@ -311,22 +348,48 @@ SIMPLE_PATTERN_RESULT simple_pattern_matches_length_extract(SIMPLE_PATTERN *list
     return simple_pattern_matches_extract_with_length(list, str, len, wildcarded, wildcarded_size);
 }
 
-static inline void free_pattern(struct simple_pattern *m) {
-    while(m) {
-        struct simple_pattern *next = m->next;
-
-        free_pattern(m->child);
-        freez((void *)m->match);
-        freez(m);
-
-        m = next;
-    }
-}
-
 void simple_pattern_free(SIMPLE_PATTERN *list) {
     if(!list) return;
 
-    free_pattern(((struct simple_pattern *)list));
+    struct simple_pattern *first = (struct simple_pattern *)list;
+    // Public constructors always return the embedded root of this owner wrapper.
+    struct simple_pattern_owner *owner =
+        (struct simple_pattern_owner *)((char *)first - offsetof(struct simple_pattern_owner, root));
+
+#ifndef FSANITIZE_ADDRESS
+    if(owner->owa)
+        return;
+#endif
+
+    struct simple_pattern *root = first;
+    while(root) {
+        struct simple_pattern *next = root->next;
+        struct simple_pattern *node = root;
+
+        while(node) {
+            struct simple_pattern *child = node->child;
+            if(owner->owa)
+                onewayalloc_freez(owner->owa, node->match);
+            else
+                freez((void *)node->match);
+
+            if(node != first) {
+                if(owner->owa)
+                    onewayalloc_freez(owner->owa, node);
+                else
+                    freez(node);
+            }
+
+            node = child;
+        }
+
+        root = next;
+    }
+
+    if(owner->owa)
+        onewayalloc_freez(owner->owa, owner);
+    else
+        freez(owner);
 }
 
 /* Debugging patterns

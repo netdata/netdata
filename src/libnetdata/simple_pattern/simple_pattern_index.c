@@ -13,7 +13,61 @@ _Static_assert(sizeof(void *) <= sizeof(Word_t), "SIMPLE_PATTERN_INDEX user poin
 struct simple_pattern_index_matches {
     Pvoid_t users;
     size_t count;
+    ONEWAYALLOC *owa;
 };
+
+struct simple_pattern_index_judyl_insert {
+    Pvoid_t *array;
+    Word_t key;
+    Pvoid_t *slot;
+};
+
+static void simple_pattern_index_judyl_insert_callback(void *data) {
+    struct simple_pattern_index_judyl_insert *request = data;
+    request->slot = JudyLIns(request->array, request->key, PJE0);
+}
+
+static inline Pvoid_t *simple_pattern_index_judyl_insert(
+    Pvoid_t *array, Word_t key, ONEWAYALLOC *owa)
+{
+    if(!owa)
+        return JudyLIns(array, key, PJE0);
+
+    struct simple_pattern_index_judyl_insert request = {
+        .array = array,
+        .key = key,
+    };
+    JudyAllocThreadScopedOWA(owa, simple_pattern_index_judyl_insert_callback, &request);
+    return request.slot;
+}
+
+#ifdef FSANITIZE_ADDRESS
+struct simple_pattern_index_judyl_free {
+    Pvoid_t *array;
+};
+
+static void simple_pattern_index_judyl_free_callback(void *data) {
+    struct simple_pattern_index_judyl_free *request = data;
+    JudyLFreeArray(request->array, PJE0);
+}
+#endif
+
+static inline void simple_pattern_index_judyl_free(Pvoid_t *array, ONEWAYALLOC *owa) {
+    if(!owa) {
+        JudyLFreeArray(array, PJE0);
+        return;
+    }
+
+#ifndef FSANITIZE_ADDRESS
+    // The arena owns every Judy node; clearing the root prevents later access until bulk reclamation.
+    *array = NULL;
+#else
+    struct simple_pattern_index_judyl_free request = {
+        .array = array,
+    };
+    JudyAllocThreadScopedOWA(owa, simple_pattern_index_judyl_free_callback, &request);
+#endif
+}
 
 typedef enum {
     SIMPLE_PATTERN_INDEX_UNSEEN = 0,
@@ -68,7 +122,7 @@ static inline bool simple_pattern_index_add_user_to_result(
     Pvoid_t *user_slot;
 
     while((user_slot = JudyLFirstThenNext(users, &user, &first))) {
-        Pvoid_t *result_slot = JudyLIns(&matches->users, user, PJE0);
+        Pvoid_t *result_slot = simple_pattern_index_judyl_insert(&matches->users, user, matches->owa);
         if(unlikely(!result_slot || result_slot == PJERR))
             return false;
 
@@ -86,7 +140,8 @@ static bool simple_pattern_index_add_unsafe(SIMPLE_PATTERN_INDEX *index, STRING 
     bool added = false;
     Pvoid_t *key_slot = JudyLIns(&index->keys, (Word_t)key, PJE0);
     if(likely(key_slot && key_slot != PJERR)) {
-        if(!*key_slot)
+        bool new_key = !*key_slot;
+        if(new_key)
             string_dup(key);
 
         Pvoid_t *user_slot = JudyLIns(key_slot, (Word_t)user, PJE0);
@@ -95,7 +150,10 @@ static bool simple_pattern_index_add_unsafe(SIMPLE_PATTERN_INDEX *index, STRING 
             added = true;
         }
 
-        if(unlikely(!*key_slot)) {
+        if(unlikely(!added && new_key)) {
+            if(unlikely(*key_slot))
+                fatal("SIMPLE_PATTERN_INDEX: failed user insertion left a non-empty child array");
+
             string_freez(key);
             (void)JudyLDel(&index->keys, (Word_t)key, PJE0);
         }
@@ -148,6 +206,7 @@ static size_t simple_pattern_index_del_user_unsafe(SIMPLE_PATTERN_INDEX *index, 
             string_freez(string);
         }
 
+        // JudyLNext is key-based, so deleting the current parent before seeking its successor is safe.
         key_slot = JudyLNext(index->keys, &key, PJE0);
     }
 
@@ -230,7 +289,8 @@ static bool simple_pattern_index_search_exact_literal(
         return true;
     }
 
-    visited_slot = JudyLIns(&search->visited, (Word_t)key, PJE0);
+    visited_slot = simple_pattern_index_judyl_insert(
+        &search->visited, (Word_t)key, search->matches->owa);
     if(unlikely(!visited_slot || visited_slot == PJERR)) {
         string_freez(key);
         return false;
@@ -247,8 +307,12 @@ static bool simple_pattern_index_search_exact_literal(
     return ok;
 }
 
-SIMPLE_PATTERN_INDEX_MATCHES *simple_pattern_index_search(SIMPLE_PATTERN_INDEX *index, SIMPLE_PATTERN *pattern) {
-    SIMPLE_PATTERN_INDEX_MATCHES *matches = callocz(1, sizeof(*matches));
+SIMPLE_PATTERN_INDEX_MATCHES *simple_pattern_index_search(
+    SIMPLE_PATTERN_INDEX *index, SIMPLE_PATTERN *pattern, ONEWAYALLOC *owa)
+{
+    SIMPLE_PATTERN_INDEX_MATCHES *matches = owa ?
+        onewayalloc_callocz(owa, 1, sizeof(*matches)) : callocz(1, sizeof(*matches));
+    matches->owa = owa;
 
     if(unlikely(!index))
         return matches;
@@ -262,7 +326,7 @@ SIMPLE_PATTERN_INDEX_MATCHES *simple_pattern_index_search(SIMPLE_PATTERN_INDEX *
             .matches = matches,
         };
         ok = simple_pattern_foreach_exact_literal(pattern, simple_pattern_index_search_exact_literal, &search);
-        JudyLFreeArray(&search.visited, PJE0);
+        simple_pattern_index_judyl_free(&search.visited, owa);
     }
     else if(pattern) {
         Word_t key = 0;
@@ -350,8 +414,12 @@ void simple_pattern_index_matches_free(SIMPLE_PATTERN_INDEX_MATCHES *matches) {
     if(!matches)
         return;
 
-    JudyLFreeArray(&matches->users, PJE0);
-    freez(matches);
+    ONEWAYALLOC *owa = matches->owa;
+    simple_pattern_index_judyl_free(&matches->users, owa);
+    if(owa)
+        onewayalloc_freez(owa, matches);
+    else
+        freez(matches);
 }
 
 // ----------------------------------------------------------------------------
@@ -367,7 +435,7 @@ static bool simple_pattern_index_test_add(SIMPLE_PATTERN_INDEX *index, const cha
 static size_t simple_pattern_index_test_search(
     SIMPLE_PATTERN_INDEX *index, SIMPLE_PATTERN *pattern, void *expected, bool expected_present)
 {
-    SIMPLE_PATTERN_INDEX_MATCHES *matches = simple_pattern_index_search(index, pattern);
+    SIMPLE_PATTERN_INDEX_MATCHES *matches = simple_pattern_index_search(index, pattern, NULL);
     if(!matches)
         return SIZE_MAX;
 
@@ -377,6 +445,31 @@ static size_t simple_pattern_index_test_search(
 
     simple_pattern_index_matches_free(matches);
     return count;
+}
+
+static int simple_pattern_large_list_unittest(void) {
+    enum { RULES = 65536 };
+    size_t text_size = RULES * 2;
+    CLEAN_CHAR_P *text = mallocz(text_size);
+    for(size_t i = 0; i < RULES; i++) {
+        text[i * 2] = 'x';
+        text[i * 2 + 1] = '|';
+    }
+    text[text_size - 1] = '\0';
+
+    SIMPLE_PATTERN *heap_pattern = simple_pattern_create(
+        text, "|", SIMPLE_PATTERN_EXACT, true);
+    if(!heap_pattern)
+        return 1;
+    simple_pattern_free(heap_pattern);
+
+    ONEWAYALLOC *owa = onewayalloc_create(0);
+    SIMPLE_PATTERN *owa_pattern = simple_pattern_create_owa(
+        owa, text, "|", SIMPLE_PATTERN_EXACT, true);
+    int errors = owa_pattern ? 0 : 1;
+    simple_pattern_free(owa_pattern);
+    onewayalloc_destroy(owa);
+    return errors;
 }
 
 struct simple_pattern_index_concurrency_test {
@@ -394,7 +487,7 @@ static void simple_pattern_index_concurrency_reader(void *data) {
     struct simple_pattern_index_concurrency_test *test = data;
 
     for(size_t i = 0; i < test->iterations; i++) {
-        SIMPLE_PATTERN_INDEX_MATCHES *matches = simple_pattern_index_search(test->index, test->pattern);
+        SIMPLE_PATTERN_INDEX_MATCHES *matches = simple_pattern_index_search(test->index, test->pattern, NULL);
         size_t count = simple_pattern_index_matches_count(matches);
         if(unlikely(!matches || !simple_pattern_index_matches_contains(matches, test->stable_user) ||
                     count != 2))
@@ -480,6 +573,22 @@ int simple_pattern_index_unittest(void) {
 
     if(simple_pattern_index_test_search(index, NULL, &user1, true) != 3)
         errors++;
+
+    ONEWAYALLOC *owa = onewayalloc_create(0);
+    SIMPLE_PATTERN *owa_pattern = string_to_simple_pattern_owa(owa, "host1|uuid3");
+    SIMPLE_PATTERN_INDEX_MATCHES *owa_matches = simple_pattern_index_search(index, owa_pattern, owa);
+    if(!owa_matches || simple_pattern_index_matches_count(owa_matches) != 2 ||
+       !simple_pattern_index_matches_contains(owa_matches, &user1) ||
+       !simple_pattern_index_matches_contains(owa_matches, &user3))
+        errors++;
+    simple_pattern_index_matches_free(owa_matches);
+    simple_pattern_free(owa_pattern);
+    onewayalloc_destroy(owa);
+
+    SIMPLE_PATTERN *post_owa_pattern = string_to_simple_pattern("host2");
+    if(simple_pattern_index_test_search(index, post_owa_pattern, &user2, true) != 1)
+        errors++;
+    simple_pattern_free(post_owa_pattern);
 
     STRING *host1 = string_strdupz("host1");
     STRING *host1_acquired = string_acquire_existing("host1", 5);
@@ -593,6 +702,7 @@ int simple_pattern_index_unittest(void) {
     simple_pattern_index_destroy(NULL);
 
     errors += simple_pattern_index_concurrency_unittest();
+    errors += simple_pattern_large_list_unittest();
 
     if(errors)
         fprintf(stderr, "SIMPLE_PATTERN_INDEX: %d test(s) failed\n", errors);

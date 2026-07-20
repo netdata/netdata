@@ -412,6 +412,7 @@ struct workload_stats {
 struct query_weights_data {
     QUERY_WEIGHTS_REQUEST *qwr;
     struct query_weights_data *shared_qwd;
+    ONEWAYALLOC *owa;
 
     SIMPLE_PATTERN *scope_nodes_sp;
     SIMPLE_PATTERN *scope_contexts_sp;
@@ -1533,6 +1534,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
 
     QUERY_TARGET_REQUEST qtr = {
             .version = 1,
+            .owa = owa,
             .host = host,
             .rca = rca,
             .ria = ria,
@@ -1779,6 +1781,7 @@ static void rrdset_weights_value(
 static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qwd) {
     QUERY_TARGET_REQUEST qtr = {
             .version = 1,
+            .owa = qwd->owa,
             .scope_nodes = qwd->qwr->scope_nodes,
             .scope_contexts = qwd->qwr->scope_contexts,
             .scope_instances = qwd->qwr->scope_instances,
@@ -1802,10 +1805,9 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             .priority = STORAGE_PRIORITY_SYNCHRONOUS_FIRST,
     };
 
-    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
     QUERY_TARGET *qt = query_target_create(&qtr);
     stream_control_user_weights_query_started();
-    RRDR *r = rrd2rrdr(owa, qt);
+    RRDR *r = rrd2rrdr(qwd->owa, qt);
     stream_control_user_weights_query_finished();
 
     if(!r || rrdr_rows(r) != 1 || !r->d || r->d != r->internal.qt->query.used)
@@ -1858,9 +1860,8 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
     merge_query_value_to_stats(&qv, &qwd->stats, queries);
 
 cleanup:
-    rrdr_free(owa, r);
+    rrdr_free(qwd->owa, r);
     query_target_release(qt);
-    onewayalloc_destroy(owa);
 }
 
 // ----------------------------------------------------------------------------
@@ -2346,7 +2347,7 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 #ifndef ENABLE_DBENGINE
     return query_scope_foreach_host(scope_hosts_sp, hosts_sp,
                                     weights_do_node_callback, qwd,
-                                    &qwd->versions, NULL);
+                                    &qwd->versions, NULL, qwd->owa);
 
 #else
     size_t host_count = dictionary_entries(rrdhost_root_index);
@@ -2357,7 +2358,8 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
     qwd->hosts_array = mallocz(qwd->hosts_array_capacity * sizeof(*qwd->hosts_array));
     qwd->total_hosts = 0;
 
-    (void) query_scope_foreach_host(scope_hosts_sp, hosts_sp, weights_count_node_callback, qwd, &qwd->versions, NULL);
+    (void) query_scope_foreach_host(
+        scope_hosts_sp, hosts_sp, weights_count_node_callback, qwd, &qwd->versions, NULL, qwd->owa);
 
     size_t active_hosts = qwd->total_hosts;
 
@@ -2374,7 +2376,7 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         freez(qwd->hosts_array);
         return query_scope_foreach_host(scope_hosts_sp, hosts_sp,
                                       weights_do_node_callback, qwd,
-                                      &qwd->versions, NULL);
+                                      &qwd->versions, NULL, qwd->owa);
     }
 
     // Calculate hosts per thread
@@ -2454,6 +2456,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
     char *error = NULL;
     int resp = HTTP_RESP_OK;
+    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
 
     // if the user didn't give a timeout
     // assume 60 seconds
@@ -2467,18 +2470,19 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
     struct query_weights_data qwd = {
             .qwr = qwr,
+            .owa = owa,
 
-            .scope_nodes_sp = string_to_simple_pattern(qwr->scope_nodes),
-            .scope_contexts_sp = string_to_simple_pattern(qwr->scope_contexts),
-            .scope_instances_sp = string_to_simple_pattern(qwr->scope_instances),
-            .scope_labels_sp = string_to_simple_pattern(qwr->scope_labels),
-            .scope_dimensions_sp = string_to_simple_pattern(qwr->scope_dimensions),
-            .nodes_sp = string_to_simple_pattern(qwr->nodes),
-            .contexts_sp = string_to_simple_pattern(qwr->contexts),
-            .instances_sp = string_to_simple_pattern(qwr->instances),
-            .dimensions_sp = string_to_simple_pattern(qwr->dimensions),
-            .labels_sp = string_to_simple_pattern(qwr->labels),
-            .alerts_sp = string_to_simple_pattern(qwr->alerts),
+            .scope_nodes_sp = string_to_simple_pattern_owa(owa, qwr->scope_nodes),
+            .scope_contexts_sp = string_to_simple_pattern_owa(owa, qwr->scope_contexts),
+            .scope_instances_sp = string_to_simple_pattern_owa(owa, qwr->scope_instances),
+            .scope_labels_sp = string_to_simple_pattern_owa(owa, qwr->scope_labels),
+            .scope_dimensions_sp = string_to_simple_pattern_owa(owa, qwr->scope_dimensions),
+            .nodes_sp = string_to_simple_pattern_owa(owa, qwr->nodes),
+            .contexts_sp = string_to_simple_pattern_owa(owa, qwr->contexts),
+            .instances_sp = string_to_simple_pattern_owa(owa, qwr->instances),
+            .dimensions_sp = string_to_simple_pattern_owa(owa, qwr->dimensions),
+            .labels_sp = string_to_simple_pattern_owa(owa, qwr->labels),
+            .alerts_sp = string_to_simple_pattern_owa(owa, qwr->alerts),
             .scope_labels_pa = NULL,
             .labels_pa = NULL,
             .timeout_us = qwr->timeout_ms * USEC_PER_MS,
@@ -2497,9 +2501,9 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
     
     // Pre-compile pattern arrays for labels
     if(qwd.scope_labels_sp)
-        qwd.scope_labels_pa = pattern_array_add_simple_pattern(NULL, qwd.scope_labels_sp, ':');
+        qwd.scope_labels_pa = pattern_array_add_simple_pattern(NULL, qwd.scope_labels_sp, ':', owa);
     if(qwd.labels_sp)
-        qwd.labels_pa = pattern_array_add_simple_pattern(NULL, qwd.labels_sp, ':');
+        qwd.labels_pa = pattern_array_add_simple_pattern(NULL, qwd.labels_sp, ':', owa);
 
     if(!rrdr_relative_window_to_absolute_query(&qwr->after, &qwr->before, NULL, false))
         buffer_no_cacheable(wb);
@@ -2713,6 +2717,7 @@ cleanup:
 
     register_result_destroy(qwd.results);
     dictionary_destroy(qwd.host_snapshots);
+    onewayalloc_destroy(owa);
 
     if(error) {
         buffer_flush(wb);

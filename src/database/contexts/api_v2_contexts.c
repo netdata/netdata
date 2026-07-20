@@ -1286,6 +1286,7 @@ static void contexts_v2_contexts_to_json(BUFFER *wb, struct rrdcontext_to_json_v
 int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTEXTS_V2_MODE mode) {
     int resp = HTTP_RESP_OK;
     bool run = true;
+    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
 
     if(mode & CONTEXTS_V2_ALERTS) {
         req->options &= ~CONTEXTS_OPTION_CONFIGURATIONS;
@@ -1301,12 +1302,12 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             .mode = mode,
             .options = req->options,
             .versions = { 0 },
-            .nodes.scope_pattern = string_to_simple_pattern(req->scope_nodes),
-            .nodes.pattern = string_to_simple_pattern(req->nodes),
-            .contexts.pattern = string_to_simple_pattern(req->contexts),
-            .contexts.scope_pattern = string_to_simple_pattern(req->scope_contexts),
-            .q.pattern = string_to_simple_pattern_nocase_substring(req->q),
-            .alerts.alert_name_pattern = string_to_simple_pattern(req->alerts.alert),
+            .nodes.scope_pattern = string_to_simple_pattern_owa(owa, req->scope_nodes),
+            .nodes.pattern = string_to_simple_pattern_owa(owa, req->nodes),
+            .contexts.pattern = string_to_simple_pattern_owa(owa, req->contexts),
+            .contexts.scope_pattern = string_to_simple_pattern_owa(owa, req->scope_contexts),
+            .q.pattern = string_to_simple_pattern_nocase_substring_owa(owa, req->q),
+            .alerts.alert_name_pattern = string_to_simple_pattern_owa(owa, req->alerts.alert),
             .window = {
                     .enabled = false,
                     .after = req->after,
@@ -1435,7 +1436,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     if(run)
         ret = query_scope_foreach_host(ctl.nodes.scope_pattern, ctl.nodes.pattern,
                              rrdcontext_to_json_v2_add_host, &ctl,
-                             &ctl.versions, ctl.q.host_node_id_str);
+                             &ctl.versions, ctl.q.host_node_id_str, owa);
 
     if(unlikely(ret < 0)) {
         buffer_flush(wb);
@@ -1547,6 +1548,7 @@ cleanup:
     simple_pattern_free(ctl.contexts.scope_pattern);
     simple_pattern_free(ctl.q.pattern);
     simple_pattern_free(ctl.alerts.alert_name_pattern);
+    onewayalloc_destroy(owa);
 
     json_keys_reset();
     return resp;

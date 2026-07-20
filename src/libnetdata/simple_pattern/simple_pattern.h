@@ -30,6 +30,8 @@ typedef struct simple_pattern_index_matches SIMPLE_PATTERN_INDEX_MATCHES;
 // default_mode is used in cases where EXACT matches, without an asterisk,
 // should be considered PREFIX matches.
 SIMPLE_PATTERN *simple_pattern_create(const char *list, const char *separators, SIMPLE_PREFIX_MODE default_mode, bool case_sensitive);
+SIMPLE_PATTERN *simple_pattern_create_owa(ONEWAYALLOC *owa, const char *list, const char *separators,
+                                          SIMPLE_PREFIX_MODE default_mode, bool case_sensitive);
 
 struct netdata_string;
 
@@ -44,7 +46,9 @@ SIMPLE_PATTERN_RESULT simple_pattern_matches_length_extract(SIMPLE_PATTERN *list
 #define simple_pattern_matches_string(list, str) (simple_pattern_matches_string_extract(list, str, NULL, 0) == SP_MATCHED_POSITIVE)
 #define simple_pattern_matches_buffer(list, str) (simple_pattern_matches_buffer_extract(list, str, NULL, 0) == SP_MATCHED_POSITIVE)
 
-// free a simple_pattern that was created with simple_pattern_create()
+// Free a pattern created by either constructor. For OWA-backed patterns this
+// releases individual allocations only in sanitizer builds; normal builds
+// reclaim them with the caller-owned arena.
 // list can be NULL, in which case, this does nothing.
 void simple_pattern_free(SIMPLE_PATTERN *list);
 
@@ -68,7 +72,9 @@ bool simple_pattern_index_replace_user(
 
 // A NULL pattern selects every indexed user. Positive rules select users and a
 // negative match on any key is a permanent veto. Duplicate users are returned once.
-SIMPLE_PATTERN_INDEX_MATCHES *simple_pattern_index_search(SIMPLE_PATTERN_INDEX *index, SIMPLE_PATTERN *pattern);
+// OWA-backed matches must not outlive their caller-owned arena.
+SIMPLE_PATTERN_INDEX_MATCHES *simple_pattern_index_search(
+    SIMPLE_PATTERN_INDEX *index, SIMPLE_PATTERN *pattern, ONEWAYALLOC *owa);
 bool simple_pattern_index_matches_contains(SIMPLE_PATTERN_INDEX_MATCHES *matches, const void *user);
 void *simple_pattern_index_matches_first(SIMPLE_PATTERN_INDEX_MATCHES *matches, Word_t *cursor);
 void *simple_pattern_index_matches_next(SIMPLE_PATTERN_INDEX_MATCHES *matches, Word_t *cursor);
@@ -82,7 +88,9 @@ int simple_pattern_index_unittest(void);
 #define is_valid_sp(x) ((x) && *(x) && !((x)[0] == '*' && (x)[1] == '\0'))
 
 #define string_to_simple_pattern(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true) : NULL)
+#define string_to_simple_pattern_owa(owa, str) (is_valid_sp(str) ? simple_pattern_create_owa(owa, str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, true) : NULL)
 #define string_to_simple_pattern_nocase(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_EXACT, false) : NULL)
 #define string_to_simple_pattern_nocase_substring(str) (is_valid_sp(str) ? simple_pattern_create(str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_SUBSTRING, false) : NULL)
+#define string_to_simple_pattern_nocase_substring_owa(owa, str) (is_valid_sp(str) ? simple_pattern_create_owa(owa, str, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS, SIMPLE_PATTERN_SUBSTRING, false) : NULL)
 
 #endif //NETDATA_SIMPLE_PATTERN_H

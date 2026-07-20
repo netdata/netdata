@@ -1806,7 +1806,7 @@ paths:
             **Examples:**
             - `system.*` - Export only system charts
             - `disk.* net.*` - Export disk and network charts
-            - `!*.mdstat|*` - Export all except mdstat charts
+            - `!*.mdstat *` - Export all except mdstat charts
           required: false
           schema:
             type: string
@@ -2070,7 +2070,7 @@ paths:
             **Pattern Syntax:**
             - Exact match: `cpu_usage`
             - Wildcard: `cpu_*` (all CPU-related alerts)
-            - Multiple patterns: `cpu_* ram_*` (space-separated)
+            - Multiple patterns: `cpu_*|ram_*` (pipe-separated)
             - Negation: `!cpu_usage` (all except this alert)
 
             **Common Alert Names:**
@@ -2376,7 +2376,7 @@ paths:
 
             **Pattern Syntax:**
             - `*` matches any number of characters
-            - `context1 context2` space-separated list matches any of the contexts
+            - `context1|context2` pipe-separated list matches any of the contexts
             - `!context3` exclude specific contexts
             - Put exclusions first when combining rules: `!system.io*|system.*`
 
@@ -4170,13 +4170,15 @@ paths:
           in: query
           required: false
           description: |
-            Simple pattern to match node hostnames for scope filtering. Uses Netdata's simple pattern
-            matching (not regex). Matched nodes define the scope for topology analysis.
+            Case-sensitive simple pattern matched independently against each node's hostname, machine GUID,
+            and node ID. Matched nodes define the scope for topology analysis. A positive match is required;
+            a negative match on any identity vetoes the node even if another identity matches positively.
 
             **Pattern Syntax:**
             - `*` matches any number of characters
-            - Use `|` to separate multiple patterns (OR logic)
-            - Matches are case-insensitive
+            - Use `,` or `|` to separate multiple patterns
+            - Put exclusions before a broad positive fallback, for example `!test*|*`
+            - Matches are case-sensitive
             - No regex support - only simple wildcards
 
             **Examples:**
@@ -4368,13 +4370,15 @@ paths:
           in: query
           required: false
           description: |
-            Simple pattern to match node hostnames for scope filtering. Uses Netdata's simple pattern
-            matching (not regex). Matched nodes define the scope for version information retrieval.
+            Case-sensitive simple pattern matched independently against each node's hostname, machine GUID,
+            and node ID. Matched nodes define the scope for version information retrieval. A positive match is
+            required; a negative match on any identity vetoes the node even if another identity matches positively.
 
             **Pattern Syntax:**
             - `*` matches any number of characters
-            - Use `|` to separate multiple patterns (OR logic)
-            - Matches are case-insensitive
+            - Use `,` or `|` to separate multiple patterns
+            - Put exclusions before a broad positive fallback, for example `!test*|*`
+            - Matches are case-sensitive
             - No regex support - only simple wildcards
 
             **Examples:**
@@ -5081,13 +5085,15 @@ paths:
           in: query
           required: false
           description: |
-            Simple pattern to match node hostnames for scope filtering. Uses Netdata's simple pattern
-            matching (not regex). Matched nodes define the scope for function discovery.
+            Case-sensitive simple pattern matched independently against each node's hostname, machine GUID,
+            and node ID. Matched nodes define the scope for function discovery. A positive match is required;
+            a negative match on any identity vetoes the node even if another identity matches positively.
 
             **Pattern Syntax:**
             - `*` matches any number of characters
-            - Use `|` to separate multiple patterns (OR logic)
-            - Matches are case-insensitive
+            - Use `,` or `|` to separate multiple patterns
+            - Put exclusions before a broad positive fallback, for example `!test*|*`
+            - Matches are case-sensitive
             - No regex support - only simple wildcards
 
             **Examples:**

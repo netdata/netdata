@@ -75,8 +75,8 @@ void rrdhost_init() {
         rrdhost_identity_index = simple_pattern_index_create();
 }
 
-SIMPLE_PATTERN_INDEX_MATCHES *rrdhost_identity_index_search(SIMPLE_PATTERN *pattern) {
-    return simple_pattern_index_search(rrdhost_identity_index, pattern);
+SIMPLE_PATTERN_INDEX_MATCHES *rrdhost_identity_index_search(SIMPLE_PATTERN *pattern, ONEWAYALLOC *owa) {
+    return simple_pattern_index_search(rrdhost_identity_index, pattern, owa);
 }
 
 static void rrdhost_identity_index_del(RRDHOST *host) {
@@ -90,39 +90,74 @@ static void rrdhost_identity_index_destroy(void) {
     simple_pattern_index_destroy(identity_index);
 }
 
+struct rrdhost_identity_keys {
+    STRING *keys[3];
+    size_t count;
+};
+
+static void rrdhost_identity_keys_acquire(RRDHOST *host, struct rrdhost_identity_keys *identity) {
+    identity->keys[identity->count++] = string_dup(host->hostname);
+    identity->keys[identity->count++] = string_strdupz(host->machine_guid);
+
+    if(!UUIDiszero(host->node_id)) {
+        char uuid[UUID_STR_LEN];
+        uuid_unparse_lower(host->node_id.uuid, uuid);
+        identity->keys[identity->count++] = string_strdupz(uuid);
+    }
+}
+
+static void rrdhost_identity_keys_release(struct rrdhost_identity_keys *identity) {
+    for(size_t i = 0; i < identity->count; i++)
+        string_freez(identity->keys[i]);
+}
+
+static void rrdhost_identity_index_add(RRDHOST *host) {
+    if(unlikely(!host || !rrdhost_identity_index || !rrdhost_root_index ||
+                rrdhost_find_by_guid(host->machine_guid) != host))
+        return;
+
+    struct rrdhost_identity_keys identity = { 0 };
+    spinlock_lock(&host->rrdhost_update_lock);
+    rrdhost_identity_keys_acquire(host, &identity);
+
+    // A newly published host has no stale aliases to remove; allocation failure is fatal.
+    bool ok = true;
+    for(size_t i = 0; i < identity.count; i++)
+        if(unlikely(!simple_pattern_index_add(rrdhost_identity_index, identity.keys[i], host))) {
+            ok = false;
+            break;
+        }
+
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    if(likely(ok) && unlikely(rrdhost_find_by_guid(string2str(identity.keys[1])) != host))
+        rrdhost_identity_index_del(host);
+
+    if(unlikely(!ok))
+        fatal("RRDHOST: cannot add host '%s' to the identity index", string2str(identity.keys[0]));
+
+    rrdhost_identity_keys_release(&identity);
+}
+
 static void rrdhost_identity_index_update(RRDHOST *host) {
     if(unlikely(!host || !rrdhost_identity_index || !rrdhost_root_index ||
                 rrdhost_find_by_guid(host->machine_guid) != host))
         return;
 
-    STRING *hostname;
-    ND_UUID node_id;
+    struct rrdhost_identity_keys identity = { 0 };
     spinlock_lock(&host->rrdhost_update_lock);
-    hostname = string_dup(host->hostname);
-    node_id = host->node_id;
-
-    STRING *machine_guid = string_strdupz(host->machine_guid);
-    STRING *node_id_string = NULL;
-    if(!UUIDiszero(node_id)) {
-        char uuid[UUID_STR_LEN];
-        uuid_unparse_lower(node_id.uuid, uuid);
-        node_id_string = string_strdupz(uuid);
-    }
-
-    STRING *keys[] = { hostname, machine_guid, node_id_string };
-    size_t keys_count = node_id_string ? _countof(keys) : _countof(keys) - 1;
-    bool ok = simple_pattern_index_replace_user(rrdhost_identity_index, keys, keys_count, host);
+    rrdhost_identity_keys_acquire(host, &identity);
+    bool ok = simple_pattern_index_replace_user(
+        rrdhost_identity_index, identity.keys, identity.count, host);
     spinlock_unlock(&host->rrdhost_update_lock);
 
-    if(likely(ok) && unlikely(rrdhost_find_by_guid(string2str(machine_guid)) != host))
+    if(likely(ok) && unlikely(rrdhost_find_by_guid(string2str(identity.keys[1])) != host))
         rrdhost_identity_index_del(host);
 
-    string_freez(hostname);
-    string_freez(machine_guid);
-    string_freez(node_id_string);
-
     if(unlikely(!ok))
-        fatal("RRDHOST: cannot update the identity index for host '%s'", rrdhost_hostname(host));
+        fatal("RRDHOST: cannot update the identity index for host '%s'", string2str(identity.keys[0]));
+
+    rrdhost_identity_keys_release(&identity);
 }
 
 bool rrdhost_node_id_set(RRDHOST *host, const ND_UUID *node_id) {
@@ -587,7 +622,7 @@ RRDHOST *rrdhost_create(
 
     rrd_wrunlock();
 
-    rrdhost_identity_index_update(host);
+    rrdhost_identity_index_add(host);
 
     // ------------------------------------------------------------------------
 
@@ -1052,7 +1087,7 @@ static bool rrdhost_identity_index_unittest_search(
     RRDHOST *host1, bool host1_expected, RRDHOST *host2, bool host2_expected)
 {
     SIMPLE_PATTERN *pattern = pattern_text ? string_to_simple_pattern(pattern_text) : NULL;
-    SIMPLE_PATTERN_INDEX_MATCHES *matches = rrdhost_identity_index_search(pattern);
+    SIMPLE_PATTERN_INDEX_MATCHES *matches = rrdhost_identity_index_search(pattern, NULL);
     bool ok = matches &&
               simple_pattern_index_matches_count(matches) == expected_count &&
               simple_pattern_index_matches_contains(matches, host1) == host1_expected &&
@@ -1091,8 +1126,8 @@ int rrdhost_identity_index_unittest(void) {
     if(!host1_published || !host2_published)
         errors++;
 
-    rrdhost_identity_index_update(host1);
-    rrdhost_identity_index_update(host2);
+    rrdhost_identity_index_add(host1);
+    rrdhost_identity_index_add(host2);
 
     if(!rrdhost_identity_index_unittest_search(NULL, 2, host1, true, host2, true) ||
        !rrdhost_identity_index_unittest_search("shared", 2, host1, true, host2, true))

@@ -2220,7 +2220,7 @@
           {
             "name": "filter",
             "in": "query",
-            "description": "Simple pattern filter to include only specific charts. Uses Netdata simple pattern matching.\n\n**Pattern Syntax:**\n- Exact match: `system.cpu`\n- Wildcard: `system.*` (all system charts)\n- Multiple patterns: `system.* disk.*` (space-separated)\n- Negation: `!system.cpu` (exclude specific chart)\n\nWhen not specified, all charts are exported.\n\n**Examples:**\n- `system.*` - Export only system charts\n- `disk.* net.*` - Export disk and network charts\n- `!*.mdstat|*` - Export all except mdstat charts\n",
+            "description": "Simple pattern filter to include only specific charts. Uses Netdata simple pattern matching.\n\n**Pattern Syntax:**\n- Exact match: `system.cpu`\n- Wildcard: `system.*` (all system charts)\n- Multiple patterns: `system.* disk.*` (space-separated)\n- Negation: `!system.cpu` (exclude specific chart)\n\nWhen not specified, all charts are exported.\n\n**Examples:**\n- `system.*` - Export only system charts\n- `disk.* net.*` - Export disk and network charts\n- `!*.mdstat *` - Export all except mdstat charts\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -2412,7 +2412,7 @@
           {
             "name": "alert",
             "in": "query",
-            "description": "Filter alerts by alert name pattern. Uses Netdata simple pattern matching.\n\n**Pattern Syntax:**\n- Exact match: `cpu_usage`\n- Wildcard: `cpu_*` (all CPU-related alerts)\n- Multiple patterns: `cpu_* ram_*` (space-separated)\n- Negation: `!cpu_usage` (all except this alert)\n\n**Common Alert Names:**\n- `ram_in_use` - RAM utilization\n- `disk_space_usage` - Disk space\n- `10min_cpu_usage` - CPU usage over 10 minutes\n- `tcp_listen_overflows` - TCP connection queue overflows\n- `disk_backlog` - Disk I/O backlog\n\nWhen not specified, all alerts are included.\n\n**Examples:**\n- `alert=ram_in_use` - Only RAM usage alert\n- `alert=*cpu*` - All CPU-related alerts\n- `alert=!*_critical|*` - All alerts except those ending with _critical\n",
+            "description": "Filter alerts by alert name pattern. Uses Netdata simple pattern matching.\n\n**Pattern Syntax:**\n- Exact match: `cpu_usage`\n- Wildcard: `cpu_*` (all CPU-related alerts)\n- Multiple patterns: `cpu_*|ram_*` (pipe-separated)\n- Negation: `!cpu_usage` (all except this alert)\n\n**Common Alert Names:**\n- `ram_in_use` - RAM utilization\n- `disk_space_usage` - Disk space\n- `10min_cpu_usage` - CPU usage over 10 minutes\n- `tcp_listen_overflows` - TCP connection queue overflows\n- `disk_backlog` - Disk I/O backlog\n\nWhen not specified, all alerts are included.\n\n**Examples:**\n- `alert=ram_in_use` - Only RAM usage alert\n- `alert=*cpu*` - All CPU-related alerts\n- `alert=!*_critical|*` - All alerts except those ending with _critical\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -2568,7 +2568,7 @@
           {
             "name": "scope_contexts",
             "in": "query",
-            "description": "Filter transitions to only include alerts from specific metric contexts using pattern matching.\n\nContexts group similar metrics across instances (e.g., `system.cpu` groups CPU metrics from all nodes, `disk.io` groups disk I/O from all disks).\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- `context1 context2` space-separated list matches any of the contexts\n- `!context3` exclude specific contexts\n- Put exclusions first when combining rules: `!system.io*|system.*`\n\n**Common Context Patterns:**\n- `system.*` - All system-level metrics\n- `disk.*` - All disk-related metrics\n- `net.*` - All network-related metrics\n- `mysql.*` - All MySQL metrics\n- `nginx.*` - All Nginx metrics\n\n**Examples:**\n- `scope_contexts=system.cpu` - Only CPU alerts\n- `scope_contexts=disk.*|net.*` - All disk and network alerts\n- `scope_contexts=!system.ip*|*` - All contexts except IP-related\n\n**Use Cases:**\n- Focus on specific subsystem (e.g., storage, network)\n- Exclude noisy alert types\n- Component-specific incident investigation\n\nWhen not specified, transitions from all contexts are included.\n",
+            "description": "Filter transitions to only include alerts from specific metric contexts using pattern matching.\n\nContexts group similar metrics across instances (e.g., `system.cpu` groups CPU metrics from all nodes, `disk.io` groups disk I/O from all disks).\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- `context1|context2` pipe-separated list matches any of the contexts\n- `!context3` exclude specific contexts\n- Put exclusions first when combining rules: `!system.io*|system.*`\n\n**Common Context Patterns:**\n- `system.*` - All system-level metrics\n- `disk.*` - All disk-related metrics\n- `net.*` - All network-related metrics\n- `mysql.*` - All MySQL metrics\n- `nginx.*` - All Nginx metrics\n\n**Examples:**\n- `scope_contexts=system.cpu` - Only CPU alerts\n- `scope_contexts=disk.*|net.*` - All disk and network alerts\n- `scope_contexts=!system.ip*|*` - All contexts except IP-related\n\n**Use Cases:**\n- Focus on specific subsystem (e.g., storage, network)\n- Exclude noisy alert types\n- Component-specific incident investigation\n\nWhen not specified, transitions from all contexts are included.\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -3140,7 +3140,7 @@
             "name": "scope_nodes",
             "in": "query",
             "required": false,
-            "description": "Simple pattern to match node hostnames for scope filtering. Uses Netdata's simple pattern\nmatching (not regex). Matched nodes define the scope for topology analysis.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `|` to separate multiple patterns (OR logic)\n- Matches are case-insensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-web-*` - All web server nodes\n- `db-*|cache-*` - All database or cache nodes\n- `*` - All nodes (default)\n",
+            "description": "Case-sensitive simple pattern matched independently against each node's hostname, machine GUID,\nand node ID. Matched nodes define the scope for topology analysis. A positive match is required;\na negative match on any identity vetoes the node even if another identity matches positively.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `,` or `|` to separate multiple patterns\n- Put exclusions before a broad positive fallback, for example `!test*|*`\n- Matches are case-sensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-web-*` - All web server nodes\n- `db-*|cache-*` - All database or cache nodes\n- `*` - All nodes (default)\n",
             "schema": {
               "type": "string",
               "default": "*"
@@ -3277,7 +3277,7 @@
             "name": "scope_nodes",
             "in": "query",
             "required": false,
-            "description": "Simple pattern to match node hostnames for scope filtering. Uses Netdata's simple pattern\nmatching (not regex). Matched nodes define the scope for version information retrieval.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `|` to separate multiple patterns (OR logic)\n- Matches are case-insensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-db-*` - All database nodes\n- `web-*|app-*` - All web or application nodes\n- `*` - All nodes (default)\n",
+            "description": "Case-sensitive simple pattern matched independently against each node's hostname, machine GUID,\nand node ID. Matched nodes define the scope for version information retrieval. A positive match is\nrequired; a negative match on any identity vetoes the node even if another identity matches positively.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `,` or `|` to separate multiple patterns\n- Put exclusions before a broad positive fallback, for example `!test*|*`\n- Matches are case-sensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-db-*` - All database nodes\n- `web-*|app-*` - All web or application nodes\n- `*` - All nodes (default)\n",
             "schema": {
               "type": "string",
               "default": "*"
@@ -3762,7 +3762,7 @@
             "name": "scope_nodes",
             "in": "query",
             "required": false,
-            "description": "Simple pattern to match node hostnames for scope filtering. Uses Netdata's simple pattern\nmatching (not regex). Matched nodes define the scope for function discovery.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `|` to separate multiple patterns (OR logic)\n- Matches are case-insensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-web-*` - All web server nodes\n- `db-*|cache-*` - All database or cache nodes\n- `*` - All nodes (default)\n",
+            "description": "Case-sensitive simple pattern matched independently against each node's hostname, machine GUID,\nand node ID. Matched nodes define the scope for function discovery. A positive match is required;\na negative match on any identity vetoes the node even if another identity matches positively.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `,` or `|` to separate multiple patterns\n- Put exclusions before a broad positive fallback, for example `!test*|*`\n- Matches are case-sensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-web-*` - All web server nodes\n- `db-*|cache-*` - All database or cache nodes\n- `*` - All nodes (default)\n",
             "schema": {
               "type": "string",
               "default": "*"

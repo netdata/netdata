@@ -5,7 +5,8 @@
 ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
                                   foreach_host_cb_t cb, void *data,
                                   struct query_versions *versions,
-                                  char *host_node_id_str) {
+                                  char *host_node_id_str,
+                                  ONEWAYALLOC *owa) {
     char uuid[UUID_STR_LEN];
     if(!host_node_id_str) host_node_id_str = uuid;
     host_node_id_str[0] = '\0';
@@ -16,12 +17,12 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
     uint64_t a_hash = 0;
     uint64_t t_hash = 0;
 
-    SIMPLE_PATTERN_INDEX_MATCHES *scope_matches = rrdhost_identity_index_search(scope_hosts_sp);
-    SIMPLE_PATTERN_INDEX_MATCHES *host_matches = rrdhost_identity_index_search(hosts_sp);
-    if(unlikely(!scope_matches || !host_matches)) {
+    SIMPLE_PATTERN_INDEX_MATCHES *scope_matches = rrdhost_identity_index_search(scope_hosts_sp, owa);
+    SIMPLE_PATTERN_INDEX_MATCHES *host_matches = hosts_sp ? rrdhost_identity_index_search(hosts_sp, owa) : NULL;
+    if(unlikely(!scope_matches || (hosts_sp && !host_matches))) {
         simple_pattern_index_matches_free(host_matches);
         simple_pattern_index_matches_free(scope_matches);
-        return -1;
+        fatal("QUERY SCOPE: cannot allocate host identity matches");
     }
 
     Word_t cursor = 0;
@@ -33,7 +34,7 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
         else
             host_node_id_str[0] = '\0';
 
-        bool queryable_host = simple_pattern_index_matches_contains(host_matches, host);
+        bool queryable_host = !hosts_sp || simple_pattern_index_matches_contains(host_matches, host);
 
         v_hash += dictionary_version(host->rrdctx.contexts);
         h_hash += rrdcontext_queue_version(&host->rrdctx.hub_queue);

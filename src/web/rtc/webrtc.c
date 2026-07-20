@@ -336,8 +336,8 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
 
     web_client_timeout_checkpoint_set(w, 0);
     size_t path_offset = (size_t)(path - request);
-    size_t path_length = path_offset < size ? strnlen(path, size - path_offset) : 0;
-    HTTP_VALIDATION validation = web_client_decode_path_and_query_string(w, path, path_length);
+    HTTP_VALIDATION validation = path_offset > size ? HTTP_VALIDATION_MALFORMED_URL :
+        web_client_decode_path_and_query_string(w, path, size - path_offset);
     if(unlikely(validation != HTTP_VALIDATION_OK)) {
         buffer_flush(w->response.data);
         if(validation == HTTP_VALIDATION_URL_TOO_LONG) {
