@@ -306,11 +306,14 @@ journalctl MESSAGE_ID=9ce0cb58-ab8b-44df-82c4-bf1ad9ee22de --since "1 hour ago"
 The Netdata service's processes execute within the `netdata` journal namespace. Common queries:
 
 :::note
-Reading the `netdata` journal namespace requires elevated privileges. A non-root user running the commands below will see a `permission denied` error. Either run the commands with `sudo`, or add the user to the `systemd-journal` group (then log out and back in for it to take effect):
+If `journalctl` reports insufficient permissions for the `netdata` namespace, run the query with `sudo`.
+For persistent access without `sudo`, add the user to the `systemd-journal` group, then log out and back in.
+Membership grants read access to all local journal files, not only Netdata logs.
 
 ```bash
-sudo usermod -aG systemd-journal $USER
+sudo usermod -aG systemd-journal "$USER"
 ```
+
 :::
 
 ```bash
