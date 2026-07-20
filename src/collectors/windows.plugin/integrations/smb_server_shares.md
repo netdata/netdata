@@ -38,7 +38,7 @@ This collector only supports collecting metrics from a single instance of this i
 
 #### Auto-Detection
 
-This collector is disabled by default. When enabled, it automatically detects all available SMB share instances and metrics.
+This collector is enabled by default and automatically detects all available SMB share instances and metrics. On systems where the 'SMB Server Shares' object is not available, no SMB metrics are collected.
 
 
 #### Limits

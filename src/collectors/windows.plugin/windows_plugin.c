@@ -111,7 +111,7 @@ static struct proc_module {
      .cleanup = NULL},
     {.name = "PerflibSMB",
      .dim = "PerflibSMB",
-     .enabled = CONFIG_BOOLEAN_NO,
+     .enabled = CONFIG_BOOLEAN_YES,
      .update_every = UPDATE_EVERY_MIN,
      .func = do_PerflibSMB,
      .rd = NULL,

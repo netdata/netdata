@@ -39,7 +39,8 @@ static LPBYTE getPerformanceData(const char *pwszSource, DWORD *bytes_used) {
     }
 
     if (status != ERROR_SUCCESS) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "RegQueryValueEx failed with 0x%x.\n", status);
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR, "RegQueryValueEx failed with 0x%x.\n", status);
         return NULL;
     }
 
@@ -504,7 +505,8 @@ static BOOL isValidCounterDefinition(
 
 static inline PERF_DATA_BLOCK *getDataBlock(BYTE *pBuffer, DWORD bytes_used) {
     if(unlikely(!pBuffer || bytes_used < sizeof(PERF_DATA_BLOCK))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
                "WINDOWS: PERFLIB: Performance data block is too small.");
         return NULL;
     }
@@ -517,20 +519,23 @@ static inline PERF_DATA_BLOCK *getDataBlock(BYTE *pBuffer, DWORD bytes_used) {
         pDataBlock->TotalByteLength = bytes_used;
 
     if(unlikely(pDataBlock->TotalByteLength < sizeof(*pDataBlock))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
                "WINDOWS: PERFLIB: Invalid data block length.");
         return NULL;
     }
 
     if(memcmp(pDataBlock->Signature, signature, sizeof(signature)) != 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
                "WINDOWS: PERFLIB: Invalid data block signature.");
         return NULL;
     }
 
     if(!isValidPointer(pDataBlock, (PBYTE)pDataBlock + pDataBlock->SystemNameOffset) ||
         !isValidStructure(pDataBlock, (PBYTE)pDataBlock + pDataBlock->SystemNameOffset, pDataBlock->SystemNameLength)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
                "WINDOWS: PERFLIB: Invalid system name array.");
         return NULL;
     }
@@ -548,7 +553,8 @@ static PERF_OBJECT_TYPE *getObjectType(PERF_DATA_BLOCK* pDataBlock, PERF_OBJECT_
         pObjectType = (PERF_OBJECT_TYPE *)((PBYTE)lastObjectType + lastObjectType->TotalByteLength);
 
     if(pObjectType && (!isValidPointer(pDataBlock, pObjectType) || !isValidObjectType(pDataBlock, pObjectType))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid ObjectType!", __FUNCTION__);
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid ObjectType!", __FUNCTION__);
         pObjectType = NULL;
     }
 
@@ -585,7 +591,8 @@ static PERF_INSTANCE_DEFINITION *getInstance(
         pInstance = (PERF_INSTANCE_DEFINITION *)((PBYTE)lastCounterBlock + lastCounterBlock->ByteLength);
 
     if(pInstance && (!isValidPointer(pDataBlock, pInstance) || !isValidInstanceDefinition(pDataBlock, pObjectType, pInstance))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid Instance Definition!", __FUNCTION__);
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid Instance Definition!", __FUNCTION__);
         pInstance = NULL;
     }
 
@@ -603,7 +610,8 @@ static PERF_COUNTER_BLOCK *getObjectTypeCounterBlock(
     PERF_COUNTER_BLOCK *pCounterBlock = (PERF_COUNTER_BLOCK *)((PBYTE)pObjectType + pObjectType->DefinitionLength);
 
     if(pCounterBlock && (!isValidPointer(pDataBlock, pCounterBlock) || !isValidCounterBlock(pDataBlock, pObjectType, pCounterBlock))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid ObjectType CounterBlock!", __FUNCTION__);
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid ObjectType CounterBlock!", __FUNCTION__);
         pCounterBlock = NULL;
     }
 
@@ -622,7 +630,8 @@ static PERF_COUNTER_BLOCK *getInstanceCounterBlock(
     PERF_COUNTER_BLOCK *pCounterBlock = (PERF_COUNTER_BLOCK *)((PBYTE)pInstance + pInstance->ByteLength);
 
     if(pCounterBlock && (!isValidPointer(pDataBlock, pCounterBlock) || !isValidCounterBlock(pDataBlock, pObjectType, pCounterBlock))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid Instance CounterBlock!", __FUNCTION__);
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid Instance CounterBlock!", __FUNCTION__);
         pCounterBlock = NULL;
     }
 
@@ -660,7 +669,8 @@ static PERF_COUNTER_DEFINITION *getCounterDefinition(PERF_DATA_BLOCK *pDataBlock
         pCounterDefinition = (PERF_COUNTER_DEFINITION *)((PBYTE)lastCounterDefinition +	lastCounterDefinition->ByteLength);
 
     if(pCounterDefinition && (!isValidPointer(pDataBlock, pCounterDefinition) || !isValidCounterDefinition(pDataBlock, pObjectType, pCounterDefinition))) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid Counter Definition!", __FUNCTION__);
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR, "WINDOWS: PERFLIB: %s(): Invalid Counter Definition!", __FUNCTION__);
         pCounterDefinition = NULL;
     }
 
@@ -751,32 +761,115 @@ PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PE
                            NULL );
 }
 
-bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd) {
-    DWORD id = cd->id;
-    const char *key = cd->key;
-    internal_fatal(key == NULL, "You have to set a key for this call.");
+// Dedup for the "giving up on metric" log line. One COUNTER_DATA exists per
+// (instance x counter), so a counter missing across N instances would otherwise
+// emit N identical error lines. We log once per distinct metric key and re-arm
+// after the metric recovers.
+static SPINLOCK perflib_giveup_spinlock = SPINLOCK_INITIALIZER;
+static DICTIONARY *perflib_giveup_logged = NULL;
 
-    if(unlikely(cd->failures >= PERFLIB_MAX_FAILURES_TO_FIND_METRIC)) {
-        // we don't want to lookup and compare strings all the time
-        // when a metric is not there, so we try to find it for
-        // XX times, and then we give up.
+static bool perflib_giveup_log_should(const char *key) {
+    // A non-NULL marker value is required: dictionary_set(..., NULL, 0) stores a
+    // NULL value, which dictionary_get() cannot distinguish from "absent".
+    static const uint8_t marker = 1;
+    bool should = false;
+    spinlock_lock(&perflib_giveup_spinlock);
+    if(unlikely(!perflib_giveup_logged))
+        perflib_giveup_logged = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    if(!dictionary_get(perflib_giveup_logged, key)) {
+        dictionary_set(perflib_giveup_logged, key, (void *)&marker, sizeof(marker));
+        should = true;
+    }
+    spinlock_unlock(&perflib_giveup_spinlock);
+    return should;
+}
 
-        if(cd->failures == PERFLIB_MAX_FAILURES_TO_FIND_METRIC) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "WINDOWS: PERFLIB: Giving up on metric '%s' (tried to find it %u times).",
-                   cd->key, cd->failures);
+// Returns true only for the first caller that clears the key, so the recovery
+// notice is logged once per metric key (not once per instance).
+static bool perflib_giveup_log_clear(const char *key) {
+    bool cleared = false;
+    spinlock_lock(&perflib_giveup_spinlock);
+    if(perflib_giveup_logged)
+        cleared = dictionary_del(perflib_giveup_logged, key);
+    spinlock_unlock(&perflib_giveup_spinlock);
+    return cleared;
+}
 
-            cd->failures++; // increment it once, so that we will not log this again
-        }
+// ----------------------------------------------------------------------------
+// Park / re-probe accounting, shared by instance- and object-counter lookups.
+//
+// After PERFLIB_MAX_FAILURES_TO_FIND_METRIC consecutive misses we stop scanning
+// counter definitions every cycle, but we re-probe every PERFLIB_REPROBE_INTERVAL
+// collections so a transiently-missing counter resumes on its own (no restart).
 
-        goto failed;
+// Returns true when the metric is parked and still inside its backoff window
+// (the caller should skip the search this cycle). On the re-probe cycle it also
+// forgets the cached counter id, so a counter that came back under a new
+// CounterNameTitleIndex is resolved again by name.
+static bool perflib_counter_backoff_skip(COUNTER_DATA *cd) {
+    if(likely(cd->failures < PERFLIB_MAX_FAILURES_TO_FIND_METRIC))
+        return false;
+
+    // `--cd->backoff` is only evaluated while backoff > 0, so it never underflows;
+    // re-probing when it reaches 0 makes the period exactly PERFLIB_REPROBE_INTERVAL.
+    if(cd->backoff && --cd->backoff)
+        return true;
+
+    cd->id = 0;
+    return false;
+}
+
+// Record a successful read; if the metric had been parked, log recovery once.
+static void perflib_counter_record_success(COUNTER_DATA *cd, bool parked) {
+    if(unlikely(parked) && perflib_giveup_log_clear(cd->key))
+        nd_log(NDLS_COLLECTORS, NDLP_NOTICE,
+               "WINDOWS: PERFLIB: Metric '%s' is available again; resuming collection.", cd->key);
+    cd->updated = true;
+    cd->failures = 0;
+    cd->backoff = 0;
+}
+
+// Record a failed read; on the transition to parked, log give-up once per key.
+static void perflib_counter_record_failure(COUNTER_DATA *cd, bool parked) {
+    if(parked) {
+        // the re-probe failed; keep it parked until the next re-probe window
+        cd->backoff = PERFLIB_REPROBE_INTERVAL;
+        return;
     }
 
+    cd->failures++;
+    if(cd->failures >= PERFLIB_MAX_FAILURES_TO_FIND_METRIC) {
+        if(perflib_giveup_log_should(cd->key))
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "WINDOWS: PERFLIB: Giving up on metric '%s' after %u attempts; "
+                   "will re-probe every %u collections.",
+                   cd->key, cd->failures, PERFLIB_REPROBE_INTERVAL);
+        cd->backoff = PERFLIB_REPROBE_INTERVAL;
+    }
+}
+
+// Shared implementation for instance- and object-counter lookups. The scope is
+// explicit (object_scope), not inferred from pInstance: an instance lookup must
+// never silently fall back to the object-level counter block and return
+// object-scoped data through the instance API.
+static bool perflib_get_counter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, bool object_scope, COUNTER_DATA *cd) {
+    internal_fatal(cd->key == NULL, "You have to set a key for this call.");
+    internal_fatal(!object_scope && pInstance == NULL, "Instance counter lookup requires an instance.");
+
+    if(unlikely(!pObjectType))
+        goto failed; // missing object (not a missing counter) — do not park on it
+
+    bool parked = cd->failures >= PERFLIB_MAX_FAILURES_TO_FIND_METRIC;
+    if(unlikely(perflib_counter_backoff_skip(cd)))
+        goto failed;
+
+    DWORD id = cd->id; // read after backoff_skip, which may reset it on a re-probe
     PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
     for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
         pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
         if(!pCounterDefinition) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            nd_log_limit_static_global_var(erl, 60, 0);
+            nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
                    "WINDOWS: PERFLIB: Cannot read counter definition No %u (out of %u)",
                    c, pObjectType->NumCounters);
             break;
@@ -787,25 +880,28 @@ bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pO
                 continue;
         }
         else {
-            const char *name = RegistryFindNameByID(pCounterDefinition->CounterNameTitleIndex);
-            if(strcmp(name, key) != 0)
+            if(strcmp(RegistryFindNameByID(pCounterDefinition->CounterNameTitleIndex), cd->key) != 0)
                 continue;
 
             cd->id = pCounterDefinition->CounterNameTitleIndex;
         }
 
         cd->current.CounterType = cd->OverwriteCounterType ? cd->OverwriteCounterType : pCounterDefinition->CounterType;
-        PERF_COUNTER_BLOCK *pCounterBlock = getInstanceCounterBlock(pDataBlock, pObjectType, pInstance);
+        PERF_COUNTER_BLOCK *pCounterBlock = object_scope ?
+            getObjectTypeCounterBlock(pDataBlock, pObjectType) :
+            getInstanceCounterBlock(pDataBlock, pObjectType, pInstance);
 
         cd->previous = cd->current;
         if(likely(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current))) {
-            cd->updated = true;
-            cd->failures = 0;
+            perflib_counter_record_success(cd, parked);
             return true;
         }
+
+        // counter matched but was unreadable: stop scanning and count it as a miss
+        break;
     }
 
-    cd->failures++;
+    perflib_counter_record_failure(cd, parked);
 
 failed:
     cd->previous = cd->current;
@@ -814,44 +910,12 @@ failed:
     return false;
 }
 
+bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd) {
+    return perflib_get_counter(pDataBlock, pObjectType, pInstance, false, cd);
+}
+
 bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, COUNTER_DATA *cd) {
-    if (unlikely(!pObjectType))
-        goto cleanup;
-
-    PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
-    for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
-        pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
-        if(!pCounterDefinition) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
-                   "WINDOWS: PERFLIB: Cannot read counter definition No %u (out of %u)",
-                   c, pObjectType->NumCounters);
-            break;
-        }
-
-        if(cd->id) {
-            if(cd->id != pCounterDefinition->CounterNameTitleIndex)
-                continue;
-        }
-        else {
-            if(strcmp(RegistryFindNameByID(pCounterDefinition->CounterNameTitleIndex), cd->key) != 0)
-                continue;
-
-            cd->id = pCounterDefinition->CounterNameTitleIndex;
-        }
-
-        cd->current.CounterType = cd->OverwriteCounterType ? cd->OverwriteCounterType : pCounterDefinition->CounterType;
-        PERF_COUNTER_BLOCK *pCounterBlock = getObjectTypeCounterBlock(pDataBlock, pObjectType);
-
-        cd->previous = cd->current;
-        cd->updated = getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current);
-        return cd->updated;
-    }
-
-cleanup:
-    cd->previous = cd->current;
-    cd->current = RAW_DATA_EMPTY;
-    cd->updated = false;
-    return false;
+    return perflib_get_counter(pDataBlock, pObjectType, NULL, true, cd);
 }
 
 PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id) {
@@ -888,7 +952,8 @@ int perflibQueryAndTraverse(DWORD id,
     for(DWORD o = 0; do_data && o < pDataBlock->NumObjectTypes; o++) {
         pObjectType = getObjectType(pDataBlock, pObjectType);
         if(!pObjectType) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            nd_log_limit_static_global_var(erl, 60, 0);
+            nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
                    "WINDOWS: PERFLIB: Cannot read object type No %d (out of %d)",
                    o, pDataBlock->NumObjectTypes);
             break;
@@ -907,7 +972,8 @@ int perflibQueryAndTraverse(DWORD id,
             for(LONG i = 0; i < pObjectType->NumInstances ;i++) {
                 pInstance = getInstance(pDataBlock, pObjectType, pCounterBlock);
                 if(!pInstance) {
-                    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                    nd_log_limit_static_global_var(erl, 60, 0);
+                    nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
                            "WINDOWS: PERFLIB: Cannot read Instance No %d (out of %d)",
                            i, pObjectType->NumInstances);
                     break;
@@ -915,7 +981,8 @@ int perflibQueryAndTraverse(DWORD id,
 
                 pCounterBlock = getInstanceCounterBlock(pDataBlock, pObjectType, pInstance);
                 if(!pCounterBlock) {
-                    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                    nd_log_limit_static_global_var(erl, 60, 0);
+                    nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
                            "WINDOWS: PERFLIB: Cannot read CounterBlock of instance No %d (out of %d)",
                            i, pObjectType->NumInstances);
                     break;
@@ -932,7 +999,8 @@ int perflibQueryAndTraverse(DWORD id,
                 for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
                     pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
                     if(!pCounterDefinition) {
-                        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                        nd_log_limit_static_global_var(erl, 60, 0);
+                        nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
                                "WINDOWS: PERFLIB: Cannot read counter definition No %u (out of %u)",
                                c, pObjectType->NumCounters);
                         break;
@@ -961,7 +1029,8 @@ int perflibQueryAndTraverse(DWORD id,
             for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
                 pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
                 if(!pCounterDefinition) {
-                    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                    nd_log_limit_static_global_var(erl, 60, 0);
+                    nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
                            "WINDOWS: PERFLIB: Cannot read counter definition No %u (out of %u)",
                            c, pObjectType->NumCounters);
                     break;
