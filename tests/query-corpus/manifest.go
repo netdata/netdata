@@ -109,6 +109,14 @@ var manifest = map[string]ManifestCase{
 		Proves: "the FULL time-grouping registry: all 46 accepted name strings answer (20 variants/aliases beyond L3/families, alias==canonical), the complete countif grammar (! !: >: <: <> : == spaces empty), numeric option overrides with clamps (percentile [0,100], trimmed-mean/median [0,50]), unknown names silently parse to average; PINNED QUIRK (rulings batch): bare-number countif options lose their first digit",
 		Agent:  Green,
 	},
+	"L3/anomaly-bit-option": {
+		Proves: "options=anomaly-bit replaces fetched values with per-point anomaly rates BEFORE time-grouping: 0/100 at tier0 identity, buckets aggregate the rates (average = bucket anomaly %, max = any-anomaly), group-by consumes them as values (sum adds across members, gaps stamp PARTIAL), and tier>0 feeds FRACTIONAL window rates (100*anomaly_count/count)",
+		Agent:  Green,
+	},
+	"L5/anomaly-statistics": {
+		Proves: "jsonwrap-v2 per-dimension anomaly arrays: view.dimensions.sts.arp = mean of the plotted rows' anomaly rates, db.dimensions.sts.arp = anomaly rate of the fetched db points; stored NAN gap points are excluded from BOTH counts",
+		Agent:  Green,
+	},
 	"L4/family-tier-matrix": {
 		Proves: "every grouping family over FORCED tier1 with 6 windows per bucket equals the fetch-aware oracle (min/max/sum fetch their tier fields, all else the per-window average — avg-of-averages pinned quantitatively with unequal counts); bucket anomaly rates from tier counts; window alignment rounds `before` UP to group multiples",
 		Agent:  Green,
