@@ -494,7 +494,7 @@ Here are solutions for common alert notification issues:
 
 If notifications seem delayed:
 
-1. Check the `delay` parameter in your alarm definitions in `health.d/*.conf`. Notification delays are controlled exclusively by this parameter — there is no global delay setting in `health_alarm_notify.conf`.
+- Check the `delay` parameter in your alarm definitions in `health.d/*.conf`. Notification delays are controlled exclusively by this parameter — there is no global delay setting in `health_alarm_notify.conf`.
 
 ## Related Docs
 
