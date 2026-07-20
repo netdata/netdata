@@ -9,7 +9,7 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum, unique
 from pathlib import Path
-from typing import Annotated, Final
+from typing import Annotated, Any, Final
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from ruamel.yaml import YAML
@@ -17,7 +17,7 @@ from ruamel.yaml import YAML
 yaml: Final = YAML(typ='safe')
 DATA_PATH: Final = Path(__file__).parent / 'distros.yaml'
 PYDANTIC_CONFIG: Final = ConfigDict(
-    extra='allow',
+    extra='forbid',
     frozen=True,
     allow_inf_nan=False,
     str_strip_whitespace=True,
@@ -209,6 +209,11 @@ class BasicDistroEntry:
 class DistroData(BaseModel):
     model_config = PYDANTIC_CONFIG
 
+    _defaults: Annotated[dict[str, Any], Field(
+        title='Unparsed Values for YAML Anchors',
+        description='Mapping used to hold YAML fragments that get reused throughout the file via anchors.',
+        default_factory=dict,
+    )]
     platform_map: Annotated[dict[Arch, DockerArch], Field(
         title='Docker Platform Mapping',
         description='Mapping of internal architecture names to Docker platform strings.',
@@ -250,6 +255,17 @@ class DistroData(BaseModel):
 
         if s := {k for k, v in c.items() if v > 1}:
             raise ValueError(f'Found duplicate values in list: {s}')
+
+        return value
+
+    @field_validator('platform_map', mode='after')
+    @classmethod
+    def check_platform_map(cls: type[DistroData], value: dict[Arch, DockerArch]) -> dict[Arch, DockerArch]:
+        s1 = set(value.keys())
+        s2 = set(Arch)
+
+        if s3 := s2 - s1:
+            raise ValueError(f'Missing values from platform_map mapping: {s3}')
 
         return value
 
