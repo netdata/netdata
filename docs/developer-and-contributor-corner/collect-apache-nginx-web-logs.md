@@ -87,7 +87,7 @@ Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate metho
 
 Each `web_log` job follows one file. A wildcard (glob) can select a file, but it does not merge all matching files into one stream. Create a separate job for each file you want to monitor.
 
-For the complete configuration, including a per-account example, see the [`path` option](/src/go/plugin/go.d/collector/weblog/README.md#option-target-path) in the collector reference.
+For the complete configuration, including a per-account example, see the [collector reference](/src/go/plugin/go.d/collector/weblog/README.md).
 
 ### Custom log formats and fields
 
