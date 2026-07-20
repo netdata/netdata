@@ -131,11 +131,12 @@ two reviewed deviations, each documented in place: the `.build-id` artifact
 paths, which are content hashes and cannot match across two separate builds,
 and a single blank line CPack inserts ahead of embedded scriptlet bodies.
 
-Against that harness the branch reaches full parity on a five-distro sample
-covering each RPM family we ship: CentOS Stream 9 with twenty-three
-packages, Fedora 42 and openSUSE 15.6 with twenty-four each (nfacct exists
-on those two), Amazon Linux 2023 with twenty-two, and CentOS 7 with
-nineteen. Getting there took three iterations on CentOS Stream 9 — which
+Against that harness the branch reaches full parity on an eight-distro
+sample covering every tier we ship: CentOS Stream 9 and Rocky Linux 8 with
+twenty-three packages each, Fedora 42, Fedora 44 and openSUSE 15.6 with
+twenty-four each (nfacct exists on Fedora and Leap; Fedora 44 additionally
+exercises the sysusers side of the Fedora 43 threshold), Amazon Linux 2023
+with twenty-two, and CentOS 7 and Amazon Linux 2 with nineteen each. Getting there took three iterations on CentOS Stream 9 — which
 flushed out the build-flag and directory-ownership classes — after which
 Fedora and Amazon passed on their first attempt and openSUSE needed only
 its linker-flag and doc-path specifics. The CentOS 7 run, done later,
@@ -146,6 +147,15 @@ there over-hardened every binary; rpm 4.11 defaults its documentation
 directory to the versioned `%{NAME}-%{VERSION}` form; and the v2 builder
 image carried an EPEL macros package whose sysusers generator invented
 `user()`/`group()` provides the spec-built packages lack.
+
+The Amazon Linux 2 run then showed that AL2 belongs to the same tier by a
+mechanism that is easy to miss: AL2 defines `%rhel 7`, and the spec remaps
+`%rhel` into `centos_ver`, so every `centos_ver == 7` conditional in the
+spec fires on AL2 as well. Three option gates had been keyed on EL alone
+and needed widening to the shared legacy predicate — the legacy libbpf
+selection (modern libbpf does not compile against the AL2 toolchain at
+all), the bundled protobuf, and the python2 dependency of the pythond
+package.
 
 CentOS Stream 10 has no spec reference to compare against — its v1 image
 cannot build at all — so it was validated by building the packages and
@@ -178,11 +188,8 @@ The CI flip — pointing `distros.yml` at the `v2` builders, wiring the
 parity harness into a workflow, and upgrade-path testing from spec-built to
 CPack-built RPMs on a live system — is the follow-up this branch was scoped
 to stop short of, so that the switch is a reviewable decision of its own.
-CentOS 7 has since been parity-proven, which leaves Amazon Linux 2 as the
-one implemented-but-unvalidated platform (weak-dep downgrades, python2,
-the v235 unit): it shares every legacy fix the CentOS 7 run produced, but
-its own parity run and the behavior of its rpm macro set should still be
-established empirically. Two
+Every distro tier has since been parity-proven or, for EL 10, validated by
+direct inspection, so no implemented-but-unvalidated platform remains. Two
 smaller observations from the image work also await a decision: the
 fedora41 Dockerfiles (both revisions) were rotated out of the image build
 matrix when Fedora 44 was added but were not deleted, contrary to the
