@@ -207,13 +207,14 @@ func runShippedRoot(
 const maximumRootProtocolLineBytes = 64 * 1024
 
 type rootProtocolObservation struct {
-	mu           sync.Mutex
-	pending      []byte
-	publications int
-	withdrawals  int
-	keepalives   int
-	lifecycle    []byte
-	changed      chan struct{}
+	mu            sync.Mutex
+	pending       []byte
+	publications  int
+	withdrawals   int
+	keepalives    int
+	lifecycle     []byte
+	previousEmpty bool
+	changed       chan struct{}
 }
 
 func newRootProtocolObservation() *rootProtocolObservation {
@@ -238,13 +239,20 @@ func (rpo *rootProtocolObservation) observe(
 		}
 		line := rpo.pending[:newline]
 		rpo.pending = rpo.pending[newline+1:]
+		observed := true
 		switch {
 		case len(line) == 0:
-			rpo.keepalives++
+			if rpo.previousEmpty {
+				rpo.keepalives++
+			} else {
+				observed = false
+			}
+			rpo.previousEmpty = true
 		case bytes.HasPrefix(
 			line,
 			[]byte(`FUNCTION GLOBAL "config"`),
 		):
+			rpo.previousEmpty = false
 			rpo.publications++
 			rpo.lifecycle = append(
 				rpo.lifecycle,
@@ -254,12 +262,17 @@ func (rpo *rootProtocolObservation) observe(
 			line,
 			[]byte(`FUNCTION_DEL GLOBAL "config"`),
 		):
+			rpo.previousEmpty = false
 			rpo.withdrawals++
 			rpo.lifecycle = append(
 				rpo.lifecycle,
 				'D',
 			)
 		default:
+			rpo.previousEmpty = false
+			continue
+		}
+		if !observed {
 			continue
 		}
 		select {

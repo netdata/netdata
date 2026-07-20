@@ -58,11 +58,14 @@ type agentFixtureState struct {
 	checkOnce           sync.Once
 	cleanupGate         <-chan struct{}
 	cleanupEntered      chan struct{}
+	cleanupReturned     chan struct{}
 	cleanupOnce         sync.Once
+	cleanupReturnOnce   sync.Once
 	handleGate          <-chan struct{}
 	handleEntered       chan struct{}
 	handleOnce          sync.Once
 	handleCancelReturns bool
+	ownerDone           <-chan struct{}
 	emitCharts          bool
 	checkErr            error
 }
@@ -73,7 +76,15 @@ func (state *agentFixtureState) cleanup() {
 		state.cleanupOnce.Do(func() { close(state.cleanupEntered) })
 	}
 	if state.cleanupGate != nil {
-		<-state.cleanupGate
+		select {
+		case <-state.cleanupGate:
+		case <-state.ownerDone:
+		}
+	}
+	if state.cleanupReturned != nil {
+		state.cleanupReturnOnce.Do(func() {
+			close(state.cleanupReturned)
+		})
 	}
 }
 
@@ -83,7 +94,10 @@ func (state *agentFixtureState) check() error {
 		state.checkOnce.Do(func() { close(state.checkEntered) })
 	}
 	if state.checkGate != nil {
-		<-state.checkGate
+		select {
+		case <-state.checkGate:
+		case <-state.ownerDone:
+		}
 	}
 	return state.checkErr
 }
@@ -103,9 +117,13 @@ func (state *agentFixtureState) handle(
 			case <-state.handleGate:
 			case <-ctx.Done():
 				state.record(event + ":cancelled")
+			case <-state.ownerDone:
 			}
 		} else {
-			<-state.handleGate
+			select {
+			case <-state.handleGate:
+			case <-state.ownerDone:
+			}
 		}
 	}
 	state.record(event + ":returned")
@@ -261,6 +279,8 @@ type agentFixture struct {
 
 	terminateOnce sync.Once
 	terminateErr  error
+	forceOnce     sync.Once
+	forceErr      error
 }
 
 func startAgentFixture(
@@ -360,6 +380,7 @@ func startAgentFixtureConfiguredWithRegistry(
 	instance.In = reader
 	instance.Out = agentOutput
 	runCtx, cancel := context.WithCancel(ctx)
+	state.ownerDone = runCtx.Done()
 	fixture := &agentFixture{
 		agent:  instance,
 		input:  writer,
@@ -384,8 +405,7 @@ func (f *agentFixture) terminate(ctx context.Context) error {
 	}
 	f.terminateOnce.Do(func() {
 		terminateErr := f.agent.Terminate(ctx)
-		f.cancel()
-		closeErr := f.input.Close()
+		forceErr := f.force()
 		joinCtx, cancel := context.WithTimeout(
 			context.Background(),
 			fixtureJoinPeriod,
@@ -393,11 +413,19 @@ func (f *agentFixture) terminate(ctx context.Context) error {
 		defer cancel()
 		f.terminateErr = errors.Join(
 			terminateErr,
-			closeErr,
+			forceErr,
 			f.wait(joinCtx),
 		)
 	})
 	return f.terminateErr
+}
+
+func (f *agentFixture) force() error {
+	f.forceOnce.Do(func() {
+		f.cancel()
+		f.forceErr = f.input.Close()
+	})
+	return f.forceErr
 }
 
 func (f *agentFixture) wait(ctx context.Context) error {
@@ -410,12 +438,13 @@ func (f *agentFixture) wait(ctx context.Context) error {
 }
 
 func (f *agentFixture) close() {
+	_ = f.force()
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
 		fixtureJoinPeriod,
 	)
 	defer cancel()
-	_ = f.terminate(ctx)
+	_ = f.wait(ctx)
 }
 
 func runAgentCollectorLifecycle(

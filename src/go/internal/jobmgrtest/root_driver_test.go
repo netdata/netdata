@@ -34,6 +34,35 @@ func TestRootProtocolObservationReportsEarlyProcessExit(t *testing.T) {
 	require.NotErrorIs(t, err, context.DeadlineExceeded)
 }
 
+func TestShippedRootQuitRejectsDelayedStartupSeparatorsAsKeepalive(
+	t *testing.T,
+) {
+	directory := t.TempDir()
+	executable := filepath.Join(directory, "startup-separators")
+	script := "#!/bin/sh\n" +
+		"printf 'FUNCTION GLOBAL \"config\" 30 \"help\" \"tags\" 0xFFFF 1 1\\n\\n'\n" +
+		"sleep 0.05\n" +
+		"printf 'CONFIG fixture create accepted template path source type commands 0x0000 0x0000\\n\\n'\n" +
+		"if IFS= read -r line; then\n" +
+		"  printf 'FUNCTION_DEL GLOBAL \"config\"\\n\\n'\n" +
+		"fi\n"
+	require.NoError(t, os.WriteFile(executable, []byte(script), 0o700))
+
+	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
+	defer cancel()
+	err := runShippedRoot(
+		ctx,
+		directory,
+		shippedRoot{
+			name:       "startup-separators",
+			executable: executable,
+			module:     "fixture",
+		},
+		shippedRootQuit,
+	)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
 func TestShippedRootDriverValidatesConfigsBeforeAvailability(t *testing.T) {
 	tests := map[string]struct {
 		overridePath string
@@ -138,6 +167,7 @@ func TestRootProtocolObservationPreservesChunkBoundaries(t *testing.T) {
 		chunks          []string
 		wantPublished   int
 		wantWithdrawals int
+		wantKeepalives  int
 	}{
 		"split publication and withdrawal": {
 			chunks: []string{
@@ -148,6 +178,23 @@ func TestRootProtocolObservationPreservesChunkBoundaries(t *testing.T) {
 			},
 			wantPublished:   1,
 			wantWithdrawals: 1,
+		},
+		"startup separators are not keepalives": {
+			chunks: []string{
+				"FUNCTION GLOBAL \"config\" 30 \"help\" \"tags\" 0xFFFF 1 1\n\n",
+				"CONFIG fixture create accepted template path source type commands 0x0000 0x0000\n\n",
+				"HOST ''\n\n",
+			},
+			wantPublished: 1,
+		},
+		"standalone blank after separator is a keepalive": {
+			chunks: []string{
+				"FUNCTION GLOBAL \"config\" 30 \"help\" \"tags\" 0xFFFF 1 1\n\n",
+				"CONFIG fixture create accepted template path source type commands 0x0000 0x0000\n\n",
+				"\n",
+			},
+			wantPublished:  1,
+			wantKeepalives: 1,
 		},
 		"other routes do not count": {
 			chunks: []string{
@@ -162,9 +209,10 @@ func TestRootProtocolObservationPreservesChunkBoundaries(t *testing.T) {
 			for _, chunk := range test.chunks {
 				require.NoError(t, observation.observe([]byte(chunk)))
 			}
-			published, withdrawn, _ := observation.snapshot()
+			published, withdrawn, keepalives := observation.snapshot()
 			require.Equal(t, test.wantPublished, published)
 			require.Equal(t, test.wantWithdrawals, withdrawn)
+			require.Equal(t, test.wantKeepalives, keepalives)
 		})
 	}
 }

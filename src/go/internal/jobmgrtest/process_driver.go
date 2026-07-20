@@ -64,7 +64,7 @@ type processFixture struct {
 	done    chan struct{}
 	runErr  error
 
-	closeOnce sync.Once
+	forceOnce sync.Once
 }
 
 func startProcessFixture(
@@ -118,6 +118,7 @@ func startProcessFixture(
 		return nil, err
 	}
 	runCtx, cancel := context.WithCancel(runCtx)
+	state.ownerDone = runCtx.Done()
 	fixture := &processFixture{
 		process: process,
 		input:   writer,
@@ -142,23 +143,16 @@ func (f *processFixture) wait(ctx context.Context) error {
 }
 
 func (f *processFixture) close() {
-	f.closeOnce.Do(func() {
-		terminationCtx, cancelTermination := context.WithTimeout(
-			context.Background(),
-			fixtureJoinPeriod,
-		)
-		_ = f.process.Terminate(terminationCtx)
-		cancelTermination()
-
+	f.forceOnce.Do(func() {
 		f.cancel()
 		_ = f.input.Close()
-		joinCtx, cancelJoin := context.WithTimeout(
-			context.Background(),
-			fixtureJoinPeriod,
-		)
-		defer cancelJoin()
-		_ = f.wait(joinCtx)
 	})
+	joinCtx, cancelJoin := context.WithTimeout(
+		context.Background(),
+		fixtureJoinPeriod,
+	)
+	defer cancelJoin()
+	_ = f.wait(joinCtx)
 }
 
 func runProcessRestart(ctx context.Context) error {
