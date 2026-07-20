@@ -450,7 +450,11 @@ func parseCountifOptions(options string) (cmp string, target float64) {
 		cmp = "=="
 		s = s[1:]
 	default:
+		// bare number: tg_countif_create's post-switch advance consumes
+		// one char even when no operator matched, so the first digit is
+		// swallowed ("40" targets 0, "440" targets 40) — pinned quirk
 		cmp = "=="
+		s = s[1:]
 	}
 	s = strings.TrimLeft(s, " \t")
 	target, _ = strconv.ParseFloat(s, 64)

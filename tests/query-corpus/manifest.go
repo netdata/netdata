@@ -105,6 +105,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "ses/des at group=1 use the requested points (capped 15) as the smoothing window; incremental-sum at identity is all null — pinned current contract",
 		Agent:  Green,
 	},
+	"L3/registry-completeness": {
+		Proves: "the FULL time-grouping registry: all 46 accepted name strings answer (20 variants/aliases beyond L3/families, alias==canonical), the complete countif grammar (! !: >: <: <> : == spaces empty), numeric option overrides with clamps (percentile [0,100], trimmed-mean/median [0,50]), unknown names silently parse to average; PINNED QUIRK (rulings batch): bare-number countif options lose their first digit",
+		Agent:  Green,
+	},
 	"L4/family-tier-matrix": {
 		Proves: "every grouping family over FORCED tier1 with 6 windows per bucket equals the fetch-aware oracle (min/max/sum fetch their tier fields, all else the per-window average — avg-of-averages pinned quantitatively with unequal counts); bucket anomaly rates from tier counts; window alignment rounds `before` UP to group multiples",
 		Agent:  Green,
