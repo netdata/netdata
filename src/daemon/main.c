@@ -168,8 +168,9 @@ int help(int exitcode) {
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
 #ifdef OS_WINDOWS
-            "  -W perflibdump [key]\n"
-            "                           Dump the Windows Performance Counters Registry in JSON.\n\n"
+            "  -W perflibdump [key] [-perflibfile FILENAME]\n"
+            "                           Dump the Windows Performance Counters Registry in JSON.\n"
+            "                           Prints to stdout, or to FILENAME when -perflibfile is given.\n\n"
 #endif
     );
 
@@ -245,7 +246,7 @@ int ml_unittest(void);
 bool netdata_random_session_id_generate(void);
 
 #ifdef OS_WINDOWS
-int windows_perflib_dump(const char *key);
+int windows_perflib_dump(const char *key, const char *filename);
 #endif
 
 int unittest_prepare_rrd(const char **user) {
@@ -605,7 +606,22 @@ int netdata_main(int argc, char **argv) {
 #endif
 #ifdef OS_WINDOWS
                         else if(strcmp(optarg, "perflibdump") == 0) {
-                            return windows_perflib_dump(optind + 1 > argc ? NULL : argv[optind]);
+                            // -W perflibdump [key] [-perflibfile FILENAME]
+                            // without -perflibfile the dump goes to stdout
+                            const char *key = NULL;
+                            const char *filename = NULL;
+                            for(int a = optind; a < argc; a++) {
+                                if(strcmp(argv[a], "-perflibfile") == 0) {
+                                    if(a + 1 >= argc) {
+                                        fprintf(stderr, "Option -perflibfile requires a filename argument.\n");
+                                        return 1;
+                                    }
+                                    filename = argv[++a];
+                                }
+                                else
+                                    key = argv[a];
+                            }
+                            return windows_perflib_dump(key, filename);
                         }
                         else if(strcmp(optarg, "perflibnamestest") == 0) {
                             unittest_running = true;
