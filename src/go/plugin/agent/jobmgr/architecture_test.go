@@ -129,13 +129,6 @@ var productionOwnerDeclarations = map[string]ownerDeclaration{
 	"v2 host": {
 		packagePath: "plugin/framework/jobruntime", typeName: "jobV2HostState",
 	},
-	"prepared vnode frame": {
-		packagePath: "plugin/agent/jobmgr/joboutput", typeName: "PreparedVNodeFrame",
-	},
-	"job vnode state": {
-		packagePath: "plugin/agent/jobmgr/joboutput", typeName: "ConstructedJob",
-		fieldName: "ReleaseVNode",
-	},
 	"secret resolver": {
 		packagePath: "plugin/agent/secrets/resolver", typeName: "AtomicResolver",
 	},
@@ -208,7 +201,7 @@ func TestActiveArchitecturePackages(t *testing.T) {
 }
 
 func TestProductionOwnerManifestHasConcreteDeclarations(t *testing.T) {
-	const productionOwnerCount = 37
+	const productionOwnerCount = 35
 	require.EqualValues(t, productionOwnerCount, len(productionOwnerDeclarations))
 	root := filepath.Clean(filepath.Join(jobmgrSourceRoot(t), "../../.."))
 	for role, owner := range productionOwnerDeclarations {
@@ -286,12 +279,24 @@ func assertExactJobManagerTree(t *testing.T) {
 		"functions":                                {},
 		"joboutput":                                {},
 		"kernel.go":                                {},
+		"kernel_admission.go":                      {},
+		"kernel_dispatch.go":                       {},
+		"kernel_disposal.go":                       {},
+		"kernel_function_catalog.go":               {},
+		"kernel_ingress.go":                        {},
+		"kernel_lanes.go":                          {},
+		"kernel_runloop.go":                        {},
+		"kernel_admission_bytes.go":                {},
+		"kernel_plan.go":                           {},
+		"kernel_runports.go":                       {},
+		"kernel_structures.go":                     {},
 		"kernel_fairness_test.go":                  {},
 		"kernel_function_catalog_external_test.go": {},
 		"kernel_function_cleanup_queue_test.go":    {},
 		"kernel_hotpath_bench_test.go":             {},
 		"kernel_lifecycle_test.go":                 {},
 		"kernel_prepared_wait_test.go":             {},
+		"kernel_testhelpers_test.go":               {},
 		"lifecycle":                                {},
 		"plan.go":                                  {},
 		"production_boundaries_test.go":            {},

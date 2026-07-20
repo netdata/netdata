@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -254,7 +255,7 @@ func PrepareProtocolFrame(payload []byte) (PreparedProtocolFrame, error) {
 	if len(payload) == 0 || len(payload) > MaximumOtherFrameBytes {
 		return PreparedProtocolFrame{}, errors.New("jobmgr frame owner: invalid protocol frame size")
 	}
-	return PreparedProtocolFrame{state: &preparedProtocolFrame{payload: append([]byte(nil), payload...)}}, nil
+	return PreparedProtocolFrame{state: &preparedProtocolFrame{payload: slices.Clone(payload)}}, nil
 }
 
 func (ppf PreparedProtocolFrame) Abort() error {
@@ -337,7 +338,7 @@ func (fo *FrameOwner) commitOrdinaryTransaction(
 	}
 	fo.busy = true
 	fo.stateMu.Unlock()
-	return fo.writeAndRelease(payload, false, borrowed, commit, abort)
+	return fo.writeAndRelease(payload, borrowed, commit, abort)
 }
 
 func (fo *FrameOwner) TryCommitControl(plan ControlFramePlan) error {
@@ -364,7 +365,7 @@ func (fo *FrameOwner) TryCommitControl(plan ControlFramePlan) error {
 		fo.poison(encoded, err)
 		return err
 	}
-	return fo.writeAndRelease(encoded, true, false, nil, nil)
+	return fo.writeAndRelease(encoded, false, nil, nil)
 }
 
 func (fo *FrameOwner) Census() FrameCensus {
@@ -382,7 +383,6 @@ func (fo *FrameOwner) Poison(cause error) {
 
 func (fo *FrameOwner) writeAndRelease(
 	payload []byte,
-	control bool,
 	borrowed bool,
 	commit func() error,
 	abort func() error,
@@ -416,13 +416,12 @@ func (fo *FrameOwner) writeAndRelease(
 	if pending && notify != nil {
 		notify()
 	}
-	_ = control
 	return nil
 }
 
 func retainedFramePayload(payload []byte, borrowed bool) []byte {
 	if borrowed {
-		return append([]byte(nil), payload...)
+		return slices.Clone(payload)
 	}
 	return payload
 }

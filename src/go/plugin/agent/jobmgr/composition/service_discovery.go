@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
@@ -18,14 +19,14 @@ import (
 const dynCfgServiceDiscoveryClaim = "dyncfg:service-discovery"
 
 type serviceDiscoveryBinding struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards handler/registered/dirty
 
-	epoch      uint64
-	pluginName string
-	capture    *functionProtocolCapture
-	handler    frameworkfunctions.Handler
-	registered bool
-	dirty      error
+	epoch      uint64                     // run generation
+	pluginName string                     // owning plugin name
+	capture    *functionProtocolCapture   // protocol capture wrapping the SD responder
+	handler    frameworkfunctions.Handler // the registered service-discovery handler
+	registered bool                       // the SD Function is registered
+	dirty      error                      // sticky error (unexpected registration)
 }
 
 func newServiceDiscoveryBinding(
@@ -38,7 +39,7 @@ func newServiceDiscoveryBinding(
 			"jobmgr composition: invalid service discovery binding",
 		)
 	}
-	capture, err := newFunctionProtocolCaptureWithDirectFrames(frames)
+	capture, err := newFunctionProtocolCapture(frames)
 	if err != nil {
 		return nil, err
 	}
@@ -217,8 +218,8 @@ func (sdb *serviceDiscoveryBinding) prepare(
 	}
 	function := frameworkfunctions.Function{
 		UID: input.UID, Timeout: input.Timeout,
-		Name: input.Method, Args: append([]string(nil), input.Args...),
-		Payload:     append([]byte(nil), input.Payload...),
+		Name: input.Method, Args: slices.Clone(input.Args),
+		Payload:     slices.Clone(input.Payload),
 		Permissions: input.Permissions, Source: input.CallerSource,
 		ContentType: input.ContentType,
 	}

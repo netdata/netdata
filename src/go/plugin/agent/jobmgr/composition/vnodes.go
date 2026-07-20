@@ -28,11 +28,11 @@ import (
 const vnodeBootResourceID = "\x00jobmgr-vnode-boot"
 
 type vnodeBinding struct {
-	epoch      uint64
-	pluginName string
-	frames     *lifecycle.FrameOwner
-	config     *agentdiscovery.VNodeConfiguration
-	graph      *dyncfg.Graph
+	epoch      uint64                             // run generation
+	pluginName string                             // owning plugin name
+	frames     *lifecycle.FrameOwner              // protocol frame sink
+	config     *agentdiscovery.VNodeConfiguration // configured-vnode authority it mutates
+	graph      *dyncfg.Graph                      // dyncfg graph for vnode config entries
 }
 
 func newVNodeBinding(

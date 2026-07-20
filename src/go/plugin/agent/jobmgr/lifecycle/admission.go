@@ -54,11 +54,11 @@ type AdmissionRequestResult struct {
 }
 
 type AdmissionGrant struct {
-	Ref            AdmissionRef
-	InputBodyToken uint64
-	Kind           ReservationKind
-	Bytes          int64
-	Lane           AdmissionLaneRef
+	Ref            AdmissionRef     // reservation this grant satisfies
+	InputBodyToken uint64           // input-body token when Kind is an input-body growth grant
+	Kind           ReservationKind  // reservation kind (ordinary / cleanup / input-body growth)
+	Bytes          int64            // granted byte amount
+	Lane           AdmissionLaneRef // admission lane the reservation belongs to
 }
 
 type AdmissionCensus struct {
@@ -109,30 +109,30 @@ const (
 )
 
 type admissionRecord struct {
-	generation     uint32
-	state          admissionRecordState
-	runGeneration  uint64
-	lane           AdmissionLaneRef
-	bytes          int64
-	heldBytes      int64
-	longLivedBytes int64
-	ordinaryHeld   bool
-	growthBytes    int64
-	ticket         uint64
-	previous       uint32
-	next           uint32
-	leaf           uint32
+	generation     uint32               // ABA guard; paired with the slot to form an AdmissionRef
+	state          admissionRecordState // reservation state-machine node this record occupies
+	runGeneration  uint64               // owning run; used to reject stale-generation reservations
+	lane           AdmissionLaneRef     // owning admission lane
+	bytes          int64                // bytes still waiting to be granted
+	heldBytes      int64                // bytes currently charged to ordinaryBytes
+	longLivedBytes int64                // portion of heldBytes transferred to a long-lived permit
+	ordinaryHeld   bool                 // record counts toward ordinaryGranted
+	growthBytes    int64                // pending input-body/ordinary growth delta
+	ticket         uint64               // monotonic FIFO tiebreaker within a radix leaf
+	previous       uint32               // intrusive list link (cleanup queue or radix leaf)
+	next           uint32               // intrusive list link (cleanup queue or radix leaf)
+	leaf           uint32               // radix node index this record is filed under
 }
 
 type admissionRadixNode struct {
-	parent    uint32
-	children  [2]uint32
-	oldest    [2]uint32
-	head      uint32
-	tail      uint32
-	freeNext  uint32
-	depth     uint8
-	parentBit uint8
+	parent    uint32    // parent node index
+	children  [2]uint32 // child node indices for the next byte bit (0/1)
+	oldest    [2]uint32 // cached oldest-ticket slot reachable through each child
+	head      uint32    // record list head at a leaf
+	tail      uint32    // record list tail at a leaf
+	freeNext  uint32    // freelist link when the node is recycled
+	depth     uint8     // bit depth; == admissionRadixBits marks a leaf
+	parentBit uint8     // which child slot of the parent this node is
 }
 
 type admissionLaneUse struct {
@@ -141,33 +141,33 @@ type admissionLaneUse struct {
 }
 
 type AdmissionLedger struct {
-	lanes                   map[uint32]admissionLaneUse
-	records                 []admissionRecord
-	nodes                   []admissionRadixNode
-	ordinaryWaiting         int
-	longLivedBytes          int64
-	inputBodyNextGeneration uint64
-	freeRecords             int
-	activeRecords           int
-	runGeneration           uint64
-	cleanupWaiting          int
-	nextTicket              uint64
-	freeNodes               int
-	longLivedRecords        int
-	ordinaryGranted         int
-	ordinarySuspended       int
-	ordinaryBytes           int64
-	processBytes            int64
-	mu                      sync.Mutex
-	freeNodeHead            uint32
-	cleanupHead             uint32
-	cleanupTail             uint32
-	cleanupGrant            uint32
-	freeRecordHead          uint32
-	processReserved         bool
-	phase                   admissionPhase
-	cleanupRetained         bool
-	inputBodyCarried        bool
+	lanes                   map[uint32]admissionLaneUse // per-lane use tracking (refcounts)
+	records                 []admissionRecord           // reservation record storage (freelist-backed)
+	nodes                   []admissionRadixNode        // byte-indexed radix tree over ordinary reservations
+	ordinaryWaiting         int                         // count of ordinary reservations awaiting a grant
+	longLivedBytes          int64                       // total bytes retained by long-lived permits
+	inputBodyNextGeneration uint64                      // next input-body reservation generation
+	freeRecords             int                         // number of free record slots
+	activeRecords           int                         // number of active reservation records
+	runGeneration           uint64                      // current run generation (stale reservations rejected)
+	cleanupWaiting          int                         // count of cleanup reservations awaiting the single grant
+	nextTicket              uint64                      // next FIFO ticket to assign within a radix leaf
+	freeNodes               int                         // number of free radix nodes
+	longLivedRecords        int                         // count of records carrying long-lived bytes
+	ordinaryGranted         int                         // count of currently granted ordinary reservations
+	ordinarySuspended       int                         // count of granted ordinary reservations suspended (growing)
+	ordinaryBytes           int64                       // ordinary bytes currently charged
+	processBytes            int64                       // bytes reserved for process-lifetime storage
+	mu                      sync.Mutex                  // guards all fields
+	freeNodeHead            uint32                      // head of the radix-node freelist
+	cleanupHead             uint32                      // head of the cleanup reservation FIFO
+	cleanupTail             uint32                      // tail of the cleanup reservation FIFO
+	cleanupGrant            uint32                      // record holding the single active cleanup grant
+	freeRecordHead          uint32                      // head of the record freelist
+	processReserved         bool                        // process byte reservation has been taken
+	phase                   admissionPhase              // admission phase (open / draining / closed)
+	cleanupRetained         bool                        // the cleanup grant is retained across a generation
+	inputBodyCarried        bool                        // the input-body reservation is carried across a generation
 }
 
 func NewAdmissionLedger() *AdmissionLedger {
@@ -177,7 +177,6 @@ func NewAdmissionLedger() *AdmissionLedger {
 		lanes:   make(map[uint32]admissionLaneUse),
 		nodes:   make([]admissionRadixNode, 2),
 	}
-	ledger.nodes[1].depth = 0
 	return ledger
 }
 
@@ -654,7 +653,7 @@ func (al *AdmissionLedger) TakeGrants(quantum int, output *[4]AdmissionGrant) (c
 			break
 		}
 		available := al.ordinaryCapacity() - al.ordinaryBytes
-		slot, _ := al.oldestFitting(available)
+		slot := al.oldestFitting(available)
 		if slot == 0 {
 			break
 		}
@@ -1281,16 +1280,15 @@ func (al *AdmissionLedger) older(first, second uint32) uint32 {
 	return second
 }
 
-func (al *AdmissionLedger) oldestFitting(available int64) (slot uint32, visited int) {
+func (al *AdmissionLedger) oldestFitting(available int64) (slot uint32) {
 	if available <= 0 || al.ordinaryWaiting == 0 {
-		return 0, 0
+		return 0
 	}
 	if available > OrdinaryBudgetBytes {
 		available = OrdinaryBudgetBytes
 	}
 	value := uint32(available)
 	nodeIndex := uint32(1)
-	visited = 1
 	for depth := range admissionRadixBits {
 		node := &al.nodes[nodeIndex]
 		bit := uint8((value >> uint(admissionRadixBits-1-depth)) & 1)
@@ -1299,13 +1297,12 @@ func (al *AdmissionLedger) oldestFitting(available int64) (slot uint32, visited 
 		}
 		child := node.children[bit]
 		if child == 0 {
-			return slot, visited
+			return slot
 		}
 		nodeIndex = child
-		visited++
 	}
 	slot = al.older(slot, al.nodes[nodeIndex].head)
-	return slot, visited
+	return slot
 }
 
 func (al *AdmissionLedger) grant(slot uint32, kind ReservationKind) AdmissionGrant {
@@ -1329,6 +1326,6 @@ func (al *AdmissionLedger) hasGrantableWork() bool {
 	if al.phase != admissionOrdinaryOpen || al.ordinaryWaiting == 0 {
 		return false
 	}
-	slot, _ := al.oldestFitting(al.ordinaryCapacity() - al.ordinaryBytes)
+	slot := al.oldestFitting(al.ordinaryCapacity() - al.ordinaryBytes)
 	return slot != 0
 }

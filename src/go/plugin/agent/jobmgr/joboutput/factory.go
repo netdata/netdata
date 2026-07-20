@@ -53,19 +53,19 @@ type JobHooks interface {
 }
 
 type FactoryConfig struct {
-	PluginName string
-	Modules    ModuleCatalog
-	Tasks      *lifecycle.TaskSupervisor
-	Frames     *lifecycle.FrameOwner
-	Resolver   *secretresolver.AtomicResolver
-	StoreScope secretresolver.AtomicScopeAcquirer
-	Runtime    runtimecomp.Service
-	Vnodes     *vnoderegistry.Registry
-	Vnode      func(string) (jobruntime.VnodeSnapshot, bool)
-	Hooks      JobHooks
-	Scheduler  *Scheduler
-	Observer   lifecycle.RuntimeObserver
-	Logger     *logger.Logger
+	PluginName string                                        // owning plugin name stamped into job config
+	Modules    ModuleCatalog                                 // collector creator registry
+	Tasks      *lifecycle.TaskSupervisor                     // supervisor owning inherited run-loop goroutines
+	Frames     *lifecycle.FrameOwner                         // frame owner used as the collector output sink
+	Resolver   *secretresolver.AtomicResolver                // secret resolver applied to config before unmarshal
+	StoreScope secretresolver.AtomicScopeAcquirer            // secret store scope acquirer
+	Runtime    runtimecomp.Service                           // V2 runtime service dependency
+	Vnodes     *vnoderegistry.Registry                       // vnode registry for V2 jobs
+	Vnode      func(string) (jobruntime.VnodeSnapshot, bool) // vnode snapshot lookup by name
+	Hooks      JobHooks                                      // handler-lifecycle preparation for Function-bearing jobs
+	Scheduler  *Scheduler                                    // tick/registration scheduler
+	Observer   lifecycle.RuntimeObserver                     // runtime gauge sink
+	Logger     *logger.Logger                                // component logger (defaulted if nil)
 }
 
 // Factory owns collector construction, validation, and transfer. It does not
@@ -187,7 +187,7 @@ func (f *Factory) build(
 	)
 	if err != nil {
 		return ConstructedJob{
-			Variant: variant, SuppressCleanup: true,
+			Variant:          variant,
 			CollectorCleanup: cleanup.reject,
 		}, err
 	}

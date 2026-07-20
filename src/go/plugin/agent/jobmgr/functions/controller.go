@@ -3,13 +3,14 @@
 package functions
 
 import (
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"sync"
 
@@ -32,27 +33,27 @@ type RuntimeJob interface {
 }
 
 type Controller struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards all fields
 
-	epoch       uint64
-	modules     collectorapi.Registry
-	catalog     *Catalog
-	mutations   jobmgr.FunctionMutationPort
-	publication *Publication
+	epoch       uint64                      // run generation this controller belongs to
+	modules     collectorapi.Registry       // collector module registry
+	catalog     *Catalog                    // the route catalog it mutates
+	mutations   jobmgr.FunctionMutationPort // kernel Function-mutation port
+	publication *Publication                // external FUNCTION/FUNCTION_DEL registration set
 
-	plans        map[string]controllerModulePlan
-	jobs         map[string]map[string]controllerJob
-	groups       map[string]*controllerGroup
-	routes       map[string]controllerRoute
-	fixed        map[string]PublicationRecord
-	fixedRoute   []*HandlerGenerationDeclaration
-	availability map[string]controllerModuleAvailability
-	version      uint64
-	nextID       uint64
-	activated    bool
-	draining     bool
-	terminated   bool
-	dirty        error
+	plans            map[string]controllerModulePlan         // per-module route plans
+	jobs             map[string]map[string]controllerJob     // live jobs by module then job name
+	groups           map[string]*controllerGroup             // method-generation groups by signature key
+	routes           map[string]controllerRoute              // controller's view of published routes
+	fixed            map[string]PublicationRecord            // initial/fixed publication records
+	fixedGenerations []*HandlerGenerationDeclaration         // initial/fixed handler-generation declarations (for cleanup)
+	availability     map[string]controllerModuleAvailability // per-module availability state
+	version          uint64                                  // controller version
+	nextID           uint64                                  // next controller-assigned id
+	activated        bool                                    // Activate has run (initial snapshot published)
+	draining         bool                                    // shutdown draining has begun
+	terminated       bool                                    // controller fully torn down
+	dirty            error                                   // sticky poison error
 }
 
 type controllerJob struct {
@@ -78,11 +79,11 @@ type controllerAvailabilityProbe struct {
 }
 
 type controllerGroup struct {
-	key        string
-	module     string
-	signature  string
-	generation *methodGeneration
-	routes     map[string]controllerRoute
+	key        string                     // group key (module + content signature)
+	module     string                     // owning module
+	signature  string                     // content signature of the grouped methods
+	generation *methodGeneration          // the method generation backing the group
+	routes     map[string]controllerRoute // routes published for this group
 }
 
 type controllerRoute struct {
@@ -97,14 +98,14 @@ type InitialRoute struct {
 }
 
 type JobHandle struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards all fields
 
-	controller *Controller
-	identity   JobIdentity
-	job        RuntimeJob
-	published  bool
-	closed     bool
-	cleaned    bool
+	controller *Controller // owning controller
+	identity   JobIdentity // job identity (id + generation)
+	job        RuntimeJob  // the runtime job whose Functions are published
+	published  bool        // job Functions are published
+	closed     bool        // job publication closed and draining
+	cleaned    bool        // job cleanup complete
 }
 
 func (c *Controller) PrepareJob(
@@ -214,19 +215,19 @@ func NewController(
 			),
 			controller.cleanupInitialRoutes(
 				context.Background(),
-				controller.fixedRoute,
+				controller.fixedGenerations,
 			),
 		)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	for _, module := range names {
 		creator := controller.modules[module]
 		var plan controllerModulePlan
 		if creator.AgentFunctions != nil {
-			plan.agent = append([]funcapi.FunctionConfig(nil), creator.AgentFunctions()...)
+			plan.agent = slices.Clone(creator.AgentFunctions())
 		}
 		if creator.SharedFunctions != nil {
-			plan.shared = append([]funcapi.FunctionConfig(nil), creator.SharedFunctions()...)
+			plan.shared = slices.Clone(creator.SharedFunctions())
 		}
 		controller.plans[module] = plan
 		group, err := controller.buildAgentGroup(module, controller.modules[module])
@@ -273,8 +274,8 @@ func NewController(
 		controller.fixed[route.Publication.Name] = route.Publication
 		if _, exists := fixedGenerations[route.Declaration.Generation]; !exists {
 			fixedGenerations[route.Declaration.Generation] = struct{}{}
-			controller.fixedRoute = append(
-				controller.fixedRoute,
+			controller.fixedGenerations = append(
+				controller.fixedGenerations,
 				route.Declaration.Generation,
 			)
 		}
@@ -329,10 +330,10 @@ func (c *Controller) AbortConstruction(ctx context.Context) error {
 	}
 	c.terminated = true
 	groups := c.groups
-	fixed := c.fixedRoute
+	fixed := c.fixedGenerations
 	c.groups = nil
 	c.routes = nil
-	c.fixedRoute = nil
+	c.fixedGenerations = nil
 	c.mu.Unlock()
 	return errors.Join(
 		c.cleanupUnpublishedGroups(ctx, groups),
@@ -402,7 +403,7 @@ func (c *Controller) PublishJob(
 	}
 	var methods []funcapi.FunctionConfig
 	if creator.InstanceFunctions != nil {
-		methods = append([]funcapi.FunctionConfig(nil), creator.InstanceFunctions(job)...)
+		methods = slices.Clone(creator.InstanceFunctions(job))
 	}
 	moduleJobs[job.Name()] = controllerJob{
 		identity: identity, job: job, methods: methods,
@@ -793,7 +794,7 @@ func (c *Controller) buildModuleGroups(
 	for name := range jobs {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	for _, name := range names {
 		if err := add(c.buildInstanceGroup(module, creator, jobs[name])); err != nil {
 			return nil, unpublished, err
@@ -978,8 +979,8 @@ func validateConfiguredMethods(
 		}
 		valid = append(valid, method)
 	}
-	sort.Slice(valid, func(left, right int) bool {
-		return valid[left].ID < valid[right].ID
+	slices.SortFunc(valid, func(a, b funcapi.FunctionConfig) int {
+		return cmp.Compare(a.ID, b.ID)
 	})
 	return valid, nil
 }
@@ -1037,7 +1038,7 @@ func controllerGroupSignature(
 	for name := range jobs {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	for _, name := range names {
 		job := jobs[name]
 		writeControllerDigestString(digest, name)
@@ -1106,7 +1107,7 @@ func indexControllerRoutes(
 	for key := range groups {
 		keys = append(keys, key)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	for _, key := range keys {
 		group := groups[key]
 		for name, route := range group.routes {
@@ -1187,7 +1188,7 @@ func controllerChangedRouteNames(
 	for name := range changed {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names
 }
 
@@ -1196,7 +1197,7 @@ func sortedControllerRouteNames(routes map[string]controllerRoute) []string {
 	for name := range routes {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names
 }
 
@@ -1208,7 +1209,7 @@ func (c *Controller) publicationRecordsLocked(
 	for name := range c.fixed {
 		fixedNames = append(fixedNames, name)
 	}
-	sort.Strings(fixedNames)
+	slices.Sort(fixedNames)
 	records := make(
 		[]PublicationRecord,
 		0,

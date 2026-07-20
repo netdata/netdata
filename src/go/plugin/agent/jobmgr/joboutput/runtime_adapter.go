@@ -56,9 +56,8 @@ func NewManagedJob(
 		)
 	}
 	return ConstructedJob{
-		Variant:         variant,
-		Runtime:         runtime,
-		SuppressCleanup: true,
+		Variant: variant,
+		Runtime: runtime,
 		CollectorCleanup: func(context.Context) error {
 			job.Cleanup()
 			return nil
@@ -67,14 +66,14 @@ func NewManagedJob(
 }
 
 type scheduledJobSupport struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards the flags below
 
-	scheduler *Scheduler
-	identity  lifecycle.ResourceIdentity
-	job       RuntimeJob
-	started   bool
-	stopped   bool
-	released  bool
+	scheduler *Scheduler                 // scheduler this job registers with
+	identity  lifecycle.ResourceIdentity // resource identity
+	job       RuntimeJob                 // runtime job registered for ticks
+	started   bool                       // Register succeeded
+	stopped   bool                       // Unregister succeeded
+	released  bool                       // Release succeeded (terminal)
 }
 
 func (sjs *scheduledJobSupport) Start(context.Context) error {
@@ -132,15 +131,15 @@ func (sjs *scheduledJobSupport) Release(context.Context) error {
 }
 
 type managedLoopSupport struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards the fields below
 
-	job      ManagedJob
-	tasks    *lifecycle.TaskSupervisor
-	identity lifecycle.ResourceIdentity
-	role     lifecycle.InheritedTaskRole
-	ref      lifecycle.InheritedTaskRef
-	started  bool
-	joined   bool
+	job      ManagedJob                  // managed collector loop
+	tasks    *lifecycle.TaskSupervisor   // supervisor owning the run goroutine
+	identity lifecycle.ResourceIdentity  // resource identity of the job
+	role     lifecycle.InheritedTaskRole // inherited task role (V1 runtime / V2 runner)
+	ref      lifecycle.InheritedTaskRef  // supervisor task handle
+	started  bool                        // StartManaged launched
+	joined   bool                        // run goroutine joined
 }
 
 func (mls *managedLoopSupport) Start(ctx context.Context) error {

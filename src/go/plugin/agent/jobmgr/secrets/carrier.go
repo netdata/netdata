@@ -10,12 +10,12 @@ import (
 )
 
 type storeGenerationCarrier struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards the release flags
 
-	permit           lifecycle.LongLivedPermit
-	externalReleased bool
-	bytesReleased    bool
-	returned         bool
+	permit           lifecycle.LongLivedPermit // long-lived permit backing the store generation
+	externalReleased bool                      // external facet released
+	bytesReleased    bool                      // byte facet released
+	returned         bool                      // permit returned
 }
 
 func newStoreGenerationCarrier(

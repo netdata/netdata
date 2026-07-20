@@ -4,11 +4,12 @@ package secrets
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -27,35 +28,35 @@ const (
 )
 
 type ControllerConfig struct {
-	Epoch        uint64
-	PluginName   string
-	Frames       *lifecycle.FrameOwner
-	Store        *secretstore.SecretStore
-	Creators     *secretstore.CreatorCatalog
-	Dependencies *SecretDependencyIndex
-	Initial      []secretstore.Config
+	Epoch        uint64                      // run generation this controller belongs to
+	PluginName   string                      // owning plugin name
+	Frames       *lifecycle.FrameOwner       // protocol frame sink
+	Store        *secretstore.SecretStore    // per-run secret store
+	Creators     *secretstore.CreatorCatalog // frozen creator catalog
+	Dependencies *SecretDependencyIndex      // secret dependency index
+	Initial      []secretstore.Config        // initial (stock/user) secret store configs
 }
 
 type Controller struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards entries + published
 
-	epoch        uint64
-	pluginName   string
-	prefix       string
-	path         string
-	frames       *lifecycle.FrameOwner
-	store        *secretstore.SecretStore
-	creators     *secretstore.CreatorCatalog
-	dependencies *SecretDependencyIndex
-	initial      []secretstore.Config
-	entries      map[string]secretEntry
-	restarts     *SecretRestartCommand
-	published    bool
+	epoch        uint64                      // run generation
+	pluginName   string                      // owning plugin name
+	prefix       string                      // "<plugin>:secretstore:" ID prefix
+	path         string                      // "/collectors/<plugin>/SecretStores" config path
+	frames       *lifecycle.FrameOwner       // protocol frame sink
+	store        *secretstore.SecretStore    // per-run secret store
+	creators     *secretstore.CreatorCatalog // frozen creator catalog
+	dependencies *SecretDependencyIndex      // secret dependency index
+	initial      []secretstore.Config        // initial secret store configs
+	entries      map[string]secretEntry      // published store entries by key
+	restarts     *SecretRestartCommand       // dependent-job restart command (bound at Bind)
+	published    bool                        // initial snapshot has been published
 }
 
 type secretEntry struct {
-	config secretstore.Config
-	status dyncfg.Status
+	config secretstore.Config // the store's config
+	status dyncfg.Status      // dyncfg status (running / failed)
 }
 
 func NewController(config ControllerConfig) (*Controller, error) {
@@ -76,7 +77,7 @@ func NewController(config ControllerConfig) (*Controller, error) {
 		frames: config.Frames, store: config.Store,
 		creators:     config.Creators,
 		dependencies: config.Dependencies,
-		initial:      append([]secretstore.Config(nil), config.Initial...),
+		initial:      slices.Clone(config.Initial),
 		entries:      make(map[string]secretEntry),
 	}, nil
 }
@@ -226,11 +227,11 @@ func (c *Controller) Prepare(
 }
 
 type secretTarget struct {
-	command dyncfg.Command
-	id      string
-	key     string
-	kind    secretstore.StoreKind
-	name    string
+	command dyncfg.Command        // parsed dyncfg command
+	id      string                // raw config id
+	key     string                // store key (kind_name)
+	kind    secretstore.StoreKind // store kind
+	name    string                // store name
 }
 
 type targetFailure struct {
@@ -374,22 +375,15 @@ func cloneSecretConfig(config secretstore.Config) secretstore.Config {
 	return cloned
 }
 
-func secretMessage(
-	code int,
-	message string,
-) (lifecycle.SealedResult, error) {
-	return lifecycle.NewSealedResult(
-		code,
-		"application/json",
-		frameworkfunctions.BuildJSONPayload(code, message),
-	)
-}
-
 func mustSecretMessage(
 	code int,
 	message string,
 ) lifecycle.SealedResult {
-	result, err := secretMessage(code, message)
+	result, err := lifecycle.NewSealedResult(
+		code,
+		"application/json",
+		frameworkfunctions.BuildJSONPayload(code, message),
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -523,13 +517,12 @@ func secretResourceID(key string) string {
 func sortedInitialConfigs(
 	configs []secretstore.Config,
 ) []secretstore.Config {
-	cloned := append([]secretstore.Config(nil), configs...)
-	sort.SliceStable(cloned, func(i, j int) bool {
-		if cloned[i].ExposedKey() == cloned[j].ExposedKey() {
-			return cloned[i].SourceTypePriority() >
-				cloned[j].SourceTypePriority()
+	cloned := slices.Clone(configs)
+	slices.SortStableFunc(cloned, func(a, b secretstore.Config) int {
+		if a.ExposedKey() != b.ExposedKey() {
+			return cmp.Compare(a.ExposedKey(), b.ExposedKey())
 		}
-		return cloned[i].ExposedKey() < cloned[j].ExposedKey()
+		return cmp.Compare(b.SourceTypePriority(), a.SourceTypePriority())
 	})
 	return cloned
 }

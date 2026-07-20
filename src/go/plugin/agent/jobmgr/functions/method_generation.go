@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 
@@ -28,17 +27,17 @@ const (
 )
 
 type methodGeneration struct {
-	id       string
-	module   string
-	kind     methodGenerationKind
-	creator  collectorapi.Creator
-	methods  map[string]funcapi.FunctionConfig
-	jobs     map[string]collectorapi.RuntimeJob
-	handlers map[string]funcapi.MethodHandler
+	id       string                             // generation identity
+	module   string                             // owning collector module
+	kind     methodGenerationKind               // method kind (agent / shared / instance)
+	creator  collectorapi.Creator               // collector creator supplying the method set
+	methods  map[string]funcapi.FunctionConfig  // method configs by method ID
+	jobs     map[string]collectorapi.RuntimeJob // runtime jobs by job name (instance methods)
+	handlers map[string]funcapi.MethodHandler   // resolved method handlers by key
 
-	cleanupOnce sync.Once
-	cleanupErr  error
-	done        chan struct{}
+	cleanupOnce sync.Once     // guards cleanup (once)
+	cleanupErr  error         // captured cleanup error
+	done        chan struct{} // closed when cleanup completes
 }
 
 func newMethodGeneration(
@@ -117,7 +116,7 @@ func (mg *methodGeneration) cleanup(ctx context.Context) error {
 		for name := range mg.handlers {
 			names = append(names, name)
 		}
-		sort.Strings(names)
+		slices.Sort(names)
 		for _, name := range names {
 			mg.cleanupErr = errors.Join(
 				mg.cleanupErr,
@@ -173,8 +172,8 @@ func (mg *methodGeneration) handle(
 		}
 		response := raw.HandleRaw(ctx, funcapi.RawMethodRequest{
 			Method: method.ID, Info: slices.Contains(input.Args, "info"),
-			Args:        append([]string(nil), input.Args...),
-			Payload:     append([]byte(nil), input.Payload...),
+			Args:        slices.Clone(input.Args),
+			Payload:     slices.Clone(input.Payload),
 			ContentType: input.ContentType, Timeout: input.Timeout,
 			Permissions: input.Permissions, Source: input.CallerSource,
 		})
@@ -264,7 +263,7 @@ func (mg *methodGeneration) availableJobNames(methodID string) []string {
 			names = append(names, name)
 		}
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names
 }
 
@@ -294,7 +293,7 @@ func functionResponseError(err error) (lifecycle.SealedResult, error) {
 func (mg *methodGeneration) infoResult(
 	method funcapi.FunctionConfig,
 ) (lifecycle.SealedResult, error) {
-	params := append([]funcapi.ParamConfig(nil), method.RequiredParams...)
+	params := slices.Clone(method.RequiredParams)
 	includeJob := mg.kind == methodGenerationShared &&
 		mg.creator.InstancePolicy != collectorapi.InstancePolicySingle
 	if includeJob {
@@ -499,7 +498,7 @@ func methodValueStrings(value any) []string {
 		}
 		return values
 	case []string:
-		return slices.DeleteFunc(append([]string(nil), typed...), func(value string) bool {
+		return slices.DeleteFunc(slices.Clone(typed), func(value string) bool {
 			return value == ""
 		})
 	}

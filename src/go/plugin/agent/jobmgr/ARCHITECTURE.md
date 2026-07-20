@@ -1,341 +1,530 @@
-# Job Manager architecture
+# Job Manager Architecture
 
-## Purpose
+This is a maintainer-oriented map of the Job Manager (`jobmgr`). It explains the
+main runtime path and package boundaries as a top-to-bottom journey: the big
+picture first, then the concurrency model, then how jobs, secrets, and vnodes
+are handled, and finally the package layout and the deep invariants.
 
-Job Manager is the production orchestration boundary for Go data-collection
-plugins. It turns Function input, discovery changes, dynamic configuration, and
-process control into ordered lifecycle commands.
+It intentionally leaves collector internals opaque. How a specific collector
+walks SNMP, scrapes Prometheus, or renders charts lives in that collector and
+the framework packages it uses; Job Manager only orchestrates their lifecycle.
 
-Job Manager owns orchestration. Collector internals remain opaque:
+## Short Version
 
-- V1 and V2 jobs are created through framework factories.
-- Function and collection callbacks are collector contracts.
-- Job Manager invokes `Cleanup(context.Context)` and waits for the declared
-  lifecycle result.
-- Collector-internal goroutines, locks, caches, and profile watchers are not
-  Job Manager authorities.
+Job Manager is the orchestration boundary for a Go data-collection plugin
+process (`go.d`, `ibm.d`, `scripts.d`). It takes everything that wants to
+start, stop, reconfigure, or query a collector job and turns it into an
+ordered, safe stream of lifecycle commands run by **one single-threaded command
+kernel**.
 
-## Construction and lifetimes
+Three things can drive it:
 
-Production has one construction chain:
+- **Function calls** arriving on the plugin's stdin from the Netdata daemon —
+  including dynamic configuration (DynCfg) commands to add / edit / enable /
+  disable / test / remove jobs.
+- **Discovery** — file configs and service discovery proposing jobs to run.
+- **Autodetection retries** — jobs that failed to detect their target, retried
+  later.
 
-```text
-godplugin / ibmdplugin / scriptsdplugin
-    -> agent.New
-        -> composition.NewProcess
-            -> one process authority
-                -> one active run generation
-                    -> one CommandKernel + one KernelLoop
+Everything a plugin writes back — metrics, charts, Function registrations,
+config state, keepalives — leaves through **one serialized stdout writer**.
+
+The whole process runs **one active "run generation"** at a time. A reload
+(SIGHUP) rotates that generation cleanly without rebuilding the process itself.
+
+## Where Job Manager Sits
+
+Every plugin binary follows the same startup path.
+
+```mermaid
+flowchart TD
+    Plugin("cmd/godplugin · ibmdplugin · scriptsdplugin<br/>main()")
+    New("agent.New(Config)")
+    Host("agenthost.Run<br/>forwards OS signals")
+    Proc("composition.NewProcess<br/>build the process")
+    Run("process.Run(ctx)<br/>outer loop")
+    Gen("run generation<br/>command kernel + adapters")
+
+    Plugin --> New --> Host --> Proc --> Run --> Gen
+    Host -. "SIGHUP → Restart" .-> Run
+    Host -. "SIGINT / SIGTERM → Terminate" .-> Run
+
+    classDef entry fill:#dbeafe,stroke:#2563eb,color:#0b1021;
+    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    class Plugin,New,Host entry;
+    class Proc,Run,Gen core;
 ```
 
-The process lifetime owns:
+- `cmd/*plugin/main.go` builds a `RunModePolicy`, registers discovery
+  providers, and calls `agent.New`.
+- `cmd/internal/agenthost/host.go` hosts one process-lifetime Agent and maps OS
+  signals to acknowledged controls: **SIGHUP → `Restart`**, **SIGINT/SIGTERM →
+  `Terminate`** (each bounded to 10s).
+- `plugin/agent/agent.go` loads config and modules, then calls
+  `composition.NewProcess` and `process.Run(ctx)`.
 
-- the Function `InputCapsule` and process ingress;
-- the output `FrameOwner`;
-- admission and UID ledgers;
-- frozen module, discovery-provider, and SecretStore-creator catalogs;
-- the atomic secret resolver;
-- the runtime output service.
+**Run modes** (`plugin/agent/policy/runmode.go`) flip a few gates:
 
-Each run generation owns:
+- **Long-lived agent** (production, not a terminal): service discovery on,
+  runtime charts on, discovered jobs wait for the daemon's enable command.
+- **Terminal / debug** (attached to a TTY): service discovery off, runtime
+  charts off, discovered jobs auto-enable so a developer sees output
+  immediately.
 
-- `RunSupervisor` and `TaskSupervisor`;
-- `CommandKernel` and `KernelLoop`;
-- Function catalog, handler generations, and publications;
-- dynamic-configuration graph and controllers;
-- Job, discovery-pipeline, vnode, and SecretStore generations;
-- the scheduler-owned autodetection retry index;
-- the secret dependency index;
-- the `jobmgr.runtime` metrics projection.
+## The Big Picture
 
-A restart rotates the complete run generation. It does not construct a second
-process ingress, output owner, mutable registry, or resolver.
-
-## Package boundaries
-
-| Package | Responsibility |
-| --- | --- |
-| `jobmgr` | Command ports, lanes, claims, planning, KernelLoop, composite child commands |
-| `jobmgr/lifecycle` | Neutral admission, UID, operation, task, resource, run, and frame authorities |
-| `jobmgr/functions` | Function ingress adapter, catalog, handler generations, publication |
-| `jobmgr/joboutput` | Collector construction, Job generations, output, vnode snapshots, DynCfg jobs |
-| `jobmgr/secrets` | Secret commands, dependency index, restart transaction |
-| `jobmgr/discovery` | Discovery decisions and configured vnode state |
-| `jobmgr/composition` | The only production assembler; process and run rotation |
-| `framework/functions` | Passive Function values, registry contracts, and process input capsule |
-| `secrets/resolver` | Atomic config clone, reference compilation, scoped resolution |
-| `secrets/secretstore` | Frozen creator catalog and per-run Store generation authority |
-
-`lifecycle` is neutral and does not import Agent or adapter packages. Adapter
-packages may import the root command ports and `lifecycle`, but not sibling
-adapters. `composition` is the only package allowed to join adapters.
-
-## Command flow
+Once running, Job Manager is a funnel: several sources of intent on the left,
+one ordered kernel in the middle, one stdout stream on the right.
 
 ```mermaid
 flowchart LR
-    I["Process Function input"] --> C["Function catalog lookup + lease"]
-    D["Discovery / DynCfg intent"] --> K["CommandKernel admission"]
-    C --> K
-    K --> U["UID + memory admission"]
-    U --> L["Per-resource lane"]
-    L --> Q["Claim authority"]
-    Q --> T["TaskSupervisor"]
-    T --> A["Prepared apply / lifecycle transition"]
-    A --> F["FrameOwner terminal result / notification"]
-    A --> R["Long-lived generation authority"]
+    Daemon("Netdata daemon")
+    Fn("Function ingress<br/>stdin")
+    Disc("Discovery<br/>files + service discovery")
+    Retry("Autodetection<br/>retries")
+    Kernel("Command Kernel<br/>single-threaded loop")
+    Jobs("Collector jobs<br/>V1 / V2")
+    Secrets("Secret resolver<br/>+ store")
+    Vnodes("Vnode registry")
+    Frame("FrameOwner<br/>one stdout writer")
+
+    Daemon -->|"FUNCTION / DynCfg"| Fn --> Kernel
+    Disc --> Kernel
+    Retry --> Kernel
+    Kernel --> Jobs
+    Jobs -->|"resolve refs"| Secrets
+    Jobs -->|"attribute metrics"| Vnodes
+    Jobs --> Frame
+    Kernel --> Frame
+    Frame -->|"metrics · charts · CONFIG · FUNCTION"| Daemon
+
+    classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
+    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
+    classDef sec fill:#fee2e2,stroke:#dc2626,color:#0b1021;
+    classDef vn fill:#ccfbf1,stroke:#0d9488,color:#0b1021;
+    classDef out fill:#e5e7eb,stroke:#4b5563,color:#0b1021;
+    class Daemon,Fn,Disc,Retry ext;
+    class Kernel core;
+    class Jobs job;
+    class Secrets sec;
+    class Vnodes vn;
+    class Frame out;
 ```
 
-The main stages are:
+A useful mental split for the rest of this document:
 
-1. The process-fixed input capsule parses an immutable call.
-2. The active Function catalog resolves the route and acquires its handler
-   generation lease.
-3. Kernel admission validates the request, reserves UID and memory ownership,
-   derives the lane, and installs the operation.
-4. Claim acquisition orders conflicts before blocking work starts.
-5. `TaskSupervisor` executes the typed work outside KernelLoop.
-6. KernelLoop applies the completion and advances the lifecycle state.
-7. `FrameOwner` commits the terminal response and later protocol
-   notifications.
-8. Every lease, claim, admission reservation, task, and prepared value is
-   released or transferred to an explicit long-lived generation.
+- The **kernel** decides *what happens and in what order*.
+- **Adapters** (`functions`, `joboutput`, `secrets`, `discovery`) know *how* to
+  do the collector-specific work, behind narrow ports.
+- **`lifecycle`** provides the neutral machinery the kernel delegates to
+  (admission, tasks, framing, run control).
+- **`composition`** wires them all together.
 
-### Admission accounting
+## The Concurrency Model
 
-Admission charges ownership classes, not goroutines:
+This is the core idea. Job Manager does almost no locking in its business
+logic. Instead, **one goroutine — the KernelLoop — owns all mutable
+orchestration state** and is the only thing allowed to change it. Everything
+else either hands work in over a channel or does blocking work off to the side
+and reports back.
 
-- every ordinary operation carries one 4,608-byte aggregate framework charge,
-  plus its request, plan, result, and retained-resource bytes;
-- process construction reserves the Function catalog bound and no synthetic
-  finalizer or discovery-provider charge;
-- Job and SecretStore generations charge their declared retained bytes;
-- the singleton discovery Pipeline owns TaskSupervisor lifecycle records and
-  G/E facets with zero AdmissionLedger bytes;
-- every cleanup-capable Function generation carries a private 4-KiB catalog
-  retention allowance until its cleanup Task is acknowledged and
-  `Catalog.CompleteCleanup` releases catalog ownership.
+Think of an **air-traffic control tower with a single controller**:
 
-The Function allowance bounds generations that may accumulate behind delayed
-invocations or cleanup. It is not a reusable Task entitlement or a
-framework-wide execution limit.
+- Aircraft (commands) queue on **runways** (lanes); one moves per runway at a
+  time, in arrival order (FIFO).
+- Before taxiing, a flight reserves **airspace corridors** (claims), always
+  requested in the same order so two flights never deadlock waiting on each
+  other.
+- The controller never leaves the tower. **Pilots** (off-loop task goroutines)
+  fly the actual missions and radio back completions. The controller only reads
+  radios and updates the board.
 
-## Ownership and synchronization
+### The command lifecycle
 
-KernelLoop is the sole mutator of command lanes, command operations, deadlines,
-and claim transitions. Adapters do not reach into kernel state.
+```mermaid
+flowchart TD
+    Submit("Submit<br/>adapter, off-loop")
+    Admit("Admit<br/>UID dedupe · memory · lane")
+    Lane("Lane<br/>per-resource FIFO")
+    Claim("Claims<br/>read / write ordering")
+    Task("Run task<br/>goroutine, off-loop")
+    Complete("Apply completion<br/>on-loop")
+    Frame("FrameOwner<br/>terminal frame → stdout")
+    Dispose("Dispose<br/>release claims · lane · memory")
 
-Other authorities own their state behind explicit APIs:
+    Submit --> Admit --> Lane --> Claim --> Task --> Complete --> Frame --> Dispose
+    Complete -. "advance / wake lanes" .-> Lane
 
-- `TaskSupervisor` owns task requests, active children, and class queues.
-- `FrameOwner` serializes every stdout protocol frame.
-- `RunSupervisor` owns admission state, the generation-bound stopping cut,
-  shutdown budget, and dirty/fail-stop state.
-- Function catalog owns publication and handler-generation leases.
-- Job factory owns constructed Job generations.
-- SecretStore owns immutable published provider generations and lexical reader
-  scopes.
-- Discovery pipeline and vnode authorities own their long-lived generations.
+    classDef offloop fill:#e5e7eb,stroke:#4b5563,color:#0b1021;
+    classDef onloop fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    class Submit,Task offloop;
+    class Admit,Lane,Claim,Complete,Frame,Dispose onloop;
+```
 
-No external callback runs while KernelLoop is holding mutable adapter state.
-Blocking collector, provider, validation, stop, and cleanup work runs as a
-supervised task.
+1. **Submit** (off-loop): an adapter validates a `Request`, plans the work, and
+   pushes it onto a submission queue, then wakes the loop. `command_ports.go`,
+   `kernel.go`.
+2. **Admit** (on-loop): the loop dedupes the command's UID, charges a memory
+   budget, resolves the route, derives the lane key, and installs the operation.
+   Duplicate or over-budget commands are rejected here. `lifecycle/admission.go`,
+   `lifecycle/uid.go`.
+3. **Lane**: same-resource commands share one FIFO lane; only the lane head
+   runs while the lane is active. Different lanes advance independently.
+4. **Claims**: cross-lane exclusion. Read claims coexist; a write claim excludes
+   all others. Claims are acquired in a stable global key order and waiters are
+   FIFO per key, so the design is deadlock-free and starvation-free.
+   `claim_authority.go`.
+5. **Run task** (off-loop): the actual blocking work — construct a collector,
+   run autodetection, call a Function handler, stop a job — runs on a
+   `TaskSupervisor` goroutine, never on the loop. `lifecycle/task.go`.
+6. **Apply completion** (on-loop): the task radios its result back; the loop
+   seals it and advances the lifecycle.
+7. **Frame**: the terminal response is committed to stdout through `FrameOwner`.
+8. **Dispose**: claims, the lane slot, and the memory reservation are released,
+   waking any blocked lanes.
 
-## Ordering
+### Who owns what
 
-### Lanes
+- **On-loop (exclusive to KernelLoop):** every lane, operation, deadline, claim
+  transition, and counter. The loop is the sole mutator. A test
+  (`architecture_test.go`) even pins that on-loop actions are dispatched through
+  exactly five kernel functions.
+- **Off-loop:** the actual collector / Function / stop / cleanup work, run by
+  `TaskSupervisor`. The loop and tasks talk only over channels.
 
-Commands addressing the same resource use one FIFO lane. Different lanes may
-make progress independently.
+### Two fairness rules worth knowing
 
-Function invocations without a resource identity receive independent
-invocation-scoped lanes, so calls to the same Function may run concurrently.
-Resource-bound Functions and DynCfg routes use the addressed resource identity,
-so unrelated resources do not serialize behind one another.
+- **`TaskSupervisor` runs two independent classes** — framework-control work
+  (lifecycle/DynCfg commands) and generic Function work — in strict round-robin.
+  One class can never starve the other, and there is **no fixed "N active
+  Functions" cap**; concurrency is bounded by memory admission, not a counter.
+  `lifecycle/task.go`.
+- **A timed-out task keeps its ownership.** If blocking work overruns its
+  deadline, the kernel only *cooperatively* cancels it; its claims, lane, and
+  memory stay held until it actually returns, because a late return could still
+  mutate that resource. Repeated overruns escalate to a fail-stop.
+  `kernel.go`.
 
-### Claims
+Two more facts that catch newcomers:
 
-Claims order cross-resource conflicts:
+- Lanes give per-resource *ordering*; **claims** give cross-resource *mutual
+  exclusion*. Two independent lanes still serialize if they declare the same
+  claim key.
+- A resource-less Function call gets a **unique lane per invocation**, so
+  concurrent calls to the same Function run in parallel — unless the resolved
+  plan declares claims.
 
-- write claims exclude readers and writers;
-- read claims may coexist;
-- acquisition uses a stable global key order;
-- waiters are FIFO at each contested key;
-- a parent composite command may transfer its claim scope to acknowledged
-  child commands.
+## How the Job Manager Manages Jobs
 
-Claims are released only after the operation settles. A timed-out task that has
-not returned cannot silently surrender ownership that its late return could
-still mutate.
+A **job** is one running collector instance: a module plus a resolved config.
+Jobs are created from stock/user config files at startup, from discovery, or
+from DynCfg commands, and are retried after a failed autodetection.
 
-### Task classes
+The central guarantee is that **reconfiguring a job never disrupts the running
+one until the replacement is proven ready**. Think of a stage crew swapping
+actors mid-play: the understudy is fully costumed and rehearsed offstage while
+the current actor keeps performing; only on cue does the current actor exit,
+and only then does the understudy audition live.
 
-`TaskSupervisor` has separate queues for:
+```mermaid
+flowchart TD
+    Cmd("add / update / discovered / retry")
+    Validate("Validate config<br/>throwaway probe")
+    Prepare("Prepare candidate<br/>construct + resolve secrets<br/>(current job still running)")
+    Apply("Apply")
+    StopOld("Stop + Finalize<br/>prior generation")
+    AutoD{"Managed autodetection<br/>AcceptStart"}
+    Live("Start + Publish<br/>new generation live")
+    Fail("Commit StatusFailed<br/>schedule retry")
 
-- framework-control work, including resource and DynCfg lifecycle commands;
-- generic Function work.
+    Cmd --> Validate --> Prepare --> Apply --> StopOld --> AutoD
+    AutoD -->|"ok"| Live
+    AutoD -->|"failed"| Fail
+    Fail -. "logical clock due" .-> Prepare
 
-Ready work alternates between non-empty classes. One class cannot block service
-of the other, and there is no framework-wide fixed limit such as “four active
-Functions.” The scheduler's service quanta bound loop work per turn; they are
-not execution-concurrency limits.
+    classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
+    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
+    class Cmd ext;
+    class Validate,Apply,StopOld,AutoD core;
+    class Prepare,Live,Fail job;
+```
 
-Concurrent calls to the same collector Function are allowed by the framework.
-A collector that requires serialization owns that mutex internally.
+1. **Validate** — the config is checked with a short-lived throwaway module
+   probe, so a bad config is rejected without touching the live job.
+   `joboutput/config_factory.go`.
+2. **Prepare (non-disruptive)** — the `Factory` looks up the module creator,
+   resolves the config's secrets, builds a V1 or V2 collector, and hands back a
+   *candidate* holding a memory permit. The current job keeps running.
+   `joboutput/factory.go`, `joboutput/generation.go`.
+3. **Apply** — the kernel stops and finalizes the prior generation, then calls
+   `AcceptStart` on the candidate. `joboutput/transaction.go`.
+4. **Managed autodetection** — the candidate runs its `Check`/autodetect *after*
+   the old generation is gone. On success the job starts, publishes its
+   Functions, and begins emitting. On a clean failure the graph is committed
+   truthfully as `StatusFailed` (never a fake success) and a retry is scheduled.
+5. **Emitting** — the collector writes protocol frames through a `FrameWriter`,
+   which commits whole frames through the one `FrameOwner`.
 
-## Results and output
+### Job generations and fencing
 
-Every admitted Function UID has one terminal owner. Duplicate active or
-recently completed UIDs are rejected before a second operation is installed.
+Every job carries a monotonic **generation** number. A prepared candidate is
+consumed only if its generation matches the accepting transaction, and output
+flows only from the generation that has been accepted and started. This is how a
+slow stop of an old job can never interleave its frames with a new one.
 
-Results are sealed values. KernelLoop decides the terminal disposition and
-`FrameOwner` performs the wire commit. Post-result notifications are prepared
-separately and committed after the terminal frame.
+### V1 vs V2
 
-All protocol output, including keepalive and runtime output, passes through
-`FrameOwner`. Netdata is expected to consume stdout promptly; output
-serialization still prevents interleaved frames.
+Job Manager orchestrates both collector contracts identically; only the runtime
+adapter differs (`joboutput/runtime_adapter.go`, `framework/jobruntime`):
+
+- **V1** declares `Charts()` and returns `Collect() map[string]int64`.
+- **V2** writes to a `metrix.CollectorStore`, supplies `ChartTemplateYAML()`
+  (rendered by the chart engine), and is wired to the runtime service and the
+  vnode registry so it can emit host-scoped / vnode metrics.
+
+### Autodetection retries
+
+Retries are deliberately cheap. There is **no timer or goroutine per job**.
+Instead, one per-run map + heap + dispatcher owns all pending retries
+(`joboutput/autodetection_retry.go`, `joboutput/scheduler.go`):
+
+- The process's 1-second tick advances a **logical clock**.
+- When an entry is due, the single run-owned dispatcher resubmits it as a
+  restart through the ordinary command port — fire-and-forget — and keeps
+  authority over that config/retry token until the resulting transaction
+  settles.
+- Success, replacement, disable, removal, or shutdown invalidates the token.
 
 ## Secrets
 
-Secret resolution is atomic:
+Secrets keep credentials out of collector configs. A config value can carry a
+**reference** instead of a literal:
 
-1. clone and validate the whole input shape;
-2. compile all references and distinct Store keys;
-3. acquire one lexical `ResolutionScope`;
-4. resolve against the pinned Store generations;
-5. release the scope;
-6. return either the complete postimage or no result.
+- `${store:kind:name:key}` — looked up in a SecretStore (Vault, AWS Secrets
+  Manager, Azure Key Vault, GCP Secret Manager).
+- `${env:...}`, `${file:...}`, `${cmd:...}` — resolved from the plugin
+  process's own environment variables, files, or command output.
 
-SecretStore mutations prepare a provider outside publication, then commit by
-generation compare-and-swap. Replacement or removal retires the prior
-generation only after its readers drain. Dependent Job restarts execute as one
-composite command under the parent Store mutation's ordering scope.
+Resolution happens only in memory, only when a job is built. The key property
+is that it is **atomic — all references resolve, or none do**. Picture a notary:
+photocopy the whole document, list every blank, check out the referenced files
+under one pass, fill every blank on the copy, check the files back in, and hand
+back a fully-filled copy or nothing at all.
 
-The dependency index performs deterministic lookup and replacement. Discovery
-publication work is proportional to frozen providers plus changed source
-records; no provider-count ceiling is imposed.
+```mermaid
+flowchart TD
+    Ref("config with a secret reference")
+    Clone("Clone + validate whole config")
+    Compile("Compile references → distinct store keys")
+    Scope("Acquire ONE reader scope<br/>pin current store generations")
+    Resolve("Resolve the clone")
+    Release("Release scope · drain readers")
+    Post("Complete postimage → build job")
 
-## Jobs and collectors
+    Ref --> Clone --> Compile --> Scope --> Resolve --> Release --> Post
 
-Job Manager distinguishes orchestration contracts, not collector
-implementations:
+    classDef sec fill:#fee2e2,stroke:#dc2626,color:#0b1021;
+    classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
+    class Ref,Clone,Compile,Scope,Resolve,Release sec;
+    class Post job;
+```
 
-- V1 runtime adapts `Check`, `Charts`, `Collect`, and cleanup.
-- V2 runtime adapts collector-store, host/vnode scope, chart engine, and
-  cleanup.
-- Function methods and static Functions publish through the Function catalog.
-- Job output is fenced by its acknowledged Job generation.
+The resolver lives in `plugin/agent/secrets/resolver`; it never mutates the
+input config and returns `nil` on any error, so a half-resolved config can never
+reach a collector.
 
-Collector construction is non-disruptive: the factory validates configuration
-and allocates the candidate while the current generation is still live.
-Managed autodetection runs later in the transaction's `AcceptStart` phase,
-after the prior generation has stopped and finalized. A clean autodetection
-failure commits the truthful failed/removal graph state and schedules an
-eligible retry; it is not reported as an uncommitted success.
+### Changing a store restarts its jobs
 
-Autodetection retries are owned by one per-run map/heap and one run-owned
-dispatcher. The scheduler tick advances a logical per-run clock and wakes the
-dispatcher without waiting for command admission. The dispatcher uses the
-ordinary blocking prepared-command port, submits without waiting for terminal
-completion, and retains exact configuration-UID/retry-generation authority
-until the resulting transaction settles. Success, replacement, disable,
-removal, or run shutdown invalidates that authority. Shutdown stops new retry
-work before the kernel and joins the dispatcher after the kernel drains. No
-per-Job goroutine, timer, channel, fixed population limit, or retry service
-quantum exists.
+Backing stores are managed live over DynCfg (`add` / `update` / `remove`). The
+store (`plugin/agent/secrets/secretstore`) keeps **numbered, immutable
+generations** per `kind:name`:
 
-`TaskSupervisor` retains the concrete long-lived Job permit until the whole
-prepared transaction exists. Clean rejection before that transfer cleans
-external resources while leaving the framework record and permit for the one
-supervisor abort. Ambiguous cleanup failure retains all ownership evidence and
-fails closed.
+1. A new generation is prepared *outside* publication, then committed by
+   compare-and-swap against the expected generation.
+2. If any running jobs depend on that store key, they are restarted as **one
+   composite command** — stop dependents → commit the new generation → start
+   dependents — all under the store's ordering/claim scope
+   (`dyncfg:secretstores`), so nothing else mutates those jobs in between.
+   `secrets/restart.go`, `secrets/transaction.go`.
+3. The superseded generation is retired only after its last reader scope drains,
+   so an in-flight resolution never sees credentials vanish mid-read.
 
-The chart engine, chart templates, SNMP profiles, and other collector framework
-internals are outside the kernel design. Their only relevance here is the
-public factory/runtime contract they implement.
+## Vnodes (Virtual Nodes)
 
-## Restart and shutdown
+A single job often monitors many *remote* things — one job scraping 50
+switches, or one cloud collector pulling hundreds of resources. Netdata wants
+each to appear as its own **node** in the UI, with its own hostname and charts,
+not collapsed under the agent's host. A **vnode** is a lightweight,
+agent-declared "virtual host" (name, hostname, GUID, labels) that a job can
+attribute its metrics to.
 
-Run rotation is an acknowledged sequence:
+Think of **name badges at a conference**: the agent prints a batch up front and
+can print more on demand. When a job reports a metric it wears a badge, so the
+dashboard files it under that identity instead of "the agent."
 
-1. seal process ingress returns;
-2. publish the active run's generation-bound stopping cut, close external
-   command ingress, and begin the one run shutdown budget;
-3. typed-cancel preparation while draining every ownership action already
-   admitted before the cut;
-4. keep inherited activation, Function mutation, and claim-covered private
-   composite commands available only to those protected action chains;
-5. after those chains and every accepted Function mutation settle, close
-   private continuation and Function-mutation ingress, seal inherited
-   activation, and enter cleanup-only admission;
-6. cancel and join inherited work, withdraw Function publications, close the
-   catalog, and stop long-lived resources;
-7. require exact-zero authority censuses and run the finalizer;
-8. finish the run and reopen the drained process ledgers for the next
-   generation;
-9. construct, start, and adopt the next complete run.
+- **Configured vnodes** are loaded from `vnodes/` config files at startup and
+  passed once as `InitialVnodes` (`agent/setup.go` → `agent/agent.go` →
+  `composition`). At startup they are published to the daemon as DynCfg config
+  entries.
+- **Runtime vnodes** can be added, edited, or removed live through a DynCfg
+  vnode Function (`composition/vnodes.go`).
+- The vnode authority (`discovery/vnode.go`) is **revision-versioned and
+  live-merged**: a job's `vnode:` name is resolved against the current set of
+  file-configured *and* runtime vnodes, not a frozen startup snapshot. The
+  resolved snapshot is attached to the job so its runtime emits under that
+  virtual host.
+- A vnode cannot be removed while a job references it (`409`), and only
+  runtime (DynCfg-sourced) vnodes are removable (`405`).
 
-Termination follows the same retirement path without constructing a successor.
-Construction failure, release failure, retained ownership, or an invalid
-lifecycle transition marks the run dirty and makes shutdown fail closed.
+## Restart and Shutdown
 
-Post-cut command rejection and cancellation of already accepted work use the
-same typed current-generation cause. `TaskSupervisor` normalizes inherited
-completion only when every error-tree leaf is that exact cause; stale,
-unrecognized, over-deep, or mixed real errors remain fatal. A genuine
-spontaneous inherited failure dirties and wakes the run immediately. A
-pipeline provider may complete successfully after its finite publication;
-that clean provider completion is not a failure.
+Job Manager separates two lifetimes:
 
-Preparation remains cancellable. Once an ownership-changing lifecycle action
-starts, user cancellation, operation deadline, and shutdown no longer cancel
-that action. KernelLoop tracks such chains from resource accept/start,
-capability commit, transaction apply, or an executing explicit resource stop
-until terminal disposal. The first shutdown cut preserves only the transitive
-inherited-task, Function-mutation, and private-composite authority those chains
-need. The response may report cancellation or deadline while the action
-finishes to a provable disposition; only then does the second cut revoke that
-authority. The existing run shutdown budget remains the fail-closed bound.
+- **The process is the building.** Built once by `composition.NewProcess`, it
+  survives every reload: the stdin reader, the one `FrameOwner`, the memory and
+  UID ledgers, the frozen module registry, the secret resolver, the vnode
+  registry, and the runtime metrics service.
+- **The run generation is the current tenant.** A complete, self-contained
+  occupant built by `composition/run.go`: the kernel and its loop, the task
+  supervisor, the run supervisor, the DynCfg graph, the per-generation secret
+  store, the Function catalog and publications, the job factory, the
+  autodetection scheduler, and the `jobmgr.runtime` metrics.
 
-Collector work that remains blocked at process exit is considered safe enough
+A **SIGHUP reload evicts the whole tenant and moves a fresh one in without
+touching the building.**
+
+```mermaid
+flowchart TD
+    HUP("SIGHUP → Restart")
+    Seal("Seal ingress")
+    Cut("Publish stopping cut<br/>begin shutdown budget (10s)")
+    Drain("Drain admitted work<br/>protected chains finish")
+    Census("Require exact-zero census<br/>run finalizer")
+    Reopen("Reopen ledgers")
+    Next("Construct + adopt<br/>next generation")
+
+    HUP --> Seal --> Cut --> Drain --> Census --> Reopen --> Next
+
+    classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
+    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    class HUP ext;
+    class Seal,Cut,Drain,Census,Reopen,Next core;
+```
+
+The rotation is an acknowledged sequence (`composition/process.go` `rotate`):
+
+1. Seal stdin ingress so no new external command enters.
+2. Publish the generation-bound **stopping cut**, close external command
+   ingress, and start the single shutdown budget (default 10s).
+3. Drain every ownership action admitted before the cut; work whose
+   ownership-changing phase already started (accept/apply/stop chains) is
+   allowed to finish to a provable disposition.
+4. Withdraw Function publications, close the catalog, cancel and join inherited
+   work, stop long-lived resources, and run the finalizer — all executed inside
+   the kernel loop.
+5. Require an **exact-zero authority census** (no active tasks, claims, permits,
+   or retained frame bytes). Any leftover marks the run **dirty** and fails the
+   handoff closed rather than silently proceeding.
+6. Reopen the drained ledgers and construct, start, and adopt the next
+   generation.
+
+**Termination** (SIGINT/SIGTERM) follows the same retirement path with no
+successor. Collector work still blocked at process exit is considered safe
 because process termination removes it; Job Manager does not add a second
-unbounded shutdown mechanism around that assumption.
+unbounded shutdown mechanism around that.
 
-## Runtime metrics
+## Runtime Metrics
 
-One component, `jobmgr.runtime`, projects current production concepts:
+In long-lived agent mode, one component — `jobmgr.runtime` — projects live
+orchestration counts: admitted / active / rejected operations, active Function
+invocations, claim keys and waiters, active and queued tasks, active jobs, frame
+commits and failures, timeouts, panics, and dirty runs
+(`composition/runtime_metrics.go`).
 
-- active/admitted/rejected operations;
-- active Function invocations;
-- claim keys, waiters, and oldest wait;
-- active/queued tasks and oldest wait;
-- active Jobs;
-- frame commits and failures;
-- timeouts, disposal, panics, and dirty runs.
+Mutation owners write metric-owned atomics; the producer only snapshots them —
+it never reads kernel-private state. The component is registered before external
+admission opens and unregistered (with a final projection) when its generation
+retires, strictly before the successor re-registers, so no predecessor sample
+crosses a reload.
 
-Mutation owners write metrics-owned atomics. The runtime producer snapshots
-those projections into the metrics store; it never reads or mutates
-KernelLoop-private state. Registration occurs before external admission;
-terminal run acknowledgement unregisters the cadence producer, refreshes and
-synchronously emits the final projection, then removes the component behind
-an output barrier. No predecessor-generation sample can cross a successful
-HUP handoff.
+## Package Map
 
-## Static and behavioral proof
+| Package | Responsibility |
+| --- | --- |
+| `jobmgr` (root) | Command ports, the `CommandKernel` + `KernelLoop`, lanes, claims, composite child commands |
+| `jobmgr/lifecycle` | Neutral authorities: admission, UID, operation, task, frame, run, resource, transaction |
+| `jobmgr/functions` | Function stdin ingress, routing catalog, handler generations, publication to Netdata |
+| `jobmgr/joboutput` | Collector construction, job generations, output frames, DynCfg jobs, autodetection retries, vnode frames |
+| `jobmgr/secrets` | Secret dependency index, store command adapter, dependent-restart transaction |
+| `jobmgr/discovery` | Discovery add/remove decisions and the configured-vnode authority |
+| `jobmgr/composition` | The only assembler; process construction and run-generation rotation |
+| `framework/functions` | Passive Function values and the stdin input capsule |
+| `framework/dyncfg` | The dynamic-configuration `Graph` |
+| `framework/jobruntime` | V1 / V2 job runtime and host/vnode scope |
+| `framework/vnoderegistry` | Vnode metadata registry |
+| `agent/secrets/resolver` | Atomic config clone, reference compilation, scoped resolution |
+| `agent/secrets/secretstore` | Frozen creator catalog and per-run store generations |
+| `agent/discovery` | Provider catalog and the discovery pipeline generation |
 
-`architecture_test.go` enforces:
+### Dependency rules
 
-- the exact root package and six adapter subpackages;
-- no build-ignored production bridge;
-- neutral lifecycle dependencies and adapter direction;
-- concrete declarations for every authority;
-- one production construction chain and one authority set;
-- absence of retired Manager, Service/Snapshot, recursive Resolver, and
-  file-persister lifecycle declarations;
-- no experimental identities in production Go source.
+The layering is enforced by `architecture_test.go`, not just convention:
 
-Behavioral tests cover admission, cancellation, deadlines, claims, fairness,
-composite rollback, task panic containment, Function publication, Job and
-SecretStore generations, discovery rotation, output framing, restart, and
-shutdown.
+- **`lifecycle` is neutral.** It imports no sibling, no adapter, and no Agent or
+  collector package — only the standard library (and YAML). All domain policy
+  (which bytes to charge, which frame is a keepalive, when to go dirty) is
+  supplied by the caller.
+- **Adapters do not import each other.** `functions`, `joboutput`, `secrets`,
+  and `discovery` may import the root command ports and `lifecycle`, but never a
+  sibling adapter.
+- **`composition` is the only assembler.** It is the single package allowed to
+  join adapters, break construction cycles, and own the process/run-generation
+  split.
+
+`architecture_test.go` additionally pins the set of active packages, the named
+production owners, the single production construction chain, and that on-loop
+actions are dispatched only through the sanctioned kernel funnel. If you add or
+move an authority, that test is where the structure is asserted.
+
+## Where To Change Things
+
+- Add or change a Function surface, routing, or publication:
+  - `functions/` (catalog, controller, publication, protocol).
+- Change how a collector job is built, started, stopped, or retried:
+  - `joboutput/` (factory, generation, transaction, scheduler,
+    autodetection_retry).
+- Change secret reference syntax or resolution:
+  - `agent/secrets/resolver`.
+- Change how a secret store commits or restarts dependents:
+  - `agent/secrets/secretstore` and `secrets/` (restart, transaction,
+    dependency).
+- Change discovery add/remove decisions or configured vnodes:
+  - `discovery/` (decision, vnode) and `composition/{discovery,vnodes}.go`.
+- Change the ordering model (lanes, claims, admission, deadlines):
+  - `kernel.go`, `claim_authority.go`, and `lifecycle/`.
+- Change how the process is assembled, reloaded, or shut down:
+  - `composition/` (process, run, public).
+- Add or move an authority:
+  - update `architecture_test.go`'s owner and package manifests in the same
+    change.
+
+## Validation
+
+Useful focused checks after changes:
+
+```text
+cd src/go
+env GOCACHE=/tmp/netdata-go-build-cache go test -count=1 ./plugin/agent/jobmgr/...
+env GOCACHE=/tmp/netdata-go-build-cache go test -race -count=1 ./plugin/agent/jobmgr/...
+env GOCACHE=/tmp/netdata-go-build-cache go vet ./plugin/agent/jobmgr/...
+```
+
+Job Manager is concurrency-sensitive: the `-race` run is not optional for
+changes to the kernel, claims, admission, tasks, or the run/shutdown paths.
+
+When a change touches shared framework code that Job Manager consumes
+(`framework/jobruntime`, `metrix`, the chart engine), also build and test a
+couple of representative real collectors so the change is proven against real
+users, not only against Job Manager's own tests.

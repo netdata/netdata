@@ -16,32 +16,32 @@ type ModuleReconciler interface {
 }
 
 type Scheduler struct {
-	mu     sync.Mutex
-	tickMu sync.Mutex
+	mu     sync.Mutex // guards job/module indexes and lists
+	tickMu sync.Mutex // serializes Tick() so ticks never overlap
 
-	reconciler ModuleReconciler
-	retries    *autoDetectionRetryIndex
-	jobs       map[lifecycle.ResourceIdentity]*scheduledJob
-	modules    map[string]*scheduledModule
-	jobHead    *scheduledJob
-	jobTail    *scheduledJob
-	moduleHead *scheduledModule
-	moduleTail *scheduledModule
-	moduleTick []string
+	reconciler ModuleReconciler                             // per-module reconciliation callback
+	retries    *autoDetectionRetryIndex                     // auto-detection retry worker
+	jobs       map[lifecycle.ResourceIdentity]*scheduledJob // identity -> scheduled job
+	modules    map[string]*scheduledModule                  // module name -> module census
+	jobHead    *scheduledJob                                // insertion-ordered job list head
+	jobTail    *scheduledJob                                // insertion-ordered job list tail
+	moduleHead *scheduledModule                             // insertion-ordered module list head
+	moduleTail *scheduledModule                             // insertion-ordered module list tail
+	moduleTick []string                                     // reused scratch slice of module names per tick
 }
 
 type scheduledJob struct {
-	identity lifecycle.ResourceIdentity
-	job      RuntimeJob
-	previous *scheduledJob
-	next     *scheduledJob
+	identity lifecycle.ResourceIdentity // resource identity
+	job      RuntimeJob                 // runtime job ticked each cycle
+	previous *scheduledJob              // previous job in the insertion-ordered list
+	next     *scheduledJob              // next job in the insertion-ordered list
 }
 
 type scheduledModule struct {
-	name     string
-	jobs     int
-	previous *scheduledModule
-	next     *scheduledModule
+	name     string           // module name
+	jobs     int              // count of scheduled jobs for this module
+	previous *scheduledModule // previous module in the insertion-ordered list
+	next     *scheduledModule // next module in the insertion-ordered list
 }
 
 func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {

@@ -3,8 +3,9 @@
 package secrets
 
 import (
+	"cmp"
 	"errors"
-	"sort"
+	"slices"
 	"sync"
 
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
@@ -18,11 +19,11 @@ import (
 // authority. Reads scale with the selected Store's dependents, not the full
 // DynCfg graph.
 type SecretDependencyIndex struct {
-	mu sync.RWMutex
+	mu sync.RWMutex // guards the maps
 
-	jobs    map[string]jobDependency
-	byStore map[string]map[string]struct{}
-	commits uint64
+	jobs    map[string]jobDependency       // per-job dependency record by job full name
+	byStore map[string]map[string]struct{} // job set by store key (reverse index)
+	commits uint64                         // monotonic mutation counter
 }
 
 type jobDependency struct {
@@ -32,10 +33,10 @@ type jobDependency struct {
 }
 
 type SecretDependencyCensus struct {
-	Jobs       int
-	StoreKeys  int
-	References int
-	Commits    uint64
+	Jobs       int    // count of jobs with dependencies
+	StoreKeys  int    // count of distinct store keys depended on
+	References int    // total job->store references
+	Commits    uint64 // mutation counter
 }
 
 func NewSecretDependencyIndex() *SecretDependencyIndex {
@@ -77,7 +78,7 @@ func (sdi *SecretDependencyIndex) PrepareJobChange(
 		dependency := jobDependency{
 			display:   config.Module() + ":" + config.Name(),
 			running:   postimage.Status == dyncfg.StatusRunning.String(),
-			storeKeys: append([]string(nil), keys...),
+			storeKeys: slices.Clone(keys),
 		}
 		next = &dependency
 	}
@@ -106,11 +107,11 @@ func (sdi *SecretDependencyIndex) Affected(
 		})
 	}
 	sdi.mu.RUnlock()
-	sort.Slice(refs, func(i, j int) bool {
-		if refs[i].ID == refs[j].ID {
-			return refs[i].Display < refs[j].Display
+	slices.SortFunc(refs, func(a, b secretstore.JobRef) int {
+		if a.ID != b.ID {
+			return cmp.Compare(a.ID, b.ID)
 		}
-		return refs[i].ID < refs[j].ID
+		return cmp.Compare(a.Display, b.Display)
 	})
 	return refs
 }
@@ -150,7 +151,7 @@ func (sdi *SecretDependencyIndex) commitJobChange(
 	if next != nil {
 		cloned := jobDependency{
 			display: next.display, running: next.running,
-			storeKeys: append([]string(nil), next.storeKeys...),
+			storeKeys: slices.Clone(next.storeKeys),
 		}
 		sdi.jobs[id] = cloned
 		for _, key := range cloned.storeKeys {

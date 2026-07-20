@@ -101,24 +101,24 @@ func (bpi *boundProcessInput) AdoptInputBody(token uint64) error {
 // ProcessIngress owns the one process-lifetime Function reader and swaps only
 // its generation-scoped delivery capability during Agent restart.
 type ProcessIngress struct {
-	active        processInputPort
-	body          processInputPort
-	idle          *sync.Cond
-	capsule       *functionwire.InputCapsule
-	boundary      *capsuleBoundary
-	admission     *lifecycle.AdmissionLedger
-	state         ProcessIngressState
-	runGeneration uint64
-	deliveries    int
-	budgetOps     int
-	bodyToken     uint64
-	pauseNext     uint64
-	fencedToken   uint64
-	readerStarts  int
-	mu            sync.Mutex
-	growth        bool
-	pauseSealed   bool
-	bodySuspended bool
+	active        processInputPort           // current generation's delivery port; nil unless live
+	body          processInputPort           // port owning the in-flight input body, if any
+	idle          *sync.Cond                 // cond broadcast on every state/counter change
+	capsule       *functionwire.InputCapsule // process-lifetime wire reader (never swapped)
+	boundary      *capsuleBoundary           // gate mediating reader vs control-plane access
+	admission     *lifecycle.AdmissionLedger // shared admission ledger (identity-checked on Adopt)
+	state         ProcessIngressState        // paused | live | contained
+	runGeneration uint64                     // generation of the active binding
+	deliveries    int                        // in-flight HandleCall/Cancel/Reject/Quit count
+	budgetOps     int                        // in-flight body-budget operations count
+	bodyToken     uint64                     // admission token of the current input body
+	pauseNext     uint64                     // generation the next Adopt must match after a drain
+	fencedToken   uint64                     // body token discarded by Fence (accepts late releases)
+	readerStarts  int                        // Run() guard; started exactly once
+	mu            sync.Mutex                 // guards all fields
+	bodyGrowing   bool                       // a GrowInputBody op is in flight
+	pauseSealed   bool                       // seal step done; drain may proceed
+	bodySuspended bool                       // body handed to admission across a generation swap
 }
 
 func NewProcessIngress(reader io.Reader, admission *lifecycle.AdmissionLedger) (*ProcessIngress, error) {
@@ -167,7 +167,7 @@ func (pi *ProcessIngress) Adopt(ctx context.Context, binding ProcessBinding) err
 		pi.active != nil ||
 		pi.deliveries != 0 ||
 		pi.budgetOps != 0 ||
-		pi.growth {
+		pi.bodyGrowing {
 		pi.mu.Unlock()
 		return errors.New("jobmgr Function process ingress: adopt outside drained pause")
 	}
@@ -191,7 +191,7 @@ func (pi *ProcessIngress) Adopt(ctx context.Context, binding ProcessBinding) err
 		pi.active != nil ||
 		pi.deliveries != 0 ||
 		pi.budgetOps != 0 ||
-		pi.growth {
+		pi.bodyGrowing {
 		return errors.New("jobmgr Function process ingress: adopt state changed during preparation")
 	}
 	pi.active = binding.port
@@ -267,7 +267,7 @@ func (pi *ProcessIngress) DrainPause(ctx context.Context, nextGeneration uint64)
 		pi.active == nil ||
 		pi.deliveries != 0 ||
 		pi.budgetOps != 0 ||
-		pi.growth {
+		pi.bodyGrowing {
 		pi.state = ProcessIngressPaused
 		pi.active = nil
 		pi.pauseSealed = false
@@ -331,7 +331,7 @@ func (pi *ProcessIngress) Fence(ctx context.Context) error {
 		pi.active != nil ||
 		pi.deliveries != 0 ||
 		pi.budgetOps != 0 ||
-		pi.growth {
+		pi.bodyGrowing {
 		pi.mu.Unlock()
 		return errors.New("jobmgr Function process ingress: final fence outside drained pause")
 	}
@@ -450,7 +450,7 @@ func (pi *ProcessIngress) GrowInputBody(ctx context.Context, token uint64, nextC
 	for pi.state == ProcessIngressPaused {
 		pi.idle.Wait()
 	}
-	if pi.state != ProcessIngressLive || pi.active == nil || pi.growth {
+	if pi.state != ProcessIngressLive || pi.active == nil || pi.bodyGrowing {
 		pi.mu.Unlock()
 		return 0, errors.New("jobmgr Function process ingress: payload growth outside live state")
 	}
@@ -480,7 +480,7 @@ func (pi *ProcessIngress) GrowInputBody(ctx context.Context, token uint64, nextC
 		return 0, err
 	}
 	pi.bodyToken = result
-	pi.growth = true
+	pi.bodyGrowing = true
 	pi.mu.Unlock()
 	return result, nil
 }
@@ -491,7 +491,7 @@ func (pi *ProcessIngress) CommitInputBodyGrowth(token uint64, capacity int64) er
 	if port == nil ||
 		token == 0 ||
 		token != pi.bodyToken ||
-		!pi.growth ||
+		!pi.bodyGrowing ||
 		pi.budgetOps == 0 {
 		pi.mu.Unlock()
 		return errors.New("jobmgr Function process ingress: payload commit has no pending growth")
@@ -499,7 +499,7 @@ func (pi *ProcessIngress) CommitInputBodyGrowth(token uint64, capacity int64) er
 	pi.mu.Unlock()
 	err := port.CommitInputBodyGrowth(token, capacity)
 	pi.mu.Lock()
-	pi.growth = false
+	pi.bodyGrowing = false
 	pi.budgetOps--
 	pi.idle.Broadcast()
 	pi.mu.Unlock()
@@ -520,7 +520,7 @@ func (pi *ProcessIngress) ReleaseInputBody(token uint64) error {
 		port == nil ||
 		token == 0 ||
 		token != pi.bodyToken ||
-		pi.growth {
+		pi.bodyGrowing {
 		pi.mu.Unlock()
 		return errors.New("jobmgr Function process ingress: payload release has no live run binding")
 	}

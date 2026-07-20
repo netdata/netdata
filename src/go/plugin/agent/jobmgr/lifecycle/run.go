@@ -24,19 +24,19 @@ func (sr *StoppingRejection) Error() string {
 }
 
 type RunSupervisor struct {
-	mu         sync.Mutex
-	generation uint64
-	admission  bool
-	dirty      error
-	terminal   bool
-	clock      Clock
-	timeout    time.Duration
-	shutdown   *ShutdownBudget
-	state      RunTerminalState
-	observer   RuntimeObserver
-	stopping   chan struct{}
-	stopCause  *StoppingRejection
-	stopped    bool
+	mu         sync.Mutex         // guards all fields
+	generation uint64             // this run's generation number
+	admission  bool               // admission is open (external commands accepted)
+	dirty      error              // first fatal cause; run is failing closed
+	terminal   bool               // run has reached a terminal (quiescent) state
+	clock      Clock              // logical/real clock
+	timeout    time.Duration      // shutdown budget duration
+	shutdown   *ShutdownBudget    // active shutdown budget once BeginShutdown ran
+	state      RunTerminalState   // terminal state classification
+	observer   RuntimeObserver    // sink for run-level runtime counters
+	stopping   chan struct{}      // closed once the stopping cut is published
+	stopCause  *StoppingRejection // the generation-bound stopping rejection
+	stopped    bool               // stopping cut has been published
 }
 
 type RunCensus struct {

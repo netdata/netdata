@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"sync"
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
@@ -19,10 +20,10 @@ import (
 const discoveryResourceID = "__jobmgr_discovery__"
 
 type runDiscoveryServices struct {
-	BuildContext agentdiscovery.BuildContext
-	Providers    *agentdiscovery.ProviderCatalog
-	RunJob       []string
-	AutoEnable   bool
+	BuildContext agentdiscovery.BuildContext     // discovery build context (paths, defaults, output/registration seams)
+	Providers    *agentdiscovery.ProviderCatalog // frozen discovery provider catalog
+	RunJob       []string                        // allow-list filter of job names (empty = allow all)
+	AutoEnable   bool                            // publish discovered jobs as Running vs Accepted
 }
 
 func (rds runDiscoveryServices) valid() bool {
@@ -138,11 +139,11 @@ func (rg *runGeneration) startDiscovery(ctx context.Context) error {
 }
 
 type preparedDiscovery struct {
-	pipeline  *agentdiscovery.PipelineGeneration
-	decisions *jobmgrdiscovery.DecisionIndex
-	tasks     *lifecycle.TaskSupervisor
-	identity  lifecycle.ResourceIdentity
-	permit    lifecycle.LongLivedPermit
+	pipeline  *agentdiscovery.PipelineGeneration // the discovery pipeline generation
+	decisions *jobmgrdiscovery.DecisionIndex     // the add/remove decision index
+	tasks     *lifecycle.TaskSupervisor          // supervisor owning the pipeline + provider goroutines
+	identity  lifecycle.ResourceIdentity         // singleton discovery resource identity
+	permit    lifecycle.LongLivedPermit          // long-lived (zero-byte) permit for the pipeline
 }
 
 func newPreparedDiscovery(
@@ -207,29 +208,29 @@ func (pd *preparedDiscovery) Dispose(context.Context) error {
 }
 
 type readyDiscovery struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards the lifecycle flags
 
-	pipeline      *agentdiscovery.PipelineGeneration
-	decisions     *jobmgrdiscovery.DecisionIndex
-	tasks         *lifecycle.TaskSupervisor
-	identity      lifecycle.ResourceIdentity
-	permit        lifecycle.LongLivedPermit
-	providerNames []string
-	disabledNames []string
-	published     chan struct{}
-	supervisorRef lifecycle.InheritedTaskRef
-	providerRefs  map[string]lifecycle.InheritedTaskRef
-	started       bool
-	isPublished   bool
-	stopped       bool
-	finalized     bool
+	pipeline      *agentdiscovery.PipelineGeneration    // the discovery pipeline generation
+	decisions     *jobmgrdiscovery.DecisionIndex        // the add/remove decision index
+	tasks         *lifecycle.TaskSupervisor             // supervisor owning the pipeline + provider goroutines
+	identity      lifecycle.ResourceIdentity            // singleton discovery resource identity
+	permit        lifecycle.LongLivedPermit             // long-lived (zero-byte) permit for the pipeline
+	providerNames []string                              // enabled provider names
+	disabledNames []string                              // disabled provider names
+	published     chan struct{}                         // closed once discovery output is live
+	supervisorRef lifecycle.InheritedTaskRef            // inherited task ref for the aggregation supervisor
+	providerRefs  map[string]lifecycle.InheritedTaskRef // inherited task ref per provider
+	started       bool                                  // start has run
+	isPublished   bool                                  // discovery output is published
+	stopped       bool                                  // stop has run
+	finalized     bool                                  // teardown complete
 
-	providerReleased   map[string]bool
-	supervisorReleased bool
-	externalActivated  bool
-	externalReleased   bool
-	bytesReleased      bool
-	permitReturned     bool
+	providerReleased   map[string]bool // per-provider release completed
+	supervisorReleased bool            // supervisor task released
+	externalActivated  bool            // external facet activated
+	externalReleased   bool            // external facet released
+	bytesReleased      bool            // byte facet released (zero-byte permit)
+	permitReturned     bool            // permit returned
 }
 
 func (rd *readyDiscovery) Identity() lifecycle.ResourceIdentity {
@@ -375,7 +376,7 @@ func (rd *readyDiscovery) abortStart() error {
 	}
 	rd.mu.Lock()
 	supervisorRef := rd.supervisorRef
-	providerNames := append([]string(nil), rd.providerNames...)
+	providerNames := slices.Clone(rd.providerNames)
 	providerRefs := make(
 		map[string]lifecycle.InheritedTaskRef,
 		len(rd.providerRefs),
@@ -497,7 +498,7 @@ func (rd *readyDiscovery) Stop(ctx context.Context) error {
 		return nil
 	}
 	supervisorRef := rd.supervisorRef
-	providerNames := append([]string(nil), rd.providerNames...)
+	providerNames := slices.Clone(rd.providerNames)
 	providerRefs := make(
 		map[string]lifecycle.InheritedTaskRef,
 		len(rd.providerRefs),

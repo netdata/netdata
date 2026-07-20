@@ -12,13 +12,13 @@ import (
 const DefaultShutdownTimeout = 10 * time.Second
 
 type ShutdownBudget struct {
-	deadline time.Time
-	clock    Clock
-	ctx      *shutdownContext
-	cancel   func()
-	stop     chan struct{}
-	done     chan struct{}
-	finish   sync.Once
+	deadline time.Time        // absolute shutdown deadline
+	clock    Clock            // clock used to derive the deadline context
+	ctx      *shutdownContext // deadline-bounded context for shutdown-phase work
+	cancel   func()           // cancels ctx
+	stop     chan struct{}    // signals the budget timer to stop
+	done     chan struct{}    // closed when the budget is finished
+	finish   sync.Once        // guards FinishShutdown (once)
 }
 
 func newShutdownBudget(clock Clock, timeout time.Duration) (*ShutdownBudget, error) {

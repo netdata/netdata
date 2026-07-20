@@ -16,12 +16,12 @@ import (
 // SecretRestartCommand serializes acknowledged dependent stop, Store commit,
 // and successor start operations through their real resource lanes.
 type SecretRestartCommand struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards nextUID
 
-	epoch        uint64
-	dependencies *SecretDependencyIndex
-	jobs         DependentJobPort
-	nextUID      uint64
+	epoch        uint64                 // run generation
+	dependencies *SecretDependencyIndex // secret dependency index
+	jobs         DependentJobPort       // port used to stop/start dependent jobs
+	nextUID      uint64                 // next child-command UID to assign
 }
 
 func NewSecretRestartCommand(

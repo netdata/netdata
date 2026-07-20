@@ -3,9 +3,10 @@
 package discovery
 
 import (
+	"cmp"
 	"errors"
 	"maps"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -30,13 +31,13 @@ var (
 // VNodeConfiguration owns immutable configured-vnode values and their atomic
 // revision changes.
 type VNodeConfiguration struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards records + pending
 
-	records      map[string]vnodeRecord
-	pending      map[string]*preparedVNodeState
-	bytes        int
-	pendingBytes int
-	pendingNew   int
+	records      map[string]vnodeRecord         // committed vnode snapshots by name
+	pending      map[string]*preparedVNodeState // in-flight prepared vnode edits by name
+	bytes        int                            // committed vnode config bytes (accounting)
+	pendingBytes int                            // in-flight vnode config bytes
+	pendingNew   int                            // count of in-flight new-vnode edits
 }
 
 type vnodeRecord struct {
@@ -49,20 +50,20 @@ type PreparedVNode struct {
 }
 
 type ConfiguredVNode struct {
-	ID       string
-	Snapshot jobruntime.VnodeSnapshot
+	ID       string                   // vnode name
+	Snapshot jobruntime.VnodeSnapshot // the vnode snapshot (hostname, GUID, labels)
 }
 
 type preparedVNodeState struct {
-	mu        sync.Mutex
-	consumed  bool
-	owner     *VNodeConfiguration
-	id        string
-	expected  uint64
-	next      jobruntime.VnodeSnapshot
-	bytes     int
-	remove    bool
-	newRecord bool
+	mu        sync.Mutex               // guards consumed
+	consumed  bool                     // the prepared edit has been committed or aborted
+	owner     *VNodeConfiguration      // the vnode configuration this edit belongs to
+	id        string                   // vnode name
+	expected  uint64                   // revision the edit was prepared against (optimistic check)
+	next      jobruntime.VnodeSnapshot // the snapshot to commit
+	bytes     int                      // config bytes of next (accounting)
+	remove    bool                     // the edit removes the vnode
+	newRecord bool                     // the edit creates a new vnode
 }
 
 func NewVNodeConfiguration() *VNodeConfiguration {
@@ -80,7 +81,7 @@ func NewVNodeConfigurationWithInitial(
 	for id := range initial {
 		ids = append(ids, id)
 	}
-	sort.Strings(ids)
+	slices.Sort(ids)
 	for _, id := range ids {
 		vnode := initial[id]
 		if vnode == nil {
@@ -283,8 +284,8 @@ func (vc *VNodeConfiguration) Entries() []ConfiguredVNode {
 		})
 	}
 	vc.mu.Unlock()
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].ID < entries[j].ID
+	slices.SortFunc(entries, func(a, b ConfiguredVNode) int {
+		return cmp.Compare(a.ID, b.ID)
 	})
 	return entries
 }

@@ -26,15 +26,14 @@ func TestJobFactoryRejectCleanup(t *testing.T) {
 	}{
 		"construction error": {
 			build: func(t *testing.T, events *jobEventLog) (ConstructedJob, error) {
-				return testConstructedJob(t, JobVariantV1, events, &bytes.Buffer{}), errors.New("construction failed")
+				return testConstructedJob(t, JobVariantV1, events), errors.New("construction failed")
 			},
-			want: []string{"handler-close", "runtime-abort", "handler", "vnode", "collector"},
+			want: []string{"handler-close", "runtime-abort", "handler", "collector"},
 		},
 		"invalid construction": {
 			build: func(_ *testing.T, events *jobEventLog) (ConstructedJob, error) {
 				return ConstructedJob{
-					Runtime:         &recordingJobRuntime{events: events},
-					SuppressCleanup: true,
+					Runtime: &recordingJobRuntime{events: events},
 					CollectorCleanup: func(context.Context) error {
 						events.add("collector")
 						return nil
@@ -92,7 +91,6 @@ func TestJobPreparationLeavesCleanRejectedPermitWithTaskSupervisor(t *testing.T)
 				t,
 				JobVariantV1,
 				events,
-				&bytes.Buffer{},
 			), errors.New("construction failed")
 		},
 	)
@@ -150,7 +148,7 @@ func TestJobGenerationV1V2(t *testing.T) {
 				7,
 				permit,
 				func(context.Context) (ConstructedJob, error) {
-					return testConstructedJob(t, test.variant, events, jobEventWriter{events: events}), nil
+					return testConstructedJob(t, test.variant, events), nil
 				},
 			)
 			require.NoError(t, err)
@@ -172,9 +170,8 @@ func TestJobGenerationV1V2(t *testing.T) {
 			require.NoError(t, generation.Finalize())
 
 			want := []string{
-				"runtime-start", "handler-publish", "handler-close", "runtime-stop", "prepare-cleanup",
-				"write", "metadata-commit", "runtime-release", "vnode", "handler",
-				"collector",
+				"runtime-start", "handler-publish", "handler-close", "runtime-stop",
+				"runtime-release", "handler", "collector",
 			}
 
 			got := events.snapshot()
@@ -201,7 +198,7 @@ func TestJobGenerationPermitReturnLast(t *testing.T) {
 		1,
 		permit,
 		func(context.Context) (ConstructedJob, error) {
-			constructed := testConstructedJob(t, JobVariantV1, events, &bytes.Buffer{})
+			constructed := testConstructedJob(t, JobVariantV1, events)
 			constructed.Runtime = &recordingJobRuntime{events: events, stopGate: release}
 			return constructed, nil
 		},
@@ -252,16 +249,6 @@ func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
 				}
 			},
 		},
-		"cleanup frame write failure": {
-			configure: func(constructed *ConstructedJob) {
-				owner, err := lifecycle.NewFrameOwner(shortJobProtocolWriter{})
-				if err != nil {
-					panic(err)
-				}
-				constructed.FrameOwner = owner
-			},
-			start: true,
-		},
 		"runtime stop panic": {
 			configure: func(constructed *ConstructedJob) {
 				constructed.Runtime = &recordingJobRuntime{
@@ -282,7 +269,7 @@ func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
 				1,
 				permit,
 				func(context.Context) (ConstructedJob, error) {
-					constructed := testConstructedJob(t, JobVariantV2, events, &bytes.Buffer{})
+					constructed := testConstructedJob(t, JobVariantV2, events)
 					test.configure(&constructed)
 					return constructed, nil
 				},
@@ -312,15 +299,6 @@ func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
 
 func TestJobLifecyclePanicsPreserveTaskClassification(t *testing.T) {
 	tests := map[string]func() error{
-		"cleanup preparation": func() error {
-			_, err := callPreparedCleanup(
-				func(uint64) (PreparedVNodeFrame, error) {
-					panic("prepare cleanup")
-				},
-				1,
-			)
-			return err
-		},
 		"job lifecycle": func() error {
 			return callJobLifecycle("test", func() error {
 				panic("lifecycle")
@@ -349,7 +327,7 @@ func BenchmarkBJobFactoryCold(b *testing.B) {
 			1,
 			permit,
 			func(context.Context) (ConstructedJob, error) {
-				return testConstructedJob(b, JobVariantV1, events, &bytes.Buffer{}), nil
+				return testConstructedJob(b, JobVariantV1, events), nil
 			},
 		)
 		if err != nil {
@@ -371,31 +349,11 @@ func testConstructedJob(
 	t testingHelper,
 	variant JobVariant,
 	events *jobEventLog,
-	writer interface{ Write([]byte) (int, error) },
 ) ConstructedJob {
 	t.Helper()
-	owner, err := lifecycle.NewFrameOwner(writer)
-	require.NoError(t, err)
 	return ConstructedJob{
-		Variant:    variant,
-		Runtime:    &recordingJobRuntime{events: events},
-		FrameOwner: owner,
-		PrepareCleanup: func(generation uint64) (PreparedVNodeFrame, error) {
-			events.add("prepare-cleanup")
-			return PrepareVNodeFrame(
-				generation,
-				1,
-				[]byte("CLEANUP\n\n"),
-				func() error {
-					events.add("metadata-commit")
-					return nil
-				},
-				func() error {
-					events.add("metadata-abort")
-					return nil
-				},
-			)
-		},
+		Variant: variant,
+		Runtime: &recordingJobRuntime{events: events},
 		Handlers: &recordingHandlerLifecycle{
 			publish: func() error {
 				events.add("handler-publish")
@@ -410,7 +368,6 @@ func testConstructedJob(
 				return nil
 			},
 		},
-		ReleaseVNode: func() error { events.add("vnode"); return nil },
 		CollectorCleanup: func(context.Context) error {
 			events.add("collector")
 			return nil
@@ -521,22 +478,6 @@ func (rjr *recordingJobRuntime) ReleaseAfterCleanup(context.Context) error {
 }
 
 var _ jobruntime.Runtime = (*recordingJobRuntime)(nil)
-
-type jobEventWriter struct{ events *jobEventLog }
-
-func (jew jobEventWriter) Write(payload []byte) (int, error) {
-	jew.events.add("write")
-	return len(payload), nil
-}
-
-type shortJobProtocolWriter struct{}
-
-func (shortJobProtocolWriter) Write(payload []byte) (int, error) {
-	if len(payload) == 0 {
-		return 0, nil
-	}
-	return len(payload) - 1, nil
-}
 
 type jobEventLog struct {
 	mu     sync.Mutex

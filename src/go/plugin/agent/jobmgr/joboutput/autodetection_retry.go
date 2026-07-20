@@ -20,38 +20,38 @@ type autoDetectionRetryPlanner func(
 ) (jobmgr.WorkPlan, error)
 
 type autoDetectionRetryToken struct {
-	uid        string
-	generation uint64
+	uid        string // config UID this retry targets
+	generation uint64 // retry generation; stale tokens are ignored
 }
 
 type autoDetectionRetryIndex struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards all fields below
 
-	entries          map[string]*autoDetectionRetry
-	queue            autoDetectionRetryHeap
-	commands         jobmgr.PreparedCommandPort
-	plan             autoDetectionRetryPlanner
-	failure          func(error)
-	run              uint64
-	logicalClock     int64
-	lastProcessClock int
-	clockInitialized bool
-	generation       uint64
-	bound            bool
-	closed           bool
-	failed           bool
-	terminalErr      error
-	wake             chan struct{}
-	stop             chan struct{}
-	done             chan struct{}
-	failOnce         sync.Once
+	entries          map[string]*autoDetectionRetry // full-name -> pending retry
+	queue            autoDetectionRetryHeap         // due-ordered min-heap of retries
+	commands         jobmgr.PreparedCommandPort     // prepared-command port used to dispatch retries
+	plan             autoDetectionRetryPlanner      // builds a WorkPlan for one retry
+	failure          func(error)                    // terminal-failure callback (fail-once)
+	run              uint64                         // bound run epoch; stale retries are dropped
+	logicalClock     int64                          // monotonic logical time derived from process ticks
+	lastProcessClock int                            // last observed process clock (regression guard)
+	clockInitialized bool                           // logical clock has a baseline
+	generation       uint64                         // monotonic issuer for retry-token sequence numbers
+	bound            bool                           // bind() succeeded; the worker is running
+	closed           bool                           // stopWorker() has been called
+	failed           bool                           // terminal failure latched
+	terminalErr      error                          // joined terminal error
+	wake             chan struct{}                  // worker wake signal
+	stop             chan struct{}                  // worker stop signal
+	done             chan struct{}                  // closed when the worker exits
+	failOnce         sync.Once                      // guards single fail() delivery
 }
 
 type autoDetectionRetry struct {
-	config confgroup.Config
-	token  autoDetectionRetryToken
-	due    int64
-	index  int
+	config confgroup.Config        // config to re-attempt
+	token  autoDetectionRetryToken // retry token (uid + generation) identifying this attempt
+	due    int64                   // logical time this retry becomes due
+	index  int                     // position in the retry min-heap
 }
 
 type autoDetectionRetryHeap []*autoDetectionRetry

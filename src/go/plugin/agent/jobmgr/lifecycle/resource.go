@@ -20,16 +20,16 @@ const (
 )
 
 type TaskOutcome struct {
-	kind        TaskOutcomeKind
-	frame       SealedResult
-	prepared    PreparedResource
-	ready       ReadyResource
-	capability  PreparedCapability
-	transaction PreparedResourceTransaction
-	scope       ResourceTransactionScope
-	scopeSet    bool
-	disposition ResourceTransactionDisposition
-	identity    ResourceIdentity
+	kind        TaskOutcomeKind                // discriminant selecting which payload field is set
+	frame       SealedResult                   // sealed result (Frame / applied transaction) payload
+	prepared    PreparedResource               // prepared-resource payload
+	ready       ReadyResource                  // ready-resource payload
+	capability  PreparedCapability             // prepared-capability payload
+	transaction PreparedResourceTransaction    // prepared-resource-transaction payload
+	scope       ResourceTransactionScope       // transaction scope (transaction kinds)
+	scopeSet    bool                           // distinguishes a zero scope from unset
+	disposition ResourceTransactionDisposition // transaction disposition (applied variant)
+	identity    ResourceIdentity               // resource identity for kinds that carry one
 }
 
 func NoValueOutcome() TaskOutcome {

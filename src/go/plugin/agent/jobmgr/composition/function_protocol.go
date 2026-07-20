@@ -17,11 +17,10 @@ import (
 // call into a sealed result plus post-result notifications. FrameOwner remains
 // the only wire writer.
 type functionProtocolCapture struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards active
 
-	frames *lifecycle.FrameOwner
-	active *bytes.Buffer
-	direct bool
+	frames *lifecycle.FrameOwner // the one wire frame writer
+	active *bytes.Buffer         // buffer capturing the current invocation's output; nil when idle
 }
 
 func newFunctionProtocolCapture(
@@ -33,17 +32,6 @@ func newFunctionProtocolCapture(
 	return &functionProtocolCapture{frames: frames}, nil
 }
 
-func newFunctionProtocolCaptureWithDirectFrames(
-	frames *lifecycle.FrameOwner,
-) (*functionProtocolCapture, error) {
-	capture, err := newFunctionProtocolCapture(frames)
-	if err != nil {
-		return nil, err
-	}
-	capture.direct = true
-	return capture, nil
-}
-
 func (fpc *functionProtocolCapture) Write(payload []byte) (int, error) {
 	if fpc == nil {
 		return 0, errors.New("jobmgr composition: nil Function protocol writer")
@@ -52,11 +40,6 @@ func (fpc *functionProtocolCapture) Write(payload []byte) (int, error) {
 	defer fpc.mu.Unlock()
 	if fpc.active != nil {
 		return fpc.active.Write(payload)
-	}
-	if !fpc.direct {
-		return 0, errors.New(
-			"jobmgr composition: Function protocol write outside invocation",
-		)
 	}
 	if err := fpc.frames.CommitBorrowedProtocolFrame(payload); err != nil {
 		return 0, err

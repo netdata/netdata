@@ -127,7 +127,7 @@ func (c *Controller) prepareGet(
 			nil,
 		)
 	}
-	payload, err := jsonMarshal(typed)
+	payload, err := json.Marshal(typed)
 	if err != nil {
 		return nil, err
 	}
@@ -769,8 +769,4 @@ func boundSecretMessage(message string) string {
 		end--
 	}
 	return message[:end] + suffix
-}
-
-func jsonMarshal(value any) ([]byte, error) {
-	return json.Marshal(value)
 }

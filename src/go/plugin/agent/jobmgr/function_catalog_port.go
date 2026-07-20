@@ -20,15 +20,15 @@ const (
 // FunctionLookup is the bounded immutable input to one loop-owned Function
 // route lookup and invocation-lease acquisition.
 type FunctionLookup struct {
-	UID          string
-	Route        string
-	Args         []string
-	Payload      []byte
-	ContentType  string
-	Permissions  string
-	CallerSource string
-	Timeout      time.Duration
-	HasPayload   bool
+	UID          string        // call UID
+	Route        string        // requested Function route
+	Args         []string      // call arguments
+	Payload      []byte        // request payload
+	ContentType  string        // payload content type
+	Permissions  string        // caller permissions
+	CallerSource string        // caller source string
+	Timeout      time.Duration // caller-requested timeout
+	HasPayload   bool          // whether a payload is present
 }
 
 // FunctionInvocationRef identifies one generation-tagged invocation lease
@@ -74,15 +74,15 @@ type FunctionCatalogMutationProgress struct {
 }
 
 type FunctionCatalogCensus struct {
-	Version            uint64
-	Routes             int
-	InvocationLeases   int
-	PendingCleanups    int
-	CompletedCleanups  int
-	FailedCleanups     int
-	CloseRoutesPending int
-	Closed             bool
-	MutationActive     bool
+	Version            uint64 // catalog version
+	Routes             int    // count of live routes
+	InvocationLeases   int    // outstanding invocation leases
+	PendingCleanups    int    // generations with cleanup pending
+	CompletedCleanups  int    // completed cleanups
+	FailedCleanups     int    // failed cleanups
+	CloseRoutesPending int    // routes still on the close list
+	Closed             bool   // catalog is closed
+	MutationActive     bool   // a catalog mutation is in progress
 }
 
 func (fcp FunctionCleanupPlan) validate() error {

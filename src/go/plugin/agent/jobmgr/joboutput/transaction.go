@@ -12,29 +12,29 @@ import (
 )
 
 type ResourceTransactionSpec struct {
-	Scope            lifecycle.ResourceTransactionScope
-	Disposition      lifecycle.ResourceTransactionDisposition
-	Current          lifecycle.ReadyResource
-	Successor        lifecycle.PreparedResource
-	UnusedPermit     lifecycle.LongLivedPermit
-	Graph            *dyncfg.Graph
-	Mutation         dyncfg.GraphMutation
-	MutationPrepared bool
-	AfterGraphCommit func()
-	AfterApply       func()
-	Result           lifecycle.SealedResult
-	Cleanup          lifecycle.TaskCleanup
-	SuccessorFailure func(
+	Scope            lifecycle.ResourceTransactionScope       // identity of current + successor slots this txn spans
+	Disposition      lifecycle.ResourceTransactionDisposition // Unchanged / Installed / Removed / Replaced
+	Current          lifecycle.ReadyResource                  // running resource to stop/finalize (Removed/Replaced)
+	Successor        lifecycle.PreparedResource               // prepared job to start/publish (Installed/Replaced)
+	UnusedPermit     lifecycle.LongLivedPermit                // permit to abort when a successor slot goes unused
+	Graph            *dyncfg.Graph                            // dyncfg graph whose postimage is committed on apply
+	Mutation         dyncfg.GraphMutation                     // prepared graph mutation (valid when MutationPrepared)
+	MutationPrepared bool                                     // Mutation is owned and must be committed or aborted
+	AfterGraphCommit func()                                   // fires after the primary graph commit
+	AfterApply       func()                                   // fires after the whole transaction applies
+	Result           lifecycle.SealedResult                   // sealed dyncfg response for the caller
+	Cleanup          lifecycle.TaskCleanup                    // protocol-frame cleanup emitted on success
+	SuccessorFailure func(                                    // resolves an auto-detection failure into a fallback outcome
 		*autoDetectionFailure,
 	) (SuccessorFailureResolution, error)
 }
 
 type SuccessorFailureResolution struct {
-	Postimage        *dyncfg.GraphConfig
-	AfterGraphCommit func()
-	AfterApply       func()
-	Result           lifecycle.SealedResult
-	Cleanup          lifecycle.TaskCleanup
+	Postimage        *dyncfg.GraphConfig    // graph postimage to commit (nil = remove)
+	AfterGraphCommit func()                 // fires after the graph commit
+	AfterApply       func()                 // fires after apply (e.g. schedule a retry)
+	Result           lifecycle.SealedResult // sealed dyncfg response
+	Cleanup          lifecycle.TaskCleanup  // protocol-frame cleanup
 }
 
 // PreparedResourceTransaction owns one unpublished graph postimage and the
@@ -47,15 +47,15 @@ type PreparedResourceTransaction struct {
 }
 
 type PreparedNoopResourceTransaction struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards consumed
 
-	consumed   bool
-	scope      lifecycle.ResourceTransactionScope
-	current    lifecycle.ReadyResource
-	permit     lifecycle.LongLivedPermit
-	result     lifecycle.SealedResult
-	cleanup    lifecycle.TaskCleanup
-	afterApply func()
+	consumed   bool                               // the transaction has been applied or disposed
+	scope      lifecycle.ResourceTransactionScope // the (no-op) transaction scope
+	current    lifecycle.ReadyResource            // unchanged current resource, if any
+	permit     lifecycle.LongLivedPermit          // permit to abort on apply (usually empty)
+	result     lifecycle.SealedResult             // sealed dyncfg response to deliver
+	cleanup    lifecycle.TaskCleanup              // protocol-frame cleanup on success
+	afterApply func()                             // side effect after apply
 }
 
 func PrepareNoopResourceTransaction(
@@ -67,7 +67,7 @@ func PrepareNoopResourceTransaction(
 	afterApply func(),
 ) (*PreparedNoopResourceTransaction, error) {
 	if !scope.Valid() ||
-		(current == nil) != !scope.Current.Valid() ||
+		(current == nil) == scope.Current.Valid() ||
 		current != nil && current.Identity() != scope.Current ||
 		cleanup == nil {
 		return nil, errors.New("job output: invalid no-op transaction")
@@ -475,7 +475,7 @@ func validateResourceTransactionSpec(spec ResourceTransactionSpec) error {
 	switch spec.Disposition {
 	case lifecycle.ResourceTransactionUnchanged:
 		if spec.Successor != nil ||
-			(spec.Current == nil) != !spec.Scope.Current.Valid() {
+			(spec.Current == nil) == spec.Scope.Current.Valid() {
 			return errors.New(
 				"job output: invalid unchanged transaction",
 			)

@@ -41,16 +41,16 @@ const (
 )
 
 type OperationGeneration struct {
-	UID        string
-	LaneKey    string
-	Task       TaskRef
-	ID         OperationID
-	Source     Source
-	State      OperationState
-	Response   ResponseState
-	Child      ChildState
-	timedOut   bool
-	childPhase uint8
+	UID        string         // dedupe UID
+	LaneKey    string         // serialization lane key
+	Task       TaskRef        // bound child task ref once started
+	ID         OperationID    // operation identity
+	Source     Source         // ingress origin (JobManager / Function)
+	State      OperationState // monotonic operation phase
+	Response   ResponseState  // response-frame state machine
+	Child      ChildState     // child sub-state machine
+	timedOut   bool           // operation deadline fired
+	childPhase uint8          // last child phase sequence acknowledged
 }
 
 func NewOperation(id OperationID, uid string, source Source, laneKey string, responseRequired bool) (*OperationGeneration, error) {

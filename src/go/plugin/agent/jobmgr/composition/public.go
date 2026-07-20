@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -38,48 +39,48 @@ type RuntimeService interface {
 // the mutable registries and constructs the provider, secret-creator, resolver,
 // vnode-metadata, admission, UID, and frame authorities exactly once.
 type Config struct {
-	Input  io.Reader
-	Output io.Writer
+	Input  io.Reader // plugin stdin
+	Output io.Writer // plugin stdout
 
-	PluginName string
-	Modules    collectorapi.Registry
-	Defaults   confgroup.Registry
+	PluginName string                // plugin name (go.d / ibm.d / scripts.d)
+	Modules    collectorapi.Registry // enabled collector module registry
+	Defaults   confgroup.Registry    // per-module config defaults
 
-	DiscoveryBuildContext agentdiscovery.BuildContext
-	DiscoveryProviders    []agentdiscovery.ProviderFactory
-	RunJob                []string
-	AutoEnable            bool
+	DiscoveryBuildContext agentdiscovery.BuildContext      // discovery build context (paths, defaults)
+	DiscoveryProviders    []agentdiscovery.ProviderFactory // discovery provider factories
+	RunJob                []string                         // allow-list filter of job names (empty = allow all)
+	AutoEnable            bool                             // publish discovered jobs as Running vs Accepted
 
-	SecretStoreCreators []secretstore.Creator
-	Resolver            *secretresolver.AtomicResolver
-	InitialSecrets      []secretstore.Config
-	InitialVnodes       map[string]*vnodes.VirtualNode
-	InitialJobs         []dyncfg.GraphConfig
+	SecretStoreCreators []secretstore.Creator          // secret store backend creators (vault/aws/azure/gcp)
+	Resolver            *secretresolver.AtomicResolver // atomic secret resolver
+	InitialSecrets      []secretstore.Config           // initial secret store configs
+	InitialVnodes       map[string]*vnodes.VirtualNode // file-configured vnodes
+	InitialJobs         []dyncfg.GraphConfig           // initial (stock/user) job configs
 
-	Runtime RuntimeService
+	Runtime RuntimeService // runtime service (charts/host-scope; nil disables runtime charts)
 
-	FirstGeneration uint64
-	ShutdownTimeout time.Duration
-	Clock           lifecycle.Clock
-	KeepAlive       bool
+	FirstGeneration uint64          // starting run generation (0 -> 1)
+	ShutdownTimeout time.Duration   // per-run shutdown budget
+	Clock           lifecycle.Clock // logical/real clock
+	KeepAlive       bool            // emit keepalive frames (long-lived agent mode)
 }
 
 // Process owns the one process-lifetime ingress and rotates only complete run
 // generations. Restart and Terminate are acknowledged by Run returning from
 // the resulting transition or final shutdown.
 type Process struct {
-	core     *processCore
-	commands chan processControl
-	started  chan struct{}
-	done     chan struct{}
+	core     *processCore        // the process core (owns ledgers, ingress, frames)
+	commands chan processControl // inbound Restart/Terminate controls
+	started  chan struct{}       // closed once Run starts
+	done     chan struct{}       // closed once Run returns
 
-	mu        sync.Mutex
-	attempted bool
-	running   bool
-	result    error
+	mu        sync.Mutex // guards attempted/running/result
+	attempted bool       // Run has been attempted (once)
+	running   bool       // the process is running
+	result    error      // terminal run result
 
-	runtime    RuntimeService
-	pluginName string
+	runtime    RuntimeService // runtime service (started/stopped around Run)
+	pluginName string         // plugin name
 }
 
 func NewProcess(config Config) (*Process, error) {
@@ -140,7 +141,7 @@ func NewProcess(config Config) (*Process, error) {
 		len(config.InitialJobs),
 	)
 	for index, record := range config.InitialJobs {
-		record.Payload = append([]byte(nil), record.Payload...)
+		record.Payload = slices.Clone(record.Payload)
 		initialJobs[index] = record
 	}
 	build := config.DiscoveryBuildContext
@@ -193,7 +194,7 @@ func NewProcess(config Config) (*Process, error) {
 		Discovery: runDiscoveryServices{
 			BuildContext: build,
 			Providers:    providers,
-			RunJob:       append([]string(nil), config.RunJob...),
+			RunJob:       slices.Clone(config.RunJob),
 			AutoEnable:   config.AutoEnable,
 		},
 		Planner:        productionPlanner,

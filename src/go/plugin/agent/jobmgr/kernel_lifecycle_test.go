@@ -3443,7 +3443,7 @@ func TestKernelShutdownDrainsMoreThanTwoSubmissionQuantaWithoutAnotherWake(t *te
 func TestKernelClosedAdmissionDoesNotRearmFrameBlockedControl(t *testing.T) {
 	kernel, _ := newKernel(t)
 	source := sourceIndex(lifecycle.SourceFunction)
-	kernel.blockedSubmission[source] = true
+	kernel.hasBlockedSubmission[source] = true
 	kernel.blockedSubmissions[source] = submission{controlStatus: lifecycle.ControlBadRequest}
 	require.False(t, kernel.hasRunnableSubmissions())
 }

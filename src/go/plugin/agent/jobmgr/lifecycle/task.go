@@ -60,12 +60,12 @@ const (
 )
 
 type TaskAction struct {
-	Ref                TaskRef
-	Sequence           uint8
-	Kind               TaskActionKind
-	UID                string
-	Expiry             int64
-	ExpectedGeneration uint64
+	Ref                TaskRef        // target task ref
+	Sequence           uint8          // phase-action sequence number
+	Kind               TaskActionKind // action kind (accept-start / commit / apply / dispose)
+	UID                string         // operation UID for correlation
+	Expiry             int64          // result expiry stamp
+	ExpectedGeneration uint64         // generation the action expects the resource to match
 }
 
 type TaskAcknowledgement struct {
@@ -77,32 +77,32 @@ type TaskAcknowledgement struct {
 }
 
 type taskSlot struct {
-	generation             uint64
-	freeNext               uint32
-	active                 bool
-	joined                 bool
-	actionPending          bool
-	sequence               uint8
-	maxPhaseTransitions    uint8
-	outcome                TaskOutcome
-	cancel                 context.CancelCauseFunc
-	cleanup                TaskCleanup
-	preserveDisposeContext bool
-	retainedTimeout        bool
-	action                 chan TaskAction
+	generation             uint64                  // ABA guard for the TaskRef
+	freeNext               uint32                  // freelist link
+	active                 bool                    // slot is in use
+	joined                 bool                    // child goroutine has exited its action loop
+	actionPending          bool                    // an action is queued but unacknowledged
+	sequence               uint8                   // last acknowledged phase sequence
+	maxPhaseTransitions    uint8                   // phase-action ceiling (from the plan)
+	outcome                TaskOutcome             // current in-flight outcome (result/resource/capability/transaction)
+	cancel                 context.CancelCauseFunc // child context canceller
+	cleanup                TaskCleanup             // deferred cleanup closure
+	preserveDisposeContext bool                    // dispose under the live (not cancel-stripped) context
+	retainedTimeout        bool                    // child kept alive past a timeout (feeds the fail-stop)
+	action                 chan TaskAction         // 1-deep phase-action mailbox
 }
 
 type taskRequest struct {
-	slot       uint32
-	generation uint32
-	freeNext   uint32
-	previous   uint32
-	next       uint32
-	active     bool
-	class      TaskClass
-	plan       TaskPlan
-	initial    TaskOutcome
-	queuedAt   time.Time
+	slot       uint32      // slot index in the request storage
+	generation uint32      // ABA guard for the request ref
+	freeNext   uint32      // freelist link
+	previous   uint32      // previous request in its class queue
+	next       uint32      // next request in its class queue
+	active     bool        // request slot is in use
+	class      TaskClass   // task class (framework-control / generic Function)
+	plan       TaskPlan    // the task plan to run
+	initial    TaskOutcome // seed outcome carried into the child
+	queuedAt   time.Time   // enqueue time (oldest-wait metric)
 }
 
 type taskRequestQueue struct {
@@ -112,27 +112,27 @@ type taskRequestQueue struct {
 }
 
 type TaskSupervisor struct {
-	frame       *FrameOwner
-	inherited   inheritedTaskRegistry
-	longLived   longLivedRegistry
-	slots       []*taskSlot
-	freeSlot    uint32
-	requests    []*taskRequest
-	pending     [2]taskRequestQueue
-	freeRequest uint32
-	nextClass   TaskClass
-	completions chan TaskCompletion
-	acks        chan TaskAcknowledgement
-	active      int
-	retained    int
-	saturated   bool
-	observer    RuntimeObserver
-	run         *RunSupervisor
-	wake        func()
+	frame       *FrameOwner              // frame owner used as the collector/output sink
+	inherited   inheritedTaskRegistry    // registry of long-lived inherited tasks
+	longLived   longLivedRegistry        // registry of long-lived permits
+	slots       []*taskSlot              // transient task slot storage (freelist-backed)
+	freeSlot    uint32                   // head of the task slot freelist
+	requests    []*taskRequest           // task request storage (freelist-backed)
+	pending     [2]taskRequestQueue      // per-class pending request queues
+	freeRequest uint32                   // head of the request freelist
+	nextClass   TaskClass                // class to service first (round-robin fairness)
+	completions chan TaskCompletion      // inbound task completion channel
+	acks        chan TaskAcknowledgement // inbound task acknowledgement channel
+	active      int                      // count of running task children
+	retained    int                      // count of retained (timed-out) children
+	saturated   bool                     // retained-timeout fail-stop threshold reached
+	observer    RuntimeObserver          // sink for task runtime counters
+	run         *RunSupervisor           // bound run supervisor
+	wake        func()                   // kernel wake callback
 
-	admissionReadyMu      sync.Mutex
-	onAdmissionReady      func()
-	admissionReadyPending bool
+	admissionReadyMu      sync.Mutex // guards the admission-ready notifier
+	onAdmissionReady      func()     // callback fired when admission can make progress
+	admissionReadyPending bool       // an admission-ready notification is pending
 }
 
 func (ts *TaskSupervisor) BindRun(

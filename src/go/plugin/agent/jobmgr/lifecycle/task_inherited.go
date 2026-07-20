@@ -47,22 +47,22 @@ type inheritedTaskRegistry struct {
 }
 
 type inheritedTaskSlot struct {
-	generation     uint32
-	freeNext       uint32
-	active         bool
-	owner          ResourceIdentity
-	role           InheritedTaskRole
-	key            string
-	cancel         context.CancelCauseFunc
-	done           chan struct{}
-	cancelled      bool
-	finished       bool
-	joined         bool
-	releasing      bool
-	permit         LongLivedPermitRef
-	err            error
-	activePrevious uint32
-	activeNext     uint32
+	generation     uint32                  // ABA guard for the task ref
+	freeNext       uint32                  // freelist link
+	active         bool                    // slot is in use
+	owner          ResourceIdentity        // owning resource identity
+	role           InheritedTaskRole       // inherited task role (V1 runtime / V2 runner / pipeline)
+	key            string                  // identity tuple key into the owners map
+	cancel         context.CancelCauseFunc // child context canceller
+	done           chan struct{}           // closed when the child goroutine exits
+	cancelled      bool                    // cancellation requested
+	finished       bool                    // child completed
+	joined         bool                    // child goroutine joined
+	releasing      bool                    // release is in flight
+	permit         LongLivedPermitRef      // long-lived permit backing this task, if any
+	err            error                   // captured child error
+	activePrevious uint32                  // previous slot in the active list (shutdown cursor)
+	activeNext     uint32                  // next slot in the active list (shutdown cursor)
 }
 
 type inheritedOwnerRole struct {

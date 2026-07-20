@@ -18,6 +18,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Stop is a test-only teardown helper that runs the same shutdown sequence the
+// kernel drives in production: BeforeFunctionCatalogClose then FinalizeRun.
+func (fa *FunctionAssembly) Stop() error {
+	if fa == nil {
+		return nil
+	}
+	if err := fa.BeforeFunctionCatalogClose(
+		context.Background(),
+		fa.epoch,
+	); err != nil {
+		return err
+	}
+	return fa.FinalizeRun(context.Background(), fa.epoch)
+}
+
 func TestFunctionAssemblyLifecycle(t *testing.T) {
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)

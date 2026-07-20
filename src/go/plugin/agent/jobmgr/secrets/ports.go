@@ -9,10 +9,10 @@ import (
 // CommandInput is the wire-neutral input consumed by the secret command
 // adapter.
 type CommandInput struct {
-	Args        []string
-	Payload     []byte
-	ContentType string
-	HasPayload  bool
+	Args        []string // dyncfg command arguments
+	Payload     []byte   // request payload
+	ContentType string   // payload content type
+	HasPayload  bool     // whether a payload is present
 }
 
 // CommandPort submits prepared secret plans and waits for acknowledged

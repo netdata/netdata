@@ -5,6 +5,7 @@ package jobmgr
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,14 +14,14 @@ import (
 )
 
 type kernelCompositeScope struct {
-	kernel *CommandKernel
-	parent *commandOperation
-	closed atomic.Bool
-	fenced bool
+	kernel *CommandKernel    // owning kernel
+	parent *commandOperation // parent composite operation
+	closed atomic.Bool       // scope closed to new child submissions
+	fenced bool              // the composite fence is installed
 
-	rollbackMu     sync.Mutex
-	rollbackCtx    context.Context
-	rollbackCancel context.CancelFunc
+	rollbackMu     sync.Mutex         // guards the lazily-created rollback context
+	rollbackCtx    context.Context    // run-owned bounded rollback context
+	rollbackCancel context.CancelFunc // cancels rollbackCtx
 }
 
 func newKernelCompositeScope(
@@ -131,7 +132,7 @@ func (kcs *kernelCompositeScope) submitAndWait(
 			kcs.kernel.abortRequestInputBody(request),
 		)
 	}
-	request.Args = append([]string(nil), request.Args...)
+	request.Args = slices.Clone(request.Args)
 	owned, err := prepareOwnedJobPlan(request, plan)
 	if err != nil {
 		return errors.Join(

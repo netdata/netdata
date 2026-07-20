@@ -19,11 +19,11 @@ const (
 )
 
 type DiscoveredJobChange struct {
-	Config  confgroup.Config
-	Status  dyncfg.Status
-	Remove  bool
-	Restart bool
-	retry   autoDetectionRetryToken
+	Config  confgroup.Config        // discovered job configuration
+	Status  dyncfg.Status           // target graph status (Accepted / Running)
+	Remove  bool                    // remove the job rather than install it
+	Restart bool                    // force a running job to re-prepare
+	retry   autoDetectionRetryToken // auto-detection retry token (zero = not a retry)
 }
 
 func (dcjc *DynCfgJobController) planAutoDetectionRetry(

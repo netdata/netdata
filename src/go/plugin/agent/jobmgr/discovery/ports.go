@@ -19,9 +19,9 @@ type PreparedCommandPort interface {
 }
 
 type DiscoveredChange struct {
-	Config confgroup.Config
-	Status dyncfg.Status
-	Remove bool
+	Config confgroup.Config // the winning discovered config
+	Status dyncfg.Status    // target status (Accepted / Running)
+	Remove bool             // remove the job rather than install it
 }
 
 type PlanDiscovered func(DiscoveredChange) (jobmgr.WorkPlan, error)

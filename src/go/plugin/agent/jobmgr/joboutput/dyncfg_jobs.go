@@ -30,22 +30,22 @@ const (
 var dynCfgJobNameReplacer = strings.NewReplacer(" ", "_", ":", "_")
 
 type DynCfgJobRequest struct {
-	Args         []string
-	Payload      []byte
-	ContentType  string
-	CallerSource string
-	HasPayload   bool
+	Args         []string // dyncfg command arguments
+	Payload      []byte   // request payload
+	ContentType  string   // payload content type
+	CallerSource string   // caller source string
+	HasPayload   bool     // whether a payload is present
 }
 
 type DynCfgJobControllerConfig struct {
-	PluginName    string
-	Modules       collectorapi.Registry
-	Defaults      confgroup.Registry
-	Factory       *Factory
-	ConfigModules *ConfigModuleFactory
-	Graph         *dyncfg.Graph
-	Frames        *lifecycle.FrameOwner
-	Dependencies  JobDependencyIndex
+	PluginName    string                // owning plugin name
+	Modules       collectorapi.Registry // collector module registry
+	Defaults      confgroup.Registry    // per-module config defaults
+	Factory       *Factory              // job construction factory
+	ConfigModules *ConfigModuleFactory  // short-lived config-probe factory
+	Graph         *dyncfg.Graph         // dyncfg graph authority
+	Frames        *lifecycle.FrameOwner // protocol frame sink
+	Dependencies  JobDependencyIndex    // secret-dependency index (optional)
 }
 
 type JobDependencyIndex interface {
@@ -58,17 +58,17 @@ type JobDependencyIndex interface {
 // DynCfgJobController prepares collector configuration graph/resource
 // transactions. CommandKernel remains the only current-job authority.
 type DynCfgJobController struct {
-	pluginName    string
-	prefix        string
-	path          string
-	modules       collectorapi.Registry
-	defaults      confgroup.Registry
-	factory       *Factory
-	configModules *ConfigModuleFactory
-	graph         *dyncfg.Graph
-	frames        *lifecycle.FrameOwner
-	dependencies  JobDependencyIndex
-	scheduler     *Scheduler
+	pluginName    string                // owning plugin
+	prefix        string                // "<plugin>:collector:" ID prefix
+	path          string                // "/collectors/<plugin>/jobs" config path
+	modules       collectorapi.Registry // collector registry
+	defaults      confgroup.Registry    // per-module config defaults
+	factory       *Factory              // job construction factory
+	configModules *ConfigModuleFactory  // short-lived config-probe factory
+	graph         *dyncfg.Graph         // dyncfg graph authority
+	frames        *lifecycle.FrameOwner // protocol frame sink
+	dependencies  JobDependencyIndex    // secret-dependency index (optional)
+	scheduler     *Scheduler            // tick + retry scheduler
 }
 
 func NewDynCfgJobController(
@@ -140,7 +140,7 @@ func (dcjc *DynCfgJobController) Handle(
 		return lifecycle.SealedResult{},
 			errors.New("job output: invalid DynCfg request")
 	}
-	target, result := dcjc.resolveRequest(request, false)
+	target, result := dcjc.resolveRequest(request)
 	if result.valid {
 		return result.result, nil
 	}
@@ -227,7 +227,7 @@ func (dcjc *DynCfgJobController) Prepare(
 			"job output: invalid DynCfg transaction preparation",
 		)
 	}
-	target, failure := dcjc.resolveRequest(request, true)
+	target, failure := dcjc.resolveRequest(request)
 	if failure.valid {
 		return dcjc.noop(scope, current, permit, failure.result)
 	}
@@ -396,6 +396,27 @@ func (dcjc *DynCfgJobController) prepareAdd(
 	)
 }
 
+// updateCleanup selects the protocol cleanup for an update postimage: a plain
+// status echo for dyncfg-sourced configs, or a full CONFIG CREATE that adopts a
+// non-dyncfg (stock/discovered) config into dyncfg ownership.
+func (dcjc *DynCfgJobController) updateCleanup(
+	target dynCfgTarget,
+	request DynCfgJobRequest,
+	oldConfig confgroup.Config,
+	postimage dyncfg.GraphConfig,
+	status dyncfg.Status,
+) lifecycle.TaskCleanup {
+	if oldConfig.SourceType() != confgroup.TypeDyncfg {
+		return dcjc.configCreateCleanup(
+			postimage,
+			confgroup.TypeDyncfg,
+			request.CallerSource,
+			dcjc.configType(target.creator),
+		)
+	}
+	return dcjc.configStatusCleanup(target.resourceID, status)
+}
+
 func (dcjc *DynCfgJobController) prepareUpdate(
 	ctx context.Context,
 	request DynCfgJobRequest,
@@ -481,18 +502,9 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		Status: record.Status, Payload: payload,
 	}
 	if record.Status == dyncfg.StatusDisabled.String() {
-		cleanup := dcjc.configStatusCleanup(
-			target.resourceID,
-			dyncfg.StatusDisabled,
+		cleanup := dcjc.updateCleanup(
+			target, request, oldConfig, postimage, dyncfg.StatusDisabled,
 		)
-		if oldConfig.SourceType() != confgroup.TypeDyncfg {
-			cleanup = dcjc.configCreateCleanup(
-				postimage,
-				confgroup.TypeDyncfg,
-				request.CallerSource,
-				dcjc.configType(target.creator),
-			)
-		}
 		return dcjc.prepareMutation(
 			scope,
 			current,
@@ -531,32 +543,14 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 	if current != nil {
 		disposition = lifecycle.ResourceTransactionReplaced
 	}
-	cleanup := dcjc.configStatusCleanup(
-		target.resourceID,
-		dyncfg.StatusRunning,
+	cleanup := dcjc.updateCleanup(
+		target, request, oldConfig, postimage, dyncfg.StatusRunning,
 	)
-	if oldConfig.SourceType() != confgroup.TypeDyncfg {
-		cleanup = dcjc.configCreateCleanup(
-			postimage,
-			confgroup.TypeDyncfg,
-			request.CallerSource,
-			dcjc.configType(target.creator),
-		)
-	}
 	failedPostimage := postimage
 	failedPostimage.Status = dyncfg.StatusFailed.String()
-	failedCleanup := dcjc.configStatusCleanup(
-		target.resourceID,
-		dyncfg.StatusFailed,
+	failedCleanup := dcjc.updateCleanup(
+		target, request, oldConfig, failedPostimage, dyncfg.StatusFailed,
 	)
-	if oldConfig.SourceType() != confgroup.TypeDyncfg {
-		failedCleanup = dcjc.configCreateCleanup(
-			failedPostimage,
-			confgroup.TypeDyncfg,
-			request.CallerSource,
-			dcjc.configType(target.creator),
-		)
-	}
 	return dcjc.prepareMutation(
 		scope,
 		current,
@@ -1149,12 +1143,12 @@ func (dcjc *DynCfgJobController) scheduleAutoDetectionRetry(
 }
 
 type successorFailurePlan struct {
-	postimage        dyncfg.GraphConfig
-	failedCleanup    lifecycle.TaskCleanup
-	removedCleanup   lifecycle.TaskCleanup
-	result           func(*autoDetectionFailure) lifecycle.SealedResult
-	afterApply       func(*autoDetectionFailure)
-	removePlainStock bool
+	postimage        dyncfg.GraphConfig                                 // graph postimage to commit as StatusFailed
+	failedCleanup    lifecycle.TaskCleanup                              // protocol cleanup for the failed status
+	removedCleanup   lifecycle.TaskCleanup                              // protocol cleanup when a plain stock job is removed instead
+	result           func(*autoDetectionFailure) lifecycle.SealedResult // builds the dyncfg response from the failure
+	afterApply       func(*autoDetectionFailure)                        // side effect (retry scheduling) after apply
+	removePlainStock bool                                               // remove instead of fail for a stock + non-coded failure
 }
 
 func successorFailureResolver(
@@ -1265,7 +1259,6 @@ func (dcjc *DynCfgJobController) noopWithAfterApply(
 
 func (dcjc *DynCfgJobController) resolveRequest(
 	request DynCfgJobRequest,
-	mutation bool,
 ) (dynCfgTarget, dynCfgFailure) {
 	if len(request.Args) < 2 {
 		return dynCfgTarget{}, newDynCfgFailure(
@@ -1372,18 +1365,6 @@ func (dcjc *DynCfgJobController) resolveRequest(
 	resourceID := module + "_" + name
 	if module == name {
 		resourceID = module
-	}
-	if mutation &&
-		command != dyncfg.CommandAdd &&
-		command != dyncfg.CommandUpdate &&
-		command != dyncfg.CommandEnable &&
-		command != dyncfg.CommandRestart &&
-		command != dyncfg.CommandDisable &&
-		command != dyncfg.CommandRemove {
-		return dynCfgTarget{
-			command: command, module: module, name: name,
-			resourceID: resourceID, creator: creator,
-		}, dynCfgFailure{}
 	}
 	return dynCfgTarget{
 		command: command, module: module, name: name,
@@ -1631,11 +1612,11 @@ func mustDynCfgMessage(
 }
 
 type dynCfgTarget struct {
-	command    dyncfg.Command
-	module     string
-	name       string
-	resourceID string
-	creator    collectorapi.Creator
+	command    dyncfg.Command       // parsed dyncfg command
+	module     string               // collector module name
+	name       string               // job name
+	resourceID string               // graph resource ID (module or module_name)
+	creator    collectorapi.Creator // resolved collector creator
 }
 
 type dynCfgFailure struct {

@@ -23,27 +23,27 @@ const (
 )
 
 type uidRecord struct {
-	state uidState
-	key   string
+	state uidState // record state (active / tombstone / free)
+	key   string   // the UID
 
-	expires time.Time
-	prev    *uidRecord
-	next    *uidRecord
+	expires time.Time  // tombstone expiry time
+	prev    *uidRecord // previous record in the tombstone list
+	next    *uidRecord // next record in the tombstone list
 
-	freeNext *uidRecord
+	freeNext *uidRecord // freelist link
 }
 
 type UIDLedger struct {
-	mu     sync.Mutex
-	closed bool
+	mu     sync.Mutex // guards all fields
+	closed bool       // ledger is closed (shutdown)
 
-	free  *uidRecord
-	index map[string]*uidRecord
+	free  *uidRecord            // head of the record freelist
+	index map[string]*uidRecord // active + tombstoned records by UID
 
-	tombstoneHead *uidRecord
-	tombstoneTail *uidRecord
-	active        int
-	tombstones    int
+	tombstoneHead *uidRecord // head of the timed tombstone list
+	tombstoneTail *uidRecord // tail of the timed tombstone list
+	active        int        // count of active UIDs
+	tombstones    int        // count of tombstoned UIDs
 }
 
 func NewUIDLedger() *UIDLedger {

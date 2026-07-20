@@ -5,6 +5,7 @@ package functions
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -14,17 +15,17 @@ import (
 
 // Ingress translates process Function commands into lifecycle-kernel commands.
 type Ingress struct {
-	kernel jobmgr.AdmissionCommandPort
-	clock  lifecycle.Clock
-	quit   func()
-	once   sync.Once
+	kernel jobmgr.AdmissionCommandPort // admission command port to submit calls to
+	clock  lifecycle.Clock             // clock for deadline derivation
+	quit   func()                      // cancels the ingress reader
+	once   sync.Once                   // guards quit (once)
 }
 
 type inputBodyBudget struct {
-	admission     *lifecycle.AdmissionLedger
-	kernel        jobmgr.AdmissionCommandPort
-	runGeneration uint64
-	grants        <-chan lifecycle.AdmissionGrant
+	admission     *lifecycle.AdmissionLedger      // admission ledger granting input-body growth
+	kernel        jobmgr.AdmissionCommandPort     // command port notified when body grants arrive
+	runGeneration uint64                          // run generation this budget serves
+	grants        <-chan lifecycle.AdmissionGrant // channel of input-body growth grants
 }
 
 func NewIngress(kernel jobmgr.AdmissionCommandPort, clock lifecycle.Clock, quit func()) (*Ingress, error) {
@@ -80,7 +81,7 @@ func (i *Ingress) HandleCall(ctx context.Context, call functionwire.Call) error 
 	}
 	return i.kernel.Submit(ctx, jobmgr.Request{
 		UID: call.UID, Source: lifecycle.SourceFunction, Route: call.Method,
-		Args: append([]string(nil), call.Args...), Payload: call.Payload, ContentType: call.ContentType,
+		Args: slices.Clone(call.Args), Payload: call.Payload, ContentType: call.ContentType,
 		Permissions: call.Access, CallerSource: call.Source, Timeout: call.Timeout,
 		HasPayload: call.HasPayload, InputBodyToken: call.InputBodyToken, PayloadCapacity: call.PayloadCapacity,
 		Deadline: deadline,

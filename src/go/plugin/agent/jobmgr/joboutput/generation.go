@@ -73,19 +73,15 @@ const (
 )
 
 type ConstructedJob struct {
-	Runtime            jobruntime.Runtime
-	Handlers           HandlerLifecycle
-	Observer           lifecycle.RuntimeObserver
-	FrameOwner         *lifecycle.FrameOwner
-	PrepareCleanup     func(uint64) (PreparedVNodeFrame, error)
-	ReleaseVNode       func() error
-	CollectorCleanup   func(context.Context) error
-	Variant            JobVariant
-	SuppressCleanup    bool
-	autoDetection      func(context.Context) error
-	autoDetectionEvery func() int
-	finalCleanup       func(context.Context) error
-	retryAutoDetection func() bool
+	Runtime            jobruntime.Runtime          // collector run loop wrapped as a jobruntime.Runtime
+	Handlers           HandlerLifecycle            // Function-handler lifecycle; nil when the job has no Functions
+	Observer           lifecycle.RuntimeObserver   // runtime gauge sink for active-job accounting
+	CollectorCleanup   func(context.Context) error // opaque collector teardown; swapped reject->final on Accept
+	Variant            JobVariant                  // V1 or V2 collector shape
+	autoDetection      func(context.Context) error // managed auto-detection probe run during Accept
+	autoDetectionEvery func() int                  // retry cadence (seconds) reported by the collector
+	finalCleanup       func(context.Context) error // Cleanup() variant installed once the job is accepted
+	retryAutoDetection func() bool                 // whether a failed auto-detection should be rescheduled
 }
 
 func (cj ConstructedJob) validate() error {
@@ -93,12 +89,6 @@ func (cj ConstructedJob) validate() error {
 		cj.Runtime == nil ||
 		cj.CollectorCleanup == nil {
 		return errors.New("job output: incomplete constructed job")
-	}
-	if (cj.PrepareCleanup == nil) == !cj.SuppressCleanup {
-		return errors.New("job output: cleanup output must be prepared or explicitly suppressed")
-	}
-	if cj.PrepareCleanup != nil && cj.FrameOwner == nil {
-		return errors.New("job output: cleanup output has no FrameOwner")
 	}
 	return nil
 }
@@ -108,12 +98,12 @@ type PreparedJob struct {
 }
 
 type preparedJobState struct {
-	mu          sync.Mutex
-	consumed    bool
-	id          string
-	generation  uint64
-	constructed ConstructedJob
-	permit      lifecycle.LongLivedPermit
+	mu          sync.Mutex                // guards consumed
+	consumed    bool                      // the prepared job has been taken (accept/dispose/reject)
+	id          string                    // job full name
+	generation  uint64                    // job generation this candidate targets
+	constructed ConstructedJob            // the assembled but not-yet-started job
+	permit      lifecycle.LongLivedPermit // long-lived permit held until accepted or disposed
 }
 
 func prepareJob(
@@ -327,20 +317,20 @@ func (pj PreparedJob) takeForGeneration(
 }
 
 type JobGeneration struct {
-	resources      ConstructedJob
-	permit         lifecycle.LongLivedPermit
-	stopErr        error
-	terminalErr    error
-	stopDone       chan struct{}
-	done           chan struct{}
-	ID             string
-	Generation     uint64
-	mu             sync.Mutex
-	state          JobState
-	Variant        JobVariant
-	finished       bool
-	stopFinished   bool
-	observedActive bool
+	resources      ConstructedJob            // the constructed job this generation owns
+	permit         lifecycle.LongLivedPermit // long-lived permit backing the generation
+	stopErr        error                     // memoized result of the terminal Stop path
+	terminalErr    error                     // memoized result of finish()/Finalize()
+	stopDone       chan struct{}             // closed when Stop() reaches a terminal stop state
+	done           chan struct{}             // closed when the generation is finished
+	ID             string                    // job full name
+	Generation     uint64                    // lifecycle generation counter for this instance
+	mu             sync.Mutex                // guards state + the *Err/*finished fields
+	state          JobState                  // current JobState in the lifecycle FSM
+	Variant        JobVariant                // V1 or V2 collector shape
+	finished       bool                      // finish() has run (done closed)
+	stopFinished   bool                      // finishStop() has run (stopDone closed)
+	observedActive bool                      // active-job gauge currently reflects this generation
 }
 
 func (jg *JobGeneration) Identity() lifecycle.ResourceIdentity {
@@ -496,35 +486,10 @@ func (jg *JobGeneration) Stop(ctx context.Context) error {
 	}); err != nil {
 		return jg.finishStop(JobRetained, err)
 	}
-	if jg.resources.PrepareCleanup != nil {
-		prepared, err := callPreparedCleanup(
-			jg.resources.PrepareCleanup,
-			jg.Generation,
-		)
-		if err != nil {
-			return jg.finishStop(JobRetained, err)
-		}
-		if prepared.Generation() != jg.Generation {
-			return jg.finishStop(
-				JobRetained,
-				errors.Join(ErrJobGenerationMismatch, prepared.Abort()),
-			)
-		}
-		if err := callJobLifecycle("cleanup frame transfer", func() error {
-			return prepared.Transfer(jg.resources.FrameOwner)
-		}); err != nil {
-			return jg.finishStop(JobRetained, err)
-		}
-	}
 	if err := callJobLifecycle("runtime post-cleanup release", func() error {
 		return jg.resources.Runtime.ReleaseAfterCleanup(ctx)
 	}); err != nil {
 		return jg.finishStop(JobRetained, err)
-	}
-	if jg.resources.ReleaseVNode != nil {
-		if err := callJobLifecycle("vnode release", jg.resources.ReleaseVNode); err != nil {
-			return jg.finishStop(JobRetained, err)
-		}
 	}
 	if jg.resources.Handlers != nil {
 		if err := callJobLifecycle("handler Cleanup", func() error {
@@ -661,11 +626,6 @@ func cleanupConstructed(
 			return err
 		}
 	}
-	if constructed.ReleaseVNode != nil {
-		if err := callJobLifecycle("vnode release", constructed.ReleaseVNode); err != nil {
-			return err
-		}
-	}
 	if constructed.CollectorCleanup != nil {
 		if err := callJobLifecycle("collector Cleanup", func() error {
 			return constructed.CollectorCleanup(ctx)
@@ -709,23 +669,6 @@ func callConstructJob(
 	}()
 	constructed, err = build(ctx)
 	return constructed, err, true
-}
-
-func callPreparedCleanup(
-	prepare func(uint64) (PreparedVNodeFrame, error),
-	generation uint64,
-) (prepared PreparedVNodeFrame, err error) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			prepared = PreparedVNodeFrame{}
-			err = fmt.Errorf(
-				"%w in cleanup preparation: %v",
-				lifecycle.ErrTaskPanic,
-				recovered,
-			)
-		}
-	}()
-	return prepare(generation)
 }
 
 func callJobLifecycle(name string, call func() error) (err error) {

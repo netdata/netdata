@@ -12,13 +12,13 @@ import (
 )
 
 type storeGenerationResource struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards retired
 
-	identity lifecycle.ResourceIdentity
-	store    *secretstore.SecretStore
-	key      string
-	storeGen uint64
-	retired  bool
+	identity lifecycle.ResourceIdentity // resource identity of the store generation
+	store    *secretstore.SecretStore   // the secret store
+	key      string                     // store key (kind_name)
+	storeGen uint64                     // the store generation number this resource retires
+	retired  bool                       // the generation has been retired
 }
 
 func newStoreGenerationResource(

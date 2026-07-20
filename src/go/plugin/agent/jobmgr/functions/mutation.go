@@ -27,47 +27,47 @@ type RouteChange struct {
 }
 
 type preparedGeneration struct {
-	declaration HandlerGenerationDeclaration
-	generation  *handlerGeneration
-	references  int
-	initialized bool
+	declaration HandlerGenerationDeclaration // the handler-generation declaration
+	generation  *handlerGeneration           // the built handler generation
+	references  int                          // route references to assign at commit
+	initialized bool                         // generation has been constructed
 }
 
 type preparedRouteChange struct {
-	publicName  string
-	prefix      string
-	generation  int
-	declaration *Declaration
+	publicName  string       // route name key
+	prefix      string       // optional prefix (empty = direct route)
+	generation  int          // 1-based index into the mutation's generations (0 = removal)
+	declaration *Declaration // desired route declaration (nil = removal)
 
-	placeholder *route
-	resolved    *route
+	placeholder *route // topology-phase stand-in route
+	resolved    *route // materialize-phase final route
 
-	namePath     []*catalogNode
-	nameBranches []uint8
-	nameCopies   [2][]*catalogNode
+	namePath     []*catalogNode    // captured name-trie node path
+	nameBranches []uint8           // per-depth child branch taken on the name descent
+	nameCopies   [2][]*catalogNode // pre-allocated copy-on-write node sets (quiesce/materialize)
 
-	prefixPath     []*prefixNode
-	prefixBranches []uint8
-	prefixCopies   [2][]*prefixNode
+	prefixPath     []*prefixNode    // captured prefix-trie node path
+	prefixBranches []uint8          // per-depth child branch on the prefix descent
+	prefixCopies   [2][]*prefixNode // pre-allocated prefix copy-on-write node sets
 }
 
 // Mutation is an off-loop-owned, fully allocated mutation request. NewMutation
 // performs payload-relative validation and allocates every path-copy record so
 // KernelLoop preparation can be node-bounded and allocation-free.
 type Mutation struct {
-	expectedVersion     uint64
-	changes             []preparedRouteChange
-	generations         []preparedGeneration
-	totalNodes          int
-	storage             *catalogStorage
-	storageBytes        int64
-	pathStorageBytes    int64
-	cleanupStorageBytes int64
-	storageState        atomic.Uint32
-	builder             MutationBuilder
-	transitions         []routeTransition
-	removals            []generationRemoval
-	removalIndex        map[*handlerGeneration]int
+	expectedVersion     uint64                     // catalog version this mutation was built against
+	changes             []preparedRouteChange      // per-route changes to apply
+	generations         []preparedGeneration       // new handler generations introduced
+	totalNodes          int                        // total trie nodes touched (accounting)
+	storage             *catalogStorage            // the catalog storage budget
+	storageBytes        int64                      // total storage bytes reserved
+	pathStorageBytes    int64                      // trie-path bytes reserved
+	cleanupStorageBytes int64                      // cleanup-retention bytes reserved
+	storageState        atomic.Uint32              // atomic publish/abort state of the reservation
+	builder             MutationBuilder            // the mutation builder driving apply
+	transitions         []routeTransition          // route transitions to commit
+	removals            []generationRemoval        // generation removals to commit
+	removalIndex        map[*handlerGeneration]int // generation -> removal index
 }
 
 func (*Mutation) FunctionCatalogMutation() {}
@@ -287,10 +287,10 @@ type routeChangeKey struct {
 }
 
 type routeTransition struct {
-	oldRoute           *route
-	newRoute           *route
-	oldAdmissionClosed bool
-	tombstone          bool
+	oldRoute           *route // route being replaced (nil for a pure add)
+	newRoute           *route // successor route (nil for a removal)
+	oldAdmissionClosed bool   // old route's admission-closed state (for rollback)
+	tombstone          bool   // transition is a removal tombstone
 }
 
 type generationRemoval struct {
@@ -321,20 +321,20 @@ const (
 )
 
 type routeMutationStep struct {
-	oldRoute      *route
-	updatedName   *catalogNode
-	updatedPrefix *prefixNode
-	change        *preparedRouteChange
-	replacement   *route
-	nameNode      *catalogNode
-	prefixNode    *prefixNode
-	set           routeSet
-	nameDepth     int
-	prefixDepth   int
-	phaseIndex    int
-	pathByteDelta int64
-	hadRoute      bool
-	state         routeStepPhase
+	oldRoute      *route               // route being replaced at this step
+	updatedName   *catalogNode         // rewritten name-trie leaf
+	updatedPrefix *prefixNode          // rewritten prefix-trie leaf
+	change        *preparedRouteChange // the prepared change being applied
+	replacement   *route               // the successor route
+	nameNode      *catalogNode         // current name-trie node in the descent
+	prefixNode    *prefixNode          // current prefix-trie node in the descent
+	set           routeSet             // which route set (name/prefix) is being walked
+	nameDepth     int                  // current depth in the name descent
+	prefixDepth   int                  // current depth in the prefix descent
+	phaseIndex    int                  // index within the current phase
+	pathByteDelta int64                // storage byte delta from path copies
+	hadRoute      bool                 // a route already existed at this key
+	state         routeStepPhase       // step phase (topology/quiesce/materialize)
 }
 
 type MutationProgress struct {
@@ -346,32 +346,32 @@ type MutationProgress struct {
 // MutationBuilder is catalog-owned after BeginMutation. PrepareStep is the
 // only preparation transition and consumes at most the requested node quantum.
 type MutationBuilder struct {
-	catalog      *Catalog
-	mutation     *Mutation
-	phase        mutationPhase
-	root         *catalogNode
-	change       int
-	generation   int
-	routeOrdinal uint64
-	step         routeMutationStep
-	transitions  []routeTransition
-	removals     []generationRemoval
-	removalIndex map[*handlerGeneration]int
-	removalCount int
-	completed    int
-	lastStep     int
-	postimage    *MutationPostimage
-	pathBytes    int64
-	quiesced     bool
-	failed       bool
-	finished     bool
+	catalog      *Catalog                   // the catalog being mutated
+	mutation     *Mutation                  // the mutation being applied
+	phase        mutationPhase              // topology -> generations -> materialize state machine
+	root         *catalogNode               // working postimage trie root during construction
+	change       int                        // per-phase change cursor index
+	generation   int                        // per-phase generation cursor index
+	routeOrdinal uint64                     // ID offset for newly added routes
+	step         routeMutationStep          // scratch state for the current route step
+	transitions  []routeTransition          // accumulated route transitions
+	removals     []generationRemoval        // accumulated generation removals
+	removalIndex map[*handlerGeneration]int // generation -> removal index
+	removalCount int                        // valid prefix length of removals
+	completed    int                        // count of completed steps
+	lastStep     int                        // index of the last processed step
+	postimage    *MutationPostimage         // the committed postimage once finished
+	pathBytes    int64                      // trie-path bytes accounted so far
+	quiesced     bool                       // predecessors quiesced (admission closed)
+	failed       bool                       // mutation failed and must be aborted
+	finished     bool                       // mutation finished
 }
 
 type MutationPostimage struct {
-	builder   *MutationBuilder
-	root      *catalogNode
-	pathBytes int64
-	finished  bool
+	builder   *MutationBuilder // owning builder
+	root      *catalogNode     // the postimage trie root
+	pathBytes int64            // trie-path bytes in the postimage
+	finished  bool             // postimage committed
 }
 
 // BeginMutation transfers one prepared mutation to the loop-owned catalog.

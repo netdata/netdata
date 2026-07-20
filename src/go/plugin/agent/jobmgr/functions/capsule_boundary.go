@@ -13,20 +13,20 @@ import (
 var errProcessInputContained = errors.New("jobmgr Function process ingress: input capsule contained")
 
 type capsuleBoundary struct {
-	mu          sync.Mutex
-	idle        chan struct{}
-	idleWaiters int
+	mu          sync.Mutex    // guards all fields
+	idle        chan struct{} // channel closed to wake waiters; replaced after each signal
+	idleWaiters int           // count parked on the current idle channel
 
-	target    *ProcessIngress
-	state     ProcessIngressState
-	active    int
-	parsing   bool
-	adopting  bool
-	contained bool
+	target    *ProcessIngress     // ProcessIngress deliveries go to; nil once contained
+	state     ProcessIngressState // mirrors ProcessIngress lifecycle for read admission
+	active    int                 // in-flight delivery acquisitions
+	parsing   bool                // a wire read/parse is in progress
+	adopting  bool                // an Adopt preparation is draining the boundary
+	contained bool                // terminal; target detached, reads discarded
 
-	readReturns    int
-	waitingReads   int
-	discardedReads int
+	readReturns    int // total AcquireInputRead calls (census)
+	waitingReads   int // reads currently parked awaiting live state (census)
+	discardedReads int // reads dropped because contained/detached (census)
 }
 
 type capsuleBoundaryCensus struct {

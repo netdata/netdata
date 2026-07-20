@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -15,26 +15,26 @@ import (
 )
 
 type DecisionConfig struct {
-	Generation uint64
-	RunJob     []string
-	AutoEnable bool
-	Plan       PlanDiscovered
-	Commands   PreparedCommandPort
+	Generation uint64              // run generation
+	RunJob     []string            // allow-list filter of job names (empty = allow all)
+	AutoEnable bool                // publish discovered jobs as Running vs Accepted
+	Plan       PlanDiscovered      // builds a WorkPlan for a discovered change
+	Commands   PreparedCommandPort // prepared-command port for submitting decisions
 }
 
 // DecisionIndex owns one run generation's desired and acknowledged discovery
 // selections.
 type DecisionIndex struct {
-	generation uint64
-	runJob     map[string]struct{}
-	autoEnable bool
-	plan       PlanDiscovered
-	commands   PreparedCommandPort
+	generation uint64              // run generation
+	runJob     map[string]struct{} // allow-list filter set (empty = allow all)
+	autoEnable bool                // publish discovered jobs as Running vs Accepted
+	plan       PlanDiscovered      // builds a WorkPlan for a discovered change
+	commands   PreparedCommandPort // prepared-command port for submitting decisions
 
-	sources      map[string]map[uint64]confgroup.Config
-	candidates   map[string]map[decisionCandidateKey]confgroup.Config
-	acknowledged map[string]acknowledgedConfig
-	revision     uint64
+	sources      map[string]map[uint64]confgroup.Config               // per-source config sets (authoritative full set per source)
+	candidates   map[string]map[decisionCandidateKey]confgroup.Config // per-job candidate configs by key
+	acknowledged map[string]acknowledgedConfig                        // last acknowledged config per job full name
+	revision     uint64                                               // monotonic decision revision
 }
 
 type decisionCandidateKey struct {
@@ -154,7 +154,7 @@ func (di *DecisionIndex) applyGroup(
 	for name := range affected {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	for _, name := range names {
 		if err := di.reconcile(ctx, name); err != nil {
 			return err

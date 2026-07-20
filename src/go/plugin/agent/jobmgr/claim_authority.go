@@ -3,10 +3,10 @@
 package jobmgr
 
 import (
+	"cmp"
 	"container/heap"
 	"errors"
 	"slices"
-	"sort"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -27,23 +27,23 @@ type authorityClaim struct {
 }
 
 type authorityClaimKey struct {
-	references      int
-	writer          *authorityClaimEdge
-	readerHead      *authorityClaimEdge
-	readerTail      *authorityClaimEdge
-	waiterHead      *authorityClaimEdge
-	waiterTail      *authorityClaimEdge
-	settlementIndex int
+	references      int                 // outstanding edges referencing this key
+	writer          *authorityClaimEdge // the write edge currently holding the key, if any
+	readerHead      *authorityClaimEdge // head of the reader edge list
+	readerTail      *authorityClaimEdge // tail of the reader edge list
+	waiterHead      *authorityClaimEdge // head of the FIFO waiter list
+	waiterTail      *authorityClaimEdge // tail of the FIFO waiter list
+	settlementIndex int                 // index in the settlement heap (-1 when absent)
 }
 
 type authorityClaimEdge struct {
-	claim     authorityClaim
-	operation *commandOperation
-	key       *authorityClaimKey
-	held      bool
-	waiting   bool
-	prev      *authorityClaimEdge
-	next      *authorityClaimEdge
+	claim     authorityClaim      // the (key, mode) this edge requests
+	operation *commandOperation   // operation owning this edge
+	key       *authorityClaimKey  // the claim key this edge is registered against
+	held      bool                // the edge currently holds the key
+	waiting   bool                // the edge is parked in the key's waiter list
+	prev      *authorityClaimEdge // previous edge in the key's reader/waiter list
+	next      *authorityClaimEdge // next edge in the key's reader/waiter list
 }
 
 type authorityClaimHeap []*authorityClaimKey
@@ -77,15 +77,15 @@ func (ach *authorityClaimHeap) Pop() any {
 }
 
 type claimAuthority struct {
-	keys             map[string]*authorityClaimKey
-	nextTicket       uint64
-	waiterCount      int
-	settlements      authorityClaimHeap
-	settlementGrants [maximumClaimSettlementQuantum]*commandOperation
-	observer         lifecycle.RuntimeObserver
-	now              func() time.Time
-	waitHead         *commandOperation
-	waitTail         *commandOperation
+	keys             map[string]*authorityClaimKey                    // active claim keys by string
+	nextTicket       uint64                                           // next global FIFO ticket to assign
+	waiterCount      int                                              // count of operations currently waiting
+	settlements      authorityClaimHeap                               // min-heap of keys with a serviceable waiter (by ticket)
+	settlementGrants [maximumClaimSettlementQuantum]*commandOperation // reusable grant buffer for one settlement quantum
+	observer         lifecycle.RuntimeObserver                        // sink for claim runtime counters
+	now              func() time.Time                                 // clock for the oldest-wait metric
+	waitHead         *commandOperation                                // head of the global wait list (oldest-wait metric)
+	waitTail         *commandOperation                                // tail of the global wait list
 }
 
 func newClaimAuthority() *claimAuthority {
@@ -125,11 +125,11 @@ func normalizeAuthorityClaimModes(writeClaims, readClaims []string) ([]authority
 			return nil, errors.New("jobmgr claims: empty key")
 		}
 	}
-	sort.Slice(claims, func(i, j int) bool {
-		if claims[i].key == claims[j].key {
-			return claims[i].mode > claims[j].mode
+	slices.SortFunc(claims, func(a, b authorityClaim) int {
+		if a.key != b.key {
+			return cmp.Compare(a.key, b.key)
 		}
-		return claims[i].key < claims[j].key
+		return cmp.Compare(b.mode, a.mode)
 	})
 	claims = slices.CompactFunc(claims, func(left, right authorityClaim) bool { return left.key == right.key })
 	return claims, nil

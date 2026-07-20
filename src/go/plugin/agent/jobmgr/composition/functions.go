@@ -18,17 +18,17 @@ import (
 // Function catalog, which the kernel consumes, and the mutation capability,
 // which the kernel publishes after construction.
 type FunctionAssembly struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards the lifecycle flags
 
-	epoch       uint64
-	controller  *functionadapter.Controller
-	catalog     *functionadapter.Catalog
-	publication *functionadapter.Publication
-	hooks       functionJobHooks
-	bound       bool
-	active      bool
-	draining    bool
-	stopped     bool
+	epoch       uint64                       // run generation this assembly belongs to
+	controller  *functionadapter.Controller  // Function controller (route planning + publication)
+	catalog     *functionadapter.Catalog     // the route catalog
+	publication *functionadapter.Publication // external FUNCTION/FUNCTION_DEL registration set
+	hooks       functionJobHooks             // job handler-lifecycle hooks
+	bound       bool                         // Bind has run
+	active      bool                         // Activate has run (initial snapshot published)
+	draining    bool                         // shutdown draining has begun
+	stopped     bool                         // fully stopped
 }
 
 func NewFunctionAssembly(
@@ -186,21 +186,6 @@ func (fa *FunctionAssembly) FinalizeRun(
 	}
 	fa.stopped = true
 	return fa.controller.Stop(fa.epoch)
-}
-
-// Stop is the direct construction-abort helper. Active production runs use the
-// kernel-owned barrier and finalizer methods above.
-func (fa *FunctionAssembly) Stop() error {
-	if fa == nil {
-		return nil
-	}
-	if err := fa.BeforeFunctionCatalogClose(
-		context.Background(),
-		fa.epoch,
-	); err != nil {
-		return err
-	}
-	return fa.FinalizeRun(context.Background(), fa.epoch)
 }
 
 type functionJobHooks struct {

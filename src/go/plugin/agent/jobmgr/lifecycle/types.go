@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -30,13 +31,13 @@ const (
 )
 
 type SealedResult struct {
-	status       int
-	contentType  string
-	payloadKind  sealedPayloadKind
-	payload      []byte
-	value        Value
-	payloadBytes int
-	planBytes    int64
+	status       int               // HTTP-ish status (100-599)
+	contentType  string            // payload MIME type
+	payloadKind  sealedPayloadKind // raw bytes vs a closed Value
+	payload      []byte            // owned raw bytes (raw kind)
+	value        Value             // closed Value (value kind)
+	payloadBytes int               // encoded payload length for framing
+	planBytes    int64             // accounting charge (raw: byte length; value: value.charge)
 }
 
 type sealedPayloadKind uint8
@@ -51,7 +52,7 @@ func NewSealedResult(status int, contentType string, payload []byte) (SealedResu
 	if err := result.validate(); err != nil {
 		return SealedResult{}, err
 	}
-	result.payload = append([]byte(nil), payload...)
+	result.payload = slices.Clone(payload)
 	return result, nil
 }
 
@@ -233,27 +234,27 @@ func allErrorLeavesMatch(
 }
 
 type TaskPlan struct {
-	Source                 Source
-	Deadline               time.Time
-	InitialCancellation    error
-	MaxPhaseTransitions    uint8
-	Work                   TaskWork
-	Runner                 TaskRunner
-	Cleanup                TaskCleanup
-	permitAdmission        *AdmissionLedger
-	permitAdmissionRef     AdmissionRef
-	permitOwner            ResourceIdentity
-	permitPlan             LongLivedPlan
-	permitWork             PreparedResourcePermitWork
-	capabilityPermitWork   PreparedCapabilityPermitWork
-	transactionWork        PreparedResourceTransactionWork
-	transactionScope       ResourceTransactionScope
-	transactionScopeSet    bool
-	initialReady           ReadyResource
-	initialIdentity        ResourceIdentity
-	taskContext            context.Context
-	preserveDisposeContext bool
-	drainDependent         bool
+	Source                 Source                          // ingress origin; selects the default phase bound
+	Deadline               time.Time                       // absolute child deadline; zero = none
+	InitialCancellation    error                           // pre-arm the child context as cancelled/deadline
+	MaxPhaseTransitions    uint8                           // phase-action ceiling; 0 = source default
+	Work                   TaskWork                        // one-shot work closure (one work source)
+	Runner                 TaskRunner                      // reusable work runner (one work source)
+	Cleanup                TaskCleanup                     // post-disposal cleanup
+	permitAdmission        *AdmissionLedger                // admission ledger for a long-lived permit
+	permitAdmissionRef     AdmissionRef                    // admission record backing the permit
+	permitOwner            ResourceIdentity                // owning resource identity for the permit
+	permitPlan             LongLivedPlan                   // long-lived plan terms
+	permitWork             PreparedResourcePermitWork      // permit-bound resource work (one variant)
+	capabilityPermitWork   PreparedCapabilityPermitWork    // permit-bound capability work (one variant)
+	transactionWork        PreparedResourceTransactionWork // permit-bound transaction work (one variant)
+	transactionScope       ResourceTransactionScope        // current/successor identities a transaction may touch
+	transactionScopeSet    bool                            // distinguishes a zero scope from unset
+	initialReady           ReadyResource                   // pre-existing ready resource threaded in as the work source
+	initialIdentity        ResourceIdentity                // identity of initialReady
+	taskContext            context.Context                 // shutdown-budget context substituted for the dispatch parent
+	preserveDisposeContext bool                            // dispose under the live context
+	drainDependent         bool                            // task owns a ready resource that must drain before terminal
 }
 
 func NewResourceTransactionTaskPlan(

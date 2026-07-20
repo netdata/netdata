@@ -23,20 +23,20 @@ const (
 // resource-scoped commands. The submitting adapter transfers ownership of Args
 // and Payload until the request reaches terminal disposal.
 type Request struct {
-	Deadline        time.Time
-	ContentType     string
-	Route           string
-	UID             string
-	Permissions     string
-	CallerSource    string
-	LaneKey         string
-	Args            []string
-	Payload         []byte
-	Timeout         time.Duration
-	InputBodyToken  uint64
-	PayloadCapacity int64
-	Source          lifecycle.Source
-	HasPayload      bool
+	Deadline        time.Time        // absolute request deadline; zero = none
+	ContentType     string           // payload content type
+	Route           string           // Function route / method id
+	UID             string           // unique command id (dedupe key)
+	Permissions     string           // caller permissions
+	CallerSource    string           // caller source string
+	LaneKey         string           // serialization lane (Job Manager commands only)
+	Args            []string         // command arguments
+	Payload         []byte           // request payload
+	Timeout         time.Duration    // caller-requested timeout
+	InputBodyToken  uint64           // admission token for a reserved input body
+	PayloadCapacity int64            // reserved input-body capacity
+	Source          lifecycle.Source // ingress source (JobManager / Function)
+	HasPayload      bool             // whether a payload is present
 }
 
 // Validate checks the bounded admission invariants independent of mutable

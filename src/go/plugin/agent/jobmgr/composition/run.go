@@ -27,26 +27,26 @@ import (
 type runPlannerFactory func(runPlannerCapabilities) (jobmgr.Planner, jobmgr.RunFinalizer, error)
 
 type runPlannerCapabilities struct {
-	Tasks      *lifecycle.TaskSupervisor
-	Functions  *FunctionAssembly
-	Jobs       *joboutput.Factory
-	DynCfg     *joboutput.DynCfgJobController
-	Graph      *dyncfg.Graph
-	StoreScope func(
+	Tasks      *lifecycle.TaskSupervisor      // task supervisor
+	Functions  *FunctionAssembly              // Function assembly
+	Jobs       *joboutput.Factory             // job factory
+	DynCfg     *joboutput.DynCfgJobController // dyncfg job controller
+	Graph      *dyncfg.Graph                  // dyncfg graph
+	StoreScope func(                          // secret store scope acquirer
 		[]string,
 	) (secretresolver.AtomicScope, error)
-	StoreCensus func() secretstore.SecretStoreCensus
+	StoreCensus func() secretstore.SecretStoreCensus // secret store census accessor
 }
 
 type runJobServices struct {
-	PluginName    string
-	Defaults      confgroup.Registry
-	Resolver      *secretresolver.AtomicResolver
-	StoreCreators *secretstore.CreatorCatalog
-	Runtime       runtimecomp.Service
-	Vnodes        *vnoderegistry.Registry
-	InitialVnodes map[string]*vnodes.VirtualNode
-	Graph         []dyncfg.GraphConfig
+	PluginName    string                         // owning plugin name
+	Defaults      confgroup.Registry             // per-module config defaults
+	Resolver      *secretresolver.AtomicResolver // atomic secret resolver (process-fixed)
+	StoreCreators *secretstore.CreatorCatalog    // frozen secret store creator catalog
+	Runtime       runtimecomp.Service            // runtime service dependency
+	Vnodes        *vnoderegistry.Registry        // vnode metadata registry
+	InitialVnodes map[string]*vnodes.VirtualNode // file-configured vnodes
+	Graph         []dyncfg.GraphConfig           // initial job configs
 }
 
 type runSecretServices struct {
@@ -60,45 +60,45 @@ type autoDetectionRetryWorker interface {
 }
 
 type runGenerationConfig struct {
-	Generation           uint64
-	ShutdownTimeout      time.Duration
-	Clock                lifecycle.Clock
-	Admission            *lifecycle.AdmissionLedger
-	UIDs                 *lifecycle.UIDLedger
-	Frames               *lifecycle.FrameOwner
-	Modules              collectorapi.Registry
-	Jobs                 runJobServices
-	Secrets              runSecretServices
-	Discovery            runDiscoveryServices
-	AdmissionServiceGate <-chan struct{}
-	Planner              runPlannerFactory
+	Generation           uint64                     // this run's generation number
+	ShutdownTimeout      time.Duration              // per-run shutdown budget
+	Clock                lifecycle.Clock            // logical/real clock
+	Admission            *lifecycle.AdmissionLedger // process-lifetime admission ledger
+	UIDs                 *lifecycle.UIDLedger       // process-lifetime UID ledger
+	Frames               *lifecycle.FrameOwner      // the one frame writer
+	Modules              collectorapi.Registry      // collector module registry
+	Jobs                 runJobServices             // job services
+	Secrets              runSecretServices          // secret services
+	Discovery            runDiscoveryServices       // discovery services
+	AdmissionServiceGate <-chan struct{}            // test-only seam to pause admission grant servicing
+	Planner              runPlannerFactory          // run planner factory
 }
 
 type runGeneration struct {
-	run               *lifecycle.RunSupervisor
-	tasks             *lifecycle.TaskSupervisor
-	functions         *FunctionAssembly
-	jobs              *joboutput.Factory
-	scheduler         *joboutput.Scheduler
-	retryWorker       autoDetectionRetryWorker
-	dyncfg            *joboutput.DynCfgJobController
-	graph             *dyncfg.Graph
-	initialJobs       []dyncfg.GraphConfig
-	secrets           *secretadapter.Controller
-	vnodes            *vnodeBinding
-	vnodeConfig       *agentdiscovery.VNodeConfiguration
-	serviceDiscovery  *serviceDiscoveryBinding
-	discovery         runDiscoveryServices
-	kernel            *jobmgr.CommandKernel
-	loop              *jobmgr.KernelLoop
-	inputBodyGrants   chan lifecycle.AdmissionGrant
-	metrics           *runMetrics
-	runtime           runtimecomp.Service
-	runtimeRegistered bool
+	run               *lifecycle.RunSupervisor           // run supervisor for this generation
+	tasks             *lifecycle.TaskSupervisor          // task supervisor
+	functions         *FunctionAssembly                  // Function assembly (catalog + controller + publication)
+	jobs              *joboutput.Factory                 // job factory
+	scheduler         *joboutput.Scheduler               // tick + retry scheduler (same object as retryWorker)
+	retryWorker       autoDetectionRetryWorker           // autodetection retry worker (the scheduler via a narrow interface)
+	dyncfg            *joboutput.DynCfgJobController     // dyncfg job controller
+	graph             *dyncfg.Graph                      // dyncfg config graph
+	initialJobs       []dyncfg.GraphConfig               // initial (stock/user) job configs to publish
+	secrets           *secretadapter.Controller          // secret store controller
+	vnodes            *vnodeBinding                      // dyncfg vnode binding
+	vnodeConfig       *agentdiscovery.VNodeConfiguration // configured-vnode authority (file + runtime, live-merged)
+	serviceDiscovery  *serviceDiscoveryBinding           // service-discovery dyncfg binding (nil when SD is off)
+	discovery         runDiscoveryServices               // discovery services
+	kernel            *jobmgr.CommandKernel              // the command kernel
+	loop              *jobmgr.KernelLoop                 // the kernel loop
+	inputBodyGrants   chan lifecycle.AdmissionGrant      // channel delivering input-body growth grants to the kernel
+	metrics           *runMetrics                        // jobmgr.runtime metrics projection (nil when runtime charts off)
+	runtime           runtimecomp.Service                // runtime service
+	runtimeRegistered bool                               // guards double-unregister of jobmgr.runtime
 
-	mu               sync.Mutex
-	started          bool
-	startedAttempted bool
+	mu               sync.Mutex // guards started/startedAttempted
+	started          bool       // start succeeded
+	startedAttempted bool       // start was attempted (guards re-entry)
 }
 
 func dynCfgPublication(

@@ -20,15 +20,15 @@ const (
 )
 
 type runMetrics struct {
-	store              metrix.RuntimeStore
-	gauges             [lifecycle.RuntimeGaugeJobsActive + 1]metrix.StatefulGauge
-	gaugeValues        [lifecycle.RuntimeGaugeJobsActive + 1]atomic.Int64
-	counters           [lifecycle.RuntimeCounterDirtyRuns + 1]metrix.StatefulCounter
-	counterValues      [lifecycle.RuntimeCounterDirtyRuns + 1]atomic.Uint64
-	counterPublished   [lifecycle.RuntimeCounterDirtyRuns + 1]uint64
-	timestamps         [lifecycle.RuntimeTimestampOldestTaskWait + 1]atomic.Int64
-	ages               [lifecycle.RuntimeTimestampOldestTaskWait + 1]metrix.StatefulGauge
-	projectionUpdateMu sync.Mutex
+	store              metrix.RuntimeStore                                                // runtime metrics store
+	gauges             [lifecycle.RuntimeGaugeJobsActive + 1]metrix.StatefulGauge         // stateful gauges by RuntimeGauge id
+	gaugeValues        [lifecycle.RuntimeGaugeJobsActive + 1]atomic.Int64                 // current gauge values (written by mutation owners)
+	counters           [lifecycle.RuntimeCounterDirtyRuns + 1]metrix.StatefulCounter      // stateful counters by RuntimeCounter id
+	counterValues      [lifecycle.RuntimeCounterDirtyRuns + 1]atomic.Uint64               // current counter values (written by mutation owners)
+	counterPublished   [lifecycle.RuntimeCounterDirtyRuns + 1]uint64                      // last published counter values (delta computation)
+	timestamps         [lifecycle.RuntimeTimestampOldestTaskWait + 1]atomic.Int64         // event timestamps by RuntimeTimestamp id
+	ages               [lifecycle.RuntimeTimestampOldestTaskWait + 1]metrix.StatefulGauge // age gauges derived from timestamps
+	projectionUpdateMu sync.Mutex                                                         // serializes projection snapshots
 }
 
 func newRunMetrics() *runMetrics {

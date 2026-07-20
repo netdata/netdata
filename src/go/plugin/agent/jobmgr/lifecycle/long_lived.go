@@ -5,7 +5,7 @@ package lifecycle
 import (
 	"errors"
 	"math/bits"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -41,8 +41,8 @@ func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
 		return LongLivedPlan{},
 			errors.New("jobmgr long-lived permit: invalid pipeline provider keys")
 	}
-	keys := append([]string(nil), providerKeys...)
-	sort.Strings(keys)
+	keys := slices.Clone(providerKeys)
+	slices.Sort(keys)
 	for index, key := range keys {
 		if key == "" || key != strings.TrimSpace(key) ||
 			index > 0 && key == keys[index-1] {
@@ -171,11 +171,11 @@ func (ref LongLivedPermitRef) valid() bool {
 }
 
 type LongLivedPermit struct {
-	supervisor *TaskSupervisor
-	ref        LongLivedPermitRef
-	owner      ResourceIdentity
-	class      LongLivedClass
-	bytes      int64
+	supervisor *TaskSupervisor    // issuing task supervisor
+	ref        LongLivedPermitRef // slot reference in the long-lived registry
+	owner      ResourceIdentity   // resource identity that owns the permit
+	class      LongLivedClass     // permit class (job / secret-store / pipeline)
+	bytes      int64              // retained byte charge (0 for charge-free permits)
 }
 
 func (llp LongLivedPermit) Valid() bool {
@@ -264,28 +264,28 @@ func (llp LongLivedPermit) AbortUnused() error {
 }
 
 type longLivedRegistry struct {
-	mu       sync.Mutex
-	slots    []*longLivedSlot
-	owners   map[ResourceIdentity]LongLivedPermitRef
-	classes  [LongLivedSecretStore + 1]int
-	freeHead uint32
-	census   LongLivedCensus
-	sealed   bool
+	mu       sync.Mutex                              // guards all fields
+	slots    []*longLivedSlot                        // permit slot storage (freelist-backed)
+	owners   map[ResourceIdentity]LongLivedPermitRef // active permit ref by owning resource identity
+	classes  [LongLivedSecretStore + 1]int           // per-class active permit counts
+	freeHead uint32                                  // head of the slot freelist
+	census   LongLivedCensus                         // cached census projection
+	sealed   bool                                    // no further permits may be issued (shutdown)
 }
 
 type longLivedSlot struct {
-	generation     uint32
-	freeNext       uint32
-	active         bool
-	owner          ResourceIdentity
-	class          LongLivedClass
-	admission      *AdmissionLedger
-	admissionRef   AdmissionRef
-	bytes          int64
-	bytesReleasing bool
-	gClaims        map[longLivedGKey]longLivedGState
-	eReserved      LongLivedExternalFacet
-	eActive        LongLivedExternalFacet
+	generation     uint32                            // ABA guard for the permit ref
+	freeNext       uint32                            // freelist link
+	active         bool                              // slot is in use
+	owner          ResourceIdentity                  // owning resource identity
+	class          LongLivedClass                    // permit class
+	admission      *AdmissionLedger                  // back-reference for byte release (nil when charge-free)
+	admissionRef   AdmissionRef                      // admission record backing the retained bytes
+	bytes          int64                             // retained byte charge
+	bytesReleasing bool                              // byte release is in flight
+	gClaims        map[longLivedGKey]longLivedGState // per-inherited-task facet states (one 'G' facet per inherited task)
+	eReserved      LongLivedExternalFacet            // reserved external ('E') facets
+	eActive        LongLivedExternalFacet            // activated external ('E') facets
 }
 
 type longLivedGKey struct {

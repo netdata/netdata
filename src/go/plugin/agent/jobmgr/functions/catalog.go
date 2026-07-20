@@ -22,15 +22,15 @@ const (
 var dynCfgJobNameReplacer = strings.NewReplacer(" ", "_", ":", "_")
 
 type HandlerInput struct {
-	UID          string
-	Method       string
-	Args         []string
-	Payload      []byte
-	ContentType  string
-	Permissions  string
-	CallerSource string
-	Timeout      time.Duration
-	HasPayload   bool
+	UID          string        // call UID
+	Method       string        // resolved method ID passed to the handler
+	Args         []string      // call arguments
+	Payload      []byte        // request payload
+	ContentType  string        // payload content type
+	Permissions  string        // caller permissions
+	CallerSource string        // caller source string
+	Timeout      time.Duration // caller-requested timeout
+	HasPayload   bool          // whether a payload is present
 }
 
 type Handler func(context.Context, HandlerInput) (lifecycle.SealedResult, error)
@@ -64,13 +64,13 @@ type ResourceTransactionCommand struct {
 }
 
 type ResourceTransactionDeclaration struct {
-	Prepare          ResourceTransactionHandler
-	PrepareComposite CompositeResourceTransactionHandler
-	Permit           lifecycle.LongLivedPlan
-	PermitPolicy     SuccessorPermitPolicy
-	CommandArgument  uint16
-	GlobalClaim      string
-	Commands         []ResourceTransactionCommand
+	Prepare          ResourceTransactionHandler          // prepares a plain resource transaction
+	PrepareComposite CompositeResourceTransactionHandler // prepares a composite resource transaction (child commands)
+	Permit           lifecycle.LongLivedPlan             // long-lived plan for the successor
+	PermitPolicy     SuccessorPermitPolicy               // when to issue the successor permit
+	CommandArgument  uint16                              // argument index carrying the dyncfg command
+	GlobalClaim      string                              // claim key held for the whole transaction domain
+	Commands         []ResourceTransactionCommand        // accepted transaction commands
 }
 
 // HandlerGenerationDeclaration describes one job- or module-owned handler
@@ -173,15 +173,15 @@ func resolveDynCfgJobResource(
 }
 
 type Declaration struct {
-	ID                  string
-	Generation          *HandlerGenerationDeclaration
-	Transaction         *ResourceTransactionDeclaration
-	PublicName          string
-	Prefix              string
-	Resource            ResourcePolicy
-	CooperativeCancel   bool
-	CooperativeDeadline bool
-	RawPayload          bool
+	ID                  string                          // stable route/declaration identity
+	Generation          *HandlerGenerationDeclaration   // handler generation for this route (nil for pure transactions)
+	Transaction         *ResourceTransactionDeclaration // optional resource-transaction declaration
+	PublicName          string                          // exact Function name advertised to Netdata
+	Prefix              string                          // optional arg[0] prefix; empty = exact route
+	Resource            ResourcePolicy                  // policy deriving the resource ID from call args
+	CooperativeCancel   bool                            // request honors cooperative cancellation
+	CooperativeDeadline bool                            // request honors the caller deadline
+	RawPayload          bool                            // skip JSON validation; pass the payload verbatim
 }
 
 type HandlerGenerationCensus struct {
@@ -197,18 +197,18 @@ type HandlerGenerationCensus struct {
 type CatalogCensus = jobmgr.FunctionCatalogCensus
 
 type handlerGeneration struct {
-	cleanupRef jobmgr.FunctionCleanupRef
-	id         string
-	handler    Handler
-	cleanup    func(context.Context) error
+	cleanupRef jobmgr.FunctionCleanupRef   // kernel cleanup ref for this generation
+	id         string                      // generation identity
+	handler    Handler                     // the Function handler
+	cleanup    func(context.Context) error // collector cleanup callback (nil = no cleanup)
 
-	routeReferences  int
-	invocationLeases int
-	admissionClosed  bool
-	cleanupPending   bool
-	cleaned          bool
-	cleanupFailed    bool
-	retentionCharged bool
+	routeReferences  int  // routes currently pointing at this generation
+	invocationLeases int  // outstanding in-flight invocations
+	admissionClosed  bool // no new invocations admitted (retiring)
+	cleanupPending   bool // cleanup task dispatched, awaiting acknowledgement
+	cleaned          bool // cleanup acknowledged; generation released
+	cleanupFailed    bool // cleanup failed
+	retentionCharged bool // the 4-KiB cleanup retention allowance is charged
 }
 
 func (hg *handlerGeneration) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
@@ -231,25 +231,25 @@ func (hg *handlerGeneration) census() HandlerGenerationCensus {
 }
 
 type route struct {
-	id                  uint64
-	publicName          string
-	prefix              string
-	method              string
-	handler             *handlerGeneration
-	resource            ResourcePolicy
-	cooperativeCancel   bool
-	cooperativeDeadline bool
-	rawPayload          bool
-	transaction         *ResourceTransactionDeclaration
-	admissionClosed     bool
-	invocationLeases    int
-	retiring            bool
-	retiringDrained     bool
-	retiringNamePath    []*catalogNode
-	retiringPrefixPath  []*prefixNode
-	retiringNext        *route
-	closePrevious       *route
-	closeNext           *route
+	id                  uint64                          // stable catalog-assigned route identity
+	publicName          string                          // exact Function name key into the name trie
+	prefix              string                          // optional arg[0] prefix; empty = an exact route
+	method              string                          // handler method ID passed to the generation on invoke
+	handler             *handlerGeneration              // owning handler generation (shared across routes)
+	resource            ResourcePolicy                  // policy deriving the resource ID from call args
+	cooperativeCancel   bool                            // request honors cooperative cancellation
+	cooperativeDeadline bool                            // request honors the caller deadline
+	rawPayload          bool                            // skip JSON validation; pass the payload verbatim
+	transaction         *ResourceTransactionDeclaration // optional resource-transaction declaration
+	admissionClosed     bool                            // no new invocations admitted (retiring/closing)
+	invocationLeases    int                             // outstanding in-flight invocations on this route
+	retiring            bool                            // marked for removal by a committed mutation
+	retiringDrained     bool                            // retiring AND all leases released (prune-eligible)
+	retiringNamePath    []*catalogNode                  // pre-allocated name-trie node path used at prune time
+	retiringPrefixPath  []*prefixNode                   // pre-allocated prefix-trie node path used at prune time
+	retiringNext        *route                          // singly-linked deferred-prune list link
+	closePrevious       *route                          // doubly-linked close-order list back link
+	closeNext           *route                          // doubly-linked close-order list forward link
 }
 
 type prefixNode struct {
@@ -357,12 +357,12 @@ func setInitialCatalogRouteSet(root *catalogNode, name string, set routeSet) *ca
 }
 
 type invocationSlot struct {
-	generation      uint64
-	freeNext        uint32
-	resolved        *route
-	input           HandlerInput
-	claims          [17]string
-	transactionPlan jobmgr.ResourceTransactionPlan
+	generation      uint64                         // bumped per reuse; validates the lease ref
+	freeNext        uint32                         // next free slot index on the free-list
+	resolved        *route                         // route this invocation targets
+	input           HandlerInput                   // materialized handler input for the call
+	claims          [17]string                     // fixed claim buffer: [0]=global claim, [1:]=command claims
+	transactionPlan jobmgr.ResourceTransactionPlan // resource-transaction plan when the route is transactional
 }
 
 func (is *invocationSlot) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
@@ -431,28 +431,28 @@ func (is *invocationSlot) prepareCompositeResourceTransaction(
 }
 
 type Catalog struct {
-	routes      *catalogNode
-	generations map[jobmgr.FunctionCleanupRef]*handlerGeneration
-	mutation    *MutationBuilder
-	storage     catalogStorage
+	routes      *catalogNode                                     // root of the public-name route trie
+	generations map[jobmgr.FunctionCleanupRef]*handlerGeneration // handler generations by cleanup ref
+	mutation    *MutationBuilder                                 // the in-flight mutation builder, if any
+	storage     catalogStorage                                   // two-bucket storage budget (published + cleanup retention)
 
-	invocations []*invocationSlot
-	freeLease   uint32
+	invocations []*invocationSlot // invocation slot pool
+	freeSlot    uint32            // head of the invocation-slot free-list
 
-	closeHead *route
-	closeTail *route
+	closeHead *route // head of the close-order route list
+	closeTail *route // tail of the close-order route list
 
-	deferredPrune *route
+	deferredPrune *route // routes whose prune is deferred while a mutation is active
 
-	nextRouteID      uint64
-	nextGenerationID uint32
-	version          uint64
-	routeCount       int
-	invocationCount  int
-	pendingCleanups  int
-	completedCleanup int
-	failedCleanup    int
-	closed           bool
+	nextRouteID      uint64 // next route ID to assign
+	nextGenerationID uint32 // next handler-generation ID to assign
+	version          uint64 // catalog version, bumped per committed mutation
+	routeCount       int    // count of live routes
+	invocationCount  int    // count of active invocations
+	pendingCleanups  int    // count of generations with cleanup pending
+	completedCleanup int    // count of completed cleanups
+	failedCleanup    int    // count of failed cleanups
+	closed           bool   // catalog is closed (shutdown)
 }
 
 func NewCatalog(declarations []Declaration) (*Catalog, error) {
@@ -781,7 +781,7 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 		}
 	}
 
-	slotIndex := c.freeLease
+	slotIndex := c.freeSlot
 	var slot *invocationSlot
 	if slotIndex == 0 {
 		if uint64(len(c.invocations)) > uint64(^uint32(0)) {
@@ -797,12 +797,12 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 			return jobmgr.FunctionCatalogDecision{},
 				errors.New("jobmgr Function catalog: invalid free invocation slot")
 		}
-		c.freeLease = slot.freeNext
+		c.freeSlot = slot.freeNext
 	}
 	nextGeneration := slot.generation + 1
 	if nextGeneration == 0 {
-		slot.freeNext = c.freeLease
-		c.freeLease = slotIndex
+		slot.freeNext = c.freeSlot
+		c.freeSlot = slotIndex
 		return jobmgr.FunctionCatalogDecision{}, errors.New("jobmgr Function catalog: invocation generation wrapped")
 	}
 	*slot = invocationSlot{
@@ -883,8 +883,8 @@ func (c *Catalog) ReleaseInvocation(ref jobmgr.FunctionInvocationRef) (jobmgr.Fu
 	generation.invocationLeases--
 	c.invocationCount--
 	slotGeneration := slot.generation
-	*slot = invocationSlot{generation: slotGeneration, freeNext: c.freeLease}
-	c.freeLease = ref.Slot
+	*slot = invocationSlot{generation: slotGeneration, freeNext: c.freeSlot}
+	c.freeSlot = ref.Slot
 	c.retireDrainedRoute(resolved)
 	return c.maybeCleanup(generation)
 }

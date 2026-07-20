@@ -159,14 +159,14 @@ func (cmf *ConfigModuleFactory) Validate(
 
 func (cmf *ConfigModuleFactory) construct(
 	module string,
-) (attempt configModuleAttempt, err error) {
+) (attempt constructedConfigModule, err error) {
 	if cmf == nil || module == "" {
-		return configModuleAttempt{},
+		return constructedConfigModule{},
 			errors.New("job output: invalid config-module construction")
 	}
 	creator, ok := cmf.config.Modules.Lookup(module)
 	if !ok {
-		return configModuleAttempt{},
+		return constructedConfigModule{},
 			fmt.Errorf("job output: module %q is not registered", module)
 	}
 	defer func() {
@@ -184,20 +184,20 @@ func (cmf *ConfigModuleFactory) construct(
 	} else if creator.Create != nil {
 		constructed = creator.Create()
 	} else {
-		return configModuleAttempt{},
+		return constructedConfigModule{},
 			fmt.Errorf(
 				"job output: module %q has no collector creator",
 				module,
 			)
 	}
 	if constructed == nil {
-		return configModuleAttempt{},
+		return constructedConfigModule{},
 			fmt.Errorf(
 				"job output: module %q returned a nil config module",
 				module,
 			)
 	}
-	return configModuleAttempt{module: constructed}, nil
+	return constructedConfigModule{module: constructed}, nil
 }
 
 func (cmf *ConfigModuleFactory) applyResolved(
@@ -237,13 +237,13 @@ func (cmf *ConfigModuleFactory) applyResolved(
 	return nil
 }
 
-type configModuleAttempt struct {
+type constructedConfigModule struct {
 	module configModule
 	once   sync.Once
 	err    error
 }
 
-func (cma *configModuleAttempt) cleanup(ctx context.Context) error {
+func (cma *constructedConfigModule) cleanup(ctx context.Context) error {
 	if cma == nil || cma.module == nil {
 		return nil
 	}

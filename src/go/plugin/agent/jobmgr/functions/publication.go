@@ -14,22 +14,22 @@ import (
 const MaximumMutationPublicationChanges = jobmgr.MaximumFunctionMutationChanges
 
 type PublicationRecord struct {
-	Name               string
-	Generation         uint64
-	Timeout            int
-	Help               string
-	Tags               string
-	Access             string
-	Priority           int
-	Version            int
-	AvailabilityDigest [32]byte
+	Name               string   // public Function name
+	Generation         uint64   // handler generation exposed
+	Timeout            int      // advertised timeout
+	Help               string   // help text
+	Tags               string   // advertised tags
+	Access             string   // access mask
+	Priority           int      // advertised priority
+	Version            int      // advertised version
+	AvailabilityDigest [32]byte // digest for change/availability detection
 }
 
 type PublicationHandle struct {
-	ID         uint64
-	Epoch      uint64
-	Generation uint64
-	Name       string
+	ID         uint64 // publication id
+	Epoch      uint64 // run epoch
+	Generation uint64 // handler generation
+	Name       string // public Function name
 }
 
 // PublicationPort is the external Function registry boundary. Calls may block
@@ -64,14 +64,14 @@ type PublicationCensus struct {
 // one CommandKernel lane without another worker, timer, or reconciliation
 // goroutine.
 type Publication struct {
-	epoch     uint64
-	version   uint64
-	digest    [32]byte
-	port      PublicationPort
-	published map[string]publishedRoute
-	retained  []PublicationHandle
-	stopped   bool
-	dirty     error
+	epoch     uint64                    // run epoch this publication belongs to
+	version   uint64                    // publication version
+	digest    [32]byte                  // aggregate publication digest
+	port      PublicationPort           // wire port emitting FUNCTION/FUNCTION_DEL
+	published map[string]publishedRoute // currently published routes by name
+	retained  []PublicationHandle       // handles retained across a transition
+	stopped   bool                      // publication stopped (shutdown)
+	dirty     error                     // sticky poison error
 }
 
 func NewPublication(epoch uint64, port PublicationPort) (*Publication, error) {

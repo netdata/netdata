@@ -34,31 +34,31 @@ type processInputCompletion struct {
 }
 
 type processCoreConfig struct {
-	Input           io.Reader
-	Output          io.Writer
-	Clock           lifecycle.Clock
-	FirstGeneration uint64
-	ShutdownTimeout time.Duration
-	KeepAlive       bool
-	Modules         collectorapi.Registry
-	Jobs            runJobServices
-	Secrets         runSecretServices
-	Discovery       runDiscoveryServices
-	Planner         runPlannerFactory
-	FinalizeOutput  func()
+	Input           io.Reader             // plugin stdin
+	Output          io.Writer             // plugin stdout
+	Clock           lifecycle.Clock       // logical/real clock
+	FirstGeneration uint64                // starting run generation (0 -> 1)
+	ShutdownTimeout time.Duration         // per-run shutdown budget
+	KeepAlive       bool                  // emit keepalive frames (long-lived agent mode)
+	Modules         collectorapi.Registry // collector module registry
+	Jobs            runJobServices        // process-lifetime job services (resolver, catalogs, vnodes)
+	Secrets         runSecretServices     // process-lifetime secret services
+	Discovery       runDiscoveryServices  // discovery services (providers, build context)
+	Planner         runPlannerFactory     // run planner factory
+	FinalizeOutput  func()                // stops the runtime service at process teardown
 }
 
 type processCore struct {
-	config processCoreConfig
+	config processCoreConfig // process configuration
 
-	admission *lifecycle.AdmissionLedger
-	uids      *lifecycle.UIDLedger
-	frames    *lifecycle.FrameOwner
-	ingress   *functionadapter.ProcessIngress
-	quit      atomic.Bool
+	admission *lifecycle.AdmissionLedger      // process-lifetime admission ledger
+	uids      *lifecycle.UIDLedger            // process-lifetime UID ledger
+	frames    *lifecycle.FrameOwner           // the one process-lifetime frame writer
+	ingress   *functionadapter.ProcessIngress // the one process-lifetime stdin reader
+	quit      atomic.Bool                     // set once to stop the outer loop
 
-	mu      sync.Mutex
-	started bool
+	mu      sync.Mutex // guards started
+	started bool       // the outer run loop has started (once)
 }
 
 const processAdmissionBytes = functionadapter.MaximumCatalogStorageBytes

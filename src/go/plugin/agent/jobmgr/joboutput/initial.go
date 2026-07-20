@@ -4,10 +4,11 @@ package joboutput
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -40,9 +41,9 @@ func (dcjc *DynCfgJobController) PublishInitial(
 	); err != nil {
 		return err
 	}
-	configs := append([]dyncfg.GraphConfig(nil), initial...)
-	sort.Slice(configs, func(i, j int) bool {
-		return configs[i].ID < configs[j].ID
+	configs := slices.Clone(initial)
+	slices.SortFunc(configs, func(a, b dyncfg.GraphConfig) int {
+		return cmp.Compare(a.ID, b.ID)
 	})
 	for index, record := range configs {
 		config, status, err := dcjc.initialConfiguration(record)
@@ -139,7 +140,7 @@ func (dcjc *DynCfgJobController) templatePublicationCleanup() lifecycle.TaskClea
 			names = append(names, name)
 		}
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	if len(names) == 0 {
 		return func() error { return nil }
 	}

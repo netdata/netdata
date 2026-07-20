@@ -13,23 +13,23 @@ import (
 )
 
 type preparedSecretSpec struct {
-	scope   lifecycle.ResourceTransactionScope
-	current lifecycle.ReadyResource
-	permit  lifecycle.LongLivedPermit
+	scope   lifecycle.ResourceTransactionScope // transaction identity triple (current/successor) being applied
+	current lifecycle.ReadyResource            // existing ready store resource; nil on install
+	permit  lifecycle.LongLivedPermit          // long-lived byte/external grant for the successor generation
 
-	store    *secretstore.SecretStore
-	storeKey string
-	mutation *secretstore.PreparedSecretMutation
-	abort    bool
-	remove   bool
-	restarts *SecretRestartCommand
+	store    *secretstore.SecretStore            // target secret store
+	storeKey string                              // the store's kind_name key
+	mutation *secretstore.PreparedSecretMutation // prepared store mutation; nil means a no-op transaction
+	abort    bool                                // commit-less path: abort the mutation (validation-only failure)
+	remove   bool                                // removal transaction (no successor resource installed)
+	restarts *SecretRestartCommand               // dependent stop->commit->start orchestrator; nil skips restarts
 
-	result  lifecycle.SealedResult
-	cleanup lifecycle.TaskCleanup
+	result  lifecycle.SealedResult // sealed dyncfg response
+	cleanup lifecycle.TaskCleanup  // post-commit protocol emit
 
-	controller  *Controller
-	entry       *secretEntry
-	removeEntry bool
+	controller  *Controller  // controller to publish the entry into
+	entry       *secretEntry // the entry to commit
+	removeEntry bool         // delete the entry instead of committing it
 }
 
 type preparedSecretTransaction struct {
@@ -43,7 +43,7 @@ func newPreparedSecretTransaction(
 	spec preparedSecretSpec,
 ) (*preparedSecretTransaction, error) {
 	if !spec.scope.Valid() ||
-		(spec.current == nil) != !spec.scope.Current.Valid() ||
+		(spec.current == nil) == spec.scope.Current.Valid() ||
 		spec.current != nil &&
 			spec.current.Identity() != spec.scope.Current ||
 		spec.cleanup == nil ||

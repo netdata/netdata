@@ -4,13 +4,13 @@ package lifecycle
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -100,17 +100,17 @@ const (
 )
 
 type Value struct {
-	string       string
-	array        []Value
-	object       []ObjectField
-	uint64       uint64
-	float        float64
-	repeatLength int
-	charge       int64
-	kind         valueKind
-	bool         bool
-	repeated     bool
-	repeatByte   byte
+	str          string        // string payload (kind == string)
+	arr          []Value       // array elements (kind == array)
+	obj          []ObjectField // object fields (kind == object)
+	u64          uint64        // unsigned payload (kind == uint64)
+	f64          float64       // float payload (kind == float)
+	repeatLength int           // length of a synthetic repeated-byte string
+	charge       int64         // accounting charge propagated into SealedResult.planBytes
+	kind         valueKind     // variant discriminant
+	boolean      bool          // bool payload (kind == bool)
+	repeated     bool          // value is a synthetic repeated-byte string (bench/large payloads)
+	repeatByte   byte          // the repeated byte
 }
 
 type ObjectField struct {
@@ -120,16 +120,16 @@ type ObjectField struct {
 
 func NullValue() Value { return Value{kind: valueNull, charge: functionValueNodeCharge} }
 func BoolValue(value bool) Value {
-	return Value{kind: valueBool, bool: value, charge: functionValueNodeCharge}
+	return Value{kind: valueBool, boolean: value, charge: functionValueNodeCharge}
 }
 func Uint64Value(value uint64) Value {
-	return Value{kind: valueUint64, uint64: value, charge: functionValueNodeCharge}
+	return Value{kind: valueUint64, u64: value, charge: functionValueNodeCharge}
 }
 func FiniteFloat64Value(value float64) (Value, error) {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return Value{}, errors.New("jobmgr Function value: non-finite float")
 	}
-	return Value{kind: valueFloat64, float: value, charge: functionValueNodeCharge}, nil
+	return Value{kind: valueFloat64, f64: value, charge: functionValueNodeCharge}, nil
 }
 
 func StringValue(value string) (Value, error) {
@@ -140,7 +140,7 @@ func StringValue(value string) (Value, error) {
 	if err != nil {
 		return Value{}, err
 	}
-	return Value{kind: valueString, string: strings.Clone(value), charge: charge}, nil
+	return Value{kind: valueString, str: strings.Clone(value), charge: charge}, nil
 }
 
 func RepeatedStringValue(length int, fill byte) (Value, error) {
@@ -162,11 +162,11 @@ func ArrayValue(values ...Value) (Value, error) {
 			return Value{}, err
 		}
 	}
-	return Value{kind: valueArray, array: append([]Value(nil), values...), charge: charge}, nil
+	return Value{kind: valueArray, arr: slices.Clone(values), charge: charge}, nil
 }
 
 func ObjectValue(fields ...ObjectField) (Value, error) {
-	owned := append([]ObjectField(nil), fields...)
+	owned := slices.Clone(fields)
 	charge := functionValueNodeCharge
 	for index := range owned {
 		if !utf8.ValidString(owned[index].Key) || owned[index].Value.kind == valueInvalid {
@@ -179,13 +179,13 @@ func ObjectValue(fields ...ObjectField) (Value, error) {
 			return Value{}, err
 		}
 	}
-	sort.Slice(owned, func(i, j int) bool { return owned[i].Key < owned[j].Key })
+	slices.SortFunc(owned, func(a, b ObjectField) int { return cmp.Compare(a.Key, b.Key) })
 	for index := 1; index < len(owned); index++ {
 		if owned[index-1].Key == owned[index].Key {
 			return Value{}, errors.New("jobmgr Function value: duplicate object key")
 		}
 	}
-	return Value{kind: valueObject, object: owned, charge: charge}, nil
+	return Value{kind: valueObject, obj: owned, charge: charge}, nil
 }
 
 type TableResult struct{ resultPlan }
@@ -242,11 +242,11 @@ func appendValueJSON(dst []byte, value Value, depth int) ([]byte, error) {
 	case valueNull:
 		return append(dst, "null"...), nil
 	case valueBool:
-		return strconv.AppendBool(dst, value.bool), nil
+		return strconv.AppendBool(dst, value.boolean), nil
 	case valueUint64:
-		return strconv.AppendUint(dst, value.uint64, 10), nil
+		return strconv.AppendUint(dst, value.u64, 10), nil
 	case valueFloat64:
-		return strconv.AppendFloat(dst, value.float, 'g', -1, 64), nil
+		return strconv.AppendFloat(dst, value.f64, 'g', -1, 64), nil
 	case valueString:
 		if value.repeated {
 			dst = append(dst, '"')
@@ -258,10 +258,10 @@ func appendValueJSON(dst []byte, value Value, depth int) ([]byte, error) {
 			}
 			return append(dst, '"'), nil
 		}
-		return appendJSONString(dst, value.string), nil
+		return appendJSONString(dst, value.str), nil
 	case valueArray:
 		dst = append(dst, '[')
-		for index, member := range value.array {
+		for index, member := range value.arr {
 			if index > 0 {
 				dst = append(dst, ',')
 			}
@@ -274,7 +274,7 @@ func appendValueJSON(dst []byte, value Value, depth int) ([]byte, error) {
 		return append(dst, ']'), nil
 	case valueObject:
 		dst = append(dst, '{')
-		for index, field := range value.object {
+		for index, field := range value.obj {
 			if index > 0 {
 				dst = append(dst, ',')
 			}
@@ -300,22 +300,22 @@ func valueJSONSize(value Value, depth int) (int, error) {
 	case valueNull:
 		return 4, nil
 	case valueBool:
-		if value.bool {
+		if value.boolean {
 			return 4, nil
 		}
 		return 5, nil
 	case valueUint64:
-		return len(strconv.FormatUint(value.uint64, 10)), nil
+		return len(strconv.FormatUint(value.u64, 10)), nil
 	case valueFloat64:
-		return len(strconv.FormatFloat(value.float, 'g', -1, 64)), nil
+		return len(strconv.FormatFloat(value.f64, 'g', -1, 64)), nil
 	case valueString:
 		if value.repeated {
 			return checkedResultSize(value.repeatLength, 2)
 		}
-		return jsonStringSize(value.string), nil
+		return jsonStringSize(value.str), nil
 	case valueArray:
 		total := 2
-		for index, member := range value.array {
+		for index, member := range value.arr {
 			size, err := valueJSONSize(member, depth+1)
 			if err != nil {
 				return 0, err
@@ -334,7 +334,7 @@ func valueJSONSize(value Value, depth int) (int, error) {
 		return total, nil
 	case valueObject:
 		total := 2
-		for index, field := range value.object {
+		for index, field := range value.obj {
 			valueSize, err := valueJSONSize(field.Value, depth+1)
 			if err != nil {
 				return 0, err
