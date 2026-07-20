@@ -37,7 +37,7 @@
             "type": "object"
         },
         "BasicDistroEntry": {
-            "additionalProperties": true,
+            "additionalProperties": false,
             "properties": {
                 "distro": {
                     "description": "The name of the platform",
@@ -86,7 +86,7 @@
             "type": "object"
         },
         "BasicPackagingInfo": {
-            "additionalProperties": true,
+            "additionalProperties": false,
             "properties": {
                 "arches": {
                     "description": "Specifies the list of architectures to build packages for this platform for.",
@@ -123,7 +123,7 @@
             "type": "string"
         },
         "FullDistroEntry": {
-            "additionalProperties": true,
+            "additionalProperties": false,
             "properties": {
                 "distro": {
                     "description": "The name of the platform",
@@ -240,7 +240,7 @@
             "type": "string"
         },
         "PackagingInfo": {
-            "additionalProperties": true,
+            "additionalProperties": false,
             "properties": {
                 "type": {
                     "$ref": "#/$defs/PackageType",
@@ -288,7 +288,7 @@
             "type": "object"
         },
         "TestConfig": {
-            "additionalProperties": true,
+            "additionalProperties": false,
             "properties": {
                 "ebpf-core": {
                     "default": false,
@@ -307,8 +307,14 @@
             "type": "object"
         }
     },
-    "additionalProperties": true,
+    "additionalProperties": false,
     "properties": {
+        "anchors": {
+            "additionalProperties": true,
+            "description": "Mapping used to hold YAML fragments that get reused throughout the file via anchors.",
+            "title": "Unparsed Values for YAML Anchors",
+            "type": "object"
+        },
         "platform_map": {
             "additionalProperties": {
                 "$ref": "#/$defs/DockerArch"
