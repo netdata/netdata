@@ -6,8 +6,16 @@ everything it needs on first contact instead of asking for it over multiple
 round trips.
 
 - POSIX systems (Linux, Docker, static installs, macOS/BSD best-effort):
-  [`netdata-support-bundle.sh`](netdata-support-bundle.sh)
+  [`netdata-support-bundle`](netdata-support-bundle)
 - Windows: [`netdata-support-bundle.ps1`](netdata-support-bundle.ps1)
+
+The POSIX file is intentionally **extension-less** (`netdata-support-bundle`, not
+`.sh`): the installed command and its repository path stay implementation-neutral,
+so a future reimplementation (e.g. in Rust) can replace it at the same path and
+command name without changing any build/packaging reference. It is a `/bin/sh`
+script today (see the shebang). The Windows counterpart keeps `.ps1` because
+PowerShell requires the extension to execute a script; on Windows a future
+replacement is shipped through the MSI packaging instead.
 
 ```sh
 # installed with the agent (in PATH, like netdatacli):
@@ -21,8 +29,8 @@ sudo /opt/netdata/usr/sbin/netdata-support-bundle
 tag='<TRUSTED_NETDATA_RELEASE_TAG>'
 t=$(mktemp "${TMPDIR:-/tmp}/netdata-support-bundle.XXXXXX")
 trap 'rm -f "$t"' EXIT HUP INT TERM
-curl -fsSL -o "$t" "https://raw.githubusercontent.com/netdata/netdata/$tag/packaging/installer/netdata-support-bundle.sh" \
-  || wget -qO "$t" "https://raw.githubusercontent.com/netdata/netdata/$tag/packaging/installer/netdata-support-bundle.sh"
+curl -fsSL -o "$t" "https://raw.githubusercontent.com/netdata/netdata/$tag/packaging/installer/netdata-support-bundle" \
+  || wget -qO "$t" "https://raw.githubusercontent.com/netdata/netdata/$tag/packaging/installer/netdata-support-bundle"
 ```
 
 Inspect the downloaded script. Only after that separate review, run:

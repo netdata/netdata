@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # netdata-support-bundle - collect a sanitized diagnostic bundle for Netdata support tickets.
-# Windows counterpart of netdata-support-bundle.sh. Same bundle layout, same MANIFEST
+# Windows counterpart of netdata-support-bundle. Same bundle layout, same MANIFEST
 # schema (netdata-support-bundle/v1), same sanitization rules.
 #
 # What is collected and WHY each item is included is documented in
@@ -153,7 +153,7 @@ function Invoke-RedactSecretLine([string]$line) {
         else { $m.Value }
     })
     # NOTE (scope): nested JSON arrays/objects under secret keys are not
-    # deep-parsed - see the matching note in netdata-support-bundle.sh and the
+    # deep-parsed - see the matching note in netdata-support-bundle and the
     # "Redaction philosophy" section of SUPPORT-BUNDLE.md. Collected agent JSON
     # keeps credentials in string/scalar fields (handled above), not structures.
     # URL creds and Go-style DSN creds

@@ -4253,10 +4253,9 @@ if(NOT OS_WINDOWS)
 
   # user-facing support-bundle tool: on PATH as `netdata-support-bundle`, like netdatacli
   install(PROGRAMS
-          packaging/installer/netdata-support-bundle.sh
+          packaging/installer/netdata-support-bundle
           COMPONENT netdata
-          DESTINATION "${BINDIR}"
-          RENAME netdata-support-bundle)
+          DESTINATION "${BINDIR}")
 
   install(FILES
           system/netdata.conf

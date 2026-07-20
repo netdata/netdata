@@ -19,7 +19,7 @@
 #   - Bundle is legible to humans AND AI agents: triage-ordered directories, pristine
 #     file copies, provenance in MANIFEST.json, human summary.txt, README.md inside.
 #
-# Usage: sudo sh netdata-support-bundle.sh [options]
+# Usage: sudo netdata-support-bundle [options]   (or: sh netdata-support-bundle [options])
 #   -o, --output DIR     where to write the tarball (default: /tmp)
 #   --since HOURS        log window in hours (default: 24)
 #   --timeout SECONDS    per-command timeout (default: 10)
