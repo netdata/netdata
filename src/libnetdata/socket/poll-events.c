@@ -187,6 +187,7 @@ static bool poll_request_ingress_timed_out(POLLINFO *pi, time_t complete_request
 
 int poll_events_unittest(void) {
     int errors = 0;
+    volatile time_t disabled_timeout = 0;
     POLLINFO pi = {
         .flags = POLLINFO_FLAG_REQUEST_INGRESS,
         .request_ingress_t = 100,
@@ -194,7 +195,7 @@ int poll_events_unittest(void) {
 
     if(poll_request_ingress_timed_out(&pi, 5, 104) ||
        !poll_request_ingress_timed_out(&pi, 5, 105) ||
-       poll_request_ingress_timed_out(&pi, 0, 200))
+       poll_request_ingress_timed_out(&pi, disabled_timeout, 200))
         errors++;
 
     pi.flags &= ~POLLINFO_FLAG_REQUEST_INGRESS;

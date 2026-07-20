@@ -776,9 +776,9 @@ static inline char *web_client_valid_method(
                 copyme += 9;
                 char *end = strchr(copyme,'&');
                 if(end){
-                    size_t length = MIN(255, end - copyme);
-                    memcpy(hostname,copyme,length);
-                    hostname[length] = 0X00;
+                    size_t hostname_length = MIN(255, end - copyme);
+                    memcpy(hostname, copyme, hostname_length);
+                    hostname[hostname_length] = 0X00;
                 }
                 else{
                     memcpy(hostname,"not available",13);

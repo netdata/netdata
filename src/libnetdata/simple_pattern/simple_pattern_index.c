@@ -119,9 +119,8 @@ static inline bool simple_pattern_index_add_user_to_result(
 {
     Word_t user = 0;
     bool first = true;
-    Pvoid_t *user_slot;
 
-    while((user_slot = JudyLFirstThenNext(users, &user, &first))) {
+    while(JudyLFirstThenNext(users, &user, &first)) {
         Pvoid_t *result_slot = simple_pattern_index_judyl_insert(&matches->users, user, matches->owa);
         if(unlikely(!result_slot || result_slot == PJERR))
             return false;
