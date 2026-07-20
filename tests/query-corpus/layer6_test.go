@@ -314,3 +314,167 @@ func TestCase018MultipassAverage(t *testing.T) {
 	t.Logf("avg-of-sums reproduced on %d/%d rows", reproduced, len(col))
 	expectAgentStatus(t, "CASE-018/multipass-average", reproduced == 0)
 }
+
+// TestLayer6TwoPassPercentage pins percentage as the PASS-2 aggregation.
+// The percentage pass is the FIRST pass with a percentage aggregation
+// (query-group-by-init.c percentage_of_group_pass), so pass 1 runs in
+// SHADOW hidden mode: dimensions excluded by the `dimensions` selector
+// accumulate in per-group shadow buckets, kept apart from the visible
+// sums, and fold into the DENOMINATOR (vh) of their normal group at the
+// percentage pass. A shadow bucket that is itself incomplete (a gapped
+// hidden member) taints the final point PARTIAL through the hgbc top
+// bit. Non-raw converts v*100/(v+h); raw converts NOTHING — the value
+// stays the visible accumulator, the hidden accumulator rides the wire,
+// and the point count is the number of visible pass-1 groups.
+func TestLayer6TwoPassPercentage(t *testing.T) {
+	members := l5Members()
+	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
+		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")
+	}
+
+	// select dc: the anomaly-run member stays visible (drives ARP), the
+	// gap member (da) lands on the hidden side (drives the hgbc taint)
+	const sel = "dc"
+
+	chains := []struct{ key1, key2 string }{
+		{"instance", "node"},
+		{"dimension", "selected"},
+	}
+
+	for _, mode := range []string{"non-raw", "raw"} {
+		raw := mode == "raw"
+		for _, kc := range chains {
+			t.Run(mode+"/"+kc.key1+"-sum/"+kc.key2+"-percentage", func(t *testing.T) {
+				// bucket the palette: per final group, the visible and
+				// shadow pass-1 buckets (partitioned by the union key)
+				type buckets struct{ vis, hid [][]l5Member }
+				finals := map[string]*buckets{}
+				addTo := func(m l5Member, hidden bool) {
+					fk := l5GroupKey(kc.key2, m)
+					b := finals[fk]
+					if b == nil {
+						b = &buckets{}
+						finals[fk] = b
+					}
+					uk := l5GroupKey(kc.key1, m) + "\x00" + fk
+					list := &b.vis
+					if hidden {
+						list = &b.hid
+					}
+					placed := false
+					for gi := range *list {
+						if l5GroupKey(kc.key1, (*list)[gi][0])+"\x00"+l5GroupKey(kc.key2, (*list)[gi][0]) == uk {
+							(*list)[gi] = append((*list)[gi], m)
+							placed = true
+							break
+						}
+					}
+					if !placed {
+						*list = append(*list, []l5Member{m})
+					}
+				}
+				for _, m := range members {
+					addTo(m, m.Dim != sel)
+				}
+
+				params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
+				params.Set("dimensions", sel)
+				params.Set("group_by[0]", kc.key1)
+				params.Set("aggregation[0]", "sum")
+				params.Set("group_by[1]", kc.key2)
+				params.Set("aggregation[1]", "percentage")
+				if raw {
+					params.Set("options", "jsonwrap|raw")
+				}
+				doc, err := td.DataV3All(params)
+				if err != nil {
+					t.Fatal(err)
+				}
+				cols, err := canon.Columns(doc)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(cols) != len(finals) {
+					t.Fatalf("got %d groups %v, want %d %v", len(cols), keys2(cols), len(finals), keys2(finals))
+				}
+
+				for fk, b := range finals {
+					col, ok := cols[fk]
+					if !ok {
+						t.Errorf("group %q missing (have %v)", fk, keys2(cols))
+						continue
+					}
+					for _, pt := range col {
+						i := int(pt.T - fixture.T0)
+
+						var v, h, arTot float64
+						gbc := 0
+						partial := false
+						for _, g := range b.vis {
+							sum, ar1, gbc1 := l6Pass1("sum", g, i)
+							if gbc1 == 0 {
+								continue
+							}
+							if gbc1 < len(g) {
+								partial = true
+							}
+							v += sum
+							arTot += ar1
+							gbc++
+						}
+						hidContrib := 0
+						for _, g := range b.hid {
+							sum, _, gbc1 := l6Pass1("sum", g, i)
+							if gbc1 == 0 {
+								continue
+							}
+							if gbc1 < len(g) {
+								partial = true
+							}
+							h += sum
+							hidContrib++
+						}
+						if hidContrib < len(b.hid) {
+							partial = true
+						}
+
+						if gbc == 0 {
+							if pt.Value != nil {
+								t.Errorf("%q row %d: value %v, want null", fk, i, *pt.Value)
+							}
+							continue
+						}
+
+						want := v
+						wantAR := arTot
+						if !raw {
+							want = v * 100 / (v + h)
+							wantAR = arTot / float64(gbc)
+						}
+						switch {
+						case pt.Value == nil:
+							t.Errorf("%q row %d: null, want %v", fk, i, want)
+						case !tierValueMatch(*pt.Value, want, 1e-9):
+							t.Errorf("%q row %d: value %v, want %v", fk, i, *pt.Value, want)
+						}
+						if !tierValueMatch(pt.ARP, wantAR, 1e-9) {
+							t.Errorf("%q row %d: arp %v, want %v", fk, i, pt.ARP, wantAR)
+						}
+						if raw {
+							if pt.Count == nil || *pt.Count != int64(gbc) {
+								t.Errorf("%q row %d: count %v, want %d visible pass-1 groups", fk, i, pt.Count, gbc)
+							}
+							if pt.Hidden == nil || !tierValueMatch(*pt.Hidden, h, 1e-9) {
+								t.Errorf("%q row %d: hidden %v, want %v", fk, i, pt.Hidden, h)
+							}
+						}
+						gotPartial := pt.PA&canon.AnnotationPartial != 0
+						if gotPartial != partial {
+							t.Errorf("%q row %d: partial %v, want %v (pa %d)", fk, i, gotPartial, partial, pt.PA)
+						}
+					}
+				}
+			})
+		}
+	}
+}
