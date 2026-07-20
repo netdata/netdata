@@ -246,7 +246,7 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: "The DNS module does not publish standalone Netdata charts. It registers the `dns-queries` on-demand function (FUNCTIONGLOBAL) consumed by the network-viewer. The function returns a table with four rows (one per transport-and-IP-family combination) and the following columns: `Transport` (UDP or TCP), `IPFamily` (IPv4 or IPv6), `Queries` (DNS queries/s), `Responses` (DNS responses/s)."
+      description: "The DNS module does not publish standalone Netdata charts. It writes DNS flow data to a POSIX shared-memory segment; the `network-viewer.plugin` reads that segment and registers the `dns-queries` on-demand function (FUNCTIONGLOBAL). The function returns a table with four rows (one per transport-and-IP-family combination) and the following columns: `Transport` (UDP or TCP), `IPFamily` (IPv4 or IPv6), `Queries` (DNS queries/s), `Responses` (DNS responses/s)."
       availability: []
       scopes: []
   - meta:

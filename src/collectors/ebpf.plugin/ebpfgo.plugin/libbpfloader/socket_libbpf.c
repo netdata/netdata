@@ -499,8 +499,10 @@ int netdata_socket_runtime_snapshot(
     typedef struct { uint16_t protocol; uint16_t port; } lkey_t;
     lkey_t lkey = {}, lnext = {};
     netdata_passive_conn_t *pbuf = rt->percpu_passive;
+    bool first_liter = true;
 
-    while (bpf_map_get_next_key(lfd, &lkey, &lnext) == 0) {
+    while (bpf_map_get_next_key(lfd, first_liter ? NULL : &lkey, &lnext) == 0) {
+        first_liter = false;
         if (bpf_map_lookup_elem(lfd, &lnext, pbuf) == 0) {
             uint64_t conn = socket_sum_percpu_passive_counter(pbuf, lcount);
             if (lnext.protocol == SOCKET_IPPROTO_TCP)
@@ -581,7 +583,7 @@ static void pid_ht_accumulate(struct netdata_socket_per_pid_entry *ht,
             return;
         }
     }
-    /* Hash table full — silent drop; should not occur for < 8192 unique PIDs. */
+    /* Hash table full — silent drop; should not occur for < 16384 unique PIDs. */
 }
 
 /* Read tbl_nd_socket, aggregate per PID, and store a sorted result array.
@@ -615,8 +617,10 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
     /* Iterate all connection entries and accumulate per PID. */
     netdata_socket_bpf_key_t key = {}, next = {};
     netdata_socket_bpf_value_t *vbuf = rt->percpu_nd_socket;
+    bool first_nditer = true;
 
-    while (bpf_map_get_next_key(ndfd, &key, &next) == 0) {
+    while (bpf_map_get_next_key(ndfd, first_nditer ? NULL : &key, &next) == 0) {
+        first_nditer = false;
         if (next.pid != 0 && bpf_map_lookup_elem(ndfd, &next, vbuf) == 0) {
             if (ndcount == 1) {
                 pid_ht_accumulate(rt->pid_ht, next.pid, vbuf);

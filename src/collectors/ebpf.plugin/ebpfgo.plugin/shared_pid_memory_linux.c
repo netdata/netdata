@@ -92,6 +92,21 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
 
     ctx->total = total;
     size_t length = shared_pid_memory_nbytes(ctx);
+
+    /* If a crashed writer left a segment whose size differs from what this
+     * run needs, unlink and re-create to get a new inode.  Consumers detect
+     * the inode change on their next refresh and remap, preventing a SIGBUS
+     * from a stale larger mapping accessing pages past the shrunk file end. */
+    if (reused && pre_stat.st_size != (off_t)length) {
+        close(ctx->shm_fd);
+        ctx->shm_fd = -1;
+        (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
+        ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
+        if (ctx->shm_fd < 0)
+            goto fail;
+        reused = false;
+    }
+
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
         goto fail;
 

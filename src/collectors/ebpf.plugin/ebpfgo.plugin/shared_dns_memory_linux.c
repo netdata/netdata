@@ -58,12 +58,24 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
     if (fstat(ctx->shm_fd, &pre_stat) != 0)
         goto fail;
     bool reused = pre_stat.st_size > 0;
+    size_t length = sizeof(struct ebpfgo_dns_shared);
 
-    if (ftruncate(ctx->shm_fd, (off_t)sizeof(struct ebpfgo_dns_shared)) != 0)
+    /* Same size-mismatch guard as shared_pid_memory_linux.c: unlink and
+     * re-create when a crashed writer left a segment of a different size. */
+    if (reused && pre_stat.st_size != (off_t)length) {
+        close(ctx->shm_fd);
+        ctx->shm_fd = -1;
+        (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
+        ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_RDWR, 0660);
+        if (ctx->shm_fd < 0)
+            goto fail;
+        reused = false;
+    }
+
+    if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
         goto fail;
 
-    ctx->data = mmap(NULL, sizeof(struct ebpfgo_dns_shared),
-                     PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
+    ctx->data = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
     if (ctx->data == MAP_FAILED) {
         ctx->data = NULL;
         goto fail;
@@ -83,7 +95,7 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
          * for the full rationale.  The sem_post resets a semaphore stuck at 0
          * from a crashed writer so the first publish and consumers can proceed. */
         bool locked = ebpfgo_shm_sem_wait(ctx->sem);
-        memset(ctx->data, 0, sizeof(struct ebpfgo_dns_shared));
+        memset(ctx->data, 0, length);
         (void)locked;
         sem_post(ctx->sem);
     }

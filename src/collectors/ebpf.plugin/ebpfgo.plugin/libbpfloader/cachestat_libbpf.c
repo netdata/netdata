@@ -1017,8 +1017,10 @@ int netdata_cachestat_runtime_snapshot_apps(
      * across cycles so steady-state has zero allocations. */
     size_t out_count = 0;
     uint32_t key = 0, next_key = 0;
+    bool first_iter = true;
 
-    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+    while (bpf_map_get_next_key(fd, first_iter ? NULL : &key, &next_key) == 0) {
+        first_iter = false;
         if (bpf_map_lookup_elem(fd, &next_key, values)) {
             key = next_key;
             memset(values, 0, (size_t)count * sizeof(*values));

@@ -6,7 +6,7 @@ import "github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libb
 
 type SharedDnsMemoryPublisher struct{}
 
-func NewSharedDnsMemoryPublisher() (*SharedDnsMemoryPublisher, error) {
+func NewSharedDnsMemoryPublisher(_ uint32) (*SharedDnsMemoryPublisher, error) {
 	return nil, ErrDisabled
 }
 
