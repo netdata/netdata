@@ -926,6 +926,8 @@ int main(int argc, char **argv) {
     program_name = PLUGIN_XENSTAT_NAME;
 
     nd_log_initialize_for_external_plugins(PLUGIN_XENSTAT_NAME);
+    if(nd_environment_freeze_process() != 0)
+        fatal("Cannot freeze the process environment: %s", strerror(errno));
     netdata_threads_init_for_external_plugins(0);
 
     // ------------------------------------------------------------------------

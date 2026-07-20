@@ -176,7 +176,8 @@ static void oom_score_adj(void) {
     }
 
     // check the environment
-    const char *s = getenv("OOMScoreAdjust");
+    CLEAN_CHAR_P *oom_score_adjust = nd_environment_get_dup("OOMScoreAdjust");
+    const char *s = oom_score_adjust;
     if(!s || !*s) {
         snprintfz(buf, sizeof(buf) - 1, "%d", (int)wanted_score);
         s = buf;

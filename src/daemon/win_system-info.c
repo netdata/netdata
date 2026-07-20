@@ -7,10 +7,17 @@
 #include "libnetdata/os/windows-wmi/windows-wmi-GetSystemInfo.h"
 #include "daemon/status-file-dmi.h"
 #include "daemon/status-file-product.h"
+#include "libnetdata/environment/environment.h"
 #include "libnetdata/os/os-windows-wrappers.h"
-#include "libnetdata/os/setenv.h"
 
 #ifdef OS_WINDOWS
+
+static void netdata_windows_publish_environment(const char *name, const char *value) {
+    if(nd_environment_set(name, value, true) != 0)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "WINDOWS SYSTEM INFO: cannot publish child environment variable '%s': %s",
+               name, strerror(errno));
+}
 
 typedef struct netdata_windows_os_info {
     char name[256];
@@ -82,7 +89,7 @@ static void netdata_windows_cpu_from_system_info(struct rrdhost_system_info *sys
     // by anonymous-statistics.sh (mirrors the Linux system-info.sh dispatch, and the RAM/disk
     // detection pattern in this file).
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
-    nd_setenv("NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    netdata_windows_publish_environment("NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
 }
 
 static void netdata_windows_cpu_vendor_model(struct rrdhost_system_info *systemInfo,
@@ -143,7 +150,7 @@ static void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
                                            (!size) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : memSize);
     // Not stored in the struct; consumed from the environment by anonymous-statistics.sh.
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD);
-    nd_setenv("NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    netdata_windows_publish_environment("NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD);
 }
 
 static ULONGLONG netdata_windows_get_disk_size(char *cVolume)
@@ -192,7 +199,7 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
 
     // Not stored in the struct; consumed from the environment by anonymous-statistics.sh.
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD);
-    nd_setenv("NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    netdata_windows_publish_environment("NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD);
 }
 
 // Host
@@ -447,15 +454,6 @@ static void netdata_windows_set_container_os_none(struct rrdhost_system_info *sy
                                   NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
 }
 
-static const char *netdata_windows_container_is_official_image(void)
-{
-    const char *official = getenv("NETDATA_OFFICIAL_IMAGE");
-    if(official && *official)
-        return official;
-
-    return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE;
-}
-
 // Cloud
 static void netdata_windows_cloud(struct rrdhost_system_info *systemInfo)
 {
@@ -488,12 +486,14 @@ static void netdata_windows_container(struct rrdhost_system_info *systemInfo, co
 
     // rrdhost_system_info_set_by_name() recognizes but does not store this key (it has no
     // struct field); its only consumer is anonymous-statistics.sh, which reads it from the
-    // environment. On Linux the system-info.sh dispatch loop nd_setenv()s it — mirror that
-    // here so the flag is not silently dropped on Windows.
-    const char *official_image = netdata_windows_container_is_official_image();
+    // managed environment. Mirror the Linux system-info.sh publication so the flag is not
+    // silently dropped on Windows.
+    CLEAN_CHAR_P *official_image_env = nd_environment_get_dup("NETDATA_OFFICIAL_IMAGE");
+    const char *official_image = official_image_env && *official_image_env ?
+                                     official_image_env : NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE;
     (void)rrdhost_system_info_set_by_name(
         systemInfo, "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE", official_image);
-    nd_setenv("NETDATA_CONTAINER_IS_OFFICIAL_IMAGE", official_image, 1);
+    netdata_windows_publish_environment("NETDATA_CONTAINER_IS_OFFICIAL_IMAGE", official_image);
 }
 
 static void netdata_windows_install_type(struct rrdhost_system_info *systemInfo)
@@ -630,10 +630,10 @@ static void netdata_windows_detect_virtualization(struct rrdhost_system_info *sy
     const char *virt = netdata_windows_detect_virt();
 
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_VIRTUALIZATION", virt);
-    nd_setenv("NETDATA_SYSTEM_VIRTUALIZATION", virt, 1);
+    netdata_windows_publish_environment("NETDATA_SYSTEM_VIRTUALIZATION", virt);
 
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD);
-    nd_setenv("NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    netdata_windows_publish_environment("NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD);
 }
 
 const char *netdata_windows_container_from_env(const char *k_host, const char *k_port) {
@@ -654,8 +654,10 @@ const char *netdata_windows_container_detection_method(const char *container) {
 }
 
 static const char *netdata_windows_detect_container(void) {
+    CLEAN_CHAR_P *kubernetes_service_host = nd_environment_get_dup("KUBERNETES_SERVICE_HOST");
+    CLEAN_CHAR_P *kubernetes_service_port = nd_environment_get_dup("KUBERNETES_SERVICE_PORT");
     const char *from_env = netdata_windows_container_from_env(
-        getenv("KUBERNETES_SERVICE_HOST"), getenv("KUBERNETES_SERVICE_PORT"));
+        kubernetes_service_host, kubernetes_service_port);
     if(from_env)
         return from_env;
 
@@ -677,10 +679,10 @@ static const char *netdata_windows_detect_container_state(struct rrdhost_system_
     const char *container_detection = netdata_windows_container_detection_method(container);
 
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CONTAINER", container);
-    nd_setenv("NETDATA_SYSTEM_CONTAINER", container, 1);
+    netdata_windows_publish_environment("NETDATA_SYSTEM_CONTAINER", container);
 
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CONTAINER_DETECTION", container_detection);
-    nd_setenv("NETDATA_SYSTEM_CONTAINER_DETECTION", container_detection, 1);
+    netdata_windows_publish_environment("NETDATA_SYSTEM_CONTAINER_DETECTION", container_detection);
 
     return container;
 }

@@ -456,9 +456,6 @@ static size_t test_dbengine_burst_retention(RRDHOST *host) {
 }
 
 int test_dbengine(void) {
-    // provide enough threads to dbengine
-    setenv("UV_THREADPOOL_SIZE", "48", 1);
-
     size_t errors = 0, value_errors = 0, time_errors = 0;
 
     nd_log_limits_unlimited();

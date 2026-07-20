@@ -4,6 +4,10 @@
 #define NETDATA_LIB_H 1
 
 # ifdef __cplusplus
+// The environment compiler guard is applied at the end of this header. Load
+// the standard C library facade first so later C++ headers cannot redeclare a
+// poisoned native environment API.
+#include <cstdlib>
 extern "C" {
 # endif
 
@@ -94,6 +98,7 @@ struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int
 // this may include windows.h
 #include "os/os.h"
 #include "os/ci.h"
+#include "environment/environment.h"
 
 #include "socket/socket.h"
 #include "socket/nd-sock.h"
@@ -327,6 +332,8 @@ static inline void *CLEANUP_FUNCTION_GET_PTR(void *pptr) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+
+#include "environment/native-environment-compiler-check.h"
 
 # ifdef __cplusplus
 }

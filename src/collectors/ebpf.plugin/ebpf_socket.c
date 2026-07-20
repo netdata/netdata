@@ -3037,7 +3037,7 @@ void ebpf_parse_service_name_section(struct config *cfg)
         }
     }
 
-    char *port_string = getenv("NETDATA_LISTEN_PORT");
+    CLEAN_CHAR_P *port_string = nd_environment_get_dup("NETDATA_LISTEN_PORT");
     if (port_string) {
         // if variable has an invalid value, we assume netdata is using 19999
         int default_port = str2i(port_string);

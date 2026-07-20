@@ -1718,7 +1718,9 @@ void netdev_main(void *ptr_is_null __maybe_unused)
     worker_register("NETDEV");
     worker_register_job_name(0, "netdev");
 
-    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
+    CLEAN_CHAR_P *kubernetes_service_host = nd_environment_get_dup("KUBERNETES_SERVICE_HOST");
+    CLEAN_CHAR_P *kubernetes_service_port = nd_environment_get_dup("KUBERNETES_SERVICE_PORT");
+    if (kubernetes_service_host && kubernetes_service_port)
         virtual_device_collect_delay_secs = 300;
 
     rrd_function_add_inline(localhost, NULL, "network-interfaces", 10,

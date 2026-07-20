@@ -1652,6 +1652,8 @@ static void plugin_exit(int code) {
 
 int main (int argc, char **argv) {
     nd_log_initialize_for_external_plugins("freeipmi.plugin");
+    if(nd_environment_freeze_process() != 0)
+        fatal("Cannot freeze the process environment: %s", strerror(errno));
     netdata_threads_init_for_external_plugins(0); // set the default threads stack size here
 
     bool netdata_do_sel = IPMI_ENABLE_SEL_BY_DEFAULT;

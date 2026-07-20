@@ -12,6 +12,8 @@
 // used when the caller passes a non-positive timeout_ms (i.e. no explicit grace)
 #define SPAWN_KILL_DEFAULT_GRACE_MS 2000
 
+#if !defined(SPAWN_SERVER_VERSION_WINDOWS) && !defined(SPAWN_SERVER_VERSION_NOFORK) && \
+    !defined(SPAWN_SERVER_VERSION_UV) && !defined(SPAWN_SERVER_VERSION_POSIX_SPAWN)
 #if defined(OS_WINDOWS)
 #define SPAWN_SERVER_VERSION_WINDOWS 1
 // #define SPAWN_SERVER_VERSION_UV 1
@@ -21,16 +23,21 @@
 // #define SPAWN_SERVER_VERSION_UV 1
 // #define SPAWN_SERVER_VERSION_POSIX_SPAWN 1
 #endif
+#endif
 
 struct spawn_server {
     size_t id;
     size_t request_id;
     const char *name;
+    ND_ENVIRONMENT *environment;
 
 #if defined(SPAWN_SERVER_VERSION_UV)
     uv_loop_t *loop;
     uv_thread_t thread;
     uv_async_t async;
+    uv_timer_t shutdown_timer;
+    size_t live_processes;
+    bool shutdown_timer_initialized;
     bool stopping;
 
     SPINLOCK spinlock;
@@ -71,8 +78,10 @@ struct spawn_instance {
 
 #if defined(SPAWN_SERVER_VERSION_UV)
     uv_process_t process;
+    SPAWN_SERVER *server;
     int exit_code;
     uv_sem_t sem;
+    bool process_close_completed;
 #endif
 
 #if defined(SPAWN_SERVER_VERSION_NOFORK)

@@ -4,6 +4,7 @@
 #define SPAWN_SERVER_H
 
 #include "../common.h"
+#include "../environment/environment.h"
 
 #define SPAWN_SERVER_TRANSFER_FDS 4
 
@@ -39,7 +40,13 @@ typedef int (*spawn_request_callback_t)(SPAWN_REQUEST *request);
 typedef struct spawn_instance SPAWN_INSTANCE;
 typedef struct spawn_server SPAWN_SERVER;
 
-SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name, spawn_request_callback_t child_callback, int argc, const char **argv);
+// The environment context remains caller-owned and must outlive the server.
+SPAWN_SERVER *spawn_server_create(SPAWN_SERVER_OPTIONS options, const char *name,
+                                  spawn_request_callback_t child_callback, int argc, const char **argv,
+                                  ND_ENVIRONMENT *environment, const char *runtime_directory);
+#if defined(OS_WINDOWS)
+bool spawn_server_windows_publish_cygwin_path(void);
+#endif
 void spawn_server_destroy(SPAWN_SERVER *server);
 pid_t spawn_server_pid(SPAWN_SERVER *server);
 

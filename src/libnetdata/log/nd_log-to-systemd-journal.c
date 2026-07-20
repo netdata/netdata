@@ -44,16 +44,9 @@ bool nd_log_journal_socket_available(void) {
     return true;
 }
 
-static void nd_log_journal_direct_set_env(void) {
-    if(nd_log.sources[NDLS_COLLECTORS].method == NDLM_JOURNAL)
-        nd_setenv("NETDATA_SYSTEMD_JOURNAL_PATH", nd_log.journal_direct.filename, 1);
-}
-
 bool nd_log_journal_direct_init(const char *path) {
-    if(nd_log.journal_direct.initialized) {
-        nd_log_journal_direct_set_env();
+    if(nd_log.journal_direct.initialized)
         return true;
-    }
 
     int fd;
     char filename[FILENAME_MAX];
@@ -71,8 +64,6 @@ bool nd_log_journal_direct_init(const char *path) {
     nd_log.journal_direct.initialized = true;
 
     strncpyz(nd_log.journal_direct.filename, filename, sizeof(nd_log.journal_direct.filename) - 1);
-    nd_log_journal_direct_set_env();
-
     return true;
 }
 

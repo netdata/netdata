@@ -66,7 +66,22 @@ static char *read_line_path(void)
 
 int main(int argc, char **argv)
 {
+    if(nd_environment_init() != 0) {
+        fprintf(stderr, "Cannot initialize the process environment: %s\n", strerror(errno));
+        return 1;
+    }
+
     const char *run_dir = argc > 1 ? argv[1] : os_run_dir(true);
+    if(!run_dir) {
+        fprintf(stderr, "Cannot resolve the runtime directory.\n");
+        return 1;
+    }
+
+    if(nd_environment_freeze_process() != 0) {
+        fprintf(stderr, "Cannot freeze the process environment: %s\n", strerror(errno));
+        return 1;
+    }
+
     const char *service_name = argc > 2 ? argv[2] : "cgroups-lookup";
     char **owned_paths = NULL;
     nipc_str_view_t *paths = NULL;

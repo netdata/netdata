@@ -96,7 +96,7 @@ static void env_expand_labels_value(const char *src, char *dst, size_t dst_size)
                 default_val = sep + 2;
             }
 
-            const char *env_val = getenv(var_name);
+            CLEAN_CHAR_P *env_val = nd_environment_get_dup(var_name);
             const char *resolved;
 
             if(env_val && *env_val)
@@ -377,11 +377,11 @@ int rrdhost_labels_unittest(void) {
     int errors = 0;
 
     // --- set up test env vars ---
-    setenv("ND_TEST_VAR", "hello", 1);
-    setenv("ND_TEST_DC", "us-east", 1);
-    setenv("ND_TEST_RACK", "rack42", 1);
-    setenv("ND_TEST_EMPTY", "", 1);
-    unsetenv("ND_TEST_UNSET");
+    errors += nd_environment_set("ND_TEST_VAR", "hello", true) != 0;
+    errors += nd_environment_set("ND_TEST_DC", "us-east", true) != 0;
+    errors += nd_environment_set("ND_TEST_RACK", "rack42", true) != 0;
+    errors += nd_environment_set("ND_TEST_EMPTY", "", true) != 0;
+    errors += nd_environment_unset("ND_TEST_UNSET") != 0;
 
     // no variables — pass through unchanged
     errors += env_expand_unittest_check("plain value", "plain value", "plain text");
@@ -435,7 +435,7 @@ int rrdhost_labels_unittest(void) {
     errors += env_expand_unittest_check("${ND_TEST_UNSET:-a:-b}", "a:-b", "default containing :-");
 
     // no recursive expansion — env value containing ${...} is NOT re-expanded
-    setenv("ND_TEST_NESTED", "${ND_TEST_VAR}", 1);
+    errors += nd_environment_set("ND_TEST_NESTED", "${ND_TEST_VAR}", true) != 0;
     errors += env_expand_unittest_check("${ND_TEST_NESTED}", "${ND_TEST_VAR}", "no recursive expansion");
 
     // default containing ${...} is NOT re-expanded
@@ -499,11 +499,11 @@ int rrdhost_labels_unittest(void) {
     }
 
     // --- cleanup test env vars ---
-    unsetenv("ND_TEST_VAR");
-    unsetenv("ND_TEST_DC");
-    unsetenv("ND_TEST_RACK");
-    unsetenv("ND_TEST_EMPTY");
-    unsetenv("ND_TEST_NESTED");
+    errors += nd_environment_unset("ND_TEST_VAR") != 0;
+    errors += nd_environment_unset("ND_TEST_DC") != 0;
+    errors += nd_environment_unset("ND_TEST_RACK") != 0;
+    errors += nd_environment_unset("ND_TEST_EMPTY") != 0;
+    errors += nd_environment_unset("ND_TEST_NESTED") != 0;
 
     errors += is_parent_label_unittest();
 

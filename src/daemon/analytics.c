@@ -888,10 +888,13 @@ void get_system_timezone(void)
 #ifndef OS_WINDOWS
     // avoid flood calls to stat(/etc/localtime)
     // http://stackoverflow.com/questions/4554271/how-to-avoid-excessive-stat-etc-localtime-calls-in-strftime-on-linux
-    const char *tz = getenv("TZ");
+    CLEAN_CHAR_P *tz = nd_environment_get_dup("TZ");
     if (!tz || !*tz) {
-        setenv("TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), 1);
-        tz = getenv("TZ");
+        if(nd_environment_set(
+               "TZ", inicfg_get(&netdata_config, CONFIG_SECTION_ENV_VARS, "TZ", ":/etc/localtime"), true) != 0)
+            fatal("Cannot publish required environment variable 'TZ': %s", strerror(errno));
+        freez(tz);
+        tz = nd_environment_get_dup("TZ");
     }
 
     // use the TZ variable if it's an explicit IANA name (not a path starting with ':')
@@ -1145,9 +1148,8 @@ static bool timezone_info_from_tzfile(const char *timezone, time_t t, char *abbr
     if (!timezone_name_is_safe_tzdb_path(timezone))
         return false;
 
-    const char *tzdir = getenv("TZDIR");
-    if (!tzdir || !*tzdir)
-        tzdir = "/usr/share/zoneinfo";
+    CLEAN_CHAR_P *tzdir_env = nd_environment_get_dup("TZDIR");
+    const char *tzdir = (tzdir_env && *tzdir_env) ? tzdir_env : "/usr/share/zoneinfo";
 
     char path[FILENAME_MAX + 1];
     snprintfz(path, sizeof(path), "%s/%s", tzdir, timezone);
@@ -1332,7 +1334,7 @@ bool analytics_check_enabled(void) {
 
     if(access(filename, R_OK) != 0) {
         // the file is not there, check the environment variable
-        const char *s = getenv("DISABLE_TELEMETRY");
+        CLEAN_CHAR_P *s = nd_environment_get_dup("DISABLE_TELEMETRY");
         netdata_anonymous_statistics_enabled = !s || !*s;
     }
     else

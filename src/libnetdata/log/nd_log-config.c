@@ -2,6 +2,11 @@
 
 #include "nd_log-internals.h"
 
+static void nd_log_publish_environment_value(const char *name, const char *value) {
+    if(nd_environment_set(name, value, true) != 0)
+        fatal("Cannot publish required logging environment variable '%s': %s", name, strerror(errno));
+}
+
 void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
     char buf[FILENAME_MAX + 100];
     if(setting && *setting)
@@ -145,22 +150,6 @@ void nd_log_set_user_settings(ND_LOG_SOURCES source, const char *setting) {
     ls->min_priority = NDLP_DEBUG;
 #endif
 
-    if(source == NDLS_COLLECTORS) {
-        // set the method for the collector processes we will spawn
-
-        ND_LOG_METHOD method = NDLM_STDERR;
-        ND_LOG_FORMAT format = NDLF_LOGFMT;
-        ND_LOG_FIELD_PRIORITY priority = ls->min_priority;
-
-        if(IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(ls->method)) {
-            method = ls->method;
-            format = ls->format;
-        }
-
-        nd_setenv("NETDATA_LOG_METHOD", nd_log_id2method(method), 1);
-        nd_setenv("NETDATA_LOG_FORMAT", nd_log_id2format(format), 1);
-        nd_setenv("NETDATA_LOG_LEVEL", nd_log_id2priority(priority), 1);
-    }
 }
 
 void nd_log_set_priority_level(const char *setting) {
@@ -178,8 +167,6 @@ void nd_log_set_priority_level(const char *setting) {
             nd_log.sources[i].min_priority = priority;
     }
 
-    // the right one
-    nd_setenv("NETDATA_LOG_LEVEL", nd_log_id2priority(priority), 1);
 }
 
 void nd_log_set_facility(const char *facility) {
@@ -187,7 +174,6 @@ void nd_log_set_facility(const char *facility) {
         facility = "daemon";
 
     nd_log.syslog.facility = nd_log_facility2id(facility);
-    nd_setenv("NETDATA_SYSLOG_FACILITY", nd_log_id2facility(nd_log.syslog.facility), 1);
 }
 
 void nd_log_set_flood_protection(size_t logs, time_t period) {
@@ -205,9 +191,36 @@ void nd_log_set_flood_protection(size_t logs, time_t period) {
     nd_log.sources[NDLS_COLLECTORS].limits.throttle_period = period;
     spinlock_unlock(&nd_log.sources[NDLS_COLLECTORS].limits.spinlock);
 
+}
+
+void nd_log_publish_child_environment(void) {
+    struct nd_log_source *collectors = &nd_log.sources[NDLS_COLLECTORS];
+    ND_LOG_METHOD method = NDLM_STDERR;
+    ND_LOG_FORMAT format = NDLF_LOGFMT;
+
+    if(IS_VALID_LOG_METHOD_FOR_EXTERNAL_PLUGINS(collectors->method)) {
+        method = collectors->method;
+        format = collectors->format;
+    }
+
+    nd_log_publish_environment_value("NETDATA_LOG_METHOD", nd_log_id2method(method));
+    nd_log_publish_environment_value("NETDATA_LOG_FORMAT", nd_log_id2format(format));
+    nd_log_publish_environment_value("NETDATA_LOG_LEVEL", nd_log_id2priority(collectors->min_priority));
+    nd_log_publish_environment_value("NETDATA_SYSLOG_FACILITY", nd_log_id2facility(nd_log.syslog.facility));
+
+    uint32_t period;
+    uint32_t logs;
+    spinlock_lock(&collectors->limits.spinlock);
+    period = collectors->limits.throttle_period;
+    logs = collectors->limits.logs_per_period_backup;
+    spinlock_unlock(&collectors->limits.spinlock);
+
     char buf[100];
-    snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t)period);
-    nd_setenv("NETDATA_ERRORS_THROTTLE_PERIOD", buf, 1);
-    snprintfz(buf, sizeof(buf), "%" PRIu64, (uint64_t)logs);
-    nd_setenv("NETDATA_ERRORS_PER_PERIOD", buf, 1);
+    snprintfz(buf, sizeof(buf), "%" PRIu32, period);
+    nd_log_publish_environment_value("NETDATA_ERRORS_THROTTLE_PERIOD", buf);
+    snprintfz(buf, sizeof(buf), "%" PRIu32, logs);
+    nd_log_publish_environment_value("NETDATA_ERRORS_PER_PERIOD", buf);
+
+    if(collectors->method == NDLM_JOURNAL && nd_log.journal_direct.initialized)
+        nd_log_publish_environment_value("NETDATA_SYSTEMD_JOURNAL_PATH", nd_log.journal_direct.filename);
 }

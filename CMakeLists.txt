@@ -1039,6 +1039,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/eval/re2c_lemon/lexer.c
         src/libnetdata/eval/re2c_lemon/parser.c
         src/libnetdata/eval/re2c_lemon/parser_wrapper.c
+        src/libnetdata/environment/environment.c
+        src/libnetdata/environment/environment.h
         src/libnetdata/facets/facets.c
         src/libnetdata/facets/facets.h
         src/libnetdata/functions_evloop/functions_evloop.c
@@ -2893,6 +2895,11 @@ endif()
 
 add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
 target_link_libraries(spawn-tester libnetdata)
+
+add_executable(environment-unittest EXCLUDE_FROM_ALL
+        src/libnetdata/environment/environment-unittest.c)
+target_compile_definitions(environment-unittest PRIVATE NETDATA_INTERNAL_CHECKS=1)
+target_link_libraries(environment-unittest libnetdata)
 
 if(ENABLE_PLUGIN_APPS)
     set(APPS_PLUGIN_FILES

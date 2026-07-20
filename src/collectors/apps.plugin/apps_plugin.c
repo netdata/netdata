@@ -752,13 +752,12 @@ static void apps_lookup_netipc_try_start(void)
 
 int main(int argc, char **argv) {
     nd_log_initialize_for_external_plugins("apps.plugin");
-    netdata_threads_init_for_external_plugins(0);
 
     pagesize = (size_t)sysconf(_SC_PAGESIZE);
 
     bool send_resource_usage = true;
     {
-        const char *s = getenv("NETDATA_INTERNALS_MONITORING");
+        CLEAN_CHAR_P *s = nd_environment_get_dup("NETDATA_INTERNALS_MONITORING");
         if(s && *s && strcmp(s, "NO") == 0)
             send_resource_usage = false;
     }
@@ -766,17 +765,18 @@ int main(int argc, char **argv) {
     // since apps.plugin runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
 
-    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(!netdata_configured_host_prefix)
+        netdata_configured_host_prefix = "";
     if(verify_netdata_host_prefix(true) == -1) exit(1);
 
-    user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    user_config_dir = nd_environment_get_dup("NETDATA_USER_CONFIG_DIR");
     if(user_config_dir == NULL) {
         // netdata_log_info("NETDATA_CONFIG_DIR is not passed from netdata");
         user_config_dir = CONFIG_DIR;
     }
     // else netdata_log_info("Found NETDATA_USER_CONFIG_DIR='%s'", user_config_dir);
 
-    stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+    stock_config_dir = nd_environment_get_dup("NETDATA_STOCK_CONFIG_DIR");
     if(stock_config_dir == NULL) {
         // netdata_log_info("NETDATA_CONFIG_DIR is not passed from netdata");
         stock_config_dir = LIBCONFIG_DIR;
@@ -817,6 +817,13 @@ int main(int argc, char **argv) {
 #endif
     }
 #endif
+
+    if(!os_run_dir(true))
+        fatal("Cannot establish the runtime directory");
+    if(nd_environment_freeze_process() != 0)
+        fatal("Cannot freeze the process environment: %s", strerror(errno));
+
+    netdata_threads_init_for_external_plugins(0);
 
     netdata_log_info("started on pid %d", getpid());
 

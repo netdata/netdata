@@ -23,7 +23,7 @@ bool is_path_unix_socket(const char *path) {
 }
 
 bool is_stderr_connected_to_journal(void) {
-    const char *journal_stream = getenv("JOURNAL_STREAM");
+    CLEAN_CHAR_P *journal_stream = nd_environment_get_dup("JOURNAL_STREAM");
     if (!journal_stream)
         return false; // JOURNAL_STREAM is not set
 
