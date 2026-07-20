@@ -106,10 +106,32 @@ static struct prometheus_server {
     struct prometheus_server *next;
 } *prometheus_server_root = NULL;
 
+static struct prometheus_unit_alias {
+    const char *newunit;
+    uint32_t hash;
+    const char *oldunit;
+} prometheus_unit_aliases[] = {
+    { "KiB/s", 0, "kilobytes/s" },
+    { "MiB/s", 0, "MB/s" },
+    { "GiB/s", 0, "GB/s" },
+    { "KiB", 0, "KB" },
+    { "MiB", 0, "MB" },
+    { "GiB", 0, "GB" },
+    { "inodes", 0, "Inodes" },
+    { "percentage", 0, "percent" },
+    { "faults/s", 0, "page faults/s" },
+    { "KiB/operation", 0, "kilobytes per operation" },
+    { "milliseconds/operation", 0, "ms per operation" },
+    { NULL, 0, NULL },
+};
+
 static netdata_mutex_t prometheus_server_root_mutex;
 
-static void __attribute__((constructor)) init_mutex(void) {
+static void __attribute__((constructor)) init_prometheus(void) {
     netdata_mutex_init(&prometheus_server_root_mutex);
+
+    for(size_t i = 0; prometheus_unit_aliases[i].newunit; i++)
+        prometheus_unit_aliases[i].hash = simple_hash(prometheus_unit_aliases[i].newunit);
 }
 
 static void __attribute__((destructor)) destroy_mutex(void) {
@@ -218,38 +240,14 @@ inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int sh
     char *ret = d;
     size_t n;
 
-    // Fix for issue 5227
+    // Legacy unit aliases for pre-v1.12 metric names.
     if (unlikely(showoldunits)) {
-        static struct {
-            const char *newunit;
-            uint32_t hash;
-            const char *oldunit;
-        } units[] = { { "KiB/s", 0, "kilobytes/s" },
-                      { "MiB/s", 0, "MB/s" },
-                      { "GiB/s", 0, "GB/s" },
-                      { "KiB", 0, "KB" },
-                      { "MiB", 0, "MB" },
-                      { "GiB", 0, "GB" },
-                      { "inodes", 0, "Inodes" },
-                      { "percentage", 0, "percent" },
-                      { "faults/s", 0, "page faults/s" },
-                      { "KiB/operation", 0, "kilobytes per operation" },
-                      { "milliseconds/operation", 0, "ms per operation" },
-                      { NULL, 0, NULL } };
-        static int initialized = 0;
-        int i;
-
-        if (unlikely(!initialized)) {
-            for (i = 0; units[i].newunit; i++)
-                units[i].hash = simple_hash(units[i].newunit);
-            initialized = 1;
-        }
-
         uint32_t hash = simple_hash(s);
-        for (i = 0; units[i].newunit; i++) {
-            if (unlikely(hash == units[i].hash && !strcmp(s, units[i].newunit))) {
+        for (size_t i = 0; prometheus_unit_aliases[i].newunit; i++) {
+            if (unlikely(hash == prometheus_unit_aliases[i].hash &&
+                         !strcmp(s, prometheus_unit_aliases[i].newunit))) {
                 // netdata_log_info("matched extension for filename '%s': '%s'", filename, last_dot);
-                s = units[i].oldunit;
+                s = prometheus_unit_aliases[i].oldunit;
                 sorig = s;
                 break;
             }

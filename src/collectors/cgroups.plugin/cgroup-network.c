@@ -2,13 +2,15 @@
 
 #include "libnetdata/libnetdata.h"
 
-SPAWN_SERVER *spawn_server = NULL;
+extern char **environ;
 
-char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
-char env_netdata_log_method[FILENAME_MAX + 50] = "";
-char env_netdata_log_format[FILENAME_MAX + 50] = "";
-char env_netdata_log_level[FILENAME_MAX + 50] = "";
-char *environment[] = {
+static SPAWN_SERVER *spawn_server = NULL;
+
+static char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
+static char env_netdata_log_method[FILENAME_MAX + 50] = "";
+static char env_netdata_log_format[FILENAME_MAX + 50] = "";
+static char env_netdata_log_level[FILENAME_MAX + 50] = "";
+static char *environment[] = {
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
         env_netdata_host_prefix,
         env_netdata_log_method,
@@ -371,6 +373,7 @@ pid_t read_pid_from_cgroup_file(const char *filename) {
     FILE *fp = fdopen(fd, "r");
     if(!fp) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot upgrade fd to fp for file '%s'.", filename);
+        close(fd);
         return 0;
     }
 
@@ -584,26 +587,28 @@ static void read_from_spawned(SPAWN_INSTANCE *si, const char *name __maybe_unuse
     char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
     char *s;
     FILE *fp = fdopen(spawn_server_instance_read_fd(si), "r");
-    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
-        trim(s);
+    if(fp) {
+        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
+            trim(s);
 
-        if(*s && *s != '\n') {
-            char *t = s;
-            while(*t && *t != ' ') t++;
-            if(*t == ' ') {
-                *t = '\0';
-                t++;
+            if(*s && *s != '\n') {
+                char *t = s;
+                while(*t && *t != ' ') t++;
+                if(*t == ' ') {
+                    *t = '\0';
+                    t++;
+                }
+
+                if(strcmp(s, "EXIT") == 0)
+                    break;
+
+                if(!*s || !*t) continue;
+                add_device(s, t);
             }
-
-            if(strcmp(s, "EXIT") == 0)
-                break;
-
-            if(!*s || !*t) continue;
-            add_device(s, t);
         }
+        fclose(fp);
+        spawn_server_instance_read_fd_unset(si);
     }
-    fclose(fp);
-    spawn_server_instance_read_fd_unset(si);
     spawn_server_exec_kill(spawn_server, si, 0);
 }
 
@@ -714,9 +719,9 @@ int verify_path(const char *path) {
         }
     }
 
-    if(strstr(path, "/../")) {
+    if(strstr(path, "/../") || strendswith(path, "/..")) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "invalid parent path sequence detected in '%s'", path);
-        return 1;
+        return -1;
     }
 
     if(path[0] != '/') {
@@ -793,8 +798,6 @@ int main(int argc, const char **argv) {
         collector_error("setresuid(0, 0, 0) failed.");
 
     nd_log_initialize_for_external_plugins("cgroup-network");
-    spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback, argc, argv);
-    nd_log_register_fatal_final_cb(cleanup_spawn_server_on_fatal);
 
     // since cgroup-network runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
@@ -807,6 +810,10 @@ int main(int argc, const char **argv) {
 
     if(netdata_configured_host_prefix[0] != '\0' && verify_path(netdata_configured_host_prefix) == -1)
         fatal("invalid NETDATA_HOST_PREFIX '%s'", netdata_configured_host_prefix);
+
+    int helper = 1;
+    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
+        helper = 0;
 
     // ------------------------------------------------------------------------
     // build a safe environment for our script
@@ -829,6 +836,14 @@ int main(int argc, const char **argv) {
 
     // ------------------------------------------------------------------------
 
+    // This is a dedicated privileged process; no child may inherit its caller's environment.
+    environ = environment;
+
+    spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback, argc, argv);
+    // Spawn initialization may publish its detected runtime directory; do not pass it to helper requests.
+    environ = environment;
+    nd_log_register_fatal_final_cb(cleanup_spawn_server_on_fatal);
+
     if(argc == 2 && (!strcmp(argv[1], "version") || !strcmp(argv[1], "-version") || !strcmp(argv[1], "--version") || !strcmp(argv[1], "-v") || !strcmp(argv[1], "-V"))) {
         fprintf(stderr, "cgroup-network %s\n", NETDATA_VERSION);
         exit(0);
@@ -838,9 +853,6 @@ int main(int argc, const char **argv) {
         usage();
 
     int arg = 1;
-    int helper = 1;
-    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
-        helper = 0;
 
     if(!strcmp(argv[arg], "-p") || !strcmp(argv[arg], "--pid")) {
         pid = atoi(argv[arg+1]);
