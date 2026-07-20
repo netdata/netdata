@@ -8,6 +8,16 @@ static struct rrdengine_instance test_ctx_0 = {0};
 static struct rrdengine_instance test_ctx_1 = {0};
 static struct rrdengine_instance test_ctx_tier[4] = { 0 }; // For stress test tiers
 
+static int mrg_allocation_alignment_unittest(MRG *mrg) {
+    if((uintptr_t)mrg % _Alignof(MRG) == 0)
+        return 0;
+
+    fprintf(stderr,
+            "DBENGINE METRIC: MRG allocation is not aligned to %zu bytes\n",
+            (size_t)_Alignof(MRG));
+    return 1;
+}
+
 struct mrg_stress_entry {
     nd_uuid_t uuid;
     time_t after;
@@ -187,6 +197,7 @@ static int mrg_destroy_referenced_metric_unittest(void) {
     int errors = 0;
 
     MRG *mrg = mrg_create_for_unittest();
+    errors += mrg_allocation_alignment_unittest(mrg);
     nd_uuid_t uuid;
     uuid_generate(uuid);
 
@@ -361,6 +372,7 @@ int mrg_unittest(void) {
 
     // Use mrg_create_for_unittest to avoid pre-loaded metrics that block deletion
     MRG *mrg = mrg_create_for_unittest();
+    errors += mrg_allocation_alignment_unittest(mrg);
 
 #ifndef NETDATA_INTERNAL_CHECKS
     errors += mrg_metrics_delete_underflow_unittest(mrg);
