@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -20,44 +21,50 @@ type ProcessDriver struct{}
 
 type ProcessScenario string
 
-const (
-	ProcessRestart                ProcessScenario = "restart"
-	ProcessNoncooperativeShutdown ProcessScenario = "noncooperative shutdown"
-	ProcessInputFence             ProcessScenario = "input fence"
-	ProcessRepeatedStop           ProcessScenario = "repeated stop"
-)
+var processRuntimeScenarios = map[ProcessScenario]func(context.Context) error{
+	"restart waits for old Cleanup":              runProcessRestart,
+	"noncooperative Cleanup remains owned":       runProcessNoncooperativeShutdown,
+	"input fence cleans up exactly once":         runProcessInputFence,
+	"repeated stop invokes Cleanup exactly once": runCollectorRepeatedStop,
+}
 
-func (driver *ProcessDriver) Run(
+func ProcessScenarios() map[ProcessScenario]struct{} {
+	scenarios := make(
+		map[ProcessScenario]struct{},
+		len(processRuntimeScenarios),
+	)
+	for scenario := range processRuntimeScenarios {
+		scenarios[scenario] = struct{}{}
+	}
+	return scenarios
+}
+
+func (d *ProcessDriver) Run(
 	ctx context.Context,
 	scenario ProcessScenario,
 ) error {
-	if driver == nil || ctx == nil {
+	if d == nil || ctx == nil {
 		return errors.New("jobmgr test: invalid Process driver")
 	}
-	var result error
-	switch scenario {
-	case ProcessRestart:
-		result = runProcessRestart(ctx)
-	case ProcessNoncooperativeShutdown:
-		result = runProcessNoncooperativeShutdown(ctx)
-	case ProcessInputFence:
-		result = runProcessInputFence(ctx)
-	case ProcessRepeatedStop:
-		result = runCollectorRepeatedStop(ctx)
-	default:
-		result = fmt.Errorf(
+	run := processRuntimeScenarios[scenario]
+	if run == nil {
+		return fmt.Errorf(
 			"jobmgr test: unknown Process scenario %q",
 			scenario,
 		)
 	}
-	return result
+	return run(ctx)
 }
 
 type processFixture struct {
 	process *composition.Process
 	input   *io.PipeWriter
 	state   *agentFixtureState
-	done    chan error
+	cancel  context.CancelFunc
+	done    chan struct{}
+	runErr  error
+
+	closeOnce sync.Once
 }
 
 func startProcessFixture(
@@ -110,13 +117,48 @@ func startProcessFixture(
 		_ = writer.Close()
 		return nil, err
 	}
-	done := make(chan error, 1)
+	runCtx, cancel := context.WithCancel(runCtx)
+	fixture := &processFixture{
+		process: process,
+		input:   writer,
+		state:   state,
+		cancel:  cancel,
+		done:    make(chan struct{}),
+	}
 	go func() {
-		done <- process.Run(runCtx)
+		fixture.runErr = process.Run(runCtx)
+		close(fixture.done)
 	}()
-	return &processFixture{
-		process: process, input: writer, state: state, done: done,
-	}, nil
+	return fixture, nil
+}
+
+func (f *processFixture) wait(ctx context.Context) error {
+	select {
+	case <-f.done:
+		return f.runErr
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (f *processFixture) close() {
+	f.closeOnce.Do(func() {
+		terminationCtx, cancelTermination := context.WithTimeout(
+			context.Background(),
+			fixtureJoinPeriod,
+		)
+		_ = f.process.Terminate(terminationCtx)
+		cancelTermination()
+
+		f.cancel()
+		_ = f.input.Close()
+		joinCtx, cancelJoin := context.WithTimeout(
+			context.Background(),
+			fixtureJoinPeriod,
+		)
+		defer cancelJoin()
+		_ = f.wait(joinCtx)
+	})
 }
 
 func runProcessRestart(ctx context.Context) error {
@@ -126,18 +168,23 @@ func runProcessRestart(ctx context.Context) error {
 		cleanupGate: release, cleanupEntered: entered,
 	}
 	fixture, err := startProcessFixture(
-		context.Background(),
+		ctx,
 		state,
 		time.Second,
 	)
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
+	var releaseOnce sync.Once
+	releaseCleanup := func() {
+		releaseOnce.Do(func() { close(release) })
+	}
+	defer releaseCleanup()
 	if err := waitUntil(ctx, func() bool {
 		return state.count("check") == 1
 	}); err != nil {
 		_ = fixture.input.Close()
-		close(release)
 		return err
 	}
 	restarted := make(chan error, 1)
@@ -148,12 +195,10 @@ func runProcessRestart(ctx context.Context) error {
 	case <-entered:
 	case <-ctx.Done():
 		_ = fixture.input.Close()
-		close(release)
 		return ctx.Err()
 	}
 	select {
 	case err := <-restarted:
-		close(release)
 		_ = fixture.input.Close()
 		return fmt.Errorf(
 			"restart returned before old Cleanup disposition: %v",
@@ -162,13 +207,12 @@ func runProcessRestart(ctx context.Context) error {
 	case <-time.After(50 * time.Millisecond):
 	}
 	if state.count("init") != 1 {
-		close(release)
 		_ = fixture.input.Close()
 		return errors.New(
 			"replacement initialized before old Cleanup disposition",
 		)
 	}
-	close(release)
+	releaseCleanup()
 	select {
 	case err := <-restarted:
 		if err != nil {
@@ -192,13 +236,8 @@ func runProcessRestart(ctx context.Context) error {
 	if err := fixture.input.Close(); err != nil {
 		return err
 	}
-	select {
-	case err := <-fixture.done:
-		if err != nil {
-			return err
-		}
-	case <-ctx.Done():
-		return ctx.Err()
+	if err := fixture.wait(ctx); err != nil {
+		return err
 	}
 	if got := state.count("cleanup"); got != 2 {
 		return fmt.Errorf("process cleanup count=%d, want 2", got)
@@ -209,13 +248,14 @@ func runProcessRestart(ctx context.Context) error {
 func runProcessInputFence(ctx context.Context) error {
 	state := &agentFixtureState{}
 	fixture, err := startProcessFixture(
-		context.Background(),
+		ctx,
 		state,
 		time.Second,
 	)
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	if err := waitUntil(ctx, func() bool {
 		return state.count("check") == 1
 	}); err != nil {
@@ -229,13 +269,8 @@ func runProcessInputFence(ctx context.Context) error {
 	if err := fixture.input.Close(); err != nil {
 		return err
 	}
-	select {
-	case err := <-fixture.done:
-		if err != nil {
-			return err
-		}
-	case <-ctx.Done():
-		return ctx.Err()
+	if err := fixture.wait(ctx); err != nil {
+		return err
 	}
 	if got := state.count("cleanup"); got != 1 {
 		return fmt.Errorf("process cleanup count=%d, want 1", got)
@@ -250,18 +285,23 @@ func runProcessNoncooperativeShutdown(ctx context.Context) error {
 		cleanupGate: release, cleanupEntered: entered,
 	}
 	fixture, err := startProcessFixture(
-		context.Background(),
+		ctx,
 		state,
 		100*time.Millisecond,
 	)
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
+	var releaseOnce sync.Once
+	releaseCleanup := func() {
+		releaseOnce.Do(func() { close(release) })
+	}
+	defer releaseCleanup()
 	if err := waitUntil(ctx, func() bool {
 		return state.count("check") == 1
 	}); err != nil {
 		_ = fixture.input.Close()
-		close(release)
 		return err
 	}
 	terminated := make(chan error, 1)
@@ -271,7 +311,6 @@ func runProcessNoncooperativeShutdown(ctx context.Context) error {
 	select {
 	case <-entered:
 	case <-ctx.Done():
-		close(release)
 		_ = fixture.input.Close()
 		return ctx.Err()
 	}
@@ -279,16 +318,13 @@ func runProcessNoncooperativeShutdown(ctx context.Context) error {
 	select {
 	case terminalErr = <-terminated:
 	case <-ctx.Done():
-		close(release)
 		_ = fixture.input.Close()
 		return ctx.Err()
 	}
-	close(release)
+	releaseCleanup()
 	closeErr := fixture.input.Close()
-	var runErr error
-	select {
-	case runErr = <-fixture.done:
-	case <-ctx.Done():
+	runErr := fixture.wait(ctx)
+	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if terminalErr == nil || runErr == nil {
@@ -315,13 +351,14 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 		cleanupEntered: entered,
 	}
 	fixture, err := startProcessFixture(
-		context.Background(),
+		ctx,
 		state,
 		time.Second,
 	)
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	released := false
 	defer func() {
 		if !released {
@@ -397,10 +434,5 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 	if err := fixture.input.Close(); err != nil {
 		return err
 	}
-	select {
-	case err := <-fixture.done:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	return fixture.wait(ctx)
 }

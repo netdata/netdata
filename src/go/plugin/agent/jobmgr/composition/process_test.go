@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestProcessCoreServiceDiscoveryUsesCandidateFunctionTransaction(t *testing.T) {
+func TestProcessCoreServiceDiscoverySendsFunctionResultBeforeStatus(t *testing.T) {
 	reader, writer := io.Pipe()
 	output := newProcessSynchronizedBuffer()
 	services := testRunServiceDiscoveryServices(t)
@@ -78,7 +78,7 @@ func TestProcessCoreServiceDiscoveryUsesCandidateFunctionTransaction(t *testing.
 	require.NoError(t, writer.Close())
 }
 
-func TestProcessCoreVnodeDynCfgUsesCandidateTransaction(t *testing.T) {
+func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 	reader, writer := io.Pipe()
 	output := newProcessSynchronizedBuffer()
 	jobs := testRunJobServices(t)

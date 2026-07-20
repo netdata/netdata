@@ -14,39 +14,9 @@ import (
 )
 
 func TestProductionAgentScenarios(t *testing.T) {
-	tests := map[string]jobmgrtest.AgentScenario{
-		"start acknowledgement":                        jobmgrtest.AgentStartAcknowledgement,
-		"start replacement ordering":                   jobmgrtest.AgentStartReplacementOrdering,
-		"collector V1 lifecycle":                       jobmgrtest.AgentCollectorV1Lifecycle,
-		"collector V2 lifecycle":                       jobmgrtest.AgentCollectorV2Lifecycle,
-		"collector V2 acquired abort":                  jobmgrtest.AgentCollectorV2AcquiredAbort,
-		"Function admission closes before lease drain": jobmgrtest.AgentFunctionAdmissionClosesBeforeDrain,
-		"Function replacement ordering":                jobmgrtest.AgentFunctionReplacementOrdering,
-		"collector V1 published abort":                 jobmgrtest.AgentCollectorV1PublishedAbort,
-		"blocking stop":                                jobmgrtest.AgentBlockingStop,
-		"held handler shutdown":                        jobmgrtest.AgentHeldHandlerShutdown,
-		"late handler quarantine":                      jobmgrtest.AgentLateHandlerQuarantine,
-		"UID growth":                                   jobmgrtest.AgentUIDGrowth,
-		"concurrent same-route Functions":              jobmgrtest.AgentConcurrentSameRouteFunctions,
-		"control with large ordinary population":       jobmgrtest.AgentControlWithLargeOrdinaryPopulation,
-		"Function terminal variants":                   jobmgrtest.AgentFunctionTerminalVariants,
-		"awaiting terminal bound":                      jobmgrtest.AgentAwaitingTerminalBound,
-		"Function output fault":                        jobmgrtest.AgentFunctionOutputFault,
-		"config output fault":                          jobmgrtest.AgentConfigOutputFault,
-		"collector V1 output fault":                    jobmgrtest.AgentCollectorV1OutputFault,
-		"collector V2 output fault":                    jobmgrtest.AgentCollectorV2OutputFault,
-		"runtime output fault":                         jobmgrtest.AgentRuntimeOutputFault,
-		"cleanup output fault":                         jobmgrtest.AgentCleanupOutputFault,
-		"Function header boundaries":                   jobmgrtest.AgentFunctionHeaderBoundaries,
-		"Function body boundaries":                     jobmgrtest.AgentFunctionBodyBoundaries,
-		"Function raw payload":                         jobmgrtest.AgentFunctionRawPayload,
-		"Function timeout boundaries":                  jobmgrtest.AgentFunctionTimeoutBoundaries,
-		"Function invalid JSON":                        jobmgrtest.AgentFunctionInvalidJSON,
-		"Function result boundaries":                   jobmgrtest.AgentFunctionResultBoundaries,
-	}
 	driver := &jobmgrtest.AgentDriver{}
-	for name, scenario := range tests {
-		t.Run(name, func(t *testing.T) {
+	for scenario := range jobmgrtest.AgentScenarios() {
+		t.Run(string(scenario), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 			defer cancel()
 
@@ -56,15 +26,9 @@ func TestProductionAgentScenarios(t *testing.T) {
 }
 
 func TestProductionProcessScenarios(t *testing.T) {
-	tests := map[string]jobmgrtest.ProcessScenario{
-		"restart waits for old Cleanup":              jobmgrtest.ProcessRestart,
-		"noncooperative Cleanup remains owned":       jobmgrtest.ProcessNoncooperativeShutdown,
-		"input fence cleans up exactly once":         jobmgrtest.ProcessInputFence,
-		"repeated stop invokes Cleanup exactly once": jobmgrtest.ProcessRepeatedStop,
-	}
 	driver := &jobmgrtest.ProcessDriver{}
-	for name, scenario := range tests {
-		t.Run(name, func(t *testing.T) {
+	for scenario := range jobmgrtest.ProcessScenarios() {
+		t.Run(string(scenario), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
 
@@ -127,22 +91,9 @@ func productionShippedRootDriver(t *testing.T) jobmgrtest.ShippedRootDriver {
 	require.True(t, filepath.IsAbs(configDirectory))
 
 	return jobmgrtest.ShippedRootDriver{
-		Roots: map[string]jobmgrtest.ShippedRoot{
-			"godplugin": {
-				Executable: os.Getenv("JOBMGRTEST_GODPLUGIN_BIN"),
-				Module:     "testrandom",
-				ConfigDir:  configDirectory,
-			},
-			"ibmdplugin": {
-				Executable: os.Getenv("JOBMGRTEST_IBMDPLUGIN_BIN"),
-				Module:     "websphere_mp",
-				ConfigDir:  configDirectory,
-			},
-			"scriptsdplugin": {
-				Executable: os.Getenv("JOBMGRTEST_SCRIPTSDPLUGIN_BIN"),
-				Module:     "nagios",
-				ConfigDir:  configDirectory,
-			},
-		},
+		ConfigDir:      configDirectory,
+		GoDPlugin:      os.Getenv("JOBMGRTEST_GODPLUGIN_BIN"),
+		IBMPlugin:      os.Getenv("JOBMGRTEST_IBMDPLUGIN_BIN"),
+		ScriptsDPlugin: os.Getenv("JOBMGRTEST_SCRIPTSDPLUGIN_BIN"),
 	}
 }

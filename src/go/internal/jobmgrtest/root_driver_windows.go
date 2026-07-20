@@ -4,24 +4,24 @@ package jobmgrtest
 
 import (
 	"context"
+	"errors"
 )
 
-type ShippedRoot struct {
-	Executable string
-	Module     string
-	ConfigDir  string
-}
-
-type ShippedRootDriver struct {
-	Roots map[string]ShippedRoot
-}
-
-func (ShippedRootDriver) RunMatrixAvailable(
-	context.Context,
+func (srd ShippedRootDriver) RunMatrixAvailable(
+	ctx context.Context,
 ) ([]string, error) {
-	return []string{
-		"godplugin",
-		"ibmdplugin",
-		"scriptsdplugin",
-	}, nil
+	if ctx == nil {
+		return nil, errors.New(
+			"jobmgr test: nil shipped-root matrix context",
+		)
+	}
+	if err := srd.validateConfigs(); err != nil {
+		return nil, err
+	}
+	roots := srd.roots()
+	missing := make([]string, 0, len(roots))
+	for _, root := range roots {
+		missing = append(missing, root.name)
+	}
+	return missing, nil
 }

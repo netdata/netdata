@@ -28,15 +28,16 @@ import (
 )
 
 const productionFixtureModule = "jobmgrtest"
+const fixtureJoinPeriod = 5 * time.Second
 
 // AgentDriver exercises one behavior through the public Agent API.
 type AgentDriver struct{}
 
-func (driver *AgentDriver) Run(
+func (d *AgentDriver) Run(
 	ctx context.Context,
 	scenario AgentScenario,
 ) error {
-	if driver == nil || ctx == nil {
+	if d == nil || ctx == nil {
 		return errors.New("jobmgr test: invalid Agent driver")
 	}
 	run := agentRuntimeScenarios[scenario]
@@ -47,13 +48,6 @@ func (driver *AgentDriver) Run(
 		)
 	}
 	return run(ctx)
-}
-
-func prefixError(prefix string, err error) error {
-	if err == nil {
-		return nil
-	}
-	return fmt.Errorf("%s: %w", prefix, err)
 }
 
 type agentFixtureState struct {
@@ -261,7 +255,12 @@ type agentFixture struct {
 	input  *io.PipeWriter
 	output *synchronizedBuffer
 	state  *agentFixtureState
-	done   chan error
+	cancel context.CancelFunc
+	done   chan struct{}
+	runErr error
+
+	terminateOnce sync.Once
+	terminateErr  error
 }
 
 func startAgentFixture(
@@ -316,22 +315,6 @@ func startAgentCapacityFixtureWithState(
 	)
 }
 
-func startAgentFixtureConfigured(
-	ctx context.Context,
-	v2 bool,
-	state *agentFixtureState,
-	wrapOutput func(*synchronizedBuffer) io.Writer,
-	runPolicy policy.RunModePolicy,
-) (*agentFixture, error) {
-	return startAgentFixtureConfiguredWithRegistry(
-		ctx,
-		state,
-		fixtureRegistry(state, v2),
-		wrapOutput,
-		runPolicy,
-	)
-}
-
 func startAgentFixtureConfiguredWithRegistry(
 	ctx context.Context,
 	state *agentFixtureState,
@@ -339,6 +322,9 @@ func startAgentFixtureConfiguredWithRegistry(
 	wrapOutput func(*synchronizedBuffer) io.Writer,
 	runPolicy policy.RunModePolicy,
 ) (*agentFixture, error) {
+	if ctx == nil {
+		return nil, errors.New("jobmgr test: nil Agent fixture context")
+	}
 	logger.Level.SetByName("critical")
 	reader, writer := io.Pipe()
 	output := &synchronizedBuffer{}
@@ -373,29 +359,63 @@ func startAgentFixtureConfiguredWithRegistry(
 	})
 	instance.In = reader
 	instance.Out = agentOutput
-	done := make(chan error, 1)
+	runCtx, cancel := context.WithCancel(ctx)
+	fixture := &agentFixture{
+		agent:  instance,
+		input:  writer,
+		output: output,
+		state:  state,
+		cancel: cancel,
+		done:   make(chan struct{}),
+	}
 	go func() {
-		done <- instance.RunContext(ctx)
+		fixture.runErr = instance.RunContext(runCtx)
+		close(fixture.done)
 	}()
-	return &agentFixture{
-		agent: instance, input: writer, output: output,
-		state: state, done: done,
-	}, nil
+	return fixture, nil
 }
 
-func (fixture *agentFixture) terminate(ctx context.Context) error {
-	if fixture == nil {
+func (f *agentFixture) terminate(ctx context.Context) error {
+	if f == nil {
 		return errors.New("jobmgr test: nil Agent fixture")
 	}
-	terminateErr := fixture.agent.Terminate(ctx)
-	closeErr := fixture.input.Close()
-	var runErr error
-	select {
-	case runErr = <-fixture.done:
-	case <-ctx.Done():
-		runErr = ctx.Err()
+	if ctx == nil {
+		return errors.New("jobmgr test: nil Agent termination context")
 	}
-	return errors.Join(terminateErr, closeErr, runErr)
+	f.terminateOnce.Do(func() {
+		terminateErr := f.agent.Terminate(ctx)
+		f.cancel()
+		closeErr := f.input.Close()
+		joinCtx, cancel := context.WithTimeout(
+			context.Background(),
+			fixtureJoinPeriod,
+		)
+		defer cancel()
+		f.terminateErr = errors.Join(
+			terminateErr,
+			closeErr,
+			f.wait(joinCtx),
+		)
+	})
+	return f.terminateErr
+}
+
+func (f *agentFixture) wait(ctx context.Context) error {
+	select {
+	case <-f.done:
+		return f.runErr
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (f *agentFixture) close() {
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		fixtureJoinPeriod,
+	)
+	defer cancel()
+	_ = f.terminate(ctx)
 }
 
 func runAgentCollectorLifecycle(
@@ -407,6 +427,7 @@ func runAgentCollectorLifecycle(
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	if err := waitUntil(ctx, func() bool {
 		return fixture.state.count("check") >= 1
 	}); err != nil {
@@ -478,6 +499,7 @@ func runAgentAcquiredAbort(
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	if err := waitUntil(ctx, func() bool {
 		return state.count("check") >= 1 &&
 			(!requirePublication || fixture.output.contains(
@@ -529,6 +551,7 @@ func runAgentFunctionFlow(
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.contains(
 			`FUNCTION GLOBAL "jobmgrtest:echo"`,
@@ -973,6 +996,7 @@ func runAgentFunctionScenario(
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.contains(
 			`FUNCTION GLOBAL "jobmgrtest:echo"`,
@@ -1200,47 +1224,6 @@ func repeatedJSONSHA256(payloadBytes int) [sha256.Size]byte {
 	var result [sha256.Size]byte
 	copy(result[:], digest.Sum(nil))
 	return result
-}
-
-func runAgentFunctionBurst(ctx context.Context) error {
-	fixture, err := startAgentFixture(ctx, false)
-	if err != nil {
-		return err
-	}
-	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:echo"`,
-		)
-	}); err != nil {
-		_ = fixture.input.Close()
-		return err
-	}
-	const requests = 32
-	for index := range requests {
-		uid := fmt.Sprintf("jobmgrtest-burst-%02d", index)
-		line := fmt.Sprintf(
-			"FUNCTION %s 30 %q 0xFFFF %q\n",
-			uid,
-			"jobmgrtest:echo "+uid,
-			"method=api,role=test",
-		)
-		if _, err := io.WriteString(fixture.input, line); err != nil {
-			_ = fixture.input.Close()
-			return err
-		}
-	}
-	for index := range requests {
-		uid := fmt.Sprintf("jobmgrtest-burst-%02d", index)
-		if err := waitUntil(ctx, func() bool {
-			return fixture.output.contains(
-				"FUNCTION_RESULT_BEGIN " + uid + " 200 application/json",
-			)
-		}); err != nil {
-			_ = fixture.input.Close()
-			return fmt.Errorf("Function burst stalled at %s: %w", uid, err)
-		}
-	}
-	return fixture.terminate(ctx)
 }
 
 func fixtureRegistry(

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 )
@@ -18,10 +19,15 @@ type ResolverDriver struct {
 	PIDFile string
 }
 
-func (driver ResolverDriver) Run(ctx context.Context) error {
+type resolverResult struct {
+	resolved any
+	err      error
+}
+
+func (d ResolverDriver) Run(ctx context.Context) error {
 	if ctx == nil ||
-		driver.Helper == "" ||
-		driver.PIDFile == "" {
+		d.Helper == "" ||
+		d.PIDFile == "" {
 		return errors.New("jobmgr test: invalid Resolver driver")
 	}
 	resolver, err := secretresolver.NewDefaultAtomicResolver()
@@ -29,39 +35,36 @@ func (driver ResolverDriver) Run(ctx context.Context) error {
 		return err
 	}
 	input := map[string]any{
-		"secret": "${cmd:" + driver.Helper + " " + driver.PIDFile + "}",
+		"secret": "${cmd:" + d.Helper + " " + d.PIDFile + "}",
 	}
 	resolveCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	type resolveResult struct {
-		resolved any
-		err      error
-	}
-	result := make(chan resolveResult, 1)
+	result := make(chan resolverResult, 1)
 	go func() {
 		resolved, err := resolver.Resolve(resolveCtx, input, nil)
-		result <- resolveResult{resolved: resolved, err: err}
+		result <- resolverResult{resolved: resolved, err: err}
 	}()
 	var pidData []byte
 	if err := waitUntil(ctx, func() bool {
-		pidData, err = os.ReadFile(driver.PIDFile)
+		pidData, err = os.ReadFile(d.PIDFile)
 		return err == nil && len(pidData) != 0
 	}); err != nil {
 		cancel()
-		return fmt.Errorf(
-			"resolver helper did not publish PIDs: %w",
-			err,
+		_, joinErr := waitResolverResult(result)
+		return errors.Join(
+			fmt.Errorf(
+				"resolver helper did not publish PIDs: %w",
+				err,
+			),
+			joinErr,
 		)
 	}
 	cancel()
-	var resolved any
-	var resolveErr error
-	select {
-	case outcome := <-result:
-		resolved, resolveErr = outcome.resolved, outcome.err
-	case <-ctx.Done():
-		return fmt.Errorf("resolver did not stop after cancellation: %w", ctx.Err())
+	outcome, err := waitResolverResult(result)
+	if err != nil {
+		return err
 	}
+	resolved, resolveErr := outcome.resolved, outcome.err
 	if resolveErr == nil {
 		return fmt.Errorf(
 			"resolver command unexpectedly succeeded: %#v",
@@ -69,7 +72,7 @@ func (driver ResolverDriver) Run(ctx context.Context) error {
 		)
 	}
 	if input["secret"] !=
-		"${cmd:"+driver.Helper+" "+driver.PIDFile+"}" {
+		"${cmd:"+d.Helper+" "+d.PIDFile+"}" {
 		return errors.New("resolver mutated caller input on cancellation")
 	}
 	fields := strings.Fields(string(pidData))
@@ -99,4 +102,19 @@ func (driver ResolverDriver) Run(ctx context.Context) error {
 		)
 	}
 	return nil
+}
+
+func waitResolverResult(
+	result <-chan resolverResult,
+) (resolverResult, error) {
+	timer := time.NewTimer(fixtureJoinPeriod)
+	defer timer.Stop()
+	select {
+	case outcome := <-result:
+		return outcome, nil
+	case <-timer.C:
+		return resolverResult{}, errors.New(
+			"resolver did not stop after cancellation",
+		)
+	}
 }

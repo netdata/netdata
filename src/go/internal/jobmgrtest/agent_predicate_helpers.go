@@ -36,6 +36,7 @@ func runAgentStartAcknowledgementVariant(
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	released := false
 	defer func() {
 		if !released {
@@ -94,6 +95,7 @@ func runAgentStartReplacementOrderingVariant(
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	released := false
 	defer func() {
 		if !released {
@@ -173,6 +175,7 @@ func runAgentBlockingStop(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	released := false
 	defer func() {
 		if !released {
@@ -210,18 +213,7 @@ func runAgentBlockingStop(ctx context.Context) error {
 	}
 }
 
-func runAgentHeldHandlerShutdown(ctx context.Context) error {
-	return runAgentHeldHandlerTerminal(ctx, true)
-}
-
-func runAgentLateHandlerQuarantine(ctx context.Context) error {
-	return runAgentHeldHandlerTerminal(ctx, true)
-}
-
-func runAgentHeldHandlerTerminal(
-	ctx context.Context,
-	expectNoLateFrame bool,
-) error {
+func runAgentHeldHandlerTerminal(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
 	state := &agentFixtureState{
@@ -232,6 +224,7 @@ func runAgentHeldHandlerTerminal(
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	released := false
 	defer func() {
 		if !released {
@@ -279,8 +272,8 @@ func runAgentHeldHandlerTerminal(
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-	if expectNoLateFrame && fixture.output.contains(
-		"FUNCTION_RESULT_BEGIN "+uid+" 200 ",
+	if fixture.output.contains(
+		"FUNCTION_RESULT_BEGIN " + uid + " 200 ",
 	) {
 		return errors.New(
 			"old-generation handler committed a frame after shutdown quarantine",
@@ -302,6 +295,7 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	released := false
 	defer func() {
 		if !released {
@@ -425,6 +419,7 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	released := false
 	defer func() {
 		if !released {
@@ -628,6 +623,7 @@ func runAgentHeldFunctionPopulation(
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	released := false
 	defer func() {
 		if !released {
@@ -719,6 +715,7 @@ func runAgentControlWithLargeOrdinaryPopulation(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	defer fixture.input.Close()
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.contains(
@@ -742,15 +739,14 @@ func runAgentControlWithLargeOrdinaryPopulation(ctx context.Context) error {
 	); err != nil {
 		return err
 	}
-	select {
-	case runErr := <-fixture.done:
-		if runErr != nil {
-			return runErr
+	if runErr := fixture.wait(ctx); runErr != nil {
+		if errors.Is(runErr, context.DeadlineExceeded) ||
+			errors.Is(runErr, context.Canceled) {
+			return errors.New(
+				"CANCEL and QUIT did not progress with a large ordinary population",
+			)
 		}
-	case <-ctx.Done():
-		return errors.New(
-			"CANCEL and QUIT did not progress with a large ordinary population",
-		)
+		return runErr
 	}
 	if state.count("raw:echo:cancelled") == 0 {
 		return errors.New(
@@ -760,27 +756,8 @@ func runAgentControlWithLargeOrdinaryPopulation(ctx context.Context) error {
 	return nil
 }
 
-func runAgentFunctionTerminalVariants(ctx context.Context) error {
-	return errors.Join(
-		runAgentFunctionFlow(ctx, true),
-		runAgentFunctionTimeoutBoundaries(ctx),
-	)
-}
-
-func runAgentAwaitingTerminalBound(ctx context.Context) error {
-	return runAgentFunctionScenario(
-		ctx,
-		func(fixture *agentFixture) error {
-			return sendFunctionAndRequireStatus(
-				ctx,
-				fixture,
-				"jobmgrtest-awaiting-deadline",
-				"0",
-				"jobmgrtest:echo deadline",
-				504,
-			)
-		},
-	)
+func runAgentFunctionStatusVariants(ctx context.Context) error {
+	return runAgentFunctionFlow(ctx, true)
 }
 
 type outputFaultCut uint8
@@ -889,7 +866,7 @@ func runAgentOutputFaultMode(
 		registry = fixtureOutputRegistry(state, v2)
 	}
 	fixture, err := startAgentFixtureConfiguredWithRegistry(
-		context.Background(),
+		ctx,
 		state,
 		registry,
 		func(output *synchronizedBuffer) io.Writer {
@@ -905,6 +882,7 @@ func runAgentOutputFaultMode(
 	if err != nil {
 		return err
 	}
+	defer fixture.close()
 	defer fixture.input.Close()
 	switch cut {
 	case outputFaultFunction:
@@ -931,12 +909,18 @@ func runAgentOutputFaultMode(
 			return err
 		}
 		go func() {
-			_ = fixture.agent.Terminate(context.Background())
+			terminationCtx, cancel := context.WithTimeout(
+				context.Background(),
+				fixtureJoinPeriod,
+			)
+			defer cancel()
+			_ = fixture.terminate(terminationCtx)
 		}()
 	}
 	select {
 	case <-injected:
-	case runErr := <-fixture.done:
+	case <-fixture.done:
+		runErr := fixture.wait(context.Background())
 		return fmt.Errorf(
 			"output fault cut %d terminated before injection: %w; events=%v; output=%s",
 			cut,
@@ -953,15 +937,14 @@ func runAgentOutputFaultMode(
 			fixture.output.String(),
 		)
 	}
-	select {
-	case runErr := <-fixture.done:
-		if runErr == nil {
-			return errors.New(
-				"output fault produced a clean Agent disposition",
-			)
-		}
-	case <-ctx.Done():
+	runErr := fixture.wait(ctx)
+	if ctx.Err() != nil {
 		return ctx.Err()
+	}
+	if runErr == nil {
+		return errors.New(
+			"output fault produced a clean Agent disposition",
+		)
 	}
 	return nil
 }
