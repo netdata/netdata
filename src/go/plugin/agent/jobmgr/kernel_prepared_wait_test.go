@@ -54,6 +54,38 @@ func TestSubmitPreparedAndWaitReturnsCleanTransactionPreparationError(t *testing
 	require.NoError(t, kernel.Wait(context.Background()))
 }
 
+func TestSubmitPreparedPreservesStoppingRejectionWithoutInputBodyCleanup(t *testing.T) {
+	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	loop, err := NewKernelLoop(kernel)
+	require.NoError(t, err)
+	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, run.OpenAdmission())
+
+	plan, err := stoppedKernelPlanner{}.Plan(Request{})
+	require.NoError(t, err)
+
+	kernel.Stop()
+	shutdownCtx, cancelShutdown := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancelShutdown()
+	require.NoError(t, kernel.WaitShutdownStarted(shutdownCtx))
+
+	err = kernel.SubmitPrepared(
+		context.Background(),
+		Request{
+			UID:     "stopping-boundary",
+			LaneKey: "stopping-boundary",
+			Source:  lifecycle.SourceJobManager,
+			Route:   "internal/test",
+		},
+		plan,
+	)
+	require.Same(t, run.StoppingCause(), err)
+	require.NoError(t, kernel.Wait(context.Background()))
+}
+
 func TestSubmitPreparedAndWaitDirtiesRunForRetainedTransactionPreparation(t *testing.T) {
 	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	loop, err := NewKernelLoop(kernel)

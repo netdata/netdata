@@ -909,18 +909,23 @@ func (ck *CommandKernel) submitWithPlan(
 	terminal chan error,
 ) error {
 	if ctx == nil {
-		return errors.Join(errors.New("jobmgr kernel: nil submission context"), ck.abortRequestInputBody(request))
+		return ck.abortRequestInputBodyWith(
+			request,
+			errors.New("jobmgr kernel: nil submission context"),
+		)
 	}
 	if err := ctx.Err(); err != nil {
-		return errors.Join(err, ck.abortRequestInputBody(request))
+		return ck.abortRequestInputBodyWith(request, err)
 	}
 	if err := request.Validate(); err != nil {
-		return errors.Join(err, ck.abortRequestInputBody(request))
+		return ck.abortRequestInputBodyWith(request, err)
 	}
 	if prepared && request.Source != lifecycle.SourceJobManager {
-		return errors.Join(
-			errors.New("jobmgr kernel: only Job Manager commands accept prepared plans"),
-			ck.abortRequestInputBody(request),
+		return ck.abortRequestInputBodyWith(
+			request,
+			errors.New(
+				"jobmgr kernel: only Job Manager commands accept prepared plans",
+			),
 		)
 	}
 	request.Args = append([]string(nil), request.Args...)
@@ -928,13 +933,13 @@ func (ck *CommandKernel) submitWithPlan(
 		var err error
 		plan, err = prepareOwnedJobPlan(request, plan)
 		if err != nil {
-			return errors.Join(err, ck.abortRequestInputBody(request))
+			return ck.abortRequestInputBodyWith(request, err)
 		}
 	} else if request.Source == lifecycle.SourceJobManager {
 		var err error
 		plan, err = ck.prepareJobPlan(request)
 		if err != nil {
-			return errors.Join(err, ck.abortRequestInputBody(request))
+			return ck.abortRequestInputBodyWith(request, err)
 		}
 	}
 	result := make(chan error, 1)
@@ -945,7 +950,7 @@ func (ck *CommandKernel) submitWithPlan(
 		result:   result,
 		terminal: terminal,
 	}); err != nil {
-		return errors.Join(err, ck.abortRequestInputBody(request))
+		return ck.abortRequestInputBodyWith(request, err)
 	}
 	select {
 	case err := <-result:
@@ -1508,7 +1513,10 @@ func (ck *CommandKernel) serviceSubmissions(quantum int) bool {
 			}
 		} else {
 			if submitted.context != nil && submitted.context.Err() != nil {
-				err = errors.Join(context.Cause(submitted.context), ck.abortRequestInputBody(submitted.request))
+				err = ck.abortRequestInputBodyWith(
+					submitted.request,
+					context.Cause(submitted.context),
+				)
 			} else {
 				err = ck.admitSubmission(
 					submitted.request,
@@ -1645,23 +1653,20 @@ func (ck *CommandKernel) admitSubmission(
 			rollback,
 		)
 		if err != nil {
-			return errors.Join(
-				err,
-				ck.abortRequestInputBody(request),
-			)
+			return ck.abortRequestInputBodyWith(request, err)
 		}
 		if request.InputBodyToken != 0 {
-			return errors.Join(
+			return ck.abortRequestInputBodyWith(
+				request,
 				errors.New(
 					"jobmgr composite: child cannot own parser input",
 				),
-				ck.abortRequestInputBody(request),
 			)
 		}
 	} else if rollback {
-		return errors.Join(
+		return ck.abortRequestInputBodyWith(
+			request,
 			errors.New("jobmgr kernel: rollback child has no parent"),
-			ck.abortRequestInputBody(request),
 		)
 	} else if !ck.run.Admitting() {
 		return ck.rejectClosedAdmission(request)
@@ -1674,7 +1679,7 @@ func (ck *CommandKernel) admitSubmission(
 				1,
 			)
 		}
-		return errors.Join(err, ck.abortRequestInputBody(request))
+		return ck.abortRequestInputBodyWith(request, err)
 	}
 	var functionInvocation FunctionInvocationRef
 	var functionResourceID string
@@ -1754,12 +1759,12 @@ func (ck *CommandKernel) admitSubmission(
 	if parent != nil &&
 		parent.lane != nil &&
 		parent.lane.mapKey == laneID {
-		return errors.Join(
+		return ck.abortRequestInputBodyWith(
+			request,
 			errors.New(
 				"jobmgr composite: child cannot use its active parent lane",
 			),
 			ck.uids.Complete(request.UID, false, now),
-			ck.abortRequestInputBody(request),
 		)
 	}
 	lane := ck.lanes[laneID]
@@ -1835,10 +1840,10 @@ func (ck *CommandKernel) admitSubmission(
 	} else if parent != nil {
 		if err := ck.beginCompositeFence(parent); err != nil {
 			ck.releaseUnusedLane(lane)
-			return errors.Join(
+			return ck.abortRequestInputBodyWith(
+				request,
 				err,
 				ck.uids.Complete(request.UID, false, now),
-				ck.abortRequestInputBody(request),
 			)
 		}
 		requested = ck.admission.GrantCompositeProgress(
@@ -1852,10 +1857,10 @@ func (ck *CommandKernel) admitSubmission(
 	}
 	if requested.Rejected != nil {
 		ck.releaseUnusedLane(lane)
-		return errors.Join(
+		return ck.abortRequestInputBodyWith(
+			request,
 			requested.Rejected,
 			ck.uids.Complete(request.UID, false, now),
-			ck.abortRequestInputBody(request),
 		)
 	}
 	request.InputBodyToken = 0
@@ -5256,6 +5261,31 @@ func (ck *CommandKernel) abortRequestInputBody(request Request) error {
 		ck.NotifyControlReady()
 	}
 	return err
+}
+
+func (ck *CommandKernel) abortRequestInputBodyWith(
+	request Request,
+	primary error,
+	cleanup ...error,
+) error {
+	abortErr := ck.abortRequestInputBody(request)
+	hasCleanupError := abortErr != nil
+	if !hasCleanupError {
+		for _, err := range cleanup {
+			if err != nil {
+				hasCleanupError = true
+				break
+			}
+		}
+	}
+	if !hasCleanupError {
+		return primary
+	}
+	errs := make([]error, 0, len(cleanup)+2)
+	errs = append(errs, primary)
+	errs = append(errs, cleanup...)
+	errs = append(errs, abortErr)
+	return errors.Join(errs...)
 }
 
 func operationResultAdmissionBytes(base int64, result lifecycle.ResultPreflight) (int64, error) {
