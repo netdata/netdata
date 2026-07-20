@@ -41,6 +41,7 @@ impl FlowDecoders {
         let packet_context = packet_context.or(computed_context.as_ref());
         let mut template_state_changed = false;
         let mut parser_source_evictions = 0_u64;
+        let mut v9_nsel_flowsets_by_packet = Vec::new();
         let is_sflow = is_sflow_payload(payload);
 
         if let Some(context) = packet_context {
@@ -56,6 +57,7 @@ impl FlowDecoders {
                 input_realtime_usec,
             )
         } else {
+            parser_source_evictions = std::mem::take(&mut self.pending_parser_source_evictions);
             let parser_source = packet_context
                 .map(|context| context.parser_source)
                 .unwrap_or_else(|| normalize_template_scope_source(source));
@@ -68,22 +70,25 @@ impl FlowDecoders {
                     Ok(())
                 },
             );
-            parser_source_evictions = removals.len() as u64;
+            parser_source_evictions = parser_source_evictions.saturating_add(removals.len() as u64);
             for removal in removals {
                 self.remove_evicted_parser_source(removal);
             }
 
             if let Some(context) = packet_context {
-                template_state_changed = self.observe_decoder_state_from_packets(
+                let observation = self.observe_decoder_state_from_packets(
                     context,
                     &result.packets,
                     input_realtime_usec,
                 );
+                template_state_changed = observation.template_state_changed;
+                v9_nsel_flowsets_by_packet = observation.v9_nsel_flowsets_by_packet;
             }
 
             decode_netflow_result(
                 result,
                 &mut self.sampling,
+                &v9_nsel_flowsets_by_packet,
                 source,
                 self.decapsulation_mode,
                 self.timestamp_source,

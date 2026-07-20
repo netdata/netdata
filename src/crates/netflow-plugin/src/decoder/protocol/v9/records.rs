@@ -5,11 +5,12 @@ pub(crate) fn append_v9_records(
     out: &mut Vec<DecodedFlow>,
     packet: V9,
     sampling: &mut SamplingState,
+    nsel_flowsets: Option<&[bool]>,
     decapsulation_mode: DecapsulationMode,
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
-) -> u64 {
-    let mut partial_counter_records = 0_u64;
+    stats: &mut DecodeStats,
+) {
     let export_usec = unix_timestamp_to_usec(packet.header.unix_secs as u64, 0);
     let observation_domain_id = packet.header.source_id;
     let version = 9_u16;
@@ -18,7 +19,11 @@ pub(crate) fn append_v9_records(
         packet.header.sys_up_time as u64,
     );
 
-    for flowset in packet.flowsets {
+    for (flowset_index, flowset) in packet.flowsets.into_iter().enumerate() {
+        let nsel = nsel_flowsets
+            .and_then(|flowsets| flowsets.get(flowset_index))
+            .copied()
+            .unwrap_or(false);
         match flowset.body {
             V9FlowSetBody::Data(data) => {
                 for record in data.fields {
@@ -30,8 +35,12 @@ pub(crate) fn append_v9_records(
                     let mut decap_required = false;
                     let mut decap_ok = false;
                     let mut counters = OrdinaryCounterSelector::default();
+                    let mut nsel_state = NselRecordState::default();
 
                     for (field, value) in record {
+                        if nsel && nsel_state.observe(field, &value) {
+                            continue;
+                        }
                         if field == V9Field::Layer2packetSectionData {
                             decap_required = true;
                             if let FieldValue::Vec(raw_value) = &value
@@ -103,6 +112,23 @@ pub(crate) fn append_v9_records(
                         }
                     }
 
+                    rec.flow_start_usec = flow_start_usec.unwrap_or(0);
+                    rec.flow_end_usec = flow_end_usec.unwrap_or(0);
+                    if nsel {
+                        let projection = project_nsel_record(rec, nsel_state, input_realtime_usec);
+                        stats.partial_counter_records = stats
+                            .partial_counter_records
+                            .saturating_add(projection.stats.partial_counter_records);
+                        projection.stats.merge_into(stats);
+                        if let Some(flow) = projection.forward {
+                            out.push(flow);
+                        }
+                        if let Some(flow) = projection.reverse {
+                            out.push(flow);
+                        }
+                        continue;
+                    }
+
                     apply_sampling_state_record(
                         &mut rec,
                         source,
@@ -121,14 +147,12 @@ pub(crate) fn append_v9_records(
                     }
 
                     if counters.apply_to_record(&mut rec) {
-                        partial_counter_records += 1;
+                        stats.partial_counter_records += 1;
                     }
 
                     if rec.flows == 0 {
                         rec.flows = 1;
                     }
-                    rec.flow_start_usec = flow_start_usec.unwrap_or(0);
-                    rec.flow_end_usec = flow_end_usec.unwrap_or(0);
                     finalize_record(&mut rec);
                     let first_switched_usec =
                         (rec.flow_start_usec != 0).then_some(rec.flow_start_usec);
@@ -145,6 +169,4 @@ pub(crate) fn append_v9_records(
             _ => continue,
         }
     }
-
-    partial_counter_records
 }

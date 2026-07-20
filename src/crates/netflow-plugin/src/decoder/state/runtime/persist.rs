@@ -17,7 +17,15 @@ impl FlowDecoders {
         // Validate replay into a fresh parser first so restore failures do not
         // partially mutate the live parser or sampling state.
         let mut validation_parser = super::init::new_netflow_parser(self.max_records_per_flowset);
-        Self::replay_namespace_packets_into(&mut validation_parser, key, &namespace, source)?;
+        let mut validation_removals = Vec::new();
+        Self::replay_namespace_packets_into(
+            &mut validation_parser,
+            key,
+            &namespace,
+            source,
+            &mut validation_removals,
+        )?;
+        debug_assert!(validation_removals.is_empty());
 
         self.replay_namespace_packets(key, &namespace, source)?;
         self.hydrated_namespace_sources
@@ -46,18 +54,16 @@ impl FlowDecoders {
 
         let parser_source = expected_key.parser_source(source);
         let mut validation_parser = super::init::new_netflow_parser(self.max_records_per_flowset);
+        let mut validation_removals = Vec::new();
         Self::replay_namespace_packets_into(
             &mut validation_parser,
             &expected_key,
             &persisted.namespace,
             parser_source,
+            &mut validation_removals,
         )?;
-        Self::replay_namespace_packets_into(
-            &mut self.netflow,
-            &expected_key,
-            &persisted.namespace,
-            parser_source,
-        )?;
+        debug_assert!(validation_removals.is_empty());
+        self.replay_namespace_packets(&expected_key, &persisted.namespace, parser_source)?;
 
         self.loaded_decoder_namespaces.insert(expected_key.clone());
         self.decoder_state_namespaces
@@ -104,7 +110,21 @@ impl FlowDecoders {
         namespace: &DecoderStateNamespace,
         source: SocketAddr,
     ) -> Result<(), String> {
-        Self::replay_namespace_packets_into(&mut self.netflow, key, namespace, source)
+        let mut removals = Vec::new();
+        let result = Self::replay_namespace_packets_into(
+            &mut self.netflow,
+            key,
+            namespace,
+            source,
+            &mut removals,
+        );
+        self.pending_parser_source_evictions = self
+            .pending_parser_source_evictions
+            .saturating_add(removals.len() as u64);
+        for removal in removals {
+            self.remove_evicted_parser_source(removal);
+        }
+        result
     }
 
     fn replay_namespace_packets_into(
@@ -112,6 +132,7 @@ impl FlowDecoders {
         key: &DecoderStateNamespaceKey,
         namespace: &DecoderStateNamespace,
         source: SocketAddr,
+        removals: &mut Vec<AutoSourceKey>,
     ) -> Result<(), String> {
         let mut observed_namespace = DecoderStateNamespace::default();
         let mut observed_sampling = SamplingState::default();
@@ -121,7 +142,10 @@ impl FlowDecoders {
             .into_iter()
             .enumerate()
         {
-            let result = parser.parse_from_source(source, &packet);
+            let result = parser.parse_from_source_with_reporter(source, &packet, &mut |removal| {
+                removals.push(removal.source);
+                Ok(())
+            });
             if let Some(err) = &result.error {
                 return Err(format!(
                     "failed to replay persisted namespace packet {} for {} / {} from {}: {}",
@@ -193,9 +217,9 @@ fn record_v9_template_mismatch(
 ) {
     let matches = expected.len() == observed.len()
         && expected.iter().all(|(id, template)| {
-            observed
-                .get(id)
-                .is_some_and(|other| template.definition == other.definition)
+            observed.get(id).is_some_and(|other| {
+                template.definition == other.definition && template.nsel == other.nsel
+            })
         });
     if !matches {
         mismatches.push(format!(

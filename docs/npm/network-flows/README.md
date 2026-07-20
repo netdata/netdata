@@ -67,7 +67,7 @@ The Netdata netflow plugin decodes:
 
 - **NetFlow v5** (legacy, IPv4-only)
 - **NetFlow v7** (rare, Cisco Catalyst 5000)
-- **NetFlow v9** (the modern Cisco / Juniper / FortiGate / Arista format)
+- **NetFlow v9** (the modern Cisco / Juniper / FortiGate / Arista format), including automatically detected Cisco ASA NSEL
 - **IPFIX** (RFC 7011, the IETF-standardised successor to NetFlow v9)
 - **sFlow v5** (the packet-sampling protocol most switches use)
 

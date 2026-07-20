@@ -12,8 +12,16 @@ pub(crate) fn observe_v9_decoder_state_from_packet(
     let observation_domain_id = packet.header.source_id;
     let mut template_state_changed = false;
     let mut dirty_sampling_namespaces = Vec::new();
+    let mut nsel_flowsets = Vec::with_capacity(packet.flowsets.len());
 
     for flowset in &packet.flowsets {
+        nsel_flowsets.push(
+            matches!(flowset.body, V9FlowSetBody::Data(_))
+                && namespace
+                    .v9_templates
+                    .get(&flowset.header.flowset_id)
+                    .is_some_and(|template| template.nsel),
+        );
         match &flowset.body {
             V9FlowSetBody::Template(templates) => {
                 for template in &templates.templates {
@@ -24,12 +32,13 @@ pub(crate) fn observe_v9_decoder_state_from_packet(
                             field_type: field.field_type_number,
                             field_length: field.field_length,
                         })
-                        .collect();
+                        .collect::<Vec<_>>();
+                    let nsel = is_nsel_template(&fields);
                     template_state_changed |= namespace.set_v9_template(
                         template.template_id,
                         fields,
                         received_at_usec,
-                        false,
+                        nsel,
                     );
                     template_state.install(
                         key,
@@ -102,5 +111,6 @@ pub(crate) fn observe_v9_decoder_state_from_packet(
         namespace_state_changed: template_state_changed,
         template_state_changed,
         dirty_sampling_namespaces,
+        v9_nsel_flowsets: nsel_flowsets,
     }
 }

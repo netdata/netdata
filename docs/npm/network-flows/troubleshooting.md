@@ -107,6 +107,21 @@ If it's climbing, the exporter is sending data records before their templates. E
 - Templates are sent rarely. Cisco IOS / IOS-XE Flexible NetFlow ships a default `template data timeout` of **600 seconds (10 minutes)**; Juniper and others have their own defaults, often longer. After a plugin restart, you'll see template errors until the next template re-send. **Fix on the router side**: lower the template refresh interval to 60 seconds (the [Quick Start](/docs/npm/network-flows/quick-start.md) configurations show this).
 - The exporter is using template IDs that collide with another exporter's templates. Most common cause: two exporters NATted behind the same public IP. Place the plugin inside the NAT boundary or give each exporter a distinct address.
 
+### Cisco ASA NSEL packets arrive, but fewer traffic rows appear
+
+Cisco ASA Network Secure Event Logging is detected automatically from its NetFlow v9 templates; there is no NSEL configuration switch. Netdata requires a validated event field (233, or legacy 40005) together with Cisco extended-event field 33002 before applying NSEL semantics.
+
+NSEL exporter records and stored traffic rows are intentionally not one-to-one:
+
+- Event 5 updates contain interval traffic and are the only events stored in the flow database.
+- Event 1 create, event 2 teardown, and event 3 deny records are counted but not stored as traffic. Teardown contains lifetime totals that repeat earlier updates; storing it would double-count and put old traffic in the close-time bucket.
+- One update can create two rows: initiator traffic in the reported direction and nonzero responder traffic with endpoints swapped.
+- An all-zero initiator direction remains visible. An all-zero responder direction is suppressed and diagnosed. A direction with only bytes or only packets is stored with zero for the missing member and diagnosed as partial.
+
+The Network Flows function response exposes cumulative `decoded_nsel_*` statistics for received event types, malformed/counterless/partial records, suppressed zero responders, and emitted forward/reverse rows. These statistics are not yet dimensions of `netflow.input_packets`; the health-chart layout is tracked separately.
+
+If `template_errors` rises, check the v9 template refresh cadence. On first startup, Netdata cannot decode data received before the first template. Learned templates are persisted for later restarts, but v9 streams are separated by exporter IP, UDP source port, and Source ID; a new source port needs its own template.
+
 **UDP kernel drops:**
 
 The plugin doesn't count these. Check at the OS level:

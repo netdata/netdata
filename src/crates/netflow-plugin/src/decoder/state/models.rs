@@ -156,6 +156,13 @@ pub(crate) struct DecoderStateObservation {
     pub(crate) namespace_state_changed: bool,
     pub(crate) template_state_changed: bool,
     pub(crate) dirty_sampling_namespaces: Vec<DecoderStateNamespaceKey>,
+    pub(crate) v9_nsel_flowsets: Vec<bool>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct DecoderStateBatchObservation {
+    pub(crate) template_state_changed: bool,
+    pub(crate) v9_nsel_flowsets_by_packet: Vec<Option<Vec<bool>>>,
 }
 
 impl DecoderStateNamespace {

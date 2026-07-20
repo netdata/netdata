@@ -105,6 +105,18 @@ pub(crate) struct DecodeStats {
     pub(crate) template_errors: u64,
     pub(crate) parser_source_evictions: u64,
     pub(crate) partial_counter_records: u64,
+    pub(crate) nsel_records: u64,
+    pub(crate) nsel_update_records: u64,
+    pub(crate) nsel_create_records: u64,
+    pub(crate) nsel_teardown_records: u64,
+    pub(crate) nsel_denied_records: u64,
+    pub(crate) nsel_unsupported_event_records: u64,
+    pub(crate) nsel_malformed_records: u64,
+    pub(crate) nsel_counterless_update_records: u64,
+    pub(crate) nsel_partial_counter_records: u64,
+    pub(crate) nsel_zero_responder_records: u64,
+    pub(crate) nsel_forward_rows: u64,
+    pub(crate) nsel_reverse_rows: u64,
     pub(crate) netflow_v5_packets: u64,
     pub(crate) netflow_v7_packets: u64,
     pub(crate) netflow_v9_packets: u64,
@@ -120,6 +132,18 @@ impl DecodeStats {
         self.template_errors += other.template_errors;
         self.parser_source_evictions += other.parser_source_evictions;
         self.partial_counter_records += other.partial_counter_records;
+        self.nsel_records += other.nsel_records;
+        self.nsel_update_records += other.nsel_update_records;
+        self.nsel_create_records += other.nsel_create_records;
+        self.nsel_teardown_records += other.nsel_teardown_records;
+        self.nsel_denied_records += other.nsel_denied_records;
+        self.nsel_unsupported_event_records += other.nsel_unsupported_event_records;
+        self.nsel_malformed_records += other.nsel_malformed_records;
+        self.nsel_counterless_update_records += other.nsel_counterless_update_records;
+        self.nsel_partial_counter_records += other.nsel_partial_counter_records;
+        self.nsel_zero_responder_records += other.nsel_zero_responder_records;
+        self.nsel_forward_rows += other.nsel_forward_rows;
+        self.nsel_reverse_rows += other.nsel_reverse_rows;
         self.netflow_v5_packets += other.netflow_v5_packets;
         self.netflow_v7_packets += other.netflow_v7_packets;
         self.netflow_v9_packets += other.netflow_v9_packets;

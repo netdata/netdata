@@ -244,5 +244,6 @@ pub(crate) fn observe_ipfix_decoder_state_from_packet(
         namespace_state_changed: template_state_changed,
         template_state_changed,
         dirty_sampling_namespaces,
+        v9_nsel_flowsets: Vec::new(),
     }
 }

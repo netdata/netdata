@@ -37,6 +37,13 @@ protocols:
   decapsulation_mode: none
   # one of: input, netflow_packet, netflow_first_switched
   timestamp_source: input
+  # Expire NetFlow v9 templates 90 minutes after the last template refresh.
+  # Data records do not refresh this timer. Set to null to disable expiry.
+  v9_template_lifetime: 90m
+  # Bound learned NetFlow v9/IPFIX sampling rates. The per-stream limit is
+  # clamped to the global limit when configured higher.
+  sampling_cache_max_entries: 100000
+  sampling_cache_max_entries_per_stream: 65536
 
 journal:
   # Relative paths are resolved against NETDATA_CACHE_DIR.

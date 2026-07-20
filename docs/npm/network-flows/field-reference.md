@@ -61,6 +61,21 @@ If a NetFlow v9 or IPFIX record contains both a sampled frame and whole-flow cou
 
 IPFIX reverse Information Elements and initiator/responder counter pairs describe direction in other ways. Netdata handles them separately; they do not use this incoming/post-observation rule. If an IPFIX record contains any IANA initiator/responder counter field (IEs 231/232/298/299), that session-direction model is authoritative: initiator counters produce the forward flow, responder counters produce the reverse flow, and ordinary IEs 1/2/23/24 are ignored. If the same record also contains RFC 5103 reverse Information Elements, their byte and packet counters are ignored while their addresses, ports, timestamps, and other non-counter fields are retained. Records containing only RFC 5103 reverse Information Elements are unchanged.
 
+### Cisco ASA NSEL counters and events
+
+Cisco ASA Network Secure Event Logging (NSEL) uses NetFlow v9 as its transport, but its records describe firewall connection events rather than ordinary one-way NetFlow records. Netdata recognizes NSEL automatically when a validated template contains either the modern event field 233 or legacy field 40005 together with Cisco extended-event field 33002. There is no NSEL configuration switch.
+
+For recognized NSEL templates:
+
+- Event 5 is a periodic traffic update. Its initiator counters (IEs 231/298) produce the forward row; its responder counters (IEs 232/299) produce a separate row with source and destination fields swapped.
+- Event 2 is the connection teardown and repeats lifetime totals already represented by event-5 updates. Netdata counts it diagnostically but does not store it as traffic, avoiding double-counting and avoiding moving earlier traffic into the teardown time bucket.
+- Events 1 (create) and 3 (deny), unsupported events, malformed records, and event-5 records with no counters are counted diagnostically but do not enter the flow database.
+- A direction is present when it carries either its byte or packet counter. If one member is missing, Netdata stores zero for that missing member and counts a partial-counter diagnostic. An all-zero initiator direction is retained; an all-zero responder direction is suppressed and counted diagnostically.
+- NSEL counters are unsampled interval contributions, so Netdata stores the same values in `RAW_BYTES`/`RAW_PACKETS` and `BYTES`/`PACKETS` with `SAMPLING_RATE=1`. Learned sampling options from other v9 templates do not scale them.
+- NSEL rows use collector receive time for journal placement. IE 323 remains available as `OBSERVATION_TIME_MILLIS` metadata but does not decide the query bucket.
+
+This event policy means the number of NSEL exporter records is intentionally different from the number of stored traffic rows. It also means a lost UDP update remains a visible gap: Netdata does not use a later teardown total to fabricate traffic at the wrong time.
+
 ## Identity — who and what
 
 | Field | Type | v5 | v7 | v9 | IPFIX | sFlow | Description |
@@ -261,7 +276,7 @@ Column legend:
 
 | Field | Type | v5 | v7 | v9 | IPFIX | sFlow | Source | Tiers | Selectivity | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Canonical byte counter, scaled by `SAMPLING_RATE` at ingest. v9/IPFIX prefer IEs 1/2 and fall back to IEs 23/24 as a matched family. sFlow derives it from decoded L3 length |
+| `BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Canonical byte counter, scaled by `SAMPLING_RATE` at ingest. Ordinary v9/IPFIX prefer IEs 1/2 and fall back to IEs 23/24 as a matched family. Cisco ASA NSEL event 5 uses initiator/responder IEs 231/232. sFlow derives it from decoded L3 length |
 | `DIRECTION` | string | — | — | ◐ | ◐ | — | decoder | all | facet, group-by, filter | v9 IE 61, IPFIX IE 61/239. sFlow has no native direction |
 | `DST_ADDR` | IP | ✓ | ✓ | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9/IPFIX IE 12/28; sFlow `SampledHeader`/`SampledIPv4`/`SampledIPv6`. Raw-only |
 | `DST_ADDR_NAT` | IP | — | — | ◐ | ◐ | — | decoder | raw | facet, group-by, filter | v9 IE 226/282; IPFIX `postNATdestinationIPv4/IPv6Address` |
@@ -318,7 +333,7 @@ Column legend:
 | `IP_FRAGMENT_OFFSET` | uint16 | — | — | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9/IPFIX IE 88 `FragmentOffset`. sFlow from parsed IPv4 header |
 | `MPLS_LABELS` | string | — | — | ◐ | ◐ | ◐ | decoder | raw | filter | v9 IE 70-79 `MplsLabel1..10`. IPFIX IE 70 `MplsTopLabelStackSection` + 71-79 `MplsLabelStackSection2..10`. sFlow from MPLS in `SampledHeader`. Comma-separated decimal labels |
 | `NEXT_HOP` | IP | ✓ | ✓ | ◐ | ◐ | ◐ | both | all | facet, group-by, filter | v9 IE 15/18/62/63; IPFIX same. sFlow `ExtendedRouter`/`ExtendedGateway`. Enrichment overlay via `net_providers` chain (default `[flow, routing]`) |
-| `OBSERVATION_TIME_MILLIS` | uint64 | — | — | ◐ | — | — | decoder | raw | hidden | v9 IE 323 `ObservationTimeMilliseconds`. IPFIX observation-time fields are not exposed |
+| `OBSERVATION_TIME_MILLIS` | uint64 | — | — | ◐ | — | — | decoder | raw | hidden | v9 IE 323 `ObservationTimeMilliseconds`. For Cisco ASA NSEL this remains metadata; collector receive time determines journal/query placement. IPFIX observation-time fields are not exposed |
 | `OUT_IF` | uint32 | ✓ | ✓ | ◐ | ◐ | ◐ | decoder | all | facet, group-by, filter | v9 IE 14 `OutputSnmp`; IPFIX IE 14/253. sFlow flow-sample `output` (single index only; LOCAL→0) |
 | `OUT_IF_BOUNDARY` | uint8 | — | — | — | — | — | enrichment | all | facet, group-by, filter | Same semantics as `IN_IF_BOUNDARY` |
 | `OUT_IF_CONNECTIVITY` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | Static metadata or interface classifier connectivity tag |
@@ -326,11 +341,11 @@ Column legend:
 | `OUT_IF_NAME` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.if_indexes.<idx>.name` |
 | `OUT_IF_PROVIDER` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | Static metadata or interface classifier provider tag |
 | `OUT_IF_SPEED` | uint64 | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.if_indexes.<idx>.speed` (bps) |
-| `PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Canonical packet counter, selected with `BYTES` from the same family and scaled by `SAMPLING_RATE`. sFlow always 1 per sample |
+| `PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Canonical packet counter, selected with `BYTES` from the same family and scaled by `SAMPLING_RATE`. Cisco ASA NSEL event 5 uses initiator/responder IEs 298/299 without sampling. sFlow always 1 per sample |
 | `PROTOCOL` | uint8 | ✓ | ✓ | ✓ | ✓ | ◐ | decoder | all | facet, group-by, filter | IP protocol number: v5/v7 protocol_number; v9 IE 4; IPFIX IE 4 `ProtocolIdentifier`. sFlow from `SampledIPv4`/`SampledIPv6` or parsed L3. Zero (`HOPOPT`) is retained explicitly |
-| `RAW_BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Unscaled byte value from the selected canonical counter family; the non-selected family is discarded |
-| `RAW_PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Unscaled packet value from the selected canonical counter family; the non-selected family is discarded |
-| `SAMPLING_RATE` | uint64 | ✓ (header) | — | ◐ | ◐ | ✓ | decoder | raw | metric | v5 from header `sampling_interval`. v7 has no rate (treated as unsampled). v9/IPFIX from IE 34/305/306 or Sampling Options template. sFlow per-sample rate |
+| `RAW_BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Unscaled byte value from the selected canonical counter family; the non-selected family is discarded. Equal to `BYTES` for Cisco ASA NSEL |
+| `RAW_PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Unscaled packet value from the selected canonical counter family; the non-selected family is discarded. Equal to `PACKETS` for Cisco ASA NSEL |
+| `SAMPLING_RATE` | uint64 | ✓ (header) | — | ◐ | ◐ | ✓ | decoder | raw | metric | v5 from header `sampling_interval`. v7 has no rate (treated as unsampled). Ordinary v9/IPFIX use IE 34/305/306 or Sampling Options; Cisco ASA NSEL is forced to 1. sFlow per-sample rate |
 | `SRC_ADDR` | IP | ✓ | ✓ | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9/IPFIX IE 8/27. sFlow `SampledHeader`/`SampledIPv4`/`SampledIPv6`. Raw-only |
 | `SRC_ADDR_NAT` | IP | — | — | ◐ | ◐ | — | decoder | raw | facet, group-by, filter | v9 IE 225/281; IPFIX `postNATsourceIPv4/IPv6Address` |
 | `SRC_AS` | uint32 | ✓ | ✓ | ◐ | ◐ | ◐ | both | all | facet, group-by, filter | decoder IE 16 / sFlow `ExtendedGateway` `src_as`. Enrichment chain: `asn_providers` (default `[flow, routing, geoip]`); per-CIDR `enrichment.networks.<cidr>.asn` overrides |

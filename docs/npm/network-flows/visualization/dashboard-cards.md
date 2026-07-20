@@ -89,6 +89,7 @@ These charts do not include:
 - **GeoIP staleness signal.** No "MMDB last loaded" timestamp or version. The mapping memory dimensions tell you if a database is loaded, not how old it is.
 - **Per-tier query latency.** These charts cover ingest and storage; query-side performance isn't observable.
 - **BioRIS counters.** BioRIS routing-state details are not published as chart dimensions.
+- **Cisco NSEL outcome counters.** Typed `decoded_nsel_*` counters are present in Network Flows function response stats, but their final health-chart grouping is intentionally not designed yet.
 
 ## How to use these charts for diagnosis
 

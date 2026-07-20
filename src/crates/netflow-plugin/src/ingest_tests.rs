@@ -84,6 +84,49 @@ fn ingest_metrics_snapshot_exposes_partial_counter_records() {
 }
 
 #[test]
+fn nsel_decode_stats_survive_merge_and_ingest_metrics() {
+    let one = DecodeStats {
+        nsel_records: 1,
+        nsel_update_records: 2,
+        nsel_create_records: 3,
+        nsel_teardown_records: 4,
+        nsel_denied_records: 5,
+        nsel_unsupported_event_records: 6,
+        nsel_malformed_records: 7,
+        nsel_counterless_update_records: 8,
+        nsel_partial_counter_records: 9,
+        nsel_zero_responder_records: 10,
+        nsel_forward_rows: 11,
+        nsel_reverse_rows: 12,
+        ..DecodeStats::default()
+    };
+    let mut merged = DecodeStats::default();
+    merged.merge(&one);
+    merged.merge(&one);
+
+    let metrics = IngestMetrics::default();
+    metrics.apply_decode_stats(&merged);
+    let snapshot = metrics.snapshot();
+
+    for (key, expected) in [
+        ("decoded_nsel_records", 2),
+        ("decoded_nsel_update_records", 4),
+        ("decoded_nsel_create_records", 6),
+        ("decoded_nsel_teardown_records", 8),
+        ("decoded_nsel_denied_records", 10),
+        ("decoded_nsel_unsupported_event_records", 12),
+        ("decoded_nsel_malformed_records", 14),
+        ("decoded_nsel_counterless_update_records", 16),
+        ("decoded_nsel_partial_counter_records", 18),
+        ("decoded_nsel_zero_responder_records", 20),
+        ("decoded_nsel_forward_rows", 22),
+        ("decoded_nsel_reverse_rows", 24),
+    ] {
+        assert_eq!(snapshot.get(key).copied(), Some(expected), "{key}");
+    }
+}
+
+#[test]
 fn ingest_service_with_decap_none_keeps_outer_header_view() {
     let (_tmp, mut service) = new_test_ingest_service(ConfigDecapsulationMode::None);
     let flows = decode_fixture_sequence(

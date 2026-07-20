@@ -69,6 +69,7 @@ pub(crate) fn missing_template_ids(packets: &[NetflowPacket]) -> HashSet<u16> {
 pub(crate) fn decode_netflow_result(
     result: ParseResult,
     sampling: &mut SamplingState,
+    v9_nsel_flowsets_by_packet: &[Option<Vec<bool>>],
     source: SocketAddr,
     decapsulation_mode: DecapsulationMode,
     timestamp_source: TimestampSource,
@@ -91,7 +92,7 @@ pub(crate) fn decode_netflow_result(
         batch.stats.template_errors = 1;
     }
     batch.stats.parsed_packets = result.packets.len() as u64;
-    for packet in result.packets {
+    for (packet_index, packet) in result.packets.into_iter().enumerate() {
         match packet {
             NetflowPacket::V5(v5) => {
                 if enable_v5 {
@@ -120,14 +121,18 @@ pub(crate) fn decode_netflow_result(
             NetflowPacket::V9(v9) => {
                 if enable_v9 {
                     batch.stats.netflow_v9_packets += 1;
-                    batch.stats.partial_counter_records += append_v9_records(
+                    append_v9_records(
                         source,
                         &mut batch.flows,
                         v9,
                         sampling,
+                        v9_nsel_flowsets_by_packet
+                            .get(packet_index)
+                            .and_then(Option::as_deref),
                         decapsulation_mode,
                         timestamp_source,
                         input_realtime_usec,
+                        &mut batch.stats,
                     );
                 }
             }

@@ -15,6 +15,9 @@ modules:
         - netflow v7
         - netflow v9
         - cisco
+        - cisco asa
+        - nsel
+        - firewall
         - flows
         - network flows
         - flow collector
@@ -35,12 +38,18 @@ modules:
           ports, protocol, bytes, packets, ToS, TCP flags, and ingress/egress interface indices.
           Enrichment adds GeoIP country/city/ASN, static metadata, and classifier tags.
 
+          Cisco ASA NSEL over NetFlow v9 is recognized automatically. Event-5 interval updates
+          become directional traffic rows; create, teardown, deny, malformed, and counterless
+          events remain diagnostics and do not enter the flow database.
+
           For full documentation including vendor configuration examples, sampling caveats, template
           handling and verification steps, see the [Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
         method_description: |
           The plugin listens on configurable UDP listener sockets for NetFlow datagrams.
           NetFlow v5 and v7 records are decoded directly. NetFlow v9 records are decoded using
-          dynamic templates cached from the exporter. Decoded records are enriched in-memory
+          dynamic templates cached from the exporter and persisted across restarts. Validated
+          Cisco ASA NSEL templates automatically activate event-aware directional decoding.
+          Decoded records are enriched in-memory
           and appended to disk-backed journal tiers (raw, 1-minute, 5-minute, 1-hour rollups).
       supported_platforms:
         include: []
@@ -87,6 +96,18 @@ modules:
             - name: protocols.v9
               description: Enable NetFlow v9 decoding.
               default_value: true
+              required: false
+            - name: protocols.v9_template_lifetime
+              description: Maximum age of a NetFlow v9 template since its last template refresh. Set to `null` to disable expiry; zero is invalid.
+              default_value: 90m
+              required: false
+            - name: protocols.sampling_cache_max_entries
+              description: Maximum learned NetFlow v9/IPFIX sampling-rate entries across all exporter streams. Must be positive.
+              default_value: 100000
+              required: false
+            - name: protocols.sampling_cache_max_entries_per_stream
+              description: Maximum learned sampling-rate entries for one exporter stream. Must be positive; values above the global limit are clamped.
+              default_value: 65536
               required: false
             - name: journal.journal_dir
               description: Directory for journal files (relative to NETDATA_CACHE_DIR).
@@ -144,7 +165,8 @@ modules:
             description: |
               See [Troubleshooting](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting) for
               the full diagnostic recipe -- including UDP path checks, template-error analysis,
-              and the "looks like a bug but isn't" section (doubling, mirroring, internal-IP geolocation).
+              Cisco ASA NSEL event handling, and the "looks like a bug but isn't" section
+              (doubling, mirroring, internal-IP geolocation).
               See also [Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality)
               and [Anti-patterns](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/anti-patterns).
     alerts: []
@@ -157,6 +179,8 @@ modules:
         Use the Network Flows view in the Netdata dashboard to query and visualize flow data.
         For the full list of fields and the per-protocol availability matrix, see the
         [Field Reference](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/field-reference).
+        Cisco ASA NSEL event 5 emits initiator and nonzero responder directions as separate
+        rows. Create, teardown, deny, malformed, and counterless events are excluded from traffic.
         For visualisation guidance see [Sankey and Table](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/visualization/sankey-and-table),
         [Time-Series](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/visualization/time-series),
         and [Maps and Globe](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/visualization/maps-and-globe).
@@ -196,8 +220,8 @@ modules:
           and template withdrawal. Each record exposes the same core fields as NetFlow plus
           any additional IEs the exporter provides.
 
-          For full documentation including vendor configuration examples (Cisco, Juniper, Arista,
-          ASA NSEL), biflow handling, sampling caveats, and verification steps, see the
+          For full documentation including vendor configuration examples (Cisco, Juniper, Arista),
+          biflow handling, sampling caveats, and verification steps, see the
           [Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
         method_description: |
           The plugin uses the same configurable UDP listener set as NetFlow. IPFIX messages are identified by
@@ -241,6 +265,14 @@ modules:
             - name: protocols.ipfix
               description: Enable IPFIX decoding.
               default_value: true
+              required: false
+            - name: protocols.sampling_cache_max_entries
+              description: Maximum learned NetFlow v9/IPFIX sampling-rate entries across all exporter streams. Must be positive.
+              default_value: 100000
+              required: false
+            - name: protocols.sampling_cache_max_entries_per_stream
+              description: Maximum learned sampling-rate entries for one exporter stream. Must be positive; values above the global limit are clamped.
+              default_value: 65536
               required: false
             - name: journal.journal_dir
               description: Directory for journal files (relative to NETDATA_CACHE_DIR).
