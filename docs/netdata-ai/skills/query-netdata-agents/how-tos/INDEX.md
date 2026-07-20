@@ -87,6 +87,7 @@ skill-verification harness questions for `verify/questions.md`; replace each
 
 - `current-cpu-direct.md` (stub -- not yet authored)
 - `peak-memory-last-hour-direct.md` (stub -- not yet authored)
+- [export-cpu-io-memory-three-days-direct.md](./export-cpu-io-memory-three-days-direct.md) -- export CPU, disk I/O, and memory in one-minute buckets for the 72 hours ending at 14:00 through a direct Agent call.
 
 ## Cross-skill how-tos
 
