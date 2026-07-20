@@ -216,14 +216,22 @@ func TestSHMFlagRoundTrip_ResetsAfterPublish(t *testing.T) {
 		t.Fatal("MarkSocketActive flag was lost across UpdateApps")
 	}
 
-	// Publish resets activeModules so a module that stops publishing has its
-	// bit cleared on the consumer's next read.  Without a publisher the call
-	// is a no-op, but the flag reset still happens.
+	// Publish clears the CACHESTAT bit each cycle; the SOCKET bit persists
+	// until MarkSocketInactive() is called when the socket goroutine exits.
 	if err := store.Publish(nil); err != nil {
 		t.Fatalf("Publish(nil): %v", err)
 	}
+	if store.activeModules&ebpfgoSHMFlagCachestat != 0 {
+		t.Fatalf("CACHESTAT bit still set after Publish: activeModules = %#x", store.activeModules)
+	}
+	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
+		t.Fatal("SOCKET bit was cleared by Publish; should persist until MarkSocketInactive")
+	}
+
+	// MarkSocketInactive clears the SOCKET bit (called on socket goroutine exit).
+	store.MarkSocketInactive()
 	if store.activeModules != 0 {
-		t.Fatalf("activeModules after Publish(nil) = %#x, want 0", store.activeModules)
+		t.Fatalf("activeModules after MarkSocketInactive = %#x, want 0", store.activeModules)
 	}
 }
 

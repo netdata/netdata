@@ -20,10 +20,8 @@ func TestBuildNetworkProtocolsJSON_BPFMapping(t *testing.T) {
 	// Distinct, non-zero values for each BPF counter so a swap is detectable.
 	p := socketGlobalPublish{
 		tcpDimReceivedCalls: 111,
-		tcpDimReceivedKbits: 222,
 		tcpDimReceivedErr:   333,
 		tcpDimSentCalls:     444,
-		tcpDimSentKbits:     555,
 		tcpDimSentErr:       666,
 		tcpCloseCalls:       777,
 		tcpRetransmit:       888,
@@ -31,8 +29,6 @@ func TestBuildNetworkProtocolsJSON_BPFMapping(t *testing.T) {
 		tcpV6Conn:           20,
 		udpRecvCalls:        1111,
 		udpSendCalls:        2222,
-		udpRecvKbits:        3333,
-		udpSendKbits:        4444,
 		udpRecvErr:          5555,
 		udpSendErr:          6666,
 		inboundTCP:          7777,
@@ -121,21 +117,17 @@ func TestSocketGlobalStateUpdate_BPFMapping(t *testing.T) {
 	cur := prev
 	// Received path: cleanup_rbuf counters advance.
 	cur.CallsTCPCleanupRbuf = 100
-	cur.BytesTCPCleanupRbuf = 1000
 	cur.ErrorTCPCleanupRbuf = 5
 	// Sent path: sendmsg counters advance.
 	cur.CallsTCPSendmsg = 200
-	cur.BytesTCPSendmsg = 2000
 	cur.ErrorTCPSendmsg = 7
-	// Other counters advance so they don't fall through the first-read gate.
+	// Other counters advance.
 	cur.CallsTCPClose = 1
 	cur.TCPRetransmit = 2
 	cur.CallsTCPConnectIPv4 = 3
 	cur.CallsTCPConnectIPv6 = 4
 	cur.CallsUDPRecvmsg = 5
 	cur.CallsUDPSendmsg = 6
-	cur.BytesUDPRecvmsg = 7000
-	cur.BytesUDPSendmsg = 8000
 	cur.ErrorUDPRecvmsg = 9
 	cur.ErrorUDPSendmsg = 10
 	cur.InboundConnTCP = 11
@@ -150,26 +142,14 @@ func TestSocketGlobalStateUpdate_BPFMapping(t *testing.T) {
 	if got.tcpDimReceivedCalls != 100 {
 		t.Errorf("tcpDimReceivedCalls = %d, want 100 (CallsTCPCleanupRbuf delta)", got.tcpDimReceivedCalls)
 	}
-	if got.tcpDimReceivedKbits <= 0 {
-		t.Errorf("tcpDimReceivedKbits = %d, must be positive (no negative-sign trick)", got.tcpDimReceivedKbits)
-	}
 	if got.tcpDimReceivedErr != 5 {
 		t.Errorf("tcpDimReceivedErr = %d, want 5", got.tcpDimReceivedErr)
 	}
 	if got.tcpDimSentCalls != 200 {
 		t.Errorf("tcpDimSentCalls = %d, want 200 (CallsTCPSendmsg delta)", got.tcpDimSentCalls)
 	}
-	if got.tcpDimSentKbits <= 0 {
-		t.Errorf("tcpDimSentKbits = %d, must be positive", got.tcpDimSentKbits)
-	}
 	if got.tcpDimSentErr != 7 {
 		t.Errorf("tcpDimSentErr = %d, want 7", got.tcpDimSentErr)
-	}
-	if got.udpRecvKbits <= 0 {
-		t.Errorf("udpRecvKbits = %d, must be positive", got.udpRecvKbits)
-	}
-	if got.udpSendKbits <= 0 {
-		t.Errorf("udpSendKbits = %d, must be positive", got.udpSendKbits)
 	}
 }
 
