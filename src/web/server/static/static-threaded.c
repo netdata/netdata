@@ -253,8 +253,9 @@ static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
     ssize_t bytes;
     bytes = web_client_receive(w);
 
-    if (likely(bytes > 0)) {
-        pulse_web_server_received_bytes(bytes);
+    if (likely(bytes > 0) || unlikely(w->request_too_large)) {
+        if(bytes > 0)
+            pulse_web_server_received_bytes(bytes);
 
         if(unlikely(starting_keepalive_request && w->request_ingress_started_ut)) {
             pi->request_ingress_t = pi->last_received_t;

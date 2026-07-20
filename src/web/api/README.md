@@ -18,10 +18,10 @@ Explore the Agent API using:
 - **[Swagger Editor](https://editor.swagger.io/?url=https://raw.githubusercontent.com/netdata/netdata/master/src/web/api/netdata-swagger.yaml)** - Edit and test API calls
 - **[OpenAPI Specification](https://raw.githubusercontent.com/netdata/netdata/master/src/web/api/netdata-swagger.yaml)** - Raw OpenAPI YAML
 
-The Agent accepts an encoded HTTP request target of up to 1,048,576 bytes. A
-larger request target is rejected with HTTP `414 URI Too Long`. Proxies, load
-balancers, browsers, and Netdata Cloud paths may enforce lower limits before a
-request reaches the Agent.
+The Agent accepts a complete encoded HTTP request of up to 1,048,576 bytes,
+including the request line, headers, and body. A larger request is rejected with
+HTTP `413 Content Too Long`. Proxies, load balancers, browsers, and Netdata Cloud
+paths may enforce lower limits before a request reaches the Agent.
 
 ## Cloud API
 

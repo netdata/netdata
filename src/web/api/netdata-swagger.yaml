@@ -39,9 +39,9 @@ info:
     - `/api/v3/claim` - Agent claiming
     - Additional management and streaming endpoints
 
-    ### Agent Request-target Limit
+    ### Agent Request Limit
 
-    The Agent accepts an encoded HTTP request target of up to 1,048,576 bytes and returns HTTP `414 URI Too Long` for a larger target. Intermediaries may enforce lower limits before the request reaches the Agent.
+    The Agent accepts a complete encoded HTTP request of up to 1,048,576 bytes, including the request line, headers, and body. It returns HTTP `413 Content Too Long` for a larger request. Intermediaries may enforce lower limits before the request reaches the Agent.
 
     **Note:** V1 and V2 APIs are deprecated and maintained for backwards compatibility only. New integrations should use V3 exclusively.
   version: "v1-rolling"
