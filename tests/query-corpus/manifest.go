@@ -69,6 +69,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "the three gap-only dimension states per the #23095 working-as-intended ruling: live phantom retention, gone after restart, back on next iteration",
 		Agent:  Green, FixedBy: "ruling #23095",
 	},
+	"L1/resets-overflows": {
+		Proves: "parent rrdset_done reset/overflow arithmetic over the v1 wire: implausible backward step → zero increment + SN_FLAG_RESET; plausible 32-bit wrap reconstructs cap-relative delta — ONE LESS than the true modulo delta (cap 0xFFFFFFFF, pinned quirk, rulings batch); percentage-of-incremental-row pre-pass absorbs the reset (0% + RESET, survivors split 100%); a silence beyond the gap threshold resets the collection (no spike from the across-gap delta, no RESET, null gap rows); sub-second sample offsets BLEND adjacent sample rates across stored rows with exact mass conservation",
+		Agent:  Green,
+	},
 	"L2/tier1-palette": {
 		Proves: "tier1 rollup identity for the edge-data palette: aligned windows (partial first — T0 unaligned), interior gaps (partial counts + stored-empty windows), fractional anomaly rates, reset annotation LOST at tier1+ (pages store no flags), float32 sum/min/max write-rounding",
 		Agent:  Green,

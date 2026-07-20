@@ -21,6 +21,7 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | L1/trailing-window | beyond-retention reads return nulls at the fixed epoch | green | n/a | |
 | L1/precision | storage_number quantization contract (Go pack/unpack port) | green | n/a | |
 | L1/gap-states | #23095 ruling pinned: live phantom / gone after restart / back next iteration | green | n/a | ruling #23095 |
+| L1/resets-overflows | v1 reset/overflow arithmetic: backward step → 0 + RESET; 32-bit wrap stores cap-relative delta (one less than true — quirk, ruling pending); pcent-over-diff pre-pass absorption; long-gap collection reset (no spike, no flag); blend mass conservation | green | n/a | |
 | L2/tier1-palette | tier1 rollup identity for the palette: aligned windows, partial counts, stored-empty windows, fractional anomaly rates, RESET annotation lost at tier1+, float32 write-rounding | green | n/a | |
 | L2/whole-chart-absence | never-stored tier windows read like stored-empty ones (null + EMPTY), flanking partial counts correct | green | n/a | |
 | L2/sn-vs-original | tiers aggregate ORIGINAL collected doubles, not tier0-quantized values (2^24+1 discriminates) | green | n/a | |
