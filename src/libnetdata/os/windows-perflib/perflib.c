@@ -848,69 +848,18 @@ static void perflib_counter_record_failure(COUNTER_DATA *cd, bool parked) {
     }
 }
 
-bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd) {
-    const char *key = cd->key;
-    internal_fatal(key == NULL, "You have to set a key for this call.");
+// Shared implementation for instance- and object-counter lookups. They differ
+// only in how the counter block is located: pass the instance for an instance
+// counter, or NULL for an object-level (single-instance) counter.
+static bool perflib_get_counter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd) {
+    internal_fatal(cd->key == NULL, "You have to set a key for this call.");
+
+    if(unlikely(!pObjectType))
+        goto failed; // missing object (not a missing counter) — do not park on it
 
     bool parked = cd->failures >= PERFLIB_MAX_FAILURES_TO_FIND_METRIC;
     if(unlikely(perflib_counter_backoff_skip(cd)))
         goto failed;
-
-    DWORD id = cd->id; // read after backoff_skip, which may reset it on a re-probe
-    PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
-    for(DWORD c = 0; c < pObjectType->NumCounters ;c++) {
-        pCounterDefinition = getCounterDefinition(pDataBlock, pObjectType, pCounterDefinition);
-        if(!pCounterDefinition) {
-            nd_log_limit_static_global_var(erl, 60, 0);
-            nd_log_limit(&erl, NDLS_COLLECTORS, NDLP_ERR,
-                   "WINDOWS: PERFLIB: Cannot read counter definition No %u (out of %u)",
-                   c, pObjectType->NumCounters);
-            break;
-        }
-
-        if(id) {
-            if(id != pCounterDefinition->CounterNameTitleIndex)
-                continue;
-        }
-        else {
-            const char *name = RegistryFindNameByID(pCounterDefinition->CounterNameTitleIndex);
-            if(strcmp(name, key) != 0)
-                continue;
-
-            cd->id = pCounterDefinition->CounterNameTitleIndex;
-        }
-
-        cd->current.CounterType = cd->OverwriteCounterType ? cd->OverwriteCounterType : pCounterDefinition->CounterType;
-        PERF_COUNTER_BLOCK *pCounterBlock = getInstanceCounterBlock(pDataBlock, pObjectType, pInstance);
-
-        cd->previous = cd->current;
-        if(likely(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current))) {
-            perflib_counter_record_success(cd, parked);
-            return true;
-        }
-
-        // counter matched but was unreadable: stop scanning and count it as a miss
-        break;
-    }
-
-    perflib_counter_record_failure(cd, parked);
-
-failed:
-    cd->previous = cd->current;
-    cd->current = RAW_DATA_EMPTY;
-    cd->updated = false;
-    return false;
-}
-
-bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, COUNTER_DATA *cd) {
-    if (unlikely(!pObjectType))
-        goto cleanup; // missing object (not a missing counter) — do not park on it
-
-    internal_fatal(cd->key == NULL, "You have to set a key for this call.");
-
-    bool parked = cd->failures >= PERFLIB_MAX_FAILURES_TO_FIND_METRIC;
-    if(unlikely(perflib_counter_backoff_skip(cd)))
-        goto cleanup;
 
     DWORD id = cd->id; // read after backoff_skip, which may reset it on a re-probe
     PERF_COUNTER_DEFINITION *pCounterDefinition = NULL;
@@ -936,7 +885,9 @@ bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObj
         }
 
         cd->current.CounterType = cd->OverwriteCounterType ? cd->OverwriteCounterType : pCounterDefinition->CounterType;
-        PERF_COUNTER_BLOCK *pCounterBlock = getObjectTypeCounterBlock(pDataBlock, pObjectType);
+        PERF_COUNTER_BLOCK *pCounterBlock = pInstance ?
+            getInstanceCounterBlock(pDataBlock, pObjectType, pInstance) :
+            getObjectTypeCounterBlock(pDataBlock, pObjectType);
 
         cd->previous = cd->current;
         if(likely(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current))) {
@@ -950,11 +901,19 @@ bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObj
 
     perflib_counter_record_failure(cd, parked);
 
-cleanup:
+failed:
     cd->previous = cd->current;
     cd->current = RAW_DATA_EMPTY;
     cd->updated = false;
     return false;
+}
+
+bool perflibGetInstanceCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance, COUNTER_DATA *cd) {
+    return perflib_get_counter(pDataBlock, pObjectType, pInstance, cd);
+}
+
+bool perflibGetObjectCounter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, COUNTER_DATA *cd) {
+    return perflib_get_counter(pDataBlock, pObjectType, NULL, cd);
 }
 
 PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id) {
