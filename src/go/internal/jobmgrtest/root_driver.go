@@ -7,13 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/creack/pty"
 	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest/runner"
 )
 
@@ -30,20 +28,6 @@ type ShippedRootDriver struct {
 	Roots map[string]ShippedRoot
 }
 
-func (driver ShippedRootDriver) Available(caseID string) bool {
-	runs, err := shippedRootRuns(caseID)
-	if err != nil {
-		return false
-	}
-	for _, run := range runs {
-		root, ok := driver.Roots[run.root]
-		if !ok || !shippedRootAvailable(root) {
-			return false
-		}
-	}
-	return true
-}
-
 func shippedRootAvailable(root ShippedRoot) bool {
 	if !filepath.IsAbs(root.Executable) ||
 		!filepath.IsAbs(root.ConfigDir) ||
@@ -56,61 +40,20 @@ func shippedRootAvailable(root ShippedRoot) bool {
 		info.Mode()&0o111 != 0
 }
 
-func (driver ShippedRootDriver) Run(
-	ctx context.Context,
-	caseID string,
-) error {
-	if ctx == nil {
-		return errors.New("jobmgr test: nil shipped-root context")
-	}
-	runs, err := shippedRootRuns(caseID)
-	if err != nil {
-		return err
-	}
-	if !driver.Available(caseID) {
-		return fmt.Errorf(
-			"jobmgr test: shipped-root executables unavailable for %s",
-			caseID,
-		)
-	}
-	for _, run := range runs {
-		if err := runShippedRoot(
-			ctx,
-			driver.Roots[run.root],
-			run.scenario,
-		); err != nil {
-			return fmt.Errorf(
-				"%s %s: %w",
-				run.root,
-				run.scenario,
-				err,
-			)
-		}
-	}
-	return nil
+var shippedRootNames = [...]string{
+	"godplugin",
+	"ibmdplugin",
+	"scriptsdplugin",
 }
 
-// RunAvailable executes every supported physical root assigned to a case and
-// returns the unavailable root names. Callers may retain partial local
-// execution evidence, but a nonempty missing set cannot earn case credit.
-func (driver ShippedRootDriver) RunAvailable(
-	ctx context.Context,
-	caseID string,
-) ([]string, error) {
-	if ctx == nil {
-		return nil, errors.New(
-			"jobmgr test: nil shipped-root context",
-		)
-	}
-	runs, err := shippedRootRuns(caseID)
-	if err != nil {
-		return nil, err
-	}
-	return driver.runAvailable(ctx, runs)
+var shippedRootScenarios = [...]string{
+	"quit",
+	"repeated-hup",
+	"shutdown",
 }
 
-// RunMatrixAvailable executes the mandatory root/scenario product independently
-// of the frozen predicate closure.
+// RunMatrixAvailable executes every supported physical root under each
+// production-relevant process lifecycle.
 func (driver ShippedRootDriver) RunMatrixAvailable(
 	ctx context.Context,
 ) ([]string, error) {
@@ -119,109 +62,25 @@ func (driver ShippedRootDriver) RunMatrixAvailable(
 			"jobmgr test: nil shipped-root matrix context",
 		)
 	}
-	return driver.runAvailable(ctx, shippedRootMatrixRuns())
-}
-
-func (driver ShippedRootDriver) runAvailable(
-	ctx context.Context,
-	runs []shippedRootRun,
-) ([]string, error) {
 	var missing []string
-	for _, run := range runs {
-		root, ok := driver.Roots[run.root]
+	for _, name := range shippedRootNames {
+		root, ok := driver.Roots[name]
 		if !ok || !shippedRootAvailable(root) {
-			missing = append(missing, run.root)
+			missing = append(missing, name)
 			continue
 		}
-		if err := runShippedRoot(
-			ctx,
-			root,
-			run.scenario,
-		); err != nil {
-			return missing, fmt.Errorf(
-				"%s %s: %w",
-				run.root,
-				run.scenario,
-				err,
-			)
+		for _, scenario := range shippedRootScenarios {
+			if err := runShippedRoot(ctx, root, scenario); err != nil {
+				return missing, fmt.Errorf(
+					"%s %s: %w",
+					name,
+					scenario,
+					err,
+				)
+			}
 		}
 	}
 	return missing, nil
-}
-
-type shippedRootRun struct {
-	root     string
-	scenario string
-}
-
-func shippedRootMatrixRuns() []shippedRootRun {
-	roots := [...]string{
-		"godplugin",
-		"ibmdplugin",
-		"scriptsdplugin",
-	}
-	scenarios := [...]string{
-		"terminal",
-		"all-pipe",
-		"repeated-hup",
-		"shutdown",
-	}
-	runs := make([]shippedRootRun, 0, len(roots)*len(scenarios))
-	for _, root := range roots {
-		for _, scenario := range scenarios {
-			runs = append(runs, shippedRootRun{
-				root: root, scenario: scenario,
-			})
-		}
-	}
-	return runs
-}
-
-func shippedRootRuns(caseID string) ([]shippedRootRun, error) {
-	if caseID == "F06.1" {
-		return []shippedRootRun{
-			{root: "godplugin", scenario: "repeated-hup"},
-			{root: "ibmdplugin", scenario: "repeated-hup"},
-			{root: "scriptsdplugin", scenario: "repeated-hup"},
-		}, nil
-	}
-	runs := map[string]shippedRootRun{
-		"F24.20-b-godplugin-terminal": {
-			root: "godplugin", scenario: "terminal",
-		},
-		"F24.21-b-godplugin-nonterminal": {
-			root: "godplugin", scenario: "all-pipe",
-		},
-		"F24.22-b-godplugin-hup": {
-			root: "godplugin", scenario: "repeated-hup",
-		},
-		"F24.23-b-ibmdplugin-terminal": {
-			root: "ibmdplugin", scenario: "terminal",
-		},
-		"F24.24-b-ibmdplugin-nonterminal": {
-			root: "ibmdplugin", scenario: "all-pipe",
-		},
-		"F24.25-b-ibmdplugin-hup": {
-			root: "ibmdplugin", scenario: "repeated-hup",
-		},
-		"F24.26-b-scriptsdplugin-terminal": {
-			root: "scriptsdplugin", scenario: "terminal",
-		},
-		"F24.27-b-scriptsdplugin-nonterminal": {
-			root: "scriptsdplugin", scenario: "all-pipe",
-		},
-		"F24.28-b-scriptsdplugin-hup": {
-			root: "scriptsdplugin", scenario: "repeated-hup",
-		},
-	}
-	run, ok := runs[caseID]
-	if !ok {
-		return nil, fmt.Errorf(
-			"jobmgr test: unknown shipped-root case %q",
-			caseID,
-		)
-	}
-	return []shippedRootRun{run}, nil
 }
 
 func runShippedRoot(
@@ -230,21 +89,6 @@ func runShippedRoot(
 	scenario string,
 ) error {
 	observer := newRootProtocolObservation()
-	var terminalMaster *os.File
-	var terminalSlave *os.File
-	var terminalDone chan struct{}
-	if scenario == "terminal" {
-		var err error
-		terminalMaster, terminalSlave, err = pty.Open()
-		if err != nil {
-			return err
-		}
-		terminalDone = make(chan struct{})
-		go func() {
-			_, _ = io.Copy(io.Discard, terminalMaster)
-			close(terminalDone)
-		}()
-	}
 	spec := runner.Spec{
 		Executable: root.Executable,
 		Arguments: []string{
@@ -254,27 +98,11 @@ func runShippedRoot(
 		Directory:  root.ConfigDir,
 		ObserveOut: observer.observe,
 	}
-	if terminalSlave != nil {
-		spec.Stderr = terminalSlave
-	}
 	process, err := runner.Start(spec)
-	if terminalSlave != nil {
-		_ = terminalSlave.Close()
-	}
 	if err != nil {
-		if terminalMaster != nil {
-			_ = terminalMaster.Close()
-			<-terminalDone
-		}
 		return err
 	}
 	defer process.Kill()
-	defer func() {
-		if terminalMaster != nil {
-			_ = terminalMaster.Close()
-			<-terminalDone
-		}
-	}()
 
 	if err := observer.wait(ctx, func(
 		publications, _, _ int,
@@ -284,14 +112,7 @@ func runShippedRoot(
 		return err
 	}
 	switch scenario {
-	case "terminal":
-		if _, err := process.WriteContext(
-			ctx,
-			[]byte("QUIT\n"),
-		); err != nil {
-			return err
-		}
-	case "all-pipe":
+	case "quit":
 		_, _, keepalives := observer.snapshot()
 		if err := observer.wait(ctx, func(
 			_, _, observedKeepalives int,

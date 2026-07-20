@@ -294,8 +294,9 @@ func assertExactJobManagerTree(t *testing.T) {
 		"kernel_prepared_wait_test.go":             {},
 		"lifecycle":                                {},
 		"plan.go":                                  {},
-		"production_cases_test.go":                 {},
+		"production_boundaries_test.go":            {},
 		"secrets":                                  {},
+		"testdata":                                 {},
 	}
 	entries, err := os.ReadDir(jobmgrSourceRoot(t))
 	require.NoError(t, err)

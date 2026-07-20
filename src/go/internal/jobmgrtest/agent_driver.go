@@ -29,22 +29,21 @@ import (
 
 const productionFixtureModule = "jobmgrtest"
 
-// AgentDriver exercises one exact immutable production predicate through the
-// shipped Agent API. Predicates are never cached or credited by family name.
+// AgentDriver exercises one behavior through the public Agent API.
 type AgentDriver struct{}
 
 func (driver *AgentDriver) Run(
 	ctx context.Context,
-	predicate string,
+	scenario AgentScenario,
 ) error {
 	if driver == nil || ctx == nil {
 		return errors.New("jobmgr test: invalid Agent driver")
 	}
-	run := agentRuntimePredicates[predicate]
+	run := agentRuntimeScenarios[scenario]
 	if run == nil {
 		return fmt.Errorf(
-			"jobmgr test: unknown Agent predicate %q",
-			predicate,
+			"jobmgr test: unknown Agent scenario %q",
+			scenario,
 		)
 	}
 	return run(ctx)

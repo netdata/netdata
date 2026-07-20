@@ -15,57 +15,39 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
-// ProcessDriver exercises one exact process-fixed predicate through
-// composition.NewProcess.
+// ProcessDriver exercises process-fixed behavior through composition.NewProcess.
 type ProcessDriver struct{}
+
+type ProcessScenario string
+
+const (
+	ProcessRestart                ProcessScenario = "restart"
+	ProcessNoncooperativeShutdown ProcessScenario = "noncooperative shutdown"
+	ProcessInputFence             ProcessScenario = "input fence"
+	ProcessRepeatedStop           ProcessScenario = "repeated stop"
+)
 
 func (driver *ProcessDriver) Run(
 	ctx context.Context,
-	predicate string,
+	scenario ProcessScenario,
 ) error {
 	if driver == nil || ctx == nil {
 		return errors.New("jobmgr test: invalid Process driver")
 	}
 	var result error
-	switch predicate {
-	case "F05.2":
+	switch scenario {
+	case ProcessRestart:
 		result = runProcessRestart(ctx)
-	case "F05.3":
+	case ProcessNoncooperativeShutdown:
 		result = runProcessNoncooperativeShutdown(ctx)
-	case "F06.2", "F22.1-agent":
+	case ProcessInputFence:
 		result = runProcessInputFence(ctx)
-	default:
-		result = fmt.Errorf(
-			"jobmgr test: unknown Process predicate %q",
-			predicate,
-		)
-	}
-	return result
-}
-
-// CollectorBoundaryDriver treats collectors as opaque V1/V2/Cleanup
-// implementations and observes only the public composition disposition.
-type CollectorBoundaryDriver struct{}
-
-func (driver *CollectorBoundaryDriver) Run(
-	ctx context.Context,
-	predicate string,
-) error {
-	if driver == nil || ctx == nil {
-		return errors.New("jobmgr test: invalid collector-boundary driver")
-	}
-	var result error
-	switch predicate {
-	case "F18.1":
+	case ProcessRepeatedStop:
 		result = runCollectorRepeatedStop(ctx)
-	case "F18.4":
-		result = runProcessInputFence(ctx)
-	case "F10.7", "F18.5":
-		result = runProcessNoncooperativeShutdown(ctx)
 	default:
 		result = fmt.Errorf(
-			"jobmgr test: unknown collector-boundary predicate %q",
-			predicate,
+			"jobmgr test: unknown Process scenario %q",
+			scenario,
 		)
 	}
 	return result

@@ -5,72 +5,9 @@ package jobmgrtest
 import (
 	"context"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
-
-func TestShippedRootCaseMapIsPredicateExact(t *testing.T) {
-	tests := map[string]struct {
-		caseID string
-		want   int
-	}{
-		"blocked-reader HUP runs every root": {
-			caseID: "F06.1",
-			want:   3,
-		},
-		"one terminal root": {
-			caseID: "F24.20-b-godplugin-terminal",
-			want:   1,
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			runs, err := shippedRootRuns(test.caseID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(runs) != test.want {
-				t.Fatalf(
-					"case %s runs=%d, want %d",
-					test.caseID,
-					len(runs),
-					test.want,
-				)
-			}
-		})
-	}
-}
-
-func TestShippedRootScenarioMatrixHasExactRootScenarioProduct(t *testing.T) {
-	observed := shippedRootMatrixRuns()
-	if len(observed) != 12 {
-		t.Fatalf("shipped-root executions=%d, want 12", len(observed))
-	}
-	seen := make(map[shippedRootRun]struct{}, len(observed))
-	for _, run := range observed {
-		if _, exists := seen[run]; exists {
-			t.Fatalf("duplicate shipped-root scenario: %+v", run)
-		}
-		seen[run] = struct{}{}
-	}
-	for _, root := range []string{
-		"godplugin",
-		"ibmdplugin",
-		"scriptsdplugin",
-	} {
-		for _, scenario := range []string{
-			"terminal",
-			"all-pipe",
-			"repeated-hup",
-			"shutdown",
-		} {
-			run := shippedRootRun{
-				root: root, scenario: scenario,
-			}
-			if _, exists := seen[run]; !exists {
-				t.Fatalf("missing shipped-root scenario: %+v", run)
-			}
-		}
-	}
-}
 
 func TestRootProtocolObservationPreservesChunkBoundaries(t *testing.T) {
 	tests := map[string]struct {
@@ -99,33 +36,18 @@ func TestRootProtocolObservationPreservesChunkBoundaries(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			observation := newRootProtocolObservation()
 			for _, chunk := range test.chunks {
-				if err := observation.observe(
-					[]byte(chunk),
-					0,
-				); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, observation.observe([]byte(chunk), 0))
 			}
 			published, withdrawn, _ := observation.snapshot()
-			if published != test.wantPublished ||
-				withdrawn != test.wantWithdrawals {
-				t.Fatalf(
-					"lifecycle=%d/%d, want %d/%d",
-					published,
-					withdrawn,
-					test.wantPublished,
-					test.wantWithdrawals,
-				)
-			}
-			if err := observation.wait(
+			require.Equal(t, test.wantPublished, published)
+			require.Equal(t, test.wantWithdrawals, withdrawn)
+			require.NoError(t, observation.wait(
 				context.Background(),
 				func(publications, withdrawals, _ int) bool {
 					return publications == test.wantPublished &&
 						withdrawals == test.wantWithdrawals
 				},
-			); err != nil {
-				t.Fatal(err)
-			}
+			))
 		})
 	}
 }

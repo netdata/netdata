@@ -18,12 +18,8 @@ type ResolverDriver struct {
 	PIDFile string
 }
 
-func (driver ResolverDriver) Run(
-	ctx context.Context,
-	predicate string,
-) error {
+func (driver ResolverDriver) Run(ctx context.Context) error {
 	if ctx == nil ||
-		predicate != "F10.6" ||
 		driver.Helper == "" ||
 		driver.PIDFile == "" {
 		return errors.New("jobmgr test: invalid Resolver driver")
