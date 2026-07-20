@@ -347,6 +347,45 @@ If the service still won't start, check the Windows Services manager to ensure t
 
 </details>
 
+<br/>
+
+<details>
+<summary>Issue: Driver Signature Verification Error (ERROR_INVALID_IMAGE_HASH / 577)</summary>
+
+**Symptoms**: The Netdata log shows:
+
+> `Driver failed to start: ERROR_INVALID_IMAGE_HASH (577). This usually indicates a driver signature verification failure.`
+>
+> `Windows cannot verify the digital signature for this file.`
+
+**What this means**: 64-bit Windows requires kernel-mode drivers to carry a Microsoft WHQL (Windows Hardware Quality Labs) signature. The Netdata hardware metrics driver (`netdata_driver.sys`) does not have WHQL signing — it uses a standard code-signing certificate, which Windows rejects for kernel-mode driver loading under default signature enforcement (including systems with Secure Boot enabled).
+
+**Impact**: The driver is an optional component used only for CPU temperature metrics via hardware MSR (Model Specific Register) reads. All other Netdata monitoring — CPU usage, memory, disk, network, and process metrics — works normally. Only the hardware-level CPU temperature chart (`cpu.temperature`) is unavailable.
+
+**What to do**: Reinstalling Netdata will not fix this — the driver has the same signature status in every release. You have two options:
+
+1. **Continue without the driver** (recommended for most users): No action needed. Netdata collects all metrics except hardware-level CPU temperature.
+
+2. **Enable Windows test signing** (advanced): If CPU temperature metrics are required, enable test signing mode to allow non-WHQL-signed kernel drivers to load:
+
+```powershell
+# Run PowerShell as Administrator
+bcdedit /set testsigning on
+
+# Reboot for the change to take effect
+Restart-Computer
+```
+
+After reboot, restart the Netdata service:
+
+```powershell
+Restart-Service netdata
+```
+
+> **Warning**: Test signing mode lowers system security by allowing any kernel driver with a test certificate to load — not just Netdata's. Enable it only if you understand this trade-off. To disable it later, run `bcdedit /set testsigning off` and reboot.
+
+</details>
+
 ## Alternative: Using Windows Add/Remove Programs
 
 For users who prefer the traditional Windows approach, you can also manage Netdata installations through the Windows Control Panel:
