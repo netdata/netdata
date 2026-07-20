@@ -83,6 +83,10 @@ add_executable(stream-replay-endpoints-test EXCLUDE_FROM_ALL
         src/streaming/tests/stream-replay-endpoints-test.c)
 target_link_libraries(stream-replay-endpoints-test libnetdata)
 
+add_executable(run-dir-safety-test EXCLUDE_FROM_ALL
+        src/libnetdata/os/tests/run-dir-safety-test.c)
+target_link_libraries(run-dir-safety-test libnetdata)
+
 if(OS_LINUX)
         add_executable(http-auth-bearer-test EXCLUDE_FROM_ALL
                 src/web/api/tests/http-auth-bearer-test.c)
