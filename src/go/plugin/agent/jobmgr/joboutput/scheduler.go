@@ -16,32 +16,13 @@ type ModuleReconciler interface {
 }
 
 type Scheduler struct {
-	mu     sync.Mutex // guards job/module indexes and lists
+	mu     sync.Mutex // guards jobs and modules
 	tickMu sync.Mutex // serializes Tick() so ticks never overlap
 
-	reconciler ModuleReconciler                             // per-module reconciliation callback
-	retries    *autoDetectionRetryIndex                     // auto-detection retry worker
-	jobs       map[lifecycle.ResourceIdentity]*scheduledJob // identity -> scheduled job
-	modules    map[string]*scheduledModule                  // module name -> module census
-	jobHead    *scheduledJob                                // insertion-ordered job list head
-	jobTail    *scheduledJob                                // insertion-ordered job list tail
-	moduleHead *scheduledModule                             // insertion-ordered module list head
-	moduleTail *scheduledModule                             // insertion-ordered module list tail
-	moduleTick []string                                     // reused scratch slice of module names per tick
-}
-
-type scheduledJob struct {
-	identity lifecycle.ResourceIdentity // resource identity
-	job      RuntimeJob                 // runtime job ticked each cycle
-	previous *scheduledJob              // previous job in the insertion-ordered list
-	next     *scheduledJob              // next job in the insertion-ordered list
-}
-
-type scheduledModule struct {
-	name     string           // module name
-	jobs     int              // count of scheduled jobs for this module
-	previous *scheduledModule // previous module in the insertion-ordered list
-	next     *scheduledModule // next module in the insertion-ordered list
+	reconciler ModuleReconciler                          // per-module reconciliation callback
+	retries    *autoDetectionRetryIndex                  // auto-detection retry worker
+	jobs       map[lifecycle.ResourceIdentity]RuntimeJob // scheduled job by identity
+	modules    map[string]int                            // scheduled job count by module
 }
 
 func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {
@@ -51,8 +32,8 @@ func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {
 	return &Scheduler{
 		reconciler: reconciler,
 		retries:    newAutoDetectionRetryIndex(),
-		jobs:       make(map[lifecycle.ResourceIdentity]*scheduledJob),
-		modules:    make(map[string]*scheduledModule),
+		jobs:       make(map[lifecycle.ResourceIdentity]RuntimeJob),
+		modules:    make(map[string]int),
 	}, nil
 }
 
@@ -104,34 +85,8 @@ func (s *Scheduler) Register(
 	if s.jobs[identity] != nil {
 		return errors.New("job output: duplicate scheduler registration")
 	}
-	record := &scheduledJob{
-		identity: identity,
-		job:      job,
-		previous: s.jobTail,
-	}
-	if s.jobTail == nil {
-		s.jobHead = record
-	} else {
-		s.jobTail.next = record
-	}
-	s.jobTail = record
-	s.jobs[identity] = record
-
-	module := s.modules[job.ModuleName()]
-	if module == nil {
-		module = &scheduledModule{
-			name:     job.ModuleName(),
-			previous: s.moduleTail,
-		}
-		if s.moduleTail == nil {
-			s.moduleHead = module
-		} else {
-			s.moduleTail.next = module
-		}
-		s.moduleTail = module
-		s.modules[module.name] = module
-	}
-	module.jobs++
+	s.jobs[identity] = job
+	s.modules[job.ModuleName()]++
 	return nil
 }
 
@@ -144,39 +99,20 @@ func (s *Scheduler) Unregister(
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	record := s.jobs[identity]
-	if record == nil || record.job != job {
+	registered := s.jobs[identity]
+	if registered == nil || registered != job {
 		return errors.New("job output: stale scheduler unregistration")
 	}
-	module := s.modules[job.ModuleName()]
-	if module == nil || module.jobs <= 0 {
+	module := job.ModuleName()
+	count := s.modules[module]
+	if count <= 0 {
 		return errors.New("job output: scheduler module census differs")
 	}
-	if record.previous == nil {
-		s.jobHead = record.next
-	} else {
-		record.previous.next = record.next
-	}
-	if record.next == nil {
-		s.jobTail = record.previous
-	} else {
-		record.next.previous = record.previous
-	}
 	delete(s.jobs, identity)
-
-	module.jobs--
-	if module.jobs == 0 {
-		if module.previous == nil {
-			s.moduleHead = module.next
-		} else {
-			module.previous.next = module.next
-		}
-		if module.next == nil {
-			s.moduleTail = module.previous
-		} else {
-			module.next.previous = module.previous
-		}
-		delete(s.modules, module.name)
+	if count == 1 {
+		delete(s.modules, module)
+	} else {
+		s.modules[module] = count - 1
 	}
 	return nil
 }
@@ -189,22 +125,22 @@ func (s *Scheduler) Tick(ctx context.Context, clock int) error {
 	defer s.tickMu.Unlock()
 	s.retries.advance(clock)
 	s.mu.Lock()
-	for record := s.jobHead; record != nil; record = record.next {
-		record.job.Tick(clock)
+	// Keep registration stable until every selected job has been ticked. A
+	// successful Unregister is the caller's authority to clean up the job.
+	for _, job := range s.jobs {
+		job.Tick(clock)
 	}
-	s.moduleTick = s.moduleTick[:0]
-	for module := s.moduleHead; module != nil; module = module.next {
-		s.moduleTick = append(s.moduleTick, module.name)
+	modules := make([]string, 0, len(s.modules))
+	for module := range s.modules {
+		modules = append(modules, module)
 	}
 	s.mu.Unlock()
 
 	var result error
-	for index, module := range s.moduleTick {
-		s.moduleTick[index] = ""
+	for _, module := range modules {
 		if err := s.reconciler.ReconcileModule(ctx, module); err != nil {
 			result = errors.Join(result, err)
 		}
 	}
-	s.moduleTick = s.moduleTick[:0]
 	return result
 }

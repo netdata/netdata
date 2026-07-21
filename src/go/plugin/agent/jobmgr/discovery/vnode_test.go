@@ -3,8 +3,6 @@
 package discovery
 
 import (
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
@@ -66,6 +64,21 @@ func TestVNodeConfigAtomicRevisions(t *testing.T) {
 				require.ErrorIs(t, err, ErrVNodeRevision)
 			},
 		},
+		"commit selects one preparation from the same revision": {
+			run: func(t *testing.T, configuration *VNodeConfiguration) {
+				first := commitVNode(t, configuration, "node", 0, testVNode("host", "source"))
+				winner, err := configuration.PrepareUpsert("node", first.Revision, testVNode("winner", "source"))
+				require.NoError(t, err)
+				stale, err := configuration.PrepareUpsert("node", first.Revision, testVNode("stale", "source"))
+				require.NoError(t, err)
+
+				_, err = winner.Commit()
+				require.NoError(t, err)
+				_, err = stale.Commit()
+				require.ErrorIs(t, err, ErrVNodeRevision)
+				require.NoError(t, stale.Abort())
+			},
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -118,37 +131,6 @@ func TestVNodeConfigInitialIdentityMustMatchMapKey(t *testing.T) {
 		},
 	)
 	require.Error(t, err)
-}
-
-func TestVNodeConfigBounds(t *testing.T) {
-	tests := map[string]struct {
-		prepare func(*VNodeConfiguration) error
-	}{
-		"record count": {
-			prepare: func(configuration *VNodeConfiguration) error {
-				for index := range MaximumVNodeConfigurationRecords {
-					id := strconv.Itoa(index)
-					commitVNode(t, configuration, id, 0, testVNode(id, "source"))
-				}
-				_, err := configuration.PrepareUpsert("overflow", 0, testVNode("overflow", "source"))
-				return err
-			},
-		},
-		"record bytes": {
-			prepare: func(configuration *VNodeConfiguration) error {
-				vnode := testVNode("host", "source")
-				vnode.Labels["large"] = strings.Repeat("x", MaximumVNodeConfigurationBytes)
-				_, err := configuration.PrepareUpsert("node", 0, vnode)
-				return err
-			},
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := test.prepare(newTestVNodeConfiguration(t))
-			require.ErrorIs(t, err, ErrVNodeCapacity)
-		})
-	}
 }
 
 func BenchmarkBVNodeConfigLookup(b *testing.B) {

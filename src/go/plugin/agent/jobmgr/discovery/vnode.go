@@ -14,35 +14,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
-const (
-	MaximumVNodeConfigurationRecords = 4_096
-	MaximumVNodeConfigurationBytes   = 16 * 1024 * 1024
-	vnodeRecordOverheadBytes         = 64
-	vnodeLabelOverheadBytes          = 16
-)
-
 var (
 	ErrVNodePreparedConsumed = errors.New("vnode configuration: prepared update consumed")
 	ErrVNodeRevision         = errors.New("vnode configuration: expected revision differs")
 	ErrVNodeNoChange         = errors.New("vnode configuration: no change")
-	ErrVNodeCapacity         = errors.New("vnode configuration: capacity exhausted")
 )
 
 // VNodeConfiguration owns immutable configured-vnode values and their atomic
 // revision changes.
 type VNodeConfiguration struct {
-	mu sync.Mutex // guards records + pending
+	mu sync.Mutex // guards records
 
-	records      map[string]vnodeRecord         // committed vnode snapshots by name
-	pending      map[string]*preparedVNodeState // in-flight prepared vnode edits by name
-	bytes        int                            // committed vnode config bytes (accounting)
-	pendingBytes int                            // in-flight vnode config bytes
-	pendingNew   int                            // count of in-flight new-vnode edits
-}
-
-type vnodeRecord struct {
-	snapshot jobruntime.VnodeSnapshot
-	bytes    int
+	records map[string]jobruntime.VnodeSnapshot // committed vnode snapshots by name
 }
 
 type PreparedVNode struct {
@@ -55,21 +38,18 @@ type ConfiguredVNode struct {
 }
 
 type preparedVNodeState struct {
-	mu        sync.Mutex               // guards consumed
-	consumed  bool                     // the prepared edit has been committed or aborted
-	owner     *VNodeConfiguration      // the vnode configuration this edit belongs to
-	id        string                   // vnode name
-	expected  uint64                   // revision the edit was prepared against (optimistic check)
-	next      jobruntime.VnodeSnapshot // the snapshot to commit
-	bytes     int                      // config bytes of next (accounting)
-	remove    bool                     // the edit removes the vnode
-	newRecord bool                     // the edit creates a new vnode
+	mu       sync.Mutex               // guards consumed
+	consumed bool                     // the prepared edit has been committed or aborted
+	owner    *VNodeConfiguration      // the vnode configuration this edit belongs to
+	id       string                   // vnode name
+	expected uint64                   // revision the edit was prepared against (optimistic check)
+	next     jobruntime.VnodeSnapshot // the snapshot to commit
+	remove   bool                     // the edit removes the vnode
 }
 
 func NewVNodeConfigurationWithInitial(initial map[string]*vnodes.VirtualNode) (*VNodeConfiguration, error) {
 	configuration := &VNodeConfiguration{
-		records: make(map[string]vnodeRecord),
-		pending: make(map[string]*preparedVNodeState),
+		records: make(map[string]jobruntime.VnodeSnapshot),
 	}
 	ids := slices.Sorted(maps.Keys(initial))
 	for _, id := range ids {
@@ -105,34 +85,19 @@ func (vc *VNodeConfiguration) PrepareUpsert(
 		return PreparedVNode{}, errors.New("vnode configuration: invalid preparation")
 	}
 	nextVNode := vnode.Copy()
-	nextBytes, err := vnodeConfigurationBytes(id, nextVNode)
-	if err != nil {
-		return PreparedVNode{}, err
-	}
 	vc.mu.Lock()
 	defer vc.mu.Unlock()
 	current := vc.records[id]
-	if current.snapshot.Revision != expected {
+	if current.Revision != expected {
 		return PreparedVNode{}, ErrVNodeRevision
 	}
-	if vc.pending[id] != nil {
-		return PreparedVNode{}, errors.New("vnode configuration: update already pending")
-	}
-	if current.snapshot.Vnode != nil && vnodeConfigurationEqual(current.snapshot.Vnode, nextVNode) {
+	if current.Vnode != nil && vnodeConfigurationEqual(current.Vnode, nextVNode) {
 		return PreparedVNode{}, ErrVNodeNoChange
 	}
-	newRecord := current.snapshot.Vnode == nil
-	if newRecord &&
-		len(vc.records)+vc.pendingNew == MaximumVNodeConfigurationRecords {
-		return PreparedVNode{}, ErrVNodeCapacity
-	}
-	if nextBytes > MaximumVNodeConfigurationBytes-vc.bytes-vc.pendingBytes {
-		return PreparedVNode{}, ErrVNodeCapacity
-	}
 	metadataRevision := uint64(1)
-	if current.snapshot.Vnode != nil {
-		metadataRevision = current.snapshot.MetadataRevision
-		if !vnodeMetadataEqual(current.snapshot.Vnode, nextVNode) {
+	if current.Vnode != nil {
+		metadataRevision = current.MetadataRevision
+		if !vnodeMetadataEqual(current.Vnode, nextVNode) {
 			if metadataRevision == ^uint64(0) {
 				return PreparedVNode{}, errors.New("vnode configuration: metadata revision wrapped")
 			}
@@ -145,12 +110,6 @@ func (vc *VNodeConfiguration) PrepareUpsert(
 			Vnode: nextVNode, Revision: expected + 1,
 			MetadataRevision: metadataRevision,
 		},
-		bytes: nextBytes, newRecord: newRecord,
-	}
-	vc.pending[state.id] = state
-	vc.pendingBytes += nextBytes
-	if newRecord {
-		vc.pendingNew++
 	}
 	return PreparedVNode{state: state}, nil
 }
@@ -166,20 +125,16 @@ func (vc *VNodeConfiguration) PrepareRemove(
 	vc.mu.Lock()
 	defer vc.mu.Unlock()
 	current, ok := vc.records[id]
-	if !ok || current.snapshot.Revision != expected {
+	if !ok || current.Revision != expected {
 		return PreparedVNode{}, ErrVNodeRevision
-	}
-	if vc.pending[id] != nil {
-		return PreparedVNode{}, errors.New("vnode configuration: update already pending")
 	}
 	state := &preparedVNodeState{
 		owner: vc, id: strings.Clone(id), expected: expected,
 		next: jobruntime.VnodeSnapshot{
-			Revision: expected + 1, MetadataRevision: current.snapshot.MetadataRevision,
+			Revision: expected + 1, MetadataRevision: current.MetadataRevision,
 		},
 		remove: true,
 	}
-	vc.pending[state.id] = state
 	return PreparedVNode{state: state}, nil
 }
 
@@ -196,29 +151,16 @@ func (pv PreparedVNode) Commit() (jobruntime.VnodeSnapshot, error) {
 	configuration := state.owner
 	configuration.mu.Lock()
 	defer configuration.mu.Unlock()
-	if configuration.pending[state.id] != state {
-		return jobruntime.VnodeSnapshot{}, errors.New("vnode configuration: stale prepared update")
-	}
 	current := configuration.records[state.id]
-	if current.snapshot.Revision != state.expected {
+	if current.Revision != state.expected {
 		return jobruntime.VnodeSnapshot{}, ErrVNodeRevision
 	}
 	state.consumed = true
-	delete(configuration.pending, state.id)
-	configuration.pendingBytes -= state.bytes
-	if state.newRecord {
-		configuration.pendingNew--
-	}
 	if state.remove {
 		delete(configuration.records, state.id)
-		configuration.bytes -= current.bytes
 		return state.next.Copy(), nil
 	}
-	configuration.bytes += state.bytes - current.bytes
-	configuration.records[state.id] = vnodeRecord{
-		snapshot: state.next.Copy(),
-		bytes:    state.bytes,
-	}
+	configuration.records[state.id] = state.next.Copy()
 	return state.next.Copy(), nil
 }
 
@@ -232,18 +174,7 @@ func (pv PreparedVNode) Abort() error {
 	if state.consumed {
 		return ErrVNodePreparedConsumed
 	}
-	configuration := state.owner
-	configuration.mu.Lock()
-	defer configuration.mu.Unlock()
-	if configuration.pending[state.id] != state {
-		return errors.New("vnode configuration: stale prepared update")
-	}
 	state.consumed = true
-	delete(configuration.pending, state.id)
-	configuration.pendingBytes -= state.bytes
-	if state.newRecord {
-		configuration.pendingNew--
-	}
 	return nil
 }
 
@@ -255,8 +186,8 @@ func (vc *VNodeConfiguration) Lookup(
 	}
 	vc.mu.Lock()
 	defer vc.mu.Unlock()
-	record, ok := vc.records[id]
-	return record.snapshot.Copy(), ok
+	snapshot, ok := vc.records[id]
+	return snapshot.Copy(), ok
 }
 
 func (vc *VNodeConfiguration) Entries() []ConfiguredVNode {
@@ -265,10 +196,10 @@ func (vc *VNodeConfiguration) Entries() []ConfiguredVNode {
 	}
 	vc.mu.Lock()
 	entries := make([]ConfiguredVNode, 0, len(vc.records))
-	for id, record := range vc.records {
+	for id, snapshot := range vc.records {
 		entries = append(entries, ConfiguredVNode{
 			ID:       id,
-			Snapshot: record.snapshot.Copy(),
+			Snapshot: snapshot.Copy(),
 		})
 	}
 	vc.mu.Unlock()
@@ -276,23 +207,6 @@ func (vc *VNodeConfiguration) Entries() []ConfiguredVNode {
 		return cmp.Compare(a.ID, b.ID)
 	})
 	return entries
-}
-
-func vnodeConfigurationBytes(id string, vnode *vnodes.VirtualNode) (int, error) {
-	size := vnodeRecordOverheadBytes + len(id) + len(vnode.Name) +
-		len(vnode.Hostname) + len(vnode.GUID) + len(vnode.Source) +
-		len(vnode.SourceType)
-	for key, value := range vnode.Labels {
-		step := vnodeLabelOverheadBytes + len(key) + len(value)
-		if step > MaximumVNodeConfigurationBytes-size {
-			return 0, ErrVNodeCapacity
-		}
-		size += step
-	}
-	if size > MaximumVNodeConfigurationBytes {
-		return 0, ErrVNodeCapacity
-	}
-	return size, nil
 }
 
 func vnodeConfigurationEqual(left, right *vnodes.VirtualNode) bool {

@@ -45,11 +45,7 @@ func TestSchedulerTicksEachJobAndModuleOnce(t *testing.T) {
 		require.False(t, job.ticks != 1 || job.clock != 7)
 	}
 
-	got := reconciler.snapshot()
-	require.True(t, equalStrings(
-		got,
-		[]string{"module-a", "module-b"},
-	))
+	require.ElementsMatch(t, []string{"module-a", "module-b"}, reconciler.snapshot())
 
 	for name, job := range jobs {
 		require.NoError(t, scheduler.Unregister(
@@ -63,28 +59,6 @@ func TestSchedulerTicksEachJobAndModuleOnce(t *testing.T) {
 	for name, job := range jobs {
 		require.EqualValues(t, 1, job.ticks, "job=%s", name)
 	}
-}
-
-func TestSchedulerWarmTickDoesNotAllocate(t *testing.T) {
-	scheduler, err := NewScheduler(testModuleReconciler{})
-	require.NoError(t, err)
-	job := &schedulerTestJob{id: "job", module: "module"}
-	identity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
-
-	require.NoError(t, scheduler.Register(identity, job))
-
-	ctx := context.Background()
-
-	require.NoError(t, scheduler.Tick(ctx, 1))
-
-	allocations := testing.AllocsPerRun(1_000, func() {
-		if err := scheduler.Tick(ctx, 1); err != nil {
-			panic(err)
-		}
-	})
-	require.EqualValues(t, 0, allocations)
-
-	require.NoError(t, scheduler.Unregister(identity, job))
 }
 
 func TestSchedulerGrowsBeyondFormerActiveJobLimit(t *testing.T) {
