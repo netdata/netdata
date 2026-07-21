@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "web/api/formatters/rrd2json.h"
+#include "web/api/queries/query-internal.h"
 #include "database/contexts/rrdcontext-internal.h"
 #ifdef OS_WINDOWS
 #include "win_system-info.h"
@@ -1618,6 +1619,285 @@ static int test_rrdmetric_algorithm_follows_rrddim(void) {
     return rc;
 }
 
+static int test_rrddim_scale_minimum_magnitude(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    if(rrddim_scale_magnitude(INT32_MIN) != (int64_t)INT32_MAX + 1) {
+        fprintf(stderr, "%s: INT32_MIN magnitude is not representable\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_insert = rrdset_create_localhost(
+        "netdata", "unittest-scale-min-insert", "unittest-scale-min-insert", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *insert_a = rrddim_add(st_insert, "a", NULL, INT32_MIN, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *insert_b = rrddim_add(st_insert, "b", NULL, INT32_MIN, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+
+    if(insert_a->multiplier != INT32_MIN || insert_a->divisor != INT32_MIN ||
+       insert_b->multiplier != INT32_MIN || insert_b->divisor != INT32_MIN ||
+       rrdset_flag_check(st_insert, RRDSET_FLAG_HETEROGENEOUS)) {
+        fprintf(stderr, "%s: identical signed-minimum dimensions were not preserved as homogeneous\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_multiplier = rrdset_create_localhost(
+        "netdata", "unittest-scale-min-multiplier", "unittest-scale-min-multiplier", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_multiplier, "a", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_add(st_multiplier, "b", NULL, INT32_MIN, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrdset_flag_set(st_multiplier, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+    rrdset_update_heterogeneous_flag(st_multiplier);
+    if(!rrdset_flag_check(st_multiplier, RRDSET_FLAG_HETEROGENEOUS)) {
+        fprintf(stderr, "%s: differing signed-minimum multiplier was not heterogeneous\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_divisor = rrdset_create_localhost(
+        "netdata", "unittest-scale-min-divisor", "unittest-scale-min-divisor", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_divisor, "a", NULL, 1, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_add(st_divisor, "b", NULL, 1, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+    rrdset_flag_set(st_divisor, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+    rrdset_update_heterogeneous_flag(st_divisor);
+    if(rrdset_flag_check(st_divisor, RRDSET_FLAG_HETEROGENEOUS)) {
+        fprintf(stderr, "%s: identical signed-minimum divisors were not homogeneous\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+static int test_rrddim_collected_minimum_magnitude(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-collected-min-magnitude", "unittest-collected-min-magnitude", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd_int = rrddim_add(st, "int", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_float = rrddim_add(st, "float", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    memset(&rd_float->collector.collected, 0, sizeof(rd_float->collector.collected));
+    rrddim_option_set(rd_float, RRDDIM_OPTION_VALUE_FLOAT);
+
+    const struct {
+        collected_number value;
+        uint64_t expected_max;
+    } cases[] = {
+        { 0, 0 },
+        { 1, 1 },
+        { -1, 1 },
+        { LLONG_MAX, (uint64_t)LLONG_MAX },
+        { -LLONG_MAX, (uint64_t)LLONG_MAX },
+        { LLONG_MIN, UINT64_C(1) << 63 },
+        { 7, UINT64_C(1) << 63 },
+    };
+
+    int rc = 0;
+    for(size_t i = 0; i < _countof(cases); i++) {
+        rrddim_set_by_pointer(st, rd_int, cases[i].value);
+        uint64_t actual = rrddim_collected_max_as_uint64(rd_int);
+        if(actual != cases[i].expected_max) {
+            fprintf(stderr, "%s: case %zu maximum is %" PRIu64 ", expected %" PRIu64 "\n",
+                    __FUNCTION__, i, actual, cases[i].expected_max);
+            rc = 1;
+        }
+    }
+
+    if(rd_int->collector.collected.i.collected_value_max != INT64_MIN ||
+       rrddim_collected_max_as_double(rd_int) != (NETDATA_DOUBLE)(UINT64_C(1) << 63)) {
+        fprintf(stderr, "%s: integer 2^63 maximum representation was not preserved\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    rrddim_set_by_pointer(st, rd_float, LLONG_MIN);
+    rrddim_set_by_pointer(st, rd_float, 7);
+    if(rd_float->collector.collected.f.collected_value_max != (NETDATA_DOUBLE)(UINT64_C(1) << 63)) {
+        fprintf(stderr, "%s: float lane did not preserve the LLONG_MIN magnitude\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+static int test_rrdset_homogeneity_multiplier_sign(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    struct homogeneity_case {
+        const char *name;
+        int32_t multiplier_a;
+        int32_t multiplier_b;
+        int32_t divisor_a;
+        int32_t divisor_b;
+        RRD_ALGORITHM algorithm_a;
+        RRD_ALGORITHM algorithm_b;
+        bool heterogeneous;
+    } cases[] = {
+        { "negative-positive", -1, 1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "negative-negative", -1, -1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "positive-negative", 1, -1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "unequal-magnitude", -1, 2, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, true },
+        { "unequal-divisor", -1, 1, 1, 2, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, true },
+        { "unequal-algorithm", -1, 1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_INCREMENTAL, true },
+        { "minimum-magnitude", INT32_MIN, INT32_MIN, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "minimum-unequal", INT32_MIN, 1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, true },
+    };
+
+    int rc = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "unittest-homogeneity-%s", cases[i].name);
+
+        RRDSET *st = rrdset_create_localhost(
+            "netdata", id, id, "netdata", NULL, "Unit Testing", "x", "unittest", NULL, 1,
+            nd_profile.update_every, RRDSET_TYPE_LINE);
+        rrddim_add(st, "a", NULL, cases[i].multiplier_a, cases[i].divisor_a, cases[i].algorithm_a);
+        rrddim_add(st, "b", NULL, cases[i].multiplier_b, cases[i].divisor_b, cases[i].algorithm_b);
+
+        bool immediate = rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS);
+        if(immediate != cases[i].heterogeneous) {
+            fprintf(stderr, "%s: %s insertion classified heterogeneous=%d, expected %d\n",
+                    __FUNCTION__, cases[i].name, immediate, cases[i].heterogeneous);
+            rc = 1;
+        }
+
+        rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+        rrdset_update_heterogeneous_flag(st);
+        bool deferred = rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS);
+        if(deferred != cases[i].heterogeneous ||
+           rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK)) {
+            fprintf(stderr, "%s: %s deferred classified heterogeneous=%d, expected %d (check pending=%d)\n",
+                    __FUNCTION__, cases[i].name, deferred, cases[i].heterogeneous,
+                    rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK));
+            rc = 1;
+        }
+    }
+
+    RRDSET *st_single = rrdset_create_localhost(
+        "netdata", "unittest-homogeneity-single", "unittest-homogeneity-single", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_single, "a", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrdset_flag_set(st_single, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+    rrdset_update_heterogeneous_flag(st_single);
+    if(rrdset_flag_check(st_single, RRDSET_FLAG_HETEROGENEOUS) ||
+       rrdset_flag_check(st_single, RRDSET_FLAG_HOMOGENEOUS_CHECK)) {
+        fprintf(stderr, "%s: one negative dimension was not homogeneous after deferred recomputation\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_update = rrdset_create_localhost(
+        "netdata", "unittest-homogeneity-update", "unittest-homogeneity-update", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_update, "a", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_add(st_update, "b", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    RRDDIM *first = NULL, *second = NULL, *rd;
+    rrddim_foreach_read(rd, st_update) {
+        if(!first)
+            first = rd;
+        else if(!second)
+            second = rd;
+    }
+    rrddim_foreach_done(rd);
+
+    if(!first || !second) {
+        fprintf(stderr, "%s: failed to locate both metadata-update dimensions\n", __FUNCTION__);
+        rc = 1;
+    }
+    else {
+        rrddim_set_multiplier(st_update, first, -1);
+        if(!rrdset_flag_check(st_update, RRDSET_FLAG_HOMOGENEOUS_CHECK)) {
+            fprintf(stderr, "%s: multiplier metadata update did not request homogeneity recomputation\n", __FUNCTION__);
+            rc = 1;
+        }
+
+        rrdset_update_heterogeneous_flag(st_update);
+        if(rrdset_flag_check(st_update, RRDSET_FLAG_HETEROGENEOUS)) {
+            fprintf(stderr, "%s: equal magnitudes became heterogeneous after first-dimension sign update\n", __FUNCTION__);
+            rc = 1;
+        }
+
+        rrddim_set_multiplier(st_update, second, 2);
+        rrdset_update_heterogeneous_flag(st_update);
+        if(!rrdset_flag_check(st_update, RRDSET_FLAG_HETEROGENEOUS)) {
+            fprintf(stderr, "%s: unequal updated magnitudes were not heterogeneous\n", __FUNCTION__);
+            rc = 1;
+        }
+
+        rrddim_set_multiplier(st_update, second, -1);
+        rrdset_update_heterogeneous_flag(st_update);
+        if(rrdset_flag_check(st_update, RRDSET_FLAG_HETEROGENEOUS)) {
+            fprintf(stderr, "%s: restoring equal negative magnitudes did not clear heterogeneity\n", __FUNCTION__);
+            rc = 1;
+        }
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+static int test_rrddim_divisor_normalization(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-divisor-normalization", "unittest-divisor-normalization", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "d", NULL, 1, 0, RRD_ALGORITHM_ABSOLUTE);
+
+    int rc = 0;
+    if(rd->divisor != 1) {
+        fprintf(stderr, "%s: construction stored zero divisor as %d instead of 1\n", __FUNCTION__, rd->divisor);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, 7) != 1 || rd->divisor != 7) {
+        fprintf(stderr, "%s: valid positive divisor was not preserved\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, 0) != 1 || rd->divisor != 1) {
+        fprintf(stderr, "%s: zero divisor update was not normalized to 1\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, 0) != 0 || rd->divisor != 1) {
+        fprintf(stderr, "%s: repeated normalized zero update was not a no-op\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, -7) != 1 || rd->divisor != -7) {
+        fprintf(stderr, "%s: valid negative divisor was not preserved\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDDIM *same_rd = rrddim_add(st, "d", NULL, 1, 0, RRD_ALGORITHM_ABSOLUTE);
+    if(same_rd != rd || rd->divisor != 1) {
+        fprintf(stderr, "%s: conflict update did not preserve identity and normalize zero divisor\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 static int test_rrdset_rejects_invalid_update_every(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -1675,6 +1955,291 @@ static int test_rrdset_rejects_invalid_update_every(void) {
     return rc;
 }
 
+static int test_rrdr_relative_window_extreme_values(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    const time_t maximum = (time_t)(((uintmax_t)1 << (sizeof(time_t) * CHAR_BIT - 1)) - 1);
+    const time_t minimum = -maximum - 1;
+    int errors = 0;
+
+#define RRDR_WINDOW_CHECK(condition, message) do {                                  \
+        if(!(condition)) {                                                          \
+            fprintf(stderr, "%s: %s\n", __FUNCTION__, (message));                \
+            errors++;                                                               \
+        }                                                                            \
+    } while(0)
+
+    RRDR_WINDOW_CHECK(rrdr_relative_window_value_is_relative(-API_RELATIVE_TIME_MAX),
+                      "negative relative boundary was classified as absolute");
+    RRDR_WINDOW_CHECK(rrdr_relative_window_value_is_relative(API_RELATIVE_TIME_MAX),
+                      "positive relative boundary was classified as absolute");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(-API_RELATIVE_TIME_MAX - 1),
+                      "value below the relative boundary was classified as relative");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(API_RELATIVE_TIME_MAX + 1),
+                      "value above the relative boundary was classified as relative");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(minimum),
+                      "minimum time_t was classified as relative");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(maximum),
+                      "maximum time_t was classified as relative");
+
+    struct {
+        time_t after;
+        time_t before;
+        bool absolute;
+        const char *name;
+    } query_wrapper_cases[] = {
+        { .after = -300, .before = -60, .absolute = false, .name = "relative" },
+        { .after = 0, .before = 0, .absolute = false, .name = "default" },
+        { .after = -300, .before = maximum, .absolute = false, .name = "mixed" },
+        { .after = maximum - 100, .before = maximum, .absolute = true, .name = "future absolute" },
+        { .after = minimum, .before = maximum, .absolute = true, .name = "extreme absolute" },
+    };
+
+    for(size_t i = 0; i < _countof(query_wrapper_cases); i++) {
+        time_t after = query_wrapper_cases[i].after;
+        time_t before = query_wrapper_cases[i].before;
+        bool absolute = rrdr_relative_window_to_absolute_query(&after, &before, NULL, true);
+
+        if(absolute != query_wrapper_cases[i].absolute) {
+            fprintf(stderr, "%s: query wrapper misclassified %s window as %s\n", __FUNCTION__,
+                    query_wrapper_cases[i].name, absolute ? "absolute" : "relative");
+            errors++;
+        }
+    }
+
+    {
+        const time_t now = 2000000000;
+        time_t after = -300;
+        time_t before = -60;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, now);
+
+        RRDR_WINDOW_CHECK(relative, "ordinary relative window was classified as absolute");
+        RRDR_WINDOW_CHECK(before == now - 60, "ordinary relative before changed");
+        RRDR_WINDOW_CHECK(after == now - 60 - 300 + 1, "ordinary relative after changed");
+    }
+
+    {
+        time_t after = minimum + 100;
+        time_t before = maximum;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, maximum - 1);
+
+        RRDR_WINDOW_CHECK(!relative, "absolute future window was classified as relative");
+        RRDR_WINDOW_CHECK(before == maximum - 1, "future before was not shifted to now");
+        RRDR_WINDOW_CHECK(after == minimum + 99, "wide intermediate changed a representable shifted after");
+    }
+
+    {
+        time_t after = -3;
+        time_t before = minimum + 1;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, 123);
+
+        RRDR_WINDOW_CHECK(relative, "mixed relative window was classified as absolute");
+        RRDR_WINDOW_CHECK(before == minimum + 1, "absolute before changed without a future shift");
+        RRDR_WINDOW_CHECK(after == minimum, "unrepresentable relative after did not saturate to time_t minimum");
+    }
+
+    {
+        time_t after = maximum;
+        time_t before = minimum;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, 123);
+
+        RRDR_WINDOW_CHECK(!relative, "extreme absolute window was classified as relative");
+        RRDR_WINDOW_CHECK(before == 123, "extreme future before was not shifted to now");
+        RRDR_WINDOW_CHECK(after == minimum, "unrepresentable future shift did not saturate to time_t minimum");
+    }
+
+    {
+        time_t after = -1;
+        time_t before = -1;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, minimum);
+
+        RRDR_WINDOW_CHECK(relative, "minimum-now relative window was classified as absolute");
+        RRDR_WINDOW_CHECK(before == minimum, "minimum-now before did not saturate");
+        RRDR_WINDOW_CHECK(after == minimum, "minimum-now after did not saturate");
+    }
+
+    {
+        time_t after = minimum;
+        time_t before = maximum;
+        time_t now;
+        bool absolute = rrdr_relative_window_to_absolute_query(&after, &before, &now, false);
+        time_t minimum_query_time = now - (10 * 365 * 86400);
+
+        RRDR_WINDOW_CHECK(absolute, "query wrapper changed absolute classification");
+        RRDR_WINDOW_CHECK(before == now, "query wrapper changed shifted before");
+        RRDR_WINDOW_CHECK(after == minimum_query_time, "query wrapper did not apply its existing lower clamp");
+    }
+
+#undef RRDR_WINDOW_CHECK
+
+    return errors;
+}
+
+static void query_window_test_target_init(
+    QUERY_TARGET *qt, time_t after, time_t before, size_t points, time_t resampling_time,
+    RRDR_TIME_GROUPING grouping, RRDR_OPTIONS options, time_t update_every) {
+    *qt = (QUERY_TARGET){
+        .request = {
+            .after = after,
+            .before = before,
+            .points = points,
+            .resampling_time = resampling_time,
+            .time_group_method = grouping,
+        },
+        .window = {
+            .options = options,
+            .after = after,
+            .before = before,
+        },
+        .db = {
+            .first_time_s = 1000000000,
+            .last_time_s = 1000000600,
+            .minimum_latest_update_every_s = update_every,
+        },
+    };
+    snprintfz(qt->id, sizeof(qt->id) - 1, "query-window-unittest");
+}
+
+static int test_query_window_resampling_boundaries(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    const time_t maximum = (time_t)(((uintmax_t)1 << (sizeof(time_t) * CHAR_BIT - 1)) - 1);
+    int errors = 0;
+
+#define QUERY_WINDOW_CHECK(condition, message) do {                                 \
+        if(!(condition)) {                                                          \
+            fprintf(stderr, "%s: %s\n", __FUNCTION__, (message));                \
+            errors++;                                                               \
+        }                                                                            \
+    } while(0)
+
+    for(RRDR_TIME_GROUPING grouping = RRDR_GROUPING_AVERAGE;
+        grouping <= RRDR_GROUPING_EXTREMES; grouping++) {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000001, 1000000600, 10, 60, grouping, RRDR_OPTION_NOT_ALIGNED, 1);
+
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid grouping mode was rejected");
+        QUERY_WINDOW_CHECK(qt.window.time_group_method == grouping, "grouping mode changed");
+        QUERY_WINDOW_CHECK(qt.window.after == 1000000001 && qt.window.before == 1000000600,
+                           "unaligned resampling window changed");
+        QUERY_WINDOW_CHECK(qt.window.points == 10 && qt.window.group == 60,
+                           "unaligned resampling point layout changed");
+        QUERY_WINDOW_CHECK(qt.window.resampling_group == 60 && qt.window.resampling_divisor == 1.0,
+                           "unaligned resampling ratio changed");
+    }
+
+    {
+        QUERY_TARGET qt;
+        query_window_test_target_init(&qt, 1000000001, 1000000600, 10, 60, RRDR_GROUPING_AVERAGE, 0, 1);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid aligned window was rejected");
+        QUERY_WINDOW_CHECK(qt.window.after == 1000000021 && qt.window.before == 1000000620,
+                           "aligned resampling endpoints changed");
+        QUERY_WINDOW_CHECK(qt.window.points == 10 && qt.window.group == 60,
+                           "aligned resampling point layout changed");
+    }
+
+    {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000001, 1000000600, 10, 60, RRDR_GROUPING_AVERAGE,
+            RRDR_OPTION_NATURAL_POINTS | RRDR_OPTION_NOT_ALIGNED, 5);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid natural-points window was rejected");
+        QUERY_WINDOW_CHECK(qt.window.after == 1000000005 && qt.window.before == 1000000600,
+                           "natural-points endpoints changed");
+        QUERY_WINDOW_CHECK(qt.window.points == 10 && qt.window.group == 12 &&
+                           qt.window.query_granularity == 5 && qt.window.resampling_group == 12,
+                           "natural-points layout changed");
+    }
+
+    {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, -600, 0, 10, 0, RRDR_GROUPING_AVERAGE, RRDR_OPTION_NOT_ALIGNED, 1);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid relative window was rejected");
+        QUERY_WINDOW_CHECK(qt.window.relative, "relative window classification changed");
+    }
+
+    if(maximum > INT_MAX) {
+        const time_t large_resampling = (time_t)((uint64_t)INT_MAX + 1);
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000000, 1000000600, 2, large_resampling,
+            RRDR_GROUPING_AVERAGE, RRDR_OPTION_NOT_ALIGNED, 1);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "representable cadence above INT_MAX was rejected");
+        QUERY_WINDOW_CHECK(qt.window.group == (size_t)large_resampling,
+                           "cadence above INT_MAX was narrowed");
+        QUERY_WINDOW_CHECK(qt.window.after == (time_t)(1000000600LL - 4294967295LL),
+                           "large representable final window changed");
+
+        time_t timestamps[2] = { 0 };
+        RRDR r = {
+            .n = 2,
+            .t = timestamps,
+            .internal = { .qt = &qt },
+        };
+        rrd2rrdr_set_timestamps(&r);
+        QUERY_WINDOW_CHECK(r.view.update_every == large_resampling,
+                           "RRDR cadence above INT_MAX was narrowed");
+        QUERY_WINDOW_CHECK(timestamps[1] == qt.window.before,
+                           "large representable timestamps did not end at before");
+
+        if(sizeof(time_t) > sizeof(size_t)) {
+            const time_t duration_above_size_max = (time_t)(((uint64_t)INT_MAX + 1) * 5);
+            query_window_test_target_init(
+                &qt, 1000000000, 1000000600, 2, duration_above_size_max,
+                RRDR_GROUPING_AVERAGE,
+                RRDR_OPTION_NATURAL_POINTS | RRDR_OPTION_NOT_ALIGNED, 5);
+            QUERY_WINDOW_CHECK(query_target_calculate_window(&qt),
+                               "representable time64 duration above SIZE_MAX was rejected");
+            QUERY_WINDOW_CHECK(qt.window.group == (size_t)((uint64_t)INT_MAX + 1),
+                               "time64 duration above SIZE_MAX changed its group");
+        }
+    }
+
+    for(size_t i = 0; i < 2; i++) {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000000, 1000000600, 2, maximum, RRDR_GROUPING_AVERAGE,
+            i ? RRDR_OPTION_NOT_ALIGNED : 0, 1);
+        QUERY_WINDOW_CHECK(!query_target_calculate_window(&qt),
+                           "unrepresentable maximum resampling window was accepted");
+    }
+
+    {
+        RRDSET *st = rrdset_create_localhost(
+            "netdata", "unittest-query-window-resampling", "unittest-query-window-resampling",
+            "netdata", NULL, "Unit Testing", "x", "unittest", NULL, 1, 1, RRDSET_TYPE_LINE);
+        rrddim_add(st, "d", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        QUERY_TARGET_REQUEST request = {
+            .version = 1,
+            .st = st,
+            .after = 1000000000,
+            .before = 1000000600,
+            .points = 2,
+            .resampling_time = maximum,
+            .alerts = "unittest-alert:*",
+            .time_group_method = RRDR_GROUPING_AVERAGE,
+            .options = RRDR_OPTION_NOT_ALIGNED,
+            .query_source = QUERY_SOURCE_UNITTEST,
+            .priority = STORAGE_PRIORITY_SYNCHRONOUS,
+        };
+
+        QUERY_WINDOW_CHECK(!query_target_create(&request),
+                           "query target accepted an unrepresentable resampling window");
+
+        request.resampling_time = 60;
+        QUERY_TARGET *qt = query_target_create(&request);
+        QUERY_WINDOW_CHECK(qt, "query target pool did not recover after rejected window");
+        query_target_release(qt);
+    }
+
+#undef QUERY_WINDOW_CHECK
+
+    return errors;
+}
+
 int run_all_mockup_tests(void)
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
@@ -1700,7 +2265,25 @@ int run_all_mockup_tests(void)
     if(test_rrdmetric_algorithm_follows_rrddim())
         return 1;
 
+    if(test_rrddim_scale_minimum_magnitude())
+        return 1;
+
+    if(test_rrddim_collected_minimum_magnitude())
+        return 1;
+
+    if(test_rrdset_homogeneity_multiplier_sign())
+        return 1;
+
+    if(test_rrddim_divisor_normalization())
+        return 1;
+
     if(test_rrdset_rejects_invalid_update_every())
+        return 1;
+
+    if(test_rrdr_relative_window_extreme_values())
+        return 1;
+
+    if(test_query_window_resampling_boundaries())
         return 1;
 
     if(!test_variable_renames())

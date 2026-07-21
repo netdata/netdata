@@ -333,6 +333,40 @@ This structure allows for flexible and powerful metric configuration within Netd
 - **`update every (flushInterval) = 1s`** - How often StatsD updates Netdata charts
 - **`decimal detail = 1000`** - Controls decimal precision in gauges and histograms
 
+### Accepting metrics from another machine (LAN/remote host)
+
+By default, Netdata's StatsD listener binds only to `localhost`, so it accepts metrics from applications running on the **same machine** as the Netdata Agent. To accept metrics from another machine on your network, change the `bind to` setting in the `[statsd]` section of `netdata.conf`.
+
+1. Open the StatsD configuration:
+
+   ```bash
+   sudo ./edit-config netdata.conf
+   ```
+
+2. In the `[statsd]` section, set `bind to` to the Netdata host's LAN IP address (for example, `192.168.1.10`):
+
+   ```
+   [statsd]
+   	bind to = udp:192.168.1.10:8125 tcp:192.168.1.10:8125
+   ```
+
+   To listen on all interfaces instead of a single IP, bind to `0.0.0.0`:
+
+   ```
+   [statsd]
+   	bind to = udp:0.0.0.0:8125 tcp:0.0.0.0:8125
+   ```
+
+3. [Restart](/docs/netdata-agent/start-stop-restart.md) the Agent so the new binding takes effect.
+
+4. On the sending machine, point your application's StatsD client at the Netdata host's IP address and port `8125`, using either UDP or TCP. For client library examples, see [Using StatsD with Different Languages](#using-statsd-with-different-languages).
+
+:::warning
+
+Binding `bind to` to `0.0.0.0` or a routable network interface exposes port `8125` to other hosts on the network. Restrict access with a firewall that only allows connections from your trusted machines, and avoid binding to public-facing interfaces.
+
+:::
+
 ## StatsD Charts
 
 Netdata can visualize StatsD collected metrics in two ways:

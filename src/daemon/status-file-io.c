@@ -102,10 +102,10 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
     // Linux: https://man7.org/linux/man-pages/man7/signal-safety.7.html
-    // memcpy(), strlen(), open(), write(), fsync(), close(), fchmod(), rename(), unlink()
+    // memcpy(), strlen(), lstat(), open(), fstat(), ftruncate(), write(), fsync(), close(), fchmod(), rename(), unlink()
 
     // MacOS: https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/sigaction.2.html#//apple_ref/doc/man/2/sigaction
-    // open(), write(), fsync(), close(), rename(), unlink()
+    // lstat(), open(), fstat(), ftruncate(), write(), fsync(), close(), rename(), unlink()
     // does not explicitly mention fchmod, memcpy(), and strlen(), but they are safe
 
     if(!directory || !*directory)
@@ -138,10 +138,37 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     memcpy(&temp[pos], tid_str, tid_len); pos += tid_len;
     temp[pos] = '\0';
 
-    // Open file with O_WRONLY, O_CREAT, and O_TRUNC flags
-    int fd = open(temp, O_WRONLY | O_CREAT | O_TRUNC, 0664);
+    // Reuse a regular temporary file left by an interrupted save; create absent names exclusively.
+    struct stat before;
+    bool reuse = lstat(temp, &before) == 0;
+    if(reuse && !S_ISREG(before.st_mode))
+        return false;
+
+    if(!reuse && errno != ENOENT)
+        return false;
+
+    int flags = O_WRONLY | O_NONBLOCK;
+#ifdef O_NOFOLLOW
+    flags |= O_NOFOLLOW;
+#endif
+    if(!reuse)
+        flags |= O_CREAT | O_EXCL;
+
+    int fd = open(temp, flags, 0664);
     if (fd == -1)
         return false;
+
+    struct stat after;
+    if(fstat(fd, &after) != 0 || !S_ISREG(after.st_mode) ||
+       (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))) {
+        close(fd);
+        return false;
+    }
+
+    if(reuse && ftruncate(fd, 0) != 0) {
+        close(fd);
+        return false;
+    }
 
     /* Write content to file using write() */
     size_t total_written = 0;

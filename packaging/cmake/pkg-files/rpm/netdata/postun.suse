@@ -1,0 +1,2 @@
+%service_del_postun netdata.service
+%service_del_postun netdata-updater.timer

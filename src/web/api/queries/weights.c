@@ -4,6 +4,14 @@
 #include "KolmogorovSmirnovDist.h"
 
 #define MAX_POINTS 10000
+
+static bool weights_points_exceed_max(size_t points, uint32_t shifts) {
+    if(unlikely(shifts >= sizeof(points) * CHAR_BIT))
+        return points != 0;
+
+    return points > ((size_t)MAX_POINTS >> shifts);
+}
+
 int metric_correlations_version = 1;
 
 typedef struct weights_stats {
@@ -2591,12 +2599,12 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
         // if the baseline size will not comply to MAX_POINTS
         // lower the window of the baseline
-        while(qwd.shifts && (qwr->points << qwd.shifts) > MAX_POINTS)
+        while(qwd.shifts && weights_points_exceed_max(qwr->points, qwd.shifts))
             qwd.shifts--;
 
         // if the baseline size still does not comply to MAX_POINTS
         // lower the resolution of the highlight and the baseline
-        while((qwr->points << qwd.shifts) > MAX_POINTS)
+        while(weights_points_exceed_max(qwr->points, qwd.shifts))
             qwr->points = qwr->points >> 1;
 
         if(qwr->points < 15) {
@@ -2853,6 +2861,44 @@ static int mc_unittest4(void) {
     return errors + ret;
 }
 
+static int weights_points_exceed_max_unittest(void) {
+    static const struct {
+        size_t points;
+        uint32_t shifts;
+        bool expected;
+        const char *description;
+    } cases[] = {
+        { 0, UINT32_MAX, false, "zero points at maximum shift" },
+        { MAX_POINTS - 1, 0, false, "below maximum" },
+        { MAX_POINTS, 0, false, "at maximum" },
+        { MAX_POINTS + 1, 0, true, "above maximum" },
+        { MAX_POINTS / 2, 1, false, "shifted value at maximum" },
+        { MAX_POINTS / 2 + 1, 1, true, "shifted value above maximum" },
+        { 1, 13, false, "one point below shift threshold" },
+        { 2, 13, true, "two points at shift threshold" },
+        { 1, 14, true, "one point above shift threshold" },
+        { (size_t)1 << (sizeof(size_t) * CHAR_BIT - 1), 1, true, "native-width wrap pair" },
+        { SIZE_MAX, 0, true, "maximum points" },
+        { SIZE_MAX, 29, true, "maximum points at source maximum shift" },
+        { 1, (uint32_t)(sizeof(size_t) * CHAR_BIT - 1), true, "one point at native maximum shift" },
+        { 1, (uint32_t)(sizeof(size_t) * CHAR_BIT), true, "one point at native width" },
+        { 1, UINT32_MAX, true, "one point at maximum shift" },
+    };
+
+    int errors = 0;
+    for(size_t i = 0; i < _countof(cases); i++) {
+        bool actual = weights_points_exceed_max(cases[i].points, cases[i].shifts);
+        int ret = actual == cases[i].expected ? 0 : 1;
+
+        fprintf(stderr, "%s weights point limit %s: points=%zu, shifts=%u, expected=%s, got=%s\n",
+                ret ? "FAILED" : "OK", cases[i].description, cases[i].points, cases[i].shifts,
+                cases[i].expected ? "true" : "false", actual ? "true" : "false");
+        errors += ret;
+    }
+
+    return errors;
+}
+
 int mc_unittest(void) {
     int errors = 0;
 
@@ -2860,6 +2906,7 @@ int mc_unittest(void) {
     errors += mc_unittest2();
     errors += mc_unittest3();
     errors += mc_unittest4();
+    errors += weights_points_exceed_max_unittest();
 
     return errors;
 }

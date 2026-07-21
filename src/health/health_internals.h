@@ -43,6 +43,41 @@
 #define HEALTH_HOST_LABEL_KEY "host labels"
 #define HEALTH_CHART_LABEL_KEY "chart labels"
 
+static inline int health_delay_apply_multiplier(int delay, float multiplier, int maximum) {
+    const float float_delay = (float)delay;
+
+    // Prove the range widely, then preserve the existing float multiplication and truncation.
+    const double wide = (double)float_delay * (double)multiplier;
+
+    if(wide > (double)INT_MAX)
+        return maximum;
+
+    if(wide < (double)INT_MIN)
+        return INT_MIN;
+
+    const float multiplied = float_delay * multiplier;
+    if((double)multiplied > (double)maximum)
+        return maximum;
+
+    if((double)multiplied < (double)INT_MIN)
+        return INT_MIN;
+
+    return (int)multiplied;
+}
+
+static inline bool health_delay_product_exceeds(int delay, float multiplier, int value) {
+    const float float_delay = (float)delay;
+    const double wide = (double)float_delay * (double)multiplier;
+
+    if(wide > (double)FLT_MAX)
+        return true;
+
+    if(wide < -(double)FLT_MAX)
+        return false;
+
+    return (float)value < float_delay * multiplier;
+}
+
 void alert_action_options_to_buffer_json_array(BUFFER *wb, const char *key, ALERT_ACTION_OPTIONS options);
 void alert_action_options_to_buffer(BUFFER *wb, ALERT_ACTION_OPTIONS options);
 ALERT_ACTION_OPTIONS alert_action_options_parse(char *o);
@@ -103,6 +138,9 @@ int health_readfile(const char *filename, void *data, bool stock_config);
 
 // for unit testing
 int health_parse_db_lookup(size_t line, const char *filename, char *string, struct rrd_alert_config *ac);
+int health_parse_delay(size_t line, const char *filename, char *string,
+                       int *delay_up_duration, int *delay_down_duration,
+                       int *delay_max_duration, float *delay_multiplier);
 void unlink_alarm_notify_in_progress(ALARM_ENTRY *ae);
 void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up(void);
 

@@ -39,6 +39,12 @@ gantt
 | `tier1` | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     6 bytes     |
 | `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |    18 bytes     |
 
+:::note
+
+Tier resolution shifts proportionally when you change `[db].update every`, and a longer `update every` lets the same per-tier disk size hold more time of data. See [Update Every and Tier Granularity](/src/database/CONFIGURATION.md#update-every-and-tier-granularity) for the full mechanics and the Parent-Child behavior.
+
+:::
+
 ### Default Disk Footprint
 
 Netdata Agent metrics storage is limited to 3 GiB by default (configurable), using 1 GiB per tier × 3 tiers. In total, with SQLite databases, alert transitions, and other metadata, expect about 4 GiB of disk usage under normal conditions. The default retention limits are:

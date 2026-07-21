@@ -1027,7 +1027,8 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
     aclk_host_config->host = host;
     aclk_host_config->stream_alerts = false;
     time_t now = now_realtime_sec();
-    aclk_host_config->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
+    aclk_host_config->node_info_send_time =
+        (host == localhost || NULL == localhost) ? nd_time_t_add_saturating(now, -25) : now;
 
     struct aclk_sync_cfg_t *expected = NULL;
     if (__atomic_compare_exchange_n(&host->aclk_host_config, &expected, aclk_host_config, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
@@ -1167,7 +1168,7 @@ void aclk_synchronization_init(void)
 
     if (sem_init) {
         int finished_vnodes = 0;
-        time_t deadline = now_realtime_sec() + 60;  // hard timeput to avoid infinite block
+        time_t deadline = nd_time_t_add_saturating(now_realtime_sec(), 60);  // hard timeput to avoid infinite block
         while (finished_vnodes < node_data.vnodes) {
             if (uv_sem_trywait(&ctx_sem) == 0) {
                 finished_vnodes++;
