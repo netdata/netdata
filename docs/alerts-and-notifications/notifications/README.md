@@ -77,7 +77,7 @@ You can configure different notification channels for different severity levels.
 Netdata does not provide a native on-call rotation, escalation, or shift-scheduling engine. These capabilities are handled by the dedicated incident-management integrations that Netdata delivers alerts to.
 
 - **From the Agent:** incident-management and incident-response integrations such as [PagerDuty](/src/health/notifications/pagerduty/README.md), [Opsgenie](/src/health/notifications/opsgenie/README.md), [SIGNL4](/src/health/notifications/signl4/README.md), and [ilert](/src/health/notifications/ilert/README.md), where you define on-call schedules, escalation policies, and shift rotations. See the full list of [supported Agent integrations](https://learn.netdata.cloud/docs/alerts-&-notifications/notifications/agent-dispatched-notifications).
-- **From Cloud:** PagerDuty is available as a [Business-tier notification method](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#service-classification).
+- **From Cloud:** PagerDuty is available as a [paid-plan notification method](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#service-classification).
 
 To use on-call rotations, configure one of these integrations to receive your Netdata alerts, then set up your rotations, escalation policies, and shift schedules inside that service. To change where alerts are sent, see [Notification Methods](#notification-methods) or the [Cloud notification methods](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md) guide.
 
