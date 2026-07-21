@@ -151,8 +151,8 @@ typedef struct facet_value {
     uint32_t final_facet_value_counter;
     uint32_t order;
 
-    uint32_t *histogram;
-    uint32_t min, max, sum;
+    uint64_t *histogram;
+    uint64_t min, max, sum;
 
     struct facet_value *prev, *next;
 } FACET_VALUE;
@@ -925,6 +925,13 @@ void facets_set_timeframe_and_histogram_by_name(FACETS *facets, const char *key_
     facets_set_timeframe_and_histogram_by_id(facets, hash_str, after_ut, before_ut);
 }
 
+static inline uint64_t facets_u64_saturating_add(uint64_t current, uint64_t add) {
+    if(unlikely(add > UINT64_MAX - current))
+        return UINT64_MAX;
+
+    return current + add;
+}
+
 static inline uint32_t facets_histogram_slot_at_time_ut(FACETS *facets, usec_t usec, FACET_VALUE *v) {
     if(unlikely(!v->histogram))
         v->histogram = callocz(facets->histogram.slots, sizeof(*v->histogram));
@@ -947,7 +954,7 @@ static inline uint32_t facets_histogram_slot_at_time_ut(FACETS *facets, usec_t u
 
 static inline void facets_histogram_update_value_slot(FACETS *facets, usec_t usec, FACET_VALUE *v) {
     uint32_t slot = facets_histogram_slot_at_time_ut(facets, usec, v);
-    v->histogram[slot]++;
+    v->histogram[slot] = facets_u64_saturating_add(v->histogram[slot], 1);
 }
 
 static inline void facets_histogram_update_value(FACETS *facets, usec_t usec) {
@@ -971,6 +978,46 @@ static usec_t overlap_duration_ut(usec_t start1, usec_t end1, usec_t start2, use
         return overlap_end - overlap_start;
     else
         return 0; // No overlap
+}
+
+static size_t facets_estimated_entries_for_overlap(usec_t overlap_ut, size_t entries, usec_t total_ut) {
+    if(!overlap_ut || !entries)
+        return 0;
+
+    if(overlap_ut == total_ut)
+        return entries;
+
+#if defined(__SIZEOF_INT128__)
+    return (size_t)(((__uint128_t)overlap_ut * (__uint128_t)entries) / (__uint128_t)total_ut);
+#else
+    if(entries <= UINT64_MAX / overlap_ut)
+        return (size_t)((overlap_ut * (uint64_t)entries) / total_ut);
+
+    size_t quotient = 0;
+    usec_t remainder = 0;
+
+    for(size_t bit = sizeof(entries) * CHAR_BIT; bit > 0; bit--) {
+        // The quotient cannot exceed the already processed prefix of entries.
+        quotient *= 2;
+        if(remainder >= total_ut - remainder) {
+            remainder -= total_ut - remainder;
+            quotient++;
+        }
+        else
+            remainder += remainder;
+
+        if(entries & ((size_t)1 << (bit - 1))) {
+            if(remainder >= total_ut - overlap_ut) {
+                remainder -= total_ut - overlap_ut;
+                quotient++;
+            }
+            else
+                remainder += overlap_ut;
+        }
+    }
+
+    return quotient;
+#endif
 }
 
 void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, size_t entries) {
@@ -1000,9 +1047,11 @@ void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, siz
 
     FACET_VALUE *v = facets->histogram.key->estimated_value.v;
 
+#ifdef NETDATA_INTERNAL_CHECKS
     size_t slots = 0;
-    size_t total_ut = to_ut - from_ut;
-    ssize_t remaining_entries = (ssize_t)entries;
+    size_t remaining_entries = entries;
+#endif
+    usec_t total_ut = to_ut - from_ut;
     size_t slot = facets_histogram_slot_at_time_ut(facets, from_ut, v);
     for(; slot < facets->histogram.slots ;slot++) {
         usec_t slot_start_ut = facets->histogram.after_ut + slot * facets->histogram.slot_width_ut;
@@ -1013,17 +1062,23 @@ void facets_update_estimations(FACETS *facets, usec_t from_ut, usec_t to_ut, siz
 
         usec_t overlap_ut = overlap_duration_ut(from_ut, to_ut, slot_start_ut, slot_end_ut);
 
-        size_t slot_entries = (overlap_ut * entries) / total_ut;
-        v->histogram[slot] += slot_entries;
-        remaining_entries -= (ssize_t)slot_entries;
+        size_t slot_entries = facets_estimated_entries_for_overlap(overlap_ut, entries, total_ut);
+        v->histogram[slot] = facets_u64_saturating_add(v->histogram[slot], slot_entries);
+#ifdef NETDATA_INTERNAL_CHECKS
+        internal_fatal(slot_entries > remaining_entries,
+                       "distribution of estimations assigned more entries than available");
+        remaining_entries -= slot_entries;
         slots++;
+#endif
     }
 
+#ifdef NETDATA_INTERNAL_CHECKS
     // Check if all entries are assigned
     // This should always be true if the distribution is correct
-    internal_fatal(remaining_entries < 0 || remaining_entries >= (ssize_t)(slots),
-                   "distribution of estimations is not accurate - there are %zd remaining entries",
+    internal_fatal(remaining_entries >= slots,
+                   "distribution of estimations is not accurate - there are %zu remaining entries",
                    remaining_entries);
+#endif
 }
 
 void facets_row_finished_unsampled(FACETS *facets, usec_t usec) {
@@ -1234,7 +1289,7 @@ static inline void facets_histogram_value_arp(BUFFER *wb, FACETS *facets __maybe
     buffer_json_array_close(wb); // key
 }
 
-static inline void facets_histogram_value_con(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, uint32_t sum) {
+static inline void facets_histogram_value_con(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, uint64_t sum) {
     buffer_json_member_add_array(wb, key);
     {
         if(k && k->values.enabled) {
@@ -1255,7 +1310,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
     CLEAN_BUFFER *tmp = buffer_create(0, NULL);
 
     size_t dimensions = 0;
-    uint32_t min = UINT32_MAX, max = 0, sum = 0, count = 0;
+    uint64_t min = UINT64_MAX, max = 0, sum = 0, count = 0;
 
     if(k && k->values.enabled) {
         FACET_VALUE *v;
@@ -1267,12 +1322,12 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
 
             dimensions++;
 
-            v->min = UINT32_MAX;
+            v->min = UINT64_MAX;
             v->max = 0;
             v->sum = 0;
 
             for(uint32_t i = 0; i < facets->histogram.slots ;i++) {
-                uint32_t n = v->histogram[i];
+                uint64_t n = v->histogram[i];
 
                 if(n < min)
                     min = n;
@@ -1280,7 +1335,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                 if(n > max)
                     max = n;
 
-                sum += n;
+                sum = facets_u64_saturating_add(sum, n);
                 count++;
 
                 if(n < v->min)
@@ -1289,7 +1344,7 @@ static void facets_histogram_generate(FACETS *facets, FACET_KEY *k, BUFFER *wb) 
                 if(n > v->max)
                     v->max = n;
 
-                v->sum += n;
+                v->sum = facets_u64_saturating_add(v->sum, n);
             }
         }
         foreach_value_in_key_done(v);
@@ -2604,6 +2659,7 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
 
     size_t entries = k->values.used;
     struct facet_value_restore {
+        FACET_VALUE *v;
         const char *name;
         uint32_t name_len;
     } *values = mallocz(entries * sizeof(*values));
@@ -2614,6 +2670,7 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
         if(used >= entries)
             break;
 
+        values[used].v = v;
         values[used].name = v->name;
         values[used].name_len = v->name_len;
         used++;
@@ -2626,17 +2683,12 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
 
     ret = facets_sort_and_reorder_values_internal(k);
 
-    used = 0;
-    foreach_value_in_key(k, v) {
-        if(used >= entries)
-            break;
-
+    for(uint32_t i = 0; i < used; i++) {
+        v = values[i].v;
         freez((void *)v->name);
-        v->name = values[used].name;
-        v->name_len = values[used].name_len;
-        used++;
+        v->name = values[i].name;
+        v->name_len = values[i].name_len;
     }
-    foreach_value_in_key_done(v);
 
     buffer_free(tb);
     freez(values);
