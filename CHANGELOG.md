@@ -724,6 +724,21 @@
 - Netdata fixes part 66 ([#23137](https://github.com/netdata/netdata/issues/23137))
 - Netdata fixes part 67 ([#23138](https://github.com/netdata/netdata/issues/23138))
 - Netdata fixes part 73 ([#23144](https://github.com/netdata/netdata/issues/23144))
+- Docs: Add journalctl namespace permission note to log README ([#23032](https://github.com/netdata/netdata/issues/23032))
+- Build(deps): bump actions/setup-python from 6 to 7 ([#23193](https://github.com/netdata/netdata/issues/23193))
+- Build(deps): bump actions/setup-go from 6 to 7 ([#23192](https://github.com/netdata/netdata/issues/23192))
+- Netdata fixes part 82 ([#23170](https://github.com/netdata/netdata/issues/23170))
+- Docs: Correct agent query-metrics point cap from 500 to actual limits ([#23022](https://github.com/netdata/netdata/issues/23022))
+- Docs: Fix incorrect config vars in notification troubleshooting ([#23043](https://github.com/netdata/netdata/issues/23043))
+- Docs: Add remove custom host labels procedure to organize docs ([#23045](https://github.com/netdata/netdata/issues/23045))
+- Netdata fixes part 79 ([#23154](https://github.com/netdata/netdata/issues/23154))
+- Netdata fixes part 68 ([#23139](https://github.com/netdata/netdata/issues/23139))
+- Netdata fixes part 75 ([#23150](https://github.com/netdata/netdata/issues/23150))
+- Docs: Add HA parent local collector guidance to FAQ ([#23050](https://github.com/netdata/netdata/issues/23050))
+- Regenerate integrations docs ([#23166](https://github.com/netdata/netdata/issues/23166))
+- Netdata fixes part 77 ([#23152](https://github.com/netdata/netdata/issues/23152))
+- Perflib Rework ([#23189](https://github.com/netdata/netdata/issues/23189))
+- Add missing information [#23151](https://github.com/netdata/netdata/issues/23151) ([#23186](https://github.com/netdata/netdata/issues/23186))
 
 ## [2.10.0] - 2026-04-09
 
