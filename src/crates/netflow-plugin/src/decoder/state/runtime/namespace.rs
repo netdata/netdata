@@ -58,7 +58,7 @@ impl FlowDecoders {
 
     pub(crate) fn decoder_state_namespace_filename(key: &DecoderStateNamespaceKey) -> String {
         format!(
-            "v4--{}--{}--{:05}--{:08x}.bin",
+            "v5--{}--{}--{:05}--{:08x}.bin",
             match key.protocol {
                 DecoderStateProtocol::V9 => "v9",
                 DecoderStateProtocol::Ipfix => "ipfix",
@@ -178,7 +178,7 @@ mod tests {
 
         assert_eq!(
             filename,
-            "v4--v9--___fe80__1_______odd_name--02055--1234abcd.bin"
+            "v5--v9--___fe80__1_______odd_name--02055--1234abcd.bin"
         );
     }
 }

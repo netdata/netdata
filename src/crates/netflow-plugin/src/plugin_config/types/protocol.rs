@@ -1,9 +1,10 @@
 use super::*;
+use crate::decoder::{
+    DEFAULT_SAMPLING_CACHE_MAX_ENTRIES, DEFAULT_SAMPLING_CACHE_MAX_ENTRIES_PER_STREAM,
+};
 use std::str::FromStr;
 
 const DEFAULT_V9_TEMPLATE_LIFETIME: Duration = Duration::from_secs(90 * 60);
-const DEFAULT_SAMPLING_CACHE_MAX_ENTRIES: usize = 100_000;
-const DEFAULT_SAMPLING_CACHE_MAX_ENTRIES_PER_STREAM: usize = 65_536;
 
 fn default_v9_template_lifetime() -> NullableDuration {
     NullableDuration(Some(DEFAULT_V9_TEMPLATE_LIFETIME))

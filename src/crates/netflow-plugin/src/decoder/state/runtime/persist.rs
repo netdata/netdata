@@ -71,8 +71,10 @@ impl FlowDecoders {
         if let Some(namespace) = self.decoder_state_namespaces.get_mut(&expected_key) {
             self.templates.load_namespace(&expected_key, namespace);
         }
-        self.sampling
-            .replace_namespace(&expected_key, &persisted.sampling_rates);
+        self.dirty_decoder_namespaces.extend(
+            self.sampling
+                .replace_namespace(&expected_key, &persisted.sampling_rates),
+        );
         self.dirty_decoder_namespaces.remove(&expected_key);
         self.hydrated_namespace_sources.remove(&expected_key);
         self.hydrated_namespace_sources

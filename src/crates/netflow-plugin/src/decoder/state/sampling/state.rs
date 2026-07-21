@@ -178,11 +178,18 @@ impl SamplingState {
         &mut self,
         namespace: &DecoderStateNamespaceKey,
         rows: &[PersistedSamplingRate],
-    ) {
+    ) -> Vec<DecoderStateNamespaceKey> {
         self.clear_namespace(namespace);
+        let mut dirty = Vec::new();
         for row in rows {
-            let _ = self.set_for_namespace(namespace.clone(), row.sampler_id, row.sampling_rate);
+            for key in self.set_for_namespace(namespace.clone(), row.sampler_id, row.sampling_rate)
+            {
+                if !dirty.contains(&key) {
+                    dirty.push(key);
+                }
+            }
         }
+        dirty
     }
 }
 
@@ -242,7 +249,7 @@ mod tests {
 
         let rows = state.snapshot_namespace(&namespace);
         let mut restored = SamplingState::new(10, 10);
-        restored.replace_namespace(&namespace, &rows);
+        let _ = restored.replace_namespace(&namespace, &rows);
 
         assert_eq!(restored.get(source, 9, 1, 7), Some(4_000));
     }

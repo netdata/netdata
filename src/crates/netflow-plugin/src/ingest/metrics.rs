@@ -1,7 +1,7 @@
 use super::tier_commit::TierCommitTelemetry;
 use super::*;
 
-pub(super) const INGEST_STATS_SNAPSHOT_KEY_COUNT: usize = 70;
+pub(super) const INGEST_STATS_SNAPSHOT_KEY_COUNT: usize = 71;
 
 #[derive(Default)]
 pub(crate) struct IngestMetrics {
@@ -11,6 +11,7 @@ pub(crate) struct IngestMetrics {
     pub(crate) parsed_packets: AtomicU64,
     pub(crate) parse_errors: AtomicU64,
     pub(crate) template_errors: AtomicU64,
+    pub(crate) parser_source_evictions: AtomicU64,
     pub(crate) partial_counter_records: AtomicU64,
     pub(crate) nsel_records: AtomicU64,
     pub(crate) nsel_update_records: AtomicU64,
@@ -87,6 +88,8 @@ impl IngestMetrics {
             .fetch_add(stats.parse_errors, Ordering::Relaxed);
         self.template_errors
             .fetch_add(stats.template_errors, Ordering::Relaxed);
+        self.parser_source_evictions
+            .fetch_add(stats.parser_source_evictions, Ordering::Relaxed);
         self.partial_counter_records
             .fetch_add(stats.partial_counter_records, Ordering::Relaxed);
         self.nsel_records
@@ -160,6 +163,7 @@ impl IngestMetrics {
         insert!("decoded_parsed_packets", parsed_packets);
         insert!("decoded_parse_errors", parse_errors);
         insert!("decoded_template_errors", template_errors);
+        insert!("decoded_parser_source_evictions", parser_source_evictions);
         insert!("decoded_partial_counter_records", partial_counter_records);
         insert!("decoded_nsel_records", nsel_records);
         insert!("decoded_nsel_update_records", nsel_update_records);

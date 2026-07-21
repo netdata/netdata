@@ -3825,8 +3825,71 @@ fn v9_and_ipfix_state_keys_are_protocol_discriminated() {
 }
 
 #[test]
-fn decoder_state_schema_is_four() {
-    assert_eq!(DECODER_STATE_SCHEMA_VERSION, 4);
+fn decoder_state_schema_is_five() {
+    assert_eq!(DECODER_STATE_SCHEMA_VERSION, 5);
+}
+
+#[test]
+fn restoring_sampling_marks_a_globally_evicted_namespace_dirty() {
+    let source_a = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1)), 2055);
+    let source_b = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 2)), 2055);
+    let namespace_a = SamplingState::namespace_key(source_a, 9, 1).unwrap();
+    let namespace_b = SamplingState::namespace_key(source_b, 9, 2).unwrap();
+
+    let mut persisted = FlowDecoders::with_protocols_decap_timestamp_packet_and_state_limits(
+        true,
+        true,
+        true,
+        true,
+        true,
+        DecapsulationMode::None,
+        TimestampSource::Input,
+        u16::MAX as usize,
+        None,
+        1,
+        1,
+    );
+    persisted
+        .sampling
+        .set_for_namespace(namespace_b.clone(), 2, 200);
+    let bytes = persisted
+        .export_decoder_state_namespace(&namespace_b)
+        .unwrap()
+        .unwrap();
+
+    let mut restored = FlowDecoders::with_protocols_decap_timestamp_packet_and_state_limits(
+        true,
+        true,
+        true,
+        true,
+        true,
+        DecapsulationMode::None,
+        TimestampSource::Input,
+        u16::MAX as usize,
+        None,
+        1,
+        1,
+    );
+    restored
+        .sampling
+        .set_for_namespace(namespace_a.clone(), 1, 100);
+
+    restored
+        .import_decoder_state_namespace(namespace_b.clone(), source_b, &bytes)
+        .unwrap();
+
+    assert!(
+        restored
+            .sampling
+            .snapshot_namespace(&namespace_a)
+            .is_empty()
+    );
+    assert_eq!(restored.sampling.snapshot_namespace(&namespace_b).len(), 1);
+    assert_eq!(
+        restored.dirty_decoder_state_namespaces(),
+        vec![namespace_a],
+        "the evicted namespace must be persisted so stale sampling state is removed from disk"
+    );
 }
 
 #[test]
