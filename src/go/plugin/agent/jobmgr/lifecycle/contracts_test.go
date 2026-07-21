@@ -12,7 +12,6 @@ import (
 var _ interface {
 	Validate() error
 	Class() LongLivedClass
-	Bytes() int64
 } = LongLivedPlan{}
 
 func TestControlFramePlanValidate(t *testing.T) {

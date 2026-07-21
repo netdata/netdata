@@ -734,10 +734,6 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 		require.FailNow(t, "test failed", "composite child did not start")
 	}
 
-	beforeConflict := admission.Census()
-	capacity := lifecycle.OrdinaryBudgetBytes -
-		beforeConflict.ProcessBytes
-	available := capacity - beforeConflict.OrdinaryBytes
 	conflictingRequest := Request{
 		UID:     "fence-conflicting",
 		LaneKey: "fence-conflicting",
@@ -750,13 +746,10 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 		[]string{"graph"},
 		func() { close(conflictingApplied) },
 	)
-	base, err := operationAdmissionBytes(conflictingRequest, conflictingPlan)
-	require.NoError(t, err)
-	permit, err := lifecycle.NewSecretStoreLongLivedPlan(available - base)
-	require.NoError(t, err)
+	permit := lifecycle.NewSecretStoreLongLivedPlan()
 	conflictingPlan.Transaction.AllocateSuccessor = true
 	conflictingPlan.Transaction.Permit = permit
-	conflictingPlan, err = prepareOwnedJobPlan(conflictingRequest, conflictingPlan)
+	conflictingPlan, err := prepareOwnedJobPlan(conflictingRequest, conflictingPlan)
 	require.NoError(t, err)
 	conflictingAdmitted := make(chan error, 1)
 	conflictingDone := make(chan error, 1)
@@ -911,39 +904,17 @@ func TestCompositeChildGetsParentLinkedProgressAdmission(
 	beforeBlocker := admission.Census()
 	capacity := lifecycle.OrdinaryBudgetBytes -
 		beforeBlocker.ProcessBytes
-	blockerRequest := Request{
-		UID:     "progress-blocker",
-		LaneKey: "blocker",
-		Source:  lifecycle.SourceJobManager,
-		Route:   "internal/test/progress-blocker",
-	}
-	blockerEntered := make(chan struct{})
-	blockerRelease := make(chan struct{})
-	blockerPlan := compositeTestPlan(
-		"blocker",
-		nil,
-		func() {
-			close(blockerEntered)
-			<-blockerRelease
-		},
+	blocker := admission.RequestOrdinary(
+		run.Generation(),
+		lifecycle.AdmissionLaneRef{Slot: 1_000, Generation: 1},
+		capacity-beforeBlocker.OrdinaryBytes,
 	)
-	base, err := operationAdmissionBytes(blockerRequest, blockerPlan)
+	require.NoError(t, blocker.Rejected)
+	var blockerGrants [lifecycle.TaskStartServiceQuantum]lifecycle.AdmissionGrant
+	count, _, err := admission.TakeGrants(1, &blockerGrants)
 	require.NoError(t, err)
-	permit, err := lifecycle.NewSecretStoreLongLivedPlan(
-		capacity - beforeBlocker.OrdinaryBytes - base,
-	)
-	require.NoError(t, err)
-	blockerPlan.Transaction.AllocateSuccessor = true
-	blockerPlan.Transaction.Permit = permit
-	blockerDone := make(chan error, 1)
-	go func() {
-		blockerDone <- kernel.SubmitPreparedAndWait(t.Context(), blockerRequest, blockerPlan)
-	}()
-	select {
-	case <-blockerEntered:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "ordinary-budget blocker did not start")
-	}
+	require.EqualValues(t, 1, count)
+	require.Equal(t, blocker.Ref, blockerGrants[0].Ref)
 
 	require.EqualValues(t, capacity, admission.Census().OrdinaryBytes)
 
@@ -963,13 +934,8 @@ func TestCompositeChildGetsParentLinkedProgressAdmission(
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "progress parent did not finish")
 	}
-	close(blockerRelease)
-	select {
-	case err := <-blockerDone:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "ordinary-budget blocker did not finish")
-	}
+	_, err = admission.ReleaseOrdinary(blocker.Ref)
+	require.NoError(t, err)
 
 	require.NoError(t, run.DirtyCause())
 

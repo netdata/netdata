@@ -21,16 +21,6 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 		return 0, errors.New("jobmgr kernel: input body does not self-fit admission")
 	}
 	bytes += payloadBytes
-	if plan.Transaction != nil && plan.Transaction.AllocateSuccessor {
-		persistent := plan.Transaction.Permit.Bytes()
-		if !validPersistentAdmission(
-			plan.Transaction.Permit,
-			lifecycle.OrdinaryBudgetBytes-bytes,
-		) {
-			return 0, errors.New("jobmgr kernel: transaction successor does not self-fit admission")
-		}
-		bytes += persistent
-	}
 	addField := func(field string) bool {
 		if int64(len(field)) > lifecycle.OrdinaryBudgetBytes-bytes {
 			return false
@@ -69,23 +59,6 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 	}
 	bytes += authorityClaimEdges * authorityClaimEdgeAdmissionBytes
 	return bytes, nil
-}
-
-func validPersistentAdmission(
-	plan lifecycle.LongLivedPlan,
-	available int64,
-) bool {
-	if available < 0 {
-		return false
-	}
-	switch plan.Class() {
-	case lifecycle.LongLivedPipeline, lifecycle.LongLivedJob:
-		return plan.Bytes() == 0
-	case lifecycle.LongLivedSecretStore:
-		return plan.Bytes() > 0 && plan.Bytes() <= available
-	default:
-		return false
-	}
 }
 
 func (ck *CommandKernel) abortRequestInputBody(request Request) error {

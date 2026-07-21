@@ -114,7 +114,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			}
 			hooks := test.configure(state, &creator)
 			factory, output := newFactoryTestHarness(t, creator, hooks)
-			permit, tasks, admission, admissionRef := issueTestJobPermit(
+			permit, tasks := issueTestJobPermit(
 				t,
 				"module_job",
 				1,
@@ -146,9 +146,6 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				test.wantRetained,
 				tasks.LongLivedCensus().Active != 0,
 			)
-			if !test.wantRetained {
-				releaseTestJobAdmission(t, admission, admissionRef)
-			}
 		})
 	}
 }
@@ -181,7 +178,7 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				creator.SharedFunctions = func() []funcapi.FunctionConfig { return nil }
 			}
 			factory, output := newFactoryTestHarness(t, creator, test.hooks)
-			permit, tasks, admission, admissionRef := issueTestJobPermit(
+			permit, tasks := issueTestJobPermit(
 				t,
 				"module_job",
 				1,
@@ -209,7 +206,6 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				lifecycle.LongLivedCensus{},
 				tasks.LongLivedCensus(),
 			)
-			releaseTestJobAdmission(t, admission, admissionRef)
 		})
 	}
 }
@@ -225,7 +221,7 @@ func TestFactoryDefersAutoDetectionUntilPreparedJobAcceptance(t *testing.T) {
 		},
 	}
 	factory, _ := newFactoryTestHarness(t, creator, nil)
-	permit, tasks, admission, admissionRef := issueTestJobPermit(
+	permit, tasks := issueTestJobPermit(
 		t,
 		"module_job",
 		1,
@@ -247,8 +243,6 @@ func TestFactoryDefersAutoDetectionUntilPreparedJobAcceptance(t *testing.T) {
 	require.EqualValues(t, 1, state.collectorCleanup)
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 
-	_, err = admission.ReleaseOrdinary(admissionRef)
-	require.NoError(t, err)
 }
 
 func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
@@ -262,7 +256,7 @@ func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
 		},
 	}
 	factory, _ := newFactoryTestHarness(t, creator, nil)
-	permit, tasks, admission, admissionRef := issueTestJobPermit(
+	permit, tasks := issueTestJobPermit(
 		t,
 		"module_job",
 		1,
@@ -284,7 +278,6 @@ func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
 		lifecycle.LongLivedCensus{},
 		tasks.LongLivedCensus(),
 	)
-	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 type factoryTestState struct {

@@ -14,7 +14,6 @@ type storeGenerationCarrier struct {
 
 	permit           lifecycle.LongLivedPermit // long-lived permit backing the store generation
 	externalReleased bool                      // external facet released
-	bytesReleased    bool                      // byte facet released
 	returned         bool                      // permit returned
 }
 
@@ -49,9 +48,7 @@ func (sgc *storeGenerationCarrier) Activate() error {
 	}
 	sgc.mu.Lock()
 	defer sgc.mu.Unlock()
-	if sgc.externalReleased ||
-		sgc.bytesReleased ||
-		sgc.returned {
+	if sgc.externalReleased || sgc.returned {
 		return errors.New(
 			"jobmgr secrets: Store-generation carrier cannot activate",
 		)
@@ -81,12 +78,6 @@ func (sgc *storeGenerationCarrier) Release() error {
 			return err
 		}
 		sgc.externalReleased = true
-	}
-	if !sgc.bytesReleased {
-		if err := sgc.permit.ReleaseBytes(); err != nil {
-			return err
-		}
-		sgc.bytesReleased = true
 	}
 	if err := sgc.permit.Return(); err != nil {
 		return err

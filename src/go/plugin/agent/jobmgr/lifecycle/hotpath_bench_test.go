@@ -108,25 +108,12 @@ func BenchmarkBLongLivedPermitLifecycle(b *testing.B) {
 	if err != nil {
 		require.FailNow(b, "benchmark failed", err)
 	}
-	admission := NewAdmissionLedger()
-	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
 	plan := NewJobLongLivedPlan()
-	var grants [4]AdmissionGrant
 	var generation uint64
 	b.ReportAllocs()
 	for b.Loop() {
 		generation++
-		request := admission.RequestOrdinary(1, lane, 1)
-		if request.Rejected != nil {
-			require.FailNow(b, "benchmark failed", request.Rejected)
-		}
-		count, _, err := admission.TakeGrants(1, &grants)
-		if err != nil || count != 1 {
-			require.FailNowf(b, "benchmark failed", "grant count=%d err=%v", count, err)
-		}
 		permit, err := supervisor.IssueLongLivedPermit(
-			admission,
-			request.Ref,
 			ResourceIdentity{ID: "job", Generation: generation},
 			plan,
 		)
@@ -134,9 +121,6 @@ func BenchmarkBLongLivedPermitLifecycle(b *testing.B) {
 			require.FailNow(b, "benchmark failed", err)
 		}
 		if err := permit.AbortUnused(); err != nil {
-			require.FailNow(b, "benchmark failed", err)
-		}
-		if _, err := admission.ReleaseOrdinary(request.Ref); err != nil {
 			require.FailNow(b, "benchmark failed", err)
 		}
 	}

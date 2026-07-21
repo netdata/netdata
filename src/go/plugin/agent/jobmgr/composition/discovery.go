@@ -229,7 +229,6 @@ type readyDiscovery struct {
 	supervisorReleased bool            // supervisor task released
 	externalActivated  bool            // external facet activated
 	externalReleased   bool            // external facet released
-	bytesReleased      bool            // byte facet released (zero-byte permit)
 	permitReturned     bool            // permit returned
 }
 
@@ -621,13 +620,6 @@ func (rd *readyDiscovery) Finalize() error {
 			return err
 		}
 		rd.externalReleased = true
-	}
-	if !rd.bytesReleased {
-		if err := rd.permit.ReleaseBytes(); err != nil {
-			rd.mu.Unlock()
-			return err
-		}
-		rd.bytesReleased = true
 	}
 	if !rd.permitReturned {
 		if err := rd.permit.Return(); err != nil {

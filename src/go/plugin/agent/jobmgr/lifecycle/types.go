@@ -176,8 +176,6 @@ type TaskPlan struct {
 	MaxPhaseTransitions    uint8                           // phase-action ceiling; 0 = source default
 	Work                   TaskWork                        // one-shot work closure (one work source)
 	Cleanup                TaskCleanup                     // post-disposal cleanup
-	permitAdmission        *AdmissionLedger                // admission ledger for a long-lived permit
-	permitAdmissionRef     AdmissionRef                    // admission record backing the permit
 	permitOwner            ResourceIdentity                // owning resource identity for the permit
 	permitPlan             LongLivedPlan                   // long-lived plan terms
 	transactionWork        PreparedResourceTransactionWork // permit-bound transaction work (one variant)
@@ -218,8 +216,6 @@ func NewResourceTransactionPermitTaskPlan(
 	source Source,
 	deadline time.Time,
 	maxPhaseTransitions uint8,
-	admission *AdmissionLedger,
-	admissionRef AdmissionRef,
 	current ReadyResource,
 	scope ResourceTransactionScope,
 	permitPlan LongLivedPlan,
@@ -234,8 +230,6 @@ func NewResourceTransactionPermitTaskPlan(
 		Source:              source,
 		Deadline:            deadline,
 		MaxPhaseTransitions: maxPhaseTransitions,
-		permitAdmission:     admission,
-		permitAdmissionRef:  admissionRef,
 		permitOwner:         scope.Successor,
 		permitPlan:          permitPlan,
 		transactionWork:     work,
@@ -333,7 +327,7 @@ func (tp TaskPlan) Validate() error {
 		return errors.New("jobmgr lifecycle: unexpected preserved disposal context")
 	}
 	if tp.transactionWork != nil && tp.transactionScope.Successor.Valid() {
-		if tp.permitAdmission == nil || !tp.permitAdmissionRef.Valid() || !tp.permitOwner.Valid() {
+		if !tp.permitOwner.Valid() {
 			return errors.New("jobmgr lifecycle: incomplete prepared-resource permit work")
 		}
 		if err := tp.permitPlan.Validate(); err != nil {
@@ -343,7 +337,7 @@ func (tp TaskPlan) Validate() error {
 			tp.permitOwner != tp.transactionScope.Successor {
 			return errors.New("jobmgr lifecycle: transaction permit owner differs from successor")
 		}
-	} else if tp.permitAdmission != nil || tp.permitAdmissionRef.Valid() || tp.permitOwner.Valid() || tp.permitPlan.class != 0 {
+	} else if tp.permitOwner.Valid() || tp.permitPlan.class != 0 {
 		return errors.New("jobmgr lifecycle: unexpected prepared-resource permit terms")
 	}
 	limit := tp.phaseLimit()

@@ -46,7 +46,7 @@ func TestJobFactoryRejectCleanup(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			events := &jobEventLog{}
-			permit, tasks, admission, admissionRef := issueTestJobPermit(
+			permit, tasks := issueTestJobPermit(
 				t,
 				"job",
 				1,
@@ -72,13 +72,12 @@ func TestJobFactoryRejectCleanup(t *testing.T) {
 				lifecycle.LongLivedCensus{},
 				tasks.LongLivedCensus(),
 			)
-			releaseTestJobAdmission(t, admission, admissionRef)
 		})
 	}
 }
 
 func TestJobPreparationLeavesCleanRejectedPermitWithTaskSupervisor(t *testing.T) {
-	permit, tasks, admission, admissionRef := issueTestJobPermit(t, "job", 1)
+	permit, tasks := issueTestJobPermit(t, "job", 1)
 	events := &jobEventLog{}
 
 	prepared, err := prepareJob(
@@ -100,11 +99,10 @@ func TestJobPreparationLeavesCleanRejectedPermitWithTaskSupervisor(t *testing.T)
 	require.NoError(t, permit.AbortUnused())
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 
-	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 func TestPreparedTransactionRejectsStaleUnusedPermitAtConstruction(t *testing.T) {
-	permit, _, admission, admissionRef := issueTestJobPermit(t, "job", 1)
+	permit, _ := issueTestJobPermit(t, "job", 1)
 	require.NoError(t, permit.AbortUnused())
 	result, err := lifecycle.NewSealedResult(204, "application/json", nil)
 	require.NoError(t, err)
@@ -124,7 +122,6 @@ func TestPreparedTransactionRejectsStaleUnusedPermitAtConstruction(t *testing.T)
 	)
 	require.Error(t, err)
 
-	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 func TestJobGenerationV1V2(t *testing.T) {
@@ -137,7 +134,7 @@ func TestJobGenerationV1V2(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			events := &jobEventLog{}
-			permit, tasks, admission, admissionRef := issueTestJobPermit(
+			permit, tasks := issueTestJobPermit(
 				t,
 				"job",
 				7,
@@ -183,7 +180,6 @@ func TestJobGenerationV1V2(t *testing.T) {
 				lifecycle.LongLivedCensus{},
 				tasks.LongLivedCensus(),
 			)
-			releaseTestJobAdmission(t, admission, admissionRef)
 		})
 	}
 }
@@ -191,7 +187,7 @@ func TestJobGenerationV1V2(t *testing.T) {
 func TestJobGenerationPermitReturnLast(t *testing.T) {
 	events := &jobEventLog{}
 	release := make(chan struct{})
-	permit, tasks, admission, admissionRef := issueTestJobPermit(t, "job", 1)
+	permit, tasks := issueTestJobPermit(t, "job", 1)
 	prepared, err := prepareJob(
 		context.Background(),
 		"job",
@@ -223,7 +219,6 @@ func TestJobGenerationPermitReturnLast(t *testing.T) {
 	require.EqualValues(t, JobStopped, generation.State())
 	census := tasks.LongLivedCensus()
 	require.EqualValues(t, 1, census.Active)
-	require.Zero(t, census.Bytes)
 	require.Zero(t, census.ExternalActive)
 
 	require.NoError(t, generation.Finalize())
@@ -232,7 +227,6 @@ func TestJobGenerationPermitReturnLast(t *testing.T) {
 		lifecycle.LongLivedCensus{},
 		tasks.LongLivedCensus(),
 	)
-	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
@@ -262,7 +256,7 @@ func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			events := &jobEventLog{}
-			permit, tasks, _, _ := issueTestJobPermit(t, "job", 1)
+			permit, tasks := issueTestJobPermit(t, "job", 1)
 			prepared, err := prepareJob(
 				context.Background(),
 				"job",
@@ -316,7 +310,7 @@ func TestJobLifecyclePanicsPreserveTaskClassification(t *testing.T) {
 func BenchmarkBJobFactoryCold(b *testing.B) {
 	for b.Loop() {
 		events := &jobEventLog{}
-		permit, _, admission, admissionRef := issueTestJobPermit(
+		permit, _ := issueTestJobPermit(
 			b,
 			"job",
 			1,
@@ -336,7 +330,6 @@ func BenchmarkBJobFactoryCold(b *testing.B) {
 		if err := prepared.Dispose(context.Background()); err != nil {
 			require.FailNow(b, "benchmark failed", err)
 		}
-		releaseTestJobAdmission(b, admission, admissionRef)
 	}
 }
 
@@ -400,45 +393,19 @@ func issueTestJobPermit(
 ) (
 	lifecycle.LongLivedPermit,
 	*lifecycle.TaskSupervisor,
-	*lifecycle.AdmissionLedger,
-	lifecycle.AdmissionRef,
 ) {
 	t.Helper()
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
-	admission := lifecycle.NewAdmissionLedger()
 	plan := lifecycle.NewJobLongLivedPlan()
-	requested := admission.RequestOrdinary(
-		1,
-		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
-		plan.Bytes()+1,
-	)
-	require.Nil(t, requested.Rejected)
-	var grants [4]lifecycle.AdmissionGrant
-	count, _, err := admission.TakeGrants(1, &grants)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-	require.Equal(t, requested.Ref, grants[0].Ref)
 	permit, err := tasks.IssueLongLivedPermit(
-		admission,
-		requested.Ref,
 		lifecycle.ResourceIdentity{ID: id, Generation: generation},
 		plan,
 	)
 	require.NoError(t, err)
-	return permit, tasks, admission, requested.Ref
-}
-
-func releaseTestJobAdmission(
-	t testingHelper,
-	admission *lifecycle.AdmissionLedger,
-	ref lifecycle.AdmissionRef,
-) {
-	t.Helper()
-	_, err := admission.ReleaseOrdinary(ref)
-	require.NoError(t, err)
+	return permit, tasks
 }
 
 type recordingJobRuntime struct {

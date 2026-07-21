@@ -526,9 +526,6 @@ func (jg *JobGeneration) Stop(ctx context.Context) error {
 	}); err != nil {
 		return jg.finishStop(JobRetained, err)
 	}
-	if err := callJobLifecycle("job byte facet release", jg.permit.ReleaseBytes); err != nil {
-		return jg.finishStop(JobRetained, err)
-	}
 	return jg.finishStop(JobStopped, nil)
 }
 
@@ -660,12 +657,6 @@ func disposeConstructed(
 	permit lifecycle.LongLivedPermit,
 ) error {
 	if err := rejectConstructed(ctx, constructed, permit); err != nil {
-		return err
-	}
-	if err := callJobLifecycle(
-		"job byte facet release",
-		permit.ReleaseBytes,
-	); err != nil {
 		return err
 	}
 	return callJobLifecycle("permit return", permit.Return)

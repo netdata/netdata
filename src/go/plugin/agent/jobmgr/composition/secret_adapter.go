@@ -119,7 +119,7 @@ func newSecretInitialRoute(
 					}
 					return composite, err
 				},
-				PermitPolicy:    functionadapter.SuccessorPermitSecretStorePayload,
+				Permit:          lifecycle.NewSecretStoreLongLivedPlan(),
 				CommandArgument: 1,
 				GlobalClaim:     secretadapter.SecretGraphClaim,
 				Commands:        commands,

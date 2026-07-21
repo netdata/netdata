@@ -137,8 +137,6 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 					operation.Source,
 					operation.request.Deadline,
 					lifecycle.TransactionTaskPhases,
-					ck.admission,
-					operation.admission,
 					lane.current,
 					scope,
 					transaction.Permit,

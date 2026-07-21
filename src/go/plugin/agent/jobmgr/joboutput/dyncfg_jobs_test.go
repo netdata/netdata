@@ -273,7 +273,7 @@ func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
 			require.NoError(t, graph.Commit(mutation))
 			record, exists := graph.Lookup(config.FullName())
 			require.True(t, exists)
-			permit, permitTasks, _, _ := issueTestJobPermit(
+			permit, permitTasks := issueTestJobPermit(
 				t,
 				config.FullName(),
 				1,
@@ -397,7 +397,7 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
 		prefix:   "current",
 		events:   &events,
 	}
-	permit, tasks, admission, admissionRef :=
+	permit, tasks :=
 		issueTestJobPermit(t, config.FullName(), 2)
 	scope := lifecycle.ResourceTransactionScope{
 		ID:      config.FullName(),
@@ -473,7 +473,7 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
 	)
 	require.NoError(t, err)
 	require.NoError(t, graph.Commit(replacementMutation))
-	retryPermit, retryTasks, retryAdmission, retryAdmissionRef :=
+	retryPermit, retryTasks :=
 		issueTestJobPermit(t, config.FullName(), 3)
 	retryScope := lifecycle.ResourceTransactionScope{
 		ID: config.FullName(),
@@ -506,12 +506,6 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
 		retryTasks.LongLivedCensus(),
 	)
 
-	releaseTestJobAdmission(t, admission, admissionRef)
-	releaseTestJobAdmission(
-		t,
-		retryAdmission,
-		retryAdmissionRef,
-	)
 	controller.scheduler.StopAutoDetectionRetries()
 	require.NoError(t, controller.scheduler.WaitAutoDetectionRetries(
 		context.Background(),
@@ -557,7 +551,7 @@ func TestNonRetryableAutoDetectionFailureSettlesExistingRetry(t *testing.T) {
 		prefix:   "current",
 		events:   &events,
 	}
-	permit, tasks, admission, admissionRef := issueTestJobPermit(
+	permit, tasks := issueTestJobPermit(
 		t,
 		config.FullName(),
 		2,
@@ -595,7 +589,6 @@ func TestNonRetryableAutoDetectionFailureSettlesExistingRetry(t *testing.T) {
 		lifecycle.LongLivedCensus{},
 		tasks.LongLivedCensus(),
 	)
-	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 type nonRetryableAutoDetectionError struct{}
@@ -654,17 +647,6 @@ func TestPlainStockRetryCanRestartAfterFailedGraphRecordWasRemoved(t *testing.T)
 	token := controller.scheduler.retries.entries[config.FullName()].token
 	controller.scheduler.retries.mu.Unlock()
 	permitPlan := lifecycle.NewJobLongLivedPlan()
-	admission := lifecycle.NewAdmissionLedger()
-	requested := admission.RequestOrdinary(
-		1,
-		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
-		permitPlan.Bytes()+1,
-	)
-	require.Nil(t, requested.Rejected)
-	var grants [lifecycle.TaskStartServiceQuantum]lifecycle.AdmissionGrant
-	count, _, err := admission.TakeGrants(1, &grants)
-	require.NoError(t, err)
-	require.EqualValues(t, 1, count)
 	scope := lifecycle.ResourceTransactionScope{
 		ID: config.FullName(),
 		Successor: lifecycle.ResourceIdentity{
@@ -675,8 +657,6 @@ func TestPlainStockRetryCanRestartAfterFailedGraphRecordWasRemoved(t *testing.T)
 		lifecycle.SourceJobManager,
 		time.Time{},
 		lifecycle.TransactionTaskPhases,
-		admission,
-		requested.Ref,
 		nil,
 		scope,
 		permitPlan,
@@ -737,8 +717,6 @@ func TestPlainStockRetryCanRestartAfterFailedGraphRecordWasRemoved(t *testing.T)
 	require.NoError(t, supervisor.Release(ref))
 	require.NoError(t, current.Stop(context.Background()))
 	require.NoError(t, current.Finalize())
-	_, err = admission.ReleaseOrdinary(requested.Ref)
-	require.NoError(t, err)
 	require.EqualValues(
 		t,
 		lifecycle.LongLivedCensus{},
@@ -759,7 +737,7 @@ func TestRetryPreparationFailureSettlesExactToken(t *testing.T) {
 	controller.scheduler.retries.mu.Lock()
 	token := controller.scheduler.retries.entries[config.FullName()].token
 	controller.scheduler.retries.mu.Unlock()
-	permit, tasks, admission, admissionRef := issueTestJobPermit(
+	permit, tasks := issueTestJobPermit(
 		t,
 		config.FullName(),
 		1,
@@ -789,7 +767,6 @@ func TestRetryPreparationFailureSettlesExactToken(t *testing.T) {
 	))
 	require.NoError(t, permit.AbortUnused())
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
-	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 func TestDependencyPreparationFailureLeavesPermitForTaskSupervisor(
@@ -809,7 +786,7 @@ func TestDependencyPreparationFailureLeavesPermitForTaskSupervisor(
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("user=test")
 	config.SetProvider("test")
-	permit, tasks, admission, admissionRef :=
+	permit, tasks :=
 		issueTestJobPermit(t, config.FullName(), 1)
 	scope := lifecycle.ResourceTransactionScope{
 		ID: config.FullName(),
@@ -837,7 +814,6 @@ func TestDependencyPreparationFailureLeavesPermitForTaskSupervisor(
 		lifecycle.LongLivedCensus{},
 		tasks.LongLivedCensus(),
 	)
-	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 func TestPrepareMutationLeavesUnusedPermitForTaskSupervisor(t *testing.T) {
@@ -848,7 +824,7 @@ func TestPrepareMutationLeavesUnusedPermitForTaskSupervisor(t *testing.T) {
 			return nil, sentinel
 		},
 	)
-	permit, tasks, admission, admissionRef := issueTestJobPermit(t, "module_job", 1)
+	permit, tasks := issueTestJobPermit(t, "module_job", 1)
 	scope := lifecycle.ResourceTransactionScope{
 		ID:        "module_job",
 		Successor: lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
@@ -870,7 +846,6 @@ func TestPrepareMutationLeavesUnusedPermitForTaskSupervisor(t *testing.T) {
 	require.ErrorIs(t, err, sentinel)
 	require.NoError(t, permit.AbortUnused())
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
-	releaseTestJobAdmission(t, admission, admissionRef)
 }
 
 func TestPrepareMutationRollsBackAfterTransactionValidationFailure(t *testing.T) {

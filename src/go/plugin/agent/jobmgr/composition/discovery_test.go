@@ -76,7 +76,7 @@ func TestDiscoveryShutdownCancelsSupervisorBeforeProviders(t *testing.T) {
 
 func TestDiscoveryChildrenWaitForPublication(t *testing.T) {
 	entered := make(chan struct{})
-	prepared, admission, admissionRef := newPublicationTestDiscovery(
+	prepared := newPublicationTestDiscovery(
 		t,
 		publicationTestDiscoverer{entered: entered},
 	)
@@ -104,13 +104,10 @@ func TestDiscoveryChildrenWaitForPublication(t *testing.T) {
 
 	require.NoError(t, ready.Finalize())
 
-	_, releaseOrdinaryErr := admission.ReleaseOrdinary(admissionRef)
-	require.NoError(t, releaseOrdinaryErr)
-
 	require.False(t, enteredBeforePublish)
 }
 
-func TestDiscoveryZeroChargePermitFailurePaths(t *testing.T) {
+func TestDiscoveryPermitFailurePaths(t *testing.T) {
 	tests := map[string]struct {
 		fail func(*testing.T, *preparedDiscovery)
 	}{
@@ -134,27 +131,13 @@ func TestDiscoveryZeroChargePermitFailurePaths(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			prepared, admission, admissionRef := newPublicationTestDiscovery(
+			prepared := newPublicationTestDiscovery(
 				t,
 				publicationTestDiscoverer{},
 			)
 			test.fail(t, prepared)
 
 			require.EqualValues(t, lifecycle.LongLivedCensus{}, prepared.tasks.LongLivedCensus())
-
-			census := admission.Census()
-			require.False(t, census.ActiveRecords != 1 ||
-				census.OrdinaryGranted != 1 ||
-				census.OrdinaryBytes != 1 ||
-				census.LongLivedRecords != 0 ||
-				census.LongLivedBytes != 0)
-
-			_, err := admission.ReleaseOrdinary(admissionRef)
-			require.NoError(t, err)
-
-			admissionCensus := admission.Census()
-			require.False(t, admissionCensus.ActiveRecords != 0 || admissionCensus.OrdinaryBytes != 0)
-
 		})
 	}
 }
@@ -273,11 +256,7 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 func newPublicationTestDiscovery(
 	t *testing.T,
 	discoverer agentdiscovery.Discoverer,
-) (
-	*preparedDiscovery,
-	*lifecycle.AdmissionLedger,
-	lifecycle.AdmissionRef,
-) {
+) *preparedDiscovery {
 	t.Helper()
 	pipeline := newDiscoveryTestPipeline(t, discoverer)
 	decisions, err := jobmgrdiscovery.NewDecisionIndex(
@@ -300,25 +279,10 @@ func newPublicationTestDiscovery(
 		[]string{"provider"},
 	)
 	require.NoError(t, err)
-	admission := lifecycle.NewAdmissionLedger()
-	requested := admission.RequestOrdinary(
-		1,
-		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
-		plan.Bytes()+1,
-	)
-	require.Nil(t, requested.Rejected)
-	var grants [4]lifecycle.AdmissionGrant
-	count, _, err := admission.TakeGrants(1, &grants)
-	require.False(t, err != nil || count != 1 || grants[0].Ref != requested.Ref)
 	identity := lifecycle.ResourceIdentity{
 		ID: discoveryResourceID, Generation: 1,
 	}
-	permit, err := tasks.IssueLongLivedPermit(
-		admission,
-		requested.Ref,
-		identity,
-		plan,
-	)
+	permit, err := tasks.IssueLongLivedPermit(identity, plan)
 	require.NoError(t, err)
 	prepared, err := newPreparedDiscovery(
 		pipeline,
@@ -328,7 +292,7 @@ func newPublicationTestDiscovery(
 		permit,
 	)
 	require.NoError(t, err)
-	return prepared, admission, requested.Ref
+	return prepared
 }
 
 func newDiscoveryTestPipeline(

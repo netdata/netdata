@@ -190,23 +190,7 @@ func TestInheritedFiniteProviderCompletionDoesNotDirtyRun(t *testing.T) {
 	}
 	plan, err := NewPipelineLongLivedPlan([]string{"finite"})
 	require.NoError(t, err)
-	admission := NewAdmissionLedger()
-	requested := admission.RequestOrdinary(
-		1,
-		AdmissionLaneRef{Slot: 1, Generation: 1},
-		plan.Bytes()+1,
-	)
-	require.Nil(t, requested.Rejected)
-	var grants [4]AdmissionGrant
-	count, _, err := admission.TakeGrants(1, &grants)
-	require.NoError(t, err)
-	require.EqualValues(t, 1, count)
-	permit, err := supervisor.IssueLongLivedPermit(
-		admission,
-		requested.Ref,
-		owner,
-		plan,
-	)
+	permit, err := supervisor.IssueLongLivedPermit(owner, plan)
 	require.NoError(t, err)
 	finished := make(chan struct{})
 	ref, err := supervisor.StartInheritedWithPermitKey(
@@ -245,8 +229,6 @@ func TestInheritedFiniteProviderCompletionDoesNotDirtyRun(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
 	require.NoError(t, permit.AbortUnused())
-	_, err = admission.ReleaseOrdinary(requested.Ref)
-	require.NoError(t, err)
 }
 
 func TestStoppingErrorTreeMatchingIsStrictAndBounded(t *testing.T) {

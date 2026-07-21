@@ -62,8 +62,7 @@ func (wp WorkPlan) validate() error {
 				err,
 			)
 		}
-	} else if wp.Transaction.Permit.Class() != 0 ||
-		wp.Transaction.Permit.Bytes() != 0 {
+	} else if wp.Transaction.Permit.Class() != 0 {
 		return errors.New("jobmgr kernel: transaction without successor has a permit")
 	}
 	return nil

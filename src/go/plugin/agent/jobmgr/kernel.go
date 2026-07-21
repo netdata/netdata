@@ -377,7 +377,7 @@ func (ck *CommandKernel) Start(ctx context.Context) error {
 }
 
 func (ck *CommandKernel) bindRunNotifications() error {
-	if err := ck.frames.BindRunNotifications(
+	return ck.frames.BindRunNotifications(
 		ck.run.Generation(),
 		ck.NotifyControlReady,
 		func(err error) {
@@ -385,16 +385,7 @@ func (ck *CommandKernel) bindRunNotifications() error {
 			ck.NotifyControlReady()
 		},
 		ck.runtimeObserver,
-	); err != nil {
-		return err
-	}
-	if err := ck.tasks.BindAdmissionReady(ck.NotifyControlReady); err != nil {
-		return errors.Join(
-			err,
-			ck.frames.ReleaseRunNotifications(ck.run.Generation()),
-		)
-	}
-	return nil
+	)
 }
 
 // beginResultEncode sizes and admits an operation's terminal result and then
@@ -1649,10 +1640,10 @@ func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
 	if !ck.functionCatalogDrained() {
 		return false
 	}
-	if longLived.Active != longLived.FinalizerOwnedActive || longLived.Bytes != longLived.FinalizerOwnedBytes {
+	if longLived.Active != longLived.SecretStores {
 		return false
 	}
-	return ck.admission.RunFinalizerReady(ck.run.Generation(), longLived.FinalizerOwnedRecords, longLived.FinalizerOwnedBytes)
+	return ck.admission.RunFinalizerReady(ck.run.Generation(), 0, 0)
 }
 
 func (ck *CommandKernel) completeRunFinalizer(completion lifecycle.TaskCompletion) {

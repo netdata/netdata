@@ -114,16 +114,6 @@ func (c *Controller) Prefix() string {
 	return c.prefix
 }
 
-func MutationPermit(
-	payload []byte,
-) (lifecycle.LongLivedPlan, error) {
-	retained := int64(len(payload))
-	if retained == 0 {
-		retained = 1
-	}
-	return lifecycle.NewSecretStoreLongLivedPlan(retained)
-}
-
 func (c *Controller) Prepare(
 	ctx context.Context,
 	input CommandInput,

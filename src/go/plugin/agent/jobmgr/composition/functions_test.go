@@ -484,7 +484,6 @@ func (sfrr *shutdownFunctionReadyResource) AbortReady(
 		sfrr.permit.ReleaseExternal(
 			lifecycle.LongLivedEJobResources,
 		),
-		sfrr.permit.ReleaseBytes(),
 		sfrr.permit.Return(),
 	)
 }
@@ -502,7 +501,6 @@ func (sfrr *shutdownFunctionReadyResource) Stop(
 		sfrr.permit.ReleaseExternal(
 			lifecycle.LongLivedEJobResources,
 		),
-		sfrr.permit.ReleaseBytes(),
 	)
 }
 

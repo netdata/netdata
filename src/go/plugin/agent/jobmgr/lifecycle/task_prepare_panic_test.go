@@ -11,8 +11,6 @@ import (
 )
 
 func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T) {
-	admission := NewAdmissionLedger()
-	admissionRef := grantLongLivedTestAdmission(t, admission, 100)
 	supervisor := newLongLivedTestSupervisor(t)
 	current := &recordingReadyResource{
 		identity: ResourceIdentity{ID: "job", Generation: 1},
@@ -28,8 +26,6 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 		SourceJobManager,
 		time.Time{},
 		TransactionTaskPhases,
-		admission,
-		admissionRef,
 		current,
 		scope,
 		permit,
@@ -57,11 +53,4 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
 	require.NoError(t, supervisor.Release(ref))
 	require.Equal(t, LongLivedCensus{}, supervisor.LongLivedCensus())
-
-	_, err = admission.ReleaseOrdinary(admissionRef)
-	require.NoError(t, err)
-	census := admission.Census()
-	require.Zero(t, census.ActiveRecords)
-	require.Zero(t, census.OrdinaryBytes)
-	require.Zero(t, census.LongLivedBytes)
 }

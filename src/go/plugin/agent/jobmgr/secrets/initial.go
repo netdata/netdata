@@ -11,7 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"gopkg.in/yaml.v2"
 )
 
 const secretBootResourceID = "\x00jobmgr-secret-boot"
@@ -127,14 +126,6 @@ func (c *Controller) publishTemplates(
 func (c *Controller) planInitial(
 	config secretstore.Config,
 ) (jobmgr.WorkPlan, error) {
-	payload, err := yaml.Marshal(config)
-	if err != nil {
-		return jobmgr.WorkPlan{}, err
-	}
-	permit, err := MutationPermit(payload)
-	if err != nil {
-		return jobmgr.WorkPlan{}, err
-	}
 	key := config.ExposedKey()
 	resourceID := secretResourceID(key)
 	return jobmgr.WorkPlan{
@@ -143,7 +134,7 @@ func (c *Controller) planInitial(
 		Transaction: &jobmgr.ResourceTransactionPlan{
 			ID:                resourceID,
 			AllocateSuccessor: true,
-			Permit:            permit,
+			Permit:            lifecycle.NewSecretStoreLongLivedPlan(),
 			Prepare: func(
 				ctx context.Context,
 				current lifecycle.ReadyResource,

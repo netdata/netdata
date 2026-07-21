@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 )
 
@@ -124,10 +123,6 @@ type TaskSupervisor struct {
 	observer    RuntimeObserver          // sink for task runtime counters
 	run         *RunSupervisor           // bound run supervisor
 	wake        func()                   // kernel wake callback
-
-	admissionReadyMu      sync.Mutex // guards the admission-ready notifier
-	onAdmissionReady      func()     // callback fired when admission can make progress
-	admissionReadyPending bool       // an admission-ready notification is pending
 }
 
 func (ts *TaskSupervisor) BindRun(
@@ -182,37 +177,6 @@ func (ts *TaskSupervisor) BindRuntimeObserver(
 	ts.observer = observer
 	ts.observeRuntimeState()
 	return nil
-}
-
-func (ts *TaskSupervisor) BindAdmissionReady(notify func()) error {
-	if ts == nil || notify == nil {
-		return errors.New("jobmgr task supervisor: invalid admission-ready binding")
-	}
-	ts.admissionReadyMu.Lock()
-	if ts.onAdmissionReady != nil {
-		ts.admissionReadyMu.Unlock()
-		return errors.New("jobmgr task supervisor: admission-ready notifier already bound")
-	}
-	ts.onAdmissionReady = notify
-	pending := ts.admissionReadyPending
-	ts.admissionReadyPending = false
-	ts.admissionReadyMu.Unlock()
-	if pending {
-		notify()
-	}
-	return nil
-}
-
-func (ts *TaskSupervisor) notifyAdmissionReady() {
-	ts.admissionReadyMu.Lock()
-	notify := ts.onAdmissionReady
-	if notify == nil {
-		ts.admissionReadyPending = true
-	}
-	ts.admissionReadyMu.Unlock()
-	if notify != nil {
-		notify()
-	}
 }
 
 func (ts *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskRequestRef, error) {
@@ -414,8 +378,6 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 		var permit LongLivedPermit
 		if plan.transactionScope.Successor.Valid() {
 			issued, err := ts.IssueLongLivedPermit(
-				plan.permitAdmission,
-				plan.permitAdmissionRef,
 				plan.permitOwner,
 				plan.permitPlan,
 			)
@@ -495,8 +457,6 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 		plan.transactionWork = nil
 		plan.transactionScope = ResourceTransactionScope{}
 		plan.transactionScopeSet = false
-		plan.permitAdmission = nil
-		plan.permitAdmissionRef = AdmissionRef{}
 		plan.permitOwner = ResourceIdentity{}
 		plan.permitPlan = LongLivedPlan{}
 	}

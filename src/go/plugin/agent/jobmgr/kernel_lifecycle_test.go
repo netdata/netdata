@@ -1153,7 +1153,7 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 	require.EqualValues(t, population, active)
 
 	census := tasks.LongLivedCensus()
-	require.False(t, census.Active != population || census.Jobs != population || census.Bytes != 0)
+	require.False(t, census.Active != population || census.Jobs != population)
 
 	admissionCensus := admission.Census()
 	require.False(t, admissionCensus.LongLivedRecords != 0 ||
@@ -2225,30 +2225,18 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 		if err := permit.ReleaseExternal(lifecycle.LongLivedESecretStore); err != nil {
 			return err
 		}
-		if err := permit.ReleaseBytes(); err != nil {
-			return err
-		}
 		return permit.Return()
 	})
-	kernel, run, admission, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
-	plan, err := lifecycle.NewSecretStoreLongLivedPlan(512)
-	require.NoError(t, err)
-	requested := admission.RequestOrdinary(
-		run.Generation(),
-		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
-		plan.Bytes()+512,
+	kernel, run, _, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
+	plan := lifecycle.NewSecretStoreLongLivedPlan()
+	var err error
+	permit, err = tasks.IssueLongLivedPermit(
+		lifecycle.ResourceIdentity{ID: "secret-store", Generation: 1},
+		plan,
 	)
-	require.Nil(t, requested.Rejected)
-	var grants [4]lifecycle.AdmissionGrant
-	count, _, err := admission.TakeGrants(1, &grants)
-	require.False(t, err != nil || count != 1 || grants[0].Ref != requested.Ref)
-	permit, err = tasks.IssueLongLivedPermit(admission, requested.Ref, lifecycle.ResourceIdentity{ID: "secret-store", Generation: 1}, plan)
 	require.NoError(t, err)
 
 	require.NoError(t, permit.ActivateExternal(lifecycle.LongLivedESecretStore))
-
-	_, releaseOrdinaryErr := admission.ReleaseOrdinary(requested.Ref)
-	require.NoError(t, releaseOrdinaryErr)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2311,22 +2299,13 @@ func TestKernelRunFinalizerRejectsUnrelatedLongLivedPermit(t *testing.T) {
 		calls.Add(1)
 		return nil
 	})
-	kernel, run, admission, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, 10*time.Millisecond)
+	kernel, run, _, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, 10*time.Millisecond)
 	plan := lifecycle.NewJobLongLivedPlan()
-	requested := admission.RequestOrdinary(
-		run.Generation(),
-		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
-		512,
+	permit, err := tasks.IssueLongLivedPermit(
+		lifecycle.ResourceIdentity{ID: "job", Generation: 1},
+		plan,
 	)
-	require.Nil(t, requested.Rejected)
-	var grants [4]lifecycle.AdmissionGrant
-	count, _, err := admission.TakeGrants(1, &grants)
-	require.False(t, err != nil || count != 1 || grants[0].Ref != requested.Ref)
-	permit, err := tasks.IssueLongLivedPermit(admission, requested.Ref, lifecycle.ResourceIdentity{ID: "job", Generation: 1}, plan)
 	require.NoError(t, err)
-
-	_, releaseOrdinaryErr := admission.ReleaseOrdinary(requested.Ref)
-	require.NoError(t, releaseOrdinaryErr)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2363,19 +2342,10 @@ func TestKernelRejectsMissingRunFinalizer(t *testing.T) {
 }
 
 func TestKernelCannotReportQuiescentWithRetainedLongLivedPermit(t *testing.T) {
-	kernel, run, admission, _, tasks := newKernelWithPlannerAndTimeout(t, stoppedKernelPlanner{}, time.Millisecond)
+	kernel, run, _, _, tasks := newKernelWithPlannerAndTimeout(t, stoppedKernelPlanner{}, time.Millisecond)
 	permitPlan := lifecycle.NewJobLongLivedPlan()
-	requested := admission.RequestOrdinary(
-		run.Generation(),
-		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
-		512,
-	)
-	require.Nil(t, requested.Rejected)
-	var grants [4]lifecycle.AdmissionGrant
-	count, _, err := admission.TakeGrants(1, &grants)
-	require.False(t, err != nil || count != 1 || grants[0].Ref != requested.Ref)
 	permit, err := tasks.IssueLongLivedPermit(
-		admission, requested.Ref, lifecycle.ResourceIdentity{ID: "retained", Generation: 1}, permitPlan,
+		lifecycle.ResourceIdentity{ID: "retained", Generation: 1}, permitPlan,
 	)
 	require.NoError(t, err)
 
@@ -2390,12 +2360,9 @@ func TestKernelCannotReportQuiescentWithRetainedLongLivedPermit(t *testing.T) {
 	require.False(t, waitErr == nil || !strings.Contains(waitErr.Error(), "shutdown deadline exceeded") || !strings.Contains(waitErr.Error(), "nonzero process census"))
 
 	census := tasks.LongLivedCensus()
-	require.False(t, census.Active != 1 || census.Bytes != permitPlan.Bytes() || census.ExternalReserved != 1)
+	require.False(t, census.Active != 1 || census.ExternalReserved != 1)
 
 	require.NoError(t, permit.AbortUnused())
-
-	_, releaseOrdinaryErr := admission.ReleaseOrdinary(requested.Ref)
-	require.NoError(t, releaseOrdinaryErr)
 
 }
 
@@ -2763,14 +2730,13 @@ func TestOperationAdmissionBytesUsesAggregateFrameworkOverhead(t *testing.T) {
 	require.EqualValues(t, want, got)
 }
 
-func TestOperationAdmissionBytesChargesOnlyByteOwningLongLivedPlans(t *testing.T) {
+func TestOperationAdmissionBytesIgnoresLongLivedPlans(t *testing.T) {
 	pipeline, err := lifecycle.NewPipelineLongLivedPlan(
 		[]string{"provider"},
 	)
 	require.NoError(t, err)
 	job := lifecycle.NewJobLongLivedPlan()
-	secretStore, err := lifecycle.NewSecretStoreLongLivedPlan(91)
-	require.NoError(t, err)
+	secretStore := lifecycle.NewSecretStoreLongLivedPlan()
 	tests := map[string]struct {
 		permit lifecycle.LongLivedPlan
 		want   int64
@@ -2783,9 +2749,9 @@ func TestOperationAdmissionBytesChargesOnlyByteOwningLongLivedPlans(t *testing.T
 			permit: job,
 			want:   operationFrameworkAdmissionBytes,
 		},
-		"SecretStore retained bytes": {
+		"SecretStore": {
 			permit: secretStore,
-			want:   operationFrameworkAdmissionBytes + 91,
+			want:   operationFrameworkAdmissionBytes,
 		},
 	}
 	for name, test := range tests {
@@ -3879,7 +3845,6 @@ func (ktrr *kernelTestReadyResource) Publish() error {
 func (ktrr *kernelTestReadyResource) AbortReady(context.Context) error {
 	return errors.Join(
 		ktrr.permit.ReleaseExternal(lifecycle.LongLivedEJobResources),
-		ktrr.permit.ReleaseBytes(),
 		ktrr.permit.Return(),
 	)
 }
@@ -3893,7 +3858,7 @@ func (ktrr *kernelTestReadyResource) Stop(context.Context) error {
 }
 
 func (ktrr *kernelTestReadyResource) Finalize() error {
-	return errors.Join(ktrr.permit.ReleaseBytes(), ktrr.permit.Return())
+	return ktrr.permit.Return()
 }
 
 type stoppedKernelPlanner struct{}

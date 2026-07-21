@@ -199,42 +199,17 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			admission := NewAdmissionLedger()
 			supervisor := newResourceTaskSupervisor(t)
-			var grants [4]AdmissionGrant
 			seedPlan, err := test.permitPlan([]string{"provider"})
 			require.NoError(t, err)
-			seedAdmission := admission.RequestOrdinary(
-				1,
-				AdmissionLaneRef{Slot: 1, Generation: 1},
-				seedPlan.Bytes()+1,
-			)
-			require.Nil(t, seedAdmission.Rejected)
-			count, _, err := admission.TakeGrants(1, &grants)
-			require.NoError(t, err)
-			require.EqualValues(t, 1, count)
 			seed, err := supervisor.IssueLongLivedPermit(
-				admission,
-				seedAdmission.Ref,
 				ResourceIdentity{ID: "seed", Generation: 1},
 				seedPlan,
 			)
 			require.NoError(t, err)
 
-			_, releaseOrdinaryErr := admission.ReleaseOrdinary(seedAdmission.Ref)
-			require.NoError(t, releaseOrdinaryErr)
-
 			permitPlan, err := test.permitPlan([]string{"provider"})
 			require.NoError(t, err)
-			transactionAdmission := admission.RequestOrdinary(
-				1,
-				AdmissionLaneRef{Slot: 2, Generation: 1},
-				permitPlan.Bytes()+1,
-			)
-			require.Nil(t, transactionAdmission.Rejected)
-			count, _, err = admission.TakeGrants(1, &grants)
-			require.NoError(t, err)
-			require.EqualValues(t, 1, count)
 			scope := ResourceTransactionScope{
 				ID:        "successor",
 				Successor: ResourceIdentity{ID: "successor", Generation: 1},
@@ -244,8 +219,6 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 				SourceJobManager,
 				time.Time{},
 				TransactionTaskPhases,
-				admission,
-				transactionAdmission.Ref,
 				nil,
 				scope,
 				permitPlan,
@@ -263,7 +236,7 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 			requestRef, err := supervisor.Enqueue(TaskClassFrameworkControl, plan)
 			require.NoError(t, err)
 			var started [TaskStartServiceQuantum]TaskStart
-			count, _, err = supervisor.Dispatch(context.Background(), 1, &started)
+			count, _, err := supervisor.Dispatch(context.Background(), 1, &started)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, count)
 			require.Equal(t, requestRef, started[0].Request)
@@ -273,15 +246,7 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 			require.EqualValues(t, 0, supervisor.Active())
 			require.EqualValues(t, 0, supervisor.Pending())
 
-			_, releaseOrdinaryErr2 := admission.ReleaseOrdinary(transactionAdmission.Ref)
-			require.NoError(t, releaseOrdinaryErr2)
-
 			require.NoError(t, seed.AbortUnused())
-
-			census := admission.Census()
-			require.EqualValues(t, 0, census.ActiveRecords)
-			require.EqualValues(t, 0, census.OrdinaryBytes)
-			require.EqualValues(t, 0, census.LongLivedBytes)
 		})
 	}
 }
@@ -296,8 +261,6 @@ func TestResourceTransactionPermitPlanRejectsPipelineReplacement(t *testing.T) {
 		SourceJobManager,
 		time.Time{},
 		TransactionTaskPhases,
-		NewAdmissionLedger(),
-		AdmissionRef{Slot: 2, Generation: 1},
 		current,
 		ResourceTransactionScope{
 			ID:        identity.ID,

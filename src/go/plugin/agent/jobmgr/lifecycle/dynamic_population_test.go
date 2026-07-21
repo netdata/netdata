@@ -100,15 +100,11 @@ func testTaskRequestGrowth(t *testing.T) {
 }
 
 func testLongLivedJobGrowth(t *testing.T) {
-	admission := NewAdmissionLedger()
 	supervisor := newLongLivedTestSupervisor(t)
 	plan := NewJobLongLivedPlan()
 	permits := make([]LongLivedPermit, 0, formerFixedPopulation+1)
 	for index := 0; index <= formerFixedPopulation; index++ {
-		ref := grantLongLivedTestAdmission(t, admission, 2)
 		permit, issueErr := supervisor.IssueLongLivedPermit(
-			admission,
-			ref,
 			ResourceIdentity{
 				ID:         fmt.Sprintf("job-%03d", index),
 				Generation: 1,
@@ -116,10 +112,6 @@ func testLongLivedJobGrowth(t *testing.T) {
 			plan,
 		)
 		require.NoError(t, issueErr)
-
-		_, releaseErr := admission.ReleaseOrdinary(ref)
-		require.NoError(t, releaseErr)
-
 		permits = append(permits, permit)
 	}
 	for _, permit := range permits {
