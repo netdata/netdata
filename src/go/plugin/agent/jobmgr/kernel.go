@@ -268,14 +268,13 @@ type CommandKernel struct {
 	shutdownLanesDone        bool                                            // shutdown lane sweep finished
 	functionCatalog          FunctionCatalogPort                             // Function catalog port (routing + census)
 	inputBodyGrants          chan<- lifecycle.AdmissionGrant                 // channel delivering input-body growth grants
-	admissionServiceGate     <-chan struct{}                                 // test-only seam to pause admission grant servicing
 	runtimeObserver          lifecycle.RuntimeObserver                       // sink for jobmgr.runtime metric atomics
 	runtimeHead              *commandOperation                               // head of the runtime-metrics op list
 	runtimeTail              *commandOperation                               // tail of the runtime-metrics op list
 	functionOperations       int                                             // count of active Function operations
 }
 
-func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.AdmissionLedger, uids *lifecycle.UIDLedger, tasks *lifecycle.TaskSupervisor, frames *lifecycle.FrameOwner, clock lifecycle.Clock, inputBodyGrants chan<- lifecycle.AdmissionGrant, admissionServiceGate <-chan struct{}, shutdownBarrier RunShutdownBarrier, finalizer RunFinalizer, functionCatalog FunctionCatalogPort) (*CommandKernel, error) {
+func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.AdmissionLedger, uids *lifecycle.UIDLedger, tasks *lifecycle.TaskSupervisor, frames *lifecycle.FrameOwner, clock lifecycle.Clock, inputBodyGrants chan<- lifecycle.AdmissionGrant, shutdownBarrier RunShutdownBarrier, finalizer RunFinalizer, functionCatalog FunctionCatalogPort) (*CommandKernel, error) {
 	if run == nil || admission == nil || uids == nil || tasks == nil || frames == nil || clock == nil || inputBodyGrants == nil || shutdownBarrier == nil || finalizer == nil {
 		return nil, errors.New("jobmgr kernel: incomplete lifecycle capabilities")
 	}
@@ -312,7 +311,6 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		nextSource:              lifecycle.SourceJobManager,
 		nextExternalSource:      lifecycle.SourceJobManager,
 		inputBodyGrants:         inputBodyGrants,
-		admissionServiceGate:    admissionServiceGate,
 		shutdownBarrier:         shutdownBarrier,
 		finalizer:               finalizer,
 		functionCatalog:         functionCatalog,

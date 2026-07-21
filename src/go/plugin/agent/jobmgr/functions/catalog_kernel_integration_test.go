@@ -47,7 +47,6 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 		frames,
 		clock,
 		make(chan lifecycle.AdmissionGrant, 1),
-		nil,
 		jobmgr.RunShutdownBarrierFunc(
 			func(context.Context, uint64) error { return nil },
 		),

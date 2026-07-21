@@ -310,13 +310,6 @@ func (ck *CommandKernel) rejectClosedAdmission(request Request) error {
 }
 
 func (ck *CommandKernel) serviceAdmissions(quantum int) bool {
-	if ck.admissionServiceGate != nil {
-		select {
-		case <-ck.admissionServiceGate:
-		default:
-			return false
-		}
-	}
 	var grants [4]lifecycle.AdmissionGrant
 	count, more, err := ck.admission.TakeGrants(quantum, &grants)
 	if err != nil {

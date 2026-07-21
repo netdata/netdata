@@ -48,7 +48,7 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	require.NoError(t, err)
 	kernel, err := jobmgr.NewCommandKernel(
 		run, admission, uids, tasks, frames, clock,
-		make(chan lifecycle.AdmissionGrant, 1), nil,
+		make(chan lifecycle.AdmissionGrant, 1),
 		jobmgr.RunShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
 		jobmgr.RunFinalizerFunc(func(context.Context, uint64) error { return nil }),
 		catalog,
@@ -579,7 +579,7 @@ func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmg
 	require.NoError(t, err)
 	kernel, err := jobmgr.NewCommandKernel(
 		run, admission, uids, tasks, frames, clock,
-		make(chan lifecycle.AdmissionGrant, 1), nil,
+		make(chan lifecycle.AdmissionGrant, 1),
 		jobmgr.RunShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
 		jobmgr.RunFinalizerFunc(func(context.Context, uint64) error { return nil }),
 		catalog,

@@ -476,8 +476,6 @@ func TestWorkPlanRejectsUnboundedClaims(t *testing.T) {
 
 func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
 	kernel, run, admission, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	gate := make(chan struct{})
-	kernel.admissionServiceGate = gate
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -503,7 +501,6 @@ func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
 	default:
 	}
 
-	close(gate)
 	kernel.serviceAdmissions(1)
 	select {
 	case err := <-submitted:
@@ -516,10 +513,20 @@ func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
 func TestKernelCancelledSubmitReleasesUngrantableAdmission(t *testing.T) {
 	kernel, run, admission, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	catalog := testFunctionCatalogFor(t, kernel)
-	gate := make(chan struct{})
-	kernel.admissionServiceGate = gate
 
 	require.NoError(t, run.OpenAdmission())
+	blocker := admission.RequestOrdinary(
+		run.Generation(),
+		lifecycle.AdmissionLaneRef{Slot: ^uint32(0), Generation: 1},
+		lifecycle.OrdinaryBudgetBytes-1,
+	)
+	require.NoError(t, blocker.Rejected)
+	var grants [4]lifecycle.AdmissionGrant
+	count, more, err := admission.TakeGrants(1, &grants)
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+	require.False(t, more)
+	require.Equal(t, blocker.Ref, grants[0].Ref)
 
 	startKernelLoop(t, kernel)
 
@@ -544,7 +551,10 @@ func TestKernelCancelledSubmitReleasesUngrantableAdmission(t *testing.T) {
 	}
 
 	census := admission.Census()
-	require.False(t, census.ActiveRecords != 0 || census.OrdinaryWaiting != 0)
+	require.False(t, census.ActiveRecords != 1 || census.OrdinaryWaiting != 0 || census.OrdinaryGranted != 1)
+
+	_, err = admission.ReleaseOrdinary(blocker.Ref)
+	require.NoError(t, err)
 
 	kernel.Stop()
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
@@ -2350,7 +2360,7 @@ func TestKernelRejectsMissingRunFinalizer(t *testing.T) {
 
 	_, newCommandKernelErr := NewCommandKernel(
 		run, admission, uids, tasks, frames, lifecycle.RealClock{},
-		make(chan lifecycle.AdmissionGrant, 1), nil,
+		make(chan lifecycle.AdmissionGrant, 1),
 		newNoopRunShutdownBarrier(), nil,
 		newTestFunctionCatalog(planner),
 	)
@@ -2455,7 +2465,7 @@ func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing
 	grants := make(chan lifecycle.AdmissionGrant, 1)
 	planner := stoppedKernelPlanner{}
 	kernel, err := NewCommandKernel(
-		run, admission, uids, tasks, frames, lifecycle.RealClock{}, grants, nil,
+		run, admission, uids, tasks, frames, lifecycle.RealClock{}, grants,
 		newNoopRunShutdownBarrier(), newNoopRunFinalizer(),
 		newTestFunctionCatalog(planner),
 	)
@@ -3245,7 +3255,7 @@ func newKernelWithClockFinalizerCatalogAndTimeout(t *testing.T, planner testPlan
 	require.NoError(t, err)
 	kernel, err := NewCommandKernel(
 		run, admission, uids, tasks, frames, clock,
-		make(chan lifecycle.AdmissionGrant, 1), nil,
+		make(chan lifecycle.AdmissionGrant, 1),
 		newNoopRunShutdownBarrier(), finalizer,
 		functionCatalog,
 	)

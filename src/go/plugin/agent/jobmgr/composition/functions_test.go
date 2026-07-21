@@ -259,7 +259,6 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 		frames,
 		clock,
 		make(chan lifecycle.AdmissionGrant, 1),
-		nil,
 		assembly,
 		assembly,
 		assembly.Catalog(),

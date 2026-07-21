@@ -304,7 +304,6 @@ func newRunGeneration(
 		config.Frames,
 		lifecycle.RealClock{},
 		inputBodyGrants,
-		nil,
 		functions,
 		joinedRunFinalizer{
 			functions: functions,
