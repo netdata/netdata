@@ -174,8 +174,6 @@ type commandLane struct {
 	current            lifecycle.ReadyResource    // live ReadyResource published on this lane; nil while stopping/absent
 	currentStopping    bool                       // a stop/transaction detached current; a Stop task is in flight
 	retiringIdentity   lifecycle.ResourceIdentity // resource stopped, finalize pending (exclusive with current)
-	installPlanned     bool                       // an ordinary install occupies the lane
-	stopPlanned        bool                       // an ordinary stop occupies the lane
 	transactionPlanned int                        // count of in-flight resource transactions on the lane
 	shutdownRequest    lifecycle.TaskRequestRef   // task-request ref for the lane's shutdown stop
 	shutdownTask       lifecycle.TaskRef          // task ref for the lane's shutdown stop
@@ -518,10 +516,6 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		ck.completeResourceTransactionTask(operation, completion)
 		return
 	}
-	if operation.plan.Resource != nil {
-		ck.completeResourceTask(operation, completion)
-		return
-	}
 	if operation.cancelled &&
 		operation.Response == lifecycle.ResponseOpen &&
 		!operation.controlQueued {
@@ -544,49 +538,6 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 			status = lifecycle.ControlInternal
 		}
 		ck.enqueueControl(operation, status)
-	}
-	if err := ck.sendOperationAction(operation, action); err != nil {
-		ck.run.Dirty(err)
-	}
-}
-
-func (ck *CommandKernel) completeResourceTask(operation *commandOperation, completion lifecycle.TaskCompletion) {
-	kind := lifecycle.TaskActionDispose
-	if completion.Err == nil {
-		switch operation.plan.Resource.Action {
-		case ResourceInstall:
-			if completion.Kind != lifecycle.TaskOutcomePreparedResource {
-				ck.run.Dirty(errors.New("jobmgr kernel: install task returned the wrong outcome"))
-				return
-			}
-			if !operation.cancelled &&
-				!operation.TimedOut() &&
-				ck.ownershipActionAllowed(operation) {
-				kind = lifecycle.TaskActionAcceptStart
-			}
-		case ResourceStop:
-			if completion.Kind != lifecycle.TaskOutcomeReadyResource {
-				ck.run.Dirty(errors.New("jobmgr kernel: stop task returned the wrong outcome"))
-				return
-			}
-			kind = lifecycle.TaskActionStopResource
-		default:
-			ck.run.Dirty(errors.New("jobmgr kernel: unknown resource completion"))
-			return
-		}
-	}
-	if completion.Err != nil {
-		operation.terminalErr = errors.Join(
-			operation.terminalErr,
-			completion.Err,
-		)
-		if !ck.isStoppingCauseCancellation(operation, completion.Err) {
-			ck.run.Dirty(completion.Err)
-		}
-	}
-	action := lifecycle.TaskAction{Ref: completion.Ref, Sequence: completion.Sequence + 1, Kind: kind}
-	if kind == lifecycle.TaskActionAcceptStart {
-		action.ExpectedGeneration = operation.resourceGeneration
 	}
 	if err := ck.sendOperationAction(operation, action); err != nil {
 		ck.run.Dirty(err)
@@ -764,8 +715,7 @@ func (ck *CommandKernel) sendOperationAction(
 	if operation == nil || !action.Ref.Valid() {
 		return errors.New("jobmgr kernel: invalid operation action")
 	}
-	ownershipEntry := action.Kind == lifecycle.TaskActionAcceptStart ||
-		action.Kind == lifecycle.TaskActionApplyResourceTransaction
+	ownershipEntry := action.Kind == lifecycle.TaskActionApplyResourceTransaction
 	if ownershipEntry &&
 		!operation.ownershipChain &&
 		!ck.ownershipActionAllowed(operation) {
@@ -808,30 +758,6 @@ func (ck *CommandKernel) ownershipActionAllowed(
 		operation != nil &&
 		operation.parent != nil &&
 		operation.parent.ownershipChain
-}
-
-func (ck *CommandKernel) protectExecutingResourceStop(
-	operation *commandOperation,
-) error {
-	if operation == nil || !resourceStopOperation(operation) ||
-		operation.Child != lifecycle.ChildExecuting {
-		return errors.New(
-			"jobmgr kernel: invalid resource-stop continuation",
-		)
-	}
-	if operation.ownershipChain {
-		return errors.New(
-			"jobmgr kernel: duplicate resource-stop continuation",
-		)
-	}
-	if !ck.ownershipActionAllowed(operation) {
-		return errors.New(
-			"jobmgr kernel: resource-stop action admission closed",
-		)
-	}
-	operation.ownershipChain = true
-	ck.ownershipChains++
-	return nil
 }
 
 func (ck *CommandKernel) restoreTransactionOutcome(
@@ -1137,10 +1063,6 @@ func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 		ck.acknowledgeResourceTransactionTask(operation, ack)
 		return
 	}
-	if operation.plan.Resource != nil {
-		ck.acknowledgeResourceTask(operation, ack)
-		return
-	}
 	if ack.Err != nil {
 		operation.PoisonResponse()
 		ck.run.Dirty(ack.Err)
@@ -1266,91 +1188,6 @@ func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 	ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 }
 
-func (ck *CommandKernel) acknowledgeResourceTask(operation *commandOperation, ack lifecycle.TaskAcknowledgement) {
-	if ack.Err != nil {
-		ck.run.Dirty(ack.Err)
-		if ack.Kind == lifecycle.TaskActionStopResource || ack.Kind == lifecycle.TaskActionFinalizeResource || ack.Kind == lifecycle.TaskActionDispose {
-			return
-		}
-		if ack.Kind == lifecycle.TaskActionAcceptStart || ack.Kind == lifecycle.TaskActionPublishResource {
-			action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionDispose}
-			if err := ck.sendOperationAction(operation, action); err != nil {
-				ck.run.Dirty(err)
-			}
-			return
-		}
-		ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
-		return
-	}
-	lane := operation.lane
-	switch ack.Kind {
-	case lifecycle.TaskActionAcceptStart:
-		if operation.cancelled ||
-			operation.TimedOut() ||
-			!ck.ownershipActionAllowed(operation) {
-			action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionDispose}
-			if err := ck.sendOperationAction(operation, action); err != nil {
-				ck.run.Dirty(err)
-			}
-			return
-		}
-		if lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || lane.retiringIdentity.Valid() {
-			ck.run.Dirty(errors.New("jobmgr kernel: resource publication found a nonempty current slot"))
-			return
-		}
-		action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionPublishResource}
-		if err := ck.sendOperationAction(operation, action); err != nil {
-			ck.run.Dirty(err)
-		}
-	case lifecycle.TaskActionPublishResource:
-		if lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || lane.retiringIdentity.Valid() {
-			ck.run.Dirty(errors.New("jobmgr kernel: resource publication found a nonempty current slot"))
-			return
-		}
-		expected := lifecycle.ResourceIdentity{ID: operation.plan.Resource.ID, Generation: operation.resourceGeneration}
-		resource, err := ck.tasks.TakePublishedReadyResource(ack.Ref, ack.Sequence, expected)
-		if err != nil {
-			ck.run.Dirty(err)
-			action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionDispose}
-			if actionErr := ck.sendOperationAction(operation, action); actionErr != nil {
-				ck.run.Dirty(actionErr)
-			}
-			return
-		}
-		identity := expected
-		lane.current = resource
-		lane.currentIdentity = identity
-		lane.resourceSource = operation.Source
-		ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
-	case lifecycle.TaskActionStopResource:
-		identity := lane.currentIdentity
-		if !lane.currentStopping || lane.current != nil || identity.ID != operation.plan.Resource.ID || identity.Generation != operation.resourceGeneration || lane.retiringIdentity.Valid() {
-			ck.run.Dirty(errors.New("jobmgr kernel: stopped resource differs from current slot"))
-			return
-		}
-		lane.currentIdentity = lifecycle.ResourceIdentity{}
-		lane.currentStopping = false
-		lane.retiringIdentity = identity
-		action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionFinalizeResource}
-		if err := ck.sendOperationAction(operation, action); err != nil {
-			ck.run.Dirty(err)
-		}
-	case lifecycle.TaskActionFinalizeResource:
-		identity := lane.retiringIdentity
-		if lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || identity.ID != operation.plan.Resource.ID || identity.Generation != operation.resourceGeneration {
-			ck.run.Dirty(errors.New("jobmgr kernel: finalized resource differs from retiring slot"))
-			return
-		}
-		lane.retiringIdentity = lifecycle.ResourceIdentity{}
-		lane.resourceSource = 0
-		ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
-	case lifecycle.TaskActionDispose:
-		ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
-	default:
-		ck.run.Dirty(errors.New("jobmgr kernel: unexpected resource acknowledgement"))
-	}
-}
-
 func (ck *CommandKernel) sendResourceTermination(operation *commandOperation, ref lifecycle.TaskRef, sequence uint8) {
 	termination := lifecycle.TaskAction{Ref: ref, Sequence: sequence, Kind: lifecycle.TaskActionTerminate}
 	if err := ck.sendOperationAction(operation, termination); err != nil {
@@ -1420,13 +1257,11 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 	operation.cancelled = true
 	switch operation.Child {
 	case lifecycle.ChildExecuting:
-		if !resourceStopOperation(operation) {
-			if err := ck.tasks.CancelWithCause(
-				operation.Task,
-				ck.run.StoppingCause(),
-			); err != nil {
-				return err
-			}
+		if err := ck.tasks.CancelWithCause(
+			operation.Task,
+			ck.run.StoppingCause(),
+		); err != nil {
+			return err
 		}
 		if operation.Response != lifecycle.ResponseNotRequired &&
 			!operation.plan.CooperativeCancel &&
@@ -1484,12 +1319,6 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 		return errors.New("jobmgr kernel: invalid shutdown child state")
 	}
 	return nil
-}
-
-func resourceStopOperation(operation *commandOperation) bool {
-	return operation != nil &&
-		operation.plan.Resource != nil &&
-		operation.plan.Resource.Action == ResourceStop
 }
 
 func cancellationControl(operation *commandOperation) lifecycle.ControlStatus {

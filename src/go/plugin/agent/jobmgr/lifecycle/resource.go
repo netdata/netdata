@@ -12,7 +12,6 @@ type TaskOutcomeKind uint8
 const (
 	TaskOutcomeNone TaskOutcomeKind = iota
 	TaskOutcomeFrame
-	TaskOutcomePreparedResource
 	TaskOutcomeReadyResource
 	TaskOutcomePreparedResourceTransaction
 	TaskOutcomeAppliedResourceTransaction
@@ -21,7 +20,6 @@ const (
 type TaskOutcome struct {
 	kind        TaskOutcomeKind                // discriminant selecting which payload field is set
 	frame       SealedResult                   // sealed result (Frame / applied transaction) payload
-	prepared    PreparedResource               // prepared-resource payload
 	ready       ReadyResource                  // ready-resource payload
 	transaction PreparedResourceTransaction    // prepared-resource-transaction payload
 	scope       ResourceTransactionScope       // transaction scope (transaction kinds)
@@ -39,11 +37,6 @@ func NewFrameOutcome(result SealedResult) (TaskOutcome, error) {
 		return TaskOutcome{}, err
 	}
 	return TaskOutcome{kind: TaskOutcomeFrame, frame: result}, nil
-}
-
-func preparedResourceOutcome(resource PreparedResource, identity ResourceIdentity) (TaskOutcome, error) {
-	outcome := TaskOutcome{kind: TaskOutcomePreparedResource, prepared: resource, identity: identity}
-	return outcome, outcome.validate()
 }
 
 func preparedResourceTransactionOutcome(
@@ -96,8 +89,7 @@ func (to TaskOutcome) ReadyResource() (ReadyResource, bool) {
 }
 
 func (to TaskOutcome) ResourceIdentity() (ResourceIdentity, bool) {
-	return to.identity, (to.kind == TaskOutcomePreparedResource ||
-		to.kind == TaskOutcomeReadyResource ||
+	return to.identity, (to.kind == TaskOutcomeReadyResource ||
 		to.kind == TaskOutcomeAppliedResourceTransaction) &&
 		to.identity.Valid()
 }
@@ -106,7 +98,6 @@ func (to TaskOutcome) validate() error {
 	switch to.kind {
 	case TaskOutcomeNone:
 		if !emptySealedResult(to.frame) ||
-			to.prepared != nil ||
 			to.ready != nil ||
 			to.transaction != nil ||
 			to.scopeSet ||
@@ -115,8 +106,7 @@ func (to TaskOutcome) validate() error {
 			return errors.New("jobmgr lifecycle: nonempty no-value outcome")
 		}
 	case TaskOutcomeFrame:
-		if to.prepared != nil ||
-			to.ready != nil ||
+		if to.ready != nil ||
 			to.transaction != nil ||
 			to.scopeSet ||
 			to.disposition != 0 ||
@@ -124,19 +114,8 @@ func (to TaskOutcome) validate() error {
 			return errors.New("jobmgr lifecycle: mixed frame outcome")
 		}
 		return to.frame.validate()
-	case TaskOutcomePreparedResource:
-		if !emptySealedResult(to.frame) ||
-			to.prepared == nil ||
-			to.ready != nil ||
-			to.transaction != nil ||
-			to.scopeSet ||
-			to.disposition != 0 ||
-			!to.identity.Valid() {
-			return errors.New("jobmgr lifecycle: invalid prepared resource outcome")
-		}
 	case TaskOutcomeReadyResource:
 		if !emptySealedResult(to.frame) ||
-			to.prepared != nil ||
 			to.ready == nil ||
 			to.transaction != nil ||
 			to.scopeSet ||
@@ -146,7 +125,6 @@ func (to TaskOutcome) validate() error {
 		}
 	case TaskOutcomePreparedResourceTransaction:
 		if !emptySealedResult(to.frame) ||
-			to.prepared != nil ||
 			to.ready != nil ||
 			to.transaction == nil ||
 			!to.scopeSet ||
@@ -156,8 +134,7 @@ func (to TaskOutcome) validate() error {
 			return errors.New("jobmgr lifecycle: invalid prepared resource transaction outcome")
 		}
 	case TaskOutcomeAppliedResourceTransaction:
-		if to.prepared != nil ||
-			to.transaction != nil ||
+		if to.transaction != nil ||
 			!to.scopeSet ||
 			!to.scope.Valid() ||
 			!to.disposition.Valid() {
@@ -205,33 +182,11 @@ func (to TaskOutcome) validate() error {
 func (to TaskOutcome) empty() bool {
 	return to.kind == TaskOutcomeNone &&
 		emptySealedResult(to.frame) &&
-		to.prepared == nil &&
 		to.ready == nil &&
 		to.transaction == nil &&
 		!to.scopeSet &&
 		to.disposition == 0 &&
 		!to.identity.Valid()
-}
-
-func preparedResourceIdentity(resource PreparedResource) (identity ResourceIdentity, err error) {
-	if resource == nil {
-		return ResourceIdentity{}, errors.New("jobmgr lifecycle: nil prepared resource")
-	}
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			identity = ResourceIdentity{}
-			err = fmt.Errorf(
-				"%w in prepared resource identity: %v",
-				ErrTaskPanic,
-				recovered,
-			)
-		}
-	}()
-	identity = resource.Identity()
-	if !identity.Valid() {
-		return ResourceIdentity{}, errors.New("jobmgr lifecycle: invalid prepared resource identity")
-	}
-	return identity, nil
 }
 
 func readyResourceIdentity(resource ReadyResource) (identity ResourceIdentity, err error) {

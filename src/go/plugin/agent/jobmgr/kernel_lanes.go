@@ -43,7 +43,6 @@ func (ck *CommandKernel) releaseUnusedLane(lane *commandLane) {
 		lane.tail != nil || lane.active != nil ||
 		lane.continuationTail != nil || lane.ready ||
 		lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || lane.retiringIdentity.Valid() ||
-		lane.installPlanned || lane.stopPlanned ||
 		lane.shutdownRequest.Valid() || lane.shutdownTask.Valid() || lane.shutdownAction != 0 {
 		return
 	}

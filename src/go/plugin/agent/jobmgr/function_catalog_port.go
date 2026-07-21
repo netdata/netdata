@@ -111,7 +111,7 @@ func (fcd FunctionCatalogDecision) validate() error {
 	if fcd.Rejected != 0 {
 		if !fcd.Rejected.Valid() || fcd.Lease.Valid() ||
 			fcd.ResourceID != "" ||
-			fcd.Plan.Work != nil || fcd.Plan.Resource != nil ||
+			fcd.Plan.Work != nil ||
 			fcd.Plan.Transaction != nil ||
 			len(fcd.Plan.Claims) != 0 ||
 			fcd.Plan.OwnedBytes != 0 ||
@@ -124,8 +124,7 @@ func (fcd FunctionCatalogDecision) validate() error {
 	if !fcd.Lease.Valid() {
 		return errors.New("jobmgr kernel: resolved Function has no invocation lease")
 	}
-	if fcd.Plan.Resource != nil ||
-		fcd.Plan.NoResponse {
+	if fcd.Plan.NoResponse {
 		return errors.New("jobmgr kernel: Function catalog returned internal work")
 	}
 	if fcd.Plan.Transaction != nil &&

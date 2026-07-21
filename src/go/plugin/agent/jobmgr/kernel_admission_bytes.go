@@ -24,16 +24,6 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 		return 0, errors.New("jobmgr kernel: plan-owned bytes do not self-fit admission")
 	}
 	bytes += plan.OwnedBytes
-	if plan.Resource != nil && plan.Resource.Action == ResourceInstall {
-		persistent := plan.Resource.Permit.Bytes()
-		if !validPersistentAdmission(
-			plan.Resource.Permit,
-			lifecycle.OrdinaryBudgetBytes-bytes,
-		) {
-			return 0, errors.New("jobmgr kernel: long-lived resource does not self-fit admission")
-		}
-		bytes += persistent
-	}
 	if plan.Transaction != nil && plan.Transaction.AllocateSuccessor {
 		persistent := plan.Transaction.Permit.Bytes()
 		if !validPersistentAdmission(

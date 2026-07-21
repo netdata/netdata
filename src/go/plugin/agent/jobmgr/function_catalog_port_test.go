@@ -58,7 +58,12 @@ func TestFunctionCatalogDecisionValidate(t *testing.T) {
 		"resolved internal work": {
 			decision: FunctionCatalogDecision{
 				Lease: validLease,
-				Plan:  WorkPlan{NoResponse: true, Resource: &ResourcePlan{Action: ResourceStop, ID: "lane"}},
+				Plan: WorkPlan{
+					NoResponse: true,
+					Work: func(context.Context) (lifecycle.TaskOutcome, error) {
+						return lifecycle.NoValueOutcome(), nil
+					},
+				},
 			},
 			wantErr: true,
 		},

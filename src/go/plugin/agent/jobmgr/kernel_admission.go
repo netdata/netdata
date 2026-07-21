@@ -14,19 +14,12 @@ import (
 
 func prepareOwnedJobPlan(request Request, plan WorkPlan) (WorkPlan, error) {
 	plan.Claims = slices.Clone(plan.Claims)
-	if plan.Resource != nil {
-		resource := *plan.Resource
-		plan.Resource = &resource
-	}
 	if plan.Transaction != nil {
 		transaction := *plan.Transaction
 		plan.Transaction = &transaction
 	}
 	if err := plan.validate(); err != nil {
 		return WorkPlan{}, err
-	}
-	if plan.Resource != nil && plan.Resource.ID != request.LaneKey {
-		return WorkPlan{}, errors.New("jobmgr kernel: resource identity differs from lane")
 	}
 	if plan.Transaction != nil && plan.Transaction.ID != request.LaneKey {
 		return WorkPlan{}, errors.New("jobmgr kernel: transaction identity differs from lane")
@@ -151,7 +144,7 @@ func (ck *CommandKernel) admitSubmission(
 			functionInvocation: functionInvocation,
 		}
 	}
-	if plan.Resource != nil || plan.Transaction != nil {
+	if plan.Transaction != nil {
 		laneID = resourceCommandLaneKey(request.LaneKey)
 	}
 	if parent != nil &&
@@ -166,46 +159,12 @@ func (ck *CommandKernel) admitSubmission(
 		)
 	}
 	lane := ck.lanes[laneID]
-	if resource := plan.Resource; resource != nil {
-		if lane != nil && lane.transactionPlanned != 0 {
-			_ = ck.uids.Complete(request.UID, false, now)
-			_ = ck.abortRequestInputBody(request)
-			return errors.New(
-				"jobmgr kernel: internal resource plan overlaps a public resource transaction",
-			)
-		}
-		switch resource.Action {
-		case ResourceInstall:
-			if lane != nil && (lane.installPlanned || ((lane.current != nil || lane.currentIdentity.Valid()) && !lane.stopPlanned && !lane.currentStopping && !lane.retiringIdentity.Valid())) {
-				_ = ck.uids.Complete(request.UID, false, now)
-				_ = ck.abortRequestInputBody(request)
-				return errors.New("jobmgr kernel: install is not sequenced after an exact stop")
-			}
-		case ResourceStop:
-			if lane == nil || lane.stopPlanned || lane.currentStopping || lane.retiringIdentity.Valid() ||
-				(lane.current == nil && !lane.currentIdentity.Valid() && !lane.installPlanned) {
-				err := errors.Join(ck.uids.Complete(request.UID, false, now), ck.abortRequestInputBody(request))
-				if err == nil {
-					if submissionResult != nil {
-						submissionResult <- nil
-					}
-					if terminalResult != nil {
-						terminalResult <- nil
-					}
-				}
-				return err
-			}
-		}
-	}
 	if plan.Transaction != nil && lane != nil &&
-		(lane.installPlanned ||
-			lane.stopPlanned ||
-			lane.currentStopping ||
-			lane.retiringIdentity.Valid()) {
+		(lane.currentStopping || lane.retiringIdentity.Valid()) {
 		_ = ck.uids.Complete(request.UID, false, now)
 		_ = ck.abortRequestInputBody(request)
 		return errors.New(
-			"jobmgr kernel: resource transaction overlaps internal resource authority",
+			"jobmgr kernel: resource transaction overlaps retiring resource authority",
 		)
 	}
 	if lane == nil {
@@ -311,14 +270,6 @@ func (ck *CommandKernel) admitSubmission(
 	ck.observeRuntimeOperations()
 	ck.byAdmission[requested.Ref] = operation
 	releaseFunctionInvocation = false
-	if resource := plan.Resource; resource != nil {
-		switch resource.Action {
-		case ResourceInstall:
-			lane.installPlanned = true
-		case ResourceStop:
-			lane.stopPlanned = true
-		}
-	}
 	if plan.Transaction != nil {
 		lane.transactionPlanned++
 	}

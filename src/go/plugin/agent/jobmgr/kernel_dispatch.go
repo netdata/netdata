@@ -73,53 +73,6 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 		if operation.Child == lifecycle.ChildDeadlineStartPending {
 			taskPlan.InitialCancellation = context.DeadlineExceeded
 		}
-		if resource := operation.plan.Resource; resource != nil {
-			switch resource.Action {
-			case ResourceInstall:
-				if lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || lane.retiringIdentity.Valid() {
-					ck.run.Dirty(errors.New("jobmgr kernel: install encountered a live or retiring resource"))
-					return false
-				}
-				ck.nextResourceGeneration++
-				generation := ck.nextResourceGeneration
-				if generation == 0 {
-					ck.run.Dirty(errors.New("jobmgr kernel: resource generation wrapped"))
-					return false
-				}
-				operation.resourceGeneration = generation
-				prepare := resource.Prepare
-				identity := lifecycle.ResourceIdentity{ID: resource.ID, Generation: generation}
-				permitTaskPlan, err := lifecycle.NewPreparedResourcePermitTaskPlan(
-					operation.Source, operation.request.Deadline, phaseLimit,
-					ck.admission, operation.admission, identity, resource.Permit,
-					func(ctx context.Context, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResource, error) {
-						return prepare(ctx, generation, permit)
-					},
-				)
-				if err != nil {
-					ck.run.Dirty(err)
-					return false
-				}
-				taskPlan = permitTaskPlan
-			case ResourceStop:
-				if lane.current == nil || !lane.currentIdentity.Valid() || lane.currentIdentity.ID != resource.ID || lane.currentStopping || lane.retiringIdentity.Valid() {
-					ck.run.Dirty(errors.New("jobmgr kernel: stop encountered no exact current resource"))
-					return false
-				}
-				operation.resourceGeneration = lane.currentIdentity.Generation
-				readyPlan, err := lifecycle.NewReadyResourceTaskPlan(
-					operation.Source, operation.request.Deadline, phaseLimit, lane.current, lane.currentIdentity,
-				)
-				if err != nil {
-					ck.run.Dirty(err)
-					return false
-				}
-				taskPlan = readyPlan
-			default:
-				ck.run.Dirty(errors.New("jobmgr kernel: unknown resource action at dispatch"))
-				return false
-			}
-		}
 		if transaction := operation.plan.Transaction; transaction != nil {
 			if lane.currentStopping ||
 				lane.retiringIdentity.Valid() ||
@@ -217,10 +170,6 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 			ck.markReady(lane)
 			return false
 		}
-		if operation.plan.Resource != nil && operation.plan.Resource.Action == ResourceStop {
-			lane.current = nil
-			lane.currentStopping = true
-		}
 		if operation.plan.Transaction != nil && operation.transactionScope.Current.Valid() {
 			lane.current = nil
 			lane.currentStopping = true
@@ -302,12 +251,6 @@ func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
 		if err := operation.StartChild(start.Task); err != nil {
 			ck.run.Dirty(err)
 			return more
-		}
-		if resourceStopOperation(operation) {
-			if err := ck.protectExecutingResourceStop(operation); err != nil {
-				ck.run.Dirty(err)
-				return more
-			}
 		}
 		ck.tasksByRef[start.Task] = operation
 	}

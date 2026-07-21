@@ -48,8 +48,6 @@ type TaskActionKind uint8
 
 const (
 	TaskActionEncodeWrite TaskActionKind = iota + 1
-	TaskActionAcceptStart
-	TaskActionPublishResource
 	TaskActionStopResource
 	TaskActionFinalizeResource
 	TaskActionApplyResourceTransaction
@@ -59,12 +57,11 @@ const (
 )
 
 type TaskAction struct {
-	Ref                TaskRef        // target task ref
-	Sequence           uint8          // phase-action sequence number
-	Kind               TaskActionKind // action kind (accept-start / commit / apply / dispose)
-	UID                string         // operation UID for correlation
-	Expiry             int64          // result expiry stamp
-	ExpectedGeneration uint64         // generation the action expects the resource to match
+	Ref      TaskRef        // target task ref
+	Sequence uint8          // phase-action sequence number
+	Kind     TaskActionKind // action kind (encode / resource lifecycle / cleanup / terminate)
+	UID      string         // operation UID for correlation
+	Expiry   int64          // result expiry stamp
 }
 
 type TaskAcknowledgement struct {
@@ -372,8 +369,7 @@ func (ts *TaskSupervisor) Pending() int {
 }
 
 func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial TaskOutcome) (TaskRef, error) {
-	hasDirectWork := plan.Work != nil ||
-		plan.permitWork != nil
+	hasDirectWork := plan.Work != nil
 	if plan.transactionWork == nil {
 		if (hasDirectWork != initial.empty()) ||
 			plan.initialReady != nil ||
@@ -398,47 +394,6 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 			ts.recycleUnusedSlot(index, slot)
 		}
 	}()
-	if plan.permitWork != nil {
-		permit, err := ts.IssueLongLivedPermit(plan.permitAdmission, plan.permitAdmissionRef, plan.permitOwner, plan.permitPlan)
-		if err != nil {
-			return TaskRef{}, err
-		}
-		permitWork := plan.permitWork
-		permitOwner := plan.permitOwner
-		plan.Work = func(
-			ctx context.Context,
-		) (outcome TaskOutcome, resultErr error) {
-			defer func() {
-				if recovered := recover(); recovered != nil {
-					outcome = TaskOutcome{}
-					resultErr = errors.Join(
-						fmt.Errorf(
-							"%w in prepared-resource work: %v",
-							ErrTaskPanic,
-							recovered,
-						),
-						permit.AbortUnused(),
-					)
-				}
-			}()
-			resource, workErr := permitWork(ctx, permit)
-			if resource == nil {
-				return TaskOutcome{}, errors.Join(workErr, permit.AbortUnused())
-			}
-			identity, identityErr := preparedResourceIdentity(resource)
-			if identityErr != nil || identity != permitOwner {
-				outcome, outcomeErr := preparedResourceOutcome(resource, permitOwner)
-				return outcome, errors.Join(workErr, identityErr, outcomeErr, errors.New("jobmgr task supervisor: prepared resource identity differs from permit owner"))
-			}
-			outcome, outcomeErr := preparedResourceOutcome(resource, identity)
-			return outcome, errors.Join(workErr, outcomeErr)
-		}
-		plan.permitAdmission = nil
-		plan.permitAdmissionRef = AdmissionRef{}
-		plan.permitOwner = ResourceIdentity{}
-		plan.permitPlan = LongLivedPlan{}
-		plan.permitWork = nil
-	}
 	if plan.transactionWork != nil {
 		var current ReadyResource
 		if plan.transactionScope.Current.Valid() {
@@ -658,16 +613,11 @@ func (ts *TaskSupervisor) SendAction(action TaskAction) error {
 	if slot.joined || slot.actionPending || action.Sequence != slot.sequence+1 || action.Sequence > slot.maxPhaseTransitions {
 		return errors.New("jobmgr task supervisor: stale, duplicate, or wrong-sequence phase action")
 	}
-	if action.Kind == TaskActionEncodeWrite && (action.UID == "" || action.Expiry <= 0 || action.ExpectedGeneration != 0) {
+	if action.Kind == TaskActionEncodeWrite && (action.UID == "" || action.Expiry <= 0) {
 		return errors.New("jobmgr task supervisor: invalid encode/write action")
 	}
-	if action.Kind == TaskActionAcceptStart &&
-		(action.ExpectedGeneration == 0 || action.UID != "" || action.Expiry != 0) {
-		return errors.New("jobmgr task supervisor: invalid generation-bound action")
-	}
 	if action.Kind != TaskActionEncodeWrite &&
-		action.Kind != TaskActionAcceptStart &&
-		(action.UID != "" || action.Expiry != 0 || action.ExpectedGeneration != 0) {
+		(action.UID != "" || action.Expiry != 0) {
 		return errors.New("jobmgr task supervisor: unexpected action payload")
 	}
 	slot.actionPending = true
@@ -784,22 +734,6 @@ func (ts *TaskSupervisor) PreflightResult(ref TaskRef, uid string, expiry int64)
 	return ResultPreflight{PlanBytes: int64(len(slot.outcome.frame.payload)), FrameBytes: int64(encodedBytes)}, nil
 }
 
-func (ts *TaskSupervisor) TakePublishedReadyResource(ref TaskRef, sequence uint8, expected ResourceIdentity) (ReadyResource, error) {
-	slot, err := ts.slot(ref)
-	if err != nil {
-		return nil, err
-	}
-	if slot.actionPending || slot.sequence != sequence || slot.outcome.kind != TaskOutcomeReadyResource || slot.outcome.ready == nil {
-		return nil, errors.New("jobmgr task supervisor: ready resource is unavailable for publication")
-	}
-	resource := slot.outcome.ready
-	if !expected.Valid() || slot.outcome.identity != expected {
-		return nil, errors.New("jobmgr task supervisor: ready resource identity differs")
-	}
-	slot.outcome = TaskOutcome{}
-	return resource, nil
-}
-
 func (ts *TaskSupervisor) TakeAppliedResourceTransaction(
 	ref TaskRef,
 	sequence uint8,
@@ -908,35 +842,6 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 				}
 			}
 			slot.outcome = TaskOutcome{}
-		case TaskActionAcceptStart:
-			if slot.outcome.kind != TaskOutcomePreparedResource || slot.outcome.prepared == nil {
-				ack.Err = errors.New("jobmgr task child: accept/start without prepared resource")
-			} else {
-				prepared := slot.outcome.prepared
-				identity := slot.outcome.identity
-				ready, acceptErr, panicked := runPreparedAcceptStart(
-					context.WithoutCancel(ctx),
-					prepared,
-					action.ExpectedGeneration,
-				)
-				if acceptErr != nil {
-					ack.Err = acceptErr
-					if ready != nil {
-						slot.outcome, ack.Err = readyResourceOutcome(ready, identity)
-						ack.Err = errors.Join(acceptErr, ack.Err)
-					} else if !panicked {
-						slot.outcome = TaskOutcome{}
-					}
-				} else {
-					slot.outcome, ack.Err = readyResourceOutcome(ready, identity)
-				}
-			}
-		case TaskActionPublishResource:
-			if slot.outcome.kind != TaskOutcomeReadyResource || slot.outcome.ready == nil {
-				ack.Err = errors.New("jobmgr task child: publish without ready resource")
-			} else {
-				ack.Err = callReadyResource("publish", slot.outcome.ready.Publish)
-			}
 		case TaskActionStopResource:
 			if slot.outcome.kind != TaskOutcomeReadyResource || slot.outcome.ready == nil {
 				ack.Err = errors.New("jobmgr task child: stop without ready resource")
@@ -1097,18 +1002,6 @@ func runTaskWork(ctx context.Context, work TaskWork) (result TaskOutcome, err er
 	return work(ctx)
 }
 
-func runPreparedAcceptStart(ctx context.Context, prepared PreparedResource, expected uint64) (ready ReadyResource, err error, panicked bool) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			ready = nil
-			err = fmt.Errorf("%w in prepared-resource accept/start: %v", ErrTaskPanic, recovered)
-			panicked = true
-		}
-	}()
-	ready, err = prepared.AcceptStart(ctx, expected)
-	return ready, err, false
-}
-
 func runPreparedResourceTransactionApply(
 	ctx context.Context,
 	transaction PreparedResourceTransaction,
@@ -1155,8 +1048,6 @@ func disposeTaskOutcome(ctx context.Context, outcome TaskOutcome, preserveContex
 	switch outcome.kind {
 	case TaskOutcomeNone, TaskOutcomeFrame:
 		return nil
-	case TaskOutcomePreparedResource:
-		return callReadyResource("dispose prepared", func() error { return outcome.prepared.Dispose(cleanupCtx) })
 	case TaskOutcomeReadyResource:
 		return callReadyResource("abort ready", func() error { return outcome.ready.AbortReady(cleanupCtx) })
 	case TaskOutcomePreparedResourceTransaction:

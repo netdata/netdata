@@ -245,100 +245,6 @@ func TestKernelShutdownBudgetBoundsProtectedOwnershipAction(t *testing.T) {
 	}
 }
 
-func TestKernelShutdownDrainsAcceptStartBeforeInheritedSeal(t *testing.T) {
-	kernel, run, _, _, tasks := newKernelWithPlanner(
-		t,
-		stoppedKernelPlanner{},
-	)
-	loop, err := NewKernelLoop(kernel.CommandKernel)
-	require.NoError(t, err)
-	require.NoError(t, loop.Start(t.Context()))
-	require.NoError(t, run.OpenAdmission())
-
-	permitPlan, err := lifecycle.NewJobLongLivedPlan(40)
-	require.NoError(t, err)
-	acceptEntered := make(chan struct{})
-	acceptRelease := make(chan struct{})
-	published := make(chan struct{})
-	submitted := make(chan error, 1)
-	go func() {
-		submitted <- kernel.SubmitPreparedAndWait(
-			context.Background(),
-			Request{
-				UID:     "shutdown-accept-start",
-				LaneKey: "shutdown-accept-start",
-				Source:  lifecycle.SourceJobManager,
-				Route:   "internal/test",
-			},
-			WorkPlan{
-				NoResponse: true,
-				Resource: &ResourcePlan{
-					Action: ResourceInstall,
-					ID:     "shutdown-accept-start",
-					Permit: permitPlan,
-					Prepare: func(
-						_ context.Context,
-						generation uint64,
-						permit lifecycle.LongLivedPermit,
-					) (lifecycle.PreparedResource, error) {
-						identity := lifecycle.ResourceIdentity{
-							ID:         "shutdown-accept-start",
-							Generation: generation,
-						}
-						return &inheritedActivationPreparedResource{
-							identity:  identity,
-							permit:    permit,
-							tasks:     tasks,
-							entered:   acceptEntered,
-							release:   acceptRelease,
-							published: published,
-						}, nil
-					},
-				},
-			},
-		)
-	}()
-
-	select {
-	case <-acceptEntered:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "AcceptStart did not reach inherited activation gate")
-	}
-	kernel.Stop()
-	shutdownCtx, cancelShutdown := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
-	defer cancelShutdown()
-	require.NoError(t, kernel.WaitShutdownStarted(shutdownCtx))
-	close(acceptRelease)
-
-	select {
-	case err := <-submitted:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "resource install did not settle")
-	}
-	select {
-	case <-published:
-	default:
-		require.FailNow(
-			t,
-			"test failed",
-			"accepted resource was disposed instead of published",
-		)
-	}
-	waitCtx, cancelWait := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
-	defer cancelWait()
-	require.NoError(t, kernel.Wait(waitCtx))
-	require.NoError(t, run.DirtyCause())
-	require.Equal(t, lifecycle.InheritedTaskCensus{}, tasks.InheritedCensus())
-	require.Equal(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
-}
-
 func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 	catalog := &shutdownActionMutationCatalog{}
 	kernel, run, admission, uids, _ :=
@@ -593,310 +499,6 @@ func (samc *shutdownActionMutationCatalog) LifecycleCensus() FunctionCatalogCens
 	}
 }
 
-type inheritedActivationPreparedResource struct {
-	identity  lifecycle.ResourceIdentity
-	permit    lifecycle.LongLivedPermit
-	tasks     *lifecycle.TaskSupervisor
-	entered   chan<- struct{}
-	release   <-chan struct{}
-	published chan<- struct{}
-}
-
-func (iapr *inheritedActivationPreparedResource) Identity() lifecycle.ResourceIdentity {
-	return iapr.identity
-}
-
-func (iapr *inheritedActivationPreparedResource) AcceptStart(
-	_ context.Context,
-	expected uint64,
-) (lifecycle.ReadyResource, error) {
-	close(iapr.entered)
-	<-iapr.release
-	if expected != iapr.identity.Generation {
-		return nil, errors.New("inherited activation generation differs")
-	}
-	if err := iapr.permit.ActivateExternal(
-		lifecycle.LongLivedEJobResources,
-	); err != nil {
-		return nil, err
-	}
-	ref, err := iapr.tasks.StartInherited(
-		context.Background(),
-		iapr.identity,
-		lifecycle.InheritedV1Runtime,
-		func(ctx context.Context) error {
-			<-ctx.Done()
-			return nil
-		},
-	)
-	if err != nil {
-		return nil, errors.Join(
-			err,
-			iapr.permit.ReleaseExternal(
-				lifecycle.LongLivedEJobResources,
-			),
-			iapr.permit.ReleaseBytes(),
-			iapr.permit.Return(),
-		)
-	}
-	return &inheritedActivationReadyResource{
-		identity:  iapr.identity,
-		permit:    iapr.permit,
-		tasks:     iapr.tasks,
-		ref:       ref,
-		published: iapr.published,
-	}, nil
-}
-
-func (iapr *inheritedActivationPreparedResource) Dispose(
-	context.Context,
-) error {
-	return iapr.permit.AbortUnused()
-}
-
-type inheritedActivationReadyResource struct {
-	identity  lifecycle.ResourceIdentity
-	permit    lifecycle.LongLivedPermit
-	tasks     *lifecycle.TaskSupervisor
-	ref       lifecycle.InheritedTaskRef
-	published chan<- struct{}
-}
-
-func (iarr *inheritedActivationReadyResource) Identity() lifecycle.ResourceIdentity {
-	return iarr.identity
-}
-
-func (iarr *inheritedActivationReadyResource) Publish() error {
-	close(iarr.published)
-	return nil
-}
-
-func (iarr *inheritedActivationReadyResource) AbortReady(
-	ctx context.Context,
-) error {
-	return iarr.stopAndRelease(ctx)
-}
-
-func (iarr *inheritedActivationReadyResource) Stop(
-	ctx context.Context,
-) error {
-	return iarr.stopInherited(ctx)
-}
-
-func (iarr *inheritedActivationReadyResource) Finalize() error {
-	return errors.Join(
-		iarr.permit.ReleaseBytes(),
-		iarr.permit.Return(),
-	)
-}
-
-func (iarr *inheritedActivationReadyResource) stopAndRelease(
-	ctx context.Context,
-) error {
-	return errors.Join(
-		iarr.stopInherited(ctx),
-		iarr.permit.ReleaseBytes(),
-		iarr.permit.Return(),
-	)
-}
-
-func (iarr *inheritedActivationReadyResource) stopInherited(
-	ctx context.Context,
-) error {
-	cancelErr := iarr.tasks.CancelInherited(iarr.ref, iarr.identity)
-	_, joinErr := iarr.tasks.JoinInherited(ctx, iarr.ref, iarr.identity)
-	releaseErr := iarr.tasks.ReleaseInherited(iarr.ref, iarr.identity)
-	return errors.Join(
-		cancelErr,
-		joinErr,
-		releaseErr,
-		iarr.permit.ReleaseExternal(
-			lifecycle.LongLivedEJobResources,
-		),
-	)
-}
-
-func TestKernelDisposesResourcePreparedAfterCancellationCut(t *testing.T) {
-	tests := map[string]struct {
-		suffix   string
-		trigger  func(*testing.T, *testCommandKernel, string)
-		shutdown bool
-	}{
-		"explicit cancellation": {
-			suffix: "cancel",
-			trigger: func(
-				t *testing.T,
-				kernel *testCommandKernel,
-				uid string,
-			) {
-				t.Helper()
-				require.NoError(t, kernel.Cancel(
-					context.Background(),
-					uid,
-				))
-			},
-		},
-		"shutdown cancellation": {
-			suffix: "shutdown",
-			trigger: func(
-				t *testing.T,
-				kernel *testCommandKernel,
-				_ string,
-			) {
-				t.Helper()
-				kernel.Stop()
-				ctx, cancel := context.WithTimeout(
-					context.Background(),
-					time.Second,
-				)
-				defer cancel()
-				require.NoError(t, kernel.WaitShutdownStarted(ctx))
-			},
-			shutdown: true,
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			kernel, run, _, _, _ := newKernelWithPlanner(
-				t,
-				stoppedKernelPlanner{},
-			)
-			loop, err := NewKernelLoop(kernel.CommandKernel)
-			require.NoError(t, err)
-			require.NoError(t, loop.Start(t.Context()))
-			require.NoError(t, run.OpenAdmission())
-
-			permitPlan, err := lifecycle.NewJobLongLivedPlan(40)
-			require.NoError(t, err)
-			uid := "prepared-after-" + test.suffix
-			preparing := make(chan struct{})
-			release := make(chan struct{})
-			accepted := make(chan struct{})
-			disposed := make(chan struct{})
-			resource := newKernelTestReadyResource(uid, nil, nil)
-			returned := make(chan error, 1)
-			go func() {
-				returned <- kernel.SubmitPreparedAndWait(
-					context.Background(),
-					Request{
-						UID:     uid,
-						LaneKey: uid,
-						Source:  lifecycle.SourceJobManager,
-						Route:   "internal/test",
-					},
-					WorkPlan{
-						NoResponse: true,
-						Resource: &ResourcePlan{
-							Action: ResourceInstall,
-							ID:     uid,
-							Permit: permitPlan,
-							Prepare: func(
-								_ context.Context,
-								generation uint64,
-								permit lifecycle.LongLivedPermit,
-							) (
-								lifecycle.PreparedResource,
-								error,
-							) {
-								close(preparing)
-								<-release
-								return &cancellationObservedPreparedResource{
-									identity: lifecycle.ResourceIdentity{
-										ID:         uid,
-										Generation: generation,
-									},
-									permit: permit, ready: resource,
-									accepted: accepted, disposed: disposed,
-								}, nil
-							},
-						},
-					},
-				)
-			}()
-			select {
-			case <-preparing:
-			case err := <-returned:
-				require.FailNowf(
-					t,
-					"test failed",
-					"resource preparation was rejected: %v",
-					err,
-				)
-			case <-time.After(time.Second):
-				require.FailNow(
-					t,
-					"test failed",
-					"resource preparation did not start",
-				)
-			}
-			test.trigger(t, kernel, uid)
-			close(release)
-
-			select {
-			case <-disposed:
-			case <-accepted:
-				require.FailNow(
-					t,
-					"test failed",
-					"cancelled resource installation was accepted",
-				)
-			case <-time.After(time.Second):
-				require.FailNow(
-					t,
-					"test failed",
-					"cancelled resource installation was not settled",
-				)
-			}
-			returnedErr := <-returned
-			require.NoError(t, returnedErr)
-			if !test.shutdown {
-				kernel.Stop()
-			}
-			require.NoError(t, kernel.Wait(context.Background()))
-			require.NoError(t, run.DirtyCause())
-		})
-	}
-}
-
-type cancellationObservedPreparedResource struct {
-	identity lifecycle.ResourceIdentity
-	permit   lifecycle.LongLivedPermit
-	ready    *kernelTestReadyResource
-	accepted chan<- struct{}
-	disposed chan<- struct{}
-}
-
-func (copr *cancellationObservedPreparedResource) Identity() lifecycle.ResourceIdentity {
-	return copr.identity
-}
-
-func (copr *cancellationObservedPreparedResource) AcceptStart(
-	_ context.Context,
-	expected uint64,
-) (lifecycle.ReadyResource, error) {
-	close(copr.accepted)
-	if expected != copr.identity.Generation {
-		return nil, errors.New(
-			"cancelled resource generation differs",
-		)
-	}
-	if err := copr.permit.ActivateExternal(
-		lifecycle.LongLivedEJobResources,
-	); err != nil {
-		return nil, err
-	}
-	copr.ready.identity = copr.identity
-	copr.ready.permit = copr.permit
-	return copr.ready, nil
-}
-
-func (copr *cancellationObservedPreparedResource) Dispose(
-	context.Context,
-) error {
-	close(copr.disposed)
-	return copr.permit.AbortUnused()
-}
-
 func atomicTransactionPlan(
 	entered chan<- struct{},
 	release <-chan struct{},
@@ -1048,86 +650,53 @@ func TestShutdownCancellationPreservesGenerationStoppingCause(t *testing.T) {
 }
 
 func TestShutdownPreparationCancellationDoesNotDirtyResource(t *testing.T) {
-	tests := map[string]struct {
-		plan func(
-			*testing.T,
-			chan<- struct{},
-			chan<- error,
-		) WorkPlan
-	}{
-		"resource": {
-			plan: func(
-				t *testing.T,
-				started chan<- struct{},
-				observed chan<- error,
-			) WorkPlan {
-				t.Helper()
-				permit, err := lifecycle.NewJobLongLivedPlan(40)
-				require.NoError(t, err)
-				return WorkPlan{
-					NoResponse: true,
-					Resource: &ResourcePlan{
-						Action: ResourceInstall,
-						ID:     "stopping-resource",
-						Permit: permit,
-						Prepare: func(
-							ctx context.Context,
-							_ uint64,
-							_ lifecycle.LongLivedPermit,
-						) (lifecycle.PreparedResource, error) {
-							close(started)
-							<-ctx.Done()
-							observed <- context.Cause(ctx)
-							return nil, ctx.Err()
-						},
-					},
-				}
+	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	loop, err := NewKernelLoop(kernel.CommandKernel)
+	require.NoError(t, err)
+	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, run.OpenAdmission())
+	started := make(chan struct{})
+	observed := make(chan error, 1)
+	returned := make(chan error, 1)
+	go func() {
+		returned <- kernel.SubmitPreparedAndWait(
+			context.Background(),
+			Request{
+				UID:     "stopping-transaction",
+				LaneKey: "stopping-transaction",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test",
 			},
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-			loop, err := NewKernelLoop(kernel.CommandKernel)
-			require.NoError(t, err)
-			require.NoError(t, loop.Start(t.Context()))
-			require.NoError(t, run.OpenAdmission())
-			started := make(chan struct{})
-			observed := make(chan error, 1)
-			returned := make(chan error, 1)
-			plan := test.plan(t, started, observed)
-			go func() {
-				returned <- kernel.SubmitPreparedAndWait(
-					context.Background(),
-					Request{
-						UID:     "stopping-" + name,
-						LaneKey: "stopping-" + name,
-						Source:  lifecycle.SourceJobManager,
-						Route:   "internal/test",
+			WorkPlan{
+				NoResponse: true,
+				Transaction: &ResourceTransactionPlan{
+					ID: "stopping-transaction",
+					Prepare: func(
+						ctx context.Context,
+						_ lifecycle.ReadyResource,
+						_ lifecycle.ResourceTransactionScope,
+						_ lifecycle.LongLivedPermit,
+					) (lifecycle.PreparedResourceTransaction, error) {
+						close(started)
+						<-ctx.Done()
+						observed <- context.Cause(ctx)
+						return nil, ctx.Err()
 					},
-					plan,
-				)
-			}()
-			<-started
+				},
+			},
+		)
+	}()
+	<-started
 
-			kernel.Stop()
-			cause := <-observed
-			returnedErr := <-returned
-			require.Same(t, run.StoppingCause(), cause)
-			stopping, ok := errors.AsType[*lifecycle.StoppingRejection](
-				returnedErr,
-			)
-			require.Truef(
-				t,
-				ok,
-				"terminal error is not a stopping rejection: %v",
-				returnedErr,
-			)
-			require.EqualValues(t, run.Generation(), stopping.Generation)
-			require.NoError(t, kernel.Wait(context.Background()))
-			require.NoError(t, run.DirtyCause())
-		})
-	}
+	kernel.Stop()
+	cause := <-observed
+	returnedErr := <-returned
+	require.Same(t, run.StoppingCause(), cause)
+	stopping, ok := errors.AsType[*lifecycle.StoppingRejection](returnedErr)
+	require.Truef(t, ok, "terminal error is not a stopping rejection: %v", returnedErr)
+	require.EqualValues(t, run.Generation(), stopping.Generation)
+	require.NoError(t, kernel.Wait(context.Background()))
+	require.NoError(t, run.DirtyCause())
 }
 
 func TestSubmitPreparedAndWaitJoinsAcceptedCancellation(t *testing.T) {

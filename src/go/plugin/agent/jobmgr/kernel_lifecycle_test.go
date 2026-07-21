@@ -586,46 +586,6 @@ func TestKernelCancelledSubmitReleasesUngrantableAdmission(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
-func TestKernelAbsentResourceStopSettlesWithoutAdmission(t *testing.T) {
-	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
-		return WorkPlan{
-			Resource:   &ResourcePlan{Action: ResourceStop, ID: route},
-			NoResponse: true,
-		}, nil
-	})
-	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
-
-	require.NoError(t, run.OpenAdmission())
-
-	startKernelLoop(t, kernel)
-
-	result := make(chan error, 1)
-	go func() {
-		result <- kernel.SubmitAndWait(context.Background(), Request{
-			UID: "absent-stop", LaneKey: "resource", Source: lifecycle.SourceJobManager, Route: "resource",
-		})
-	}()
-	select {
-	case err := <-result:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "absent resource stop did not settle")
-	}
-
-	census := admission.Census()
-	require.False(t, census.ActiveRecords != 0 || census.OrdinaryWaiting != 0 || census.OrdinaryGranted != 0)
-
-	kernel.Stop()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	require.NoError(t, kernel.Wait(ctx))
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
-	closeUIDLedger(t, uids)
-}
-
 func TestKernelTerminalNoResponseDisposalCompletesUIDOwnership(t *testing.T) {
 	kernel, run, _, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	require.NoError(t, run.OpenAdmission())
@@ -2906,9 +2866,9 @@ func TestOperationAdmissionBytesChargesDeclaredLongLivedBytes(t *testing.T) {
 			got, err := operationAdmissionBytes(
 				Request{},
 				WorkPlan{
-					Resource: &ResourcePlan{
-						Action: ResourceInstall,
-						Permit: test.permit,
+					Transaction: &ResourceTransactionPlan{
+						AllocateSuccessor: true,
+						Permit:            test.permit,
 					},
 				},
 			)
@@ -3686,30 +3646,7 @@ func (ktrsp kernelTestResourceSetPlanner) Plan(request Request) (WorkPlan, error
 	if resource == nil {
 		return WorkPlan{}, errors.New("unexpected kernel resource-set identity")
 	}
-	return WorkPlan{
-		NoResponse: true,
-		Resource: &ResourcePlan{
-			Action: ResourceInstall,
-			ID:     request.LaneKey,
-			Permit: ktrsp.permitPlan,
-			Prepare: func(
-				_ context.Context,
-				generation uint64,
-				permit lifecycle.LongLivedPermit,
-			) (lifecycle.PreparedResource, error) {
-				identity := lifecycle.ResourceIdentity{
-					ID:         request.LaneKey,
-					Generation: generation,
-				}
-				resource.identity = identity
-				return &kernelTestPreparedResource{
-					identity: identity,
-					permit:   permit,
-					ready:    resource,
-				}, nil
-			},
-		},
-	}, nil
+	return kernelTestInstallPlan(request.LaneKey, ktrsp.permitPlan, resource), nil
 }
 
 type kernelTestTransactionPlanner struct {
@@ -3726,30 +3663,11 @@ func (kttp kernelTestTransactionPlanner) Plan(
 ) (WorkPlan, error) {
 	switch request.Route {
 	case "install":
-		return WorkPlan{
-			NoResponse: true,
-			Resource: &ResourcePlan{
-				Action: ResourceInstall,
-				ID:     request.LaneKey,
-				Permit: kttp.permitPlan,
-				Prepare: func(
-					_ context.Context,
-					generation uint64,
-					permit lifecycle.LongLivedPermit,
-				) (lifecycle.PreparedResource, error) {
-					identity := lifecycle.ResourceIdentity{
-						ID:         request.LaneKey,
-						Generation: generation,
-					}
-					kttp.current.identity = identity
-					return &kernelTestPreparedResource{
-						identity: identity,
-						permit:   permit,
-						ready:    kttp.current,
-					}, nil
-				},
-			},
-		}, nil
+		return kernelTestInstallPlan(
+			request.LaneKey,
+			kttp.permitPlan,
+			kttp.current,
+		), nil
 	case "replace":
 		return WorkPlan{
 			Transaction: &ResourceTransactionPlan{
@@ -3845,23 +3763,11 @@ func (ktprt *kernelTestPreparedResourceTransaction) Dispose(
 func (ktrp kernelTestResourcePlanner) Plan(request Request) (WorkPlan, error) {
 	switch request.Route {
 	case "install":
-		return WorkPlan{
-			NoResponse: true,
-			Resource: &ResourcePlan{
-				Action: ResourceInstall,
-				ID:     request.LaneKey,
-				Permit: ktrp.permitPlan,
-				Prepare: func(_ context.Context, generation uint64, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResource, error) {
-					identity := lifecycle.ResourceIdentity{ID: request.LaneKey, Generation: generation}
-					ktrp.resource.identity = identity
-					return &kernelTestPreparedResource{
-						identity: identity,
-						permit:   permit,
-						ready:    ktrp.resource,
-					}, nil
-				},
-			},
-		}, nil
+		return kernelTestInstallPlan(
+			request.LaneKey,
+			ktrp.permitPlan,
+			ktrp.resource,
+		), nil
 	case "use":
 		return WorkPlan{
 			Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
@@ -3875,16 +3781,140 @@ func (ktrp kernelTestResourcePlanner) Plan(request Request) (WorkPlan, error) {
 			}),
 		}, nil
 	case "stop":
-		return WorkPlan{
-			NoResponse: true,
-			Resource: &ResourcePlan{
-				Action: ResourceStop,
-				ID:     request.LaneKey,
-			},
-		}, nil
+		return kernelTestRemovePlan(request.LaneKey), nil
 	default:
 		return WorkPlan{}, errors.New("unexpected kernel resource route")
 	}
+}
+
+func kernelTestInstallPlan(
+	id string,
+	permit lifecycle.LongLivedPlan,
+	resource *kernelTestReadyResource,
+) WorkPlan {
+	return WorkPlan{
+		NoResponse: true,
+		Transaction: &ResourceTransactionPlan{
+			ID: id, AllocateSuccessor: true, Permit: permit,
+			Prepare: func(
+				_ context.Context,
+				current lifecycle.ReadyResource,
+				scope lifecycle.ResourceTransactionScope,
+				permit lifecycle.LongLivedPermit,
+			) (lifecycle.PreparedResourceTransaction, error) {
+				if current != nil || scope.Current.Valid() ||
+					scope.ID != id || !scope.Successor.Valid() {
+					return nil, errors.New("kernel test install scope differs")
+				}
+				return &kernelTestInstallTransaction{
+					scope: scope, permit: permit, resource: resource,
+				}, nil
+			},
+		},
+	}
+}
+
+func kernelTestRemovePlan(id string) WorkPlan {
+	return WorkPlan{
+		NoResponse: true,
+		Transaction: &ResourceTransactionPlan{
+			ID: id,
+			Prepare: func(
+				_ context.Context,
+				current lifecycle.ReadyResource,
+				scope lifecycle.ResourceTransactionScope,
+				permit lifecycle.LongLivedPermit,
+			) (lifecycle.PreparedResourceTransaction, error) {
+				if current == nil || permit.Valid() ||
+					scope.ID != id || !scope.Current.Valid() ||
+					scope.Successor.Valid() {
+					return nil, errors.New("kernel test remove scope differs")
+				}
+				return &kernelTestRemoveTransaction{
+					scope: scope, resource: current,
+				}, nil
+			},
+		},
+	}
+}
+
+type kernelTestInstallTransaction struct {
+	scope    lifecycle.ResourceTransactionScope
+	permit   lifecycle.LongLivedPermit
+	resource *kernelTestReadyResource
+}
+
+func (ktit *kernelTestInstallTransaction) Scope() lifecycle.ResourceTransactionScope {
+	return ktit.scope
+}
+
+func (ktit *kernelTestInstallTransaction) Apply(
+	context.Context,
+) (lifecycle.AppliedResourceTransaction, error) {
+	if err := ktit.permit.ActivateExternal(
+		lifecycle.LongLivedEJobResources,
+	); err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	ktit.resource.identity = ktit.scope.Successor
+	ktit.resource.permit = ktit.permit
+	if err := ktit.resource.Publish(); err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	result, err := lifecycle.NewSealedResult(204, "application/json", nil)
+	if err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	return lifecycle.NewAppliedResourceTransaction(
+		ktit.scope,
+		lifecycle.ResourceTransactionInstalled,
+		ktit.resource,
+		result,
+		func() error { return nil },
+	)
+}
+
+func (ktit *kernelTestInstallTransaction) Dispose(
+	context.Context,
+) (lifecycle.ReadyResource, error) {
+	return nil, ktit.permit.AbortUnused()
+}
+
+type kernelTestRemoveTransaction struct {
+	scope    lifecycle.ResourceTransactionScope
+	resource lifecycle.ReadyResource
+}
+
+func (ktrt *kernelTestRemoveTransaction) Scope() lifecycle.ResourceTransactionScope {
+	return ktrt.scope
+}
+
+func (ktrt *kernelTestRemoveTransaction) Apply(
+	ctx context.Context,
+) (lifecycle.AppliedResourceTransaction, error) {
+	if err := ktrt.resource.Stop(ctx); err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	if err := ktrt.resource.Finalize(); err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	result, err := lifecycle.NewSealedResult(204, "application/json", nil)
+	if err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	return lifecycle.NewAppliedResourceTransaction(
+		ktrt.scope,
+		lifecycle.ResourceTransactionRemoved,
+		nil,
+		result,
+		func() error { return nil },
+	)
+}
+
+func (ktrt *kernelTestRemoveTransaction) Dispose(
+	context.Context,
+) (lifecycle.ReadyResource, error) {
+	return ktrt.resource, nil
 }
 
 func newKernelTestReadyResource(id string, publishRelease, stopRelease <-chan struct{}) *kernelTestReadyResource {
@@ -3895,31 +3925,6 @@ func newKernelTestReadyResource(id string, publishRelease, stopRelease <-chan st
 		stopEntered:    make(chan struct{}),
 		stopRelease:    stopRelease,
 	}
-}
-
-type kernelTestPreparedResource struct {
-	identity lifecycle.ResourceIdentity
-	permit   lifecycle.LongLivedPermit
-	ready    *kernelTestReadyResource
-}
-
-func (ktpr *kernelTestPreparedResource) Identity() lifecycle.ResourceIdentity {
-	return ktpr.identity
-}
-
-func (ktpr *kernelTestPreparedResource) AcceptStart(_ context.Context, expected uint64) (lifecycle.ReadyResource, error) {
-	if expected != ktpr.identity.Generation {
-		return nil, errors.New("kernel test resource generation differs")
-	}
-	if err := ktpr.permit.ActivateExternal(lifecycle.LongLivedEJobResources); err != nil {
-		return nil, err
-	}
-	ktpr.ready.permit = ktpr.permit
-	return ktpr.ready, nil
-}
-
-func (ktpr *kernelTestPreparedResource) Dispose(context.Context) error {
-	return ktpr.permit.AbortUnused()
 }
 
 type kernelTestReadyResource struct {

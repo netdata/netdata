@@ -12,185 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func preparedResourceTaskWork(work func(context.Context) (PreparedResource, error)) TaskWork {
-	return func(ctx context.Context) (TaskOutcome, error) {
-		resource, err := work(ctx)
-		if resource == nil {
-			return TaskOutcome{}, err
-		}
-		identity, identityErr := preparedResourceIdentity(resource)
-		if identityErr != nil {
-			return TaskOutcome{}, errors.Join(err, identityErr)
-		}
-		outcome, outcomeErr := preparedResourceOutcome(resource, identity)
-		return outcome, errors.Join(err, outcomeErr)
-	}
-}
-
-func TestTaskSupervisorAcceptsStartsPublishesAndTransfersPreparedResource(t *testing.T) {
-	supervisor := newResourceTaskSupervisor(t)
-	var events []string
-	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 7}, events: &events}
-	prepared := &recordingPreparedResource{identity: ready.identity, ready: ready, events: &events}
-	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
-		Source: SourceJobManager,
-		Work: preparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
-			return prepared, nil
-		}),
-	})
-	completion := <-supervisor.CompletionCh()
-	require.False(t, completion.Kind != TaskOutcomePreparedResource || completion.Err != nil)
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 7}))
-
-	ack := <-supervisor.AcknowledgementCh()
-	require.False(t, ack.Err != nil || ack.Kind != TaskActionAcceptStart)
-
-	require.Error(t, supervisor.Release(ref))
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionPublishResource}))
-
-	acknowledgementCh := <-supervisor.AcknowledgementCh()
-	require.False(t, acknowledgementCh.Err != nil || acknowledgementCh.Kind != TaskActionPublishResource)
-
-	taken, err := supervisor.TakePublishedReadyResource(ref, 3, ready.identity)
-	require.NoError(t, err)
-	require.Same(t, ready, taken)
-
-	_, takePublishedReadyResourceErr := supervisor.TakePublishedReadyResource(ref, 3, ready.identity)
-	require.Error(t, takePublishedReadyResourceErr)
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
-
-	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
-
-	require.NoError(t, supervisor.Release(ref))
-
-	got, want := events, []string{"accept-start", "publish"}
-	require.Equal(t, want, got)
-}
-
-func TestTaskSupervisorRetainsPreparedResourceReturnedWithPrepareError(t *testing.T) {
-	supervisor := newResourceTaskSupervisor(t)
-	observer := &recordingRuntimeObserver{}
-
-	require.NoError(t, supervisor.BindRuntimeObserver(observer))
-
-	var events []string
-	wantFailure := errors.New("construction cleanup failed")
-	prepared := &recordingPreparedResource{
-		identity: ResourceIdentity{ID: "pipeline", Generation: 1}, events: &events,
-	}
-	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
-		Source: SourceJobManager,
-		Work: preparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
-			return prepared, wantFailure
-		}),
-	})
-	completion := <-supervisor.CompletionCh()
-	require.False(t, completion.Kind != TaskOutcomePreparedResource || !errors.Is(completion.Err, wantFailure))
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
-
-	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
-
-	require.EqualValues(t, 1, observer.counter(RuntimeCounterResultsDisposed))
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
-
-	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
-
-	require.NoError(t, supervisor.Release(ref))
-
-	got, want := events, []string{"dispose"}
-	require.Equal(t, want, got)
-}
-
-func TestTaskSupervisorDoesNotCancelStartedOwnershipAction(t *testing.T) {
-	supervisor := newResourceTaskSupervisor(t)
-	var events []string
-	entered := make(chan struct{})
-	release := make(chan struct{})
-	ready := &recordingReadyResource{
-		identity: ResourceIdentity{ID: "job", Generation: 1},
-		events:   &events,
-	}
-	prepared := &recordingPreparedResource{
-		identity:      ready.identity,
-		ready:         ready,
-		events:        &events,
-		acceptEntered: entered,
-		acceptGate:    release,
-	}
-	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
-		Source: SourceJobManager,
-		Work: preparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
-			return prepared, nil
-		}),
-	})
-	require.NoError(t, (<-supervisor.CompletionCh()).Err)
-	require.NoError(t, supervisor.SendAction(TaskAction{
-		Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart,
-		ExpectedGeneration: 1,
-	}))
-	<-entered
-
-	stopping := &StoppingRejection{Generation: 7}
-	require.NoError(t, supervisor.CancelWithCause(ref, stopping))
-	close(release)
-	ack := <-supervisor.AcknowledgementCh()
-	require.NoError(t, ack.Err)
-	require.Equal(t, []string{"accept-start"}, events)
-
-	require.NoError(t, supervisor.SendAction(TaskAction{
-		Ref: ref, Sequence: 3, Kind: TaskActionDispose,
-	}))
-	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
-	require.NoError(t, supervisor.SendAction(TaskAction{
-		Ref: ref, Sequence: 4, Kind: TaskActionTerminate,
-	}))
-	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
-	require.NoError(t, supervisor.Release(ref))
-}
-
-func TestTaskSupervisorRetainsReadyResourceAfterPublishFailureUntilAbort(t *testing.T) {
-	supervisor := newResourceTaskSupervisor(t)
-	var events []string
-	wantFailure := errors.New("publish failed")
-	ready := &recordingReadyResource{
-		identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events, publishErr: wantFailure,
-	}
-	prepared := &recordingPreparedResource{identity: ready.identity, ready: ready, events: &events}
-	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
-		Source: SourceJobManager,
-		Work: preparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
-			return prepared, nil
-		}),
-	})
-	<-supervisor.CompletionCh()
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 1}))
-
-	<-supervisor.AcknowledgementCh()
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionPublishResource}))
-
-	require.ErrorIs(t, (<-supervisor.AcknowledgementCh()).Err, wantFailure)
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionDispose}))
-
-	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 5, Kind: TaskActionTerminate}))
-
-	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
-
-	require.NoError(t, supervisor.Release(ref))
-
-	got, want := events, []string{"accept-start", "publish", "abort-ready"}
-	require.Equal(t, want, got)
-}
-
 func TestTaskSupervisorStopsAndFinalizesInitialReadyResource(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
@@ -310,53 +131,26 @@ func TestTaskSupervisorFinalizesResourceOffLoop(t *testing.T) {
 }
 
 func TestTaskSupervisorDisposesResourcesWithoutExpiredWorkContext(t *testing.T) {
-	tests := map[string]struct {
-		plan     func(*[]string) (TaskPlan, func() error)
-		wantKind TaskOutcomeKind
-	}{
-		"prepared": {
-			plan: func(events *[]string) (TaskPlan, func() error) {
-				prepared := &recordingPreparedResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: events}
-				return TaskPlan{
-					Source: SourceJobManager, Deadline: time.Now().Add(-time.Second),
-					Work: preparedResourceTaskWork(func(context.Context) (PreparedResource, error) { return prepared, nil }),
-				}, func() error { return prepared.disposeContextErr }
-			},
-			wantKind: TaskOutcomePreparedResource,
-		},
-		"ready": {
-			plan: func(events *[]string) (TaskPlan, func() error) {
-				ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: events}
-				return readyTaskPlan(t, SourceJobManager, time.Now().Add(-time.Second), ready), func() error {
-					return ready.abortContextErr
-				}
-			},
-			wantKind: TaskOutcomeReadyResource,
-		},
+	supervisor := newResourceTaskSupervisor(t)
+	var events []string
+	ready := &recordingReadyResource{
+		identity: ResourceIdentity{ID: "job", Generation: 1},
+		events:   &events,
 	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			supervisor := newResourceTaskSupervisor(t)
-			var events []string
-			plan, contextErr := test.plan(&events)
-			_, ref := enqueueAndDispatchTask(t, supervisor, plan)
+	plan := readyTaskPlan(t, SourceJobManager, time.Now().Add(-time.Second), ready)
+	_, ref := enqueueAndDispatchTask(t, supervisor, plan)
 
-			completion := <-supervisor.CompletionCh()
-			require.False(t, completion.Err != nil || completion.Kind != test.wantKind)
+	completion := <-supervisor.CompletionCh()
+	require.NoError(t, completion.Err)
+	require.Equal(t, TaskOutcomeReadyResource, completion.Kind)
 
-			require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
+	require.NoError(t, ready.abortContextErr)
 
-			require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
-
-			require.NoError(t, contextErr())
-
-			require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
-
-			require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
-
-			require.NoError(t, supervisor.Release(ref))
-		})
-	}
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
+	require.NoError(t, supervisor.Release(ref))
 }
 
 func TestTaskSupervisorPreservesShutdownBudgetForResourceDisposal(t *testing.T) {
@@ -411,62 +205,6 @@ func TestTaskSupervisorReturnsPendingInitialResourceOnTransferAwareCancellation(
 
 }
 
-func TestTaskSupervisorRetainsPreparedResourceWhenAcceptStartPanics(t *testing.T) {
-	supervisor := newResourceTaskSupervisor(t)
-	var events []string
-	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events}
-	prepared := &recordingPreparedResource{identity: ready.identity, ready: ready, events: &events, panicAccept: true}
-	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
-		Source: SourceJobManager,
-		Work:   preparedResourceTaskWork(func(context.Context) (PreparedResource, error) { return prepared, nil }),
-	})
-	<-supervisor.CompletionCh()
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 1}))
-
-	require.ErrorIs(t, (<-supervisor.AcknowledgementCh()).Err, ErrTaskPanic)
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
-
-	require.NotNil(t, (<-supervisor.AcknowledgementCh()).Err)
-
-	require.Error(t, supervisor.Release(ref))
-}
-
-func TestTaskSupervisorRetainsReadyResourceReturnedWithAcceptError(t *testing.T) {
-	supervisor := newResourceTaskSupervisor(t)
-	var events []string
-	wantFailure := errors.New("start cleanup failed")
-	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events}
-	prepared := &recordingPreparedResource{identity: ready.identity, ready: ready, events: &events, acceptErr: wantFailure}
-	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
-		Source: SourceJobManager,
-		Work:   preparedResourceTaskWork(func(context.Context) (PreparedResource, error) { return prepared, nil }),
-	})
-	completion := <-supervisor.CompletionCh()
-	require.False(t, completion.Ref != ref || completion.Kind != TaskOutcomePreparedResource || completion.Err != nil)
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 1}))
-
-	ack := <-supervisor.AcknowledgementCh()
-	require.ErrorIs(t, ack.Err, wantFailure)
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionDispose}))
-
-	ack = <-supervisor.AcknowledgementCh()
-	require.Nil(t, ack.Err)
-
-	got, want := events, []string{"accept-start", "abort-ready"}
-	require.Equal(t, want, got)
-
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
-
-	ack = <-supervisor.AcknowledgementCh()
-	require.Nil(t, ack.Err)
-
-	require.NoError(t, supervisor.Release(ref))
-}
-
 func TestTaskSupervisorRetainsReadyResourceWhenAbortFails(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
@@ -499,54 +237,17 @@ func readyTaskPlan(t *testing.T, source Source, deadline time.Time, resource Rea
 	t.Helper()
 	identity, err := readyResourceIdentity(resource)
 	require.NoError(t, err)
-	plan, err := NewReadyResourceTaskPlan(source, deadline, TransactionTaskPhases, resource, identity)
+	plan := TaskPlan{
+		Source:              source,
+		Deadline:            deadline,
+		MaxPhaseTransitions: TransactionTaskPhases,
+		initialReady:        resource,
+		initialIdentity:     identity,
+		drainDependent:      true,
+	}
+	err = plan.Validate()
 	require.NoError(t, err)
 	return plan
-}
-
-type recordingPreparedResource struct {
-	identity          ResourceIdentity
-	ready             ReadyResource
-	events            *[]string
-	consumed          bool
-	panicAccept       bool
-	acceptErr         error
-	acceptEntered     chan struct{}
-	acceptGate        <-chan struct{}
-	disposeContextErr error
-}
-
-func (rpr *recordingPreparedResource) Identity() ResourceIdentity { return rpr.identity }
-
-func (rpr *recordingPreparedResource) AcceptStart(ctx context.Context, _ uint64) (ReadyResource, error) {
-	if rpr.panicAccept {
-		panic("accept panic")
-	}
-	if rpr.acceptEntered != nil {
-		close(rpr.acceptEntered)
-	}
-	if rpr.acceptGate != nil {
-		<-rpr.acceptGate
-	}
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
-	if rpr.consumed {
-		return nil, errors.New("prepared resource consumed")
-	}
-	rpr.consumed = true
-	*rpr.events = append(*rpr.events, "accept-start")
-	return rpr.ready, rpr.acceptErr
-}
-
-func (rpr *recordingPreparedResource) Dispose(ctx context.Context) error {
-	rpr.disposeContextErr = ctx.Err()
-	if rpr.consumed {
-		return errors.New("prepared resource consumed")
-	}
-	rpr.consumed = true
-	*rpr.events = append(*rpr.events, "dispose")
-	return nil
 }
 
 type recordingReadyResource struct {

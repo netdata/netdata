@@ -26,9 +26,7 @@ func (ck *CommandKernel) cancelOperation(uid string) {
 	}
 	operation.cancelled = true
 	if operation.Child == lifecycle.ChildExecuting {
-		if !resourceStopOperation(operation) {
-			_ = ck.tasks.Cancel(operation.Task)
-		}
+		_ = ck.tasks.Cancel(operation.Task)
 		if operation.Response != lifecycle.ResponseNotRequired && !operation.plan.CooperativeCancel {
 			ck.enqueueControl(operation, lifecycle.ControlCancelled)
 		}
@@ -107,12 +105,10 @@ func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 		deferControl := requiresCooperativeDeadlineStart(operation) &&
 			(operation.Child == lifecycle.ChildNotStarted || operation.Child == lifecycle.ChildExecuting)
 		if operation.Child == lifecycle.ChildExecuting {
-			if !resourceStopOperation(operation) {
-				_ = ck.tasks.CancelWithCause(
-					operation.Task,
-					context.DeadlineExceeded,
-				)
-			}
+			_ = ck.tasks.CancelWithCause(
+				operation.Task,
+				context.DeadlineExceeded,
+			)
 			if operation.Response == lifecycle.ResponseNotRequired {
 				if err := ck.markRetainedTimeout(operation, true); err != nil {
 					ck.run.Dirty(err)
@@ -317,22 +313,6 @@ func (ck *CommandKernel) tryDispose(operation *commandOperation) {
 		}
 		delete(ck.byAdmission, operation.admission)
 		operation.admission = lifecycle.AdmissionRef{}
-	}
-	if resource := operation.plan.Resource; resource != nil {
-		switch resource.Action {
-		case ResourceInstall:
-			if !lane.installPlanned {
-				ck.run.Dirty(errors.New("jobmgr kernel: install plan marker cleared twice"))
-				return
-			}
-			lane.installPlanned = false
-		case ResourceStop:
-			if !lane.stopPlanned {
-				ck.run.Dirty(errors.New("jobmgr kernel: stop plan marker cleared twice"))
-				return
-			}
-			lane.stopPlanned = false
-		}
 	}
 	if operation.plan.Transaction != nil {
 		if lane.transactionPlanned <= 0 {
@@ -544,20 +524,7 @@ func (ck *CommandKernel) unlinkQueued(operation *commandOperation, submissionErr
 	}
 	if operation.taskRequest.Valid() {
 		var err error
-		if operation.plan.Resource != nil && operation.plan.Resource.Action == ResourceStop {
-			var outcome lifecycle.TaskOutcome
-			outcome, err = ck.tasks.CancelPendingOutcome(operation.taskRequest)
-			if err == nil {
-				resource, ok := outcome.ReadyResource()
-				identity, identityOK := outcome.ResourceIdentity()
-				if !ok || !identityOK || !operation.lane.currentStopping || operation.lane.current != nil || identity != operation.lane.currentIdentity {
-					err = errors.New("jobmgr kernel: cancelled stop did not return the exact current resource")
-				} else {
-					operation.lane.current = resource
-					operation.lane.currentStopping = false
-				}
-			}
-		} else if operation.plan.Transaction != nil {
+		if operation.plan.Transaction != nil {
 			var outcome lifecycle.TaskOutcome
 			outcome, err = ck.tasks.CancelPendingOutcome(
 				operation.taskRequest,

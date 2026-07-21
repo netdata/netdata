@@ -3,7 +3,6 @@
 package jobmgr
 
 import (
-	"context"
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -11,7 +10,6 @@ import (
 
 type WorkPlan struct {
 	Work                lifecycle.TaskWork       // command work (one work source)
-	Resource            *ResourcePlan            // resource install/stop plan (one work source)
 	Transaction         *ResourceTransactionPlan // resource transaction plan (one work source)
 	Cleanup             lifecycle.TaskCleanup    // post-disposal cleanup
 	Claims              []string                 // write claim keys
@@ -19,20 +17,6 @@ type WorkPlan struct {
 	NoResponse          bool                     // the command produces no terminal response frame
 	CooperativeCancel   bool                     // work honors cooperative cancellation
 	CooperativeDeadline bool                     // work honors the caller deadline
-}
-
-type ResourceAction uint8
-
-const (
-	ResourceInstall ResourceAction = iota + 1
-	ResourceStop
-)
-
-type ResourcePlan struct {
-	Action  ResourceAction                                                                               // install or stop the resource
-	ID      string                                                                                       // resource ID this plan targets
-	Permit  lifecycle.LongLivedPlan                                                                      // long-lived permit the resource reserves
-	Prepare func(context.Context, uint64, lifecycle.LongLivedPermit) (lifecycle.PreparedResource, error) // builds the prepared resource
 }
 
 type ResourceTransactionPlan struct {
@@ -62,9 +46,6 @@ func (wp WorkPlan) validate() error {
 	if wp.Work != nil {
 		workKinds++
 	}
-	if wp.Resource != nil {
-		workKinds++
-	}
 	if wp.Transaction != nil {
 		workKinds++
 	}
@@ -77,51 +58,24 @@ func (wp WorkPlan) validate() error {
 		}
 		return nil
 	}
-	if wp.Transaction != nil {
-		if wp.Cleanup != nil {
-			return errors.New("jobmgr kernel: resource transaction cleanup must be sealed by apply")
-		}
-		if wp.Transaction.ID == "" ||
-			(wp.Transaction.Prepare == nil) ==
-				(wp.Transaction.PrepareComposite == nil) {
-			return errors.New("jobmgr kernel: invalid resource transaction plan")
-		}
-		if wp.Transaction.AllocateSuccessor {
-			if err := wp.Transaction.Permit.Validate(); err != nil {
-				return errors.Join(
-					errors.New("jobmgr kernel: transaction successor has no long-lived permit"),
-					err,
-				)
-			}
-		} else if wp.Transaction.Permit.Class() != 0 ||
-			wp.Transaction.Permit.Bytes() != 0 {
-			return errors.New("jobmgr kernel: transaction without successor has a permit")
-		}
-		return nil
-	}
-	if !wp.NoResponse {
-		return errors.New("jobmgr kernel: invalid internal resource plan")
-	}
 	if wp.Cleanup != nil {
-		return errors.New("jobmgr kernel: resource plan cannot add an unrelated task cleanup")
+		return errors.New("jobmgr kernel: resource transaction cleanup must be sealed by apply")
 	}
-	if wp.Resource.ID == "" {
-		return errors.New("jobmgr kernel: invalid internal resource plan")
+	if wp.Transaction.ID == "" ||
+		(wp.Transaction.Prepare == nil) ==
+			(wp.Transaction.PrepareComposite == nil) {
+		return errors.New("jobmgr kernel: invalid resource transaction plan")
 	}
-	switch wp.Resource.Action {
-	case ResourceInstall:
-		if wp.Resource.Prepare == nil {
-			return errors.New("jobmgr kernel: install resource plan has no factory")
+	if wp.Transaction.AllocateSuccessor {
+		if err := wp.Transaction.Permit.Validate(); err != nil {
+			return errors.Join(
+				errors.New("jobmgr kernel: transaction successor has no long-lived permit"),
+				err,
+			)
 		}
-		if err := wp.Resource.Permit.Validate(); err != nil {
-			return errors.Join(errors.New("jobmgr kernel: install resource plan has no long-lived permit"), err)
-		}
-	case ResourceStop:
-		if wp.Resource.Prepare != nil || wp.Resource.Permit.Class() != 0 || wp.Resource.Permit.Bytes() != 0 {
-			return errors.New("jobmgr kernel: stop resource plan has a factory")
-		}
-	default:
-		return errors.New("jobmgr kernel: unknown resource action")
+	} else if wp.Transaction.Permit.Class() != 0 ||
+		wp.Transaction.Permit.Bytes() != 0 {
+		return errors.New("jobmgr kernel: transaction without successor has a permit")
 	}
 	return nil
 }
