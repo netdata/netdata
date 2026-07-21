@@ -238,42 +238,36 @@ func newRunGeneration(
 	if err != nil {
 		return nil, err
 	}
-	jobs, err := joboutput.NewFactory(joboutput.FactoryConfig{
-		PluginName: config.Jobs.PluginName,
-		Modules:    config.Modules,
-		Tasks:      tasks,
-		Frames:     config.Frames,
-		Resolver:   config.Jobs.Resolver,
-		StoreScope: func(keys []string) (secretresolver.AtomicScope, error) {
-			return acquireRunOwnedStoreScope(
-				run,
-				stores,
-				keys,
-			)
-		},
-		Runtime:   config.Jobs.Runtime,
-		Vnodes:    config.Jobs.Vnodes,
-		Vnode:     vnodeConfig.Lookup,
-		Hooks:     functions.JobHooks(),
-		Scheduler: scheduler,
-		Observer:  metrics,
-	})
-	if err != nil {
-		return nil, err
+	storeScope := func(keys []string) (secretresolver.AtomicScope, error) {
+		return acquireRunOwnedStoreScope(
+			run,
+			stores,
+			keys,
+		)
 	}
 	configModules, err := joboutput.NewConfigModuleFactory(
 		joboutput.ConfigModuleFactoryConfig{
-			Modules:  config.Modules,
-			Resolver: config.Jobs.Resolver,
-			StoreScope: func(keys []string) (secretresolver.AtomicScope, error) {
-				return acquireRunOwnedStoreScope(
-					run,
-					stores,
-					keys,
-				)
-			},
+			Modules:    config.Modules,
+			Resolver:   config.Jobs.Resolver,
+			StoreScope: storeScope,
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
+	jobs, err := joboutput.NewFactory(joboutput.FactoryConfig{
+		PluginName:    config.Jobs.PluginName,
+		Modules:       config.Modules,
+		Tasks:         tasks,
+		Frames:        config.Frames,
+		ConfigModules: configModules,
+		Runtime:       config.Jobs.Runtime,
+		Vnodes:        config.Jobs.Vnodes,
+		Vnode:         vnodeConfig.Lookup,
+		Hooks:         functions.JobHooks(),
+		Scheduler:     scheduler,
+		Observer:      metrics,
+	})
 	if err != nil {
 		return nil, err
 	}

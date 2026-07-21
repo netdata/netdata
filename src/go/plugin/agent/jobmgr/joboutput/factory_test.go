@@ -370,16 +370,21 @@ func newFactoryTestHarness(
 	require.NoError(t, err)
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
-	factory, err := NewFactory(FactoryConfig{
-		PluginName: "test",
+	configModules, err := NewConfigModuleFactory(ConfigModuleFactoryConfig{
 		Modules:    collectorapi.Registry{"module": creator},
-		Tasks:      tasks,
-		Frames:     frames,
 		Resolver:   resolver,
 		StoreScope: unavailableStoreScope,
-		Vnodes:     vnoderegistry.New(),
-		Hooks:      hooks,
-		Scheduler:  newTestScheduler(t),
+	})
+	require.NoError(t, err)
+	factory, err := NewFactory(FactoryConfig{
+		PluginName:    "test",
+		Modules:       collectorapi.Registry{"module": creator},
+		Tasks:         tasks,
+		Frames:        frames,
+		ConfigModules: configModules,
+		Vnodes:        vnoderegistry.New(),
+		Hooks:         hooks,
+		Scheduler:     newTestScheduler(t),
 	})
 	require.NoError(t, err)
 	return factory, output

@@ -6,18 +6,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
-	"gopkg.in/yaml.v2"
 )
 
 type ModuleCatalog interface {
@@ -51,25 +47,23 @@ type JobHooks interface {
 }
 
 type FactoryConfig struct {
-	PluginName string                                        // owning plugin name stamped into job config
-	Modules    ModuleCatalog                                 // collector creator registry
-	Tasks      *lifecycle.TaskSupervisor                     // supervisor owning inherited run-loop goroutines
-	Frames     *lifecycle.FrameOwner                         // frame owner used as the collector output sink
-	Resolver   *secretresolver.AtomicResolver                // secret resolver applied to config before unmarshal
-	StoreScope secretresolver.AtomicScopeAcquirer            // secret store scope acquirer
-	Runtime    runtimecomp.Service                           // V2 runtime service dependency
-	Vnodes     *vnoderegistry.Registry                       // vnode registry for V2 jobs
-	Vnode      func(string) (jobruntime.VnodeSnapshot, bool) // vnode snapshot lookup by name
-	Hooks      JobHooks                                      // handler-lifecycle preparation for Function-bearing jobs
-	Scheduler  *Scheduler                                    // tick/registration scheduler
-	Observer   lifecycle.RuntimeObserver                     // runtime gauge sink
+	PluginName    string                                        // owning plugin name stamped into job config
+	Modules       ModuleCatalog                                 // collector creator registry
+	Tasks         *lifecycle.TaskSupervisor                     // supervisor owning inherited run-loop goroutines
+	Frames        *lifecycle.FrameOwner                         // frame owner used as the collector output sink
+	ConfigModules *ConfigModuleFactory                          // resolved config application and short-lived probes
+	Runtime       runtimecomp.Service                           // V2 runtime service dependency
+	Vnodes        *vnoderegistry.Registry                       // vnode registry for V2 jobs
+	Vnode         func(string) (jobruntime.VnodeSnapshot, bool) // vnode snapshot lookup by name
+	Hooks         JobHooks                                      // handler-lifecycle preparation for Function-bearing jobs
+	Scheduler     *Scheduler                                    // tick/registration scheduler
+	Observer      lifecycle.RuntimeObserver                     // runtime gauge sink
 }
 
 // Factory owns collector construction, validation, and transfer. It does not
 // own current-job indexing or lifecycle state.
 type Factory struct {
 	config FactoryConfig
-	logger *logger.Logger
 }
 
 func NewFactory(config FactoryConfig) (*Factory, error) {
@@ -77,16 +71,12 @@ func NewFactory(config FactoryConfig) (*Factory, error) {
 		config.Modules == nil ||
 		config.Tasks == nil ||
 		config.Frames == nil ||
-		config.Resolver == nil ||
-		config.StoreScope == nil ||
+		config.ConfigModules == nil ||
 		config.Vnodes == nil ||
 		config.Scheduler == nil {
 		return nil, errors.New("job output: incomplete factory configuration")
 	}
-	return &Factory{
-		config: config,
-		logger: logger.New().With(slog.String("component", "job factory")),
-	}, nil
+	return &Factory{config: config}, nil
 }
 
 func (f *Factory) ValidateConfig(
@@ -118,16 +108,7 @@ func (f *Factory) ValidateConfig(
 	if _, err := f.lookupVNode(config); err != nil {
 		return err
 	}
-	configModules, err := NewConfigModuleFactory(
-		ConfigModuleFactoryConfig{
-			Modules: f.config.Modules, Resolver: f.config.Resolver,
-			StoreScope: f.config.StoreScope,
-		},
-	)
-	if err != nil {
-		return err
-	}
-	return configModules.Validate(ctx, config)
+	return f.config.ConfigModules.Validate(ctx, config)
 }
 
 func (f *Factory) build(
@@ -317,7 +298,7 @@ func (f *Factory) buildV1(
 	if named, ok := module.(interface{ SetJobName(string) }); ok {
 		named.SetJobName(config.Name())
 	}
-	if err := f.applyConfig(ctx, config, module); err != nil {
+	if err := f.config.ConfigModules.applyResolved(ctx, config, module); err != nil {
 		return nil, err
 	}
 	jobConfig := jobruntime.JobConfig{
@@ -371,7 +352,7 @@ func (f *Factory) buildV2(
 	if named, ok := module.(interface{ SetJobName(string) }); ok {
 		named.SetJobName(config.Name())
 	}
-	if err := f.applyConfig(ctx, config, module); err != nil {
+	if err := f.config.ConfigModules.applyResolved(ctx, config, module); err != nil {
 		return nil, err
 	}
 	jobConfig := jobruntime.JobV2Config{
@@ -401,39 +382,6 @@ func callFactoryModuleCleanup(
 		cleanup(context.WithoutCancel(ctx))
 		return nil
 	})
-}
-
-func (f *Factory) applyConfig(
-	ctx context.Context,
-	config confgroup.Config,
-	module any,
-) error {
-	resolveCtx := logger.ContextWithLogger(
-		ctx,
-		f.logger.With(
-			slog.String("collector", config.Module()),
-			slog.String("job", config.Name()),
-		),
-	)
-	resolved, err := f.config.Resolver.Resolve(
-		resolveCtx,
-		map[string]any(config),
-		f.config.StoreScope,
-	)
-	if err != nil {
-		return fmt.Errorf("job output: resolving configuration secrets: %w", err)
-	}
-	payload, err := yaml.Marshal(resolved)
-	if err != nil {
-		return fmt.Errorf("job output: marshaling configuration: %w", err)
-	}
-	if len(payload) > secretresolver.MaximumAtomicResolvedBytes {
-		return errors.New("job output: serialized configuration exceeds maximum size")
-	}
-	if err := yaml.Unmarshal(payload, module); err != nil {
-		return fmt.Errorf("job output: applying configuration: %w", err)
-	}
-	return nil
 }
 
 func (f *Factory) lookupVNode(

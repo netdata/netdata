@@ -292,7 +292,7 @@ func (c *Controller) Bind(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.mutations != nil || c.publication != nil ||
-		c.activated || c.terminated {
+		c.activated || c.draining || c.terminated || c.dirty != nil {
 		return errors.New("jobmgr Function controller: duplicate binding")
 	}
 	c.mutations = mutations
@@ -337,7 +337,7 @@ func (c *Controller) Activate() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.mutations == nil || c.publication == nil ||
-		c.activated || c.terminated {
+		c.activated || c.draining || c.terminated || c.dirty != nil {
 		return errors.New("jobmgr Function controller: invalid activation")
 	}
 	records := c.publicationRecordsLocked(c.routes)
@@ -512,11 +512,13 @@ func (c *Controller) Stop(epoch uint64) error {
 	if c == nil {
 		return nil
 	}
-	beginErr := c.BeginShutdown(epoch)
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if epoch != c.epoch || !c.draining || c.terminated {
+		return errors.New("jobmgr Function controller: invalid stop")
+	}
 	c.terminated = true
-	return errors.Join(beginErr, c.dirty)
+	return c.dirty
 }
 
 // BeginShutdown withdraws external routes before CommandKernel closes the
@@ -528,8 +530,11 @@ func (c *Controller) BeginShutdown(epoch uint64) error {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if epoch != c.epoch {
+		return errors.New("jobmgr Function controller: invalid shutdown generation")
+	}
 	if c.terminated {
-		return c.dirty
+		return errors.New("jobmgr Function controller: shutdown after stop")
 	}
 	if c.draining {
 		return c.dirty

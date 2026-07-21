@@ -5,7 +5,6 @@ package composition
 import (
 	"context"
 	"errors"
-	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
@@ -18,17 +17,9 @@ import (
 // Function catalog, which the kernel consumes, and the mutation capability,
 // which the kernel publishes after construction.
 type FunctionAssembly struct {
-	mu sync.Mutex // guards the lifecycle flags
-
-	epoch       uint64                       // run generation this assembly belongs to
 	controller  *functionadapter.Controller  // Function controller (route planning + publication)
 	catalog     *functionadapter.Catalog     // the route catalog
 	publication *functionadapter.Publication // external FUNCTION/FUNCTION_DEL registration set
-	hooks       functionJobHooks             // job handler-lifecycle hooks
-	bound       bool                         // Bind has run
-	active      bool                         // Activate has run (initial snapshot published)
-	draining    bool                         // shutdown draining has begun
-	stopped     bool                         // fully stopped
 }
 
 func NewFunctionAssembly(
@@ -63,10 +54,9 @@ func NewFunctionAssembly(
 		)
 	}
 	assembly := &FunctionAssembly{
-		epoch: epoch, controller: controller, catalog: catalog,
+		controller: controller, catalog: catalog,
 		publication: publication,
 	}
-	assembly.hooks.controller = controller
 	return assembly, nil
 }
 
@@ -84,7 +74,7 @@ func (fa *FunctionAssembly) JobHooks() joboutput.JobHooks {
 	if fa == nil {
 		return nil
 	}
-	return fa.hooks
+	return functionJobHooks{controller: fa.controller}
 }
 
 func (fa *FunctionAssembly) ReconcileModule(
@@ -101,28 +91,13 @@ func (fa *FunctionAssembly) Bind(mutations jobmgr.FunctionMutationPort) error {
 	if fa == nil || mutations == nil {
 		return errors.New("jobmgr composition: invalid Function binding")
 	}
-	fa.mu.Lock()
-	defer fa.mu.Unlock()
-	if fa.bound || fa.active || fa.draining || fa.stopped {
-		return errors.New("jobmgr composition: duplicate or late Function binding")
-	}
-	if err := fa.controller.Bind(mutations, fa.publication); err != nil {
-		return err
-	}
-	fa.bound = true
-	return nil
+	return fa.controller.Bind(mutations, fa.publication)
 }
 
 func (fa *FunctionAssembly) abortConstruction() error {
 	if fa == nil {
 		return nil
 	}
-	fa.mu.Lock()
-	defer fa.mu.Unlock()
-	if fa.active || fa.draining || fa.stopped {
-		return errors.New("jobmgr composition: Function construction abort after activation")
-	}
-	fa.stopped = true
 	return fa.controller.AbortConstruction(context.Background())
 }
 
@@ -132,16 +107,7 @@ func (fa *FunctionAssembly) Activate() error {
 	if fa == nil {
 		return errors.New("jobmgr composition: nil Function activation")
 	}
-	fa.mu.Lock()
-	defer fa.mu.Unlock()
-	if !fa.bound || fa.active || fa.draining || fa.stopped {
-		return errors.New("jobmgr composition: invalid Function activation")
-	}
-	if err := fa.controller.Activate(); err != nil {
-		return err
-	}
-	fa.active = true
-	return nil
+	return fa.controller.Activate()
 }
 
 // BeforeFunctionCatalogClose is CommandKernel's supervised shutdown barrier.
@@ -154,18 +120,10 @@ func (fa *FunctionAssembly) BeforeFunctionCatalogClose(
 	if fa == nil {
 		return nil
 	}
-	fa.mu.Lock()
-	defer fa.mu.Unlock()
-	if generation != fa.epoch ||
-		!fa.bound ||
-		fa.stopped {
-		return errors.New("jobmgr composition: invalid Function shutdown barrier")
-	}
-	fa.draining = true
-	return fa.controller.BeginShutdown(fa.epoch)
+	return fa.controller.BeginShutdown(generation)
 }
 
-// FinalizeRun terminalizes composition-side Function state after the kernel has
+// FinalizeRun terminalizes controller-owned Function state after the kernel has
 // drained the catalog and every job handle.
 func (fa *FunctionAssembly) FinalizeRun(
 	_ context.Context,
@@ -174,15 +132,7 @@ func (fa *FunctionAssembly) FinalizeRun(
 	if fa == nil {
 		return nil
 	}
-	fa.mu.Lock()
-	defer fa.mu.Unlock()
-	if generation != fa.epoch ||
-		!fa.draining ||
-		fa.stopped {
-		return errors.New("jobmgr composition: invalid Function finalization")
-	}
-	fa.stopped = true
-	return fa.controller.Stop(fa.epoch)
+	return fa.controller.Stop(generation)
 }
 
 type functionJobHooks struct {

@@ -203,10 +203,17 @@ func (cmf *ConfigModuleFactory) construct(
 func (cmf *ConfigModuleFactory) applyResolved(
 	ctx context.Context,
 	config confgroup.Config,
-	module configModule,
+	module any,
 ) error {
-	resolved, err := cmf.config.Resolver.Resolve(
+	resolveCtx := logger.ContextWithLogger(
 		ctx,
+		cmf.logger.With(
+			slog.String("collector", config.Module()),
+			slog.String("job", config.Name()),
+		),
+	)
+	resolved, err := cmf.config.Resolver.Resolve(
+		resolveCtx,
 		map[string]any(config),
 		cmf.config.StoreScope,
 	)

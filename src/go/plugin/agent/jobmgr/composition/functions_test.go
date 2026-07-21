@@ -18,19 +18,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Stop is a test-only teardown helper that runs the same shutdown sequence the
-// kernel drives in production: BeforeFunctionCatalogClose then FinalizeRun.
-func (fa *FunctionAssembly) Stop() error {
+// stopFunctionAssembly runs the same shutdown sequence the kernel drives in
+// production: BeforeFunctionCatalogClose then FinalizeRun.
+func stopFunctionAssembly(fa *FunctionAssembly, epoch uint64) error {
 	if fa == nil {
 		return nil
 	}
 	if err := fa.BeforeFunctionCatalogClose(
 		context.Background(),
-		fa.epoch,
+		epoch,
 	); err != nil {
 		return err
 	}
-	return fa.FinalizeRun(context.Background(), fa.epoch)
+	return fa.FinalizeRun(context.Background(), epoch)
 }
 
 func TestFunctionAssemblyLifecycle(t *testing.T) {
@@ -61,7 +61,7 @@ func TestFunctionAssemblyLifecycle(t *testing.T) {
 
 	require.EqualValues(t, registration, output.String())
 
-	require.NoError(t, assembly.Stop())
+	require.NoError(t, stopFunctionAssembly(assembly, 7))
 
 	require.EqualValues(t, registration+"FUNCTION_DEL GLOBAL \"module:method\"\n\n", output.String())
 }
@@ -102,10 +102,32 @@ func TestFunctionAssemblyStateGuards(t *testing.T) {
 				if err := assembly.Activate(); err != nil {
 					return err
 				}
-				if err := assembly.Stop(); err != nil {
+				if err := stopFunctionAssembly(assembly, 1); err != nil {
 					return err
 				}
 				return assembly.Bind(mutations)
+			},
+		},
+		"finalize before shutdown": {
+			run: func(assembly *FunctionAssembly, mutations *assemblyMutationPort) error {
+				if err := assembly.Bind(mutations); err != nil {
+					return err
+				}
+				if err := assembly.Activate(); err != nil {
+					return err
+				}
+				return assembly.FinalizeRun(context.Background(), 1)
+			},
+		},
+		"shutdown from wrong generation": {
+			run: func(assembly *FunctionAssembly, mutations *assemblyMutationPort) error {
+				if err := assembly.Bind(mutations); err != nil {
+					return err
+				}
+				if err := assembly.Activate(); err != nil {
+					return err
+				}
+				return assembly.BeforeFunctionCatalogClose(context.Background(), 2)
 			},
 		},
 	}

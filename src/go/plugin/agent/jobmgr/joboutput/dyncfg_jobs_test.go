@@ -940,20 +940,20 @@ func newDynCfgJobTestHarness(
 	}
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
-	factory, err := NewFactory(
-		FactoryConfig{
-			PluginName: "go.d", Modules: modules,
-			Tasks: supervisor, Frames: frames,
-			Resolver: resolver, StoreScope: unavailableStoreScope,
-			Vnodes:    vnoderegistry.New(),
-			Scheduler: newTestScheduler(t),
-		},
-	)
-	require.NoError(t, err)
 	configModules, err := NewConfigModuleFactory(
 		ConfigModuleFactoryConfig{
 			Modules: modules, Resolver: resolver,
 			StoreScope: unavailableStoreScope,
+		},
+	)
+	require.NoError(t, err)
+	factory, err := NewFactory(
+		FactoryConfig{
+			PluginName: "go.d", Modules: modules,
+			Tasks: supervisor, Frames: frames,
+			ConfigModules: configModules,
+			Vnodes:        vnoderegistry.New(),
+			Scheduler:     newTestScheduler(t),
 		},
 	)
 	require.NoError(t, err)
