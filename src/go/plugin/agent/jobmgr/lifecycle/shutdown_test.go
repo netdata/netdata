@@ -182,8 +182,10 @@ func TestFinishShutdownPublishesDueClockWithoutTimerBridge(t *testing.T) {
 
 func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 	census := RunCensus{
-		AdmissionRunDrained:  true,
-		RunFinalizerComplete: true,
+		AdmissionRunDrained:    true,
+		KernelDrained:          true,
+		FunctionCatalogDrained: true,
+		RunFinalizerComplete:   true,
 	}
 	tests := map[string]struct {
 		run func(*testing.T, *RunSupervisor)
@@ -246,10 +248,43 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 	}
 }
 
+func TestRunCensusQuiescenceRequiresExplicitOwnershipProofs(t *testing.T) {
+	base := RunCensus{
+		AdmissionRunDrained:    true,
+		KernelDrained:          true,
+		FunctionCatalogDrained: true,
+		RunFinalizerComplete:   true,
+	}
+	tests := map[string]struct {
+		mutate func(*RunCensus)
+	}{
+		"kernel ownership": {
+			mutate: func(census *RunCensus) { census.KernelDrained = false },
+		},
+		"Function catalog ownership": {
+			mutate: func(census *RunCensus) { census.FunctionCatalogDrained = false },
+		},
+		"active UID ownership": {
+			mutate: func(census *RunCensus) { census.UIDActive = 1 },
+		},
+	}
+
+	require.True(t, base.Quiescent())
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			census := base
+			test.mutate(&census)
+			require.False(t, census.Quiescent())
+		})
+	}
+}
+
 func TestRunSupervisorProjectsFirstDirtyTransitionExactlyOnce(t *testing.T) {
 	census := RunCensus{
-		AdmissionRunDrained:  true,
-		RunFinalizerComplete: true,
+		AdmissionRunDrained:    true,
+		KernelDrained:          true,
+		FunctionCatalogDrained: true,
+		RunFinalizerComplete:   true,
 	}
 	tests := map[string]struct {
 		run func(*testing.T, *RunSupervisor)

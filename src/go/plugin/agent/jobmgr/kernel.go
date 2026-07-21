@@ -1626,21 +1626,11 @@ func (ck *CommandKernel) shutdownBarrierSettled() bool {
 }
 
 func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
-	if !ck.shutdownBarrierSettled() {
-		return false
-	}
-	inherited := ck.tasks.InheritedCensus()
-	longLived := ck.tasks.LongLivedCensus()
-	if !ck.kernelStateDrained() ||
-		ck.runtimeHead != nil || ck.runtimeTail != nil ||
-		ck.functionOperations != 0 ||
-		inherited.Active != 0 {
-		return false
-	}
-	if !ck.functionCatalogDrained() {
-		return false
-	}
-	if longLived.Active != longLived.SecretStores {
+	census := ck.runCensus()
+	if !census.KernelDrained || !census.FunctionCatalogDrained ||
+		census.UIDActive != 0 || census.TransientActive != 0 ||
+		census.TransientPending != 0 || census.Inherited.Active != 0 ||
+		census.LongLived.Active != census.LongLived.SecretStores {
 		return false
 	}
 	return ck.admission.RunFinalizerReady(ck.run.Generation(), 0, 0)
@@ -1687,17 +1677,13 @@ func (ck *CommandKernel) runFinalizerFailedTerminal() bool {
 }
 
 func (ck *CommandKernel) shutdownQuiescent() bool {
-	if !ck.shutdownBarrierSettled() {
-		return false
-	}
-	inherited := ck.tasks.InheritedCensus()
-	longLived := ck.tasks.LongLivedCensus()
-	frame := ck.frames.Census()
-	return ck.kernelStateDrained() && ck.functionCatalogDrained() &&
-		ck.admission.RunDrained(ck.run.Generation()) && inherited.Active == 0 &&
-		longLived == (lifecycle.LongLivedCensus{}) && !frame.Poisoned &&
-		!frame.Busy && !frame.PendingControl && frame.RetainedBytes == 0 &&
-		ck.finalizerDone && !ck.finalizerFailed
+	return ck.runCensus().Quiescent()
+}
+
+func (ck *CommandKernel) kernelOwnershipDrained() bool {
+	return ck.shutdownBarrierSettled() && ck.kernelStateDrained() &&
+		ck.runtimeHead == nil && ck.runtimeTail == nil &&
+		ck.functionOperations == 0
 }
 
 func (ck *CommandKernel) kernelStateDrained() bool {
@@ -1731,10 +1717,16 @@ func (ck *CommandKernel) functionCatalogDrained() bool {
 }
 
 func (ck *CommandKernel) runCensus() lifecycle.RunCensus {
+	uidActive, _, _ := ck.uids.Census()
 	return lifecycle.RunCensus{
-		AdmissionRunDrained: ck.admission.RunDrained(ck.run.Generation()),
-		Admission:           ck.admission.Census(), TransientActive: ck.tasks.Active(), TransientPending: ck.tasks.Pending(),
-		Inherited: ck.tasks.InheritedCensus(), LongLived: ck.tasks.LongLivedCensus(),
+		AdmissionRunDrained:    ck.admission.RunDrained(ck.run.Generation()),
+		Admission:              ck.admission.Census(),
+		KernelDrained:          ck.kernelOwnershipDrained(),
+		FunctionCatalogDrained: ck.functionCatalogDrained(),
+		UIDActive:              uidActive,
+		TransientActive:        ck.tasks.Active(),
+		TransientPending:       ck.tasks.Pending(),
+		Inherited:              ck.tasks.InheritedCensus(), LongLived: ck.tasks.LongLivedCensus(),
 		Frame:                ck.frames.Census(),
 		RunFinalizerComplete: ck.finalizerDone && !ck.finalizerFailed,
 	}

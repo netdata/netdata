@@ -40,14 +40,28 @@ type RunSupervisor struct {
 }
 
 type RunCensus struct {
-	AdmissionRunDrained  bool
-	Admission            AdmissionCensus
-	TransientActive      int
-	TransientPending     int
-	Inherited            InheritedTaskCensus
-	LongLived            LongLivedCensus
-	Frame                FrameCensus
-	RunFinalizerComplete bool
+	AdmissionRunDrained    bool
+	Admission              AdmissionCensus
+	KernelDrained          bool
+	FunctionCatalogDrained bool
+	UIDActive              int
+	TransientActive        int
+	TransientPending       int
+	Inherited              InheritedTaskCensus
+	LongLived              LongLivedCensus
+	Frame                  FrameCensus
+	RunFinalizerComplete   bool
+}
+
+func (census RunCensus) Quiescent() bool {
+	frameDrained := !census.Frame.Poisoned && !census.Frame.Busy &&
+		!census.Frame.PendingControl && census.Frame.RetainedBytes == 0
+	return census.AdmissionRunDrained && census.KernelDrained &&
+		census.FunctionCatalogDrained && census.UIDActive == 0 &&
+		census.TransientActive == 0 && census.TransientPending == 0 &&
+		census.Inherited.Active == 0 &&
+		census.LongLived == (LongLivedCensus{}) && frameDrained &&
+		census.RunFinalizerComplete
 }
 
 type RunTerminalState struct {
@@ -206,12 +220,7 @@ func (rs *RunSupervisor) Terminal(census RunCensus) error {
 		return errors.New("jobmgr run supervisor: terminal while admitting")
 	}
 	rs.publishStoppingLocked()
-	frameDrained := !census.Frame.Poisoned && !census.Frame.Busy &&
-		!census.Frame.PendingControl && census.Frame.RetainedBytes == 0
-	quiescent := census.AdmissionRunDrained && census.TransientActive == 0 &&
-		census.TransientPending == 0 && census.Inherited.Active == 0 &&
-		census.LongLived == (LongLivedCensus{}) && frameDrained &&
-		census.RunFinalizerComplete
+	quiescent := census.Quiescent()
 	if !quiescent {
 		first := rs.dirty == nil
 		rs.dirty = errors.Join(

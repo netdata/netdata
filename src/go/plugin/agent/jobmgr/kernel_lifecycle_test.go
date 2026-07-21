@@ -618,6 +618,23 @@ func TestKernelTerminalNoResponseDisposalCompletesUIDOwnership(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
+func TestKernelRunCensusCountsOnlyActiveUIDOwnership(t *testing.T) {
+	kernel, _, _, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	now := kernel.clock.Now()
+	const uid = "run-census"
+	require.NoError(t, uids.Admit(uid, now))
+
+	require.EqualValues(t, 1, kernel.runCensus().UIDActive)
+
+	require.NoError(t, uids.Complete(uid, true, now))
+	require.Zero(t, kernel.runCensus().UIDActive)
+	active, tombstones, _ := uids.Census()
+	require.Zero(t, active)
+	require.EqualValues(t, 1, tombstones)
+
+	closeUIDLedger(t, uids)
+}
+
 func TestKernelResourceStopCompletesAfterOperationDeadline(t *testing.T) {
 	stopRelease := make(chan struct{})
 	resource := newKernelTestReadyResource("resource", nil, stopRelease)
