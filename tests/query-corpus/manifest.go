@@ -237,6 +237,14 @@ var manifest = map[string]ManifestCase{
 		Proves: "the selector surface with VALUE-exact oracles: nodes/instances/dimensions filters and their scope_ counterparts, '!' negation patterns, label key:value patterns (labels + scope_labels); match-ids/match-names dimension modes with id!=name dims (default matches BOTH; each mode excludes the other's namespace; a no-match response is the bare [time] labels row)",
 		Agent:  Green,
 	},
+	"API/options-long-tail": {
+		Proves: "ms renders epoch-milliseconds; rfc3339 loses to seconds on the v1 formatters (pinned no-op); objectrows emits named row objects; jsonwrap all-dimensions ADDS full_dimension_list/full_chart_list/full_chart_labels while the queried selection stays; tqx wraps datatable in the gviz envelope echoing reqId; tsv-excel == tsv; csv label-quotes quotes the header; v2 minimal-stats drops totals, long-json-keys switches to descriptive keys, group-by-labels flattens the label values into the view",
+		Agent:  Green,
+	},
+	"API/row-reductions": {
+		Proves: "the single-series formats reduce each row by the requested option: min2max = max-min (0 on single-value rows), min, max, average — exact cells over the formatter fixture (default sum pinned by L7/formatters)",
+		Agent:  Green,
+	},
 	"API/fallbacks-and-limits": {
 		Proves: "unknown v1 format silently serves json; unknown weights method silently runs ks2; cardinality_limit at 2 folds five dimensions into the remaining bucket and at >= the dimension count folds nothing",
 		Agent:  Green,
