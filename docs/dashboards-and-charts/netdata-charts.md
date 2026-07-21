@@ -60,35 +60,58 @@ A **dimension** is a value shown on a chart. Dimensions can represent:
 
 Each chart’s legend lists its dimensions. You can hide or show specific dimensions to focus on what matters most.
 
+### How Charts Are Identified
+
+Netdata identifies and organizes charts in several ways, with each identifier serving a different purpose.
+
+| Term                  | Purpose                                          | Example         |
+|-----------------------|--------------------------------------------------|-----------------|
+| Context (metric type) | Groups equivalent metrics across chart instances | `disk.util`     |
+| Chart ID              | Identifies one chart on a node                   | `disk_util.sda` |
+| Chart ID type         | Forms the first part of a chart ID               | `disk_util`     |
+| Family                | Groups related charts for navigation             | `utilization`   |
+| Visualization type    | Controls how the chart is displayed              | `area`          |
+
+A context is the metric type shared by equivalent charts. A chart ID identifies one specific chart on a node and uses the form `[type].[id]`. These identifiers are related but serve different purposes and do not always use the same spelling. For example, the chart `disk_util.sda` belongs to the `disk.util` context and the `utilization` family.
+
+Some common chart ID types and patterns are:
+
+| Type or pattern  | What it covers                                  | Example chart IDs                                          |
+|------------------|-------------------------------------------------|------------------------------------------------------------|
+| `system`         | Host-wide or aggregated system resources        | `system.cpu`, `system.ram`, `system.net`                   |
+| `netdata`        | The Netdata Agent’s runtime and self-monitoring | `netdata.memory`, `netdata.clients`, `netdata.network_api` |
+| `disk`, `disk_*` | Physical and logical disks                      | `disk.sda`, `disk_util.sda`                                |
+| `net`, `net_*`   | Individual network interfaces                   | `net.eth0`, `net_packets.eth0`                             |
+
+:::note
+
+In chart IDs, the `netdata` type identifies charts that monitor the Netdata Agent itself. Their contexts also commonly use the `netdata` namespace, although the complete chart ID and context can differ. For example, chart ID `netdata.clients` belongs to context `netdata.http_api_clients`.
+
+Most `netdata.*` charts do not measure network traffic, but charts such as `netdata.network_api`, `netdata.network_statsd`, and `netdata.network_streaming` measure Agent-specific network I/O for its web/API, StatsD, and streaming connections. They do not represent host-wide network-interface traffic.
+
+For network-interface traffic, use `system.net` for the aggregate bandwidth of interfaces that Netdata classifies as physical, `net.<interface>` for bandwidth on an individual interface, and `net_packets.<interface>` for its packet rate. Interfaces classified as virtual are generally excluded from the `system.net` aggregate; when collected, they appear in individual charts.
+
+:::
+
 ### Contexts
 
-A **context** groups charts by metric type and displayed dimensions. Contexts define how charts are organized and where they appear in the Netdata menu.
+A **context** identifies a metric type shared by equivalent charts. Contexts define how charts are organized and where they appear in the Netdata menu.
 
 **Examples:**
 
-- `apps.cpu` for **Apps CPU Time**
-- `apps.mem` for **Apps Real Memory**
+- `system.cpu` for system CPU utilization
+- `disk.io` for disk I/O bandwidth
+- `net.net` for network-interface bandwidth
 
-The part before the dot (`.`) is the **type**, while the part after is defined by the chart’s developer or its family.
+The part before the dot in a context is its namespace. It identifies a group of related metric types and does not have to match a chart ID type.
 
 Contexts are also used for alert configurations.
 
 ### Families
 
-A **family** represents a specific instance of a hardware or software resource that needs its own chart.
+A **family** groups related charts for navigation and presentation. It is metadata associated with a chart, not part of the chart ID or context.
 
-For example, in disk monitoring:
-
-- Disk drives like `sda` and `sdb` each have their own family.
-
-The combination of **context** and **family** forms the `[context].[family]` naming scheme:
-
-| Context        | `sda` family       | `sdb` family       |
-|----------------|--------------------|--------------------|
-| `disk.io`      | `disk_io.sda`      | `disk_io.sdb`      |
-| `disk.ops`     | `disk_ops.sda`     | `disk_ops.sdb`     |
-| `disk.backlog` | `disk_backlog.sda` | `disk_backlog.sdb` |
-| `disk.util`    | `disk_util.sda`    | `disk_util.sdb`    |
+For example, the `disk.sda` chart has the `disk.io` context and belongs to the `io` family. The `disk_util.sda` chart has the `disk.util` context and belongs to the `utilization` family.
 
 ## Title Bar
 
@@ -177,12 +200,12 @@ The **Group by** dropdown allows you to apply different grouping strategies on t
 
 ![Group by dropdown](https://user-images.githubusercontent.com/43294513/235468819-3af5a1d3-8619-48fb-a8b7-8e8b4cf6a8ff.png)
 
-| Grouping Option    | Description                                                |
-|--------------------|------------------------------------------------------------|
+| Grouping Option    | Description                                                                                               |
+|--------------------|-----------------------------------------------------------------------------------------------------------|
 | Group by Node      | Display each node (hostname) as a separate labeled dimension in the chart legend, with one entry per node |
-| Group by Instance  | Summarize data by instance with one dimension per instance |
-| Group by Dimension | Aggregate data across all nodes by dimension               |
-| Group by Label     | Summarize data based on label values                       |
+| Group by Instance  | Summarize data by instance with one dimension per instance                                                |
+| Group by Dimension | Aggregate data across all nodes by dimension                                                              |
+| Group by Label     | Summarize data based on label values                                                                      |
 
 :::tip
 
@@ -219,11 +242,11 @@ Each chart has a default aggregation function, which you can adjust as needed:
 
 When selecting aggregation functions over time, charts may offer dropdown menus for **Percentiles** and **Trimmed Mean / Median** selection. Below are examples of these dropdowns:
 
-### Percentile Selection Example:
+### Percentile Selection Example
 
 ![Percentile selection dropdown](https://user-images.githubusercontent.com/70198089/236410299-de5f3367-f3b0-4beb-a73f-a49007c543d4.png)
 
-### Trimmed Mean / Median Selection Example:
+### Trimmed Mean / Median Selection Example
 
 ![Trimmed Mean or Median selection dropdown](https://user-images.githubusercontent.com/70198089/236410858-74b46af9-280a-4ab2-ad26-5a6aa9403aa8.png)
 
