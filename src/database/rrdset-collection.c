@@ -790,7 +790,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                 if(rrddim_is_int(rd)) {
                     uint64_t last = (uint64_t)rd->collector.collected.i.last_collected_value;
                     uint64_t new = (uint64_t)rd->collector.collected.i.collected_value;
-                    uint64_t max = (uint64_t)rd->collector.collected.i.collected_value_max;
+                    uint64_t max = rrddim_collected_max_as_uint64(rd);
 
                     // If the new is smaller than the old (overflow/reset), handle wrap
                     if(unlikely(last > new)) {
@@ -818,7 +818,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                     }
                     else {
                         rd->collector.calculated_value +=
-                            (NETDATA_DOUBLE)((int64_t)(rd->collector.collected.i.collected_value - rd->collector.collected.i.last_collected_value))
+                            (NETDATA_DOUBLE)((int64_t)(new - last))
                             * (NETDATA_DOUBLE) rd->multiplier
                             / (NETDATA_DOUBLE) rd->divisor;
                     }

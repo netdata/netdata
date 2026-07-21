@@ -234,7 +234,7 @@ void aclk_check_node_info_and_collectors(void)
         }
 
         if (pp_queue_empty && aclk_host_config->node_info_send_time &&
-            aclk_host_config->node_info_send_time + 30 < now) {
+            nd_time_t_add_compare(aclk_host_config->node_info_send_time, 30, now) < 0) {
             aclk_host_config->node_info_send_time = 0;
             build_node_info(host, NULL);
             schedule_node_state_update(host, 10000);
@@ -242,7 +242,7 @@ void aclk_check_node_info_and_collectors(void)
         }
 
         if (pp_queue_empty && aclk_host_config->node_collectors_send &&
-            aclk_host_config->node_collectors_send + 30 < now) {
+            nd_time_t_add_compare(aclk_host_config->node_collectors_send, 30, now) < 0) {
             build_node_collectors(host);
             internal_error(true, "ACLK SYNC: Sending collectors for %s", rrdhost_hostname(host));
             aclk_host_config->node_collectors_send = 0;
