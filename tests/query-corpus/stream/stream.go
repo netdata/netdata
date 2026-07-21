@@ -212,6 +212,21 @@ func (c *Conn) DefineChart(ch Chart) {
 		ch.ID, ch.Title, ch.Units, ch.Family, ch.Context, ch.Type, ch.Priority, ch.UpdateEvery)
 }
 
+// DimensionNamed buffers a DIMENSION line with an explicit name
+// (distinct from the id) — the match-ids/match-names surface.
+func (c *Conn) DimensionNamed(id, name, algorithm string, mul, div int) {
+	if algorithm == "" {
+		algorithm = "absolute"
+	}
+	if mul == 0 {
+		mul = 1
+	}
+	if div == 0 {
+		div = 1
+	}
+	c.Linef("DIMENSION '%s' '%s' %s %d %d ''", id, name, algorithm, mul, div)
+}
+
 // Dimension buffers a DIMENSION line for the current chart scope.
 func (c *Conn) Dimension(id, algorithm string, mul, div int) {
 	if algorithm == "" {
