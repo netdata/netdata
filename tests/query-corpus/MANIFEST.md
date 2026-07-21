@@ -54,6 +54,11 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | CASE-018/multipass-average | AVERAGE at pass 1 feeds pass 2 the group SUMS — final value inflated ~members-per-group (item 3 family; fix owned by the rollup-correctness SOW) | **red** | n/a | |
 | L7/formatters | classic v1 formats byte/structure-pinned: csv/tsv CRLF endings, literal "null" gap cells, newest-first default + options=flip, unquoted header cells (current contract), csvjsonarray valid JSON + numeric timestamps (#23115/#23117), ssv/ssvcomma/markdown/html/array/json/datatable/jsonp | green | n/a | |
 | CASE-019/v1-json-name-escaping | v1 json/jsonp/csvjsonarray/datatable emit dimension names unescaped — a double-quote in a name (or label value via group_by=label) breaks the JSON; json2 escapes properly | **red** | n/a | |
+| W/value | weights value = after-INCLUSIVE window average (121 pts/120s — ruling pending); rollups = mean of dims; timeframe stats exact; value never rank-normalizes | green | n/a | |
+| W/anomaly-rate-per-metric | per-metric anomaly-rate = true anomaly rates (anomaly bit applied); NONZERO default drops zero weights, explicit options keep them | green | n/a | |
+| CASE-021/multidim-anomaly-rate | the multi-dim weights path (any context selector; v1 default method) never applies the anomaly bit — "anomaly-rate" ranks by plain value averages | **red** | n/a | |
+| W/volume | volume = (hl-bl)/bl x fraction-of-time above/below baseline; equal-averages metrics skipped | green | n/a | |
+| W/ks2 | ks2 exact endpoints (identical diffs → 0, one-sided diffs → 1); spread_results_evenly rank normalization pinned via Go port; intermediate KS values deferred (KSfbar port) | green | n/a | |
 | L8/post-processing | percentage (implies absolute on v2/v3 — as does any non-dimension group-by), absolute, nonzero (+ self-neutralizing all-zero), null2zero, cardinality_limit fold | green | n/a | |
 
 ## Corpus-wide pusher discipline

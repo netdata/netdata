@@ -213,6 +213,26 @@ var manifest = map[string]ManifestCase{
 		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) emit dimension names UNESCAPED between quotes (json.c header loop) — a double-quote in a name (or a label value via group_by=label) produces invalid JSON; the v3 json2 path escapes properly",
 		Agent:  Red,
 	},
+	"W/value": {
+		Proves: "weights method=value: per-metric weight = the window average over NATURAL points with the after-INCLUSIVE window (121 points for a 120s span — rulings batch); MULTINODE rollup rows carry the mean of their dimensions; the per-dimension timeframe stats (min/avg/max/sum/count/anomaly_count) are exact; method=value NEVER rank-normalizes",
+		Agent:  Green,
+	},
+	"W/anomaly-rate-per-metric": {
+		Proves: "weights method=anomaly-rate on the PER-METRIC path (no context selector) applies the anomaly bit: raw weights are the true window anomaly rates; the NONZERO default (no options= given) drops zero-weight results, any explicit options= keeps them",
+		Agent:  Green,
+	},
+	"CASE-021/multidim-anomaly-rate": {
+		Proves: "the MULTI-DIMENSIONAL weights path (any context selector; /api/v1/weights defaults to anomaly-rate) never applies the anomaly bit — raw weights are the PLAIN VALUE AVERAGES, not anomaly rates (the bit is forced only for format=MCP and the per-metric path)",
+		Agent:  Red,
+	},
+	"W/volume": {
+		Proves: "weights method=volume: weight = (highlight-baseline)/baseline x the fraction of highlight time above/below the baseline average (countif); metrics with EQUAL window averages are skipped entirely",
+		Agent:  Green,
+	},
+	"W/ks2": {
+		Proves: "weights method=ks2 exact endpoints: identical consecutive-diff distributions weigh exactly 0, fully one-sided diff distributions with n*d^2>=18 weigh exactly 1 (KSfbar special cases); spread_results_evenly rank normalization pinned via the Go port (unique-value slots, ties share a slot); intermediate KS probabilities are a recorded deferral (KSfbar port)",
+		Agent:  Green,
+	},
 	"L8/post-processing": {
 		Proves: "options=percentage (v2/v3 FORCE absolute with it — and with any non-dimension group-by: shares computed over |values|), options=absolute (|v| at fetch), nonzero (drops all-zero dims; self-neutralizes when everything is zero), null2zero (gap cells become 0), cardinality_limit (top N-1 by |view sum| + 'remaining X dimensions' fold of per-row sums)",
 		Agent:  Green,
