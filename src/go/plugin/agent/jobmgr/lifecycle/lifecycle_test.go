@@ -1363,6 +1363,108 @@ func TestFrameOwnerShortWritePoisonsAndRetains(t *testing.T) {
 	require.ErrorIs(t, owner.Commit(next), ErrFrameOwnerPoisoned)
 }
 
+func TestFrameOwnerLatePoisonBindingReplaysOriginalCause(t *testing.T) {
+	cause := errors.New("write failed")
+	tests := map[string]struct {
+		bind func(*FrameOwner, chan<- error) error
+	}{
+		"process binding": {
+			bind: func(owner *FrameOwner, notified chan<- error) error {
+				return owner.BindPoisoned(func(err error) { notified <- err })
+			},
+		},
+		"run binding": {
+			bind: func(owner *FrameOwner, notified chan<- error) error {
+				return owner.BindRunNotifications(
+					1,
+					func() {},
+					func(err error) { notified <- err },
+					nil,
+				)
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			owner, err := NewFrameOwner(io.Discard)
+			require.NoError(t, err)
+			owner.Poison(cause)
+			notified := make(chan error, 1)
+
+			require.NoError(t, test.bind(owner, notified))
+
+			select {
+			case err := <-notified:
+				require.ErrorIs(t, err, ErrFrameOwnerPoisoned)
+				require.ErrorIs(t, err, cause)
+			default:
+				require.FailNow(t, "late binding did not replay poison")
+			}
+		})
+	}
+}
+
+func TestFrameOwnerTransactionalPreflightAbortsState(t *testing.T) {
+	owner, err := NewFrameOwner(io.Discard)
+	require.NoError(t, err)
+	commits := 0
+	aborts := 0
+
+	err = owner.CommitBorrowedProtocolTransaction(
+		nil,
+		protocolTestTransaction{
+			commit: func() error {
+				commits++
+				return nil
+			},
+			abort: func() error {
+				aborts++
+				return nil
+			},
+		},
+	)
+
+	require.Error(t, err)
+	require.Zero(t, commits)
+	require.Equal(t, 1, aborts)
+	require.False(t, owner.Census().Poisoned)
+}
+
+func TestFrameOwnerWriteFailureAbortsBeforePoisonNotification(t *testing.T) {
+	abortErr := errors.New("abort failed")
+	aborted := false
+	owner, err := NewFrameOwner(shortWriter{})
+	require.NoError(t, err)
+	notified := make(chan error, 1)
+	require.NoError(t, owner.BindPoisoned(func(err error) {
+		require.True(t, aborted)
+		notified <- err
+	}))
+
+	err = owner.CommitBorrowedProtocolTransaction(
+		[]byte("frame"),
+		protocolTestTransaction{
+			commit: func() error {
+				return nil
+			},
+			abort: func() error {
+				aborted = true
+				return abortErr
+			},
+		},
+	)
+
+	require.ErrorIs(t, err, io.ErrShortWrite)
+	require.ErrorIs(t, err, abortErr)
+	select {
+	case poisonErr := <-notified:
+		require.ErrorIs(t, poisonErr, io.ErrShortWrite)
+		require.ErrorIs(t, poisonErr, abortErr)
+	default:
+		require.FailNow(t, "write failure did not notify poison")
+	}
+}
+
 func TestFrameOwnerRunNotificationLeaseCanMoveAfterExactRelease(t *testing.T) {
 	owner, err := NewFrameOwner(io.Discard)
 	require.NoError(t, err)
@@ -1485,4 +1587,17 @@ type shortWriter struct{}
 
 func (shortWriter) Write(payload []byte) (int, error) {
 	return len(payload) - 1, nil
+}
+
+type protocolTestTransaction struct {
+	commit func() error
+	abort  func() error
+}
+
+func (transaction protocolTestTransaction) Commit() error {
+	return transaction.commit()
+}
+
+func (transaction protocolTestTransaction) Abort() error {
+	return transaction.abort()
 }

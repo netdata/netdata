@@ -13,7 +13,9 @@ import (
 
 func TestProviderBackedGenerationScopeOperandValidation(t *testing.T) {
 	store, catalog := newProviderAuthority(t)
-	generations := make(map[string]uint64)
+	t.Cleanup(func() {
+		require.NoError(t, store.Close(context.Background()))
+	})
 	keys := make([]string, 0, len(providerConfigs()))
 	for _, provider := range providerConfigs() {
 		mutation, err := store.PrepareMutation(
@@ -24,15 +26,29 @@ func TestProviderBackedGenerationScopeOperandValidation(t *testing.T) {
 			0,
 		)
 		require.NoError(t, err)
+		t.Cleanup(func() {
+			if mutation.Valid() {
+				require.NoError(t, mutation.Abort())
+			}
+		})
 		result, err := mutation.Commit(context.Background())
 		require.NoError(t, err)
 		require.True(t, result.Applied)
 		key := secretstore.StoreKey(provider.kind, provider.name)
 		keys = append(keys, key)
-		generations[key] = result.Generation
+		t.Cleanup(func() {
+			require.NoError(t, store.Retire(
+				context.Background(),
+				key,
+				result.Generation,
+			))
+		})
 	}
 	scope, err := store.AcquireScope(keys)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, scope.Release(context.Background()))
+	})
 
 	tests := map[string]struct {
 		storeKey        string
@@ -73,13 +89,4 @@ func TestProviderBackedGenerationScopeOperandValidation(t *testing.T) {
 		})
 	}
 
-	require.NoError(t, scope.Release(context.Background()))
-	for _, key := range keys {
-		require.NoError(t, store.Retire(
-			context.Background(),
-			key,
-			generations[key],
-		))
-	}
-	require.NoError(t, store.Close(context.Background()))
 }

@@ -70,3 +70,40 @@ func TestOperationResponseCommitPrecedesDisposalAcknowledgement(
 
 	require.True(t, operation.CanDisposeTerminal())
 }
+
+func TestOperationResponseTerminalStatesRemainTerminalWhenPoisoned(t *testing.T) {
+	tests := map[string]struct {
+		response ResponseState
+		want     ResponseState
+	}{
+		"open becomes poisoned": {
+			response: ResponseOpen,
+			want:     ResponsePoisoned,
+		},
+		"pending becomes poisoned": {
+			response: ResponsePending,
+			want:     ResponsePoisoned,
+		},
+		"committed remains committed": {
+			response: ResponseCommitted,
+			want:     ResponseCommitted,
+		},
+		"not required remains not required": {
+			response: ResponseNotRequired,
+			want:     ResponseNotRequired,
+		},
+		"poisoned remains poisoned": {
+			response: ResponsePoisoned,
+			want:     ResponsePoisoned,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			operation := &OperationGeneration{Response: test.response}
+
+			operation.PoisonResponse()
+
+			require.Equal(t, test.want, operation.Response)
+		})
+	}
+}

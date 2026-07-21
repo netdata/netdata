@@ -135,6 +135,8 @@ func TestAgent_Run(t *testing.T) {
 			cancel()
 			require.NoError(t, writer.Close())
 			require.NoError(t, <-runDone)
+			assert.ErrorIs(t, a.Restart(context.Background()), ErrNotRunning)
+			assert.ErrorIs(t, a.Terminate(context.Background()), ErrNotRunning)
 
 			generations := test.restarts + 1
 			for _, module := range []string{"module1", "module2"} {

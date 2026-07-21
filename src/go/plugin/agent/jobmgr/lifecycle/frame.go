@@ -63,6 +63,7 @@ type FrameOwner struct {
 	busy            bool
 	pendingControl  bool
 	poisoned        bool
+	poisonErr       error
 	retained        []byte
 	commits         uint64
 	onControlReady  func()
@@ -70,6 +71,27 @@ type FrameOwner struct {
 	runtimeObserver RuntimeObserver
 	runBinding      uint64
 	controlBuffer   [ControlFrameBytes]byte
+}
+
+// ProtocolTransaction is the in-memory half of one serialized protocol frame.
+// FrameOwner commits it only after the complete frame is written and aborts it
+// on every other terminal path.
+type ProtocolTransaction interface {
+	Commit() error
+	Abort() error
+}
+
+type protocolCallbackTransaction struct {
+	commit func() error
+	abort  func() error
+}
+
+func (transaction protocolCallbackTransaction) Commit() error {
+	return transaction.commit()
+}
+
+func (transaction protocolCallbackTransaction) Abort() error {
+	return transaction.abort()
 }
 
 func NewFrameOwner(writer io.Writer) (*FrameOwner, error) {
@@ -109,10 +131,10 @@ func (fo *FrameOwner) BindPoisoned(notify func(error)) error {
 		return errors.New("jobmgr frame owner: poison notifier already bound")
 	}
 	fo.onPoisoned = notify
-	poisoned := fo.poisoned
+	poisonErr := fo.poisonErr
 	fo.stateMu.Unlock()
-	if poisoned {
-		notify(ErrFrameOwnerPoisoned)
+	if poisonErr != nil {
+		notify(poisonErr)
 	}
 	return nil
 }
@@ -142,13 +164,13 @@ func (fo *FrameOwner) BindRunNotifications(
 	fo.onPoisoned = poisoned
 	fo.runtimeObserver = observer
 	pending := fo.pendingControl && !fo.busy
-	isPoisoned := fo.poisoned
+	poisonErr := fo.poisonErr
 	fo.stateMu.Unlock()
 	if pending {
 		controlReady()
 	}
-	if isPoisoned {
-		poisoned(ErrFrameOwnerPoisoned)
+	if poisonErr != nil {
+		poisoned(poisonErr)
 	}
 	return nil
 }
@@ -292,7 +314,25 @@ func (fo *FrameOwner) CommitBorrowedProtocolFrame(payload []byte) error {
 	if len(payload) == 0 || len(payload) > MaximumOtherFrameBytes {
 		return errors.New("jobmgr frame owner: invalid borrowed protocol frame size")
 	}
-	return fo.commitOrdinaryTransaction(payload, nil, nil, true)
+	return fo.commitOrdinaryTransaction(payload, nil, true)
+}
+
+// CommitBorrowedProtocolTransaction publishes bytes before making their
+// corresponding in-memory state visible. A failed write runs abort instead.
+func (fo *FrameOwner) CommitBorrowedProtocolTransaction(
+	payload []byte,
+	transaction ProtocolTransaction,
+) error {
+	if transaction == nil {
+		return errors.New("jobmgr frame owner: invalid borrowed protocol transaction")
+	}
+	if len(payload) == 0 || len(payload) > MaximumOtherFrameBytes {
+		return errors.Join(
+			errors.New("jobmgr frame owner: invalid borrowed protocol transaction"),
+			callFrameTransition("abort", transaction, false),
+		)
+	}
+	return fo.commitOrdinaryTransaction(payload, transaction, true)
 }
 
 func (fo *FrameOwner) CommitPreparedProtocolFrame(frame PreparedProtocolFrame) error {
@@ -315,17 +355,20 @@ func (fo *FrameOwner) CommitPreparedProtocolTransaction(
 	if err != nil {
 		return err
 	}
-	return fo.commitOrdinaryTransaction(payload, commit, abort, false)
+	return fo.commitOrdinaryTransaction(
+		payload,
+		protocolCallbackTransaction{commit: commit, abort: abort},
+		false,
+	)
 }
 
 func (fo *FrameOwner) commitOrdinary(payload []byte) error {
-	return fo.commitOrdinaryTransaction(payload, nil, nil, false)
+	return fo.commitOrdinaryTransaction(payload, nil, false)
 }
 
 func (fo *FrameOwner) commitOrdinaryTransaction(
 	payload []byte,
-	commit func() error,
-	abort func() error,
+	transaction ProtocolTransaction,
 	borrowed bool,
 ) error {
 	fo.stateMu.Lock()
@@ -334,11 +377,14 @@ func (fo *FrameOwner) commitOrdinaryTransaction(
 	}
 	if fo.poisoned {
 		fo.stateMu.Unlock()
-		return errors.Join(ErrFrameOwnerPoisoned, callFrameTransition("abort", abort))
+		return errors.Join(
+			ErrFrameOwnerPoisoned,
+			callFrameTransition("abort", transaction, false),
+		)
 	}
 	fo.busy = true
 	fo.stateMu.Unlock()
-	return fo.writeAndRelease(payload, borrowed, commit, abort)
+	return fo.writeAndRelease(payload, borrowed, transaction)
 }
 
 func (fo *FrameOwner) TryCommitControl(plan ControlFramePlan) error {
@@ -365,7 +411,7 @@ func (fo *FrameOwner) TryCommitControl(plan ControlFramePlan) error {
 		fo.poison(encoded, err)
 		return err
 	}
-	return fo.writeAndRelease(encoded, false, nil, nil)
+	return fo.writeAndRelease(encoded, false, nil)
 }
 
 func (fo *FrameOwner) Census() FrameCensus {
@@ -384,21 +430,25 @@ func (fo *FrameOwner) Poison(cause error) {
 func (fo *FrameOwner) writeAndRelease(
 	payload []byte,
 	borrowed bool,
-	commit func() error,
-	abort func() error,
+	transaction ProtocolTransaction,
 ) error {
 	count, err := fo.writer.Write(payload)
 	if err != nil || count != len(payload) {
 		if err == nil {
 			err = io.ErrShortWrite
 		}
-		fo.poison(retainedFramePayload(payload, borrowed), err)
-		return errors.Join(
+		resultErr := errors.Join(
 			fmt.Errorf("jobmgr frame owner: commit: %w", err),
-			callFrameTransition("abort", abort),
+			callFrameTransition("abort", transaction, false),
 		)
+		fo.poison(retainedFramePayload(payload, borrowed), resultErr)
+		return resultErr
 	}
-	if err := callFrameTransition("commit", commit); err != nil {
+	if err := callFrameTransition("commit", transaction, true); err != nil {
+		err = errors.Join(
+			err,
+			callFrameTransition("abort", transaction, false),
+		)
 		fo.poison(retainedFramePayload(payload, borrowed), err)
 		return err
 	}
@@ -426,8 +476,12 @@ func retainedFramePayload(payload []byte, borrowed bool) []byte {
 	return payload
 }
 
-func callFrameTransition(name string, transition func() error) (err error) {
-	if transition == nil {
+func callFrameTransition(
+	name string,
+	transaction ProtocolTransaction,
+	commit bool,
+) (err error) {
+	if transaction == nil {
 		return nil
 	}
 	defer func() {
@@ -440,7 +494,10 @@ func callFrameTransition(name string, transition func() error) (err error) {
 			)
 		}
 	}()
-	return transition()
+	if commit {
+		return transaction.Commit()
+	}
+	return transaction.Abort()
 }
 
 func (fo *FrameOwner) poison(payload []byte, cause error) {
@@ -451,15 +508,17 @@ func (fo *FrameOwner) poison(payload []byte, cause error) {
 	fo.poisoned = true
 	fo.busy = false
 	if first {
+		fo.poisonErr = errors.Join(ErrFrameOwnerPoisoned, cause)
 		fo.retained = payload
 	}
+	poisonErr := fo.poisonErr
 	fo.available.Broadcast()
 	fo.stateMu.Unlock()
 	if first && observer != nil {
 		observer.AddRuntimeCounter(RuntimeCounterFrameFailures, 1)
 	}
 	if first && notify != nil {
-		notify(errors.Join(ErrFrameOwnerPoisoned, cause))
+		notify(poisonErr)
 	}
 }
 

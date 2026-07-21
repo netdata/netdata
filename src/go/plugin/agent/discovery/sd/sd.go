@@ -110,6 +110,7 @@ type (
 		dyncfgCh       chan dyncfg.Function
 		dyncfgMu       sync.Mutex
 		dyncfgPending  map[string]pendingDyncfgFunction
+		dyncfgClosed   bool
 		newPipeline    func(config pipeline.Config) (sdPipeline, error)
 
 		ctx context.Context

@@ -565,7 +565,6 @@ func (j *Job) runOnce() {
 	}
 
 	if err := commitJobOutput(j.out, j.buf.Bytes()); err != nil {
-		j.panicked.Store(true)
 		j.Errorf("collection output failed: %v", err)
 	}
 	j.buf.Reset()

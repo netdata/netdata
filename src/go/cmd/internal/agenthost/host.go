@@ -43,8 +43,10 @@ func Run(a *agent.Agent) error {
 				if err == nil {
 					continue
 				}
-				a.Errorf("restarting the Agent failed: %v", err)
-				restartErr = fmt.Errorf("restart Agent: %w", err)
+				restartErr = restartControlError(err)
+				if restartErr != nil {
+					a.Errorf("restarting the Agent failed: %v", err)
+				}
 			} else {
 				a.Infof("received %s signal (%d). Terminating...", sig, sig)
 			}
@@ -75,6 +77,13 @@ func Run(a *agent.Agent) error {
 			return err
 		}
 	}
+}
+
+func restartControlError(err error) error {
+	if err == nil || errors.Is(err, agent.ErrNotRunning) {
+		return nil
+	}
+	return fmt.Errorf("restart Agent: %w", err)
 }
 
 func waitForRun(done <-chan error, timeout time.Duration) error {

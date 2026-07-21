@@ -55,14 +55,7 @@ func validateResultPlanSize(status int, contentType string, payloadBytes int) er
 	if status < 100 || status > 599 || contentType == "" || payloadBytes < 0 {
 		return errors.New("jobmgr Function result: invalid immutable plan")
 	}
-	deferredBytes := payloadBytes
-	if deferredBytes > 0 {
-		deferredBytes++
-	}
-	if deferredBytes > FunctionPayloadBytes {
-		return fmt.Errorf("%w: deferred payload is %d bytes", ErrFunctionResultTooLarge, deferredBytes)
-	}
-	return nil
+	return validateFunctionPayloadSize(payloadBytes)
 }
 
 type ErrorResult struct{ resultPlan }

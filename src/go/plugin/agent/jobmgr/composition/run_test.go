@@ -5,6 +5,7 @@ package composition
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -193,6 +194,31 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 	require.NoError(t, admission.CloseDrained(1))
 
 	closeRunTestUIDs(t, uids)
+}
+
+func TestRunGenerationConstructionFailureClosesSecretStore(t *testing.T) {
+	var storeCensus func() secretstore.SecretStoreCensus
+	plannerErr := errors.New("planner construction failed")
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+
+	generation, err := newRunGeneration(runGenerationConfig{
+		Generation: 1, ShutdownTimeout: time.Second,
+		Clock: lifecycle.RealClock{}, Admission: lifecycle.NewAdmissionLedger(),
+		UIDs: lifecycle.NewUIDLedger(), Frames: frames,
+		Modules: collectorapi.Registry{}, Jobs: testRunJobServices(t),
+		Discovery: testRunDiscoveryServices(t),
+		Planner: func(
+			capabilities runPlannerCapabilities,
+		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
+			storeCensus = capabilities.StoreCensus
+			return nil, nil, plannerErr
+		},
+	})
+	require.ErrorIs(t, err, plannerErr)
+	require.Nil(t, generation)
+	require.NotNil(t, storeCensus)
+	require.True(t, storeCensus().Closed)
 }
 
 func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {

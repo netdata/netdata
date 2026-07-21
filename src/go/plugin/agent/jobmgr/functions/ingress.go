@@ -7,6 +7,7 @@ import (
 	"errors"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -74,10 +75,9 @@ func (ibb *inputBodyBudget) ReleaseInputBody(token uint64) error {
 }
 
 func (i *Ingress) HandleCall(ctx context.Context, call functionwire.Call) error {
-	now := i.clock.Now()
-	deadline := now.Add(call.Timeout)
-	if call.Timeout == 0 {
-		deadline = now
+	var deadline time.Time
+	if call.Timeout > 0 {
+		deadline = i.clock.Now().Add(call.Timeout)
 	}
 	return i.kernel.Submit(ctx, jobmgr.Request{
 		UID: call.UID, Source: lifecycle.SourceFunction, Route: call.Method,

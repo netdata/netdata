@@ -242,24 +242,26 @@ func (ts *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskRequestRe
 		plan.initialReady = nil
 		plan.initialIdentity = ResourceIdentity{}
 	}
-	slot := ts.freeRequest
-	reused := slot != 0
-	if slot == 0 {
-		if uint64(len(ts.requests)) > uint64(^uint32(0)) {
-			return TaskRequestRef{}, errors.New("jobmgr task supervisor: request reference space exhausted")
+	var slot uint32
+	var record *taskRequest
+	var generation uint32
+	for generation == 0 {
+		slot = ts.freeRequest
+		if slot == 0 {
+			if uint64(len(ts.requests)) > uint64(^uint32(0)) {
+				return TaskRequestRef{}, errors.New("jobmgr task supervisor: request reference space exhausted")
+			}
+			slot = uint32(len(ts.requests))
+			record = &taskRequest{slot: slot}
+			ts.requests = append(ts.requests, record)
+		} else {
+			record = ts.requests[slot]
+			ts.freeRequest = record.freeNext
 		}
-		slot = uint32(len(ts.requests))
-		ts.requests = append(ts.requests, &taskRequest{slot: slot})
-	}
-	record := ts.requests[slot]
-	if reused {
-		ts.freeRequest = record.freeNext
-	}
-	generation := record.generation + 1
-	if generation == 0 {
-		record.freeNext = ts.freeRequest
-		ts.freeRequest = slot
-		return TaskRequestRef{}, errors.New("jobmgr task supervisor: request generation wrapped")
+		generation = record.generation + 1
+		if generation == 0 {
+			*record = taskRequest{slot: slot, generation: record.generation}
+		}
 	}
 	*record = taskRequest{
 		slot: slot, generation: generation, active: true,
@@ -615,7 +617,7 @@ func (ts *TaskSupervisor) allocateSlot() (uint32, *taskSlot, error) {
 	var index uint32
 	var slot *taskSlot
 	if ts.freeSlot == 0 {
-		if uint64(len(ts.slots)) > uint64(^uint32(0)) {
+		if uint64(len(ts.slots)) >= uint64(^uint32(0)) {
 			return 0, nil, errors.New("jobmgr task supervisor: reference space exhausted")
 		}
 		index = uint32(len(ts.slots))

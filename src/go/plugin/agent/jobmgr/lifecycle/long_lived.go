@@ -402,51 +402,11 @@ func (ts *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedger, admis
 			releaseErr,
 		)
 	}
-	index := 0
-	var slot *longLivedSlot
-	if registry.freeHead == 0 {
-		if uint64(len(registry.slots)) > uint64(^uint32(0)) {
-			registry.mu.Unlock()
-			releaseErr := ts.releaseLongLivedAdmission(
-				admission,
-				admissionRef,
-				plan.bytes,
-			)
-			return LongLivedPermit{}, errors.Join(
-				errors.New("jobmgr long-lived permit: reference space exhausted"),
-				releaseErr,
-			)
-		}
-		index = len(registry.slots)
-		slot = &longLivedSlot{}
-		registry.slots = append(registry.slots, slot)
-	} else {
-		index = int(registry.freeHead - 1)
-		slot = registry.slots[index]
-		if slot == nil {
-			registry.mu.Unlock()
-			releaseErr := ts.releaseLongLivedAdmission(
-				admission,
-				admissionRef,
-				plan.bytes,
-			)
-			return LongLivedPermit{}, errors.Join(
-				errors.New("jobmgr long-lived permit: invalid free slot"),
-				releaseErr,
-			)
-		}
-		registry.freeHead = slot.freeNext
-	}
-	generation := slot.generation + 1
-	if generation == 0 {
-		*slot = longLivedSlot{
-			generation: slot.generation,
-			freeNext:   registry.freeHead,
-		}
-		registry.freeHead = uint32(index + 1)
+	index, slot, generation, allocationErr := registry.allocateSlot()
+	if allocationErr != nil {
 		registry.mu.Unlock()
 		releaseErr := ts.releaseLongLivedAdmission(admission, admissionRef, plan.bytes)
-		return LongLivedPermit{}, errors.Join(errors.New("jobmgr long-lived permit: generation wrapped"), releaseErr)
+		return LongLivedPermit{}, errors.Join(allocationErr, releaseErr)
 	}
 	*slot = longLivedSlot{
 		generation: generation, active: true, owner: owner, class: plan.class,
@@ -472,6 +432,40 @@ func (ts *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedger, admis
 	}
 	registry.mu.Unlock()
 	return LongLivedPermit{supervisor: ts, ref: ref, owner: owner, class: plan.class, bytes: plan.bytes}, nil
+}
+
+func (registry *longLivedRegistry) allocateSlot() (
+	int,
+	*longLivedSlot,
+	uint32,
+	error,
+) {
+	for {
+		var index int
+		var slot *longLivedSlot
+		if registry.freeHead == 0 {
+			if uint64(len(registry.slots)) >= uint64(^uint32(0)) {
+				return 0, nil, 0,
+					errors.New("jobmgr long-lived permit: reference space exhausted")
+			}
+			index = len(registry.slots)
+			slot = &longLivedSlot{}
+			registry.slots = append(registry.slots, slot)
+		} else {
+			index = int(registry.freeHead - 1)
+			slot = registry.slots[index]
+			if slot == nil {
+				return 0, nil, 0,
+					errors.New("jobmgr long-lived permit: invalid free slot")
+			}
+			registry.freeHead = slot.freeNext
+		}
+		generation := slot.generation + 1
+		if generation != 0 {
+			return index, slot, generation, nil
+		}
+		*slot = longLivedSlot{generation: slot.generation}
+	}
 }
 
 func (ts *TaskSupervisor) LongLivedCensus() LongLivedCensus {

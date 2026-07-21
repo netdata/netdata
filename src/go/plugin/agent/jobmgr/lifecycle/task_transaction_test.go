@@ -76,9 +76,10 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 			_, ref := enqueueAndDispatchTask(t, supervisor, plan)
 
 			first := <-supervisor.CompletionCh()
-			require.False(t, first.Ref != ref || first.Sequence != 1 ||
-				first.Kind != TaskOutcomePreparedResourceTransaction ||
-				first.Err != nil)
+			require.Equal(t, ref, first.Ref)
+			require.EqualValues(t, 1, first.Sequence)
+			require.Equal(t, TaskOutcomePreparedResourceTransaction, first.Kind)
+			require.NoError(t, first.Err)
 			require.NoError(t, supervisor.CancelWithCause(
 				ref,
 				&StoppingRejection{Generation: 7},
@@ -90,13 +91,15 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 			)
 
 			second := <-supervisor.CompletionCh()
-			require.False(t, second.Ref != ref || second.Sequence != 2 ||
-				second.Kind != TaskOutcomeAppliedResourceTransaction ||
-				second.Err != nil)
+			require.Equal(t, ref, second.Ref)
+			require.EqualValues(t, 2, second.Sequence)
+			require.Equal(t, TaskOutcomeAppliedResourceTransaction, second.Kind)
+			require.NoError(t, second.Err)
 			require.NoError(t, prepared.applyContextErr)
 			disposition, current, err := supervisor.TakeAppliedResourceTransaction(ref, 2, test.scope)
 			require.NoError(t, err)
-			require.False(t, disposition != test.disposition || current != test.resulting)
+			require.Equal(t, test.disposition, disposition)
+			require.Equal(t, test.resulting, current)
 
 			_, preflightResultErr := supervisor.PreflightResult(ref, "tx", 1)
 			require.NoError(t, preflightResultErr)
@@ -208,7 +211,8 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 			)
 			require.Nil(t, seedAdmission.Rejected)
 			count, _, err := admission.TakeGrants(1, &grants)
-			require.False(t, err != nil || count != 1)
+			require.NoError(t, err)
+			require.EqualValues(t, 1, count)
 			seed, err := supervisor.IssueLongLivedPermit(
 				admission,
 				seedAdmission.Ref,
@@ -229,7 +233,8 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 			)
 			require.Nil(t, transactionAdmission.Rejected)
 			count, _, err = admission.TakeGrants(1, &grants)
-			require.False(t, err != nil || count != 1)
+			require.NoError(t, err)
+			require.EqualValues(t, 1, count)
 			scope := ResourceTransactionScope{
 				ID:        "successor",
 				Successor: ResourceIdentity{ID: "successor", Generation: 1},
@@ -259,13 +264,14 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 			require.NoError(t, err)
 			var started [TaskStartServiceQuantum]TaskStart
 			count, _, err = supervisor.Dispatch(context.Background(), 1, &started)
-			require.False(t, err != nil ||
-				count != 1 ||
-				started[0].Request != requestRef ||
-				!errors.Is(started[0].Err, ErrLongLivedRecordCapacity))
+			require.NoError(t, err)
+			require.EqualValues(t, 1, count)
+			require.Equal(t, requestRef, started[0].Request)
+			require.ErrorIs(t, started[0].Err, ErrLongLivedRecordCapacity)
 			require.EqualValues(t, TaskOutcomeNone, started[0].Outcome.Kind())
 			require.False(t, transactionRan.Load())
-			require.False(t, supervisor.Active() != 0 || supervisor.Pending() != 0)
+			require.EqualValues(t, 0, supervisor.Active())
+			require.EqualValues(t, 0, supervisor.Pending())
 
 			_, releaseOrdinaryErr2 := admission.ReleaseOrdinary(transactionAdmission.Ref)
 			require.NoError(t, releaseOrdinaryErr2)
@@ -273,7 +279,9 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 			require.NoError(t, seed.AbortUnused())
 
 			census := admission.Census()
-			require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0 || census.LongLivedBytes != 0)
+			require.EqualValues(t, 0, census.ActiveRecords)
+			require.EqualValues(t, 0, census.OrdinaryBytes)
+			require.EqualValues(t, 0, census.LongLivedBytes)
 		})
 	}
 }

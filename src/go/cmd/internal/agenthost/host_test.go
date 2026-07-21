@@ -7,7 +7,35 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestRestartControlErrorTreatsStoppedProcessAsBenign(t *testing.T) {
+	sentinel := errors.New("restart failed")
+	tests := map[string]struct {
+		err  error
+		want error
+	}{
+		"success": {},
+		"process already stopped": {
+			err: agent.ErrNotRunning,
+		},
+		"wrapped process already stopped": {
+			err: errors.Join(sentinel, agent.ErrNotRunning),
+		},
+		"restart failure": {
+			err:  sentinel,
+			want: sentinel,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.ErrorIs(t, restartControlError(test.err), test.want)
+		})
+	}
+}
 
 func TestWaitForRunReturnsExactTerminalDisposition(t *testing.T) {
 	sentinel := errors.New("dirty run")

@@ -196,6 +196,46 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 	}
 }
 
+func TestPreparedResourceTransactionAbortsGraphMutationOnPanic(t *testing.T) {
+	successorIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
+	events := []string{}
+	successor := &transactionTestPreparedResource{
+		identity:    successorIdentity,
+		events:      &events,
+		acceptPanic: "accept panic",
+	}
+	graph, err := dyncfg.NewGraph(nil)
+	require.NoError(t, err)
+	change := dyncfg.GraphChange{
+		ID: "job",
+		Config: &dyncfg.GraphConfig{
+			ID: "job", Module: "module", Name: "job",
+		},
+	}
+	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{change})
+	require.NoError(t, err)
+	result, err := lifecycle.NewSealedResult(200, "application/json", nil)
+	require.NoError(t, err)
+	transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
+		Scope: lifecycle.ResourceTransactionScope{
+			ID: "job", Successor: successorIdentity,
+		},
+		Disposition: lifecycle.ResourceTransactionInstalled,
+		Successor:   successor,
+		Graph:       graph, Mutation: mutation, MutationPrepared: true,
+		Result: result, Cleanup: func() error { return nil },
+	})
+	require.NoError(t, err)
+
+	require.Panics(t, func() {
+		_, _ = transaction.Apply(context.Background())
+	})
+
+	next, err := graph.PrepareMutation([]dyncfg.GraphChange{change})
+	require.NoError(t, err)
+	require.NoError(t, graph.Abort(next))
+}
+
 func TestPreparedResourceTransactionSettlesBeforeFailureResolution(t *testing.T) {
 	var events []string
 	successorIdentity := lifecycle.ResourceIdentity{
@@ -251,11 +291,12 @@ func TestPreparedResourceTransactionSettlesBeforeFailureResolution(t *testing.T)
 }
 
 type transactionTestPreparedResource struct {
-	identity   lifecycle.ResourceIdentity
-	ready      lifecycle.ReadyResource
-	events     *[]string
-	acceptErr  error
-	disposeErr error
+	identity    lifecycle.ResourceIdentity
+	ready       lifecycle.ReadyResource
+	events      *[]string
+	acceptErr   error
+	acceptPanic any
+	disposeErr  error
 }
 
 func (ttpr *transactionTestPreparedResource) Identity() lifecycle.ResourceIdentity {
@@ -267,6 +308,9 @@ func (ttpr *transactionTestPreparedResource) AcceptStart(
 	expected uint64,
 ) (lifecycle.ReadyResource, error) {
 	*ttpr.events = append(*ttpr.events, "successor-accept")
+	if ttpr.acceptPanic != nil {
+		panic(ttpr.acceptPanic)
+	}
 	if ttpr.acceptErr != nil {
 		return nil, ttpr.acceptErr
 	}

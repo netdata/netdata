@@ -15,6 +15,14 @@ type pendingDyncfgFunction struct {
 	done chan struct{}
 }
 
+type dyncfgAdmission uint8
+
+const (
+	dyncfgAdmissionAccepted dyncfgAdmission = iota + 1
+	dyncfgAdmissionDuplicate
+	dyncfgAdmissionClosed
+)
+
 // enqueueDyncfgFunction blocks until the function is accepted by the run loop
 // and fully executed, or service discovery shuts down. The synchronous
 // completion lets an owning Function transaction capture one terminal result
@@ -24,46 +32,50 @@ func (d *ServiceDiscovery) enqueueDyncfgFunction(fn dyncfg.Function) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	pending, ok := d.beginDyncfg(fn)
-	if !ok {
-		d.dyncfgApi.SendCodef(
-			fn,
-			409,
-			"A command with UID '%s' is already pending.",
-			fn.UID(),
-		)
+	pending, admission := d.beginDyncfg(fn)
+	switch admission {
+	case dyncfgAdmissionDuplicate:
+		d.dyncfgApi.SendCodef(fn, 409, "A command with UID '%s' is already pending.", fn.UID())
+		return
+	case dyncfgAdmissionClosed:
+		d.dyncfgApi.SendCodef(fn, 503, sdShuttingDownMsg)
 		return
 	}
 	select {
 	case d.dyncfgCh <- fn:
 		<-pending.done
 	case <-ctx.Done():
-		d.cancelDyncfg(fn)
-		d.dyncfgApi.SendCodef(fn, 503, sdShuttingDownMsg)
+		if d.cancelDyncfg(fn) {
+			d.dyncfgApi.SendCodef(fn, 503, sdShuttingDownMsg)
+		}
 	}
 }
 
 func (d *ServiceDiscovery) beginDyncfg(
 	fn dyncfg.Function,
-) (pendingDyncfgFunction, bool) {
+) (pendingDyncfgFunction, dyncfgAdmission) {
+	d.dyncfgMu.Lock()
+	defer d.dyncfgMu.Unlock()
+	if d.dyncfgClosed {
+		return pendingDyncfgFunction{}, dyncfgAdmissionClosed
+	}
 	if fn.UID() == "" {
 		done := make(chan struct{})
 		close(done)
-		return pendingDyncfgFunction{fn: fn, done: done}, true
+		return pendingDyncfgFunction{fn: fn, done: done},
+			dyncfgAdmissionAccepted
 	}
-	d.dyncfgMu.Lock()
-	defer d.dyncfgMu.Unlock()
 	if d.dyncfgPending == nil {
 		d.dyncfgPending = make(map[string]pendingDyncfgFunction)
 	}
 	if _, exists := d.dyncfgPending[fn.UID()]; exists {
-		return pendingDyncfgFunction{}, false
+		return pendingDyncfgFunction{}, dyncfgAdmissionDuplicate
 	}
 	pending := pendingDyncfgFunction{
 		fn: fn, done: make(chan struct{}),
 	}
 	d.dyncfgPending[fn.UID()] = pending
-	return pending, true
+	return pending, dyncfgAdmissionAccepted
 }
 
 func (d *ServiceDiscovery) completeDyncfg(fn dyncfg.Function) {
@@ -81,17 +93,22 @@ func (d *ServiceDiscovery) completeDyncfg(fn dyncfg.Function) {
 	}
 }
 
-func (d *ServiceDiscovery) cancelDyncfg(fn dyncfg.Function) {
+func (d *ServiceDiscovery) cancelDyncfg(fn dyncfg.Function) bool {
 	if fn.UID() == "" {
-		return
+		return true
 	}
 	d.dyncfgMu.Lock()
+	defer d.dyncfgMu.Unlock()
+	if _, exists := d.dyncfgPending[fn.UID()]; !exists {
+		return false
+	}
 	delete(d.dyncfgPending, fn.UID())
-	d.dyncfgMu.Unlock()
+	return true
 }
 
 func (d *ServiceDiscovery) failPendingDyncfg() {
 	d.dyncfgMu.Lock()
+	d.dyncfgClosed = true
 	pending := make([]pendingDyncfgFunction, 0, len(d.dyncfgPending))
 	for uid, command := range d.dyncfgPending {
 		delete(d.dyncfgPending, uid)

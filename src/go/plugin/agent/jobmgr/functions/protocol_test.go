@@ -38,6 +38,20 @@ func TestFunctionPublicationFrame(t *testing.T) {
 	require.Error(t, port.Withdraw(handle))
 }
 
+func TestFunctionWithdrawalUsesRegistrationNameBytes(t *testing.T) {
+	name := "module:\u0085method"
+	registration, err := encodeFunctionRegistration(PublicationRecord{
+		Name: name, Generation: 1, Timeout: 1,
+		Help: "help", Tags: "top", Access: "0x0000",
+	})
+	require.NoError(t, err)
+	withdrawal, err := encodeFunctionWithdrawal(name)
+	require.NoError(t, err)
+
+	require.Contains(t, string(registration), `"`+name+`"`)
+	require.Equal(t, "FUNCTION_DEL GLOBAL \""+name+"\"\n\n", string(withdrawal))
+}
+
 func TestFunctionPublicationFrameRejectsInjection(t *testing.T) {
 	tests := map[string]struct {
 		mutate func(*PublicationRecord)

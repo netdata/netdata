@@ -92,6 +92,31 @@ func TestRepeatedStringValuePreflightsExactDeferredBoundary(t *testing.T) {
 	}
 }
 
+func TestResultPlanSizeUsesCanonicalPayloadBoundary(t *testing.T) {
+	tests := map[string]int{
+		"negative":        -1,
+		"empty":           0,
+		"largest valid":   FunctionPayloadBytes - 1,
+		"at limit":        FunctionPayloadBytes,
+		"integer maximum": math.MaxInt,
+	}
+	for name, payloadBytes := range tests {
+		t.Run(name, func(t *testing.T) {
+			planErr := validateResultPlanSize(200, "application/json", payloadBytes)
+			canonicalErr := validateFunctionPayloadSize(payloadBytes)
+
+			if payloadBytes < 0 {
+				require.Error(t, planErr)
+				return
+			}
+			require.Equal(t, canonicalErr == nil, planErr == nil)
+			if canonicalErr != nil {
+				require.ErrorIs(t, planErr, ErrFunctionResultTooLarge)
+			}
+		})
+	}
+}
+
 func TestRepeatedStringValueAppendGrowsDestination(t *testing.T) {
 	pad, err := RepeatedStringValue(4*1024, 'A')
 	require.NoError(t, err)

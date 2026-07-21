@@ -392,9 +392,7 @@ func (c *Controller) prepareRemove(
 			),
 		)
 	}
-	if affected := formatSecretJobs(
-		c.dependencies.Affected(target.key, false),
-	); affected != "" {
+	if affected := formatSecretJobs(c.dependencies.Affected(target.key, false)); affected != "" {
 		return c.noopMessage(
 			scope,
 			current,
@@ -435,12 +433,16 @@ func (c *Controller) prepareRemove(
 	}
 	return newPreparedSecretTransaction(
 		preparedSecretSpec{
-			scope: scope, current: current,
-			store: c.store, storeKey: target.key,
-			mutation: &mutation, remove: true,
-			result:     mustSecretMessage(200, ""),
-			cleanup:    c.configDeleteCleanup(target.key),
-			controller: c, removeEntry: true,
+			scope:       scope,
+			current:     current,
+			store:       c.store,
+			storeKey:    target.key,
+			mutation:    mutation,
+			remove:      true,
+			result:      mustSecretMessage(200, ""),
+			cleanup:     c.configDeleteCleanup(target.key),
+			controller:  c,
+			removeEntry: true,
 		},
 	)
 }
@@ -516,7 +518,7 @@ func (c *Controller) prepareStoreMutation(
 					permit:   permit,
 					store:    c.store,
 					storeKey: config.ExposedKey(),
-					mutation: &mutation,
+					mutation: mutation,
 					abort:    true,
 					result: mustSecretMessage(
 						400,
@@ -566,7 +568,7 @@ func (c *Controller) prepareStoreMutation(
 			permit:     permit,
 			store:      c.store,
 			storeKey:   config.ExposedKey(),
-			mutation:   &mutation,
+			mutation:   mutation,
 			result:     mustSecretMessage(200, ""),
 			cleanup:    c.configCreateCleanup(entry),
 			controller: c, entry: &entry,

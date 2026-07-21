@@ -14,20 +14,22 @@ import (
 )
 
 func TestFunctionIngressLeavesResourceSelectionToCatalog(t *testing.T) {
+	now := time.Unix(100, 0)
 	tests := map[string]struct {
-		call functionwire.Call
+		call         functionwire.Call
+		wantDeadline time.Time
 	}{
 		"collector method": {
 			call: functionwire.Call{
 				UID: "method", Method: "module:method",
 				Timeout: time.Second,
 			},
+			wantDeadline: now.Add(time.Second),
 		},
-		"DynCfg method": {
+		"DynCfg method without timeout": {
 			call: functionwire.Call{
 				UID: "dyncfg", Method: "config",
-				Args:    []string{"go.d:collector:module:job", "enable"},
-				Timeout: time.Second,
+				Args: []string{"go.d:collector:module:job", "enable"},
 			},
 		},
 	}
@@ -36,20 +38,43 @@ func TestFunctionIngressLeavesResourceSelectionToCatalog(t *testing.T) {
 			port := &recordingIngressPort{done: make(chan struct{})}
 			ingress, err := NewIngress(
 				port,
-				lifecycle.RealClock{},
+				ingressTestClock{now: now},
 				func() {},
 			)
 			require.NoError(t, err)
 
 			require.NoError(t, ingress.HandleCall(context.Background(), test.call))
+			if len(test.call.Args) != 0 {
+				test.call.Args[0] = "mutated"
+			}
 
-			require.EqualValues(t, 1, len(port.requests))
+			require.Len(t, port.requests, 1)
 			request := port.requests[0]
-			require.EqualValues(t, lifecycle.SourceFunction, request.Source)
-			require.EqualValues(t, "", request.LaneKey)
-			require.EqualValues(t, test.call.Method, request.Route)
+			require.Equal(t, lifecycle.SourceFunction, request.Source)
+			require.Empty(t, request.LaneKey)
+			require.Equal(t, test.call.UID, request.UID)
+			require.Equal(t, test.call.Method, request.Route)
+			if len(test.call.Args) == 0 {
+				require.Empty(t, request.Args)
+			} else {
+				require.Equal(t, []string{"go.d:collector:module:job", "enable"}, request.Args)
+			}
+			require.Equal(t, test.call.Timeout, request.Timeout)
+			require.Equal(t, test.wantDeadline, request.Deadline)
 		})
 	}
+}
+
+type ingressTestClock struct {
+	now time.Time
+}
+
+func (clock ingressTestClock) Now() time.Time {
+	return clock.now
+}
+
+func (ingressTestClock) Arm(string, time.Duration) (<-chan time.Time, func()) {
+	panic("unexpected timer arm")
 }
 
 type recordingIngressPort struct {

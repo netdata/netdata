@@ -124,7 +124,7 @@ func (a *Agent) Restart(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return process.Restart(ctx)
+	return normalizeProcessControlError(process.Restart(ctx))
 }
 
 func (a *Agent) Terminate(ctx context.Context) error {
@@ -132,7 +132,14 @@ func (a *Agent) Terminate(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return process.Terminate(ctx)
+	return normalizeProcessControlError(process.Terminate(ctx))
+}
+
+func normalizeProcessControlError(err error) error {
+	if errors.Is(err, composition.ErrProcessStopped) {
+		return ErrNotRunning
+	}
+	return err
 }
 
 func (a *Agent) run(ctx context.Context) error {

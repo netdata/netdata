@@ -110,7 +110,7 @@ func (pst *preparedSecretTransaction) apply(
 					"jobmgr secrets: validation transaction lost its mutation",
 				)
 		}
-		if err := spec.mutation.Abort(ctx); err != nil {
+		if err := spec.mutation.Abort(); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
 		}
 		spec.mutation = nil
@@ -164,19 +164,14 @@ func (pst *preparedSecretTransaction) apply(
 	if !result.Applied {
 		var abortErr error
 		if !commitCalled {
-			rollbackCtx := ctx
 			if commands != nil {
-				var rollbackErr error
-				rollbackCtx, rollbackErr =
-					commands.RollbackContext()
+				_, rollbackErr := commands.RollbackContext()
 				postCommitErr = errors.Join(
 					postCommitErr,
 					rollbackErr,
 				)
 			}
-			if rollbackCtx != nil {
-				abortErr = spec.mutation.Abort(rollbackCtx)
-			}
+			abortErr = spec.mutation.Abort()
 		}
 		if predecessorRestored && abortErr == nil {
 			return lifecycle.NewAppliedResourceTransaction(
@@ -274,7 +269,7 @@ func (pst *preparedSecretTransaction) Dispose(
 		)
 	}
 	if spec.mutation != nil {
-		err = spec.mutation.Abort(ctx)
+		err = spec.mutation.Abort()
 	} else if spec.permit.Valid() {
 		err = spec.permit.AbortUnused()
 	}

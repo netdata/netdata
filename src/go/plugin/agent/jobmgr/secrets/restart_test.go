@@ -18,9 +18,10 @@ import (
 )
 
 type restartTestCommandScope struct {
-	normalErr     error
-	rollbackErr   error
-	rollbackCalls int
+	normalErr          error
+	rollbackErr        error
+	rollbackContextErr error
+	rollbackCalls      int
 }
 
 func (rtcs *restartTestCommandScope) SubmitPreparedAndWait(
@@ -39,10 +40,13 @@ func (rtcs *restartTestCommandScope) SubmitRollbackAndWait(
 	return rtcs.rollbackErr
 }
 
-func (*restartTestCommandScope) RollbackContext() (
+func (rtcs *restartTestCommandScope) RollbackContext() (
 	context.Context,
 	error,
 ) {
+	if rtcs.rollbackContextErr != nil {
+		return nil, rtcs.rollbackContextErr
+	}
 	return context.Background(), nil
 }
 

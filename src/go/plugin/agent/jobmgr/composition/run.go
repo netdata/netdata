@@ -116,7 +116,20 @@ func dynCfgPublication(
 	}
 }
 
-func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
+func newRunGeneration(
+	config runGenerationConfig,
+) (generation *runGeneration, resultErr error) {
+	var stores *secretstore.SecretStore
+	var secretController *secretadapter.Controller
+	var functions *FunctionAssembly
+	defer func() {
+		if resultErr != nil {
+			resultErr = errors.Join(
+				resultErr,
+				abortRunConstruction(functions, secretController, stores),
+			)
+		}
+	}()
 	if config.Generation == 0 ||
 		config.ShutdownTimeout <= 0 ||
 		config.Clock == nil ||
@@ -153,7 +166,7 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	if err != nil {
 		return nil, err
 	}
-	stores, err := secretstore.NewSecretStore(
+	stores, err = secretstore.NewSecretStore(
 		config.Jobs.Resolver,
 	)
 	if err != nil {
@@ -192,7 +205,7 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretController, err := secretadapter.NewController(
+	secretController, err = secretadapter.NewController(
 		secretadapter.ControllerConfig{
 			Epoch:        config.Generation,
 			PluginName:   config.Jobs.PluginName,
@@ -245,7 +258,7 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		config.Discovery.BuildContext.Out = serviceDiscovery.capture
 		config.Discovery.BuildContext.FnReg = serviceDiscovery
 	}
-	functions, err := NewFunctionAssembly(
+	functions, err = NewFunctionAssembly(
 		config.Generation,
 		config.Modules,
 		config.Frames,
@@ -256,7 +269,7 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	}
 	scheduler, err := joboutput.NewScheduler(functions)
 	if err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
+		return nil, err
 	}
 	jobs, err := joboutput.NewFactory(joboutput.FactoryConfig{
 		PluginName: config.Jobs.PluginName,
@@ -281,7 +294,7 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		Observer:  metrics,
 	})
 	if err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
+		return nil, err
 	}
 	configModules, err := joboutput.NewConfigModuleFactory(
 		joboutput.ConfigModuleFactoryConfig{
@@ -299,7 +312,7 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		},
 	)
 	if err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
+		return nil, err
 	}
 	dynCfgJobs, err := joboutput.NewDynCfgJobController(
 		joboutput.DynCfgJobControllerConfig{
@@ -314,10 +327,10 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		},
 	)
 	if err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
+		return nil, err
 	}
 	if err := dynCfgBinding.bind(dynCfgJobs); err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
+		return nil, err
 	}
 	planner, finalizer, err := config.Planner(runPlannerCapabilities{
 		Tasks: tasks, Functions: functions,
@@ -334,12 +347,11 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		StoreCensus: stores.Census,
 	})
 	if err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
+		return nil, err
 	}
 	if planner == nil || finalizer == nil {
-		return nil, errors.Join(
-			errors.New("jobmgr composition: planner factory returned incomplete ports"),
-			functions.abortConstruction(),
+		return nil, errors.New(
+			"jobmgr composition: planner factory returned incomplete ports",
 		)
 	}
 	inputBodyGrants := make(chan lifecycle.AdmissionGrant, 1)
@@ -362,26 +374,26 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		functions.Catalog(),
 	)
 	if err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
+		return nil, err
 	}
 	loop, err := jobmgr.NewKernelLoop(kernel)
 	if err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
+		return nil, err
 	}
 	if err := functions.Bind(kernel); err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
+		return nil, err
 	}
 	if err := secretController.Bind(
 		secretDependentJobBinding{controller: dynCfgJobs},
 	); err != nil {
-		return nil, errors.Join(err, functions.abortConstruction())
+		return nil, err
 	}
 	if metrics != nil {
 		if err := kernel.BindRuntimeObserver(metrics); err != nil {
-			return nil, errors.Join(err, functions.abortConstruction())
+			return nil, err
 		}
 		if err := metrics.register(config.Jobs.Runtime); err != nil {
-			return nil, errors.Join(err, functions.abortConstruction())
+			return nil, err
 		}
 	}
 	return &runGeneration{
@@ -400,6 +412,27 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		metrics: metrics, runtime: config.Jobs.Runtime,
 		runtimeRegistered: metrics != nil,
 	}, nil
+}
+
+func abortRunConstruction(
+	functions *FunctionAssembly,
+	controller *secretadapter.Controller,
+	stores *secretstore.SecretStore,
+) error {
+	functionErr := functions.abortConstruction()
+	if controller != nil {
+		return errors.Join(
+			functionErr,
+			controller.Close(context.Background()),
+		)
+	}
+	if stores != nil {
+		return errors.Join(
+			functionErr,
+			stores.Close(context.Background()),
+		)
+	}
+	return functionErr
 }
 
 func (rg *runGeneration) start(ctx context.Context) error {
@@ -490,7 +523,7 @@ func (rg *runGeneration) abortConstruction() error {
 	}
 	return errors.Join(
 		rg.releaseRuntimeMetrics(),
-		rg.functions.abortConstruction(),
+		abortRunConstruction(rg.functions, rg.secrets, nil),
 	)
 }
 

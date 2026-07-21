@@ -5,12 +5,14 @@ package joboutput
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -128,6 +130,79 @@ func TestFrameWriterSuccessfulCommitDoesNotCopy(t *testing.T) {
 		}
 	})
 	require.EqualValues(t, 0, allocations)
+}
+
+func TestFrameWriterCommitsOutputAndStateAsOneTransaction(t *testing.T) {
+	writeErr := errors.New("write failed")
+	commitErr := errors.New("commit failed")
+	tests := map[string]struct {
+		writeErr   error
+		commitErr  error
+		wantErr    error
+		wantEvents []string
+		wantOutput bool
+		wantPoison bool
+	}{
+		"success": {
+			wantEvents: []string{"write", "commit"}, wantOutput: true,
+		},
+		"write failure aborts state": {
+			writeErr: writeErr, wantErr: writeErr,
+			wantEvents: []string{"write", "abort"}, wantPoison: true,
+		},
+		"state failure aborts and poisons written output": {
+			commitErr: commitErr, wantErr: commitErr,
+			wantEvents: []string{"write", "commit", "abort"},
+			wantOutput: true, wantPoison: true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var output bytes.Buffer
+			var events []string
+			owner, err := lifecycle.NewFrameOwner(frameWriteFunc(func(payload []byte) (int, error) {
+				events = append(events, "write")
+				if test.writeErr != nil {
+					return 0, test.writeErr
+				}
+				return output.Write(payload)
+			}))
+			require.NoError(t, err)
+			writer := FrameWriter{Owner: owner}
+
+			err = writer.CommitJobOutput(
+				[]byte("BEGIN x\nEND\n\n"),
+				&recordingFrameState{
+					events: &events, commitErr: test.commitErr,
+				},
+			)
+			require.ErrorIs(t, err, test.wantErr)
+			assert.Equal(t, test.wantEvents, events)
+			assert.Equal(t, test.wantOutput, output.Len() != 0)
+			assert.Equal(t, test.wantPoison, owner.Census().Poisoned)
+		})
+	}
+}
+
+type recordingFrameState struct {
+	events    *[]string
+	commitErr error
+}
+
+func (state *recordingFrameState) Commit() error {
+	*state.events = append(*state.events, "commit")
+	return state.commitErr
+}
+
+func (state *recordingFrameState) Abort() error {
+	*state.events = append(*state.events, "abort")
+	return nil
+}
+
+type frameWriteFunc func([]byte) (int, error)
+
+func (write frameWriteFunc) Write(payload []byte) (int, error) {
+	return write(payload)
 }
 
 type recordingManagedJob struct {

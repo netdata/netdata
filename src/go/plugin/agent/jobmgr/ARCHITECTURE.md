@@ -281,8 +281,9 @@ adapter differs (`joboutput/runtime_adapter.go`, `framework/jobruntime`):
 
 - **V1** declares `Charts()` and returns `Collect() map[string]int64`.
 - **V2** writes to a `metrix.CollectorStore`, supplies `ChartTemplateYAML()`
-  (rendered by the chart engine), and is wired to the runtime service and the
-  vnode registry so it can emit host-scoped / vnode metrics.
+  (rendered by the chart engine), and is wired to the runtime service. Each V2
+  scope owns its last successful host definition; the shared vnode registry
+  only diagnoses conflicting metadata after successful output.
 
 ### Autodetection retries
 
@@ -463,7 +464,7 @@ crosses a reload.
 | `framework/functions` | Passive Function values and the stdin input capsule |
 | `framework/dyncfg` | The dynamic-configuration `Graph` |
 | `framework/jobruntime` | V1 / V2 job runtime and host/vnode scope |
-| `framework/vnoderegistry` | Vnode metadata registry |
+| `framework/vnoderegistry` | Post-success vnode owner/conflict registry |
 | `agent/secrets/resolver` | Atomic config clone, reference compilation, scoped resolution |
 | `agent/secrets/secretstore` | Frozen creator catalog and per-run store generations |
 | `agent/discovery` | Provider catalog and the discovery pipeline generation |

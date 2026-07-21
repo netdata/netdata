@@ -388,6 +388,35 @@ func TestJob_MainLoop_Panic(t *testing.T) {
 	assert.True(t, m.CleanupDone)
 }
 
+func TestJob_OutputFailureDoesNotReportCollectorPanic(t *testing.T) {
+	mod := &collectorapi.MockCollectorV1{
+		ChartsFunc: func() *collectorapi.Charts {
+			return &collectorapi.Charts{
+				&collectorapi.Chart{
+					ID: "id", Title: "title", Units: "units",
+					Dims: collectorapi.Dims{&collectorapi.Dim{ID: "value"}},
+				},
+			}
+		},
+		CollectFunc: func(context.Context) map[string]int64 {
+			return map[string]int64{"value": 1}
+		},
+	}
+	job := NewJob(JobConfig{
+		PluginName: pluginName, Name: jobName, ModuleName: modName,
+		FullName: modName + "_" + jobName, Module: mod,
+		Out: writeFunc(func([]byte) (int, error) {
+			return 0, errors.New("write failed")
+		}),
+		UpdateEvery: 1,
+	})
+	require.NoError(t, job.AutoDetection(context.Background()))
+
+	job.runOnce()
+
+	assert.False(t, job.Panicked())
+}
+
 func TestJob_Tick(t *testing.T) {
 	job := newTestJob()
 	for i := range 3 {

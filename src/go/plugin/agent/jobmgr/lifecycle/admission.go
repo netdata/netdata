@@ -154,6 +154,7 @@ type AdmissionLedger struct {
 	longLivedBytes          int64                       // total bytes retained by long-lived permits
 	inputBodyNextGeneration uint64                      // next input-body reservation generation
 	freeRecords             int                         // number of free record slots
+	retiredRecords          int                         // exhausted ABA slots permanently outside the freelist
 	activeRecords           int                         // number of active reservation records
 	runGeneration           uint64                      // current run generation (stale reservations rejected)
 	cleanupWaiting          int                         // count of cleanup reservations awaiting the single grant
@@ -1002,7 +1003,8 @@ func (al *AdmissionLedger) Census() AdmissionCensus {
 
 func (al *AdmissionLedger) allOperationRecordsFree() bool {
 	return al.activeRecords == 0 &&
-		al.freeRecords == len(al.records)-inputBodyRecordSlot-1
+		al.freeRecords+al.retiredRecords ==
+			len(al.records)-inputBodyRecordSlot-1
 }
 
 func (al *AdmissionLedger) allRadixNodesFree() bool {
@@ -1047,29 +1049,29 @@ func (al *AdmissionLedger) bindRunGeneration(runGeneration uint64) {
 }
 
 func (al *AdmissionLedger) allocateRecord(runGeneration uint64, lane AdmissionLaneRef, bytes int64, state admissionRecordState) (AdmissionRef, error) {
-	slot := al.freeRecordHead
-	if slot == 0 {
-		if uint64(len(al.records)) > uint64(^uint32(0)) {
-			return AdmissionRef{}, errors.New(
-				"jobmgr admission: record reference space exhausted",
-			)
+	var slot uint32
+	var record *admissionRecord
+	var generation uint32
+	for generation == 0 {
+		slot = al.freeRecordHead
+		if slot == 0 {
+			if uint64(len(al.records)) > uint64(^uint32(0)) {
+				return AdmissionRef{}, errors.New(
+					"jobmgr admission: record reference space exhausted",
+				)
+			}
+			slot = uint32(len(al.records))
+			al.records = append(al.records, admissionRecord{})
+		} else {
+			al.freeRecordHead = al.records[slot].next
+			al.freeRecords--
 		}
-		slot = uint32(len(al.records))
-		al.records = append(al.records, admissionRecord{})
-	} else {
-		al.freeRecordHead = al.records[slot].next
-		al.freeRecords--
-	}
-	record := &al.records[slot]
-	generation := record.generation + 1
-	if generation == 0 {
-		*record = admissionRecord{
-			generation: record.generation,
-			next:       al.freeRecordHead,
+		record = &al.records[slot]
+		generation = record.generation + 1
+		if generation == 0 {
+			*record = admissionRecord{generation: record.generation}
+			al.retiredRecords++
 		}
-		al.freeRecordHead = slot
-		al.freeRecords++
-		return AdmissionRef{}, errors.New("jobmgr admission: record generation wrapped")
 	}
 	al.nextTicket++
 	if al.nextTicket == 0 {

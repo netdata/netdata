@@ -30,9 +30,7 @@ type ResolutionScope struct {
 	pins     map[string]*StoreGeneration
 }
 
-func (store *SecretStore) AcquireScope(
-	keys []string,
-) (*ResolutionScope, error) {
+func (store *SecretStore) AcquireScope(keys []string) (*ResolutionScope, error) {
 	if store == nil || len(keys) == 0 {
 		return nil, errors.New("secretstore: invalid scope request")
 	}
@@ -67,10 +65,6 @@ func (store *SecretStore) AcquireScope(
 		pins = append(pins, record.current)
 	}
 	next := slot.generation + 1
-	if next == 0 {
-		store.releaseUnusedScopeSlot(index, slot)
-		return nil, errors.New("secretstore: scope generation wrapped")
-	}
 	for _, generation := range pins {
 		generation.readers++
 		store.readers++
@@ -93,23 +87,28 @@ func (store *SecretStore) allocateScope() (
 	*scopeSlot,
 	error,
 ) {
-	if store.freeScope == 0 {
-		if uint64(len(store.scopes)) > uint64(^uint32(0)) {
-			return 0, nil,
-				errors.New("secretstore: scope reference exhausted")
+	for {
+		if store.freeScope == 0 {
+			if uint64(len(store.scopes)) >= uint64(^uint32(0)) {
+				return 0, nil,
+					errors.New("secretstore: scope reference exhausted")
+			}
+			index := uint32(len(store.scopes))
+			slot := &scopeSlot{}
+			store.scopes = append(store.scopes, slot)
+			return index, slot, nil
 		}
-		index := uint32(len(store.scopes))
-		slot := &scopeSlot{}
-		store.scopes = append(store.scopes, slot)
-		return index, slot, nil
+		index := store.freeScope - 1
+		slot := store.scopes[index]
+		if slot == nil {
+			return 0, nil, errors.New("secretstore: invalid free scope")
+		}
+		store.freeScope = slot.freeNext
+		if slot.generation+1 != 0 {
+			return index, slot, nil
+		}
+		*slot = scopeSlot{generation: slot.generation}
 	}
-	index := store.freeScope - 1
-	slot := store.scopes[index]
-	if slot == nil {
-		return 0, nil, errors.New("secretstore: invalid free scope")
-	}
-	store.freeScope = slot.freeNext
-	return index, slot, nil
 }
 
 func (store *SecretStore) releaseUnusedScopeSlot(

@@ -626,6 +626,52 @@ func TestKernelAbsentResourceStopSettlesWithoutAdmission(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
+func TestKernelTerminalNoResponseDisposalCompletesUIDOwnership(t *testing.T) {
+	kernel, run, _, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	require.NoError(t, run.OpenAdmission())
+	now := kernel.clock.Now()
+	const uid = "terminal-no-response"
+	require.NoError(t, uids.Admit(uid, now))
+	request := Request{
+		UID: uid, LaneKey: "internal", Source: lifecycle.SourceJobManager,
+	}
+	laneKey := commandLaneKey{key: request.LaneKey, source: request.Source}
+	lane, err := kernel.allocateLane(laneKey, request)
+	require.NoError(t, err)
+	generation, err := lifecycle.NewOperation(
+		1,
+		uid,
+		request.Source,
+		request.LaneKey,
+		false,
+	)
+	require.NoError(t, err)
+	operation := &commandOperation{
+		OperationGeneration: generation,
+		request:             request,
+		lane:                lane,
+		deadline:            deadlineEntry{index: -1},
+		runtimeStarted:      now,
+	}
+	lane.owners = 1
+	lane.head = operation
+	lane.tail = operation
+	lane.active = operation
+	kernel.operations[uid] = operation
+	kernel.appendOperation(operation)
+	kernel.appendRuntimeOperation(operation)
+
+	operation.PoisonResponse()
+	kernel.tryDispose(operation)
+
+	require.NotContains(t, kernel.operations, uid)
+	active, tombstones, closed := uids.Census()
+	require.Zero(t, active)
+	require.Zero(t, tombstones)
+	require.False(t, closed)
+	closeUIDLedger(t, uids)
+}
+
 func TestKernelResourceStopCompletesAfterOperationDeadline(t *testing.T) {
 	stopRelease := make(chan struct{})
 	resource := newKernelTestReadyResource("resource", nil, stopRelease)

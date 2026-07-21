@@ -170,7 +170,9 @@ func (og *OperationGeneration) CommitResponse() error {
 }
 
 func (og *OperationGeneration) PoisonResponse() {
-	og.Response = ResponsePoisoned
+	if og.Response == ResponseOpen || og.Response == ResponsePending {
+		og.Response = ResponsePoisoned
+	}
 }
 
 func (og *OperationGeneration) MarkTimedOut() {

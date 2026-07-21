@@ -4,7 +4,6 @@ package functions
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -103,9 +102,9 @@ func encodeFunctionRegistration(record PublicationRecord) ([]byte, error) {
 		return nil, errors.New("jobmgr Function protocol: invalid registration")
 	}
 	payload := make([]byte, 0, len(record.Name)+len(record.Help)+len(record.Tags)+80)
-	payload = append(payload, `FUNCTION GLOBAL "`...)
-	payload = append(payload, record.Name...)
-	payload = append(payload, `" `...)
+	payload = append(payload, "FUNCTION GLOBAL "...)
+	payload = appendQuotedFunctionName(payload, record.Name)
+	payload = append(payload, ' ')
 	payload = strconv.AppendInt(payload, int64(record.Timeout), 10)
 	payload = append(payload, ` "`...)
 	payload = append(payload, record.Help...)
@@ -125,7 +124,17 @@ func encodeFunctionWithdrawal(name string) ([]byte, error) {
 	if !validFunctionName(name) {
 		return nil, errors.New("jobmgr Function protocol: invalid withdrawal name")
 	}
-	return fmt.Appendf(nil, "FUNCTION_DEL GLOBAL %q\n\n", name), nil
+	payload := make([]byte, 0, len(name)+24)
+	payload = append(payload, "FUNCTION_DEL GLOBAL "...)
+	payload = appendQuotedFunctionName(payload, name)
+	payload = append(payload, '\n', '\n')
+	return payload, nil
+}
+
+func appendQuotedFunctionName(payload []byte, name string) []byte {
+	payload = append(payload, '"')
+	payload = append(payload, name...)
+	return append(payload, '"')
 }
 
 func validFunctionName(value string) bool {

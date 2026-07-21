@@ -178,28 +178,10 @@ func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceI
 		registry.mu.Unlock()
 		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: duplicate inherited owner role")
 	}
-	var index uint32
-	var slot *inheritedTaskSlot
-	if registry.freeHead != 0 {
-		handle := registry.freeHead
-		index = handle - 1
-		slot = registry.slots[index]
-		registry.freeHead = slot.freeNext
-	} else {
-		if uint64(len(registry.slots)) > uint64(^uint32(0)) {
-			registry.mu.Unlock()
-			return InheritedTaskRef{}, errors.New("jobmgr task supervisor: inherited reference space exhausted")
-		}
-		index = uint32(len(registry.slots))
-		slot = &inheritedTaskSlot{}
-		registry.slots = append(registry.slots, slot)
-	}
-	generation := slot.generation + 1
-	if generation == 0 {
-		*slot = inheritedTaskSlot{generation: slot.generation, freeNext: registry.freeHead}
-		registry.freeHead = index + 1
+	index, slot, generation, err := registry.allocateSlot()
+	if err != nil {
 		registry.mu.Unlock()
-		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: inherited task generation wrapped")
+		return InheritedTaskRef{}, err
 	}
 	ctx, cancel := context.WithCancelCause(parent)
 	done := make(chan struct{})
@@ -230,6 +212,40 @@ func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceI
 	}()
 	<-started
 	return ref, nil
+}
+
+func (registry *inheritedTaskRegistry) allocateSlot() (
+	uint32,
+	*inheritedTaskSlot,
+	uint32,
+	error,
+) {
+	for {
+		var index uint32
+		var slot *inheritedTaskSlot
+		if registry.freeHead != 0 {
+			index = registry.freeHead - 1
+			slot = registry.slots[index]
+			if slot == nil {
+				return 0, nil, 0,
+					errors.New("jobmgr task supervisor: invalid inherited free slot")
+			}
+			registry.freeHead = slot.freeNext
+		} else {
+			if uint64(len(registry.slots)) >= uint64(^uint32(0)) {
+				return 0, nil, 0,
+					errors.New("jobmgr task supervisor: inherited reference space exhausted")
+			}
+			index = uint32(len(registry.slots))
+			slot = &inheritedTaskSlot{}
+			registry.slots = append(registry.slots, slot)
+		}
+		generation := slot.generation + 1
+		if generation != 0 {
+			return index, slot, generation, nil
+		}
+		*slot = inheritedTaskSlot{generation: slot.generation}
+	}
 }
 
 func (ts *TaskSupervisor) CancelInherited(ref InheritedTaskRef, owner ResourceIdentity) error {

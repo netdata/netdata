@@ -13,14 +13,27 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
+const maximumFunctionProtocolCaptureBytes = lifecycle.MaximumFunctionFrameBytes + lifecycle.MaximumOtherFrameBytes
+
+var errFunctionProtocolCaptureTooLarge = errors.New(
+	"jobmgr composition: Function protocol capture exceeds frame bounds",
+)
+
 // functionProtocolCapture adapts one synchronous service-discovery responder
 // call into a sealed result plus post-result notifications. FrameOwner remains
 // the only wire writer.
 type functionProtocolCapture struct {
 	mu sync.Mutex // guards active
 
-	frames *lifecycle.FrameOwner // the one wire frame writer
-	active *bytes.Buffer         // buffer capturing the current invocation's output; nil when idle
+	frames       *lifecycle.FrameOwner           // the one wire frame writer
+	active       *boundedFunctionProtocolCapture // current invocation output; nil when idle
+	captureLimit int                             // combined result + notification frame bounds
+}
+
+type boundedFunctionProtocolCapture struct {
+	payload []byte
+	limit   int
+	err     error
 }
 
 func newFunctionProtocolCapture(
@@ -29,7 +42,9 @@ func newFunctionProtocolCapture(
 	if frames == nil {
 		return nil, errors.New("jobmgr composition: nil Function protocol owner")
 	}
-	return &functionProtocolCapture{frames: frames}, nil
+	return &functionProtocolCapture{
+		frames: frames, captureLimit: maximumFunctionProtocolCaptureBytes,
+	}, nil
 }
 
 func (fpc *functionProtocolCapture) Write(payload []byte) (int, error) {
@@ -39,7 +54,7 @@ func (fpc *functionProtocolCapture) Write(payload []byte) (int, error) {
 	fpc.mu.Lock()
 	defer fpc.mu.Unlock()
 	if fpc.active != nil {
-		return fpc.active.Write(payload)
+		return fpc.active.write(payload)
 	}
 	if err := fpc.frames.CommitBorrowedProtocolFrame(payload); err != nil {
 		return 0, err
@@ -61,14 +76,14 @@ func (fpc *functionProtocolCapture) invoke(
 		return lifecycle.SealedResult{}, nil,
 			errors.New("jobmgr composition: concurrent Function protocol invocation")
 	}
-	var output bytes.Buffer
-	fpc.active = &output
+	output := &boundedFunctionProtocolCapture{limit: fpc.captureLimit}
+	fpc.active = output
 	fpc.mu.Unlock()
 
 	callErr := callFunctionProtocol(call)
 
 	fpc.mu.Lock()
-	if fpc.active != &output {
+	if fpc.active != output {
 		fpc.mu.Unlock()
 		return lifecycle.SealedResult{}, nil,
 			errors.Join(
@@ -77,11 +92,46 @@ func (fpc *functionProtocolCapture) invoke(
 			)
 	}
 	fpc.active = nil
+	captureErr := output.err
 	fpc.mu.Unlock()
-	if callErr != nil {
-		return lifecycle.SealedResult{}, nil, callErr
+	if err := errors.Join(callErr, captureErr); err != nil {
+		return lifecycle.SealedResult{}, nil, err
 	}
-	return splitFunctionProtocol(uid, output.Bytes(), fpc.frames)
+	return splitFunctionProtocol(uid, output.payload, fpc.frames)
+}
+
+func (capture *boundedFunctionProtocolCapture) write(
+	payload []byte,
+) (int, error) {
+	if capture.err != nil {
+		return 0, capture.err
+	}
+	if capture.limit <= 0 || len(capture.payload) > capture.limit {
+		capture.err = errFunctionProtocolCaptureTooLarge
+		return 0, capture.err
+	}
+	accepted := min(len(payload), capture.limit-len(capture.payload))
+	if accepted > 0 {
+		capture.grow(accepted)
+		capture.payload = append(capture.payload, payload[:accepted]...)
+	}
+	if accepted != len(payload) {
+		capture.err = errFunctionProtocolCaptureTooLarge
+		return accepted, capture.err
+	}
+	return accepted, nil
+}
+
+func (capture *boundedFunctionProtocolCapture) grow(additional int) {
+	required := len(capture.payload) + additional
+	if required <= cap(capture.payload) {
+		return
+	}
+	capacity := max(64, cap(capture.payload)*2)
+	capacity = min(capture.limit, max(required, capacity))
+	grown := make([]byte, len(capture.payload), capacity)
+	copy(grown, capture.payload)
+	capture.payload = grown
 }
 
 func callFunctionProtocol(call func()) (err error) {

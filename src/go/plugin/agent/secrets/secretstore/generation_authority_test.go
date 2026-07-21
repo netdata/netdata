@@ -10,6 +10,7 @@ import (
 
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/stretchr/testify/require"
 )
 
 func newGenerationTestSecretStore(t testing.TB) *SecretStore {
@@ -190,7 +191,7 @@ func TestPreparedSecretMutationMatrix(t *testing.T) {
 			}
 			switch test.action {
 			case "abort":
-				err = mutation.Abort(t.Context())
+				err = mutation.Abort()
 			case "commit":
 				ctx := t.Context()
 				if test.cancelCommit {
@@ -240,6 +241,30 @@ func TestPreparedSecretMutationMatrix(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPreparedSecretMutationAliasesShareLinearState(t *testing.T) {
+	store := newGenerationTestSecretStore(t)
+	carrier := &generationTestCarrier{}
+	mutation, err := store.PrepareMutation(
+		t.Context(),
+		newGenerationTestCatalog(t),
+		carrier,
+		generationTestConfig("main", "value"),
+		0,
+	)
+	require.NoError(t, err)
+	alias := mutation
+	require.True(t, mutation.Valid())
+	require.True(t, alias.Valid())
+
+	require.NoError(t, alias.Abort())
+
+	require.False(t, mutation.Valid())
+	require.Error(t, mutation.Abort())
+	require.True(t, carrier.released)
+	require.Zero(t, store.Census().Preparations)
+	require.NoError(t, store.Close(t.Context()))
 }
 
 func TestSecretStorePreparationOwnershipRegressions(t *testing.T) {
@@ -296,7 +321,7 @@ func TestSecretStorePreparationOwnershipRegressions(t *testing.T) {
 				if census := store.Census(); census.Preparations != 1 {
 					t.Fatalf("failed preparation census=%+v", census)
 				}
-				if err := mutation.Abort(t.Context()); err != nil {
+				if err := mutation.Abort(); err != nil {
 					t.Fatal(err)
 				}
 				if !carrier.released {
@@ -414,7 +439,7 @@ func TestSecretStorePreparationOwnershipRegressions(t *testing.T) {
 				if census := store.Census(); census.Preparations != 1 {
 					t.Fatalf("removal preparation census=%+v", census)
 				}
-				if err := removal.Abort(t.Context()); err != nil {
+				if err := removal.Abort(); err != nil {
 					t.Fatal(err)
 				}
 				if err := store.Retire(
@@ -659,7 +684,7 @@ func BenchmarkBSecretMutationControl(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		if err := mutation.Abort(context.Background()); err != nil {
+		if err := mutation.Abort(); err != nil {
 			b.Fatal(err)
 		}
 	}

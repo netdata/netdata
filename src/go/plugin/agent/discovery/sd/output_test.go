@@ -62,6 +62,36 @@ func TestDyncfgConfigReturnsAfterQueuedCommandCompletes(t *testing.T) {
 	)
 }
 
+func TestDyncfgAdmissionRejectsCommandsAfterShutdown(t *testing.T) {
+	var output bytes.Buffer
+	discovery, err := NewServiceDiscovery(Config{
+		PluginName:  "test",
+		Out:         &output,
+		Discoverers: NewRegistry(),
+	})
+	require.NoError(t, err)
+	discovery.ctx = context.Background()
+	discovery.failPendingDyncfg()
+
+	done := make(chan struct{})
+	go func() {
+		discovery.enqueueDyncfgFunction(dyncfg.NewFunction(functions.Function{
+			UID:  "late",
+			Name: "config",
+			Args: []string{"test:sd:type:name", string(dyncfg.CommandRestart)},
+		}))
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("late dyncfg admission blocked after shutdown")
+	}
+	assert.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN late 503 application/json")
+	assert.Empty(t, discovery.dyncfgCh)
+}
+
 func TestNewServiceDiscovery_UsesConfiguredOutForDyncfgResponder(t *testing.T) {
 	const pluginName = "test"
 

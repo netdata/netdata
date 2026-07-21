@@ -54,7 +54,7 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(
 			},
 			store:      store,
 			storeKey:   "vault:main",
-			mutation:   &mutation,
+			mutation:   mutation,
 			result:     mustSecretMessage(200, ""),
 			cleanup:    func() error { return nil },
 			controller: &Controller{},
@@ -72,6 +72,72 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(
 	census := store.Census()
 	require.EqualValues(t, secretstore.SecretStoreCensus{}, census)
 
+	require.NoError(t, store.Close(t.Context()))
+}
+
+func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
+	rollbackErr := errors.New("rollback context unavailable")
+	stopErr := errors.New("dependent stop failed")
+	resolver, err := secretresolver.NewAtomicResolver(nil)
+	require.NoError(t, err)
+	store, err := secretstore.NewSecretStore(resolver)
+	require.NoError(t, err)
+	catalog, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
+		Kind:        secretstore.KindVault,
+		DisplayName: "Vault",
+		Schema:      `{}`,
+		Create: func() secretstore.Store {
+			return &transactionTestStore{}
+		},
+	}})
+	require.NoError(t, err)
+	carrier := &transactionTestCarrier{}
+	mutation, err := store.PrepareMutation(
+		t.Context(),
+		catalog,
+		carrier,
+		secretstore.Config{
+			"name":            "main",
+			"kind":            string(secretstore.KindVault),
+			"value":           "value",
+			"__source__":      confgroup.TypeDyncfg,
+			"__source_type__": confgroup.TypeDyncfg,
+		},
+		0,
+	)
+	require.NoError(t, err)
+	dependencies := NewSecretDependencyIndex()
+	dependencies.jobs["module_two"] = jobDependency{
+		display: "module:job", running: true,
+		storeKeys: []string{"vault:main"},
+	}
+	dependencies.byStore["vault:main"] = map[string]struct{}{
+		"module_two": {},
+	}
+	restarts, err := NewSecretRestartCommand(
+		1,
+		dependencies,
+		restartTestJobs{stopError: stopErr},
+	)
+	require.NoError(t, err)
+	transaction, err := newPreparedSecretTransaction(preparedSecretSpec{
+		scope: lifecycle.ResourceTransactionScope{
+			ID: "secretstore:vault:main",
+		},
+		store: store, storeKey: "vault:main", mutation: mutation,
+		restarts:   restarts,
+		result:     mustSecretMessage(200, ""),
+		cleanup:    func() error { return nil },
+		controller: &Controller{},
+	})
+	require.NoError(t, err)
+	commands := &restartTestCommandScope{rollbackContextErr: rollbackErr}
+
+	_, applyErr := transaction.ApplyComposite(t.Context(), commands)
+
+	require.NoError(t, applyErr)
+	require.True(t, carrier.released)
+	require.Zero(t, store.Census().Preparations)
 	require.NoError(t, store.Close(t.Context()))
 }
 

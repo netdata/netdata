@@ -238,7 +238,7 @@ func BenchmarkBFrameCommit(b *testing.B) {
 	}
 }
 
-func BenchmarkBRunAck(b *testing.B) {
+func BenchmarkBRunAdmitting(b *testing.B) {
 	supervisor, err := NewRunSupervisor(
 		1,
 		RealClock{},

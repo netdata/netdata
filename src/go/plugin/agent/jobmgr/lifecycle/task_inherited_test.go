@@ -24,12 +24,14 @@ func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 	})
 	require.NoError(t, err)
 	<-entered
-	require.False(t, supervisor.Active() != 0 || supervisor.InheritedActive() != 1)
+	require.EqualValues(t, 0, supervisor.Active())
+	require.EqualValues(t, 1, supervisor.InheritedActive())
 
 	require.NoError(t, supervisor.CancelInherited(ref, owner))
 
 	joinInheritedJoined, joinInheritedErr := supervisor.JoinInherited(context.Background(), ref, owner)
-	require.False(t, joinInheritedErr != nil || !joinInheritedJoined)
+	require.NoError(t, joinInheritedErr)
+	require.True(t, joinInheritedJoined)
 
 	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
 
@@ -317,7 +319,8 @@ func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {
 	require.NoError(t, supervisor.CancelInherited(ref, owner))
 
 	joinInheritedJoined, joinInheritedErr := supervisor.JoinInherited(context.Background(), ref, owner)
-	require.False(t, !joinInheritedJoined || !errors.Is(joinInheritedErr, ErrTaskPanic))
+	require.True(t, joinInheritedJoined)
+	require.ErrorIs(t, joinInheritedErr, ErrTaskPanic)
 
 	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
 
@@ -377,7 +380,8 @@ func TestInheritedTaskMissedJoinRetainsRecord(t *testing.T) {
 	defer cancel()
 
 	joinInheritedJoined, joinInheritedErr := supervisor.JoinInherited(ctx, ref, owner)
-	require.False(t, joinInheritedJoined || !errors.Is(joinInheritedErr, context.DeadlineExceeded))
+	require.False(t, joinInheritedJoined)
+	require.ErrorIs(t, joinInheritedErr, context.DeadlineExceeded)
 
 	require.Error(t, supervisor.ReleaseInherited(ref, owner))
 
@@ -408,7 +412,8 @@ func TestInheritedTasksGrowBeyondFormerDerivedLimit(t *testing.T) {
 		owner := ResourceIdentity{ID: "pipeline", Generation: uint64(index + 1)}
 
 		joined, err := supervisor.JoinInherited(context.Background(), ref, owner)
-		require.False(t, err != nil || !joined)
+		require.NoError(t, err)
+		require.True(t, joined)
 
 		require.NoError(t, supervisor.ReleaseInherited(ref, owner))
 	}

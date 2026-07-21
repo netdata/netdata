@@ -582,14 +582,6 @@ func (pi *ProcessIngress) discardCall(call functionwire.Call) error {
 		pi.mu.Unlock()
 		return nil
 	}
-	port := pi.body
-	if port != nil {
-		pi.body = nil
-		pi.bodyToken = 0
-	}
 	pi.mu.Unlock()
-	if port == nil {
-		return errors.New("jobmgr Function process ingress: discarded payload has no run binding")
-	}
-	return port.ReleaseInputBody(call.InputBodyToken)
+	return errors.New("jobmgr Function process ingress: discarded payload has no run binding")
 }

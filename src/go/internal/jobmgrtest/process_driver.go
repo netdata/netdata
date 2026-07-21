@@ -385,9 +385,11 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 	select {
 	case secondErr = <-results[1]:
 		secondConsumed = true
-		if secondErr == nil {
-			return errors.New(
-				"repeated stop returned success while Cleanup was held",
+		if !errors.Is(secondErr, composition.ErrProcessStopped) {
+			return fmt.Errorf(
+				"repeated stop error=%v, want %w",
+				secondErr,
+				composition.ErrProcessStopped,
 			)
 		}
 	case <-time.After(50 * time.Millisecond):

@@ -277,7 +277,7 @@ func (ck *CommandKernel) tryDispose(operation *commandOperation) {
 		ck.run.Dirty(err)
 		return
 	}
-	if operation.Response == lifecycle.ResponseNotRequired {
+	if !operation.uidCompleted {
 		if err := ck.completeOperationUID(operation, false); err != nil {
 			ck.run.Dirty(err)
 			return

@@ -864,7 +864,7 @@ func runAgentFunctionTimeoutBoundaries(ctx context.Context) error {
 				},
 				"zero": {
 					timeout: "0",
-					status:  504,
+					status:  200,
 				},
 				"one second": {
 					timeout: "1",

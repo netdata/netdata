@@ -219,7 +219,7 @@ func (prt *PreparedResourceTransaction) Apply(
 	}
 	mutationOwned := spec.Graph != nil && spec.MutationPrepared
 	defer func() {
-		if resultErr != nil && mutationOwned {
+		if mutationOwned {
 			resultErr = errors.Join(
 				resultErr,
 				spec.Graph.Abort(spec.Mutation),
@@ -313,12 +313,12 @@ func (prt *PreparedResourceTransaction) Apply(
 					return lifecycle.AppliedResourceTransaction{},
 						errors.Join(err, prepareErr)
 				} else {
-					if commitErr := spec.Graph.Commit(
+					if commitErr := commitGraphMutation(
+						spec.Graph,
 						mutation,
 					); commitErr != nil {
-						abortErr := spec.Graph.Abort(mutation)
 						return lifecycle.AppliedResourceTransaction{},
-							errors.Join(err, commitErr, abortErr)
+							errors.Join(err, commitErr)
 					}
 					graphCommitted = true
 					if resolution.AfterGraphCommit != nil {
@@ -352,10 +352,10 @@ func (prt *PreparedResourceTransaction) Apply(
 	if spec.Graph != nil &&
 		spec.MutationPrepared &&
 		!graphCommitted {
-		if err := spec.Graph.Commit(spec.Mutation); err != nil {
+		mutationOwned = false
+		if err := commitGraphMutation(spec.Graph, spec.Mutation); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
 		}
-		mutationOwned = false
 		if spec.AfterGraphCommit != nil {
 			spec.AfterGraphCommit()
 		}
@@ -374,6 +374,23 @@ func (prt *PreparedResourceTransaction) Apply(
 		afterApply()
 	}
 	return applied, nil
+}
+
+func commitGraphMutation(
+	graph *dyncfg.Graph,
+	mutation dyncfg.GraphMutation,
+) (resultErr error) {
+	mutationOwned := true
+	defer func() {
+		if mutationOwned {
+			resultErr = errors.Join(resultErr, graph.Abort(mutation))
+		}
+	}()
+	if err := graph.Commit(mutation); err != nil {
+		return err
+	}
+	mutationOwned = false
+	return nil
 }
 
 func composeAfterApply(first, second func()) func() {

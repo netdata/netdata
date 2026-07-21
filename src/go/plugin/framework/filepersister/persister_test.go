@@ -13,10 +13,11 @@ import (
 
 func TestSave(t *testing.T) {
 	tests := map[string]struct {
-		path     func(t *testing.T) string
-		data     saveTestData
-		wantFile bool
-		want     string
+		path      func(t *testing.T) string
+		data      saveTestData
+		wantFile  bool
+		wantBytes bool
+		want      string
 	}{
 		"empty path": {
 			path: func(*testing.T) string { return "" },
@@ -26,22 +27,27 @@ func TestSave(t *testing.T) {
 			path: func(t *testing.T) string {
 				return filepath.Join(t.TempDir(), "status")
 			},
-			data: saveTestData{err: errors.New("marshal failed")},
+			data:      saveTestData{err: errors.New("marshal failed")},
+			wantBytes: true,
 		},
 		"successful save": {
 			path: func(t *testing.T) string {
 				return filepath.Join(t.TempDir(), "status")
 			},
-			data:     saveTestData{value: "persisted"},
-			wantFile: true,
-			want:     "persisted",
+			data:      saveTestData{value: "persisted"},
+			wantFile:  true,
+			wantBytes: true,
+			want:      "persisted",
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			path := test.path(t)
+			bytesCalled := false
+			test.data.called = &bytesCalled
 			Save(path, test.data)
+			require.Equal(t, test.wantBytes, bytesCalled)
 			if !test.wantFile {
 				if path != "" {
 					_, err := os.Stat(path)
@@ -57,10 +63,14 @@ func TestSave(t *testing.T) {
 }
 
 type saveTestData struct {
-	value string
-	err   error
+	value  string
+	err    error
+	called *bool
 }
 
 func (data saveTestData) Bytes() ([]byte, error) {
+	if data.called != nil {
+		*data.called = true
+	}
 	return []byte(data.value), data.err
 }

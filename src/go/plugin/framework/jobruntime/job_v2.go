@@ -174,6 +174,15 @@ type jobV2PreparedScopeEmission struct {
 	live     bool
 }
 
+func (prepared *jobV2PreparedScopeEmission) Commit() error {
+	return prepared.attempt.Commit()
+}
+
+func (prepared *jobV2PreparedScopeEmission) Abort() error {
+	prepared.attempt.Abort()
+	return nil
+}
+
 type jobV2ScopeState struct {
 	scopeKey string
 	scope    metrix.HostScope
@@ -640,7 +649,6 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 
 	defer func() {
 		if r := recover(); r != nil {
-			j.rollbackPreparedEmission(prepared)
 			j.buf.Reset()
 			if j.runtimeAggregator != nil {
 				j.runtimeAggregator.Reset()
@@ -704,19 +712,16 @@ func (j *JobV2) finishPreparedEmission(prepared jobV2PreparedEmission) error {
 	successes := 0
 	failures := 0
 	var finalErr error
-	for _, scope := range prepared.scopes {
-		if err := scope.attempt.Commit(); err != nil {
-			j.rollbackVnodeRegistryEmission(scope.decision)
+	for index := range prepared.scopes {
+		scope := &prepared.scopes[index]
+		if err := commitJobOutputTransaction(
+			j.out,
+			scope.output,
+			scope,
+		); err != nil {
 			failures++
 			finalErr = errors.Join(finalErr, err)
 			j.Warningf("finalize emission for host scope %q failed: %v", scope.scope.scopeKey, err)
-			continue
-		}
-		if err := commitJobOutput(j.out, scope.output); err != nil {
-			j.rollbackVnodeRegistryEmission(scope.decision)
-			failures++
-			finalErr = errors.Join(finalErr, err)
-			j.Warningf("write emission for host scope %q failed: %v", scope.scope.scopeKey, err)
 			continue
 		}
 		j.commitScopeEmission(scope)
@@ -739,13 +744,11 @@ func (j *JobV2) prepareScopeEmission(scope metrix.HostScope, live bool, sinceLas
 	var decision jobV2EmissionDecision
 	defer func() {
 		if r := recover(); r != nil {
-			j.rollbackVnodeRegistryEmission(decision)
 			attempt.Abort()
 			j.buf.Reset()
 			panic(r)
 		}
 		if !ok {
-			j.rollbackVnodeRegistryEmission(decision)
 			attempt.Abort()
 			j.buf.Reset()
 		}
@@ -784,8 +787,8 @@ func (j *JobV2) prepareScopeEmission(scope metrix.HostScope, live bool, sinceLas
 		return jobV2PreparedScopeEmission{}, false
 	}
 	plan := attempt.Plan()
-	if err := j.prepareScopeVnodeRegistryEmission(state, &decision, plan); err != nil {
-		j.Warningf("prepare vnode registry for host scope %q failed: %v", state.scopeKey, err)
+	if err := j.prepareScopeVnodeEmission(state, &decision, plan); err != nil {
+		j.Warningf("prepare vnode emission for host scope %q failed: %v", state.scopeKey, err)
 		return jobV2PreparedScopeEmission{}, false
 	}
 
@@ -809,15 +812,30 @@ func (j *JobV2) prepareScopeEmission(scope metrix.HostScope, live bool, sinceLas
 	return prepared, true
 }
 
-func (j *JobV2) commitScopeEmission(prepared jobV2PreparedScopeEmission) {
+func (j *JobV2) commitScopeEmission(prepared *jobV2PreparedScopeEmission) {
 	if prepared.scope == nil {
 		return
 	}
 	state := prepared.scope
-	if state.scopeKey == defaultHostScopeKey || prepared.decision.registryOwner != "" {
+	decision := prepared.decision
+	if decision.registryOwner != "" && decision.observeRegistry {
+		result, err := j.vnodeRegistry.Register(decision.registryOwner, decision.defineInfo)
+		if err != nil {
+			j.Warningf("record vnode registry for host scope %q failed: %v", state.scopeKey, err)
+			decision.registryOwner = ""
+		} else if result.MetadataConflict && result.ConflictFirstSeen {
+			j.Warningf(
+				"conflicting vnode metadata for guid %q: hostname %q differs from %q",
+				result.Info.GUID,
+				result.Info.Hostname,
+				result.Conflicting.Hostname,
+			)
+		}
+	}
+	if state.scopeKey == defaultHostScopeKey || decision.registryOwner != "" {
 		keep := make(map[vnoderegistry.Owner]struct{}, 1)
-		if prepared.decision.registryOwner != "" {
-			keep[prepared.decision.registryOwner] = struct{}{}
+		if decision.registryOwner != "" {
+			keep[decision.registryOwner] = struct{}{}
 		}
 		state.host.releaseSupersededRegistryOwnersExcept(
 			j.vnodeRegistry,
@@ -825,16 +843,10 @@ func (j *JobV2) commitScopeEmission(prepared jobV2PreparedScopeEmission) {
 			j.vnodeRegistryOwnerNamespacePrefix(state.scopeKey),
 		)
 	}
-	state.host.commitSuccessfulEmission(prepared.plan, prepared.decision)
+	state.host.commitSuccessfulEmission(prepared.plan, decision)
 	if !prepared.live && len(state.host.cleanupCharts) == 0 {
 		state.host.releaseRegistryOwners(j.vnodeRegistry)
 		delete(j.scopeStates, state.scopeKey)
-	}
-}
-
-func (j *JobV2) rollbackPreparedEmission(prepared jobV2PreparedEmission) {
-	for _, scope := range prepared.scopes {
-		j.rollbackVnodeRegistryEmission(scope.decision)
 	}
 }
 
@@ -869,7 +881,7 @@ func (j *JobV2) currentVnode() vnodes.VirtualNode {
 	return *j.vnode.Copy()
 }
 
-func (j *JobV2) prepareScopeVnodeRegistryEmission(state *jobV2ScopeState, decision *jobV2EmissionDecision, plan chartengine.Plan) error {
+func (j *JobV2) prepareScopeVnodeEmission(state *jobV2ScopeState, decision *jobV2EmissionDecision, plan chartengine.Plan) error {
 	if decision == nil || !decision.targetHost.isVnode() || len(plan.Actions) == 0 {
 		return nil
 	}
@@ -878,49 +890,37 @@ func (j *JobV2) prepareScopeVnodeRegistryEmission(state *jobV2ScopeState, decisi
 	}
 	if state.scopeKey == defaultHostScopeKey {
 		vnode := j.currentVnode()
-		return j.prepareVnodeRegistryEmission(decision, j.vnodeRegistryOwner(decision.targetHost), netdataapi.HostInfo{
+		return j.prepareVnodeEmission(state, decision, j.vnodeRegistryOwner(decision.targetHost), netdataapi.HostInfo{
 			GUID:     vnode.GUID,
 			Hostname: vnode.Hostname,
 			Labels:   vnode.Labels,
 		})
 	}
-	return j.prepareVnodeRegistryEmission(decision, j.vnodeRegistryScopedOwner(state.scopeKey, state.scope.GUID), metrixHostScopeInfo(state.scope))
+	return j.prepareVnodeEmission(state, decision, j.vnodeRegistryScopedOwner(state.scopeKey, state.scope.GUID), metrixHostScopeInfo(state.scope))
 }
 
-func (j *JobV2) prepareVnodeRegistryEmission(decision *jobV2EmissionDecision, owner vnoderegistry.Owner, info netdataapi.HostInfo) error {
-	registryInfo := netdataapi.HostInfo{
+func (j *JobV2) prepareVnodeEmission(state *jobV2ScopeState, decision *jobV2EmissionDecision, owner vnoderegistry.Owner, info netdataapi.HostInfo) error {
+	preparedInfo, err := chartemit.PrepareHostInfo(netdataapi.HostInfo{
 		GUID:     info.GUID,
 		Hostname: info.Hostname,
 		Labels:   maps.Clone(info.Labels),
-	}
-	result, err := j.vnodeRegistry.Register(owner, registryInfo)
+	})
 	if err != nil {
 		return err
 	}
-	if result.MetadataUpdated && result.UpdateFirstSeen {
-		j.Warningf(
-			"vnode registry metadata updated for guid %q: hostname %q replaced by %q",
-			result.Info.GUID,
-			result.Previous.Hostname,
-			result.Info.Hostname,
-		)
-	}
 
 	scope := &chartemit.HostScope{GUID: decision.targetHost.guid}
-	if result.NeedDefine {
-		scope.Define = &result.Info
+	if state.host.needsDefinition(decision.targetHost, preparedInfo) {
+		scope.Define = &preparedInfo
+		decision.observeRegistry = true
 	}
 	decision.hostScope = scope
-	decision.defineInfo = result.Info
+	decision.defineInfo = preparedInfo
 	decision.registryOwner = owner
-	decision.registryRegistration = result
-	return nil
-}
-
-func (j *JobV2) rollbackVnodeRegistryEmission(decision jobV2EmissionDecision) {
-	if decision.registryOwner != "" {
-		j.vnodeRegistry.Rollback(decision.registryOwner, decision.registryRegistration)
+	if !state.host.tracksRegistryOwner(owner, decision.targetHost.guid) {
+		decision.observeRegistry = true
 	}
+	return nil
 }
 
 const vnodeRegistryOwnerSeparator = "\xff"
