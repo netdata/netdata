@@ -52,17 +52,16 @@ typedef struct {
 #define SOCKET_IPPROTO_TCP 6
 #define SOCKET_IPPROTO_UDP 17
 
-/* NETDATA_SOCKET_COUNTER = 18 (enum ebpf_socket_idx in ebpf_socket.h). */
+/* 18 indexed per-CPU counters in the socket BPF program's tbl_global_sock map. */
 #define SOCKET_GLOBAL_MAP_ENTRIES 18
 
 /* -------------------------------------------------------------------------
  * tbl_nd_socket per-PID aggregation types
  * ---------------------------------------------------------------------- */
 
-/* BPF map key for tbl_nd_socket.  Must match netdata_socket_idx_t in
- * ebpf_socket.h: saddr[16] + daddr[16] + dport[2] + _pad[2] + pid[4] = 40
- * bytes.  The two-byte padding brings pid to a 4-byte boundary, matching
- * the C compiler layout used by both the BPF program and ebpf_socket.c. */
+/* BPF map key for tbl_nd_socket.  Must match the key struct in the socket BPF
+ * program: saddr[16] + daddr[16] + dport[2] + _pad[2] + pid[4] = 40 bytes.
+ * The two-byte padding brings pid to a 4-byte boundary per C struct alignment. */
 typedef struct {
     uint8_t  saddr[16];
     uint8_t  daddr[16];
@@ -72,10 +71,10 @@ typedef struct {
 } netdata_socket_bpf_key_t;
 
 /* BPF map value for tbl_nd_socket.  Must match netdata_socket_t in
- * ebpf-ipc.h.  Layout confirmed by ebpf_socket.c:2915 which allocates
- * sizeof(netdata_socket_t) per CPU for per-CPU map reads.
- * Total size = 112 bytes (tcp substructure = 48 bytes including 4-byte
- * trailing pad to reach 8-byte alignment, udp = 24 bytes). */
+ * ebpf-ipc.h.  Total size = 112 bytes (tcp substructure = 48 bytes
+ * including 4-byte trailing pad to reach 8-byte alignment, udp = 24 bytes).
+ * Note: ebpf-ipc.h omits the explicit tcp._pad field; the BPF program layout
+ * adds it so the substructure size is a multiple of 8. */
 #define ND_SOCK_COMM_LEN 16
 typedef struct {
     char     name[ND_SOCK_COMM_LEN];
@@ -109,7 +108,7 @@ typedef struct {
  * layer can copy directly into ebpfSocketPublishApps. */
 struct netdata_socket_per_pid_entry {
     uint32_t pid;
-    uint64_t bytes_sent;       /* tcp_bytes_sent  (UDP excluded — matches ebpf_socket.c:2198) */
+    uint64_t bytes_sent;       /* tcp_bytes_sent: TCP only; UDP traffic is in udp_bytes_sent */
     uint64_t bytes_received;   /* tcp_bytes_received */
     uint64_t call_tcp_sent;
     uint64_t call_tcp_received;
@@ -471,7 +470,7 @@ int netdata_socket_runtime_snapshot(
     if (!ubuf)
         return -1;
 
-    /* Map key order matches enum ebpf_socket_idx from ebpf_socket.h. */
+    /* Map key order matches the 18 indexed counters in the socket BPF program's tbl_global_sock. */
     uint64_t *dst[] = {
         &out->calls_tcp_sendmsg,       /* 0  */
         &out->error_tcp_sendmsg,       /* 1  */

@@ -17,9 +17,9 @@ type SocketPIDEntry struct {
 }
 
 // SocketSnapshot holds the raw monotonic counters read from the socket BPF
-// maps in a single collection cycle.  Field order matches enum ebpf_socket_idx
-// from ebpf_socket.h (keys 0-17 for tbl_global_sock) plus the two inbound
-// connection counters aggregated from tbl_lports.
+// maps in a single collection cycle.  Fields at keys 0-17 mirror the 18
+// indexed counters in the socket BPF program's tbl_global_sock map; the last
+// two fields are inbound connection counters aggregated from tbl_lports.
 type SocketSnapshot struct {
 	CallsTCPSendmsg     uint64 // key  0
 	ErrorTCPSendmsg     uint64 // key  1
