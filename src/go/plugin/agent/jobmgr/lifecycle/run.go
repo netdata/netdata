@@ -40,8 +40,6 @@ type RunSupervisor struct {
 }
 
 type RunCensus struct {
-	AdmissionRunDrained    bool
-	Admission              AdmissionCensus
 	KernelDrained          bool
 	FunctionCatalogDrained bool
 	UIDActive              int
@@ -56,7 +54,7 @@ type RunCensus struct {
 func (census RunCensus) Quiescent() bool {
 	frameDrained := !census.Frame.Poisoned && !census.Frame.Busy &&
 		!census.Frame.PendingControl && census.Frame.RetainedBytes == 0
-	return census.AdmissionRunDrained && census.KernelDrained &&
+	return census.KernelDrained &&
 		census.FunctionCatalogDrained && census.UIDActive == 0 &&
 		census.TransientActive == 0 && census.TransientPending == 0 &&
 		census.Inherited.Active == 0 &&

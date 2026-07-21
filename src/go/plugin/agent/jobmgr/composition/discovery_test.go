@@ -211,12 +211,10 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 	require.NoError(t, err)
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
-	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
 		Generation: 1, ShutdownTimeout: time.Second,
-		Admission: admission,
-		UIDs:      uids, Frames: frames,
+		UIDs: uids, Frames: frames,
 		Modules: collectorapi.Registry{},
 		Jobs:    testRunJobServices(t),
 		Discovery: runDiscoveryServices{
@@ -247,8 +245,6 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 	require.EqualValues(t, lifecycle.InheritedTaskCensus{}, generation.tasks.InheritedCensus())
 
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, generation.tasks.LongLivedCensus())
-
-	require.NoError(t, admission.CloseDrained(1))
 
 	closeRunTestUIDs(t, uids)
 }

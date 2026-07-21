@@ -118,7 +118,7 @@ A useful mental split for the rest of this document:
 - **Adapters** (`functions`, `joboutput`, `secrets`, `discovery`) know *how* to
   do the collector-specific work, behind narrow ports.
 - **`lifecycle`** provides the neutral machinery the kernel delegates to
-  (admission, tasks, framing, run control).
+  (UID ownership, tasks, framing, and run control).
 - **`composition`** wires them all together.
 
 ## The Concurrency Model
@@ -145,13 +145,13 @@ Think of an **air-traffic control tower with a single controller**:
 ```mermaid
 flowchart TD
     Submit("Submit<br/>adapter, off-loop")
-    Admit("Admit<br/>UID dedupe · memory · lane")
+    Admit("Admit<br/>UID dedupe · route · lane")
     Lane("Lane<br/>per-resource FIFO")
     Claim("Claims<br/>read / write ordering")
     Task("Run task<br/>goroutine, off-loop")
     Complete("Apply completion<br/>on-loop")
     Frame("FrameOwner<br/>terminal frame → stdout")
-    Dispose("Dispose<br/>release claims · lane · memory")
+    Dispose("Dispose<br/>release claims · lane")
 
     Submit --> Admit --> Lane --> Claim --> Task --> Complete --> Frame --> Dispose
     Complete -. "advance / wake lanes" .-> Lane
@@ -166,10 +166,9 @@ flowchart TD
    Job Manager plan or submits an unresolved Function request, pushes it onto a
    submission queue, and wakes the loop. `command_ports.go`,
    `kernel_ingress.go`.
-2. **Admit** (on-loop): the loop dedupes the command's UID, charges a memory
-   budget, resolves the route, derives the lane key, and installs the operation.
-   Duplicate or over-budget commands are rejected here. `lifecycle/admission.go`,
-   `lifecycle/uid.go`.
+2. **Admit** (on-loop): the loop dedupes the command's UID, resolves the route,
+   derives the lane key, and installs the operation. Duplicate UIDs and invalid
+   routes are rejected here. `kernel_admission.go`, `lifecycle/uid.go`.
 3. **Lane**: same-resource commands share one FIFO lane; only the lane head
    runs while the lane is active. Different lanes advance independently.
 4. **Claims**: cross-lane exclusion. Read claims coexist; a write claim excludes
@@ -182,8 +181,7 @@ flowchart TD
 6. **Apply completion** (on-loop): the task radios its result back; the loop
    seals it and advances the lifecycle.
 7. **Frame**: the terminal response is committed to stdout through `FrameOwner`.
-8. **Dispose**: claims, the lane slot, and the memory reservation are released,
-   waking any blocked lanes.
+8. **Dispose**: claims and the lane slot are released, waking any blocked lanes.
 
 ### Who owns what
 
@@ -199,12 +197,11 @@ flowchart TD
 - **`TaskSupervisor` runs two independent classes** — framework-control work
   (lifecycle/DynCfg commands) and generic Function work — in strict round-robin.
   One class can never starve the other, and there is **no fixed "N active
-  Functions" cap**; concurrency is bounded by memory admission, not a counter.
-  `lifecycle/task.go`.
+  Functions" cap**. `lifecycle/task.go`.
 - **A timed-out task keeps its ownership.** If blocking work overruns its
   deadline, the kernel only *cooperatively* cancels it; its claims, lane, and
-  memory stay held until it actually returns, because a late return could still
-  mutate that resource. Repeated overruns escalate to a fail-stop.
+  resource authority stay held until it actually returns, because a late return
+  could still mutate that resource. Repeated overruns escalate to a fail-stop.
   `kernel_disposal.go` and `kernel_runloop.go`.
 
 Two more facts that catch newcomers:
@@ -456,7 +453,7 @@ crosses a reload.
 | Package | Responsibility |
 | --- | --- |
 | `jobmgr` (root) | Command ports, the `CommandKernel` run loop, lanes, claims, composite child commands |
-| `jobmgr/lifecycle` | Neutral authorities: admission, UID, operation, task, frame, run, resource, transaction |
+| `jobmgr/lifecycle` | Neutral authorities: UID, operation, task, frame, run, resource, transaction |
 | `jobmgr/functions` | Function stdin ingress, routing catalog, handler generations, publication to Netdata |
 | `jobmgr/joboutput` | Collector construction, job generations, output frames, DynCfg jobs, autodetection retries, vnode snapshots |
 | `jobmgr/secrets` | Secret dependency index, store command adapter, dependent-restart transaction |
@@ -475,9 +472,8 @@ crosses a reload.
 The layering is enforced by `architecture_test.go`, not just convention:
 
 - **`lifecycle` is neutral.** It imports no sibling, no adapter, and no Agent or
-  collector package — only the standard library. All domain policy
-  (which bytes to charge, which frame is a keepalive, when to go dirty) is
-  supplied by the caller.
+  collector package — only the standard library. Domain policy (which frame is
+  a keepalive, when to go dirty) is supplied by the caller.
 - **Adapters do not import each other.** `functions`, `joboutput`, `secrets`,
   and `discovery` may import the root command ports and `lifecycle`, but never a
   sibling adapter.
@@ -504,7 +500,7 @@ black-box tests rather than an exact private-type or source-file manifest.
     dependency).
 - Change discovery add/remove decisions or configured vnodes:
   - `discovery/` (decision, vnode) and `composition/{discovery,vnodes}.go`.
-- Change the ordering model (lanes, claims, admission, deadlines):
+- Change the ordering model (lanes, claims, command acceptance, deadlines):
   - `kernel*.go`, `claim_authority.go`, and `lifecycle/`.
 - Change how the process is assembled, reloaded, or shut down:
   - `composition/` (process, run, public).
@@ -523,7 +519,7 @@ env GOCACHE=/tmp/netdata-go-build-cache go vet ./plugin/agent/jobmgr/...
 ```
 
 Job Manager is concurrency-sensitive: the `-race` run is not optional for
-changes to the kernel, claims, admission, tasks, or the run/shutdown paths.
+changes to the kernel, claims, tasks, or the run/shutdown paths.
 
 When a change touches shared framework code that Job Manager consumes
 (`framework/jobruntime`, `metrix`, the chart engine), also build and test a

@@ -51,7 +51,6 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 	run, err := lifecycle.NewRunSupervisor(1, clock, 5*time.Second)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
-	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
@@ -59,12 +58,10 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 	require.NoError(t, err)
 	kernel, err := jobmgr.NewCommandKernel(
 		run,
-		admission,
 		uids,
 		tasks,
 		frames,
 		clock,
-		make(chan lifecycle.AdmissionGrant, 1),
 		testRunShutdownBarrierFunc(
 			func(context.Context, uint64) error { return nil },
 		),
@@ -94,8 +91,6 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
 
 	closeCleanupIntegrationUIDs(t, uids)
 }

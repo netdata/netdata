@@ -15,7 +15,7 @@ import (
 )
 
 func TestSubmitPreparedAndWaitReturnsCleanTransactionPreparationError(t *testing.T) {
-	kernel, run, _, _, _ := newKernelWithPlanner(
+	kernel, run, _, _ := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)
@@ -53,7 +53,7 @@ func TestSubmitPreparedAndWaitReturnsCleanTransactionPreparationError(t *testing
 }
 
 func TestSubmitPreparedPreservesStoppingRejectionWithoutInputBodyCleanup(t *testing.T) {
-	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 
@@ -83,7 +83,7 @@ func TestSubmitPreparedPreservesStoppingRejectionWithoutInputBodyCleanup(t *test
 }
 
 func TestSubmitPreparedAndWaitDirtiesRunForRetainedTransactionPreparation(t *testing.T) {
-	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 
@@ -138,7 +138,7 @@ func TestKernelDoesNotCancelStartedTransactionAction(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+			kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 			require.NoError(t, kernel.Start(t.Context()))
 			require.NoError(t, run.OpenAdmission())
 			entered := make(chan struct{})
@@ -178,7 +178,7 @@ func TestKernelDoesNotCancelStartedTransactionAction(t *testing.T) {
 }
 
 func TestKernelShutdownBudgetBoundsProtectedOwnershipAction(t *testing.T) {
-	kernel, run, _, _, _ := newKernelWithPlannerAndTimeout(
+	kernel, run, _, _ := newKernelWithPlannerAndTimeout(
 		t,
 		stoppedKernelPlanner{},
 		20*time.Millisecond,
@@ -237,7 +237,7 @@ func TestKernelShutdownBudgetBoundsProtectedOwnershipAction(t *testing.T) {
 
 func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 	catalog := &shutdownActionMutationCatalog{}
-	kernel, run, admission, uids, _ :=
+	kernel, run, uids, _ :=
 		newKernelWithClockFinalizerCatalogAndTimeout(
 			t,
 			stoppedKernelPlanner{},
@@ -315,11 +315,10 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 	require.NoErrorf(
 		t,
 		waitErr,
-		"phase=%d continuations=%d cancellationDone=%v inputReady=%v mutationActive=%v mutationPaused=%v catalog active=%v closed=%v",
+		"phase=%d continuations=%d cancellationDone=%v mutationActive=%v mutationPaused=%v catalog active=%v closed=%v",
 		kernel.shutdownPhase,
 		kernel.ownershipChains,
 		kernel.shutdownCancelDone,
-		kernel.shutdownInputBodyReady,
 		kernel.functionMutationActive,
 		kernel.functionMutationPaused,
 		catalog.active.Load(),
@@ -329,7 +328,6 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 	require.EqualValues(t, 1, catalog.beginCalls.Load())
 	require.EqualValues(t, 1, catalog.commitCalls.Load())
 	require.True(t, catalog.closed.Load())
-	require.NoError(t, admission.CloseDrained(run.Generation()))
 	closeUIDLedger(t, uids)
 }
 
@@ -557,7 +555,7 @@ func (*atomicPreparedTransaction) Dispose(
 }
 
 func TestShutdownCancellationPreservesGenerationStoppingCause(t *testing.T) {
-	kernel, run, _, _, _ := newKernelWithPlanner(
+	kernel, run, _, _ := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)
@@ -632,7 +630,7 @@ func TestShutdownCancellationPreservesGenerationStoppingCause(t *testing.T) {
 }
 
 func TestShutdownPreparationCancellationDoesNotDirtyResource(t *testing.T) {
-	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 	started := make(chan struct{})
@@ -680,7 +678,7 @@ func TestShutdownPreparationCancellationDoesNotDirtyResource(t *testing.T) {
 }
 
 func TestSubmitPreparedAndWaitJoinsAcceptedCancellation(t *testing.T) {
-	kernel, run, _, _, _ := newKernelWithPlanner(
+	kernel, run, _, _ := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)

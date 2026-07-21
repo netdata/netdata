@@ -14,8 +14,6 @@ import (
 var ErrFunctionResultTooLarge = errors.New("jobmgr lifecycle: Function result exceeds bound")
 
 const (
-	ProcessBudgetBytes                  = 256 * 1024 * 1024
-	OrdinaryBudgetBytes                 = ProcessBudgetBytes
 	TaskStartServiceQuantum             = 4
 	RetainedTimeoutFailStopThreshold    = 4
 	InheritedCancellationServiceQuantum = 4

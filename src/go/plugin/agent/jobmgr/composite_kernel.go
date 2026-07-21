@@ -127,18 +127,12 @@ func (kcs *kernelCompositeScope) submitAndWait(
 		)
 	}
 	if err := request.Validate(); err != nil {
-		return errors.Join(
-			err,
-			kcs.kernel.abortRequestInputBody(request),
-		)
+		return err
 	}
 	request.Args = slices.Clone(request.Args)
 	owned, err := prepareOwnedJobPlan(request, plan)
 	if err != nil {
-		return errors.Join(
-			err,
-			kcs.kernel.abortRequestInputBody(request),
-		)
+		return err
 	}
 	result := make(chan error, 1)
 	terminal := make(chan error, 1)
@@ -155,10 +149,7 @@ func (kcs *kernelCompositeScope) submitAndWait(
 			terminal:  terminal,
 		},
 	); err != nil {
-		return errors.Join(
-			err,
-			kcs.kernel.abortRequestInputBody(request),
-		)
+		return err
 	}
 
 	accepted, err := kcs.waitChildAdmission(

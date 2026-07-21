@@ -39,15 +39,14 @@ type runSecretServices struct {
 }
 
 type runGenerationConfig struct {
-	Generation      uint64                     // this run's generation number
-	ShutdownTimeout time.Duration              // per-run shutdown budget
-	Admission       *lifecycle.AdmissionLedger // process-lifetime admission ledger
-	UIDs            *lifecycle.UIDLedger       // process-lifetime UID ledger
-	Frames          *lifecycle.FrameOwner      // the one frame writer
-	Modules         collectorapi.Registry      // collector module registry
-	Jobs            runJobServices             // job services
-	Secrets         runSecretServices          // secret services
-	Discovery       runDiscoveryServices       // discovery services
+	Generation      uint64                // this run's generation number
+	ShutdownTimeout time.Duration         // per-run shutdown budget
+	UIDs            *lifecycle.UIDLedger  // process-lifetime UID ledger
+	Frames          *lifecycle.FrameOwner // the one frame writer
+	Modules         collectorapi.Registry // collector module registry
+	Jobs            runJobServices        // job services
+	Secrets         runSecretServices     // secret services
+	Discovery       runDiscoveryServices  // discovery services
 }
 
 type runGeneration struct {
@@ -60,7 +59,6 @@ type runGeneration struct {
 	vnodes            *vnodeBinding                  // dyncfg vnode binding
 	discovery         runDiscoveryServices           // discovery services
 	kernel            *jobmgr.CommandKernel          // the command kernel
-	inputBodyGrants   chan lifecycle.AdmissionGrant  // channel delivering input-body growth grants to the kernel
 	metrics           *runMetrics                    // jobmgr.runtime metrics projection (nil when runtime charts off)
 	runtime           runtimecomp.Service            // runtime service
 	runtimeRegistered bool                           // guards double-unregister of jobmgr.runtime
@@ -101,7 +99,6 @@ func newRunGeneration(
 	}()
 	if config.Generation == 0 ||
 		config.ShutdownTimeout <= 0 ||
-		config.Admission == nil ||
 		config.UIDs == nil ||
 		config.Frames == nil ||
 		config.Modules == nil ||
@@ -289,15 +286,12 @@ func newRunGeneration(
 	if err := dynCfgBinding.bind(dynCfgJobs); err != nil {
 		return nil, err
 	}
-	inputBodyGrants := make(chan lifecycle.AdmissionGrant, 1)
 	kernel, err := jobmgr.NewCommandKernel(
 		run,
-		config.Admission,
 		config.UIDs,
 		tasks,
 		config.Frames,
 		lifecycle.RealClock{},
-		inputBodyGrants,
 		functions,
 		joinedRunFinalizer{
 			functions: functions,
@@ -332,7 +326,6 @@ func newRunGeneration(
 		vnodes:            vnodeBinding,
 		discovery:         config.Discovery,
 		kernel:            kernel,
-		inputBodyGrants:   inputBodyGrants,
 		metrics:           metrics,
 		runtime:           config.Jobs.Runtime,
 		runtimeRegistered: metrics != nil,

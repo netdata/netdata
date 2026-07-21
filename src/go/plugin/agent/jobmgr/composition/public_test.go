@@ -12,7 +12,6 @@ import (
 	"time"
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -68,19 +67,6 @@ func TestProductionProcessQuitHasOneCleanTerminalDisposition(t *testing.T) {
 
 		require.NoError(t, process.Run(context.Background()))
 	}
-}
-
-func TestProductionProcessDoesNotReserveSpeculativeCatalogStorage(t *testing.T) {
-	process, err := NewProcess(testProductionProcessConfig(strings.NewReader("QUIT\n"), io.Discard))
-	require.NoError(t, err)
-
-	require.Zero(t, process.core.admission.Census().ProcessBytes)
-
-	require.NoError(t, process.Run(context.Background()))
-
-	census := process.core.admission.Census()
-	require.Zero(t, census.ProcessBytes)
-	require.Equal(t, lifecycle.AdmissionClosed, census.Phase)
 }
 
 func TestProcessControlCancellationAfterHandoffWaitsForDisposition(t *testing.T) {

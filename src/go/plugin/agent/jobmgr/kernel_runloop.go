@@ -148,9 +148,6 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 				beginShutdown(cause)
 			}
 		} else {
-			if err := ck.advanceShutdownInputBody(); err != nil {
-				ck.run.Dirty(err)
-			}
 			var shutdownErr error
 			if ck.shutdownPhase == commandShutdownActionDrain {
 				moreShutdownCancellation, shutdownErr =
@@ -390,10 +387,7 @@ func (ck *CommandKernel) serviceSubmissions(quantum int) bool {
 			}
 		} else {
 			if submitted.context != nil && submitted.context.Err() != nil {
-				err = ck.abortRequestInputBodyWith(
-					submitted.request,
-					context.Cause(submitted.context),
-				)
+				err = context.Cause(submitted.context)
 			} else {
 				err = ck.admitSubmission(
 					submitted.request,

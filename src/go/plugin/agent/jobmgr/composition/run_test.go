@@ -36,11 +36,10 @@ func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
-	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
 		Generation: 7, ShutdownTimeout: time.Second,
-		Admission: admission, UIDs: uids, Frames: frames,
+		UIDs: uids, Frames: frames,
 		Modules: modules, Jobs: testRunJobServices(t),
 		Discovery: testRunDiscoveryServices(t),
 	})
@@ -58,7 +57,6 @@ func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 
 	generation.Stop()
 	require.NoError(t, generation.Wait(context.Background()))
-	require.NoError(t, admission.CloseDrained(7))
 	closeRunTestUIDs(t, uids)
 }
 
@@ -111,11 +109,10 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(
 
 			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 			require.NoError(t, err)
-			admission := lifecycle.NewAdmissionLedger()
 			uids := lifecycle.NewUIDLedger()
 			generation, err := newRunGeneration(runGenerationConfig{
 				Generation: 1, ShutdownTimeout: 10 * time.Second,
-				Admission: admission, UIDs: uids,
+				UIDs:   uids,
 				Frames: frames, Modules: modules, Jobs: jobs,
 				Discovery: testRunDiscoveryServices(t, configs...),
 			})
@@ -135,8 +132,6 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(
 			require.NoError(t, generation.Wait(context.Background()))
 
 			require.EqualValues(t, int32(test.jobs), cleanupCalls.Load())
-
-			require.NoError(t, admission.CloseDrained(1))
 
 			closeRunTestUIDs(t, uids)
 		})
@@ -178,11 +173,10 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 			},
 		},
 	}
-	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
 		Generation: 1, ShutdownTimeout: time.Second,
-		Admission: admission, UIDs: uids,
+		UIDs:   uids,
 		Frames: frames, Modules: modules,
 		Jobs:      testRunJobServices(t),
 		Discovery: testRunDiscoveryServices(t),
@@ -208,8 +202,6 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 	for index := range want {
 		require.EqualValues(t, want[index], got[index])
 	}
-
-	require.NoError(t, admission.CloseDrained(1))
 
 	closeRunTestUIDs(t, uids)
 }
@@ -252,11 +244,10 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
-	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
 		Generation: 1, ShutdownTimeout: time.Second,
-		Admission: admission, UIDs: uids,
+		UIDs:   uids,
 		Frames: frames, Modules: modules, Jobs: jobs,
 		Discovery: testRunDiscoveryServicesAccepted(t, config),
 	})
@@ -294,8 +285,6 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	require.NoError(t, generation.Wait(context.Background()))
 
 	require.EqualValues(t, 1, cleanupCalls.Load())
-
-	require.NoError(t, admission.CloseDrained(1))
 
 	closeRunTestUIDs(t, uids)
 }
@@ -350,11 +339,10 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
-	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
 		Generation: 1, ShutdownTimeout: time.Second,
-		Admission: admission, UIDs: uids,
+		UIDs:   uids,
 		Frames: frames, Modules: modules, Jobs: jobs,
 		Discovery: testRunDiscoveryServicesAccepted(t, config),
 	})
@@ -435,7 +423,6 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 		lifecycle.LongLivedCensus{},
 		generation.tasks.LongLivedCensus(),
 	)
-	require.NoError(t, admission.CloseDrained(1))
 	closeRunTestUIDs(t, uids)
 }
 

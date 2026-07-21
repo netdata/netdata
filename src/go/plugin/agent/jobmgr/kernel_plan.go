@@ -26,13 +26,10 @@ type ResourceTransactionPlan struct {
 }
 
 func (wp WorkPlan) validate() error {
-	claimBytes := 0
 	for _, key := range wp.Claims {
-		if key == "" || len(key) > maximumClaimKeyBytes ||
-			len(key) > maximumPlanClaimBytes-claimBytes {
+		if key == "" || len(key) > maximumClaimKeyBytes {
 			return errors.New("jobmgr kernel: invalid or oversized claim key")
 		}
-		claimBytes += len(key)
 	}
 	workKinds := 0
 	if wp.Work != nil {

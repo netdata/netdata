@@ -15,22 +15,6 @@ import (
 const formerFixedPopulation = 256
 const formerFixedUIDPopulation = 16_384
 
-func TestAdmissionPopulationGrowsBeyondFormerLimits(t *testing.T) {
-	tests := map[string]struct {
-		run func(*testing.T)
-	}{
-		"admission records": {
-			run: testAdmissionRecordGrowth,
-		},
-		"same admission lane": {
-			run: testAdmissionLaneGrowth,
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, test.run)
-	}
-}
-
 func TestPendingTaskRequestPopulationGrowsBeyondFormerLimit(t *testing.T) {
 	testTaskRequestGrowth(t)
 }
@@ -41,40 +25,6 @@ func TestLongLivedJobPermitPopulationGrowsBeyondFormerLimit(t *testing.T) {
 
 func TestActiveFunctionUIDPopulationGrowsBeyondFormerLimit(t *testing.T) {
 	testUIDGrowth(t)
-}
-
-func testAdmissionRecordGrowth(t *testing.T) {
-	ledger := NewAdmissionLedger()
-	refs := make([]AdmissionRef, 0, formerFixedPopulation+1)
-	for index := 0; index <= formerFixedPopulation; index++ {
-		result := ledger.RequestOrdinary(
-			1,
-			AdmissionLaneRef{
-				Slot:       uint32(index + 1),
-				Generation: 1,
-			},
-			1,
-		)
-		require.Nil(t, result.Rejected)
-		refs = append(refs, result.Ref)
-	}
-	for _, ref := range refs {
-		require.NoError(t, ledger.CancelWaiting(ref))
-	}
-}
-
-func testAdmissionLaneGrowth(t *testing.T) {
-	ledger := NewAdmissionLedger()
-	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
-	refs := make([]AdmissionRef, 0, formerFixedPopulation+1)
-	for index := 0; index <= formerFixedPopulation; index++ {
-		result := ledger.RequestOrdinary(1, lane, 1)
-		require.Nil(t, result.Rejected)
-		refs = append(refs, result.Ref)
-	}
-	for _, ref := range refs {
-		require.NoError(t, ledger.CancelWaiting(ref))
-	}
 }
 
 func testTaskRequestGrowth(t *testing.T) {

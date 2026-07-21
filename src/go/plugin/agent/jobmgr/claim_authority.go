@@ -98,10 +98,8 @@ func (ca *claimAuthority) bindRuntimeObserver(
 
 func normalizeAuthorityClaims(input []string) ([]string, error) {
 	claims := slices.Clone(input)
-	for _, claim := range claims {
-		if claim == "" {
-			return nil, errors.New("jobmgr claims: empty key")
-		}
+	if slices.Contains(claims, "") {
+		return nil, errors.New("jobmgr claims: empty key")
 	}
 	slices.Sort(claims)
 	claims = slices.Compact(claims)

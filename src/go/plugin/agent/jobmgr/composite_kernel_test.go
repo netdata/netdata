@@ -178,7 +178,7 @@ func compositeTestApplied(
 func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 	t *testing.T,
 ) {
-	kernel, run, _, _, _ := newKernelWithPlanner(
+	kernel, run, _, _ := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)
@@ -372,7 +372,7 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			kernel, run, _, _, _ := newKernelWithPlanner(
+			kernel, run, _, _ := newKernelWithPlanner(
 				t,
 				stoppedKernelPlanner{},
 			)
@@ -475,7 +475,7 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 }
 
 func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
-	kernel, run, _, _, _ := newKernelWithPlanner(
+	kernel, run, _, _ := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)
@@ -543,7 +543,7 @@ func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
 func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 	t *testing.T,
 ) {
-	kernel, run, _, _, _ := newKernelWithPlanner(
+	kernel, run, _, _ := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)
@@ -682,7 +682,7 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 func TestCompositeFenceAcceptsButDefersConflictingWorkWithoutBlockingUnrelatedWork(
 	t *testing.T,
 ) {
-	kernel, run, admission, _, _ := newKernelWithPlanner(
+	kernel, run, _, _ := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)
@@ -796,7 +796,7 @@ func TestCompositeFenceAcceptsButDefersConflictingWorkWithoutBlockingUnrelatedWo
 	select {
 	case <-unrelatedApplied:
 	case <-time.After(time.Second):
-		require.FailNowf(t, "test failed", "unrelated work was starved by conflicting admission: %+v", admission.Census())
+		require.FailNow(t, "test failed", "unrelated work was starved by the conflicting operation")
 	}
 	select {
 	case err := <-conflictingAdmitted:
@@ -838,14 +838,12 @@ func TestCompositeFenceAcceptsButDefersConflictingWorkWithoutBlockingUnrelatedWo
 	require.NoError(t, run.DirtyCause())
 
 	stopCompositeTestKernel(t, kernel)
-	census := admission.Census()
-	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
 }
 
-func TestCompositeChildRunsWithoutAggregateAdmissionCapacity(
+func TestCompositeChildRunsWhileParentOwnsFence(
 	t *testing.T,
 ) {
-	kernel, run, admission, _, _ := newKernelWithPlanner(
+	kernel, run, _, _ := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)
@@ -903,31 +901,12 @@ func TestCompositeChildRunsWithoutAggregateAdmissionCapacity(
 		require.FailNow(t, "test failed", "progress parent did not enter apply")
 	}
 
-	beforeBlocker := admission.Census()
-	capacity := lifecycle.OrdinaryBudgetBytes -
-		beforeBlocker.ProcessBytes
-	blocker := admission.RequestOrdinary(
-		run.Generation(),
-		lifecycle.AdmissionLaneRef{Slot: 1_000, Generation: 1},
-		capacity-beforeBlocker.OrdinaryBytes,
-	)
-	require.NoError(t, blocker.Rejected)
-	var blockerGrants [lifecycle.TaskStartServiceQuantum]lifecycle.AdmissionGrant
-	count, _, err := admission.TakeGrants(1, &blockerGrants)
-	require.NoError(t, err)
-	require.EqualValues(t, 1, count)
-	require.Equal(t, blocker.Ref, blockerGrants[0].Ref)
-
-	require.EqualValues(t, capacity, admission.Census().OrdinaryBytes)
-
 	close(submitChild)
 	select {
 	case <-childEntered:
 	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "composite child did not receive parent-linked progress admission")
+		require.FailNow(t, "test failed", "composite child did not start while its parent owned the fence")
 	}
-
-	require.EqualValues(t, capacity, admission.Census().OrdinaryBytes)
 
 	close(childRelease)
 	select {
@@ -936,12 +915,7 @@ func TestCompositeChildRunsWithoutAggregateAdmissionCapacity(
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "progress parent did not finish")
 	}
-	_, err = admission.ReleaseOrdinary(blocker.Ref)
-	require.NoError(t, err)
-
 	require.NoError(t, run.DirtyCause())
 
 	stopCompositeTestKernel(t, kernel)
-	census := admission.Census()
-	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
 }

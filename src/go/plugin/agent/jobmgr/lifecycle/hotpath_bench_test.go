@@ -10,26 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func BenchmarkBAdmission(b *testing.B) {
-	ledger := NewAdmissionLedger()
-	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
-	var grants [4]AdmissionGrant
-	b.ReportAllocs()
-	for b.Loop() {
-		request := ledger.RequestOrdinary(1, lane, 1)
-		if request.Rejected != nil {
-			require.FailNow(b, "benchmark failed", request.Rejected)
-		}
-		count, _, err := ledger.TakeGrants(1, &grants)
-		if err != nil || count != 1 {
-			require.FailNowf(b, "benchmark failed", "grant count=%d err=%v", count, err)
-		}
-		if _, err := ledger.ReleaseOrdinary(request.Ref); err != nil {
-			require.FailNow(b, "benchmark failed", err)
-		}
-	}
-}
-
 func BenchmarkBOperationTransition(b *testing.B) {
 	b.ReportAllocs()
 	var id OperationID

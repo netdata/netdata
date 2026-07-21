@@ -12,36 +12,11 @@ import (
 
 func TestGenerationWrapRetiresExhaustedFreelistHeads(t *testing.T) {
 	tests := map[string]func(*testing.T){
-		"admission record": testAdmissionRecordGenerationRetirement,
-		"queued task":      testQueuedTaskGenerationRetirement,
+		"queued task": testQueuedTaskGenerationRetirement,
 	}
 	for name, test := range tests {
 		t.Run(name, test)
 	}
-}
-
-func testAdmissionRecordGenerationRetirement(t *testing.T) {
-	ledger := NewAdmissionLedger()
-	ledger.records = append(
-		ledger.records,
-		admissionRecord{generation: math.MaxUint32, next: 3},
-		admissionRecord{generation: 7},
-	)
-	ledger.freeRecordHead = 2
-	ledger.freeRecords = 2
-	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
-
-	ref, err := ledger.allocateRecord(
-		1,
-		lane,
-		1,
-		admissionOrdinaryWaiting,
-	)
-
-	require.NoError(t, err)
-	require.Equal(t, AdmissionRef{Slot: 3, Generation: 8}, ref)
-	ledger.freeRecord(ref.Slot)
-	require.True(t, ledger.allOperationRecordsFree())
 }
 
 func testQueuedTaskGenerationRetirement(t *testing.T) {

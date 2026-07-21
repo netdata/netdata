@@ -326,7 +326,6 @@ func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
 	census := process.ingress.Census()
 	require.False(t, census.State != "contained" ||
 		census.RunGeneration != 0 || census.ReaderStarts != 0)
-	require.Equal(t, lifecycle.AdmissionClosed, process.admission.Census().Phase)
 	cleanupsMu.Lock()
 	defer cleanupsMu.Unlock()
 	require.EqualValues(t, 1, cleanups)

@@ -20,7 +20,7 @@ func (fn runFinalizerFunc) FinalizeRun(ctx context.Context, generation uint64) e
 }
 
 // admit is a test-only convenience that submits an already-prepared command
-// through the kernel admission path with no input-body reservation.
+// through the kernel admission path.
 func (ck *CommandKernel) admit(
 	request Request,
 	plan WorkPlan,

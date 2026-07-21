@@ -57,11 +57,10 @@ type processRuntimeConfig struct {
 type processCore struct {
 	config processRuntimeConfig // retained process configuration
 
-	admission *lifecycle.AdmissionLedger      // process-lifetime admission ledger
-	uids      *lifecycle.UIDLedger            // process-lifetime UID ledger
-	frames    *lifecycle.FrameOwner           // the one process-lifetime frame writer
-	ingress   *functionadapter.ProcessIngress // the one process-lifetime stdin reader
-	quit      atomic.Bool                     // set once to stop the outer loop
+	uids    *lifecycle.UIDLedger            // process-lifetime UID ledger
+	frames  *lifecycle.FrameOwner           // the one process-lifetime frame writer
+	ingress *functionadapter.ProcessIngress // the one process-lifetime stdin reader
+	quit    atomic.Bool                     // set once to stop the outer loop
 }
 
 func newProcessCore(config processCoreConfig) (*processCore, error) {
@@ -77,7 +76,6 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		!config.Discovery.valid() {
 		return nil, errors.New("jobmgr composition: invalid process construction")
 	}
-	admission := lifecycle.NewAdmissionLedger()
 	frames, err := lifecycle.NewFrameOwner(config.Output)
 	if err != nil {
 		return nil, err
@@ -96,8 +94,7 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 			Discovery:       config.Discovery,
 			FinalizeOutput:  config.FinalizeOutput,
 		},
-		admission: admission,
-		uids:      lifecycle.NewUIDLedger(), frames: frames, ingress: ingress,
+		uids: lifecycle.NewUIDLedger(), frames: frames, ingress: ingress,
 	}, nil
 }
 
@@ -111,17 +108,17 @@ func (pc *processCore) run(
 	generationID := uint64(1)
 	generation, err := pc.newRun(generationID)
 	if err != nil {
-		return pc.finalize(nil, generationID, err)
+		return pc.finalize(nil, err)
 	}
 	if err := generation.start(ctx); err != nil {
-		return pc.finalize(generation, generationID, err)
+		return pc.finalize(generation, err)
 	}
 	binding, err := pc.binding(generation)
 	if err != nil {
-		return pc.finalize(generation, generationID, err)
+		return pc.finalize(generation, err)
 	}
 	if err := pc.ingress.Adopt(ctx, binding); err != nil {
-		return pc.finalize(generation, generationID, err)
+		return pc.finalize(generation, err)
 	}
 	inputDone := make(chan processInputCompletion, 1)
 	go func() {
@@ -137,11 +134,10 @@ func (pc *processCore) run(
 		select {
 		case input := <-inputDone:
 			if input.quit {
-				return pc.finalize(generation, generationID, input.err)
+				return pc.finalize(generation, input.err)
 			}
 			return pc.finalize(
 				generation,
-				generationID,
 				errors.Join(
 					errors.New("jobmgr composition: Function input stopped"),
 					input.err,
@@ -150,14 +146,13 @@ func (pc *processCore) run(
 		case <-generation.kernel.Done():
 			return pc.finalize(
 				generation,
-				generationID,
 				errors.Join(
 					errors.New("jobmgr composition: active run stopped unexpectedly"),
 					generation.Wait(context.Background()),
 				),
 			)
 		case <-ctx.Done():
-			return pc.finalize(generation, generationID, ctx.Err())
+			return pc.finalize(generation, ctx.Err())
 		case clock := <-ticks.C:
 			if generation.run.IsStopping() {
 				continue
@@ -175,7 +170,6 @@ func (pc *processCore) run(
 				} else {
 					return pc.finalize(
 						generation,
-						generationID,
 						errors.Join(
 							errors.New(
 								"jobmgr composition: keepalive write failed",
@@ -189,7 +183,6 @@ func (pc *processCore) run(
 			if control.result == nil {
 				return pc.finalize(
 					generation,
-					generationID,
 					errors.New("jobmgr composition: invalid process control"),
 				)
 			}
@@ -199,20 +192,18 @@ func (pc *processCore) run(
 				if nextID == 0 {
 					finalErr := pc.finalize(
 						generation,
-						generationID,
 						errors.New("jobmgr composition: run generation wrapped"),
 					)
 					control.result <- finalErr
 					return finalErr
 				}
-				next, finalGeneration, rotateErr := pc.rotate(
+				next, rotateErr := pc.rotate(
 					ctx,
 					generation,
-					generationID,
 					nextID,
 				)
 				if rotateErr != nil {
-					finalErr := pc.finalize(next, finalGeneration, rotateErr)
+					finalErr := pc.finalize(next, rotateErr)
 					control.result <- finalErr
 					return finalErr
 				}
@@ -220,13 +211,12 @@ func (pc *processCore) run(
 				generationID = nextID
 				control.result <- nil
 			case processTerminate:
-				finalErr := pc.finalize(generation, generationID, nil)
+				finalErr := pc.finalize(generation, nil)
 				control.result <- finalErr
 				return finalErr
 			default:
 				finalErr := pc.finalize(
 					generation,
-					generationID,
 					errors.New("jobmgr composition: invalid process command"),
 				)
 				control.result <- finalErr
@@ -241,7 +231,7 @@ func (pc *processCore) newRun(
 ) (*runGeneration, error) {
 	return newRunGeneration(runGenerationConfig{
 		Generation: generation, ShutdownTimeout: pc.config.ShutdownTimeout,
-		Admission: pc.admission, UIDs: pc.uids, Frames: pc.frames,
+		UIDs: pc.uids, Frames: pc.frames,
 		Modules: pc.config.Modules, Jobs: pc.config.Jobs,
 		Secrets:   pc.config.Secrets,
 		Discovery: pc.config.Discovery,
@@ -268,50 +258,45 @@ func (pc *processCore) binding(
 func (pc *processCore) rotate(
 	ctx context.Context,
 	current *runGeneration,
-	currentID uint64,
 	nextID uint64,
-) (*runGeneration, uint64, error) {
+) (*runGeneration, error) {
 	if err := pc.ingress.SealPause(); err != nil {
-		return current, currentID, err
+		return current, err
 	}
 	current.Stop()
 	budget, err := current.run.BeginShutdown()
 	if err != nil {
-		return current, currentID, err
+		return current, err
 	}
 	shutdownCtx := budget.Context()
 	if err := pc.ingress.DrainPause(shutdownCtx, nextID); err != nil {
-		return current, currentID, err
+		return current, err
 	}
 	if err := pc.retireRun(shutdownCtx, current); err != nil {
-		return current, currentID, err
+		return current, err
 	}
 	if err := current.run.FinishShutdown(); err != nil {
-		return current, currentID, err
-	}
-	if err := pc.admission.ReopenDrained(currentID, nextID); err != nil {
-		return current, currentID, err
+		return current, err
 	}
 	next, err := pc.newRun(nextID)
 	if err != nil {
-		return nil, nextID, err
+		return nil, err
 	}
 	if err := next.start(ctx); err != nil {
-		return next, nextID, err
+		return next, err
 	}
 	binding, err := pc.binding(next)
 	if err != nil {
-		return next, nextID, err
+		return next, err
 	}
 	if err := pc.ingress.Adopt(ctx, binding); err != nil {
-		return next, nextID, err
+		return next, err
 	}
-	return next, nextID, nil
+	return next, nil
 }
 
 func (pc *processCore) finalize(
 	current *runGeneration,
-	generation uint64,
 	cause error,
 ) error {
 	finalErr := cause
@@ -364,23 +349,6 @@ func (pc *processCore) finalize(
 	}
 	if err := closeProcessUIDs(shutdownCtx, pc.uids); err != nil {
 		finalErr = errors.Join(finalErr, err)
-	}
-	switch census := pc.admission.Census(); census.Phase {
-	case lifecycle.AdmissionOrdinaryOpen:
-		if err := pc.admission.BeginCleanupOnly(generation); err != nil {
-			finalErr = errors.Join(finalErr, err)
-		}
-		fallthrough
-	case lifecycle.AdmissionCleanupOnly:
-		if err := pc.admission.CloseDrained(generation); err != nil {
-			finalErr = errors.Join(finalErr, err)
-		}
-	case lifecycle.AdmissionClosed:
-	default:
-		finalErr = errors.Join(
-			finalErr,
-			errors.New("jobmgr composition: invalid final admission phase"),
-		)
 	}
 	if finishRun != nil {
 		if err := finishRun.FinishShutdown(); err != nil {

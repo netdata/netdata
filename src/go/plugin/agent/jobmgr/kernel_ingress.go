@@ -177,31 +177,22 @@ func (ck *CommandKernel) submitWithPlan(
 	terminal chan error,
 ) error {
 	if ctx == nil {
-		return ck.abortRequestInputBodyWith(
-			request,
-			errors.New("jobmgr kernel: nil submission context"),
-		)
+		return errors.New("jobmgr kernel: nil submission context")
 	}
 	if err := ctx.Err(); err != nil {
-		return ck.abortRequestInputBodyWith(request, err)
+		return err
 	}
 	if err := request.Validate(); err != nil {
-		return ck.abortRequestInputBodyWith(request, err)
+		return err
 	}
 	if prepared && request.Source != lifecycle.SourceJobManager {
-		return ck.abortRequestInputBodyWith(
-			request,
-			errors.New(
-				"jobmgr kernel: only Job Manager commands accept prepared plans",
-			),
+		return errors.New(
+			"jobmgr kernel: only Job Manager commands accept prepared plans",
 		)
 	}
 	if !prepared && request.Source != lifecycle.SourceFunction {
-		return ck.abortRequestInputBodyWith(
-			request,
-			errors.New(
-				"jobmgr kernel: Job Manager commands require prepared plans",
-			),
+		return errors.New(
+			"jobmgr kernel: Job Manager commands require prepared plans",
 		)
 	}
 	request.Args = slices.Clone(request.Args)
@@ -209,7 +200,7 @@ func (ck *CommandKernel) submitWithPlan(
 		var err error
 		plan, err = prepareOwnedJobPlan(request, plan)
 		if err != nil {
-			return ck.abortRequestInputBodyWith(request, err)
+			return err
 		}
 	}
 	result := make(chan error, 1)
@@ -220,7 +211,7 @@ func (ck *CommandKernel) submitWithPlan(
 		result:   result,
 		terminal: terminal,
 	}); err != nil {
-		return ck.abortRequestInputBodyWith(request, err)
+		return err
 	}
 	select {
 	case err := <-result:

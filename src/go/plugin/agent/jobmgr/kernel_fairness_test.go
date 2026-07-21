@@ -13,7 +13,7 @@ func TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress(
 	t *testing.T,
 ) {
 	const hotLanePopulation = 33
-	kernel, run, _, _, _ := newKernelWithPlanner(
+	kernel, run, _, _ := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)

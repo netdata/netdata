@@ -209,11 +209,10 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 	jobs.Runtime = service
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
-	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
 		Generation: 1, ShutdownTimeout: time.Second,
-		Admission: admission, UIDs: uids,
+		UIDs:   uids,
 		Frames: frames, Modules: collectorapi.Registry{}, Jobs: jobs,
 		Discovery: testRunDiscoveryServices(t),
 	})
@@ -240,8 +239,6 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 
 	got, ok := reader.Value(runtimeMetricPrefix+".dirty_runs_total", nil)
 	require.False(t, !ok || got != 1)
-
-	require.NoError(t, admission.CloseDrained(1))
 
 	closeRunTestUIDs(t, uids)
 }

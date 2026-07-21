@@ -55,7 +55,6 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	run, err := lifecycle.NewRunSupervisor(1, clock, time.Second)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
-	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
@@ -63,8 +62,7 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
 	kernel, err := jobmgr.NewCommandKernel(
-		run, admission, uids, tasks, frames, clock,
-		make(chan lifecycle.AdmissionGrant, 1),
+		run, uids, tasks, frames, clock,
 		runShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
 		runFinalizerFunc(func(context.Context, uint64) error { return nil }),
 		catalog,
@@ -88,8 +86,6 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	require.False(t, !census.Closed || census.Routes != 0 ||
 		census.InvocationLeases != 0 || census.PendingCleanups != 0 ||
 		cleanupCalls.Load() != 1)
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
 
 	closeExternalUIDLedger(t, uids)
 }
@@ -122,7 +118,7 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 		},
 	})
 	require.NoError(t, err)
-	kernel, run, admission, uids := newExternalKernel(t, catalog)
+	kernel, _, uids := newExternalKernel(t, catalog)
 	for index := range calls {
 		if err := kernel.Submit(context.Background(), jobmgr.Request{
 			UID: fmt.Sprintf("same-route-%d", index), Source: lifecycle.SourceFunction,
@@ -166,8 +162,6 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 
 	require.EqualValues(t, calls, len(seen))
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeExternalUIDLedger(t, uids)
 }
 
@@ -197,7 +191,7 @@ func TestKernelSameRouteFunctionCancellationIsInvocationLocal(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	kernel, run, admission, uids := newExternalKernel(t, catalog)
+	kernel, _, uids := newExternalKernel(t, catalog)
 	results := map[string]chan error{
 		"blocked":   make(chan error, 1),
 		"cancelled": make(chan error, 1),
@@ -257,8 +251,6 @@ func TestKernelSameRouteFunctionCancellationIsInvocationLocal(t *testing.T) {
 
 	require.NoError(t, kernel.Wait(context.Background()))
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeExternalUIDLedger(t, uids)
 }
 
@@ -283,7 +275,7 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 		PublicName: "direct",
 	}})
 	require.NoError(t, err)
-	kernel, run, admission, uids := newExternalKernel(t, catalog)
+	kernel, _, uids := newExternalKernel(t, catalog)
 
 	newGeneration := &functionadapter.HandlerGenerationDeclaration{
 		ID: "new",
@@ -337,8 +329,6 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 	default:
 		require.FailNow(t, "test failed", "replacement handler was not cleaned during catalog close")
 	}
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
 
 	closeExternalUIDLedger(t, uids)
 }
@@ -395,7 +385,7 @@ func TestFunctionCatalogShutdownCompletesResumedMultiTurnMutation(t *testing.T) 
 		firstCommitStep:     firstCommitStep,
 		resumeCommit:        resumeCommit,
 	}
-	kernel, run, admission, uids := newExternalKernel(t, observed)
+	kernel, _, uids := newExternalKernel(t, observed)
 	mutation, err := catalog.NewMutation(catalog.Census().Version, changes)
 	require.NoError(t, err)
 	require.NoError(t, kernel.QuiesceFunctions(context.Background(), mutation))
@@ -432,7 +422,6 @@ func TestFunctionCatalogShutdownCompletesResumedMultiTurnMutation(t *testing.T) 
 	require.Zero(t, census.PendingCleanups)
 	require.EqualValues(t, population, predecessorCleanups.Load())
 	require.EqualValues(t, population, successorCleanups.Load())
-	require.NoError(t, admission.CloseDrained(run.Generation()))
 	closeExternalUIDLedger(t, uids)
 }
 
@@ -441,7 +430,7 @@ func TestFunctionCatalogMutationCancellationAfterHandoffWaitsForDisposition(t *t
 		begun: make(chan struct{}),
 		allow: make(chan struct{}),
 	}
-	kernel, run, admission, uids := newExternalKernel(t, catalog)
+	kernel, _, uids := newExternalKernel(t, catalog)
 	ctx, cancel := context.WithCancel(context.Background())
 	type mutationResult struct {
 		version uint64
@@ -488,8 +477,6 @@ func TestFunctionCatalogMutationCancellationAfterHandoffWaitsForDisposition(t *t
 
 	require.NoError(t, kernel.Wait(context.Background()))
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeExternalUIDLedger(t, uids)
 
 	require.Nil(t, early)
@@ -502,7 +489,7 @@ func TestFunctionCatalogPausedMutationAbortsDuringShutdown(t *testing.T) {
 		allow: make(chan struct{}),
 	}
 	close(catalog.allow)
-	kernel, run, admission, uids := newExternalKernel(t, catalog)
+	kernel, run, uids := newExternalKernel(t, catalog)
 	mutation := handoffMutation{}
 
 	require.NoError(t, kernel.QuiesceFunctions(context.Background(), mutation))
@@ -525,8 +512,6 @@ func TestFunctionCatalogPausedMutationAbortsDuringShutdown(t *testing.T) {
 		stopping.Generation,
 	)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeExternalUIDLedger(t, uids)
 }
 
@@ -537,7 +522,7 @@ func TestFunctionCatalogMutationAfterShutdownCutIsRejectedBeforeAdmission(
 		begun: make(chan struct{}),
 		allow: make(chan struct{}),
 	}
-	kernel, run, admission, uids := newExternalKernel(t, catalog)
+	kernel, run, uids := newExternalKernel(t, catalog)
 
 	kernel.Stop()
 	shutdownCtx, cancelShutdown := context.WithTimeout(
@@ -568,7 +553,6 @@ func TestFunctionCatalogMutationAfterShutdownCutIsRejectedBeforeAdmission(
 
 	require.NoError(t, kernel.Wait(context.Background()))
 	require.True(t, catalog.closed.Load())
-	require.NoError(t, admission.CloseDrained(run.Generation()))
 	closeExternalUIDLedger(t, uids)
 }
 
@@ -685,21 +669,19 @@ func (hmc *handoffMutationCatalog) LifecycleCensus() jobmgr.FunctionCatalogCensu
 	}
 }
 
-func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmgr.CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger) {
+func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmgr.CommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger) {
 	t.Helper()
 	clock := lifecycle.RealClock{}
 	run, err := lifecycle.NewRunSupervisor(1, clock, time.Second)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
-	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
 	kernel, err := jobmgr.NewCommandKernel(
-		run, admission, uids, tasks, frames, clock,
-		make(chan lifecycle.AdmissionGrant, 1),
+		run, uids, tasks, frames, clock,
 		runShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
 		runFinalizerFunc(func(context.Context, uint64) error { return nil }),
 		catalog,
@@ -709,7 +691,7 @@ func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmg
 	require.NoError(t, run.OpenAdmission())
 	require.NoError(t, kernel.Start(context.Background()))
 
-	return kernel, run, admission, uids
+	return kernel, run, uids
 }
 
 func closeExternalUIDLedger(t *testing.T, ledger *lifecycle.UIDLedger) {

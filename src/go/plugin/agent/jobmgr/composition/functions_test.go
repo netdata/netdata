@@ -228,15 +228,14 @@ func TestFunctionAssemblyCommitsProtectedTransactionAfterShutdownCut(
 }
 
 type shutdownFunctionHarness struct {
-	kernel    *jobmgr.CommandKernel
-	run       *lifecycle.RunSupervisor
-	admission *lifecycle.AdmissionLedger
-	uids      *lifecycle.UIDLedger
-	tasks     *lifecycle.TaskSupervisor
-	output    *bytes.Buffer
-	job       *assemblyTestJob
-	handle    joboutput.HandlerLifecycle
-	permit    lifecycle.LongLivedPlan
+	kernel *jobmgr.CommandKernel
+	run    *lifecycle.RunSupervisor
+	uids   *lifecycle.UIDLedger
+	tasks  *lifecycle.TaskSupervisor
+	output *bytes.Buffer
+	job    *assemblyTestJob
+	handle joboutput.HandlerLifecycle
+	permit lifecycle.LongLivedPlan
 }
 
 func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
@@ -262,18 +261,15 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 	run, err := lifecycle.NewRunSupervisor(1, clock, time.Second)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
-	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
 	kernel, err := jobmgr.NewCommandKernel(
 		run,
-		admission,
 		uids,
 		tasks,
 		frames,
 		clock,
-		make(chan lifecycle.AdmissionGrant, 1),
 		assembly,
 		assembly,
 		assembly.Catalog(),
@@ -295,7 +291,7 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 	require.NoError(t, err)
 	permit := lifecycle.NewJobLongLivedPlan()
 	return shutdownFunctionHarness{
-		kernel: kernel, run: run, admission: admission, uids: uids,
+		kernel: kernel, run: run, uids: uids,
 		tasks: tasks, output: output, job: job, handle: handle,
 		permit: permit,
 	}
@@ -304,7 +300,6 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 func (sfh shutdownFunctionHarness) requireDrained(t *testing.T) {
 	t.Helper()
 	require.Equal(t, lifecycle.LongLivedCensus{}, sfh.tasks.LongLivedCensus())
-	require.NoError(t, sfh.admission.CloseDrained(sfh.run.Generation()))
 	closeRunTestUIDs(t, sfh.uids)
 }
 

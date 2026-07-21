@@ -20,7 +20,7 @@ const (
 	maximumRequestMetadataBytes = maximumRequestArgumentBytes
 )
 
-// Request is one immutable command admission value. LaneKey is supplied only
+// Request is one immutable command value. LaneKey is supplied only
 // for Job Manager commands. Generic Function calls receive independent
 // invocation lanes; the Function catalog selects a shared lane only for
 // resource-scoped commands. The submitting adapter transfers ownership of Args
@@ -40,7 +40,7 @@ type Request struct {
 	HasPayload   bool             // whether a payload is present
 }
 
-// Validate checks the bounded admission invariants independent of mutable
+// Validate checks the bounded request invariants independent of mutable
 // orchestration state.
 func (r Request) Validate() error {
 	if lifecycle.ValidateUID(r.UID) != nil ||

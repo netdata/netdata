@@ -182,7 +182,6 @@ func TestFinishShutdownPublishesDueClockWithoutTimerBridge(t *testing.T) {
 
 func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 	census := RunCensus{
-		AdmissionRunDrained:    true,
 		KernelDrained:          true,
 		FunctionCatalogDrained: true,
 		RunFinalizerComplete:   true,
@@ -250,7 +249,6 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 
 func TestRunCensusQuiescenceRequiresExplicitOwnershipProofs(t *testing.T) {
 	base := RunCensus{
-		AdmissionRunDrained:    true,
 		KernelDrained:          true,
 		FunctionCatalogDrained: true,
 		RunFinalizerComplete:   true,
@@ -281,7 +279,6 @@ func TestRunCensusQuiescenceRequiresExplicitOwnershipProofs(t *testing.T) {
 
 func TestRunSupervisorProjectsFirstDirtyTransitionExactlyOnce(t *testing.T) {
 	census := RunCensus{
-		AdmissionRunDrained:    true,
 		KernelDrained:          true,
 		FunctionCatalogDrained: true,
 		RunFinalizerComplete:   true,

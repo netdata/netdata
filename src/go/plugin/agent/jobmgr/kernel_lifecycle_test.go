@@ -169,7 +169,7 @@ func TestKernelDirtyStateTriggersFailStop(t *testing.T) {
 func TestKernelResourcePublicationRunsOffLoop(t *testing.T) {
 	publishRelease := make(chan struct{})
 	resource := newKernelTestReadyResource("resource", publishRelease, nil)
-	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, kernelResourcePlanner(t, resource, nil, nil))
+	kernel, run, uids, tasks := newKernelWithPlanner(t, kernelResourcePlanner(t, resource, nil, nil))
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -198,8 +198,6 @@ func TestKernelResourcePublicationRunsOffLoop(t *testing.T) {
 	require.NoError(t, shutdownErr)
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -213,7 +211,7 @@ func TestKernelPlanningRunsOutsideLoop(t *testing.T) {
 			return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 		})}, nil
 	})
-	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
+	kernel, run, uids, _ := newKernelWithPlanner(t, planner)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -246,8 +244,6 @@ func TestKernelPlanningRunsOutsideLoop(t *testing.T) {
 
 	require.NoError(t, shutdownErr)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -259,7 +255,7 @@ func TestFunctionCatalogPlanningWaitsForKernelLoop(t *testing.T) {
 			Work: lifecycle.FrameTaskWork(plannerPlanWork),
 		}, nil
 	})
-	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
+	kernel, run, uids, _ := newKernelWithPlanner(t, planner)
 	catalog := testFunctionCatalogFor(t, kernel)
 
 	require.NoError(t, run.OpenAdmission())
@@ -289,8 +285,6 @@ func TestFunctionCatalogPlanningWaitsForKernelLoop(t *testing.T) {
 	kernel.Stop()
 
 	require.NoError(t, kernel.Wait(context.Background()))
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
 
 	closeUIDLedger(t, uids)
 	require.False(t, calledBeforeStart)
@@ -347,7 +341,7 @@ func TestFunctionCatalogDecisionOwnsExactLease(t *testing.T) {
 			}
 			var output bytes.Buffer
 			planner := stoppedKernelPlanner{}
-			kernel, run, admission, uids, _ := newKernelWithClockFinalizerCatalogAndTimeout(
+			kernel, run, uids, _ := newKernelWithClockFinalizerCatalogAndTimeout(
 				t, planner, catalog, &output, lifecycle.RealClock{}, newNoopRunFinalizer(), time.Second,
 			)
 
@@ -369,8 +363,6 @@ func TestFunctionCatalogDecisionOwnsExactLease(t *testing.T) {
 
 			require.False(t, resolves != 1 || releases != test.wantReleases)
 			require.False(t, test.wantStatus != "" && !bytes.Contains(output.Bytes(), []byte(test.wantStatus)))
-
-			require.NoError(t, admission.CloseDrained(run.Generation()))
 
 			closeUIDLedger(t, uids)
 		})
@@ -405,9 +397,8 @@ func TestFunctionHandlerCleanupRunsOffKernelLoop(t *testing.T) {
 	}
 	planner := stoppedKernelPlanner{}
 	var run *lifecycle.RunSupervisor
-	var admission *lifecycle.AdmissionLedger
 	var uids *lifecycle.UIDLedger
-	kernel, run, admission, uids, _ = newKernelWithClockFinalizerCatalogAndTimeout(
+	kernel, run, uids, _ = newKernelWithClockFinalizerCatalogAndTimeout(
 		t, planner, catalog, io.Discard, lifecycle.RealClock{}, newNoopRunFinalizer(), time.Second,
 	)
 
@@ -432,96 +423,30 @@ func TestFunctionHandlerCleanupRunsOffKernelLoop(t *testing.T) {
 
 	require.False(t, len(kernel.functionCleanupRequests) != 0 || len(kernel.functionCleanupTasks) != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
-func TestWorkPlanRejectsUnboundedClaims(t *testing.T) {
-	valid := WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}
-	tests := map[string]struct {
-		mutate func(*WorkPlan)
-	}{
-		"oversized claim key": {
-			mutate: func(plan *WorkPlan) {
-				plan.Claims = []string{strings.Repeat("c", maximumClaimKeyBytes+1)}
-			},
-		},
-		"oversized aggregate claims": {
-			mutate: func(plan *WorkPlan) {
-				plan.Claims = []string{
-					strings.Repeat("a", maximumPlanClaimBytes/2),
-					strings.Repeat("b", maximumPlanClaimBytes/2+1),
-				}
-			},
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			plan := valid
-			test.mutate(&plan)
-
-			require.Error(t, plan.validate())
-		})
-	}
-}
-
-func TestWorkPlanAcceptsClaimsBeyondFormerCountLimit(t *testing.T) {
+func TestWorkPlanRejectsOversizedClaimKey(t *testing.T) {
 	plan := WorkPlan{
 		Work:   lifecycle.FrameTaskWork(plannerPlanWork),
-		Claims: make([]string, 1_025),
+		Claims: []string{strings.Repeat("c", maximumClaimKeyBytes+1)},
+	}
+	require.Error(t, plan.validate())
+}
+
+func TestWorkPlanAcceptsClaimsBeyondFormerAggregateByteLimit(t *testing.T) {
+	plan := WorkPlan{
+		Work:   lifecycle.FrameTaskWork(plannerPlanWork),
+		Claims: make([]string, 5),
 	}
 	for index := range plan.Claims {
-		plan.Claims[index] = "c"
+		plan.Claims[index] = strings.Repeat(string(rune('a'+index)), maximumClaimKeyBytes)
 	}
 	require.NoError(t, plan.validate())
 }
 
-func TestKernelSubmissionIgnoresAggregateAdmissionCapacity(t *testing.T) {
-	kernel, run, admission, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	require.NoError(t, run.OpenAdmission())
-	blocker := admission.RequestOrdinary(
-		run.Generation(),
-		lifecycle.AdmissionLaneRef{Slot: ^uint32(0), Generation: 1},
-		lifecycle.OrdinaryBudgetBytes,
-	)
-	require.NoError(t, blocker.Rejected)
-	var grants [lifecycle.TaskStartServiceQuantum]lifecycle.AdmissionGrant
-	count, _, err := admission.TakeGrants(1, &grants)
-	require.NoError(t, err)
-	require.EqualValues(t, 1, count)
-	require.Equal(t, blocker.Ref, grants[0].Ref)
-
-	request := Request{
-		UID: "aggregate-capacity", Source: lifecycle.SourceFunction, Route: "route",
-	}
-	plan, err := kernel.prepareSubmissionPlanForTest(request)
-	require.NoError(t, err)
-	submitted := make(chan error, 1)
-	kernel.submissions[sourceIndex(request.Source)] <- submission{
-		request: request,
-		plan:    plan,
-		result:  submitted,
-	}
-	kernel.serviceSubmissions(1)
-
-	select {
-	case err := <-submitted:
-		require.NoError(t, err)
-	default:
-		require.FailNow(t, "test failed", "submission waited for aggregate admission capacity")
-	}
-	census := admission.Census()
-	require.False(t, census.ActiveRecords != 1 || census.OrdinaryWaiting != 0 ||
-		census.OrdinaryGranted != 1)
-	require.Contains(t, kernel.operations, request.UID)
-
-	_, err = admission.ReleaseOrdinary(blocker.Ref)
-	require.NoError(t, err)
-}
-
 func TestKernelTerminalNoResponseDisposalCompletesUIDOwnership(t *testing.T) {
-	kernel, run, _, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	kernel, run, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	require.NoError(t, run.OpenAdmission())
 	now := kernel.clock.Now()
 	const uid = "terminal-no-response"
@@ -567,7 +492,7 @@ func TestKernelTerminalNoResponseDisposalCompletesUIDOwnership(t *testing.T) {
 }
 
 func TestKernelRunCensusCountsOnlyActiveUIDOwnership(t *testing.T) {
-	kernel, _, _, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	kernel, _, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	now := kernel.clock.Now()
 	const uid = "run-census"
 	require.NoError(t, uids.Admit(uid, now))
@@ -586,7 +511,7 @@ func TestKernelRunCensusCountsOnlyActiveUIDOwnership(t *testing.T) {
 func TestKernelResourceStopCompletesAfterOperationDeadline(t *testing.T) {
 	stopRelease := make(chan struct{})
 	resource := newKernelTestReadyResource("resource", nil, stopRelease)
-	kernel, run, admission, uids, tasks := newKernelWithPlanner(
+	kernel, run, uids, tasks := newKernelWithPlanner(
 		t,
 		kernelResourcePlanner(t, resource, nil, nil),
 	)
@@ -656,7 +581,6 @@ func TestKernelResourceStopCompletesAfterOperationDeadline(t *testing.T) {
 
 	kernel.Stop()
 	require.NoError(t, kernel.Wait(context.Background()))
-	require.NoError(t, admission.CloseDrained(run.Generation()))
 	closeUIDLedger(t, uids)
 }
 
@@ -728,7 +652,7 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 				events:     &events,
 			}
 			var output bytes.Buffer
-			kernel, run, admission, uids, tasks :=
+			kernel, run, uids, tasks :=
 				newKernelWithPlannerAndWriter(t, planner, &output)
 
 			require.NoError(t, run.OpenAdmission())
@@ -788,8 +712,6 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 
 			require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
-			require.NoError(t, admission.CloseDrained(run.Generation()))
-
 			closeUIDLedger(t, uids)
 		})
 	}
@@ -817,7 +739,7 @@ func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
 		})
 	})
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks :=
+	kernel, run, uids, tasks :=
 		newKernelWithPlannerAndWriter(t, planner, &output)
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
 		return "resource"
@@ -874,8 +796,6 @@ func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -892,7 +812,7 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 		events:              &events,
 	}
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks :=
+	kernel, run, uids, tasks :=
 		newKernelWithPlannerAndWriter(t, planner, &output)
 
 	require.NoError(t, run.OpenAdmission())
@@ -944,8 +864,6 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -961,7 +879,7 @@ func TestKernelPreparedInternalTransactionAppliesWithoutResponse(t *testing.T) {
 		events:     &events,
 	}
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks :=
+	kernel, run, uids, tasks :=
 		newKernelWithPlannerAndWriter(t, planner, &output)
 
 	require.NoError(t, run.OpenAdmission())
@@ -1012,8 +930,6 @@ func TestKernelPreparedInternalTransactionAppliesWithoutResponse(t *testing.T) {
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -1022,7 +938,7 @@ func TestKernelShutdownStopsResourceAfterActiveUserDrains(t *testing.T) {
 	workEntered := make(chan struct{})
 	workRelease := make(chan struct{})
 	resource := newKernelTestReadyResource("resource", nil, stopRelease)
-	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, kernelResourcePlanner(t, resource, workEntered, workRelease))
+	kernel, run, uids, tasks := newKernelWithPlanner(t, kernelResourcePlanner(t, resource, workEntered, workRelease))
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
 		return "resource"
 	})
@@ -1076,8 +992,6 @@ func TestKernelShutdownStopsResourceAfterActiveUserDrains(t *testing.T) {
 	require.False(t, overlap)
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -1091,7 +1005,7 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 		resources[id] = newKernelTestReadyResource(id, nil, stopRelease)
 	}
 	permitPlan := lifecycle.NewJobLongLivedPlan()
-	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, kernelTestResourceSetPlanner{
+	kernel, run, uids, tasks := newKernelWithPlanner(t, kernelTestResourceSetPlanner{
 		permitPlan: permitPlan,
 		resources:  resources,
 	})
@@ -1124,10 +1038,6 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 	census := tasks.LongLivedCensus()
 	require.False(t, census.Active != population || census.Jobs != population)
 
-	admissionCensus := admission.Census()
-	require.False(t, admissionCensus.LongLivedRecords != 0 ||
-		admissionCensus.LongLivedBytes != 0)
-
 	close(stopRelease)
 
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -1139,15 +1049,13 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
 func TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta(t *testing.T) {
 	const genericPopulation = lifecycle.TaskStartServiceQuantum * 2
 
-	kernel, run, admission, uids, tasks := newKernelWithPlanner(
+	kernel, run, uids, tasks := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)
@@ -1232,8 +1140,6 @@ func TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta(t *testing.T) {
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -1264,7 +1170,7 @@ func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 ) {
 	const population = lifecycle.TaskStartServiceQuantum * 2
 
-	kernel, run, admission, uids, tasks := newKernelWithPlanner(
+	kernel, run, uids, tasks := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)
@@ -1333,8 +1239,6 @@ func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -1354,7 +1258,7 @@ func TestKernelRunFinalizerUsesSharedBudgetExactlyOnce(t *testing.T) {
 		}{generation: generation, deadline: deadline}
 		return nil
 	})
-	kernel, run, admission, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
+	kernel, run, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -1376,7 +1280,7 @@ func TestKernelRunFinalizerUsesSharedBudgetExactlyOnce(t *testing.T) {
 	terminal := run.TerminalState()
 	require.False(t, !terminal.Reached || !terminal.Quiescent || terminal.Dirty != nil)
 
-	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || !admission.RunDrained(run.Generation()))
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 }
 
 func TestKernelShutdownDeadlineWinsFinalizerCompletion(t *testing.T) {
@@ -1399,7 +1303,7 @@ func TestKernelShutdownDeadlineWinsFinalizerCompletion(t *testing.T) {
 		<-ctx.Done()
 		return nil
 	})
-	kernel, run, _, _, _ := newKernelWithClockFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, clock, finalizer, time.Second)
+	kernel, run, _, _ := newKernelWithClockFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, clock, finalizer, time.Second)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -1440,7 +1344,7 @@ func TestKernelDueClockWinsIndependentFinalizerCompletion(t *testing.T) {
 		<-release
 		return nil
 	})
-	kernel, run, _, _, _ := newKernelWithClockFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, clock, finalizer, time.Second)
+	kernel, run, _, _ := newKernelWithClockFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, clock, finalizer, time.Second)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -1472,7 +1376,7 @@ func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 			return plannerPlanWork(ctx)
 		})}, nil
 	})
-	kernel, run, admission, uids, _ := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
+	kernel, run, uids, _ := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -1515,8 +1419,6 @@ func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 
 	require.NoError(t, kernel.Wait(context.Background()))
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -1551,7 +1453,7 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 		})}, nil
 	})
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
+	kernel, run, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
 		return "queued-deadline"
 	})
@@ -1608,8 +1510,6 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN queued-deadline 504 application/json ")))
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -1641,7 +1541,7 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 		}, nil
 	})
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks :=
+	kernel, run, uids, tasks :=
 		newKernelWithClockFinalizerAndTimeout(
 			t,
 			planner,
@@ -1711,8 +1611,6 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -1762,7 +1660,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 		})}, nil
 	})
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
+	kernel, run, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "same-lane" })
 
 	require.NoError(t, run.OpenAdmission())
@@ -1834,8 +1732,6 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN same-lane-deadline 504 application/json ")))
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -1863,7 +1759,7 @@ func TestKernelCancelBeforeQueuedCooperativeDeadlineDisposesOperation(t *testing
 		}, nil
 	})
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(
+	kernel, run, uids, tasks := newKernelWithClockFinalizerAndTimeout(
 		t,
 		planner,
 		&output,
@@ -1938,8 +1834,6 @@ func TestKernelCancelBeforeQueuedCooperativeDeadlineDisposesOperation(t *testing
 	require.EqualValues(t, 0, tasks.Active())
 	require.EqualValues(t, 0, tasks.Pending())
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -1964,7 +1858,7 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 		})}, nil
 	})
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
+	kernel, run, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
 		return "queued-noncooperative"
 	})
@@ -2012,8 +1906,6 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -2029,7 +1921,7 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 		})}, nil
 	})
 	writer := &firstHoldingFrameWriter{offered: make(chan []byte, 1), release: make(chan struct{})}
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, writer, clock, newNoopRunFinalizer(), time.Second)
+	kernel, run, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, writer, clock, newNoopRunFinalizer(), time.Second)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2092,8 +1984,6 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -2124,7 +2014,7 @@ func TestKernelFourthBackgroundTransactionTimeoutDirtiesWithoutResponseCommit(t 
 		}, nil
 	})
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
+	kernel, run, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2179,8 +2069,6 @@ func TestKernelFourthBackgroundTransactionTimeoutDirtiesWithoutResponseCommit(t 
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0 || tasks.LongLivedCensus() != (lifecycle.LongLivedCensus{}))
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
@@ -2194,7 +2082,7 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 		}
 		return permit.Return()
 	})
-	kernel, run, _, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
+	kernel, run, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
 	plan := lifecycle.NewSecretStoreLongLivedPlan()
 	var err error
 	permit, err = tasks.IssueLongLivedPermit(
@@ -2228,7 +2116,7 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 func TestKernelRunFinalizerFailureReleasesTaskWithoutQuiescence(t *testing.T) {
 	want := errors.New("finalizer failed")
 	finalizer := runFinalizerFunc(func(context.Context, uint64) error { return want })
-	kernel, run, _, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
+	kernel, run, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2245,7 +2133,7 @@ func TestKernelRunFinalizerFailureReleasesTaskWithoutQuiescence(t *testing.T) {
 
 func TestKernelRunFinalizerPanicReleasesTaskWithoutQuiescence(t *testing.T) {
 	finalizer := runFinalizerFunc(func(context.Context, uint64) error { panic("finalizer panic") })
-	kernel, run, _, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
+	kernel, run, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2266,7 +2154,7 @@ func TestKernelRunFinalizerRejectsUnrelatedLongLivedPermit(t *testing.T) {
 		calls.Add(1)
 		return nil
 	})
-	kernel, run, _, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, 10*time.Millisecond)
+	kernel, run, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, 10*time.Millisecond)
 	plan := lifecycle.NewJobLongLivedPlan()
 	permit, err := tasks.IssueLongLivedPermit(
 		lifecycle.ResourceIdentity{ID: "job", Generation: 1},
@@ -2290,7 +2178,6 @@ func TestKernelRunFinalizerRejectsUnrelatedLongLivedPermit(t *testing.T) {
 func TestKernelRejectsMissingRunFinalizer(t *testing.T) {
 	run, err := lifecycle.NewRunSupervisor(1, lifecycle.RealClock{}, time.Second)
 	require.NoError(t, err)
-	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	frames, err := lifecycle.NewFrameOwner(io.Discard)
 	require.NoError(t, err)
@@ -2299,8 +2186,7 @@ func TestKernelRejectsMissingRunFinalizer(t *testing.T) {
 	planner := stoppedKernelPlanner{}
 
 	_, newCommandKernelErr := NewCommandKernel(
-		run, admission, uids, tasks, frames, lifecycle.RealClock{},
-		make(chan lifecycle.AdmissionGrant, 1),
+		run, uids, tasks, frames, lifecycle.RealClock{},
 		newNoopRunShutdownBarrier(), nil,
 		newTestFunctionCatalog(planner),
 	)
@@ -2309,7 +2195,7 @@ func TestKernelRejectsMissingRunFinalizer(t *testing.T) {
 }
 
 func TestKernelCannotReportQuiescentWithRetainedLongLivedPermit(t *testing.T) {
-	kernel, run, _, _, tasks := newKernelWithPlannerAndTimeout(t, stoppedKernelPlanner{}, time.Millisecond)
+	kernel, run, _, tasks := newKernelWithPlannerAndTimeout(t, stoppedKernelPlanner{}, time.Millisecond)
 	permitPlan := lifecycle.NewJobLongLivedPlan()
 	permit, err := tasks.IssueLongLivedPermit(
 		lifecycle.ResourceIdentity{ID: "retained", Generation: 1}, permitPlan,
@@ -2345,7 +2231,7 @@ func TestKernelStopDrainsCooperativeTask(t *testing.T) {
 			}),
 		}, nil
 	})
-	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, planner)
+	kernel, run, uids, tasks := newKernelWithPlanner(t, planner)
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "lane" })
 
 	require.NoError(t, run.OpenAdmission())
@@ -2371,62 +2257,7 @@ func TestKernelStopDrainsCooperativeTask(t *testing.T) {
 
 	require.False(t, tasks.Active() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
 
-	census := admission.Census()
-	require.False(t, census.ActiveRecords != 0 || census.Phase != lifecycle.AdmissionCleanupOnly)
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
-}
-
-func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing.T) {
-	run, err := lifecycle.NewRunSupervisor(1, lifecycle.RealClock{}, lifecycle.DefaultShutdownTimeout)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = run.FinishShutdown() })
-	uids := lifecycle.NewUIDLedger()
-	admission := lifecycle.NewAdmissionLedger()
-	frames, err := lifecycle.NewFrameOwner(io.Discard)
-	require.NoError(t, err)
-	tasks, err := lifecycle.NewTaskSupervisor(frames)
-	require.NoError(t, err)
-	grants := make(chan lifecycle.AdmissionGrant, 1)
-	planner := stoppedKernelPlanner{}
-	kernel, err := NewCommandKernel(
-		run, admission, uids, tasks, frames, lifecycle.RealClock{}, grants,
-		newNoopRunShutdownBarrier(), newNoopRunFinalizer(),
-		newTestFunctionCatalog(planner),
-	)
-	require.NoError(t, err)
-
-	require.NoError(t, run.OpenAdmission())
-
-	const capacity = int64(64 * 1024)
-	token, err := admission.RequestInputBodyGrowth(run.Generation(), 0, capacity)
-	require.NoError(t, err)
-
-	run.BeginStopping()
-	require.NoError(t, kernel.beginShutdown(time.Now().Add(time.Second)))
-	require.NoError(t, kernel.advanceShutdownInputBody())
-	require.NoError(t, kernel.advanceShutdownAuthority())
-
-	select {
-	case grant := <-grants:
-		require.False(t, grant.Kind != lifecycle.ReservationInputBodyGrowth || grant.InputBodyToken != token)
-	default:
-		require.FailNow(t, "test failed", "shutdown did not settle the pending input body growth")
-	}
-
-	census := admission.Census()
-	require.False(t, census.Phase != lifecycle.AdmissionCleanupOnly || census.InputBodyWaiting)
-
-	_, commitInputBodyGrowthErr := admission.CommitInputBodyGrowth(token, capacity)
-	require.NoError(t, commitInputBodyGrowthErr)
-
-	_, abortInputBodyErr := admission.AbortInputBody(token)
-	require.NoError(t, abortInputBodyErr)
-
-	census = admission.Census()
-	require.False(t, census.InputBodyActive || census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
 }
 
 func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
@@ -2466,7 +2297,6 @@ func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
 	}
 	require.False(t, len(kernel.operations) != 0 || kernel.operationHead != nil || kernel.operationTail != nil)
 
-	require.NoError(t, kernel.advanceShutdownInputBody())
 	require.NoError(t, kernel.advanceShutdownAuthority())
 	completeNoopShutdownBarrier(t, kernel)
 
@@ -2506,7 +2336,6 @@ func TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns(t *testing.T) {
 			}
 
 			require.NoError(t, kernel.beginShutdown(time.Now().Add(time.Second)))
-			require.NoError(t, kernel.advanceShutdownInputBody())
 			require.NoError(t, kernel.advanceShutdownAuthority())
 			completeNoopShutdownBarrier(t, kernel)
 
@@ -2569,7 +2398,7 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 			return WorkPlan{}, errors.New("unexpected route")
 		}
 	})
-	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, planner)
+	kernel, run, uids, tasks := newKernelWithPlanner(t, planner)
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "lane" })
 	catalog := testFunctionCatalogFor(t, kernel)
 
@@ -2612,30 +2441,16 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 	require.False(t, catalog.next != 2 || catalog.release != 2 || len(catalog.leases) != 0)
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
-func TestKernelWritesValidResultWithoutAggregateReservation(t *testing.T) {
+func TestKernelWritesLargeValidResult(t *testing.T) {
 	sealed := largeRawSealedResult(t)
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) { return sealed, nil })}, nil
 	})
 	writer := &holdingFrameWriter{offered: make(chan []byte, 1), release: make(chan struct{})}
-	kernel, run, admission, uids, _ := newKernelWithPlannerAndWriter(t, planner, writer)
-	blocker := admission.RequestOrdinary(
-		run.Generation(),
-		lifecycle.AdmissionLaneRef{Slot: ^uint32(0), Generation: 1},
-		lifecycle.OrdinaryBudgetBytes,
-	)
-	require.NoError(t, blocker.Rejected)
-	var grants [lifecycle.TaskStartServiceQuantum]lifecycle.AdmissionGrant
-	count, _, err := admission.TakeGrants(1, &grants)
-	require.NoError(t, err)
-	require.EqualValues(t, 1, count)
-	require.Equal(t, blocker.Ref, grants[0].Ref)
-
+	kernel, run, uids, _ := newKernelWithPlannerAndWriter(t, planner, writer)
 	require.NoError(t, run.OpenAdmission())
 
 	startKernelLoop(t, kernel)
@@ -2649,20 +2464,12 @@ func TestKernelWritesValidResultWithoutAggregateReservation(t *testing.T) {
 		require.FailNow(t, "test failed", "result did not reach held Write")
 	}
 
-	census := admission.Census()
-	require.False(t, census.OrdinaryBytes != lifecycle.OrdinaryBudgetBytes ||
-		census.OrdinaryGranted != 1 || census.OrdinaryWaiting != 0)
-
 	close(writer.release)
-	_, err = admission.ReleaseOrdinary(blocker.Ref)
-	require.NoError(t, err)
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	require.NoError(t, kernel.Wait(ctx))
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
 
 	closeUIDLedger(t, uids)
 }
@@ -2787,7 +2594,7 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 			Work:   lifecycle.FrameTaskWork(plannerPlanWork),
 		}, nil
 	})
-	kernel, run, _, _, tasks := newKernelWithPlanner(t, planner)
+	kernel, run, _, tasks := newKernelWithPlanner(t, planner)
 	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
 
 	require.NoError(t, run.OpenAdmission())
@@ -2820,7 +2627,7 @@ func TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass(t *testin
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		return WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}, nil
 	})
-	kernel, run, _, _, tasks := newKernelWithPlanner(t, planner)
+	kernel, run, _, tasks := newKernelWithPlanner(t, planner)
 	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string {
 		if lookup.Route == "dyncfg" {
 			return "dyncfg-resource"
@@ -2852,7 +2659,7 @@ func TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass(t *testin
 }
 
 func TestKernelSubmissionBacklogCannotStarveStop(t *testing.T) {
-	kernel, run, admission, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	kernel, run, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2876,14 +2683,12 @@ func TestKernelSubmissionBacklogCannotStarveStop(t *testing.T) {
 
 	require.NoError(t, kernel.Wait(ctx))
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
 func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 	var output bytes.Buffer
-	kernel, run, admission, uids, _ := newKernelWithPlannerAndWriter(t, stoppedKernelPlanner{}, &output)
+	kernel, run, uids, _ := newKernelWithPlannerAndWriter(t, stoppedKernelPlanner{}, &output)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2916,14 +2721,12 @@ func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 
 	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN deadline-probe 504 application/json ")))
 
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
 	closeUIDLedger(t, uids)
 }
 
-func TestKernelPreAdmissionRejectionCommitsWithoutUIDOrAdmissionRecord(t *testing.T) {
+func TestKernelPreAdmissionRejectionCommitsWithoutUIDOwnership(t *testing.T) {
 	var output bytes.Buffer
-	kernel, run, admission, uids, _ := newKernelWithPlannerAndWriter(t, stoppedKernelPlanner{}, &output)
+	kernel, run, uids, _ := newKernelWithPlannerAndWriter(t, stoppedKernelPlanner{}, &output)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2931,8 +2734,8 @@ func TestKernelPreAdmissionRejectionCommitsWithoutUIDOrAdmissionRecord(t *testin
 
 	require.NoError(t, kernel.Reject(context.Background(), "malformed-safe-uid", lifecycle.ControlBadRequest))
 
-	census := admission.Census()
-	require.False(t, census.ActiveRecords != 0 || census.OrdinaryWaiting != 0 || census.OrdinaryGranted != 0)
+	active, _, _ := uids.Census()
+	require.Zero(t, active)
 
 	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN malformed-safe-uid 400 application/json ")))
 	kernel.Stop()
@@ -2940,8 +2743,6 @@ func TestKernelPreAdmissionRejectionCommitsWithoutUIDOrAdmissionRecord(t *testin
 	defer cancel()
 
 	require.NoError(t, kernel.Wait(ctx))
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
 
 	closeUIDLedger(t, uids)
 }
@@ -2986,55 +2787,53 @@ func newStoppedKernel(t *testing.T) *testCommandKernel {
 
 func newKernel(t *testing.T) (*testCommandKernel, *lifecycle.RunSupervisor) {
 	t.Helper()
-	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	return kernel, run
 }
 
-func newKernelWithPlanner(t *testing.T, planner testPlanner) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithPlanner(t *testing.T, planner testPlanner) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithPlannerAndWriter(t, planner, io.Discard)
 }
 
-func newKernelWithPlannerAndTimeout(t *testing.T, planner testPlanner, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithPlannerAndTimeout(t *testing.T, planner testPlanner, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithPlannerWriterAndTimeout(t, planner, io.Discard, timeout)
 }
 
-func newKernelWithPlannerAndWriter(t *testing.T, planner testPlanner, writer io.Writer) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithPlannerAndWriter(t *testing.T, planner testPlanner, writer io.Writer) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithPlannerWriterAndTimeout(t, planner, writer, lifecycle.DefaultShutdownTimeout)
 }
 
-func newKernelWithPlannerWriterAndTimeout(t *testing.T, planner testPlanner, writer io.Writer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithPlannerWriterAndTimeout(t *testing.T, planner testPlanner, writer io.Writer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithPlannerWriterFinalizerAndTimeout(t, planner, writer, newNoopRunFinalizer(), timeout)
 }
 
-func newKernelWithPlannerWriterFinalizerAndTimeout(t *testing.T, planner testPlanner, writer io.Writer, finalizer RunFinalizer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithPlannerWriterFinalizerAndTimeout(t *testing.T, planner testPlanner, writer io.Writer, finalizer RunFinalizer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithClockFinalizerAndTimeout(t, planner, writer, lifecycle.RealClock{}, finalizer, timeout)
 }
 
-func newKernelWithClockFinalizerAndTimeout(t *testing.T, planner testPlanner, writer io.Writer, clock lifecycle.Clock, finalizer RunFinalizer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithClockFinalizerAndTimeout(t *testing.T, planner testPlanner, writer io.Writer, clock lifecycle.Clock, finalizer RunFinalizer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithClockFinalizerCatalogAndTimeout(
 		t, planner, newTestFunctionCatalog(planner), writer, clock, finalizer, timeout,
 	)
 }
 
-func newKernelWithClockFinalizerCatalogAndTimeout(t *testing.T, planner testPlanner, functionCatalog FunctionCatalogPort, writer io.Writer, clock lifecycle.Clock, finalizer RunFinalizer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithClockFinalizerCatalogAndTimeout(t *testing.T, planner testPlanner, functionCatalog FunctionCatalogPort, writer io.Writer, clock lifecycle.Clock, finalizer RunFinalizer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	t.Helper()
 	run, err := lifecycle.NewRunSupervisor(1, clock, timeout)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	uids := lifecycle.NewUIDLedger()
-	admission := lifecycle.NewAdmissionLedger()
 	frames, err := lifecycle.NewFrameOwner(writer)
 	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
 	kernel, err := NewCommandKernel(
-		run, admission, uids, tasks, frames, clock,
-		make(chan lifecycle.AdmissionGrant, 1),
+		run, uids, tasks, frames, clock,
 		newNoopRunShutdownBarrier(), finalizer,
 		functionCatalog,
 	)
 	require.NoError(t, err)
-	return &testCommandKernel{CommandKernel: kernel, planner: planner}, run, admission, uids, tasks
+	return &testCommandKernel{CommandKernel: kernel, planner: planner}, run, uids, tasks
 }
 
 type kernelFinalizerClock struct {
@@ -3134,7 +2933,7 @@ func (tck *testCommandKernel) Submit(ctx context.Context, request Request) error
 	}
 	plan, err := tck.planner.Plan(request)
 	if err != nil {
-		return tck.abortRequestInputBodyWith(request, err)
+		return err
 	}
 	return tck.CommandKernel.SubmitPrepared(ctx, request, plan)
 }
@@ -3145,7 +2944,7 @@ func (tck *testCommandKernel) SubmitAndWait(ctx context.Context, request Request
 	}
 	plan, err := tck.planner.Plan(request)
 	if err != nil {
-		return tck.abortRequestInputBodyWith(request, err)
+		return err
 	}
 	return tck.CommandKernel.SubmitPreparedAndWait(ctx, request, plan)
 }
@@ -3160,7 +2959,7 @@ func (tck *testCommandKernel) submit(
 	}
 	plan, err := tck.planner.Plan(request)
 	if err != nil {
-		return tck.abortRequestInputBodyWith(request, err)
+		return err
 	}
 	return tck.CommandKernel.submitPrepared(ctx, request, plan, terminal)
 }

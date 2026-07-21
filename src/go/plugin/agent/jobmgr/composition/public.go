@@ -36,7 +36,7 @@ type RuntimeService interface {
 
 // Config is the process-fixed production composition input. NewProcess freezes
 // the mutable registries and constructs the provider, secret-creator, resolver,
-// vnode-metadata, admission, UID, and frame authorities exactly once.
+// vnode-metadata, UID, and frame authorities exactly once.
 type Config struct {
 	Input  io.Reader // plugin stdin
 	Output io.Writer // plugin stdout

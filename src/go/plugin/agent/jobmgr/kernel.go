@@ -15,8 +15,7 @@ import (
 const externalSourceQueueDepth = 32
 
 const (
-	maximumClaimKeyBytes  = maximumRequestArgumentBytes
-	maximumPlanClaimBytes = lifecycle.ControlFrameBytes
+	maximumClaimKeyBytes = maximumRequestArgumentBytes
 	// Keep lifecycle-event service capacity at least equal to the maximum
 	// phase work introduced by one task-start quantum.
 	asyncEventServiceQuantum = lifecycle.TaskStartServiceQuantum *
@@ -41,6 +40,27 @@ type commandLaneKey struct {
 	functionInvocation FunctionInvocationRef // unique invocation ref for a resource-less Function call
 	source             lifecycle.Source      // source that scheduled the command
 	resource           bool                  // true for a resource lane, false for a Function-invocation lane
+}
+
+func sourceIndex(source lifecycle.Source) int {
+	if source == lifecycle.SourceJobManager {
+		return 0
+	}
+	return 1
+}
+
+func sourceForIndex(index int) lifecycle.Source {
+	if index == 0 {
+		return lifecycle.SourceJobManager
+	}
+	return lifecycle.SourceFunction
+}
+
+func otherSource(source lifecycle.Source) lifecycle.Source {
+	if source == lifecycle.SourceJobManager {
+		return lifecycle.SourceFunction
+	}
+	return lifecycle.SourceJobManager
 }
 
 type functionMutationSubmission struct {
@@ -180,7 +200,6 @@ type commandLane struct {
 // (see runLoop); external callers interact through channels, never these fields.
 type CommandKernel struct {
 	run                      *lifecycle.RunSupervisor                        // run supervisor (admission gate, stopping cut, shutdown budget, dirty state)
-	admission                *lifecycle.AdmissionLedger                      // memory admission ledger
 	uids                     *lifecycle.UIDLedger                            // UID dedupe ledger
 	tasks                    *lifecycle.TaskSupervisor                       // off-loop task supervisor
 	frames                   *lifecycle.FrameOwner                           // the one stdout frame writer
@@ -256,20 +275,18 @@ type CommandKernel struct {
 	shutdownPhase            commandShutdownPhase                            // current shutdown phase
 	shutdownCancelCursor     *commandOperation                               // cursor sweeping operations to cancel during shutdown
 	shutdownCancelDone       bool                                            // shutdown cancellation sweep finished
-	shutdownInputBodyReady   bool                                            // input-body ingress drained during shutdown
 	ownershipChains          int                                             // count of protected ownership chains still running
 	shutdownLaneCursor       *commandLane                                    // cursor sweeping lanes to stop during shutdown
 	shutdownLanesDone        bool                                            // shutdown lane sweep finished
 	functionCatalog          FunctionCatalogPort                             // Function catalog port (routing + census)
-	inputBodyGrants          chan<- lifecycle.AdmissionGrant                 // channel delivering input-body growth grants
 	runtimeObserver          lifecycle.RuntimeObserver                       // sink for jobmgr.runtime metric atomics
 	runtimeHead              *commandOperation                               // head of the runtime-metrics op list
 	runtimeTail              *commandOperation                               // tail of the runtime-metrics op list
 	functionOperations       int                                             // count of active Function operations
 }
 
-func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.AdmissionLedger, uids *lifecycle.UIDLedger, tasks *lifecycle.TaskSupervisor, frames *lifecycle.FrameOwner, clock lifecycle.Clock, inputBodyGrants chan<- lifecycle.AdmissionGrant, shutdownBarrier RunShutdownBarrier, finalizer RunFinalizer, functionCatalog FunctionCatalogPort) (*CommandKernel, error) {
-	if run == nil || admission == nil || uids == nil || tasks == nil || frames == nil || clock == nil || inputBodyGrants == nil || shutdownBarrier == nil || finalizer == nil {
+func NewCommandKernel(run *lifecycle.RunSupervisor, uids *lifecycle.UIDLedger, tasks *lifecycle.TaskSupervisor, frames *lifecycle.FrameOwner, clock lifecycle.Clock, shutdownBarrier RunShutdownBarrier, finalizer RunFinalizer, functionCatalog FunctionCatalogPort) (*CommandKernel, error) {
+	if run == nil || uids == nil || tasks == nil || frames == nil || clock == nil || shutdownBarrier == nil || finalizer == nil {
 		return nil, errors.New("jobmgr kernel: incomplete lifecycle capabilities")
 	}
 	if functionCatalog == nil {
@@ -277,7 +294,6 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 	}
 	kernel := &CommandKernel{
 		run:                     run,
-		admission:               admission,
 		uids:                    uids,
 		tasks:                   tasks,
 		frames:                  frames,
@@ -303,7 +319,6 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		compositeFenceClaims:    make(map[string]int),
 		nextSource:              lifecycle.SourceJobManager,
 		nextExternalSource:      lifecycle.SourceJobManager,
-		inputBodyGrants:         inputBodyGrants,
 		shutdownBarrier:         shutdownBarrier,
 		finalizer:               finalizer,
 		functionCatalog:         functionCatalog,
@@ -1141,7 +1156,6 @@ func (ck *CommandKernel) beginShutdown(deadline time.Time) error {
 	ck.shutdownCancelCursor = ck.operationHead
 	ck.shutdownCancelDone =
 		ck.shutdownCancelCursor == nil
-	ck.shutdownInputBodyReady = false
 	ck.shutdownLaneCursor = nil
 	ck.shutdownLanesDone = false
 	return nil
@@ -1242,32 +1256,9 @@ func cancellationControl(operation *commandOperation) lifecycle.ControlStatus {
 	return lifecycle.ControlCancelled
 }
 
-func (ck *CommandKernel) advanceShutdownInputBody() error {
-	if ck.shutdownInputBodyReady {
-		return nil
-	}
-	grant, waiting, err := ck.admission.TakeShutdownInputBodyGrant(ck.run.Generation())
-	if err != nil {
-		return err
-	}
-	if grant.Kind == lifecycle.ReservationInputBodyGrowth {
-		select {
-		case ck.inputBodyGrants <- grant:
-		default:
-			return errors.New("jobmgr kernel: input body grant gate is full during shutdown")
-		}
-	}
-	if waiting {
-		return nil
-	}
-	ck.shutdownInputBodyReady = true
-	return nil
-}
-
 func (ck *CommandKernel) advanceShutdownAuthority() error {
 	if ck.shutdownPhase != commandShutdownActionDrain ||
 		!ck.shutdownCancelDone ||
-		!ck.shutdownInputBodyReady ||
 		ck.ownershipChains != 0 {
 		return nil
 	}
@@ -1289,11 +1280,6 @@ func (ck *CommandKernel) advanceShutdownAuthority() error {
 	close(ck.functionMutationStopped)
 	ck.closeContinuationIngress()
 	if err := ck.tasks.SealInherited(); err != nil {
-		return err
-	}
-	if err := ck.admission.BeginCleanupOnly(
-		ck.run.Generation(),
-	); err != nil {
 		return err
 	}
 	ck.shutdownLaneCursor = ck.laneHead
@@ -1580,7 +1566,7 @@ func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
 		census.LongLived.Active != census.LongLived.SecretStores {
 		return false
 	}
-	return ck.admission.RunFinalizerReady(ck.run.Generation(), 0, 0)
+	return true
 }
 
 func (ck *CommandKernel) completeRunFinalizer(completion lifecycle.TaskCompletion) {
@@ -1666,8 +1652,6 @@ func (ck *CommandKernel) functionCatalogDrained() bool {
 func (ck *CommandKernel) runCensus() lifecycle.RunCensus {
 	uidActive, _, _ := ck.uids.Census()
 	return lifecycle.RunCensus{
-		AdmissionRunDrained:    ck.admission.RunDrained(ck.run.Generation()),
-		Admission:              ck.admission.Census(),
 		KernelDrained:          ck.kernelOwnershipDrained(),
 		FunctionCatalogDrained: ck.functionCatalogDrained(),
 		UIDActive:              uidActive,
