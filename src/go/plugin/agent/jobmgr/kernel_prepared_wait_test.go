@@ -448,24 +448,21 @@ func (samc *shutdownActionMutationCatalog) ResumeMutation(
 
 func (samc *shutdownActionMutationCatalog) AdvanceMutation(
 	int,
-	*[MaximumFunctionCleanupBatch]FunctionCleanupPlan,
-) (FunctionCatalogMutationProgress, int, error) {
+) (FunctionCatalogMutationProgress, []FunctionCleanupPlan, error) {
 	if !samc.active.CompareAndSwap(true, false) {
-		return FunctionCatalogMutationProgress{}, 0,
+		return FunctionCatalogMutationProgress{}, nil,
 			errors.New("test Function mutation is inactive")
 	}
 	samc.commitCalls.Add(1)
 	return FunctionCatalogMutationProgress{
 		Version: 2,
 		Done:    true,
-	}, 0, nil
+	}, nil, nil
 }
 
-func (samc *shutdownActionMutationCatalog) AbortMutation(
-	*[MaximumFunctionCleanupBatch]FunctionCleanupPlan,
-) (int, error) {
+func (samc *shutdownActionMutationCatalog) AbortMutation(FunctionCatalogMutation) error {
 	samc.active.Store(false)
-	return 0, nil
+	return nil
 }
 
 func (*shutdownActionMutationCatalog) BeginClose() error {
@@ -474,10 +471,9 @@ func (*shutdownActionMutationCatalog) BeginClose() error {
 
 func (samc *shutdownActionMutationCatalog) CloseStep(
 	int,
-	*[MaximumFunctionCleanupBatch]FunctionCleanupPlan,
-) (int, bool, error) {
+) ([]FunctionCleanupPlan, bool, error) {
 	samc.closed.Store(true)
-	return 0, false, nil
+	return nil, false, nil
 }
 
 func (samc *shutdownActionMutationCatalog) LifecycleCensus() FunctionCatalogCensus {

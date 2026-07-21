@@ -8,6 +8,7 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -111,8 +112,7 @@ func (rp ResourcePolicy) validate() error {
 	if rp == (ResourcePolicy{}) {
 		return nil
 	}
-	if rp.Argument >= 1_024 ||
-		rp.Prefix == "" ||
+	if rp.Prefix == "" ||
 		len(rp.Prefix)+len(rp.ScopePrefix) >
 			maximumDeclarationMetadataBytes ||
 		strings.TrimSpace(rp.ScopePrefix) != rp.ScopePrefix {
@@ -192,16 +192,13 @@ type CatalogCensus = jobmgr.FunctionCatalogCensus
 
 type handlerGeneration struct {
 	cleanupRef jobmgr.FunctionCleanupRef   // kernel cleanup ref for this generation
-	id         string                      // generation identity
 	handler    Handler                     // the Function handler
 	cleanup    func(context.Context) error // collector cleanup callback (nil = no cleanup)
 
 	routeReferences  int  // routes currently pointing at this generation
 	invocationLeases int  // outstanding in-flight invocations
-	admissionClosed  bool // no new invocations admitted (retiring)
 	cleanupPending   bool // cleanup task dispatched, awaiting acknowledgement
 	cleaned          bool // cleanup acknowledged; generation released
-	retentionCharged bool // the 4-KiB cleanup retention allowance is charged
 }
 
 func (hg *handlerGeneration) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
@@ -212,7 +209,7 @@ func (hg *handlerGeneration) RunTask(ctx context.Context) (lifecycle.TaskOutcome
 }
 
 type route struct {
-	publicName          string                          // exact Function name key into the name trie
+	publicName          string                          // external Function name
 	prefix              string                          // optional arg[0] prefix; empty = an exact route
 	method              string                          // handler method ID passed to the generation on invoke
 	handler             *handlerGeneration              // owning handler generation (shared across routes)
@@ -221,109 +218,43 @@ type route struct {
 	cooperativeDeadline bool                            // request honors the caller deadline
 	rawPayload          bool                            // skip JSON validation; pass the payload verbatim
 	transaction         *ResourceTransactionDeclaration // optional resource-transaction declaration
-	admissionClosed     bool                            // no new invocations admitted (retiring/closing)
 	invocationLeases    int                             // outstanding in-flight invocations on this route
-	retiring            bool                            // marked for removal by a committed mutation
-	retiringDrained     bool                            // retiring AND all leases released (prune-eligible)
-	retiringNamePath    []*catalogNode                  // pre-allocated name-trie node path used at prune time
-	retiringPrefixPath  []*prefixNode                   // pre-allocated prefix-trie node path used at prune time
-	retiringNext        *route                          // singly-linked deferred-prune list link
-	closePrevious       *route                          // doubly-linked close-order list back link
-	closeNext           *route                          // doubly-linked close-order list forward link
-}
-
-type prefixNode struct {
-	resolved *route
-	child    [2]*prefixNode
 }
 
 type routeSet struct {
-	direct      *route
-	prefixes    *prefixNode
-	prefixCount int
+	direct   *route
+	prefixes []*route
 }
 
 func (set routeSet) empty() bool {
-	return set.direct == nil && set.prefixCount == 0
+	return set.direct == nil && len(set.prefixes) == 0
 }
 
 func (set routeSet) resolve(arguments []string) *route {
-	if set.prefixCount == 0 {
+	if len(set.prefixes) == 0 {
 		return set.direct
 	}
 	if len(arguments) == 0 {
 		return nil
 	}
-	node := set.prefixes
 	argument := arguments[0]
-	for depth := 0; depth < len(argument)*8 && node != nil; depth++ {
-		node = node.child[keyBit(argument, depth)]
-		if (depth+1)%8 == 0 && node != nil && node.resolved != nil {
-			return node.resolved
+	for _, resolved := range set.prefixes {
+		if strings.HasPrefix(argument, resolved.prefix) {
+			return resolved
 		}
 	}
 	return nil
 }
 
-func insertInitialPrefix(root *prefixNode, prefix string, resolved *route) (*prefixNode, error) {
-	if root == nil {
-		root = &prefixNode{}
-	}
-	node := root
-	for byteIndex := range len(prefix) {
-		if node.resolved != nil {
-			return nil, errors.New("jobmgr Function catalog: prefix overlaps a shorter prefix")
-		}
-		for depth := byteIndex * 8; depth < (byteIndex+1)*8; depth++ {
-			branch := keyBit(prefix, depth)
-			if node.child[branch] == nil {
-				node.child[branch] = &prefixNode{}
-			}
-			node = node.child[branch]
+func appendInitialPrefix(set routeSet, resolved *route) (routeSet, error) {
+	for _, existing := range set.prefixes {
+		if strings.HasPrefix(existing.prefix, resolved.prefix) ||
+			strings.HasPrefix(resolved.prefix, existing.prefix) {
+			return routeSet{}, errors.New("jobmgr Function catalog: overlapping prefix route")
 		}
 	}
-	if node.resolved != nil {
-		return nil, errors.New("jobmgr Function catalog: duplicate prefix")
-	}
-	if node.child[0] != nil || node.child[1] != nil {
-		return nil, errors.New("jobmgr Function catalog: prefix overlaps a longer prefix")
-	}
-	node.resolved = resolved
-	return root, nil
-}
-
-type catalogNode struct {
-	routes  routeSet
-	present bool
-	child   [2]*catalogNode
-}
-
-func catalogRouteSet(root *catalogNode, name string) (routeSet, bool) {
-	node := root
-	for depth := 0; depth < len(name)*8 && node != nil; depth++ {
-		node = node.child[keyBit(name, depth)]
-	}
-	if node == nil || !node.present {
-		return routeSet{}, false
-	}
-	return node.routes, true
-}
-
-func setInitialCatalogRouteSet(root *catalogNode, name string, set routeSet) *catalogNode {
-	if root == nil {
-		root = &catalogNode{}
-	}
-	node := root
-	for depth := range len(name) * 8 {
-		branch := keyBit(name, depth)
-		if node.child[branch] == nil {
-			node.child[branch] = &catalogNode{}
-		}
-		node = node.child[branch]
-	}
-	node.routes = set
-	node.present = !set.empty()
-	return root
+	set.prefixes = append(set.prefixes, resolved)
+	return set, nil
 }
 
 type invocationSlot struct {
@@ -331,13 +262,9 @@ type invocationSlot struct {
 	freeNext        uint32                         // next free slot index on the free-list
 	resolved        *route                         // route this invocation targets
 	input           HandlerInput                   // materialized handler input for the call
-	claims          [17]string                     // fixed claim buffer: [0]=global claim, [1:]=command claims
+	claims          []string                       // global claim followed by command claims
 	transactionPlan jobmgr.ResourceTransactionPlan // resource-transaction plan when the route is transactional
 }
-
-// maxCommandClaims is the number of per-command claim slots in an
-// invocationSlot's fixed claim buffer; index 0 is reserved for the global claim.
-const maxCommandClaims = len(invocationSlot{}.claims) - 1
 
 func (is *invocationSlot) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
 	if is == nil || is.resolved == nil || is.resolved.handler == nil {
@@ -404,26 +331,30 @@ func (is *invocationSlot) prepareCompositeResourceTransaction(
 	)
 }
 
+type catalogSnapshot struct {
+	version uint64
+	routes  map[string]routeSet
+	active  []*route
+}
+
 type Catalog struct {
-	routes      *catalogNode                                     // root of the public-name route trie
-	generations map[jobmgr.FunctionCleanupRef]*handlerGeneration // handler generations by cleanup ref
-	mutation    *MutationBuilder                                 // the in-flight mutation builder, if any
-	storage     catalogStorage                                   // two-bucket storage budget (published + cleanup retention)
+	snapshot        atomic.Pointer[catalogSnapshot]
+	mutation        *MutationBuilder
+	retiring        map[string]map[*route]struct{}
+	cleanupByRef    map[jobmgr.FunctionCleanupRef]*handlerGeneration
+	nextCleanupSlot atomic.Uint32
 
 	invocations []*invocationSlot // invocation slot pool
 	freeSlot    uint32            // head of the invocation-slot free-list
 
-	closeHead *route // head of the close-order route list
-	closeTail *route // tail of the close-order route list
+	closeRoutes []*route
+	closeIndex  int
 
-	deferredPrune *route // routes whose prune is deferred while a mutation is active
-
-	nextGenerationID uint32 // next handler-generation ID to assign
-	version          uint64 // catalog version, bumped per committed mutation
-	routeCount       int    // count of live routes
-	invocationCount  int    // count of active invocations
-	pendingCleanups  int    // count of generations with cleanup pending
-	closed           bool   // catalog is closed (shutdown)
+	version         uint64 // catalog version, bumped per committed mutation
+	routeCount      int    // count of live routes
+	invocationCount int    // count of active invocations
+	pendingCleanups int    // count of generations with cleanup pending
+	closed          bool   // catalog is closed (shutdown)
 }
 
 func NewCatalog(declarations []Declaration) (*Catalog, error) {
@@ -435,9 +366,6 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 		if err := validateDeclaration(declaration); err != nil {
 			return nil, err
 		}
-	}
-	if _, err := initialPathStorageBound(declarations); err != nil {
-		return nil, err
 	}
 	checked := make([]initialRoute, 0, len(declarations))
 	checkedSets := make(map[string]routeSet, len(declarations))
@@ -452,9 +380,8 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 		generation := generationByDeclaration[declaration.Generation]
 		if generation == nil {
 			generation = &handlerGeneration{
-				id: declaration.Generation.ID, handler: declaration.Generation.Handler,
-				cleanup:          declaration.Generation.Cleanup,
-				retentionCharged: declaration.Generation.Cleanup != nil,
+				handler: declaration.Generation.Handler,
+				cleanup: declaration.Generation.Cleanup,
 			}
 			generationByDeclaration[declaration.Generation] = generation
 		}
@@ -465,57 +392,39 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 			}
 			set.direct = &route{}
 		} else {
-			root, err := insertInitialPrefix(set.prefixes, declaration.Prefix, &route{})
+			var err error
+			set, err = appendInitialPrefix(set, &route{prefix: declaration.Prefix})
 			if err != nil {
 				return nil, err
 			}
-			set.prefixes = root
-			set.prefixCount++
 		}
 		checkedSets[declaration.PublicName] = set
 		checked = append(checked, initialRoute{declaration: declaration, generation: generation})
 	}
 	catalog := &Catalog{
-		generations: make(map[jobmgr.FunctionCleanupRef]*handlerGeneration, len(declarations)),
-		invocations: make([]*invocationSlot, 1),
-		version:     1,
+		cleanupByRef: make(map[jobmgr.FunctionCleanupRef]*handlerGeneration),
+		retiring:     make(map[string]map[*route]struct{}),
+		invocations:  make([]*invocationSlot, 1),
+		version:      1,
 	}
-
+	snapshot := &catalogSnapshot{version: 1, routes: make(map[string]routeSet)}
 	for _, checkedRoute := range checked {
-		if err := catalog.addInitial(checkedRoute.declaration, checkedRoute.generation); err != nil {
+		if err := catalog.addInitial(snapshot, checkedRoute.declaration, checkedRoute.generation); err != nil {
 			return nil, err
 		}
 	}
-	var cleanupBytes int64
-	for _, generation := range generationByDeclaration {
-		if generation.retentionCharged {
-			if err := addStorageProduct(
-				&cleanupBytes,
-				1,
-				catalogGenerationRetentionBytes,
-			); err != nil {
-				return nil, err
-			}
-		}
-	}
-	if err := catalog.storage.initialize(
-		catalogPathStorage(catalog.routes),
-		cleanupBytes,
-	); err != nil {
-		return nil, err
-	}
+	catalog.snapshot.Store(snapshot)
 	return catalog, nil
 }
 
-func (c *Catalog) addInitial(declaration Declaration, generation *handlerGeneration) error {
-	set, _ := catalogRouteSet(c.routes, declaration.PublicName)
-	if !generation.cleanupRef.Valid() {
-		c.nextGenerationID++
-		if c.nextGenerationID == 0 {
-			return errors.New("jobmgr Function catalog: handler generation wrapped")
+func (c *Catalog) addInitial(snapshot *catalogSnapshot, declaration Declaration, generation *handlerGeneration) error {
+	set := snapshot.routes[declaration.PublicName]
+	if generation.cleanup != nil && !generation.cleanupRef.Valid() {
+		ref, err := c.allocateCleanupRef()
+		if err != nil {
+			return err
 		}
-		generation.cleanupRef = jobmgr.FunctionCleanupRef{Slot: c.nextGenerationID, Generation: 1}
-		c.generations[generation.cleanupRef] = generation
+		generation.cleanupRef = ref
 	}
 	resolved := &route{
 		publicName: declaration.PublicName,
@@ -529,18 +438,25 @@ func (c *Catalog) addInitial(declaration Declaration, generation *handlerGenerat
 	if declaration.Prefix == "" {
 		set.direct = resolved
 	} else {
-		root, err := insertInitialPrefix(set.prefixes, declaration.Prefix, resolved)
+		var err error
+		set, err = appendInitialPrefix(set, resolved)
 		if err != nil {
 			return err
 		}
-		set.prefixes = root
-		set.prefixCount++
 	}
 	generation.routeReferences++
-	c.routes = setInitialCatalogRouteSet(c.routes, declaration.PublicName, set)
-	c.appendCloseRoute(resolved)
+	snapshot.routes[declaration.PublicName] = set
+	snapshot.active = append(snapshot.active, resolved)
 	c.routeCount++
 	return nil
+}
+
+func (c *Catalog) allocateCleanupRef() (jobmgr.FunctionCleanupRef, error) {
+	slot := c.nextCleanupSlot.Add(1)
+	if slot == 0 {
+		return jobmgr.FunctionCleanupRef{}, errors.New("jobmgr Function catalog: cleanup identity exhausted")
+	}
+	return jobmgr.FunctionCleanupRef{Slot: slot, Generation: 1}, nil
 }
 
 func validateDeclaration(declaration Declaration) error {
@@ -577,9 +493,7 @@ func validateResourceTransactionDeclaration(
 		(declaration.PrepareComposite == nil) ||
 		declaration.GlobalClaim == "" ||
 		len(declaration.GlobalClaim) > maximumDeclarationMetadataBytes ||
-		declaration.CommandArgument >= 1_024 ||
-		len(declaration.Commands) == 0 ||
-		len(declaration.Commands) > 16 {
+		len(declaration.Commands) == 0 {
 		return errors.New(
 			"jobmgr Function catalog: invalid resource transaction declaration",
 		)
@@ -587,8 +501,7 @@ func validateResourceTransactionDeclaration(
 	hasSuccessor := false
 	for index, command := range declaration.Commands {
 		if command.Name == "" ||
-			len(command.Name) > maximumDeclarationMetadataBytes ||
-			len(command.Claims) > maxCommandClaims {
+			len(command.Name) > maximumDeclarationMetadataBytes {
 			return errors.New(
 				"jobmgr Function catalog: invalid resource transaction command",
 			)
@@ -696,21 +609,30 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 			Rejected: lifecycle.ControlUnavailable,
 		}, nil
 	}
-	set, ok := catalogRouteSet(c.routes, lookup.Route)
+	snapshot := c.snapshot.Load()
+	if snapshot == nil {
+		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlUnavailable}, nil
+	}
+	set, ok := snapshot.routes[lookup.Route]
 	if !ok {
+		if len(c.retiring[lookup.Route]) != 0 {
+			return jobmgr.FunctionCatalogDecision{
+				Rejected: lifecycle.ControlUnavailable,
+			}, nil
+		}
 		return jobmgr.FunctionCatalogDecision{
 			Rejected: lifecycle.ControlNotFound,
 		}, nil
 	}
 	resolved := set.resolve(lookup.Args)
-	if resolved == nil || resolved.retiringDrained {
+	if resolved == nil {
 		return jobmgr.FunctionCatalogDecision{
 			Rejected: lifecycle.ControlNotFound,
 		}, nil
 	}
 	resourceID := resolved.resource.resolve(lookup.Args)
 	generation := resolved.handler
-	if resolved.admissionClosed || generation.admissionClosed {
+	if c.mutation != nil && c.mutation.quiesces(resolved) {
 		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlUnavailable}, nil
 	}
 	command, transactionCommand := resourceTransactionCommand(
@@ -778,11 +700,8 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 		CooperativeDeadline: resolved.cooperativeDeadline,
 	}
 	if transactionCommand {
-		slot.claims[0] = resolved.transaction.GlobalClaim
-		claimCount := 1 + copy(
-			slot.claims[1:],
-			command.Claims,
-		)
+		slot.claims = append(slot.claims, resolved.transaction.GlobalClaim)
+		slot.claims = append(slot.claims, command.Claims...)
 		slot.transactionPlan = jobmgr.ResourceTransactionPlan{
 			ID:                resourceID,
 			AllocateSuccessor: command.AllocateSuccessor,
@@ -798,7 +717,7 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 			slot.transactionPlan.Permit = transactionPermit
 		}
 		plan = jobmgr.WorkPlan{
-			Claims:      slot.claims[:claimCount],
+			Claims:      slot.claims,
 			Transaction: &slot.transactionPlan,
 		}
 	}
@@ -842,10 +761,16 @@ func (c *Catalog) ReleaseInvocation(ref jobmgr.FunctionInvocationRef) (jobmgr.Fu
 	resolved.invocationLeases--
 	generation.invocationLeases--
 	c.invocationCount--
+	if resolved.invocationLeases == 0 {
+		retired := c.retiring[resolved.publicName]
+		delete(retired, resolved)
+		if len(retired) == 0 {
+			delete(c.retiring, resolved.publicName)
+		}
+	}
 	slotGeneration := slot.generation
 	*slot = invocationSlot{generation: slotGeneration, freeNext: c.freeSlot}
 	c.freeSlot = ref.Slot
-	c.retireDrainedRoute(resolved)
 	return c.maybeCleanup(generation)
 }
 
@@ -853,163 +778,40 @@ func (c *Catalog) maybeCleanup(generation *handlerGeneration) (jobmgr.FunctionCl
 	if generation == nil || generation.routeReferences < 0 || generation.invocationLeases < 0 {
 		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: invalid handler generation")
 	}
-	if !generation.admissionClosed || generation.routeReferences != 0 ||
+	if generation.routeReferences != 0 ||
 		generation.invocationLeases != 0 || generation.cleanupPending || generation.cleaned {
 		return jobmgr.FunctionCleanupPlan{}, nil
 	}
-	return c.cleanupDrainedGeneration(generation), nil
+	return c.cleanupDrainedGeneration(generation)
 }
 
-func (c *Catalog) retireDrainedRoute(retired *route) {
-	if c == nil || retired == nil || !retired.retiring ||
-		retired.retiringDrained || retired.invocationLeases != 0 {
-		return
-	}
-	retired.retiringDrained = true
-	if c.mutation != nil {
-		retired.retiringNext = c.deferredPrune
-		c.deferredPrune = retired
-		return
-	}
-	c.pruneRetiringRoutes(retired)
-}
-
-func (c *Catalog) pruneRetiringRoutes(head *route) {
-	var released int64
-	for route := head; route != nil; {
-		next := route.retiringNext
-		route.retiringNext = nil
-		released += pruneRetiringRoute(&c.routes, route)
-		route = next
-	}
-	c.storage.releasePublishedPaths(released)
-}
-
-func pruneRetiringRoute(
-	root **catalogNode,
-	retired *route,
-) int64 {
-	if root == nil || retired == nil || *root == nil {
-		return 0
-	}
-	defer func() {
-		retired.retiringNamePath = nil
-		retired.retiringPrefixPath = nil
-	}()
-
-	nameBits := len(retired.publicName) * 8
-	if len(retired.retiringNamePath) != nameBits+1 {
-		return 0
-	}
-	node := *root
-	for depth := 0; depth <= nameBits; depth++ {
-		if node == nil {
-			return 0
-		}
-		retired.retiringNamePath[depth] = node
-		if depth != nameBits {
-			node = node.child[keyBit(retired.publicName, depth)]
-		}
-	}
-	leaf := retired.retiringNamePath[nameBits]
-	var released int64
-	if retired.prefix == "" {
-		if leaf.routes.direct != retired {
-			return 0
-		}
-		leaf.routes.direct = nil
-	} else {
-		prefixBits := len(retired.prefix) * 8
-		if len(retired.retiringPrefixPath) != prefixBits+1 ||
-			leaf.routes.prefixCount <= 0 {
-			return 0
-		}
-		prefix := leaf.routes.prefixes
-		for depth := 0; depth <= prefixBits; depth++ {
-			if prefix == nil {
-				return 0
-			}
-			retired.retiringPrefixPath[depth] = prefix
-			if depth != prefixBits {
-				prefix = prefix.child[keyBit(retired.prefix, depth)]
-			}
-		}
-		if retired.retiringPrefixPath[prefixBits].resolved != retired {
-			return 0
-		}
-		retired.retiringPrefixPath[prefixBits].resolved = nil
-		leaf.routes.prefixCount--
-		for depth := prefixBits; depth >= 0; depth-- {
-			current := retired.retiringPrefixPath[depth]
-			if current.resolved != nil ||
-				current.child[0] != nil ||
-				current.child[1] != nil {
-				break
-			}
-			if depth == 0 {
-				leaf.routes.prefixes = nil
-			} else {
-				parent := retired.retiringPrefixPath[depth-1]
-				parent.child[keyBit(retired.prefix, depth-1)] = nil
-			}
-			released += prefixNodeStorageBytes
-		}
-	}
-
-	leaf.present = !leaf.routes.empty()
-	for depth := nameBits; depth >= 0; depth-- {
-		current := retired.retiringNamePath[depth]
-		if current.present ||
-			current.child[0] != nil ||
-			current.child[1] != nil {
-			break
-		}
-		if depth == 0 {
-			*root = nil
-		} else {
-			parent := retired.retiringNamePath[depth-1]
-			parent.child[keyBit(retired.publicName, depth-1)] = nil
-		}
-		released += catalogNodeStorageBytes
-	}
-	return released
-}
-
-func (c *Catalog) cleanupDrainedGeneration(generation *handlerGeneration) jobmgr.FunctionCleanupPlan {
+func (c *Catalog) cleanupDrainedGeneration(generation *handlerGeneration) (jobmgr.FunctionCleanupPlan, error) {
 	if generation.cleanup == nil {
 		generation.cleaned = true
-		delete(c.generations, generation.cleanupRef)
-		return jobmgr.FunctionCleanupPlan{}
+		return jobmgr.FunctionCleanupPlan{}, nil
+	}
+	if !generation.cleanupRef.Valid() || c.cleanupByRef[generation.cleanupRef] != nil {
+		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: invalid cleanup dispatch")
 	}
 	generation.cleanupPending = true
+	c.cleanupByRef[generation.cleanupRef] = generation
 	c.pendingCleanups++
-	return jobmgr.FunctionCleanupPlan{Ref: generation.cleanupRef, Work: generation.RunTask}
+	return jobmgr.FunctionCleanupPlan{Ref: generation.cleanupRef, Work: generation.RunTask}, nil
 }
 
 func (c *Catalog) CompleteCleanup(ref jobmgr.FunctionCleanupRef) error {
 	if c == nil || !ref.Valid() {
 		return errors.New("jobmgr Function catalog: invalid cleanup completion")
 	}
-	generation := c.generations[ref]
+	generation := c.cleanupByRef[ref]
 	if generation == nil || generation.cleanupRef != ref || !generation.cleanupPending ||
 		generation.cleaned || generation.routeReferences != 0 || generation.invocationLeases != 0 {
 		return errors.New("jobmgr Function catalog: stale cleanup completion")
 	}
-	if !generation.retentionCharged {
-		return errors.New(
-			"jobmgr Function catalog: cleanup has no generation retention",
-		)
-	}
-	if err := c.storage.releaseCleanup(
-		catalogGenerationRetentionBytes,
-	); err != nil {
-		return err
-	}
-	generation.retentionCharged = false
 	generation.cleanupPending = false
 	generation.cleaned = true
 	c.pendingCleanups--
-	delete(c.generations, ref)
+	delete(c.cleanupByRef, ref)
 	return nil
 }
 
@@ -1018,69 +820,44 @@ func (c *Catalog) BeginClose() error {
 		return errors.New("jobmgr Function catalog: duplicate close")
 	}
 	c.closed = true
+	snapshot := c.snapshot.Load()
+	if snapshot != nil {
+		c.closeRoutes = snapshot.active
+	}
 	return nil
 }
 
-func (c *Catalog) CloseStep(quantum int, cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (int, bool, error) {
-	if c == nil || !c.closed || quantum <= 0 || quantum > MaximumCloseQuantum || cleanups == nil {
-		return 0, false, errors.New("jobmgr Function catalog: invalid close step")
+func (c *Catalog) CloseStep(quantum int) ([]jobmgr.FunctionCleanupPlan, bool, error) {
+	if c == nil || !c.closed || quantum <= 0 || quantum > MaximumCloseQuantum {
+		return nil, false, errors.New("jobmgr Function catalog: invalid close step")
 	}
-	count := 0
-	for quantum > 0 && c.closeHead != nil {
-		resolved := c.closeHead
-		c.unlinkCloseRoute(resolved)
+	cleanups := make([]jobmgr.FunctionCleanupPlan, 0, quantum)
+	for quantum > 0 && c.closeIndex < len(c.closeRoutes) {
+		resolved := c.closeRoutes[c.closeIndex]
+		c.closeIndex++
 		generation := resolved.handler
 		if generation == nil || generation.routeReferences <= 0 {
-			return count, true, errors.New("jobmgr Function catalog: route reference underflow")
+			return cleanups, true, errors.New("jobmgr Function catalog: route reference underflow")
 		}
 		generation.routeReferences--
 		if generation.routeReferences == 0 {
-			generation.admissionClosed = true
 			cleanup, err := c.maybeCleanup(generation)
 			if err != nil {
-				return count, true, err
+				return cleanups, true, err
 			}
 			if cleanup.Ref.Valid() {
-				cleanups[count] = cleanup
-				count++
+				cleanups = append(cleanups, cleanup)
 			}
 		}
 		c.routeCount--
 		quantum--
 	}
-	more := c.closeHead != nil
+	more := c.closeIndex < len(c.closeRoutes)
 	if !more {
-		c.routes = nil
-		if err := c.storage.releasePublished(); err != nil {
-			return count, false, err
-		}
+		c.closeRoutes = nil
+		c.snapshot.Store(nil)
 	}
-	return count, more, nil
-}
-
-func (c *Catalog) appendCloseRoute(resolved *route) {
-	resolved.closePrevious = c.closeTail
-	if c.closeTail != nil {
-		c.closeTail.closeNext = resolved
-	} else {
-		c.closeHead = resolved
-	}
-	c.closeTail = resolved
-}
-
-func (c *Catalog) unlinkCloseRoute(resolved *route) {
-	if resolved.closePrevious != nil {
-		resolved.closePrevious.closeNext = resolved.closeNext
-	} else {
-		c.closeHead = resolved.closeNext
-	}
-	if resolved.closeNext != nil {
-		resolved.closeNext.closePrevious = resolved.closePrevious
-	} else {
-		c.closeTail = resolved.closePrevious
-	}
-	resolved.closePrevious = nil
-	resolved.closeNext = nil
+	return cleanups, more, nil
 }
 
 func (c *Catalog) Census() CatalogCensus {

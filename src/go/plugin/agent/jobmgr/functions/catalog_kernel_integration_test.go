@@ -35,7 +35,7 @@ func (fn testRunFinalizerFunc) FinalizeRun(
 func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 	t *testing.T,
 ) {
-	const population = jobmgr.MaximumFunctionCleanupBatch
+	const population = 300
 
 	declarations := testCleanupDeclarations(population)
 	var cleanupCalls atomic.Int32
@@ -91,16 +91,6 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 		census.PendingCleanups != 0 ||
 		cleanupCalls.Load() != population)
 
-	published := catalog.storage.published.Load()
-	require.EqualValues(t, 0, published)
-
-	cleanup := catalog.storage.cleanup.Load()
-	require.EqualValues(t, 0, cleanup)
-
-	total := catalog.storage.total.Load()
-	require.EqualValues(t, 0, total)
-
-	require.False(t, catalog.storage.preparation.Load())
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())

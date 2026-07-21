@@ -64,8 +64,6 @@ type processCore struct {
 	quit      atomic.Bool                     // set once to stop the outer loop
 }
 
-const processAdmissionBytes = functionadapter.MaximumCatalogStorageBytes
-
 func newProcessCore(config processCoreConfig) (*processCore, error) {
 	if config.Input == nil ||
 		config.Output == nil ||
@@ -80,28 +78,13 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		return nil, errors.New("jobmgr composition: invalid process construction")
 	}
 	admission := lifecycle.NewAdmissionLedger()
-	if err := admission.ReserveProcessBytes(
-		processAdmissionBytes,
-	); err != nil {
-		return nil, err
-	}
 	frames, err := lifecycle.NewFrameOwner(config.Output)
 	if err != nil {
-		return nil, errors.Join(
-			err,
-			admission.ReleaseProcessBytes(
-				processAdmissionBytes,
-			),
-		)
+		return nil, err
 	}
 	ingress, err := functionadapter.NewProcessIngress(config.Input, admission)
 	if err != nil {
-		return nil, errors.Join(
-			err,
-			admission.ReleaseProcessBytes(
-				processAdmissionBytes,
-			),
-		)
+		return nil, err
 	}
 	return &processCore{
 		config: processRuntimeConfig{
@@ -405,11 +388,6 @@ func (pc *processCore) finalize(
 		if err := finishRun.FinishShutdown(); err != nil {
 			finalErr = errors.Join(finalErr, err)
 		}
-	}
-	if err := pc.admission.ReleaseProcessBytes(
-		processAdmissionBytes,
-	); err != nil {
-		finalErr = errors.Join(finalErr, err)
 	}
 	if pc.ingress.Census().State != functionadapter.ProcessIngressContained {
 		finalErr = errors.Join(

@@ -2,13 +2,7 @@
 
 package functions
 
-import (
-	"errors"
-
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
-)
-
-const MaximumMutationPublicationChanges = jobmgr.MaximumFunctionMutationChanges
+import "errors"
 
 type PublicationRecord struct {
 	Name       string // public Function name
@@ -55,21 +49,16 @@ func NewPublication(epoch uint64, port PublicationPort) (*Publication, error) {
 }
 
 // ApplyInitialSnapshot installs one complete catalog-backed snapshot before
-// Function ingress is published. Catalog storage, rather than the steady
-// mutation quantum, bounds the snapshot.
+// Function ingress is published.
 func (p *Publication) ApplyInitialSnapshot(
 	epoch, version uint64,
-	catalogStorageBytes int64,
 	changes []PublicationChange,
 ) error {
 	if p == nil {
 		return errors.New("jobmgr Function publication: invalid initial snapshot")
 	}
 	if p.version != 0 ||
-		len(p.published) != 0 ||
-		catalogStorageBytes < 0 ||
-		catalogStorageBytes > MaximumCatalogStorageBytes ||
-		int64(len(changes)) > catalogStorageBytes {
+		len(p.published) != 0 {
 		return p.poison(
 			errors.New(
 				"jobmgr Function publication: invalid initial snapshot",
@@ -85,7 +74,7 @@ func (p *Publication) ApplyInitialSnapshot(
 			)
 		}
 	}
-	return p.applyTransition(epoch, version, changes, 0, func() error {
+	return p.applyTransition(epoch, version, changes, func() error {
 		return nil
 	}, nil, nil)
 }
@@ -101,11 +90,13 @@ func (p *Publication) ApplyTransition(
 	commit func() error,
 	abort func() error,
 ) error {
+	if quiesce == nil || abort == nil {
+		return errors.New("jobmgr Function publication: incomplete transition boundary")
+	}
 	return p.applyTransition(
 		epoch,
 		version,
 		changes,
-		MaximumMutationPublicationChanges,
 		commit,
 		quiesce,
 		abort,
@@ -115,7 +106,6 @@ func (p *Publication) ApplyTransition(
 func (p *Publication) applyTransition(
 	epoch, version uint64,
 	changes []PublicationChange,
-	maximumChanges int,
 	commit func() error,
 	quiesce func() error,
 	abort func() error,
@@ -123,14 +113,13 @@ func (p *Publication) applyTransition(
 	if commit == nil {
 		return errors.New("jobmgr Function publication: nil transition commit")
 	}
-	if maximumChanges != 0 && (quiesce == nil || abort == nil) {
+	if (quiesce == nil) != (abort == nil) {
 		return errors.New("jobmgr Function publication: incomplete transition boundary")
 	}
 	if err := p.validateTransition(
 		epoch,
 		version,
 		changes,
-		maximumChanges,
 	); err != nil {
 		return err
 	}
@@ -145,7 +134,11 @@ func (p *Publication) applyTransition(
 			continue
 		}
 		if err := p.port.Withdraw(change.Name); err != nil {
-			return p.poison(errors.Join(err, abort()))
+			var abortErr error
+			if abort != nil {
+				abortErr = abort()
+			}
+			return p.poison(errors.Join(err, abortErr))
 		}
 		delete(p.published, change.Name)
 	}
@@ -172,7 +165,6 @@ func (p *Publication) applyTransition(
 func (p *Publication) validateTransition(
 	epoch, version uint64,
 	changes []PublicationChange,
-	maximumChanges int,
 ) error {
 	if p == nil || p.port == nil {
 		return errors.New("jobmgr Function publication: invalid state")
@@ -185,9 +177,7 @@ func (p *Publication) validateTransition(
 	}
 	if epoch != p.epoch ||
 		version == 0 ||
-		version != p.version+1 ||
-		maximumChanges < 0 ||
-		maximumChanges != 0 && len(changes) > maximumChanges {
+		version != p.version+1 {
 		return p.poison(errors.New("jobmgr Function publication: stale or invalid transition"))
 	}
 	seen := make(map[string]struct{}, len(changes))

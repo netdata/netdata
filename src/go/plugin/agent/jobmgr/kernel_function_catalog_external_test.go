@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -342,6 +343,99 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 	closeExternalUIDLedger(t, uids)
 }
 
+func TestFunctionCatalogShutdownCompletesResumedMultiTurnMutation(t *testing.T) {
+	const population = 2*jobmgr.MaximumFunctionMutationQuantum + 1
+
+	var predecessorCleanups atomic.Int32
+	var successorCleanups atomic.Int32
+	declarations := make([]functionadapter.Declaration, population)
+	replacements := make([]functionadapter.Declaration, population)
+	changes := make([]functionadapter.RouteChange, population)
+	for index := range population {
+		name := fmt.Sprintf("multi-turn-%03d", index)
+		declarations[index] = functionadapter.Declaration{
+			ID:         "method",
+			PublicName: name,
+			Generation: &functionadapter.HandlerGenerationDeclaration{
+				ID: fmt.Sprintf("predecessor-%03d", index),
+				Handler: func(context.Context, functionadapter.HandlerInput) (lifecycle.SealedResult, error) {
+					return lifecycle.NewControlResult(lifecycle.ControlInternal)
+				},
+				Cleanup: func(context.Context) error {
+					predecessorCleanups.Add(1)
+					return nil
+				},
+			},
+		}
+		replacements[index] = functionadapter.Declaration{
+			ID:         "method",
+			PublicName: name,
+			Generation: &functionadapter.HandlerGenerationDeclaration{
+				ID: fmt.Sprintf("successor-%03d", index),
+				Handler: func(context.Context, functionadapter.HandlerInput) (lifecycle.SealedResult, error) {
+					return lifecycle.NewControlResult(lifecycle.ControlInternal)
+				},
+				Cleanup: func(context.Context) error {
+					successorCleanups.Add(1)
+					return nil
+				},
+			},
+		}
+		changes[index] = functionadapter.RouteChange{
+			PublicName:  name,
+			Declaration: &replacements[index],
+		}
+	}
+	catalog, err := functionadapter.NewCatalog(declarations)
+	require.NoError(t, err)
+	firstCommitStep := make(chan struct{})
+	resumeCommit := make(chan struct{})
+	observed := &observedFunctionCatalog{
+		FunctionCatalogPort: catalog,
+		firstCommitStep:     firstCommitStep,
+		resumeCommit:        resumeCommit,
+	}
+	kernel, run, admission, uids := newExternalKernel(t, observed)
+	mutation, err := catalog.NewMutation(catalog.Census().Version, changes)
+	require.NoError(t, err)
+	require.NoError(t, kernel.QuiesceFunctions(context.Background(), mutation))
+
+	type commitResult struct {
+		version uint64
+		err     error
+	}
+	committed := make(chan commitResult, 1)
+	go func() {
+		version, err := kernel.CommitFunctions(context.Background(), mutation)
+		committed <- commitResult{version: version, err: err}
+	}()
+	select {
+	case <-firstCommitStep:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "multi-turn mutation did not complete its first commit step")
+	}
+	kernel.Stop()
+	close(resumeCommit)
+
+	select {
+	case result := <-committed:
+		require.NoError(t, result.err)
+		require.EqualValues(t, 2, result.version)
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "test failed", "resumed mutation did not finish during shutdown")
+	}
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	census := catalog.Census()
+	require.True(t, census.Closed)
+	require.Zero(t, census.Routes)
+	require.Zero(t, census.PendingCleanups)
+	require.EqualValues(t, population, predecessorCleanups.Load())
+	require.EqualValues(t, population, successorCleanups.Load())
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+	closeExternalUIDLedger(t, uids)
+}
+
 func TestFunctionCatalogMutationCancellationAfterHandoffWaitsForDisposition(t *testing.T) {
 	catalog := &handoffMutationCatalog{
 		begun: make(chan struct{}),
@@ -482,6 +576,26 @@ type handoffMutation struct{}
 
 func (handoffMutation) FunctionCatalogMutation() {}
 
+type observedFunctionCatalog struct {
+	jobmgr.FunctionCatalogPort
+	firstCommitStep chan struct{}
+	resumeCommit    <-chan struct{}
+	once            sync.Once
+}
+
+func (ofc *observedFunctionCatalog) AdvanceMutation(
+	quantum int,
+) (jobmgr.FunctionCatalogMutationProgress, []jobmgr.FunctionCleanupPlan, error) {
+	progress, cleanups, err := ofc.FunctionCatalogPort.AdvanceMutation(quantum)
+	if err == nil && !progress.Done {
+		ofc.once.Do(func() {
+			close(ofc.firstCommitStep)
+			<-ofc.resumeCommit
+		})
+	}
+	return progress, cleanups, err
+}
+
 type handoffMutationCatalog struct {
 	begun  chan struct{}
 	allow  chan struct{}
@@ -521,15 +635,12 @@ func (hmc *handoffMutationCatalog) AdvanceMutationQuiesce(
 	select {
 	case <-hmc.allow:
 		return jobmgr.FunctionCatalogMutationProgress{
-			CompletedNodes: 1,
-			TotalNodes:     1,
-			Version:        1,
-			Quiesced:       true,
+			Version:  1,
+			Quiesced: true,
 		}, nil
 	default:
 		return jobmgr.FunctionCatalogMutationProgress{
-			TotalNodes: 1,
-			Version:    1,
+			Version: 1,
 		}, nil
 	}
 }
@@ -542,22 +653,17 @@ func (*handoffMutationCatalog) ResumeMutation(
 
 func (hmc *handoffMutationCatalog) AdvanceMutation(
 	int,
-	*[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan,
-) (jobmgr.FunctionCatalogMutationProgress, int, error) {
+) (jobmgr.FunctionCatalogMutationProgress, []jobmgr.FunctionCleanupPlan, error) {
 	hmc.active.Store(false)
 	return jobmgr.FunctionCatalogMutationProgress{
-		CompletedNodes: 1,
-		TotalNodes:     1,
-		Version:        2,
-		Done:           true,
-	}, 0, nil
+		Version: 2,
+		Done:    true,
+	}, nil, nil
 }
 
-func (hmc *handoffMutationCatalog) AbortMutation(
-	*[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan,
-) (int, error) {
+func (hmc *handoffMutationCatalog) AbortMutation(jobmgr.FunctionCatalogMutation) error {
 	hmc.active.Store(false)
-	return 0, nil
+	return nil
 }
 
 func (hmc *handoffMutationCatalog) BeginClose() error {
@@ -567,9 +673,8 @@ func (hmc *handoffMutationCatalog) BeginClose() error {
 
 func (*handoffMutationCatalog) CloseStep(
 	int,
-	*[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan,
-) (int, bool, error) {
-	return 0, false, nil
+) ([]jobmgr.FunctionCleanupPlan, bool, error) {
+	return nil, false, nil
 }
 
 func (hmc *handoffMutationCatalog) LifecycleCensus() jobmgr.FunctionCatalogCensus {

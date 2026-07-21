@@ -349,7 +349,6 @@ func (c *Controller) Activate() error {
 	if err := c.publication.ApplyInitialSnapshot(
 		c.epoch,
 		c.version,
-		c.catalog.storage.published.Load(),
 		changes,
 	); err != nil {
 		c.dirty = errors.Join(c.dirty, err)

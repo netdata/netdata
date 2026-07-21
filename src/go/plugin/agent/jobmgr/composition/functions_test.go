@@ -399,13 +399,11 @@ func (amp *assemblyMutationPort) CommitFunctions(
 		return 0, err
 	}
 	for {
-		var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-		progress, count, err := amp.catalog.AdvanceMutation(jobmgr.MaximumFunctionMutationQuantum, &cleanups)
+		progress, cleanups, err := amp.catalog.AdvanceMutation(jobmgr.MaximumFunctionMutationQuantum)
 		if err != nil {
 			return 0, err
 		}
-		for index := range count {
-			cleanup := cleanups[index]
+		for _, cleanup := range cleanups {
 			_, cleanupErr := cleanup.Work(context.Background())
 			if err := amp.catalog.CompleteCleanup(cleanup.Ref); err != nil {
 				return 0, errors.Join(cleanupErr, err)
@@ -424,22 +422,7 @@ func (amp *assemblyMutationPort) AbortFunctions(
 	if amp == nil || amp.catalog == nil {
 		return errors.New("nil mutation port")
 	}
-	if err := amp.catalog.ResumeMutation(mutation); err != nil {
-		return err
-	}
-	var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-	count, err := amp.catalog.AbortMutation(&cleanups)
-	if err != nil {
-		return err
-	}
-	for index := range count {
-		cleanup := cleanups[index]
-		_, cleanupErr := cleanup.Work(context.Background())
-		if err := amp.catalog.CompleteCleanup(cleanup.Ref); err != nil {
-			return errors.Join(cleanupErr, err)
-		}
-	}
-	return nil
+	return amp.catalog.AbortMutation(mutation)
 }
 
 type assemblyTestHandler struct{}

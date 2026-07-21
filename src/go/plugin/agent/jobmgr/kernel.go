@@ -15,7 +15,6 @@ import (
 const externalSourceQueueDepth = 32
 
 const (
-	maximumPlanClaims     = 1_024
 	maximumClaimKeyBytes  = maximumRequestArgumentBytes
 	maximumPlanClaimBytes = lifecycle.ControlFrameBytes
 	// Keep lifecycle-event service capacity at least equal to the maximum
@@ -1334,6 +1333,12 @@ func (ck *CommandKernel) advanceShutdownAuthority() error {
 		ck.ownershipChains != 0 {
 		return nil
 	}
+	// A resumed mutation retires predecessors incrementally and cannot be
+	// rolled back. Let the bounded commit finish before entering cleanup drain.
+	if ck.functionMutationActive &&
+		ck.functionMutation.action == functionMutationCommit {
+		return nil
+	}
 	if err := ck.abortFunctionMutationForShutdown(); err != nil {
 		return err
 	}
@@ -1362,7 +1367,7 @@ func (ck *CommandKernel) abortFunctionMutationForShutdown() error {
 	if !ck.functionMutationActive && !ck.functionMutationPaused {
 		return nil
 	}
-	abortErr := ck.abortMutationCleanups()
+	abortErr := ck.abortFunctionMutation(ck.functionMutation.mutation)
 	terminalErr := error(ck.run.StoppingCause())
 	if abortErr != nil {
 		terminalErr = errors.Join(terminalErr, abortErr)

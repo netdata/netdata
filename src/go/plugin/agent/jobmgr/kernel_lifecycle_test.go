@@ -442,14 +442,6 @@ func TestWorkPlanRejectsUnboundedClaims(t *testing.T) {
 	tests := map[string]struct {
 		mutate func(*WorkPlan)
 	}{
-		"too many claims": {
-			mutate: func(plan *WorkPlan) {
-				plan.Claims = make([]string, maximumPlanClaims+1)
-				for index := range plan.Claims {
-					plan.Claims[index] = "claim"
-				}
-			},
-		},
 		"oversized claim key": {
 			mutate: func(plan *WorkPlan) {
 				plan.Claims = []string{strings.Repeat("c", maximumClaimKeyBytes+1)}
@@ -472,6 +464,17 @@ func TestWorkPlanRejectsUnboundedClaims(t *testing.T) {
 			require.Error(t, plan.validate())
 		})
 	}
+}
+
+func TestWorkPlanAcceptsClaimsBeyondFormerCountLimit(t *testing.T) {
+	plan := WorkPlan{
+		Work:   lifecycle.FrameTaskWork(plannerPlanWork),
+		Claims: make([]string, 1_025),
+	}
+	for index := range plan.Claims {
+		plan.Claims[index] = "c"
+	}
+	require.NoError(t, plan.validate())
 }
 
 func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
@@ -3433,18 +3436,18 @@ func (functionCatalogPortStub) ResumeMutation(FunctionCatalogMutation) error {
 	return errors.New("test Function catalog: no active mutation")
 }
 
-func (functionCatalogPortStub) AdvanceMutation(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (FunctionCatalogMutationProgress, int, error) {
-	return FunctionCatalogMutationProgress{}, 0, errors.New("test Function catalog: no active mutation")
+func (functionCatalogPortStub) AdvanceMutation(int) (FunctionCatalogMutationProgress, []FunctionCleanupPlan, error) {
+	return FunctionCatalogMutationProgress{}, nil, errors.New("test Function catalog: no active mutation")
 }
 
-func (functionCatalogPortStub) AbortMutation(*[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (int, error) {
-	return 0, errors.New("test Function catalog: no active mutation")
+func (functionCatalogPortStub) AbortMutation(FunctionCatalogMutation) error {
+	return errors.New("test Function catalog: no active mutation")
 }
 
 func (functionCatalogPortStub) BeginClose() error { return nil }
 
-func (functionCatalogPortStub) CloseStep(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (int, bool, error) {
-	return 0, false, nil
+func (functionCatalogPortStub) CloseStep(int) ([]FunctionCleanupPlan, bool, error) {
+	return nil, false, nil
 }
 
 func (functionCatalogPortStub) LifecycleCensus() FunctionCatalogCensus {
@@ -3508,18 +3511,18 @@ func (*testFunctionCatalog) ResumeMutation(FunctionCatalogMutation) error {
 	return errors.New("test Function catalog: no active mutation")
 }
 
-func (*testFunctionCatalog) AdvanceMutation(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (FunctionCatalogMutationProgress, int, error) {
-	return FunctionCatalogMutationProgress{}, 0, errors.New("test Function catalog: no active mutation")
+func (*testFunctionCatalog) AdvanceMutation(int) (FunctionCatalogMutationProgress, []FunctionCleanupPlan, error) {
+	return FunctionCatalogMutationProgress{}, nil, errors.New("test Function catalog: no active mutation")
 }
 
-func (*testFunctionCatalog) AbortMutation(*[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (int, error) {
-	return 0, errors.New("test Function catalog: no active mutation")
+func (*testFunctionCatalog) AbortMutation(FunctionCatalogMutation) error {
+	return errors.New("test Function catalog: no active mutation")
 }
 
 func (*testFunctionCatalog) BeginClose() error { return nil }
 
-func (*testFunctionCatalog) CloseStep(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (int, bool, error) {
-	return 0, false, nil
+func (*testFunctionCatalog) CloseStep(int) ([]FunctionCleanupPlan, bool, error) {
+	return nil, false, nil
 }
 
 func (*testFunctionCatalog) LifecycleCensus() FunctionCatalogCensus {

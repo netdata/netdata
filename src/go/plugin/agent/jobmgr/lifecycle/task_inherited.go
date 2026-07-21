@@ -29,16 +29,16 @@ type InheritedTaskRef struct {
 }
 
 func (ref InheritedTaskRef) valid() bool {
-	return ref.Generation != 0
+	return ref.Slot != 0 && ref.Generation != 0
 }
 
 type InheritedTaskWork func(context.Context) error
 
 type inheritedTaskRegistry struct {
 	mu             sync.Mutex
-	slots          []*inheritedTaskSlot
+	slots          map[uint32]*inheritedTaskSlot
 	owners         map[inheritedOwnerRole]InheritedTaskRef
-	freeHead       uint32
+	nextSlot       uint32
 	census         InheritedTaskCensus
 	sealed         bool
 	activeHead     uint32
@@ -47,9 +47,6 @@ type inheritedTaskRegistry struct {
 }
 
 type inheritedTaskSlot struct {
-	generation     uint32                  // ABA guard for the task ref
-	freeNext       uint32                  // freelist link
-	active         bool                    // slot is in use
 	owner          ResourceIdentity        // owning resource identity
 	role           InheritedTaskRole       // inherited task role (V1 runtime / V2 runner / pipeline)
 	key            string                  // identity tuple key into the owners map
@@ -178,7 +175,7 @@ func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceI
 		registry.mu.Unlock()
 		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: duplicate inherited owner role")
 	}
-	index, slot, generation, err := registry.allocateSlot()
+	slotID, slot, err := registry.allocateSlot()
 	if err != nil {
 		registry.mu.Unlock()
 		return InheritedTaskRef{}, err
@@ -187,21 +184,20 @@ func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceI
 	done := make(chan struct{})
 	started := make(chan struct{})
 	*slot = inheritedTaskSlot{
-		generation: generation, active: true, owner: owner, role: role,
+		owner: owner, role: role,
 		key:    key,
 		cancel: cancel, done: done, permit: permit,
 	}
 	registry.census.Active++
-	ref := InheritedTaskRef{Slot: index, Generation: generation}
+	ref := InheritedTaskRef{Slot: slotID, Generation: 1}
 	registry.owners[ownerKey] = ref
-	handle := index + 1
 	slot.activePrevious = registry.activeTail
 	if registry.activeTail != 0 {
-		registry.slots[registry.activeTail-1].activeNext = handle
+		registry.slots[registry.activeTail].activeNext = slotID
 	} else {
-		registry.activeHead = handle
+		registry.activeHead = slotID
 	}
-	registry.activeTail = handle
+	registry.activeTail = slotID
 	registry.mu.Unlock()
 
 	go func() {
@@ -217,35 +213,17 @@ func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceI
 func (registry *inheritedTaskRegistry) allocateSlot() (
 	uint32,
 	*inheritedTaskSlot,
-	uint32,
 	error,
 ) {
-	for {
-		var index uint32
-		var slot *inheritedTaskSlot
-		if registry.freeHead != 0 {
-			index = registry.freeHead - 1
-			slot = registry.slots[index]
-			if slot == nil {
-				return 0, nil, 0,
-					errors.New("jobmgr task supervisor: invalid inherited free slot")
-			}
-			registry.freeHead = slot.freeNext
-		} else {
-			if uint64(len(registry.slots)) >= uint64(^uint32(0)) {
-				return 0, nil, 0,
-					errors.New("jobmgr task supervisor: inherited reference space exhausted")
-			}
-			index = uint32(len(registry.slots))
-			slot = &inheritedTaskSlot{}
-			registry.slots = append(registry.slots, slot)
-		}
-		generation := slot.generation + 1
-		if generation != 0 {
-			return index, slot, generation, nil
-		}
-		*slot = inheritedTaskSlot{generation: slot.generation}
+	next := registry.nextSlot + 1
+	if next == 0 {
+		return 0, nil,
+			errors.New("jobmgr task supervisor: inherited reference space exhausted")
 	}
+	registry.nextSlot = next
+	slot := &inheritedTaskSlot{}
+	registry.slots[next] = slot
+	return next, slot, nil
 }
 
 func (ts *TaskSupervisor) CancelInherited(ref InheritedTaskRef, owner ResourceIdentity) error {
@@ -362,23 +340,20 @@ func (ts *TaskSupervisor) ReleaseInherited(ref InheritedTaskRef, owner ResourceI
 		key:   slot.key,
 	}
 	previous, next := slot.activePrevious, slot.activeNext
-	handle := ref.Slot + 1
-	if registry.shutdownCursor == handle {
+	if registry.shutdownCursor == ref.Slot {
 		registry.shutdownCursor = next
 	}
 	if previous != 0 {
-		registry.slots[previous-1].activeNext = next
+		registry.slots[previous].activeNext = next
 	} else {
 		registry.activeHead = next
 	}
 	if next != 0 {
-		registry.slots[next-1].activePrevious = previous
+		registry.slots[next].activePrevious = previous
 	} else {
 		registry.activeTail = previous
 	}
-	generation := slot.generation
-	*slot = inheritedTaskSlot{generation: generation, freeNext: registry.freeHead}
-	registry.freeHead = ref.Slot + 1
+	delete(registry.slots, ref.Slot)
 	delete(registry.owners, key)
 	registry.census.Active--
 	registry.census.Cancelled--
@@ -428,7 +403,7 @@ func (ts *TaskSupervisor) CancelInheritedBatch(
 	}
 	for census.Visited < quantum && registry.shutdownCursor != 0 {
 		handle := registry.shutdownCursor
-		slot := registry.slots[handle-1]
+		slot := registry.slots[handle]
 		registry.shutdownCursor = slot.activeNext
 		census.Visited++
 		if slot.cancelled {
@@ -464,6 +439,7 @@ func (ts *TaskSupervisor) InheritedCancellationPending() bool {
 }
 
 func (itr *inheritedTaskRegistry) initialize() {
+	itr.slots = make(map[uint32]*inheritedTaskSlot)
 	itr.owners = make(map[inheritedOwnerRole]InheritedTaskRef)
 }
 
@@ -485,12 +461,11 @@ func (itr *inheritedTaskRegistry) slot(ref InheritedTaskRef, owner ResourceIdent
 	if !ref.valid() || !owner.Valid() {
 		return nil, errors.New("jobmgr task supervisor: invalid inherited reference")
 	}
-	if uint64(ref.Slot) >= uint64(len(itr.slots)) ||
-		itr.slots[ref.Slot] == nil {
+	slot := itr.slots[ref.Slot]
+	if slot == nil {
 		return nil, errors.New("jobmgr task supervisor: stale or cross-owner inherited reference")
 	}
-	slot := itr.slots[ref.Slot]
-	if !slot.active || slot.generation != ref.Generation || slot.owner != owner {
+	if ref.Generation != 1 || slot.owner != owner {
 		return nil, errors.New("jobmgr task supervisor: stale or cross-owner inherited reference")
 	}
 	return slot, nil
@@ -537,12 +512,11 @@ func (itr *inheritedTaskRegistry) complete(
 	if !ref.valid() {
 		return false, taskErr
 	}
-	if uint64(ref.Slot) >= uint64(len(itr.slots)) ||
-		itr.slots[ref.Slot] == nil {
+	slot := itr.slots[ref.Slot]
+	if slot == nil || ref.Generation != 1 {
 		return false, taskErr
 	}
-	slot := itr.slots[ref.Slot]
-	if !slot.active || slot.generation != ref.Generation || slot.finished {
+	if slot.finished {
 		return false, taskErr
 	}
 	spontaneousFailure := !slot.cancelled &&

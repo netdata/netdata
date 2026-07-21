@@ -24,9 +24,27 @@ func (fcq *functionCleanupQueue) push(plan FunctionCleanupPlan) error {
 	if !plan.Ref.Valid() {
 		return nil
 	}
+	fcq.compact()
 	fcq.plans = append(fcq.plans, plan)
 	fcq.count++
 	return nil
+}
+
+func (fcq *functionCleanupQueue) compact() {
+	if fcq.head == 0 || fcq.head < len(fcq.plans)/2 {
+		return
+	}
+	if cap(fcq.plans) > 2*fcq.count {
+		plans := make([]FunctionCleanupPlan, fcq.count)
+		copy(plans, fcq.plans[fcq.head:])
+		fcq.plans = plans
+		fcq.head = 0
+		return
+	}
+	copy(fcq.plans, fcq.plans[fcq.head:])
+	clear(fcq.plans[fcq.count:])
+	fcq.plans = fcq.plans[:fcq.count]
+	fcq.head = 0
 }
 
 func (fcq *functionCleanupQueue) front() FunctionCleanupPlan {

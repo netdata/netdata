@@ -26,9 +26,6 @@ type ResourceTransactionPlan struct {
 }
 
 func (wp WorkPlan) validate() error {
-	if len(wp.Claims) > maximumPlanClaims {
-		return errors.New("jobmgr kernel: too many plan claims")
-	}
 	claimBytes := 0
 	for _, key := range wp.Claims {
 		if key == "" || len(key) > maximumClaimKeyBytes ||

@@ -56,7 +56,7 @@ func TestFunctionPublicationDiff(t *testing.T) {
 	a := publicationRecord("a", 1)
 	b := publicationRecord("b", 1)
 
-	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, 2, []PublicationChange{
+	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, []PublicationChange{
 		{Name: "a", Record: &a}, {Name: "b", Record: &b},
 	}),
 	)
@@ -91,7 +91,7 @@ func TestFunctionPublicationNoRearm(t *testing.T) {
 	publication, err := NewPublication(1, port)
 	require.NoError(t, err)
 	record := publicationRecord("work", 1)
-	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, 1, []PublicationChange{{
+	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, []PublicationChange{{
 		Name: record.Name, Record: &record,
 	}}),
 	)
@@ -109,12 +109,13 @@ func TestFunctionPublicationNoRearm(t *testing.T) {
 }
 
 func TestFunctionPublicationInitialSnapshotExceedsMutationQuantum(t *testing.T) {
+	const population = 257
 	port := newRecordingPublicationPort()
 	publication, err := NewPublication(1, port)
 	require.NoError(t, err)
-	records := make([]PublicationRecord, 0, MaximumMutationPublicationChanges+3)
-	changes := make([]PublicationChange, 0, MaximumMutationPublicationChanges+3)
-	for index := range MaximumMutationPublicationChanges + 3 {
+	records := make([]PublicationRecord, 0, population)
+	changes := make([]PublicationChange, 0, population)
+	for index := range population {
 		record := publicationRecord(fmt.Sprintf("work-%03d", index), 1)
 		records = append(records, record)
 		changes = append(
@@ -126,7 +127,6 @@ func TestFunctionPublicationInitialSnapshotExceedsMutationQuantum(t *testing.T) 
 	require.NoError(t, publication.ApplyInitialSnapshot(
 		1,
 		1,
-		int64(len(records)),
 		changes,
 	),
 	)
@@ -134,29 +134,32 @@ func TestFunctionPublicationInitialSnapshotExceedsMutationQuantum(t *testing.T) 
 	require.EqualValues(t, len(records), len(port.active))
 }
 
-func TestFunctionPublicationMutationCannotExceedQuantum(t *testing.T) {
+func TestFunctionPublicationMutationExceedsFormerCountLimit(t *testing.T) {
+	const population = 257
 	port := newRecordingPublicationPort()
 	publication, err := NewPublication(1, port)
 	require.NoError(t, err)
 
-	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, 0, nil))
+	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, nil))
 
-	changes := make([]PublicationChange, 0, MaximumMutationPublicationChanges+1)
-	for index := range MaximumMutationPublicationChanges + 1 {
+	records := make([]PublicationRecord, 0, population)
+	changes := make([]PublicationChange, 0, population)
+	for index := range population {
 		record := publicationRecord(fmt.Sprintf("work-%03d", index), 1)
+		records = append(records, record)
 		changes = append(
 			changes,
-			PublicationChange{Name: record.Name, Record: &record},
+			PublicationChange{Name: record.Name, Record: &records[index]},
 		)
 	}
-	committed := false
+	var quiesced, committed, aborted bool
 
-	require.Error(t, publication.ApplyTransition(
+	require.NoError(t, publication.ApplyTransition(
 		1,
 		2,
 		changes,
 		func() error {
-			committed = true
+			quiesced = true
 			return nil
 		},
 		func() error {
@@ -164,13 +167,16 @@ func TestFunctionPublicationMutationCannotExceedQuantum(t *testing.T) {
 			return nil
 		},
 		func() error {
-			committed = true
+			aborted = true
 			return nil
 		},
 	),
 	)
 
-	require.False(t, committed || len(port.published) != 0 || len(port.active) != 0)
+	require.True(t, quiesced)
+	require.True(t, committed)
+	require.False(t, aborted)
+	require.Len(t, port.active, population)
 }
 
 func TestFunctionPublicationTransitionOrdersCatalogBetweenFrames(t *testing.T) {
@@ -180,7 +186,6 @@ func TestFunctionPublicationTransitionOrdersCatalogBetweenFrames(t *testing.T) {
 	current := publicationRecord("work", 1)
 
 	require.NoError(t, publication.ApplyInitialSnapshot(
-		1,
 		1,
 		1,
 		[]PublicationChange{{Name: current.Name, Record: &current}},
@@ -225,7 +230,6 @@ func TestFunctionPublicationWithdrawalFailureAbortsQuiescedCatalog(t *testing.T)
 	current := publicationRecord("work", 1)
 
 	require.NoError(t, publication.ApplyInitialSnapshot(
-		1,
 		1,
 		1,
 		[]PublicationChange{{Name: current.Name, Record: &current}},

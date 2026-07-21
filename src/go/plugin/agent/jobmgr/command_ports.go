@@ -16,7 +16,6 @@ const (
 	MaximumPluginSDLineBytes = 15_487
 
 	maximumRequestArgumentBytes = MaximumPluginSDLineBytes
-	maximumRequestArguments     = 1_024
 	maximumRequestMetadataBytes = maximumRequestArgumentBytes
 )
 
@@ -59,8 +58,7 @@ func (r Request) Validate() error {
 		len(r.ContentType) > maximumRequestMetadataBytes ||
 		len(r.Permissions) > maximumRequestMetadataBytes ||
 		len(r.CallerSource) > maximumRequestMetadataBytes ||
-		r.Timeout < 0 ||
-		len(r.Args) > maximumRequestArguments {
+		r.Timeout < 0 {
 		return errors.New("jobmgr: request metadata exceeds bounds")
 	}
 	argumentBytes := 0

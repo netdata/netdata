@@ -14,14 +14,11 @@ import (
 
 type abortCleanupCatalog struct {
 	functionCatalogPortStub
-	cleanups []FunctionCleanupPlan
-	err      error
+	err error
 }
 
-func (acc *abortCleanupCatalog) AbortMutation(
-	cleanups *[MaximumFunctionCleanupBatch]FunctionCleanupPlan,
-) (int, error) {
-	return copy(cleanups[:], acc.cleanups), acc.err
+func (acc *abortCleanupCatalog) AbortMutation(FunctionCatalogMutation) error {
+	return acc.err
 }
 
 func TestFunctionCleanupQueuePreservesFIFOAndReleasesReferences(t *testing.T) {
@@ -55,28 +52,41 @@ func TestFunctionCleanupQueuePreservesFIFOAndReleasesReferences(t *testing.T) {
 	require.False(t, plan.Ref.Valid() || plan.Work != nil)
 }
 
-func TestAbortMutationCleanupsPreservesOrderAndJoinsErrors(t *testing.T) {
+func TestFunctionCleanupQueueStorageTracksLiveBacklog(t *testing.T) {
+	const population = 10_000
+
+	plan := func(slot uint32) FunctionCleanupPlan {
+		return FunctionCleanupPlan{
+			Ref: FunctionCleanupRef{Slot: slot, Generation: 1},
+			Work: func(context.Context) (lifecycle.TaskOutcome, error) {
+				return lifecycle.NoValueOutcome(), nil
+			},
+		}
+	}
+	var queue functionCleanupQueue
+	for slot := uint32(1); slot <= population; slot++ {
+		require.NoError(t, queue.push(plan(slot)))
+	}
+	for queue.count > 1 {
+		queue.pop()
+	}
+	require.NoError(t, queue.push(plan(population+1)))
+	queue.pop()
+
+	require.Equal(t, 1, queue.count)
+	assert.LessOrEqual(t, len(queue.plans), 2*queue.count)
+	assert.LessOrEqual(t, cap(queue.plans), 2*queue.count)
+	assert.EqualValues(t, population+1, queue.front().Ref.Slot)
+}
+
+func TestAbortFunctionMutationReturnsCatalogError(t *testing.T) {
 	abortErr := errors.New("abort failed")
-	work := func(context.Context) (lifecycle.TaskOutcome, error) {
-		return lifecycle.NoValueOutcome(), nil
-	}
-	catalog := &abortCleanupCatalog{
-		cleanups: []FunctionCleanupPlan{
-			{Ref: FunctionCleanupRef{Slot: 1, Generation: 1}, Work: work},
-			{Ref: FunctionCleanupRef{Slot: 2, Generation: 1}, Work: work},
-			{Ref: FunctionCleanupRef{Slot: 3, Generation: 1}},
-		},
-		err: abortErr,
-	}
+	catalog := &abortCleanupCatalog{err: abortErr}
 	kernel := &CommandKernel{functionCatalog: catalog}
 
-	err := kernel.abortMutationCleanups()
+	err := kernel.abortFunctionMutation(nil)
 	require.ErrorIs(t, err, abortErr)
-	assert.EqualError(t, err, "abort failed\njobmgr kernel: invalid Function cleanup plan")
-	require.Equal(t, 2, kernel.functionCleanupBacklog.count)
-	assert.EqualValues(t, 1, kernel.functionCleanupBacklog.front().Ref.Slot)
-	kernel.functionCleanupBacklog.pop()
-	assert.EqualValues(t, 2, kernel.functionCleanupBacklog.front().Ref.Slot)
+	assert.EqualError(t, err, "abort failed")
 }
 
 func BenchmarkBFunctionCleanupQueuePushPop(b *testing.B) {

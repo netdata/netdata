@@ -75,8 +75,7 @@ type claimAuthority struct {
 
 func newClaimAuthority() *claimAuthority {
 	return &claimAuthority{
-		keys:        make(map[string]*authorityClaimKey),
-		settlements: make(authorityClaimHeap, 0, maximumPlanClaims),
+		keys: make(map[string]*authorityClaimKey),
 	}
 }
 

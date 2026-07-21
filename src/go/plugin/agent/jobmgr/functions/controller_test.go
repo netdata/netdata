@@ -144,6 +144,68 @@ func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T)
 	require.NoError(t, closeErr)
 }
 
+func TestFunctionControllerWithdrawalFailureCleansUnpublishedSuccessor(t *testing.T) {
+	available := false
+	predecessor := &controllerTestHandler{}
+	successor := &controllerTestHandler{}
+	handlers := []*controllerTestHandler{predecessor, successor}
+	constructions := 0
+	controller, catalog, err := NewController(1, collectorapi.Registry{
+		"module": {
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{
+					{ID: "always"},
+					{ID: "conditional", Available: func() bool { return available }},
+				}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				handler := handlers[constructions]
+				constructions++
+				return handler
+			},
+		},
+	})
+	require.NoError(t, err)
+	mutations := controllerTestMutationPort{catalog: catalog}
+	publicationPort := newRecordingPublicationPort()
+	publication, err := NewPublication(1, publicationPort)
+	require.NoError(t, err)
+	require.NoError(t, controller.Bind(&mutations, publication))
+	require.NoError(t, controller.Activate())
+
+	withdrawErr := errors.New("withdraw failed")
+	publicationPort.withdrawErr = withdrawErr
+	available = true
+	err = controller.ReconcileModule(context.Background(), "module")
+	require.ErrorIs(t, err, withdrawErr)
+	require.EqualValues(t, 2, constructions)
+	require.Zero(t, predecessor.cleanupCount())
+	require.EqualValues(t, 1, successor.cleanupCount())
+
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID: "predecessor-restored", Route: "module:always",
+	})
+	require.NoError(t, err)
+	require.True(t, decision.Lease.Valid())
+	cleanup, err := catalog.ReleaseInvocation(decision.Lease)
+	require.NoError(t, err)
+	require.False(t, cleanup.Ref.Valid())
+
+	require.NoError(t, catalog.BeginClose())
+	for {
+		cleanups, more, err := catalog.CloseStep(jobmgr.MaximumFunctionCloseQuantum)
+		require.NoError(t, err)
+		for _, cleanup := range cleanups {
+			runCleanupPlan(t, catalog, cleanup)
+		}
+		if !more {
+			break
+		}
+	}
+	require.EqualValues(t, 1, predecessor.cleanupCount())
+	require.EqualValues(t, 1, successor.cleanupCount())
+}
+
 func TestFunctionControllerRawRequestFidelity(t *testing.T) {
 	handler := &controllerTestHandler{}
 	modules := collectorapi.Registry{
@@ -413,13 +475,11 @@ func (ctmp *controllerTestMutationPort) CommitFunctions(
 		return 0, err
 	}
 	for {
-		var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-		progress, count, err := ctmp.catalog.AdvanceMutation(jobmgr.MaximumFunctionMutationQuantum, &cleanups)
+		progress, cleanups, err := ctmp.catalog.AdvanceMutation(jobmgr.MaximumFunctionMutationQuantum)
 		if err != nil {
 			return 0, err
 		}
-		for index := range count {
-			cleanup := cleanups[index]
+		for _, cleanup := range cleanups {
 			_, cleanupErr := cleanup.Work(context.Background())
 			if err := ctmp.catalog.CompleteCleanup(cleanup.Ref); err != nil {
 				return 0, errors.Join(cleanupErr, err)
@@ -438,22 +498,7 @@ func (ctmp *controllerTestMutationPort) AbortFunctions(
 	if ctmp == nil || ctmp.catalog == nil {
 		return errors.New("nil mutation port")
 	}
-	if err := ctmp.catalog.ResumeMutation(mutation); err != nil {
-		return err
-	}
-	var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-	count, err := ctmp.catalog.AbortMutation(&cleanups)
-	if err != nil {
-		return err
-	}
-	for index := range count {
-		cleanup := cleanups[index]
-		_, cleanupErr := cleanup.Work(context.Background())
-		if err := ctmp.catalog.CompleteCleanup(cleanup.Ref); err != nil {
-			return errors.Join(cleanupErr, err)
-		}
-	}
-	return nil
+	return ctmp.catalog.AbortMutation(mutation)
 }
 
 type controllerTestJob struct {

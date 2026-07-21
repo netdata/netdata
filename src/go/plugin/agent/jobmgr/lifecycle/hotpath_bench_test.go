@@ -99,6 +99,88 @@ func BenchmarkBTaskSupervisorEnqueueCancel(b *testing.B) {
 	}
 }
 
+func BenchmarkBLongLivedPermitLifecycle(b *testing.B) {
+	frame, err := NewFrameOwner(io.Discard)
+	if err != nil {
+		require.FailNow(b, "benchmark failed", err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		require.FailNow(b, "benchmark failed", err)
+	}
+	admission := NewAdmissionLedger()
+	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
+	plan := NewJobLongLivedPlan()
+	var grants [4]AdmissionGrant
+	var generation uint64
+	b.ReportAllocs()
+	for b.Loop() {
+		generation++
+		request := admission.RequestOrdinary(1, lane, 1)
+		if request.Rejected != nil {
+			require.FailNow(b, "benchmark failed", request.Rejected)
+		}
+		count, _, err := admission.TakeGrants(1, &grants)
+		if err != nil || count != 1 {
+			require.FailNowf(b, "benchmark failed", "grant count=%d err=%v", count, err)
+		}
+		permit, err := supervisor.IssueLongLivedPermit(
+			admission,
+			request.Ref,
+			ResourceIdentity{ID: "job", Generation: generation},
+			plan,
+		)
+		if err != nil {
+			require.FailNow(b, "benchmark failed", err)
+		}
+		if err := permit.AbortUnused(); err != nil {
+			require.FailNow(b, "benchmark failed", err)
+		}
+		if _, err := admission.ReleaseOrdinary(request.Ref); err != nil {
+			require.FailNow(b, "benchmark failed", err)
+		}
+	}
+}
+
+func BenchmarkBInheritedTaskLifecycle(b *testing.B) {
+	frame, err := NewFrameOwner(io.Discard)
+	if err != nil {
+		require.FailNow(b, "benchmark failed", err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		require.FailNow(b, "benchmark failed", err)
+	}
+	var generation uint64
+	b.ReportAllocs()
+	for b.Loop() {
+		generation++
+		owner := ResourceIdentity{ID: "job", Generation: generation}
+		ref, err := supervisor.StartInherited(
+			context.Background(),
+			owner,
+			InheritedV1Runtime,
+			func(ctx context.Context) error {
+				<-ctx.Done()
+				return nil
+			},
+		)
+		if err != nil {
+			require.FailNow(b, "benchmark failed", err)
+		}
+		if err := supervisor.CancelInherited(ref, owner); err != nil {
+			require.FailNow(b, "benchmark failed", err)
+		}
+		joined, err := supervisor.JoinInherited(context.Background(), ref, owner)
+		if err != nil || !joined {
+			require.FailNowf(b, "benchmark failed", "joined=%v err=%v", joined, err)
+		}
+		if err := supervisor.ReleaseInherited(ref, owner); err != nil {
+			require.FailNow(b, "benchmark failed", err)
+		}
+	}
+}
+
 func BenchmarkBTaskSupervisorDispatch(b *testing.B) {
 	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {

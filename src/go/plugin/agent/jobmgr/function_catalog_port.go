@@ -11,10 +11,8 @@ import (
 )
 
 const (
-	MaximumFunctionMutationChanges = 256
 	MaximumFunctionMutationQuantum = 64
 	MaximumFunctionCloseQuantum    = 32
-	MaximumFunctionCleanupBatch    = MaximumFunctionMutationChanges
 )
 
 // FunctionLookup is the bounded immutable input to one loop-owned Function
@@ -65,11 +63,9 @@ type FunctionCatalogMutation interface {
 }
 
 type FunctionCatalogMutationProgress struct {
-	CompletedNodes int    // mutation nodes applied so far
-	TotalNodes     int    // total nodes in the mutation
-	Version        uint64 // catalog version the mutation targets
-	Quiesced       bool   // no mutation work is in flight
-	Done           bool   // the mutation has fully completed
+	Version  uint64 // catalog version the mutation targets
+	Quiesced bool   // predecessor admission is closed
+	Done     bool   // the mutation has fully completed
 }
 
 type FunctionCatalogCensus struct {
@@ -143,10 +139,10 @@ type FunctionCatalogPort interface {
 	BeginMutation(FunctionCatalogMutation) error
 	AdvanceMutationQuiesce(int) (FunctionCatalogMutationProgress, error)
 	ResumeMutation(FunctionCatalogMutation) error
-	AdvanceMutation(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (FunctionCatalogMutationProgress, int, error)
-	AbortMutation(*[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (int, error)
+	AdvanceMutation(int) (FunctionCatalogMutationProgress, []FunctionCleanupPlan, error)
+	AbortMutation(FunctionCatalogMutation) error
 	BeginClose() error
-	CloseStep(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (int, bool, error)
+	CloseStep(int) ([]FunctionCleanupPlan, bool, error)
 	LifecycleCensus() FunctionCatalogCensus
 }
 

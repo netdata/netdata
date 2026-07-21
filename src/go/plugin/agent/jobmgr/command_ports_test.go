@@ -101,13 +101,12 @@ func TestRequestValidate(t *testing.T) {
 			}(),
 			wantErr: true,
 		},
-		"too many arguments": {
+		"arguments beyond former count limit": {
 			request: func() Request {
 				request := valid
-				request.Args = make([]string, maximumRequestArguments+1)
+				request.Args = make([]string, 1_025)
 				return request
 			}(),
-			wantErr: true,
 		},
 		"oversized arguments": {
 			request: func() Request {

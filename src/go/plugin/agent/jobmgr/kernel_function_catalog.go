@@ -16,23 +16,17 @@ func (ck *CommandKernel) releaseFunctionInvocation(ref FunctionInvocationRef) er
 	return ck.functionCleanupBacklog.push(cleanup)
 }
 
-func (ck *CommandKernel) pushFunctionCleanupBatch(cleanups *[MaximumFunctionCleanupBatch]FunctionCleanupPlan, count int) error {
-	if cleanups == nil || count < 0 || count > len(cleanups) {
-		return errors.New("jobmgr kernel: invalid Function cleanup batch")
-	}
-	for index := range count {
-		if err := ck.functionCleanupBacklog.push(cleanups[index]); err != nil {
+func (ck *CommandKernel) pushFunctionCleanupBatch(cleanups []FunctionCleanupPlan) error {
+	for _, cleanup := range cleanups {
+		if err := ck.functionCleanupBacklog.push(cleanup); err != nil {
 			return err
 		}
-		cleanups[index] = FunctionCleanupPlan{}
 	}
 	return nil
 }
 
-func (ck *CommandKernel) abortMutationCleanups() error {
-	var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-	count, abortErr := ck.functionCatalog.AbortMutation(&cleanups)
-	return errors.Join(abortErr, ck.pushFunctionCleanupBatch(&cleanups, count))
+func (ck *CommandKernel) abortFunctionMutation(mutation FunctionCatalogMutation) error {
+	return ck.functionCatalog.AbortMutation(mutation)
 }
 
 func (ck *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
@@ -129,13 +123,7 @@ func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmiss
 			}
 			return
 		}
-		if err := ck.functionCatalog.ResumeMutation(
-			submitted.mutation,
-		); err != nil {
-			submitted.result <- functionMutationResult{err: err}
-			return
-		}
-		abortErr := ck.abortMutationCleanups()
+		abortErr := ck.abortFunctionMutation(submitted.mutation)
 		submitted.result <- functionMutationResult{
 			err: abortErr,
 		}
@@ -159,7 +147,7 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 			quantum,
 		)
 		if err != nil {
-			abortErr := ck.abortMutationCleanups()
+			abortErr := ck.abortFunctionMutation(ck.functionMutation.mutation)
 			ck.functionMutation.result <- functionMutationResult{
 				err: errors.Join(err, abortErr),
 			}
@@ -185,7 +173,7 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 		invariantErr := errors.New(
 			"jobmgr kernel: invalid active Function mutation",
 		)
-		abortErr := ck.abortMutationCleanups()
+		abortErr := ck.abortFunctionMutation(ck.functionMutation.mutation)
 		ck.functionMutation.result <- functionMutationResult{
 			err: errors.Join(invariantErr, abortErr),
 		}
@@ -194,10 +182,9 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 		ck.run.Dirty(errors.Join(invariantErr, abortErr))
 		return false
 	}
-	var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-	progress, count, err := ck.functionCatalog.AdvanceMutation(quantum, &cleanups)
+	progress, cleanups, err := ck.functionCatalog.AdvanceMutation(quantum)
 	if err != nil {
-		abortErr := ck.abortMutationCleanups()
+		abortErr := ck.abortFunctionMutation(ck.functionMutation.mutation)
 		ck.functionMutation.result <- functionMutationResult{err: errors.Join(err, abortErr)}
 		ck.functionMutation = functionMutationSubmission{}
 		ck.functionMutationActive = false
@@ -206,7 +193,7 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 		}
 		return false
 	}
-	if err := ck.pushFunctionCleanupBatch(&cleanups, count); err != nil {
+	if err := ck.pushFunctionCleanupBatch(cleanups); err != nil {
 		ck.functionMutation.result <- functionMutationResult{err: err}
 		ck.functionMutation = functionMutationSubmission{}
 		ck.functionMutationActive = false
@@ -237,13 +224,12 @@ func (ck *CommandKernel) serviceFunctionCatalogClose(quantum int) bool {
 	if !ck.functionCatalogCloseMore {
 		return false
 	}
-	var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
-	count, more, err := ck.functionCatalog.CloseStep(quantum, &cleanups)
+	cleanups, more, err := ck.functionCatalog.CloseStep(quantum)
 	if err != nil {
 		ck.run.Dirty(err)
 		return false
 	}
-	if err := ck.pushFunctionCleanupBatch(&cleanups, count); err != nil {
+	if err := ck.pushFunctionCleanupBatch(cleanups); err != nil {
 		ck.run.Dirty(err)
 		return false
 	}
