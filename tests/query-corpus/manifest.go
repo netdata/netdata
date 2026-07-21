@@ -122,8 +122,8 @@ var manifest = map[string]ManifestCase{
 		Agent:  Green, FixedBy: "#23127",
 	},
 	"CASE-016/fresh-host-forgotten-on-restart": {
-		Proves: "a child first connected < one metadata scan cycle (5s) before a graceful restart is forgotten: pending host metadata is not flushed at shutdown (sqlite_metadata.c metasync shutdown path), host 404s after boot, dbengine data orphaned",
-		Agent:  Red,
+		Proves: "a child first connected < one metadata scan cycle (5s) before a graceful restart SURVIVES it: the metasync shutdown path now runs a final host scan, so the fresh host's metadata reaches sqlite regardless of scan phase (was: forgotten — host 404 after boot, dbengine data orphaned)",
+		Agent:  Green, FixedBy: "#23120",
 	},
 	"L3/families": {
 		Proves: "every registry time_group equals its Go oracle over the mixed palette at group 10 (all-gap bucket, anomaly run, reset): average/sum/min/max, extremes, stddev/cv (Welford, sample variance, single-value=0), median + trimmed-median (value-range trim + R-7 quantile), percentile/trimmed-mean (slot-window means with fractional interpolation), ses/des (running state across buckets), incremental-sum (carry), countif (options grammar)",
