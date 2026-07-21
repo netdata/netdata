@@ -31,7 +31,7 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | L2/tier2 | second-level rollup (3600s windows) over replicated history incl. gap run; tier1 cross-checked on identical data | green | n/a | |
 | L2/update-every-sweep | ue {10,30,60,600,3600}: tier0 identity, tier1 windows on the scaled grid, time-group buckets in both grid modes (absolute-aligned + unaligned); v1 rate contract at ue=10 | green | n/a | |
 | CASE-017/tier-boundary-absorption | tier>0 first bucket keeps out the tier point ending exactly at `after` (was: absorbed pre-window data); tier0 control clean | green | n/a | #23127 |
-| CASE-016/fresh-host-forgotten-on-restart | child connected <5s before a graceful restart is forgotten (pending host metadata never flushed at shutdown); its dbengine data orphaned | **red** | n/a | |
+| CASE-016/fresh-host-forgotten-on-restart | child connected <5s before a graceful restart SURVIVES it — the metasync shutdown now flushes pending host metadata regardless of scan phase (was: forgotten, data orphaned) | green | n/a | #23120 |
 | L3/families | every time_group equals its Go oracle over the mixed palette at group 10 (incl. stddev/cv Welford, median value-range trim + R-7, percentile/trimmed-mean slot-window means, ses/des running state, incremental-sum carry, countif grammar) | green | n/a | |
 | L3/sign-semantics | percentile/trimmed-mean top-walk on negative buckets; extremes champions by abs; all-negative + mixed fixtures | green | n/a | |
 | L3/sparse-buckets | single-value buckets: stddev 0.0, pass-through families, incremental-sum all null (pinned contract) | green | n/a | |
