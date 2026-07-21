@@ -11,15 +11,6 @@ type Handler func(context.Context, Function)
 // Job Manager and service discovery use it to publish handlers without owning
 // ingress or invocation lifecycle.
 type Registry interface {
-	Register(name string, fn func(Function))
-	Unregister(name string)
 	RegisterPrefix(name, prefix string, fn func(Function))
 	UnregisterPrefix(name string, prefix string)
-}
-
-// ContextRegistry is implemented by registries that pass request cancellation
-// directly to Function handlers.
-type ContextRegistry interface {
-	RegisterWithContext(name string, fn Handler)
-	RegisterPrefixWithContext(name, prefix string, fn Handler)
 }

@@ -307,14 +307,6 @@ func mergeJSONArrays(aRaw, bRaw json.RawMessage) (json.RawMessage, error) {
 	return bs, nil
 }
 
-func NewDiscovererPayload(typ string, cfg any) (DiscovererPayload, error) {
-	bs, err := json.Marshal(cfg)
-	if err != nil {
-		return DiscovererPayload{}, err
-	}
-	return DiscovererPayload{Kind: typ, Config: bs}, nil
-}
-
 // MarshalYAML implements yaml.Marshaler.
 // It only marshals the canonical format, not legacy fields.
 func (c Config) MarshalYAML() (any, error) {

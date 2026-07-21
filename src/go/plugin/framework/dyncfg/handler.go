@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -70,44 +69,6 @@ type RetryableError interface {
 func IsRetryableError(err error) bool {
 	var re RetryableError
 	return errors.As(err, &re) && re.DyncfgRetryable()
-}
-
-// commandMessageBox carries a command's success/warning message from its
-// effect to its commit. One box exists per command invocation and rides the
-// effect contexts, so concurrent commands can never cross-attribute
-// messages; the mutex covers the effect-goroutine write vs the commit read.
-type commandMessageBox struct {
-	mu  sync.Mutex
-	msg string
-}
-
-func (b *commandMessageBox) set(msg string) {
-	b.mu.Lock()
-	b.msg = msg
-	b.mu.Unlock()
-}
-
-func (b *commandMessageBox) take() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	msg := strings.TrimSpace(b.msg)
-	b.msg = ""
-	return msg
-}
-
-type commandMessageKey struct{}
-
-func withCommandMessage(ctx context.Context, box *commandMessageBox) context.Context {
-	return context.WithValue(ctx, commandMessageKey{}, box)
-}
-
-// SetCommandMessage records a success/warning message for the running
-// command; the commit emits it in the terminal response. No-op outside a
-// command effect.
-func SetCommandMessage(ctx context.Context, msg string) {
-	if box, ok := ctx.Value(commandMessageKey{}).(*commandMessageBox); ok {
-		box.set(msg)
-	}
 }
 
 // HandlerOpts configures the handler with component-specific settings.
@@ -735,9 +696,8 @@ func (h *Handler[C]) cmdEnable(fn Function, run StepRunner) {
 		return
 	}
 
-	box := &commandMessageBox{}
 	run(func(ctx context.Context) error {
-		return h.cb.Start(withCommandMessage(ctx, box), entry.Cfg)
+		return h.cb.Start(ctx, entry.Cfg)
 	}, func(err error) {
 		if errors.Is(err, ErrPhaseNeverRan) {
 			// The start never executed (shutdown): the config is untouched -
@@ -770,7 +730,7 @@ func (h *Handler[C]) cmdEnable(fn Function, run StepRunner) {
 		}
 
 		entry.Status = StatusRunning
-		h.api.SendCodef(fn, 200, "%s", box.take())
+		h.api.SendCodef(fn, 200, "")
 		h.NotifyConfigStatus(entry.Cfg, StatusRunning)
 		h.cb.OnStatusChange(entry, oldStatus, fn)
 	})
@@ -803,10 +763,9 @@ func (h *Handler[C]) cmdDisable(fn Function, run StepRunner) {
 	}
 
 	// Unconditional for all non-Disabled statuses.
-	box := &commandMessageBox{}
 	staged := h.stagedStopFor(entry.Cfg)
 	run(func(ctx context.Context) error {
-		staged.Wait(withCommandMessage(ctx, box))
+		staged.Wait(ctx)
 		return nil
 	}, func(stopErr error) {
 		if errors.Is(stopErr, ErrPhaseNeverRan) {
@@ -824,7 +783,7 @@ func (h *Handler[C]) cmdDisable(fn Function, run StepRunner) {
 			return
 		}
 		entry.Status = StatusDisabled
-		h.api.SendCodef(fn, 200, "%s", box.take())
+		h.api.SendCodef(fn, 200, "")
 		h.NotifyConfigStatus(entry.Cfg, StatusDisabled)
 		h.cb.OnStatusChange(entry, oldStatus, fn)
 	})
@@ -970,10 +929,9 @@ func (h *Handler[C]) cmdRemove(fn Function, run StepRunner) {
 	// Cache removal precedes the blocking stop (remove-before-block).
 	h.seen.Remove(entry.Cfg)
 	h.exposed.Remove(entry.Cfg)
-	box := &commandMessageBox{}
 	staged := h.stagedStopFor(entry.Cfg)
 	run(func(ctx context.Context) error {
-		staged.Wait(withCommandMessage(ctx, box))
+		staged.Wait(ctx)
 		return nil
 	}, func(stopErr error) {
 		if errors.Is(stopErr, ErrPhaseNeverRan) {
@@ -998,7 +956,7 @@ func (h *Handler[C]) cmdRemove(fn Function, run StepRunner) {
 			h.cb.OnStatusChange(entry, oldStatus, fn)
 			return
 		}
-		h.api.SendCodef(fn, 200, "%s", box.take())
+		h.api.SendCodef(fn, 200, "")
 		h.NotifyConfigRemove(entry.Cfg)
 	})
 }
@@ -1015,11 +973,10 @@ func (h *Handler[C]) cmdUpdate(fn Function, run StepRunner) {
 		return
 	}
 
-	box := &commandMessageBox{}
 	var newCfg C
 	run(func(ctx context.Context) error {
 		var err error
-		newCfg, err = h.cb.ParseAndValidate(withCommandMessage(ctx, box), fn, name)
+		newCfg, err = h.cb.ParseAndValidate(ctx, fn, name)
 		return err
 	}, func(err error) {
 		if errors.Is(err, ErrPhaseNeverRan) {
@@ -1067,7 +1024,7 @@ func (h *Handler[C]) cmdUpdate(fn Function, run StepRunner) {
 				if isConversion {
 					h.NotifyConfigCreate(newCfg, StatusDisabled)
 				}
-				h.api.SendCodef(fn, 200, "%s", box.take())
+				h.api.SendCodef(fn, 200, "")
 				h.NotifyConfigStatus(newCfg, StatusDisabled)
 				h.cb.OnStatusChange(newEntry, oldStatus, fn)
 				return
@@ -1083,9 +1040,7 @@ func (h *Handler[C]) cmdUpdate(fn Function, run StepRunner) {
 				upd := h.stagedUpdateFor(oldCfg, newCfg)
 				effect, undo = upd.Run, upd.Undo
 			}
-			run(func(ctx context.Context) error {
-				return effect(withCommandMessage(ctx, box))
-			}, func(err error) {
+			run(effect, func(err error) {
 				if errors.Is(err, ErrPhaseNeverRan) {
 					// The update was interrupted by shutdown: roll back to the
 					// old cache state and answer retryably, publishing nothing
@@ -1132,7 +1087,7 @@ func (h *Handler[C]) cmdUpdate(fn Function, run StepRunner) {
 				if isConversion {
 					h.NotifyConfigCreate(newCfg, StatusRunning)
 				}
-				h.api.SendCodef(fn, 200, "%s", box.take())
+				h.api.SendCodef(fn, 200, "")
 				h.NotifyConfigStatus(newCfg, StatusRunning)
 				h.cb.OnStatusChange(newEntry, oldStatus, fn)
 			})
@@ -1142,7 +1097,7 @@ func (h *Handler[C]) cmdUpdate(fn Function, run StepRunner) {
 		if isConversion {
 			staged := h.stagedStopFor(oldCfg)
 			run(func(ctx context.Context) error {
-				staged.Wait(withCommandMessage(ctx, box))
+				staged.Wait(ctx)
 				return nil
 			}, func(stopErr error) {
 				if errors.Is(stopErr, ErrPhaseNeverRan) {

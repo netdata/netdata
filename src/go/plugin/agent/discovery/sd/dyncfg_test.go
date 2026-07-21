@@ -35,11 +35,11 @@ func defaultTestServices() []pipeline.ServiceRuleConfig {
 }
 
 func mustDiscovererPayload(typ string, cfg any) pipeline.DiscovererPayload {
-	p, err := pipeline.NewDiscovererPayload(typ, cfg)
+	payload, err := json.Marshal(cfg)
 	if err != nil {
 		panic(err)
 	}
-	return p
+	return pipeline.DiscovererPayload{Kind: typ, Config: payload}
 }
 
 func newTestNetListenersConfig(name string, interval confopt.LongDuration, timeout confopt.Duration, services []pipeline.ServiceRuleConfig) pipeline.Config {

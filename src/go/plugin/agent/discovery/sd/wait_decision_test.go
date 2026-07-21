@@ -180,8 +180,6 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 
 type waitTestFunctionRegistry struct{}
 
-func (waitTestFunctionRegistry) Register(string, func(functions.Function))               {}
-func (waitTestFunctionRegistry) Unregister(string)                                       {}
 func (waitTestFunctionRegistry) RegisterPrefix(string, string, func(functions.Function)) {}
 func (waitTestFunctionRegistry) UnregisterPrefix(string, string)                         {}
 

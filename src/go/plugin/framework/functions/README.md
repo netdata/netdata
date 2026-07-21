@@ -8,12 +8,13 @@ dispatcher, worker pool, scheduler, invocation ledger, or runtime component.
 
 - `Function` is the compatibility value used by framework registries and
   handlers.
-- `Registry` and `ContextRegistry` publish and withdraw Function handlers.
+- `Registry` publishes and withdraws prefix Function handlers for service
+  discovery.
 - `InputCapsule` is the process-fixed bounded parser for `FUNCTION`,
   `FUNCTION_PAYLOAD`, `FUNCTION_CANCEL`, and `QUIT` input.
 - `Consumer` receives immutable parsed calls and control events.
 - `TerminalFinalizer` is the terminal-response callback contract.
-- `BuildJSONPayload` and `SplitFunctionName` are passive helpers.
+- `BuildJSONPayload` is a passive helper.
 
 The active Job Manager generation owns routing, UID admission, cancellation,
 deadlines, ordering, task execution, terminal-once behavior, and runtime

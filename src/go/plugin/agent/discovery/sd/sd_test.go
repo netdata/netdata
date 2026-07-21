@@ -112,10 +112,9 @@ func TestServiceDiscovery_UnsupportedDiscovererConfigIsIgnored(t *testing.T) {
 }
 
 func prepareConfigFile(source, name string) confFile {
-	disc, _ := pipeline.NewDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{})
 	cfg := pipeline.Config{
 		Name:       name,
-		Discoverer: disc,
+		Discoverer: mustDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{}),
 		Services:   defaultTestServices(),
 	}
 	bs, _ := yaml.Marshal(cfg)
@@ -127,10 +126,9 @@ func prepareConfigFile(source, name string) confFile {
 }
 
 func prepareUnsupportedDiscovererConfigFile(source, name string) confFile {
-	disc, _ := pipeline.NewDiscovererPayload("unsupported", map[string]any{})
 	cfg := pipeline.Config{
 		Name:       name,
-		Discoverer: disc,
+		Discoverer: mustDiscovererPayload("unsupported", map[string]any{}),
 		Services:   defaultTestServices(),
 	}
 	bs, _ := yaml.Marshal(cfg)
@@ -142,9 +140,8 @@ func prepareUnsupportedDiscovererConfigFile(source, name string) confFile {
 }
 
 func prepareUnnamedConfigFile(source string) confFile {
-	disc, _ := pipeline.NewDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{})
 	cfg := pipeline.Config{
-		Discoverer: disc,
+		Discoverer: mustDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{}),
 		Services:   defaultTestServices(),
 	}
 	bs, _ := yaml.Marshal(cfg)
@@ -162,11 +159,10 @@ func prepareEmptyConfigFile(source string) confFile {
 }
 
 func prepareDisabledConfigFile(source, name string) confFile {
-	disc, _ := pipeline.NewDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{})
 	cfg := pipeline.Config{
 		Name:       name,
 		Disabled:   true,
-		Discoverer: disc,
+		Discoverer: mustDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{}),
 		Services:   defaultTestServices(),
 	}
 	bs, _ := yaml.Marshal(cfg)
@@ -178,9 +174,8 @@ func prepareDisabledConfigFile(source, name string) confFile {
 }
 
 func prepareInvalidConfigFile(source string) confFile {
-	disc, _ := pipeline.NewDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{})
 	cfg := pipeline.Config{
-		Discoverer: disc,
+		Discoverer: mustDiscovererPayload(testDiscovererTypeNetListeners, testNetListenersConfig{}),
 	}
 	bs, _ := yaml.Marshal(cfg)
 

@@ -52,51 +52,6 @@ func (sdb *serviceDiscoveryBinding) prefix() string {
 	return sdb.pluginName + ":sd:"
 }
 
-func (sdb *serviceDiscoveryBinding) Register(
-	name string,
-	fn func(frameworkfunctions.Function),
-) {
-	if fn == nil {
-		sdb.recordRegistrationError(
-			errors.New("nil exact service discovery Function"),
-		)
-		return
-	}
-	sdb.recordRegistrationError(
-		fmt.Errorf(
-			"unexpected exact service discovery Function registration %q",
-			name,
-		),
-	)
-}
-
-func (sdb *serviceDiscoveryBinding) Unregister(name string) {
-	sdb.recordRegistrationError(
-		fmt.Errorf(
-			"unexpected exact service discovery Function withdrawal %q",
-			name,
-		),
-	)
-}
-
-func (sdb *serviceDiscoveryBinding) RegisterWithContext(
-	name string,
-	fn frameworkfunctions.Handler,
-) {
-	if fn == nil {
-		sdb.recordRegistrationError(
-			errors.New("nil exact service discovery Function"),
-		)
-		return
-	}
-	sdb.recordRegistrationError(
-		fmt.Errorf(
-			"unexpected exact service discovery Function registration %q",
-			name,
-		),
-	)
-}
-
 func (sdb *serviceDiscoveryBinding) RegisterPrefix(
 	name string,
 	prefix string,
@@ -108,7 +63,7 @@ func (sdb *serviceDiscoveryBinding) RegisterPrefix(
 		)
 		return
 	}
-	sdb.registerPrefixWithContext(
+	sdb.registerPrefix(
 		name,
 		prefix,
 		func(_ context.Context, input frameworkfunctions.Function) {
@@ -117,15 +72,7 @@ func (sdb *serviceDiscoveryBinding) RegisterPrefix(
 	)
 }
 
-func (sdb *serviceDiscoveryBinding) RegisterPrefixWithContext(
-	name string,
-	prefix string,
-	fn frameworkfunctions.Handler,
-) {
-	sdb.registerPrefixWithContext(name, prefix, fn)
-}
-
-func (sdb *serviceDiscoveryBinding) registerPrefixWithContext(
+func (sdb *serviceDiscoveryBinding) registerPrefix(
 	name string,
 	prefix string,
 	fn frameworkfunctions.Handler,
@@ -294,7 +241,4 @@ func newServiceDiscoveryInitialRoute(
 	}, nil
 }
 
-var (
-	_ frameworkfunctions.Registry        = (*serviceDiscoveryBinding)(nil)
-	_ frameworkfunctions.ContextRegistry = (*serviceDiscoveryBinding)(nil)
-)
+var _ frameworkfunctions.Registry = (*serviceDiscoveryBinding)(nil)
