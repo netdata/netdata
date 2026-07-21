@@ -259,8 +259,8 @@ func (d *Daemon) Restart() error {
 // instead of hanging it until the go test framework panics.
 var queryClient = &http.Client{Timeout: 30 * time.Second}
 
-// getJSON performs a bounded GET and parses the JSON response.
-func getJSON(u string) (map[string]any, error) {
+// getRawBody performs a bounded GET and returns the raw response body.
+func getRawBody(u string) ([]byte, error) {
 	resp, err := queryClient.Get(u)
 	if err != nil {
 		return nil, fmt.Errorf("daemon: GET %s: %w", u, err)
@@ -273,6 +273,15 @@ func getJSON(u string) (map[string]any, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("daemon: GET %s: HTTP %d: %s", u, resp.StatusCode, body)
 	}
+	return body, nil
+}
+
+// getJSON performs a bounded GET and parses the JSON response.
+func getJSON(u string) (map[string]any, error) {
+	body, err := getRawBody(u)
+	if err != nil {
+		return nil, err
+	}
 	var doc map[string]any
 	if err := json.Unmarshal(body, &doc); err != nil {
 		return nil, fmt.Errorf("daemon: parse %s: %w (body %q)", u, err, truncate(body, 300))
@@ -284,20 +293,8 @@ func getJSON(u string) (map[string]any, error) {
 // body — the classic formatter surface (csv, tsv, ssv, html, arrays…)
 // asserted byte-level by the formatter layer.
 func (d *Daemon) DataV1Raw(host string, params url.Values) (string, error) {
-	u := fmt.Sprintf("%s/host/%s/api/v1/data?%s", d.BaseURL, url.PathEscape(host), params.Encode())
-	resp, err := queryClient.Get(u)
-	if err != nil {
-		return "", fmt.Errorf("daemon: GET %s: %w", u, err)
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("daemon: read %s: %w", u, err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("daemon: GET %s: HTTP %d: %s", u, resp.StatusCode, body)
-	}
-	return string(body), nil
+	body, err := getRawBody(fmt.Sprintf("%s/host/%s/api/v1/data?%s", d.BaseURL, url.PathEscape(host), params.Encode()))
+	return string(body), err
 }
 
 // DataV3All queries /api/v3/data (all nodes of the agent) with the given

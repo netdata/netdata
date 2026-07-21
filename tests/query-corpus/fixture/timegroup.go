@@ -446,13 +446,11 @@ func parseCountifOptions(options string) (cmp string, target float64) {
 		} else {
 			s = s[1:]
 		}
-	case ':':
-		cmp = "=="
-		s = s[1:]
 	default:
-		// bare number: tg_countif_create's post-switch advance consumes
-		// one char even when no operator matched, so the first digit is
-		// swallowed ("40" targets 0, "440" targets 40) — pinned quirk
+		// ':' compares EQUAL; for a bare number tg_countif_create's
+		// post-switch advance consumes one char even though no operator
+		// matched, so the first digit is swallowed ("40" targets 0,
+		// "440" targets 40) — pinned quirk. Both paths skip one char.
 		cmp = "=="
 		s = s[1:]
 	}

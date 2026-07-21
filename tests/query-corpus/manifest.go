@@ -49,6 +49,18 @@ var manifest = map[string]ManifestCase{
 		Proves: "fixtures survive daemon restart byte-identical (journal-v2 read path)",
 		Agent:  Green,
 	},
+	"CASE-015/live-disconnect-discard": {
+		Proves: "receiver drains delivered live data before honoring HUP: a child disconnecting right after writing loses nothing (was: up to the whole burst discarded)",
+		Agent:  Green, FixedBy: "#23118",
+	},
+	"CASE-015/replication-disconnect-discard": {
+		Proves: "same drain guarantee on the replication path: a child disconnecting after its final REND loses nothing",
+		Agent:  Green, FixedBy: "#23118",
+	},
+	"CASE-015/robustness": {
+		Proves: "receiver teardown with queued replies to a dead child stays crash-free: mid-dialogue disconnect and a 30-cycle disconnect soak",
+		Agent:  Green,
+	},
 	"L1/palette": {
 		Proves: "tier0 ingestion identity for the edge-data palette: complete, leading/interior-run gaps, trailing short retention, reset (AR and lone-R), anomaly runs, negatives, all-zero, update_every=5",
 		Agent:  Green,
@@ -69,8 +81,16 @@ var manifest = map[string]ManifestCase{
 		Proves: "the three gap-only dimension states per the #23095 working-as-intended ruling: live phantom retention, gone after restart, back on next iteration",
 		Agent:  Green, FixedBy: "ruling #23095",
 	},
+	"L1/incremental-rates": {
+		Proves: "the db stores PER-SECOND rates regardless of update_every: a v1 child's raw counters through the parent's rrdset_done yield K*(mul/div)/UE per second (incremental at ue 1/2/5 incl. mul/div scaling; absolute control unscaled)",
+		Agent:  Green,
+	},
 	"L1/resets-overflows": {
 		Proves: "parent rrdset_done reset/overflow arithmetic over the v1 wire: implausible backward step → zero increment + SN_FLAG_RESET; plausible 32-bit wrap reconstructs cap-relative delta — ONE LESS than the true modulo delta (cap 0xFFFFFFFF, pinned quirk, rulings batch); percentage-of-incremental-row pre-pass absorbs the reset (0% + RESET, survivors split 100%); a silence beyond the gap threshold resets the collection (no spike from the across-gap delta, no RESET, null gap rows); sub-second sample offsets BLEND adjacent sample rates across stored rows with exact mass conservation",
+		Agent:  Green,
+	},
+	"L1/off-grid-timestamps": {
+		Proves: "samples pushed OFF the absolute ue grid: STORAGE keeps the pushed timestamps exactly (retention proves it), while every VIEW re-grids to absolute ue multiples and serves boundary-INTERPOLATED values (envelope-pinned; the exact virtual-point oracle is layer-9 work)",
 		Agent:  Green,
 	},
 	"L2/tier1-palette": {
@@ -92,6 +112,18 @@ var manifest = map[string]ManifestCase{
 	"L2/tier2": {
 		Proves: "second-level rollup (granularity 3600) over replicated history incl. a gap run, with tier1 cross-checked on identical data across the gap boundary",
 		Agent:  Green,
+	},
+	"L2/update-every-sweep": {
+		Proves: "ue {10,30,60,600,3600} over the backdated v2 protocol: tier0 identity, tier1 windows on the scaled grid (gran = ue x 60, absolute alignment, partial counts, stored-empty family, fractional anomaly rates), time-group buckets in BOTH grid modes (default: bucket ends snap to absolute multiples of group x ue with `after` rounded UP; unaligned: grid anchored at `after`); paced v1 rate contract extended to ue=10",
+		Agent:  Green,
+	},
+	"CASE-017/tier-boundary-absorption": {
+		Proves: "a tier>0 query whose after equals a stored tier point end keeps that point out of the first bucket (was: absorbed, leaking pre-window data into (after, before] — the backward-expanded storage scan met the inclusive bucket-start check); tier0 control stays clean",
+		Agent:  Green, FixedBy: "#23127",
+	},
+	"CASE-016/fresh-host-forgotten-on-restart": {
+		Proves: "a child first connected < one metadata scan cycle (5s) before a graceful restart is forgotten: pending host metadata is not flushed at shutdown (sqlite_metadata.c metasync shutdown path), host 404s after boot, dbengine data orphaned",
+		Agent:  Red,
 	},
 	"L3/families": {
 		Proves: "every registry time_group equals its Go oracle over the mixed palette at group 10 (all-gap bucket, anomaly run, reset): average/sum/min/max, extremes, stddev/cv (Welford, sample variance, single-value=0), median + trimmed-median (value-range trim + R-7 quantile), percentile/trimmed-mean (slot-window means with fractional interpolation), ses/des (running state across buckets), incremental-sum (carry), countif (options grammar)",
@@ -117,9 +149,13 @@ var manifest = map[string]ManifestCase{
 		Proves: "options=anomaly-bit replaces fetched values with per-point anomaly rates BEFORE time-grouping: 0/100 at tier0 identity, buckets aggregate the rates (average = bucket anomaly %, max = any-anomaly), group-by consumes them as values (sum adds across members, gaps stamp PARTIAL), and tier>0 feeds FRACTIONAL window rates (100*anomaly_count/count)",
 		Agent:  Green,
 	},
-	"L5/anomaly-statistics": {
-		Proves: "jsonwrap-v2 per-dimension anomaly arrays: view.dimensions.sts.arp = mean of the plotted rows' anomaly rates, db.dimensions.sts.arp = anomaly rate of the fetched db points; stored NAN gap points are excluded from BOTH counts",
+	"L3/sum-over-time-volume": {
+		Proves: "time_group=sum has two modes: RATE-stored metrics (incremental) multiply each point by its duration — the sum is the VOLUME at any update_every; non-rate metrics sum plainly",
 		Agent:  Green,
+	},
+	"CASE-020/sum-over-time-units": {
+		Proves: "summing a rate over time produces a volume, but the response units keep the rate form — 'units/s' should become 'units' when time_group=sum integrates a rate",
+		Agent:  Red,
 	},
 	"L4/family-tier-matrix": {
 		Proves: "every grouping family over FORCED tier1 with 6 windows per bucket equals the fetch-aware oracle (min/max/sum fetch their tier fields, all else the per-window average — avg-of-averages pinned quantitatively with unequal counts); bucket anomaly rates from tier counts; window alignment rounds `before` UP to group multiples",
@@ -149,6 +185,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "per-group view statistics (D-B SETTLED, #23097 verified numerically): non-average aggregations average over view ROWS (mean plotted value, row-extreme min/max); AVERAGE keeps the weighted (pre-division sum, contributions) pair; raw keeps (sum, count) untouched for the cloud",
 		Agent:  Green, FixedBy: "#23097",
 	},
+	"L5/anomaly-statistics": {
+		Proves: "jsonwrap-v2 per-dimension anomaly arrays: view.dimensions.sts.arp = mean of the plotted rows' anomaly rates, db.dimensions.sts.arp = anomaly rate of the fetched db points; stored NAN gap points are excluded from BOTH counts",
+		Agent:  Green,
+	},
 	"L5/multi-key-group-by": {
 		Proves: "multi-key group_by: groups are attribute TUPLES, ids join in the FIXED engine order (dimension, instance, label, node, context, units) regardless of request order; instance drops @node when node is in the mask; selected and percentage-of-instance collapse rules; avg alias; unknown aggregation silently parses to average",
 		Agent:  Green,
@@ -175,46 +215,6 @@ var manifest = map[string]ManifestCase{
 	},
 	"L8/post-processing": {
 		Proves: "options=percentage (v2/v3 FORCE absolute with it — and with any non-dimension group-by: shares computed over |values|), options=absolute (|v| at fetch), nonzero (drops all-zero dims; self-neutralizes when everything is zero), null2zero (gap cells become 0), cardinality_limit (top N-1 by |view sum| + 'remaining X dimensions' fold of per-row sums)",
-		Agent:  Green,
-	},
-	"L1/incremental-rates": {
-		Proves: "the db stores PER-SECOND rates regardless of update_every: a v1 child's raw counters through the parent's rrdset_done yield K*(mul/div)/UE per second (incremental at ue 1/2/5 incl. mul/div scaling; absolute control unscaled)",
-		Agent:  Green,
-	},
-	"L3/sum-over-time-volume": {
-		Proves: "time_group=sum has two modes: RATE-stored metrics (incremental) multiply each point by its duration — the sum is the VOLUME at any update_every; non-rate metrics sum plainly",
-		Agent:  Green,
-	},
-	"CASE-020/sum-over-time-units": {
-		Proves: "summing a rate over time produces a volume, but the response units keep the rate form — 'units/s' should become 'units' when time_group=sum integrates a rate",
-		Agent:  Red,
-	},
-	"CASE-017/tier-boundary-absorption": {
-		Proves: "a tier>0 query whose after equals a stored tier point end keeps that point out of the first bucket (was: absorbed, leaking pre-window data into (after, before] — the backward-expanded storage scan met the inclusive bucket-start check); tier0 control stays clean",
-		Agent:  Green, FixedBy: "#23127",
-	},
-	"L2/update-every-sweep": {
-		Proves: "ue {10,30,60,600,3600} over the backdated v2 protocol: tier0 identity, tier1 windows on the scaled grid (gran = ue x 60, absolute alignment, partial counts, stored-empty family, fractional anomaly rates), time-group buckets in BOTH grid modes (default: bucket ends snap to absolute multiples of group x ue with `after` rounded UP; unaligned: grid anchored at `after`); paced v1 rate contract extended to ue=10",
-		Agent:  Green,
-	},
-	"L1/off-grid-timestamps": {
-		Proves: "samples pushed OFF the absolute ue grid: STORAGE keeps the pushed timestamps exactly (retention proves it), while every VIEW re-grids to absolute ue multiples and serves boundary-INTERPOLATED values (envelope-pinned; the exact virtual-point oracle is layer-9 work)",
-		Agent:  Green,
-	},
-	"CASE-016/fresh-host-forgotten-on-restart": {
-		Proves: "a child first connected < one metadata scan cycle (5s) before a graceful restart is forgotten: pending host metadata is not flushed at shutdown (sqlite_metadata.c metasync shutdown path), host 404s after boot, dbengine data orphaned",
-		Agent:  Red,
-	},
-	"CASE-015/live-disconnect-discard": {
-		Proves: "receiver drains delivered live data before honoring HUP: a child disconnecting right after writing loses nothing (was: up to the whole burst discarded)",
-		Agent:  Green, FixedBy: "#23118",
-	},
-	"CASE-015/replication-disconnect-discard": {
-		Proves: "same drain guarantee on the replication path: a child disconnecting after its final REND loses nothing",
-		Agent:  Green, FixedBy: "#23118",
-	},
-	"CASE-015/robustness": {
-		Proves: "receiver teardown with queued replies to a dead child stays crash-free: mid-dialogue disconnect and a 30-cycle disconnect soak",
 		Agent:  Green,
 	},
 }
