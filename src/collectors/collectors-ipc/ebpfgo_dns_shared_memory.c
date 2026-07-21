@@ -77,8 +77,8 @@ static bool netdata_ebpfgo_dns_shm_open(
 
     if (sem_name) {
         ctx->sem = sem_open(sem_name, 0);
-        /* SEM_FAILED is non-fatal: proceed without the semaphore and rely on
-         * the kernel's mmap visibility for reader/writer ordering. */
+        if (ctx->sem == SEM_FAILED)
+            goto fail;
     }
 
     return true;
@@ -123,7 +123,8 @@ bool netdata_ebpfgo_dns_shared_memory_refresh(
 
     if (ctx->sem == SEM_FAILED && sem_name) {
         ctx->sem = sem_open(sem_name, 0);
-        /* SEM_FAILED is non-fatal: subsequent calls treat the SHM as lock-free. */
+        if (ctx->sem == SEM_FAILED)
+            return false;
     }
 
     bool locked = false;
