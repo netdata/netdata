@@ -190,7 +190,7 @@ flowchart TD
 - **On-loop (exclusive to KernelLoop):** every lane, operation, deadline, claim
   transition, and counter. The loop is the sole mutator. A test
   (`architecture_test.go`) even pins that on-loop actions are dispatched through
-  exactly five kernel functions.
+  the sanctioned kernel ownership funnel.
 - **Off-loop:** the actual collector / Function / stop / cleanup work, run by
   `TaskSupervisor`. The loop and tasks talk only over channels.
 
@@ -485,10 +485,10 @@ The layering is enforced by `architecture_test.go`, not just convention:
   join adapters, break construction cycles, and own the process/run-generation
   split.
 
-`architecture_test.go` additionally pins the set of active packages, the named
-production owners, the single production construction chain, and that on-loop
-actions are dispatched only through the sanctioned kernel funnel. If you add or
-move an authority, that test is where the structure is asserted.
+`architecture_test.go` additionally checks the shipped-root/composition
+construction boundary and that on-loop actions are dispatched only through the
+sanctioned kernel funnel. Behavioral ownership guarantees belong in focused or
+black-box tests rather than an exact private-type or source-file manifest.
 
 ## Where To Change Things
 
@@ -508,9 +508,8 @@ move an authority, that test is where the structure is asserted.
   - `kernel*.go`, `claim_authority.go`, and `lifecycle/`.
 - Change how the process is assembled, reloaded, or shut down:
   - `composition/` (process, run, public).
-- Add or move an authority:
-  - update `architecture_test.go`'s owner and package manifests in the same
-    change.
+- Change a package dependency or production construction boundary:
+  - update the durable checks in `architecture_test.go` in the same change.
 
 ## Validation
 
