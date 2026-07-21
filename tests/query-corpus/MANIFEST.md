@@ -65,7 +65,7 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | API/fallbacks-and-limits | unknown v1 format → json; unknown weights method → ks2; cardinality_limit 2 folds five dims, >= dim count folds nothing | green | n/a | |
 | W/value | weights value = after-INCLUSIVE window average (121 pts/120s — ruling pending); rollups = mean of dims; timeframe stats exact; value never rank-normalizes | green | n/a | |
 | W/anomaly-rate-per-metric | per-metric anomaly-rate = true anomaly rates (anomaly bit applied); NONZERO default drops zero weights, explicit options keep them | green | n/a | |
-| W/anomaly-rate-multidim | anomaly-bit option = the working contract (true rates, what dashboards send); the BARE method is path-inconsistent (multi-dim returns value averages where per-metric/MCP force the bit) — ruling pending | green | n/a | |
+| W/anomaly-rate-multidim | method=anomaly-rate implies the anomaly bit on every path — bare method == explicit option, true rates everywhere (was: multi-dim ranked by value averages) | green | n/a | #23212 |
 | W/volume | volume = (hl-bl)/bl x fraction-of-time above/below baseline; equal-averages metrics skipped | green | n/a | |
 | W/ks2 | ks2 exact endpoints (identical diffs → 0, one-sided diffs → 1); spread_results_evenly rank normalization pinned via Go port; intermediate KS values deferred (KSfbar port) | green | n/a | |
 | L8/post-processing | percentage (implies absolute on v2/v3 — as does any non-dimension group-by), absolute, nonzero (+ self-neutralizing all-zero), null2zero, cardinality_limit fold | green | n/a | |
