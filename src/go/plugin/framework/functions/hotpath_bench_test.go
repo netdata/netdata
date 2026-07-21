@@ -12,10 +12,7 @@ func BenchmarkBFunctionIngress(b *testing.B) {
 		"QUIT\n"
 	b.ReportAllocs()
 	for b.Loop() {
-		capsule, err := NewInputCapsule(
-			strings.NewReader(input),
-			&immediateCapsuleBodyBudget{},
-		)
+		capsule, err := NewInputCapsule(strings.NewReader(input))
 		if err != nil {
 			b.Fatal(err)
 		}

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	functionwire "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,13 +38,11 @@ func TestRequestValidate(t *testing.T) {
 				return request
 			}(),
 		},
-		"reserved payload": {
+		"payload": {
 			request: func() Request {
 				request := valid
 				request.HasPayload = true
-				request.InputBodyToken = 1
-				request.Payload = make([]byte, 2, 8)
-				request.PayloadCapacity = 8
+				request.Payload = []byte("{}")
 				return request
 			}(),
 		},
@@ -69,7 +68,7 @@ func TestRequestValidate(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		"payload without reservation": {
+		"payload without presence marker": {
 			request: func() Request {
 				request := valid
 				request.Payload = []byte("{}")
@@ -77,13 +76,12 @@ func TestRequestValidate(t *testing.T) {
 			}(),
 			wantErr: true,
 		},
-		"retained payload capacity without reservation": {
+		"unused payload capacity": {
 			request: func() Request {
 				request := valid
 				request.Payload = make([]byte, 0, 8)
 				return request
 			}(),
-			wantErr: true,
 		},
 		"unsafe UID": {
 			request: func() Request {
@@ -140,13 +138,11 @@ func TestRequestValidate(t *testing.T) {
 			}(),
 			wantErr: true,
 		},
-		"reservation capacity mismatch": {
+		"oversized payload": {
 			request: func() Request {
 				request := valid
 				request.HasPayload = true
-				request.InputBodyToken = 1
-				request.Payload = make([]byte, 2, 8)
-				request.PayloadCapacity = 7
+				request.Payload = make([]byte, functionwire.MaximumInputBodyBytes+1)
 				return request
 			}(),
 			wantErr: true,

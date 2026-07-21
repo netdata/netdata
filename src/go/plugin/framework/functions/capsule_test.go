@@ -13,10 +13,10 @@ import (
 func TestInputCapsuleParsesFunctionCancelAndQuit(t *testing.T) {
 	consumer := &recordingCapsuleConsumer{}
 	capsule, err := NewInputCapsule(strings.NewReader(
-		"FUNCTION u1 30 \"perf:work-001 mode:F token:u1\" 0xFFFF \"method=api,role=test\"\n"+
-			"FUNCTION_CANCEL u1\nQUIT\n"+
+		"FUNCTION u1 30 \"perf:work-001 mode:F token:u1\" 0xFFFF \"method=api,role=test\"\n" +
+			"FUNCTION_CANCEL u1\nQUIT\n" +
 			"FUNCTION u2 30 \"perf:work-002 mode:F token:u2\" 0xFFFF \"method=api,role=test\"\n",
-	), &immediateCapsuleBodyBudget{})
+	))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestInputCapsuleResynchronizesSafeUIDHeaderErrors(t *testing.T) {
 	oversized := "FUNCTION oversized 30 \"" + strings.Repeat("x", MaximumInputLineBytes) + "\" 0xFFFF \"source\"\n"
 	input := "FUNCTION bad-time nope \"x\" 0xFFFF \"source\"\n" + oversized +
 		"FUNCTION good 30 \"perf:work-001 mode:F token:good\" 0xFFFF \"source\"\nQUIT\n"
-	capsule, err := NewInputCapsule(strings.NewReader(input), &immediateCapsuleBodyBudget{})
+	capsule, err := NewInputCapsule(strings.NewReader(input))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestInputCapsuleRejectsUnaddressableOrUnterminatedInput(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			capsule, err := NewInputCapsule(strings.NewReader(test.input), &immediateCapsuleBodyBudget{})
+			capsule, err := NewInputCapsule(strings.NewReader(test.input))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -86,7 +86,7 @@ func TestInputCapsuleCommandLineAndTimeoutBoundaries(t *testing.T) {
 		"FUNCTION timeout-one 1 \"perf:work\" 0xFFFF \"source\"\n" +
 		"FUNCTION timeout-max 900 \"perf:work\" 0xFFFF \"source\"\nQUIT\n"
 	consumer := &recordingCapsuleConsumer{}
-	capsule, err := NewInputCapsule(strings.NewReader(input), &immediateCapsuleBodyBudget{})
+	capsule, err := NewInputCapsule(strings.NewReader(input))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestInputCapsulePreservesPayloadBytesAndPreAdmissionCancel(t *testing.T) {
 		"  leading\tvalue  \r\n\r\ntail\nFUNCTION_PAYLOAD_END\r\n" +
 		"FUNCTION_PAYLOAD cancelled 30 \"raw:echo\" 0xFFFF \"source\" application/octet-stream\n" +
 		"partial\nFUNCTION_CANCEL cancelled\nQUIT\n"
-	capsule, err := NewInputCapsule(strings.NewReader(input), &immediateCapsuleBodyBudget{})
+	capsule, err := NewInputCapsule(strings.NewReader(input))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,9 +145,7 @@ func TestInputCapsulePreservesPayloadBytesAndPreAdmissionCancel(t *testing.T) {
 	call := consumer.calls[0]
 	if !call.HasPayload ||
 		call.ContentType != "application/octet-stream" ||
-		string(call.Payload) != "  leading\tvalue  \r\n\r\ntail" ||
-		call.PayloadCapacity != int64(cap(call.Payload)) ||
-		call.InputBodyToken == 0 {
+		string(call.Payload) != "  leading\tvalue  \r\n\r\ntail" {
 		t.Fatalf("payload call differs: %#v payload=%q", call, call.Payload)
 	}
 	if len(consumer.rejections) != 1 ||
@@ -172,8 +170,7 @@ func TestInputCapsulePayloadBoundariesAndResynchronization(t *testing.T) {
 			input := "FUNCTION_PAYLOAD boundary 30 \"raw:echo\" 0xFFFF \"source\" application/octet-stream\n" +
 				strings.Repeat("x", test.size) + "\nFUNCTION_PAYLOAD_END\n" +
 				"FUNCTION successor 30 \"perf:work\" 0xFFFF \"source\"\nQUIT\n"
-			budget := &immediateCapsuleBodyBudget{}
-			capsule, err := NewInputCapsule(strings.NewReader(input), budget)
+			capsule, err := NewInputCapsule(strings.NewReader(input))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -188,41 +185,15 @@ func TestInputCapsulePayloadBoundariesAndResynchronization(t *testing.T) {
 					len(consumer.rejections) != 0 {
 					t.Fatalf("accepted boundary flow differs: calls=%#v rejections=%#v", consumer.calls, consumer.rejections)
 				}
-				if consumer.calls[0].PayloadCapacity != MaximumInputBodyBytes {
-					t.Fatalf("accepted boundary capacity=%d, want %d", consumer.calls[0].PayloadCapacity, MaximumInputBodyBytes)
-				}
 			} else if len(consumer.calls) != 1 ||
 				consumer.calls[0].UID != "successor" ||
 				len(consumer.rejections) != 1 ||
 				consumer.rejections[0] != (recordedCapsuleRejection{uid: "boundary", status: 413}) {
 				t.Fatalf("overflow resynchronization differs: calls=%#v rejections=%#v", consumer.calls, consumer.rejections)
 			}
-			if budget.maximum > MaximumInputBodyBytes {
-				t.Fatalf("body budget exceeded limit: %d", budget.maximum)
-			}
 		})
 	}
 }
-
-type immediateCapsuleBodyBudget struct {
-	maximum int64
-}
-
-func (budget *immediateCapsuleBodyBudget) GrowInputBody(_ context.Context, token uint64, capacity int64) (uint64, error) {
-	if capacity <= 0 || capacity > MaximumInputBodyBytes {
-		return 0, fmt.Errorf("invalid test capacity %d", capacity)
-	}
-	if token == 0 {
-		token = 1
-	}
-	if capacity > budget.maximum {
-		budget.maximum = capacity
-	}
-	return token, nil
-}
-
-func (*immediateCapsuleBodyBudget) CommitInputBodyGrowth(uint64, int64) error { return nil }
-func (*immediateCapsuleBodyBudget) ReleaseInputBody(uint64) error             { return nil }
 
 type recordingCapsuleConsumer struct {
 	calls      []Call

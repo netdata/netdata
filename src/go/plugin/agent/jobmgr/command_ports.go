@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	functionwire "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
 
 const (
@@ -25,20 +26,18 @@ const (
 // resource-scoped commands. The submitting adapter transfers ownership of Args
 // and Payload until the request reaches terminal disposal.
 type Request struct {
-	Deadline        time.Time        // absolute request deadline; zero = none
-	ContentType     string           // payload content type
-	Route           string           // Function route / method id
-	UID             string           // unique command id (dedupe key)
-	Permissions     string           // caller permissions
-	CallerSource    string           // caller source string
-	LaneKey         string           // serialization lane (Job Manager commands only)
-	Args            []string         // command arguments
-	Payload         []byte           // request payload
-	Timeout         time.Duration    // caller-requested timeout
-	InputBodyToken  uint64           // admission token for a reserved input body
-	PayloadCapacity int64            // reserved input-body capacity
-	Source          lifecycle.Source // ingress source (JobManager / Function)
-	HasPayload      bool             // whether a payload is present
+	Deadline     time.Time        // absolute request deadline; zero = none
+	ContentType  string           // payload content type
+	Route        string           // Function route / method id
+	UID          string           // unique command id (dedupe key)
+	Permissions  string           // caller permissions
+	CallerSource string           // caller source string
+	LaneKey      string           // serialization lane (Job Manager commands only)
+	Args         []string         // command arguments
+	Payload      []byte           // request payload
+	Timeout      time.Duration    // caller-requested timeout
+	Source       lifecycle.Source // ingress source (JobManager / Function)
+	HasPayload   bool             // whether a payload is present
 }
 
 // Validate checks the bounded admission invariants independent of mutable
@@ -68,17 +67,9 @@ func (r Request) Validate() error {
 		}
 		argumentBytes += len(argument)
 	}
-	if r.InputBodyToken == 0 {
-		if r.PayloadCapacity != 0 || cap(r.Payload) != 0 {
-			return errors.New("jobmgr: unreserved input payload")
-		}
-		return nil
-	}
-	if !r.HasPayload ||
-		r.PayloadCapacity <= 0 ||
-		int64(cap(r.Payload)) != r.PayloadCapacity ||
-		int64(len(r.Payload)) > r.PayloadCapacity {
-		return errors.New("jobmgr: invalid input payload reservation")
+	if len(r.Payload) > functionwire.MaximumInputBodyBytes ||
+		!r.HasPayload && len(r.Payload) != 0 {
+		return errors.New("jobmgr: invalid input payload")
 	}
 	return nil
 }
@@ -89,14 +80,6 @@ type CommandPort interface {
 	Submit(context.Context, Request) error
 	Reject(context.Context, string, lifecycle.ControlStatus) error
 	Cancel(context.Context, string) error
-}
-
-// AdmissionCommandPort adds the wake and terminal signals needed by a bounded
-// input-body admission adapter.
-type AdmissionCommandPort interface {
-	CommandPort
-	NotifyControlReady()
-	Done() <-chan struct{}
 }
 
 // PreparedCommandPort accepts one already prepared Job Manager plan. It is

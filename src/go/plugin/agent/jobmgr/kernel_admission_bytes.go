@@ -16,10 +16,11 @@ const (
 
 func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 	bytes := operationFrameworkAdmissionBytes
-	if request.PayloadCapacity < 0 || request.PayloadCapacity > lifecycle.MaximumInputBodyBytes || request.PayloadCapacity > lifecycle.OrdinaryBudgetBytes-bytes {
+	payloadBytes := int64(len(request.Payload))
+	if payloadBytes > lifecycle.OrdinaryBudgetBytes-bytes {
 		return 0, errors.New("jobmgr kernel: input body does not self-fit admission")
 	}
-	bytes += request.PayloadCapacity
+	bytes += payloadBytes
 	if plan.Transaction != nil && plan.Transaction.AllocateSuccessor {
 		persistent := plan.Transaction.Permit.Bytes()
 		if !validPersistentAdmission(
@@ -88,14 +89,7 @@ func validPersistentAdmission(
 }
 
 func (ck *CommandKernel) abortRequestInputBody(request Request) error {
-	if request.InputBodyToken == 0 {
-		return nil
-	}
-	wake, err := ck.admission.AbortInputBody(request.InputBodyToken)
-	if wake {
-		ck.NotifyControlReady()
-	}
-	return err
+	return nil
 }
 
 func (ck *CommandKernel) abortRequestInputBodyWith(

@@ -82,7 +82,7 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 	if err != nil {
 		return nil, err
 	}
-	ingress, err := functionadapter.NewProcessIngress(config.Input, admission)
+	ingress, err := functionadapter.NewProcessIngress(config.Input)
 	if err != nil {
 		return nil, err
 	}
@@ -257,9 +257,7 @@ func (pc *processCore) binding(
 	}
 	return functionadapter.NewProcessBinding(
 		generation.kernel,
-		pc.admission,
 		generation.run.Generation(),
-		generation.inputBodyGrants,
 		lifecycle.RealClock{},
 		func() {
 			pc.quit.Store(true)

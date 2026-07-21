@@ -25,25 +25,15 @@ const (
 // Call is the immutable Function ingress value transferred to the active
 // Agent generation.
 type Call struct {
-	UID             string
-	Timeout         time.Duration
-	Method          string
-	Args            []string
-	Access          string
-	Source          string
-	Payload         []byte
-	ContentType     string
-	HasPayload      bool
-	InputBodyToken  uint64
-	PayloadCapacity int64
-}
-
-// BodyBudget owns input-payload reservations while the process-fixed reader
-// incrementally parses a payload.
-type BodyBudget interface {
-	GrowInputBody(context.Context, uint64, int64) (uint64, error)
-	CommitInputBodyGrowth(uint64, int64) error
-	ReleaseInputBody(uint64) error
+	UID         string
+	Timeout     time.Duration
+	Method      string
+	Args        []string
+	Access      string
+	Source      string
+	Payload     []byte
+	ContentType string
+	HasPayload  bool
 }
 
 // ReadReturnGate fences reader returns while process ingress changes Agent
@@ -64,7 +54,6 @@ type Consumer interface {
 // parser payload and transfers completed calls to Consumer.
 type InputCapsule struct {
 	reader        io.Reader
-	budget        BodyBudget
 	payload       *payloadState
 	discarding    bool
 	discardingUID string
@@ -73,8 +62,6 @@ type InputCapsule struct {
 type payloadState struct {
 	call           Call
 	body           []byte
-	token          uint64
-	capacity       int64
 	separator      [2]byte
 	separatorBytes int
 	hasLine        bool
@@ -82,11 +69,11 @@ type payloadState struct {
 	overflow       bool
 }
 
-func NewInputCapsule(reader io.Reader, budget BodyBudget) (*InputCapsule, error) {
-	if reader == nil || budget == nil {
-		return nil, errors.New("Function ingress: incomplete input capsule")
+func NewInputCapsule(reader io.Reader) (*InputCapsule, error) {
+	if reader == nil {
+		return nil, errors.New("Function ingress: nil input reader")
 	}
-	return &InputCapsule{reader: reader, budget: budget}, nil
+	return &InputCapsule{reader: reader}, nil
 }
 
 func (capsule *InputCapsule) Run(ctx context.Context, consumer Consumer) error {
@@ -94,7 +81,7 @@ func (capsule *InputCapsule) Run(ctx context.Context, consumer Consumer) error {
 		return errors.New("Function ingress: invalid run")
 	}
 	reader := bufio.NewReaderSize(capsule.reader, MaximumInputLineBytes+1)
-	gate, _ := capsule.budget.(ReadReturnGate)
+	gate, _ := consumer.(ReadReturnGate)
 	for {
 		segment, readErr := reader.ReadSlice('\n')
 		if gate != nil {
@@ -191,26 +178,17 @@ func (capsule *InputCapsule) consumeRead(ctx context.Context, consumer Consumer,
 	return false, false, nil
 }
 
-// DiscardPausedPayload removes parser ownership after the corresponding body
-// reservation has been suspended or released by process composition.
-func (capsule *InputCapsule) DiscardPausedPayload(expectedToken uint64) error {
+// DiscardPausedPayload removes parser ownership after process composition has
+// fenced the process-fixed reader.
+func (capsule *InputCapsule) DiscardPausedPayload() {
 	capsule.discarding = false
 	capsule.discardingUID = ""
 	if capsule.payload == nil {
-		if expectedToken != 0 {
-			return errors.New("Function ingress: contained body token has no parser payload")
-		}
-		return nil
+		return
 	}
 	state := capsule.payload
 	capsule.payload = nil
 	state.body = nil
-	if state.token != expectedToken {
-		return errors.New("Function ingress: contained parser/body token mismatch")
-	}
-	state.token = 0
-	state.capacity = 0
-	return nil
 }
 
 func hasLF(value []byte) bool {
@@ -379,36 +357,16 @@ func (capsule *InputCapsule) appendPayload(ctx context.Context, value []byte) er
 		return nil
 	}
 	if len(value) > MaximumInputBodyBytes-len(state.body) {
-		if state.token != 0 {
-			if err := capsule.budget.ReleaseInputBody(state.token); err != nil {
-				return err
-			}
-		}
 		state.body = nil
-		state.token = 0
-		state.capacity = 0
 		state.overflow = true
 		return nil
 	}
 	needed := len(state.body) + len(value)
-	if int64(needed) > state.capacity {
-		next := min(max(max(state.capacity*2, initialBodyCapacity), int64(needed)), MaximumInputBodyBytes)
-		token, err := capsule.budget.GrowInputBody(ctx, state.token, next)
-		if err != nil {
-			return err
-		}
-		grown := make([]byte, len(state.body), int(next))
+	if needed > cap(state.body) {
+		next := min(max(max(cap(state.body)*2, initialBodyCapacity), needed), MaximumInputBodyBytes)
+		grown := make([]byte, len(state.body), next)
 		copy(grown, state.body)
 		state.body = grown
-		state.token = token
-		state.capacity = next
-		if err := capsule.budget.CommitInputBodyGrowth(token, next); err != nil {
-			_ = capsule.budget.ReleaseInputBody(token)
-			state.body = nil
-			state.token = 0
-			state.capacity = 0
-			return err
-		}
 	}
 	state.body = append(state.body, value...)
 	return nil
@@ -423,9 +381,6 @@ func (capsule *InputCapsule) completePayload(ctx context.Context, consumer Consu
 	}
 	call := state.call
 	call.Payload = state.body
-	call.InputBodyToken = state.token
-	call.PayloadCapacity = state.capacity
-	state.token = 0
 	capsule.payload = nil
 	return consumer.HandleCall(ctx, call)
 }
@@ -436,10 +391,8 @@ func (capsule *InputCapsule) abortPayload() error {
 	}
 	state := capsule.payload
 	capsule.payload = nil
-	if state.token == 0 {
-		return nil
-	}
-	return capsule.budget.ReleaseInputBody(state.token)
+	state.body = nil
+	return nil
 }
 
 func tokenize(line string) ([]string, error) {

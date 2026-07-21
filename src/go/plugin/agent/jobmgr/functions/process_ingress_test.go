@@ -4,24 +4,22 @@ package functions
 
 import (
 	"context"
-	"errors"
 	"io"
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	functionwire "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/stretchr/testify/require"
 )
 
 func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) {
 	reader, writer := io.Pipe()
-	ingress, err := NewProcessIngress(reader, lifecycle.NewAdmissionLedger())
+	ingress, err := NewProcessIngress(reader)
 	require.NoError(t, err)
 	first := newTestProcessInput(1)
 	second := newTestProcessInput(2)
 
-	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: first, admission: ingress.admission}))
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: first}))
 
 	done := make(chan error, 1)
 	go func() { done <- ingress.Run(context.Background()) }()
@@ -52,7 +50,7 @@ func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) 
 	default:
 	}
 
-	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: second, admission: ingress.admission}))
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: second}))
 
 	carriedCall := <-second.calls
 	require.EqualValues(t, "carried", carriedCall.UID)
@@ -82,8 +80,7 @@ func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) 
 	require.False(t, census.State != ProcessIngressContained ||
 		census.ReaderStarts != 1 ||
 		census.RunGeneration != 0 ||
-		census.ActiveDeliveries != 0 ||
-		census.PendingBody)
+		census.ActiveDeliveries != 0)
 
 	require.Error(t, ingress.Run(context.Background()))
 }
@@ -91,11 +88,11 @@ func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) 
 func TestProcessIngressTimedOutDrainRetainsSealedStateForRetry(t *testing.T) {
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
-	ingress, err := NewProcessIngress(reader, lifecycle.NewAdmissionLedger())
+	ingress, err := NewProcessIngress(reader)
 	require.NoError(t, err)
 	input := newTestProcessInput(1)
 
-	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: input, admission: ingress.admission}))
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: input}))
 
 	done := make(chan error, 1)
 	go func() { done <- ingress.Run(context.Background()) }()
@@ -125,44 +122,21 @@ func TestProcessIngressTimedOutDrainRetainsSealedStateForRetry(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
-func TestProcessIngressFenceAcceptsOnlyItsDiscardedBodyToken(t *testing.T) {
-	admission := lifecycle.NewAdmissionLedger()
+func TestProcessIngressDiscardsPartialBodyOnFence(t *testing.T) {
 	reader, writer := io.Pipe()
-	ingress, err := NewProcessIngress(reader, admission)
+	ingress, err := NewProcessIngress(reader)
 	require.NoError(t, err)
-	input := newLedgerTestProcessInput(1, admission)
-	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: input, admission: admission}))
+	input := newTestProcessInput(1)
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: input}))
 
 	done := make(chan error, 1)
 	go func() { done <- ingress.Run(context.Background()) }()
 	_, err = io.WriteString(writer, "FUNCTION_PAYLOAD fenced 30 \"test:work\" 0xFFFF \"source\" application/octet-stream\npartial\n")
 	require.NoError(t, err)
-	require.Eventually(t, func() bool {
-		census := ingress.Census()
-		return census.PendingBody && census.BudgetOperations == 0
-	}, time.Second, time.Millisecond)
 
 	require.NoError(t, ingress.SealPause())
 	require.NoError(t, ingress.DrainPause(context.Background(), 0))
 	require.NoError(t, ingress.Fence(context.Background()))
-
-	tests := map[string]struct {
-		token   uint64
-		wantErr bool
-	}{
-		"fenced body completion is harmless": {token: 1},
-		"foreign body token is rejected":     {token: 2, wantErr: true},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			err := ingress.ReleaseInputBody(test.token)
-			if test.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-		})
-	}
 
 	require.NoError(t, writer.Close())
 	require.NoError(t, <-done)
@@ -180,7 +154,6 @@ type testProcessInput struct {
 	generation uint64
 	calls      chan functionwire.Call
 	release    chan struct{}
-	admission  *lifecycle.AdmissionLedger
 }
 
 func newTestProcessInput(generation uint64) *testProcessInput {
@@ -191,27 +164,7 @@ func newTestProcessInput(generation uint64) *testProcessInput {
 	}
 }
 
-func newLedgerTestProcessInput(generation uint64, admission *lifecycle.AdmissionLedger) *testProcessInput {
-	input := newTestProcessInput(generation)
-	input.admission = admission
-	return input
-}
-
 func (tpi *testProcessInput) Generation() uint64 { return tpi.generation }
-
-func (tpi *testProcessInput) SuspendInputBody(nextGeneration, token uint64) error {
-	if tpi.admission == nil {
-		return nil
-	}
-	return tpi.admission.SuspendInputBody(tpi.generation, nextGeneration, token)
-}
-
-func (tpi *testProcessInput) AdoptInputBody(token uint64) error {
-	if tpi.admission == nil {
-		return nil
-	}
-	return tpi.admission.AdoptInputBody(tpi.generation, token)
-}
 
 func (tpi *testProcessInput) HandleCall(_ context.Context, call functionwire.Call) error {
 	tpi.calls <- call
@@ -222,38 +175,3 @@ func (tpi *testProcessInput) HandleCall(_ context.Context, call functionwire.Cal
 func (*testProcessInput) HandleCancel(context.Context, string) error      { return nil }
 func (*testProcessInput) HandleReject(context.Context, string, int) error { return nil }
 func (*testProcessInput) HandleQuit(context.Context) error                { return nil }
-
-func (tpi *testProcessInput) GrowInputBody(_ context.Context, token uint64, capacity int64) (uint64, error) {
-	if tpi.admission == nil {
-		return 1, nil
-	}
-	result, err := tpi.admission.RequestInputBodyGrowth(tpi.generation, token, capacity)
-	if err != nil {
-		return 0, err
-	}
-	var grants [4]lifecycle.AdmissionGrant
-	count, _, err := tpi.admission.TakeGrants(1, &grants)
-	if err != nil {
-		return 0, err
-	}
-	if count != 1 || grants[0].Kind != lifecycle.ReservationInputBodyGrowth || grants[0].InputBodyToken != result {
-		return 0, errors.New("test process input: input-body grant differs")
-	}
-	return result, nil
-}
-
-func (tpi *testProcessInput) CommitInputBodyGrowth(token uint64, capacity int64) error {
-	if tpi.admission == nil {
-		return nil
-	}
-	_, err := tpi.admission.CommitInputBodyGrowth(token, capacity)
-	return err
-}
-
-func (tpi *testProcessInput) ReleaseInputBody(token uint64) error {
-	if tpi.admission == nil {
-		return nil
-	}
-	_, err := tpi.admission.AbortInputBody(token)
-	return err
-}

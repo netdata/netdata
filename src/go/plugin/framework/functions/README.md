@@ -29,7 +29,7 @@ rotation until it is drained or discarded by the process ingress protocol.
 The capsule:
 
 - bounds command lines, payload bodies, and nesting-independent input storage;
-- reserves payload capacity through `BodyBudget`;
+- grows its one process-owned payload geometrically up to the body limit;
 - rejects malformed or oversized input without transferring partial data;
 - treats cancellation and quit as control events;
 - never invokes collector code directly.

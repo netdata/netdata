@@ -47,14 +47,6 @@ func (ck *CommandKernel) admitSubmission(
 		if err != nil {
 			return ck.abortRequestInputBodyWith(request, err)
 		}
-		if request.InputBodyToken != 0 {
-			return ck.abortRequestInputBodyWith(
-				request,
-				errors.New(
-					"jobmgr composite: child cannot own parser input",
-				),
-			)
-		}
 	} else if rollback {
 		return ck.abortRequestInputBodyWith(
 			request,
@@ -192,9 +184,7 @@ func (ck *CommandKernel) admitSubmission(
 	}
 	admissionLane := lifecycle.AdmissionLaneRef{Slot: lane.slot, Generation: lane.generation}
 	requested := lifecycle.AdmissionRequestResult{}
-	if request.InputBodyToken != 0 {
-		requested = ck.admission.TransferInputBody(ck.run.Generation(), request.InputBodyToken, admissionLane, charge, request.PayloadCapacity)
-	} else if parent != nil {
+	if parent != nil {
 		if err := ck.beginCompositeFence(parent); err != nil {
 			ck.releaseUnusedLane(lane)
 			return ck.abortRequestInputBodyWith(
@@ -220,7 +210,6 @@ func (ck *CommandKernel) admitSubmission(
 			ck.uids.Complete(request.UID, false, now),
 		)
 	}
-	request.InputBodyToken = 0
 	operation := &commandOperation{
 		OperationGeneration: operationGeneration, request: request, plan: plan, claims: claims,
 		functionInvocation: functionInvocation,
@@ -341,7 +330,7 @@ func (ck *CommandKernel) serviceAdmissions(quantum int) bool {
 				wake, suspendErr :=
 					ck.admission.SuspendOrdinary(
 						grant.Ref,
-						operation.request.PayloadCapacity,
+						int64(len(operation.request.Payload)),
 					)
 				if suspendErr != nil {
 					ck.run.Dirty(suspendErr)
