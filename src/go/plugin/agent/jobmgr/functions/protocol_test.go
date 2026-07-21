@@ -15,27 +15,20 @@ func TestFunctionPublicationFrame(t *testing.T) {
 	var output bytes.Buffer
 	owner, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
-	port, err := NewFramePublicationPort(7, owner)
+	port, err := NewFramePublicationPort(owner)
 	require.NoError(t, err)
 	record := PublicationRecord{
 		Name: "module:method", Generation: 3, Timeout: 60,
 		Help: "method help", Tags: "top", Access: "0x0013",
 		Priority: 100, Version: 3,
 	}
-	handle, err := port.Publish(record)
-	require.NoError(t, err)
-	require.EqualValues(t, PublicationHandle{
-		ID: 1, Epoch: 7, Generation: 3, Name: "module:method",
-	}, handle)
-
-	require.NoError(t, port.Withdraw(handle))
+	require.NoError(t, port.Publish(record))
+	require.NoError(t, port.Withdraw(record.Name))
 
 	want := "" +
 		"FUNCTION GLOBAL \"module:method\" 60 \"method help\" \"top\" 0x0013 100 3\n\n" +
 		"FUNCTION_DEL GLOBAL \"module:method\"\n\n"
 	require.EqualValues(t, want, output.String())
-
-	require.Error(t, port.Withdraw(handle))
 }
 
 func TestFunctionWithdrawalUsesRegistrationNameBytes(t *testing.T) {
@@ -83,7 +76,7 @@ func TestFunctionPublicationFrameRejectsInjection(t *testing.T) {
 			var output bytes.Buffer
 			owner, err := lifecycle.NewFrameOwner(&output)
 			require.NoError(t, err)
-			port, err := NewFramePublicationPort(1, owner)
+			port, err := NewFramePublicationPort(owner)
 			require.NoError(t, err)
 			record := PublicationRecord{
 				Name: "module:method", Generation: 1, Timeout: 1,
@@ -91,7 +84,7 @@ func TestFunctionPublicationFrameRejectsInjection(t *testing.T) {
 			}
 			test.mutate(&record)
 
-			_, publishErr := port.Publish(record)
+			publishErr := port.Publish(record)
 			require.Error(t, publishErr)
 
 			require.EqualValues(t, 0, output.Len())
@@ -99,18 +92,17 @@ func TestFunctionPublicationFrameRejectsInjection(t *testing.T) {
 	}
 }
 
-func TestFunctionPublicationFrameNoHandleBeforeCommit(t *testing.T) {
+func TestFunctionPublicationFrameCommitFailurePoisonsOwner(t *testing.T) {
 	writer := &failingFunctionFrameWriter{err: errors.New("write failed")}
 	owner, err := lifecycle.NewFrameOwner(writer)
 	require.NoError(t, err)
-	port, err := NewFramePublicationPort(1, owner)
+	port, err := NewFramePublicationPort(owner)
 	require.NoError(t, err)
 	record := PublicationRecord{
 		Name: "module:method", Generation: 1, Timeout: 1,
 		Help: "help", Tags: "top", Access: "0x0000",
 	}
-	handle, err := port.Publish(record)
-	require.False(t, err == nil || handle != (PublicationHandle{}))
+	require.Error(t, port.Publish(record))
 
 	census := owner.Census()
 	require.True(t, census.Poisoned)

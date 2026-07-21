@@ -79,10 +79,7 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 	require.EqualValues(t, 1, handler.cleanupCount())
 
 	got := publicationPort.events
-	require.True(t, equalPublicationEvents(
-		got,
-		[]string{"publish:module:method", "withdraw:module:method"},
-	))
+	require.Equal(t, []string{"publish:module:method", "withdraw:module:method"}, got)
 
 	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
 		UID: "after-close", Route: "module:method",
@@ -235,10 +232,7 @@ func TestFunctionControllerAgentAvailabilityIsMonotonic(t *testing.T) {
 	require.NoError(t, controller.ReconcileModule(context.Background(), "module"))
 
 	got := publicationPort.events
-	require.True(t, equalPublicationEvents(
-		got,
-		[]string{"publish:module:delayed"},
-	))
+	require.Equal(t, []string{"publish:module:delayed"}, got)
 
 	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
 		UID: "still-published", Route: "module:delayed",
@@ -497,11 +491,11 @@ type blockingWithdrawPublicationPort struct {
 }
 
 func (bwpp *blockingWithdrawPublicationPort) Withdraw(
-	handle PublicationHandle,
+	name string,
 ) error {
 	close(bwpp.entered)
 	<-bwpp.release
-	return bwpp.recordingPublicationPort.Withdraw(handle)
+	return bwpp.recordingPublicationPort.Withdraw(name)
 }
 
 func (cth *controllerTestHandler) MethodParams(

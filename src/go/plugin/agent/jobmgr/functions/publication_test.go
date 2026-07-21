@@ -11,47 +11,37 @@ import (
 )
 
 type recordingPublicationPort struct {
-	nextID      uint64
 	published   []PublicationRecord
-	withdrawn   []PublicationHandle
+	withdrawn   []string
 	events      []string
-	active      map[uint64]PublicationHandle
-	badHandle   bool
-	publishErr  error
+	active      map[string]PublicationRecord
 	withdrawErr error
 }
 
 func newRecordingPublicationPort() *recordingPublicationPort {
-	return &recordingPublicationPort{active: make(map[uint64]PublicationHandle)}
+	return &recordingPublicationPort{active: make(map[string]PublicationRecord)}
 }
 
-func (rpp *recordingPublicationPort) Publish(record PublicationRecord) (PublicationHandle, error) {
-	if rpp.publishErr != nil {
-		return PublicationHandle{}, rpp.publishErr
-	}
-	rpp.nextID++
-	handle := PublicationHandle{
-		ID: rpp.nextID, Epoch: 1, Generation: record.Generation, Name: record.Name,
-	}
-	if rpp.badHandle {
-		handle.Generation++
+func (rpp *recordingPublicationPort) Publish(record PublicationRecord) error {
+	if _, ok := rpp.active[record.Name]; ok {
+		return errors.New("duplicate publish")
 	}
 	rpp.published = append(rpp.published, record)
 	rpp.events = append(rpp.events, "publish:"+record.Name)
-	rpp.active[handle.ID] = handle
-	return handle, nil
+	rpp.active[record.Name] = record
+	return nil
 }
 
-func (rpp *recordingPublicationPort) Withdraw(handle PublicationHandle) error {
+func (rpp *recordingPublicationPort) Withdraw(name string) error {
 	if rpp.withdrawErr != nil {
 		return rpp.withdrawErr
 	}
-	if _, ok := rpp.active[handle.ID]; !ok {
+	if _, ok := rpp.active[name]; !ok {
 		return errors.New("duplicate or unknown withdraw")
 	}
-	delete(rpp.active, handle.ID)
-	rpp.withdrawn = append(rpp.withdrawn, handle)
-	rpp.events = append(rpp.events, "withdraw:"+handle.Name)
+	delete(rpp.active, name)
+	rpp.withdrawn = append(rpp.withdrawn, name)
+	rpp.events = append(rpp.events, "withdraw:"+name)
 	return nil
 }
 
@@ -85,10 +75,7 @@ func TestFunctionPublicationDiff(t *testing.T) {
 	require.False(t, len(port.published) != 3 || len(port.withdrawn) != 2 || len(port.active) != 1)
 
 	got := port.events[len(port.events)-3:]
-	require.True(t, equalPublicationEvents(
-		got,
-		[]string{"withdraw:a", "withdraw:b", "publish:a"},
-	))
+	require.Equal(t, []string{"withdraw:a", "withdraw:b", "publish:a"}, got)
 
 	require.NoError(t, publication.Stop(1))
 
@@ -97,18 +84,6 @@ func TestFunctionPublicationDiff(t *testing.T) {
 	require.NoError(t, publication.Stop(1))
 
 	require.EqualValues(t, 3, len(port.withdrawn))
-}
-
-func equalPublicationEvents(left, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for index := range left {
-		if left[index] != right[index] {
-			return false
-		}
-	}
-	return true
 }
 
 func TestFunctionPublicationNoRearm(t *testing.T) {
@@ -234,13 +209,13 @@ func TestFunctionPublicationTransitionOrdersCatalogBetweenFrames(t *testing.T) {
 	)
 
 	got := port.events
-	require.True(t, equalPublicationEvents(got, []string{
+	require.Equal(t, []string{
 		"publish:work",
 		"catalog:quiesce",
 		"withdraw:work",
 		"catalog:commit",
 		"publish:work",
-	}))
+	}, got)
 }
 
 func TestFunctionPublicationWithdrawalFailureAbortsQuiescedCatalog(t *testing.T) {
@@ -281,23 +256,4 @@ func TestFunctionPublicationWithdrawalFailureAbortsQuiescedCatalog(t *testing.T)
 	require.False(t, !quiesced || committed || !aborted)
 
 	require.EqualValues(t, 1, len(port.active))
-}
-
-func TestFunctionPublicationMismatchedAcknowledgementPoisonsAndRetainsHandle(t *testing.T) {
-	port := newRecordingPublicationPort()
-	port.badHandle = true
-	publication, err := NewPublication(1, port)
-	require.NoError(t, err)
-	record := publicationRecord("work", 1)
-
-	require.Error(t, publication.ApplyInitialSnapshot(1, 1, 1, []PublicationChange{{
-		Name: record.Name, Record: &record,
-	}}),
-	)
-
-	require.EqualValues(t, 1, len(port.active))
-
-	require.Error(t, publication.Stop(1))
-
-	require.False(t, len(port.active) != 0 || len(port.withdrawn) != 1)
 }

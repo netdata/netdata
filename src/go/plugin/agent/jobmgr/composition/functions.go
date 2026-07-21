@@ -48,7 +48,7 @@ func NewFunctionAssembly(
 	if err != nil {
 		return nil, err
 	}
-	port, err := functionadapter.NewFramePublicationPort(epoch, frames)
+	port, err := functionadapter.NewFramePublicationPort(frames)
 	if err != nil {
 		return nil, errors.Join(
 			err,

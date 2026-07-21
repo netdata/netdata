@@ -6,73 +6,48 @@ import (
 	"errors"
 	"strconv"
 	"strings"
-	"sync"
 	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
-// FramePublicationPort is the sole Function-registration protocol writer.
-// Handles become live only after the complete frame has been committed.
+// FramePublicationPort writes Function-registration protocol frames. The
+// Publication state machine owns the set of currently published Functions.
 type FramePublicationPort struct {
-	mu sync.Mutex // guards the mutable fields below
-
-	epoch  uint64                       // run generation stamped on each handle; fences withdrawals to this port
-	nextID uint64                       // monotonic allocator for handle IDs
-	frames *lifecycle.FrameOwner        // the one serialized stdout frame writer
-	active map[uint64]PublicationHandle // live publication handles by ID
+	frames *lifecycle.FrameOwner // the one serialized stdout frame writer
 }
 
 func NewFramePublicationPort(
-	epoch uint64,
 	frames *lifecycle.FrameOwner,
 ) (*FramePublicationPort, error) {
-	if epoch == 0 || frames == nil {
+	if frames == nil {
 		return nil, errors.New("jobmgr Function protocol: invalid publication port")
 	}
-	return &FramePublicationPort{
-		epoch: epoch, frames: frames, active: make(map[uint64]PublicationHandle),
-	}, nil
+	return &FramePublicationPort{frames: frames}, nil
 }
 
 func (fpp *FramePublicationPort) Publish(
 	record PublicationRecord,
-) (PublicationHandle, error) {
+) error {
 	if fpp == nil {
-		return PublicationHandle{}, errors.New("jobmgr Function protocol: nil publication port")
+		return errors.New("jobmgr Function protocol: nil publication port")
 	}
 	payload, err := encodeFunctionRegistration(record)
 	if err != nil {
-		return PublicationHandle{}, err
+		return err
 	}
 	prepared, err := lifecycle.PrepareProtocolFrame(payload)
 	if err != nil {
-		return PublicationHandle{}, err
+		return err
 	}
-	fpp.mu.Lock()
-	defer fpp.mu.Unlock()
-	nextID := fpp.nextID + 1
-	if nextID == 0 {
-		return PublicationHandle{}, errors.New("jobmgr Function protocol: handle identity wrapped")
-	}
-	if err := fpp.frames.CommitPreparedProtocolFrame(prepared); err != nil {
-		return PublicationHandle{}, err
-	}
-	fpp.nextID = nextID
-	handle := PublicationHandle{
-		ID: nextID, Epoch: fpp.epoch,
-		Generation: record.Generation, Name: record.Name,
-	}
-	fpp.active[handle.ID] = handle
-	return handle, nil
+	return fpp.frames.CommitPreparedProtocolFrame(prepared)
 }
 
-func (fpp *FramePublicationPort) Withdraw(handle PublicationHandle) error {
-	if fpp == nil || handle.ID == 0 || handle.Epoch != fpp.epoch ||
-		handle.Generation == 0 || handle.Name == "" {
+func (fpp *FramePublicationPort) Withdraw(name string) error {
+	if fpp == nil {
 		return errors.New("jobmgr Function protocol: invalid withdrawal")
 	}
-	payload, err := encodeFunctionWithdrawal(handle.Name)
+	payload, err := encodeFunctionWithdrawal(name)
 	if err != nil {
 		return err
 	}
@@ -80,17 +55,7 @@ func (fpp *FramePublicationPort) Withdraw(handle PublicationHandle) error {
 	if err != nil {
 		return err
 	}
-	fpp.mu.Lock()
-	defer fpp.mu.Unlock()
-	current, exists := fpp.active[handle.ID]
-	if !exists || current != handle {
-		return errors.New("jobmgr Function protocol: stale or cross-generation withdrawal")
-	}
-	if err := fpp.frames.CommitPreparedProtocolFrame(prepared); err != nil {
-		return err
-	}
-	delete(fpp.active, handle.ID)
-	return nil
+	return fpp.frames.CommitPreparedProtocolFrame(prepared)
 }
 
 func encodeFunctionRegistration(record PublicationRecord) ([]byte, error) {

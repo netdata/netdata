@@ -21,19 +21,12 @@ type PublicationRecord struct {
 	Version    int    // advertised version
 }
 
-type PublicationHandle struct {
-	ID         uint64 // publication id
-	Epoch      uint64 // run epoch
-	Generation uint64 // handler generation
-	Name       string // public Function name
-}
-
 // PublicationPort is the external Function registry boundary. Calls may block
 // and therefore Publication transitions must execute as serialized TaskChild
 // work, never on the kernel loop.
 type PublicationPort interface {
-	Publish(PublicationRecord) (PublicationHandle, error)
-	Withdraw(PublicationHandle) error
+	Publish(PublicationRecord) error
+	Withdraw(string) error
 }
 
 type PublicationChange struct {
@@ -41,30 +34,24 @@ type PublicationChange struct {
 	Record *PublicationRecord
 }
 
-type publishedRoute struct {
-	record PublicationRecord
-	handle PublicationHandle
-}
-
 // Publication owns the acknowledged external Function registration set. Its
 // methods are deliberately synchronous so a caller can serialize them through
 // one CommandKernel lane without another worker, timer, or reconciliation
 // goroutine.
 type Publication struct {
-	epoch     uint64                    // run epoch this publication belongs to
-	version   uint64                    // publication version
-	port      PublicationPort           // wire port emitting FUNCTION/FUNCTION_DEL
-	published map[string]publishedRoute // currently published routes by name
-	retained  []PublicationHandle       // handles retained across a transition
-	stopped   bool                      // publication stopped (shutdown)
-	dirty     error                     // sticky poison error
+	epoch     uint64                       // run epoch this publication belongs to
+	version   uint64                       // publication version
+	port      PublicationPort              // wire port emitting FUNCTION/FUNCTION_DEL
+	published map[string]PublicationRecord // currently published routes by name
+	stopped   bool                         // publication stopped (shutdown)
+	dirty     error                        // sticky poison error
 }
 
 func NewPublication(epoch uint64, port PublicationPort) (*Publication, error) {
 	if epoch == 0 || port == nil {
 		return nil, errors.New("jobmgr Function publication: invalid construction")
 	}
-	return &Publication{epoch: epoch, port: port, published: make(map[string]publishedRoute)}, nil
+	return &Publication{epoch: epoch, port: port, published: make(map[string]PublicationRecord)}, nil
 }
 
 // ApplyInitialSnapshot installs one complete catalog-backed snapshot before
@@ -154,10 +141,10 @@ func (p *Publication) applyTransition(
 	}
 	for _, change := range changes {
 		current, exists := p.published[change.Name]
-		if !exists || (change.Record != nil && current.record == *change.Record) {
+		if !exists || (change.Record != nil && current == *change.Record) {
 			continue
 		}
-		if err := p.port.Withdraw(current.handle); err != nil {
+		if err := p.port.Withdraw(change.Name); err != nil {
 			return p.poison(errors.Join(err, abort()))
 		}
 		delete(p.published, change.Name)
@@ -170,21 +157,13 @@ func (p *Publication) applyTransition(
 			continue
 		}
 		current, exists := p.published[change.Name]
-		if exists && current.record == *change.Record {
+		if exists && current == *change.Record {
 			continue
 		}
-		handle, err := p.port.Publish(*change.Record)
-		if err != nil {
+		if err := p.port.Publish(*change.Record); err != nil {
 			return p.poison(err)
 		}
-		if err := p.validateHandle(handle, *change.Record); err != nil {
-			if handle.ID != 0 {
-				p.retained = append(p.retained, handle)
-			}
-			return p.poison(err)
-		}
-		next := publishedRoute{record: *change.Record, handle: handle}
-		p.published[change.Name] = next
+		p.published[change.Name] = *change.Record
 	}
 	p.version = version
 	return nil
@@ -236,19 +215,11 @@ func (p *Publication) validateTransition(
 	return nil
 }
 
-func (p *Publication) validateHandle(handle PublicationHandle, record PublicationRecord) error {
-	if handle.ID == 0 || handle.Epoch != p.epoch ||
-		handle.Generation != record.Generation || handle.Name != record.Name {
-		return errors.New("jobmgr Function publication: mismatched acknowledgement handle")
-	}
-	return nil
-}
-
 func (p *Publication) Stop(epoch uint64) error {
 	if p == nil {
 		return nil
 	}
-	if p.stopped && len(p.published) == 0 && len(p.retained) == 0 {
+	if p.stopped && len(p.published) == 0 {
 		return p.dirty
 	}
 	p.stopped = true
@@ -256,21 +227,13 @@ func (p *Publication) Stop(epoch uint64) error {
 	if epoch != p.epoch {
 		stopErr = p.poison(errors.New("jobmgr Function publication: stop epoch mismatch"))
 	}
-	for name, current := range p.published {
-		if err := p.port.Withdraw(current.handle); err != nil {
+	for name := range p.published {
+		if err := p.port.Withdraw(name); err != nil {
 			stopErr = errors.Join(stopErr, err)
 			continue
 		}
 		delete(p.published, name)
 	}
-	retained := p.retained[:0]
-	for _, handle := range p.retained {
-		if err := p.port.Withdraw(handle); err != nil {
-			stopErr = errors.Join(stopErr, err)
-			retained = append(retained, handle)
-		}
-	}
-	p.retained = retained
 	return errors.Join(p.dirty, stopErr)
 }
 
