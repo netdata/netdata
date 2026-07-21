@@ -141,23 +141,26 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			case "cachestat":
 				b, ok := parseConfigBool(value)
 				if !ok {
-					return pluginConfigFile{}, false, fmt.Errorf("%s: invalid cachestat %q", path, value)
+					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid cachestat %q, using default\n", path, value)
+				} else {
+					cfg.Cachestat = boolPtr(b)
 				}
-				cfg.Cachestat = boolPtr(b)
 				found = true
 			case "socket":
 				b, ok := parseConfigBool(value)
 				if !ok {
-					return pluginConfigFile{}, false, fmt.Errorf("%s: invalid socket %q", path, value)
+					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid socket %q, using default\n", path, value)
+				} else {
+					cfg.Socket = boolPtr(b)
 				}
-				cfg.Socket = boolPtr(b)
 				found = true
 			case "dns":
 				b, ok := parseConfigBool(value)
 				if !ok {
-					return pluginConfigFile{}, false, fmt.Errorf("%s: invalid dns %q", path, value)
+					fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid dns %q, using default\n", path, value)
+				} else {
+					cfg.DNS = boolPtr(b)
 				}
-				cfg.DNS = boolPtr(b)
 				found = true
 			}
 			continue
@@ -178,37 +181,42 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 		case "update every":
 			n, err := strconv.Atoi(value)
 			if err != nil {
-				return pluginConfigFile{}, false, fmt.Errorf("%s: invalid update every %q: %w", path, value, err)
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid update every %q, using default\n", path, value)
+			} else {
+				cfg.UpdateEvery = intPtr(n)
 			}
-			cfg.UpdateEvery = intPtr(n)
 			found = true
 		case "apps":
 			b, ok := parseConfigBool(value)
 			if !ok {
-				return pluginConfigFile{}, false, fmt.Errorf("%s: invalid apps %q", path, value)
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid apps %q, using default\n", path, value)
+			} else {
+				cfg.AppsEnabled = boolPtr(b)
 			}
-			cfg.AppsEnabled = boolPtr(b)
 			found = true
 		case "cgroups":
 			b, ok := parseConfigBool(value)
 			if !ok {
-				return pluginConfigFile{}, false, fmt.Errorf("%s: invalid cgroups %q", path, value)
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid cgroups %q, using default\n", path, value)
+			} else {
+				cfg.Cgroups = boolPtr(b)
 			}
-			cfg.Cgroups = boolPtr(b)
 			found = true
 		case "pid table size":
 			n, err := strconv.ParseUint(value, 10, 32)
 			if err != nil {
-				return pluginConfigFile{}, false, fmt.Errorf("%s: invalid pid table size %q: %w", path, value, err)
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid pid table size %q, using default\n", path, value)
+			} else {
+				cfg.PidTable = uint32Ptr(uint32(n))
 			}
-			cfg.PidTable = uint32Ptr(uint32(n))
 			found = true
 		case "maps per core":
 			b, ok := parseConfigBool(value)
 			if !ok {
-				return pluginConfigFile{}, false, fmt.Errorf("%s: invalid maps per core %q", path, value)
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid maps per core %q, using default\n", path, value)
+			} else {
+				cfg.MapsPerCore = boolPtr(b)
 			}
-			cfg.MapsPerCore = boolPtr(b)
 			found = true
 		case "btf path":
 			cfg.BTFPath = stringPtr(value)
@@ -216,31 +224,45 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 		case "lifetime":
 			n, err := strconv.Atoi(value)
 			if err != nil {
-				return pluginConfigFile{}, false, fmt.Errorf("%s: invalid lifetime %q: %w", path, value, err)
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid lifetime %q, using default\n", path, value)
+			} else {
+				cfg.Lifetime = intPtr(n)
 			}
-			cfg.Lifetime = intPtr(n)
 			found = true
 		case "ebpf object flavor":
 			flavor, ok := parseObjectFlavor(value)
 			if !ok {
-				return pluginConfigFile{}, false, fmt.Errorf("%s: invalid ebpf object flavor %q", path, value)
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf object flavor %q, using default\n", path, value)
+			} else {
+				cfg.ObjectFlavor = stringPtr(flavor)
 			}
-			cfg.ObjectFlavor = stringPtr(flavor)
 			found = true
 		case "ebpf type format":
 			// Legacy key from the old ebpf.plugin; maps to ebpf object flavor.
 			// "legacy" forces the kprobe-based tracing path; "co-re" and "auto"
-			// leave flavor selection to auto-detection.
-			if strings.EqualFold(value, "legacy") {
+			// are explicit no-ops (leave flavor to auto-detection).  Any other
+			// value is unrecognized — warn so the operator can correct a typo.
+			switch strings.ToLower(value) {
+			case "legacy":
 				cfg.ObjectFlavor = stringPtr("tracing")
+			case "co-re", "auto":
+				// no-op: these are the documented default choices
+			default:
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf type format %q, using default\n", path, value)
 			}
 			found = true
 		case "ebpf co-re tracing":
 			// Legacy key from the old ebpf.plugin.  "probe" means kprobe
-			// attachment, which is equivalent to the tracing (legacy) object
-			// flavor.  "trampoline" is the default and needs no override.
-			if strings.EqualFold(value, "probe") {
+			// attachment, equivalent to the tracing (legacy) object flavor.
+			// "trampoline" is the documented default no-op.  Any other value
+			// is unrecognized — warn so the operator can correct a typo.
+			switch strings.ToLower(value) {
+			case "probe":
 				cfg.ObjectFlavor = stringPtr("tracing")
+			case "trampoline":
+				// no-op: default
+			default:
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized ebpf co-re tracing %q, using default\n", path, value)
 			}
 			found = true
 		case "collect pid":
@@ -248,9 +270,10 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			// collection level written to the cstat_ctrl map.
 			level := parseCollectPidLevel(value)
 			if level < 0 {
-				return pluginConfigFile{}, false, fmt.Errorf("%s: invalid collect pid %q", path, value)
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: unrecognized collect pid %q, using default\n", path, value)
+			} else {
+				cfg.CollectPidLevel = intPtr(level)
 			}
-			cfg.CollectPidLevel = intPtr(level)
 			found = true
 		}
 	}

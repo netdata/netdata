@@ -125,11 +125,74 @@ func TestParsePluginConfigFile(t *testing.T) {
 	checkPtr(t, "ObjectFlavor", cfg.ObjectFlavor, stringPtr("arena"))
 }
 
-func TestParsePluginConfigFileCollectPidInvalid(t *testing.T) {
-	path := writeTempConfig(t, "ebpf.d.conf", "[global]\ncollect pid = invalid\n")
-	_, _, err := parsePluginConfigFile(path)
-	if err == nil {
-		t.Fatal("expected parse error for invalid collect pid, got nil")
+// TestParsePluginConfigFileInvalidValuesAreIgnored verifies that unrecognized
+// or malformed values for recognized config keys are silently skipped (warning
+// to stderr) rather than returning an error.  This preserves the lenient
+// contract of ebpf.d.conf, shared with the legacy C ebpf.plugin: a single
+// typo must not crash-loop the whole Go plugin via os.Exit(1) in main.
+func TestParsePluginConfigFileInvalidValuesAreIgnored(t *testing.T) {
+	tests := map[string]struct {
+		content string
+		check   func(t *testing.T, cfg pluginConfigFile)
+	}{
+		"invalid collect pid leaves CollectPidLevel nil": {
+			content: "[global]\ncollect pid = invalid\n",
+			check: func(t *testing.T, cfg pluginConfigFile) {
+				checkPtr(t, "CollectPidLevel", cfg.CollectPidLevel, (*int)(nil))
+			},
+		},
+		"invalid ebpf object flavor leaves ObjectFlavor nil": {
+			content: "[global]\nebpf object flavor = bufffer\n",
+			check: func(t *testing.T, cfg pluginConfigFile) {
+				checkPtr(t, "ObjectFlavor", cfg.ObjectFlavor, (*string)(nil))
+			},
+		},
+		"invalid update every leaves UpdateEvery nil": {
+			content: "[global]\nupdate every = abc\n",
+			check: func(t *testing.T, cfg pluginConfigFile) {
+				checkPtr(t, "UpdateEvery", cfg.UpdateEvery, (*int)(nil))
+			},
+		},
+		"invalid maps per core leaves MapsPerCore nil": {
+			content: "[global]\nmaps per core = maybe\n",
+			check: func(t *testing.T, cfg pluginConfigFile) {
+				checkPtr(t, "MapsPerCore", cfg.MapsPerCore, (*bool)(nil))
+			},
+		},
+		"invalid cachestat in ebpf programs leaves Cachestat nil": {
+			content: "[ebpf programs]\ncachestat = maybe\n",
+			check: func(t *testing.T, cfg pluginConfigFile) {
+				checkPtr(t, "Cachestat", cfg.Cachestat, (*bool)(nil))
+			},
+		},
+		"unrecognized ebpf type format leaves ObjectFlavor nil": {
+			content: "[global]\nebpf type format = bufffer\n",
+			check: func(t *testing.T, cfg pluginConfigFile) {
+				checkPtr(t, "ObjectFlavor", cfg.ObjectFlavor, (*string)(nil))
+			},
+		},
+		"unrecognized ebpf co-re tracing leaves ObjectFlavor nil": {
+			content: "[global]\nebpf co-re tracing = unknown\n",
+			check: func(t *testing.T, cfg pluginConfigFile) {
+				checkPtr(t, "ObjectFlavor", cfg.ObjectFlavor, (*string)(nil))
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			path := writeTempConfig(t, "ebpf.d.conf", tc.content)
+			cfg, ok, err := parsePluginConfigFile(path)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// The key was recognized so the file is marked found, even though
+			// the value was invalid and the field stays nil.
+			if !ok {
+				t.Fatal("file should be marked found when a recognized key is present")
+			}
+			tc.check(t, cfg)
+		})
 	}
 }
 
