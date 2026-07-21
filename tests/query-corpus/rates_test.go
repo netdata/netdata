@@ -49,7 +49,7 @@ func TestIncrementalRates(t *testing.T) {
 		i++
 		hostname := "rates-" + name
 		context := "fixture.rates_" + name
-		g := guid(100 + i)
+		g := guid(130 + i)
 
 		t.Run(name, func(t *testing.T) {
 			t.Parallel() // the cases pace in real time — overlap them
