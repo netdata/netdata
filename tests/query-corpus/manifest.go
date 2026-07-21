@@ -221,6 +221,14 @@ var manifest = map[string]ManifestCase{
 		Proves: "a negative `after` is relative to `before` (identical to the absolute equivalent); (0,0) resolves to the ~600s grid-aligned default window ending NOW — NOT the full retention (the reason backdated fixtures settle via explicit windows); time_resampling (v1 gtime) forces the bucket size up",
 		Agent:  Green,
 	},
+	"L9/natural-points": {
+		Proves: "options=natural-points keeps the db COUNT and spacing with raw sample values, but timestamps still snap onto the absolute ue grid; slot values around region boundaries are the raw sample OR its phase-interpolation toward the next (two-candidate pin; the full natural-mode slot selection is a recorded deferral — the DEFAULT virtual-points mode is oracle-exact)",
+		Agent:  Green,
+	},
+	"L9/live-edge": {
+		Proves: "queries past NOW on a live chart: the grid derives from the requested `before` (no clamp) — at most ONE bucket-end past now is served, holding the collected tail, or the incomplete tail is trimmed, depending on where now falls against the grid (phase-dependent; envelope-pinned: the series ends within a bucket of now, nothing further into the future)",
+		Agent:  Green,
+	},
 	"L9/v2-v3-parity": {
 		Proves: "/api/v2/data and /api/v3/data answer identically for identical params (shared api_v23_data_internal) — only the api version field differs",
 		Agent:  Green,

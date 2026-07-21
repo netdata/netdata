@@ -338,3 +338,149 @@ func TestLayer9V2V3Parity(t *testing.T) {
 		t.Errorf("v2 and v3 responses differ:\nv2: %.600s\nv3: %.600s", a, b)
 	}
 }
+
+// TestLayer9NaturalPoints: options=natural-points serves the raw
+// stored sample VALUES at db spacing — but the timestamps still snap
+// onto the absolute ue grid (the same phase shift as every other
+// view): "natural" means the count and the values, not the times.
+func TestLayer9NaturalPoints(t *testing.T) {
+	ch := l9Settle(t)
+
+	after := fixture.T0 + int64(3000)
+	before := fixture.T0 + int64(6000)
+	params := daemon.DataParams(l9Context, after, before, 100)
+	params.Set("options", "jsonwrap|natural-points")
+	doc, err := td.DataV3("l9-interp", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	col := cols["load"]
+
+	// the natural samples in (after, before] — keep the full stream too:
+	// the last row's interpolation partner sits OUTSIDE the window
+	all := ch.Dimensions[0].DBPoints(l9UE)
+	var want []fixture.DBPoint
+	first := -1
+	for i, p := range all {
+		if p.End > after && p.End <= before {
+			if first < 0 {
+				first = i
+			}
+			want = append(want, p)
+		}
+	}
+	if len(col) != len(want) {
+		t.Fatalf("got %d rows, want the %d natural samples", len(col), len(want))
+	}
+	// natural mode keeps the db count and spacing but the slot values
+	// around region boundaries may be the RAW sample or its
+	// phase-interpolation toward the next sample — pin the two-candidate
+	// contract exactly (the full natural-mode slot selection is a
+	// recorded deferral; the DEFAULT virtual-points mode is oracle-exact)
+	snap := (int64(l9UE) - fixture.T0%int64(l9UE)) % int64(l9UE)
+	phase := float64(snap) / float64(l9UE)
+	for i, pt := range col {
+		if pt.T != want[i].End+snap {
+			t.Errorf("row %d: time t0%+d, want the grid-snapped t0%+d", i, pt.T-fixture.T0, want[i].End+snap-fixture.T0)
+			continue
+		}
+		if want[i].Gap {
+			// the row at a gap's tail may already carry the next
+			// sample's raw value (the boundary slot has no anchor)
+			if pt.Value != nil {
+				nextRaw := i+1 < len(want) && !want[i+1].Gap && tierValueMatch(*pt.Value, want[i+1].Value, 1e-9)
+				if !nextRaw {
+					t.Errorf("row t0%+d: value %v, want null (gap) or the next raw sample", pt.T-fixture.T0, *pt.Value)
+				}
+			}
+			continue
+		}
+		if pt.Value == nil {
+			t.Errorf("row t0%+d: null, want %v", pt.T-fixture.T0, want[i].Value)
+			continue
+		}
+		raw := want[i].Value
+		candidates := []float64{raw}
+		if next := first + i + 1; next < len(all) && !all[next].Gap {
+			candidates = append(candidates, raw+(all[next].Value-raw)*phase)
+		}
+		matched := false
+		for _, c := range candidates {
+			if tierValueMatch(*pt.Value, c, 1e-9) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			t.Errorf("row t0%+d: value %v, want the raw %v or its phase-interpolation", pt.T-fixture.T0, *pt.Value, raw)
+		}
+	}
+}
+
+// TestLayer9LiveEdgeTrimming: on a live (wall-clocked) chart, a query
+// reaching past NOW serves at most ONE bucket-end beyond now — the
+// incomplete tail bucket at its grid position, holding the collected
+// tail — and nothing further into the future.
+func TestLayer9LiveEdgeTrimming(t *testing.T) {
+	const ue = 1
+	const n = 65
+	ctx := "fixture.l9edge"
+	now := time.Now().Unix()
+	base := now - n // rows at base+1 .. base+n ≈ now
+	ch := fixture.Series(ctx, ctx, base, n, ue, strconv.Itoa, notAnom)
+	pushLiveBurst(t, "l9-edge", guid(165), ch)
+	if _, err := td.WaitRetention("l9-edge", ctx, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	// ask past now: the window must clamp — no rows in the future
+	params := daemon.DataParams(ctx, base, now+3600, 10)
+	doc, err := td.DataV3("l9-edge", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	col := cols["load"]
+	if len(col) == 0 {
+		t.Fatal("no rows")
+	}
+	// PINNED CONTRACT: the grid derives from the REQUESTED before (no
+	// clamp to now) — the incomplete tail bucket is stamped at its grid
+	// end, which may sit up to one bucket past now, holding the real
+	// collected tail; nothing is served beyond that (dashboards always
+	// send before=now, so the future stamp never reaches them)
+	span := int64(0)
+	if len(col) >= 2 {
+		span = col[1].T - col[0].T
+	}
+	nowAfter := time.Now().Unix()
+	future := 0
+	for _, pt := range col {
+		if pt.T > nowAfter+2 {
+			future++
+			if pt.T > nowAfter+span+2 {
+				t.Errorf("row at t=%d is beyond one bucket past now (%ds, span %ds)", pt.T, pt.T-nowAfter, span)
+			}
+			if pt.Value == nil {
+				t.Errorf("the future-stamped tail bucket at t=%d is null — expected the collected tail", pt.T)
+			}
+		}
+	}
+	if future > 1 {
+		t.Errorf("%d rows past now, want at most the one tail bucket", future)
+	}
+	// the tail bucket is served OR trimmed depending on where now falls
+	// against the grid (sub-second query phase) — the deterministic pin
+	// is the envelope: the series ends within one bucket of now
+	lastRow := col[len(col)-1]
+	if span > 0 && lastRow.T < now-2*span {
+		t.Errorf("last row at t=%d, %ds before now — the live edge was over-trimmed (span %ds)", lastRow.T, now-lastRow.T, span)
+	}
+}
