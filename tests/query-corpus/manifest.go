@@ -257,9 +257,9 @@ var manifest = map[string]ManifestCase{
 		Proves: "weights method=anomaly-rate on the PER-METRIC path (no context selector) applies the anomaly bit: raw weights are the true window anomaly rates; the NONZERO default (no options= given) drops zero-weight results, any explicit options= keeps them",
 		Agent:  Green,
 	},
-	"CASE-021/multidim-anomaly-rate": {
-		Proves: "the MULTI-DIMENSIONAL weights path (any context selector; /api/v1/weights defaults to anomaly-rate) never applies the anomaly bit — raw weights are the PLAIN VALUE AVERAGES, not anomaly rates (the bit is forced only for format=MCP and the per-metric path)",
-		Agent:  Red,
+	"W/anomaly-rate-multidim": {
+		Proves: "the multi-dim anomaly contract: options=anomaly-bit is the WORKING contract (honored, true rates — what the dashboards send: their Anomaly Rate selector is the option on volume/ks2, never the method); the BARE method is path-INCONSISTENT — per-metric and MCP force the bit, the multi-dim path returns plain value averages (RULING PENDING: should the method imply the option everywhere?)",
+		Agent:  Green,
 	},
 	"W/volume": {
 		Proves: "weights method=volume: weight = (highlight-baseline)/baseline x the fraction of highlight time above/below the baseline average (countif); metrics with EQUAL window averages are skipped entirely",

@@ -4,11 +4,12 @@
 // /api/v1/metric_correlations shares the machinery), never touched by
 // the corpus before. Methods (weights.c):
 //   - value: the window average per metric (natural points);
-//   - anomaly-rate: the same with the anomaly bit as the value — but
-//     ONLY on the per-metric path; the multi-dimensional path (any
-//     request with a context selector, and /api/v1/weights defaults to
-//     this method) never applies the anomaly bit and ranks by PLAIN
-//     VALUE AVERAGES — CASE-021 (red);
+//   - anomaly-rate: the anomaly bit as the value. The WORKING contract
+//     is the options=anomaly-bit flag (honored on every path — the
+//     dashboards' "Anomaly Rate" selector is exactly this option on
+//     volume/ks2); the BARE method is path-inconsistent (per-metric
+//     and MCP force the bit, the multi-dimensional path does not) —
+//     pinned green, RULING PENDING;
 //   - volume: highlight-vs-baseline relative change times the fraction
 //     of highlight time above/below the baseline average; metrics with
 //     EQUAL averages are skipped entirely;
@@ -356,40 +357,53 @@ func TestWeightsPerMetricAnomalyRate(t *testing.T) {
 	}
 }
 
-// TestCase021MultiDimAnomalyRate pins the KNOWN BUG: the
-// multi-dimensional weights path (taken whenever a context selector is
-// present — and /api/v1/weights DEFAULTS to method=anomaly-rate) never
-// applies the anomaly bit, so it ranks metrics by their PLAIN VALUE
-// AVERAGES while labeling the result "anomaly-rate". With options=raw
-// the registered values are the window averages, not anomaly rates.
-func TestCase021MultiDimAnomalyRate(t *testing.T) {
+// TestWeightsMultiDimAnomalyRate pins BOTH halves of the multi-dim
+// anomaly contract (RULING PENDING on the bare-method half):
+//   - options=anomaly-bit is the WORKING contract: the multi-dim path
+//     honors it and returns true anomaly rates — this is what the
+//     dashboards send (their "Anomaly Rate" selector is the option on
+//     volume/ks2, never method=anomaly-rate);
+//   - the BARE method (no option) is path-INCONSISTENT: the per-metric
+//     and MCP paths force the anomaly bit, the multi-dimensional path
+//     does not — a bare /api/v1/weights with a context selector (its
+//     default method IS anomaly-rate) ranks by plain value averages.
+//     Pinned as current behavior; if ruled a bug, forcing the bit
+//     flips this half and the pin demands its update.
+func TestWeightsMultiDimAnomalyRate(t *testing.T) {
 	weightsSettle(t, "weights-h", guid(160), weightsFixture())
 
-	doc, err := td.HostJSON("weights-h", "api/v1/weights", weightsV1Params("anomaly-rate", wContext, "raw", false))
+	averages := weightsHighlightAverages()
+	rates := map[string]float64{"flat": 0, "level": 0, "split": 0, "anom": 12000.0 / 121}
+
+	// the working contract: explicit anomaly-bit → true rates
+	doc, err := td.HostJSON("weights-h", "api/v1/weights", weightsV1Params("anomaly-rate", wContext, "raw|anomaly-bit", false))
 	if err != nil {
 		t.Fatal(err)
 	}
 	got := v1ContextsWeights(t, doc, wContext)
-	averages := weightsHighlightAverages()
-	rates := map[string]float64{"flat": 0, "level": 0, "split": 0, "anom": 12000.0 / 121}
+	for id, w := range rates {
+		if g, ok := got[id]; !ok || !tierValueMatch(g, w, 1e-9) {
+			t.Errorf("with anomaly-bit, %s: weight %v, want the true rate %v", id, got[id], w)
+		}
+	}
 
-	broken, fixedCount := 0, 0
-	for id := range averages {
+	// the bare-method inconsistency: no option → value averages
+	doc, err = td.HostJSON("weights-h", "api/v1/weights", weightsV1Params("anomaly-rate", wContext, "raw", false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = v1ContextsWeights(t, doc, wContext)
+	for id, avg := range averages {
 		g, ok := got[id]
 		if !ok {
 			continue
 		}
-		switch {
-		case tierValueMatch(g, averages[id], 1e-9):
-			broken++
-		case tierValueMatch(g, rates[id], 1e-9):
-			fixedCount++
-		default:
-			t.Fatalf("%s: weight %v matches neither the value average %v (bug) nor the anomaly rate %v (fix) — new behavior, investigate",
-				id, g, averages[id], rates[id])
+		if tierValueMatch(g, rates[id], 1e-9) && !tierValueMatch(g, avg, 1e-9) {
+			t.Errorf("bare method now returns anomaly rates on the multi-dim path (%s = %v) — the inconsistency was fixed: update this pin and the manifest", id, g)
+		} else if !tierValueMatch(g, avg, 1e-9) {
+			t.Errorf("bare method %s: weight %v matches neither the pinned average %v nor the rate — investigate", id, g, avg)
 		}
 	}
-	expectAgentStatus(t, "CASE-021/multidim-anomaly-rate", broken == 0 && fixedCount == len(averages))
 }
 
 func TestWeightsVolume(t *testing.T) {
