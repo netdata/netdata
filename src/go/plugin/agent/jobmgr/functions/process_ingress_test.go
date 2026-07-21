@@ -61,7 +61,8 @@ func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) 
 	secondCall := <-second.calls
 	require.EqualValues(t, "second", secondCall.UID)
 
-	require.NoError(t, ingress.Pause(context.Background(), 0))
+	require.NoError(t, ingress.SealPause())
+	require.NoError(t, ingress.DrainPause(context.Background(), 0))
 
 	require.NoError(t, ingress.Fence(context.Background()))
 
@@ -86,7 +87,7 @@ func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) 
 	require.Error(t, ingress.Run(context.Background()))
 }
 
-func TestProcessIngressTimedOutPauseCanBeRetriedWithoutSplitState(t *testing.T) {
+func TestProcessIngressTimedOutDrainRetainsSealedStateForRetry(t *testing.T) {
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	ingress, err := NewProcessIngress(reader, lifecycle.NewAdmissionLedger())
@@ -102,18 +103,19 @@ func TestProcessIngressTimedOutPauseCanBeRetriedWithoutSplitState(t *testing.T) 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
 
-	require.ErrorIs(t, ingress.Pause(ctx, 0), context.DeadlineExceeded)
+	require.NoError(t, ingress.SealPause())
+	require.ErrorIs(t, ingress.DrainPause(ctx, 0), context.DeadlineExceeded)
 
 	ingress.boundary.mu.Lock()
 	boundaryState := ingress.boundary.state
 	ingress.boundary.mu.Unlock()
 
 	census := ingress.Census()
-	require.False(t, census.State != ProcessIngressLive || boundaryState != ProcessIngressLive)
+	require.False(t, census.State != ProcessIngressLive || boundaryState != ProcessIngressPaused)
 
 	close(input.release)
 
-	require.NoError(t, ingress.Pause(context.Background(), 0))
+	require.NoError(t, ingress.DrainPause(context.Background(), 0))
 
 	require.NoError(t, ingress.Fence(context.Background()))
 
@@ -139,7 +141,8 @@ func TestProcessIngressFenceAcceptsOnlyItsDiscardedBodyToken(t *testing.T) {
 		return census.PendingBody && census.BudgetOperations == 0
 	}, time.Second, time.Millisecond)
 
-	require.NoError(t, ingress.Pause(context.Background(), 0))
+	require.NoError(t, ingress.SealPause())
+	require.NoError(t, ingress.DrainPause(context.Background(), 0))
 	require.NoError(t, ingress.Fence(context.Background()))
 
 	tests := map[string]struct {

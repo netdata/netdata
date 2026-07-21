@@ -74,7 +74,7 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	census := catalog.Census()
 	require.False(t, !census.Closed || census.Routes != 0 ||
 		census.InvocationLeases != 0 || census.PendingCleanups != 0 ||
-		census.CompletedCleanups != 1 || cleanupCalls.Load() != 1)
+		cleanupCalls.Load() != 1)
 
 	require.NoError(t, admission.CloseDrained(run.Generation()))
 
@@ -149,7 +149,7 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 	require.NoError(t, kernel.Wait(context.Background()))
 
 	census := catalog.Census()
-	require.False(t, census.InvocationLeases != 0 || census.CompletedCleanups != 1 || cleanupCalls.Load() != 1)
+	require.False(t, census.InvocationLeases != 0 || cleanupCalls.Load() != 1)
 
 	require.EqualValues(t, calls, len(seen))
 
@@ -491,7 +491,6 @@ func (*handoffMutationCatalog) ReleaseInvocation(
 
 func (*handoffMutationCatalog) CompleteCleanup(
 	jobmgr.FunctionCleanupRef,
-	error,
 ) error {
 	return nil
 }

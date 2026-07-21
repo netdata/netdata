@@ -1121,7 +1121,7 @@ func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 		}
 		delete(ck.functionCleanupTasks, ack.Ref)
 		completeErr := errors.Join(cleanup.err, ack.Err)
-		catalogErr := ck.functionCatalog.CompleteCleanup(cleanup.ref, completeErr)
+		catalogErr := ck.functionCatalog.CompleteCleanup(cleanup.ref)
 		if completeErr != nil || catalogErr != nil {
 			ck.run.Dirty(errors.Join(completeErr, catalogErr))
 		}
@@ -2004,8 +2004,7 @@ func (ck *CommandKernel) kernelStateDrained() bool {
 func (ck *CommandKernel) functionCatalogDrained() bool {
 	census := ck.functionCatalog.LifecycleCensus()
 	return census.Closed && !census.MutationActive && census.Routes == 0 &&
-		census.CloseRoutesPending == 0 && census.InvocationLeases == 0 &&
-		census.PendingCleanups == 0
+		census.InvocationLeases == 0 && census.PendingCleanups == 0
 }
 
 func (ck *CommandKernel) runCensus() lifecycle.RunCensus {

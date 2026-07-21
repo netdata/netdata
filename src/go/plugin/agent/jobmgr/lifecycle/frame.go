@@ -53,7 +53,6 @@ type FrameCensus struct {
 	Busy           bool
 	PendingControl bool
 	RetainedBytes  int
-	Commits        uint64
 }
 
 type FrameOwner struct {
@@ -65,7 +64,6 @@ type FrameOwner struct {
 	poisoned        bool
 	poisonErr       error
 	retained        []byte
-	commits         uint64
 	onControlReady  func()
 	onPoisoned      func(error)
 	runtimeObserver RuntimeObserver
@@ -345,7 +343,7 @@ func (fo *FrameOwner) TryCommitControl(plan ControlFramePlan) error {
 func (fo *FrameOwner) Census() FrameCensus {
 	fo.stateMu.Lock()
 	defer fo.stateMu.Unlock()
-	return FrameCensus{Poisoned: fo.poisoned, Busy: fo.busy, PendingControl: fo.pendingControl, RetainedBytes: len(fo.retained), Commits: fo.commits}
+	return FrameCensus{Poisoned: fo.poisoned, Busy: fo.busy, PendingControl: fo.pendingControl, RetainedBytes: len(fo.retained)}
 }
 
 func (fo *FrameOwner) Poison(cause error) {
@@ -382,7 +380,6 @@ func (fo *FrameOwner) writeAndRelease(
 	}
 	fo.stateMu.Lock()
 	fo.busy = false
-	fo.commits++
 	pending := fo.pendingControl
 	notify := fo.onControlReady
 	observer := fo.runtimeObserver

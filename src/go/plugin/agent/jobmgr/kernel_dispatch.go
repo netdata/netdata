@@ -345,7 +345,7 @@ func (ck *CommandKernel) rejectTaskStart(start lifecycle.TaskStart) {
 	if cleanupRef, ok := ck.functionCleanupRequests[start.Request]; ok {
 		delete(ck.functionCleanupRequests, start.Request)
 		completeErr := errors.Join(errors.New("jobmgr kernel: Function cleanup task start rejected"), start.Err)
-		ck.run.Dirty(errors.Join(completeErr, ck.functionCatalog.CompleteCleanup(cleanupRef, completeErr)))
+		ck.run.Dirty(errors.Join(completeErr, ck.functionCatalog.CompleteCleanup(cleanupRef)))
 		return
 	}
 	if ck.shutdownBarrierRequest.Valid() &&

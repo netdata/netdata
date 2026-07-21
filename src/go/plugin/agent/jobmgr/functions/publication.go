@@ -3,7 +3,6 @@
 package functions
 
 import (
-	"crypto/sha256"
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -12,15 +11,14 @@ import (
 const MaximumMutationPublicationChanges = jobmgr.MaximumFunctionMutationChanges
 
 type PublicationRecord struct {
-	Name               string   // public Function name
-	Generation         uint64   // handler generation exposed
-	Timeout            int      // advertised timeout
-	Help               string   // help text
-	Tags               string   // advertised tags
-	Access             string   // access mask
-	Priority           int      // advertised priority
-	Version            int      // advertised version
-	AvailabilityDigest [32]byte // digest for change/availability detection
+	Name       string // public Function name
+	Generation uint64 // handler generation exposed
+	Timeout    int    // advertised timeout
+	Help       string // help text
+	Tags       string // advertised tags
+	Access     string // access mask
+	Priority   int    // advertised priority
+	Version    int    // advertised version
 }
 
 type PublicationHandle struct {
@@ -48,15 +46,6 @@ type publishedRoute struct {
 	handle PublicationHandle
 }
 
-type PublicationCensus struct {
-	Epoch           uint64
-	Version         uint64
-	Published       int
-	RetainedHandles int
-	Stopped         bool
-	Dirty           bool
-}
-
 // Publication owns the acknowledged external Function registration set. Its
 // methods are deliberately synchronous so a caller can serialize them through
 // one CommandKernel lane without another worker, timer, or reconciliation
@@ -64,7 +53,6 @@ type PublicationCensus struct {
 type Publication struct {
 	epoch     uint64                    // run epoch this publication belongs to
 	version   uint64                    // publication version
-	digest    [32]byte                  // aggregate publication digest
 	port      PublicationPort           // wire port emitting FUNCTION/FUNCTION_DEL
 	published map[string]publishedRoute // currently published routes by name
 	retained  []PublicationHandle       // handles retained across a transition
@@ -84,7 +72,6 @@ func NewPublication(epoch uint64, port PublicationPort) (*Publication, error) {
 // mutation quantum, bounds the snapshot.
 func (p *Publication) ApplyInitialSnapshot(
 	epoch, version uint64,
-	digest [32]byte,
 	catalogStorageBytes int64,
 	changes []PublicationChange,
 ) error {
@@ -111,7 +98,7 @@ func (p *Publication) ApplyInitialSnapshot(
 			)
 		}
 	}
-	return p.applyTransition(epoch, version, digest, changes, 0, func() error {
+	return p.applyTransition(epoch, version, changes, 0, func() error {
 		return nil
 	}, nil, nil)
 }
@@ -122,7 +109,6 @@ func (p *Publication) ApplyInitialSnapshot(
 // mutations.
 func (p *Publication) ApplyTransition(
 	epoch, version uint64,
-	digest [32]byte,
 	changes []PublicationChange,
 	quiesce func() error,
 	commit func() error,
@@ -131,7 +117,6 @@ func (p *Publication) ApplyTransition(
 	return p.applyTransition(
 		epoch,
 		version,
-		digest,
 		changes,
 		MaximumMutationPublicationChanges,
 		commit,
@@ -142,7 +127,6 @@ func (p *Publication) ApplyTransition(
 
 func (p *Publication) applyTransition(
 	epoch, version uint64,
-	digest [32]byte,
 	changes []PublicationChange,
 	maximumChanges int,
 	commit func() error,
@@ -203,7 +187,6 @@ func (p *Publication) applyTransition(
 		p.published[change.Name] = next
 	}
 	p.version = version
-	p.digest = digest
 	return nil
 }
 
@@ -261,22 +244,6 @@ func (p *Publication) validateHandle(handle PublicationHandle, record Publicatio
 	return nil
 }
 
-func (p *Publication) Poll(epoch, version uint64, digest [32]byte) error {
-	if p == nil {
-		return errors.New("jobmgr Function publication: nil poll")
-	}
-	if p.dirty != nil {
-		return p.dirty
-	}
-	if p.stopped {
-		return errors.New("jobmgr Function publication: poll after stop")
-	}
-	if epoch != p.epoch || version != p.version || digest != p.digest {
-		return p.poison(errors.New("jobmgr Function publication: stale availability poll"))
-	}
-	return nil
-}
-
 func (p *Publication) Stop(epoch uint64) error {
 	if p == nil {
 		return nil
@@ -307,44 +274,10 @@ func (p *Publication) Stop(epoch uint64) error {
 	return errors.Join(p.dirty, stopErr)
 }
 
-func (p *Publication) Census() PublicationCensus {
-	if p == nil {
-		return PublicationCensus{}
-	}
-	return PublicationCensus{
-		Epoch: p.epoch, Version: p.version,
-		Published: len(p.published), RetainedHandles: len(p.retained),
-		Stopped: p.stopped, Dirty: p.dirty != nil,
-	}
-}
-
 func (p *Publication) poison(err error) error {
 	if err == nil {
 		return p.dirty
 	}
 	p.dirty = errors.Join(p.dirty, err)
 	return p.dirty
-}
-
-func DigestSortedPublications(records []PublicationRecord) ([32]byte, error) {
-	digest := sha256.New()
-	for index, record := range records {
-		if record.Name == "" || record.Generation == 0 || record.Timeout < 0 ||
-			record.Priority < 0 || record.Version < 0 ||
-			(index > 0 && records[index-1].Name >= record.Name) {
-			return [32]byte{}, errors.New("jobmgr Function publication: invalid or unsorted records")
-		}
-		writeDigestString(digest, record.Name)
-		writeDigestUint64(digest, record.Generation)
-		writeDigestUint64(digest, uint64(record.Timeout))
-		writeDigestString(digest, record.Help)
-		writeDigestString(digest, record.Tags)
-		writeDigestString(digest, record.Access)
-		writeDigestUint64(digest, uint64(record.Priority))
-		writeDigestUint64(digest, uint64(record.Version))
-		_, _ = digest.Write(record.AvailabilityDigest[:])
-	}
-	var result [32]byte
-	copy(result[:], digest.Sum(nil))
-	return result, nil
 }

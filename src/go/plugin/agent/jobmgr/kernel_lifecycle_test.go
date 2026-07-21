@@ -425,8 +425,8 @@ func TestFunctionHandlerCleanupRunsOffKernelLoop(t *testing.T) {
 				},
 			}, nil
 		},
-		complete: func(_ FunctionCleanupRef, err error) error {
-			cleanupCompleted <- err
+		complete: func(FunctionCleanupRef) error {
+			cleanupCompleted <- nil
 			return nil
 		},
 	}
@@ -2843,7 +2843,7 @@ func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing
 
 	select {
 	case grant := <-grants:
-		require.False(t, grant.Kind != lifecycle.ReservationInputBodyGrowth || grant.InputBodyToken != token || grant.Bytes != capacity)
+		require.False(t, grant.Kind != lifecycle.ReservationInputBodyGrowth || grant.InputBodyToken != token)
 	default:
 		require.FailNow(t, "test failed", "shutdown did not settle the pending input body growth")
 	}
@@ -3749,7 +3749,7 @@ type testFunctionCatalog struct {
 type functionCatalogPortStub struct {
 	resolve  func(FunctionLookup) (FunctionCatalogDecision, error)
 	release  func(FunctionInvocationRef) (FunctionCleanupPlan, error)
-	complete func(FunctionCleanupRef, error) error
+	complete func(FunctionCleanupRef) error
 }
 
 func (fcps functionCatalogPortStub) ResolveAndAcquire(lookup FunctionLookup) (FunctionCatalogDecision, error) {
@@ -3760,11 +3760,11 @@ func (fcps functionCatalogPortStub) ReleaseInvocation(ref FunctionInvocationRef)
 	return fcps.release(ref)
 }
 
-func (fcps functionCatalogPortStub) CompleteCleanup(ref FunctionCleanupRef, err error) error {
+func (fcps functionCatalogPortStub) CompleteCleanup(ref FunctionCleanupRef) error {
 	if fcps.complete == nil {
 		return nil
 	}
-	return fcps.complete(ref, err)
+	return fcps.complete(ref)
 }
 
 func (functionCatalogPortStub) BeginMutation(FunctionCatalogMutation) error {
@@ -3840,7 +3840,7 @@ func (tfc *testFunctionCatalog) ReleaseInvocation(ref FunctionInvocationRef) (Fu
 	return FunctionCleanupPlan{}, nil
 }
 
-func (*testFunctionCatalog) CompleteCleanup(FunctionCleanupRef, error) error { return nil }
+func (*testFunctionCatalog) CompleteCleanup(FunctionCleanupRef) error { return nil }
 
 func (*testFunctionCatalog) BeginMutation(FunctionCatalogMutation) error {
 	return errors.New("test Function catalog: mutations unsupported")

@@ -23,20 +23,12 @@ type SecretDependencyIndex struct {
 
 	jobs    map[string]jobDependency       // per-job dependency record by job full name
 	byStore map[string]map[string]struct{} // job set by store key (reverse index)
-	commits uint64                         // monotonic mutation counter
 }
 
 type jobDependency struct {
 	display   string
 	running   bool
 	storeKeys []string
-}
-
-type SecretDependencyCensus struct {
-	Jobs       int    // count of jobs with dependencies
-	StoreKeys  int    // count of distinct store keys depended on
-	References int    // total job->store references
-	Commits    uint64 // mutation counter
 }
 
 func NewSecretDependencyIndex() *SecretDependencyIndex {
@@ -116,22 +108,6 @@ func (sdi *SecretDependencyIndex) Affected(
 	return refs
 }
 
-func (sdi *SecretDependencyIndex) Census() SecretDependencyCensus {
-	if sdi == nil {
-		return SecretDependencyCensus{}
-	}
-	sdi.mu.RLock()
-	defer sdi.mu.RUnlock()
-	census := SecretDependencyCensus{
-		Jobs: len(sdi.jobs), StoreKeys: len(sdi.byStore),
-		Commits: sdi.commits,
-	}
-	for _, jobs := range sdi.byStore {
-		census.References += len(jobs)
-	}
-	return census
-}
-
 func (sdi *SecretDependencyIndex) commitJobChange(
 	id string,
 	next *jobDependency,
@@ -163,5 +139,4 @@ func (sdi *SecretDependencyIndex) commitJobChange(
 			jobs[id] = struct{}{}
 		}
 	}
-	sdi.commits++
 }

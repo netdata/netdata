@@ -233,7 +233,7 @@ func TestAdmissionShutdownSettlesOnlyPendingInputBodyGrowth(t *testing.T) {
 	require.NoError(t, err)
 	grant, waiting, err := ledger.TakeShutdownInputBodyGrant(1)
 	require.False(t, err != nil || waiting)
-	require.False(t, grant.Kind != ReservationInputBodyGrowth || grant.InputBodyToken != token || grant.Bytes != capacity)
+	require.False(t, grant.Kind != ReservationInputBodyGrowth || grant.InputBodyToken != token)
 
 	census := ledger.Census()
 	require.False(t, census.OrdinaryWaiting != 1 || !census.InputBodyActive || census.InputBodyWaiting)
@@ -388,7 +388,7 @@ func TestAdmissionOrdinaryGrowthRetainsOneRecordAndWaitsByDelta(t *testing.T) {
 	ready, wake, err := ledger.ResizeOrdinary(second.Ref, OrdinaryBudgetBytes-101)
 	require.False(t, err != nil || !ready || !wake)
 	count, _, err = ledger.TakeGrants(1, &grants)
-	require.False(t, err != nil || count != 1 || grants[0].Ref != first.Ref || grants[0].Kind != ReservationOrdinaryGrowth || grants[0].Bytes != 101)
+	require.False(t, err != nil || count != 1 || grants[0].Ref != first.Ref || grants[0].Kind != ReservationOrdinaryGrowth)
 
 	_, releaseOrdinaryErr := ledger.ReleaseOrdinary(first.Ref)
 	require.NoError(t, releaseOrdinaryErr)
@@ -405,7 +405,7 @@ func TestAdmissionInputBodyGrowthTransfersIntoOperationRecord(t *testing.T) {
 	require.NoError(t, err)
 	var grants [4]AdmissionGrant
 	count, _, err := ledger.TakeGrants(4, &grants)
-	require.False(t, err != nil || count != 1 || grants[0].Kind != ReservationInputBodyGrowth || grants[0].InputBodyToken != token || grants[0].Bytes != initial)
+	require.False(t, err != nil || count != 1 || grants[0].Kind != ReservationInputBodyGrowth || grants[0].InputBodyToken != token)
 
 	_, commitInputBodyGrowthErr := ledger.CommitInputBodyGrowth(token, initial)
 	require.NoError(t, commitInputBodyGrowthErr)
@@ -416,7 +416,7 @@ func TestAdmissionInputBodyGrowthTransfersIntoOperationRecord(t *testing.T) {
 	require.False(t, requestInputBodyGrowthErr != nil || requestInputBodyGrowthNext != token)
 
 	count, _, err = ledger.TakeGrants(4, &grants)
-	require.False(t, err != nil || count != 1 || grants[0].Kind != ReservationInputBodyGrowth || grants[0].Bytes != initial+grown)
+	require.False(t, err != nil || count != 1 || grants[0].Kind != ReservationInputBodyGrowth)
 
 	census := ledger.Census()
 	require.False(t, census.OrdinaryBytes != initial+grown || census.InputBodyBytes != initial+grown)
@@ -432,7 +432,7 @@ func TestAdmissionInputBodyGrowthTransfersIntoOperationRecord(t *testing.T) {
 	require.False(t, ledgerCensus.InputBodyActive || ledgerCensus.InputBodyBytes != 0 || ledgerCensus.ActiveRecords != 1 || ledgerCensus.OrdinaryBytes != grown)
 
 	count, _, err = ledger.TakeGrants(4, &grants)
-	require.False(t, err != nil || count != 1 || grants[0].Kind != ReservationOrdinary || grants[0].Ref != transferred.Ref || grants[0].Bytes != grown+512)
+	require.False(t, err != nil || count != 1 || grants[0].Kind != ReservationOrdinary || grants[0].Ref != transferred.Ref)
 
 	_, releaseOrdinaryErr := ledger.ReleaseOrdinary(transferred.Ref)
 	require.NoError(t, releaseOrdinaryErr)
@@ -1501,7 +1501,7 @@ func TestFunctionPayloadAndFrameCapacityAreSeparateFromControlReserve(t *testing
 	require.NoError(t, owner.Commit(frame))
 
 	census := owner.Census()
-	require.False(t, census.Commits != 1 || census.RetainedBytes != 0)
+	require.Zero(t, census.RetainedBytes)
 }
 
 func TestFunctionFrameSizePreflightsBeforeAppend(t *testing.T) {

@@ -352,7 +352,6 @@ type MutationBuilder struct {
 	root         *catalogNode               // working postimage trie root during construction
 	change       int                        // per-phase change cursor index
 	generation   int                        // per-phase generation cursor index
-	routeOrdinal uint64                     // ID offset for newly added routes
 	step         routeMutationStep          // scratch state for the current route step
 	transitions  []routeTransition          // accumulated route transitions
 	removals     []generationRemoval        // accumulated generation removals
@@ -383,14 +382,7 @@ func (c *Catalog) startMutation(mutation *Mutation) (*MutationBuilder, error) {
 		}
 		return nil, errors.New("jobmgr Function catalog: invalid mutation admission")
 	}
-	additions := 0
-	for index := range mutation.changes {
-		if mutation.changes[index].declaration != nil {
-			additions++
-		}
-	}
-	if uint64(additions) > math.MaxUint64-c.nextRouteID ||
-		uint64(len(mutation.generations)) > uint64(math.MaxUint32-c.nextGenerationID) {
+	if uint64(len(mutation.generations)) > uint64(math.MaxUint32-c.nextGenerationID) {
 		_ = mutation.Discard()
 		return nil, errors.New("jobmgr Function catalog: mutation identity exhausted")
 	}
@@ -567,9 +559,7 @@ func (mb *MutationBuilder) startRouteStep() {
 		transition := &mb.transitions[mb.change]
 		if change.declaration != nil {
 			preparedGeneration := &mb.mutation.generations[change.generation-1]
-			mb.routeOrdinal++
 			*change.resolved = route{
-				id:         mb.catalog.nextRouteID + mb.routeOrdinal,
 				publicName: change.publicName, prefix: change.prefix,
 				method: change.declaration.ID, handler: preparedGeneration.generation,
 				resource:            change.declaration.Resource,
@@ -895,7 +885,6 @@ func (c *Catalog) commitMutation(postimage *MutationPostimage, cleanups *[jobmgr
 			cleanupCount++
 		}
 	}
-	c.nextRouteID += postimage.builder.routeOrdinal
 	c.nextGenerationID += uint32(len(builder.mutation.generations))
 	c.version++
 	c.mutation = nil

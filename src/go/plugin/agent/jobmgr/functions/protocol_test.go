@@ -113,7 +113,7 @@ func TestFunctionPublicationFrameNoHandleBeforeCommit(t *testing.T) {
 	require.False(t, err == nil || handle != (PublicationHandle{}))
 
 	census := owner.Census()
-	require.False(t, !census.Poisoned || census.Commits != 0)
+	require.True(t, census.Poisoned)
 }
 
 type failingFunctionFrameWriter struct {

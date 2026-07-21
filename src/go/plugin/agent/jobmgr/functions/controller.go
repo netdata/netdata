@@ -353,10 +353,6 @@ func (c *Controller) Activate() error {
 		return errors.New("jobmgr Function controller: invalid activation")
 	}
 	records := c.publicationRecordsLocked(c.routes)
-	digest, err := DigestSortedPublications(records)
-	if err != nil {
-		return err
-	}
 	changes := make([]PublicationChange, 0, len(records))
 	for index := range records {
 		record := records[index]
@@ -365,7 +361,6 @@ func (c *Controller) Activate() error {
 	if err := c.publication.ApplyInitialSnapshot(
 		c.epoch,
 		c.version,
-		digest,
 		c.catalog.storage.published.Load(),
 		changes,
 	); err != nil {
@@ -645,17 +640,11 @@ func (c *Controller) reconcileModuleLocked(
 	}()
 	retired := retiredMethodGenerations(c.groups, nextGroups)
 	publicationChanges := controllerPublicationChanges(c.routes, nextRoutes)
-	records := c.publicationRecordsLocked(nextRoutes)
-	digest, err := DigestSortedPublications(records)
-	if err != nil {
-		return nil, errors.Join(err, mutation.Discard())
-	}
 	expectedVersion := c.version + 1
 	transitionCtx := context.WithoutCancel(ctx)
 	err = c.publication.ApplyTransition(
 		c.epoch,
 		expectedVersion,
-		digest,
 		publicationChanges,
 		func() error {
 			return c.mutations.QuiesceFunctions(ctx, mutation)

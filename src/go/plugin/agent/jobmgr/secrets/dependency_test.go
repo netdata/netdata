@@ -113,8 +113,8 @@ func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 
 	require.EqualValues(t, 0, len(index.Affected("aws-sm:prod", false)))
 
-	census := index.Census()
-	require.False(t, census.Jobs != 1 || census.StoreKeys != 1 || census.References != 1 || census.Commits != 3)
+	refs = index.Affected("vault:main", false)
+	require.False(t, len(refs) != 1 || refs[0].ID != "module_two")
 }
 
 func BenchmarkBSecretDependencyLookup(b *testing.B) {

@@ -175,15 +175,6 @@ func (call *atomicResolveCall) resolveString(value string) (string, error) {
 	return builder.String(), nil
 }
 
-func visitAtomicReferences(value string, visit func(atomicReference) error) error {
-	return visitAtomicReferenceSpans(
-		value,
-		func(_, _ int, reference atomicReference) error {
-			return visit(reference)
-		},
-	)
-}
-
 func visitAtomicReferenceSpans(
 	value string,
 	visit func(int, int, atomicReference) error,

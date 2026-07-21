@@ -188,16 +188,6 @@ type Declaration struct {
 	RawPayload          bool                            // skip JSON validation; pass the payload verbatim
 }
 
-type HandlerGenerationCensus struct {
-	ID               string
-	RouteReferences  int
-	InvocationLeases int
-	AdmissionClosed  bool
-	CleanupPending   bool
-	Cleaned          bool
-	CleanupFailed    bool
-}
-
 type CatalogCensus = jobmgr.FunctionCatalogCensus
 
 type handlerGeneration struct {
@@ -211,7 +201,6 @@ type handlerGeneration struct {
 	admissionClosed  bool // no new invocations admitted (retiring)
 	cleanupPending   bool // cleanup task dispatched, awaiting acknowledgement
 	cleaned          bool // cleanup acknowledged; generation released
-	cleanupFailed    bool // cleanup failed
 	retentionCharged bool // the 4-KiB cleanup retention allowance is charged
 }
 
@@ -222,20 +211,7 @@ func (hg *handlerGeneration) RunTask(ctx context.Context) (lifecycle.TaskOutcome
 	return lifecycle.NoValueOutcome(), hg.cleanup(ctx)
 }
 
-func (hg *handlerGeneration) census() HandlerGenerationCensus {
-	if hg == nil {
-		return HandlerGenerationCensus{}
-	}
-	return HandlerGenerationCensus{
-		ID: hg.id, RouteReferences: hg.routeReferences,
-		InvocationLeases: hg.invocationLeases, AdmissionClosed: hg.admissionClosed,
-		CleanupPending: hg.cleanupPending, Cleaned: hg.cleaned,
-		CleanupFailed: hg.cleanupFailed,
-	}
-}
-
 type route struct {
-	id                  uint64                          // stable catalog-assigned route identity
 	publicName          string                          // exact Function name key into the name trie
 	prefix              string                          // optional arg[0] prefix; empty = an exact route
 	method              string                          // handler method ID passed to the generation on invoke
@@ -442,14 +418,11 @@ type Catalog struct {
 
 	deferredPrune *route // routes whose prune is deferred while a mutation is active
 
-	nextRouteID      uint64 // next route ID to assign
 	nextGenerationID uint32 // next handler-generation ID to assign
 	version          uint64 // catalog version, bumped per committed mutation
 	routeCount       int    // count of live routes
 	invocationCount  int    // count of active invocations
 	pendingCleanups  int    // count of generations with cleanup pending
-	completedCleanup int    // count of completed cleanups
-	failedCleanup    int    // count of failed cleanups
 	closed           bool   // catalog is closed (shutdown)
 }
 
@@ -505,7 +478,6 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 	catalog := &Catalog{
 		generations: make(map[jobmgr.FunctionCleanupRef]*handlerGeneration, len(declarations)),
 		invocations: make([]*invocationSlot, 1),
-		nextRouteID: 1,
 		version:     1,
 	}
 
@@ -545,13 +517,9 @@ func (c *Catalog) addInitial(declaration Declaration, generation *handlerGenerat
 		generation.cleanupRef = jobmgr.FunctionCleanupRef{Slot: c.nextGenerationID, Generation: 1}
 		c.generations[generation.cleanupRef] = generation
 	}
-	c.nextRouteID++
-	if c.nextRouteID == 0 {
-		return errors.New("jobmgr Function catalog: route identity wrapped")
-	}
 	resolved := &route{
-		id: c.nextRouteID, publicName: declaration.PublicName,
-		prefix: declaration.Prefix, method: declaration.ID,
+		publicName: declaration.PublicName,
+		prefix:     declaration.Prefix, method: declaration.ID,
 		handler: generation, resource: declaration.Resource,
 		cooperativeCancel:   declaration.CooperativeCancel,
 		cooperativeDeadline: declaration.CooperativeDeadline,
@@ -1010,7 +978,6 @@ func pruneRetiringRoute(
 func (c *Catalog) cleanupDrainedGeneration(generation *handlerGeneration) jobmgr.FunctionCleanupPlan {
 	if generation.cleanup == nil {
 		generation.cleaned = true
-		c.completedCleanup++
 		delete(c.generations, generation.cleanupRef)
 		return jobmgr.FunctionCleanupPlan{}
 	}
@@ -1019,7 +986,7 @@ func (c *Catalog) cleanupDrainedGeneration(generation *handlerGeneration) jobmgr
 	return jobmgr.FunctionCleanupPlan{Ref: generation.cleanupRef, Runner: generation}
 }
 
-func (c *Catalog) CompleteCleanup(ref jobmgr.FunctionCleanupRef, cleanupErr error) error {
+func (c *Catalog) CompleteCleanup(ref jobmgr.FunctionCleanupRef) error {
 	if c == nil || !ref.Valid() {
 		return errors.New("jobmgr Function catalog: invalid cleanup completion")
 	}
@@ -1041,12 +1008,7 @@ func (c *Catalog) CompleteCleanup(ref jobmgr.FunctionCleanupRef, cleanupErr erro
 	generation.retentionCharged = false
 	generation.cleanupPending = false
 	generation.cleaned = true
-	generation.cleanupFailed = cleanupErr != nil
 	c.pendingCleanups--
-	c.completedCleanup++
-	if cleanupErr != nil {
-		c.failedCleanup++
-	}
 	delete(c.generations, ref)
 	return nil
 }
@@ -1128,19 +1090,11 @@ func (c *Catalog) Census() CatalogCensus {
 	return CatalogCensus{
 		Version: c.version, Routes: c.routeCount,
 		InvocationLeases: c.invocationCount, PendingCleanups: c.pendingCleanups,
-		CompletedCleanups: c.completedCleanup, FailedCleanups: c.failedCleanup,
-		Closed: c.closed, CloseRoutesPending: c.routeCount,
+		Closed:         c.closed,
 		MutationActive: c.mutation != nil,
 	}
 }
 
 func (c *Catalog) LifecycleCensus() jobmgr.FunctionCatalogCensus {
 	return c.Census()
-}
-
-func (c *Catalog) HandlerCensus(ref jobmgr.FunctionCleanupRef) HandlerGenerationCensus {
-	if c == nil {
-		return HandlerGenerationCensus{}
-	}
-	return c.generations[ref].census()
 }

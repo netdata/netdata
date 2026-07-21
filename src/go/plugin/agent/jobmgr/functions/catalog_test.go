@@ -375,12 +375,12 @@ func TestHandlerLeaseLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, outcome.Kind() != lifecycle.TaskOutcomeNone || cleanupCalls.Load() != 1)
 
-	require.NoError(t, catalog.CompleteCleanup(cleanup.Ref, nil))
+	require.NoError(t, catalog.CompleteCleanup(cleanup.Ref))
 
-	require.Error(t, catalog.CompleteCleanup(cleanup.Ref, nil))
+	require.Error(t, catalog.CompleteCleanup(cleanup.Ref))
 
 	census := catalog.Census()
-	require.False(t, census.PendingCleanups != 0 || census.CompletedCleanups != 1 || census.FailedCleanups != 0)
+	require.Zero(t, census.PendingCleanups)
 }
 
 func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
@@ -599,14 +599,6 @@ func TestFunctionCatalogReaddsRouteBeforeRetiredLeaseDrains(t *testing.T) {
 			)
 			catalog, err := NewCatalog([]Declaration{target, sibling})
 			require.NoError(t, err)
-			var oldRef jobmgr.FunctionCleanupRef
-			for ref, generation := range catalog.generations {
-				if generation.id == "old-shared" {
-					oldRef = ref
-					break
-				}
-			}
-			require.True(t, oldRef.Valid())
 			held, err := catalog.ResolveAndAcquire(
 				jobmgr.FunctionLookup{
 					UID:   "held-old",
@@ -656,8 +648,13 @@ func TestFunctionCatalogReaddsRouteBeforeRetiredLeaseDrains(t *testing.T) {
 			require.NoError(t, err)
 			require.False(t, cleanup.Ref.Valid())
 
-			census := catalog.HandlerCensus(oldRef)
-			require.False(t, census.RouteReferences != 1 || census.InvocationLeases != 0 || census.AdmissionClosed)
+			siblingInvocation, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+				UID: "sibling", Route: "sibling",
+			})
+			require.NoError(t, err)
+			cleanup, err = catalog.ReleaseInvocation(siblingInvocation.Lease)
+			require.NoError(t, err)
+			require.False(t, cleanup.Ref.Valid())
 		})
 	}
 }
@@ -867,7 +864,7 @@ func TestHandlerCleanupOnce(t *testing.T) {
 			_, runTaskErr := cleanup.Runner.RunTask(context.Background())
 			require.NoError(t, runTaskErr)
 
-			require.NoError(t, catalog.CompleteCleanup(cleanup.Ref, nil))
+			require.NoError(t, catalog.CompleteCleanup(cleanup.Ref))
 
 			total++
 		}
@@ -878,7 +875,7 @@ func TestHandlerCleanupOnce(t *testing.T) {
 	require.False(t, total != 1 || cleanupCalls.Load() != 1)
 
 	census := catalog.Census()
-	require.False(t, census.Routes != 0 || census.CloseRoutesPending != 0 || census.CompletedCleanups != 1)
+	require.Zero(t, census.Routes)
 }
 
 func TestFunctionCatalogRetainsGenerationStorageUntilCleanupCompletion(
@@ -1464,5 +1461,5 @@ func runCleanupPlan(t *testing.T, catalog *Catalog, cleanup jobmgr.FunctionClean
 	_, err := cleanup.Runner.RunTask(context.Background())
 	require.NoError(t, err)
 
-	require.NoError(t, catalog.CompleteCleanup(cleanup.Ref, nil))
+	require.NoError(t, catalog.CompleteCleanup(cleanup.Ref))
 }

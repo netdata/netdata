@@ -51,11 +51,9 @@ type AdmissionRequestResult struct {
 }
 
 type AdmissionGrant struct {
-	Ref            AdmissionRef     // reservation this grant satisfies
-	InputBodyToken uint64           // input-body token when Kind is an input-body growth grant
-	Kind           ReservationKind  // reservation kind (ordinary / input-body growth)
-	Bytes          int64            // granted byte amount
-	Lane           AdmissionLaneRef // admission lane the reservation belongs to
+	Ref            AdmissionRef    // reservation this grant satisfies
+	InputBodyToken uint64          // input-body token when Kind is an input-body growth grant
+	Kind           ReservationKind // reservation kind (ordinary / input-body growth)
 }
 
 type AdmissionCensus struct {
@@ -1205,11 +1203,11 @@ func (al *AdmissionLedger) oldestFitting(available int64) (slot uint32) {
 func (al *AdmissionLedger) grant(slot uint32, kind ReservationKind) AdmissionGrant {
 	record := al.records[slot]
 	if kind == ReservationInputBodyGrowth {
-		return AdmissionGrant{InputBodyToken: uint64(record.generation), Kind: kind, Bytes: record.heldBytes}
+		return AdmissionGrant{InputBodyToken: uint64(record.generation), Kind: kind}
 	}
 	return AdmissionGrant{
 		Ref:  AdmissionRef{Slot: slot, Generation: record.generation},
-		Kind: kind, Bytes: record.heldBytes, Lane: record.lane,
+		Kind: kind,
 	}
 }
 

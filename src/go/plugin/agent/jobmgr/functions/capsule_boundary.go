@@ -24,16 +24,7 @@ type capsuleBoundary struct {
 	adopting  bool                // an Adopt preparation is draining the boundary
 	contained bool                // terminal; target detached, reads discarded
 
-	readReturns    int // total AcquireInputRead calls (census)
-	waitingReads   int // reads currently parked awaiting live state (census)
-	discardedReads int // reads dropped because contained/detached (census)
-}
-
-type capsuleBoundaryCensus struct {
-	ReadReturns        int
-	WaitingReadReturns int
-	DiscardedReads     int
-	CapabilityAttached bool
+	waitingReads int // reads currently parked; fence waits for them to return
 }
 
 func newCapsuleBoundary(target *ProcessIngress) (*capsuleBoundary, error) {
@@ -149,16 +140,16 @@ func (cb *capsuleBoundary) abortAdopt() {
 	cb.mu.Unlock()
 }
 
-func (cb *capsuleBoundary) fence(ctx context.Context) error {
+func (cb *capsuleBoundary) fence(ctx context.Context) (bool, error) {
 	cb.mu.Lock()
 	if cb.state != ProcessIngressPaused || cb.contained || cb.adopting {
 		cb.mu.Unlock()
-		return errors.New("jobmgr Function process ingress: capsule fence outside drained pause")
+		return false, errors.New("jobmgr Function process ingress: capsule fence outside drained pause")
 	}
 	for cb.active != 0 || cb.parsing {
 		if err := cb.waitLocked(ctx); err != nil {
 			cb.mu.Unlock()
-			return err
+			return false, err
 		}
 	}
 	cb.target = nil
@@ -168,11 +159,11 @@ func (cb *capsuleBoundary) fence(ctx context.Context) error {
 	for cb.waitingReads != 0 {
 		if err := cb.waitLocked(ctx); err != nil {
 			cb.mu.Unlock()
-			return err
+			return true, err
 		}
 	}
 	cb.mu.Unlock()
-	return nil
+	return true, nil
 }
 
 func (cb *capsuleBoundary) acquire() (*ProcessIngress, bool) {
@@ -189,9 +180,7 @@ func (cb *capsuleBoundary) acquire() (*ProcessIngress, bool) {
 
 func (cb *capsuleBoundary) AcquireInputRead(ctx context.Context, _ bool) (bool, error) {
 	cb.mu.Lock()
-	cb.readReturns++
 	if cb.contained || cb.target == nil {
-		cb.discardedReads++
 		cb.mu.Unlock()
 		return false, nil
 	}
@@ -204,7 +193,6 @@ func (cb *capsuleBoundary) AcquireInputRead(ctx context.Context, _ bool) (bool, 
 			if waiting {
 				cb.waitingReads--
 			}
-			cb.discardedReads++
 			cb.signalLocked()
 			cb.mu.Unlock()
 			return false, nil
@@ -235,17 +223,6 @@ func (cb *capsuleBoundary) AcquireInputRead(ctx context.Context, _ bool) (bool, 
 			cb.mu.Unlock()
 			return false, err
 		}
-	}
-}
-
-func (cb *capsuleBoundary) census() capsuleBoundaryCensus {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-	return capsuleBoundaryCensus{
-		ReadReturns:        cb.readReturns,
-		WaitingReadReturns: cb.waitingReads,
-		DiscardedReads:     cb.discardedReads,
-		CapabilityAttached: cb.target != nil,
 	}
 }
 

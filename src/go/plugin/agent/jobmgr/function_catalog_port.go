@@ -74,15 +74,12 @@ type FunctionCatalogMutationProgress struct {
 }
 
 type FunctionCatalogCensus struct {
-	Version            uint64 // catalog version
-	Routes             int    // count of live routes
-	InvocationLeases   int    // outstanding invocation leases
-	PendingCleanups    int    // generations with cleanup pending
-	CompletedCleanups  int    // completed cleanups
-	FailedCleanups     int    // failed cleanups
-	CloseRoutesPending int    // routes still on the close list
-	Closed             bool   // catalog is closed
-	MutationActive     bool   // a catalog mutation is in progress
+	Version          uint64 // catalog version
+	Routes           int    // count of live routes
+	InvocationLeases int    // outstanding invocation leases
+	PendingCleanups  int    // generations with cleanup pending
+	Closed           bool   // catalog is closed
+	MutationActive   bool   // a catalog mutation is in progress
 }
 
 func (fcp FunctionCleanupPlan) validate() error {
@@ -153,7 +150,7 @@ func (fcd FunctionCatalogDecision) validate() error {
 type FunctionCatalogPort interface {
 	ResolveAndAcquire(FunctionLookup) (FunctionCatalogDecision, error)
 	ReleaseInvocation(FunctionInvocationRef) (FunctionCleanupPlan, error)
-	CompleteCleanup(FunctionCleanupRef, error) error
+	CompleteCleanup(FunctionCleanupRef) error
 	BeginMutation(FunctionCatalogMutation) error
 	AdvanceMutationQuiesce(int) (FunctionCatalogMutationProgress, error)
 	ResumeMutation(FunctionCatalogMutation) error

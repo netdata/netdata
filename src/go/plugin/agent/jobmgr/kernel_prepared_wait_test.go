@@ -516,7 +516,6 @@ func (*shutdownActionMutationCatalog) ReleaseInvocation(
 
 func (*shutdownActionMutationCatalog) CompleteCleanup(
 	FunctionCleanupRef,
-	error,
 ) error {
 	return nil
 }

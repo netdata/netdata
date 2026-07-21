@@ -44,8 +44,7 @@ type decisionCandidateKey struct {
 }
 
 type acknowledgedConfig struct {
-	config   confgroup.Config
-	revision uint64
+	config confgroup.Config
 }
 
 func NewDecisionIndex(config DecisionConfig) (*DecisionIndex, error) {
@@ -221,10 +220,7 @@ func (di *DecisionIndex) reconcile(
 	}
 	di.revision = revision
 	if hasNext {
-		di.acknowledged[fullName] = acknowledgedConfig{
-			config:   next,
-			revision: revision,
-		}
+		di.acknowledged[fullName] = acknowledgedConfig{config: next}
 	} else {
 		delete(di.acknowledged, fullName)
 	}

@@ -76,7 +76,6 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 		census.Routes != 0 ||
 		census.InvocationLeases != 0 ||
 		census.PendingCleanups != 0 ||
-		census.CompletedCleanups != population ||
 		cleanupCalls.Load() != population)
 
 	published := catalog.storage.published.Load()

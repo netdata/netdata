@@ -22,22 +22,12 @@ const (
 )
 
 type ProcessIngressCensus struct {
-	State                  ProcessIngressState
-	CapsulePayloadBytes    int
-	ActiveDeliveries       int
-	ReadReturns            int
-	WaitingReadReturns     int
-	DiscardedReads         int
-	BudgetOperations       int
-	ReaderStarts           int
-	CapsulePayloadCapacity int
-	RunGeneration          uint64
-	CapsuleDiscardingLine  bool
-	CapsulePayloadActive   bool
-	CapabilityAttached     bool
-	PendingBody            bool
-	BodyBindingAttached    bool
-	BodySuspended          bool
+	State            ProcessIngressState
+	ActiveDeliveries int
+	BudgetOperations int
+	ReaderStarts     int
+	RunGeneration    uint64
+	PendingBody      bool
 }
 
 type processInputPort interface {
@@ -303,25 +293,6 @@ func (pi *ProcessIngress) DrainPause(ctx context.Context, nextGeneration uint64)
 	return pauseErr
 }
 
-func (pi *ProcessIngress) Pause(ctx context.Context, nextGeneration uint64) error {
-	if err := pi.SealPause(); err != nil {
-		return err
-	}
-	if err := pi.DrainPause(ctx, nextGeneration); err != nil {
-		pi.mu.Lock()
-		rollback := pi.state == ProcessIngressLive && pi.pauseSealed
-		if rollback {
-			pi.pauseSealed = false
-		}
-		pi.mu.Unlock()
-		if rollback {
-			_ = pi.boundary.rollbackPause()
-		}
-		return err
-	}
-	return nil
-}
-
 func (pi *ProcessIngress) Fence(ctx context.Context) error {
 	if ctx == nil {
 		return errors.New("jobmgr Function process ingress: nil fence context")
@@ -356,9 +327,8 @@ func (pi *ProcessIngress) Fence(ctx context.Context) error {
 			releaseErr = errors.New("jobmgr Function process ingress: suspended body release exposed unrelated grantable work")
 		}
 	}
-	fenceErr := pi.boundary.fence(ctx)
-	boundary := pi.boundary.census()
-	if !boundary.CapabilityAttached {
+	detached, fenceErr := pi.boundary.fence(ctx)
+	if detached {
 		pi.mu.Lock()
 		pi.state = ProcessIngressContained
 		pi.runGeneration = 0
@@ -375,28 +345,13 @@ func (pi *ProcessIngress) Census() ProcessIngressCensus {
 }
 
 func (pi *ProcessIngress) censusLocked() ProcessIngressCensus {
-	boundary := pi.boundary.census()
-	var contained functionwire.ContainedInputCensus
-	if pi.state == ProcessIngressContained {
-		contained = pi.capsule.ContainedCensus()
-	}
 	return ProcessIngressCensus{
-		State:                  pi.state,
-		RunGeneration:          pi.runGeneration,
-		ReaderStarts:           pi.readerStarts,
-		ReadReturns:            boundary.ReadReturns,
-		WaitingReadReturns:     boundary.WaitingReadReturns,
-		DiscardedReads:         boundary.DiscardedReads,
-		CapabilityAttached:     boundary.CapabilityAttached,
-		CapsulePayloadActive:   contained.PayloadActive,
-		CapsulePayloadBytes:    contained.PayloadBytes,
-		CapsulePayloadCapacity: contained.PayloadCapacity,
-		CapsuleDiscardingLine:  contained.DiscardingLine,
-		ActiveDeliveries:       pi.deliveries,
-		BudgetOperations:       pi.budgetOps,
-		PendingBody:            pi.body != nil || pi.bodySuspended,
-		BodyBindingAttached:    pi.body != nil,
-		BodySuspended:          pi.bodySuspended,
+		State:            pi.state,
+		RunGeneration:    pi.runGeneration,
+		ReaderStarts:     pi.readerStarts,
+		ActiveDeliveries: pi.deliveries,
+		BudgetOperations: pi.budgetOps,
+		PendingBody:      pi.body != nil || pi.bodySuspended,
 	}
 }
 

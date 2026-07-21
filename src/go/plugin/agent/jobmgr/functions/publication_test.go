@@ -59,13 +59,6 @@ func publicationRecord(name string, generation uint64) PublicationRecord {
 	return PublicationRecord{Name: name, Generation: generation, Timeout: 1, Access: "0x0000"}
 }
 
-func publicationDigest(t testing.TB, records ...PublicationRecord) [32]byte {
-	t.Helper()
-	digest, err := DigestSortedPublications(records)
-	require.NoError(t, err)
-	return digest
-}
-
 func TestFunctionPublicationDiff(t *testing.T) {
 	port := newRecordingPublicationPort()
 	publication, err := NewPublication(1, port)
@@ -73,20 +66,16 @@ func TestFunctionPublicationDiff(t *testing.T) {
 	a := publicationRecord("a", 1)
 	b := publicationRecord("b", 1)
 
-	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, publicationDigest(t, a, b), 2, []PublicationChange{
+	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, 2, []PublicationChange{
 		{Name: "a", Record: &a}, {Name: "b", Record: &b},
 	}),
 	)
 
 	require.False(t, len(port.published) != 2 || len(port.withdrawn) != 0)
 
-	require.NoError(t, publication.Poll(1, 1, publicationDigest(t, a, b)))
-
-	require.False(t, len(port.published) != 2 || len(port.withdrawn) != 0)
-
 	a2 := publicationRecord("a", 2)
 
-	require.NoError(t, publication.ApplyTransition(1, 2, publicationDigest(t, a2), []PublicationChange{
+	require.NoError(t, publication.ApplyTransition(1, 2, []PublicationChange{
 		{Name: "a", Record: &a2}, {Name: "b"},
 	}, func() error { return nil }, func() error { return nil }, func() error {
 		return nil
@@ -100,9 +89,6 @@ func TestFunctionPublicationDiff(t *testing.T) {
 		got,
 		[]string{"withdraw:a", "withdraw:b", "publish:a"},
 	))
-
-	census := publication.Census()
-	require.False(t, census.Version != 2 || census.Published != 1 || census.Dirty || census.Stopped)
 
 	require.NoError(t, publication.Stop(1))
 
@@ -130,23 +116,19 @@ func TestFunctionPublicationNoRearm(t *testing.T) {
 	publication, err := NewPublication(1, port)
 	require.NoError(t, err)
 	record := publicationRecord("work", 1)
-	digest := publicationDigest(t, record)
-
-	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, digest, 1, []PublicationChange{{
+	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, 1, []PublicationChange{{
 		Name: record.Name, Record: &record,
 	}}),
 	)
 
 	require.NoError(t, publication.Stop(1))
 
-	require.Error(t, publication.ApplyTransition(1, 2, digest, []PublicationChange{{
+	require.Error(t, publication.ApplyTransition(1, 2, []PublicationChange{{
 		Name: record.Name, Record: &record,
 	}}, func() error { return nil }, func() error { return nil }, func() error {
 		return nil
 	}),
 	)
-
-	require.Error(t, publication.Poll(1, 1, digest))
 
 	require.False(t, len(port.published) != 1 || len(port.withdrawn) != 1 || len(port.active) != 0)
 }
@@ -169,14 +151,12 @@ func TestFunctionPublicationInitialSnapshotExceedsMutationQuantum(t *testing.T) 
 	require.NoError(t, publication.ApplyInitialSnapshot(
 		1,
 		1,
-		publicationDigest(t, records...),
 		int64(len(records)),
 		changes,
 	),
 	)
 
-	census := publication.Census()
-	require.False(t, census.Published != len(records) || census.Version != 1 || census.Dirty)
+	require.EqualValues(t, len(records), len(port.active))
 }
 
 func TestFunctionPublicationMutationCannotExceedQuantum(t *testing.T) {
@@ -184,7 +164,7 @@ func TestFunctionPublicationMutationCannotExceedQuantum(t *testing.T) {
 	publication, err := NewPublication(1, port)
 	require.NoError(t, err)
 
-	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, publicationDigest(t), 0, nil))
+	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, 0, nil))
 
 	changes := make([]PublicationChange, 0, MaximumMutationPublicationChanges+1)
 	for index := range MaximumMutationPublicationChanges + 1 {
@@ -199,7 +179,6 @@ func TestFunctionPublicationMutationCannotExceedQuantum(t *testing.T) {
 	require.Error(t, publication.ApplyTransition(
 		1,
 		2,
-		[32]byte{},
 		changes,
 		func() error {
 			committed = true
@@ -228,7 +207,6 @@ func TestFunctionPublicationTransitionOrdersCatalogBetweenFrames(t *testing.T) {
 	require.NoError(t, publication.ApplyInitialSnapshot(
 		1,
 		1,
-		publicationDigest(t, current),
 		1,
 		[]PublicationChange{{Name: current.Name, Record: &current}},
 	),
@@ -239,7 +217,6 @@ func TestFunctionPublicationTransitionOrdersCatalogBetweenFrames(t *testing.T) {
 	require.NoError(t, publication.ApplyTransition(
 		1,
 		2,
-		publicationDigest(t, next),
 		[]PublicationChange{{Name: next.Name, Record: &next}},
 		func() error {
 			port.events = append(port.events, "catalog:quiesce")
@@ -275,7 +252,6 @@ func TestFunctionPublicationWithdrawalFailureAbortsQuiescedCatalog(t *testing.T)
 	require.NoError(t, publication.ApplyInitialSnapshot(
 		1,
 		1,
-		publicationDigest(t, current),
 		1,
 		[]PublicationChange{{Name: current.Name, Record: &current}},
 	),
@@ -287,7 +263,6 @@ func TestFunctionPublicationWithdrawalFailureAbortsQuiescedCatalog(t *testing.T)
 	err = publication.ApplyTransition(
 		1,
 		2,
-		publicationDigest(t, next),
 		[]PublicationChange{{Name: next.Name, Record: &next}},
 		func() error {
 			quiesced = true
@@ -305,8 +280,7 @@ func TestFunctionPublicationWithdrawalFailureAbortsQuiescedCatalog(t *testing.T)
 	require.Error(t, err)
 	require.False(t, !quiesced || committed || !aborted)
 
-	census := publication.Census()
-	require.False(t, census.Version != 1 || census.Published != 1 || !census.Dirty)
+	require.EqualValues(t, 1, len(port.active))
 }
 
 func TestFunctionPublicationMismatchedAcknowledgementPoisonsAndRetainsHandle(t *testing.T) {
@@ -316,62 +290,14 @@ func TestFunctionPublicationMismatchedAcknowledgementPoisonsAndRetainsHandle(t *
 	require.NoError(t, err)
 	record := publicationRecord("work", 1)
 
-	require.Error(t, publication.ApplyInitialSnapshot(1, 1, publicationDigest(t, record), 1, []PublicationChange{{
+	require.Error(t, publication.ApplyInitialSnapshot(1, 1, 1, []PublicationChange{{
 		Name: record.Name, Record: &record,
 	}}),
 	)
 
-	census := publication.Census()
-	require.False(t, !census.Dirty || census.RetainedHandles != 1 || census.Published != 0)
+	require.EqualValues(t, 1, len(port.active))
 
 	require.Error(t, publication.Stop(1))
 
 	require.False(t, len(port.active) != 0 || len(port.withdrawn) != 1)
-}
-
-func TestFunctionPublicationSteadyPollAllocatesNothing(t *testing.T) {
-	port := newRecordingPublicationPort()
-	publication, err := NewPublication(1, port)
-	require.NoError(t, err)
-	record := publicationRecord("work", 1)
-	digest := publicationDigest(t, record)
-
-	require.NoError(t, publication.ApplyInitialSnapshot(
-		1,
-		1,
-		digest,
-		1,
-		[]PublicationChange{{
-			Name: record.Name, Record: &record,
-		}},
-	),
-	)
-
-	allocations := testing.AllocsPerRun(1_000, func() {
-		if pollErr := publication.Poll(1, 1, digest); pollErr != nil {
-			panic(pollErr)
-		}
-	})
-	require.EqualValues(t, 0, allocations)
-}
-
-func BenchmarkBFunctionPublication(b *testing.B) {
-	port := newRecordingPublicationPort()
-	publication, err := NewPublication(1, port)
-	if err != nil {
-		require.FailNow(b, "benchmark failed", err)
-	}
-	record := publicationRecord("work", 1)
-	digest := publicationDigest(b, record)
-	if err := publication.ApplyInitialSnapshot(1, 1, digest, 1, []PublicationChange{{
-		Name: record.Name, Record: &record,
-	}}); err != nil {
-		require.FailNow(b, "benchmark failed", err)
-	}
-	b.ReportAllocs()
-	for b.Loop() {
-		if err := publication.Poll(1, 1, digest); err != nil {
-			require.FailNow(b, "benchmark failed", err)
-		}
-	}
 }
