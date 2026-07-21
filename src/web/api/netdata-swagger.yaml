@@ -6722,7 +6722,7 @@ paths:
       description: |
         **Bearer Token Authentication Control**
 
-        This endpoint controls whether the Netdata agent requires bearer token authentication for API access. Bearer protection adds an additional security layer by requiring a valid bearer token in the Authorization header for routes that expose data (those requiring `HTTP_ACCESS_ANONYMOUS_DATA` or higher) when enabled. Routes declared with `HTTP_ACCESS_NONE` stay reachable without a bearer token.
+        This endpoint controls whether the Netdata agent requires bearer token authentication for API access. Bearer protection adds an additional security layer by downgrading unauthenticated requests to `HTTP_ACCESS_NONE` when enabled, so unauthenticated direct requests need a valid bearer token to reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`. Already-authenticated sessions (for example Netdata Cloud/ACLK) keep their permissions and are unaffected. Routes declared with `HTTP_ACCESS_NONE` do not acquire a generic bearer-token requirement; their own ACL, transport, and callback authorization still apply.
 
         **Use Cases:**
         - **Cloud Integration:** Enable bearer protection when agent is claimed to Netdata Cloud
@@ -6745,7 +6745,7 @@ paths:
         - All three identifiers must be present and match for the operation to succeed
 
         **Protection States:**
-        - **Enabled (true):** Requests to routes requiring `HTTP_ACCESS_ANONYMOUS_DATA` or higher require a valid bearer token in the Authorization header; `HTTP_ACCESS_NONE` routes (such as claim) remain reachable
+        - **Enabled (true):** Unauthenticated direct requests need a valid bearer token to reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`; already-authenticated sessions keep their permissions, and `HTTP_ACCESS_NONE` routes (such as claim) do not acquire a generic bearer-token requirement, though their own ACL, transport, and callback authorization still apply
         - **Disabled (false):** API requests do not require bearer tokens (default for unclaimed agents)
 
         **Important Notes:**
@@ -6759,7 +6759,7 @@ paths:
         **Typical Workflow:**
         1. Agent is claimed to Netdata Cloud
         2. Cloud calls this endpoint to enable bearer protection
-        3. Future API calls to data routes (requiring `HTTP_ACCESS_ANONYMOUS_DATA` or higher) require bearer tokens
+        3. Unauthenticated direct calls to routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA` then require bearer tokens (already-authenticated sessions keep their permissions)
         4. Cloud obtains tokens via `/api/v3/bearer_get_token` as needed
         5. Tokens are included in Authorization headers for authenticated requests
 
@@ -6792,7 +6792,7 @@ paths:
             - When agent is claimed, typically enabled by Netdata Cloud
 
             **Effect:**
-            - When enabled: requests to routes requiring `HTTP_ACCESS_ANONYMOUS_DATA` or higher must include a valid bearer token in the Authorization header; `HTTP_ACCESS_NONE` routes stay reachable
+            - When enabled: unauthenticated direct requests must include a valid bearer token to reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`; already-authenticated sessions keep their permissions, and `HTTP_ACCESS_NONE` routes do not acquire a generic bearer-token requirement, though their own ACL, transport, and callback authorization still apply
             - When disabled: API requests work without bearer tokens (less secure)
 
             Example: `bearer_protection=on`
