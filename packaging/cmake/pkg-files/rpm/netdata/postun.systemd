@@ -1,0 +1,2 @@
+%systemd_postun_with_restart netdata.service
+%systemd_postun_with_restart netdata-updater.timer
