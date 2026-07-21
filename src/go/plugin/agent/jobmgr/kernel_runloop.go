@@ -125,7 +125,6 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		moreClaimSettlements := ck.serviceClaimSettlements(
 			maximumClaimSettlementQuantum,
 		)
-		moreAdmissions := false
 		moreCompositeFenceRechecks := false
 		moreTasks := false
 		moreTaskStarts := false
@@ -136,7 +135,6 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		if !shuttingDown {
 			moreCompositeFenceRechecks =
 				ck.serviceCompositeFenceBlocked(4)
-			moreAdmissions = ck.serviceAdmissions(4)
 			moreTasks = ck.scheduleTasks(4)
 		}
 		servicedAsyncEvents := ck.serviceAsyncEvents(
@@ -213,7 +211,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		}
 		if moreDeadlines || moreControls || moreSubmissions || moreFunctionCleanups ||
 			moreFunctionMutation || moreFunctionClose || moreClaimSettlements ||
-			moreCompositeFenceRechecks || moreAdmissions ||
+			moreCompositeFenceRechecks ||
 			moreTasks || moreTaskStarts ||
 			servicedAsyncEvents > 0 || moreShutdownCancellation ||
 			shutdownAuthorityAdvanced ||

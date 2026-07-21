@@ -36,35 +36,12 @@ func (ck *CommandKernel) cancelOperation(uid string) {
 		return
 	}
 	if operation.Child == lifecycle.ChildNotStarted {
-		var cause error
-		if operation.submissionContext != nil {
-			cause = context.Cause(operation.submissionContext)
-		}
-		if cause == nil {
-			cause = context.Canceled
-		}
-		ck.unlinkQueued(operation, cause)
+		ck.unlinkQueued(operation)
 		if operation.Response != lifecycle.ResponseNotRequired {
 			ck.enqueueControl(operation, lifecycle.ControlCancelled)
 		} else {
 			ck.tryDispose(operation)
 		}
-		return
-	}
-	if operation.Child == lifecycle.ChildResultReady &&
-		operation.resultGrowthWaiting {
-		if err := ck.admission.CancelWaiting(operation.admission); err != nil {
-			ck.run.Dirty(err)
-			return
-		}
-		operation.resultGrowthWaiting = false
-		if operation.Response != lifecycle.ResponseNotRequired {
-			ck.enqueueControl(
-				operation,
-				lifecycle.ControlCancelled,
-			)
-		}
-		ck.sendDisposeAction(operation)
 		return
 	}
 }
@@ -127,20 +104,11 @@ func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 					}
 				}
 			} else {
-				ck.unlinkQueued(operation, context.DeadlineExceeded)
+				ck.unlinkQueued(operation)
 				if operation.Response == lifecycle.ResponseNotRequired {
 					ck.tryDispose(operation)
 				}
 			}
-		} else if operation.Child ==
-			lifecycle.ChildResultReady &&
-			operation.resultGrowthWaiting {
-			if err := ck.admission.CancelWaiting(operation.admission); err != nil {
-				ck.run.Dirty(err)
-				return false
-			}
-			operation.resultGrowthWaiting = false
-			ck.sendDisposeAction(operation)
 		}
 		if operation.Response != lifecycle.ResponseNotRequired && !deferControl {
 			ck.enqueueControl(operation, lifecycle.ControlDeadline)
@@ -301,18 +269,6 @@ func (ck *CommandKernel) tryDispose(operation *commandOperation) {
 		ck.removeHead(lane)
 	} else if operation.previous != nil || operation.next != nil {
 		ck.unlink(operation)
-	}
-	if operation.admission.Valid() {
-		if !operation.admitted {
-			ck.run.Dirty(errors.New("jobmgr kernel: terminal operation retained an ungranted admission"))
-			return
-		}
-		if _, err := ck.admission.ReleaseOrdinary(operation.admission); err != nil {
-			ck.run.Dirty(err)
-			return
-		}
-		delete(ck.byAdmission, operation.admission)
-		operation.admission = lifecycle.AdmissionRef{}
 	}
 	if operation.plan.Transaction != nil {
 		if lane.transactionPlanned <= 0 {
@@ -492,7 +448,7 @@ func (ck *CommandKernel) completeOperationUID(operation *commandOperation, tombs
 	return nil
 }
 
-func (ck *CommandKernel) unlinkQueued(operation *commandOperation, submissionErr error) {
+func (ck *CommandKernel) unlinkQueued(operation *commandOperation) {
 	if operation.Child == lifecycle.ChildDeadlineStartPending {
 		ck.run.Dirty(errors.New("jobmgr kernel: required deadline start was unlinked without abandonment"))
 		return
@@ -504,21 +460,6 @@ func (ck *CommandKernel) unlinkQueued(operation *commandOperation, submissionErr
 	if operation.fenceBlocked {
 		if err := ck.removeCompositeFenceBlocked(operation); err != nil {
 			ck.run.Dirty(err)
-		}
-	}
-	if operation.admission.Valid() && !operation.admitted {
-		if err := ck.admission.CancelWaiting(operation.admission); err != nil {
-			ck.run.Dirty(err)
-		} else {
-			delete(ck.byAdmission, operation.admission)
-			operation.admission = lifecycle.AdmissionRef{}
-			operation.request.Args = nil
-			operation.request.Payload = nil
-			operation.plan.Claims = nil
-			operation.plan.Work = nil
-			operation.claims = nil
-			operation.authorityClaimEdges = nil
-			ck.settleSubmission(operation, submissionErr)
 		}
 	}
 	if operation.taskRequest.Valid() {
@@ -643,7 +584,7 @@ func (ck *CommandKernel) markReady(lane *commandLane) {
 	if lane == nil ||
 		lane.active != nil ||
 		lane.head == nil ||
-		!lane.head.admitted ||
+		lane.head.fenceBlocked ||
 		ck.claims.waiting(lane.head) {
 		return
 	}

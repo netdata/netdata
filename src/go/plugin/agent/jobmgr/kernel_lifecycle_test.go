@@ -477,13 +477,23 @@ func TestWorkPlanAcceptsClaimsBeyondFormerCountLimit(t *testing.T) {
 	require.NoError(t, plan.validate())
 }
 
-func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
+func TestKernelSubmissionIgnoresAggregateAdmissionCapacity(t *testing.T) {
 	kernel, run, admission, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-
 	require.NoError(t, run.OpenAdmission())
+	blocker := admission.RequestOrdinary(
+		run.Generation(),
+		lifecycle.AdmissionLaneRef{Slot: ^uint32(0), Generation: 1},
+		lifecycle.OrdinaryBudgetBytes,
+	)
+	require.NoError(t, blocker.Rejected)
+	var grants [lifecycle.TaskStartServiceQuantum]lifecycle.AdmissionGrant
+	count, _, err := admission.TakeGrants(1, &grants)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
+	require.Equal(t, blocker.Ref, grants[0].Ref)
 
 	request := Request{
-		UID: "grant-boundary", Source: lifecycle.SourceFunction, Route: "route",
+		UID: "aggregate-capacity", Source: lifecycle.SourceFunction, Route: "route",
 	}
 	plan, err := kernel.prepareSubmissionPlanForTest(request)
 	require.NoError(t, err)
@@ -495,81 +505,19 @@ func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
 	}
 	kernel.serviceSubmissions(1)
 
-	census := admission.Census()
-	require.False(t, census.OrdinaryWaiting != 1 || census.OrdinaryGranted != 0)
-
-	select {
-	case err := <-submitted:
-		require.FailNowf(t, "test failed", "submission returned before ordinary grant: %v", err)
-	default:
-	}
-
-	kernel.serviceAdmissions(1)
 	select {
 	case err := <-submitted:
 		require.NoError(t, err)
 	default:
-		require.FailNow(t, "test failed", "submission did not return after ordinary grant")
+		require.FailNow(t, "test failed", "submission waited for aggregate admission capacity")
 	}
-}
-
-func TestKernelCancelledSubmitReleasesUngrantableAdmission(t *testing.T) {
-	kernel, run, admission, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	catalog := testFunctionCatalogFor(t, kernel)
-
-	require.NoError(t, run.OpenAdmission())
-	blocker := admission.RequestOrdinary(
-		run.Generation(),
-		lifecycle.AdmissionLaneRef{Slot: ^uint32(0), Generation: 1},
-		lifecycle.OrdinaryBudgetBytes-1,
-	)
-	require.NoError(t, blocker.Rejected)
-	var grants [4]lifecycle.AdmissionGrant
-	count, more, err := admission.TakeGrants(1, &grants)
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-	require.False(t, more)
-	require.Equal(t, blocker.Ref, grants[0].Ref)
-
-	startKernelLoop(t, kernel)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	submitted := make(chan error, 1)
-	go func() {
-		submitted <- kernel.Submit(ctx, Request{
-			UID: "cancel-before-grant", Source: lifecycle.SourceFunction, Route: "route",
-		})
-	}()
-	deadline := time.Now().Add(time.Second)
-	for admission.Census().OrdinaryWaiting != 1 {
-		require.False(t, time.Now().After(deadline))
-		runtime.Gosched()
-	}
-	cancel()
-	select {
-	case err := <-submitted:
-		require.ErrorIs(t, err, context.Canceled)
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "cancelled submission did not return")
-	}
-
 	census := admission.Census()
-	require.False(t, census.ActiveRecords != 1 || census.OrdinaryWaiting != 0 || census.OrdinaryGranted != 1)
+	require.False(t, census.ActiveRecords != 1 || census.OrdinaryWaiting != 0 ||
+		census.OrdinaryGranted != 1)
+	require.Contains(t, kernel.operations, request.UID)
 
 	_, err = admission.ReleaseOrdinary(blocker.Ref)
 	require.NoError(t, err)
-
-	kernel.Stop()
-	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
-	defer waitCancel()
-
-	require.NoError(t, kernel.Wait(waitCtx))
-
-	require.False(t, catalog.next != 1 || catalog.release != 1 || len(catalog.leases) != 0)
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
-	closeUIDLedger(t, uids)
 }
 
 func TestKernelTerminalNoResponseDisposalCompletesUIDOwnership(t *testing.T) {
@@ -713,7 +661,8 @@ func TestKernelResourceStopCompletesAfterOperationDeadline(t *testing.T) {
 }
 
 type kernelRuntimeObserver struct {
-	operationTimeouts atomic.Uint64
+	operationTimeouts  atomic.Uint64
+	operationsAdmitted atomic.Uint64
 }
 
 func (*kernelRuntimeObserver) SetRuntimeGauge(
@@ -734,6 +683,9 @@ func (kro *kernelRuntimeObserver) AddRuntimeCounter(
 ) {
 	if counter == lifecycle.RuntimeCounterOperationTimeouts {
 		kro.operationTimeouts.Add(delta)
+	}
+	if counter == lifecycle.RuntimeCounterOperationsAdmitted {
+		kro.operationsAdmitted.Add(delta)
 	}
 }
 
@@ -1353,8 +1305,6 @@ func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 			nil,
 		),
 		)
-	}
-	for kernel.serviceAdmissions(lifecycle.TaskStartServiceQuantum) {
 	}
 	for kernel.scheduleTasks(lifecycle.TaskStartServiceQuantum) {
 	}
@@ -2667,13 +2617,24 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
-func TestKernelReservesExactPlanAndFrameBytesBeforeWrite(t *testing.T) {
-	sealed, planBytes := largeRawSealedResult(t)
+func TestKernelWritesValidResultWithoutAggregateReservation(t *testing.T) {
+	sealed := largeRawSealedResult(t)
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) { return sealed, nil })}, nil
 	})
 	writer := &holdingFrameWriter{offered: make(chan []byte, 1), release: make(chan struct{})}
 	kernel, run, admission, uids, _ := newKernelWithPlannerAndWriter(t, planner, writer)
+	blocker := admission.RequestOrdinary(
+		run.Generation(),
+		lifecycle.AdmissionLaneRef{Slot: ^uint32(0), Generation: 1},
+		lifecycle.OrdinaryBudgetBytes,
+	)
+	require.NoError(t, blocker.Rejected)
+	var grants [lifecycle.TaskStartServiceQuantum]lifecycle.AdmissionGrant
+	count, _, err := admission.TakeGrants(1, &grants)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
+	require.Equal(t, blocker.Ref, grants[0].Ref)
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2682,174 +2643,19 @@ func TestKernelReservesExactPlanAndFrameBytesBeforeWrite(t *testing.T) {
 
 	require.NoError(t, kernel.Submit(context.Background(), request))
 
-	var frame []byte
 	select {
-	case frame = <-writer.offered:
+	case <-writer.offered:
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "result did not reach held Write")
 	}
-	chargedRequest := request
-	chargedRequest.LaneKey = request.Route
-	base, err := operationAdmissionBytes(chargedRequest, WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)})
-	require.NoError(t, err)
-	wantBytes := base + planBytes + int64(len(frame))
 
 	census := admission.Census()
-	require.False(t, census.OrdinaryBytes != wantBytes || census.OrdinaryGranted != 1 || census.OrdinaryWaiting != 0)
+	require.False(t, census.OrdinaryBytes != lifecycle.OrdinaryBudgetBytes ||
+		census.OrdinaryGranted != 1 || census.OrdinaryWaiting != 0)
 
 	close(writer.release)
-	kernel.Stop()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	require.NoError(t, kernel.Wait(ctx))
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
-	closeUIDLedger(t, uids)
-}
-
-func TestOperationAdmissionBytesIncludesSealedRequestMetadata(t *testing.T) {
-	baseRequest := Request{
-		UID: "metadata", Source: lifecycle.SourceFunction, Route: "route",
-	}
-	plan := WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}
-	base, err := operationAdmissionBytes(baseRequest, plan)
+	_, err = admission.ReleaseOrdinary(blocker.Ref)
 	require.NoError(t, err)
-	tests := map[string]struct {
-		mutate func(*Request)
-		delta  int64
-	}{
-		"content type": {
-			mutate: func(request *Request) { request.ContentType = "application/json" },
-			delta:  int64(len("application/json")),
-		},
-		"argument storage": {
-			mutate: func(request *Request) { request.Args = []string{"a", "bc"} },
-			delta:  int64(len("a") + len("bc") + 2*16),
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			request := baseRequest
-			test.mutate(&request)
-			got, err := operationAdmissionBytes(request, plan)
-			require.NoError(t, err)
-			require.EqualValues(t, base+test.delta, got)
-		})
-	}
-}
-
-func TestOperationAdmissionBytesUsesAggregateFrameworkOverhead(t *testing.T) {
-	got, err := operationAdmissionBytes(Request{}, WorkPlan{})
-	require.NoError(t, err)
-	const want = int64(4_608)
-	require.EqualValues(t, want, got)
-}
-
-func TestOperationAdmissionBytesIgnoresLongLivedPlans(t *testing.T) {
-	pipeline, err := lifecycle.NewPipelineLongLivedPlan(
-		[]string{"provider"},
-	)
-	require.NoError(t, err)
-	job := lifecycle.NewJobLongLivedPlan()
-	secretStore := lifecycle.NewSecretStoreLongLivedPlan()
-	tests := map[string]struct {
-		permit lifecycle.LongLivedPlan
-		want   int64
-	}{
-		"charge-free Pipeline": {
-			permit: pipeline,
-			want:   operationFrameworkAdmissionBytes,
-		},
-		"charge-free Job": {
-			permit: job,
-			want:   operationFrameworkAdmissionBytes,
-		},
-		"SecretStore": {
-			permit: secretStore,
-			want:   operationFrameworkAdmissionBytes,
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			got, err := operationAdmissionBytes(
-				Request{},
-				WorkPlan{
-					Transaction: &ResourceTransactionPlan{
-						AllocateSuccessor: true,
-						Permit:            test.permit,
-					},
-				},
-			)
-			require.NoError(t, err)
-			require.EqualValues(t, test.want, got)
-		})
-	}
-}
-
-func TestOperationResultAdmissionBytesBoundaries(t *testing.T) {
-	base := int64(512)
-	tests := map[string]struct {
-		frame int64
-		valid bool
-	}{
-		"below deferred boundary": {frame: lifecycle.OrdinaryBudgetBytes - base - 2, valid: true},
-		"at deferred boundary":    {frame: lifecycle.OrdinaryBudgetBytes - base - 1, valid: true},
-		"over deferred boundary":  {frame: lifecycle.OrdinaryBudgetBytes - base, valid: false},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			total, err := operationResultAdmissionBytes(base, lifecycle.ResultPreflight{PlanBytes: 1, FrameBytes: test.frame})
-			require.EqualValues(t, test.valid, err == nil, "total=%d", total)
-		})
-	}
-}
-
-func TestKernelCancelsResultWaitingForAdmissionGrowth(t *testing.T) {
-	sealed, _ := largeRawSealedResult(t)
-	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
-		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) { return sealed, nil })}, nil
-	})
-	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
-	blocker := admission.RequestOrdinary(run.Generation(), lifecycle.AdmissionLaneRef{Slot: ^uint32(0), Generation: 1}, lifecycle.OrdinaryBudgetBytes-1024*1024)
-	require.Nil(t, blocker.Rejected)
-	var grants [4]lifecycle.AdmissionGrant
-
-	takeGrantsCount, _, takeGrantsErr := admission.TakeGrants(1, &grants)
-	require.False(t, takeGrantsErr != nil || takeGrantsCount != 1 || grants[0].Ref != blocker.Ref)
-
-	require.NoError(t, run.OpenAdmission())
-
-	startKernelLoop(t, kernel)
-
-	require.NoError(t, kernel.Submit(context.Background(), Request{UID: "growth-cancel", Source: lifecycle.SourceFunction, Route: "route"}))
-
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
-		census := admission.Census()
-		if census.OrdinaryWaiting == 1 && census.OrdinaryGranted == 2 {
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
-
-	census := admission.Census()
-	require.False(t, census.OrdinaryWaiting != 1 || census.OrdinaryGranted != 2)
-
-	require.NoError(t, kernel.Cancel(context.Background(), "growth-cancel"))
-
-	deadline = time.Now().Add(time.Second)
-	for admission.Census().OrdinaryWaiting != 0 && time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
-	}
-
-	admissionCensus := admission.Census()
-	require.False(t, admissionCensus.OrdinaryWaiting != 0 || admissionCensus.OrdinaryGranted < 1 || admissionCensus.OrdinaryGranted > 2)
-
-	_, releaseOrdinaryErr := admission.ReleaseOrdinary(blocker.Ref)
-	require.NoError(t, releaseOrdinaryErr)
-
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -2865,12 +2671,12 @@ func plannerPlanWork(context.Context) (lifecycle.SealedResult, error) {
 	return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 }
 
-func largeRawSealedResult(t *testing.T) (lifecycle.SealedResult, int64) {
+func largeRawSealedResult(t *testing.T) lifecycle.SealedResult {
 	t.Helper()
 	payload := []byte(`{"pad":"` + strings.Repeat("A", 1024*1024) + `"}`)
 	result, err := lifecycle.NewSealedResult(200, "application/json", payload)
 	require.NoError(t, err)
-	return result, int64(len(payload))
+	return result
 }
 
 type holdingFrameWriter struct {
@@ -2917,7 +2723,6 @@ func TestKernelExternalSubmissionServiceRotatesSources(t *testing.T) {
 		kernel.submissions[sourceIndex(request.Source)] <- submission{request: request, plan: plan, result: results[index]}
 	}
 	kernel.serviceSubmissions(4)
-	kernel.serviceAdmissions(4)
 	for _, result := range results {
 		require.NoError(t, <-result)
 	}
@@ -2998,10 +2803,6 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 
 		require.NoError(t, kernel.admit(request, plan, nil, nil, nil))
 	}
-	for range 3 {
-		kernel.serviceAdmissions(4)
-	}
-
 	got := kernel.ready[0].len + kernel.ready[1].len
 	require.EqualValues(t, 9, got)
 
@@ -3036,8 +2837,6 @@ func TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass(t *testin
 	for _, request := range requests {
 		require.NoError(t, kernel.admit(request, WorkPlan{}, nil, nil, nil))
 	}
-	kernel.serviceAdmissions(len(requests))
-
 	more := kernel.scheduleTasks(len(requests))
 	require.False(t, more)
 

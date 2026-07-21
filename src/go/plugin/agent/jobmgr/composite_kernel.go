@@ -474,7 +474,6 @@ func (ck *CommandKernel) blockOnCompositeFence(
 	operation *commandOperation,
 ) error {
 	if operation == nil || operation.parent != nil ||
-		operation.admitted || !operation.admission.Valid() ||
 		operation.fenceBlocked ||
 		!ck.compositeFenceConflicts(operation.claims) {
 		return errors.New(
@@ -559,11 +558,8 @@ func (ck *CommandKernel) serviceCompositeFenceBlocked(
 			}
 			continue
 		}
-		if err := ck.admission.ResumeOrdinary(
-			operation.admission,
-		); err != nil {
-			ck.run.Dirty(err)
-			return false
+		if operation.lane.active == nil && operation.lane.head == operation {
+			ck.markReady(operation.lane)
 		}
 	}
 	return ck.compositeFenceRecheck

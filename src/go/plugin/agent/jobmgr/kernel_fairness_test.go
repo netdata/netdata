@@ -78,7 +78,6 @@ func TestKernelReadyLaneFairnessAtBoundaries(t *testing.T) {
 					require.NoError(t, err)
 					operation := &commandOperation{
 						OperationGeneration: generation,
-						admitted:            true,
 					}
 					lane := &commandLane{
 						key:    uid,

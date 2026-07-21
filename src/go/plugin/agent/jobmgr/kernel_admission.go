@@ -175,15 +175,6 @@ func (ck *CommandKernel) admitSubmission(
 		_ = ck.abortRequestInputBody(request)
 		return err
 	}
-	charge, err := operationAdmissionBytes(request, plan)
-	if err != nil {
-		_ = ck.uids.Complete(request.UID, false, now)
-		ck.releaseUnusedLane(lane)
-		_ = ck.abortRequestInputBody(request)
-		return err
-	}
-	admissionLane := lifecycle.AdmissionLaneRef{Slot: lane.slot, Generation: lane.generation}
-	requested := lifecycle.AdmissionRequestResult{}
 	if parent != nil {
 		if err := ck.beginCompositeFence(parent); err != nil {
 			ck.releaseUnusedLane(lane)
@@ -193,28 +184,12 @@ func (ck *CommandKernel) admitSubmission(
 				ck.uids.Complete(request.UID, false, now),
 			)
 		}
-		requested = ck.admission.GrantCompositeProgress(
-			ck.run.Generation(),
-			parent.admission,
-			admissionLane,
-			charge,
-		)
-	} else {
-		requested = ck.admission.RequestOrdinary(ck.run.Generation(), admissionLane, charge)
-	}
-	if requested.Rejected != nil {
-		ck.releaseUnusedLane(lane)
-		return ck.abortRequestInputBodyWith(
-			request,
-			requested.Rejected,
-			ck.uids.Complete(request.UID, false, now),
-		)
 	}
 	operation := &commandOperation{
 		OperationGeneration: operationGeneration, request: request, plan: plan, claims: claims,
 		functionInvocation: functionInvocation,
-		admission:          requested.Ref, admissionBase: charge, deadline: deadlineEntry{index: -1},
-		submissionContext: submissionContext, submissionResult: submissionResult, terminalResult: terminalResult,
+		deadline:           deadlineEntry{index: -1},
+		submissionContext:  submissionContext, submissionResult: submissionResult, terminalResult: terminalResult,
 		parent: parent, claimsInherited: parent != nil,
 		compositeRollback: rollback,
 		shutdownChild: parent != nil &&
@@ -224,7 +199,6 @@ func (ck *CommandKernel) admitSubmission(
 	if parent == nil {
 		prepareClaimEdges(operation, claims)
 		if err := ck.claims.register(operation); err != nil {
-			_ = ck.admission.CancelWaiting(requested.Ref)
 			_ = ck.uids.Complete(request.UID, false, now)
 			ck.releaseUnusedLane(lane)
 			return err
@@ -257,7 +231,6 @@ func (ck *CommandKernel) admitSubmission(
 		)
 	}
 	ck.observeRuntimeOperations()
-	ck.byAdmission[requested.Ref] = operation
 	releaseFunctionInvocation = false
 	if plan.Transaction != nil {
 		lane.transactionPlanned++
@@ -270,11 +243,16 @@ func (ck *CommandKernel) admitSubmission(
 		operation.deadline = deadlineEntry{when: request.Deadline, operation: operation, index: -1}
 		heap.Push(&ck.deadlines, &operation.deadline)
 	}
-	if parent != nil {
-		operation.admitted = true
-		ck.settleSubmission(operation, nil)
+	if parent == nil && ck.compositeFenceConflicts(operation.claims) {
+		if err := ck.blockOnCompositeFence(operation); err != nil {
+			ck.run.Dirty(err)
+			ck.settleSubmission(operation, err)
+			ck.cancelOperation(operation.UID)
+			return nil
+		}
 	}
-	if operation.admitted && lane.active == nil && lane.head == operation {
+	ck.settleSubmission(operation, nil)
+	if !operation.fenceBlocked && lane.active == nil && lane.head == operation {
 		ck.markReady(lane)
 	}
 	return nil
@@ -296,86 +274,6 @@ func (ck *CommandKernel) rejectClosedAdmission(request Request) error {
 		return ck.run.StoppingCause()
 	}
 	return closedErr
-}
-
-func (ck *CommandKernel) serviceAdmissions(quantum int) bool {
-	var grants [4]lifecycle.AdmissionGrant
-	count, more, err := ck.admission.TakeGrants(quantum, &grants)
-	if err != nil {
-		ck.run.Dirty(err)
-		return false
-	}
-	for _, grant := range grants[:count] {
-		if grant.Kind == lifecycle.ReservationInputBodyGrowth {
-			select {
-			case ck.inputBodyGrants <- grant:
-			default:
-				ck.run.Dirty(errors.New("jobmgr kernel: input body grant gate is full"))
-				return false
-			}
-			continue
-		}
-		operation := ck.byAdmission[grant.Ref]
-		if operation == nil || operation.admission != grant.Ref {
-			ck.run.Dirty(errors.New("jobmgr kernel: invalid admission grant"))
-			return false
-		}
-		switch grant.Kind {
-		case lifecycle.ReservationOrdinary:
-			if operation.admitted {
-				ck.run.Dirty(errors.New("jobmgr kernel: duplicate initial admission grant"))
-				return false
-			}
-			if ck.compositeFenceConflicts(operation.claims) {
-				wake, suspendErr :=
-					ck.admission.SuspendOrdinary(
-						grant.Ref,
-						int64(len(operation.request.Payload)),
-					)
-				if suspendErr != nil {
-					ck.run.Dirty(suspendErr)
-					return false
-				}
-				if err := ck.blockOnCompositeFence(
-					operation,
-				); err != nil {
-					ck.run.Dirty(err)
-					return false
-				}
-				more = more || wake
-				continue
-			}
-			operation.admitted = true
-			ck.settleSubmission(operation, nil)
-			if operation.lane.active == nil && operation.lane.head == operation {
-				ck.markReady(operation.lane)
-			}
-		case lifecycle.ReservationOrdinaryGrowth:
-			if !operation.admitted ||
-				operation.Child !=
-					lifecycle.ChildResultReady {
-				ck.run.Dirty(errors.New("jobmgr kernel: invalid result growth grant"))
-				return false
-			}
-			if !operation.resultGrowthWaiting {
-				ck.run.Dirty(
-					errors.New(
-						"jobmgr kernel: unowned ordinary growth grant",
-					),
-				)
-				return false
-			}
-			operation.resultGrowthWaiting = false
-			if err := ck.sendEncodeAction(operation); err != nil {
-				ck.run.Dirty(err)
-				return false
-			}
-		default:
-			ck.run.Dirty(errors.New("jobmgr kernel: unexpected admission grant kind"))
-			return false
-		}
-	}
-	return more
 }
 
 func (ck *CommandKernel) settleSubmission(operation *commandOperation, err error) {

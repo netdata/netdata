@@ -85,15 +85,15 @@ func stopCompositeTestKernel(
 	require.False(t, err != nil && !errors.Is(err, ErrStopped))
 }
 
-func waitForCompositeRecords(
+func waitForAdmittedOperations(
 	t *testing.T,
-	admission *lifecycle.AdmissionLedger,
+	observer *kernelRuntimeObserver,
 	count int,
 ) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
 	for {
-		if census := admission.Census(); census.ActiveRecords >= count {
+		if observer.operationsAdmitted.Load() >= uint64(count) {
 			return
 		}
 		require.False(t, time.Now().After(deadline))
@@ -543,10 +543,12 @@ func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
 func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 	t *testing.T,
 ) {
-	kernel, run, admission, _, _ := newKernelWithPlanner(
+	kernel, run, _, _, _ := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
 	)
+	observer := &kernelRuntimeObserver{}
+	require.NoError(t, kernel.BindRuntimeObserver(observer))
 	startKernelLoop(t, kernel)
 
 	require.NoError(t, run.OpenAdmission())
@@ -644,7 +646,7 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 		)
 	}()
 	close(submitChild)
-	waitForCompositeRecords(t, admission, 4)
+	waitForAdmittedOperations(t, observer, 4)
 	close(blockerRelease)
 
 	select {
@@ -677,7 +679,7 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 	stopCompositeTestKernel(t, kernel)
 }
 
-func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
+func TestCompositeFenceAcceptsButDefersConflictingWorkWithoutBlockingUnrelatedWork(
 	t *testing.T,
 ) {
 	kernel, run, admission, _, _ := newKernelWithPlanner(
@@ -798,7 +800,13 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 	}
 	select {
 	case err := <-conflictingAdmitted:
-		require.FailNowf(t, "test failed", "conflicting operation admitted before parent terminal: %v", err)
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "conflicting operation was not accepted")
+	}
+	select {
+	case <-conflictingApplied:
+		require.FailNow(t, "test failed", "conflicting operation ran before parent terminal")
 	default:
 	}
 	select {
@@ -814,12 +822,6 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 		require.NoError(t, err)
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "composite parent did not finish")
-	}
-	select {
-	case err := <-conflictingAdmitted:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "conflicting operation was not admitted after parent terminal")
 	}
 	select {
 	case <-conflictingApplied:
@@ -840,7 +842,7 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
 }
 
-func TestCompositeChildGetsParentLinkedProgressAdmission(
+func TestCompositeChildRunsWithoutAggregateAdmissionCapacity(
 	t *testing.T,
 ) {
 	kernel, run, admission, _, _ := newKernelWithPlanner(
@@ -925,7 +927,7 @@ func TestCompositeChildGetsParentLinkedProgressAdmission(
 		require.FailNow(t, "test failed", "composite child did not receive parent-linked progress admission")
 	}
 
-	require.False(t, admission.Census().OrdinaryBytes <= capacity)
+	require.EqualValues(t, capacity, admission.Census().OrdinaryBytes)
 
 	close(childRelease)
 	select {

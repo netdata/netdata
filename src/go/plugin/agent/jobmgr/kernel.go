@@ -123,10 +123,6 @@ type commandOperation struct {
 	transactionApplied             bool                               // the transaction's ownership-changing apply has started
 	transactionRestored            bool                               // a failed transaction's predecessor was restored
 	deadline                       deadlineEntry                      // deadline heap entry
-	admission                      lifecycle.AdmissionRef             // admission reservation ref
-	admissionBase                  int64                              // framework-base byte charge for this operation
-	admitted                       bool                               // admission byte grant received
-	resultGrowthWaiting            bool                               // waiting for a larger admission grant to frame the result
 	resultExpiry                   int64                              // expiry stamped into the result frame
 	taskRequest                    lifecycle.TaskRequestRef           // off-loop task request ref
 	submissionContext              context.Context                    // caller context threaded to the submission
@@ -236,7 +232,6 @@ type CommandKernel struct {
 	finalizerAction          lifecycle.TaskActionKind                        // finalizer task action kind
 	finalizerDone            bool                                            // finalizer completed (or was a noop)
 	finalizerFailed          bool                                            // finalizer failed
-	byAdmission              map[lifecycle.AdmissionRef]*commandOperation    // operations keyed by admission ref
 	lanes                    map[commandLaneKey]*commandLane                 // active lanes by key
 	laneSlots                []*commandLane                                  // lane slot storage (freelist-backed)
 	freeLane                 uint32                                          // head of the lane slot freelist
@@ -304,7 +299,6 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		shutdownTasks:           make(map[lifecycle.TaskRef]*commandLane),
 		functionMutations:       make(chan functionMutationSubmission),
 		functionMutationStopped: make(chan struct{}),
-		byAdmission:             make(map[lifecycle.AdmissionRef]*commandOperation),
 		lanes:                   make(map[commandLaneKey]*commandLane),
 		compositeFenceClaims:    make(map[string]int),
 		nextSource:              lifecycle.SourceJobManager,
@@ -388,15 +382,14 @@ func (ck *CommandKernel) bindRunNotifications() error {
 	)
 }
 
-// beginResultEncode sizes and admits an operation's terminal result and then
-// dispatches its encode. It returns true when the caller must return now (a
-// result-growth wait, a dispatched encode, or a dirty resize) and false after
-// enqueuing a control frame on a preflight or size error, so the caller falls
-// through to its disposal action. It dispatches no ownership action itself, so
-// the ownership-gate invariant (SendAction stays in the sanctioned callers) holds.
+// beginResultEncode validates an operation's terminal result and dispatches its
+// encode. It returns false after enqueuing a control frame on a preflight error,
+// so the caller falls through to its disposal action. It dispatches no ownership
+// action itself, so the ownership-gate invariant (SendAction stays in the
+// sanctioned callers) holds.
 func (ck *CommandKernel) beginResultEncode(operation *commandOperation, ref lifecycle.TaskRef) bool {
 	expiry := lifecycle.ExpiryAt(ck.clock.Now())
-	preflight, err := ck.tasks.PreflightResult(ref, operation.UID, expiry)
+	_, err := ck.tasks.PreflightResult(ref, operation.UID, expiry)
 	if err != nil {
 		status := lifecycle.ControlInternal
 		if errors.Is(err, lifecycle.ErrFunctionResultTooLarge) {
@@ -405,21 +398,7 @@ func (ck *CommandKernel) beginResultEncode(operation *commandOperation, ref life
 		ck.enqueueControl(operation, status)
 		return false
 	}
-	total, sizeErr := operationResultAdmissionBytes(operation.admissionBase, preflight)
-	if sizeErr != nil {
-		ck.enqueueControl(operation, lifecycle.ControlPayloadTooLarge)
-		return false
-	}
-	ready, _, resizeErr := ck.admission.ResizeOrdinary(operation.admission, total)
-	if resizeErr != nil {
-		ck.run.Dirty(resizeErr)
-		return true
-	}
 	operation.resultExpiry = expiry
-	if !ready {
-		operation.resultGrowthWaiting = true
-		return true
-	}
 	if err := ck.sendEncodeAction(operation); err != nil {
 		ck.run.Dirty(err)
 	}
@@ -1047,10 +1026,6 @@ func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 		if err := operation.CommitResponse(); err != nil {
 			ck.run.Dirty(err)
 		}
-		if _, _, err := ck.admission.ResizeOrdinary(operation.admission, operation.admissionBase); err != nil {
-			ck.run.Dirty(err)
-			return
-		}
 		if err := ck.completeOperationUID(operation, false); err != nil {
 			ck.run.Dirty(err)
 			return
@@ -1112,13 +1087,6 @@ func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 	case lifecycle.TaskActionEncodeWrite:
 		if ack.Err == nil {
 			if err := operation.CommitResponse(); err != nil {
-				ck.run.Dirty(err)
-				return
-			}
-			if _, _, err := ck.admission.ResizeOrdinary(
-				operation.admission,
-				operation.admissionBase,
-			); err != nil {
 				ck.run.Dirty(err)
 				return
 			}
@@ -1237,10 +1205,7 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 			ck.enqueueControl(operation, cancellationControl(operation))
 		}
 	case lifecycle.ChildNotStarted:
-		ck.unlinkQueued(
-			operation,
-			ck.run.StoppingCause(),
-		)
+		ck.unlinkQueued(operation)
 		if operation.Response != lifecycle.ResponseNotRequired {
 			ck.enqueueControl(operation, cancellationControl(operation))
 		} else {
@@ -1251,10 +1216,7 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 			if err := operation.AbandonDeadlineStart(); err != nil {
 				return err
 			}
-			ck.unlinkQueued(
-				operation,
-				ck.run.StoppingCause(),
-			)
+			ck.unlinkQueued(operation)
 			if operation.Response == lifecycle.ResponseOpen {
 				ck.enqueueControl(operation, lifecycle.ControlDeadline)
 			} else {
@@ -1262,21 +1224,6 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 			}
 		}
 	case lifecycle.ChildResultReady:
-		if operation.resultGrowthWaiting {
-			if err := ck.admission.CancelWaiting(
-				operation.admission,
-			); err != nil {
-				return err
-			}
-			operation.resultGrowthWaiting = false
-			ck.sendDisposeAction(operation)
-			if operation.Response != lifecycle.ResponseNotRequired {
-				ck.enqueueControl(
-					operation,
-					cancellationControl(operation),
-				)
-			}
-		}
 	case lifecycle.ChildActionPending:
 	case lifecycle.ChildAbandonedBeforeStart,
 		lifecycle.ChildActionAcknowledged,
@@ -1696,7 +1643,7 @@ func (ck *CommandKernel) kernelStateDrained() bool {
 		len(ck.functionCleanupTasks) != 0 || len(ck.functionCleanupRequests) != 0 ||
 		ck.functionCleanupBacklog.count != 0 ||
 		ck.functionMutationActive || ck.functionMutationPaused ||
-		len(ck.byAdmission) != 0 || len(ck.lanes) != 0 ||
+		len(ck.lanes) != 0 ||
 		len(ck.compositeFenceClaims) != 0 ||
 		ck.compositeFenceHead != nil ||
 		ck.compositeFenceTail != nil ||

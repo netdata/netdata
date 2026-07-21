@@ -27,7 +27,7 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 		}
 		quantum--
 		operation := lane.head
-		if operation == nil || !operation.admitted || lane.active != nil {
+		if operation == nil || operation.fenceBlocked || lane.active != nil {
 			ck.run.Dirty(errors.New("jobmgr kernel: invalid ready lane"))
 			return false
 		}
@@ -298,7 +298,7 @@ func (ck *CommandKernel) rejectTaskStart(start lifecycle.TaskStart) {
 	delete(ck.tasksByRequest, start.Request)
 	operation.taskRequest = lifecycle.TaskRequestRef{}
 	operation.terminalErr = errors.Join(operation.terminalErr, start.Err)
-	ck.unlinkQueued(operation, start.Err)
+	ck.unlinkQueued(operation)
 	if operation.Response != lifecycle.ResponseNotRequired {
 		ck.enqueueControl(operation, lifecycle.ControlUnavailable)
 	}
