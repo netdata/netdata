@@ -392,7 +392,6 @@ func (ck *CommandKernel) serviceSubmissions(quantum int) bool {
 				err = ck.admitSubmission(
 					submitted.request,
 					submitted.plan,
-					submitted.context,
 					submitted.result,
 					submitted.terminal,
 					submitted.composite,

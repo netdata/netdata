@@ -254,7 +254,8 @@ flowchart TD
    `joboutput/config_factory.go`.
 2. **Prepare (non-disruptive)** — the `Factory` looks up the module creator,
    resolves the config's secrets, builds a V1 or V2 collector, and hands back a
-   *candidate* holding a memory permit. The current job keeps running.
+   *candidate* holding a long-lived resource permit. The current job keeps
+   running.
    `joboutput/factory.go`, `joboutput/generation.go`.
 3. **Apply** — the kernel stops and finalizes the prior generation, then calls
    `AcceptStart` on the candidate. `joboutput/transaction.go`.
@@ -382,9 +383,9 @@ dashboard files it under that identity instead of "the agent."
 Job Manager separates two lifetimes:
 
 - **The process is the building.** Built once by `composition.NewProcess`, it
-  survives every reload: the stdin reader, the one `FrameOwner`, the memory and
-  UID ledgers, the frozen module registry, the secret resolver, the vnode
-  registry, and the runtime metrics service.
+  survives every reload: the stdin reader, the one `FrameOwner`, the UID ledger,
+  the frozen module registry, the secret resolver, the vnode registry, and the
+  runtime metrics service.
 - **The run generation is the current tenant.** A complete, self-contained
   occupant built by `composition/run.go`: the kernel and its loop, the task
   supervisor, the run supervisor, the DynCfg graph, the per-generation secret
@@ -401,15 +402,14 @@ flowchart TD
     Cut("Publish stopping cut<br/>begin shutdown budget (10s)")
     Drain("Drain admitted work<br/>protected chains finish")
     Census("Require exact-zero census<br/>run finalizer")
-    Reopen("Reopen ledgers")
     Next("Construct + adopt<br/>next generation")
 
-    HUP --> Seal --> Cut --> Drain --> Census --> Reopen --> Next
+    HUP --> Seal --> Cut --> Drain --> Census --> Next
 
     classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
     classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
     class HUP ext;
-    class Seal,Cut,Drain,Census,Reopen,Next core;
+    class Seal,Cut,Drain,Census,Next core;
 ```
 
 The rotation is an acknowledged sequence (`composition/process.go` `rotate`):
@@ -426,8 +426,7 @@ The rotation is an acknowledged sequence (`composition/process.go` `rotate`):
 5. Require an **exact-zero authority census** (no active tasks, claims, permits,
    or retained frame bytes). Any leftover marks the run **dirty** and fails the
    handoff closed rather than silently proceeding.
-6. Reopen the drained ledgers and construct, start, and adopt the next
-   generation.
+6. Construct, start, and adopt the next generation.
 
 **Termination** (SIGINT/SIGTERM) follows the same retirement path with no
 successor. Collector work still blocked at process exit is considered safe

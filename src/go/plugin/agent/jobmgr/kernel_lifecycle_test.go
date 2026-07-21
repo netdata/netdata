@@ -1206,9 +1206,6 @@ func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 				Source: lifecycle.SourceJobManager,
 			},
 			plan,
-			context.Background(),
-			nil,
-			nil,
 		),
 		)
 	}
@@ -2280,7 +2277,7 @@ func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
 			LaneKey: "shared",
 		}
 
-		require.NoError(t, kernel.admit(request, plan, nil, nil, nil))
+		require.NoError(t, kernel.admit(request, plan))
 	}
 
 	require.NoError(t, kernel.beginShutdown(time.Now().Add(time.Second)))
@@ -2608,7 +2605,7 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 		plan, err := kernel.prepareSubmissionPlanForTest(request)
 		require.NoError(t, err)
 
-		require.NoError(t, kernel.admit(request, plan, nil, nil, nil))
+		require.NoError(t, kernel.admit(request, plan))
 	}
 	got := kernel.ready[0].len + kernel.ready[1].len
 	require.EqualValues(t, 9, got)
@@ -2642,7 +2639,7 @@ func TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass(t *testin
 		{UID: "dyncfg-second", Source: lifecycle.SourceFunction, Route: "dyncfg"},
 	}
 	for _, request := range requests {
-		require.NoError(t, kernel.admit(request, WorkPlan{}, nil, nil, nil))
+		require.NoError(t, kernel.admit(request, WorkPlan{}))
 	}
 	more := kernel.scheduleTasks(len(requests))
 	require.False(t, more)
@@ -2699,7 +2696,7 @@ func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 	plan, err := kernel.prepareSubmissionPlanForTest(request)
 	require.NoError(t, err)
 
-	require.NoError(t, kernel.admit(request, plan, nil, nil, nil))
+	require.NoError(t, kernel.admit(request, plan))
 
 	for index := range externalSourceQueueDepth {
 		request := Request{

@@ -89,7 +89,7 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 				require.NoError(t, err)
 				require.False(t, disposition != lifecycle.ResourceTransactionUnchanged || current != nil)
 
-				_, preflightResultErr := supervisor.PreflightResult(ref, "add", 1)
+				preflightResultErr := supervisor.PreflightResult(ref, "add", 1)
 				require.NoError(t, preflightResultErr)
 
 				sendDynCfgJobTestAction(

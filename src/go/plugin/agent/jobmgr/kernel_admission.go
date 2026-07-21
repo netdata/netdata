@@ -4,7 +4,6 @@ package jobmgr
 
 import (
 	"container/heap"
-	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -30,7 +29,6 @@ func prepareOwnedJobPlan(request Request, plan WorkPlan) (WorkPlan, error) {
 func (ck *CommandKernel) admitSubmission(
 	request Request,
 	plan WorkPlan,
-	submissionContext context.Context,
 	submissionResult,
 	terminalResult chan error,
 	composite *kernelCompositeScope,
@@ -172,8 +170,8 @@ func (ck *CommandKernel) admitSubmission(
 		OperationGeneration: operationGeneration, request: request, plan: plan, claims: claims,
 		functionInvocation: functionInvocation,
 		deadline:           deadlineEntry{index: -1},
-		submissionContext:  submissionContext, submissionResult: submissionResult, terminalResult: terminalResult,
-		parent: parent, claimsInherited: parent != nil,
+		terminalResult:     terminalResult,
+		parent:             parent, claimsInherited: parent != nil,
 		compositeRollback: rollback,
 		shutdownChild: parent != nil &&
 			ck.shutdownPhase == commandShutdownActionDrain,
@@ -228,12 +226,16 @@ func (ck *CommandKernel) admitSubmission(
 	if parent == nil && ck.compositeFenceConflicts(operation.claims) {
 		if err := ck.blockOnCompositeFence(operation); err != nil {
 			ck.run.Dirty(err)
-			ck.settleSubmission(operation, err)
+			if submissionResult != nil {
+				submissionResult <- err
+			}
 			ck.cancelOperation(operation.UID)
 			return nil
 		}
 	}
-	ck.settleSubmission(operation, nil)
+	if submissionResult != nil {
+		submissionResult <- nil
+	}
 	if !operation.fenceBlocked && lane.active == nil && lane.head == operation {
 		ck.markReady(lane)
 	}
@@ -252,13 +254,4 @@ func (ck *CommandKernel) rejectClosedAdmission() error {
 		return ck.run.StoppingCause()
 	}
 	return closedErr
-}
-
-func (ck *CommandKernel) settleSubmission(operation *commandOperation, err error) {
-	if operation == nil || operation.submissionResult == nil {
-		return
-	}
-	operation.submissionResult <- err
-	operation.submissionResult = nil
-	operation.submissionContext = nil
 }

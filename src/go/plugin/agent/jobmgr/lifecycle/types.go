@@ -22,7 +22,6 @@ const (
 	FunctionEnvelopeBytes               = 64 * 1024
 	MaximumFunctionFrameBytes           = FunctionPayloadBytes + FunctionEnvelopeBytes
 	MaximumOtherFrameBytes              = 100 * 1024 * 1024
-	MaximumInputBodyBytes               = 20 * 1024 * 1024
 	FunctionTaskPhases                  = 4
 	TransactionTaskPhases               = 6
 )

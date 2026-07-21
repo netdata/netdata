@@ -24,16 +24,12 @@ func (fn runFinalizerFunc) FinalizeRun(ctx context.Context, generation uint64) e
 func (ck *CommandKernel) admit(
 	request Request,
 	plan WorkPlan,
-	submissionContext context.Context,
-	submissionResult,
-	terminalResult chan error,
 ) error {
 	return ck.admitSubmission(
 		request,
 		plan,
-		submissionContext,
-		submissionResult,
-		terminalResult,
+		nil,
+		nil,
 		nil,
 		false,
 	)

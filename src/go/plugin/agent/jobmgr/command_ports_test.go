@@ -46,6 +46,14 @@ func TestRequestValidate(t *testing.T) {
 				return request
 			}(),
 		},
+		"payload at limit": {
+			request: func() Request {
+				request := valid
+				request.HasPayload = true
+				request.Payload = make([]byte, functionwire.MaximumInputBodyBytes)
+				return request
+			}(),
+		},
 		"missing identity": {
 			request: func() Request {
 				request := valid

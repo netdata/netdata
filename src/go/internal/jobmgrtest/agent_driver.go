@@ -728,15 +728,15 @@ func runAgentFunctionBodyBoundaries(ctx context.Context) error {
 				status int
 			}{
 				"one byte below": {
-					size:   lifecycle.MaximumInputBodyBytes - 1,
+					size:   frameworkfunctions.MaximumInputBodyBytes - 1,
 					status: 200,
 				},
 				"exact": {
-					size:   lifecycle.MaximumInputBodyBytes,
+					size:   frameworkfunctions.MaximumInputBodyBytes,
 					status: 200,
 				},
 				"one byte over": {
-					size:   lifecycle.MaximumInputBodyBytes + 1,
+					size:   frameworkfunctions.MaximumInputBodyBytes + 1,
 					status: 413,
 				},
 			}

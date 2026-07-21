@@ -475,7 +475,7 @@ func TestTaskSupervisorPreflightsResultEnvelopeBeforeAction(t *testing.T) {
 	require.NoError(t, err)
 	oversizedUID := strings.Repeat("u", 2+FunctionEnvelopeBytes-baseEnvelope)
 
-	_, preflightResultErr := supervisor.PreflightResult(ref, oversizedUID, 1)
+	preflightResultErr := supervisor.PreflightResult(ref, oversizedUID, 1)
 	require.ErrorIs(t, preflightResultErr, ErrFunctionResultTooLarge)
 
 	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))

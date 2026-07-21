@@ -39,7 +39,7 @@ func TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress(
 		plan, err := kernel.prepareSubmissionPlanForTest(request)
 		require.NoError(t, err)
 
-		require.NoError(t, kernel.admit(request, plan, nil, nil, nil))
+		require.NoError(t, kernel.admit(request, plan))
 	}
 	cold := Request{
 		UID:    "cold-progress",
@@ -49,7 +49,7 @@ func TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress(
 	plan, err := kernel.prepareSubmissionPlanForTest(cold)
 	require.NoError(t, err)
 
-	require.NoError(t, kernel.admit(cold, plan, nil, nil, nil))
+	require.NoError(t, kernel.admit(cold, plan))
 }
 
 func TestKernelReadyLaneFairnessAtBoundaries(t *testing.T) {

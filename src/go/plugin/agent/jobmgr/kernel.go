@@ -145,8 +145,6 @@ type commandOperation struct {
 	deadline                       deadlineEntry                      // deadline heap entry
 	resultExpiry                   int64                              // expiry stamped into the result frame
 	taskRequest                    lifecycle.TaskRequestRef           // off-loop task request ref
-	submissionContext              context.Context                    // caller context threaded to the submission
-	submissionResult               chan error                         // channel that releases the submitter once admitted
 	terminalResult                 chan error                         // channel that delivers the terminal disposition
 	terminalErr                    error                              // terminal error, if any
 	parent                         *commandOperation                  // parent composite operation, if this is a child
@@ -404,7 +402,7 @@ func (ck *CommandKernel) bindRunNotifications() error {
 // sanctioned callers) holds.
 func (ck *CommandKernel) beginResultEncode(operation *commandOperation, ref lifecycle.TaskRef) bool {
 	expiry := lifecycle.ExpiryAt(ck.clock.Now())
-	_, err := ck.tasks.PreflightResult(ref, operation.UID, expiry)
+	err := ck.tasks.PreflightResult(ref, operation.UID, expiry)
 	if err != nil {
 		status := lifecycle.ControlInternal
 		if errors.Is(err, lifecycle.ErrFunctionResultTooLarge) {

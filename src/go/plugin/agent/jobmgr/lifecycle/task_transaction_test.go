@@ -101,7 +101,7 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 			require.Equal(t, test.disposition, disposition)
 			require.Equal(t, test.resulting, current)
 
-			_, preflightResultErr := supervisor.PreflightResult(ref, "tx", 1)
+			preflightResultErr := supervisor.PreflightResult(ref, "tx", 1)
 			require.NoError(t, preflightResultErr)
 
 			require.NoError(t, supervisor.SendAction(TaskAction{

@@ -670,28 +670,20 @@ func (ts *TaskSupervisor) RetainedTimeouts() (int, bool) {
 	return ts.retained, ts.saturated
 }
 
-type ResultPreflight struct {
-	PlanBytes  int64
-	FrameBytes int64
-}
-
-func (ts *TaskSupervisor) PreflightResult(ref TaskRef, uid string, expiry int64) (ResultPreflight, error) {
+func (ts *TaskSupervisor) PreflightResult(ref TaskRef, uid string, expiry int64) error {
 	slot, err := ts.slot(ref)
 	if err != nil {
-		return ResultPreflight{}, err
+		return err
 	}
 	if slot.outcome.kind != TaskOutcomeFrame {
-		return ResultPreflight{}, errors.New("jobmgr task supervisor: result is unavailable for preflight")
+		return errors.New("jobmgr task supervisor: result is unavailable for preflight")
 	}
 	frame, err := PrepareFrame(uid, slot.outcome.frame, expiry)
 	if err != nil {
-		return ResultPreflight{}, err
+		return err
 	}
-	encodedBytes, err := frame.encodedSize()
-	if err != nil {
-		return ResultPreflight{}, err
-	}
-	return ResultPreflight{PlanBytes: int64(len(slot.outcome.frame.payload)), FrameBytes: int64(encodedBytes)}, nil
+	_, err = frame.encodedSize()
+	return err
 }
 
 func (ts *TaskSupervisor) TakeAppliedResourceTransaction(

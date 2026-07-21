@@ -85,6 +85,40 @@ func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) 
 	require.Error(t, ingress.Run(context.Background()))
 }
 
+func TestProcessIngressCarriesPartialBodyAcrossAdopt(t *testing.T) {
+	reader, writer := io.Pipe()
+	ingress, err := NewProcessIngress(reader)
+	require.NoError(t, err)
+	first := newTestProcessInput(1)
+	second := newTestProcessInput(2)
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: first}))
+
+	done := make(chan error, 1)
+	go func() { done <- ingress.Run(context.Background()) }()
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD carried 30 \"test:work\" 0xFFFF \"source\" application/octet-stream\npartial\n",
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, ingress.SealPause())
+	require.NoError(t, ingress.DrainPause(context.Background(), 2))
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: second}))
+
+	_, err = io.WriteString(writer, "successor\nFUNCTION_PAYLOAD_END\n")
+	require.NoError(t, err)
+	call := <-second.calls
+	require.Equal(t, "carried", call.UID)
+	require.Equal(t, "partial\nsuccessor", string(call.Payload))
+	close(second.release)
+
+	require.NoError(t, ingress.SealPause())
+	require.NoError(t, ingress.DrainPause(context.Background(), 0))
+	require.NoError(t, ingress.Fence(context.Background()))
+	require.NoError(t, writer.Close())
+	require.NoError(t, <-done)
+}
+
 func TestProcessIngressTimedOutDrainRetainsSealedStateForRetry(t *testing.T) {
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()

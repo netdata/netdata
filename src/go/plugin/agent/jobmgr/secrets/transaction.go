@@ -15,7 +15,7 @@ import (
 type preparedSecretSpec struct {
 	scope   lifecycle.ResourceTransactionScope // transaction identity triple (current/successor) being applied
 	current lifecycle.ReadyResource            // existing ready store resource; nil on install
-	permit  lifecycle.LongLivedPermit          // long-lived byte/external grant for the successor generation
+	permit  lifecycle.LongLivedPermit          // long-lived resource/external ownership for the successor generation
 
 	store    *secretstore.SecretStore            // target secret store
 	storeKey string                              // the store's kind_name key
