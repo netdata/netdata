@@ -152,7 +152,8 @@ func TestPipelineGenerationRunsNamedProvidersAndAggregates(t *testing.T) {
 	}
 	generation.sendEvery = time.Millisecond
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 	out := make(chan []*confgroup.Group, 2)
 	runErr := make(chan error, 1)
 	go func() {

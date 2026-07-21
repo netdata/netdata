@@ -44,3 +44,75 @@ func TestFunctionProtocolCaptureReportsIgnoredWriteOverflow(t *testing.T) {
 	require.ErrorIs(t, err, errFunctionProtocolCaptureTooLarge)
 	assert.Nil(t, capture.active)
 }
+
+func TestSplitFunctionProtocol(t *testing.T) {
+	const (
+		resultWithPayload = "FUNCTION_RESULT_BEGIN uid 200 application/json 0\n{\"ok\":true}\nFUNCTION_RESULT_END\n\n"
+		emptyResult       = "FUNCTION_RESULT_BEGIN uid 200 application/json 0\nFUNCTION_RESULT_END\n\n"
+	)
+	tests := map[string]struct {
+		output            string
+		wantPayload       string
+		wantNotifications string
+		wantError         string
+	}{
+		"non-empty payload": {
+			output:      resultWithPayload,
+			wantPayload: `{"ok":true}`,
+		},
+		"empty payload": {
+			output: emptyResult,
+		},
+		"marker text before result": {
+			output: "CONFIG example create running job path dyncfg 'source FUNCTION_RESULT_BEGIN uid 500 text/plain 0' commands\n\n" +
+				resultWithPayload,
+			wantPayload:       `{"ok":true}`,
+			wantNotifications: "CONFIG example create running job path dyncfg 'source FUNCTION_RESULT_BEGIN uid 500 text/plain 0' commands\n\n",
+		},
+		"marker text after result": {
+			output: resultWithPayload +
+				"CONFIG example create running job path dyncfg 'source FUNCTION_RESULT_BEGIN another 500 text/plain 0' commands\n\n",
+			wantPayload:       `{"ok":true}`,
+			wantNotifications: "CONFIG example create running job path dyncfg 'source FUNCTION_RESULT_BEGIN another 500 text/plain 0' commands\n\n",
+		},
+		"two result lines": {
+			output:    resultWithPayload + resultWithPayload,
+			wantError: "Function handler produced multiple results",
+		},
+		"only embedded marker text": {
+			output:    "CONFIG example create running job path dyncfg 'source FUNCTION_RESULT_BEGIN uid 500 text/plain 0' commands\n\n",
+			wantError: "Function handler produced no terminal result",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var notifications bytes.Buffer
+			frames, err := lifecycle.NewFrameOwner(&notifications)
+			require.NoError(t, err)
+
+			result, cleanup, err := splitFunctionProtocol("uid", []byte(test.output), frames)
+			if test.wantError != "" {
+				require.ErrorContains(t, err, test.wantError)
+				assert.Nil(t, cleanup)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, cleanup)
+			require.NoError(t, cleanup())
+			assert.Equal(t, test.wantNotifications, notifications.String())
+
+			var encoded bytes.Buffer
+			resultFrames, err := lifecycle.NewFrameOwner(&encoded)
+			require.NoError(t, err)
+			frame, err := lifecycle.PrepareFrame("result", result, 1)
+			require.NoError(t, err)
+			require.NoError(t, resultFrames.Commit(frame))
+			want := "FUNCTION_RESULT_BEGIN result 200 application/json 1\n"
+			if test.wantPayload != "" {
+				want += test.wantPayload + "\n"
+			}
+			want += "FUNCTION_RESULT_END\n\n"
+			assert.Equal(t, want, encoded.String())
+		})
+	}
+}

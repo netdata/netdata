@@ -148,13 +148,33 @@ func callFunctionProtocol(call func()) (err error) {
 	return nil
 }
 
+// indexProtocolLine prevents marker-like payload text from being parsed as a
+// protocol control line.
+func indexProtocolLine(payload, prefix []byte) int {
+	if len(prefix) == 0 {
+		return -1
+	}
+	for offset := 0; offset < len(payload); {
+		index := bytes.Index(payload[offset:], prefix)
+		if index < 0 {
+			return -1
+		}
+		index += offset
+		if index == 0 || payload[index-1] == '\n' {
+			return index
+		}
+		offset = index + 1
+	}
+	return -1
+}
+
 func splitFunctionProtocol(
 	uid string,
 	output []byte,
 	frames *lifecycle.FrameOwner,
 ) (lifecycle.SealedResult, lifecycle.TaskCleanup, error) {
 	beginPrefix := []byte("FUNCTION_RESULT_BEGIN " + uid + " ")
-	begin := bytes.Index(output, beginPrefix)
+	begin := indexProtocolLine(output, beginPrefix)
 	if begin < 0 {
 		return lifecycle.SealedResult{}, nil,
 			errors.New("jobmgr composition: Function handler produced no terminal result")
@@ -184,7 +204,11 @@ func splitFunctionProtocol(
 			errors.New("jobmgr composition: Function result has no terminal marker")
 	}
 	end := headerEnd + endRelative
-	payload := output[headerEnd+1 : end]
+	payloadStart := headerEnd
+	if end != headerEnd {
+		payloadStart++
+	}
+	payload := output[payloadStart:end]
 	result, err := lifecycle.NewSealedResult(status, header[3], payload)
 	if err != nil {
 		return lifecycle.SealedResult{}, nil, err
@@ -197,7 +221,7 @@ func splitFunctionProtocol(
 	)
 	notifications = append(notifications, output[:begin]...)
 	notifications = append(notifications, output[frameEnd:]...)
-	if bytes.Contains(notifications, []byte("FUNCTION_RESULT_BEGIN ")) {
+	if indexProtocolLine(notifications, []byte("FUNCTION_RESULT_BEGIN ")) >= 0 {
 		return lifecycle.SealedResult{}, nil,
 			errors.New("jobmgr composition: Function handler produced multiple results")
 	}

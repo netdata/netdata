@@ -74,9 +74,8 @@ type Process struct {
 	started  chan struct{}       // closed once Run starts
 	done     chan struct{}       // closed once Run returns
 
-	mu        sync.Mutex // guards attempted/running/result
+	mu        sync.Mutex // guards attempted/result
 	attempted bool       // Run has been attempted (once)
-	running   bool       // the process is running
 	result    error      // terminal run result
 
 	runtime    RuntimeService // runtime service (started/stopped around Run)
@@ -214,7 +213,6 @@ func (p *Process) Run(ctx context.Context) error {
 		return errors.New("jobmgr composition: production run already attempted")
 	}
 	p.attempted = true
-	p.running = true
 	close(p.started)
 	p.mu.Unlock()
 
@@ -227,7 +225,6 @@ func (p *Process) Run(ctx context.Context) error {
 	result := p.core.run(ctx, p.commands)
 	p.mu.Lock()
 	p.result = result
-	p.running = false
 	close(p.done)
 	p.mu.Unlock()
 	return result
