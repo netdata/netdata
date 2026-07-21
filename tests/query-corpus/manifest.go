@@ -233,6 +233,14 @@ var manifest = map[string]ManifestCase{
 		Proves: "/api/v2/data and /api/v3/data answer identically for identical params (shared api_v23_data_internal) — only the api version field differs",
 		Agent:  Green,
 	},
+	"API/selectors": {
+		Proves: "the selector surface with VALUE-exact oracles: nodes/instances/dimensions filters and their scope_ counterparts, '!' negation patterns, label key:value patterns (labels + scope_labels); match-ids/match-names dimension modes with id!=name dims (default matches BOTH; each mode excludes the other's namespace; a no-match response is the bare [time] labels row)",
+		Agent:  Green,
+	},
+	"API/fallbacks-and-limits": {
+		Proves: "unknown v1 format silently serves json; unknown weights method silently runs ks2; cardinality_limit at 2 folds five dimensions into the remaining bucket and at >= the dimension count folds nothing",
+		Agent:  Green,
+	},
 	"W/value": {
 		Proves: "weights method=value: per-metric weight = the window average over NATURAL points with the after-INCLUSIVE window (121 points for a 120s span — rulings batch); MULTINODE rollup rows carry the mean of their dimensions; the per-dimension timeframe stats (min/avg/max/sum/count/anomaly_count) are exact; method=value NEVER rank-normalizes",
 		Agent:  Green,
