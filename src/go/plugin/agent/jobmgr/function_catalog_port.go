@@ -53,9 +53,8 @@ func (ref FunctionCleanupRef) Valid() bool {
 // FunctionCleanupPlan is inert work returned by a catalog transition when a
 // closed handler generation becomes drained.
 type FunctionCleanupPlan struct {
-	Ref    FunctionCleanupRef
-	Work   lifecycle.TaskWork
-	Runner lifecycle.TaskRunner
+	Ref  FunctionCleanupRef
+	Work lifecycle.TaskWork
 }
 
 // FunctionCatalogMutation is an adapter-owned immutable mutation postimage
@@ -83,14 +82,7 @@ type FunctionCatalogCensus struct {
 }
 
 func (fcp FunctionCleanupPlan) validate() error {
-	workKinds := 0
-	if fcp.Work != nil {
-		workKinds++
-	}
-	if fcp.Runner != nil {
-		workKinds++
-	}
-	if fcp.Ref.Valid() != (workKinds == 1) {
+	if fcp.Ref.Valid() != (fcp.Work != nil) {
 		return errors.New("jobmgr kernel: invalid Function cleanup plan")
 	}
 	return nil
@@ -119,10 +111,10 @@ func (fcd FunctionCatalogDecision) validate() error {
 	if fcd.Rejected != 0 {
 		if !fcd.Rejected.Valid() || fcd.Lease.Valid() ||
 			fcd.ResourceID != "" ||
-			fcd.Plan.Work != nil || fcd.Plan.Runner != nil || fcd.Plan.Resource != nil ||
-			fcd.Plan.Transaction != nil || fcd.Plan.Capability != nil ||
+			fcd.Plan.Work != nil || fcd.Plan.Resource != nil ||
+			fcd.Plan.Transaction != nil ||
 			len(fcd.Plan.Claims) != 0 ||
-			len(fcd.Plan.ReadClaims) != 0 || fcd.Plan.OwnedBytes != 0 ||
+			fcd.Plan.OwnedBytes != 0 ||
 			fcd.Plan.NoResponse || fcd.Plan.Cleanup != nil ||
 			fcd.Plan.CooperativeCancel || fcd.Plan.CooperativeDeadline {
 			return errors.New("jobmgr kernel: invalid Function rejection")
@@ -133,7 +125,6 @@ func (fcd FunctionCatalogDecision) validate() error {
 		return errors.New("jobmgr kernel: resolved Function has no invocation lease")
 	}
 	if fcd.Plan.Resource != nil ||
-		fcd.Plan.Capability != nil ||
 		fcd.Plan.NoResponse {
 		return errors.New("jobmgr kernel: Function catalog returned internal work")
 	}

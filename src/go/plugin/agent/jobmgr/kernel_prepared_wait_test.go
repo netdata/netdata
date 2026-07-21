@@ -1047,7 +1047,7 @@ func TestShutdownCancellationPreservesGenerationStoppingCause(t *testing.T) {
 	require.NoError(t, state.Dirty)
 }
 
-func TestShutdownPreparationCancellationDoesNotDirtyResourceOrCapability(t *testing.T) {
+func TestShutdownPreparationCancellationDoesNotDirtyResource(t *testing.T) {
 	tests := map[string]struct {
 		plan func(
 			*testing.T,
@@ -1075,34 +1075,6 @@ func TestShutdownPreparationCancellationDoesNotDirtyResourceOrCapability(t *test
 							_ uint64,
 							_ lifecycle.LongLivedPermit,
 						) (lifecycle.PreparedResource, error) {
-							close(started)
-							<-ctx.Done()
-							observed <- context.Cause(ctx)
-							return nil, ctx.Err()
-						},
-					},
-				}
-			},
-		},
-		"capability": {
-			plan: func(
-				t *testing.T,
-				started chan<- struct{},
-				observed chan<- error,
-			) WorkPlan {
-				t.Helper()
-				permit, err := lifecycle.NewSecretStoreLongLivedPlan(40)
-				require.NoError(t, err)
-				return WorkPlan{
-					NoResponse: true,
-					Capability: &CapabilityPlan{
-						ID:     "stopping-capability",
-						Permit: permit,
-						Prepare: func(
-							ctx context.Context,
-							_ uint64,
-							_ lifecycle.LongLivedPermit,
-						) (lifecycle.PreparedCapability, error) {
 							close(started)
 							<-ctx.Done()
 							observed <- context.Cause(ctx)

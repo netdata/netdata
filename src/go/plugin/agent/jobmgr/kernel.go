@@ -522,10 +522,6 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		ck.completeResourceTask(operation, completion)
 		return
 	}
-	if operation.plan.Capability != nil {
-		ck.completeCapabilityTask(operation, completion)
-		return
-	}
 	if operation.cancelled &&
 		operation.Response == lifecycle.ResponseOpen &&
 		!operation.controlQueued {
@@ -548,37 +544,6 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 			status = lifecycle.ControlInternal
 		}
 		ck.enqueueControl(operation, status)
-	}
-	if err := ck.sendOperationAction(operation, action); err != nil {
-		ck.run.Dirty(err)
-	}
-}
-
-func (ck *CommandKernel) completeCapabilityTask(operation *commandOperation, completion lifecycle.TaskCompletion) {
-	kind := lifecycle.TaskActionDispose
-	if completion.Err == nil &&
-		!operation.cancelled &&
-		!operation.TimedOut() &&
-		ck.ownershipActionAllowed(operation) {
-		if completion.Kind != lifecycle.TaskOutcomePreparedCapability {
-			ck.dirtyCapability(operation, errors.New("jobmgr kernel: capability task returned the wrong outcome"))
-			return
-		}
-		kind = lifecycle.TaskActionCommitCapability
-	}
-	if completion.Err != nil {
-		if ck.isStoppingCauseCancellation(operation, completion.Err) {
-			operation.terminalErr = errors.Join(
-				operation.terminalErr,
-				completion.Err,
-			)
-		} else {
-			ck.dirtyCapability(operation, completion.Err)
-		}
-	}
-	action := lifecycle.TaskAction{Ref: completion.Ref, Sequence: completion.Sequence + 1, Kind: kind}
-	if kind == lifecycle.TaskActionCommitCapability {
-		action.ExpectedGeneration = operation.resourceGeneration
 	}
 	if err := ck.sendOperationAction(operation, action); err != nil {
 		ck.run.Dirty(err)
@@ -800,7 +765,6 @@ func (ck *CommandKernel) sendOperationAction(
 		return errors.New("jobmgr kernel: invalid operation action")
 	}
 	ownershipEntry := action.Kind == lifecycle.TaskActionAcceptStart ||
-		action.Kind == lifecycle.TaskActionCommitCapability ||
 		action.Kind == lifecycle.TaskActionApplyResourceTransaction
 	if ownershipEntry &&
 		!operation.ownershipChain &&
@@ -1177,10 +1141,6 @@ func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 		ck.acknowledgeResourceTask(operation, ack)
 		return
 	}
-	if operation.plan.Capability != nil {
-		ck.acknowledgeCapabilityTask(operation, ack)
-		return
-	}
 	if ack.Err != nil {
 		operation.PoisonResponse()
 		ck.run.Dirty(ack.Err)
@@ -1304,51 +1264,6 @@ func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 		return
 	}
 	ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
-}
-
-func (ck *CommandKernel) acknowledgeCapabilityTask(operation *commandOperation, ack lifecycle.TaskAcknowledgement) {
-	switch ack.Kind {
-	case lifecycle.TaskActionCommitCapability:
-		switch ack.CapabilityDisposition {
-		case lifecycle.CapabilityApplied:
-			if ack.Err != nil {
-				ck.dirtyCapability(operation, ack.Err)
-			}
-		case lifecycle.CapabilityDisposed:
-			if ack.Err == nil {
-				ck.dirtyCapability(operation, errors.New("jobmgr kernel: capability was disposed without a commit error"))
-			} else {
-				ck.dirtyCapability(operation, ack.Err)
-			}
-		case lifecycle.CapabilityRetained:
-			ck.dirtyCapability(operation, errors.Join(errors.New("jobmgr kernel: capability commit retained ambiguous ownership"), ack.Err))
-			return
-		default:
-			ck.dirtyCapability(operation, errors.New("jobmgr kernel: invalid capability commit disposition"))
-			return
-		}
-	case lifecycle.TaskActionDispose:
-		if ack.CapabilityDisposition != 0 {
-			ck.dirtyCapability(operation, errors.New("jobmgr kernel: dispose acknowledged a capability disposition"))
-			return
-		}
-		if ack.Err != nil {
-			ck.dirtyCapability(operation, ack.Err)
-			return
-		}
-	default:
-		ck.dirtyCapability(operation, errors.New("jobmgr kernel: unexpected capability acknowledgement"))
-		return
-	}
-	ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
-}
-
-func (ck *CommandKernel) dirtyCapability(operation *commandOperation, err error) {
-	if err == nil {
-		err = errors.New("jobmgr kernel: unspecified capability failure")
-	}
-	operation.terminalErr = errors.Join(operation.terminalErr, err)
-	ck.run.Dirty(err)
 }
 
 func (ck *CommandKernel) acknowledgeResourceTask(operation *commandOperation, ack lifecycle.TaskAcknowledgement) {

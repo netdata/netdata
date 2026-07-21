@@ -48,34 +48,6 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 				return plan
 			},
 		},
-		"prepared capability": {
-			plan: func(
-				t *testing.T,
-				_ *TaskSupervisor,
-				admission *AdmissionLedger,
-				admissionRef AdmissionRef,
-			) TaskPlan {
-				permit, err := NewSecretStoreLongLivedPlan(40)
-				require.NoError(t, err)
-				plan, err := NewPreparedCapabilityPermitTaskPlan(
-					SourceJobManager,
-					time.Time{},
-					TransactionTaskPhases,
-					admission,
-					admissionRef,
-					ResourceIdentity{ID: "secret", Generation: 1},
-					permit,
-					func(context.Context, LongLivedPermit) (
-						PreparedCapability,
-						error,
-					) {
-						panic("prepare capability")
-					},
-				)
-				require.NoError(t, err)
-				return plan
-			},
-		},
 		"resource transaction": {
 			plan: func(
 				t *testing.T,

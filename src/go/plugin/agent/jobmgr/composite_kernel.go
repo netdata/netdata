@@ -352,7 +352,7 @@ func (ck *CommandKernel) validateCompositeAdmission(
 	}
 	childClaims, err := normalizeAuthorityClaimModes(
 		plan.Claims,
-		plan.ReadClaims,
+		nil,
 	)
 	if err != nil {
 		return nil, err

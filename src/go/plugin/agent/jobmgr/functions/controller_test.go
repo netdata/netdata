@@ -65,7 +65,7 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, runTaskErr := decision.Plan.Runner.RunTask(context.Background())
+	_, runTaskErr := decision.Plan.Work(context.Background())
 	require.NoError(t, runTaskErr)
 
 	cleanup, err := catalog.ReleaseInvocation(decision.Lease)
@@ -179,7 +179,7 @@ func TestFunctionControllerRawRequestFidelity(t *testing.T) {
 	decision, err := catalog.ResolveAndAcquire(lookup)
 	require.NoError(t, err)
 
-	_, runTaskErr := decision.Plan.Runner.RunTask(context.Background())
+	_, runTaskErr := decision.Plan.Work(context.Background())
 	require.NoError(t, runTaskErr)
 
 	if cleanup, err := catalog.ReleaseInvocation(decision.Lease); err != nil {
@@ -426,7 +426,7 @@ func (ctmp *controllerTestMutationPort) CommitFunctions(
 		}
 		for index := range count {
 			cleanup := cleanups[index]
-			_, cleanupErr := cleanup.Runner.RunTask(context.Background())
+			_, cleanupErr := cleanup.Work(context.Background())
 			if err := ctmp.catalog.CompleteCleanup(cleanup.Ref); err != nil {
 				return 0, errors.Join(cleanupErr, err)
 			}
@@ -454,7 +454,7 @@ func (ctmp *controllerTestMutationPort) AbortFunctions(
 	}
 	for index := range count {
 		cleanup := cleanups[index]
-		_, cleanupErr := cleanup.Runner.RunTask(context.Background())
+		_, cleanupErr := cleanup.Work(context.Background())
 		if err := ctmp.catalog.CompleteCleanup(cleanup.Ref); err != nil {
 			return errors.Join(cleanupErr, err)
 		}

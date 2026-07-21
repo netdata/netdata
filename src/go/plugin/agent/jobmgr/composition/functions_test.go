@@ -477,7 +477,7 @@ func (amp *assemblyMutationPort) CommitFunctions(
 		}
 		for index := range count {
 			cleanup := cleanups[index]
-			_, cleanupErr := cleanup.Runner.RunTask(context.Background())
+			_, cleanupErr := cleanup.Work(context.Background())
 			if err := amp.catalog.CompleteCleanup(cleanup.Ref); err != nil {
 				return 0, errors.Join(cleanupErr, err)
 			}
@@ -505,7 +505,7 @@ func (amp *assemblyMutationPort) AbortFunctions(
 	}
 	for index := range count {
 		cleanup := cleanups[index]
-		_, cleanupErr := cleanup.Runner.RunTask(context.Background())
+		_, cleanupErr := cleanup.Work(context.Background())
 		if err := amp.catalog.CompleteCleanup(cleanup.Ref); err != nil {
 			return errors.Join(cleanupErr, err)
 		}

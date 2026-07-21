@@ -50,7 +50,6 @@ const (
 	TaskActionEncodeWrite TaskActionKind = iota + 1
 	TaskActionAcceptStart
 	TaskActionPublishResource
-	TaskActionCommitCapability
 	TaskActionStopResource
 	TaskActionFinalizeResource
 	TaskActionApplyResourceTransaction
@@ -69,11 +68,10 @@ type TaskAction struct {
 }
 
 type TaskAcknowledgement struct {
-	Ref                   TaskRef
-	Sequence              uint8
-	Kind                  TaskActionKind
-	CapabilityDisposition CapabilityDisposition
-	Err                   error
+	Ref      TaskRef
+	Sequence uint8
+	Kind     TaskActionKind
+	Err      error
 }
 
 type taskSlot struct {
@@ -375,9 +373,7 @@ func (ts *TaskSupervisor) Pending() int {
 
 func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial TaskOutcome) (TaskRef, error) {
 	hasDirectWork := plan.Work != nil ||
-		plan.Runner != nil ||
-		plan.permitWork != nil ||
-		plan.capabilityPermitWork != nil
+		plan.permitWork != nil
 	if plan.transactionWork == nil {
 		if (hasDirectWork != initial.empty()) ||
 			plan.initialReady != nil ||
@@ -442,47 +438,6 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 		plan.permitOwner = ResourceIdentity{}
 		plan.permitPlan = LongLivedPlan{}
 		plan.permitWork = nil
-	}
-	if plan.capabilityPermitWork != nil {
-		permit, err := ts.IssueLongLivedPermit(plan.permitAdmission, plan.permitAdmissionRef, plan.permitOwner, plan.permitPlan)
-		if err != nil {
-			return TaskRef{}, err
-		}
-		permitWork := plan.capabilityPermitWork
-		permitOwner := plan.permitOwner
-		plan.Work = func(
-			ctx context.Context,
-		) (outcome TaskOutcome, resultErr error) {
-			defer func() {
-				if recovered := recover(); recovered != nil {
-					outcome = TaskOutcome{}
-					resultErr = errors.Join(
-						fmt.Errorf(
-							"%w in prepared-capability work: %v",
-							ErrTaskPanic,
-							recovered,
-						),
-						permit.AbortUnused(),
-					)
-				}
-			}()
-			capability, workErr := permitWork(ctx, permit)
-			if capability == nil {
-				return TaskOutcome{}, errors.Join(workErr, permit.AbortUnused())
-			}
-			identity, identityErr := preparedCapabilityIdentity(capability)
-			if identityErr != nil || identity != permitOwner {
-				outcome, outcomeErr := preparedCapabilityOutcome(capability, permitOwner)
-				return outcome, errors.Join(workErr, identityErr, outcomeErr, errors.New("jobmgr task supervisor: prepared capability identity differs from permit owner"))
-			}
-			outcome, outcomeErr := preparedCapabilityOutcome(capability, identity)
-			return outcome, errors.Join(workErr, outcomeErr)
-		}
-		plan.permitAdmission = nil
-		plan.permitAdmissionRef = AdmissionRef{}
-		plan.permitOwner = ResourceIdentity{}
-		plan.permitPlan = LongLivedPlan{}
-		plan.capabilityPermitWork = nil
 	}
 	if plan.transactionWork != nil {
 		var current ReadyResource
@@ -706,14 +661,12 @@ func (ts *TaskSupervisor) SendAction(action TaskAction) error {
 	if action.Kind == TaskActionEncodeWrite && (action.UID == "" || action.Expiry <= 0 || action.ExpectedGeneration != 0) {
 		return errors.New("jobmgr task supervisor: invalid encode/write action")
 	}
-	if (action.Kind == TaskActionAcceptStart ||
-		action.Kind == TaskActionCommitCapability) &&
+	if action.Kind == TaskActionAcceptStart &&
 		(action.ExpectedGeneration == 0 || action.UID != "" || action.Expiry != 0) {
 		return errors.New("jobmgr task supervisor: invalid generation-bound action")
 	}
 	if action.Kind != TaskActionEncodeWrite &&
 		action.Kind != TaskActionAcceptStart &&
-		action.Kind != TaskActionCommitCapability &&
 		(action.UID != "" || action.Expiry != 0 || action.ExpectedGeneration != 0) {
 		return errors.New("jobmgr task supervisor: unexpected action payload")
 	}
@@ -910,11 +863,7 @@ func (ts *TaskSupervisor) TakeDisposedResourceTransaction(
 func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskSlot, plan TaskPlan, outcome TaskOutcome) {
 	var err error
 	if outcome.empty() {
-		if plan.Runner != nil {
-			outcome, err = runTaskRunner(ctx, plan.Runner)
-		} else {
-			outcome, err = runTaskWork(ctx, plan.Work)
-		}
+		outcome, err = runTaskWork(ctx, plan.Work)
 	}
 	if err != nil {
 		err = normalizeStoppingCancellation(
@@ -987,37 +936,6 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 				ack.Err = errors.New("jobmgr task child: publish without ready resource")
 			} else {
 				ack.Err = callReadyResource("publish", slot.outcome.ready.Publish)
-			}
-		case TaskActionCommitCapability:
-			if slot.outcome.kind != TaskOutcomePreparedCapability || slot.outcome.capability == nil {
-				ack.Err = errors.New("jobmgr task child: commit without prepared capability")
-			} else {
-				disposition, commitErr, panicked := runPreparedCapabilityCommit(
-					context.WithoutCancel(ctx),
-					slot.outcome.capability,
-					action.ExpectedGeneration,
-				)
-				ack.CapabilityDisposition = disposition
-				ack.Err = commitErr
-				switch disposition {
-				case CapabilityApplied:
-					slot.outcome = TaskOutcome{}
-				case CapabilityDisposed:
-					slot.outcome = TaskOutcome{}
-					if ack.Err == nil {
-						ack.Err = errors.New("jobmgr task child: capability commit disposed without an error")
-					}
-				case CapabilityRetained:
-					if ack.Err == nil {
-						ack.Err = errors.New("jobmgr task child: capability commit retained without an error")
-					}
-				default:
-					ack.CapabilityDisposition = CapabilityRetained
-					ack.Err = errors.Join(ack.Err, errors.New("jobmgr task child: invalid capability disposition"))
-				}
-				if panicked {
-					ack.CapabilityDisposition = CapabilityRetained
-				}
 			}
 		case TaskActionStopResource:
 			if slot.outcome.kind != TaskOutcomeReadyResource || slot.outcome.ready == nil {
@@ -1179,16 +1097,6 @@ func runTaskWork(ctx context.Context, work TaskWork) (result TaskOutcome, err er
 	return work(ctx)
 }
 
-func runTaskRunner(ctx context.Context, runner TaskRunner) (result TaskOutcome, err error) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			result = TaskOutcome{}
-			err = fmt.Errorf("%w: %v", ErrTaskPanic, recovered)
-		}
-	}()
-	return runner.RunTask(ctx)
-}
-
 func runPreparedAcceptStart(ctx context.Context, prepared PreparedResource, expected uint64) (ready ReadyResource, err error, panicked bool) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -1199,18 +1107,6 @@ func runPreparedAcceptStart(ctx context.Context, prepared PreparedResource, expe
 	}()
 	ready, err = prepared.AcceptStart(ctx, expected)
 	return ready, err, false
-}
-
-func runPreparedCapabilityCommit(ctx context.Context, capability PreparedCapability, expected uint64) (disposition CapabilityDisposition, err error, panicked bool) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			disposition = CapabilityRetained
-			err = fmt.Errorf("%w in prepared-capability commit: %v", ErrTaskPanic, recovered)
-			panicked = true
-		}
-	}()
-	disposition, err = capability.Commit(ctx, expected)
-	return disposition, err, false
 }
 
 func runPreparedResourceTransactionApply(
@@ -1263,8 +1159,6 @@ func disposeTaskOutcome(ctx context.Context, outcome TaskOutcome, preserveContex
 		return callReadyResource("dispose prepared", func() error { return outcome.prepared.Dispose(cleanupCtx) })
 	case TaskOutcomeReadyResource:
 		return callReadyResource("abort ready", func() error { return outcome.ready.AbortReady(cleanupCtx) })
-	case TaskOutcomePreparedCapability:
-		return callReadyResource("dispose prepared capability", func() error { return outcome.capability.Dispose(cleanupCtx) })
 	case TaskOutcomePreparedResourceTransaction:
 		return errors.New(
 			"jobmgr task child: resource transaction requires transfer-aware disposal",

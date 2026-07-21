@@ -773,7 +773,7 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 	generation.invocationLeases++
 	c.invocationCount++
 	plan := jobmgr.WorkPlan{
-		Runner:              slot,
+		Work:                slot.RunTask,
 		CooperativeCancel:   resolved.cooperativeCancel,
 		CooperativeDeadline: resolved.cooperativeDeadline,
 	}
@@ -983,7 +983,7 @@ func (c *Catalog) cleanupDrainedGeneration(generation *handlerGeneration) jobmgr
 	}
 	generation.cleanupPending = true
 	c.pendingCleanups++
-	return jobmgr.FunctionCleanupPlan{Ref: generation.cleanupRef, Runner: generation}
+	return jobmgr.FunctionCleanupPlan{Ref: generation.cleanupRef, Work: generation.RunTask}
 }
 
 func (c *Catalog) CompleteCleanup(ref jobmgr.FunctionCleanupRef) error {

@@ -46,7 +46,6 @@ func (ck *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 			lifecycle.TaskPlan{
 				Source: lifecycle.SourceFunction,
 				Work:   cleanup.Work,
-				Runner: cleanup.Runner,
 			},
 		)
 		if err != nil {

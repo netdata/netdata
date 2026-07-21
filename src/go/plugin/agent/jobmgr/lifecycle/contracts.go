@@ -79,33 +79,6 @@ type ReadyResource interface {
 	Finalize() error
 }
 
-// CapabilityDisposition describes the terminal result of capability commit.
-type CapabilityDisposition uint8
-
-const (
-	CapabilityApplied CapabilityDisposition = iota + 1
-	CapabilityDisposed
-	CapabilityRetained
-)
-
-// Valid reports whether disposition is a terminal capability disposition.
-func (cd CapabilityDisposition) Valid() bool {
-	switch cd {
-	case CapabilityApplied, CapabilityDisposed, CapabilityRetained:
-		return true
-	default:
-		return false
-	}
-}
-
-// PreparedCapability owns an unpublished capability until it is committed or
-// disposed.
-type PreparedCapability interface {
-	Identity() ResourceIdentity
-	Commit(context.Context, uint64) (CapabilityDisposition, error)
-	Dispose(context.Context) error
-}
-
 // ControlStatus is the closed set of statuses the orchestration loop may emit
 // without invoking a domain handler.
 type ControlStatus uint16

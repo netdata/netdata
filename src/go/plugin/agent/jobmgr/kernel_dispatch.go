@@ -69,7 +69,6 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 		taskPlan := lifecycle.TaskPlan{
 			Source: operation.Source, Deadline: operation.request.Deadline,
 			MaxPhaseTransitions: phaseLimit, Work: operation.plan.Work, Cleanup: operation.plan.Cleanup,
-			Runner: operation.plan.Runner,
 		}
 		if operation.Child == lifecycle.ChildDeadlineStartPending {
 			taskPlan.InitialCancellation = context.DeadlineExceeded
@@ -206,29 +205,6 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 				ck.run.Dirty(err)
 				return false
 			}
-		}
-		if capability := operation.plan.Capability; capability != nil {
-			ck.nextResourceGeneration++
-			generation := ck.nextResourceGeneration
-			if generation == 0 {
-				ck.run.Dirty(errors.New("jobmgr kernel: capability generation wrapped"))
-				return false
-			}
-			operation.resourceGeneration = generation
-			identity := lifecycle.ResourceIdentity{ID: capability.ID, Generation: generation}
-			prepare := capability.Prepare
-			capabilityPlan, err := lifecycle.NewPreparedCapabilityPermitTaskPlan(
-				operation.Source, operation.request.Deadline, phaseLimit,
-				ck.admission, operation.admission, identity, capability.Permit,
-				func(ctx context.Context, permit lifecycle.LongLivedPermit) (lifecycle.PreparedCapability, error) {
-					return prepare(ctx, generation, permit)
-				},
-			)
-			if err != nil {
-				ck.run.Dirty(err)
-				return false
-			}
-			taskPlan = capabilityPlan
 		}
 		requestRef, err := ck.tasks.Enqueue(
 			taskClassForOperation(operation, lane),

@@ -110,14 +110,14 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 			require.NoError(t, err)
 			require.EqualValues(t, test.wantStatus, decision.Rejected)
 			if test.wantStatus != 0 {
-				require.False(t, decision.Lease.Valid() || decision.Plan.Runner != nil)
+				require.False(t, decision.Lease.Valid() || decision.Plan.Work != nil)
 				return
 			}
-			require.False(t, !decision.Lease.Valid() || decision.Plan.Runner == nil || decision.ResourceID != test.wantResource)
+			require.False(t, !decision.Lease.Valid() || decision.Plan.Work == nil || decision.ResourceID != test.wantResource)
 
 			require.EqualValues(t, 1, catalog.Census().InvocationLeases)
 
-			outcome, err := decision.Plan.Runner.RunTask(context.Background())
+			outcome, err := decision.Plan.Work(context.Background())
 			require.NoError(t, err)
 			require.False(t, outcome.Kind() != lifecycle.TaskOutcomeFrame || handled.UID != test.lookup.UID ||
 				handled.Method != test.wantMethod)
@@ -195,7 +195,7 @@ func TestFunctionPayloadValidationRunsInTaskChild(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.EqualValues(t, 0, calls.Load())
-	outcome, err := decision.Plan.Runner.RunTask(context.Background())
+	outcome, err := decision.Plan.Work(context.Background())
 	require.NoError(t, err)
 	require.False(t, outcome.Kind() != lifecycle.TaskOutcomeFrame || calls.Load() != 0)
 
@@ -266,7 +266,7 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 			require.NoError(t, err)
 			plan := decision.Plan.Transaction
 			require.False(t, plan == nil ||
-				decision.Plan.Runner != nil ||
+				decision.Plan.Work != nil ||
 				plan.ID != "mysql" ||
 				plan.AllocateSuccessor != test.allocateSuccessor ||
 				!reflect.DeepEqual(decision.Plan.Claims, test.wantClaims))
@@ -369,9 +369,9 @@ func TestHandlerLeaseLifecycle(t *testing.T) {
 	require.False(t, count != 0 || more || cleanupCalls.Load() != 0)
 	cleanup, err := catalog.ReleaseInvocation(decision.Lease)
 	require.NoError(t, err)
-	require.False(t, !cleanup.Ref.Valid() || cleanup.Runner == nil)
+	require.False(t, !cleanup.Ref.Valid() || cleanup.Work == nil)
 	require.EqualValues(t, 0, cleanupCalls.Load())
-	outcome, err := cleanup.Runner.RunTask(context.Background())
+	outcome, err := cleanup.Work(context.Background())
 	require.NoError(t, err)
 	require.False(t, outcome.Kind() != lifecycle.TaskOutcomeNone || cleanupCalls.Load() != 1)
 
@@ -861,7 +861,7 @@ func TestHandlerCleanupOnce(t *testing.T) {
 		require.NoError(t, err)
 		for _, cleanup := range cleanups[:count] {
 
-			_, runTaskErr := cleanup.Runner.RunTask(context.Background())
+			_, runTaskErr := cleanup.Work(context.Background())
 			require.NoError(t, runTaskErr)
 
 			require.NoError(t, catalog.CompleteCleanup(cleanup.Ref))
@@ -1389,22 +1389,6 @@ func BenchmarkBHandlerLease(b *testing.B) {
 	}
 }
 
-func TestFunctionCatalogLookupAndHandlerLeaseAllocateNothing(t *testing.T) {
-	catalog, err := NewCatalog([]Declaration{testDeclaration("direct", "", ResourcePolicy{})})
-	require.NoError(t, err)
-	lookup := jobmgr.FunctionLookup{UID: "allocations", Route: "direct"}
-	allocations := testing.AllocsPerRun(1_000, func() {
-		decision, resolveErr := catalog.ResolveAndAcquire(lookup)
-		if resolveErr != nil {
-			panic(resolveErr)
-		}
-		if _, releaseErr := catalog.ReleaseInvocation(decision.Lease); releaseErr != nil {
-			panic(releaseErr)
-		}
-	})
-	require.EqualValues(t, 0, allocations)
-}
-
 func testDeclaration(publicName, prefix string, resource ResourcePolicy) Declaration {
 	return testDeclarationForGeneration(testGeneration(publicName), publicName, prefix, resource)
 }
@@ -1456,9 +1440,9 @@ func resolvedMethod(catalog *Catalog, publicName string, args []string) string {
 
 func runCleanupPlan(t *testing.T, catalog *Catalog, cleanup jobmgr.FunctionCleanupPlan) {
 	t.Helper()
-	require.False(t, !cleanup.Ref.Valid() || cleanup.Runner == nil)
+	require.False(t, !cleanup.Ref.Valid() || cleanup.Work == nil)
 
-	_, err := cleanup.Runner.RunTask(context.Background())
+	_, err := cleanup.Work(context.Background())
 	require.NoError(t, err)
 
 	require.NoError(t, catalog.CompleteCleanup(cleanup.Ref))

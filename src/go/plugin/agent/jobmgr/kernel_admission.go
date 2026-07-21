@@ -14,7 +14,6 @@ import (
 
 func prepareOwnedJobPlan(request Request, plan WorkPlan) (WorkPlan, error) {
 	plan.Claims = slices.Clone(plan.Claims)
-	plan.ReadClaims = slices.Clone(plan.ReadClaims)
 	if plan.Resource != nil {
 		resource := *plan.Resource
 		plan.Resource = &resource
@@ -22,10 +21,6 @@ func prepareOwnedJobPlan(request Request, plan WorkPlan) (WorkPlan, error) {
 	if plan.Transaction != nil {
 		transaction := *plan.Transaction
 		plan.Transaction = &transaction
-	}
-	if plan.Capability != nil {
-		capability := *plan.Capability
-		plan.Capability = &capability
 	}
 	if err := plan.validate(); err != nil {
 		return WorkPlan{}, err
@@ -35,9 +30,6 @@ func prepareOwnedJobPlan(request Request, plan WorkPlan) (WorkPlan, error) {
 	}
 	if plan.Transaction != nil && plan.Transaction.ID != request.LaneKey {
 		return WorkPlan{}, errors.New("jobmgr kernel: transaction identity differs from lane")
-	}
-	if plan.Capability != nil && plan.Capability.ID != request.LaneKey {
-		return WorkPlan{}, errors.New("jobmgr kernel: capability identity differs from lane")
 	}
 	return plan, nil
 }
@@ -128,7 +120,6 @@ func (ck *CommandKernel) admitSubmission(
 		}
 		plan = decision.Plan
 		plan.Claims = slices.Clone(plan.Claims)
-		plan.ReadClaims = slices.Clone(plan.ReadClaims)
 		functionInvocation = decision.Lease
 		functionResourceID = decision.ResourceID
 		request.LaneKey = request.Route
@@ -144,7 +135,7 @@ func (ck *CommandKernel) admitSubmission(
 			}
 		}
 	}()
-	claims, err := normalizeAuthorityClaimModes(plan.Claims, plan.ReadClaims)
+	claims, err := normalizeAuthorityClaimModes(plan.Claims, nil)
 	if err != nil {
 		_ = ck.uids.Complete(request.UID, false, now)
 		_ = ck.abortRequestInputBody(request)

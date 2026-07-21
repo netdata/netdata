@@ -719,12 +719,6 @@ func TestTaskSupervisorContainsPanicAndReleasesSlot(t *testing.T) {
 				panic("fixture panic")
 			}),
 		},
-		"reusable runner": {
-			Source: SourceFunction,
-			Runner: taskRunnerFunc(func(context.Context) (TaskOutcome, error) {
-				panic("fixture panic")
-			}),
-		},
 	}
 	for name, plan := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -752,12 +746,6 @@ func TestTaskSupervisorContainsPanicAndReleasesSlot(t *testing.T) {
 			require.EqualValues(t, 0, supervisor.Active())
 		})
 	}
-}
-
-type taskRunnerFunc func(context.Context) (TaskOutcome, error)
-
-func (fn taskRunnerFunc) RunTask(ctx context.Context) (TaskOutcome, error) {
-	return fn(ctx)
 }
 
 func TestTaskSupervisorPreservesAuthoritativeCancellationCause(t *testing.T) {

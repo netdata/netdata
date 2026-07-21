@@ -57,14 +57,14 @@ func TestFunctionCleanupQueuePreservesFIFOAndReleasesChunks(t *testing.T) {
 		if index == functionCleanupChunkCapacity-1 {
 			require.Nil(t, firstChunk.next)
 			for slot, plan := range firstChunk.plans {
-				require.False(t, plan.Ref.Valid() || plan.Work != nil || plan.Runner != nil, "slot=%d", slot)
+				require.False(t, plan.Ref.Valid() || plan.Work != nil, "slot=%d", slot)
 			}
 		}
 	}
 	require.False(t, queue.count != 0 || queue.head != nil || queue.tail != nil)
 
 	plan := queue.front()
-	require.False(t, plan.Ref.Valid() || plan.Work != nil || plan.Runner != nil)
+	require.False(t, plan.Ref.Valid() || plan.Work != nil)
 }
 
 func TestAbortMutationCleanupsPreservesOrderAndJoinsErrors(t *testing.T) {

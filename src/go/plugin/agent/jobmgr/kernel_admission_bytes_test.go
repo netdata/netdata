@@ -50,7 +50,8 @@ func populatedOperationAdmissionFixture() (Request, WorkPlan) {
 			CallerSource: "cloud",
 			Args:         []string{"dyncfg", "update", "module:job", "source=cloud"},
 		}, WorkPlan{
-			Claims:     []string{"dyncfg:jobs", "job:module_job"},
-			ReadClaims: []string{"secrets:store-a", "vnode:host-a"},
+			Claims: []string{
+				"dyncfg:jobs", "job:module_job", "secrets:store-a", "vnode:host-a",
+			},
 		}
 }

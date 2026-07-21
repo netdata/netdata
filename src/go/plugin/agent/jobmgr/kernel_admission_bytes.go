@@ -44,16 +44,6 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 		}
 		bytes += persistent
 	}
-	if plan.Capability != nil {
-		persistent := plan.Capability.Permit.Bytes()
-		if !validPersistentAdmission(
-			plan.Capability.Permit,
-			lifecycle.OrdinaryBudgetBytes-bytes,
-		) {
-			return 0, errors.New("jobmgr kernel: long-lived capability does not self-fit admission")
-		}
-		bytes += persistent
-	}
 	addField := func(field string) bool {
 		if int64(len(field)) > lifecycle.OrdinaryBudgetBytes-bytes {
 			return false
@@ -79,11 +69,6 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 			return 0, errors.New("jobmgr kernel: operation does not self-fit admission")
 		}
 	}
-	for _, field := range plan.ReadClaims {
-		if !addField(field) {
-			return 0, errors.New("jobmgr kernel: operation does not self-fit admission")
-		}
-	}
 	const requestArgumentAdmissionBytes = int64(16)
 	arguments := int64(len(request.Args))
 	if arguments > (lifecycle.OrdinaryBudgetBytes-bytes)/requestArgumentAdmissionBytes {
@@ -91,7 +76,7 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 	}
 	bytes += arguments * requestArgumentAdmissionBytes
 	const authorityClaimEdgeAdmissionBytes = int64(96)
-	authorityClaimEdges := int64(len(plan.Claims) + len(plan.ReadClaims))
+	authorityClaimEdges := int64(len(plan.Claims))
 	if authorityClaimEdges > (lifecycle.OrdinaryBudgetBytes-bytes)/authorityClaimEdgeAdmissionBytes {
 		return 0, errors.New("jobmgr kernel: claim edges do not self-fit admission")
 	}

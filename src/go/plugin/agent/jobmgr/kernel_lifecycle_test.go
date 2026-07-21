@@ -484,7 +484,7 @@ func TestWorkPlanRejectsUnboundedClaims(t *testing.T) {
 		},
 		"oversized aggregate claims": {
 			mutate: func(plan *WorkPlan) {
-				plan.ReadClaims = []string{
+				plan.Claims = []string{
 					strings.Repeat("a", maximumPlanClaimBytes/2),
 					strings.Repeat("b", maximumPlanClaimBytes/2+1),
 				}
@@ -1556,83 +1556,6 @@ func TestKernelDueClockWinsIndependentFinalizerCompletion(t *testing.T) {
 	require.False(t, !terminal.Reached || terminal.Quiescent || terminal.Dirty == nil)
 }
 
-func TestKernelDueClockDisposesLatePreparedCapabilityWithoutTimerDelivery(t *testing.T) {
-	clock := newKernelFinalizerClock()
-	prepared := make(chan context.Context, 1)
-	release := make(chan struct{})
-	permitPlan, err := lifecycle.NewSecretStoreLongLivedPlan(4096)
-	require.NoError(t, err)
-	var capability *latePreparedCapability
-	const capabilityID = "secret-store:late"
-	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
-		return WorkPlan{
-			NoResponse: true, CooperativeDeadline: true,
-			Capability: &CapabilityPlan{
-				ID: capabilityID, Permit: permitPlan,
-				Prepare: func(ctx context.Context, generation uint64, permit lifecycle.LongLivedPermit) (lifecycle.PreparedCapability, error) {
-					if err := permit.ActivateExternal(lifecycle.LongLivedESecretStore); err != nil {
-						return nil, err
-					}
-					capability = &latePreparedCapability{
-						identity: lifecycle.ResourceIdentity{ID: capabilityID, Generation: generation}, permit: permit,
-					}
-					prepared <- ctx
-					<-release
-					return capability, nil
-				},
-			},
-		}, nil
-	})
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
-
-	require.NoError(t, run.OpenAdmission())
-
-	startKernelLoop(t, kernel)
-	request := Request{
-		UID: "late-capability", LaneKey: capabilityID, Source: lifecycle.SourceJobManager, Route: "late",
-		Deadline: clock.Now().Add(time.Second),
-	}
-	done := make(chan error, 1)
-	go func() { done <- kernel.SubmitAndWait(context.Background(), request) }()
-	var workCtx context.Context
-	select {
-	case workCtx = <-prepared:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "prepared capability did not enter")
-	}
-	select {
-	case <-workCtx.Done():
-		require.FailNowf(t, "test failed", "host clock canceled prepared capability before authoritative Clock advanced: %v", workCtx.Err())
-	default:
-	}
-	clock.advance(time.Second + time.Nanosecond)
-	kernel.NotifyControlReady()
-	select {
-	case <-workCtx.Done():
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "authoritative Clock deadline did not cancel prepared capability")
-	}
-	close(release)
-	select {
-	case err := <-done:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "late capability did not reach terminal ownership")
-	}
-	require.False(t, capability.committed.Load() || !capability.disposed.Load())
-
-	census := tasks.LongLivedCensus()
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, census)
-
-	kernel.Stop()
-
-	require.NoError(t, kernel.Wait(context.Background()))
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
-	closeUIDLedger(t, uids)
-}
-
 func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	workEntered := make(chan struct{})
@@ -1686,101 +1609,6 @@ func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 	kernel.Stop()
 
 	require.NoError(t, kernel.Wait(context.Background()))
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
-	closeUIDLedger(t, uids)
-}
-
-func TestKernelDeadlineDoesNotCancelPendingCapabilityCommit(t *testing.T) {
-	clock := newKernelFinalizerClock()
-	commitEntered := make(chan context.Context, 1)
-	commitRelease := make(chan struct{})
-	permitPlan, err := lifecycle.NewSecretStoreLongLivedPlan(4096)
-	require.NoError(t, err)
-	const capabilityID = "secret-store:commit-deadline"
-	var capability *deadlineCommitCapability
-	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
-		return WorkPlan{
-			NoResponse: true, CooperativeDeadline: true,
-			Capability: &CapabilityPlan{
-				ID: capabilityID, Permit: permitPlan,
-				Prepare: func(_ context.Context, generation uint64, permit lifecycle.LongLivedPermit) (lifecycle.PreparedCapability, error) {
-					if err := permit.ActivateExternal(lifecycle.LongLivedESecretStore); err != nil {
-						return nil, err
-					}
-					capability = &deadlineCommitCapability{
-						latePreparedCapability: latePreparedCapability{
-							identity: lifecycle.ResourceIdentity{ID: capabilityID, Generation: generation}, permit: permit,
-						},
-						entered: commitEntered,
-						gate:    commitRelease,
-					}
-					return capability, nil
-				},
-			},
-		}, nil
-	})
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
-
-	require.NoError(t, run.OpenAdmission())
-
-	startKernelLoop(t, kernel)
-	done := make(chan error, 1)
-	deadline := clock.Now().Add(time.Second)
-	go func() {
-		done <- kernel.SubmitAndWait(context.Background(), Request{
-			UID: "commit-deadline", LaneKey: capabilityID, Source: lifecycle.SourceJobManager, Route: "commit-deadline",
-			Deadline: deadline,
-		})
-	}()
-	var commitCtx context.Context
-	select {
-	case commitCtx = <-commitEntered:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "capability commit did not enter")
-	}
-
-	_, ok := commitCtx.Deadline()
-	require.False(t, ok)
-
-	select {
-	case <-commitCtx.Done():
-		require.FailNowf(t, "test failed", "capability commit context canceled before authoritative deadline: %v", commitCtx.Err())
-	default:
-	}
-	clock.advance(time.Second + time.Nanosecond)
-	kernel.NotifyControlReady()
-	select {
-	case <-commitCtx.Done():
-		require.FailNowf(
-			t,
-			"started capability commit was cancelled",
-			"error: %v",
-			commitCtx.Err(),
-		)
-	case <-time.After(50 * time.Millisecond):
-	}
-	select {
-	case terminalErr := <-done:
-		require.FailNowf(
-			t,
-			"capability completed before commit release",
-			"error: %v",
-			terminalErr,
-		)
-	default:
-	}
-	close(commitRelease)
-	require.NoError(t, <-done)
-	require.True(t, capability.committed.Load())
-	require.False(t, capability.disposed.Load())
-
-	kernel.Stop()
-	require.NoError(t, kernel.Wait(context.Background()))
-
-	census := tasks.LongLivedCensus()
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, census)
 
 	require.NoError(t, admission.CloseDrained(run.Generation()))
 
@@ -1893,7 +1721,7 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 	) (WorkPlan, error) {
 		if route == "runner" {
 			return WorkPlan{
-				Runner:              runner,
+				Work:                runner.RunTask,
 				CooperativeDeadline: true,
 			}, nil
 		}
@@ -2210,92 +2038,6 @@ func TestKernelCancelBeforeQueuedCooperativeDeadlineDisposesOperation(t *testing
 	closeUIDLedger(t, uids)
 }
 
-func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) {
-	clock := newKernelFinalizerClock()
-	releaseBlockers := make(chan struct{})
-	blockerEntered := make(chan struct{}, 1)
-	permitPlan, err := lifecycle.NewSecretStoreLongLivedPlan(4096)
-	require.NoError(t, err)
-	var prepareCalls atomic.Int32
-	const capabilityID = "secret-store:queued-deadline"
-	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
-		if route == "capability" {
-			return WorkPlan{
-				NoResponse: true,
-				Capability: &CapabilityPlan{
-					ID: capabilityID, Permit: permitPlan,
-					Prepare: func(context.Context, uint64, lifecycle.LongLivedPermit) (lifecycle.PreparedCapability, error) {
-						prepareCalls.Add(1)
-						return nil, errors.New("queued capability unexpectedly started")
-					},
-				},
-			}, nil
-		}
-		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
-			blockerEntered <- struct{}{}
-			<-releaseBlockers
-			return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
-		})}, nil
-	})
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
-
-	require.NoError(t, run.OpenAdmission())
-
-	startKernelLoop(t, kernel)
-
-	require.NoError(t, kernel.Submit(context.Background(), Request{
-		UID: "queued-capability-blocker", LaneKey: capabilityID,
-		Source: lifecycle.SourceJobManager, Route: "blocker",
-	}),
-	)
-
-	select {
-	case <-blockerEntered:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "same-lane capability blocker did not start")
-	}
-	terminal := make(chan error, 1)
-	go func() {
-		terminal <- kernel.SubmitAndWait(context.Background(), Request{
-			UID: "queued-no-response-capability", LaneKey: capabilityID, Source: lifecycle.SourceJobManager,
-			Route: "capability", Deadline: clock.Now(),
-		})
-	}()
-	select {
-	case <-clock.deadlineArmed:
-	case <-time.After(time.Second):
-		close(releaseBlockers)
-		kernel.Stop()
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Second)
-		defer cleanupCancel()
-		_ = kernel.Wait(cleanupCtx)
-		require.FailNow(t, "test failed", "queued no-response capability deadline was not armed")
-	}
-	kernel.NotifyControlReady()
-	select {
-	case err := <-terminal:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		close(releaseBlockers)
-		kernel.Stop()
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Second)
-		defer cleanupCancel()
-		_ = kernel.Wait(cleanupCtx)
-		require.FailNow(t, "test failed", "queued no-response capability did not reach terminal disposal")
-	}
-	require.EqualValues(t, 0, prepareCalls.Load())
-	close(releaseBlockers)
-	kernel.Stop()
-
-	require.NoError(t, kernel.Wait(context.Background()))
-
-	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
-	closeUIDLedger(t, uids)
-}
-
 func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	releaseBlockers := make(chan struct{})
@@ -2450,25 +2192,28 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 	closeUIDLedger(t, uids)
 }
 
-func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T) {
+func TestKernelFourthBackgroundTransactionTimeoutDirtiesWithoutResponseCommit(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	release := make(chan struct{})
 	entered := make(chan string, lifecycle.RetainedTimeoutFailStopThreshold)
-	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-	require.NoError(t, err)
 	planner := plannerFunc(func(_ context.Context, route string, args []string) (WorkPlan, error) {
-		if route != "background-capability" || len(args) != 1 {
-			return WorkPlan{}, errors.New("unexpected background capability request")
+		if route != "background-transaction" || len(args) != 1 {
+			return WorkPlan{}, errors.New("unexpected background transaction request")
 		}
 		id := args[0]
 		return WorkPlan{
 			NoResponse: true, CooperativeDeadline: true,
-			Capability: &CapabilityPlan{
-				ID: id, Permit: permitPlan,
-				Prepare: func(context.Context, uint64, lifecycle.LongLivedPermit) (lifecycle.PreparedCapability, error) {
+			Transaction: &ResourceTransactionPlan{
+				ID: id,
+				Prepare: func(
+					_ context.Context,
+					_ lifecycle.ReadyResource,
+					scope lifecycle.ResourceTransactionScope,
+					_ lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResourceTransaction, error) {
 					entered <- id
 					<-release
-					return nil, nil
+					return &simpleCompositeChildTransaction{scope: scope}, nil
 				},
 			},
 		}, nil
@@ -2487,7 +2232,7 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 
 		require.NoError(t, kernel.submit(context.Background(), Request{
 			UID: fmt.Sprintf("background-timeout-%d", index), LaneKey: id, Source: lifecycle.SourceJobManager,
-			Route: "background-capability", Args: []string{id}, Deadline: deadline,
+			Route: "background-transaction", Args: []string{id}, Deadline: deadline,
 		}, terminals[index]),
 		)
 	}
@@ -2495,7 +2240,7 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 		select {
 		case <-entered:
 		case <-time.After(time.Second):
-			require.FailNow(t, "test failed", "background capability did not occupy its TaskChild slot")
+			require.FailNow(t, "test failed", "background transaction did not occupy its TaskChild slot")
 		}
 	}
 	clock.advance(time.Second + time.Nanosecond)
@@ -2532,53 +2277,6 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 	require.NoError(t, admission.CloseDrained(run.Generation()))
 
 	closeUIDLedger(t, uids)
-}
-
-type latePreparedCapability struct {
-	identity   lifecycle.ResourceIdentity
-	permit     lifecycle.LongLivedPermit
-	committed  atomic.Bool
-	disposed   atomic.Bool
-	once       sync.Once
-	releaseErr error
-}
-
-type deadlineCommitCapability struct {
-	latePreparedCapability
-	entered chan<- context.Context
-	gate    <-chan struct{}
-}
-
-func (dcc *deadlineCommitCapability) Commit(ctx context.Context, _ uint64) (lifecycle.CapabilityDisposition, error) {
-	dcc.entered <- ctx
-	<-dcc.gate
-	dcc.committed.Store(true)
-	return lifecycle.CapabilityApplied, dcc.release()
-}
-
-func (lpc *latePreparedCapability) Identity() lifecycle.ResourceIdentity {
-	return lpc.identity
-}
-
-func (lpc *latePreparedCapability) Commit(context.Context, uint64) (lifecycle.CapabilityDisposition, error) {
-	lpc.committed.Store(true)
-	return lifecycle.CapabilityApplied, lpc.release()
-}
-
-func (lpc *latePreparedCapability) Dispose(context.Context) error {
-	lpc.disposed.Store(true)
-	return lpc.release()
-}
-
-func (lpc *latePreparedCapability) release() error {
-	lpc.once.Do(func() {
-		lpc.releaseErr = errors.Join(
-			lpc.permit.ReleaseExternal(lifecycle.LongLivedESecretStore),
-			lpc.permit.ReleaseBytes(),
-			lpc.permit.Return(),
-		)
-	})
-	return lpc.releaseErr
 }
 
 func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {

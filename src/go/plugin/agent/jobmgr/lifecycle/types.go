@@ -73,12 +73,6 @@ func (sr SealedResult) validate() error {
 
 type TaskWork func(context.Context) (TaskOutcome, error)
 
-// TaskRunner permits a supervisor-owned reusable record to provide work
-// without allocating a per-dispatch closure.
-type TaskRunner interface {
-	RunTask(context.Context) (TaskOutcome, error)
-}
-
 func FrameTaskWork(work func(context.Context) (SealedResult, error)) TaskWork {
 	return func(ctx context.Context) (TaskOutcome, error) {
 		result, err := work(ctx)
@@ -92,8 +86,6 @@ func FrameTaskWork(work func(context.Context) (SealedResult, error)) TaskWork {
 type TaskCleanup func() error
 
 type PreparedResourcePermitWork func(context.Context, LongLivedPermit) (PreparedResource, error)
-
-type PreparedCapabilityPermitWork func(context.Context, LongLivedPermit) (PreparedCapability, error)
 
 type PreparedResourceTransactionWork func(
 	context.Context,
@@ -185,14 +177,12 @@ type TaskPlan struct {
 	InitialCancellation    error                           // pre-arm the child context as cancelled/deadline
 	MaxPhaseTransitions    uint8                           // phase-action ceiling; 0 = source default
 	Work                   TaskWork                        // one-shot work closure (one work source)
-	Runner                 TaskRunner                      // reusable work runner (one work source)
 	Cleanup                TaskCleanup                     // post-disposal cleanup
 	permitAdmission        *AdmissionLedger                // admission ledger for a long-lived permit
 	permitAdmissionRef     AdmissionRef                    // admission record backing the permit
 	permitOwner            ResourceIdentity                // owning resource identity for the permit
 	permitPlan             LongLivedPlan                   // long-lived plan terms
 	permitWork             PreparedResourcePermitWork      // permit-bound resource work (one variant)
-	capabilityPermitWork   PreparedCapabilityPermitWork    // permit-bound capability work (one variant)
 	transactionWork        PreparedResourceTransactionWork // permit-bound transaction work (one variant)
 	transactionScope       ResourceTransactionScope        // current/successor identities a transaction may touch
 	transactionScopeSet    bool                            // distinguishes a zero scope from unset
@@ -304,17 +294,6 @@ func NewPreparedResourcePermitTaskPlan(source Source, deadline time.Time, maxPha
 	return plan, nil
 }
 
-func NewPreparedCapabilityPermitTaskPlan(source Source, deadline time.Time, maxPhaseTransitions uint8, admission *AdmissionLedger, admissionRef AdmissionRef, owner ResourceIdentity, permitPlan LongLivedPlan, work PreparedCapabilityPermitWork) (TaskPlan, error) {
-	plan := TaskPlan{
-		Source: source, Deadline: deadline, MaxPhaseTransitions: maxPhaseTransitions,
-		permitAdmission: admission, permitAdmissionRef: admissionRef, permitOwner: owner, permitPlan: permitPlan, capabilityPermitWork: work,
-	}
-	if err := plan.Validate(); err != nil {
-		return TaskPlan{}, err
-	}
-	return plan, nil
-}
-
 func NewReadyResourceTaskPlan(source Source, deadline time.Time, maxPhaseTransitions uint8, resource ReadyResource, identity ResourceIdentity) (TaskPlan, error) {
 	plan := TaskPlan{
 		Source: source, Deadline: deadline, MaxPhaseTransitions: maxPhaseTransitions,
@@ -338,13 +317,7 @@ func (tp TaskPlan) Validate() error {
 	if tp.Work != nil {
 		workSources++
 	}
-	if tp.Runner != nil {
-		workSources++
-	}
 	if tp.permitWork != nil {
-		workSources++
-	}
-	if tp.capabilityPermitWork != nil {
 		workSources++
 	}
 	if tp.transactionWork != nil {
@@ -368,9 +341,7 @@ func (tp TaskPlan) Validate() error {
 		return errors.New("jobmgr lifecycle: initial ready resource has invalid identity")
 	}
 	if (tp.Work != nil ||
-		tp.Runner != nil ||
-		tp.permitWork != nil ||
-		tp.capabilityPermitWork != nil) &&
+		tp.permitWork != nil) &&
 		tp.initialIdentity.Valid() {
 		return errors.New("jobmgr lifecycle: work task has an unexpected resource identity")
 	}
@@ -393,7 +364,6 @@ func (tp TaskPlan) Validate() error {
 		return errors.New("jobmgr lifecycle: unexpected preserved disposal context")
 	}
 	if tp.permitWork != nil ||
-		tp.capabilityPermitWork != nil ||
 		(tp.transactionWork != nil && tp.transactionScope.Successor.Valid()) {
 		if tp.permitAdmission == nil || !tp.permitAdmissionRef.Valid() || !tp.permitOwner.Valid() {
 			return errors.New("jobmgr lifecycle: incomplete prepared-resource permit work")

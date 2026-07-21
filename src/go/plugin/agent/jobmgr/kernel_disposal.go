@@ -155,7 +155,7 @@ func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 
 func requiresCooperativeDeadlineStart(operation *commandOperation) bool {
 	return operation != nil &&
-		(operation.plan.Work != nil || operation.plan.Runner != nil) &&
+		operation.plan.Work != nil &&
 		operation.plan.CooperativeDeadline
 }
 
@@ -535,9 +535,7 @@ func (ck *CommandKernel) unlinkQueued(operation *commandOperation, submissionErr
 			operation.request.Args = nil
 			operation.request.Payload = nil
 			operation.plan.Claims = nil
-			operation.plan.ReadClaims = nil
 			operation.plan.Work = nil
-			operation.plan.Runner = nil
 			operation.plan.Cleanup = nil
 			operation.claims = nil
 			operation.authorityClaimEdges = nil

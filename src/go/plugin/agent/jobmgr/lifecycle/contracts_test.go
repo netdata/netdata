@@ -112,11 +112,6 @@ func TestClosedValues(t *testing.T) {
 	assert.True(t, TaskClassGenericFunction.Valid())
 	assert.False(t, TaskClass(0).Valid())
 
-	assert.True(t, CapabilityApplied.Valid())
-	assert.True(t, CapabilityDisposed.Valid())
-	assert.True(t, CapabilityRetained.Valid())
-	assert.False(t, CapabilityDisposition(0).Valid())
-
 	assert.True(t, (ResourceIdentity{ID: "job:a", Generation: 1}).Valid())
 	assert.False(t, (ResourceIdentity{ID: "job:a"}).Valid())
 	assert.False(t, (ResourceIdentity{Generation: 1}).Valid())
