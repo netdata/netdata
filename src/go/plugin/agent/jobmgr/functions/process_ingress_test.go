@@ -63,14 +63,15 @@ func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) 
 
 	require.NoError(t, ingress.SealPause())
 	require.NoError(t, ingress.DrainPause(context.Background(), 0))
+	writeFunctionLine(t, writer, "fenced")
+	select {
+	case call := <-second.calls:
+		require.FailNowf(t, "test failed", "fenced call reached retired run: %+v", call)
+	default:
+	}
 
 	require.NoError(t, ingress.Fence(context.Background()))
 
-	ingress.boundary.mu.Lock()
-	require.False(t, ingress.boundary.target != nil ||
-		!ingress.boundary.contained ||
-		ingress.boundary.state != ProcessIngressContained)
-	ingress.boundary.mu.Unlock()
 	writeFunctionLine(t, writer, "contained")
 
 	require.NoError(t, writer.Close())
@@ -106,12 +107,12 @@ func TestProcessIngressTimedOutDrainRetainsSealedStateForRetry(t *testing.T) {
 	require.NoError(t, ingress.SealPause())
 	require.ErrorIs(t, ingress.DrainPause(ctx, 0), context.DeadlineExceeded)
 
-	ingress.boundary.mu.Lock()
-	boundaryState := ingress.boundary.state
-	ingress.boundary.mu.Unlock()
+	ingress.mu.Lock()
+	pauseSealed := ingress.pauseSealed
+	ingress.mu.Unlock()
 
 	census := ingress.Census()
-	require.False(t, census.State != ProcessIngressLive || boundaryState != ProcessIngressPaused)
+	require.False(t, census.State != ProcessIngressLive || !pauseSealed)
 
 	close(input.release)
 
