@@ -1017,3 +1017,43 @@ void netdata_dns_runtime_close(struct netdata_dns_runtime *rt)
 
     free(rt);
 }
+
+/* -------------------------------------------------------------------------
+ * Test helpers — thin non-static wrappers so the Go test layer can exercise
+ * the packet parser without a live BPF runtime or a real BPF object file.
+ * Using void * for the runtime pointer avoids pulling the full struct
+ * definition (which requires libbpf headers) into the CGo test preamble.
+ * ---------------------------------------------------------------------- */
+
+void *netdata_dns_alloc_test_runtime(void)
+{
+    struct netdata_dns_runtime *rt = calloc(1, sizeof(*rt));
+    if (rt) {
+        rt->sock_fd = -1;
+        rt->flow_fd = -1;
+    }
+    return rt;
+}
+
+void netdata_dns_free_test_runtime(void *p)
+{
+    free(p);
+}
+
+/* Delegates to the static dns_parse_raw_packet with now_us=0 and NULL output
+ * pointers — sufficient for boundary/malformed-packet tests. */
+int netdata_dns_test_parse_raw_packet(void *p, const char *buf, int n)
+{
+    return (int)dns_parse_raw_packet(
+        (struct netdata_dns_runtime *)p,
+        buf, (ssize_t)n,
+        0 /* now_us */,
+        NULL, NULL, NULL);
+}
+
+/* Thin wrapper so the test layer can vary out_size to check overflow guards. */
+int netdata_dns_test_read_name(const char *msg, int msg_len, int offset,
+                               char *out, int out_size)
+{
+    return dns_read_name(msg, msg_len, offset, out, out_size);
+}

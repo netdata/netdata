@@ -177,6 +177,18 @@ func TestParsePluginConfigFileInvalidValuesAreIgnored(t *testing.T) {
 				checkPtr(t, "ObjectFlavor", cfg.ObjectFlavor, (*string)(nil))
 			},
 		},
+		"invalid socket monitoring table size leaves field nil": {
+			content: "[global]\nsocket monitoring table size = abc\n",
+			check: func(t *testing.T, cfg pluginConfigFile) {
+				checkPtr(t, "SocketMonitoringTableSize", cfg.SocketMonitoringTableSize, (*uint32)(nil))
+			},
+		},
+		"invalid udp connection table size leaves field nil": {
+			content: "[global]\nudp connection table size = abc\n",
+			check: func(t *testing.T, cfg pluginConfigFile) {
+				checkPtr(t, "UDPConnectionTableSize", cfg.UDPConnectionTableSize, (*uint32)(nil))
+			},
+		},
 	}
 
 	for name, tc := range tests {
