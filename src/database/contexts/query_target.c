@@ -93,6 +93,9 @@ void query_target_release(QUERY_TARGET *qt) {
     simple_pattern_free(qt->instances.scope_labels_pattern);
     qt->instances.scope_labels_pattern = NULL;
 
+    simple_pattern_free(qt->instances.alerts_pattern);
+    qt->instances.alerts_pattern = NULL;
+
     pattern_array_free(qt->instances.labels_pa);
     qt->instances.labels_pa = NULL;
 
@@ -1266,9 +1269,9 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     if(query_target_has_percentage_of_group(qt))
         qt->window.options &= ~RRDR_OPTION_PERCENTAGE;
 
-    qt->internal.relative = rrdr_relative_window_to_absolute_query(&qt->window.after, &qt->window.before
-                                                                   , &qt->window.now, unittest_running
-                                                                  );
+    bool absolute_period_requested = rrdr_relative_window_to_absolute_query(
+        &qt->window.after, &qt->window.before, &qt->window.now, unittest_running);
+    qt->internal.relative = !absolute_period_requested;
 
     // prepare our local variables - we need these across all these functions
     QUERY_TARGET_LOCALS qtl = {
@@ -1358,7 +1361,10 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 
     // we need the available db retention for this call
     // so it has to be done last
-    query_target_calculate_window(qt);
+    if(unlikely(!query_target_calculate_window(qt))) {
+        query_target_release(qt);
+        return NULL;
+    }
 
     qt->timings.preprocessed_ut = now_monotonic_usec();
 

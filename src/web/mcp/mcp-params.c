@@ -518,8 +518,8 @@ void mcp_params_validate_time_window(time_t *after, time_t *before, time_t now) 
     if (!now) now = now_realtime_sec();
     
     // Check if both are relative times (within 3 years of zero)
-    bool after_is_relative = (ABS(*after) <= API_RELATIVE_TIME_MAX);
-    bool before_is_relative = (ABS(*before) <= API_RELATIVE_TIME_MAX);
+    bool after_is_relative = rrdr_relative_window_value_is_relative(*after);
+    bool before_is_relative = rrdr_relative_window_value_is_relative(*before);
     
     if (after_is_relative && before_is_relative) {
         // Case 1: Both are relative and positive - assistant didn't read instructions
@@ -575,8 +575,8 @@ bool mcp_params_parse_time_window(
     }
     
     // Check if after is later than before (when both are absolute timestamps)
-    bool after_is_absolute = (ABS(*after) > API_RELATIVE_TIME_MAX);
-    bool before_is_absolute = (ABS(*before) > API_RELATIVE_TIME_MAX);
+    bool after_is_absolute = !rrdr_relative_window_value_is_relative(*after);
+    bool before_is_absolute = !rrdr_relative_window_value_is_relative(*before);
     
     if (after_is_absolute && before_is_absolute && *after >= *before) {
         if (error) {

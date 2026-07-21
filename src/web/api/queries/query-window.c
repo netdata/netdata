@@ -20,6 +20,24 @@
 #define query_debug_log_free() debug_dummy()
 #endif
 
+static inline bool query_window_uint_to_size(uintmax_t value, size_t *result) {
+    if(unlikely(value > SIZE_MAX))
+        return false;
+
+    *result = (size_t)value;
+    return true;
+}
+
+static inline bool query_window_uint_to_time(uintmax_t value, time_t *result) {
+    const uintmax_t maximum = ((uintmax_t)1 << (sizeof(time_t) * CHAR_BIT - 1)) - 1;
+
+    if(unlikely(value > maximum))
+        return false;
+
+    *result = (time_t)value;
+    return true;
+}
+
 bool query_target_calculate_window(QUERY_TARGET *qt) {
     if (unlikely(!qt)) return false;
 
@@ -57,7 +75,8 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
 
     query_debug_log_init();
 
-    if (ABS(before_requested) <= API_RELATIVE_TIME_MAX || ABS(after_requested) <= API_RELATIVE_TIME_MAX) {
+    if (rrdr_relative_window_value_is_relative(before_requested) ||
+        rrdr_relative_window_value_is_relative(after_requested)) {
         relative_period_requested = true;
         natural_points = true;
         options |= RRDR_OPTION_NATURAL_POINTS;
@@ -163,12 +182,16 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         query_debug_log(":auto natural points_wanted %zu", points_wanted);
     }
 
-    time_t duration = before_wanted - after_wanted;
+    time_t duration;
+    if(unlikely(__builtin_sub_overflow(before_wanted, after_wanted, &duration) || duration < 0))
+        goto failed;
 
     // if the resampling time is too big, extend the duration to the past
     if (unlikely(resampling_time_requested > duration)) {
-        after_wanted = before_wanted - resampling_time_requested;
-        duration = before_wanted - after_wanted;
+        if(unlikely(__builtin_sub_overflow(before_wanted, resampling_time_requested, &after_wanted)))
+            goto failed;
+
+        duration = resampling_time_requested;
         query_debug_log(":resampling after_wanted %ld", after_wanted);
     }
 
@@ -178,14 +201,25 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     if (resampling_time_requested > query_granularity && duration % resampling_time_requested) {
         time_t delta = duration % resampling_time_requested;
         if (delta > resampling_time_requested / 10) {
-            after_wanted -= resampling_time_requested - delta;
-            duration = before_wanted - after_wanted;
+            time_t extension = resampling_time_requested - delta;
+            if(unlikely(__builtin_sub_overflow(after_wanted, extension, &after_wanted) ||
+                        __builtin_add_overflow(duration, extension, &duration)))
+                goto failed;
+
             query_debug_log(":resampling2 after_wanted %ld", after_wanted);
         }
     }
 
     // the available points of the query
-    size_t points_available = (duration + 1) / query_granularity;
+    uintmax_t duration_units = (uintmax_t)(duration / query_granularity);
+    if(duration % query_granularity == query_granularity - 1 &&
+       unlikely(__builtin_add_overflow(duration_units, (uintmax_t)1, &duration_units)))
+        goto failed;
+
+    size_t points_available;
+    if(unlikely(!query_window_uint_to_size(duration_units, &points_available)))
+        goto failed;
+
     if (unlikely(points_available <= 0)) points_available = 1;
     query_debug_log(":points_available %zu", points_available);
 
@@ -209,7 +243,13 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
 
     query_debug_log(":group %zu", group);
 
-    if (points_wanted * group * query_granularity < (size_t)duration) {
+    uintmax_t grouped_points;
+    bool grouped_points_fit = !__builtin_mul_overflow(
+        (uintmax_t)points_wanted, (uintmax_t)group, &grouped_points);
+    uintmax_t required_grouped_points = (uintmax_t)(duration / query_granularity) +
+                                        (duration % query_granularity != 0);
+
+    if (grouped_points_fit && grouped_points < required_grouped_points) {
         // the grouping we are going to do, is not enough
         // to cover the entire duration requested, so
         // we have to change the number of points, to make sure we will
@@ -232,9 +272,10 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     size_t resampling_group = 1;
     if (unlikely(resampling_time_requested > query_granularity)) {
         // the points we should group to satisfy gtime
-        resampling_group = resampling_time_requested / query_granularity;
-        if (unlikely(resampling_time_requested % query_granularity))
-            resampling_group++;
+        uintmax_t resampling_group_wide = (uintmax_t)(resampling_time_requested / query_granularity) +
+                                         (resampling_time_requested % query_granularity != 0);
+        if(unlikely(!query_window_uint_to_size(resampling_group_wide, &resampling_group)))
+            goto failed;
 
         query_debug_log(":resampling group %zu", resampling_group);
 
@@ -244,35 +285,75 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
             query_debug_log(":group less res %zu", group);
         }
         if (unlikely(group % resampling_group)) {
-            group += resampling_group - (group % resampling_group); // make sure group is multiple of resampling_group
+            if(unlikely(__builtin_add_overflow(
+                    group, resampling_group - (group % resampling_group), &group)))
+                goto failed;
+
             query_debug_log(":group mod res %zu", group);
         }
+    }
 
+    uintmax_t view_update_every_wide;
+    time_t view_update_every;
+    if(unlikely(__builtin_mul_overflow(
+                    (uintmax_t)group, (uintmax_t)query_granularity, &view_update_every_wide) ||
+                !query_window_uint_to_time(view_update_every_wide, &view_update_every)))
+        goto failed;
+
+    if (unlikely(resampling_time_requested > query_granularity)) {
         // resampling_divisor = group / resampling_group;
-        resampling_divisor = (NETDATA_DOUBLE) (group * query_granularity) / (NETDATA_DOUBLE) resampling_time_requested;
+        resampling_divisor = (NETDATA_DOUBLE)view_update_every / (NETDATA_DOUBLE)resampling_time_requested;
         query_debug_log(":resampling divisor " NETDATA_DOUBLE_FORMAT, resampling_divisor);
     }
 
     // now that we have group, align the requested timeframe to fit it.
-    if (aligned && before_wanted % (group * query_granularity)) {
-        if (before_is_aligned_to_db_end)
-            before_wanted -= before_wanted % (time_t)(group * query_granularity);
-        else
-            before_wanted += (time_t)(group * query_granularity) - before_wanted % (time_t)(group * query_granularity);
+    // The product is proven representable above; retain the original conversions for negative timestamps.
+    bool alignment_needed = aligned && before_wanted % (group * query_granularity);
+    time_t alignment = aligned ? before_wanted % view_update_every : 0;
+    if (alignment_needed) {
+        if (before_is_aligned_to_db_end) {
+            if(unlikely(__builtin_sub_overflow(before_wanted, alignment, &before_wanted)))
+                goto failed;
+        }
+        else if(alignment > 0) {
+            time_t adjustment = view_update_every - alignment;
+            if(unlikely(__builtin_add_overflow(before_wanted, adjustment, &before_wanted)))
+                goto failed;
+        }
+        else {
+            if(unlikely(__builtin_add_overflow(before_wanted, view_update_every, &before_wanted) ||
+                        __builtin_sub_overflow(before_wanted, alignment, &before_wanted)))
+                goto failed;
+        }
+
         query_debug_log(":align before_wanted %ld", before_wanted);
     }
 
-    after_wanted = before_wanted - (time_t)(points_wanted * group * query_granularity) + query_granularity;
+    uintmax_t preceding_points_duration, final_duration;
+    if(unlikely(__builtin_mul_overflow(
+                    (uintmax_t)(points_wanted - 1), view_update_every_wide, &preceding_points_duration) ||
+                __builtin_add_overflow(preceding_points_duration,
+                                       view_update_every_wide - (uintmax_t)query_granularity,
+                                       &final_duration) ||
+                !query_window_uint_to_time(final_duration, &duration) ||
+                __builtin_sub_overflow(before_wanted, duration, &after_wanted)))
+        goto failed;
+
+    time_t query_start;
+    if(unlikely(__builtin_sub_overflow(after_wanted, query_granularity, &query_start)))
+        goto failed;
+    (void)query_start;
+
     query_debug_log(":final after_wanted %ld", after_wanted);
 
-    duration = before_wanted - after_wanted;
-    query_debug_log(":final duration %ld", duration + 1);
+    query_debug_log(":final duration %ju", final_duration);
 
     query_debug_log_fin();
 
-    internal_error(points_wanted != duration / (query_granularity * group) + 1,
+    uintmax_t calculated_points = final_duration / view_update_every_wide + 1;
+    internal_error((uintmax_t)points_wanted != calculated_points,
                    "QUERY: points_wanted %zu is not points %zu",
-                   points_wanted, (size_t)(duration / (query_granularity * group) + 1));
+                   points_wanted, (size_t)calculated_points);
 
     internal_error(group < resampling_group,
                    "QUERY: group %zu is less than the desired group points %zu",
@@ -300,4 +381,8 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     qt->window.aligned = aligned;
 
     return true;
+
+failed:
+    query_debug_log_free();
+    return false;
 }

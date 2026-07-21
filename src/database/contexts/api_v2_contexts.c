@@ -1309,7 +1309,6 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
             .alerts.alert_name_pattern = string_to_simple_pattern(req->alerts.alert),
             .window = {
                     .enabled = false,
-                    .relative = false,
                     .after = req->after,
                     .before = req->before,
             },
@@ -1356,8 +1355,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
     }
 
     if(req->after || req->before) {
-        ctl.window.relative = rrdr_relative_window_to_absolute_query(
-            &ctl.window.after, &ctl.window.before, &ctl.now, false);
+        rrdr_relative_window_to_absolute_query(&ctl.window.after, &ctl.window.before, &ctl.now, false);
 
         ctl.window.enabled = !(mode & CONTEXTS_V2_ALERT_TRANSITIONS);
     }

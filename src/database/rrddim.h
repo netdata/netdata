@@ -125,7 +125,7 @@ struct rrddim {
         union {
             struct {
                 collected_number collected_value;               // legacy int lane
-                collected_number collected_value_max;           // legacy int lane
+                collected_number collected_value_max;           // unsigned magnitude; INT64_MIN encodes 2^63
                 collected_number last_collected_value;          // legacy int lane
             } i;
             struct {
@@ -164,6 +164,10 @@ size_t rrddim_size(void);
 
 #define rrddim_foreach_done(rd) \
     dfe_done(rd)
+
+static inline int64_t rrddim_scale_magnitude(int32_t value) {
+    return value < 0 ? -(int64_t)value : (int64_t)value;
+}
 
 struct pluginsd_rrddim {
     RRDDIM_ACQUIRED *rda;
@@ -228,6 +232,23 @@ static inline void rrddim_set_last_collected_float(RRDDIM *rd, NETDATA_DOUBLE v)
     rd->collector.collected.f.last_collected_value = v;
 }
 
+static inline uint64_t rrddim_collected_max_as_uint64(RRDDIM *rd) {
+    return (uint64_t)rd->collector.collected.i.collected_value_max;
+}
+
+static inline void rrddim_update_collected_max_from_int(RRDDIM *rd, collected_number value) {
+    if(rrddim_is_float(rd)) {
+        NETDATA_DOUBLE magnitude = value >= 0 ? (NETDATA_DOUBLE)value : -(NETDATA_DOUBLE)value;
+        if(unlikely(magnitude > rd->collector.collected.f.collected_value_max))
+            rrddim_set_collected_max_float(rd, magnitude);
+    }
+    else {
+        uint64_t magnitude = value >= 0 ? (uint64_t)value : UINT64_C(0) - (uint64_t)value;
+        if(unlikely(magnitude > rrddim_collected_max_as_uint64(rd)))
+            rrddim_set_collected_max_int(rd, magnitude > INT64_MAX ? INT64_MIN : (int64_t)magnitude);
+    }
+}
+
 static inline NETDATA_DOUBLE rrddim_collected_as_double(RRDDIM *rd) {
     return rrddim_is_float(rd) ? rd->collector.collected.f.collected_value
                                : (NETDATA_DOUBLE)rd->collector.collected.i.collected_value;
@@ -240,7 +261,7 @@ static inline NETDATA_DOUBLE rrddim_last_collected_as_double(RRDDIM *rd) {
 
 static inline NETDATA_DOUBLE rrddim_collected_max_as_double(RRDDIM *rd) {
     return rrddim_is_float(rd) ? rd->collector.collected.f.collected_value_max
-                               : (NETDATA_DOUBLE)rd->collector.collected.i.collected_value_max;
+                               : (NETDATA_DOUBLE)rrddim_collected_max_as_uint64(rd);
 }
 
 static inline int64_t rrddim_last_collected_raw_int(RRDDIM *rd) {
