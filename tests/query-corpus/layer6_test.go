@@ -212,6 +212,10 @@ func TestLayer6TwoPassMatrix(t *testing.T) {
 							t.Errorf("final group %q missing (have %v)", gname, keys2(cols))
 							continue
 						}
+						if len(col) != l5Rows {
+							t.Errorf("%q: got %d rows, want %d", gname, len(col), l5Rows)
+							continue
+						}
 						for _, pt := range col {
 							i := int(pt.T - fixture.T0)
 							want, wantAR, wantGbc, wantPartial, wantEmpty := l6Expected(ac.agg1, ac.agg2, pass1Groups, i, raw)
@@ -404,6 +408,10 @@ func TestLayer6TwoPassPercentage(t *testing.T) {
 						t.Errorf("group %q missing (have %v)", fk, keys2(cols))
 						continue
 					}
+					if len(col) != l5Rows {
+						t.Errorf("%q: got %d rows, want %d", fk, len(col), l5Rows)
+						continue
+					}
 					for _, pt := range col {
 						i := int(pt.T - fixture.T0)
 
@@ -421,6 +429,13 @@ func TestLayer6TwoPassPercentage(t *testing.T) {
 							v += sum
 							arTot += ar1
 							gbc++
+						}
+						// a visible pass-1 group contributing NOTHING on a
+						// row (all members gapped) shorts the engine's gbc
+						// against its expected count → PARTIAL, mirroring
+						// the hidden-side check below
+						if gbc > 0 && gbc < len(b.vis) {
+							partial = true
 						}
 						hidContrib := 0
 						for _, g := range b.hid {

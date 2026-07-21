@@ -144,12 +144,21 @@ func TestLayer7Formatters(t *testing.T) {
 		}
 	})
 
+	// the single-series formats reduce each row to the SUM of its
+	// dimensions (rrdr2value default): plain + quoted = 0.5 everywhere,
+	// except the gap rows where only `plain` contributes; newest first
+	ssvWant := []string{"0.5", "0.5", "4.5", "3.5", "0.5", "0.5"}
+
 	t.Run("ssv", func(t *testing.T) {
-		// single series: the sum per row (plain + quoted), newest first
 		got := get(t, "ssv", "")
 		cells := strings.Split(strings.TrimSpace(got), " ")
 		if len(cells) != l7Rows {
 			t.Fatalf("ssv: %d cells, want %d (%q)", len(cells), l7Rows, got)
+		}
+		for i, c := range cells {
+			if c != ssvWant[i] {
+				t.Errorf("ssv cell %d: %q, want %q", i, c, ssvWant[i])
+			}
 		}
 	})
 
@@ -158,6 +167,11 @@ func TestLayer7Formatters(t *testing.T) {
 		cells := strings.Split(strings.TrimSpace(got), ",")
 		if len(cells) != l7Rows {
 			t.Fatalf("ssvcomma: %d cells, want %d (%q)", len(cells), l7Rows, got)
+		}
+		for i, c := range cells {
+			if c != ssvWant[i] {
+				t.Errorf("ssvcomma cell %d: %q, want %q", i, c, ssvWant[i])
+			}
 		}
 	})
 
@@ -212,12 +226,22 @@ func TestLayer7Formatters(t *testing.T) {
 
 	t.Run("array", func(t *testing.T) {
 		got := get(t, "array", "")
-		var arr []any
+		var arr []float64
 		if err := json.Unmarshal([]byte(got), &arr); err != nil {
 			t.Fatalf("array is not valid JSON (%v): %q", err, got)
 		}
 		if len(arr) != l7Rows {
-			t.Errorf("array: %d cells, want %d", len(arr), l7Rows)
+			t.Fatalf("array: %d cells, want %d", len(arr), l7Rows)
+		}
+		// same single-series reduction as ssv, newest first
+		for i, v := range arr {
+			want, err := strconv.ParseFloat(ssvWant[i], 64)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if v != want {
+				t.Errorf("array cell %d: %v, want %v", i, v, want)
+			}
 		}
 	})
 

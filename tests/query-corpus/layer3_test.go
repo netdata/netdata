@@ -53,20 +53,26 @@ func tgBuckets(d fixture.Dimension, group int) [][]float64 {
 	return out
 }
 
+// tgQuery names one time-group request and the oracle that must answer
+// it: OracleName/OracleOptions default to the sent pair, and diverge only
+// for the registry alias rows (alias == oracle-verified canonical) and
+// the silent-fallback pin (an unknown time_group parses to average).
+type tgQuery struct {
+	Name, Options             string
+	OracleName, OracleOptions string
+}
+
 // verifyTimeGroup queries ch with the given time_group/options at the
 // given bucket size and asserts every bucket against the oracle.
 func verifyTimeGroup(t *testing.T, host string, ch fixture.Chart, name, options string, group int) {
 	t.Helper()
-	verifyTimeGroupAs(t, host, ch, name, options, name, options, group)
+	verifyTimeGroupAs(t, host, ch, tgQuery{Name: name, Options: options, OracleName: name, OracleOptions: options}, group)
 }
 
-// verifyTimeGroupAs sends name/options to the engine but asserts against
-// the oracle of oracleName/oracleOptions. The split exists for the
-// registry alias rows (alias == oracle-verified canonical) and for the
-// silent-fallback pin (an unknown time_group parses to average).
-func verifyTimeGroupAs(t *testing.T, host string, ch fixture.Chart, name, options, oracleName, oracleOptions string, group int) {
+func verifyTimeGroupAs(t *testing.T, host string, ch fixture.Chart, q tgQuery, group int) {
 	t.Helper()
 
+	name, options := q.Name, q.Options
 	d := ch.Dimensions[0]
 	n := int64(len(d.Points))
 	points := n / int64(group)
@@ -89,7 +95,7 @@ func verifyTimeGroupAs(t *testing.T, host string, ch fixture.Chart, name, option
 		t.Fatalf("%s%s: got %d buckets, want %d", name, optSuffix(options), len(col), points)
 	}
 
-	exp := fixture.TGOracle(oracleName, oracleOptions, tgBuckets(d, group), group, int(points))
+	exp := fixture.TGOracle(q.OracleName, q.OracleOptions, tgBuckets(d, group), group, int(points))
 	for i, pt := range col {
 		want := exp[i]
 		bucketT := fixture.T0 + int64((i+1)*group)
