@@ -288,7 +288,7 @@ void web_client_request_done(struct web_client *w);
 
 void web_client_build_http_header(struct web_client *w);
 
-void web_client_reset_allocations_for_reuse(struct web_client *w);
+void web_client_reset_allocations_for_cache(struct web_client *w);
 void web_client_reuse_from_cache(struct web_client *w);
 struct web_client *web_client_create(size_t *statistics_memory_accounting);
 void web_client_free(struct web_client *w);

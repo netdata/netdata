@@ -156,7 +156,7 @@ void web_client_release_to_cache(struct web_client *w) {
     }
 
     // Do not park request-sized allocations until another client needs this slot.
-    web_client_reset_allocations_for_reuse(w);
+    web_client_reset_allocations_for_cache(w);
 
     spinlock_lock(&web_clients_cache.avail.spinlock);
     if(unlikely(!web_clients_cache.avail.reserved))
@@ -184,6 +184,9 @@ static int web_client_cache_unittest_grow_allocations(struct web_client *w) {
         if(buffers[i]->size <= NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE)
             errors++;
     }
+
+    w->response.data->len = NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1;
+    w->response.data->buffer[w->response.data->len] = '\0';
 
     if(!w->payload)
         w->payload = buffer_create(0, w->statistics.memory_accounting);

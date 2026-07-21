@@ -125,9 +125,15 @@ static inline void web_client_reset_or_recreate_buffer(
         buffer_reset(*wb);
 }
 
-static void web_client_reset_allocations(struct web_client *w, bool free_all) {
+typedef enum {
+    WEB_CLIENT_ALLOCATIONS_FOR_NEXT_REQUEST,
+    WEB_CLIENT_ALLOCATIONS_FOR_CACHE,
+    WEB_CLIENT_ALLOCATIONS_FREE,
+} WEB_CLIENT_ALLOCATIONS_RESET_MODE;
 
-    if(free_all) {
+static void web_client_reset_allocations(struct web_client *w, WEB_CLIENT_ALLOCATIONS_RESET_MODE mode) {
+
+    if(mode == WEB_CLIENT_ALLOCATIONS_FREE) {
         // the web client is to be destroyed
 
         buffer_free(w->url_as_received);
@@ -155,7 +161,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         w->payload = NULL;
     }
     else {
-        // the web client is to be re-used
+        // Oversized request-derived allocations should not remain attached to a keep-alive or cached client.
 
         web_client_reset_or_recreate_buffer(&w->url_as_received,
                                             NETDATA_WEB_DECODED_URL_INITIAL_SIZE,
@@ -182,10 +188,16 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
                                             NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE,
                                             NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
                                             w->statistics.memory_accounting);
-        web_client_reset_or_recreate_buffer(&w->response.data,
-                                            NETDATA_WEB_RESPONSE_INITIAL_SIZE,
-                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
-                                            w->statistics.memory_accounting);
+        if(mode == WEB_CLIENT_ALLOCATIONS_FOR_NEXT_REQUEST &&
+           w->response.data->len > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE) {
+            // Keep large-response capacity on an active keep-alive connection to avoid reallocating it every request.
+            buffer_reset(w->response.data);
+        }
+        else
+            web_client_reset_or_recreate_buffer(&w->response.data,
+                                                NETDATA_WEB_RESPONSE_INITIAL_SIZE,
+                                                NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                                w->statistics.memory_accounting);
 
         if(w->payload) {
             if(w->payload->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE) {
@@ -253,8 +265,8 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     web_client_reset_path_flags(w);
 }
 
-void web_client_reset_allocations_for_reuse(struct web_client *w) {
-    web_client_reset_allocations(w, false);
+void web_client_reset_allocations_for_cache(struct web_client *w) {
+    web_client_reset_allocations(w, WEB_CLIENT_ALLOCATIONS_FOR_CACHE);
 }
 
 void web_client_log_completed_request(struct web_client *w, bool update_web_stats) {
@@ -331,7 +343,7 @@ void web_client_request_done(struct web_client *w) {
     netdata_log_debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
 
     web_client_log_completed_request(w, true);
-    web_client_reset_allocations_for_reuse(w);
+    web_client_reset_allocations(w, WEB_CLIENT_ALLOCATIONS_FOR_NEXT_REQUEST);
 
     w->mode = HTTP_REQUEST_MODE_GET;
 
@@ -2405,7 +2417,7 @@ HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, co
 void web_client_reuse_from_cache(struct web_client *w) {
     // zero everything about it - but keep the buffers
 
-    web_client_reset_allocations_for_reuse(w);
+    web_client_reset_allocations_for_cache(w);
 
     // remember the pointers to the buffers
     BUFFER *b1 = w->response.data;
@@ -2466,7 +2478,7 @@ struct web_client *web_client_create(size_t *statistics_memory_accounting) {
 void web_client_free(struct web_client *w) {
     netdata_ssl_close(&w->ssl);
 
-    web_client_reset_allocations(w, true);
+    web_client_reset_allocations(w, WEB_CLIENT_ALLOCATIONS_FREE);
 
     __atomic_sub_fetch(w->statistics.memory_accounting, sizeof(struct web_client), __ATOMIC_RELAXED);
     freez(w);
@@ -2830,6 +2842,29 @@ int web_client_request_unittest(void) {
 
     web_client_reuse_from_cache(w);
     if(web_client_decode_path_and_query_string(w, "/api?x=%GG", 10) != HTTP_VALIDATION_MALFORMED_URL)
+        errors++;
+
+    // Active keep-alive clients reuse large response capacity, but request-inflated capacity is released.
+    web_client_reuse_from_cache(w);
+    buffer_need_bytes(w->url_as_received, NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1);
+    buffer_need_bytes(w->response.data, NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1);
+    BUFFER *large_response_buffer = w->response.data;
+    size_t large_response_size = w->response.data->size;
+    if(large_response_size <= NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE)
+        errors++;
+    memset(w->response.data->buffer, 'x', NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1);
+    w->response.data->len = NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1;
+    w->response.data->buffer[w->response.data->len] = '\0';
+    web_client_request_done(w);
+    if(w->response.data != large_response_buffer || w->response.data->size != large_response_size ||
+       buffer_strlen(w->response.data) ||
+       w->url_as_received->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE)
+        errors++;
+
+    // A later small response no longer justifies keeping the oversized capacity on the connection.
+    buffer_strcat(w->response.data, "ok");
+    web_client_request_done(w);
+    if(w->response.data->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE || buffer_strlen(w->response.data))
         errors++;
 
     web_client_reuse_from_cache(w);
