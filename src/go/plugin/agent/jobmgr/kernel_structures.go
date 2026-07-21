@@ -11,7 +11,7 @@ type functionCleanupTask struct {
 	err error
 }
 
-// Fixed chunks keep each KernelLoop queue operation worst-case O(1).
+// Fixed chunks keep each kernel-loop queue operation worst-case O(1).
 const functionCleanupChunkCapacity = 64
 
 type functionCleanupChunk struct {

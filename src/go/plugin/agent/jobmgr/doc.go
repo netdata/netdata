@@ -3,7 +3,7 @@
 // Package jobmgr owns the single command kernel used by a Go data-collection
 // plugin process.
 //
-// The kernel serializes mutable orchestration state on KernelLoop, orders
+// The kernel serializes mutable orchestration state on its run loop, orders
 // conflicting work through claims, delegates blocking work to lifecycle
 // TaskSupervisor, and commits Function results and protocol notifications
 // through lifecycle FrameOwner.

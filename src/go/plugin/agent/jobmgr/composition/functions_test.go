@@ -267,10 +267,8 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 	)
 	require.NoError(t, err)
 	require.NoError(t, assembly.Bind(kernel))
-	loop, err := jobmgr.NewKernelLoop(kernel)
-	require.NoError(t, err)
 	require.NoError(t, run.OpenAdmission())
-	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, assembly.Activate())
 
 	job := &assemblyTestJob{}

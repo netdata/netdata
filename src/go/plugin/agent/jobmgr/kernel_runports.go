@@ -12,7 +12,7 @@ type RunFinalizer interface {
 
 // RunShutdownBarrier performs blocking external withdrawal before the
 // loop-owned Function catalog begins close. It runs as one supervised shutdown
-// task, never on KernelLoop.
+// task, never on the kernel loop.
 type RunShutdownBarrier interface {
 	BeforeFunctionCatalogClose(context.Context, uint64) error
 }

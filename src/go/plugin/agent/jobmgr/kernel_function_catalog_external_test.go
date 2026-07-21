@@ -54,12 +54,9 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 		catalog,
 	)
 	require.NoError(t, err)
-	loop, err := jobmgr.NewKernelLoop(kernel)
-	require.NoError(t, err)
 
 	require.NoError(t, run.OpenAdmission())
-
-	require.NoError(t, loop.Start(context.Background()))
+	require.NoError(t, kernel.Start(context.Background()))
 
 	require.NoError(t, kernel.SubmitAndWait(context.Background(), jobmgr.Request{
 		UID: "concrete-catalog", Source: lifecycle.SourceFunction, Route: "direct",
@@ -588,12 +585,9 @@ func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmg
 		catalog,
 	)
 	require.NoError(t, err)
-	loop, err := jobmgr.NewKernelLoop(kernel)
-	require.NoError(t, err)
 
 	require.NoError(t, run.OpenAdmission())
-
-	require.NoError(t, loop.Start(context.Background()))
+	require.NoError(t, kernel.Start(context.Background()))
 
 	return kernel, run, admission, uids
 }

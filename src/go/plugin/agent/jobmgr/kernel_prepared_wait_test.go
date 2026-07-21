@@ -19,13 +19,11 @@ func TestSubmitPreparedAndWaitReturnsCleanTransactionPreparationError(t *testing
 		t,
 		stoppedKernelPlanner{},
 	)
-	loop, err := NewKernelLoop(kernel.CommandKernel)
-	require.NoError(t, err)
-	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 
 	sentinel := errors.New("transaction preparation failed")
-	err = kernel.SubmitPreparedAndWait(
+	err := kernel.SubmitPreparedAndWait(
 		context.Background(),
 		Request{
 			UID:     "prepared-transaction-failure",
@@ -56,9 +54,7 @@ func TestSubmitPreparedAndWaitReturnsCleanTransactionPreparationError(t *testing
 
 func TestSubmitPreparedPreservesStoppingRejectionWithoutInputBodyCleanup(t *testing.T) {
 	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	loop, err := NewKernelLoop(kernel.CommandKernel)
-	require.NoError(t, err)
-	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 
 	plan, err := stoppedKernelPlanner{}.Plan(Request{})
@@ -88,13 +84,11 @@ func TestSubmitPreparedPreservesStoppingRejectionWithoutInputBodyCleanup(t *test
 
 func TestSubmitPreparedAndWaitDirtiesRunForRetainedTransactionPreparation(t *testing.T) {
 	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	loop, err := NewKernelLoop(kernel.CommandKernel)
-	require.NoError(t, err)
-	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 
 	sentinel := errors.New("transaction preparation retained ownership")
-	err = kernel.SubmitPreparedAndWait(
+	err := kernel.SubmitPreparedAndWait(
 		context.Background(),
 		Request{
 			UID:     "retained-transaction-failure",
@@ -145,9 +139,7 @@ func TestKernelDoesNotCancelStartedTransactionAction(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-			loop, err := NewKernelLoop(kernel.CommandKernel)
-			require.NoError(t, err)
-			require.NoError(t, loop.Start(t.Context()))
+			require.NoError(t, kernel.Start(t.Context()))
 			require.NoError(t, run.OpenAdmission())
 			entered := make(chan struct{})
 			release := make(chan struct{})
@@ -191,9 +183,7 @@ func TestKernelShutdownBudgetBoundsProtectedOwnershipAction(t *testing.T) {
 		stoppedKernelPlanner{},
 		20*time.Millisecond,
 	)
-	loop, err := NewKernelLoop(kernel.CommandKernel)
-	require.NoError(t, err)
-	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 
 	entered := make(chan struct{})
@@ -257,9 +247,7 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 			newNoopRunFinalizer(),
 			3*time.Second,
 		)
-	loop, err := NewKernelLoop(kernel.CommandKernel)
-	require.NoError(t, err)
-	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 
 	actionEntered := make(chan struct{})
@@ -577,9 +565,7 @@ func TestShutdownCancellationPreservesGenerationStoppingCause(t *testing.T) {
 		t,
 		stoppedKernelPlanner{},
 	)
-	loop, err := NewKernelLoop(kernel.CommandKernel)
-	require.NoError(t, err)
-	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 
 	started := make(chan struct{})
@@ -651,9 +637,7 @@ func TestShutdownCancellationPreservesGenerationStoppingCause(t *testing.T) {
 
 func TestShutdownPreparationCancellationDoesNotDirtyResource(t *testing.T) {
 	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	loop, err := NewKernelLoop(kernel.CommandKernel)
-	require.NoError(t, err)
-	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 	started := make(chan struct{})
 	observed := make(chan error, 1)
@@ -704,10 +688,7 @@ func TestSubmitPreparedAndWaitJoinsAcceptedCancellation(t *testing.T) {
 		t,
 		stoppedKernelPlanner{},
 	)
-	loop, err := NewKernelLoop(kernel.CommandKernel)
-	require.NoError(t, err)
-
-	require.NoError(t, loop.Start(t.Context()))
+	require.NoError(t, kernel.Start(t.Context()))
 
 	require.NoError(t, run.OpenAdmission())
 

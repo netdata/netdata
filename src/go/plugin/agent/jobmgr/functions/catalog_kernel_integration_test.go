@@ -57,12 +57,9 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 		catalog,
 	)
 	require.NoError(t, err)
-	loop, err := jobmgr.NewKernelLoop(kernel)
-	require.NoError(t, err)
 
 	require.NoError(t, run.OpenAdmission())
-
-	require.NoError(t, loop.Start(context.Background()))
+	require.NoError(t, kernel.Start(context.Background()))
 
 	kernel.Stop()
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Second)

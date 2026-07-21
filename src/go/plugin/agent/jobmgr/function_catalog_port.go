@@ -59,7 +59,7 @@ type FunctionCleanupPlan struct {
 
 // FunctionCatalogMutation is an adapter-owned immutable mutation postimage
 // request. CommandKernel treats it as an opaque typed value and returns it only
-// to the injected Function catalog on KernelLoop.
+// to the injected Function catalog on the kernel loop.
 type FunctionCatalogMutation interface {
 	FunctionCatalogMutation()
 }
@@ -135,7 +135,7 @@ func (fcd FunctionCatalogDecision) validate() error {
 }
 
 // FunctionCatalogPort is implemented by the Function adapter. Every method is
-// a bounded KernelLoop transition: it must not wait, lock, perform I/O, or
+// a bounded kernel-loop transition: it must not wait, lock, perform I/O, or
 // invoke handler or Cleanup callbacks.
 type FunctionCatalogPort interface {
 	ResolveAndAcquire(FunctionLookup) (FunctionCatalogDecision, error)
@@ -152,8 +152,8 @@ type FunctionCatalogPort interface {
 }
 
 // FunctionMutationPort is the composition-facing capability for submitting an
-// already prepared catalog mutation to KernelLoop. A successful quiesce closes
-// predecessor admission and transfers the paused mutation to KernelLoop; the
+// already prepared catalog mutation to the kernel loop. A successful quiesce closes
+// predecessor admission and transfers the paused mutation to the kernel loop; the
 // caller must consume it exactly once with commit or abort.
 type FunctionMutationPort interface {
 	QuiesceFunctions(context.Context, FunctionCatalogMutation) error

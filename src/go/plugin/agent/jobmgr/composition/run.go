@@ -60,7 +60,6 @@ type runGeneration struct {
 	vnodes            *vnodeBinding                  // dyncfg vnode binding
 	discovery         runDiscoveryServices           // discovery services
 	kernel            *jobmgr.CommandKernel          // the command kernel
-	loop              *jobmgr.KernelLoop             // the kernel loop
 	inputBodyGrants   chan lifecycle.AdmissionGrant  // channel delivering input-body growth grants to the kernel
 	metrics           *runMetrics                    // jobmgr.runtime metrics projection (nil when runtime charts off)
 	runtime           runtimecomp.Service            // runtime service
@@ -316,10 +315,6 @@ func newRunGeneration(
 	if err != nil {
 		return nil, err
 	}
-	loop, err := jobmgr.NewKernelLoop(kernel)
-	if err != nil {
-		return nil, err
-	}
 	if err := functions.Bind(kernel); err != nil {
 		return nil, err
 	}
@@ -344,7 +339,6 @@ func newRunGeneration(
 		vnodes:            vnodeBinding,
 		discovery:         config.Discovery,
 		kernel:            kernel,
-		loop:              loop,
 		inputBodyGrants:   inputBodyGrants,
 		metrics:           metrics,
 		runtime:           config.Jobs.Runtime,
@@ -384,7 +378,7 @@ func (rg *runGeneration) start(ctx context.Context) error {
 	}
 	rg.startedAttempted = true
 	rg.mu.Unlock()
-	if err := rg.loop.Start(ctx); err != nil {
+	if err := rg.kernel.Start(ctx); err != nil {
 		return errors.Join(err, rg.abortConstruction())
 	}
 	rg.mu.Lock()

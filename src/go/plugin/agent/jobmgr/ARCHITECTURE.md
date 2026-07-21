@@ -124,7 +124,7 @@ A useful mental split for the rest of this document:
 ## The Concurrency Model
 
 This is the core idea. Job Manager does almost no locking in its business
-logic. Instead, **one goroutine — the KernelLoop — owns all mutable
+logic. Instead, **one goroutine — the `CommandKernel` run loop — owns all mutable
 orchestration state** and is the only thing allowed to change it. Everything
 else either hands work in over a channel or does blocking work off to the side
 and reports back.
@@ -187,7 +187,7 @@ flowchart TD
 
 ### Who owns what
 
-- **On-loop (exclusive to KernelLoop):** every lane, operation, deadline, claim
+- **On-loop (exclusive to the `CommandKernel` run loop):** every lane, operation, deadline, claim
   transition, and counter. The loop is the sole mutator. A test
   (`architecture_test.go`) even pins that on-loop actions are dispatched through
   the sanctioned kernel ownership funnel.
@@ -455,7 +455,7 @@ crosses a reload.
 
 | Package | Responsibility |
 | --- | --- |
-| `jobmgr` (root) | Command ports, the `CommandKernel` + `KernelLoop`, lanes, claims, composite child commands |
+| `jobmgr` (root) | Command ports, the `CommandKernel` run loop, lanes, claims, composite child commands |
 | `jobmgr/lifecycle` | Neutral authorities: admission, UID, operation, task, frame, run, resource, transaction |
 | `jobmgr/functions` | Function stdin ingress, routing catalog, handler generations, publication to Netdata |
 | `jobmgr/joboutput` | Collector construction, job generations, output frames, DynCfg jobs, autodetection retries, vnode snapshots |

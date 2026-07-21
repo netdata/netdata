@@ -30,7 +30,7 @@ type PublicationHandle struct {
 
 // PublicationPort is the external Function registry boundary. Calls may block
 // and therefore Publication transitions must execute as serialized TaskChild
-// work, never on KernelLoop.
+// work, never on the kernel loop.
 type PublicationPort interface {
 	Publish(PublicationRecord) (PublicationHandle, error)
 	Withdraw(PublicationHandle) error

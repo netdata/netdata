@@ -85,7 +85,7 @@ func (pac preAdmissionControl) Unwrap() error {
 }
 
 // commandOperation is one command's full lifecycle record, owned exclusively by
-// KernelLoop (the sole mutator of every field below).
+// CommandKernel's run loop (the sole mutator of every field below).
 type commandOperation struct {
 	*lifecycle.OperationGeneration                                    // embedded neutral lifecycle state machine (state, response, child)
 	request                        Request                            // immutable admitted command
@@ -149,7 +149,7 @@ type commandOperation struct {
 }
 
 // commandLane serializes every command addressed to one resource/invocation key
-// into a FIFO; KernelLoop is its sole mutator.
+// into a FIFO; CommandKernel's run loop is its sole mutator.
 type commandLane struct {
 	slot               uint32                     // index of this lane in laneSlots (freelist-managed)
 	generation         uint32                     // ABA guard bumped when the slot is reused
@@ -181,7 +181,7 @@ type commandLane struct {
 }
 
 // CommandKernel owns all mutable orchestration state for one run generation.
-// Every field below is read and written ONLY on the single KernelLoop goroutine
+// Every field below is read and written ONLY on the single run-loop goroutine
 // (see runLoop); external callers interact through channels, never these fields.
 type CommandKernel struct {
 	run                      *lifecycle.RunSupervisor                        // run supervisor (admission gate, stopping cut, shutdown budget, dirty state)
@@ -360,34 +360,23 @@ func (ck *CommandKernel) BindRuntimeObserver(
 	return nil
 }
 
-type KernelLoop struct {
-	kernel *CommandKernel
-}
-
-func NewKernelLoop(kernel *CommandKernel) (*KernelLoop, error) {
-	if kernel == nil {
-		return nil, errors.New("jobmgr kernel loop: nil command kernel")
-	}
-	return &KernelLoop{kernel: kernel}, nil
-}
-
-func (kl *KernelLoop) Start(ctx context.Context) error {
-	if kl == nil || ctx == nil {
-		return errors.New("jobmgr kernel loop: invalid start")
+func (ck *CommandKernel) Start(ctx context.Context) error {
+	if ck == nil || ctx == nil {
+		return errors.New("jobmgr kernel: invalid start")
 	}
 	started := false
-	kl.kernel.startOnce.Do(func() {
+	ck.startOnce.Do(func() {
 		started = true
-		kl.kernel.startErr = kl.kernel.bindRunNotifications()
-		if kl.kernel.startErr != nil {
+		ck.startErr = ck.bindRunNotifications()
+		if ck.startErr != nil {
 			return
 		}
-		go kl.kernel.runLoop(ctx)
+		go ck.runLoop(ctx)
 	})
 	if !started {
-		return errors.New("jobmgr kernel loop: already started")
+		return errors.New("jobmgr kernel: already started")
 	}
-	return kl.kernel.startErr
+	return ck.startErr
 }
 
 func (ck *CommandKernel) bindRunNotifications() error {

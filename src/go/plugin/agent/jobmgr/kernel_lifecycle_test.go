@@ -78,55 +78,28 @@ func TestKernelStopCutRejectsCancellationBeforeShutdownCompletes(
 	require.NoError(t, kernel.Wait(context.Background()))
 }
 
-func TestKernelLoopStartsExactlyOnce(t *testing.T) {
+func TestCommandKernelStartsExactlyOnce(t *testing.T) {
 	tests := map[string]struct {
 		run func(*testing.T)
 	}{
 		"nil command kernel": {
 			run: func(t *testing.T) {
-				_, err := NewKernelLoop(nil)
-				require.Error(t, err)
+				var kernel *CommandKernel
+				require.Error(t, kernel.Start(context.Background()))
 			},
 		},
 		"nil context": {
 			run: func(t *testing.T) {
 				kernel, _ := newKernel(t)
-				loop, err := NewKernelLoop(kernel.CommandKernel)
-				require.NoError(t, err)
-
-				require.Error(t, loop.Start(nil))
+				require.Error(t, kernel.Start(nil))
 			},
 		},
 		"duplicate start": {
 			run: func(t *testing.T) {
 				kernel, _ := newKernel(t)
-				loop, err := NewKernelLoop(kernel.CommandKernel)
-				require.NoError(t, err)
+				require.NoError(t, kernel.Start(context.Background()))
+				require.Error(t, kernel.Start(context.Background()))
 
-				require.NoError(t, loop.Start(context.Background()))
-
-				require.Error(t, loop.Start(context.Background()))
-
-				kernel.Stop()
-
-				require.NoError(t, kernel.Wait(context.Background()))
-			},
-		},
-		"duplicate wrappers": {
-			run: func(t *testing.T) {
-				kernel, _ := newKernel(t)
-				first, err := NewKernelLoop(kernel.CommandKernel)
-				require.NoError(t, err)
-				second, err := NewKernelLoop(kernel.CommandKernel)
-				require.NoError(t, err)
-
-				require.NoError(t, first.Start(context.Background()))
-
-				if err := second.Start(context.Background()); err == nil {
-					kernel.Stop()
-					_ = kernel.Wait(context.Background())
-					require.FailNow(t, "test failed", "second wrapper start was accepted")
-				}
 				kernel.Stop()
 
 				require.NoError(t, kernel.Wait(context.Background()))
@@ -3980,8 +3953,5 @@ func (stoppedKernelPlanner) Plan(Request) (WorkPlan, error) {
 
 func startKernelLoop(t *testing.T, kernel *testCommandKernel) {
 	t.Helper()
-	loop, err := NewKernelLoop(kernel.CommandKernel)
-	require.NoError(t, err)
-
-	require.NoError(t, loop.Start(context.Background()))
+	require.NoError(t, kernel.Start(context.Background()))
 }

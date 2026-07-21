@@ -126,7 +126,7 @@ func (fa *FunctionAssembly) abortConstruction() error {
 	return fa.controller.AbortConstruction(context.Background())
 }
 
-// Activate publishes static Function routes after KernelLoop is running and
+// Activate publishes static Function routes after the kernel loop is running and
 // before the process-fixed ingress capability is adopted.
 func (fa *FunctionAssembly) Activate() error {
 	if fa == nil {

@@ -53,7 +53,7 @@ type preparedRouteChange struct {
 
 // Mutation is an off-loop-owned, fully allocated mutation request. NewMutation
 // performs payload-relative validation and allocates every path-copy record so
-// KernelLoop preparation can be node-bounded and allocation-free.
+// Kernel-loop preparation can be node-bounded and allocation-free.
 type Mutation struct {
 	expectedVersion     uint64                     // catalog version this mutation was built against
 	changes             []preparedRouteChange      // per-route changes to apply
