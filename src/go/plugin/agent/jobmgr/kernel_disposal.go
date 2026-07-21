@@ -213,6 +213,7 @@ func (ck *CommandKernel) serviceControls(quantum int) bool {
 		if errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
 			return false
 		}
+		ck.controls[0] = nil // release the drained operation; append compacts on reallocation
 		ck.controls = ck.controls[1:]
 		operation.controlQueued = false
 		quantum--

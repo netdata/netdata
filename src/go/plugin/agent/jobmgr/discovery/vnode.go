@@ -77,11 +77,7 @@ func NewVNodeConfigurationWithInitial(
 	initial map[string]*vnodes.VirtualNode,
 ) (*VNodeConfiguration, error) {
 	configuration := NewVNodeConfiguration()
-	ids := make([]string, 0, len(initial))
-	for id := range initial {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
+	ids := slices.Sorted(maps.Keys(initial))
 	for _, id := range ids {
 		vnode := initial[id]
 		if vnode == nil {

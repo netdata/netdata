@@ -13,6 +13,7 @@ import (
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -80,7 +81,7 @@ func TestProductionProcessChargesCatalogStorageUntilFinalClose(t *testing.T) {
 	require.NoError(t, process.Run(context.Background()))
 
 	census := process.core.admission.Census()
-	require.False(t, census.ProcessBytes != 0 || census.Phase != "closed")
+	require.False(t, census.ProcessBytes != 0 || census.Phase != lifecycle.AdmissionClosed)
 }
 
 func TestProcessControlCancellationAfterHandoffWaitsForDisposition(t *testing.T) {

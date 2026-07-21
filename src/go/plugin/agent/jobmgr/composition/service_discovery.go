@@ -208,10 +208,7 @@ func (sdb *serviceDiscoveryBinding) prepare(
 			scope,
 			nil,
 			lifecycle.LongLivedPermit{},
-			mustVNodeMessage(
-				503,
-				"Service discovery configuration is not available.",
-			),
+			mustDynCfgMessage(503, "Service discovery configuration is not available."),
 			func() error { return nil },
 			nil,
 		)
@@ -273,10 +270,7 @@ func newServiceDiscoveryInitialRoute(
 					context.Context,
 					functionadapter.HandlerInput,
 				) (lifecycle.SealedResult, error) {
-					return mustVNodeMessage(
-						501,
-						"Service discovery command is not implemented.",
-					), nil
+					return mustDynCfgMessage(501, "Service discovery command is not implemented."), nil
 				},
 			},
 			Transaction: &functionadapter.ResourceTransactionDeclaration{

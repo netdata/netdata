@@ -29,11 +29,11 @@ const (
 )
 
 type LongLivedPlan struct {
-	providerKeys       []string
-	bytes              int64
-	class              LongLivedClass
-	replacementOverlap bool
-	e                  LongLivedExternalFacet
+	providerKeys       []string               // secret-provider keys this plan pins (pipeline class)
+	bytes              int64                  // byte ('B') facet reserved by the permit
+	class              LongLivedClass         // permit class: pipeline, job, or secret store
+	replacementOverlap bool                   // whether the permit may overlap a replaced generation
+	external           LongLivedExternalFacet // external ('E') facets the plan reserves
 }
 
 func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
@@ -53,7 +53,7 @@ func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
 	plan := LongLivedPlan{
 		class:        LongLivedPipeline,
 		providerKeys: keys,
-		e:            LongLivedEProvider,
+		external:     LongLivedEProvider,
 	}
 	return plan, plan.Validate()
 }
@@ -99,7 +99,7 @@ func newResourceLongLivedPlan(
 		class:              class,
 		bytes:              bytes,
 		replacementOverlap: replacementOverlap,
-		e:                  e,
+		external:           e,
 	}
 	return plan, plan.Validate()
 }
@@ -112,20 +112,20 @@ func (llp LongLivedPlan) Validate() error {
 	case LongLivedPipeline:
 		if llp.replacementOverlap ||
 			!validPipelineProviderKeys(llp.providerKeys) ||
-			llp.e != LongLivedEProvider ||
+			llp.external != LongLivedEProvider ||
 			llp.bytes != 0 {
 			return errors.New("jobmgr long-lived permit: invalid pipeline facets")
 		}
 	case LongLivedJob:
 		if llp.bytes <= 0 ||
 			len(llp.providerKeys) != 0 ||
-			llp.e != LongLivedEJobResources {
+			llp.external != LongLivedEJobResources {
 			return errors.New("jobmgr long-lived permit: invalid job facets")
 		}
 	case LongLivedSecretStore:
 		if llp.bytes <= 0 ||
 			len(llp.providerKeys) != 0 ||
-			llp.e != LongLivedESecretStore {
+			llp.external != LongLivedESecretStore {
 			return errors.New("jobmgr long-lived permit: invalid SecretStore facets")
 		}
 	default:
@@ -302,18 +302,18 @@ const (
 )
 
 type LongLivedCensus struct {
-	Active                int
-	Pipelines             int
-	Jobs                  int
-	SecretStores          int
-	Bytes                 int64
-	GReserved             int
-	GActive               int
-	ExternalReserved      int
-	ExternalActive        int
-	FinalizerOwnedActive  int
-	FinalizerOwnedRecords int
-	FinalizerOwnedBytes   int64
+	Active                int   // total active long-lived permits
+	Pipelines             int   // active pipeline-class permits
+	Jobs                  int   // active job-class permits
+	SecretStores          int   // active secret-store-class permits
+	Bytes                 int64 // total reserved bytes (the 'B' facet)
+	GReserved             int   // reserved inherited-task ('G') facets across all permits
+	GActive               int   // activated inherited-task ('G') facets
+	ExternalReserved      int   // reserved external ('E') facets
+	ExternalActive        int   // activated external ('E') facets
+	FinalizerOwnedActive  int   // active permits inherited by the run finalizer
+	FinalizerOwnedRecords int   // permit records owned by the run finalizer
+	FinalizerOwnedBytes   int64 // bytes reserved by finalizer-owned permits
 }
 
 func longLivedGClaims(plan LongLivedPlan) map[longLivedGKey]longLivedGState {
@@ -411,7 +411,7 @@ func (ts *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedger, admis
 	*slot = longLivedSlot{
 		generation: generation, active: true, owner: owner, class: plan.class,
 		bytes:   plan.bytes,
-		gClaims: gClaims, eReserved: plan.e,
+		gClaims: gClaims, eReserved: plan.external,
 	}
 	if plan.bytes > 0 {
 		slot.admission = admission
@@ -424,7 +424,7 @@ func (ts *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedger, admis
 	registry.incrementClassCensus(plan.class)
 	registry.census.Bytes += plan.bytes
 	registry.census.GReserved += len(gClaims)
-	registry.census.ExternalReserved += bits.OnesCount8(uint8(plan.e))
+	registry.census.ExternalReserved += bits.OnesCount8(uint8(plan.external))
 	if plan.class == LongLivedSecretStore {
 		registry.census.FinalizerOwnedActive++
 		registry.census.FinalizerOwnedRecords++
@@ -538,7 +538,7 @@ func (ts *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, owner Re
 	if longLivedGClaimsRetained(slot.gClaims) ||
 		slot.eReserved != 0 || slot.eActive != 0 {
 		registry.mu.Unlock()
-		return errors.New("jobmgr long-lived permit: byte release before G/E facets")
+		return errors.New("jobmgr long-lived permit: byte release before inherited-task/external facets")
 	}
 	if slot.bytes == 0 {
 		if slot.class != LongLivedPipeline ||
@@ -624,7 +624,7 @@ func (ts *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, owner Re
 	if slot.bytes != 0 || slot.bytesReleasing ||
 		longLivedGClaimsRetained(slot.gClaims) ||
 		slot.eReserved != 0 || slot.eActive != 0 {
-		return errors.New("jobmgr long-lived permit: return with retained B/G/E facets")
+		return errors.New("jobmgr long-lived permit: return with retained bytes/inherited-task/external facets")
 	}
 	delete(registry.owners, slot.owner)
 	generation := slot.generation

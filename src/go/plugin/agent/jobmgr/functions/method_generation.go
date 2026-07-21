@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -112,11 +113,7 @@ func (mg *methodGeneration) wait(ctx context.Context) error {
 
 func (mg *methodGeneration) cleanup(ctx context.Context) error {
 	mg.cleanupOnce.Do(func() {
-		names := make([]string, 0, len(mg.handlers))
-		for name := range mg.handlers {
-			names = append(names, name)
-		}
-		slices.Sort(names)
+		names := slices.Sorted(maps.Keys(mg.handlers))
 		for _, name := range names {
 			mg.cleanupErr = errors.Join(
 				mg.cleanupErr,
@@ -457,14 +454,9 @@ func parseMethodArguments(arguments []string) map[string][]string {
 }
 
 func splitMethodCSV(value string) []string {
-	parts := strings.Split(value, ",")
-	values := parts[:0]
-	for _, part := range parts {
-		if part != "" {
-			values = append(values, part)
-		}
-	}
-	return values
+	return slices.DeleteFunc(strings.Split(value, ","), func(s string) bool {
+		return s == ""
+	})
 }
 
 func methodParamValues(

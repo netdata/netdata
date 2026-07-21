@@ -388,16 +388,16 @@ func (pc *processCore) finalize(
 		finalErr = errors.Join(finalErr, err)
 	}
 	switch census := pc.admission.Census(); census.Phase {
-	case "ordinary-open":
+	case lifecycle.AdmissionOrdinaryOpen:
 		if err := pc.admission.BeginCleanupOnly(generation); err != nil {
 			finalErr = errors.Join(finalErr, err)
 		}
 		fallthrough
-	case "cleanup-only":
+	case lifecycle.AdmissionCleanupOnly:
 		if err := pc.admission.CloseDrained(generation); err != nil {
 			finalErr = errors.Join(finalErr, err)
 		}
-	case "closed":
+	case lifecycle.AdmissionClosed:
 	default:
 		finalErr = errors.Join(
 			finalErr,

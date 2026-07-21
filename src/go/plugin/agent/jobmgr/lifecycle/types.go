@@ -156,13 +156,13 @@ type PreparedResourceTransactionWork func(
 	LongLivedPermit,
 ) (PreparedResourceTransaction, error)
 
-func canonicalCancellationCause(cause error) (error, bool, bool) {
+func canonicalCancellationCause(cause error) (canonical error, deadline, ok bool) {
 	if stopping, ok := cause.(*StoppingRejection); ok &&
 		stopping.Generation != 0 {
 		return stopping, false, true
 	}
 	cancelled := errors.Is(cause, context.Canceled)
-	deadline := errors.Is(cause, context.DeadlineExceeded)
+	deadline = errors.Is(cause, context.DeadlineExceeded)
 	if cancelled == deadline {
 		return nil, false, false
 	}
@@ -464,14 +464,7 @@ func (tp TaskPlan) Validate() error {
 	} else if tp.permitAdmission != nil || tp.permitAdmissionRef.Valid() || tp.permitOwner.Valid() || tp.permitPlan.class != 0 {
 		return errors.New("jobmgr lifecycle: unexpected prepared-resource permit terms")
 	}
-	limit := tp.MaxPhaseTransitions
-	if limit == 0 {
-		if tp.Source == SourceFunction {
-			limit = FunctionTaskPhases
-		} else {
-			limit = TransactionTaskPhases
-		}
-	}
+	limit := tp.phaseLimit()
 	if limit < 3 || limit > TransactionTaskPhases {
 		return errors.New("jobmgr lifecycle: invalid task phase bound")
 	}

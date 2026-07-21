@@ -32,24 +32,24 @@ const (
 )
 
 type ResourcePlan struct {
-	Action  ResourceAction
-	ID      string
-	Permit  lifecycle.LongLivedPlan
-	Prepare func(context.Context, uint64, lifecycle.LongLivedPermit) (lifecycle.PreparedResource, error)
+	Action  ResourceAction                                                                               // install or stop the resource
+	ID      string                                                                                       // resource ID this plan targets
+	Permit  lifecycle.LongLivedPlan                                                                      // long-lived permit the resource reserves
+	Prepare func(context.Context, uint64, lifecycle.LongLivedPermit) (lifecycle.PreparedResource, error) // builds the prepared resource
 }
 
 type ResourceTransactionPlan struct {
-	ID                string
-	AllocateSuccessor bool
-	Permit            lifecycle.LongLivedPlan
-	Prepare           lifecycle.PreparedResourceTransactionWork
-	PrepareComposite  CompositeResourceTransactionWork
+	ID                string                                    // resource ID the transaction targets
+	AllocateSuccessor bool                                      // whether a successor resource is prepared
+	Permit            lifecycle.LongLivedPlan                   // long-lived permit for the successor
+	Prepare           lifecycle.PreparedResourceTransactionWork // single-resource transaction work
+	PrepareComposite  CompositeResourceTransactionWork          // composite (multi-resource) transaction work
 }
 
 type CapabilityPlan struct {
-	ID      string
-	Permit  lifecycle.LongLivedPlan
-	Prepare func(context.Context, uint64, lifecycle.LongLivedPermit) (lifecycle.PreparedCapability, error)
+	ID      string                                                                                         // capability ID this plan targets
+	Permit  lifecycle.LongLivedPlan                                                                        // long-lived permit the capability reserves
+	Prepare func(context.Context, uint64, lifecycle.LongLivedPermit) (lifecycle.PreparedCapability, error) // builds the prepared capability
 }
 
 func (wp WorkPlan) validate() error {

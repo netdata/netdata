@@ -68,34 +68,34 @@ type AdmissionGrant struct {
 }
 
 type AdmissionCensus struct {
-	Phase             string
-	ProcessBytes      int64
-	ActiveRecords     int
-	OrdinaryWaiting   int
-	OrdinaryGranted   int
-	OrdinarySuspended int
-	OrdinaryBytes     int64
-	LongLivedRecords  int
-	LongLivedBytes    int64
-	CleanupWaiting    int
-	CleanupGranted    bool
-	CleanupRetained   bool
-	InputBodyActive   bool
-	InputBodyWaiting  bool
-	InputBodyCarried  bool
-	InputBodyBytes    int64
-	AllocatedRadix    int
-	FreeRecords       int
-	FreeRadixNodes    int
-	RunGeneration     uint64
+	Phase             AdmissionPhase // current admission phase (ordinary-open / cleanup-only / closed)
+	ProcessBytes      int64          // bytes reserved at process scope
+	ActiveRecords     int            // admission records currently in use
+	OrdinaryWaiting   int            // ordinary reservations waiting for a grant
+	OrdinaryGranted   int            // ordinary reservations currently granted
+	OrdinarySuspended int            // ordinary reservations currently suspended
+	OrdinaryBytes     int64          // bytes reserved by ordinary reservations
+	LongLivedRecords  int            // long-lived reservation records
+	LongLivedBytes    int64          // bytes reserved by long-lived reservations
+	CleanupWaiting    int            // cleanup reservations waiting for a grant
+	CleanupGranted    bool           // whether the cleanup reservation is granted
+	CleanupRetained   bool           // whether cleanup bytes remain retained
+	InputBodyActive   bool           // whether an input-body growth grant is active
+	InputBodyWaiting  bool           // whether an input-body growth reservation is waiting
+	InputBodyCarried  bool           // whether input-body reservation bytes are carried
+	InputBodyBytes    int64          // bytes reserved for input-body growth
+	AllocatedRadix    int            // radix-tree nodes allocated for the lane index
+	FreeRecords       int            // admission records on the free list for reuse
+	FreeRadixNodes    int            // radix-tree nodes on the free list for reuse
+	RunGeneration     uint64         // run generation these counts belong to
 }
 
-type admissionPhase uint8
+type AdmissionPhase uint8
 
 const (
-	admissionOrdinaryOpen admissionPhase = iota + 1
-	admissionCleanupOnly
-	admissionClosed
+	AdmissionOrdinaryOpen AdmissionPhase = iota + 1
+	AdmissionCleanupOnly
+	AdmissionClosed
 )
 
 type admissionRecordState uint8
@@ -172,14 +172,14 @@ type AdmissionLedger struct {
 	cleanupGrant            uint32                      // record holding the single active cleanup grant
 	freeRecordHead          uint32                      // head of the record freelist
 	processReserved         bool                        // process byte reservation has been taken
-	phase                   admissionPhase              // admission phase (open / draining / closed)
+	phase                   AdmissionPhase              // admission phase (open / draining / closed)
 	cleanupRetained         bool                        // the cleanup grant is retained across a generation
 	inputBodyCarried        bool                        // the input-body reservation is carried across a generation
 }
 
 func NewAdmissionLedger() *AdmissionLedger {
 	ledger := &AdmissionLedger{
-		phase:   admissionOrdinaryOpen,
+		phase:   AdmissionOrdinaryOpen,
 		records: make([]admissionRecord, inputBodyRecordSlot+1),
 		lanes:   make(map[uint32]admissionLaneUse),
 		nodes:   make([]admissionRadixNode, 2),
@@ -193,7 +193,7 @@ func (al *AdmissionLedger) ReserveProcessBytes(bytes int64) error {
 	}
 	al.mu.Lock()
 	defer al.mu.Unlock()
-	if al.processReserved || al.phase != admissionOrdinaryOpen || al.runGeneration != 0 || al.activeRecords != 0 || al.ordinaryWaiting != 0 || al.ordinaryGranted != 0 || al.ordinarySuspended != 0 || al.ordinaryBytes != 0 {
+	if al.processReserved || al.phase != AdmissionOrdinaryOpen || al.runGeneration != 0 || al.activeRecords != 0 || al.ordinaryWaiting != 0 || al.ordinaryGranted != 0 || al.ordinarySuspended != 0 || al.ordinaryBytes != 0 {
 		return errors.New("jobmgr admission: process bytes must be reserved before run admission")
 	}
 	al.processBytes = bytes
@@ -207,10 +207,10 @@ func (al *AdmissionLedger) ReleaseProcessBytes(bytes int64) error {
 	}
 	al.mu.Lock()
 	defer al.mu.Unlock()
-	pristineConstruction := al.phase == admissionOrdinaryOpen && al.runGeneration == 0 && al.activeRecords == 0 &&
+	pristineConstruction := al.phase == AdmissionOrdinaryOpen && al.runGeneration == 0 && al.activeRecords == 0 &&
 		al.ordinaryWaiting == 0 && al.ordinaryGranted == 0 &&
 		al.ordinarySuspended == 0 && al.ordinaryBytes == 0
-	closedProcess := al.phase == admissionClosed && al.activeRecords == 0 && al.ordinaryBytes == 0
+	closedProcess := al.phase == AdmissionClosed && al.activeRecords == 0 && al.ordinaryBytes == 0
 	if !al.processReserved || (!pristineConstruction && !closedProcess) || al.processBytes != bytes {
 		return errors.New("jobmgr admission: stale or premature process byte release")
 	}
@@ -326,7 +326,7 @@ func (al *AdmissionLedger) RequestInputBodyGrowth(runGeneration, token uint64, n
 	if al.inputBodyCarried {
 		return 0, errors.New("jobmgr admission: input body is suspended between runs")
 	}
-	if al.phase != admissionOrdinaryOpen || runGeneration == 0 || (al.runGeneration != 0 && al.runGeneration != runGeneration) {
+	if al.phase != AdmissionOrdinaryOpen || runGeneration == 0 || (al.runGeneration != 0 && al.runGeneration != runGeneration) {
 		return 0, errors.New("jobmgr admission: input body rejected by phase")
 	}
 	record := &al.records[inputBodyRecordSlot]
@@ -424,7 +424,7 @@ func (al *AdmissionLedger) AbortInputBody(token uint64) (bool, error) {
 func (al *AdmissionLedger) SuspendInputBody(runGeneration, nextGeneration, token uint64) error {
 	al.mu.Lock()
 	defer al.mu.Unlock()
-	if (al.phase != admissionOrdinaryOpen && al.phase != admissionCleanupOnly) || runGeneration == 0 || al.runGeneration != runGeneration ||
+	if (al.phase != AdmissionOrdinaryOpen && al.phase != AdmissionCleanupOnly) || runGeneration == 0 || al.runGeneration != runGeneration ||
 		(nextGeneration != 0 && nextGeneration <= runGeneration) || al.inputBodyCarried {
 		return errors.New("jobmgr admission: invalid input body suspension")
 	}
@@ -443,7 +443,7 @@ func (al *AdmissionLedger) SuspendInputBody(runGeneration, nextGeneration, token
 func (al *AdmissionLedger) AdoptInputBody(runGeneration, token uint64) error {
 	al.mu.Lock()
 	defer al.mu.Unlock()
-	if al.phase != admissionOrdinaryOpen || runGeneration == 0 || al.runGeneration != runGeneration ||
+	if al.phase != AdmissionOrdinaryOpen || runGeneration == 0 || al.runGeneration != runGeneration ||
 		!al.inputBodyCarried || al.inputBodyNextGeneration != runGeneration {
 		return errors.New("jobmgr admission: invalid carried input body adoption")
 	}
@@ -468,12 +468,9 @@ func (al *AdmissionLedger) RunDrained(runGeneration uint64) bool {
 func (al *AdmissionLedger) RunFinalizerReady(runGeneration uint64, allowedLongLivedRecords int, allowedLongLivedBytes int64) bool {
 	al.mu.Lock()
 	defer al.mu.Unlock()
-	if al.phase != admissionCleanupOnly || runGeneration == 0 || al.runGeneration != runGeneration || allowedLongLivedRecords < 0 || allowedLongLivedBytes < 0 ||
-		al.activeRecords != 0 || al.ordinaryWaiting != 0 || al.ordinaryGranted != 0 || al.ordinarySuspended != 0 ||
+	if al.phase != AdmissionCleanupOnly || runGeneration == 0 || al.runGeneration != runGeneration || allowedLongLivedRecords < 0 || allowedLongLivedBytes < 0 ||
 		al.longLivedRecords != allowedLongLivedRecords || al.longLivedBytes != allowedLongLivedBytes ||
-		al.cleanupWaiting != 0 || al.cleanupGrant != 0 || al.cleanupRetained || al.cleanupHead != 0 || al.cleanupTail != 0 ||
-		al.oldestInNode(1) != 0 || !al.allOperationRecordsFree() ||
-		!al.allRadixNodesFree() {
+		!al.operationallyQuiescent() {
 		return false
 	}
 	if !al.inputBodyCarried {
@@ -608,7 +605,7 @@ func (al *AdmissionLedger) ResumeOrdinary(
 	if err != nil {
 		return err
 	}
-	if al.phase != admissionOrdinaryOpen ||
+	if al.phase != AdmissionOrdinaryOpen ||
 		record.state != admissionOrdinarySuspended ||
 		record.ordinaryHeld ||
 		record.longLivedBytes != 0 ||
@@ -641,7 +638,7 @@ func (al *AdmissionLedger) TakeGrants(quantum int, output *[4]AdmissionGrant) (c
 	}
 	al.mu.Lock()
 	defer al.mu.Unlock()
-	if al.phase == admissionClosed {
+	if al.phase == AdmissionClosed {
 		return 0, false, errors.New("jobmgr admission: ledger is closed")
 	}
 	for count < quantum {
@@ -656,7 +653,7 @@ func (al *AdmissionLedger) TakeGrants(quantum int, output *[4]AdmissionGrant) (c
 			count++
 			continue
 		}
-		if al.phase != admissionOrdinaryOpen || al.ordinaryWaiting == 0 {
+		if al.phase != AdmissionOrdinaryOpen || al.ordinaryWaiting == 0 {
 			break
 		}
 		available := al.ordinaryCapacity() - al.ordinaryBytes
@@ -693,10 +690,10 @@ func (al *AdmissionLedger) TakeGrants(quantum int, output *[4]AdmissionGrant) (c
 func (al *AdmissionLedger) TakeShutdownInputBodyGrant(runGeneration uint64) (AdmissionGrant, bool, error) {
 	al.mu.Lock()
 	defer al.mu.Unlock()
-	if al.phase == admissionCleanupOnly && runGeneration != 0 && al.runGeneration == runGeneration {
+	if al.phase == AdmissionCleanupOnly && runGeneration != 0 && al.runGeneration == runGeneration {
 		return AdmissionGrant{}, false, nil
 	}
-	if al.phase != admissionOrdinaryOpen || runGeneration == 0 || (al.runGeneration != 0 && al.runGeneration != runGeneration) {
+	if al.phase != AdmissionOrdinaryOpen || runGeneration == 0 || (al.runGeneration != 0 && al.runGeneration != runGeneration) {
 		return AdmissionGrant{}, false, errors.New("jobmgr admission: invalid shutdown input body service")
 	}
 	record := &al.records[inputBodyRecordSlot]
@@ -759,32 +756,27 @@ func (al *AdmissionLedger) ResizeOrdinary(ref AdmissionRef, totalBytes int64) (r
 
 func (al *AdmissionLedger) ReleaseOrdinary(ref AdmissionRef) (bool, error) {
 	al.mu.Lock()
+	defer al.mu.Unlock()
 	record, err := al.record(ref)
 	if err != nil {
-		al.mu.Unlock()
 		return false, err
 	}
 	if record.state != admissionOrdinaryGranted || !record.ordinaryHeld {
-		al.mu.Unlock()
 		return false, errors.New("jobmgr admission: ordinary request is not granted")
 	}
 	if record.longLivedBytes != 0 {
 		if err := al.validateRecordLane(record); err != nil {
-			al.mu.Unlock()
 			return false, err
 		}
 	}
 	ordinaryBytes := record.heldBytes - record.longLivedBytes
 	if ordinaryBytes <= 0 {
-		al.mu.Unlock()
 		return false, errors.New("jobmgr admission: ordinary facet has invalid bytes")
 	}
 	al.ordinaryBytes -= ordinaryBytes
 	al.ordinaryGranted--
 	al.freeRecord(ref.Slot)
-	wake := al.hasGrantableWork()
-	al.mu.Unlock()
-	return wake, nil
+	return al.hasGrantableWork(), nil
 }
 
 func (al *AdmissionLedger) validateRecordLane(record *admissionRecord) error {
@@ -845,12 +837,12 @@ func (al *AdmissionLedger) releaseLongLived(ref AdmissionRef, bytes int64) (bool
 		return false, errors.New("jobmgr admission: invalid long-lived release")
 	}
 	al.mu.Lock()
+	defer al.mu.Unlock()
 	record, recordErr := al.record(ref)
 	if recordErr == nil {
 		if record.state != admissionOrdinaryGranted ||
 			record.longLivedBytes != bytes ||
 			record.heldBytes < bytes {
-			al.mu.Unlock()
 			return false, errors.New("jobmgr admission: stale or mismatched long-lived release")
 		}
 		record.heldBytes -= bytes
@@ -858,26 +850,22 @@ func (al *AdmissionLedger) releaseLongLived(ref AdmissionRef, bytes int64) (bool
 	} else if al.longLivedRecords <= 0 ||
 		al.longLivedBytes < bytes ||
 		al.ordinaryBytes < bytes {
-		al.mu.Unlock()
 		return false, errors.New("jobmgr admission: stale or mismatched detached long-lived release")
 	}
 	al.ordinaryBytes -= bytes
 	al.longLivedRecords--
 	al.longLivedBytes -= bytes
-	wake := al.hasGrantableWork()
-	al.mu.Unlock()
-	return wake, nil
+	return al.hasGrantableWork(), nil
 }
 
 func (al *AdmissionLedger) ReleaseCleanup(ref AdmissionRef, outcome FrameOutcome) (bool, error) {
 	al.mu.Lock()
+	defer al.mu.Unlock()
 	record, err := al.record(ref)
 	if err != nil {
-		al.mu.Unlock()
 		return false, err
 	}
 	if record.state != admissionCleanupGranted || al.cleanupGrant != ref.Slot {
-		al.mu.Unlock()
 		return false, errors.New("jobmgr admission: cleanup request is not the active grant")
 	}
 	switch outcome {
@@ -889,21 +877,18 @@ func (al *AdmissionLedger) ReleaseCleanup(ref AdmissionRef, outcome FrameOutcome
 		al.cleanupGrant = 0
 		al.cleanupRetained = true
 	default:
-		al.mu.Unlock()
 		return false, errors.New("jobmgr admission: invalid cleanup frame outcome")
 	}
-	wake := al.hasGrantableWork()
-	al.mu.Unlock()
-	return wake, nil
+	return al.hasGrantableWork(), nil
 }
 
 func (al *AdmissionLedger) BeginCleanupOnly(runGeneration uint64) error {
 	al.mu.Lock()
 	defer al.mu.Unlock()
-	if al.phase == admissionCleanupOnly && runGeneration != 0 && al.runGeneration == runGeneration {
+	if al.phase == AdmissionCleanupOnly && runGeneration != 0 && al.runGeneration == runGeneration {
 		return nil
 	}
-	if al.phase != admissionOrdinaryOpen {
+	if al.phase != AdmissionOrdinaryOpen {
 		return errors.New("jobmgr admission: cleanup-only transition is not available")
 	}
 	if runGeneration == 0 || (al.runGeneration != 0 && al.runGeneration != runGeneration) {
@@ -913,27 +898,27 @@ func (al *AdmissionLedger) BeginCleanupOnly(runGeneration uint64) error {
 		return errors.New("jobmgr admission: cleanup-only transition with ordinary waiters")
 	}
 	al.bindRunGeneration(runGeneration)
-	al.phase = admissionCleanupOnly
+	al.phase = AdmissionCleanupOnly
 	return nil
 }
 
 func (al *AdmissionLedger) CloseDrained(runGeneration uint64) error {
 	al.mu.Lock()
 	defer al.mu.Unlock()
-	if al.phase != admissionCleanupOnly || runGeneration == 0 || al.runGeneration != runGeneration {
+	if al.phase != AdmissionCleanupOnly || runGeneration == 0 || al.runGeneration != runGeneration {
 		return errors.New("jobmgr admission: invalid drained close")
 	}
 	if !al.drained() {
 		return errors.New("jobmgr admission: close with retained state")
 	}
-	al.phase = admissionClosed
+	al.phase = AdmissionClosed
 	return nil
 }
 
 func (al *AdmissionLedger) ReopenDrained(completedGeneration, nextGeneration uint64) error {
 	al.mu.Lock()
 	defer al.mu.Unlock()
-	if al.phase != admissionCleanupOnly || completedGeneration == 0 || al.runGeneration != completedGeneration || nextGeneration <= completedGeneration {
+	if al.phase != AdmissionCleanupOnly || completedGeneration == 0 || al.runGeneration != completedGeneration || nextGeneration <= completedGeneration {
 		return errors.New("jobmgr admission: invalid drained reopen")
 	}
 	if !al.runDrained(completedGeneration) {
@@ -945,25 +930,35 @@ func (al *AdmissionLedger) ReopenDrained(completedGeneration, nextGeneration uin
 		}
 		al.records[inputBodyRecordSlot].runGeneration = nextGeneration
 	}
-	al.phase = admissionOrdinaryOpen
+	al.phase = AdmissionOrdinaryOpen
 	al.runGeneration = nextGeneration
 	return nil
 }
 
-func (al *AdmissionLedger) drained() bool {
-	return al.activeRecords == 0 && al.ordinaryWaiting == 0 && al.ordinaryGranted == 0 && al.ordinarySuspended == 0 && al.ordinaryBytes == 0 &&
-		al.longLivedRecords == 0 && al.longLivedBytes == 0 &&
-		al.cleanupWaiting == 0 && al.cleanupGrant == 0 && !al.cleanupRetained && al.cleanupHead == 0 && al.cleanupTail == 0 &&
+// operationallyQuiescent reports that no ordinary or cleanup operation activity
+// remains and every operation record and radix node is free. It deliberately
+// excludes phase, generation, long-lived, and input-body accounting, which each
+// caller checks with its own expectations.
+func (al *AdmissionLedger) operationallyQuiescent() bool {
+	return al.activeRecords == 0 && al.ordinaryWaiting == 0 &&
+		al.ordinaryGranted == 0 && al.ordinarySuspended == 0 &&
+		al.cleanupWaiting == 0 && al.cleanupGrant == 0 && !al.cleanupRetained &&
+		al.cleanupHead == 0 && al.cleanupTail == 0 &&
 		al.oldestInNode(1) == 0 && al.allOperationRecordsFree() &&
-		al.allRadixNodesFree() &&
-		al.records[inputBodyRecordSlot].state == admissionRecordFree && !al.inputBodyCarried && al.inputBodyNextGeneration == 0
+		al.allRadixNodesFree()
+}
+
+func (al *AdmissionLedger) drained() bool {
+	return al.operationallyQuiescent() &&
+		al.ordinaryBytes == 0 &&
+		al.longLivedRecords == 0 && al.longLivedBytes == 0 &&
+		al.records[inputBodyRecordSlot].state == admissionRecordFree &&
+		!al.inputBodyCarried && al.inputBodyNextGeneration == 0
 }
 
 func (al *AdmissionLedger) runDrained(runGeneration uint64) bool {
-	if al.phase != admissionCleanupOnly || runGeneration == 0 || al.runGeneration != runGeneration || al.activeRecords != 0 || al.ordinaryWaiting != 0 || al.ordinaryGranted != 0 || al.ordinarySuspended != 0 ||
-		al.longLivedRecords != 0 || al.longLivedBytes != 0 || al.cleanupWaiting != 0 || al.cleanupGrant != 0 || al.cleanupRetained ||
-		al.cleanupHead != 0 || al.cleanupTail != 0 || al.oldestInNode(1) != 0 ||
-		!al.allOperationRecordsFree() || !al.allRadixNodesFree() {
+	if al.phase != AdmissionCleanupOnly || runGeneration == 0 || al.runGeneration != runGeneration ||
+		al.longLivedRecords != 0 || al.longLivedBytes != 0 || !al.operationallyQuiescent() {
 		return false
 	}
 	if !al.inputBodyCarried {
@@ -978,7 +973,7 @@ func (al *AdmissionLedger) Census() AdmissionCensus {
 	al.mu.Lock()
 	defer al.mu.Unlock()
 	return AdmissionCensus{
-		Phase:             al.phase.String(),
+		Phase:             al.phase,
 		ProcessBytes:      al.processBytes,
 		ActiveRecords:     al.activeRecords,
 		OrdinaryWaiting:   al.ordinaryWaiting,
@@ -1011,13 +1006,13 @@ func (al *AdmissionLedger) allRadixNodesFree() bool {
 	return al.freeNodes == len(al.nodes)-2
 }
 
-func (ap admissionPhase) String() string {
+func (ap AdmissionPhase) String() string {
 	switch ap {
-	case admissionOrdinaryOpen:
+	case AdmissionOrdinaryOpen:
 		return "ordinary-open"
-	case admissionCleanupOnly:
+	case AdmissionCleanupOnly:
 		return "cleanup-only"
-	case admissionClosed:
+	case AdmissionClosed:
 		return "closed"
 	default:
 		return "invalid"
@@ -1028,7 +1023,7 @@ func (al *AdmissionLedger) validateRequest(runGeneration uint64, lane AdmissionL
 	if runGeneration == 0 || !lane.Valid() {
 		return errors.New("jobmgr admission: invalid request identity")
 	}
-	if al.phase == admissionClosed || (kind == ReservationOrdinary && al.phase != admissionOrdinaryOpen) {
+	if al.phase == AdmissionClosed || (kind == ReservationOrdinary && al.phase != AdmissionOrdinaryOpen) {
 		return errors.New("jobmgr admission: request rejected by phase")
 	}
 	if al.runGeneration != 0 && al.runGeneration != runGeneration {
@@ -1333,13 +1328,13 @@ func (al *AdmissionLedger) grant(slot uint32, kind ReservationKind) AdmissionGra
 }
 
 func (al *AdmissionLedger) hasGrantableWork() bool {
-	if al.phase == admissionClosed {
+	if al.phase == AdmissionClosed {
 		return false
 	}
 	if al.cleanupGrant == 0 && !al.cleanupRetained && al.cleanupHead != 0 {
 		return true
 	}
-	if al.phase != admissionOrdinaryOpen || al.ordinaryWaiting == 0 {
+	if al.phase != AdmissionOrdinaryOpen || al.ordinaryWaiting == 0 {
 		return false
 	}
 	slot := al.oldestFitting(al.ordinaryCapacity() - al.ordinaryBytes)

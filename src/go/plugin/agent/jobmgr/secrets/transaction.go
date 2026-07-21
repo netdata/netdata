@@ -32,6 +32,19 @@ type preparedSecretSpec struct {
 	removeEntry bool         // delete the entry instead of committing it
 }
 
+// commitEntryDisposition applies the entry side of a committed transaction:
+// delete the entry on removal, publish the committed entry, or do nothing.
+func (spec preparedSecretSpec) commitEntryDisposition() {
+	if spec.removeEntry {
+		spec.controller.commitEntry(spec.storeKey, nil)
+	} else if spec.entry != nil {
+		spec.controller.commitEntry(
+			spec.entry.config.ExposedKey(),
+			spec.entry,
+		)
+	}
+}
+
 type preparedSecretTransaction struct {
 	mu sync.Mutex
 
@@ -121,14 +134,7 @@ func (pst *preparedSecretTransaction) apply(
 				return lifecycle.AppliedResourceTransaction{}, err
 			}
 		}
-		if spec.removeEntry {
-			spec.controller.commitEntry(spec.storeKey, nil)
-		} else if spec.entry != nil {
-			spec.controller.commitEntry(
-				spec.entry.config.ExposedKey(),
-				spec.entry,
-			)
-		}
+		spec.commitEntryDisposition()
 		return lifecycle.NewAppliedResourceTransaction(
 			spec.scope,
 			lifecycle.ResourceTransactionUnchanged,
@@ -228,14 +234,7 @@ func (pst *preparedSecretTransaction) apply(
 			disposition = lifecycle.ResourceTransactionReplaced
 		}
 	}
-	if spec.removeEntry {
-		spec.controller.commitEntry(spec.storeKey, nil)
-	} else if spec.entry != nil {
-		spec.controller.commitEntry(
-			spec.entry.config.ExposedKey(),
-			spec.entry,
-		)
-	}
+	spec.commitEntryDisposition()
 	resultFrame := spec.result
 	if message != "" {
 		resultFrame = mustSecretMessage(200, message)

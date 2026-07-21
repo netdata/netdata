@@ -45,17 +45,6 @@ func (jv JobVariant) Valid() bool {
 	return jv == JobVariantV1 || jv == JobVariantV2
 }
 
-func (jv JobVariant) String() string {
-	switch jv {
-	case JobVariantV1:
-		return "v1"
-	case JobVariantV2:
-		return "v2"
-	default:
-		return "invalid"
-	}
-}
-
 type JobState uint8
 
 const (
@@ -71,6 +60,35 @@ const (
 	JobAborted
 	JobRetained
 )
+
+func (js JobState) String() string {
+	switch js {
+	case JobAllocated:
+		return "allocated"
+	case JobActivating:
+		return "activating"
+	case JobReady:
+		return "ready"
+	case JobPublishing:
+		return "publishing"
+	case JobActive:
+		return "active"
+	case JobStopping:
+		return "stopping"
+	case JobStopped:
+		return "stopped"
+	case JobFinalizing:
+		return "finalizing"
+	case JobTerminal:
+		return "terminal"
+	case JobAborted:
+		return "aborted"
+	case JobRetained:
+		return "retained"
+	default:
+		return "invalid"
+	}
+}
 
 type ConstructedJob struct {
 	Runtime            jobruntime.Runtime          // collector run loop wrapped as a jobruntime.Runtime
@@ -350,7 +368,7 @@ func (jg *JobGeneration) Start(ctx context.Context) error {
 	if jg.state != JobAllocated {
 		state := jg.state
 		jg.mu.Unlock()
-		return fmt.Errorf("job output: start from state %d", state)
+		return fmt.Errorf("job output: start from state %s", state)
 	}
 	jg.state = JobActivating
 	jg.mu.Unlock()
@@ -383,7 +401,7 @@ func (jg *JobGeneration) Publish() error {
 	if jg.state != JobReady {
 		state := jg.state
 		jg.mu.Unlock()
-		return fmt.Errorf("job output: publish from state %d", state)
+		return fmt.Errorf("job output: publish from state %s", state)
 	}
 	jg.state = JobPublishing
 	handlers := jg.resources.Handlers
@@ -418,7 +436,7 @@ func (jg *JobGeneration) AbortReady(ctx context.Context) error {
 	if jg.state != JobReady {
 		state := jg.state
 		jg.mu.Unlock()
-		return fmt.Errorf("job output: ready abort from state %d", state)
+		return fmt.Errorf("job output: ready abort from state %s", state)
 	}
 	jg.state = JobStopping
 	jg.mu.Unlock()
@@ -471,7 +489,7 @@ func (jg *JobGeneration) Stop(ctx context.Context) error {
 	default:
 		state := jg.state
 		jg.mu.Unlock()
-		return fmt.Errorf("job output: stop from state %d", state)
+		return fmt.Errorf("job output: stop from state %s", state)
 	}
 
 	if jg.resources.Handlers != nil {
@@ -534,7 +552,7 @@ func (jg *JobGeneration) Finalize() error {
 	default:
 		state := jg.state
 		jg.mu.Unlock()
-		return fmt.Errorf("job output: finalize from state %d", state)
+		return fmt.Errorf("job output: finalize from state %s", state)
 	}
 	if err := jg.permit.Return(); err != nil {
 		return jg.finish(JobRetained, err)

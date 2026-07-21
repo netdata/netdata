@@ -4,7 +4,7 @@ package secretstore
 
 import (
 	"errors"
-	"sort"
+	"slices"
 )
 
 // CreatorCatalog is the frozen process-wide SecretStore factory authority.
@@ -53,7 +53,7 @@ func (catalog *CreatorCatalog) Creators() []Creator {
 	for kind := range catalog.creators {
 		kinds = append(kinds, kind)
 	}
-	sort.Slice(kinds, func(i, j int) bool { return kinds[i] < kinds[j] })
+	slices.Sort(kinds)
 	creators := make([]Creator, 0, len(kinds))
 	for _, kind := range kinds {
 		creators = append(creators, catalog.creators[kind])

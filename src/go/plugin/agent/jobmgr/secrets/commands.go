@@ -19,11 +19,20 @@ import (
 )
 
 const (
-	// A rendered response is capped at 4096 bytes. Each job-name list gets a
-	// 3584-byte content budget, reserving 512 bytes for surrounding prose and its
-	// truncation marker; boundSecretMessage enforces the total after lists combine.
+	// A rendered response is capped at maximumSecretJobSummaryBytes. Each job-name
+	// list gets the content budget below, reserving secretJobSummaryReserveBytes
+	// for surrounding prose and its truncation marker; boundSecretMessage enforces
+	// the total after lists combine.
 	maximumSecretJobSummaryBytes = 4 * 1024
-	secretJobSummaryContentBytes = 7 * 512
+	secretJobSummaryReserveBytes = 512
+	secretJobSummaryContentBytes = maximumSecretJobSummaryBytes - secretJobSummaryReserveBytes
+)
+
+// Operator-facing response messages reused across secretstore commands.
+const (
+	msgSecretStoreNotConfigured    = "The specified secretstore '%s' is not configured."
+	msgInvalidSecretStoreConfig    = "Invalid secretstore configuration."
+	msgSecretStoreValidationFailed = "Secretstore configuration validation failed."
 )
 
 func (c *Controller) prepareSchema(
@@ -37,10 +46,7 @@ func (c *Controller) prepareSchema(
 				scope,
 				current,
 				404,
-				fmt.Sprintf(
-					"The specified secretstore '%s' is not configured.",
-					target.key,
-				),
+				fmt.Sprintf(msgSecretStoreNotConfigured, target.key),
 			)
 		}
 	}
@@ -50,10 +56,7 @@ func (c *Controller) prepareSchema(
 			scope,
 			current,
 			404,
-			fmt.Sprintf(
-				"The specified secretstore kind '%s' is not supported.",
-				target.kind,
-			),
+			fmt.Sprintf("The specified secretstore kind '%s' is not supported.", target.kind),
 		)
 	}
 	result, err := lifecycle.NewSealedResult(
@@ -85,10 +88,7 @@ func (c *Controller) prepareGet(
 			scope,
 			current,
 			404,
-			fmt.Sprintf(
-				"The specified secretstore '%s' is not configured.",
-				target.key,
-			),
+			fmt.Sprintf(msgSecretStoreNotConfigured, target.key),
 		)
 	}
 	typed, err := typedSecretConfig(
@@ -150,7 +150,7 @@ func (c *Controller) prepareUserConfig(
 			scope,
 			current,
 			400,
-			"Invalid secretstore configuration.",
+			msgInvalidSecretStoreConfig,
 		)
 	}
 	payload, err := yaml.Marshal(typed)
@@ -189,7 +189,7 @@ func (c *Controller) prepareTest(
 			current,
 			404,
 			fmt.Sprintf(
-				"The specified secretstore '%s' is not configured.",
+				msgSecretStoreNotConfigured,
 				target.key,
 			),
 		)
@@ -204,7 +204,7 @@ func (c *Controller) prepareTest(
 				scope,
 				current,
 				400,
-				"Invalid secretstore configuration.",
+				msgInvalidSecretStoreConfig,
 			)
 		}
 		validationOnly = false
@@ -218,7 +218,7 @@ func (c *Controller) prepareTest(
 			scope,
 			current,
 			400,
-			"Secretstore configuration validation failed.",
+			msgSecretStoreValidationFailed,
 		)
 	}
 	if !validationOnly && config.Hash() == entry.config.Hash() {
@@ -255,50 +255,27 @@ func (c *Controller) prepareAdd(
 	input CommandInput,
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if current != nil || scope.Current.Valid() {
-		return c.noop(
+	_, exists := c.entry(target.key)
+	if current != nil || scope.Current.Valid() || exists {
+		return c.noopMessageWithPermit(
 			scope,
 			current,
 			permit,
-			mustSecretMessage(
-				409,
-				fmt.Sprintf(
-					"The specified secretstore '%s' already exists.",
-					target.key,
-				),
+			409,
+			fmt.Sprintf(
+				"The specified secretstore '%s' already exists.",
+				target.key,
 			),
-			nil,
-			nil,
-		)
-	}
-	if _, exists := c.entry(target.key); exists {
-		return c.noop(
-			scope,
-			current,
-			permit,
-			mustSecretMessage(
-				409,
-				fmt.Sprintf(
-					"The specified secretstore '%s' already exists.",
-					target.key,
-				),
-			),
-			nil,
-			nil,
 		)
 	}
 	config, err := c.configFromPayload(input, target)
 	if err != nil {
-		return c.noop(
+		return c.noopMessageWithPermit(
 			scope,
 			current,
 			permit,
-			mustSecretMessage(
-				400,
-				"Invalid secretstore configuration.",
-			),
-			nil,
-			nil,
+			400,
+			msgInvalidSecretStoreConfig,
 		)
 	}
 	return c.prepareStoreMutation(
@@ -322,37 +299,27 @@ func (c *Controller) prepareUpdate(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	entry, exists := c.entry(target.key)
 	if !exists {
-		return c.noop(
+		return c.noopMessageWithPermit(
 			scope,
 			current,
 			permit,
-			mustSecretMessage(
-				404,
-				fmt.Sprintf(
-					"The specified secretstore '%s' is not configured.",
-					target.key,
-				),
+			404,
+			fmt.Sprintf(
+				msgSecretStoreNotConfigured,
+				target.key,
 			),
-			nil,
-			nil,
 		)
 	}
 	config, err := c.configFromPayload(input, target)
 	if err != nil {
-		return c.noop(
+		return c.noopMessageWithPermit(
 			scope,
 			current,
 			permit,
-			mustSecretMessage(
-				400,
-				"Invalid secretstore configuration.",
-			),
-			nil,
-			nil,
+			400,
+			msgInvalidSecretStoreConfig,
 		)
 	}
-	config.SetSource(confgroup.TypeDyncfg)
-	config.SetSourceType(confgroup.TypeDyncfg)
 	expected := c.store.Generation(target.key)
 	if expected != 0 && entry.config.Hash() == config.Hash() {
 		return c.noop(
@@ -387,7 +354,7 @@ func (c *Controller) prepareRemove(
 			current,
 			404,
 			fmt.Sprintf(
-				"The specified secretstore '%s' is not configured.",
+				msgSecretStoreNotConfigured,
 				target.key,
 			),
 		)
@@ -502,65 +469,28 @@ func (c *Controller) prepareStoreMutation(
 		config: config, status: dyncfg.StatusRunning,
 	}
 	if prepareErr != nil {
+		spec := preparedSecretSpec{
+			scope: scope, current: current,
+			permit:   permit,
+			store:    c.store,
+			storeKey: config.ExposedKey(),
+			result: mustSecretMessage(
+				400,
+				msgSecretStoreValidationFailed,
+			),
+			cleanup:    func() error { return nil },
+			controller: c,
+		}
+		if installFailure {
+			entry.status = dyncfg.StatusFailed
+			spec.cleanup = c.configCreateCleanup(entry)
+			spec.entry = &entry
+		}
 		if mutation.Valid() {
-			if installFailure {
-				entry.status = dyncfg.StatusFailed
-			}
-			cleanup := func() error { return nil }
-			var storedEntry *secretEntry
-			if installFailure {
-				cleanup = c.configCreateCleanup(entry)
-				storedEntry = &entry
-			}
-			return newPreparedSecretTransaction(
-				preparedSecretSpec{
-					scope: scope, current: current,
-					permit:   permit,
-					store:    c.store,
-					storeKey: config.ExposedKey(),
-					mutation: mutation,
-					abort:    true,
-					result: mustSecretMessage(
-						400,
-						"Secretstore configuration validation failed.",
-					),
-					cleanup:    cleanup,
-					controller: c,
-					entry:      storedEntry,
-				},
-			)
+			spec.mutation = mutation
+			spec.abort = true
 		}
-		if !installFailure {
-			return newPreparedSecretTransaction(
-				preparedSecretSpec{
-					scope: scope, current: current,
-					permit:   permit,
-					store:    c.store,
-					storeKey: config.ExposedKey(),
-					result: mustSecretMessage(
-						400,
-						"Secretstore configuration validation failed.",
-					),
-					cleanup:    func() error { return nil },
-					controller: c,
-				},
-			)
-		}
-		entry.status = dyncfg.StatusFailed
-		return newPreparedSecretTransaction(
-			preparedSecretSpec{
-				scope: scope, current: current,
-				permit:   permit,
-				store:    c.store,
-				storeKey: config.ExposedKey(),
-				result: mustSecretMessage(
-					400,
-					"Secretstore configuration validation failed.",
-				),
-				cleanup:    c.configCreateCleanup(entry),
-				controller: c, entry: &entry,
-			},
-		)
+		return newPreparedSecretTransaction(spec)
 	}
 	return newPreparedSecretTransaction(
 		preparedSecretSpec{
@@ -609,10 +539,26 @@ func (c *Controller) noopMessage(
 	code int,
 	message string,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	return c.noop(
+	return c.noopMessageWithPermit(
 		scope,
 		current,
 		lifecycle.LongLivedPermit{},
+		code,
+		message,
+	)
+}
+
+func (c *Controller) noopMessageWithPermit(
+	scope lifecycle.ResourceTransactionScope,
+	current lifecycle.ReadyResource,
+	permit lifecycle.LongLivedPermit,
+	code int,
+	message string,
+) (lifecycle.PreparedResourceTransaction, error) {
+	return c.noop(
+		scope,
+		current,
+		permit,
 		mustSecretMessage(code, message),
 		nil,
 		nil,

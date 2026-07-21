@@ -128,7 +128,6 @@ func TestPipelineGenerationConstruction(t *testing.T) {
 func TestPipelineGenerationRunsNamedProvidersAndAggregates(t *testing.T) {
 	factories := make([]ProviderFactory, 0, 2)
 	for _, source := range []string{"file", "service-discovery"} {
-		source := source
 		factories = append(factories, NewProviderFactory(
 			source,
 			func(BuildContext) (Discoverer, bool, error) {
@@ -170,14 +169,11 @@ func TestPipelineGenerationRunsNamedProvidersAndAggregates(t *testing.T) {
 	}()
 	var providers sync.WaitGroup
 	for _, name := range generation.ProviderNames() {
-		name := name
-		providers.Add(1)
-		go func() {
-			defer providers.Done()
+		providers.Go(func() {
 			if err := generation.RunProvider(ctx, name); err != nil {
 				t.Errorf("provider %q: %v", name, err)
 			}
-		}()
+		})
 	}
 	providers.Wait()
 
@@ -233,8 +229,7 @@ func TestPipelineGenerationPropagatesApplyFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	runErr := make(chan error, 1)
 	go func() {
 		runErr <- generation.Run(
@@ -262,7 +257,7 @@ func TestPipelineGenerationHasNoFixedProviderPopulationCeiling(
 ) {
 	const population = 300
 	factories := make([]ProviderFactory, 0, population)
-	for ordinal := 0; ordinal < population; ordinal++ {
+	for ordinal := range population {
 		factories = append(
 			factories,
 			NewProviderFactory(

@@ -15,12 +15,12 @@ import (
 // FramePublicationPort is the sole Function-registration protocol writer.
 // Handles become live only after the complete frame has been committed.
 type FramePublicationPort struct {
-	mu sync.Mutex
+	mu sync.Mutex // guards the mutable fields below
 
-	epoch  uint64
-	nextID uint64
-	frames *lifecycle.FrameOwner
-	active map[uint64]PublicationHandle
+	epoch  uint64                       // run generation stamped on each handle; fences withdrawals to this port
+	nextID uint64                       // monotonic allocator for handle IDs
+	frames *lifecycle.FrameOwner        // the one serialized stdout frame writer
+	active map[uint64]PublicationHandle // live publication handles by ID
 }
 
 func NewFramePublicationPort(

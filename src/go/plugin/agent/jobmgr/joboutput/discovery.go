@@ -293,14 +293,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			) lifecycle.SealedResult {
 				return result
 			},
-			afterApply: func(
-				failure *autoDetectionFailure,
-			) {
-				dcjc.scheduleAutoDetectionRetry(
-					change.Config,
-					failure,
-				)
-			},
+			afterApply: dcjc.scheduleRetryAfterApply(change.Config),
 			removePlainStock: change.Config.SourceType() ==
 				confgroup.TypeStock,
 		},

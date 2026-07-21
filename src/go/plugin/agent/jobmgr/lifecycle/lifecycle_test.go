@@ -88,7 +88,7 @@ func TestAdmissionProcessBytesReduceOrdinaryCapacityUntilFinalClose(t *testing.T
 	require.NoError(t, ledger.ReleaseProcessBytes(processBytes))
 
 	census := ledger.Census()
-	require.False(t, census.ProcessBytes != 0 || census.OrdinaryBytes != 0 || census.Phase != "closed")
+	require.False(t, census.ProcessBytes != 0 || census.OrdinaryBytes != 0 || census.Phase != AdmissionClosed)
 }
 
 func TestAdmissionProcessBytesCanUnwindPristineConstruction(t *testing.T) {
@@ -100,7 +100,7 @@ func TestAdmissionProcessBytesCanUnwindPristineConstruction(t *testing.T) {
 	require.NoError(t, ledger.ReleaseProcessBytes(processBytes))
 
 	census := ledger.Census()
-	require.False(t, census.ProcessBytes != 0 || census.ActiveRecords != 0 || census.Phase != "ordinary-open" || census.RunGeneration != 0)
+	require.False(t, census.ProcessBytes != 0 || census.ActiveRecords != 0 || census.Phase != AdmissionOrdinaryOpen || census.RunGeneration != 0)
 
 	require.NoError(t, ledger.ReserveProcessBytes(processBytes))
 

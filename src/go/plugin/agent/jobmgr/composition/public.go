@@ -97,19 +97,13 @@ func NewProcess(config Config) (*Process, error) {
 	modules := maps.Clone(config.Modules)
 	defaults := maps.Clone(config.Defaults)
 	providers, err := agentdiscovery.NewProviderCatalog(
-		append(
-			[]agentdiscovery.ProviderFactory(nil),
-			config.DiscoveryProviders...,
-		),
+		slices.Clone(config.DiscoveryProviders),
 	)
 	if err != nil {
 		return nil, err
 	}
-	creators := append(
-		[]secretstore.Creator(nil),
-		config.SecretStoreCreators...,
-	)
-	if creators == nil {
+	creators := slices.Clone(config.SecretStoreCreators)
+	if len(creators) == 0 {
 		creators = backends.Creators()
 	}
 	creatorCatalog, err := secretstore.NewCreatorCatalog(creators)

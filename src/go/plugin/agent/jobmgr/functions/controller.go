@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"sync"
@@ -72,10 +73,10 @@ type controllerModuleAvailability struct {
 }
 
 type controllerAvailabilityProbe struct {
-	methodID string
-	job      RuntimeJob
-	agent    func() bool
-	observed bool
+	methodID string      // method whose availability this probe tracks
+	job      RuntimeJob  // backing job for a job-scoped method; nil for an agent-level method
+	agent    func() bool // agent-level availability predicate (job nil); nil means always available
+	observed bool        // availability captured at build time, compared against the live value to detect change
 }
 
 type controllerGroup struct {
@@ -531,9 +532,6 @@ func (c *Controller) Stop(epoch uint64) error {
 	beginErr := c.BeginShutdown(epoch)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.terminated {
-		return errors.Join(beginErr, c.dirty)
-	}
 	c.terminated = true
 	return errors.Join(beginErr, c.dirty)
 }
@@ -790,11 +788,7 @@ func (c *Controller) buildModuleGroups(
 		return nil, unpublished, err
 	}
 	jobs := c.jobs[module]
-	names := make([]string, 0, len(jobs))
-	for name := range jobs {
-		names = append(names, name)
-	}
-	slices.Sort(names)
+	names := slices.Sorted(maps.Keys(jobs))
 	for _, name := range names {
 		if err := add(c.buildInstanceGroup(module, creator, jobs[name])); err != nil {
 			return nil, unpublished, err
@@ -1034,11 +1028,7 @@ func controllerGroupSignature(
 		}
 		writeDigestString(digest, string(presentation))
 	}
-	names := make([]string, 0, len(jobs))
-	for name := range jobs {
-		names = append(names, name)
-	}
-	slices.Sort(names)
+	names := slices.Sorted(maps.Keys(jobs))
 	for _, name := range names {
 		job := jobs[name]
 		writeDigestString(digest, name)
@@ -1078,11 +1068,7 @@ func indexControllerRoutes(
 	groups map[string]*controllerGroup,
 ) (map[string]controllerRoute, error) {
 	routes := make(map[string]controllerRoute)
-	keys := make([]string, 0, len(groups))
-	for key := range groups {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
+	keys := slices.Sorted(maps.Keys(groups))
 	for _, key := range keys {
 		group := groups[key]
 		for name, route := range group.routes {
@@ -1100,42 +1086,56 @@ func indexControllerRoutes(
 	return routes, nil
 }
 
+// controllerChanges walks the changed route names between current and next,
+// emitting removed(name) for a route that disappeared and present(name, route)
+// otherwise. It backs the route and publication change builders below.
+func controllerChanges[T any](
+	current map[string]controllerRoute,
+	next map[string]controllerRoute,
+	removed func(name string) T,
+	present func(name string, route controllerRoute) T,
+) []T {
+	names := controllerChangedRouteNames(current, next)
+	changes := make([]T, 0, len(names))
+	for _, name := range names {
+		route, exists := next[name]
+		if !exists {
+			changes = append(changes, removed(name))
+			continue
+		}
+		changes = append(changes, present(name, route))
+	}
+	return changes
+}
+
 func controllerRouteChanges(
 	current map[string]controllerRoute,
 	next map[string]controllerRoute,
 ) []RouteChange {
-	names := controllerChangedRouteNames(current, next)
-	changes := make([]RouteChange, 0, len(names))
-	for _, name := range names {
-		route, exists := next[name]
-		if !exists {
-			changes = append(changes, RouteChange{PublicName: name})
-			continue
-		}
-		declaration := route.declaration
-		changes = append(changes, RouteChange{
-			PublicName: name, Declaration: &declaration,
-		})
-	}
-	return changes
+	return controllerChanges(current, next,
+		func(name string) RouteChange {
+			return RouteChange{PublicName: name}
+		},
+		func(name string, route controllerRoute) RouteChange {
+			declaration := route.declaration
+			return RouteChange{PublicName: name, Declaration: &declaration}
+		},
+	)
 }
 
 func controllerPublicationChanges(
 	current map[string]controllerRoute,
 	next map[string]controllerRoute,
 ) []PublicationChange {
-	names := controllerChangedRouteNames(current, next)
-	changes := make([]PublicationChange, 0, len(names))
-	for _, name := range names {
-		route, exists := next[name]
-		if !exists {
-			changes = append(changes, PublicationChange{Name: name})
-			continue
-		}
-		record := route.publication
-		changes = append(changes, PublicationChange{Name: name, Record: &record})
-	}
-	return changes
+	return controllerChanges(current, next,
+		func(name string) PublicationChange {
+			return PublicationChange{Name: name}
+		},
+		func(name string, route controllerRoute) PublicationChange {
+			record := route.publication
+			return PublicationChange{Name: name, Record: &record}
+		},
+	)
 }
 
 func controllerChangedRouteNames(
@@ -1159,32 +1159,18 @@ func controllerChangedRouteNames(
 			changed[name] = struct{}{}
 		}
 	}
-	names := make([]string, 0, len(changed))
-	for name := range changed {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	return names
+	return slices.Sorted(maps.Keys(changed))
 }
 
 func sortedControllerRouteNames(routes map[string]controllerRoute) []string {
-	names := make([]string, 0, len(routes))
-	for name := range routes {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	return names
+	return slices.Sorted(maps.Keys(routes))
 }
 
 func (c *Controller) publicationRecordsLocked(
 	routes map[string]controllerRoute,
 ) []PublicationRecord {
 	names := sortedControllerRouteNames(routes)
-	fixedNames := make([]string, 0, len(c.fixed))
-	for name := range c.fixed {
-		fixedNames = append(fixedNames, name)
-	}
-	slices.Sort(fixedNames)
+	fixedNames := slices.Sorted(maps.Keys(c.fixed))
 	records := make(
 		[]PublicationRecord,
 		0,

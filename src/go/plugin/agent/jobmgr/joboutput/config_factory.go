@@ -19,10 +19,10 @@ import (
 )
 
 type ConfigModuleFactoryConfig struct {
-	Modules    ModuleCatalog
-	Resolver   *secretresolver.AtomicResolver
-	StoreScope secretresolver.AtomicScopeAcquirer
-	Logger     *logger.Logger
+	Modules    ModuleCatalog                      // registry of module creators to look up by name
+	Resolver   *secretresolver.AtomicResolver     // resolves secret references in a config
+	StoreScope secretresolver.AtomicScopeAcquirer // acquires the reader scope for secret resolution
+	Logger     *logger.Logger                     // base logger for the throwaway probe module
 }
 
 type configModule interface {
@@ -66,23 +66,23 @@ func (cmf *ConfigModuleFactory) Configuration(
 			"job output: invalid config-module configuration request",
 		)
 	}
-	attempt, err := cmf.construct(config.Module())
+	probe, err := cmf.construct(config.Module())
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
 		err = errors.Join(
 			err,
-			attempt.cleanup(context.WithoutCancel(ctx)),
+			probe.cleanup(context.WithoutCancel(ctx)),
 		)
 	}()
-	if err = applyConfigModuleRaw(config, attempt.module); err != nil {
+	if err = applyConfigModuleRaw(config, probe.module); err != nil {
 		return nil, fmt.Errorf(
 			"job output: applying raw configuration: %w",
 			err,
 		)
 	}
-	value := attempt.module.Configuration()
+	value := probe.module.Configuration()
 	if value == nil {
 		return nil, errors.New(
 			"job output: collector does not provide configuration",
@@ -105,30 +105,30 @@ func (cmf *ConfigModuleFactory) Test(
 	if ctx == nil || config == nil {
 		return errors.New("job output: invalid config-module test")
 	}
-	attempt, err := cmf.construct(config.Module())
+	probe, err := cmf.construct(config.Module())
 	if err != nil {
 		return err
 	}
 	defer func() {
 		err = errors.Join(
 			err,
-			attempt.cleanup(context.WithoutCancel(ctx)),
+			probe.cleanup(context.WithoutCancel(ctx)),
 		)
 	}()
-	if named, ok := attempt.module.(interface{ SetJobName(string) }); ok {
+	if named, ok := probe.module.(interface{ SetJobName(string) }); ok {
 		named.SetJobName(config.Name())
 	}
-	if err := cmf.applyResolved(ctx, config, attempt.module); err != nil {
+	if err := cmf.applyResolved(ctx, config, probe.module); err != nil {
 		return err
 	}
-	attempt.module.GetBase().Logger = cmf.config.Logger.With(
+	probe.module.GetBase().Logger = cmf.config.Logger.With(
 		slog.String("collector", config.Module()),
 		slog.String("job", config.Name()),
 	)
-	if err := attempt.module.Init(ctx); err != nil {
+	if err := probe.module.Init(ctx); err != nil {
 		return fmt.Errorf("job output: collector initialization: %w", err)
 	}
-	if err := attempt.module.Check(ctx); err != nil {
+	if err := probe.module.Check(ctx); err != nil {
 		return fmt.Errorf("job output: collector check: %w", err)
 	}
 	return nil
@@ -141,25 +141,25 @@ func (cmf *ConfigModuleFactory) Validate(
 	if ctx == nil || config == nil {
 		return errors.New("job output: invalid config-module validation")
 	}
-	attempt, err := cmf.construct(config.Module())
+	probe, err := cmf.construct(config.Module())
 	if err != nil {
 		return err
 	}
 	defer func() {
 		err = errors.Join(
 			err,
-			attempt.cleanup(context.WithoutCancel(ctx)),
+			probe.cleanup(context.WithoutCancel(ctx)),
 		)
 	}()
-	if named, ok := attempt.module.(interface{ SetJobName(string) }); ok {
+	if named, ok := probe.module.(interface{ SetJobName(string) }); ok {
 		named.SetJobName(config.Name())
 	}
-	return cmf.applyResolved(ctx, config, attempt.module)
+	return cmf.applyResolved(ctx, config, probe.module)
 }
 
 func (cmf *ConfigModuleFactory) construct(
 	module string,
-) (attempt constructedConfigModule, err error) {
+) (probe constructedConfigModule, err error) {
 	if cmf == nil || module == "" {
 		return constructedConfigModule{},
 			errors.New("job output: invalid config-module construction")
@@ -243,20 +243,20 @@ type constructedConfigModule struct {
 	err    error
 }
 
-func (cma *constructedConfigModule) cleanup(ctx context.Context) error {
-	if cma == nil || cma.module == nil {
+func (ccm *constructedConfigModule) cleanup(ctx context.Context) error {
+	if ccm == nil || ccm.module == nil {
 		return nil
 	}
-	cma.once.Do(func() {
-		cma.err = callJobLifecycle(
+	ccm.once.Do(func() {
+		ccm.err = callJobLifecycle(
 			"config-module Cleanup",
 			func() error {
-				cma.module.Cleanup(ctx)
+				ccm.module.Cleanup(ctx)
 				return nil
 			},
 		)
 	})
-	return cma.err
+	return ccm.err
 }
 
 func applyConfigModuleRaw(

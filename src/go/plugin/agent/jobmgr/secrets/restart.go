@@ -109,6 +109,10 @@ func (src *SecretRestartCommand) Apply(
 			errors.Join(commitErr, restoreErr)
 	}
 
+	// Operational restart failures are surfaced to the user via message (built
+	// from failures) rather than as an error: a dependent job failing to restart
+	// must not fail the already-applied secretstore change. Only the integrity
+	// error (startErr) propagates.
 	failures, startErr, _ := src.start(
 		commands,
 		stopped,

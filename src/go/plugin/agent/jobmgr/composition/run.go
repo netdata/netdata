@@ -5,6 +5,7 @@ package composition
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -75,26 +76,23 @@ type runGenerationConfig struct {
 }
 
 type runGeneration struct {
-	run               *lifecycle.RunSupervisor           // run supervisor for this generation
-	tasks             *lifecycle.TaskSupervisor          // task supervisor
-	functions         *FunctionAssembly                  // Function assembly (catalog + controller + publication)
-	jobs              *joboutput.Factory                 // job factory
-	scheduler         *joboutput.Scheduler               // tick + retry scheduler (same object as retryWorker)
-	retryWorker       autoDetectionRetryWorker           // autodetection retry worker (the scheduler via a narrow interface)
-	dyncfg            *joboutput.DynCfgJobController     // dyncfg job controller
-	graph             *dyncfg.Graph                      // dyncfg config graph
-	initialJobs       []dyncfg.GraphConfig               // initial (stock/user) job configs to publish
-	secrets           *secretadapter.Controller          // secret store controller
-	vnodes            *vnodeBinding                      // dyncfg vnode binding
-	vnodeConfig       *agentdiscovery.VNodeConfiguration // configured-vnode authority (file + runtime, live-merged)
-	serviceDiscovery  *serviceDiscoveryBinding           // service-discovery dyncfg binding (nil when SD is off)
-	discovery         runDiscoveryServices               // discovery services
-	kernel            *jobmgr.CommandKernel              // the command kernel
-	loop              *jobmgr.KernelLoop                 // the kernel loop
-	inputBodyGrants   chan lifecycle.AdmissionGrant      // channel delivering input-body growth grants to the kernel
-	metrics           *runMetrics                        // jobmgr.runtime metrics projection (nil when runtime charts off)
-	runtime           runtimecomp.Service                // runtime service
-	runtimeRegistered bool                               // guards double-unregister of jobmgr.runtime
+	run               *lifecycle.RunSupervisor       // run supervisor for this generation
+	tasks             *lifecycle.TaskSupervisor      // task supervisor
+	functions         *FunctionAssembly              // Function assembly (catalog + controller + publication)
+	scheduler         *joboutput.Scheduler           // tick + retry scheduler (same object as retryWorker)
+	retryWorker       autoDetectionRetryWorker       // autodetection retry worker (the scheduler via a narrow interface)
+	dyncfg            *joboutput.DynCfgJobController // dyncfg job controller
+	graph             *dyncfg.Graph                  // dyncfg config graph
+	initialJobs       []dyncfg.GraphConfig           // initial (stock/user) job configs to publish
+	secrets           *secretadapter.Controller      // secret store controller
+	vnodes            *vnodeBinding                  // dyncfg vnode binding
+	discovery         runDiscoveryServices           // discovery services
+	kernel            *jobmgr.CommandKernel          // the command kernel
+	loop              *jobmgr.KernelLoop             // the kernel loop
+	inputBodyGrants   chan lifecycle.AdmissionGrant  // channel delivering input-body growth grants to the kernel
+	metrics           *runMetrics                    // jobmgr.runtime metrics projection (nil when runtime charts off)
+	runtime           runtimecomp.Service            // runtime service
+	runtimeRegistered bool                           // guards double-unregister of jobmgr.runtime
 
 	mu               sync.Mutex // guards started/startedAttempted
 	started          bool       // start succeeded
@@ -277,9 +275,7 @@ func newRunGeneration(
 		Tasks:      tasks,
 		Frames:     config.Frames,
 		Resolver:   config.Jobs.Resolver,
-		StoreScope: func(
-			keys []string,
-		) (secretresolver.AtomicScope, error) {
+		StoreScope: func(keys []string) (secretresolver.AtomicScope, error) {
 			return acquireRunOwnedStoreScope(
 				run,
 				stores,
@@ -300,9 +296,7 @@ func newRunGeneration(
 		joboutput.ConfigModuleFactoryConfig{
 			Modules:  config.Modules,
 			Resolver: config.Jobs.Resolver,
-			StoreScope: func(
-				keys []string,
-			) (secretresolver.AtomicScope, error) {
+			StoreScope: func(keys []string) (secretresolver.AtomicScope, error) {
 				return acquireRunOwnedStoreScope(
 					run,
 					stores,
@@ -335,9 +329,7 @@ func newRunGeneration(
 	planner, finalizer, err := config.Planner(runPlannerCapabilities{
 		Tasks: tasks, Functions: functions,
 		Jobs: jobs, DynCfg: dynCfgJobs, Graph: graph,
-		StoreScope: func(
-			keys []string,
-		) (secretresolver.AtomicScope, error) {
+		StoreScope: func(keys []string) (secretresolver.AtomicScope, error) {
 			return acquireRunOwnedStoreScope(
 				run,
 				stores,
@@ -350,9 +342,7 @@ func newRunGeneration(
 		return nil, err
 	}
 	if planner == nil || finalizer == nil {
-		return nil, errors.New(
-			"jobmgr composition: planner factory returned incomplete ports",
-		)
+		return nil, errors.New("jobmgr composition: planner factory returned incomplete ports")
 	}
 	inputBodyGrants := make(chan lifecycle.AdmissionGrant, 1)
 	kernel, err := jobmgr.NewCommandKernel(
@@ -383,9 +373,7 @@ func newRunGeneration(
 	if err := functions.Bind(kernel); err != nil {
 		return nil, err
 	}
-	if err := secretController.Bind(
-		secretDependentJobBinding{controller: dynCfgJobs},
-	); err != nil {
+	if err := secretController.Bind(secretDependentJobBinding{controller: dynCfgJobs}); err != nil {
 		return nil, err
 	}
 	if metrics != nil {
@@ -397,19 +385,22 @@ func newRunGeneration(
 		}
 	}
 	return &runGeneration{
-		run: run, tasks: tasks, functions: functions,
-		jobs: jobs, dyncfg: dynCfgJobs, graph: graph,
-		scheduler: scheduler, retryWorker: scheduler,
-		initialJobs: append(
-			[]dyncfg.GraphConfig(nil),
-			config.Jobs.Graph...,
-		),
-		secrets: secretController,
-		vnodes:  vnodeBinding, vnodeConfig: vnodeConfig,
-		serviceDiscovery: serviceDiscovery,
-		discovery:        config.Discovery,
-		kernel:           kernel, loop: loop, inputBodyGrants: inputBodyGrants,
-		metrics: metrics, runtime: config.Jobs.Runtime,
+		run:               run,
+		tasks:             tasks,
+		functions:         functions,
+		dyncfg:            dynCfgJobs,
+		graph:             graph,
+		scheduler:         scheduler,
+		retryWorker:       scheduler,
+		initialJobs:       slices.Clone(config.Jobs.Graph),
+		secrets:           secretController,
+		vnodes:            vnodeBinding,
+		discovery:         config.Discovery,
+		kernel:            kernel,
+		loop:              loop,
+		inputBodyGrants:   inputBodyGrants,
+		metrics:           metrics,
+		runtime:           config.Jobs.Runtime,
 		runtimeRegistered: metrics != nil,
 	}, nil
 }

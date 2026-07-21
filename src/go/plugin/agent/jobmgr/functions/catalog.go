@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -146,13 +147,8 @@ func resolveDynCfgJobResource(
 	)
 	target = strings.TrimPrefix(target, ":")
 	if target == "" {
-		if len(arguments) > 2 &&
-			len(arguments) > 1 &&
-			strings.EqualFold(arguments[1], "add") {
-			name := dynCfgJobNameReplacer.Replace(arguments[2])
-			if name != "" {
-				return name
-			}
+		if name, isAdd := addCommandJobName(arguments); isAdd && name != "" {
+			return name
 		}
 		return invalidDynCfgResourceID
 	}
@@ -160,16 +156,24 @@ func resolveDynCfgJobResource(
 	if module == "" {
 		return invalidDynCfgResourceID
 	}
-	if len(arguments) > 2 &&
-		len(arguments) > 1 &&
-		strings.EqualFold(arguments[1], "add") {
-		name = dynCfgJobNameReplacer.Replace(arguments[2])
+	if replaced, isAdd := addCommandJobName(arguments); isAdd {
+		name = replaced
 		hasName = name != ""
 	}
 	if !hasName || name == module {
 		return module
 	}
 	return module + "_" + name
+}
+
+// addCommandJobName extracts the job name from a DynCfg "add" command's
+// arguments. It reports whether this is an add command (arguments[1] == "add");
+// the returned name is the replacer-normalized arguments[2] and may be empty.
+func addCommandJobName(arguments []string) (string, bool) {
+	if len(arguments) > 2 && strings.EqualFold(arguments[1], "add") {
+		return dynCfgJobNameReplacer.Replace(arguments[2]), true
+	}
+	return "", false
 }
 
 type Declaration struct {
@@ -354,6 +358,10 @@ type invocationSlot struct {
 	claims          [17]string                     // fixed claim buffer: [0]=global claim, [1:]=command claims
 	transactionPlan jobmgr.ResourceTransactionPlan // resource-transaction plan when the route is transactional
 }
+
+// maxCommandClaims is the number of per-command claim slots in an
+// invocationSlot's fixed claim buffer; index 0 is reserved for the global claim.
+const maxCommandClaims = len(invocationSlot{}.claims) - 1
 
 func (is *invocationSlot) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
 	if is == nil || is.resolved == nil || is.resolved.handler == nil {
@@ -612,9 +620,7 @@ func validateResourceTransactionDeclaration(
 	for index, command := range declaration.Commands {
 		if command.Name == "" ||
 			len(command.Name) > maximumDeclarationMetadataBytes ||
-			len(command.Claims) > len(
-				(invocationSlot{}).claims,
-			)-1 {
+			len(command.Claims) > maxCommandClaims {
 			return errors.New(
 				"jobmgr Function catalog: invalid resource transaction command",
 			)
@@ -690,14 +696,10 @@ func cloneResourceTransactionDeclaration(
 		return nil
 	}
 	cloned := *declaration
-	cloned.Commands = append(
-		[]ResourceTransactionCommand(nil),
-		declaration.Commands...,
-	)
+	cloned.Commands = slices.Clone(declaration.Commands)
 	for index := range cloned.Commands {
-		cloned.Commands[index].Claims = append(
-			[]string(nil),
-			declaration.Commands[index].Claims...,
+		cloned.Commands[index].Claims = slices.Clone(
+			declaration.Commands[index].Claims,
 		)
 	}
 	return &cloned
@@ -904,12 +906,11 @@ func (c *Catalog) retireDrainedRoute(retired *route) {
 	c.pruneRetiringRoutes(retired)
 }
 
-func (c *Catalog) pruneRetiringRoutes(routes *route) {
+func (c *Catalog) pruneRetiringRoutes(head *route) {
 	var released int64
-	for route := routes; route != nil; {
+	for route := head; route != nil; {
 		next := route.retiringNext
 		route.retiringNext = nil
-		route.retiringDrained = true
 		released += pruneRetiringRoute(&c.routes, route)
 		route = next
 	}

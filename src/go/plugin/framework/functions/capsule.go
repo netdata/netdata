@@ -409,16 +409,7 @@ func (capsule *InputCapsule) appendPayload(ctx context.Context, value []byte) er
 	}
 	needed := len(state.body) + len(value)
 	if int64(needed) > state.capacity {
-		next := state.capacity * 2
-		if next < initialBodyCapacity {
-			next = initialBodyCapacity
-		}
-		if next < int64(needed) {
-			next = int64(needed)
-		}
-		if next > MaximumInputBodyBytes {
-			next = MaximumInputBodyBytes
-		}
+		next := min(max(max(state.capacity*2, initialBodyCapacity), int64(needed)), MaximumInputBodyBytes)
 		token, err := capsule.budget.GrowInputBody(ctx, state.token, next)
 		if err != nil {
 			return err

@@ -161,9 +161,6 @@ func (fa *FunctionAssembly) BeforeFunctionCatalogClose(
 		fa.stopped {
 		return errors.New("jobmgr composition: invalid Function shutdown barrier")
 	}
-	if fa.draining {
-		return fa.controller.BeginShutdown(fa.epoch)
-	}
 	fa.draining = true
 	return fa.controller.BeginShutdown(fa.epoch)
 }

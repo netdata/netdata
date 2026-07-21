@@ -140,27 +140,22 @@ func (c *Controller) Prepare(
 	published := c.published
 	c.mu.Unlock()
 	if !published {
-		return c.noop(
+		return c.noopMessageWithPermit(
 			scope,
 			current,
 			permit,
-			mustSecretMessage(
-				503,
-				"Secretstore configuration is not published yet.",
-			),
-			nil,
-			nil,
+			503,
+			"Secretstore configuration is not published yet.",
 		)
 	}
 	target, failure := c.resolveTarget(input)
 	if failure != nil {
-		return c.noop(
+		return c.noopMessageWithPermit(
 			scope,
 			current,
 			permit,
-			mustSecretMessage(failure.code, failure.message),
-			nil,
-			nil,
+			failure.code,
+			failure.message,
 		)
 	}
 	switch target.command {
@@ -208,20 +203,16 @@ func (c *Controller) Prepare(
 			target,
 		)
 	default:
-		return c.noop(
+		return c.noopMessageWithPermit(
 			scope,
 			current,
 			permit,
-			mustSecretMessage(
-				501,
-				fmt.Sprintf(
-					"Function '%s' command '%s' is not implemented.",
-					"config",
-					target.command,
-				),
+			501,
+			fmt.Sprintf(
+				"Function '%s' command '%s' is not implemented.",
+				"config",
+				target.command,
 			),
-			nil,
-			nil,
 		)
 	}
 }

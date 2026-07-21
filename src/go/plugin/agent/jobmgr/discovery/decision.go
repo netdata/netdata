@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -150,11 +151,7 @@ func (di *DecisionIndex) applyGroup(
 		di.sources[group.Source] = next
 	}
 
-	names := make([]string, 0, len(affected))
-	for name := range affected {
-		names = append(names, name)
-	}
-	slices.Sort(names)
+	names := slices.Sorted(maps.Keys(affected))
 	for _, name := range names {
 		if err := di.reconcile(ctx, name); err != nil {
 			return err
@@ -266,10 +263,10 @@ func (di *DecisionIndex) selectConfig(
 }
 
 type DecisionCensus struct {
-	Sources      int
-	Candidates   int
-	Acknowledged int
-	Revision     uint64
+	Sources      int    // distinct discovery sources with an active config set
+	Candidates   int    // total candidate configs across all jobs
+	Acknowledged int    // jobs whose desired selection has been acknowledged
+	Revision     uint64 // monotonic decision revision
 }
 
 func (di *DecisionIndex) Census() DecisionCensus {

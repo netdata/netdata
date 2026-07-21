@@ -252,8 +252,6 @@ func (dcjc *DynCfgJobController) Prepare(
 			ctx,
 			request,
 			target,
-			record,
-			exists,
 			current,
 			scope,
 		)
@@ -325,8 +323,6 @@ func (dcjc *DynCfgJobController) prepareAdd(
 	ctx context.Context,
 	request DynCfgJobRequest,
 	target dynCfgTarget,
-	record dyncfg.GraphRecord,
-	exists bool,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 ) (lifecycle.PreparedResourceTransaction, error) {
@@ -377,8 +373,6 @@ func (dcjc *DynCfgJobController) prepareAdd(
 	if current != nil {
 		disposition = lifecycle.ResourceTransactionRemoved
 	}
-	_ = record
-	_ = exists
 	return dcjc.prepareMutation(
 		scope,
 		current,
@@ -566,23 +560,11 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			removedCleanup: dcjc.configDeleteCleanup(
 				dcjc.configID(target.module, target.name),
 			),
-			result: func(
-				failure *autoDetectionFailure,
-			) lifecycle.SealedResult {
-				return autoDetectionFailureResult(
-					failure,
-					422,
-					"config update failed: %v",
-				)
-			},
-			afterApply: func(
-				failure *autoDetectionFailure,
-			) {
-				dcjc.scheduleAutoDetectionRetry(
-					config,
-					failure,
-				)
-			},
+			result: autoDetectionFailureResultFunc(
+				422,
+				"config update failed: %v",
+			),
+			afterApply: dcjc.scheduleRetryAfterApply(config),
 			removePlainStock: config.SourceType() ==
 				confgroup.TypeStock,
 		},
@@ -666,23 +648,11 @@ func (dcjc *DynCfgJobController) prepareEnable(
 			removedCleanup: dcjc.configDeleteCleanup(
 				dcjc.externalID(target.resourceID),
 			),
-			result: func(
-				failure *autoDetectionFailure,
-			) lifecycle.SealedResult {
-				return autoDetectionFailureResult(
-					failure,
-					422,
-					"job enable failed: %v",
-				)
-			},
-			afterApply: func(
-				failure *autoDetectionFailure,
-			) {
-				dcjc.scheduleAutoDetectionRetry(
-					config,
-					failure,
-				)
-			},
+			result: autoDetectionFailureResultFunc(
+				422,
+				"job enable failed: %v",
+			),
+			afterApply: dcjc.scheduleRetryAfterApply(config),
 			removePlainStock: config.SourceType() ==
 				confgroup.TypeStock,
 		},
@@ -784,23 +754,11 @@ func (dcjc *DynCfgJobController) prepareRestart(
 			removedCleanup: dcjc.configDeleteCleanup(
 				dcjc.externalID(target.resourceID),
 			),
-			result: func(
-				failure *autoDetectionFailure,
-			) lifecycle.SealedResult {
-				return autoDetectionFailureResult(
-					failure,
-					422,
-					"config restart failed: %v",
-				)
-			},
-			afterApply: func(
-				failure *autoDetectionFailure,
-			) {
-				dcjc.scheduleAutoDetectionRetry(
-					config,
-					failure,
-				)
-			},
+			result: autoDetectionFailureResultFunc(
+				422,
+				"config restart failed: %v",
+			),
+			afterApply: dcjc.scheduleRetryAfterApply(config),
 			removePlainStock: config.SourceType() ==
 				confgroup.TypeStock,
 		},
@@ -969,58 +927,37 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 	if dcjc.dependencies != nil {
 		var err error
 		dependencyCommit, err = dcjc.dependencies.PrepareJobChange(
-			scopeResourceID(scope),
+			scope.ID,
 			postimage,
 		)
 		if err != nil {
 			if successor != nil {
-				rollbackErr := rejectPreparedSuccessor(
-					context.Background(),
-					successor,
-				)
-				err = errors.Join(
-					err,
-					rollbackErr,
-				)
-				if rollbackErr != nil {
-					err = lifecycle.RetainOwnership(err)
-				}
+				err = rollbackSuccessorMutation(successor, err)
 			}
 			return nil, err
 		}
 		if failurePlan != nil {
 			failedDependencyCommit, err =
 				dcjc.dependencies.PrepareJobChange(
-					scopeResourceID(scope),
+					scope.ID,
 					&failurePlan.postimage,
 				)
 			if err == nil &&
 				failurePlan.removePlainStock {
 				removedDependencyCommit, err =
 					dcjc.dependencies.PrepareJobChange(
-						scopeResourceID(scope),
+						scope.ID,
 						nil,
 					)
 			}
 			if err != nil {
-				rollbackErr := rejectPreparedSuccessor(
-					context.Background(),
-					successor,
-				)
-				err = errors.Join(
-					err,
-					rollbackErr,
-				)
-				if rollbackErr != nil {
-					err = lifecycle.RetainOwnership(err)
-				}
-				return nil, err
+				return nil, rollbackSuccessorMutation(successor, err)
 			}
 		}
 	}
 	mutation, err := dcjc.graph.PrepareMutation(
 		[]dyncfg.GraphChange{{
-			ID: scopeResourceID(scope), Config: postimage,
+			ID: scope.ID, Config: postimage,
 		}},
 	)
 	if errors.Is(err, dyncfg.ErrGraphNoChange) {
@@ -1055,17 +992,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 	}
 	if err != nil {
 		if successor != nil {
-			rollbackErr := rejectPreparedSuccessor(
-				context.Background(),
-				successor,
-			)
-			err = errors.Join(
-				err,
-				rollbackErr,
-			)
-			if rollbackErr != nil {
-				err = lifecycle.RetainOwnership(err)
-			}
+			err = rollbackSuccessorMutation(successor, err)
 		}
 		return nil, err
 	}
@@ -1211,6 +1138,27 @@ func autoDetectionFailureResult(
 	)
 }
 
+// autoDetectionFailureResultFunc adapts autoDetectionFailureResult into a
+// successorFailurePlan.result closure with a fixed default code and message.
+func autoDetectionFailureResultFunc(
+	defaultCode int,
+	message string,
+) func(*autoDetectionFailure) lifecycle.SealedResult {
+	return func(failure *autoDetectionFailure) lifecycle.SealedResult {
+		return autoDetectionFailureResult(failure, defaultCode, message)
+	}
+}
+
+// scheduleRetryAfterApply adapts scheduleAutoDetectionRetry into a
+// successorFailurePlan.afterApply closure that reschedules the given config.
+func (dcjc *DynCfgJobController) scheduleRetryAfterApply(
+	config confgroup.Config,
+) func(*autoDetectionFailure) {
+	return func(failure *autoDetectionFailure) {
+		dcjc.scheduleAutoDetectionRetry(config, failure)
+	}
+}
+
 func rejectPreparedSuccessor(
 	ctx context.Context,
 	successor lifecycle.PreparedResource,
@@ -1219,6 +1167,21 @@ func rejectPreparedSuccessor(
 		return prepared.reject(ctx)
 	}
 	return successor.Dispose(ctx)
+}
+
+// rollbackSuccessorMutation rejects a prepared successor after a failed mutation
+// prep, joins the rejection error, and retains ownership when the rejection
+// itself fails so a leaked resource is never treated as released.
+func rollbackSuccessorMutation(
+	successor lifecycle.PreparedResource,
+	err error,
+) error {
+	rollbackErr := rejectPreparedSuccessor(context.Background(), successor)
+	err = errors.Join(err, rollbackErr)
+	if rollbackErr != nil {
+		err = lifecycle.RetainOwnership(err)
+	}
+	return err
 }
 
 func (dcjc *DynCfgJobController) noop(
@@ -1693,18 +1656,6 @@ func validateGraphResourcePair(
 		)
 	}
 	return nil
-}
-
-func transactionScopeID(
-	scope lifecycle.ResourceTransactionScope,
-) string {
-	return scope.ID
-}
-
-func scopeResourceID(
-	scope lifecycle.ResourceTransactionScope,
-) string {
-	return transactionScopeID(scope)
 }
 
 func validDynCfgProtocolField(value string) bool {

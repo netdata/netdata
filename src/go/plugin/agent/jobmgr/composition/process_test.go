@@ -571,7 +571,7 @@ func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 				census.RunGeneration != 0 ||
 				census.ReaderStarts != tc.wantReaderStart)
 
-			require.EqualValues(t, "closed", process.admission.Census().Phase)
+			require.Equal(t, lifecycle.AdmissionClosed, process.admission.Census().Phase)
 
 			cleanupsMu.Lock()
 			defer cleanupsMu.Unlock()

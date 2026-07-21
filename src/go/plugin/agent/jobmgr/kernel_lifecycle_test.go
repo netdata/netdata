@@ -2906,7 +2906,7 @@ func TestKernelStopDrainsCooperativeTask(t *testing.T) {
 	require.False(t, tasks.Active() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
 
 	census := admission.Census()
-	require.False(t, census.ActiveRecords != 0 || census.Phase != "cleanup-only")
+	require.False(t, census.ActiveRecords != 0 || census.Phase != lifecycle.AdmissionCleanupOnly)
 
 	require.NoError(t, admission.CloseDrained(run.Generation()))
 
@@ -2951,7 +2951,7 @@ func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing
 	}
 
 	census := admission.Census()
-	require.False(t, census.Phase != "cleanup-only" || census.InputBodyWaiting)
+	require.False(t, census.Phase != lifecycle.AdmissionCleanupOnly || census.InputBodyWaiting)
 
 	_, commitInputBodyGrowthErr := admission.CommitInputBodyGrowth(token, capacity)
 	require.NoError(t, commitInputBodyGrowthErr)

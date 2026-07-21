@@ -66,11 +66,11 @@ type FunctionCatalogMutation interface {
 }
 
 type FunctionCatalogMutationProgress struct {
-	CompletedNodes int
-	TotalNodes     int
-	Version        uint64
-	Quiesced       bool
-	Done           bool
+	CompletedNodes int    // mutation nodes applied so far
+	TotalNodes     int    // total nodes in the mutation
+	Version        uint64 // catalog version the mutation targets
+	Quiesced       bool   // no mutation work is in flight
+	Done           bool   // the mutation has fully completed
 }
 
 type FunctionCatalogCensus struct {

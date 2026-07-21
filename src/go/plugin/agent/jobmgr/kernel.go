@@ -38,10 +38,10 @@ type submission struct {
 }
 
 type commandLaneKey struct {
-	key                string
-	functionInvocation FunctionInvocationRef
-	source             lifecycle.Source
-	resource           bool
+	key                string                // resource/lane key that identifies the lane
+	functionInvocation FunctionInvocationRef // unique invocation ref for a resource-less Function call
+	source             lifecycle.Source      // source that scheduled the command
+	resource           bool                  // true for a resource lane, false for a Function-invocation lane
 }
 
 type functionMutationSubmission struct {
@@ -169,7 +169,6 @@ type commandLane struct {
 	allNext            *commandLane               // next lane in the all-lanes list
 	allListed          bool                       // linked into the all-lanes list
 	shutdownVisited    bool                       // lane already swept by the shutdown cursor
-	resourceGeneration uint64                     // generation of the installed resource
 	resourceSource     lifecycle.Source           // source that scheduled the current resource (for shutdown stop)
 	currentIdentity    lifecycle.ResourceIdentity // identity of the installed resource; Valid once installed
 	current            lifecycle.ReadyResource    // live ReadyResource published on this lane; nil while stopping/absent
@@ -405,6 +404,44 @@ func (ck *CommandKernel) bindRunNotifications() error {
 	return nil
 }
 
+// beginResultEncode sizes and admits an operation's terminal result and then
+// dispatches its encode. It returns true when the caller must return now (a
+// result-growth wait, a dispatched encode, or a dirty resize) and false after
+// enqueuing a control frame on a preflight or size error, so the caller falls
+// through to its disposal action. It dispatches no ownership action itself, so
+// the ownership-gate invariant (SendAction stays in the sanctioned callers) holds.
+func (ck *CommandKernel) beginResultEncode(operation *commandOperation, ref lifecycle.TaskRef) bool {
+	expiry := lifecycle.ExpiryAt(ck.clock.Now())
+	preflight, err := ck.tasks.PreflightResult(ref, operation.UID, expiry)
+	if err != nil {
+		status := lifecycle.ControlInternal
+		if errors.Is(err, lifecycle.ErrFunctionResultTooLarge) {
+			status = lifecycle.ControlPayloadTooLarge
+		}
+		ck.enqueueControl(operation, status)
+		return false
+	}
+	total, sizeErr := operationResultAdmissionBytes(operation.admissionBase, preflight)
+	if sizeErr != nil {
+		ck.enqueueControl(operation, lifecycle.ControlPayloadTooLarge)
+		return false
+	}
+	ready, _, resizeErr := ck.admission.ResizeOrdinary(operation.admission, total)
+	if resizeErr != nil {
+		ck.run.Dirty(resizeErr)
+		return true
+	}
+	operation.resultExpiry = expiry
+	if !ready {
+		operation.resultGrowthWaiting = true
+		return true
+	}
+	if err := ck.sendEncodeAction(operation); err != nil {
+		ck.run.Dirty(err)
+	}
+	return true
+}
+
 func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 	if cleanup, ok := ck.functionCleanupTasks[completion.Ref]; ok {
 		if completion.Sequence != 1 || completion.Kind != lifecycle.TaskOutcomeNone {
@@ -490,34 +527,8 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 	}
 	action := lifecycle.TaskAction{Ref: completion.Ref, Sequence: completion.Sequence + 1, Kind: lifecycle.TaskActionDispose}
 	if completion.Err == nil && operation.Response == lifecycle.ResponseOpen && !operation.controlQueued {
-		expiry := lifecycle.ExpiryAt(ck.clock.Now())
-		preflight, err := ck.tasks.PreflightResult(completion.Ref, operation.UID, expiry)
-		if err != nil {
-			status := lifecycle.ControlInternal
-			if errors.Is(err, lifecycle.ErrFunctionResultTooLarge) {
-				status = lifecycle.ControlPayloadTooLarge
-			}
-			ck.enqueueControl(operation, status)
-		} else {
-			total, sizeErr := operationResultAdmissionBytes(operation.admissionBase, preflight)
-			if sizeErr != nil {
-				ck.enqueueControl(operation, lifecycle.ControlPayloadTooLarge)
-			} else {
-				ready, _, resizeErr := ck.admission.ResizeOrdinary(operation.admission, total)
-				if resizeErr != nil {
-					ck.run.Dirty(resizeErr)
-					return
-				}
-				operation.resultExpiry = expiry
-				if !ready {
-					operation.resultGrowthWaiting = true
-					return
-				}
-				if err := ck.sendEncodeAction(operation); err != nil {
-					ck.run.Dirty(err)
-				}
-				return
-			}
+		if ck.beginResultEncode(operation, completion.Ref) {
+			return
 		}
 	}
 	if completion.Err != nil && operation.Response == lifecycle.ResponseOpen && !operation.controlQueued {
@@ -744,50 +755,8 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 		}
 		if operation.Response == lifecycle.ResponseOpen &&
 			!operation.controlQueued {
-			expiry := lifecycle.ExpiryAt(ck.clock.Now())
-			preflight, preflightErr := ck.tasks.PreflightResult(
-				completion.Ref,
-				operation.UID,
-				expiry,
-			)
-			if preflightErr != nil {
-				status := lifecycle.ControlInternal
-				if errors.Is(
-					preflightErr,
-					lifecycle.ErrFunctionResultTooLarge,
-				) {
-					status = lifecycle.ControlPayloadTooLarge
-				}
-				ck.enqueueControl(operation, status)
-			} else {
-				total, sizeErr := operationResultAdmissionBytes(
-					operation.admissionBase,
-					preflight,
-				)
-				if sizeErr != nil {
-					ck.enqueueControl(
-						operation,
-						lifecycle.ControlPayloadTooLarge,
-					)
-				} else {
-					ready, _, resizeErr := ck.admission.ResizeOrdinary(
-						operation.admission,
-						total,
-					)
-					if resizeErr != nil {
-						ck.run.Dirty(resizeErr)
-						return
-					}
-					operation.resultExpiry = expiry
-					if !ready {
-						operation.resultGrowthWaiting = true
-						return
-					}
-					if err := ck.sendEncodeAction(operation); err != nil {
-						ck.run.Dirty(err)
-					}
-					return
-				}
+			if ck.beginResultEncode(operation, completion.Ref) {
+				return
 			}
 		}
 		ck.sendTransactionAction(
@@ -1014,11 +983,6 @@ func (ck *CommandKernel) applyTransactionDisposition(
 	lane.current = current
 	lane.currentIdentity = identity
 	lane.currentStopping = false
-	if identity.Valid() {
-		lane.resourceGeneration = identity.Generation
-	} else {
-		lane.resourceGeneration = 0
-	}
 	return nil
 }
 
@@ -1435,7 +1399,6 @@ func (ck *CommandKernel) acknowledgeResourceTask(operation *commandOperation, ac
 		identity := expected
 		lane.current = resource
 		lane.currentIdentity = identity
-		lane.resourceGeneration = identity.Generation
 		lane.resourceSource = operation.Source
 		ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 	case lifecycle.TaskActionStopResource:
@@ -1927,13 +1890,20 @@ func (ck *CommandKernel) advanceRunFinalizer() error {
 	return nil
 }
 
+// shutdownBarrierSettled reports that the shutdown barrier completed cleanly and
+// the kernel is in the cleanup-drain phase with no outstanding ownership chains —
+// the precondition shared by the finalizer-readiness and quiescence checks.
+func (ck *CommandKernel) shutdownBarrierSettled() bool {
+	return ck.shutdownPhase == commandShutdownCleanupDrain &&
+		ck.ownershipChains == 0 &&
+		ck.shutdownBarrierDone && !ck.shutdownBarrierFailed &&
+		!ck.shutdownBarrierRequest.Valid() &&
+		!ck.shutdownBarrierTask.Valid() &&
+		ck.shutdownBarrierAction == 0
+}
+
 func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
-	if ck.shutdownPhase != commandShutdownCleanupDrain ||
-		ck.ownershipChains != 0 ||
-		!ck.shutdownBarrierDone || ck.shutdownBarrierFailed ||
-		ck.shutdownBarrierRequest.Valid() ||
-		ck.shutdownBarrierTask.Valid() ||
-		ck.shutdownBarrierAction != 0 {
+	if !ck.shutdownBarrierSettled() {
 		return false
 	}
 	inherited := ck.tasks.InheritedCensus()
@@ -1994,12 +1964,7 @@ func (ck *CommandKernel) runFinalizerFailedTerminal() bool {
 }
 
 func (ck *CommandKernel) shutdownQuiescent() bool {
-	if ck.shutdownPhase != commandShutdownCleanupDrain ||
-		ck.ownershipChains != 0 ||
-		!ck.shutdownBarrierDone || ck.shutdownBarrierFailed ||
-		ck.shutdownBarrierRequest.Valid() ||
-		ck.shutdownBarrierTask.Valid() ||
-		ck.shutdownBarrierAction != 0 {
+	if !ck.shutdownBarrierSettled() {
 		return false
 	}
 	inherited := ck.tasks.InheritedCensus()

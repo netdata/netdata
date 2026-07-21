@@ -979,7 +979,6 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 						slot.outcome = TaskOutcome{}
 					}
 				} else {
-					slot.outcome = TaskOutcome{}
 					slot.outcome, ack.Err = readyResourceOutcome(ready, identity)
 				}
 			}

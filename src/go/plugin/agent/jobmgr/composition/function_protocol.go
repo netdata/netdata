@@ -106,7 +106,7 @@ func (capture *boundedFunctionProtocolCapture) write(
 	if capture.err != nil {
 		return 0, capture.err
 	}
-	if capture.limit <= 0 || len(capture.payload) > capture.limit {
+	if capture.limit <= 0 {
 		capture.err = errFunctionProtocolCaptureTooLarge
 		return 0, capture.err
 	}

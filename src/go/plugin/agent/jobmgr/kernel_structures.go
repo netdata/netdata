@@ -15,10 +15,10 @@ type functionCleanupTask struct {
 const functionCleanupChunkCapacity = 64
 
 type functionCleanupChunk struct {
-	plans [functionCleanupChunkCapacity]FunctionCleanupPlan
-	head  int
-	tail  int
-	next  *functionCleanupChunk
+	plans      [functionCleanupChunkCapacity]FunctionCleanupPlan
+	readIndex  int
+	writeIndex int
+	next       *functionCleanupChunk
 }
 
 type functionCleanupQueue struct {
@@ -35,7 +35,7 @@ func (fcq *functionCleanupQueue) push(plan FunctionCleanupPlan) error {
 		return nil
 	}
 	if fcq.tail == nil ||
-		fcq.tail.tail == functionCleanupChunkCapacity {
+		fcq.tail.writeIndex == functionCleanupChunkCapacity {
 		chunk := &functionCleanupChunk{}
 		if fcq.tail == nil {
 			fcq.head = chunk
@@ -44,8 +44,8 @@ func (fcq *functionCleanupQueue) push(plan FunctionCleanupPlan) error {
 		}
 		fcq.tail = chunk
 	}
-	fcq.tail.plans[fcq.tail.tail] = plan
-	fcq.tail.tail++
+	fcq.tail.plans[fcq.tail.writeIndex] = plan
+	fcq.tail.writeIndex++
 	fcq.count++
 	return nil
 }
@@ -54,7 +54,7 @@ func (fcq *functionCleanupQueue) front() FunctionCleanupPlan {
 	if fcq.count == 0 {
 		return FunctionCleanupPlan{}
 	}
-	return fcq.head.plans[fcq.head.head]
+	return fcq.head.plans[fcq.head.readIndex]
 }
 
 func (fcq *functionCleanupQueue) pop() {
@@ -62,10 +62,10 @@ func (fcq *functionCleanupQueue) pop() {
 		return
 	}
 	chunk := fcq.head
-	chunk.plans[chunk.head] = FunctionCleanupPlan{}
-	chunk.head++
+	chunk.plans[chunk.readIndex] = FunctionCleanupPlan{}
+	chunk.readIndex++
 	fcq.count--
-	if chunk.head == chunk.tail {
+	if chunk.readIndex == chunk.writeIndex {
 		fcq.head = chunk.next
 		chunk.next = nil
 		if fcq.head == nil {
