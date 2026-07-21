@@ -20,7 +20,7 @@ func TestSocketRuntimeDisabledBuild(t *testing.T) {
 
 	var rt *libbpfloader.SocketRuntime
 
-	if err := rt.Prepare(false); !errors.Is(err, libbpfloader.ErrDisabled) {
+	if err := rt.Prepare(false, 0, 0); !errors.Is(err, libbpfloader.ErrDisabled) {
 		t.Fatalf("Prepare: got %v, want ErrDisabled", err)
 	}
 	if err := rt.Load(); !errors.Is(err, libbpfloader.ErrDisabled) {

@@ -111,8 +111,8 @@ func NewSocketRuntime(path string, useCore bool) (*SocketRuntime, error) {
 	return newDisabledRuntime[SocketRuntime](path, useCore)
 }
 
-func (r *SocketRuntime) Prepare(mapsPerCore bool) error {
-	_ = mapsPerCore
+func (r *SocketRuntime) Prepare(mapsPerCore bool, ndSocketSize uint32, nvUDPSize uint32) error {
+	_, _, _ = mapsPerCore, ndSocketSize, nvUDPSize
 	return ErrDisabled
 }
 

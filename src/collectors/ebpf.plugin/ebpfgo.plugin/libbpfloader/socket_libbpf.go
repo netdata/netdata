@@ -46,7 +46,8 @@ struct netdata_socket_per_pid_entry {
 };
 
 struct netdata_ebpf_socket_runtime *netdata_socket_runtime_open_mode(const char *path, int use_core);
-int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int maps_per_core);
+int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int maps_per_core,
+                                   uint32_t nd_socket_size, uint32_t nv_udp_size);
 int netdata_socket_runtime_load(struct netdata_ebpf_socket_runtime *rt);
 int netdata_socket_runtime_attach(struct netdata_ebpf_socket_runtime *rt);
 int netdata_socket_runtime_snapshot(struct netdata_ebpf_socket_runtime *rt, int maps_per_core, struct netdata_ebpf_socket_snapshot *out);
@@ -81,7 +82,7 @@ func NewSocketRuntime(path string, useCore bool) (*SocketRuntime, error) {
 	return &SocketRuntime{ptr: rt}, nil
 }
 
-func (r *SocketRuntime) Prepare(mapsPerCore bool) error {
+func (r *SocketRuntime) Prepare(mapsPerCore bool, ndSocketSize uint32, nvUDPSize uint32) error {
 	if r == nil || r.ptr == nil {
 		return ErrDisabled
 	}
@@ -91,7 +92,8 @@ func (r *SocketRuntime) Prepare(mapsPerCore bool) error {
 		cMapsPerCore = 1
 	}
 
-	if ret := C.netdata_socket_runtime_prepare(r.ptr, cMapsPerCore); ret != 0 {
+	if ret := C.netdata_socket_runtime_prepare(r.ptr, cMapsPerCore,
+		C.uint32_t(ndSocketSize), C.uint32_t(nvUDPSize)); ret != 0 {
 		return fmt.Errorf("prepare socket runtime failed: %d", int(ret))
 	}
 

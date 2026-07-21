@@ -12,6 +12,12 @@ const (
 	// socketDefaultPIDTableSize matches cachestatDefaultPIDTableSize so both
 	// modules produce an identically-sized SHM segment.
 	socketDefaultPIDTableSize uint32 = 32768
+	// socketDefaultMonitoringTableSize is the default max_entries for tbl_nd_socket.
+	// Matches the legacy C plugin default (NETDATA_MAXIMUM_CONNECTIONS_ALLOWED).
+	socketDefaultMonitoringTableSize uint32 = 16384
+	// socketDefaultUDPConnectionTableSize is the default max_entries for tbl_nv_udp.
+	// Matches the legacy C plugin default (NETDATA_MAXIMUM_UDP_CONNECTIONS_ALLOWED).
+	socketDefaultUDPConnectionTableSize uint32 = 4096
 	// socketMaxBaseSelector is the highest SelectKernelName index for which a
 	// base-flavor (no suffix) socket object file is shipped.  Objects for newer
 	// kernels use the buffer or arena flavor only.
@@ -25,12 +31,14 @@ type SocketLegacyConfig struct {
 	KernelVersion uint32
 	IsDebian      bool
 	HasBTF        bool
-	ConfigFound   bool
-	Enabled       bool
-	UpdateEvery   int
-	MapsPerCore   bool
-	ObjectFlavor  string
-	BTFPath       string
+	ConfigFound                 bool
+	Enabled                     bool
+	UpdateEvery                 int
+	MapsPerCore                 bool
+	ObjectFlavor                string
+	BTFPath                     string
+	SocketMonitoringTableSize   uint32 // max_entries for tbl_nd_socket
+	UDPConnectionTableSize      uint32 // max_entries for tbl_nv_udp
 }
 
 type SocketLegacyHandle struct {
@@ -58,9 +66,11 @@ func defaultSocketLegacyConfig() SocketLegacyConfig {
 		BTFPath:      socketDefaultBTFPath,
 		UpdateEvery:  socketDefaultUpdateEvery,
 		HasBTF:       kernelBTFSupported(socketDefaultBTFPath),
-		MapsPerCore:  true,
-		ObjectFlavor: socketDefaultObjectFlavor,
-		Enabled:      false, // stock ebpf.d.conf: socket = no
+		MapsPerCore:               true,
+		ObjectFlavor:              socketDefaultObjectFlavor,
+		Enabled:                   false, // stock ebpf.d.conf: socket = no
+		SocketMonitoringTableSize: socketDefaultMonitoringTableSize,
+		UDPConnectionTableSize:    socketDefaultUDPConnectionTableSize,
 	}
 }
 
@@ -87,6 +97,12 @@ func resolveSocketLegacyConfig() (SocketLegacyConfig, error) {
 	}
 	if fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" {
 		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
+	}
+	if fileCfg.SocketMonitoringTableSize != nil && *fileCfg.SocketMonitoringTableSize > 0 {
+		cfg.SocketMonitoringTableSize = *fileCfg.SocketMonitoringTableSize
+	}
+	if fileCfg.UDPConnectionTableSize != nil && *fileCfg.UDPConnectionTableSize > 0 {
+		cfg.UDPConnectionTableSize = *fileCfg.UDPConnectionTableSize
 	}
 
 	kver, isRHF, err := resolveKernelAndRH()

@@ -282,8 +282,7 @@ To configure an eBPF thread:
 
 2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script to edit a thread configuration file. The following configuration files are available:
 
-    - `network.conf`: Configuration for the [`network` thread](#network-configuration). This config file overwrites the global options and also
-        lets you specify which network the eBPF collector monitors.
+    - `socket.conf`: Configuration for the socket thread. Lets you set BPF map sizes (`socket monitoring table size`, `udp connection table size`) and the standard `ebpf object flavor`/`maps per core` options.
     - `process.conf`: Configuration for the [`process` thread](#sync-configuration).
     - `cachestat.conf`: Configuration for the `cachestat` thread(#filesystem-configuration).
     - `dcstat.conf`: Configuration for the `dcstat` thread.
@@ -298,62 +297,6 @@ To configure an eBPF thread:
         ```bash
         ./edit-config FILE.conf
         ```
-
-### Network configuration
-
-The network configuration has specific options to configure which network(s) the eBPF collector monitors. These options
-are divided in the following sections:
-
-#### `[network connections]`
-
-You can configure the information shown with function `ebpf_socket` using the settings in this section.
-
-```text
-[network connections]
-    enabled = yes
-    resolve hostname ips = no
-    resolve service names = yes
-    ports = 1-1024 !145 !domain
-    hostnames = !example.com
-    ips = !127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
-```
-
-When you define a `ports` setting, Netdata will collect network metrics for that specific port. For example, if you
-write `ports = 19999`, Netdata will collect only connections for itself. The `hostnames` setting accepts
-[simple patterns](/src/libnetdata/simple_pattern/README.md). The `ports`, and `ips` settings accept negation (`!`) to deny
-specific values or asterisk alone to define all values.
-
-In the above example, Netdata will collect metrics for all ports between `1` and `1024`, with the exception of `53` (domain)
-and `145`.
-
-The following options are available:
-
-- `enabled`: Disable network connections monitoring. This can affect directly some funcion output.
-- `resolve hostname ips`: Enable resolving IPs to hostnames. It is disabled by default because it can be too slow.
-- `resolve service names`: Convert destination ports into service names, for example, port `53` protocol `UDP` becomes `domain`.
-    all names are read from /etc/services.
-- `ports`: Define the destination ports for Netdata to monitor.
-- `hostnames`: The list of hostnames that can be resolved to an IP address.
-- `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-    range of IPs, or use CIDR values.
-
-By default the traffic table is created using the destination IPs and ports of the sockets. This can be
-changed, so that Netdata uses service names (if possible), by specifying `resolve service name = yes` in the configuration
-section.
-
-#### `[service name]`
-
-Netdata uses the list of services in `/etc/services` to plot network connection charts. If this file does not contain
-the name for a particular service you use in your infrastructure, you will need to add it to the `[service name]`
-section.
-
-For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
-service in network connection charts, and thus see the name of the service instead of its port, define it:
-
-```text
-[service name]
-    19999 = Netdata
-```
 
 ### Sync configuration
 

@@ -33,6 +33,11 @@ static inline int bpf_map__set_type(struct bpf_map *map, enum bpf_map_type type)
     ((struct bpf_map_def *)bpf_map__def(map))->type = type;
     return 0;
 }
+
+static inline int bpf_map__set_max_entries(struct bpf_map *map, __u32 max_entries)
+{
+    return bpf_map__resize(map, max_entries);
+}
 #endif /* !LIBBPF_MAJOR_VERSION */
 
 /* Passive connection value stored in tbl_lports.
@@ -359,13 +364,27 @@ struct netdata_ebpf_socket_runtime *netdata_socket_runtime_open_mode(const char 
     return rt;
 }
 
-int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int maps_per_core)
+int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int maps_per_core,
+                                   uint32_t nd_socket_size, uint32_t nv_udp_size)
 {
     if (!rt || !rt->obj)
         return -1;
 
     socket_prepare_autoload(rt->obj, rt->kind == NETDATA_SOCKET_RUNTIME_CORE);
     socket_update_map_types(rt->obj, maps_per_core);
+
+    /* Resize user-configurable hash maps before bpf_object__load().
+     * A zero value means "keep the compiled-in default". */
+    if (nd_socket_size > 0) {
+        struct bpf_map *m = bpf_object__find_map_by_name(rt->obj, "tbl_nd_socket");
+        if (m)
+            bpf_map__set_max_entries(m, nd_socket_size);
+    }
+    if (nv_udp_size > 0) {
+        struct bpf_map *m = bpf_object__find_map_by_name(rt->obj, "tbl_nv_udp");
+        if (m)
+            bpf_map__set_max_entries(m, nv_udp_size);
+    }
 
     /* Allocate per-CPU buffer for tbl_global_sock snapshot reads.
      * Size depends on whether the map was switched to PERCPU_ARRAY. */

@@ -18,7 +18,7 @@ func tryLoadSocketPlan(cfg SocketLegacyConfig, plan LoadPlan) (*SocketLegacyHand
 		return nil, err
 	}
 
-	if err := rt.Prepare(cfg.MapsPerCore); err != nil {
+	if err := rt.Prepare(cfg.MapsPerCore, cfg.SocketMonitoringTableSize, cfg.UDPConnectionTableSize); err != nil {
 		rt.Close()
 		return nil, err
 	}

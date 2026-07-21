@@ -22,8 +22,10 @@ type pluginConfigFile struct {
 	UpdateEvery     *int
 	AppsEnabled     *bool
 	Cgroups         *bool
-	PidTable        *uint32
-	MapsPerCore     *bool
+	PidTable                  *uint32
+	SocketMonitoringTableSize *uint32
+	UDPConnectionTableSize    *uint32
+	MapsPerCore               *bool
 	BTFPath         *string
 	Lifetime        *int
 	ObjectFlavor    *string
@@ -210,6 +212,22 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 				cfg.PidTable = uint32Ptr(uint32(n))
 			}
 			found = true
+		case "socket monitoring table size":
+			n, err := strconv.ParseUint(value, 10, 32)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid socket monitoring table size %q, using default\n", path, value)
+			} else {
+				cfg.SocketMonitoringTableSize = uint32Ptr(uint32(n))
+			}
+			found = true
+		case "udp connection table size":
+			n, err := strconv.ParseUint(value, 10, 32)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid udp connection table size %q, using default\n", path, value)
+			} else {
+				cfg.UDPConnectionTableSize = uint32Ptr(uint32(n))
+			}
+			found = true
 		case "maps per core":
 			b, ok := parseConfigBool(value)
 			if !ok {
@@ -306,6 +324,12 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	}
 	if other.PidTable != nil {
 		c.PidTable = other.PidTable
+	}
+	if other.SocketMonitoringTableSize != nil {
+		c.SocketMonitoringTableSize = other.SocketMonitoringTableSize
+	}
+	if other.UDPConnectionTableSize != nil {
+		c.UDPConnectionTableSize = other.UDPConnectionTableSize
 	}
 	if other.MapsPerCore != nil {
 		c.MapsPerCore = other.MapsPerCore
