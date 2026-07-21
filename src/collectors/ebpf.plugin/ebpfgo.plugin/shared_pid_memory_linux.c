@@ -20,6 +20,7 @@ struct shared_pid_memory {
     uint32_t update_every_s;
     int shm_fd;
     sem_t *sem;
+    bool shm_owned; /* true only after successful open — guards shm_unlink in close */
 };
 
 static inline size_t shared_pid_memory_nbytes(const struct shared_pid_memory *ctx)
@@ -52,6 +53,51 @@ static void shared_pid_memory_invalidate(struct shared_pid_memory *ctx)
 
     if (locked)
         sem_post(ctx->sem);
+}
+
+/* Unlink and recreate both SHM and semaphore objects so that consumers
+ * detect the new inode on their next refresh and re-open a semaphore that
+ * starts at 1.  Called when sem_timedwait times out in the reused-segment
+ * path: a timeout cannot distinguish a slow live holder from a crashed owner,
+ * so posting without ownership is unsafe; replacing the generation is the
+ * only protocol-correct recovery. */
+static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t length)
+{
+    if (ctx->sem != SEM_FAILED) {
+        sem_close(ctx->sem);
+        ctx->sem = SEM_FAILED;
+    }
+    if (ctx->mapping) {
+        munmap(ctx->mapping, length);
+        ctx->mapping = NULL;
+        ctx->header  = NULL;
+        ctx->entries = NULL;
+    }
+    if (ctx->shm_fd >= 0) {
+        close(ctx->shm_fd);
+        ctx->shm_fd = -1;
+    }
+    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
+    (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
+
+    ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
+    if (ctx->shm_fd < 0)
+        return false;
+
+    if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
+        return false;
+
+    ctx->mapping = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
+    if (ctx->mapping == MAP_FAILED) {
+        ctx->mapping = NULL;
+        return false;
+    }
+    ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
+    ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
+
+    /* New SHM is kernel-zero-filled; no explicit memset needed. */
+    ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
+    return ctx->sem != SEM_FAILED;
 }
 
 struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_every_s)
@@ -131,18 +177,22 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
         goto fail;
 
     if (reused) {
-        /* Zero the segment under the semaphore so a reader that survived the
-         * crash cannot observe a torn copy.  Zeroing last_publish_ut causes
-         * any in-flight reader to reject the data via is_live.
-         * Always call sem_post after zeroing: if the previous writer crashed
-         * while holding the semaphore (value=0), sem_timedwait times out and
-         * locked=false; the unconditional sem_post resets the value to 1 so
-         * the first publish cycle and all consumers can proceed. */
-        bool locked = ebpfgo_shm_sem_wait(ctx->sem);
-        memset(ctx->mapping, 0, length);
-        (void)locked;
-        sem_post(ctx->sem);
+        if (ebpfgo_shm_sem_wait(ctx->sem)) {
+            /* Acquired: zero the segment so surviving consumers see a clean
+             * slate, then release.  Zeroing last_publish_ut makes any
+             * in-flight reader reject the data via is_live. */
+            memset(ctx->mapping, 0, length);
+            sem_post(ctx->sem);
+        } else {
+            /* Timed out: a slow live holder and a crashed owner both produce
+             * the same timeout; posting without ownership is unsafe.  Replace
+             * both SHM and semaphore so consumers detect the new inode on
+             * their next refresh and re-open a semaphore that starts at 1. */
+            if (!pid_shm_replace_generation(ctx, length))
+                goto fail;
+        }
     }
+    ctx->shm_owned = true;
     return ctx;
 
 fail:
@@ -210,11 +260,13 @@ void shared_pid_memory_close(struct shared_pid_memory *ctx)
         close(ctx->shm_fd);
 
     /* Unlink the SHM name so /dev/shm is not littered across Netdata restarts
-     * or version-name bumps.  The sem name is intentionally NOT unlinked here:
-     * the sem object must outlive this process so consumers and the next writer
-     * instance both open the same underlying kernel object (P1 semaphore-desync
-     * lesson). */
-    (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
+     * or version-name bumps.  Only unlink when we successfully completed open
+     * (shm_owned=true): a failed open must not unlink a live publisher's name.
+     * The sem name is intentionally NOT unlinked: the sem object must outlive
+     * this process so consumers and the next writer both open the same
+     * underlying kernel object (P1 semaphore-desync lesson). */
+    if (ctx->shm_owned)
+        (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
 
     free(ctx);
 }

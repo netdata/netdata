@@ -20,6 +20,7 @@ struct shared_dns_memory {
     uint32_t update_every_s;
     int shm_fd;
     sem_t *sem;
+    bool shm_owned; /* true only after successful open — guards shm_unlink in close */
 };
 
 static void shared_dns_memory_invalidate(struct shared_dns_memory *ctx)
@@ -38,6 +39,43 @@ static void shared_dns_memory_invalidate(struct shared_dns_memory *ctx)
 
     if (locked)
         sem_post(ctx->sem);
+}
+
+/* See pid_shm_replace_generation for the full rationale.  Same generation-
+ * replacement approach applied to the DNS SHM and semaphore objects. */
+static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t length)
+{
+    if (ctx->sem != SEM_FAILED) {
+        sem_close(ctx->sem);
+        ctx->sem = SEM_FAILED;
+    }
+    if (ctx->data) {
+        munmap(ctx->data, length);
+        ctx->data = NULL;
+    }
+    if (ctx->shm_fd >= 0) {
+        close(ctx->shm_fd);
+        ctx->shm_fd = -1;
+    }
+    (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
+    (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
+
+    ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_RDWR, 0660);
+    if (ctx->shm_fd < 0)
+        return false;
+
+    if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
+        return false;
+
+    ctx->data = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, ctx->shm_fd, 0);
+    if (ctx->data == MAP_FAILED) {
+        ctx->data = NULL;
+        return false;
+    }
+
+    /* New SHM is kernel-zero-filled; no explicit memset needed. */
+    ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0660, 1);
+    return ctx->sem != SEM_FAILED;
 }
 
 struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
@@ -91,15 +129,19 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         goto fail;
 
     if (reused) {
-        /* Zero and unconditionally release — see shared_pid_memory_linux.c
-         * for the full rationale.  The sem_post resets a semaphore stuck at 0
-         * from a crashed writer so the first publish and consumers can proceed. */
-        bool locked = ebpfgo_shm_sem_wait(ctx->sem);
-        memset(ctx->data, 0, length);
-        (void)locked;
-        sem_post(ctx->sem);
+        if (ebpfgo_shm_sem_wait(ctx->sem)) {
+            memset(ctx->data, 0, length);
+            sem_post(ctx->sem);
+        } else {
+            /* Timed out: see pid_shm_replace_generation for the rationale.
+             * Replace both SHM and semaphore instead of posting without
+             * ownership. */
+            if (!dns_shm_replace_generation(ctx, length))
+                goto fail;
+        }
     }
 
+    ctx->shm_owned = true;
     return ctx;
 
 fail:
@@ -164,8 +206,11 @@ void shared_dns_memory_close(struct shared_dns_memory *ctx)
     }
 
     /* Unlink the SHM name — see shared_pid_memory_linux.c for rationale.
+     * Only unlink when we successfully completed open (shm_owned=true): a
+     * failed open must not unlink a live publisher's name.
      * sem name is intentionally NOT unlinked here. */
-    (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
+    if (ctx->shm_owned)
+        (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
 
     free(ctx);
 }
