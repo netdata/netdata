@@ -111,6 +111,10 @@ func assertGroups(t *testing.T, params url.Values, groups map[string][]l5Member,
 			t.Errorf("group %q missing (have %v)", id, keys2(cols))
 			continue
 		}
+		if len(col) != l5Rows {
+			t.Errorf("%q: got %d rows, want %d", id, len(col), l5Rows)
+			continue
+		}
 		for _, pt := range col {
 			i := int(pt.T - fixture.T0)
 			want, wantAR, _, wantPartial, wantEmpty := l5Expected(agg, group, i, false)

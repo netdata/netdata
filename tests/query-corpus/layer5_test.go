@@ -384,6 +384,10 @@ func TestLayer5Percentage(t *testing.T) {
 						t.Errorf("group %q missing (have %v)", gname, keys2(cols))
 						continue
 					}
+					if len(col) != l5Rows {
+						t.Errorf("%q: got %d rows, want %d", gname, len(col), l5Rows)
+						continue
+					}
 					for _, pt := range col {
 						i := int(pt.T - fixture.T0)
 						var n, h float64
