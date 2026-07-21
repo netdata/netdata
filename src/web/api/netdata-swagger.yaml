@@ -6722,7 +6722,7 @@ paths:
       description: |
         **Bearer Token Authentication Control**
 
-        This endpoint controls whether the Netdata agent requires bearer token authentication for API access. Bearer protection adds an additional security layer by downgrading unauthenticated requests to `HTTP_ACCESS_NONE` when enabled. To reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`, an unauthenticated direct HTTP request must present a valid bearer token in the `Authorization` header. WebRTC requests are never parsed for an `Authorization` header, so an unauthenticated WebRTC call cannot supply a bearer token and is rejected for such routes. Already-authenticated sessions (for example Netdata Cloud/ACLK) keep their permissions and are unaffected. Routes declared with `HTTP_ACCESS_NONE` do not acquire a generic bearer-token requirement; their own ACL, transport, and callback authorization still apply.
+        This endpoint controls whether the Netdata agent requires bearer token authentication for API access. Bearer protection adds an additional security layer by downgrading unauthenticated requests to `HTTP_ACCESS_NONE` when enabled. To reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`, an unauthenticated direct HTTP request must present a valid bearer token in the `Authorization` header. API messages sent over an established WebRTC data channel are not parsed for an `Authorization` header (unlike the initial HTTP `rtc_offer` signaling request, which is), so an unauthenticated call made over the data channel cannot supply a bearer token and is rejected for such routes. Already-authenticated sessions (for example Netdata Cloud/ACLK) keep their permissions and are unaffected. Routes declared with `HTTP_ACCESS_NONE` do not acquire a generic bearer-token requirement; their own ACL, transport, and callback authorization still apply.
 
         **Use Cases:**
         - **Cloud Integration:** Enable bearer protection when agent is claimed to Netdata Cloud
@@ -6745,7 +6745,7 @@ paths:
         - All three identifiers must be present and match for the operation to succeed
 
         **Protection States:**
-        - **Enabled (true):** An unauthenticated direct HTTP request needs a valid bearer token (in the `Authorization` header) to reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`; unauthenticated WebRTC requests carry no `Authorization` header and so are rejected for such routes; already-authenticated sessions keep their permissions, and `HTTP_ACCESS_NONE` routes (such as claim) do not acquire a generic bearer-token requirement, though their own ACL, transport, and callback authorization still apply
+        - **Enabled (true):** An unauthenticated direct HTTP request needs a valid bearer token (in the `Authorization` header) to reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`; unauthenticated API messages sent over an established WebRTC data channel carry no `Authorization` header and so are rejected for such routes; already-authenticated sessions keep their permissions, and `HTTP_ACCESS_NONE` routes (such as claim) do not acquire a generic bearer-token requirement, though their own ACL, transport, and callback authorization still apply
         - **Disabled (false):** API requests do not require bearer tokens (default for unclaimed agents)
 
         **Important Notes:**
@@ -6759,7 +6759,7 @@ paths:
         **Typical Workflow:**
         1. Agent is claimed to Netdata Cloud
         2. Cloud calls this endpoint to enable bearer protection
-        3. Unauthenticated direct HTTP calls to routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA` then require a bearer token, while unauthenticated WebRTC calls (which carry no `Authorization` header) are rejected for such routes (already-authenticated sessions keep their permissions)
+        3. Unauthenticated direct HTTP calls to routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA` then require a bearer token, while unauthenticated API messages sent over an established WebRTC data channel (which carry no `Authorization` header) are rejected for such routes (already-authenticated sessions keep their permissions)
         4. Cloud obtains tokens via `/api/v3/bearer_get_token` as needed
         5. Tokens are included in Authorization headers for authenticated requests
 
@@ -6792,7 +6792,7 @@ paths:
             - When agent is claimed, typically enabled by Netdata Cloud
 
             **Effect:**
-            - When enabled: an unauthenticated direct HTTP request must include a valid bearer token in the `Authorization` header to reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`; unauthenticated WebRTC requests carry no `Authorization` header and are rejected for such routes; already-authenticated sessions keep their permissions, and `HTTP_ACCESS_NONE` routes do not acquire a generic bearer-token requirement, though their own ACL, transport, and callback authorization still apply
+            - When enabled: an unauthenticated direct HTTP request must include a valid bearer token in the `Authorization` header to reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`; unauthenticated API messages sent over an established WebRTC data channel carry no `Authorization` header and are rejected for such routes; already-authenticated sessions keep their permissions, and `HTTP_ACCESS_NONE` routes do not acquire a generic bearer-token requirement, though their own ACL, transport, and callback authorization still apply
             - When disabled: API requests work without bearer tokens (less secure)
 
             Example: `bearer_protection=on`
