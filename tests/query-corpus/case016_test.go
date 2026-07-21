@@ -14,13 +14,12 @@
 // (self-healing); ephemeral or no-retention children lose the data
 // permanently — the same healing asymmetry as CASE-015.
 //
-// The bug is a RACE against the 5s scan phase: if a scan tick happens to
-// fire between the fresh host's connection and the shutdown, the host is
-// persisted and that attempt does not reproduce (seen under full-suite
-// load). The case therefore retries with a brand-new fresh host up to
-// three times — reproducing once proves the bug; three consecutive
-// survivals demand the manifest flip (that is the fixed behavior, where
-// the shutdown flush persists the host regardless of scan phase).
+// FIXED by #23120 (merged 2026-07-16): the metasync shutdown path now
+// runs a final host scan, so the fresh host persists regardless of scan
+// phase — the case is GREEN and pins that guarantee. The bug was a RACE
+// against the 5s scan phase, so the case still retries with a brand-new
+// fresh host up to three times: a single reproduction flags a
+// regression; three consecutive survivals are the fixed behavior.
 package corpus
 
 import (
