@@ -60,6 +60,8 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | L9/live-edge | past-now queries: grid from requested before (no clamp); at most one future-stamped tail bucket or a trimmed tail (phase-dependent, envelope-pinned) | green | n/a | |
 | L9/v2-v3-parity | /api/v2/data == /api/v3/data for identical params (shared implementation; only the api field differs) | green | n/a | |
 | API/selectors | nodes/instances/dimensions/labels filters + scope_ variants, ! negation, label key:value; match-ids/match-names with id!=name dims (default matches both); value-exact via the member oracle | green | n/a | |
+| API/options-long-tail | ms, rfc3339 (v1 no-op with seconds, pinned), objectrows, all-dimensions (full_* blocks), gviz tqx envelope, tsv-excel alias, label-quotes, v2 minimal-stats/long-json-keys/group-by-labels | green | n/a | |
+| API/row-reductions | ssv min2max/min/max/average exact cells (default sum pinned by L7) | green | n/a | |
 | API/fallbacks-and-limits | unknown v1 format → json; unknown weights method → ks2; cardinality_limit 2 folds five dims, >= dim count folds nothing | green | n/a | |
 | W/value | weights value = after-INCLUSIVE window average (121 pts/120s — ruling pending); rollups = mean of dims; timeframe stats exact; value never rank-normalizes | green | n/a | |
 | W/anomaly-rate-per-metric | per-metric anomaly-rate = true anomaly rates (anomaly bit applied); NONZERO default drops zero weights, explicit options keep them | green | n/a | |
