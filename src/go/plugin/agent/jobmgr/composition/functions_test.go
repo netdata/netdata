@@ -278,8 +278,7 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 		Job: job,
 	})
 	require.NoError(t, err)
-	permit, err := lifecycle.NewJobLongLivedPlan(40)
-	require.NoError(t, err)
+	permit := lifecycle.NewJobLongLivedPlan()
 	return shutdownFunctionHarness{
 		kernel: kernel, run: run, admission: admission, uids: uids,
 		tasks: tasks, output: output, job: job, handle: handle,

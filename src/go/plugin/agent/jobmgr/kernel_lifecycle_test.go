@@ -747,8 +747,7 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 			var events []string
 			current := newKernelTestReadyResource("resource", nil, nil)
 			successor := newKernelTestReadyResource("resource", nil, nil)
-			permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-			require.NoError(t, err)
+			permitPlan := lifecycle.NewJobLongLivedPlan()
 			planner := kernelTestTransactionPlanner{
 				permitPlan: permitPlan,
 				current:    current,
@@ -781,7 +780,7 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 				uid = "replace-success"
 			}
 
-			err = kernel.SubmitAndWait(
+			err := kernel.SubmitAndWait(
 				context.Background(),
 				Request{
 					UID:     uid,
@@ -828,8 +827,7 @@ func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
 	var events []string
 	current := newKernelTestReadyResource("resource", nil, nil)
 	successor := newKernelTestReadyResource("resource", nil, nil)
-	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-	require.NoError(t, err)
+	permitPlan := lifecycle.NewJobLongLivedPlan()
 	resourcePlanner := kernelTestTransactionPlanner{
 		permitPlan: permitPlan,
 		current:    current,
@@ -913,8 +911,7 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 	var events []string
 	current := newKernelTestReadyResource("resource", nil, nil)
 	successor := newKernelTestReadyResource("resource", nil, nil)
-	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-	require.NoError(t, err)
+	permitPlan := lifecycle.NewJobLongLivedPlan()
 	planner := kernelTestTransactionPlanner{
 		permitPlan:          permitPlan,
 		current:             current,
@@ -984,8 +981,7 @@ func TestKernelPreparedInternalTransactionAppliesWithoutResponse(t *testing.T) {
 	var events []string
 	current := newKernelTestReadyResource("resource", nil, nil)
 	successor := newKernelTestReadyResource("resource", nil, nil)
-	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-	require.NoError(t, err)
+	permitPlan := lifecycle.NewJobLongLivedPlan()
 	planner := kernelTestTransactionPlanner{
 		permitPlan: permitPlan,
 		current:    current,
@@ -1122,8 +1118,7 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 		id := fmt.Sprintf("resource-%02d", index)
 		resources[id] = newKernelTestReadyResource(id, nil, stopRelease)
 	}
-	permitPlan, err := lifecycle.NewJobLongLivedPlan(512)
-	require.NoError(t, err)
+	permitPlan := lifecycle.NewJobLongLivedPlan()
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, kernelTestResourceSetPlanner{
 		permitPlan: permitPlan,
 		resources:  resources,
@@ -1154,15 +1149,12 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 	active := tasks.Active()
 	require.EqualValues(t, population, active)
 
-	wantLongLivedBytes := int64(population) *
-		512
-
 	census := tasks.LongLivedCensus()
-	require.False(t, census.Active != population || census.Bytes != wantLongLivedBytes)
+	require.False(t, census.Active != population || census.Jobs != population || census.Bytes != 0)
 
 	admissionCensus := admission.Census()
-	require.False(t, admissionCensus.LongLivedRecords != population ||
-		admissionCensus.LongLivedBytes != wantLongLivedBytes)
+	require.False(t, admissionCensus.LongLivedRecords != 0 ||
+		admissionCensus.LongLivedBytes != 0)
 
 	close(stopRelease)
 
@@ -2317,12 +2309,11 @@ func TestKernelRunFinalizerRejectsUnrelatedLongLivedPermit(t *testing.T) {
 		return nil
 	})
 	kernel, run, admission, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, 10*time.Millisecond)
-	plan, err := lifecycle.NewJobLongLivedPlan(512)
-	require.NoError(t, err)
+	plan := lifecycle.NewJobLongLivedPlan()
 	requested := admission.RequestOrdinary(
 		run.Generation(),
 		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
-		plan.Bytes()+512,
+		512,
 	)
 	require.Nil(t, requested.Rejected)
 	var grants [4]lifecycle.AdmissionGrant
@@ -2370,12 +2361,11 @@ func TestKernelRejectsMissingRunFinalizer(t *testing.T) {
 
 func TestKernelCannotReportQuiescentWithRetainedLongLivedPermit(t *testing.T) {
 	kernel, run, admission, _, tasks := newKernelWithPlannerAndTimeout(t, stoppedKernelPlanner{}, time.Millisecond)
-	permitPlan, err := lifecycle.NewJobLongLivedPlan(512)
-	require.NoError(t, err)
+	permitPlan := lifecycle.NewJobLongLivedPlan()
 	requested := admission.RequestOrdinary(
 		run.Generation(),
 		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
-		permitPlan.Bytes()+512,
+		512,
 	)
 	require.Nil(t, requested.Rejected)
 	var grants [4]lifecycle.AdmissionGrant
@@ -2770,13 +2760,12 @@ func TestOperationAdmissionBytesUsesAggregateFrameworkOverhead(t *testing.T) {
 	require.EqualValues(t, want, got)
 }
 
-func TestOperationAdmissionBytesChargesDeclaredLongLivedBytes(t *testing.T) {
+func TestOperationAdmissionBytesChargesOnlyByteOwningLongLivedPlans(t *testing.T) {
 	pipeline, err := lifecycle.NewPipelineLongLivedPlan(
 		[]string{"provider"},
 	)
 	require.NoError(t, err)
-	job, err := lifecycle.NewJobLongLivedPlan(73)
-	require.NoError(t, err)
+	job := lifecycle.NewJobLongLivedPlan()
 	secretStore, err := lifecycle.NewSecretStoreLongLivedPlan(91)
 	require.NoError(t, err)
 	tests := map[string]struct {
@@ -2787,9 +2776,9 @@ func TestOperationAdmissionBytesChargesDeclaredLongLivedBytes(t *testing.T) {
 			permit: pipeline,
 			want:   operationFrameworkAdmissionBytes,
 		},
-		"Job retained bytes": {
+		"charge-free Job": {
 			permit: job,
-			want:   operationFrameworkAdmissionBytes + 73,
+			want:   operationFrameworkAdmissionBytes,
 		},
 		"SecretStore retained bytes": {
 			permit: secretStore,
@@ -3551,8 +3540,7 @@ func testFunctionCatalogFor(t *testing.T, kernel *testCommandKernel) *testFuncti
 
 func kernelResourcePlanner(t *testing.T, resource *kernelTestReadyResource, workEntered chan<- struct{}, workRelease <-chan struct{}) testPlanner {
 	t.Helper()
-	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-	require.NoError(t, err)
+	permitPlan := lifecycle.NewJobLongLivedPlan()
 	return kernelTestResourcePlanner{
 		permitPlan:  permitPlan,
 		resource:    resource,

@@ -82,8 +82,7 @@ func testLongLivedGenerationRetirement(t *testing.T) {
 		{generation: 7},
 	}
 	supervisor.longLived.freeHead = 1
-	plan, err := NewJobLongLivedPlan(1)
-	require.NoError(t, err)
+	plan := NewJobLongLivedPlan()
 	admissionRef := grantLongLivedTestAdmission(t, admission, 1)
 
 	permit, err := supervisor.IssueLongLivedPermit(

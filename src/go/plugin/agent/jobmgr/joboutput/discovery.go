@@ -13,10 +13,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const (
-	DynCfgJobGraphClaim     = "dyncfg:jobs"
-	DefaultJobRetainedBytes = 512
-)
+const DynCfgJobGraphClaim = "dyncfg:jobs"
 
 type DiscoveredJobChange struct {
 	Config  confgroup.Config        // discovered job configuration
@@ -84,10 +81,7 @@ func (dcjc *DynCfgJobController) PlanDiscovered(
 			errors.New("job output: only a running discovery config can restart")
 	}
 	if change.Status == dyncfg.StatusRunning {
-		permit, err = lifecycle.NewJobLongLivedPlan(DefaultJobRetainedBytes)
-		if err != nil {
-			return jobmgr.WorkPlan{}, err
-		}
+		permit = lifecycle.NewJobLongLivedPlan()
 	}
 	return jobmgr.WorkPlan{
 		Claims:     []string{DynCfgJobGraphClaim},

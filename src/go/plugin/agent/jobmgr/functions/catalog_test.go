@@ -205,8 +205,7 @@ func TestFunctionPayloadValidationRunsInTaskChild(t *testing.T) {
 }
 
 func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
-	permit, err := lifecycle.NewJobLongLivedPlan(4096)
-	require.NoError(t, err)
+	permit := lifecycle.NewJobLongLivedPlan()
 	tests := map[string]struct {
 		command           string
 		allocateSuccessor bool
@@ -1132,8 +1131,7 @@ func TestFunctionCatalogBoundedMutationTurns(t *testing.T) {
 }
 
 func TestCatalogRejectsInvalidDeclarations(t *testing.T) {
-	permit, err := lifecycle.NewJobLongLivedPlan(1)
-	require.NoError(t, err)
+	permit := lifecycle.NewJobLongLivedPlan()
 	tests := map[string]Declaration{
 		"missing handler": {
 			ID: "method", Generation: &HandlerGenerationDeclaration{ID: "generation"},

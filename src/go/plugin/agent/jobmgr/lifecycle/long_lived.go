@@ -57,32 +57,21 @@ func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
 	return plan, plan.Validate()
 }
 
-func NewJobLongLivedPlan(bytes int64) (LongLivedPlan, error) {
-	return newResourceLongLivedPlan(
-		LongLivedJob,
-		LongLivedEJobResources,
-		bytes,
-	)
+func NewJobLongLivedPlan() LongLivedPlan {
+	return LongLivedPlan{
+		class: LongLivedJob, external: LongLivedEJobResources,
+	}
 }
 
 func NewSecretStoreLongLivedPlan(bytes int64) (LongLivedPlan, error) {
-	return newResourceLongLivedPlan(
-		LongLivedSecretStore,
-		LongLivedESecretStore,
-		bytes,
-	)
-}
-
-func newResourceLongLivedPlan(
-	class LongLivedClass,
-	e LongLivedExternalFacet,
-	bytes int64,
-) (LongLivedPlan, error) {
 	if bytes <= 0 || bytes >= OrdinaryBudgetBytes {
 		return LongLivedPlan{},
 			errors.New("jobmgr long-lived permit: invalid retained byte charge")
 	}
-	plan := LongLivedPlan{class: class, bytes: bytes, external: e}
+	plan := LongLivedPlan{
+		class: LongLivedSecretStore, bytes: bytes,
+		external: LongLivedESecretStore,
+	}
 	return plan, plan.Validate()
 }
 
@@ -98,7 +87,7 @@ func (llp LongLivedPlan) Validate() error {
 			return errors.New("jobmgr long-lived permit: invalid pipeline facets")
 		}
 	case LongLivedJob:
-		if llp.bytes <= 0 ||
+		if llp.bytes != 0 ||
 			len(llp.providerKeys) != 0 ||
 			llp.external != LongLivedEJobResources {
 			return errors.New("jobmgr long-lived permit: invalid job facets")
@@ -162,9 +151,9 @@ func (llp LongLivedPermit) Valid() bool {
 		return false
 	}
 	switch llp.class {
-	case LongLivedPipeline:
+	case LongLivedPipeline, LongLivedJob:
 		return llp.bytes == 0
-	case LongLivedJob, LongLivedSecretStore:
+	case LongLivedSecretStore:
 		return llp.bytes > 0
 	default:
 		return false
@@ -520,7 +509,7 @@ func (ts *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, owner Re
 		return errors.New("jobmgr long-lived permit: byte release before inherited-task/external facets")
 	}
 	if slot.bytes == 0 {
-		if slot.class != LongLivedPipeline ||
+		if (slot.class != LongLivedPipeline && slot.class != LongLivedJob) ||
 			slot.admission != nil ||
 			slot.admissionRef.Valid() {
 			registry.mu.Unlock()
@@ -582,7 +571,7 @@ func reserveLongLivedAdmission(
 	plan LongLivedPlan,
 ) error {
 	if plan.bytes == 0 {
-		if plan.class != LongLivedPipeline {
+		if plan.class != LongLivedPipeline && plan.class != LongLivedJob {
 			return errors.New(
 				"jobmgr long-lived permit: invalid charge-free class",
 			)

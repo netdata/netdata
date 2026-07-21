@@ -102,8 +102,7 @@ func testTaskRequestGrowth(t *testing.T) {
 func testLongLivedJobGrowth(t *testing.T) {
 	admission := NewAdmissionLedger()
 	supervisor := newLongLivedTestSupervisor(t)
-	plan, err := NewJobLongLivedPlan(1)
-	require.NoError(t, err)
+	plan := NewJobLongLivedPlan()
 	permits := make([]LongLivedPermit, 0, formerFixedPopulation+1)
 	for index := 0; index <= formerFixedPopulation; index++ {
 		ref := grantLongLivedTestAdmission(t, admission, 2)

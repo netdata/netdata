@@ -23,8 +23,7 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 		Current:   current.identity,
 		Successor: ResourceIdentity{ID: "job", Generation: 2},
 	}
-	permit, err := NewJobLongLivedPlan(40)
-	require.NoError(t, err)
+	permit := NewJobLongLivedPlan()
 	plan, err := NewResourceTransactionPermitTaskPlan(
 		SourceJobManager,
 		time.Time{},

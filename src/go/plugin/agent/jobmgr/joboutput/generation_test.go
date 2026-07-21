@@ -409,8 +409,7 @@ func issueTestJobPermit(
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
 	admission := lifecycle.NewAdmissionLedger()
-	plan, err := lifecycle.NewJobLongLivedPlan(DefaultJobRetainedBytes)
-	require.NoError(t, err)
+	plan := lifecycle.NewJobLongLivedPlan()
 	requested := admission.RequestOrdinary(
 		1,
 		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},

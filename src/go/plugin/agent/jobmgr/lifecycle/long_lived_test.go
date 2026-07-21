@@ -178,29 +178,21 @@ func TestPipelineLongLivedPlanProviderKeys(t *testing.T) {
 	}
 }
 
-func TestLongLivedResourcePlansChargeDeclaredBytes(t *testing.T) {
-	tests := map[string]struct {
-		newPlan func(int64) (LongLivedPlan, error)
-	}{
-		"job": {
-			newPlan: NewJobLongLivedPlan,
-		},
-		"secret store": {
-			newPlan: NewSecretStoreLongLivedPlan,
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			const retainedBytes = int64(73)
-			plan, err := test.newPlan(retainedBytes)
-			require.NoError(t, err)
-			require.EqualValues(t, retainedBytes, plan.Bytes())
+func TestJobLongLivedPlanOwnsResourcesWithoutAdmissionCharge(t *testing.T) {
+	plan := NewJobLongLivedPlan()
+	require.NoError(t, plan.Validate())
+	require.Equal(t, LongLivedJob, plan.Class())
+	require.Zero(t, plan.Bytes())
+}
 
-			newPlan2, newPlanErr := test.newPlan(0)
-			require.Error(t, newPlanErr, "plan=%+v", newPlan2)
+func TestSecretStoreLongLivedPlanChargesDeclaredBytes(t *testing.T) {
+	const retainedBytes = int64(73)
+	plan, err := NewSecretStoreLongLivedPlan(retainedBytes)
+	require.NoError(t, err)
+	require.EqualValues(t, retainedBytes, plan.Bytes())
 
-		})
-	}
+	invalid, err := NewSecretStoreLongLivedPlan(0)
+	require.Error(t, err, "plan=%+v", invalid)
 }
 
 func TestZeroChargePipelinePermitRequiresLiveAdmissionAuthority(t *testing.T) {
@@ -332,10 +324,9 @@ func TestPipelinePermitReleasesDisabledProviderClaim(t *testing.T) {
 
 func TestLongLivedPermitSurvivesOperationAdmissionRelease(t *testing.T) {
 	admission := NewAdmissionLedger()
-	ref := grantLongLivedTestAdmission(t, admission, 100)
+	ref := grantLongLivedTestAdmission(t, admission, 0)
 	supervisor := newLongLivedTestSupervisor(t)
-	plan, err := NewJobLongLivedPlan(40)
-	require.NoError(t, err)
+	plan := NewJobLongLivedPlan()
 	permit, err := supervisor.IssueLongLivedPermit(admission, ref, ResourceIdentity{ID: "job", Generation: 1}, plan)
 	require.NoError(t, err)
 
@@ -346,8 +337,11 @@ func TestLongLivedPermitSurvivesOperationAdmissionRelease(t *testing.T) {
 	require.False(t, census.ActiveRecords != 0 ||
 		census.FreeRecords == 0 ||
 		census.OrdinaryGranted != 0 ||
-		census.OrdinaryBytes != plan.Bytes() ||
-		census.LongLivedBytes != plan.Bytes())
+		census.OrdinaryBytes != 0 ||
+		census.LongLivedBytes != 0)
+	require.EqualValues(t, LongLivedCensus{
+		Active: 1, Jobs: 1, ExternalReserved: 1,
+	}, supervisor.LongLivedCensus())
 
 	require.NoError(t, permit.ReleaseExternal(LongLivedEJobResources))
 
@@ -365,8 +359,7 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 	supervisor := newLongLivedTestSupervisor(t)
 	pipelinePlan, err := NewPipelineLongLivedPlan([]string{"provider"})
 	require.NoError(t, err)
-	jobPlan, err := NewJobLongLivedPlan(1)
-	require.NoError(t, err)
+	jobPlan := NewJobLongLivedPlan()
 
 	const jobs = formerFixedPopulation + 1
 	permits := make([]LongLivedPermit, 0, jobs+1)
@@ -406,8 +399,8 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 
 	census := admission.Census()
 	require.False(t, census.ActiveRecords != 0 ||
-		census.LongLivedRecords != jobs ||
-		census.OrdinaryBytes != int64(jobs)*jobPlan.Bytes())
+		census.LongLivedRecords != 0 ||
+		census.OrdinaryBytes != 0)
 
 	require.EqualValues(t, jobs+1, supervisor.LongLivedCensus().Active)
 
@@ -425,10 +418,9 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 
 func TestLongLivedPermitRemainsLiveAfterIssuanceIsSealed(t *testing.T) {
 	admission := NewAdmissionLedger()
-	ref := grantLongLivedTestAdmission(t, admission, 40)
+	ref := grantLongLivedTestAdmission(t, admission, 0)
 	supervisor := newLongLivedTestSupervisor(t)
-	plan, err := NewJobLongLivedPlan(40)
-	require.NoError(t, err)
+	plan := NewJobLongLivedPlan()
 	permit, err := supervisor.IssueLongLivedPermit(
 		admission,
 		ref,
@@ -559,10 +551,10 @@ func TestLongLivedByteReleaseSignalsNewAdmissionCapacity(t *testing.T) {
 
 	admission := NewAdmissionLedger()
 	ownerRef := grantLongLivedTestAdmission(t, admission, 100)
-	plan, err := NewJobLongLivedPlan(40)
+	plan, err := NewSecretStoreLongLivedPlan(40)
 	require.NoError(t, err)
 	permit, err := supervisor.IssueLongLivedPermit(
-		admission, ownerRef, ResourceIdentity{ID: "owner", Generation: 1}, plan,
+		admission, ownerRef, ResourceIdentity{ID: "secret-store", Generation: 1}, plan,
 	)
 	require.NoError(t, err)
 
@@ -580,7 +572,7 @@ func TestLongLivedByteReleaseSignalsNewAdmissionCapacity(t *testing.T) {
 	count, _, err := admission.TakeGrants(2, &grants)
 	require.False(t, err != nil || count != 1 || grants[0].Ref != blocker.Ref)
 
-	require.NoError(t, permit.ReleaseExternal(LongLivedEJobResources))
+	require.NoError(t, permit.ReleaseExternal(LongLivedESecretStore))
 
 	require.NoError(t, permit.ReleaseBytes())
 

@@ -121,12 +121,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 		return jobmgr.WorkPlan{}, nil,
 			errors.New("job output: invalid dependent start")
 	}
-	permit, err := lifecycle.NewJobLongLivedPlan(
-		DefaultJobRetainedBytes,
-	)
-	if err != nil {
-		return jobmgr.WorkPlan{}, nil, err
-	}
+	permit := lifecycle.NewJobLongLivedPlan()
 	state := &SecretDependentStart{}
 	// The enclosing secret mutation keeps the dependency graph stable through
 	// this acknowledged restart.

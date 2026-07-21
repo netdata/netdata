@@ -15,8 +15,7 @@ import (
 )
 
 const (
-	dynCfgJobRetainedBytes int64 = joboutput.DefaultJobRetainedBytes
-	dynCfgJobGlobalClaim         = joboutput.DynCfgJobGraphClaim
+	dynCfgJobGlobalClaim = joboutput.DynCfgJobGraphClaim
 )
 
 // dynCfgJobBinding seals the construction cycle between the immutable Function
@@ -91,12 +90,7 @@ func newDynCfgJobInitialRoute(
 		return functionadapter.InitialRoute{},
 			errors.New("jobmgr composition: invalid DynCfg job route")
 	}
-	permit, err := lifecycle.NewJobLongLivedPlan(
-		dynCfgJobRetainedBytes,
-	)
-	if err != nil {
-		return functionadapter.InitialRoute{}, err
-	}
+	permit := lifecycle.NewJobLongLivedPlan()
 	return functionadapter.InitialRoute{
 		Declaration: functionadapter.Declaration{
 			ID: "dyncfg/jobs",

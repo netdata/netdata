@@ -653,8 +653,7 @@ func TestPlainStockRetryCanRestartAfterFailedGraphRecordWasRemoved(t *testing.T)
 	controller.scheduler.retries.mu.Lock()
 	token := controller.scheduler.retries.entries[config.FullName()].token
 	controller.scheduler.retries.mu.Unlock()
-	permitPlan, err := lifecycle.NewJobLongLivedPlan(DefaultJobRetainedBytes)
-	require.NoError(t, err)
+	permitPlan := lifecycle.NewJobLongLivedPlan()
 	admission := lifecycle.NewAdmissionLedger()
 	requested := admission.RequestOrdinary(
 		1,

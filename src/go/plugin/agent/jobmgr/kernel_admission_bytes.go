@@ -78,9 +78,9 @@ func validPersistentAdmission(
 		return false
 	}
 	switch plan.Class() {
-	case lifecycle.LongLivedPipeline:
+	case lifecycle.LongLivedPipeline, lifecycle.LongLivedJob:
 		return plan.Bytes() == 0
-	case lifecycle.LongLivedJob, lifecycle.LongLivedSecretStore:
+	case lifecycle.LongLivedSecretStore:
 		return plan.Bytes() > 0 && plan.Bytes() <= available
 	default:
 		return false
