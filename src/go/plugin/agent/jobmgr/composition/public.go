@@ -20,7 +20,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -51,18 +50,13 @@ type Config struct {
 	RunJob                []string                         // allow-list filter of job names (empty = allow all)
 	AutoEnable            bool                             // publish discovered jobs as Running vs Accepted
 
-	SecretStoreCreators []secretstore.Creator          // secret store backend creators (vault/aws/azure/gcp)
-	Resolver            *secretresolver.AtomicResolver // atomic secret resolver
-	InitialSecrets      []secretstore.Config           // initial secret store configs
-	InitialVnodes       map[string]*vnodes.VirtualNode // file-configured vnodes
-	InitialJobs         []dyncfg.GraphConfig           // initial (stock/user) job configs
+	InitialSecrets []secretstore.Config           // initial secret store configs
+	InitialVnodes  map[string]*vnodes.VirtualNode // file-configured vnodes
 
 	Runtime RuntimeService // runtime service (charts/host-scope; nil disables runtime charts)
 
-	FirstGeneration uint64          // starting run generation (0 -> 1)
-	ShutdownTimeout time.Duration   // per-run shutdown budget
-	Clock           lifecycle.Clock // logical/real clock
-	KeepAlive       bool            // emit keepalive frames (long-lived agent mode)
+	ShutdownTimeout time.Duration // per-run shutdown budget
+	KeepAlive       bool          // emit keepalive frames (long-lived agent mode)
 }
 
 // Process owns the one process-lifetime ingress and rotates only complete run
@@ -101,20 +95,13 @@ func NewProcess(config Config) (*Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	creators := slices.Clone(config.SecretStoreCreators)
-	if len(creators) == 0 {
-		creators = backends.Creators()
-	}
-	creatorCatalog, err := secretstore.NewCreatorCatalog(creators)
+	creatorCatalog, err := secretstore.NewCreatorCatalog(backends.Creators())
 	if err != nil {
 		return nil, err
 	}
-	resolver := config.Resolver
-	if resolver == nil {
-		resolver, err = secretresolver.NewDefaultAtomicResolver()
-		if err != nil {
-			return nil, err
-		}
+	resolver, err := secretresolver.NewDefaultAtomicResolver()
+	if err != nil {
+		return nil, err
 	}
 	initialVnodes := make(
 		map[string]*vnodes.VirtualNode,
@@ -129,14 +116,6 @@ func NewProcess(config Config) (*Process, error) {
 		}
 		initialVnodes[id] = vnode.Copy()
 	}
-	initialJobs := make(
-		[]dyncfg.GraphConfig,
-		len(config.InitialJobs),
-	)
-	for index, record := range config.InitialJobs {
-		record.Payload = slices.Clone(record.Payload)
-		initialJobs[index] = record
-	}
 	build := config.DiscoveryBuildContext
 	if build.Identity.Name == "" {
 		build.Identity.Name = config.PluginName
@@ -149,10 +128,6 @@ func NewProcess(config Config) (*Process, error) {
 	build.Registry = defaults
 	build.Out = config.Output
 	build.FnReg = nil
-	firstGeneration := config.FirstGeneration
-	if firstGeneration == 0 {
-		firstGeneration = 1
-	}
 	shutdownTimeout := config.ShutdownTimeout
 	if shutdownTimeout == 0 {
 		shutdownTimeout = 10 * time.Second
@@ -167,7 +142,6 @@ func NewProcess(config Config) (*Process, error) {
 	}
 	core, err := newProcessCore(processCoreConfig{
 		Input: config.Input, Output: config.Output,
-		Clock: config.Clock, FirstGeneration: firstGeneration,
 		ShutdownTimeout: shutdownTimeout,
 		KeepAlive:       config.KeepAlive,
 		Modules:         modules,
@@ -179,7 +153,6 @@ func NewProcess(config Config) (*Process, error) {
 			Runtime:       config.Runtime,
 			Vnodes:        vnoderegistry.New(),
 			InitialVnodes: initialVnodes,
-			Graph:         initialJobs,
 		},
 		Secrets: runSecretServices{
 			Initial: initialSecrets,
@@ -236,29 +209,6 @@ func (p *Process) Restart(ctx context.Context) error {
 
 func (p *Process) Terminate(ctx context.Context) error {
 	return p.send(ctx, processTerminate)
-}
-
-func (p *Process) Done() <-chan struct{} {
-	if p == nil {
-		closed := make(chan struct{})
-		close(closed)
-		return closed
-	}
-	return p.done
-}
-
-func (p *Process) Wait(ctx context.Context) error {
-	if p == nil || ctx == nil {
-		return errors.New("jobmgr composition: invalid production wait")
-	}
-	select {
-	case <-p.done:
-		p.mu.Lock()
-		defer p.mu.Unlock()
-		return p.result
-	case <-ctx.Done():
-		return ctx.Err()
-	}
 }
 
 func (p *Process) send(
@@ -331,19 +281,8 @@ func cloneSecretConfigs(
 }
 
 func productionPlanner(
-	capabilities runPlannerCapabilities,
+	runPlannerCapabilities,
 ) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-	if capabilities.Tasks == nil ||
-		capabilities.Functions == nil ||
-		capabilities.Jobs == nil ||
-		capabilities.DynCfg == nil ||
-		capabilities.Graph == nil ||
-		capabilities.StoreScope == nil ||
-		capabilities.StoreCensus == nil {
-		return nil, nil, errors.New(
-			"jobmgr composition: incomplete production capabilities",
-		)
-	}
 	return productionRejectingPlanner{},
 		jobmgr.RunFinalizerFunc(
 			func(context.Context, uint64) error { return nil },

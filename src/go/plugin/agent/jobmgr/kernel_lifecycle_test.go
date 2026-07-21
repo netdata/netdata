@@ -2857,7 +2857,8 @@ func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing
 	_, abortInputBodyErr := admission.AbortInputBody(token)
 	require.NoError(t, abortInputBodyErr)
 
-	require.True(t, kernel.shutdownQuiescent())
+	census = admission.Census()
+	require.False(t, census.InputBodyActive || census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
 }
 
 func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
@@ -2899,6 +2900,7 @@ func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
 
 	require.NoError(t, kernel.advanceShutdownInputBody())
 	require.NoError(t, kernel.advanceShutdownAuthority())
+	completeNoopShutdownBarrier(t, kernel)
 
 	_, err := kernel.serviceShutdownStops(quantum)
 	require.NoError(t, err)
@@ -2938,6 +2940,7 @@ func TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns(t *testing.T) {
 			require.NoError(t, kernel.beginShutdown(time.Now().Add(time.Second)))
 			require.NoError(t, kernel.advanceShutdownInputBody())
 			require.NoError(t, kernel.advanceShutdownAuthority())
+			completeNoopShutdownBarrier(t, kernel)
 
 			for {
 				before := len(kernel.lanes)
@@ -2952,6 +2955,25 @@ func TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns(t *testing.T) {
 			require.False(t, len(kernel.lanes) != 0 || kernel.laneHead != nil || kernel.laneTail != nil)
 		})
 	}
+}
+
+func completeNoopShutdownBarrier(t *testing.T, kernel *CommandKernel) {
+	t.Helper()
+	require.NoError(t, kernel.advanceShutdownBarrier())
+	kernel.serviceTaskStarts(1)
+	select {
+	case completion := <-kernel.tasks.CompletionCh():
+		kernel.completeTask(completion)
+	case <-time.After(time.Second):
+		require.FailNow(t, "shutdown barrier did not complete")
+	}
+	select {
+	case acknowledgement := <-kernel.tasks.AcknowledgementCh():
+		kernel.acknowledgeTask(acknowledgement)
+	case <-time.After(time.Second):
+		require.FailNow(t, "shutdown barrier termination was not acknowledged")
+	}
+	require.True(t, kernel.shutdownBarrierDone)
 }
 
 func TestKernelRunsTaskCleanupBeforeSlotRelease(t *testing.T) {

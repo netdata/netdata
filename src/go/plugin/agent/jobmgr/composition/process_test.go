@@ -33,11 +33,11 @@ func TestProcessCoreServiceDiscoverySendsFunctionResultBeforeStatus(t *testing.T
 	output := newProcessSynchronizedBuffer()
 	services := testRunServiceDiscoveryServices(t)
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output, FirstGeneration: 1,
-		ShutdownTimeout: time.Second, Clock: lifecycle.RealClock{},
-		Modules:   collectorapi.Registry{},
-		Jobs:      testRunJobServices(t),
-		Discovery: services,
+		Input: reader, Output: output,
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{},
+		Jobs:            testRunJobServices(t),
+		Discovery:       services,
 		Planner: func(
 			runPlannerCapabilities,
 		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
@@ -91,11 +91,11 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 		},
 	}
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output, FirstGeneration: 1,
-		ShutdownTimeout: time.Second, Clock: lifecycle.RealClock{},
-		Modules:   collectorapi.Registry{},
-		Jobs:      jobs,
-		Discovery: testRunDiscoveryServices(t),
+		Input: reader, Output: output,
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{},
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServices(t),
 		Planner: func(
 			runPlannerCapabilities,
 		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
@@ -163,8 +163,8 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 		},
 	}
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output, FirstGeneration: 1,
-		ShutdownTimeout: time.Second, Clock: lifecycle.RealClock{},
+		Input: reader, Output: output,
+		ShutdownTimeout: time.Second,
 		Modules: collectorapi.Registry{
 			"module": {
 				AgentFunctions: func() []funcapi.FunctionConfig {
@@ -257,8 +257,8 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 	) (secretresolver.AtomicScope, error)
 	var storeCensus func() secretstore.SecretStoreCensus
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output, FirstGeneration: 1,
-		ShutdownTimeout: time.Second, Clock: lifecycle.RealClock{},
+		Input: reader, Output: output,
+		ShutdownTimeout: time.Second,
 		Modules: collectorapi.Registry{
 			"module": {
 				AgentFunctions: func() []funcapi.FunctionConfig {
@@ -394,9 +394,9 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 	plannerCalls := 0
 	process, err := newProcessCore(processCoreConfig{
 		Input: reader, Output: newProcessSynchronizedBuffer(),
-		FirstGeneration: 1, ShutdownTimeout: 100 * time.Millisecond,
-		Clock: lifecycle.RealClock{}, Modules: collectorapi.Registry{},
-		Jobs: testRunJobServices(t),
+		ShutdownTimeout: 100 * time.Millisecond,
+		Modules:         collectorapi.Registry{},
+		Jobs:            testRunJobServices(t),
 		Discovery: runDiscoveryServices{
 			BuildContext: agentdiscovery.BuildContext{
 				Registry: confgroup.Registry{"test": {}},
@@ -513,8 +513,7 @@ func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 						events <- "withdraw"
 					}
 				}},
-				FirstGeneration: 1, ShutdownTimeout: time.Second,
-				Clock: lifecycle.RealClock{},
+				ShutdownTimeout: time.Second,
 				Modules: collectorapi.Registry{
 					"module": {
 						AgentFunctions: func() []funcapi.FunctionConfig {

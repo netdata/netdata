@@ -24,8 +24,10 @@ func (ck *CommandKernel) admit(
 	)
 }
 
-// newNoopRunFinalizer and newNoopRunShutdownBarrier build inert run-lifecycle
-// callbacks used only by tests. Production wires real callbacks and detects the
-// inert forms with isNoopRunFinalizer / isNoopRunShutdownBarrier.
-func newNoopRunFinalizer() RunFinalizer             { return noopRunFinalizer{} }
-func newNoopRunShutdownBarrier() RunShutdownBarrier { return noopRunShutdownBarrier{} }
+func newNoopRunFinalizer() RunFinalizer {
+	return RunFinalizerFunc(func(context.Context, uint64) error { return nil })
+}
+
+func newNoopRunShutdownBarrier() RunShutdownBarrier {
+	return RunShutdownBarrierFunc(func(context.Context, uint64) error { return nil })
+}

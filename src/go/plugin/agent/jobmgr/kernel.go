@@ -286,11 +286,22 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		return nil, errors.New("jobmgr kernel: incomplete command planning ports")
 	}
 	kernel := &CommandKernel{
-		run: run, admission: admission, uids: uids, tasks: tasks, frames: frames, clock: clock, claims: newClaimAuthority(),
-		cancel: make(chan string), wake: make(chan struct{}, 1), stop: make(chan struct{}), done: make(chan struct{}), shutdownStarted: make(chan struct{}),
-		submissionStopped:   make(chan struct{}),
-		continuationStopped: make(chan struct{}),
-		operations:          make(map[string]*commandOperation), tasksByRef: make(map[lifecycle.TaskRef]*commandOperation),
+		run:                     run,
+		admission:               admission,
+		uids:                    uids,
+		tasks:                   tasks,
+		frames:                  frames,
+		clock:                   clock,
+		claims:                  newClaimAuthority(),
+		cancel:                  make(chan string),
+		wake:                    make(chan struct{}, 1),
+		stop:                    make(chan struct{}),
+		done:                    make(chan struct{}),
+		shutdownStarted:         make(chan struct{}),
+		submissionStopped:       make(chan struct{}),
+		continuationStopped:     make(chan struct{}),
+		operations:              make(map[string]*commandOperation),
+		tasksByRef:              make(map[lifecycle.TaskRef]*commandOperation),
 		tasksByRequest:          make(map[lifecycle.TaskRequestRef]*commandOperation),
 		functionCleanupTasks:    make(map[lifecycle.TaskRef]functionCleanupTask),
 		functionCleanupRequests: make(map[lifecycle.TaskRequestRef]FunctionCleanupRef),
@@ -298,18 +309,18 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		shutdownTasks:           make(map[lifecycle.TaskRef]*commandLane),
 		functionMutations:       make(chan functionMutationSubmission),
 		functionMutationStopped: make(chan struct{}),
-		byAdmission:             make(map[lifecycle.AdmissionRef]*commandOperation), lanes: make(map[commandLaneKey]*commandLane),
-		compositeFenceClaims: make(map[string]compositeFenceClaimUse),
-		nextSource:           lifecycle.SourceJobManager, nextExternalSource: lifecycle.SourceJobManager,
-		inputBodyGrants:      inputBodyGrants,
-		admissionServiceGate: admissionServiceGate,
-		shutdownBarrier:      shutdownBarrier,
-		shutdownBarrierDone:  isNoopRunShutdownBarrier(shutdownBarrier),
-		finalizer:            finalizer,
-		finalizerDone:        isNoopRunFinalizer(finalizer),
-		jobPlanner:           jobPlanner,
-		functionCatalog:      functionCatalog,
-		laneSlots:            []*commandLane{nil},
+		byAdmission:             make(map[lifecycle.AdmissionRef]*commandOperation),
+		lanes:                   make(map[commandLaneKey]*commandLane),
+		compositeFenceClaims:    make(map[string]compositeFenceClaimUse),
+		nextSource:              lifecycle.SourceJobManager,
+		nextExternalSource:      lifecycle.SourceJobManager,
+		inputBodyGrants:         inputBodyGrants,
+		admissionServiceGate:    admissionServiceGate,
+		shutdownBarrier:         shutdownBarrier,
+		finalizer:               finalizer,
+		jobPlanner:              jobPlanner,
+		functionCatalog:         functionCatalog,
+		laneSlots:               []*commandLane{nil},
 	}
 	for index := range kernel.submissions {
 		kernel.submissions[index] = make(chan submission, externalSourceQueueDepth)
@@ -743,18 +754,15 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 		}
 		operation.transactionApplied = true
 
-		if (operation.cancelled ||
-			operation.TimedOut()) &&
-			operation.Response ==
-				lifecycle.ResponseOpen &&
+		if (operation.cancelled || operation.TimedOut()) &&
+			operation.Response == lifecycle.ResponseOpen &&
 			!operation.controlQueued {
 			ck.enqueueControl(
 				operation,
 				cancellationControl(operation),
 			)
 		}
-		if operation.Response == lifecycle.ResponseOpen &&
-			!operation.controlQueued {
+		if operation.Response == lifecycle.ResponseOpen && !operation.controlQueued {
 			if ck.beginResultEncode(operation, completion.Ref) {
 				return
 			}

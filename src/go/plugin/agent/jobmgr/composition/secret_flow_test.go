@@ -21,7 +21,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 )
 
 func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
@@ -66,18 +65,11 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	jobConfig.SetProvider(confgroup.TypeDyncfg)
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
-	jobPayload, err := yaml.Marshal(jobConfig)
-	require.NoError(t, err)
 	jobs := testRunJobServices(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
-	jobs.Graph = []dyncfg.GraphConfig{{
-		ID: jobConfig.FullName(), Module: jobConfig.Module(),
-		Name: jobConfig.Name(), Status: dyncfg.StatusRunning.String(),
-		Payload: jobPayload,
-	}}
-	jobs.StoreCreators, err = secretstore.NewCreatorCatalog(
+	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
 			Kind:        secretstore.KindVault,
 			DisplayName: "Vault",
@@ -88,6 +80,7 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 		}},
 	)
 	require.NoError(t, err)
+	jobs.StoreCreators = creators
 	initialStore := secretstore.Config{
 		"name": "main", "kind": string(secretstore.KindVault),
 		"value":           "initial",
@@ -100,13 +93,13 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	output := newProcessSynchronizedBuffer()
 	var graph *dyncfg.Graph
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output, FirstGeneration: 1,
-		ShutdownTimeout: time.Second, Clock: lifecycle.RealClock{},
-		Modules: modules, Jobs: jobs,
+		Input: reader, Output: output,
+		ShutdownTimeout: time.Second,
+		Modules:         modules, Jobs: jobs,
 		Secrets: runSecretServices{
 			Initial: []secretstore.Config{initialStore},
 		},
-		Discovery: testRunDiscoveryServices(t),
+		Discovery: testRunDiscoveryServices(t, jobConfig),
 		Planner: func(
 			capabilities runPlannerCapabilities,
 		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
@@ -209,18 +202,11 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 	jobConfig.SetProvider(confgroup.TypeDyncfg)
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
-	jobPayload, err := yaml.Marshal(jobConfig)
-	require.NoError(t, err)
 	jobs := testRunJobServices(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
-	jobs.Graph = []dyncfg.GraphConfig{{
-		ID: jobConfig.FullName(), Module: jobConfig.Module(),
-		Name: jobConfig.Name(), Status: dyncfg.StatusRunning.String(),
-		Payload: jobPayload,
-	}}
-	jobs.StoreCreators, err = secretstore.NewCreatorCatalog(
+	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
 			Kind:        secretstore.KindVault,
 			DisplayName: "Vault",
@@ -231,6 +217,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 		}},
 	)
 	require.NoError(t, err)
+	jobs.StoreCreators = creators
 	initialStore := secretstore.Config{
 		"name": "main", "kind": string(secretstore.KindVault),
 		"value":           "initial",
@@ -246,13 +233,13 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 	) (secretresolver.AtomicScope, error)
 	var storeCensus func() secretstore.SecretStoreCensus
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output, FirstGeneration: 1,
-		ShutdownTimeout: time.Second, Clock: lifecycle.RealClock{},
-		Modules: modules, Jobs: jobs,
+		Input: reader, Output: output,
+		ShutdownTimeout: time.Second,
+		Modules:         modules, Jobs: jobs,
 		Secrets: runSecretServices{
 			Initial: []secretstore.Config{initialStore},
 		},
-		Discovery: testRunDiscoveryServices(t),
+		Discovery: testRunDiscoveryServices(t, jobConfig),
 		Planner: func(
 			capabilities runPlannerCapabilities,
 		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
@@ -333,7 +320,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	jobs := testRunJobServices(t)
 	var err error
-	jobs.StoreCreators, err = secretstore.NewCreatorCatalog(
+	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
 			Kind:        secretstore.KindVault,
 			DisplayName: "Vault",
@@ -344,13 +331,14 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		}},
 	)
 	require.NoError(t, err)
+	jobs.StoreCreators = creators
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output, FirstGeneration: 1,
-		ShutdownTimeout: time.Second, Clock: lifecycle.RealClock{},
-		Modules: collectorapi.Registry{}, Jobs: jobs,
+		Input: reader, Output: output,
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{}, Jobs: jobs,
 		Discovery: testRunDiscoveryServices(t),
 		Planner: func(
 			runPlannerCapabilities,
@@ -482,18 +470,11 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 	jobConfig.SetProvider(confgroup.TypeDyncfg)
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
-	jobPayload, err := yaml.Marshal(jobConfig)
-	require.NoError(t, err)
 	jobs := testRunJobServices(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
-	jobs.Graph = []dyncfg.GraphConfig{{
-		ID: jobConfig.FullName(), Module: jobConfig.Module(),
-		Name: jobConfig.Name(), Status: dyncfg.StatusRunning.String(),
-		Payload: jobPayload,
-	}}
-	jobs.StoreCreators, err = secretstore.NewCreatorCatalog(
+	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
 			Kind:        secretstore.KindVault,
 			DisplayName: "Vault",
@@ -504,6 +485,7 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 		}},
 	)
 	require.NoError(t, err)
+	jobs.StoreCreators = creators
 	initialStore := secretstore.Config{
 		"name": "main", "kind": string(secretstore.KindVault),
 		"value":           "initial",
@@ -515,13 +497,13 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 	output := newProcessSynchronizedBuffer()
 	var graph *dyncfg.Graph
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output, FirstGeneration: 1,
-		ShutdownTimeout: time.Second, Clock: lifecycle.RealClock{},
-		Modules: modules, Jobs: jobs,
+		Input: reader, Output: output,
+		ShutdownTimeout: time.Second,
+		Modules:         modules, Jobs: jobs,
 		Secrets: runSecretServices{
 			Initial: []secretstore.Config{initialStore},
 		},
-		Discovery: testRunDiscoveryServices(t),
+		Discovery: testRunDiscoveryServices(t, jobConfig),
 		Planner: func(
 			capabilities runPlannerCapabilities,
 		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {

@@ -208,12 +208,3 @@ func (s *Scheduler) Tick(ctx context.Context, clock int) error {
 	s.moduleTick = s.moduleTick[:0]
 	return result
 }
-
-func (s *Scheduler) Census() int {
-	if s == nil {
-		return 0
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.jobs)
-}

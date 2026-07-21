@@ -5,7 +5,6 @@ package composition
 import (
 	"context"
 	"errors"
-	"slices"
 	"sync"
 	"time"
 
@@ -28,15 +27,9 @@ import (
 type runPlannerFactory func(runPlannerCapabilities) (jobmgr.Planner, jobmgr.RunFinalizer, error)
 
 type runPlannerCapabilities struct {
-	Tasks      *lifecycle.TaskSupervisor      // task supervisor
-	Functions  *FunctionAssembly              // Function assembly
-	Jobs       *joboutput.Factory             // job factory
-	DynCfg     *joboutput.DynCfgJobController // dyncfg job controller
-	Graph      *dyncfg.Graph                  // dyncfg graph
-	StoreScope func(                          // secret store scope acquirer
-		[]string,
-	) (secretresolver.AtomicScope, error)
-	StoreCensus func() secretstore.SecretStoreCensus // secret store census accessor
+	Graph       *dyncfg.Graph                                      // dyncfg graph
+	StoreScope  func([]string) (secretresolver.AtomicScope, error) // secret store scope acquirer
+	StoreCensus func() secretstore.SecretStoreCensus               // secret store census accessor
 }
 
 type runJobServices struct {
@@ -47,7 +40,6 @@ type runJobServices struct {
 	Runtime       runtimecomp.Service            // runtime service dependency
 	Vnodes        *vnoderegistry.Registry        // vnode metadata registry
 	InitialVnodes map[string]*vnodes.VirtualNode // file-configured vnodes
-	Graph         []dyncfg.GraphConfig           // initial job configs
 }
 
 type runSecretServices struct {
@@ -83,7 +75,6 @@ type runGeneration struct {
 	retryWorker       autoDetectionRetryWorker       // autodetection retry worker (the scheduler via a narrow interface)
 	dyncfg            *joboutput.DynCfgJobController // dyncfg job controller
 	graph             *dyncfg.Graph                  // dyncfg config graph
-	initialJobs       []dyncfg.GraphConfig           // initial (stock/user) job configs to publish
 	secrets           *secretadapter.Controller      // secret store controller
 	vnodes            *vnodeBinding                  // dyncfg vnode binding
 	discovery         runDiscoveryServices           // discovery services
@@ -327,8 +318,7 @@ func newRunGeneration(
 		return nil, err
 	}
 	planner, finalizer, err := config.Planner(runPlannerCapabilities{
-		Tasks: tasks, Functions: functions,
-		Jobs: jobs, DynCfg: dynCfgJobs, Graph: graph,
+		Graph: graph,
 		StoreScope: func(keys []string) (secretresolver.AtomicScope, error) {
 			return acquireRunOwnedStoreScope(
 				run,
@@ -392,7 +382,6 @@ func newRunGeneration(
 		graph:             graph,
 		scheduler:         scheduler,
 		retryWorker:       scheduler,
-		initialJobs:       slices.Clone(config.Jobs.Graph),
 		secrets:           secretController,
 		vnodes:            vnodeBinding,
 		discovery:         config.Discovery,
@@ -479,7 +468,6 @@ func (rg *runGeneration) start(ctx context.Context) error {
 		ctx,
 		rg.kernel,
 		rg.run.Generation(),
-		rg.initialJobs,
 	); err != nil {
 		rg.run.Dirty(err)
 		rg.Stop()

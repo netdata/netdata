@@ -36,8 +36,6 @@ type processInputCompletion struct {
 type processCoreConfig struct {
 	Input           io.Reader             // plugin stdin
 	Output          io.Writer             // plugin stdout
-	Clock           lifecycle.Clock       // logical/real clock
-	FirstGeneration uint64                // starting run generation (0 -> 1)
 	ShutdownTimeout time.Duration         // per-run shutdown budget
 	KeepAlive       bool                  // emit keepalive frames (long-lived agent mode)
 	Modules         collectorapi.Registry // collector module registry
@@ -66,7 +64,6 @@ const processAdmissionBytes = functionadapter.MaximumCatalogStorageBytes
 func newProcessCore(config processCoreConfig) (*processCore, error) {
 	if config.Input == nil ||
 		config.Output == nil ||
-		config.FirstGeneration == 0 ||
 		config.ShutdownTimeout <= 0 ||
 		config.Modules == nil ||
 		config.Jobs.PluginName == "" ||
@@ -77,9 +74,6 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		!config.Discovery.valid() ||
 		config.Planner == nil {
 		return nil, errors.New("jobmgr composition: invalid process construction")
-	}
-	if config.Clock == nil {
-		config.Clock = lifecycle.RealClock{}
 	}
 	admission := lifecycle.NewAdmissionLedger()
 	if err := admission.ReserveProcessBytes(
@@ -126,7 +120,7 @@ func (pc *processCore) run(
 	pc.started = true
 	pc.mu.Unlock()
 
-	generationID := pc.config.FirstGeneration
+	generationID := uint64(1)
 	generation, err := pc.newRun(generationID)
 	if err != nil {
 		return pc.finalize(nil, generationID, err)
@@ -259,7 +253,7 @@ func (pc *processCore) newRun(
 ) (*runGeneration, error) {
 	return newRunGeneration(runGenerationConfig{
 		Generation: generation, ShutdownTimeout: pc.config.ShutdownTimeout,
-		Clock: pc.config.Clock, Admission: pc.admission,
+		Clock: lifecycle.RealClock{}, Admission: pc.admission,
 		UIDs: pc.uids, Frames: pc.frames,
 		Modules: pc.config.Modules, Jobs: pc.config.Jobs,
 		Secrets:   pc.config.Secrets,
@@ -280,7 +274,7 @@ func (pc *processCore) binding(
 		pc.admission,
 		generation.run.Generation(),
 		generation.inputBodyGrants,
-		pc.config.Clock,
+		lifecycle.RealClock{},
 		func() {
 			pc.quit.Store(true)
 		},

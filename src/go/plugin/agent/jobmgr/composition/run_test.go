@@ -23,10 +23,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 )
 
-func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveryPipeline(
+func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(
 	t *testing.T,
 ) {
 	tests := map[string]struct {
@@ -71,7 +70,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveryPipeline(
 			jobs.Defaults = confgroup.Registry{
 				"module": {UpdateEvery: 1},
 			}
-			jobs.Graph = fullCapacityInitialJobs(t, test.jobs)
+			configs := fullCapacityDiscoveredJobs(test.jobs)
 
 			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 			require.NoError(t, err)
@@ -81,7 +80,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveryPipeline(
 				Generation: 1, ShutdownTimeout: 10 * time.Second,
 				Clock: lifecycle.RealClock{}, Admission: admission, UIDs: uids,
 				Frames: frames, Modules: modules, Jobs: jobs,
-				Discovery: testRunDiscoveryServices(t),
+				Discovery: testRunDiscoveryServices(t, configs...),
 				Planner: func(
 					runPlannerCapabilities,
 				) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
@@ -98,11 +97,10 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveryPipeline(
 				require.FailNowf(t, "test failed", "full-capacity generation start: %v; shutdown: %v", err, waitErr)
 			}
 
-			require.EqualValues(t, test.jobs, generation.scheduler.Census())
-
-			require.EqualValues(t, test.jobs, len(generation.graph.IDs()))
-
-			require.EqualValues(t, test.jobs+1, generation.tasks.LongLivedCensus().Active)
+			require.Eventually(t, func() bool {
+				return len(generation.graph.IDs()) == test.jobs &&
+					generation.tasks.LongLivedCensus().Active == test.jobs+1
+			}, 10*time.Second, 10*time.Millisecond)
 
 			generation.Stop()
 
@@ -251,16 +249,10 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	config.SetProvider(confgroup.TypeDyncfg)
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
-	payload, err := yaml.Marshal(config)
-	require.NoError(t, err)
 	jobs := testRunJobServices(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
-	jobs.Graph = []dyncfg.GraphConfig{{
-		ID: "module_job", Module: "module", Name: "job",
-		Status: dyncfg.StatusAccepted.String(), Payload: payload,
-	}}
 
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
@@ -271,11 +263,11 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 		Generation: 1, ShutdownTimeout: time.Second,
 		Clock: lifecycle.RealClock{}, Admission: admission, UIDs: uids,
 		Frames: frames, Modules: modules, Jobs: jobs,
-		Discovery: testRunDiscoveryServices(t),
+		Discovery: testRunDiscoveryServicesAccepted(t, config),
 		Planner: func(
 			capabilities runPlannerCapabilities,
 		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			require.False(t, capabilities.Jobs == nil || capabilities.DynCfg == nil || capabilities.Graph == nil)
+			require.NotNil(t, capabilities.Graph)
 			return runRejectingPlanner{},
 				jobmgr.RunFinalizerFunc(
 					func(context.Context, uint64) error { return nil },
@@ -286,6 +278,10 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, generation.start(context.Background()))
+	require.Eventually(t, func() bool {
+		record, ok := generation.graph.Lookup(config.FullName())
+		return ok && record.Status == dyncfg.StatusAccepted.String()
+	}, time.Second, time.Millisecond)
 
 	require.NoError(t, generation.kernel.SubmitAndWait(
 		context.Background(),
@@ -361,17 +357,10 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 	config.SetProvider(confgroup.TypeDyncfg)
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
-	payload, err := yaml.Marshal(config)
-	require.NoError(t, err)
 	jobs := testRunJobServices(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
-	jobs.Graph = []dyncfg.GraphConfig{{
-		ID: config.FullName(), Module: config.Module(),
-		Name: config.Name(), Status: dyncfg.StatusAccepted.String(),
-		Payload: payload,
-	}}
 
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
@@ -382,7 +371,7 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 		Generation: 1, ShutdownTimeout: time.Second,
 		Clock: lifecycle.RealClock{}, Admission: admission, UIDs: uids,
 		Frames: frames, Modules: modules, Jobs: jobs,
-		Discovery: testRunDiscoveryServices(t),
+		Discovery: testRunDiscoveryServicesAccepted(t, config),
 		Planner: func(
 			runPlannerCapabilities,
 		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
@@ -395,6 +384,10 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 	})
 	require.NoError(t, err)
 	require.NoError(t, generation.start(context.Background()))
+	require.Eventually(t, func() bool {
+		record, ok := generation.graph.Lookup(config.FullName())
+		return ok && record.Status == dyncfg.StatusAccepted.String()
+	}, time.Second, time.Millisecond)
 
 	submitted := make(chan error, 1)
 	go func() {
@@ -470,12 +463,8 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 	closeRunTestUIDs(t, uids)
 }
 
-func fullCapacityInitialJobs(
-	t testing.TB,
-	count int,
-) []dyncfg.GraphConfig {
-	t.Helper()
-	records := make([]dyncfg.GraphConfig, count)
+func fullCapacityDiscoveredJobs(count int) []confgroup.Config {
+	configs := make([]confgroup.Config, count)
 	for ordinal := range count {
 		name := fmt.Sprintf("job-%03d", ordinal)
 		config := confgroup.Config{
@@ -488,15 +477,9 @@ func fullCapacityInitialJobs(
 		config.SetProvider(confgroup.TypeDyncfg)
 		config.SetSourceType(confgroup.TypeDyncfg)
 		config.SetSource("test")
-		payload, err := yaml.Marshal(config)
-		require.NoError(t, err)
-		records[ordinal] = dyncfg.GraphConfig{
-			ID: config.FullName(), Module: config.Module(),
-			Name: config.Name(), Status: dyncfg.StatusRunning.String(),
-			Payload: payload,
-		}
+		configs[ordinal] = config
 	}
-	return records
+	return configs
 }
 
 func testRunJobServices(t testing.TB) runJobServices {
@@ -514,7 +497,10 @@ func testRunJobServices(t testing.TB) runJobServices {
 	}
 }
 
-func testRunDiscoveryServices(t testing.TB) runDiscoveryServices {
+func testRunDiscoveryServices(
+	t testing.TB,
+	configs ...confgroup.Config,
+) runDiscoveryServices {
 	t.Helper()
 	factory := agentdiscovery.NewProviderFactory(
 		"test",
@@ -523,7 +509,7 @@ func testRunDiscoveryServices(t testing.TB) runDiscoveryServices {
 			bool,
 			error,
 		) {
-			return runTestDiscoverer{}, true, nil
+			return runTestDiscoverer{configs: configs}, true, nil
 		},
 	)
 	catalog, err := agentdiscovery.NewProviderCatalog(
@@ -539,12 +525,30 @@ func testRunDiscoveryServices(t testing.TB) runDiscoveryServices {
 	}
 }
 
-type runTestDiscoverer struct{}
+func testRunDiscoveryServicesAccepted(
+	t testing.TB,
+	configs ...confgroup.Config,
+) runDiscoveryServices {
+	services := testRunDiscoveryServices(t, configs...)
+	services.AutoEnable = false
+	return services
+}
 
-func (runTestDiscoverer) Run(
+type runTestDiscoverer struct {
+	configs []confgroup.Config
+}
+
+func (rtd runTestDiscoverer) Run(
 	ctx context.Context,
-	_ chan<- []*confgroup.Group,
+	out chan<- []*confgroup.Group,
 ) {
+	if len(rtd.configs) != 0 {
+		select {
+		case out <- []*confgroup.Group{{Source: "test", Configs: rtd.configs}}:
+		case <-ctx.Done():
+			return
+		}
+	}
 	<-ctx.Done()
 }
 
