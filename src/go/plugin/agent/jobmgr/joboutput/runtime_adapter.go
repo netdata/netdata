@@ -19,19 +19,21 @@ type ManagedJob interface {
 	Cleanup()
 }
 
-// NewManagedJob transfers one constructed collector loop into a generation.
+// newManagedJob transfers one constructed collector loop into a generation.
 // Runtime join is TaskSupervisor-owned; Cleanup remains the final opaque
 // collector boundary after runtime support is released.
-func NewManagedJob(
+func newManagedJob(
 	variant JobVariant,
 	job ManagedJob,
 	tasks *lifecycle.TaskSupervisor,
 	identity lifecycle.ResourceIdentity,
 	scheduler *Scheduler,
+	collectorCleanup func(context.Context) error,
 ) (ConstructedJob, error) {
 	runtimeJob, ok := job.(RuntimeJob)
 	if !variant.Valid() || job == nil || !ok ||
-		tasks == nil || !identity.Valid() || scheduler == nil {
+		tasks == nil || !identity.Valid() || scheduler == nil ||
+		collectorCleanup == nil {
 		return ConstructedJob{}, errors.New("job output: invalid managed job")
 	}
 	support := &managedLoopSupport{
@@ -56,12 +58,9 @@ func NewManagedJob(
 		)
 	}
 	return ConstructedJob{
-		Variant: variant,
-		Runtime: runtime,
-		CollectorCleanup: func(context.Context) error {
-			job.Cleanup()
-			return nil
-		},
+		Variant:          variant,
+		Runtime:          runtime,
+		CollectorCleanup: collectorCleanup,
 	}, nil
 }
 

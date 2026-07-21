@@ -190,63 +190,17 @@ type jobV2ScopeState struct {
 	host     jobV2HostState
 }
 
-func (j *JobV2) FullName() string                 { return j.fullName }
-func (j *JobV2) ModuleName() string               { return j.moduleName }
-func (j *JobV2) Name() string                     { return j.name }
-func (j *JobV2) Panicked() bool                   { return j.panicked.Load() }
-func (j *JobV2) IsRunning() bool                  { return j.running.Load() }
-func (j *JobV2) Module() collectorapi.CollectorV2 { return j.module }
-func (j *JobV2) Collector() any                   { return j.module }
+func (j *JobV2) FullName() string   { return j.fullName }
+func (j *JobV2) ModuleName() string { return j.moduleName }
+func (j *JobV2) Name() string       { return j.name }
+func (j *JobV2) IsRunning() bool    { return j.running.Load() }
+func (j *JobV2) Collector() any     { return j.module }
 func (j *JobV2) AutoDetectionEvery() int {
 	return j.autoDetectEvery
 }
 func (j *JobV2) RetryAutoDetection() bool {
 	return retryAutoDetection(j.autoDetectEvery, j.autoDetectTries)
 }
-func (j *JobV2) Configuration() any {
-	if j.module == nil {
-		return nil
-	}
-	return j.module.Configuration()
-}
-func (j *JobV2) IsFunctionOnly() bool { return j.functionOnly }
-func (j *JobV2) Vnode() vnodes.VirtualNode {
-	j.vnodeMu.RLock()
-	defer j.vnodeMu.RUnlock()
-	return *j.vnode.Copy()
-}
-
-// SetVnodeSnapshot commits the vnode config directly into the job BEFORE Start:
-// registration-time freshness must be visible to Cleanup even when the job
-// never collects. Pre-Start only: the job goroutine does not exist yet, and the
-// write is published to it by the Start goroutine launch. Module-owned vnode
-// state is never overridden.
-func (j *JobV2) SetVnodeSnapshot(snapshot VnodeSnapshot) {
-	if snapshot.Vnode == nil {
-		return
-	}
-	if j.module != nil && j.module.VirtualNode() != nil {
-		return
-	}
-	next := snapshot.Vnode.Copy()
-	var metadataChanged bool
-	j.vnodeMu.Lock()
-	j.vnode = *next
-	if snapshot.Revision != 0 {
-		j.vnodeRevision = snapshot.Revision
-	}
-	metadataChanged = snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
-	if snapshot.MetadataRevision != 0 {
-		j.vnodeMetadataRevision = snapshot.MetadataRevision
-	}
-	j.vnodeMu.Unlock()
-	if metadataChanged {
-		if state := j.scopeStates[defaultHostScopeKey]; state != nil {
-			state.host.invalidateDefine()
-		}
-	}
-}
-
 func (j *JobV2) refreshVnodeSnapshot() {
 	if j.vnodeName == "" || j.vnodeLookup == nil {
 		return
@@ -366,18 +320,12 @@ func (j *JobV2) cleanup(emit bool) {
 	j.clearAllScopeStateAfterCleanup()
 }
 
-// AutoDetection invokes init, check and postCheck. It handles panic.
-// ctx flows into the module's Init/Check calls and must be non-nil.
-func (j *JobV2) AutoDetection(ctx context.Context) (err error) {
-	return j.autoDetection(ctx, true)
-}
-
 // AutoDetectionManaged leaves failure cleanup with the Job Manager factory.
 func (j *JobV2) AutoDetectionManaged(ctx context.Context) (err error) {
-	return j.autoDetection(ctx, false)
+	return j.autoDetection(ctx)
 }
 
-func (j *JobV2) autoDetection(ctx context.Context, cleanupOnFailure bool) (err error) {
+func (j *JobV2) autoDetection(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic %v", r)
@@ -387,9 +335,6 @@ func (j *JobV2) autoDetection(ctx context.Context, cleanupOnFailure bool) (err e
 			if logger.Level.Enabled(slog.LevelDebug) {
 				j.Errorf("STACK: %s", debug.Stack())
 			}
-		}
-		if err != nil && cleanupOnFailure {
-			j.Cleanup()
 		}
 	}()
 	if j.isStock {
@@ -419,18 +364,14 @@ func (j *JobV2) autoDetection(ctx context.Context, cleanupOnFailure bool) (err e
 	return nil
 }
 
-func (j *JobV2) Start() {
-	j.run(true, nil)
-}
-
 // StartManaged starts the collector loop while leaving Cleanup ownership with
 // the caller. It acknowledges readiness only after the loop and optional
 // runner have published their active state.
 func (j *JobV2) StartManaged(ready chan<- struct{}) {
-	j.run(false, ready)
+	j.run(ready)
 }
 
-func (j *JobV2) run(cleanup bool, ready chan<- struct{}) {
+func (j *JobV2) run(ready chan<- struct{}) {
 	j.stopCtrl.markStarted()
 	j.running.Store(true)
 	runCtx, cancel := context.WithCancel(context.Background())
@@ -472,12 +413,9 @@ LOOP:
 	}
 	cancel()
 	j.waitCollectorRunner(runCtx, runnerDone)
-	// Mark not-running before cleanup so external function dispatch can reject requests
-	// while module resources are being torn down.
+	// Mark not-running before returning so external function dispatch rejects
+	// requests before the lifecycle owner tears module resources down.
 	j.running.Store(false)
-	if cleanup {
-		j.Cleanup()
-	}
 }
 
 func (j *JobV2) startCollectorRunner(ctx context.Context) <-chan error {
@@ -953,10 +891,6 @@ func (j *JobV2) vnodeRegistryOwner(target jobV2HostRef) vnoderegistry.Owner {
 
 func (j *JobV2) vnodeRegistryScopedOwner(scopeKey, guid string) vnoderegistry.Owner {
 	return vnoderegistry.Owner(j.vnodeRegistryScopedOwnerPrefix(scopeKey) + guid)
-}
-
-func (j *JobV2) penalty() int {
-	return penaltyFromRetries(int(j.retries.Load()), j.updateEvery)
 }
 
 func (j *JobV2) disableAutoDetection() {

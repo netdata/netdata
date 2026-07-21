@@ -280,10 +280,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 		d.handler.AddDiscoveredConfig(scfg, dyncfg.StatusAccepted)
 
 		d.handler.NotifyConfigCreate(scfg, dyncfg.StatusAccepted)
-		if d.runModePolicy.AutoEnableDiscovered || d.fnReg == nil || d.dyncfgCh == nil {
-			// Auto-enable in terminal mode and tests.
-			// Also auto-enable when no function registry is attached, because
-			// no external enable/disable commands can be delivered.
+		if d.runModePolicy.AutoEnableDiscovered {
 			d.autoEnableConfig(scfg)
 		} else {
 			// Wait for netdata to send enable/disable
@@ -316,7 +313,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	d.handler.NotifyConfigRemove(entry.Cfg)
 	d.handler.NotifyConfigCreate(scfg, dyncfg.StatusAccepted)
 
-	if d.runModePolicy.AutoEnableDiscovered || d.fnReg == nil || d.dyncfgCh == nil {
+	if d.runModePolicy.AutoEnableDiscovered {
 		d.autoEnableConfig(scfg)
 	} else {
 		d.handler.WaitForDecision(scfg)

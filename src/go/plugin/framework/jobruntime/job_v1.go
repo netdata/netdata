@@ -84,8 +84,8 @@ func NewJob(cfg JobConfig) *Job {
 	}
 
 	j := &Job{
-		AutoDetectEvery: cfg.AutoDetectEvery,
-		AutoDetectTries: infTries,
+		autoDetectEvery: cfg.AutoDetectEvery,
+		autoDetectTries: infTries,
 
 		pluginName:            cfg.PluginName,
 		name:                  cfg.Name,
@@ -129,8 +129,8 @@ type Job struct {
 	fullName   string
 
 	updateEvery     int
-	AutoDetectEvery int
-	AutoDetectTries int
+	autoDetectEvery int
+	autoDetectTries int
 	priority        int
 	labels          map[string]string
 
@@ -141,7 +141,7 @@ type Job struct {
 
 	module collectorapi.CollectorV1
 
-	// running tracks whether the job's main loop is active (set in Start, cleared in Start's defer)
+	// running tracks whether the managed job loop is active.
 	running atomic.Bool
 
 	initialized bool
@@ -156,9 +156,7 @@ type Job struct {
 	api                  *netdataapi.API
 
 	vnodeCreated bool
-	// vnodeMu covers j.vnode against off-goroutine readers (Vnode is
-	// called from the manager loop on registered jobs) racing the job
-	// goroutine's writes and the pre-Start baseline write.
+	// vnodeMu covers current vnode state while collection refreshes it.
 	vnodeMu               sync.RWMutex
 	vnode                 vnodes.VirtualNode
 	vnodeName             string
@@ -171,9 +169,8 @@ type Job struct {
 
 	stopCtrl stopController
 
-	// moduleCleanup guards the module's Cleanup to exactly once: it is
-	// reachable from the detection-failure defer, the main loop's tail, and
-	// Cleanup() (detected-but-never-started jobs are disposed through it).
+	// moduleCleanup guards explicit accepted/rejected lifecycle cleanup to
+	// exactly once.
 	moduleCleanup sync.Once
 
 	skipTracker tickstate.SkipTracker
@@ -210,43 +207,22 @@ func (j *Job) Name() string {
 	return j.name
 }
 
-// Panicked returns 'panicked' flag value.
-func (j *Job) Panicked() bool {
-	return j.panicked.Load()
-}
-
-// AutoDetectionEvery returns value of AutoDetectEvery.
+// AutoDetectionEvery returns the autodetection retry cadence.
 func (j *Job) AutoDetectionEvery() int {
-	return j.AutoDetectEvery
+	return j.autoDetectEvery
 }
 
 // RetryAutoDetection returns whether it is needed to retry autodetection.
 func (j *Job) RetryAutoDetection() bool {
-	return retryAutoDetection(j.AutoDetectEvery, j.AutoDetectTries)
-}
-
-func (j *Job) Configuration() any {
-	return j.module.Configuration()
-}
-
-func (j *Job) Vnode() vnodes.VirtualNode {
-	j.vnodeMu.RLock()
-	defer j.vnodeMu.RUnlock()
-	return *j.vnode.Copy()
-}
-
-// AutoDetection invokes init, check and postCheck. It handles panic.
-// ctx flows into the module's Init/Check calls and must be non-nil.
-func (j *Job) AutoDetection(ctx context.Context) (err error) {
-	return j.autoDetection(ctx, true)
+	return retryAutoDetection(j.autoDetectEvery, j.autoDetectTries)
 }
 
 // AutoDetectionManaged leaves failure cleanup with the Job Manager factory.
 func (j *Job) AutoDetectionManaged(ctx context.Context) (err error) {
-	return j.autoDetection(ctx, false)
+	return j.autoDetection(ctx)
 }
 
-func (j *Job) autoDetection(ctx context.Context, cleanupOnFailure bool) (err error) {
+func (j *Job) autoDetection(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic %v", r)
@@ -257,9 +233,6 @@ func (j *Job) autoDetection(ctx context.Context, cleanupOnFailure bool) (err err
 			if logger.Level.Enabled(slog.LevelDebug) {
 				j.Errorf("STACK: %s", debug.Stack())
 			}
-		}
-		if err != nil && cleanupOnFailure {
-			j.cleanupModule()
 		}
 	}()
 
@@ -292,27 +265,6 @@ func (j *Job) autoDetection(ctx context.Context, cleanupOnFailure bool) (err err
 	}
 
 	return nil
-}
-
-// SetVnodeSnapshot commits the vnode config directly into the job BEFORE Start:
-// registration-time freshness must be visible to Cleanup even when the job
-// never collects. Pre-Start only: the job goroutine does not exist yet, and the
-// write is published to it by the Start goroutine launch. Module-owned vnode
-// state is never overridden.
-func (j *Job) SetVnodeSnapshot(snapshot VnodeSnapshot) {
-	if snapshot.Vnode == nil || (j.module != nil && j.module.VirtualNode() != nil) {
-		return
-	}
-	next := snapshot.Vnode.Copy()
-	j.vnodeMu.Lock()
-	j.vnode = *next
-	if snapshot.Revision != 0 {
-		j.vnodeRevision = snapshot.Revision
-	}
-	if snapshot.MetadataRevision != 0 {
-		j.vnodeMetadataRevision = snapshot.MetadataRevision
-	}
-	j.vnodeMu.Unlock()
 }
 
 func (j *Job) refreshVnodeSnapshot() bool {
@@ -373,35 +325,19 @@ func (j *Job) IsRunning() bool {
 	return j.running.Load()
 }
 
-// Module returns the underlying module instance.
-// This allows function handlers to access the collector for querying data.
-func (j *Job) Module() collectorapi.CollectorV1 {
-	return j.module
-}
-
 // Collector returns the underlying collector instance bound to this job.
 func (j *Job) Collector() any {
 	return j.module
-}
-
-// IsFunctionOnly returns true if this job is function-only (no metrics collection).
-func (j *Job) IsFunctionOnly() bool {
-	return j.functionOnly
-}
-
-// Start starts job main loop.
-func (j *Job) Start() {
-	j.run(true, nil)
 }
 
 // StartManaged starts the collector loop while leaving Cleanup ownership with
 // the caller. It acknowledges readiness only after the loop has published its
 // running state.
 func (j *Job) StartManaged(ready chan<- struct{}) {
-	j.run(false, ready)
+	j.run(ready)
 }
 
-func (j *Job) run(cleanup bool, ready chan<- struct{}) {
+func (j *Job) run(ready chan<- struct{}) {
 	j.stopCtrl.markStarted()
 	j.running.Store(true)
 	if ready != nil {
@@ -433,9 +369,6 @@ LOOP:
 			}
 		}
 	}
-	if cleanup {
-		j.Cleanup()
-	}
 }
 
 // Stop stops job main loop. It blocks until the job is stopped.
@@ -448,7 +381,7 @@ func (j *Job) shouldCollect(clock int) bool {
 }
 
 func (j *Job) disableAutoDetection() {
-	disableAutoDetection(&j.AutoDetectEvery)
+	disableAutoDetection(&j.autoDetectEvery)
 }
 
 func (j *Job) cleanupModule() {
@@ -524,7 +457,7 @@ func (j *Job) init(ctx context.Context) error {
 
 func (j *Job) check(ctx context.Context) error {
 	if err := j.module.Check(ctx); err != nil {
-		consumeAutoDetectTry(&j.AutoDetectTries)
+		consumeAutoDetectTry(&j.autoDetectTries)
 		return err
 	}
 	return nil
@@ -835,10 +768,6 @@ func (j *Job) updateChart(chart *collectorapi.Chart, mx collectedMetrics, sinceL
 		chart.Retries++
 	}
 	return chart.IsUpdated()
-}
-
-func (j *Job) penalty() int {
-	return penaltyFromRetries(int(j.retries.Load()), j.updateEvery)
 }
 
 func getChartType(chart *collectorapi.Chart, j *Job) string {

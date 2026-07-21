@@ -28,7 +28,6 @@ type RuntimeJob interface {
 	ManagedJob
 	collectorapi.RuntimeJob
 
-	AutoDetection(context.Context) error
 	AutoDetectionManaged(context.Context) error
 	AutoDetectionEvery() int
 	RetryAutoDetection() bool
@@ -177,12 +176,13 @@ func (f *Factory) build(
 		return ConstructedJob{}, err
 	}
 	cleanup := &factoryJobCleanup{job: job}
-	constructed, err := NewManagedJob(
+	constructed, err := newManagedJob(
 		variant,
 		job,
 		f.config.Tasks,
 		identity,
 		f.config.Scheduler,
+		cleanup.reject,
 	)
 	if err != nil {
 		return ConstructedJob{
@@ -190,7 +190,6 @@ func (f *Factory) build(
 			CollectorCleanup: cleanup.reject,
 		}, err
 	}
-	constructed.CollectorCleanup = cleanup.reject
 	if hasFunctions && f.config.Hooks == nil {
 		return constructed,
 			errors.New("job output: function-bearing job has no handler lifecycle")

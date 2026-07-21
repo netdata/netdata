@@ -105,15 +105,6 @@ func (graph *Graph) Lookup(id string) (GraphRecord, bool) {
 	return record, ok
 }
 
-func (graph *Graph) LookupExposed(module, name string) (GraphRecord, bool) {
-	key := exposedGraphKey{module: module, name: name}
-	graph.mu.RLock()
-	id := graph.exposed[key]
-	record, ok := graph.records[id]
-	graph.mu.RUnlock()
-	return record, ok
-}
-
 func (graph *Graph) IDs() []string {
 	graph.mu.RLock()
 	ids := make([]string, 0, len(graph.records))
@@ -123,13 +114,6 @@ func (graph *Graph) IDs() []string {
 	graph.mu.RUnlock()
 	sort.Strings(ids)
 	return ids
-}
-
-func (graph *Graph) Version() uint64 {
-	graph.mu.RLock()
-	version := graph.version
-	graph.mu.RUnlock()
-	return version
 }
 
 func (graph *Graph) PrepareMutation(changes []GraphChange) (GraphMutation, error) {

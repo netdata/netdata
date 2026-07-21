@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -1526,7 +1525,6 @@ func TestFunctionFrameSizePreflightsBeforeAppend(t *testing.T) {
 type stepWriter struct {
 	offered chan []byte
 	release chan struct{}
-	mu      sync.Mutex
 }
 
 func newStepWriter() *stepWriter {

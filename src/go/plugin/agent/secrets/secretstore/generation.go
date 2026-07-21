@@ -72,8 +72,8 @@ type StoreGeneration struct {
 	next       *StoreGeneration
 }
 
-// SecretStoreCensus is the exact retained-state census used by shutdown and
-// migration publication gates.
+// SecretStoreCensus is the exact retained-state census used by ownership and
+// leak verification.
 type SecretStoreCensus struct {
 	Current      int
 	Retiring     int

@@ -328,7 +328,7 @@ func TestCmdAdd_ExtractKeyFailure(t *testing.T) {
 	fn := newTestFn("badid", "add", "job1", []byte(`{}`))
 	h.CmdAdd(fn)
 
-	assert.Equal(t, 0, h.exposed.Count())
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
 }
 
 func TestCmdEnable_ExtractKeyFailure(t *testing.T) {
@@ -381,7 +381,7 @@ func TestCmdAdd_Success(t *testing.T) {
 	h.CmdAdd(fn)
 
 	// Config should be in both caches.
-	_, ok := h.seen.LookupByUID("dyncfg:job1")
+	_, ok := lookupSeenByUID(h.seen, "dyncfg:job1")
 	assert.True(t, ok, "config should be in seen cache")
 
 	entry, ok := h.exposed.LookupByKey("job1")
@@ -398,7 +398,7 @@ func TestCmdAdd_InvalidArgs(t *testing.T) {
 	fn.fn.Args = fn.fn.Args[:2]
 	h.CmdAdd(fn)
 
-	assert.Equal(t, 0, h.exposed.Count())
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
 }
 
 func TestCmdAdd_NoPayload(t *testing.T) {
@@ -408,7 +408,7 @@ func TestCmdAdd_NoPayload(t *testing.T) {
 	fn := newTestFn("test:job1", "add", "job1", nil)
 	h.CmdAdd(fn)
 
-	assert.Equal(t, 0, h.exposed.Count())
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
 }
 
 func TestCmdAdd_InvalidConfigName(t *testing.T) {
@@ -422,7 +422,7 @@ func TestCmdAdd_InvalidConfigName(t *testing.T) {
 	fn := newTestFn("test:bad.name", "add", "bad.name", []byte(`{}`))
 	h.CmdAdd(fn)
 
-	assert.Equal(t, 0, h.exposed.Count())
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
 }
 
 func TestCmdAdd_NonJobConfigTypeRejected(t *testing.T) {
@@ -434,8 +434,8 @@ func TestCmdAdd_NonJobConfigTypeRejected(t *testing.T) {
 	fn := newTestFn("test:job1", "add", "job1", []byte(`{}`))
 	h.CmdAdd(fn)
 
-	assert.Equal(t, 0, h.seen.Count())
-	assert.Equal(t, 0, h.exposed.Count())
+	assert.Equal(t, 0, seenCacheCount(h.seen))
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
 	assert.Contains(t, out.String(), "405")
 	assert.Contains(t, out.String(), "adding configurations of type 'single' is not supported, only 'job' configurations can be added.")
 }
@@ -450,7 +450,7 @@ func TestCmdAdd_ParseError(t *testing.T) {
 	fn := newTestFn("test:job1", "add", "job1", []byte(`{}`))
 	h.CmdAdd(fn)
 
-	assert.Equal(t, 0, h.exposed.Count())
+	assert.Equal(t, 0, exposedCacheCount(h.exposed))
 }
 
 func TestCmdAdd_ReplacesExisting(t *testing.T) {
@@ -486,7 +486,7 @@ func TestCmdAdd_ReplacesExisting_KeepsNonDyncfgInSeen(t *testing.T) {
 	h.CmdAdd(fn)
 
 	// Stock config stays in seen (for re-promotion).
-	_, ok := h.seen.LookupByUID("stock:job1")
+	_, ok := lookupSeenByUID(h.seen, "stock:job1")
 	assert.True(t, ok, "stock config should remain in seen cache")
 }
 
@@ -656,7 +656,7 @@ func TestCmdRemove_DyncfgConfig(t *testing.T) {
 	fn := newTestFn("test:job1", "remove", "", nil)
 	h.CmdRemove(fn)
 
-	_, ok := h.seen.LookupByUID("dyncfg:job1")
+	_, ok := lookupSeenByUID(h.seen, "dyncfg:job1")
 	assert.False(t, ok, "should be removed from seen")
 
 	_, ok = h.exposed.LookupByKey("job1")
@@ -694,7 +694,7 @@ func TestCmdRemove_DyncfgSingleRejected(t *testing.T) {
 	fn := newTestFn("test:job1", "remove", "", nil)
 	h.CmdRemove(fn)
 
-	_, ok := h.seen.LookupByUID("dyncfg:job1")
+	_, ok := lookupSeenByUID(h.seen, "dyncfg:job1")
 	assert.True(t, ok, "dyncfg single should not be removed")
 
 	_, ok = h.exposed.LookupByKey("job1")
@@ -786,7 +786,7 @@ func TestCmdUpdate_Conversion_Success(t *testing.T) {
 	assert.Equal(t, "dyncfg", entry.Cfg.SourceType())
 
 	// Old stock config should still be in seen (for re-promotion).
-	_, ok := h.seen.LookupByUID("stock:job1")
+	_, ok := lookupSeenByUID(h.seen, "stock:job1")
 	assert.True(t, ok, "stock config should stay in seen for conversion")
 }
 
@@ -944,10 +944,10 @@ func TestCmdUpdate_NonConversion_StartFails_NonDisruptiveRollback(t *testing.T) 
 	assert.Equal(t, StatusRunning, entry.Status)
 	assert.Equal(t, oldCfg.UID(), entry.Cfg.UID())
 
-	_, ok := h.seen.LookupByUID(oldCfg.UID())
+	_, ok := lookupSeenByUID(h.seen, oldCfg.UID())
 	assert.True(t, ok, "old config should be restored in seen cache")
 
-	_, ok = h.seen.LookupByUID(newCfg.UID())
+	_, ok = lookupSeenByUID(h.seen, newCfg.UID())
 	assert.False(t, ok, "new config should be removed from seen cache on rollback")
 }
 

@@ -154,9 +154,8 @@ func (*schedulerTestJob) IsRunning() bool        { return true }
 func (job *schedulerTestJob) Collector() any     { return job }
 func (*schedulerTestJob) StartManaged(chan<- struct{}) {
 }
-func (*schedulerTestJob) Stop()                               {}
-func (*schedulerTestJob) Cleanup()                            {}
-func (*schedulerTestJob) AutoDetection(context.Context) error { return nil }
+func (*schedulerTestJob) Stop()    {}
+func (*schedulerTestJob) Cleanup() {}
 func (*schedulerTestJob) AutoDetectionManaged(context.Context) error {
 	return nil
 }

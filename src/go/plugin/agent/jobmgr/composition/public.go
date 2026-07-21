@@ -129,7 +129,7 @@ func NewProcess(config Config) (*Process, error) {
 	build.FnReg = nil
 	shutdownTimeout := config.ShutdownTimeout
 	if shutdownTimeout == 0 {
-		shutdownTimeout = 10 * time.Second
+		shutdownTimeout = lifecycle.DefaultShutdownTimeout
 	}
 	initialSecrets, err := cloneSecretConfigs(config.InitialSecrets)
 	if err != nil {

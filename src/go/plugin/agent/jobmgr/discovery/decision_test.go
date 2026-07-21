@@ -14,6 +14,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type decisionTestCensus struct {
+	sources      int
+	candidates   int
+	acknowledged int
+	revision     uint64
+}
+
+func decisionIndexCensus(index *DecisionIndex) decisionTestCensus {
+	census := decisionTestCensus{
+		sources:      len(index.sources),
+		acknowledged: len(index.acknowledged),
+		revision:     index.revision,
+	}
+	for _, candidates := range index.candidates {
+		census.candidates += len(candidates)
+	}
+	return census
+}
+
 func TestDecisionIndexAcknowledgesSelectionAndFallback(t *testing.T) {
 	var changes []DiscoveredChange
 	commands := &decisionTestCommands{}
@@ -58,11 +77,7 @@ func TestDecisionIndexAcknowledgesSelectionAndFallback(t *testing.T) {
 		changes[1].Config.UID() != user.UID() ||
 		changes[2].Config.UID() != stock.UID() ||
 		!changes[3].Remove)
-
-	census := index.Census()
-	require.EqualValues(t, DecisionCensus{
-		Revision: 4,
-	}, census)
+	require.EqualValues(t, decisionTestCensus{revision: 4}, decisionIndexCensus(index))
 }
 
 func TestDecisionIndexFailureKeepsLastAcknowledgedSelection(t *testing.T) {
@@ -93,11 +108,9 @@ func TestDecisionIndexFailureKeepsLastAcknowledgedSelection(t *testing.T) {
 
 	acknowledged := index.acknowledged[stock.FullName()]
 	require.Equal(t, stock.UID(), acknowledged.config.UID())
-
-	census := index.Census()
-	require.EqualValues(t, DecisionCensus{
-		Sources: 2, Candidates: 2, Acknowledged: 1, Revision: 1,
-	}, census)
+	require.EqualValues(t, decisionTestCensus{
+		sources: 2, candidates: 2, acknowledged: 1, revision: 1,
+	}, decisionIndexCensus(index))
 }
 
 func TestDecisionIndexConfigurationPolicy(t *testing.T) {
@@ -199,14 +212,12 @@ func TestDecisionIndexReconcilesOnlyChangedSourceRecords(t *testing.T) {
 	)
 
 	require.EqualValues(t, population+1, len(commands.requests))
-
-	census := index.Census()
-	require.EqualValues(t, DecisionCensus{
-		Sources:      population,
-		Candidates:   population,
-		Acknowledged: population,
-		Revision:     population + 1,
-	}, census)
+	require.EqualValues(t, decisionTestCensus{
+		sources:      population,
+		candidates:   population,
+		acknowledged: population,
+		revision:     population + 1,
+	}, decisionIndexCensus(index))
 }
 
 func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
@@ -258,14 +269,12 @@ func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
 
 			require.NoError(t, index.Apply(context.Background(), test.batch()))
 
-			census := index.Census()
-			require.EqualValues(t, DecisionCensus{
-				Sources:      test.wantSources,
-				Candidates:   population,
-				Acknowledged: population,
-				Revision:     population,
-			}, census)
-
+			require.EqualValues(t, decisionTestCensus{
+				sources:      test.wantSources,
+				candidates:   population,
+				acknowledged: population,
+				revision:     population,
+			}, decisionIndexCensus(index))
 			require.EqualValues(t, population, len(commands.requests))
 		})
 	}

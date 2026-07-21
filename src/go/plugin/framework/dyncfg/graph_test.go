@@ -7,6 +7,21 @@ import (
 	"testing"
 )
 
+func lookupExposedGraph(graph *Graph, module, name string) (GraphRecord, bool) {
+	graph.mu.RLock()
+	defer graph.mu.RUnlock()
+
+	id := graph.exposed[exposedGraphKey{module: module, name: name}]
+	record, ok := graph.records[id]
+	return record, ok
+}
+
+func graphVersion(graph *Graph) uint64 {
+	graph.mu.RLock()
+	defer graph.mu.RUnlock()
+	return graph.version
+}
+
 func TestDynCfgAtomicIndexes(t *testing.T) {
 	graph, err := NewGraph([]GraphConfig{{
 		ID: "old", Module: "m", Name: "job", Payload: []byte("old"),
@@ -26,7 +41,7 @@ func TestDynCfgAtomicIndexes(t *testing.T) {
 	if _, ok := graph.Lookup("new"); ok {
 		t.Fatal("private postimage visible before commit")
 	}
-	if record, ok := graph.LookupExposed("m", "job"); !ok || record.ID != "old" {
+	if record, ok := lookupExposedGraph(graph, "m", "job"); !ok || record.ID != "old" {
 		t.Fatalf("pre-commit exposed record=%#v ok=%v", record, ok)
 	}
 	if err := graph.Commit(mutation); err != nil {
@@ -35,7 +50,7 @@ func TestDynCfgAtomicIndexes(t *testing.T) {
 	if _, ok := graph.Lookup("old"); ok {
 		t.Fatal("removed ID survived commit")
 	}
-	if record, ok := graph.LookupExposed("m", "job"); !ok ||
+	if record, ok := lookupExposedGraph(graph, "m", "job"); !ok ||
 		record.ID != "new" ||
 		record.Payload() != "new" {
 		t.Fatalf("post-commit exposed record=%#v ok=%v", record, ok)
@@ -80,7 +95,7 @@ func TestDynCfgGraphMutationFailuresPreservePriorGraph(t *testing.T) {
 				t.Fatal(err)
 			}
 			test.run(t, graph)
-			if record, ok := graph.LookupExposed("m", "a"); !ok || record.ID != "a" {
+			if record, ok := lookupExposedGraph(graph, "m", "a"); !ok || record.ID != "a" {
 				t.Fatalf("graph changed after failed mutation: %#v ok=%v", record, ok)
 			}
 		})
@@ -98,8 +113,8 @@ func TestDynCfgGraphNoChangeIsTyped(t *testing.T) {
 	if _, err := graph.PrepareMutation([]GraphChange{{ID: "a", Config: &config}}); !errors.Is(err, ErrGraphNoChange) {
 		t.Fatalf("no-change error=%v, want ErrGraphNoChange", err)
 	}
-	if graph.Version() != 1 {
-		t.Fatalf("version=%d after no-change", graph.Version())
+	if version := graphVersion(graph); version != 1 {
+		t.Fatalf("version=%d after no-change", version)
 	}
 }
 

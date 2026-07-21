@@ -531,14 +531,11 @@ func (*assemblyTestHandler) Cleanup(context.Context) {}
 
 type assemblyTestJob struct{}
 
-func (*assemblyTestJob) FullName() string   { return "module_job" }
-func (*assemblyTestJob) ModuleName() string { return "module" }
-func (*assemblyTestJob) Name() string       { return "job" }
-func (*assemblyTestJob) IsRunning() bool    { return true }
-func (*assemblyTestJob) Collector() any     { return nil }
-func (*assemblyTestJob) AutoDetection(context.Context) error {
-	return nil
-}
+func (*assemblyTestJob) FullName() string                           { return "module_job" }
+func (*assemblyTestJob) ModuleName() string                         { return "module" }
+func (*assemblyTestJob) Name() string                               { return "job" }
+func (*assemblyTestJob) IsRunning() bool                            { return true }
+func (*assemblyTestJob) Collector() any                             { return nil }
 func (*assemblyTestJob) AutoDetectionManaged(context.Context) error { return nil }
 func (*assemblyTestJob) AutoDetectionEvery() int                    { return 0 }
 func (*assemblyTestJob) RetryAutoDetection() bool                   { return false }

@@ -105,8 +105,8 @@ func TestServiceDiscovery_UnsupportedDiscovererConfigIsIgnored(t *testing.T) {
 		configs: []confFile{
 			prepareUnsupportedDiscovererConfigFile("/usr/lib/netdata/conf.d/sd/unsupported.conf", "unsupported"),
 		},
-		wantPipelines:    nil,
-		wantExposedCount: 0,
+		wantPipelines: nil,
+		wantExposed:   []wantExposedCfg{},
 	}
 	sim.run(t)
 }
@@ -209,7 +209,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 				{name: "myconfig", started: true, stopped: true},  // stock stopped
 				{name: "myconfig", started: true, stopped: false}, // user running
 			},
-			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
@@ -224,7 +223,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			wantPipelines: []*mockPipeline{
 				{name: "myconfig", started: true, stopped: false}, // user keeps running
 			},
-			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
@@ -239,7 +237,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			wantPipelines: []*mockPipeline{
 				{name: "myconfig", started: true, stopped: false}, // first stock keeps running
 			},
-			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeStock, status: dyncfg.StatusRunning},
 			},
@@ -254,7 +251,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			wantPipelines: []*mockPipeline{
 				{name: "myconfig", started: true, stopped: false}, // first user keeps running
 			},
-			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
@@ -270,7 +266,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 			wantPipelines: []*mockPipeline{
 				{name: "myconfig", started: true, stopped: false}, // user keeps running
 			},
-			wantExposedCount: 1,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "myconfig", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},
 			},
@@ -285,7 +280,6 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 				{name: "stock-config", started: true, stopped: false},
 				{name: "user-config", started: true, stopped: false},
 			},
-			wantExposedCount: 2,
 			wantExposed: []wantExposedCfg{
 				{discovererType: "net_listeners", name: "stock-config", sourceType: confgroup.TypeStock, status: dyncfg.StatusRunning},
 				{discovererType: "net_listeners", name: "user-config", sourceType: confgroup.TypeUser, status: dyncfg.StatusRunning},

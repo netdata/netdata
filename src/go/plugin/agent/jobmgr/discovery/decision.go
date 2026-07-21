@@ -257,25 +257,3 @@ func (di *DecisionIndex) selectConfig(
 	}
 	return selected, true
 }
-
-type DecisionCensus struct {
-	Sources      int    // distinct discovery sources with an active config set
-	Candidates   int    // total candidate configs across all jobs
-	Acknowledged int    // jobs whose desired selection has been acknowledged
-	Revision     uint64 // monotonic decision revision
-}
-
-func (di *DecisionIndex) Census() DecisionCensus {
-	if di == nil {
-		return DecisionCensus{}
-	}
-	census := DecisionCensus{
-		Sources:      len(di.sources),
-		Acknowledged: len(di.acknowledged),
-		Revision:     di.revision,
-	}
-	for _, candidates := range di.candidates {
-		census.Candidates += len(candidates)
-	}
-	return census
-}

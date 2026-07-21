@@ -162,6 +162,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 				return
 			case fn := <-sd.dyncfgCh:
 				sd.dyncfgSeqExec(fn)
+				sd.completeDyncfg(fn)
 			}
 		}
 	}()
@@ -170,9 +171,6 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 	// Run the test scenario
 	s.do(sd)
-
-	// Give a bit of time for async operations
-	time.Sleep(100 * time.Millisecond)
 
 	cancel()
 
@@ -208,9 +206,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 	// Verify exposed configs
 	if s.wantExposed != nil {
-		wantLen, gotLen := len(s.wantExposed), sd.exposed.Count()
-		require.Equalf(t, wantLen, gotLen, "exposedConfigs: different len (want %d got %d)", wantLen, gotLen)
-
+		require.Equal(t, len(s.wantExposed), exposedCacheCount(sd.exposed), "exposedConfigs: different len")
 		for _, want := range s.wantExposed {
 			entry, ok := sd.exposed.LookupByKey(want.discovererType + ":" + want.name)
 			require.Truef(t, ok, "exposedConfigs: config '%s:%s' not found", want.discovererType, want.name)
@@ -221,7 +217,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 
 	// Verify running pipelines
 	if s.wantRunning != nil {
-		gotRunning := sd.mgr.Keys()
+		gotRunning := runningPipelineKeys(sd.mgr)
 		assert.ElementsMatch(t, s.wantRunning, gotRunning, "running pipelines")
 	}
 }
@@ -236,27 +232,18 @@ func sendDyncfgCmd(sd *ServiceDiscovery, uid string, args []string, payload []by
 		ContentType: "application/json",
 	})
 
-	// Call dyncfgConfig directly for commands that are handled there (schema, get, userconfig)
-	// and dyncfgSeqExec for state-changing commands
-	cmd := ""
-	if len(args) >= 2 {
-		cmd = args[1]
-	}
+	sd.dyncfgConfig(fn)
+}
 
-	switch cmd {
-	case "schema", "get", "userconfig", "test":
-		// These are handled directly in dyncfgConfig (read-only/validation commands)
-		sd.dyncfgConfig(fn)
-	default:
-		// State-changing commands go through the channel
-		select {
-		case sd.dyncfgCh <- fn:
-		case <-time.After(time.Second):
-		}
-	}
+func runningPipelineKeys(mgr *PipelineManager) []string {
+	mgr.mux.Lock()
+	defer mgr.mux.Unlock()
 
-	// Give time for processing
-	time.Sleep(50 * time.Millisecond)
+	keys := make([]string, 0, len(mgr.pipelines))
+	for key := range mgr.pipelines {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 func TestServiceDiscovery_DyncfgSchema(t *testing.T) {

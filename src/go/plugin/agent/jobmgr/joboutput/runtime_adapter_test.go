@@ -30,12 +30,16 @@ func TestManagedJobV1V2JoinBeforeCleanup(t *testing.T) {
 			tasks, err := lifecycle.NewTaskSupervisor(frame)
 			require.NoError(t, err)
 			job := newRecordingManagedJob()
-			constructed, err := NewManagedJob(
+			constructed, err := newManagedJob(
 				test.variant,
 				job,
 				tasks,
 				lifecycle.ResourceIdentity{ID: "job", Generation: 1},
 				newTestScheduler(t),
+				func(context.Context) error {
+					job.Cleanup()
+					return nil
+				},
 			)
 			require.NoError(t, err)
 
@@ -73,12 +77,16 @@ func TestManagedJobStartAcknowledgesLoopReadiness(t *testing.T) {
 			require.NoError(t, err)
 			job := newRecordingManagedJob()
 			job.readyGate = make(chan struct{})
-			constructed, err := NewManagedJob(
+			constructed, err := newManagedJob(
 				test.variant,
 				job,
 				tasks,
 				lifecycle.ResourceIdentity{ID: "job", Generation: 1},
 				newTestScheduler(t),
+				func(context.Context) error {
+					job.Cleanup()
+					return nil
+				},
 			)
 			require.NoError(t, err)
 			started := make(chan error, 1)
@@ -247,9 +255,6 @@ func (*recordingManagedJob) ModuleName() string {
 func (*recordingManagedJob) Name() string       { return "job" }
 func (*recordingManagedJob) IsRunning() bool    { return true }
 func (job *recordingManagedJob) Collector() any { return job }
-func (*recordingManagedJob) AutoDetection(context.Context) error {
-	return nil
-}
 func (*recordingManagedJob) AutoDetectionManaged(context.Context) error {
 	return nil
 }

@@ -1106,7 +1106,7 @@ func TestFunctionCatalogBoundedMutationTurns(t *testing.T) {
 			require.NoError(t, err)
 			progress := builder.Progress()
 			delta := progress.CompletedNodes - previous.CompletedNodes
-			require.False(t, delta <= 0 || delta > quantum || progress.LastStepNodes != delta)
+			require.False(t, delta <= 0 || delta > quantum)
 
 			_, ok := catalogRouteSet(catalog.routes, "config")
 			require.False(t, ok)

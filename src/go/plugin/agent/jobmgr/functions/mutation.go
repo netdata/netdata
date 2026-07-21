@@ -340,7 +340,6 @@ type routeMutationStep struct {
 type MutationProgress struct {
 	CompletedNodes int
 	TotalNodes     int
-	LastStepNodes  int
 }
 
 // MutationBuilder is catalog-owned after BeginMutation. PrepareStep is the
@@ -812,7 +811,6 @@ func (mb *MutationBuilder) Progress() MutationProgress {
 	return MutationProgress{
 		CompletedNodes: mb.completed,
 		TotalNodes:     mb.mutation.totalNodes,
-		LastStepNodes:  mb.lastStep,
 	}
 }
 
