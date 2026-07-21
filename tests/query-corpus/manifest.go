@@ -258,8 +258,8 @@ var manifest = map[string]ManifestCase{
 		Agent:  Green,
 	},
 	"W/anomaly-rate-multidim": {
-		Proves: "the multi-dim anomaly contract: options=anomaly-bit is the WORKING contract (honored, true rates — what the dashboards send: their Anomaly Rate selector is the option on volume/ks2, never the method); the BARE method is path-INCONSISTENT — per-metric and MCP force the bit, the multi-dim path returns plain value averages (RULING PENDING: should the method imply the option everywhere?)",
-		Agent:  Green,
+		Proves: "method=anomaly-rate implies the anomaly bit on EVERY path: the bare method and the explicit options=anomaly-bit are equivalent, both returning true anomaly rates through the multi-dimensional path (was: the bare method ranked by plain value averages there while per-metric and MCP forced the bit)",
+		Agent:  Green, FixedBy: "#23212",
 	},
 	"W/volume": {
 		Proves: "weights method=volume: weight = (highlight-baseline)/baseline x the fraction of highlight time above/below the baseline average (countif); metrics with EQUAL window averages are skipped entirely",
