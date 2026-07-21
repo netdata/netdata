@@ -206,7 +206,7 @@ var manifest = map[string]ManifestCase{
 		Agent:  Red,
 	},
 	"L7/formatters": {
-		Proves: "classic v1 formats over a hostile fixture: csv/tsv byte-exact (newest-first default, natural order option, unquoted header cells pinned as current contract), ssv/ssvcomma cell counts, csvjsonarray VALID JSON with NUMERIC timestamps (#23115/#23117 pinned), markdown/html/array/json/datatable/jsonp structure",
+		Proves: "classic v1 formats over a hostile fixture: csv/tsv byte-exact (newest-first default, natural order option, unquoted header cells pinned as current contract), ssv/ssvcomma/array exact row-sum values, csvjsonarray VALID JSON with NUMERIC timestamps (#23115/#23117 pinned), markdown/html/json/datatable/jsonp structure",
 		Agent:  Green,
 	},
 	"CASE-019/v1-json-name-escaping": {

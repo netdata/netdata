@@ -46,7 +46,7 @@ func TestCase016FreshHostForgottenOnRestart(t *testing.T) {
 		// below is the only pending one
 		time.Sleep(8 * time.Second)
 
-		pushLiveBurst(t, hostname, guid(65+attempt), fresh)
+		pushLiveBurst(t, hostname, guid(190+attempt), fresh)
 		settleAndVerify(t, hostname, fresh)
 
 		if err := td.Restart(); err != nil {

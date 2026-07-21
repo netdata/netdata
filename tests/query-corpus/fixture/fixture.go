@@ -49,13 +49,6 @@ type Chart struct {
 	Dimensions     []Dimension
 }
 
-// Host is one child host: pushed over its own streaming connection.
-type Host struct {
-	Hostname    string
-	MachineGUID string
-	Charts      []Chart
-}
-
 // FirstT returns the earliest point timestamp across the chart's dimensions.
 func (c Chart) FirstT() int64 {
 	var first int64
