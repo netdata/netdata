@@ -121,7 +121,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             continue;
 
         buffer_fast_strcat(wb, pre_label, pre_label_len);
-        buffer_strcat(wb, string2str(r->dn[c]));
+        // dimension names can carry any character (label values become
+        // names under group_by=label) - escape them or the JSON breaks
+        buffer_json_strcat(wb, string2str(r->dn[c]));
         buffer_fast_strcat(wb, post_label, post_label_len);
         i++;
     }
