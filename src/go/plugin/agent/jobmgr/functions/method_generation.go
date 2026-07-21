@@ -387,15 +387,7 @@ func functionJSONResult(status int, payload any) (lifecycle.SealedResult, error)
 	if err != nil {
 		return lifecycle.SealedResult{}, err
 	}
-	envelope, err := lifecycle.NewCompleteRawEnvelope(
-		status,
-		lifecycle.ReviewedPerformanceJSON,
-		encoded,
-	)
-	if err != nil {
-		return lifecycle.SealedResult{}, err
-	}
-	return lifecycle.SealFunctionResult(envelope)
+	return lifecycle.NewSealedResult(status, "application/json", encoded)
 }
 
 func responseStatus(payload map[string]any, fallback int) int {

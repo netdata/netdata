@@ -3,19 +3,15 @@
 package lifecycle
 
 import (
-	"bytes"
 	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
-
-	"gopkg.in/yaml.v3"
 )
 
 const MaximumFunctionValueDepth = 128
@@ -385,63 +381,6 @@ func appendJSONString(dst []byte, value string) []byte {
 	return append(dst, encoded...)
 }
 
-type ReviewedBodySchema uint8
-
-const (
-	ReviewedPerformanceJSON ReviewedBodySchema = iota + 1
-	ReviewedDynCfgJSON
-	ReviewedDynCfgYAML
-	ReviewedSNMPTrapJSON
-)
-
-type CompleteRawEnvelope struct{ resultPlan }
-
-func NewCompleteRawValueEnvelope(status int, schema ReviewedBodySchema, value Value) (CompleteRawEnvelope, error) {
-	if schema != ReviewedPerformanceJSON && schema != ReviewedDynCfgJSON && schema != ReviewedSNMPTrapJSON {
-		return CompleteRawEnvelope{}, errors.New("jobmgr Function result: reviewed Value codec is not JSON")
-	}
-	plan, err := newClosedValuePlan(status, value)
-	if err != nil {
-		return CompleteRawEnvelope{}, err
-	}
-	return CompleteRawEnvelope{plan}, nil
-}
-
-func NewCompleteRawEnvelope(status int, schema ReviewedBodySchema, body []byte) (CompleteRawEnvelope, error) {
-	if status < 100 || status > 599 || !utf8.Valid(body) {
-		return CompleteRawEnvelope{}, errors.New("jobmgr Function result: invalid reviewed raw envelope")
-	}
-	contentType := ""
-	switch schema {
-	case ReviewedPerformanceJSON, ReviewedDynCfgJSON, ReviewedSNMPTrapJSON:
-		if !json.Valid(body) {
-			return CompleteRawEnvelope{}, errors.New("jobmgr Function result: invalid reviewed JSON")
-		}
-		var compact bytes.Buffer
-		if err := json.Compact(&compact, body); err != nil || !bytes.Equal(compact.Bytes(), body) {
-			return CompleteRawEnvelope{}, errors.New("jobmgr Function result: reviewed JSON is not one compact value")
-		}
-		contentType = "application/json"
-	case ReviewedDynCfgYAML:
-		if err := validateReviewedYAML(body); err != nil {
-			return CompleteRawEnvelope{}, err
-		}
-		contentType = "application/yaml"
-	default:
-		return CompleteRawEnvelope{}, errors.New("jobmgr Function result: unknown reviewed body schema")
-	}
-	if err := validateResultPlanSize(status, contentType, len(body)); err != nil {
-		return CompleteRawEnvelope{}, err
-	}
-	sealed, err := newOwnedSealedResult(status, contentType, bytes.Clone(body))
-	if err != nil {
-		return CompleteRawEnvelope{}, err
-	}
-	return CompleteRawEnvelope{resultPlan{sealed: sealed}}, nil
-}
-
-func (cre CompleteRawEnvelope) functionResultPlan() resultPlan { return cre.resultPlan }
-
 func SealFunctionResult(result FunctionResult) (SealedResult, error) {
 	if result == nil {
 		return SealedResult{}, errors.New("jobmgr Function result: nil result")
@@ -451,75 +390,4 @@ func SealFunctionResult(result FunctionResult) (SealedResult, error) {
 		return SealedResult{}, errors.Join(errors.New("jobmgr Function result: invalid sealed plan"), err)
 	}
 	return plan.sealed, nil
-}
-
-func validateReviewedYAML(body []byte) error {
-	if len(body) == 0 {
-		return errors.New("jobmgr Function result: empty reviewed YAML")
-	}
-	for line := range strings.SplitSeq(strings.ReplaceAll(string(body), "\r\n", "\n"), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "FUNCTION_RESULT_END" {
-			return errors.New("jobmgr Function result: unsafe reviewed YAML")
-		}
-	}
-	decoder := yaml.NewDecoder(bytes.NewReader(body))
-	var document yaml.Node
-	if err := decoder.Decode(&document); err != nil {
-		return errors.New("jobmgr Function result: invalid reviewed YAML")
-	}
-	var extra yaml.Node
-	if err := decoder.Decode(&extra); err != io.EOF {
-		return errors.New("jobmgr Function result: reviewed YAML must contain one document")
-	}
-	if err := validateReviewedYAMLNode(&document, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func validateReviewedYAMLNode(node *yaml.Node, depth int) error {
-	if node == nil || depth > MaximumFunctionValueDepth || node.Kind == yaml.AliasNode || node.Anchor != "" || node.Style&yaml.TaggedStyle != 0 {
-		return errors.New("jobmgr Function result: unsafe reviewed YAML graph")
-	}
-	switch node.Kind {
-	case yaml.DocumentNode:
-		if len(node.Content) != 1 {
-			return errors.New("jobmgr Function result: invalid reviewed YAML document")
-		}
-		return validateReviewedYAMLNode(node.Content[0], depth)
-	case yaml.MappingNode:
-		if len(node.Content)%2 != 0 {
-			return errors.New("jobmgr Function result: invalid reviewed YAML mapping")
-		}
-		keys := make(map[string]struct{}, len(node.Content)/2)
-		for index := 0; index < len(node.Content); index += 2 {
-			key := node.Content[index]
-			if key.Kind != yaml.ScalarNode || key.Value == "<<" {
-				return errors.New("jobmgr Function result: unsafe reviewed YAML key")
-			}
-			if _, ok := keys[key.Value]; ok {
-				return errors.New("jobmgr Function result: duplicate reviewed YAML key")
-			}
-			keys[key.Value] = struct{}{}
-			if err := validateReviewedYAMLNode(key, depth+1); err != nil {
-				return err
-			}
-			if err := validateReviewedYAMLNode(node.Content[index+1], depth+1); err != nil {
-				return err
-			}
-		}
-		return nil
-	case yaml.SequenceNode:
-		for _, child := range node.Content {
-			if err := validateReviewedYAMLNode(child, depth+1); err != nil {
-				return err
-			}
-		}
-		return nil
-	case yaml.ScalarNode:
-		return nil
-	default:
-		return errors.New("jobmgr Function result: unknown reviewed YAML node")
-	}
 }

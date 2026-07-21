@@ -24,10 +24,8 @@ func TestClosedFunctionResultVariantsHaveExactSizeAppend(t *testing.T) {
 	require.NoError(t, err)
 	topologyResult, err := NewTopologyResult(200, body)
 	require.NoError(t, err)
-	rawResult, err := NewCompleteRawEnvelope(200, ReviewedPerformanceJSON, []byte(`{"status":200}`))
-	require.NoError(t, err)
 	for name, result := range map[string]FunctionResult{
-		"error": errorResult, "table": tableResult, "topology": topologyResult, "raw": rawResult,
+		"error": errorResult, "table": tableResult, "topology": topologyResult,
 	} {
 		seed := []byte("seed:")
 		appended := result.Append(bytes.Clone(seed))
@@ -135,44 +133,4 @@ func TestRepeatedStringValueAppendGrowsDestination(t *testing.T) {
 				!bytes.HasSuffix(appended, []byte(`"}`)))
 		})
 	}
-}
-
-func TestReviewedRawEnvelopeCopiesAndValidatesBody(t *testing.T) {
-	body := []byte(`{"status":200}`)
-	result, err := NewCompleteRawEnvelope(200, ReviewedPerformanceJSON, body)
-	require.NoError(t, err)
-	body[2] = 'X'
-
-	got := string(result.Append(nil))
-	require.EqualValues(t, `{"status":200}`, got)
-
-	for _, invalid := range [][]byte{
-		[]byte(`{"status": 200}`),
-		[]byte(`{"status":`),
-	} {
-
-		_, newCompleteRawEnvelopeErr3 := NewCompleteRawEnvelope(200, ReviewedPerformanceJSON, invalid)
-		require.Error(t, newCompleteRawEnvelopeErr3)
-
-	}
-
-	_, newCompleteRawEnvelopeErr := NewCompleteRawEnvelope(200, ReviewedDynCfgYAML, []byte("key: value\n"))
-	require.NoError(t, newCompleteRawEnvelopeErr)
-
-	for _, invalid := range [][]byte{
-		[]byte("key: value\nFUNCTION_RESULT_END\n"),
-		[]byte("key: &anchor value\nother: *anchor\n"),
-		[]byte("key: !!str value\n"),
-		[]byte("key: first\nkey: second\n"),
-		[]byte("---\nkey: value\n---\nother: value\n"),
-	} {
-
-		_, newCompleteRawEnvelopeErr4 := NewCompleteRawEnvelope(200, ReviewedDynCfgYAML, invalid)
-		require.Error(t, newCompleteRawEnvelopeErr4)
-
-	}
-
-	_, newCompleteRawEnvelopeErr2 := NewCompleteRawEnvelope(200, 0, []byte(`{}`))
-	require.Error(t, newCompleteRawEnvelopeErr2)
-
 }
