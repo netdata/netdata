@@ -68,9 +68,9 @@ A **context** groups charts by metric type and displayed dimensions. Contexts de
 
 - `apps.cpu` for **Apps CPU Time**
 - `apps.mem` for **Apps Real Memory**
-- `net.net` for network **Bandwidth**
+- `net.net` for **network Bandwidth**
 
-The part before the dot (`.`) is the **type**, while the part after is defined by the chart's developer or its family.
+The part before the dot (`.`) is the **type**, while the part after is defined by the chart’s developer or its family.
 
 Contexts are also used for alert configurations.
 
@@ -180,12 +180,12 @@ The **Group by** dropdown allows you to apply different grouping strategies on t
 
 ![Group by dropdown](https://user-images.githubusercontent.com/43294513/235468819-3af5a1d3-8619-48fb-a8b7-8e8b4cf6a8ff.png)
 
-| Grouping Option    | Description                                                |
-|--------------------|------------------------------------------------------------|
+| Grouping Option    | Description                                                                                               |
+|--------------------|-----------------------------------------------------------------------------------------------------------|
 | Group by Node      | Display each node (hostname) as a separate labeled dimension in the chart legend, with one entry per node |
-| Group by Instance  | Summarize data by instance with one dimension per instance |
-| Group by Dimension | Aggregate data across all nodes by dimension               |
-| Group by Label     | Summarize data based on label values                       |
+| Group by Instance  | Summarize data by instance with one dimension per instance                                                |
+| Group by Dimension | Aggregate data across all nodes by dimension                                                              |
+| Group by Label     | Summarize data based on label values                                                                      |
 
 :::tip
 
@@ -222,11 +222,11 @@ Each chart has a default aggregation function, which you can adjust as needed:
 
 When selecting aggregation functions over time, charts may offer dropdown menus for **Percentiles** and **Trimmed Mean / Median** selection. Below are examples of these dropdowns:
 
-### Percentile Selection Example:
+### Percentile Selection Example
 
 ![Percentile selection dropdown](https://user-images.githubusercontent.com/70198089/236410299-de5f3367-f3b0-4beb-a73f-a49007c543d4.png)
 
-### Trimmed Mean / Median Selection Example:
+### Trimmed Mean / Median Selection Example
 
 ![Trimmed Mean or Median selection dropdown](https://user-images.githubusercontent.com/70198089/236410858-74b46af9-280a-4ab2-ad26-5a6aa9403aa8.png)
 
