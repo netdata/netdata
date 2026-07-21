@@ -213,6 +213,18 @@ var manifest = map[string]ManifestCase{
 		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) emit dimension names UNESCAPED between quotes (json.c header loop) — a double-quote in a name (or a label value via group_by=label) produces invalid JSON; the v3 json2 path escapes properly",
 		Agent:  Red,
 	},
+	"L9/virtual-points": {
+		Proves: "the virtual-points view oracle is engine-EXACT (fixture/viewpoints.go, the rrd2rrdr_query_execute port): grid boundaries cutting sample intervals serve a linearly interpolated boundary point per line; only freshly fetched points ending inside the line are added whole (a pending straddler shifts to the interpolation anchor WITHOUT re-adding, keeping its original bounds); off-grid charts re-time onto the absolute grid with exact interpolated slots; upsampling serves interpolated sub-ue slots, with the query's FIRST straddler raw — tier0 has no backward plan expansion, so it has no anchor (the CASE-017 asymmetry)",
+		Agent:  Green,
+	},
+	"L9/window-normalization": {
+		Proves: "a negative `after` is relative to `before` (identical to the absolute equivalent); (0,0) resolves to the ~600s grid-aligned default window ending NOW — NOT the full retention (the reason backdated fixtures settle via explicit windows); time_resampling (v1 gtime) forces the bucket size up",
+		Agent:  Green,
+	},
+	"L9/v2-v3-parity": {
+		Proves: "/api/v2/data and /api/v3/data answer identically for identical params (shared api_v23_data_internal) — only the api version field differs",
+		Agent:  Green,
+	},
 	"W/value": {
 		Proves: "weights method=value: per-metric weight = the window average over NATURAL points with the after-INCLUSIVE window (121 points for a 120s span — rulings batch); MULTINODE rollup rows carry the mean of their dimensions; the per-dimension timeframe stats (min/avg/max/sum/count/anomaly_count) are exact; method=value NEVER rank-normalizes",
 		Agent:  Green,
