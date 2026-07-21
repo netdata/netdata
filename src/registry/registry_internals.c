@@ -5,6 +5,76 @@
 
 struct registry registry;
 
+FILE *registry_fopen_regular(const char *filename, const char *mode) {
+    int flags;
+    bool truncate = false;
+
+    if(strcmp(mode, "r") == 0)
+        flags = O_RDONLY;
+    else if(strcmp(mode, "a") == 0)
+        flags = O_WRONLY | O_APPEND | O_CREAT;
+    else if(strcmp(mode, "w") == 0) {
+        flags = O_WRONLY | O_CREAT;
+        truncate = true;
+    }
+    else {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    struct stat st;
+    if(stat(filename, &st) == 0) {
+        if(!S_ISREG(st.st_mode)) {
+            errno = EINVAL;
+            return NULL;
+        }
+    }
+    else if(errno != ENOENT)
+        return NULL;
+
+    int fd = open(filename, flags | O_NONBLOCK, 0666);
+    if(fd == -1)
+        return NULL;
+
+    if(fstat(fd, &st) != 0) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if(!S_ISREG(st.st_mode)) {
+        close(fd);
+        errno = EINVAL;
+        return NULL;
+    }
+
+    int status_flags = fcntl(fd, F_GETFL);
+    if(status_flags == -1 || fcntl(fd, F_SETFL, status_flags & ~O_NONBLOCK) != 0) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    FILE *fp = fdopen(fd, mode);
+    if(!fp) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if(truncate && ftruncate(fd, 0) != 0) {
+        int saved_errno = errno;
+        fclose(fp);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    return fp;
+}
+
 // ----------------------------------------------------------------------------
 // common functions
 
