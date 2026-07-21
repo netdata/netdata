@@ -53,7 +53,7 @@ func TestLayer3RegistryCompleteness(t *testing.T) {
 			{"coefficient-of-variation", "cv"},
 		} {
 			t.Run(tc.sent, func(t *testing.T) {
-				verifyTimeGroupAs(t, "l3-reg", ch, tc.sent, "", tc.canonical, "", 10)
+				verifyTimeGroupAs(t, "l3-reg", ch, tgQuery{Name: tc.sent, OracleName: tc.canonical}, 10)
 			})
 		}
 	})
@@ -96,6 +96,6 @@ func TestLayer3RegistryCompleteness(t *testing.T) {
 	// unknown names never error: time_grouping_parse silently falls
 	// back to average — pinned
 	t.Run("unknown-name-fallback", func(t *testing.T) {
-		verifyTimeGroupAs(t, "l3-reg", ch, "no-such-grouping", "", "average", "", 10)
+		verifyTimeGroupAs(t, "l3-reg", ch, tgQuery{Name: "no-such-grouping", OracleName: "average"}, 10)
 	})
 }

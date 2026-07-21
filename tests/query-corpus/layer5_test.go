@@ -521,7 +521,9 @@ func TestLayer5Statistics(t *testing.T) {
 						continue
 					}
 
-					// derive the expected sts from the per-row oracle
+					// derive the expected sts from the per-row oracle;
+					// the pre-division sum and the row extremes feed only
+					// the non-raw assertions
 					var rowSum, preDivSum, minV, maxV float64
 					rows, contributions := 0, 0
 					for i := 1; i <= l5Rows; i++ {
@@ -529,29 +531,29 @@ func TestLayer5Statistics(t *testing.T) {
 						if empty {
 							continue
 						}
-						sumV, _, _, _, _ := l5Expected("sum", group, i, false)
-						preDivSum += sumV
 						rowSum += v
-						if rows == 0 {
-							minV, maxV = v, v
-						} else {
-							minV = math.Min(minV, v)
-							maxV = math.Max(maxV, v)
+						if !raw {
+							sumV, _, _, _, _ := l5Expected("sum", group, i, false)
+							preDivSum += sumV
+							if rows == 0 {
+								minV, maxV = v, v
+							} else {
+								minV = math.Min(minV, v)
+								maxV = math.Max(maxV, v)
+							}
 						}
 						rows++
 						contributions += gbc
 					}
 
 					if raw {
-						// raw keeps the accumulated (sum, count) pair
-						wantSum, wantCnt := rowSum, contributions
-						if agg != "average" && agg != "sum" {
-							// min/max/extremes rows carry the champion values
-							wantSum = rowSum
+						// raw keeps the accumulated (sum, count) pair —
+						// for min/max/extremes the rows carry the
+						// champion values, so their sum is the row sum too
+						if !tierValueMatch(got["sum"], rowSum, 1e-9) {
+							t.Errorf("%q: raw sts sum %v, want %v", gname, got["sum"], rowSum)
 						}
-						if !tierValueMatch(got["sum"], wantSum, 1e-9) {
-							t.Errorf("%q: raw sts sum %v, want %v", gname, got["sum"], wantSum)
-						}
+						wantCnt := contributions
 						if cnt, ok := got["cnt"]; ok && int(cnt) != wantCnt {
 							t.Errorf("%q: raw sts count %v, want %d", gname, cnt, wantCnt)
 						}
