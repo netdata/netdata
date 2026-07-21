@@ -14,6 +14,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type testRunShutdownBarrierFunc func(context.Context, uint64) error
+
+func (fn testRunShutdownBarrierFunc) BeforeFunctionCatalogClose(
+	ctx context.Context,
+	generation uint64,
+) error {
+	return fn(ctx, generation)
+}
+
+type testRunFinalizerFunc func(context.Context, uint64) error
+
+func (fn testRunFinalizerFunc) FinalizeRun(
+	ctx context.Context,
+	generation uint64,
+) error {
+	return fn(ctx, generation)
+}
+
 func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 	t *testing.T,
 ) {
@@ -47,10 +65,10 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 		frames,
 		clock,
 		make(chan lifecycle.AdmissionGrant, 1),
-		jobmgr.RunShutdownBarrierFunc(
+		testRunShutdownBarrierFunc(
 			func(context.Context, uint64) error { return nil },
 		),
-		jobmgr.RunFinalizerFunc(
+		testRunFinalizerFunc(
 			func(context.Context, uint64) error { return nil },
 		),
 		catalog,

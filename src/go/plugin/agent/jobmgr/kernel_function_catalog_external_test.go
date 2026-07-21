@@ -17,6 +17,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type runShutdownBarrierFunc func(context.Context, uint64) error
+
+func (fn runShutdownBarrierFunc) BeforeFunctionCatalogClose(
+	ctx context.Context,
+	generation uint64,
+) error {
+	return fn(ctx, generation)
+}
+
+type runFinalizerFunc func(context.Context, uint64) error
+
+func (fn runFinalizerFunc) FinalizeRun(ctx context.Context, generation uint64) error {
+	return fn(ctx, generation)
+}
+
 func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	var cleanupCalls atomic.Int32
 	catalog, err := functionadapter.NewCatalog([]functionadapter.Declaration{
@@ -49,8 +64,8 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	kernel, err := jobmgr.NewCommandKernel(
 		run, admission, uids, tasks, frames, clock,
 		make(chan lifecycle.AdmissionGrant, 1),
-		jobmgr.RunShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
-		jobmgr.RunFinalizerFunc(func(context.Context, uint64) error { return nil }),
+		runShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
+		runFinalizerFunc(func(context.Context, uint64) error { return nil }),
 		catalog,
 	)
 	require.NoError(t, err)
@@ -580,8 +595,8 @@ func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmg
 	kernel, err := jobmgr.NewCommandKernel(
 		run, admission, uids, tasks, frames, clock,
 		make(chan lifecycle.AdmissionGrant, 1),
-		jobmgr.RunShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
-		jobmgr.RunFinalizerFunc(func(context.Context, uint64) error { return nil }),
+		runShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
+		runFinalizerFunc(func(context.Context, uint64) error { return nil }),
 		catalog,
 	)
 	require.NoError(t, err)

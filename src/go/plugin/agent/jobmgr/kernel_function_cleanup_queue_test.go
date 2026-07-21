@@ -24,8 +24,8 @@ func (acc *abortCleanupCatalog) AbortMutation(
 	return copy(cleanups[:], acc.cleanups), acc.err
 }
 
-func TestFunctionCleanupQueuePreservesFIFOAndReleasesChunks(t *testing.T) {
-	const population = 3*functionCleanupChunkCapacity + 7
+func TestFunctionCleanupQueuePreservesFIFOAndReleasesReferences(t *testing.T) {
+	const population = 199
 
 	var queue functionCleanupQueue
 	for index := range population {
@@ -42,26 +42,14 @@ func TestFunctionCleanupQueuePreservesFIFOAndReleasesChunks(t *testing.T) {
 		require.NoError(t, queue.push(plan))
 	}
 	require.EqualValues(t, population, queue.count)
-	chunks := 0
-	for chunk := queue.head; chunk != nil; chunk = chunk.next {
-		chunks++
-	}
-	const wantChunks = 4
-	require.EqualValues(t, wantChunks, chunks)
-
-	firstChunk := queue.head
 	for index := range population {
 		plan := queue.front()
 		require.False(t, plan.Ref.Slot != uint32(index+1) || plan.Ref.Generation != 1)
 		queue.pop()
-		if index == functionCleanupChunkCapacity-1 {
-			require.Nil(t, firstChunk.next)
-			for slot, plan := range firstChunk.plans {
-				require.False(t, plan.Ref.Valid() || plan.Work != nil, "slot=%d", slot)
-			}
-		}
 	}
-	require.False(t, queue.count != 0 || queue.head != nil || queue.tail != nil)
+	require.Zero(t, queue.count)
+	require.Zero(t, queue.head)
+	require.Nil(t, queue.plans)
 
 	plan := queue.front()
 	require.False(t, plan.Ref.Valid() || plan.Work != nil)
@@ -92,7 +80,7 @@ func TestAbortMutationCleanupsPreservesOrderAndJoinsErrors(t *testing.T) {
 }
 
 func BenchmarkBFunctionCleanupQueuePushPop(b *testing.B) {
-	const population = 4 * functionCleanupChunkCapacity
+	const population = 256
 	plans := make([]FunctionCleanupPlan, population)
 	for index := range plans {
 		plans[index] = FunctionCleanupPlan{

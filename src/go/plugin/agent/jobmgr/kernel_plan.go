@@ -12,7 +12,6 @@ type WorkPlan struct {
 	Work                lifecycle.TaskWork       // command work (one work source)
 	Transaction         *ResourceTransactionPlan // resource transaction plan (one work source)
 	Claims              []string                 // write claim keys
-	OwnedBytes          int64                    // retained bytes charged to this plan
 	NoResponse          bool                     // the command produces no terminal response frame
 	CooperativeCancel   bool                     // work honors cooperative cancellation
 	CooperativeDeadline bool                     // work honors the caller deadline
@@ -27,9 +26,6 @@ type ResourceTransactionPlan struct {
 }
 
 func (wp WorkPlan) validate() error {
-	if wp.OwnedBytes < 0 {
-		return errors.New("jobmgr kernel: negative plan-owned bytes")
-	}
 	if len(wp.Claims) > maximumPlanClaims {
 		return errors.New("jobmgr kernel: too many plan claims")
 	}

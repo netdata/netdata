@@ -33,14 +33,14 @@ func compositeTestPlan(
 		Transaction: &ResourceTransactionPlan{
 			ID: id,
 			Prepare: func(
-				context.Context,
-				lifecycle.ReadyResource,
-				lifecycle.ResourceTransactionScope,
-				lifecycle.LongLivedPermit,
+				_ context.Context,
+				_ lifecycle.ReadyResource,
+				scope lifecycle.ResourceTransactionScope,
+				permit lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
 				return &simpleCompositeChildTransaction{
-					scope: lifecycle.ResourceTransactionScope{ID: id},
-					apply: onApply,
+					scope: scope,
+					apply: onApply, permit: permit,
 				}, nil
 			},
 		},
@@ -124,8 +124,9 @@ func (ctt *compositeTestTransaction) Dispose(
 }
 
 type simpleCompositeChildTransaction struct {
-	scope lifecycle.ResourceTransactionScope
-	apply func()
+	scope  lifecycle.ResourceTransactionScope
+	apply  func()
+	permit lifecycle.LongLivedPermit
 }
 
 func (scct *simpleCompositeChildTransaction) Scope() lifecycle.ResourceTransactionScope {
@@ -138,13 +139,24 @@ func (scct *simpleCompositeChildTransaction) Apply(
 	if scct.apply != nil {
 		scct.apply()
 	}
+	if scct.permit.Valid() {
+		if err := scct.permit.AbortUnused(); err != nil {
+			return lifecycle.AppliedResourceTransaction{}, err
+		}
+		scct.permit = lifecycle.LongLivedPermit{}
+	}
 	return compositeTestApplied(scct.scope)
 }
 
 func (scct *simpleCompositeChildTransaction) Dispose(
 	context.Context,
 ) (lifecycle.ReadyResource, error) {
-	return nil, nil
+	if !scct.permit.Valid() {
+		return nil, nil
+	}
+	err := scct.permit.AbortUnused()
+	scct.permit = lifecycle.LongLivedPermit{}
+	return nil, err
 }
 
 func compositeTestApplied(
@@ -740,8 +752,10 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 	)
 	base, err := operationAdmissionBytes(conflictingRequest, conflictingPlan)
 	require.NoError(t, err)
-	conflictingPlan.OwnedBytes = available - base
-	require.False(t, conflictingPlan.OwnedBytes <= 0)
+	permit, err := lifecycle.NewSecretStoreLongLivedPlan(available - base)
+	require.NoError(t, err)
+	conflictingPlan.Transaction.AllocateSuccessor = true
+	conflictingPlan.Transaction.Permit = permit
 	conflictingPlan, err = prepareOwnedJobPlan(conflictingRequest, conflictingPlan)
 	require.NoError(t, err)
 	conflictingAdmitted := make(chan error, 1)
@@ -826,12 +840,11 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 		require.FailNow(t, "test failed", "conflicting operation did not reach terminal")
 	}
 
-	census := admission.Census()
-	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
-
 	require.NoError(t, run.DirtyCause())
 
 	stopCompositeTestKernel(t, kernel)
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
 }
 
 func TestCompositeChildGetsParentLinkedProgressAdmission(
@@ -916,9 +929,12 @@ func TestCompositeChildGetsParentLinkedProgressAdmission(
 	)
 	base, err := operationAdmissionBytes(blockerRequest, blockerPlan)
 	require.NoError(t, err)
-	blockerPlan.OwnedBytes =
-		capacity - beforeBlocker.OrdinaryBytes - base
-	require.False(t, blockerPlan.OwnedBytes <= 0)
+	permit, err := lifecycle.NewSecretStoreLongLivedPlan(
+		capacity - beforeBlocker.OrdinaryBytes - base,
+	)
+	require.NoError(t, err)
+	blockerPlan.Transaction.AllocateSuccessor = true
+	blockerPlan.Transaction.Permit = permit
 	blockerDone := make(chan error, 1)
 	go func() {
 		blockerDone <- kernel.SubmitPreparedAndWait(t.Context(), blockerRequest, blockerPlan)
@@ -955,10 +971,9 @@ func TestCompositeChildGetsParentLinkedProgressAdmission(
 		require.FailNow(t, "test failed", "ordinary-budget blocker did not finish")
 	}
 
-	census := admission.Census()
-	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
-
 	require.NoError(t, run.DirtyCause())
 
 	stopCompositeTestKernel(t, kernel)
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
 }

@@ -12,9 +12,9 @@ import (
 
 func TestClaimAuthorityFIFOAndDirectCancellation(t *testing.T) {
 	authority := newClaimAuthority()
-	first := claimTestOperation(t, authority, 1, "first", []string{"b"}, nil)
-	second := claimTestOperation(t, authority, 2, "second", []string{"a", "b"}, nil)
-	third := claimTestOperation(t, authority, 3, "third", []string{"a"}, nil)
+	first := claimTestOperation(t, authority, 1, "first", []string{"b"})
+	second := claimTestOperation(t, authority, 2, "second", []string{"a", "b"})
+	third := claimTestOperation(t, authority, 3, "third", []string{"a"})
 
 	acquireGranted, acquireErr := authority.acquire(first)
 	require.False(t, acquireErr != nil || !acquireGranted)
@@ -33,9 +33,9 @@ func TestClaimAuthorityFIFOAndDirectCancellation(t *testing.T) {
 	_, releaseErr := authority.release(third)
 	require.NoError(t, releaseErr)
 
-	blocker := claimTestOperation(t, authority, 4, "blocker", []string{"b"}, nil)
-	cancelled := claimTestOperation(t, authority, 5, "cancelled", []string{"a", "b"}, nil)
-	survivor := claimTestOperation(t, authority, 6, "survivor", []string{"b"}, nil)
+	blocker := claimTestOperation(t, authority, 4, "blocker", []string{"b"})
+	cancelled := claimTestOperation(t, authority, 5, "cancelled", []string{"a", "b"})
+	survivor := claimTestOperation(t, authority, 6, "survivor", []string{"b"})
 	_, _ = authority.acquire(blocker)
 	_, _ = authority.acquire(cancelled)
 	_, _ = authority.acquire(survivor)
@@ -53,9 +53,9 @@ func TestClaimAuthorityFIFOAndDirectCancellation(t *testing.T) {
 
 func TestClaimAuthorityLexicographicOrderRetainsAndReleasesPrefix(t *testing.T) {
 	authority := newClaimAuthority()
-	holder := claimTestOperation(t, authority, 1, "holder", []string{"b"}, nil)
-	parked := claimTestOperation(t, authority, 2, "parked", []string{"b", "a", "a"}, nil)
-	probe := claimTestOperation(t, authority, 3, "probe", []string{"a"}, nil)
+	holder := claimTestOperation(t, authority, 1, "holder", []string{"b"})
+	parked := claimTestOperation(t, authority, 2, "parked", []string{"b", "a", "a"})
+	probe := claimTestOperation(t, authority, 3, "probe", []string{"a"})
 
 	acquireGranted, acquireErr := authority.acquire(holder)
 	require.False(t, acquireErr != nil || !acquireGranted)
@@ -63,7 +63,7 @@ func TestClaimAuthorityLexicographicOrderRetainsAndReleasesPrefix(t *testing.T) 
 	acquireGranted2, acquireErr2 := authority.acquire(parked)
 	require.False(t, acquireErr2 != nil || acquireGranted2)
 
-	require.False(t, parked.claimCursor != 1 || !parked.authorityClaimEdges[0].held || parked.authorityClaimEdges[0].claim.key != "a" || !parked.authorityClaimEdges[1].waiting)
+	require.False(t, parked.claimCursor != 1 || !parked.authorityClaimEdges[0].held || parked.authorityClaimEdges[0].claim != "a" || !parked.authorityClaimEdges[1].waiting)
 
 	acquireGranted3, acquireErr3 := authority.acquire(probe)
 	require.False(t, acquireErr3 != nil || acquireGranted3)
@@ -76,31 +76,6 @@ func TestClaimAuthorityLexicographicOrderRetainsAndReleasesPrefix(t *testing.T) 
 
 	_, releaseErr2 := authority.release(holder)
 	require.NoError(t, releaseErr2)
-
-}
-
-func TestClaimAuthorityFIFOReadersWriters(t *testing.T) {
-	authority := newClaimAuthority()
-	reader1 := claimTestOperation(t, authority, 1, "reader-1", nil, []string{"shared"})
-	writer := claimTestOperation(t, authority, 2, "writer", []string{"shared"}, nil)
-	reader2 := claimTestOperation(t, authority, 3, "reader-2", nil, []string{"shared"})
-
-	acquireGranted, acquireErr := authority.acquire(reader1)
-	require.False(t, acquireErr != nil || !acquireGranted)
-
-	acquireGranted2, acquireErr2 := authority.acquire(writer)
-	require.False(t, acquireErr2 != nil || acquireGranted2)
-
-	acquireGranted3, acquireErr3 := authority.acquire(reader2)
-	require.False(t, acquireErr3 != nil || acquireGranted3)
-
-	granted, err := authority.release(reader1)
-	require.False(t, err != nil || len(granted) != 1 || granted[0] != writer)
-	granted, err = authority.release(writer)
-	require.False(t, err != nil || len(granted) != 1 || granted[0] != reader2)
-
-	_, releaseErr := authority.release(reader2)
-	require.NoError(t, releaseErr)
 
 }
 
@@ -136,13 +111,16 @@ func TestClaimAuthoritySettlementUsesBoundedTurns(t *testing.T) {
 		quantum    = 4
 	)
 	authority := newClaimAuthority()
+	claims := make([]string, population)
+	for index := range claims {
+		claims[index] = fmt.Sprintf("claim-%03d", index)
+	}
 	holder := claimTestOperation(
 		t,
 		authority,
 		1,
 		"holder",
-		[]string{"shared"},
-		nil,
+		claims,
 	)
 
 	acquireGranted, acquireErr := authority.acquire(holder)
@@ -154,8 +132,7 @@ func TestClaimAuthoritySettlementUsesBoundedTurns(t *testing.T) {
 			authority,
 			lifecycle.OperationID(index+2),
 			fmt.Sprintf("waiter-%d", index),
-			nil,
-			[]string{"shared"},
+			[]string{claims[index]},
 		)
 
 		granted, err := authority.acquire(waiter)
@@ -192,9 +169,9 @@ type claimAllocationFixture struct {
 func newClaimAllocationFixture(tb testing.TB, cancel bool, base lifecycle.OperationID) claimAllocationFixture {
 	tb.Helper()
 	authority := newClaimAuthority()
-	target := claimTestOperation(tb, authority, base, fmt.Sprintf("target-%d", base), []string{"a", "b", "c", "d"}, nil)
+	target := claimTestOperation(tb, authority, base, fmt.Sprintf("target-%d", base), []string{"a", "b", "c", "d"})
 	if cancel {
-		blocker := claimTestOperation(tb, authority, base+1, fmt.Sprintf("blocker-%d", base), []string{"d"}, nil)
+		blocker := claimTestOperation(tb, authority, base+1, fmt.Sprintf("blocker-%d", base), []string{"d"})
 		if granted, err := authority.acquire(blocker); err != nil || !granted {
 			require.FailNowf(tb, "benchmark failed", "blocker acquire: granted=%v err=%v", granted, err)
 		}
@@ -218,8 +195,8 @@ func BenchmarkClaimAuthorityAcquireCancel(b *testing.B) {
 			b.ResetTimer()
 			for b.Loop() {
 				authority := newClaimAuthority()
-				blocker := claimTestOperation(b, authority, 1, "blocker", []string{claims[keys-1]}, nil)
-				target := claimTestOperation(b, authority, 2, "target", claims, nil)
+				blocker := claimTestOperation(b, authority, 1, "blocker", []string{claims[keys-1]})
+				target := claimTestOperation(b, authority, 2, "target", claims)
 				if granted, err := authority.acquire(blocker); err != nil || !granted {
 					require.FailNow(b, "benchmark failed", err)
 				}
@@ -235,13 +212,13 @@ func BenchmarkClaimAuthorityAcquireCancel(b *testing.B) {
 	}
 }
 
-func claimTestOperation(tb testing.TB, authority *claimAuthority, id lifecycle.OperationID, uid string, writes, reads []string) *commandOperation {
+func claimTestOperation(tb testing.TB, authority *claimAuthority, id lifecycle.OperationID, uid string, claims []string) *commandOperation {
 	tb.Helper()
 	generation, err := lifecycle.NewOperation(id, uid, lifecycle.SourceJobManager, uid, true)
 	if err != nil {
 		require.FailNow(tb, "benchmark failed", err)
 	}
-	normalized, err := normalizeAuthorityClaimModes(writes, reads)
+	normalized, err := normalizeAuthorityClaims(claims)
 	if err != nil {
 		require.FailNow(tb, "benchmark failed", err)
 	}

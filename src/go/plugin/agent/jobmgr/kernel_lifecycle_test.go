@@ -1381,7 +1381,7 @@ func TestKernelRunFinalizerUsesSharedBudgetExactlyOnce(t *testing.T) {
 		generation uint64
 		deadline   time.Time
 	}, 1)
-	finalizer := RunFinalizerFunc(func(ctx context.Context, generation uint64) error {
+	finalizer := runFinalizerFunc(func(ctx context.Context, generation uint64) error {
 		deadline, ok := ctx.Deadline()
 		if !ok {
 			return errors.New("finalizer context has no deadline")
@@ -1432,7 +1432,7 @@ func TestKernelShutdownDeadlineWinsFinalizerCompletion(t *testing.T) {
 	}
 	clock := newKernelFinalizerClock()
 	started := make(chan struct{})
-	finalizer := RunFinalizerFunc(func(ctx context.Context, _ uint64) error {
+	finalizer := runFinalizerFunc(func(ctx context.Context, _ uint64) error {
 		close(started)
 		<-ctx.Done()
 		return nil
@@ -1473,7 +1473,7 @@ func TestKernelDueClockWinsIndependentFinalizerCompletion(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	started := make(chan struct{})
 	release := make(chan struct{})
-	finalizer := RunFinalizerFunc(func(context.Context, uint64) error {
+	finalizer := runFinalizerFunc(func(context.Context, uint64) error {
 		close(started)
 		<-release
 		return nil
@@ -2225,7 +2225,7 @@ func TestKernelFourthBackgroundTransactionTimeoutDirtiesWithoutResponseCommit(t 
 func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 	var permit lifecycle.LongLivedPermit
 	called := make(chan struct{}, 1)
-	finalizer := RunFinalizerFunc(func(context.Context, uint64) error {
+	finalizer := runFinalizerFunc(func(context.Context, uint64) error {
 		called <- struct{}{}
 		if err := permit.ReleaseExternal(lifecycle.LongLivedESecretStore); err != nil {
 			return err
@@ -2277,7 +2277,7 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 
 func TestKernelRunFinalizerFailureReleasesTaskWithoutQuiescence(t *testing.T) {
 	want := errors.New("finalizer failed")
-	finalizer := RunFinalizerFunc(func(context.Context, uint64) error { return want })
+	finalizer := runFinalizerFunc(func(context.Context, uint64) error { return want })
 	kernel, run, _, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
 
 	require.NoError(t, run.OpenAdmission())
@@ -2294,7 +2294,7 @@ func TestKernelRunFinalizerFailureReleasesTaskWithoutQuiescence(t *testing.T) {
 }
 
 func TestKernelRunFinalizerPanicReleasesTaskWithoutQuiescence(t *testing.T) {
-	finalizer := RunFinalizerFunc(func(context.Context, uint64) error { panic("finalizer panic") })
+	finalizer := runFinalizerFunc(func(context.Context, uint64) error { panic("finalizer panic") })
 	kernel, run, _, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
 
 	require.NoError(t, run.OpenAdmission())
@@ -2312,7 +2312,7 @@ func TestKernelRunFinalizerPanicReleasesTaskWithoutQuiescence(t *testing.T) {
 
 func TestKernelRunFinalizerRejectsUnrelatedLongLivedPermit(t *testing.T) {
 	var calls atomic.Int32
-	finalizer := RunFinalizerFunc(func(context.Context, uint64) error {
+	finalizer := runFinalizerFunc(func(context.Context, uint64) error {
 		calls.Add(1)
 		return nil
 	})

@@ -15,12 +15,6 @@ type CommandInput struct {
 	HasPayload  bool     // whether a payload is present
 }
 
-// CommandPort submits prepared secret plans and waits for acknowledged
-// completion when sequencing depends on the resulting state.
-type CommandPort interface {
-	jobmgr.PreparedCommandPort
-}
-
 type DependentStopResult interface {
 	Stopped() (bool, error)
 }

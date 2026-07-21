@@ -271,11 +271,6 @@ type preparedCompositeBridge struct {
 	scope       *kernelCompositeScope
 }
 
-type compositeFenceClaimUse struct {
-	readers int
-	writers int
-}
-
 func (pcb *preparedCompositeBridge) Scope() (
 	scope lifecycle.ResourceTransactionScope,
 ) {
@@ -350,10 +345,7 @@ func (ck *CommandKernel) validateCompositeAdmission(
 			"jobmgr composite: cancelled parent rejected normal child",
 		)
 	}
-	childClaims, err := normalizeAuthorityClaimModes(
-		plan.Claims,
-		nil,
-	)
+	childClaims, err := normalizeAuthorityClaims(plan.Claims)
 	if err != nil {
 		return nil, err
 	}
@@ -367,21 +359,16 @@ func (ck *CommandKernel) validateCompositeAdmission(
 
 func claimsCoveredByParent(
 	parent,
-	child []authorityClaim,
+	child []string,
 ) bool {
 	parentIndex := 0
 	for _, wanted := range child {
 		for parentIndex < len(parent) &&
-			parent[parentIndex].key < wanted.key {
+			parent[parentIndex] < wanted {
 			parentIndex++
 		}
 		if parentIndex >= len(parent) ||
-			parent[parentIndex].key != wanted.key {
-			return false
-		}
-		held := parent[parentIndex]
-		if wanted.mode == authorityClaimWrite &&
-			held.mode != authorityClaimWrite {
+			parent[parentIndex] != wanted {
 			return false
 		}
 	}
@@ -435,13 +422,7 @@ func (ck *CommandKernel) beginCompositeFence(
 		return nil
 	}
 	for _, claim := range parent.claims {
-		use := ck.compositeFenceClaims[claim.key]
-		if claim.mode == authorityClaimRead {
-			use.readers++
-		} else {
-			use.writers++
-		}
-		ck.compositeFenceClaims[claim.key] = use
+		ck.compositeFenceClaims[claim]++
 	}
 	parent.composite.fenced = true
 	return nil
@@ -455,21 +436,16 @@ func (ck *CommandKernel) endCompositeFence(
 		return nil
 	}
 	for _, claim := range parent.claims {
-		use := ck.compositeFenceClaims[claim.key]
-		if claim.mode == authorityClaimRead {
-			use.readers--
-		} else {
-			use.writers--
-		}
-		if use.readers < 0 || use.writers < 0 {
+		use := ck.compositeFenceClaims[claim] - 1
+		if use < 0 {
 			return errors.New(
 				"jobmgr composite: negative admission fence ownership",
 			)
 		}
-		if use.readers == 0 && use.writers == 0 {
-			delete(ck.compositeFenceClaims, claim.key)
+		if use == 0 {
+			delete(ck.compositeFenceClaims, claim)
 		} else {
-			ck.compositeFenceClaims[claim.key] = use
+			ck.compositeFenceClaims[claim] = use
 		}
 	}
 	parent.composite.fenced = false
@@ -484,15 +460,10 @@ func (ck *CommandKernel) endCompositeFence(
 }
 
 func (ck *CommandKernel) compositeFenceConflicts(
-	claims []authorityClaim,
+	claims []string,
 ) bool {
 	for _, claim := range claims {
-		use := ck.compositeFenceClaims[claim.key]
-		if claim.mode == authorityClaimRead {
-			if use.writers != 0 {
-				return true
-			}
-		} else if use.readers != 0 || use.writers != 0 {
+		if ck.compositeFenceClaims[claim] != 0 {
 			return true
 		}
 	}

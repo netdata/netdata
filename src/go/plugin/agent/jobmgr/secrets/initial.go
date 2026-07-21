@@ -18,7 +18,7 @@ const secretBootResourceID = "\x00jobmgr-secret-boot"
 
 func (c *Controller) PublishInitial(
 	ctx context.Context,
-	commands CommandPort,
+	commands jobmgr.PreparedCommandPort,
 ) error {
 	if c == nil || ctx == nil || commands == nil {
 		return errors.New(
@@ -76,7 +76,7 @@ func (c *Controller) PublishInitial(
 
 func (c *Controller) publishTemplates(
 	ctx context.Context,
-	commands CommandPort,
+	commands jobmgr.PreparedCommandPort,
 ) error {
 	plan := jobmgr.WorkPlan{
 		Claims:     []string{SecretGraphClaim},

@@ -16,18 +16,3 @@ type RunFinalizer interface {
 type RunShutdownBarrier interface {
 	BeforeFunctionCatalogClose(context.Context, uint64) error
 }
-
-type RunShutdownBarrierFunc func(context.Context, uint64) error
-
-func (fn RunShutdownBarrierFunc) BeforeFunctionCatalogClose(
-	ctx context.Context,
-	generation uint64,
-) error {
-	return fn(ctx, generation)
-}
-
-type RunFinalizerFunc func(context.Context, uint64) error
-
-func (fn RunFinalizerFunc) FinalizeRun(ctx context.Context, generation uint64) error {
-	return fn(ctx, generation)
-}

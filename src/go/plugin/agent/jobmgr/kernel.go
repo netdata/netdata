@@ -90,7 +90,7 @@ type commandOperation struct {
 	*lifecycle.OperationGeneration                                    // embedded neutral lifecycle state machine (state, response, child)
 	request                        Request                            // immutable admitted command
 	plan                           WorkPlan                           // prepared work for the command
-	claims                         []authorityClaim                   // normalized claim set (sorted, deduped)
+	claims                         []string                           // normalized claim set (sorted, deduped)
 	authorityClaimEdges            []authorityClaimEdge               // per-claim edge state in the claim authority
 	claimCursor                    int                                // index of the next claim edge to acquire
 	claimTicket                    uint64                             // global FIFO ticket for cross-key settlement fairness
@@ -251,7 +251,7 @@ type CommandKernel struct {
 	controls                 []*commandOperation                             // pending terminal-control FIFO
 	operationHead            *commandOperation                               // head of the all-operations list
 	operationTail            *commandOperation                               // tail of the all-operations list
-	compositeFenceClaims     map[string]compositeFenceClaimUse               // claim keys currently fenced by active composites
+	compositeFenceClaims     map[string]int                                  // active composite fences per claim key
 	compositeFenceHead       *commandOperation                               // head of the composite fence list
 	compositeFenceTail       *commandOperation                               // tail of the composite fence list
 	compositeFenceCount      int                                             // number of fenced operations
@@ -307,7 +307,7 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		functionMutationStopped: make(chan struct{}),
 		byAdmission:             make(map[lifecycle.AdmissionRef]*commandOperation),
 		lanes:                   make(map[commandLaneKey]*commandLane),
-		compositeFenceClaims:    make(map[string]compositeFenceClaimUse),
+		compositeFenceClaims:    make(map[string]int),
 		nextSource:              lifecycle.SourceJobManager,
 		nextExternalSource:      lifecycle.SourceJobManager,
 		inputBodyGrants:         inputBodyGrants,

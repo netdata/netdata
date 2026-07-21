@@ -20,10 +20,6 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 		return 0, errors.New("jobmgr kernel: input body does not self-fit admission")
 	}
 	bytes += request.PayloadCapacity
-	if plan.OwnedBytes > lifecycle.OrdinaryBudgetBytes-bytes {
-		return 0, errors.New("jobmgr kernel: plan-owned bytes do not self-fit admission")
-	}
-	bytes += plan.OwnedBytes
 	if plan.Transaction != nil && plan.Transaction.AllocateSuccessor {
 		persistent := plan.Transaction.Permit.Bytes()
 		if !validPersistentAdmission(

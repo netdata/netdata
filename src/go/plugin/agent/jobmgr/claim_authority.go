@@ -3,7 +3,6 @@
 package jobmgr
 
 import (
-	"cmp"
 	"container/heap"
 	"errors"
 	"slices"
@@ -12,32 +11,18 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
-type authorityClaimMode uint8
-
-const (
-	authorityClaimRead authorityClaimMode = iota + 1
-	authorityClaimWrite
-)
-
 const maximumClaimSettlementQuantum = 4
-
-type authorityClaim struct {
-	key  string
-	mode authorityClaimMode
-}
 
 type authorityClaimKey struct {
 	references      int                 // outstanding edges referencing this key
-	writer          *authorityClaimEdge // the write edge currently holding the key, if any
-	readerHead      *authorityClaimEdge // head of the reader edge list
-	readerTail      *authorityClaimEdge // tail of the reader edge list
+	holder          *authorityClaimEdge // the edge currently holding the key, if any
 	waiterHead      *authorityClaimEdge // head of the FIFO waiter list
 	waiterTail      *authorityClaimEdge // tail of the FIFO waiter list
 	settlementIndex int                 // index in the settlement heap (-1 when absent)
 }
 
 type authorityClaimEdge struct {
-	claim     authorityClaim      // the (key, mode) this edge requests
+	claim     string              // claim key this edge requests
 	operation *commandOperation   // operation owning this edge
 	key       *authorityClaimKey  // the claim key this edge is registered against
 	held      bool                // the edge currently holds the key
@@ -112,30 +97,19 @@ func (ca *claimAuthority) bindRuntimeObserver(
 	return nil
 }
 
-func normalizeAuthorityClaimModes(writeClaims, readClaims []string) ([]authorityClaim, error) {
-	claims := make([]authorityClaim, 0, len(writeClaims)+len(readClaims))
-	for _, key := range readClaims {
-		claims = append(claims, authorityClaim{key: key, mode: authorityClaimRead})
-	}
-	for _, key := range writeClaims {
-		claims = append(claims, authorityClaim{key: key, mode: authorityClaimWrite})
-	}
+func normalizeAuthorityClaims(input []string) ([]string, error) {
+	claims := slices.Clone(input)
 	for _, claim := range claims {
-		if claim.key == "" {
+		if claim == "" {
 			return nil, errors.New("jobmgr claims: empty key")
 		}
 	}
-	slices.SortFunc(claims, func(a, b authorityClaim) int {
-		if a.key != b.key {
-			return cmp.Compare(a.key, b.key)
-		}
-		return cmp.Compare(b.mode, a.mode)
-	})
-	claims = slices.CompactFunc(claims, func(left, right authorityClaim) bool { return left.key == right.key })
+	slices.Sort(claims)
+	claims = slices.Compact(claims)
 	return claims, nil
 }
 
-func prepareClaimEdges(operation *commandOperation, claims []authorityClaim) {
+func prepareClaimEdges(operation *commandOperation, claims []string) {
 	operation.claims = claims
 	operation.authorityClaimEdges = make([]authorityClaimEdge, len(claims))
 	for index, claim := range claims {
@@ -150,7 +124,7 @@ func (ca *claimAuthority) register(operation *commandOperation) error {
 	}
 	for index := range operation.authorityClaimEdges {
 		edge := &operation.authorityClaimEdges[index]
-		edge.key = ca.key(edge.claim.key)
+		edge.key = ca.key(edge.claim)
 		edge.key.references++
 	}
 	operation.claimRegistered = true
@@ -247,7 +221,7 @@ func (ca *claimAuthority) acquireFromCursor(operation *commandOperation) (bool, 
 		if edge.held || edge.waiting || edge.key == nil {
 			return false, errors.New("jobmgr claims: invalid acquisition edge")
 		}
-		if edge.key.waiterHead != nil || !canHold(edge.key, edge.claim.mode) {
+		if edge.key.waiterHead != nil || edge.key.holder != nil {
 			ca.enqueueWaiter(edge)
 			operation.claimWaiting = true
 			return false, nil
@@ -260,53 +234,19 @@ func (ca *claimAuthority) acquireFromCursor(operation *commandOperation) (bool, 
 	return true, nil
 }
 
-func canHold(key *authorityClaimKey, mode authorityClaimMode) bool {
-	if key.writer != nil {
-		return false
-	}
-	return mode == authorityClaimRead || key.readerHead == nil
-}
-
 func holdEdge(edge *authorityClaimEdge) {
 	edge.held = true
-	if edge.claim.mode == authorityClaimWrite {
-		edge.key.writer = edge
-		return
-	}
-	edge.prev = edge.key.readerTail
-	if edge.key.readerTail != nil {
-		edge.key.readerTail.next = edge
-	} else {
-		edge.key.readerHead = edge
-	}
-	edge.key.readerTail = edge
+	edge.key.holder = edge
 }
 
 func (ca *claimAuthority) releaseEdge(edge *authorityClaimEdge) error {
 	if edge == nil || !edge.held || edge.waiting || edge.key == nil {
 		return errors.New("jobmgr claims: release of unheld edge")
 	}
-	if edge.claim.mode == authorityClaimWrite {
-		if edge.key.writer != edge {
-			return errors.New("jobmgr claims: writer holder mismatch")
-		}
-		edge.key.writer = nil
-	} else {
-		if edge.prev != nil {
-			edge.prev.next = edge.next
-		} else if edge.key.readerHead == edge {
-			edge.key.readerHead = edge.next
-		} else {
-			return errors.New("jobmgr claims: reader holder mismatch")
-		}
-		if edge.next != nil {
-			edge.next.prev = edge.prev
-		} else if edge.key.readerTail == edge {
-			edge.key.readerTail = edge.prev
-		} else {
-			return errors.New("jobmgr claims: reader tail mismatch")
-		}
+	if edge.key.holder != edge {
+		return errors.New("jobmgr claims: holder mismatch")
 	}
+	edge.key.holder = nil
 	edge.held = false
 	edge.prev = nil
 	edge.next = nil
@@ -372,8 +312,7 @@ func (ca *claimAuthority) serviceSettlements(
 			return nil, false, errors.New("jobmgr claims: invalid wake operation")
 		}
 		edge := &operation.authorityClaimEdges[operation.claimCursor]
-		if edge.key != key || key.waiterHead != edge ||
-			!canHold(key, edge.claim.mode) {
+		if edge.key != key || key.waiterHead != edge || key.holder != nil {
 			return nil, false, errors.New("jobmgr claims: settlement head differs")
 		}
 		if err := ca.removeWaiter(edge); err != nil {
@@ -479,13 +418,7 @@ func (ca *claimAuthority) refreshSettlement(key *authorityClaimKey) {
 }
 
 func claimSettlementEligible(key *authorityClaimKey) bool {
-	if key == nil || key.writer != nil || key.waiterHead == nil {
-		return false
-	}
-	if key.waiterHead.claim.mode == authorityClaimWrite {
-		return key.readerHead == nil
-	}
-	return true
+	return key != nil && key.holder == nil && key.waiterHead != nil
 }
 
 func (ca *claimAuthority) forget(operation *commandOperation) error {
@@ -498,11 +431,11 @@ func (ca *claimAuthority) forget(operation *commandOperation) error {
 			return errors.New("jobmgr claims: invalid terminal edge")
 		}
 		edge.key.references--
-		if edge.key.references == 0 && edge.key.writer == nil && edge.key.readerHead == nil && edge.key.waiterHead == nil {
+		if edge.key.references == 0 && edge.key.holder == nil && edge.key.waiterHead == nil {
 			if edge.key.settlementIndex >= 0 {
 				return errors.New("jobmgr claims: terminal key remains settlement-eligible")
 			}
-			delete(ca.keys, edge.claim.key)
+			delete(ca.keys, edge.claim)
 		}
 		edge.key = nil
 	}

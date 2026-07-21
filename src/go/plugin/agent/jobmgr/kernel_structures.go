@@ -11,19 +11,9 @@ type functionCleanupTask struct {
 	err error
 }
 
-// Fixed chunks keep each kernel-loop queue operation worst-case O(1).
-const functionCleanupChunkCapacity = 64
-
-type functionCleanupChunk struct {
-	plans      [functionCleanupChunkCapacity]FunctionCleanupPlan
-	readIndex  int
-	writeIndex int
-	next       *functionCleanupChunk
-}
-
 type functionCleanupQueue struct {
-	head  *functionCleanupChunk
-	tail  *functionCleanupChunk
+	plans []FunctionCleanupPlan
+	head  int
 	count int
 }
 
@@ -34,18 +24,7 @@ func (fcq *functionCleanupQueue) push(plan FunctionCleanupPlan) error {
 	if !plan.Ref.Valid() {
 		return nil
 	}
-	if fcq.tail == nil ||
-		fcq.tail.writeIndex == functionCleanupChunkCapacity {
-		chunk := &functionCleanupChunk{}
-		if fcq.tail == nil {
-			fcq.head = chunk
-		} else {
-			fcq.tail.next = chunk
-		}
-		fcq.tail = chunk
-	}
-	fcq.tail.plans[fcq.tail.writeIndex] = plan
-	fcq.tail.writeIndex++
+	fcq.plans = append(fcq.plans, plan)
 	fcq.count++
 	return nil
 }
@@ -54,23 +33,19 @@ func (fcq *functionCleanupQueue) front() FunctionCleanupPlan {
 	if fcq.count == 0 {
 		return FunctionCleanupPlan{}
 	}
-	return fcq.head.plans[fcq.head.readIndex]
+	return fcq.plans[fcq.head]
 }
 
 func (fcq *functionCleanupQueue) pop() {
 	if fcq.count == 0 {
 		return
 	}
-	chunk := fcq.head
-	chunk.plans[chunk.readIndex] = FunctionCleanupPlan{}
-	chunk.readIndex++
+	fcq.plans[fcq.head] = FunctionCleanupPlan{}
+	fcq.head++
 	fcq.count--
-	if chunk.readIndex == chunk.writeIndex {
-		fcq.head = chunk.next
-		chunk.next = nil
-		if fcq.head == nil {
-			fcq.tail = nil
-		}
+	if fcq.count == 0 {
+		fcq.plans = nil
+		fcq.head = 0
 	}
 }
 

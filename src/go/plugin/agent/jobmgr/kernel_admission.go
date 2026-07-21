@@ -128,7 +128,7 @@ func (ck *CommandKernel) admitSubmission(
 			}
 		}
 	}()
-	claims, err := normalizeAuthorityClaimModes(plan.Claims, nil)
+	claims, err := normalizeAuthorityClaims(plan.Claims)
 	if err != nil {
 		_ = ck.uids.Complete(request.UID, false, now)
 		_ = ck.abortRequestInputBody(request)
