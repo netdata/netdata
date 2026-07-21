@@ -211,6 +211,55 @@ func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsSocketOnlyEntries(t *te
 	}
 }
 
+// TestCachestatSharedMemoryStoreSolePublisherEvictsExitedPIDs verifies that
+// when socket is the sole publisher (no cachestat entries), each call to
+// UpdateSocketApps rebuilds entries from the current snapshot rather than
+// accumulating entries for PIDs that are no longer in the snapshot.
+//
+// Regression: the old "len(s.entries) == 0" guard took the merge path from
+// cycle 2 onward, causing exited PIDs to remain in s.entries forever.
+func TestCachestatSharedMemoryStoreSolePublisherEjectsExitedPIDs(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+
+	// Cycle 1: PIDs 10 and 20 are active.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 10, BytesSent: 100},
+		{PID: 20, BytesSent: 200},
+	})
+	snap1 := store.Snapshot()
+	if len(snap1) != 2 {
+		t.Fatalf("cycle 1: Snapshot() len = %d, want 2", len(snap1))
+	}
+
+	// Cycle 2: PID 10 has exited; PID 30 is new.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 20, BytesSent: 201},
+		{PID: 30, BytesSent: 300},
+	})
+	snap2 := store.Snapshot()
+	if len(snap2) != 2 {
+		t.Fatalf("cycle 2: Snapshot() len = %d, want 2 (exited PID 10 must be evicted)", len(snap2))
+	}
+	if snap2[0].pid != 20 || snap2[1].pid != 30 {
+		t.Fatalf("cycle 2: Snapshot() pids = %d,%d, want 20,30", snap2[0].pid, snap2[1].pid)
+	}
+	if snap2[0].socket.BytesSent != 201 {
+		t.Fatalf("cycle 2: PID 20 BytesSent = %d, want 201", snap2[0].socket.BytesSent)
+	}
+
+	// Cycle 3: PID 20 exits too; only PID 30 remains.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 30, BytesSent: 301},
+	})
+	snap3 := store.Snapshot()
+	if len(snap3) != 1 {
+		t.Fatalf("cycle 3: Snapshot() len = %d, want 1 (exited PID 20 must be evicted)", len(snap3))
+	}
+	if snap3[0].pid != 30 {
+		t.Fatalf("cycle 3: Snapshot() pid = %d, want 30", snap3[0].pid)
+	}
+}
+
 func BenchmarkCachestatSharedMemoryStoreUpdateAppsSorted(b *testing.B) {
 	const appsCount = 1024
 	apps := make([]libbpfloader.CachestatAppSnapshot, appsCount)

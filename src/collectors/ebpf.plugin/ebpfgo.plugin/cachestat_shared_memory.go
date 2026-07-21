@@ -26,6 +26,11 @@ type cachestatSharedMemoryStore struct {
 	stalePIDs     []uint32
 	socketData    map[uint32]ebpfSocketPublishApps // latest per-PID socket snapshot from tbl_nd_socket
 	activeModules uint32                           // EBPFGO_SHM_FLAG_* bits set when a module writes data
+	// cachestatOwnsEntries is true when UpdateApps last populated s.entries.
+	// When false (socket is the sole publisher), UpdateSocketApps must rebuild
+	// s.entries from scratch each cycle rather than merging in-place, so
+	// exited PIDs are evicted instead of accumulating indefinitely.
+	cachestatOwnsEntries bool
 }
 
 func NewCachestatSharedMemoryStore() *cachestatSharedMemoryStore {
@@ -229,6 +234,8 @@ func (s *cachestatSharedMemoryStore) UpdateApps(apps []libbpfloader.CachestatApp
 	s.missCount, s.nextMiss = s.nextMiss, s.missCount
 	s.stalePIDs = stalePIDs
 	s.activeModules |= ebpfgoSHMFlagCachestat // mark cachestat as an active producer
+	// Track ownership so UpdateSocketApps knows to merge rather than rebuild.
+	s.cachestatOwnsEntries = len(s.entries) > 0
 	s.applySocketDataLocked()
 	return stalePIDs
 }
@@ -300,11 +307,17 @@ func (s *cachestatSharedMemoryStore) MarkSocketActive() {
 // UpdateSocketApps stores the latest per-PID socket snapshot and applies it to
 // the current entries.  Called by the socket collector each cycle.
 //
-// When cachestat is also running as publisher, socket data is merged into the
-// cachestat-populated entries via applySocketDataLocked.  When socket is the
-// sole publisher (cachestat disabled or has no apps/cgroups consumers),
-// s.entries is empty and we must build entries directly from socket data so
-// the C consumer can look up per-PID socket stats.
+// When cachestat is also running as publisher (cachestatOwnsEntries == true),
+// socket data is merged into the cachestat-populated entries via
+// applySocketDataLocked so both modules' data appear on the same rows.
+//
+// When socket is the sole publisher (cachestat disabled or has no apps/cgroups
+// consumers), s.entries is rebuilt from scratch each cycle via
+// buildEntriesFromSocketLocked.  This mirrors the double-buffer pattern used
+// by UpdateApps and ensures that exited PIDs are evicted automatically — if we
+// merged in-place the way the co-publisher path does, entries would accumulate
+// every PID that ever had socket activity and never shrink, eventually exceeding
+// the 32768-row SHM capacity and silently dropping high-PID processes.
 func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.SocketPIDEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -331,10 +344,10 @@ func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.Soc
 		s.clearSocketDataFromEntriesLocked()
 		return
 	}
-	if len(s.entries) == 0 {
-		s.buildEntriesFromSocketLocked()
-	} else {
+	if s.cachestatOwnsEntries {
 		s.applySocketDataLocked()
+	} else {
+		s.buildEntriesFromSocketLocked()
 	}
 }
 
