@@ -309,6 +309,12 @@ func (d *Daemon) DataV3(host string, params url.Values) (map[string]any, error) 
 	return getJSON(fmt.Sprintf("%s/host/%s/api/v3/data?%s", d.BaseURL, url.PathEscape(host), params.Encode()))
 }
 
+// HostJSON queries an arbitrary /host/<host>/<endpoint> API path (e.g.
+// "api/v2/weights") and returns the parsed JSON document.
+func (d *Daemon) HostJSON(host, endpoint string, params url.Values) (map[string]any, error) {
+	return getJSON(fmt.Sprintf("%s/host/%s/%s?%s", d.BaseURL, url.PathEscape(host), endpoint, params.Encode()))
+}
+
 func truncate(b []byte, n int) string {
 	if len(b) <= n {
 		return string(b)
