@@ -15,8 +15,7 @@ var ErrFunctionResultTooLarge = errors.New("jobmgr lifecycle: Function result ex
 
 const (
 	ProcessBudgetBytes                  = 256 * 1024 * 1024
-	CleanupBudgetBytes                  = 100 * 1024 * 1024
-	OrdinaryBudgetBytes                 = ProcessBudgetBytes - CleanupBudgetBytes
+	OrdinaryBudgetBytes                 = ProcessBudgetBytes
 	TaskStartServiceQuantum             = 4
 	RetainedTimeoutFailStopThreshold    = 4
 	InheritedCancellationServiceQuantum = 4
@@ -31,36 +30,17 @@ const (
 )
 
 type SealedResult struct {
-	status       int               // HTTP-ish status (100-599)
-	contentType  string            // payload MIME type
-	payloadKind  sealedPayloadKind // raw bytes vs a closed Value
-	payload      []byte            // owned raw bytes (raw kind)
-	value        Value             // closed Value (value kind)
-	payloadBytes int               // encoded payload length for framing
-	planBytes    int64             // accounting charge (raw: byte length; value: value.charge)
+	status      int    // HTTP-ish status (100-599)
+	contentType string // payload MIME type
+	payload     []byte // owned encoded payload
 }
 
-type sealedPayloadKind uint8
-
-const (
-	sealedPayloadRaw sealedPayloadKind = iota + 1
-	sealedPayloadValue
-)
-
 func NewSealedResult(status int, contentType string, payload []byte) (SealedResult, error) {
-	result := SealedResult{status: status, contentType: contentType, payloadKind: sealedPayloadRaw, payload: payload, payloadBytes: len(payload), planBytes: int64(len(payload))}
+	result := SealedResult{status: status, contentType: contentType, payload: payload}
 	if err := result.validate(); err != nil {
 		return SealedResult{}, err
 	}
 	result.payload = slices.Clone(payload)
-	return result, nil
-}
-
-func newOwnedSealedResult(status int, contentType string, ownedPayload []byte) (SealedResult, error) {
-	result := SealedResult{status: status, contentType: contentType, payloadKind: sealedPayloadRaw, payload: ownedPayload, payloadBytes: len(ownedPayload), planBytes: int64(len(ownedPayload))}
-	if err := result.validate(); err != nil {
-		return SealedResult{}, err
-	}
 	return result, nil
 }
 
@@ -88,30 +68,7 @@ func (sr SealedResult) validate() error {
 	if sr.contentType == "" || strings.ContainsAny(sr.contentType, " \t\r\n\x00") {
 		return errors.New("jobmgr lifecycle: invalid result content type")
 	}
-	switch sr.payloadKind {
-	case sealedPayloadRaw:
-		if len(sr.payload) != sr.payloadBytes || sr.planBytes != int64(len(sr.payload)) {
-			return errors.New("jobmgr lifecycle: raw result size differs")
-		}
-	case sealedPayloadValue:
-		if sr.value.kind == valueInvalid || sr.payload != nil || sr.planBytes != sr.value.charge {
-			return errors.New("jobmgr lifecycle: invalid closed Value result")
-		}
-	default:
-		return errors.New("jobmgr lifecycle: unknown sealed payload variant")
-	}
-	return validateFunctionPayloadSize(sr.payloadBytes)
-}
-
-func (sr SealedResult) appendPayload(dst []byte) ([]byte, error) {
-	switch sr.payloadKind {
-	case sealedPayloadRaw:
-		return append(dst, sr.payload...), nil
-	case sealedPayloadValue:
-		return appendValueJSON(dst, sr.value, 0)
-	default:
-		return nil, errors.New("jobmgr lifecycle: unknown sealed payload variant")
-	}
+	return validateFunctionPayloadSize(len(sr.payload))
 }
 
 type TaskWork func(context.Context) (TaskOutcome, error)
@@ -129,17 +86,6 @@ func FrameTaskWork(work func(context.Context) (SealedResult, error)) TaskWork {
 			return TaskOutcome{}, err
 		}
 		return NewFrameOutcome(result)
-	}
-}
-
-func PreparedResourceTaskWork(work func(context.Context) (PreparedResource, error)) TaskWork {
-	return func(ctx context.Context) (TaskOutcome, error) {
-		resource, err := work(ctx)
-		if resource == nil {
-			return TaskOutcome{}, err
-		}
-		outcome, outcomeErr := PreparedResourceOutcome(resource)
-		return outcome, errors.Join(err, outcomeErr)
 	}
 }
 
@@ -293,9 +239,7 @@ func NewResourceTransactionPermitTaskPlan(
 	work PreparedResourceTransactionWork,
 ) (TaskPlan, error) {
 	if scope.Current.Valid() {
-		var err error
-		permitPlan, err = permitPlan.forReplacement()
-		if err != nil {
+		if err := permitPlan.validateReplacementClass(); err != nil {
 			return TaskPlan{}, err
 		}
 	}

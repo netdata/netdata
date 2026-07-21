@@ -12,6 +12,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func preparedResourceTaskWork(work func(context.Context) (PreparedResource, error)) TaskWork {
+	return func(ctx context.Context) (TaskOutcome, error) {
+		resource, err := work(ctx)
+		if resource == nil {
+			return TaskOutcome{}, err
+		}
+		identity, identityErr := preparedResourceIdentity(resource)
+		if identityErr != nil {
+			return TaskOutcome{}, errors.Join(err, identityErr)
+		}
+		outcome, outcomeErr := preparedResourceOutcome(resource, identity)
+		return outcome, errors.Join(err, outcomeErr)
+	}
+}
+
 func TestTaskSupervisorAcceptsStartsPublishesAndTransfersPreparedResource(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
@@ -19,7 +34,7 @@ func TestTaskSupervisorAcceptsStartsPublishesAndTransfersPreparedResource(t *tes
 	prepared := &recordingPreparedResource{identity: ready.identity, ready: ready, events: &events}
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 		Source: SourceJobManager,
-		Work: PreparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
+		Work: preparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
 			return prepared, nil
 		}),
 	})
@@ -68,7 +83,7 @@ func TestTaskSupervisorRetainsPreparedResourceReturnedWithPrepareError(t *testin
 	}
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 		Source: SourceJobManager,
-		Work: PreparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
+		Work: preparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
 			return prepared, wantFailure
 		}),
 	})
@@ -109,7 +124,7 @@ func TestTaskSupervisorDoesNotCancelStartedOwnershipAction(t *testing.T) {
 	}
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 		Source: SourceJobManager,
-		Work: PreparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
+		Work: preparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
 			return prepared, nil
 		}),
 	})
@@ -148,7 +163,7 @@ func TestTaskSupervisorRetainsReadyResourceAfterPublishFailureUntilAbort(t *test
 	prepared := &recordingPreparedResource{identity: ready.identity, ready: ready, events: &events}
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 		Source: SourceJobManager,
-		Work: PreparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
+		Work: preparedResourceTaskWork(func(context.Context) (PreparedResource, error) {
 			return prepared, nil
 		}),
 	})
@@ -304,7 +319,7 @@ func TestTaskSupervisorDisposesResourcesWithoutExpiredWorkContext(t *testing.T) 
 				prepared := &recordingPreparedResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: events}
 				return TaskPlan{
 					Source: SourceJobManager, Deadline: time.Now().Add(-time.Second),
-					Work: PreparedResourceTaskWork(func(context.Context) (PreparedResource, error) { return prepared, nil }),
+					Work: preparedResourceTaskWork(func(context.Context) (PreparedResource, error) { return prepared, nil }),
 				}, func() error { return prepared.disposeContextErr }
 			},
 			wantKind: TaskOutcomePreparedResource,
@@ -403,7 +418,7 @@ func TestTaskSupervisorRetainsPreparedResourceWhenAcceptStartPanics(t *testing.T
 	prepared := &recordingPreparedResource{identity: ready.identity, ready: ready, events: &events, panicAccept: true}
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 		Source: SourceJobManager,
-		Work:   PreparedResourceTaskWork(func(context.Context) (PreparedResource, error) { return prepared, nil }),
+		Work:   preparedResourceTaskWork(func(context.Context) (PreparedResource, error) { return prepared, nil }),
 	})
 	<-supervisor.CompletionCh()
 
@@ -426,7 +441,7 @@ func TestTaskSupervisorRetainsReadyResourceReturnedWithAcceptError(t *testing.T)
 	prepared := &recordingPreparedResource{identity: ready.identity, ready: ready, events: &events, acceptErr: wantFailure}
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 		Source: SourceJobManager,
-		Work:   PreparedResourceTaskWork(func(context.Context) (PreparedResource, error) { return prepared, nil }),
+		Work:   preparedResourceTaskWork(func(context.Context) (PreparedResource, error) { return prepared, nil }),
 	})
 	completion := <-supervisor.CompletionCh()
 	require.False(t, completion.Ref != ref || completion.Kind != TaskOutcomePreparedResource || completion.Err != nil)

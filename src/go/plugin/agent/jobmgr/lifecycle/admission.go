@@ -11,7 +11,7 @@ import (
 const (
 	// The radix indexes ordinary byte requests directly, so it must represent
 	// every value admitted by OrdinaryBudgetBytes without truncating high bits.
-	admissionRadixBits         = 28
+	admissionRadixBits         = 29
 	admissionRadixMaximumBytes = 1<<admissionRadixBits - 1
 	// Fail compilation if a future ordinary budget no longer fits the radix key.
 	_ uint64 = admissionRadixMaximumBytes - OrdinaryBudgetBytes
@@ -24,16 +24,7 @@ type ReservationKind uint8
 const (
 	ReservationOrdinary ReservationKind = iota + 1
 	ReservationOrdinaryGrowth
-	ReservationCleanup
 	ReservationInputBodyGrowth
-)
-
-type FrameOutcome uint8
-
-const (
-	FrameOutcomeCommitted FrameOutcome = iota + 1
-	FrameOutcomeSafeAbort
-	FrameOutcomePoisoned
 )
 
 type AdmissionLaneRef struct {
@@ -62,7 +53,7 @@ type AdmissionRequestResult struct {
 type AdmissionGrant struct {
 	Ref            AdmissionRef     // reservation this grant satisfies
 	InputBodyToken uint64           // input-body token when Kind is an input-body growth grant
-	Kind           ReservationKind  // reservation kind (ordinary / cleanup / input-body growth)
+	Kind           ReservationKind  // reservation kind (ordinary / input-body growth)
 	Bytes          int64            // granted byte amount
 	Lane           AdmissionLaneRef // admission lane the reservation belongs to
 }
@@ -77,9 +68,6 @@ type AdmissionCensus struct {
 	OrdinaryBytes     int64          // bytes reserved by ordinary reservations
 	LongLivedRecords  int            // long-lived reservation records
 	LongLivedBytes    int64          // bytes reserved by long-lived reservations
-	CleanupWaiting    int            // cleanup reservations waiting for a grant
-	CleanupGranted    bool           // whether the cleanup reservation is granted
-	CleanupRetained   bool           // whether cleanup bytes remain retained
 	InputBodyActive   bool           // whether an input-body growth grant is active
 	InputBodyWaiting  bool           // whether an input-body growth reservation is waiting
 	InputBodyCarried  bool           // whether input-body reservation bytes are carried
@@ -106,9 +94,6 @@ const (
 	admissionOrdinaryGranted
 	admissionOrdinaryGrowing
 	admissionOrdinarySuspended
-	admissionCleanupWaiting
-	admissionCleanupGranted
-	admissionCleanupRetained
 	admissionInputBodyWaiting
 	admissionInputBodyGranted
 	admissionInputBodyGrowing
@@ -125,8 +110,8 @@ type admissionRecord struct {
 	ordinaryHeld   bool                 // record counts toward ordinaryGranted
 	growthBytes    int64                // pending input-body/ordinary growth delta
 	ticket         uint64               // monotonic FIFO tiebreaker within a radix leaf
-	previous       uint32               // intrusive list link (cleanup queue or radix leaf)
-	next           uint32               // intrusive list link (cleanup queue or radix leaf)
+	previous       uint32               // intrusive radix-leaf list link
+	next           uint32               // intrusive radix-leaf list link
 	leaf           uint32               // radix node index this record is filed under
 }
 
@@ -157,7 +142,6 @@ type AdmissionLedger struct {
 	retiredRecords          int                         // exhausted ABA slots permanently outside the freelist
 	activeRecords           int                         // number of active reservation records
 	runGeneration           uint64                      // current run generation (stale reservations rejected)
-	cleanupWaiting          int                         // count of cleanup reservations awaiting the single grant
 	nextTicket              uint64                      // next FIFO ticket to assign within a radix leaf
 	freeNodes               int                         // number of free radix nodes
 	longLivedRecords        int                         // count of records carrying long-lived bytes
@@ -167,13 +151,9 @@ type AdmissionLedger struct {
 	processBytes            int64                       // bytes reserved for process-lifetime storage
 	mu                      sync.Mutex                  // guards all fields
 	freeNodeHead            uint32                      // head of the radix-node freelist
-	cleanupHead             uint32                      // head of the cleanup reservation FIFO
-	cleanupTail             uint32                      // tail of the cleanup reservation FIFO
-	cleanupGrant            uint32                      // record holding the single active cleanup grant
 	freeRecordHead          uint32                      // head of the record freelist
 	processReserved         bool                        // process byte reservation has been taken
 	phase                   AdmissionPhase              // admission phase (open / draining / closed)
-	cleanupRetained         bool                        // the cleanup grant is retained across a generation
 	inputBodyCarried        bool                        // the input-body reservation is carried across a generation
 }
 
@@ -229,7 +209,7 @@ func (al *AdmissionLedger) RequestOrdinary(runGeneration uint64, lane AdmissionL
 	if bytes <= 0 || bytes > al.ordinaryCapacity() {
 		return AdmissionRequestResult{Rejected: fmt.Errorf("jobmgr admission: ordinary bytes %d outside process capacity", bytes)}
 	}
-	if err := al.validateRequest(runGeneration, lane, ReservationOrdinary); err != nil {
+	if err := al.validateRequest(runGeneration, lane); err != nil {
 		return AdmissionRequestResult{Rejected: err}
 	}
 	ref, err := al.allocateRecord(runGeneration, lane, bytes, admissionOrdinaryWaiting)
@@ -272,11 +252,7 @@ func (al *AdmissionLedger) GrantCompositeProgress(
 			"jobmgr admission: composite parent is not granted",
 		)}
 	}
-	if err := al.validateRequest(
-		runGeneration,
-		lane,
-		ReservationOrdinary,
-	); err != nil {
+	if err := al.validateRequest(runGeneration, lane); err != nil {
 		return AdmissionRequestResult{Rejected: err}
 	}
 	ref, err := al.allocateRecord(
@@ -293,24 +269,6 @@ func (al *AdmissionLedger) GrantCompositeProgress(
 	record.ordinaryHeld = true
 	al.ordinaryGranted++
 	al.ordinaryBytes += bytes
-	return AdmissionRequestResult{Ref: ref}
-}
-
-func (al *AdmissionLedger) RequestCleanup(runGeneration uint64, lane AdmissionLaneRef, bytes int64) AdmissionRequestResult {
-	if bytes <= 0 || bytes > CleanupBudgetBytes {
-		return AdmissionRequestResult{Rejected: fmt.Errorf("jobmgr admission: cleanup bytes %d outside 1..%d", bytes, CleanupBudgetBytes)}
-	}
-	al.mu.Lock()
-	defer al.mu.Unlock()
-	if err := al.validateRequest(runGeneration, lane, ReservationCleanup); err != nil {
-		return AdmissionRequestResult{Rejected: err}
-	}
-	ref, err := al.allocateRecord(runGeneration, lane, bytes, admissionCleanupWaiting)
-	if err != nil {
-		return AdmissionRequestResult{Rejected: err}
-	}
-	al.appendCleanup(ref.Slot)
-	al.cleanupWaiting++
 	return AdmissionRequestResult{Ref: ref}
 }
 
@@ -500,7 +458,7 @@ func (al *AdmissionLedger) TransferInputBody(runGeneration uint64, token uint64,
 	if body.state != admissionInputBodyGranted || body.runGeneration != runGeneration || body.heldBytes != capacity || body.growthBytes != 0 {
 		return AdmissionRequestResult{Rejected: errors.New("jobmgr admission: input body is not transferable")}
 	}
-	if err := al.validateRequest(runGeneration, lane, ReservationOrdinary); err != nil {
+	if err := al.validateRequest(runGeneration, lane); err != nil {
 		return AdmissionRequestResult{Rejected: err}
 	}
 	ref, err := al.allocateRecord(runGeneration, lane, totalBytes-capacity, admissionOrdinaryWaiting)
@@ -550,11 +508,6 @@ func (al *AdmissionLedger) CancelWaiting(ref AdmissionRef) error {
 		}
 		al.ordinarySuspended--
 		al.ordinaryBytes -= record.heldBytes
-		al.freeRecord(ref.Slot)
-		return nil
-	case admissionCleanupWaiting:
-		al.removeCleanup(ref.Slot)
-		al.cleanupWaiting--
 		al.freeRecord(ref.Slot)
 		return nil
 	default:
@@ -642,17 +595,6 @@ func (al *AdmissionLedger) TakeGrants(quantum int, output *[4]AdmissionGrant) (c
 		return 0, false, errors.New("jobmgr admission: ledger is closed")
 	}
 	for count < quantum {
-		if al.cleanupGrant == 0 && !al.cleanupRetained && al.cleanupHead != 0 {
-			slot := al.cleanupHead
-			al.removeCleanup(slot)
-			record := &al.records[slot]
-			record.state = admissionCleanupGranted
-			al.cleanupWaiting--
-			al.cleanupGrant = slot
-			output[count] = al.grant(slot, ReservationCleanup)
-			count++
-			continue
-		}
 		if al.phase != AdmissionOrdinaryOpen || al.ordinaryWaiting == 0 {
 			break
 		}
@@ -858,30 +800,6 @@ func (al *AdmissionLedger) releaseLongLived(ref AdmissionRef, bytes int64) (bool
 	return al.hasGrantableWork(), nil
 }
 
-func (al *AdmissionLedger) ReleaseCleanup(ref AdmissionRef, outcome FrameOutcome) (bool, error) {
-	al.mu.Lock()
-	defer al.mu.Unlock()
-	record, err := al.record(ref)
-	if err != nil {
-		return false, err
-	}
-	if record.state != admissionCleanupGranted || al.cleanupGrant != ref.Slot {
-		return false, errors.New("jobmgr admission: cleanup request is not the active grant")
-	}
-	switch outcome {
-	case FrameOutcomeCommitted, FrameOutcomeSafeAbort:
-		al.cleanupGrant = 0
-		al.freeRecord(ref.Slot)
-	case FrameOutcomePoisoned:
-		record.state = admissionCleanupRetained
-		al.cleanupGrant = 0
-		al.cleanupRetained = true
-	default:
-		return false, errors.New("jobmgr admission: invalid cleanup frame outcome")
-	}
-	return al.hasGrantableWork(), nil
-}
-
 func (al *AdmissionLedger) BeginCleanupOnly(runGeneration uint64) error {
 	al.mu.Lock()
 	defer al.mu.Unlock()
@@ -935,15 +853,13 @@ func (al *AdmissionLedger) ReopenDrained(completedGeneration, nextGeneration uin
 	return nil
 }
 
-// operationallyQuiescent reports that no ordinary or cleanup operation activity
+// operationallyQuiescent reports that no ordinary operation activity
 // remains and every operation record and radix node is free. It deliberately
 // excludes phase, generation, long-lived, and input-body accounting, which each
 // caller checks with its own expectations.
 func (al *AdmissionLedger) operationallyQuiescent() bool {
 	return al.activeRecords == 0 && al.ordinaryWaiting == 0 &&
 		al.ordinaryGranted == 0 && al.ordinarySuspended == 0 &&
-		al.cleanupWaiting == 0 && al.cleanupGrant == 0 && !al.cleanupRetained &&
-		al.cleanupHead == 0 && al.cleanupTail == 0 &&
 		al.oldestInNode(1) == 0 && al.allOperationRecordsFree() &&
 		al.allRadixNodesFree()
 }
@@ -982,9 +898,6 @@ func (al *AdmissionLedger) Census() AdmissionCensus {
 		OrdinaryBytes:     al.ordinaryBytes,
 		LongLivedRecords:  al.longLivedRecords,
 		LongLivedBytes:    al.longLivedBytes,
-		CleanupWaiting:    al.cleanupWaiting,
-		CleanupGranted:    al.cleanupGrant != 0,
-		CleanupRetained:   al.cleanupRetained,
 		InputBodyActive:   al.records[inputBodyRecordSlot].state != admissionRecordFree,
 		InputBodyWaiting:  al.records[inputBodyRecordSlot].state == admissionInputBodyWaiting || al.records[inputBodyRecordSlot].state == admissionInputBodyGrowing,
 		InputBodyCarried:  al.inputBodyCarried,
@@ -1019,11 +932,11 @@ func (ap AdmissionPhase) String() string {
 	}
 }
 
-func (al *AdmissionLedger) validateRequest(runGeneration uint64, lane AdmissionLaneRef, kind ReservationKind) error {
+func (al *AdmissionLedger) validateRequest(runGeneration uint64, lane AdmissionLaneRef) error {
 	if runGeneration == 0 || !lane.Valid() {
 		return errors.New("jobmgr admission: invalid request identity")
 	}
-	if al.phase == AdmissionClosed || (kind == ReservationOrdinary && al.phase != AdmissionOrdinaryOpen) {
+	if al.phase != AdmissionOrdinaryOpen {
 		return errors.New("jobmgr admission: request rejected by phase")
 	}
 	if al.runGeneration != 0 && al.runGeneration != runGeneration {
@@ -1139,33 +1052,6 @@ func (al *AdmissionLedger) resetInputBodyRecord() {
 	*record = admissionRecord{generation: generation}
 	al.inputBodyCarried = false
 	al.inputBodyNextGeneration = 0
-}
-
-func (al *AdmissionLedger) appendCleanup(slot uint32) {
-	record := &al.records[slot]
-	record.previous = al.cleanupTail
-	if al.cleanupTail == 0 {
-		al.cleanupHead = slot
-	} else {
-		al.records[al.cleanupTail].next = slot
-	}
-	al.cleanupTail = slot
-}
-
-func (al *AdmissionLedger) removeCleanup(slot uint32) {
-	record := &al.records[slot]
-	if record.previous == 0 {
-		al.cleanupHead = record.next
-	} else {
-		al.records[record.previous].next = record.next
-	}
-	if record.next == 0 {
-		al.cleanupTail = record.previous
-	} else {
-		al.records[record.next].previous = record.previous
-	}
-	record.previous = 0
-	record.next = 0
 }
 
 func (al *AdmissionLedger) insertOrdinary(slot uint32) error {
@@ -1330,9 +1216,6 @@ func (al *AdmissionLedger) grant(slot uint32, kind ReservationKind) AdmissionGra
 func (al *AdmissionLedger) hasGrantableWork() bool {
 	if al.phase == AdmissionClosed {
 		return false
-	}
-	if al.cleanupGrant == 0 && !al.cleanupRetained && al.cleanupHead != 0 {
-		return true
 	}
 	if al.phase != AdmissionOrdinaryOpen || al.ordinaryWaiting == 0 {
 		return false

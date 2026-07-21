@@ -81,19 +81,6 @@ type ProtocolTransaction interface {
 	Abort() error
 }
 
-type protocolCallbackTransaction struct {
-	commit func() error
-	abort  func() error
-}
-
-func (transaction protocolCallbackTransaction) Commit() error {
-	return transaction.commit()
-}
-
-func (transaction protocolCallbackTransaction) Abort() error {
-	return transaction.abort()
-}
-
 func NewFrameOwner(writer io.Writer) (*FrameOwner, error) {
 	if writer == nil {
 		return nil, errors.New("jobmgr frame owner: nil writer")
@@ -101,42 +88,6 @@ func NewFrameOwner(writer io.Writer) (*FrameOwner, error) {
 	owner := &FrameOwner{writer: writer}
 	owner.available = sync.NewCond(&owner.stateMu)
 	return owner, nil
-}
-
-func (fo *FrameOwner) BindControlReady(notify func()) error {
-	if fo == nil || notify == nil {
-		return errors.New("jobmgr frame owner: invalid control-ready binding")
-	}
-	fo.stateMu.Lock()
-	if fo.onControlReady != nil {
-		fo.stateMu.Unlock()
-		return errors.New("jobmgr frame owner: control-ready notifier already bound")
-	}
-	fo.onControlReady = notify
-	pending := fo.pendingControl && !fo.busy
-	fo.stateMu.Unlock()
-	if pending {
-		notify()
-	}
-	return nil
-}
-
-func (fo *FrameOwner) BindPoisoned(notify func(error)) error {
-	if fo == nil || notify == nil {
-		return errors.New("jobmgr frame owner: invalid poison binding")
-	}
-	fo.stateMu.Lock()
-	if fo.onPoisoned != nil {
-		fo.stateMu.Unlock()
-		return errors.New("jobmgr frame owner: poison notifier already bound")
-	}
-	fo.onPoisoned = notify
-	poisonErr := fo.poisonErr
-	fo.stateMu.Unlock()
-	if poisonErr != nil {
-		notify(poisonErr)
-	}
-	return nil
 }
 
 // BindRunNotifications installs one generation-scoped notification lease.
@@ -197,7 +148,7 @@ func PrepareFrame(uid string, result SealedResult, expiry int64) (PreparedFrame,
 	if err := result.validate(); err != nil {
 		return PreparedFrame{}, err
 	}
-	encodedBytes, _, err := functionFrameSize(uid, result.status, result.contentType, expiry, result.payloadBytes)
+	encodedBytes, _, err := functionFrameSize(uid, result.status, result.contentType, expiry, len(result.payload))
 	if err != nil {
 		return PreparedFrame{}, err
 	}
@@ -229,12 +180,8 @@ func appendPreparedFrame(dst []byte, frame preparedFunctionFrameContent) ([]byte
 	}
 	start := len(dst)
 	dst = fmt.Appendf(dst, "FUNCTION_RESULT_BEGIN %s %d %s %d\n", frame.uid, frame.result.status, frame.result.contentType, frame.expiry)
-	var err error
-	dst, err = frame.result.appendPayload(dst)
-	if err != nil {
-		return dst, err
-	}
-	if frame.result.payloadBytes > 0 {
+	dst = append(dst, frame.result.payload...)
+	if len(frame.result.payload) > 0 {
 		dst = append(dst, '\n')
 	}
 	dst = append(dst, "FUNCTION_RESULT_END\n\n"...)
@@ -341,25 +288,6 @@ func (fo *FrameOwner) CommitPreparedProtocolFrame(frame PreparedProtocolFrame) e
 		return err
 	}
 	return fo.commitOrdinary(payload)
-}
-
-func (fo *FrameOwner) CommitPreparedProtocolTransaction(
-	frame PreparedProtocolFrame,
-	commit func() error,
-	abort func() error,
-) error {
-	if commit == nil || abort == nil {
-		return errors.New("jobmgr frame owner: invalid protocol transaction")
-	}
-	payload, err := frame.take()
-	if err != nil {
-		return err
-	}
-	return fo.commitOrdinaryTransaction(
-		payload,
-		protocolCallbackTransaction{commit: commit, abort: abort},
-		false,
-	)
 }
 
 func (fo *FrameOwner) commitOrdinary(payload []byte) error {

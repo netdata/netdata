@@ -286,6 +286,32 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 	}
 }
 
+func TestResourceTransactionPermitPlanRejectsPipelineReplacement(t *testing.T) {
+	plan, err := NewPipelineLongLivedPlan([]string{"provider"})
+	require.NoError(t, err)
+	identity := ResourceIdentity{ID: "pipeline", Generation: 1}
+	current := &recordingReadyResource{identity: identity, events: new([]string)}
+
+	_, err = NewResourceTransactionPermitTaskPlan(
+		SourceJobManager,
+		time.Time{},
+		TransactionTaskPhases,
+		NewAdmissionLedger(),
+		AdmissionRef{Slot: 2, Generation: 1},
+		current,
+		ResourceTransactionScope{
+			ID:        identity.ID,
+			Current:   identity,
+			Successor: ResourceIdentity{ID: identity.ID, Generation: 2},
+		},
+		plan,
+		func(context.Context, ReadyResource, ResourceTransactionScope, LongLivedPermit) (PreparedResourceTransaction, error) {
+			return nil, nil
+		},
+	)
+	require.Error(t, err)
+}
+
 type recordingPreparedResourceTransaction struct {
 	scope           ResourceTransactionScope
 	current         ReadyResource

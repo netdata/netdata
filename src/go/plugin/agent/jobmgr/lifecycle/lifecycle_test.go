@@ -21,17 +21,12 @@ func TestAdmissionAndUIDExactRelease(t *testing.T) {
 	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
 	ordinary := ledger.RequestOrdinary(1, lane, OrdinaryBudgetBytes)
 	require.Nil(t, ordinary.Rejected)
-	cleanup := ledger.RequestCleanup(1, lane, CleanupBudgetBytes)
-	require.Nil(t, cleanup.Rejected)
 	var grants [4]AdmissionGrant
 	count, _, err := ledger.TakeGrants(len(grants), &grants)
 	require.NoError(t, err)
-	require.False(t, count != 2 || grants[0].Ref != cleanup.Ref || grants[1].Ref != ordinary.Ref)
+	require.False(t, count != 1 || grants[0].Ref != ordinary.Ref)
 
 	require.Error(t, ledger.CloseDrained(1))
-
-	_, releaseCleanupErr := ledger.ReleaseCleanup(cleanup.Ref, FrameOutcomeCommitted)
-	require.NoError(t, releaseCleanupErr)
 
 	_, releaseOrdinaryErr := ledger.ReleaseOrdinary(ordinary.Ref)
 	require.NoError(t, releaseOrdinaryErr)
@@ -318,7 +313,7 @@ func TestUIDLedgerGrowsAndCloseWorkRemainsBatched(t *testing.T) {
 func TestAdmissionRadixDomainAndOldestFitting(t *testing.T) {
 	ledger := NewAdmissionLedger()
 	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
-	for _, size := range []int64{0, OrdinaryBudgetBytes + 1, 268_435_455} {
+	for _, size := range []int64{0, OrdinaryBudgetBytes + 1, OrdinaryBudgetBytes + 2} {
 		result := ledger.RequestOrdinary(1, lane, size)
 		require.False(t, result.Rejected == nil || result.Ref.Valid())
 	}
@@ -374,46 +369,6 @@ func TestAdmissionMoreReportsOnlyImmediatelyGrantableWork(t *testing.T) {
 	_, releaseOrdinaryErr := ledger.ReleaseOrdinary(waiting.Ref)
 	require.NoError(t, releaseOrdinaryErr)
 
-}
-
-func TestAdmissionCleanupFIFOAndDirectCancellation(t *testing.T) {
-	ledger := NewAdmissionLedger()
-	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
-	firstCleanup := ledger.RequestCleanup(1, lane, CleanupBudgetBytes)
-	secondCleanup := ledger.RequestCleanup(1, lane, 1)
-	ordinary := ledger.RequestOrdinary(1, lane, 1)
-	cancelled := ledger.RequestOrdinary(1, lane, 2)
-	for _, result := range []AdmissionRequestResult{firstCleanup, secondCleanup, ordinary, cancelled} {
-		require.Nil(t, result.Rejected)
-	}
-
-	require.NoError(t, ledger.CancelWaiting(cancelled.Ref))
-
-	require.Error(t, ledger.CancelWaiting(cancelled.Ref))
-
-	var grants [4]AdmissionGrant
-	count, _, err := ledger.TakeGrants(len(grants), &grants)
-	require.NoError(t, err)
-	require.False(t, count != 2 || grants[0].Ref != firstCleanup.Ref || grants[1].Ref != ordinary.Ref)
-
-	_, releaseCleanupErr := ledger.ReleaseCleanup(firstCleanup.Ref, FrameOutcomeCommitted)
-	require.NoError(t, releaseCleanupErr)
-
-	count, _, err = ledger.TakeGrants(len(grants), &grants)
-	require.False(t, err != nil || count != 1 || grants[0].Ref != secondCleanup.Ref)
-
-	_, releaseCleanupErr2 := ledger.ReleaseCleanup(secondCleanup.Ref, FrameOutcomeSafeAbort)
-	require.NoError(t, releaseCleanupErr2)
-
-	_, releaseOrdinaryErr := ledger.ReleaseOrdinary(ordinary.Ref)
-	require.NoError(t, releaseOrdinaryErr)
-
-	require.NoError(t, ledger.BeginCleanupOnly(1))
-
-	result := ledger.RequestOrdinary(1, lane, 1)
-	require.NotNil(t, result.Rejected)
-
-	require.NoError(t, ledger.CloseDrained(1))
 }
 
 func TestAdmissionOrdinaryGrowthRetainsOneRecordAndWaitsByDelta(t *testing.T) {
@@ -1022,7 +977,7 @@ func TestTaskSupervisorPreflightsResultEnvelopeBeforeAction(t *testing.T) {
 	})
 	completion := <-supervisor.CompletionCh()
 	require.Nil(t, completion.Err)
-	_, baseEnvelope, err := functionFrameSize("u", 200, "application/json", 1, result.payloadBytes)
+	_, baseEnvelope, err := functionFrameSize("u", 200, "application/json", 1, len(result.payload))
 	require.NoError(t, err)
 	oversizedUID := strings.Repeat("u", 2+FunctionEnvelopeBytes-baseEnvelope)
 
@@ -1257,7 +1212,12 @@ func TestFrameOwnerControlReservationPrecedesLaterOrdinaryFrame(t *testing.T) {
 	owner, err := NewFrameOwner(writer)
 	require.NoError(t, err)
 
-	require.NoError(t, owner.BindControlReady(func() { controlReady <- struct{}{} }))
+	require.NoError(t, owner.BindRunNotifications(
+		1,
+		func() { controlReady <- struct{}{} },
+		func(error) {},
+		nil,
+	))
 
 	result, err := NewSealedResult(200, "application/json", []byte(`{"status":200}`))
 	require.NoError(t, err)
@@ -1324,7 +1284,12 @@ func TestFrameOwnerLateControlReadyBindingReplaysPendingWake(t *testing.T) {
 
 	ready := make(chan struct{}, 1)
 
-	require.NoError(t, owner.BindControlReady(func() { ready <- struct{}{} }))
+	require.NoError(t, owner.BindRunNotifications(
+		1,
+		func() { ready <- struct{}{} },
+		func(error) {},
+		nil,
+	))
 
 	select {
 	case <-ready:
@@ -1332,7 +1297,7 @@ func TestFrameOwnerLateControlReadyBindingReplaysPendingWake(t *testing.T) {
 		require.FailNow(t, "test failed", "late binding lost pending control wake")
 	}
 
-	require.Error(t, owner.BindControlReady(func() {}))
+	require.Error(t, owner.BindRunNotifications(2, func() {}, func(error) {}, nil))
 }
 
 func TestFrameOwnerShortWritePoisonsAndRetains(t *testing.T) {
@@ -1340,7 +1305,12 @@ func TestFrameOwnerShortWritePoisonsAndRetains(t *testing.T) {
 	require.NoError(t, err)
 	poisoned := make(chan error, 1)
 
-	require.NoError(t, owner.BindPoisoned(func(err error) { poisoned <- err }))
+	require.NoError(t, owner.BindRunNotifications(
+		1,
+		func() {},
+		func(err error) { poisoned <- err },
+		nil,
+	))
 
 	result, err := NewSealedResult(200, "application/json", []byte(`{}`))
 	require.NoError(t, err)
@@ -1365,42 +1335,24 @@ func TestFrameOwnerShortWritePoisonsAndRetains(t *testing.T) {
 
 func TestFrameOwnerLatePoisonBindingReplaysOriginalCause(t *testing.T) {
 	cause := errors.New("write failed")
-	tests := map[string]struct {
-		bind func(*FrameOwner, chan<- error) error
-	}{
-		"process binding": {
-			bind: func(owner *FrameOwner, notified chan<- error) error {
-				return owner.BindPoisoned(func(err error) { notified <- err })
-			},
-		},
-		"run binding": {
-			bind: func(owner *FrameOwner, notified chan<- error) error {
-				return owner.BindRunNotifications(
-					1,
-					func() {},
-					func(err error) { notified <- err },
-					nil,
-				)
-			},
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			owner, err := NewFrameOwner(io.Discard)
-			require.NoError(t, err)
-			owner.Poison(cause)
-			notified := make(chan error, 1)
+	owner, err := NewFrameOwner(io.Discard)
+	require.NoError(t, err)
+	owner.Poison(cause)
+	notified := make(chan error, 1)
 
-			require.NoError(t, test.bind(owner, notified))
+	require.NoError(t, owner.BindRunNotifications(
+		1,
+		func() {},
+		func(err error) { notified <- err },
+		nil,
+	))
 
-			select {
-			case err := <-notified:
-				require.ErrorIs(t, err, ErrFrameOwnerPoisoned)
-				require.ErrorIs(t, err, cause)
-			default:
-				require.FailNow(t, "late binding did not replay poison")
-			}
-		})
+	select {
+	case err := <-notified:
+		require.ErrorIs(t, err, ErrFrameOwnerPoisoned)
+		require.ErrorIs(t, err, cause)
+	default:
+		require.FailNow(t, "late binding did not replay poison")
 	}
 }
 
@@ -1436,10 +1388,15 @@ func TestFrameOwnerWriteFailureAbortsBeforePoisonNotification(t *testing.T) {
 	owner, err := NewFrameOwner(shortWriter{})
 	require.NoError(t, err)
 	notified := make(chan error, 1)
-	require.NoError(t, owner.BindPoisoned(func(err error) {
-		require.True(t, aborted)
-		notified <- err
-	}))
+	require.NoError(t, owner.BindRunNotifications(
+		1,
+		func() {},
+		func(err error) {
+			require.True(t, aborted)
+			notified <- err
+		},
+		nil,
+	))
 
 	err = owner.CommitBorrowedProtocolTransaction(
 		[]byte("frame"),

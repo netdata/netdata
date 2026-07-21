@@ -45,31 +45,6 @@ func TestAdmissionResourceAlgebraBoundaries(t *testing.T) {
 			require.EqualValues(t, test.wantAccepted, result.Rejected == nil)
 		})
 	}
-
-	cleanupTests := map[string]struct {
-		bytes        int64
-		wantAccepted bool
-	}{
-		"one below": {
-			bytes: CleanupBudgetBytes - 1, wantAccepted: true,
-		},
-		"exact": {
-			bytes: CleanupBudgetBytes, wantAccepted: true,
-		},
-		"one above": {
-			bytes: CleanupBudgetBytes + 1,
-		},
-	}
-	for name, test := range cleanupTests {
-		t.Run("cleanup "+name, func(t *testing.T) {
-			result := NewAdmissionLedger().RequestCleanup(
-				1,
-				AdmissionLaneRef{Slot: 1, Generation: 1},
-				test.bytes,
-			)
-			require.EqualValues(t, test.wantAccepted, result.Rejected == nil)
-		})
-	}
 }
 
 func TestAdmissionSuspensionPreservesRetainedBytes(t *testing.T) {

@@ -29,11 +29,10 @@ const (
 )
 
 type LongLivedPlan struct {
-	providerKeys       []string               // secret-provider keys this plan pins (pipeline class)
-	bytes              int64                  // byte ('B') facet reserved by the permit
-	class              LongLivedClass         // permit class: pipeline, job, or secret store
-	replacementOverlap bool                   // whether the permit may overlap a replaced generation
-	external           LongLivedExternalFacet // external ('E') facets the plan reserves
+	providerKeys []string               // secret-provider keys this plan pins (pipeline class)
+	bytes        int64                  // byte ('B') facet reserved by the permit
+	class        LongLivedClass         // permit class: pipeline, job, or secret store
+	external     LongLivedExternalFacet // external ('E') facets the plan reserves
 }
 
 func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
@@ -63,7 +62,6 @@ func NewJobLongLivedPlan(bytes int64) (LongLivedPlan, error) {
 		LongLivedJob,
 		LongLivedEJobResources,
 		bytes,
-		false,
 	)
 }
 
@@ -72,16 +70,6 @@ func NewSecretStoreLongLivedPlan(bytes int64) (LongLivedPlan, error) {
 		LongLivedSecretStore,
 		LongLivedESecretStore,
 		bytes,
-		false,
-	)
-}
-
-func NewSecretStoreReplacementLongLivedPlan(bytes int64) (LongLivedPlan, error) {
-	return newResourceLongLivedPlan(
-		LongLivedSecretStore,
-		LongLivedESecretStore,
-		bytes,
-		true,
 	)
 }
 
@@ -89,18 +77,12 @@ func newResourceLongLivedPlan(
 	class LongLivedClass,
 	e LongLivedExternalFacet,
 	bytes int64,
-	replacementOverlap bool,
 ) (LongLivedPlan, error) {
 	if bytes <= 0 || bytes >= OrdinaryBudgetBytes {
 		return LongLivedPlan{},
 			errors.New("jobmgr long-lived permit: invalid retained byte charge")
 	}
-	plan := LongLivedPlan{
-		class:              class,
-		bytes:              bytes,
-		replacementOverlap: replacementOverlap,
-		external:           e,
-	}
+	plan := LongLivedPlan{class: class, bytes: bytes, external: e}
 	return plan, plan.Validate()
 }
 
@@ -110,8 +92,7 @@ func (llp LongLivedPlan) Validate() error {
 	}
 	switch llp.class {
 	case LongLivedPipeline:
-		if llp.replacementOverlap ||
-			!validPipelineProviderKeys(llp.providerKeys) ||
+		if !validPipelineProviderKeys(llp.providerKeys) ||
 			llp.external != LongLivedEProvider ||
 			llp.bytes != 0 {
 			return errors.New("jobmgr long-lived permit: invalid pipeline facets")
@@ -147,15 +128,13 @@ func validPipelineProviderKeys(keys []string) bool {
 	return true
 }
 
-func (llp LongLivedPlan) forReplacement() (LongLivedPlan, error) {
+func (llp LongLivedPlan) validateReplacementClass() error {
 	switch llp.class {
 	case LongLivedJob, LongLivedSecretStore:
-		llp.replacementOverlap = true
+		return nil
 	default:
-		return LongLivedPlan{},
-			errors.New("jobmgr long-lived permit: class has no replacement overlap")
+		return errors.New("jobmgr long-lived permit: class cannot replace a resource")
 	}
-	return llp, llp.Validate()
 }
 
 func (llp LongLivedPlan) Class() LongLivedClass { return llp.class }
@@ -641,9 +620,6 @@ func (ts *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, owner Re
 }
 
 func longLivedClassFull(count int, plan LongLivedPlan) bool {
-	if plan.replacementOverlap {
-		return false
-	}
 	switch plan.class {
 	case LongLivedPipeline:
 		return count >= 1

@@ -828,7 +828,7 @@ func (ts *TaskSupervisor) PreflightResult(ref TaskRef, uid string, expiry int64)
 	if err != nil {
 		return ResultPreflight{}, err
 	}
-	return ResultPreflight{PlanBytes: slot.outcome.frame.planBytes, FrameBytes: int64(encodedBytes)}, nil
+	return ResultPreflight{PlanBytes: int64(len(slot.outcome.frame.payload)), FrameBytes: int64(encodedBytes)}, nil
 }
 
 func (ts *TaskSupervisor) TakePublishedReadyResource(ref TaskRef, sequence uint8, expected ResourceIdentity) (ReadyResource, error) {
@@ -1397,5 +1397,5 @@ func otherTaskClass(class TaskClass) TaskClass {
 }
 
 func emptySealedResult(result SealedResult) bool {
-	return result.status == 0 && result.contentType == "" && result.payloadKind == 0 && len(result.payload) == 0 && result.value.kind == valueInvalid && result.payloadBytes == 0 && result.planBytes == 0
+	return result.status == 0 && result.contentType == "" && len(result.payload) == 0
 }

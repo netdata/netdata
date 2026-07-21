@@ -2634,108 +2634,6 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 	require.False(t, !terminal.Quiescent || terminal.Dirty != nil)
 }
 
-func TestKernelLongLivedBoundaryAllowsReplacementAndSteadyAddition(t *testing.T) {
-	var seeded []lifecycle.LongLivedPermit
-	finalizer := RunFinalizerFunc(func(context.Context, uint64) error {
-		var result error
-		for _, permit := range seeded {
-			result = errors.Join(result, permit.AbortUnused())
-		}
-		return result
-	})
-	steadyPlan, err := lifecycle.NewSecretStoreLongLivedPlan(1)
-	require.NoError(t, err)
-	replacementPlan, err := lifecycle.NewSecretStoreReplacementLongLivedPlan(1)
-	require.NoError(t, err)
-	var replacementPrepared atomic.Int32
-	var additionPrepared atomic.Int32
-	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
-		permitPlan := steadyPlan
-		prepared := &additionPrepared
-		if route == "replacement" {
-			permitPlan = replacementPlan
-			prepared = &replacementPrepared
-		} else if route != "addition" {
-			return WorkPlan{}, errors.New("unexpected long-lived boundary route")
-		}
-		return WorkPlan{
-			NoResponse: true,
-			Capability: &CapabilityPlan{
-				ID: "secret-store:" + route, Permit: permitPlan,
-				Prepare: func(_ context.Context, generation uint64, permit lifecycle.LongLivedPermit) (lifecycle.PreparedCapability, error) {
-					prepared.Add(1)
-					if err := permit.ActivateExternal(lifecycle.LongLivedESecretStore); err != nil {
-						return nil, err
-					}
-					return &latePreparedCapability{
-						identity: lifecycle.ResourceIdentity{ID: "secret-store:" + route, Generation: generation}, permit: permit,
-					}, nil
-				},
-			},
-		}, nil
-	})
-	kernel, run, admission, uids, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, planner, io.Discard, finalizer, time.Second)
-	seeded = make([]lifecycle.LongLivedPermit, 0, 1)
-	requested := admission.RequestOrdinary(
-		run.Generation(),
-		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
-		steadyPlan.Bytes()+1,
-	)
-	require.Nil(t, requested.Rejected)
-	var grants [4]lifecycle.AdmissionGrant
-	count, _, err := admission.TakeGrants(1, &grants)
-	require.False(t, err != nil || count != 1 || grants[0].Ref != requested.Ref)
-	permit, err := tasks.IssueLongLivedPermit(
-		admission,
-		requested.Ref,
-		lifecycle.ResourceIdentity{ID: "seed", Generation: 1},
-		steadyPlan,
-	)
-	require.NoError(t, err)
-
-	_, releaseOrdinaryErr := admission.ReleaseOrdinary(requested.Ref)
-	require.NoError(t, releaseOrdinaryErr)
-
-	seeded = append(seeded, permit)
-
-	require.NoError(t, run.OpenAdmission())
-
-	startKernelLoop(t, kernel)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	require.NoError(t, kernel.SubmitAndWait(ctx, Request{
-		UID: "boundary-replacement", LaneKey: "secret-store:replacement", Source: lifecycle.SourceJobManager, Route: "replacement",
-	}),
-	)
-
-	require.EqualValues(t, 1, replacementPrepared.Load())
-	err = kernel.SubmitAndWait(ctx, Request{
-		UID: "boundary-addition", LaneKey: "secret-store:addition", Source: lifecycle.SourceJobManager, Route: "addition",
-	})
-	require.NoError(t, err)
-	require.EqualValues(t, 1, additionPrepared.Load())
-	require.False(t, !run.Admitting() || run.DirtyCause() != nil)
-
-	census := admission.Census()
-	require.False(t, census.ActiveRecords != 0 || census.LongLivedRecords != 1 || census.OrdinaryGranted != 0)
-
-	longLivedCensus := tasks.LongLivedCensus()
-	require.False(t, longLivedCensus.Active != 1 ||
-		longLivedCensus.SecretStores != 1 ||
-		longLivedCensus.Bytes != steadyPlan.Bytes())
-
-	kernel.Stop()
-
-	require.NoError(t, kernel.Wait(context.Background()))
-
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
-	closeUIDLedger(t, uids)
-}
-
 func TestKernelRunFinalizerFailureReleasesTaskWithoutQuiescence(t *testing.T) {
 	want := errors.New("finalizer failed")
 	finalizer := RunFinalizerFunc(func(context.Context, uint64) error { return want })
@@ -3178,14 +3076,7 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 }
 
 func TestKernelReservesExactPlanAndFrameBytesBeforeWrite(t *testing.T) {
-	pad, err := lifecycle.RepeatedStringValue(1024*1024, 'A')
-	require.NoError(t, err)
-	body, err := lifecycle.ObjectValue(lifecycle.ObjectField{Key: "pad", Value: pad})
-	require.NoError(t, err)
-	result, err := lifecycle.NewTableResult(200, body)
-	require.NoError(t, err)
-	sealed, err := lifecycle.SealFunctionResult(result)
-	require.NoError(t, err)
+	sealed, planBytes := largeRawSealedResult(t)
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) { return sealed, nil })}, nil
 	})
@@ -3209,8 +3100,7 @@ func TestKernelReservesExactPlanAndFrameBytesBeforeWrite(t *testing.T) {
 	chargedRequest.LaneKey = request.Route
 	base, err := operationAdmissionBytes(chargedRequest, WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)})
 	require.NoError(t, err)
-	const repeatedObjectPlanBytes = int64(64 + 16 + len("pad") + 64)
-	wantBytes := base + repeatedObjectPlanBytes + int64(len(frame))
+	wantBytes := base + planBytes + int64(len(frame))
 
 	census := admission.Census()
 	require.False(t, census.OrdinaryBytes != wantBytes || census.OrdinaryGranted != 1 || census.OrdinaryWaiting != 0)
@@ -3327,14 +3217,7 @@ func TestOperationResultAdmissionBytesBoundaries(t *testing.T) {
 }
 
 func TestKernelCancelsResultWaitingForAdmissionGrowth(t *testing.T) {
-	pad, err := lifecycle.RepeatedStringValue(1024*1024, 'A')
-	require.NoError(t, err)
-	body, err := lifecycle.ObjectValue(lifecycle.ObjectField{Key: "pad", Value: pad})
-	require.NoError(t, err)
-	result, err := lifecycle.NewTableResult(200, body)
-	require.NoError(t, err)
-	sealed, err := lifecycle.SealFunctionResult(result)
-	require.NoError(t, err)
+	sealed, _ := largeRawSealedResult(t)
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) { return sealed, nil })}, nil
 	})
@@ -3390,6 +3273,14 @@ func TestKernelCancelsResultWaitingForAdmissionGrowth(t *testing.T) {
 
 func plannerPlanWork(context.Context) (lifecycle.SealedResult, error) {
 	return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
+}
+
+func largeRawSealedResult(t *testing.T) (lifecycle.SealedResult, int64) {
+	t.Helper()
+	payload := []byte(`{"pad":"` + strings.Repeat("A", 1024*1024) + `"}`)
+	result, err := lifecycle.NewSealedResult(200, "application/json", payload)
+	require.NoError(t, err)
+	return result, int64(len(payload))
 }
 
 type holdingFrameWriter struct {

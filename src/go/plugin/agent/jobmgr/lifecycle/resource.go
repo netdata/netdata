@@ -43,14 +43,6 @@ func NewFrameOutcome(result SealedResult) (TaskOutcome, error) {
 	return TaskOutcome{kind: TaskOutcomeFrame, frame: result}, nil
 }
 
-func PreparedResourceOutcome(resource PreparedResource) (TaskOutcome, error) {
-	identity, err := preparedResourceIdentity(resource)
-	if err != nil {
-		return TaskOutcome{}, err
-	}
-	return preparedResourceOutcome(resource, identity)
-}
-
 func preparedResourceOutcome(resource PreparedResource, identity ResourceIdentity) (TaskOutcome, error) {
 	outcome := TaskOutcome{kind: TaskOutcomePreparedResource, prepared: resource, identity: identity}
 	return outcome, outcome.validate()

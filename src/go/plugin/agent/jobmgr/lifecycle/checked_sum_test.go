@@ -11,9 +11,8 @@ import (
 )
 
 var (
-	checkedSumResult    int
-	checkedChargeResult int64
-	checkedSumOK        bool
+	checkedSumResult int
+	checkedSumOK     bool
 )
 
 func TestCheckedSum(t *testing.T) {
@@ -38,48 +37,11 @@ func TestCheckedSum(t *testing.T) {
 	}
 }
 
-func TestCheckedSumWrappersPreserveErrors(t *testing.T) {
-	tests := map[string]struct {
-		check func() error
-		want  string
-	}{
-		"result size": {
-			check: func() error {
-				_, err := checkedResultSize(math.MaxInt, 1)
-				return err
-			},
-			want: "jobmgr lifecycle: Function result exceeds bound: result size overflow",
-		},
-		"plan charge": {
-			check: func() error {
-				_, err := checkedCharge(math.MaxInt64, 1)
-				return err
-			},
-			want: "jobmgr lifecycle: Function result exceeds bound: plan charge overflow",
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			assert.EqualError(t, test.check(), test.want)
-		})
-	}
-}
-
 func TestCheckedSumDoesNotAllocate(t *testing.T) {
 	allocations := testing.AllocsPerRun(1_000, func() {
 		checkedSumResult, checkedSumOK = checkedSum(math.MaxInt, 1, 2, 3, 4)
-		var err error
-		checkedSumResult, err = checkedResultSize(1, 2, 3, 4)
-		if err != nil {
-			panic(err)
-		}
-		checkedChargeResult, err = checkedCharge(1, 2, 3, 4)
-		if err != nil {
-			panic(err)
-		}
 	})
 	require.Zero(t, allocations)
 	assert.Equal(t, 10, checkedSumResult)
-	assert.EqualValues(t, 10, checkedChargeResult)
 	assert.True(t, checkedSumOK)
 }

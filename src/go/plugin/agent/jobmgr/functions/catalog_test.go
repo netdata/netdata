@@ -1254,11 +1254,12 @@ func TestCatalogRejectsInvalidDeclarations(t *testing.T) {
 }
 
 func TestCatalogRejectsPathStorageBeyondProcessBudgetBeforePublication(t *testing.T) {
+	const pathCount = 10
 	prefix := strings.Repeat("p", maximumDeclarationMetadataBytes)
 	tests := map[string]func() error{
 		"initial catalog": func() error {
 			var declarations []Declaration
-			for index := range 5 {
+			for index := range pathCount {
 				name := fmt.Sprintf("%d%s", index, strings.Repeat("n", maximumDeclarationMetadataBytes-1))
 				declarations = append(
 					declarations,
@@ -1274,7 +1275,7 @@ func TestCatalogRejectsPathStorageBeyondProcessBudgetBeforePublication(t *testin
 				return err
 			}
 			var changes []RouteChange
-			for index := range 3 {
+			for index := range pathCount {
 				name := fmt.Sprintf("%d%s", index, strings.Repeat("n", maximumDeclarationMetadataBytes-1))
 				declaration := testDeclaration(
 					name,

@@ -188,9 +188,6 @@ func TestLongLivedResourcePlansChargeDeclaredBytes(t *testing.T) {
 		"secret store": {
 			newPlan: NewSecretStoreLongLivedPlan,
 		},
-		"secret store replacement": {
-			newPlan: NewSecretStoreReplacementLongLivedPlan,
-		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -452,70 +449,6 @@ func TestLongLivedPermitRemainsLiveAfterIssuanceIsSealed(t *testing.T) {
 
 	_, err = admission.ReleaseOrdinary(ref)
 	require.NoError(t, err)
-	require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
-}
-
-func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T) {
-	const replacements = 9
-
-	admission := NewAdmissionLedger()
-	supervisor := newLongLivedTestSupervisor(t)
-	steadyPlan, err := NewSecretStoreLongLivedPlan(1)
-	require.NoError(t, err)
-	replacementPlan, err := NewSecretStoreReplacementLongLivedPlan(1)
-	require.NoError(t, err)
-
-	permits := make([]LongLivedPermit, 0, replacements+1)
-	issue := func(owner ResourceIdentity, plan LongLivedPlan) {
-		t.Helper()
-		ref := grantLongLivedTestAdmission(t, admission, 2)
-		permit, issueErr := supervisor.IssueLongLivedPermit(
-			admission,
-			ref,
-			owner,
-			plan,
-		)
-		require.NoError(t, issueErr)
-
-		_, releaseErr := admission.ReleaseOrdinary(ref)
-		require.NoError(t, releaseErr)
-
-		permits = append(permits, permit)
-	}
-
-	issue(
-		ResourceIdentity{ID: "secret-store", Generation: 1},
-		steadyPlan,
-	)
-	for index := range replacements {
-		issue(
-			ResourceIdentity{
-				ID:         fmt.Sprintf("secret-store-replacement-%02d", index),
-				Generation: 1,
-			},
-			replacementPlan,
-		)
-	}
-
-	census := supervisor.LongLivedCensus()
-	require.False(t, census.Active != replacements+1 ||
-		census.SecretStores != replacements+1 ||
-		census.Bytes != int64(replacements+1)*steadyPlan.Bytes())
-
-	admissionCensus := admission.Census()
-	require.False(t, admissionCensus.ActiveRecords != 0 ||
-		admissionCensus.LongLivedRecords != replacements+1 ||
-		admissionCensus.OrdinaryBytes != int64(replacements+1)*steadyPlan.Bytes())
-
-	for _, permit := range permits {
-		require.NoError(t, permit.AbortUnused())
-	}
-
-	admissionCensus2 := admission.Census()
-	require.False(t, admissionCensus2.ActiveRecords != 0 ||
-		admissionCensus2.LongLivedRecords != 0 ||
-		admissionCensus2.OrdinaryBytes != 0)
-
 	require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 }
 
