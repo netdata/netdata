@@ -154,10 +154,24 @@ Lines for `netflow-plugin` confirm the stock listeners are up.
 
 Open the Netdata UI in your browser. Click the **Live** tab in the top navigation; **Network Flows** appears in the Functions list on the right (see [Live tab](/docs/dashboards-and-charts/live-tab.md)). Selecting it opens the Sankey + Table view. The plugin's operational charts also appear under the standard charts page in the `netflow` family.
 
-If Network Flows doesn't appear under Live, or the view is empty:
+### "Connect this agent to Netdata to use this function"
+
+If you select **Network Flows** on the Live tab and see the message **Connect this agent to Netdata to use this function**, the plugin is working — the block is access control, not a plugin failure. Network Flows (`flows:netflow`) is a [sensitive function](/docs/netdata-oss-limitations.md): the local dashboard you reach anonymously at `http://<agent-ip>:19999` does not serve sensitive functions to anonymous (signed-out) users.
+
+To use Network Flows from your standalone host:
+
+1. **Sign in to Netdata Cloud** at [app.netdata.cloud](https://app.netdata.cloud) and **claim/connect this agent** to your Netdata Cloud Space. The free Community tier is sufficient — sensitive functions are fully available on Community, no paid plan is required.
+2. Open Network Flows **through Netdata Cloud** (not the anonymous local dashboard URL). Cloud authenticates you as a member of the agent's Space and forwards the Function call to your local agent.
+
+Connecting the agent to Netdata Cloud does **not** move or offload your flow data. Collection and storage stay entirely on the local agent, in its four-tier journal under `/var/cache/netdata/flows/` (raw + 1-minute + 5-minute + 1-hour rollups). Only authentication is handled through Netdata Cloud — the flow records themselves never leave the host. Fully anonymous or offline access to the Network Flows function is not possible; Cloud authentication is required.
+
+See [Netdata Access Control and Feature Availability](/docs/netdata-oss-limitations.md) for the full Anonymous / Community / Paid access model.
+
+### Network Flows doesn't appear, or the view is empty
+
+If Network Flows doesn't appear under Live at all, or the view is empty after you have authenticated through Netdata Cloud:
 
 - Check that the plugin process is running: `pgrep -fa netflow-plugin`.
-- Check Netdata Cloud SSO: Functions require authenticated access to the agent's space.
 - See [Troubleshooting](/docs/npm/network-flows/troubleshooting.md).
 
 ## Configuring flow sources
