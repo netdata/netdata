@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 
@@ -127,7 +126,7 @@ func newTestHandler(cb *mockCallbacks) *Handler[testConfig] {
 
 func newTestHandlerWithOutput(cb *mockCallbacks) (*Handler[testConfig], *bytes.Buffer) {
 	var buf bytes.Buffer
-	api := NewResponder(netdataapi.New(safewriter.New(&buf)))
+	api := NewResponder(NewProtocolOutput(safewriter.New(&buf)))
 	h := NewHandler(HandlerOpts[testConfig]{
 		API:       api,
 		Seen:      NewSeenCache[testConfig](),

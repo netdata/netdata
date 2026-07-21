@@ -14,7 +14,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -105,7 +104,7 @@ func (s *dyncfgSim) run(t *testing.T) {
 	sd := &ServiceDiscovery{
 		Logger:      logger.New(),
 		pluginName:  testPluginName,
-		dyncfgApi:   dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		dyncfgApi:   dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&buf))),
 		seen:        dyncfg.NewSeenCache[sdConfig](),
 		exposed:     dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:    make(chan dyncfg.Function, 1),

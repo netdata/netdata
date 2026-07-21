@@ -4,11 +4,11 @@ package discovery
 
 import (
 	"errors"
-	"io"
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
 
@@ -21,14 +21,14 @@ type (
 		ServiceDiscoveryConfigDir multipath.MultiPath
 	}
 	BuildContext struct {
-		RunMode    policy.RunModePolicy
-		Identity   PluginIdentity
-		Out        io.Writer
-		Paths      PathsConfig
-		Registry   confgroup.Registry
-		ReadPaths  []string
-		DummyNames []string
-		FnReg      functions.Registry
+		RunMode      policy.RunModePolicy
+		Identity     PluginIdentity
+		DyncfgOutput dyncfg.Output
+		Paths        PathsConfig
+		Registry     confgroup.Registry
+		ReadPaths    []string
+		DummyNames   []string
+		FnReg        functions.Registry
 	}
 )
 

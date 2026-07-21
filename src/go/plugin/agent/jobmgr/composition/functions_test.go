@@ -144,13 +144,6 @@ func TestFunctionAssemblyStateGuards(t *testing.T) {
 	}
 }
 
-func TestFunctionProtocolPanicPreservesTaskClassification(t *testing.T) {
-	err := callFunctionProtocol(func() {
-		panic("handler failed")
-	})
-	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
-}
-
 func TestFunctionAssemblyJobHookCapturesExactHandle(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)

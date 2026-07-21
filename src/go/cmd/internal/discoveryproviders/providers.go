@@ -54,7 +54,7 @@ func SD(registry sd.Registry) discovery.ProviderFactory {
 			ConfigDefaults: ctx.Registry,
 			PluginName:     ctx.Identity.Name,
 			RunModePolicy:  ctx.RunMode,
-			Out:            ctx.Out,
+			DyncfgOutput:   ctx.DyncfgOutput,
 			ConfDir:        ctx.Paths.ServiceDiscoveryConfigDir,
 			FnReg:          ctx.FnReg,
 			Discoverers:    registry,

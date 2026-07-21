@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"gopkg.in/yaml.v2"
 )
@@ -96,6 +97,10 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry) discoverySetup
 	if !a.serviceDiscoveryEnabled() {
 		sdConfDir = nil
 	}
+	var dyncfgOutput dyncfg.Output
+	if a.Out != nil {
+		dyncfgOutput = dyncfg.NewProtocolOutput(a.Out)
+	}
 
 	cfg := discoverySetup{
 		Defaults: reg,
@@ -104,7 +109,7 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry) discoverySetup
 			Identity: discovery.PluginIdentity{
 				Name: a.Name,
 			},
-			Out: a.Out,
+			DyncfgOutput: dyncfgOutput,
 			Paths: discovery.PathsConfig{
 				CollectorsConfigWatchPath: watchPaths,
 				ServiceDiscoveryConfigDir: sdConfDir,

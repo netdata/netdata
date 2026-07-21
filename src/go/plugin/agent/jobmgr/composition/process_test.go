@@ -19,6 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	frameworkfunctions "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/require"
@@ -419,7 +420,7 @@ func testRunServiceDiscoveryServices(
 		) {
 			return processServiceDiscovery{
 				registry: build.FnReg,
-				output:   build.Out,
+				output:   build.DyncfgOutput,
 			}, true, nil
 		},
 	)
@@ -440,7 +441,7 @@ func testRunServiceDiscoveryServices(
 
 type processServiceDiscovery struct {
 	registry frameworkfunctions.Registry
-	output   io.Writer
+	output   dyncfg.Output
 }
 
 type processNoncooperativeDiscovery struct {
@@ -460,21 +461,19 @@ func (psd processServiceDiscovery) Run(
 	ctx context.Context,
 	_ chan<- []*confgroup.Group,
 ) {
-	api := netdataapi.New(psd.output)
 	psd.registry.RegisterPrefix(
 		"config",
 		"go.d:sd:",
 		func(function frameworkfunctions.Function) {
-			api.FUNCRESULT(netdataapi.FunctionResult{
-				UID: function.UID, Code: "200",
-				ContentType:     "application/json",
-				ExpireTimestamp: "0",
-				Payload:         `{"status":200}`,
+			psd.output.FunctionResult(dyncfg.Result{
+				UID: function.UID, Code: 200,
+				ContentType: "application/json",
+				Payload:     `{"status":200}`,
 			})
-			api.CONFIGSTATUS("go.d:sd:test:job", "running")
+			psd.output.ConfigStatus("go.d:sd:test:job", dyncfg.StatusRunning)
 		},
 	)
-	api.CONFIGCREATE(netdataapi.ConfigOpts{
+	psd.output.ConfigCreate(netdataapi.ConfigOpts{
 		ID: "go.d:sd:test", Status: "accepted",
 		ConfigType: "template",
 		Path:       "/collectors/go.d/ServiceDiscovery",

@@ -4,9 +4,6 @@ package dyncfg
 
 import (
 	"fmt"
-	"strconv"
-	"sync"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	fnpkg "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -14,37 +11,12 @@ import (
 
 // Responder handles standardized responses for dyncfg operations
 type Responder struct {
-	api *netdataapi.API
-
-	finalizeMux sync.RWMutex
-	finalize    fnpkg.TerminalFinalizer
+	output Output
 }
 
 // NewResponder creates a new responder
-func NewResponder(api *netdataapi.API) *Responder {
-	return &Responder{
-		api:      api,
-		finalize: fnpkg.DirectTerminalFinalizer,
-	}
-}
-
-// SetTerminalFinalizer overrides terminal response finalization behavior.
-func (r *Responder) SetTerminalFinalizer(finalize fnpkg.TerminalFinalizer) {
-	r.finalizeMux.Lock()
-	defer r.finalizeMux.Unlock()
-
-	if finalize == nil {
-		r.finalize = fnpkg.DirectTerminalFinalizer
-		return
-	}
-	r.finalize = finalize
-}
-
-func (r *Responder) finalizeTerminal(uid, source string, emit func()) bool {
-	r.finalizeMux.RLock()
-	finalize := r.finalize
-	r.finalizeMux.RUnlock()
-	return finalize(uid, source, emit)
+func NewResponder(output Output) *Responder {
+	return &Responder{output: output}
 }
 
 // SendCodef sends a response with a specific code and message
@@ -60,15 +32,11 @@ func (r *Responder) SendCodef(fn Function, code int, message string, args ...any
 
 	payload := fnpkg.BuildJSONPayload(code, msg)
 
-	res := netdataapi.FunctionResult{
-		UID:             fn.UID(),
-		ContentType:     "application/json",
-		Payload:         string(payload),
-		Code:            strconv.Itoa(code),
-		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
-	}
-	r.finalizeTerminal(fn.UID(), "dyncfg.responder.sendcodef", func() {
-		r.api.FUNCRESULT(res)
+	r.output.FunctionResult(Result{
+		UID:         fn.UID(),
+		Code:        code,
+		ContentType: "application/json",
+		Payload:     string(payload),
 	})
 }
 
@@ -88,28 +56,24 @@ func (r *Responder) sendPayload(fn Function, payload, contentType string) {
 		return
 	}
 
-	res := netdataapi.FunctionResult{
-		UID:             fn.UID(),
-		ContentType:     contentType,
-		Payload:         payload,
-		Code:            "200",
-		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
-	}
-	r.finalizeTerminal(fn.UID(), "dyncfg.responder.sendpayload", func() {
-		r.api.FUNCRESULT(res)
+	r.output.FunctionResult(Result{
+		UID:         fn.UID(),
+		Code:        200,
+		ContentType: contentType,
+		Payload:     payload,
 	})
 }
 
 func (r *Responder) ConfigCreate(opts netdataapi.ConfigOpts) {
-	r.api.CONFIGCREATE(opts)
+	r.output.ConfigCreate(opts)
 }
 
 // ConfigStatus sends a CONFIG STATUS command
 func (r *Responder) ConfigStatus(id string, status Status) {
-	r.api.CONFIGSTATUS(id, status.String())
+	r.output.ConfigStatus(id, status)
 }
 
 // ConfigDelete sends a CONFIG DELETE command
 func (r *Responder) ConfigDelete(id string) {
-	r.api.CONFIGDELETE(id)
+	r.output.ConfigDelete(id)
 }

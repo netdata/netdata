@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
@@ -63,7 +62,7 @@ func (sim *discoverySimExt) run(t *testing.T) {
 			confFiles: sim.configs,
 			ch:        make(chan confFile),
 		},
-		dyncfgApi:   dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		dyncfgApi:   dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&buf))),
 		seen:        dyncfg.NewSeenCache[sdConfig](),
 		exposed:     dyncfg.NewExposedCache[sdConfig](),
 		discoverers: testDiscovererRegistry(),
@@ -141,7 +140,7 @@ func (sim *discoverySim) run(t *testing.T) {
 			confFiles: sim.configs,
 			ch:        make(chan confFile),
 		},
-		dyncfgApi:   dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf))),
+		dyncfgApi:   dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&buf))),
 		seen:        dyncfg.NewSeenCache[sdConfig](),
 		exposed:     dyncfg.NewExposedCache[sdConfig](),
 		discoverers: testDiscovererRegistry(),

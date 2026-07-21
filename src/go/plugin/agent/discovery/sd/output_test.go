@@ -19,9 +19,9 @@ import (
 func TestDyncfgConfigReturnsAfterQueuedCommandCompletes(t *testing.T) {
 	var output bytes.Buffer
 	discovery, err := NewServiceDiscovery(Config{
-		PluginName:  "test",
-		Out:         &output,
-		Discoverers: NewRegistry(),
+		PluginName:   "test",
+		DyncfgOutput: dyncfg.NewProtocolOutput(&output),
+		Discoverers:  NewRegistry(),
 	})
 	require.NoError(t, err)
 	discovery.ctx = context.Background()
@@ -65,9 +65,9 @@ func TestDyncfgConfigReturnsAfterQueuedCommandCompletes(t *testing.T) {
 func TestDyncfgAdmissionRejectsCommandsAfterShutdown(t *testing.T) {
 	var output bytes.Buffer
 	discovery, err := NewServiceDiscovery(Config{
-		PluginName:  "test",
-		Out:         &output,
-		Discoverers: NewRegistry(),
+		PluginName:   "test",
+		DyncfgOutput: dyncfg.NewProtocolOutput(&output),
+		Discoverers:  NewRegistry(),
 	})
 	require.NoError(t, err)
 	discovery.ctx = context.Background()
@@ -92,14 +92,14 @@ func TestDyncfgAdmissionRejectsCommandsAfterShutdown(t *testing.T) {
 	assert.Empty(t, discovery.dyncfgCh)
 }
 
-func TestNewServiceDiscovery_UsesConfiguredOutForDyncfgResponder(t *testing.T) {
+func TestNewServiceDiscoveryUsesConfiguredDyncfgOutput(t *testing.T) {
 	const pluginName = "test"
 
 	var buf bytes.Buffer
 	sd, err := NewServiceDiscovery(Config{
-		PluginName:  pluginName,
-		Out:         &buf,
-		Discoverers: NewRegistry(),
+		PluginName:   pluginName,
+		DyncfgOutput: dyncfg.NewProtocolOutput(&buf),
+		Discoverers:  NewRegistry(),
 	})
 	require.NoError(t, err)
 

@@ -222,7 +222,7 @@ func newRunGeneration(
 			initialRoutes,
 			serviceDiscoveryRoute,
 		)
-		config.Discovery.BuildContext.Out = serviceDiscovery.capture
+		config.Discovery.BuildContext.DyncfgOutput = serviceDiscovery
 		config.Discovery.BuildContext.FnReg = serviceDiscovery
 	}
 	functions, err = NewFunctionAssembly(

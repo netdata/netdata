@@ -19,6 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -125,7 +126,7 @@ func NewProcess(config Config) (*Process, error) {
 		)
 	}
 	build.Registry = defaults
-	build.Out = config.Output
+	build.DyncfgOutput = dyncfg.NewProtocolOutput(config.Output)
 	build.FnReg = nil
 	shutdownTimeout := config.ShutdownTimeout
 	if shutdownTimeout == 0 {

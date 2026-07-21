@@ -17,14 +17,13 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 )
 
 type Config struct {
 	ConfigDefaults confgroup.Registry
 	PluginName     string
 	RunModePolicy  policy.RunModePolicy
-	Out            io.Writer
+	DyncfgOutput   dyncfg.Output
 	ConfDir        multipath.MultiPath
 	FnReg          functions.Registry
 	Discoverers    Registry
@@ -37,9 +36,9 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 	if cfg.Discoverers == nil {
 		return nil, fmt.Errorf("service discovery discoverer registry is not configured")
 	}
-	out := cfg.Out
-	if out == nil {
-		out = io.Discard
+	output := cfg.DyncfgOutput
+	if output == nil {
+		output = dyncfg.NewProtocolOutput(io.Discard)
 	}
 
 	d := &ServiceDiscovery{
@@ -50,16 +49,11 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		runModePolicy:  cfg.RunModePolicy,
 		fnReg:          cfg.FnReg,
 		discoverers:    cfg.Discoverers,
-		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(out)),
+		dyncfgApi:      dyncfg.NewResponder(output),
 		seen:           dyncfg.NewSeenCache[sdConfig](),
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
 		dyncfgPending:  make(map[string]pendingDyncfgFunction),
-	}
-	if provider, ok := cfg.FnReg.(interface {
-		TerminalFinalizer() functions.TerminalFinalizer
-	}); ok {
-		d.dyncfgApi.SetTerminalFinalizer(provider.TerminalFinalizer())
 	}
 	d.newPipeline = func(config pipeline.Config) (sdPipeline, error) {
 		return pipeline.New(config, d.newDiscoverersFromRegistry)

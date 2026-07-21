@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
@@ -131,7 +130,7 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 		pluginName:     testPluginName,
 		fnReg:          waitTestFunctionRegistry{},
 		discoverers:    testDiscovererRegistry(),
-		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))),
+		dyncfgApi:      dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&out))),
 		seen:           dyncfg.NewSeenCache[sdConfig](),
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
