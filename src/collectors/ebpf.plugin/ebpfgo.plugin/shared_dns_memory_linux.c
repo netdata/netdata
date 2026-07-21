@@ -6,6 +6,7 @@
  * apps_ebpf_shared_pid_row.h, included transitively via apps_ebpf_shared_dns_row.h */
 #include "apps_ebpf_shared_pid_row.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <semaphore.h>
 #include <stdbool.h>
@@ -91,16 +92,26 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
     ctx->sem = SEM_FAILED;
     ctx->update_every_s = update_every_s;
 
-    ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_RDWR, 0660);
-    if (ctx->shm_fd < 0)
-        goto fail;
-
-    struct stat pre_stat;
-    if (fstat(ctx->shm_fd, &pre_stat) != 0)
-        goto fail;
-    bool reused = pre_stat.st_size > 0;
-    if (!reused)
+    /* See shared_pid_memory_linux.c for the full rationale.  O_CREAT|O_EXCL
+     * ensures shm_name_created is set only by the actual creator — a racing
+     * publisher that opens the same name via the EEXIST fallback does not
+     * claim creation and cannot unlink a live publisher's segment on failure. */
+    struct stat pre_stat = {0};
+    bool reused;
+    ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_EXCL | O_RDWR, 0660);
+    if (ctx->shm_fd >= 0) {
+        reused = false;
         ctx->shm_name_created = true;
+    } else if (errno == EEXIST) {
+        ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_RDWR, 0);
+        if (ctx->shm_fd < 0)
+            goto fail;
+        if (fstat(ctx->shm_fd, &pre_stat) != 0)
+            goto fail;
+        reused = pre_stat.st_size > 0;
+    } else {
+        goto fail;
+    }
     size_t length = sizeof(struct ebpfgo_dns_shared);
 
     /* Same size-mismatch guard as shared_pid_memory_linux.c: unlink and

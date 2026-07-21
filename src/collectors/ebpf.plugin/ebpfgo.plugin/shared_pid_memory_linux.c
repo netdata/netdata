@@ -2,6 +2,7 @@
 
 #include "shared_pid_memory.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -116,30 +117,36 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
     ctx->sem = SEM_FAILED;
     ctx->update_every_s = update_every_s;
 
-    /* Close() calls shm_unlink so /dev/shm is not littered, but this also
+    /* close() calls shm_unlink so /dev/shm is not littered, but this also
      * means a graceful restart creates a fresh SHM object (new inode).
      * Consumers detect the inode change on their next refresh and reconnect
      * within one collection cycle.  The "reused" branch below fires only
      * after a crash (unlink did not run), where the prior segment still exists.
      *
-     * We probe the pre-truncate size with fstat() to detect the reused
-     * case: a non-zero size means the prior publisher may have left rows in
-     * the segment, and the new run must clear them — the kernel only
-     * zero-fills when shm_open creates a new segment.  If fstat() cannot
-     * prove which state we opened, fail the open rather than optimistically
-     * treating unknown state as brand new.  Clearing on the reuse path
-     * preserves the original optimisation that avoids a 17.5 MB page-fault
-     * storm on the first-publish-after-create path. */
-    ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
-    if (ctx->shm_fd < 0)
-        goto fail;
-
-    struct stat pre_stat;
-    if (fstat(ctx->shm_fd, &pre_stat) != 0)
-        goto fail;
-    bool reused = pre_stat.st_size > 0;
-    if (!reused)
+     * We use O_CREAT|O_EXCL so shm_name_created is set only by the actual
+     * creator — a racing second publisher that opens the same name sees EEXIST
+     * and never sets shm_name_created, so a later failure on its side cannot
+     * unlink a live publisher's segment.  On EEXIST we open without claiming
+     * creation.  A non-zero pre-ftruncate size (reused=true) means a prior
+     * publisher left rows that must be cleared — the kernel only zero-fills
+     * fresh segments.  Clearing preserves the optimisation that avoids a
+     * 17.5 MB page-fault storm on the first publish after creation. */
+    struct stat pre_stat = {0};
+    bool reused;
+    ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_EXCL | O_RDWR, 0660);
+    if (ctx->shm_fd >= 0) {
+        reused = false;
         ctx->shm_name_created = true;
+    } else if (errno == EEXIST) {
+        ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_RDWR, 0);
+        if (ctx->shm_fd < 0)
+            goto fail;
+        if (fstat(ctx->shm_fd, &pre_stat) != 0)
+            goto fail;
+        reused = pre_stat.st_size > 0;
+    } else {
+        goto fail;
+    }
 
     ctx->total = total;
     size_t length = shared_pid_memory_nbytes(ctx);
