@@ -20,7 +20,8 @@ struct shared_dns_memory {
     uint32_t update_every_s;
     int shm_fd;
     sem_t *sem;
-    bool shm_owned; /* true only after successful open — guards shm_unlink in close */
+    bool shm_owned;        /* set on successful open; triggers unlink for the reused-takeover path */
+    bool shm_name_created; /* set when this context created/recreated the SHM name; triggers unlink on any exit */
 };
 
 static void shared_dns_memory_invalidate(struct shared_dns_memory *ctx)
@@ -63,6 +64,8 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
     ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_RDWR, 0660);
     if (ctx->shm_fd < 0)
         return false;
+    /* Mark created before any further steps; close() unlinks on any failure path. */
+    ctx->shm_name_created = true;
 
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
         return false;
@@ -96,6 +99,8 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
     if (fstat(ctx->shm_fd, &pre_stat) != 0)
         goto fail;
     bool reused = pre_stat.st_size > 0;
+    if (!reused)
+        ctx->shm_name_created = true;
     size_t length = sizeof(struct ebpfgo_dns_shared);
 
     /* Same size-mismatch guard as shared_pid_memory_linux.c: unlink and
@@ -108,6 +113,7 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         if (ctx->shm_fd < 0)
             goto fail;
         reused = false;
+        ctx->shm_name_created = true;
     }
 
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
@@ -205,11 +211,12 @@ void shared_dns_memory_close(struct shared_dns_memory *ctx)
         ctx->shm_fd = -1;
     }
 
-    /* Unlink the SHM name — see shared_pid_memory_linux.c for rationale.
-     * Only unlink when we successfully completed open (shm_owned=true): a
-     * failed open must not unlink a live publisher's name.
+    /* Unlink the SHM name — see shared_pid_memory_linux.c for the full rationale.
+     * Unlink when shm_name_created (we created the name — clean up on any exit) or
+     * shm_owned (took over existing — clean up on graceful close).  Both false means
+     * a failed open on a pre-existing segment — must not unlink a live publisher's name.
      * sem name is intentionally NOT unlinked here. */
-    if (ctx->shm_owned)
+    if (ctx->shm_name_created || ctx->shm_owned)
         (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
 
     free(ctx);

@@ -20,7 +20,8 @@ struct shared_pid_memory {
     uint32_t update_every_s;
     int shm_fd;
     sem_t *sem;
-    bool shm_owned; /* true only after successful open — guards shm_unlink in close */
+    bool shm_owned;        /* set on successful open; triggers unlink for the reused-takeover path */
+    bool shm_name_created; /* set when this context created/recreated the SHM name; triggers unlink on any exit */
 };
 
 static inline size_t shared_pid_memory_nbytes(const struct shared_pid_memory *ctx)
@@ -83,6 +84,8 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
     ctx->shm_fd = shm_open(NETDATA_EBPFGO_INTEGRATION_NAME, O_CREAT | O_RDWR, 0660);
     if (ctx->shm_fd < 0)
         return false;
+    /* Mark created before any further steps; close() unlinks on any failure path. */
+    ctx->shm_name_created = true;
 
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
         return false;
@@ -135,6 +138,8 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
     if (fstat(ctx->shm_fd, &pre_stat) != 0)
         goto fail;
     bool reused = pre_stat.st_size > 0;
+    if (!reused)
+        ctx->shm_name_created = true;
 
     ctx->total = total;
     size_t length = shared_pid_memory_nbytes(ctx);
@@ -151,6 +156,7 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
         if (ctx->shm_fd < 0)
             goto fail;
         reused = false;
+        ctx->shm_name_created = true;
     }
 
     if (ftruncate(ctx->shm_fd, (off_t)length) != 0)
@@ -260,12 +266,17 @@ void shared_pid_memory_close(struct shared_pid_memory *ctx)
         close(ctx->shm_fd);
 
     /* Unlink the SHM name so /dev/shm is not littered across Netdata restarts
-     * or version-name bumps.  Only unlink when we successfully completed open
-     * (shm_owned=true): a failed open must not unlink a live publisher's name.
+     * or version-name bumps.  Two distinct conditions warrant unlinking:
+     * - shm_name_created: this context created/recreated the name, so it must
+     *   clean it up even if init failed later (prevents orphaned /dev/shm objects).
+     * - shm_owned: we fully completed as publisher; unlink on graceful exit so
+     *   the next restart gets a fresh inode (covers the reused-takeover path).
+     * A failed open on a pre-existing segment (both false) must not unlink a
+     * live publisher's name.
      * The sem name is intentionally NOT unlinked: the sem object must outlive
      * this process so consumers and the next writer both open the same
      * underlying kernel object (P1 semaphore-desync lesson). */
-    if (ctx->shm_owned)
+    if (ctx->shm_name_created || ctx->shm_owned)
         (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
 
     free(ctx);
