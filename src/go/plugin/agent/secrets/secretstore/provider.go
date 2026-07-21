@@ -6,10 +6,9 @@ import "context"
 
 // Creator describes one SecretStore provider implementation.
 type Creator struct {
-	Kind        StoreKind
-	DisplayName string
-	Schema      string
-	Create      func() Store
+	Kind   StoreKind
+	Schema string
+	Create func() Store
 }
 
 // Store is a mutable provider instance used during configuration.

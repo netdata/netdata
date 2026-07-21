@@ -16,15 +16,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	frameworkfunctions "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,15 +34,6 @@ func TestProcessCoreServiceDiscoverySendsFunctionResultBeforeStatus(t *testing.T
 		Modules:         collectorapi.Registry{},
 		Jobs:            testRunJobServices(t),
 		Discovery:       services,
-		Planner: func(
-			runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(
-					func(context.Context, uint64) error { return nil },
-				),
-				nil
-		},
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -96,15 +83,6 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 		Modules:         collectorapi.Registry{},
 		Jobs:            jobs,
 		Discovery:       testRunDiscoveryServices(t),
-		Planner: func(
-			runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(
-					func(context.Context, uint64) error { return nil },
-				),
-				nil
-		},
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -181,11 +159,6 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 		},
 		Jobs:      testRunJobServices(t),
 		Discovery: testRunDiscoveryServices(t),
-		Planner: func(runPlannerCapabilities) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(func(context.Context, uint64) error { return nil }),
-				nil
-		},
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 2)
@@ -214,158 +187,6 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 	require.EqualValues(t, 2, cleanups)
 }
 
-func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
-	t *testing.T,
-) {
-	reader, writer := io.Pipe()
-	defer func() { require.NoError(t, writer.Close()) }()
-	events := make(chan string, 8)
-	output := processRecordingWriter{
-		record: func(payload []byte) {
-			switch {
-			case bytes.HasPrefix(payload, []byte("FUNCTION GLOBAL")) &&
-				bytes.Contains(payload, []byte(`"module:method"`)):
-				events <- "publish"
-			case bytes.HasPrefix(payload, []byte("FUNCTION_DEL")) &&
-				bytes.Contains(payload, []byte(`"module:method"`)):
-				events <- "withdraw"
-			}
-		},
-	}
-	jobs := testRunJobServices(t)
-	var err error
-	jobs.StoreCreators, err = secretstore.NewCreatorCatalog(
-		[]secretstore.Creator{{
-			Kind:        secretstore.KindVault,
-			DisplayName: "Vault",
-			Schema:      `{}`,
-			Create: func() secretstore.Store {
-				return &processSecretStore{}
-			},
-		}},
-	)
-	require.NoError(t, err)
-	initialStore := secretstore.Config{
-		"name": "main", "kind": string(secretstore.KindVault),
-		"value":           "initial",
-		"__source__":      confgroup.TypeUser,
-		"__source_type__": confgroup.TypeUser,
-	}
-	plannerCalls := 0
-	var storeScope func(
-		[]string,
-	) (secretresolver.AtomicScope, error)
-	var storeCensus func() secretstore.SecretStoreCensus
-	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output,
-		ShutdownTimeout: time.Second,
-		Modules: collectorapi.Registry{
-			"module": {
-				AgentFunctions: func() []funcapi.FunctionConfig {
-					return []funcapi.FunctionConfig{{ID: "method"}}
-				},
-				MethodHandler: func(
-					collectorapi.RuntimeJob,
-				) funcapi.MethodHandler {
-					return &runTestHandler{
-						cleanup: func() {},
-					}
-				},
-			},
-		},
-		Jobs: jobs,
-		Secrets: runSecretServices{
-			Initial: []secretstore.Config{initialStore},
-		},
-		Discovery: testRunDiscoveryServices(t),
-		Planner: func(
-			capabilities runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			plannerCalls++
-			storeScope = capabilities.StoreScope
-			storeCensus = capabilities.StoreCensus
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(
-					func(context.Context, uint64) error {
-						return nil
-					},
-				),
-				nil
-		},
-	})
-	require.NoError(t, err)
-	commands := make(chan processControl, 1)
-	done := make(chan error, 1)
-	go func() {
-		done <- process.run(context.Background(), commands)
-	}()
-	waitProcessEvent(t, events, "publish")
-	require.False(t, storeScope == nil || storeCensus == nil)
-	key := secretstore.StoreKey(secretstore.KindVault, "main")
-	var retained secretresolver.AtomicScope
-	deadline := time.Now().Add(3 * time.Second)
-	for retained == nil {
-		retained, err = storeScope([]string{key})
-		if err == nil {
-			break
-		}
-		require.False(t, time.Now().After(deadline))
-		time.Sleep(time.Millisecond)
-	}
-	defer func() {
-		if retained != nil {
-			assert.NoError(t, retained.Release(context.Background()))
-		}
-	}()
-
-	census := storeCensus()
-	require.False(t, census.Current != 1 || census.Generations != 1 || census.Readers != 1 || census.Scopes != 1)
-
-	control := testProcessControl(processRestart)
-	commands <- control
-	waitProcessEvent(t, events, "withdraw")
-	select {
-	case err := <-control.result:
-		require.False(t, err == nil ||
-			!strings.Contains(err.Error(), "secretstore: close with retained ownership") ||
-			!strings.Contains(err.Error(), "jobmgr composition: run did not quiesce"))
-	case <-time.After(3 * time.Second):
-		require.FailNow(t, "test failed", "restart did not reject unquiesced predecessor")
-	}
-	select {
-	case err := <-done:
-		require.False(t, err == nil || !strings.Contains(err.Error(), "secretstore: close with retained ownership"))
-	case <-time.After(3 * time.Second):
-		require.FailNow(t, "test failed", "process did not exit after rejected publication")
-	}
-	require.EqualValues(t, 1, plannerCalls)
-	select {
-	case event := <-events:
-		require.FailNowf(t, "test failed", "successor produced event %q", event)
-	default:
-	}
-
-	ingressCensus := process.ingress.Census()
-	require.False(t, ingressCensus.State != "contained" || ingressCensus.RunGeneration != 0)
-
-	storeCensus2 := storeCensus()
-	require.False(t, storeCensus2.Current != 0 ||
-		storeCensus2.Retiring != 1 ||
-		storeCensus2.Generations != 1 ||
-		storeCensus2.Readers != 1 ||
-		storeCensus2.Scopes != 1 ||
-		!storeCensus2.Closing)
-
-	require.NoError(t, retained.Release(context.Background()))
-
-	retained = nil
-
-	require.EqualValues(t, secretstore.SecretStoreCensus{
-		Closing: true,
-	}, storeCensus(),
-	)
-}
-
 func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 	t *testing.T,
 ) {
@@ -391,7 +212,6 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 		[]agentdiscovery.ProviderFactory{factory},
 	)
 	require.NoError(t, err)
-	plannerCalls := 0
 	process, err := newProcessCore(processCoreConfig{
 		Input: reader, Output: newProcessSynchronizedBuffer(),
 		ShutdownTimeout: 100 * time.Millisecond,
@@ -402,18 +222,6 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 				Registry: confgroup.Registry{"test": {}},
 			},
 			Providers: catalog,
-		},
-		Planner: func(
-			runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			plannerCalls++
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(
-					func(context.Context, uint64) error {
-						return nil
-					},
-				),
-				nil
 		},
 	})
 	require.NoError(t, err)
@@ -443,140 +251,84 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "process did not exit after retained discovery provider")
 	}
-	require.EqualValues(t, 1, plannerCalls)
 }
 
-func TestProcessCoreContainsConstructionFailures(t *testing.T) {
-	cases := map[string]struct {
-		failAt             int
-		restart            bool
-		providerBuildPanic bool
-		wantErr            error
-		wantErrorText      string
-		wantCleanups       int
-		wantReaderStart    int
-	}{
-		"first generation": {
-			failAt: 1, wantErr: errProcessPlannerConstruction,
-			wantCleanups: 1,
+func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
+	reader, writer := io.Pipe()
+	events := make(chan string, 8)
+	var cleanupsMu sync.Mutex
+	cleanups := 0
+	factory := agentdiscovery.NewProviderFactory(
+		"panicked",
+		func(agentdiscovery.BuildContext) (
+			agentdiscovery.Discoverer,
+			bool,
+			error,
+		) {
+			panic("provider construction")
 		},
-		"restart successor": {
-			failAt: 2, restart: true,
-			wantErr:      errProcessPlannerConstruction,
-			wantCleanups: 2, wantReaderStart: 1,
-		},
-		"provider build panic": {
-			providerBuildPanic: true,
-			wantErrorText:      "provider factory panic",
-			wantCleanups:       1,
-		},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			reader, writer := io.Pipe()
-			events := make(chan string, 8)
-			var cleanupsMu sync.Mutex
-			cleanups := 0
-			plannerCalls := 0
-			discovery := testRunDiscoveryServices(t)
-			if tc.providerBuildPanic {
-				factory := agentdiscovery.NewProviderFactory(
-					"panicked",
-					func(agentdiscovery.BuildContext) (
-						agentdiscovery.Discoverer,
-						bool,
-						error,
-					) {
-						panic("provider construction")
-					},
-				)
-				catalog, err := agentdiscovery.NewProviderCatalog(
-					[]agentdiscovery.ProviderFactory{factory},
-				)
-				require.NoError(t, err)
-				discovery = runDiscoveryServices{
-					BuildContext: agentdiscovery.BuildContext{
-						Registry: confgroup.Registry{"module": {}},
-					},
-					Providers: catalog,
-				}
+	)
+	catalog, err := agentdiscovery.NewProviderCatalog(
+		[]agentdiscovery.ProviderFactory{factory},
+	)
+	require.NoError(t, err)
+	process, err := newProcessCore(processCoreConfig{
+		Input: reader,
+		Output: processRecordingWriter{record: func(payload []byte) {
+			switch {
+			case bytes.HasPrefix(payload, []byte("FUNCTION GLOBAL")) &&
+				bytes.Contains(payload, []byte(`"module:method"`)):
+				events <- "publish"
+			case bytes.HasPrefix(payload, []byte("FUNCTION_DEL")) &&
+				bytes.Contains(payload, []byte(`"module:method"`)):
+				events <- "withdraw"
 			}
-			process, err := newProcessCore(processCoreConfig{
-				Input: reader,
-				Output: processRecordingWriter{record: func(payload []byte) {
-					switch {
-					case bytes.HasPrefix(payload, []byte("FUNCTION GLOBAL")) &&
-						bytes.Contains(payload, []byte(`"module:method"`)):
-						events <- "publish"
-					case bytes.HasPrefix(payload, []byte("FUNCTION_DEL")) &&
-						bytes.Contains(payload, []byte(`"module:method"`)):
-						events <- "withdraw"
-					}
-				}},
-				ShutdownTimeout: time.Second,
-				Modules: collectorapi.Registry{
-					"module": {
-						AgentFunctions: func() []funcapi.FunctionConfig {
-							return []funcapi.FunctionConfig{{ID: "method"}}
-						},
-						MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-							return &runTestHandler{cleanup: func() {
-								cleanupsMu.Lock()
-								cleanups++
-								cleanupsMu.Unlock()
-							}}
-						},
-					},
+		}},
+		ShutdownTimeout: time.Second,
+		Modules: collectorapi.Registry{
+			"module": {
+				AgentFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{ID: "method"}}
 				},
-				Jobs:      testRunJobServices(t),
-				Discovery: discovery,
-				Planner: func(runPlannerCapabilities) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-					plannerCalls++
-					if plannerCalls == tc.failAt {
-						return nil, nil, errProcessPlannerConstruction
-					}
-					return runRejectingPlanner{},
-						jobmgr.RunFinalizerFunc(func(context.Context, uint64) error { return nil }),
-						nil
+				MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+					return &runTestHandler{cleanup: func() {
+						cleanupsMu.Lock()
+						cleanups++
+						cleanupsMu.Unlock()
+					}}
 				},
-			})
-			require.NoError(t, err)
-			commands := make(chan processControl, 1)
-			done := make(chan error, 1)
-			go func() {
-				done <- process.run(context.Background(), commands)
-			}()
-			if tc.providerBuildPanic {
-				waitProcessEvent(t, events, "publish")
-				waitProcessEvent(t, events, "withdraw")
-			} else if tc.restart {
-				waitProcessEvent(t, events, "publish")
-				commands <- testProcessControl(processRestart)
-				waitProcessEvent(t, events, "withdraw")
-			}
-			select {
-			case err := <-done:
-				require.False(t, tc.wantErr != nil && !errors.Is(err, tc.wantErr))
-				require.False(t, tc.wantErrorText != "" && !strings.Contains(err.Error(), tc.wantErrorText))
-			case <-time.After(3 * time.Second):
-				require.FailNow(t, "test failed", "process did not contain construction failure")
-			}
-
-			require.NoError(t, writer.Close())
-
-			require.EqualValues(t, 0, len(events))
-			census := process.ingress.Census()
-			require.False(t, census.State != "contained" ||
-				census.RunGeneration != 0 ||
-				census.ReaderStarts != tc.wantReaderStart)
-
-			require.Equal(t, lifecycle.AdmissionClosed, process.admission.Census().Phase)
-
-			cleanupsMu.Lock()
-			defer cleanupsMu.Unlock()
-			require.EqualValues(t, tc.wantCleanups, cleanups)
-		})
+			},
+		},
+		Jobs: testRunJobServices(t),
+		Discovery: runDiscoveryServices{
+			BuildContext: agentdiscovery.BuildContext{
+				Registry: confgroup.Registry{"module": {}},
+			},
+			Providers: catalog,
+		},
+	})
+	require.NoError(t, err)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), make(chan processControl, 1))
+	}()
+	waitProcessEvent(t, events, "publish")
+	waitProcessEvent(t, events, "withdraw")
+	select {
+	case err := <-done:
+		require.ErrorContains(t, err, "provider factory panic")
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "test failed", "process did not contain construction failure")
 	}
+	require.NoError(t, writer.Close())
+	require.Empty(t, events)
+	census := process.ingress.Census()
+	require.False(t, census.State != "contained" ||
+		census.RunGeneration != 0 || census.ReaderStarts != 0)
+	require.Equal(t, lifecycle.AdmissionClosed, process.admission.Census().Phase)
+	cleanupsMu.Lock()
+	defer cleanupsMu.Unlock()
+	require.EqualValues(t, 1, cleanups)
 }
 
 func TestProcessRetirementPreservesRunDirtyCause(t *testing.T) {
@@ -596,8 +348,6 @@ func TestProcessRetirementPreservesRunDirtyCause(t *testing.T) {
 	)
 	require.False(t, !errors.Is(err, cause) || !strings.Contains(err.Error(), "run did not quiesce"))
 }
-
-var errProcessPlannerConstruction = errors.New("process planner construction failed")
 
 type processRecordingWriter struct {
 	record func([]byte)

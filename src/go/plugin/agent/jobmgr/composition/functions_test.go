@@ -343,7 +343,6 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 		nil,
 		assembly,
 		assembly,
-		runRejectingPlanner{},
 		assembly.Catalog(),
 	)
 	require.NoError(t, err)

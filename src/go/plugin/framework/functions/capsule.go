@@ -70,13 +70,6 @@ type InputCapsule struct {
 	discardingUID string
 }
 
-type ContainedInputCensus struct {
-	PayloadActive   bool
-	PayloadBytes    int
-	PayloadCapacity int
-	DiscardingLine  bool
-}
-
 type payloadState struct {
 	call           Call
 	body           []byte
@@ -218,16 +211,6 @@ func (capsule *InputCapsule) DiscardPausedPayload(expectedToken uint64) error {
 	state.token = 0
 	state.capacity = 0
 	return nil
-}
-
-func (capsule *InputCapsule) ContainedCensus() ContainedInputCensus {
-	census := ContainedInputCensus{DiscardingLine: capsule.discarding}
-	if capsule.payload != nil {
-		census.PayloadActive = true
-		census.PayloadBytes = len(capsule.payload.body)
-		census.PayloadCapacity = cap(capsule.payload.body)
-	}
-	return census
 }
 
 func hasLF(value []byte) bool {

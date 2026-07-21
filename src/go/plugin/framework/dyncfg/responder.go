@@ -40,13 +40,6 @@ func (r *Responder) SetTerminalFinalizer(finalize fnpkg.TerminalFinalizer) {
 	r.finalize = finalize
 }
 
-// TerminalFinalizer returns the currently configured terminal finalizer.
-func (r *Responder) TerminalFinalizer() fnpkg.TerminalFinalizer {
-	r.finalizeMux.RLock()
-	defer r.finalizeMux.RUnlock()
-	return r.finalize
-}
-
 func (r *Responder) finalizeTerminal(uid, source string, emit func()) bool {
 	r.finalizeMux.RLock()
 	finalize := r.finalize
@@ -84,24 +77,6 @@ func (r *Responder) SendJSON(fn Function, payload string) {
 	r.sendPayload(fn, payload, "application/json")
 }
 
-// SendJSONWithCode sends a JSON payload response with a specific HTTP status code
-func (r *Responder) SendJSONWithCode(fn Function, payload string, code int) {
-	if fn.UID() == "" {
-		return
-	}
-
-	res := netdataapi.FunctionResult{
-		UID:             fn.UID(),
-		ContentType:     "application/json",
-		Payload:         payload,
-		Code:            strconv.Itoa(code),
-		ExpireTimestamp: strconv.FormatInt(time.Now().Unix(), 10),
-	}
-	r.finalizeTerminal(fn.UID(), "dyncfg.responder.sendjsonwithcode", func() {
-		r.api.FUNCRESULT(res)
-	})
-}
-
 // SendYAML sends a YAML payload response
 func (r *Responder) SendYAML(fn Function, payload string) {
 	r.sendPayload(fn, payload, "application/yaml")
@@ -137,14 +112,4 @@ func (r *Responder) ConfigStatus(id string, status Status) {
 // ConfigDelete sends a CONFIG DELETE command
 func (r *Responder) ConfigDelete(id string) {
 	r.api.CONFIGDELETE(id)
-}
-
-// FunctionGlobal registers a global function with Netdata
-func (r *Responder) FunctionGlobal(opts netdataapi.FunctionGlobalOpts) {
-	r.api.FUNCTIONGLOBAL(opts)
-}
-
-// FunctionRemove removes a previously registered function from Netdata.
-func (r *Responder) FunctionRemove(name string) {
-	r.api.FUNCTIONREMOVE(name)
 }

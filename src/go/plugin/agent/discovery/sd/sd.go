@@ -66,7 +66,6 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 	}
 	d.sdCb = &sdCallbacks{sd: d}
 	d.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
-		Logger:    d.Logger,
 		API:       d.dyncfgApi,
 		Seen:      d.seen,
 		Exposed:   d.exposed,
@@ -75,8 +74,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 			return cfg.PipelineKey()
 		},
 
-		Path:           fmt.Sprintf(dyncfgSDPath, cfg.PluginName),
-		EnableFailCode: 422,
+		Path: fmt.Sprintf(dyncfgSDPath, cfg.PluginName),
 		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
@@ -125,18 +123,6 @@ type (
 	}
 )
 
-// SetDyncfgResponder allows overriding the default responder (e.g., to silence output in tests).
-func (d *ServiceDiscovery) SetDyncfgResponder(api *dyncfg.Responder) {
-	if api != nil && d.dyncfgApi != nil {
-		api.SetTerminalFinalizer(d.dyncfgApi.TerminalFinalizer())
-	}
-	dyncfg.BindResponder(&d.dyncfgApi, d.handler, api)
-}
-
-func (d *ServiceDiscovery) String() string {
-	return "service discovery"
-}
-
 func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	d.Info("instance is started")
 	defer func() { d.unregisterDyncfgTemplates(); d.Info("instance is stopped") }()
@@ -177,15 +163,13 @@ func (d *ServiceDiscovery) run(ctx context.Context) {
 	defer d.failPendingDyncfg()
 	for {
 		if d.handler.WaitingForDecision() {
-			step, ok := d.handler.NextWaitDecisionStep(ctx, d.dyncfgCh)
+			fn, ok := d.handler.NextWaitDecision(ctx, d.dyncfgCh)
 			if !ok {
 				return
 			}
-			if step.HasCommand {
-				d.dyncfgSeqExec(step.Command)
-				d.completeDyncfg(step.Command)
-				continue
-			}
+			d.dyncfgSeqExec(fn)
+			d.completeDyncfg(fn)
+			continue
 		} else {
 			select {
 			case <-ctx.Done():

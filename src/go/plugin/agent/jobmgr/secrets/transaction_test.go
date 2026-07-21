@@ -23,9 +23,8 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(
 	require.NoError(t, err)
 	catalog, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
-			Kind:        secretstore.KindVault,
-			DisplayName: "Vault",
-			Schema:      `{}`,
+			Kind:   secretstore.KindVault,
+			Schema: `{}`,
 			Create: func() secretstore.Store {
 				return &transactionTestStore{}
 			},
@@ -83,9 +82,8 @@ func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
 	store, err := secretstore.NewSecretStore(resolver)
 	require.NoError(t, err)
 	catalog, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
-		Kind:        secretstore.KindVault,
-		DisplayName: "Vault",
-		Schema:      `{}`,
+		Kind:   secretstore.KindVault,
+		Schema: `{}`,
 		Create: func() secretstore.Store {
 			return &transactionTestStore{}
 		},

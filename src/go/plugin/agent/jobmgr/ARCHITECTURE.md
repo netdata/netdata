@@ -162,9 +162,10 @@ flowchart TD
     class Admit,Lane,Claim,Complete,Frame,Dispose onloop;
 ```
 
-1. **Submit** (off-loop): an adapter validates a `Request`, plans the work, and
-   pushes it onto a submission queue, then wakes the loop. `command_ports.go`,
-   `kernel.go`.
+1. **Submit** (off-loop): an adapter validates a `Request`, attaches a prepared
+   Job Manager plan or submits an unresolved Function request, pushes it onto a
+   submission queue, and wakes the loop. `command_ports.go`,
+   `kernel_ingress.go`.
 2. **Admit** (on-loop): the loop dedupes the command's UID, charges a memory
    budget, resolves the route, derives the lane key, and installs the operation.
    Duplicate or over-budget commands are rejected here. `lifecycle/admission.go`,
@@ -204,7 +205,7 @@ flowchart TD
   deadline, the kernel only *cooperatively* cancels it; its claims, lane, and
   memory stay held until it actually returns, because a late return could still
   mutate that resource. Repeated overruns escalate to a fail-stop.
-  `kernel.go`.
+  `kernel_disposal.go` and `kernel_runloop.go`.
 
 Two more facts that catch newcomers:
 
@@ -457,7 +458,7 @@ crosses a reload.
 | `jobmgr` (root) | Command ports, the `CommandKernel` + `KernelLoop`, lanes, claims, composite child commands |
 | `jobmgr/lifecycle` | Neutral authorities: admission, UID, operation, task, frame, run, resource, transaction |
 | `jobmgr/functions` | Function stdin ingress, routing catalog, handler generations, publication to Netdata |
-| `jobmgr/joboutput` | Collector construction, job generations, output frames, DynCfg jobs, autodetection retries, vnode frames |
+| `jobmgr/joboutput` | Collector construction, job generations, output frames, DynCfg jobs, autodetection retries, vnode snapshots |
 | `jobmgr/secrets` | Secret dependency index, store command adapter, dependent-restart transaction |
 | `jobmgr/discovery` | Discovery add/remove decisions and the configured-vnode authority |
 | `jobmgr/composition` | The only assembler; process construction and run-generation rotation |
@@ -474,7 +475,7 @@ crosses a reload.
 The layering is enforced by `architecture_test.go`, not just convention:
 
 - **`lifecycle` is neutral.** It imports no sibling, no adapter, and no Agent or
-  collector package — only the standard library (and YAML). All domain policy
+  collector package — only the standard library. All domain policy
   (which bytes to charge, which frame is a keepalive, when to go dirty) is
   supplied by the caller.
 - **Adapters do not import each other.** `functions`, `joboutput`, `secrets`,
@@ -504,7 +505,7 @@ move an authority, that test is where the structure is asserted.
 - Change discovery add/remove decisions or configured vnodes:
   - `discovery/` (decision, vnode) and `composition/{discovery,vnodes}.go`.
 - Change the ordering model (lanes, claims, admission, deadlines):
-  - `kernel.go`, `claim_authority.go`, and `lifecycle/`.
+  - `kernel*.go`, `claim_authority.go`, and `lifecycle/`.
 - Change how the process is assembled, reloaded, or shut down:
   - `composition/` (process, run, public).
 - Add or move an authority:

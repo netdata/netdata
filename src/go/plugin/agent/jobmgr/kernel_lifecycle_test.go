@@ -91,7 +91,7 @@ func TestKernelLoopStartsExactlyOnce(t *testing.T) {
 		"nil context": {
 			run: func(t *testing.T) {
 				kernel, _ := newKernel(t)
-				loop, err := NewKernelLoop(kernel)
+				loop, err := NewKernelLoop(kernel.CommandKernel)
 				require.NoError(t, err)
 
 				require.Error(t, loop.Start(nil))
@@ -100,7 +100,7 @@ func TestKernelLoopStartsExactlyOnce(t *testing.T) {
 		"duplicate start": {
 			run: func(t *testing.T) {
 				kernel, _ := newKernel(t)
-				loop, err := NewKernelLoop(kernel)
+				loop, err := NewKernelLoop(kernel.CommandKernel)
 				require.NoError(t, err)
 
 				require.NoError(t, loop.Start(context.Background()))
@@ -115,9 +115,9 @@ func TestKernelLoopStartsExactlyOnce(t *testing.T) {
 		"duplicate wrappers": {
 			run: func(t *testing.T) {
 				kernel, _ := newKernel(t)
-				first, err := NewKernelLoop(kernel)
+				first, err := NewKernelLoop(kernel.CommandKernel)
 				require.NoError(t, err)
-				second, err := NewKernelLoop(kernel)
+				second, err := NewKernelLoop(kernel.CommandKernel)
 				require.NoError(t, err)
 
 				require.NoError(t, first.Start(context.Background()))
@@ -142,11 +142,11 @@ func TestKernelLoopStartsExactlyOnce(t *testing.T) {
 func TestKernelTerminalRejectsWithoutRetainingSubmissions(t *testing.T) {
 	tests := map[string]struct {
 		source lifecycle.Source
-		call   func(context.Context, *CommandKernel, int) error
+		call   func(context.Context, *testCommandKernel, int) error
 	}{
 		"command": {
 			source: lifecycle.SourceJobManager,
-			call: func(ctx context.Context, kernel *CommandKernel, index int) error {
+			call: func(ctx context.Context, kernel *testCommandKernel, index int) error {
 				return kernel.Submit(ctx, Request{
 					UID:     fmt.Sprintf("terminal-command-%d", index),
 					LaneKey: "lane",
@@ -157,7 +157,7 @@ func TestKernelTerminalRejectsWithoutRetainingSubmissions(t *testing.T) {
 		},
 		"control": {
 			source: lifecycle.SourceFunction,
-			call: func(ctx context.Context, kernel *CommandKernel, index int) error {
+			call: func(ctx context.Context, kernel *testCommandKernel, index int) error {
 				return kernel.Reject(ctx, fmt.Sprintf("terminal-control-%d", index), lifecycle.ControlBadRequest)
 			},
 		},
@@ -406,7 +406,7 @@ func TestFunctionCatalogDecisionOwnsExactLease(t *testing.T) {
 
 func TestFunctionHandlerCleanupRunsOffKernelLoop(t *testing.T) {
 	cleanupCompleted := make(chan error, 1)
-	var kernel *CommandKernel
+	var kernel *testCommandKernel
 	catalog := functionCatalogPortStub{
 		resolve: func(FunctionLookup) (FunctionCatalogDecision, error) {
 			return FunctionCatalogDecision{
@@ -2721,7 +2721,7 @@ func TestKernelRejectsMissingRunFinalizer(t *testing.T) {
 		run, admission, uids, tasks, frames, lifecycle.RealClock{},
 		make(chan lifecycle.AdmissionGrant, 1), nil,
 		newNoopRunShutdownBarrier(), nil,
-		planner, newTestFunctionCatalog(planner),
+		newTestFunctionCatalog(planner),
 	)
 	require.Error(t, newCommandKernelErr)
 
@@ -2826,7 +2826,7 @@ func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing
 	kernel, err := NewCommandKernel(
 		run, admission, uids, tasks, frames, lifecycle.RealClock{}, grants, nil,
 		newNoopRunShutdownBarrier(), newNoopRunFinalizer(),
-		planner, newTestFunctionCatalog(planner),
+		newTestFunctionCatalog(planner),
 	)
 	require.NoError(t, err)
 
@@ -2957,7 +2957,7 @@ func TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns(t *testing.T) {
 	}
 }
 
-func completeNoopShutdownBarrier(t *testing.T, kernel *CommandKernel) {
+func completeNoopShutdownBarrier(t *testing.T, kernel *testCommandKernel) {
 	t.Helper()
 	require.NoError(t, kernel.advanceShutdownBarrier())
 	kernel.serviceTaskStarts(1)
@@ -3606,7 +3606,7 @@ func TestKernelDeadlineServiceHasFixedQuantum(t *testing.T) {
 	require.False(t, kernel.serviceDeadlines(now, 4) || len(kernel.controls) != 9 || kernel.deadlines.Len() != 0)
 }
 
-func newStoppedKernel(t *testing.T) *CommandKernel {
+func newStoppedKernel(t *testing.T) *testCommandKernel {
 	t.Helper()
 	kernel, _ := newKernel(t)
 	startKernelLoop(t, kernel)
@@ -3617,39 +3617,39 @@ func newStoppedKernel(t *testing.T) *CommandKernel {
 	return kernel
 }
 
-func newKernel(t *testing.T) (*CommandKernel, *lifecycle.RunSupervisor) {
+func newKernel(t *testing.T) (*testCommandKernel, *lifecycle.RunSupervisor) {
 	t.Helper()
 	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	return kernel, run
 }
 
-func newKernelWithPlanner(t *testing.T, planner Planner) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithPlanner(t *testing.T, planner testPlanner) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithPlannerAndWriter(t, planner, io.Discard)
 }
 
-func newKernelWithPlannerAndTimeout(t *testing.T, planner Planner, timeout time.Duration) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithPlannerAndTimeout(t *testing.T, planner testPlanner, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithPlannerWriterAndTimeout(t, planner, io.Discard, timeout)
 }
 
-func newKernelWithPlannerAndWriter(t *testing.T, planner Planner, writer io.Writer) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithPlannerAndWriter(t *testing.T, planner testPlanner, writer io.Writer) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithPlannerWriterAndTimeout(t, planner, writer, lifecycle.DefaultShutdownTimeout)
 }
 
-func newKernelWithPlannerWriterAndTimeout(t *testing.T, planner Planner, writer io.Writer, timeout time.Duration) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithPlannerWriterAndTimeout(t *testing.T, planner testPlanner, writer io.Writer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithPlannerWriterFinalizerAndTimeout(t, planner, writer, newNoopRunFinalizer(), timeout)
 }
 
-func newKernelWithPlannerWriterFinalizerAndTimeout(t *testing.T, planner Planner, writer io.Writer, finalizer RunFinalizer, timeout time.Duration) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithPlannerWriterFinalizerAndTimeout(t *testing.T, planner testPlanner, writer io.Writer, finalizer RunFinalizer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithClockFinalizerAndTimeout(t, planner, writer, lifecycle.RealClock{}, finalizer, timeout)
 }
 
-func newKernelWithClockFinalizerAndTimeout(t *testing.T, planner Planner, writer io.Writer, clock lifecycle.Clock, finalizer RunFinalizer, timeout time.Duration) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithClockFinalizerAndTimeout(t *testing.T, planner testPlanner, writer io.Writer, clock lifecycle.Clock, finalizer RunFinalizer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	return newKernelWithClockFinalizerCatalogAndTimeout(
 		t, planner, newTestFunctionCatalog(planner), writer, clock, finalizer, timeout,
 	)
 }
 
-func newKernelWithClockFinalizerCatalogAndTimeout(t *testing.T, planner Planner, functionCatalog FunctionCatalogPort, writer io.Writer, clock lifecycle.Clock, finalizer RunFinalizer, timeout time.Duration) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+func newKernelWithClockFinalizerCatalogAndTimeout(t *testing.T, planner testPlanner, functionCatalog FunctionCatalogPort, writer io.Writer, clock lifecycle.Clock, finalizer RunFinalizer, timeout time.Duration) (*testCommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	t.Helper()
 	run, err := lifecycle.NewRunSupervisor(1, clock, timeout)
 	require.NoError(t, err)
@@ -3664,10 +3664,10 @@ func newKernelWithClockFinalizerCatalogAndTimeout(t *testing.T, planner Planner,
 		run, admission, uids, tasks, frames, clock,
 		make(chan lifecycle.AdmissionGrant, 1), nil,
 		newNoopRunShutdownBarrier(), finalizer,
-		planner, functionCatalog,
+		functionCatalog,
 	)
 	require.NoError(t, err)
-	return kernel, run, admission, uids, tasks
+	return &testCommandKernel{CommandKernel: kernel, planner: planner}, run, admission, uids, tasks
 }
 
 type kernelFinalizerClock struct {
@@ -3752,15 +3752,65 @@ func (fn plannerFunc) Plan(request Request) (WorkPlan, error) {
 	return fn(context.Background(), request.Route, request.Args)
 }
 
-func (ck *CommandKernel) prepareSubmissionPlanForTest(request Request) (WorkPlan, error) {
+type testPlanner interface {
+	Plan(Request) (WorkPlan, error)
+}
+
+type testCommandKernel struct {
+	*CommandKernel
+	planner testPlanner
+}
+
+func (tck *testCommandKernel) Submit(ctx context.Context, request Request) error {
+	if request.Source != lifecycle.SourceJobManager {
+		return tck.CommandKernel.Submit(ctx, request)
+	}
+	plan, err := tck.planner.Plan(request)
+	if err != nil {
+		return tck.abortRequestInputBodyWith(request, err)
+	}
+	return tck.CommandKernel.SubmitPrepared(ctx, request, plan)
+}
+
+func (tck *testCommandKernel) SubmitAndWait(ctx context.Context, request Request) error {
+	if request.Source != lifecycle.SourceJobManager {
+		return tck.CommandKernel.SubmitAndWait(ctx, request)
+	}
+	plan, err := tck.planner.Plan(request)
+	if err != nil {
+		return tck.abortRequestInputBodyWith(request, err)
+	}
+	return tck.CommandKernel.SubmitPreparedAndWait(ctx, request, plan)
+}
+
+func (tck *testCommandKernel) submit(
+	ctx context.Context,
+	request Request,
+	terminal chan error,
+) error {
+	if request.Source != lifecycle.SourceJobManager {
+		return tck.CommandKernel.submit(ctx, request, terminal)
+	}
+	plan, err := tck.planner.Plan(request)
+	if err != nil {
+		return tck.abortRequestInputBodyWith(request, err)
+	}
+	return tck.CommandKernel.submitPrepared(ctx, request, plan, terminal)
+}
+
+func (tck *testCommandKernel) prepareSubmissionPlanForTest(request Request) (WorkPlan, error) {
 	if request.Source == lifecycle.SourceFunction {
 		return WorkPlan{}, nil
 	}
-	return ck.prepareJobPlan(request)
+	plan, err := tck.planner.Plan(request)
+	if err != nil {
+		return WorkPlan{}, err
+	}
+	return prepareOwnedJobPlan(request, plan)
 }
 
 type testFunctionCatalog struct {
-	planner  Planner
+	planner  testPlanner
 	resource func(FunctionLookup) string
 	next     uint64
 	release  uint64
@@ -3819,7 +3869,7 @@ func (functionCatalogPortStub) LifecycleCensus() FunctionCatalogCensus {
 	return FunctionCatalogCensus{Closed: true}
 }
 
-func newTestFunctionCatalog(planner Planner) *testFunctionCatalog {
+func newTestFunctionCatalog(planner testPlanner) *testFunctionCatalog {
 	return &testFunctionCatalog{
 		planner: planner,
 		leases:  make(map[FunctionInvocationRef]struct{}),
@@ -3894,19 +3944,19 @@ func (*testFunctionCatalog) LifecycleCensus() FunctionCatalogCensus {
 	return FunctionCatalogCensus{Closed: true}
 }
 
-func setTestFunctionResource(t *testing.T, kernel *CommandKernel, resource func(FunctionLookup) string) {
+func setTestFunctionResource(t *testing.T, kernel *testCommandKernel, resource func(FunctionLookup) string) {
 	t.Helper()
 	testFunctionCatalogFor(t, kernel).resource = resource
 }
 
-func testFunctionCatalogFor(t *testing.T, kernel *CommandKernel) *testFunctionCatalog {
+func testFunctionCatalogFor(t *testing.T, kernel *testCommandKernel) *testFunctionCatalog {
 	t.Helper()
 	catalog, ok := kernel.functionCatalog.(*testFunctionCatalog)
 	require.True(t, ok)
 	return catalog
 }
 
-func kernelResourcePlanner(t *testing.T, resource *kernelTestReadyResource, workEntered chan<- struct{}, workRelease <-chan struct{}) Planner {
+func kernelResourcePlanner(t *testing.T, resource *kernelTestReadyResource, workEntered chan<- struct{}, workRelease <-chan struct{}) testPlanner {
 	t.Helper()
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
 	require.NoError(t, err)
@@ -4225,9 +4275,9 @@ func (stoppedKernelPlanner) Plan(Request) (WorkPlan, error) {
 	})}, nil
 }
 
-func startKernelLoop(t *testing.T, kernel *CommandKernel) {
+func startKernelLoop(t *testing.T, kernel *testCommandKernel) {
 	t.Helper()
-	loop, err := NewKernelLoop(kernel)
+	loop, err := NewKernelLoop(kernel.CommandKernel)
 	require.NoError(t, err)
 
 	require.NoError(t, loop.Start(context.Background()))

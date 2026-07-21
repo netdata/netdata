@@ -51,7 +51,7 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 		make(chan lifecycle.AdmissionGrant, 1), nil,
 		jobmgr.RunShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
 		jobmgr.RunFinalizerFunc(func(context.Context, uint64) error { return nil }),
-		externalPlanner{}, catalog,
+		catalog,
 	)
 	require.NoError(t, err)
 	loop, err := jobmgr.NewKernelLoop(kernel)
@@ -585,7 +585,7 @@ func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmg
 		make(chan lifecycle.AdmissionGrant, 1), nil,
 		jobmgr.RunShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
 		jobmgr.RunFinalizerFunc(func(context.Context, uint64) error { return nil }),
-		externalPlanner{}, catalog,
+		catalog,
 	)
 	require.NoError(t, err)
 	loop, err := jobmgr.NewKernelLoop(kernel)
@@ -596,16 +596,6 @@ func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmg
 	require.NoError(t, loop.Start(context.Background()))
 
 	return kernel, run, admission, uids
-}
-
-type externalPlanner struct{}
-
-func (externalPlanner) Plan(jobmgr.Request) (jobmgr.WorkPlan, error) {
-	return jobmgr.WorkPlan{
-		Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
-			return lifecycle.NewControlResult(lifecycle.ControlInternal)
-		}),
-	}, nil
 }
 
 func closeExternalUIDLedger(t *testing.T, ledger *lifecycle.UIDLedger) {

@@ -42,12 +42,21 @@ type processCoreConfig struct {
 	Jobs            runJobServices        // process-lifetime job services (resolver, catalogs, vnodes)
 	Secrets         runSecretServices     // process-lifetime secret services
 	Discovery       runDiscoveryServices  // discovery services (providers, build context)
-	Planner         runPlannerFactory     // run planner factory
 	FinalizeOutput  func()                // stops the runtime service at process teardown
 }
 
+type processRuntimeConfig struct {
+	ShutdownTimeout time.Duration
+	KeepAlive       bool
+	Modules         collectorapi.Registry
+	Jobs            runJobServices
+	Secrets         runSecretServices
+	Discovery       runDiscoveryServices
+	FinalizeOutput  func()
+}
+
 type processCore struct {
-	config processCoreConfig // process configuration
+	config processRuntimeConfig // retained process configuration
 
 	admission *lifecycle.AdmissionLedger      // process-lifetime admission ledger
 	uids      *lifecycle.UIDLedger            // process-lifetime UID ledger
@@ -71,8 +80,7 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		config.Jobs.Resolver == nil ||
 		config.Jobs.StoreCreators == nil ||
 		config.Jobs.Vnodes == nil ||
-		!config.Discovery.valid() ||
-		config.Planner == nil {
+		!config.Discovery.valid() {
 		return nil, errors.New("jobmgr composition: invalid process construction")
 	}
 	admission := lifecycle.NewAdmissionLedger()
@@ -100,8 +108,17 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		)
 	}
 	return &processCore{
-		config: config, admission: admission,
-		uids: lifecycle.NewUIDLedger(), frames: frames, ingress: ingress,
+		config: processRuntimeConfig{
+			ShutdownTimeout: config.ShutdownTimeout,
+			KeepAlive:       config.KeepAlive,
+			Modules:         config.Modules,
+			Jobs:            config.Jobs,
+			Secrets:         config.Secrets,
+			Discovery:       config.Discovery,
+			FinalizeOutput:  config.FinalizeOutput,
+		},
+		admission: admission,
+		uids:      lifecycle.NewUIDLedger(), frames: frames, ingress: ingress,
 	}, nil
 }
 
@@ -253,12 +270,10 @@ func (pc *processCore) newRun(
 ) (*runGeneration, error) {
 	return newRunGeneration(runGenerationConfig{
 		Generation: generation, ShutdownTimeout: pc.config.ShutdownTimeout,
-		Clock: lifecycle.RealClock{}, Admission: pc.admission,
-		UIDs: pc.uids, Frames: pc.frames,
+		Admission: pc.admission, UIDs: pc.uids, Frames: pc.frames,
 		Modules: pc.config.Modules, Jobs: pc.config.Jobs,
 		Secrets:   pc.config.Secrets,
 		Discovery: pc.config.Discovery,
-		Planner:   pc.config.Planner,
 	})
 }
 

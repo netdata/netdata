@@ -756,9 +756,8 @@ func (published generationTestPublished) Resolve(
 func newGenerationTestCatalog(t testing.TB) *CreatorCatalog {
 	t.Helper()
 	catalog, err := NewCreatorCatalog([]Creator{{
-		Kind:        KindVault,
-		DisplayName: "Vault",
-		Schema:      `{}`,
+		Kind:   KindVault,
+		Schema: `{}`,
 		Create: func() Store {
 			return &generationTestStore{}
 		},

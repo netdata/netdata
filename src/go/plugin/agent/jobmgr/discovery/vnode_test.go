@@ -69,13 +69,13 @@ func TestVNodeConfigAtomicRevisions(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			test.run(t, NewVNodeConfiguration())
+			test.run(t, newTestVNodeConfiguration(t))
 		})
 	}
 }
 
 func TestVNodeConfigCopiesMutableValues(t *testing.T) {
-	configuration := NewVNodeConfiguration()
+	configuration := newTestVNodeConfiguration(t)
 	input := testVNode("host", "source")
 	snapshot := commitVNode(t, configuration, "node", 0, input)
 	input.Labels["site"] = "mutated-input"
@@ -145,14 +145,14 @@ func TestVNodeConfigBounds(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := test.prepare(NewVNodeConfiguration())
+			err := test.prepare(newTestVNodeConfiguration(t))
 			require.ErrorIs(t, err, ErrVNodeCapacity)
 		})
 	}
 }
 
 func BenchmarkBVNodeConfigLookup(b *testing.B) {
-	configuration := NewVNodeConfiguration()
+	configuration := newTestVNodeConfiguration(b)
 	commitVNode(b, configuration, "node", 0, testVNode("host", "source"))
 	b.ReportAllocs()
 	for b.Loop() {
@@ -163,6 +163,13 @@ func BenchmarkBVNodeConfigLookup(b *testing.B) {
 type vnodeTesting interface {
 	require.TestingT
 	Helper()
+}
+
+func newTestVNodeConfiguration(t vnodeTesting) *VNodeConfiguration {
+	t.Helper()
+	configuration, err := NewVNodeConfigurationWithInitial(nil)
+	require.NoError(t, err)
+	return configuration
 }
 
 func commitVNode(

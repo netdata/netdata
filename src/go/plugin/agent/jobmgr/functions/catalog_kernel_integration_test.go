@@ -54,7 +54,6 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 		jobmgr.RunFinalizerFunc(
 			func(context.Context, uint64) error { return nil },
 		),
-		cleanupIntegrationPlanner{},
 		catalog,
 	)
 	require.NoError(t, err)
@@ -95,20 +94,6 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 	require.NoError(t, admission.CloseDrained(run.Generation()))
 
 	closeCleanupIntegrationUIDs(t, uids)
-}
-
-type cleanupIntegrationPlanner struct{}
-
-func (cleanupIntegrationPlanner) Plan(
-	jobmgr.Request,
-) (jobmgr.WorkPlan, error) {
-	return jobmgr.WorkPlan{
-		Work: lifecycle.FrameTaskWork(
-			func(context.Context) (lifecycle.SealedResult, error) {
-				return lifecycle.NewControlResult(lifecycle.ControlInternal)
-			},
-		),
-	}, nil
 }
 
 func closeCleanupIntegrationUIDs(

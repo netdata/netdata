@@ -141,7 +141,6 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 	}
 	sd.sdCb = &sdCallbacks{sd: sd}
 	sd.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
-		Logger:    sd.Logger,
 		API:       sd.dyncfgApi,
 		Seen:      sd.seen,
 		Exposed:   sd.exposed,
@@ -150,8 +149,7 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 			return cfg.PipelineKey()
 		},
 
-		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
-		EnableFailCode: 422,
+		Path: fmt.Sprintf(dyncfgSDPath, testPluginName),
 		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,

@@ -5,8 +5,8 @@ package composition
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -24,6 +24,43 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
+	modules := collectorapi.Registry{
+		"z-module": {},
+		"single-module": {
+			InstancePolicy: collectorapi.InstancePolicySingle,
+		},
+		"a-module": {},
+	}
+	var output bytes.Buffer
+	frames, err := lifecycle.NewFrameOwner(&output)
+	require.NoError(t, err)
+	admission := lifecycle.NewAdmissionLedger()
+	uids := lifecycle.NewUIDLedger()
+	generation, err := newRunGeneration(runGenerationConfig{
+		Generation: 7, ShutdownTimeout: time.Second,
+		Admission: admission, UIDs: uids, Frames: frames,
+		Modules: modules, Jobs: testRunJobServices(t),
+		Discovery: testRunDiscoveryServices(t),
+	})
+	require.NoError(t, err)
+	require.NoError(t, generation.start(t.Context()))
+
+	wire := output.String()
+	aTemplate := "CONFIG go.d:collector:a-module create accepted template"
+	zTemplate := "CONFIG go.d:collector:z-module create accepted template"
+	aAt := strings.Index(wire, aTemplate)
+	zAt := strings.Index(wire, zTemplate)
+	require.False(t, aAt < 0 || zAt < 0 || aAt >= zAt, "wire=%q", wire)
+	require.NotContains(t, wire, "CONFIG go.d:collector:single-module create")
+	require.EqualValues(t, 7, generation.run.Generation())
+
+	generation.Stop()
+	require.NoError(t, generation.Wait(context.Background()))
+	require.NoError(t, admission.CloseDrained(7))
+	closeRunTestUIDs(t, uids)
+}
 
 func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(
 	t *testing.T,
@@ -78,18 +115,9 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(
 			uids := lifecycle.NewUIDLedger()
 			generation, err := newRunGeneration(runGenerationConfig{
 				Generation: 1, ShutdownTimeout: 10 * time.Second,
-				Clock: lifecycle.RealClock{}, Admission: admission, UIDs: uids,
+				Admission: admission, UIDs: uids,
 				Frames: frames, Modules: modules, Jobs: jobs,
 				Discovery: testRunDiscoveryServices(t, configs...),
-				Planner: func(
-					runPlannerCapabilities,
-				) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-					return runRejectingPlanner{},
-						jobmgr.RunFinalizerFunc(
-							func(context.Context, uint64) error { return nil },
-						),
-						nil
-				},
 			})
 			require.NoError(t, err)
 			if err := generation.start(context.Background()); err != nil {
@@ -98,7 +126,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(
 			}
 
 			require.Eventually(t, func() bool {
-				return len(generation.graph.IDs()) == test.jobs &&
+				return len(generation.vnodes.graph.IDs()) == test.jobs &&
 					generation.tasks.LongLivedCensus().Active == test.jobs+1
 			}, 10*time.Second, 10*time.Millisecond)
 
@@ -154,18 +182,10 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
 		Generation: 1, ShutdownTimeout: time.Second,
-		Clock: lifecycle.RealClock{}, Admission: admission, UIDs: uids,
+		Admission: admission, UIDs: uids,
 		Frames: frames, Modules: modules,
 		Jobs:      testRunJobServices(t),
 		Discovery: testRunDiscoveryServices(t),
-		Planner: func(runPlannerCapabilities) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(func(context.Context, uint64) error {
-					record("finalizer")
-					return nil
-				}),
-				nil
-		},
 	})
 	require.NoError(t, err)
 
@@ -183,7 +203,7 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 	eventsMu.Lock()
 	got := append([]string(nil), events...)
 	eventsMu.Unlock()
-	want := []string{"publish", "result", "withdraw", "cleanup", "finalizer"}
+	want := []string{"publish", "result", "withdraw", "cleanup"}
 	require.EqualValues(t, len(want), len(got))
 	for index := range want {
 		require.EqualValues(t, want[index], got[index])
@@ -192,31 +212,6 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 	require.NoError(t, admission.CloseDrained(1))
 
 	closeRunTestUIDs(t, uids)
-}
-
-func TestRunGenerationConstructionFailureClosesSecretStore(t *testing.T) {
-	var storeCensus func() secretstore.SecretStoreCensus
-	plannerErr := errors.New("planner construction failed")
-	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-	require.NoError(t, err)
-
-	generation, err := newRunGeneration(runGenerationConfig{
-		Generation: 1, ShutdownTimeout: time.Second,
-		Clock: lifecycle.RealClock{}, Admission: lifecycle.NewAdmissionLedger(),
-		UIDs: lifecycle.NewUIDLedger(), Frames: frames,
-		Modules: collectorapi.Registry{}, Jobs: testRunJobServices(t),
-		Discovery: testRunDiscoveryServices(t),
-		Planner: func(
-			capabilities runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			storeCensus = capabilities.StoreCensus
-			return nil, nil, plannerErr
-		},
-	})
-	require.ErrorIs(t, err, plannerErr)
-	require.Nil(t, generation)
-	require.NotNil(t, storeCensus)
-	require.True(t, storeCensus().Closed)
 }
 
 func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
@@ -261,25 +256,15 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
 		Generation: 1, ShutdownTimeout: time.Second,
-		Clock: lifecycle.RealClock{}, Admission: admission, UIDs: uids,
+		Admission: admission, UIDs: uids,
 		Frames: frames, Modules: modules, Jobs: jobs,
 		Discovery: testRunDiscoveryServicesAccepted(t, config),
-		Planner: func(
-			capabilities runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			require.NotNil(t, capabilities.Graph)
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(
-					func(context.Context, uint64) error { return nil },
-				),
-				nil
-		},
 	})
 	require.NoError(t, err)
 
 	require.NoError(t, generation.start(context.Background()))
 	require.Eventually(t, func() bool {
-		record, ok := generation.graph.Lookup(config.FullName())
+		record, ok := generation.vnodes.graph.Lookup(config.FullName())
 		return ok && record.Status == dyncfg.StatusAccepted.String()
 	}, time.Second, time.Millisecond)
 
@@ -297,7 +282,7 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	),
 	)
 
-	record, ok := generation.graph.Lookup("module_job")
+	record, ok := generation.vnodes.graph.Lookup("module_job")
 	require.False(t, !ok || record.Status != dyncfg.StatusRunning.String())
 	wire := output.String()
 	resultAt := bytes.Index(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN enable 200 application/json"))
@@ -369,23 +354,14 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
 		Generation: 1, ShutdownTimeout: time.Second,
-		Clock: lifecycle.RealClock{}, Admission: admission, UIDs: uids,
+		Admission: admission, UIDs: uids,
 		Frames: frames, Modules: modules, Jobs: jobs,
 		Discovery: testRunDiscoveryServicesAccepted(t, config),
-		Planner: func(
-			runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(
-					func(context.Context, uint64) error { return nil },
-				),
-				nil
-		},
 	})
 	require.NoError(t, err)
 	require.NoError(t, generation.start(context.Background()))
 	require.Eventually(t, func() bool {
-		record, ok := generation.graph.Lookup(config.FullName())
+		record, ok := generation.vnodes.graph.Lookup(config.FullName())
 		return ok && record.Status == dyncfg.StatusAccepted.String()
 	}, time.Second, time.Millisecond)
 
@@ -580,12 +556,6 @@ func (*runTestHandler) Handle(
 
 func (rth *runTestHandler) Cleanup(context.Context) {
 	rth.cleanup()
-}
-
-type runRejectingPlanner struct{}
-
-func (runRejectingPlanner) Plan(jobmgr.Request) (jobmgr.WorkPlan, error) {
-	return jobmgr.RejectionPlan(lifecycle.ControlBadRequest), nil
 }
 
 func TestCloseProcessUIDsObservesShutdownContextBetweenBatches(t *testing.T) {

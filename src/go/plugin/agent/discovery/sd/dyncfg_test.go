@@ -116,14 +116,12 @@ func (s *dyncfgSim) run(t *testing.T) {
 	}
 	sd.sdCb = &sdCallbacks{sd: sd}
 	sd.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
-		Logger:    sd.Logger,
 		API:       sd.dyncfgApi,
 		Seen:      sd.seen,
 		Exposed:   sd.exposed,
 		Callbacks: sd.sdCb,
 
-		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
-		EnableFailCode: 422,
+		Path: fmt.Sprintf(dyncfgSDPath, testPluginName),
 		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,

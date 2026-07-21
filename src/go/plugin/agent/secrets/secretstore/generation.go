@@ -65,7 +65,6 @@ type StoreGeneration struct {
 	generation uint64
 	config     Config
 	hash       uint64
-	status     StoreStatus
 	published  PublishedStore
 	carrier    GenerationCarrier
 	readers    int
@@ -139,22 +138,19 @@ func (store *SecretStore) Generation(key string) uint64 {
 	return record.current.generation
 }
 
-func (store *SecretStore) Config(key string) (Config, StoreStatus, bool) {
+func (store *SecretStore) Config(key string) (Config, bool) {
 	if store == nil {
-		return nil, StoreStatus{}, false
+		return nil, false
 	}
 	store.mu.Lock()
 	record := store.records[key]
 	if record == nil || record.current == nil {
 		store.mu.Unlock()
-		return nil, StoreStatus{}, false
+		return nil, false
 	}
 	config := record.current.config
-	status := record.current.status
 	store.mu.Unlock()
-	return cloneConfig(config),
-		cloneStoreStatus(status),
-		true
+	return cloneConfig(config), true
 }
 
 // Retire removes the matching current generation from admission and releases

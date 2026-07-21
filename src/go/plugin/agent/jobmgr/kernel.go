@@ -268,7 +268,6 @@ type CommandKernel struct {
 	ownershipChains          int                                             // count of protected ownership chains still running
 	shutdownLaneCursor       *commandLane                                    // cursor sweeping lanes to stop during shutdown
 	shutdownLanesDone        bool                                            // shutdown lane sweep finished
-	jobPlanner               Planner                                         // source-specific Job Manager command planner
 	functionCatalog          FunctionCatalogPort                             // Function catalog port (routing + census)
 	inputBodyGrants          chan<- lifecycle.AdmissionGrant                 // channel delivering input-body growth grants
 	admissionServiceGate     <-chan struct{}                                 // test-only seam to pause admission grant servicing
@@ -278,11 +277,11 @@ type CommandKernel struct {
 	functionOperations       int                                             // count of active Function operations
 }
 
-func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.AdmissionLedger, uids *lifecycle.UIDLedger, tasks *lifecycle.TaskSupervisor, frames *lifecycle.FrameOwner, clock lifecycle.Clock, inputBodyGrants chan<- lifecycle.AdmissionGrant, admissionServiceGate <-chan struct{}, shutdownBarrier RunShutdownBarrier, finalizer RunFinalizer, jobPlanner Planner, functionCatalog FunctionCatalogPort) (*CommandKernel, error) {
+func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.AdmissionLedger, uids *lifecycle.UIDLedger, tasks *lifecycle.TaskSupervisor, frames *lifecycle.FrameOwner, clock lifecycle.Clock, inputBodyGrants chan<- lifecycle.AdmissionGrant, admissionServiceGate <-chan struct{}, shutdownBarrier RunShutdownBarrier, finalizer RunFinalizer, functionCatalog FunctionCatalogPort) (*CommandKernel, error) {
 	if run == nil || admission == nil || uids == nil || tasks == nil || frames == nil || clock == nil || inputBodyGrants == nil || shutdownBarrier == nil || finalizer == nil {
 		return nil, errors.New("jobmgr kernel: incomplete lifecycle capabilities")
 	}
-	if jobPlanner == nil || functionCatalog == nil {
+	if functionCatalog == nil {
 		return nil, errors.New("jobmgr kernel: incomplete command planning ports")
 	}
 	kernel := &CommandKernel{
@@ -318,7 +317,6 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		admissionServiceGate:    admissionServiceGate,
 		shutdownBarrier:         shutdownBarrier,
 		finalizer:               finalizer,
-		jobPlanner:              jobPlanner,
 		functionCatalog:         functionCatalog,
 		laneSlots:               []*commandLane{nil},
 	}

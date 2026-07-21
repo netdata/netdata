@@ -13,13 +13,10 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
 )
 
@@ -71,9 +68,8 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	}
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
-			Kind:        secretstore.KindVault,
-			DisplayName: "Vault",
-			Schema:      `{}`,
+			Kind:   secretstore.KindVault,
+			Schema: `{}`,
 			Create: func() secretstore.Store {
 				return &processSecretStore{}
 			},
@@ -91,7 +87,6 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
-	var graph *dyncfg.Graph
 	process, err := newProcessCore(processCoreConfig{
 		Input: reader, Output: output,
 		ShutdownTimeout: time.Second,
@@ -100,16 +95,6 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 			Initial: []secretstore.Config{initialStore},
 		},
 		Discovery: testRunDiscoveryServices(t, jobConfig),
-		Planner: func(
-			capabilities runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			graph = capabilities.Graph
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(
-					func(context.Context, uint64) error { return nil },
-				),
-				nil
-		},
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -123,7 +108,7 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	case err := <-done:
 		require.FailNowf(t, "test failed", "process stopped before initial collector start: %v; output=%q", err, output.String())
 	case <-time.After(3 * time.Second):
-		require.FailNowf(t, "test failed", "collector did not start with initial secret; graph=%v output=%q", graph.IDs(), output.String())
+		require.FailNowf(t, "test failed", "collector did not start with initial secret; output=%q", output.String())
 	}
 
 	_, writeStringErr := io.WriteString(
@@ -208,9 +193,8 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 	}
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
-			Kind:        secretstore.KindVault,
-			DisplayName: "Vault",
-			Schema:      `{}`,
+			Kind:   secretstore.KindVault,
+			Schema: `{}`,
 			Create: func() secretstore.Store {
 				return &processSecretStore{}
 			},
@@ -228,10 +212,6 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
-	var storeScope func(
-		[]string,
-	) (secretresolver.AtomicScope, error)
-	var storeCensus func() secretstore.SecretStoreCensus
 	process, err := newProcessCore(processCoreConfig{
 		Input: reader, Output: output,
 		ShutdownTimeout: time.Second,
@@ -240,17 +220,6 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 			Initial: []secretstore.Config{initialStore},
 		},
 		Discovery: testRunDiscoveryServices(t, jobConfig),
-		Planner: func(
-			capabilities runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			storeScope = capabilities.StoreScope
-			storeCensus = capabilities.StoreCensus
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(
-					func(context.Context, uint64) error { return nil },
-				),
-				nil
-		},
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -291,20 +260,6 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 	waitSecretStart(t, starts, "replacement")
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel 499 application/json")
 
-	key := secretstore.StoreKey(secretstore.KindVault, "main")
-	scope, err := storeScope([]string{key})
-	require.NoError(t, err)
-	value, resolveErr := scope.Resolve(t.Context(), key, "key")
-	releaseErr := scope.Release(t.Context())
-	require.False(t, resolveErr != nil || releaseErr != nil || string(value) != "replacement")
-
-	census := storeCensus()
-	require.False(t, census.Current != 1 ||
-		census.Generations != 1 ||
-		census.Preparations != 0 ||
-		census.Readers != 0 ||
-		census.Scopes != 0)
-
 	require.EqualValues(t, 1, cleanups.Load())
 
 	commands <- testProcessControl(processTerminate)
@@ -322,9 +277,8 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	var err error
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
-			Kind:        secretstore.KindVault,
-			DisplayName: "Vault",
-			Schema:      `{}`,
+			Kind:   secretstore.KindVault,
+			Schema: `{}`,
 			Create: func() secretstore.Store {
 				return &processSecretStore{}
 			},
@@ -340,15 +294,6 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		ShutdownTimeout: time.Second,
 		Modules:         collectorapi.Registry{}, Jobs: jobs,
 		Discovery: testRunDiscoveryServices(t),
-		Planner: func(
-			runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(
-					func(context.Context, uint64) error { return nil },
-				),
-				nil
-		},
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -476,9 +421,8 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 	}
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
-			Kind:        secretstore.KindVault,
-			DisplayName: "Vault",
-			Schema:      `{}`,
+			Kind:   secretstore.KindVault,
+			Schema: `{}`,
 			Create: func() secretstore.Store {
 				return &processSecretStore{}
 			},
@@ -495,7 +439,6 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
-	var graph *dyncfg.Graph
 	process, err := newProcessCore(processCoreConfig{
 		Input: reader, Output: output,
 		ShutdownTimeout: time.Second,
@@ -504,16 +447,6 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 			Initial: []secretstore.Config{initialStore},
 		},
 		Discovery: testRunDiscoveryServices(t, jobConfig),
-		Planner: func(
-			capabilities runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			graph = capabilities.Graph
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(
-					func(context.Context, uint64) error { return nil },
-				),
-				nil
-		},
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -551,17 +484,12 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 
 	waitActiveUIDs(t, process.uids, 2)
 
-	_, exists := graph.Lookup("module_other")
-	require.False(t, exists)
-
 	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN job-add")
 
 	releaseOnce.Do(func() { close(releaseRestart) })
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-rotation 200 application/json")
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN job-add 202 application/json")
-
-	lookupRecord, lookupExists := graph.Lookup("module_other")
-	require.False(t, !lookupExists || lookupRecord.Status != dyncfg.StatusAccepted.String())
+	output.waitContains(t, "CONFIG go.d:collector:module:other create accepted job")
 
 	commands <- testProcessControl(processTerminate)
 	select {

@@ -196,16 +196,18 @@ func (ck *CommandKernel) submitWithPlan(
 			),
 		)
 	}
+	if !prepared && request.Source != lifecycle.SourceFunction {
+		return ck.abortRequestInputBodyWith(
+			request,
+			errors.New(
+				"jobmgr kernel: Job Manager commands require prepared plans",
+			),
+		)
+	}
 	request.Args = slices.Clone(request.Args)
 	if prepared {
 		var err error
 		plan, err = prepareOwnedJobPlan(request, plan)
-		if err != nil {
-			return ck.abortRequestInputBodyWith(request, err)
-		}
-	} else if request.Source == lifecycle.SourceJobManager {
-		var err error
-		plan, err = ck.prepareJobPlan(request)
 		if err != nil {
 			return ck.abortRequestInputBodyWith(request, err)
 		}

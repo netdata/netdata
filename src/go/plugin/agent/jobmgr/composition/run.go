@@ -24,14 +24,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
-type runPlannerFactory func(runPlannerCapabilities) (jobmgr.Planner, jobmgr.RunFinalizer, error)
-
-type runPlannerCapabilities struct {
-	Graph       *dyncfg.Graph                                      // dyncfg graph
-	StoreScope  func([]string) (secretresolver.AtomicScope, error) // secret store scope acquirer
-	StoreCensus func() secretstore.SecretStoreCensus               // secret store census accessor
-}
-
 type runJobServices struct {
 	PluginName    string                         // owning plugin name
 	Defaults      confgroup.Registry             // per-module config defaults
@@ -46,35 +38,24 @@ type runSecretServices struct {
 	Initial []secretstore.Config
 }
 
-type autoDetectionRetryWorker interface {
-	StopAutoDetectionRetries()
-	WaitAutoDetectionRetries(context.Context) error
-	AutoDetectionRetriesJoined() bool
-}
-
 type runGenerationConfig struct {
-	Generation           uint64                     // this run's generation number
-	ShutdownTimeout      time.Duration              // per-run shutdown budget
-	Clock                lifecycle.Clock            // logical/real clock
-	Admission            *lifecycle.AdmissionLedger // process-lifetime admission ledger
-	UIDs                 *lifecycle.UIDLedger       // process-lifetime UID ledger
-	Frames               *lifecycle.FrameOwner      // the one frame writer
-	Modules              collectorapi.Registry      // collector module registry
-	Jobs                 runJobServices             // job services
-	Secrets              runSecretServices          // secret services
-	Discovery            runDiscoveryServices       // discovery services
-	AdmissionServiceGate <-chan struct{}            // test-only seam to pause admission grant servicing
-	Planner              runPlannerFactory          // run planner factory
+	Generation      uint64                     // this run's generation number
+	ShutdownTimeout time.Duration              // per-run shutdown budget
+	Admission       *lifecycle.AdmissionLedger // process-lifetime admission ledger
+	UIDs            *lifecycle.UIDLedger       // process-lifetime UID ledger
+	Frames          *lifecycle.FrameOwner      // the one frame writer
+	Modules         collectorapi.Registry      // collector module registry
+	Jobs            runJobServices             // job services
+	Secrets         runSecretServices          // secret services
+	Discovery       runDiscoveryServices       // discovery services
 }
 
 type runGeneration struct {
 	run               *lifecycle.RunSupervisor       // run supervisor for this generation
 	tasks             *lifecycle.TaskSupervisor      // task supervisor
 	functions         *FunctionAssembly              // Function assembly (catalog + controller + publication)
-	scheduler         *joboutput.Scheduler           // tick + retry scheduler (same object as retryWorker)
-	retryWorker       autoDetectionRetryWorker       // autodetection retry worker (the scheduler via a narrow interface)
+	scheduler         *joboutput.Scheduler           // tick + retry scheduler
 	dyncfg            *joboutput.DynCfgJobController // dyncfg job controller
-	graph             *dyncfg.Graph                  // dyncfg config graph
 	secrets           *secretadapter.Controller      // secret store controller
 	vnodes            *vnodeBinding                  // dyncfg vnode binding
 	discovery         runDiscoveryServices           // discovery services
@@ -121,7 +102,6 @@ func newRunGeneration(
 	}()
 	if config.Generation == 0 ||
 		config.ShutdownTimeout <= 0 ||
-		config.Clock == nil ||
 		config.Admission == nil ||
 		config.UIDs == nil ||
 		config.Frames == nil ||
@@ -131,13 +111,12 @@ func newRunGeneration(
 		config.Jobs.Resolver == nil ||
 		config.Jobs.StoreCreators == nil ||
 		config.Jobs.Vnodes == nil ||
-		!config.Discovery.valid() ||
-		config.Planner == nil {
+		!config.Discovery.valid() {
 		return nil, errors.New("jobmgr composition: invalid run construction")
 	}
 	run, err := lifecycle.NewRunSupervisor(
 		config.Generation,
-		config.Clock,
+		lifecycle.RealClock{},
 		config.ShutdownTimeout,
 	)
 	if err != nil {
@@ -317,23 +296,6 @@ func newRunGeneration(
 	if err := dynCfgBinding.bind(dynCfgJobs); err != nil {
 		return nil, err
 	}
-	planner, finalizer, err := config.Planner(runPlannerCapabilities{
-		Graph: graph,
-		StoreScope: func(keys []string) (secretresolver.AtomicScope, error) {
-			return acquireRunOwnedStoreScope(
-				run,
-				stores,
-				keys,
-			)
-		},
-		StoreCensus: stores.Census,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if planner == nil || finalizer == nil {
-		return nil, errors.New("jobmgr composition: planner factory returned incomplete ports")
-	}
 	inputBodyGrants := make(chan lifecycle.AdmissionGrant, 1)
 	kernel, err := jobmgr.NewCommandKernel(
 		run,
@@ -341,16 +303,14 @@ func newRunGeneration(
 		config.UIDs,
 		tasks,
 		config.Frames,
-		config.Clock,
+		lifecycle.RealClock{},
 		inputBodyGrants,
-		config.AdmissionServiceGate,
+		nil,
 		functions,
 		joinedRunFinalizer{
 			functions: functions,
 			secrets:   secretController,
-			next:      finalizer,
 		},
-		planner,
 		functions.Catalog(),
 	)
 	if err != nil {
@@ -379,9 +339,7 @@ func newRunGeneration(
 		tasks:             tasks,
 		functions:         functions,
 		dyncfg:            dynCfgJobs,
-		graph:             graph,
 		scheduler:         scheduler,
-		retryWorker:       scheduler,
 		secrets:           secretController,
 		vnodes:            vnodeBinding,
 		discovery:         config.Discovery,
@@ -508,7 +466,7 @@ func (rg *runGeneration) abortConstruction() error {
 
 func (rg *runGeneration) Stop() {
 	if rg != nil && rg.kernel != nil {
-		rg.retryWorker.StopAutoDetectionRetries()
+		rg.scheduler.StopAutoDetectionRetries()
 		rg.kernel.Stop()
 	}
 }
@@ -520,11 +478,11 @@ func (rg *runGeneration) Wait(ctx context.Context) error {
 	waitErr := rg.kernel.Wait(ctx)
 	select {
 	case <-rg.kernel.Done():
-		rg.retryWorker.StopAutoDetectionRetries()
+		rg.scheduler.StopAutoDetectionRetries()
 	default:
 	}
-	retryErr := rg.retryWorker.WaitAutoDetectionRetries(ctx)
-	retryJoined := rg.retryWorker.AutoDetectionRetriesJoined()
+	retryErr := rg.scheduler.WaitAutoDetectionRetries(ctx)
+	retryJoined := rg.scheduler.AutoDetectionRetriesJoined()
 	select {
 	case <-rg.kernel.Done():
 		if !retryJoined {
@@ -559,7 +517,6 @@ func (rg *runGeneration) releaseRuntimeMetrics() error {
 type joinedRunFinalizer struct {
 	functions *FunctionAssembly
 	secrets   *secretadapter.Controller
-	next      jobmgr.RunFinalizer
 }
 
 func (jrf joinedRunFinalizer) FinalizeRun(
@@ -567,13 +524,11 @@ func (jrf joinedRunFinalizer) FinalizeRun(
 	generation uint64,
 ) error {
 	if jrf.functions == nil ||
-		jrf.secrets == nil ||
-		jrf.next == nil {
+		jrf.secrets == nil {
 		return errors.New("jobmgr composition: incomplete run finalizer")
 	}
 	return errors.Join(
 		jrf.functions.FinalizeRun(ctx, generation),
 		jrf.secrets.Close(ctx),
-		jrf.next.FinalizeRun(ctx, generation),
 	)
 }

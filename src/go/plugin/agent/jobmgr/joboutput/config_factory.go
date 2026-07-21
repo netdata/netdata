@@ -22,7 +22,6 @@ type ConfigModuleFactoryConfig struct {
 	Modules    ModuleCatalog                      // registry of module creators to look up by name
 	Resolver   *secretresolver.AtomicResolver     // resolves secret references in a config
 	StoreScope secretresolver.AtomicScopeAcquirer // acquires the reader scope for secret resolution
-	Logger     *logger.Logger                     // base logger for the throwaway probe module
 }
 
 type configModule interface {
@@ -37,6 +36,7 @@ type configModule interface {
 // Every constructed module is cleaned before the call returns.
 type ConfigModuleFactory struct {
 	config ConfigModuleFactoryConfig
+	logger *logger.Logger
 }
 
 func NewConfigModuleFactory(
@@ -49,12 +49,12 @@ func NewConfigModuleFactory(
 			"job output: incomplete config-module factory configuration",
 		)
 	}
-	if config.Logger == nil {
-		config.Logger = logger.New().With(
+	return &ConfigModuleFactory{
+		config: config,
+		logger: logger.New().With(
 			slog.String("component", "config module factory"),
-		)
-	}
-	return &ConfigModuleFactory{config: config}, nil
+		),
+	}, nil
 }
 
 func (cmf *ConfigModuleFactory) Configuration(
@@ -121,7 +121,7 @@ func (cmf *ConfigModuleFactory) Test(
 	if err := cmf.applyResolved(ctx, config, probe.module); err != nil {
 		return err
 	}
-	probe.module.GetBase().Logger = cmf.config.Logger.With(
+	probe.module.GetBase().Logger = cmf.logger.With(
 		slog.String("collector", config.Module()),
 		slog.String("job", config.Name()),
 	)

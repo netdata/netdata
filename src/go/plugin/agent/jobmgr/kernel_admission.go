@@ -12,14 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
-func (ck *CommandKernel) prepareJobPlan(request Request) (WorkPlan, error) {
-	plan, err := ck.jobPlanner.Plan(request)
-	if err != nil {
-		return WorkPlan{}, err
-	}
-	return prepareOwnedJobPlan(request, plan)
-}
-
 func prepareOwnedJobPlan(request Request, plan WorkPlan) (WorkPlan, error) {
 	plan.Claims = slices.Clone(plan.Claims)
 	plan.ReadClaims = slices.Clone(plan.ReadClaims)

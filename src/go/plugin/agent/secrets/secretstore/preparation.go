@@ -15,7 +15,6 @@ type preparedStore struct {
 	key        string
 	rawConfig  Config
 	configHash uint64
-	status     StoreStatus
 	published  PublishedStore
 }
 
@@ -50,7 +49,6 @@ func preparePublishedConfig(
 	}
 
 	kind := raw.Kind()
-	name := raw.Name()
 	key := raw.ExposedKey()
 
 	store, ok := newStore(kind)
@@ -89,10 +87,6 @@ func preparePublishedConfig(
 		key:        key,
 		rawConfig:  rawConfig,
 		configHash: rawHash,
-		status: StoreStatus{
-			Name: name,
-			Kind: kind,
-		},
-		published: published,
+		published:  published,
 	}, nil
 }

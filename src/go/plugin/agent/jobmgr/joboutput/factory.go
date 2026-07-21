@@ -65,13 +65,13 @@ type FactoryConfig struct {
 	Hooks      JobHooks                                      // handler-lifecycle preparation for Function-bearing jobs
 	Scheduler  *Scheduler                                    // tick/registration scheduler
 	Observer   lifecycle.RuntimeObserver                     // runtime gauge sink
-	Logger     *logger.Logger                                // component logger (defaulted if nil)
 }
 
 // Factory owns collector construction, validation, and transfer. It does not
 // own current-job indexing or lifecycle state.
 type Factory struct {
 	config FactoryConfig
+	logger *logger.Logger
 }
 
 func NewFactory(config FactoryConfig) (*Factory, error) {
@@ -85,10 +85,10 @@ func NewFactory(config FactoryConfig) (*Factory, error) {
 		config.Scheduler == nil {
 		return nil, errors.New("job output: incomplete factory configuration")
 	}
-	if config.Logger == nil {
-		config.Logger = logger.New().With(slog.String("component", "job factory"))
-	}
-	return &Factory{config: config}, nil
+	return &Factory{
+		config: config,
+		logger: logger.New().With(slog.String("component", "job factory")),
+	}, nil
 }
 
 func (f *Factory) ValidateConfig(
@@ -124,7 +124,6 @@ func (f *Factory) ValidateConfig(
 		ConfigModuleFactoryConfig{
 			Modules: f.config.Modules, Resolver: f.config.Resolver,
 			StoreScope: f.config.StoreScope,
-			Logger:     f.config.Logger,
 		},
 	)
 	if err != nil {
@@ -413,7 +412,7 @@ func (f *Factory) applyConfig(
 ) error {
 	resolveCtx := logger.ContextWithLogger(
 		ctx,
-		f.config.Logger.With(
+		f.logger.With(
 			slog.String("collector", config.Module()),
 			slog.String("job", config.Name()),
 		),

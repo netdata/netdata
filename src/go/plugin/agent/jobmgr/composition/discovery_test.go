@@ -232,8 +232,8 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
 		Generation: 1, ShutdownTimeout: time.Second,
-		Clock: lifecycle.RealClock{}, Admission: admission,
-		UIDs: uids, Frames: frames,
+		Admission: admission,
+		UIDs:      uids, Frames: frames,
 		Modules: collectorapi.Registry{},
 		Jobs:    testRunJobServices(t),
 		Discovery: runDiscoveryServices{
@@ -241,17 +241,6 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 				Registry: confgroup.Registry{"test": {}},
 			},
 			Providers: catalog,
-		},
-		Planner: func(
-			runPlannerCapabilities,
-		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			return runRejectingPlanner{},
-				jobmgr.RunFinalizerFunc(
-					func(context.Context, uint64) error {
-						return nil
-					},
-				),
-				nil
 		},
 	})
 	require.NoError(t, err)

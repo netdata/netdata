@@ -13,21 +13,14 @@ import (
 )
 
 type (
-	PlatformPolicy struct {
-		IsInsideK8s bool
-	}
 	PluginIdentity struct {
 		Name string
 	}
 	PathsConfig struct {
-		PluginConfigDir           multipath.MultiPath
-		CollectorsConfigDir       multipath.MultiPath
 		CollectorsConfigWatchPath []string
 		ServiceDiscoveryConfigDir multipath.MultiPath
-		VarLibDir                 string
 	}
 	BuildContext struct {
-		Policy     PlatformPolicy
 		RunMode    policy.RunModePolicy
 		Identity   PluginIdentity
 		Out        io.Writer

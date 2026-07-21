@@ -132,10 +132,6 @@ func TestProviderSchemaAndValidationParity(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			displayName, ok := catalog.DisplayName(tc.kind)
-			require.True(t, ok)
-			assert.NotEmpty(t, displayName)
-
 			schema, ok := catalog.Schema(tc.kind)
 			require.True(t, ok)
 			schemaObj := decodeProviderSchema(t, schema)

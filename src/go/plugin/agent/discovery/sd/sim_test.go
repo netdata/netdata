@@ -66,14 +66,12 @@ func (sim *discoverySimExt) run(t *testing.T) {
 	}
 	mgr.sdCb = &sdCallbacks{sd: mgr}
 	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
-		Logger:    mgr.Logger,
 		API:       mgr.dyncfgApi,
 		Seen:      mgr.seen,
 		Exposed:   mgr.exposed,
 		Callbacks: mgr.sdCb,
 
-		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
-		EnableFailCode: 422,
+		Path: fmt.Sprintf(dyncfgSDPath, testPluginName),
 		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
@@ -143,14 +141,12 @@ func (sim *discoverySim) run(t *testing.T) {
 	}
 	mgr.sdCb = &sdCallbacks{sd: mgr}
 	mgr.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
-		Logger:    mgr.Logger,
 		API:       mgr.dyncfgApi,
 		Seen:      mgr.seen,
 		Exposed:   mgr.exposed,
 		Callbacks: mgr.sdCb,
 
-		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
-		EnableFailCode: 422,
+		Path: fmt.Sprintf(dyncfgSDPath, testPluginName),
 		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,

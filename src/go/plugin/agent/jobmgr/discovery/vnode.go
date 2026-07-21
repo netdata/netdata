@@ -66,17 +66,11 @@ type preparedVNodeState struct {
 	newRecord bool                     // the edit creates a new vnode
 }
 
-func NewVNodeConfiguration() *VNodeConfiguration {
-	return &VNodeConfiguration{
+func NewVNodeConfigurationWithInitial(initial map[string]*vnodes.VirtualNode) (*VNodeConfiguration, error) {
+	configuration := &VNodeConfiguration{
 		records: make(map[string]vnodeRecord),
 		pending: make(map[string]*preparedVNodeState),
 	}
-}
-
-func NewVNodeConfigurationWithInitial(
-	initial map[string]*vnodes.VirtualNode,
-) (*VNodeConfiguration, error) {
-	configuration := NewVNodeConfiguration()
 	ids := slices.Sorted(maps.Keys(initial))
 	for _, id := range ids {
 		vnode := initial[id]
@@ -88,9 +82,7 @@ func NewVNodeConfigurationWithInitial(
 			vnode.Name = id
 		}
 		if vnode.Name != id {
-			return nil, errors.New(
-				"vnode configuration: initial identity differs from map key",
-			)
+			return nil, errors.New("vnode configuration: initial identity differs from map key")
 		}
 		prepared, err := configuration.PrepareUpsert(id, 0, vnode)
 		if err != nil {

@@ -151,7 +151,3 @@ func (wp WorkPlan) validate() error {
 	}
 	return nil
 }
-
-type Planner interface {
-	Plan(Request) (WorkPlan, error)
-}

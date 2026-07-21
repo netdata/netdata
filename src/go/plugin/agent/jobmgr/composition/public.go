@@ -13,7 +13,6 @@ import (
 	"time"
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -163,7 +162,6 @@ func NewProcess(config Config) (*Process, error) {
 			RunJob:       slices.Clone(config.RunJob),
 			AutoEnable:   config.AutoEnable,
 		},
-		Planner:        productionPlanner,
 		FinalizeOutput: finalizeOutput,
 	})
 	if err != nil {
@@ -278,24 +276,6 @@ func cloneSecretConfigs(
 		cloned[index] = clone
 	}
 	return cloned, nil
-}
-
-func productionPlanner(
-	runPlannerCapabilities,
-) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-	return productionRejectingPlanner{},
-		jobmgr.RunFinalizerFunc(
-			func(context.Context, uint64) error { return nil },
-		),
-		nil
-}
-
-type productionRejectingPlanner struct{}
-
-func (productionRejectingPlanner) Plan(
-	jobmgr.Request,
-) (jobmgr.WorkPlan, error) {
-	return jobmgr.RejectionPlan(lifecycle.ControlBadRequest), nil
 }
 
 type processFrameWriter struct {

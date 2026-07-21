@@ -74,7 +74,7 @@ func compositeParentTestPlan(
 
 func stopCompositeTestKernel(
 	t *testing.T,
-	kernel *CommandKernel,
+	kernel *testCommandKernel,
 ) {
 	t.Helper()
 	kernel.Stop()

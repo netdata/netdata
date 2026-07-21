@@ -325,7 +325,7 @@ func (c *Controller) entry(
 	defer c.mu.Unlock()
 	entry, ok := c.entries[key]
 	if ok {
-		entry.config, _, _ = c.store.Config(key)
+		entry.config, _ = c.store.Config(key)
 		if entry.config == nil {
 			entry.config = cloneSecretConfig(
 				c.entries[key].config,

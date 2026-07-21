@@ -216,27 +216,30 @@ func TestProductionOwnerManifestHasConcreteDeclarations(t *testing.T) {
 func TestCommandKernelRoutesOperationActionsThroughOwnershipGate(
 	t *testing.T,
 ) {
-	path := filepath.Join(jobmgrSourceRoot(t), "kernel.go")
-	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	files, err := productionGoFiles(jobmgrSourceRoot(t))
 	require.NoError(t, err)
 
 	directSenders := make(map[string]int)
-	for _, declaration := range file.Decls {
-		function, ok := declaration.(*ast.FuncDecl)
-		if !ok || function.Body == nil {
-			continue
-		}
-		ast.Inspect(function.Body, func(node ast.Node) bool {
-			call, ok := node.(*ast.CallExpr)
-			if !ok {
+	for _, path := range files {
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		require.NoError(t, err)
+		for _, declaration := range file.Decls {
+			function, ok := declaration.(*ast.FuncDecl)
+			if !ok || function.Body == nil {
+				continue
+			}
+			ast.Inspect(function.Body, func(node ast.Node) bool {
+				call, ok := node.(*ast.CallExpr)
+				if !ok {
+					return true
+				}
+				selector, ok := call.Fun.(*ast.SelectorExpr)
+				if ok && selector.Sel.Name == "SendAction" {
+					directSenders[function.Name.Name]++
+				}
 				return true
-			}
-			selector, ok := call.Fun.(*ast.SelectorExpr)
-			if ok && selector.Sel.Name == "SendAction" {
-				directSenders[function.Name.Name]++
-			}
-			return true
-		})
+			})
+		}
 	}
 
 	require.Equal(t, map[string]int{
@@ -299,7 +302,6 @@ func assertExactJobManagerTree(t *testing.T) {
 		"kernel_prepared_wait_test.go":             {},
 		"kernel_testhelpers_test.go":               {},
 		"lifecycle":                                {},
-		"plan.go":                                  {},
 		"production_boundaries_test.go":            {},
 		"secrets":                                  {},
 		"testdata":                                 {},
@@ -840,7 +842,7 @@ func TestProductionConstructionGuardRejectsAdversarialSources(t *testing.T) {
 			source: `package composition
 				import "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 				func construct() {
-					_, _ = jobmgr.NewCommandKernel(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+					_, _ = jobmgr.NewCommandKernel(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 				}`,
 			contract: constructionContract{commandKernel: 1},
 		},
@@ -1366,26 +1368,27 @@ func TestWorkPlanCannotCarryKernelLoopAbandonCallback(t *testing.T) {
 	require.False(t, found)
 }
 
-func TestCommandKernelUsesSourceSpecificPlanningPorts(t *testing.T) {
+func TestCommandKernelUsesOnlyFunctionCatalogPlanningPort(t *testing.T) {
 	constructor := reflect.ValueOf(jobmgr.NewCommandKernel).Type()
-	planner := reflect.TypeFor[jobmgr.Planner]()
 	functionCatalog := reflect.TypeFor[jobmgr.FunctionCatalogPort]()
-	require.False(t, constructor.NumIn() < 2 ||
-		constructor.In(constructor.NumIn()-2) != planner ||
+	require.False(t, constructor.NumIn() == 0 ||
 		constructor.In(constructor.NumIn()-1) != functionCatalog)
 	for in := range constructor.Ins() {
 		require.NotEqualValues(t, reflect.Map, in.Kind())
 	}
 
-	data, err := os.ReadFile(filepath.Join(jobmgrSourceRoot(t), "kernel.go"))
+	files, err := productionGoFiles(jobmgrSourceRoot(t))
 	require.NoError(t, err)
-	source := string(data)
-	for _, forbidden := range []string{
-		"map[lifecycle.Source]Planner",
-		"planners[request.Source]",
-		"preparePlan(request Request)",
-	} {
-		require.NotContains(t, source, forbidden)
+	for _, path := range files {
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		for _, forbidden := range []string{
+			"type Planner interface",
+			"jobPlanner",
+			"prepareJobPlan",
+		} {
+			require.NotContains(t, string(data), forbidden, "file=%s", path)
+		}
 	}
 }
 

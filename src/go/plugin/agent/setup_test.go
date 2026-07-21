@@ -286,7 +286,6 @@ func TestAgent_buildDiscoveryConf(t *testing.T) {
 		}
 
 		cfg := a.buildDiscoveryConf(enabled)
-		assert.True(t, cfg.BuildContext.Policy.IsInsideK8s)
 		assert.Empty(t, cfg.Providers)
 	})
 
@@ -297,7 +296,6 @@ func TestAgent_buildDiscoveryConf(t *testing.T) {
 		}
 
 		cfg := a.buildDiscoveryConf(enabled)
-		assert.False(t, cfg.BuildContext.Policy.IsInsideK8s)
 		assert.Len(t, cfg.Providers, 1)
 	})
 }

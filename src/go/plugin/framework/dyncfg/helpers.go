@@ -10,15 +10,3 @@ func WrapHandler(handler func(Function)) func(functions.Function) {
 		handler(NewFunction(fn))
 	}
 }
-
-// BindResponder swaps a component responder and keeps handler API in sync.
-func BindResponder[C Config](dst **Responder, handler *Handler[C], responder *Responder) {
-	if responder == nil {
-		// Nil means "keep the current responder" rather than clearing output wiring.
-		return
-	}
-	*dst = responder
-	if handler != nil {
-		handler.SetAPI(responder)
-	}
-}

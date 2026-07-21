@@ -468,7 +468,6 @@ func (store *SecretStore) commitPreparation(
 		generation: nextGeneration,
 		config:     cloneConfig(slot.prepared.rawConfig),
 		hash:       slot.prepared.configHash,
-		status:     cloneStoreStatus(slot.prepared.status),
 		published:  slot.prepared.published,
 		carrier:    slot.carrier,
 	}

@@ -19,7 +19,7 @@ func TestSubmitPreparedAndWaitReturnsCleanTransactionPreparationError(t *testing
 		t,
 		stoppedKernelPlanner{},
 	)
-	loop, err := NewKernelLoop(kernel)
+	loop, err := NewKernelLoop(kernel.CommandKernel)
 	require.NoError(t, err)
 	require.NoError(t, loop.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
@@ -56,7 +56,7 @@ func TestSubmitPreparedAndWaitReturnsCleanTransactionPreparationError(t *testing
 
 func TestSubmitPreparedPreservesStoppingRejectionWithoutInputBodyCleanup(t *testing.T) {
 	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	loop, err := NewKernelLoop(kernel)
+	loop, err := NewKernelLoop(kernel.CommandKernel)
 	require.NoError(t, err)
 	require.NoError(t, loop.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
@@ -88,7 +88,7 @@ func TestSubmitPreparedPreservesStoppingRejectionWithoutInputBodyCleanup(t *test
 
 func TestSubmitPreparedAndWaitDirtiesRunForRetainedTransactionPreparation(t *testing.T) {
 	kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	loop, err := NewKernelLoop(kernel)
+	loop, err := NewKernelLoop(kernel.CommandKernel)
 	require.NoError(t, err)
 	require.NoError(t, loop.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
@@ -126,18 +126,18 @@ func TestSubmitPreparedAndWaitDirtiesRunForRetainedTransactionPreparation(t *tes
 
 func TestKernelDoesNotCancelStartedTransactionAction(t *testing.T) {
 	tests := map[string]struct {
-		trigger      func(*testing.T, *CommandKernel)
+		trigger      func(*testing.T, *testCommandKernel)
 		stopAfterRun bool
 	}{
 		"user cancellation": {
-			trigger: func(t *testing.T, kernel *CommandKernel) {
+			trigger: func(t *testing.T, kernel *testCommandKernel) {
 				t.Helper()
 				require.NoError(t, kernel.Cancel(context.Background(), "atomic-action"))
 			},
 			stopAfterRun: true,
 		},
 		"shutdown": {
-			trigger: func(_ *testing.T, kernel *CommandKernel) {
+			trigger: func(_ *testing.T, kernel *testCommandKernel) {
 				kernel.Stop()
 			},
 		},
@@ -145,7 +145,7 @@ func TestKernelDoesNotCancelStartedTransactionAction(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-			loop, err := NewKernelLoop(kernel)
+			loop, err := NewKernelLoop(kernel.CommandKernel)
 			require.NoError(t, err)
 			require.NoError(t, loop.Start(t.Context()))
 			require.NoError(t, run.OpenAdmission())
@@ -191,7 +191,7 @@ func TestKernelShutdownBudgetBoundsProtectedOwnershipAction(t *testing.T) {
 		stoppedKernelPlanner{},
 		20*time.Millisecond,
 	)
-	loop, err := NewKernelLoop(kernel)
+	loop, err := NewKernelLoop(kernel.CommandKernel)
 	require.NoError(t, err)
 	require.NoError(t, loop.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
@@ -250,7 +250,7 @@ func TestKernelShutdownDrainsAcceptStartBeforeInheritedSeal(t *testing.T) {
 		t,
 		stoppedKernelPlanner{},
 	)
-	loop, err := NewKernelLoop(kernel)
+	loop, err := NewKernelLoop(kernel.CommandKernel)
 	require.NoError(t, err)
 	require.NoError(t, loop.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
@@ -351,7 +351,7 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 			newNoopRunFinalizer(),
 			3*time.Second,
 		)
-	loop, err := NewKernelLoop(kernel)
+	loop, err := NewKernelLoop(kernel.CommandKernel)
 	require.NoError(t, err)
 	require.NoError(t, loop.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
@@ -444,7 +444,7 @@ type shutdownActionMutation struct{}
 func (shutdownActionMutation) FunctionCatalogMutation() {}
 
 type shutdownActionMutationTransaction struct {
-	kernel  *CommandKernel
+	kernel  *testCommandKernel
 	entered chan<- struct{}
 	release <-chan struct{}
 	scope   lifecycle.ResourceTransactionScope
@@ -719,14 +719,14 @@ func (iarr *inheritedActivationReadyResource) stopInherited(
 func TestKernelDisposesResourcePreparedAfterCancellationCut(t *testing.T) {
 	tests := map[string]struct {
 		suffix   string
-		trigger  func(*testing.T, *CommandKernel, string)
+		trigger  func(*testing.T, *testCommandKernel, string)
 		shutdown bool
 	}{
 		"explicit cancellation": {
 			suffix: "cancel",
 			trigger: func(
 				t *testing.T,
-				kernel *CommandKernel,
+				kernel *testCommandKernel,
 				uid string,
 			) {
 				t.Helper()
@@ -740,7 +740,7 @@ func TestKernelDisposesResourcePreparedAfterCancellationCut(t *testing.T) {
 			suffix: "shutdown",
 			trigger: func(
 				t *testing.T,
-				kernel *CommandKernel,
+				kernel *testCommandKernel,
 				_ string,
 			) {
 				t.Helper()
@@ -761,7 +761,7 @@ func TestKernelDisposesResourcePreparedAfterCancellationCut(t *testing.T) {
 				t,
 				stoppedKernelPlanner{},
 			)
-			loop, err := NewKernelLoop(kernel)
+			loop, err := NewKernelLoop(kernel.CommandKernel)
 			require.NoError(t, err)
 			require.NoError(t, loop.Start(t.Context()))
 			require.NoError(t, run.OpenAdmission())
@@ -975,7 +975,7 @@ func TestShutdownCancellationPreservesGenerationStoppingCause(t *testing.T) {
 		t,
 		stoppedKernelPlanner{},
 	)
-	loop, err := NewKernelLoop(kernel)
+	loop, err := NewKernelLoop(kernel.CommandKernel)
 	require.NoError(t, err)
 	require.NoError(t, loop.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
@@ -1116,7 +1116,7 @@ func TestShutdownPreparationCancellationDoesNotDirtyResourceOrCapability(t *test
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			kernel, run, _, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-			loop, err := NewKernelLoop(kernel)
+			loop, err := NewKernelLoop(kernel.CommandKernel)
 			require.NoError(t, err)
 			require.NoError(t, loop.Start(t.Context()))
 			require.NoError(t, run.OpenAdmission())
@@ -1163,7 +1163,7 @@ func TestSubmitPreparedAndWaitJoinsAcceptedCancellation(t *testing.T) {
 		t,
 		stoppedKernelPlanner{},
 	)
-	loop, err := NewKernelLoop(kernel)
+	loop, err := NewKernelLoop(kernel.CommandKernel)
 	require.NoError(t, err)
 
 	require.NoError(t, loop.Start(t.Context()))

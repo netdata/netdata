@@ -58,8 +58,6 @@ func TestSchedulerTicksEachJobAndModuleOnce(t *testing.T) {
 		),
 		)
 	}
-	require.Equal(t, 0, schedulerJobCount(scheduler))
-
 	require.NoError(t, scheduler.Tick(context.Background(), 8))
 
 	for name, job := range jobs {
@@ -120,7 +118,10 @@ func TestSchedulerGrowsBeyondFormerActiveJobLimit(t *testing.T) {
 
 				jobs = append(jobs, job)
 			}
-			require.Equal(t, test.population, schedulerJobCount(scheduler))
+			require.NoError(t, scheduler.Tick(context.Background(), 1))
+			for _, job := range jobs {
+				require.EqualValues(t, 1, job.ticks, "job=%s", job.id)
+			}
 			for _, job := range jobs {
 				require.NoError(t, scheduler.Unregister(
 					lifecycle.ResourceIdentity{
@@ -131,14 +132,12 @@ func TestSchedulerGrowsBeyondFormerActiveJobLimit(t *testing.T) {
 				),
 				)
 			}
+			require.NoError(t, scheduler.Tick(context.Background(), 2))
+			for _, job := range jobs {
+				require.EqualValues(t, 1, job.ticks, "job=%s", job.id)
+			}
 		})
 	}
-}
-
-func schedulerJobCount(scheduler *Scheduler) int {
-	scheduler.mu.Lock()
-	defer scheduler.mu.Unlock()
-	return len(scheduler.jobs)
 }
 
 type schedulerTestJob struct {

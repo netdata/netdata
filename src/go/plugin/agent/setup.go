@@ -100,20 +100,14 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry) discoverySetup
 	cfg := discoverySetup{
 		Defaults: reg,
 		BuildContext: discovery.BuildContext{
-			Policy: discovery.PlatformPolicy{
-				IsInsideK8s: a.IsInsideK8s,
-			},
 			RunMode: a.runModePolicy,
 			Identity: discovery.PluginIdentity{
 				Name: a.Name,
 			},
 			Out: a.Out,
 			Paths: discovery.PathsConfig{
-				PluginConfigDir:           a.ConfigDir,
-				CollectorsConfigDir:       a.CollectorsConfDir,
 				CollectorsConfigWatchPath: watchPaths,
 				ServiceDiscoveryConfigDir: sdConfDir,
-				VarLibDir:                 a.VarLibDir,
 			},
 			Registry:   reg,
 			ReadPaths:  readPaths,
