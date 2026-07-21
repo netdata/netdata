@@ -1,0 +1,93 @@
+* Tue Apr 07 2026 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-40
+- Make the scripts plugin a recommended dependency of the agent package
+* Tue Feb 10 2026 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-39
+- Add scripts plugin
+- Add new otel-signal-viewer plugin
+- Add back systemd-journal plugin with journal-viewer plugin as a transitional package
+* Tue Nov 11 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-37
+- Update to use sysusers infrastructure when available.
+* Fri Oct 24 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-36
+- Add proper cleanup of auto-update configuration on uninstall
+* Tue Sep 30 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-35
+- Add IBM plugin
+* Tue Jul 29 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-34
+- Add OpenTelemetry plugin
+* Tue Jul 15 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-33
+- Fix file handling for systemd-journal and systemd-units plugins
+* Tue May 27 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-32
+- Correctly handle systmed-units plugin as it’s own package
+* Fri Mar 21 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-31
+- Exclude build directory from install to make openSUSE happy
+* Tue Jan 28 2025 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-30
+- Removed lm_sensors dependency for plugin-go package
+* Thu Aug 29 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-29
+- Split dashboard to it’s own package
+* Fri Jul 19 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-28
+- Fix dependency issues with old logs-management plugin
+* Tue Jul 16 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-27
+- Removed logs-management plugin
+* Wed Jul 03 2024 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-26
+- Added lm_sensors as weak dependency for plugin-go package
+* Tue Feb 06 2024 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-25
+- Add package for network-viewer plugin
+* Thu Oct 26 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-24
+- Add package for logs-management plugin
+* Tue Sep 19 2023 Austin hemmelgarn <austin@netdata.cloud> 0.0.0-24
+- Switch to using cmake for builds.
+* Mon Aug 28 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-23
+- Build go.d.plugin natively for CentOS Stream distro
+* Mon Aug 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-22
+- Explicitly depend on version-matched plugins in native packages
+* Thu Aug 03 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-21
+- Added systemd-journal plugin handling
+* Wed Jun 14 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-20
+- Added eBPF build dependency (again)
+* Fri Apr 07 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-19
+- Split additional plugins out in their own packages.
+* Tue Mar 21 2023 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-18
+- Fix systemd handling to follow BCP.
+- Drop pre-systemd init support.
+* Thu Feb 16 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-17
+- Added eBPF build dependency
+* Thu Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
+- Bundle updater script in native packages.
+* Mon Oct 11 2021 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-15
+- Remove support code for legacy ACLK implementation.
+* Wed Sep 16 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-14
+- Convert to using 'AutoReq: yes' for library dependencies.
+* Thu Feb 13 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-13
+- Add handling for custom libmosquitto fork
+* Wed Jan 01 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-12
+- Add explicit installation of log and cache directories
+- Clean up build dependencies.
+* Thu Dec 19 2019 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-11
+- Fix remaining ownership and permissions issues.
+* Mon Nov 04 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-10
+- Fix /etc/netdata permissions
+* Mon Sep 23 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-9
+- Do not build CUPS plugin subpackage on CentOS 6 and CentOS 7
+* Tue Aug 20 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-8
+- Split CUPS functionality on separate package
+* Fri Jun 28 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-7
+- Raise the path overrides to the spec file level, not just the configure.
+- Adjust tighter permissions on some folders, based on what we did on our installer
+- Introduce go.d plugin download and install, to include it on the package (Temporarily, to become separate package on next iteration)
+* Tue Jun 25 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-6
+- Adjust dependency list: Some packages are missing on some distros, adopt to build successfully
+* Mon Jun 24 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-5
+Another pass on cleaning up pre/post installation steps
+- Sync permission and ownership on files and directories
+* Sun Jun 16 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-4
+First draft refactor on package dependencies section
+- Remove freeipmi/nfacct plugin flags. We auto-detect all plugins by decision
+- Start refactor of package dependencies
+- Add missing dependencies, with respect to distro peculiarities
+- Adjust existing dependencies, so that distro-specific package names is applied
+* Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-3
+- Temporary set version statically
+- Fix changelog ordering
+- Comment-out node.d configuration directory
+* Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-2
+- Fix permissions for log files
+* Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
+- Initial add.
