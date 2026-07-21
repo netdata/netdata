@@ -5,6 +5,76 @@
 
 struct registry registry;
 
+FILE *registry_fopen_regular(const char *filename, const char *mode) {
+    int flags;
+    bool truncate = false;
+
+    if(strcmp(mode, "r") == 0)
+        flags = O_RDONLY;
+    else if(strcmp(mode, "a") == 0)
+        flags = O_WRONLY | O_APPEND | O_CREAT;
+    else if(strcmp(mode, "w") == 0) {
+        flags = O_WRONLY | O_CREAT;
+        truncate = true;
+    }
+    else {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    struct stat st;
+    if(stat(filename, &st) == 0) {
+        if(!S_ISREG(st.st_mode)) {
+            errno = EINVAL;
+            return NULL;
+        }
+    }
+    else if(errno != ENOENT)
+        return NULL;
+
+    int fd = open(filename, flags | O_NONBLOCK, 0666);
+    if(fd == -1)
+        return NULL;
+
+    if(fstat(fd, &st) != 0) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if(!S_ISREG(st.st_mode)) {
+        close(fd);
+        errno = EINVAL;
+        return NULL;
+    }
+
+    int status_flags = fcntl(fd, F_GETFL);
+    if(status_flags == -1 || fcntl(fd, F_SETFL, status_flags & ~O_NONBLOCK) != 0) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    FILE *fp = fdopen(fd, mode);
+    if(!fp) {
+        int saved_errno = errno;
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if(truncate && ftruncate(fd, 0) != 0) {
+        int saved_errno = errno;
+        fclose(fp);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    return fp;
+}
+
 // ----------------------------------------------------------------------------
 // common functions
 
@@ -28,11 +98,10 @@ int regenerate_guid(const char *guid, char *result) {
     return 0;
 }
 
-// make sure the names of the machines / URLs do not contain any tabs
-// (which are used as our separator in the database files)
+// make sure values do not contain whitespace separators used by the database files
 // and are properly trimmed (before and after)
-static inline char *registry_fix_machine_name(char *name, size_t *len) {
-    char *s = name?name:"";
+static inline char *registry_fix_string(char *value, size_t *len, size_t max_length) {
+    char *s = value ? value : "";
 
     // skip leading spaces
     while(*s && isspace((uint8_t)*s)) s++;
@@ -54,24 +123,26 @@ static inline char *registry_fix_machine_name(char *name, size_t *len) {
             break;
     }
 
+    size_t length = t - s;
+    if(length > max_length) {
+        length = max_length;
+        while(length && s[length - 1] == ' ')
+            length--;
+        s[length] = '\0';
+    }
+
     if(likely(len))
-        *len = (t - s);
+        *len = length;
 
     return s;
 }
 
+char *registry_fix_machine_name(char *name, size_t *len) {
+    return registry_fix_string(name, len, registry.max_name_length);
+}
+
 static inline char *registry_fix_url(char *url, size_t *len) {
-    size_t l = 0;
-    char *s = registry_fix_machine_name(url, &l);
-
-    // protection from too big URLs
-    if(l > registry.max_url_length) {
-        l = registry.max_url_length;
-        s[l] = '\0';
-    }
-
-    if(len) *len = l;
-    return s;
+    return registry_fix_string(url, len, registry.max_url_length);
 }
 
 
@@ -193,16 +264,19 @@ REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_
 
     STRING *d_url = string_strdupz(delete_url);
     REGISTRY_PERSON_URL *dpu = registry_person_url_index_find(p, d_url);
-    string_freez(d_url);
 
     if(!dpu) {
         netdata_log_info("Registry Delete Request: URL not found for person: '%s', machine '%s', url '%s', delete url '%s'", p->guid
              , m->guid, string2str(pu->url), delete_url);
+        string_freez(d_url);
         return NULL;
     }
 
-    registry_log('D', p, m, pu->url, string2str(dpu->url));
+    STRING *request_url = string_dup(pu->url);
     registry_person_unlink_from_url(p, dpu);
+    registry_log('D', p, m, request_url, string2str(d_url));
+    string_freez(request_url);
+    string_freez(d_url);
 
     return p;
 }

@@ -350,7 +350,7 @@ typedef struct query_target {
 
     struct {
         time_t now;                         // the current timestamp, the absolute max for any query timestamp
-        bool relative;                      // true when the request made with relative timestamps, true if it was absolute
+        bool relative;                      // true when the request was made with relative timestamps
         bool aligned;
         time_t after;                       // the absolute timestamp this query is about
         time_t before;                      // the absolute timestamp this query is about

@@ -39,9 +39,7 @@ REGISTRY_PERSON_URL *registry_person_url_allocate(REGISTRY_PERSON *p, REGISTRY_M
 
     REGISTRY_PERSON_URL *pu = aral_mallocz(registry.person_urls_aral);
 
-    // a simple strcpy() should do the job,
-    // but I prefer to be safe, since the caller specified name_len
-    pu->machine_name = string_strdupz(machine_name);
+    pu->machine_name = string_strndupz(machine_name, machine_name_len);
 
     pu->machine = m;
     pu->first_t = pu->last_t = (uint32_t)when;

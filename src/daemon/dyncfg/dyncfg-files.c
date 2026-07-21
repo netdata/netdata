@@ -67,6 +67,17 @@ void dyncfg_file_save(const char *id, DYNCFG *df) {
     fclose(fp);
 }
 
+bool dyncfg_file_read_payload(FILE *fp, BUFFER *payload, size_t expected_size) {
+    buffer_flush(payload);
+    buffer_need_bytes(payload, expected_size);
+
+    size_t read_size = fread(payload->buffer, 1, expected_size, fp);
+    payload->len = read_size;
+    payload->buffer[read_size] = '\0';
+
+    return read_size == expected_size && !ferror(fp);
+}
+
 void dyncfg_file_load(const char *d_name) {
     char filename[PATH_MAX];
     snprintf(filename, sizeof(filename), "%s/%s", dyncfg_globals.dir, d_name);
@@ -146,6 +157,14 @@ void dyncfg_file_load(const char *d_name) {
         }
     }
 
+    if(ferror(fp)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "DYNCFG: failed while reading metadata from file '%s'. Ignoring it.", filename);
+        fclose(fp);
+        dyncfg_cleanup(&tmp);
+        return;
+    }
+
     if (read_payload) {
         // Determine the actual size of the remaining file content
         int rc = 0;
@@ -194,13 +213,20 @@ void dyncfg_file_load(const char *d_name) {
         tmp.dyncfg.payload = buffer_create(actual_size, NULL);
         tmp.dyncfg.payload->content_type = content_type;
 
-        buffer_need_bytes(tmp.dyncfg.payload, actual_size);
-        tmp.dyncfg.payload->len = fread(tmp.dyncfg.payload->buffer, 1, actual_size, fp);
+        if(!dyncfg_file_read_payload(fp, tmp.dyncfg.payload, actual_size)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "DYNCFG: failed to read the complete payload from file '%s': expected %zu bytes, read %zu, stream error: %s. Ignoring it.",
+                   filename, actual_size, (size_t)tmp.dyncfg.payload->len, ferror(fp) ? "yes" : "no");
+
+            fclose(fp);
+            dyncfg_cleanup(&tmp);
+            return;
+        }
 
         if (content_length != tmp.dyncfg.payload->len) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "DYNCFG: content_length %zu does not match actual payload size %zu for file '%s'",
-                   content_length, actual_size, filename);
+                   content_length, (size_t)tmp.dyncfg.payload->len, filename);
         }
     }
 
