@@ -357,11 +357,7 @@ By default, Netdata's StatsD listener binds only to `localhost`, so it accepts m
    	bind to = udp:0.0.0.0:8125 tcp:0.0.0.0:8125
    ```
 
-3. Restart Netdata so the new binding takes effect:
-
-   ```bash
-   sudo systemctl restart netdata
-   ```
+3. [Restart](/docs/netdata-agent/start-stop-restart.md) the Agent so the new binding takes effect.
 
 4. On the sending machine, point your application's StatsD client at the Netdata host's IP address and port `8125`, using either UDP or TCP. For client library examples, see [Using StatsD with Different Languages](#using-statsd-with-different-languages).
 
