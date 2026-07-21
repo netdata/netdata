@@ -1038,6 +1038,11 @@ sidebar:
       edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/README.md
     items:
       - meta:
+          label: Netdata Support Bundle
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/netdata-support-bundle.md
+          description: Collect a sanitized diagnostics archive from a Netdata Agent and attach it to a support ticket or bug report.
+          keywords: [support bundle, diagnostics, troubleshooting, bug report, support ticket, sanitized logs]
+      - meta:
           label: REST API
           edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/README.md
         items:
