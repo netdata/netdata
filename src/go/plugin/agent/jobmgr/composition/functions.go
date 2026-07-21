@@ -199,10 +199,7 @@ func (fjh functionJobHooks) Prepare(
 		return nil, errors.New("jobmgr composition: invalid Function job preparation")
 	}
 	return fjh.controller.PrepareJob(
-		functionadapter.JobIdentity{
-			ID:         published.Identity.ID,
-			Generation: published.Identity.Generation,
-		},
+		published.Identity,
 		published.Job,
 	)
 }

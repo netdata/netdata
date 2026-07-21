@@ -45,7 +45,7 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 		fullName: "module_job", module: "module", name: "job", running: true,
 	}
 	handle, err := controller.PrepareJob(
-		JobIdentity{ID: job.FullName(), Generation: 1},
+		lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1},
 		job,
 	)
 	require.NoError(t, err)
@@ -121,7 +121,7 @@ func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T)
 		fullName: "module_job", module: "module", name: "job", running: true,
 	}
 	handle, err := controller.PrepareJob(
-		JobIdentity{ID: job.FullName(), Generation: 1},
+		lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1},
 		job,
 	)
 	require.NoError(t, err)

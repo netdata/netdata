@@ -17,21 +17,9 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
-
-type JobIdentity struct {
-	ID         string
-	Generation uint64
-}
-
-func (ji JobIdentity) valid() bool {
-	return ji.ID != "" && ji.Generation != 0
-}
-
-type RuntimeJob interface {
-	collectorapi.RuntimeJob
-}
 
 type Controller struct {
 	mu sync.Mutex // guards all fields
@@ -58,8 +46,8 @@ type Controller struct {
 }
 
 type controllerJob struct {
-	identity JobIdentity
-	job      RuntimeJob
+	identity lifecycle.ResourceIdentity
+	job      collectorapi.RuntimeJob
 	methods  []funcapi.FunctionConfig
 }
 
@@ -73,10 +61,10 @@ type controllerModuleAvailability struct {
 }
 
 type controllerAvailabilityProbe struct {
-	methodID string      // method whose availability this probe tracks
-	job      RuntimeJob  // backing job for a job-scoped method; nil for an agent-level method
-	agent    func() bool // agent-level availability predicate (job nil); nil means always available
-	observed bool        // availability captured at build time, compared against the live value to detect change
+	methodID string                  // method whose availability this probe tracks
+	job      collectorapi.RuntimeJob // backing job for a job-scoped method; nil for an agent-level method
+	agent    func() bool             // agent-level availability predicate (job nil); nil means always available
+	observed bool                    // availability captured at build time, compared against the live value to detect change
 }
 
 type controllerGroup struct {
@@ -101,19 +89,19 @@ type InitialRoute struct {
 type JobHandle struct {
 	mu sync.Mutex // guards all fields
 
-	controller *Controller // owning controller
-	identity   JobIdentity // job identity (id + generation)
-	job        RuntimeJob  // the runtime job whose Functions are published
-	published  bool        // job Functions are published
-	closed     bool        // job publication closed and draining
-	cleaned    bool        // job cleanup complete
+	controller *Controller                // owning controller
+	identity   lifecycle.ResourceIdentity // job identity (id + generation)
+	job        collectorapi.RuntimeJob    // the runtime job whose Functions are published
+	published  bool                       // job Functions are published
+	closed     bool                       // job publication closed and draining
+	cleaned    bool                       // job cleanup complete
 }
 
 func (c *Controller) PrepareJob(
-	identity JobIdentity,
-	job RuntimeJob,
+	identity lifecycle.ResourceIdentity,
+	job collectorapi.RuntimeJob,
 ) (*JobHandle, error) {
-	if c == nil || !identity.valid() || job == nil ||
+	if c == nil || !identity.Valid() || job == nil ||
 		identity.ID != job.FullName() || job.ModuleName() == "" || job.Name() == "" {
 		return nil, errors.New("jobmgr Function controller: invalid job preparation")
 	}
@@ -373,10 +361,10 @@ func (c *Controller) Activate() error {
 
 func (c *Controller) PublishJob(
 	ctx context.Context,
-	identity JobIdentity,
-	job RuntimeJob,
+	identity lifecycle.ResourceIdentity,
+	job collectorapi.RuntimeJob,
 ) error {
-	if ctx == nil || !identity.valid() || job == nil ||
+	if ctx == nil || !identity.Valid() || job == nil ||
 		identity.ID != job.FullName() || job.ModuleName() == "" || job.Name() == "" {
 		return errors.New("jobmgr Function controller: invalid job publication")
 	}
@@ -418,10 +406,10 @@ func (c *Controller) PublishJob(
 
 func (c *Controller) CloseAndDrainJob(
 	ctx context.Context,
-	identity JobIdentity,
-	job RuntimeJob,
+	identity lifecycle.ResourceIdentity,
+	job collectorapi.RuntimeJob,
 ) error {
-	if ctx == nil || !identity.valid() || job == nil {
+	if ctx == nil || !identity.Valid() || job == nil {
 		return errors.New("jobmgr Function controller: invalid job close")
 	}
 	c.mu.Lock()
@@ -1239,7 +1227,7 @@ func retiredMethodGenerations(
 
 func generationReferencesJob(
 	generation *methodGeneration,
-	job RuntimeJob,
+	job collectorapi.RuntimeJob,
 ) bool {
 	if generation == nil || job == nil {
 		return false
@@ -1268,8 +1256,4 @@ func (c *Controller) cleanupUnpublishedGroups(
 		err = errors.Join(err, group.generation.cleanup(ctx))
 	}
 	return err
-}
-
-func (ji JobIdentity) String() string {
-	return ji.ID + "@" + strconv.FormatUint(ji.Generation, 10)
 }

@@ -141,7 +141,6 @@ func TestFunctionAssemblyJobHookCapturesExactHandle(t *testing.T) {
 	job := &assemblyTestJob{}
 	handle, err := assembly.JobHooks().Prepare(joboutput.PublishedJob{
 		Identity: lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 3},
-		Variant:  joboutput.JobVariantV1,
 		Job:      job,
 	})
 	require.NoError(t, err)
@@ -277,8 +276,7 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 			ID:         job.FullName(),
 			Generation: 1,
 		},
-		Variant: joboutput.JobVariantV1,
-		Job:     job,
+		Job: job,
 	})
 	require.NoError(t, err)
 	permit, err := lifecycle.NewJobLongLivedPlan(40)

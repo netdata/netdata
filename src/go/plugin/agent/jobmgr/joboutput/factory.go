@@ -37,7 +37,6 @@ type RuntimeJob interface {
 
 type PublishedJob struct {
 	Identity lifecycle.ResourceIdentity
-	Variant  JobVariant
 	Job      RuntimeJob
 }
 
@@ -195,7 +194,7 @@ func (f *Factory) build(
 			errors.New("job output: function-bearing job has no handler lifecycle")
 	}
 	if hooks := f.config.Hooks; hasFunctions {
-		published := PublishedJob{Identity: identity, Variant: variant, Job: job}
+		published := PublishedJob{Identity: identity, Job: job}
 		handlers, prepareErr := callPrepareHandlers(hooks, published)
 		constructed.Handlers = handlers
 		if prepareErr != nil {
