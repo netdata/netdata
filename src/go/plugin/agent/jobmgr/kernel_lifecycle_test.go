@@ -2607,54 +2607,6 @@ func completeNoopShutdownBarrier(t *testing.T, kernel *testCommandKernel) {
 	require.True(t, kernel.shutdownBarrierDone)
 }
 
-func TestKernelRunsTaskCleanupBeforeSlotRelease(t *testing.T) {
-	cleaned := make(chan struct{}, 2)
-	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
-		return WorkPlan{
-			Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
-				return lifecycle.NewSealedResult(200, "application/json", []byte(`{"status":200}`))
-			}),
-			Cleanup: func() error {
-				cleaned <- struct{}{}
-				return nil
-			},
-		}, nil
-	})
-	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, planner)
-
-	require.NoError(t, run.OpenAdmission())
-
-	startKernelLoop(t, kernel)
-
-	require.NoError(t, kernel.Submit(context.Background(), Request{
-		UID: "cleanup", LaneKey: "lane", Source: lifecycle.SourceJobManager,
-		Route: "route", Deadline: time.Now().Add(time.Minute),
-	}),
-	)
-
-	select {
-	case <-cleaned:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "task cleanup phase did not execute")
-	}
-	kernel.Stop()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	require.NoError(t, kernel.Wait(ctx))
-
-	select {
-	case <-cleaned:
-		require.FailNow(t, "test failed", "task cleanup phase executed more than once")
-	default:
-	}
-	require.False(t, tasks.Active() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
-
-	require.NoError(t, admission.CloseDrained(run.Generation()))
-
-	closeUIDLedger(t, uids)
-}
-
 func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 	started := make(chan struct{})
 	var queuedWorkStarted atomic.Bool

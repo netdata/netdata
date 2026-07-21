@@ -1068,16 +1068,6 @@ func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 			return
 		}
 	}
-	if ack.Kind == lifecycle.TaskActionCleanup {
-		operation.cleanupDone = true
-	}
-	if operation.plan.Cleanup != nil && !operation.cleanupDone {
-		cleanup := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionCleanup}
-		if err := ck.sendOperationAction(operation, cleanup); err != nil {
-			ck.run.Dirty(err)
-		}
-		return
-	}
 	termination := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionTerminate}
 	if err := ck.sendOperationAction(operation, termination); err != nil {
 		ck.run.Dirty(err)

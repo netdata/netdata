@@ -115,7 +115,7 @@ func (fcd FunctionCatalogDecision) validate() error {
 			fcd.Plan.Transaction != nil ||
 			len(fcd.Plan.Claims) != 0 ||
 			fcd.Plan.OwnedBytes != 0 ||
-			fcd.Plan.NoResponse || fcd.Plan.Cleanup != nil ||
+			fcd.Plan.NoResponse ||
 			fcd.Plan.CooperativeCancel || fcd.Plan.CooperativeDeadline {
 			return errors.New("jobmgr kernel: invalid Function rejection")
 		}

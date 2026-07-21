@@ -11,7 +11,6 @@ import (
 type WorkPlan struct {
 	Work                lifecycle.TaskWork       // command work (one work source)
 	Transaction         *ResourceTransactionPlan // resource transaction plan (one work source)
-	Cleanup             lifecycle.TaskCleanup    // post-disposal cleanup
 	Claims              []string                 // write claim keys
 	OwnedBytes          int64                    // retained bytes charged to this plan
 	NoResponse          bool                     // the command produces no terminal response frame
@@ -57,9 +56,6 @@ func (wp WorkPlan) validate() error {
 			return errors.New("jobmgr kernel: frame work cannot suppress its response")
 		}
 		return nil
-	}
-	if wp.Cleanup != nil {
-		return errors.New("jobmgr kernel: resource transaction cleanup must be sealed by apply")
 	}
 	if wp.Transaction.ID == "" ||
 		(wp.Transaction.Prepare == nil) ==

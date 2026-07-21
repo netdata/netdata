@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -63,9 +62,6 @@ type processCore struct {
 	frames    *lifecycle.FrameOwner           // the one process-lifetime frame writer
 	ingress   *functionadapter.ProcessIngress // the one process-lifetime stdin reader
 	quit      atomic.Bool                     // set once to stop the outer loop
-
-	mu      sync.Mutex // guards started
-	started bool       // the outer run loop has started (once)
 }
 
 const processAdmissionBytes = functionadapter.MaximumCatalogStorageBytes
@@ -129,14 +125,6 @@ func (pc *processCore) run(
 	if pc == nil || ctx == nil || commands == nil {
 		return errors.New("jobmgr composition: invalid process run")
 	}
-	pc.mu.Lock()
-	if pc.started {
-		pc.mu.Unlock()
-		return errors.New("jobmgr composition: process already started")
-	}
-	pc.started = true
-	pc.mu.Unlock()
-
 	generationID := uint64(1)
 	generation, err := pc.newRun(generationID)
 	if err != nil {

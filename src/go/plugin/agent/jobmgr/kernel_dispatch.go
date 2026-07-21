@@ -68,7 +68,7 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 		}
 		taskPlan := lifecycle.TaskPlan{
 			Source: operation.Source, Deadline: operation.request.Deadline,
-			MaxPhaseTransitions: phaseLimit, Work: operation.plan.Work, Cleanup: operation.plan.Cleanup,
+			MaxPhaseTransitions: phaseLimit, Work: operation.plan.Work,
 		}
 		if operation.Child == lifecycle.ChildDeadlineStartPending {
 			taskPlan.InitialCancellation = context.DeadlineExceeded

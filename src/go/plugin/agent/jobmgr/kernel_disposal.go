@@ -516,7 +516,6 @@ func (ck *CommandKernel) unlinkQueued(operation *commandOperation, submissionErr
 			operation.request.Payload = nil
 			operation.plan.Claims = nil
 			operation.plan.Work = nil
-			operation.plan.Cleanup = nil
 			operation.claims = nil
 			operation.authorityClaimEdges = nil
 			ck.settleSubmission(operation, submissionErr)
