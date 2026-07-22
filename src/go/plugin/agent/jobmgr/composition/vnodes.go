@@ -29,11 +29,12 @@ import (
 const vnodeBootResourceID = "\x00jobmgr-vnode-boot"
 
 type vnodeBinding struct {
-	epoch      uint64                             // run generation
-	pluginName string                             // owning plugin name
-	frames     *lifecycle.FrameOwner              // protocol frame sink
-	config     *agentdiscovery.VNodeConfiguration // configured-vnode authority it mutates
-	graph      *dyncfg.Graph                      // dyncfg graph for vnode config entries
+	epoch       uint64                             // run generation
+	pluginName  string                             // owning plugin name
+	frames      *lifecycle.FrameOwner              // protocol frame sink
+	config      *agentdiscovery.VNodeConfiguration // configured-vnode authority it mutates
+	graph       *dyncfg.Graph                      // dyncfg graph for vnode config entries
+	diagnostics jobmgr.DiagnosticObserver          // operational logger and optional trace sink
 }
 
 func newVNodeBinding(
@@ -42,16 +43,18 @@ func newVNodeBinding(
 	frames *lifecycle.FrameOwner,
 	config *agentdiscovery.VNodeConfiguration,
 	graph *dyncfg.Graph,
+	diagnostics jobmgr.DiagnosticObserver,
 ) (*vnodeBinding, error) {
 	if epoch == 0 || pluginName == "" || frames == nil || config == nil || graph == nil {
 		return nil, errors.New("jobmgr composition: invalid vnode binding")
 	}
 	binding := &vnodeBinding{
-		epoch:      epoch,
-		pluginName: pluginName,
-		frames:     frames,
-		config:     config,
-		graph:      graph,
+		epoch:       epoch,
+		pluginName:  pluginName,
+		frames:      frames,
+		config:      config,
+		graph:       graph,
+		diagnostics: diagnostics,
 	}
 	if err := binding.validateInitial(); err != nil {
 		return nil, err
@@ -102,16 +105,20 @@ func (vb *vnodeBinding) prepare(
 		!strings.HasPrefix(scope.ID, "vnode:") {
 		return nil, errors.New("jobmgr composition: invalid vnode transaction scope")
 	}
-	switch vnodeCommand(input) {
+	command := vnodeCommand(input)
+	var transaction lifecycle.PreparedResourceTransaction
+	var err error
+	switch command {
 	case dyncfg.CommandAdd:
-		return vb.prepareAdd(input, scope)
+		transaction, err = vb.prepareAdd(input, scope)
 	case dyncfg.CommandUpdate:
-		return vb.prepareUpdate(input, scope)
+		transaction, err = vb.prepareUpdate(input, scope)
 	case dyncfg.CommandRemove:
-		return vb.prepareRemove(input, scope)
+		transaction, err = vb.prepareRemove(input, scope)
 	default:
-		return vb.noop(scope, mustDynCfgMessage(501, "Vnode command is not implemented."), nil)
+		transaction, err = vb.noop(scope, mustDynCfgMessage(501, "Vnode command is not implemented."), nil)
 	}
+	return vb.observeTransaction(command, scope.ID, transaction, err)
 }
 
 func newVNodeInitialRoute(epoch uint64, binding *vnodeBinding) (functionadapter.InitialRoute, error) {

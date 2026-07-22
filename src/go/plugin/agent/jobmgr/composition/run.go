@@ -39,17 +39,19 @@ type runSecretServices struct {
 }
 
 type runGenerationConfig struct {
-	Generation      uint64                // this run's generation number
-	ShutdownTimeout time.Duration         // per-run shutdown budget
-	UIDs            *lifecycle.UIDLedger  // process-lifetime UID ledger
-	Frames          *lifecycle.FrameOwner // the one frame writer
-	Modules         collectorapi.Registry // collector module registry
-	Jobs            runJobServices        // job services
-	Secrets         runSecretServices     // secret services
-	Discovery       runDiscoveryServices  // discovery services
+	Generation      uint64                    // this run's generation number
+	ShutdownTimeout time.Duration             // per-run shutdown budget
+	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational logger and optional trace sink
+	UIDs            *lifecycle.UIDLedger      // process-lifetime UID ledger
+	Frames          *lifecycle.FrameOwner     // the one frame writer
+	Modules         collectorapi.Registry     // collector module registry
+	Jobs            runJobServices            // job services
+	Secrets         runSecretServices         // secret services
+	Discovery       runDiscoveryServices      // discovery services
 }
 
 type runGeneration struct {
+	diagnostics       jobmgr.DiagnosticObserver      // operational logger and optional trace sink
 	run               *lifecycle.RunSupervisor       // run supervisor for this generation
 	tasks             *lifecycle.TaskSupervisor      // task supervisor
 	functions         *FunctionAssembly              // Function assembly (catalog + controller + publication)
@@ -121,6 +123,7 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		config.Frames,
 		vnodeConfig,
 		graph,
+		config.Diagnostics,
 	)
 	if err != nil {
 		return nil, err
@@ -147,6 +150,7 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 			Creators:     config.Jobs.StoreCreators,
 			Dependencies: dependencies,
 			Initial:      config.Secrets.Initial,
+			Diagnostics:  config.Diagnostics,
 		},
 	)
 	if err != nil {
@@ -159,7 +163,12 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 	initialRoutes := []functionadapter.InitialRoute{dynCfgRoute, secretRoute, vnodeRoute}
 	var serviceDiscovery *serviceDiscoveryBinding
 	if len(config.Discovery.BuildContext.Paths.ServiceDiscoveryConfigDir) != 0 {
-		serviceDiscovery, err = newServiceDiscoveryBinding(config.Jobs.PluginName, config.Frames)
+		serviceDiscovery, err = newServiceDiscoveryBinding(
+			config.Generation,
+			config.Jobs.PluginName,
+			config.Frames,
+			config.Diagnostics,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -211,6 +220,7 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 	dynCfgJobs, err := joboutput.NewDynCfgJobController(
 		joboutput.DynCfgJobControllerConfig{
 			PluginName:    config.Jobs.PluginName,
+			Generation:    config.Generation,
 			Modules:       config.Modules,
 			Defaults:      config.Jobs.Defaults,
 			Factory:       jobs,
@@ -218,6 +228,7 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 			Graph:         graph,
 			Frames:        config.Frames,
 			Dependencies:  dependencies,
+			Diagnostics:   config.Diagnostics,
 		},
 	)
 	if err != nil {
@@ -242,6 +253,11 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 	if err != nil {
 		return nil, err
 	}
+	if config.Diagnostics != nil {
+		if err := kernel.BindDiagnosticObserver(config.Diagnostics); err != nil {
+			return nil, err
+		}
+	}
 	if err := functions.Bind(kernel); err != nil {
 		return nil, err
 	}
@@ -259,6 +275,7 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		}
 	}
 	return &runGeneration{
+		diagnostics:       config.Diagnostics,
 		run:               run,
 		tasks:             tasks,
 		functions:         functions,

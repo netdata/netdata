@@ -37,6 +37,7 @@ func TestProcessCoreServiceDiscoverySendsFunctionResultBeforeStatus(t *testing.T
 		Modules:         collectorapi.Registry{},
 		Jobs:            testRunJobServices(t),
 		Discovery:       services,
+		Diagnostics:     testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -87,6 +88,7 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 		Modules:         collectorapi.Registry{},
 		Jobs:            jobs,
 		Discovery:       testRunDiscoveryServices(t),
+		Diagnostics:     testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -133,6 +135,7 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	events := make(chan string, 16)
+	diagnostics := &recordingCompositionDiagnosticObserver{}
 	var cleanupsMu sync.Mutex
 	cleanups := 0
 	output := processRecordingWriter{
@@ -167,8 +170,9 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 				},
 			},
 		},
-		Jobs:      testRunJobServices(t),
-		Discovery: testRunDiscoveryServices(t),
+		Jobs:        testRunJobServices(t),
+		Discovery:   testRunDiscoveryServices(t),
+		Diagnostics: diagnostics,
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 2)
@@ -194,6 +198,14 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 	cleanupsMu.Lock()
 	defer cleanupsMu.Unlock()
 	require.EqualValues(t, 2, cleanups)
+	diagnosticEvents := diagnostics.snapshot()
+	diagnosticNames := make([]string, 0, len(diagnosticEvents))
+	for _, event := range diagnosticEvents {
+		diagnosticNames = append(diagnosticNames, event.Name)
+	}
+	require.Contains(t, diagnosticNames, "job manager generation rotation started")
+	require.Contains(t, diagnosticNames, "job manager generation rotation completed")
+	require.Contains(t, diagnosticNames, "job manager process stopped")
 }
 
 func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(t *testing.T) {
@@ -227,6 +239,7 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(t *testing.
 			},
 			Providers: catalog,
 		},
+		Diagnostics: testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -310,6 +323,7 @@ func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
 			},
 			Providers: catalog,
 		},
+		Diagnostics: testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
 	done := make(chan error, 1)

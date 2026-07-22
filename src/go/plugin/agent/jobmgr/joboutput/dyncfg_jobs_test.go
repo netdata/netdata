@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -1065,6 +1066,19 @@ func newDynCfgJobTestHarness(
 	*bytes.Buffer,
 	*factoryTestState,
 ) {
+	return newDynCfgJobTestHarnessWithDiagnostics(t, nil)
+}
+
+func newDynCfgJobTestHarnessWithDiagnostics(
+	t *testing.T,
+	diagnostics jobmgr.DiagnosticObserver,
+) (
+	*DynCfgJobController,
+	*dyncfg.Graph,
+	*lifecycle.TaskSupervisor,
+	*bytes.Buffer,
+	*factoryTestState,
+) {
 	t.Helper()
 	output := &bytes.Buffer{}
 	frames, err := lifecycle.NewFrameOwner(output)
@@ -1110,6 +1124,7 @@ func newDynCfgJobTestHarness(
 	controller, err := NewDynCfgJobController(
 		DynCfgJobControllerConfig{
 			PluginName: "go.d",
+			Generation: 9,
 			Modules:    modules,
 			Defaults: confgroup.Registry{
 				"module": {UpdateEvery: 1},
@@ -1118,6 +1133,7 @@ func newDynCfgJobTestHarness(
 			ConfigModules: configModules,
 			Graph:         graph,
 			Frames:        frames,
+			Diagnostics:   diagnostics,
 		},
 	)
 	require.NoError(t, err)

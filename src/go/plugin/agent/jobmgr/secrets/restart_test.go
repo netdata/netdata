@@ -77,7 +77,7 @@ func (rtj restartTestJobs) PlanDependentStart(string) (jobmgr.WorkPlan, Dependen
 }
 
 func TestSecretRestartCommandCommitsWithoutDependentsOrCompositeScope(t *testing.T) {
-	command, err := NewSecretRestartCommand(1, NewSecretDependencyIndex(), restartTestJobs{})
+	command, err := NewSecretRestartCommand(1, NewSecretDependencyIndex(), restartTestJobs{}, nil)
 	require.NoError(t, err)
 	commits := 0
 	result, message, restored, err := command.Apply(
@@ -129,6 +129,7 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(t *testing.T) {
 			stopError:    stopError,
 			restoreError: restoreError,
 		},
+		nil,
 	)
 	require.NoError(t, err)
 	commitCalled := false
@@ -167,7 +168,7 @@ func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(t *testi
 	)
 	require.NoError(t, err)
 	commitDependency()
-	command, err := NewSecretRestartCommand(1, index, restartTestJobs{})
+	command, err := NewSecretRestartCommand(1, index, restartTestJobs{}, nil)
 	require.NoError(t, err)
 	scope := &restartTestCommandScope{
 		normalErr: context.Canceled,
@@ -210,9 +211,10 @@ func TestSecretRestartCommandRedactsAppliedRestartFailure(t *testing.T) {
 	)
 	require.NoError(t, err)
 	commitDependency()
+	diagnostics := &secretRecordingDiagnosticObserver{}
 	command, err := NewSecretRestartCommand(1, index, restartTestJobs{
 		restoreError: sensitive,
-	})
+	}, diagnostics)
 	require.NoError(t, err)
 	result, message, _, err := command.Apply(
 		context.Background(),
@@ -227,6 +229,19 @@ func TestSecretRestartCommandRedactsAppliedRestartFailure(t *testing.T) {
 	)
 	require.False(t, !result.Applied || err != nil)
 	require.False(t, strings.Contains(message, "backend-sensitive-detail") || !strings.Contains(message, "module:one"))
+	events := diagnostics.snapshot()
+	var warning jobmgr.DiagnosticEvent
+	for _, event := range events {
+		if event.Name == "secretstore dependent collector restart failed" {
+			warning = event
+			break
+		}
+	}
+	require.Equal(t, jobmgr.DiagnosticWarning, warning.Level)
+	require.Equal(t, "secretstore:vault_main", warning.Resource)
+	require.EqualValues(t, 1, warning.Count)
+	require.NotContains(t, fmt.Sprintf("%+v", events), "module:one")
+	require.NotContains(t, fmt.Sprintf("%+v", events), "backend-sensitive-detail")
 }
 
 func BenchmarkBSecretRestart(b *testing.B) {
@@ -258,7 +273,7 @@ func BenchmarkBSecretRestart(b *testing.B) {
 		}
 		commit()
 	}
-	command, err := NewSecretRestartCommand(1, index, restartTestJobs{})
+	command, err := NewSecretRestartCommand(1, index, restartTestJobs{}, nil)
 	if err != nil {
 		require.FailNow(b, "benchmark failed", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -32,19 +33,21 @@ type processInputCompletion struct {
 }
 
 type processCoreConfig struct {
-	Input           io.Reader             // plugin stdin
-	Output          io.Writer             // plugin stdout
-	ShutdownTimeout time.Duration         // per-run shutdown budget
-	KeepAlive       bool                  // emit keepalive frames (long-lived agent mode)
-	Modules         collectorapi.Registry // collector module registry
-	Jobs            runJobServices        // process-lifetime job services (resolver, catalogs, vnodes)
-	Secrets         runSecretServices     // process-lifetime secret services
-	Discovery       runDiscoveryServices  // discovery services (providers, build context)
-	FinalizeOutput  func()                // stops the runtime service at process teardown
+	Input           io.Reader                 // plugin stdin
+	Output          io.Writer                 // plugin stdout
+	ShutdownTimeout time.Duration             // per-run shutdown budget
+	KeepAlive       bool                      // emit keepalive frames (long-lived agent mode)
+	Modules         collectorapi.Registry     // collector module registry
+	Jobs            runJobServices            // process-lifetime job services (resolver, catalogs, vnodes)
+	Secrets         runSecretServices         // process-lifetime secret services
+	Discovery       runDiscoveryServices      // discovery services (providers, build context)
+	FinalizeOutput  func()                    // stops the runtime service at process teardown
+	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational logger and trace sink
 }
 
 type processCore struct {
-	config processCoreConfig // retained process configuration
+	config      processCoreConfig         // retained process configuration
+	diagnostics jobmgr.DiagnosticObserver // process-wide operational logger and optional trace sink
 
 	uids    *lifecycle.UIDLedger            // process-lifetime UID ledger
 	frames  *lifecycle.FrameOwner           // the one process-lifetime frame writer
@@ -61,6 +64,7 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		config.Jobs.Resolver == nil ||
 		config.Jobs.StoreCreators == nil ||
 		config.Jobs.Vnodes == nil ||
+		config.Diagnostics == nil ||
 		!config.Discovery.valid() {
 		return nil, errors.New("jobmgr composition: invalid process construction")
 	}
@@ -73,10 +77,11 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		return nil, err
 	}
 	return &processCore{
-		config:  config,
-		uids:    lifecycle.NewUIDLedger(),
-		frames:  frames,
-		ingress: ingress,
+		config:      config,
+		diagnostics: config.Diagnostics,
+		uids:        lifecycle.NewUIDLedger(),
+		frames:      frames,
+		ingress:     ingress,
 	}, nil
 }
 
@@ -92,6 +97,11 @@ func (pc *processCore) run(ctx context.Context, commands <-chan processControl) 
 	if err := generation.start(ctx); err != nil {
 		return pc.finalize(generation, err)
 	}
+	jobmgr.ObserveDiagnostic(pc.diagnostics, jobmgr.DiagnosticEvent{
+		Level:      jobmgr.DiagnosticInfo,
+		Name:       "job manager generation started",
+		Generation: generationID,
+	})
 	quit := false
 	markQuit := func() { quit = true }
 	binding, err := pc.binding(generation, markQuit)
@@ -188,6 +198,7 @@ func (pc *processCore) newRun(generation uint64) (*runGeneration, error) {
 	return newRunGeneration(runGenerationConfig{
 		Generation:      generation,
 		ShutdownTimeout: pc.config.ShutdownTimeout,
+		Diagnostics:     pc.diagnostics,
 		UIDs:            pc.uids,
 		Frames:          pc.frames,
 		Modules:         pc.config.Modules,
@@ -215,6 +226,12 @@ func (pc *processCore) rotate(
 	nextID uint64,
 	quit func(),
 ) (*runGeneration, error) {
+	jobmgr.ObserveDiagnostic(pc.diagnostics, jobmgr.DiagnosticEvent{
+		Level:      jobmgr.DiagnosticInfo,
+		Name:       "job manager generation rotation started",
+		Generation: current.run.Generation(),
+		State:      "rotating",
+	})
 	if err := pc.ingress.SealPause(); err != nil {
 		return current, err
 	}
@@ -247,10 +264,25 @@ func (pc *processCore) rotate(
 	if err := pc.ingress.Adopt(ctx, binding); err != nil {
 		return next, err
 	}
+	jobmgr.ObserveDiagnostic(pc.diagnostics, jobmgr.DiagnosticEvent{
+		Level:      jobmgr.DiagnosticInfo,
+		Name:       "job manager generation rotation completed",
+		Generation: nextID,
+		State:      "running",
+	})
 	return next, nil
 }
 
 func (pc *processCore) finalize(current *runGeneration, cause error) error {
+	generation := uint64(0)
+	if current != nil && current.run != nil {
+		generation = current.run.Generation()
+	}
+	jobmgr.TraceDiagnostic(pc.diagnostics, jobmgr.DiagnosticEvent{
+		Name:       "job manager process finalization started",
+		Generation: generation,
+		Err:        cause,
+	})
 	finalErr := cause
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), pc.config.ShutdownTimeout)
 	defer cancel()
@@ -303,6 +335,18 @@ func (pc *processCore) finalize(current *runGeneration, cause error) error {
 	if pc.config.FinalizeOutput != nil {
 		pc.config.FinalizeOutput()
 	}
+	level := jobmgr.DiagnosticInfo
+	name := "job manager process stopped"
+	if finalErr != nil {
+		level = jobmgr.DiagnosticError
+		name = "job manager process failed"
+	}
+	jobmgr.ObserveDiagnostic(pc.diagnostics, jobmgr.DiagnosticEvent{
+		Level:      level,
+		Name:       name,
+		Generation: generation,
+		Err:        finalErr,
+	})
 	return finalErr
 }
 
@@ -313,17 +357,31 @@ func (pc *processCore) retireRun(ctx context.Context, generation *runGeneration)
 	waitErr := generation.Wait(ctx)
 	terminal := generation.run.TerminalState()
 	if !terminal.Reached || !terminal.Quiescent {
-		return errors.Join(
+		err := errors.Join(
 			waitErr,
 			generation.run.DirtyCause(),
 			errors.New("jobmgr composition: run did not quiesce"),
 		)
+		jobmgr.ObserveDiagnostic(generation.diagnostics, jobmgr.DiagnosticEvent{
+			Level:      jobmgr.DiagnosticError,
+			Name:       "job manager run did not quiesce",
+			Generation: generation.run.Generation(),
+			Err:        err,
+		})
+		return err
 	}
 	if generation.tasks.Active() != 0 ||
 		generation.tasks.Pending() != 0 ||
 		generation.tasks.InheritedActive() != 0 ||
 		generation.tasks.LongLivedCensus() != (lifecycle.LongLivedCensus{}) {
-		return errors.Join(waitErr, errors.New("jobmgr composition: retired run retained tasks"))
+		err := errors.Join(waitErr, errors.New("jobmgr composition: retired run retained tasks"))
+		jobmgr.ObserveDiagnostic(generation.diagnostics, jobmgr.DiagnosticEvent{
+			Level:      jobmgr.DiagnosticError,
+			Name:       "job manager retired run retained tasks",
+			Generation: generation.run.Generation(),
+			Err:        err,
+		})
+		return err
 	}
 	return waitErr
 }

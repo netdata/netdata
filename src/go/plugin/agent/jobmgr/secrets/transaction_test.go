@@ -111,7 +111,7 @@ func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
 	dependencies.byStore["vault:main"] = map[string]struct{}{"module_two": {}}
 	restarts, err := NewSecretRestartCommand(1, dependencies, restartTestJobs{
 		stopError: stopErr,
-	})
+	}, nil)
 	require.NoError(t, err)
 	transaction, err := newPreparedSecretTransaction(preparedSecretSpec{
 		scope: lifecycle.ResourceTransactionScope{

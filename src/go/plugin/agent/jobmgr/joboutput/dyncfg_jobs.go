@@ -35,14 +35,16 @@ type DynCfgJobRequest struct {
 }
 
 type DynCfgJobControllerConfig struct {
-	PluginName    string                // owning plugin name
-	Modules       collectorapi.Registry // collector module registry
-	Defaults      confgroup.Registry    // per-module config defaults
-	Factory       *Factory              // job construction factory
-	ConfigModules *ConfigModuleFactory  // short-lived config-probe factory
-	Graph         *dyncfg.Graph         // dyncfg graph authority
-	Frames        *lifecycle.FrameOwner // protocol frame sink
-	Dependencies  JobDependencyIndex    // secret-dependency index (optional)
+	PluginName    string                    // owning plugin name
+	Generation    uint64                    // owning run generation
+	Modules       collectorapi.Registry     // collector module registry
+	Defaults      confgroup.Registry        // per-module config defaults
+	Factory       *Factory                  // job construction factory
+	ConfigModules *ConfigModuleFactory      // short-lived config-probe factory
+	Graph         *dyncfg.Graph             // dyncfg graph authority
+	Frames        *lifecycle.FrameOwner     // protocol frame sink
+	Dependencies  JobDependencyIndex        // secret-dependency index (optional)
+	Diagnostics   jobmgr.DiagnosticObserver // operational logger and optional trace sink
 }
 
 type JobDependencyIndex interface {
@@ -52,17 +54,19 @@ type JobDependencyIndex interface {
 // DynCfgJobController prepares collector configuration graph/resource
 // transactions. CommandKernel remains the only current-job authority.
 type DynCfgJobController struct {
-	pluginName    string                // owning plugin
-	prefix        string                // "<plugin>:collector:" ID prefix
-	path          string                // "/collectors/<plugin>/jobs" config path
-	modules       collectorapi.Registry // collector registry
-	defaults      confgroup.Registry    // per-module config defaults
-	factory       *Factory              // job construction factory
-	configModules *ConfigModuleFactory  // short-lived config-probe factory
-	graph         *dyncfg.Graph         // dyncfg graph authority
-	frames        *lifecycle.FrameOwner // protocol frame sink
-	dependencies  JobDependencyIndex    // secret-dependency index (optional)
-	scheduler     *Scheduler            // tick + retry scheduler
+	generation    uint64                    // owning run generation
+	pluginName    string                    // owning plugin
+	prefix        string                    // "<plugin>:collector:" ID prefix
+	path          string                    // "/collectors/<plugin>/jobs" config path
+	modules       collectorapi.Registry     // collector registry
+	defaults      confgroup.Registry        // per-module config defaults
+	factory       *Factory                  // job construction factory
+	configModules *ConfigModuleFactory      // short-lived config-probe factory
+	graph         *dyncfg.Graph             // dyncfg graph authority
+	frames        *lifecycle.FrameOwner     // protocol frame sink
+	dependencies  JobDependencyIndex        // secret-dependency index (optional)
+	diagnostics   jobmgr.DiagnosticObserver // operational logger and optional trace sink
+	scheduler     *Scheduler                // tick + retry scheduler
 }
 
 func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobController, error) {
@@ -76,6 +80,7 @@ func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobControl
 		return nil, errors.New("job output: incomplete DynCfg job controller configuration")
 	}
 	return &DynCfgJobController{
+		generation:    config.Generation,
 		pluginName:    config.PluginName,
 		prefix:        DynCfgJobPrefix(config.PluginName),
 		path:          fmt.Sprintf(dynCfgCollectorPathFormat, config.PluginName),
@@ -86,6 +91,7 @@ func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobControl
 		graph:         config.Graph,
 		frames:        config.Frames,
 		dependencies:  config.Dependencies,
+		diagnostics:   config.Diagnostics,
 		scheduler:     config.Factory.config.Scheduler,
 	}, nil
 }
@@ -124,8 +130,10 @@ func (dcjc *DynCfgJobController) Handle(
 	}
 	target, result := dcjc.resolveRequest(request)
 	if result.valid {
+		dcjc.traceCommand("job configuration request rejected", target, nil)
 		return result.result, nil
 	}
+	dcjc.traceCommand("job configuration request resolved", target, nil)
 	switch target.command {
 	case dyncfg.CommandSchema:
 		if target.creator.JobConfigSchema == "" {
@@ -180,7 +188,8 @@ func (dcjc *DynCfgJobController) Prepare(
 	}
 	target, failure := dcjc.resolveRequest(request)
 	if failure.valid {
-		return dcjc.noop(scope, current, permit, failure.result)
+		transaction, err := dcjc.noop(scope, current, permit, failure.result)
+		return dcjc.observeTransaction(target, transaction, err)
 	}
 	if target.resourceID != scope.ID {
 		return nil, errors.New("job output: DynCfg target differs from transaction scope")
@@ -190,21 +199,23 @@ func (dcjc *DynCfgJobController) Prepare(
 		return nil, err
 	}
 
+	var transaction lifecycle.PreparedResourceTransaction
+	var err error
 	switch target.command {
 	case dyncfg.CommandAdd:
-		return dcjc.prepareAdd(ctx, request, target, current, scope)
+		transaction, err = dcjc.prepareAdd(ctx, request, target, current, scope)
 	case dyncfg.CommandUpdate:
-		return dcjc.prepareUpdate(ctx, request, target, record, exists, current, scope, permit)
+		transaction, err = dcjc.prepareUpdate(ctx, request, target, record, exists, current, scope, permit)
 	case dyncfg.CommandEnable:
-		return dcjc.prepareEnable(ctx, target, record, exists, current, scope, permit)
+		transaction, err = dcjc.prepareEnable(ctx, target, record, exists, current, scope, permit)
 	case dyncfg.CommandRestart:
-		return dcjc.prepareRestart(ctx, target, record, exists, current, scope, permit)
+		transaction, err = dcjc.prepareRestart(ctx, target, record, exists, current, scope, permit)
 	case dyncfg.CommandDisable:
-		return dcjc.prepareDisable(target, record, exists, current, scope)
+		transaction, err = dcjc.prepareDisable(target, record, exists, current, scope)
 	case dyncfg.CommandRemove:
-		return dcjc.prepareRemove(target, record, exists, current, scope)
+		transaction, err = dcjc.prepareRemove(target, record, exists, current, scope)
 	default:
-		return dcjc.noop(
+		transaction, err = dcjc.noop(
 			scope,
 			current,
 			permit,
@@ -214,6 +225,7 @@ func (dcjc *DynCfgJobController) Prepare(
 			),
 		)
 	}
+	return dcjc.observeTransaction(target, transaction, err)
 }
 
 func (dcjc *DynCfgJobController) configID(module string, name string) string {

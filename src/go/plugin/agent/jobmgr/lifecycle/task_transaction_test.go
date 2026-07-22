@@ -59,6 +59,7 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 				},
 			)
 			require.NoError(t, err)
+			require.EqualValues(t, 200, applied.ResultStatus())
 			prepared := &recordingPreparedResourceTransaction{
 				scope:   test.scope,
 				current: test.current,

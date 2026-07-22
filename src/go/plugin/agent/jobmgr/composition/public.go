@@ -154,6 +154,7 @@ func NewProcess(config Config) (*Process, error) {
 			AutoEnable:   config.AutoEnable,
 		},
 		FinalizeOutput: finalizeOutput,
+		Diagnostics:    newProcessDiagnosticLogger(),
 	})
 	if err != nil {
 		return nil, err

@@ -69,6 +69,12 @@ type AppliedResourceTransaction struct {
 	cleanup     TaskCleanup
 }
 
+// ResultStatus exposes only the response status needed for operational
+// classification; the sealed response body remains owned by the transaction.
+func (art AppliedResourceTransaction) ResultStatus() int {
+	return art.result.status
+}
+
 func NewAppliedResourceTransaction(
 	scope ResourceTransactionScope,
 	disposition ResourceTransactionDisposition,

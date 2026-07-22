@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -23,12 +25,14 @@ const dynCfgServiceDiscoveryClaim = "dyncfg:service-discovery"
 type serviceDiscoveryBinding struct {
 	mu sync.Mutex // guards handler/registered/active/dirty
 
-	pluginName string                      // owning plugin name
-	frames     *lifecycle.FrameOwner       // the one wire frame writer
-	handler    frameworkfunctions.Handler  // the registered service-discovery handler
-	active     *serviceDiscoveryInvocation // current synchronous invocation
-	registered bool                        // the SD Function is registered
-	dirty      error                       // sticky error (unexpected registration)
+	pluginName  string                      // owning plugin name
+	epoch       uint64                      // run generation
+	frames      *lifecycle.FrameOwner       // the one wire frame writer
+	diagnostics jobmgr.DiagnosticObserver   // operational logger and optional trace sink
+	handler     frameworkfunctions.Handler  // the registered service-discovery handler
+	active      *serviceDiscoveryInvocation // current synchronous invocation
+	registered  bool                        // the SD Function is registered
+	dirty       error                       // sticky error (unexpected registration)
 }
 
 type serviceDiscoveryInvocation struct {
@@ -48,13 +52,20 @@ type preparedServiceDiscoveryTransaction struct {
 	consumed bool
 }
 
-func newServiceDiscoveryBinding(pluginName string, frames *lifecycle.FrameOwner) (*serviceDiscoveryBinding, error) {
-	if pluginName == "" || frames == nil {
+func newServiceDiscoveryBinding(
+	epoch uint64,
+	pluginName string,
+	frames *lifecycle.FrameOwner,
+	diagnostics jobmgr.DiagnosticObserver,
+) (*serviceDiscoveryBinding, error) {
+	if epoch == 0 || pluginName == "" || frames == nil {
 		return nil, errors.New("jobmgr composition: invalid service discovery binding")
 	}
 	return &serviceDiscoveryBinding{
-		pluginName: pluginName,
-		frames:     frames,
+		pluginName:  pluginName,
+		epoch:       epoch,
+		frames:      frames,
+		diagnostics: diagnostics,
 	}, nil
 }
 
@@ -82,30 +93,36 @@ func (sdb *serviceDiscoveryBinding) RegisterPrefix(
 
 func (sdb *serviceDiscoveryBinding) registerPrefix(name string, prefix string, fn frameworkfunctions.Handler) {
 	sdb.mu.Lock()
-	defer sdb.mu.Unlock()
 	if sdb.dirty != nil {
+		sdb.mu.Unlock()
 		return
 	}
 	if name != joboutput.DynCfgFunctionName || prefix != sdb.prefix() || fn == nil || sdb.registered {
 		sdb.setDirtyLocked(errors.New("jobmgr composition: invalid service discovery Function registration"))
+		sdb.mu.Unlock()
 		return
 	}
 	sdb.handler = fn
 	sdb.registered = true
+	sdb.mu.Unlock()
+	sdb.trace("service discovery Function registered", "", "", 0, nil)
 }
 
 func (sdb *serviceDiscoveryBinding) UnregisterPrefix(name string, prefix string) {
 	sdb.mu.Lock()
-	defer sdb.mu.Unlock()
 	if sdb.dirty != nil {
+		sdb.mu.Unlock()
 		return
 	}
 	if name != joboutput.DynCfgFunctionName || prefix != sdb.prefix() || !sdb.registered {
 		sdb.setDirtyLocked(errors.New("jobmgr composition: invalid service discovery Function withdrawal"))
+		sdb.mu.Unlock()
 		return
 	}
 	sdb.handler = nil
 	sdb.registered = false
+	sdb.mu.Unlock()
+	sdb.trace("service discovery Function withdrawn", "", "", 0, nil)
 }
 
 func (sdb *serviceDiscoveryBinding) recordRegistrationError(err error) {
@@ -186,17 +203,23 @@ func (psdt *preparedServiceDiscoveryTransaction) Apply(
 			"jobmgr composition: nil service discovery apply context",
 		)
 	}
+	command := serviceDiscoveryCommand(function.Args)
+	binding.trace("service discovery configuration invocation started", string(command), scope.ID, 0, nil)
 	result, cleanup, err := binding.invoke(function.UID, func() { handler(ctx, function) })
+	binding.trace("service discovery configuration invocation completed", string(command), scope.ID, 0, err)
 	if err != nil {
+		binding.observeCommand(command, scope.ID, 0, err)
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
-	return lifecycle.NewAppliedResourceTransaction(
+	applied, err := lifecycle.NewAppliedResourceTransaction(
 		scope,
 		lifecycle.ResourceTransactionUnchanged,
 		nil,
 		result,
 		cleanup,
 	)
+	binding.observeCommand(command, scope.ID, applied.ResultStatus(), err)
+	return applied, err
 }
 
 func (psdt *preparedServiceDiscoveryTransaction) Dispose(context.Context) (lifecycle.ReadyResource, error) {
@@ -347,26 +370,94 @@ func (sdb *serviceDiscoveryBinding) emitNotification(emit func(dyncfg.Output)) {
 	payload := encoded.Bytes()
 
 	sdb.mu.Lock()
-	defer sdb.mu.Unlock()
 	if sdb.active == nil {
-		if err := sdb.frames.CommitBorrowedProtocolFrame(payload); err != nil {
-			sdb.setDirtyLocked(err)
+		commitErr := sdb.frames.CommitBorrowedProtocolFrame(payload)
+		if commitErr != nil {
+			sdb.setDirtyLocked(commitErr)
 		}
+		sdb.mu.Unlock()
+		sdb.trace("service discovery notification committed", "", "", len(payload), commitErr)
 		return
 	}
 	if len(payload) > lifecycle.MaximumOtherFrameBytes-len(sdb.active.notifications) {
+		boundErr := errors.New("jobmgr composition: service discovery notifications exceed frame bounds")
 		sdb.active.err = errors.Join(
 			sdb.active.err,
-			errors.New("jobmgr composition: service discovery notifications exceed frame bounds"),
+			boundErr,
 		)
+		sdb.mu.Unlock()
+		sdb.trace("service discovery notification rejected", "", "", len(payload), boundErr)
 		return
 	}
 	sdb.active.notifications = append(sdb.active.notifications, payload...)
+	sdb.mu.Unlock()
+	sdb.trace("service discovery notification buffered", "", "", len(payload), nil)
 }
 
 func (sdb *serviceDiscoveryBinding) setDirtyLocked(err error) {
 	if sdb.dirty == nil {
 		sdb.dirty = err
+	}
+}
+
+func (sdb *serviceDiscoveryBinding) trace(name string, command string, resource string, count int, err error) {
+	if sdb == nil {
+		return
+	}
+	jobmgr.TraceDiagnostic(sdb.diagnostics, jobmgr.DiagnosticEvent{
+		Name:       name,
+		Command:    command,
+		Resource:   resource,
+		Generation: sdb.epoch,
+		Count:      count,
+		Err:        err,
+	})
+}
+
+func (sdb *serviceDiscoveryBinding) observeCommand(
+	command dyncfg.Command,
+	resource string,
+	status int,
+	err error,
+) {
+	if !serviceDiscoveryMutationCommand(command) {
+		return
+	}
+	level := jobmgr.DiagnosticInfo
+	name := "service discovery configuration command completed"
+	if err != nil || !jobmgr.DiagnosticResultSucceeded(status) {
+		level = jobmgr.DiagnosticWarning
+		name = "service discovery configuration command failed"
+	}
+	jobmgr.ObserveDiagnostic(sdb.diagnostics, jobmgr.DiagnosticEvent{
+		Level:        level,
+		Name:         name,
+		Command:      string(command),
+		Resource:     resource,
+		Generation:   sdb.epoch,
+		ResultStatus: status,
+		Err:          err,
+	})
+}
+
+func serviceDiscoveryCommand(args []string) dyncfg.Command {
+	if len(args) < 2 {
+		return ""
+	}
+	return dyncfg.Command(strings.ToLower(args[1]))
+}
+
+func serviceDiscoveryMutationCommand(command dyncfg.Command) bool {
+	switch command {
+	case dyncfg.CommandAdd,
+		dyncfg.CommandEnable,
+		dyncfg.CommandDisable,
+		dyncfg.CommandUpdate,
+		dyncfg.CommandRestart,
+		dyncfg.CommandRemove:
+		return true
+	default:
+		return false
 	}
 }
 

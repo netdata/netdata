@@ -11,6 +11,9 @@ import (
 )
 
 func (ck *CommandKernel) runLoop(ctx context.Context) {
+	ck.trace(DiagnosticEvent{
+		Name: "kernel run started",
+	})
 	var terminal error
 	var shutdownBudget *lifecycle.ShutdownBudget
 	var shutdownC <-chan struct{}
@@ -61,6 +64,17 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		shuttingDown = true
 		stopDeadline()
 		terminal = errors.Join(terminal, cause)
+		ck.trace(DiagnosticEvent{
+			Name: "kernel shutdown started",
+			Err:  cause,
+		})
+		if dirty := ck.run.DirtyCause(); dirty != nil {
+			ck.observe(DiagnosticEvent{
+				Level: DiagnosticError,
+				Name:  "job manager run became dirty",
+				Err:   dirty,
+			})
+		}
 		budget, err := ck.run.BeginShutdown()
 		if err != nil {
 			ck.run.Dirty(err)
@@ -81,6 +95,10 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 			terminal = errors.Join(terminal, err)
 		}
 		ck.doneErr = terminal
+		ck.trace(DiagnosticEvent{
+			Name: "kernel run stopped",
+			Err:  terminal,
+		})
 		close(ck.done)
 	}()
 	for {
@@ -253,6 +271,7 @@ func (ck *CommandKernel) serviceClaimSettlements(quantum int) bool {
 		return false
 	}
 	for _, operation := range granted {
+		ck.traceOperation("operation claims acquired", operation)
 		ck.markReady(operation.lane)
 	}
 	return more
@@ -351,6 +370,17 @@ func (ck *CommandKernel) serviceSubmissions(quantum int) bool {
 		if dequeued {
 			ck.notifySubmissionSpace(selected)
 		}
+		ck.trace(DiagnosticEvent{
+			Name:       "request received",
+			UID:        submitted.request.UID,
+			Route:      submitted.request.Route,
+			Lane:       submitted.request.LaneKey,
+			Generation: ck.run.Generation(),
+			Source:     submitted.request.Source,
+			Control:    submitted.controlStatus,
+			Rollback:   submitted.rollback,
+			Composite:  submitted.composite != nil,
+		})
 		var err error
 		if submitted.controlStatus != 0 {
 			err = ck.frames.TryCommitControl(lifecycle.ControlFramePlan{
@@ -402,6 +432,18 @@ func (ck *CommandKernel) serviceSubmissions(quantum int) bool {
 					ck.runtimeObserver.AddRuntimeCounter(lifecycle.RuntimeCounterOperationsRejected, 1)
 				}
 				submitted.result <- err
+				ck.trace(DiagnosticEvent{
+					Name:       "request rejected",
+					UID:        submitted.request.UID,
+					Route:      submitted.request.Route,
+					Lane:       submitted.request.LaneKey,
+					Generation: ck.run.Generation(),
+					Source:     submitted.request.Source,
+					Control:    submitted.controlStatus,
+					Err:        err,
+					Rollback:   submitted.rollback,
+					Composite:  submitted.composite != nil,
+				})
 				if submitted.controlStatus != 0 && submitted.terminal != nil {
 					submitted.terminal <- err
 				}

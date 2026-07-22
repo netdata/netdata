@@ -118,7 +118,8 @@ func testProcessCoreSecretUpdateDependentRestart(t *testing.T, restartErr error)
 		Secrets: runSecretServices{
 			Initial: []secretstore.Config{initialStore},
 		},
-		Discovery: testRunDiscoveryServices(t, jobConfig),
+		Discovery:   testRunDiscoveryServices(t, jobConfig),
+		Diagnostics: testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -258,7 +259,8 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 		Secrets: runSecretServices{
 			Initial: []secretstore.Config{initialStore},
 		},
-		Discovery: testRunDiscoveryServices(t, jobConfig),
+		Discovery:   testRunDiscoveryServices(t, jobConfig),
+		Diagnostics: testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -341,6 +343,7 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		Modules:         collectorapi.Registry{},
 		Jobs:            jobs,
 		Discovery:       testRunDiscoveryServices(t),
+		Diagnostics:     testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -487,7 +490,8 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(t *testing.T) {
 		Secrets: runSecretServices{
 			Initial: []secretstore.Config{initialStore},
 		},
-		Discovery: testRunDiscoveryServices(t, jobConfig),
+		Discovery:   testRunDiscoveryServices(t, jobConfig),
+		Diagnostics: testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)

@@ -4,9 +4,11 @@ package composition
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/discovery"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
@@ -180,10 +182,53 @@ func TestVNodeBindingRejectsOwnedTransactionScope(t *testing.T) {
 	require.EqualError(t, err, "jobmgr composition: invalid vnode transaction scope")
 }
 
+func TestVNodeDiagnosticsFollowAppliedCommandWithoutPayload(t *testing.T) {
+	const payloadSentinel = "vnode-payload-must-not-appear"
+	diagnostics := &recordingCompositionDiagnosticObserver{}
+	binding, _ := newTestVNodeBindingWithDiagnostics(t, confgroup.TypeDyncfg, nil, diagnostics)
+	transaction, err := binding.prepare(
+		context.Background(),
+		functionadapter.HandlerInput{
+			Args:         []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)},
+			Payload:      []byte(`{"hostname":"` + payloadSentinel + `","guid":"` + testVNodeGUID + `"}`),
+			ContentType:  "application/json",
+			CallerSource: "user=test",
+			HasPayload:   true,
+		},
+		nil,
+		lifecycle.ResourceTransactionScope{
+			ID: "vnode:db",
+		},
+		lifecycle.LongLivedPermit{},
+	)
+	require.NoError(t, err)
+	_, err = transaction.Apply(context.Background())
+	require.NoError(t, err)
+
+	events := diagnostics.snapshot()
+	names := make([]string, 0, len(events))
+	for _, event := range events {
+		names = append(names, event.Name)
+	}
+	require.Contains(t, names, "vnode configuration transaction prepared")
+	require.Contains(t, names, "vnode configuration transaction applied")
+	require.Contains(t, names, "vnode configuration command completed")
+	require.NotContains(t, fmt.Sprintf("%+v", events), payloadSentinel)
+}
+
 func newTestVNodeBinding(
 	t *testing.T,
 	sourceType string,
 	graphConfigs []dyncfg.GraphConfig,
+) (*vnodeBinding, *agentdiscovery.VNodeConfiguration) {
+	return newTestVNodeBindingWithDiagnostics(t, sourceType, graphConfigs, nil)
+}
+
+func newTestVNodeBindingWithDiagnostics(
+	t *testing.T,
+	sourceType string,
+	graphConfigs []dyncfg.GraphConfig,
+	diagnostics jobmgr.DiagnosticObserver,
 ) (*vnodeBinding, *agentdiscovery.VNodeConfiguration) {
 	t.Helper()
 	source := "user=test"
@@ -200,7 +245,7 @@ func newTestVNodeBinding(
 	require.NoError(t, err)
 	frames, err := lifecycle.NewFrameOwner(io.Discard)
 	require.NoError(t, err)
-	binding, err := newVNodeBinding(1, "go.d", frames, configured, graph)
+	binding, err := newVNodeBinding(1, "go.d", frames, configured, graph, diagnostics)
 	require.NoError(t, err)
 	return binding, configured
 }

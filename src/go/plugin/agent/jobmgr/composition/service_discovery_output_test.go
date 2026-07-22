@@ -5,6 +5,7 @@ package composition
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
@@ -86,7 +87,7 @@ func TestServiceDiscoveryBindingCapturesTypedInvocationOutput(t *testing.T) {
 			var notifications bytes.Buffer
 			frames, err := lifecycle.NewFrameOwner(&notifications)
 			require.NoError(t, err)
-			binding, err := newServiceDiscoveryBinding("go.d", frames)
+			binding, err := newServiceDiscoveryBinding(1, "go.d", frames, nil)
 			require.NoError(t, err)
 
 			result, cleanup, err := binding.invoke("uid", func() {
@@ -117,7 +118,7 @@ func TestServiceDiscoveryBindingRoutesNotificationsOutsideInvocations(t *testing
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
-	binding, err := newServiceDiscoveryBinding("go.d", frames)
+	binding, err := newServiceDiscoveryBinding(1, "go.d", frames, nil)
 	require.NoError(t, err)
 
 	binding.ConfigDelete("go.d:sd:type:gone")
@@ -128,7 +129,7 @@ func TestServiceDiscoveryBindingRoutesNotificationsOutsideInvocations(t *testing
 func TestServiceDiscoveryBindingRejectsResultOutsideInvocation(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
-	binding, err := newServiceDiscoveryBinding("go.d", frames)
+	binding, err := newServiceDiscoveryBinding(1, "go.d", frames, nil)
 	require.NoError(t, err)
 
 	binding.FunctionResult(dyncfg.Result{
@@ -152,7 +153,7 @@ func TestServiceDiscoveryTransactionDisposeDoesNotInvokeHandler(t *testing.T) {
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
-	binding, err := newServiceDiscoveryBinding("go.d", frames)
+	binding, err := newServiceDiscoveryBinding(1, "go.d", frames, nil)
 	require.NoError(t, err)
 
 	invoked := false
@@ -185,4 +186,50 @@ func TestServiceDiscoveryTransactionDisposeDoesNotInvokeHandler(t *testing.T) {
 	require.Nil(t, current)
 	require.False(t, invoked)
 	require.Empty(t, output.String())
+}
+
+func TestServiceDiscoveryDiagnosticsFollowAppliedCommandWithoutPayload(t *testing.T) {
+	const payloadSentinel = "service-discovery-payload-must-not-appear"
+	diagnostics := &recordingCompositionDiagnosticObserver{}
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	binding, err := newServiceDiscoveryBinding(3, "go.d", frames, diagnostics)
+	require.NoError(t, err)
+	binding.RegisterPrefix("config", "go.d:sd:", func(function frameworkfunctions.Function) {
+		binding.FunctionResult(dyncfg.Result{
+			UID:         function.UID,
+			Code:        200,
+			ContentType: "application/json",
+		})
+		binding.ConfigStatus("go.d:sd:type:job", dyncfg.StatusRunning)
+	})
+	transaction, err := binding.prepare(
+		context.Background(),
+		functionadapter.HandlerInput{
+			UID:        "diagnostic-enable",
+			Method:     "config",
+			Args:       []string{"go.d:sd:type:job", string(dyncfg.CommandEnable)},
+			Payload:    []byte(payloadSentinel),
+			HasPayload: true,
+		},
+		nil,
+		lifecycle.ResourceTransactionScope{
+			ID: "go.d:sd:type:job",
+		},
+		lifecycle.LongLivedPermit{},
+	)
+	require.NoError(t, err)
+	_, err = transaction.Apply(context.Background())
+	require.NoError(t, err)
+
+	events := diagnostics.snapshot()
+	names := make([]string, 0, len(events))
+	for _, event := range events {
+		names = append(names, event.Name)
+	}
+	require.Contains(t, names, "service discovery Function registered")
+	require.Contains(t, names, "service discovery configuration invocation started")
+	require.Contains(t, names, "service discovery notification buffered")
+	require.Contains(t, names, "service discovery configuration command completed")
+	require.NotContains(t, fmt.Sprintf("%+v", events), payloadSentinel)
 }

@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -35,6 +36,7 @@ type ControllerConfig struct {
 	Creators     *secretstore.CreatorCatalog // frozen creator catalog
 	Dependencies *SecretDependencyIndex      // secret dependency index
 	Initial      []secretstore.Config        // initial (stock/user) secret store configs
+	Diagnostics  jobmgr.DiagnosticObserver   // operational logger and optional trace sink
 }
 
 type Controller struct {
@@ -47,6 +49,7 @@ type Controller struct {
 	store        *secretstore.SecretStore    // per-run secret store
 	creators     *secretstore.CreatorCatalog // frozen creator catalog
 	dependencies *SecretDependencyIndex      // secret dependency index
+	diagnostics  jobmgr.DiagnosticObserver   // operational logger and optional trace sink
 	initial      []secretstore.Config        // initial secret store configs
 	entries      map[string]secretEntry      // published store entries by key
 	restarts     *SecretRestartCommand       // dependent-job restart command (bound at Bind)
@@ -75,6 +78,7 @@ func NewController(config ControllerConfig) (*Controller, error) {
 		store:        config.Store,
 		creators:     config.Creators,
 		dependencies: config.Dependencies,
+		diagnostics:  config.Diagnostics,
 		initial:      slices.Clone(config.Initial),
 		entries:      make(map[string]secretEntry),
 	}, nil
@@ -89,7 +93,7 @@ func (c *Controller) Bind(jobs DependentJobPort) error {
 	if c.restarts != nil || c.published {
 		return errors.New("jobmgr secrets: duplicate or late controller binding")
 	}
-	restarts, err := NewSecretRestartCommand(c.epoch, c.dependencies, jobs)
+	restarts, err := NewSecretRestartCommand(c.epoch, c.dependencies, jobs, c.diagnostics)
 	if err != nil {
 		return err
 	}
@@ -128,25 +132,29 @@ func (c *Controller) Prepare(
 	}
 	target, failure := c.resolveTarget(input)
 	if failure != nil {
-		return c.noopMessageWithPermit(scope, current, permit, failure.code, failure.message)
+		transaction, err := c.noopMessageWithPermit(scope, current, permit, failure.code, failure.message)
+		return c.observeTransaction(target, transaction, err)
 	}
+	c.traceCommand("secretstore configuration request resolved", target, nil)
+	var transaction lifecycle.PreparedResourceTransaction
+	var err error
 	switch target.command {
 	case dyncfg.CommandSchema:
-		return c.prepareSchema(scope, current, target)
+		transaction, err = c.prepareSchema(scope, current, target)
 	case dyncfg.CommandGet:
-		return c.prepareGet(scope, current, target)
+		transaction, err = c.prepareGet(scope, current, target)
 	case dyncfg.CommandUserconfig:
-		return c.prepareUserConfig(scope, current, input, target)
+		transaction, err = c.prepareUserConfig(scope, current, input, target)
 	case dyncfg.CommandTest:
-		return c.prepareTest(ctx, scope, current, input, target)
+		transaction, err = c.prepareTest(ctx, scope, current, input, target)
 	case dyncfg.CommandAdd:
-		return c.prepareAdd(ctx, scope, current, permit, input, target)
+		transaction, err = c.prepareAdd(ctx, scope, current, permit, input, target)
 	case dyncfg.CommandUpdate:
-		return c.prepareUpdate(ctx, scope, current, permit, input, target)
+		transaction, err = c.prepareUpdate(ctx, scope, current, permit, input, target)
 	case dyncfg.CommandRemove:
-		return c.prepareRemove(scope, current, target)
+		transaction, err = c.prepareRemove(scope, current, target)
 	default:
-		return c.noopMessageWithPermit(
+		transaction, err = c.noopMessageWithPermit(
 			scope,
 			current,
 			permit,
@@ -154,6 +162,7 @@ func (c *Controller) Prepare(
 			fmt.Sprintf("Function '%s' command '%s' is not implemented.", "config", target.command),
 		)
 	}
+	return c.observeTransaction(target, transaction, err)
 }
 
 type secretTarget struct {

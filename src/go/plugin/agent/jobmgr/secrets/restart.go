@@ -18,16 +18,18 @@ import (
 type SecretRestartCommand struct {
 	mu sync.Mutex // guards nextUID
 
-	epoch        uint64                 // run generation
-	dependencies *SecretDependencyIndex // secret dependency index
-	jobs         DependentJobPort       // port used to stop/start dependent jobs
-	nextUID      uint64                 // next child-command UID to assign
+	epoch        uint64                    // run generation
+	dependencies *SecretDependencyIndex    // secret dependency index
+	jobs         DependentJobPort          // port used to stop/start dependent jobs
+	diagnostics  jobmgr.DiagnosticObserver // operational logger and optional trace sink
+	nextUID      uint64                    // next child-command UID to assign
 }
 
 func NewSecretRestartCommand(
 	epoch uint64,
 	dependencies *SecretDependencyIndex,
 	jobs DependentJobPort,
+	diagnostics jobmgr.DiagnosticObserver,
 ) (*SecretRestartCommand, error) {
 	if epoch == 0 || dependencies == nil || jobs == nil {
 		return nil, errors.New("jobmgr secrets: incomplete restart command")
@@ -36,6 +38,7 @@ func NewSecretRestartCommand(
 		epoch:        epoch,
 		dependencies: dependencies,
 		jobs:         jobs,
+		diagnostics:  diagnostics,
 	}, nil
 }
 
@@ -49,8 +52,10 @@ func (src *SecretRestartCommand) Apply(
 		return secretstore.SecretMutationResult{}, "", false, errors.New("jobmgr secrets: invalid restart command")
 	}
 	refs := src.dependencies.Affected(storeKey, true)
+	src.trace("secretstore dependent restart started", storeKey, len(refs), nil)
 	if len(refs) == 0 {
 		result, err := commit(ctx)
+		src.trace("secretstore mutation committed without dependent restarts", storeKey, 0, err)
 		return result, "", !result.Retained, err
 	}
 	if commands == nil {
@@ -94,8 +99,30 @@ func (src *SecretRestartCommand) Apply(
 	if len(failures) != 0 {
 		message = "Secretstore change applied, but dependent collector restarts failed for jobs: " +
 			formatSecretJobNames(failures) + "."
+		jobmgr.ObserveDiagnostic(src.diagnostics, jobmgr.DiagnosticEvent{
+			Level:      jobmgr.DiagnosticWarning,
+			Name:       "secretstore dependent collector restart failed",
+			Resource:   secretResourceID(storeKey),
+			Generation: src.epoch,
+			Count:      len(failures),
+			Err:        errors.Join(commitErr, startErr),
+		})
 	}
+	src.trace("secretstore dependent restart completed", storeKey, len(stopped), errors.Join(commitErr, startErr))
 	return result, message, false, errors.Join(commitErr, startErr)
+}
+
+func (src *SecretRestartCommand) trace(name string, storeKey string, count int, err error) {
+	if src == nil {
+		return
+	}
+	jobmgr.TraceDiagnostic(src.diagnostics, jobmgr.DiagnosticEvent{
+		Name:       name,
+		Resource:   secretResourceID(storeKey),
+		Generation: src.epoch,
+		Count:      count,
+		Err:        err,
+	})
 }
 
 func (src *SecretRestartCommand) restore(commands jobmgr.CompositeCommandScope, ids []string) error {

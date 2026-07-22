@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -432,6 +433,10 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+			diagnostics := &recordingDiagnosticObserver{
+				trace: true,
+			}
+			require.NoError(t, kernel.BindDiagnosticObserver(diagnostics))
 			startKernelLoop(t, kernel)
 			require.NoError(t, run.OpenAdmission())
 			probeCtx, cancelProbe := context.WithTimeout(context.Background(), time.Second)
@@ -509,6 +514,14 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 			require.NoError(t, kernel.Wait(waitCtx))
 			require.NoError(t, probe.waitSettlement(waitCtx))
 			require.NoError(t, run.DirtyCause())
+			if test.suffix == "rollback" {
+				require.True(t, slices.ContainsFunc(diagnostics.snapshot(), func(event DiagnosticEvent) bool {
+					return event.Name == "operation admitted" &&
+						event.UID == childID &&
+						event.Rollback &&
+						event.Composite
+				}))
+			}
 		})
 	}
 }
