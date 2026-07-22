@@ -65,9 +65,6 @@ int aclk_disable_runtime = 0;
 
 ACLK_DISCONNECT_ACTION disconnect_req = ACLK_NO_DISCONNECT;
 
-usec_t aclk_session_us = 0;
-time_t aclk_session_sec = 0;
-
 time_t last_conn_time_mqtt = 0;
 time_t last_conn_time_appl = 0;
 time_t last_disconnect_time = 0;
@@ -109,7 +106,6 @@ static void aclk_ssl_keylog_cb(const SSL *ssl, const char *line)
 #endif
 
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
-OSSL_DECODER_CTX *aclk_dctx = NULL;
 EVP_PKEY *aclk_private_key = NULL;
 #else
 static RSA *aclk_private_key = NULL;
@@ -119,10 +115,6 @@ static int load_private_key()
     if (aclk_private_key != NULL) {
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
         EVP_PKEY_free(aclk_private_key);
-        if (aclk_dctx)
-            OSSL_DECODER_CTX_free(aclk_dctx);
-
-        aclk_dctx = NULL;
 #else
         RSA_free(aclk_private_key);
 #endif
@@ -139,44 +131,57 @@ static int load_private_key()
     }
     netdata_log_debug(D_ACLK, "Claimed agent loaded private key len=%ld bytes", bytes_read);
 
+    int rc = 1;
     BIO *key_bio = BIO_new_mem_buf(private_key, -1);
     if (key_bio==NULL) {
         netdata_log_error("ACLK: Claimed agent cannot establish ACLK - failed to create BIO for key");
-        goto biofailed;
+        goto cleanup;
     }
 
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
-    aclk_dctx = OSSL_DECODER_CTX_new_for_pkey(&aclk_private_key, "PEM", NULL,
-                                              "RSA",
-                                              OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
-                                              NULL, NULL);
+    OSSL_DECODER_CTX *dctx = OSSL_DECODER_CTX_new_for_pkey(&aclk_private_key, "PEM", NULL,
+                                                          "RSA",
+                                                          OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
+                                                          NULL, NULL);
 
-    if (!aclk_dctx) {
+    if (!dctx) {
         netdata_log_error("ACLK: Loading private key (from claiming) failed - no OpenSSL Decoders found");
-        goto biofailed;
+        goto cleanup;
     }
 
     // this is necesseary to avoid RSA key with wrong size
-    if (!OSSL_DECODER_from_bio(aclk_dctx, key_bio)) {
+    int decoded = OSSL_DECODER_from_bio(dctx, key_bio);
+    OSSL_DECODER_CTX_free(dctx);
+    if (!decoded) {
         netdata_log_error("ACLK: Decoding private key (from claiming) failed - invalid format.");
-        goto biofailed;
+        goto cleanup;
     }
 #else
     aclk_private_key = PEM_read_bio_RSAPrivateKey(key_bio, NULL, NULL, NULL);
-#endif
     BIO_free(key_bio);
+    key_bio = NULL;
+#endif
     if (aclk_private_key!=NULL)
-    {
-        freez(private_key);
-        return 0;
+        rc = 0;
+    else {
+        char err[512];
+        ERR_error_string_n(ERR_get_error(), err, sizeof(err));
+        netdata_log_error("ACLK: Claimed agent cannot establish ACLK - cannot create private key: %s", err);
     }
-    char err[512];
-    ERR_error_string_n(ERR_get_error(), err, sizeof(err));
-    netdata_log_error("ACLK: Claimed agent cannot establish ACLK - cannot create private key: %s", err);
 
-biofailed:
+cleanup:
+    if (key_bio)
+        BIO_free(key_bio);
+    if (rc && aclk_private_key) {
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+        EVP_PKEY_free(aclk_private_key);
+#else
+        RSA_free(aclk_private_key);
+#endif
+        aclk_private_key = NULL;
+    }
     freez(private_key);
-    return 1;
+    return rc;
 }
 
 /**
@@ -334,9 +339,11 @@ static int handle_connection(mqtt_wss_client client)
             return 1;
         }
 
-        if (disconnect_req != ACLK_NO_DISCONNECT) {
+        ACLK_DISCONNECT_ACTION action = __atomic_load_n(&disconnect_req, __ATOMIC_RELAXED);
+        if (action != ACLK_NO_DISCONNECT) {
+            action = __atomic_exchange_n(&disconnect_req, ACLK_NO_DISCONNECT, __ATOMIC_RELAXED);
             const char *reason;
-            switch (disconnect_req) {
+            switch (action) {
                 case ACLK_CLOUD_DISCONNECT:
                     worker_is_busy(WORKER_ACLK_CMD_DISCONNECT);
                     reason = "cloud request";
@@ -362,7 +369,6 @@ static int handle_connection(mqtt_wss_client client)
 
             nd_log(NDLS_DAEMON, NDLP_NOTICE, "Going to restart connection due to \"%s\"", reason);
 
-            disconnect_req = ACLK_NO_DISCONNECT;
             aclk_graceful_disconnect(client);
             aclk_shared_state.mqtt_shutdown_msg_id = -1;
             aclk_shared_state.mqtt_shutdown_msg_rcvd = 0;
@@ -435,7 +441,7 @@ static unsigned long aclk_reconnect_delay() {
     unsigned long recon_delay;
     time_t now;
 
-    if (aclk_disable_runtime) {
+    if (__atomic_load_n(&aclk_disable_runtime, __ATOMIC_RELAXED)) {
         aclk_tbeb_reset();
         return 60 * MSEC_PER_SEC;
     }
@@ -514,16 +520,18 @@ static int aclk_get_transport_idx(aclk_env_t *env) {
 ACLK_STATUS aclk_status = ACLK_STATUS_OFFLINE;
 
 const char *aclk_status_to_string(void) {
-    if(aclk_status == ACLK_STATUS_CONNECTED)
+    ACLK_STATUS status = __atomic_load_n(&aclk_status, __ATOMIC_RELAXED);
+
+    if(status == ACLK_STATUS_CONNECTED)
         return "connected";
 
-    if((int)aclk_status < (int)ND_SOCK_ERR_MAX)
-        return ND_SOCK_ERROR_2str((ND_SOCK_ERROR)aclk_status);
+    if((int)status < (int)ND_SOCK_ERR_MAX)
+        return ND_SOCK_ERROR_2str((ND_SOCK_ERROR)status);
 
-    if((int)aclk_status < (int)HTTPS_CLIENT_RESP_MAX)
-        return https_client_resp_t_2str((https_client_resp_t)aclk_status);
+    if((int)status < (int)HTTPS_CLIENT_RESP_MAX)
+        return https_client_resp_t_2str((https_client_resp_t)status);
 
-    switch(aclk_status) {
+    switch(status) {
         case ACLK_STATUS_CONNECTED:
             return "connected";
 
@@ -593,7 +601,7 @@ const char *aclk_status_to_string(void) {
 }
 
 void aclk_status_set(ACLK_STATUS status) {
-    aclk_status = status;
+    __atomic_store_n(&aclk_status, status, __ATOMIC_RELAXED);
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &aclk_connection_msgid),
@@ -741,9 +749,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
 #endif
 
-        aclk_session_newarch = now_realtime_usec();
-        aclk_session_sec = aclk_session_newarch / USEC_PER_SEC;
-        aclk_session_us = aclk_session_newarch % USEC_PER_SEC;
+        aclk_session_store(now_realtime_usec());
 
         mqtt_conn_params.will_msg = aclk_generate_lwt(&mqtt_conn_params.will_msg_len);
 
@@ -998,7 +1004,7 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struc
         .hops = hops,
         .live = live,
         .queryable = queryable,
-        .session_id = aclk_session_newarch};
+        .session_id = aclk_session_load()};
 
     char node_id[UUID_STR_LEN];
     uuid_unparse_lower(host->node_id.uuid, node_id);
@@ -1067,7 +1073,7 @@ static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
         "\n\t\tCheckpoints: %d"
         "\n\t\tAlert count: %d"
         "\n\t\tAlert snapshot count: %d",
-        aclk_host_config->stream_alerts,
+        aclk_alert_streaming_enabled(aclk_host_config),
         aclk_host_config->checkpoint_count,
         aclk_host_config->alert_count,
         aclk_host_config->snapshot_count);
@@ -1117,8 +1123,9 @@ char *aclk_state(void)
     time_t next_connection_attempt_snapshot = __atomic_load_n(&next_connection_attempt, __ATOMIC_RELAXED);
     float last_backoff_value_snapshot;
     __atomic_load(&last_backoff_value, &last_backoff_value_snapshot, __ATOMIC_RELAXED);
+    bool disable_runtime = __atomic_load_n(&aclk_disable_runtime, __ATOMIC_RELAXED);
 
-    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_is_online ? "Yes" : "No", connection_counter > 0 ? (connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
+    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_is_online ? "Yes" : "No", connection_counter > 0 ? (connection_counter - 1) : 0, disable_runtime ? "Yes" : "No");
     if (last_conn_time_mqtt_snapshot && ((tmptr = localtime_r(&last_conn_time_mqtt_snapshot, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
@@ -1191,7 +1198,7 @@ static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
     if (!aclk_host_config)
         return;
 
-    json_object *tmp = json_object_new_int(aclk_host_config->stream_alerts);
+    json_object *tmp = json_object_new_int(aclk_alert_streaming_enabled(aclk_host_config));
     json_object_object_add(obj, "updates", tmp);
 
     tmp = json_object_new_int(aclk_host_config->checkpoint_count);
@@ -1307,7 +1314,7 @@ char *aclk_state_json(void)
         tmp = json_object_new_double(last_backoff_value_snapshot);
     json_object_object_add(msg, "last-backoff-value", tmp);
 
-    tmp = json_object_new_boolean(aclk_disable_runtime);
+    tmp = json_object_new_boolean(__atomic_load_n(&aclk_disable_runtime, __ATOMIC_RELAXED));
     json_object_object_add(msg, "banned-by-cloud", tmp);
 
     grp = json_object_new_array();

@@ -15,7 +15,7 @@ ENUM_STR_MAP_DEFINE(CLOUD_STATUS) = {
 ENUM_STR_DEFINE_FUNCTIONS(CLOUD_STATUS, CLOUD_STATUS_AVAILABLE, "available");
 
 CLOUD_STATUS cloud_status(void) {
-    if(unlikely(aclk_disable_runtime))
+    if(unlikely(__atomic_load_n(&aclk_disable_runtime, __ATOMIC_RELAXED)))
         return CLOUD_STATUS_BANNED;
 
     if(likely(aclk_online()))
@@ -52,7 +52,7 @@ size_t cloud_connection_id(void) {
 }
 
 const char *cloud_status_aclk_offline_reason() {
-    if(aclk_disable_runtime)
+    if(__atomic_load_n(&aclk_disable_runtime, __ATOMIC_RELAXED))
         return "banned";
 
     return aclk_status_to_string();

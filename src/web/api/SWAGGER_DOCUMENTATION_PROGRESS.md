@@ -631,7 +631,10 @@ Must apply CODE-FIRST METHODOLOGY to all 67 remaining APIs:
 ## PERMISSIONS ANALYSIS - COMPLETE ✅
 
 **Summary:**
-Comprehensive analysis of ACL (Access Control Lists) and HTTP_ACCESS permissions completed for all 68 APIs.
+The route ACL and `HTTP_ACCESS` dimensions have been reconciled independently
+for all 68 production API route registrations. Authorization also includes
+connection/transport admission and callback-local checks; route flags alone do
+not describe the complete request path.
 
 **Analysis Document:** `API_PERMISSIONS_ANALYSIS.md`
 
@@ -643,14 +646,18 @@ Comprehensive analysis of ACL (Access Control Lists) and HTTP_ACCESS permissions
    - `/api/v*/bearer_get_token` - Generate bearer tokens (requires: SIGNED_ID + SAME_SPACE)
    - ⚠️ These APIs are ONLY accessible via Netdata Cloud (ACLK), not via direct HTTP
 
-2. **Public Data APIs (48 total - No Authentication Required):**
-   - Most metrics, alerts, and metadata APIs
-   - Require `HTTP_ACCESS_ANONYMOUS_DATA`
-   - Subject to IP-based ACL restrictions in netdata.conf
+2. **`HTTP_ACCESS` Accounting:**
+   - 55 routes require `HTTP_ACCESS_ANONYMOUS_DATA`
+   - 7 routes require `HTTP_ACCESS_NONE`
+   - 6 ACLK registrations require signed access masks
+   - These dimensions overlap ACL categories and must not be added together
 
-3. **Public Info APIs (11 total - Unrestricted):**
-   - Have `HTTP_ACL_NOCHECK` - bypass ACL checking
-   - Includes: info, versions, progress, me, claim, stream_info
+3. **Per-Route ACL Bypass (9 total):**
+   - `HTTP_ACL_NOCHECK` skips only the route-table ACL comparison
+   - Four routes still require `HTTP_ACCESS_ANONYMOUS_DATA` and are rejected for
+     unauthenticated requests when bearer protection is enabled
+   - Five routes require `HTTP_ACCESS_NONE`, but connection/transport/coarse
+     admission and callback-local checks still apply
 
 4. **Special Permission Handling:**
    - `/api/v*/config` - Permissions checked per-action internally
@@ -667,7 +674,7 @@ Comprehensive analysis of ACL (Access Control Lists) and HTTP_ACCESS permissions
 - `HTTP_ACL_BADGES` - Badge generation (configurable via "allow badges from")
 - `HTTP_ACL_MANAGEMENT` - Management operations (configurable via "allow management from")
 - `HTTP_ACL_ACLK` - Cloud-only access
-- `HTTP_ACL_NOCHECK` - No restrictions
+- `HTTP_ACL_NOCHECK` - Skip only the endpoint's route-table ACL comparison
 
 **Next Action:** ✅ COMPLETE - Security documentation added to all 68 APIs
 
@@ -678,7 +685,10 @@ Comprehensive analysis of ACL (Access Control Lists) and HTTP_ACCESS permissions
 ## SECURITY DOCUMENTATION IN SWAGGER - ⚠️ PARTIALLY VERIFIED
 
 **Summary:**
-All 68 APIs have security documentation in swagger.yaml based on ACL/ACCESS flags from registration structs. **However, actual endpoint behavior and parameter handling NOT VERIFIED.**
+All 68 APIs have security prose in the committed Swagger documents. The nine
+`HTTP_ACL_NOCHECK` routes and the v1 registry callback were verified through the
+current request path; other endpoint behavior and parameter handling retain their
+existing verification status.
 
 **What Was Added:**
 
@@ -694,33 +704,36 @@ All 68 APIs have security documentation in swagger.yaml based on ACL/ACCESS flag
    - Description: Detailed ACLK access requirements, permissions, and restrictions
    - APIs: rtc_offer, bearer_protection, bearer_get_token (v2 & v3)
 
-   **Public Data APIs (51 total):**
+   **Operations with optional bearer declarations (54 total):**
    - Security field: `security: [{}, bearerAuth: []]` (no auth OR bearer auth)
    - Description: Bearer protection optional, IP ACL restrictions, access methods
    - APIs: data, weights, contexts, alerts, functions, badges, config, etc. (v1, v2, v3)
 
-   **Always Public APIs (11 total):**
-   - Security field: NONE (intentionally omitted - indicates always public)
-   - Description: Always accessible, no restrictions, cannot be secured
-   - APIs: info, versions, progress, claim, me, registry, manage
+   **Routes without a security declaration:**
+   - An omitted OpenAPI security field does not prove that runtime access is
+     unrestricted
+   - Four `HTTP_ACL_NOCHECK` routes that require
+     `HTTP_ACCESS_ANONYMOUS_DATA` currently omit this declaration; that
+     machine-readable schema issue is tracked separately from this prose audit
 
 3. **Security Section Format:**
    Each API's description includes a **Security & Access Control** section with:
-   - Access type (ACLK-Only / Public Data / Always Public)
+   - Route ACL behavior
    - Authentication requirements
-   - IP-based ACL restrictions (where applicable)
+   - Connection/IP admission (where applicable)
    - Access methods (HTTP, Cloud, external tools)
    - Configuration references (netdata.conf settings)
 
 **Verification Status:**
 - ✅ 68/68 APIs have "Security & Access Control" in descriptions (based on registration flags)
 - ✅ 6 ACLK-only APIs have `aclkAuth` security scheme (verified from ACL flags)
-- ✅ 51 Public Data APIs have optional bearer auth `[{}, bearerAuth: []]` (verified from ACCESS flags)
-- ✅ 11 Always Public APIs have NO security field (verified from HTTP_ACL_NOCHECK)
+- ✅ 54 operations have optional bearer auth `[{}, bearerAuth: []]`
+- ⚠️ An omitted security field is not treated as evidence of unrestricted runtime access
 - ✅ All security flags match API_PERMISSIONS_ANALYSIS.md
-- ⚠️ **Actual endpoint behavior and parameter security NOT VERIFIED from implementation code**
+- ✅ The complete authorization path was verified for all nine NOCHECK routes and v1 registry
+- ⚠️ **Other endpoint behavior and parameter security retain their existing verification status**
 
-**Security Documentation Date:** 2025-10-04 (flags verified, behavior unverified)
+**Security Documentation Date:** 2026-07-16 (NOCHECK and registry authorization behavior verified)
 
 ---
 
@@ -1928,8 +1941,10 @@ Per dimension:
 - Build Info: `src/daemon/buildinfo.c`
 
 **Security Configuration:**
-- ACL: `HTTP_ACL_NOCHECK` - No access control (public endpoint)
-- ACCESS: `HTTP_ACCESS_NONE` - No authentication required
+- ACL: `HTTP_ACL_NOCHECK` - Skips only the route-table ACL comparison
+- ACCESS: `HTTP_ACCESS_NONE` - The generic access gate does not require a bearer token
+- Direct HTTP: Global connection allowlisting, listener/port ACLs, and coarse API admission still apply
+- Callback: No additional authorization check
 
 ### PARAMETERS (9 total, all optional)
 
@@ -2149,7 +2164,7 @@ Per dimension:
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 9 (all optional)
 **Response Fields Verified:** 155+ fields (comprehensive agent information)
-**Security:** HTTP_ACL_NOCHECK + HTTP_ACCESS_NONE (public endpoint)
+**Security:** `HTTP_ACL_NOCHECK` + `HTTP_ACCESS_NONE`; independent admission gates still apply
 **Dual-Agent Agreement:** ✅ Both agents confirmed complete agent information structure
 
 ---
@@ -2538,8 +2553,10 @@ Per dimension:
 - Response Generation: `src/web/api/formatters/jsonwrap-v2.c:65-74`
 
 **Security Configuration:**
-- ACL: `HTTP_ACL_NOCHECK` - No access control (public endpoint)
-- ACCESS: `HTTP_ACCESS_ANONYMOUS_DATA` - Allows anonymous data access
+- ACL: `HTTP_ACL_NOCHECK` - Skips only the route-table ACL comparison
+- ACCESS: `HTTP_ACCESS_ANONYMOUS_DATA` - Bearer mode rejects unauthenticated requests
+- Direct HTTP: Global connection allowlisting, listener/port ACLs, and coarse API admission still apply
+- Callback: No additional authorization check
 
 ### PARAMETERS (7 total, all optional)
 
@@ -2576,7 +2593,7 @@ Per dimension:
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 7 (all optional)
 **Response Fields Verified:** 9 fields (version hashes for cache invalidation)
-**Security:** HTTP_ACL_NOCHECK + HTTP_ACCESS_ANONYMOUS_DATA (public endpoint)
+**Security:** `HTTP_ACL_NOCHECK` + `HTTP_ACCESS_ANONYMOUS_DATA`; bearer mode and independent admission gates still apply
 **Dual-Agent Agreement:** ✅ Both agents confirmed version hash structure
 
 ---
@@ -2589,8 +2606,10 @@ Per dimension:
 - Core Logic: `src/libnetdata/query_progress/progress.c`
 
 **Security Configuration:**
-- ACL: `HTTP_ACL_NOCHECK` - No access control (public endpoint)
-- ACCESS: `HTTP_ACCESS_ANONYMOUS_DATA` - Allows anonymous data access
+- ACL: `HTTP_ACL_NOCHECK` - Skips only the route-table ACL comparison
+- ACCESS: `HTTP_ACCESS_ANONYMOUS_DATA` - Bearer mode rejects unauthenticated requests
+- Direct HTTP: Global connection allowlisting, listener/port ACLs, and coarse API admission still apply
+- Callback: No additional authorization check
 
 ### PARAMETERS (1 required)
 
@@ -2623,7 +2642,7 @@ Per dimension:
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 1 (required transaction UUID)
 **Response Fields Verified:** 8 fields (dynamic based on query state)
-**Security:** HTTP_ACL_NOCHECK + HTTP_ACCESS_ANONYMOUS_DATA (public endpoint)
+**Security:** `HTTP_ACL_NOCHECK` + `HTTP_ACCESS_ANONYMOUS_DATA`; bearer mode and independent admission gates still apply
 **Dual-Agent Agreement:** ✅ Both agents confirmed progress tracking structure
 
 ✅ **ALL THREE ENDPOINTS VERIFIED** - APIs #15-17 complete with checklists
@@ -2962,8 +2981,10 @@ Per dimension:
 - Response Generator: `src/streaming/stream-parents.c:306-342`
 
 **Security Configuration:**
-- ACL: `HTTP_ACL_NOCHECK`
-- ACCESS: `HTTP_ACCESS_NONE`
+- ACL: `HTTP_ACL_NOCHECK` - Skips only the route-table ACL comparison
+- ACCESS: `HTTP_ACCESS_NONE` - The generic access gate does not require a bearer token
+- Direct HTTP: Global connection allowlisting, listener/port ACLs, and coarse API admission still apply
+- Callback: No additional authorization check
 
 ### PARAMETERS (1 total)
 1. ✅ `machine_guid` - string, optional - The machine GUID of the host to query stream information for. If not provided or invalid, returns HTTP_RESP_NOT_FOUND (404)
@@ -3000,7 +3021,7 @@ Per dimension:
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 1
 **Response Fields Verified:** 12
-**Security:** HTTP_ACL_NOCHECK + HTTP_ACCESS_NONE
+**Security:** `HTTP_ACL_NOCHECK` + `HTTP_ACCESS_NONE`; independent admission gates still apply
 **Response Format:** JSON with quoted keys and values
 **Default Return Code:** HTTP_RESP_OK (200) or HTTP_RESP_NOT_FOUND (404)
 **Dual-Agent Agreement:** ✅ Agent confirmed streaming infrastructure status structure
@@ -3074,8 +3095,10 @@ Per dimension:
 - Implementation: `src/web/api/v2/api_v2_claim.c:237-239` (wrapper calling `api_claim` at lines 173-231)
 
 **Security Configuration:**
-- ACL: `HTTP_ACL_NOCHECK` (No ACL checks - security handled internally)
-- ACCESS: `HTTP_ACCESS_NONE` (No standard access flags - custom security via session ID)
+- ACL: `HTTP_ACL_NOCHECK` - Skips only the route-table ACL comparison
+- ACCESS: `HTTP_ACCESS_NONE` - The generic access gate does not require a bearer token
+- Direct HTTP: Global connection allowlisting, listener/port ACLs, and coarse API admission still apply
+- Callback: Status reads need no local credential; claim mutations require the current rotating random session ID and valid parameters
 
 **HTTP Method:** GET (parameters in query string)
 
@@ -3143,7 +3166,7 @@ Per dimension:
 
 **Parameters Verified:** 4
 **Response Fields Verified:** 19 (variable based on cloud status and response type)
-**Security:** Custom UUID-based session verification (HTTP_ACL_NOCHECK + HTTP_ACCESS_NONE + random session ID)
+**Security:** `HTTP_ACL_NOCHECK` + `HTTP_ACCESS_NONE`; claim mutation uses rotating UUID-based session verification and independent admission gates still apply
 **Dual-Agent Agreement:** ✅ Agent confirmed cloud claiming workflow structure
 
 **Notes:**
@@ -3280,8 +3303,10 @@ Per dimension:
 - Implementation: `src/web/api/v3/api_v3_me.c:5-38`
 
 **Security Configuration:**
-- ACL: `HTTP_ACL_NOCHECK` (no ACL check required)
-- ACCESS: `HTTP_ACCESS_NONE` (no specific access requirements)
+- ACL: `HTTP_ACL_NOCHECK` - Skips only the route-table ACL comparison
+- ACCESS: `HTTP_ACCESS_NONE` - The generic access gate does not require a bearer token
+- Direct HTTP: Global connection allowlisting, listener/port ACLs, and coarse API admission still apply
+- Callback: No additional authorization check
 
 ### PARAMETERS (0 total)
 **No parameters** - This endpoint accepts no query parameters or request body.
@@ -3321,7 +3346,7 @@ Per dimension:
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 0 (no parameters accepted)
 **Response Fields Verified:** 5 (all fields enumerated with complete possible values)
-**Security:** HTTP_ACL_NOCHECK + HTTP_ACCESS_NONE (open endpoint, relies on authentication context from web client)
+**Security:** `HTTP_ACL_NOCHECK` + `HTTP_ACCESS_NONE`; reports the web-client authentication context after independent admission gates
 **Dual-Agent Agreement:** ✅ Agent confirmed user authentication context structure
 
 ### NOTES
@@ -3340,8 +3365,12 @@ Per dimension:
 ### Verification Strategy:
 Agent-based analysis revealed that 88% of V2 APIs (15/17) share identical callback implementations with V3 APIs, enabling efficient verification through cross-reference.
 
-### Category 1: V2 APIs Verified by V3 Reference (15 APIs)
-These endpoints use the **exact same callback function** as their V3 counterparts. All parameters, response fields, and behavior are identical - only the URL path differs.
+### Category 1: V2 APIs Verified by V3 Callback Reference (15 APIs)
+These endpoints use the **same callback function** as their V3 counterparts for
+response behavior. Route ACL and `HTTP_ACCESS` settings are version-specific and
+must not be inherited from the callback: for example, v2 `info` requires
+`ANONYMOUS_DATA` while v3 `info` requires `NONE`, and v2 `versions` uses the nodes
+ACL while v3 `versions` uses `NOCHECK`.
 
 1. `/api/v2/weights` = `/api/v3/weights` (callback: `api_v2_weights`)
 2. `/api/v2/contexts` = `/api/v3/contexts` (callback: `api_v2_contexts`)
@@ -3375,7 +3404,10 @@ See complete checklist above (Agent A verification). Key differences from V3:
 - **V2** (`version=2`): Returns **plain text** error messages on validation failures
 - **V3** (`version=3`): Returns **JSON** error responses on validation failures
 
-All other aspects (parameters, success responses, claiming logic, security) are identical. See `/api/v3/claim` checklist for complete parameter and response documentation.
+All other callback behavior, parameters, success responses, and claiming logic
+are identical. Both claim routes use `HTTP_ACL_NOCHECK` + `HTTP_ACCESS_NONE`,
+while independent connection/transport admission remains version-agnostic. See
+`/api/v3/claim` for the complete parameter and response documentation.
 
 ### Build Status:
 - `ENABLE_API_v2`: **Hardcoded enabled** in `src/web/api/web_api.h`
@@ -3641,7 +3673,7 @@ No query parameters
 - Implementation: `src/web/api/v1/api_v1_info.c:6-25`
 
 **Security Configuration:**
-- ACL: `HTTP_ACL_NOCHECK`
+- ACL: `HTTP_ACL_NODES`
 - ACCESS: `HTTP_ACCESS_ANONYMOUS_DATA`
 
 ### PARAMETERS (0 total)
@@ -3733,7 +3765,7 @@ No query parameters
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 0
 **Response Fields Verified:** 59
-**Security:** HTTP_ACL_NOCHECK + HTTP_ACCESS_ANONYMOUS_DATA
+**Security:** `HTTP_ACL_NODES` + `HTTP_ACCESS_ANONYMOUS_DATA`
 **Dual-Agent Agreement:** ✅ Agent confirmed comprehensive agent info structure
 
 ---
@@ -4172,6 +4204,8 @@ Response structure is determined dynamically by the weights engine based on the 
 **Security Configuration:**
 - ACL: `HTTP_ACL_NONE` (manages ACL by itself)
 - ACCESS: `HTTP_ACCESS_NONE` (manages access by itself)
+- Direct HTTP: Global connection allowlisting, listener/port ACLs, and coarse API admission still apply
+- Callback: `hello` requires dashboard ACL; every other action requires registry ACL
 
 ### PARAMETERS (8 total)
 
@@ -4225,7 +4259,7 @@ Response structure is determined dynamically by the weights engine based on the 
 - Other actions: require HTTP_ACL_REGISTRY permission
 - Respects Do-Not-Track (DNT) header
 - Sets persistent cookies for person identification
-- Supports cookie-based and bearer token authentication
+- Cookie or bearer data may identify person_guid but does not replace callback authorization
 **Dual-Agent Agreement:** ✅ Agent confirmed registry with multi-action structure
 
 ---

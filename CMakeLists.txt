@@ -805,15 +805,6 @@ int main() {
 }
 " HAVE_BUILTIN_ATOMICS)
 
-check_cxx_source_compiles("
-#include <stdint.h>
-int main(void) {
-        uint64_t a;
-        __sync_add_and_fetch(&a, 1);
-        return 0;
-}
-" ARCH_SUPPORTS_64BIT_ATOMICS)
-
 check_c_source_compiles("
 void my_printf(char const *s, ...) __attribute__((format(gnu_printf, 1, 2)));
 int main() { return 0; }
@@ -1941,6 +1932,7 @@ set(SYSTEMD_UNITS_PLUGIN_FILES
 
 set(STREAMING_PLUGIN_FILES
         src/streaming/stream.h
+        src/streaming/stream-trace.h
         src/streaming/stream-compression/compression.c
         src/streaming/stream-compression/compression.h
         src/streaming/stream-compression/brotli.c

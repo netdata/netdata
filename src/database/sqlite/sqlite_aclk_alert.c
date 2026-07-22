@@ -424,12 +424,10 @@ void health_alarm_log_populate(
 
     alarm_log->conf_source = source ? strdupz(source) : strdupz("");
 
-    time_t duration = sqlite3_column_int64(res, DURATION);
-    alarm_log->duration =  (duration > 0) ? duration : 0;
-
+    int64_t duration = sqlite3_column_int64(res, DURATION);
     int64_t non_clear_duration = sqlite3_column_int64(res, NON_CLEAR_DURATION);
-    alarm_log->non_clear_duration = (non_clear_duration <= 0) ? 0 :
-                                    (non_clear_duration > UINT32_MAX) ? UINT32_MAX : (uint32_t)non_clear_duration;
+    alarm_log->duration = nd_duration_to_uint32_saturating(duration);
+    alarm_log->non_clear_duration = nd_duration_to_uint32_saturating(non_clear_duration);
 
     alarm_log->status = rrdcalc_status_to_proto_enum(current_status);
     alarm_log->old_status = rrdcalc_status_to_proto_enum((RRDCALC_STATUS)sqlite3_column_int64(res, OLD_STATUS));
@@ -707,22 +705,23 @@ void aclk_push_alert_events_for_all_hosts(void)
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        if (!aclk_host_config || false == aclk_host_config->stream_alerts || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+        if (!aclk_host_config || !aclk_alert_streaming_enabled(aclk_host_config) || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
             (void)process_alert_pending_queue(host);
             commit_alert_events(host);
             continue;
         }
 
-        if (aclk_host_config->send_snapshot) {
+        enum aclk_alert_snapshot_state snapshot_state = aclk_alert_snapshot_state_get(aclk_host_config);
+        if (snapshot_state != ACLK_ALERT_SNAPSHOT_IDLE) {
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-            if (aclk_host_config->send_snapshot == 1)
+            if (snapshot_state == ACLK_ALERT_SNAPSHOT_PENDING)
                 continue;
             (void)process_alert_pending_queue(host);
             commit_alert_events(host);
             rebuild_host_alert_version_table(host);
             send_alert_snapshot_to_cloud(host);
             aclk_host_config->snapshot_count++;
-            aclk_host_config->send_snapshot = 0;
+            aclk_alert_snapshot_complete(aclk_host_config);
         }
         else
             aclk_push_alert_event(host, &res, &res_version);
@@ -993,7 +992,7 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_
             (long long unsigned)cloud_version,
             (long long unsigned)local_version);
 
-        aclk_host_config->send_snapshot = 1;
+        aclk_alert_snapshot_request(aclk_host_config);
         rrdhost_flag_set(aclk_host_config->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
     }
     else
@@ -1178,7 +1177,9 @@ void aclk_start_alert_streaming(char *node_id, uint64_t cloud_version)
     nd_log(NDLS_ACCESS, NDLP_DEBUG, "ACLK REQ [%s (%s)]: STREAM ALERTS ENABLED", node_id,
         aclk_host_config->host ? rrdhost_hostname(aclk_host_config->host) : "N/A");
     schedule_alert_snapshot_if_needed(aclk_host_config, cloud_version);
-    aclk_host_config->stream_alerts = true;
+    aclk_alert_streaming_set(aclk_host_config, true);
+    if (aclk_alert_snapshot_state_get(aclk_host_config) != ACLK_ALERT_SNAPSHOT_IDLE)
+        rrdhost_flag_set(aclk_host_config->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 }
 
 // Do checkpoint alert version check

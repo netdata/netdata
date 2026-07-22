@@ -183,7 +183,7 @@ static int aclk_parse_otp_error(const char *json_str) {
     }
 
     if (block_retry > 0)
-        aclk_disable_runtime = 1;
+        __atomic_store_n(&aclk_disable_runtime, 1, __ATOMIC_RELAXED);
 
     if (backoff > 0)
         aclk_block_until = now_monotonic_sec() + backoff;
@@ -263,7 +263,7 @@ static int aclk_parse_otp_error(const char *json_str) {
     }
 
     if (block_retry > 0)
-        aclk_disable_runtime = 1;
+        __atomic_store_n(&aclk_disable_runtime, 1, __ATOMIC_RELAXED);
 
     if (backoff > 0)
         aclk_block_until = now_monotonic_sec() + backoff;

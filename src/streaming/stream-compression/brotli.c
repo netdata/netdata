@@ -88,7 +88,7 @@ void stream_decompressor_init_brotli(struct decompressor_state *state) {
         if (!state->stream)
             return;
 
-        simple_ring_buffer_make_room(&state->output, COMPRESSION_MAX_CHUNK);
+        simple_ring_buffer_set_capacity(&state->output, COMPRESSION_MAX_CHUNK + 1);
         state->initialized = true;
     }
 }
@@ -126,9 +126,9 @@ size_t stream_decompress_brotli(struct decompressor_state *state, const char *co
 
     size_t decompressed_size = state->output.size - available_out;
     if(available_out == 0) {
-        netdata_log_error("STREAM_DECOMPRESS: BrotliDecoderDecompressStream() needs a bigger output buffer than the one we provided "
-                          "(output buffer %zu bytes, compressed payload %zu bytes)",
-                          state->output.size, compressed_size);
+        netdata_log_error("STREAM_DECOMPRESS: BrotliDecoderDecompressStream() produced at least %zu bytes, exceeding "
+                          "the max supported size of %zu bytes (compressed payload %zu bytes)",
+                          state->output.size, (size_t)COMPRESSION_MAX_CHUNK, compressed_size);
         return 0;
     }
 
