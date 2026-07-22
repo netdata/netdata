@@ -391,6 +391,10 @@ trap 'trap_handler 15 0' TERM
 # ======================================================================
 # Utility functions
 
+sanitize_string() {
+    printf '%s\n' "$1" | tr -cd "[:alnum:] :/.,_-"
+}
+
 canonical_path() {
   OLDPWD="$(pwd)"
   cd "$(dirname "${1}")" || exit 1
@@ -2615,7 +2619,7 @@ parse_args() {
       "--interactive") INTERACTIVE=1 ;;
       "--dry-run") DRY_RUN=1 ;;
       "--release-channel")
-        RELEASE_CHANNEL="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        RELEASE_CHANNEL="$(sanitize_string "${2}" | tr '[:upper:]' '[:lower:]')"
         case "${RELEASE_CHANNEL}" in
           nightly|stable|default) shift 1 ;;
           *)
@@ -2634,7 +2638,7 @@ parse_args() {
       "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
       "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
       "--auto-update-type"|"--auto-update-method")
-        NETDATA_AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        NETDATA_AUTO_UPDATE_TYPE="$(sanitize_string "${2}" | tr '[:upper:]' '[:lower:]')"
         case "${NETDATA_AUTO_UPDATE_TYPE}" in
           systemd|interval|crontab) shift 1 ;;
           *)
@@ -2658,19 +2662,19 @@ parse_args() {
         NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
         ;;
       "--install-prefix")
-        INSTALL_PREFIX="${2}"
+        INSTALL_PREFIX="$(sanitize_string "${2}")"
         shift 1
         ;;
       "--old-install-prefix")
-        OLD_INSTALL_PREFIX="${2}"
+        OLD_INSTALL_PREFIX="$(sanitize_string "${2}")"
         shift 1
         ;;
       "--install-major-version")
-        INSTALL_MAJOR_VERSION="${2}"
+        INSTALL_MAJOR_VERSION="$(sanitize_string "${2}")"
         shift 1
         ;;
       "--install-version")
-        INSTALL_VERSION="${2}"
+        INSTALL_VERSION="$(sanitize_string "${2}")"
         AUTO_UPDATE=0
         shift 1
         ;;
@@ -2698,8 +2702,9 @@ parse_args() {
       "--static-only") NETDATA_REQUESTED_INSTALL_TYPE="static" ;;
       "--build-only") NETDATA_REQUESTED_INSTALL_TYPE="build" ;;
       "--install-type")
-        case "${2}" in
-          native|static|build|auto|any) NETDATA_REQUESTED_INSTALL_TYPE="${2}" ;;
+        t="$(sanitize_string "${2}")"
+        case "${t}" in
+          native|static|build|auto|any) NETDATA_REQUESTED_INSTALL_TYPE="${t}" ;;
           *) fatal "${2} is not a recognized install type. Please specify one of native, static, build, auto, or any." F051F ;;
         esac
         shift 1
@@ -2707,15 +2712,15 @@ parse_args() {
       "--claim-"*)
         optname="$(echo "${1}" | cut -d '-' -f 4-)"
         case "${optname}" in
-          token) NETDATA_CLAIM_TOKEN="${2}"; shift 1 ;;
-          rooms) NETDATA_CLAIM_ROOMS="${2}"; shift 1 ;;
-          url) NETDATA_CLAIM_URL="${2}"; shift 1 ;;
-          proxy) NETDATA_CLAIM_PROXY="${2}"; shift 1 ;;
+          token) NETDATA_CLAIM_TOKEN="$(sanitize_string "${2}")"; shift 1 ;;
+          rooms) NETDATA_CLAIM_ROOMS="$(sanitize_string "${2}")"; shift 1 ;;
+          url) NETDATA_CLAIM_URL="$(sanitize_string "${2}")"; shift 1 ;;
+          proxy) NETDATA_CLAIM_PROXY="$(sanitize_string "${2}")"; shift 1 ;;
           noproxy) NETDATA_CLAIM_PROXY="none" ;;
           insecure) NETDATA_CLAIM_INSECURE=yes ;;
           noreload) NETDATA_CLAIM_NORELOAD=1 ;;
           id|user|hostname)
-            NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}=${2}"
+            NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}=$(sanitize_string "${2}")"
             shift 1
             ;;
           verbose|daemon-not-running) NETDATA_CLAIM_EXTRA="${NETDATA_CLAIM_EXTRA} -${optname}" ;;
@@ -2723,35 +2728,37 @@ parse_args() {
         esac
         ;;
       "--local-build-options")
-        LOCAL_BUILD_OPTIONS="${LOCAL_BUILD_OPTIONS} ${2}"
+        LOCAL_BUILD_OPTIONS="${LOCAL_BUILD_OPTIONS} $(sanitize_string "${2}")"
         shift 1
         ;;
       "--static-install-options")
-        STATIC_INSTALL_OPTIONS="${STATIC_INSTALL_OPTIONS} ${2}"
+        STATIC_INSTALL_OPTIONS="${STATIC_INSTALL_OPTIONS} $(sanitize_string "${2}")"
         shift 1
         ;;
       "--prepare-offline-install-source")
         if [ -n "${2}" ]; then
           set_action 'prepare-offline'
-          OFFLINE_TARGET="${2}"
+          OFFLINE_TARGET="$(sanitize_string "${2}")"
           shift 1
         else
           fatal "A target directory must be specified with the --prepare-offline-install-source option." F0500
         fi
         ;;
       "--offline-architecture")
-        if echo "${STATIC_INSTALL_ARCHES}" | grep -qw "${2}"; then
-          NETDATA_OFFLINE_ARCHES="${NETDATA_OFFLINE_ARCHES} ${2}"
+        arch="$(sanitize_string "${2}")"
+        if echo "${STATIC_INSTALL_ARCHES}" | grep -qw "${arch}"; then
+          NETDATA_OFFLINE_ARCHES="${NETDATA_OFFLINE_ARCHES} ${arch}"
         else
-          fatal "${2} is not a recognized static build architecture (supported architectures are ${STATIC_INSTALL_ARCHES})" F0518
+          fatal "${arch} is not a recognized static build architecture (supported architectures are ${STATIC_INSTALL_ARCHES})" F0518
         fi
         shift 1
         ;;
       "--offline-install-source")
         if [ -d "${2}" ]; then
-          NETDATA_OFFLINE_INSTALL_SOURCE="${2}"
+          p="$(sanitize_string "${2}")"
+          NETDATA_OFFLINE_INSTALL_SOURCE="${p}"
           # shellcheck disable=SC2164
-          NETDATA_TARBALL_BASEURL="file://$(cd "${2}"; pwd)"
+          NETDATA_TARBALL_BASEURL="file://$(cd "${p}"; pwd)"
           shift 1
         else
           fatal "A source directory must be specified with the --offline-install-source option." F0501
