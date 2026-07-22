@@ -1,6 +1,6 @@
 //go:build !windows
 
-package jobmgrtest
+package secretresolver
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 	"syscall"
 )
 
-func ResolverDriverSupported() bool {
+func resolverContainmentSupported() bool {
 	return true
 }
 

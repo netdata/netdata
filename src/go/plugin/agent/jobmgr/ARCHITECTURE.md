@@ -171,9 +171,9 @@ flowchart TD
    routes are rejected here. `kernel_admission.go`, `lifecycle/uid.go`.
 3. **Lane**: same-resource commands share one FIFO lane; only the lane head
    runs while the lane is active. Different lanes advance independently.
-4. **Claims**: cross-lane exclusion. Read claims coexist; a write claim excludes
-   all others. Claims are acquired in a stable global key order and waiters are
-   FIFO per key, so the design is deadlock-free and starvation-free.
+4. **Claims**: cross-lane exclusion. Every claim is exclusive. Claims are
+   acquired in a stable global key order and waiters are FIFO per key, so the
+   design is deadlock-free and starvation-free.
    `claim_authority.go`.
 5. **Run task** (off-loop): the actual blocking work — construct a collector,
    run autodetection, call a Function handler, stop a job — runs on a

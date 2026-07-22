@@ -39,11 +39,10 @@ type serviceDiscoveryInvocation struct {
 }
 
 func newServiceDiscoveryBinding(
-	epoch uint64,
 	pluginName string,
 	frames *lifecycle.FrameOwner,
 ) (*serviceDiscoveryBinding, error) {
-	if epoch == 0 || pluginName == "" || frames == nil {
+	if pluginName == "" || frames == nil {
 		return nil, errors.New(
 			"jobmgr composition: invalid service discovery binding",
 		)

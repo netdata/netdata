@@ -27,8 +27,8 @@ type authorityClaimEdge struct {
 	key       *authorityClaimKey  // the claim key this edge is registered against
 	held      bool                // the edge currently holds the key
 	waiting   bool                // the edge is parked in the key's waiter list
-	prev      *authorityClaimEdge // previous edge in the key's reader/waiter list
-	next      *authorityClaimEdge // next edge in the key's reader/waiter list
+	prev      *authorityClaimEdge // previous edge in the key's waiter list
+	next      *authorityClaimEdge // next edge in the key's waiter list
 }
 
 type authorityClaimHeap []*authorityClaimKey

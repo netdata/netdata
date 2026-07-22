@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/internal/jobmgrtest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,29 +35,6 @@ func TestProductionProcessScenarios(t *testing.T) {
 			require.NoError(t, driver.Run(ctx, scenario))
 		})
 	}
-}
-
-func TestProductionResolverContainment(t *testing.T) {
-	if !jobmgrtest.ResolverDriverSupported() {
-		t.Skip("process-group containment requires a Unix process model")
-	}
-	directory := t.TempDir()
-	helper := filepath.Join(directory, "resolver-helper")
-	pidFile := filepath.Join(directory, "resolver-pids")
-	script := "#!/bin/sh\n" +
-		"sleep 30 &\n" +
-		"child=$!\n" +
-		"printf '%s %s\\n' \"$$\" \"$child\" > \"$1\"\n" +
-		"wait \"$child\"\n"
-
-	require.NoError(t, os.WriteFile(helper, []byte(script), 0o700))
-
-	driver := jobmgrtest.ResolverDriver{
-		Helper: helper, PIDFile: pidFile,
-	}
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	require.NoError(t, driver.Run(ctx))
 }
 
 func TestProductionShippedRootScenarioMatrix(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest/runner"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/internal/jobmgrtest/runner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

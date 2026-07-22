@@ -200,7 +200,6 @@ func newRunGeneration(
 		config.Discovery.BuildContext.Paths.ServiceDiscoveryConfigDir,
 	) != 0 {
 		serviceDiscovery, err = newServiceDiscoveryBinding(
-			config.Generation,
 			config.Jobs.PluginName,
 			config.Frames,
 		)

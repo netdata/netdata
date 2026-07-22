@@ -1,8 +1,8 @@
 //go:build windows
 
-package jobmgrtest
+package secretresolver
 
-func ResolverDriverSupported() bool {
+func resolverContainmentSupported() bool {
 	return false
 }
 

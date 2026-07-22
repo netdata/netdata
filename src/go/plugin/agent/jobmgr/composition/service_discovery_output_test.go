@@ -72,7 +72,7 @@ func TestServiceDiscoveryBindingCapturesTypedInvocationOutput(t *testing.T) {
 			var notifications bytes.Buffer
 			frames, err := lifecycle.NewFrameOwner(&notifications)
 			require.NoError(t, err)
-			binding, err := newServiceDiscoveryBinding(1, "go.d", frames)
+			binding, err := newServiceDiscoveryBinding("go.d", frames)
 			require.NoError(t, err)
 
 			result, cleanup, err := binding.invoke("uid", func() {
@@ -103,7 +103,7 @@ func TestServiceDiscoveryBindingRoutesNotificationsOutsideInvocations(t *testing
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
-	binding, err := newServiceDiscoveryBinding(1, "go.d", frames)
+	binding, err := newServiceDiscoveryBinding("go.d", frames)
 	require.NoError(t, err)
 
 	binding.ConfigDelete("go.d:sd:type:gone")
@@ -114,7 +114,7 @@ func TestServiceDiscoveryBindingRoutesNotificationsOutsideInvocations(t *testing
 func TestServiceDiscoveryBindingRejectsResultOutsideInvocation(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
-	binding, err := newServiceDiscoveryBinding(1, "go.d", frames)
+	binding, err := newServiceDiscoveryBinding("go.d", frames)
 	require.NoError(t, err)
 
 	binding.FunctionResult(dyncfg.Result{
