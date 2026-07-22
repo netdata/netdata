@@ -697,6 +697,10 @@ if ($ApiOk) {
     Write-Utf8 (Join-Path $marker 'AGENT-WAS-DOWN.txt') "Agent API at 127.0.0.1:$NdPort was unreachable when this bundle was created. See 05-logs and 06-state\status-file.json for why."
     Add-Manifest '07-runtime\AGENT-WAS-DOWN.txt' 'file' 'generated' 'Marker: agent was not running'
 }
+# Elevation state: the perflib dump needs an elevated session, and the summary
+# reports it too. Computed once here (after the self-test path has already
+# exited) so it is never evaluated on non-Windows self-test runs.
+$IsElevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (Test-Path $NetdataExe) {
     Save-Cmd '07-runtime\buildinfo.txt' 'netdata -W buildinfo (verbatim; works with daemon down)' { & $using:NetdataExe -W buildinfo 2>&1 } 'netdata.exe -W buildinfo'
     Save-CmdRaw '07-runtime\buildinfo.json' 'netdata -W buildinfojson (machine-readable; no header so it parses as JSON)' { & $using:NetdataExe -W buildinfojson 2>&1 } 'netdata.exe -W buildinfojson'
@@ -705,20 +709,35 @@ if (Test-Path $NetdataExe) {
     # diagnose Windows collector issues (e.g. PerflibSMB). Written to a file via
     # -perflibfile (not a capped stdout capture) so a large dump is not
     # truncated; sanitized like any other file (instance names can include
-    # share/host names). Bounded by the per-command timeout and a size ceiling.
+    # share/host names). The dump reads HKEY_PERFORMANCE_DATA and needs an
+    # elevated session, and enumerating every counter can exceed the default
+    # per-command timeout, so perflib gets an elevation pre-check and a 30s
+    # floor. A failure is never silent: a JSON marker records why, mirroring the
+    # never-omit behaviour of Save-Cmd.
     $perfPath = Join-Path $Work '07-runtime\perflib.json'
     New-Item -ItemType Directory -Path (Split-Path $perfPath) -Force | Out-Null
-    $pjob = Start-Job -ScriptBlock { & $using:NetdataExe -W perflibdump -perflibfile $using:perfPath 2>$null }
-    $null = Wait-Job $pjob -Timeout $TimeoutSeconds
-    Stop-Job $pjob -ErrorAction SilentlyContinue
-    Remove-Job $pjob -Force
-    if ((Test-Path $perfPath) -and (Get-Item $perfPath).Length -gt 0) {
-        if ((Get-Item $perfPath).Length -gt 16MB) { Write-Utf8 $perfPath '{"error":"perflib dump exceeded 16 MB and was withheld"}' }
-        Invoke-SanitizeFile $perfPath
-        Add-Manifest '07-runtime\perflib.json' 'cmd' 'netdata.exe -W perflibdump -perflibfile' 'Windows performance-library dump: counter/instance metadata for Windows collector diagnosis (e.g. PerflibSMB)'
-    } elseif (Test-Path $perfPath) {
-        Remove-Item $perfPath -Force
+    $perfOrigin = 'netdata.exe -W perflibdump -perflibfile'
+    $perfTitle = 'Windows performance-library dump: counter/instance metadata for Windows collector diagnosis (e.g. PerflibSMB)'
+    if (-not $IsElevated) {
+        Write-Utf8 $perfPath (@{ error = 'perflib dump skipped: not running elevated'; hint = 'Re-run the bundle in an elevated (Run as Administrator) PowerShell to collect it.' } | ConvertTo-Json -Compress)
+    } else {
+        $perfTimeout = [Math]::Max($TimeoutSeconds, 30)
+        $pjob = Start-Job -ScriptBlock { & $using:NetdataExe -W perflibdump -perflibfile $using:perfPath 2>&1 }
+        $perfDone = Wait-Job $pjob -Timeout $perfTimeout
+        $perfErr = if ($perfDone) { Receive-Job $pjob 2>&1 | Out-String } else { "TIMEOUT after ${perfTimeout}s" }
+        Stop-Job $pjob -ErrorAction SilentlyContinue
+        Remove-Job $pjob -Force
+        if ((Test-Path $perfPath) -and (Get-Item $perfPath).Length -gt 0) {
+            if ((Get-Item $perfPath).Length -gt 16MB) { Write-Utf8 $perfPath '{"error":"perflib dump exceeded 16 MB and was withheld"}' }
+        } else {
+            # never silently drop it: leave a marker with the captured reason
+            $perfMsg = $perfErr.Trim()
+            if (-not $perfMsg) { $perfMsg = 'perflib dump produced no output and no error text' }
+            Write-Utf8 $perfPath (@{ error = 'perflib dump was not collected'; reason = $perfMsg; hint = 'If this timed out, re-run with a larger -TimeoutSeconds. If it reported an access error, ensure the bundle runs in an elevated PowerShell.' } | ConvertTo-Json -Compress)
+        }
     }
+    Invoke-SanitizeFile $perfPath
+    Add-Manifest '07-runtime\perflib.json' 'cmd' $perfOrigin $perfTitle
 }
 if ((Test-Path $NetdataCli) -and $NetdataProc) {
     Save-CmdRaw '07-runtime\aclk-state.json' 'Cloud connectivity state (netdatacli aclk-state json; no header so it parses as JSON)' { & $using:NetdataCli aclk-state json 2>&1 } 'netdatacli.exe aclk-state json'
@@ -757,7 +776,7 @@ NETDATA SUPPORT BUNDLE SUMMARY
 generated:        $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))
 tool version:     $ToolVersion (windows)
 runtime seconds:  $RuntimeSecs
-ran elevated:     $(([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
+ran elevated:     $IsElevated
 pii obfuscation:  $(if ($Obfuscate) { 'on' } else { 'OFF' })
 
 agent version:    $(if ($AgentVersion) { $AgentVersion } else { 'unknown' })
