@@ -5,6 +5,7 @@ package jobmgr
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -301,6 +302,113 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(t *testing.T) {
 
 	err := kernel.Wait(waitCtx)
 	require.False(t, err != nil && !errors.Is(err, ErrStopped))
+}
+
+func TestCompositeChildCancelledBeforeApplyReportsTerminalCause(t *testing.T) {
+	tests := map[string]struct {
+		deadline bool
+		want     error
+	}{
+		"deadline": {
+			deadline: true,
+			want:     context.DeadlineExceeded,
+		},
+		"explicit cancellation": {
+			want: context.Canceled,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			clock := newKernelFinalizerClock()
+			kernel, run, uids, tasks := newKernelWithClockFinalizerAndTimeout(
+				t,
+				stoppedKernelPlanner{},
+				io.Discard,
+				clock,
+				newNoopRunFinalizer(),
+				time.Second,
+			)
+			require.NoError(t, run.OpenAdmission())
+			startKernelLoop(t, kernel)
+
+			childPrepareEntered := make(chan struct{})
+			childPlan := WorkPlan{
+				NoResponse: true,
+				Transaction: &ResourceTransactionPlan{
+					ID: "cancelled-composite-child",
+					Prepare: func(
+						ctx context.Context,
+						_ lifecycle.ReadyResource,
+						scope lifecycle.ResourceTransactionScope,
+						_ lifecycle.LongLivedPermit,
+					) (lifecycle.PreparedResourceTransaction, error) {
+						close(childPrepareEntered)
+						<-ctx.Done()
+						return &simpleCompositeChildTransaction{
+							scope: scope,
+						}, nil
+					},
+				},
+			}
+			childResult := make(chan error, 1)
+			parentPlan := compositeParentTestPlan(
+				"cancelled-composite-parent",
+				nil,
+				func(ctx context.Context, commands CompositeCommandScope) error {
+					childResult <- commands.SubmitPreparedAndWait(ctx, Request{
+						UID:     "cancelled-composite-child",
+						LaneKey: "cancelled-composite-child",
+						Source:  lifecycle.SourceJobManager,
+						Route:   "internal/test/cancelled-composite-child",
+					}, childPlan)
+					return nil
+				},
+			)
+			request := Request{
+				UID:     "cancelled-composite-parent",
+				LaneKey: "cancelled-composite-parent",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test/cancelled-composite-parent",
+			}
+			if test.deadline {
+				request.Deadline = clock.Now().Add(time.Second)
+			}
+			parentResult := make(chan error, 1)
+			go func() {
+				parentResult <- kernel.SubmitPreparedAndWait(context.Background(), request, parentPlan)
+			}()
+			select {
+			case <-childPrepareEntered:
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "composite child preparation did not start")
+			}
+			if test.deadline {
+				clock.advance(time.Second + time.Nanosecond)
+				kernel.NotifyControlReady()
+			} else {
+				require.NoError(t, kernel.Cancel(context.Background(), request.UID))
+			}
+			select {
+			case err := <-childResult:
+				require.ErrorIs(t, err, test.want)
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "cancelled composite child did not reach terminal state")
+			}
+			select {
+			case err := <-parentResult:
+				require.NoError(t, err)
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "cancelled composite parent did not reach terminal state")
+			}
+
+			kernel.Stop()
+			require.NoError(t, kernel.Wait(context.Background()))
+			require.NoError(t, run.DirtyCause())
+			require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+			closeUIDLedger(t, uids)
+		})
+	}
 }
 
 func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {

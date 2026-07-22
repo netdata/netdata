@@ -4,10 +4,13 @@ package composition
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
+	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	frameworkfunctions "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -143,4 +146,43 @@ func TestServiceDiscoveryHandlerPanicIsClassifiedAsTaskPanic(t *testing.T) {
 		panic("handler failed")
 	})
 	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
+}
+
+func TestServiceDiscoveryTransactionDisposeDoesNotInvokeHandler(t *testing.T) {
+	var output bytes.Buffer
+	frames, err := lifecycle.NewFrameOwner(&output)
+	require.NoError(t, err)
+	binding, err := newServiceDiscoveryBinding("go.d", frames)
+	require.NoError(t, err)
+
+	invoked := false
+	binding.RegisterPrefix("config", "go.d:sd:", func(function frameworkfunctions.Function) {
+		invoked = true
+		binding.FunctionResult(dyncfg.Result{
+			UID:         function.UID,
+			Code:        200,
+			ContentType: "application/json",
+		})
+		binding.ConfigStatus("go.d:sd:type:job", dyncfg.StatusRunning)
+	})
+	transaction, err := binding.prepare(
+		context.Background(),
+		functionadapter.HandlerInput{
+			UID:    "cancelled",
+			Method: "config",
+			Args:   []string{"go.d:sd:type:job", "enable"},
+		},
+		nil,
+		lifecycle.ResourceTransactionScope{
+			ID: "go.d:sd:type:job",
+		},
+		lifecycle.LongLivedPermit{},
+	)
+	require.NoError(t, err)
+
+	current, err := transaction.Dispose(context.Background())
+	require.NoError(t, err)
+	require.Nil(t, current)
+	require.False(t, invoked)
+	require.Empty(t, output.String())
 }

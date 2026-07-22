@@ -12,9 +12,13 @@ import (
 )
 
 func (ck *CommandKernel) cancelOperation(uid string) {
+	ck.cancelOperationWithCause(uid, context.Canceled)
+}
+
+func (ck *CommandKernel) cancelOperationWithCause(uid string, cause error) {
 	operation := ck.operations[uid]
 	if operation != nil && operation.activeChild != nil && !operation.activeChild.compositeRollback {
-		ck.cancelOperation(operation.activeChild.UID)
+		ck.cancelOperationWithCause(operation.activeChild.UID, cause)
 	}
 	if operation == nil || operation.Response == lifecycle.ResponseCommitted ||
 		operation.Response == lifecycle.ResponsePoisoned {
@@ -23,9 +27,12 @@ func (ck *CommandKernel) cancelOperation(uid string) {
 	if operation.TimedOut() {
 		return
 	}
+	if !operation.cancelled {
+		ck.recordCompositeChildTerminalCause(operation, cause)
+	}
 	operation.cancelled = true
 	if operation.Child == lifecycle.ChildExecuting {
-		_ = ck.tasks.Cancel(operation.Task)
+		_ = ck.tasks.CancelWithCause(operation.Task, cause)
 		if operation.Response != lifecycle.ResponseNotRequired && !operation.plan.CooperativeCancel {
 			ck.enqueueControl(operation, lifecycle.ControlCancelled)
 		}
@@ -60,10 +67,9 @@ func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 		}
 		ck.markOperationTimedOut(operation)
 		if operation.activeChild != nil && !operation.activeChild.compositeRollback {
-			ck.cancelOperation(operation.activeChild.UID)
+			ck.cancelOperationWithCause(operation.activeChild.UID, context.DeadlineExceeded)
 		}
-		deferControl := requiresCooperativeDeadlineStart(operation) &&
-			(operation.Child == lifecycle.ChildNotStarted || operation.Child == lifecycle.ChildExecuting)
+		deferControl := defersDeadlineControl(operation)
 		if operation.Child == lifecycle.ChildExecuting {
 			_ = ck.tasks.CancelWithCause(operation.Task, context.DeadlineExceeded)
 			if operation.Response == lifecycle.ResponseNotRequired {
@@ -101,24 +107,54 @@ func requiresCooperativeDeadlineStart(operation *commandOperation) bool {
 	return operation != nil && operation.plan.Work != nil && operation.plan.CooperativeDeadline
 }
 
+func defersDeadlineControl(operation *commandOperation) bool {
+	if operation == nil {
+		return false
+	}
+	if operation.plan.Transaction != nil && operation.Child == lifecycle.ChildActionPending {
+		return true
+	}
+	if !operation.plan.CooperativeDeadline {
+		return false
+	}
+	return operation.Child == lifecycle.ChildExecuting ||
+		operation.Child == lifecycle.ChildNotStarted && requiresCooperativeDeadlineStart(operation)
+}
+
+func (ck *CommandKernel) expireReadyOperationDeadline(operation *commandOperation) bool {
+	if operation == nil || operation.TimedOut() || operation.request.Deadline.IsZero() ||
+		operation.request.Deadline.After(ck.clock.Now()) {
+		return false
+	}
+	ck.markOperationTimedOut(operation)
+	if requiresCooperativeDeadlineStart(operation) {
+		if err := operation.RequireDeadlineStart(); err != nil {
+			ck.run.Dirty(err)
+			return true
+		}
+		return false
+	}
+	ck.unlinkQueued(operation)
+	if operation.Response == lifecycle.ResponseOpen {
+		ck.enqueueControl(operation, lifecycle.ControlDeadline)
+	} else {
+		ck.tryDispose(operation)
+	}
+	return true
+}
+
 func (ck *CommandKernel) markOperationDeadlineIfDue(operation *commandOperation) {
 	if operation == nil || operation.request.Deadline.IsZero() ||
 		(operation.Response != lifecycle.ResponseOpen && operation.Response != lifecycle.ResponseNotRequired) {
 		return
 	}
 	if operation.TimedOut() {
-		if operation.Response == lifecycle.ResponseOpen {
-			ck.enqueueControl(operation, lifecycle.ControlDeadline)
-		}
 		return
 	}
 	if operation.request.Deadline.After(ck.clock.Now()) {
 		return
 	}
 	ck.markOperationTimedOut(operation)
-	if operation.Response == lifecycle.ResponseOpen {
-		ck.enqueueControl(operation, lifecycle.ControlDeadline)
-	}
 }
 
 func (ck *CommandKernel) markOperationTimedOut(operation *commandOperation) {
@@ -126,9 +162,19 @@ func (ck *CommandKernel) markOperationTimedOut(operation *commandOperation) {
 		return
 	}
 	operation.MarkTimedOut()
+	ck.recordCompositeChildTerminalCause(operation, context.DeadlineExceeded)
 	if ck.runtimeObserver != nil {
 		ck.runtimeObserver.AddRuntimeCounter(lifecycle.RuntimeCounterOperationTimeouts, 1)
 	}
+}
+
+func (ck *CommandKernel) recordCompositeChildTerminalCause(operation *commandOperation, cause error) {
+	if operation == nil || operation.parent == nil || operation.ownershipChain ||
+		operation.Response != lifecycle.ResponseNotRequired || cause == nil ||
+		errors.Is(operation.terminalErr, cause) {
+		return
+	}
+	operation.terminalErr = errors.Join(operation.terminalErr, cause)
 }
 
 func (ck *CommandKernel) enqueueControl(operation *commandOperation, status lifecycle.ControlStatus) {

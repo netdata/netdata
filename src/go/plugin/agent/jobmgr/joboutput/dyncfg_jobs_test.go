@@ -360,7 +360,7 @@ func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
 func requireDynCfgJobTemplateParents(t *testing.T, wire string) {
 	t.Helper()
 	templates := make(map[string]struct{})
-	for _, line := range strings.Split(strings.TrimSpace(wire), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(wire), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 5 || fields[0] != "CONFIG" || fields[2] != "create" {
 			continue

@@ -472,7 +472,9 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		ck.completeResourceTransactionTask(operation, completion)
 		return
 	}
-	if operation.cancelled && operation.Response == lifecycle.ResponseOpen && !operation.controlQueued {
+	if (operation.cancelled || operation.TimedOut()) &&
+		operation.Response == lifecycle.ResponseOpen &&
+		!operation.controlQueued {
 		ck.enqueueControl(operation, cancellationControl(operation))
 	}
 	action := lifecycle.TaskAction{
@@ -528,7 +530,9 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 			}
 			operation.terminalErr = errors.Join(operation.terminalErr, completion.Err)
 			status := lifecycle.ControlUnavailable
-			if errors.Is(completion.Err, lifecycle.ErrTaskPanic) {
+			if operation.cancelled || operation.TimedOut() {
+				status = cancellationControl(operation)
+			} else if errors.Is(completion.Err, lifecycle.ErrTaskPanic) {
 				status = lifecycle.ControlInternal
 			}
 			if operation.Response == lifecycle.ResponseOpen && !operation.controlQueued {
@@ -541,14 +545,20 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 			ck.run.Dirty(errors.New("jobmgr kernel: transaction preparation returned the wrong outcome"))
 			return
 		}
+		ownershipAllowed := ck.ownershipActionAllowed(operation)
 		action := lifecycle.TaskActionApplyResourceTransaction
 		if operation.cancelled ||
 			operation.TimedOut() ||
-			!ck.ownershipActionAllowed(operation) ||
+			!ownershipAllowed ||
 			(operation.Response != lifecycle.ResponseOpen &&
 				operation.Response != lifecycle.ResponseNotRequired) ||
 			operation.controlQueued {
 			action = lifecycle.TaskActionDispose
+		}
+		if action == lifecycle.TaskActionDispose && !ownershipAllowed &&
+			operation.Response == lifecycle.ResponseOpen &&
+			!operation.controlQueued {
+			operation.cancelled = true
 		}
 		ck.sendTransactionAction(operation, completion.Ref, completion.Sequence+1, action)
 	case 2:
@@ -989,6 +999,11 @@ func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 					return
 				}
 			}
+			if (operation.cancelled || operation.TimedOut()) &&
+				operation.Response == lifecycle.ResponseOpen &&
+				!operation.controlQueued {
+				ck.enqueueControl(operation, cancellationControl(operation))
+			}
 			ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 			return
 		}
@@ -1077,6 +1092,9 @@ func (ck *CommandKernel) serviceShutdownCancellation(quantum int) (bool, error) 
 func (ck *CommandKernel) cancelOperationForShutdown(operation *commandOperation) error {
 	if operation == nil || operation.State == lifecycle.OperationDisposedTerminal {
 		return errors.New("jobmgr kernel: invalid shutdown operation")
+	}
+	if !operation.cancelled && !operation.TimedOut() {
+		ck.recordCompositeChildTerminalCause(operation, ck.run.StoppingCause())
 	}
 	operation.cancelled = true
 	switch operation.Child {

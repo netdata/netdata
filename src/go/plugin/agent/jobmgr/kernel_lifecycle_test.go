@@ -822,69 +822,433 @@ func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
 }
 
 func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
-	var events []string
-	current := newKernelTestReadyResource("resource", nil, nil)
-	successor := newKernelTestReadyResource("resource", nil, nil)
-	permitPlan := lifecycle.NewJobLongLivedPlan()
-	planner := kernelTestTransactionPlanner{
-		permitPlan:          permitPlan,
-		current:             current,
-		successor:           successor,
-		waitForCancellation: true,
-		events:              &events,
+	tests := map[string]struct {
+		uid        string
+		deadline   bool
+		cancel     bool
+		wantStatus int
+	}{
+		"deadline": {
+			uid:        "replace-deadline",
+			deadline:   true,
+			wantStatus: 504,
+		},
+		"explicit cancellation": {
+			uid:        "replace-cancel",
+			cancel:     true,
+			wantStatus: 499,
+		},
 	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var events []string
+			prepareEntered := make(chan struct{})
+			disposeEntered := make(chan struct{})
+			disposeRelease := make(chan struct{})
+			current := newKernelTestReadyResource("resource", nil, nil)
+			successor := newKernelTestReadyResource("resource", nil, nil)
+			planner := kernelTestTransactionPlanner{
+				permitPlan:          lifecycle.NewJobLongLivedPlan(),
+				current:             current,
+				successor:           successor,
+				prepareEntered:      prepareEntered,
+				disposeEntered:      disposeEntered,
+				disposeRelease:      disposeRelease,
+				waitForCancellation: true,
+				cooperativeCancel:   true,
+				cooperativeDeadline: true,
+				events:              &events,
+			}
+			writer := &holdingFrameWriter{
+				offered: make(chan []byte, 1),
+				release: make(chan struct{}),
+			}
+			kernel, run, uids, tasks := newKernelWithPlannerAndWriter(t, planner, writer)
+
+			require.NoError(t, run.OpenAdmission())
+			startKernelLoop(t, kernel)
+			require.NoError(t, kernel.submitAndWait(context.Background(), Request{
+				UID:     "install-before-cancel",
+				LaneKey: "resource",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "install",
+			}))
+
+			originalIdentity := current.identity
+			request := Request{
+				UID:     test.uid,
+				LaneKey: "resource",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "replace",
+			}
+			if test.deadline {
+				request.Deadline = time.Now().Add(10 * time.Millisecond)
+			}
+			result := make(chan error, 1)
+			go func() {
+				result <- kernel.submitAndWait(context.Background(), request)
+			}()
+
+			select {
+			case <-prepareEntered:
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "transaction preparation did not start")
+			}
+			if test.cancel {
+				require.NoError(t, kernel.Cancel(context.Background(), request.UID))
+			}
+			var frame []byte
+			earlyFrame := false
+			select {
+			case <-disposeEntered:
+			case frame = <-writer.offered:
+				earlyFrame = true
+				close(writer.release)
+				select {
+				case <-disposeEntered:
+				case <-time.After(time.Second):
+					require.FailNow(t, "test failed", "transaction did not enter disposal after early response")
+				}
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "cancelled transaction did not enter disposal")
+			}
+
+			if !earlyFrame {
+				barrier := make(chan error, 1)
+				go func() { barrier <- kernel.Cancel(context.Background(), "post-dispose-selection-barrier") }()
+				select {
+				case frame = <-writer.offered:
+					earlyFrame = true
+					close(writer.release)
+				case err := <-barrier:
+					require.NoError(t, err)
+				}
+				if earlyFrame {
+					require.NoError(t, <-barrier)
+				}
+			}
+			close(disposeRelease)
+			if !earlyFrame {
+				select {
+				case frame = <-writer.offered:
+					close(writer.release)
+				case <-time.After(time.Second):
+					require.FailNow(t, "test failed", "cancelled transaction did not emit a terminal frame")
+				}
+			}
+			select {
+			case err := <-result:
+				require.NoError(t, err)
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "cancelled transaction did not reach terminal state")
+			}
+
+			lane := kernel.lanes[resourceCommandLaneKey("resource")]
+			require.False(t, lane == nil ||
+				lane.current != current ||
+				lane.currentIdentity != originalIdentity ||
+				lane.currentStopping ||
+				lane.transactionPlanned != 0)
+			require.Equal(t, []string{"prepare", "dispose"}, events)
+			require.Contains(
+				t,
+				string(frame),
+				fmt.Sprintf("FUNCTION_RESULT_BEGIN %s %d application/json", test.uid, test.wantStatus),
+			)
+			require.False(t, earlyFrame, "terminal response preceded exact transaction restoration")
+
+			kernel.Stop()
+			waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			require.NoError(t, kernel.Wait(waitCtx))
+			require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+			closeUIDLedger(t, uids)
+		})
+	}
+}
+
+func TestKernelDoesNotStartQueuedExpiredResourceTransaction(t *testing.T) {
+	clock := newKernelFinalizerClock()
+	var prepareStarted atomic.Bool
+	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
+		return WorkPlan{
+			CooperativeDeadline: true,
+			Transaction: &ResourceTransactionPlan{
+				ID: "expired-transaction",
+				Prepare: func(
+					_ context.Context,
+					_ lifecycle.ReadyResource,
+					scope lifecycle.ResourceTransactionScope,
+					_ lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResourceTransaction, error) {
+					prepareStarted.Store(true)
+					return &simpleCompositeChildTransaction{
+						scope: scope,
+					}, nil
+				},
+			},
+		}, nil
+	})
 	var output bytes.Buffer
-	kernel, run, uids, tasks := newKernelWithPlannerAndWriter(t, planner, &output)
-
+	kernel, run, uids, tasks := newKernelWithClockFinalizerAndTimeout(
+		t,
+		planner,
+		&output,
+		clock,
+		newNoopRunFinalizer(),
+		time.Second,
+	)
+	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "expired-transaction" })
 	require.NoError(t, run.OpenAdmission())
-
 	startKernelLoop(t, kernel)
 
-	require.NoError(t, kernel.submitAndWait(
-		context.Background(),
-		Request{
-			UID:     "install-before-cancel",
-			LaneKey: "resource",
-			Source:  lifecycle.SourceJobManager,
-			Route:   "install",
-		},
-	),
-	)
-
-	originalIdentity := current.identity
-
-	require.NoError(t, kernel.submitAndWait(
-		context.Background(),
-		Request{
-			UID:      "replace-deadline",
-			LaneKey:  "resource",
-			Source:   lifecycle.SourceJobManager,
-			Route:    "replace",
-			Deadline: time.Now().Add(10 * time.Millisecond),
-		},
-	),
-	)
-
-	lane := kernel.lanes[resourceCommandLaneKey("resource")]
-	require.False(t, lane == nil ||
-		lane.current != current ||
-		lane.currentIdentity != originalIdentity ||
-		lane.currentStopping ||
-		lane.transactionPlanned != 0)
-
-	want := []string{"prepare", "dispose"}
-	require.Equal(t, want, events)
-
-	require.Contains(t, output.String(), "replace-deadline")
+	result := make(chan error, 1)
+	go func() {
+		result <- kernel.submitAndWait(context.Background(), Request{
+			UID:      "expired-transaction",
+			Source:   lifecycle.SourceFunction,
+			Route:    "transaction",
+			Deadline: clock.Now(),
+		})
+	}()
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "expired transaction did not reach terminal state")
+	}
+	require.False(t, prepareStarted.Load())
+	require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN expired-transaction 504 application/json")
 
 	kernel.Stop()
-	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	require.NoError(t, kernel.Wait(waitCtx))
-
+	require.NoError(t, kernel.Wait(context.Background()))
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+	closeUIDLedger(t, uids)
+}
 
+func TestKernelDoesNotDispatchTransactionWhoseDeadlineBecameDueAfterScheduling(t *testing.T) {
+	clock := newKernelFinalizerClock()
+	var prepareStarted atomic.Bool
+	plan := WorkPlan{
+		NoResponse: true,
+		Transaction: &ResourceTransactionPlan{
+			ID: "expired-before-dispatch",
+			Prepare: func(
+				_ context.Context,
+				_ lifecycle.ReadyResource,
+				scope lifecycle.ResourceTransactionScope,
+				_ lifecycle.LongLivedPermit,
+			) (lifecycle.PreparedResourceTransaction, error) {
+				prepareStarted.Store(true)
+				return &simpleCompositeChildTransaction{
+					scope: scope,
+				}, nil
+			},
+		},
+	}
+	kernel, run, uids, tasks := newKernelWithClockFinalizerAndTimeout(
+		t,
+		stoppedKernelPlanner{},
+		io.Discard,
+		clock,
+		newNoopRunFinalizer(),
+		time.Second,
+	)
+	require.NoError(t, run.OpenAdmission())
+	require.NoError(t, kernel.admit(Request{
+		UID:      "expired-before-dispatch",
+		LaneKey:  "expired-before-dispatch",
+		Source:   lifecycle.SourceJobManager,
+		Deadline: clock.Now().Add(time.Second),
+	}, plan))
+	require.False(t, kernel.scheduleTasks(1))
+	require.EqualValues(t, 1, tasks.Pending())
+
+	clock.advance(time.Second + time.Nanosecond)
+	more := kernel.serviceTaskStarts(lifecycle.TaskStartServiceQuantum)
+	dispatched := tasks.Active() != 0
+
+	require.False(t, kernel.serviceDeadlines(clock.Now(), lifecycle.TaskStartServiceQuantum))
+	startKernelLoop(t, kernel)
+	kernel.Stop()
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.True(t, more)
+	require.False(t, dispatched)
+	require.False(t, prepareStarted.Load())
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+	closeUIDLedger(t, uids)
+}
+
+func TestKernelCancellationStatusOutranksTransactionPreparationError(t *testing.T) {
+	tests := map[string]struct {
+		deadline   bool
+		cancel     bool
+		wantStatus int
+		wantErr    error
+	}{
+		"deadline": {
+			deadline:   true,
+			wantStatus: 504,
+			wantErr:    context.DeadlineExceeded,
+		},
+		"explicit cancellation": {
+			cancel:     true,
+			wantStatus: 499,
+			wantErr:    context.Canceled,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var events []string
+			prepareEntered := make(chan struct{})
+			current := newKernelTestReadyResource("resource", nil, nil)
+			planner := kernelTestTransactionPlanner{
+				permitPlan:          lifecycle.NewJobLongLivedPlan(),
+				current:             current,
+				successor:           newKernelTestReadyResource("resource", nil, nil),
+				prepareEntered:      prepareEntered,
+				waitForCancellation: true,
+				returnContextErr:    true,
+				cooperativeCancel:   true,
+				cooperativeDeadline: true,
+				events:              &events,
+			}
+			var output bytes.Buffer
+			kernel, run, uids, tasks := newKernelWithPlannerAndWriter(t, planner, &output)
+			require.NoError(t, run.OpenAdmission())
+			startKernelLoop(t, kernel)
+			require.NoError(t, kernel.submitAndWait(context.Background(), Request{
+				UID:     "install-before-prepare-error",
+				LaneKey: "resource",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "install",
+			}))
+
+			request := Request{
+				UID:     "prepare-error-" + strings.ReplaceAll(name, " ", "-"),
+				LaneKey: "resource",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "replace",
+			}
+			if test.deadline {
+				request.Deadline = time.Now().Add(10 * time.Millisecond)
+			}
+			result := make(chan error, 1)
+			go func() { result <- kernel.submitAndWait(context.Background(), request) }()
+			select {
+			case <-prepareEntered:
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "transaction preparation did not start")
+			}
+			if test.cancel {
+				require.NoError(t, kernel.Cancel(context.Background(), request.UID))
+			}
+			select {
+			case err := <-result:
+				require.ErrorIs(t, err, test.wantErr)
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "transaction preparation error did not terminalize")
+			}
+			require.Contains(
+				t,
+				output.String(),
+				fmt.Sprintf("FUNCTION_RESULT_BEGIN %s %d application/json", request.UID, test.wantStatus),
+			)
+			lane := kernel.lanes[resourceCommandLaneKey("resource")]
+			require.NotNil(t, lane)
+			require.Same(t, current, lane.current)
+			require.False(t, lane.currentStopping || lane.transactionPlanned != 0)
+
+			kernel.Stop()
+			require.NoError(t, kernel.Wait(context.Background()))
+			require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+			closeUIDLedger(t, uids)
+		})
+	}
+}
+
+func TestKernelShutdownTerminalizesPreparedTransactionAfterDispose(t *testing.T) {
+	disposeEntered := make(chan struct{})
+	disposeRelease := make(chan struct{})
+	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
+		return WorkPlan{
+			CooperativeCancel: true,
+			Transaction: &ResourceTransactionPlan{
+				ID: "shutdown-transaction",
+				Prepare: func(
+					_ context.Context,
+					_ lifecycle.ReadyResource,
+					scope lifecycle.ResourceTransactionScope,
+					_ lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResourceTransaction, error) {
+					return &kernelBlockingDisposeTransaction{
+						scope:   scope,
+						entered: disposeEntered,
+						release: disposeRelease,
+					}, nil
+				},
+			},
+		}, nil
+	})
+	kernel, run, uids, tasks := newKernelWithPlanner(t, planner)
+	require.NoError(t, run.OpenAdmission())
+	request := Request{
+		UID:     "shutdown-transaction",
+		LaneKey: "shutdown-transaction",
+		Source:  lifecycle.SourceJobManager,
+		Route:   "transaction",
+	}
+	plan, err := planner.Plan(request)
+	require.NoError(t, err)
+	require.NoError(t, kernel.admit(request, plan))
+	require.False(t, kernel.scheduleTasks(1))
+	require.False(t, kernel.serviceTaskStarts(1))
+
+	var completion lifecycle.TaskCompletion
+	select {
+	case completion = <-tasks.CompletionCh():
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "transaction preparation did not complete")
+	}
+	run.BeginStopping()
+	budget, err := run.BeginShutdown()
+	require.NoError(t, err)
+	require.NoError(t, kernel.beginShutdown(budget.Deadline()))
+	kernel.completeTask(completion)
+	select {
+	case <-disposeEntered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "shutdown transaction did not enter disposal")
+	}
+	more, err := kernel.serviceShutdownCancellation(1)
+	require.NoError(t, err)
+	require.False(t, more)
+	close(disposeRelease)
+
+	var disposeAck lifecycle.TaskAcknowledgement
+	select {
+	case disposeAck = <-tasks.AcknowledgementCh():
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "shutdown transaction disposal was not acknowledged")
+	}
+	kernel.acknowledgeTask(disposeAck)
+	controlCount := kernel.controls.count
+	if controlCount != 0 {
+		require.False(t, kernel.serviceControls(1))
+	}
+	select {
+	case terminationAck := <-tasks.AcknowledgementCh():
+		kernel.acknowledgeTask(terminationAck)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "shutdown transaction termination was not acknowledged")
+	}
+
+	require.EqualValues(t, 1, controlCount)
+	require.Empty(t, kernel.operations)
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 	closeUIDLedger(t, uids)
 }
 
@@ -3429,7 +3793,13 @@ type kernelTestTransactionPlanner struct {
 	current             *kernelTestReadyResource
 	successor           *kernelTestReadyResource
 	prepareErr          error
+	prepareEntered      chan<- struct{}
+	disposeEntered      chan<- struct{}
+	disposeRelease      <-chan struct{}
 	waitForCancellation bool
+	returnContextErr    bool
+	cooperativeCancel   bool
+	cooperativeDeadline bool
 	events              *[]string
 }
 
@@ -3439,6 +3809,8 @@ func (kttp kernelTestTransactionPlanner) Plan(request Request) (WorkPlan, error)
 		return kernelTestInstallPlan(request.LaneKey, kttp.permitPlan, kttp.current), nil
 	case "replace":
 		return WorkPlan{
+			CooperativeCancel:   kttp.cooperativeCancel,
+			CooperativeDeadline: kttp.cooperativeDeadline,
 			Transaction: &ResourceTransactionPlan{
 				ID:                request.LaneKey,
 				AllocateSuccessor: true,
@@ -3453,18 +3825,26 @@ func (kttp kernelTestTransactionPlanner) Plan(request Request) (WorkPlan, error)
 					if current != kttp.current || scope.Current != kttp.current.identity || !scope.Successor.Valid() {
 						return nil, errors.New("kernel test transaction scope differs")
 					}
+					if kttp.prepareEntered != nil {
+						close(kttp.prepareEntered)
+					}
 					if kttp.waitForCancellation {
 						<-ctx.Done()
+					}
+					if kttp.returnContextErr {
+						return nil, context.Cause(ctx)
 					}
 					if kttp.prepareErr != nil {
 						return nil, kttp.prepareErr
 					}
 					return &kernelTestPreparedResourceTransaction{
-						scope:     scope,
-						current:   kttp.current,
-						successor: kttp.successor,
-						permit:    permit,
-						events:    kttp.events,
+						scope:          scope,
+						current:        kttp.current,
+						successor:      kttp.successor,
+						permit:         permit,
+						disposeEntered: kttp.disposeEntered,
+						disposeRelease: kttp.disposeRelease,
+						events:         kttp.events,
 					}, nil
 				},
 			},
@@ -3475,11 +3855,33 @@ func (kttp kernelTestTransactionPlanner) Plan(request Request) (WorkPlan, error)
 }
 
 type kernelTestPreparedResourceTransaction struct {
-	scope     lifecycle.ResourceTransactionScope
-	current   *kernelTestReadyResource
-	successor *kernelTestReadyResource
-	permit    lifecycle.LongLivedPermit
-	events    *[]string
+	scope          lifecycle.ResourceTransactionScope
+	current        *kernelTestReadyResource
+	successor      *kernelTestReadyResource
+	permit         lifecycle.LongLivedPermit
+	disposeEntered chan<- struct{}
+	disposeRelease <-chan struct{}
+	events         *[]string
+}
+
+type kernelBlockingDisposeTransaction struct {
+	scope   lifecycle.ResourceTransactionScope
+	entered chan<- struct{}
+	release <-chan struct{}
+}
+
+func (kbdt *kernelBlockingDisposeTransaction) Scope() lifecycle.ResourceTransactionScope {
+	return kbdt.scope
+}
+
+func (*kernelBlockingDisposeTransaction) Apply(context.Context) (lifecycle.AppliedResourceTransaction, error) {
+	return lifecycle.AppliedResourceTransaction{}, errors.New("kernel test: shutdown transaction unexpectedly applied")
+}
+
+func (kbdt *kernelBlockingDisposeTransaction) Dispose(context.Context) (lifecycle.ReadyResource, error) {
+	close(kbdt.entered)
+	<-kbdt.release
+	return nil, nil
 }
 
 func (ktprt *kernelTestPreparedResourceTransaction) Scope() lifecycle.ResourceTransactionScope {
@@ -3522,6 +3924,12 @@ func (ktprt *kernelTestPreparedResourceTransaction) Apply(
 
 func (ktprt *kernelTestPreparedResourceTransaction) Dispose(context.Context) (lifecycle.ReadyResource, error) {
 	*ktprt.events = append(*ktprt.events, "dispose")
+	if ktprt.disposeEntered != nil {
+		close(ktprt.disposeEntered)
+	}
+	if ktprt.disposeRelease != nil {
+		<-ktprt.disposeRelease
+	}
 	return ktprt.current, ktprt.permit.AbortUnused()
 }
 

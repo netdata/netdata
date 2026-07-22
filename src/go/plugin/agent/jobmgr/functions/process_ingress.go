@@ -328,7 +328,14 @@ func (pi *ProcessIngress) releaseDelivery() {
 }
 
 func (pi *ProcessIngress) dispositionDeliveryError(port processInputPort, err error) error {
-	if err == nil || !errors.Is(err, jobmgr.ErrStopped) {
+	if err == nil {
+		return err
+	}
+	expectedStopping := err == jobmgr.ErrStopped
+	if stopping, ok := err.(*lifecycle.StoppingRejection); ok {
+		expectedStopping = stopping.Generation == port.Generation()
+	}
+	if !expectedStopping {
 		return err
 	}
 	pi.mu.Lock()

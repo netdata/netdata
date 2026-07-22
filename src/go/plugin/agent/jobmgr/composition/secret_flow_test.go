@@ -20,7 +20,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(t *testing.T) {
+func TestProcessCoreSecretUpdateDependentRestart(t *testing.T) {
+	tests := map[string]struct {
+		restartErr error
+	}{
+		"starts replacement generation": {},
+		"reports replacement construction failure": {
+			restartErr: errors.New("collector initialization exposed backend-sensitive-detail"),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			testProcessCoreSecretUpdateDependentRestart(t, test.restartErr)
+		})
+	}
+}
+
+func testProcessCoreSecretUpdateDependentRestart(t *testing.T, restartErr error) {
+	t.Helper()
 	starts := make(chan string, 4)
 	var cleanups atomic.Int32
 	modules := collectorapi.Registry{
@@ -33,6 +51,9 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(t *testing
 				}
 				collector.InitFunc = func(context.Context) error {
 					starts <- collector.Config.OptionStr
+					if collector.Config.OptionStr == "replacement" && restartErr != nil {
+						return restartErr
+					}
 					return nil
 				}
 				return collector
@@ -131,8 +152,15 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(t *testing
 	require.NoError(t, writeStringErr)
 
 	waitSecretStart(t, starts, "replacement")
-	require.EqualValues(t, 1, cleanups.Load())
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-update 200 application/json")
+	if restartErr == nil {
+		require.EqualValues(t, 1, cleanups.Load())
+	} else {
+		output.waitContains(t, "CONFIG go.d:collector:module:job status failed")
+		wire := output.String()
+		require.Contains(t, wire, "dependent collector restarts failed for jobs: module:job")
+		require.NotContains(t, wire, "backend-sensitive-detail")
+	}
 
 	commands <- testProcessControl(processTerminate)
 	select {

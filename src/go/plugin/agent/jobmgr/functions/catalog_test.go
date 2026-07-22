@@ -175,6 +175,8 @@ func TestFunctionCatalogResourceTransactionHasNoArbitraryCountLimits(t *testing.
 		}
 	}
 	declaration := testDeclaration("config", "", DynCfgJobResource(0, "job:"))
+	declaration.CooperativeCancel = true
+	declaration.CooperativeDeadline = true
 	declaration.Transaction = &ResourceTransactionDeclaration{
 		Prepare: func(
 			context.Context,
@@ -205,6 +207,8 @@ func TestFunctionCatalogResourceTransactionHasNoArbitraryCountLimits(t *testing.
 	assert.Equal(t, "mysql", decision.ResourceID)
 	assert.Len(t, decision.Plan.Claims, 21)
 	assert.Equal(t, "global", decision.Plan.Claims[0])
+	assert.True(t, decision.Plan.CooperativeCancel)
+	assert.True(t, decision.Plan.CooperativeDeadline)
 	_, err = catalog.ReleaseInvocation(decision.Lease)
 	require.NoError(t, err)
 }

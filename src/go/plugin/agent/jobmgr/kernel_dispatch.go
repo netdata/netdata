@@ -17,16 +17,21 @@ func taskClassForOperation(operation *commandOperation, lane *commandLane) lifec
 }
 
 func (ck *CommandKernel) scheduleTasks(quantum int) bool {
+	deadlineProgress := false
 	for quantum > 0 {
 		lane := ck.nextReadyLane()
 		if lane == nil {
-			return false
+			return deadlineProgress
 		}
 		quantum--
 		operation := lane.head
 		if operation == nil || operation.fenceBlocked || lane.active != nil {
 			ck.run.Dirty(errors.New("jobmgr kernel: invalid ready lane"))
 			return false
+		}
+		if ck.expireReadyOperationDeadline(operation) {
+			deadlineProgress = true
+			continue
 		}
 		if ck.shutdownPhase != commandShutdownRunning &&
 			(ck.shutdownPhase != commandShutdownActionDrain ||
@@ -154,10 +159,16 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 		lane.active = operation
 		ck.tasksByRequest[requestRef] = operation
 	}
-	return ck.ready[0].len != 0 || ck.ready[1].len != 0
+	return deadlineProgress || ck.ready[0].len != 0 || ck.ready[1].len != 0
 }
 
 func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
+	if ck.shutdownPhase == commandShutdownRunning && ck.tasks.Pending() != 0 {
+		deadline := ck.nextDeadline()
+		if !deadline.IsZero() && !deadline.After(ck.clock.Now()) {
+			return true
+		}
+	}
 	var started [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
 	count, more, dispatchErr := ck.tasks.Dispatch(context.Background(), quantum, &started)
 	for _, start := range started[:count] {

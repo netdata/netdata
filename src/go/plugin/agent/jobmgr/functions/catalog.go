@@ -639,8 +639,10 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 			slot.transactionPlan.Permit = transactionPermit
 		}
 		plan = jobmgr.WorkPlan{
-			Claims:      slot.claims,
-			Transaction: &slot.transactionPlan,
+			Claims:              slot.claims,
+			Transaction:         &slot.transactionPlan,
+			CooperativeCancel:   resolved.cooperativeCancel,
+			CooperativeDeadline: resolved.cooperativeDeadline,
 		}
 	}
 	return jobmgr.FunctionCatalogDecision{

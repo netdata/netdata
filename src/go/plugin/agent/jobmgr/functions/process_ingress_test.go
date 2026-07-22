@@ -4,10 +4,14 @@ package functions
 
 import (
 	"context"
+	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	functionwire "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/stretchr/testify/require"
 )
@@ -192,6 +196,68 @@ func TestProcessIngressDiscardsPartialBodyOnFence(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
+func TestProcessIngressSealedPauseClassifiesExactStoppingDelivery(t *testing.T) {
+	structuralErr := errors.New("structural delivery failure")
+	tests := map[string]struct {
+		deliveryErr    error
+		wantSuppressed bool
+	}{
+		"current generation stopping rejection": {
+			deliveryErr: &lifecycle.StoppingRejection{
+				Generation: 1,
+			},
+			wantSuppressed: true,
+		},
+		"legacy exact stopped rejection": {
+			deliveryErr:    jobmgr.ErrStopped,
+			wantSuppressed: true,
+		},
+		"wrong generation stopping rejection": {
+			deliveryErr: &lifecycle.StoppingRejection{
+				Generation: 2,
+			},
+		},
+		"joined generation stopping rejection": {
+			deliveryErr: errors.Join(&lifecycle.StoppingRejection{
+				Generation: 1,
+			}, structuralErr),
+		},
+		"joined legacy stopped rejection": {
+			deliveryErr: errors.Join(jobmgr.ErrStopped, structuralErr),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ingress, err := NewProcessIngress(strings.NewReader(""))
+			require.NoError(t, err)
+			input := newTestProcessInput(1)
+			input.callErr = test.deliveryErr
+			require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{
+				port: input,
+			}))
+
+			result := make(chan error, 1)
+			go func() {
+				result <- ingress.HandleCall(context.Background(), functionwire.Call{
+					UID: "during-pause",
+				})
+			}()
+			<-input.calls
+			require.NoError(t, ingress.SealPause())
+			close(input.release)
+
+			deliveryErr := <-result
+			if test.wantSuppressed {
+				require.NoError(t, deliveryErr)
+			} else {
+				require.Error(t, deliveryErr)
+			}
+			require.NoError(t, ingress.DrainPause(context.Background(), 0))
+		})
+	}
+}
+
 func writeFunctionLine(t *testing.T, writer io.Writer, uid string) {
 	t.Helper()
 	line := "FUNCTION " + uid + " 30 \"test:work\" 0xFFFF \"method=api,role=test\"\n"
@@ -204,6 +270,7 @@ type testProcessInput struct {
 	generation uint64
 	calls      chan functionwire.Call
 	release    chan struct{}
+	callErr    error
 }
 
 func newTestProcessInput(generation uint64) *testProcessInput {
@@ -219,7 +286,7 @@ func (tpi *testProcessInput) Generation() uint64 { return tpi.generation }
 func (tpi *testProcessInput) HandleCall(_ context.Context, call functionwire.Call) error {
 	tpi.calls <- call
 	<-tpi.release
-	return nil
+	return tpi.callErr
 }
 
 func (*testProcessInput) HandleCancel(context.Context, string) error      { return nil }

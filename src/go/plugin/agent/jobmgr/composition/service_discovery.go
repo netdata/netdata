@@ -38,6 +38,16 @@ type serviceDiscoveryInvocation struct {
 	err           error
 }
 
+type preparedServiceDiscoveryTransaction struct {
+	mu sync.Mutex
+
+	binding  *serviceDiscoveryBinding
+	handler  frameworkfunctions.Handler
+	function frameworkfunctions.Function
+	scope    lifecycle.ResourceTransactionScope
+	consumed bool
+}
+
 func newServiceDiscoveryBinding(pluginName string, frames *lifecycle.FrameOwner) (*serviceDiscoveryBinding, error) {
 	if pluginName == "" || frames == nil {
 		return nil, errors.New("jobmgr composition: invalid service discovery binding")
@@ -144,14 +154,80 @@ func (sdb *serviceDiscoveryBinding) prepare(
 		Source:      input.CallerSource,
 		ContentType: input.ContentType,
 	}
-	result, cleanup, err := sdb.invoke(
-		input.UID,
-		func() { handler(ctx, function) },
-	)
-	if err != nil {
-		return nil, err
+	return &preparedServiceDiscoveryTransaction{
+		binding:  sdb,
+		handler:  handler,
+		function: function,
+		scope:    scope,
+	}, nil
+}
+
+func (psdt *preparedServiceDiscoveryTransaction) Scope() lifecycle.ResourceTransactionScope {
+	if psdt == nil {
+		return lifecycle.ResourceTransactionScope{}
 	}
-	return joboutput.PrepareNoopResourceTransaction(scope, nil, lifecycle.LongLivedPermit{}, result, cleanup, nil)
+	psdt.mu.Lock()
+	defer psdt.mu.Unlock()
+	if psdt.consumed {
+		return lifecycle.ResourceTransactionScope{}
+	}
+	return psdt.scope
+}
+
+func (psdt *preparedServiceDiscoveryTransaction) Apply(
+	ctx context.Context,
+) (lifecycle.AppliedResourceTransaction, error) {
+	binding, handler, function, scope, err := psdt.take()
+	if err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	if ctx == nil {
+		return lifecycle.AppliedResourceTransaction{}, errors.New(
+			"jobmgr composition: nil service discovery apply context",
+		)
+	}
+	result, cleanup, err := binding.invoke(function.UID, func() { handler(ctx, function) })
+	if err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	return lifecycle.NewAppliedResourceTransaction(
+		scope,
+		lifecycle.ResourceTransactionUnchanged,
+		nil,
+		result,
+		cleanup,
+	)
+}
+
+func (psdt *preparedServiceDiscoveryTransaction) Dispose(context.Context) (lifecycle.ReadyResource, error) {
+	_, _, _, _, err := psdt.take()
+	return nil, err
+}
+
+func (psdt *preparedServiceDiscoveryTransaction) take() (
+	*serviceDiscoveryBinding,
+	frameworkfunctions.Handler,
+	frameworkfunctions.Function,
+	lifecycle.ResourceTransactionScope,
+	error,
+) {
+	if psdt == nil {
+		return nil, nil, frameworkfunctions.Function{}, lifecycle.ResourceTransactionScope{},
+			errors.New("jobmgr composition: nil service discovery transaction")
+	}
+	psdt.mu.Lock()
+	defer psdt.mu.Unlock()
+	if psdt.consumed {
+		return nil, nil, frameworkfunctions.Function{}, lifecycle.ResourceTransactionScope{},
+			errors.New("jobmgr composition: service discovery transaction consumed")
+	}
+	psdt.consumed = true
+	binding, handler, function, scope := psdt.binding, psdt.handler, psdt.function, psdt.scope
+	psdt.binding = nil
+	psdt.handler = nil
+	psdt.function = frameworkfunctions.Function{}
+	psdt.scope = lifecycle.ResourceTransactionScope{}
+	return binding, handler, function, scope, nil
 }
 
 func (sdb *serviceDiscoveryBinding) invoke(
