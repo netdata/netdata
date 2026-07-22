@@ -131,12 +131,35 @@ run for every collector on every cycle.
 - Keep bench comments in sync with the code they measure, in the same change, with
   self-contained wording (no round/session references).
 
+## Go Formatting
+
+`gofmt` and `goimports` are the baseline. This repository additionally
+RECOMMENDS (not CI-enforced) a fuller formatting pipeline that keeps line
+wrapping tight and keyed struct literals readable:
+
+1. `golines -m 120 -t 4 -w <paths>` — join over-wrapped signatures/calls and
+   split lines past ~120 columns. SKIP this step if `golines` is not installed
+   (`go install github.com/segmentio/golines@latest`).
+2. `go run ./tools/expandstructs <paths>` — put each keyed struct-literal field
+   on its own line. Runs `gofmt` internally.
+3. `goimports -w <paths>` — order imports.
+
+Conventions this encodes:
+
+- Keep a signature / call / return / composite literal on ONE line when it fits
+  within ~120 columns; wrap only when it does not.
+- Keyed struct literals of a named type go ONE field per line.
+
+`gofmt`/`goimports` cannot express these two rules, so they are not CI-enforced;
+re-run the pipeline if code drifts. See `tools/expandstructs/README.md`.
+
 ## Validation For Go Changes
 
 Run the narrowest command that actually exercises the change; do not claim
 full-project validation from a narrow one.
 
-- Always: `gofmt` clean and `go vet ./<pkg>/` clean.
+- Always: formatted per "Go Formatting" above (at minimum `gofmt` clean) and
+  `go vet ./<pkg>/` clean.
 - Unit: `go test -count=1 ./<pkg>/...` for every package you touched.
 - Concurrency: add `-race` for concurrency-sensitive packages (`metrix`, the job
   runtime, `plugin/agent/jobmgr`).
