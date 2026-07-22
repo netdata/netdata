@@ -76,6 +76,9 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
 
 bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_streaming, bool internal);
 
+// true if name is a reserved dynamic-configuration function name ("config" or "config <id>")
+bool rrd_function_name_is_dyncfg(const char *name);
+
 // call a function, to be run from anywhere
 int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      HTTP_ACCESS user_access, const char *cmd,
