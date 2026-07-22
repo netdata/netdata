@@ -48,7 +48,9 @@ func TestFunctionAssemblyLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	catalog, ok := assembly.Catalog().(*functionadapter.Catalog)
 	require.True(t, ok)
-	mutations := &assemblyMutationPort{catalog: catalog}
+	mutations := &assemblyMutationPort{
+		catalog: catalog,
+	}
 
 	require.NoError(t, assembly.Bind(mutations))
 
@@ -136,7 +138,9 @@ func TestFunctionAssemblyStateGuards(t *testing.T) {
 			require.NoError(t, err)
 			catalog := assembly.Catalog().(*functionadapter.Catalog)
 
-			require.Error(t, test.run(assembly, &assemblyMutationPort{catalog: catalog}))
+			require.Error(t, test.run(assembly, &assemblyMutationPort{
+				catalog: catalog,
+			}))
 		})
 	}
 }
@@ -144,12 +148,17 @@ func TestFunctionAssemblyStateGuards(t *testing.T) {
 func TestFunctionAssemblyJobHookCapturesExactHandle(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
-	assembly, err := NewFunctionAssembly(1, collectorapi.Registry{"module": {}}, frames)
+	assembly, err := NewFunctionAssembly(1, collectorapi.Registry{
+		"module": {},
+	}, frames)
 	require.NoError(t, err)
 	job := &assemblyTestJob{}
 	handle, err := assembly.JobHooks().Prepare(joboutput.PublishedJob{
-		Identity: lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 3},
-		Job:      job,
+		Identity: lifecycle.ResourceIdentity{
+			ID:         job.FullName(),
+			Generation: 3,
+		},
+		Job: job,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, handle)
@@ -261,15 +270,24 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 
 	job := &assemblyTestJob{}
 	handle, err := assembly.JobHooks().Prepare(joboutput.PublishedJob{
-		Identity: lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1},
-		Job:      job,
+		Identity: lifecycle.ResourceIdentity{
+			ID:         job.FullName(),
+			Generation: 1,
+		},
+		Job: job,
 	})
 	require.NoError(t, err)
 	permit := lifecycle.NewJobLongLivedPlan()
 	return shutdownFunctionHarness{
-		kernel: kernel, run: run, uids: uids,
-		tasks: tasks, output: output, job: job, handle: handle,
-		permit: permit, probe: probe,
+		kernel: kernel,
+		run:    run,
+		uids:   uids,
+		tasks:  tasks,
+		output: output,
+		job:    job,
+		handle: handle,
+		permit: permit,
+		probe:  probe,
 	}
 }
 
@@ -367,7 +385,9 @@ func (*assemblyTestHandler) MethodParams(context.Context, string) ([]funcapi.Par
 }
 
 func (*assemblyTestHandler) Handle(context.Context, string, funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	return &funcapi.FunctionResponse{Status: 200}
+	return &funcapi.FunctionResponse{
+		Status: 200,
+	}
 }
 
 func (*assemblyTestHandler) Cleanup(context.Context) {}
@@ -443,7 +463,11 @@ func (sfpt *shutdownFunctionPreparedTransaction) Apply(
 		_, disposeErr := sfpt.Dispose(ctx)
 		return lifecycle.AppliedResourceTransaction{}, errors.Join(err, disposeErr)
 	}
-	ready := &shutdownFunctionReadyResource{identity: sfpt.scope.Successor, permit: sfpt.permit, handle: sfpt.handle}
+	ready := &shutdownFunctionReadyResource{
+		identity: sfpt.scope.Successor,
+		permit:   sfpt.permit,
+		handle:   sfpt.handle,
+	}
 	if err := ready.Publish(); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, errors.Join(err, ready.AbortReady(ctx))
 	}

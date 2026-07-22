@@ -21,7 +21,9 @@ func NewFramePublicationPort(frames *lifecycle.FrameOwner) (*FramePublicationPor
 	if frames == nil {
 		return nil, errors.New("jobmgr Function protocol: invalid publication port")
 	}
-	return &FramePublicationPort{frames: frames}, nil
+	return &FramePublicationPort{
+		frames: frames,
+	}, nil
 }
 
 func (fpp *FramePublicationPort) Publish(record PublicationRecord) error {

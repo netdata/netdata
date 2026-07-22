@@ -40,7 +40,10 @@ func TestProcessRoundTripAndRepeatableWait(t *testing.T) {
 
 func TestProcessWaitCancellationKillsAndJoins(t *testing.T) {
 	requireShell(t)
-	process, err := Start(Spec{Executable: "/bin/sh", Arguments: []string{"-c", "sleep 30 & wait"}})
+	process, err := Start(Spec{
+		Executable: "/bin/sh",
+		Arguments:  []string{"-c", "sleep 30 & wait"},
+	})
 	require.NoError(t, err)
 	defer process.Kill()
 

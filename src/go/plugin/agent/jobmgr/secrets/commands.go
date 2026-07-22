@@ -289,10 +289,14 @@ func (c *Controller) prepareStoreMutation(
 		return nil, err
 	}
 	mutation, prepareErr := c.store.PrepareMutation(ctx, c.creators, carrier, config, expected)
-	entry := secretEntry{config: config, status: dyncfg.StatusRunning}
+	entry := secretEntry{
+		config: config,
+		status: dyncfg.StatusRunning,
+	}
 	if prepareErr != nil {
 		spec := preparedSecretSpec{
-			scope: scope, current: current,
+			scope:      scope,
+			current:    current,
 			permit:     permit,
 			store:      c.store,
 			storeKey:   config.ExposedKey(),
@@ -313,15 +317,17 @@ func (c *Controller) prepareStoreMutation(
 	}
 	return newPreparedSecretTransaction(
 		preparedSecretSpec{
-			scope: scope, current: current,
+			scope:      scope,
+			current:    current,
 			permit:     permit,
 			store:      c.store,
 			storeKey:   config.ExposedKey(),
 			mutation:   mutation,
 			result:     mustSecretMessage(200, ""),
 			cleanup:    c.configCreateCleanup(entry),
-			controller: c, entry: &entry,
-			restarts: c.restartCommand(),
+			controller: c,
+			entry:      &entry,
+			restarts:   c.restartCommand(),
 		},
 	)
 }
@@ -345,9 +351,13 @@ func (c *Controller) noop(
 	}
 	return newPreparedSecretTransaction(
 		preparedSecretSpec{
-			scope: scope, current: current,
-			permit: permit, result: result, cleanup: cleanup,
-			controller: c, entry: entry,
+			scope:      scope,
+			current:    current,
+			permit:     permit,
+			result:     result,
+			cleanup:    cleanup,
+			controller: c,
+			entry:      entry,
 		},
 	)
 }

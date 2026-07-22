@@ -28,8 +28,10 @@ func (dcjc *DynCfgJobController) planAutoDetectionRetry(
 	token autoDetectionRetryToken,
 ) (jobmgr.WorkPlan, error) {
 	return dcjc.PlanDiscovered(DiscoveredJobChange{
-		Config: config, Status: dyncfg.StatusRunning,
-		Restart: true, retry: token,
+		Config:  config,
+		Status:  dyncfg.StatusRunning,
+		Restart: true,
+		retry:   token,
 	})
 }
 
@@ -167,8 +169,10 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		return nil, err
 	}
 	postimage := dyncfg.GraphConfig{
-		ID: scope.ID, Module: change.Config.Module(),
-		Name: change.Config.Name(), Status: change.Status.String(),
+		ID:      scope.ID,
+		Module:  change.Config.Module(),
+		Name:    change.Config.Name(),
+		Status:  change.Status.String(),
 		Payload: payload,
 	}
 	cleanup := dcjc.configCreateCleanup(

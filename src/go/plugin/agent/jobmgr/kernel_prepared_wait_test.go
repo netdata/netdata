@@ -259,7 +259,9 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 							kernel:  kernel,
 							entered: actionEntered,
 							release: actionRelease,
-							scope:   lifecycle.ResourceTransactionScope{ID: "shutdown-action-mutation"},
+							scope: lifecycle.ResourceTransactionScope{
+								ID: "shutdown-action-mutation",
+							},
 						}, nil
 					},
 				},
@@ -380,7 +382,10 @@ func (samc *shutdownActionMutationCatalog) AdvanceMutationQuiesce(int) (Function
 	if !samc.active.Load() {
 		return FunctionCatalogMutationProgress{}, errors.New("test Function mutation is inactive")
 	}
-	return FunctionCatalogMutationProgress{Version: 1, Quiesced: true}, nil
+	return FunctionCatalogMutationProgress{
+		Version:  1,
+		Quiesced: true,
+	}, nil
 }
 
 func (samc *shutdownActionMutationCatalog) ResumeMutation(FunctionCatalogMutation) error {
@@ -397,7 +402,10 @@ func (samc *shutdownActionMutationCatalog) AdvanceMutation(
 		return FunctionCatalogMutationProgress{}, nil
 	}
 	samc.commitCalls.Add(1)
-	return FunctionCatalogMutationProgress{Version: 2, Done: true}, nil
+	return FunctionCatalogMutationProgress{
+		Version: 2,
+		Done:    true,
+	}, nil
 }
 
 func (samc *shutdownActionMutationCatalog) AbortMutation(FunctionCatalogMutation) error {
@@ -430,7 +438,9 @@ func atomicTransactionPlan(entered chan<- struct{}, release <-chan struct{}, act
 				lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
 				return &atomicPreparedTransaction{
-					scope:   lifecycle.ResourceTransactionScope{ID: "atomic-action"},
+					scope: lifecycle.ResourceTransactionScope{
+						ID: "atomic-action",
+					},
 					entered: entered,
 					release: release,
 					done:    actionDone,

@@ -33,7 +33,11 @@ type SealedResult struct {
 }
 
 func NewSealedResult(status int, contentType string, payload []byte) (SealedResult, error) {
-	result := SealedResult{status: status, contentType: contentType, payload: payload}
+	result := SealedResult{
+		status:      status,
+		contentType: contentType,
+		payload:     payload,
+	}
 	if err := result.validate(); err != nil {
 		return SealedResult{}, err
 	}
@@ -236,10 +240,13 @@ func NewShutdownReadyResourceTaskPlan(
 		return TaskPlan{}, errors.New("jobmgr lifecycle: nil shutdown budget")
 	}
 	plan := TaskPlan{
-		Source: source, MaxPhaseTransitions: maxPhaseTransitions,
-		initialReady: resource, initialIdentity: identity,
-		taskContext: budget.Context(), preserveDisposeContext: true,
-		drainDependent: true,
+		Source:                 source,
+		MaxPhaseTransitions:    maxPhaseTransitions,
+		initialReady:           resource,
+		initialIdentity:        identity,
+		taskContext:            budget.Context(),
+		preserveDisposeContext: true,
+		drainDependent:         true,
 	}
 	if err := plan.Validate(); err != nil {
 		return TaskPlan{}, err
@@ -257,8 +264,10 @@ func NewShutdownWorkTaskPlan(
 		return TaskPlan{}, errors.New("jobmgr lifecycle: nil shutdown budget")
 	}
 	plan := TaskPlan{
-		Source: source, MaxPhaseTransitions: maxPhaseTransitions, Work: work,
-		taskContext: budget.Context(),
+		Source:              source,
+		MaxPhaseTransitions: maxPhaseTransitions,
+		Work:                work,
+		taskContext:         budget.Context(),
 	}
 	if err := plan.Validate(); err != nil {
 		return TaskPlan{}, err

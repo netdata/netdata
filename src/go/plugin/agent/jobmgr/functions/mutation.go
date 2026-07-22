@@ -137,14 +137,19 @@ func (c *Catalog) NewMutation(expectedVersion uint64, changes []RouteChange) (*M
 		} else {
 			routes[change.PublicName] = set
 		}
-		mutation.transitions[index] = routeTransition{oldRoute: oldRoute, newRoute: newRoute}
+		mutation.transitions[index] = routeTransition{
+			oldRoute: oldRoute,
+			newRoute: newRoute,
+		}
 		if oldRoute != nil {
 			mutation.quiesced[oldRoute] = struct{}{}
 			generation := oldRoute.handler
 			retirementIndex, exists := retirementIndices[generation]
 			if !exists {
 				retirementIndices[generation] = len(mutation.retirements)
-				mutation.retirements = append(mutation.retirements, generationRetirement{generation: generation})
+				mutation.retirements = append(mutation.retirements, generationRetirement{
+					generation: generation,
+				})
 				retirementIndex = len(mutation.retirements) - 1
 			}
 			mutation.retirements[retirementIndex].references++
@@ -171,7 +176,11 @@ func (c *Catalog) NewMutation(expectedVersion uint64, changes []RouteChange) (*M
 			active = append(active, transition.newRoute)
 		}
 	}
-	mutation.postimage = &catalogSnapshot{version: expectedVersion + 1, routes: routes, active: active}
+	mutation.postimage = &catalogSnapshot{
+		version: expectedVersion + 1,
+		routes:  routes,
+		active:  active,
+	}
 	return mutation, nil
 }
 
@@ -234,7 +243,9 @@ func (c *Catalog) BeginMutation(mutation jobmgr.FunctionCatalogMutation) error {
 		return err
 	}
 	builder := &prepared.builder
-	*builder = MutationBuilder{mutation: prepared}
+	*builder = MutationBuilder{
+		mutation: prepared,
+	}
 	c.mutation = builder
 	return nil
 }
@@ -258,7 +269,9 @@ func (c *Catalog) AdvanceMutationQuiesce(quantum int) (jobmgr.FunctionCatalogMut
 		quantum--
 	}
 	if builder.preflightTransitionIndex < len(builder.mutation.transitions) {
-		return jobmgr.FunctionCatalogMutationProgress{Version: c.version}, nil
+		return jobmgr.FunctionCatalogMutationProgress{
+			Version: c.version,
+		}, nil
 	}
 	for quantum > 0 && builder.preflightRetirementIndex < len(builder.mutation.retirements) {
 		if err := c.validateRetirement(builder.mutation.retirements[builder.preflightRetirementIndex]); err != nil {
@@ -268,10 +281,15 @@ func (c *Catalog) AdvanceMutationQuiesce(quantum int) (jobmgr.FunctionCatalogMut
 		quantum--
 	}
 	if builder.preflightRetirementIndex < len(builder.mutation.retirements) {
-		return jobmgr.FunctionCatalogMutationProgress{Version: c.version}, nil
+		return jobmgr.FunctionCatalogMutationProgress{
+			Version: c.version,
+		}, nil
 	}
 	builder.preflightComplete = true
-	return jobmgr.FunctionCatalogMutationProgress{Version: c.version, Quiesced: true}, nil
+	return jobmgr.FunctionCatalogMutationProgress{
+		Version:  c.version,
+		Quiesced: true,
+	}, nil
 }
 
 func (c *Catalog) validateRetirement(retirement generationRetirement) error {
@@ -328,7 +346,9 @@ func (c *Catalog) AdvanceMutation(quantum int) (jobmgr.FunctionCatalogMutationPr
 		}
 	}
 	if builder.index < len(builder.mutation.transitions) {
-		return jobmgr.FunctionCatalogMutationProgress{Version: c.version}, cleanups
+		return jobmgr.FunctionCatalogMutationProgress{
+			Version: c.version,
+		}, cleanups
 	}
 
 	c.snapshot.Store(builder.mutation.postimage)
@@ -337,7 +357,10 @@ func (c *Catalog) AdvanceMutation(quantum int) (jobmgr.FunctionCatalogMutationPr
 	c.mutation = nil
 	builder.finished = true
 	builder.mutation.release()
-	return jobmgr.FunctionCatalogMutationProgress{Version: c.version, Done: true}, cleanups
+	return jobmgr.FunctionCatalogMutationProgress{
+		Version: c.version,
+		Done:    true,
+	}, cleanups
 }
 
 func (c *Catalog) AbortMutation(mutation jobmgr.FunctionCatalogMutation) error {

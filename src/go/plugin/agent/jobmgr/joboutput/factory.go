@@ -75,7 +75,9 @@ func NewFactory(config FactoryConfig) (*Factory, error) {
 		config.Scheduler == nil {
 		return nil, errors.New("job output: incomplete factory configuration")
 	}
-	return &Factory{config: config}, nil
+	return &Factory{
+		config: config,
+	}, nil
 }
 
 func (f *Factory) ValidateConfig(ctx context.Context, config confgroup.Config) error {
@@ -124,7 +126,10 @@ func (f *Factory) build(ctx context.Context, config confgroup.Config, generation
 	if err != nil {
 		return ConstructedJob{}, err
 	}
-	identity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: generation}
+	identity := lifecycle.ResourceIdentity{
+		ID:         config.FullName(),
+		Generation: generation,
+	}
 	var job RuntimeJob
 	var variant JobVariant
 	if creator.CreateV2 != nil {
@@ -137,16 +142,24 @@ func (f *Factory) build(ctx context.Context, config confgroup.Config, generation
 	if err != nil {
 		return ConstructedJob{}, err
 	}
-	cleanup := &factoryJobCleanup{job: job}
+	cleanup := &factoryJobCleanup{
+		job: job,
+	}
 	constructed, err := newManagedJob(variant, job, f.config.Tasks, identity, f.config.Scheduler, cleanup.reject)
 	if err != nil {
-		return ConstructedJob{Variant: variant, CollectorCleanup: cleanup.reject}, err
+		return ConstructedJob{
+			Variant:          variant,
+			CollectorCleanup: cleanup.reject,
+		}, err
 	}
 	if hasFunctions && f.config.Hooks == nil {
 		return constructed, errors.New("job output: function-bearing job has no handler lifecycle")
 	}
 	if hooks := f.config.Hooks; hasFunctions {
-		published := PublishedJob{Identity: identity, Job: job}
+		published := PublishedJob{
+			Identity: identity,
+			Job:      job,
+		}
 		handlers, prepareErr := callPrepareHandlers(hooks, published)
 		constructed.Handlers = handlers
 		if prepareErr != nil {
@@ -263,13 +276,21 @@ func (f *Factory) buildV1(
 		return nil, err
 	}
 	jobConfig := jobruntime.JobConfig{
-		PluginName: f.config.PluginName, Name: config.Name(),
-		ModuleName: config.Module(), FullName: config.FullName(),
-		Source: factoryLogSource(config), Module: module,
-		Labels: factoryLabels(config), Out: FrameWriter{Owner: f.config.Frames},
-		UpdateEvery: config.UpdateEvery(), AutoDetectEvery: config.AutoDetectionRetry(),
-		Priority: config.Priority(), IsStock: config.SourceType() == confgroup.TypeStock,
-		FunctionOnly: functionOnly,
+		PluginName: f.config.PluginName,
+		Name:       config.Name(),
+		ModuleName: config.Module(),
+		FullName:   config.FullName(),
+		Source:     factoryLogSource(config),
+		Module:     module,
+		Labels:     factoryLabels(config),
+		Out: FrameWriter{
+			Owner: f.config.Frames,
+		},
+		UpdateEvery:     config.UpdateEvery(),
+		AutoDetectEvery: config.AutoDetectionRetry(),
+		Priority:        config.Priority(),
+		IsStock:         config.SourceType() == confgroup.TypeStock,
+		FunctionOnly:    functionOnly,
 	}
 	if vnode.Vnode != nil {
 		jobConfig.Vnode = *vnode.Vnode.Copy()
@@ -317,13 +338,22 @@ func (f *Factory) buildV2(
 		return nil, err
 	}
 	jobConfig := jobruntime.JobV2Config{
-		PluginName: f.config.PluginName, Name: config.Name(),
-		ModuleName: config.Module(), FullName: config.FullName(),
-		Source: factoryLogSource(config), Module: module,
-		Labels: factoryLabels(config), Out: FrameWriter{Owner: f.config.Frames},
-		UpdateEvery: config.UpdateEvery(), AutoDetectEvery: config.AutoDetectionRetry(),
-		IsStock: config.SourceType() == confgroup.TypeStock, FunctionOnly: functionOnly,
-		RuntimeService: f.config.Runtime, VnodeRegistry: f.config.Vnodes,
+		PluginName: f.config.PluginName,
+		Name:       config.Name(),
+		ModuleName: config.Module(),
+		FullName:   config.FullName(),
+		Source:     factoryLogSource(config),
+		Module:     module,
+		Labels:     factoryLabels(config),
+		Out: FrameWriter{
+			Owner: f.config.Frames,
+		},
+		UpdateEvery:     config.UpdateEvery(),
+		AutoDetectEvery: config.AutoDetectionRetry(),
+		IsStock:         config.SourceType() == confgroup.TypeStock,
+		FunctionOnly:    functionOnly,
+		RuntimeService:  f.config.Runtime,
+		VnodeRegistry:   f.config.Vnodes,
 	}
 	if vnode.Vnode != nil {
 		jobConfig.Vnode = *vnode.Vnode.Copy()

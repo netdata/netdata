@@ -161,8 +161,11 @@ func commitVNode(
 
 func testVNode(hostname, source string) *vnodes.VirtualNode {
 	return &vnodes.VirtualNode{
-		Name: "node", Hostname: hostname, GUID: "guid",
-		Source: source, SourceType: "test",
-		Labels: map[string]string{"site": "original"},
+		Name:       "node",
+		Hostname:   hostname,
+		GUID:       "guid",
+		Source:     source,
+		SourceType: "test",
+		Labels:     map[string]string{"site": "original"},
 	}
 }

@@ -43,7 +43,11 @@ func NewFunctionAssembly(
 	if err != nil {
 		return nil, errors.Join(err, controller.AbortConstruction(context.Background()))
 	}
-	assembly := &FunctionAssembly{controller: controller, catalog: catalog, publication: publication}
+	assembly := &FunctionAssembly{
+		controller:  controller,
+		catalog:     catalog,
+		publication: publication,
+	}
 	return assembly, nil
 }
 
@@ -61,7 +65,9 @@ func (fa *FunctionAssembly) JobHooks() joboutput.JobHooks {
 	if fa == nil {
 		return nil
 	}
-	return functionJobHooks{controller: fa.controller}
+	return functionJobHooks{
+		controller: fa.controller,
+	}
 }
 
 func (fa *FunctionAssembly) ReconcileModule(ctx context.Context, module string) error {

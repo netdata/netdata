@@ -18,7 +18,11 @@ func TestAgentFixtureCloseIsIdempotentAndJoins(t *testing.T) {
 			if err != nil {
 				return fixtureCloseTarget{}, err
 			}
-			return fixtureCloseTarget{state: fixture.state, close: fixture.close, done: fixture.done}, nil
+			return fixtureCloseTarget{
+				state: fixture.state,
+				close: fixture.close,
+				done:  fixture.done,
+			}, nil
 		},
 	)
 }
@@ -32,7 +36,11 @@ func TestProcessFixtureCloseIsIdempotentAndJoins(t *testing.T) {
 			if err != nil {
 				return fixtureCloseTarget{}, err
 			}
-			return fixtureCloseTarget{state: fixture.state, close: fixture.close, done: fixture.done}, nil
+			return fixtureCloseTarget{
+				state: fixture.state,
+				close: fixture.close,
+				done:  fixture.done,
+			}, nil
 		},
 	)
 }

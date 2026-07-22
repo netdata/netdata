@@ -12,11 +12,20 @@ import (
 
 func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T) {
 	supervisor := newLongLivedTestSupervisor(t)
-	current := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: new([]string)}
+	current := &recordingReadyResource{
+		identity: ResourceIdentity{
+			ID:         "job",
+			Generation: 1,
+		},
+		events: new([]string),
+	}
 	scope := ResourceTransactionScope{
-		ID:        "job",
-		Current:   current.identity,
-		Successor: ResourceIdentity{ID: "job", Generation: 2},
+		ID:      "job",
+		Current: current.identity,
+		Successor: ResourceIdentity{
+			ID:         "job",
+			Generation: 2,
+		},
 	}
 	permit := NewJobLongLivedPlan()
 	plan, err := NewResourceTransactionPermitTaskPlan(
@@ -40,9 +49,17 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 	require.NotNil(t, gotCurrent)
 	require.Equal(t, scope.Current, gotCurrent.Identity())
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     TaskActionDispose,
+	}))
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     TaskActionTerminate,
+	}))
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
 	require.NoError(t, supervisor.Release(ref))
 	require.Equal(t, LongLivedCensus{}, supervisor.LongLivedCensus())

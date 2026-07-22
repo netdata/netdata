@@ -14,10 +14,18 @@ import (
 func TestModuleCatalogPolicyIsFrozenAtProcessConstruction(t *testing.T) {
 	config := testProductionProcessConfig(strings.NewReader(""), io.Discard)
 	config.Modules = collectorapi.Registry{
-		"enabled":  {Defaults: collectorapi.Defaults{UpdateEvery: 1}},
-		"disabled": {Defaults: collectorapi.Defaults{UpdateEvery: 1, Disabled: true}},
+		"enabled": {Defaults: collectorapi.Defaults{
+			UpdateEvery: 1,
+		}},
+		"disabled": {Defaults: collectorapi.Defaults{
+			UpdateEvery: 1,
+			Disabled:    true,
+		}},
 	}
-	config.Defaults = confgroup.Registry{"enabled": {UpdateEvery: 1}, "disabled": {UpdateEvery: 1}}
+	config.Defaults = confgroup.Registry{
+		"enabled":  {UpdateEvery: 1},
+		"disabled": {UpdateEvery: 1},
+	}
 	process, err := NewProcess(config)
 	require.NoError(t, err)
 	delete(config.Modules, "enabled")
@@ -42,7 +50,11 @@ func TestModuleCatalogPolicyIsFrozenAtProcessConstruction(t *testing.T) {
 }
 
 func TestModuleCatalogLookupAllocatesNothing(t *testing.T) {
-	modules := collectorapi.Registry{"module": {Defaults: collectorapi.Defaults{UpdateEvery: 1}}}
+	modules := collectorapi.Registry{
+		"module": {Defaults: collectorapi.Defaults{
+			UpdateEvery: 1,
+		}},
+	}
 	allocations := testing.AllocsPerRun(1_000, func() {
 		if _, ok := modules.Lookup("module"); !ok {
 			panic("module disappeared")
@@ -54,7 +66,11 @@ func TestModuleCatalogLookupAllocatesNothing(t *testing.T) {
 func BenchmarkBProcessRestart(b *testing.B) {
 	started := make(chan struct{})
 	close(started)
-	process := &Process{commands: make(chan processControl), started: started, done: make(chan struct{})}
+	process := &Process{
+		commands: make(chan processControl),
+		started:  started,
+		done:     make(chan struct{}),
+	}
 	go func() {
 		for control := range process.commands {
 			control.result <- nil
@@ -72,7 +88,11 @@ func BenchmarkBProcessRestart(b *testing.B) {
 }
 
 func BenchmarkBModuleLookup(b *testing.B) {
-	modules := collectorapi.Registry{"module": {Defaults: collectorapi.Defaults{UpdateEvery: 1}}}
+	modules := collectorapi.Registry{
+		"module": {Defaults: collectorapi.Defaults{
+			UpdateEvery: 1,
+		}},
+	}
 	b.ReportAllocs()
 	for b.Loop() {
 		if _, ok := modules.Lookup("module"); !ok {

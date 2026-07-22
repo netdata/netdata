@@ -65,11 +65,15 @@ func (rtj restartTestJobs) PlanDependentStop(id string) (jobmgr.WorkPlan, Depend
 	if id == "module_two" {
 		return jobmgr.WorkPlan{}, nil, rtj.stopError
 	}
-	return jobmgr.WorkPlan{}, restartTestStop{stopped: true}, nil
+	return jobmgr.WorkPlan{}, restartTestStop{
+		stopped: true,
+	}, nil
 }
 
 func (rtj restartTestJobs) PlanDependentStart(string) (jobmgr.WorkPlan, DependentStartResult, error) {
-	return jobmgr.WorkPlan{}, restartTestStart{err: rtj.restoreError}, nil
+	return jobmgr.WorkPlan{}, restartTestStart{
+		err: rtj.restoreError,
+	}, nil
 }
 
 func TestSecretRestartCommandCommitsWithoutDependentsOrCompositeScope(t *testing.T) {
@@ -82,7 +86,10 @@ func TestSecretRestartCommandCommitsWithoutDependentsOrCompositeScope(t *testing
 		"vault:main",
 		func(context.Context) (secretstore.SecretMutationResult, error) {
 			commits++
-			return secretstore.SecretMutationResult{Generation: 1, Applied: true}, nil
+			return secretstore.SecretMutationResult{
+				Generation: 1,
+				Applied:    true,
+			}, nil
 		},
 	)
 	require.NoError(t, err)
@@ -95,14 +102,20 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(t *testing.T) {
 	restoreError := errors.New("first dependent restore failed")
 	index := NewSecretDependencyIndex()
 	for _, name := range []string{"one", "two"} {
-		config := confgroup.Config{"module": "module", "name": name, "secret": "${store:vault:main:value}"}
+		config := confgroup.Config{
+			"module": "module",
+			"name":   name,
+			"secret": "${store:vault:main:value}",
+		}
 		payload, err := yaml.Marshal(config)
 		require.NoError(t, err)
 		commit, err := index.PrepareJobChange(
 			config.FullName(),
 			&dyncfg.GraphConfig{
-				ID: config.FullName(), Module: config.Module(),
-				Name: config.Name(), Status: dyncfg.StatusRunning.String(),
+				ID:      config.FullName(),
+				Module:  config.Module(),
+				Name:    config.Name(),
+				Status:  dyncfg.StatusRunning.String(),
 				Payload: payload,
 			},
 		)
@@ -112,7 +125,10 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(t *testing.T) {
 	command, err := NewSecretRestartCommand(
 		1,
 		index,
-		restartTestJobs{stopError: stopError, restoreError: restoreError},
+		restartTestJobs{
+			stopError:    stopError,
+			restoreError: restoreError,
+		},
 	)
 	require.NoError(t, err)
 	commitCalled := false
@@ -132,14 +148,20 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(t *testing.T) {
 
 func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(t *testing.T) {
 	index := NewSecretDependencyIndex()
-	config := confgroup.Config{"module": "module", "name": "one", "secret": "${store:vault:main:value}"}
+	config := confgroup.Config{
+		"module": "module",
+		"name":   "one",
+		"secret": "${store:vault:main:value}",
+	}
 	payload, err := yaml.Marshal(config)
 	require.NoError(t, err)
 	commitDependency, err := index.PrepareJobChange(
 		config.FullName(),
 		&dyncfg.GraphConfig{
-			ID: config.FullName(), Module: config.Module(),
-			Name: config.Name(), Status: dyncfg.StatusRunning.String(),
+			ID:      config.FullName(),
+			Module:  config.Module(),
+			Name:    config.Name(),
+			Status:  dyncfg.StatusRunning.String(),
 			Payload: payload,
 		},
 	)
@@ -147,7 +169,9 @@ func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(t *testi
 	commitDependency()
 	command, err := NewSecretRestartCommand(1, index, restartTestJobs{})
 	require.NoError(t, err)
-	scope := &restartTestCommandScope{normalErr: context.Canceled}
+	scope := &restartTestCommandScope{
+		normalErr: context.Canceled,
+	}
 	commitCalled := false
 	_, _, restored, err := command.Apply(
 		context.Background(),
@@ -167,27 +191,38 @@ func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(t *testi
 func TestSecretRestartCommandRedactsAppliedRestartFailure(t *testing.T) {
 	sensitive := errors.New("collector initialization exposed backend-sensitive-detail")
 	index := NewSecretDependencyIndex()
-	config := confgroup.Config{"module": "module", "name": "one", "secret": "${store:vault:main:value}"}
+	config := confgroup.Config{
+		"module": "module",
+		"name":   "one",
+		"secret": "${store:vault:main:value}",
+	}
 	payload, err := yaml.Marshal(config)
 	require.NoError(t, err)
 	commitDependency, err := index.PrepareJobChange(
 		config.FullName(),
 		&dyncfg.GraphConfig{
-			ID: config.FullName(), Module: config.Module(),
-			Name: config.Name(), Status: dyncfg.StatusRunning.String(),
+			ID:      config.FullName(),
+			Module:  config.Module(),
+			Name:    config.Name(),
+			Status:  dyncfg.StatusRunning.String(),
 			Payload: payload,
 		},
 	)
 	require.NoError(t, err)
 	commitDependency()
-	command, err := NewSecretRestartCommand(1, index, restartTestJobs{restoreError: sensitive})
+	command, err := NewSecretRestartCommand(1, index, restartTestJobs{
+		restoreError: sensitive,
+	})
 	require.NoError(t, err)
 	result, message, _, err := command.Apply(
 		context.Background(),
 		&restartTestCommandScope{},
 		"vault:main",
 		func(context.Context) (secretstore.SecretMutationResult, error) {
-			return secretstore.SecretMutationResult{Generation: 1, Applied: true}, nil
+			return secretstore.SecretMutationResult{
+				Generation: 1,
+				Applied:    true,
+			}, nil
 		},
 	)
 	require.False(t, !result.Applied || err != nil)
@@ -199,7 +234,11 @@ func BenchmarkBSecretRestart(b *testing.B) {
 	const dependents = 16
 	for job := range dependents {
 		name := fmt.Sprintf("job-%d", job)
-		config := confgroup.Config{"module": "module", "name": name, "secret": "${store:vault:main:value}"}
+		config := confgroup.Config{
+			"module": "module",
+			"name":   name,
+			"secret": "${store:vault:main:value}",
+		}
 		payload, err := yaml.Marshal(config)
 		if err != nil {
 			require.FailNow(b, "benchmark failed", err)
@@ -207,8 +246,10 @@ func BenchmarkBSecretRestart(b *testing.B) {
 		commit, err := index.PrepareJobChange(
 			config.FullName(),
 			&dyncfg.GraphConfig{
-				ID: config.FullName(), Module: config.Module(),
-				Name: name, Status: dyncfg.StatusRunning.String(),
+				ID:      config.FullName(),
+				Module:  config.Module(),
+				Name:    name,
+				Status:  dyncfg.StatusRunning.String(),
 				Payload: payload,
 			},
 		)
@@ -223,7 +264,10 @@ func BenchmarkBSecretRestart(b *testing.B) {
 	}
 	scope := &restartTestCommandScope{}
 	commit := func(context.Context) (secretstore.SecretMutationResult, error) {
-		return secretstore.SecretMutationResult{Generation: 1, Applied: true}, nil
+		return secretstore.SecretMutationResult{
+			Generation: 1,
+			Applied:    true,
+		}, nil
 	}
 	b.ReportAllocs()
 	b.ResetTimer()

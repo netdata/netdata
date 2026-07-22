@@ -68,10 +68,11 @@ func NewController(config ControllerConfig) (*Controller, error) {
 		return nil, errors.New("jobmgr secrets: incomplete controller configuration")
 	}
 	return &Controller{
-		epoch:  config.Epoch,
-		prefix: fmt.Sprintf("%s:secretstore:", config.PluginName),
-		path:   fmt.Sprintf(dynCfgSecretPath, config.PluginName),
-		frames: config.Frames, store: config.Store,
+		epoch:        config.Epoch,
+		prefix:       fmt.Sprintf("%s:secretstore:", config.PluginName),
+		path:         fmt.Sprintf(dynCfgSecretPath, config.PluginName),
+		frames:       config.Frames,
+		store:        config.Store,
 		creators:     config.Creators,
 		dependencies: config.Dependencies,
 		initial:      slices.Clone(config.Initial),
@@ -178,10 +179,16 @@ func (c *Controller) resolveTarget(input CommandInput) (secretTarget, *targetFai
 	id := input.Args[0]
 	rest, ok := strings.CutPrefix(id, c.prefix)
 	if !ok || rest == "" {
-		return secretTarget{}, &targetFailure{code: 400, message: "invalid config ID format."}
+		return secretTarget{}, &targetFailure{
+			code:    400,
+			message: "invalid config ID format.",
+		}
 	}
 	command := dyncfg.Command(strings.ToLower(input.Args[1]))
-	target := secretTarget{command: command, id: id}
+	target := secretTarget{
+		command: command,
+		id:      id,
+	}
 	if command == dyncfg.CommandAdd {
 		if len(input.Args) < 3 {
 			return secretTarget{}, &targetFailure{
@@ -190,7 +197,10 @@ func (c *Controller) resolveTarget(input CommandInput) (secretTarget, *targetFai
 			}
 		}
 		if strings.Contains(rest, ":") {
-			return secretTarget{}, &targetFailure{code: 400, message: "invalid secretstore template ID."}
+			return secretTarget{}, &targetFailure{
+				code:    400,
+				message: "invalid secretstore template ID.",
+			}
 		}
 		target.kind = secretstore.StoreKind(rest)
 		target.name = input.Args[2]
@@ -217,11 +227,17 @@ func (c *Controller) resolveTarget(input CommandInput) (secretTarget, *targetFai
 				return target, nil
 			}
 		}
-		return secretTarget{}, &targetFailure{code: 400, message: "invalid config ID format."}
+		return secretTarget{}, &targetFailure{
+			code:    400,
+			message: "invalid config ID format.",
+		}
 	}
 	kind, name, err := secretstore.ParseStoreKey(rest)
 	if err != nil {
-		return secretTarget{}, &targetFailure{code: 400, message: "invalid config ID format."}
+		return secretTarget{}, &targetFailure{
+			code:    400,
+			message: "invalid config ID format.",
+		}
 	}
 	target.key, target.kind, target.name = secretstore.StoreKey(kind, name), kind, name
 	return target, nil
@@ -247,7 +263,10 @@ func (c *Controller) commitEntry(key string, entry *secretEntry) {
 		delete(c.entries, key)
 		return
 	}
-	c.entries[key] = secretEntry{config: cloneSecretConfig(entry.config), status: entry.status}
+	c.entries[key] = secretEntry{
+		config: cloneSecretConfig(entry.config),
+		status: entry.status,
+	}
 }
 
 func cloneSecretConfig(config secretstore.Config) secretstore.Config {

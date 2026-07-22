@@ -9,7 +9,9 @@ import (
 
 func BenchmarkBCommandKernelLaneOps(b *testing.B) {
 	var ring readyQueue
-	lane := &commandLane{source: lifecycle.SourceJobManager}
+	lane := &commandLane{
+		source: lifecycle.SourceJobManager,
+	}
 	b.ReportAllocs()
 	for b.Loop() {
 		ring.push(lane)
@@ -20,9 +22,15 @@ func BenchmarkBCommandKernelLaneOps(b *testing.B) {
 }
 
 func BenchmarkBKernelMixedTurn(b *testing.B) {
-	kernel := &CommandKernel{nextSource: lifecycle.SourceJobManager}
-	jobManagerLane := &commandLane{source: lifecycle.SourceJobManager}
-	functionLane := &commandLane{source: lifecycle.SourceFunction}
+	kernel := &CommandKernel{
+		nextSource: lifecycle.SourceJobManager,
+	}
+	jobManagerLane := &commandLane{
+		source: lifecycle.SourceJobManager,
+	}
+	functionLane := &commandLane{
+		source: lifecycle.SourceFunction,
+	}
 	b.ReportAllocs()
 	for b.Loop() {
 		kernel.ready[sourceIndex(jobManagerLane.source)].push(jobManagerLane)

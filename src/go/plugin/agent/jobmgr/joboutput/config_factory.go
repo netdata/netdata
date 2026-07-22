@@ -149,7 +149,9 @@ func (cmf *ConfigModuleFactory) construct(module string) (probe constructedConfi
 	if constructed == nil {
 		return constructedConfigModule{}, fmt.Errorf("job output: module %q returned a nil config module", module)
 	}
-	return constructedConfigModule{module: constructed}, nil
+	return constructedConfigModule{
+		module: constructed,
+	}, nil
 }
 
 func (cmf *ConfigModuleFactory) applyResolved(ctx context.Context, config confgroup.Config, module any) error {

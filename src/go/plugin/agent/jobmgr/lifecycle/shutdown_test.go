@@ -26,7 +26,9 @@ type shutdownTestClock struct {
 }
 
 func newShutdownTestClock() *shutdownTestClock {
-	return &shutdownTestClock{now: time.Unix(100, 0)}
+	return &shutdownTestClock{
+		now: time.Unix(100, 0),
+	}
 }
 
 func (stc *shutdownTestClock) Now() time.Time {
@@ -167,7 +169,11 @@ func TestFinishShutdownPublishesDueClockWithoutTimerBridge(t *testing.T) {
 }
 
 func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
-	census := RunCensus{KernelDrained: true, FunctionCatalogDrained: true, RunFinalizerComplete: true}
+	census := RunCensus{
+		KernelDrained:          true,
+		FunctionCatalogDrained: true,
+		RunFinalizerComplete:   true,
+	}
 	tests := map[string]struct {
 		run func(*testing.T, *RunSupervisor)
 	}{
@@ -230,7 +236,11 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 }
 
 func TestRunCensusQuiescenceRequiresExplicitOwnershipProofs(t *testing.T) {
-	base := RunCensus{KernelDrained: true, FunctionCatalogDrained: true, RunFinalizerComplete: true}
+	base := RunCensus{
+		KernelDrained:          true,
+		FunctionCatalogDrained: true,
+		RunFinalizerComplete:   true,
+	}
 	tests := map[string]struct {
 		mutate func(*RunCensus)
 	}{
@@ -256,7 +266,11 @@ func TestRunCensusQuiescenceRequiresExplicitOwnershipProofs(t *testing.T) {
 }
 
 func TestRunSupervisorProjectsFirstDirtyTransitionExactlyOnce(t *testing.T) {
-	census := RunCensus{KernelDrained: true, FunctionCatalogDrained: true, RunFinalizerComplete: true}
+	census := RunCensus{
+		KernelDrained:          true,
+		FunctionCatalogDrained: true,
+		RunFinalizerComplete:   true,
+	}
 	tests := map[string]struct {
 		run func(*testing.T, *RunSupervisor)
 	}{
@@ -318,7 +332,10 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 			refs := make([]InheritedTaskRef, population)
 			owners := make([]ResourceIdentity, population)
 			for index := range population {
-				owners[index] = ResourceIdentity{ID: "owner-" + strconv.Itoa(index+1), Generation: 1}
+				owners[index] = ResourceIdentity{
+					ID:         "owner-" + strconv.Itoa(index+1),
+					Generation: 1,
+				}
 				refs[index], err = supervisor.StartInherited(
 					context.Background(),
 					owners[index],
@@ -353,7 +370,10 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 
 			_, startInheritedErr := supervisor.StartInherited(
 				context.Background(),
-				ResourceIdentity{ID: "late", Generation: 1},
+				ResourceIdentity{
+					ID:         "late",
+					Generation: 1,
+				},
 				InheritedV1Runtime,
 				func(context.Context) error { return nil },
 			)

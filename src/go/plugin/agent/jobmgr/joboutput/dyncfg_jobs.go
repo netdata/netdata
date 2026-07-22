@@ -76,14 +76,17 @@ func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobControl
 		return nil, errors.New("job output: incomplete DynCfg job controller configuration")
 	}
 	return &DynCfgJobController{
-		pluginName: config.PluginName,
-		prefix:     DynCfgJobPrefix(config.PluginName),
-		path:       fmt.Sprintf(dynCfgCollectorPathFormat, config.PluginName),
-		modules:    config.Modules, defaults: config.Defaults,
-		factory: config.Factory, configModules: config.ConfigModules,
-		graph: config.Graph, frames: config.Frames,
-		dependencies: config.Dependencies,
-		scheduler:    config.Factory.config.Scheduler,
+		pluginName:    config.PluginName,
+		prefix:        DynCfgJobPrefix(config.PluginName),
+		path:          fmt.Sprintf(dynCfgCollectorPathFormat, config.PluginName),
+		modules:       config.Modules,
+		defaults:      config.Defaults,
+		factory:       config.Factory,
+		configModules: config.ConfigModules,
+		graph:         config.Graph,
+		frames:        config.Frames,
+		dependencies:  config.Dependencies,
+		scheduler:     config.Factory.config.Scheduler,
 	}, nil
 }
 
@@ -261,7 +264,10 @@ type dynCfgFailure struct {
 }
 
 func newDynCfgFailure(code int, message string) dynCfgFailure {
-	return dynCfgFailure{valid: true, result: mustDynCfgMessage(code, message)}
+	return dynCfgFailure{
+		valid:  true,
+		result: mustDynCfgMessage(code, message),
+	}
 }
 
 func graphRecordConfig(record dyncfg.GraphRecord) (confgroup.Config, error) {
@@ -277,8 +283,11 @@ func graphRecordConfig(record dyncfg.GraphRecord) (confgroup.Config, error) {
 
 func graphConfig(record dyncfg.GraphRecord, status dyncfg.Status) dyncfg.GraphConfig {
 	return dyncfg.GraphConfig{
-		ID: record.ID, Module: record.Module, Name: record.Name,
-		Status: status.String(), Payload: []byte(record.Payload()),
+		ID:      record.ID,
+		Module:  record.Module,
+		Name:    record.Name,
+		Status:  status.String(),
+		Payload: []byte(record.Payload()),
 	}
 }
 

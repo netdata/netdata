@@ -19,15 +19,37 @@ func TestControlFramePlanValidate(t *testing.T) {
 		plan    ControlFramePlan
 		wantErr bool
 	}{
-		"valid":      {plan: ControlFramePlan{UID: "request-1", Status: ControlDeadline, Expiry: 1}},
-		"empty UID":  {plan: ControlFramePlan{Status: ControlDeadline, Expiry: 1}, wantErr: true},
-		"unsafe UID": {plan: ControlFramePlan{UID: "request 1", Status: ControlDeadline, Expiry: 1}, wantErr: true},
+		"valid": {plan: ControlFramePlan{
+			UID:    "request-1",
+			Status: ControlDeadline,
+			Expiry: 1,
+		}},
+		"empty UID": {plan: ControlFramePlan{
+			Status: ControlDeadline,
+			Expiry: 1,
+		}, wantErr: true},
+		"unsafe UID": {plan: ControlFramePlan{
+			UID:    "request 1",
+			Status: ControlDeadline,
+			Expiry: 1,
+		}, wantErr: true},
 		"overlong UID": {
-			plan:    ControlFramePlan{UID: strings.Repeat("u", MaximumUIDBytes+1), Status: ControlDeadline, Expiry: 1},
+			plan: ControlFramePlan{
+				UID:    strings.Repeat("u", MaximumUIDBytes+1),
+				Status: ControlDeadline,
+				Expiry: 1,
+			},
 			wantErr: true,
 		},
-		"unknown status":     {plan: ControlFramePlan{UID: "request-1", Status: 200, Expiry: 1}, wantErr: true},
-		"nonpositive expiry": {plan: ControlFramePlan{UID: "request-1", Status: ControlDeadline}, wantErr: true},
+		"unknown status": {plan: ControlFramePlan{
+			UID:    "request-1",
+			Status: 200,
+			Expiry: 1,
+		}, wantErr: true},
+		"nonpositive expiry": {plan: ControlFramePlan{
+			UID:    "request-1",
+			Status: ControlDeadline,
+		}, wantErr: true},
 	}
 
 	for name, tc := range tests {
@@ -69,7 +91,14 @@ func TestClosedValues(t *testing.T) {
 	assert.True(t, TaskClassGenericFunction.Valid())
 	assert.False(t, TaskClass(0).Valid())
 
-	assert.True(t, (ResourceIdentity{ID: "job:a", Generation: 1}).Valid())
-	assert.False(t, (ResourceIdentity{ID: "job:a"}).Valid())
-	assert.False(t, (ResourceIdentity{Generation: 1}).Valid())
+	assert.True(t, (ResourceIdentity{
+		ID:         "job:a",
+		Generation: 1,
+	}).Valid())
+	assert.False(t, (ResourceIdentity{
+		ID: "job:a",
+	}).Valid())
+	assert.False(t, (ResourceIdentity{
+		Generation: 1,
+	}).Valid())
 }

@@ -89,8 +89,11 @@ func (dcjc *DynCfgJobController) resolveRequest(request DynCfgJobRequest) (dynCf
 		resourceID = module
 	}
 	return dynCfgTarget{
-		command: command, module: module, name: name,
-		resourceID: resourceID, creator: creator,
+		command:    command,
+		module:     module,
+		name:       name,
+		resourceID: resourceID,
+		creator:    creator,
 	}, dynCfgFailure{}
 }
 

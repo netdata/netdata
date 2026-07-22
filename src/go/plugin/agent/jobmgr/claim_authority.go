@@ -73,7 +73,9 @@ type claimAuthority struct {
 }
 
 func newClaimAuthority() *claimAuthority {
-	return &claimAuthority{keys: make(map[string]*authorityClaimKey)}
+	return &claimAuthority{
+		keys: make(map[string]*authorityClaimKey),
+	}
 }
 
 func (ca *claimAuthority) bindRuntimeObserver(observer lifecycle.RuntimeObserver, now func() time.Time) error {
@@ -103,7 +105,10 @@ func prepareClaimEdges(operation *commandOperation, claims []string) {
 	operation.claims = claims
 	operation.authorityClaimEdges = make([]authorityClaimEdge, len(claims))
 	for index, claim := range claims {
-		operation.authorityClaimEdges[index] = authorityClaimEdge{claim: claim, operation: operation}
+		operation.authorityClaimEdges[index] = authorityClaimEdge{
+			claim:     claim,
+			operation: operation,
+		}
 	}
 	operation.claimPrepared = true
 }
@@ -415,7 +420,9 @@ func (ca *claimAuthority) forget(operation *commandOperation) error {
 func (ca *claimAuthority) key(name string) *authorityClaimKey {
 	state := ca.keys[name]
 	if state == nil {
-		state = &authorityClaimKey{settlementIndex: -1}
+		state = &authorityClaimKey{
+			settlementIndex: -1,
+		}
 		ca.keys[name] = state
 	}
 	return state

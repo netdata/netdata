@@ -51,7 +51,10 @@ func startCompositionShutdownProbe(
 	}()
 	select {
 	case <-started:
-		return compositionShutdownProbe{cancelled: cancelled, settled: settled}, nil
+		return compositionShutdownProbe{
+			cancelled: cancelled,
+			settled:   settled,
+		}, nil
 	case err := <-settled:
 		return compositionShutdownProbe{}, errors.Join(errors.New("shutdown probe settled before starting"), err)
 	case <-ctx.Done():

@@ -31,7 +31,11 @@ func compositeTestPlan(id string, claims []string, onApply func()) WorkPlan {
 				scope lifecycle.ResourceTransactionScope,
 				permit lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
-				return &simpleCompositeChildTransaction{scope: scope, apply: onApply, permit: permit}, nil
+				return &simpleCompositeChildTransaction{
+					scope:  scope,
+					apply:  onApply,
+					permit: permit,
+				}, nil
 			},
 		},
 	}
@@ -53,7 +57,10 @@ func compositeParentTestPlan(
 				scope lifecycle.ResourceTransactionScope,
 				_ lifecycle.LongLivedPermit,
 			) (PreparedCompositeResourceTransaction, error) {
-				return &compositeTestTransaction{scope: scope, apply: apply}, nil
+				return &compositeTestTransaction{
+					scope: scope,
+					apply: apply,
+				}, nil
 			},
 		},
 	}
@@ -170,7 +177,9 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(t *testing.T) {
 				lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
 				return &simpleCompositeChildTransaction{
-					scope: lifecycle.ResourceTransactionScope{ID: id},
+					scope: lifecycle.ResourceTransactionScope{
+						ID: id,
+					},
 					apply: onApply,
 				}, nil
 			},
@@ -332,9 +341,10 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 				parentDone <- kernel.SubmitPreparedAndWait(
 					context.Background(),
 					Request{
-						UID: parentID, LaneKey: parentID,
-						Source: lifecycle.SourceJobManager,
-						Route:  "internal/test/" + parentID,
+						UID:     parentID,
+						LaneKey: parentID,
+						Source:  lifecycle.SourceJobManager,
+						Route:   "internal/test/" + parentID,
 					},
 					compositeParentTestPlan(
 						parentID,
@@ -346,9 +356,10 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 								ctx,
 								commands,
 								Request{
-									UID: childID, LaneKey: childID,
-									Source: lifecycle.SourceJobManager,
-									Route:  "internal/test/" + childID,
+									UID:     childID,
+									LaneKey: childID,
+									Source:  lifecycle.SourceJobManager,
+									Route:   "internal/test/" + childID,
 								},
 								compositeTestPlan(
 									childID,

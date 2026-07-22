@@ -87,7 +87,10 @@ func BenchmarkBLongLivedPermitLifecycle(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		generation++
-		permit, err := supervisor.IssueLongLivedPermit(ResourceIdentity{ID: "job", Generation: generation}, plan)
+		permit, err := supervisor.IssueLongLivedPermit(ResourceIdentity{
+			ID:         "job",
+			Generation: generation,
+		}, plan)
 		if err != nil {
 			require.FailNow(b, "benchmark failed", err)
 		}
@@ -110,7 +113,10 @@ func BenchmarkBInheritedTaskLifecycle(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		generation++
-		owner := ResourceIdentity{ID: "job", Generation: generation}
+		owner := ResourceIdentity{
+			ID:         "job",
+			Generation: generation,
+		}
 		ref, err := supervisor.StartInherited(
 			context.Background(),
 			owner,
@@ -168,15 +174,17 @@ func BenchmarkBTaskSupervisorDispatch(b *testing.B) {
 		}
 		completion := <-supervisor.CompletionCh()
 		if err := supervisor.SendAction(TaskAction{
-			Ref: completion.Ref, Sequence: 2,
-			Kind: TaskActionDispose,
+			Ref:      completion.Ref,
+			Sequence: 2,
+			Kind:     TaskActionDispose,
 		}); err != nil {
 			require.FailNow(b, "benchmark failed", err)
 		}
 		ack := <-supervisor.AcknowledgementCh()
 		if err := supervisor.SendAction(TaskAction{
-			Ref: ack.Ref, Sequence: 3,
-			Kind: TaskActionTerminate,
+			Ref:      ack.Ref,
+			Sequence: 3,
+			Kind:     TaskActionTerminate,
 		}); err != nil {
 			require.FailNow(b, "benchmark failed", err)
 		}
@@ -226,15 +234,17 @@ func BenchmarkBTaskChildLaunchCompletion(b *testing.B) {
 		}
 		completion := <-supervisor.CompletionCh()
 		if err := supervisor.SendAction(TaskAction{
-			Ref: completion.Ref, Sequence: 2,
-			Kind: TaskActionDispose,
+			Ref:      completion.Ref,
+			Sequence: 2,
+			Kind:     TaskActionDispose,
 		}); err != nil {
 			require.FailNow(b, "benchmark failed", err)
 		}
 		ack := <-supervisor.AcknowledgementCh()
 		if err := supervisor.SendAction(TaskAction{
-			Ref: ack.Ref, Sequence: 3,
-			Kind: TaskActionTerminate,
+			Ref:      ack.Ref,
+			Sequence: 3,
+			Kind:     TaskActionTerminate,
 		}); err != nil {
 			require.FailNow(b, "benchmark failed", err)
 		}

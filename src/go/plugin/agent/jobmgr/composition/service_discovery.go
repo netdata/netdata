@@ -42,7 +42,10 @@ func newServiceDiscoveryBinding(pluginName string, frames *lifecycle.FrameOwner)
 	if pluginName == "" || frames == nil {
 		return nil, errors.New("jobmgr composition: invalid service discovery binding")
 	}
-	return &serviceDiscoveryBinding{pluginName: pluginName, frames: frames}, nil
+	return &serviceDiscoveryBinding{
+		pluginName: pluginName,
+		frames:     frames,
+	}, nil
 }
 
 func (sdb *serviceDiscoveryBinding) prefix() string {
@@ -132,10 +135,13 @@ func (sdb *serviceDiscoveryBinding) prepare(
 		)
 	}
 	function := frameworkfunctions.Function{
-		UID: input.UID, Timeout: input.Timeout,
-		Name: input.Method, Args: slices.Clone(input.Args),
+		UID:         input.UID,
+		Timeout:     input.Timeout,
+		Name:        input.Method,
+		Args:        slices.Clone(input.Args),
 		Payload:     slices.Clone(input.Payload),
-		Permissions: input.Permissions, Source: input.CallerSource,
+		Permissions: input.Permissions,
+		Source:      input.CallerSource,
 		ContentType: input.ContentType,
 	}
 	result, cleanup, err := sdb.invoke(
@@ -156,7 +162,9 @@ func (sdb *serviceDiscoveryBinding) invoke(
 		return lifecycle.SealedResult{}, nil, errors.New("jobmgr composition: invalid service discovery invocation")
 	}
 
-	invocation := &serviceDiscoveryInvocation{uid: uid}
+	invocation := &serviceDiscoveryInvocation{
+		uid: uid,
+	}
 	sdb.mu.Lock()
 	if sdb.dirty != nil || sdb.active != nil {
 		err := errors.Join(sdb.dirty, errors.New("jobmgr composition: service discovery invocation unavailable"))

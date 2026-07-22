@@ -88,12 +88,19 @@ type ResourcePolicy struct {
 
 // DynCfgJobResource derives a collector job resource from DynCfg arguments.
 func DynCfgJobResource(index uint16, prefix string) ResourcePolicy {
-	return ResourcePolicy{Argument: index, Prefix: prefix}
+	return ResourcePolicy{
+		Argument: index,
+		Prefix:   prefix,
+	}
 }
 
 // ScopedDynCfgJobResource additionally namespaces the derived resource.
 func ScopedDynCfgJobResource(index uint16, prefix, scopePrefix string) ResourcePolicy {
-	return ResourcePolicy{Argument: index, Prefix: prefix, ScopePrefix: scopePrefix}
+	return ResourcePolicy{
+		Argument:    index,
+		Prefix:      prefix,
+		ScopePrefix: scopePrefix,
+	}
 }
 
 func (rp ResourcePolicy) validate() error {
@@ -351,13 +358,18 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 			set.direct = &route{}
 		} else {
 			var err error
-			set, err = appendInitialPrefix(set, &route{prefix: declaration.Prefix})
+			set, err = appendInitialPrefix(set, &route{
+				prefix: declaration.Prefix,
+			})
 			if err != nil {
 				return nil, err
 			}
 		}
 		checkedSets[declaration.PublicName] = set
-		checked = append(checked, initialRoute{declaration: declaration, generation: generation})
+		checked = append(checked, initialRoute{
+			declaration: declaration,
+			generation:  generation,
+		})
 	}
 	catalog := &Catalog{
 		cleanupByRef: make(map[jobmgr.FunctionCleanupRef]*handlerGeneration),
@@ -365,7 +377,10 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 		invocations:  make([]*invocationSlot, 1),
 		version:      1,
 	}
-	snapshot := &catalogSnapshot{version: 1, routes: make(map[string]routeSet)}
+	snapshot := &catalogSnapshot{
+		version: 1,
+		routes:  make(map[string]routeSet),
+	}
 	for _, checkedRoute := range checked {
 		if err := catalog.addInitial(snapshot, checkedRoute.declaration, checkedRoute.generation); err != nil {
 			return nil, err
@@ -381,9 +396,11 @@ func (c *Catalog) addInitial(snapshot *catalogSnapshot, declaration Declaration,
 		return err
 	}
 	resolved := &route{
-		publicName: declaration.PublicName,
-		prefix:     declaration.Prefix, method: declaration.ID,
-		handler: generation, resource: declaration.Resource,
+		publicName:          declaration.PublicName,
+		prefix:              declaration.Prefix,
+		method:              declaration.ID,
+		handler:             generation,
+		resource:            declaration.Resource,
 		cooperativeCancel:   declaration.CooperativeCancel,
 		cooperativeDeadline: declaration.CooperativeDeadline,
 		rawPayload:          declaration.RawPayload,
@@ -530,27 +547,39 @@ func resourceTransactionCommand(
 
 func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.FunctionCatalogDecision, error) {
 	if c == nil || c.closed {
-		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlUnavailable}, nil
+		return jobmgr.FunctionCatalogDecision{
+			Rejected: lifecycle.ControlUnavailable,
+		}, nil
 	}
 	snapshot := c.snapshot.Load()
 	if snapshot == nil {
-		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlUnavailable}, nil
+		return jobmgr.FunctionCatalogDecision{
+			Rejected: lifecycle.ControlUnavailable,
+		}, nil
 	}
 	set, ok := snapshot.routes[lookup.Route]
 	if !ok {
 		if len(c.retiring[lookup.Route]) != 0 {
-			return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlUnavailable}, nil
+			return jobmgr.FunctionCatalogDecision{
+				Rejected: lifecycle.ControlUnavailable,
+			}, nil
 		}
-		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlNotFound}, nil
+		return jobmgr.FunctionCatalogDecision{
+			Rejected: lifecycle.ControlNotFound,
+		}, nil
 	}
 	resolved := set.resolve(lookup.Args)
 	if resolved == nil {
-		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlNotFound}, nil
+		return jobmgr.FunctionCatalogDecision{
+			Rejected: lifecycle.ControlNotFound,
+		}, nil
 	}
 	resourceID := resolved.resource.resolve(lookup.Args)
 	generation := resolved.handler
 	if c.mutation != nil && c.mutation.quiesces(resolved) {
-		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlUnavailable}, nil
+		return jobmgr.FunctionCatalogDecision{
+			Rejected: lifecycle.ControlUnavailable,
+		}, nil
 	}
 	command, transactionCommand := resourceTransactionCommand(resolved.transaction, lookup.Args)
 	var transactionPermit lifecycle.LongLivedPlan
@@ -582,8 +611,9 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 		return jobmgr.FunctionCatalogDecision{}, errors.New("jobmgr Function catalog: invocation generation wrapped")
 	}
 	*slot = invocationSlot{
-		generation: nextGeneration, resolved: resolved,
-		input: handlerInput(lookup, resolved.method),
+		generation: nextGeneration,
+		resolved:   resolved,
+		input:      handlerInput(lookup, resolved.method),
 	}
 	resolved.invocationLeases++
 	generation.invocationLeases++
@@ -608,21 +638,32 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 		if command.AllocateSuccessor {
 			slot.transactionPlan.Permit = transactionPermit
 		}
-		plan = jobmgr.WorkPlan{Claims: slot.claims, Transaction: &slot.transactionPlan}
+		plan = jobmgr.WorkPlan{
+			Claims:      slot.claims,
+			Transaction: &slot.transactionPlan,
+		}
 	}
 	return jobmgr.FunctionCatalogDecision{
 		ResourceID: resourceID,
 		Plan:       plan,
-		Lease:      jobmgr.FunctionInvocationRef{Slot: slotIndex, Generation: nextGeneration},
+		Lease: jobmgr.FunctionInvocationRef{
+			Slot:       slotIndex,
+			Generation: nextGeneration,
+		},
 	}, nil
 }
 
 func handlerInput(lookup jobmgr.FunctionLookup, method string) HandlerInput {
 	return HandlerInput{
-		UID: lookup.UID, Method: method, Args: lookup.Args,
-		Payload: lookup.Payload, ContentType: lookup.ContentType,
-		Permissions: lookup.Permissions, CallerSource: lookup.CallerSource,
-		Timeout: lookup.Timeout, HasPayload: lookup.HasPayload,
+		UID:          lookup.UID,
+		Method:       method,
+		Args:         lookup.Args,
+		Payload:      lookup.Payload,
+		ContentType:  lookup.ContentType,
+		Permissions:  lookup.Permissions,
+		CallerSource: lookup.CallerSource,
+		Timeout:      lookup.Timeout,
+		HasPayload:   lookup.HasPayload,
 	}
 }
 
@@ -665,7 +706,10 @@ func (c *Catalog) ReleaseInvocation(ref jobmgr.FunctionInvocationRef) (jobmgr.Fu
 		}
 	}
 	slotGeneration := slot.generation
-	*slot = invocationSlot{generation: slotGeneration, freeNext: c.freeSlot}
+	*slot = invocationSlot{
+		generation: slotGeneration,
+		freeNext:   c.freeSlot,
+	}
 	c.freeSlot = ref.Slot
 	return c.cleanupIfDrained(generation), nil
 }
@@ -773,7 +817,10 @@ func (c *Catalog) CloseStep(quantum int) ([]jobmgr.FunctionCleanupPlan, bool, er
 				references++
 			}
 		}
-		retirement := generationRetirement{generation: generation, references: references}
+		retirement := generationRetirement{
+			generation: generation,
+			references: references,
+		}
 		if err := c.validateRetirement(retirement); err != nil {
 			return nil, false, err
 		}

@@ -34,7 +34,10 @@ func TestManagedJobV1V2JoinBeforeCleanup(t *testing.T) {
 				test.variant,
 				job,
 				tasks,
-				lifecycle.ResourceIdentity{ID: "job", Generation: 1},
+				lifecycle.ResourceIdentity{
+					ID:         "job",
+					Generation: 1,
+				},
 				newTestScheduler(t),
 				func(context.Context) error {
 					job.Cleanup()
@@ -80,7 +83,10 @@ func TestManagedJobStartAcknowledgesLoopReadiness(t *testing.T) {
 				test.variant,
 				job,
 				tasks,
-				lifecycle.ResourceIdentity{ID: "job", Generation: 1},
+				lifecycle.ResourceIdentity{
+					ID:         "job",
+					Generation: 1,
+				},
 				newTestScheduler(t),
 				func(context.Context) error {
 					job.Cleanup()
@@ -119,7 +125,9 @@ func TestFrameWriterWholeCommit(t *testing.T) {
 	var output bytes.Buffer
 	owner, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
-	writer := FrameWriter{Owner: owner}
+	writer := FrameWriter{
+		Owner: owner,
+	}
 	payload := []byte("BEGIN x\nEND\n\n")
 	n, err := writer.Write(payload)
 	require.NoError(t, err)
@@ -129,7 +137,9 @@ func TestFrameWriterWholeCommit(t *testing.T) {
 func TestFrameWriterSuccessfulCommitDoesNotCopy(t *testing.T) {
 	owner, err := lifecycle.NewFrameOwner(io.Discard)
 	require.NoError(t, err)
-	writer := FrameWriter{Owner: owner}
+	writer := FrameWriter{
+		Owner: owner,
+	}
 	payload := []byte("BEGIN x\nEND\n\n")
 	allocations := testing.AllocsPerRun(1_000, func() {
 		if _, err := writer.Write(payload); err != nil {
@@ -173,11 +183,16 @@ func TestFrameWriterCommitsOutputAndStateAsOneTransaction(t *testing.T) {
 				return output.Write(payload)
 			}))
 			require.NoError(t, err)
-			writer := FrameWriter{Owner: owner}
+			writer := FrameWriter{
+				Owner: owner,
+			}
 
 			err = writer.CommitJobOutput(
 				[]byte("BEGIN x\nEND\n\n"),
-				&recordingFrameState{events: &events, commitErr: test.commitErr},
+				&recordingFrameState{
+					events:    &events,
+					commitErr: test.commitErr,
+				},
 			)
 			require.ErrorIs(t, err, test.wantErr)
 			assert.Equal(t, test.wantEvents, events)
@@ -217,7 +232,10 @@ type recordingManagedJob struct {
 }
 
 func newRecordingManagedJob() *recordingManagedJob {
-	return &recordingManagedJob{started: make(chan struct{}), stop: make(chan struct{})}
+	return &recordingManagedJob{
+		started: make(chan struct{}),
+		stop:    make(chan struct{}),
+	}
 }
 
 func (job *recordingManagedJob) StartManaged(ready chan<- struct{}) {

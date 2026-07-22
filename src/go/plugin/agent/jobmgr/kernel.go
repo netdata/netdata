@@ -423,7 +423,9 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		cleanup.err = completion.Err
 		ck.functionCleanupTasks[completion.Ref] = cleanup
 		if err := ck.tasks.SendAction(lifecycle.TaskAction{
-			Ref: completion.Ref, Sequence: 2, Kind: lifecycle.TaskActionTerminate,
+			Ref:      completion.Ref,
+			Sequence: 2,
+			Kind:     lifecycle.TaskActionTerminate,
 		}); err != nil {
 			ck.run.Dirty(err)
 		}
@@ -596,7 +598,11 @@ func (ck *CommandKernel) sendTransactionAction(
 	sequence uint8,
 	kind lifecycle.TaskActionKind,
 ) {
-	action := lifecycle.TaskAction{Ref: ref, Sequence: sequence, Kind: kind}
+	action := lifecycle.TaskAction{
+		Ref:      ref,
+		Sequence: sequence,
+		Kind:     kind,
+	}
 	if err := ck.sendOperationAction(operation, action); err != nil {
 		ck.run.Dirty(err)
 	}
@@ -834,7 +840,11 @@ func (ck *CommandKernel) sendShutdownAction(lane *commandLane, kind lifecycle.Ta
 	}
 	lane.shutdownAction = kind
 	if err := ck.tasks.SendAction(
-		lifecycle.TaskAction{Ref: lane.shutdownTask, Sequence: sequence, Kind: kind},
+		lifecycle.TaskAction{
+			Ref:      lane.shutdownTask,
+			Sequence: sequence,
+			Kind:     kind,
+		},
 	); err != nil {
 		ck.run.Dirty(err)
 	}
@@ -855,8 +865,11 @@ func (ck *CommandKernel) sendEncodeAction(operation *commandOperation) error {
 		sequence = 3
 	}
 	action := lifecycle.TaskAction{
-		Ref: operation.Task, Sequence: sequence, Kind: lifecycle.TaskActionEncodeWrite,
-		UID: operation.UID, Expiry: operation.resultExpiry,
+		Ref:      operation.Task,
+		Sequence: sequence,
+		Kind:     lifecycle.TaskActionEncodeWrite,
+		UID:      operation.UID,
+		Expiry:   operation.resultExpiry,
 	}
 	return ck.sendOperationAction(operation, action)
 }
@@ -930,7 +943,11 @@ func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 			return
 		}
 	}
-	termination := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionTerminate}
+	termination := lifecycle.TaskAction{
+		Ref:      ack.Ref,
+		Sequence: ack.Sequence + 1,
+		Kind:     lifecycle.TaskActionTerminate,
+	}
 	if err := ck.sendOperationAction(operation, termination); err != nil {
 		ck.run.Dirty(err)
 	}
@@ -994,7 +1011,11 @@ func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 	}
 
 	if operation.transactionApplied && !operation.cleanupDone {
-		cleanup := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionCleanup}
+		cleanup := lifecycle.TaskAction{
+			Ref:      ack.Ref,
+			Sequence: ack.Sequence + 1,
+			Kind:     lifecycle.TaskActionCleanup,
+		}
 		if err := ck.sendOperationAction(operation, cleanup); err != nil {
 			ck.run.Dirty(err)
 		}
@@ -1004,7 +1025,11 @@ func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 }
 
 func (ck *CommandKernel) sendResourceTermination(operation *commandOperation, ref lifecycle.TaskRef, sequence uint8) {
-	termination := lifecycle.TaskAction{Ref: ref, Sequence: sequence, Kind: lifecycle.TaskActionTerminate}
+	termination := lifecycle.TaskAction{
+		Ref:      ref,
+		Sequence: sequence,
+		Kind:     lifecycle.TaskActionTerminate,
+	}
 	if err := ck.sendOperationAction(operation, termination); err != nil {
 		ck.run.Dirty(err)
 	}
@@ -1138,7 +1163,9 @@ func (ck *CommandKernel) abortFunctionMutationForShutdown() error {
 		terminalErr = errors.Join(terminalErr, abortErr)
 	}
 	if ck.functionMutation.result != nil {
-		ck.functionMutation.result <- functionMutationResult{err: terminalErr}
+		ck.functionMutation.result <- functionMutationResult{
+			err: terminalErr,
+		}
 	}
 	ck.functionMutation = functionMutationSubmission{}
 	ck.functionMutationActive = false
@@ -1281,7 +1308,9 @@ func (ck *CommandKernel) completeShutdownBarrier(completion lifecycle.TaskComple
 	}
 	ck.shutdownBarrierAction = lifecycle.TaskActionTerminate
 	if err := ck.tasks.SendAction(lifecycle.TaskAction{
-		Ref: completion.Ref, Sequence: 2, Kind: lifecycle.TaskActionTerminate,
+		Ref:      completion.Ref,
+		Sequence: 2,
+		Kind:     lifecycle.TaskActionTerminate,
 	}); err != nil {
 		ck.run.Dirty(err)
 	}
@@ -1383,7 +1412,11 @@ func (ck *CommandKernel) completeRunFinalizer(completion lifecycle.TaskCompletio
 	}
 	ck.finalizerAction = lifecycle.TaskActionTerminate
 	if err := ck.tasks.SendAction(
-		lifecycle.TaskAction{Ref: completion.Ref, Sequence: 2, Kind: lifecycle.TaskActionTerminate},
+		lifecycle.TaskAction{
+			Ref:      completion.Ref,
+			Sequence: 2,
+			Kind:     lifecycle.TaskActionTerminate,
+		},
 	); err != nil {
 		ck.run.Dirty(err)
 	}
@@ -1473,8 +1506,9 @@ func (ck *CommandKernel) runCensus() lifecycle.RunCensus {
 		UIDActive:              uidActive,
 		TransientActive:        ck.tasks.Active(),
 		TransientPending:       ck.tasks.Pending(),
-		InheritedActive:        ck.tasks.InheritedActive(), LongLived: ck.tasks.LongLivedCensus(),
-		Frame:                ck.frames.Census(),
-		RunFinalizerComplete: ck.finalizerDone && !ck.finalizerFailed,
+		InheritedActive:        ck.tasks.InheritedActive(),
+		LongLived:              ck.tasks.LongLivedCensus(),
+		Frame:                  ck.frames.Census(),
+		RunFinalizerComplete:   ck.finalizerDone && !ck.finalizerFailed,
 	}
 }

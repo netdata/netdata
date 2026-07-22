@@ -11,7 +11,9 @@ type captureResult struct {
 func captureStderr(reader io.ReadCloser, done chan<- captureResult) {
 	defer reader.Close()
 	buffer := make([]byte, readBufferBytes)
-	result := captureResult{payload: make([]byte, 0, stderrLimit)}
+	result := captureResult{
+		payload: make([]byte, 0, stderrLimit),
+	}
 	var total int64
 	for {
 		count, err := reader.Read(buffer)

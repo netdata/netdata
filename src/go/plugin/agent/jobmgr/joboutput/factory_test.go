@@ -81,9 +81,13 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				creator.Create = func() collectorapi.CollectorV1 {
 					return state.module(nil, false)
 				}
-				return factoryTestHooks{prepare: func(PublishedJob) (HandlerLifecycle, error) {
-					return &factoryTestHandlers{state: state}, errors.New("prepare failed")
-				}}
+				return factoryTestHooks{
+					prepare: func(PublishedJob) (HandlerLifecycle, error) {
+						return &factoryTestHandlers{
+							state: state,
+						}, errors.New("prepare failed")
+					},
+				}
 			},
 			wantClose: 1,
 		},
@@ -94,9 +98,11 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				creator.Create = func() collectorapi.CollectorV1 {
 					return state.module(nil, false)
 				}
-				return factoryTestHooks{prepare: func(PublishedJob) (HandlerLifecycle, error) {
-					panic("prepare failed")
-				}}
+				return factoryTestHooks{
+					prepare: func(PublishedJob) (HandlerLifecycle, error) {
+						panic("prepare failed")
+					},
+				}
 			},
 			wantRetained: true,
 		},
@@ -116,7 +122,10 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			prepared, err := factory.Prepare(
 				context.Background(),
 				factoryTestConfig(creator.FunctionOnly),
-				lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+				lifecycle.ResourceIdentity{
+					ID:         "module_job",
+					Generation: 1,
+				},
 				permit,
 			)
 			if err == nil {
@@ -153,7 +162,10 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			creator := collectorapi.Creator{
 				FunctionOnly: test.functionOnly,
 				CreateV2: func() collectorapi.CollectorV2 {
-					return &factoryTestV2{state: state, checkErr: test.checkErr}
+					return &factoryTestV2{
+						state:    state,
+						checkErr: test.checkErr,
+					}
 				},
 			}
 			if test.functionOnly {
@@ -165,7 +177,10 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			prepared, err := factory.Prepare(
 				context.Background(),
 				factoryTestConfig(test.functionOnly),
-				lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+				lifecycle.ResourceIdentity{
+					ID:         "module_job",
+					Generation: 1,
+				},
 				permit,
 			)
 			if err == nil {
@@ -198,7 +213,10 @@ func TestFactoryDefersAutoDetectionUntilPreparedJobAcceptance(t *testing.T) {
 	prepared, err := factory.Prepare(
 		context.Background(),
 		factoryTestConfig(false),
-		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 1,
+		},
 		permit,
 	)
 	require.NoError(t, err)
@@ -228,7 +246,10 @@ func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
 	prepared, err := factory.Prepare(
 		context.Background(),
 		factoryTestConfig(false),
-		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 1,
+		},
 		permit,
 	)
 	require.NoError(t, err)
@@ -314,14 +335,18 @@ func newFactoryTestHarness(t *testing.T, creator collectorapi.Creator, hooks Job
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
 	configModules, err := NewConfigModuleFactory(ConfigModuleFactoryConfig{
-		Modules:    collectorapi.Registry{"module": creator},
+		Modules: collectorapi.Registry{
+			"module": creator,
+		},
 		Resolver:   resolver,
 		StoreScope: unavailableStoreScope,
 	})
 	require.NoError(t, err)
 	factory, err := NewFactory(FactoryConfig{
-		PluginName:    "test",
-		Modules:       collectorapi.Registry{"module": creator},
+		PluginName: "test",
+		Modules: collectorapi.Registry{
+			"module": creator,
+		},
 		Tasks:         tasks,
 		Frames:        frames,
 		ConfigModules: configModules,
@@ -338,5 +363,10 @@ func unavailableStoreScope([]string) (secretresolver.AtomicScope, error) {
 }
 
 func factoryTestConfig(functionOnly bool) confgroup.Config {
-	return confgroup.Config{"module": "module", "name": "job", "update_every": 1, "function_only": functionOnly}
+	return confgroup.Config{
+		"module":        "module",
+		"name":          "job",
+		"update_every":  1,
+		"function_only": functionOnly,
+	}
 }

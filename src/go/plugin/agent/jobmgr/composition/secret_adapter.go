@@ -114,7 +114,8 @@ func newSecretInitialRoute(
 
 func secretCommandInput(input functionadapter.HandlerInput) secretadapter.CommandInput {
 	return secretadapter.CommandInput{
-		Args: input.Args, Payload: input.Payload,
+		Args:        input.Args,
+		Payload:     input.Payload,
 		ContentType: input.ContentType,
 		HasPayload:  input.HasPayload,
 	}

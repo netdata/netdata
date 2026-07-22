@@ -179,7 +179,10 @@ func newClaimAllocationFixture(tb testing.TB, cancel bool, base lifecycle.Operat
 	} else if granted, err := authority.acquire(target); err != nil || !granted {
 		require.FailNowf(tb, "benchmark failed", "target acquire: granted=%v err=%v", granted, err)
 	}
-	return claimAllocationFixture{authority: authority, target: target}
+	return claimAllocationFixture{
+		authority: authority,
+		target:    target,
+	}
 }
 
 func BenchmarkClaimAuthorityAcquireCancel(b *testing.B) {
@@ -226,7 +229,9 @@ func claimTestOperation(
 	if err != nil {
 		require.FailNow(tb, "benchmark failed", err)
 	}
-	operation := &commandOperation{OperationGeneration: generation}
+	operation := &commandOperation{
+		OperationGeneration: generation,
+	}
 	prepareClaimEdges(operation, normalized)
 	if err := authority.register(operation); err != nil {
 		require.FailNow(tb, "benchmark failed", err)

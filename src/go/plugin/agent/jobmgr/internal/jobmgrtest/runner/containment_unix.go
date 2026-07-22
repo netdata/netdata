@@ -9,7 +9,9 @@ import (
 )
 
 func configureContainment(command *exec.Cmd) {
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	command.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+	}
 }
 
 func killContained(command *exec.Cmd) error {

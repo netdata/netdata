@@ -24,7 +24,9 @@ func newStoreGenerationCarrier(
 	if !permit.Valid() || permit.Owner() != owner || permit.Class() != lifecycle.LongLivedSecretStore {
 		return nil, errors.New("jobmgr secrets: invalid Store-generation carrier")
 	}
-	return &storeGenerationCarrier{permit: permit}, nil
+	return &storeGenerationCarrier{
+		permit: permit,
+	}, nil
 }
 
 func (sgc *storeGenerationCarrier) Valid() bool {

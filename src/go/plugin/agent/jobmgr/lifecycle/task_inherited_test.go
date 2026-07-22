@@ -15,7 +15,10 @@ import (
 
 func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	owner := ResourceIdentity{ID: "pipeline", Generation: 7}
+	owner := ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 7,
+	}
 	entered := make(chan struct{})
 	ref, err := supervisor.StartInherited(
 		context.Background(),
@@ -69,7 +72,10 @@ func TestInheritedShutdownNormalizesOnlyCurrentStoppingCause(t *testing.T) {
 			run, err := NewRunSupervisor(11, RealClock{}, time.Second)
 			require.NoError(t, err)
 			require.NoError(t, supervisor.BindRun(run, func() {}))
-			owner := ResourceIdentity{ID: "pipeline", Generation: 1}
+			owner := ResourceIdentity{
+				ID:         "pipeline",
+				Generation: 1,
+			}
 			ref, err := supervisor.StartInherited(
 				context.Background(),
 				owner,
@@ -110,7 +116,10 @@ func TestInheritedSpontaneousFailureDirtiesAndWakesRun(t *testing.T) {
 		default:
 		}
 	}))
-	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
+	owner := ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 1,
+	}
 	release := make(chan struct{})
 	failure := errors.New("provider failed")
 	ref, err := supervisor.StartInherited(
@@ -151,7 +160,10 @@ func TestInheritedFiniteProviderCompletionDoesNotDirtyRun(t *testing.T) {
 		default:
 		}
 	}))
-	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
+	owner := ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 1,
+	}
 	plan, err := NewPipelineLongLivedPlan([]string{"finite"})
 	require.NoError(t, err)
 	permit, err := supervisor.IssueLongLivedPermit(owner, plan)
@@ -188,7 +200,9 @@ func TestInheritedFiniteProviderCompletionDoesNotDirtyRun(t *testing.T) {
 }
 
 func TestStoppingErrorTreeMatchingIsStrictAndBounded(t *testing.T) {
-	current := &StoppingRejection{Generation: 17}
+	current := &StoppingRejection{
+		Generation: 17,
+	}
 	deep := error(current)
 	for range strictErrorTreeLimit {
 		deep = fmt.Errorf("wrapped: %w", deep)
@@ -197,10 +211,12 @@ func TestStoppingErrorTreeMatchingIsStrictAndBounded(t *testing.T) {
 		err  error
 		want bool
 	}{
-		"exact":                {err: current, want: true},
-		"wrapped exact":        {err: fmt.Errorf("wrapped: %w", current), want: true},
-		"joined exact":         {err: errors.Join(current, current), want: true},
-		"wrong generation":     {err: &StoppingRejection{Generation: 18}},
+		"exact":         {err: current, want: true},
+		"wrapped exact": {err: fmt.Errorf("wrapped: %w", current), want: true},
+		"joined exact":  {err: errors.Join(current, current), want: true},
+		"wrong generation": {err: &StoppingRejection{
+			Generation: 18,
+		}},
 		"mixed real error":     {err: errors.Join(current, errors.New("cleanup failed"))},
 		"generic cancellation": {err: context.Canceled},
 		"tree over bound":      {err: deep},
@@ -218,12 +234,18 @@ func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {
 
 	require.NoError(t, supervisor.BindRuntimeObserver(observer))
 
-	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
+	owner := ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 1,
+	}
 	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV2Runner, func(context.Context) error {
 		panic("boom")
 	})
 	require.NoError(t, err)
-	wrongOwner := ResourceIdentity{ID: owner.ID, Generation: owner.Generation + 1}
+	wrongOwner := ResourceIdentity{
+		ID:         owner.ID,
+		Generation: owner.Generation + 1,
+	}
 
 	require.Error(t, supervisor.CancelInherited(ref, wrongOwner))
 
@@ -275,7 +297,10 @@ func (rro *recordingRuntimeObserver) counter(kind RuntimeCounter) uint64 {
 
 func TestInheritedTaskMissedJoinRetainsRecord(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
+	owner := ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 1,
+	}
 	releaseWork := make(chan struct{})
 	finished := make(chan struct{})
 	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV1Runtime, func(context.Context) error {
@@ -306,7 +331,10 @@ func TestInheritedTasksGrowBeyondFormerDerivedLimit(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	refs := make([]InheritedTaskRef, 0, population)
 	for index := range population {
-		owner := ResourceIdentity{ID: "pipeline", Generation: uint64(index + 1)}
+		owner := ResourceIdentity{
+			ID:         "pipeline",
+			Generation: uint64(index + 1),
+		}
 		ref, err := supervisor.StartInherited(
 			context.Background(),
 			owner,
@@ -320,12 +348,18 @@ func TestInheritedTasksGrowBeyondFormerDerivedLimit(t *testing.T) {
 		refs = append(refs, ref)
 	}
 	for index, ref := range refs {
-		owner := ResourceIdentity{ID: "pipeline", Generation: uint64(index + 1)}
+		owner := ResourceIdentity{
+			ID:         "pipeline",
+			Generation: uint64(index + 1),
+		}
 
 		require.NoError(t, supervisor.CancelInherited(ref, owner))
 	}
 	for index, ref := range refs {
-		owner := ResourceIdentity{ID: "pipeline", Generation: uint64(index + 1)}
+		owner := ResourceIdentity{
+			ID:         "pipeline",
+			Generation: uint64(index + 1),
+		}
 
 		joined, err := supervisor.JoinInherited(context.Background(), ref, owner)
 		require.NoError(t, err)
@@ -342,7 +376,10 @@ func TestInheritedPipelineTasksRequirePermit(t *testing.T) {
 		"supervisor": InheritedPipelineSupervisor,
 	}
 	supervisor := newResourceTaskSupervisor(t)
-	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
+	owner := ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 1,
+	}
 	for name, role := range tests {
 		t.Run(name, func(t *testing.T) {
 			_, err := supervisor.StartInherited(

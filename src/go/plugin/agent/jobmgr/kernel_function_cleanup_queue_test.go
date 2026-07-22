@@ -110,8 +110,12 @@ func TestFunctionCleanupQueueReleasesConsumedChunks(t *testing.T) {
 
 func TestAbortFunctionMutationReturnsCatalogError(t *testing.T) {
 	abortErr := errors.New("abort failed")
-	catalog := &abortCleanupCatalog{err: abortErr}
-	kernel := &CommandKernel{functionCatalog: catalog}
+	catalog := &abortCleanupCatalog{
+		err: abortErr,
+	}
+	kernel := &CommandKernel{
+		functionCatalog: catalog,
+	}
 
 	err := kernel.abortFunctionMutation(nil)
 	require.ErrorIs(t, err, abortErr)

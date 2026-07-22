@@ -35,8 +35,16 @@ func newManagedJob(
 		collectorCleanup == nil {
 		return ConstructedJob{}, errors.New("job output: invalid managed job")
 	}
-	support := &managedLoopSupport{job: job, tasks: tasks, identity: identity}
-	scheduled := &scheduledJobSupport{scheduler: scheduler, identity: identity, job: job}
+	support := &managedLoopSupport{
+		job:      job,
+		tasks:    tasks,
+		identity: identity,
+	}
+	scheduled := &scheduledJobSupport{
+		scheduler: scheduler,
+		identity:  identity,
+		job:       job,
+	}
 	var runtime jobruntime.Runtime
 	switch variant {
 	case JobVariantV1:
@@ -46,7 +54,11 @@ func newManagedJob(
 		support.role = lifecycle.InheritedV2Runner
 		runtime = jobruntime.NewV2Runtime([]jobruntime.Support{support, scheduled})
 	}
-	return ConstructedJob{Variant: variant, Runtime: runtime, CollectorCleanup: collectorCleanup}, nil
+	return ConstructedJob{
+		Variant:          variant,
+		Runtime:          runtime,
+		CollectorCleanup: collectorCleanup,
+	}, nil
 }
 
 type scheduledJobSupport struct {

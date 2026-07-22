@@ -59,7 +59,10 @@ func NewFunctionCleanupPlan(ref FunctionCleanupRef, work lifecycle.TaskWork) (Fu
 	if !ref.Valid() || work == nil {
 		return FunctionCleanupPlan{}, errors.New("jobmgr kernel: invalid Function cleanup plan")
 	}
-	return FunctionCleanupPlan{ref: ref, work: work}, nil
+	return FunctionCleanupPlan{
+		ref:  ref,
+		work: work,
+	}, nil
 }
 
 // Valid reports whether this plan owns cleanup work.

@@ -15,7 +15,10 @@ func TestOperationRequiredDeadlineStartIsNonterminal(t *testing.T) {
 	require.NoError(t, operation.RequireDeadlineStart())
 
 	require.False(t, operation.Child != ChildDeadlineStartPending || operation.CanDisposeTerminal())
-	ref := TaskRef{Slot: 0, Generation: 1}
+	ref := TaskRef{
+		Slot:       0,
+		Generation: 1,
+	}
 
 	require.NoError(t, operation.StartChild(ref))
 
@@ -40,7 +43,10 @@ func TestOperationAbandonedDeadlineStartBecomesTerminal(t *testing.T) {
 func TestOperationResponseCommitPrecedesDisposalAcknowledgement(t *testing.T) {
 	operation, err := NewOperation(1, "uid", SourceFunction, "lane", true)
 	require.NoError(t, err)
-	ref := TaskRef{Slot: 1, Generation: 1}
+	ref := TaskRef{
+		Slot:       1,
+		Generation: 1,
+	}
 
 	require.NoError(t, operation.StartChild(ref))
 
@@ -76,7 +82,9 @@ func TestOperationResponseTerminalStatesRemainTerminalWhenPoisoned(t *testing.T)
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			operation := &OperationGeneration{Response: test.response}
+			operation := &OperationGeneration{
+				Response: test.response,
+			}
 
 			operation.PoisonResponse()
 

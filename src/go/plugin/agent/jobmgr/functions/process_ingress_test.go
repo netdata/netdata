@@ -19,7 +19,9 @@ func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) 
 	first := newTestProcessInput(1)
 	second := newTestProcessInput(2)
 
-	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: first}))
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{
+		port: first,
+	}))
 
 	done := make(chan error, 1)
 	go func() { done <- ingress.Run(context.Background()) }()
@@ -50,7 +52,9 @@ func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) 
 	default:
 	}
 
-	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: second}))
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{
+		port: second,
+	}))
 
 	carriedCall := <-second.calls
 	require.EqualValues(t, "carried", carriedCall.UID)
@@ -92,7 +96,9 @@ func TestProcessIngressCarriesPartialBodyAcrossAdopt(t *testing.T) {
 	require.NoError(t, err)
 	first := newTestProcessInput(1)
 	second := newTestProcessInput(2)
-	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: first}))
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{
+		port: first,
+	}))
 
 	done := make(chan error, 1)
 	go func() { done <- ingress.Run(context.Background()) }()
@@ -104,7 +110,9 @@ func TestProcessIngressCarriesPartialBodyAcrossAdopt(t *testing.T) {
 
 	require.NoError(t, ingress.SealPause())
 	require.NoError(t, ingress.DrainPause(context.Background(), 2))
-	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: second}))
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{
+		port: second,
+	}))
 
 	_, err = io.WriteString(writer, "successor\nFUNCTION_PAYLOAD_END\n")
 	require.NoError(t, err)
@@ -127,7 +135,9 @@ func TestProcessIngressTimedOutDrainRetainsSealedStateForRetry(t *testing.T) {
 	require.NoError(t, err)
 	input := newTestProcessInput(1)
 
-	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: input}))
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{
+		port: input,
+	}))
 
 	done := make(chan error, 1)
 	go func() { done <- ingress.Run(context.Background()) }()
@@ -162,7 +172,9 @@ func TestProcessIngressDiscardsPartialBodyOnFence(t *testing.T) {
 	ingress, err := NewProcessIngress(reader)
 	require.NoError(t, err)
 	input := newTestProcessInput(1)
-	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: input}))
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{
+		port: input,
+	}))
 
 	done := make(chan error, 1)
 	go func() { done <- ingress.Run(context.Background()) }()

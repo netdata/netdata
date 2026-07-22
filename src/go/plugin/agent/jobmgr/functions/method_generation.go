@@ -53,7 +53,10 @@ func newMethodGeneration(
 		return nil, errors.New("jobmgr Function method generation: invalid construction")
 	}
 	generation := &methodGeneration{
-		id: id, module: module, kind: kind, creator: creator,
+		id:       id,
+		module:   module,
+		kind:     kind,
+		creator:  creator,
 		methods:  make(map[string]funcapi.FunctionConfig, len(methods)),
 		jobs:     make(map[string]collectorapi.RuntimeJob, len(jobs)),
 		handlers: make(map[string]funcapi.MethodHandler, max(1, len(jobs))),
@@ -94,7 +97,11 @@ func newMethodGeneration(
 }
 
 func (mg *methodGeneration) declaration() *HandlerGenerationDeclaration {
-	return &HandlerGenerationDeclaration{ID: mg.id, Handler: mg.handle, Cleanup: mg.cleanup}
+	return &HandlerGenerationDeclaration{
+		ID:      mg.id,
+		Handler: mg.handle,
+		Cleanup: mg.cleanup,
+	}
 }
 
 func (mg *methodGeneration) wait(ctx context.Context) error {
@@ -156,11 +163,14 @@ func (mg *methodGeneration) handle(ctx context.Context, input HandlerInput) (lif
 			)
 		}
 		response := raw.HandleRaw(ctx, funcapi.RawMethodRequest{
-			Method: method.ID, Info: slices.Contains(input.Args, "info"),
+			Method:      method.ID,
+			Info:        slices.Contains(input.Args, "info"),
 			Args:        slices.Clone(input.Args),
 			Payload:     slices.Clone(input.Payload),
-			ContentType: input.ContentType, Timeout: input.Timeout,
-			Permissions: input.Permissions, Source: input.CallerSource,
+			ContentType: input.ContentType,
+			Timeout:     input.Timeout,
+			Permissions: input.Permissions,
+			Source:      input.CallerSource,
 		})
 		return mg.responseResult(method, nil, response)
 	}
@@ -181,7 +191,9 @@ func (mg *methodGeneration) handle(ctx context.Context, input HandlerInput) (lif
 	}
 	resolved := funcapi.ResolveParams(params, values)
 	if mg.sharedJobSelectable() {
-		resolved[functionJobParameter] = funcapi.ResolvedParam{IDs: []string{jobName}}
+		resolved[functionJobParameter] = funcapi.ResolvedParam{
+			IDs: []string{jobName},
+		}
 	}
 	response := handler.Handle(ctx, method.ID, resolved)
 	if job != nil && !job.IsRunning() {
@@ -201,7 +213,8 @@ func (mg *methodGeneration) resolveTarget(
 		names := mg.availableJobNames(method.ID)
 		if len(names) != 1 {
 			return "", nil, nil, functionStatusError{
-				status: 404, message: fmt.Sprintf("unknown function %q", method.ID),
+				status:  404,
+				message: fmt.Sprintf("unknown function %q", method.ID),
 			}
 		}
 		name := names[0]
@@ -210,7 +223,8 @@ func (mg *methodGeneration) resolveTarget(
 		names := mg.availableJobNames(method.ID)
 		if len(names) == 0 {
 			return "", nil, nil, functionStatusError{
-				status: 404, message: fmt.Sprintf("no %s instances available", mg.module),
+				status:  404,
+				message: fmt.Sprintf("no %s instances available", mg.module),
 			}
 		}
 		name := names[0]
@@ -222,7 +236,8 @@ func (mg *methodGeneration) resolveTarget(
 			)
 			if len(values) > 1 {
 				return "", nil, nil, functionStatusError{
-					status: 400, message: "parameter '__job' expects a single value",
+					status:  400,
+					message: "parameter '__job' expects a single value",
 				}
 			}
 			if len(values) == 1 {
@@ -232,7 +247,8 @@ func (mg *methodGeneration) resolveTarget(
 		job := mg.jobs[name]
 		if job == nil || !slices.Contains(names, name) {
 			return "", nil, nil, functionStatusError{
-				status: 404, message: fmt.Sprintf("unknown job %q, available: %v", name, names),
+				status:  404,
+				message: fmt.Sprintf("unknown job %q, available: %v", name, names),
 			}
 		}
 		return name, job, mg.handlers[name], nil
@@ -504,15 +520,25 @@ func validateMethodParamValues(
 func buildFunctionJobParam(jobs []string) funcapi.ParamConfig {
 	options := make([]funcapi.ParamOption, 0, max(1, len(jobs)))
 	for index, job := range jobs {
-		options = append(options, funcapi.ParamOption{ID: job, Name: job, Default: index == 0})
+		options = append(options, funcapi.ParamOption{
+			ID:      job,
+			Name:    job,
+			Default: index == 0,
+		})
 	}
 	if len(options) == 0 {
-		options = append(options, funcapi.ParamOption{Name: "(No instances configured)", Disabled: true})
+		options = append(options, funcapi.ParamOption{
+			Name:     "(No instances configured)",
+			Disabled: true,
+		})
 	}
 	return funcapi.ParamConfig{
-		ID: functionJobParameter, Name: "Instance",
-		Help:      "Select which instance to query",
-		Selection: funcapi.ParamSelect, Options: options, UniqueView: true,
+		ID:         functionJobParameter,
+		Name:       "Instance",
+		Help:       "Select which instance to query",
+		Selection:  funcapi.ParamSelect,
+		Options:    options,
+		UniqueView: true,
 	}
 }
 

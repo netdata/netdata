@@ -46,7 +46,9 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 	require.NoError(t, err)
 	transaction, err := newPreparedSecretTransaction(
 		preparedSecretSpec{
-			scope:      lifecycle.ResourceTransactionScope{ID: "secretstore:vault:main"},
+			scope: lifecycle.ResourceTransactionScope{
+				ID: "secretstore:vault:main",
+			},
 			store:      store,
 			storeKey:   "vault:main",
 			mutation:   mutation,
@@ -102,22 +104,31 @@ func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
 	require.NoError(t, err)
 	dependencies := NewSecretDependencyIndex()
 	dependencies.jobs["module_two"] = jobDependency{
-		display: "module:job", running: true,
+		display:   "module:job",
+		running:   true,
 		storeKeys: []string{"vault:main"},
 	}
 	dependencies.byStore["vault:main"] = map[string]struct{}{"module_two": {}}
-	restarts, err := NewSecretRestartCommand(1, dependencies, restartTestJobs{stopError: stopErr})
+	restarts, err := NewSecretRestartCommand(1, dependencies, restartTestJobs{
+		stopError: stopErr,
+	})
 	require.NoError(t, err)
 	transaction, err := newPreparedSecretTransaction(preparedSecretSpec{
-		scope: lifecycle.ResourceTransactionScope{ID: "secretstore:vault:main"},
-		store: store, storeKey: "vault:main", mutation: mutation,
+		scope: lifecycle.ResourceTransactionScope{
+			ID: "secretstore:vault:main",
+		},
+		store:      store,
+		storeKey:   "vault:main",
+		mutation:   mutation,
 		restarts:   restarts,
 		result:     mustSecretMessage(200, ""),
 		cleanup:    func() error { return nil },
 		controller: &Controller{},
 	})
 	require.NoError(t, err)
-	commands := &restartTestCommandScope{rollbackContextErr: rollbackErr}
+	commands := &restartTestCommandScope{
+		rollbackContextErr: rollbackErr,
+	}
 
 	_, applyErr := transaction.ApplyComposite(t.Context(), commands)
 

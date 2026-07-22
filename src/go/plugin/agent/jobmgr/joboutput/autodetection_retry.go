@@ -114,9 +114,12 @@ func (adri *autoDetectionRetryIndex) schedule(config confgroup.Config, after int
 	}
 	retry := &autoDetectionRetry{
 		config: cloned,
-		token:  autoDetectionRetryToken{uid: cloned.UID(), generation: adri.generation},
-		due:    adri.logicalClock + int64(after),
-		index:  -1,
+		token: autoDetectionRetryToken{
+			uid:        cloned.UID(),
+			generation: adri.generation,
+		},
+		due:   adri.logicalClock + int64(after),
+		index: -1,
 	}
 	adri.entries[cloned.FullName()] = retry
 	heap.Push(&adri.queue, retry)

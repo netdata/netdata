@@ -32,7 +32,9 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 	}
 	controller, catalog, err := NewController(1, modules)
 	require.NoError(t, err)
-	mutations := controllerTestMutationPort{catalog: catalog}
+	mutations := controllerTestMutationPort{
+		catalog: catalog,
+	}
 	publicationPort := newRecordingPublicationPort()
 	publication, err := NewPublication(1, publicationPort)
 	require.NoError(t, err)
@@ -41,8 +43,16 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 
 	require.NoError(t, controller.Activate())
 
-	job := &controllerTestJob{fullName: "module_job", module: "module", name: "job", running: true}
-	handle, err := controller.PrepareJob(lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}, job)
+	job := &controllerTestJob{
+		fullName: "module_job",
+		module:   "module",
+		name:     "job",
+		running:  true,
+	}
+	handle, err := controller.PrepareJob(lifecycle.ResourceIdentity{
+		ID:         job.FullName(),
+		Generation: 1,
+	}, job)
 	require.NoError(t, err)
 
 	require.NoError(t, handle.Publish())
@@ -55,7 +65,10 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 		}
 	})
 	require.EqualValues(t, 0, allocations)
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "request", Route: "module:method"})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "request",
+		Route: "module:method",
+	})
 	require.NoError(t, err)
 
 	_, runTaskErr := decision.Plan.Work(context.Background())
@@ -72,7 +85,10 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 	got := publicationPort.events
 	require.Equal(t, []string{"publish:module:method", "withdraw:module:method"}, got)
 
-	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "after-close", Route: "module:method"})
+	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "after-close",
+		Route: "module:method",
+	})
 	require.NoError(t, err)
 	require.NotEqualValues(t, 0, decision.Rejected)
 }
@@ -90,7 +106,9 @@ func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T)
 		},
 	})
 	require.NoError(t, err)
-	mutations := controllerTestMutationPort{catalog: catalog}
+	mutations := controllerTestMutationPort{
+		catalog: catalog,
+	}
 	publicationPort := &blockingWithdrawPublicationPort{
 		recordingPublicationPort: newRecordingPublicationPort(),
 		entered:                  make(chan struct{}),
@@ -103,8 +121,16 @@ func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T)
 
 	require.NoError(t, controller.Activate())
 
-	job := &controllerTestJob{fullName: "module_job", module: "module", name: "job", running: true}
-	handle, err := controller.PrepareJob(lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}, job)
+	job := &controllerTestJob{
+		fullName: "module_job",
+		module:   "module",
+		name:     "job",
+		running:  true,
+	}
+	handle, err := controller.PrepareJob(lifecycle.ResourceIdentity{
+		ID:         job.FullName(),
+		Generation: 1,
+	}, job)
 	require.NoError(t, err)
 
 	require.NoError(t, handle.Publish())
@@ -115,7 +141,8 @@ func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T)
 	}()
 	<-publicationPort.entered
 	decision, resolveErr := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-		UID: "during-withdraw", Route: "module:method",
+		UID:   "during-withdraw",
+		Route: "module:method",
 	})
 	if decision.Lease.Valid() {
 		_, _ = catalog.ReleaseInvocation(decision.Lease)
@@ -150,7 +177,9 @@ func TestFunctionControllerWithdrawalFailureCleansUnpublishedSuccessor(t *testin
 		},
 	})
 	require.NoError(t, err)
-	mutations := controllerTestMutationPort{catalog: catalog}
+	mutations := controllerTestMutationPort{
+		catalog: catalog,
+	}
 	publicationPort := newRecordingPublicationPort()
 	publication, err := NewPublication(1, publicationPort)
 	require.NoError(t, err)
@@ -167,7 +196,8 @@ func TestFunctionControllerWithdrawalFailureCleansUnpublishedSuccessor(t *testin
 	require.EqualValues(t, 1, successor.cleanupCount())
 
 	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-		UID: "predecessor-restored", Route: "module:always",
+		UID:   "predecessor-restored",
+		Route: "module:always",
 	})
 	require.NoError(t, err)
 	require.True(t, decision.Lease.Valid())
@@ -204,7 +234,9 @@ func TestFunctionControllerRawRequestFidelity(t *testing.T) {
 	}
 	controller, catalog, err := NewController(1, modules)
 	require.NoError(t, err)
-	mutations := controllerTestMutationPort{catalog: catalog}
+	mutations := controllerTestMutationPort{
+		catalog: catalog,
+	}
 	publicationPort := newRecordingPublicationPort()
 	publication, err := NewPublication(1, publicationPort)
 	require.NoError(t, err)
@@ -214,10 +246,15 @@ func TestFunctionControllerRawRequestFidelity(t *testing.T) {
 	require.NoError(t, controller.Activate())
 
 	lookup := jobmgr.FunctionLookup{
-		UID: "raw-request", Route: "module:raw", Args: []string{"info", "arg"},
-		Payload: []byte(`{"value":1}`), ContentType: "application/json",
-		Permissions: "0x0013", CallerSource: "cloud",
-		Timeout: 17 * time.Second, HasPayload: true,
+		UID:          "raw-request",
+		Route:        "module:raw",
+		Args:         []string{"info", "arg"},
+		Payload:      []byte(`{"value":1}`),
+		ContentType:  "application/json",
+		Permissions:  "0x0013",
+		CallerSource: "cloud",
+		Timeout:      17 * time.Second,
+		HasPayload:   true,
 	}
 	decision, err := catalog.ResolveAndAcquire(lookup)
 	require.NoError(t, err)
@@ -259,7 +296,9 @@ func TestFunctionControllerAgentAvailabilityIsMonotonic(t *testing.T) {
 	}
 	controller, catalog, err := NewController(1, modules)
 	require.NoError(t, err)
-	mutations := controllerTestMutationPort{catalog: catalog}
+	mutations := controllerTestMutationPort{
+		catalog: catalog,
+	}
 	publicationPort := newRecordingPublicationPort()
 	publication, err := NewPublication(1, publicationPort)
 	require.NoError(t, err)
@@ -281,7 +320,8 @@ func TestFunctionControllerAgentAvailabilityIsMonotonic(t *testing.T) {
 	require.Equal(t, []string{"publish:module:delayed"}, got)
 
 	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-		UID: "still-published", Route: "module:delayed",
+		UID:   "still-published",
+		Route: "module:delayed",
 	})
 	require.NoError(t, err)
 	require.EqualValues(t, 0, decision.Rejected)
@@ -304,7 +344,9 @@ func TestFunctionControllerRejectsInvalidDeclarations(t *testing.T) {
 		"duplicate alias":     {methods: []funcapi.FunctionConfig{{ID: "method", Aliases: []string{"alias", "alias"}}}},
 		"invalid public name": {methods: []funcapi.FunctionConfig{{ID: "method", FunctionName: "invalid name"}}},
 		"unmarshalable presentation": {
-			methods: []funcapi.FunctionConfig{(funcapi.FunctionConfig{ID: "method"}).WithPresentation(func() {})},
+			methods: []funcapi.FunctionConfig{(funcapi.FunctionConfig{
+				ID: "method",
+			}).WithPresentation(func() {})},
 		},
 	}
 	for name, test := range tests {
@@ -355,8 +397,16 @@ func TestFunctionControllerReportsInitialRouteCleanupFailure(t *testing.T) {
 				Cleanup: test.cleanup,
 			}
 			valid := InitialRoute{
-				Declaration: Declaration{ID: "initial", Generation: generation, PublicName: "initial"},
-				Publication: PublicationRecord{Name: "initial", Generation: 1, Access: "signed-id"},
+				Declaration: Declaration{
+					ID:         "initial",
+					Generation: generation,
+					PublicName: "initial",
+				},
+				Publication: PublicationRecord{
+					Name:       "initial",
+					Generation: 1,
+					Access:     "signed-id",
+				},
 			}
 			invalid := valid
 			invalid.Publication.Access = ""
@@ -496,7 +546,9 @@ func (cth *controllerTestHandler) MethodParams(context.Context, string) ([]funca
 }
 
 func (cth *controllerTestHandler) Handle(context.Context, string, funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	return &funcapi.FunctionResponse{Status: 200}
+	return &funcapi.FunctionResponse{
+		Status: 200,
+	}
 }
 
 func (cth *controllerTestHandler) HandleRaw(
@@ -506,7 +558,9 @@ func (cth *controllerTestHandler) HandleRaw(
 	cth.mu.Lock()
 	cth.raw = request
 	cth.mu.Unlock()
-	return &funcapi.FunctionResponse{Status: 200}
+	return &funcapi.FunctionResponse{
+		Status: 200,
+	}
 }
 
 func (cth *controllerTestHandler) Cleanup(context.Context) {

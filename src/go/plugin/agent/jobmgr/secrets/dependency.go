@@ -82,7 +82,10 @@ func (sdi *SecretDependencyIndex) Affected(storeKey string, runningOnly bool) []
 		if !ok || runningOnly && !dependency.running {
 			continue
 		}
-		refs = append(refs, secretstore.JobRef{ID: id, Display: dependency.display})
+		refs = append(refs, secretstore.JobRef{
+			ID:      id,
+			Display: dependency.display,
+		})
 	}
 	sdi.mu.RUnlock()
 	slices.SortFunc(refs, func(a, b secretstore.JobRef) int {
@@ -109,7 +112,8 @@ func (sdi *SecretDependencyIndex) commitJobChange(id string, next *jobDependency
 	}
 	if next != nil {
 		cloned := jobDependency{
-			display: next.display, running: next.running,
+			display:   next.display,
+			running:   next.running,
 			storeKeys: slices.Clone(next.storeKeys),
 		}
 		sdi.jobs[id] = cloned

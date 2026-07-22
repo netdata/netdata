@@ -83,12 +83,15 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 		if successor != nil {
 			return dcjc.prepareResourceTransaction(
 				ResourceTransactionSpec{
-					Scope: scope, Disposition: disposition,
-					Current: current, Successor: successor,
+					Scope:            scope,
+					Disposition:      disposition,
+					Current:          current,
+					Successor:        successor,
 					Graph:            dcjc.graph,
 					AfterGraphCommit: dependencyCommit,
 					AfterApply:       dcjc.retrySettlement(scope.ID, retry),
-					Result:           result, Cleanup: cleanup,
+					Result:           result,
+					Cleanup:          cleanup,
 					SuccessorFailure: successorFailureResolver(
 						failurePlan,
 						failedDependencyCommit,
@@ -114,14 +117,18 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 	}
 	return dcjc.prepareResourceTransaction(
 		ResourceTransactionSpec{
-			Scope: scope, Disposition: disposition,
-			Current: current, Successor: successor,
-			UnusedPermit: unusedPermit,
-			Graph:        dcjc.graph, Mutation: mutation,
+			Scope:            scope,
+			Disposition:      disposition,
+			Current:          current,
+			Successor:        successor,
+			UnusedPermit:     unusedPermit,
+			Graph:            dcjc.graph,
+			Mutation:         mutation,
 			MutationPrepared: true,
 			AfterGraphCommit: dependencyCommit,
 			AfterApply:       dcjc.retrySettlement(scope.ID, retry),
-			Result:           result, Cleanup: cleanup,
+			Result:           result,
+			Cleanup:          cleanup,
 			SuccessorFailure: successorFailureResolver(failurePlan, failedDependencyCommit, removedDependencyCommit),
 		},
 	)

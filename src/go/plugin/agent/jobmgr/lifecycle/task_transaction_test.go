@@ -18,14 +18,25 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 		resulting   ReadyResource
 	}{
 		"graph-only command": {
-			scope:       ResourceTransactionScope{ID: "job"},
+			scope: ResourceTransactionScope{
+				ID: "job",
+			},
 			disposition: ResourceTransactionUnchanged,
 		},
 		"remove current resource": {
-			scope: ResourceTransactionScope{ID: "job", Current: ResourceIdentity{ID: "job", Generation: 1}},
+			scope: ResourceTransactionScope{
+				ID: "job",
+				Current: ResourceIdentity{
+					ID:         "job",
+					Generation: 1,
+				},
+			},
 			current: &recordingReadyResource{
-				identity: ResourceIdentity{ID: "job", Generation: 1},
-				events:   new([]string),
+				identity: ResourceIdentity{
+					ID:         "job",
+					Generation: 1,
+				},
+				events: new([]string),
 			},
 			disposition: ResourceTransactionRemoved,
 		},
@@ -49,7 +60,10 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 			)
 			require.NoError(t, err)
 			prepared := &recordingPreparedResourceTransaction{
-				scope: test.scope, current: test.current, applied: applied, events: &events,
+				scope:   test.scope,
+				current: test.current,
+				applied: applied,
+				events:  &events,
 			}
 			plan, err := NewResourceTransactionTaskPlan(
 				SourceJobManager,
@@ -75,10 +89,14 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 			require.EqualValues(t, 1, first.Sequence)
 			require.Equal(t, TaskOutcomePreparedResourceTransaction, first.Kind)
 			require.NoError(t, first.Err)
-			require.NoError(t, supervisor.CancelWithCause(ref, &StoppingRejection{Generation: 7}))
+			require.NoError(t, supervisor.CancelWithCause(ref, &StoppingRejection{
+				Generation: 7,
+			}))
 
 			require.NoError(t, supervisor.SendAction(TaskAction{
-				Ref: ref, Sequence: 2, Kind: TaskActionApplyResourceTransaction,
+				Ref:      ref,
+				Sequence: 2,
+				Kind:     TaskActionApplyResourceTransaction,
 			}),
 			)
 
@@ -97,17 +115,29 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 			require.NoError(t, preflightResultErr)
 
 			require.NoError(t, supervisor.SendAction(TaskAction{
-				Ref: ref, Sequence: 3, Kind: TaskActionEncodeWrite, UID: "tx", Expiry: 1,
+				Ref:      ref,
+				Sequence: 3,
+				Kind:     TaskActionEncodeWrite,
+				UID:      "tx",
+				Expiry:   1,
 			}),
 			)
 
 			require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
-			require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionCleanup}))
+			require.NoError(t, supervisor.SendAction(TaskAction{
+				Ref:      ref,
+				Sequence: 4,
+				Kind:     TaskActionCleanup,
+			}))
 
 			require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
-			require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 5, Kind: TaskActionTerminate}))
+			require.NoError(t, supervisor.SendAction(TaskAction{
+				Ref:      ref,
+				Sequence: 5,
+				Kind:     TaskActionTerminate,
+			}))
 
 			require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
@@ -122,9 +152,22 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 func TestTaskSupervisorDisposesPreparedTransactionAndRestoresCurrent(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
-	current := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 7}, events: &events}
-	scope := ResourceTransactionScope{ID: "job", Current: current.identity}
-	prepared := &recordingPreparedResourceTransaction{scope: scope, current: current, events: &events}
+	current := &recordingReadyResource{
+		identity: ResourceIdentity{
+			ID:         "job",
+			Generation: 7,
+		},
+		events: &events,
+	}
+	scope := ResourceTransactionScope{
+		ID:      "job",
+		Current: current.identity,
+	}
+	prepared := &recordingPreparedResourceTransaction{
+		scope:   scope,
+		current: current,
+		events:  &events,
+	}
 	plan, err := NewResourceTransactionTaskPlan(
 		SourceJobManager,
 		time.Time{},
@@ -145,7 +188,11 @@ func TestTaskSupervisorDisposesPreparedTransactionAndRestoresCurrent(t *testing.
 	_, ref := enqueueAndDispatchTask(t, supervisor, plan)
 	<-supervisor.CompletionCh()
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     TaskActionDispose,
+	}))
 
 	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
@@ -153,7 +200,11 @@ func TestTaskSupervisorDisposesPreparedTransactionAndRestoresCurrent(t *testing.
 	require.NoError(t, err)
 	require.Same(t, current, restored)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     TaskActionTerminate,
+	}))
 
 	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
@@ -166,8 +217,14 @@ func TestTaskSupervisorDisposesPreparedTransactionAndRestoresCurrent(t *testing.
 func TestResourceTransactionPermitPlanRejectsPipelineReplacement(t *testing.T) {
 	plan, err := NewPipelineLongLivedPlan([]string{"provider"})
 	require.NoError(t, err)
-	identity := ResourceIdentity{ID: "pipeline", Generation: 1}
-	current := &recordingReadyResource{identity: identity, events: new([]string)}
+	identity := ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 1,
+	}
+	current := &recordingReadyResource{
+		identity: identity,
+		events:   new([]string),
+	}
 
 	_, err = NewResourceTransactionPermitTaskPlan(
 		SourceJobManager,
@@ -175,9 +232,12 @@ func TestResourceTransactionPermitPlanRejectsPipelineReplacement(t *testing.T) {
 		TransactionTaskPhases,
 		current,
 		ResourceTransactionScope{
-			ID:        identity.ID,
-			Current:   identity,
-			Successor: ResourceIdentity{ID: identity.ID, Generation: 2},
+			ID:      identity.ID,
+			Current: identity,
+			Successor: ResourceIdentity{
+				ID:         identity.ID,
+				Generation: 2,
+			},
 		},
 		plan,
 		func(context.Context, ReadyResource, ResourceTransactionScope, LongLivedPermit) (PreparedResourceTransaction, error) {

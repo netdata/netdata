@@ -105,12 +105,20 @@ func TestTaskSupervisorDynamicPopulationAndGenerationCheckedReuse(t *testing.T) 
 		completion := <-supervisor.CompletionCh()
 		require.EqualValues(t, 1, completion.Sequence)
 
-		require.NoError(t, supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}))
+		require.NoError(t, supervisor.SendAction(TaskAction{
+			Ref:      completion.Ref,
+			Sequence: 2,
+			Kind:     TaskActionDispose,
+		}))
 
 		ack := <-supervisor.AcknowledgementCh()
 		require.False(t, ack.Sequence != 2 || ack.Err != nil)
 
-		require.NoError(t, supervisor.SendAction(TaskAction{Ref: ack.Ref, Sequence: 3, Kind: TaskActionTerminate}))
+		require.NoError(t, supervisor.SendAction(TaskAction{
+			Ref:      ack.Ref,
+			Sequence: 3,
+			Kind:     TaskActionTerminate,
+		}))
 
 		ack = <-supervisor.AcknowledgementCh()
 		require.False(t, ack.Sequence != 3 || ack.Kind != TaskActionTerminate || ack.Err != nil)
@@ -123,9 +131,12 @@ func TestTaskSupervisorDynamicPopulationAndGenerationCheckedReuse(t *testing.T) 
 	}
 	pending, err := supervisor.Enqueue(
 		TaskClassGenericFunction,
-		TaskPlan{Source: SourceFunction, Work: frameTaskWork(func(context.Context) (SealedResult, error) {
-			return NewSealedResult(200, "application/json", []byte(`{}`))
-		})},
+		TaskPlan{
+			Source: SourceFunction,
+			Work: frameTaskWork(func(context.Context) (SealedResult, error) {
+				return NewSealedResult(200, "application/json", []byte(`{}`))
+			}),
+		},
 	)
 	require.NoError(t, err)
 	var started [TaskStartServiceQuantum]TaskStart
@@ -136,21 +147,36 @@ func TestTaskSupervisorDynamicPopulationAndGenerationCheckedReuse(t *testing.T) 
 	generation, ok := previous[ref.Slot]
 	require.False(t, !ok || ref.Generation != generation+1)
 
-	stale := TaskRef{Slot: ref.Slot, Generation: previous[ref.Slot]}
+	stale := TaskRef{
+		Slot:       ref.Slot,
+		Generation: previous[ref.Slot],
+	}
 
 	require.Error(t, supervisor.Cancel(stale))
 
-	require.Error(t, supervisor.SendAction(TaskAction{Ref: stale, Sequence: 2, Kind: TaskActionDispose}))
+	require.Error(t, supervisor.SendAction(TaskAction{
+		Ref:      stale,
+		Sequence: 2,
+		Kind:     TaskActionDispose,
+	}))
 
 	require.Error(t, supervisor.Release(stale))
 
 	completion := <-supervisor.CompletionCh()
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      completion.Ref,
+		Sequence: 2,
+		Kind:     TaskActionDispose,
+	}))
 
 	ack := <-supervisor.AcknowledgementCh()
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ack.Ref, Sequence: 3, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ack.Ref,
+		Sequence: 3,
+		Kind:     TaskActionTerminate,
+	}))
 
 	ack = <-supervisor.AcknowledgementCh()
 
@@ -193,7 +219,11 @@ func TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch(t *testing.T) {
 	for range refs {
 		completion := <-supervisor.CompletionCh()
 
-		require.NoError(t, supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}))
+		require.NoError(t, supervisor.SendAction(TaskAction{
+			Ref:      completion.Ref,
+			Sequence: 2,
+			Kind:     TaskActionDispose,
+		}))
 	}
 	acknowledged := make([]TaskRef, 0, len(refs))
 	for range refs {
@@ -202,7 +232,11 @@ func TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch(t *testing.T) {
 		acknowledged = append(acknowledged, ack.Ref)
 	}
 	for _, ref := range acknowledged {
-		require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+		require.NoError(t, supervisor.SendAction(TaskAction{
+			Ref:      ref,
+			Sequence: 3,
+			Kind:     TaskActionTerminate,
+		}))
 	}
 	for range refs {
 		ack := <-supervisor.AcknowledgementCh()
@@ -232,12 +266,20 @@ func TestTaskSupervisorContainsPanicAndReleasesSlot(t *testing.T) {
 			require.False(t, completion.Ref != ref || !errors.Is(completion.Err, ErrTaskPanic) ||
 				!strings.Contains(completion.Err.Error(), "fixture panic"))
 
-			require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+			require.NoError(t, supervisor.SendAction(TaskAction{
+				Ref:      ref,
+				Sequence: 2,
+				Kind:     TaskActionDispose,
+			}))
 
 			ack := <-supervisor.AcknowledgementCh()
 			require.False(t, ack.Ref != ref || ack.Sequence != 2 || ack.Kind != TaskActionDispose || ack.Err != nil)
 
-			require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+			require.NoError(t, supervisor.SendAction(TaskAction{
+				Ref:      ref,
+				Sequence: 3,
+				Kind:     TaskActionTerminate,
+			}))
 
 			ack = <-supervisor.AcknowledgementCh()
 			require.False(t, ack.Ref != ref || ack.Sequence != 3 || ack.Kind != TaskActionTerminate || ack.Err != nil)
@@ -263,12 +305,18 @@ func TestTaskSupervisorPreservesAuthoritativeCancellationCause(t *testing.T) {
 	}
 	observed := make(chan cancellationObservation, 1)
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
-		Source: SourceFunction, Deadline: deadline,
+		Source:   SourceFunction,
+		Deadline: deadline,
 		Work: func(ctx context.Context) (TaskOutcome, error) {
 			observedDeadline, ok := ctx.Deadline()
 			<-ctx.Done()
 			cause := context.Cause(ctx)
-			observed <- cancellationObservation{deadline: observedDeadline, ok: ok, err: ctx.Err(), cause: cause}
+			observed <- cancellationObservation{
+				deadline: observedDeadline,
+				ok:       ok,
+				err:      ctx.Err(),
+				cause:    cause,
+			}
 			return TaskOutcome{}, cause
 		},
 	})
@@ -286,12 +334,20 @@ func TestTaskSupervisorPreservesAuthoritativeCancellationCause(t *testing.T) {
 	completion := <-supervisor.CompletionCh()
 	require.False(t, completion.Ref != ref || !errors.Is(completion.Err, context.DeadlineExceeded))
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     TaskActionDispose,
+	}))
 
 	ack := <-supervisor.AcknowledgementCh()
 	require.Nil(t, ack.Err)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     TaskActionTerminate,
+	}))
 
 	ack = <-supervisor.AcknowledgementCh()
 	require.Nil(t, ack.Err)
@@ -366,13 +422,17 @@ func TestTaskSupervisorDeliversCanonicalPendingCancellation(t *testing.T) {
 			require.ErrorIs(t, completion.Err, test.want)
 
 			require.NoError(t, supervisor.SendAction(TaskAction{
-				Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose,
+				Ref:      completion.Ref,
+				Sequence: 2,
+				Kind:     TaskActionDispose,
 			}))
 			ack := <-supervisor.AcknowledgementCh()
 			require.NoError(t, ack.Err)
 
 			require.NoError(t, supervisor.SendAction(TaskAction{
-				Ref: completion.Ref, Sequence: 3, Kind: TaskActionTerminate,
+				Ref:      completion.Ref,
+				Sequence: 3,
+				Kind:     TaskActionTerminate,
 			}))
 			ack = <-supervisor.AcknowledgementCh()
 			require.NoError(t, ack.Err)
@@ -421,7 +481,8 @@ func TestTaskSupervisorChecksPhaseSequenceAndPublishesOwnedResult(t *testing.T) 
 	sealed, err := NewSealedResult(200, "application/json", payload)
 	require.NoError(t, err)
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
-		Source: SourceFunction, MaxPhaseTransitions: 4,
+		Source:              SourceFunction,
+		MaxPhaseTransitions: 4,
 		Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			return sealed, nil
 		}),
@@ -432,12 +493,24 @@ func TestTaskSupervisorChecksPhaseSequenceAndPublishesOwnedResult(t *testing.T) 
 
 	require.Error(
 		t,
-		supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionEncodeWrite, UID: "u1", Expiry: 1}),
+		supervisor.SendAction(TaskAction{
+			Ref:      ref,
+			Sequence: 3,
+			Kind:     TaskActionEncodeWrite,
+			UID:      "u1",
+			Expiry:   1,
+		}),
 	)
 
 	require.NoError(
 		t,
-		supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionEncodeWrite, UID: "u1", Expiry: 1}),
+		supervisor.SendAction(TaskAction{
+			Ref:      ref,
+			Sequence: 2,
+			Kind:     TaskActionEncodeWrite,
+			UID:      "u1",
+			Expiry:   1,
+		}),
 	)
 
 	ack := <-supervisor.AcknowledgementCh()
@@ -450,7 +523,11 @@ func TestTaskSupervisorChecksPhaseSequenceAndPublishesOwnedResult(t *testing.T) 
 
 	require.Error(t, supervisor.Release(ref))
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     TaskActionTerminate,
+	}))
 
 	ack = <-supervisor.AcknowledgementCh()
 	require.False(t, ack.Ref != ref || ack.Sequence != 3 || ack.Kind != TaskActionTerminate || ack.Err != nil)
@@ -480,11 +557,19 @@ func TestTaskSupervisorPreflightsResultEnvelopeBeforeAction(t *testing.T) {
 	preflightResultErr := supervisor.PreflightResult(ref, oversizedUID, 1)
 	require.ErrorIs(t, preflightResultErr, ErrFunctionResultTooLarge)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     TaskActionDispose,
+	}))
 
 	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     TaskActionTerminate,
+	}))
 
 	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
@@ -498,7 +583,8 @@ func TestTaskSupervisorRunsCleanupBeforeExplicitTermination(t *testing.T) {
 	require.NoError(t, err)
 	cleaned := make(chan struct{}, 1)
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
-		Source: SourceJobManager, MaxPhaseTransitions: 4,
+		Source:              SourceJobManager,
+		MaxPhaseTransitions: 4,
 		Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		}),
@@ -509,12 +595,20 @@ func TestTaskSupervisorRunsCleanupBeforeExplicitTermination(t *testing.T) {
 	})
 	completion := <-supervisor.CompletionCh()
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     TaskActionDispose,
+	}))
 
 	ack := <-supervisor.AcknowledgementCh()
 	require.False(t, ack.Sequence != 2 || ack.Err != nil)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 3, Kind: TaskActionCleanup}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      completion.Ref,
+		Sequence: 3,
+		Kind:     TaskActionCleanup,
+	}))
 
 	acknowledgementCh := <-supervisor.AcknowledgementCh()
 	require.False(
@@ -528,7 +622,11 @@ func TestTaskSupervisorRunsCleanupBeforeExplicitTermination(t *testing.T) {
 		require.FailNow(t, "test failed", "cleanup phase did not execute")
 	}
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 4,
+		Kind:     TaskActionTerminate,
+	}))
 
 	acknowledgementCh2 := <-supervisor.AcknowledgementCh()
 	require.False(
@@ -547,10 +645,13 @@ func TestTaskSupervisorDispatchRotatesPendingClasses(t *testing.T) {
 	require.NoError(t, err)
 	release := make(chan struct{})
 	plan := func(source Source) TaskPlan {
-		return TaskPlan{Source: source, Work: frameTaskWork(func(context.Context) (SealedResult, error) {
-			<-release
-			return NewSealedResult(200, "application/json", []byte(`{}`))
-		})}
+		return TaskPlan{
+			Source: source,
+			Work: frameTaskWork(func(context.Context) (SealedResult, error) {
+				<-release
+				return NewSealedResult(200, "application/json", []byte(`{}`))
+			}),
+		}
 	}
 	j1, _ := supervisor.Enqueue(TaskClassFrameworkControl, plan(SourceJobManager))
 	j2, _ := supervisor.Enqueue(TaskClassFrameworkControl, plan(SourceJobManager))
@@ -567,11 +668,19 @@ func TestTaskSupervisorDispatchRotatesPendingClasses(t *testing.T) {
 	for range TaskStartServiceQuantum {
 		completion := <-supervisor.CompletionCh()
 
-		require.NoError(t, supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}))
+		require.NoError(t, supervisor.SendAction(TaskAction{
+			Ref:      completion.Ref,
+			Sequence: 2,
+			Kind:     TaskActionDispose,
+		}))
 
 		ack := <-supervisor.AcknowledgementCh()
 
-		require.NoError(t, supervisor.SendAction(TaskAction{Ref: ack.Ref, Sequence: 3, Kind: TaskActionTerminate}))
+		require.NoError(t, supervisor.SendAction(TaskAction{
+			Ref:      ack.Ref,
+			Sequence: 3,
+			Kind:     TaskActionTerminate,
+		}))
 
 		ack = <-supervisor.AcknowledgementCh()
 
@@ -646,7 +755,9 @@ func TestTaskSupervisorFrameworkControlStartsWithManyActiveGenericTasks(t *testi
 		completion := <-supervisor.CompletionCh()
 
 		require.NoError(t, supervisor.SendAction(TaskAction{
-			Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose,
+			Ref:      completion.Ref,
+			Sequence: 2,
+			Kind:     TaskActionDispose,
 		}),
 		)
 
@@ -663,9 +774,12 @@ func TestTaskSupervisorDirectlyCancelsPendingRequest(t *testing.T) {
 	supervisor, err := NewTaskSupervisor(frame)
 	require.NoError(t, err)
 	plan := func(source Source) TaskPlan {
-		return TaskPlan{Source: source, Work: frameTaskWork(func(context.Context) (SealedResult, error) {
-			return NewSealedResult(200, "application/json", []byte(`{}`))
-		})}
+		return TaskPlan{
+			Source: source,
+			Work: frameTaskWork(func(context.Context) (SealedResult, error) {
+				return NewSealedResult(200, "application/json", []byte(`{}`))
+			}),
+		}
 	}
 	cancelled, err := supervisor.Enqueue(TaskClassFrameworkControl, plan(SourceJobManager))
 	require.NoError(t, err)
@@ -681,11 +795,19 @@ func TestTaskSupervisorDirectlyCancelsPendingRequest(t *testing.T) {
 	require.False(t, err != nil || count != 1 || more || started[0].Request != survivor)
 	completion := <-supervisor.CompletionCh()
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      completion.Ref,
+		Sequence: 2,
+		Kind:     TaskActionDispose,
+	}))
 
 	ack := <-supervisor.AcknowledgementCh()
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ack.Ref, Sequence: 3, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ack.Ref,
+		Sequence: 3,
+		Kind:     TaskActionTerminate,
+	}))
 
 	ack = <-supervisor.AcknowledgementCh()
 
@@ -732,7 +854,11 @@ func TestFrameOwnerControlReservationPrecedesLaterOrdinaryFrame(t *testing.T) {
 
 	require.ErrorIs(
 		t,
-		owner.TryCommitControl(ControlFramePlan{UID: "uc", Status: ControlDeadline, Expiry: 1}),
+		owner.TryCommitControl(ControlFramePlan{
+			UID:    "uc",
+			Status: ControlDeadline,
+			Expiry: 1,
+		}),
 		ErrFrameOwnerBusy,
 	)
 
@@ -750,7 +876,11 @@ func TestFrameOwnerControlReservationPrecedesLaterOrdinaryFrame(t *testing.T) {
 	<-controlReady
 	controlDone := make(chan error, 1)
 	go func() {
-		controlDone <- owner.TryCommitControl(ControlFramePlan{UID: "uc", Status: ControlDeadline, Expiry: 1})
+		controlDone <- owner.TryCommitControl(ControlFramePlan{
+			UID:    "uc",
+			Status: ControlDeadline,
+			Expiry: 1,
+		})
 	}()
 
 	require.True(t, bytes.Contains(<-writer.offered, []byte("FUNCTION_RESULT_BEGIN uc 504 ")))
@@ -779,7 +909,9 @@ func TestFrameOwnerLateControlReadyBindingReplaysPendingWake(t *testing.T) {
 	<-writer.offered
 
 	require.ErrorIs(t, owner.TryCommitControl(ControlFramePlan{
-		UID: "control", Status: ControlDeadline, Expiry: 1,
+		UID:    "control",
+		Status: ControlDeadline,
+		Expiry: 1,
 	}), ErrFrameOwnerBusy)
 
 	writer.release <- struct{}{}
@@ -1057,7 +1189,10 @@ type stepWriter struct {
 }
 
 func newStepWriter() *stepWriter {
-	return &stepWriter{offered: make(chan []byte), release: make(chan struct{})}
+	return &stepWriter{
+		offered: make(chan []byte),
+		release: make(chan struct{}),
+	}
 }
 
 func (sw *stepWriter) Write(payload []byte) (int, error) {

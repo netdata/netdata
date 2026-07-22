@@ -19,7 +19,9 @@ type recordingPublicationPort struct {
 }
 
 func newRecordingPublicationPort() *recordingPublicationPort {
-	return &recordingPublicationPort{active: make(map[string]PublicationRecord)}
+	return &recordingPublicationPort{
+		active: make(map[string]PublicationRecord),
+	}
 }
 
 func (rpp *recordingPublicationPort) Publish(record PublicationRecord) error {
@@ -46,7 +48,12 @@ func (rpp *recordingPublicationPort) Withdraw(name string) error {
 }
 
 func publicationRecord(name string, generation uint64) PublicationRecord {
-	return PublicationRecord{Name: name, Generation: generation, Timeout: 1, Access: "0x0000"}
+	return PublicationRecord{
+		Name:       name,
+		Generation: generation,
+		Timeout:    1,
+		Access:     "0x0000",
+	}
 }
 
 func TestFunctionPublicationDiff(t *testing.T) {
@@ -118,7 +125,10 @@ func TestFunctionPublicationInitialSnapshotExceedsMutationQuantum(t *testing.T) 
 	for index := range population {
 		record := publicationRecord(fmt.Sprintf("work-%03d", index), 1)
 		records = append(records, record)
-		changes = append(changes, PublicationChange{Name: record.Name, Record: &records[index]})
+		changes = append(changes, PublicationChange{
+			Name:   record.Name,
+			Record: &records[index],
+		})
 	}
 
 	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, changes))
@@ -139,7 +149,10 @@ func TestFunctionPublicationMutationExceedsFormerCountLimit(t *testing.T) {
 	for index := range population {
 		record := publicationRecord(fmt.Sprintf("work-%03d", index), 1)
 		records = append(records, record)
-		changes = append(changes, PublicationChange{Name: record.Name, Record: &records[index]})
+		changes = append(changes, PublicationChange{
+			Name:   record.Name,
+			Record: &records[index],
+		})
 	}
 	var quiesced, committed, aborted bool
 

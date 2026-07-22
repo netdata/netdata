@@ -100,8 +100,9 @@ func (dcjc *DynCfgJobController) templatePublicationCleanup() lifecycle.TaskClea
 			ID:         dcjc.prefix + name,
 			Status:     dyncfg.StatusAccepted.String(),
 			ConfigType: dyncfg.ConfigTypeTemplate.String(),
-			Path:       dcjc.path, SourceType: "internal",
-			Source: "internal",
+			Path:       dcjc.path,
+			SourceType: "internal",
+			Source:     "internal",
 			SupportedCommands: dyncfg.JoinCommands(
 				dyncfg.CommandAdd,
 				dyncfg.CommandSchema,

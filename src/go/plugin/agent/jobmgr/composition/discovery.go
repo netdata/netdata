@@ -35,7 +35,10 @@ func (rg *runGeneration) startDiscovery(ctx context.Context) error {
 		return errors.New("jobmgr composition: invalid discovery start")
 	}
 	pipeline, err := agentdiscovery.NewPipelineGeneration(
-		agentdiscovery.PipelineConfig{BuildContext: rg.discovery.BuildContext, Providers: rg.discovery.Providers},
+		agentdiscovery.PipelineConfig{
+			BuildContext: rg.discovery.BuildContext,
+			Providers:    rg.discovery.Providers,
+		},
 	)
 	if err != nil {
 		return err
@@ -145,8 +148,11 @@ func newPreparedDiscovery(
 		return nil, errors.New("jobmgr composition: invalid prepared discovery")
 	}
 	return &preparedDiscovery{
-		pipeline: pipeline, decisions: decisions, tasks: tasks,
-		identity: identity, permit: permit,
+		pipeline:  pipeline,
+		decisions: decisions,
+		tasks:     tasks,
+		identity:  identity,
+		permit:    permit,
 	}, nil
 }
 
@@ -162,8 +168,10 @@ func (pd *preparedDiscovery) AcceptStart(ctx context.Context, expected uint64) (
 		return nil, errors.New("jobmgr composition: invalid discovery acceptance")
 	}
 	resource := &readyDiscovery{
-		pipeline: pd.pipeline, decisions: pd.decisions,
-		tasks: pd.tasks, identity: pd.identity,
+		pipeline:         pd.pipeline,
+		decisions:        pd.decisions,
+		tasks:            pd.tasks,
+		identity:         pd.identity,
 		permit:           pd.permit,
 		providerNames:    pd.pipeline.ProviderNames(),
 		disabledNames:    pd.pipeline.DisabledProviderNames(),

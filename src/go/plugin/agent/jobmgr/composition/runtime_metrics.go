@@ -34,7 +34,9 @@ type runMetrics struct {
 func newRunMetrics() *runMetrics {
 	store := metrix.NewRuntimeStore()
 	meter := store.Write().StatefulMeter(runtimeMetricPrefix)
-	metrics := &runMetrics{store: store}
+	metrics := &runMetrics{
+		store: store,
+	}
 	metrics.gauges[lifecycle.RuntimeGaugeOperationsActive] = runtimeGauge(meter, "operations_active", "operations")
 	metrics.gauges[lifecycle.RuntimeGaugeFunctionInvocationsActive] =
 		runtimeGauge(meter, "function_invocations_active", "invocations")
@@ -171,10 +173,12 @@ func (rm *runMetrics) register(service runtimecomp.Service) error {
 		Name:        runtimeComponentName,
 		Store:       rm.store,
 		UpdateEvery: 1,
-		Autogen:     runtimecomp.AutogenPolicy{Enabled: true},
-		Module:      "jobmgr",
-		JobName:     "runtime",
-		JobLabels:   map[string]string{"component": "jobmgr_runtime"},
+		Autogen: runtimecomp.AutogenPolicy{
+			Enabled: true,
+		},
+		Module:    "jobmgr",
+		JobName:   "runtime",
+		JobLabels: map[string]string{"component": "jobmgr_runtime"},
 	}); err != nil {
 		return err
 	}

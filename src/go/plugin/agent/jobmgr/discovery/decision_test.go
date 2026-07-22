@@ -56,7 +56,9 @@ func TestDecisionIndexAcknowledgesSelectionAndFallback(t *testing.T) {
 		changes[1].Config.UID() != user.UID() ||
 		changes[2].Config.UID() != stock.UID() ||
 		!changes[3].Remove)
-	require.EqualValues(t, decisionTestCensus{revision: 4}, decisionIndexCensus(index))
+	require.EqualValues(t, decisionTestCensus{
+		revision: 4,
+	}, decisionIndexCensus(index))
 }
 
 func TestDecisionIndexFailureKeepsLastAcknowledgedSelection(t *testing.T) {
@@ -85,7 +87,10 @@ func TestDecisionIndexFailureKeepsLastAcknowledgedSelection(t *testing.T) {
 	acknowledged := index.acknowledged[stock.FullName()]
 	require.Equal(t, stock.UID(), acknowledged.UID())
 	require.EqualValues(t, decisionTestCensus{
-		sources: 2, candidates: 2, acknowledged: 1, revision: 1,
+		sources:      2,
+		candidates:   2,
+		acknowledged: 1,
+		revision:     1,
 	}, decisionIndexCensus(index))
 }
 
@@ -199,7 +204,9 @@ func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
 	}{
 		"many configs from one source": {
 			batch: func() []*confgroup.Group {
-				group := &confgroup.Group{Source: "source"}
+				group := &confgroup.Group{
+					Source: "source",
+				}
 				for ordinal := range population {
 					group.Configs = append(
 						group.Configs,
@@ -285,7 +292,12 @@ func BenchmarkBDecisionIndexApply(b *testing.B) {
 
 func newDecisionTestIndex(t *testing.T, commands PreparedCommandPort, plan PlanDiscovered) *DecisionIndex {
 	t.Helper()
-	index, err := NewDecisionIndex(DecisionConfig{Generation: 1, AutoEnable: true, Commands: commands, Plan: plan})
+	index, err := NewDecisionIndex(DecisionConfig{
+		Generation: 1,
+		AutoEnable: true,
+		Commands:   commands,
+		Plan:       plan,
+	})
 	require.NoError(t, err)
 	return index
 }

@@ -72,7 +72,9 @@ func NewRunSupervisor(generation uint64, clock Clock, shutdownTimeout time.Durat
 		generation: generation,
 		clock:      clock,
 		timeout:    shutdownTimeout,
-		stopCause:  &StoppingRejection{Generation: generation},
+		stopCause: &StoppingRejection{
+			Generation: generation,
+		},
 	}, nil
 }
 
@@ -211,7 +213,11 @@ func (rs *RunSupervisor) Terminal(census RunCensus) error {
 		}
 	}
 	rs.terminal = true
-	rs.state = RunTerminalState{Reached: true, Quiescent: quiescent, Dirty: rs.dirty}
+	rs.state = RunTerminalState{
+		Reached:   true,
+		Quiescent: quiescent,
+		Dirty:     rs.dirty,
+	}
 	return rs.dirty
 }
 

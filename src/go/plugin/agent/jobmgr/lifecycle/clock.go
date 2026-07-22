@@ -31,7 +31,9 @@ func newRealClockTimer() *realClockTimer {
 	if !timer.Stop() {
 		<-timer.C
 	}
-	return &realClockTimer{timer: timer}
+	return &realClockTimer{
+		timer: timer,
+	}
 }
 
 func (rct *realClockTimer) Arm(delay time.Duration) <-chan time.Time {

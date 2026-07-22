@@ -72,7 +72,12 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &processCore{config: config, uids: lifecycle.NewUIDLedger(), frames: frames, ingress: ingress}, nil
+	return &processCore{
+		config:  config,
+		uids:    lifecycle.NewUIDLedger(),
+		frames:  frames,
+		ingress: ingress,
+	}, nil
 }
 
 func (pc *processCore) run(ctx context.Context, commands <-chan processControl) error {
@@ -98,7 +103,10 @@ func (pc *processCore) run(ctx context.Context, commands <-chan processControl) 
 	}
 	inputDone := make(chan processInputCompletion, 1)
 	go func() {
-		inputDone <- processInputCompletion{err: pc.ingress.Run(ctx), quit: quit}
+		inputDone <- processInputCompletion{
+			err:  pc.ingress.Run(ctx),
+			quit: quit,
+		}
 	}()
 	ticks := ticker.New(time.Second)
 	defer ticks.Stop()
@@ -178,11 +186,14 @@ func (pc *processCore) run(ctx context.Context, commands <-chan processControl) 
 
 func (pc *processCore) newRun(generation uint64) (*runGeneration, error) {
 	return newRunGeneration(runGenerationConfig{
-		Generation: generation, ShutdownTimeout: pc.config.ShutdownTimeout,
-		UIDs: pc.uids, Frames: pc.frames,
-		Modules: pc.config.Modules, Jobs: pc.config.Jobs,
-		Secrets:   pc.config.Secrets,
-		Discovery: pc.config.Discovery,
+		Generation:      generation,
+		ShutdownTimeout: pc.config.ShutdownTimeout,
+		UIDs:            pc.uids,
+		Frames:          pc.frames,
+		Modules:         pc.config.Modules,
+		Jobs:            pc.config.Jobs,
+		Secrets:         pc.config.Secrets,
+		Discovery:       pc.config.Discovery,
 	})
 }
 

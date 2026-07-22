@@ -31,7 +31,8 @@ func TestProcessCoreServiceDiscoverySendsFunctionResultBeforeStatus(t *testing.T
 	output := newProcessSynchronizedBuffer()
 	services := testRunServiceDiscoveryServices(t)
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output,
+		Input:           reader,
+		Output:          output,
 		ShutdownTimeout: time.Second,
 		Modules:         collectorapi.Registry{},
 		Jobs:            testRunJobServices(t),
@@ -80,7 +81,8 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 		},
 	}
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output,
+		Input:           reader,
+		Output:          output,
 		ShutdownTimeout: time.Second,
 		Modules:         collectorapi.Registry{},
 		Jobs:            jobs,
@@ -146,7 +148,8 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 		},
 	}
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output,
+		Input:           reader,
+		Output:          output,
 		ShutdownTimeout: time.Second,
 		Modules: collectorapi.Registry{
 			"module": {
@@ -154,11 +157,13 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 					return []funcapi.FunctionConfig{{ID: "method"}}
 				},
 				MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-					return &runTestHandler{cleanup: func() {
-						cleanupsMu.Lock()
-						cleanups++
-						cleanupsMu.Unlock()
-					}}
+					return &runTestHandler{
+						cleanup: func() {
+							cleanupsMu.Lock()
+							cleanups++
+							cleanupsMu.Unlock()
+						},
+					}
 				},
 			},
 		},
@@ -200,19 +205,27 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(t *testing.
 	factory := agentdiscovery.NewProviderFactory(
 		"noncooperative",
 		func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
-			return processNoncooperativeDiscovery{started: started, release: release}, true, nil
+			return processNoncooperativeDiscovery{
+				started: started,
+				release: release,
+			}, true, nil
 		},
 	)
 	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
 	require.NoError(t, err)
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: newProcessSynchronizedBuffer(),
+		Input:           reader,
+		Output:          newProcessSynchronizedBuffer(),
 		ShutdownTimeout: 100 * time.Millisecond,
 		Modules:         collectorapi.Registry{},
 		Jobs:            testRunJobServices(t),
 		Discovery: runDiscoveryServices{
-			BuildContext: agentdiscovery.BuildContext{Registry: confgroup.Registry{"test": {}}},
-			Providers:    catalog,
+			BuildContext: agentdiscovery.BuildContext{
+				Registry: confgroup.Registry{
+					"test": {},
+				},
+			},
+			Providers: catalog,
 		},
 	})
 	require.NoError(t, err)
@@ -259,16 +272,18 @@ func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
 	require.NoError(t, err)
 	process, err := newProcessCore(processCoreConfig{
 		Input: reader,
-		Output: processRecordingWriter{record: func(payload []byte) {
-			switch {
-			case bytes.HasPrefix(payload, []byte("FUNCTION GLOBAL")) &&
-				bytes.Contains(payload, []byte(`"module:method"`)):
-				events <- "publish"
-			case bytes.HasPrefix(payload, []byte("FUNCTION_DEL")) &&
-				bytes.Contains(payload, []byte(`"module:method"`)):
-				events <- "withdraw"
-			}
-		}},
+		Output: processRecordingWriter{
+			record: func(payload []byte) {
+				switch {
+				case bytes.HasPrefix(payload, []byte("FUNCTION GLOBAL")) &&
+					bytes.Contains(payload, []byte(`"module:method"`)):
+					events <- "publish"
+				case bytes.HasPrefix(payload, []byte("FUNCTION_DEL")) &&
+					bytes.Contains(payload, []byte(`"module:method"`)):
+					events <- "withdraw"
+				}
+			},
+		},
 		ShutdownTimeout: time.Second,
 		Modules: collectorapi.Registry{
 			"module": {
@@ -276,18 +291,24 @@ func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
 					return []funcapi.FunctionConfig{{ID: "method"}}
 				},
 				MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-					return &runTestHandler{cleanup: func() {
-						cleanupsMu.Lock()
-						cleanups++
-						cleanupsMu.Unlock()
-					}}
+					return &runTestHandler{
+						cleanup: func() {
+							cleanupsMu.Lock()
+							cleanups++
+							cleanupsMu.Unlock()
+						},
+					}
 				},
 			},
 		},
 		Jobs: testRunJobServices(t),
 		Discovery: runDiscoveryServices{
-			BuildContext: agentdiscovery.BuildContext{Registry: confgroup.Registry{"module": {}}},
-			Providers:    catalog,
+			BuildContext: agentdiscovery.BuildContext{
+				Registry: confgroup.Registry{
+					"module": {},
+				},
+			},
+			Providers: catalog,
 		},
 	})
 	require.NoError(t, err)
@@ -318,7 +339,9 @@ func TestProcessRetirementPreservesRunDirtyCause(t *testing.T) {
 
 	run.Dirty(cause)
 
-	err = (&processCore{}).retireRun(context.Background(), &runGeneration{run: run})
+	err = (&processCore{}).retireRun(context.Background(), &runGeneration{
+		run: run,
+	})
 	require.False(t, !errors.Is(err, cause) || !strings.Contains(err.Error(), "run did not quiesce"))
 }
 
@@ -338,7 +361,9 @@ type processSynchronizedBuffer struct {
 }
 
 func newProcessSynchronizedBuffer() *processSynchronizedBuffer {
-	return &processSynchronizedBuffer{writes: make(chan struct{}, 32)}
+	return &processSynchronizedBuffer{
+		writes: make(chan struct{}, 32),
+	}
 }
 
 func (psb *processSynchronizedBuffer) Write(payload []byte) (int, error) {
@@ -379,15 +404,22 @@ func testRunServiceDiscoveryServices(t testing.TB) runDiscoveryServices {
 	factory := agentdiscovery.NewProviderFactory(
 		"service-discovery-test",
 		func(build agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
-			return processServiceDiscovery{registry: build.FnReg, output: build.DyncfgOutput}, true, nil
+			return processServiceDiscovery{
+				registry: build.FnReg,
+				output:   build.DyncfgOutput,
+			}, true, nil
 		},
 	)
 	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
 	require.NoError(t, err)
 	return runDiscoveryServices{
 		BuildContext: agentdiscovery.BuildContext{
-			Registry: confgroup.Registry{"test": {}},
-			Paths:    agentdiscovery.PathsConfig{ServiceDiscoveryConfigDir: multipath.MultiPath{"enabled"}},
+			Registry: confgroup.Registry{
+				"test": {},
+			},
+			Paths: agentdiscovery.PathsConfig{
+				ServiceDiscoveryConfigDir: multipath.MultiPath{"enabled"},
+			},
 		},
 		Providers: catalog,
 	}
@@ -414,7 +446,8 @@ func (psd processServiceDiscovery) Run(ctx context.Context, _ chan<- []*confgrou
 		"go.d:sd:",
 		func(function frameworkfunctions.Function) {
 			psd.output.FunctionResult(dyncfg.Result{
-				UID: function.UID, Code: 200,
+				UID:         function.UID,
+				Code:        200,
 				ContentType: "application/json",
 				Payload:     `{"status":200}`,
 			})
@@ -422,10 +455,12 @@ func (psd processServiceDiscovery) Run(ctx context.Context, _ chan<- []*confgrou
 		},
 	)
 	psd.output.ConfigCreate(netdataapi.ConfigOpts{
-		ID: "go.d:sd:test", Status: "accepted",
-		ConfigType: "template",
-		Path:       "/collectors/go.d/ServiceDiscovery",
-		SourceType: "internal", Source: "internal",
+		ID:                "go.d:sd:test",
+		Status:            "accepted",
+		ConfigType:        "template",
+		Path:              "/collectors/go.d/ServiceDiscovery",
+		SourceType:        "internal",
+		Source:            "internal",
 		SupportedCommands: "get",
 	})
 	<-ctx.Done()
@@ -443,5 +478,8 @@ func waitProcessEvent(t *testing.T, events <-chan string, want string) {
 }
 
 func testProcessControl(command processCommand) processControl {
-	return processControl{command: command, result: make(chan error, 1)}
+	return processControl{
+		command: command,
+		result:  make(chan error, 1),
+	}
 }

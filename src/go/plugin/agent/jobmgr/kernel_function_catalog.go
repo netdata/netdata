@@ -35,7 +35,10 @@ func (ck *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 		cleanup := ck.functionCleanupBacklog.front()
 		request, err := ck.tasks.Enqueue(
 			lifecycle.TaskClassFrameworkControl,
-			lifecycle.TaskPlan{Source: lifecycle.SourceFunction, Work: cleanup.Work()},
+			lifecycle.TaskPlan{
+				Source: lifecycle.SourceFunction,
+				Work:   cleanup.Work(),
+			},
 		)
 		if err != nil {
 			ck.run.Dirty(err)
@@ -69,7 +72,9 @@ func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmiss
 			if ck.shutdownPhase != commandShutdownRunning {
 				err = ck.run.StoppingCause()
 			}
-			submitted.result <- functionMutationResult{err: err}
+			submitted.result <- functionMutationResult{
+				err: err,
+			}
 		}
 		return
 	}
@@ -82,7 +87,9 @@ func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmiss
 			return
 		}
 		if err := ck.functionCatalog.BeginMutation(submitted.mutation); err != nil {
-			submitted.result <- functionMutationResult{err: err}
+			submitted.result <- functionMutationResult{
+				err: err,
+			}
 			return
 		}
 	case functionMutationCommit:
@@ -93,7 +100,9 @@ func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmiss
 			return
 		}
 		if err := ck.functionCatalog.ResumeMutation(submitted.mutation); err != nil {
-			submitted.result <- functionMutationResult{err: err}
+			submitted.result <- functionMutationResult{
+				err: err,
+			}
 			return
 		}
 		ck.functionMutationPaused = false
@@ -105,7 +114,9 @@ func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmiss
 			return
 		}
 		abortErr := ck.abortFunctionMutation(submitted.mutation)
-		submitted.result <- functionMutationResult{err: abortErr}
+		submitted.result <- functionMutationResult{
+			err: abortErr,
+		}
 		ck.functionMutation = functionMutationSubmission{}
 		ck.functionMutationPaused = false
 		if abortErr != nil {
@@ -125,7 +136,9 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 		progress, err := ck.functionCatalog.AdvanceMutationQuiesce(quantum)
 		if err != nil {
 			abortErr := ck.abortFunctionMutation(ck.functionMutation.mutation)
-			ck.functionMutation.result <- functionMutationResult{err: errors.Join(err, abortErr)}
+			ck.functionMutation.result <- functionMutationResult{
+				err: errors.Join(err, abortErr),
+			}
 			ck.functionMutation = functionMutationSubmission{}
 			ck.functionMutationActive = false
 			if abortErr != nil {
@@ -136,7 +149,9 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 		if !progress.Quiesced {
 			return true
 		}
-		ck.functionMutation.result <- functionMutationResult{version: progress.Version}
+		ck.functionMutation.result <- functionMutationResult{
+			version: progress.Version,
+		}
 		ck.functionMutation.result = nil
 		ck.functionMutationActive = false
 		ck.functionMutationPaused = true
@@ -145,7 +160,9 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 	if ck.functionMutation.action != functionMutationCommit {
 		invariantErr := errors.New("jobmgr kernel: invalid active Function mutation")
 		abortErr := ck.abortFunctionMutation(ck.functionMutation.mutation)
-		ck.functionMutation.result <- functionMutationResult{err: errors.Join(invariantErr, abortErr)}
+		ck.functionMutation.result <- functionMutationResult{
+			err: errors.Join(invariantErr, abortErr),
+		}
 		ck.functionMutation = functionMutationSubmission{}
 		ck.functionMutationActive = false
 		ck.run.Dirty(errors.Join(invariantErr, abortErr))
@@ -156,7 +173,9 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 	if !progress.Done {
 		return true
 	}
-	ck.functionMutation.result <- functionMutationResult{version: progress.Version}
+	ck.functionMutation.result <- functionMutationResult{
+		version: progress.Version,
+	}
 	ck.functionMutation = functionMutationSubmission{}
 	ck.functionMutationActive = false
 	return false

@@ -129,7 +129,10 @@ func prepareJob(
 	permit lifecycle.LongLivedPermit,
 	build func(context.Context) (ConstructedJob, error),
 ) (PreparedJob, error) {
-	identity := lifecycle.ResourceIdentity{ID: id, Generation: generation}
+	identity := lifecycle.ResourceIdentity{
+		ID:         id,
+		Generation: generation,
+	}
 	if ctx == nil ||
 		id == "" ||
 		generation == 0 ||
@@ -162,10 +165,14 @@ func prepareJob(
 	if err := constructed.validate(); err != nil {
 		return PreparedJob{}, errors.Join(err, rejectConstructed(cleanupCtx, constructed, permit))
 	}
-	return PreparedJob{state: &preparedJobState{
-		id: id, generation: generation, constructed: constructed,
-		permit: permit,
-	}}, nil
+	return PreparedJob{
+		state: &preparedJobState{
+			id:          id,
+			generation:  generation,
+			constructed: constructed,
+			permit:      permit,
+		},
+	}, nil
 }
 
 func (pj PreparedJob) Valid() bool {
@@ -186,7 +193,10 @@ func (pj PreparedJob) Identity() lifecycle.ResourceIdentity {
 	if pj.state.consumed {
 		return lifecycle.ResourceIdentity{}
 	}
-	return lifecycle.ResourceIdentity{ID: pj.state.id, Generation: pj.state.generation}
+	return lifecycle.ResourceIdentity{
+		ID:         pj.state.id,
+		Generation: pj.state.generation,
+	}
 }
 
 func (pj PreparedJob) AcceptStart(ctx context.Context, expected uint64) (lifecycle.ReadyResource, error) {
@@ -218,7 +228,9 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 		if err := callJobLifecycle("collector autodetection", func() error {
 			return state.constructed.autoDetection(ctx)
 		}); err != nil {
-			failure := &autoDetectionFailure{cause: err}
+			failure := &autoDetectionFailure{
+				cause: err,
+			}
 			if state.constructed.retryAutoDetection != nil {
 				failure.retry = state.constructed.retryAutoDetection()
 			}
@@ -243,10 +255,12 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 		state.constructed.CollectorCleanup = state.constructed.finalCleanup
 	}
 	return &JobGeneration{
-		ID: state.id, Generation: state.generation,
-		resources: state.constructed, state: JobAllocated,
-		stopDone: make(chan struct{}),
-		permit:   state.permit,
+		ID:         state.id,
+		Generation: state.generation,
+		resources:  state.constructed,
+		state:      JobAllocated,
+		stopDone:   make(chan struct{}),
+		permit:     state.permit,
 	}, nil
 }
 
@@ -326,7 +340,10 @@ func (jg *JobGeneration) Identity() lifecycle.ResourceIdentity {
 	if jg == nil {
 		return lifecycle.ResourceIdentity{}
 	}
-	return lifecycle.ResourceIdentity{ID: jg.ID, Generation: jg.Generation}
+	return lifecycle.ResourceIdentity{
+		ID:         jg.ID,
+		Generation: jg.Generation,
+	}
 }
 
 func (jg *JobGeneration) Start(ctx context.Context) error {

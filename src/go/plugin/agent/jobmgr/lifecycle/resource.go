@@ -36,7 +36,10 @@ func NewFrameOutcome(result SealedResult) (TaskOutcome, error) {
 	if err := result.validate(); err != nil {
 		return TaskOutcome{}, err
 	}
-	return TaskOutcome{kind: TaskOutcomeFrame, frame: result}, nil
+	return TaskOutcome{
+		kind:  TaskOutcomeFrame,
+		frame: result,
+	}, nil
 }
 
 func preparedResourceTransactionOutcome(
@@ -75,7 +78,11 @@ func readyResourceOutcome(resource ReadyResource, identity ResourceIdentity) (Ta
 	if resource == nil || !identity.Valid() {
 		return TaskOutcome{}, errors.New("jobmgr lifecycle: invalid known ready resource")
 	}
-	return TaskOutcome{kind: TaskOutcomeReadyResource, ready: resource, identity: identity}, nil
+	return TaskOutcome{
+		kind:     TaskOutcomeReadyResource,
+		ready:    resource,
+		identity: identity,
+	}, nil
 }
 
 func (to TaskOutcome) Kind() TaskOutcomeKind {

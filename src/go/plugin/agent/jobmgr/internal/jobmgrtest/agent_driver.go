@@ -444,7 +444,9 @@ func runAgentCollectorLifecycle(ctx context.Context, v2 bool, restart bool) erro
 }
 
 func runAgentAcquiredAbort(ctx context.Context, v2 bool, requirePublication bool) error {
-	state := &agentFixtureState{checkErr: errors.New("fixture autodetection failure")}
+	state := &agentFixtureState{
+		checkErr: errors.New("fixture autodetection failure"),
+	}
 	fixture, err := startAgentFixtureWithState(ctx, v2, state)
 	if err != nil {
 		return err
@@ -1005,11 +1007,15 @@ func fixtureRegistryWithFunctions(
 	functionCount int,
 ) collectorapi.Registry {
 	creator := collectorapi.Creator{
-		Defaults:       collectorapi.Defaults{UpdateEvery: 1},
+		Defaults: collectorapi.Defaults{
+			UpdateEvery: 1,
+		},
 		FunctionOnly:   true,
 		InstancePolicy: collectorapi.InstancePolicySingle,
 		MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-			return fixtureFunctionHandler{state: state}
+			return fixtureFunctionHandler{
+				state: state,
+			}
 		},
 	}
 	functions := func() []funcapi.FunctionConfig {
@@ -1024,7 +1030,10 @@ func fixtureRegistryWithFunctions(
 	}
 	if v2 {
 		creator.CreateV2 = func() collectorapi.CollectorV2 {
-			return &fixtureCollectorV2{state: state, store: metrix.NewCollectorStore()}
+			return &fixtureCollectorV2{
+				state: state,
+				store: metrix.NewCollectorStore(),
+			}
 		}
 	} else {
 		creator.Create = func() collectorapi.CollectorV1 {
@@ -1049,8 +1058,12 @@ func fixtureRegistryWithFunctions(
 					}
 					return &collectorapi.Charts{
 						&collectorapi.Chart{
-							ID: "value", Title: "Value", Units: "value",
-							Dims: collectorapi.Dims{&collectorapi.Dim{ID: "value"}},
+							ID:    "value",
+							Title: "Value",
+							Units: "value",
+							Dims: collectorapi.Dims{&collectorapi.Dim{
+								ID: "value",
+							}},
 						},
 					}
 				},
@@ -1060,7 +1073,9 @@ func fixtureRegistryWithFunctions(
 			}
 		}
 	}
-	return collectorapi.Registry{productionFixtureModule: creator}
+	return collectorapi.Registry{
+		productionFixtureModule: creator,
+	}
 }
 
 func fixtureFunctionConfigs(count int) []funcapi.FunctionConfig {
@@ -1071,8 +1086,10 @@ func fixtureFunctionConfigs(count int) []funcapi.FunctionConfig {
 	for ordinal := 0; len(functions) < count; ordinal++ {
 		id := fmt.Sprintf("work-%03d", ordinal)
 		functions = append(functions, funcapi.FunctionConfig{
-			ID: id, FunctionName: "jobmgrtest:" + id,
-			Name: "jobmgrtest:" + id, RawRequest: true,
+			ID:           id,
+			FunctionName: "jobmgrtest:" + id,
+			Name:         "jobmgrtest:" + id,
+			RawRequest:   true,
 		})
 	}
 	return functions[:count]

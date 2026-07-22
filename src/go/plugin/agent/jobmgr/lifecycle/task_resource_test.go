@@ -16,7 +16,10 @@ func TestTaskSupervisorStopsAndFinalizesInitialReadyResource(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
 	ready := &recordingReadyResource{
-		identity:           ResourceIdentity{ID: "job", Generation: 3},
+		identity: ResourceIdentity{
+			ID:         "job",
+			Generation: 3,
+		},
 		events:             &events,
 		panicAfterIdentity: true,
 	}
@@ -24,15 +27,27 @@ func TestTaskSupervisorStopsAndFinalizesInitialReadyResource(t *testing.T) {
 	completion := <-supervisor.CompletionCh()
 	require.False(t, completion.Kind != TaskOutcomeReadyResource || completion.Err != nil)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionStopResource}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     TaskActionStopResource,
+	}))
 
 	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionFinalizeResource}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     TaskActionFinalizeResource,
+	}))
 
 	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 4,
+		Kind:     TaskActionTerminate,
+	}))
 
 	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
@@ -45,18 +60,38 @@ func TestTaskSupervisorStopsAndFinalizesInitialReadyResource(t *testing.T) {
 func TestTaskSupervisorStopsWithNonCancellableActionContext(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
-	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 3}, events: &events}
+	ready := &recordingReadyResource{
+		identity: ResourceIdentity{
+			ID:         "job",
+			Generation: 3,
+		},
+		events: &events,
+	}
 	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
 	require.NoError(t, (<-supervisor.CompletionCh()).Err)
-	require.NoError(t, supervisor.CancelWithCause(ref, &StoppingRejection{Generation: 7}))
+	require.NoError(t, supervisor.CancelWithCause(ref, &StoppingRejection{
+		Generation: 7,
+	}))
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionStopResource}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     TaskActionStopResource,
+	}))
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
 	require.NoError(t, ready.stopContextErr)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionFinalizeResource}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     TaskActionFinalizeResource,
+	}))
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 4,
+		Kind:     TaskActionTerminate,
+	}))
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
 	require.NoError(t, supervisor.Release(ref))
 }
@@ -67,17 +102,30 @@ func TestTaskSupervisorFinalizesResourceOffLoop(t *testing.T) {
 	finalizeEntered := make(chan struct{})
 	finalizeRelease := make(chan struct{})
 	ready := &recordingReadyResource{
-		identity: ResourceIdentity{ID: "job", Generation: 3}, events: &events,
-		finalizeEntered: finalizeEntered, finalizeGate: finalizeRelease,
+		identity: ResourceIdentity{
+			ID:         "job",
+			Generation: 3,
+		},
+		events:          &events,
+		finalizeEntered: finalizeEntered,
+		finalizeGate:    finalizeRelease,
 	}
 	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
 	<-supervisor.CompletionCh()
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionStopResource}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     TaskActionStopResource,
+	}))
 
 	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionFinalizeResource}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     TaskActionFinalizeResource,
+	}))
 
 	select {
 	case <-finalizeEntered:
@@ -94,7 +142,11 @@ func TestTaskSupervisorFinalizesResourceOffLoop(t *testing.T) {
 	completion := <-supervisor.CompletionCh()
 	require.False(t, completion.Ref != other || completion.Err != nil)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: other, Sequence: 2, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      other,
+		Sequence: 2,
+		Kind:     TaskActionTerminate,
+	}))
 
 	ack := <-supervisor.AcknowledgementCh()
 	require.False(t, ack.Ref != other || ack.Err != nil)
@@ -106,7 +158,11 @@ func TestTaskSupervisorFinalizesResourceOffLoop(t *testing.T) {
 	acknowledgementCh := <-supervisor.AcknowledgementCh()
 	require.False(t, acknowledgementCh.Ref != ref || acknowledgementCh.Err != nil)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 4,
+		Kind:     TaskActionTerminate,
+	}))
 
 	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
@@ -116,7 +172,13 @@ func TestTaskSupervisorFinalizesResourceOffLoop(t *testing.T) {
 func TestTaskSupervisorDisposesResourcesWithoutExpiredWorkContext(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
-	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events}
+	ready := &recordingReadyResource{
+		identity: ResourceIdentity{
+			ID:         "job",
+			Generation: 1,
+		},
+		events: &events,
+	}
 	plan := readyTaskPlan(t, SourceJobManager, time.Now().Add(-time.Second), ready)
 	_, ref := enqueueAndDispatchTask(t, supervisor, plan)
 
@@ -124,11 +186,19 @@ func TestTaskSupervisorDisposesResourcesWithoutExpiredWorkContext(t *testing.T) 
 	require.NoError(t, completion.Err)
 	require.Equal(t, TaskOutcomeReadyResource, completion.Kind)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     TaskActionDispose,
+	}))
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
 	require.NoError(t, ready.abortContextErr)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     TaskActionTerminate,
+	}))
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
 	require.NoError(t, supervisor.Release(ref))
 }
@@ -141,7 +211,13 @@ func TestTaskSupervisorPreservesShutdownBudgetForResourceDisposal(t *testing.T) 
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
-	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events}
+	ready := &recordingReadyResource{
+		identity: ResourceIdentity{
+			ID:         "job",
+			Generation: 1,
+		},
+		events: &events,
+	}
 	plan, err := NewShutdownReadyResourceTaskPlan(
 		SourceJobManager,
 		budget,
@@ -155,13 +231,21 @@ func TestTaskSupervisorPreservesShutdownBudgetForResourceDisposal(t *testing.T) 
 	completion := <-supervisor.CompletionCh()
 	require.False(t, completion.Err != nil || completion.Kind != TaskOutcomeReadyResource)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     TaskActionDispose,
+	}))
 
 	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
 	require.False(t, ready.abortContextErr != nil || !ready.abortDeadline.Equal(budget.Deadline()))
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     TaskActionTerminate,
+	}))
 
 	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
 
@@ -171,7 +255,13 @@ func TestTaskSupervisorPreservesShutdownBudgetForResourceDisposal(t *testing.T) 
 func TestTaskSupervisorReturnsPendingInitialResourceOnTransferAwareCancellation(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
-	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 9}, events: &events}
+	ready := &recordingReadyResource{
+		identity: ResourceIdentity{
+			ID:         "job",
+			Generation: 9,
+		},
+		events: &events,
+	}
 	request, err := supervisor.Enqueue(
 		TaskClassFrameworkControl,
 		readyTaskPlan(t, SourceJobManager, time.Time{}, ready),
@@ -196,18 +286,29 @@ func TestTaskSupervisorRetainsReadyResourceWhenAbortFails(t *testing.T) {
 	var events []string
 	wantFailure := errors.New("abort failed")
 	ready := &recordingReadyResource{
-		identity: ResourceIdentity{ID: "job", Generation: 1},
+		identity: ResourceIdentity{
+			ID:         "job",
+			Generation: 1,
+		},
 		events:   &events,
 		abortErr: wantFailure,
 	}
 	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
 	<-supervisor.CompletionCh()
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     TaskActionDispose,
+	}))
 
 	require.ErrorIs(t, (<-supervisor.AcknowledgementCh()).Err, wantFailure)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+	require.NoError(t, supervisor.SendAction(TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     TaskActionTerminate,
+	}))
 
 	require.NotNil(t, (<-supervisor.AcknowledgementCh()).Err)
 

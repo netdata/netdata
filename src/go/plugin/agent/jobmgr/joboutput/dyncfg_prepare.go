@@ -40,8 +40,11 @@ func (dcjc *DynCfgJobController) prepareAdd(
 		return nil, err
 	}
 	postimage := dyncfg.GraphConfig{
-		ID: target.resourceID, Module: target.module, Name: target.name,
-		Status: dyncfg.StatusAccepted.String(), Payload: payload,
+		ID:      target.resourceID,
+		Module:  target.module,
+		Name:    target.name,
+		Status:  dyncfg.StatusAccepted.String(),
+		Payload: payload,
 	}
 	disposition := lifecycle.ResourceTransactionUnchanged
 	if current != nil {
@@ -135,8 +138,11 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		return nil, err
 	}
 	postimage := dyncfg.GraphConfig{
-		ID: target.resourceID, Module: target.module, Name: target.name,
-		Status: record.Status, Payload: payload,
+		ID:      target.resourceID,
+		Module:  target.module,
+		Name:    target.name,
+		Status:  record.Status,
+		Payload: payload,
 	}
 	if record.Status == dyncfg.StatusDisabled.String() {
 		cleanup := dcjc.updateCleanup(target, request, oldConfig, postimage, dyncfg.StatusDisabled)

@@ -33,16 +33,23 @@ func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
 			return LongLivedPlan{}, errors.New("jobmgr long-lived permit: invalid pipeline provider key")
 		}
 	}
-	plan := LongLivedPlan{class: LongLivedPipeline, providerKeys: keys}
+	plan := LongLivedPlan{
+		class:        LongLivedPipeline,
+		providerKeys: keys,
+	}
 	return plan, plan.Validate()
 }
 
 func NewJobLongLivedPlan() LongLivedPlan {
-	return LongLivedPlan{class: LongLivedJob}
+	return LongLivedPlan{
+		class: LongLivedJob,
+	}
 }
 
 func NewSecretStoreLongLivedPlan() LongLivedPlan {
-	return LongLivedPlan{class: LongLivedSecretStore}
+	return LongLivedPlan{
+		class: LongLivedSecretStore,
+	}
 }
 
 func (llp LongLivedPlan) Validate() error {
@@ -207,9 +214,14 @@ func longLivedGClaims(plan LongLivedPlan) map[longLivedGKey]longLivedGState {
 		return nil
 	}
 	claims := make(map[longLivedGKey]longLivedGState, len(plan.providerKeys)+1)
-	claims[longLivedGKey{role: InheritedPipelineSupervisor}] = longLivedGReserved
+	claims[longLivedGKey{
+		role: InheritedPipelineSupervisor,
+	}] = longLivedGReserved
 	for _, key := range plan.providerKeys {
-		claims[longLivedGKey{role: InheritedPipelineProvider, key: key}] = longLivedGReserved
+		claims[longLivedGKey{
+			role: InheritedPipelineProvider,
+			key:  key,
+		}] = longLivedGReserved
 	}
 	return claims
 }
@@ -252,14 +264,24 @@ func (ts *TaskSupervisor) IssueLongLivedPermit(owner ResourceIdentity, plan Long
 		registry.mu.Unlock()
 		return LongLivedPermit{}, allocationErr
 	}
-	*slot = longLivedSlot{owner: owner, class: plan.class, gClaims: gClaims, external: longLivedExternalReserved}
+	*slot = longLivedSlot{
+		owner:    owner,
+		class:    plan.class,
+		gClaims:  gClaims,
+		external: longLivedExternalReserved,
+	}
 	registry.owners[owner] = ref
 	registry.census.Active++
 	if plan.class == LongLivedSecretStore {
 		registry.census.SecretStores++
 	}
 	registry.mu.Unlock()
-	return LongLivedPermit{supervisor: ts, ref: ref, owner: owner, class: plan.class}, nil
+	return LongLivedPermit{
+		supervisor: ts,
+		ref:        ref,
+		owner:      owner,
+		class:      plan.class,
+	}, nil
 }
 
 func (registry *longLivedRegistry) allocateSlot() (LongLivedPermitRef, *longLivedSlot, error) {
@@ -377,7 +399,10 @@ func longLivedGKeyForInherited(role InheritedTaskRole, key string) (longLivedGKe
 	default:
 		return longLivedGKey{}, false
 	}
-	return longLivedGKey{role: role, key: key}, true
+	return longLivedGKey{
+		role: role,
+		key:  key,
+	}, true
 }
 
 func (ts *TaskSupervisor) activateLongLivedG(

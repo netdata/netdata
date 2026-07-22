@@ -25,7 +25,10 @@ func runAgentStartAcknowledgement(ctx context.Context) error {
 func runAgentStartAcknowledgementVariant(ctx context.Context, v2 bool) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{checkGate: release, checkEntered: entered}
+	state := &agentFixtureState{
+		checkGate:    release,
+		checkEntered: entered,
+	}
 	fixture, err := startAgentInstanceFixtureWithState(ctx, v2, state)
 	if err != nil {
 		return err
@@ -71,7 +74,10 @@ func runAgentStartReplacementOrdering(ctx context.Context) error {
 func runAgentStartReplacementOrderingVariant(ctx context.Context, v2 bool) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{checkGate: release, checkEntered: entered}
+	state := &agentFixtureState{
+		checkGate:    release,
+		checkEntered: entered,
+	}
 	fixture, err := startAgentInstanceFixtureWithState(ctx, v2, state)
 	if err != nil {
 		return err
@@ -132,7 +138,10 @@ func runAgentStartReplacementOrderingVariant(ctx context.Context, v2 bool) error
 func runAgentBlockingStop(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{cleanupGate: release, cleanupEntered: entered}
+	state := &agentFixtureState{
+		cleanupGate:    release,
+		cleanupEntered: entered,
+	}
 	fixture, err := startAgentFixtureWithState(ctx, false, state)
 	if err != nil {
 		return err
@@ -175,7 +184,10 @@ func runAgentBlockingStop(ctx context.Context) error {
 func runAgentHeldHandlerTerminal(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{handleGate: release, handleEntered: entered}
+	state := &agentFixtureState{
+		handleGate:    release,
+		handleEntered: entered,
+	}
 	fixture, err := startAgentFixtureWithState(ctx, false, state)
 	if err != nil {
 		return err
@@ -232,7 +244,10 @@ func runAgentHeldHandlerTerminal(ctx context.Context) error {
 func runAgentFunctionAdmissionClosesBeforeLeaseDrain(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{handleGate: release, handleEntered: entered}
+	state := &agentFixtureState{
+		handleGate:    release,
+		handleEntered: entered,
+	}
 	fixture, err := startAgentInstanceFixtureWithState(ctx, false, state)
 	if err != nil {
 		return err
@@ -322,7 +337,10 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(ctx context.Context) error 
 func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{handleGate: release, handleEntered: entered}
+	state := &agentFixtureState{
+		handleGate:    release,
+		handleEntered: entered,
+	}
 	fixture, err := startAgentInstanceFixtureWithState(ctx, false, state)
 	if err != nil {
 		return err
@@ -491,7 +509,10 @@ func runAgentConcurrentSameRouteFunctionPopulation(ctx context.Context) error {
 func runAgentHeldFunctionPopulation(ctx context.Context, admitted int, route func(int) string) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{handleGate: release, handleEntered: entered}
+	state := &agentFixtureState{
+		handleGate:    release,
+		handleEntered: entered,
+	}
 	fixture, err := startAgentCapacityFixtureWithState(ctx, state)
 	if err != nil {
 		return err
@@ -568,7 +589,10 @@ func heldFunctionStatuses(output []byte) (map[string]int, error) {
 
 func runAgentControlWithLargeOrdinaryPopulation(ctx context.Context) error {
 	release := make(chan struct{})
-	state := &agentFixtureState{handleGate: release, handleCancelReturns: true}
+	state := &agentFixtureState{
+		handleGate:          release,
+		handleCancelReturns: true,
+	}
 	fixture, err := startAgentCapacityFixtureWithState(ctx, state)
 	if err != nil {
 		return err
@@ -715,7 +739,12 @@ func runAgentOutputFaultMode(ctx context.Context, cut outputFaultCut, mode injec
 		state,
 		registry,
 		func(output *synchronizedBuffer) io.Writer {
-			return &predicateFaultWriter{target: output, match: match, mode: mode, injected: injected}
+			return &predicateFaultWriter{
+				target:   output,
+				match:    match,
+				mode:     mode,
+				injected: injected,
+			}
 		},
 		runPolicy,
 	)

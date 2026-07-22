@@ -33,7 +33,9 @@ func TestJobFactoryRejectCleanup(t *testing.T) {
 		"invalid construction": {
 			build: func(_ *testing.T, events *jobEventLog) (ConstructedJob, error) {
 				return ConstructedJob{
-					Runtime: &recordingJobRuntime{events: events},
+					Runtime: &recordingJobRuntime{
+						events: events,
+					},
 					CollectorCleanup: func(context.Context) error {
 						events.add("collector")
 						return nil
@@ -97,8 +99,11 @@ func TestPreparedTransactionRejectsStaleUnusedPermitAtConstruction(t *testing.T)
 
 	_, err = PrepareNoopResourceTransaction(
 		lifecycle.ResourceTransactionScope{
-			ID:        "job",
-			Successor: lifecycle.ResourceIdentity{ID: "job", Generation: 1},
+			ID: "job",
+			Successor: lifecycle.ResourceIdentity{
+				ID:         "job",
+				Generation: 1,
+			},
 		},
 		nil,
 		permit,
@@ -173,7 +178,10 @@ func TestJobGenerationPermitReturnLast(t *testing.T) {
 		permit,
 		func(context.Context) (ConstructedJob, error) {
 			constructed := testConstructedJob(t, JobVariantV1, events)
-			constructed.Runtime = &recordingJobRuntime{events: events, stopGate: release}
+			constructed.Runtime = &recordingJobRuntime{
+				events:   events,
+				stopGate: release,
+			}
 			return constructed, nil
 		},
 	)
@@ -311,7 +319,9 @@ func testConstructedJob(t testingHelper, variant JobVariant, events *jobEventLog
 	t.Helper()
 	return ConstructedJob{
 		Variant: variant,
-		Runtime: &recordingJobRuntime{events: events},
+		Runtime: &recordingJobRuntime{
+			events: events,
+		},
 		Handlers: &recordingHandlerLifecycle{
 			publish: func() error {
 				events.add("handler-publish")
@@ -356,7 +366,10 @@ func issueTestJobPermit(
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
 	plan := lifecycle.NewJobLongLivedPlan()
-	permit, err := tasks.IssueLongLivedPermit(lifecycle.ResourceIdentity{ID: id, Generation: generation}, plan)
+	permit, err := tasks.IssueLongLivedPermit(lifecycle.ResourceIdentity{
+		ID:         id,
+		Generation: generation,
+	}, plan)
 	require.NoError(t, err)
 	return permit, tasks
 }

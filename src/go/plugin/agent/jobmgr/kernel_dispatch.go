@@ -60,8 +60,10 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 			phaseLimit = lifecycle.FunctionTaskPhases
 		}
 		taskPlan := lifecycle.TaskPlan{
-			Source: operation.Source, Deadline: operation.request.Deadline,
-			MaxPhaseTransitions: phaseLimit, Work: operation.plan.Work,
+			Source:              operation.Source,
+			Deadline:            operation.request.Deadline,
+			MaxPhaseTransitions: phaseLimit,
+			Work:                operation.plan.Work,
 		}
 		if operation.Child == lifecycle.ChildDeadlineStartPending {
 			taskPlan.InitialCancellation = context.DeadlineExceeded
@@ -73,7 +75,10 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 				ck.run.Dirty(errors.New("jobmgr kernel: transaction encountered an invalid current resource slot"))
 				return false
 			}
-			scope := lifecycle.ResourceTransactionScope{ID: transaction.ID, Current: lane.currentIdentity}
+			scope := lifecycle.ResourceTransactionScope{
+				ID:      transaction.ID,
+				Current: lane.currentIdentity,
+			}
 			if transaction.AllocateSuccessor {
 				ck.nextResourceGeneration++
 				generation := ck.nextResourceGeneration
@@ -81,7 +86,10 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 					ck.run.Dirty(errors.New("jobmgr kernel: transaction successor generation wrapped"))
 					return false
 				}
-				scope.Successor = lifecycle.ResourceIdentity{ID: transaction.ID, Generation: generation}
+				scope.Successor = lifecycle.ResourceIdentity{
+					ID:         transaction.ID,
+					Generation: generation,
+				}
 			}
 			operation.transactionScope = scope
 			transactionWork := transaction.Prepare
@@ -98,7 +106,10 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 					if prepared == nil {
 						return nil, prepareErr
 					}
-					return &preparedCompositeBridge{transaction: prepared, scope: composite}, prepareErr
+					return &preparedCompositeBridge{
+						transaction: prepared,
+						scope:       composite,
+					}, prepareErr
 				}
 			}
 			var err error
@@ -156,7 +167,9 @@ func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
 				return more
 			}
 			delete(ck.functionCleanupRequests, start.Request)
-			ck.functionCleanupTasks[start.Task] = functionCleanupTask{ref: cleanupRef}
+			ck.functionCleanupTasks[start.Task] = functionCleanupTask{
+				ref: cleanupRef,
+			}
 			continue
 		}
 		if ck.shutdownBarrierRequest.Valid() && start.Request == ck.shutdownBarrierRequest {

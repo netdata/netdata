@@ -28,7 +28,12 @@ func TestRunOwnedAtomicScopeDirtiesRunOnReleaseFailure(t *testing.T) {
 	releaseErr := errors.New("store scope release failed")
 	run, err := lifecycle.NewRunSupervisor(1, lifecycle.RealClock{}, time.Second)
 	require.NoError(t, err)
-	scope := &runOwnedAtomicScope{run: run, scope: releaseErrorAtomicScope{err: releaseErr}}
+	scope := &runOwnedAtomicScope{
+		run: run,
+		scope: releaseErrorAtomicScope{
+			err: releaseErr,
+		},
+	}
 
 	require.ErrorIs(t, scope.Release(t.Context()), releaseErr)
 

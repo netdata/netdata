@@ -113,7 +113,9 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 	return jobmgr.WorkPlan{
 		NoResponse: true,
 		Transaction: &jobmgr.ResourceTransactionPlan{
-			ID: id, AllocateSuccessor: true, Permit: permit,
+			ID:                id,
+			AllocateSuccessor: true,
+			Permit:            permit,
 			Prepare: func(
 				ctx context.Context,
 				current lifecycle.ReadyResource,

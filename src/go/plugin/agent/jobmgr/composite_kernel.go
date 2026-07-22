@@ -25,7 +25,10 @@ type kernelCompositeScope struct {
 }
 
 func newKernelCompositeScope(kernel *CommandKernel, parent *commandOperation) *kernelCompositeScope {
-	return &kernelCompositeScope{kernel: kernel, parent: parent}
+	return &kernelCompositeScope{
+		kernel: kernel,
+		parent: parent,
+	}
 }
 
 func (kcs *kernelCompositeScope) SubmitPreparedAndWait(ctx context.Context, request Request, plan WorkPlan) error {

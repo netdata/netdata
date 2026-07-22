@@ -43,7 +43,12 @@ func NewProcessBinding(
 	if runGeneration == 0 {
 		return ProcessBinding{}, errors.New("jobmgr Function process ingress: incomplete binding")
 	}
-	return ProcessBinding{port: &boundProcessInput{Ingress: ingress, runGeneration: runGeneration}}, nil
+	return ProcessBinding{
+		port: &boundProcessInput{
+			Ingress:       ingress,
+			runGeneration: runGeneration,
+		},
+	}, nil
 }
 
 type boundProcessInput struct {
@@ -73,7 +78,10 @@ func NewProcessIngress(reader io.Reader) (*ProcessIngress, error) {
 	if reader == nil {
 		return nil, errors.New("jobmgr Function process ingress: incomplete process authority")
 	}
-	ingress := &ProcessIngress{state: ProcessIngressPaused, changed: make(chan struct{})}
+	ingress := &ProcessIngress{
+		state:   ProcessIngressPaused,
+		changed: make(chan struct{}),
+	}
 	capsule, err := functionwire.NewInputCapsule(reader)
 	if err != nil {
 		return nil, err

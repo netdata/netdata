@@ -19,7 +19,10 @@ import (
 )
 
 func TestDiscoveryShutdownCancelsSupervisorBeforeProviders(t *testing.T) {
-	identity := lifecycle.ResourceIdentity{ID: discoveryResourceID, Generation: 1}
+	identity := lifecycle.ResourceIdentity{
+		ID:         discoveryResourceID,
+		Generation: 1,
+	}
 	supervisorRef := lifecycle.InheritedTaskRef(1)
 	providerRefs := map[string]lifecycle.InheritedTaskRef{"file": 2, "service-discovery": 3}
 	supervisorCancelled := false
@@ -58,7 +61,9 @@ func TestDiscoveryShutdownCancelsSupervisorBeforeProviders(t *testing.T) {
 
 func TestDiscoveryChildrenWaitForPublication(t *testing.T) {
 	entered := make(chan struct{})
-	prepared := newPublicationTestDiscovery(t, publicationTestDiscoverer{entered: entered})
+	prepared := newPublicationTestDiscovery(t, publicationTestDiscoverer{
+		entered: entered,
+	})
 	ready, err := prepared.AcceptStart(context.Background(), 1)
 	require.NoError(t, err)
 
@@ -173,13 +178,19 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
-		Generation: 1, ShutdownTimeout: time.Second,
-		UIDs: uids, Frames: frames,
-		Modules: collectorapi.Registry{},
-		Jobs:    testRunJobServices(t),
+		Generation:      1,
+		ShutdownTimeout: time.Second,
+		UIDs:            uids,
+		Frames:          frames,
+		Modules:         collectorapi.Registry{},
+		Jobs:            testRunJobServices(t),
 		Discovery: runDiscoveryServices{
-			BuildContext: agentdiscovery.BuildContext{Registry: confgroup.Registry{"test": {}}},
-			Providers:    catalog,
+			BuildContext: agentdiscovery.BuildContext{
+				Registry: confgroup.Registry{
+					"test": {},
+				},
+			},
+			Providers: catalog,
 		},
 	})
 	require.NoError(t, err)
@@ -188,7 +199,9 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 
 	require.EqualValues(t, 2, generation.tasks.InheritedActive())
 
-	require.EqualValues(t, lifecycle.LongLivedCensus{Active: 1}, generation.tasks.LongLivedCensus())
+	require.EqualValues(t, lifecycle.LongLivedCensus{
+		Active: 1,
+	}, generation.tasks.LongLivedCensus())
 
 	generation.Stop()
 
@@ -220,7 +233,10 @@ func newPublicationTestDiscovery(t *testing.T, discoverer agentdiscovery.Discove
 	require.NoError(t, err)
 	plan, err := lifecycle.NewPipelineLongLivedPlan([]string{"provider"})
 	require.NoError(t, err)
-	identity := lifecycle.ResourceIdentity{ID: discoveryResourceID, Generation: 1}
+	identity := lifecycle.ResourceIdentity{
+		ID:         discoveryResourceID,
+		Generation: 1,
+	}
 	permit, err := tasks.IssueLongLivedPermit(identity, plan)
 	require.NoError(t, err)
 	prepared, err := newPreparedDiscovery(pipeline, decisions, tasks, identity, permit)
@@ -246,8 +262,12 @@ func newDiscoveryTestPipeline(
 	require.NoError(t, err)
 	pipeline, err := agentdiscovery.NewPipelineGeneration(
 		agentdiscovery.PipelineConfig{
-			BuildContext: agentdiscovery.BuildContext{Registry: confgroup.Registry{"module": {}}},
-			Providers:    catalog,
+			BuildContext: agentdiscovery.BuildContext{
+				Registry: confgroup.Registry{
+					"module": {},
+				},
+			},
+			Providers: catalog,
 		},
 	)
 	require.NoError(t, err)

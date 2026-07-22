@@ -18,9 +18,14 @@ func TestFunctionPublicationFrame(t *testing.T) {
 	port, err := NewFramePublicationPort(owner)
 	require.NoError(t, err)
 	record := PublicationRecord{
-		Name: "module:method", Generation: 3, Timeout: 60,
-		Help: "method help", Tags: "top", Access: "0x0013",
-		Priority: 100, Version: 3,
+		Name:       "module:method",
+		Generation: 3,
+		Timeout:    60,
+		Help:       "method help",
+		Tags:       "top",
+		Access:     "0x0013",
+		Priority:   100,
+		Version:    3,
 	}
 	require.NoError(t, port.Publish(record))
 	require.NoError(t, port.Withdraw(record.Name))
@@ -34,8 +39,12 @@ func TestFunctionPublicationFrame(t *testing.T) {
 func TestFunctionWithdrawalUsesRegistrationNameBytes(t *testing.T) {
 	name := "module:\u0085method"
 	registration, err := encodeFunctionRegistration(PublicationRecord{
-		Name: name, Generation: 1, Timeout: 1,
-		Help: "help", Tags: "top", Access: "0x0000",
+		Name:       name,
+		Generation: 1,
+		Timeout:    1,
+		Help:       "help",
+		Tags:       "top",
+		Access:     "0x0000",
 	})
 	require.NoError(t, err)
 	withdrawal, err := encodeFunctionWithdrawal(name)
@@ -79,8 +88,12 @@ func TestFunctionPublicationFrameRejectsInjection(t *testing.T) {
 			port, err := NewFramePublicationPort(owner)
 			require.NoError(t, err)
 			record := PublicationRecord{
-				Name: "module:method", Generation: 1, Timeout: 1,
-				Help: "help", Tags: "top", Access: "0x0000",
+				Name:       "module:method",
+				Generation: 1,
+				Timeout:    1,
+				Help:       "help",
+				Tags:       "top",
+				Access:     "0x0000",
 			}
 			test.mutate(&record)
 
@@ -93,14 +106,20 @@ func TestFunctionPublicationFrameRejectsInjection(t *testing.T) {
 }
 
 func TestFunctionPublicationFrameCommitFailurePoisonsOwner(t *testing.T) {
-	writer := &failingFunctionFrameWriter{err: errors.New("write failed")}
+	writer := &failingFunctionFrameWriter{
+		err: errors.New("write failed"),
+	}
 	owner, err := lifecycle.NewFrameOwner(writer)
 	require.NoError(t, err)
 	port, err := NewFramePublicationPort(owner)
 	require.NoError(t, err)
 	record := PublicationRecord{
-		Name: "module:method", Generation: 1, Timeout: 1,
-		Help: "help", Tags: "top", Access: "0x0000",
+		Name:       "module:method",
+		Generation: 1,
+		Timeout:    1,
+		Help:       "help",
+		Tags:       "top",
+		Access:     "0x0000",
 	}
 	require.Error(t, port.Publish(record))
 

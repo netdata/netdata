@@ -51,7 +51,11 @@ func TestShippedRootQuitRejectsDelayedStartupSeparatorsAsKeepalive(t *testing.T)
 	err := runShippedRoot(
 		ctx,
 		directory,
-		shippedRoot{name: "startup-separators", executable: executable, module: "fixture"},
+		shippedRoot{
+			name:       "startup-separators",
+			executable: executable,
+			module:     "fixture",
+		},
 		shippedRootQuit,
 	)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
@@ -91,7 +95,9 @@ func TestShippedRootDriverValidatesConfigsBeforeAvailability(t *testing.T) {
 			if test.removePath != "" {
 				require.NoError(t, os.Remove(filepath.Join(configDir, test.removePath)))
 			}
-			driver := ShippedRootDriver{ConfigDir: configDir}
+			driver := ShippedRootDriver{
+				ConfigDir: configDir,
+			}
 
 			missing, err := driver.RunMatrixAvailable(t.Context())
 			if test.wantError {
@@ -105,7 +111,11 @@ func TestShippedRootDriverValidatesConfigsBeforeAvailability(t *testing.T) {
 }
 
 func TestShippedRootDriverHasClosedRootMembership(t *testing.T) {
-	driver := ShippedRootDriver{GoDPlugin: "go", IBMPlugin: "ibm", ScriptsDPlugin: "scripts"}
+	driver := ShippedRootDriver{
+		GoDPlugin:      "go",
+		IBMPlugin:      "ibm",
+		ScriptsDPlugin: "scripts",
+	}
 	observed := make(map[string]shippedRoot)
 	for _, root := range driver.roots() {
 		observed[root.name] = root

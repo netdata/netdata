@@ -35,9 +35,12 @@ func (dcjc *DynCfgJobController) configCreateCleanup(
 	return dcjc.protocolCleanup(func(api *netdataapi.API) {
 		api.CONFIGCREATE(
 			netdataapi.ConfigOpts{
-				ID: id, Status: config.Status,
-				ConfigType: configType.String(), Path: dcjc.path,
-				SourceType: sourceType, Source: source,
+				ID:                id,
+				Status:            config.Status,
+				ConfigType:        configType.String(),
+				Path:              dcjc.path,
+				SourceType:        sourceType,
+				Source:            source,
 				SupportedCommands: commands,
 			},
 		)

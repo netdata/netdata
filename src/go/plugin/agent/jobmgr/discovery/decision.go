@@ -87,7 +87,10 @@ func (di *DecisionIndex) applyGroup(ctx context.Context, group *confgroup.Group)
 		fullName := config.FullName()
 		affected[fullName] = struct{}{}
 		candidates := di.candidates[fullName]
-		delete(candidates, decisionCandidateKey{source: group.Source, hash: hash})
+		delete(candidates, decisionCandidateKey{
+			source: group.Source,
+			hash:   hash,
+		})
 		if len(candidates) == 0 {
 			delete(di.candidates, fullName)
 		}
@@ -111,7 +114,10 @@ func (di *DecisionIndex) applyGroup(ctx context.Context, group *confgroup.Group)
 			candidates = make(map[decisionCandidateKey]confgroup.Config)
 			di.candidates[fullName] = candidates
 		}
-		candidates[decisionCandidateKey{source: group.Source, hash: hash}] = cloned
+		candidates[decisionCandidateKey{
+			source: group.Source,
+			hash:   hash,
+		}] = cloned
 	}
 	if len(next) == 0 {
 		delete(di.sources, group.Source)

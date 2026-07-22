@@ -35,6 +35,9 @@ func testQueuedTaskGenerationRetirement(t *testing.T) {
 	ref, err := supervisor.Enqueue(TaskClassGenericFunction, plan)
 
 	require.NoError(t, err)
-	require.Equal(t, TaskRequestRef{Slot: 2, Generation: 8}, ref)
+	require.Equal(t, TaskRequestRef{
+		Slot:       2,
+		Generation: 8,
+	}, ref)
 	require.NoError(t, supervisor.CancelPending(ref))
 }

@@ -30,7 +30,12 @@ func newStoreGenerationResource(
 	if !identity.Valid() || store == nil || key == "" || storeGeneration == 0 {
 		return nil, errors.New("jobmgr secrets: invalid Store-generation resource")
 	}
-	return &storeGenerationResource{identity: identity, store: store, key: key, storeGen: storeGeneration}, nil
+	return &storeGenerationResource{
+		identity: identity,
+		store:    store,
+		key:      key,
+		storeGen: storeGeneration,
+	}, nil
 }
 
 func (sgr *storeGenerationResource) Identity() lifecycle.ResourceIdentity {

@@ -20,22 +20,31 @@ func TestFunctionIngressLeavesResourceSelectionToCatalog(t *testing.T) {
 		wantDeadline time.Time
 	}{
 		"collector method": {
-			call:         functionwire.Call{UID: "method", Method: "module:method", Timeout: time.Second},
+			call: functionwire.Call{
+				UID:     "method",
+				Method:  "module:method",
+				Timeout: time.Second,
+			},
 			wantDeadline: now.Add(time.Second),
 		},
 		"DynCfg method without timeout": {
 			call: functionwire.Call{
-				UID: "dyncfg", Method: "config",
-				Args: []string{"go.d:collector:module:job", "enable"},
+				UID:    "dyncfg",
+				Method: "config",
+				Args:   []string{"go.d:collector:module:job", "enable"},
 			},
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			port := &recordingIngressPort{done: make(chan struct{})}
+			port := &recordingIngressPort{
+				done: make(chan struct{}),
+			}
 			ingress, err := newIngress(
 				port,
-				ingressTestClock{now: now},
+				ingressTestClock{
+					now: now,
+				},
 				func() {},
 			)
 			require.NoError(t, err)

@@ -48,7 +48,9 @@ type preparedVNodeState struct {
 }
 
 func NewVNodeConfigurationWithInitial(initial map[string]*vnodes.VirtualNode) (*VNodeConfiguration, error) {
-	configuration := &VNodeConfiguration{records: make(map[string]jobruntime.VnodeSnapshot)}
+	configuration := &VNodeConfiguration{
+		records: make(map[string]jobruntime.VnodeSnapshot),
+	}
 	ids := slices.Sorted(maps.Keys(initial))
 	for _, id := range ids {
 		vnode := initial[id]
@@ -102,10 +104,18 @@ func (vc *VNodeConfiguration) PrepareUpsert(
 		}
 	}
 	state := &preparedVNodeState{
-		owner: vc, id: strings.Clone(id), expected: expected,
-		next: jobruntime.VnodeSnapshot{Vnode: nextVNode, Revision: expected + 1, MetadataRevision: metadataRevision},
+		owner:    vc,
+		id:       strings.Clone(id),
+		expected: expected,
+		next: jobruntime.VnodeSnapshot{
+			Vnode:            nextVNode,
+			Revision:         expected + 1,
+			MetadataRevision: metadataRevision,
+		},
 	}
-	return PreparedVNode{state: state}, nil
+	return PreparedVNode{
+		state: state,
+	}, nil
 }
 
 func (vc *VNodeConfiguration) PrepareRemove(id string, expected uint64) (PreparedVNode, error) {
@@ -119,11 +129,18 @@ func (vc *VNodeConfiguration) PrepareRemove(id string, expected uint64) (Prepare
 		return PreparedVNode{}, ErrVNodeRevision
 	}
 	state := &preparedVNodeState{
-		owner: vc, id: strings.Clone(id), expected: expected,
-		next:   jobruntime.VnodeSnapshot{Revision: expected + 1, MetadataRevision: current.MetadataRevision},
+		owner:    vc,
+		id:       strings.Clone(id),
+		expected: expected,
+		next: jobruntime.VnodeSnapshot{
+			Revision:         expected + 1,
+			MetadataRevision: current.MetadataRevision,
+		},
 		remove: true,
 	}
-	return PreparedVNode{state: state}, nil
+	return PreparedVNode{
+		state: state,
+	}, nil
 }
 
 func (pv PreparedVNode) Commit() (jobruntime.VnodeSnapshot, error) {
@@ -183,7 +200,10 @@ func (vc *VNodeConfiguration) Entries() []ConfiguredVNode {
 	vc.mu.Lock()
 	entries := make([]ConfiguredVNode, 0, len(vc.records))
 	for id, snapshot := range vc.records {
-		entries = append(entries, ConfiguredVNode{ID: id, Snapshot: snapshot.Copy()})
+		entries = append(entries, ConfiguredVNode{
+			ID:       id,
+			Snapshot: snapshot.Copy(),
+		})
 	}
 	vc.mu.Unlock()
 	slices.SortFunc(entries, func(a, b ConfiguredVNode) int {

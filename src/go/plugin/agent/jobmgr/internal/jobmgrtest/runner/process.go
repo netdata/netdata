@@ -87,7 +87,11 @@ func Start(spec Spec) (*Process, error) {
 		return nil, fmt.Errorf("jobmgr root runner: start: %w", err)
 	}
 
-	process := &Process{command: command, stdin: stdin, done: make(chan struct{})}
+	process := &Process{
+		command: command,
+		stdin:   stdin,
+		done:    make(chan struct{}),
+	}
 	stdoutDone := make(chan error, 1)
 	stderrDone := make(chan captureResult, 1)
 	go process.observeOutput(stdout, spec.ObserveOut, stdoutDone)
@@ -210,8 +214,11 @@ func (p *Process) reap(stdoutDone <-chan error, stderrDone <-chan captureResult)
 	waitErr := p.command.Wait()
 	p.killOnce.Do(func() {})
 	p.result = waitResult{
-		result: Result{Stderr: stderrResult.payload, StderrTruncated: stderrResult.truncated},
-		err:    errors.Join(stdoutErr, stderrResult.err, waitErr),
+		result: Result{
+			Stderr:          stderrResult.payload,
+			StderrTruncated: stderrResult.truncated,
+		},
+		err: errors.Join(stdoutErr, stderrResult.err, waitErr),
 	}
 	close(p.done)
 }

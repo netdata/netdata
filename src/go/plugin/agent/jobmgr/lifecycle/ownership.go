@@ -21,7 +21,9 @@ func RetainOwnership(err error) error {
 	if err == nil || OwnershipRetained(err) {
 		return err
 	}
-	return &retainedOwnershipError{cause: err}
+	return &retainedOwnershipError{
+		cause: err,
+	}
 }
 
 // OwnershipRetained reports whether err contains a retained-ownership failure.

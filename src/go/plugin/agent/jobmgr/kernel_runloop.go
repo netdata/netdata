@@ -354,7 +354,9 @@ func (ck *CommandKernel) serviceSubmissions(quantum int) bool {
 		var err error
 		if submitted.controlStatus != 0 {
 			err = ck.frames.TryCommitControl(lifecycle.ControlFramePlan{
-				UID: submitted.request.UID, Status: submitted.controlStatus, Expiry: lifecycle.ExpiryAt(ck.clock.Now()),
+				UID:    submitted.request.UID,
+				Status: submitted.controlStatus,
+				Expiry: lifecycle.ExpiryAt(ck.clock.Now()),
 			})
 			if err != nil && !errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
 				ck.run.Dirty(err)

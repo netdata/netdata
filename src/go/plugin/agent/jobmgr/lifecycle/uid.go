@@ -47,7 +47,9 @@ type UIDLedger struct {
 }
 
 func NewUIDLedger() *UIDLedger {
-	return &UIDLedger{index: make(map[string]*uidRecord)}
+	return &UIDLedger{
+		index: make(map[string]*uidRecord),
+	}
 }
 
 func (ul *UIDLedger) Admit(uid string, now time.Time) error {
@@ -77,7 +79,10 @@ func (ul *UIDLedger) Admit(uid string, now time.Time) error {
 	} else {
 		ul.free = record.freeNext
 	}
-	*record = uidRecord{state: uidStateActive, key: strings.Clone(uid)}
+	*record = uidRecord{
+		state: uidStateActive,
+		key:   strings.Clone(uid),
+	}
 	ul.index[record.key] = record
 	ul.active++
 	return nil
@@ -174,6 +179,9 @@ func (ul *UIDLedger) removeRecord(record *uidRecord) {
 		ul.tombstones--
 	}
 	delete(ul.index, record.key)
-	*record = uidRecord{state: uidStateFree, freeNext: ul.free}
+	*record = uidRecord{
+		state:    uidStateFree,
+		freeNext: ul.free,
+	}
 	ul.free = record
 }

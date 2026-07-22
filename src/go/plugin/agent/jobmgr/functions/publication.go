@@ -51,7 +51,11 @@ func NewPublication(epoch uint64, port PublicationPort) (*Publication, error) {
 	if epoch == 0 || port == nil {
 		return nil, errors.New("jobmgr Function publication: invalid construction")
 	}
-	return &Publication{epoch: epoch, port: port, published: make(map[string]PublicationRecord)}, nil
+	return &Publication{
+		epoch:     epoch,
+		port:      port,
+		published: make(map[string]PublicationRecord),
+	}, nil
 }
 
 // ApplyInitialSnapshot installs one complete catalog-backed snapshot before

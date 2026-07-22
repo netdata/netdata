@@ -15,15 +15,23 @@ func TestPipelinePermitConservesOwnershipFacets(t *testing.T) {
 	supervisor := newLongLivedTestSupervisor(t)
 	plan, err := NewPipelineLongLivedPlan([]string{"file", "service-discovery"})
 	require.NoError(t, err)
-	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
+	owner := ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 1,
+	}
 	permit, err := supervisor.IssueLongLivedPermit(owner, plan)
 	require.NoError(t, err)
 
-	require.Equal(t, LongLivedCensus{Active: 1}, supervisor.LongLivedCensus())
+	require.Equal(t, LongLivedCensus{
+		Active: 1,
+	}, supervisor.LongLivedCensus())
 	require.Error(t, permit.Return())
 
 	wrongOwner := permit
-	wrongOwner.owner = ResourceIdentity{ID: "other", Generation: 1}
+	wrongOwner.owner = ResourceIdentity{
+		ID:         "other",
+		Generation: 1,
+	}
 	require.Error(t, wrongOwner.ActivateExternal())
 	require.NoError(t, permit.ActivateExternal())
 	require.Error(t, permit.ActivateExternal())
@@ -55,7 +63,9 @@ func TestPipelinePermitConservesOwnershipFacets(t *testing.T) {
 		require.NoError(t, err)
 		refs[name] = child
 	}
-	require.Equal(t, LongLivedCensus{Active: 1}, supervisor.LongLivedCensus())
+	require.Equal(t, LongLivedCensus{
+		Active: 1,
+	}, supervisor.LongLivedCensus())
 
 	require.NoError(t, permit.ReleaseExternal())
 	for _, child := range refs {
@@ -116,7 +126,10 @@ func TestPipelinePermitReleasesDisabledProviderClaim(t *testing.T) {
 	supervisor := newLongLivedTestSupervisor(t)
 	plan, err := NewPipelineLongLivedPlan([]string{"disabled", "enabled"})
 	require.NoError(t, err)
-	permit, err := supervisor.IssueLongLivedPermit(ResourceIdentity{ID: "pipeline", Generation: 1}, plan)
+	permit, err := supervisor.IssueLongLivedPermit(ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 1,
+	}, plan)
 	require.NoError(t, err)
 
 	require.NoError(t, permit.ReleaseUnusedInherited(InheritedPipelineProvider, "disabled"))
@@ -132,7 +145,10 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 	permits := make([]LongLivedPermit, 0, jobs)
 	for index := range jobs {
 		permit, err := supervisor.IssueLongLivedPermit(
-			ResourceIdentity{ID: fmt.Sprintf("job-%03d", index), Generation: 1},
+			ResourceIdentity{
+				ID:         fmt.Sprintf("job-%03d", index),
+				Generation: 1,
+			},
 			NewJobLongLivedPlan(),
 		)
 		require.NoError(t, err)
@@ -149,13 +165,19 @@ func TestLongLivedPermitRejectsDuplicateOwnerAndAllowsMultiplePipelines(t *testi
 	supervisor := newLongLivedTestSupervisor(t)
 	pipeline, err := NewPipelineLongLivedPlan([]string{"provider"})
 	require.NoError(t, err)
-	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
+	owner := ResourceIdentity{
+		ID:         "pipeline",
+		Generation: 1,
+	}
 	permit, err := supervisor.IssueLongLivedPermit(owner, pipeline)
 	require.NoError(t, err)
 
 	_, err = supervisor.IssueLongLivedPermit(owner, NewJobLongLivedPlan())
 	require.Error(t, err)
-	second, err := supervisor.IssueLongLivedPermit(ResourceIdentity{ID: "other-pipeline", Generation: 1}, pipeline)
+	second, err := supervisor.IssueLongLivedPermit(ResourceIdentity{
+		ID:         "other-pipeline",
+		Generation: 1,
+	}, pipeline)
 	require.NoError(t, err)
 	require.NoError(t, second.AbortUnused())
 	require.NoError(t, permit.AbortUnused())
@@ -163,7 +185,10 @@ func TestLongLivedPermitRejectsDuplicateOwnerAndAllowsMultiplePipelines(t *testi
 
 func TestLongLivedPermitRemainsLiveAfterIssuanceIsSealed(t *testing.T) {
 	supervisor := newLongLivedTestSupervisor(t)
-	permit, err := supervisor.IssueLongLivedPermit(ResourceIdentity{ID: "job", Generation: 1}, NewJobLongLivedPlan())
+	permit, err := supervisor.IssueLongLivedPermit(ResourceIdentity{
+		ID:         "job",
+		Generation: 1,
+	}, NewJobLongLivedPlan())
 	require.NoError(t, err)
 	require.NoError(t, supervisor.SealInherited())
 	require.NoError(t, permit.ValidateLive())
@@ -179,7 +204,10 @@ func TestSecretStorePermitsHaveNoConfiguredCountLimit(t *testing.T) {
 	permits := make([]LongLivedPermit, 0, stores)
 	for index := range stores {
 		permit, err := supervisor.IssueLongLivedPermit(
-			ResourceIdentity{ID: fmt.Sprintf("secret-store-%02d", index), Generation: 1},
+			ResourceIdentity{
+				ID:         fmt.Sprintf("secret-store-%02d", index),
+				Generation: 1,
+			},
 			NewSecretStoreLongLivedPlan(),
 		)
 		require.NoError(t, err)
@@ -197,7 +225,10 @@ func TestSecretStorePermitsHaveNoConfiguredCountLimit(t *testing.T) {
 func TestLongLivedPermitReturnWaitsForExternalRelease(t *testing.T) {
 	supervisor := newLongLivedTestSupervisor(t)
 	permit, err := supervisor.IssueLongLivedPermit(
-		ResourceIdentity{ID: "secret-store", Generation: 1},
+		ResourceIdentity{
+			ID:         "secret-store",
+			Generation: 1,
+		},
 		NewSecretStoreLongLivedPlan(),
 	)
 	require.NoError(t, err)

@@ -193,7 +193,9 @@ func (ts *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskRequestRe
 				return TaskRequestRef{}, errors.New("jobmgr task supervisor: request reference space exhausted")
 			}
 			slot = uint32(len(ts.requests))
-			record = &taskRequest{slot: slot}
+			record = &taskRequest{
+				slot: slot,
+			}
 			ts.requests = append(ts.requests, record)
 		} else {
 			record = ts.requests[slot]
@@ -201,13 +203,20 @@ func (ts *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskRequestRe
 		}
 		generation = record.generation + 1
 		if generation == 0 {
-			*record = taskRequest{slot: slot, generation: record.generation}
+			*record = taskRequest{
+				slot:       slot,
+				generation: record.generation,
+			}
 		}
 	}
 	*record = taskRequest{
-		slot: slot, generation: generation, active: true,
-		class: class, plan: plan, initial: initial,
-		queuedAt: time.Now(),
+		slot:       slot,
+		generation: generation,
+		active:     true,
+		class:      class,
+		plan:       plan,
+		initial:    initial,
+		queuedAt:   time.Now(),
 	}
 	queue := &ts.pending[taskClassIndex(class)]
 	record.previous = queue.tail
@@ -219,7 +228,10 @@ func (ts *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskRequestRe
 	queue.tail = slot
 	queue.count++
 	ts.observeRuntimeState()
-	return TaskRequestRef{Slot: slot, Generation: generation}, nil
+	return TaskRequestRef{
+		Slot:       slot,
+		Generation: generation,
+	}, nil
 }
 
 func (ts *TaskSupervisor) CancelPending(ref TaskRequestRef) error {
@@ -288,13 +300,19 @@ func (ts *TaskSupervisor) Dispatch(
 			break
 		}
 		record := ts.requests[queue.head]
-		requestRef := TaskRequestRef{Slot: record.slot, Generation: record.generation}
+		requestRef := TaskRequestRef{
+			Slot:       record.slot,
+			Generation: record.generation,
+		}
 		taskRef, err := ts.start(parent, record.plan, record.initial)
 		if err != nil {
 			return count, true, err
 		}
 		ts.removeRequest(record)
-		started[count] = TaskStart{Request: requestRef, Task: taskRef}
+		started[count] = TaskStart{
+			Request: requestRef,
+			Task:    taskRef,
+		}
 		count++
 		ts.nextClass = classForTaskIndex(1 - selected)
 	}
@@ -421,7 +439,10 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 	slot.cleanup = plan.Cleanup
 	slot.preserveDisposeContext = plan.preserveDisposeContext
 	slot.maxPhaseTransitions = plan.phaseLimit()
-	ref := TaskRef{Slot: index, Generation: slot.generation}
+	ref := TaskRef{
+		Slot:       index,
+		Generation: slot.generation,
+	}
 	ts.active++
 	ts.observeRuntimeState()
 	launched = true
@@ -437,7 +458,9 @@ func (ts *TaskSupervisor) allocateSlot() (uint32, *taskSlot, error) {
 			return 0, nil, errors.New("jobmgr task supervisor: reference space exhausted")
 		}
 		index = uint32(len(ts.slots))
-		slot = &taskSlot{action: make(chan TaskAction, 1)}
+		slot = &taskSlot{
+			action: make(chan TaskAction, 1),
+		}
 		ts.slots = append(ts.slots, slot)
 	} else {
 		index = ts.freeSlot - 1
@@ -496,7 +519,10 @@ func newTaskChildContext(parent context.Context, deadline time.Time) (context.Co
 	if deadline.IsZero() {
 		return ctx, cancel
 	}
-	return taskChildContext{Context: ctx, deadline: deadline}, cancel
+	return taskChildContext{
+		Context:  ctx,
+		deadline: deadline,
+	}, cancel
 }
 
 func (ts *TaskSupervisor) CompletionCh() <-chan TaskCompletion {
@@ -563,7 +589,11 @@ func (ts *TaskSupervisor) Release(ref TaskRef) error {
 	slot.cancel(context.Canceled)
 	generation := slot.generation
 	action := slot.action
-	*slot = taskSlot{generation: generation, freeNext: ts.freeSlot, action: action}
+	*slot = taskSlot{
+		generation: generation,
+		freeNext:   ts.freeSlot,
+		action:     action,
+	}
 	ts.freeSlot = ref.Slot + 1
 	ts.active--
 	ts.observeRuntimeState()
@@ -648,7 +678,10 @@ func (ts *TaskSupervisor) TakeAppliedResourceTransaction(
 	if err := outcome.validate(); err != nil {
 		return 0, nil, err
 	}
-	slot.outcome = TaskOutcome{kind: TaskOutcomeFrame, frame: outcome.frame}
+	slot.outcome = TaskOutcome{
+		kind:  TaskOutcomeFrame,
+		frame: outcome.frame,
+	}
 	return outcome.disposition, outcome.ready, nil
 }
 
@@ -701,11 +734,20 @@ func (ts *TaskSupervisor) runChild(
 	}
 	outcome = TaskOutcome{}
 	slot.sequence = 1
-	ts.completions <- TaskCompletion{Ref: ref, Sequence: 1, Kind: slot.outcome.kind, Err: err}
+	ts.completions <- TaskCompletion{
+		Ref:      ref,
+		Sequence: 1,
+		Kind:     slot.outcome.kind,
+		Err:      err,
+	}
 	ts.observeTaskPanic(err)
 	for {
 		action := <-slot.action
-		ack := TaskAcknowledgement{Ref: ref, Sequence: action.Sequence, Kind: action.Kind}
+		ack := TaskAcknowledgement{
+			Ref:      ref,
+			Sequence: action.Sequence,
+			Kind:     action.Kind,
+		}
 		if action.Ref != ref || action.Sequence != slot.sequence+1 || action.Sequence > slot.maxPhaseTransitions {
 			ack.Err = errors.New("jobmgr task child: stale or wrong-sequence phase action")
 			slot.actionPending = false
@@ -971,7 +1013,11 @@ func (ts *TaskSupervisor) removeRequest(record *taskRequest) {
 	queue.count--
 	slot := record.slot
 	generation := record.generation
-	*record = taskRequest{slot: slot, generation: generation, freeNext: ts.freeRequest}
+	*record = taskRequest{
+		slot:       slot,
+		generation: generation,
+		freeNext:   ts.freeRequest,
+	}
 	ts.freeRequest = slot
 	ts.observeRuntimeState()
 }

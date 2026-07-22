@@ -37,7 +37,11 @@ func (ck *CommandKernel) submitFunctionMutation(
 		return 0, errors.New("jobmgr kernel: invalid Function mutation")
 	}
 	result := make(chan functionMutationResult, 1)
-	submission := functionMutationSubmission{mutation: mutation, result: result, action: action}
+	submission := functionMutationSubmission{
+		mutation: mutation,
+		result:   result,
+		action:   action,
+	}
 	select {
 	case ck.functionMutations <- submission:
 		ck.NotifyControlReady()
@@ -239,7 +243,11 @@ func (ck *CommandKernel) Reject(ctx context.Context, uid string, status lifecycl
 	if ctx == nil {
 		return errors.New("jobmgr kernel: nil submission context")
 	}
-	if err := (lifecycle.ControlFramePlan{UID: uid, Status: status, Expiry: 1}).Validate(); err != nil {
+	if err := (lifecycle.ControlFramePlan{
+		UID:    uid,
+		Status: status,
+		Expiry: 1,
+	}).Validate(); err != nil {
 		return err
 	}
 	if status != lifecycle.ControlBadRequest && status != lifecycle.ControlPayloadTooLarge &&
@@ -249,8 +257,11 @@ func (ck *CommandKernel) Reject(ctx context.Context, uid string, status lifecycl
 	result := make(chan error, 1)
 	if err := ck.enqueueSubmission(ctx, lifecycle.SourceFunction, submission{
 		controlStatus: status,
-		request:       Request{UID: uid, Source: lifecycle.SourceFunction},
-		result:        result,
+		request: Request{
+			UID:    uid,
+			Source: lifecycle.SourceFunction,
+		},
+		result: result,
 	}); err != nil {
 		return err
 	}

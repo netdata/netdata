@@ -37,10 +37,13 @@ func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
-		Generation: 7, ShutdownTimeout: time.Second,
-		UIDs: uids, Frames: frames,
-		Modules: modules, Jobs: testRunJobServices(t),
-		Discovery: testRunDiscoveryServices(t),
+		Generation:      7,
+		ShutdownTimeout: time.Second,
+		UIDs:            uids,
+		Frames:          frames,
+		Modules:         modules,
+		Jobs:            testRunJobServices(t),
+		Discovery:       testRunDiscoveryServices(t),
 	})
 	require.NoError(t, err)
 	require.NoError(t, generation.start(t.Context()))
@@ -75,9 +78,12 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 							ChartsFunc: func() *collectorapi.Charts {
 								return &collectorapi.Charts{
 									&collectorapi.Chart{
-										ID: "chart", Title: "chart",
+										ID:    "chart",
+										Title: "chart",
 										Units: "value",
-										Dims:  collectorapi.Dims{&collectorapi.Dim{ID: "value"}},
+										Dims: collectorapi.Dims{&collectorapi.Dim{
+											ID: "value",
+										}},
 									},
 								}
 							},
@@ -95,17 +101,22 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 				},
 			}
 			jobs := testRunJobServices(t)
-			jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
+			jobs.Defaults = confgroup.Registry{
+				"module": {UpdateEvery: 1},
+			}
 			configs := fullCapacityDiscoveredJobs(test.jobs)
 
 			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 			require.NoError(t, err)
 			uids := lifecycle.NewUIDLedger()
 			generation, err := newRunGeneration(runGenerationConfig{
-				Generation: 1, ShutdownTimeout: 10 * time.Second,
-				UIDs:   uids,
-				Frames: frames, Modules: modules, Jobs: jobs,
-				Discovery: testRunDiscoveryServices(t, configs...),
+				Generation:      1,
+				ShutdownTimeout: 10 * time.Second,
+				UIDs:            uids,
+				Frames:          frames,
+				Modules:         modules,
+				Jobs:            jobs,
+				Discovery:       testRunDiscoveryServices(t, configs...),
 			})
 			require.NoError(t, err)
 			if err := generation.start(context.Background()); err != nil {
@@ -160,24 +171,30 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				return &runTestHandler{cleanup: func() { record("cleanup") }}
+				return &runTestHandler{
+					cleanup: func() { record("cleanup") },
+				}
 			},
 		},
 	}
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
-		Generation: 1, ShutdownTimeout: time.Second,
-		UIDs:   uids,
-		Frames: frames, Modules: modules,
-		Jobs:      testRunJobServices(t),
-		Discovery: testRunDiscoveryServices(t),
+		Generation:      1,
+		ShutdownTimeout: time.Second,
+		UIDs:            uids,
+		Frames:          frames,
+		Modules:         modules,
+		Jobs:            testRunJobServices(t),
+		Discovery:       testRunDiscoveryServices(t),
 	})
 	require.NoError(t, err)
 
 	require.NoError(t, generation.start(context.Background()))
 
 	require.NoError(t, generation.kernel.Submit(context.Background(), jobmgr.Request{
-		UID: "function-flow", Source: lifecycle.SourceFunction, Route: "module:method",
+		UID:    "function-flow",
+		Source: lifecycle.SourceFunction,
+		Route:  "module:method",
 	}),
 	)
 	require.Eventually(t, func() bool {
@@ -220,27 +237,39 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				return &runTestHandler{cleanup: func() {}}
+				return &runTestHandler{
+					cleanup: func() {},
+				}
 			},
 			JobConfigSchema: collectorapi.MockConfigSchema,
 		},
 	}
-	config := confgroup.Config{"module": "module", "name": "job", "update_every": 1, "function_only": true}
+	config := confgroup.Config{
+		"module":        "module",
+		"name":          "job",
+		"update_every":  1,
+		"function_only": true,
+	}
 	config.SetProvider(confgroup.TypeDyncfg)
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
 	jobs := testRunJobServices(t)
-	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
 
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
-		Generation: 1, ShutdownTimeout: time.Second,
-		UIDs:   uids,
-		Frames: frames, Modules: modules, Jobs: jobs,
-		Discovery: testRunDiscoveryServicesAccepted(t, config),
+		Generation:      1,
+		ShutdownTimeout: time.Second,
+		UIDs:            uids,
+		Frames:          frames,
+		Modules:         modules,
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServicesAccepted(t, config),
 	})
 	require.NoError(t, err)
 
@@ -310,31 +339,41 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(t *testi
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				return &runTestHandler{cleanup: func() {}}
+				return &runTestHandler{
+					cleanup: func() {},
+				}
 			},
 			JobConfigSchema: collectorapi.MockConfigSchema,
 		},
 	}
 	config := confgroup.Config{
-		"module": "module", "name": "job",
-		"update_every": 1, "function_only": true,
-		"option_str": "work", "option_int": 1,
+		"module":        "module",
+		"name":          "job",
+		"update_every":  1,
+		"function_only": true,
+		"option_str":    "work",
+		"option_int":    1,
 	}
 	config.SetProvider(confgroup.TypeDyncfg)
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
 	jobs := testRunJobServices(t)
-	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
 
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
-		Generation: 1, ShutdownTimeout: time.Second,
-		UIDs:   uids,
-		Frames: frames, Modules: modules, Jobs: jobs,
-		Discovery: testRunDiscoveryServicesAccepted(t, config),
+		Generation:      1,
+		ShutdownTimeout: time.Second,
+		UIDs:            uids,
+		Frames:          frames,
+		Modules:         modules,
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServicesAccepted(t, config),
 	})
 	require.NoError(t, err)
 	require.NoError(t, generation.start(context.Background()))
@@ -420,15 +459,21 @@ func testRunDiscoveryServices(t testing.TB, configs ...confgroup.Config) runDisc
 	factory := agentdiscovery.NewProviderFactory(
 		"test",
 		func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
-			return runTestDiscoverer{configs: configs}, true, nil
+			return runTestDiscoverer{
+				configs: configs,
+			}, true, nil
 		},
 	)
 	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
 	require.NoError(t, err)
 	return runDiscoveryServices{
-		BuildContext: agentdiscovery.BuildContext{Registry: confgroup.Registry{"test": {}}},
-		Providers:    catalog,
-		AutoEnable:   true,
+		BuildContext: agentdiscovery.BuildContext{
+			Registry: confgroup.Registry{
+				"test": {},
+			},
+		},
+		Providers:  catalog,
+		AutoEnable: true,
 	}
 }
 
@@ -472,7 +517,9 @@ func (*runTestHandler) MethodParams(context.Context, string) ([]funcapi.ParamCon
 }
 
 func (*runTestHandler) Handle(context.Context, string, funcapi.ResolvedParams) *funcapi.FunctionResponse {
-	return &funcapi.FunctionResponse{Status: 200}
+	return &funcapi.FunctionResponse{
+		Status: 200,
+	}
 }
 
 func (rth *runTestHandler) Cleanup(context.Context) {

@@ -83,7 +83,9 @@ func NewFrameOwner(writer io.Writer) (*FrameOwner, error) {
 	if writer == nil {
 		return nil, errors.New("jobmgr frame owner: nil writer")
 	}
-	owner := &FrameOwner{writer: writer}
+	owner := &FrameOwner{
+		writer: writer,
+	}
 	owner.available = sync.NewCond(&owner.stateMu)
 	return owner, nil
 }
@@ -146,7 +148,12 @@ func PrepareFrame(uid string, result SealedResult, expiry int64) (PreparedFrame,
 		return PreparedFrame{}, err
 	}
 	return PreparedFrame{
-		state: &preparedFunctionFrame{uid: uid, result: result, expiry: expiry, encodedBytes: encodedBytes},
+		state: &preparedFunctionFrame{
+			uid:          uid,
+			result:       result,
+			expiry:       expiry,
+			encodedBytes: encodedBytes,
+		},
 	}, nil
 }
 
@@ -226,7 +233,10 @@ func (pf PreparedFrame) take() (preparedFunctionFrameContent, error) {
 	}
 	pf.state.consumed = true
 	content := preparedFunctionFrameContent{
-		uid: pf.state.uid, result: pf.state.result, expiry: pf.state.expiry, encodedBytes: pf.state.encodedBytes,
+		uid:          pf.state.uid,
+		result:       pf.state.result,
+		expiry:       pf.state.expiry,
+		encodedBytes: pf.state.encodedBytes,
 	}
 	pf.state.result = SealedResult{}
 	return content, nil
@@ -236,7 +246,11 @@ func PrepareProtocolFrame(payload []byte) (PreparedProtocolFrame, error) {
 	if len(payload) == 0 || len(payload) > MaximumOtherFrameBytes {
 		return PreparedProtocolFrame{}, errors.New("jobmgr frame owner: invalid protocol frame size")
 	}
-	return PreparedProtocolFrame{state: &preparedProtocolFrame{payload: slices.Clone(payload)}}, nil
+	return PreparedProtocolFrame{
+		state: &preparedProtocolFrame{
+			payload: slices.Clone(payload),
+		},
+	}, nil
 }
 
 func (ppf PreparedProtocolFrame) Abort() error {

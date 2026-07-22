@@ -83,8 +83,12 @@ func PrepareNoopResourceTransaction(
 		return nil, errors.New("job output: no-op transaction has an unexpected permit")
 	}
 	return &PreparedNoopResourceTransaction{
-		scope: scope, current: current, permit: permit,
-		result: result, cleanup: cleanup, afterApply: afterApply,
+		scope:      scope,
+		current:    current,
+		permit:     permit,
+		result:     result,
+		cleanup:    cleanup,
+		afterApply: afterApply,
 	}, nil
 }
 
@@ -174,7 +178,9 @@ func PrepareResourceTransaction(spec ResourceTransactionSpec) (*PreparedResource
 	if err := validateResourceTransactionSpec(spec); err != nil {
 		return nil, err
 	}
-	return &PreparedResourceTransaction{spec: spec}, nil
+	return &PreparedResourceTransaction{
+		spec: spec,
+	}, nil
 }
 
 func (prt *PreparedResourceTransaction) Scope() lifecycle.ResourceTransactionScope {

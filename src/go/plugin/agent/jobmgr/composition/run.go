@@ -246,7 +246,10 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		config.Frames,
 		lifecycle.RealClock{},
 		functions,
-		joinedRunFinalizer{functions: functions, secrets: secretController},
+		joinedRunFinalizer{
+			functions: functions,
+			secrets:   secretController,
+		},
 		functions.Catalog(),
 	)
 	if err != nil {
@@ -255,7 +258,9 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 	if err := functions.Bind(kernel); err != nil {
 		return nil, err
 	}
-	if err := secretController.Bind(secretDependentJobBinding{controller: dynCfgJobs}); err != nil {
+	if err := secretController.Bind(secretDependentJobBinding{
+		controller: dynCfgJobs,
+	}); err != nil {
 		return nil, err
 	}
 	if metrics != nil {

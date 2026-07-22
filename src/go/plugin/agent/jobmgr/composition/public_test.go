@@ -79,7 +79,11 @@ func TestProcessControlCancellationAfterHandoffWaitsForDisposition(t *testing.T)
 		t.Run(name, func(t *testing.T) {
 			started := make(chan struct{})
 			close(started)
-			process := &Process{commands: make(chan processControl), started: started, done: make(chan struct{})}
+			process := &Process{
+				commands: make(chan processControl),
+				started:  started,
+				done:     make(chan struct{}),
+			}
 			accepted := make(chan struct{})
 			release := make(chan struct{})
 			go func() {
@@ -133,10 +137,15 @@ func testProductionProcessConfig(input io.Reader, output io.Writer) Config {
 		},
 	)
 	return Config{
-		Input: input, Output: output,
-		PluginName:         "go.d",
-		Modules:            collectorapi.Registry{"test": {}},
-		Defaults:           confgroup.Registry{"test": {}},
+		Input:      input,
+		Output:     output,
+		PluginName: "go.d",
+		Modules: collectorapi.Registry{
+			"test": {},
+		},
+		Defaults: confgroup.Registry{
+			"test": {},
+		},
 		DiscoveryProviders: []agentdiscovery.ProviderFactory{factory},
 		ShutdownTimeout:    time.Second,
 	}

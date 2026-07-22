@@ -58,10 +58,15 @@ func (ck *CommandKernel) admitSubmission(
 	var laneID commandLaneKey
 	if request.Source == lifecycle.SourceFunction {
 		decision, err := ck.functionCatalog.ResolveAndAcquire(FunctionLookup{
-			UID: request.UID, Route: request.Route, Args: request.Args,
-			Payload: request.Payload, ContentType: request.ContentType,
-			Permissions: request.Permissions, CallerSource: request.CallerSource,
-			Timeout: request.Timeout, HasPayload: request.HasPayload,
+			UID:          request.UID,
+			Route:        request.Route,
+			Args:         request.Args,
+			Payload:      request.Payload,
+			ContentType:  request.ContentType,
+			Permissions:  request.Permissions,
+			CallerSource: request.CallerSource,
+			Timeout:      request.Timeout,
+			HasPayload:   request.HasPayload,
 		})
 		if err != nil {
 			return errors.Join(err, ck.uids.Complete(request.UID, false, now))
@@ -103,11 +108,17 @@ func (ck *CommandKernel) admitSubmission(
 		return errors.Join(err, ck.uids.Complete(request.UID, false, now))
 	}
 	if request.Source == lifecycle.SourceJobManager {
-		laneID = commandLaneKey{source: request.Source, key: request.LaneKey}
+		laneID = commandLaneKey{
+			source: request.Source,
+			key:    request.LaneKey,
+		}
 	} else if functionResourceID != "" {
 		laneID = resourceCommandLaneKey(functionResourceID)
 	} else {
-		laneID = commandLaneKey{source: request.Source, functionInvocation: functionInvocation}
+		laneID = commandLaneKey{
+			source:             request.Source,
+			functionInvocation: functionInvocation,
+		}
 	}
 	if plan.Transaction != nil {
 		laneID = resourceCommandLaneKey(request.LaneKey)
@@ -150,11 +161,17 @@ func (ck *CommandKernel) admitSubmission(
 		}
 	}
 	operation := &commandOperation{
-		OperationGeneration: operationGeneration, request: request, plan: plan, claims: claims,
-		functionInvocation: functionInvocation,
-		deadline:           deadlineEntry{index: -1},
-		terminalResult:     terminalResult,
-		parent:             parent, claimsInherited: parent != nil,
+		OperationGeneration: operationGeneration,
+		request:             request,
+		plan:                plan,
+		claims:              claims,
+		functionInvocation:  functionInvocation,
+		deadline: deadlineEntry{
+			index: -1,
+		},
+		terminalResult:    terminalResult,
+		parent:            parent,
+		claimsInherited:   parent != nil,
 		compositeRollback: rollback,
 		shutdownChild: parent != nil &&
 			ck.shutdownPhase == commandShutdownActionDrain,
@@ -199,7 +216,11 @@ func (ck *CommandKernel) admitSubmission(
 		operation.composite = newKernelCompositeScope(ck, operation)
 	}
 	if !request.Deadline.IsZero() {
-		operation.deadline = deadlineEntry{when: request.Deadline, operation: operation, index: -1}
+		operation.deadline = deadlineEntry{
+			when:      request.Deadline,
+			operation: operation,
+			index:     -1,
+		}
 		heap.Push(&ck.deadlines, &operation.deadline)
 	}
 	if parent == nil && ck.compositeFenceConflicts(operation.claims) {

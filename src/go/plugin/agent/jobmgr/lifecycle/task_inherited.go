@@ -149,7 +149,11 @@ func (ts *TaskSupervisor) startInherited(
 		}
 		return 0, errors.New("jobmgr task supervisor: inherited activation is sealed")
 	}
-	ownerKey := inheritedOwnerRole{owner: owner, role: role, key: key}
+	ownerKey := inheritedOwnerRole{
+		owner: owner,
+		role:  role,
+		key:   key,
+	}
 	if _, ok := registry.owners[ownerKey]; ok {
 		registry.mu.Unlock()
 		return 0, errors.New("jobmgr task supervisor: duplicate inherited owner role")
@@ -161,7 +165,14 @@ func (ts *TaskSupervisor) startInherited(
 	}
 	ctx, cancel := context.WithCancelCause(parent)
 	done := make(chan struct{})
-	*slot = inheritedTaskSlot{owner: owner, role: role, key: key, cancel: cancel, done: done, permit: permit}
+	*slot = inheritedTaskSlot{
+		owner:  owner,
+		role:   role,
+		key:    key,
+		cancel: cancel,
+		done:   done,
+		permit: permit,
+	}
 	registry.active++
 	registry.owners[ownerKey] = ref
 	slot.activePrevious = registry.activeTail
@@ -298,7 +309,11 @@ func (ts *TaskSupervisor) ReleaseInherited(ref InheritedTaskRef, owner ResourceI
 			return errors.Join(err, errors.New("jobmgr task supervisor: inherited release changed"))
 		}
 	}
-	key := inheritedOwnerRole{owner: slot.owner, role: slot.role, key: slot.key}
+	key := inheritedOwnerRole{
+		owner: slot.owner,
+		role:  slot.role,
+		key:   slot.key,
+	}
 	previous, next := slot.activePrevious, slot.activeNext
 	if registry.shutdownCursor == ref {
 		registry.shutdownCursor = next

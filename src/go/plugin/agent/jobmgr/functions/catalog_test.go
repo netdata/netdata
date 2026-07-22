@@ -24,29 +24,43 @@ func TestFunctionCatalogLookup(t *testing.T) {
 	}{
 		"direct route": {
 			declaration: testDeclaration("direct", "", ResourcePolicy{}),
-			lookup:      jobmgr.FunctionLookup{UID: "direct", Route: "direct"},
+			lookup: jobmgr.FunctionLookup{
+				UID:   "direct",
+				Route: "direct",
+			},
 		},
 		"prefix route": {
 			declaration: testDeclaration("config", "job:", ResourcePolicy{}),
-			lookup:      jobmgr.FunctionLookup{UID: "prefix", Route: "config", Args: []string{"job:mysql"}},
+			lookup: jobmgr.FunctionLookup{
+				UID:   "prefix",
+				Route: "config",
+				Args:  []string{"job:mysql"},
+			},
 		},
 		"DynCfg resource": {
 			declaration: testDeclaration("config", "go.d:collector:", DynCfgJobResource(0, "go.d:collector:")),
 			lookup: jobmgr.FunctionLookup{
-				UID: "resource", Route: "config",
-				Args: []string{"go.d:collector:mysql:production", "update"},
+				UID:   "resource",
+				Route: "config",
+				Args:  []string{"go.d:collector:mysql:production", "update"},
 			},
 			wantResource: "mysql_production",
 		},
 		"missing prefix argument": {
 			declaration: testDeclaration("config", "job:", ResourcePolicy{}),
-			lookup:      jobmgr.FunctionLookup{UID: "missing-arg", Route: "config"},
-			wantStatus:  lifecycle.ControlNotFound,
+			lookup: jobmgr.FunctionLookup{
+				UID:   "missing-arg",
+				Route: "config",
+			},
+			wantStatus: lifecycle.ControlNotFound,
 		},
 		"unknown route": {
 			declaration: testDeclaration("direct", "", ResourcePolicy{}),
-			lookup:      jobmgr.FunctionLookup{UID: "missing", Route: "unknown"},
-			wantStatus:  lifecycle.ControlNotFound,
+			lookup: jobmgr.FunctionLookup{
+				UID:   "missing",
+				Route: "unknown",
+			},
+			wantStatus: lifecycle.ControlNotFound,
 		},
 	}
 
@@ -131,7 +145,10 @@ func TestFunctionPayloadValidationRunsInTask(t *testing.T) {
 	require.NoError(t, err)
 
 	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-		UID: "invalid-json", Route: "direct", HasPayload: true, Payload: []byte("{"),
+		UID:        "invalid-json",
+		Route:      "direct",
+		HasPayload: true,
+		Payload:    []byte("{"),
 	})
 	require.NoError(t, err)
 	assert.Zero(t, calls.Load())
@@ -152,7 +169,10 @@ func TestFunctionCatalogResourceTransactionHasNoArbitraryCountLimits(t *testing.
 		for claimIndex := range claims {
 			claims[claimIndex] = fmt.Sprintf("claim-%02d-%02d", index, claimIndex)
 		}
-		commands[index] = ResourceTransactionCommand{Name: fmt.Sprintf("command-%02d", index), Claims: claims}
+		commands[index] = ResourceTransactionCommand{
+			Name:   fmt.Sprintf("command-%02d", index),
+			Claims: claims,
+		}
 	}
 	declaration := testDeclaration("config", "", DynCfgJobResource(0, "job:"))
 	declaration.Transaction = &ResourceTransactionDeclaration{
@@ -176,7 +196,9 @@ func TestFunctionCatalogResourceTransactionHasNoArbitraryCountLimits(t *testing.
 	arguments[commandArgument] = "command-19"
 
 	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-		UID: "transaction", Route: "config", Args: arguments,
+		UID:   "transaction",
+		Route: "config",
+		Args:  arguments,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, decision.Plan.Transaction)
@@ -197,14 +219,19 @@ func TestFunctionCatalogMutationLifecycle(t *testing.T) {
 			change: func() RouteChange {
 				replacement := testDeclaration("work", "", ResourcePolicy{})
 				replacement.ID = "replacement"
-				return RouteChange{PublicName: "work", Declaration: &replacement}
+				return RouteChange{
+					PublicName:  "work",
+					Declaration: &replacement,
+				}
 			},
 			wantOldStatus: lifecycle.ControlUnavailable,
 			wantNewMethod: "replacement",
 		},
 		"remove": {
 			change: func() RouteChange {
-				return RouteChange{PublicName: "work"}
+				return RouteChange{
+					PublicName: "work",
+				}
 			},
 			wantOldStatus: lifecycle.ControlUnavailable,
 		},
@@ -235,10 +262,16 @@ func TestFunctionCatalogMutationLifecycle(t *testing.T) {
 			progress, err := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
 			require.NoError(t, err)
 			require.True(t, progress.Quiesced)
-			oldDecision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "old", Route: "work"})
+			oldDecision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+				UID:   "old",
+				Route: "work",
+			})
 			require.NoError(t, err)
 			assert.Equal(t, test.wantOldStatus, oldDecision.Rejected)
-			otherDecision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "other", Route: "other"})
+			otherDecision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+				UID:   "other",
+				Route: "other",
+			})
 			require.NoError(t, err)
 			require.True(t, otherDecision.Lease.Valid())
 			_, err = catalog.ReleaseInvocation(otherDecision.Lease)
@@ -250,7 +283,10 @@ func TestFunctionCatalogMutationLifecycle(t *testing.T) {
 			assert.Empty(t, cleanups)
 			assert.EqualValues(t, 2, progress.Version)
 
-			decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "new", Route: "work"})
+			decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+				UID:   "new",
+				Route: "work",
+			})
 			require.NoError(t, err)
 			if test.wantNewMethod == "" {
 				assert.Equal(t, lifecycle.ControlNotFound, decision.Rejected)
@@ -278,7 +314,10 @@ func TestFunctionCatalogMutationAbortRestoresAdmission(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, catalog.AbortMutation(mutation))
 
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "old", Route: "work"})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "old",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	require.True(t, decision.Lease.Valid())
 	assert.EqualValues(t, 1, catalog.census().Version)
@@ -301,7 +340,10 @@ func TestFunctionCatalogRejectsForeignMutationAbort(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Error(t, catalog.AbortMutation(second))
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "blocked", Route: "work"})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "blocked",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	assert.Equal(t, lifecycle.ControlUnavailable, decision.Rejected)
 	require.NoError(t, catalog.AbortMutation(first))
@@ -323,7 +365,10 @@ func TestFunctionCatalogMutationExceedsFormerCountLimit(t *testing.T) {
 	for index := range population {
 		name := fmt.Sprintf("work-%03d", index)
 		declaration := testDeclaration(name, "", ResourcePolicy{})
-		changes = append(changes, RouteChange{PublicName: name, Declaration: &declaration})
+		changes = append(changes, RouteChange{
+			PublicName:  name,
+			Declaration: &declaration,
+		})
 	}
 	mutation, err := catalog.NewMutation(1, changes)
 	require.NoError(t, err)
@@ -349,7 +394,8 @@ func TestFunctionCatalogMutationExceedsFormerCountLimit(t *testing.T) {
 			break
 		}
 		decision, resolveErr := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-			UID: "pre-commit", Route: "work-000",
+			UID:   "pre-commit",
+			Route: "work-000",
 		})
 		require.NoError(t, resolveErr)
 		assert.Equal(t, lifecycle.ControlNotFound, decision.Rejected)
@@ -365,7 +411,9 @@ func TestFunctionCatalogMutationPreflightIsBoundedAndClosesAdmission(t *testing.
 	for index := range population {
 		name := fmt.Sprintf("work-%03d", index)
 		declarations = append(declarations, testDeclaration(name, "", ResourcePolicy{}))
-		changes = append(changes, RouteChange{PublicName: name})
+		changes = append(changes, RouteChange{
+			PublicName: name,
+		})
 	}
 	catalog, err := NewCatalog(declarations)
 	require.NoError(t, err)
@@ -376,7 +424,10 @@ func TestFunctionCatalogMutationPreflightIsBoundedAndClosesAdmission(t *testing.
 	progress, err := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
 	require.NoError(t, err)
 	assert.False(t, progress.Quiesced)
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "preflight", Route: "work-000"})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "preflight",
+		Route: "work-000",
+	})
 	require.NoError(t, err)
 	assert.Equal(t, lifecycle.ControlUnavailable, decision.Rejected)
 	require.Error(t, catalog.ResumeMutation(mutation))
@@ -487,7 +538,10 @@ func TestFunctionCatalogCleanupWaitsForLastLease(t *testing.T) {
 	}
 	catalog, err := NewCatalog([]Declaration{old})
 	require.NoError(t, err)
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "held", Route: "work"})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "held",
+		Route: "work",
+	})
 	require.NoError(t, err)
 
 	replacement := testDeclaration("work", "", ResourcePolicy{})
@@ -509,7 +563,10 @@ func TestFunctionCatalogCleanupOwnershipSurvivesPausedLeaseRelease(t *testing.T)
 	old.Generation.Cleanup = func(context.Context) error { return nil }
 	catalog, err := NewCatalog([]Declaration{old})
 	require.NoError(t, err)
-	held, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "held", Route: "work"})
+	held, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "held",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	mutation, err := catalog.NewMutation(1, []RouteChange{{PublicName: "work"}})
 	require.NoError(t, err)
@@ -531,18 +588,27 @@ func TestFunctionCatalogCleanupOwnershipSurvivesPausedLeaseRelease(t *testing.T)
 func TestFunctionCatalogRemovedRouteStaysUnavailableUntilLeaseDrains(t *testing.T) {
 	catalog, err := NewCatalog([]Declaration{testDeclaration("work", "", ResourcePolicy{})})
 	require.NoError(t, err)
-	held, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "held", Route: "work"})
+	held, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "held",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	mutation, err := catalog.NewMutation(1, []RouteChange{{PublicName: "work"}})
 	require.NoError(t, err)
 	commitMutation(t, catalog, mutation)
 
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "retiring", Route: "work"})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "retiring",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	assert.Equal(t, lifecycle.ControlUnavailable, decision.Rejected)
 	_, err = catalog.ReleaseInvocation(held.Lease)
 	require.NoError(t, err)
-	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "retired", Route: "work"})
+	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "retired",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	assert.Equal(t, lifecycle.ControlNotFound, decision.Rejected)
 }
@@ -550,7 +616,10 @@ func TestFunctionCatalogRemovedRouteStaysUnavailableUntilLeaseDrains(t *testing.
 func TestFunctionCatalogRemovedRouteWaitsForEveryRetiredGeneration(t *testing.T) {
 	catalog, err := NewCatalog([]Declaration{testDeclaration("work", "", ResourcePolicy{})})
 	require.NoError(t, err)
-	first, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "first", Route: "work"})
+	first, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "first",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	removeFirst, err := catalog.NewMutation(1, []RouteChange{{PublicName: "work"}})
 	require.NoError(t, err)
@@ -560,7 +629,10 @@ func TestFunctionCatalogRemovedRouteWaitsForEveryRetiredGeneration(t *testing.T)
 	addSecond, err := catalog.NewMutation(2, []RouteChange{{PublicName: "work", Declaration: &secondDeclaration}})
 	require.NoError(t, err)
 	commitMutation(t, catalog, addSecond)
-	second, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "second", Route: "work"})
+	second, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "second",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	removeSecond, err := catalog.NewMutation(3, []RouteChange{{PublicName: "work"}})
 	require.NoError(t, err)
@@ -568,12 +640,18 @@ func TestFunctionCatalogRemovedRouteWaitsForEveryRetiredGeneration(t *testing.T)
 
 	_, err = catalog.ReleaseInvocation(second.Lease)
 	require.NoError(t, err)
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "first-held", Route: "work"})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "first-held",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	assert.Equal(t, lifecycle.ControlUnavailable, decision.Rejected)
 	_, err = catalog.ReleaseInvocation(first.Lease)
 	require.NoError(t, err)
-	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "all-drained", Route: "work"})
+	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "all-drained",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	assert.Equal(t, lifecycle.ControlNotFound, decision.Rejected)
 }
@@ -581,13 +659,19 @@ func TestFunctionCatalogRemovedRouteWaitsForEveryRetiredGeneration(t *testing.T)
 func TestFunctionCatalogRemovalWaitsForReplacedGeneration(t *testing.T) {
 	catalog, err := NewCatalog([]Declaration{testDeclaration("work", "", ResourcePolicy{})})
 	require.NoError(t, err)
-	first, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "first", Route: "work"})
+	first, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "first",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	secondDeclaration := testDeclaration("work", "", ResourcePolicy{})
 	replace, err := catalog.NewMutation(1, []RouteChange{{PublicName: "work", Declaration: &secondDeclaration}})
 	require.NoError(t, err)
 	commitMutation(t, catalog, replace)
-	second, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "second", Route: "work"})
+	second, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "second",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	remove, err := catalog.NewMutation(2, []RouteChange{{PublicName: "work"}})
 	require.NoError(t, err)
@@ -595,12 +679,18 @@ func TestFunctionCatalogRemovalWaitsForReplacedGeneration(t *testing.T) {
 
 	_, err = catalog.ReleaseInvocation(second.Lease)
 	require.NoError(t, err)
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "first-held", Route: "work"})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "first-held",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	assert.Equal(t, lifecycle.ControlUnavailable, decision.Rejected)
 	_, err = catalog.ReleaseInvocation(first.Lease)
 	require.NoError(t, err)
-	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "all-drained", Route: "work"})
+	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "all-drained",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	assert.Equal(t, lifecycle.ControlNotFound, decision.Rejected)
 }
@@ -612,7 +702,10 @@ func TestFunctionCatalogRetiredRouteDrainsBeforeSharedGeneration(t *testing.T) {
 		testDeclarationForGeneration(generation, "two", "", ResourcePolicy{}),
 	})
 	require.NoError(t, err)
-	held, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "held", Route: "one"})
+	held, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "held",
+		Route: "one",
+	})
 	require.NoError(t, err)
 	remove, err := catalog.NewMutation(1, []RouteChange{{PublicName: "one"}})
 	require.NoError(t, err)
@@ -620,10 +713,16 @@ func TestFunctionCatalogRetiredRouteDrainsBeforeSharedGeneration(t *testing.T) {
 	_, err = catalog.ReleaseInvocation(held.Lease)
 	require.NoError(t, err)
 
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "retired", Route: "one"})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "retired",
+		Route: "one",
+	})
 	require.NoError(t, err)
 	assert.Equal(t, lifecycle.ControlNotFound, decision.Rejected)
-	other, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "other", Route: "two"})
+	other, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "other",
+		Route: "two",
+	})
 	require.NoError(t, err)
 	require.True(t, other.Lease.Valid())
 	_, err = catalog.ReleaseInvocation(other.Lease)
@@ -709,7 +808,10 @@ func TestFunctionCatalogReleaseValidatesCleanupBeforeReleasingLease(t *testing.T
 	declaration.Generation.Cleanup = func(context.Context) error { return nil }
 	catalog, err := NewCatalog([]Declaration{declaration})
 	require.NoError(t, err)
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "held", Route: "work"})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID:   "held",
+		Route: "work",
+	})
 	require.NoError(t, err)
 	resolved := catalog.snapshot.Load().routes["work"].direct
 	generation := resolved.handler
@@ -736,7 +838,8 @@ func TestFunctionCatalogInvocationPopulationExceedsFormerLimit(t *testing.T) {
 	leases := make([]jobmgr.FunctionInvocationRef, 0, population)
 	for index := range population {
 		decision, resolveErr := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-			UID: fmt.Sprintf("call-%03d", index), Route: "work",
+			UID:   fmt.Sprintf("call-%03d", index),
+			Route: "work",
 		})
 		require.NoError(t, resolveErr)
 		require.True(t, decision.Lease.Valid())
@@ -818,8 +921,11 @@ func testDeclarationForGeneration(
 	resource ResourcePolicy,
 ) Declaration {
 	return Declaration{
-		ID: "method", Generation: generation, PublicName: publicName,
-		Prefix: prefix, Resource: resource,
+		ID:         "method",
+		Generation: generation,
+		PublicName: publicName,
+		Prefix:     prefix,
+		Resource:   resource,
 	}
 }
 

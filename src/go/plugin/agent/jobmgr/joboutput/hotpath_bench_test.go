@@ -20,7 +20,9 @@ func BenchmarkBConfigFactoryCold(b *testing.B) {
 			Modules: collectorapi.Registry{
 				"module": {
 					CreateV2: func() collectorapi.CollectorV2 {
-						return &factoryTestV2{state: state}
+						return &factoryTestV2{
+							state: state,
+						}
 					},
 				},
 			},
@@ -41,7 +43,9 @@ func BenchmarkBConfigFactoryCold(b *testing.B) {
 }
 
 func BenchmarkBJobGenerationLookup(b *testing.B) {
-	generation := &JobGeneration{state: JobActive}
+	generation := &JobGeneration{
+		state: JobActive,
+	}
 	b.ReportAllocs()
 	for b.Loop() {
 		if generation.State() != JobActive {

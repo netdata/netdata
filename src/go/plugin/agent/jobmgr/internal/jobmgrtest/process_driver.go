@@ -66,22 +66,30 @@ func startProcessFixture(
 	logger.Level.SetByName("critical")
 	reader, writer := io.Pipe()
 	output := &synchronizedBuffer{}
-	defaults := confgroup.Registry{productionFixtureModule: {UpdateEvery: 1}}
+	defaults := confgroup.Registry{
+		productionFixtureModule: {UpdateEvery: 1},
+	}
 	build := agentdiscovery.BuildContext{
-		RunMode:    policy.Agent(true),
-		Identity:   agentdiscovery.PluginIdentity{Name: "jobmgrtest"},
+		RunMode: policy.Agent(true),
+		Identity: agentdiscovery.PluginIdentity{
+			Name: "jobmgrtest",
+		},
 		Registry:   defaults,
 		DummyNames: []string{productionFixtureModule},
 	}
 	provider := agentdiscovery.NewProviderFactory(
 		"dummy",
 		func(build agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
-			discoverer, err := dummy.NewDiscovery(dummy.Config{Registry: build.Registry, Names: build.DummyNames})
+			discoverer, err := dummy.NewDiscovery(dummy.Config{
+				Registry: build.Registry,
+				Names:    build.DummyNames,
+			})
 			return discoverer, err == nil, err
 		},
 	)
 	process, err := composition.NewProcess(composition.Config{
-		Input: reader, Output: output,
+		Input:                 reader,
+		Output:                output,
 		PluginName:            "jobmgrtest",
 		Modules:               fixtureRegistry(state, false),
 		Defaults:              defaults,
@@ -133,7 +141,10 @@ func (f *processFixture) close() {
 func runProcessRestart(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{cleanupGate: release, cleanupEntered: entered}
+	state := &agentFixtureState{
+		cleanupGate:    release,
+		cleanupEntered: entered,
+	}
 	fixture, err := startProcessFixture(ctx, state, time.Second)
 	if err != nil {
 		return err
@@ -235,7 +246,10 @@ func runProcessInputFence(ctx context.Context) error {
 func runProcessNoncooperativeShutdown(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{cleanupGate: release, cleanupEntered: entered}
+	state := &agentFixtureState{
+		cleanupGate:    release,
+		cleanupEntered: entered,
+	}
 	fixture, err := startProcessFixture(ctx, state, 100*time.Millisecond)
 	if err != nil {
 		return err
@@ -287,7 +301,10 @@ func runProcessNoncooperativeShutdown(ctx context.Context) error {
 func runCollectorRepeatedStop(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{cleanupGate: release, cleanupEntered: entered}
+	state := &agentFixtureState{
+		cleanupGate:    release,
+		cleanupEntered: entered,
+	}
 	fixture, err := startProcessFixture(ctx, state, time.Second)
 	if err != nil {
 		return err

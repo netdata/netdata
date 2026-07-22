@@ -57,7 +57,8 @@ func (dcjb *dynCfgJobBinding) prepare(
 
 func dynCfgJobRequest(input functionadapter.HandlerInput) joboutput.DynCfgJobRequest {
 	return joboutput.DynCfgJobRequest{
-		Args: input.Args, Payload: input.Payload,
+		Args:         input.Args,
+		Payload:      input.Payload,
 		ContentType:  input.ContentType,
 		CallerSource: input.CallerSource,
 		HasPayload:   input.HasPayload,

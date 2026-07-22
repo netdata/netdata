@@ -25,7 +25,10 @@ func TestSchedulerTicksEachJobAndModuleOnce(t *testing.T) {
 	for _, name := range order {
 		job := jobs[name]
 
-		require.NoError(t, scheduler.Register(lifecycle.ResourceIdentity{ID: name, Generation: 1}, job))
+		require.NoError(t, scheduler.Register(lifecycle.ResourceIdentity{
+			ID:         name,
+			Generation: 1,
+		}, job))
 	}
 
 	require.NoError(t, scheduler.Tick(context.Background(), 7))
@@ -38,7 +41,10 @@ func TestSchedulerTicksEachJobAndModuleOnce(t *testing.T) {
 	require.ElementsMatch(t, []string{"module-a", "module-b"}, reconciler.snapshot())
 
 	for name, job := range jobs {
-		require.NoError(t, scheduler.Unregister(lifecycle.ResourceIdentity{ID: name, Generation: 1}, job))
+		require.NoError(t, scheduler.Unregister(lifecycle.ResourceIdentity{
+			ID:         name,
+			Generation: 1,
+		}, job))
 	}
 	require.NoError(t, scheduler.Tick(context.Background(), 8))
 
@@ -61,9 +67,15 @@ func TestSchedulerGrowsBeyondFormerActiveJobLimit(t *testing.T) {
 			jobs := make([]*schedulerTestJob, 0, test.population)
 			for index := 0; index < test.population; index++ {
 				id := fmt.Sprintf("dynamic-job-%03d", index)
-				job := &schedulerTestJob{id: id, module: "module"}
+				job := &schedulerTestJob{
+					id:     id,
+					module: "module",
+				}
 
-				require.NoError(t, scheduler.Register(lifecycle.ResourceIdentity{ID: id, Generation: 1}, job))
+				require.NoError(t, scheduler.Register(lifecycle.ResourceIdentity{
+					ID:         id,
+					Generation: 1,
+				}, job))
 
 				jobs = append(jobs, job)
 			}
@@ -72,7 +84,10 @@ func TestSchedulerGrowsBeyondFormerActiveJobLimit(t *testing.T) {
 				require.EqualValues(t, 1, job.ticks, "job=%s", job.id)
 			}
 			for _, job := range jobs {
-				require.NoError(t, scheduler.Unregister(lifecycle.ResourceIdentity{ID: job.id, Generation: 1}, job))
+				require.NoError(t, scheduler.Unregister(lifecycle.ResourceIdentity{
+					ID:         job.id,
+					Generation: 1,
+				}, job))
 			}
 			require.NoError(t, scheduler.Tick(context.Background(), 2))
 			for _, job := range jobs {

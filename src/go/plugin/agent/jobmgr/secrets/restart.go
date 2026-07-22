@@ -32,7 +32,11 @@ func NewSecretRestartCommand(
 	if epoch == 0 || dependencies == nil || jobs == nil {
 		return nil, errors.New("jobmgr secrets: incomplete restart command")
 	}
-	return &SecretRestartCommand{epoch: epoch, dependencies: dependencies, jobs: jobs}, nil
+	return &SecretRestartCommand{
+		epoch:        epoch,
+		dependencies: dependencies,
+		jobs:         jobs,
+	}, nil
 }
 
 func (src *SecretRestartCommand) Apply(

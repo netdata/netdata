@@ -46,7 +46,13 @@ func newVNodeBinding(
 	if epoch == 0 || pluginName == "" || frames == nil || config == nil || graph == nil {
 		return nil, errors.New("jobmgr composition: invalid vnode binding")
 	}
-	binding := &vnodeBinding{epoch: epoch, pluginName: pluginName, frames: frames, config: config, graph: graph}
+	binding := &vnodeBinding{
+		epoch:      epoch,
+		pluginName: pluginName,
+		frames:     frames,
+		config:     config,
+		graph:      graph,
+	}
 	if err := binding.validateInitial(); err != nil {
 		return nil, err
 	}
@@ -455,11 +461,13 @@ func (vb *vnodeBinding) configCreateVNodeJob(api *netdataapi.API, vnode *vnodes.
 		commands += " " + string(dyncfg.CommandRemove)
 	}
 	api.CONFIGCREATE(netdataapi.ConfigOpts{
-		ID:         vb.prefix() + ":" + vnode.Name,
-		Status:     dyncfg.StatusRunning.String(),
-		ConfigType: dyncfg.ConfigTypeJob.String(),
-		Path:       vb.path(), SourceType: vnode.SourceType,
-		Source: vnode.Source, SupportedCommands: commands,
+		ID:                vb.prefix() + ":" + vnode.Name,
+		Status:            dyncfg.StatusRunning.String(),
+		ConfigType:        dyncfg.ConfigTypeJob.String(),
+		Path:              vb.path(),
+		SourceType:        vnode.SourceType,
+		Source:            vnode.Source,
+		SupportedCommands: commands,
 	})
 }
 
@@ -481,8 +489,9 @@ func (vb *vnodeBinding) initialCleanup() lifecycle.TaskCleanup {
 			ID:         vb.prefix(),
 			Status:     dyncfg.StatusAccepted.String(),
 			ConfigType: dyncfg.ConfigTypeTemplate.String(),
-			Path:       vb.path(), SourceType: "internal",
-			Source: "internal",
+			Path:       vb.path(),
+			SourceType: "internal",
+			Source:     "internal",
 			SupportedCommands: dyncfg.JoinCommands(
 				dyncfg.CommandAdd,
 				dyncfg.CommandSchema,
@@ -585,7 +594,12 @@ func newPreparedVNodeTransaction(
 	); err != nil {
 		return nil, err
 	}
-	return &preparedVNodeTransaction{scope: scope, prepared: prepared, result: result, cleanup: cleanup}, nil
+	return &preparedVNodeTransaction{
+		scope:    scope,
+		prepared: prepared,
+		result:   result,
+		cleanup:  cleanup,
+	}, nil
 }
 
 func (pvt *preparedVNodeTransaction) Scope() lifecycle.ResourceTransactionScope {

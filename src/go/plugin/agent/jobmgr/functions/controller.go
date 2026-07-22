@@ -103,7 +103,11 @@ func (c *Controller) PrepareJob(
 	if _, ok := c.modules.Lookup(job.ModuleName()); !ok {
 		return nil, errors.New("jobmgr Function controller: job module is not registered")
 	}
-	return &JobHandle{controller: c, identity: identity, job: job}, nil
+	return &JobHandle{
+		controller: c,
+		identity:   identity,
+		job:        job,
+	}, nil
 }
 
 func (jh *JobHandle) Publish() error {
@@ -282,7 +286,10 @@ func (c *Controller) Activate() error {
 	changes := make([]PublicationChange, 0, len(records))
 	for index := range records {
 		record := records[index]
-		changes = append(changes, PublicationChange{Name: record.Name, Record: &record})
+		changes = append(changes, PublicationChange{
+			Name:   record.Name,
+			Record: &record,
+		})
 	}
 	if err := c.publication.ApplyInitialSnapshot(c.epoch, c.version, changes); err != nil {
 		c.dirty = errors.Join(c.dirty, err)
@@ -322,7 +329,11 @@ func (c *Controller) publishJob(
 	if creator.InstanceFunctions != nil {
 		methods = slices.Clone(creator.InstanceFunctions(job))
 	}
-	moduleJobs[job.Name()] = controllerJob{identity: identity, job: job, methods: methods}
+	moduleJobs[job.Name()] = controllerJob{
+		identity: identity,
+		job:      job,
+		methods:  methods,
+	}
 	if _, err := c.reconcileModuleLocked(ctx, job.ModuleName(), creator); err != nil {
 		if c.dirty == nil {
 			delete(moduleJobs, job.Name())
@@ -761,8 +772,11 @@ func (c *Controller) buildGroup(
 	}
 	declaration := generation.declaration()
 	group := &controllerGroup{
-		key: key, module: module, signature: signature,
-		generation: generation, routes: make(map[string]controllerRoute),
+		key:        key,
+		module:     module,
+		signature:  signature,
+		generation: generation,
+		routes:     make(map[string]controllerRoute),
 	}
 	for _, method := range methods {
 		names := []string{funcapi.FunctionName(module, method)}
@@ -781,9 +795,12 @@ func (c *Controller) buildGroup(
 			group.routes[name] = controllerRoute{
 				module: module,
 				declaration: Declaration{
-					ID: method.ID, Generation: declaration,
-					PublicName: name, RawPayload: method.RawRequest,
-					CooperativeCancel: true, CooperativeDeadline: true,
+					ID:                  method.ID,
+					Generation:          declaration,
+					PublicName:          name,
+					RawPayload:          method.RawRequest,
+					CooperativeCancel:   true,
+					CooperativeDeadline: true,
 				},
 				publication: methodPublicationRecord(name, module, method, c.nextID),
 			}
@@ -914,8 +931,14 @@ func methodPublicationRecord(
 		tags = "top"
 	}
 	return PublicationRecord{
-		Name: name, Generation: generation, Timeout: 60,
-		Help: help, Tags: tags, Access: access, Priority: 100, Version: 3,
+		Name:       name,
+		Generation: generation,
+		Timeout:    60,
+		Help:       help,
+		Tags:       tags,
+		Access:     access,
+		Priority:   100,
+		Version:    3,
 	}
 }
 
@@ -964,11 +987,16 @@ func controllerChanges[T any](
 func controllerRouteChanges(current map[string]controllerRoute, next map[string]controllerRoute) []RouteChange {
 	return controllerChanges(current, next,
 		func(name string) RouteChange {
-			return RouteChange{PublicName: name}
+			return RouteChange{
+				PublicName: name,
+			}
 		},
 		func(name string, route controllerRoute) RouteChange {
 			declaration := route.declaration
-			return RouteChange{PublicName: name, Declaration: &declaration}
+			return RouteChange{
+				PublicName:  name,
+				Declaration: &declaration,
+			}
 		},
 	)
 }
@@ -979,11 +1007,16 @@ func controllerPublicationChanges(
 ) []PublicationChange {
 	return controllerChanges(current, next,
 		func(name string) PublicationChange {
-			return PublicationChange{Name: name}
+			return PublicationChange{
+				Name: name,
+			}
 		},
 		func(name string, route controllerRoute) PublicationChange {
 			record := route.publication
-			return PublicationChange{Name: name, Record: &record}
+			return PublicationChange{
+				Name:   name,
+				Record: &record,
+			}
 		},
 	)
 }

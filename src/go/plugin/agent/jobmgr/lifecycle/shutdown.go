@@ -30,10 +30,13 @@ func newShutdownBudget(clock Clock, timeout time.Duration) (*ShutdownBudget, err
 	budget := &ShutdownBudget{
 		deadline: deadline,
 		clock:    clock,
-		ctx:      &shutdownContext{deadline: deadline, done: make(chan struct{})},
-		cancel:   cancel,
-		stop:     make(chan struct{}),
-		done:     make(chan struct{}),
+		ctx: &shutdownContext{
+			deadline: deadline,
+			done:     make(chan struct{}),
+		},
+		cancel: cancel,
+		stop:   make(chan struct{}),
+		done:   make(chan struct{}),
 	}
 	go func() {
 		defer close(budget.done)

@@ -63,7 +63,9 @@ func newPreparedSecretTransaction(spec preparedSecretSpec) (*preparedSecretTrans
 			spec.permit.Owner() != spec.scope.Successor) {
 		return nil, errors.New("jobmgr secrets: no-op permit differs from scope")
 	}
-	return &preparedSecretTransaction{spec: spec}, nil
+	return &preparedSecretTransaction{
+		spec: spec,
+	}, nil
 }
 
 func (pst *preparedSecretTransaction) Scope() lifecycle.ResourceTransactionScope {

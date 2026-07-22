@@ -28,7 +28,10 @@ func acquireRunOwnedStoreScope(
 	if err != nil {
 		return nil, err
 	}
-	return &runOwnedAtomicScope{run: run, scope: scope}, nil
+	return &runOwnedAtomicScope{
+		run:   run,
+		scope: scope,
+	}, nil
 }
 
 func (roas *runOwnedAtomicScope) Resolve(ctx context.Context, reference, original string) ([]byte, error) {

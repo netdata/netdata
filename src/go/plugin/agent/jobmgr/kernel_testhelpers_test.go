@@ -34,7 +34,12 @@ func startShutdownProbe(ctx context.Context, ck *CommandKernel, uid string) (shu
 	go func() {
 		settled <- ck.SubmitPreparedAndWait(
 			context.Background(),
-			Request{UID: uid, LaneKey: uid, Source: lifecycle.SourceJobManager, Route: "internal/shutdown-probe"},
+			Request{
+				UID:     uid,
+				LaneKey: uid,
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/shutdown-probe",
+			},
 			WorkPlan{
 				Work: frameTaskWork(func(ctx context.Context) (lifecycle.SealedResult, error) {
 					close(started)
@@ -47,7 +52,10 @@ func startShutdownProbe(ctx context.Context, ck *CommandKernel, uid string) (shu
 	}()
 	select {
 	case <-started:
-		return shutdownProbe{cancelled: cancelled, settled: settled}, nil
+		return shutdownProbe{
+			cancelled: cancelled,
+			settled:   settled,
+		}, nil
 	case err := <-settled:
 		return shutdownProbe{}, errors.Join(errors.New("shutdown probe settled before starting"), err)
 	case <-ctx.Done():

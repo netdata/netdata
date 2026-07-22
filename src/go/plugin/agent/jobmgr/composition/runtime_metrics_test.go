@@ -174,7 +174,9 @@ func TestRunMetricsRegistration(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			service := &runMetricsService{producerErr: test.producerErr}
+			service := &runMetricsService{
+				producerErr: test.producerErr,
+			}
 			metrics := newRunMetrics()
 			err := metrics.register(service)
 			require.EqualValues(t, test.wantErr, err != nil)
@@ -201,10 +203,13 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
-		Generation: 1, ShutdownTimeout: time.Second,
-		UIDs:   uids,
-		Frames: frames, Modules: collectorapi.Registry{}, Jobs: jobs,
-		Discovery: testRunDiscoveryServices(t),
+		Generation:      1,
+		ShutdownTimeout: time.Second,
+		UIDs:            uids,
+		Frames:          frames,
+		Modules:         collectorapi.Registry{},
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServices(t),
 	})
 	require.NoError(t, err)
 	components, removals, producers, producerRemovals := service.snapshot()

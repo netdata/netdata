@@ -163,7 +163,9 @@ type rootProtocolObservation struct {
 }
 
 func newRootProtocolObservation() *rootProtocolObservation {
-	return &rootProtocolObservation{changed: make(chan struct{}, 1)}
+	return &rootProtocolObservation{
+		changed: make(chan struct{}, 1),
+	}
 }
 
 func (rpo *rootProtocolObservation) observe(chunk []byte) error {

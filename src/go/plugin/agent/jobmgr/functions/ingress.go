@@ -24,7 +24,11 @@ func newIngress(kernel jobmgr.CommandPort, clock lifecycle.Clock, quit func()) (
 	if kernel == nil || clock == nil || quit == nil {
 		return nil, errors.New("jobmgr Function ingress adapter: incomplete ports")
 	}
-	return &Ingress{kernel: kernel, clock: clock, quit: quit}, nil
+	return &Ingress{
+		kernel: kernel,
+		clock:  clock,
+		quit:   quit,
+	}, nil
 }
 
 func (i *Ingress) HandleCall(ctx context.Context, call functionwire.Call) error {
@@ -33,11 +37,17 @@ func (i *Ingress) HandleCall(ctx context.Context, call functionwire.Call) error 
 		deadline = i.clock.Now().Add(call.Timeout)
 	}
 	return i.kernel.Submit(ctx, jobmgr.Request{
-		UID: call.UID, Source: lifecycle.SourceFunction, Route: call.Method,
-		Args: slices.Clone(call.Args), Payload: call.Payload, ContentType: call.ContentType,
-		Permissions: call.Access, CallerSource: call.Source, Timeout: call.Timeout,
-		HasPayload: call.HasPayload,
-		Deadline:   deadline,
+		UID:          call.UID,
+		Source:       lifecycle.SourceFunction,
+		Route:        call.Method,
+		Args:         slices.Clone(call.Args),
+		Payload:      call.Payload,
+		ContentType:  call.ContentType,
+		Permissions:  call.Access,
+		CallerSource: call.Source,
+		Timeout:      call.Timeout,
+		HasPayload:   call.HasPayload,
+		Deadline:     deadline,
 	})
 }
 

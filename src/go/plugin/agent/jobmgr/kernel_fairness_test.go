@@ -26,13 +26,21 @@ func TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress(t *testing.
 		},
 	)
 	for index := range hotLanePopulation {
-		request := Request{UID: fmt.Sprintf("hot-%02d", index), Source: lifecycle.SourceFunction, Route: "route"}
+		request := Request{
+			UID:    fmt.Sprintf("hot-%02d", index),
+			Source: lifecycle.SourceFunction,
+			Route:  "route",
+		}
 		plan, err := kernel.prepareSubmissionPlanForTest(request)
 		require.NoError(t, err)
 
 		require.NoError(t, kernel.admit(request, plan))
 	}
-	cold := Request{UID: "cold-progress", Source: lifecycle.SourceFunction, Route: "route"}
+	cold := Request{
+		UID:    "cold-progress",
+		Source: lifecycle.SourceFunction,
+		Route:  "route",
+	}
 	plan, err := kernel.prepareSubmissionPlanForTest(cold)
 	require.NoError(t, err)
 
@@ -59,8 +67,14 @@ func TestKernelReadyLaneFairnessAtBoundaries(t *testing.T) {
 						false,
 					)
 					require.NoError(t, err)
-					operation := &commandOperation{OperationGeneration: generation}
-					lane := &commandLane{key: uid, source: source, head: operation}
+					operation := &commandOperation{
+						OperationGeneration: generation,
+					}
+					lane := &commandLane{
+						key:    uid,
+						source: source,
+						head:   operation,
+					}
 					expected[sourceIndex] = append(expected[sourceIndex], lane)
 					kernel.markReady(lane)
 				}

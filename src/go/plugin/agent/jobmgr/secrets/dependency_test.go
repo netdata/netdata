@@ -81,9 +81,11 @@ func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 			commit, err := index.PrepareJobChange(
 				test.id,
 				&dyncfg.GraphConfig{
-					ID: test.id, Module: "module",
-					Name:   config["name"].(string),
-					Status: test.status.String(), Payload: payload,
+					ID:      test.id,
+					Module:  "module",
+					Name:    config["name"].(string),
+					Status:  test.status.String(),
+					Payload: payload,
 				},
 			)
 			require.NoError(t, err)
@@ -125,8 +127,11 @@ func BenchmarkBSecretDependencyLookup(b *testing.B) {
 		commit, err := index.PrepareJobChange(
 			id,
 			&dyncfg.GraphConfig{
-				ID: id, Module: "module", Name: fmt.Sprintf("%d", job),
-				Status: dyncfg.StatusRunning.String(), Payload: payload,
+				ID:      id,
+				Module:  "module",
+				Name:    fmt.Sprintf("%d", job),
+				Status:  dyncfg.StatusRunning.String(),
+				Payload: payload,
 			},
 		)
 		if err != nil {

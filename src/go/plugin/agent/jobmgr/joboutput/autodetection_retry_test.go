@@ -146,7 +146,9 @@ func TestAutoDetectionRetryUsesLogicalClockFromFirstRunTick(t *testing.T) {
 func TestAutoDetectionRetryRetainsExactAuthorityWhileDispatching(t *testing.T) {
 	release := make(chan struct{})
 	index := newAutoDetectionRetryIndex()
-	commands := &autoDetectionRetryTestCommands{block: release}
+	commands := &autoDetectionRetryTestCommands{
+		block: release,
+	}
 	require.NoError(t, index.bind(
 		commands,
 		func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
@@ -186,7 +188,9 @@ func TestAutoDetectionRetryRetainsExactAuthorityWhileDispatching(t *testing.T) {
 
 func TestSchedulerTickDoesNotBlockOnRetryAdmission(t *testing.T) {
 	release := make(chan struct{})
-	commands := &autoDetectionRetryTestCommands{block: release}
+	commands := &autoDetectionRetryTestCommands{
+		block: release,
+	}
 	scheduler, err := NewScheduler(testModuleReconciler{})
 	require.NoError(t, err)
 	require.NoError(t, scheduler.bindAutoDetectionRetries(
@@ -232,7 +236,9 @@ func TestAutoDetectionRetryReportsStructuralDispatchFailure(t *testing.T) {
 			failed := make(chan error, 1)
 			index := newAutoDetectionRetryIndex()
 			require.NoError(t, index.bind(
-				&autoDetectionRetryTestCommands{submitErr: test.submitErr},
+				&autoDetectionRetryTestCommands{
+					submitErr: test.submitErr,
+				},
 				func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
 					return jobmgr.WorkPlan{}, test.planningErr
 				},
@@ -263,7 +269,9 @@ func TestAutoDetectionRetryReportsStructuralDispatchFailure(t *testing.T) {
 
 func TestAutoDetectionRetryWaitRequiresWorkerJoin(t *testing.T) {
 	release := make(chan struct{})
-	commands := &autoDetectionRetryTestCommands{block: release}
+	commands := &autoDetectionRetryTestCommands{
+		block: release,
+	}
 	index := newAutoDetectionRetryIndex()
 	require.NoError(t, index.bind(
 		commands,
@@ -303,13 +311,19 @@ func TestAutoDetectionRetryClassifiesStoppingSubmission(t *testing.T) {
 		submitErr   error
 		wantFailure bool
 	}{
-		"exact current stopping token is clean": {submitErr: &lifecycle.StoppingRejection{Generation: 1}},
+		"exact current stopping token is clean": {submitErr: &lifecycle.StoppingRejection{
+			Generation: 1,
+		}},
 		"wrong generation is structural": {
-			submitErr:   &lifecycle.StoppingRejection{Generation: 2},
+			submitErr: &lifecycle.StoppingRejection{
+				Generation: 2,
+			},
 			wantFailure: true,
 		},
 		"joined structural error is not hidden": {
-			submitErr:   errors.Join(&lifecycle.StoppingRejection{Generation: 1}, sentinel),
+			submitErr: errors.Join(&lifecycle.StoppingRejection{
+				Generation: 1,
+			}, sentinel),
 			wantFailure: true,
 		},
 	}
@@ -318,7 +332,9 @@ func TestAutoDetectionRetryClassifiesStoppingSubmission(t *testing.T) {
 			failed := make(chan error, 1)
 			index := newAutoDetectionRetryIndex()
 			require.NoError(t, index.bind(
-				&autoDetectionRetryTestCommands{submitErr: test.submitErr},
+				&autoDetectionRetryTestCommands{
+					submitErr: test.submitErr,
+				},
 				func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
 					return jobmgr.WorkPlan{}, nil
 				},

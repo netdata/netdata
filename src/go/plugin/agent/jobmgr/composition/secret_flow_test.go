@@ -44,22 +44,28 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(t *testing
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				return &runTestHandler{cleanup: func() {}}
+				return &runTestHandler{
+					cleanup: func() {},
+				}
 			},
 			JobConfigSchema: collectorapi.MockConfigSchema,
 		},
 	}
 	jobConfig := confgroup.Config{
-		"module": "module", "name": "job",
-		"update_every": 1, "function_only": true,
-		"option_str": "${store:vault:main:key}",
-		"option_int": 1,
+		"module":        "module",
+		"name":          "job",
+		"update_every":  1,
+		"function_only": true,
+		"option_str":    "${store:vault:main:key}",
+		"option_int":    1,
 	}
 	jobConfig.SetProvider(confgroup.TypeDyncfg)
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
-	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
 			Kind:   secretstore.KindVault,
@@ -72,7 +78,8 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(t *testing
 	require.NoError(t, err)
 	jobs.StoreCreators = creators
 	initialStore := secretstore.Config{
-		"name": "main", "kind": string(secretstore.KindVault),
+		"name":            "main",
+		"kind":            string(secretstore.KindVault),
 		"value":           "initial",
 		"__source__":      confgroup.TypeUser,
 		"__source_type__": confgroup.TypeUser,
@@ -82,10 +89,14 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(t *testing
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output,
+		Input:           reader,
+		Output:          output,
 		ShutdownTimeout: time.Second,
-		Modules:         modules, Jobs: jobs,
-		Secrets:   runSecretServices{Initial: []secretstore.Config{initialStore}},
+		Modules:         modules,
+		Jobs:            jobs,
+		Secrets: runSecretServices{
+			Initial: []secretstore.Config{initialStore},
+		},
 		Discovery: testRunDiscoveryServices(t, jobConfig),
 	})
 	require.NoError(t, err)
@@ -166,22 +177,28 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				return &runTestHandler{cleanup: func() {}}
+				return &runTestHandler{
+					cleanup: func() {},
+				}
 			},
 			JobConfigSchema: collectorapi.MockConfigSchema,
 		},
 	}
 	jobConfig := confgroup.Config{
-		"module": "module", "name": "job",
-		"update_every": 1, "function_only": true,
-		"option_str": "${store:vault:main:key}",
-		"option_int": 1,
+		"module":        "module",
+		"name":          "job",
+		"update_every":  1,
+		"function_only": true,
+		"option_str":    "${store:vault:main:key}",
+		"option_int":    1,
 	}
 	jobConfig.SetProvider(confgroup.TypeDyncfg)
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
-	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
 			Kind:   secretstore.KindVault,
@@ -194,7 +211,8 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	require.NoError(t, err)
 	jobs.StoreCreators = creators
 	initialStore := secretstore.Config{
-		"name": "main", "kind": string(secretstore.KindVault),
+		"name":            "main",
+		"kind":            string(secretstore.KindVault),
 		"value":           "initial",
 		"__source__":      confgroup.TypeUser,
 		"__source_type__": confgroup.TypeUser,
@@ -204,10 +222,14 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output,
+		Input:           reader,
+		Output:          output,
 		ShutdownTimeout: time.Second,
-		Modules:         modules, Jobs: jobs,
-		Secrets:   runSecretServices{Initial: []secretstore.Config{initialStore}},
+		Modules:         modules,
+		Jobs:            jobs,
+		Secrets: runSecretServices{
+			Initial: []secretstore.Config{initialStore},
+		},
 		Discovery: testRunDiscoveryServices(t, jobConfig),
 	})
 	require.NoError(t, err)
@@ -285,10 +307,12 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output,
+		Input:           reader,
+		Output:          output,
 		ShutdownTimeout: time.Second,
-		Modules:         collectorapi.Registry{}, Jobs: jobs,
-		Discovery: testRunDiscoveryServices(t),
+		Modules:         collectorapi.Registry{},
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServices(t),
 	})
 	require.NoError(t, err)
 	commands := make(chan processControl, 1)
@@ -383,22 +407,28 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(t *testing.T) {
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
 			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				return &runTestHandler{cleanup: func() {}}
+				return &runTestHandler{
+					cleanup: func() {},
+				}
 			},
 			JobConfigSchema: collectorapi.MockConfigSchema,
 		},
 	}
 	jobConfig := confgroup.Config{
-		"module": "module", "name": "job",
-		"update_every": 1, "function_only": true,
-		"option_str": "${store:vault:main:key}",
-		"option_int": 1,
+		"module":        "module",
+		"name":          "job",
+		"update_every":  1,
+		"function_only": true,
+		"option_str":    "${store:vault:main:key}",
+		"option_int":    1,
 	}
 	jobConfig.SetProvider(confgroup.TypeDyncfg)
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
-	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
 			Kind:   secretstore.KindVault,
@@ -411,7 +441,8 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(t *testing.T) {
 	require.NoError(t, err)
 	jobs.StoreCreators = creators
 	initialStore := secretstore.Config{
-		"name": "main", "kind": string(secretstore.KindVault),
+		"name":            "main",
+		"kind":            string(secretstore.KindVault),
 		"value":           "initial",
 		"__source__":      confgroup.TypeUser,
 		"__source_type__": confgroup.TypeUser,
@@ -420,10 +451,14 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(t *testing.T) {
 	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
-		Input: reader, Output: output,
+		Input:           reader,
+		Output:          output,
 		ShutdownTimeout: time.Second,
-		Modules:         modules, Jobs: jobs,
-		Secrets:   runSecretServices{Initial: []secretstore.Config{initialStore}},
+		Modules:         modules,
+		Jobs:            jobs,
+		Secrets: runSecretServices{
+			Initial: []secretstore.Config{initialStore},
+		},
 		Discovery: testRunDiscoveryServices(t, jobConfig),
 	})
 	require.NoError(t, err)

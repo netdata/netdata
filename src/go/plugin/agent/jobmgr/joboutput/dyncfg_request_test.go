@@ -34,7 +34,9 @@ func TestDynCfgResolveRequestReportsArgumentErrors(t *testing.T) {
 	controller, _, _, _, _ := newDynCfgJobTestHarness(t)
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, failure := controller.resolveRequest(DynCfgJobRequest{Args: test.args})
+			_, failure := controller.resolveRequest(DynCfgJobRequest{
+				Args: test.args,
+			})
 			require.Equal(t, test.wantFailure, failure)
 		})
 	}

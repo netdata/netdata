@@ -57,12 +57,16 @@ func TestVNodeBindingPreparesUpdates(t *testing.T) {
 			transaction, err := binding.prepare(
 				context.Background(),
 				functionadapter.HandlerInput{
-					Args: test.args, Payload: []byte(test.payload),
-					ContentType: "application/json", CallerSource: "user=test",
-					HasPayload: true,
+					Args:         test.args,
+					Payload:      []byte(test.payload),
+					ContentType:  "application/json",
+					CallerSource: "user=test",
+					HasPayload:   true,
 				},
 				nil,
-				lifecycle.ResourceTransactionScope{ID: "vnode:" + target},
+				lifecycle.ResourceTransactionScope{
+					ID: "vnode:" + target,
+				},
 				lifecycle.LongLivedPermit{},
 			)
 			require.NoError(t, err)
@@ -131,9 +135,13 @@ func TestVNodeBindingPreparesRemovals(t *testing.T) {
 			}
 			transaction, err := binding.prepare(
 				context.Background(),
-				functionadapter.HandlerInput{Args: test.args},
+				functionadapter.HandlerInput{
+					Args: test.args,
+				},
 				nil,
-				lifecycle.ResourceTransactionScope{ID: "vnode:" + target},
+				lifecycle.ResourceTransactionScope{
+					ID: "vnode:" + target,
+				},
 				lifecycle.LongLivedPermit{},
 			)
 			require.NoError(t, err)
@@ -156,11 +164,16 @@ func TestVNodeBindingRejectsOwnedTransactionScope(t *testing.T) {
 	binding, _ := newTestVNodeBinding(t, confgroup.TypeDyncfg, nil)
 	_, err := binding.prepare(
 		context.Background(),
-		functionadapter.HandlerInput{Args: []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)}},
+		functionadapter.HandlerInput{
+			Args: []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)},
+		},
 		nil,
 		lifecycle.ResourceTransactionScope{
-			ID:      "vnode:db",
-			Current: lifecycle.ResourceIdentity{ID: "vnode:db", Generation: 1},
+			ID: "vnode:db",
+			Current: lifecycle.ResourceIdentity{
+				ID:         "vnode:db",
+				Generation: 1,
+			},
 		},
 		lifecycle.LongLivedPermit{},
 	)

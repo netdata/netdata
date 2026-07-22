@@ -42,7 +42,10 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 							},
 							CreateV2: func() collectorapi.CollectorV2 {
 								v2Creates++
-								return &factoryTestV2{state: state, checkErr: test.checkErr}
+								return &factoryTestV2{
+									state:    state,
+									checkErr: test.checkErr,
+								}
 							},
 						},
 					},

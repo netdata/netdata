@@ -130,7 +130,8 @@ func NewProcess(config Config) (*Process, error) {
 		finalizeOutput = config.Runtime.Stop
 	}
 	core, err := newProcessCore(processCoreConfig{
-		Input: config.Input, Output: config.Output,
+		Input:           config.Input,
+		Output:          config.Output,
 		ShutdownTimeout: shutdownTimeout,
 		KeepAlive:       config.KeepAlive,
 		Modules:         modules,
@@ -143,7 +144,9 @@ func NewProcess(config Config) (*Process, error) {
 			Vnodes:        vnoderegistry.New(),
 			InitialVnodes: initialVnodes,
 		},
-		Secrets: runSecretServices{Initial: initialSecrets},
+		Secrets: runSecretServices{
+			Initial: initialSecrets,
+		},
 		Discovery: runDiscoveryServices{
 			BuildContext: build,
 			Providers:    providers,
@@ -156,9 +159,12 @@ func NewProcess(config Config) (*Process, error) {
 		return nil, err
 	}
 	return &Process{
-		core: core, commands: make(chan processControl),
-		started: make(chan struct{}), done: make(chan struct{}),
-		runtime: config.Runtime, pluginName: config.PluginName,
+		core:       core,
+		commands:   make(chan processControl),
+		started:    make(chan struct{}),
+		done:       make(chan struct{}),
+		runtime:    config.Runtime,
+		pluginName: config.PluginName,
 	}, nil
 }
 
@@ -176,7 +182,9 @@ func (p *Process) Run(ctx context.Context) error {
 	p.mu.Unlock()
 
 	if p.runtime != nil {
-		p.runtime.Start(p.pluginName, joboutput.FrameWriter{Owner: p.core.frames})
+		p.runtime.Start(p.pluginName, joboutput.FrameWriter{
+			Owner: p.core.frames,
+		})
 	}
 	result := p.core.run(ctx, p.commands)
 	p.mu.Lock()
@@ -212,7 +220,10 @@ func (p *Process) send(ctx context.Context, command processCommand) error {
 	}
 	result := make(chan error, 1)
 	select {
-	case p.commands <- processControl{command: command, result: result}:
+	case p.commands <- processControl{
+		command: command,
+		result:  result,
+	}:
 	case <-p.done:
 		return ErrProcessStopped
 	case <-ctx.Done():
