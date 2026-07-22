@@ -10,6 +10,8 @@
 //! 1. Worker connects to the supervisor's IPC socket.
 //! 2. Supervisor sends `Configure` with the worker's resolved config.
 //! 3. Worker initializes, then sends `Ready` with zero or more function declarations.
+//!    The legacy-logs worker may instead send `Disabled` — nothing to serve or
+//!    init failed — and exit immediately after.
 //! 4. Supervisor registers the declarations and enters its main loop.
 
 pub mod config;
@@ -133,10 +135,16 @@ pub enum LegacyLogsRequest {
 /// Messages sent from the legacy-logs worker back to the supervisor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LegacyLogsResponse {
-    /// Worker is initialized and ready. Carries zero or more function declarations.
+    /// Worker is initialized and ready. Carries the function declarations to
+    /// register.
     Ready {
         declarations: Vec<FunctionDeclaration>,
     },
+    /// Worker will not serve — the legacy journal directory is absent or the
+    /// handler failed to initialize (details in the worker's own logs) — and
+    /// exits immediately after sending this. Terminal: no further messages
+    /// follow, and the supervisor is expected to reap the child.
+    Disabled,
     /// Function completed.
     Result(FunctionResult),
     /// Progress update for a running function.

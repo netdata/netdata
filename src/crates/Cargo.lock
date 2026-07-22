@@ -3502,6 +3502,7 @@ dependencies = [
  "netdata-plugin-schema",
  "netdata-plugin-types",
  "serde_json",
+ "tempfile",
  "tokio",
  "tokio-util",
  "tracing",

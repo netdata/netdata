@@ -19,6 +19,12 @@ use tokio::process::Command;
 /// Maximum time to wait for a worker to connect after spawning.
 const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Bound on reaping the legacy-logs child after it reports `Disabled`. The
+/// worker exits right after sending it, so this only fires if the worker
+/// wedges mid-exit; distinct from the shutdown budget in `shutdown_workers`,
+/// which is sized to the agent's 3s QUIT→SIGTERM window.
+const LEGACY_REAP_TIMEOUT: Duration = Duration::from_secs(2);
+
 use crate::config;
 
 /// Parse a required identity env var into a [`uuid::Uuid`], hard-erroring with a
@@ -109,17 +115,19 @@ struct Supervisor {
     // Moving a guard above its connection would SIGKILL workers before their IPC
     // channel closes, defeating graceful shutdown.
     ingestor: Connection<IngestorRequest, IngestorResponse>,
-    #[allow(dead_code)] // drop-only: SIGKILL fallback for the ingestor worker
+    /// Waited on during shutdown; SIGKILL fallback on drop.
     ingestor_child: ChildGuard,
     ledger: Connection<LedgerRequest, LedgerResponse>,
-    #[allow(dead_code)] // drop-only: SIGKILL fallback for the ledger worker
+    /// Waited on during shutdown; SIGKILL fallback on drop.
     ledger_child: ChildGuard,
     legacy: Connection<LegacyLogsRequest, LegacyLogsResponse>,
-    #[allow(dead_code)] // drop-only: SIGKILL fallback for the legacy-logs worker
+    /// Reaped on `Disabled` (`reap_legacy`) and waited on during shutdown;
+    /// SIGKILL fallback on drop.
     legacy_child: ChildGuard,
     /// Whether the legacy-logs worker is usable. The legacy viewer is a
     /// best-effort backward-compat surface and is fully decoupled from the new
-    /// pipeline: a configure failure or a runtime crash flips this to `false`
+    /// pipeline: a `Disabled` handshake (nothing to serve — the worker exits),
+    /// a configure failure, or a runtime crash flips this to `false`
     /// and the supervisor keeps serving ingestor + ledger. The
     /// ingestor/ledger remain fatal on failure by design. Monotonic: once
     /// `false` it stays `false` — workers are never restarted (see `run`).
@@ -218,7 +226,15 @@ impl Supervisor {
                 self.register_declarations(Worker::LegacyLogs, declarations)
                     .await?;
             }
-            other => bail!("expected Ready from legacy-logs, got: {other:?}"),
+            LegacyLogsResponse::Disabled => {
+                // Nothing to serve (or handler init failed — the worker logged
+                // why). The worker exits right after sending this; reap it here
+                // so it does not sit as a zombie until plugin shutdown.
+                tracing::info!("legacy-logs reported Disabled; reaping the worker");
+                self.disable_legacy();
+                self.reap_legacy().await;
+            }
+            other => bail!("expected Ready or Disabled from legacy-logs, got: {other:?}"),
         }
         Ok(())
     }
@@ -234,6 +250,21 @@ impl Supervisor {
         self.routing.retain(|_, w| !matches!(w, Worker::LegacyLogs));
         self.transactions
             .retain(|_, w| !matches!(w, Worker::LegacyLogs));
+    }
+
+    /// Reap the legacy-logs child with a bounded wait, logging the outcome.
+    /// Safe to call after a prior successful wait — tokio fuses the child, so
+    /// a re-wait returns the cached exit status — and a timed-out wait here is
+    /// covered later by `shutdown_workers`' unconditional wait and, last
+    /// resort, ChildGuard's SIGKILL on drop.
+    async fn reap_legacy(&mut self) {
+        match tokio::time::timeout(LEGACY_REAP_TIMEOUT, self.legacy_child.child.wait()).await {
+            Ok(Ok(status)) => tracing::info!("legacy-logs exited: {status}"),
+            Ok(Err(e)) => tracing::warn!("failed to reap legacy-logs: {e}"),
+            Err(_) => tracing::warn!(
+                "legacy-logs did not exit within {LEGACY_REAP_TIMEOUT:?} after Disabled"
+            ),
+        }
     }
 
     /// Route a function call from the agent to the appropriate worker.
@@ -295,8 +326,15 @@ impl Supervisor {
         if let Err(e) = self.ledger.send(LedgerRequest::Shutdown).await {
             tracing::warn!("failed to send Shutdown to ledger: {e}");
         }
-        if let Err(e) = self.legacy.send(LegacyLogsRequest::Shutdown).await {
-            tracing::warn!("failed to send Shutdown to legacy-logs: {e}");
+        // A disabled legacy worker is already gone (exited or crashed) — skip
+        // the doomed send. The child wait below stays unconditional: on the
+        // crash/configure-failure paths nobody has reaped the child yet, and
+        // re-waiting an already-reaped child returns its cached exit status
+        // (tokio fuses the child after the first successful wait).
+        if self.legacy_alive {
+            if let Err(e) = self.legacy.send(LegacyLogsRequest::Shutdown).await {
+                tracing::warn!("failed to send Shutdown to legacy-logs: {e}");
+            }
         }
 
         // The agent waits 3 seconds after sending QUIT before sending SIGTERM.
@@ -438,6 +476,13 @@ impl Supervisor {
             } => self.forward_progress(transaction, done, total).await,
             LegacyLogsResponse::Ready { .. } => {
                 tracing::warn!("unexpected late Ready from legacy-logs");
+            }
+            LegacyLogsResponse::Disabled => {
+                // Only expected during the Configure handshake; a late one
+                // still means "worker is gone", so honor it.
+                tracing::warn!("unexpected late Disabled from legacy-logs, disabling it");
+                self.disable_legacy();
+                self.reap_legacy().await;
             }
         }
     }
