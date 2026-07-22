@@ -21,7 +21,10 @@ extern int   netdata_dns_test_read_name(const char *msg, int msg_len, int offset
                                         char *out, int out_size);
 */
 import "C"
-import "unsafe"
+
+import (
+	"unsafe"
+)
 
 func dnsAllocTestRuntime() unsafe.Pointer {
 	return unsafe.Pointer(C.netdata_dns_alloc_test_runtime())
