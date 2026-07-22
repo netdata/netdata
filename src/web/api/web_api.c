@@ -19,13 +19,30 @@ void web_client_ensure_proper_authorization(struct web_client *w) {
     web_client_set_permissions(w, HTTP_ACCESS_ALL, HTTP_USER_ROLE_ADMIN, USER_AUTH_METHOD_GOD);
 #else
     if(w->user_auth.method == USER_AUTH_METHOD_NONE) {
+        bool bearer_protected = netdata_bearer_protection_is_enabled();
         web_client_set_permissions(
             w,
-            (netdata_is_protected_by_bearer) ? HTTP_ACCESS_NONE : HTTP_ACCESS_ANONYMOUS_DATA,
-            (netdata_is_protected_by_bearer) ? HTTP_USER_ROLE_NONE : HTTP_USER_ROLE_ANY,
+            bearer_protected ? HTTP_ACCESS_NONE : HTTP_ACCESS_ANONYMOUS_DATA,
+            bearer_protected ? HTTP_USER_ROLE_NONE : HTTP_USER_ROLE_ANY,
             USER_AUTH_METHOD_NONE);
     }
 #endif
+}
+
+void web_api_command_hashes_init(struct web_api_command *api_commands, SPINLOCK *spinlock, bool *initialized) {
+    if(likely(__atomic_load_n(initialized, __ATOMIC_ACQUIRE)))
+        return;
+
+    spinlock_lock(spinlock);
+
+    if(unlikely(!__atomic_load_n(initialized, __ATOMIC_ACQUIRE))) {
+        for(int i = 0; api_commands[i].api ; i++)
+            api_commands[i].hash = simple_hash(api_commands[i].api);
+
+        __atomic_store_n(initialized, true, __ATOMIC_RELEASE);
+    }
+
+    spinlock_unlock(spinlock);
 }
 
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {

@@ -478,6 +478,7 @@ static void test_chart_update_dimension_counts()
     spinlock_init(&dim.slock);
 
     ml_chart_t chart = {};
+    spinlock_init(&chart.mls_spinlock);
 
     dim.mls = MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART;
     dim.mt = METRIC_TYPE_VARIABLE;
@@ -488,7 +489,7 @@ static void test_chart_update_dimension_counts()
     ML_TEST_ASSERT(chart.mls.num_machine_learning_status_enabled == 0,
                    "excluded dimensions must not increment enabled status");
 
-    chart.mls = {};
+    ml_chart_reset_stats(&chart);
     dim.mls = MACHINE_LEARNING_STATUS_ENABLED;
     dim.mt = METRIC_TYPE_CONSTANT;
     dim.ts = TRAINING_STATUS_UNTRAINED;
@@ -504,7 +505,7 @@ static void test_chart_update_dimension_counts()
     ML_TEST_ASSERT(chart.mls.num_anomalous_dimensions == 0,
                    "constant dimensions must ignore anomaly input");
 
-    chart.mls = {};
+    ml_chart_reset_stats(&chart);
     dim.mt = METRIC_TYPE_VARIABLE;
     dim.ts = TRAINING_STATUS_UNTRAINED;
     ml_chart_update_dimension(&chart, &dim, true);
@@ -515,7 +516,7 @@ static void test_chart_update_dimension_counts()
     ML_TEST_ASSERT(chart.mls.num_anomalous_dimensions == 0,
                    "untrained dimensions must not count anomaly input");
 
-    chart.mls = {};
+    ml_chart_reset_stats(&chart);
     dim.ts = TRAINING_STATUS_TRAINED;
     ml_chart_update_dimension(&chart, &dim, true);
     ML_TEST_ASSERT(chart.mls.num_training_status_trained == 1,
@@ -525,7 +526,7 @@ static void test_chart_update_dimension_counts()
     ML_TEST_ASSERT(chart.mls.num_normal_dimensions == 0,
                    "trained anomalous dimensions must not increment normal count");
 
-    chart.mls = {};
+    ml_chart_reset_stats(&chart);
     dim.ts = TRAINING_STATUS_SILENCED;
     ml_chart_update_dimension(&chart, &dim, false);
     ML_TEST_ASSERT(chart.mls.num_training_status_silenced == 1,

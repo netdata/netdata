@@ -8,6 +8,7 @@
 void netdata_conf_section_global(void);
 void netdata_conf_section_global_run_as_user(const char **user);
 void netdata_conf_section_global_hostname(void);
+void netdata_conf_section_global_wmi_timeout(void);
 
 size_t netdata_conf_cpus(void);
 void libuv_initialize(void);

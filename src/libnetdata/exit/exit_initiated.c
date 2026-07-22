@@ -4,6 +4,10 @@
 
 static volatile sig_atomic_t exit_initiated = EXIT_REASON_NONE;
 
+_Static_assert(EXIT_REASON_SHUTDOWN_TIMEOUT <= SIG_ATOMIC_MAX, "exit reasons must fit in sig_atomic_t");
+_Static_assert(__atomic_always_lock_free(sizeof(exit_initiated), &exit_initiated),
+               "exit reason atomics must be lock-free");
+
 ENUM_STR_MAP_DEFINE(EXIT_REASON) = {
     { EXIT_REASON_SIGBUS, "signal-bus-error"},
     { EXIT_REASON_SIGSEGV, "signal-segmentation-fault"},
@@ -101,7 +105,7 @@ static const char *self_path = NULL;
 static OS_FILE_METADATA self = { 0 };
 
 void exit_initiated_init(void) {
-    exit_initiated = EXIT_REASON_NONE;
+    __atomic_store_n(&exit_initiated, EXIT_REASON_NONE, __ATOMIC_RELAXED);
 
     freez((char *)self_path);
     self_path = os_get_process_path();
@@ -111,11 +115,11 @@ void exit_initiated_init(void) {
 
 ALWAYS_INLINE
 EXIT_REASON exit_initiated_get(void) {
-    return (EXIT_REASON)exit_initiated;
+    return (EXIT_REASON)__atomic_load_n(&exit_initiated, __ATOMIC_RELAXED);
 }
 
 void exit_initiated_add(EXIT_REASON reason) {
-    exit_initiated |= (sig_atomic_t)reason;
+    __atomic_fetch_or(&exit_initiated, (sig_atomic_t)reason, __ATOMIC_RELAXED);
 }
 
 void exit_initiated_set(EXIT_REASON reason) {

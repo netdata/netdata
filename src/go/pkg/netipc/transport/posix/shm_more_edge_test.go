@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 )
 
@@ -31,6 +32,99 @@ func fillShmHeader(data []byte, ownerPID int32, ownerGen uint32, reqOff, reqCap,
 	binary.NativeEndian.PutUint32(data[shmHeaderReqCapOff:shmHeaderReqCapOff+4], reqCap)
 	binary.NativeEndian.PutUint32(data[shmHeaderRespOffOff:shmHeaderRespOffOff+4], respOff)
 	binary.NativeEndian.PutUint32(data[shmHeaderRespCapOff:shmHeaderRespCapOff+4], respCap)
+}
+
+func TestShmServerCreatePreallocation(t *testing.T) {
+	t.Run("ENOSPC preserves cause and removes file", func(t *testing.T) {
+		runDir := t.TempDir()
+		const (
+			svc       = "go_shm_allocate_enospc"
+			sessionID = uint64(41)
+		)
+
+		var calls int
+		var gotMode uint32
+		var gotOff, gotLen int64
+		ctx, err := shmServerCreate(runDir, svc, sessionID, 1024, 2048,
+			func(_ int, mode uint32, off, len int64) error {
+				calls++
+				gotMode, gotOff, gotLen = mode, off, len
+				return syscall.ENOSPC
+			})
+		if ctx != nil {
+			ctx.ShmDestroy()
+			t.Fatal("allocation failure returned a context")
+		}
+		if !errors.Is(err, ErrShmAllocate) {
+			t.Fatalf("create error = %v, want ErrShmAllocate", err)
+		}
+		if !errors.Is(err, syscall.ENOSPC) {
+			t.Fatalf("create error = %v, want underlying ENOSPC", err)
+		}
+		if calls != 1 {
+			t.Fatalf("fallocate calls = %d, want 1", calls)
+		}
+		wantLen := int64(shmAlign64(uint32(shmHeaderLen)) + shmAlign64(1024) + shmAlign64(2048))
+		if gotMode != 0 || gotOff != 0 || gotLen != wantLen {
+			t.Fatalf("fallocate args = mode %d off %d len %d, want 0, 0, %d", gotMode, gotOff, gotLen, wantLen)
+		}
+
+		path, pathErr := buildShmPath(runDir, svc, sessionID)
+		if pathErr != nil {
+			t.Fatalf("build path: %v", pathErr)
+		}
+		if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("failed allocation file should be removed, stat err = %v", statErr)
+		}
+	})
+
+	t.Run("unsupported allocation has no sparse fallback", func(t *testing.T) {
+		runDir := t.TempDir()
+		const (
+			svc       = "go_shm_allocate_unsupported"
+			sessionID = uint64(43)
+		)
+
+		ctx, err := shmServerCreate(runDir, svc, sessionID, 1024, 1024,
+			func(_ int, _ uint32, _, _ int64) error {
+				return syscall.EOPNOTSUPP
+			})
+		if ctx != nil {
+			ctx.ShmDestroy()
+			t.Fatal("unsupported allocation returned a context")
+		}
+		if !errors.Is(err, ErrShmAllocate) || !errors.Is(err, syscall.EOPNOTSUPP) {
+			t.Fatalf("create error = %v, want allocation error wrapping EOPNOTSUPP", err)
+		}
+
+		path, pathErr := buildShmPath(runDir, svc, sessionID)
+		if pathErr != nil {
+			t.Fatalf("build path: %v", pathErr)
+		}
+		if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("unsupported allocation file should be removed, stat err = %v", statErr)
+		}
+	})
+
+	t.Run("EINTR retries", func(t *testing.T) {
+		runDir := t.TempDir()
+		var calls int
+		ctx, err := shmServerCreate(runDir, "go_shm_allocate_eintr", 42, 1024, 1024,
+			func(fd int, mode uint32, off, len int64) error {
+				calls++
+				if calls == 1 {
+					return syscall.EINTR
+				}
+				return syscall.Fallocate(fd, mode, off, len)
+			})
+		if err != nil {
+			t.Fatalf("create after EINTR: %v", err)
+		}
+		defer ctx.ShmDestroy()
+		if calls != 2 {
+			t.Fatalf("fallocate calls = %d, want 2", calls)
+		}
+	})
 }
 
 func writeRawShmRegionFile(t *testing.T, runDir, service string, sessionID uint64, size int, fill func([]byte)) string {

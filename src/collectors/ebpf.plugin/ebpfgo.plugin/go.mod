@@ -1,6 +1,6 @@
 module github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin
 
-go 1.26.0
+go 1.26.2
 
 // Packages from go/plugins (netipc, netdataapi) are co-developed in this
 // repository.  The replace directive lets the module resolve them from the

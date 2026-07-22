@@ -77,8 +77,8 @@ bool object_state_acquire(OBJECT_STATE *os, OBJECT_STATE_ID wanted_state_id) {
     REFCOUNT desired;
 
     do {
-        // If refcount is negative, it means deactivation is in progress or complete
-        if(expected < 0)
+        // Negative values mean deactivation; saturated refcounts cannot be incremented safely.
+        if(expected < 0 || expected >= REFCOUNT_MAX)
             return false;
 
         desired = expected + 1;

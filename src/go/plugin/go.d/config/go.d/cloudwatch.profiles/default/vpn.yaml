@@ -9,7 +9,8 @@
 version: v1
 display_name: AWS Site-to-Site VPN
 namespace: AWS/VPN
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: VpnId
@@ -33,7 +34,7 @@ template:
     instances:
       by_labels: [account_id, region, vpn_id]
   charts:
-    - id: cw_vpn_traffic
+    - id: aws_cloudwatch_vpn_traffic
       context: traffic
       title: Site-to-Site VPN Traffic
       family: Traffic
@@ -44,7 +45,7 @@ template:
           name: received
         - selector: tunnel_data_out_sum
           name: sent
-    - id: cw_vpn_tunnel_state
+    - id: aws_cloudwatch_vpn_tunnel_state
       context: tunnel_state
       title: Site-to-Site VPN Tunnel State
       family: Status

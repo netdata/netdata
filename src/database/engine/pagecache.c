@@ -499,7 +499,8 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
     time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
 
-    size_t pages_found = 0;
+    // Recovery may return a partial result after a later mmap access faults.
+    volatile size_t pages_found = 0;
 
     NJFV2IDX_FIND_STATE state = {
             .init = false,
@@ -563,9 +564,10 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                 goto release_journal;
             }
 
-            struct journal_page_list *page_list =
-                (struct journal_page_list *)((uint8_t *)page_list_header + sizeof(*page_list_header));
-            struct journal_extent_list *extent_list = (void *)((uint8_t *)j2_header + j2_header->extent_offset);
+            const volatile struct journal_page_list *page_list =
+                (const volatile struct journal_page_list *)((uint8_t *)page_list_header + sizeof(*page_list_header));
+            const volatile struct journal_extent_list *extent_list =
+                (const volatile struct journal_extent_list *)((uint8_t *)j2_header + j2_header->extent_offset);
             uint32_t extent_entries = j2_header->extent_count;
             uint32_t uuid_page_entries = page_list_header->entries;
             size_t page_list_size;
@@ -580,7 +582,7 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
             }
 
             for (uint32_t index = 0; index < uuid_page_entries; index++) {
-                struct journal_page_list *page_entry_in_journal = &page_list[index];
+                const volatile struct journal_page_list *page_entry_in_journal = &page_list[index];
 
                 time_t page_first_time_s = page_entry_in_journal->delta_start_s + journal_start_time_s;
                 time_t page_last_time_s = page_entry_in_journal->delta_end_s + journal_start_time_s;
@@ -595,7 +597,8 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                     break;
 
                 // Make sure index is valid for this file
-                if (page_entry_in_journal->extent_index >= extent_entries) {
+                uint32_t extent_index = page_entry_in_journal->extent_index;
+                if (extent_index >= extent_entries) {
                     nd_log_limit_static_thread_var(erl, 60, 0);
                     nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                                  "DBENGINE: Invalid extent index in journalfile %u",
@@ -604,15 +607,16 @@ static NOT_INLINE_HOT size_t get_page_list_from_journal_v2(struct rrdengine_inst
                 }
 
                 uint32_t page_update_every_s = page_entry_in_journal->update_every_s;
+                struct extent_io_data ei = {
+                    .block = OFFSET_TO_BLOCK(extent_list[extent_index].datafile_offset),
+                    .bytes = extent_list[extent_index].datafile_size,
+                    .fileno = datafile->fileno,
+                };
 
                 if (datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) {
                     //for open cache item
                     // add this page to open cache
                     bool added = false;
-                    struct extent_io_data ei = {0};
-                    ei.block = OFFSET_TO_BLOCK(extent_list[page_entry_in_journal->extent_index].datafile_offset);
-                    ei.bytes = extent_list[page_entry_in_journal->extent_index].datafile_size;
-                    ei.fileno = datafile->fileno;
 
                     PGC_ENTRY e = {0};
                     e.hot = false;

@@ -272,7 +272,12 @@ bool rfc3339_parse_ut(const char *rfc3339, usec_t *timestamp_ut, char **endptr) 
 
 #if defined(HAVE_TIMEGM)
     // If available, use timegm() which interprets tm as UTC.
+    int saved_errno = errno;
+    errno = 0;
     epoch_s = timegm(&tm);
+    if (epoch_s == (time_t)-1 && errno != 0)
+        return false; // Error in time conversion
+    errno = saved_errno;
 #else
     // Use mktime(), which assumes tm is local time, then adjust.
     epoch_s = mktime(&tm);

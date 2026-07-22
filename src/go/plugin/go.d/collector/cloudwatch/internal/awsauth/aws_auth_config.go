@@ -18,45 +18,28 @@ import (
 )
 
 const (
-	ModeDefault    = "default"
-	ModeAccessKey  = "access_key"
-	ModeAssumeRole = "assume_role"
-
-	// defaultConfigPath is the error-message prefix Validate() uses when no explicit
-	// path is given. cloudwatch (the sole consumer) embeds this config under the
-	// "auth" key, so validation errors read as "auth.*".
-	defaultConfigPath = "auth"
-
-	// baseIdentityRef is Identity.Ref for the base credential source when it is
-	// monitored alongside assumed roles (include_base_account).
-	baseIdentityRef = "base"
+	CredentialTypeDefault = "default"
+	CredentialTypeStatic  = "static"
 )
 
-type ModeAccessKeyConfig struct {
+// StaticCredentialConfig contains explicit long-lived or temporary AWS credentials.
+type StaticCredentialConfig struct {
 	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id,omitempty"`
 	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key,omitempty"`
 	SessionToken    string `yaml:"session_token,omitempty" json:"session_token,omitempty"`
 }
 
-type AssumeRole struct {
+// CredentialConfig describes only how the base AWS credentials are acquired.
+// Which identity is monitored, including optional role assumption, is a separate
+// Identity compiled from a CloudWatch target.
+type CredentialConfig struct {
+	Type       string                  `yaml:"type" json:"type"`
+	TypeStatic *StaticCredentialConfig `yaml:"type_static,omitempty" json:"type_static,omitempty"`
+}
+
+type AssumeRoleConfig struct {
 	RoleARN    string `yaml:"role_arn,omitempty" json:"role_arn,omitempty"`
 	ExternalID string `yaml:"external_id,omitempty" json:"external_id,omitempty"`
-}
-
-type ModeAssumeRoleConfig struct {
-	// Roles are assumed one per monitored account; account_id is resolved per role
-	// via sts:GetCallerIdentity.
-	Roles []AssumeRole `yaml:"roles,omitempty" json:"roles,omitempty"`
-	// IncludeBaseAccount also monitors the base identity's own account (the identity
-	// used to assume the roles). Off by default: with roles set, only the assumed-role
-	// accounts are monitored.
-	IncludeBaseAccount bool `yaml:"include_base_account,omitempty" json:"include_base_account,omitempty"`
-}
-
-type Config struct {
-	Mode           string                `yaml:"mode,omitempty" json:"mode,omitempty"`
-	ModeAccessKey  *ModeAccessKeyConfig  `yaml:"mode_access_key,omitempty" json:"mode_access_key,omitempty"`
-	ModeAssumeRole *ModeAssumeRoleConfig `yaml:"mode_assume_role,omitempty" json:"mode_assume_role,omitempty"`
 }
 
 // ConfigOptions controls how the regional aws.Config is built.
@@ -69,99 +52,97 @@ type ConfigOptions struct {
 	STSRegion string
 }
 
-func (c Config) NormalizedMode() string {
-	return strings.ToLower(strings.TrimSpace(c.Mode))
-}
-
-func (c Config) Validate() error {
-	return c.ValidateWithPath(defaultConfigPath)
-}
-
-func (c Config) ValidateWithPath(path string) error {
-	modeField := fieldPath(path, "mode")
-	mode := c.NormalizedMode()
-
-	if mode == "" {
-		return errors.New(modeField + " is required")
+func (c CredentialConfig) ValidateWithPath(path string) error {
+	typeField := fieldPath(path, "type")
+	if strings.TrimSpace(c.Type) == "" {
+		return errors.New(typeField + " is required")
+	}
+	canonicalType := strings.ToLower(strings.TrimSpace(c.Type))
+	if c.Type != canonicalType {
+		return fmt.Errorf("%s must use canonical value %q", typeField, canonicalType)
 	}
 
-	switch mode {
-	case ModeDefault:
-		return nil
-	case ModeAccessKey:
-		if c.ModeAccessKey == nil {
-			return fmt.Errorf("%s is required when %s is %q", fieldPath(path, "mode_access_key"), modeField, ModeAccessKey)
+	switch c.Type {
+	case CredentialTypeDefault:
+		if c.TypeStatic != nil {
+			return fmt.Errorf("%s is not allowed when %s is %q", fieldPath(path, "type_static"), typeField, CredentialTypeDefault)
 		}
-		var errs []error
-		if strings.TrimSpace(c.ModeAccessKey.AccessKeyID) == "" {
-			errs = append(errs, errors.New(fieldPath(path, "mode_access_key.access_key_id")+" is required"))
+	case CredentialTypeStatic:
+		if c.TypeStatic == nil {
+			return errors.New(fieldPath(path, "type_static") + " is required")
 		}
-		if strings.TrimSpace(c.ModeAccessKey.SecretAccessKey) == "" {
-			errs = append(errs, errors.New(fieldPath(path, "mode_access_key.secret_access_key")+" is required"))
-		}
-		return errors.Join(errs...)
-	case ModeAssumeRole:
-		rolesField := fieldPath(path, "mode_assume_role.roles")
-		if c.ModeAssumeRole == nil || len(c.ModeAssumeRole.Roles) == 0 {
-			return fmt.Errorf("%s must contain at least one role when %s is %q", rolesField, modeField, ModeAssumeRole)
-		}
-		// One role per monitored account; each needs a role_arn.
-		var errs []error
-		for i, r := range c.ModeAssumeRole.Roles {
-			if strings.TrimSpace(r.RoleARN) == "" {
-				errs = append(errs, errors.New(fieldPath(path, fmt.Sprintf("mode_assume_role.roles[%d].role_arn", i))+" is required"))
-			}
+		staticPath := fieldPath(path, "type_static")
+		errs := []error{
+			validateCredentialValue(fieldPath(staticPath, "access_key_id"), c.TypeStatic.AccessKeyID, true),
+			validateCredentialValue(fieldPath(staticPath, "secret_access_key"), c.TypeStatic.SecretAccessKey, true),
+			validateCredentialValue(fieldPath(staticPath, "session_token"), c.TypeStatic.SessionToken, false),
 		}
 		return errors.Join(errs...)
 	default:
-		return fmt.Errorf("%s %q is invalid: expected one of %q, %q, %q",
-			modeField, c.Mode, ModeDefault, ModeAccessKey, ModeAssumeRole)
+		return fmt.Errorf("%s %q is invalid: expected one of %q, %q",
+			typeField, c.Type, CredentialTypeDefault, CredentialTypeStatic)
 	}
+	return nil
 }
 
-// Identity is one AWS credential source the collector treats as a distinct account.
-// Build a regional aws.Config for it with NewConfig.
+func validateCredentialValue(path, value string, required bool) error {
+	canonical := strings.TrimSpace(value)
+	if canonical == "" {
+		if required {
+			return errors.New(path + " is required")
+		}
+		return nil
+	}
+	if value != canonical {
+		return errors.New(path + " must not contain surrounding whitespace")
+	}
+	return nil
+}
+
+// Identity is one compiled monitored target. Ref is the target name and remains
+// distinct even when multiple identities resolve to the same AWS account.
 type Identity struct {
-	// Ref is a stable, config-derived reference used for logging and as a pre-STS
-	// cache key: the role ARN for an assumed-role identity, or the mode name
-	// (default/access_key) or "base" for a base identity.
-	Ref  string
-	auth Config
-	role *AssumeRole // non-nil => assume this role; nil => base identity (no assumption)
+	Ref         string
+	credentials CredentialConfig
+	role        *AssumeRoleConfig
 }
 
-// Identities returns the distinct credential sources this config monitors: exactly
-// one for default/access_key; one per role for assume_role, plus the base identity
-// when include_base_account is set. The order is stable (roles as configured, base
-// last).
-func (c Config) Identities() []Identity {
-	if c.NormalizedMode() == ModeAssumeRole && c.ModeAssumeRole != nil {
-		ids := make([]Identity, 0, len(c.ModeAssumeRole.Roles)+1)
-		for i := range c.ModeAssumeRole.Roles {
-			ids = append(ids, Identity{
-				Ref:  strings.TrimSpace(c.ModeAssumeRole.Roles[i].RoleARN),
-				auth: c,
-				role: &c.ModeAssumeRole.Roles[i],
-			})
-		}
-		if c.ModeAssumeRole.IncludeBaseAccount {
-			ids = append(ids, Identity{Ref: baseIdentityRef, auth: c})
-		}
-		return ids
+func NewIdentity(ref string, credentials CredentialConfig, role *AssumeRoleConfig) Identity {
+	id := Identity{Ref: ref, credentials: credentials}
+	if role != nil {
+		v := *role
+		id.role = &v
 	}
-	return []Identity{{Ref: c.NormalizedMode(), auth: c}}
+	return id
 }
 
 // NewConfig builds a regional aws.Config for this identity.
 //
-//	base identity (default / access_key / the included base) -> SDK default
+//	base identity (default or static credentials) -> SDK default
 //	  credential chain (env, shared config, instance profile, IRSA/web-identity),
 //	  or static access keys.
 //	assumed-role identity -> the base identity assumes the role via a regional STS
 //	  endpoint, cached.
 func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Config, error) {
-	if err := id.auth.Validate(); err != nil {
+	if id.Ref == "" {
+		return aws.Config{}, errors.New("target reference is required")
+	}
+	if id.Ref != strings.TrimSpace(id.Ref) {
+		return aws.Config{}, errors.New("target reference must not contain surrounding whitespace")
+	}
+	if err := id.credentials.ValidateWithPath("credentials"); err != nil {
 		return aws.Config{}, err
+	}
+	if id.role != nil {
+		if strings.TrimSpace(id.role.RoleARN) == "" {
+			return aws.Config{}, errors.New("assume_role.role_arn is required")
+		}
+		if id.role.RoleARN != strings.TrimSpace(id.role.RoleARN) {
+			return aws.Config{}, errors.New("assume_role.role_arn must not contain surrounding whitespace")
+		}
+		if id.role.ExternalID != strings.TrimSpace(id.role.ExternalID) {
+			return aws.Config{}, errors.New("assume_role.external_id must not contain surrounding whitespace")
+		}
 	}
 
 	region := strings.TrimSpace(opts.Region)
@@ -179,13 +160,13 @@ func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Confi
 	if region != "" {
 		loadOpts = append(loadOpts, awsconfig.WithRegion(region))
 	}
-	if id.auth.NormalizedMode() == ModeAccessKey {
-		ak := id.auth.ModeAccessKey
+	if id.credentials.Type == CredentialTypeStatic {
+		static := id.credentials.TypeStatic
 		loadOpts = append(loadOpts, awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(
-				strings.TrimSpace(ak.AccessKeyID),
-				strings.TrimSpace(ak.SecretAccessKey),
-				strings.TrimSpace(ak.SessionToken),
+				static.AccessKeyID,
+				static.SecretAccessKey,
+				static.SessionToken,
 			),
 		))
 	}
@@ -207,10 +188,10 @@ func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Confi
 			o.Region = stsRegion
 		}
 	})
-	provider := stscreds.NewAssumeRoleProvider(stsClient, strings.TrimSpace(id.role.RoleARN), func(o *stscreds.AssumeRoleOptions) {
+	provider := stscreds.NewAssumeRoleProvider(stsClient, id.role.RoleARN, func(o *stscreds.AssumeRoleOptions) {
 		o.RoleSessionName = "netdata" // stable session name for legible CloudTrail entries
-		if v := strings.TrimSpace(id.role.ExternalID); v != "" {
-			o.ExternalID = aws.String(v)
+		if id.role.ExternalID != "" {
+			o.ExternalID = aws.String(id.role.ExternalID)
 		}
 	})
 	base.Credentials = aws.NewCredentialsCache(provider)

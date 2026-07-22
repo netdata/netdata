@@ -270,7 +270,7 @@ static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_
 
 static inline void simple_hashtable_init_named(SIMPLE_HASHTABLE_NAMED *ht, size_t size) {
     memset(ht, 0, sizeof(*ht));
-    ht->size = size;
+    ht->size = size ? size : 1;
     ht->hashtable = callocz(ht->size, sizeof(*ht->hashtable));
 }
 

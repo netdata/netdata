@@ -189,8 +189,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use journal_core::{JournalFileOptions, JournalWriter};
-    use journal_registry::repository::file::Status;
+    use journal_sdk_core::{JournalFileOptions, JournalWriter};
+    use journal_sdk_registry::repository::file::Status;
     use std::collections::BTreeMap;
     use tempfile::TempDir;
     use uuid::Uuid;
@@ -230,7 +230,7 @@ mod tests {
         path: &Path,
         option_seed: u8,
         entries: &[TestEntry],
-    ) -> Result<(), journal_core::JournalError> {
+    ) -> Result<(), journal_sdk_core::JournalError> {
         let repo_file = RegistryFile::from_path(path).expect("test journal path should parse");
         let head_seqnum = match repo_file.status() {
             Status::Archived { head_seqnum, .. } => *head_seqnum,

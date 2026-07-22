@@ -72,9 +72,10 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
         host_version = stream_receiver_program_version_strdupz(host);
 
     RRDHOST_TZ host_tz = rrdhost_tz_get(host);
+    RRDHOST_METADATA_IDENTITY identity = rrdhost_metadata_identity_acquire(host);
 
-    node_info.data.name = rrdhost_hostname(host);
-    node_info.data.os = rrdhost_os(host);
+    node_info.data.name = string2str(identity.common.hostname);
+    node_info.data.os = string2str(identity.os);
     node_info.data.version = host_version ? host_version : NETDATA_VERSION;
     node_info.data.release_channel = get_release_channel();
     node_info.data.timezone = host_tz.abbrev_timezone;
@@ -83,24 +84,29 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
     node_info.node_capabilities = (struct capability *)aclk_get_agent_capas();
     node_info.data.host_labels_ptr = host->rrdlabels;
 
-    rrdhost_system_info_to_node_info(host->system_info, &node_info);
+    spinlock_lock(&host->rrdhost_update_lock);
+    struct rrdhost_system_info *system_info = rrdhost_system_info_dup(host->system_info);
+    spinlock_unlock(&host->rrdhost_update_lock);
+    rrdhost_system_info_to_node_info(system_info, &node_info);
 
     aclk_update_node_info(&node_info, sync_completion);
+    rrdhost_system_info_free(system_info);
     nd_log(
         NDLS_ACCESS,
         NDLP_DEBUG,
         "ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)",
         aclk_host_config->node_id,
-        rrdhost_hostname(host),
+        string2str(identity.common.hostname),
         host->machine_guid,
         host == localhost ? "parent" : "child");
 
+    rrdhost_metadata_identity_release(&identity);
     rrd_rdunlock();
     rrdhost_tz_free(&host_tz);
     freez(node_info.node_instance_capabilities);
     freez(host_version);
 
-    aclk_host_config->node_collectors_send = now_realtime_sec();
+    aclk_send_timestamp_set(&aclk_host_config->node_collectors_send, now_realtime_sec());
 }
 
 void send_node_info_with_wait(RRDHOST *host)
@@ -153,6 +159,16 @@ void send_node_update_with_wait(RRDHOST *host, int live, int queryable)
     // sc is automatically freed when both waiter and query release their references
 }
 
+static inline void hostname_snapshot_update(STRING **snapshot, RRDHOST *host)
+{
+    spinlock_lock(&host->rrdhost_update_lock);
+    STRING *hostname = string_dup(host->hostname);
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    string_freez(*snapshot);
+    *snapshot = hostname;
+}
+
 void aclk_check_node_info_and_collectors(void)
 {
     RRDHOST *host;
@@ -184,23 +200,25 @@ void aclk_check_node_info_and_collectors(void)
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
             internal_error(true, "ACLK SYNC: Context still pending for %s", rrdhost_hostname(host));
             context_loading++;
-            context_loading_host = host->hostname;
+            hostname_snapshot_update(&context_loading_host, host);
             continue;
         }
 
-        if (!aclk_host_config->node_info_send_time && !aclk_host_config->node_collectors_send)
+        time_t node_info_send_time = aclk_send_timestamp_get(&aclk_host_config->node_info_send_time);
+        time_t node_collectors_send = aclk_send_timestamp_get(&aclk_host_config->node_collectors_send);
+        if (!node_info_send_time && !node_collectors_send)
             continue;
 
         if (unlikely(rrdhost_receiver_replicating_charts(host))) {
             internal_error(true, "ACLK SYNC: Host %s is still replicating in", rrdhost_hostname(host));
             replicating_rcv++;
-            replicating_rcv_host = host->hostname;
+            hostname_snapshot_update(&replicating_rcv_host, host);
         }
 
         if (unlikely(rrdhost_sender_replicating_charts(host))) {
             internal_error(true, "ACLK SYNC: Host %s is still replicating out", rrdhost_hostname(host));
             replicating_snd++;
-            replicating_snd_host = host->hostname;
+            hostname_snapshot_update(&replicating_snd_host, host);
         }
 
 #ifdef REPLICATION_TRACKING
@@ -212,24 +230,26 @@ void aclk_check_node_info_and_collectors(void)
 
         bool pp_queue_empty = !rrdcontext_queue_entries(&host->rrdctx.pp_queue);
 
-        if (!pp_queue_empty && (aclk_host_config->node_info_send_time || aclk_host_config->node_collectors_send)) {
+        if (!pp_queue_empty && (node_info_send_time || node_collectors_send)) {
             context_pp++;
-            context_pp_host = host->hostname;
+            hostname_snapshot_update(&context_pp_host, host);
         }
 
-        if (pp_queue_empty && aclk_host_config->node_info_send_time &&
-            aclk_host_config->node_info_send_time + 30 < now) {
-            aclk_host_config->node_info_send_time = 0;
+        node_info_send_time = aclk_send_timestamp_get(&aclk_host_config->node_info_send_time);
+        if (pp_queue_empty && node_info_send_time &&
+            nd_time_t_add_compare(node_info_send_time, 30, now) < 0 &&
+            aclk_send_timestamp_claim(&aclk_host_config->node_info_send_time, node_info_send_time)) {
             build_node_info(host, NULL);
             schedule_node_state_update(host, 10000);
             internal_error(true, "ACLK SYNC: Sending node info for %s", rrdhost_hostname(host));
         }
 
-        if (pp_queue_empty && aclk_host_config->node_collectors_send &&
-            aclk_host_config->node_collectors_send + 30 < now) {
+        node_collectors_send = aclk_send_timestamp_get(&aclk_host_config->node_collectors_send);
+        if (pp_queue_empty && node_collectors_send &&
+            nd_time_t_add_compare(node_collectors_send, 30, now) < 0 &&
+            aclk_send_timestamp_claim(&aclk_host_config->node_collectors_send, node_collectors_send)) {
             build_node_collectors(host);
             internal_error(true, "ACLK SYNC: Sending collectors for %s", rrdhost_hostname(host));
-            aclk_host_config->node_collectors_send = 0;
         }
     }
     dfe_done(host);
@@ -285,4 +305,9 @@ void aclk_check_node_info_and_collectors(void)
                      replay_counters_txt
                      );
     }
+
+    string_freez(context_loading_host);
+    string_freez(replicating_rcv_host);
+    string_freez(replicating_snd_host);
+    string_freez(context_pp_host);
 }

@@ -2,6 +2,8 @@
 
 #include "libnetdata/libnetdata.h"
 #include "duration.h"
+#include "entries.h"
+#include "size.h"
 
 typedef struct {
     const char *input;
@@ -459,6 +461,149 @@ static int test_duration_parse_seconds_int_range(void) {
     return failed;
 }
 
+static int test_parser_fixed_width_conversions(void) {
+    int failed = 0;
+
+    struct {
+        const char *input;
+        const char *default_unit;
+        const char *output_unit;
+        bool should_succeed;
+        int64_t expected;
+        const char *description;
+    } duration_tests[] = {
+        { "nan", "ns", "ns", false, 0, "duration NaN fails" },
+        { "inf", "ns", "ns", false, 0, "duration infinity fails" },
+        { "-inf", "ns", "ns", false, 0, "negative duration infinity fails" },
+        { "1e400ns", "ns", "ns", false, 0, "duration exponent overflow fails" },
+        { "1e300y", "ns", "ns", false, 0, "duration unit scaling overflow fails" },
+        { "9223372036854775808ns", "ns", "ns", false, 0, "duration positive limit fails" },
+        { "-9223372036854775808ns", "ns", "ns", false, 0, "duration negative limit fails" },
+        { "0ns-9223372036854775808ns", "ns", "ns", false, 0, "duration final negative limit fails" },
+        { "0ns-9223372036854775808ns1ns", "ns", "ns", true, -INT64_MAX, "duration minimum intermediate cancels" },
+        { "0ns-9223372036854775808ns-1ns", "ns", "ns", false, 0, "duration negative sum overflow fails" },
+        { "9223372036854774784ns1024ns", "ns", "ns", false, 0, "duration positive sum overflow fails" },
+        { "0ns-9223372036854774784ns-1024ns", "ns", "ns", false, 0, "duration summed negative limit fails" },
+        { "9223372036854774784ns", "ns", "ns", true, INT64_C(9223372036854774784), "large duration succeeds" },
+        { "-9223372036854774784ns", "ns", "ns", true, -INT64_C(9223372036854774784), "large negative duration succeeds" },
+        { "9223372036854774784ns ago", "ns", "ns", true, -INT64_C(9223372036854774784), "large duration ago succeeds" },
+        { "9223372036854774784ns-1024ns", "ns", "ns", true, INT64_C(9223372036854773760), "large duration subtraction succeeds" },
+        { "1.5s", "s", "s", true, 2, "duration half rounds away from zero" },
+    };
+
+    for(size_t i = 0; i < sizeof(duration_tests) / sizeof(duration_tests[0]); i++) {
+        int64_t result = INT64_C(0x123456789);
+        bool success = duration_parse(
+            duration_tests[i].input, &result, duration_tests[i].default_unit, duration_tests[i].output_unit);
+
+        if(success != duration_tests[i].should_succeed || result != duration_tests[i].expected) {
+            fprintf(stderr,
+                    "FAILED: %s: success=%d result=%" PRId64 "\n",
+                    duration_tests[i].description, success, result);
+            failed++;
+        }
+    }
+
+    struct {
+        const char *input;
+        const char *default_unit;
+        bool should_succeed;
+        uint64_t expected;
+        const char *description;
+    } size_tests[] = {
+        { "nanB", "B", false, 0, "size NaN fails" },
+        { "infB", "B", false, 0, "size infinity fails" },
+        { "1e400B", "B", false, 0, "size exponent overflow fails" },
+        { "0x1p64B", "B", false, 0, "size hexadecimal exponent overflow fails" },
+        { "18446744073709551616B", "B", false, 0, "size unsigned limit fails" },
+        { "18446744073709560KB", "B", false, 0, "size unit scaling overflow fails" },
+        { "17592186044416", "MiB", false, 0, "size default unit scaling overflow fails" },
+        { "-1B", "B", false, 0, "negative size fails" },
+        { "18446744073709549568B", "B", true, UINT64_C(18446744073709549568), "large size succeeds" },
+        { "1536B", "KiB", true, 2, "size half rounds up" },
+        { "1535B", "KiB", true, 1, "size below half rounds down" },
+    };
+
+    for(size_t i = 0; i < sizeof(size_tests) / sizeof(size_tests[0]); i++) {
+        uint64_t result = UINT64_C(0x123456789);
+        bool success = size_parse(size_tests[i].input, &result, size_tests[i].default_unit);
+
+        if(success != size_tests[i].should_succeed || result != size_tests[i].expected) {
+            fprintf(stderr,
+                    "FAILED: %s: success=%d result=%" PRIu64 "\n",
+                    size_tests[i].description, success, result);
+            failed++;
+        }
+    }
+
+    struct {
+        const char *input;
+        const char *default_unit;
+        bool should_succeed;
+        uint64_t expected;
+        const char *description;
+    } entries_tests[] = {
+        { "nan", "", false, 0, "entries NaN fails" },
+        { "inf", "", false, 0, "entries infinity fails" },
+        { "1e400", "", false, 0, "entries exponent overflow fails" },
+        { "18446744073709551616", "", false, 0, "entries unsigned limit fails" },
+        { "18446744074G", "", false, 0, "entries unit scaling overflow fails" },
+        { "-1", "", false, 0, "negative entries fail" },
+        { "18446744073709549568", "", true, UINT64_C(18446744073709549568), "large entries value succeeds" },
+        { "1.5K", "K", true, 2, "entries half rounds up" },
+    };
+
+    for(size_t i = 0; i < sizeof(entries_tests) / sizeof(entries_tests[0]); i++) {
+        uint64_t result = UINT64_C(0x123456789);
+        bool success = entries_parse(entries_tests[i].input, &result, entries_tests[i].default_unit);
+
+        if(success != entries_tests[i].should_succeed || result != entries_tests[i].expected) {
+            fprintf(stderr,
+                    "FAILED: %s: success=%d result=%" PRIu64 "\n",
+                    entries_tests[i].description, success, result);
+            failed++;
+        }
+    }
+
+    int64_t signed_result;
+    uint64_t unsigned_result;
+    const NETDATA_DOUBLE signed_limit = (NETDATA_DOUBLE)(UINT64_C(1) << 63);
+    const NETDATA_DOUBLE unsigned_limit = signed_limit * 2.0;
+
+    if(parser_round_number_to_int64(NAN, &signed_result) ||
+       parser_round_number_to_int64(INFINITY, &signed_result) ||
+       parser_round_number_to_int64(signed_limit, &signed_result) ||
+       !parser_round_number_to_int64(-signed_limit, &signed_result) || signed_result != INT64_MIN ||
+       !parser_round_number_to_int64(1.5, &signed_result) || signed_result != 2 ||
+       !parser_round_number_to_int64(-1.5, &signed_result) || signed_result != -2) {
+        fprintf(stderr, "FAILED: checked signed conversion boundaries or rounding\n");
+        failed++;
+    }
+
+    if(parser_round_number_to_uint64(NAN, &unsigned_result) ||
+       parser_round_number_to_uint64(INFINITY, &unsigned_result) ||
+       parser_round_number_to_uint64(-1.0, &unsigned_result) ||
+       parser_round_number_to_uint64(unsigned_limit, &unsigned_result) ||
+       !parser_round_number_to_uint64(1.5, &unsigned_result) || unsigned_result != 2 ||
+       !parser_round_number_to_uint64(-0.0, &unsigned_result) || unsigned_result != 0) {
+        fprintf(stderr, "FAILED: checked unsigned conversion boundaries or rounding\n");
+        failed++;
+    }
+
+    NETDATA_DOUBLE uint64_max_as_number = (NETDATA_DOUBLE)UINT64_MAX;
+    if(uint64_max_as_number < unsigned_limit) {
+        if(!parser_round_number_to_uint64(uint64_max_as_number, &unsigned_result) ||
+           unsigned_result != UINT64_MAX ||
+           !size_parse("18446744073709551615B", &unsigned_result, "B") || unsigned_result != UINT64_MAX ||
+           !entries_parse("18446744073709551615", &unsigned_result, "") || unsigned_result != UINT64_MAX) {
+            fprintf(stderr, "FAILED: representable uint64 maximum conversion\n");
+            failed++;
+        }
+    }
+
+    return failed;
+}
+
 int duration_unittest(void) {
     int passed = 0;
     int failed = 0;
@@ -498,6 +643,14 @@ int duration_unittest(void) {
         printf("All int range tests passed\n");
     } else {
         failed += range_failed;
+    }
+
+    printf("\nRunning fixed-width parser conversion tests...\n");
+    int conversion_failed = test_parser_fixed_width_conversions();
+    if(conversion_failed == 0) {
+        printf("All fixed-width parser conversion tests passed\n");
+    } else {
+        failed += conversion_failed;
     }
 
     printf("\n===============================================================\n");

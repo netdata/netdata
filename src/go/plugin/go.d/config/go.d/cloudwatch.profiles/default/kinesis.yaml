@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon Kinesis Data Streams
 namespace: AWS/Kinesis
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: StreamName
@@ -51,17 +52,19 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the {StreamName} grain.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {StreamName} grain.
   # ----------------------------------------------------------------------------------------
-  # - id: put_record_bytes
-  #   metric_name: PutRecord.Bytes
-  #   statistics: [sum]
-  #   rate: true
-  # - id: put_records_bytes
-  #   metric_name: PutRecords.Bytes
-  #   statistics: [sum]
-  #   rate: true
+  - id: put_record_bytes
+    disabled: true
+    metric_name: PutRecord.Bytes
+    statistics: [sum]
+    rate: true
+  - id: put_records_bytes
+    disabled: true
+    metric_name: PutRecords.Bytes
+    statistics: [sum]
+    rate: true
   # Enhanced SHARD-level metrics use the {StreamName, ShardId} grain (opt-in via
   # EnableEnhancedMonitoring, billed as custom metrics); enhanced fan-out consumers use
   # {StreamName, ConsumerName}. Both need their own profile. See:
@@ -73,7 +76,7 @@ template:
     instances:
       by_labels: [account_id, region, stream_name]
   charts:
-    - id: cw_kinesis_throughput
+    - id: aws_cloudwatch_kinesis_throughput
       context: throughput
       title: Kinesis Data Throughput
       family: Throughput
@@ -84,7 +87,7 @@ template:
           name: incoming
         - selector: get_records_bytes_sum
           name: outgoing
-    - id: cw_kinesis_records
+    - id: aws_cloudwatch_kinesis_records
       context: records
       title: Kinesis Records
       family: Records
@@ -95,7 +98,7 @@ template:
           name: incoming
         - selector: get_records_records_sum
           name: outgoing
-    - id: cw_kinesis_iterator_age
+    - id: aws_cloudwatch_kinesis_iterator_age
       context: iterator_age
       title: Kinesis GetRecords Iterator Age
       family: Consumers
@@ -104,7 +107,7 @@ template:
       dimensions:
         - selector: get_records_iterator_age_maximum
           name: iterator_age
-    - id: cw_kinesis_latency
+    - id: aws_cloudwatch_kinesis_latency
       context: latency
       title: Kinesis Operation Latency
       family: Latency
@@ -117,7 +120,7 @@ template:
           name: put_record
         - selector: put_records_latency_average
           name: put_records
-    - id: cw_kinesis_throttling
+    - id: aws_cloudwatch_kinesis_throttling
       context: throughput_exceeded
       title: Kinesis Throughput Exceeded
       family: Throttling
@@ -128,7 +131,7 @@ template:
           name: read
         - selector: write_throughput_exceeded_average
           name: write
-    - id: cw_kinesis_put_errors
+    - id: aws_cloudwatch_kinesis_put_errors
       context: put_errors
       title: Kinesis PutRecords Rejected
       family: Errors
@@ -140,16 +143,16 @@ template:
         - selector: put_records_throttled_sum
           name: throttled
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_kinesis_put_bytes
-    #   context: put_bytes
-    #   title: Kinesis Put Bytes
-    #   family: Throughput
-    #   units: bytes/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: put_record_bytes_sum
-    #       name: put_record
-    #     - selector: put_records_bytes_sum
-    #       name: put_records
+    - id: aws_cloudwatch_kinesis_put_bytes
+      context: put_bytes
+      title: Kinesis Put Bytes
+      family: Throughput
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: put_record_bytes_sum
+          name: put_record
+        - selector: put_records_bytes_sum
+          name: put_records

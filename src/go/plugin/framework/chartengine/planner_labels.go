@@ -19,70 +19,208 @@ type compiledInstanceLabelPlan struct {
 	includeAll   bool
 }
 
-type chartLabelAccumulator struct {
-	mode        program.PromotionMode
-	promoteKeys map[string]struct{}
-	excluded    map[string]struct{}
-	instance    map[string]string
-	selected    map[string]string
-	initialized bool
+type chartLabelPolicy struct {
+	mode         program.PromotionMode
+	promoteKeys  map[string]struct{}
+	excluded     map[string]struct{}
+	instancePlan compiledInstanceLabelPlan
+}
 
-	instancePlan      compiledInstanceLabelPlan
+type chartLabelAccumulator struct {
+	policy                 *chartLabelPolicy
+	dimensionKeyExclusions map[string]struct{}
+	instance               map[string]string
+	selected               map[string]string
+	initialized            bool
+
 	instanceKeys      map[string]struct{}
 	resolvedScratch   []instanceLabelValue
 	includeAllScratch []string
 }
 
-func newChartLabelAccumulator(chart program.Chart) *chartLabelAccumulator {
+type chartLabelMembership struct {
+	seriesID          metrix.SeriesID
+	dimensionKeyLabel string
+}
+
+type chartLabelTracker struct {
+	previous *materializedChartPresentation
+	change   *chartLabelChange
+	observed int
+}
+
+type chartLabelChange struct {
+	proposedMembership  []chartLabelMembership
+	accumulator         *chartLabelAccumulator
+	reconcileDuringScan bool
+}
+
+func compileChartLabelPolicy(chart program.Chart) *chartLabelPolicy {
 	plan := compileInstanceLabelPlan(chart.Identity)
-	acc := &chartLabelAccumulator{
+	policy := &chartLabelPolicy{
 		mode:        chart.Labels.Mode,
 		promoteKeys: make(map[string]struct{}, len(chart.Labels.PromoteKeys)),
 		excluded: make(map[string]struct{},
 			len(chart.Labels.Exclusions.SelectorConstrainedKeys)+len(chart.Labels.Exclusions.DimensionKeyLabels)),
-		instance:          make(map[string]string),
-		selected:          make(map[string]string),
-		instancePlan:      plan,
-		instanceKeys:      make(map[string]struct{}, len(plan.explicitKeys)),
-		resolvedScratch:   make([]instanceLabelValue, 0, len(plan.explicitKeys)),
-		includeAllScratch: make([]string, 0, len(plan.explicitKeys)),
+		instancePlan: plan,
 	}
 	for _, key := range chart.Labels.PromoteKeys {
 		key = strings.TrimSpace(key)
 		if key == "" {
 			continue
 		}
-		acc.promoteKeys[key] = struct{}{}
+		policy.promoteKeys[key] = struct{}{}
 	}
 	for _, key := range chart.Labels.Exclusions.SelectorConstrainedKeys {
 		key = strings.TrimSpace(key)
 		if key == "" {
 			continue
 		}
-		acc.excluded[key] = struct{}{}
+		policy.excluded[key] = struct{}{}
 	}
 	for _, key := range chart.Labels.Exclusions.DimensionKeyLabels {
 		key = strings.TrimSpace(key)
 		if key == "" {
 			continue
 		}
-		acc.excluded[key] = struct{}{}
+		policy.excluded[key] = struct{}{}
 	}
-	return acc
+	return policy
 }
 
-func newAutogenChartLabelAccumulator() *chartLabelAccumulator {
-	return &chartLabelAccumulator{
-		mode:              program.PromotionModeAutoIntersection,
-		promoteKeys:       make(map[string]struct{}),
-		excluded:          make(map[string]struct{}),
-		instance:          make(map[string]string),
-		selected:          make(map[string]string),
-		instancePlan:      compileInstanceLabelPlan(program.ChartIdentity{}),
-		instanceKeys:      make(map[string]struct{}),
-		resolvedScratch:   make([]instanceLabelValue, 0),
-		includeAllScratch: make([]string, 0),
+func compileAutogenChartLabelPolicy() *chartLabelPolicy {
+	return &chartLabelPolicy{
+		mode:         program.PromotionModeAutoIntersection,
+		promoteKeys:  make(map[string]struct{}),
+		excluded:     make(map[string]struct{}),
+		instancePlan: compileInstanceLabelPlan(program.ChartIdentity{}),
 	}
+}
+
+func newChartLabelAccumulator(policy *chartLabelPolicy) *chartLabelAccumulator {
+	plan := policy.instancePlan
+	return &chartLabelAccumulator{
+		policy:                 policy,
+		dimensionKeyExclusions: make(map[string]struct{}),
+		instance:               make(map[string]string, len(plan.explicitKeys)),
+		selected:               make(map[string]string, len(policy.promoteKeys)),
+		instanceKeys:           make(map[string]struct{}, len(plan.explicitKeys)),
+		resolvedScratch:        make([]instanceLabelValue, 0, len(plan.explicitKeys)),
+		includeAllScratch:      make([]string, 0, len(plan.explicitKeys)),
+	}
+}
+
+func (a *chartLabelAccumulator) reset() {
+	if a == nil {
+		return
+	}
+	clear(a.dimensionKeyExclusions)
+	clear(a.instance)
+	clear(a.selected)
+	clear(a.instanceKeys)
+	a.resolvedScratch = a.resolvedScratch[:0]
+	a.includeAllScratch = a.includeAllScratch[:0]
+	a.initialized = false
+}
+
+func newChartLabelTracker(previous *materializedChartPresentation) chartLabelTracker {
+	return chartLabelTracker{previous: previous}
+}
+
+func (c *chartLabelChange) ensureAccumulator(policy *chartLabelPolicy) *chartLabelAccumulator {
+	if c.accumulator == nil {
+		c.accumulator = newChartLabelAccumulator(policy)
+	}
+	return c.accumulator
+}
+
+func (t *chartLabelTracker) observeMembership(
+	identity metrix.SeriesIdentity,
+	dimensionKeyLabel string,
+) bool {
+	previousMembership := t.previousMembership()
+	membership := chartLabelMembership{
+		seriesID:          identity.ID,
+		dimensionKeyLabel: dimensionKeyLabel,
+	}
+	index := t.observed
+	t.observed++
+	if t.change == nil && index < len(previousMembership) && previousMembership[index] == membership {
+		return false
+	}
+
+	if t.change == nil {
+		t.change = &chartLabelChange{
+			proposedMembership:  make([]chartLabelMembership, 0, t.observed),
+			reconcileDuringScan: t.previous == nil || index == 0,
+		}
+		t.change.proposedMembership = append(t.change.proposedMembership, previousMembership[:index]...)
+	}
+	t.change.proposedMembership = append(t.change.proposedMembership, membership)
+	return t.change.reconcileDuringScan
+}
+
+func (t *chartLabelTracker) observeDuringScan(policy *chartLabelPolicy, labels metrix.LabelView, dimensionKeyLabel string) error {
+	return t.change.ensureAccumulator(policy).observe(labels, dimensionKeyLabel)
+}
+
+func (t *chartLabelTracker) finishMembership() bool {
+	previousMembership := t.previousMembership()
+	if t.change == nil && t.observed != len(previousMembership) {
+		t.change = &chartLabelChange{
+			proposedMembership: append(
+				make([]chartLabelMembership, 0, t.observed),
+				previousMembership[:t.observed]...,
+			),
+			reconcileDuringScan: t.previous == nil,
+		}
+	}
+	return t.change != nil
+}
+
+func (t *chartLabelTracker) previousMembership() []chartLabelMembership {
+	if t.previous == nil {
+		return nil
+	}
+	return t.previous.labelMembership
+}
+
+func (t *chartLabelTracker) beginReplay(policy *chartLabelPolicy) {
+	t.change.ensureAccumulator(policy).reset()
+}
+
+func (t *chartLabelTracker) observeReplay(labels metrix.LabelView, dimensionKeyLabel string) error {
+	return t.change.accumulator.observe(labels, dimensionKeyLabel)
+}
+
+func (t *chartLabelTracker) needsReplay() bool {
+	return t.change != nil && !t.change.reconcileDuringScan
+}
+
+func (t *chartLabelTracker) changed() bool {
+	return t.change != nil
+}
+
+func (t *chartLabelTracker) membership() []chartLabelMembership {
+	if t.change != nil {
+		return t.change.proposedMembership
+	}
+	return t.previousMembership()
+}
+
+func (t *chartLabelTracker) accumulator() *chartLabelAccumulator {
+	if t.change == nil {
+		return nil
+	}
+	return t.change.accumulator
+}
+
+func (a *chartLabelAccumulator) isExcluded(key string) bool {
+	if _, ok := a.policy.excluded[key]; ok {
+		return true
+	}
+	_, ok := a.dimensionKeyExclusions[key]
+	return ok
 }
 
 func compileInstanceLabelPlan(identity program.ChartIdentity) compiledInstanceLabelPlan {
@@ -129,7 +267,7 @@ func (a *chartLabelAccumulator) observe(labels metrix.LabelView, dimensionKeyLab
 	}
 
 	if key := strings.TrimSpace(dimensionKeyLabel); key != "" {
-		a.excluded[key] = struct{}{}
+		a.dimensionKeyExclusions[key] = struct{}{}
 	}
 
 	ok := a.resolveInstanceLabelsForObserve(labels)
@@ -137,11 +275,11 @@ func (a *chartLabelAccumulator) observe(labels metrix.LabelView, dimensionKeyLab
 		return nil
 	}
 
-	switch a.mode {
+	switch a.policy.mode {
 	case program.PromotionModeExplicitIntersection:
 		if !a.initialized {
-			for key := range a.promoteKeys {
-				if _, excluded := a.excluded[key]; excluded {
+			for key := range a.policy.promoteKeys {
+				if a.isExcluded(key) {
 					continue
 				}
 				if a.isInstanceKey(key) {
@@ -157,7 +295,7 @@ func (a *chartLabelAccumulator) observe(labels metrix.LabelView, dimensionKeyLab
 			return nil
 		}
 		for key, value := range a.selected {
-			if _, excluded := a.excluded[key]; excluded {
+			if a.isExcluded(key) {
 				delete(a.selected, key)
 				continue
 			}
@@ -178,7 +316,7 @@ func (a *chartLabelAccumulator) observe(labels metrix.LabelView, dimensionKeyLab
 	default:
 		if !a.initialized {
 			labels.Range(func(key, value string) bool {
-				if _, excluded := a.excluded[key]; excluded {
+				if a.isExcluded(key) {
 					return true
 				}
 				if a.isInstanceKey(key) {
@@ -191,7 +329,7 @@ func (a *chartLabelAccumulator) observe(labels metrix.LabelView, dimensionKeyLab
 			return nil
 		}
 		for key, value := range a.selected {
-			if _, excluded := a.excluded[key]; excluded {
+			if a.isExcluded(key) {
 				delete(a.selected, key)
 				continue
 			}
@@ -229,7 +367,7 @@ func (a *chartLabelAccumulator) resolveInstanceLabelsForObserve(labels metrix.La
 	a.resetInstanceKeys()
 
 	resolved := a.resolvedScratch[:0]
-	for _, key := range a.instancePlan.explicitKeys {
+	for _, key := range a.policy.instancePlan.explicitKeys {
 		value, ok := labels.Get(key)
 		if !ok {
 			a.resolvedScratch = resolved[:0]
@@ -238,13 +376,13 @@ func (a *chartLabelAccumulator) resolveInstanceLabelsForObserve(labels metrix.La
 		resolved = append(resolved, instanceLabelValue{Key: key, Value: value})
 	}
 
-	if a.instancePlan.includeAll {
+	if a.policy.instancePlan.includeAll {
 		extra := a.includeAllScratch[:0]
 		labels.Range(func(key, _ string) bool {
-			if _, excluded := a.instancePlan.excludeSet[key]; excluded {
+			if _, excluded := a.policy.instancePlan.excludeSet[key]; excluded {
 				return true
 			}
-			if _, already := a.instancePlan.explicitSet[key]; already {
+			if _, already := a.policy.instancePlan.explicitSet[key]; already {
 				return true
 			}
 			extra = append(extra, key)
@@ -275,9 +413,9 @@ func (a *chartLabelAccumulator) isInstanceKey(key string) bool {
 	return ok
 }
 
-func (a *chartLabelAccumulator) materialize() (map[string]string, error) {
+func (a *chartLabelAccumulator) materialize() map[string]string {
 	if a == nil {
-		return nil, nil
+		return nil
 	}
 	out := make(map[string]string, len(a.instance)+len(a.selected))
 	for key, value := range a.instance {
@@ -293,5 +431,42 @@ func (a *chartLabelAccumulator) materialize() (map[string]string, error) {
 		out[key] = value
 	}
 	delete(out, collectJobLabel)
-	return out, nil
+	return out
+}
+
+func (a *chartLabelAccumulator) materializedEquals(values map[string]string) bool {
+	if a == nil {
+		return len(values) == 0
+	}
+
+	count := 0
+	for key := range a.instance {
+		if strings.TrimSpace(key) == "" || key == collectJobLabel {
+			continue
+		}
+		if _, overridden := a.selected[key]; overridden {
+			continue
+		}
+		count++
+	}
+	for key := range a.selected {
+		if strings.TrimSpace(key) == "" || key == collectJobLabel {
+			continue
+		}
+		count++
+	}
+	if count != len(values) {
+		return false
+	}
+
+	for key, want := range values {
+		got, ok := a.selected[key]
+		if !ok {
+			got, ok = a.instance[key]
+		}
+		if !ok || got != want {
+			return false
+		}
+	}
+	return true
 }

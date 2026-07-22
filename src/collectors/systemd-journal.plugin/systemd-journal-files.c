@@ -47,7 +47,7 @@ void buffer_json_journal_versions(BUFFER *wb)
 
 static bool journal_sd_id128_parse(const char *in, NsdId128 *ret)
 {
-    while (isspace(*in))
+    while (isspace((uint8_t)*in))
         in++;
 
     char uuid[33];
@@ -400,7 +400,7 @@ static void files_registry_insert_cb(const DICTIONARY_ITEM *item, void *value, v
 
                 if (e) {
                     const char *d = s;
-                    for (; d < e && (isdigit(*d) || *d == '.' || *d == ':'); d++)
+                    for (; d < e && (isdigit((uint8_t)*d) || *d == '.' || *d == ':'); d++)
                         ;
                     if (d == e) {
                         // a valid IP address

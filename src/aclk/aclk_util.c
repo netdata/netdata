@@ -76,7 +76,7 @@ void aclk_env_t_destroy(aclk_env_t *env) {
 
 int aclk_env_has_capa(const char *capa)
 {
-    for (int i = 0; i < (int) aclk_env->capability_count; i++) {
+    for (size_t i = 0; i < aclk_env->capability_count; i++) {
         if (!strcasecmp(capa, aclk_env->capabilities[i]))
             return 1;
     }
@@ -361,12 +361,26 @@ unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int mins_ms
         return 0;
     }
 
-    attempt++;
+    if (attempt < INT_MAX)
+        attempt++;
 
     if (attempt == 0)
         return 0;
 
-    unsigned long int delay = pow(base, attempt - 1);
+    unsigned long int delay = 1;
+    unsigned long int delay_limit = MAX(mins_ms, min_ms);
+    unsigned long int base_ul = (unsigned long int)base;
+
+    // Once the exponential term exceeds both clamp thresholds, the result is clamped.
+    if (base_ul > 1) {
+        for (int i = 0; i < attempt - 1; i++) {
+            if (delay > delay_limit / base_ul)
+                return min_ms;
+
+            delay *= base_ul;
+        }
+    }
+
     delay *= MSEC_PER_SEC;
 
     delay += (os_random32() % (MAX(1000, delay/2)));

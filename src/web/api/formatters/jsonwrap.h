@@ -14,6 +14,7 @@ void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb);
 
 void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb);
 void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb);
+void rrdr_json_wrapper_cardinality_v2(BUFFER *wb, RRDR *r, RRDR_OPTIONS options);
 void rrdr_json_wrapper_partial_data_trimming_v2(BUFFER *wb, RRDR *r, RRDR_OPTIONS options);
 
 struct query_versions;

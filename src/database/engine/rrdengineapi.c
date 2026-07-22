@@ -494,6 +494,21 @@ static PGD *rrdeng_alloc_new_page_data(struct rrdeng_collect_handle *handle, use
     return d;
 }
 
+static ALWAYS_INLINE void rrdeng_store_metric_first_retention(struct rrdeng_collect_handle *handle) {
+    if(likely((handle->page_flags & (RRDENG_PAGE_RETENTION_RECORDED | RRDENG_PAGE_CREATED_IN_FUTURE)) ||
+              pgd_is_empty(handle->page_data)))
+        return;
+
+    // once the page holds a real (non-gap) value, record the page start as
+    // the metric's retention start; gap-only pages are discarded at flush,
+    // so they must not leave retention behind; without this stamp, a metric
+    // without retention gets first_time_s set by the first retention reader
+    // using the newest hot point, hiding all older points of this page from
+    // queries (burst ingestion: replication catch-up)
+    mrg_metric_expand_retention(main_mrg, handle->metric, pgc_page_start_time_s(handle->pgc_page), 0, 0);
+    handle->page_flags |= RRDENG_PAGE_RETENTION_RECORDED;
+}
+
 static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *sch,
                                              const usec_t point_in_time_ut,
                                              const NETDATA_DOUBLE n,
@@ -521,12 +536,16 @@ static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_H
     if(unlikely(!handle->pgc_page)) {
         rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, handle->page_data);
         // handle->position is set to 1 already
+
+        rrdeng_store_metric_first_retention(handle);
     }
     else {
         // update an existing page
         pgc_page_hot_set_end_time_s(main_cache, handle->pgc_page,
                                     (time_t) (point_in_time_ut / USEC_PER_SEC), additional_bytes);
         handle->page_end_time_ut = point_in_time_ut;
+
+        rrdeng_store_metric_first_retention(handle);
 
         if(unlikely(++handle->page_position >= handle->page_entries_max)) {
             internal_fatal(handle->page_position > handle->page_entries_max, "DBENGINE: exceeded page max number of points");

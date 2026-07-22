@@ -12,6 +12,11 @@ typedef struct perflib_registry {
     char *help;
 } perfLibRegistryEntry;
 
+typedef struct perflib_retired_string {
+    char *value;
+    struct perflib_retired_string *next;
+} perfLibRetiredString;
+
 static inline bool compare_perfLibRegistryEntry(const char *k1, const char *k2) {
     return strcmp(k1, k2) == 0;
 }
@@ -35,6 +40,7 @@ static struct {
     struct simple_hashtable_PERFLIB hashtable;
     FILETIME lastWriteTime;
     PERFLIB_ENTRIES_JudyLSet registry_entries;
+    perfLibRetiredString *retired_strings;
 } names_globals = {
     .spinlock = SPINLOCK_INITIALIZER,
 };
@@ -61,6 +67,16 @@ static inline perfLibRegistryEntry* registry_ensure_entry(DWORD id) {
     }
     
     return entry;
+}
+
+static inline void RegistryRetireString_unsafe(char *value) {
+    if(!value)
+        return;
+
+    perfLibRetiredString *retired = mallocz(sizeof(*retired));
+    retired->value = value;
+    retired->next = names_globals.retired_strings;
+    names_globals.retired_strings = retired;
 }
 
 DWORD RegistryFindIDByName(const char *name) {
@@ -95,7 +111,13 @@ static void RegistrySetData_unsafe(DWORD id, const char *key, const char *help) 
         if(entry->key) {
             // Only if the key actually changes, we need to update hash
             if(strcmp(entry->key, key) != 0) {
-                freez(entry->key);
+                XXH64_hash_t old_hash = XXH3_64bits((void *)entry->key, strlen(entry->key));
+                SIMPLE_HASHTABLE_SLOT_PERFLIB *old_sl =
+                    simple_hashtable_get_slot_PERFLIB(&names_globals.hashtable, old_hash, entry->key, false);
+                if(SIMPLE_HASHTABLE_SLOT_DATA(old_sl) == entry)
+                    simple_hashtable_del_slot_PERFLIB(&names_globals.hashtable, old_sl);
+
+                RegistryRetireString_unsafe(entry->key);
                 entry->key = strdupz(key);
                 add_to_hash = true;
             }
@@ -107,9 +129,14 @@ static void RegistrySetData_unsafe(DWORD id, const char *key, const char *help) 
     }
 
     if(help) {
-        if(entry->help)
-            freez(entry->help);
-        entry->help = strdupz(help);
+        if(entry->help) {
+            if(strcmp(entry->help, help) != 0) {
+                RegistryRetireString_unsafe(entry->help);
+                entry->help = strdupz(help);
+            }
+        }
+        else
+            entry->help = strdupz(help);
     }
 
     entry->id = id;
@@ -344,6 +371,15 @@ static void free_registry_entry(Word_t idx, perfLibRegistryEntry *entry, void *d
     }
 }
 
+static void free_retired_strings_unsafe(void) {
+    while(names_globals.retired_strings) {
+        perfLibRetiredString *retired = names_globals.retired_strings;
+        names_globals.retired_strings = retired->next;
+        freez(retired->value);
+        freez(retired);
+    }
+}
+
 // Cleanup function to be called during shutdown to free allocated resources
 void PerflibNamesRegistryCleanup(void) {
     spinlock_lock(&names_globals.spinlock);
@@ -353,6 +389,8 @@ void PerflibNamesRegistryCleanup(void) {
     
     // Free the hashtable
     simple_hashtable_destroy_PERFLIB(&names_globals.hashtable);
+
+    free_retired_strings_unsafe();
     
     spinlock_unlock(&names_globals.spinlock);
 }

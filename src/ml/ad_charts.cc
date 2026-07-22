@@ -245,7 +245,7 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
         }
 
         rrddim_set_by_pointer(host->ml_running_rs,
-                              host->ml_running_rd, host->ml_running);
+                              host->ml_running_rd, ml_running_load(host->rh));
         rrdset_done(host->ml_running_rs);
     }
 }
@@ -377,7 +377,7 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
         /*
          * Compute the values of the dimensions based on the host rate chart
         */
-        if (host->ml_running) {
+        if (ml_running_load(host->rh)) {
             // Reclaim the previous host's query scratch before starting the
             // next one. Cheap no-op on the first iteration of a fresh arena.
             onewayalloc_reset(owa);

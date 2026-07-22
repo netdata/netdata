@@ -54,6 +54,7 @@ static struct {
     , {"long-keys"         , 0    , RRDR_OPTION_LONG_JSON_KEYS}
     , {"mcp-info"          , 0    , RRDR_OPTION_MCP_INFO}
     , {"rfc3339"           , 0    , RRDR_OPTION_RFC3339}
+    , {"cardinality-limit-all", 0 , RRDR_OPTION_CARDINALITY_ALL}
     , {NULL                , 0    , 0}
 };
 

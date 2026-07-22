@@ -3,8 +3,23 @@
 #include "win_system-info.h"
 #include "database/rrdhost-system-info.h"
 #include "libnetdata/os/windows-api/windows_api.h"
+#include "libnetdata/os/windows-wmi/windows-wmi.h"
+#include "libnetdata/os/windows-wmi/windows-wmi-GetSystemInfo.h"
+#include "daemon/status-file-dmi.h"
+#include "daemon/status-file-product.h"
+#include "libnetdata/os/os-windows-wrappers.h"
+#include "libnetdata/os/setenv.h"
 
 #ifdef OS_WINDOWS
+
+typedef struct netdata_windows_os_info {
+    char name[256];
+    char id[4096];
+    char id_like[256];
+    char version[4096];
+    char version_id[4096];
+    char detection[64];
+} NETDATA_WINDOWS_OS_INFO;
 
 static void netdata_windows_ip(struct rrdhost_system_info *systemInfo)
 {
@@ -61,18 +76,13 @@ static void netdata_windows_cpu_from_system_info(struct rrdhost_system_info *sys
     char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture);
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
 
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_SYSTEM_VIRTUALIZATION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_SYSTEM_CONTAINER", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_SYSTEM_CONTAINER_DETECTION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-
+    // GetSystemInfo() cannot fail, so CPU info (arch, logical count) is always gathered here.
+    // Record the detection method unconditionally, independent of the optional registry probe
+    // (freq/vendor/model) that may fail. Not stored in the struct; consumed from the environment
+    // by anonymous-statistics.sh (mirrors the Linux system-info.sh dispatch, and the RAM/disk
+    // detection pattern in this file).
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+    nd_setenv("NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
 static void netdata_windows_cpu_vendor_model(struct rrdhost_system_info *systemInfo,
@@ -109,7 +119,6 @@ static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *system
 
     netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_VENDOR", "VendorIdentifier");
     netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_MODEL", "ProcessorNameString");
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
 }
 
 static void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
@@ -132,7 +141,9 @@ static void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
     (void)rrdhost_system_info_set_by_name(systemInfo,
                                            "NETDATA_SYSTEM_TOTAL_RAM",
                                            (!size) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : memSize);
+    // Not stored in the struct; consumed from the environment by anonymous-statistics.sh.
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+    nd_setenv("NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
 static ULONGLONG netdata_windows_get_disk_size(char *cVolume)
@@ -178,7 +189,10 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
     char diskSize[256];
     (void)snprintf(diskSize, 255, "%llu", total);
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_TOTAL_DISK_SIZE", diskSize);
+
+    // Not stored in the struct; consumed from the environment by anonymous-statistics.sh.
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+    nd_setenv("NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
 // Host
@@ -331,31 +345,115 @@ static char *netdata_windows_get_os_id_like(DWORD build)
     return id_like;
 }
 
-static void netdata_windows_host(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_set_os_fields(struct rrdhost_system_info *systemInfo,
+                                          const char *prefix,
+                                          const char *name,
+                                          const char *id,
+                                          const char *id_like,
+                                          const char *version,
+                                          const char *version_id,
+                                          const char *detection)
 {
-    char osVersion[4096];
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_NAME", "Microsoft Windows");
+    char key[64];
+
+    snprintf(key, sizeof(key), "%s_NAME", prefix);
+    (void)rrdhost_system_info_set_by_name(systemInfo, key, name);
+
+    snprintf(key, sizeof(key), "%s_ID", prefix);
+    (void)rrdhost_system_info_set_by_name(systemInfo, key, id);
+
+    snprintf(key, sizeof(key), "%s_ID_LIKE", prefix);
+    (void)rrdhost_system_info_set_by_name(systemInfo, key, id_like);
+
+    snprintf(key, sizeof(key), "%s_VERSION", prefix);
+    (void)rrdhost_system_info_set_by_name(systemInfo, key, version);
+
+    snprintf(key, sizeof(key), "%s_VERSION_ID", prefix);
+    (void)rrdhost_system_info_set_by_name(systemInfo, key, version_id);
+
+    snprintf(key, sizeof(key), "%s_DETECTION", prefix);
+    (void)rrdhost_system_info_set_by_name(systemInfo, key, detection);
+}
+
+static void netdata_windows_get_local_os_info(NETDATA_WINDOWS_OS_INFO *info)
+{
+    memset(info, 0, sizeof(*info));
+
+    snprintf(info->name, sizeof(info->name), "%s", "Microsoft Windows");
 
     DWORD build = netdata_windows_get_current_build();
+    netdata_windows_discover_os_version(info->id, sizeof(info->id), build);
+    snprintf(info->version, sizeof(info->version), "%s", info->id);
+    snprintf(info->version_id, sizeof(info->version_id), "%s", info->id);
+    snprintf(info->id_like, sizeof(info->id_like), "%s", netdata_windows_get_os_id_like(build));
+    snprintf(info->detection, sizeof(info->detection), "%s", NETDATA_WIN_DETECTION_METHOD);
+}
 
-    netdata_windows_discover_os_version(osVersion, 4095, build);
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_ID", osVersion);
-
-    char *id_like = netdata_windows_get_os_id_like(build);
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_ID_LIKE", id_like);
-
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_VERSION", osVersion);
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_VERSION_ID", osVersion);
-
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_HOST_OS_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+static void netdata_windows_set_local_kernel_info(struct rrdhost_system_info *systemInfo)
+{
+    char kernelVersion[4096];
+    DWORD build = netdata_windows_get_current_build();
 
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_KERNEL_NAME", "Windows");
+    netdata_windows_os_kernel_version(kernelVersion, sizeof(kernelVersion), build);
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_KERNEL_VERSION", kernelVersion);
+}
 
-    netdata_windows_os_kernel_version(osVersion, 4095, build);
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_KERNEL_VERSION", osVersion);
+static void netdata_windows_set_host_os_info(struct rrdhost_system_info *systemInfo, const NETDATA_WINDOWS_OS_INFO *info)
+{
+    netdata_windows_set_os_fields(systemInfo,
+                                  "NETDATA_HOST_OS",
+                                  info->name,
+                                  info->id,
+                                  info->id_like,
+                                  info->version,
+                                  info->version_id,
+                                  info->detection);
+}
 
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_HOST_IS_K8S_NODE", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE);
+static void netdata_windows_set_host_os_unknown(struct rrdhost_system_info *systemInfo)
+{
+    netdata_windows_set_os_fields(systemInfo,
+                                  "NETDATA_HOST_OS",
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN,
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN,
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN,
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN,
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN,
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
+}
+
+static void netdata_windows_set_container_os_info(struct rrdhost_system_info *systemInfo, const NETDATA_WINDOWS_OS_INFO *info)
+{
+    netdata_windows_set_os_fields(systemInfo,
+                                  "NETDATA_CONTAINER_OS",
+                                  info->name,
+                                  info->id,
+                                  info->id_like,
+                                  info->version,
+                                  info->version_id,
+                                  info->detection);
+}
+
+static void netdata_windows_set_container_os_none(struct rrdhost_system_info *systemInfo)
+{
+    netdata_windows_set_os_fields(systemInfo,
+                                  "NETDATA_CONTAINER_OS",
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE,
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE,
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE,
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE,
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE,
+                                  NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
+}
+
+static const char *netdata_windows_container_is_official_image(void)
+{
+    const char *official = getenv("NETDATA_OFFICIAL_IMAGE");
+    if(official && *official)
+        return official;
+
+    return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE;
 }
 
 // Cloud
@@ -370,22 +468,32 @@ static void netdata_windows_cloud(struct rrdhost_system_info *systemInfo)
 }
 
 // Container
-static void netdata_windows_container(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_container(struct rrdhost_system_info *systemInfo, const char *container)
 {
+    NETDATA_WINDOWS_OS_INFO info;
+    netdata_windows_get_local_os_info(&info);
+
+    if(strcmp(container, NETDATA_WIN_CONTAINER_NONE) == 0) {
+        netdata_windows_set_host_os_info(systemInfo, &info);
+        netdata_windows_set_container_os_none(systemInfo);
+    }
+    else {
+        netdata_windows_set_host_os_unknown(systemInfo);
+        netdata_windows_set_container_os_info(systemInfo, &info);
+    }
+
+    netdata_windows_set_local_kernel_info(systemInfo);
     (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_CONTAINER_OS_NAME", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
+        systemInfo, "NETDATA_HOST_IS_K8S_NODE", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE);
+
+    // rrdhost_system_info_set_by_name() recognizes but does not store this key (it has no
+    // struct field); its only consumer is anonymous-statistics.sh, which reads it from the
+    // environment. On Linux the system-info.sh dispatch loop nd_setenv()s it — mirror that
+    // here so the flag is not silently dropped on Windows.
+    const char *official_image = netdata_windows_container_is_official_image();
     (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_CONTAINER_OS_ID", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_CONTAINER_OS_ID_LIKE", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_CONTAINER_OS_VERSION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_CONTAINER_OS_VERSION_ID", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_CONTAINER_OS_DETECTION", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_NONE);
-    (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE);
+        systemInfo, "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE", official_image);
+    nd_setenv("NETDATA_CONTAINER_IS_OFFICIAL_IMAGE", official_image, 1);
 }
 
 static void netdata_windows_install_type(struct rrdhost_system_info *systemInfo)
@@ -393,12 +501,199 @@ static void netdata_windows_install_type(struct rrdhost_system_info *systemInfo)
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_INSTALL_TYPE", "netdata-installer.exe");
 }
 
+static bool netdata_windows_str_contains_ci(const char *haystack, const char *needle) {
+    return haystack && needle && *needle && strcasestr(haystack, needle) != NULL;
+}
+
+const char *netdata_windows_normalize_virt_string(const char *raw) {
+    if(!raw || !*raw) return NETDATA_WIN_VIRT_BARE_METAL;
+
+    if(netdata_windows_str_contains_ci(raw, "vmware")) return NETDATA_WIN_VIRT_VMWARE;
+    if(netdata_windows_str_contains_ci(raw, "virtualbox")) return NETDATA_WIN_VIRT_ORACLE;
+    if(netdata_windows_str_contains_ci(raw, "innotek") || netdata_windows_str_contains_ci(raw, "oracle corp")) return NETDATA_WIN_VIRT_ORACLE;
+    if(netdata_windows_str_contains_ci(raw, "parallels")) return NETDATA_WIN_VIRT_PARALLELS;
+    if(netdata_windows_str_contains_ci(raw, "qemu")) return NETDATA_WIN_VIRT_QEMU;
+    if(netdata_windows_str_contains_ci(raw, "kvm")) return NETDATA_WIN_VIRT_KVM;
+    if(netdata_windows_str_contains_ci(raw, "xen") || netdata_windows_str_contains_ci(raw, "domu")) return NETDATA_WIN_VIRT_XEN;
+    if(netdata_windows_str_contains_ci(raw, "amazon")) return NETDATA_WIN_VIRT_AMAZON;
+    if(netdata_windows_str_contains_ci(raw, "digitalocean")) return NETDATA_WIN_VIRT_DIGITALOCEAN;
+    if(netdata_windows_str_contains_ci(raw, "virtual machine") ||
+       netdata_windows_str_contains_ci(raw, "hyper-v") ||
+       netdata_windows_str_contains_ci(raw, "microsoft hv")) return NETDATA_WIN_VIRT_MICROSOFT;
+
+    return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
+}
+
+static bool netdata_windows_is_unknown_virt_result(const char *virt) {
+    return virt && strcmp(virt, NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN) == 0;
+}
+
+const char *netdata_windows_resolve_virt_detection(const char *wmi, const char *smbios, const char *registry) {
+    const char *probes[] = { wmi, smbios, registry };
+    const char *unknown = NULL;
+
+    for(size_t i = 0; i < sizeof(probes) / sizeof(probes[0]); i++) {
+        const char *probe = probes[i];
+        if(!probe)
+            continue;
+
+        if(netdata_windows_is_unknown_virt_result(probe)) {
+            unknown = probe;
+            continue;
+        }
+
+        return probe;
+    }
+
+    if(unknown)
+        return unknown;
+
+    return NETDATA_WIN_VIRT_BARE_METAL;
+}
+
+static const char *netdata_windows_detect_via_wmi(void) {
+    Win32ComputerSystemInfo cs;
+    if(!GetWin32ComputerSystemInfo(&cs) || !cs.Populated)
+        return NULL;
+
+    if(cs.Model[0]) {
+        const char *m = netdata_windows_normalize_virt_string(cs.Model);
+        if(strcmp(m, NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN) != 0)
+            return m;
+    }
+
+    if(cs.Manufacturer[0]) {
+        const char *m = netdata_windows_normalize_virt_string(cs.Manufacturer);
+        if(strcmp(m, NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN) != 0)
+            return m;
+    }
+
+    return NULL;
+}
+
+static const char *netdata_windows_detect_via_smbios(void) {
+    DMI_INFO dmi;
+    dmi_info_init(&dmi);
+    os_dmi_info_get(&dmi);
+
+    if(!dmi_is_virtual_machine(&dmi))
+        return NULL;
+
+    char buf[128];
+    buf[0] = '\0';
+
+    if(dmi.product.name[0]) {
+        snprintf(buf, sizeof(buf), "%s", dmi.product.name);
+    }
+    else if(dmi.product.family[0]) {
+        snprintf(buf, sizeof(buf), "%s", dmi.product.family);
+    }
+    else if(dmi.sys.vendor[0]) {
+        snprintf(buf, sizeof(buf), "%s", dmi.sys.vendor);
+    }
+    else if(dmi.board.name[0]) {
+        snprintf(buf, sizeof(buf), "%s", dmi.board.name);
+    }
+    else {
+        return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
+    }
+
+    const char *m = netdata_windows_normalize_virt_string(buf);
+    if(strcmp(m, NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN) == 0)
+        return NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN;
+
+    return m;
+}
+
+static const char *netdata_windows_detect_via_registry(void) {
+    if(netdata_registry_key_exists(HKEY_LOCAL_MACHINE, "SOFTWARE\\VMware, Inc.\\VMware Tools"))
+        return NETDATA_WIN_VIRT_VMWARE;
+
+    if(netdata_registry_key_exists(HKEY_LOCAL_MACHINE, "SOFTWARE\\Oracle\\VirtualBox Guest Additions"))
+        return NETDATA_WIN_VIRT_ORACLE;
+
+    if(netdata_registry_key_exists(HKEY_LOCAL_MACHINE, "SOFTWARE\\Parallels\\Parallels Tools"))
+        return NETDATA_WIN_VIRT_PARALLELS;
+
+    return NULL;
+}
+
+static const char *netdata_windows_detect_virt(void) {
+    const char *wmi = netdata_windows_detect_via_wmi();
+    const char *smbios = netdata_windows_detect_via_smbios();
+    const char *registry = netdata_windows_detect_via_registry();
+
+    return netdata_windows_resolve_virt_detection(wmi, smbios, registry);
+}
+
+static void netdata_windows_detect_virtualization(struct rrdhost_system_info *systemInfo) {
+    const char *virt = netdata_windows_detect_virt();
+
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_VIRTUALIZATION", virt);
+    nd_setenv("NETDATA_SYSTEM_VIRTUALIZATION", virt, 1);
+
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+    nd_setenv("NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+}
+
+const char *netdata_windows_container_from_env(const char *k_host, const char *k_port) {
+    if(k_host && *k_host && k_port && *k_port)
+        return NETDATA_WIN_CONTAINER_KUBERNETES;
+
+    return NULL;
+}
+
+const char *netdata_windows_container_detection_method(const char *container) {
+    if(container && strcmp(container, NETDATA_WIN_CONTAINER_KUBERNETES) == 0)
+        return NETDATA_WIN_CONTAINER_KUBERNETES_DETECT;
+
+    if(container && strcmp(container, NETDATA_WIN_CONTAINER_WINDOWS) == 0)
+        return NETDATA_WIN_CONTAINER_WINDOWS_DETECT;
+
+    return NETDATA_WIN_CONTAINER_NONE;
+}
+
+static const char *netdata_windows_detect_container(void) {
+    const char *from_env = netdata_windows_container_from_env(
+        getenv("KUBERNETES_SERVICE_HOST"), getenv("KUBERNETES_SERVICE_PORT"));
+    if(from_env)
+        return from_env;
+
+    // Windows container base images (servercore/nanoserver) report the normal OS edition string
+    // in Win32_OperatingSystem.Caption (e.g. "Microsoft Windows Server 2022 Datacenter"), never
+    // the word "container", so a caption match cannot detect them. The reliable marker is the
+    // ContainerType value under HKLM\SYSTEM\CurrentControlSet\Control, which the host populates
+    // only inside a Windows container; its mere presence identifies the container.
+    unsigned int container_type;
+    if(netdata_registry_get_dword(&container_type, HKEY_LOCAL_MACHINE,
+                                  "SYSTEM\\CurrentControlSet\\Control", "ContainerType"))
+        return NETDATA_WIN_CONTAINER_WINDOWS;
+
+    return NETDATA_WIN_CONTAINER_NONE;
+}
+
+static const char *netdata_windows_detect_container_state(struct rrdhost_system_info *systemInfo) {
+    const char *container = netdata_windows_detect_container();
+    const char *container_detection = netdata_windows_container_detection_method(container);
+
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CONTAINER", container);
+    nd_setenv("NETDATA_SYSTEM_CONTAINER", container, 1);
+
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CONTAINER_DETECTION", container_detection);
+    nd_setenv("NETDATA_SYSTEM_CONTAINER_DETECTION", container_detection, 1);
+
+    return container;
+}
+
 void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo)
 {
+    const char *container;
+
     netdata_windows_cloud(systemInfo);
-    netdata_windows_container(systemInfo);
-    netdata_windows_host(systemInfo);
     netdata_windows_get_cpu(systemInfo);
+    netdata_windows_detect_virtualization(systemInfo);
+    container = netdata_windows_detect_container_state(systemInfo);
+    netdata_windows_container(systemInfo, container);
     netdata_windows_get_mem(systemInfo);
     netdata_windows_get_total_disk_size(systemInfo);
     netdata_windows_install_type(systemInfo);

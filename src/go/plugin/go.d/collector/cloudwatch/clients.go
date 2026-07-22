@@ -50,81 +50,106 @@ func defaultNewAWSConfig(ctx context.Context, id awsauth.Identity, region string
 	return id.NewConfig(ctx, awsauth.ConfigOptions{Region: region})
 }
 
-// clientKey identifies a client by the account it authenticates as and the region
-// it targets. Multi-account jobs need a distinct client per (account, region): the
-// same region is queried under each account's own credentials.
+// clientKey identifies a client by configured target and region. Account id is not
+// a credential identity: two targets can resolve to one account with different
+// permissions and must retain separate clients.
 type clientKey struct {
-	account string
-	region  string
+	target string
+	region string
 }
 
-// clientCache builds and caches one client of type T per (account, region). It is
+// clientCache builds and caches one client of type T per (target, region). It is
 // generic so the CloudWatch and Resource Groups Tagging API clients (identical
-// per-(account, region) lifecycle, different API surface) share one implementation.
-// forAccountRegion is safe for concurrent use, so callers need not pre-resolve
+// per-(target, region) lifecycle, different API surface) share one implementation.
+// forTargetRegion is safe for concurrent use, so callers need not pre-resolve
 // clients to avoid racing a shared cache. A client is built at most once per
-// (account, region); only successes are cached, so a transient credential error is
+// (target, region); only successes are cached, so a transient credential error is
 // retried next call.
 type clientCache[T any] struct {
-	mu      sync.Mutex
-	clients map[clientKey]T
-	build   func(ctx context.Context, account, region string) (T, error)
+	mu       sync.Mutex
+	clients  map[clientKey]T
+	building map[clientKey]*clientBuild[T]
+	build    func(ctx context.Context, target, region string) (T, error)
 }
 
-func newClientCache[T any](build func(ctx context.Context, account, region string) (T, error)) *clientCache[T] {
+type clientBuild[T any] struct {
+	ready  chan struct{}
+	client T
+	err    error
+}
+
+func newClientCache[T any](build func(ctx context.Context, target, region string) (T, error)) *clientCache[T] {
 	return &clientCache[T]{
-		clients: make(map[clientKey]T),
-		build:   build,
+		clients:  make(map[clientKey]T),
+		building: make(map[clientKey]*clientBuild[T]),
+		build:    build,
 	}
 }
 
-func (cc *clientCache[T]) forAccountRegion(ctx context.Context, account, region string) (T, error) {
-	key := clientKey{account: account, region: region}
+func (cc *clientCache[T]) forTargetRegion(ctx context.Context, target, region string) (T, error) {
+	key := clientKey{target: target, region: region}
 	cc.mu.Lock()
-	defer cc.mu.Unlock()
 	if client, ok := cc.clients[key]; ok {
+		cc.mu.Unlock()
 		return client, nil
 	}
-	client, err := cc.build(ctx, account, region)
-	if err != nil {
-		var zero T
-		return zero, err
+	if pending, ok := cc.building[key]; ok {
+		cc.mu.Unlock()
+		select {
+		case <-pending.ready:
+			return pending.client, pending.err
+		case <-ctx.Done():
+			var zero T
+			return zero, ctx.Err()
+		}
 	}
-	cc.clients[key] = client
-	return client, nil
+	pending := &clientBuild[T]{ready: make(chan struct{})}
+	cc.building[key] = pending
+	cc.mu.Unlock()
+
+	pending.client, pending.err = cc.build(ctx, target, region)
+
+	cc.mu.Lock()
+	delete(cc.building, key)
+	if pending.err == nil {
+		cc.clients[key] = pending.client
+	}
+	close(pending.ready)
+	cc.mu.Unlock()
+	return pending.client, pending.err
 }
 
 func (cc *clientCache[T]) reset() {
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
 	cc.clients = make(map[clientKey]T)
+	cc.building = make(map[clientKey]*clientBuild[T])
 }
 
-// buildAccountRegionClient constructs a CloudWatch client for one (account, region)
-// using that account's resolved auth identity. It is the clientCache's builder; the
+// buildTargetRegionClient constructs a CloudWatch client for one (target, region)
+// using that target's compiled auth identity. It is the clientCache's builder; the
 // cache memoizes its successful results. It reads c.newAWSConfig/c.newCloudWatchClient
 // at call time so test seams set after New() are honored.
-func (c *Collector) buildAccountRegionClient(ctx context.Context, account, region string) (cloudwatchClient, error) {
-	id, ok := c.identityForAccount(account)
+func (c *Collector) buildTargetRegionClient(ctx context.Context, target, region string) (cloudwatchClient, error) {
+	resolved, ok := c.resolvedTargetByRef(target)
 	if !ok {
-		return nil, fmt.Errorf("no resolved identity for account %q", account)
+		return nil, fmt.Errorf("target %q is not resolved", target)
 	}
-	cfg, err := c.newAWSConfig(ctx, id, region)
+	cfg, err := c.newAWSConfig(ctx, resolved.target.Identity, region)
 	if err != nil {
 		return nil, err
 	}
 	return c.newCloudWatchClient(cfg), nil
 }
 
-// buildAccountRegionRGTAClient constructs a Resource Groups Tagging API client for
-// one (account, region), mirroring buildAccountRegionClient. RGTA is regional, so
-// the tag lookup for a series uses the client for that series' (account, region).
-func (c *Collector) buildAccountRegionRGTAClient(ctx context.Context, account, region string) (rgtaClient, error) {
-	id, ok := c.identityForAccount(account)
+// buildTargetRegionRGTAClient mirrors buildTargetRegionClient for the Resource
+// Groups Tagging API.
+func (c *Collector) buildTargetRegionRGTAClient(ctx context.Context, target, region string) (rgtaClient, error) {
+	resolved, ok := c.resolvedTargetByRef(target)
 	if !ok {
-		return nil, fmt.Errorf("no resolved identity for account %q", account)
+		return nil, fmt.Errorf("target %q is not resolved", target)
 	}
-	cfg, err := c.newAWSConfig(ctx, id, region)
+	cfg, err := c.newAWSConfig(ctx, resolved.target.Identity, region)
 	if err != nil {
 		return nil, err
 	}

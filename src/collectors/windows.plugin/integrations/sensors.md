@@ -130,7 +130,7 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| name | Sensor friendly name. |
+| label | Sensor friendly name. |
 | manufacturer | The sensor manufacturer. |
 | model | The sensor model. |
 
@@ -139,6 +139,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.hw.sensor.temperature.input | input | Cel |
+| system.hw.sensor.temperature.histogram | 40, 50, 60, 70, 80, 85, 90, 95, 100, +Inf | sensors |
 | system.hw.sensor.power.input | input | W |
 | system.hw.sensor.current.input | input | A |
 | system.hw.sensor.humidity.input | input | % |

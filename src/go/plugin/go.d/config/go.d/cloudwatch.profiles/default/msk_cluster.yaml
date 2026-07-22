@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon MSK Cluster
 namespace: AWS/Kafka
-period: 300
+query:
+  period: 5m
 # Cluster-grain DEFAULT-level MSK health metrics. Broker-grain metrics live in msk.yaml.
 instance:
   dimensions:
@@ -22,7 +23,7 @@ template:
     instances:
       by_labels: [account_id, region, cluster_name]
   charts:
-    - id: cw_msk_cluster_active_controllers
+    - id: aws_cloudwatch_msk_cluster_active_controllers
       context: active_controllers
       title: MSK Active Controller Count
       family: Controllers
@@ -31,7 +32,7 @@ template:
       dimensions:
         - selector: active_controller_count_sum
           name: active
-    - id: cw_msk_cluster_offline_partitions
+    - id: aws_cloudwatch_msk_cluster_offline_partitions
       context: offline_partitions
       title: MSK Offline Partitions
       family: Partitions

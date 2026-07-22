@@ -13,8 +13,8 @@ use crate::query::{
     virtual_flow_field_dependencies,
 };
 use anyhow::{Context, Result, bail};
-use journal_core::file::JournalFileMap;
-use journal_registry::FileInfo;
+use journal_sdk_core::file::JournalFileMap;
+use journal_sdk_registry::FileInfo;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;

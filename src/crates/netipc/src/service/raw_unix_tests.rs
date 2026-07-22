@@ -4140,7 +4140,7 @@ fn test_poll_fd_eintr_returns_timeout() {
     let mut action: libc::sigaction = unsafe { std::mem::zeroed() };
     let mut old_action: libc::sigaction = unsafe { std::mem::zeroed() };
     action.sa_flags = 0;
-    action.sa_sigaction = noop_signal_handler as usize;
+    action.sa_sigaction = noop_signal_handler as *const () as usize;
     unsafe { libc::sigemptyset(&mut action.sa_mask) };
     assert_eq!(
         unsafe { libc::sigaction(libc::SIGUSR1, &action, &mut old_action) },

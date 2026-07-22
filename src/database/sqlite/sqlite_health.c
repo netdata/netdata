@@ -187,7 +187,7 @@ static void insert_alert_queue(
     if (!aclk_host_config)
         return;
 
-    time_t submit_delay = trigger_time + calculate_delay(old_status, new_status);
+    time_t submit_delay = nd_time_t_add_saturating(trigger_time, calculate_delay(old_status, new_status));
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
@@ -763,6 +763,7 @@ void sql_health_alarm_log_load(RRDHOST *host)
         if(unlikely(rc)) {
             if (rrdcalc_isrepeating(rc)) {
                 rc->last_repeat = last_repeat;
+                rrdcalc_runtime_snapshot_publish_repeat_state(rc);
                 // We iterate through repeating alarm entries only to
                 // find the latest last_repeat timestamp. Otherwise,
                 // there is no need to keep them in memory.

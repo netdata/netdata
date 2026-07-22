@@ -239,7 +239,9 @@ int do_PerflibSMB(int update_every, usec_t dt __maybe_unused)
 
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
     if (!pDataBlock)
-        return -1;
+        // A failed Perflib query is transient; return -1 only when the object
+        // is not registered, otherwise the main loop disables this module.
+        return 0;
 
     do_smb_server_shares(pDataBlock, update_every);
 

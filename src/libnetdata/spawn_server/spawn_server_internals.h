@@ -88,6 +88,7 @@ struct spawn_instance {
 #if defined(SPAWN_SERVER_VERSION_WINDOWS)
     HANDLE process_handle;
     DWORD dwProcessId;
+    LOG_FORWARDER_TOKEN stderr_log_token;
 #endif
 };
 

@@ -122,13 +122,13 @@ static inline void validate_key(LOG_JOB *jb __maybe_unused, HASHED_KEY *k) {
     for(size_t i = 0; i < k->len ;i++) {
         char c = k->key[i];
 
-        if((c < 'A' || c > 'Z') && !isdigit(c) && c != '_') {
+        if((c < 'A' || c > 'Z') && !isdigit((uint8_t)c) && c != '_') {
             l2j_log("WARNING: key '%s' contains characters that are not allowed by systemd-journal.", k->key);
             break;
         }
     }
 
-    if(isdigit(k->key[0]))
+    if(isdigit((uint8_t)k->key[0]))
         l2j_log("WARNING: key '%s' starts with a digit and may not be accepted by systemd-journal.", k->key);
 
     if(k->key[0] == '_')
@@ -464,11 +464,11 @@ static char *get_next_line(LOG_JOB *jb __maybe_unused, char *buffer, size_t size
     size_t len = strlen(line);
 
     // remove trailing newlines and spaces
-    while(len > 1 && (line[len - 1] == '\n' || isspace(line[len - 1])))
+    while(len > 1 && (line[len - 1] == '\n' || isspace((uint8_t)line[len - 1])))
         line[--len] = '\0';
 
     // skip leading spaces
-    while(isspace(*line)) {
+    while(isspace((uint8_t)*line)) {
         line++;
         len--;
     }

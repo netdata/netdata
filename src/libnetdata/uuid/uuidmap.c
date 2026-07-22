@@ -115,8 +115,6 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     UUIDMAP_ID id = uuidmap_acquire_by_uuid(uuid);
     if(id != 0) return id;
 
-    uuidmap_init_aral();
-
     // we didn't find it - let's add it
 
     uint8_t partition = uuid_to_uuidmap_partition(uuid);
@@ -160,6 +158,11 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     PValue = JudyLIns(&uuid_map.p[partition].id_to_uuid, id, PJE0);
     if (!PValue || PValue == PJERR)
         fatal("UUIDMAP: corrupted JudyL array");
+
+    // initialize the ARAL at its point of use: a concurrent uuidmap_destroy()
+    // may have destroyed it after any earlier check, but it needs all
+    // partition locks, so the write lock we hold here excludes it
+    uuidmap_init_aral();
 
     struct uuidmap_entry *ue = aral_mallocz(uuid_map.ar);
     nd_uuid_copy(ue->uuid, uuid);
@@ -294,15 +297,54 @@ UUIDMAP_ID uuidmap_dup(UUIDMAP_ID id) {
     return id;
 }
 
+static void uuidmap_lock_all_partitions(void) {
+    for(size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++)
+        rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
+}
+
+static void uuidmap_unlock_all_partitions(void) {
+    for(size_t partition = UUIDMAP_PARTITIONS; partition > 0; partition--)
+        rw_spinlock_write_unlock(&uuid_map.p[partition - 1].spinlock);
+}
+
+static void uuidmap_destroy_restore_claimed_entries(struct uuidmap_entry **claimed, size_t used) {
+    for(size_t i = 0; i < used; i++) {
+        REFCOUNT expected = REFCOUNT_DELETED;
+        bool restored = __atomic_compare_exchange_n(&claimed[i]->refcount, &expected, 0,
+                                                    false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+        internal_fatal(!restored, "UUIDMAP: cannot restore destroy-claimed UUID entry refcount");
+    }
+}
+
+static bool uuidmap_destroy_claim_entry(struct uuidmap_entry *ue, struct uuidmap_entry ***claimed, size_t *used,
+                                        size_t *size) {
+    if(!refcount_acquire_for_deletion(&ue->refcount))
+        return false;
+
+    if(*used == *size) {
+        internal_fatal(*size > SIZE_MAX / 2, "UUIDMAP: too many UUID entries to claim during destroy");
+
+        size_t new_size = *size ? *size * 2 : 1024;
+        internal_fatal(new_size > SIZE_MAX / sizeof(**claimed),
+                       "UUIDMAP: too many UUID entries to claim during destroy");
+
+        *claimed = reallocz(*claimed, new_size * sizeof(**claimed));
+        *size = new_size;
+    }
+
+    (*claimed)[(*used)++] = ue;
+    return true;
+}
+
 size_t uuidmap_destroy(void) {
     size_t referenced = 0;
+    size_t claimed_used = 0, claimed_size = 0;
+    struct uuidmap_entry **claimed = NULL;
+
+    uuidmap_lock_all_partitions();
 
     // Traverse all partitions
     for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++) {
-        // Lock the partition to prevent new entries while we're cleaning up
-        rw_spinlock_write_lock(&uuid_map.p[partition].spinlock);
-
-        Pvoid_t uuid_to_id = uuid_map.p[partition].uuid_to_id;
         Pvoid_t id_to_uuid = uuid_map.p[partition].id_to_uuid;
 
         // Process all entries in the id_to_uuid map
@@ -318,21 +360,37 @@ size_t uuidmap_destroy(void) {
 
             struct uuidmap_entry *ue = *id_pvalue;
 
-            // Try to acquire for deletion
-            if (!refcount_acquire_for_deletion(&ue->refcount))
+            // Try to acquire for deletion.
+            if (!uuidmap_destroy_claim_entry(ue, &claimed, &claimed_used, &claimed_size))
                 referenced++;
-
-            aral_freez(uuid_map.ar, ue);
         }
+    }
+
+    if(referenced) {
+        uuidmap_destroy_restore_claimed_entries(claimed, claimed_used);
+        freez(claimed);
+        uuidmap_unlock_all_partitions();
+        return referenced;
+    }
+
+    for(size_t i = 0; i < claimed_used; i++)
+        aral_freez(uuid_map.ar, claimed[i]);
+    freez(claimed);
+
+    // Traverse all partitions
+    for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++) {
+        Pvoid_t uuid_to_id = uuid_map.p[partition].uuid_to_id;
+        Pvoid_t id_to_uuid = uuid_map.p[partition].id_to_uuid;
 
         // Free all Judy arrays
         JudyHSFreeArray(&uuid_to_id, PJE0);
         JudyLFreeArray(&id_to_uuid, PJE0);
 
-        // Reset partition data
-        memset(&uuid_map.p[partition], 0, sizeof(uuid_map.p[partition]));
-
-        rw_spinlock_write_unlock(&uuid_map.p[partition].spinlock);
+        uuid_map.p[partition].uuid_to_id = NULL;
+        uuid_map.p[partition].id_to_uuid = NULL;
+        uuid_map.p[partition].next_id = 0;
+        uuid_map.p[partition].memory = 0;
+        uuid_map.p[partition].entries = 0;
     }
 
     // Destroy ARAL
@@ -341,7 +399,7 @@ size_t uuidmap_destroy(void) {
         uuid_map.ar = NULL;
     }
 
-    memset(&uuid_map, 0, sizeof(uuid_map));
+    uuidmap_unlock_all_partitions();
     return referenced;
 }
 
@@ -365,6 +423,62 @@ typedef struct uuidmap_delete_gate {
     bool allow_delete;
     bool delete_done;
 } UUIDMAP_DELETE_GATE;
+
+static int uuidmap_destroy_referenced_entry_unittest(void) {
+    fprintf(stderr, "\nTesting UUID Map destroy with referenced entry...\n");
+
+    nd_uuid_t test_uuid = {
+        0x6d, 0x0f, 0x8b, 0x2a,
+        0x48, 0x57, 0x4c, 0x2e,
+        0x9a, 0x6f, 0x8a, 0x63,
+        0x01, 0x7e, 0x2d, 0x19
+    };
+
+    int errors = 0;
+
+    // in the full unittest sequence, earlier tests may still hold referenced
+    // entries in the global map - the expectations below are relative to them
+    size_t baseline = uuidmap_destroy();
+
+    UUIDMAP_ID id = uuidmap_create(test_uuid);
+    if(!id) {
+        fprintf(stderr, "ERROR: Cannot create UUID for referenced destroy test\n");
+        return 1;
+    }
+
+    size_t referenced = uuidmap_destroy();
+    if(referenced != baseline + 1) {
+        fprintf(stderr, "ERROR: UUID destroy returned %zu referenced entries, expected %zu\n",
+                referenced, baseline + 1);
+        errors++;
+    }
+
+    nd_uuid_t found_uuid;
+    if(!uuidmap_uuid(id, found_uuid)) {
+        fprintf(stderr, "ERROR: UUID disappeared after referenced destroy returned non-zero\n");
+        errors++;
+    }
+    else if(uuid_compare(found_uuid, test_uuid) != 0) {
+        fprintf(stderr, "ERROR: UUID changed after referenced destroy returned non-zero\n");
+        errors++;
+    }
+
+    uuidmap_free(id);
+
+    referenced = uuidmap_destroy();
+    if(referenced != baseline) {
+        fprintf(stderr, "ERROR: UUID destroy returned %zu referenced entries after release, expected %zu\n",
+                referenced, baseline);
+        errors++;
+    }
+
+    if(errors)
+        fprintf(stderr, "UUID Map destroy referenced entry test: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "UUID Map destroy referenced entry test: OK\n");
+
+    return errors;
+}
 
 static void uuidmap_deferred_free_thread(void *arg) {
     UUIDMAP_DELETE_GATE *gate = arg;
@@ -606,7 +720,8 @@ int uuidmap_unittest(void) {
     fprintf(stderr, "\nTesting UUID Map...\n");
 
     const size_t ENTRIES = 100000;
-    int errors = uuidmap_locked_lookup_delete_interleaving_unittest();
+    int errors = uuidmap_destroy_referenced_entry_unittest();
+    errors += uuidmap_locked_lookup_delete_interleaving_unittest();
     errors += uuidmap_concurrent_unittest();
 
     struct test_entry {

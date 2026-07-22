@@ -25,9 +25,9 @@ impl JournalEncodeBuffer {
     pub(super) fn encode_record_and_write(
         &mut self,
         record: &crate::flow::FlowRecord,
-        journal: &mut journal_log_writer::Log,
-        timestamps: journal_log_writer::EntryTimestamps,
-    ) -> journal_log_writer::Result<()> {
+        journal: &mut journal_sdk_log_writer::Log,
+        timestamps: journal_sdk_log_writer::EntryTimestamps,
+    ) -> journal_sdk_log_writer::Result<()> {
         record.encode_to_journal_buf(&mut self.data, &mut self.refs);
         // 87 canonical fields — stack array avoids heap allocation.
         let mut slices = [&[] as &[u8]; 87];
@@ -86,9 +86,9 @@ impl JournalEncodeBuffer {
 
     pub(crate) fn write_encoded(
         &self,
-        journal: &mut journal_log_writer::Log,
-        timestamps: journal_log_writer::EntryTimestamps,
-    ) -> journal_log_writer::Result<()> {
+        journal: &mut journal_sdk_log_writer::Log,
+        timestamps: journal_sdk_log_writer::EntryTimestamps,
+    ) -> journal_sdk_log_writer::Result<()> {
         // Tier rows currently emit <= 73 fields; keep slack for schema growth.
         let mut slices = [&[] as &[u8]; 96];
         let n = self.refs.len().min(slices.len());

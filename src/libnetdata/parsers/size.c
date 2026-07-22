@@ -79,7 +79,10 @@ static inline double size_round_to_resolution_dbl2(uint64_t value, uint64_t reso
 }
 
 static inline uint64_t size_round_to_resolution_int(uint64_t value, uint64_t resolution) {
-    return (value + (resolution / 2)) / resolution;
+    uint64_t quotient = value / resolution;
+    uint64_t remainder = value % resolution;
+
+    return quotient + (remainder >= resolution - resolution / 2);
 }
 
 // -------------------------------------------------------------------------------------------------------------------
@@ -139,7 +142,12 @@ bool size_parse(const char *size_str, uint64_t *result, const char *default_unit
         }
     }
 
-    uint64_t bytes = (uint64_t)round(value * (NETDATA_DOUBLE)su->multiplier);
+    uint64_t bytes;
+    if(!parser_round_number_to_uint64(value * (NETDATA_DOUBLE)su->multiplier, &bytes)) {
+        *result = 0;
+        return false;
+    }
+
     *result = size_round_to_resolution_int(bytes, su_def->multiplier);
 
     return true;

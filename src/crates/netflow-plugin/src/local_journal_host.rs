@@ -1,6 +1,6 @@
 use crate::plugin_config::PluginConfig;
 use anyhow::{Context, Result};
-use journal_host::{LoadOptions, LocalJournalProvider};
+use journal_sdk_host::{LoadOptions, LocalJournalProvider};
 
 pub(crate) fn load_local_journal_provider(cfg: &PluginConfig) -> Result<LocalJournalProvider> {
     let state_dir = cfg.journal_host_state_dir();

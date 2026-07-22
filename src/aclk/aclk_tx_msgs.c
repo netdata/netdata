@@ -36,6 +36,7 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
 
     if (unlikely(!topic)) {
         netdata_log_error("Couldn't get topic. Aborting message send.");
+        freez(msg);
         return 0;
     }
 
@@ -69,17 +70,22 @@ static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obj
     str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
     len = strlen(str);
 
+    const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
     size_t full_msg_len = len;
-    if (payload_len)
-        full_msg_len += strlen(V2_BIN_PAYLOAD_SEPARATOR) + payload_len;
+    if (payload_len && unlikely(
+            aclk_size_add_overflow(&full_msg_len, sep_len) ||
+            aclk_size_add_overflow(&full_msg_len, payload_len))) {
+        json_object_put(msg);
+        return HTTP_RESP_CONTENT_TOO_LONG;
+    }
 
     full_msg = mallocz(full_msg_len);
     memcpy(full_msg, str, len);
     json_object_put(msg);
 
     if (payload_len) {
-        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1);
-        len += strlen(V2_BIN_PAYLOAD_SEPARATOR);
+        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, sep_len);
+        len += sep_len;
         memcpy(&full_msg[len], payload, payload_len);
     }
 
@@ -134,12 +140,14 @@ static struct json_object *create_hdr(const char *type, const char *msg_id)
     tmp = json_object_new_int64(ts_us);
     json_object_object_add(obj, "timestamp-offset-usec", tmp);
 
-    tmp = json_object_new_int64(aclk_session_sec);
+    usec_t session = aclk_session_load();
+
+    tmp = json_object_new_int64(session / USEC_PER_SEC);
     json_object_object_add(obj, "connect", tmp);
 
 // TODO handle this somehow see above
-//    tmp = json_object_new_uint64(0 /* TODO aclk_session_us */);
-    tmp = json_object_new_int64(aclk_session_us);
+//    tmp = json_object_new_uint64(session % USEC_PER_SEC);
+    tmp = json_object_new_int64(session % USEC_PER_SEC);
     json_object_object_add(obj, "connect-offset-usec", tmp);
 
     tmp = json_object_new_int(ACLK_HEADER_VERSION);
@@ -293,7 +301,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     update_agent_connection_t conn = {
         .reachable = (reachable ? 1 : 0),
         .lwt = 0,
-        .session_id = aclk_session_newarch,
+        .session_id = aclk_session_load(),
         .capabilities = aclk_get_agent_capas(),
     };
 
@@ -327,7 +335,7 @@ char *aclk_generate_lwt(size_t *size) {
     update_agent_connection_t conn = {
         .reachable = 0,
         .lwt = 1,
-        .session_id = aclk_session_newarch,
+        .session_id = aclk_session_load(),
         .capabilities = NULL
     };
 

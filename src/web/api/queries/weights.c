@@ -4,6 +4,14 @@
 #include "KolmogorovSmirnovDist.h"
 
 #define MAX_POINTS 10000
+
+static bool weights_points_exceed_max(size_t points, uint32_t shifts) {
+    if(unlikely(shifts >= sizeof(points) * CHAR_BIT))
+        return points != 0;
+
+    return points > ((size_t)MAX_POINTS >> shifts);
+}
+
 int metric_correlations_version = 1;
 
 typedef struct weights_stats {
@@ -56,6 +64,7 @@ typedef enum {
 struct register_result {
     RESULT_FLAGS flags;
     RRDHOST *host;
+    STRING *hostname;
     RRDCONTEXT_ACQUIRED *rca;
     RRDINSTANCE_ACQUIRED *ria;
     RRDMETRIC_ACQUIRED *rma;
@@ -64,6 +73,62 @@ struct register_result {
     STORAGE_POINT baseline;
     usec_t duration_ut;
 };
+
+struct weights_host_snapshot {
+    RRDHOST *host;
+    STRING *hostname;
+};
+
+static bool weights_host_snapshot_conflict_callback(
+    const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value, void *data __maybe_unused) {
+    struct weights_host_snapshot *snapshot = new_value;
+
+    string_freez(snapshot->hostname);
+    snapshot->hostname = NULL;
+    return false;
+}
+
+static void weights_host_snapshot_delete_callback(
+    const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct weights_host_snapshot *snapshot = value;
+
+    string_freez(snapshot->hostname);
+    snapshot->hostname = NULL;
+}
+
+static DICTIONARY *weights_host_snapshots_init(void) {
+    DICTIONARY *snapshots = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct weights_host_snapshot));
+
+    dictionary_register_conflict_callback(snapshots, weights_host_snapshot_conflict_callback, NULL);
+    dictionary_register_delete_callback(snapshots, weights_host_snapshot_delete_callback, NULL);
+    return snapshots;
+}
+
+static struct weights_host_snapshot *weights_host_snapshot_get(DICTIONARY *snapshots, RRDHOST *host) {
+    char key[2 * sizeof(void *) + 3];
+    int key_len = snprintfz(key, sizeof(key), "%p", (void *)host);
+
+    struct weights_host_snapshot *snapshot = dictionary_get_advanced(snapshots, key, key_len);
+    if(likely(snapshot))
+        return snapshot;
+
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+    struct weights_host_snapshot candidate = {
+        .host = host,
+        .hostname = identity.hostname,
+    };
+    identity.hostname = NULL;
+    rrdhost_identity_release(&identity);
+
+    snapshot = dictionary_set_advanced(snapshots, key, key_len, &candidate, sizeof(candidate), NULL);
+    if(unlikely(!snapshot)) {
+        string_freez(candidate.hostname);
+        fatal("QUERY WEIGHTS: failed to retain a host hostname");
+    }
+
+    return snapshot;
+}
 
 static DICTIONARY *register_result_init() {
     DICTIONARY *results = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct register_result));
@@ -108,7 +173,8 @@ static void merge_results_dictionaries(DICTIONARY *main_results, DICTIONARY *loc
 static ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryable);
 static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
 
-static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria,
+static void register_result(DICTIONARY *results, RRDHOST *host, STRING *hostname,
+                            RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria,
                             RRDMETRIC_ACQUIRED *rma, NETDATA_DOUBLE value, RESULT_FLAGS flags,
                             STORAGE_POINT *highlighted, STORAGE_POINT *baseline, WEIGHTS_STATS *stats,
                             bool register_zero, usec_t duration_ut) {
@@ -129,6 +195,7 @@ static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUI
     struct register_result t = {
         .flags = flags,
         .host = host,
+        .hostname = hostname,
         .rca = rca,
         .ria = ria,
         .rma = rma,
@@ -344,6 +411,7 @@ struct workload_stats {
 
 struct query_weights_data {
     QUERY_WEIGHTS_REQUEST *qwr;
+    struct query_weights_data *shared_qwd;
 
     SIMPLE_PATTERN *scope_nodes_sp;
     SIMPLE_PATTERN *scope_contexts_sp;
@@ -370,6 +438,8 @@ struct query_weights_data {
     bool register_zero;
 
     DICTIONARY *results;
+    DICTIONARY *host_snapshots;
+    struct weights_host_snapshot *host_snapshot;
     WEIGHTS_STATS stats;
     RRDHOST **hosts_array;
     size_t total_hosts;
@@ -394,6 +464,25 @@ struct query_weights_thread_data {
     size_t thread_id;
 };
 
+static inline struct query_weights_data *query_weights_status_qwd(struct query_weights_data *qwd) {
+    return qwd->shared_qwd ? qwd->shared_qwd : qwd;
+}
+
+static inline bool query_weights_is_stopped(struct query_weights_data *qwd) {
+    struct query_weights_data *status_qwd = query_weights_status_qwd(qwd);
+
+    return __atomic_load_n(&status_qwd->timed_out, __ATOMIC_RELAXED) ||
+           __atomic_load_n(&status_qwd->interrupted, __ATOMIC_RELAXED);
+}
+
+static inline void query_weights_set_timed_out(struct query_weights_data *qwd) {
+    __atomic_store_n(&query_weights_status_qwd(qwd)->timed_out, true, __ATOMIC_RELAXED);
+}
+
+static inline void query_weights_set_interrupted(struct query_weights_data *qwd) {
+    __atomic_store_n(&query_weights_status_qwd(qwd)->interrupted, true, __ATOMIC_RELAXED);
+}
+
 // Worker thread function for parallel host processing
 void query_weights_worker_thread(void *arg)
 {
@@ -404,6 +493,29 @@ void query_weights_worker_thread(void *arg)
     memset(&thread_data->local_stats, 0, sizeof(WEIGHTS_STATS));
     thread_data->local_examined_dimensions = 0;
     memset(&thread_data->local_versions, 0, sizeof(struct query_versions));
+
+    // Copy only immutable query inputs; mutable state is shared atomically or owned by this worker.
+    struct query_weights_data local_qwd = {
+        .qwr = main_qwd->qwr,
+        .shared_qwd = main_qwd,
+        .scope_contexts_sp = main_qwd->scope_contexts_sp,
+        .scope_instances_sp = main_qwd->scope_instances_sp,
+        .scope_dimensions_sp = main_qwd->scope_dimensions_sp,
+        .contexts_sp = main_qwd->contexts_sp,
+        .instances_sp = main_qwd->instances_sp,
+        .dimensions_sp = main_qwd->dimensions_sp,
+        .alerts_sp = main_qwd->alerts_sp,
+        .scope_labels_pa = main_qwd->scope_labels_pa,
+        .labels_pa = main_qwd->labels_pa,
+        .timeout_us = main_qwd->timeout_us,
+        .timings.received_ut = main_qwd->timings.received_ut,
+        .examined_dimensions = thread_data->local_examined_dimensions,
+        .register_zero = main_qwd->register_zero,
+        .results = thread_data->local_results,
+        .host_snapshots = main_qwd->host_snapshots,
+        .stats = thread_data->local_stats,
+        .shifts = main_qwd->shifts,
+    };
 
     // Process assigned hosts
     for (size_t i = 0; i < thread_data->host_count; i++) {
@@ -429,22 +541,18 @@ void query_weights_worker_thread(void *arg)
             break;
         }
 
-        // Create a local query_weights_data for this thread
-        struct query_weights_data local_qwd = *main_qwd;
-        local_qwd.results = thread_data->local_results;
-        local_qwd.stats = thread_data->local_stats;
-        local_qwd.examined_dimensions = thread_data->local_examined_dimensions;
-        local_qwd.versions = thread_data->local_versions;
-
         char uuid[UUID_STR_LEN];
         if(!UUIDiszero(host->node_id))
             uuid_unparse_lower(host->node_id.uuid, uuid);
         else
             uuid[0] = '\0';
 
+        local_qwd.host_snapshot = weights_host_snapshot_get(local_qwd.host_snapshots, host);
+
         SIMPLE_PATTERN_RESULT match = SP_MATCHED_POSITIVE;
         if(main_qwd->scope_nodes_sp) {
-            match = simple_pattern_matches_string_extract(main_qwd->scope_nodes_sp, host->hostname, NULL, 0);
+            match = simple_pattern_matches_string_extract(
+                main_qwd->scope_nodes_sp, local_qwd.host_snapshot->hostname, NULL, 0);
             if(match == SP_NOT_MATCHED) {
                 match = simple_pattern_matches_extract(main_qwd->scope_nodes_sp, host->machine_guid, NULL, 0);
                 if(match == SP_NOT_MATCHED && *uuid)
@@ -456,7 +564,8 @@ void query_weights_worker_thread(void *arg)
             continue;
 
         if(main_qwd->nodes_sp) {
-            match = simple_pattern_matches_string_extract(main_qwd->nodes_sp, host->hostname, NULL, 0);
+            match = simple_pattern_matches_string_extract(
+                main_qwd->nodes_sp, local_qwd.host_snapshot->hostname, NULL, 0);
             if(match == SP_NOT_MATCHED) {
                 match = simple_pattern_matches_extract(main_qwd->nodes_sp, host->machine_guid, NULL, 0);
                 if(match == SP_NOT_MATCHED && *uuid)
@@ -1043,8 +1152,10 @@ static size_t registered_results_to_json_multinode_no_group_by(
             if(!dun->exposed)
                 continue;
 
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(dun->host);
             buffer_json_add_array_item_object(wb);
-            buffer_json_node_add_v2(wb, dun->host, dun->i, dun->duration_ut, true);
+            buffer_json_node_add_v2(wb, dun->host, &identity, dun->i, dun->duration_ut, true);
+            rrdhost_identity_release(&identity);
             buffer_json_object_close(wb);
         }
         dfe_done(dun);
@@ -1175,7 +1286,7 @@ static size_t registered_results_to_json_multinode_group_by(
                 buffer_fast_strcat(key, "@", 1);
                 buffer_fast_strcat(name, "@", 1);
                 buffer_strcat(key, node_uuid);
-                buffer_strcat(name, rrdhost_hostname(t->host));
+                buffer_strcat(name, string2str(t->hostname));
             }
         }
         if(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_NODE) {
@@ -1185,7 +1296,7 @@ static size_t registered_results_to_json_multinode_group_by(
             }
 
             buffer_strcat(key, node_uuid);
-            buffer_strcat(name, rrdhost_hostname(t->host));
+            buffer_strcat(name, string2str(t->hostname));
         }
         if(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_CONTEXT) {
             if(buffer_strlen(key)) {
@@ -1527,7 +1638,7 @@ cleanup:
 }
 
 static void rrdset_metric_correlations_ks2(
-        RRDHOST *host,
+        RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
         time_t baseline_after, time_t baseline_before,
@@ -1582,7 +1693,7 @@ static void rrdset_metric_correlations_ks2(
 
         // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
         // so, we flip the result of kstwo()
-        register_result(results, host, rca, ria, rma, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, &highlighted_sp,
+        register_result(results, host, hostname, rca, ria, rma, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, &highlighted_sp,
                         &baseline_sp, stats, register_zero, ended_ut - started_ut);
     }
 
@@ -1604,7 +1715,7 @@ static void merge_query_value_to_stats(QUERY_VALUE *qv, WEIGHTS_STATS *stats, si
 }
 
 static void rrdset_metric_correlations_volume(
-        RRDHOST *host,
+        RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
         time_t baseline_after, time_t baseline_before,
@@ -1671,7 +1782,7 @@ static void rrdset_metric_correlations_volume(
         pcent = highlight_countif.value;
     }
 
-    register_result(results, host, rca, ria, rma, pcent, flags, &highlight_average.sp, &baseline_average.sp, stats,
+    register_result(results, host, hostname, rca, ria, rma, pcent, flags, &highlight_average.sp, &baseline_average.sp, stats,
                     register_zero, baseline_average.duration_ut + highlight_average.duration_ut + highlight_countif.duration_ut);
 }
 
@@ -1679,7 +1790,7 @@ static void rrdset_metric_correlations_volume(
 // VALUE / ANOMALY RATE algorithm functions
 
 static void rrdset_weights_value(
-        RRDHOST *host,
+        RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
         time_t after, time_t before,
@@ -1696,7 +1807,7 @@ static void rrdset_weights_value(
     merge_query_value_to_stats(&qv, stats, 1);
 
     if(netdata_double_isnumber(qv.value))
-        register_result(results, host, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero, qv.duration_ut);
+        register_result(results, host, hostname, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero, qv.duration_ut);
 }
 
 static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qwd) {
@@ -1742,6 +1853,8 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
     };
 
     size_t queries = 0;
+    RRDHOST *last_host = NULL;
+    struct weights_host_snapshot *host_snapshot = NULL;
     for(size_t d = 0; d < r->d ;d++) {
         qwd->examined_dimensions++;
 
@@ -1763,7 +1876,12 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             QUERY_CONTEXT *qc = query_context(r->internal.qt, qm->link.query_context_id);
             QUERY_NODE *qn = query_node(r->internal.qt, qm->link.query_node_id);
 
-            register_result(qwd->results, qn->rrdhost, qc->rca, qi->ria, qd->rma, qv.value, 0,
+            if(!host_snapshot || qn->rrdhost != last_host) {
+                last_host = qn->rrdhost;
+                host_snapshot = weights_host_snapshot_get(qwd->host_snapshots, last_host);
+            }
+
+            register_result(qwd->results, qn->rrdhost, host_snapshot->hostname, qc->rca, qi->ria, qd->rma, qv.value, 0,
                             &r->internal.qt->query.array[d].query_points, NULL,
                             &qwd->stats, qwd->register_zero, qm->duration_ut);
         }
@@ -1946,7 +2064,7 @@ static int registered_results_to_json_mcp_callback(const DICTIONARY_ITEM *item _
 
     // Add metadata
     // Add node name
-    buffer_json_add_array_item_string(wb, rrdhost_hostname(t->host));
+    buffer_json_add_array_item_string(wb, string2str(t->hostname));
     
     // Add context
     buffer_json_add_array_item_string(wb, rrdcontext_acquired_id(t->rca));
@@ -2079,8 +2197,11 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
     struct query_weights_data *qwd = data;
     QUERY_WEIGHTS_REQUEST *qwr = qwd->qwr;
 
+    if(query_weights_is_stopped(qwd))
+        return -1;
+
     if(qwd->qwr->interrupt_callback && qwd->qwr->interrupt_callback(qwd->qwr->interrupt_callback_data)) {
-        __atomic_store_n(&qwd->interrupted, true, __ATOMIC_RELAXED);
+        query_weights_set_interrupted(qwd);
         return -1;
     }
 
@@ -2089,7 +2210,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
     switch(qwr->method) {
         case WEIGHTS_METHOD_VALUE:
             rrdset_weights_value(
-                    host, rca, ria, rma,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
                     qwr->options, qwr->time_group_method, qwr->time_group_options, qwr->tier,
@@ -2098,19 +2219,19 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
             break;
 
         case WEIGHTS_METHOD_ANOMALY_RATE:
-            qwr->options |= RRDR_OPTION_ANOMALY_BIT;
             rrdset_weights_value(
-                    host, rca, ria, rma,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
-                    qwr->options, qwr->time_group_method, qwr->time_group_options, qwr->tier,
+                    qwr->options,
+                    qwr->time_group_method, qwr->time_group_options, qwr->tier,
                     &qwd->stats, qwd->register_zero
             );
             break;
 
         case WEIGHTS_METHOD_MC_VOLUME:
             rrdset_metric_correlations_volume(
-                    host, rca, ria, rma,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->baseline_after, qwr->baseline_before,
                     qwr->after, qwr->before,
@@ -2122,7 +2243,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
         default:
         case WEIGHTS_METHOD_MC_KS2:
             rrdset_metric_correlations_ks2(
-                    host, rca, ria, rma,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->baseline_after, qwr->baseline_before,
                     qwr->after, qwr->before, qwr->points,
@@ -2134,7 +2255,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
 
     qwd->timings.executed_ut = now_monotonic_usec();
     if(qwd->timings.executed_ut - qwd->timings.received_ut > qwd->timeout_us) {
-        qwd->timed_out = true;
+        query_weights_set_timed_out(qwd);
         return -1;
     }
 
@@ -2191,8 +2312,15 @@ static ssize_t weights_count_node_callback(void *data, RRDHOST *host, bool query
 
     struct query_weights_data *qwd = data;
     if (qwd->total_hosts >= qwd->hosts_array_capacity) {
-        qwd->hosts_array_capacity *= 2;
-        qwd->hosts_array = reallocz(qwd->hosts_array, sizeof(RRDHOST *) * qwd->hosts_array_capacity);
+        if(unlikely(qwd->hosts_array_capacity > SIZE_MAX / 2))
+            fatal("QUERY WEIGHTS: too many hosts to allocate");
+
+        size_t new_capacity = qwd->hosts_array_capacity ? qwd->hosts_array_capacity * 2 : 1;
+        if(unlikely(new_capacity > SIZE_MAX / sizeof(*qwd->hosts_array)))
+            fatal("QUERY WEIGHTS: too many hosts to allocate");
+
+        qwd->hosts_array = reallocz(qwd->hosts_array, new_capacity * sizeof(*qwd->hosts_array));
+        qwd->hosts_array_capacity = new_capacity;
     }
     qwd->hosts_array[qwd->total_hosts++] = host;
 
@@ -2239,6 +2367,9 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
                                             qwd->dimensions_sp,
                                             true, true, qwd->qwr->version,
                                             weights_for_rrdmetric, qwd);
+    if(query_weights_is_stopped(qwd))
+        return -1;
+
     return ret;
 }
 
@@ -2253,8 +2384,11 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
 #else
     size_t host_count = dictionary_entries(rrdhost_root_index);
-    qwd->hosts_array = mallocz(sizeof(RRDHOST *) * host_count);
-    qwd->hosts_array_capacity = host_count;
+    qwd->hosts_array_capacity = host_count ? host_count : 1;
+    if(unlikely(qwd->hosts_array_capacity > SIZE_MAX / sizeof(*qwd->hosts_array)))
+        fatal("QUERY WEIGHTS: too many hosts to allocate");
+
+    qwd->hosts_array = mallocz(qwd->hosts_array_capacity * sizeof(*qwd->hosts_array));
     qwd->total_hosts = 0;
 
     (void) query_scope_foreach_host(scope_hosts_sp, hosts_sp, weights_count_node_callback, qwd, &qwd->versions, NULL);
@@ -2340,6 +2474,9 @@ static ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryabl
 
     struct query_weights_data *qwd = data;
 
+    if(!qwd->host_snapshot || qwd->host_snapshot->host != host)
+        qwd->host_snapshot = weights_host_snapshot_get(qwd->host_snapshots, host);
+
     ssize_t ret = query_scope_foreach_context(host, qwd->qwr->scope_contexts,
                                 qwd->scope_contexts_sp, qwd->contexts_sp,
                                 weights_do_context_callback, queryable, qwd);
@@ -2383,6 +2520,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             .examined_dimensions = 0,
             .register_zero = true,
             .results = register_result_init(),
+            .host_snapshots = weights_host_snapshots_init(),
             .stats = {},
             .shifts = 0,
             .total_workload = {0}, // Initialize workload statistics
@@ -2452,12 +2590,12 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
         // if the baseline size will not comply to MAX_POINTS
         // lower the window of the baseline
-        while(qwd.shifts && (qwr->points << qwd.shifts) > MAX_POINTS)
+        while(qwd.shifts && weights_points_exceed_max(qwr->points, qwd.shifts))
             qwd.shifts--;
 
         // if the baseline size still does not comply to MAX_POINTS
         // lower the resolution of the highlight and the baseline
-        while((qwr->points << qwd.shifts) > MAX_POINTS)
+        while(weights_points_exceed_max(qwr->points, qwd.shifts))
             qwr->points = qwr->points >> 1;
 
         if(qwr->points < 15) {
@@ -2477,14 +2615,16 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         qwr->options &= ~RRDR_OPTION_NONZERO;
     }
 
+    if(qwr->method == WEIGHTS_METHOD_ANOMALY_RATE)
+        // the method means anomaly rates: imply the option on every
+        // path, so all paths rank by anomaly rates and the response
+        // reports the option
+        qwr->options |= RRDR_OPTION_ANOMALY_BIT;
+
     if(qwr->host && qwr->version == 1)
         weights_do_node_callback(&qwd, qwr->host, true);
     else {
         if((qwd.qwr->method == WEIGHTS_METHOD_VALUE || qwd.qwr->method == WEIGHTS_METHOD_ANOMALY_RATE) && (qwd.contexts_sp || qwd.scope_contexts_sp)) {
-
-            if(qwd.qwr->format == WEIGHTS_FORMAT_MCP && qwd.qwr->method == WEIGHTS_METHOD_ANOMALY_RATE)
-                qwd.qwr->options |= RRDR_OPTION_ANOMALY_BIT;
-
             rrdset_weights_multi_dimensional_value(&qwd);
         }
         else {
@@ -2606,6 +2746,7 @@ cleanup:
     pattern_array_free(qwd.labels_pa);
 
     register_result_destroy(qwd.results);
+    dictionary_destroy(qwd.host_snapshots);
 
     if(error) {
         buffer_flush(wb);
@@ -2709,6 +2850,44 @@ static int mc_unittest4(void) {
     return errors + ret;
 }
 
+static int weights_points_exceed_max_unittest(void) {
+    static const struct {
+        size_t points;
+        uint32_t shifts;
+        bool expected;
+        const char *description;
+    } cases[] = {
+        { 0, UINT32_MAX, false, "zero points at maximum shift" },
+        { MAX_POINTS - 1, 0, false, "below maximum" },
+        { MAX_POINTS, 0, false, "at maximum" },
+        { MAX_POINTS + 1, 0, true, "above maximum" },
+        { MAX_POINTS / 2, 1, false, "shifted value at maximum" },
+        { MAX_POINTS / 2 + 1, 1, true, "shifted value above maximum" },
+        { 1, 13, false, "one point below shift threshold" },
+        { 2, 13, true, "two points at shift threshold" },
+        { 1, 14, true, "one point above shift threshold" },
+        { (size_t)1 << (sizeof(size_t) * CHAR_BIT - 1), 1, true, "native-width wrap pair" },
+        { SIZE_MAX, 0, true, "maximum points" },
+        { SIZE_MAX, 29, true, "maximum points at source maximum shift" },
+        { 1, (uint32_t)(sizeof(size_t) * CHAR_BIT - 1), true, "one point at native maximum shift" },
+        { 1, (uint32_t)(sizeof(size_t) * CHAR_BIT), true, "one point at native width" },
+        { 1, UINT32_MAX, true, "one point at maximum shift" },
+    };
+
+    int errors = 0;
+    for(size_t i = 0; i < _countof(cases); i++) {
+        bool actual = weights_points_exceed_max(cases[i].points, cases[i].shifts);
+        int ret = actual == cases[i].expected ? 0 : 1;
+
+        fprintf(stderr, "%s weights point limit %s: points=%zu, shifts=%u, expected=%s, got=%s\n",
+                ret ? "FAILED" : "OK", cases[i].description, cases[i].points, cases[i].shifts,
+                cases[i].expected ? "true" : "false", actual ? "true" : "false");
+        errors += ret;
+    }
+
+    return errors;
+}
+
 int mc_unittest(void) {
     int errors = 0;
 
@@ -2716,6 +2895,7 @@ int mc_unittest(void) {
     errors += mc_unittest2();
     errors += mc_unittest3();
     errors += mc_unittest4();
+    errors += weights_points_exceed_max_unittest();
 
     return errors;
 }

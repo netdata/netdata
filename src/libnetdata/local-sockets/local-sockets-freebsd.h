@@ -336,16 +336,21 @@ static inline void local_sockets_freebsd_enumerate_pids(
         char *p   = fdbuf;
         char *efdbuf = fdbuf + fd_size;
 
-        while (p < efdbuf) {
+        while ((size_t)(efdbuf - p) >= sizeof(((struct kinfo_file *)0)->kf_structsize)) {
             struct kinfo_file *kf = (struct kinfo_file *)p;
-            if (kf->kf_structsize == 0) break;
+            if (kf->kf_structsize <= 0) break;
+
+            size_t kf_structsize = (size_t)kf->kf_structsize;
+            if (kf_structsize < offsetof(struct kinfo_file, kf_path) ||
+                kf_structsize > (size_t)(efdbuf - p))
+                break;
 
             // Only care about internet sockets owned by a FD (fd >= 0).
             if (kf->kf_fd < 0 ||
                 kf->kf_type != KF_TYPE_SOCKET ||
                 (kf->kf_sock_domain != AF_INET && kf->kf_sock_domain != AF_INET6) ||
                 (kf->kf_sock_protocol != IPPROTO_TCP && kf->kf_sock_protocol != IPPROTO_UDP)) {
-                p += kf->kf_structsize;
+                p += kf_structsize;
                 continue;
             }
 
@@ -362,7 +367,7 @@ static inline void local_sockets_freebsd_enumerate_pids(
             };
 
             if (!local_sockets_freebsd_fill_endpoint(&n.local, sa_local, kf->kf_sock_protocol)) {
-                p += kf->kf_structsize;
+                p += kf_structsize;
                 continue;
             }
 
@@ -381,7 +386,7 @@ static inline void local_sockets_freebsd_enumerate_pids(
                 n.inode = KF_SOCK_PCB_UDP(kf);
 
             if (!n.inode) {
-                p += kf->kf_structsize;
+                p += kf_structsize;
                 continue;
             }
 
@@ -448,7 +453,7 @@ static inline void local_sockets_freebsd_enumerate_pids(
 
             local_sockets_add_socket(ls, &n);
 
-            p += kf->kf_structsize;
+            p += kf_structsize;
         }
 
         freez(fdbuf);

@@ -121,13 +121,14 @@ static inline void append_double(BUFFER *b, double n, const char *separator) {
 
 static inline void append_guid(BUFFER *b, GUID *guid, const char *separator) {
     fatal_assert(sizeof(GUID) == sizeof(nd_uuid_t));
-    if (!guid) return;
+
+    ND_UUID uuid;
+    if (!wevt_GUID_to_ND_UUID(&uuid, guid)) return;
 
     append_separator_if_needed(b, separator);
 
-    ND_UUID *uuid = (ND_UUID *)guid;
     buffer_need_bytes(b, UUID_STR_LEN);
-    uuid_unparse_lower(uuid->uuid, &b->buffer[b->len]);
+    uuid_unparse_lower(uuid.uuid, &b->buffer[b->len]);
     b->len += UUID_STR_LEN - 1;
 
     internal_fatal(buffer_strlen(b) != strlen(buffer_tostring(b)),

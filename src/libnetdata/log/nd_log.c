@@ -354,10 +354,12 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     nd_logger_log_fields(fp, fd, mutex, limit, priority, output, &nd_log.sources[source],
                          thread_log_fields, THREAD_FIELDS_MAX);
 
-    if(nd_log.sources[source].pending_msg && spinlock_trylock(&nd_log.sources[source].limits.spinlock)) {
+    const char *pending_msg = NULL;
+
+    if(spinlock_trylock(&nd_log.sources[source].limits.spinlock)) {
         // we have to check again if the pending message is still there
 
-        const char *pending_msg = nd_log.sources[source].pending_msg;
+        pending_msg = nd_log.sources[source].pending_msg;
 
         if(pending_msg) {
             nd_logger_unset_all_thread_fields();
@@ -397,13 +399,13 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         }
 
         spinlock_unlock(&nd_log.sources[source].limits.spinlock);
-
-        if(pending_msg)
-            nd_logger_log_fields(fp, fd, mutex, false, priority, output, &nd_log.sources[source],
-                                 thread_log_fields, THREAD_FIELDS_MAX);
-
-        freez((void *)pending_msg);
     }
+
+    if(pending_msg)
+        nd_logger_log_fields(fp, fd, mutex, false, priority, output, &nd_log.sources[source],
+                             thread_log_fields, THREAD_FIELDS_MAX);
+
+    freez((void *)pending_msg);
 
     errno_clear();
 }

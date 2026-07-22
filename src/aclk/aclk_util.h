@@ -22,6 +22,14 @@
 // and are supposed not to be needed outside of ACLK
 extern usec_t aclk_session_newarch;
 
+static inline usec_t aclk_session_load(void) {
+    return __atomic_load_n(&aclk_session_newarch, __ATOMIC_RELAXED);
+}
+
+static inline void aclk_session_store(usec_t session) {
+    __atomic_store_n(&aclk_session_newarch, session, __ATOMIC_RELAXED);
+}
+
 extern int chart_batch_id;
 
 typedef enum {

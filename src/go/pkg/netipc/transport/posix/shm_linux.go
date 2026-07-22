@@ -61,6 +61,8 @@ const (
 var (
 	ErrShmPathTooLong = errors.New("SHM path exceeds limit")
 	ErrShmOpen        = errors.New("SHM open failed")
+	ErrShmAllocate    = errors.New("SHM allocation failed")
+	// Deprecated: SHM creation no longer uses ftruncate; use ErrShmAllocate.
 	ErrShmTruncate    = errors.New("SHM ftruncate failed")
 	ErrShmMmap        = errors.New("SHM mmap failed")
 	ErrShmBadMagic    = errors.New("SHM header magic mismatch")
@@ -140,8 +142,24 @@ func (c *ShmContext) OwnerAlive() bool {
 //  Server API
 // ---------------------------------------------------------------------------
 
+type shmFallocateFunc func(fd int, mode uint32, off, len int64) error
+
+func shmPreallocate(fd int, size int64, fallocate shmFallocateFunc) error {
+	for {
+		err := fallocate(fd, 0, 0, size)
+		if err == syscall.EINTR {
+			continue
+		}
+		return err
+	}
+}
+
 // ShmServerCreate creates a SHM region at {runDir}/{serviceName}-{sessionID}.ipcshm.
 func ShmServerCreate(runDir, serviceName string, sessionID uint64, reqCapacity, respCapacity uint32) (*ShmContext, error) {
+	return shmServerCreate(runDir, serviceName, sessionID, reqCapacity, respCapacity, syscall.Fallocate)
+}
+
+func shmServerCreate(runDir, serviceName string, sessionID uint64, reqCapacity, respCapacity uint32, fallocate shmFallocateFunc) (*ShmContext, error) {
 	path, err := buildShmPath(runDir, serviceName, sessionID)
 	if err != nil {
 		return nil, err
@@ -171,10 +189,10 @@ func ShmServerCreate(runDir, serviceName string, sessionID uint64, reqCapacity, 
 	}
 	fd := int(f.Fd())
 
-	if err := syscall.Ftruncate(fd, int64(regionSize)); err != nil {
+	if err := shmPreallocate(fd, int64(regionSize), fallocate); err != nil {
 		_ = f.Close()
 		_ = os.Remove(path)
-		return nil, fmt.Errorf("%w: %v", ErrShmTruncate, err)
+		return nil, fmt.Errorf("%w: %w", ErrShmAllocate, err)
 	}
 
 	data, err := syscall.Mmap(fd, 0, regionSize,

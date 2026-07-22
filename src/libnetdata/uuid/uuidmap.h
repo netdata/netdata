@@ -37,7 +37,7 @@ static inline UUIDMAP_ID uuidmap_make_id(uint8_t partition, uint32_t id) {
 // returns ID, or zero on error
 UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid);
 
-// returns the number of entries still referenced (although freed)
+// returns the number of entries still referenced; non-zero leaves UUIDMap intact
 size_t uuidmap_destroy(void);
 
 // delete a uuid from the map

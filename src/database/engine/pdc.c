@@ -679,15 +679,17 @@ void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags) {
     if(flags & RRDENG_PAGE_CONFLICT)
         buffer_strcat(wb, "CONFLICT ");
     if(flags & RRDENG_PAGE_FULL)
-        buffer_strcat(wb, "PAGE_FULL");
+        buffer_strcat(wb, "PAGE_FULL ");
     if(flags & RRDENG_PAGE_COLLECT_FINALIZE)
-        buffer_strcat(wb, "COLLECT_FINALIZE");
+        buffer_strcat(wb, "COLLECT_FINALIZE ");
     if(flags & RRDENG_PAGE_UPDATE_EVERY_CHANGE)
-        buffer_strcat(wb, "UPDATE_EVERY_CHANGE");
+        buffer_strcat(wb, "UPDATE_EVERY_CHANGE ");
     if(flags & RRDENG_PAGE_STEP_TOO_SMALL)
-        buffer_strcat(wb, "STEP_TOO_SMALL");
+        buffer_strcat(wb, "STEP_TOO_SMALL ");
     if(flags & RRDENG_PAGE_STEP_UNALIGNED)
-        buffer_strcat(wb, "STEP_UNALIGNED");
+        buffer_strcat(wb, "STEP_UNALIGNED ");
+    if(flags & RRDENG_PAGE_RETENTION_RECORDED)
+        buffer_strcat(wb, "RETENTION_RECORDED ");
 }
 
 ALWAYS_INLINE VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, uint32_t overwrite_zero_update_every_s, bool have_read_error) {

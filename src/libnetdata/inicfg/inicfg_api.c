@@ -336,14 +336,16 @@ time_t inicfg_get_duration_seconds(struct config *root, const char *section, con
 
     const char *s = string2str(opt->value);
 
-    int result = 0;
-    if(!duration_parse_seconds(s, &result)) {
-        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_SECS);
+    int parsed = 0;
+    time_t result = 0;
+    if(!duration_parse_seconds(s, &parsed) ||
+       (parsed < 0 && __builtin_sub_overflow((time_t)0, parsed, &result))) {
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
+        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_SECS);
         return default_value;
     }
 
-    return ABS(result);
+    return parsed < 0 ? result : (time_t)parsed;
 }
 
 time_t inicfg_set_duration_seconds(struct config *root, const char *section, const char *name, time_t value) {
@@ -381,8 +383,8 @@ msec_t inicfg_get_duration_ms(struct config *root, const char *section, const ch
 
     smsec_t result = 0;
     if(!duration_parse_msec_t(s, &result)) {
-        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_MS);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
+        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_MS);
         return default_value;
     }
 
@@ -427,12 +429,12 @@ time_t inicfg_get_duration_days_to_seconds(struct config *root, const char *sect
 
     int64_t result = 0;
     if(!duration_parse(s, &result, "d", "s")) {
-        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS_TO_SECONDS);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
+        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_DAYS_TO_SECONDS);
         return default_value_seconds;
     }
 
-    return (unsigned)ABS(result);
+    return ABS(result);
 }
 
 long long inicfg_get_number(struct config *root, const char *section, const char *name, long long value) {
@@ -521,8 +523,8 @@ uint64_t inicfg_get_size_bytes(struct config *root, const char *section, const c
     const char *s = string2str(opt->value);
     uint64_t result = 0;
     if(!size_parse_bytes(s, &result)) {
-        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_SIZE_IN_BYTES);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid size", section, name, s);
+        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_SIZE_IN_BYTES);
         return default_value;
     }
 
@@ -562,12 +564,12 @@ uint64_t inicfg_get_size_mb(struct config *root, const char *section, const char
     const char *s = string2str(opt->value);
     uint64_t result = 0;
     if(!size_parse_mb(s, &result)) {
-        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_SIZE_IN_MB);
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid size", section, name, s);
+        inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_SIZE_IN_MB);
         return default_value;
     }
 
-    return (unsigned)result;
+    return result;
 }
 
 uint64_t inicfg_set_size_mb(struct config *root, const char *section, const char *name, uint64_t value) {

@@ -44,11 +44,12 @@ type runtimeMetrics struct {
 	planChartInstances     metrix.StatefulGauge
 	planInferredDimensions metrix.StatefulGauge
 
-	actionCreateChart     metrix.StatefulCounter
-	actionCreateDimension metrix.StatefulCounter
-	actionUpdateChart     metrix.StatefulCounter
-	actionRemoveDimension metrix.StatefulCounter
-	actionRemoveChart     metrix.StatefulCounter
+	actionCreateChart       metrix.StatefulCounter
+	actionCreateDimension   metrix.StatefulCounter
+	actionUpdateChartLabels metrix.StatefulCounter
+	actionUpdateChart       metrix.StatefulCounter
+	actionRemoveDimension   metrix.StatefulCounter
+	actionRemoveChart       metrix.StatefulCounter
 
 	lifecycleRemovedChartByCap        metrix.StatefulCounter
 	lifecycleRemovedChartByExpiry     metrix.StatefulCounter
@@ -72,11 +73,12 @@ type PlanRuntimeSample struct {
 	planChartInstances     int
 	planInferredDimensions int
 
-	actionCreateChart     int
-	actionCreateDimension int
-	actionUpdateChart     int
-	actionRemoveDimension int
-	actionRemoveChart     int
+	actionCreateChart       int
+	actionCreateDimension   int
+	actionUpdateChartLabels int
+	actionUpdateChart       int
+	actionRemoveDimension   int
+	actionRemoveChart       int
 
 	lifecycleRemovedChartByCap        int
 	lifecycleRemovedChartByExpiry     int
@@ -260,11 +262,12 @@ func newRuntimeMetrics(store metrix.RuntimeStore) *runtimeMetrics {
 			metrix.WithUnit("dimensions"),
 		),
 
-		actionCreateChart:     actions.WithLabelValues("create_chart"),
-		actionCreateDimension: actions.WithLabelValues("create_dimension"),
-		actionUpdateChart:     actions.WithLabelValues("update_chart"),
-		actionRemoveDimension: actions.WithLabelValues("remove_dimension"),
-		actionRemoveChart:     actions.WithLabelValues("remove_chart"),
+		actionCreateChart:       actions.WithLabelValues("create_chart"),
+		actionCreateDimension:   actions.WithLabelValues("create_dimension"),
+		actionUpdateChartLabels: actions.WithLabelValues("update_chart_labels"),
+		actionUpdateChart:       actions.WithLabelValues("update_chart"),
+		actionRemoveDimension:   actions.WithLabelValues("remove_dimension"),
+		actionRemoveChart:       actions.WithLabelValues("remove_chart"),
 
 		lifecycleRemovedChartByCap:        lifecycleRemoved.WithLabelValues("chart", "cap"),
 		lifecycleRemovedChartByExpiry:     lifecycleRemoved.WithLabelValues("chart", "expiry"),
@@ -345,6 +348,9 @@ func (m *runtimeMetrics) observeBuild(sample PlanRuntimeSample) {
 	}
 	if sample.actionCreateDimension > 0 {
 		m.actionCreateDimension.Add(float64(sample.actionCreateDimension))
+	}
+	if sample.actionUpdateChartLabels > 0 {
+		m.actionUpdateChartLabels.Add(float64(sample.actionUpdateChartLabels))
 	}
 	if sample.actionUpdateChart > 0 {
 		m.actionUpdateChart.Add(float64(sample.actionUpdateChart))
@@ -460,7 +466,7 @@ func (m *runtimeMetrics) observeBuildRollup(samples []PlanRuntimeSample) {
 	var routeCacheRetained, routeCachePruned, routeCacheFullDrops int
 	var seriesScanned, seriesMatched, seriesUnmatched, seriesAutogenMatched uint64
 	var seriesFilteredBySeq, seriesFilteredBySel uint64
-	var actionCreateChart, actionCreateDimension, actionUpdateChart, actionRemoveDimension, actionRemoveChart int
+	var actionCreateChart, actionCreateDimension, actionUpdateChartLabels, actionUpdateChart, actionRemoveDimension, actionRemoveChart int
 	var lifecycleRemovedChartByCap, lifecycleRemovedChartByExpiry int
 	var lifecycleRemovedDimensionByCap, lifecycleRemovedDimensionByExpiry int
 	var routeCacheEntries, planChartInstances, planInferredDimensions int
@@ -525,6 +531,7 @@ func (m *runtimeMetrics) observeBuildRollup(samples []PlanRuntimeSample) {
 
 		actionCreateChart += sample.actionCreateChart
 		actionCreateDimension += sample.actionCreateDimension
+		actionUpdateChartLabels += sample.actionUpdateChartLabels
 		actionUpdateChart += sample.actionUpdateChart
 		actionRemoveDimension += sample.actionRemoveDimension
 		actionRemoveChart += sample.actionRemoveChart
@@ -568,6 +575,7 @@ func (m *runtimeMetrics) observeBuildRollup(samples []PlanRuntimeSample) {
 
 	addIfPositive(m.actionCreateChart, float64(actionCreateChart))
 	addIfPositive(m.actionCreateDimension, float64(actionCreateDimension))
+	addIfPositive(m.actionUpdateChartLabels, float64(actionUpdateChartLabels))
 	addIfPositive(m.actionUpdateChart, float64(actionUpdateChart))
 	addIfPositive(m.actionRemoveDimension, float64(actionRemoveDimension))
 	addIfPositive(m.actionRemoveChart, float64(actionRemoveChart))
@@ -597,6 +605,8 @@ func actionKindCounts(actions []EngineAction) PlanRuntimeSample {
 			out.actionCreateChart++
 		case ActionCreateDimension:
 			out.actionCreateDimension++
+		case ActionUpdateChartLabels:
+			out.actionUpdateChartLabels++
 		case ActionUpdateChart:
 			out.actionUpdateChart++
 		case ActionRemoveDimension:

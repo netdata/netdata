@@ -19,6 +19,21 @@ fn cleanup_shm(service: &str, session_id: u64) {
     let _ = std::fs::remove_file(&path);
 }
 
+struct FallocateFaultGuard;
+
+impl FallocateFaultGuard {
+    fn install(errors: &[i32]) -> Self {
+        install_fallocate_faults(errors);
+        Self
+    }
+}
+
+impl Drop for FallocateFaultGuard {
+    fn drop(&mut self) {
+        clear_fallocate_faults();
+    }
+}
+
 fn wait_for_server_ready(rx: &mpsc::Receiver<u64>, service: &str) -> u64 {
     rx.recv_timeout(SERVER_READY_TIMEOUT).unwrap_or_else(|err| {
         panic!("timed out waiting for server readiness for service={service}: {err}")
@@ -523,6 +538,7 @@ fn shm_error_display_all_variants() {
         (ShmError::PathTooLong, "SHM path exceeds limit"),
         (ShmError::Open(2), "open failed: errno 2"),
         (ShmError::Truncate(28), "ftruncate failed: errno 28"),
+        (ShmError::Allocate(28), "SHM allocation failed: errno 28"),
         (ShmError::Mmap(12), "mmap failed: errno 12"),
         (ShmError::BadMagic, "SHM header magic mismatch"),
         (ShmError::BadVersion, "SHM header version mismatch"),
@@ -540,6 +556,86 @@ fn shm_error_display_all_variants() {
     }
     let e: &dyn std::error::Error = &ShmError::PathTooLong;
     let _ = format!("{e}");
+}
+
+#[test]
+fn test_server_create_allocate_enospc_cleans_up_before_mmap() {
+    ensure_run_dir();
+    let svc = "rs_shm_alloc_enospc";
+    let sid = 0xa110_c001;
+    cleanup_shm(svc, sid);
+
+    let fault = FallocateFaultGuard::install(&[libc::ENOSPC]);
+    let err = match ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024) {
+        Ok(_) => panic!("injected ENOSPC must fail SHM creation"),
+        Err(err) => err,
+    };
+
+    assert_eq!(err, ShmError::Allocate(libc::ENOSPC));
+    assert_eq!(syscall_test_counts(), (1, 0), "mmap must not be reached");
+
+    let path = build_shm_path(TEST_RUN_DIR, svc, sid).expect("SHM path");
+    assert!(!path.exists(), "failed allocation must unlink its file");
+
+    drop(fault);
+    let mut server = ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024)
+        .expect("cleanup must permit recreation at the same path");
+    server.destroy();
+}
+
+#[test]
+fn test_server_create_retries_fallocate_after_eintr() {
+    ensure_run_dir();
+    let svc = "rs_shm_alloc_eintr";
+    let sid = 0xa110_c002;
+    cleanup_shm(svc, sid);
+
+    let _fault = FallocateFaultGuard::install(&[libc::EINTR]);
+    let mut server = ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 2048)
+        .expect("fallocate must retry EINTR");
+
+    assert_eq!(
+        syscall_test_counts(),
+        (2, 1),
+        "one interrupted allocation retry must precede one mmap"
+    );
+
+    let request = unsafe {
+        std::slice::from_raw_parts(
+            server.base.add(server.request_offset as usize),
+            server.request_capacity as usize,
+        )
+    };
+    let response = unsafe {
+        std::slice::from_raw_parts(
+            server.base.add(server.response_offset as usize),
+            server.response_capacity as usize,
+        )
+    };
+    assert!(request.iter().all(|byte| *byte == 0));
+    assert!(response.iter().all(|byte| *byte == 0));
+
+    server.destroy();
+}
+
+#[test]
+fn test_server_create_does_not_fallback_when_fallocate_is_unsupported() {
+    ensure_run_dir();
+    let svc = "rs_shm_alloc_unsupported";
+    let sid = 0xa110_c003;
+    cleanup_shm(svc, sid);
+
+    let _fault = FallocateFaultGuard::install(&[libc::EOPNOTSUPP]);
+    let err = match ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024) {
+        Ok(_) => panic!("unsupported fallocate must disable SHM creation"),
+        Err(err) => err,
+    };
+
+    assert_eq!(err, ShmError::Allocate(libc::EOPNOTSUPP));
+    assert_eq!(syscall_test_counts(), (1, 0), "mmap must not be reached");
+
+    let path = build_shm_path(TEST_RUN_DIR, svc, sid).expect("SHM path");
+    assert!(!path.exists(), "failed allocation must unlink its file");
 }
 
 // -----------------------------------------------------------------------

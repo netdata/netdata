@@ -54,15 +54,94 @@ static void rrddim_metric_handle_rrddim_store(struct mem_metric_handle *mh, RRDD
     __atomic_store_n(&mh->rd, rd, __ATOMIC_RELEASE);
 }
 
+static storage_number *rrddim_metric_handle_data_load(const struct mem_metric_handle *mh) {
+    return __atomic_load_n(&mh->data, __ATOMIC_RELAXED);
+}
+
+static void rrddim_metric_handle_data_store(struct mem_metric_handle *mh, storage_number *data) {
+    __atomic_store_n(&mh->data, data, __ATOMIC_RELAXED);
+}
+
+static storage_number rrddim_metric_handle_slot_load(const struct mem_metric_handle *mh, size_t slot) {
+    storage_number *data = rrddim_metric_handle_data_load(mh);
+    return __atomic_load_n(&data[slot], __ATOMIC_RELAXED);
+}
+
+static void rrddim_metric_handle_slot_store(struct mem_metric_handle *mh, size_t slot, storage_number value) {
+    storage_number *data = rrddim_metric_handle_data_load(mh);
+    __atomic_store_n(&data[slot], value, __ATOMIC_RELAXED);
+}
+
+static size_t rrddim_metric_handle_counter_load(const struct mem_metric_handle *mh) {
+    return __atomic_load_n(&mh->counter, __ATOMIC_RELAXED);
+}
+
+static void rrddim_metric_handle_counter_store(struct mem_metric_handle *mh, size_t counter) {
+    __atomic_store_n(&mh->counter, counter, __ATOMIC_RELAXED);
+}
+
+static size_t rrddim_metric_handle_entries_load(const struct mem_metric_handle *mh) {
+    return __atomic_load_n(&mh->entries, __ATOMIC_RELAXED);
+}
+
+static void rrddim_metric_handle_entries_store(struct mem_metric_handle *mh, size_t entries) {
+    __atomic_store_n(&mh->entries, entries, __ATOMIC_RELAXED);
+}
+
+static size_t rrddim_metric_handle_current_entry_load(const struct mem_metric_handle *mh) {
+    return __atomic_load_n(&mh->current_entry, __ATOMIC_RELAXED);
+}
+
+static void rrddim_metric_handle_current_entry_store(struct mem_metric_handle *mh, size_t current_entry) {
+    __atomic_store_n(&mh->current_entry, current_entry, __ATOMIC_RELAXED);
+}
+
+static time_t rrddim_metric_handle_last_updated_s_load(const struct mem_metric_handle *mh) {
+    return __atomic_load_n(&mh->last_updated_s, __ATOMIC_RELAXED);
+}
+
+static void rrddim_metric_handle_last_updated_s_store(struct mem_metric_handle *mh, time_t last_updated_s) {
+    __atomic_store_n(&mh->last_updated_s, last_updated_s, __ATOMIC_RELAXED);
+}
+
+static time_t rrddim_metric_handle_update_every_s_load(const struct mem_metric_handle *mh) {
+    return __atomic_load_n(&mh->update_every_s, __ATOMIC_RELAXED);
+}
+
+static void rrddim_metric_handle_update_every_s_store(struct mem_metric_handle *mh, time_t update_every_s) {
+    __atomic_store_n(&mh->update_every_s, update_every_s, __ATOMIC_RELAXED);
+}
+
+static time_t rrddim_metric_handle_duration_s(const struct mem_metric_handle *mh) {
+    time_t counter = (time_t)rrddim_metric_handle_counter_load(mh);
+    time_t entries = (time_t)rrddim_metric_handle_entries_load(mh);
+
+    return MIN(counter, entries) * rrddim_metric_handle_update_every_s_load(mh);
+}
+
+static size_t rrddim_metric_handle_last_slot(const struct mem_metric_handle *mh) {
+    size_t current_entry = rrddim_metric_handle_current_entry_load(mh);
+    size_t entries = rrddim_metric_handle_entries_load(mh);
+
+    return current_entry == 0 ? entries - 1 : current_entry - 1;
+}
+
+static size_t rrddim_metric_handle_first_slot(const struct mem_metric_handle *mh) {
+    size_t counter = rrddim_metric_handle_counter_load(mh);
+    size_t entries = rrddim_metric_handle_entries_load(mh);
+
+    return counter >= entries ? rrddim_metric_handle_current_entry_load(mh) : 0;
+}
+
 static void update_metric_handle_from_rrddim(struct mem_metric_handle *mh, RRDDIM *rd) {
-    mh->data           = rd->db.data;
+    rrddim_metric_handle_data_store(mh, rd->db.data);
     mh->memsize        = rd->db.memsize;
     mh->memory_mode    = rd->rrd_memory_mode;
-    mh->counter        = rd->rrdset->counter;
-    mh->entries        = rd->rrdset->db.entries;
-    mh->current_entry  = rd->rrdset->db.current_entry;
-    mh->last_updated_s = rd->rrdset->last_updated.tv_sec;
-    mh->update_every_s = rd->rrdset->update_every;
+    rrddim_metric_handle_counter_store(mh, rd->rrdset->counter);
+    rrddim_metric_handle_entries_store(mh, rd->rrdset->db.entries);
+    rrddim_metric_handle_current_entry_store(mh, rd->rrdset->db.current_entry);
+    rrddim_metric_handle_last_updated_s_store(mh, rd->rrdset->last_updated.tv_sec);
+    rrddim_metric_handle_update_every_s_store(mh, rd->rrdset->update_every);
 }
 
 static void check_metric_handle_from_rrddim(struct mem_metric_handle *mh) {
@@ -70,8 +149,10 @@ static void check_metric_handle_from_rrddim(struct mem_metric_handle *mh) {
     if(!rd)
         return;
 
-    internal_fatal(mh->entries != (size_t)rd->rrdset->db.entries, "RRDDIM: entries do not match");
-    internal_fatal(mh->update_every_s != rd->rrdset->update_every, "RRDDIM: update every does not match");
+    internal_fatal(rrddim_metric_handle_entries_load(mh) != (size_t)rd->rrdset->db.entries,
+                   "RRDDIM: entries do not match");
+    internal_fatal(rrddim_metric_handle_update_every_s_load(mh) != rd->rrdset->update_every,
+                   "RRDDIM: update every does not match");
 }
 
 static int64_t rrddim_metric_remove_from_index(struct mem_metric_handle *mh) {
@@ -90,17 +171,18 @@ static int64_t rrddim_metric_remove_from_index(struct mem_metric_handle *mh) {
 }
 
 static void rrddim_metric_free_data(struct mem_metric_handle *mh) {
-    if(!mh->data)
+    storage_number *data = rrddim_metric_handle_data_load(mh);
+    if(!data)
         return;
 
     pulse_db_rrd_memory_sub(mh->memsize);
 
     if(mh->memory_mode == RRD_DB_MODE_RAM)
-        nd_munmap(mh->data, mh->memsize);
+        nd_munmap(data, mh->memsize);
     else
-        freez(mh->data);
+        freez(data);
 
-    mh->data = NULL;
+    rrddim_metric_handle_data_store(mh, NULL);
     mh->memsize = 0;
 }
 
@@ -221,7 +303,7 @@ bool rrddim_metric_release_from_rrddim(STORAGE_METRIC_HANDLE *smh, RRDDIM *rd) {
     netdata_rwlock_wrlock(&rrddim_Judy_rwlock);
     if(rrddim_metric_handle_rrddim_load(mh) == rd) {
         rrddim_metric_handle_rrddim_store(mh, NULL);
-        data_transferred = (mh->data == rd->db.data);
+        data_transferred = (rrddim_metric_handle_data_load(mh) == rd->db.data);
 
         if(mh->indexed) {
             JudyAllocThreadPulseReset();
@@ -274,7 +356,7 @@ void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
 
     rrddim_store_metric_flush(sch);
-    mh->update_every_s = update_every;
+    rrddim_metric_handle_update_every_s_store(mh, update_every);
 }
 
 STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *smh, uint32_t update_every __maybe_unused, STORAGE_METRICS_GROUP *smg __maybe_unused) {
@@ -282,7 +364,8 @@ STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *smh, uint32_t
     RRDDIM *rd = rrddim_metric_handle_rrddim_load(mh);
 
     update_metric_handle_from_rrddim(mh, rd);
-    internal_fatal((uint32_t)mh->update_every_s != update_every, "RRDDIM: update requested does not match the dimension");
+    internal_fatal((uint32_t)rrddim_metric_handle_update_every_s_load(mh) != update_every,
+                   "RRDDIM: update requested does not match the dimension");
 
     struct mem_collect_handle *ch = callocz(1, sizeof(struct mem_collect_handle));
     ch->common.seb = STORAGE_ENGINE_BACKEND_RRDDIM;
@@ -298,15 +381,15 @@ void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *sch) {
     struct mem_collect_handle *ch = (struct mem_collect_handle *)sch;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)ch->smh;
 
-    size_t entries = mh->entries;
+    size_t entries = rrddim_metric_handle_entries_load(mh);
     storage_number empty = pack_storage_number(NAN, SN_FLAG_NONE);
 
     for(size_t i = 0; i < entries ;i++)
-        mh->data[i] = empty;
+        rrddim_metric_handle_slot_store(mh, i, empty);
 
-    mh->counter = 0;
-    mh->last_updated_s = 0;
-    mh->current_entry = 0;
+    rrddim_metric_handle_counter_store(mh, 0);
+    rrddim_metric_handle_last_updated_s_store(mh, 0);
+    rrddim_metric_handle_current_entry_store(mh, 0);
 }
 
 static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *sch, time_t now_collect_s) {
@@ -316,29 +399,29 @@ static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *sch, time_t now_c
     internal_fatal(ch->rd != rrddim_metric_handle_rrddim_load(mh), "RRDDIM: dimensions do not match");
     check_metric_handle_from_rrddim(mh);
 
-    size_t entries = mh->entries;
-    time_t update_every_s = mh->update_every_s;
-    time_t last_stored_s = mh->last_updated_s;
+    size_t entries = rrddim_metric_handle_entries_load(mh);
+    time_t update_every_s = rrddim_metric_handle_update_every_s_load(mh);
+    time_t last_stored_s = rrddim_metric_handle_last_updated_s_load(mh);
     size_t gap_entries = (now_collect_s - last_stored_s) / update_every_s;
     if(gap_entries >= entries)
         rrddim_store_metric_flush(sch);
 
     else {
         storage_number empty = pack_storage_number(NAN, SN_FLAG_NONE);
-        size_t current_entry = mh->current_entry;
+        size_t current_entry = rrddim_metric_handle_current_entry_load(mh);
         time_t now_store_s = last_stored_s + update_every_s;
 
         // fill the dimension
         size_t c;
         for(c = 0; c < entries && now_store_s <= now_collect_s ; now_store_s += update_every_s, c++) {
-            mh->data[current_entry++] = empty;
+            rrddim_metric_handle_slot_store(mh, current_entry++, empty);
 
             if(unlikely(current_entry >= entries))
                 current_entry = 0;
         }
-        mh->counter += c;
-        mh->current_entry = current_entry;
-        mh->last_updated_s = now_store_s;
+        rrddim_metric_handle_counter_store(mh, rrddim_metric_handle_counter_load(mh) + c);
+        rrddim_metric_handle_current_entry_store(mh, current_entry);
+        rrddim_metric_handle_last_updated_s_store(mh, now_store_s);
     }
 }
 
@@ -359,16 +442,22 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *sch,
     internal_fatal(ch->rd != rrddim_metric_handle_rrddim_load(mh), "RRDDIM: dimensions do not match");
     check_metric_handle_from_rrddim(mh);
 
-    if(unlikely(point_in_time_s <= mh->last_updated_s))
+    time_t last_updated_s = rrddim_metric_handle_last_updated_s_load(mh);
+    time_t update_every_s = rrddim_metric_handle_update_every_s_load(mh);
+
+    if(unlikely(point_in_time_s <= last_updated_s))
         return;
 
-    if(unlikely(mh->last_updated_s && point_in_time_s - mh->update_every_s > mh->last_updated_s))
+    if(unlikely(last_updated_s && point_in_time_s - update_every_s > last_updated_s))
         rrddim_fill_the_gap(sch, point_in_time_s);
 
-    mh->data[mh->current_entry] = pack_storage_number(n, flags);
-    mh->counter++;
-    mh->current_entry = (mh->current_entry + 1) >= mh->entries ? 0 : mh->current_entry + 1;
-    mh->last_updated_s = point_in_time_s;
+    size_t current_entry = rrddim_metric_handle_current_entry_load(mh);
+    size_t entries = rrddim_metric_handle_entries_load(mh);
+
+    rrddim_metric_handle_slot_store(mh, current_entry, pack_storage_number(n, flags));
+    rrddim_metric_handle_counter_store(mh, rrddim_metric_handle_counter_load(mh) + 1);
+    rrddim_metric_handle_current_entry_store(mh, (current_entry + 1) >= entries ? 0 : current_entry + 1);
+    rrddim_metric_handle_last_updated_s_store(mh, point_in_time_s);
 }
 
 int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *sch) {
@@ -379,15 +468,6 @@ int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *sch) {
 
 // ----------------------------------------------------------------------------
 
-// get the total duration in seconds of the round-robin database
-#define metric_duration(mh) (( (time_t)(mh)->counter >= (time_t)(mh)->entries ? (time_t)(mh)->entries : (time_t)(mh)->counter ) * (time_t)(mh)->update_every_s)
-
-// get the last slot updated in the round-robin database
-#define rrddim_last_slot(mh) ((size_t)(((mh)->current_entry == 0) ? (mh)->entries - 1 : (mh)->current_entry - 1))
-
-// return the slot that has the oldest value
-#define rrddim_first_slot(mh) ((size_t)((mh)->counter >= (size_t)(mh)->entries ? (mh)->current_entry : 0))
-
 // get the slot of the round-robin database, for the given timestamp (t)
 // it always returns a valid slot, although it may not be for the time requested if the time is outside the round-robin database
 // only valid when not using dbengine
@@ -397,10 +477,10 @@ static inline size_t rrddim_time2slot(STORAGE_METRIC_HANDLE *smh, time_t t) {
     size_t ret = 0;
     time_t last_entry_s  = rrddim_query_latest_time_s(smh);
     time_t first_entry_s = rrddim_query_oldest_time_s(smh);
-    size_t entries       = mh->entries;
-    size_t first_slot    = rrddim_first_slot(mh);
-    size_t last_slot     = rrddim_last_slot(mh);
-    size_t update_every  = mh->update_every_s;
+    size_t entries       = rrddim_metric_handle_entries_load(mh);
+    size_t first_slot    = rrddim_metric_handle_first_slot(mh);
+    size_t last_slot     = rrddim_metric_handle_last_slot(mh);
+    time_t update_every  = rrddim_metric_handle_update_every_s_load(mh);
 
     if(t >= last_entry_s) {
         // the requested time is after the last entry we have
@@ -435,9 +515,9 @@ static inline time_t rrddim_slot2time(STORAGE_METRIC_HANDLE *smh, size_t slot) {
     time_t ret;
     time_t last_entry_s  = rrddim_query_latest_time_s(smh);
     time_t first_entry_s = rrddim_query_oldest_time_s(smh);
-    size_t entries       = mh->entries;
-    size_t last_slot     = rrddim_last_slot(mh);
-    size_t update_every  = mh->update_every_s;
+    size_t entries       = rrddim_metric_handle_entries_load(mh);
+    size_t last_slot     = rrddim_metric_handle_last_slot(mh);
+    time_t update_every  = rrddim_metric_handle_update_every_s_load(mh);
 
     if(slot >= entries) {
         netdata_log_error("INTERNAL ERROR: caller of rrddim_slot2time() gives invalid slot %zu", slot);
@@ -481,7 +561,7 @@ void rrddim_query_init(STORAGE_METRIC_HANDLE *smh, struct storage_engine_query_h
 
     h->slot           = rrddim_time2slot(smh, start_time_s);
     h->last_slot      = rrddim_time2slot(smh, end_time_s);
-    h->dt             = mh->update_every_s;
+    h->dt             = rrddim_metric_handle_update_every_s_load(mh);
 
     h->next_timestamp = start_time_s;
     h->slot_timestamp = rrddim_slot2time(smh, h->slot);
@@ -500,7 +580,7 @@ ALWAYS_INLINE STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query
     struct mem_query_handle* h = (struct mem_query_handle*)seqh->handle;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)h->smh;
 
-    size_t entries = mh->entries;
+    size_t entries = rrddim_metric_handle_entries_load(mh);
     size_t slot = h->slot;
 
     STORAGE_POINT sp;
@@ -523,7 +603,7 @@ ALWAYS_INLINE STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query
         return sp;
     }
 
-    storage_number n = mh->data[slot++];
+    storage_number n = rrddim_metric_handle_slot_load(mh, slot++);
     if(unlikely(slot >= entries)) slot = 0;
 
     h->slot = slot;
@@ -557,10 +637,10 @@ time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *
 
 time_t rrddim_query_latest_time_s(STORAGE_METRIC_HANDLE *smh) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
-    return mh->last_updated_s;
+    return rrddim_metric_handle_last_updated_s_load(mh);
 }
 
 time_t rrddim_query_oldest_time_s(STORAGE_METRIC_HANDLE *smh) {
     struct mem_metric_handle *mh = (struct mem_metric_handle *)smh;
-    return (time_t)(mh->last_updated_s - metric_duration(mh));
+    return (time_t)(rrddim_metric_handle_last_updated_s_load(mh) - rrddim_metric_handle_duration_s(mh));
 }

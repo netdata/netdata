@@ -10,8 +10,15 @@ struct alert_counts {
     size_t error;
 };
 
+struct alert_runtime_snapshot {
+    RRDCALC *rc;
+    RRDCALC_RUNTIME_SNAPSHOT state;
+};
+
 struct alert_v2_entry {
     RRDCALC *tmp;
+    RRDCALC_STATUS tmp_status;
+    NETDATA_DOUBLE tmp_value;
 
     STRING *name;
     STRING *summary;
@@ -57,31 +64,34 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
                 if(ctl->alerts.alarm_id_filter && ctl->alerts.alarm_id_filter != (time_t)rcl->id)
                     continue;
 
+                struct alert_runtime_snapshot alert = { .rc = rcl };
+                rrdcalc_runtime_snapshot_get(rcl, &alert.state);
+
                 size_t m = ctl->request->alerts.status & CONTEXTS_ALERT_STATUSES ? 0 : 1;
 
                 if (!m) {
                     if ((ctl->request->alerts.status & CONTEXT_ALERT_UNINITIALIZED) &&
-                        rcl->status == RRDCALC_STATUS_UNINITIALIZED)
+                        alert.state.status == RRDCALC_STATUS_UNINITIALIZED)
                         m++;
 
                     if ((ctl->request->alerts.status & CONTEXT_ALERT_UNDEFINED) &&
-                        rcl->status == RRDCALC_STATUS_UNDEFINED)
+                        alert.state.status == RRDCALC_STATUS_UNDEFINED)
                         m++;
 
                     if ((ctl->request->alerts.status & CONTEXT_ALERT_CLEAR) &&
-                        rcl->status == RRDCALC_STATUS_CLEAR)
+                        alert.state.status == RRDCALC_STATUS_CLEAR)
                         m++;
 
                     if ((ctl->request->alerts.status & CONTEXT_ALERT_RAISED) &&
-                        rcl->status >= RRDCALC_STATUS_RAISED)
+                        alert.state.status >= RRDCALC_STATUS_RAISED)
                         m++;
 
                     if ((ctl->request->alerts.status & CONTEXT_ALERT_WARNING) &&
-                        rcl->status == RRDCALC_STATUS_WARNING)
+                        alert.state.status == RRDCALC_STATUS_WARNING)
                         m++;
 
                     if ((ctl->request->alerts.status & CONTEXT_ALERT_CRITICAL) &&
-                        rcl->status == RRDCALC_STATUS_CRITICAL)
+                        alert.state.status == RRDCALC_STATUS_CRITICAL)
                         m++;
 
                     if(!m)
@@ -92,6 +102,8 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
                 if(summary_requested) {
                     struct alert_v2_entry t = {
                         .tmp = rcl,
+                        .tmp_status = alert.state.status,
+                        .tmp_value = alert.state.value,
                     };
                     struct alert_v2_entry *a2e =
                         dictionary_set(ctl->alerts.summary, string2str(rcl->config.name),
@@ -103,28 +115,28 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
                                             (ssize_t)string_strlen(rcl->config.type),
                                             NULL,
                                             sizeof(struct alert_by_x_entry),
-                                            rcl);
+                                            &alert);
 
                     dictionary_set_advanced(ctl->alerts.by_component,
                                             string2str(rcl->config.component),
                                             (ssize_t)string_strlen(rcl->config.component),
                                             NULL,
                                             sizeof(struct alert_by_x_entry),
-                                            rcl);
+                                            &alert);
 
                     dictionary_set_advanced(ctl->alerts.by_classification,
                                             string2str(rcl->config.classification),
                                             (ssize_t)string_strlen(rcl->config.classification),
                                             NULL,
                                             sizeof(struct alert_by_x_entry),
-                                            rcl);
+                                            &alert);
 
                     dictionary_set_advanced(ctl->alerts.by_recipient,
                                             string2str(rcl->config.recipient),
                                             (ssize_t)string_strlen(rcl->config.recipient),
                                             NULL,
                                             sizeof(struct alert_by_x_entry),
-                                            rcl);
+                                            &alert);
 
                     char module[128];
                     rrdlabels_get_value_strcpyz(st->rrdlabels, module, sizeof(module), "_collect_module");
@@ -136,7 +148,7 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
                                             -1,
                                             NULL,
                                             sizeof(struct alert_by_x_entry),
-                                            rcl);
+                                            &alert);
                 }
 
                 matches++;
@@ -148,7 +160,15 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
                     struct sql_alert_instance_v2_entry z = {
                         .ati = ati,
                         .tmp = rcl,
+                        .status = alert.state.status,
+                        .flags = alert.state.run_flags,
+                        .value = alert.state.value,
+                        .last_updated = alert.state.last_updated,
+                        .last_status_change = alert.state.last_status_change,
+                        .last_status_change_value = alert.state.last_status_change_value,
+                        .global_id = alert.state.global_id,
                     };
+                    uuid_copy(z.last_transition_id, alert.state.last_transition_id);
                     dictionary_set(ctl->alerts.alert_instances, key, &z, sizeof(z));
                 }
             }
@@ -160,8 +180,8 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
     return matches != 0;
 }
 
-static void alert_counts_add(struct alert_counts *t, RRDCALC *rc) {
-    switch(rc->status) {
+static void alert_counts_add(struct alert_counts *t, RRDCALC_STATUS status, NETDATA_DOUBLE value) {
+    switch(status) {
         case RRDCALC_STATUS_CRITICAL:
             t->critical++;
             break;
@@ -180,17 +200,18 @@ static void alert_counts_add(struct alert_counts *t, RRDCALC *rc) {
 
         case RRDCALC_STATUS_UNDEFINED:
         default:
-            if(!netdata_double_isnumber(rc->value))
+            if(!netdata_double_isnumber(value))
                 t->error++;
 
             break;
     }
 }
 
-static void alerts_v2_add(struct alert_v2_entry *t, RRDCALC *rc) {
+static void alerts_v2_add(
+    struct alert_v2_entry *t, RRDCALC *rc, RRDCALC_STATUS status, NETDATA_DOUBLE value) {
     t->instances++;
 
-    alert_counts_add(&t->counts, rc);
+    alert_counts_add(&t->counts, status, value);
 
     dictionary_set(t->nodes, rc->rrdset->rrdhost->machine_guid, NULL, 0);
 
@@ -210,13 +231,14 @@ static void alerts_by_x_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
         silent_string = string_strdupz("silent");
 
     struct alert_by_x_entry *b = value;
-    RRDCALC *rc = data;
-    if(!rc) {
+    struct alert_runtime_snapshot *alert = data;
+    if(!alert) {
         // prototype
         b->prototypes.available++;
     }
     else {
-        alert_counts_add(&b->running.counts, rc);
+        RRDCALC *rc = alert->rc;
+        alert_counts_add(&b->running.counts, alert->state.status, alert->state.value);
 
         b->running.total++;
 
@@ -235,7 +257,7 @@ static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     struct alert_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
     t->name = rc->config.name;
-    t->summary = rc->config.summary; // the original summary
+    t->summary = string_dup(rc->config.summary); // the original summary
     t->context = rrdlabels_create();
     t->recipient = rrdlabels_create();
     t->classification = rrdlabels_create();
@@ -256,7 +278,7 @@ static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     t->nodes = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_VALUE_LINK_DONT_CLONE|DICT_OPTION_NAME_LINK_DONT_CLONE);
     t->configs = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_VALUE_LINK_DONT_CLONE);
 
-    alerts_v2_add(t, rc);
+    alerts_v2_add(t, rc, t->tmp_status, t->tmp_value);
 }
 
 static bool alerts_v2_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *data __maybe_unused) {
@@ -272,13 +294,14 @@ static bool alerts_v2_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         rrdlabels_add(t->component, string2str(rc->config.component), "yes", RRDLABEL_SRC_AUTO);
     if (string_strlen(rc->config.type))
         rrdlabels_add(t->type, string2str(rc->config.type), "yes", RRDLABEL_SRC_AUTO);
-    alerts_v2_add(t, rc);
+    alerts_v2_add(t, rc, n->tmp_status, n->tmp_value);
     return true;
 }
 
 static void alerts_v2_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct alert_v2_entry *t = value;
 
+    string_freez(t->summary);
     rrdlabels_destroy(t->context);
     rrdlabels_destroy(t->recipient);
     rrdlabels_destroy(t->classification);
@@ -688,20 +711,13 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->component = rc->config.component;
     t->name = rc->config.name;
     t->source = rc->config.source;
-    t->status = rc->status;
-    t->flags = rc->run_flags;
     t->info = rc->config.info;
-    t->summary = rc->summary;
-    t->value = rc->value;
-    t->last_updated = rc->last_updated;
-    t->last_status_change = rc->last_status_change;
-    t->last_status_change_value = rc->last_status_change_value;
+    rrdcalc_runtime_strings_acquire(rc, &t->summary, NULL);
     t->host = rc->rrdset->rrdhost;
     t->alarm_id = rc->id;
     t->ni = ctl->nodes.ni;
 
     uuid_copy(t->config_hash_id, rc->config.hash_id);
-    health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(rc, &t->global_id, &t->last_transition_id);
 }
 
 static bool alert_instances_v2_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value __maybe_unused, void *data __maybe_unused) {
@@ -709,8 +725,9 @@ static bool alert_instances_v2_conflict_callback(const DICTIONARY_ITEM *item __m
     return true;
 }
 
-static void alert_instances_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *data __maybe_unused) {
-    ;
+static void alert_instances_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct sql_alert_instance_v2_entry *t = value;
+    string_freez(t->summary);
 }
 
 static void rrdcontext_v2_set_transition_filter(const char *machine_guid, const char *context, time_t alarm_id, void *data) {

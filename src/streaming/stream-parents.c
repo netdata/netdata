@@ -60,7 +60,8 @@ static const char *stream_parent_effective_service(const char *definition, int d
 
 struct blocked_parent {
     STRING *destination;
-    usec_t until;
+    usec_t since_ut;
+    usec_t duration_ut;
 };
 
 DEFINE_JUDYL_TYPED(BLOCKED_PARENTS, struct blocked_parent *);
@@ -76,7 +77,8 @@ static void block_parent_for_all_nodes(STREAM_PARENT *d, time_t duration_s) {
         p->destination = string_dup(d->destination);
         BLOCKED_PARENTS_SET(&blocked_parents_set, (Word_t)p->destination, p);
     }
-    p->until = now_monotonic_usec() + duration_s * USEC_PER_SEC;
+    p->since_ut = now_monotonic_usec();
+    p->duration_ut = (usec_t)duration_s * USEC_PER_SEC;
 
     rw_spinlock_write_unlock(&blocked_parents_spinlock);
 }
@@ -85,7 +87,7 @@ static bool is_a_blocked_parent(STREAM_PARENT *d) {
     rw_spinlock_read_lock(&blocked_parents_spinlock);
 
     struct blocked_parent *p = BLOCKED_PARENTS_GET(&blocked_parents_set, (Word_t)d->destination);
-    bool ret = p && p->until > now_monotonic_usec();
+    bool ret = p && clocks_usec_delta_or_zero(now_monotonic_usec(), p->since_ut) < p->duration_ut;
 
     rw_spinlock_read_unlock(&blocked_parents_spinlock);
     return ret;

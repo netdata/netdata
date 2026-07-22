@@ -42,6 +42,32 @@ The rest of this document is mostly about `CollectorStore` (the cycle model and
 the descriptor lifecycle). `RuntimeStore` differences are called out where they
 matter.
 
+## Source Map
+
+`metrix` intentionally keeps its public API and implementation in one Go package.
+The public import path is `github.com/netdata/netdata/go/plugins/pkg/metrix`;
+`metrix/selector` is the only subpackage and imports the root package. The root
+package must not import `selector`, or it would create a cycle.
+
+This single-package shape preserves root-defined public type identity and avoids
+facade/wrapper overhead on write, commit, read, and Vec hot paths. Use file
+ownership, tests, and docs to keep the package navigable; introduce a new
+subpackage only when a future concern has a proven one-way dependency boundary.
+
+Current ownership map:
+
+| Concern | Files |
+| --- | --- |
+| Public API contracts | `interfaces.go`, `types.go`, `options.go`, `read_options.go`, `errors.go`, `host_scope.go` |
+| Shared store model and series helpers | `store_model.go`, `descriptor_model.go`, `series_helpers.go`, `identity.go`, `retention.go` |
+| Collector store facade, cycle commit, descriptor lifecycle | `collector_store.go`, `collector_cycle.go`, `collector_retention.go`, `descriptor_resolution.go`, `descriptor_registry.go`, `descriptor_schema.go` |
+| Runtime store, immediate writes, overlay snapshots | `runtime_store.go`, `runtime_model.go`, `runtime_write.go`, `runtime_commit.go` |
+| Write API, meters, Vec, instruments | `backend.go`, `meter.go`, `vec.go`, `vec_cache.go`, `vec_factory.go`, `vec_handles.go`, `gauge.go`, `counter.go`, `histogram.go`, `summary.go`, `summary_sketch.go`, `stateset.go`, `measureset.go`, `measureset_normalize.go`, `measureset_store.go`, `seeded.go` |
+| Labels, label sets, metadata, validation | `labels.go`, `labelset.go`, `meta.go`, `value_validation.go` |
+| Snapshot reads and flattening | `reader.go`, `reader_flatten.go` |
+| Public-contract tests | `public_contract_test.go` (`package metrix_test`); white-box implementation tests remain in `package metrix` |
+| Selector expressions | `selector/` |
+
 ## The Big Picture
 
 A few words carry the whole model. This table is the vocabulary the rest of the

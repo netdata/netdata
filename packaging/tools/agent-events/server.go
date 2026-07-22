@@ -63,6 +63,9 @@ var (
 	// Track active connections for graceful shutdown
 	activeConnections int32
 
+	// Optional OTLP log export of accepted events (nil when disabled)
+	otlpLogs *otlpEmitter
+
 	// OpenTelemetry meter provider and metrics
 	meterProvider *sdkmetric.MeterProvider
 	meter         metric.Meter
@@ -381,6 +384,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if shouldProcess {
 		// Write to stdout for normal processing
 		fmt.Println(string(outputBytes))
+		if otlpLogs != nil {
+			otlpLogs.emit(ctx, fullData, outputBytes)
+		}
 		requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success")))
 	} else if dedupLogger != nil {
 		// Write to dedup log file if it's a duplicate and logging is enabled
@@ -433,6 +439,14 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		"log_enabled": dedupLogEnabled,
 		"log_file":    dedupLogPath,
 	}
+	otlpEndpoint := ""
+	if otlpLogs != nil {
+		otlpEndpoint = otlpLogs.endpoint
+	}
+	status["otlp"] = map[string]interface{}{
+		"enabled":  otlpLogs != nil,
+		"endpoint": otlpEndpoint,
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(status); err != nil {
@@ -461,6 +475,7 @@ func main() {
 	flag.StringVar(&dedupLogFile, "dedup-logfile", "", "File to log deduplicated requests (empty to disable)")
 	flag.Var(&keyPaths, "dedup-key", "JSON path (dot-notation) for deduplication key (can be used multiple times)")
 	flag.StringVar(&dedupSeparator, "dedup-separator", "-", "Separator used between multi-key values")
+	otlpEndpoint := flag.String("otlp-endpoint", "", "OTLP/gRPC endpoint (host:port) to also export accepted events as OTel log records (empty to disable)")
 	flag.Parse()
 
 	// Configure final logger based on flags
@@ -504,6 +519,17 @@ func main() {
 	if _, err := initMetrics(); err != nil { // Handle potential error from initMetrics
 		slog.Error("failed to initialize metrics", "error", err)
 		os.Exit(1)
+	}
+
+	// Initialize optional OTLP log export of accepted events
+	if *otlpEndpoint != "" {
+		var err error
+		otlpLogs, err = newOTLPEmitter(context.Background(), *otlpEndpoint)
+		if err != nil {
+			slog.Error("failed to initialize OTLP log export", "endpoint", *otlpEndpoint, "error", err)
+			os.Exit(1)
+		}
+		slog.Info("OTLP log export enabled", "endpoint", *otlpEndpoint)
 	}
 
 	// Start background tasks
@@ -578,6 +604,15 @@ func main() {
 			slog.Error("server shutdown failed", "error", err)
 		} else {
 			slog.Info("server shutdown completed gracefully")
+		}
+
+		// Flush OTLP log export after the server drains, so records emitted by
+		// in-flight requests are not lost
+		if otlpLogs != nil {
+			slog.Info("shutting down OTLP log export")
+			if err := otlpLogs.shutdown(shutdownCtx); err != nil {
+				slog.Error("OTLP log export shutdown failed", "error", err)
+			}
 		}
 
 		// Close deduplication log file if open

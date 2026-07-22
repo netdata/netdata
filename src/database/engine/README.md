@@ -117,6 +117,8 @@ data from lower tiers, so that the aggregation they provide will be accurate.
 Configuring how the number of tiers and the disk space allocated to each tier is how you can
 [change how long netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
+For how `update every` controls each tier's granularity and interacts with retention time and disk size, see [Update Every and Tier Granularity](/src/database/CONFIGURATION.md#update-every-and-tier-granularity).
+
 ### Data loss
 
 Until **hot pages** and **dirty pages** are **flushed** to disk, they are at risk (e.g., due to a crash, or

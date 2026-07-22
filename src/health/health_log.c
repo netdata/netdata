@@ -207,8 +207,9 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     STRING *recipient = rc->config.recipient;
     STRING *source = rc->config.source;
     STRING *units = rc->config.units;
-    STRING *summary = rc->summary;
-    STRING *info = rc->info;
+    STRING *summary = NULL;
+    STRING *info = NULL;
+    rrdcalc_runtime_strings_acquire(rc, &summary, &info);
 
     if (duration < 0)
         duration = 0;
@@ -242,13 +243,13 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->old_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae_units(ae), -1));
     ae->new_value_string = string_strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae_units(ae), -1));
 
-    ae->summary = string_dup(summary);
-    ae->info = string_dup(info);
+    ae->summary = summary;
+    ae->info = info;
     ae->old_status = old_status;
     ae->new_status = new_status;
     ae->duration = duration;
     ae->delay = delay;
-    ae->delay_up_to_timestamp = when + delay;
+    ae->delay_up_to_timestamp = nd_time_t_add_saturating(when, delay);
     ae->flags |= flags;
 
     ae->last_repeat = 0;
@@ -283,7 +284,8 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
 
                 if((t->new_status == RRDCALC_STATUS_WARNING || t->new_status == RRDCALC_STATUS_CRITICAL) &&
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
-                    ae->non_clear_duration += t->non_clear_duration;
+                    ae->non_clear_duration =
+                        nd_time_t_add_saturating(ae->non_clear_duration, t->non_clear_duration);
 
                 update_ae = t;
             }
@@ -366,7 +368,7 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     ALARM_ENTRY *ae = host->health_log.alarms;
     while(ae) {
         // Check if entry is old enough to be deleted
-        if(ae->when < now - retention && 
+        if(nd_time_t_add_compare(now, -(intmax_t)retention, ae->when) > 0 &&
            (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) && // Only remove entries that have been processed/updated
            __atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED) == 0) { // Only remove entries not pending save
             

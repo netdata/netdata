@@ -728,23 +728,18 @@ int do_PerflibStorage(int update_every, usec_t dt __maybe_unused)
     // Each perflibGetPerformanceData() call reuses the same internal buffer, so we must
     // query and consume each block before issuing the next call to avoid pointer aliasing.
     usec_t now_ut = now_monotonic_usec();
-    bool processed_any = false;
 
     if (logical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(logical_id);
-        if (pDataBlock) {
+        if (pDataBlock)
             do_logical_disk(pDataBlock, update_every, now_ut);
-            processed_any = true;
-        }
     }
 
     if (physical_id != PERFLIB_REGISTRY_NAME_NOT_FOUND) {
         PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(physical_id);
-        if (pDataBlock) {
+        if (pDataBlock)
             do_physical_disk(pDataBlock, update_every, now_ut);
-            processed_any = true;
-        }
     }
 
-    return processed_any ? 0 : -1;
+    return 0;
 }

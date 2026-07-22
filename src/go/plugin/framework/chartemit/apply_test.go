@@ -284,7 +284,7 @@ func TestApplyPlanGapsNonFiniteFloatUpdate(t *testing.T) {
 	assert.Contains(t, out, "SET 'value' = \n")
 }
 
-func TestApplyPlanDimensionOnlyCreateEmitsLabelsAndCommit(t *testing.T) {
+func TestApplyPlanDimensionOnlyCreatePreservesExistingLabels(t *testing.T) {
 	var buf bytes.Buffer
 	api := netdataapi.New(&buf)
 
@@ -326,11 +326,9 @@ func TestApplyPlanDimensionOnlyCreateEmitsLabelsAndCommit(t *testing.T) {
 	assert.Equal(t, `HOST ''
 
 CHART 'collector.job.dimension_only_chart' '' 'Dimension-only chart' '1' 'Runtime' 'runtime.dimension_only' 'line' '0' '1' '' 'go.d.plugin' 'runtime'
-CLABEL 'instance' 'localhost' '2'
-CLABEL '_collect_job' 'job01' '1'
-CLABEL_COMMIT
 DIMENSION 'value' 'value' 'absolute' '1' '1' ''
 `, out)
+	assert.NotContains(t, out, "CLABEL")
 }
 
 func TestApplyPlanSanitizesWireValues(t *testing.T) {

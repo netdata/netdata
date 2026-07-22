@@ -33,10 +33,11 @@ static BUFFER *sender_commit_start_with_trace(struct sender_state *s, struct sen
               commit->last_function ? commit->last_function : "(null)",
               func ? func : "(null)");
 
-    if(unlikely(commit->receiver_tid && commit->receiver_tid != gettid_cached()))
+    pid_t receiver_tid = __atomic_load_n(&commit->receiver_tid, __ATOMIC_RELAXED);
+    if(unlikely(receiver_tid && receiver_tid != gettid_cached()))
         fatal("STREAM SND '%s' [to %s]: thread buffer is reserved for tid %d, but it used by thread %d function '%s()'.",
               rrdhost_hostname(s->host), s->remote_ip,
-              commit->receiver_tid, gettid_cached(), func ? func : "(null)");
+              receiver_tid, gettid_cached(), func ? func : "(null)");
 
     if(unlikely(commit->wb &&
                  commit->wb->size > default_size &&
@@ -125,9 +126,11 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
                         // so that the decompressor will have a whole line to work with
 
                         const char *t = &src[COMPRESSION_MAX_MSG_SIZE];
-                        while (--t >= src)
+                        while (t > src) {
+                            t--;
                             if (unlikely(*t == '\n'))
                                 break;
+                        }
 
                         if (t <= src)
                             size_to_compress = COMPRESSION_MAX_MSG_SIZE;
@@ -242,7 +245,7 @@ void sender_thread_commit_with_trace(struct sender_state *s, BUFFER *wb, STREAM_
     }
     else {
         commit = &s->host->stream.snd.commit;
-        is_receiver = commit->receiver_tid == gettid_cached();
+        is_receiver = __atomic_load_n(&commit->receiver_tid, __ATOMIC_RELAXED) == gettid_cached();
     }
 
     if (unlikely(wb != commit->wb))

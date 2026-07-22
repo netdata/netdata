@@ -253,8 +253,21 @@ bool duration_parse(const char *duration, int64_t *result, const char *default_u
             }
         }
 
-        v += (int64_t)round(value * (NETDATA_DOUBLE)du->multiplier);
+        int64_t nanoseconds;
+        if(!parser_round_number_to_int64(value * (NETDATA_DOUBLE)du->multiplier, &nanoseconds) ||
+           (nanoseconds > 0 && v > INT64_MAX - nanoseconds) ||
+           (nanoseconds < 0 && v < INT64_MIN - nanoseconds)) {
+            *result = 0;
+            return false;
+        }
+
+        v += nanoseconds;
         parsed_any_duration = true;
+    }
+
+    if(v == INT64_MIN) {
+        *result = 0;
+        return false;
     }
 
     v *= sign;

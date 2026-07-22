@@ -2153,9 +2153,9 @@ groups:
 
 	matChart := e.state.materialized.charts["service_mode"]
 	require.NotNil(t, matChart)
-	require.Contains(t, matChart.scratchEntries, "ok")
-	require.Contains(t, matChart.scratchEntries, "warn")
-	require.NotNil(t, matChart.scratchEntries["ok"])
+	require.Contains(t, matChart.dimensionScratchEntries(), "ok")
+	require.Contains(t, matChart.dimensionScratchEntries(), "warn")
+	require.NotNil(t, matChart.dimensionScratchEntries()["ok"])
 
 	cc.BeginCycle()
 	mode.Observe(3, okSet)
@@ -2179,8 +2179,8 @@ groups:
 	matChart = e.state.materialized.charts["service_mode"]
 	require.NotNil(t, matChart)
 	assert.NotContains(t, matChart.dimensions, "warn")
-	require.Contains(t, matChart.scratchEntries, "warn")
-	require.Contains(t, matChart.scratchEntries, "ok")
+	require.Contains(t, matChart.dimensionScratchEntries(), "warn")
+	require.Contains(t, matChart.dimensionScratchEntries(), "ok")
 
 	cc.BeginCycle()
 	mode.Observe(4, okSet)
@@ -2195,8 +2195,8 @@ groups:
 
 	matChart = e.state.materialized.charts["service_mode"]
 	require.NotNil(t, matChart)
-	assert.NotContains(t, matChart.scratchEntries, "warn")
-	require.Contains(t, matChart.scratchEntries, "ok")
+	assert.NotContains(t, matChart.dimensionScratchEntries(), "warn")
+	require.Contains(t, matChart.dimensionScratchEntries(), "ok")
 }
 
 func TestBuildPlanSequenceModeScenarios(t *testing.T) {
@@ -2272,9 +2272,9 @@ groups:
 
 				matChart := e.state.materialized.charts["component_load"]
 				require.NotNil(t, matChart)
-				require.Contains(t, matChart.scratchEntries, "ok")
-				require.Contains(t, matChart.scratchEntries, "warn")
-				require.NotNil(t, matChart.scratchEntries["ok"])
+				require.Contains(t, matChart.dimensionScratchEntries(), "ok")
+				require.Contains(t, matChart.dimensionScratchEntries(), "warn")
+				require.NotNil(t, matChart.dimensionScratchEntries()["ok"])
 
 				plan2, err := buildPlan(e, reader)
 				require.NoError(t, err)
@@ -2290,8 +2290,8 @@ groups:
 
 				matChart = e.state.materialized.charts["component_load"]
 				require.NotNil(t, matChart)
-				require.Contains(t, matChart.scratchEntries, "ok")
-				require.Contains(t, matChart.scratchEntries, "warn")
+				require.Contains(t, matChart.dimensionScratchEntries(), "ok")
+				require.Contains(t, matChart.dimensionScratchEntries(), "warn")
 			},
 		},
 	}

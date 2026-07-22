@@ -52,6 +52,7 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
     char *time_group_options = NULL;
     char *tier_str = NULL;
     char *cardinality_limit_str = NULL;
+    char *limit_str = NULL;
     size_t tier = 0;
     size_t cardinality_limit = 0;
     RRDR_TIME_GROUPING time_group = RRDR_GROUPING_AVERAGE;
@@ -116,6 +117,7 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
         else if(!strcmp(name, "time_resampling")) resampling_time_str = value;
         else if(!strcmp(name, "tier")) tier_str = value;
         else if(!strcmp(name, "cardinality_limit")) cardinality_limit_str = value;
+        else if(!strcmp(name, "limit")) limit_str = value;
         else if(!strcmp(name, "callback")) responseHandler = value;
         else if(!strcmp(name, "filename")) outFileName = value;
         else if(!strcmp(name, "tqx")) {
@@ -198,6 +200,16 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
     
     if(cardinality_limit_str && *cardinality_limit_str) {
         cardinality_limit = str2ul(cardinality_limit_str);
+    }
+    else if(limit_str && *limit_str) {
+        // limit=N means "return at most N dimensions"; the engine reserves
+        // one extra slot for the 'remaining N dimensions' aggregate, so the
+        // response carries the top-N plus the folded tail. Agents without
+        // this parameter ignore it, which lets clients use it without
+        // version gating.
+        size_t limit = str2ul(limit_str);
+        if(limit)
+            cardinality_limit = (limit < SIZE_MAX) ? limit + 1 : limit;
     }
 
     time_t    before = (before_str && *before_str)?str2l(before_str):0;

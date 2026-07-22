@@ -176,11 +176,11 @@ typedef struct ebpf_network_viewer_port_list {
     char *value;
     uint32_t hash;
 
-    uint16_t first;
-    uint16_t last;
+    uint16_t first; // network byte order
+    uint16_t last;  // network byte order
 
-    uint16_t cmp_first;
-    uint16_t cmp_last;
+    uint16_t cmp_first; // host byte order
+    uint16_t cmp_last;  // host byte order
 
     uint16_t protocol;
     uint32_t pid;

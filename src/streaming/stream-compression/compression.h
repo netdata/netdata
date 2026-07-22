@@ -97,6 +97,19 @@ static inline void simple_ring_buffer_make_room(SIMPLE_RING_BUFFER *b, size_t si
     }
 }
 
+static inline void simple_ring_buffer_set_capacity(SIMPLE_RING_BUFFER *b, size_t size) {
+    if(unlikely(!b))
+        fatal("STREAM_COMPRESSION: NULL simple ring buffer");
+
+    if(unlikely(b->read_pos > size || b->write_pos > size))
+        fatal("STREAM_COMPRESSION: capacity below live ring buffer positions");
+
+    if(b->size != size) {
+        b->data = (const char *)reallocz((void *)b->data, size);
+        b->size = size;
+    }
+}
+
 static inline void simple_ring_buffer_append_data(SIMPLE_RING_BUFFER *b, const void *data, size_t size) {
     simple_ring_buffer_make_room(b, size);
     memcpy((void *)(b->data + b->write_pos), data, size);

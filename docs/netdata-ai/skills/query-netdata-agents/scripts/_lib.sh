@@ -145,6 +145,8 @@ _agents_log_masked() {
         fi
         arg="$(printf '%s' "${arg}" | sed -E \
             -e 's/(node_id=)[^&]+/\1<NODE_ID>/g' \
+            -e 's/(scope_nodes=)[^&]+/\1<NODE_SCOPE>/g' \
+            -e 's/([?&]nodes=)[^&]+/\1<NODE_SELECTOR>/g' \
             -e 's/(machine_guid=)[^&]+/\1<MACHINE_GUID>/g' \
             -e 's/(claim_id=)[^&]+/\1<CLAIM_ID>/g' \
             -e 's#(/api/v2/nodes/)[0-9a-fA-F-]{36}#\1<NODE_ID>#g' \
@@ -462,6 +464,7 @@ agents_selftest_no_token_leak() {
         "https://app.netdata.cloud/api/v2/bearer_get_token?node_id=${fake_node}&machine_guid=${fake_mg}&claim_id=${fake_claim}" \
         "https://app.netdata.cloud/api/v3/spaces/${fake_node}/rooms/${fake_mg}/nodes" \
         "http://agent.test:19999/host/${fake_node}/api/v3/function?function=flows:netflow" \
+        "http://agent.test:19999/host/${fake_node}/api/v3/data?scope_nodes=${fake_node}&nodes=${fake_node}" \
         https://example.invalid 2>&1 1>/dev/null)"
     if [[ "${out}" == *"${sentinel}"* ]]; then
         echo -e "${AGENTS_RED}[FAIL]${AGENTS_NC} _agents_log_masked leaked NETDATA_CLOUD_TOKEN to stderr" >&2

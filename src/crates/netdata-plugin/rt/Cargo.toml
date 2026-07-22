@@ -9,14 +9,14 @@ workspace = true
 
 [dependencies]
 # Local crates
-netdata-plugin-error = { path = "../error" }
-netdata-plugin-protocol = { path = "../protocol" }
-netdata-plugin-schema = { path = "../schema" }
-netdata-plugin-charts-derive = { path = "../charts-derive" }
+netdata-plugin-error = { workspace = true }
+netdata-plugin-protocol = { workspace = true }
+netdata-plugin-schema = { workspace = true }
+netdata-plugin-charts-derive = { workspace = true }
 
 # Async runtime and tokio utilities
-tokio = { version = "1.0", features = ["full"] }
-tokio-util = { version = "0.7", features = ["codec"] }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
 
 async-trait = { workspace = true }
 futures = { workspace = true }

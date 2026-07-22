@@ -155,7 +155,7 @@ fn journal_registry_event(mut event: Event) -> Option<Event> {
 
 fn is_journal_notify_path(path: &Path) -> bool {
     path.to_str()
-        .is_some_and(journal_registry::repository::File::is_journal_file)
+        .is_some_and(journal_sdk_registry::repository::File::is_journal_file)
 }
 
 fn scan_facet_contributions(
@@ -228,9 +228,9 @@ mod tests {
 
     fn file_info(path: &str) -> FileInfo {
         FileInfo {
-            file: journal_registry::repository::File::from_path(Path::new(path))
+            file: journal_sdk_registry::repository::File::from_path(Path::new(path))
                 .expect("valid journal path"),
-            time_range: journal_registry::TimeRange::Unknown,
+            time_range: journal_sdk_registry::TimeRange::Unknown,
         }
     }
 

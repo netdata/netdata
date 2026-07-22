@@ -140,6 +140,28 @@ interpreters: process1 process2 process3
 
 - For each process specified, all of its subprocesses will be automatically grouped, not just the matched process itself.
 
+### Automatic grouping on macOS
+
+On macOS, `launchd` spawns almost every process directly, and Apple ships hundreds of distinct helper processes (XPC services, app extensions, framework helpers, standalone daemons).
+To keep the number of groups meaningful, processes that do not match any group in `apps_groups.conf` are grouped automatically based on their executable path:
+
+| Executable                                                            | Group                                              |
+|-----------------------------------------------------------------------|----------------------------------------------------|
+| Application bundles (`*.app`, `*.appex`), Apple or third-party        | one group per application (`Finder`, `Xcode`, ...) |
+| Apple framework helpers (binaries inside `*.framework` bundles)       | `system-frameworks`                                |
+| Apple standalone daemons (`/usr/libexec`, `/usr/sbin`, `/bin`, ...)   | `system-daemons`                                   |
+| Driver extensions (`*.dext`)                                          | `driver-extensions`                                |
+| Third-party frameworks                                                | one group per framework                            |
+| Third-party plain binaries                                            | one group per process name                         |
+
+Since `apps_groups.conf` matches take precedence over automatic grouping, aggregated components can be re-exposed individually by naming them in the configuration.
+The stock configuration already re-exposes famous, long-stable macOS components (`windowserver`, `spotlight`, `media-analysis`, `coreaudio`, `fseventsd`, `icloud`, `nsurlsessiond`, `timemachine`, `videotoolbox`) — see the `MacOS system components of interest` section of `apps_groups.conf`.
+To re-expose any other component, add a line, e.g.:
+
+```text
+airdrop-sharing: sharingd
+```
+
 ### Matching processes
 
 `apps.plugin` uses different fields for process matching depending on the operating system:
@@ -320,6 +342,8 @@ The `--pss` option controls PSS sampling behavior:
 - The `processes` function API exposes additional columns (PSS, PssAge, SharedRatio) when PSS is enabled
 
 ### Integration with eBPF
+
+To monitor network bandwidth (upload and download) per application, enable the [`socket` program](/src/collectors/ebpf.plugin/README.md#ebpf-programs-configuration-options) (disabled by default) in `ebpf.d.conf`, then enable the `apps` option in `ebpf.d/network.conf` for the [eBPF Socket](/src/collectors/ebpf.plugin/integrations/ebpf_socket.md) collector. This adds a per-application **Bandwidth** chart alongside the other eBPF apps charts.
 
 If you don't see charts under the **eBPF syscall** or **eBPF net** sections, you should edit your
 [`ebpf.d.conf`](/src/collectors/ebpf.plugin/README.md#configure-the-ebpf-collector) file to ensure the eBPF program is enabled.

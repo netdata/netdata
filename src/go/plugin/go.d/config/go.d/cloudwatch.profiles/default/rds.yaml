@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS RDS
 namespace: AWS/RDS
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: DBInstanceIdentifier
@@ -50,32 +51,34 @@ metrics:
   - id: ebs_io_balance            # RDS storage I/O credits, percent
     metric_name: EBSIOBalance%
     statistics: [average]
+  - id: disk_queue_depth
+    metric_name: DiskQueueDepth
+    statistics: [average]
+  - id: network_receive_throughput
+    metric_name: NetworkReceiveThroughput
+    statistics: [average]
+  - id: network_transmit_throughput
+    metric_name: NetworkTransmitThroughput
+    statistics: [average]
+  - id: swap_usage
+    metric_name: SwapUsage
+    statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below, then restart the go.d process. All are
-  # published at the {DBInstanceIdentifier} grain, so no other change is needed.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {DBInstanceIdentifier} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: disk_queue_depth
-  #   metric_name: DiskQueueDepth
-  #   statistics: [average]
-  # - id: network_receive_throughput
-  #   metric_name: NetworkReceiveThroughput
-  #   statistics: [average]
-  # - id: network_transmit_throughput
-  #   metric_name: NetworkTransmitThroughput
-  #   statistics: [average]
-  # - id: swap_usage
-  #   metric_name: SwapUsage
-  #   statistics: [average]
-  # - id: burst_balance             # gp2 storage burst credits, percent
-  #   metric_name: BurstBalance
-  #   statistics: [average]
-  # - id: cpu_credit_usage          # burstable (db.t*) instances only
-  #   metric_name: CPUCreditUsage
-  #   statistics: [average]
-  # - id: cpu_credit_balance        # burstable (db.t*) instances only
-  #   metric_name: CPUCreditBalance
-  #   statistics: [average]
+  - id: burst_balance             # gp2 storage burst credits, percent
+    disabled: true
+    metric_name: BurstBalance
+    statistics: [average]
+  - id: cpu_credit_usage          # burstable (db.t*) instances only
+    disabled: true
+    metric_name: CPUCreditUsage
+    statistics: [average]
+  - id: cpu_credit_balance        # burstable (db.t*) instances only
+    disabled: true
+    metric_name: CPUCreditBalance
+    statistics: [average]
   # Engine- and storage-specific metrics are also published at {DBInstanceIdentifier} and can be
   # added the same way: BinLogDiskUsage (MySQL/MariaDB); TempDb* and FailedSQLServerAgentJobsCount
   # (SQL Server); *ReplicationSlot*, TransactionLogs* (PostgreSQL); and the *LogVolume /
@@ -88,7 +91,7 @@ template:
     instances:
       by_labels: [account_id, region, db_instance_identifier]
   charts:
-    - id: cw_rds_cpu
+    - id: aws_cloudwatch_rds_cpu
       context: cpu_utilization
       title: RDS CPU Utilization
       family: CPU
@@ -97,7 +100,7 @@ template:
       dimensions:
         - selector: cpu_utilization_average
           name: average
-    - id: cw_rds_connections
+    - id: aws_cloudwatch_rds_connections
       context: database_connections
       title: RDS Database Connections
       family: Connections
@@ -106,7 +109,7 @@ template:
       dimensions:
         - selector: database_connections_average
           name: connections
-    - id: cw_rds_memory
+    - id: aws_cloudwatch_rds_memory
       context: freeable_memory
       title: RDS Freeable Memory
       family: Memory
@@ -115,7 +118,7 @@ template:
       dimensions:
         - selector: freeable_memory_average
           name: freeable
-    - id: cw_rds_storage
+    - id: aws_cloudwatch_rds_storage
       context: free_storage_space
       title: RDS Free Storage Space
       family: Storage
@@ -124,7 +127,7 @@ template:
       dimensions:
         - selector: free_storage_space_average
           name: free
-    - id: cw_rds_throughput
+    - id: aws_cloudwatch_rds_throughput
       context: disk_throughput
       title: RDS Disk Throughput
       family: Throughput
@@ -135,7 +138,7 @@ template:
           name: read
         - selector: write_throughput_average
           name: write
-    - id: cw_rds_iops
+    - id: aws_cloudwatch_rds_iops
       context: disk_iops
       title: RDS Disk IOPS
       family: Throughput
@@ -146,7 +149,7 @@ template:
           name: read
         - selector: write_iops_average
           name: write
-    - id: cw_rds_latency
+    - id: aws_cloudwatch_rds_latency
       context: disk_latency
       title: RDS Disk Latency
       family: Latency
@@ -157,7 +160,7 @@ template:
           name: read
         - selector: write_latency_average
           name: write
-    - id: cw_rds_replica_lag
+    - id: aws_cloudwatch_rds_replica_lag
       context: replica_lag
       title: RDS Replica Lag
       family: Replication
@@ -166,7 +169,7 @@ template:
       dimensions:
         - selector: replica_lag_maximum
           name: lag
-    - id: cw_rds_transaction_ids
+    - id: aws_cloudwatch_rds_transaction_ids
       context: maximum_used_transaction_ids
       title: RDS Maximum Used Transaction IDs
       family: Transactions
@@ -175,7 +178,7 @@ template:
       dimensions:
         - selector: maximum_used_transaction_ids_average
           name: used
-    - id: cw_rds_ebs_balance
+    - id: aws_cloudwatch_rds_ebs_balance
       context: ebs_balance
       title: RDS EBS Credit Balance
       family: Credits
@@ -186,55 +189,55 @@ template:
           name: byte
         - selector: ebs_io_balance_average
           name: io
+    - id: aws_cloudwatch_rds_queue_depth
+      context: disk_queue_depth
+      title: RDS Disk Queue Depth
+      family: Disk
+      units: operations
+      algorithm: absolute
+      dimensions:
+        - selector: disk_queue_depth_average
+          name: queued
+    - id: aws_cloudwatch_rds_network
+      context: network_throughput
+      title: RDS Network Throughput
+      family: Network
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: network_receive_throughput_average
+          name: received
+        - selector: network_transmit_throughput_average
+          name: sent
+    - id: aws_cloudwatch_rds_swap
+      context: swap_usage
+      title: RDS Swap Usage
+      family: Memory
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: swap_usage_average
+          name: swap
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_rds_queue_depth
-    #   context: disk_queue_depth
-    #   title: RDS Disk Queue Depth
-    #   family: Disk
-    #   units: operations
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: disk_queue_depth_average
-    #       name: queued
-    # - id: cw_rds_network
-    #   context: network_throughput
-    #   title: RDS Network Throughput
-    #   family: Network
-    #   units: bytes/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: network_receive_throughput_average
-    #       name: received
-    #     - selector: network_transmit_throughput_average
-    #       name: sent
-    # - id: cw_rds_swap
-    #   context: swap_usage
-    #   title: RDS Swap Usage
-    #   family: Memory
-    #   units: bytes
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: swap_usage_average
-    #       name: swap
-    # - id: cw_rds_burst_balance
-    #   context: burst_balance
-    #   title: RDS Burst Balance
-    #   family: Credits
-    #   units: percentage
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: burst_balance_average
-    #       name: balance
-    # - id: cw_rds_cpu_credits
-    #   context: cpu_credits
-    #   title: RDS CPU Credits
-    #   family: CPU
-    #   units: credits
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: cpu_credit_usage_average
-    #       name: used
-    #     - selector: cpu_credit_balance_average
-    #       name: balance
+    - id: aws_cloudwatch_rds_burst_balance
+      context: burst_balance
+      title: RDS Burst Balance
+      family: Credits
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: burst_balance_average
+          name: balance
+    - id: aws_cloudwatch_rds_cpu_credits
+      context: cpu_credits
+      title: RDS CPU Credits
+      family: CPU
+      units: credits
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_credit_usage_average
+          name: used
+        - selector: cpu_credit_balance_average
+          name: balance

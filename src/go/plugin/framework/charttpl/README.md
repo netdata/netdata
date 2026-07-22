@@ -521,6 +521,10 @@ charts:
 | `lifecycle`       | object        | no       |                        | Instance/dimension cap and expiry (see [lifecycle](#lifecycle)).             |
 | `dimensions`      | array         | **yes**  |                        | At least one dimension required (see [dimensions](#6-dimensions)).           |
 
+Chart and dimension identity labels are immutable routing inputs: changing one creates a new chart or dimension
+ID. Promoted labels are non-identity metadata. When their effective intersection changes, chartengine updates the
+existing chart with a complete replacement label set; it does not recreate the chart or its dimensions.
+
 > [!TIP]
 > When `algorithm` is omitted, the engine infers it from metric name suffixes. You only need to set it explicitly when the suffix doesn't match the intended behavior (e.g., a gauge metric named `*_total`).
 

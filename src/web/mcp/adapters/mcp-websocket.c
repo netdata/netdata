@@ -99,9 +99,9 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     // Parse the JSON-RPC request
     struct json_object *request = NULL;
     enum json_tokener_error jerr = json_tokener_success;
-    request = json_tokener_parse_verbose(message, &jerr);
-    
-    if (!request || jerr != json_tokener_success) {
+    request = mcp_jsonrpc_parse_request(message, length, &jerr);
+
+    if (jerr != json_tokener_success) {
         websocket_error(wsc, "Failed to parse JSON-RPC request: %s", json_tokener_error_desc(jerr));
 
         BUFFER *error_payload = mcp_jsonrpc_build_error_payload(NULL, -32700, "Parse error", NULL, 0);
@@ -111,12 +111,12 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     }
 
     if (json_object_is_type(request, json_type_array)) {
-        int len = (int)json_object_array_length(request);
+        size_t len = json_object_array_length(request);
         BUFFER **responses = NULL;
         size_t responses_used = 0;
         size_t responses_size = 0;
 
-        for (int i = 0; i < len; i++) {
+        for (size_t i = 0; i < len; i++) {
             struct json_object *req_item = json_object_array_get_idx(request, i);
             BUFFER *resp_item = mcp_jsonrpc_process_single_request(mcpc, req_item, NULL);
             if (resp_item) {
@@ -134,7 +134,13 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
             }
         }
 
-        if (responses_used > 0) {
+        if (!len) {
+            BUFFER *response = mcp_jsonrpc_process_single_request(mcpc, NULL, NULL);
+            if (response) {
+                mcp_websocket_send_payload(wsc, response);
+                buffer_free(response);
+            }
+        } else if (responses_used > 0) {
             size_t total_len = 2; // brackets
             for (size_t i = 0; i < responses_used; i++)
                 total_len += buffer_strlen(responses[i]) + (i ? 1 : 0);

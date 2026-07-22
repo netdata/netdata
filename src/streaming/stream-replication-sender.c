@@ -1802,7 +1802,8 @@ void *replication_thread_main(void *ptr) {
 
         // statistics
         usec_t now_mono_ut = now_monotonic_usec();
-        if(unlikely(now_mono_ut - last_now_mono_ut > nd_profile.update_every * USEC_PER_SEC)) {
+        if(unlikely(clocks_usec_delta_or_zero_with_rebase(now_mono_ut, &last_now_mono_ut) >
+                    nd_profile.update_every * USEC_PER_SEC)) {
             last_now_mono_ut = now_mono_ut;
 
             worker_is_busy(WORKER_JOB_STATISTICS);

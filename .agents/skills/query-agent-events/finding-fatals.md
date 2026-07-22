@@ -119,8 +119,21 @@ elsewhere -- usually filter these OUT of crash analysis.
 
 Shutdown didn't complete in time. Look at
 `AE_AGENT_TIMINGS_EXIT` for how long shutdown ran before the
-timeout fired. Long exit timings + worker_job_id may localize
-the stuck thread.
+timeout fired.
+
+The timeout diagnostics are version-sensitive:
+
+- Fixed agents store the completed per-step timing list in
+  `AE_FATAL_STACK_TRACE`, beginning with `shutdown timings:`,
+  and identify the hung step in `AE_FATAL_MESSAGE` as
+  `shutdown timed out at step: <step>`.
+- Older agents can overwrite the timing list during SIGABRT
+  handling with an `info:` stack-trace status message. An empty
+  `AE_FATAL_MESSAGE` plus `info: fatal handler already captured
+  the stack trace` is the known pre-fix signature.
+- `AE_FATAL_FUNCTION` remains `shutdown_timeout` in both cases,
+  so use it as the stable grouping facet and use
+  `AE_FATAL_MESSAGE` for the per-step split on fixed agents.
 
 ## Triage flow
 
@@ -145,9 +158,10 @@ the stuck thread.
   journal field is `AE_FATAL_ERRNO` in both cases (the
   underscore comes from the dot transliteration).
 
-- **`exit timeout` records have NO `AE_FATAL_*` context** --
-  the shutdown timer fired without a panic site. Use
-  `AE_AGENT_TIMINGS_EXIT` and `AE_FATAL_WORKER_JOB_ID` instead.
+- **`exit timeout` context depends on the agent version** --
+  use the behavior signatures above. Do not interpret the
+  pre-fix `info: fatal handler already captured the stack trace`
+  text as evidence that a real fatal stack trace was captured.
 
 - **Disk-related causes propagate** -- a `disk full` event
   may show up as `cannot allocate` in subsequent attempts.

@@ -6,12 +6,15 @@
 #include "../common.h"
 
 typedef struct LOG_FORWARDER LOG_FORWARDER;
+typedef uint64_t LOG_FORWARDER_TOKEN;
+
+#define LOG_FORWARDER_TOKEN_NONE 0
 
 LOG_FORWARDER *log_forwarder_start(void); // done once, at spawn_server_create()
-void log_forwarder_add_fd(LOG_FORWARDER *lf, int fd); // to add a new fd
-void log_forwarder_annotate_fd_name(LOG_FORWARDER *lf, int fd, const char *cmd); // set the syslog identifier
-void log_forwarder_annotate_fd_pid(LOG_FORWARDER *lf, int fd, pid_t pid); // set the pid of the child process
-bool log_forwarder_del_and_close_fd(LOG_FORWARDER *lf, int fd); // to remove an fd
+LOG_FORWARDER_TOKEN log_forwarder_add_fd(LOG_FORWARDER *lf, int fd); // to add a new fd
+void log_forwarder_annotate_token_name(LOG_FORWARDER *lf, LOG_FORWARDER_TOKEN token, const char *cmd); // set the syslog identifier
+void log_forwarder_annotate_token_pid(LOG_FORWARDER *lf, LOG_FORWARDER_TOKEN token, pid_t pid); // set the pid of the child process
+bool log_forwarder_del_and_close_token(LOG_FORWARDER *lf, LOG_FORWARDER_TOKEN token); // to remove an fd
 void log_forwarder_stop(LOG_FORWARDER *lf); // done once, at spawn_server_destroy()
 
 #endif //NETDATA_LOG_FORWARDER_H

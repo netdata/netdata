@@ -5,6 +5,8 @@
 #include "stream-receiver-internals.h"
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
+#include "stream-trace.h"
+
 void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload, STREAM_TRAFFIC_TYPE type __maybe_unused, bool inbound) {
     if (!rpt || type != STREAM_TRAFFIC_TYPE_REPLICATION) return; // not a streaming parser
 
@@ -26,23 +28,8 @@ void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload
         struct timespec now;
         clock_gettime(CLOCK_REALTIME, &now);
 
-        time_t elapsed_sec = now.tv_sec - rpt->log.first_call.tv_sec;
-        long elapsed_nsec = now.tv_nsec - rpt->log.first_call.tv_nsec;
-
-        if (elapsed_nsec < 0) {
-            elapsed_sec--;
-            elapsed_nsec += 1000000000;
-        }
-
-        uint16_t days = elapsed_sec / 86400;
-        uint8_t hours = (elapsed_sec % 86400) / 3600;
-        uint8_t minutes = (elapsed_sec % 3600) / 60;
-        uint8_t seconds = elapsed_sec % 60;
-        uint16_t milliseconds = elapsed_nsec / 1000000;
-
-        char prefix[30];
-        snprintf(prefix, sizeof(prefix), "%03ud.%02u:%02u:%02u.%03u ",
-                 days, hours, minutes, seconds, milliseconds);
+        char prefix[STREAM_TRACE_PREFIX_SIZE];
+        stream_trace_format_elapsed_prefix(prefix, now, rpt->log.first_call);
 
         const char *line_start = payload;
         const char *line_end;
@@ -487,7 +474,7 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
     rpt->thread.line_buffer = buffer_create(sizeof(rpt->thread.uncompressed.read_buffer), NULL);
 
     // help preferred_sender_buffer() select the right buffer
-    rpt->host->stream.snd.commit.receiver_tid = gettid_cached();
+    __atomic_store_n(&rpt->host->stream.snd.commit.receiver_tid, gettid_cached(), __ATOMIC_RELAXED);
 
     rpt->replication.last_progress_ut = now_monotonic_usec();
 
@@ -593,14 +580,17 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
     if(rpt->host && rpt->host->rrdlabels)
         rrdlabels_get_value_strcpyz(rpt->host->rrdlabels, iface, sizeof(iface), "_net_default_iface");
 
-    time_t connected_s = rpt->connected_since_s ? (now_realtime_sec() - rpt->connected_since_s) : 0;
-    long long idle_s = (long long)((now_monotonic_usec() - rpt->thread.last_traffic_ut) / USEC_PER_SEC);
+    time_t connected_s = rpt->connected_since_s ?
+        nd_time_t_elapsed_saturating(now_realtime_sec(), rpt->connected_since_s) : 0;
+    usec_t idle_ut = rpt->thread.last_traffic_ut ?
+        clocks_usec_delta_or_zero(now_monotonic_usec(), rpt->thread.last_traffic_ut) : 0;
+    long long idle_s = (long long)(idle_ut / USEC_PER_SEC);
     double repl_pct = rpt->host ? rpt->host->stream.rcv.status.replication.percent : 0.0;
 
     errno_clear();
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "STREAM RCV[%zu] '%s' [from [%s]:%s]: receiver disconnected: "
-           "reason=\"%s\" msgs=%zu bytes_in=%zu bytes_out=%zu connected=%llds idle=%llds repl=%.0f%% iface=%s"
+           "reason=\"%s\" msgs=%zu bytes_in=%zu bytes_out=%zu connected=%" PRIdMAX "s idle=%llds repl=%.0f%% iface=%s"
            , sth->id
            , rpt->hostname ? rpt->hostname : "-"
            , rpt->remote_ip ? rpt->remote_ip : "-"
@@ -609,7 +599,7 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
            , count
            , rpt->thread.bytes_received
            , bytes_out
-           , (long long)connected_s
+           , (intmax_t)connected_s
            , idle_s
            , repl_pct
            , iface[0] ? iface : "-");
@@ -862,6 +852,11 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
+    if(unlikely(!parser)) {
+        stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
+        return false;
+    }
+
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
         ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
@@ -942,8 +937,15 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
         return false;
     }
 
-    if (unlikely(events & (ND_POLL_ERROR | ND_POLL_HUP | ND_POLL_INVALID))) {
-        // we have errors on this socket
+    // ND_POLL_HUP together with ND_POLL_READ means the peer disconnected,
+    // but data it already delivered is still pending in the socket buffer.
+    // Removing the receiver here would discard that data, so keep reading:
+    // polling is level-triggered, both flags stay set while data remains,
+    // and when the buffer is drained recv() returns 0 and the read path
+    // removes the receiver with the same disconnect reason.
+    if (unlikely((events & (ND_POLL_ERROR | ND_POLL_INVALID)) ||
+                 ((events & ND_POLL_HUP) && !(events & ND_POLL_READ)))) {
+        // we have errors on this socket, or EOF with nothing left to read
 
         worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_SOCKET_ERROR);
 
@@ -1045,7 +1047,11 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             overall_buffer_ratio = stats.buffer_ratio;
 
         time_t timeout_s = 600;
-        if(unlikely(rpt->thread.last_traffic_ut + timeout_s * USEC_PER_SEC < now_ut &&
+        if(unlikely(!rpt->thread.last_traffic_ut) && now_ut)
+            rpt->thread.last_traffic_ut = now_ut;
+        usec_t idle_ut = clocks_usec_delta_or_zero_with_rebase(now_ut, &rpt->thread.last_traffic_ut);
+
+        if(unlikely(idle_ut > (usec_t)timeout_s * USEC_PER_SEC &&
                      !rrdhost_receiver_replicating_charts(rpt->host))) {
 
             ND_LOG_STACK lgs[] = {
@@ -1061,7 +1067,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_TIMEOUT);
 
             char duration[RFC3339_MAX_LENGTH];
-            duration_snprintf(duration, sizeof(duration), (int64_t)(now_monotonic_usec() - rpt->thread.last_traffic_ut), "us", true);
+            duration_snprintf(duration, sizeof(duration), (int64_t)MIN(idle_ut, (usec_t)INT64_MAX), "us", true);
 
             char pending[64] = "0";
             if(stats.bytes_outstanding)
@@ -1093,7 +1099,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
     }
 }
 
-static bool stream_receiver_did_replication_progress(struct receiver_state *rpt) {
+static bool stream_receiver_did_replication_progress(struct receiver_state *rpt, usec_t now_ut) {
     RRDHOST *host = rpt->host;
 
     size_t host_counter_sum =
@@ -1103,7 +1109,7 @@ static bool stream_receiver_did_replication_progress(struct receiver_state *rpt)
     if(rpt->replication.last_counter_sum != host_counter_sum) {
         // there has been some progress
         rpt->replication.last_counter_sum = host_counter_sum;
-        rpt->replication.last_progress_ut = now_monotonic_usec();
+        rpt->replication.last_progress_ut = now_ut;
         return true;
     }
 
@@ -1115,10 +1121,16 @@ static bool stream_receiver_did_replication_progress(struct receiver_state *rpt)
         // we still have requests to execute
         return true;
 
-    return (now_monotonic_usec() - rpt->replication.last_progress_ut < 10ULL * 60 * USEC_PER_SEC);
+    if(unlikely(!rpt->replication.last_progress_ut)) {
+        rpt->replication.last_progress_ut = now_ut;
+        return true;
+    }
+
+    return clocks_usec_delta_or_zero_with_rebase(now_ut, &rpt->replication.last_progress_ut) <
+           10ULL * 60 * USEC_PER_SEC;
 }
 
-void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
+void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
 
     Word_t idx = 0;
@@ -1130,7 +1142,7 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
         RRDHOST *host = rpt->host;
 
 
-        if(stream_receiver_did_replication_progress(rpt)) {
+        if(stream_receiver_did_replication_progress(rpt, now_ut)) {
             rpt->replication.last_checked_ut = 0;
             continue;
         }
@@ -1160,7 +1172,7 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
         }
         rrdset_foreach_done(st);
 
-        if(stalled && !stream_receiver_did_replication_progress(rpt)) {
+        if(stalled && !stream_receiver_did_replication_progress(rpt, now_ut)) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests (%zu finished). "
                    "We have requested %u and got replies for %u replication commands. "
@@ -1255,7 +1267,7 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
 
         if (rpt->config.health.enabled != CONFIG_BOOLEAN_NO) {
             if (rpt->config.health.delay > 0) {
-                host->health.delay_up_to = now_realtime_sec() + rpt->config.health.delay;
+                host->health.delay_up_to = nd_time_t_add_saturating(now_realtime_sec(), rpt->config.health.delay);
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "STREAM RCV '%s' [from [%s]:%s]: "
                        "Postponing health checks for %" PRId64 " seconds, because it was just connected.",
@@ -1336,6 +1348,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
             host->health.enabled = false;
 
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
+            __atomic_store_n(&host->stream.snd.commit.receiver_tid, 0, __ATOMIC_RELAXED);
             host->receiver = NULL;
         }
     }

@@ -18,12 +18,13 @@ For the Cloud-side per-room enumeration (`POST
 
 ## Endpoints (agent v3)
 
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/api/v3/info` | Identity (node_id, machine_guid, claim_id), agent version, application info, capabilities. **No auth required**, but only basic info. |
-| `GET` | `/api/v3/contexts` | Metric contexts the agent collects (= what data is available) |
-| `GET` | `/api/v3/nodes` | Multi-host listing if this agent acts as a parent (see [query-streaming.md](./query-streaming.md)) |
-| `GET` | `/api/v3/info?host=<node_id>` | Detail for a specific host (when multi-host) |
+| Method | Path                          | Purpose                                                                                                                               |
+|--------|-------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| `GET`  | `/api/v3/info`                | Identity (node_id, machine_guid, claim_id), agent version, application info, capabilities. **No auth required**, but only basic info. |
+| `GET`  | `/api/v1/info`                | Host labels (`.host_labels`): OS, kernel, architecture, hardware, cloud provider, container/virtualization, streaming role. See "Hardware / OS query patterns" below. |
+| `GET`  | `/api/v3/contexts`            | Metric contexts the agent collects (= what data is available)                                                                         |
+| `GET`  | `/api/v3/nodes`               | Multi-host listing if this agent acts as a parent (see [query-streaming.md](./query-streaming.md))                                    |
+| `GET`  | `/api/v3/info?host=<node_id>` | Detail for a specific host (when multi-host)                                                                                          |
 
 ## Use the wrappers
 
@@ -41,8 +42,11 @@ agents_query_agent \
     GET /api/v3/info \
   | jq '.agents[0] | {nm, nd, mg, cloud, application: .application.package.version}'
 
-# Hardware and OS labels (typically exposed under .labels in /info or
-# in the chart-labels namespace; see the response shape).
+# Hardware and OS labels are NOT under /api/v3/info -- that endpoint's
+# agents[0] object has no `labels` key (verified: v2.10.3 returns only
+# ai, api, application, capabilities, cloud, contexts, db_size,
+# instances, metrics, mg, nd, nm, nodes, now, timings). See "Hardware
+# / OS query patterns" below for the endpoint that actually has them.
 agents_query_agent \
     --node    "$NODE_UUID" \
     --host    "$AGENT_HOST:19999" \
@@ -77,7 +81,6 @@ agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid
         "aclk":     "available|online|...",
         ...
       },
-      "labels": { ... },
       ...
     }
   ],
@@ -85,42 +88,36 @@ agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid
 }
 ```
 
-For the full per-agent label set, the `chart-labels` are usually
-exposed via the metrics path's `summary.nodes[].labels` (see
-[query-metrics.md](./query-metrics.md)).
+`agents[0]` has no `labels` key. For host OS/hardware/cloud facts,
+use `/api/v1/info` instead (see below). `summary.nodes[]` in a
+metrics-query response (see [query-metrics.md](./query-metrics.md))
+also has no `.labels` field -- it carries only `mg`, `nd`, `nm`,
+`ni`, `st`, `is`, `ds`, `al`, `sts`. A metrics response's
+`summary.labels[]` (flat, not per-node) carries **chart labels**
+(e.g. a disk's `device_type`/`model`/`serial`) -- useful for
+per-instance/per-dimension metadata, but not host OS/hardware facts.
 
 ## Hardware / OS query patterns
 
-Hardware and OS facts live primarily in the agent's host-labels.
-On a fully-running agent the labels are present in `/api/v3/info`
-and copied verbatim into the Cloud `/nodes` `.labels` field (the
-fast path for cross-fleet queries).
-
-| Field | Where it lives |
-|---|---|
-| Architecture, kernel, OS name/version | `agents[0].application` (build-time) AND `summary.nodes[].labels._architecture`, `_kernel_version`, `_os_name`, `_os_version` |
-| CPU count, RAM, disk space | `summary.nodes[].labels._system_cores`, `_system_ram_total`, `_system_disk_space` (chart-labels) |
-| Cloud provider / region / instance type | `summary.nodes[].labels._cloud_provider_type`, `_cloud_instance_region`, `_cloud_instance_type` |
-| Container/virtualization | `summary.nodes[].labels._container`, `_container_detection`, `_is_k8s_node`, `_is_parent`, `_is_ephemeral` |
-
-To fetch chart-labels as a structured object, run a metrics query
-and read `summary.nodes[].labels`:
+Hardware, OS, and cloud-provider facts live in the agent's
+**host labels**, exposed at `GET /api/v1/info` under `.host_labels`
+(verified live on v2.10.3; not exposed anywhere under `/api/v3/info`
+or a v3 metrics response):
 
 ```bash
-read -r -d '' BODY <<'JSON'
-{
-  "scope":     {"contexts": ["system.cpu"]},
-  "selectors": {"nodes": ["*"]},
-  "window":    {"after": -60, "before": 0, "points": 1},
-  "aggregations": {"metrics": [{"group_by": ["selected"]}], "time": {"time_group": "average"}},
-  "format":  "json2",
-  "options": ["jsonwrap", "minify", "unaligned"]
-}
-JSON
 agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
-    POST /api/v3/data "$BODY" \
-  | jq '.summary.nodes[0].labels'
+    GET /api/v1/info \
+  | jq '.host_labels'
 ```
+
+| Field                                   | `.host_labels` key(s)                                                             |
+|-----------------------------------------|-------------------------------------------------------------------------------------|
+| Architecture, kernel, OS name/version   | `_architecture`, `_kernel_version`, `_os_name`, `_os_version`, `_os`                |
+| CPU count, RAM, disk space               | `_system_cores`, `_system_cpu_model`, `_system_ram_total`, `_system_disk_space`     |
+| Hardware vendor/product                 | `_hw_sys_vendor`, `_hw_product_name`, `_hw_product_type`                           |
+| Cloud provider / region / instance type | `_cloud_provider_type`, `_cloud_instance_region`, `_cloud_instance_type`            |
+| Container/virtualization                | `_container`, `_container_detection`, `_virtualization`, `_virt_detection`, `_is_k8s_node` |
+| Streaming role / ephemerality            | `_is_parent`, `_is_ephemeral`                                                       |
 
 ## Collection-job state (failed / disabled jobs)
 
@@ -152,17 +149,17 @@ agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid
 
 ## Limits and gotchas
 
-- **`/api/v3/info` is unauthenticated**, but most other paths
-  require the bearer. The wrapper always uses the bearer; that's
-  fine for `/info` too.
-- **`labels` location varies by version.** On older agents some
-  labels appear only in `summary.nodes[].labels` of metrics
-  responses; on newer agents they're also under
-  `agents[0].labels`. Check both.
-- **Streaming roles** (parent / child) are at
-  `summary.nodes[].labels._is_parent` (true/false), and the
-  full streaming surface lives in
-  [query-streaming.md](./query-streaming.md).
+- **`/api/v1/info` and `/api/v3/info` are unauthenticated**, but
+  most other paths require the bearer. The wrapper always uses the
+  bearer; that's fine for `/info` too.
+- **Host OS/hardware/cloud facts live only in `/api/v1/info`'s
+  `.host_labels`.** Neither `/api/v3/info`'s `agents[0]` nor a v3
+  metrics response's `summary.nodes[]` carries a `labels` field
+  (verified live on v2.10.3) -- don't assume the v3 endpoints expose
+  this data under a differently-shaped field.
+- **Streaming role** (parent / child) is `.host_labels._is_parent`
+  (true/false) from `/api/v1/info`. The full streaming surface
+  lives in [query-streaming.md](./query-streaming.md).
 
 ## See also
 
@@ -172,5 +169,7 @@ agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid
   vnodes, config).
 - [query-streaming.md](./query-streaming.md) -- parent/child
   streaming relationships and replication state.
-- [query-metrics.md](./query-metrics.md) -- chart-labels via
-  `summary.nodes[].labels` of metric queries.
+- [query-metrics.md](./query-metrics.md) -- chart-labels (per
+  instance/dimension, e.g. disk `device_type`/`model`/`serial`) via
+  `summary.labels[]` of metric queries -- distinct from host
+  OS/hardware facts, which are `/api/v1/info`'s `.host_labels`.

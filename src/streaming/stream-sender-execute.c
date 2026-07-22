@@ -144,22 +144,28 @@ static void cleanup_deferred_data(struct sender_state *s) {
 
 static bool stream_sender_defer_is_end_keyword_prefix(struct sender_state *s, const char *line, size_t line_len) {
     const char *end_keyword = s->thread.defer.end_keyword;
-    if(unlikely(!end_keyword))
+    if(!end_keyword)
         return false;
 
-    size_t keyword_len = strlen(end_keyword);
+    for(size_t i = 0; i < line_len; i++) {
+        if(!end_keyword[i] || line[i] != end_keyword[i])
+            return false;
+    }
 
-    return line_len <= keyword_len && memcmp(line, end_keyword, line_len) == 0;
+    return true;
 }
 
 static bool stream_sender_defer_is_end_keyword(struct sender_state *s, const char *line, size_t line_len) {
     const char *end_keyword = s->thread.defer.end_keyword;
-    if(unlikely(!end_keyword))
+    if(!end_keyword)
         return false;
 
-    size_t keyword_len = strlen(end_keyword);
+    for(size_t i = 0; i < line_len; i++) {
+        if(!end_keyword[i] || line[i] != end_keyword[i])
+            return false;
+    }
 
-    return line_len == keyword_len && memcmp(line, end_keyword, line_len) == 0;
+    return end_keyword[line_len] == '\0';
 }
 
 static bool stream_sender_defer_payload_append(struct sender_state *s, const char *line, size_t line_len, bool add_newline) {

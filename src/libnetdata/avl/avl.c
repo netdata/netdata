@@ -58,7 +58,13 @@ avl_t *avl_insert(avl_tree_type *tree, avl_t *item) {
 
     // assert(tree != NULL && item != NULL);
 
-    z = (avl_t *) &tree->root;
+    /* Real sentinel node; avoids treating tree->root storage as avl_t. */
+    avl_t root_parent = {
+        .avl_link = { tree->root, NULL },
+        .avl_balance = 0,
+    };
+
+    z = &root_parent;
     y = tree->root;
     dir = 0;
     for (q = z, p = y; p != NULL; q = p, p = p->avl_link[dir]) {
@@ -77,7 +83,10 @@ avl_t *avl_insert(avl_tree_type *tree, avl_t *item) {
     // tree->avl_count++;
     n->avl_link[0] = n->avl_link[1] = NULL;
     n->avl_balance = 0;
-    if (y == NULL) return n;
+    if (y == NULL) {
+        tree->root = root_parent.avl_link[0];
+        return n;
+    }
 
     for (p = y, k = 0; p != n; p = p->avl_link[da[k]], k++)
         if (da[k] == 0)
@@ -133,11 +142,15 @@ avl_t *avl_insert(avl_tree_type *tree, avl_t *item) {
             w->avl_balance = 0;
         }
     }
-    else return n;
+    else {
+        tree->root = root_parent.avl_link[0];
+        return n;
+    }
 
     z->avl_link[y != z->avl_link[0]] = w;
 
     // tree->avl_generation++;
+    tree->root = root_parent.avl_link[0];
     return n;
 }
 
@@ -154,8 +167,14 @@ avl_t *avl_remove(avl_tree_type *tree, avl_t *item) {
 
     // assert (tree != NULL && item != NULL);
 
+    /* Real sentinel node; avoids treating tree->root storage as avl_t. */
+    avl_t root_parent = {
+        .avl_link = { tree->root, NULL },
+        .avl_balance = 0,
+    };
+
     k = 0;
-    p = (avl_t *) &tree->root;
+    p = &root_parent;
     for(cmp = -1; cmp != 0; cmp = tree->compar(item, p)) {
         unsigned char dir = (unsigned char)(cmp > 0);
 
@@ -286,6 +305,7 @@ avl_t *avl_remove(avl_tree_type *tree, avl_t *item) {
 
     // tree->avl_count--;
     // tree->avl_generation++;
+    tree->root = root_parent.avl_link[0];
     return item;
 }
 

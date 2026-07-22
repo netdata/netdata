@@ -38,6 +38,8 @@ type routeCandidate struct {
 
 type matchIndex struct {
 	chartsByID       map[string]program.Chart
+	labelPolicies    map[string]*chartLabelPolicy
+	autogenLabels    *chartLabelPolicy
 	byMetricName     map[string][]routeCandidate
 	wildcardMatchers []routeCandidate
 }
@@ -45,12 +47,15 @@ type matchIndex struct {
 func buildMatchIndex(charts []program.Chart) matchIndex {
 	index := matchIndex{
 		chartsByID:       make(map[string]program.Chart, len(charts)),
+		labelPolicies:    make(map[string]*chartLabelPolicy, len(charts)),
+		autogenLabels:    compileAutogenChartLabelPolicy(),
 		byMetricName:     make(map[string][]routeCandidate),
 		wildcardMatchers: make([]routeCandidate, 0),
 	}
 
 	for _, chart := range charts {
 		index.chartsByID[chart.TemplateID] = chart
+		index.labelPolicies[chart.TemplateID] = compileChartLabelPolicy(chart)
 		for i, dim := range chart.Dimensions {
 			candidate := routeCandidate{
 				chartTemplateID: chart.TemplateID,

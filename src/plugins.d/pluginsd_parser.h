@@ -60,6 +60,7 @@ typedef struct parser_user_object {
     size_t clabel_count;
     size_t data_collections_count;
     int enabled;
+    bool retry;
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     void *rpt;

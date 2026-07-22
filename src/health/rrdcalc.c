@@ -32,6 +32,63 @@ void rrdcalc_flags_to_json_array(BUFFER *wb, const char *key, RRDCALC_FLAGS flag
     buffer_json_array_close(wb);
 }
 
+void rrdcalc_runtime_snapshot_publish(RRDCALC *rc, usec_t global_id, const nd_uuid_t *transition_id) {
+    rw_spinlock_write_lock(&rc->runtime_snapshot.spinlock);
+
+    RRDCALC_RUNTIME_SNAPSHOT *state = &rc->runtime_snapshot.state;
+    state->status = rc->status;
+    state->run_flags = rc->run_flags;
+    state->value = rc->value;
+    state->last_updated = rc->last_updated;
+    state->last_status_change = rc->last_status_change;
+    state->last_status_change_value = rc->last_status_change_value;
+    state->next_update = rc->next_update;
+    state->db_after = rc->db_after;
+    state->db_before = rc->db_before;
+    state->delay_up_to_timestamp = rc->delay_up_to_timestamp;
+    state->last_repeat = rc->last_repeat;
+    state->delay_last = rc->delay_last;
+    state->times_repeat = rc->times_repeat;
+
+    if(transition_id) {
+        state->global_id = global_id;
+        uuid_copy(state->last_transition_id, *transition_id);
+    }
+
+    rw_spinlock_write_unlock(&rc->runtime_snapshot.spinlock);
+}
+
+void rrdcalc_runtime_snapshot_publish_run_flags(RRDCALC *rc) {
+    rw_spinlock_write_lock(&rc->runtime_snapshot.spinlock);
+    rc->runtime_snapshot.state.run_flags = rc->run_flags;
+    rw_spinlock_write_unlock(&rc->runtime_snapshot.spinlock);
+}
+
+void rrdcalc_runtime_snapshot_publish_repeat_state(RRDCALC *rc) {
+    rw_spinlock_write_lock(&rc->runtime_snapshot.spinlock);
+    rc->runtime_snapshot.state.run_flags = rc->run_flags;
+    rc->runtime_snapshot.state.last_repeat = rc->last_repeat;
+    rc->runtime_snapshot.state.times_repeat = rc->times_repeat;
+    rw_spinlock_write_unlock(&rc->runtime_snapshot.spinlock);
+}
+
+void rrdcalc_runtime_snapshot_get(RRDCALC *rc, RRDCALC_RUNTIME_SNAPSHOT *snapshot) {
+    rw_spinlock_read_lock(&rc->runtime_snapshot.spinlock);
+    *snapshot = rc->runtime_snapshot.state;
+    rw_spinlock_read_unlock(&rc->runtime_snapshot.spinlock);
+}
+
+void rrdcalc_runtime_strings_acquire(RRDCALC *rc, STRING **summary, STRING **info) {
+    rw_spinlock_read_lock(&rc->runtime_snapshot.spinlock);
+
+    if(summary)
+        *summary = string_dup(rc->summary);
+    if(info)
+        *info = string_dup(rc->info);
+
+    rw_spinlock_read_unlock(&rc->runtime_snapshot.spinlock);
+}
+
 inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     switch(status) {
         case RRDCALC_STATUS_REMOVED:
@@ -114,6 +171,15 @@ uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint3
 // ----------------------------------------------------------------------------
 // RRDCALC replacing info/summary text variables with RRDSET labels
 
+static void rrdcalc_runtime_string_replace(RRDCALC *rc, STRING **field, STRING *replacement) {
+    rw_spinlock_write_lock(&rc->runtime_snapshot.spinlock);
+    STRING *old = *field;
+    *field = replacement;
+    rw_spinlock_write_unlock(&rc->runtime_snapshot.spinlock);
+
+    string_freez(old);
+}
+
 static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RRDCALC *rc) {
     if (!line || !*line)
         return NULL;
@@ -136,10 +202,13 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
         }
 
         var[i] = '\0';
-        pos = m - temp + 1;
+        size_t match_pos = m - temp;
+        pos = match_pos + 1;
 
         if (!strcmp(var, RRDCALC_VAR_FAMILY)) {
-            char *buf = find_and_replace(temp, var, (rc->rrdset && rc->rrdset->family) ? rrdset_family(rc->rrdset) : "", m);
+            const char *family = (rc->rrdset && rc->rrdset->family) ? rrdset_family(rc->rrdset) : "";
+            char *buf = find_and_replace(temp, var, family, m);
+            pos = match_pos + strlen(family);
             freez(temp);
             temp = buf;
         }
@@ -154,6 +223,7 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
                 rrdlabels_get_value_strdup_or_null(rc->rrdset->rrdlabels, &lbl_value, label_val);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
+                    pos = match_pos + strlen(lbl_value);
                     freez(temp);
                     temp = buf;
                     freez(lbl_value);
@@ -172,25 +242,21 @@ void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc) {
     if(rc->rrdset && rc->rrdset->rrdlabels) {
         uint32_t labels_version = rrdlabels_version(rc->rrdset->rrdlabels);
         if (rc->labels_version != labels_version) {
-            STRING *old;
+            STRING *info = rrdcalc_replace_variables_with_rrdset_labels(string2str(rc->config.info), rc);
+            rrdcalc_runtime_string_replace(rc, &rc->info, info);
 
-            old = rc->info;
-            rc->info = rrdcalc_replace_variables_with_rrdset_labels(string2str(rc->config.info), rc);
-            string_freez(old);
-
-            old = rc->summary;
-            rc->summary = rrdcalc_replace_variables_with_rrdset_labels(string2str(rc->config.summary), rc);
-            string_freez(old);
+            STRING *summary = rrdcalc_replace_variables_with_rrdset_labels(string2str(rc->config.summary), rc);
+            rrdcalc_runtime_string_replace(rc, &rc->summary, summary);
 
             rc->labels_version = labels_version;
         }
     }
 
     if(!rc->summary)
-        rc->summary = string_dup(rc->config.summary);
+        rrdcalc_runtime_string_replace(rc, &rc->summary, string_dup(rc->config.summary));
 
     if(!rc->info)
-        rc->info = string_dup(rc->config.info);
+        rrdcalc_runtime_string_replace(rc, &rc->info, string_dup(rc->config.info));
 }
 
 // ----------------------------------------------------------------------------
@@ -256,7 +322,7 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
         host,
         rc,
         now,
-        now - rc->last_status_change,
+        nd_time_t_elapsed_saturating(now, rc->last_status_change),
         rc->old_value,
         rc->value,
         RRDCALC_STATUS_REMOVED,
@@ -266,6 +332,7 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
 
     health_alarm_log_add_entry(host, ae, true);
     health_log_alert(host, ae);
+    rrdcalc_runtime_snapshot_publish(rc, ae->global_id, &ae->transition_id);
     rrdset_flag_set(st, RRDSET_FLAG_HAS_RRDCALC_LINKED);
 }
 
@@ -282,7 +349,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
                 host,
                 rc,
                 now,
-                now - rc->last_status_change,
+                nd_time_t_elapsed_saturating(now, rc->last_status_change),
                 rc->old_value,
                 rc->value,
                 rc->status,
@@ -340,6 +407,7 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     rc->times_repeat = 0;
     rc->last_status_change_value = rc->value;
     rc->last_status_change = now_realtime_sec();
+    rw_spinlock_init(&rc->runtime_snapshot.spinlock);
 
     if(!rc->config.units)
         rc->config.units = string_dup(st->units);
@@ -364,6 +432,7 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     expression_set_variable_lookup_callback(rc->config.critical, alert_variable_lookup, rc);
 
     rrdcalc_update_info_using_rrdset_labels(rc);
+    rrdcalc_runtime_snapshot_publish(rc, 0, NULL);
 
     ctr->react_action = RRDCALC_REACT_NEW;
 }

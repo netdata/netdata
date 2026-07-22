@@ -12,7 +12,6 @@ struct prometheus_remote_write_specific_data {
 };
 
 struct prometheus_remote_write_variables_callback_options {
-    RRDHOST *host;
     time_t now;
     struct instance *instance;
 };

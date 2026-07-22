@@ -55,7 +55,7 @@ static int instance_cardinality_item_compare(const void *a, const void *b) {
 void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key, struct summary_total_counts *totals) {
     buffer_json_member_add_array(wb, key);
     long count = (long) qt->instances.used;
-    size_t cardinality_limit = qt->request.cardinality_limit;
+    size_t cardinality_limit = query_target_summary_cardinality_limit(qt);
     
     // Check if we need to apply cardinality limiting
     if (cardinality_limit > 0 && count > (long)cardinality_limit) {

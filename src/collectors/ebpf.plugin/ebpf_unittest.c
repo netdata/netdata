@@ -464,9 +464,16 @@ static void test_ebpf_parse_ports_basic(void)
     network_viewer_opt.included_port = NULL;
     network_viewer_opt.excluded_port = NULL;
 
-    ebpf_parse_ports("80 443");
+    static const char input[] = "80 443";
+    ebpf_parse_ports(input);
 
     EBPF_UT_ASSERT(network_viewer_opt.included_port != NULL, "Port list should not be NULL after parsing '80 443'");
+    EBPF_UT_ASSERT(strcmp(input, "80 443") == 0, "Port parser should not modify its input");
+
+    size_t entries = 0;
+    for (ebpf_network_viewer_port_list_t *entry = network_viewer_opt.included_port; entry; entry = entry->next)
+        entries++;
+    EBPF_UT_ASSERT(entries == 2, "Port parser should create one entry for each input token");
 
     ebpf_clean_port_structure(&network_viewer_opt.included_port);
     network_viewer_opt.included_port = NULL;
@@ -511,13 +518,20 @@ static void test_ebpf_parse_ips_basic(void)
 
     network_viewer_opt.included_ips = NULL;
 
-    ebpf_parse_ips_unsafe("192.168.1.1");
+    static const char input[] = "192.168.1.1 10.0.0.1";
+    ebpf_parse_ips_unsafe(input);
 
     EBPF_UT_ASSERT(network_viewer_opt.included_ips != NULL, "IP list should not be NULL after parsing IP");
+    EBPF_UT_ASSERT(strcmp(input, "192.168.1.1 10.0.0.1") == 0, "IP parser should not modify its input");
 
     if (network_viewer_opt.included_ips) {
         EBPF_UT_ASSERT(network_viewer_opt.included_ips->ver == AF_INET, "IP should be IPv4");
     }
+
+    size_t entries = 0;
+    for (ebpf_network_viewer_ip_list_t *entry = network_viewer_opt.included_ips; entry; entry = entry->next)
+        entries++;
+    EBPF_UT_ASSERT(entries == 2, "IP parser should create one entry for each input token");
 
     ebpf_clean_ip_structure(&network_viewer_opt.included_ips);
     network_viewer_opt.included_ips = NULL;
@@ -717,6 +731,52 @@ static void test_parse_network_viewer_section_null(void)
 }
 
 /**
+ * Test parse_network_viewer_section preserves configuration values
+ *
+ * Tests that repeated parsing consumes all list entries without changing the
+ * configuration strings retained by inicfg.
+ */
+static void test_parse_network_viewer_section_preserves_config(void)
+{
+    fprintf(stderr, "\n=== Testing parse_network_viewer_section preserves config ===\n");
+
+    struct config cfg = APPCONFIG_INITIALIZER;
+    static const char ports[] = "80 443";
+    static const char ips[] = "192.168.1.1 10.0.0.1";
+
+    inicfg_set(&cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_PORTS, ports);
+    inicfg_set(&cfg, EBPF_NETWORK_VIEWER_SECTION, "ips", ips);
+
+    for (size_t pass = 0; pass < 2; pass++) {
+        parse_network_viewer_section(&cfg);
+
+        EBPF_UT_ASSERT(
+            strcmp(inicfg_get(&cfg, EBPF_NETWORK_VIEWER_SECTION, EBPF_CONFIG_PORTS, NULL), ports) == 0,
+            "Network viewer parsing should preserve the configured port list");
+        EBPF_UT_ASSERT(
+            strcmp(inicfg_get(&cfg, EBPF_NETWORK_VIEWER_SECTION, "ips", NULL), ips) == 0,
+            "Network viewer parsing should preserve the configured IP list");
+
+        size_t port_entries = 0;
+        for (ebpf_network_viewer_port_list_t *entry = network_viewer_opt.included_port; entry; entry = entry->next)
+            port_entries++;
+        EBPF_UT_ASSERT(port_entries == 2, "Each parse should consume every configured port token");
+
+        size_t ip_entries = 0;
+        for (ebpf_network_viewer_ip_list_t *entry = network_viewer_opt.included_ips; entry; entry = entry->next)
+            ip_entries++;
+        EBPF_UT_ASSERT(ip_entries == 2, "Each parse should consume every configured IP token");
+
+        ebpf_clean_port_structure(&network_viewer_opt.included_port);
+        ebpf_clean_port_structure(&network_viewer_opt.excluded_port);
+        ebpf_clean_ip_structure(&network_viewer_opt.included_ips);
+        ebpf_clean_ip_structure(&network_viewer_opt.excluded_ips);
+    }
+
+    inicfg_free(&cfg);
+}
+
+/**
  * Test ebpf_load_collector_config
  *
  * Tests the ebpf_load_collector_config function with non-existent path
@@ -766,6 +826,7 @@ void ebpf_library_run_unittests(void)
     test_ebpf_enable_specific_chart();
     test_ebpf_enable_chart();
     test_parse_network_viewer_section_null();
+    test_parse_network_viewer_section_preserves_config();
     test_ebpf_load_collector_config();
 
     fprintf(stderr, "\n");

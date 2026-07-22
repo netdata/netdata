@@ -52,6 +52,11 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 
     int ret = jsmn_parse(&parser, js, len, tokens, n);
     while (ret == JSMN_ERROR_NOMEM) {
+        if(unlikely(n > INT_MAX / 2 || (size_t)n > SIZE_MAX / sizeof(*tokens) / 2)) {
+            freez(tokens);
+            return NULL;
+        }
+
         n *= 2;
         jsmntok_t *new = reallocz(tokens, sizeof(jsmntok_t) * n);
         if(!new) {
@@ -188,10 +193,10 @@ static inline void json_jsonc_set_integer(JSON_ENTRY *e, char *key, int64_t valu
  * @param callback_function function used to create a silencer.
  */
 static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,int (*callback_function)(struct json_entry *)) {
-    int end = json_object_array_length(ptr);
+    size_t end = json_object_array_length(ptr);
 
     if(end) {
-        int i;
+        size_t i;
         i = 0;
 
         enum json_type type;

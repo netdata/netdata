@@ -2,8 +2,9 @@
 version: v1
 display_name: AWS DynamoDB Operations
 namespace: AWS/DynamoDB
-disabled: true   # deep-grain profile ({TableName, Operation}); opt in with profiles.mode: combined
-period: 60
+disabled: true   # deep-grain profile ({TableName, Operation}); opt in with rules[].profiles.include
+query:
+  period: 1m
 instance:
   dimensions:
     - name: TableName
@@ -27,14 +28,15 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the
   # {TableName, Operation} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: fault_injection_errors
-  #   metric_name: FaultInjectionServiceInducedErrors
-  #   statistics: [sum]
-  #   rate: true
+  - id: fault_injection_errors
+    disabled: true
+    metric_name: FaultInjectionServiceInducedErrors
+    statistics: [sum]
+    rate: true
   # See: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html
 template:
   family: DynamoDB Operations
@@ -43,7 +45,7 @@ template:
     instances:
       by_labels: [account_id, region, table_name, operation]
   charts:
-    - id: cw_ddb_op_latency
+    - id: aws_cloudwatch_ddb_op_latency
       context: successful_request_latency
       title: DynamoDB Successful Request Latency
       family: Latency
@@ -52,7 +54,7 @@ template:
       dimensions:
         - selector: successful_request_latency_average
           name: latency
-    - id: cw_ddb_op_system_errors
+    - id: aws_cloudwatch_ddb_op_system_errors
       context: system_errors
       title: DynamoDB System Errors
       family: Errors
@@ -61,7 +63,7 @@ template:
       dimensions:
         - selector: system_errors_sum
           name: system_errors
-    - id: cw_ddb_op_throttled_requests
+    - id: aws_cloudwatch_ddb_op_throttled_requests
       context: throttled_requests
       title: DynamoDB Throttled Requests
       family: Throttling
@@ -70,7 +72,7 @@ template:
       dimensions:
         - selector: throttled_requests_sum
           name: throttled
-    - id: cw_ddb_op_returned_items
+    - id: aws_cloudwatch_ddb_op_returned_items
       context: returned_item_count
       title: DynamoDB Returned Items
       family: Items
@@ -80,14 +82,14 @@ template:
         - selector: returned_item_count_sum
           name: returned
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_ddb_op_fault_injection
-    #   context: fault_injection_errors
-    #   title: DynamoDB Fault Injection Errors
-    #   family: Errors
-    #   units: errors/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: fault_injection_errors_sum
-    #       name: injected
+    - id: aws_cloudwatch_ddb_op_fault_injection
+      context: fault_injection_errors
+      title: DynamoDB Fault Injection Errors
+      family: Errors
+      units: errors/s
+      algorithm: absolute
+      dimensions:
+        - selector: fault_injection_errors_sum
+          name: injected

@@ -48,7 +48,8 @@ function(netdata_bundle_sqlite3)
                 SOURCE_DIR "${sqlite_SOURCE_DIR}"
                 BINARY_DIR "${sqlite_BINARY_DIR}"
                 CONFIGURE_COMMAND "${sqlite_SOURCE_DIR}/configure" --enable-update-limit
-                BUILD_COMMAND make sqlite3.c sqlite3.h
+                # GNU Make jobserver flags are not understood by FreeBSD make.
+                BUILD_COMMAND "${CMAKE_COMMAND}" -E env MAKEFLAGS= make sqlite3.c sqlite3.h
                 INSTALL_COMMAND ${CMAKE_COMMAND} -E copy
                         "${sqlite_BINARY_DIR}/sqlite3.c"
                         "${sqlite_BINARY_DIR}/sqlite3.h"

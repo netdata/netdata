@@ -262,6 +262,9 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
                 continue;
         }
 
+        if (!rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock))
+            continue;
+
         worker_is_busy(UV_EVENT_FREE_HOST);
 
         if (delete) {
@@ -287,17 +290,22 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
 
             // Re-validate host still exists for cleanup
             RRDHOST *host_check = rrdhost_find_by_guid(machine_guid);
-            if (host_check) {
+            if (host_check == host) {
                 unregister_node(host_check->machine_guid);
+                rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
                 rrdhost_free___while_having_rrd_wrlock(host_check);
             }
+            else
+                rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
 
             // Restart iteration - the list may have changed while lock was released
             next = localhost;
             now = now_realtime_sec();
         }
-        else
+        else {
             rrdhost_cleanup_data_collection_and_health(host);
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+        }
     }
     rrd_wrunlock();
 }

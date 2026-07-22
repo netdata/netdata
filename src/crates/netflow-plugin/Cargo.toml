@@ -21,17 +21,18 @@ bumpalo = { workspace = true }
 bytesize = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
-# Journal I/O migrated to the published systemd-journal-sdk (was vendored path
-# crates). Aliased to the historical names so call sites keep `use journal_*`.
-# Scope: netflow-plugin only; log-viewer/otel still use the vendored workspace
-# crates (tracked as a follow-up). One source of journal-core in this binary.
-journal-common = { package = "systemd-journal-sdk-common", version = "0.7.8" }
-journal-core = { package = "systemd-journal-sdk-core", version = "0.7.8" }
-journal-engine = { package = "systemd-journal-sdk-engine", version = "0.7.8" }
-journal-host = { package = "systemd-journal-sdk-host", version = "0.7.8" }
-journal-index = { package = "systemd-journal-sdk-index", version = "0.7.8" }
-journal-log-writer = { package = "systemd-journal-sdk-log-writer", version = "0.7.8" }
-journal-registry = { package = "systemd-journal-sdk-registry", version = "0.7.8" }
+# Journal I/O uses the published systemd-journal-sdk crates (was vendored path
+# crates), inherited via the workspace journal-sdk-* keys; in-code idents are
+# journal_sdk_*. Scope: netflow-plugin only; log-viewer/otel still use the
+# vendored workspace crates (tracked as a follow-up). One source of journal
+# code in this binary.
+journal-sdk-common = { workspace = true }
+journal-sdk-core = { workspace = true }
+journal-sdk-engine = { workspace = true }
+journal-sdk-host = { workspace = true }
+journal-sdk-index = { workspace = true }
+journal-sdk-log-writer = { workspace = true }
+journal-sdk-registry = { workspace = true }
 humantime = { workspace = true }
 humantime-serde = { workspace = true }
 hashbrown = { workspace = true }
@@ -60,7 +61,7 @@ tokio-util = { workspace = true }
 tracing = { workspace = true }
 regex = { workspace = true }
 twox-hash = { workspace = true, features = ["xxhash64"] }
-reqwest = { workspace = true, features = ["json", "rustls"] }
+reqwest = { workspace = true, default-features = true, features = ["stream", "json", "rustls"] }
 schemars = { workspace = true }
 socket2 = { workspace = true }
 tonic = { workspace = true, features = ["transport", "tls-native-roots"] }

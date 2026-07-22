@@ -170,7 +170,10 @@ mod tests {
 
     #[test]
     fn build_subscribe_full_firehose() {
-        assert_eq!(build_subscribe(None, None), r#"{"data":{},"type":"ris_subscribe"}"#);
+        // Compare as Value: key order depends on serde_json's preserve_order
+        // feature, which other workspace crates may enable (feature unification).
+        let v: serde_json::Value = serde_json::from_str(&build_subscribe(None, None)).unwrap();
+        assert_eq!(v, json!({ "type": "ris_subscribe", "data": {} }));
     }
 
     #[test]

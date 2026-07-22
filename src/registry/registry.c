@@ -2,6 +2,7 @@
 
 #include "database/rrd.h"
 #include "registry_internals.h"
+#include "web/api/http_auth.h"
 
 #define REGISTRY_STATUS_OK "ok"
 #define REGISTRY_STATUS_REDIRECT "redirect"
@@ -191,7 +192,7 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w, bool do_not
         if (claim_id_is_set(claim_id))
             buffer_json_member_add_string(w->response.data, "claim_id", claim_id.str);
 
-        buffer_json_member_add_boolean(w->response.data, "bearer_protection", netdata_is_protected_by_bearer);
+        buffer_json_member_add_boolean(w->response.data, "bearer_protection", netdata_bearer_protection_is_enabled());
     }
     buffer_json_object_close(w->response.data);
 

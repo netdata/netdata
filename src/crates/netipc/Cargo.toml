@@ -1,13 +1,13 @@
 [package]
 name = "netipc"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 
 [lib]
 path = "src/lib.rs"
 
 [dependencies]
-libc = "0.2"
+libc = { workspace = true }
 
 [dev-dependencies]
-proptest = "1"
+proptest = { workspace = true }

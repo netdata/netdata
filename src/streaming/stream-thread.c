@@ -523,7 +523,11 @@ void stream_thread(void *ptr) {
 
     usec_t now_ut = now_monotonic_usec();
     while(!exit_thread && !nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
-        if(now_ut - last_dequeue_ut >= 100 * USEC_PER_MS) {
+        // The outer dequeue baseline is always the newest of the three.
+        if(unlikely(now_ut && now_ut < last_dequeue_ut))
+            last_check_replication_ut = last_check_all_nodes_ut = last_dequeue_ut = now_ut;
+
+        if(clocks_usec_delta_or_zero(now_ut, last_dequeue_ut) >= 100 * USEC_PER_MS) {
             last_dequeue_ut = now_ut;
 
             worker_is_busy(WORKER_STREAM_JOB_DEQUEUE);
@@ -544,7 +548,7 @@ void stream_thread(void *ptr) {
             // process any opcodes waiting
             stream_thread_process_opcodes(sth, NULL);
 
-            if(now_ut - last_check_all_nodes_ut >= nd_profile.update_every * USEC_PER_SEC) {
+            if(clocks_usec_delta_or_zero(now_ut, last_check_all_nodes_ut) >= nd_profile.update_every * USEC_PER_SEC) {
                 last_check_all_nodes_ut = now_ut;
 
                 worker_is_busy(WORKER_STREAM_JOB_LIST);
@@ -567,7 +571,7 @@ void stream_thread(void *ptr) {
                 sth->snd.bytes_received = 0;
                 sth->snd.bytes_sent = 0;
 
-                if(now_ut - last_check_replication_ut >= 10 * 60 * USEC_PER_SEC) {
+                if(clocks_usec_delta_or_zero(now_ut, last_check_replication_ut) >= 10 * 60 * USEC_PER_SEC) {
                     last_check_replication_ut = now_ut;
 
                     worker_is_busy(WORKER_STREAM_JOB_LIST);

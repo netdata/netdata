@@ -65,6 +65,21 @@ You can change these limits using [`edit-config`](/docs/netdata-agent/configurat
     dbengine tier 2 retention time = 2y
 ```
 
+### Update Every and Tier Granularity
+
+`[db].update every` sets the base data collection interval. Tier 0 stores data at this interval, and every higher tier derives its granularity by multiplying from the tier below it. The per-tier multiplier is `dbengine tier X update every iterations` (`60` by default for each tier above 0), so the effective resolution of a tier is `update every` multiplied by every multiplier below it:
+
+| `update every` | Tier 0 | Tier 1 (`×60`) | Tier 2 (`×60×60`) |
+|:--------------:|:------:|:--------------:|:-----------------:|
+| `1s` (default) | 1s     | 60s            | 3600s (1 hour)    |
+| `5s`           | 5s     | 300s           | 18000s (5 hours)  |
+
+Changing `update every` shifts the resolution of every tier proportionally, but the per-tier **retention time** limits (`dbengine tier X retention time`) are wall-clock durations and do **not** change automatically — you do not need to lower retention when you raise `update every`.
+
+Because a longer `update every` collects fewer samples per unit of time, the same per-tier disk size holds more time of data, so you may optionally reduce `dbengine tier X retention size`. For the full disk-sizing implications, see [Disk Requirements & Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md).
+
+In a Parent-Child setup, each Child streams its own `update every` to the Parent. The Parent stores that Child's metrics at the Child's collection interval, so a Child's `update every` affects only that Child's data granularity on the Parent. The Parent's `[db].update every` applies only to metrics the Parent collects locally.
+
 ### Legacy Configuration
 
 <details>

@@ -23,9 +23,16 @@ static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *par
 
     st->pluginsd.set = true;
 
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        netdata_log_debug(D_PLUGINSD, "PLUGINSD: 'host:%s/chart:%s/dim:%s' SET is setting value to '%s'",
-              rrdhost_hostname(host), rrdset_id(st), dimension, value && *value ? value : "UNSET");
+    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_PLUGINSD)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(D_PLUGINSD, "PLUGINSD: 'host:%s/chart:%s/dim:%s' SET is setting value to '%s'",
+                              string2str(identity.hostname), rrdset_id(st), dimension, value && *value ? value : "UNSET");
+            rrdhost_identity_release(&identity);
+        }
+#endif
+    }
 
     if (value && *value) {
         if(rrddim_is_float(rd))
@@ -235,6 +242,12 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     system_tz_free(&tz);
 
     rrdhost_system_info_free(system_info);
+
+    if (!host) {
+        pluginsd_host_define_cleanup(parser);
+        parser->user.retry = true;
+        return PARSER_RC_ERROR;
+    }
 
     rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
     rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
@@ -840,6 +853,7 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     // parse the parameters
 
     time_t update_every = (time_t) str2ull_encoded(update_every_str);
+    time_t parsed_update_every = update_every;
     time_t end_time = (time_t) str2ull_encoded(end_time_str);
 
     time_t wall_clock_time;
@@ -848,8 +862,10 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     else
         wall_clock_time = (time_t) str2ull_encoded(wall_clock_time_str);
 
-    if (unlikely(update_every != st->update_every))
+    if (unlikely(update_every != st->update_every)) {
         rrdset_set_update_every_s(st, update_every);
+        update_every = st->update_every;
+    }
 
     timing_step(TIMING_STEP_BEGIN2_PARSE);
 
@@ -897,7 +913,7 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
         buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
         buffer_fast_strcat(wb, "' ", 2);
 
-        if(can_copy)
+        if(can_copy && update_every == parsed_update_every)
             buffer_strcat(wb, update_every_str);
         else
             buffer_print_uint64_encoded(wb, integer_encoding, update_every);
@@ -1304,8 +1320,9 @@ bool parser_reconstruct_context(BUFFER *wb, void *ptr) {
     return true;
 }
 
-inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations)
+inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations, bool *retry)
 {
+    *retry = false;
     int enabled = cd->unsafe.enabled;
 
     if (fd_input == -1 || fd_output == -1 || !enabled) {
@@ -1376,13 +1393,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     }
 
     cd->unsafe.enabled = parser->user.enabled;
+    *retry = parser->user.retry;
     count = parser->user.data_collections_count;
 
     if(likely(count)) {
         cd->successful_collections += count;
         cd->serial_failures = 0;
     }
-    else
+    else if (!*retry)
         cd->serial_failures++;
 
     {

@@ -298,7 +298,7 @@ int arl_check(ARL_BASE *base, const char *keyword, const char *value) {
 #endif
 
     // it should be the first entry (pointed by base->next_keyword)
-    if(likely(!strcmp(keyword, e->name))) {
+    if(likely(e && !strcmp(keyword, e->name))) {
         // it is
 
 #ifdef NETDATA_INTERNAL_CHECKS

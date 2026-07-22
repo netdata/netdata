@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS Step Functions
 namespace: AWS/States
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: StateMachineArn
@@ -36,22 +37,25 @@ metrics:
     metric_name: ExecutionTime
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the {StateMachineArn}
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {StateMachineArn}
   # grain (redrive metrics appear only when executions are redriven).
   # ----------------------------------------------------------------------------------------
-  # - id: executions_redriven
-  #   metric_name: ExecutionsRedriven
-  #   statistics: [sum]
-  #   rate: true
-  # - id: redriven_executions_succeeded
-  #   metric_name: RedrivenExecutionsSucceeded
-  #   statistics: [sum]
-  #   rate: true
-  # - id: redriven_executions_failed
-  #   metric_name: RedrivenExecutionsFailed
-  #   statistics: [sum]
-  #   rate: true
+  - id: executions_redriven
+    disabled: true
+    metric_name: ExecutionsRedriven
+    statistics: [sum]
+    rate: true
+  - id: redriven_executions_succeeded
+    disabled: true
+    metric_name: RedrivenExecutionsSucceeded
+    statistics: [sum]
+    rate: true
+  - id: redriven_executions_failed
+    disabled: true
+    metric_name: RedrivenExecutionsFailed
+    statistics: [sum]
+    rate: true
   # Express Workflows publish ExpressExecutionBilledDuration/Memory at {StateMachineArn}. Metrics at
   # other grains need their own profile: activities ({ActivityArn}), Lambda tasks ({LambdaFunctionArn}),
   # service integrations ({ServiceIntegrationResourceArn}), and account-level (OpenExecutionCount).
@@ -63,7 +67,7 @@ template:
     instances:
       by_labels: [account_id, region, state_machine_arn]
   charts:
-    - id: cw_sfn_executions
+    - id: aws_cloudwatch_sfn_executions
       context: executions
       title: Step Functions Executions
       family: Executions
@@ -80,7 +84,7 @@ template:
           name: aborted
         - selector: executions_timed_out_sum
           name: timed_out
-    - id: cw_sfn_throttled
+    - id: aws_cloudwatch_sfn_throttled
       context: execution_throttled
       title: Step Functions Throttled Events
       family: Throttling
@@ -89,7 +93,7 @@ template:
       dimensions:
         - selector: execution_throttled_sum
           name: throttled
-    - id: cw_sfn_execution_time
+    - id: aws_cloudwatch_sfn_execution_time
       context: execution_time
       title: Step Functions Execution Time
       family: Duration
@@ -99,18 +103,18 @@ template:
         - selector: execution_time_average
           name: execution_time
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_sfn_redriven
-    #   context: executions_redriven
-    #   title: Step Functions Redriven Executions
-    #   family: Executions
-    #   units: executions/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: executions_redriven_sum
-    #       name: redriven
-    #     - selector: redriven_executions_succeeded_sum
-    #       name: succeeded
-    #     - selector: redriven_executions_failed_sum
-    #       name: failed
+    - id: aws_cloudwatch_sfn_redriven
+      context: executions_redriven
+      title: Step Functions Redriven Executions
+      family: Executions
+      units: executions/s
+      algorithm: absolute
+      dimensions:
+        - selector: executions_redriven_sum
+          name: redriven
+        - selector: redriven_executions_succeeded_sum
+          name: succeeded
+        - selector: redriven_executions_failed_sum
+          name: failed

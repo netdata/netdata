@@ -272,7 +272,8 @@ static inline int compare_raised_alerts(const void *a, const void *b) {
     RRDCALC *rc1 = dictionary_acquired_item_value(item1);
     RRDCALC *rc2 = dictionary_acquired_item_value(item2);
 
-    return (int)(rc2->last_status_change - rc1->last_status_change);
+    return (rc1->last_status_change < rc2->last_status_change) -
+           (rc1->last_status_change > rc2->last_status_change);
 }
 
 static void health_raised_summary_add_alert(struct health_raised_summary *hrm, const DICTIONARY_ITEM  *item) {
@@ -462,8 +463,10 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
                               ae->new_value,
                               ae->old_value,
                               ae->source?ae_source(ae):"UNKNOWN",
-                              (uint32_t)ae->duration,
-                              (ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING && ae->new_status >= RRDCALC_STATUS_WARNING) ? (uint32_t)ae->duration : (uint32_t)ae->non_clear_duration,
+                              nd_duration_to_uint32_saturating(ae->duration),
+                              nd_duration_to_uint32_saturating(
+                                  (ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING && ae->new_status >= RRDCALC_STATUS_WARNING) ?
+                                      ae->duration : ae->non_clear_duration),
                               ae_units(ae),
                               ae_info(ae),
                               ae_new_value_string(ae),
@@ -513,34 +516,6 @@ done:
     health_alarm_log_save(host, ae, false);
 }
 
-bool health_alarm_log_get_global_id_and_transition_id_for_rrdcalc(RRDCALC *rc, usec_t *global_id, nd_uuid_t *transitions_id) {
-    if(!rc->rrdset)
-        return false;
-
-    RRDHOST *host = rc->rrdset->rrdhost;
-
-    rw_spinlock_read_lock(&host->health_log.spinlock);
-
-    ALARM_ENTRY *ae;
-    for(ae = host->health_log.alarms; ae ; ae = ae->next) {
-        if(unlikely(ae->alarm_id == rc->id))
-            break;
-    }
-
-    if(ae) {
-        *global_id = ae->global_id;
-        uuid_copy(*transitions_id, ae->transition_id);
-    }
-    else {
-        *global_id = 0;
-        uuid_clear(*transitions_id);
-    }
-
-    rw_spinlock_read_unlock(&host->health_log.spinlock);
-
-    return ae != NULL;
-}
-
 void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm) {
     time_t now = now_realtime_sec();
 
@@ -580,7 +555,7 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
             ||
             ((ae->new_status == RRDCALC_STATUS_REMOVED) &&
              (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
-             (ae->when + 86400 < now_realtime_sec())))
+             (nd_time_t_add_compare(ae->when, 86400, now_realtime_sec()) < 0)))
         {
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
             health_alarm_log_free_one_nochecks_nounlink(ae);

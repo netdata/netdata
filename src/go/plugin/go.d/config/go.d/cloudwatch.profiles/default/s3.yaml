@@ -2,7 +2,9 @@
 version: v1
 display_name: AWS S3
 namespace: AWS/S3
-period: 86400
+query:
+  period: 24h
+  publication_delay: 24h
 instance:
   dimensions:
     - name: BucketName
@@ -22,7 +24,7 @@ metrics:
   # each needs its own profile:
   #   - Request metrics  {BucketName, FilterId}  -- opt-in per bucket, billed at custom-metric
   #     rates (AllRequests, GetRequests, 4xxErrors, ...). Collected by the s3_requests profile
-  #     (enable with profiles.mode: combined).
+  #     (enable explicitly with rules[].profiles.include).
   #   - Replication      {SourceBucket, DestinationBucket, RuleId}  -- when S3 replication metrics
   #     are enabled (ReplicationLatency, BytesPendingReplication, ...).
   # See: https://docs.aws.amazon.com/AmazonS3/latest/userguide/metrics-dimensions.html
@@ -33,7 +35,7 @@ template:
     instances:
       by_labels: [account_id, region, bucket_name, storage_type]
   charts:
-    - id: cw_s3_bucket_size
+    - id: aws_cloudwatch_s3_bucket_size
       context: bucket_size
       title: S3 Bucket Size
       family: Storage
@@ -42,7 +44,7 @@ template:
       dimensions:
         - selector: bucket_size_bytes_average
           name: size
-    - id: cw_s3_objects
+    - id: aws_cloudwatch_s3_objects
       context: number_of_objects
       title: S3 Number of Objects
       family: Storage

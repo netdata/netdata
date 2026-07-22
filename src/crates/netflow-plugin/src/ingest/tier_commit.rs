@@ -587,7 +587,7 @@ mod tests {
     #[test]
     fn journal_log_is_send() {
         fn assert_send<T: Send>() {}
-        assert_send::<journal_log_writer::Log>();
+        assert_send::<journal_sdk_log_writer::Log>();
     }
 
     /// Age semantics of the tick mirror: a never-claimed slot reports 0 (not

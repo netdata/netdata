@@ -273,11 +273,13 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb) {
             if(unlikely(!alert_st))
                 continue;
 
+            RRDCALC_RUNTIME_SNAPSHOT snapshot;
+            rrdcalc_runtime_snapshot_get(rc, &snapshot);
             tmp = (struct scored) {
                 .existing = false,
                 .chart = string_dup(alert_st->id),
                 .context = string_dup(alert_st->context),
-                .value = rc->value,
+                .value = snapshot.value,
                 .score = rrdlabels_common_count(alert_st->rrdlabels, st->rrdlabels),
             };
             rrdcalc_rrdset_read_unlock(alert_st);

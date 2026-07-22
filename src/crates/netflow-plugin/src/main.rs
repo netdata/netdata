@@ -43,7 +43,7 @@ const MAX_RUNTIME_WORKER_THREADS: usize = 4;
 const MIN_RUNTIME_BLOCKING_THREADS: usize = 8;
 
 fn main() {
-    if let Err(err) = journal_core::install_sigbus_handler() {
+    if let Err(err) = journal_sdk_core::install_sigbus_handler() {
         eprintln!("failed to install SIGBUS handler: {}", err);
         std::process::exit(1);
     }

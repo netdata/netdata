@@ -299,7 +299,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
             irr->total += irr->cpu[c].value;
         }
 
-        if(unlikely(isdigit(irr->id[0]))) {
+        if(unlikely(isdigit((uint8_t)irr->id[0]))) {
             size_t first_name_word = proc_interrupts_name_first_word(ff, l, cpus, words);
             proc_interrupts_build_name(irr->name, ff, l, first_name_word, words, irr->id, idlen);
         }

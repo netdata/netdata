@@ -5,8 +5,8 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-error = { path = "../error" }
-window_manager = { path = "../window_manager" }
+error = { workspace = true }
+window_manager = { workspace = true }
 memmap2 = { workspace = true }
 ruzstd = { workspace = true }
 lz4_flex = { workspace = true }

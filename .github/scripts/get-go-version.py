@@ -39,5 +39,39 @@ for modfile in GO_SRC.glob('**/go.mod'):
             'build_target': f'github.com/netdata/netdata/go/plugins/{str(mainpath)}/',
         })
 
+# Preserve the existing multi-OS build matrix. The standalone cgroup helper is
+# Linux-only, but it still belongs in the native Linux test matrix below.
+build_modules = list(modules)
+
+# Standalone Linux-only Go modules outside src/go (their own go.mod and module
+# path). Each entry's build_target is the module's own import path read from
+# go.mod.
+EXTRA_LINUX_MODULES = [
+    REPO_ROOT / 'src' / 'collectors' / 'cgroups.plugin' / 'cgroup-name',
+]
+
+for moddir in EXTRA_LINUX_MODULES:
+    modfile = moddir / 'go.mod'
+    if not modfile.exists():
+        continue
+
+    mod_version = parse('1.0.0')
+    module_path = None
+    for line in modfile.read_text().splitlines():
+        if line.startswith('go '):
+            mod_version = max(mod_version, parse(line.split()[1]))
+        elif line.startswith('module '):
+            module_path = line.split()[1]
+
+    if module_path is None:
+        continue
+
+    modules.append({
+        'module': str(moddir),
+        'version': str(mod_version),
+        'build_target': module_path,
+    })
+
 with GITHUB_OUTPUT.open('a') as f:
     f.write(f'matrix={json.dumps(modules)}\n')
+    f.write(f'build_matrix={json.dumps(build_modules)}\n')

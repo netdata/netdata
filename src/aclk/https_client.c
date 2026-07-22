@@ -275,7 +275,7 @@ static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
     buf_val[idx_end] = 0;
 
     for (ptr = buf_key; *ptr; ptr++)
-        *ptr = tolower(*ptr);
+        *ptr = tolower((uint8_t)*ptr);
 
     if (process_http_hdr(parse_ctx, buf_key, buf_val))
         return 1;

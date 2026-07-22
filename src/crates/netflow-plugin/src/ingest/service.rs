@@ -1,5 +1,5 @@
 use super::*;
-use journal_log_writer::{LogLifecycleEvent, LogLifecycleObserver};
+use journal_sdk_log_writer::{LogLifecycleEvent, LogLifecycleObserver};
 
 mod init;
 mod runtime;

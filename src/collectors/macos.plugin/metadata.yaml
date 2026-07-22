@@ -309,6 +309,31 @@ modules:
               description: Enable or disable direct IOHID temperature, current, and voltage sensor monitoring.
               default_value: yes
               required: false
+            - name: per sensor temperature charts
+              section_name: plugin:macos:sensors
+              description: Chart every temperature sensor individually, in addition to the per-subsystem summary charts and the temperature histogram.
+              default_value: no
+              required: false
+            - name: per sensor fan charts
+              section_name: plugin:macos:sensors
+              description: Chart every fan sensor individually.
+              default_value: yes
+              required: false
+            - name: per sensor voltage charts
+              section_name: plugin:macos:sensors
+              description: Chart every voltage sensor individually (per-regulator rails), in addition to the summary charts.
+              default_value: no
+              required: false
+            - name: per sensor current charts
+              section_name: plugin:macos:sensors
+              description: Chart every current sensor individually (per-regulator rails), in addition to the summary charts.
+              default_value: no
+              required: false
+            - name: per sensor power charts
+              section_name: plugin:macos:sensors
+              description: Chart every power sensor individually, in addition to the per-subsystem power summary charts.
+              default_value: no
+              required: false
             - name: discovery every
               section_name: plugin:macos:sensors
               description: How often to rescan AppleSMC for available hardware sensor keys.
@@ -890,8 +915,8 @@ modules:
               description: Sensor chip or macOS service identifier
             - name: feature
               description: Stable sensor feature identifier
-            - name: name
-              description: Human-readable sensor name
+            - name: label
+              description: Human-readable sensor label
             - name: path
               description: Stable source path for the sensor
             - name: source
@@ -931,6 +956,35 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
+            - name: system.hw.sensor.temperature.subsystem
+              description: Temperature summary per hardware subsystem
+              unit: "degrees Celsius"
+              chart_type: line
+              dimensions:
+                - name: min
+                - name: avg
+                - name: max
+            - name: system.hw.sensor.power.subsystem
+              description: Power total per hardware subsystem
+              unit: "W"
+              chart_type: line
+              dimensions:
+                - name: power
+            - name: system.hw.sensor.temperature.histogram
+              description: Distribution of all temperature sensors in fixed bands
+              unit: "sensors"
+              chart_type: heatmap
+              dimensions:
+                - name: "40"
+                - name: "50"
+                - name: "60"
+                - name: "70"
+                - name: "80"
+                - name: "85"
+                - name: "90"
+                - name: "95"
+                - name: "100"
+                - name: "+Inf"
             - name: system.hw.sensor.state.input
               description: Sensor state input
               unit: "status"

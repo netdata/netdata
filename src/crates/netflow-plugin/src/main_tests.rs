@@ -4,9 +4,9 @@ use super::{
 };
 use chrono::Utc;
 use etherparse::{SlicedPacket, TransportSlice};
-use journal_core::file::Mmap;
-use journal_core::repository::File as RepoFile;
-use journal_core::{Direction, JournalFile, JournalReader, Location};
+use journal_sdk_core::file::Mmap;
+use journal_sdk_core::repository::File as RepoFile;
+use journal_sdk_core::{Direction, JournalFile, JournalReader, Location};
 use pcap_file::pcap::PcapReader;
 use rt::ProgressState;
 use std::collections::{BTreeMap, HashMap};
@@ -897,7 +897,7 @@ fn write_raw_flows(
     head_seqnum: u64,
     flows: &[(u64, u8)],
 ) {
-    use journal_core::{JournalFileOptions, JournalWriter};
+    use journal_sdk_core::{JournalFileOptions, JournalWriter};
 
     let head_realtime = flows.first().expect("at least one flow").0;
     let machine_dir = cfg

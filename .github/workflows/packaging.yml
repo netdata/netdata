@@ -261,7 +261,7 @@ jobs:
       - name: Setup Go
         id: setup-go
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: src/go/go.mod
       - name: Prepare synthetic stock payload

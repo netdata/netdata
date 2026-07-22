@@ -323,12 +323,15 @@ SIMPLE_PATTERN_RESULT simple_pattern_matches_length_extract(SIMPLE_PATTERN *list
 }
 
 static inline void free_pattern(struct simple_pattern *m) {
-    if(!m) return;
+    while(m) {
+        struct simple_pattern *next = m->next;
 
-    free_pattern(m->child);
-    free_pattern(m->next);
-    freez((void *)m->match);
-    freez(m);
+        free_pattern(m->child);
+        freez((void *)m->match);
+        freez(m);
+
+        m = next;
+    }
 }
 
 void simple_pattern_free(SIMPLE_PATTERN *list) {

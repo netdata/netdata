@@ -3,7 +3,7 @@
 #include "health.h"
 #include "health_internals.h"
 
-static inline int health_parse_delay(
+int health_parse_delay(
         size_t line, const char *filename, char *string,
         int *delay_up_duration,
         int *delay_down_duration,
@@ -73,11 +73,11 @@ static inline int health_parse_delay(
         *delay_multiplier = 1.0;
 
     if(!given_max) {
-        if((*delay_max_duration) < (*delay_up_duration) * (*delay_multiplier))
-            *delay_max_duration = (int)((*delay_up_duration) * (*delay_multiplier));
+        if(health_delay_product_exceeds(*delay_up_duration, *delay_multiplier, *delay_max_duration))
+            *delay_max_duration = health_delay_apply_multiplier(*delay_up_duration, *delay_multiplier, INT_MAX);
 
-        if((*delay_max_duration) < (*delay_down_duration) * (*delay_multiplier))
-            *delay_max_duration = (int)((*delay_down_duration) * (*delay_multiplier));
+        if(health_delay_product_exceeds(*delay_down_duration, *delay_multiplier, *delay_max_duration))
+            *delay_max_duration = health_delay_apply_multiplier(*delay_down_duration, *delay_multiplier, INT_MAX);
     }
 
     return 1;
@@ -110,6 +110,15 @@ static inline ALERT_ACTION_OPTIONS health_parse_options(const char *s) {
     }
 
     return options;
+}
+
+static inline bool health_parse_update_every(const char *value, int *update_every) {
+    int parsed;
+    if(!duration_parse_seconds(value, &parsed) || parsed < 0)
+        return false;
+
+    *update_every = parsed;
+    return true;
 }
 
 static inline int health_parse_repeat(
@@ -309,8 +318,9 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
         return 0;
     }
 
-    // sane defaults
-    ac->update_every = ABS(ac->after);
+    // derive the default only when its positive magnitude fits in int
+    if(ac->after >= -INT_MAX)
+        ac->update_every = ABS(ac->after);
 
     // now we may have optional parameters
     while(*s) {
@@ -335,7 +345,7 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
             while(*s && !isspace((uint8_t)*s)) s++;
             while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
-            if (!duration_parse_seconds(value, &ac->update_every)) {
+            if (!health_parse_update_every(value, &ac->update_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                                   line, filename, value, key);
                 return 0;
@@ -762,7 +772,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             health_parse_db_lookup(line, filename, value, ac);
         }
         else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
-            if(!duration_parse_seconds(value, &ac->update_every))
+            if(!health_parse_update_every(value, &ac->update_every))
                 netdata_log_error(
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
                     "cannot parse duration: '%s'.",

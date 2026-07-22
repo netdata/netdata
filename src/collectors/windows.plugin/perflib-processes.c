@@ -75,7 +75,7 @@ int do_PerflibProcesses(int update_every, usec_t dt __maybe_unused)
 
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
     if (!pDataBlock)
-        return -1;
+        return 0;
 
     do_processes(pDataBlock, update_every);
 

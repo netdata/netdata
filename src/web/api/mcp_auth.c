@@ -21,12 +21,30 @@ static bool mcp_api_key_generate_and_save(void) {
     // Construct full path
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
-    
-    // Open file with O_CREAT | O_EXCL to ensure we don't overwrite
-    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+
+    struct stat st;
+    if (stat(path, &st) == 0 && !S_ISREG(st.st_mode)) {
+        netdata_log_error("MCP: API key file %s is not a regular file", path);
+        return false;
+    }
+
+    // Validate the opened object before truncating it.
+    int fd = open(path, O_WRONLY | O_CREAT | O_NONBLOCK, 0600);
     if (fd == -1) {
         netdata_log_error("MCP: Failed to create API key file %s: %s", 
                          path, strerror(errno));
+        return false;
+    }
+
+    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+        netdata_log_error("MCP: API key file %s is not a regular file", path);
+        close(fd);
+        return false;
+    }
+
+    if (ftruncate(fd, 0) != 0) {
+        netdata_log_error("MCP: Failed to truncate API key file %s: %s", path, strerror(errno));
+        close(fd);
         return false;
     }
     
@@ -42,14 +60,15 @@ static bool mcp_api_key_generate_and_save(void) {
         return false;
     }
     
-    close(fd);
-    
     // Ensure file permissions are correct (only owner can read/write)
-    if (chmod(path, 0600) == -1) {
+    if (fchmod(fd, 0600) == -1) {
         netdata_log_error("MCP: Failed to set permissions on API key file: %s", strerror(errno));
+        close(fd);
         unlink(path);
         return false;
     }
+
+    close(fd);
     
     netdata_log_info("MCP: Generated new developer preview API key");
     return true;
@@ -59,8 +78,14 @@ static bool mcp_api_key_load(void) {
     // Construct full path
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
-    
-    int fd = open(path, O_RDONLY);
+
+    struct stat st;
+    if (stat(path, &st) == 0 && !S_ISREG(st.st_mode)) {
+        netdata_log_error("MCP: API key file %s is not a regular file", path);
+        return false;
+    }
+
+    int fd = open(path, O_RDONLY | O_NONBLOCK);
     if (fd == -1) {
         if (errno == ENOENT) {
             // File doesn't exist, this is expected on first run
@@ -68,6 +93,12 @@ static bool mcp_api_key_load(void) {
         }
         netdata_log_error("MCP: Failed to open API key file %s: %s", 
                          path, strerror(errno));
+        return false;
+    }
+
+    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+        netdata_log_error("MCP: API key file %s is not a regular file", path);
+        close(fd);
         return false;
     }
     

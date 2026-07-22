@@ -544,7 +544,7 @@ int unittest_stream_compression_speed(compression_algorithm_t algorithm, const c
 
     for(int i = 0; i < 10000 ;i++) {
         compression_started_ut = now_monotonic_usec();
-        decompression_ut += compression_started_ut - decompression_started_ut;
+        decompression_ut += clocks_usec_delta_or_zero(compression_started_ut, decompression_started_ut);
 
         buffer_flush(wb);
         while(buffer_strlen(wb) < COMPRESSION_MAX_MSG_SIZE - 1024)
@@ -559,7 +559,7 @@ int unittest_stream_compression_speed(compression_algorithm_t algorithm, const c
 
         bytes_compressed += size;
         decompression_started_ut = now_monotonic_usec();
-        compression_ut += decompression_started_ut - compression_started_ut;
+        compression_ut += clocks_usec_delta_or_zero(decompression_started_ut, compression_started_ut);
 
         if(size == 0) {
             fprintf(stderr, "iteration %d: compressed size %zu is zero\n",
@@ -723,6 +723,81 @@ cleanup:
     return errors;
 }
 
+static int unittest_stream_decompression_boundary(compression_algorithm_t algorithm, const char *name) {
+    fprintf(stderr, "\nTesting streaming decompression boundary with %s\n", name);
+
+    char payload[COMPRESSION_MAX_CHUNK + 1];
+    for(size_t i = 0; i < sizeof(payload); i++)
+        payload[i] = 'A' + (i % 26);
+
+    static const size_t sizes[] = {
+        COMPRESSION_MAX_CHUNK,
+        COMPRESSION_MAX_CHUNK + 1,
+    };
+
+    int errors = 0;
+
+    for(size_t i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++) {
+        struct compressor_state cctx = {
+            .algorithm = algorithm,
+        };
+        struct decompressor_state dctx = {
+            .algorithm = algorithm,
+        };
+
+        stream_compressor_init(&cctx);
+        stream_decompressor_init(&dctx);
+
+        if(!cctx.initialized || !dctx.initialized) {
+            fprintf(stderr, "  FAILED: %s state initialization failed\n", name);
+            errors++;
+            goto cleanup;
+        }
+
+        const char *compressed;
+        static const char warmup[] = "warmup\n";
+        size_t compressed_size = stream_compress(&cctx, warmup, sizeof(warmup) - 1, &compressed);
+        size_t decompressed_size = stream_decompress(&dctx, compressed, compressed_size);
+        if(decompressed_size != sizeof(warmup) - 1 ||
+           memcmp(dctx.output.data, warmup, sizeof(warmup) - 1) != 0) {
+            fprintf(stderr, "  FAILED: %s warm-up decompression returned %zu bytes\n", name, decompressed_size);
+            errors++;
+            goto cleanup;
+        }
+        dctx.output.read_pos += decompressed_size;
+
+        compressed_size = stream_compress(&cctx, payload, sizes[i], &compressed);
+        if(!compressed_size || compressed_size > COMPRESSION_MAX_MSG_SIZE) {
+            fprintf(stderr, "  FAILED: %s compressed %zu-byte boundary payload to invalid size %zu\n",
+                    name, sizes[i], compressed_size);
+            errors++;
+            goto cleanup;
+        }
+
+        decompressed_size = stream_decompress(&dctx, compressed, compressed_size);
+        if(sizes[i] == COMPRESSION_MAX_CHUNK) {
+            if(decompressed_size != sizes[i] ||
+               stream_decompressed_bytes_in_buffer(&dctx) != sizes[i] ||
+               memcmp(dctx.output.data, payload, sizes[i]) != 0) {
+                fprintf(stderr, "  FAILED: %s exact-boundary decompression returned %zu bytes\n",
+                        name, decompressed_size);
+                errors++;
+            }
+        }
+        else if(decompressed_size != 0) {
+            fprintf(stderr, "  FAILED: %s accepted %zu-byte over-limit output\n", name, decompressed_size);
+            errors++;
+        }
+
+cleanup:
+        stream_compressor_destroy(&cctx);
+        stream_decompressor_destroy(&dctx);
+    }
+
+    fprintf(stderr, "Streaming decompression boundary with %s: %s\n", name, errors ? "FAILED" : "OK");
+    return errors;
+}
+
 #ifdef ENABLE_ZSTD
 int unittest_stream_decompress_bomb_zstd(void);
 #endif
@@ -740,6 +815,11 @@ int unittest_stream_compressions(void) {
     ret += unittest_stream_compression(COMPRESSION_ALGORITHM_LZ4, "LZ4");
     ret += unittest_stream_compression(COMPRESSION_ALGORITHM_BROTLI, "BROTLI");
     ret += unittest_stream_compression(COMPRESSION_ALGORITHM_GZIP, "GZIP");
+
+#ifdef ENABLE_BROTLI
+    ret += unittest_stream_decompression_boundary(COMPRESSION_ALGORITHM_BROTLI, "BROTLI");
+#endif
+    ret += unittest_stream_decompression_boundary(COMPRESSION_ALGORITHM_GZIP, "GZIP");
 
     ret += unittest_stream_compression_speed(COMPRESSION_ALGORITHM_ZSTD, "ZSTD");
     ret += unittest_stream_compression_speed(COMPRESSION_ALGORITHM_LZ4, "LZ4");

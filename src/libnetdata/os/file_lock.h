@@ -7,6 +7,23 @@
 
 #if defined(OS_WINDOWS)
 #include <windows.h>
+
+// wincrypt.h (included via windows.h) defines macros that conflict with OpenSSL
+#ifdef X509_NAME
+#undef X509_NAME
+#endif
+#ifdef X509_EXTENSIONS
+#undef X509_EXTENSIONS
+#endif
+#ifdef PKCS7_SIGNER_INFO
+#undef PKCS7_SIGNER_INFO
+#endif
+#ifdef OCSP_REQUEST
+#undef OCSP_REQUEST
+#endif
+#ifdef OCSP_RESPONSE
+#undef OCSP_RESPONSE
+#endif
 #endif
 
 typedef struct file_lock {
@@ -39,6 +56,16 @@ typedef struct file_lock {
  * @return FILE_LOCK The lock handle. Use FILE_LOCK_OK() to check if lock was acquired
  */
 FILE_LOCK file_lock_get(const char *filename);
+
+/**
+ * Get an exclusive file lock, waiting for the current owner if necessary.
+ *
+ * The lock is automatically released when the process exits or crashes.
+ *
+ * @param filename UTF-8 encoded filename (MSYS2/Cygwin path format or native Windows path on Windows)
+ * @return FILE_LOCK The lock handle. Use FILE_LOCK_OK() to check if lock was acquired
+ */
+FILE_LOCK file_lock_get_wait(const char *filename);
 
 /**
  * Release a file lock

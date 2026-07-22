@@ -37,12 +37,26 @@ All of Netdata's documentation **assumes your config directory is at** `/etc/net
 
 :::
 
+### On Windows
+
+On Windows, the **Netdata config directory** is located at `C:\Program Files\Netdata\etc\netdata`. Like on Linux, this directory contains configuration files, a few directories for specific configurations (including `health.d` for your alert overrides), and the `edit-config` helper script.
+
+:::note
+
+`edit-config` requires the bundled MSYS2 shell that ships with Netdata for Windows — see [Editing configuration files](/packaging/windows/WINDOWS_INSTALLER.md#editing-configuration-files) for how to open it and use `edit-config` there. Because `C:\Program Files\Netdata` is a protected system directory, run the MSYS2 shell with Administrator privileges.
+
+:::
+
+For alert-specific configuration on Windows — where the stock alert templates ship, where to place your overrides, and how to reload without restarting the Agent — see [How to Edit Health Configuration Files](/src/health/REFERENCE.md#how-to-edit-health-configuration-files) in the health configuration reference.
+
 ## Edit Configuration Files
 
 <details>
 <summary><strong>Method 1: Using `edit-config` (Recommended)</strong></summary>
 
 You should use the `edit-config` script for making configuration changes. This script lives inside your config directory and helps you manage and safely edit configuration files.
+
+On Windows, run `edit-config` from the bundled MSYS2 shell — see [On Windows](#on-windows) above.
 
 To edit `netdata.conf`:
 

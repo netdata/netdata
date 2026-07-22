@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS Application Load Balancer
 namespace: AWS/ApplicationELB
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: LoadBalancer
@@ -63,34 +64,38 @@ metrics:
     metric_name: ConsumedLCUs
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below, then restart the go.d process. All are
-  # published at the {LoadBalancer} grain, so no other change is needed.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {LoadBalancer} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: ipv6_request_count
-  #   metric_name: IPv6RequestCount
-  #   statistics: [sum]
-  #   rate: true
-  # - id: grpc_request_count
-  #   metric_name: GrpcRequestCount
-  #   statistics: [sum]
-  #   rate: true
-  # - id: rule_evaluations
-  #   metric_name: RuleEvaluations
-  #   statistics: [sum]
-  #   rate: true
-  # - id: client_tls_negotiation_errors
-  #   metric_name: ClientTLSNegotiationErrorCount
-  #   statistics: [sum]
-  #   rate: true
-  # - id: http_redirect_count
-  #   metric_name: HTTP_Redirect_Count
-  #   statistics: [sum]
-  #   rate: true
+  - id: ipv6_request_count
+    disabled: true
+    metric_name: IPv6RequestCount
+    statistics: [sum]
+    rate: true
+  - id: grpc_request_count
+    disabled: true
+    metric_name: GrpcRequestCount
+    statistics: [sum]
+    rate: true
+  - id: rule_evaluations
+    disabled: true
+    metric_name: RuleEvaluations
+    statistics: [sum]
+    rate: true
+  - id: client_tls_negotiation_errors
+    disabled: true
+    metric_name: ClientTLSNegotiationErrorCount
+    statistics: [sum]
+    rate: true
+  - id: http_redirect_count
+    disabled: true
+    metric_name: HTTP_Redirect_Count
+    statistics: [sum]
+    rate: true
   # Narrow target-health collection at {LoadBalancer, TargetGroup} is collected by the default
   # alb_target_health profile. Broader per-target / target-group metrics (HealthyHostCount,
   # RequestCountPerTarget, TargetConnectionErrorCount, ...) are collected by the disabled alb_target
-  # profile -- enable it with profiles.mode: combined or exact.
+  # profile -- enable it explicitly with rules[].profiles.include.
   # Also at {LoadBalancer}: HTTPCode_ELB_500/502/503/504_Count (5xx detail), and the DDoS-protection,
   # auth (ELBAuth*), Target Optimizer (TargetControl*), and LCU-reservation (PeakLCUs/ReservedLCUs)
   # families. See: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
@@ -101,7 +106,7 @@ template:
     instances:
       by_labels: [account_id, region, load_balancer]
   charts:
-    - id: cw_alb_requests
+    - id: aws_cloudwatch_alb_requests
       context: request_count
       title: ALB Request Count
       family: Requests
@@ -110,7 +115,7 @@ template:
       dimensions:
         - selector: request_count_sum
           name: requests
-    - id: cw_alb_target_response_codes
+    - id: aws_cloudwatch_alb_target_response_codes
       context: target_response_codes
       title: ALB Target Response Codes
       family: Responses
@@ -125,7 +130,7 @@ template:
           name: 4xx
         - selector: http_code_target_5xx_sum
           name: 5xx
-    - id: cw_alb_elb_response_codes
+    - id: aws_cloudwatch_alb_elb_response_codes
       context: elb_response_codes
       title: ALB Load Balancer Response Codes
       family: Responses
@@ -138,7 +143,7 @@ template:
           name: 4xx
         - selector: http_code_elb_5xx_sum
           name: 5xx
-    - id: cw_alb_new_connections
+    - id: aws_cloudwatch_alb_new_connections
       context: connection_rate
       title: ALB Connection Rate
       family: Connections
@@ -149,7 +154,7 @@ template:
           name: new
         - selector: rejected_connection_count_sum
           name: rejected
-    - id: cw_alb_active_connections
+    - id: aws_cloudwatch_alb_active_connections
       context: active_connections
       title: ALB Active Connections
       family: Connections
@@ -158,7 +163,7 @@ template:
       dimensions:
         - selector: active_connection_count_sum
           name: active
-    - id: cw_alb_processed_traffic
+    - id: aws_cloudwatch_alb_processed_traffic
       context: processed_bytes
       title: ALB Processed Traffic
       family: Traffic
@@ -167,7 +172,7 @@ template:
       dimensions:
         - selector: processed_bytes_sum
           name: processed
-    - id: cw_alb_target_response_time
+    - id: aws_cloudwatch_alb_target_response_time
       context: target_response_time
       title: ALB Target Response Time
       family: Latency
@@ -176,7 +181,7 @@ template:
       dimensions:
         - selector: target_response_time_average
           name: response_time
-    - id: cw_alb_consumed_lcus
+    - id: aws_cloudwatch_alb_consumed_lcus
       context: consumed_lcus
       title: ALB Consumed LCUs
       family: Capacity
@@ -186,43 +191,43 @@ template:
         - selector: consumed_lcus_average
           name: lcus
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_alb_extra_requests
-    #   context: extra_request_counts
-    #   title: ALB IPv6 and gRPC Requests
-    #   family: Requests
-    #   units: requests/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: ipv6_request_count_sum
-    #       name: ipv6
-    #     - selector: grpc_request_count_sum
-    #       name: grpc
-    # - id: cw_alb_rule_evaluations
-    #   context: rule_evaluations
-    #   title: ALB Rule Evaluations
-    #   family: Rules
-    #   units: evaluations/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: rule_evaluations_sum
-    #       name: evaluations
-    # - id: cw_alb_tls_errors
-    #   context: client_tls_negotiation_errors
-    #   title: ALB Client TLS Negotiation Errors
-    #   family: TLS
-    #   units: errors/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: client_tls_negotiation_errors_sum
-    #       name: errors
-    # - id: cw_alb_redirects
-    #   context: http_redirects
-    #   title: ALB HTTP Redirects
-    #   family: Requests
-    #   units: redirects/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: http_redirect_count_sum
-    #       name: redirects
+    - id: aws_cloudwatch_alb_extra_requests
+      context: extra_request_counts
+      title: ALB IPv6 and gRPC Requests
+      family: Requests
+      units: requests/s
+      algorithm: absolute
+      dimensions:
+        - selector: ipv6_request_count_sum
+          name: ipv6
+        - selector: grpc_request_count_sum
+          name: grpc
+    - id: aws_cloudwatch_alb_rule_evaluations
+      context: rule_evaluations
+      title: ALB Rule Evaluations
+      family: Rules
+      units: evaluations/s
+      algorithm: absolute
+      dimensions:
+        - selector: rule_evaluations_sum
+          name: evaluations
+    - id: aws_cloudwatch_alb_tls_errors
+      context: client_tls_negotiation_errors
+      title: ALB Client TLS Negotiation Errors
+      family: TLS
+      units: errors/s
+      algorithm: absolute
+      dimensions:
+        - selector: client_tls_negotiation_errors_sum
+          name: errors
+    - id: aws_cloudwatch_alb_redirects
+      context: http_redirects
+      title: ALB HTTP Redirects
+      family: Requests
+      units: redirects/s
+      algorithm: absolute
+      dimensions:
+        - selector: http_redirect_count_sum
+          name: redirects

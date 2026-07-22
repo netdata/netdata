@@ -914,7 +914,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            This collector is disabled by default. When enabled, it automatically detects all available SMB share instances and metrics.
+            This collector is enabled by default and automatically detects all available SMB share instances and metrics. On systems where the 'SMB Server Shares' object is not available, no SMB metrics are collected.
         limits:
           description: ""
         performance_impact:
@@ -1417,7 +1417,7 @@ modules:
         - name: Sensor
           description: "These metrics refer to Sensors."
           labels:
-            - name: name
+            - name: label
               description: Sensor friendly name.
             - name: manufacturer
               description: The sensor manufacturer.
@@ -1430,6 +1430,21 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
+            - name: system.hw.sensor.temperature.histogram
+              description: Distribution of all temperature sensors in fixed bands
+              unit: "sensors"
+              chart_type: heatmap
+              dimensions:
+                - name: "40"
+                - name: "50"
+                - name: "60"
+                - name: "70"
+                - name: "80"
+                - name: "85"
+                - name: "90"
+                - name: "95"
+                - name: "100"
+                - name: "+Inf"
             - name: system.hw.sensor.power.input
               description: Sensor Power
               unit: "W"

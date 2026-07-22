@@ -1371,7 +1371,7 @@ static int iis_web_service(char *name, int update_every, typeof(bool(PERF_DATA_B
 
     PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
     if (!pDataBlock)
-        return -1;
+        return 0;
 
     routine(pDataBlock, update_every);
     return 0;

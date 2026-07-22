@@ -118,14 +118,19 @@ static bool bearer_token_save_to_file(nd_uuid_t token, struct bearer_token *bt) 
         return false;
     }
 
-    if(fwrite(buffer_tostring(wb), 1, buffer_strlen(wb), fp) != buffer_strlen(wb)) {
-        fclose(fp);
+    size_t len = buffer_strlen(wb);
+    size_t written = fwrite(buffer_tostring(wb), 1, len, fp);
+    int saved_errno = errno;
+    if(fclose(fp) != 0 || written != len) {
+        if(written == len)
+            saved_errno = errno;
+
         unlink(filename);
+        errno = saved_errno;
         nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot save file '%s'", filename);
         return false;
     }
 
-    fclose(fp);
     return true;
 }
 
@@ -342,8 +347,11 @@ bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
 }
 
 void bearer_tokens_init(void) {
-    netdata_is_protected_by_bearer =
-        inicfg_get_boolean(&netdata_config, CONFIG_SECTION_WEB, "bearer token protection", netdata_is_protected_by_bearer);
+    netdata_bearer_protection_set_enabled(inicfg_get_boolean(
+        &netdata_config,
+        CONFIG_SECTION_WEB,
+        "bearer token protection",
+        netdata_bearer_protection_is_enabled()));
 
     netdata_authorized_bearers = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,

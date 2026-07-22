@@ -149,5 +149,6 @@ The `netdatacli` tool is available on Windows at the Netdata installation path (
 | **Stop**          | `Stop-Service Netdata`    | Task Manager > Services > Netdata | —                           |
 | **Restart**       | `Restart-Service Netdata` | Task Manager > Services > Netdata | —                           |
 | **Reload Health** | —                         | —                                 | `netdatacli reload-health`  |
+| **Reload Labels** | —                         | —                                 | `netdatacli reload-labels`  |
 | **Shutdown**      | —                         | —                                 | `netdatacli shutdown-agent` |
 | **Ping**          | —                         | —                                 | `netdatacli ping`           |

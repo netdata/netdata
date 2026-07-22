@@ -103,6 +103,79 @@ static inline int registry_person_save(const DICTIONARY_ITEM *item __maybe_unuse
 // ----------------------------------------------------------------------------
 // SAVE THE REGISTRY DATABASE
 
+static FILE *registry_db_open_tmp_file(const char *filename) {
+    struct stat before;
+    bool reuse = lstat(filename, &before) == 0;
+    if(reuse && !S_ISREG(before.st_mode)) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    if(!reuse && errno != ENOENT)
+        return NULL;
+
+    int flags = O_WRONLY;
+    if(reuse) {
+        flags |= O_NOFOLLOW;
+        flags |= O_NONBLOCK;
+    }
+    else
+        flags |= O_CREAT | O_EXCL;
+
+    int fd = open(filename, flags, 0666);
+    if(fd == -1)
+        return NULL;
+
+    struct stat after;
+    if(fstat(fd, &after) != 0) {
+        int saved_errno = errno;
+        if(!reuse)
+            unlink(filename);
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if(!S_ISREG(after.st_mode) ||
+       (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))) {
+        if(!reuse)
+            unlink(filename);
+        close(fd);
+        errno = EINVAL;
+        return NULL;
+    }
+
+    if(reuse) {
+        // O_NONBLOCK protects validation from FIFO races; the returned stream must retain fopen() semantics.
+        int status_flags = fcntl(fd, F_GETFL);
+        if(status_flags == -1 || fcntl(fd, F_SETFL, status_flags & ~(O_NONBLOCK | O_NOFOLLOW)) != 0) {
+            int saved_errno = errno;
+            close(fd);
+            errno = saved_errno;
+            return NULL;
+        }
+    }
+
+    FILE *fp = fdopen(fd, "w");
+    if(!fp) {
+        int saved_errno = errno;
+        if(!reuse)
+            unlink(filename);
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if(reuse && ftruncate(fileno(fp), 0) != 0) {
+        int saved_errno = errno;
+        fclose(fp);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    return fp;
+}
+
 int registry_db_save(void) {
     if(unlikely(!registry.enabled))
         return -1;
@@ -113,8 +186,9 @@ int registry_db_save(void) {
     // Implement exponential backoff for save failures
     if(registry.consecutive_save_failures > 0) {
         time_t now = now_realtime_sec();
-        time_t backoff_seconds = 60 * (1 << (registry.consecutive_save_failures - 1)); // 60s, 120s, 240s, etc.
-        if(backoff_seconds > 3600) backoff_seconds = 3600; // Cap at 1 hour
+        time_t backoff_seconds = registry.consecutive_save_failures < 7 ?
+                                     60 * (1 << (registry.consecutive_save_failures - 1)) : // 60s, 120s, etc.
+                                     3600; // Cap at 1 hour
         
         if((now - registry.last_save_failure) < backoff_seconds) {
             netdata_log_debug(D_REGISTRY, "REGISTRY: skipping save due to backoff (failed %d times, waiting %ld seconds)", 
@@ -134,7 +208,7 @@ int registry_db_save(void) {
     snprintfz(old_tmp_filename, FILENAME_MAX, "%s.old.tmp", registry.db_filename);
 
     netdata_log_debug(D_REGISTRY, "REGISTRY: Creating file '%s'", tmp_filename);
-    FILE *fp = fopen(tmp_filename, "w");
+    FILE *fp = registry_db_open_tmp_file(tmp_filename);
     if(!fp) {
         netdata_log_error("REGISTRY: Cannot create file: %s", tmp_filename);
         nd_log_limits_reset();
@@ -170,7 +244,7 @@ int registry_db_save(void) {
     netdata_log_debug(D_REGISTRY, "REGISTRY: saved %d persons", persons_saved);
 
     // save the totals
-    fprintf(fp, "T\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\n",
+    int totals_saved = fprintf(fp, "T\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\n",
             registry.persons_count,
             registry.machines_count,
             registry.usages_count + 1, // this is required - it is lost on db rotation
@@ -179,7 +253,19 @@ int registry_db_save(void) {
             registry.machines_urls_count
     );
 
-    fclose(fp);
+    int saved_errno = errno;
+    if(fclose(fp) != 0 || totals_saved < 0) {
+        if(totals_saved >= 0)
+            saved_errno = errno;
+
+        unlink(tmp_filename);
+        registry.consecutive_save_failures++;
+        registry.last_save_failure = now_realtime_sec();
+        errno = saved_errno;
+        netdata_log_error("REGISTRY: Cannot save temporary registry file '%s'", tmp_filename);
+        nd_log_limits_reset();
+        return -1;
+    }
 
     errno_clear();
 
@@ -262,7 +348,7 @@ size_t registry_db_load(void) {
     size_t line = 0;
 
     netdata_log_debug(D_REGISTRY, "REGISTRY: loading active db from: '%s'", registry.db_filename);
-    FILE *fp = fopen(registry.db_filename, "r");
+    FILE *fp = registry_fopen_regular(registry.db_filename, "r");
     if(!fp) {
         if (errno != ENOENT)
             netdata_log_error("REGISTRY: cannot open registry file: '%s'", registry.db_filename);
@@ -300,6 +386,9 @@ size_t registry_db_load(void) {
                 }
                 *url++ = '\0';
 
+                size_t machine_name_len;
+                char *machine_name = registry_fix_machine_name(&s[69], &machine_name_len);
+
                 if(*url != 'h' && *url != '*') {
                     netdata_log_error("REGISTRY: person URL line %zu does not have a valid url: %s", line, url);
                     continue;
@@ -320,7 +409,7 @@ size_t registry_db_load(void) {
 
                 REGISTRY_PERSON_URL *pu = registry_person_url_index_find(p, u);
                 if(!pu)
-                    pu = registry_person_url_allocate(p, m, u, &s[69], strlen(&s[69]), first_t);
+                    pu = registry_person_url_allocate(p, m, u, machine_name, machine_name_len, first_t);
                 else
                     netdata_log_error("REGISTRY: person URL line %zu is duplicate, reusing the old one.", line);
 

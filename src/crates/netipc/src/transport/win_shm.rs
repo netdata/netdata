@@ -26,7 +26,7 @@ mod ffi {
     pub const WAIT_OBJECT_0: DWORD = 0x00000000;
     pub const WAIT_TIMEOUT: DWORD = 0x00000102;
 
-    extern "system" {
+    unsafe extern "system" {
         pub fn CreateFileMappingW(
             hFile: HANDLE,
             lpFileMappingAttributes: *const core::ffi::c_void,
@@ -274,22 +274,22 @@ unsafe fn create_file_mapping(
 ) -> ffi::HANDLE {
     #[cfg(test)]
     if let Some(error) = take_fault_hook(WinShmFaultSite::CreateFileMapping) {
-        ffi::SetLastError(error);
+        unsafe { ffi::SetLastError(error) };
         return 0;
     }
 
-    ffi::CreateFileMappingW(h_file, attrs, protect, size_high, size_low, name)
+    unsafe { ffi::CreateFileMappingW(h_file, attrs, protect, size_high, size_low, name) }
 }
 
 #[cfg(windows)]
 unsafe fn open_file_mapping(access: u32, inherit: i32, name: *const u16) -> ffi::HANDLE {
     #[cfg(test)]
     if let Some(error) = take_fault_hook(WinShmFaultSite::OpenFileMapping) {
-        ffi::SetLastError(error);
+        unsafe { ffi::SetLastError(error) };
         return 0;
     }
 
-    ffi::OpenFileMappingW(access, inherit, name)
+    unsafe { ffi::OpenFileMappingW(access, inherit, name) }
 }
 
 #[cfg(windows)]
@@ -302,11 +302,11 @@ unsafe fn map_view_of_file(
 ) -> *mut core::ffi::c_void {
     #[cfg(test)]
     if let Some(error) = take_fault_hook(WinShmFaultSite::MapViewOfFile) {
-        ffi::SetLastError(error);
+        unsafe { ffi::SetLastError(error) };
         return std::ptr::null_mut();
     }
 
-    ffi::MapViewOfFile(mapping, access, offset_high, offset_low, bytes)
+    unsafe { ffi::MapViewOfFile(mapping, access, offset_high, offset_low, bytes) }
 }
 
 #[cfg(windows)]
@@ -318,22 +318,22 @@ unsafe fn create_event(
 ) -> ffi::HANDLE {
     #[cfg(test)]
     if let Some(error) = take_fault_hook(WinShmFaultSite::CreateEvent) {
-        ffi::SetLastError(error);
+        unsafe { ffi::SetLastError(error) };
         return 0;
     }
 
-    ffi::CreateEventW(attrs, manual_reset, initial_state, name)
+    unsafe { ffi::CreateEventW(attrs, manual_reset, initial_state, name) }
 }
 
 #[cfg(windows)]
 unsafe fn open_event(access: u32, inherit: i32, name: *const u16) -> ffi::HANDLE {
     #[cfg(test)]
     if let Some(error) = take_fault_hook(WinShmFaultSite::OpenEvent) {
-        ffi::SetLastError(error);
+        unsafe { ffi::SetLastError(error) };
         return 0;
     }
 
-    ffi::OpenEventW(access, inherit, name)
+    unsafe { ffi::OpenEventW(access, inherit, name) }
 }
 
 // ---------------------------------------------------------------------------

@@ -542,7 +542,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
                    RRDR_OPTION_ABSOLUTE | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR |
                    RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO |
                    RRDR_OPTION_MINIFY | RRDR_OPTION_MINIMAL_STATS | RRDR_OPTION_LONG_JSON_KEYS |
-                   RRDR_OPTION_MCP_INFO | RRDR_OPTION_RFC3339,
+                   RRDR_OPTION_MCP_INFO | RRDR_OPTION_RFC3339 | RRDR_OPTION_CARDINALITY_ALL,
         .time_group_method = time_group,
         .time_group_options = time_group_options,
         .resampling_time = 0,
@@ -632,7 +632,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
             // Add a warning about potentially misleading aggregation
             bool warn_aggregation = false;
             // Only warn if using average without dimension grouping AND multiple dimensions selected
-            int dimensions_count = (int)json_object_array_length(dimensions_obj);
+            size_t dimensions_count = json_object_array_length(dimensions_obj);
             if (dimensions_count > 1 &&
                 group_by[0].aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE && 
                 !(group_by[0].group_by & RRDR_GROUP_BY_DIMENSION)) {

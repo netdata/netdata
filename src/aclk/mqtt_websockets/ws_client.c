@@ -337,7 +337,7 @@ int ws_client_parse_handshake_resp(ws_client *client)
             rbuf_bump_tail(client->buf_read, strlen(WS_HTTP_NEWLINE));
 
             for (int i = 0; hdr->key[i]; i++)
-                hdr->key[i] = tolower(hdr->key[i]);
+                hdr->key[i] = tolower((uint8_t)hdr->key[i]);
 
             if (ws_client_add_http_header(client, hdr))
                 return WS_CLIENT_PROTOCOL_ERROR;

@@ -43,7 +43,7 @@ static void parse_command_reply(BUFFER *buf)
          pos < response_string + response_string_size  && !syntax_error ;
          ++pos) {
         /* Skip white-space characters */
-        for ( ; isspace(*pos) && ('\0' != *pos); ++pos) ;
+        for ( ; isspace((uint8_t)*pos) && ('\0' != *pos); ++pos) ;
 
         if ('\0' == *pos)
             continue;
