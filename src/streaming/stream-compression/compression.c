@@ -544,7 +544,7 @@ int unittest_stream_compression_speed(compression_algorithm_t algorithm, const c
 
     for(int i = 0; i < 10000 ;i++) {
         compression_started_ut = now_monotonic_usec();
-        decompression_ut += compression_started_ut - decompression_started_ut;
+        decompression_ut += clocks_usec_delta_or_zero(compression_started_ut, decompression_started_ut);
 
         buffer_flush(wb);
         while(buffer_strlen(wb) < COMPRESSION_MAX_MSG_SIZE - 1024)
@@ -559,7 +559,7 @@ int unittest_stream_compression_speed(compression_algorithm_t algorithm, const c
 
         bytes_compressed += size;
         decompression_started_ut = now_monotonic_usec();
-        compression_ut += decompression_started_ut - compression_started_ut;
+        compression_ut += clocks_usec_delta_or_zero(decompression_started_ut, compression_started_ut);
 
         if(size == 0) {
             fprintf(stderr, "iteration %d: compressed size %zu is zero\n",

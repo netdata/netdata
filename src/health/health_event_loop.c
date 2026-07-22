@@ -137,7 +137,9 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, RRDSET *st, time_t now, time_t
             *next_run = rc->next_update;
         }
 
-        netdata_log_debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rrdcalc_chart_name(rc), rrdcalc_name(rc), (int) (rc->next_update - now));
+        netdata_log_debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %" PRIdMAX " secs).",
+                          rrdcalc_chart_name(rc), rrdcalc_name(rc),
+                          (intmax_t)nd_time_t_elapsed_saturating(rc->next_update, now));
         return 0;
     }
 
@@ -192,8 +194,9 @@ static void health_sleep(time_t next_run, uint64_t loop __maybe_unused) {
     time_t now = now_realtime_sec();
     if(now < next_run) {
         worker_is_idle();
-        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %llu done. Next iteration in %d secs",
-                          (unsigned long long)loop, (int) (next_run - now));
+        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %llu done. Next iteration in %" PRIdMAX " secs",
+                          (unsigned long long)loop,
+                          (intmax_t)nd_time_t_elapsed_saturating(next_run, now));
         while (now < next_run && service_running(SERVICE_HEALTH)) {
             sleep_usec(USEC_PER_SEC);
             now = now_realtime_sec();
@@ -501,7 +504,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     host,
                     rc,
                     now_tmp,
-                    now_tmp - rc->last_status_change,
+                    nd_time_t_elapsed_saturating(now_tmp, rc->last_status_change),
                     rc->value,
                     NAN,
                     rc->status,
@@ -743,7 +746,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     host,
                     rc,
                     now,
-                    now - rc->last_status_change,
+                    nd_time_t_elapsed_saturating(now, rc->last_status_change),
                     rc->old_value,
                     rc->value,
                     rc->status,
@@ -844,7 +847,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     host,
                     rc,
                     now,
-                    now - rc->last_status_change,
+                    nd_time_t_elapsed_saturating(now, rc->last_status_change),
                     rc->old_value,
                     rc->value,
                     rc->old_status,

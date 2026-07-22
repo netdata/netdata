@@ -1941,6 +1941,7 @@ set(SYSTEMD_UNITS_PLUGIN_FILES
 
 set(STREAMING_PLUGIN_FILES
         src/streaming/stream.h
+        src/streaming/stream-trace.h
         src/streaming/stream-compression/compression.c
         src/streaming/stream-compression/compression.h
         src/streaming/stream-compression/brotli.c

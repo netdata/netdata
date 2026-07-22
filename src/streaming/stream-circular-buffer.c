@@ -77,7 +77,8 @@ size_t stream_circular_buffer_get_max_size(STREAM_CIRCULAR_BUFFER *scb) {
 }
 
 void stream_circular_buffer_recreate_timed_unsafe(STREAM_CIRCULAR_BUFFER *scb, usec_t now_ut, bool force) {
-    if(!force && (scb->stats.bytes_outstanding || now_ut - scb->last_recreate_ut < 300 * USEC_PER_SEC))
+    if(!force && (scb->stats.bytes_outstanding ||
+                  clocks_usec_delta_or_zero_with_rebase(now_ut, &scb->last_recreate_ut) < 300 * USEC_PER_SEC))
         return;
 
     scb->last_recreate_ut = now_ut;
