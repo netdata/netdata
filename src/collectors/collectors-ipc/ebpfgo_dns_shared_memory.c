@@ -5,7 +5,6 @@
 #if defined(OS_LINUX)
 
 #include <fcntl.h>
-#include "../ebpf.plugin/ebpfgo.plugin/apps_ebpf_shared_pid_row.h"
 #include "ebpfgo_shm_liveness.h"
 #include <sys/mman.h>
 #include <unistd.h>
