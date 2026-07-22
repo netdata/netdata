@@ -40,6 +40,8 @@ enum aclk_alert_snapshot_state {
     ACLK_ALERT_SNAPSHOT_READY,
 };
 
+typedef time_t aclk_send_timestamp_t __attribute__((aligned(8)));
+
 typedef struct aclk_sync_cfg_t {
     RRDHOST *host;
     uv_timer_t timer;
@@ -60,10 +62,28 @@ typedef struct aclk_sync_cfg_t {
     int alert_count;
     int snapshot_count;
     int checkpoint_count;
-    time_t node_info_send_time;
-    time_t node_collectors_send;
+    aclk_send_timestamp_t node_info_send_time;  // atomic: event loop to alert-push worker
+    aclk_send_timestamp_t node_collectors_send; // atomic: node-info builders to alert-push worker
     char node_id[UUID_STR_LEN];
 } aclk_sync_cfg_t;
+
+static inline time_t aclk_send_timestamp_get(const aclk_send_timestamp_t *send_time)
+{
+    return __atomic_load_n(send_time, __ATOMIC_ACQUIRE);
+}
+
+static inline void aclk_send_timestamp_set(aclk_send_timestamp_t *send_time, time_t value)
+{
+    __atomic_store_n(send_time, value, __ATOMIC_RELEASE);
+}
+
+static inline bool aclk_send_timestamp_claim(aclk_send_timestamp_t *send_time, time_t expected)
+{
+    // A same-value publication before this claim is covered by the send that follows;
+    // one after the claim remains pending instead of being cleared.
+    return __atomic_compare_exchange_n(
+        send_time, &expected, 0, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
+}
 
 static inline enum aclk_alert_snapshot_state aclk_alert_snapshot_state_get(aclk_sync_cfg_t *aclk_host_config)
 {
