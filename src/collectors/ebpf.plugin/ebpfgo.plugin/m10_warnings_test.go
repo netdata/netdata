@@ -317,7 +317,7 @@ func TestRunDNSGlobalCollector_NilHandleIsNoOp(t *testing.T) {
 			t.Fatalf("nil DNS handle panicked: %v", r)
 		}
 	}()
-	runDNSGlobalCollector(nil, make(chan struct{}), 5, nil)
+	runDNSGlobalCollector(nil, make(chan struct{}), 5)
 }
 
 // ---- M10: DNS fallback loader sequencing (per-query flag plumbing) ------

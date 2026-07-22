@@ -3,10 +3,19 @@
 package main
 
 /*
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "shared_dns_memory.h"
+
+// Inline offset getters for per-field ABI verification in assertSharedDnsMemoryLayout.
+// Declared as static inline to avoid external-linkage requirements across CGo
+// translation units; CGo inlines the call and needs no exported symbol.
+static inline size_t dns_flow_off_timestamp_us_fn(void) { return offsetof(struct ebpfgo_dns_flow_record, timestamp_us); }
+static inline size_t dns_flow_off_domain_fn(void)       { return offsetof(struct ebpfgo_dns_flow_record, domain); }
+static inline size_t dns_flow_off_client_port_fn(void)  { return offsetof(struct ebpfgo_dns_flow_record, client_port); }
+static inline size_t dns_agg_off_queries_udp4_fn(void)  { return offsetof(struct ebpfgo_dns_aggregate, queries_udp4); }
 */
 import "C"
 
@@ -53,14 +62,33 @@ func copyDNSDomain(dst *[256]byte, domain string) {
 	dst[n] = 0
 }
 
+// assertSharedDnsMemoryLayout panics if the Go DNS mirror structs drift from
+// their C counterparts.  Checks total size and key field offsets so a field
+// reorder that preserves struct size is also caught.
 func assertSharedDnsMemoryLayout() {
 	if got, want := unsafe.Sizeof(ebpfgoDnsAggregate{}),
 		uintptr(C.sizeof_struct_ebpfgo_dns_aggregate); got != want {
 		panic(fmt.Sprintf("ebpfgo_dns_aggregate ABI mismatch: Go=%d C=%d", got, want))
 	}
+	if got, want := unsafe.Offsetof(ebpfgoDnsAggregate{}.QueriesUDP4),
+		uintptr(C.dns_agg_off_queries_udp4_fn()); got != want {
+		panic(fmt.Sprintf("ebpfgo_dns_aggregate.QueriesUDP4 offset mismatch: Go=%d C=%d", got, want))
+	}
 	if got, want := unsafe.Sizeof(ebpfgoDnsFlowRecord{}),
 		uintptr(C.sizeof_struct_ebpfgo_dns_flow_record); got != want {
 		panic(fmt.Sprintf("ebpfgo_dns_flow_record ABI mismatch: Go=%d C=%d", got, want))
+	}
+	if got, want := unsafe.Offsetof(ebpfgoDnsFlowRecord{}.TimestampUs),
+		uintptr(C.dns_flow_off_timestamp_us_fn()); got != want {
+		panic(fmt.Sprintf("ebpfgo_dns_flow_record.TimestampUs offset mismatch: Go=%d C=%d", got, want))
+	}
+	if got, want := unsafe.Offsetof(ebpfgoDnsFlowRecord{}.Domain),
+		uintptr(C.dns_flow_off_domain_fn()); got != want {
+		panic(fmt.Sprintf("ebpfgo_dns_flow_record.Domain offset mismatch: Go=%d C=%d", got, want))
+	}
+	if got, want := unsafe.Offsetof(ebpfgoDnsFlowRecord{}.ClientPort),
+		uintptr(C.dns_flow_off_client_port_fn()); got != want {
+		panic(fmt.Sprintf("ebpfgo_dns_flow_record.ClientPort offset mismatch: Go=%d C=%d", got, want))
 	}
 }
 
