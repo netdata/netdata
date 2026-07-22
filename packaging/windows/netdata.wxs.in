@@ -356,6 +356,29 @@
                 <Custom Action="UninstallManifest" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
             </InstallExecuteSequence>
 
+            <!-- Remove classic source registrations left by pre-manifest UCRT builds.
+                 They use the same source names as the earlier MSYS build, but register
+                 them under Netdata/* (or Application) instead of NetdataWEL.  wevtutil
+                 only removes WINEVT manifest state, so leaving these keys behind can
+                 cause a rollback build to resolve its sources to removed UCRT channels. -->
+            <SetProperty
+                Id="CleanupUcrtEventLogRegistrations"
+                Value="&quot;[System64Folder]cmd.exe&quot; /d /c &quot;&quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Daemon&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Collectors&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Access&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Health&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Aclk&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataDaemon&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataCollectors&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataAccess&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataHealth&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataAclk&quot; /f &amp; exit /b 0&quot;"
+                Before="CleanupUcrtEventLogRegistrations"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="CleanupUcrtEventLogRegistrations"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+            <InstallExecuteSequence>
+                <Custom Action="CleanupUcrtEventLogRegistrations" After="UninstallManifest" Condition="REMOVE=&quot;ALL&quot;" />
+            </InstallExecuteSequence>
+
             <!-- Unregister the manifest on upgrade before re-registering with the new one.
                  Must run after InstallFiles (new manifest is on disk) but Before="DllPermission"
                  so the sequence is: UninstallManifestUpgrade (um) → DllPermission (icacls) →
