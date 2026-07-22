@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0522
+# Next unused error code: F0524
 
 # ======================================================================
 # Constants
@@ -391,8 +391,28 @@ trap 'trap_handler 15 0' TERM
 # ======================================================================
 # Utility functions
 
+# Check if a URL is valid, and ensure it uses one of the specified protocols.
+is_valid_url() {
+  echo "${1}" | grep -qE "^(${2})+://([^@\/:[:space:]]+(:[^@\/:[:space:]]*)?@)?(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9.-]+)(:[0-9]{1,5})?(/[-A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=]*)?$'" || return 1
+}
+
 sanitize_string() {
-    printf '%s\n' "$1" | tr -cd "[:alnum:] :/.,_-"
+  printf '%s\n' "${1}" | tr -cd "[:alnum:] ._-="
+  v="${1}"
+  r="$(printf '%s\n' "${1}" | tr -cd "[:alnum:] ._-")"
+  [ "${v}" = "${r}" ] || warning "Unsafe characters found in string, sanitized to ${r}"
+  echo "${r}"
+}
+
+sanitize_path() {
+  v="${1}"
+  _path_unsafe=";&'\"|\\<>()\n\$*?\`{}[]"
+  if [ -z "${_path_replace}" ]; then
+    _path_replace="$(printf "%$(printf "%s" "${_path_unsafe}" | wc -m)s" | tr " " "_")"
+  fi
+  r="$(printf '%s\n' "$1" | tr "${_path_unsafe}" "${_path_replace}")"
+  [ "${v}" = "${r}" ] || warning "Unsafe characters found in path, sanitized to ${r}"
+  echo "${r}"
 }
 
 canonical_path() {
@@ -2619,7 +2639,7 @@ parse_args() {
       "--interactive") INTERACTIVE=1 ;;
       "--dry-run") DRY_RUN=1 ;;
       "--release-channel")
-        RELEASE_CHANNEL="$(sanitize_string "${2}" | tr '[:upper:]' '[:lower:]')"
+        RELEASE_CHANNEL="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         case "${RELEASE_CHANNEL}" in
           nightly|stable|default) shift 1 ;;
           *)
@@ -2638,7 +2658,7 @@ parse_args() {
       "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
       "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
       "--auto-update-type"|"--auto-update-method")
-        NETDATA_AUTO_UPDATE_TYPE="$(sanitize_string "${2}" | tr '[:upper:]' '[:lower:]')"
+        NETDATA_AUTO_UPDATE_TYPE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         case "${NETDATA_AUTO_UPDATE_TYPE}" in
           systemd|interval|crontab) shift 1 ;;
           *)
@@ -2662,19 +2682,27 @@ parse_args() {
         NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
         ;;
       "--install-prefix")
-        INSTALL_PREFIX="$(sanitize_string "${2}")"
+        p="$(sanitize_path "${2}")"
+        if [ "${p}" != "${2}" ]; then
+          fatal "Unsafe characters detected in install prefix" F0525
+        fi
+        INSTALL_PREFIX="${p}"
         shift 1
         ;;
       "--old-install-prefix")
-        OLD_INSTALL_PREFIX="$(sanitize_string "${2}")"
+        p="$(sanitize_path "${2}")"
+        if [ "${p}" != "${2}" ]; then
+          fatal "Unsafe characters detected in old install prefix" F0526
+        fi
+        OLD_INSTALL_PREFIX="${p}"
         shift 1
         ;;
       "--install-major-version")
-        INSTALL_MAJOR_VERSION="$(sanitize_string "${2}")"
+        INSTALL_MAJOR_VERSION="${2}"
         shift 1
         ;;
       "--install-version")
-        INSTALL_VERSION="$(sanitize_string "${2}")"
+        INSTALL_VERSION="${2}"
         AUTO_UPDATE=0
         shift 1
         ;;
@@ -2702,9 +2730,8 @@ parse_args() {
       "--static-only") NETDATA_REQUESTED_INSTALL_TYPE="static" ;;
       "--build-only") NETDATA_REQUESTED_INSTALL_TYPE="build" ;;
       "--install-type")
-        t="$(sanitize_string "${2}")"
-        case "${t}" in
-          native|static|build|auto|any) NETDATA_REQUESTED_INSTALL_TYPE="${t}" ;;
+        case "${2}" in
+          native|static|build|auto|any) NETDATA_REQUESTED_INSTALL_TYPE="${2}" ;;
           *) fatal "${2} is not a recognized install type. Please specify one of native, static, build, auto, or any." F051F ;;
         esac
         shift 1
@@ -2712,10 +2739,18 @@ parse_args() {
       "--claim-"*)
         optname="$(echo "${1}" | cut -d '-' -f 4-)"
         case "${optname}" in
+          url)
+            is_valid_url "${2}" "http|https" || fatal "${2} is not a valid claim URL" F0522
+            NETDATA_CLAIM_URL="${2}"
+            shift 1
+            ;;
+          proxy)
+            is_valid_url "${2}" "http|https|socks|socks5" || fatal "${2} is not a valid claim proxy URL" F0523
+            NETDATA_CLAIM_PROXY="${2}"
+            shift 1
+            ;;
           token) NETDATA_CLAIM_TOKEN="$(sanitize_string "${2}")"; shift 1 ;;
           rooms) NETDATA_CLAIM_ROOMS="$(sanitize_string "${2}")"; shift 1 ;;
-          url) NETDATA_CLAIM_URL="$(sanitize_string "${2}")"; shift 1 ;;
-          proxy) NETDATA_CLAIM_PROXY="$(sanitize_string "${2}")"; shift 1 ;;
           noproxy) NETDATA_CLAIM_PROXY="none" ;;
           insecure) NETDATA_CLAIM_INSECURE=yes ;;
           noreload) NETDATA_CLAIM_NORELOAD=1 ;;
@@ -2745,20 +2780,18 @@ parse_args() {
         fi
         ;;
       "--offline-architecture")
-        arch="$(sanitize_string "${2}")"
-        if echo "${STATIC_INSTALL_ARCHES}" | grep -qw "${arch}"; then
-          NETDATA_OFFLINE_ARCHES="${NETDATA_OFFLINE_ARCHES} ${arch}"
+        if echo "${STATIC_INSTALL_ARCHES}" | grep -qw "${2}"; then
+          NETDATA_OFFLINE_ARCHES="${NETDATA_OFFLINE_ARCHES} ${2}"
         else
-          fatal "${arch} is not a recognized static build architecture (supported architectures are ${STATIC_INSTALL_ARCHES})" F0518
+          fatal "${2} is not a recognized static build architecture (supported architectures are ${STATIC_INSTALL_ARCHES})" F0518
         fi
         shift 1
         ;;
       "--offline-install-source")
         if [ -d "${2}" ]; then
-          p="$(sanitize_string "${2}")"
-          NETDATA_OFFLINE_INSTALL_SOURCE="${p}"
+          NETDATA_OFFLINE_INSTALL_SOURCE="${2}"
           # shellcheck disable=SC2164
-          NETDATA_TARBALL_BASEURL="file://$(cd "${p}"; pwd)"
+          NETDATA_TARBALL_BASEURL="file://$(cd "${2}"; pwd)"
           shift 1
         else
           fatal "A source directory must be specified with the --offline-install-source option." F0501
