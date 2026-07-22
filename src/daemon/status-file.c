@@ -84,6 +84,16 @@ static SPINLOCK session_status_for_signals_spinlock = SPINLOCK_INITIALIZER;
 #define SESSION_STATUS_SNAPSHOT_COPYING (UINT32_C(1) << 31)
 static uint32_t session_status_snapshot_source_state = 0;
 
+_Static_assert(__atomic_always_lock_free(sizeof(session_status_for_signals_state),
+                                         &session_status_for_signals_state),
+               "signal status snapshot state must be lock-free");
+_Static_assert(__atomic_always_lock_free(sizeof(session_status_snapshot_source_state),
+                                         &session_status_snapshot_source_state),
+               "status snapshot source state must be lock-free");
+_Static_assert(__atomic_always_lock_free(sizeof(session_status_for_signals[0].v),
+                                         &session_status_for_signals[0].v),
+               "signal status version state must be lock-free");
+
 static void daemon_status_file_session_status_writer_enter(void) {
     uint32_t state = __atomic_load_n(&session_status_snapshot_source_state, __ATOMIC_ACQUIRE);
 
@@ -181,6 +191,19 @@ typedef struct daemon_status_fatal_snapshot {
 } DAEMON_STATUS_FATAL_SNAPSHOT;
 
 static DAEMON_STATUS_FATAL_SNAPSHOT fatal_snapshot = { 0 };
+
+_Static_assert(__atomic_always_lock_free(sizeof(fatal_snapshot.filename[0]),
+                                         &fatal_snapshot.filename[0]),
+               "fatal snapshot bytes must be lock-free");
+_Static_assert(__atomic_always_lock_free(sizeof(fatal_snapshot.thread_id),
+                                         &fatal_snapshot.thread_id),
+               "fatal snapshot thread id must be lock-free");
+_Static_assert(__atomic_always_lock_free(sizeof(fatal_snapshot.line),
+                                         &fatal_snapshot.line),
+               "fatal snapshot line must be lock-free");
+_Static_assert(__atomic_always_lock_free(sizeof(fatal_snapshot.worker_job_id),
+                                         &fatal_snapshot.worker_job_id),
+               "fatal snapshot worker id must be lock-free");
 
 static void daemon_status_file_out_of_memory(void);
 
@@ -1084,7 +1107,34 @@ static void static_save_buffer_init(void) {
     buffer_flush(static_save_buffer);
 }
 
-static bool daemon_status_file_saved = false;
+enum daemon_status_file_startup_save_state {
+    DAEMON_STATUS_FILE_STARTUP_SAVE_WAITING,
+    DAEMON_STATUS_FILE_STARTUP_SAVE_SUCCEEDED,
+    DAEMON_STATUS_FILE_STARTUP_SAVE_CLOSED,
+};
+
+static uint32_t daemon_status_file_startup_save_state = DAEMON_STATUS_FILE_STARTUP_SAVE_WAITING;
+
+_Static_assert(__atomic_always_lock_free(sizeof(daemon_status_file_startup_save_state),
+                                         &daemon_status_file_startup_save_state),
+               "signal-safe startup save state must be lock-free");
+
+static void daemon_status_file_mark_startup_save_succeeded(void) {
+    uint32_t expected = __atomic_load_n(&daemon_status_file_startup_save_state, __ATOMIC_RELAXED);
+    if(expected != DAEMON_STATUS_FILE_STARTUP_SAVE_WAITING)
+        return;
+
+    __atomic_compare_exchange_n(&daemon_status_file_startup_save_state, &expected,
+                                DAEMON_STATUS_FILE_STARTUP_SAVE_SUCCEEDED, false,
+                                __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+}
+
+static bool daemon_status_file_close_startup_save_gate(void) {
+    return __atomic_exchange_n(&daemon_status_file_startup_save_state,
+                               DAEMON_STATUS_FILE_STARTUP_SAVE_CLOSED,
+                               __ATOMIC_RELAXED) == DAEMON_STATUS_FILE_STARTUP_SAVE_SUCCEEDED;
+}
+
 static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
@@ -1101,7 +1151,7 @@ static void daemon_status_file_save(BUFFER *wb, DAEMON_STATUS_FILE *ds, bool log
     buffer_json_finalize(wb);
 
     if(status_file_io_save(STATUS_FILENAME, buffer_tostring(wb), buffer_strlen(wb), log))
-        daemon_status_file_saved = true;
+        daemon_status_file_mark_startup_save_succeeded();
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1498,13 +1548,14 @@ void daemon_status_file_check_crash(void) {
            NETDATA_VERSION, msg, cause, buffer_tostring(wb));
 
     daemon_status_file_startup_step("startup(crash reports check)");
+    bool current_status_saved = daemon_status_file_close_startup_save_gate();
 
     enum crash_report_t r = check_crash_reports_config();
     if( // must be first for netdata.conf option to be used
         (r == DSF_REPORT_ALL || (this_is_a_crash && r == DSF_REPORT_CRASHES)) &&
 
         // we have a previous status, or we managed to save the current one
-        (!no_previous_status || daemon_status_file_saved) &&
+        (!no_previous_status || current_status_saved) &&
 
         // we have more than 2 restarts, or this is not a CI run
         (last_session_status.restarts > 1 || !nd_is_running_under_ci()) &&
@@ -1687,9 +1738,16 @@ static void daemon_status_file_out_of_memory(void) {
     daemon_status_file_save_twice_if_we_can_get_stack_trace(static_save_buffer, &session_status, true);
 }
 
+static bool daemon_status_file_deadly_signal_received_once = false;
+
+_Static_assert(__atomic_always_lock_free(sizeof(daemon_status_file_deadly_signal_received_once),
+                                         &daemon_status_file_deadly_signal_received_once),
+               "deadly signal one-shot state must be lock-free");
+
 NEVER_INLINE
 bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE code, void *fault_address, bool chained_handler) {
-    FUNCTION_RUN_ONCE_RET(true);
+    if(__atomic_exchange_n(&daemon_status_file_deadly_signal_received_once, true, __ATOMIC_RELAXED))
+        return true;
 
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS

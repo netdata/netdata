@@ -27,6 +27,17 @@ typedef int64_t  smsec_t;
 
 typedef int64_t stime_t;
 
+static inline usec_t clocks_usec_delta_or_zero(usec_t now_ut, usec_t old_ut) {
+    return now_ut >= old_ut ? now_ut - old_ut : 0;
+}
+
+static inline usec_t clocks_usec_delta_or_zero_with_rebase(usec_t now_ut, usec_t *old_ut) {
+    if(now_ut && now_ut < *old_ut)
+        *old_ut = now_ut;
+
+    return clocks_usec_delta_or_zero(now_ut, *old_ut);
+}
+
 typedef struct heartbeat {
     usec_t step;
     usec_t realtime;

@@ -45,6 +45,10 @@ static struct {
     { SIGXFSZ, "SIGXFSZ", 0, NETDATA_SIGNAL_DEADLY, EXIT_REASON_SIGXFSZ },
 };
 
+_Static_assert(__atomic_always_lock_free(sizeof(signals_waiting[0].count),
+                                         &signals_waiting[0].count),
+               "signal pending counters must be lock-free");
+
 typedef void (*SIGNAL_HANDLER)(int);
 typedef void (*SIGNAL_SIGACTION)(int, siginfo_t *, void *);
 
