@@ -4360,6 +4360,12 @@ if(NOT OS_WINDOWS)
           COMPONENT netdata
           DESTINATION usr/libexec/netdata)
 
+  # user-facing support-bundle tool: on PATH as `netdata-support-bundle`, like netdatacli
+  install(PROGRAMS
+          packaging/installer/netdata-support-bundle
+          COMPONENT netdata
+          DESTINATION "${BINDIR}")
+
   install(FILES
           system/netdata.conf
           system/netdata-updater.conf
@@ -4795,6 +4801,16 @@ install(CODE "
 #
 
 if(OS_WINDOWS)
+        install(FILES /usr/bin/msys-protobuf-32.dll
+                      /usr/bin/msys-yaml-0-2.dll
+                      /usr/bin/msys-uv-1.dll
+                      DESTINATION "${BINDIR}")
+
+        # user-facing support-bundle tool (Windows PowerShell implementation)
+        install(PROGRAMS packaging/installer/netdata-support-bundle.ps1
+                COMPONENT netdata
+                DESTINATION usr/libexec/netdata)
+
         # Make bash & netdata happy
         install(DIRECTORY DESTINATION tmp)
 

@@ -610,6 +610,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %endif
 %{_sbindir}/systemd-cat-native
 %{_sbindir}/%{name}-claim.sh
+%{_sbindir}/%{name}-support-bundle
 
 %{_unitdir}/%{name}.service
 %{_unitdir}/%{name}-updater.timer

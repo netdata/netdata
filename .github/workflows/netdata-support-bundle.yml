@@ -1,0 +1,157 @@
+---
+name: Netdata support bundle
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/netdata-support-bundle.yml'
+      - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
+      - 'packaging/installer/netdata-support-bundle'
+      - 'packaging/installer/netdata-support-bundle.ps1'
+      - 'packaging/installer/SUPPORT-BUNDLE.md'
+  pull_request:
+    paths:
+      - '.github/workflows/netdata-support-bundle.yml'
+      - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
+      - 'packaging/installer/netdata-support-bundle'
+      - 'packaging/installer/netdata-support-bundle.ps1'
+      - 'packaging/installer/SUPPORT-BUNDLE.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: netdata-support-bundle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  posix:
+    name: POSIX sanitization (${{ matrix.shell }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shell:
+          - sh
+          - dash
+          - busybox
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install BusyBox
+        if: matrix.shell == 'busybox'
+        run: sudo apt-get update && sudo apt-get install -y busybox
+
+      - name: Parse and run adversarial self-test
+        env:
+          TEST_SHELL: ${{ matrix.shell }}
+        run: |
+          set -eu
+          if [ "$TEST_SHELL" = busybox ]; then
+            busybox sh -n packaging/installer/netdata-support-bundle
+            busybox sh packaging/installer/netdata-support-bundle --selftest
+          else
+            "$TEST_SHELL" -n packaging/installer/netdata-support-bundle
+            "$TEST_SHELL" packaging/installer/netdata-support-bundle --selftest
+          fi
+
+  posix-e2e:
+    name: POSIX end-to-end bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and validate a fixture bundle
+        run: |
+          set -eu
+          sudo install -d -m 755 /etc/netdata
+          sudo sh -c 'printf "%s\n" "KEEP-NONSECRET-CONTENT" "password=SENTINEL-E2E-PASSWORD" > /etc/netdata/netdata.conf'
+          sudo chmod 644 /etc/netdata/netdata.conf
+          output=$(mktemp -d)
+          extract=$(mktemp -d)
+          sh packaging/installer/netdata-support-bundle --timeout 3 --since 1 -o "$output"
+          bundle=$(find "$output" -maxdepth 1 \( -name '*.tar.gz' -o -name '*.tar.zst' \) -print -quit)
+          test -n "$bundle"
+          tar -xaf "$bundle" -C "$extract"
+          root=$(find "$extract" -mindepth 1 -maxdepth 1 -type d -print -quit)
+          if ! test -s "$root/01-system/os-release.txt"; then
+            echo 'OS release fixture is missing or empty' >&2
+            find "$root" -maxdepth 2 -type f -print >&2
+            exit 1
+          fi
+          test -s "$root/08-network/resolv-conf.txt"
+          grep -qF 'KEEP-NONSECRET-CONTENT' "$root/04-config/netdata.conf"
+          if grep -R -q 'SENTINEL-E2E-PASSWORD' "$root"; then
+            echo 'planted secret survived in bundle' >&2
+            exit 1
+          fi
+          jq -e '.schema == "netdata-support-bundle/v1" and (.files | length > 0)' "$root/MANIFEST.json"
+          jq -e '.files[] | select(.path == "04-config/netdata.conf" and .bytes > 0)' "$root/MANIFEST.json"
+
+  macos-posix:
+    name: macOS POSIX sanitization
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Parse and run adversarial self-test
+        run: |
+          set -eu
+          sh -n packaging/installer/netdata-support-bundle
+          sh packaging/installer/netdata-support-bundle --selftest
+
+  powershell-core:
+    name: PowerShell 7 sanitization
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run adversarial self-test
+        shell: pwsh
+        run: ./packaging/installer/netdata-support-bundle.ps1 -SelfTest
+
+  windows-powershell:
+    name: Windows PowerShell 5.1 sanitization
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run adversarial self-test
+        shell: powershell
+        run: .\packaging\installer\netdata-support-bundle.ps1 -SelfTest
+
+      - name: Build and validate a fixture bundle
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $confDir = 'C:\Program Files\Netdata\etc\netdata'
+          [System.IO.Directory]::CreateDirectory($confDir) | Out-Null
+          $utf8 = New-Object System.Text.UTF8Encoding($false)
+          [System.IO.File]::WriteAllText(
+              (Join-Path $confDir 'netdata.conf'),
+              "KEEP-NONSECRET-CONTENT`npassword=SENTINEL-E2E-PASSWORD`n",
+              $utf8)
+          $output = Join-Path $env:RUNNER_TEMP ('netdata-support-bundle-e2e-' + [guid]::NewGuid())
+          .\packaging\installer\netdata-support-bundle.ps1 -Output $output -TimeoutSeconds 3 -SinceHours 1
+          $zip = Get-ChildItem $output -Filter '*.zip' | Select-Object -First 1
+          if (-not $zip) { throw 'bundle zip was not created' }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
+          try {
+              $manifestEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])MANIFEST.json$' } | Select-Object -First 1
+              $configEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])04-config[\\/]netdata.conf$' } | Select-Object -First 1
+              if (-not $manifestEntry -or -not $configEntry -or $configEntry.Length -eq 0) { throw 'required non-empty entries are missing' }
+              $reader = New-Object System.IO.StreamReader($configEntry.Open(), $utf8, $true)
+              try { $config = $reader.ReadToEnd() } finally { $reader.Dispose() }
+              if ($config -notmatch 'KEEP-NONSECRET-CONTENT' -or $config -match 'SENTINEL-E2E-PASSWORD') { throw 'config survival/redaction contract failed' }
+              $manifestStream = $manifestEntry.Open()
+              try {
+                  $memory = New-Object System.IO.MemoryStream
+                  try {
+                      $manifestStream.CopyTo($memory)
+                      $bytes = $memory.ToArray()
+                  } finally { $memory.Dispose() }
+              } finally { $manifestStream.Dispose() }
+              if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xff -and $bytes[1] -eq 0xfe) { throw 'MANIFEST.json is UTF-16LE' }
+              $manifest = $utf8.GetString($bytes) | ConvertFrom-Json
+              if ($manifest.schema -ne 'netdata-support-bundle/v1' -or $manifest.files.Count -eq 0) { throw 'manifest contract failed' }
+          } finally { $archive.Dispose() }
