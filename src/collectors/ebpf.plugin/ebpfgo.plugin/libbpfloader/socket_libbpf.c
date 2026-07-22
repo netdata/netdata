@@ -700,7 +700,7 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
     }
 
     if (rt->pid_ht_drops > 0)
-        fprintf(stderr, "ebpf-go.plugin: socket: pid hash table full, %u PID(s) dropped this cycle\n",
+        fprintf(stderr, "ebpf-go.plugin: socket: pid hash table full, %u connection entries dropped this cycle\n",
                 rt->pid_ht_drops);
 
     /* Compact non-empty hash-table entries into the sorted output array. */
