@@ -149,13 +149,6 @@ and exposes the collected data through the on-demand **`network-protocols`** fun
 > Removed per-app charts: `app.ebpf_call_tcp_v4_connection`, `app.ebpf_call_tcp_v6_connection`,
 > `app.ebpf_sock_total_bandwidth`, `app.ebpf_call_tcp_sendmsg`, `app.ebpf_call_tcp_cleanup_rbuf`,
 > `app.ebpf_call_tcp_retransmit`, `app.ebpf_call_udp_sendmsg`, `app.ebpf_call_udp_recvmsg`.
->
-> Removed cgroup/services charts: `cgroup.net_conn_ipv4`, `cgroup.net_conn_ipv6`,
-> `cgroup.net_total_bandwidth`, `cgroup.net_tcp_recv`, `cgroup.net_tcp_send`,
-> `cgroup.net_retransmit`, `cgroup.net_udp_send`, `cgroup.net_udp_recv`,
-> `services.net_conn_ipv4`, `services.net_conn_ipv6`, `services.net_total_bandwidth`,
-> `services.net_tcp_recv`, `services.net_tcp_send`, `services.net_tcp_retransmit`,
-> `services.net_udp_send`, `services.net_udp_recv`.
 
 ### `network-protocols` function columns
 
