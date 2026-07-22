@@ -24,10 +24,10 @@ func TestRootProtocolObservationReportsEarlyProcessExit(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
-	err = newRootProtocolObservation().wait(
+	err = newRootProtocolObservation("fixture").wait(
 		ctx,
 		process,
-		func(int, int, int) bool { return false },
+		func(int, int) bool { return false },
 	)
 	require.ErrorContains(t, err, "exited before expected protocol lifecycle")
 	require.ErrorContains(t, err, "failed")
@@ -38,12 +38,10 @@ func TestShippedRootQuitRejectsDelayedStartupSeparatorsAsKeepalive(t *testing.T)
 	directory := t.TempDir()
 	executable := filepath.Join(directory, "startup-separators")
 	script := "#!/bin/sh\n" +
-		"printf 'FUNCTION GLOBAL \"config\" 30 \"help\" \"tags\" 0xFFFF 1 1\\n\\n'\n" +
-		"sleep 0.05\n" +
 		"printf 'CONFIG fixture create accepted template path source type commands 0x0000 0x0000\\n\\n'\n" +
-		"if IFS= read -r line; then\n" +
-		"  printf 'FUNCTION_DEL GLOBAL \"config\"\\n\\n'\n" +
-		"fi\n"
+		"sleep 0.05\n" +
+		"printf 'CONFIG other create accepted template path source type commands 0x0000 0x0000\\n\\n'\n" +
+		"IFS= read -r line\n"
 	require.NoError(t, os.WriteFile(executable, []byte(script), 0o700))
 
 	ctx, cancel := context.WithTimeout(t.Context(), 500*time.Millisecond)
@@ -55,6 +53,7 @@ func TestShippedRootQuitRejectsDelayedStartupSeparatorsAsKeepalive(t *testing.T)
 			name:       "startup-separators",
 			executable: executable,
 			module:     "fixture",
+			templateID: "fixture",
 		},
 		shippedRootQuit,
 	)
@@ -122,18 +121,26 @@ func TestShippedRootDriverHasClosedRootMembership(t *testing.T) {
 	}
 
 	require.Equal(t, map[string]shippedRoot{
-		"godplugin": {name: "godplugin", executable: "go", module: "testrandom", configFile: "go.d/testrandom.conf"},
+		"godplugin": {
+			name:       "godplugin",
+			executable: "go",
+			module:     "testrandom",
+			configFile: "go.d/testrandom.conf",
+			templateID: "go.d:collector:testrandom",
+		},
 		"ibmdplugin": {
 			name:       "ibmdplugin",
 			executable: "ibm",
 			module:     "websphere_mp",
 			configFile: "ibm.d/websphere_mp.conf",
+			templateID: "ibm.d:collector:websphere_mp",
 		},
 		"scriptsdplugin": {
 			name:       "scriptsdplugin",
 			executable: "scripts",
 			module:     "nagios",
 			configFile: "scripts.d/nagios.conf",
+			templateID: "scripts.d:collector:nagios",
 		},
 	}, observed)
 }
@@ -149,36 +156,31 @@ func TestShippedRootDriverHasClosedScenarioMembership(t *testing.T) {
 func TestRootProtocolObservationPreservesChunkBoundaries(t *testing.T) {
 	tests := map[string]struct {
 		chunks          []string
-		wantPublished   int
-		wantWithdrawals int
+		wantGenerations int
 		wantKeepalives  int
 	}{
-		"split publication and withdrawal": {
+		"split template publication": {
 			chunks: []string{
-				`FUNCTION GLOB`,
-				"AL \"config\" 30 \"help\" \"tags\" 0xFFFF 1 1\n\n" +
-					`FUNCTION_DEL GLOBAL "con`,
-				"fig\"\n\n",
+				`CONFIG fix`,
+				"ture create accepted template path source type commands 0x0000 0x0000\n\n",
 			},
-			wantPublished:   1,
-			wantWithdrawals: 1,
+			wantGenerations: 1,
 		},
 		"startup separators are not keepalives": {
 			chunks: []string{
-				"FUNCTION GLOBAL \"config\" 30 \"help\" \"tags\" 0xFFFF 1 1\n\n",
 				"CONFIG fixture create accepted template path source type commands 0x0000 0x0000\n\n",
+				"CONFIG other create accepted template path source type commands 0x0000 0x0000\n\n",
 				"HOST ''\n\n",
 			},
-			wantPublished: 1,
+			wantGenerations: 1,
 		},
 		"standalone blank after separator is a keepalive": {
 			chunks: []string{
-				"FUNCTION GLOBAL \"config\" 30 \"help\" \"tags\" 0xFFFF 1 1\n\n",
 				"CONFIG fixture create accepted template path source type commands 0x0000 0x0000\n\n",
 				"\n",
 			},
-			wantPublished:  1,
-			wantKeepalives: 1,
+			wantGenerations: 1,
+			wantKeepalives:  1,
 		},
 		"other routes do not count": {
 			chunks: []string{
@@ -189,14 +191,26 @@ func TestRootProtocolObservationPreservesChunkBoundaries(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			observation := newRootProtocolObservation()
+			observation := newRootProtocolObservation("fixture")
 			for _, chunk := range test.chunks {
 				require.NoError(t, observation.observe([]byte(chunk)))
 			}
-			published, withdrawn, keepalives := observation.snapshot()
-			require.Equal(t, test.wantPublished, published)
-			require.Equal(t, test.wantWithdrawals, withdrawn)
+			generations, keepalives := observation.snapshot()
+			require.Equal(t, test.wantGenerations, generations)
 			require.Equal(t, test.wantKeepalives, keepalives)
+		})
+	}
+}
+
+func TestRootProtocolObservationRejectsGlobalConfigFunction(t *testing.T) {
+	tests := map[string]string{
+		"publication": "FUNCTION GLOBAL \"config\" 30 \"help\" \"tags\" 0x0013 1 1\n",
+		"withdrawal":  "FUNCTION_DEL GLOBAL \"config\"\n",
+	}
+	for name, line := range tests {
+		t.Run(name, func(t *testing.T) {
+			observation := newRootProtocolObservation("fixture")
+			require.ErrorContains(t, observation.observe([]byte(line)), "daemon-owned config Function")
 		})
 	}
 }

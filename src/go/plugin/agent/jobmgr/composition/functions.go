@@ -91,8 +91,9 @@ func (fa *FunctionAssembly) abortConstruction() error {
 	return fa.controller.AbortConstruction(context.Background())
 }
 
-// Activate publishes static Function routes after the kernel loop is running and
-// before the process-fixed ingress capability is adopted.
+// Activate publishes externally advertised collector Functions after the
+// kernel loop is running and before process-fixed ingress is adopted. Private
+// initial routes are already present in the catalog and are never announced.
 func (fa *FunctionAssembly) Activate() error {
 	if fa == nil {
 		return errors.New("jobmgr composition: nil Function activation")

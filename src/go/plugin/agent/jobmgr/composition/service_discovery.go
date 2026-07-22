@@ -410,7 +410,6 @@ func newServiceDiscoveryInitialRoute(
 			CooperativeDeadline: true,
 			RawPayload:          true,
 		},
-		Publication: dynCfgPublication(epoch),
 	}, nil
 }
 

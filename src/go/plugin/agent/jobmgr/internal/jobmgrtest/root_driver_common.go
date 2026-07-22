@@ -24,22 +24,31 @@ type shippedRoot struct {
 	executable string
 	module     string
 	configFile string
+	templateID string
 }
 
 func (srd ShippedRootDriver) roots() [3]shippedRoot {
 	return [3]shippedRoot{
-		{name: "godplugin", executable: srd.GoDPlugin, module: "testrandom", configFile: "go.d/testrandom.conf"},
+		{
+			name:       "godplugin",
+			executable: srd.GoDPlugin,
+			module:     "testrandom",
+			configFile: "go.d/testrandom.conf",
+			templateID: "go.d:collector:testrandom",
+		},
 		{
 			name:       "ibmdplugin",
 			executable: srd.IBMPlugin,
 			module:     "websphere_mp",
 			configFile: "ibm.d/websphere_mp.conf",
+			templateID: "ibm.d:collector:websphere_mp",
 		},
 		{
 			name:       "scriptsdplugin",
 			executable: srd.ScriptsDPlugin,
 			module:     "nagios",
 			configFile: "scripts.d/nagios.conf",
+			templateID: "scripts.d:collector:nagios",
 		},
 	}
 }

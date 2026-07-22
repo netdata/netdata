@@ -68,19 +68,6 @@ type runGeneration struct {
 	startedAttempted bool       // start was attempted (guards re-entry)
 }
 
-func dynCfgPublication(epoch uint64) functionadapter.PublicationRecord {
-	return functionadapter.PublicationRecord{
-		Name:       joboutput.DynCfgFunctionName,
-		Generation: epoch,
-		Timeout:    120,
-		Help:       "dynamic configuration",
-		Tags:       "top",
-		Access:     "0x0013",
-		Priority:   100,
-		Version:    3,
-	}
-}
-
 func newRunGeneration(config runGenerationConfig) (generation *runGeneration, resultErr error) {
 	var stores *secretstore.SecretStore
 	var secretController *secretadapter.Controller

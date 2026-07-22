@@ -30,19 +30,19 @@ type Controller struct {
 	mutations   jobmgr.FunctionMutationPort // kernel Function-mutation port
 	publication *Publication                // external FUNCTION/FUNCTION_DEL registration set
 
-	plans            map[string]controllerModulePlan          // per-module route plans
-	jobs             map[string]map[string]controllerJob      // live jobs by module then job name
-	groups           map[string]*controllerGroup              // method-generation groups by signature key
-	routes           map[string]controllerRoute               // controller's view of published routes
-	fixed            map[string]PublicationRecord             // initial/fixed publication records
-	fixedGenerations []*HandlerGenerationDeclaration          // initial/fixed handler-generation declarations (for cleanup)
-	availability     map[string][]controllerAvailabilityProbe // per-module availability probes
-	version          uint64                                   // controller version
-	nextID           uint64                                   // next controller-assigned id
-	activated        bool                                     // Activate has run (initial snapshot published)
-	draining         bool                                     // shutdown draining has begun
-	terminated       bool                                     // controller fully torn down
-	dirty            error                                    // sticky poison error
+	plans              map[string]controllerModulePlan          // per-module route plans
+	jobs               map[string]map[string]controllerJob      // live jobs by module then job name
+	groups             map[string]*controllerGroup              // method-generation groups by signature key
+	routes             map[string]controllerRoute               // controller's view of published routes
+	initialNames       map[string]struct{}                      // immutable initial-route public names
+	initialGenerations []*HandlerGenerationDeclaration          // initial handler generations retained for cleanup
+	availability       map[string][]controllerAvailabilityProbe // per-module availability probes
+	version            uint64                                   // controller version
+	nextID             uint64                                   // next controller-assigned id
+	activated          bool                                     // Activate has published the external snapshot
+	draining           bool                                     // shutdown draining has begun
+	terminated         bool                                     // controller fully torn down
+	dirty              error                                    // sticky poison error
 }
 
 type controllerJob struct {
@@ -77,9 +77,10 @@ type controllerRoute struct {
 	publication PublicationRecord
 }
 
+// InitialRoute installs an immutable private catalog route. External
+// publication is reserved for controller-managed collector Functions.
 type InitialRoute struct {
 	Declaration Declaration
-	Publication PublicationRecord
 }
 
 type JobHandle struct {
@@ -159,7 +160,7 @@ func NewController(
 		jobs:         make(map[string]map[string]controllerJob),
 		groups:       make(map[string]*controllerGroup),
 		routes:       make(map[string]controllerRoute),
-		fixed:        make(map[string]PublicationRecord),
+		initialNames: make(map[string]struct{}, len(initial)),
 		availability: make(map[string][]controllerAvailabilityProbe, len(modules)),
 		version:      1,
 	}
@@ -172,7 +173,7 @@ func NewController(
 		return errors.Join(
 			cause,
 			controller.cleanupUnpublishedGroups(context.Background(), controller.groups),
-			controller.cleanupInitialRoutes(context.Background(), controller.fixedGenerations),
+			controller.cleanupInitialRoutes(context.Background(), controller.initialGenerations),
 		)
 	}
 	slices.Sort(names)
@@ -200,9 +201,9 @@ func NewController(
 		return nil, nil, cleanupConstruction(err)
 	}
 	declarations := make([]Declaration, 0, len(routes)+len(initial))
-	fixedGenerations := make(map[*HandlerGenerationDeclaration]struct{}, len(initial))
+	initialGenerations := make(map[*HandlerGenerationDeclaration]struct{}, len(initial))
 	for _, route := range initial {
-		if err := validateInitialRoute(route); err != nil {
+		if err := validateDeclaration(route.Declaration); err != nil {
 			return nil, nil, cleanupConstruction(err)
 		}
 		if _, exists := routes[route.Declaration.PublicName]; exists {
@@ -210,15 +211,10 @@ func NewController(
 				errors.New("jobmgr Function controller: initial route collides with collector Function"),
 			)
 		}
-		if current, exists := controller.fixed[route.Publication.Name]; exists && current != route.Publication {
-			return nil, nil, cleanupConstruction(
-				errors.New("jobmgr Function controller: initial routes disagree on publication"),
-			)
-		}
-		controller.fixed[route.Publication.Name] = route.Publication
-		if _, exists := fixedGenerations[route.Declaration.Generation]; !exists {
-			fixedGenerations[route.Declaration.Generation] = struct{}{}
-			controller.fixedGenerations = append(controller.fixedGenerations, route.Declaration.Generation)
+		controller.initialNames[route.Declaration.PublicName] = struct{}{}
+		if _, exists := initialGenerations[route.Declaration.Generation]; !exists {
+			initialGenerations[route.Declaration.Generation] = struct{}{}
+			controller.initialGenerations = append(controller.initialGenerations, route.Declaration.Generation)
 		}
 		declarations = append(declarations, route.Declaration)
 	}
@@ -265,12 +261,12 @@ func (c *Controller) AbortConstruction(ctx context.Context) error {
 	}
 	c.terminated = true
 	groups := c.groups
-	fixed := c.fixedGenerations
+	initial := c.initialGenerations
 	c.groups = nil
 	c.routes = nil
-	c.fixedGenerations = nil
+	c.initialGenerations = nil
 	c.mu.Unlock()
-	return errors.Join(c.cleanupUnpublishedGroups(ctx, groups), c.cleanupInitialRoutes(ctx, fixed))
+	return errors.Join(c.cleanupUnpublishedGroups(ctx, groups), c.cleanupInitialRoutes(ctx, initial))
 }
 
 func (c *Controller) Activate() error {
@@ -531,7 +527,7 @@ func (c *Controller) reconcileModuleLocked(
 	if err != nil {
 		return nil, err
 	}
-	for name := range c.fixed {
+	for name := range c.initialNames {
 		if _, exists := nextRoutes[name]; exists {
 			return nil, errors.New("jobmgr Function controller: collector Function collides with initial route")
 		}
@@ -1048,26 +1044,11 @@ func sortedControllerRouteNames(routes map[string]controllerRoute) []string {
 
 func (c *Controller) publicationRecordsLocked(routes map[string]controllerRoute) []PublicationRecord {
 	names := sortedControllerRouteNames(routes)
-	fixedNames := slices.Sorted(maps.Keys(c.fixed))
-	records := make([]PublicationRecord, 0, len(fixedNames)+len(names))
-	for _, name := range fixedNames {
-		records = append(records, c.fixed[name])
-	}
+	records := make([]PublicationRecord, 0, len(names))
 	for _, name := range names {
 		records = append(records, routes[name].publication)
 	}
 	return records
-}
-
-func validateInitialRoute(route InitialRoute) error {
-	if err := validateDeclaration(route.Declaration); err != nil {
-		return err
-	}
-	record := route.Publication
-	if record.Name != route.Declaration.PublicName || !record.validCore() || record.Access == "" {
-		return errors.New("jobmgr Function controller: invalid initial publication")
-	}
-	return nil
 }
 
 func (c *Controller) cleanupInitialRoutes(

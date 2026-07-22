@@ -212,6 +212,10 @@ Two more facts that catch newcomers:
 - A resource-less Function call gets a **unique lane per invocation**, so
   concurrent calls to the same Function run in parallel — unless the resolved
   plan declares claims.
+- DynCfg `config` prefix routes are **private catalog routes**, not Function
+  publications. Netdata owns the global `config` Function that serves the tree
+  and delegates per-config operations; go.d emits `CONFIG` object frames but
+  never `FUNCTION GLOBAL "config"` or its withdrawal.
 
 ## How the Job Manager Manages Jobs
 

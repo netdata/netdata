@@ -219,7 +219,7 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 	closeRunTestUIDs(t, uids)
 }
 
-func TestRunGenerationDynCfgEnableUsesSameNamePerJobProtocolID(t *testing.T) {
+func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *testing.T) {
 	var cleanupCalls atomic.Int32
 	modules := collectorapi.Registry{
 		"module": {
@@ -303,10 +303,11 @@ func TestRunGenerationDynCfgEnableUsesSameNamePerJobProtocolID(t *testing.T) {
 	createAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module:module create accepted job"))
 	resultAt := bytes.Index(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN enable 200 application/json"))
 	statusAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module:module status running"))
+	require.NotContains(t, wire, `FUNCTION GLOBAL "config"`)
+	require.NotContains(t, wire, `FUNCTION_DEL GLOBAL "config"`)
 	require.False(
 		t,
-		!bytes.Contains(output.Bytes(), []byte(`FUNCTION GLOBAL "config"`)) ||
-			templateAt < 0 || createAt < 0 || templateAt >= createAt ||
+		templateAt < 0 || createAt < 0 || templateAt >= createAt ||
 			resultAt < 0 || statusAt < 0 || resultAt >= statusAt,
 		"wire=%q",
 		wire,

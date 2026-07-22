@@ -142,7 +142,6 @@ func newVNodeInitialRoute(epoch uint64, binding *vnodeBinding) (functionadapter.
 			CooperativeDeadline: true,
 			RawPayload:          true,
 		},
-		Publication: dynCfgPublication(epoch),
 	}, nil
 }
 

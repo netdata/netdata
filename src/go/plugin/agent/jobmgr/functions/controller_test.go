@@ -402,17 +402,12 @@ func TestFunctionControllerReportsInitialRouteCleanupFailure(t *testing.T) {
 					Generation: generation,
 					PublicName: "initial",
 				},
-				Publication: PublicationRecord{
-					Name:       "initial",
-					Generation: 1,
-					Access:     "signed-id",
-				},
 			}
 			invalid := valid
-			invalid.Publication.Access = ""
+			invalid.Declaration.PublicName = ""
 
 			_, _, err := NewController(1, collectorapi.Registry{}, valid, invalid)
-			require.ErrorContains(t, err, "invalid initial publication")
+			require.ErrorContains(t, err, "invalid declaration")
 			test.assert(t, err)
 		})
 	}

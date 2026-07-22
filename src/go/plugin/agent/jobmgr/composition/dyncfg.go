@@ -102,6 +102,5 @@ func newDynCfgJobInitialRoute(
 			CooperativeDeadline: true,
 			RawPayload:          true,
 		},
-		Publication: dynCfgPublication(epoch),
 	}, nil
 }
