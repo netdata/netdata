@@ -35,12 +35,14 @@ func (fn runFinalizerFunc) FinalizeRun(ctx context.Context, generation uint64) e
 
 func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	var cleanupCalls atomic.Int32
+	handled := make(chan struct{})
 	catalog, err := functionadapter.NewCatalog([]functionadapter.Declaration{
 		{
 			ID: "method", PublicName: "direct",
 			Generation: &functionadapter.HandlerGenerationDeclaration{
 				ID: "external-test",
 				Handler: func(context.Context, functionadapter.HandlerInput) (lifecycle.SealedResult, error) {
+					close(handled)
 					return lifecycle.NewControlResult(lifecycle.ControlInternal)
 				},
 				Cleanup: func(context.Context) error {
@@ -72,20 +74,22 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	require.NoError(t, run.OpenAdmission())
 	require.NoError(t, kernel.Start(context.Background()))
 
-	require.NoError(t, kernel.SubmitAndWait(context.Background(), jobmgr.Request{
+	require.NoError(t, kernel.Submit(context.Background(), jobmgr.Request{
 		UID: "concrete-catalog", Source: lifecycle.SourceFunction, Route: "direct",
 	}),
 	)
-
-	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN concrete-catalog 500 application/json ")))
+	select {
+	case <-handled:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "Function handler did not run")
+	}
 	kernel.Stop()
 
 	require.NoError(t, kernel.Wait(context.Background()))
+	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN concrete-catalog 500 application/json ")))
 
-	census := catalog.Census()
-	require.False(t, !census.Closed || census.Routes != 0 ||
-		census.InvocationLeases != 0 || census.PendingCleanups != 0 ||
-		cleanupCalls.Load() != 1)
+	require.True(t, catalog.LifecycleDrained())
+	require.EqualValues(t, 1, cleanupCalls.Load())
 
 	closeExternalUIDLedger(t, uids)
 }
@@ -157,8 +161,8 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 
 	require.NoError(t, kernel.Wait(context.Background()))
 
-	census := catalog.Census()
-	require.False(t, census.InvocationLeases != 0 || cleanupCalls.Load() != 1)
+	require.True(t, catalog.LifecycleDrained())
+	require.EqualValues(t, 1, cleanupCalls.Load())
 
 	require.EqualValues(t, calls, len(seen))
 
@@ -167,6 +171,7 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 
 func TestKernelSameRouteFunctionCancellationIsInvocationLocal(t *testing.T) {
 	entered := make(chan string, 2)
+	finished := make(chan string, 2)
 	releaseBlocked := make(chan struct{})
 	catalog, err := functionadapter.NewCatalog([]functionadapter.Declaration{
 		{
@@ -179,6 +184,7 @@ func TestKernelSameRouteFunctionCancellationIsInvocationLocal(t *testing.T) {
 					input functionadapter.HandlerInput,
 				) (lifecycle.SealedResult, error) {
 					entered <- input.UID
+					defer func() { finished <- input.UID }()
 					if input.UID == "blocked" {
 						<-releaseBlocked
 					} else {
@@ -192,23 +198,18 @@ func TestKernelSameRouteFunctionCancellationIsInvocationLocal(t *testing.T) {
 	})
 	require.NoError(t, err)
 	kernel, _, uids := newExternalKernel(t, catalog)
-	results := map[string]chan error{
-		"blocked":   make(chan error, 1),
-		"cancelled": make(chan error, 1),
+	requests := map[string]struct{}{"blocked": {}, "cancelled": {}}
+	for uid := range requests {
+		require.NoError(t, kernel.Submit(
+			context.Background(),
+			jobmgr.Request{
+				UID: uid, Source: lifecycle.SourceFunction,
+				Route: "direct",
+			},
+		))
 	}
-	for uid, result := range results {
-		go func() {
-			result <- kernel.SubmitAndWait(
-				context.Background(),
-				jobmgr.Request{
-					UID: uid, Source: lifecycle.SourceFunction,
-					Route: "direct",
-				},
-			)
-		}()
-	}
-	seen := make(map[string]struct{}, len(results))
-	for len(seen) < len(results) {
+	seen := make(map[string]struct{}, len(requests))
+	for len(seen) < len(requests) {
 		select {
 		case uid := <-entered:
 			seen[uid] = struct{}{}
@@ -224,25 +225,25 @@ func TestKernelSameRouteFunctionCancellationIsInvocationLocal(t *testing.T) {
 		require.FailNow(t, "test failed", err)
 	}
 	select {
-	case err := <-results["cancelled"]:
-		if err != nil {
+	case uid := <-finished:
+		if uid != "cancelled" {
 			close(releaseBlocked)
-			require.FailNowf(t, "test failed", "cancelled invocation terminal error: %v", err)
+			require.FailNowf(t, "test failed", "wrong invocation completed: %q", uid)
 		}
 	case <-time.After(time.Second):
 		close(releaseBlocked)
 		require.FailNow(t, "test failed", "cancelled invocation did not reach terminal")
 	}
 	select {
-	case err := <-results["blocked"]:
+	case uid := <-finished:
 		close(releaseBlocked)
-		require.FailNowf(t, "test failed", "cancelling one same-route invocation completed its peer: %v", err)
+		require.FailNowf(t, "test failed", "cancelling one same-route invocation completed its peer: %q", uid)
 	case <-time.After(25 * time.Millisecond):
 	}
 	close(releaseBlocked)
 	select {
-	case err := <-results["blocked"]:
-		require.NoError(t, err)
+	case uid := <-finished:
+		require.Equal(t, "blocked", uid)
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "blocked invocation did not complete after release")
 	}
@@ -292,7 +293,7 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 		ID: "method", Generation: newGeneration,
 		PublicName: "direct",
 	}
-	mutation, err := catalog.NewMutation(catalog.Census().Version, []functionadapter.RouteChange{{
+	mutation, err := catalog.NewMutation(1, []functionadapter.RouteChange{{
 		PublicName: "direct", Declaration: &replacement,
 	}})
 	require.NoError(t, err)
@@ -303,7 +304,7 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 		UID: "during-mutation", Route: "direct",
 	})
 	require.NoError(t, err)
-	require.False(t, rejected.Rejected != lifecycle.ControlUnavailable || catalog.Census().Version != 1)
+	require.Equal(t, lifecycle.ControlUnavailable, rejected.Rejected)
 	version, err := kernel.CommitFunctions(context.Background(), mutation)
 	require.NoError(t, err)
 	require.EqualValues(t, 2, version)
@@ -313,12 +314,12 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 		require.FailNow(t, "test failed", "retired handler cleanup did not run through TaskSupervisor")
 	}
 
-	require.NoError(t, kernel.SubmitAndWait(context.Background(), jobmgr.Request{
+	require.NoError(t, kernel.Submit(context.Background(), jobmgr.Request{
 		UID: "after-mutation", Source: lifecycle.SourceFunction, Route: "direct",
 	}),
 	)
-
-	require.False(t, oldCalls.Load() != 0 || newCalls.Load() != 1)
+	require.Eventually(t, func() bool { return newCalls.Load() == 1 }, time.Second, time.Millisecond)
+	require.Zero(t, oldCalls.Load())
 
 	kernel.Stop()
 
@@ -386,7 +387,7 @@ func TestFunctionCatalogShutdownCompletesResumedMultiTurnMutation(t *testing.T) 
 		resumeCommit:        resumeCommit,
 	}
 	kernel, _, uids := newExternalKernel(t, observed)
-	mutation, err := catalog.NewMutation(catalog.Census().Version, changes)
+	mutation, err := catalog.NewMutation(1, changes)
 	require.NoError(t, err)
 	require.NoError(t, kernel.QuiesceFunctions(context.Background(), mutation))
 
@@ -416,10 +417,7 @@ func TestFunctionCatalogShutdownCompletesResumedMultiTurnMutation(t *testing.T) 
 	}
 	require.NoError(t, kernel.Wait(context.Background()))
 
-	census := catalog.Census()
-	require.True(t, census.Closed)
-	require.Zero(t, census.Routes)
-	require.Zero(t, census.PendingCleanups)
+	require.True(t, catalog.LifecycleDrained())
 	require.EqualValues(t, population, predecessorCleanups.Load())
 	require.EqualValues(t, population, successorCleanups.Load())
 	closeExternalUIDLedger(t, uids)
@@ -515,22 +513,37 @@ func TestFunctionCatalogPausedMutationAbortsDuringShutdown(t *testing.T) {
 	closeExternalUIDLedger(t, uids)
 }
 
-func TestFunctionCatalogMutationAfterShutdownCutIsRejectedBeforeAdmission(
+func TestFunctionCatalogMutationAfterShutdownIsRejectedBeforeAdmission(
 	t *testing.T,
 ) {
 	catalog := &handoffMutationCatalog{
 		begun: make(chan struct{}),
 		allow: make(chan struct{}),
 	}
-	kernel, run, uids := newExternalKernel(t, catalog)
+	barrierEntered := make(chan struct{})
+	barrierRelease := make(chan struct{})
+	releaseBarrier := sync.OnceFunc(func() { close(barrierRelease) })
+	defer releaseBarrier()
+	kernel, run, uids := newExternalKernelWithBarrier(
+		t,
+		catalog,
+		runShutdownBarrierFunc(func(ctx context.Context, _ uint64) error {
+			close(barrierEntered)
+			select {
+			case <-barrierRelease:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}),
+	)
 
 	kernel.Stop()
-	shutdownCtx, cancelShutdown := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
-	defer cancelShutdown()
-	require.NoError(t, kernel.WaitShutdownStarted(shutdownCtx))
+	select {
+	case <-barrierEntered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "shutdown barrier did not start")
+	}
 
 	err := kernel.QuiesceFunctions(
 		context.Background(),
@@ -551,6 +564,7 @@ func TestFunctionCatalogMutationAfterShutdownCutIsRejectedBeforeAdmission(
 	default:
 	}
 
+	releaseBarrier()
 	require.NoError(t, kernel.Wait(context.Background()))
 	require.True(t, catalog.closed.Load())
 	closeExternalUIDLedger(t, uids)
@@ -661,15 +675,23 @@ func (*handoffMutationCatalog) CloseStep(
 	return nil, false, nil
 }
 
-func (hmc *handoffMutationCatalog) LifecycleCensus() jobmgr.FunctionCatalogCensus {
-	return jobmgr.FunctionCatalogCensus{
-		Version:        2,
-		MutationActive: hmc.active.Load(),
-		Closed:         hmc.closed.Load(),
-	}
+func (hmc *handoffMutationCatalog) LifecycleDrained() bool {
+	return hmc.closed.Load() && !hmc.active.Load()
 }
 
 func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmgr.CommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger) {
+	return newExternalKernelWithBarrier(
+		t,
+		catalog,
+		runShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
+	)
+}
+
+func newExternalKernelWithBarrier(
+	t *testing.T,
+	catalog jobmgr.FunctionCatalogPort,
+	barrier jobmgr.RunShutdownBarrier,
+) (*jobmgr.CommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger) {
 	t.Helper()
 	clock := lifecycle.RealClock{}
 	run, err := lifecycle.NewRunSupervisor(1, clock, time.Second)
@@ -682,7 +704,7 @@ func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmg
 	require.NoError(t, err)
 	kernel, err := jobmgr.NewCommandKernel(
 		run, uids, tasks, frames, clock,
-		runShutdownBarrierFunc(func(context.Context, uint64) error { return nil }),
+		barrier,
 		runFinalizerFunc(func(context.Context, uint64) error { return nil }),
 		catalog,
 	)

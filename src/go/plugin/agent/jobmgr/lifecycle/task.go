@@ -28,8 +28,6 @@ func (ref TaskRequestRef) Valid() bool {
 type TaskStart struct {
 	Request TaskRequestRef
 	Task    TaskRef
-	Outcome TaskOutcome
-	Err     error
 }
 
 func (ref TaskRef) Valid() bool {
@@ -305,19 +303,6 @@ func (ts *TaskSupervisor) Dispatch(parent context.Context, quantum int, started 
 		requestRef := TaskRequestRef{Slot: record.slot, Generation: record.generation}
 		taskRef, err := ts.start(parent, record.plan, record.initial)
 		if err != nil {
-			if errors.Is(err, ErrLongLivedRecordCapacity) {
-				outcome := record.initial
-				record.initial = TaskOutcome{}
-				ts.removeRequest(record)
-				started[count] = TaskStart{
-					Request: requestRef,
-					Outcome: outcome,
-					Err:     err,
-				}
-				count++
-				ts.nextClass = otherTaskClass(classForTaskIndex(selected))
-				continue
-			}
 			return count, true, err
 		}
 		ts.removeRequest(record)
@@ -666,10 +651,6 @@ func (ts *TaskSupervisor) ClearRetainedTimeout(ref TaskRef) (bool, error) {
 	return true, nil
 }
 
-func (ts *TaskSupervisor) RetainedTimeouts() (int, bool) {
-	return ts.retained, ts.saturated
-}
-
 func (ts *TaskSupervisor) PreflightResult(ref TaskRef, uid string, expiry int64) error {
 	slot, err := ts.slot(ref)
 	if err != nil {
@@ -678,11 +659,16 @@ func (ts *TaskSupervisor) PreflightResult(ref TaskRef, uid string, expiry int64)
 	if slot.outcome.kind != TaskOutcomeFrame {
 		return errors.New("jobmgr task supervisor: result is unavailable for preflight")
 	}
-	frame, err := PrepareFrame(uid, slot.outcome.frame, expiry)
-	if err != nil {
+	if err := slot.outcome.frame.validate(); err != nil {
 		return err
 	}
-	_, err = frame.encodedSize()
+	_, _, err = functionFrameSize(
+		uid,
+		slot.outcome.frame.status,
+		slot.outcome.frame.contentType,
+		expiry,
+		len(slot.outcome.frame.payload),
+	)
 	return err
 }
 

@@ -227,8 +227,8 @@ type readyDiscovery struct {
 
 	providerReleased   map[string]bool // per-provider release completed
 	supervisorReleased bool            // supervisor task released
-	externalActivated  bool            // external facet activated
-	externalReleased   bool            // external facet released
+	externalActivated  bool            // external discovery resource activated
+	externalReleased   bool            // external discovery resource released
 	permitReturned     bool            // permit returned
 }
 
@@ -245,7 +245,7 @@ func (rd *readyDiscovery) start(ctx context.Context) error {
 	if rd.started {
 		return errors.New("jobmgr composition: discovery already started")
 	}
-	if err := rd.permit.ActivateExternal(lifecycle.LongLivedEProvider); err != nil {
+	if err := rd.permit.ActivateExternal(); err != nil {
 		return err
 	}
 	rd.externalActivated = true
@@ -387,7 +387,7 @@ func (rd *readyDiscovery) abortStart() error {
 	// Publication is still closed, so every started child is a framework gate
 	// waiter and must terminate when its inherited context is canceled.
 	var cleanupErr error
-	if supervisorRef.Generation != 0 {
+	if supervisorRef != 0 {
 		cleanupErr = errors.Join(
 			cleanupErr,
 			rd.tasks.CancelInherited(
@@ -397,7 +397,7 @@ func (rd *readyDiscovery) abortStart() error {
 		)
 	}
 	for _, name := range providerNames {
-		if ref := providerRefs[name]; ref.Generation != 0 {
+		if ref := providerRefs[name]; ref != 0 {
 			cleanupErr = errors.Join(
 				cleanupErr,
 				rd.tasks.CancelInherited(
@@ -409,7 +409,7 @@ func (rd *readyDiscovery) abortStart() error {
 	}
 	for _, name := range providerNames {
 		ref := providerRefs[name]
-		if ref.Generation == 0 {
+		if ref == 0 {
 			continue
 		}
 		joined, err := rd.tasks.JoinInherited(
@@ -429,7 +429,7 @@ func (rd *readyDiscovery) abortStart() error {
 			),
 		)
 	}
-	if supervisorRef.Generation != 0 {
+	if supervisorRef != 0 {
 		joined, err := rd.tasks.JoinInherited(
 			context.Background(),
 			supervisorRef,
@@ -450,9 +450,7 @@ func (rd *readyDiscovery) abortStart() error {
 	if externalActivated {
 		cleanupErr = errors.Join(
 			cleanupErr,
-			rd.permit.ReleaseExternal(
-				lifecycle.LongLivedEProvider,
-			),
+			rd.permit.ReleaseExternal(),
 		)
 	}
 	cleanupErr = errors.Join(
@@ -613,9 +611,7 @@ func (rd *readyDiscovery) Finalize() error {
 		rd.supervisorReleased = true
 	}
 	if !rd.externalReleased {
-		if err := rd.permit.ReleaseExternal(
-			lifecycle.LongLivedEProvider,
-		); err != nil {
+		if err := rd.permit.ReleaseExternal(); err != nil {
 			rd.mu.Unlock()
 			return err
 		}

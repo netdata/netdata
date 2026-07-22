@@ -34,7 +34,7 @@ func testTaskRequestGrowth(t *testing.T) {
 	require.NoError(t, err)
 	plan := TaskPlan{
 		Source: SourceJobManager,
-		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		}),
 	}

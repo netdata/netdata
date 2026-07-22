@@ -37,15 +37,13 @@ type FunctionInvocationRef struct {
 }
 
 // FunctionCleanupRef identifies one generation cleanup acknowledged back to
-// the Function catalog after TaskSupervisor executes it off-loop.
-type FunctionCleanupRef struct {
-	Slot       uint32
-	Generation uint64
-}
+// the Function catalog after TaskSupervisor executes it off-loop. Cleanup IDs
+// are monotonic and never reused during a catalog lifetime.
+type FunctionCleanupRef uint32
 
 // Valid reports whether the reference can identify pending catalog cleanup.
 func (ref FunctionCleanupRef) Valid() bool {
-	return ref.Slot != 0 && ref.Generation != 0
+	return ref != 0
 }
 
 // FunctionCleanupPlan is inert work returned by a catalog transition when a
@@ -66,15 +64,6 @@ type FunctionCatalogMutationProgress struct {
 	Version  uint64 // catalog version the mutation targets
 	Quiesced bool   // predecessor admission is closed
 	Done     bool   // the mutation has fully completed
-}
-
-type FunctionCatalogCensus struct {
-	Version          uint64 // catalog version
-	Routes           int    // count of live routes
-	InvocationLeases int    // outstanding invocation leases
-	PendingCleanups  int    // generations with cleanup pending
-	Closed           bool   // catalog is closed
-	MutationActive   bool   // a catalog mutation is in progress
 }
 
 func (fcp FunctionCleanupPlan) validate() error {
@@ -143,7 +132,7 @@ type FunctionCatalogPort interface {
 	AbortMutation(FunctionCatalogMutation) error
 	BeginClose() error
 	CloseStep(int) ([]FunctionCleanupPlan, bool, error)
-	LifecycleCensus() FunctionCatalogCensus
+	LifecycleDrained() bool
 }
 
 // FunctionMutationPort is the composition-facing capability for submitting an

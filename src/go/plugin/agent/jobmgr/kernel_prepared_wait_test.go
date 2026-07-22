@@ -61,12 +61,6 @@ func TestSubmitPreparedPreservesStoppingRejectionWithoutInputBodyCleanup(t *test
 	require.NoError(t, err)
 
 	kernel.Stop()
-	shutdownCtx, cancelShutdown := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
-	defer cancelShutdown()
-	require.NoError(t, kernel.WaitShutdownStarted(shutdownCtx))
 
 	err = kernel.SubmitPrepared(
 		context.Background(),
@@ -249,6 +243,17 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 		)
 	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
+	probeCtx, cancelProbe := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancelProbe()
+	probe, err := startShutdownProbe(
+		probeCtx,
+		kernel.CommandKernel,
+		"function-mutation-handoff-shutdown-probe",
+	)
+	require.NoError(t, err)
 
 	actionEntered := make(chan struct{})
 	actionRelease := make(chan struct{})
@@ -297,7 +302,7 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 		time.Second,
 	)
 	defer cancelShutdown()
-	require.NoError(t, kernel.WaitShutdownStarted(shutdownCtx))
+	require.NoError(t, probe.waitCancellation(shutdownCtx))
 	close(actionRelease)
 
 	select {
@@ -312,13 +317,14 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 	)
 	defer cancelWait()
 	waitErr := kernel.Wait(waitCtx)
+	require.NoError(t, probe.waitSettlement(waitCtx))
 	require.NoErrorf(
 		t,
 		waitErr,
 		"phase=%d continuations=%d cancellationDone=%v mutationActive=%v mutationPaused=%v catalog active=%v closed=%v",
 		kernel.shutdownPhase,
 		kernel.ownershipChains,
-		kernel.shutdownCancelDone,
+		kernel.shutdownCancelCursor == nil,
 		kernel.functionMutationActive,
 		kernel.functionMutationPaused,
 		catalog.active.Load(),
@@ -474,11 +480,8 @@ func (samc *shutdownActionMutationCatalog) CloseStep(
 	return nil, false, nil
 }
 
-func (samc *shutdownActionMutationCatalog) LifecycleCensus() FunctionCatalogCensus {
-	return FunctionCatalogCensus{
-		Closed:         samc.closed.Load(),
-		MutationActive: samc.active.Load(),
-	}
+func (samc *shutdownActionMutationCatalog) LifecycleDrained() bool {
+	return samc.closed.Load() && !samc.active.Load()
 }
 
 func atomicTransactionPlan(
@@ -702,7 +705,7 @@ func TestSubmitPreparedAndWaitJoinsAcceptedCancellation(t *testing.T) {
 				Route:   "internal/test",
 			},
 			WorkPlan{
-				Work: lifecycle.FrameTaskWork(
+				Work: frameTaskWork(
 					func(context.Context) (
 						lifecycle.SealedResult,
 						error,

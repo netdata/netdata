@@ -21,13 +21,6 @@ const (
 	ProcessIngressContained ProcessIngressState = "contained"
 )
 
-type ProcessIngressCensus struct {
-	State            ProcessIngressState
-	ActiveDeliveries int
-	ReaderStarts     int
-	RunGeneration    uint64
-}
-
 type processInputPort interface {
 	functionwire.Consumer
 	Generation() uint64
@@ -71,10 +64,9 @@ type ProcessIngress struct {
 	changed       chan struct{}              // closed and replaced on state/counter changes
 	capsule       *functionwire.InputCapsule // process-lifetime wire reader (never swapped)
 	state         ProcessIngressState        // paused | live | contained
-	runGeneration uint64                     // generation of the active binding
 	deliveries    int                        // in-flight HandleCall/Cancel/Reject/Quit count
 	pauseNext     uint64                     // generation the next Adopt must match after a drain
-	readerStarts  int                        // Run() guard; started exactly once
+	readerStarted bool                       // Run() guard; started exactly once
 	mu            sync.Mutex                 // guards all fields
 	parsing       bool                       // a returned wire read is being parsed or delivered
 	waitingReads  int                        // returned reads parked while ingress is paused
@@ -102,11 +94,11 @@ func (pi *ProcessIngress) Run(ctx context.Context) error {
 		return errors.New("jobmgr Function process ingress: nil reader context")
 	}
 	pi.mu.Lock()
-	if pi.readerStarts != 0 || pi.state == ProcessIngressContained {
+	if pi.readerStarted || pi.state == ProcessIngressContained {
 		pi.mu.Unlock()
 		return errors.New("jobmgr Function process ingress: reader already started or contained")
 	}
-	pi.readerStarts++
+	pi.readerStarted = true
 	pi.mu.Unlock()
 	return pi.capsule.Run(ctx, pi)
 }
@@ -131,7 +123,6 @@ func (pi *ProcessIngress) Adopt(ctx context.Context, binding ProcessBinding) err
 	}
 	defer pi.mu.Unlock()
 	pi.active = binding.port
-	pi.runGeneration = binding.port.Generation()
 	pi.pauseNext = 0
 	pi.state = ProcessIngressLive
 	pi.signalLocked()
@@ -192,7 +183,6 @@ func (pi *ProcessIngress) Fence(ctx context.Context) error {
 	}
 	pi.capsule.DiscardPausedPayload()
 	pi.state = ProcessIngressContained
-	pi.runGeneration = 0
 	pi.signalLocked()
 	var fenceErr error
 	for pi.waitingReads != 0 && fenceErr == nil {
@@ -203,19 +193,10 @@ func (pi *ProcessIngress) Fence(ctx context.Context) error {
 	return fenceErr
 }
 
-func (pi *ProcessIngress) Census() ProcessIngressCensus {
+func (pi *ProcessIngress) State() ProcessIngressState {
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
-	return pi.censusLocked()
-}
-
-func (pi *ProcessIngress) censusLocked() ProcessIngressCensus {
-	return ProcessIngressCensus{
-		State:            pi.state,
-		RunGeneration:    pi.runGeneration,
-		ReaderStarts:     pi.readerStarts,
-		ActiveDeliveries: pi.deliveries,
-	}
+	return pi.state
 }
 
 // AcquireInputRead admits one returned reader segment into the parser. A read
@@ -223,7 +204,6 @@ func (pi *ProcessIngress) censusLocked() ProcessIngressCensus {
 // successor is adopted or the process input is contained.
 func (pi *ProcessIngress) AcquireInputRead(
 	ctx context.Context,
-	_ bool,
 ) (bool, error) {
 	if ctx == nil {
 		return false, errors.New("jobmgr Function process ingress: nil read context")

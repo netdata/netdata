@@ -29,7 +29,7 @@ func testQueuedTaskGenerationRetirement(t *testing.T) {
 	supervisor.freeRequest = 1
 	plan := TaskPlan{
 		Source: SourceFunction,
-		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			return NewSealedResult(200, "application/json", nil)
 		}),
 	}

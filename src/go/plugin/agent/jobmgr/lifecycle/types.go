@@ -70,16 +70,6 @@ func (sr SealedResult) validate() error {
 
 type TaskWork func(context.Context) (TaskOutcome, error)
 
-func FrameTaskWork(work func(context.Context) (SealedResult, error)) TaskWork {
-	return func(ctx context.Context) (TaskOutcome, error) {
-		result, err := work(ctx)
-		if err != nil {
-			return TaskOutcome{}, err
-		}
-		return NewFrameOutcome(result)
-	}
-}
-
 type TaskCleanup func() error
 
 type PreparedResourceTransactionWork func(

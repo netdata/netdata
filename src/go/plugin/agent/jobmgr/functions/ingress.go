@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -19,7 +18,6 @@ type Ingress struct {
 	kernel jobmgr.CommandPort // command port to submit calls to
 	clock  lifecycle.Clock    // clock for deadline derivation
 	quit   func()             // cancels the ingress reader
-	once   sync.Once          // guards quit (once)
 }
 
 func NewIngress(kernel jobmgr.CommandPort, clock lifecycle.Clock, quit func()) (*Ingress, error) {
@@ -52,6 +50,6 @@ func (i *Ingress) HandleReject(ctx context.Context, uid string, status int) erro
 }
 
 func (i *Ingress) HandleQuit(context.Context) error {
-	i.once.Do(i.quit)
+	i.quit()
 	return nil
 }

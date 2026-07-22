@@ -4,13 +4,10 @@ package lifecycle
 
 import (
 	"errors"
-	"math/bits"
 	"slices"
 	"strings"
 	"sync"
 )
-
-var ErrLongLivedRecordCapacity = errors.New("jobmgr long-lived permit: capacity exhausted")
 
 type LongLivedClass uint8
 
@@ -20,18 +17,9 @@ const (
 	LongLivedSecretStore
 )
 
-type LongLivedExternalFacet uint8
-
-const (
-	LongLivedEProvider LongLivedExternalFacet = 1 << iota
-	LongLivedEJobResources
-	LongLivedESecretStore
-)
-
 type LongLivedPlan struct {
-	providerKeys []string               // secret-provider keys this plan pins (pipeline class)
-	class        LongLivedClass         // permit class: pipeline, job, or secret store
-	external     LongLivedExternalFacet // external ('E') facets the plan reserves
+	providerKeys []string       // secret-provider keys this plan pins (pipeline class)
+	class        LongLivedClass // permit class: pipeline, job, or secret store
 }
 
 func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
@@ -51,38 +39,30 @@ func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
 	plan := LongLivedPlan{
 		class:        LongLivedPipeline,
 		providerKeys: keys,
-		external:     LongLivedEProvider,
 	}
 	return plan, plan.Validate()
 }
 
 func NewJobLongLivedPlan() LongLivedPlan {
-	return LongLivedPlan{
-		class: LongLivedJob, external: LongLivedEJobResources,
-	}
+	return LongLivedPlan{class: LongLivedJob}
 }
 
 func NewSecretStoreLongLivedPlan() LongLivedPlan {
-	return LongLivedPlan{
-		class: LongLivedSecretStore, external: LongLivedESecretStore,
-	}
+	return LongLivedPlan{class: LongLivedSecretStore}
 }
 
 func (llp LongLivedPlan) Validate() error {
 	switch llp.class {
 	case LongLivedPipeline:
-		if !validPipelineProviderKeys(llp.providerKeys) ||
-			llp.external != LongLivedEProvider {
+		if !validPipelineProviderKeys(llp.providerKeys) {
 			return errors.New("jobmgr long-lived permit: invalid pipeline facets")
 		}
 	case LongLivedJob:
-		if len(llp.providerKeys) != 0 ||
-			llp.external != LongLivedEJobResources {
+		if len(llp.providerKeys) != 0 {
 			return errors.New("jobmgr long-lived permit: invalid job facets")
 		}
 	case LongLivedSecretStore:
-		if len(llp.providerKeys) != 0 ||
-			llp.external != LongLivedESecretStore {
+		if len(llp.providerKeys) != 0 {
 			return errors.New("jobmgr long-lived permit: invalid SecretStore facets")
 		}
 	default:
@@ -115,13 +95,10 @@ func (llp LongLivedPlan) validateReplacementClass() error {
 
 func (llp LongLivedPlan) Class() LongLivedClass { return llp.class }
 
-type LongLivedPermitRef struct {
-	Slot       uint32
-	Generation uint32
-}
+type LongLivedPermitRef uint32
 
 func (ref LongLivedPermitRef) valid() bool {
-	return ref.Slot != 0 && ref.Generation != 0
+	return ref != 0
 }
 
 type LongLivedPermit struct {
@@ -153,18 +130,18 @@ func (llp LongLivedPermit) ValidateLive() error {
 	return err
 }
 
-func (llp LongLivedPermit) ActivateExternal(facet LongLivedExternalFacet) error {
+func (llp LongLivedPermit) ActivateExternal() error {
 	if !llp.Valid() {
 		return errors.New("jobmgr long-lived permit: invalid external activation")
 	}
-	return llp.supervisor.activateLongLivedExternal(llp.ref, llp.owner, facet)
+	return llp.supervisor.activateLongLivedExternal(llp.ref, llp.owner)
 }
 
-func (llp LongLivedPermit) ReleaseExternal(facet LongLivedExternalFacet) error {
+func (llp LongLivedPermit) ReleaseExternal() error {
 	if !llp.Valid() {
 		return errors.New("jobmgr long-lived permit: invalid external release")
 	}
-	return llp.supervisor.releaseLongLivedExternal(llp.ref, llp.owner, facet)
+	return llp.supervisor.releaseLongLivedExternal(llp.ref, llp.owner)
 }
 
 func (llp LongLivedPermit) ReleaseUnusedInherited(
@@ -201,20 +178,18 @@ func (llp LongLivedPermit) AbortUnused() error {
 
 type longLivedRegistry struct {
 	mu       sync.Mutex                              // guards all fields
-	slots    map[uint32]*longLivedSlot               // active permits by monotonic slot
+	slots    map[LongLivedPermitRef]*longLivedSlot   // active permits by monotonic ID
 	owners   map[ResourceIdentity]LongLivedPermitRef // active permit ref by owning resource identity
-	classes  [LongLivedSecretStore + 1]int           // per-class active permit counts
 	nextSlot uint32                                  // next monotonic permit slot
 	census   LongLivedCensus                         // cached census projection
 	sealed   bool                                    // no further permits may be issued (shutdown)
 }
 
 type longLivedSlot struct {
-	owner     ResourceIdentity                  // owning resource identity
-	class     LongLivedClass                    // permit class
-	gClaims   map[longLivedGKey]longLivedGState // per-inherited-task facet states (one 'G' facet per inherited task)
-	eReserved LongLivedExternalFacet            // reserved external ('E') facets
-	eActive   LongLivedExternalFacet            // activated external ('E') facets
+	owner    ResourceIdentity                  // owning resource identity
+	class    LongLivedClass                    // permit class
+	gClaims  map[longLivedGKey]longLivedGState // per-inherited-task facet states (one 'G' facet per inherited task)
+	external longLivedExternalState            // class-derived external resource state
 }
 
 type longLivedGKey struct {
@@ -227,18 +202,19 @@ type longLivedGState uint8
 const (
 	longLivedGReserved longLivedGState = iota + 1
 	longLivedGActive
-	longLivedGReleased
+)
+
+type longLivedExternalState uint8
+
+const (
+	longLivedExternalReserved longLivedExternalState = iota + 1
+	longLivedExternalActive
+	longLivedExternalReleased
 )
 
 type LongLivedCensus struct {
-	Active           int // total active long-lived permits
-	Pipelines        int // active pipeline-class permits
-	Jobs             int // active job-class permits
-	SecretStores     int // active secret-store-class permits
-	GReserved        int // reserved inherited-task ('G') facets across all permits
-	GActive          int // activated inherited-task ('G') facets
-	ExternalReserved int // reserved external ('E') facets
-	ExternalActive   int // activated external ('E') facets
+	Active       int // total active long-lived permits
+	SecretStores int // active secret-store-class permits
 }
 
 func longLivedGClaims(plan LongLivedPlan) map[longLivedGKey]longLivedGState {
@@ -264,12 +240,7 @@ func longLivedGClaims(plan LongLivedPlan) map[longLivedGKey]longLivedGState {
 func longLivedGClaimsRetained(
 	claims map[longLivedGKey]longLivedGState,
 ) bool {
-	for _, state := range claims {
-		if state != longLivedGReleased {
-			return true
-		}
-	}
-	return false
+	return len(claims) != 0
 }
 
 func longLivedGClaimsActive(
@@ -284,7 +255,7 @@ func longLivedGClaimsActive(
 }
 
 func (llr *longLivedRegistry) initialize() {
-	llr.slots = make(map[uint32]*longLivedSlot)
+	llr.slots = make(map[LongLivedPermitRef]*longLivedSlot)
 	llr.owners = make(map[ResourceIdentity]LongLivedPermitRef)
 }
 
@@ -305,32 +276,26 @@ func (ts *TaskSupervisor) IssueLongLivedPermit(owner ResourceIdentity, plan Long
 			"jobmgr long-lived permit: activation sealed or duplicate owner",
 		)
 	}
-	if longLivedClassFull(registry.classes[plan.class], plan) {
-		registry.mu.Unlock()
-		return LongLivedPermit{}, ErrLongLivedRecordCapacity
-	}
-	slotID, slot, allocationErr := registry.allocateSlot()
+	ref, slot, allocationErr := registry.allocateSlot()
 	if allocationErr != nil {
 		registry.mu.Unlock()
 		return LongLivedPermit{}, allocationErr
 	}
 	*slot = longLivedSlot{
 		owner: owner, class: plan.class,
-		gClaims: gClaims, eReserved: plan.external,
+		gClaims: gClaims, external: longLivedExternalReserved,
 	}
-	ref := LongLivedPermitRef{Slot: slotID, Generation: 1}
 	registry.owners[owner] = ref
-	registry.classes[plan.class]++
 	registry.census.Active++
-	registry.incrementClassCensus(plan.class)
-	registry.census.GReserved += len(gClaims)
-	registry.census.ExternalReserved += bits.OnesCount8(uint8(plan.external))
+	if plan.class == LongLivedSecretStore {
+		registry.census.SecretStores++
+	}
 	registry.mu.Unlock()
 	return LongLivedPermit{supervisor: ts, ref: ref, owner: owner, class: plan.class}, nil
 }
 
 func (registry *longLivedRegistry) allocateSlot() (
-	uint32,
+	LongLivedPermitRef,
 	*longLivedSlot,
 	error,
 ) {
@@ -340,9 +305,10 @@ func (registry *longLivedRegistry) allocateSlot() (
 			errors.New("jobmgr long-lived permit: reference space exhausted")
 	}
 	registry.nextSlot = next
+	ref := LongLivedPermitRef(next)
 	slot := &longLivedSlot{}
-	registry.slots[next] = slot
-	return next, slot, nil
+	registry.slots[ref] = slot
+	return ref, slot, nil
 }
 
 func (ts *TaskSupervisor) LongLivedCensus() LongLivedCensus {
@@ -355,10 +321,7 @@ func (ts *TaskSupervisor) LongLivedCensus() LongLivedCensus {
 	return registry.census
 }
 
-func (ts *TaskSupervisor) activateLongLivedExternal(ref LongLivedPermitRef, owner ResourceIdentity, facet LongLivedExternalFacet) error {
-	if !singleExternalFacet(facet) {
-		return errors.New("jobmgr long-lived permit: invalid external facet")
-	}
+func (ts *TaskSupervisor) activateLongLivedExternal(ref LongLivedPermitRef, owner ResourceIdentity) error {
 	registry := &ts.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
@@ -366,20 +329,14 @@ func (ts *TaskSupervisor) activateLongLivedExternal(ref LongLivedPermitRef, owne
 	if err != nil {
 		return err
 	}
-	if slot.eReserved&facet == 0 || slot.eActive&facet != 0 {
-		return errors.New("jobmgr long-lived permit: external facet is not reserved")
+	if slot.external != longLivedExternalReserved {
+		return errors.New("jobmgr long-lived permit: external resource is not reserved")
 	}
-	slot.eReserved &^= facet
-	slot.eActive |= facet
-	registry.census.ExternalReserved--
-	registry.census.ExternalActive++
+	slot.external = longLivedExternalActive
 	return nil
 }
 
-func (ts *TaskSupervisor) releaseLongLivedExternal(ref LongLivedPermitRef, owner ResourceIdentity, facet LongLivedExternalFacet) error {
-	if !singleExternalFacet(facet) {
-		return errors.New("jobmgr long-lived permit: invalid external facet")
-	}
+func (ts *TaskSupervisor) releaseLongLivedExternal(ref LongLivedPermitRef, owner ResourceIdentity) error {
 	registry := &ts.longLived
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
@@ -387,17 +344,12 @@ func (ts *TaskSupervisor) releaseLongLivedExternal(ref LongLivedPermitRef, owner
 	if err != nil {
 		return err
 	}
-	if slot.eActive&facet != 0 {
-		slot.eActive &^= facet
-		registry.census.ExternalActive--
+	if slot.external == longLivedExternalReserved ||
+		slot.external == longLivedExternalActive {
+		slot.external = longLivedExternalReleased
 		return nil
 	}
-	if slot.eReserved&facet != 0 {
-		slot.eReserved &^= facet
-		registry.census.ExternalReserved--
-		return nil
-	}
-	return errors.New("jobmgr long-lived permit: external facet already released or absent")
+	return errors.New("jobmgr long-lived permit: external resource already released")
 }
 
 func (ts *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, owner ResourceIdentity) error {
@@ -409,51 +361,16 @@ func (ts *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, owner Re
 		return err
 	}
 	if longLivedGClaimsRetained(slot.gClaims) ||
-		slot.eReserved != 0 || slot.eActive != 0 {
+		slot.external != longLivedExternalReleased {
 		return errors.New("jobmgr long-lived permit: return with retained inherited-task/external facets")
 	}
 	delete(registry.owners, slot.owner)
-	class := slot.class
-	delete(registry.slots, ref.Slot)
-	registry.classes[class]--
+	delete(registry.slots, ref)
 	registry.census.Active--
-	registry.decrementClassCensus(class)
+	if slot.class == LongLivedSecretStore {
+		registry.census.SecretStores--
+	}
 	return nil
-}
-
-func longLivedClassFull(count int, plan LongLivedPlan) bool {
-	switch plan.class {
-	case LongLivedPipeline:
-		return count >= 1
-	case LongLivedJob:
-		return false
-	case LongLivedSecretStore:
-		return false
-	default:
-		return true
-	}
-}
-
-func (llr *longLivedRegistry) incrementClassCensus(class LongLivedClass) {
-	switch class {
-	case LongLivedPipeline:
-		llr.census.Pipelines++
-	case LongLivedJob:
-		llr.census.Jobs++
-	case LongLivedSecretStore:
-		llr.census.SecretStores++
-	}
-}
-
-func (llr *longLivedRegistry) decrementClassCensus(class LongLivedClass) {
-	switch class {
-	case LongLivedPipeline:
-		llr.census.Pipelines--
-	case LongLivedJob:
-		llr.census.Jobs--
-	case LongLivedSecretStore:
-		llr.census.SecretStores--
-	}
 }
 
 func (ts *TaskSupervisor) releaseReservedLongLivedFacets(ref LongLivedPermitRef, owner ResourceIdentity) error {
@@ -464,19 +381,11 @@ func (ts *TaskSupervisor) releaseReservedLongLivedFacets(ref LongLivedPermitRef,
 	if err != nil {
 		return err
 	}
-	if longLivedGClaimsActive(slot.gClaims) || slot.eActive != 0 {
+	if longLivedGClaimsActive(slot.gClaims) || slot.external == longLivedExternalActive {
 		return errors.New("jobmgr long-lived permit: unused abort with active facets")
 	}
-	released := 0
-	for key, state := range slot.gClaims {
-		if state == longLivedGReserved {
-			slot.gClaims[key] = longLivedGReleased
-			released++
-		}
-	}
-	registry.census.GReserved -= released
-	registry.census.ExternalReserved -= bits.OnesCount8(uint8(slot.eReserved))
-	slot.eReserved = 0
+	clear(slot.gClaims)
+	slot.external = longLivedExternalReleased
 	return nil
 }
 
@@ -484,18 +393,14 @@ func (llr *longLivedRegistry) slot(ref LongLivedPermitRef, owner ResourceIdentit
 	if !ref.valid() || !owner.Valid() {
 		return nil, errors.New("jobmgr long-lived permit: invalid reference")
 	}
-	slot := llr.slots[ref.Slot]
+	slot := llr.slots[ref]
 	if slot == nil {
 		return nil, errors.New("jobmgr long-lived permit: invalid reference")
 	}
-	if ref.Generation != 1 || slot.owner != owner {
+	if slot.owner != owner {
 		return nil, errors.New("jobmgr long-lived permit: stale or cross-owner reference")
 	}
 	return slot, nil
-}
-
-func singleExternalFacet(facet LongLivedExternalFacet) bool {
-	return facet != 0 && facet&(facet-1) == 0
 }
 
 func longLivedGKeyForInherited(
@@ -538,8 +443,6 @@ func (ts *TaskSupervisor) activateLongLivedG(
 		return errors.New("jobmgr long-lived permit: G facet is not reserved")
 	}
 	slot.gClaims[claim] = longLivedGActive
-	registry.census.GReserved--
-	registry.census.GActive++
 	return nil
 }
 
@@ -563,8 +466,7 @@ func (ts *TaskSupervisor) releaseUnusedLongLivedG(
 	if slot.gClaims[claim] != longLivedGReserved {
 		return errors.New("jobmgr long-lived permit: G facet is not unused")
 	}
-	slot.gClaims[claim] = longLivedGReleased
-	registry.census.GReserved--
+	delete(slot.gClaims, claim)
 	return nil
 }
 
@@ -589,8 +491,6 @@ func (ts *TaskSupervisor) restoreLongLivedG(
 		return errors.New("jobmgr long-lived permit: G facet cannot be restored")
 	}
 	slot.gClaims[claim] = longLivedGReserved
-	registry.census.GActive--
-	registry.census.GReserved++
 	return nil
 }
 
@@ -614,7 +514,6 @@ func (ts *TaskSupervisor) releaseLongLivedG(
 	if slot.gClaims[claim] != longLivedGActive {
 		return errors.New("jobmgr long-lived permit: G facet is not active")
 	}
-	slot.gClaims[claim] = longLivedGReleased
-	registry.census.GActive--
+	delete(slot.gClaims, claim)
 	return nil
 }

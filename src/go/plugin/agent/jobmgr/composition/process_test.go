@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -180,8 +181,7 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 		require.FailNow(t, "test failed", "process did not terminate")
 	}
 
-	census := process.ingress.Census()
-	require.False(t, census.ReaderStarts != 1 || census.State != "contained" || census.RunGeneration != 0)
+	require.Equal(t, functionadapter.ProcessIngressContained, process.ingress.State())
 
 	cleanupsMu.Lock()
 	defer cleanupsMu.Unlock()
@@ -323,9 +323,7 @@ func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
 	}
 	require.NoError(t, writer.Close())
 	require.Empty(t, events)
-	census := process.ingress.Census()
-	require.False(t, census.State != "contained" ||
-		census.RunGeneration != 0 || census.ReaderStarts != 0)
+	require.Equal(t, functionadapter.ProcessIngressContained, process.ingress.State())
 	cleanupsMu.Lock()
 	defer cleanupsMu.Unlock()
 	require.EqualValues(t, 1, cleanups)

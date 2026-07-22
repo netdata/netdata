@@ -76,11 +76,12 @@ func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) 
 
 	require.NoError(t, <-done)
 
-	census := ingress.Census()
-	require.False(t, census.State != ProcessIngressContained ||
-		census.ReaderStarts != 1 ||
-		census.RunGeneration != 0 ||
-		census.ActiveDeliveries != 0)
+	ingress.mu.Lock()
+	state, readerStarted, deliveries := ingress.state, ingress.readerStarted, ingress.deliveries
+	ingress.mu.Unlock()
+	require.Equal(t, ProcessIngressContained, state)
+	require.True(t, readerStarted)
+	require.Zero(t, deliveries)
 
 	require.Error(t, ingress.Run(context.Background()))
 }
@@ -142,8 +143,8 @@ func TestProcessIngressTimedOutDrainRetainsSealedStateForRetry(t *testing.T) {
 	pauseSealed := ingress.pauseSealed
 	ingress.mu.Unlock()
 
-	census := ingress.Census()
-	require.False(t, census.State != ProcessIngressLive || !pauseSealed)
+	require.Equal(t, ProcessIngressLive, ingress.State())
+	require.True(t, pauseSealed)
 
 	close(input.release)
 

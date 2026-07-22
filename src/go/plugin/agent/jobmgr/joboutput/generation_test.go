@@ -28,7 +28,7 @@ func TestJobFactoryRejectCleanup(t *testing.T) {
 			build: func(t *testing.T, events *jobEventLog) (ConstructedJob, error) {
 				return testConstructedJob(t, JobVariantV1, events), errors.New("construction failed")
 			},
-			want: []string{"handler-close", "runtime-abort", "handler", "collector"},
+			want: []string{"handler-close", "runtime-abort", "collector"},
 		},
 		"invalid construction": {
 			build: func(_ *testing.T, events *jobEventLog) (ConstructedJob, error) {
@@ -168,7 +168,7 @@ func TestJobGenerationV1V2(t *testing.T) {
 
 			want := []string{
 				"runtime-start", "handler-publish", "handler-close", "runtime-stop",
-				"runtime-release", "handler", "collector",
+				"runtime-release", "collector",
 			}
 
 			got := events.snapshot()
@@ -219,7 +219,6 @@ func TestJobGenerationPermitReturnLast(t *testing.T) {
 	require.EqualValues(t, JobStopped, generation.State())
 	census := tasks.LongLivedCensus()
 	require.EqualValues(t, 1, census.Active)
-	require.Zero(t, census.ExternalActive)
 
 	require.NoError(t, generation.Finalize())
 	require.EqualValues(
@@ -356,10 +355,6 @@ func testConstructedJob(
 				events.add("handler-close")
 				return nil
 			},
-			cleanup: func(context.Context) error {
-				events.add("handler")
-				return nil
-			},
 		},
 		CollectorCleanup: func(context.Context) error {
 			events.add("collector")
@@ -371,7 +366,6 @@ func testConstructedJob(
 type recordingHandlerLifecycle struct {
 	publish       func() error
 	closeAndDrain func(context.Context) error
-	cleanup       func(context.Context) error
 }
 
 func (rhl *recordingHandlerLifecycle) Publish() error {
@@ -380,10 +374,6 @@ func (rhl *recordingHandlerLifecycle) Publish() error {
 
 func (rhl *recordingHandlerLifecycle) CloseAndDrain(ctx context.Context) error {
 	return rhl.closeAndDrain(ctx)
-}
-
-func (rhl *recordingHandlerLifecycle) Cleanup(ctx context.Context) error {
-	return rhl.cleanup(ctx)
 }
 
 func issueTestJobPermit(

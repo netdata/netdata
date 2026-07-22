@@ -189,18 +189,6 @@ func appendPreparedFrame(dst []byte, frame preparedFunctionFrameContent) ([]byte
 	return dst, nil
 }
 
-func (pf PreparedFrame) encodedSize() (int, error) {
-	if pf.state == nil {
-		return 0, errors.New("jobmgr frame owner: unprepared frame")
-	}
-	pf.state.mu.Lock()
-	defer pf.state.mu.Unlock()
-	if pf.state.consumed {
-		return 0, ErrPreparedFrameConsumed
-	}
-	return pf.state.encodedBytes, nil
-}
-
 func (pf PreparedFrame) take() (preparedFunctionFrameContent, error) {
 	if pf.state == nil {
 		return preparedFunctionFrameContent{}, errors.New("jobmgr frame owner: unprepared frame")
@@ -511,7 +499,15 @@ func resultFrameSize(uid string, status int, contentType string, expiry int64, p
 }
 
 func checkedSizeSum(values ...int) (int, bool) {
-	return checkedSum(int(^uint(0)>>1), values...)
+	maximum := int(^uint(0) >> 1)
+	total := 0
+	for _, value := range values {
+		if value < 0 || total > maximum-value {
+			return 0, false
+		}
+		total += value
+	}
+	return total, true
 }
 
 func decimalBytes(value uint64) int {

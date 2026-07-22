@@ -13,6 +13,7 @@ import (
 	"time"
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -191,7 +192,7 @@ func (p *Process) Run(ctx context.Context) error {
 	if p.runtime != nil {
 		p.runtime.Start(
 			p.pluginName,
-			processFrameWriter{frames: p.core.frames},
+			joboutput.FrameWriter{Owner: p.core.frames},
 		)
 	}
 	result := p.core.run(ctx, p.commands)
@@ -277,21 +278,4 @@ func cloneSecretConfigs(
 		cloned[index] = clone
 	}
 	return cloned, nil
-}
-
-type processFrameWriter struct {
-	frames *lifecycle.FrameOwner
-}
-
-func (pfw processFrameWriter) Write(payload []byte) (int, error) {
-	if pfw.frames == nil {
-		return 0, errors.New("jobmgr composition: runtime output has no frame owner")
-	}
-	if len(payload) == 0 {
-		return 0, nil
-	}
-	if err := pfw.frames.CommitBorrowedProtocolFrame(payload); err != nil {
-		return 0, err
-	}
-	return len(payload), nil
 }

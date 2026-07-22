@@ -56,8 +56,7 @@ func TestManagedJobV1V2JoinBeforeCleanup(t *testing.T) {
 			got, want := job.snapshot(), []string{"start", "stop", "joined", "cleanup"}
 			require.True(t, equalStrings(got, want))
 
-			census := tasks.InheritedCensus()
-			require.EqualValues(t, lifecycle.InheritedTaskCensus{}, census)
+			require.Zero(t, tasks.InheritedActive())
 		})
 	}
 }

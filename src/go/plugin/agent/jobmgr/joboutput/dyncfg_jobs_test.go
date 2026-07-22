@@ -301,8 +301,6 @@ func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
 			require.True(t, lifecycle.OwnershipRetained(err))
 			census := permitTasks.LongLivedCensus()
 			require.EqualValues(t, 1, census.Active)
-			require.EqualValues(t, 1, census.Jobs)
-			require.EqualValues(t, 1, census.ExternalActive)
 		})
 	}
 }
@@ -973,7 +971,8 @@ func startDynCfgJobTestTask(
 	var starts [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
 	count, _, err := supervisor.Dispatch(context.Background(), 1, &starts)
 	require.NoError(t, err)
-	require.False(t, count != 1 || starts[0].Request != request || starts[0].Err != nil)
+	require.EqualValues(t, 1, count)
+	require.Equal(t, request, starts[0].Request)
 	return starts[0].Task
 }
 

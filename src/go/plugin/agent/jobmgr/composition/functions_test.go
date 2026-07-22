@@ -162,8 +162,6 @@ func TestFunctionAssemblyJobHookCapturesExactHandle(t *testing.T) {
 	require.NotNil(t, handle)
 
 	require.NoError(t, handle.CloseAndDrain(context.Background()))
-
-	require.NoError(t, handle.Cleanup(context.Background()))
 }
 
 func TestFunctionAssemblyCommitsProtectedTransactionAfterShutdownCut(
@@ -209,7 +207,12 @@ func TestFunctionAssemblyCommitsProtectedTransactionAfterShutdownCut(
 
 	waitShutdownFunctionGate(t, applyEntered, "transaction apply")
 	harness.kernel.Stop()
-	waitShutdownFunctionStart(t, harness.kernel)
+	shutdownCtx, cancelShutdown := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancelShutdown()
+	require.NoError(t, harness.probe.waitCancellation(shutdownCtx))
 	close(applyRelease)
 	require.NoError(t, waitShutdownFunctionResult(
 		t,
@@ -222,6 +225,7 @@ func TestFunctionAssemblyCommitsProtectedTransactionAfterShutdownCut(
 	)
 	defer cancelWait()
 	require.NoError(t, harness.kernel.Wait(waitCtx))
+	require.NoError(t, harness.probe.waitSettlement(waitCtx))
 	require.NoError(t, harness.run.DirtyCause())
 	requireFunctionPublicationCycle(t, harness.output)
 	harness.requireDrained(t)
@@ -236,6 +240,7 @@ type shutdownFunctionHarness struct {
 	job    *assemblyTestJob
 	handle joboutput.HandlerLifecycle
 	permit lifecycle.LongLivedPlan
+	probe  compositionShutdownProbe
 }
 
 func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
@@ -279,6 +284,17 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 	require.NoError(t, run.OpenAdmission())
 	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, assembly.Activate())
+	probeCtx, cancelProbe := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancelProbe()
+	probe, err := startCompositionShutdownProbe(
+		probeCtx,
+		kernel,
+		"function-assembly-shutdown-probe",
+	)
+	require.NoError(t, err)
 
 	job := &assemblyTestJob{}
 	handle, err := assembly.JobHooks().Prepare(joboutput.PublishedJob{
@@ -293,7 +309,7 @@ func newShutdownFunctionHarness(t *testing.T) shutdownFunctionHarness {
 	return shutdownFunctionHarness{
 		kernel: kernel, run: run, uids: uids,
 		tasks: tasks, output: output, job: job, handle: handle,
-		permit: permit,
+		permit: permit, probe: probe,
 	}
 }
 
@@ -314,16 +330,6 @@ func waitShutdownFunctionGate(
 	case <-time.After(time.Second):
 		require.FailNowf(t, "test failed", "%s did not reach the shutdown gate", name)
 	}
-}
-
-func waitShutdownFunctionStart(
-	t *testing.T,
-	kernel *jobmgr.CommandKernel,
-) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	require.NoError(t, kernel.WaitShutdownStarted(ctx))
 }
 
 func waitShutdownFunctionResult(
@@ -475,10 +481,7 @@ func (sfrr *shutdownFunctionReadyResource) AbortReady(
 ) error {
 	return errors.Join(
 		sfrr.handle.CloseAndDrain(ctx),
-		sfrr.handle.Cleanup(ctx),
-		sfrr.permit.ReleaseExternal(
-			lifecycle.LongLivedEJobResources,
-		),
+		sfrr.permit.ReleaseExternal(),
 		sfrr.permit.Return(),
 	)
 }
@@ -492,10 +495,7 @@ func (sfrr *shutdownFunctionReadyResource) Stop(
 	}
 	return errors.Join(
 		sfrr.handle.CloseAndDrain(ctx),
-		sfrr.handle.Cleanup(ctx),
-		sfrr.permit.ReleaseExternal(
-			lifecycle.LongLivedEJobResources,
-		),
+		sfrr.permit.ReleaseExternal(),
 	)
 }
 
@@ -520,9 +520,7 @@ func (sfpt *shutdownFunctionPreparedTransaction) Apply(
 ) (lifecycle.AppliedResourceTransaction, error) {
 	close(sfpt.entered)
 	<-sfpt.release
-	if err := sfpt.permit.ActivateExternal(
-		lifecycle.LongLivedEJobResources,
-	); err != nil {
+	if err := sfpt.permit.ActivateExternal(); err != nil {
 		_, disposeErr := sfpt.Dispose(ctx)
 		return lifecycle.AppliedResourceTransaction{}, errors.Join(
 			err,
@@ -568,7 +566,6 @@ func (sfpt *shutdownFunctionPreparedTransaction) Dispose(
 ) (lifecycle.ReadyResource, error) {
 	return nil, errors.Join(
 		sfpt.handle.CloseAndDrain(ctx),
-		sfpt.handle.Cleanup(ctx),
 		sfpt.permit.AbortUnused(),
 	)
 }

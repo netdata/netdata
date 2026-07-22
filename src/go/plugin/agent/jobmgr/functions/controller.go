@@ -94,7 +94,6 @@ type JobHandle struct {
 	job        collectorapi.RuntimeJob    // the runtime job whose Functions are published
 	published  bool                       // job Functions are published
 	closed     bool                       // job publication closed and draining
-	cleaned    bool                       // job cleanup complete
 }
 
 func (c *Controller) PrepareJob(
@@ -117,7 +116,7 @@ func (jh *JobHandle) Publish() error {
 	}
 	jh.mu.Lock()
 	defer jh.mu.Unlock()
-	if jh.published || jh.closed || jh.cleaned {
+	if jh.published || jh.closed {
 		return errors.New("jobmgr Function controller: invalid job-handle publication")
 	}
 	if err := jh.controller.PublishJob(
@@ -140,34 +139,12 @@ func (jh *JobHandle) CloseAndDrain(ctx context.Context) error {
 	if jh.closed {
 		return nil
 	}
-	if jh.cleaned {
-		return errors.New("jobmgr Function controller: close after cleanup")
-	}
 	if jh.published {
 		if err := jh.controller.CloseAndDrainJob(ctx, jh.identity, jh.job); err != nil {
 			return err
 		}
 	}
 	jh.closed = true
-	return nil
-}
-
-func (jh *JobHandle) Cleanup(ctx context.Context) error {
-	if jh == nil || ctx == nil {
-		return errors.New("jobmgr Function controller: invalid job-handle cleanup")
-	}
-	jh.mu.Lock()
-	defer jh.mu.Unlock()
-	if jh.cleaned {
-		return nil
-	}
-	if !jh.closed {
-		return errors.New("jobmgr Function controller: cleanup before close")
-	}
-	// Catalog-owned cleanup plans execute the exact MethodHandler cleanup before
-	// CloseAndDrain returns. This acknowledgement makes the per-job lifecycle
-	// explicit without re-resolving the job through a second owner.
-	jh.cleaned = true
 	return nil
 }
 

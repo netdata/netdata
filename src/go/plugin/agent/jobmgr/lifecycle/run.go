@@ -34,7 +34,6 @@ type RunSupervisor struct {
 	shutdown   *ShutdownBudget    // active shutdown budget once BeginShutdown ran
 	state      RunTerminalState   // terminal state classification
 	observer   RuntimeObserver    // sink for run-level runtime counters
-	stopping   chan struct{}      // closed once the stopping cut is published
 	stopCause  *StoppingRejection // the generation-bound stopping rejection
 	stopped    bool               // stopping cut has been published
 }
@@ -45,7 +44,7 @@ type RunCensus struct {
 	UIDActive              int
 	TransientActive        int
 	TransientPending       int
-	Inherited              InheritedTaskCensus
+	InheritedActive        int
 	LongLived              LongLivedCensus
 	Frame                  FrameCensus
 	RunFinalizerComplete   bool
@@ -57,7 +56,7 @@ func (census RunCensus) Quiescent() bool {
 	return census.KernelDrained &&
 		census.FunctionCatalogDrained && census.UIDActive == 0 &&
 		census.TransientActive == 0 && census.TransientPending == 0 &&
-		census.Inherited.Active == 0 &&
+		census.InheritedActive == 0 &&
 		census.LongLived == (LongLivedCensus{}) && frameDrained &&
 		census.RunFinalizerComplete
 }
@@ -76,7 +75,6 @@ func NewRunSupervisor(generation uint64, clock Clock, shutdownTimeout time.Durat
 		generation: generation,
 		clock:      clock,
 		timeout:    shutdownTimeout,
-		stopping:   make(chan struct{}),
 		stopCause: &StoppingRejection{
 			Generation: generation,
 		},
@@ -199,7 +197,6 @@ func (rs *RunSupervisor) publishStoppingLocked() {
 		return
 	}
 	rs.stopped = true
-	close(rs.stopping)
 }
 
 func (rs *RunSupervisor) DirtyCause() error {

@@ -181,8 +181,6 @@ type Declaration struct {
 	RawPayload          bool                            // skip JSON validation; pass the payload verbatim
 }
 
-type CatalogCensus = jobmgr.FunctionCatalogCensus
-
 type handlerGeneration struct {
 	cleanupRef jobmgr.FunctionCleanupRef   // kernel cleanup ref for this generation
 	handler    Handler                     // the Function handler
@@ -331,11 +329,11 @@ type catalogSnapshot struct {
 }
 
 type Catalog struct {
-	snapshot        atomic.Pointer[catalogSnapshot]
-	mutation        *MutationBuilder
-	retiring        map[string]map[*route]struct{}
-	cleanupByRef    map[jobmgr.FunctionCleanupRef]*handlerGeneration
-	nextCleanupSlot atomic.Uint32
+	snapshot      atomic.Pointer[catalogSnapshot]
+	mutation      *MutationBuilder
+	retiring      map[string]map[*route]struct{}
+	cleanupByRef  map[jobmgr.FunctionCleanupRef]*handlerGeneration
+	nextCleanupID uint32
 
 	invocations []*invocationSlot // invocation slot pool
 	freeSlot    uint32            // head of the invocation-slot free-list
@@ -445,11 +443,12 @@ func (c *Catalog) addInitial(snapshot *catalogSnapshot, declaration Declaration,
 }
 
 func (c *Catalog) allocateCleanupRef() (jobmgr.FunctionCleanupRef, error) {
-	slot := c.nextCleanupSlot.Add(1)
-	if slot == 0 {
-		return jobmgr.FunctionCleanupRef{}, errors.New("jobmgr Function catalog: cleanup identity exhausted")
+	next := c.nextCleanupID + 1
+	if next == 0 {
+		return 0, errors.New("jobmgr Function catalog: cleanup identity exhausted")
 	}
-	return jobmgr.FunctionCleanupRef{Slot: slot, Generation: 1}, nil
+	c.nextCleanupID = next
+	return jobmgr.FunctionCleanupRef(next), nil
 }
 
 func validateDeclaration(declaration Declaration) error {
@@ -817,18 +816,7 @@ func (c *Catalog) CloseStep(quantum int) ([]jobmgr.FunctionCleanupPlan, bool, er
 	return cleanups, more, nil
 }
 
-func (c *Catalog) Census() CatalogCensus {
-	if c == nil {
-		return CatalogCensus{}
-	}
-	return CatalogCensus{
-		Version: c.version, Routes: c.routeCount,
-		InvocationLeases: c.invocationCount, PendingCleanups: c.pendingCleanups,
-		Closed:         c.closed,
-		MutationActive: c.mutation != nil,
-	}
-}
-
-func (c *Catalog) LifecycleCensus() jobmgr.FunctionCatalogCensus {
-	return c.Census()
+func (c *Catalog) LifecycleDrained() bool {
+	return c != nil && c.closed && c.mutation == nil && c.routeCount == 0 &&
+		c.invocationCount == 0 && c.pendingCleanups == 0
 }

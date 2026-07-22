@@ -23,19 +23,10 @@ func TestDiscoveryShutdownCancelsSupervisorBeforeProviders(t *testing.T) {
 		ID:         discoveryResourceID,
 		Generation: 1,
 	}
-	supervisorRef := lifecycle.InheritedTaskRef{
-		Slot:       1,
-		Generation: 1,
-	}
+	supervisorRef := lifecycle.InheritedTaskRef(1)
 	providerRefs := map[string]lifecycle.InheritedTaskRef{
-		"file": {
-			Slot:       2,
-			Generation: 1,
-		},
-		"service-discovery": {
-			Slot:       3,
-			Generation: 1,
-		},
+		"file":              2,
+		"service-discovery": 3,
 	}
 	supervisorCancelled := false
 	var providers []string
@@ -228,21 +219,15 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 
 	require.NoError(t, generation.start(context.Background()))
 
-	require.EqualValues(t, 2, generation.tasks.InheritedCensus().Active)
+	require.EqualValues(t, 2, generation.tasks.InheritedActive())
 
-	require.EqualValues(t, lifecycle.LongLivedCensus{
-		Active:         1,
-		Pipelines:      1,
-		GActive:        2,
-		ExternalActive: 1,
-	}, generation.tasks.LongLivedCensus(),
-	)
+	require.EqualValues(t, lifecycle.LongLivedCensus{Active: 1}, generation.tasks.LongLivedCensus())
 
 	generation.Stop()
 
 	require.NoError(t, generation.Wait(context.Background()))
 
-	require.EqualValues(t, lifecycle.InheritedTaskCensus{}, generation.tasks.InheritedCensus())
+	require.Zero(t, generation.tasks.InheritedActive())
 
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, generation.tasks.LongLivedCensus())
 

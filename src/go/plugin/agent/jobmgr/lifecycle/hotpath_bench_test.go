@@ -61,7 +61,7 @@ func BenchmarkBTaskSupervisorEnqueueCancel(b *testing.B) {
 	}
 	plan := TaskPlan{
 		Source: SourceFunction,
-		Work: FrameTaskWork(
+		Work: frameTaskWork(
 			func(context.Context) (SealedResult, error) {
 				return NewSealedResult(200, "application/json", []byte(`{}`))
 			},
@@ -226,7 +226,7 @@ func BenchmarkBTaskChildLaunchCompletion(b *testing.B) {
 	}
 	plan := TaskPlan{
 		Source: SourceFunction,
-		Work: FrameTaskWork(
+		Work: frameTaskWork(
 			func(context.Context) (SealedResult, error) {
 				return NewSealedResult(200, "application/json", []byte(`{}`))
 			},

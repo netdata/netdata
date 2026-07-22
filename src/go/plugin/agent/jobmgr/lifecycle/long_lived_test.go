@@ -19,16 +19,14 @@ func TestPipelinePermitConservesOwnershipFacets(t *testing.T) {
 	permit, err := supervisor.IssueLongLivedPermit(owner, plan)
 	require.NoError(t, err)
 
-	require.Equal(t, LongLivedCensus{
-		Active: 1, Pipelines: 1, GReserved: 3, ExternalReserved: 1,
-	}, supervisor.LongLivedCensus())
+	require.Equal(t, LongLivedCensus{Active: 1}, supervisor.LongLivedCensus())
 	require.Error(t, permit.Return())
 
 	wrongOwner := permit
 	wrongOwner.owner = ResourceIdentity{ID: "other", Generation: 1}
-	require.Error(t, wrongOwner.ActivateExternal(LongLivedEProvider))
-	require.NoError(t, permit.ActivateExternal(LongLivedEProvider))
-	require.Error(t, permit.ActivateExternal(LongLivedEProvider))
+	require.Error(t, wrongOwner.ActivateExternal())
+	require.NoError(t, permit.ActivateExternal())
+	require.Error(t, permit.ActivateExternal())
 
 	_, err = supervisor.StartInheritedWithPermitKey(
 		context.Background(), owner, InheritedPipelineProvider, "unknown", permit,
@@ -57,11 +55,9 @@ func TestPipelinePermitConservesOwnershipFacets(t *testing.T) {
 		require.NoError(t, err)
 		refs[name] = child
 	}
-	require.Equal(t, LongLivedCensus{
-		Active: 1, Pipelines: 1, GActive: 3, ExternalActive: 1,
-	}, supervisor.LongLivedCensus())
+	require.Equal(t, LongLivedCensus{Active: 1}, supervisor.LongLivedCensus())
 
-	require.NoError(t, permit.ReleaseExternal(LongLivedEProvider))
+	require.NoError(t, permit.ReleaseExternal())
 	for _, child := range refs {
 		require.NoError(t, supervisor.CancelInherited(child, owner))
 		joined, err := supervisor.JoinInherited(context.Background(), child, owner)
@@ -127,7 +123,7 @@ func TestPipelinePermitReleasesDisabledProviderClaim(t *testing.T) {
 
 	require.NoError(t, permit.ReleaseUnusedInherited(InheritedPipelineProvider, "disabled"))
 	require.Error(t, permit.ReleaseUnusedInherited(InheritedPipelineProvider, "disabled"))
-	require.Equal(t, 2, supervisor.LongLivedCensus().GReserved)
+	require.Len(t, supervisor.longLived.slots[permit.ref].gClaims, 2)
 	require.NoError(t, permit.AbortUnused())
 	require.Equal(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 }
@@ -144,14 +140,14 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 		require.NoError(t, err)
 		permits = append(permits, permit)
 	}
-	require.Equal(t, jobs, supervisor.LongLivedCensus().Jobs)
+	require.Equal(t, jobs, supervisor.LongLivedCensus().Active)
 	for _, permit := range permits {
 		require.NoError(t, permit.AbortUnused())
 	}
 	require.Equal(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 }
 
-func TestLongLivedPermitRejectsDuplicateOwnerAndPipeline(t *testing.T) {
+func TestLongLivedPermitRejectsDuplicateOwnerAndAllowsMultiplePipelines(t *testing.T) {
 	supervisor := newLongLivedTestSupervisor(t)
 	pipeline, err := NewPipelineLongLivedPlan([]string{"provider"})
 	require.NoError(t, err)
@@ -161,10 +157,11 @@ func TestLongLivedPermitRejectsDuplicateOwnerAndPipeline(t *testing.T) {
 
 	_, err = supervisor.IssueLongLivedPermit(owner, NewJobLongLivedPlan())
 	require.Error(t, err)
-	_, err = supervisor.IssueLongLivedPermit(
+	second, err := supervisor.IssueLongLivedPermit(
 		ResourceIdentity{ID: "other-pipeline", Generation: 1}, pipeline,
 	)
-	require.ErrorIs(t, err, ErrLongLivedRecordCapacity)
+	require.NoError(t, err)
+	require.NoError(t, second.AbortUnused())
 	require.NoError(t, permit.AbortUnused())
 }
 
@@ -176,8 +173,8 @@ func TestLongLivedPermitRemainsLiveAfterIssuanceIsSealed(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, supervisor.SealInherited())
 	require.NoError(t, permit.ValidateLive())
-	require.NoError(t, permit.ActivateExternal(LongLivedEJobResources))
-	require.NoError(t, permit.ReleaseExternal(LongLivedEJobResources))
+	require.NoError(t, permit.ActivateExternal())
+	require.NoError(t, permit.ReleaseExternal())
 	require.NoError(t, permit.Return())
 	require.Equal(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 }
@@ -211,9 +208,9 @@ func TestLongLivedPermitReturnWaitsForExternalRelease(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Error(t, permit.Return())
-	require.NoError(t, permit.ActivateExternal(LongLivedESecretStore))
+	require.NoError(t, permit.ActivateExternal())
 	require.Error(t, permit.Return())
-	require.NoError(t, permit.ReleaseExternal(LongLivedESecretStore))
+	require.NoError(t, permit.ReleaseExternal())
 	require.NoError(t, permit.Return())
 	require.Equal(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 }

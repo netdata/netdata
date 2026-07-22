@@ -39,7 +39,6 @@ type PublishedJob struct {
 type HandlerLifecycle interface {
 	Publish() error
 	CloseAndDrain(context.Context) error
-	Cleanup(context.Context) error
 }
 
 type JobHooks interface {

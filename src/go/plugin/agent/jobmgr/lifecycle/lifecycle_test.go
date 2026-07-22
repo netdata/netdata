@@ -79,7 +79,7 @@ func TestTaskSupervisorDynamicPopulationAndGenerationCheckedReuse(t *testing.T) 
 	for range population {
 		_, err := supervisor.Enqueue(TaskClassGenericFunction, TaskPlan{
 			Source: SourceFunction,
-			Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 				<-release
 				return NewSealedResult(200, "application/json", []byte(`{}`))
 			}),
@@ -123,7 +123,7 @@ func TestTaskSupervisorDynamicPopulationAndGenerationCheckedReuse(t *testing.T) 
 	}
 	pending, err := supervisor.Enqueue(
 		TaskClassGenericFunction,
-		TaskPlan{Source: SourceFunction, Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		TaskPlan{Source: SourceFunction, Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		})},
 	)
@@ -173,7 +173,7 @@ func TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch(t *testing.T) {
 	for range RetainedTimeoutFailStopThreshold + 1 {
 		_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 			Source: SourceFunction,
-			Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 				<-release
 				return NewSealedResult(200, "application/json", []byte(`{}`))
 			}),
@@ -185,15 +185,15 @@ func TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch(t *testing.T) {
 		require.NoError(t, err)
 		wantSaturated := index == RetainedTimeoutFailStopThreshold-1
 		require.EqualValues(t, wantSaturated, saturated)
-		count, latched := supervisor.RetainedTimeouts()
 		wantLatched := index >= RetainedTimeoutFailStopThreshold-1
-		require.False(t, count != index+1 || latched != wantLatched)
+		require.EqualValues(t, index+1, supervisor.retained)
+		require.Equal(t, wantLatched, supervisor.saturated)
 	}
 	for index, ref := range refs {
 		cleared, err := supervisor.ClearRetainedTimeout(ref)
 		require.False(t, err != nil || !cleared)
-		count, latched := supervisor.RetainedTimeouts()
-		require.False(t, count != len(refs)-index-1 || !latched)
+		require.EqualValues(t, len(refs)-index-1, supervisor.retained)
+		require.True(t, supervisor.saturated)
 	}
 	close(release)
 	for range refs {
@@ -222,7 +222,7 @@ func TestTaskSupervisorContainsPanicAndReleasesSlot(t *testing.T) {
 	tests := map[string]TaskPlan{
 		"function work": {
 			Source: SourceFunction,
-			Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 				panic("fixture panic")
 			}),
 		},
@@ -430,7 +430,7 @@ func TestTaskSupervisorChecksPhaseSequenceAndPublishesOwnedResult(t *testing.T) 
 	require.NoError(t, err)
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 		Source: SourceFunction, MaxPhaseTransitions: 4,
-		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			return sealed, nil
 		}),
 	})
@@ -465,7 +465,7 @@ func TestTaskSupervisorPreflightsResultEnvelopeBeforeAction(t *testing.T) {
 	require.NoError(t, err)
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 		Source: SourceFunction,
-		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			return result, nil
 		}),
 	})
@@ -497,7 +497,7 @@ func TestTaskSupervisorRunsCleanupBeforeExplicitTermination(t *testing.T) {
 	cleaned := make(chan struct{}, 1)
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 		Source: SourceJobManager, MaxPhaseTransitions: 4,
-		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		}),
 		Cleanup: func() error {
@@ -538,7 +538,7 @@ func TestTaskSupervisorDispatchRotatesPendingClasses(t *testing.T) {
 	require.NoError(t, err)
 	release := make(chan struct{})
 	plan := func(source Source) TaskPlan {
-		return TaskPlan{Source: source, Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		return TaskPlan{Source: source, Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			<-release
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		})}
@@ -577,7 +577,7 @@ func TestTaskSupervisorRejectsInvalidSchedulingClass(t *testing.T) {
 	require.NoError(t, err)
 	plan := TaskPlan{
 		Source: SourceFunction,
-		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		}),
 	}
@@ -603,7 +603,7 @@ func TestTaskSupervisorFrameworkControlStartsWithManyActiveGenericTasks(t *testi
 	release := make(chan struct{})
 	blockingPlan := TaskPlan{
 		Source: SourceFunction,
-		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			<-release
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		}),
@@ -618,7 +618,7 @@ func TestTaskSupervisorFrameworkControlStartsWithManyActiveGenericTasks(t *testi
 	}
 	readyPlan := TaskPlan{
 		Source: SourceFunction,
-		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		}),
 	}
@@ -657,7 +657,7 @@ func TestTaskSupervisorDirectlyCancelsPendingRequest(t *testing.T) {
 	supervisor, err := NewTaskSupervisor(frame)
 	require.NoError(t, err)
 	plan := func(source Source) TaskPlan {
-		return TaskPlan{Source: source, Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		return TaskPlan{Source: source, Work: frameTaskWork(func(context.Context) (SealedResult, error) {
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		})}
 	}

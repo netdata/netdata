@@ -4,8 +4,6 @@ package lifecycle
 
 import (
 	"context"
-	"errors"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -188,67 +186,6 @@ func TestTaskSupervisorDisposesPreparedTransactionAndRestoresCurrent(t *testing.
 
 	want := []string{"prepare", "dispose"}
 	require.Equal(t, want, events)
-}
-
-func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
-	tests := map[string]struct {
-		permitPlan func([]string) (LongLivedPlan, error)
-	}{
-		"pipeline": {permitPlan: NewPipelineLongLivedPlan},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			supervisor := newResourceTaskSupervisor(t)
-			seedPlan, err := test.permitPlan([]string{"provider"})
-			require.NoError(t, err)
-			seed, err := supervisor.IssueLongLivedPermit(
-				ResourceIdentity{ID: "seed", Generation: 1},
-				seedPlan,
-			)
-			require.NoError(t, err)
-
-			permitPlan, err := test.permitPlan([]string{"provider"})
-			require.NoError(t, err)
-			scope := ResourceTransactionScope{
-				ID:        "successor",
-				Successor: ResourceIdentity{ID: "successor", Generation: 1},
-			}
-			var transactionRan atomic.Bool
-			plan, err := NewResourceTransactionPermitTaskPlan(
-				SourceJobManager,
-				time.Time{},
-				TransactionTaskPhases,
-				nil,
-				scope,
-				permitPlan,
-				func(
-					context.Context,
-					ReadyResource,
-					ResourceTransactionScope,
-					LongLivedPermit,
-				) (PreparedResourceTransaction, error) {
-					transactionRan.Store(true)
-					return nil, errors.New("capacity-rejected transaction ran")
-				},
-			)
-			require.NoError(t, err)
-			requestRef, err := supervisor.Enqueue(TaskClassFrameworkControl, plan)
-			require.NoError(t, err)
-			var started [TaskStartServiceQuantum]TaskStart
-			count, _, err := supervisor.Dispatch(context.Background(), 1, &started)
-			require.NoError(t, err)
-			require.EqualValues(t, 1, count)
-			require.Equal(t, requestRef, started[0].Request)
-			require.ErrorIs(t, started[0].Err, ErrLongLivedRecordCapacity)
-			require.EqualValues(t, TaskOutcomeNone, started[0].Outcome.Kind())
-			require.False(t, transactionRan.Load())
-			require.EqualValues(t, 0, supervisor.Active())
-			require.EqualValues(t, 0, supervisor.Pending())
-
-			require.NoError(t, seed.AbortUnused())
-		})
-	}
 }
 
 func TestResourceTransactionPermitPlanRejectsPipelineReplacement(t *testing.T) {

@@ -103,7 +103,6 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 					ID:         transaction.ID,
 					Generation: generation,
 				}
-				operation.resourceGeneration = generation
 			}
 			operation.transactionScope = scope
 			transactionWork := transaction.Prepare
@@ -187,10 +186,6 @@ func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
 		&started,
 	)
 	for _, start := range started[:count] {
-		if start.Err != nil {
-			ck.rejectTaskStart(start)
-			continue
-		}
 		if cleanupRef, ok := ck.functionCleanupRequests[start.Request]; ok {
 			if _, exists := ck.functionCleanupTasks[start.Task]; exists {
 				ck.run.Dirty(errors.New("jobmgr kernel: duplicate Function cleanup task slot"))
@@ -256,51 +251,4 @@ func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
 		ck.run.Dirty(dispatchErr)
 	}
 	return more
-}
-
-func (ck *CommandKernel) rejectTaskStart(start lifecycle.TaskStart) {
-	if cleanupRef, ok := ck.functionCleanupRequests[start.Request]; ok {
-		delete(ck.functionCleanupRequests, start.Request)
-		completeErr := errors.Join(errors.New("jobmgr kernel: Function cleanup task start rejected"), start.Err)
-		ck.run.Dirty(errors.Join(completeErr, ck.functionCatalog.CompleteCleanup(cleanupRef)))
-		return
-	}
-	if ck.shutdownBarrierRequest.Valid() &&
-		start.Request == ck.shutdownBarrierRequest {
-		ck.shutdownBarrierRequest = lifecycle.TaskRequestRef{}
-		ck.shutdownBarrierFailed = true
-		ck.run.Dirty(errors.Join(
-			errors.New("jobmgr kernel: shutdown barrier task start rejected"),
-			start.Err,
-		))
-		return
-	}
-	operation := ck.tasksByRequest[start.Request]
-	if !errors.Is(start.Err, lifecycle.ErrLongLivedRecordCapacity) || operation == nil ||
-		operation.taskRequest != start.Request || operation.Child != lifecycle.ChildNotStarted {
-		ck.run.Dirty(errors.Join(errors.New("jobmgr kernel: invalid task start rejection"), start.Err))
-		return
-	}
-	if operation.plan.Transaction != nil {
-		if err := ck.restoreTransactionOutcome(operation, start.Outcome); err != nil {
-			ck.run.Dirty(errors.Join(
-				errors.New("jobmgr kernel: rejected transaction start lost current resource"),
-				err,
-			))
-			return
-		}
-	} else if start.Outcome.Kind() != lifecycle.TaskOutcomeNone {
-		ck.run.Dirty(
-			errors.New("jobmgr kernel: rejected non-transaction start returned an outcome"),
-		)
-		return
-	}
-	delete(ck.tasksByRequest, start.Request)
-	operation.taskRequest = lifecycle.TaskRequestRef{}
-	operation.terminalErr = errors.Join(operation.terminalErr, start.Err)
-	ck.unlinkQueued(operation)
-	if operation.Response != lifecycle.ResponseNotRequired {
-		ck.enqueueControl(operation, lifecycle.ControlUnavailable)
-	}
-	ck.tryDispose(operation)
 }

@@ -74,8 +74,6 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 
 	require.NoError(t, handle.CloseAndDrain(context.Background()))
 
-	require.NoError(t, handle.Cleanup(context.Background()))
-
 	require.EqualValues(t, 1, handler.cleanupCount())
 
 	got := publicationPort.events

@@ -39,7 +39,7 @@ type Call struct {
 // ReadReturnGate fences reader returns while process ingress changes Agent
 // generation.
 type ReadReturnGate interface {
-	AcquireInputRead(context.Context, bool) (bool, error)
+	AcquireInputRead(context.Context) (bool, error)
 	ReleaseInputRead()
 }
 
@@ -85,7 +85,7 @@ func (capsule *InputCapsule) Run(ctx context.Context, consumer Consumer) error {
 	for {
 		segment, readErr := reader.ReadSlice('\n')
 		if gate != nil {
-			allowed, err := gate.AcquireInputRead(ctx, errors.Is(readErr, bufio.ErrBufferFull))
+			allowed, err := gate.AcquireInputRead(ctx)
 			if err != nil {
 				return err
 			}

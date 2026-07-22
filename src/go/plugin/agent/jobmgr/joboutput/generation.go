@@ -144,9 +144,7 @@ func prepareJob(
 	if err := permit.ValidateLive(); err != nil {
 		return PreparedJob{}, err
 	}
-	if err := permit.ActivateExternal(
-		lifecycle.LongLivedEJobResources,
-	); err != nil {
+	if err := permit.ActivateExternal(); err != nil {
 		return PreparedJob{}, err
 	}
 	constructed, err, returned := callConstructJob(ctx, build)
@@ -270,8 +268,8 @@ func (pj PreparedJob) Accept(
 	return &JobGeneration{
 		ID: state.id, Generation: state.generation, Variant: state.constructed.Variant,
 		resources: state.constructed, state: JobAllocated,
-		done: make(chan struct{}), stopDone: make(chan struct{}),
-		permit: state.permit,
+		stopDone: make(chan struct{}),
+		permit:   state.permit,
 	}, nil
 }
 
@@ -340,13 +338,12 @@ type JobGeneration struct {
 	stopErr        error                     // memoized result of the terminal Stop path
 	terminalErr    error                     // memoized result of finish()/Finalize()
 	stopDone       chan struct{}             // closed when Stop() reaches a terminal stop state
-	done           chan struct{}             // closed when the generation is finished
 	ID             string                    // job full name
 	Generation     uint64                    // lifecycle generation counter for this instance
 	mu             sync.Mutex                // guards state + the *Err/*finished fields
 	state          JobState                  // current JobState in the lifecycle FSM
 	Variant        JobVariant                // V1 or V2 collector shape
-	finished       bool                      // finish() has run (done closed)
+	finished       bool                      // finish() has recorded the terminal result
 	stopFinished   bool                      // finishStop() has run (stopDone closed)
 	observedActive bool                      // active-job gauge currently reflects this generation
 }
@@ -509,20 +506,13 @@ func (jg *JobGeneration) Stop(ctx context.Context) error {
 	}); err != nil {
 		return jg.finishStop(JobRetained, err)
 	}
-	if jg.resources.Handlers != nil {
-		if err := callJobLifecycle("handler Cleanup", func() error {
-			return jg.resources.Handlers.Cleanup(ctx)
-		}); err != nil {
-			return jg.finishStop(JobRetained, err)
-		}
-	}
 	if err := callJobLifecycle("collector Cleanup", func() error {
 		return jg.resources.CollectorCleanup(ctx)
 	}); err != nil {
 		return jg.finishStop(JobRetained, err)
 	}
-	if err := callJobLifecycle("job external facet release", func() error {
-		return jg.permit.ReleaseExternal(lifecycle.LongLivedEJobResources)
+	if err := callJobLifecycle("job external resource release", func() error {
+		return jg.permit.ReleaseExternal()
 	}); err != nil {
 		return jg.finishStop(JobRetained, err)
 	}
@@ -575,7 +565,6 @@ func (jg *JobGeneration) finish(state JobState, err error) error {
 	jg.state = state
 	jg.terminalErr = err
 	jg.finished = true
-	close(jg.done)
 	return err
 }
 
@@ -592,7 +581,6 @@ func (jg *JobGeneration) finishStop(state JobState, err error) error {
 	if state == JobRetained && !jg.finished {
 		jg.terminalErr = err
 		jg.finished = true
-		close(jg.done)
 	}
 	return err
 }
@@ -605,8 +593,8 @@ func rejectConstructed(
 	if err := cleanupConstructed(ctx, constructed); err != nil {
 		return lifecycle.RetainOwnership(err)
 	}
-	if err := callJobLifecycle("job external facet release", func() error {
-		return permit.ReleaseExternal(lifecycle.LongLivedEJobResources)
+	if err := callJobLifecycle("job external resource release", func() error {
+		return permit.ReleaseExternal()
 	}); err != nil {
 		return lifecycle.RetainOwnership(err)
 	}
@@ -630,13 +618,6 @@ func cleanupConstructed(
 	if constructed.Runtime != nil {
 		if err := callJobLifecycle("runtime Abort", func() error {
 			return constructed.Runtime.Abort(ctx)
-		}); err != nil {
-			return err
-		}
-	}
-	if constructed.Handlers != nil {
-		if err := callJobLifecycle("handler Cleanup", func() error {
-			return constructed.Handlers.Cleanup(ctx)
 		}); err != nil {
 			return err
 		}

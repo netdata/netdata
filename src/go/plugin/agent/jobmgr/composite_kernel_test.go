@@ -378,6 +378,17 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 			)
 			startKernelLoop(t, kernel)
 			require.NoError(t, run.OpenAdmission())
+			probeCtx, cancelProbe := context.WithTimeout(
+				context.Background(),
+				time.Second,
+			)
+			defer cancelProbe()
+			probe, err := startShutdownProbe(
+				probeCtx,
+				kernel.CommandKernel,
+				"composite-shutdown-probe-"+test.suffix,
+			)
+			require.NoError(t, err)
 
 			parentEntered := make(chan struct{})
 			submitChild := make(chan struct{})
@@ -438,10 +449,7 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 				time.Second,
 			)
 			defer cancelShutdown()
-			require.NoError(
-				t,
-				kernel.WaitShutdownStarted(shutdownCtx),
-			)
+			require.NoError(t, probe.waitCancellation(shutdownCtx))
 			close(submitChild)
 
 			select {
@@ -469,6 +477,7 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 			)
 			defer cancelWait()
 			require.NoError(t, kernel.Wait(waitCtx))
+			require.NoError(t, probe.waitSettlement(waitCtx))
 			require.NoError(t, run.DirtyCause())
 		})
 	}

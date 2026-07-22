@@ -309,7 +309,7 @@ func TestFunctionCatalogMutationAbortRestoresAdmission(t *testing.T) {
 	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "old", Route: "work"})
 	require.NoError(t, err)
 	require.True(t, decision.Lease.Valid())
-	assert.EqualValues(t, 1, catalog.Census().Version)
+	assert.EqualValues(t, 1, catalog.census().Version)
 	_, err = catalog.ReleaseInvocation(decision.Lease)
 	require.NoError(t, err)
 }
@@ -382,7 +382,7 @@ func TestFunctionCatalogMutationExceedsFormerCountLimit(t *testing.T) {
 		assert.Equal(t, lifecycle.ControlNotFound, decision.Rejected)
 	}
 	assert.Equal(t, 5, turns)
-	assert.Equal(t, population, catalog.Census().Routes)
+	assert.Equal(t, population, catalog.census().Routes)
 }
 
 func TestFunctionCatalogRejectsStalePreparedMutation(t *testing.T) {
@@ -561,7 +561,7 @@ func TestFunctionCatalogCloseIsBoundedAndCleansSharedGenerationOnce(t *testing.T
 	require.Len(t, second, 1)
 	runCleanupPlan(t, catalog, second[0])
 
-	census := catalog.Census()
+	census := catalog.census()
 	assert.True(t, census.Closed)
 	assert.Zero(t, census.Routes)
 	assert.Zero(t, census.PendingCleanups)
@@ -681,4 +681,24 @@ func runCleanupPlan(t *testing.T, catalog *Catalog, cleanup jobmgr.FunctionClean
 	_, err := cleanup.Work(context.Background())
 	require.NoError(t, err)
 	require.NoError(t, catalog.CompleteCleanup(cleanup.Ref))
+}
+
+type catalogCensus struct {
+	Version          uint64
+	Routes           int
+	InvocationLeases int
+	PendingCleanups  int
+	Closed           bool
+	MutationActive   bool
+}
+
+func (c *Catalog) census() catalogCensus {
+	return catalogCensus{
+		Version:          c.version,
+		Routes:           c.routeCount,
+		InvocationLeases: c.invocationCount,
+		PendingCleanups:  c.pendingCleanups,
+		Closed:           c.closed,
+		MutationActive:   c.mutation != nil,
+	}
 }

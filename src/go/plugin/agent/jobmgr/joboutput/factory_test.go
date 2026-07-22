@@ -21,11 +21,10 @@ import (
 
 func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 	tests := map[string]struct {
-		configure          func(*factoryTestState, *collectorapi.Creator) JobHooks
-		wantClose          int
-		wantHandlerCleanup int
-		wantRetained       bool
-		wantNoCleanup      bool
+		configure     func(*factoryTestState, *collectorapi.Creator) JobHooks
+		wantClose     int
+		wantRetained  bool
+		wantNoCleanup bool
 	}{
 		"creator panic": {
 			configure: func(*factoryTestState, *collectorapi.Creator) JobHooks {
@@ -86,8 +85,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 					return &factoryTestHandlers{state: state}, errors.New("prepare failed")
 				}}
 			},
-			wantClose:          1,
-			wantHandlerCleanup: 1,
+			wantClose: 1,
 		},
 		"handler preparation panic": {
 			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
@@ -138,7 +136,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				wantCollectorCleanup = 0
 			}
 			require.EqualValues(t, wantCollectorCleanup, state.collectorCleanup)
-			require.False(t, state.handlerClose != test.wantClose || state.handlerCleanup != test.wantHandlerCleanup)
+			require.EqualValues(t, test.wantClose, state.handlerClose)
 			require.EqualValues(t, 0, output.Len())
 			require.Equal(t, test.wantRetained, lifecycle.OwnershipRetained(err))
 			require.Equal(
@@ -283,7 +281,6 @@ func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
 type factoryTestState struct {
 	collectorCleanup int
 	handlerClose     int
-	handlerCleanup   int
 	autoDetection    int
 }
 
@@ -342,11 +339,6 @@ func (*factoryTestHandlers) Publish() error { return nil }
 
 func (fth *factoryTestHandlers) CloseAndDrain(context.Context) error {
 	fth.state.handlerClose++
-	return nil
-}
-
-func (fth *factoryTestHandlers) Cleanup(context.Context) error {
-	fth.state.handlerCleanup++
 	return nil
 }
 

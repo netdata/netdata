@@ -138,7 +138,6 @@ type commandOperation struct {
 	uidCompleted                   bool                               // UID released from the dedupe ledger
 	cancelled                      bool                               // user/deadline/shutdown cancellation requested
 	functionInvocation             FunctionInvocationRef              // Function catalog invocation lease (Function commands only)
-	resourceGeneration             uint64                             // generation assigned to the resource this op installs
 	transactionScope               lifecycle.ResourceTransactionScope // current/successor identities a resource transaction may touch
 	transactionApplied             bool                               // the transaction's ownership-changing apply has started
 	transactionRestored            bool                               // a failed transaction's predecessor was restored
@@ -164,11 +163,9 @@ type commandOperation struct {
 // commandLane serializes every command addressed to one resource/invocation key
 // into a FIFO; CommandKernel's run loop is its sole mutator.
 type commandLane struct {
-	slot               uint32                     // index of this lane in laneSlots (freelist-managed)
-	generation         uint32                     // ABA guard bumped when the slot is reused
 	mapKey             commandLaneKey             // key this lane is registered under in the lanes map
 	owners             int                        // refcount of operations currently referencing the lane
-	freeNext           uint32                     // next free slot index while the lane is on the freelist
+	freeNext           *commandLane               // next recycled lane while on the freelist
 	key                string                     // resource/invocation identity this lane serializes
 	source             lifecycle.Source           // ingress source (JobManager vs Function) that owns the lane
 	head               *commandOperation          // first queued operation (FIFO head)
@@ -220,8 +217,6 @@ type CommandKernel struct {
 	startOnce                sync.Once                                       // guards Start
 	startErr                 error                                           // error captured by Start
 	stopOnce                 sync.Once                                       // guards Stop
-	shutdownStarted          chan struct{}                                   // closed once shutdown begins
-	shutdownStartOnce        sync.Once                                       // guards shutdown start
 	operations               map[string]*commandOperation                    // all live operations by UID
 	tasksByRef               map[lifecycle.TaskRef]*commandOperation         // operations keyed by their active task ref
 	tasksByRequest           map[lifecycle.TaskRequestRef]*commandOperation  // operations keyed by their task-request ref
@@ -250,8 +245,7 @@ type CommandKernel struct {
 	finalizerDone            bool                                            // finalizer completed (or was a noop)
 	finalizerFailed          bool                                            // finalizer failed
 	lanes                    map[commandLaneKey]*commandLane                 // active lanes by key
-	laneSlots                []*commandLane                                  // lane slot storage (freelist-backed)
-	freeLane                 uint32                                          // head of the lane slot freelist
+	freeLane                 *commandLane                                    // head of the recycled-lane freelist
 	ready                    [2]readyQueue                                   // per-source ready-lane queues
 	nextID                   lifecycle.OperationID                           // next operation ID to assign
 	nextResourceGeneration   uint64                                          // next resource generation to assign
@@ -272,11 +266,9 @@ type CommandKernel struct {
 	laneTail                 *commandLane                                    // tail of the all-lanes list
 	shutdownPhase            commandShutdownPhase                            // current shutdown phase
 	shutdownCancelCursor     *commandOperation                               // cursor sweeping operations to cancel during shutdown
-	shutdownCancelDone       bool                                            // shutdown cancellation sweep finished
 	ownershipChains          int                                             // count of protected ownership chains still running
 	shutdownLaneCursor       *commandLane                                    // cursor sweeping lanes to stop during shutdown
-	shutdownLanesDone        bool                                            // shutdown lane sweep finished
-	functionCatalog          FunctionCatalogPort                             // Function catalog port (routing + census)
+	functionCatalog          FunctionCatalogPort                             // Function catalog port (routing + lifecycle drain)
 	runtimeObserver          lifecycle.RuntimeObserver                       // sink for jobmgr.runtime metric atomics
 	runtimeHead              *commandOperation                               // head of the runtime-metrics op list
 	runtimeTail              *commandOperation                               // tail of the runtime-metrics op list
@@ -301,7 +293,6 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, uids *lifecycle.UIDLedger, t
 		wake:                    make(chan struct{}, 1),
 		stop:                    make(chan struct{}),
 		done:                    make(chan struct{}),
-		shutdownStarted:         make(chan struct{}),
 		submissionStopped:       make(chan struct{}),
 		continuationStopped:     make(chan struct{}),
 		operations:              make(map[string]*commandOperation),
@@ -320,7 +311,6 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, uids *lifecycle.UIDLedger, t
 		shutdownBarrier:         shutdownBarrier,
 		finalizer:               finalizer,
 		functionCatalog:         functionCatalog,
-		laneSlots:               []*commandLane{nil},
 	}
 	for index := range kernel.submissions {
 		kernel.submissions[index] = make(chan submission, externalSourceQueueDepth)
@@ -1152,10 +1142,7 @@ func (ck *CommandKernel) beginShutdown(deadline time.Time) error {
 	}
 	ck.shutdownPhase = commandShutdownActionDrain
 	ck.shutdownCancelCursor = ck.operationHead
-	ck.shutdownCancelDone =
-		ck.shutdownCancelCursor == nil
 	ck.shutdownLaneCursor = nil
-	ck.shutdownLanesDone = false
 	return nil
 }
 
@@ -1189,9 +1176,7 @@ func (ck *CommandKernel) serviceShutdownCancellation(
 			return false, err
 		}
 	}
-	ck.shutdownCancelDone =
-		ck.shutdownCancelCursor == nil
-	return !ck.shutdownCancelDone, nil
+	return ck.shutdownCancelCursor != nil, nil
 }
 
 func (ck *CommandKernel) cancelOperationForShutdown(
@@ -1256,7 +1241,7 @@ func cancellationControl(operation *commandOperation) lifecycle.ControlStatus {
 
 func (ck *CommandKernel) advanceShutdownAuthority() error {
 	if ck.shutdownPhase != commandShutdownActionDrain ||
-		!ck.shutdownCancelDone ||
+		ck.shutdownCancelCursor != nil ||
 		ck.ownershipChains != 0 {
 		return nil
 	}
@@ -1281,7 +1266,6 @@ func (ck *CommandKernel) advanceShutdownAuthority() error {
 		return err
 	}
 	ck.shutdownLaneCursor = ck.laneHead
-	ck.shutdownLanesDone = ck.shutdownLaneCursor == nil
 	return nil
 }
 
@@ -1323,8 +1307,7 @@ func (ck *CommandKernel) serviceShutdownStops(
 		}
 		ck.releaseUnusedLane(lane)
 	}
-	ck.shutdownLanesDone = ck.shutdownLaneCursor == nil
-	return !ck.shutdownLanesDone, nil
+	return ck.shutdownLaneCursor != nil, nil
 }
 
 func (ck *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
@@ -1423,7 +1406,7 @@ func (ck *CommandKernel) advanceShutdownBarrier() error {
 		ck.shutdownBarrierTask.Valid() {
 		return nil
 	}
-	if !ck.shutdownCancelDone ||
+	if ck.shutdownCancelCursor != nil ||
 		ck.tasks.InheritedCancellationPending() {
 		return nil
 	}
@@ -1560,7 +1543,7 @@ func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
 	census := ck.runCensus()
 	if !census.KernelDrained || !census.FunctionCatalogDrained ||
 		census.UIDActive != 0 || census.TransientActive != 0 ||
-		census.TransientPending != 0 || census.Inherited.Active != 0 ||
+		census.TransientPending != 0 || census.InheritedActive != 0 ||
 		census.LongLived.Active != census.LongLived.SecretStores {
 		return false
 	}
@@ -1618,7 +1601,7 @@ func (ck *CommandKernel) kernelOwnershipDrained() bool {
 }
 
 func (ck *CommandKernel) kernelStateDrained() bool {
-	if !ck.shutdownCancelDone || !ck.shutdownLanesDone ||
+	if ck.shutdownCancelCursor != nil || ck.shutdownLaneCursor != nil ||
 		ck.tasks.InheritedCancellationPending() ||
 		len(ck.operations) != 0 || len(ck.tasksByRef) != 0 ||
 		len(ck.tasksByRequest) != 0 ||
@@ -1642,9 +1625,7 @@ func (ck *CommandKernel) kernelStateDrained() bool {
 }
 
 func (ck *CommandKernel) functionCatalogDrained() bool {
-	census := ck.functionCatalog.LifecycleCensus()
-	return census.Closed && !census.MutationActive && census.Routes == 0 &&
-		census.InvocationLeases == 0 && census.PendingCleanups == 0
+	return ck.functionCatalog.LifecycleDrained()
 }
 
 func (ck *CommandKernel) runCensus() lifecycle.RunCensus {
@@ -1655,7 +1636,7 @@ func (ck *CommandKernel) runCensus() lifecycle.RunCensus {
 		UIDActive:              uidActive,
 		TransientActive:        ck.tasks.Active(),
 		TransientPending:       ck.tasks.Pending(),
-		Inherited:              ck.tasks.InheritedCensus(), LongLived: ck.tasks.LongLivedCensus(),
+		InheritedActive:        ck.tasks.InheritedActive(), LongLived: ck.tasks.LongLivedCensus(),
 		Frame:                ck.frames.Census(),
 		RunFinalizerComplete: ck.finalizerDone && !ck.finalizerFailed,
 	}

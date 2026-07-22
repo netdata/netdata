@@ -13,7 +13,7 @@ import (
 
 func TestFunctionCatalogDecisionValidate(t *testing.T) {
 	validPlan := WorkPlan{
-		Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+		Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 			return lifecycle.NewControlResult(lifecycle.ControlInternal)
 		}),
 	}

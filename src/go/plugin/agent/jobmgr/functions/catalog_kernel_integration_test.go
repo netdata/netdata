@@ -81,12 +81,8 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 
 	require.NoError(t, kernel.Wait(waitCtx))
 
-	census := catalog.Census()
-	require.False(t, !census.Closed ||
-		census.Routes != 0 ||
-		census.InvocationLeases != 0 ||
-		census.PendingCleanups != 0 ||
-		cleanupCalls.Load() != population)
+	require.True(t, catalog.LifecycleDrained())
+	require.EqualValues(t, population, cleanupCalls.Load())
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 

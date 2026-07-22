@@ -7,27 +7,15 @@ import (
 )
 
 func (ck *CommandKernel) allocateLane(mapKey commandLaneKey, request Request) (*commandLane, error) {
-	slot := ck.freeLane
-	if slot == 0 {
-		if uint64(len(ck.laneSlots)) > uint64(^uint32(0)) {
-			return nil, errors.New("jobmgr kernel: lane reference space exhausted")
-		}
-		slot = uint32(len(ck.laneSlots))
-		ck.laneSlots = append(ck.laneSlots, &commandLane{slot: slot})
-	}
-	lane := ck.laneSlots[slot]
-	if ck.freeLane != 0 {
+	lane := ck.freeLane
+	if lane == nil {
+		lane = &commandLane{}
+	} else {
 		ck.freeLane = lane.freeNext
 	}
-	generation := lane.generation + 1
-	if generation == 0 {
-		lane.freeNext = ck.freeLane
-		ck.freeLane = slot
-		return nil, errors.New("jobmgr kernel: lane generation wrapped")
-	}
 	*lane = commandLane{
-		slot: slot, generation: generation, mapKey: mapKey,
-		key: request.LaneKey, source: request.Source,
+		mapKey: mapKey,
+		key:    request.LaneKey, source: request.Source,
 	}
 	ck.lanes[mapKey] = lane
 	ck.appendLane(lane)
@@ -52,10 +40,8 @@ func (ck *CommandKernel) releaseUnusedLane(lane *commandLane) {
 	}
 	delete(ck.lanes, lane.mapKey)
 	ck.unlinkLane(lane)
-	slot := lane.slot
-	generation := lane.generation
-	*lane = commandLane{slot: slot, generation: generation, freeNext: ck.freeLane}
-	ck.freeLane = slot
+	*lane = commandLane{freeNext: ck.freeLane}
+	ck.freeLane = lane
 }
 
 func (ck *CommandKernel) appendLane(lane *commandLane) {

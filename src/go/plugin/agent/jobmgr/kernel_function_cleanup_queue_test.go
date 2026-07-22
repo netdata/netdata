@@ -27,10 +27,7 @@ func TestFunctionCleanupQueuePreservesFIFOAndReleasesReferences(t *testing.T) {
 	var queue functionCleanupQueue
 	for index := range population {
 		plan := FunctionCleanupPlan{
-			Ref: FunctionCleanupRef{
-				Slot:       uint32(index + 1),
-				Generation: 1,
-			},
+			Ref: FunctionCleanupRef(index + 1),
 			Work: func(context.Context) (lifecycle.TaskOutcome, error) {
 				return lifecycle.NoValueOutcome(), nil
 			},
@@ -41,7 +38,7 @@ func TestFunctionCleanupQueuePreservesFIFOAndReleasesReferences(t *testing.T) {
 	require.EqualValues(t, population, queue.count)
 	for index := range population {
 		plan := queue.front()
-		require.False(t, plan.Ref.Slot != uint32(index+1) || plan.Ref.Generation != 1)
+		require.Equal(t, FunctionCleanupRef(index+1), plan.Ref)
 		queue.pop()
 	}
 	require.Zero(t, queue.count)
@@ -57,7 +54,7 @@ func TestFunctionCleanupQueueStorageTracksLiveBacklog(t *testing.T) {
 
 	plan := func(slot uint32) FunctionCleanupPlan {
 		return FunctionCleanupPlan{
-			Ref: FunctionCleanupRef{Slot: slot, Generation: 1},
+			Ref: FunctionCleanupRef(slot),
 			Work: func(context.Context) (lifecycle.TaskOutcome, error) {
 				return lifecycle.NoValueOutcome(), nil
 			},
@@ -76,7 +73,7 @@ func TestFunctionCleanupQueueStorageTracksLiveBacklog(t *testing.T) {
 	require.Equal(t, 1, queue.count)
 	assert.LessOrEqual(t, len(queue.plans), 2*queue.count)
 	assert.LessOrEqual(t, cap(queue.plans), 2*queue.count)
-	assert.EqualValues(t, population+1, queue.front().Ref.Slot)
+	assert.Equal(t, FunctionCleanupRef(population+1), queue.front().Ref)
 }
 
 func TestAbortFunctionMutationReturnsCatalogError(t *testing.T) {
@@ -94,10 +91,7 @@ func BenchmarkBFunctionCleanupQueuePushPop(b *testing.B) {
 	plans := make([]FunctionCleanupPlan, population)
 	for index := range plans {
 		plans[index] = FunctionCleanupPlan{
-			Ref: FunctionCleanupRef{
-				Slot:       uint32(index + 1),
-				Generation: 1,
-			},
+			Ref: FunctionCleanupRef(index + 1),
 			Work: func(context.Context) (lifecycle.TaskOutcome, error) {
 				return lifecycle.NoValueOutcome(), nil
 			},

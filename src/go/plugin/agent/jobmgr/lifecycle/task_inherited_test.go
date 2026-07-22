@@ -88,7 +88,7 @@ func TestInheritedShutdownNormalizesOnlyCurrentStoppingCause(t *testing.T) {
 
 			run.BeginStopping()
 			require.NoError(t, supervisor.SealInherited())
-			_, more, err := supervisor.CancelInheritedBatch(
+			more, err := supervisor.CancelInheritedBatch(
 				InheritedCancellationServiceQuantum,
 			)
 			require.NoError(t, err)

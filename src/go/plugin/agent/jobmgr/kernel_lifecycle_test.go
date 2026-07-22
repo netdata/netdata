@@ -166,6 +166,27 @@ func TestKernelDirtyStateTriggersFailStop(t *testing.T) {
 	require.ErrorIs(t, kernel.Wait(ctx), want)
 }
 
+func TestShutdownProbeObservesKernelLoopCancellation(t *testing.T) {
+	kernel, run, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	require.NoError(t, run.OpenAdmission())
+	startKernelLoop(t, kernel)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	probe, err := startShutdownProbe(ctx, kernel.CommandKernel, "shutdown-probe")
+	require.NoError(t, err)
+	select {
+	case <-probe.cancelled:
+		require.FailNow(t, "test failed", "probe cancelled before shutdown")
+	default:
+	}
+
+	kernel.Stop()
+	require.NoError(t, probe.waitCancellation(ctx))
+	require.NoError(t, kernel.Wait(ctx))
+	require.NoError(t, probe.waitSettlement(ctx))
+	closeUIDLedger(t, uids)
+}
+
 func TestKernelResourcePublicationRunsOffLoop(t *testing.T) {
 	publishRelease := make(chan struct{})
 	resource := newKernelTestReadyResource("resource", publishRelease, nil)
@@ -174,6 +195,14 @@ func TestKernelResourcePublicationRunsOffLoop(t *testing.T) {
 	require.NoError(t, run.OpenAdmission())
 
 	startKernelLoop(t, kernel)
+	probeCtx, cancelProbe := context.WithTimeout(context.Background(), time.Second)
+	defer cancelProbe()
+	probe, err := startShutdownProbe(
+		probeCtx,
+		kernel.CommandKernel,
+		"publish-off-loop-shutdown-probe",
+	)
+	require.NoError(t, err)
 
 	require.NoError(t, kernel.Submit(context.Background(), Request{
 		UID: "publish-off-loop", LaneKey: "resource", Source: lifecycle.SourceJobManager, Route: "install",
@@ -187,13 +216,14 @@ func TestKernelResourcePublicationRunsOffLoop(t *testing.T) {
 	}
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	shutdownErr := kernel.WaitShutdownStarted(ctx)
+	shutdownErr := probe.waitCancellation(ctx)
 	cancel()
 	close(publishRelease)
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
 	defer waitCancel()
 
 	require.NoError(t, kernel.Wait(waitCtx))
+	require.NoError(t, probe.waitSettlement(waitCtx))
 
 	require.NoError(t, shutdownErr)
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
@@ -207,7 +237,7 @@ func TestKernelPlanningRunsOutsideLoop(t *testing.T) {
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		close(planEntered)
 		<-planRelease
-		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+		return WorkPlan{Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 			return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 		})}, nil
 	})
@@ -216,6 +246,14 @@ func TestKernelPlanningRunsOutsideLoop(t *testing.T) {
 	require.NoError(t, run.OpenAdmission())
 
 	startKernelLoop(t, kernel)
+	probeCtx, cancelProbe := context.WithTimeout(context.Background(), time.Second)
+	defer cancelProbe()
+	probe, err := startShutdownProbe(
+		probeCtx,
+		kernel.CommandKernel,
+		"planning-off-loop-shutdown-probe",
+	)
+	require.NoError(t, err)
 	submitResult := make(chan error, 1)
 	go func() {
 		submitResult <- kernel.Submit(context.Background(), Request{
@@ -229,7 +267,7 @@ func TestKernelPlanningRunsOutsideLoop(t *testing.T) {
 	}
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	shutdownErr := kernel.WaitShutdownStarted(ctx)
+	shutdownErr := probe.waitCancellation(ctx)
 	cancel()
 	close(planRelease)
 	select {
@@ -241,6 +279,7 @@ func TestKernelPlanningRunsOutsideLoop(t *testing.T) {
 	defer waitCancel()
 
 	require.NoError(t, kernel.Wait(waitCtx))
+	require.NoError(t, probe.waitSettlement(waitCtx))
 
 	require.NoError(t, shutdownErr)
 
@@ -252,7 +291,7 @@ func TestFunctionCatalogPlanningWaitsForKernelLoop(t *testing.T) {
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		planned <- struct{}{}
 		return WorkPlan{
-			Work: lifecycle.FrameTaskWork(plannerPlanWork),
+			Work: frameTaskWork(plannerPlanWork),
 		}, nil
 	})
 	kernel, run, uids, _ := newKernelWithPlanner(t, planner)
@@ -292,7 +331,7 @@ func TestFunctionCatalogPlanningWaitsForKernelLoop(t *testing.T) {
 }
 
 func TestFunctionCatalogDecisionOwnsExactLease(t *testing.T) {
-	work := WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}
+	work := WorkPlan{Work: frameTaskWork(plannerPlanWork)}
 	tests := map[string]struct {
 		decision     FunctionCatalogDecision
 		wantErr      bool
@@ -350,7 +389,7 @@ func TestFunctionCatalogDecisionOwnsExactLease(t *testing.T) {
 			startKernelLoop(t, kernel)
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
-			err := kernel.SubmitAndWait(ctx, Request{
+			err := kernel.submitAndWait(ctx, Request{
 				UID: "catalog-decision", Source: lifecycle.SourceFunction, Route: "route",
 			})
 
@@ -375,13 +414,13 @@ func TestFunctionHandlerCleanupRunsOffKernelLoop(t *testing.T) {
 	catalog := functionCatalogPortStub{
 		resolve: func(FunctionLookup) (FunctionCatalogDecision, error) {
 			return FunctionCatalogDecision{
-				Plan:  WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)},
+				Plan:  WorkPlan{Work: frameTaskWork(plannerPlanWork)},
 				Lease: FunctionInvocationRef{Slot: 1, Generation: 1},
 			}, nil
 		},
 		release: func(FunctionInvocationRef) (FunctionCleanupPlan, error) {
 			return FunctionCleanupPlan{
-				Ref: FunctionCleanupRef{Slot: 1, Generation: 1},
+				Ref: FunctionCleanupRef(1),
 				Work: func(ctx context.Context) (lifecycle.TaskOutcome, error) {
 					if err := kernel.Cancel(ctx, "cleanup-loop-barrier"); err != nil {
 						return lifecycle.NoValueOutcome(), err
@@ -406,7 +445,7 @@ func TestFunctionHandlerCleanupRunsOffKernelLoop(t *testing.T) {
 
 	startKernelLoop(t, kernel)
 
-	require.NoError(t, kernel.SubmitAndWait(context.Background(), Request{
+	require.NoError(t, kernel.submitAndWait(context.Background(), Request{
 		UID: "cleanup-off-loop", Source: lifecycle.SourceFunction, Route: "route",
 	}),
 	)
@@ -428,7 +467,7 @@ func TestFunctionHandlerCleanupRunsOffKernelLoop(t *testing.T) {
 
 func TestWorkPlanRejectsOversizedClaimKey(t *testing.T) {
 	plan := WorkPlan{
-		Work:   lifecycle.FrameTaskWork(plannerPlanWork),
+		Work:   frameTaskWork(plannerPlanWork),
 		Claims: []string{strings.Repeat("c", maximumClaimKeyBytes+1)},
 	}
 	require.Error(t, plan.validate())
@@ -436,7 +475,7 @@ func TestWorkPlanRejectsOversizedClaimKey(t *testing.T) {
 
 func TestWorkPlanAcceptsClaimsBeyondFormerAggregateByteLimit(t *testing.T) {
 	plan := WorkPlan{
-		Work:   lifecycle.FrameTaskWork(plannerPlanWork),
+		Work:   frameTaskWork(plannerPlanWork),
 		Claims: make([]string, 5),
 	}
 	for index := range plan.Claims {
@@ -519,7 +558,7 @@ func TestKernelResourceStopCompletesAfterOperationDeadline(t *testing.T) {
 	require.NoError(t, kernel.BindRuntimeObserver(observer))
 	require.NoError(t, run.OpenAdmission())
 	startKernelLoop(t, kernel)
-	require.NoError(t, kernel.SubmitAndWait(
+	require.NoError(t, kernel.submitAndWait(
 		context.Background(),
 		Request{
 			UID: "install-before-deadline-stop", LaneKey: "resource",
@@ -529,7 +568,7 @@ func TestKernelResourceStopCompletesAfterOperationDeadline(t *testing.T) {
 
 	result := make(chan error, 1)
 	go func() {
-		result <- kernel.SubmitAndWait(
+		result <- kernel.submitAndWait(
 			context.Background(),
 			Request{
 				UID: "deadline-stop", LaneKey: "resource",
@@ -576,8 +615,6 @@ func TestKernelResourceStopCompletesAfterOperationDeadline(t *testing.T) {
 		)
 	}
 	require.EqualValues(t, 0, tasks.Active())
-	retained, _ := tasks.RetainedTimeouts()
-	require.EqualValues(t, 0, retained)
 
 	kernel.Stop()
 	require.NoError(t, kernel.Wait(context.Background()))
@@ -659,7 +696,7 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 
 			startKernelLoop(t, kernel)
 
-			require.NoError(t, kernel.SubmitAndWait(
+			require.NoError(t, kernel.submitAndWait(
 				context.Background(),
 				Request{
 					UID:     "install-current",
@@ -676,7 +713,7 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 				uid = "replace-success"
 			}
 
-			err := kernel.SubmitAndWait(
+			err := kernel.submitAndWait(
 				context.Background(),
 				Request{
 					UID:     uid,
@@ -749,7 +786,7 @@ func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
 
 	startKernelLoop(t, kernel)
 
-	require.NoError(t, kernel.SubmitAndWait(
+	require.NoError(t, kernel.submitAndWait(
 		context.Background(),
 		Request{
 			UID:     "install-from-job-manager",
@@ -760,7 +797,7 @@ func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
 	),
 	)
 
-	require.NoError(t, kernel.SubmitAndWait(
+	require.NoError(t, kernel.submitAndWait(
 		context.Background(),
 		Request{
 			UID:    "replace-from-function",
@@ -819,7 +856,7 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 
 	startKernelLoop(t, kernel)
 
-	require.NoError(t, kernel.SubmitAndWait(
+	require.NoError(t, kernel.submitAndWait(
 		context.Background(),
 		Request{
 			UID:     "install-before-cancel",
@@ -832,7 +869,7 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 
 	originalIdentity := current.identity
 
-	require.NoError(t, kernel.SubmitAndWait(
+	require.NoError(t, kernel.submitAndWait(
 		context.Background(),
 		Request{
 			UID:      "replace-deadline",
@@ -886,7 +923,7 @@ func TestKernelPreparedInternalTransactionAppliesWithoutResponse(t *testing.T) {
 
 	startKernelLoop(t, kernel)
 
-	require.NoError(t, kernel.SubmitAndWait(
+	require.NoError(t, kernel.submitAndWait(
 		context.Background(),
 		Request{
 			UID:     "prepared-install",
@@ -947,14 +984,14 @@ func TestKernelShutdownStopsResourceAfterActiveUserDrains(t *testing.T) {
 
 	startKernelLoop(t, kernel)
 
-	require.NoError(t, kernel.SubmitAndWait(context.Background(), Request{
+	require.NoError(t, kernel.submitAndWait(context.Background(), Request{
 		UID: "install-before-use", LaneKey: "resource", Source: lifecycle.SourceJobManager, Route: "install",
 	}),
 	)
 
 	useResult := make(chan error, 1)
 	go func() {
-		useResult <- kernel.SubmitAndWait(context.Background(), Request{
+		useResult <- kernel.submitAndWait(context.Background(), Request{
 			UID: "active-resource-user", Source: lifecycle.SourceFunction, Route: "use",
 		})
 	}()
@@ -1014,7 +1051,7 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 
 	startKernelLoop(t, kernel)
 	for id := range resources {
-		require.NoError(t, kernel.SubmitAndWait(context.Background(), Request{
+		require.NoError(t, kernel.submitAndWait(context.Background(), Request{
 			UID:     "install-" + id,
 			LaneKey: id,
 			Source:  lifecycle.SourceJobManager,
@@ -1035,8 +1072,7 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 	active := tasks.Active()
 	require.EqualValues(t, population, active)
 
-	census := tasks.LongLivedCensus()
-	require.False(t, census.Active != population || census.Jobs != population)
+	require.EqualValues(t, population, tasks.LongLivedCensus().Active)
 
 	close(stopRelease)
 
@@ -1086,9 +1122,7 @@ func TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta(t *testing.T) {
 			},
 		)
 		require.NoError(t, err)
-		kernel.functionCleanupRequests[request] = FunctionCleanupRef{
-			Slot: slot, Generation: 1,
-		}
+		kernel.functionCleanupRequests[request] = FunctionCleanupRef(slot)
 	}
 	for index := range genericPopulation {
 		enqueueCleanup(uint32(index + 1))
@@ -1114,7 +1148,7 @@ func TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta(t *testing.T) {
 			Route:   "control",
 		},
 		WorkPlan{
-			Work: lifecycle.FrameTaskWork(
+			Work: frameTaskWork(
 				func(context.Context) (lifecycle.SealedResult, error) {
 					controlEntered <- struct{}{}
 					<-release
@@ -1191,7 +1225,7 @@ func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 		uid := fmt.Sprintf("shutdown-fence-%02d", index)
 		plan := WorkPlan{
 			NoResponse: true,
-			Work: lifecycle.FrameTaskWork(
+			Work: frameTaskWork(
 				func(context.Context) (lifecycle.SealedResult, error) {
 					entered <- uid
 					<-release
@@ -1367,7 +1401,7 @@ func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 	workEntered := make(chan struct{})
 	releaseWork := make(chan struct{})
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
-		return WorkPlan{Work: lifecycle.FrameTaskWork(func(ctx context.Context) (lifecycle.SealedResult, error) {
+		return WorkPlan{Work: frameTaskWork(func(ctx context.Context) (lifecycle.SealedResult, error) {
 			close(workEntered)
 			<-releaseWork
 			return plannerPlanWork(ctx)
@@ -1380,7 +1414,7 @@ func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 	startKernelLoop(t, kernel)
 	done := make(chan error, 1)
 	go func() {
-		done <- kernel.SubmitAndWait(context.Background(), Request{
+		done <- kernel.submitAndWait(context.Background(), Request{
 			UID: "one-deadline-timer", Source: lifecycle.SourceFunction, Route: "timer",
 			Deadline: clock.Now().Add(time.Hour),
 		})
@@ -1435,7 +1469,7 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 		if route == "deadline" {
 			return WorkPlan{
 				CooperativeDeadline: true,
-				Work: lifecycle.FrameTaskWork(func(ctx context.Context) (lifecycle.SealedResult, error) {
+				Work: frameTaskWork(func(ctx context.Context) (lifecycle.SealedResult, error) {
 					deadlineCalls.Add(1)
 					deadline, ok := ctx.Deadline()
 					deadlineEntered <- deadlineObservation{deadline: deadline, ok: ok, err: ctx.Err(), cause: context.Cause(ctx)}
@@ -1443,7 +1477,7 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 				}),
 			}, nil
 		}
-		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+		return WorkPlan{Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 			blockerEntered <- struct{}{}
 			<-release
 			return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
@@ -1528,7 +1562,7 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 			}, nil
 		}
 		return WorkPlan{
-			Work: lifecycle.FrameTaskWork(func(
+			Work: frameTaskWork(func(
 				context.Context,
 			) (lifecycle.SealedResult, error) {
 				blockerEntered <- struct{}{}
@@ -1573,7 +1607,7 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 	}
 	result := make(chan error, 1)
 	go func() {
-		result <- kernel.SubmitAndWait(
+		result <- kernel.submitAndWait(
 			context.Background(),
 			Request{
 				UID:      "due-runner",
@@ -1642,7 +1676,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 		if route == "deadline" {
 			return WorkPlan{
 				CooperativeDeadline: true,
-				Work: lifecycle.FrameTaskWork(func(ctx context.Context) (lifecycle.SealedResult, error) {
+				Work: frameTaskWork(func(ctx context.Context) (lifecycle.SealedResult, error) {
 					deadlineCalls.Add(1)
 					deadline, ok := ctx.Deadline()
 					deadlineEntered <- deadlineObservation{deadline: deadline, ok: ok, err: ctx.Err(), cause: context.Cause(ctx)}
@@ -1650,7 +1684,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 				}),
 			}, nil
 		}
-		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+		return WorkPlan{Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 			predecessorEntered <- struct{}{}
 			<-releasePredecessor
 			return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
@@ -1665,7 +1699,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	startKernelLoop(t, kernel)
 	predecessorResult := make(chan error, 1)
 	go func() {
-		predecessorResult <- kernel.SubmitAndWait(context.Background(), Request{
+		predecessorResult <- kernel.submitAndWait(context.Background(), Request{
 			UID: "same-lane-predecessor", Source: lifecycle.SourceFunction, Route: "predecessor",
 		})
 	}()
@@ -1677,7 +1711,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	due := clock.Now().Add(time.Second)
 	deadlineResult := make(chan error, 1)
 	go func() {
-		deadlineResult <- kernel.SubmitAndWait(context.Background(), Request{
+		deadlineResult <- kernel.submitAndWait(context.Background(), Request{
 			UID: "same-lane-deadline", Source: lifecycle.SourceFunction,
 			Route: "deadline", Deadline: due,
 		})
@@ -1741,14 +1775,14 @@ func TestKernelCancelBeforeQueuedCooperativeDeadlineDisposesOperation(t *testing
 		if route == "deadline" {
 			return WorkPlan{
 				CooperativeDeadline: true,
-				Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+				Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 					deadlineWorkStarted.Store(true)
 					return lifecycle.NewControlResult(lifecycle.ControlDeadline)
 				}),
 			}, nil
 		}
 		return WorkPlan{
-			Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+			Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 				holderEntered <- struct{}{}
 				<-releaseHolder
 				return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
@@ -1842,13 +1876,13 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
 		if route == "noncooperative" {
 			return WorkPlan{
-				Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+				Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 					workCalls.Add(1)
 					return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 				}),
 			}, nil
 		}
-		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+		return WorkPlan{Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 			blockerEntered <- struct{}{}
 			<-releaseBlockers
 			return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
@@ -1877,7 +1911,7 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	}
 	terminal := make(chan error, 1)
 	go func() {
-		terminal <- kernel.SubmitAndWait(context.Background(), Request{
+		terminal <- kernel.submitAndWait(context.Background(), Request{
 			UID: "queued-noncooperative-deadline", Source: lifecycle.SourceFunction,
 			Route: "noncooperative", Deadline: clock.Now(),
 		})
@@ -1911,7 +1945,7 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 	entered := make(chan string, lifecycle.RetainedTimeoutFailStopThreshold)
 	releaseWork := make(chan struct{})
 	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
-		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+		return WorkPlan{Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 			entered <- route
 			<-releaseWork
 			return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
@@ -1958,9 +1992,6 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 
 	require.NoError(t, kernel.Cancel(barrierCtx, "retained-count-barrier"))
 
-	count, saturated := tasks.RetainedTimeouts()
-	require.False(t, count != 1 || saturated)
-
 	require.NoError(t, run.DirtyCause())
 
 	close(releaseWork)
@@ -1975,9 +2006,6 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 	kernel.Stop()
 
 	require.NoError(t, kernel.Wait(context.Background()))
-
-	retainedTimeoutsCount, retainedTimeoutsSaturated := tasks.RetainedTimeouts()
-	require.False(t, retainedTimeoutsCount != 0 || retainedTimeoutsSaturated)
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
 
@@ -2037,16 +2065,16 @@ func TestKernelFourthBackgroundTransactionTimeoutDirtiesWithoutResponseCommit(t 
 	}
 	clock.advance(time.Second + time.Nanosecond)
 	kernel.NotifyControlReady()
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Second)
-	defer shutdownCancel()
-
-	require.NoError(t, kernel.WaitShutdownStarted(shutdownCtx))
+	require.Eventually(t, func() bool {
+		cause := run.DirtyCause()
+		return cause != nil && strings.Contains(
+			cause.Error(),
+			"fourth background timeout reached the retained-timeout fail-stop threshold",
+		)
+	}, time.Second, time.Millisecond)
 
 	cause := run.DirtyCause()
 	require.False(t, cause == nil || !strings.Contains(cause.Error(), "fourth background timeout reached the retained-timeout fail-stop threshold"))
-
-	count, saturated := tasks.RetainedTimeouts()
-	require.False(t, count != lifecycle.RetainedTimeoutFailStopThreshold || !saturated)
 
 	close(release)
 	for index, terminal := range terminals {
@@ -2061,9 +2089,6 @@ func TestKernelFourthBackgroundTransactionTimeoutDirtiesWithoutResponseCommit(t 
 	require.False(t, terminalErr == nil || !strings.Contains(terminalErr.Error(), "fourth background timeout reached the retained-timeout fail-stop threshold"))
 	require.EqualValues(t, 0, output.Len())
 
-	retainedTimeoutsCount, retainedTimeoutsSaturated := tasks.RetainedTimeouts()
-	require.False(t, retainedTimeoutsCount != 0 || !retainedTimeoutsSaturated)
-
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0 || tasks.LongLivedCensus() != (lifecycle.LongLivedCensus{}))
 
 	closeUIDLedger(t, uids)
@@ -2074,7 +2099,7 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 	called := make(chan struct{}, 1)
 	finalizer := runFinalizerFunc(func(context.Context, uint64) error {
 		called <- struct{}{}
-		if err := permit.ReleaseExternal(lifecycle.LongLivedESecretStore); err != nil {
+		if err := permit.ReleaseExternal(); err != nil {
 			return err
 		}
 		return permit.Return()
@@ -2088,7 +2113,7 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.NoError(t, permit.ActivateExternal(lifecycle.LongLivedESecretStore))
+	require.NoError(t, permit.ActivateExternal())
 
 	require.NoError(t, run.OpenAdmission())
 
@@ -2209,8 +2234,7 @@ func TestKernelCannotReportQuiescentWithRetainedLongLivedPermit(t *testing.T) {
 	waitErr := kernel.Wait(ctx)
 	require.False(t, waitErr == nil || !strings.Contains(waitErr.Error(), "shutdown deadline exceeded") || !strings.Contains(waitErr.Error(), "nonzero process census"))
 
-	census := tasks.LongLivedCensus()
-	require.False(t, census.Active != 1 || census.ExternalReserved != 1)
+	require.EqualValues(t, 1, tasks.LongLivedCensus().Active)
 
 	require.NoError(t, permit.AbortUnused())
 
@@ -2221,7 +2245,7 @@ func TestKernelStopDrainsCooperativeTask(t *testing.T) {
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		return WorkPlan{
 			CooperativeCancel: true,
-			Work: lifecycle.FrameTaskWork(func(ctx context.Context) (lifecycle.SealedResult, error) {
+			Work: frameTaskWork(func(ctx context.Context) (lifecycle.SealedResult, error) {
 				close(started)
 				<-ctx.Done()
 				return lifecycle.NewSealedResult(499, "application/json", []byte(`{"status":499}`))
@@ -2267,7 +2291,7 @@ func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
 	require.NoError(t, run.OpenAdmission())
 
 	plan := WorkPlan{
-		Work:       lifecycle.FrameTaskWork(plannerPlanWork),
+		Work:       frameTaskWork(plannerPlanWork),
 		NoResponse: true,
 	}
 	for index := range population {
@@ -2378,7 +2402,7 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 		case "blocking":
 			return WorkPlan{
 				CooperativeCancel: true,
-				Work: lifecycle.FrameTaskWork(func(ctx context.Context) (lifecycle.SealedResult, error) {
+				Work: frameTaskWork(func(ctx context.Context) (lifecycle.SealedResult, error) {
 					close(started)
 					<-ctx.Done()
 					return lifecycle.NewControlResult(lifecycle.ControlCancelled)
@@ -2386,7 +2410,7 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 			}, nil
 		case "queued":
 			return WorkPlan{
-				Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+				Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 					queuedWorkStarted.Store(true)
 					return lifecycle.NewControlResult(lifecycle.ControlInternal)
 				}),
@@ -2444,7 +2468,7 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 func TestKernelWritesLargeValidResult(t *testing.T) {
 	sealed := largeRawSealedResult(t)
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
-		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) { return sealed, nil })}, nil
+		return WorkPlan{Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) { return sealed, nil })}, nil
 	})
 	writer := &holdingFrameWriter{offered: make(chan []byte, 1), release: make(chan struct{})}
 	kernel, run, uids, _ := newKernelWithPlannerAndWriter(t, planner, writer)
@@ -2588,7 +2612,7 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		return WorkPlan{
 			Claims: []string{"shared"},
-			Work:   lifecycle.FrameTaskWork(plannerPlanWork),
+			Work:   frameTaskWork(plannerPlanWork),
 		}, nil
 	})
 	kernel, run, _, tasks := newKernelWithPlanner(t, planner)
@@ -2622,7 +2646,7 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 
 func TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass(t *testing.T) {
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
-		return WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}, nil
+		return WorkPlan{Work: frameTaskWork(plannerPlanWork)}, nil
 	})
 	kernel, run, _, tasks := newKernelWithPlanner(t, planner)
 	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string {
@@ -2675,8 +2699,6 @@ func TestKernelSubmissionBacklogCannotStarveStop(t *testing.T) {
 	startKernelLoop(t, kernel)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-
-	require.NoError(t, kernel.WaitShutdownStarted(ctx))
 
 	require.NoError(t, kernel.Wait(ctx))
 
@@ -2935,15 +2957,19 @@ func (tck *testCommandKernel) Submit(ctx context.Context, request Request) error
 	return tck.CommandKernel.SubmitPrepared(ctx, request, plan)
 }
 
-func (tck *testCommandKernel) SubmitAndWait(ctx context.Context, request Request) error {
-	if request.Source != lifecycle.SourceJobManager {
-		return tck.CommandKernel.SubmitAndWait(ctx, request)
-	}
-	plan, err := tck.planner.Plan(request)
-	if err != nil {
+func (tck *testCommandKernel) submitAndWait(ctx context.Context, request Request) error {
+	terminal := make(chan error, 1)
+	if err := tck.submit(ctx, request, terminal); err != nil {
 		return err
 	}
-	return tck.CommandKernel.SubmitPreparedAndWait(ctx, request, plan)
+	select {
+	case err := <-terminal:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-tck.Done():
+		return tck.Wait(context.Background())
+	}
 }
 
 func (tck *testCommandKernel) submit(
@@ -3028,9 +3054,7 @@ func (functionCatalogPortStub) CloseStep(int) ([]FunctionCleanupPlan, bool, erro
 	return nil, false, nil
 }
 
-func (functionCatalogPortStub) LifecycleCensus() FunctionCatalogCensus {
-	return FunctionCatalogCensus{Closed: true}
-}
+func (functionCatalogPortStub) LifecycleDrained() bool { return true }
 
 func newTestFunctionCatalog(planner testPlanner) *testFunctionCatalog {
 	return &testFunctionCatalog{
@@ -3103,9 +3127,7 @@ func (*testFunctionCatalog) CloseStep(int) ([]FunctionCleanupPlan, bool, error) 
 	return nil, false, nil
 }
 
-func (*testFunctionCatalog) LifecycleCensus() FunctionCatalogCensus {
-	return FunctionCatalogCensus{Closed: true}
-}
+func (*testFunctionCatalog) LifecycleDrained() bool { return true }
 
 func setTestFunctionResource(t *testing.T, kernel *testCommandKernel, resource func(FunctionLookup) string) {
 	t.Helper()
@@ -3233,7 +3255,7 @@ func (ktprt *kernelTestPreparedResourceTransaction) Apply(
 	if err := ktprt.current.Finalize(); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
-	if err := ktprt.permit.ActivateExternal(lifecycle.LongLivedEJobResources); err != nil {
+	if err := ktprt.permit.ActivateExternal(); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
 	ktprt.successor.identity = ktprt.scope.Successor
@@ -3274,7 +3296,7 @@ func (ktrp kernelTestResourcePlanner) Plan(request Request) (WorkPlan, error) {
 		), nil
 	case "use":
 		return WorkPlan{
-			Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+			Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 				if ktrp.workEntered != nil {
 					close(ktrp.workEntered)
 				}
@@ -3355,9 +3377,7 @@ func (ktit *kernelTestInstallTransaction) Scope() lifecycle.ResourceTransactionS
 func (ktit *kernelTestInstallTransaction) Apply(
 	context.Context,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	if err := ktit.permit.ActivateExternal(
-		lifecycle.LongLivedEJobResources,
-	); err != nil {
+	if err := ktit.permit.ActivateExternal(); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
 	ktit.resource.identity = ktit.scope.Successor
@@ -3456,7 +3476,7 @@ func (ktrr *kernelTestReadyResource) Publish() error {
 
 func (ktrr *kernelTestReadyResource) AbortReady(context.Context) error {
 	return errors.Join(
-		ktrr.permit.ReleaseExternal(lifecycle.LongLivedEJobResources),
+		ktrr.permit.ReleaseExternal(),
 		ktrr.permit.Return(),
 	)
 }
@@ -3466,7 +3486,7 @@ func (ktrr *kernelTestReadyResource) Stop(context.Context) error {
 	if ktrr.stopRelease != nil {
 		<-ktrr.stopRelease
 	}
-	return ktrr.permit.ReleaseExternal(lifecycle.LongLivedEJobResources)
+	return ktrr.permit.ReleaseExternal()
 }
 
 func (ktrr *kernelTestReadyResource) Finalize() error {
@@ -3476,7 +3496,7 @@ func (ktrr *kernelTestReadyResource) Finalize() error {
 type stoppedKernelPlanner struct{}
 
 func (stoppedKernelPlanner) Plan(Request) (WorkPlan, error) {
-	return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+	return WorkPlan{Work: frameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 		return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 	})}, nil
 }

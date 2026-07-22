@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -185,10 +186,15 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 
 	require.NoError(t, generation.start(context.Background()))
 
-	require.NoError(t, generation.kernel.SubmitAndWait(context.Background(), jobmgr.Request{
+	require.NoError(t, generation.kernel.Submit(context.Background(), jobmgr.Request{
 		UID: "function-flow", Source: lifecycle.SourceFunction, Route: "module:method",
 	}),
 	)
+	require.Eventually(t, func() bool {
+		eventsMu.Lock()
+		defer eventsMu.Unlock()
+		return slices.Contains(events, "result")
+	}, time.Second, time.Millisecond)
 
 	generation.Stop()
 
@@ -259,7 +265,7 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 		return ok && record.Status == dyncfg.StatusAccepted.String()
 	}, time.Second, time.Millisecond)
 
-	require.NoError(t, generation.kernel.SubmitAndWait(
+	require.NoError(t, generation.kernel.Submit(
 		context.Background(),
 		jobmgr.Request{
 			UID:    "enable",
@@ -273,16 +279,18 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	),
 	)
 
-	record, ok := generation.vnodes.graph.Lookup("module_job")
-	require.False(t, !ok || record.Status != dyncfg.StatusRunning.String())
-	wire := output.String()
-	resultAt := bytes.Index(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN enable 200 application/json"))
-	statusAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module:job status running"))
-	require.False(t, !bytes.Contains(output.Bytes(), []byte(`FUNCTION GLOBAL "config"`)) || resultAt < 0 || statusAt < 0 || resultAt >= statusAt, "wire=%q", wire)
+	require.Eventually(t, func() bool {
+		record, ok := generation.vnodes.graph.Lookup("module_job")
+		return ok && record.Status == dyncfg.StatusRunning.String()
+	}, time.Second, time.Millisecond)
 
 	generation.Stop()
 
 	require.NoError(t, generation.Wait(context.Background()))
+	wire := output.String()
+	resultAt := bytes.Index(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN enable 200 application/json"))
+	statusAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module:job status running"))
+	require.False(t, !bytes.Contains(output.Bytes(), []byte(`FUNCTION GLOBAL "config"`)) || resultAt < 0 || statusAt < 0 || resultAt >= statusAt, "wire=%q", wire)
 
 	require.EqualValues(t, 1, cleanupCalls.Load())
 
@@ -352,22 +360,30 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 		record, ok := generation.vnodes.graph.Lookup(config.FullName())
 		return ok && record.Status == dyncfg.StatusAccepted.String()
 	}, time.Second, time.Millisecond)
+	probeCtx, cancelProbe := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancelProbe()
+	probe, err := startCompositionShutdownProbe(
+		probeCtx,
+		generation.kernel,
+		"run-generation-shutdown-probe",
+	)
+	require.NoError(t, err)
 
-	submitted := make(chan error, 1)
-	go func() {
-		submitted <- generation.kernel.SubmitAndWait(
-			context.Background(),
-			jobmgr.Request{
-				UID:    "shutdown-enable",
-				Source: lifecycle.SourceFunction,
-				Route:  "config",
-				Args: []string{
-					"go.d:collector:module:job",
-					string(dyncfg.CommandEnable),
-				},
+	require.NoError(t, generation.kernel.Submit(
+		context.Background(),
+		jobmgr.Request{
+			UID:    "shutdown-enable",
+			Source: lifecycle.SourceFunction,
+			Route:  "config",
+			Args: []string{
+				"go.d:collector:module:job",
+				string(dyncfg.CommandEnable),
 			},
-		)
-	}()
+		},
+	))
 	select {
 	case <-checkEntered:
 	case <-time.After(time.Second):
@@ -384,22 +400,10 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 		time.Second,
 	)
 	defer cancelShutdown()
-	require.NoError(
-		t,
-		generation.kernel.WaitShutdownStarted(shutdownCtx),
-	)
+	require.NoError(t, probe.waitCancellation(shutdownCtx))
 	close(checkRelease)
-	select {
-	case err := <-submitted:
-		require.NoError(t, err)
-	case <-time.After(time.Second):
-		require.FailNow(
-			t,
-			"test failed",
-			"protected Job activation did not settle",
-		)
-	}
 	require.NoError(t, generation.Wait(context.Background()))
+	require.NoError(t, probe.waitSettlement(shutdownCtx))
 	require.NoError(t, generation.run.DirtyCause())
 
 	publishedAt := bytes.Index(
@@ -413,11 +417,7 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 	require.GreaterOrEqual(t, publishedAt, 0)
 	require.Greater(t, withdrawnAt, publishedAt)
 	require.EqualValues(t, 1, cleanupCalls.Load())
-	require.Equal(
-		t,
-		lifecycle.InheritedTaskCensus{},
-		generation.tasks.InheritedCensus(),
-	)
+	require.Zero(t, generation.tasks.InheritedActive())
 	require.Equal(
 		t,
 		lifecycle.LongLivedCensus{},

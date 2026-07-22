@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
@@ -44,23 +43,12 @@ type processCoreConfig struct {
 	FinalizeOutput  func()                // stops the runtime service at process teardown
 }
 
-type processRuntimeConfig struct {
-	ShutdownTimeout time.Duration
-	KeepAlive       bool
-	Modules         collectorapi.Registry
-	Jobs            runJobServices
-	Secrets         runSecretServices
-	Discovery       runDiscoveryServices
-	FinalizeOutput  func()
-}
-
 type processCore struct {
-	config processRuntimeConfig // retained process configuration
+	config processCoreConfig // retained process configuration
 
 	uids    *lifecycle.UIDLedger            // process-lifetime UID ledger
 	frames  *lifecycle.FrameOwner           // the one process-lifetime frame writer
 	ingress *functionadapter.ProcessIngress // the one process-lifetime stdin reader
-	quit    atomic.Bool                     // set once to stop the outer loop
 }
 
 func newProcessCore(config processCoreConfig) (*processCore, error) {
@@ -85,16 +73,8 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		return nil, err
 	}
 	return &processCore{
-		config: processRuntimeConfig{
-			ShutdownTimeout: config.ShutdownTimeout,
-			KeepAlive:       config.KeepAlive,
-			Modules:         config.Modules,
-			Jobs:            config.Jobs,
-			Secrets:         config.Secrets,
-			Discovery:       config.Discovery,
-			FinalizeOutput:  config.FinalizeOutput,
-		},
-		uids: lifecycle.NewUIDLedger(), frames: frames, ingress: ingress,
+		config: config,
+		uids:   lifecycle.NewUIDLedger(), frames: frames, ingress: ingress,
 	}, nil
 }
 
@@ -113,7 +93,9 @@ func (pc *processCore) run(
 	if err := generation.start(ctx); err != nil {
 		return pc.finalize(generation, err)
 	}
-	binding, err := pc.binding(generation)
+	quit := false
+	markQuit := func() { quit = true }
+	binding, err := pc.binding(generation, markQuit)
 	if err != nil {
 		return pc.finalize(generation, err)
 	}
@@ -124,7 +106,7 @@ func (pc *processCore) run(
 	go func() {
 		inputDone <- processInputCompletion{
 			err:  pc.ingress.Run(ctx),
-			quit: pc.quit.Load(),
+			quit: quit,
 		}
 	}()
 	ticks := ticker.New(time.Second)
@@ -201,6 +183,7 @@ func (pc *processCore) run(
 					ctx,
 					generation,
 					nextID,
+					markQuit,
 				)
 				if rotateErr != nil {
 					finalErr := pc.finalize(next, rotateErr)
@@ -240,8 +223,9 @@ func (pc *processCore) newRun(
 
 func (pc *processCore) binding(
 	generation *runGeneration,
+	quit func(),
 ) (functionadapter.ProcessBinding, error) {
-	if pc == nil || generation == nil {
+	if pc == nil || generation == nil || quit == nil {
 		return functionadapter.ProcessBinding{},
 			errors.New("jobmgr composition: invalid process binding")
 	}
@@ -249,9 +233,7 @@ func (pc *processCore) binding(
 		generation.kernel,
 		generation.run.Generation(),
 		lifecycle.RealClock{},
-		func() {
-			pc.quit.Store(true)
-		},
+		quit,
 	)
 }
 
@@ -259,6 +241,7 @@ func (pc *processCore) rotate(
 	ctx context.Context,
 	current *runGeneration,
 	nextID uint64,
+	quit func(),
 ) (*runGeneration, error) {
 	if err := pc.ingress.SealPause(); err != nil {
 		return current, err
@@ -285,7 +268,7 @@ func (pc *processCore) rotate(
 	if err := next.start(ctx); err != nil {
 		return next, err
 	}
-	binding, err := pc.binding(next)
+	binding, err := pc.binding(next, quit)
 	if err != nil {
 		return next, err
 	}
@@ -307,7 +290,7 @@ func (pc *processCore) finalize(
 	defer cancel()
 	var finishRun *lifecycle.RunSupervisor
 	if current != nil && current.isStarted() {
-		if pc.ingress.Census().State == functionadapter.ProcessIngressLive {
+		if pc.ingress.State() == functionadapter.ProcessIngressLive {
 			if err := pc.ingress.SealPause(); err != nil {
 				finalErr = errors.Join(finalErr, err)
 			}
@@ -320,7 +303,7 @@ func (pc *processCore) finalize(
 			shutdownCtx = budget.Context()
 			finishRun = current.run
 		}
-		if census := pc.ingress.Census(); census.State == functionadapter.ProcessIngressLive {
+		if pc.ingress.State() == functionadapter.ProcessIngressLive {
 			if err := pc.ingress.DrainPause(shutdownCtx, 0); err != nil {
 				finalErr = errors.Join(finalErr, err)
 			}
@@ -331,8 +314,7 @@ func (pc *processCore) finalize(
 	} else if current != nil {
 		finalErr = errors.Join(finalErr, current.abortConstruction())
 	}
-	ingress := pc.ingress.Census()
-	switch ingress.State {
+	switch pc.ingress.State() {
 	case functionadapter.ProcessIngressPaused:
 		finalErr = errors.Join(finalErr, pc.ingress.Fence(shutdownCtx))
 	case functionadapter.ProcessIngressContained:
@@ -355,7 +337,7 @@ func (pc *processCore) finalize(
 			finalErr = errors.Join(finalErr, err)
 		}
 	}
-	if pc.ingress.Census().State != functionadapter.ProcessIngressContained {
+	if pc.ingress.State() != functionadapter.ProcessIngressContained {
 		finalErr = errors.Join(
 			finalErr,
 			errors.New("jobmgr composition: Function ingress was not contained"),
@@ -385,7 +367,7 @@ func (pc *processCore) retireRun(
 	}
 	if generation.tasks.Active() != 0 ||
 		generation.tasks.Pending() != 0 ||
-		generation.tasks.InheritedCensus().Active != 0 ||
+		generation.tasks.InheritedActive() != 0 ||
 		generation.tasks.LongLivedCensus() != (lifecycle.LongLivedCensus{}) {
 		return errors.Join(
 			waitErr,

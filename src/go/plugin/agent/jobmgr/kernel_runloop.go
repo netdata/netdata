@@ -71,7 +71,6 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		if err := ck.beginShutdown(budget.Deadline()); err != nil {
 			ck.run.Dirty(err)
 		}
-		ck.shutdownStartOnce.Do(func() { close(ck.shutdownStarted) })
 		shutdownC = budget.Context().Done()
 		stopC = nil
 		contextC = nil
@@ -155,7 +154,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 				if shutdownErr != nil {
 					ck.run.Dirty(shutdownErr)
 				}
-				if ck.shutdownCancelDone {
+				if ck.shutdownCancelCursor == nil {
 					moreTasks = ck.scheduleTasks(4)
 					moreTaskStarts = ck.serviceTaskStarts(
 						lifecycle.TaskStartServiceQuantum,
@@ -169,7 +168,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 					phase != ck.shutdownPhase
 			}
 			if ck.shutdownPhase == commandShutdownCleanupDrain {
-				_, moreInheritedCancellations, shutdownErr =
+				moreInheritedCancellations, shutdownErr =
 					ck.tasks.CancelInheritedBatch(
 						lifecycle.InheritedCancellationServiceQuantum,
 					)

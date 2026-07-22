@@ -14,21 +14,6 @@ func (ck *CommandKernel) Submit(ctx context.Context, request Request) error {
 	return ck.submit(ctx, request, nil)
 }
 
-func (ck *CommandKernel) SubmitAndWait(ctx context.Context, request Request) error {
-	terminal := make(chan error, 1)
-	if err := ck.submit(ctx, request, terminal); err != nil {
-		return err
-	}
-	select {
-	case err := <-terminal:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-ck.done:
-		return ck.Wait(context.Background())
-	}
-}
-
 func (ck *CommandKernel) QuiesceFunctions(
 	ctx context.Context,
 	mutation FunctionCatalogMutation,
@@ -366,27 +351,6 @@ func (ck *CommandKernel) Wait(ctx context.Context) error {
 	select {
 	case <-ck.done:
 		return ck.doneErr
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-func (ck *CommandKernel) WaitShutdownStarted(ctx context.Context) error {
-	select {
-	case <-ck.shutdownStarted:
-		return nil
-	default:
-	}
-	select {
-	case <-ck.shutdownStarted:
-		return nil
-	case <-ck.done:
-		select {
-		case <-ck.shutdownStarted:
-			return nil
-		default:
-			return ck.stoppingError()
-		}
 	case <-ctx.Done():
 		return ctx.Err()
 	}

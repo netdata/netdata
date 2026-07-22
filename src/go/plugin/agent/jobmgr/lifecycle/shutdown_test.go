@@ -133,20 +133,10 @@ func TestRunSupervisorPublishesOneGenerationStoppingCut(t *testing.T) {
 			)
 			require.NoError(t, err)
 			require.NoError(t, run.OpenAdmission())
-			stopping := run.stopping
 			cause := run.StoppingCause()
 
 			test.stop(t, run)
 
-			select {
-			case <-stopping:
-			default:
-				require.FailNow(
-					t,
-					"test failed",
-					"stopping cut was not published",
-				)
-			}
 			require.True(t, run.IsStopping())
 			require.False(t, run.Admitting())
 			require.Same(t, cause, run.StoppingCause())
@@ -358,20 +348,14 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 
 			require.NoError(t, supervisor.SealInherited())
 
-			var total ShutdownCancellationCensus
 			for {
-				census, more, cancelErr := supervisor.CancelInheritedBatch(InheritedCancellationServiceQuantum)
+				more, cancelErr := supervisor.CancelInheritedBatch(InheritedCancellationServiceQuantum)
 				require.NoError(t, cancelErr)
-				require.False(t, census.Visited > InheritedCancellationServiceQuantum)
-				total.Visited += census.Visited
-				total.Signalled += census.Signalled
-				total.AlreadyCancelled += census.AlreadyCancelled
 				require.EqualValues(t, supervisor.InheritedCancellationPending(), more)
 				if !more {
 					break
 				}
 			}
-			require.False(t, total.Visited != population || total.Signalled != population || total.AlreadyCancelled != 0)
 			for range population {
 				select {
 				case <-observed:
@@ -395,8 +379,7 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 				require.NoError(t, supervisor.ReleaseInherited(refs[index], owners[index]))
 			}
 
-			census := supervisor.InheritedCensus()
-			require.EqualValues(t, InheritedTaskCensus{}, census)
+			require.Zero(t, supervisor.InheritedActive())
 		})
 	}
 }
