@@ -119,18 +119,6 @@ static const wchar_t *wel_provider_per_source[_NDLS_MAX] = {
         [NDLS_DEBUG]        = NULL,                              // used, linked to NDLS_DAEMON
 };
 
-// Map each source to its WINEVT channel name (only when not using ETW)
-static const wchar_t *wel_channel_per_source[_NDLS_MAX] = {
-        [NDLS_UNSET]        = NULL,
-        [NDLS_ACCESS]       = NETDATA_WEL_CHANNEL_ACCESS_W,
-        [NDLS_ACLK]         = NETDATA_WEL_CHANNEL_ACLK_W,
-        [NDLS_COLLECTORS]   = NETDATA_WEL_CHANNEL_COLLECTORS_W,
-        [NDLS_DAEMON]       = NETDATA_WEL_CHANNEL_DAEMON_W,
-        [NDLS_HEALTH]       = NETDATA_WEL_CHANNEL_HEALTH_W,
-        [NDLS_DEBUG]        = NULL,
-};
-
-
 bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
     const wchar_t *replacement = L"\\wevt_netdata.dll";
 
@@ -161,59 +149,6 @@ bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
     return false; // No backslash found (likely invalid input)
 }
 
-static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider, DWORD defaultMaxSize) {
-    // Build the registry path: SYSTEM\CurrentControlSet\Services\EventLog\<LogName>\<SourceName>
-    wchar_t key[MAX_PATH];
-    if(!provider)
-        swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls", channel);
-    else
-        swprintf(key, MAX_PATH, L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%ls\\%ls", channel, provider);
-
-    HKEY hRegKey;
-    DWORD disposition;
-    LONG result = RegCreateKeyExW(HKEY_LOCAL_MACHINE, key,
-                                  0, NULL, REG_OPTION_NON_VOLATILE, KEY_SET_VALUE, NULL, &hRegKey, &disposition);
-
-    if (result != ERROR_SUCCESS)
-        return false; // Could not create the registry key
-
-    // Check if MaxSize is already set
-    DWORD maxSize = 0;
-    DWORD size = sizeof(maxSize);
-    if (RegQueryValueExW(hRegKey, L"MaxSize", NULL, NULL, (LPBYTE)&maxSize, &size) != ERROR_SUCCESS) {
-        // MaxSize is not set, set it to the default value
-        RegSetValueExW(hRegKey, L"MaxSize", 0, REG_DWORD, (const BYTE*)&defaultMaxSize, sizeof(defaultMaxSize));
-    }
-
-    wchar_t modulePath[MAX_PATH];
-    if (GetModuleFileNameW(NULL, modulePath, MAX_PATH) == 0) {
-        RegCloseKey(hRegKey);
-        return false;
-    }
-
-    // Find wevt_netdata.dll: prefer the copy next to netdata.exe (dev/portable), then
-    // fall back to System32 (MSI install or placed there by wel_ensure_manifest_installed).
-    bool dllFound = wel_replace_program_with_wevt_netdata_dll(modulePath, _countof(modulePath));
-    if (!dllFound) {
-        wchar_t sys32[MAX_PATH];
-        if (GetSystemDirectoryW(sys32, _countof(sys32))) {
-            swprintf(modulePath, _countof(modulePath), L"%ls\\wevt_netdata.dll", sys32);
-            dllFound = (GetFileAttributesW(modulePath) != INVALID_FILE_ATTRIBUTES);
-        }
-    }
-    if (dllFound) {
-        RegSetValueExW(hRegKey, L"EventMessageFile", 0, REG_EXPAND_SZ,
-                       (LPBYTE)modulePath,
-                       (DWORD)((wel_wcslen_bounded(modulePath, _countof(modulePath)) + 1) * sizeof(wchar_t)));
-
-        DWORD types_supported = EVENTLOG_SUCCESS | EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | EVENTLOG_INFORMATION_TYPE;
-        RegSetValueExW(hRegKey, L"TypesSupported", 0, REG_DWORD, (LPBYTE)&types_supported, sizeof(DWORD));
-    }
-
-    RegCloseKey(hRegKey);
-    return true;
-}
-
 // Registry key where WINEVT stores registered publishers (providers).
 #define WINEVT_PUBLISHERS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Publishers\\"
 
@@ -230,6 +165,31 @@ static const struct { const wchar_t *ch; const wchar_t *label; } wel_channels[] 
     { L"Netdata/Health",     L"Health"     },
     { L"Netdata/Aclk",       L"Aclk"       },
 };
+
+// Classic EventLog keys with slash-containing names are displayed as flat logs
+// (for example, "Netdata\\Daemon") rather than WINEVT channel hierarchy.
+// Keep this list shared by the current-manifest check and the post-install cleanup
+// so existing installations receive the one-time migration automatically.
+static const wchar_t *const wel_flat_legacy_keys[] = {
+    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Daemon",
+    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Collectors",
+    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Access",
+    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Health",
+    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Aclk",
+    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL",
+};
+
+static bool wel_flat_legacy_keys_present(void) {
+    for (size_t i = 0; i < _countof(wel_flat_legacy_keys); i++) {
+        HKEY hKey;
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, wel_flat_legacy_keys[i], 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+            RegCloseKey(hKey);
+            return true;
+        }
+    }
+
+    return false;
+}
 
 static bool wel_manifest_is_current(void) {
     // All five importChannel provider GUIDs must be present; a partial registration
@@ -279,7 +239,7 @@ static bool wel_manifest_is_current(void) {
             return false;
     }
 
-    return true;
+    return !wel_flat_legacy_keys_present();
 }
 
 static bool wel_run_silent(const wchar_t *exe, const wchar_t *params) {
@@ -472,16 +432,8 @@ static void wel_ensure_manifest_installed(void) {
     // duplicate "Netdata/Daemon" entries in Event Viewer alongside the tree hierarchy.
     // Safe to delete now because wevtutil im has already created the correct
     // channel-linked entries that replace them.
-    static const wchar_t *const flat_stale_keys[] = {
-        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Daemon",
-        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Collectors",
-        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Access",
-        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Health",
-        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Aclk",
-        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL",
-    };
-    for (size_t j = 0; j < _countof(flat_stale_keys); j++)
-        RegDeleteTreeW(HKEY_LOCAL_MACHINE, flat_stale_keys[j]);
+    for (size_t j = 0; j < _countof(wel_flat_legacy_keys); j++)
+        RegDeleteTreeW(HKEY_LOCAL_MACHINE, wel_flat_legacy_keys[j]);
 
     // Set short display names on every channel so Event Viewer shows "Daemon" (not the
     // full channel name "Netdata/Daemon") as the leaf label inside the Netdata folder.
@@ -620,33 +572,11 @@ bool nd_log_init_windows(void) {
             // we will map these to NDLS_DAEMON
             continue;
 
-        DWORD defaultMaxSize = 0;
-        switch (i) {
-            case NDLS_ACLK:
-                defaultMaxSize = 5 * 1024 * 1024;
-                break;
-
-            case NDLS_HEALTH:
-                defaultMaxSize = 35 * 1024 * 1024;
-                break;
-
-            default:
-            case NDLS_ACCESS:
-            case NDLS_COLLECTORS:
-            case NDLS_DAEMON:
-                defaultMaxSize = 20 * 1024 * 1024;
-                break;
-        }
-
         if(!nd_log.eventlog.etw) {
-            // Register the source under its own WINEVT channel log ("Netdata/Daemon" etc.).
-            // wevtutil im creates EventLog\Netdata/Daemon\NetdataDaemon via importChannel;
-            // this call is idempotent and ensures MaxSize is set even when wevtutil fails.
-            const wchar_t *wel_channel = wel_channel_per_source[i];
-            if(!wel_add_to_registry(wel_channel, sub_channel, defaultMaxSize)) {
-                return false;
-            }
-
+            // The installed manifest imports each classic provider into its WINEVT
+            // channel. Do not create parallel EventLog registry keys here: a key
+            // named "Netdata/Daemon" is displayed as a flat classic log rather
+            // than as the Netdata → Daemon WINEVT channel hierarchy.
             nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, sub_channel);
             if (!nd_log.sources[i].hEventLog) {
                 return false;
