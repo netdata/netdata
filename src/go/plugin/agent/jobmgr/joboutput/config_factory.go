@@ -32,8 +32,9 @@ type configModule interface {
 	Configuration() any
 }
 
-// ConfigModuleFactory owns short-lived V2-over-V1 configuration probes.
-// Every constructed module is cleaned before the call returns.
+// ConfigModuleFactory builds short-lived throwaway collector modules used to
+// validate a config and render its effective configuration. Every constructed
+// module is cleaned before the call returns.
 type ConfigModuleFactory struct {
 	config ConfigModuleFactoryConfig
 	logger *logger.Logger

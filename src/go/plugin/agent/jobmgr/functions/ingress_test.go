@@ -36,7 +36,7 @@ func TestFunctionIngressLeavesResourceSelectionToCatalog(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			port := &recordingIngressPort{done: make(chan struct{})}
-			ingress, err := NewIngress(
+			ingress, err := newIngress(
 				port,
 				ingressTestClock{now: now},
 				func() {},

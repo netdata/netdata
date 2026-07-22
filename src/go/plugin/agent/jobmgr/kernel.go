@@ -503,16 +503,6 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 	}
 }
 
-func (ck *CommandKernel) isStoppingCauseCancellation(
-	operation *commandOperation,
-	err error,
-) bool {
-	return operation != nil &&
-		operation.cancelled &&
-		err != nil &&
-		err == ck.run.StoppingCause()
-}
-
 func (ck *CommandKernel) completeResourceTransactionTask(
 	operation *commandOperation,
 	completion lifecycle.TaskCompletion,

@@ -566,38 +566,26 @@ func (c *Controller) noopMessageWithPermit(
 }
 
 func formatSecretJobs(refs []secretstore.JobRef) string {
-	return formatBoundedSecretNames(
-		len(refs),
-		func(index int) string {
-			ref := refs[index]
-			if ref.Display != "" {
-				return ref.Display
-			}
-			return ref.ID
-		},
-	)
+	return formatBoundedSecretNames(refs, func(ref secretstore.JobRef) string {
+		if ref.Display != "" {
+			return ref.Display
+		}
+		return ref.ID
+	})
 }
 
 func formatSecretJobNames(names []string) string {
-	return formatBoundedSecretNames(
-		len(names),
-		func(index int) string {
-			return names[index]
-		},
-	)
+	return formatBoundedSecretNames(names, func(name string) string { return name })
 }
 
-func formatBoundedSecretNames(
-	count int,
-	name func(int) string,
-) string {
-	if count <= 0 || name == nil {
+func formatBoundedSecretNames[T any](items []T, name func(T) string) string {
+	if len(items) == 0 || name == nil {
 		return ""
 	}
 	var builder strings.Builder
 	builder.Grow(maximumSecretJobSummaryBytes)
-	for index := range count {
-		value := name(index)
+	for index, item := range items {
+		value := name(item)
 		separatorBytes := 0
 		if builder.Len() != 0 {
 			separatorBytes = 2
@@ -610,7 +598,7 @@ func formatBoundedSecretNames(
 				builder.WriteString(", ")
 			}
 			builder.WriteString("... and ")
-			builder.WriteString(strconv.Itoa(count - index))
+			builder.WriteString(strconv.Itoa(len(items) - index))
 			builder.WriteString(" more")
 			break
 		}

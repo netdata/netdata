@@ -192,8 +192,7 @@ func (mg *methodGeneration) handle(
 		values[param.ID] = methodParamValues(arguments, payload, param.ID)
 	}
 	resolved := funcapi.ResolveParams(params, values)
-	if mg.kind == methodGenerationShared &&
-		mg.creator.InstancePolicy != collectorapi.InstancePolicySingle {
+	if mg.sharedJobSelectable() {
 		resolved[functionJobParameter] = funcapi.ResolvedParam{IDs: []string{jobName}}
 	}
 	response := handler.Handle(ctx, method.ID, resolved)
@@ -264,6 +263,22 @@ func (mg *methodGeneration) availableJobNames(methodID string) []string {
 	return names
 }
 
+// sharedJobSelectable reports whether this shared-module generation exposes the
+// __job instance selector (a shared module with more than one selectable job).
+func (mg *methodGeneration) sharedJobSelectable() bool {
+	return mg.kind == methodGenerationShared &&
+		mg.creator.InstancePolicy != collectorapi.InstancePolicySingle
+}
+
+// withJobParam prepends the __job instance selector to params when this
+// generation exposes it.
+func (mg *methodGeneration) withJobParam(methodID string, params []funcapi.ParamConfig) []funcapi.ParamConfig {
+	if !mg.sharedJobSelectable() {
+		return params
+	}
+	return append([]funcapi.ParamConfig{buildFunctionJobParam(mg.availableJobNames(methodID))}, params...)
+}
+
 func jobBackedFunctionAvailable(job collectorapi.RuntimeJob, methodID string) bool {
 	if job == nil || !job.IsRunning() {
 		return false
@@ -290,14 +305,7 @@ func functionResponseError(err error) (lifecycle.SealedResult, error) {
 func (mg *methodGeneration) infoResult(
 	method funcapi.FunctionConfig,
 ) (lifecycle.SealedResult, error) {
-	params := slices.Clone(method.RequiredParams)
-	includeJob := mg.kind == methodGenerationShared &&
-		mg.creator.InstancePolicy != collectorapi.InstancePolicySingle
-	if includeJob {
-		params = append([]funcapi.ParamConfig{buildFunctionJobParam(
-			mg.availableJobNames(method.ID),
-		)}, params...)
-	}
+	params := mg.withJobParam(method.ID, slices.Clone(method.RequiredParams))
 	help := method.Help
 	if help == "" {
 		help = fmt.Sprintf("%s %s data function", mg.module, method.ID)
@@ -338,12 +346,7 @@ func (mg *methodGeneration) responseResult(
 	if len(response.RequiredParams) != 0 {
 		params = funcapi.MergeParamConfigs(params, response.RequiredParams)
 	}
-	if mg.kind == methodGenerationShared &&
-		mg.creator.InstancePolicy != collectorapi.InstancePolicySingle {
-		params = append([]funcapi.ParamConfig{
-			buildFunctionJobParam(mg.availableJobNames(method.ID)),
-		}, params...)
-	}
+	params = mg.withJobParam(method.ID, params)
 	payload := map[string]any{
 		"v": 3, "update_every": max(method.UpdateEvery, 1), "status": status,
 		"type":        functionResponseType(response.ResponseType, method.ResponseType),
@@ -540,7 +543,7 @@ func buildFunctionJobParam(jobs []string) funcapi.ParamConfig {
 	}
 	return funcapi.ParamConfig{
 		ID: functionJobParameter, Name: "Instance",
-		Help:      "Select which database instance to query",
+		Help:      "Select which instance to query",
 		Selection: funcapi.ParamSelect, Options: options, UniqueView: true,
 	}
 }

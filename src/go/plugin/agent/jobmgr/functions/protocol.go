@@ -59,8 +59,7 @@ func (fpp *FramePublicationPort) Withdraw(name string) error {
 }
 
 func encodeFunctionRegistration(record PublicationRecord) ([]byte, error) {
-	if record.Generation == 0 || record.Timeout < 0 || record.Priority < 0 ||
-		record.Version < 0 || !validFunctionName(record.Name) ||
+	if !record.validCore() || !validFunctionName(record.Name) ||
 		!validQuotedProtocolField(record.Help) ||
 		!validQuotedProtocolField(record.Tags) ||
 		!validFunctionAccess(record.Access) {

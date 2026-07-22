@@ -143,7 +143,7 @@ type preparedDiscovery struct {
 	decisions *jobmgrdiscovery.DecisionIndex     // the add/remove decision index
 	tasks     *lifecycle.TaskSupervisor          // supervisor owning the pipeline + provider goroutines
 	identity  lifecycle.ResourceIdentity         // singleton discovery resource identity
-	permit    lifecycle.LongLivedPermit          // long-lived (zero-byte) permit for the pipeline
+	permit    lifecycle.LongLivedPermit          // long-lived permit for the pipeline
 }
 
 func newPreparedDiscovery(
@@ -214,7 +214,7 @@ type readyDiscovery struct {
 	decisions     *jobmgrdiscovery.DecisionIndex        // the add/remove decision index
 	tasks         *lifecycle.TaskSupervisor             // supervisor owning the pipeline + provider goroutines
 	identity      lifecycle.ResourceIdentity            // singleton discovery resource identity
-	permit        lifecycle.LongLivedPermit             // long-lived (zero-byte) permit for the pipeline
+	permit        lifecycle.LongLivedPermit             // long-lived permit for the pipeline
 	providerNames []string                              // enabled provider names
 	disabledNames []string                              // disabled provider names
 	published     chan struct{}                         // closed once discovery output is live

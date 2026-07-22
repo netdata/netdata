@@ -245,6 +245,9 @@ func (rm *runMetrics) unregister(service runtimecomp.Service) error {
 		return nil
 	}
 	service.UnregisterProducer(runtimeProducerName)
+	// refreshProjection cannot fail today; the error branch mirrors the
+	// producer-registration contract and quarantines defensively if that
+	// ever changes.
 	if err := rm.refreshProjection(); err != nil {
 		service.QuarantineComponent(runtimeComponentName)
 		return err

@@ -308,7 +308,7 @@ func (ts *TaskSupervisor) Dispatch(parent context.Context, quantum int, started 
 		ts.removeRequest(record)
 		started[count] = TaskStart{Request: requestRef, Task: taskRef}
 		count++
-		ts.nextClass = otherTaskClass(classForTaskIndex(selected))
+		ts.nextClass = classForTaskIndex(1 - selected)
 	}
 	return count, ts.Pending() > 0, nil
 }
@@ -1110,13 +1110,6 @@ func classForTaskIndex(index int) TaskClass {
 		return TaskClassFrameworkControl
 	}
 	return TaskClassGenericFunction
-}
-
-func otherTaskClass(class TaskClass) TaskClass {
-	if class == TaskClassFrameworkControl {
-		return TaskClassGenericFunction
-	}
-	return TaskClassFrameworkControl
 }
 
 func emptySealedResult(result SealedResult) bool {

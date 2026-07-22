@@ -23,7 +23,6 @@ const dynCfgServiceDiscoveryClaim = "dyncfg:service-discovery"
 type serviceDiscoveryBinding struct {
 	mu sync.Mutex // guards handler/registered/active/dirty
 
-	epoch      uint64                      // run generation
 	pluginName string                      // owning plugin name
 	frames     *lifecycle.FrameOwner       // the one wire frame writer
 	handler    frameworkfunctions.Handler  // the registered service-discovery handler
@@ -50,7 +49,7 @@ func newServiceDiscoveryBinding(
 		)
 	}
 	return &serviceDiscoveryBinding{
-		epoch: epoch, pluginName: pluginName, frames: frames,
+		pluginName: pluginName, frames: frames,
 	}, nil
 }
 

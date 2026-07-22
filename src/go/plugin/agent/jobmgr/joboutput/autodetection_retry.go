@@ -330,6 +330,10 @@ func (adri *autoDetectionRetryIndex) runWorker() {
 	}
 }
 
+// takeDue pops the earliest due retry from the heap. The popped retry stays in
+// entries (keyed by full name) so its token remains authoritative until the
+// dispatched command settles (cancelToken / retrySettlement) or a reschedule
+// replaces it; leaving it in entries is intentional, not a leak.
 func (adri *autoDetectionRetryIndex) takeDue() *autoDetectionRetry {
 	adri.mu.Lock()
 	defer adri.mu.Unlock()

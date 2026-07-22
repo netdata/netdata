@@ -24,14 +24,13 @@ type ManagedJob interface {
 // collector boundary after runtime support is released.
 func newManagedJob(
 	variant JobVariant,
-	job ManagedJob,
+	job RuntimeJob,
 	tasks *lifecycle.TaskSupervisor,
 	identity lifecycle.ResourceIdentity,
 	scheduler *Scheduler,
 	collectorCleanup func(context.Context) error,
 ) (ConstructedJob, error) {
-	runtimeJob, ok := job.(RuntimeJob)
-	if !variant.Valid() || job == nil || !ok ||
+	if !variant.Valid() || job == nil ||
 		tasks == nil || !identity.Valid() || scheduler == nil ||
 		collectorCleanup == nil {
 		return ConstructedJob{}, errors.New("job output: invalid managed job")
@@ -42,7 +41,7 @@ func newManagedJob(
 	scheduled := &scheduledJobSupport{
 		scheduler: scheduler,
 		identity:  identity,
-		job:       runtimeJob,
+		job:       job,
 	}
 	var runtime jobruntime.Runtime
 	switch variant {

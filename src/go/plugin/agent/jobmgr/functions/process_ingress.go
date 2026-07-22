@@ -36,7 +36,7 @@ func NewProcessBinding(
 	clock lifecycle.Clock,
 	quit func(),
 ) (ProcessBinding, error) {
-	ingress, err := NewIngress(kernel, clock, quit)
+	ingress, err := newIngress(kernel, clock, quit)
 	if err != nil {
 		return ProcessBinding{}, err
 	}

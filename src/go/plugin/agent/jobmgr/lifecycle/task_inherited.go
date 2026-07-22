@@ -34,15 +34,15 @@ func (ref InheritedTaskRef) valid() bool {
 type InheritedTaskWork func(context.Context) error
 
 type inheritedTaskRegistry struct {
-	mu             sync.Mutex
-	slots          map[InheritedTaskRef]*inheritedTaskSlot
-	owners         map[inheritedOwnerRole]InheritedTaskRef
-	nextSlot       uint32
-	active         int
-	sealed         bool
-	activeHead     InheritedTaskRef
-	activeTail     InheritedTaskRef
-	shutdownCursor InheritedTaskRef
+	mu             sync.Mutex                              // guards all fields
+	slots          map[InheritedTaskRef]*inheritedTaskSlot // active inherited tasks by monotonic ID
+	owners         map[inheritedOwnerRole]InheritedTaskRef // active inherited-task ref by owner role
+	nextSlot       uint32                                  // next monotonic inherited-task slot
+	active         int                                     // count of active inherited tasks
+	sealed         bool                                    // no further inherited tasks may start (shutdown)
+	activeHead     InheritedTaskRef                        // oldest active task; shutdown drains from here
+	activeTail     InheritedTaskRef                        // newest active task; append point for the active list
+	shutdownCursor InheritedTaskRef                        // next active task the shutdown sweep will cancel
 }
 
 type inheritedTaskSlot struct {

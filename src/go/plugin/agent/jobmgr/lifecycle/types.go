@@ -45,12 +45,13 @@ func validateFunctionPayloadSize(size int) error {
 	if size < 0 {
 		return fmt.Errorf("%w: negative payload size", ErrFunctionResultTooLarge)
 	}
-	deferred := size
+	payloadLF := 0
 	if size > 0 {
-		if size == int(^uint(0)>>1) {
-			return fmt.Errorf("%w: payload size overflow", ErrFunctionResultTooLarge)
-		}
-		deferred++
+		payloadLF = 1
+	}
+	deferred, ok := checkedSizeSum(size, payloadLF)
+	if !ok {
+		return fmt.Errorf("%w: payload size overflow", ErrFunctionResultTooLarge)
 	}
 	if deferred > FunctionPayloadBytes {
 		return fmt.Errorf("%w: deferred payload is %d bytes", ErrFunctionResultTooLarge, deferred)

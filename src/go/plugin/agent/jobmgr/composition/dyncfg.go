@@ -14,10 +14,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
-const (
-	dynCfgJobGlobalClaim = joboutput.DynCfgJobGraphClaim
-)
-
 // dynCfgJobBinding seals the construction cycle between the immutable Function
 // catalog and the DynCfg controller whose factory consumes Function job hooks.
 type dynCfgJobBinding struct {
@@ -102,7 +98,7 @@ func newDynCfgJobInitialRoute(
 				Prepare:         binding.prepare,
 				Permit:          permit,
 				CommandArgument: 1,
-				GlobalClaim:     dynCfgJobGlobalClaim,
+				GlobalClaim:     joboutput.DynCfgJobGraphClaim,
 				Commands: []functionadapter.ResourceTransactionCommand{
 					{Name: string(dyncfg.CommandAdd)},
 					{

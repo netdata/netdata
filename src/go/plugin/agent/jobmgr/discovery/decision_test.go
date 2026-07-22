@@ -107,7 +107,7 @@ func TestDecisionIndexFailureKeepsLastAcknowledgedSelection(t *testing.T) {
 	require.ErrorIs(t, err, commands.err)
 
 	acknowledged := index.acknowledged[stock.FullName()]
-	require.Equal(t, stock.UID(), acknowledged.config.UID())
+	require.Equal(t, stock.UID(), acknowledged.UID())
 	require.EqualValues(t, decisionTestCensus{
 		sources: 2, candidates: 2, acknowledged: 1, revision: 1,
 	}, decisionIndexCensus(index))

@@ -34,8 +34,8 @@ func (dcjc *DynCfgJobController) planAutoDetectionRetry(
 }
 
 // PlanDiscovered builds one typed, response-free graph/job reconciliation
-// plan. The caller submits it through jobmgr.PreparedCommandPort, so no
-// object-token registry is needed to carry confgroup.Config through Request.
+// plan. The caller submits it through jobmgr.PreparedCommandPort with the
+// config carried directly on the plan.
 func (dcjc *DynCfgJobController) PlanDiscovered(
 	change DiscoveredJobChange,
 ) (jobmgr.WorkPlan, error) {

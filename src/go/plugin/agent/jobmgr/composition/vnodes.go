@@ -21,6 +21,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	frameworkfunctions "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"gopkg.in/yaml.v2"
 )
@@ -234,21 +235,25 @@ func (vb *vnodeBinding) prepareAdd(
 	)
 }
 
-func (vb *vnodeBinding) prepareUpdate(
+// resolveConfiguredVNode extracts the vnode name from input and looks up its
+// current snapshot. On a malformed config ID or an unknown vnode it returns
+// done=true with a ready noop transaction for the caller to return directly.
+func (vb *vnodeBinding) resolveConfiguredVNode(
 	input functionadapter.HandlerInput,
 	scope lifecycle.ResourceTransactionScope,
-) (lifecycle.PreparedResourceTransaction, error) {
+) (name string, current jobruntime.VnodeSnapshot, done bool, result lifecycle.PreparedResourceTransaction, err error) {
 	name, ok := vb.configName(input)
 	if !ok {
-		return vb.noop(
+		result, err = vb.noop(
 			scope,
 			mustDynCfgMessage(400, "invalid config ID format."),
 			nil,
 		)
+		return name, current, true, result, err
 	}
 	current, exists := vb.config.Lookup(name)
 	if !exists {
-		return vb.noop(
+		result, err = vb.noop(
 			scope,
 			mustDynCfgMessage(
 				404,
@@ -256,6 +261,18 @@ func (vb *vnodeBinding) prepareUpdate(
 			),
 			nil,
 		)
+		return name, current, true, result, err
+	}
+	return name, current, false, nil, nil
+}
+
+func (vb *vnodeBinding) prepareUpdate(
+	input functionadapter.HandlerInput,
+	scope lifecycle.ResourceTransactionScope,
+) (lifecycle.PreparedResourceTransaction, error) {
+	name, current, done, result, err := vb.resolveConfiguredVNode(input, scope)
+	if done {
+		return result, err
 	}
 	next, failure := vb.parseVNode(input, name)
 	if failure != nil {
@@ -288,24 +305,9 @@ func (vb *vnodeBinding) prepareRemove(
 	input functionadapter.HandlerInput,
 	scope lifecycle.ResourceTransactionScope,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	name, ok := vb.configName(input)
-	if !ok {
-		return vb.noop(
-			scope,
-			mustDynCfgMessage(400, "invalid config ID format."),
-			nil,
-		)
-	}
-	current, exists := vb.config.Lookup(name)
-	if !exists {
-		return vb.noop(
-			scope,
-			mustDynCfgMessage(
-				404,
-				fmt.Sprintf("The specified vnode '%s' is not registered.", name),
-			),
-			nil,
-		)
+	name, current, done, result, err := vb.resolveConfiguredVNode(input, scope)
+	if done {
+		return result, err
 	}
 	if current.Vnode.SourceType != confgroup.TypeDyncfg {
 		return vb.noop(

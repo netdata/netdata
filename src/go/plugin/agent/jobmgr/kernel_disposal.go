@@ -46,21 +46,6 @@ func (ck *CommandKernel) cancelOperation(uid string) {
 	}
 }
 
-func (ck *CommandKernel) sendDisposeAction(operation *commandOperation) {
-	sequence := uint8(2)
-	if operation.plan.Transaction != nil && operation.transactionApplied {
-		sequence = 3
-	}
-	action := lifecycle.TaskAction{
-		Ref:      operation.Task,
-		Sequence: sequence,
-		Kind:     lifecycle.TaskActionDispose,
-	}
-	if err := ck.sendOperationAction(operation, action); err != nil {
-		ck.run.Dirty(err)
-	}
-}
-
 func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 	for quantum > 0 && ck.deadlines.Len() > 0 {
 		entry := ck.deadlines[0]

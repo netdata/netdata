@@ -266,7 +266,7 @@ func (pj PreparedJob) Accept(
 			state.constructed.finalCleanup
 	}
 	return &JobGeneration{
-		ID: state.id, Generation: state.generation, Variant: state.constructed.Variant,
+		ID: state.id, Generation: state.generation,
 		resources: state.constructed, state: JobAllocated,
 		stopDone: make(chan struct{}),
 		permit:   state.permit,
@@ -342,7 +342,6 @@ type JobGeneration struct {
 	Generation     uint64                    // lifecycle generation counter for this instance
 	mu             sync.Mutex                // guards state + the *Err/*finished fields
 	state          JobState                  // current JobState in the lifecycle FSM
-	Variant        JobVariant                // V1 or V2 collector shape
 	finished       bool                      // finish() has recorded the terminal result
 	stopFinished   bool                      // finishStop() has run (stopDone closed)
 	observedActive bool                      // active-job gauge currently reflects this generation

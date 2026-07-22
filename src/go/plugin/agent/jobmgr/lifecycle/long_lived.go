@@ -149,7 +149,7 @@ func (llp LongLivedPermit) ReleaseUnusedInherited(
 	key string,
 ) error {
 	if !llp.Valid() {
-		return errors.New("jobmgr long-lived permit: invalid unused G release")
+		return errors.New("jobmgr long-lived permit: invalid unused inherited-task release")
 	}
 	return llp.supervisor.releaseUnusedLongLivedG(
 		llp.ref,

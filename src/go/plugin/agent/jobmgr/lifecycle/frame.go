@@ -154,8 +154,8 @@ func PrepareFrame(uid string, result SealedResult, expiry int64) (PreparedFrame,
 }
 
 func NewControlResult(status ControlStatus) (SealedResult, error) {
-	if err := (ControlFramePlan{UID: "validation", Status: status, Expiry: 1}).Validate(); err != nil {
-		return SealedResult{}, err
+	if !status.Valid() {
+		return SealedResult{}, errors.New("jobmgr lifecycle: invalid control status")
 	}
 	return NewSealedResult(int(status), "application/json", controlPayload(status))
 }
@@ -176,15 +176,28 @@ func appendPreparedFrame(dst []byte, frame preparedFunctionFrameContent) ([]byte
 	if frame.encodedBytes <= 0 {
 		return dst, errors.New("jobmgr frame owner: unprepared frame")
 	}
+	return appendFrameBody(dst, frame.uid, frame.result.status, frame.result.contentType, frame.expiry, frame.result.payload, frame.encodedBytes)
+}
+
+// appendFrameBody writes one FUNCTION_RESULT_BEGIN..END frame to dst, growing
+// dst once if needed, and verifies the appended length matches the precomputed
+// encodedBytes. It is the single wire-format writer shared by the prepared-frame
+// and direct-encode paths, so the protocol format lives in exactly one place.
+func appendFrameBody(dst []byte, uid string, status int, contentType string, expiry int64, payload []byte, encodedBytes int) ([]byte, error) {
 	start := len(dst)
-	dst = fmt.Appendf(dst, "FUNCTION_RESULT_BEGIN %s %d %s %d\n", frame.uid, frame.result.status, frame.result.contentType, frame.expiry)
-	dst = append(dst, frame.result.payload...)
-	if len(frame.result.payload) > 0 {
+	if cap(dst)-len(dst) < encodedBytes {
+		grown := make([]byte, len(dst), len(dst)+encodedBytes)
+		copy(grown, dst)
+		dst = grown
+	}
+	dst = fmt.Appendf(dst, "FUNCTION_RESULT_BEGIN %s %d %s %d\n", uid, status, contentType, expiry)
+	dst = append(dst, payload...)
+	if len(payload) > 0 {
 		dst = append(dst, '\n')
 	}
 	dst = append(dst, "FUNCTION_RESULT_END\n\n"...)
-	if len(dst)-start != frame.encodedBytes {
-		return dst, errors.New("jobmgr frame owner: prepared Size/Append divergence")
+	if len(dst)-start != encodedBytes {
+		return dst, errors.New("jobmgr frame owner: frame Size/Append divergence")
 	}
 	return dst, nil
 }
@@ -440,22 +453,7 @@ func encodeResult(dst []byte, uid string, status int, contentType string, expiry
 	if err != nil {
 		return dst, err
 	}
-	start := len(dst)
-	if cap(dst)-len(dst) < encodedBytes {
-		grown := make([]byte, len(dst), len(dst)+encodedBytes)
-		copy(grown, dst)
-		dst = grown
-	}
-	dst = fmt.Appendf(dst, "FUNCTION_RESULT_BEGIN %s %d %s %d\n", uid, status, contentType, expiry)
-	dst = append(dst, payload...)
-	if len(payload) > 0 {
-		dst = append(dst, '\n')
-	}
-	dst = append(dst, "FUNCTION_RESULT_END\n\n"...)
-	if len(dst)-start != encodedBytes {
-		return dst, errors.New("jobmgr frame owner: Size/Append divergence")
-	}
-	return dst, nil
+	return appendFrameBody(dst, uid, status, contentType, expiry, payload, encodedBytes)
 }
 
 func functionFrameSize(uid string, status int, contentType string, expiry int64, payloadBytes int) (frameBytes, envelopeBytes int, err error) {

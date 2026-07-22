@@ -20,7 +20,7 @@ type Ingress struct {
 	quit   func()             // cancels the ingress reader
 }
 
-func NewIngress(kernel jobmgr.CommandPort, clock lifecycle.Clock, quit func()) (*Ingress, error) {
+func newIngress(kernel jobmgr.CommandPort, clock lifecycle.Clock, quit func()) (*Ingress, error) {
 	if kernel == nil || clock == nil || quit == nil {
 		return nil, errors.New("jobmgr Function ingress adapter: incomplete ports")
 	}

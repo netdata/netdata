@@ -93,7 +93,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		}
 		if shuttingDown {
 			if shutdownBudget.ExpireIfDue() {
-				terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), ck.run.Terminal(ck.runCensus()))
+				terminal = ck.shutdownDeadlineExceededTerminal(terminal)
 				return
 			}
 		}
@@ -195,7 +195,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		}
 		if shuttingDown {
 			if shutdownBudget.ExpireIfDue() {
-				terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), ck.run.Terminal(ck.runCensus()))
+				terminal = ck.shutdownDeadlineExceededTerminal(terminal)
 				return
 			}
 			if ck.shutdownQuiescent() ||
@@ -229,7 +229,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 				}
 			} else {
 				if shutdownBudget.ExpireIfDue() {
-					terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), ck.run.Terminal(ck.runCensus()))
+					terminal = ck.shutdownDeadlineExceededTerminal(terminal)
 					return
 				}
 			}
@@ -263,7 +263,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		case <-contextC:
 			beginShutdown(ctx.Err())
 		case <-shutdownC:
-			terminal = errors.Join(terminal, errors.New("jobmgr kernel: shutdown deadline exceeded"), ck.run.Terminal(ck.runCensus()))
+			terminal = ck.shutdownDeadlineExceededTerminal(terminal)
 			return
 		}
 	}
@@ -446,4 +446,14 @@ func (ck *CommandKernel) hasRunnableSubmissions() bool {
 		}
 	}
 	return false
+}
+
+// shutdownDeadlineExceededTerminal joins the shutdown-deadline-exceeded fault
+// with the prior terminal error and the run's terminal census.
+func (ck *CommandKernel) shutdownDeadlineExceededTerminal(prev error) error {
+	return errors.Join(
+		prev,
+		errors.New("jobmgr kernel: shutdown deadline exceeded"),
+		ck.run.Terminal(ck.runCensus()),
+	)
 }

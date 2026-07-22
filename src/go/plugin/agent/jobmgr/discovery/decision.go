@@ -34,17 +34,13 @@ type DecisionIndex struct {
 
 	sources      map[string]map[uint64]confgroup.Config               // per-source config sets (authoritative full set per source)
 	candidates   map[string]map[decisionCandidateKey]confgroup.Config // per-job candidate configs by key
-	acknowledged map[string]acknowledgedConfig                        // last acknowledged config per job full name
+	acknowledged map[string]confgroup.Config                          // last acknowledged config per job full name
 	revision     uint64                                               // monotonic decision revision
 }
 
 type decisionCandidateKey struct {
 	source string
 	hash   uint64
-}
-
-type acknowledgedConfig struct {
-	config confgroup.Config
 }
 
 func NewDecisionIndex(config DecisionConfig) (*DecisionIndex, error) {
@@ -77,7 +73,7 @@ func NewDecisionIndex(config DecisionConfig) (*DecisionIndex, error) {
 			map[string]map[decisionCandidateKey]confgroup.Config,
 		),
 		acknowledged: make(
-			map[string]acknowledgedConfig,
+			map[string]confgroup.Config,
 		),
 	}, nil
 }
@@ -174,11 +170,11 @@ func (di *DecisionIndex) reconcile(
 	current, hasCurrent := di.acknowledged[fullName]
 	next, hasNext := di.selectConfig(
 		fullName,
-		current.config,
+		current,
 		hasCurrent,
 	)
 	if hasCurrent && hasNext &&
-		current.config.UID() == next.UID() {
+		current.UID() == next.UID() {
 		return nil
 	}
 	var change DiscoveredChange
@@ -189,7 +185,7 @@ func (di *DecisionIndex) reconcile(
 			change.Status = dyncfg.StatusRunning
 		}
 	} else {
-		change.Config = current.config
+		change.Config = current
 		change.Remove = true
 	}
 	plan, err := di.plan(change)
@@ -220,7 +216,7 @@ func (di *DecisionIndex) reconcile(
 	}
 	di.revision = revision
 	if hasNext {
-		di.acknowledged[fullName] = acknowledgedConfig{config: next}
+		di.acknowledged[fullName] = next
 	} else {
 		delete(di.acknowledged, fullName)
 	}

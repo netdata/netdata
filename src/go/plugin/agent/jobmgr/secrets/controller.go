@@ -38,10 +38,9 @@ type ControllerConfig struct {
 }
 
 type Controller struct {
-	mu sync.Mutex // guards entries + published
+	mu sync.Mutex // guards entries, published, restarts, and initial
 
 	epoch        uint64                      // run generation
-	pluginName   string                      // owning plugin name
 	prefix       string                      // "<plugin>:secretstore:" ID prefix
 	path         string                      // "/collectors/<plugin>/SecretStores" config path
 	frames       *lifecycle.FrameOwner       // protocol frame sink
@@ -71,7 +70,7 @@ func NewController(config ControllerConfig) (*Controller, error) {
 		)
 	}
 	return &Controller{
-		epoch: config.Epoch, pluginName: config.PluginName,
+		epoch:  config.Epoch,
 		prefix: fmt.Sprintf("%s:secretstore:", config.PluginName),
 		path:   fmt.Sprintf(dynCfgSecretPath, config.PluginName),
 		frames: config.Frames, store: config.Store,

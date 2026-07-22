@@ -15,6 +15,12 @@ type PublicationRecord struct {
 	Version    int    // advertised version
 }
 
+// validCore reports whether a record's generation and numeric fields are
+// well-formed. Callers layer their own name/access/field checks on top.
+func (r PublicationRecord) validCore() bool {
+	return r.Generation != 0 && r.Timeout >= 0 && r.Priority >= 0 && r.Version >= 0
+}
+
 // PublicationPort is the external Function registry boundary. Calls may block
 // and therefore Publication transitions must execute as serialized TaskChild
 // work, never on the kernel loop.
@@ -196,9 +202,8 @@ func (p *Publication) validateTransition(
 			}
 			continue
 		}
-		if change.Record.Name != change.Name || change.Record.Generation == 0 ||
-			change.Record.Timeout < 0 || change.Record.Priority < 0 ||
-			change.Record.Version < 0 || change.Record.Access == "" {
+		if change.Record.Name != change.Name || !change.Record.validCore() ||
+			change.Record.Access == "" {
 			return p.poison(errors.New("jobmgr Function publication: invalid desired record"))
 		}
 	}

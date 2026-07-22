@@ -30,19 +30,19 @@ type Controller struct {
 	mutations   jobmgr.FunctionMutationPort // kernel Function-mutation port
 	publication *Publication                // external FUNCTION/FUNCTION_DEL registration set
 
-	plans            map[string]controllerModulePlan         // per-module route plans
-	jobs             map[string]map[string]controllerJob     // live jobs by module then job name
-	groups           map[string]*controllerGroup             // method-generation groups by signature key
-	routes           map[string]controllerRoute              // controller's view of published routes
-	fixed            map[string]PublicationRecord            // initial/fixed publication records
-	fixedGenerations []*HandlerGenerationDeclaration         // initial/fixed handler-generation declarations (for cleanup)
-	availability     map[string]controllerModuleAvailability // per-module availability state
-	version          uint64                                  // controller version
-	nextID           uint64                                  // next controller-assigned id
-	activated        bool                                    // Activate has run (initial snapshot published)
-	draining         bool                                    // shutdown draining has begun
-	terminated       bool                                    // controller fully torn down
-	dirty            error                                   // sticky poison error
+	plans            map[string]controllerModulePlan          // per-module route plans
+	jobs             map[string]map[string]controllerJob      // live jobs by module then job name
+	groups           map[string]*controllerGroup              // method-generation groups by signature key
+	routes           map[string]controllerRoute               // controller's view of published routes
+	fixed            map[string]PublicationRecord             // initial/fixed publication records
+	fixedGenerations []*HandlerGenerationDeclaration          // initial/fixed handler-generation declarations (for cleanup)
+	availability     map[string][]controllerAvailabilityProbe // per-module availability probes
+	version          uint64                                   // controller version
+	nextID           uint64                                   // next controller-assigned id
+	activated        bool                                     // Activate has run (initial snapshot published)
+	draining         bool                                     // shutdown draining has begun
+	terminated       bool                                     // controller fully torn down
+	dirty            error                                    // sticky poison error
 }
 
 type controllerJob struct {
@@ -54,10 +54,6 @@ type controllerJob struct {
 type controllerModulePlan struct {
 	agent  []funcapi.FunctionConfig
 	shared []funcapi.FunctionConfig
-}
-
-type controllerModuleAvailability struct {
-	probes []controllerAvailabilityProbe
 }
 
 type controllerAvailabilityProbe struct {
@@ -119,7 +115,7 @@ func (jh *JobHandle) Publish() error {
 	if jh.published || jh.closed {
 		return errors.New("jobmgr Function controller: invalid job-handle publication")
 	}
-	if err := jh.controller.PublishJob(
+	if err := jh.controller.publishJob(
 		context.Background(),
 		jh.identity,
 		jh.job,
@@ -140,7 +136,7 @@ func (jh *JobHandle) CloseAndDrain(ctx context.Context) error {
 		return nil
 	}
 	if jh.published {
-		if err := jh.controller.CloseAndDrainJob(ctx, jh.identity, jh.job); err != nil {
+		if err := jh.controller.closeAndDrainJob(ctx, jh.identity, jh.job); err != nil {
 			return err
 		}
 	}
@@ -164,7 +160,7 @@ func NewController(
 		groups:       make(map[string]*controllerGroup),
 		routes:       make(map[string]controllerRoute),
 		fixed:        make(map[string]PublicationRecord),
-		availability: make(map[string]controllerModuleAvailability, len(modules)),
+		availability: make(map[string][]controllerAvailabilityProbe, len(modules)),
 		version:      1,
 	}
 	names := make([]string, 0, len(modules))
@@ -335,7 +331,7 @@ func (c *Controller) Activate() error {
 	return nil
 }
 
-func (c *Controller) PublishJob(
+func (c *Controller) publishJob(
 	ctx context.Context,
 	identity lifecycle.ResourceIdentity,
 	job collectorapi.RuntimeJob,
@@ -380,7 +376,7 @@ func (c *Controller) PublishJob(
 	return nil
 }
 
-func (c *Controller) CloseAndDrainJob(
+func (c *Controller) closeAndDrainJob(
 	ctx context.Context,
 	identity lifecycle.ResourceIdentity,
 	job collectorapi.RuntimeJob,
@@ -659,8 +655,8 @@ func (c *Controller) moduleAvailabilityChangedLocked(module string) bool {
 	if !ok {
 		return true
 	}
-	for index := range state.probes {
-		probe := &state.probes[index]
+	for index := range state {
+		probe := &state[index]
 		var available bool
 		if probe.job != nil {
 			available = jobBackedFunctionAvailable(probe.job, probe.methodID)
@@ -681,9 +677,7 @@ func (c *Controller) refreshModuleAvailabilityLocked(module string) {
 	for _, job := range jobs {
 		capacity += len(job.methods)
 	}
-	state := controllerModuleAvailability{
-		probes: make([]controllerAvailabilityProbe, 0, capacity),
-	}
+	probes := make([]controllerAvailabilityProbe, 0, capacity)
 	currentAgent := c.groups[module+"/agent"]
 	for _, method := range plan.agent {
 		if method.Available == nil {
@@ -694,7 +688,7 @@ func (c *Controller) refreshModuleAvailabilityLocked(module string) {
 				continue
 			}
 		}
-		state.probes = append(state.probes, controllerAvailabilityProbe{
+		probes = append(probes, controllerAvailabilityProbe{
 			methodID: method.ID,
 			agent:    method.Available,
 			observed: method.Available(),
@@ -702,21 +696,21 @@ func (c *Controller) refreshModuleAvailabilityLocked(module string) {
 	}
 	for _, job := range jobs {
 		for _, method := range plan.shared {
-			state.probes = append(state.probes, controllerAvailabilityProbe{
+			probes = append(probes, controllerAvailabilityProbe{
 				methodID: method.ID,
 				job:      job.job,
 				observed: jobBackedFunctionAvailable(job.job, method.ID),
 			})
 		}
 		for _, method := range job.methods {
-			state.probes = append(state.probes, controllerAvailabilityProbe{
+			probes = append(probes, controllerAvailabilityProbe{
 				methodID: method.ID,
 				job:      job.job,
 				observed: jobBackedFunctionAvailable(job.job, method.ID),
 			})
 		}
 	}
-	c.availability[module] = state
+	c.availability[module] = probes
 }
 
 func (c *Controller) buildModuleGroups(
@@ -1149,10 +1143,7 @@ func validateInitialRoute(route InitialRoute) error {
 	}
 	record := route.Publication
 	if record.Name != route.Declaration.PublicName ||
-		record.Generation == 0 ||
-		record.Timeout < 0 ||
-		record.Priority < 0 ||
-		record.Version < 0 ||
+		!record.validCore() ||
 		record.Access == "" {
 		return errors.New(
 			"jobmgr Function controller: invalid initial publication",
