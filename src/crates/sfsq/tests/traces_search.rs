@@ -30,7 +30,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
     CompareOp, Condition, PartialReason, Predicate, PredicateError, PredicateTarget,
     PredicateValue, QueryStatus, SearchData, SearchQuery, SearchRequestError, SearchSources,
-    TagScope, TimeWindow, TraceIntrinsic, TraceSource, search,
+    AttributeOwner, TimeWindow, BuiltinField, TraceSource, search,
 };
 
 const NS: u64 = 1_000_000_000;
@@ -49,7 +49,7 @@ fn cond(target: PredicateTarget, op: CompareOp, values: Vec<PredicateValue>) -> 
     Condition { target, op, values }
 }
 
-fn attr_eq(scope: TagScope, key: &str, value: &str) -> Condition {
+fn attr_eq(scope: AttributeOwner, key: &str, value: &str) -> Condition {
     cond(
         PredicateTarget::Attribute(scope, key.to_string()),
         CompareOp::Eq,
@@ -57,8 +57,8 @@ fn attr_eq(scope: TagScope, key: &str, value: &str) -> Condition {
     )
 }
 
-fn intrinsic(i: TraceIntrinsic, op: CompareOp, values: Vec<PredicateValue>) -> Condition {
-    cond(PredicateTarget::Intrinsic(i), op, values)
+fn builtin(i: BuiltinField, op: CompareOp, values: Vec<PredicateValue>) -> Condition {
+    cond(PredicateTarget::Builtin(i), op, values)
 }
 
 fn pred(conditions: Vec<Condition>) -> Predicate {
@@ -297,7 +297,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "service",
-            SearchQuery::new(pred(vec![attr_eq(TagScope::Resource, "service.name", "svc-a")])),
+            SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Resource, "service.name", "svc-a")])),
             vec![hex(3), hex(2), hex(1)],
         ),
         (
@@ -305,8 +305,8 @@ fn oracle_equivalence_under_relayouts() {
             // (900s): only the ROOT of T3 matches this pattern, so T3
             // ranks by 900s, not by its non-matching 1900s child.
             "name-regex",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::Name,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Name,
                 CompareOp::Regex,
                 vec![text("GET .*")],
             )])),
@@ -314,8 +314,8 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "status-error",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::Status,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Status,
                 CompareOp::Eq,
                 vec![text("ERROR")],
             )])),
@@ -323,8 +323,8 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "kind-keyword",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::Kind,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Kind,
                 CompareOp::Eq,
                 vec![text("CONSUMER")],
             )])),
@@ -334,8 +334,8 @@ fn oracle_equivalence_under_relayouts() {
             // Regex over the kind LABEL set is stage-A evaluable (26A):
             // matches T4's CONSUMER (1200s) and T1's SERVER (1000s).
             "kind-regex",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::Kind,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Kind,
                 CompareOp::Regex,
                 vec![text("SERVER|CONSUMER")],
             )])),
@@ -343,19 +343,19 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "duration-floor",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::Duration,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Duration,
                 CompareOp::Gte,
                 vec![PredicateValue::Integer(1_000_000)],
             )])),
             vec![hex(5)],
         ),
         (
-            // Spanset semantics: ONE span carries both conditions.
+            // Span-group semantics: ONE span carries both conditions.
             "conjunction",
             SearchQuery::new(pred(vec![
-                attr_eq(TagScope::Resource, "service.name", "svc-a"),
-                attr_eq(TagScope::Span, "http.method", "GET"),
+                attr_eq(AttributeOwner::Resource, "service.name", "svc-a"),
+                attr_eq(AttributeOwner::Span, "http.method", "GET"),
             ])),
             vec![hex(3), hex(1)],
         ),
@@ -373,20 +373,20 @@ fn oracle_equivalence_under_relayouts() {
             // re-evaluation, and the trace is dropped — never a false
             // positive from raw phase-1.
             "ghost-only-on-loser",
-            SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "ghost", "yes")])),
+            SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "ghost", "yes")])),
             vec![],
         ),
         (
             // The canonical-matches direction: `flag` exists only on the
             // canonical copy; found regardless of the newer resend.
             "flag-on-canonical",
-            SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "flag", "on")])),
+            SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "flag", "on")])),
             vec![hex(6)],
         ),
         (
             "multi-value-or",
             SearchQuery::new(pred(vec![cond(
-                PredicateTarget::Attribute(TagScope::Span, "http.method".into()),
+                PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into()),
                 CompareOp::Eq,
                 vec![text("GET"), text("POST")],
             )])),
@@ -398,7 +398,7 @@ fn oracle_equivalence_under_relayouts() {
             // satisfy a negated comparison.
             "negated-attribute",
             SearchQuery::new(pred(vec![cond(
-                PredicateTarget::Attribute(TagScope::Span, "http.method".into()),
+                PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into()),
                 CompareOp::NotEq,
                 vec![text("GET")],
             )])),
@@ -411,30 +411,30 @@ fn oracle_equivalence_under_relayouts() {
             // look.
             "negated-absent-attribute",
             SearchQuery::new(pred(vec![cond(
-                PredicateTarget::Attribute(TagScope::Span, "ghost".into()),
+                PredicateTarget::Attribute(AttributeOwner::Span, "ghost".into()),
                 CompareOp::NotEq,
                 vec![text("x")],
             )])),
             vec![],
         ),
         (
-            // Negated intrinsic with skip-at-flatten absence: the kind
+            // Negated builtin with skip-at-flatten absence: the kind
             // LABEL exists only on T1's SERVER and T4's CONSUMER spans
             // (UNSPECIFIED is skipped), so `kind != SERVER` = T4 alone.
             "negated-kind",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::Kind,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::Kind,
                 CompareOp::NotEq,
                 vec![text("SERVER")],
             )])),
             vec![hex(4)],
         ),
         (
-            // The unscoped disjunction: `env` is a RESOURCE attribute of
-            // svc-a; the unscoped lookup reaches it.
-            "unscoped-attribute",
+            // The any-owner disjunction: `env` is a RESOURCE attribute of
+            // svc-a; the any-owner lookup reaches it.
+            "any-owner-attribute",
             SearchQuery::new(pred(vec![cond(
-                PredicateTarget::UnscopedAttribute("env".into()),
+                PredicateTarget::Attribute(AttributeOwner::Any, "env".into()),
                 CompareOp::Eq,
                 vec![text("prod")],
             )])),
@@ -444,7 +444,7 @@ fn oracle_equivalence_under_relayouts() {
             // Dictionary numerics: `retries` renders as the token "3".
             "numeric-attribute",
             SearchQuery::new(pred(vec![cond(
-                PredicateTarget::Attribute(TagScope::Span, "retries".into()),
+                PredicateTarget::Attribute(AttributeOwner::Span, "retries".into()),
                 CompareOp::Gte,
                 vec![PredicateValue::Integer(2)],
             )])),
@@ -455,7 +455,7 @@ fn oracle_equivalence_under_relayouts() {
             // token (the dictionary-numeric rule, not byte equality).
             "numeric-float-eq",
             SearchQuery::new(pred(vec![cond(
-                PredicateTarget::Attribute(TagScope::Span, "retries".into()),
+                PredicateTarget::Attribute(AttributeOwner::Span, "retries".into()),
                 CompareOp::Eq,
                 vec![PredicateValue::Float(3.0)],
             )])),
@@ -464,8 +464,8 @@ fn oracle_equivalence_under_relayouts() {
         (
             // span:id — the SPAN column scan; T5's middle child.
             "span-id",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::SpanId,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::SpanId,
                 CompareOp::Eq,
                 vec![text("5252525252525252")],
             )])),
@@ -474,8 +474,8 @@ fn oracle_equivalence_under_relayouts() {
         (
             // span:parentID — children of T5's root.
             "parent-id",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::ParentSpanId,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::ParentSpanId,
                 CompareOp::Eq,
                 vec![text("5151515151515151")],
             )])),
@@ -485,8 +485,8 @@ fn oracle_equivalence_under_relayouts() {
             // Negated parent id: parent PRESENT and ≠ T5's root — roots
             // (unset parent = absent) never satisfy it.
             "negated-parent-id",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::ParentSpanId,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::ParentSpanId,
                 CompareOp::NotEq,
                 vec![text("5151515151515151")],
             )])),
@@ -497,12 +497,12 @@ fn oracle_equivalence_under_relayouts() {
             // still applies in phase 2.
             "trace-id-pin",
             SearchQuery::new(pred(vec![
-                intrinsic(
-                    TraceIntrinsic::TraceId,
+                builtin(
+                    BuiltinField::TraceId,
                     CompareOp::Eq,
                     vec![text(&hex(5)), text(&hex(2))],
                 ),
-                intrinsic(TraceIntrinsic::Status, CompareOp::Eq, vec![text("ERROR")]),
+                builtin(BuiltinField::Status, CompareOp::Eq, vec![text("ERROR")]),
             ])),
             vec![hex(5), hex(2)],
         ),
@@ -510,8 +510,8 @@ fn oracle_equivalence_under_relayouts() {
             // A pin whose remainder fails phase-2 re-evaluation drops.
             "trace-id-pin-no-match",
             SearchQuery::new(pred(vec![
-                intrinsic(TraceIntrinsic::TraceId, CompareOp::Eq, vec![text(&hex(1))]),
-                intrinsic(TraceIntrinsic::Status, CompareOp::Eq, vec![text("ERROR")]),
+                builtin(BuiltinField::TraceId, CompareOp::Eq, vec![text(&hex(1))]),
+                builtin(BuiltinField::Status, CompareOp::Eq, vec![text("ERROR")]),
             ])),
             vec![],
         ),
@@ -519,8 +519,8 @@ fn oracle_equivalence_under_relayouts() {
             // trace:id != excludes at pool admission.
             "trace-id-excluded",
             SearchQuery::new(pred(vec![
-                intrinsic(TraceIntrinsic::Status, CompareOp::Eq, vec![text("ERROR")]),
-                intrinsic(TraceIntrinsic::TraceId, CompareOp::NotEq, vec![text(&hex(5))]),
+                builtin(BuiltinField::Status, CompareOp::Eq, vec![text("ERROR")]),
+                builtin(BuiltinField::TraceId, CompareOp::NotEq, vec![text(&hex(5))]),
             ])),
             vec![hex(2)],
         ),
@@ -528,8 +528,8 @@ fn oracle_equivalence_under_relayouts() {
             // link:spanID / link:traceID — the LNKB row scan; T4 links
             // to T1's root span.
             "link-span-id",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::LinkSpanId,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::LinkSpanId,
                 CompareOp::Eq,
                 vec![text("1111111111111111")],
             )])),
@@ -537,8 +537,8 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "link-trace-id",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::LinkTraceId,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::LinkTraceId,
                 CompareOp::Eq,
                 vec![text(&hex(1))],
             )])),
@@ -548,8 +548,8 @@ fn oracle_equivalence_under_relayouts() {
             // event:name rides the flat events.name token; the span-side
             // evaluator gathers from the STRUCTURED event names.
             "event-name",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::EventName,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::EventName,
                 CompareOp::Eq,
                 vec![text("exception")],
             )])),
@@ -557,8 +557,8 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "event-name-regex",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::EventName,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::EventName,
                 CompareOp::Regex,
                 vec![text("exc.*")],
             )])),
@@ -567,15 +567,15 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Event attribute through the structural refine.
             "event-attr",
-            SearchQuery::new(pred(vec![attr_eq(TagScope::Event, "exception.type", "IOError")])),
+            SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Event, "exception.type", "IOError")])),
             vec![hex(2)],
         ),
         (
             // Same-event conjunction: name + attribute on ONE event.
             "event-subgroup-same",
             SearchQuery::new(pred(vec![
-                intrinsic(TraceIntrinsic::EventName, CompareOp::Eq, vec![text("retry")]),
-                attr_eq(TagScope::Event, "attempt", "2"),
+                builtin(BuiltinField::EventName, CompareOp::Eq, vec![text("retry")]),
+                attr_eq(AttributeOwner::Event, "attempt", "2"),
             ])),
             vec![hex(2)],
         ),
@@ -586,8 +586,8 @@ fn oracle_equivalence_under_relayouts() {
             // span-level match would leak.
             "event-subgroup-counterexample",
             SearchQuery::new(pred(vec![
-                attr_eq(TagScope::Event, "exception.type", "IOError"),
-                attr_eq(TagScope::Event, "attempt", "2"),
+                attr_eq(AttributeOwner::Event, "exception.type", "IOError"),
+                attr_eq(AttributeOwner::Event, "attempt", "2"),
             ])),
             vec![],
         ),
@@ -595,8 +595,8 @@ fn oracle_equivalence_under_relayouts() {
             // Cross-condition on names: no single event is named both.
             "event-two-names-unsatisfiable",
             SearchQuery::new(pred(vec![
-                intrinsic(TraceIntrinsic::EventName, CompareOp::Eq, vec![text("exception")]),
-                intrinsic(TraceIntrinsic::EventName, CompareOp::Eq, vec![text("retry")]),
+                builtin(BuiltinField::EventName, CompareOp::Eq, vec![text("exception")]),
+                builtin(BuiltinField::EventName, CompareOp::Eq, vec![text("retry")]),
             ])),
             vec![],
         ),
@@ -604,8 +604,8 @@ fn oracle_equivalence_under_relayouts() {
             // event:timeSinceStart computes in the refine (the corpus
             // writes events at start + 1ns).
             "event-time-since-start",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::EventTimeSinceStart,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::EventTimeSinceStart,
                 CompareOp::Lte,
                 vec![PredicateValue::Integer(1)],
             )])),
@@ -613,8 +613,8 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "event-time-since-start-none",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::EventTimeSinceStart,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::EventTimeSinceStart,
                 CompareOp::Gt,
                 vec![PredicateValue::Integer(1)],
             )])),
@@ -624,9 +624,9 @@ fn oracle_equivalence_under_relayouts() {
             // Link attribute + link id on the SAME link.
             "link-subgroup-same",
             SearchQuery::new(pred(vec![
-                attr_eq(TagScope::Link, "rel", "follows"),
-                intrinsic(
-                    TraceIntrinsic::LinkSpanId,
+                attr_eq(AttributeOwner::Link, "rel", "follows"),
+                builtin(
+                    BuiltinField::LinkSpanId,
                     CompareOp::Eq,
                     vec![text("1111111111111111")],
                 ),
@@ -638,9 +638,9 @@ fn oracle_equivalence_under_relayouts() {
             // the other — no single link has both.
             "link-subgroup-counterexample",
             SearchQuery::new(pred(vec![
-                attr_eq(TagScope::Link, "rel", "other"),
-                intrinsic(
-                    TraceIntrinsic::LinkSpanId,
+                attr_eq(AttributeOwner::Link, "rel", "other"),
+                builtin(
+                    BuiltinField::LinkSpanId,
                     CompareOp::Eq,
                     vec![text("1111111111111111")],
                 ),
@@ -650,9 +650,9 @@ fn oracle_equivalence_under_relayouts() {
         (
             "link-subgroup-other",
             SearchQuery::new(pred(vec![
-                attr_eq(TagScope::Link, "rel", "other"),
-                intrinsic(
-                    TraceIntrinsic::LinkSpanId,
+                attr_eq(AttributeOwner::Link, "rel", "other"),
+                builtin(
+                    BuiltinField::LinkSpanId,
                     CompareOp::Eq,
                     vec![text("2222222222222222")],
                 ),
@@ -663,8 +663,8 @@ fn oracle_equivalence_under_relayouts() {
             // Trace-level only: phase-1 candidates come from All over
             // the window (C-4); the root evaluates post-assembly.
             "root-service",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::RootServiceName,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::RootServiceName,
                 CompareOp::Eq,
                 vec![text("svc-a")],
             )])),
@@ -672,8 +672,8 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "root-name-regex",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::RootName,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::RootName,
                 CompareOp::Regex,
                 vec![text("GET .*")],
             )])),
@@ -681,8 +681,8 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "negated-root-name",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::RootName,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::RootName,
                 CompareOp::NotEq,
                 vec![text("GET /users")],
             )])),
@@ -691,8 +691,8 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Envelope duration: only T3 spans a second-scale envelope.
             "trace-duration",
-            SearchQuery::new(pred(vec![intrinsic(
-                TraceIntrinsic::TraceDuration,
+            SearchQuery::new(pred(vec![builtin(
+                BuiltinField::TraceDuration,
                 CompareOp::Gt,
                 vec![PredicateValue::Integer((100 * NS) as i64)],
             )])),
@@ -703,9 +703,9 @@ fn oracle_equivalence_under_relayouts() {
             // trace-level half applies post-assembly (C-4).
             "mixed-trace-level",
             SearchQuery::new(pred(vec![
-                intrinsic(TraceIntrinsic::Status, CompareOp::Eq, vec![text("ERROR")]),
-                intrinsic(
-                    TraceIntrinsic::RootServiceName,
+                builtin(BuiltinField::Status, CompareOp::Eq, vec![text("ERROR")]),
+                builtin(
+                    BuiltinField::RootServiceName,
                     CompareOp::Eq,
                     vec![text("svc-b")],
                 ),
@@ -743,7 +743,7 @@ fn oracle_equivalence_under_relayouts() {
 }
 
 /// Summary numbers against ground truth (single layout; equivalence is
-/// proven above): roots, envelope, counts, spss trim, combiner order.
+/// proven above): roots, envelope, counts, spans_per_trace trim, combiner order.
 #[test]
 fn summary_ground_truth() {
     let dir = tempfile::tempdir().unwrap();
@@ -752,7 +752,7 @@ fn summary_ground_truth() {
     let wal = write_wal(dir.path(), all, "world");
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
 
-    let data = run(sources, SearchQuery::new(Predicate::all()).spss(2));
+    let data = run(sources, SearchQuery::new(Predicate::all()).spans_per_trace(2));
     let by_id = |n: u8| {
         data.traces
             .iter()
@@ -767,7 +767,7 @@ fn summary_ground_truth() {
     assert_eq!(t1.start_ns, (1_000 * NS) as i64);
     assert_eq!(t1.duration_ns, 500_000);
     assert_eq!((t1.span_count, t1.error_count, t1.matched_count), (2, 0, 2));
-    // spss(2) attaches both, in combiner (chronological) order.
+    // spans_per_trace(2) attaches both, in combiner (chronological) order.
     assert_eq!(t1.matched_spans.len(), 2);
     assert!(t1.matched_spans[0].start_ns < t1.matched_spans[1].start_ns);
 
@@ -781,16 +781,16 @@ fn summary_ground_truth() {
     // T5: all three spans carry ERROR.
     let t5 = by_id(5);
     assert_eq!((t5.span_count, t5.error_count), (3, 3));
-    assert_eq!(t5.matched_spans.len(), 2, "spss trims the attachment");
-    assert_eq!(t5.matched_count, 3, "matched_count is not trimmed by spss");
+    assert_eq!(t5.matched_spans.len(), 2, "spans_per_trace trims the attachment");
+    assert_eq!(t5.matched_count, 3, "matched_count is not trimmed by spans_per_trace");
 
     // T6: the resend collapsed to the canonical copy.
     let t6 = by_id(6);
     assert_eq!((t6.span_count, t6.start_ns), (1, (1_300 * NS) as i64));
 
-    // spss = 0 attaches nothing, counts unaffected.
+    // spans_per_trace = 0 attaches nothing, counts unaffected.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let none = run(sources, SearchQuery::new(Predicate::all()).spss(0));
+    let none = run(sources, SearchQuery::new(Predicate::all()).spans_per_trace(0));
     assert!(none.traces.iter().all(|t| t.matched_spans.is_empty()));
     assert_eq!(none.traces.iter().map(|t| t.matched_count).sum::<usize>(), 10);
 }
@@ -829,7 +829,7 @@ fn inflated_raw_ranks_do_not_hide_the_true_top_trace() {
     }]));
     let wal = write_wal(dir.path(), reqs, "inflated");
 
-    let matching = pred(vec![attr_eq(TagScope::Span, "m", "yes")]);
+    let matching = pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")]);
     // limit 1 → initial K = 3: the raw top-3 are all inflated resends.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let top = run(sources, SearchQuery::new(matching.clone()).limit(1));
@@ -896,15 +896,15 @@ fn request_validation_matrix() {
         Err(SearchRequestError::ZeroLimit)
     ));
     assert!(matches!(
-        try_search(sources(), SearchQuery::new(Predicate::all()).spss(129)),
-        Err(SearchRequestError::SpssBeyondMax { got: 129 })
+        try_search(sources(), SearchQuery::new(Predicate::all()).spans_per_trace(129)),
+        Err(SearchRequestError::SpansPerTraceBeyondMax { got: 129 })
     ));
     // Structural predicate error.
     assert!(matches!(
         try_search(
             sources(),
             SearchQuery::new(pred(vec![cond(
-                PredicateTarget::Attribute(TagScope::Span, "x".into()),
+                PredicateTarget::Attribute(AttributeOwner::Span, "x".into()),
                 CompareOp::Regex,
                 vec![text("(")],
             )])),
@@ -914,15 +914,15 @@ fn request_validation_matrix() {
     // Stage-B constructs: named not-yet-evaluable request errors.
     for stage_b in [
         // Negated subgroup forms (the recorded open question) and the
-        // trace-level intrinsics stay not-yet-evaluable after step 8.
+        // trace-level builtins stay not-yet-evaluable after step 8.
         cond(
-            PredicateTarget::Attribute(TagScope::Event, "msg".into()),
+            PredicateTarget::Attribute(AttributeOwner::Event, "msg".into()),
             CompareOp::NotEq,
             vec![text("v")],
         ),
-        intrinsic(TraceIntrinsic::EventName, CompareOp::NotEq, vec![text("e")]),
-        intrinsic(
-            TraceIntrinsic::LinkSpanId,
+        builtin(BuiltinField::EventName, CompareOp::NotEq, vec![text("e")]),
+        builtin(
+            BuiltinField::LinkSpanId,
             CompareOp::NotEq,
             vec![text("00f067aa0ba902b7")],
         ),
@@ -1025,7 +1025,7 @@ fn determinism_under_source_permutation() {
             sealed_source(dir.path(), &wal_early, "early"),
         ]
     };
-    let q = || SearchQuery::new(pred(vec![attr_eq(TagScope::Resource, "service.name", "svc-b")]));
+    let q = || SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Resource, "service.name", "svc-b")]));
     let a = run(both_roles(forward), q());
     let b = run(both_roles(reverse), q());
     assert_eq!(norm(&a), norm(&b));
@@ -1059,7 +1059,7 @@ fn assembled_ceiling_terminates_with_the_gathered_result() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let data = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")])).limit(1),
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).limit(1),
     );
     // Ceiling = max(1 × 16, 64) = 64 < 80 candidates: Partial.
     assert!(data.status.has(PartialReason::WorkCeiling));
@@ -1072,7 +1072,7 @@ fn assembled_ceiling_terminates_with_the_gathered_result() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let again = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")])).limit(1),
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).limit(1),
     );
     assert_eq!(norm(&data), norm(&again));
 }
@@ -1102,7 +1102,7 @@ fn visited_rows_ceiling_gates_refill() {
     let wal = write_wal(dir.path(), reqs, "visited");
 
     let q = || {
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")]))
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")]))
             .limit(1)
             .visited_rows_ceiling_for_tests(30)
     };
@@ -1140,7 +1140,7 @@ fn exact_drain_at_the_ceiling_stays_complete() {
     // only match — complete, not WorkCeiling.
     let data = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")]))
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")]))
             .visited_rows_ceiling_for_tests(0),
     );
     assert_eq!(ids(&data), vec![hex(9)]);
@@ -1193,7 +1193,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let dropped = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")])).span_cap_for_tests(2),
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).span_cap_for_tests(2),
     );
     assert_eq!(ids(&dropped), vec![hex(8)]);
     assert!(dropped.status.has(PartialReason::SizeCap));
@@ -1203,7 +1203,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let kept = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "a", "yes")])).span_cap_for_tests(2),
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "a", "yes")])).span_cap_for_tests(2),
     );
     assert_eq!(ids(&kept), vec![hex(7), hex(9)]);
     assert!(kept.status.has(PartialReason::SizeCap));
@@ -1219,7 +1219,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let trimmed = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m2", "yes")]))
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m2", "yes")]))
             .span_cap_for_tests(2)
             .limit(1),
     );
@@ -1229,7 +1229,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let true_top = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m2", "yes")])).limit(1),
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m2", "yes")])).limit(1),
     );
     assert_eq!(ids(&true_top), vec![hex(9)]);
     assert_eq!(true_top.status, QueryStatus::Complete);
@@ -1238,7 +1238,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let uncapped = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")])),
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])),
     );
     assert_eq!(ids(&uncapped), vec![hex(9), hex(8)]);
     assert_eq!(uncapped.status, QueryStatus::Complete);
@@ -1285,9 +1285,9 @@ fn budget_truncated_old_source_cannot_falsify_completeness() {
     };
     let q = || {
         SearchQuery::new(pred(vec![
-            attr_eq(TagScope::Span, "m", "yes"),
+            attr_eq(AttributeOwner::Span, "m", "yes"),
             cond(
-                PredicateTarget::Attribute(TagScope::Span, "hc".into()),
+                PredicateTarget::Attribute(AttributeOwner::Span, "hc".into()),
                 CompareOp::Regex,
                 vec![text(".*")],
             ),
@@ -1303,7 +1303,7 @@ fn budget_truncated_old_source_cannot_falsify_completeness() {
     // Sanity: the unbudgeted answer is the same top-1.
     let unbudgeted = run(
         sources(),
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")])).limit(1),
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).limit(1),
     );
     assert_eq!(ids(&unbudgeted), vec![hex(249)]);
 }
@@ -1320,8 +1320,8 @@ fn trace_id_pins_skip_discovery() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let data = run(
         sources,
-        SearchQuery::new(pred(vec![intrinsic(
-            TraceIntrinsic::TraceId,
+        SearchQuery::new(pred(vec![builtin(
+            BuiltinField::TraceId,
             CompareOp::Eq,
             vec![text(&hex(5))],
         )]))
@@ -1334,8 +1334,8 @@ fn trace_id_pins_skip_discovery() {
     let none = run(
         sources,
         SearchQuery::new(pred(vec![
-            intrinsic(TraceIntrinsic::TraceId, CompareOp::Eq, vec![text(&hex(5))]),
-            intrinsic(TraceIntrinsic::TraceId, CompareOp::Eq, vec![text(&hex(4))]),
+            builtin(BuiltinField::TraceId, CompareOp::Eq, vec![text(&hex(5))]),
+            builtin(BuiltinField::TraceId, CompareOp::Eq, vec![text(&hex(4))]),
         ])),
     );
     assert!(none.traces.is_empty());
@@ -1361,8 +1361,8 @@ fn trace_level_conditions_exclude_indeterminate_candidates() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let full = run(
         sources,
-        SearchQuery::new(pred(vec![intrinsic(
-            TraceIntrinsic::RootName,
+        SearchQuery::new(pred(vec![builtin(
+            BuiltinField::RootName,
             CompareOp::Regex,
             vec![text("root-.*")],
         )])),
@@ -1375,8 +1375,8 @@ fn trace_level_conditions_exclude_indeterminate_candidates() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let capped = run(
         sources,
-        SearchQuery::new(pred(vec![intrinsic(
-            TraceIntrinsic::RootName,
+        SearchQuery::new(pred(vec![builtin(
+            BuiltinField::RootName,
             CompareOp::Regex,
             vec![text("root-.*")],
         )]))
@@ -1407,7 +1407,7 @@ fn refine_budget_abort_is_honest() {
         .collect();
     let wal = write_wal(dir.path(), reqs, "refine-budget");
     let q = |ceiling: u64| {
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Event, "seq", "2")]))
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Event, "seq", "2")]))
             .visited_rows_ceiling_for_tests(ceiling)
     };
     // Unbudgeted: all 20 match through the refine.
@@ -1477,7 +1477,7 @@ fn field_kinds_describe_the_returned_data() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let data = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "queue", "q1")])),
+        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "queue", "q1")])),
     );
     assert_eq!(ids(&data), vec![hex(4)]);
     let names: Vec<&str> = data.field_kinds.fields.iter().map(|(k, _)| k.as_str()).collect();
@@ -1495,7 +1495,7 @@ fn tail_only_search_matches_the_sealed_answer() {
     let dir = tempfile::tempdir().unwrap();
     let wal_early = write_wal(dir.path(), early_requests(), "early");
     let wal_late = write_wal(dir.path(), late_requests(), "late");
-    let q = || SearchQuery::new(pred(vec![attr_eq(TagScope::Resource, "service.name", "svc-b")]));
+    let q = || SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Resource, "service.name", "svc-b")]));
 
     let tails = both_roles(|| {
         vec![

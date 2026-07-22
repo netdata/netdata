@@ -1,13 +1,13 @@
-//! Tag / tag-value enumeration — the phase-4b operations.
+//! Attribute / attribute-value enumeration — the phase-4b operations.
 //!
-//! [`tag_names`] and [`tag_values`] answer "what can be filtered on, and
+//! [`attribute_names`] and [`attribute_values`] answer "what can be filtered on, and
 //! with which values" straight off the dictionaries: a sealed or
 //! in-memory SFST contributes its field table and per-field dictionary
 //! chunks ([`sfst::IndexReader::field_values`] — never stream batches or
 //! row columns), a WAL tail contributes its frame-decoded pair table.
 //! Keys and values come back as the TYPED, wire-neutral vocabulary of
-//! [`super::vocab`]; the Intrinsic scope is the full static
-//! [`TraceIntrinsic`] set regardless of data (intrinsics are engine
+//! [`super::vocab`]; the Builtin owner is the full static
+//! [`BuiltinField`] set regardless of data (builtin fields are engine
 //! capabilities, not data properties).
 //!
 //! Determinism (design-record decision 13): enumerate ALL candidate
@@ -43,21 +43,21 @@ use tokio_util::sync::CancellationToken;
 
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
-use super::vocab::{TagKey, TagScope, TraceIntrinsic, storage_to_tag};
+use super::vocab::{AttributeKey, AttributeOwner, BuiltinField, storage_to_attribute};
 use super::wal_scan::TraceWalScan;
 use super::window::{TimeWindow, WindowError};
 use crate::source::map_source;
 
-/// A tag-names request. [`new`](Self::new) enumerates every scope,
+/// A key-names request. [`new`](Self::new) enumerates every owner,
 /// unlimited; narrow with the builder methods.
 #[derive(Debug, Clone, Default)]
-pub struct TagNamesQuery {
+pub struct AttributeNamesQuery {
     window: Option<TimeWindow>,
-    scope: Option<TagScope>,
+    owner: Option<AttributeOwner>,
     max_keys: Option<usize>,
 }
 
-impl TagNamesQuery {
+impl AttributeNamesQuery {
     pub fn new() -> Self {
         Self::default()
     }
@@ -69,9 +69,9 @@ impl TagNamesQuery {
         self
     }
 
-    /// Enumerate only one scope.
-    pub fn scope(mut self, scope: TagScope) -> Self {
-        self.scope = Some(scope);
+    /// Enumerate only one owner.
+    pub fn owner(mut self, owner: AttributeOwner) -> Self {
+        self.owner = Some(owner);
         self
     }
 
@@ -83,19 +83,19 @@ impl TagNamesQuery {
     }
 }
 
-/// A tag-values request for one `(scope, key)` tag.
+/// A values request for one `(owner, key)` pair.
 #[derive(Debug, Clone)]
-pub struct TagValuesQuery {
-    scope: TagScope,
-    key: TagKey,
+pub struct AttributeValuesQuery {
+    owner: AttributeOwner,
+    key: AttributeKey,
     window: Option<TimeWindow>,
     max_values: Option<usize>,
 }
 
-impl TagValuesQuery {
-    pub fn new(scope: TagScope, key: TagKey) -> Self {
+impl AttributeValuesQuery {
+    pub fn new(owner: AttributeOwner, key: AttributeKey) -> Self {
         Self {
-            scope,
+            owner,
             key,
             window: None,
             max_values: None,
@@ -118,32 +118,36 @@ impl TagValuesQuery {
 }
 
 /// A request error — the caller built an invalid request or source set;
-/// nothing was queried. Data conditions are NOT errors: a tag absent
+/// nothing was queried. Data conditions are NOT errors: a key absent
 /// from every source yields an empty `Complete` result.
 #[derive(Debug, thiserror::Error)]
-pub enum TagRequestError {
+pub enum AttributeRequestError {
     #[error("a zero key/value limit would return nothing; omit the limit or raise it")]
     ZeroLimit,
     #[error(transparent)]
     Window(#[from] WindowError),
     /// The static virtual/dictionary split is known at the boundary
-    /// (decision 18B), so asking for a virtual intrinsic's values is a
+    /// (decision 18B), so asking for a virtual builtin's values is a
     /// caller bug, not a data condition.
-    #[error("intrinsic {0:?} is virtual (no value dictionary); its values cannot be enumerated")]
-    NotEnumerable(TraceIntrinsic),
-    #[error("an intrinsic key requires the Intrinsic scope, got {0:?} (pin C4)")]
-    IntrinsicKeyOutsideIntrinsicScope(TagScope),
-    #[error("the Intrinsic scope holds no attribute keys, got attribute {0:?} (pin C4)")]
-    AttributeKeyInIntrinsicScope(String),
+    #[error("builtin field {0:?} is virtual (no value dictionary); its values cannot be enumerated")]
+    NotEnumerable(BuiltinField),
+    #[error("a builtin key requires the Builtin owner, got {0:?} (pin C4)")]
+    BuiltinKeyOutsideBuiltinOwner(AttributeOwner),
+    #[error("the Builtin owner holds no attribute keys, got attribute {0:?} (pin C4)")]
+    AttributeKeyUnderBuiltinOwner(String),
+    /// `Any` exists for predicates (the owner-agnostic filter);
+    /// enumeration is per concrete owner — omit the filter to list all.
+    #[error("the Any owner is a predicate construct; enumeration takes a concrete owner")]
+    AnyOwnerNotEnumerable,
     #[error(transparent)]
     SourceSet(#[from] SourceSetError),
 }
 
-/// The enumerated keys: sorted `(scope, key)`, one exact global
+/// The enumerated keys: sorted `(owner, key)`, one exact global
 /// `truncated` flag.
 #[derive(Debug)]
-pub struct TagNamesData {
-    pub keys: Vec<(TagScope, TagKey)>,
+pub struct AttributeNamesData {
+    pub keys: Vec<(AttributeOwner, AttributeKey)>,
     pub truncated: bool,
     pub status: QueryStatus,
 }
@@ -154,36 +158,37 @@ pub struct TagNamesData {
 /// contributing source has a scalar occurrence of the field (a null- or
 /// empty-container-only attribute — pin C1).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TagValue {
+pub struct AttributeValue {
     pub value: String,
     pub kind: Option<sfst::ValueKind>,
 }
 
-/// The enumerated values of one tag: sorted by value bytes, one exact
+/// The enumerated values of one key: sorted by value bytes, one exact
 /// `truncated` flag.
 #[derive(Debug)]
-pub struct TagValuesData {
-    pub values: Vec<TagValue>,
+pub struct AttributeValuesData {
+    pub values: Vec<AttributeValue>,
     pub truncated: bool,
     pub status: QueryStatus,
 }
 
-/// Resolve a values-request `(scope, key)` pair to the storage
+/// Resolve a values-request `(owner, key)` pair to the storage
 /// dictionary field it reads, enforcing pin C4 and decision 18B.
-fn storage_field_of(scope: TagScope, key: &TagKey) -> Result<String, TagRequestError> {
-    match (scope, key) {
-        (TagScope::Intrinsic, TagKey::Intrinsic(i)) => i
+fn storage_field_of(owner: AttributeOwner, key: &AttributeKey) -> Result<String, AttributeRequestError> {
+    match (owner, key) {
+        (AttributeOwner::Any, _) => Err(AttributeRequestError::AnyOwnerNotEnumerable),
+        (AttributeOwner::Builtin, AttributeKey::Builtin(i)) => i
             .dictionary_field()
             .map(str::to_string)
-            .ok_or(TagRequestError::NotEnumerable(*i)),
-        (TagScope::Intrinsic, TagKey::Attribute(a)) => {
-            Err(TagRequestError::AttributeKeyInIntrinsicScope(a.clone()))
+            .ok_or(AttributeRequestError::NotEnumerable(*i)),
+        (AttributeOwner::Builtin, AttributeKey::Attribute(a)) => {
+            Err(AttributeRequestError::AttributeKeyUnderBuiltinOwner(a.clone()))
         }
-        (scope, TagKey::Intrinsic(_)) => {
-            Err(TagRequestError::IntrinsicKeyOutsideIntrinsicScope(scope))
+        (owner, AttributeKey::Builtin(_)) => {
+            Err(AttributeRequestError::BuiltinKeyOutsideBuiltinOwner(owner))
         }
-        (scope, TagKey::Attribute(bare)) => {
-            let prefix = scope.attribute_prefix().expect("non-Intrinsic scope");
+        (owner, AttributeKey::Attribute(bare)) => {
+            let prefix = owner.attribute_prefix().expect("validated: a concrete attribute owner");
             Ok(format!("{prefix}{bare}"))
         }
     }
@@ -195,28 +200,31 @@ fn pruned(window: Option<TimeWindow>, summary: &sfst::Summary) -> bool {
     window.is_some_and(|w| !w.overlaps_summary(summary.min_timestamp_s, summary.max_timestamp_s))
 }
 
-/// Enumerate tag keys across `sources`. See the module docs for the
+/// Enumerate attribute and builtin-field keys across `sources`. See the module docs for the
 /// determinism, cancellation, window, and failure contracts. `progress`
 /// ticks once per source, success or failure, exactly as
 /// [`trace_by_id`](super::trace_by_id)'s does.
 ///
 /// Pure sync — reads and decompresses files; invoke off any async
 /// runtime thread (the logs-engine contract).
-pub fn tag_names(
+pub fn attribute_names(
     sources: Vec<TraceSource>,
-    query: TagNamesQuery,
+    query: AttributeNamesQuery,
     cancel: CancellationToken,
     progress: Arc<AtomicUsize>,
-) -> Result<TagNamesData, TagRequestError> {
+) -> Result<AttributeNamesData, AttributeRequestError> {
     if query.max_keys == Some(0) {
-        return Err(TagRequestError::ZeroLimit);
+        return Err(AttributeRequestError::ZeroLimit);
+    }
+    if query.owner == Some(AttributeOwner::Any) {
+        return Err(AttributeRequestError::AnyOwnerNotEnumerable);
     }
     validate_sources(&sources)?;
 
     let mut status = StatusBuilder::new();
     let cancelled_empty = |mut status: StatusBuilder| {
         status.add(PartialReason::Cancelled);
-        TagNamesData {
+        AttributeNamesData {
             keys: Vec::new(),
             truncated: false,
             status: status.finish(),
@@ -226,16 +234,16 @@ pub fn tag_names(
         return Ok(cancelled_empty(status));
     }
 
-    let in_scope = |scope: TagScope| query.scope.is_none_or(|s| s == scope);
+    let in_owner = |owner: AttributeOwner| query.owner.is_none_or(|s| s == owner);
 
-    // The static intrinsic vocabulary (18B) — present regardless of what
+    // The static builtin-field vocabulary (18B) — present regardless of what
     // the sources hold, deterministic by construction.
-    let mut keys: BTreeSet<(TagScope, TagKey)> = BTreeSet::new();
-    if in_scope(TagScope::Intrinsic) {
+    let mut keys: BTreeSet<(AttributeOwner, AttributeKey)> = BTreeSet::new();
+    if in_owner(AttributeOwner::Builtin) {
         keys.extend(
-            TraceIntrinsic::ALL
+            BuiltinField::ALL
                 .into_iter()
-                .map(|i| (TagScope::Intrinsic, TagKey::Intrinsic(i))),
+                .map(|i| (AttributeOwner::Builtin, AttributeKey::Builtin(i))),
         );
     }
 
@@ -246,10 +254,10 @@ pub fn tag_names(
         }
         let mut add_storage_names = |names: &mut dyn Iterator<Item = &str>| {
             for name in names {
-                if let Some((scope, key)) = storage_to_tag(name)
-                    && in_scope(scope)
+                if let Some((owner, key)) = storage_to_attribute(name)
+                    && in_owner(owner)
                 {
-                    keys.insert((scope, key));
+                    keys.insert((owner, key));
                 }
             }
         };
@@ -290,41 +298,41 @@ pub fn tag_names(
     }
 
     // Merge-then-limit (decision 13): the BTreeSet IS the deterministic
-    // (scope, key) order; the cap truncates the tail with an exact flag.
-    let mut keys: Vec<(TagScope, TagKey)> = keys.into_iter().collect();
+    // (owner, key) order; the cap truncates the tail with an exact flag.
+    let mut keys: Vec<(AttributeOwner, AttributeKey)> = keys.into_iter().collect();
     let truncated = query.max_keys.is_some_and(|max| keys.len() > max);
     if let Some(max) = query.max_keys {
         keys.truncate(max);
     }
-    Ok(TagNamesData {
+    Ok(AttributeNamesData {
         keys,
         truncated,
         status: status.finish(),
     })
 }
 
-/// Enumerate one tag's values across `sources`. See the module docs for
+/// Enumerate one key's values across `sources`. See the module docs for
 /// the determinism, cancellation, window, and failure contracts; the
 /// kind on each value follows pin C1. `progress` ticks once per source.
 ///
 /// Pure sync — reads and decompresses files; invoke off any async
 /// runtime thread (the logs-engine contract).
-pub fn tag_values(
+pub fn attribute_values(
     sources: Vec<TraceSource>,
-    query: TagValuesQuery,
+    query: AttributeValuesQuery,
     cancel: CancellationToken,
     progress: Arc<AtomicUsize>,
-) -> Result<TagValuesData, TagRequestError> {
+) -> Result<AttributeValuesData, AttributeRequestError> {
     if query.max_values == Some(0) {
-        return Err(TagRequestError::ZeroLimit);
+        return Err(AttributeRequestError::ZeroLimit);
     }
-    let storage = storage_field_of(query.scope, &query.key)?;
+    let storage = storage_field_of(query.owner, &query.key)?;
     validate_sources(&sources)?;
 
     let mut status = StatusBuilder::new();
     let cancelled_empty = |mut status: StatusBuilder| {
         status.add(PartialReason::Cancelled);
-        TagValuesData {
+        AttributeValuesData {
             values: Vec::new(),
             truncated: false,
             status: status.finish(),
@@ -418,15 +426,15 @@ pub fn tag_values(
 
     // Merge-then-limit (decision 13): sorted by value bytes; the cap
     // truncates with an exact flag.
-    let mut out: Vec<TagValue> = values
+    let mut out: Vec<AttributeValue> = values
         .into_iter()
-        .map(|value| TagValue { value, kind })
+        .map(|value| AttributeValue { value, kind })
         .collect();
     let truncated = query.max_values.is_some_and(|max| out.len() > max);
     if let Some(max) = query.max_values {
         out.truncate(max);
     }
-    Ok(TagValuesData {
+    Ok(AttributeValuesData {
         values: out,
         truncated,
         status: status.finish(),

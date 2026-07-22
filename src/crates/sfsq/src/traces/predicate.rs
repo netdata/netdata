@@ -1,13 +1,13 @@
-//! The neutral, scope-aware search predicate AST (phase-4c decision 26A)
-//! — the FULL recorded form grammar as typed data over the
+//! The neutral, owner-aware search predicate AST (phase-4c decision
+//! 26A) — the FULL recorded form grammar as typed data over the
 //! [`vocab`](super::vocab) enums, never grammar strings (decision 16A:
-//! each wire adapter owns its rendering; the phase-5 Tempo shim is a pure
-//! translator onto this type).
+//! each wire adapter is a pure translator onto this type and owns its
+//! own rendering).
 //!
 //! The whole grammar PARSES into this AST and validates structurally in
 //! every build; stage A EVALUATES only the positive subset (conjunctions
 //! of `=`/`=~` terms on resource/span/instrumentation attributes and the
-//! dictionary-backed intrinsics except `event:name`, plus duration
+//! dictionary-backed builtins except `event:name`, plus duration
 //! bounds). A structurally valid construct outside that subset is
 //! rejected at the request boundary with the named
 //! [`PredicateError::NotYetEvaluable`] error — a clean gap, never a
@@ -26,28 +26,30 @@
 
 use sfst::{PlanTerm, TracePlan, TraceSpan};
 
-use super::vocab::{TagScope, TraceIntrinsic};
+use super::vocab::{AttributeOwner, BuiltinField};
 use super::window::TimeWindow;
 
-/// What a condition tests. Attribute scopes come from the tag vocabulary
-/// ([`TagScope::Intrinsic`] is not an attribute scope — request error);
-/// an UNSCOPED attribute is the form grammar's `.tag` (resource ∪ span
-/// disjunction, stage B); intrinsics are the full fixed set, colon forms
-/// included (`span:id` = [`TraceIntrinsic::SpanId`], …).
+/// What a condition tests. Attribute owners come from the key vocabulary
+/// ([`AttributeOwner::Builtin`] is not an attribute owner — request
+/// error); [`AttributeOwner::Any`] is the owner-agnostic attribute
+/// (pinned as the resource ∪ span disjunction, stage B); builtins are
+/// the full fixed set, colon forms included (`span:id` =
+/// [`BuiltinField::SpanId`], …).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PredicateTarget {
-    Attribute(TagScope, String),
-    UnscopedAttribute(String),
-    Intrinsic(TraceIntrinsic),
+    Attribute(AttributeOwner, String),
+    Builtin(BuiltinField),
 }
 
 impl std::fmt::Display for PredicateTarget {
     /// Diagnostic rendering (error messages only — no wire grammar).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PredicateTarget::Attribute(scope, key) => write!(f, "{scope:?} attribute {key:?}"),
-            PredicateTarget::UnscopedAttribute(key) => write!(f, "unscoped attribute {key:?}"),
-            PredicateTarget::Intrinsic(i) => write!(f, "intrinsic {i:?}"),
+            PredicateTarget::Attribute(AttributeOwner::Any, key) => {
+                write!(f, "any-owner attribute {key:?}")
+            }
+            PredicateTarget::Attribute(owner, key) => write!(f, "{owner:?} attribute {key:?}"),
+            PredicateTarget::Builtin(i) => write!(f, "builtin field {i:?}"),
         }
     }
 }
@@ -61,7 +63,8 @@ pub enum CompareOp {
     Lt,
     Gte,
     Lte,
-    /// Full-value-anchored regex (the `=~` op, Tempo semantics).
+    /// Full-value-anchored regex: `=~` matches the WHOLE value, not a
+    /// substring (the anchoring the experiment's wire grammar pinned).
     Regex,
     /// Negated full-value-anchored regex (`!~`).
     NotRegex,
@@ -99,8 +102,8 @@ pub struct Condition {
     pub values: Vec<PredicateValue>,
 }
 
-/// The predicate: a conjunction of conditions within one spanset (pinned
-/// spanset semantics, C-3: a trace matches when at least one retained
+/// The predicate: a conjunction of conditions over one per-trace span
+/// group (pinned group semantics, C-3: a trace matches when at least one retained
 /// canonical span — with its resource/scope context — satisfies ALL
 /// conditions and the window). Empty = match everything (the `{}` query).
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -127,8 +130,8 @@ pub enum PredicateError {
     NoValues { target: String },
     #[error("{op:?} takes exactly one value, got {got}")]
     OrderingArity { op: CompareOp, got: usize },
-    #[error("attribute {key:?} cannot live under the Intrinsic scope")]
-    AttributeInIntrinsicScope { key: String },
+    #[error("attribute {key:?} cannot live under the Builtin owner")]
+    AttributeUnderBuiltinOwner { key: String },
     #[error("{op:?} is not a valid comparison on {target}")]
     InvalidOpForTarget { op: CompareOp, target: String },
     #[error("{op:?} on {target} requires text values")]
@@ -157,9 +160,9 @@ pub enum PredicateError {
     NotYetEvaluable { construct: String },
 }
 
-/// The intrinsic's comparison class — which operators and value types
+/// The builtin's comparison class — which operators and value types
 /// are structurally valid on it (full grammar, both stages).
-enum IntrinsicClass {
+enum BuiltinClass {
     /// String-valued (free-form names/messages AND the closed kind/
     /// status label sets — regex over labels is valid grammar, pin 26A):
     /// `= != =~ !~` with text values.
@@ -170,13 +173,13 @@ enum IntrinsicClass {
     Id,
 }
 
-fn intrinsic_class(i: TraceIntrinsic) -> IntrinsicClass {
-    use TraceIntrinsic::*;
+fn builtin_class(i: BuiltinField) -> BuiltinClass {
+    use BuiltinField::*;
     match i {
         Name | Kind | Status | StatusMessage | InstrumentationName | InstrumentationVersion
-        | EventName | RootName | RootServiceName => IntrinsicClass::Text,
-        Duration | TraceDuration | EventTimeSinceStart => IntrinsicClass::Nanos,
-        SpanId | ParentSpanId | TraceId | LinkSpanId | LinkTraceId => IntrinsicClass::Id,
+        | EventName | RootName | RootServiceName => BuiltinClass::Text,
+        Duration | TraceDuration | EventTimeSinceStart => BuiltinClass::Nanos,
+        SpanId | ParentSpanId | TraceId | LinkSpanId | LinkTraceId => BuiltinClass::Id,
     }
 }
 
@@ -218,12 +221,12 @@ impl Condition {
         }
 
         match &self.target {
-            PredicateTarget::Attribute(TagScope::Intrinsic, key) => {
-                return Err(PredicateError::AttributeInIntrinsicScope { key: key.clone() });
+            PredicateTarget::Attribute(AttributeOwner::Builtin, key) => {
+                return Err(PredicateError::AttributeUnderBuiltinOwner { key: key.clone() });
             }
             // Attributes take every op; regex needs text patterns,
             // ordering needs numbers (dictionary-numeric, stage B).
-            PredicateTarget::Attribute(..) | PredicateTarget::UnscopedAttribute(_) => {
+            PredicateTarget::Attribute(..) => {
                 if self.op.is_regex() && !all_text {
                     return Err(PredicateError::TextValueRequired { op: self.op, target });
                 }
@@ -231,8 +234,8 @@ impl Condition {
                     return Err(PredicateError::NumericValueRequired { op: self.op, target });
                 }
             }
-            PredicateTarget::Intrinsic(i) => match intrinsic_class(*i) {
-                IntrinsicClass::Text => {
+            PredicateTarget::Builtin(i) => match builtin_class(*i) {
+                BuiltinClass::Text => {
                     if self.op.is_ordering() {
                         return Err(PredicateError::InvalidOpForTarget { op: self.op, target });
                     }
@@ -240,7 +243,7 @@ impl Condition {
                         return Err(PredicateError::TextValueRequired { op: self.op, target });
                     }
                 }
-                IntrinsicClass::Id => {
+                BuiltinClass::Id => {
                     if !matches!(self.op, CompareOp::Eq | CompareOp::NotEq) {
                         return Err(PredicateError::InvalidOpForTarget { op: self.op, target });
                     }
@@ -250,7 +253,7 @@ impl Condition {
                     // Ids are fixed-width hex text (W3C rendering):
                     // 16 chars for span ids, 32 for trace ids.
                     let width = match i {
-                        TraceIntrinsic::TraceId | TraceIntrinsic::LinkTraceId => 32,
+                        BuiltinField::TraceId | BuiltinField::LinkTraceId => 32,
                         _ => 16,
                     };
                     for value in &self.values {
@@ -268,7 +271,7 @@ impl Condition {
                         }
                     }
                 }
-                IntrinsicClass::Nanos => {
+                BuiltinClass::Nanos => {
                     if self.op.is_regex() {
                         return Err(PredicateError::InvalidOpForTarget { op: self.op, target });
                     }
@@ -296,34 +299,36 @@ impl Condition {
     /// Whether this build evaluates this condition — see the module
     /// docs. `None` = evaluable; `Some(construct)` names the
     /// not-yet-evaluable construct. After stage-B step 6 the evaluable
-    /// set covers negation, the unscoped disjunction, and
+    /// set covers negation, the any-owner disjunction, and
     /// dictionary-numeric comparisons; the remaining gaps are the
     /// colon-set ids, event/link structural refine, and the
-    /// trace-level intrinsics (steps 7-9).
+    /// trace-level builtins (steps 7-9).
     fn unevaluable_construct(&self) -> Option<String> {
-        use TraceIntrinsic::*;
+        use BuiltinField::*;
         match (&self.target, self.op) {
             // Duration: bounds, equality (any arity — an interval set),
             // and negated equality all evaluate on the DURN column.
-            (PredicateTarget::Intrinsic(Duration), op)
+            (PredicateTarget::Builtin(Duration), op)
                 if op.is_ordering() || matches!(op, CompareOp::Eq | CompareOp::NotEq) =>
             {
                 None
             }
-            // Attribute scopes (incl. the unscoped disjunction): every
+            // Attribute owners (incl. the any-owner disjunction): every
             // op — tokens for text, the dictionary-numeric path for
             // numbers, presence ∩ complement for negation.
             (
                 PredicateTarget::Attribute(
-                    TagScope::Resource | TagScope::Span | TagScope::Instrumentation,
+                    AttributeOwner::Resource
+                    | AttributeOwner::Span
+                    | AttributeOwner::Instrumentation
+                    | AttributeOwner::Any,
                     _,
-                )
-                | PredicateTarget::UnscopedAttribute(_),
+                ),
                 _,
             ) => None,
-            // Dictionary-backed intrinsics except event:name (refine).
+            // Dictionary-backed builtins except event:name (refine).
             (
-                PredicateTarget::Intrinsic(
+                PredicateTarget::Builtin(
                     Name | Kind | Status | StatusMessage | InstrumentationName
                     | InstrumentationVersion,
                 ),
@@ -335,22 +340,22 @@ impl Condition {
             // (the negated subgroup semantics are an open design
             // question for the refine step).
             (
-                PredicateTarget::Intrinsic(SpanId | ParentSpanId | TraceId),
+                PredicateTarget::Builtin(SpanId | ParentSpanId | TraceId),
                 CompareOp::Eq | CompareOp::NotEq,
             ) => None,
             (
-                PredicateTarget::Intrinsic(LinkSpanId | LinkTraceId),
+                PredicateTarget::Builtin(LinkSpanId | LinkTraceId),
                 CompareOp::Eq,
             ) => None,
-            (PredicateTarget::Intrinsic(LinkSpanId | LinkTraceId), CompareOp::NotEq) => {
+            (PredicateTarget::Builtin(LinkSpanId | LinkTraceId), CompareOp::NotEq) => {
                 Some(format!("negated {} (subgroup semantics, refine step)", self.target))
             }
             // event:name POSITIVE forms evaluate through the event
             // subgroup (any number of conditions — a single event must
             // satisfy them all); negated forms wait for the
             // subgroup-semantics decision.
-            (PredicateTarget::Intrinsic(EventName), CompareOp::Eq | CompareOp::Regex) => None,
-            (PredicateTarget::Intrinsic(EventName), CompareOp::NotEq | CompareOp::NotRegex) => {
+            (PredicateTarget::Builtin(EventName), CompareOp::Eq | CompareOp::Regex) => None,
+            (PredicateTarget::Builtin(EventName), CompareOp::NotEq | CompareOp::NotRegex) => {
                 Some(format!("negated {} (subgroup semantics, refine step)", self.target))
             }
             // Event/link-scoped attributes: POSITIVE forms evaluate
@@ -358,32 +363,32 @@ impl Condition {
             // recorded open question (flat negation vs single-item
             // subgroup semantics).
             (
-                PredicateTarget::Attribute(TagScope::Event | TagScope::Link, _),
+                PredicateTarget::Attribute(AttributeOwner::Event | AttributeOwner::Link, _),
                 CompareOp::Eq | CompareOp::Regex | CompareOp::Gt | CompareOp::Lt
                 | CompareOp::Gte | CompareOp::Lte,
             ) => None,
-            (PredicateTarget::Attribute(TagScope::Event | TagScope::Link, _), _) => {
+            (PredicateTarget::Attribute(AttributeOwner::Event | AttributeOwner::Link, _), _) => {
                 Some(format!("negated {} (subgroup semantics, refine step)", self.target))
             }
             // event:timeSinceStart computes in the refine; != would be a
             // negated per-event condition — deferred with the fork for a
             // uniform rule.
-            (PredicateTarget::Intrinsic(EventTimeSinceStart), op)
+            (PredicateTarget::Builtin(EventTimeSinceStart), op)
                 if op.is_ordering() || op == CompareOp::Eq =>
             {
                 None
             }
-            (PredicateTarget::Intrinsic(EventTimeSinceStart), _) => {
+            (PredicateTarget::Builtin(EventTimeSinceStart), _) => {
                 Some(format!("negated {} (subgroup semantics, refine step)", self.target))
             }
-            // Trace-level intrinsics evaluate post-assembly (tri-state,
+            // Trace-level builtins evaluate post-assembly (tri-state,
             // decision 15). Values are single-valued per trace, so
             // negation carries no subgroup fork.
             (
-                PredicateTarget::Intrinsic(RootName | RootServiceName),
+                PredicateTarget::Builtin(RootName | RootServiceName),
                 CompareOp::Eq | CompareOp::NotEq | CompareOp::Regex | CompareOp::NotRegex,
             ) => None,
-            (PredicateTarget::Intrinsic(TraceDuration), op)
+            (PredicateTarget::Builtin(TraceDuration), op)
                 if op.is_ordering() || matches!(op, CompareOp::Eq | CompareOp::NotEq) =>
             {
                 None
@@ -416,17 +421,17 @@ impl Predicate {
     }
 
     /// Split into `(span_local, trace_level)` (pin R3-2): trace-level
-    /// intrinsics (`rootName`, `rootServiceName`, `traceDuration`)
+    /// builtins (`RootName`, `RootServiceName`, `TraceDuration`)
     /// evaluate post-assembly as tri-state (decision 15); EVERYTHING the
     /// span-side evaluator and the file plans see — and everything
-    /// `matched_count`/`spss` are defined over — is the span-local part.
+    /// `matched_count`/`spans_per_trace` are defined over — is the span-local part.
     pub(crate) fn partition(&self) -> (Predicate, Predicate) {
-        use TraceIntrinsic::*;
+        use BuiltinField::*;
         let (trace_level, span_local): (Vec<Condition>, Vec<Condition>) =
             self.conditions.iter().cloned().partition(|c| {
                 matches!(
                     c.target,
-                    PredicateTarget::Intrinsic(RootName | RootServiceName | TraceDuration)
+                    PredicateTarget::Builtin(RootName | RootServiceName | TraceDuration)
                 )
             });
         (
@@ -441,7 +446,7 @@ impl Predicate {
 
     /// Strip `trace:id` conditions out of the predicate — they are
     /// neither span-local (a `TraceSpan` carries no trace id) nor
-    /// trace-level intrinsics; they constrain the ENGINE's candidate
+    /// trace-level builtins; they constrain the ENGINE's candidate
     /// set: `=` values intersect into a PIN set (phase-1 discovery is
     /// skipped — pins go straight to assembly), `!=` values union into
     /// an exclusion filter at pool admission. Run BEFORE the R3-2
@@ -454,7 +459,7 @@ impl Predicate {
         for condition in &self.conditions {
             if !matches!(
                 condition.target,
-                PredicateTarget::Intrinsic(TraceIntrinsic::TraceId)
+                PredicateTarget::Builtin(BuiltinField::TraceId)
             ) {
                 rest.push(condition.clone());
                 continue;
@@ -496,7 +501,7 @@ impl Predicate {
         let mut terms = Vec::with_capacity(self.conditions.len());
         let mut bound: Option<(Option<i64>, Option<i64>)> = None;
         // Event/link-scoped conditions collect into ONE subgroup each
-        // (pinned spanset semantics: a single event/link satisfies the
+        // (pinned span-group semantics: a single event/link satisfies the
         // whole scoped conjunction), appended after the span terms.
         let mut event_group: Vec<sfst::GroupCondition> = Vec::new();
         let mut link_group: Vec<sfst::GroupCondition> = Vec::new();
@@ -512,13 +517,13 @@ impl Predicate {
                     .collect()
             };
             match (&condition.target, condition.op) {
-                (PredicateTarget::Intrinsic(TraceIntrinsic::Duration), CompareOp::NotEq) => {
+                (PredicateTarget::Builtin(BuiltinField::Duration), CompareOp::NotEq) => {
                     terms.push(PlanTerm::Duration {
                         intervals: integers().into_iter().map(|v| (Some(v), Some(v))).collect(),
                         negated: true,
                     });
                 }
-                (PredicateTarget::Intrinsic(TraceIntrinsic::Duration), CompareOp::Eq)
+                (PredicateTarget::Builtin(BuiltinField::Duration), CompareOp::Eq)
                     if condition.values.len() > 1 =>
                 {
                     terms.push(PlanTerm::Duration {
@@ -526,7 +531,7 @@ impl Predicate {
                         negated: false,
                     });
                 }
-                (PredicateTarget::Intrinsic(TraceIntrinsic::Duration), op) => {
+                (PredicateTarget::Builtin(BuiltinField::Duration), op) => {
                     let PredicateValue::Integer(n) = condition.values[0] else {
                         unreachable!("validated: duration values are integers");
                     };
@@ -543,14 +548,14 @@ impl Predicate {
                     });
                 }
                 (
-                    PredicateTarget::Intrinsic(
-                        i @ (TraceIntrinsic::SpanId | TraceIntrinsic::ParentSpanId),
+                    PredicateTarget::Builtin(
+                        i @ (BuiltinField::SpanId | BuiltinField::ParentSpanId),
                     ),
                     op,
                 ) => {
                     terms.push(PlanTerm::IdColumn {
                         column: match i {
-                            TraceIntrinsic::SpanId => sfst::IdColumnKind::SpanId,
+                            BuiltinField::SpanId => sfst::IdColumnKind::SpanId,
                             _ => sfst::IdColumnKind::ParentSpanId,
                         },
                         ids: hex_span_ids(&condition.values),
@@ -558,7 +563,7 @@ impl Predicate {
                     });
                 }
                 (
-                    PredicateTarget::Intrinsic(TraceIntrinsic::LinkSpanId),
+                    PredicateTarget::Builtin(BuiltinField::LinkSpanId),
                     CompareOp::Eq,
                 ) => {
                     link_group.push(sfst::GroupCondition::LinkSpanIds(hex_span_ids(
@@ -566,7 +571,7 @@ impl Predicate {
                     )));
                 }
                 (
-                    PredicateTarget::Intrinsic(TraceIntrinsic::LinkTraceId),
+                    PredicateTarget::Builtin(BuiltinField::LinkTraceId),
                     CompareOp::Eq,
                 ) => {
                     link_group.push(sfst::GroupCondition::LinkTraceIds(
@@ -582,16 +587,16 @@ impl Predicate {
                             .collect(),
                     ));
                 }
-                (PredicateTarget::Intrinsic(TraceIntrinsic::EventName), op) => {
+                (PredicateTarget::Builtin(BuiltinField::EventName), op) => {
                     event_group.push(sfst::GroupCondition::Field {
-                        field: TraceIntrinsic::EventName
+                        field: BuiltinField::EventName
                             .dictionary_field()
                             .expect("dictionary-backed")
                             .to_string(),
                         matcher: condition_matcher(op, &condition.values),
                     });
                 }
-                (PredicateTarget::Intrinsic(TraceIntrinsic::EventTimeSinceStart), op) => {
+                (PredicateTarget::Builtin(BuiltinField::EventTimeSinceStart), op) => {
                     let intervals: Vec<(Option<i64>, Option<i64>)> = condition
                         .values
                         .iter()
@@ -604,12 +609,12 @@ impl Predicate {
                         .collect();
                     event_group.push(sfst::GroupCondition::TimeSinceStart { intervals });
                 }
-                (PredicateTarget::Attribute(scope @ (TagScope::Event | TagScope::Link), key), op) => {
+                (PredicateTarget::Attribute(scope @ (AttributeOwner::Event | AttributeOwner::Link), key), op) => {
                     let field = format!(
                         "{}{key}",
                         scope.attribute_prefix().expect("attribute scope")
                     );
-                    let group = if *scope == TagScope::Event {
+                    let group = if *scope == AttributeOwner::Event {
                         &mut event_group
                     } else {
                         &mut link_group
@@ -619,34 +624,34 @@ impl Predicate {
                         matcher: condition_matcher(op, &condition.values),
                     });
                 }
-                (PredicateTarget::Intrinsic(TraceIntrinsic::TraceId), _) => {
+                (PredicateTarget::Builtin(BuiltinField::TraceId), _) => {
                     unreachable!("trace:id conditions are split out before lowering")
                 }
                 (target, op) => {
                     let fields: Vec<String> = match target {
-                        PredicateTarget::Attribute(scope, key) => {
-                            let prefix = scope
-                                .attribute_prefix()
-                                .expect("validated: not the Intrinsic scope");
-                            vec![format!("{prefix}{key}")]
-                        }
-                        // The unscoped attribute is the pinned
+                        // The any-owner attribute is the pinned
                         // resource ∪ span disjunction.
-                        PredicateTarget::UnscopedAttribute(key) => vec![
+                        PredicateTarget::Attribute(AttributeOwner::Any, key) => vec![
                             format!(
                                 "{}{key}",
-                                TagScope::Resource
+                                AttributeOwner::Resource
                                     .attribute_prefix()
-                                    .expect("attribute scope")
+                                    .expect("attribute owner")
                             ),
                             format!(
                                 "{}{key}",
-                                TagScope::Span.attribute_prefix().expect("attribute scope")
+                                AttributeOwner::Span.attribute_prefix().expect("attribute owner")
                             ),
                         ],
-                        PredicateTarget::Intrinsic(i) => vec![
+                        PredicateTarget::Attribute(owner, key) => {
+                            let prefix = owner
+                                .attribute_prefix()
+                                .expect("validated: not the Builtin owner");
+                            vec![format!("{prefix}{key}")]
+                        }
+                        PredicateTarget::Builtin(i) => vec![
                             i.dictionary_field()
-                                .expect("evaluable intrinsics are dictionary-backed")
+                                .expect("evaluable builtins are dictionary-backed")
                                 .to_string(),
                         ],
                     };
@@ -849,7 +854,7 @@ enum EvalGroupCondition {
 /// The span-side predicate evaluator — the single source of truth for
 /// what a span-local predicate MEANS (pin R2-9): the tail's phase 1
 /// evaluates it per decoded span, phase 2 re-evaluates it per retained
-/// canonical span, and `matched_count`/`spss` are defined by it.
+/// canonical span, and `matched_count`/`spans_per_trace` are defined by it.
 pub(crate) struct EvalPredicate {
     terms: Vec<EvalTerm>,
 }
@@ -910,7 +915,7 @@ impl EvalPredicate {
                 negated,
             } => {
                 // Values gathered across the term's fields (several for
-                // the unscoped disjunction; multi-valued fields yield
+                // the any-owner disjunction; multi-valued fields yield
                 // several entries; event/link names and attributes live
                 // in the subgroup terms, never here). Negation is the
                 // pinned presence ∩ complement: present with NO matching
@@ -1064,19 +1069,19 @@ impl TraceLevelEval {
                 let negated =
                     matches!(condition.op, CompareOp::NotEq | CompareOp::NotRegex);
                 match &condition.target {
-                    PredicateTarget::Intrinsic(TraceIntrinsic::RootName) => {
+                    PredicateTarget::Builtin(BuiltinField::RootName) => {
                         TraceLevelCondition::RootName {
                             matcher: eval_matcher(&condition_matcher(condition.op, &condition.values)),
                             negated,
                         }
                     }
-                    PredicateTarget::Intrinsic(TraceIntrinsic::RootServiceName) => {
+                    PredicateTarget::Builtin(BuiltinField::RootServiceName) => {
                         TraceLevelCondition::RootService {
                             matcher: eval_matcher(&condition_matcher(condition.op, &condition.values)),
                             negated,
                         }
                     }
-                    PredicateTarget::Intrinsic(TraceIntrinsic::TraceDuration) => {
+                    PredicateTarget::Builtin(BuiltinField::TraceDuration) => {
                         let intervals = condition
                             .values
                             .iter()
@@ -1158,7 +1163,7 @@ mod tests {
     }
 
     fn span_attr(key: &str) -> PredicateTarget {
-        PredicateTarget::Attribute(TagScope::Span, key.to_string())
+        PredicateTarget::Attribute(AttributeOwner::Span, key.to_string())
     }
 
     /// Structural validation: the full-grammar rules, independent of the
@@ -1176,17 +1181,17 @@ mod tests {
             vec![PredicateValue::Float(1.5)],
         ));
         ok(cond(
-            PredicateTarget::UnscopedAttribute("x".into()),
+            PredicateTarget::Attribute(AttributeOwner::Any, "x".into()),
             CompareOp::Regex,
             vec![text("a|b")],
         ));
         ok(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::TraceDuration),
+            PredicateTarget::Builtin(BuiltinField::TraceDuration),
             CompareOp::Gte,
             vec![PredicateValue::Integer(5)],
         ));
         ok(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::SpanId),
+            PredicateTarget::Builtin(BuiltinField::SpanId),
             CompareOp::Eq,
             vec![text("00f067aa0ba902b7")],
         ));
@@ -1205,15 +1210,15 @@ mod tests {
         ));
         assert!(matches!(
             err(cond(
-                PredicateTarget::Attribute(TagScope::Intrinsic, "x".into()),
+                PredicateTarget::Attribute(AttributeOwner::Builtin, "x".into()),
                 CompareOp::Eq,
                 vec![text("v")],
             )),
-            PredicateError::AttributeInIntrinsicScope { .. }
+            PredicateError::AttributeUnderBuiltinOwner { .. }
         ));
         assert!(matches!(
             err(cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::Name),
+                PredicateTarget::Builtin(BuiltinField::Name),
                 CompareOp::Gt,
                 vec![text("v")],
             )),
@@ -1221,13 +1226,13 @@ mod tests {
         ));
         // Regex over the kind/status LABEL sets is valid grammar (26A).
         ok(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::Kind),
+            PredicateTarget::Builtin(BuiltinField::Kind),
             CompareOp::Regex,
             vec![text("SER.*")],
         ));
         assert!(matches!(
             err(cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::Kind),
+                PredicateTarget::Builtin(BuiltinField::Kind),
                 CompareOp::Gt,
                 vec![text("SERVER")],
             )),
@@ -1235,7 +1240,7 @@ mod tests {
         ));
         assert!(matches!(
             err(cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                PredicateTarget::Builtin(BuiltinField::Duration),
                 CompareOp::Gt,
                 vec![text("100ms")],
             )),
@@ -1255,7 +1260,7 @@ mod tests {
         ));
         assert!(matches!(
             err(cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::Status),
+                PredicateTarget::Builtin(BuiltinField::Status),
                 CompareOp::Eq,
                 vec![PredicateValue::Integer(2)],
             )),
@@ -1277,27 +1282,27 @@ mod tests {
             }
         };
 
-        // Attribute scopes and the unscoped disjunction: every op.
+        // Attribute owners and the any-owner disjunction: every op.
         evaluable(cond(span_attr("x"), CompareOp::Eq, vec![text("a"), text("b")]));
         evaluable(cond(span_attr("x"), CompareOp::NotEq, vec![text("v")]));
         evaluable(cond(span_attr("x"), CompareOp::NotRegex, vec![text("v.*")]));
         evaluable(cond(
-            PredicateTarget::Attribute(TagScope::Resource, "service.name".into()),
+            PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into()),
             CompareOp::Regex,
             vec![text("svc-.*")],
         ));
         evaluable(cond(
-            PredicateTarget::Attribute(TagScope::Instrumentation, "lib".into()),
+            PredicateTarget::Attribute(AttributeOwner::Instrumentation, "lib".into()),
             CompareOp::Eq,
             vec![text("v")],
         ));
         evaluable(cond(
-            PredicateTarget::UnscopedAttribute("x".into()),
+            PredicateTarget::Attribute(AttributeOwner::Any, "x".into()),
             CompareOp::Eq,
             vec![text("v")],
         ));
         evaluable(cond(
-            PredicateTarget::UnscopedAttribute("x".into()),
+            PredicateTarget::Attribute(AttributeOwner::Any, "x".into()),
             CompareOp::NotRegex,
             vec![text("v.*")],
         ));
@@ -1308,18 +1313,18 @@ mod tests {
             CompareOp::Eq,
             vec![PredicateValue::Integer(5), PredicateValue::Float(1.5)],
         ));
-        // Dictionary-backed intrinsics except event:name: all four ops.
+        // Dictionary-backed builtins except event:name: all four ops.
         for i in [
-            TraceIntrinsic::Name,
-            TraceIntrinsic::Kind,
-            TraceIntrinsic::Status,
-            TraceIntrinsic::StatusMessage,
-            TraceIntrinsic::InstrumentationName,
-            TraceIntrinsic::InstrumentationVersion,
+            BuiltinField::Name,
+            BuiltinField::Kind,
+            BuiltinField::Status,
+            BuiltinField::StatusMessage,
+            BuiltinField::InstrumentationName,
+            BuiltinField::InstrumentationVersion,
         ] {
             for op in [CompareOp::Eq, CompareOp::Regex, CompareOp::NotEq, CompareOp::NotRegex] {
                 evaluable(cond(
-                    PredicateTarget::Intrinsic(i),
+                    PredicateTarget::Builtin(i),
                     op,
                     vec![text("v")],
                 ));
@@ -1328,47 +1333,47 @@ mod tests {
         // Duration: bounds, multi-value equality, negated equality.
         for op in [CompareOp::Gt, CompareOp::Lt, CompareOp::Gte, CompareOp::Lte, CompareOp::Eq] {
             evaluable(cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                PredicateTarget::Builtin(BuiltinField::Duration),
                 op,
                 vec![PredicateValue::Integer(100)],
             ));
         }
         evaluable(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+            PredicateTarget::Builtin(BuiltinField::Duration),
             CompareOp::Eq,
             vec![PredicateValue::Integer(1), PredicateValue::Integer(2)],
         ));
         evaluable(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+            PredicateTarget::Builtin(BuiltinField::Duration),
             CompareOp::NotEq,
             vec![PredicateValue::Integer(3)],
         ));
 
         // Subgroup positives are evaluable through the refine…
         evaluable(cond(
-            PredicateTarget::Attribute(TagScope::Event, "msg".into()),
+            PredicateTarget::Attribute(AttributeOwner::Event, "msg".into()),
             CompareOp::Eq,
             vec![text("v")],
         ));
         evaluable(cond(
-            PredicateTarget::Attribute(TagScope::Link, "rel".into()),
+            PredicateTarget::Attribute(AttributeOwner::Link, "rel".into()),
             CompareOp::Regex,
             vec![text("v.*")],
         ));
         evaluable(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::EventTimeSinceStart),
+            PredicateTarget::Builtin(BuiltinField::EventTimeSinceStart),
             CompareOp::Gt,
             vec![PredicateValue::Integer(5)],
         ));
         // …their NEGATED forms sit on the recorded open question.
         assert!(rejected(cond(
-            PredicateTarget::Attribute(TagScope::Event, "msg".into()),
+            PredicateTarget::Attribute(AttributeOwner::Event, "msg".into()),
             CompareOp::NotEq,
             vec![text("v")],
         ))
         .contains("subgroup"));
         assert!(rejected(cond(
-            PredicateTarget::Attribute(TagScope::Link, "rel".into()),
+            PredicateTarget::Attribute(AttributeOwner::Link, "rel".into()),
             CompareOp::NotEq,
             vec![text("v")],
         ))
@@ -1377,12 +1382,12 @@ mod tests {
         // ids and event:name positive-only (the negated subgroup
         // semantics are the recorded open question).
         for i in [
-            TraceIntrinsic::SpanId,
-            TraceIntrinsic::ParentSpanId,
+            BuiltinField::SpanId,
+            BuiltinField::ParentSpanId,
         ] {
             for op in [CompareOp::Eq, CompareOp::NotEq] {
                 evaluable(cond(
-                    PredicateTarget::Intrinsic(i),
+                    PredicateTarget::Builtin(i),
                     op,
                     vec![text("00f067aa0ba902b7")],
                 ));
@@ -1390,39 +1395,39 @@ mod tests {
         }
         for op in [CompareOp::Eq, CompareOp::NotEq] {
             evaluable(cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::TraceId),
+                PredicateTarget::Builtin(BuiltinField::TraceId),
                 op,
                 vec![text("4bf92f3577b34da6a3ce929d0e0e4736")],
             ));
         }
         evaluable(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::LinkSpanId),
+            PredicateTarget::Builtin(BuiltinField::LinkSpanId),
             CompareOp::Eq,
             vec![text("00f067aa0ba902b7")],
         ));
         evaluable(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::LinkTraceId),
+            PredicateTarget::Builtin(BuiltinField::LinkTraceId),
             CompareOp::Eq,
             vec![text("4bf92f3577b34da6a3ce929d0e0e4736")],
         ));
         assert!(rejected(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::LinkSpanId),
+            PredicateTarget::Builtin(BuiltinField::LinkSpanId),
             CompareOp::NotEq,
             vec![text("00f067aa0ba902b7")],
         ))
         .contains("subgroup"));
         evaluable(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::EventName),
+            PredicateTarget::Builtin(BuiltinField::EventName),
             CompareOp::Eq,
             vec![text("v")],
         ));
         evaluable(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::EventName),
+            PredicateTarget::Builtin(BuiltinField::EventName),
             CompareOp::Regex,
             vec![text("v.*")],
         ));
         assert!(rejected(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::EventName),
+            PredicateTarget::Builtin(BuiltinField::EventName),
             CompareOp::NotEq,
             vec![text("v")],
         ))
@@ -1433,12 +1438,12 @@ mod tests {
         let two = Predicate {
             conditions: vec![
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::EventName),
+                    PredicateTarget::Builtin(BuiltinField::EventName),
                     CompareOp::Eq,
                     vec![text("a")],
                 ),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::EventName),
+                    PredicateTarget::Builtin(BuiltinField::EventName),
                     CompareOp::Eq,
                     vec![text("b")],
                 ),
@@ -1449,7 +1454,7 @@ mod tests {
         assert!(matches!(
             (Predicate {
                 conditions: vec![cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::SpanId),
+                    PredicateTarget::Builtin(BuiltinField::SpanId),
                     CompareOp::Eq,
                     vec![text("not-hex")],
                 )]
@@ -1457,27 +1462,27 @@ mod tests {
             .validate(),
             Err(PredicateError::InvalidIdValue { width: 16, .. })
         ));
-        // Trace-level intrinsics are evaluable post-assembly.
+        // Trace-level builtins are evaluable post-assembly.
         for op in [CompareOp::Eq, CompareOp::NotEq, CompareOp::Regex, CompareOp::NotRegex] {
             evaluable(cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::RootServiceName),
+                PredicateTarget::Builtin(BuiltinField::RootServiceName),
                 op,
                 vec![text("v")],
             ));
         }
         evaluable(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::TraceDuration),
+            PredicateTarget::Builtin(BuiltinField::TraceDuration),
             CompareOp::Gt,
             vec![PredicateValue::Integer(5)],
         ));
         evaluable(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::TraceDuration),
+            PredicateTarget::Builtin(BuiltinField::TraceDuration),
             CompareOp::NotEq,
             vec![PredicateValue::Integer(5)],
         ));
     }
 
-    /// Partition (R3-2): trace-level intrinsics split out; everything
+    /// Partition (R3-2): trace-level builtins split out; everything
     /// else stays span-local, order preserved within each part.
     #[test]
     fn partition_splits_trace_level_conditions() {
@@ -1485,17 +1490,17 @@ mod tests {
             conditions: vec![
                 cond(span_attr("x"), CompareOp::Eq, vec![text("v")]),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::TraceDuration),
+                    PredicateTarget::Builtin(BuiltinField::TraceDuration),
                     CompareOp::Gt,
                     vec![PredicateValue::Integer(5)],
                 ),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::Gt,
                     vec![PredicateValue::Integer(5)],
                 ),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::RootName),
+                    PredicateTarget::Builtin(BuiltinField::RootName),
                     CompareOp::Eq,
                     vec![text("r")],
                 ),
@@ -1506,17 +1511,17 @@ mod tests {
         assert_eq!(trace_level.conditions.len(), 2);
         assert!(span_local.conditions.iter().all(|c| !matches!(
             c.target,
-            PredicateTarget::Intrinsic(
-                TraceIntrinsic::RootName
-                    | TraceIntrinsic::RootServiceName
-                    | TraceIntrinsic::TraceDuration
+            PredicateTarget::Builtin(
+                BuiltinField::RootName
+                    | BuiltinField::RootServiceName
+                    | BuiltinField::TraceDuration
             )
         )));
         // All-trace-level → span-local is the empty form (C-4: phase-1
         // candidates come from `All` over the window).
         let only_trace = Predicate {
             conditions: vec![cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::TraceDuration),
+                PredicateTarget::Builtin(BuiltinField::TraceDuration),
                 CompareOp::Gt,
                 vec![PredicateValue::Integer(5)],
             )],
@@ -1532,23 +1537,23 @@ mod tests {
         let p = Predicate {
             conditions: vec![
                 cond(
-                    PredicateTarget::Attribute(TagScope::Resource, "service.name".into()),
+                    PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into()),
                     CompareOp::Eq,
                     vec![text("svc")],
                 ),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Status),
+                    PredicateTarget::Builtin(BuiltinField::Status),
                     CompareOp::Eq,
                     vec![text("ERROR")],
                 ),
                 cond(span_attr("http.method"), CompareOp::Regex, vec![text("GET|PUT")]),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::Gt,
                     vec![PredicateValue::Integer(100)],
                 ),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::Lte,
                     vec![PredicateValue::Integer(500)],
                 ),
@@ -1574,12 +1579,12 @@ mod tests {
         let contradictory = Predicate {
             conditions: vec![
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::Gt,
                     vec![PredicateValue::Integer(500)],
                 ),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::Lt,
                     vec![PredicateValue::Integer(100)],
                 ),
@@ -1589,13 +1594,13 @@ mod tests {
             contradictory.to_trace_plan().terms,
             vec![PlanTerm::duration(Some(501), Some(99))]
         );
-        // Stage-B lowerings: negation, unscoped disjunction, numerics,
+        // Stage-B lowerings: negation, any-owner disjunction, numerics,
         // multi-value and negated duration equality.
         let stage_b = Predicate {
             conditions: vec![
                 cond(span_attr("x"), CompareOp::NotEq, vec![text("a"), text("b")]),
                 cond(
-                    PredicateTarget::UnscopedAttribute("env".into()),
+                    PredicateTarget::Attribute(AttributeOwner::Any, "env".into()),
                     CompareOp::Eq,
                     vec![text("prod")],
                 ),
@@ -1610,12 +1615,12 @@ mod tests {
                     vec![PredicateValue::Float(0.5), PredicateValue::Integer(2)],
                 ),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::Eq,
                     vec![PredicateValue::Integer(10), PredicateValue::Integer(20)],
                 ),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::NotEq,
                     vec![PredicateValue::Integer(30)],
                 ),
@@ -1690,8 +1695,8 @@ mod tests {
                 ("name".into(), "GET /".into()),
                 ("kind".into(), "SERVER".into()),
                 ("status_code".into(), "ERROR".into()),
-                ("attributes.tag".into(), "a".into()),
-                ("attributes.tag".into(), "b".into()),
+                ("attributes.team".into(), "a".into()),
+                ("attributes.team".into(), "b".into()),
             ],
             events: vec![],
             links: vec![],
@@ -1703,7 +1708,7 @@ mod tests {
         assert!(matches(vec![], None));
         assert!(matches(
             vec![cond(
-                PredicateTarget::Attribute(TagScope::Resource, "service.name".into()),
+                PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into()),
                 CompareOp::Eq,
                 vec![text("svc")],
             )],
@@ -1711,17 +1716,17 @@ mod tests {
         ));
         // Multi-valued field: ANY value satisfies `=`.
         assert!(matches(
-            vec![cond(span_attr("tag"), CompareOp::Eq, vec![text("b")])],
+            vec![cond(span_attr("team"), CompareOp::Eq, vec![text("b")])],
             None
         ));
         assert!(!matches(
-            vec![cond(span_attr("tag"), CompareOp::Eq, vec![text("c")])],
+            vec![cond(span_attr("team"), CompareOp::Eq, vec![text("c")])],
             None
         ));
         // Regex is full-value anchored ("GET" alone must not match "GET /").
         assert!(!matches(
             vec![cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::Name),
+                PredicateTarget::Builtin(BuiltinField::Name),
                 CompareOp::Regex,
                 vec![text("GET")],
             )],
@@ -1729,7 +1734,7 @@ mod tests {
         ));
         assert!(matches(
             vec![cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::Name),
+                PredicateTarget::Builtin(BuiltinField::Name),
                 CompareOp::Regex,
                 vec![text("GET.*")],
             )],
@@ -1744,17 +1749,17 @@ mod tests {
         assert!(matches(
             vec![
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Status),
+                    PredicateTarget::Builtin(BuiltinField::Status),
                     CompareOp::Eq,
                     vec![text("ERROR")],
                 ),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::Gt,
                     vec![PredicateValue::Integer(249)],
                 ),
                 cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::Lte,
                     vec![PredicateValue::Integer(250)],
                 ),
@@ -1763,7 +1768,7 @@ mod tests {
         ));
         assert!(!matches(
             vec![cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                PredicateTarget::Builtin(BuiltinField::Duration),
                 CompareOp::Gt,
                 vec![PredicateValue::Integer(250)],
             )],
@@ -1777,7 +1782,7 @@ mod tests {
             &extreme,
             &Predicate {
                 conditions: vec![cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::Gt,
                     vec![PredicateValue::Integer(i64::MAX)],
                 )],
@@ -1789,7 +1794,7 @@ mod tests {
             &extreme,
             &Predicate {
                 conditions: vec![cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    PredicateTarget::Builtin(BuiltinField::Duration),
                     CompareOp::Lt,
                     vec![PredicateValue::Integer(i64::MIN)],
                 )],
@@ -1804,12 +1809,12 @@ mod tests {
 
         // ── Stage B: negation — present-and-no-value-matches ────────
         assert!(matches(
-            vec![cond(span_attr("tag"), CompareOp::NotEq, vec![text("c")])],
+            vec![cond(span_attr("team"), CompareOp::NotEq, vec![text("c")])],
             None
         ));
         // A multi-valued field with ONE matching value fails `!=`.
         assert!(!matches(
-            vec![cond(span_attr("tag"), CompareOp::NotEq, vec![text("a")])],
+            vec![cond(span_attr("team"), CompareOp::NotEq, vec![text("a")])],
             None
         ));
         // An ABSENT attribute never satisfies a negated comparison.
@@ -1824,16 +1829,16 @@ mod tests {
         // Negated regex.
         assert!(matches(
             vec![cond(
-                PredicateTarget::Intrinsic(TraceIntrinsic::Name),
+                PredicateTarget::Builtin(BuiltinField::Name),
                 CompareOp::NotRegex,
                 vec![text("POST.*")],
             )],
             None
         ));
-        // ── Stage B: the unscoped disjunction gathers both scopes ───
+        // ── Stage B: the any-owner disjunction gathers both owners ──
         assert!(matches(
             vec![cond(
-                PredicateTarget::UnscopedAttribute("service.name".into()),
+                PredicateTarget::Attribute(AttributeOwner::Any, "service.name".into()),
                 CompareOp::Eq,
                 vec![text("svc")],
             )],
@@ -1841,7 +1846,7 @@ mod tests {
         ));
         assert!(matches(
             vec![cond(
-                PredicateTarget::UnscopedAttribute("tag".into()),
+                PredicateTarget::Attribute(AttributeOwner::Any, "team".into()),
                 CompareOp::Eq,
                 vec![text("b")],
             )],
@@ -1849,7 +1854,7 @@ mod tests {
         ));
         assert!(!matches(
             vec![cond(
-                PredicateTarget::UnscopedAttribute("nowhere".into()),
+                PredicateTarget::Attribute(AttributeOwner::Any, "nowhere".into()),
                 CompareOp::NotEq,
                 vec![text("v")],
             )],
@@ -1905,7 +1910,7 @@ mod tests {
             &far,
             &Predicate {
                 conditions: vec![cond(
-                    PredicateTarget::Intrinsic(TraceIntrinsic::EventTimeSinceStart),
+                    PredicateTarget::Builtin(BuiltinField::EventTimeSinceStart),
                     CompareOp::Gt,
                     vec![PredicateValue::Integer(0)],
                 )],
@@ -1914,12 +1919,12 @@ mod tests {
         ));
         // Negated duration equality.
         assert!(m2(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+            PredicateTarget::Builtin(BuiltinField::Duration),
             CompareOp::NotEq,
             vec![PredicateValue::Integer(999)],
         )));
         assert!(!m2(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+            PredicateTarget::Builtin(BuiltinField::Duration),
             CompareOp::NotEq,
             vec![PredicateValue::Integer(250)],
         )));

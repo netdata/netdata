@@ -1,17 +1,17 @@
-//! `sfsq-cli trace` / `tags` / `tag-values` — the traces query engine
-//! from the terminal, without a running agent: the dev/real-use front
-//! door of `sfsq::traces` (phases 4a/4b). Point any subcommand at a mix
-//! of sealed SFSTs and traces WALs; `trace` merges one trace through the
-//! shared combiner, `tags` / `tag-values` enumerate the tag vocabulary
-//! off the dictionaries.
+//! `sfsq-cli trace` / `attributes` / `attribute-values` — the traces
+//! query engine from the terminal, without a running agent: the
+//! dev/real-use front door of `sfsq::traces` (phases 4a/4b). Point any
+//! subcommand at a mix of sealed SFSTs and traces WALs; `trace` merges
+//! one trace through the shared combiner, `attributes` /
+//! `attribute-values` enumerate the key vocabulary off the dictionaries.
 //!
 //! WAL inputs are served as tail scans over the file's full frame range —
 //! right for shut-down or recovered WALs (the dev case); an actively
 //! written WAL should be queried through a live agent instead.
 //!
-//! The scope/intrinsic spellings here (`--scope span`, `--key status`)
+//! The owner/builtin spellings here (`--owner span`, `--key status`)
 //! are this DEV TOOL's rendering of the engine's typed vocabulary — not
-//! a wire contract; wire adapters (the Tempo shim) define their own.
+//! a wire contract; wire adapters define their own.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -22,9 +22,9 @@ use tokio_util::sync::CancellationToken;
 
 use sfsq::traces::{
     CompareOp, Condition, Predicate, PredicateTarget, PredicateValue, QueryStatus, SearchQuery,
-    SearchSources, SourceId, TagKey, TagNamesQuery, TagScope, TagValuesQuery, TimeWindow,
-    TraceIntrinsic, TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage,
-    search, tag_names, tag_values, trace_by_id,
+    SearchSources, SourceId, AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeValuesQuery, TimeWindow,
+    BuiltinField, TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage,
+    search, attribute_names, attribute_values, trace_by_id,
 };
 
 /// Reconstruct one trace across sealed SFSTs and traces WALs.
@@ -169,90 +169,94 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     Ok(())
 }
 
-// ── Tag enumeration (phase 4b) ─────────────────────────────────────────
+// ── Key enumeration (phase 4b) ─────────────────────────────────────────
 
-/// A [`TagScope`] as a CLI word (this tool's rendering, not a wire
-/// contract).
+/// An [`AttributeOwner`] as a CLI word (this tool's rendering, not a
+/// wire contract). `Any` is deliberately absent: it exists for
+/// predicates (`--where .key=...`), not enumeration.
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
-pub enum ScopeArg {
+pub enum OwnerArg {
     Resource,
     Span,
     Instrumentation,
     Event,
     Link,
-    Intrinsic,
+    Builtin,
 }
 
-impl From<ScopeArg> for TagScope {
-    fn from(s: ScopeArg) -> TagScope {
+impl From<OwnerArg> for AttributeOwner {
+    fn from(s: OwnerArg) -> AttributeOwner {
         match s {
-            ScopeArg::Resource => TagScope::Resource,
-            ScopeArg::Span => TagScope::Span,
-            ScopeArg::Instrumentation => TagScope::Instrumentation,
-            ScopeArg::Event => TagScope::Event,
-            ScopeArg::Link => TagScope::Link,
-            ScopeArg::Intrinsic => TagScope::Intrinsic,
+            OwnerArg::Resource => AttributeOwner::Resource,
+            OwnerArg::Span => AttributeOwner::Span,
+            OwnerArg::Instrumentation => AttributeOwner::Instrumentation,
+            OwnerArg::Event => AttributeOwner::Event,
+            OwnerArg::Link => AttributeOwner::Link,
+            OwnerArg::Builtin => AttributeOwner::Builtin,
         }
     }
 }
 
-/// The CLI spelling of each intrinsic (kebab-case), used by `--key`
-/// under `--scope intrinsic` and by the output rendering.
-const INTRINSIC_WORDS: [(&str, TraceIntrinsic); 17] = [
-    ("name", TraceIntrinsic::Name),
-    ("kind", TraceIntrinsic::Kind),
-    ("status", TraceIntrinsic::Status),
-    ("status-message", TraceIntrinsic::StatusMessage),
-    ("instrumentation-name", TraceIntrinsic::InstrumentationName),
-    ("instrumentation-version", TraceIntrinsic::InstrumentationVersion),
-    ("event-name", TraceIntrinsic::EventName),
-    ("duration", TraceIntrinsic::Duration),
-    ("span-id", TraceIntrinsic::SpanId),
-    ("parent-span-id", TraceIntrinsic::ParentSpanId),
-    ("trace-id", TraceIntrinsic::TraceId),
-    ("link-span-id", TraceIntrinsic::LinkSpanId),
-    ("link-trace-id", TraceIntrinsic::LinkTraceId),
-    ("event-time-since-start", TraceIntrinsic::EventTimeSinceStart),
-    ("root-name", TraceIntrinsic::RootName),
-    ("root-service-name", TraceIntrinsic::RootServiceName),
-    ("trace-duration", TraceIntrinsic::TraceDuration),
+/// The CLI spelling of each builtin field (kebab-case), used by
+/// `--key` under `--owner builtin` and by the output rendering.
+const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
+    ("name", BuiltinField::Name),
+    ("kind", BuiltinField::Kind),
+    ("status", BuiltinField::Status),
+    ("status-message", BuiltinField::StatusMessage),
+    ("instrumentation-name", BuiltinField::InstrumentationName),
+    ("instrumentation-version", BuiltinField::InstrumentationVersion),
+    ("event-name", BuiltinField::EventName),
+    ("duration", BuiltinField::Duration),
+    ("span-id", BuiltinField::SpanId),
+    ("parent-span-id", BuiltinField::ParentSpanId),
+    ("trace-id", BuiltinField::TraceId),
+    ("link-span-id", BuiltinField::LinkSpanId),
+    ("link-trace-id", BuiltinField::LinkTraceId),
+    ("event-time-since-start", BuiltinField::EventTimeSinceStart),
+    ("root-name", BuiltinField::RootName),
+    ("root-service-name", BuiltinField::RootServiceName),
+    ("trace-duration", BuiltinField::TraceDuration),
 ];
 
-fn scope_word(scope: TagScope) -> &'static str {
-    match scope {
-        TagScope::Resource => "resource",
-        TagScope::Span => "span",
-        TagScope::Instrumentation => "instrumentation",
-        TagScope::Event => "event",
-        TagScope::Link => "link",
-        TagScope::Intrinsic => "intrinsic",
+fn owner_word(owner: AttributeOwner) -> &'static str {
+    match owner {
+        AttributeOwner::Resource => "resource",
+        AttributeOwner::Span => "span",
+        AttributeOwner::Instrumentation => "instrumentation",
+        AttributeOwner::Event => "event",
+        AttributeOwner::Link => "link",
+        AttributeOwner::Builtin => "builtin",
+        // Never enumerated (the engine rejects it); rendered only if a
+        // future path prints a predicate target through this table.
+        AttributeOwner::Any => "any",
     }
 }
 
-fn key_word(key: &TagKey) -> String {
+fn key_word(key: &AttributeKey) -> String {
     match key {
-        TagKey::Attribute(a) => a.clone(),
-        TagKey::Intrinsic(i) => INTRINSIC_WORDS
+        AttributeKey::Attribute(a) => a.clone(),
+        AttributeKey::Builtin(i) => BUILTIN_WORDS
             .iter()
             .find(|(_, v)| v == i)
             .map(|(w, _)| (*w).to_string())
-            .expect("every intrinsic has a CLI word"),
+            .expect("every builtin field has a CLI word"),
     }
 }
 
-/// Parse `--key` against the scope: attribute scopes take the bare key
-/// verbatim; the intrinsic scope takes one of the kebab-case words.
-fn parse_key(scope: TagScope, key: &str) -> Result<TagKey> {
-    if scope != TagScope::Intrinsic {
-        return Ok(TagKey::Attribute(key.to_string()));
+/// Parse `--key` against the owner: attribute owners take the bare key
+/// verbatim; the Builtin owner takes one of the kebab-case words.
+fn parse_key(owner: AttributeOwner, key: &str) -> Result<AttributeKey> {
+    if owner != AttributeOwner::Builtin {
+        return Ok(AttributeKey::Attribute(key.to_string()));
     }
-    INTRINSIC_WORDS
+    BUILTIN_WORDS
         .iter()
         .find(|(w, _)| *w == key)
-        .map(|(_, i)| TagKey::Intrinsic(*i))
+        .map(|(_, i)| AttributeKey::Builtin(*i))
         .ok_or_else(|| {
-            let words: Vec<&str> = INTRINSIC_WORDS.iter().map(|(w, _)| *w).collect();
-            anyhow::anyhow!("unknown intrinsic {key:?}; one of: {}", words.join(", "))
+            let words: Vec<&str> = BUILTIN_WORDS.iter().map(|(w, _)| *w).collect();
+            anyhow::anyhow!("unknown builtin field {key:?}; one of: {}", words.join(", "))
         })
 }
 
@@ -272,9 +276,9 @@ fn status_word(status: &QueryStatus) -> String {
     }
 }
 
-/// Enumerate tag keys across sealed SFSTs and traces WALs.
+/// Enumerate attribute and builtin-field keys across sealed SFSTs and traces WALs.
 #[derive(Debug, clap::Args)]
-pub struct TagsArgs {
+pub struct AttributesArgs {
     /// A sealed traces SFST file. Repeatable.
     #[arg(long = "sfst")]
     pub sfsts: Vec<PathBuf>,
@@ -283,9 +287,9 @@ pub struct TagsArgs {
     #[arg(long = "wal")]
     pub wals: Vec<PathBuf>,
 
-    /// Enumerate only one scope.
+    /// Enumerate only one owner.
     #[arg(long, value_enum)]
-    pub scope: Option<ScopeArg>,
+    pub owner: Option<OwnerArg>,
 
     /// Cap the key list (exact truncation flag); 0 is rejected.
     #[arg(long)]
@@ -302,11 +306,11 @@ pub struct TagsArgs {
     pub end_ns: Option<i64>,
 }
 
-pub fn run_tags(args: &TagsArgs, out: &mut dyn std::io::Write) -> Result<()> {
+pub fn run_attributes(args: &AttributesArgs, out: &mut dyn std::io::Write) -> Result<()> {
     let sources = build_sources(&args.sfsts, &args.wals)?;
-    let mut query = TagNamesQuery::new();
-    if let Some(scope) = args.scope {
-        query = query.scope(scope.into());
+    let mut query = AttributeNamesQuery::new();
+    if let Some(owner) = args.owner {
+        query = query.owner(owner.into());
     }
     if let Some(max) = args.max_keys {
         query = query.max_keys(max);
@@ -314,14 +318,14 @@ pub fn run_tags(args: &TagsArgs, out: &mut dyn std::io::Write) -> Result<()> {
     if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
         query = query.window(window);
     }
-    let data = tag_names(
+    let data = attribute_names(
         sources,
         query,
         CancellationToken::new(),
         Arc::new(AtomicUsize::new(0)),
     )?;
-    for (scope, key) in &data.keys {
-        writeln!(out, "{} {}", scope_word(*scope), key_word(key))?;
+    for (owner, key) in &data.keys {
+        writeln!(out, "{} {}", owner_word(*owner), key_word(key))?;
     }
     writeln!(
         out,
@@ -333,9 +337,9 @@ pub fn run_tags(args: &TagsArgs, out: &mut dyn std::io::Write) -> Result<()> {
     Ok(())
 }
 
-/// Enumerate one tag's values across sealed SFSTs and traces WALs.
+/// Enumerate one key's values across sealed SFSTs and traces WALs.
 #[derive(Debug, clap::Args)]
-pub struct TagValuesArgs {
+pub struct AttributeValuesArgs {
     /// A sealed traces SFST file. Repeatable.
     #[arg(long = "sfst")]
     pub sfsts: Vec<PathBuf>,
@@ -344,12 +348,12 @@ pub struct TagValuesArgs {
     #[arg(long = "wal")]
     pub wals: Vec<PathBuf>,
 
-    /// The tag's scope.
+    /// The key's owner.
     #[arg(long, value_enum)]
-    pub scope: ScopeArg,
+    pub owner: OwnerArg,
 
-    /// The tag key: the bare attribute name, or (under --scope intrinsic)
-    /// an intrinsic word such as `status` or `event-name`.
+    /// The key: the bare attribute name, or (under --owner builtin)
+    /// a builtin-field word such as `status` or `event-name`.
     #[arg(long)]
     pub key: String,
 
@@ -368,18 +372,18 @@ pub struct TagValuesArgs {
     pub end_ns: Option<i64>,
 }
 
-pub fn run_tag_values(args: &TagValuesArgs, out: &mut dyn std::io::Write) -> Result<()> {
-    let scope: TagScope = args.scope.into();
-    let key = parse_key(scope, &args.key)?;
+pub fn run_attribute_values(args: &AttributeValuesArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let owner: AttributeOwner = args.owner.into();
+    let key = parse_key(owner, &args.key)?;
     let sources = build_sources(&args.sfsts, &args.wals)?;
-    let mut query = TagValuesQuery::new(scope, key);
+    let mut query = AttributeValuesQuery::new(owner, key);
     if let Some(max) = args.max_values {
         query = query.max_values(max);
     }
     if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
         query = query.window(window);
     }
-    let data = tag_values(
+    let data = attribute_values(
         sources,
         query,
         CancellationToken::new(),
@@ -416,8 +420,8 @@ pub struct SearchArgs {
     pub wals: Vec<PathBuf>,
 
     /// A filter condition, repeatable (conditions AND). TARGET is
-    /// `SCOPE.KEY` (resource/span/instrumentation/event/link), `.KEY`
-    /// (unscoped: resource ∪ span), or an intrinsic word (`name`,
+    /// `OWNER.KEY` (resource/span/instrumentation/event/link), `.KEY`
+    /// (any owner: resource ∪ span), or a builtin-field word (`name`,
     /// `status`, `kind`, …). OPS: `=`, `!=` (text), `=~`, `!~`
     /// (anchored regex), `>`, `<`, `>=`, `<=` (numeric). This is the
     /// dev tool's rendering of the engine's typed predicate, not a wire
@@ -439,7 +443,7 @@ pub struct SearchArgs {
 
     /// Matched spans attached per trace (default 3, max 128, 0 = none).
     #[arg(long)]
-    pub spss: Option<usize>,
+    pub spans_per_trace: Option<usize>,
 
     /// Window start, nanoseconds since the epoch (half-open; span-START
     /// semantics). Requires --end-ns.
@@ -504,32 +508,32 @@ fn parse_condition(spec: &str) -> Result<Condition> {
     })
 }
 
-/// A `--where` target: `SCOPE.KEY` for the attribute scopes, a bare
-/// intrinsic word otherwise.
+/// A `--where` target: `OWNER.KEY` for the attribute owners, a bare
+/// builtin-field word otherwise.
 fn parse_target(word: &str) -> Result<PredicateTarget> {
-    // `.KEY` = the unscoped attribute (resource ∪ span disjunction).
+    // `.KEY` = the any-owner attribute (resource ∪ span disjunction).
     if let Some(key) = word.strip_prefix('.') {
-        return Ok(PredicateTarget::UnscopedAttribute(key.to_string()));
+        return Ok(PredicateTarget::Attribute(AttributeOwner::Any, key.to_string()));
     }
-    for (scope_name, scope) in [
-        ("resource", TagScope::Resource),
-        ("span", TagScope::Span),
-        ("instrumentation", TagScope::Instrumentation),
-        ("event", TagScope::Event),
-        ("link", TagScope::Link),
+    for (owner_name, owner) in [
+        ("resource", AttributeOwner::Resource),
+        ("span", AttributeOwner::Span),
+        ("instrumentation", AttributeOwner::Instrumentation),
+        ("event", AttributeOwner::Event),
+        ("link", AttributeOwner::Link),
     ] {
-        if let Some(key) = word.strip_prefix(scope_name).and_then(|r| r.strip_prefix('.')) {
-            return Ok(PredicateTarget::Attribute(scope, key.to_string()));
+        if let Some(key) = word.strip_prefix(owner_name).and_then(|r| r.strip_prefix('.')) {
+            return Ok(PredicateTarget::Attribute(owner, key.to_string()));
         }
     }
-    INTRINSIC_WORDS
+    BUILTIN_WORDS
         .iter()
         .find(|(w, _)| *w == word)
-        .map(|(_, i)| PredicateTarget::Intrinsic(*i))
+        .map(|(_, i)| PredicateTarget::Builtin(*i))
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "unknown --where target {word:?}: use SCOPE.KEY \
-                 (resource/span/instrumentation/event/link) or an intrinsic word"
+                "unknown --where target {word:?}: use OWNER.KEY \
+                 (resource/span/instrumentation/event/link) or a builtin-field word"
             )
         })
 }
@@ -542,14 +546,14 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
         .collect::<Result<_>>()?;
     if let Some(min) = args.min_duration_ns {
         conditions.push(Condition {
-            target: PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+            target: PredicateTarget::Builtin(BuiltinField::Duration),
             op: CompareOp::Gte,
             values: vec![PredicateValue::Integer(min)],
         });
     }
     if let Some(max) = args.max_duration_ns {
         conditions.push(Condition {
-            target: PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+            target: PredicateTarget::Builtin(BuiltinField::Duration),
             op: CompareOp::Lte,
             values: vec![PredicateValue::Integer(max)],
         });
@@ -562,8 +566,8 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
     if let Some(limit) = args.limit {
         query = query.limit(limit);
     }
-    if let Some(spss) = args.spss {
-        query = query.spss(spss);
+    if let Some(spans_per_trace) = args.spans_per_trace {
+        query = query.spans_per_trace(spans_per_trace);
     }
 
     // The dev shape: one flat set of paths serves both roles (window =
@@ -621,23 +625,23 @@ mod tests {
     use super::*;
 
     /// The CLI word table must stay in lockstep with the engine's
-    /// intrinsic set: a variant without a word would make `key_word`
-    /// PANIC while rendering `tags` output (the parse side already
-    /// fails gracefully). Walks the engine's `ALL`, so adding an
-    /// intrinsic engine-side breaks this test until the CLI learns it.
+    /// builtin-field set: a variant without a word would make `key_word`
+    /// PANIC while rendering `attributes` output (the parse side already
+    /// fails gracefully). Walks the engine's `ALL`, so adding a builtin
+    /// engine-side breaks this test until the CLI learns it.
     #[test]
-    fn every_intrinsic_has_a_cli_word() {
-        for intrinsic in TraceIntrinsic::ALL {
+    fn every_builtin_has_a_cli_word() {
+        for builtin in BuiltinField::ALL {
             assert!(
-                INTRINSIC_WORDS.iter().any(|(_, v)| *v == intrinsic),
-                "intrinsic {intrinsic:?} has no CLI word in INTRINSIC_WORDS"
+                BUILTIN_WORDS.iter().any(|(_, v)| *v == builtin),
+                "builtin field {builtin:?} has no CLI word in BUILTIN_WORDS"
             );
         }
         // And the table holds nothing stale: same size, distinct words.
-        assert_eq!(INTRINSIC_WORDS.len(), TraceIntrinsic::ALL.len());
-        let mut words: Vec<&str> = INTRINSIC_WORDS.iter().map(|(w, _)| *w).collect();
+        assert_eq!(BUILTIN_WORDS.len(), BuiltinField::ALL.len());
+        let mut words: Vec<&str> = BUILTIN_WORDS.iter().map(|(w, _)| *w).collect();
         words.sort_unstable();
         words.dedup();
-        assert_eq!(words.len(), INTRINSIC_WORDS.len(), "duplicate CLI words");
+        assert_eq!(words.len(), BUILTIN_WORDS.len(), "duplicate CLI words");
     }
 }

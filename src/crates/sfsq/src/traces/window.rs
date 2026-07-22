@@ -1,4 +1,4 @@
-//! The shared query time window — one definition serving tag
+//! The shared query time window — one definition serving key
 //! enumeration's file-granular pruning and search's span-start
 //! semantics, so the half-open-nanosecond comparison can never fork
 //! between operations.
@@ -42,7 +42,7 @@ impl TimeWindow {
     /// overlaps this window: the file range expands to nanoseconds as
     /// `[min_s·10⁹, (max_s+1)·10⁹)` (saturating) and the two half-open
     /// ranges intersect iff each starts before the other ends. THE
-    /// file-pruning comparison — tags and search share it by construction.
+    /// file-pruning comparison — key enumeration and search share it by construction.
     pub(crate) fn overlaps_summary(&self, min_s: u32, max_s: u32) -> bool {
         const NS: i64 = 1_000_000_000;
         let file_start = i64::from(min_s).saturating_mul(NS);

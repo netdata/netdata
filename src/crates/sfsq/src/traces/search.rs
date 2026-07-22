@@ -12,7 +12,7 @@
 //!   span-side evaluator. Raw matches over-approximate (a losing resend
 //!   may match while its canonical copy does not) but NEVER
 //!   under-approximate: a matching canonical span raw-matches in its own
-//!   file (pinned spanset consequence).
+//!   file (pinned per-trace span-group consequence).
 //! - **Phase 2 (exact assembly, completion set):** candidates assemble
 //!   through the shared combiner over ALL completion sources (sessions
 //!   opened once, reused for every candidate — the by-id pattern), the
@@ -55,7 +55,7 @@ use super::by_id::{DEFAULT_SPAN_CAP, FieldKinds};
 use super::predicate::{EvalPredicate, Predicate, PredicateError, TraceLevelEval};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
-use super::vocab::{TagScope, TraceIntrinsic};
+use super::vocab::{AttributeOwner, BuiltinField};
 use super::wal_scan::TraceWalScan;
 use super::window::{TimeWindow, WindowError};
 use crate::source::map_source;
@@ -66,10 +66,10 @@ use crate::source::map_source;
 /// option — search is top-K by construction.
 pub const DEFAULT_SEARCH_LIMIT: usize = 20;
 /// Default attached matched spans per returned trace.
-pub const DEFAULT_SPSS: usize = 3;
-/// Library maximum for [`SearchQuery::spss`]; beyond it is a request
+pub const DEFAULT_SPANS_PER_TRACE: usize = 3;
+/// Library maximum for [`SearchQuery::spans_per_trace`]; beyond it is a request
 /// error (an unbounded attachment would defeat the summary shape).
-pub const SPSS_MAX: usize = 128;
+pub const SPANS_PER_TRACE_MAX: usize = 128;
 /// Phase-1 over-collection: the initial per-file K is `limit ×` this;
 /// the demand-driven refill doubles it per round.
 const OVER_COLLECTION_FACTOR: usize = 3;
@@ -95,13 +95,13 @@ pub struct SearchSources {
 }
 
 /// A search request. [`new`](Self::new) applies the default limit and
-/// spss; builder methods narrow or widen.
+/// spans_per_trace; builder methods narrow or widen.
 #[derive(Debug, Clone)]
 pub struct SearchQuery {
     predicate: Predicate,
     window: Option<TimeWindow>,
     limit: usize,
-    spss: usize,
+    spans_per_trace: usize,
     visited_ceiling: u64,
     span_cap: usize,
 }
@@ -112,7 +112,7 @@ impl SearchQuery {
             predicate,
             window: None,
             limit: DEFAULT_SEARCH_LIMIT,
-            spss: DEFAULT_SPSS,
+            spans_per_trace: DEFAULT_SPANS_PER_TRACE,
             visited_ceiling: VISITED_ROWS_CEILING,
             span_cap: DEFAULT_SPAN_CAP,
         }
@@ -135,9 +135,9 @@ impl SearchQuery {
     }
 
     /// Matched spans attached per returned trace (`0` = none, max
-    /// [`SPSS_MAX`]).
-    pub fn spss(mut self, spss: usize) -> Self {
-        self.spss = spss;
+    /// [`SPANS_PER_TRACE_MAX`]).
+    pub fn spans_per_trace(mut self, spans_per_trace: usize) -> Self {
+        self.spans_per_trace = spans_per_trace;
         self
     }
 
@@ -169,8 +169,8 @@ impl SearchQuery {
 pub enum SearchRequestError {
     #[error("a zero limit would return nothing; search has no unbounded option")]
     ZeroLimit,
-    #[error("spss {got} exceeds the library maximum {SPSS_MAX}")]
-    SpssBeyondMax { got: usize },
+    #[error("spans_per_trace {got} exceeds the library maximum {SPANS_PER_TRACE_MAX}")]
+    SpansPerTraceBeyondMax { got: usize },
     /// The window set must be a subset of the completion set (one
     /// snapshot, two roles) — checked by `SourceId` membership BEFORE
     /// any I/O (pin C-2/R2-7). A source that vanishes AFTER this
@@ -183,7 +183,7 @@ pub enum SearchRequestError {
     /// carries one ready-built), so this variant is reached only through
     /// the `From` conversion — kept so a caller assembling a request can
     /// `?` window construction into the one request-error type (the
-    /// R2-8 wrapper contract, mirroring `TagRequestError`).
+    /// R2-8 wrapper contract, mirroring `AttributeRequestError`).
     #[error(transparent)]
     Window(#[from] WindowError),
     #[error(transparent)]
@@ -212,7 +212,7 @@ pub struct TraceSummary {
     /// Canonical spans in the retained capped set satisfying the
     /// span-local predicate + window after phase-2 re-evaluation.
     pub matched_count: usize,
-    /// The matched subset, `min(spss, matched_count)` spans in combiner
+    /// The matched subset, `min(spans_per_trace, matched_count)` spans in combiner
     /// total order — deterministic under any physical layout.
     pub matched_spans: Vec<sfst::TraceSpan>,
     /// `false` when this trace's assembly was capped or degraded (span
@@ -398,8 +398,8 @@ pub fn search(
     if query.limit == 0 {
         return Err(SearchRequestError::ZeroLimit);
     }
-    if query.spss > SPSS_MAX {
-        return Err(SearchRequestError::SpssBeyondMax { got: query.spss });
+    if query.spans_per_trace > SPANS_PER_TRACE_MAX {
+        return Err(SearchRequestError::SpansPerTraceBeyondMax { got: query.spans_per_trace });
     }
     query.predicate.validate()?;
     query.predicate.ensure_evaluable()?;
@@ -539,7 +539,7 @@ pub fn search(
             unreachable!("readers hold SFST sources only")
         };
         // File-granular window pruning on the summary range — sharing
-        // the tags overlap comparison; exact for span-start windows
+        // the key-enumeration overlap comparison; exact for span-start windows
         // because file ranges are span-start-based (decision 5).
         if query
             .window
@@ -761,7 +761,7 @@ pub fn search(
                     trace_id,
                     &trace,
                     &matched,
-                    query.spss,
+                    query.spans_per_trace,
                     !outcome.truncated && !merge_failed && !degraded_assembly,
                 );
                 // Trace-level conditions evaluate post-assembly as
@@ -926,25 +926,25 @@ fn discovery_state(
 /// Derive one exact summary from the assembled trace (pins R2-5):
 /// root fields from the combiner's summary root, envelope with
 /// saturating arithmetic, counts over the retained capped set, and the
-/// spss attachment in combiner order.
+/// spans_per_trace attachment in combiner order.
 fn summarize(
     trace_id: TraceId,
     trace: &sfst::Trace,
     matched: &[usize],
-    spss: usize,
+    spans_per_trace: usize,
     exact: bool,
 ) -> TraceSummary {
     // Storage names via the vocabulary only — never hand-built.
     let service_field = format!(
         "{}service.name",
-        TagScope::Resource
+        AttributeOwner::Resource
             .attribute_prefix()
-            .expect("Resource is an attribute scope")
+            .expect("Resource is an attribute owner")
     );
-    let name_field = TraceIntrinsic::Name
+    let name_field = BuiltinField::Name
         .dictionary_field()
         .expect("Name is dictionary-backed");
-    let status_field = TraceIntrinsic::Status
+    let status_field = BuiltinField::Status
         .dictionary_field()
         .expect("Status is dictionary-backed");
     let field_of = |span: &sfst::TraceSpan, field: &str| -> Option<String> {
@@ -977,7 +977,7 @@ fn summarize(
         matched_count: matched.len(),
         matched_spans: matched
             .iter()
-            .take(spss)
+            .take(spans_per_trace)
             .map(|&i| trace.spans[i].clone())
             .collect(),
         exact,

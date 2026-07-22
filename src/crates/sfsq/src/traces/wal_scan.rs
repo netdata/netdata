@@ -80,7 +80,7 @@ pub struct TraceWalScan {
     field_kinds: Vec<(String, sfst::ValueKind)>,
     /// Storage field → distinct rendered values over the scanned frames —
     /// the tail's counterpart of a sealed file's value dictionaries, for
-    /// tag enumeration. Built from EXACTLY the entry set the seal interns
+    /// key enumeration. Built from EXACTLY the entry set the seal interns
     /// (phase-4b pin C5): resource ∪ scope ∪ span entries (including
     /// `_kind`/`_status_code`/`trace_state`; the mapping layer filters,
     /// same as for sealed field tables) PLUS the structured
@@ -142,7 +142,7 @@ impl TraceWalScan {
             let paths: Vec<String> = (0..tree.len() as ng_flatten::NodeId)
                 .map(|id| tree.path(id))
                 .collect();
-            // Every renderer records the FULL storage pair into the tag
+            // Every renderer records the FULL storage pair into the key
             // pair table (pin C5) before any prefix stripping.
             type PairTable = BTreeMap<String, BTreeSet<String>>;
             let render = |entries: &[ng_flatten::Entry],
@@ -294,7 +294,7 @@ impl TraceWalScan {
     }
 
     /// Storage field → distinct rendered values over the scanned frames
-    /// (see the struct field's doc) — the tail's tag dictionaries.
+    /// (see the struct field's doc) — the tail's key dictionaries.
     pub fn pair_table(&self) -> &BTreeMap<String, BTreeSet<String>> {
         &self.pair_table
     }

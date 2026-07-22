@@ -1,54 +1,63 @@
-//! The typed, wire-neutral tag vocabulary (phase-4b decision 16A):
-//! scopes and keys are ENUMS, never grammar strings. Each wire adapter —
-//! the phase-5 Tempo shim, a future Netdata UI — owns its own string
-//! rendering of this vocabulary, in both directions, and must round-trip
-//! it; the engine stays wire-neutral (Grafana/TraceQL is a stopgap, so
-//! its words must not leak in here). The 4c predicate AST consumes these
-//! same enums.
+//! The typed, wire-neutral key vocabulary (phase-4b decision 16A):
+//! owners and keys are ENUMS, never grammar strings. Each wire adapter —
+//! a future Netdata UI, the CLI — owns its own string rendering of this
+//! vocabulary, in both directions, and must round-trip it; the engine
+//! stays wire-neutral (no query grammar's words may leak in here). The
+//! 4c predicate AST consumes these same enums.
+//!
+//! The vocabulary is OpenTelemetry's own: ATTRIBUTES belong to an owner
+//! (the OTLP message carrying them — Resource, InstrumentationScope,
+//! Span, Event, Link); BUILTIN FIELDS are the fixed members of those
+//! messages themselves (name, kind, status, ...).
 //!
 //! The storage↔vocabulary mapping lives here in BOTH directions —
-//! [`storage_to_tag`] for key enumeration; [`TagScope::attribute_prefix`]
-//! and [`TraceIntrinsic::dictionary_field`] for value lookups and 4c
+//! [`storage_to_attribute`] for key enumeration; [`AttributeOwner::attribute_prefix`]
+//! and [`BuiltinField::dictionary_field`] for value lookups and 4c
 //! lowering — so there is exactly one table to keep right.
 
-/// Where a tag lives. `Resource`/`Span`/`Instrumentation`/`Event`/`Link`
-/// hold attribute keys (prefix-stripped storage names — the prefixes are
-/// artifacts of this crate family's flattening, not something a consumer
-/// should see); `Intrinsic` holds the fixed [`TraceIntrinsic`] set.
+/// Which OTLP message a key belongs to. `Resource`/`Span`/
+/// `Instrumentation`/`Event`/`Link` hold attribute keys (prefix-stripped
+/// storage names — the prefixes are artifacts of this crate family's
+/// flattening, not something a consumer should see); `Builtin` holds the
+/// fixed [`BuiltinField`] set; `Any` (predicates only) is the
+/// owner-agnostic attribute, pinned as the resource ∪ span disjunction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum TagScope {
+pub enum AttributeOwner {
     Resource,
     Span,
     Instrumentation,
     Event,
     Link,
-    Intrinsic,
+    Builtin,
+    Any,
 }
 
-impl TagScope {
-    /// The storage prefix this scope's attribute keys carry on disk;
-    /// `None` for [`Intrinsic`](TagScope::Intrinsic) (intrinsics are not
-    /// attributes). Stripping/prepending happens against the FULL prefix
-    /// (`events.attributes.`, not `events.`) — a scope-word-only strip
+impl AttributeOwner {
+    /// The storage prefix this owner's attribute keys carry on disk;
+    /// `None` for [`Builtin`](AttributeOwner::Builtin) (builtin fields
+    /// are not attributes) and for [`Any`](AttributeOwner::Any) (no
+    /// single prefix — predicate lowering expands it per owner).
+    /// Stripping/prepending happens against the FULL prefix
+    /// (`events.attributes.`, not `events.`) — an owner-word-only strip
     /// would leave a stray `attributes.` on every key.
     pub fn attribute_prefix(self) -> Option<&'static str> {
         match self {
-            TagScope::Resource => Some("resource.attributes."),
-            TagScope::Span => Some("attributes."),
-            TagScope::Instrumentation => Some("scope.attributes."),
-            TagScope::Event => Some("events.attributes."),
-            TagScope::Link => Some("links.attributes."),
-            TagScope::Intrinsic => None,
+            AttributeOwner::Resource => Some("resource.attributes."),
+            AttributeOwner::Span => Some("attributes."),
+            AttributeOwner::Instrumentation => Some("scope.attributes."),
+            AttributeOwner::Event => Some("events.attributes."),
+            AttributeOwner::Link => Some("links.attributes."),
+            AttributeOwner::Builtin | AttributeOwner::Any => None,
         }
     }
 }
 
-/// The fixed intrinsic set — engine capabilities, not data properties,
-/// which is why key enumeration lists ALL of them unconditionally
-/// (decision 18B): filtering on `Status` is valid on a corpus with no
-/// statuses (it matches nothing).
+/// The fixed builtin-field set — engine capabilities, not data
+/// properties, which is why key enumeration lists ALL of them
+/// unconditionally (decision 18B): filtering on `Status` is valid on a
+/// corpus with no statuses (it matches nothing).
 ///
-/// Dictionary-backed intrinsics ([`dictionary_field`]
+/// Dictionary-backed builtins ([`dictionary_field`]
 /// (Self::dictionary_field) = `Some`) support value enumeration; the
 /// rest are VIRTUAL — backed by per-row columns (`Duration`, `SpanId`,
 /// `ParentSpanId`, `TraceId`), by the EVNB/LNKB structures (`LinkSpanId`,
@@ -56,11 +65,11 @@ impl TagScope {
 /// (`RootName`, `RootServiceName`, `TraceDuration`) — and value
 /// enumeration on them is a request error.
 ///
-/// `trace_state` is deliberately NOT an intrinsic (decision 17A): tags
-/// exist for filter autocomplete, and no query path filters on it; it
-/// stays visible in trace-by-id results.
+/// `trace_state` is deliberately NOT a builtin (decision 17A): the key
+/// vocabulary exists for filter autocomplete, and no query path filters
+/// on it; it stays visible in trace-by-id results.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum TraceIntrinsic {
+pub enum BuiltinField {
     // ── Dictionary-backed ───────────────────────────────────────────
     Name,
     Kind,
@@ -82,87 +91,87 @@ pub enum TraceIntrinsic {
     TraceDuration,
 }
 
-impl TraceIntrinsic {
-    /// Every intrinsic, in declaration order (dictionary-backed first).
-    pub const ALL: [TraceIntrinsic; 17] = [
-        TraceIntrinsic::Name,
-        TraceIntrinsic::Kind,
-        TraceIntrinsic::Status,
-        TraceIntrinsic::StatusMessage,
-        TraceIntrinsic::InstrumentationName,
-        TraceIntrinsic::InstrumentationVersion,
-        TraceIntrinsic::EventName,
-        TraceIntrinsic::Duration,
-        TraceIntrinsic::SpanId,
-        TraceIntrinsic::ParentSpanId,
-        TraceIntrinsic::TraceId,
-        TraceIntrinsic::LinkSpanId,
-        TraceIntrinsic::LinkTraceId,
-        TraceIntrinsic::EventTimeSinceStart,
-        TraceIntrinsic::RootName,
-        TraceIntrinsic::RootServiceName,
-        TraceIntrinsic::TraceDuration,
+impl BuiltinField {
+    /// Every builtin field, in declaration order (dictionary-backed first).
+    pub const ALL: [BuiltinField; 17] = [
+        BuiltinField::Name,
+        BuiltinField::Kind,
+        BuiltinField::Status,
+        BuiltinField::StatusMessage,
+        BuiltinField::InstrumentationName,
+        BuiltinField::InstrumentationVersion,
+        BuiltinField::EventName,
+        BuiltinField::Duration,
+        BuiltinField::SpanId,
+        BuiltinField::ParentSpanId,
+        BuiltinField::TraceId,
+        BuiltinField::LinkSpanId,
+        BuiltinField::LinkTraceId,
+        BuiltinField::EventTimeSinceStart,
+        BuiltinField::RootName,
+        BuiltinField::RootServiceName,
+        BuiltinField::TraceDuration,
     ];
 
-    /// The storage dictionary field backing this intrinsic; `None` means
+    /// The storage dictionary field backing this builtin; `None` means
     /// VIRTUAL (no value dictionary anywhere — see the type docs).
     ///
     /// Values come back as the STORAGE labels (`kind` ∈
     /// `INTERNAL/SERVER/CLIENT/PRODUCER/CONSUMER`, `status` ∈
-    /// `OK/ERROR`); mapping those to a wire vocabulary (e.g. TraceQL's
-    /// lowercase keywords) is the wire adapter's job, next to its name
-    /// table (decision 19, dissolved into 16A).
+    /// `OK/ERROR`); mapping those to a wire vocabulary is the wire
+    /// adapter's job, next to its name table (decision 19, dissolved
+    /// into 16A).
     pub fn dictionary_field(self) -> Option<&'static str> {
         match self {
-            TraceIntrinsic::Name => Some("name"),
-            TraceIntrinsic::Kind => Some("kind"),
-            TraceIntrinsic::Status => Some("status_code"),
-            TraceIntrinsic::StatusMessage => Some("status_message"),
-            TraceIntrinsic::InstrumentationName => Some("scope.name"),
-            TraceIntrinsic::InstrumentationVersion => Some("scope.version"),
-            TraceIntrinsic::EventName => Some("events.name"),
+            BuiltinField::Name => Some("name"),
+            BuiltinField::Kind => Some("kind"),
+            BuiltinField::Status => Some("status_code"),
+            BuiltinField::StatusMessage => Some("status_message"),
+            BuiltinField::InstrumentationName => Some("scope.name"),
+            BuiltinField::InstrumentationVersion => Some("scope.version"),
+            BuiltinField::EventName => Some("events.name"),
             _ => None,
         }
     }
 }
 
-/// One tag key: a data-derived attribute (bare, prefix-stripped) or a
-/// member of the fixed intrinsic set. Meaningful only as part of a
-/// `(TagScope, TagKey)` pair — `Attribute("name")` under
-/// [`TagScope::Span`] and [`TraceIntrinsic::Name`] are different tags.
+/// One key: a data-derived attribute (bare, prefix-stripped) or a
+/// member of the fixed builtin-field set. Meaningful only as part of a
+/// `(AttributeOwner, AttributeKey)` pair — `Attribute("name")` under
+/// [`AttributeOwner::Span`] and [`BuiltinField::Name`] are different keys.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum TagKey {
+pub enum AttributeKey {
     Attribute(String),
-    Intrinsic(TraceIntrinsic),
+    Builtin(BuiltinField),
 }
 
-/// Internal facets that must never surface as tags: the raw-int shadow
+/// Internal facets that must never surface as keys: the raw-int shadow
 /// entries of the label-carrying `kind` / `status_code` fields.
 const INTERNAL_FIELDS: [&str; 2] = ["_kind", "_status_code"];
 
-/// Map one storage field name to its tag, or `None` when the field is
-/// not part of the tag vocabulary: the internal facets above,
+/// Map one storage field name to its key, or `None` when the field is
+/// not part of the key vocabulary: the internal facets above,
 /// `trace_state` (17A), and anything unrecognized (a foreign field in a
 /// file this engine was pointed at is not vocabulary).
-pub fn storage_to_tag(storage: &str) -> Option<(TagScope, TagKey)> {
+pub fn storage_to_attribute(storage: &str) -> Option<(AttributeOwner, AttributeKey)> {
     if INTERNAL_FIELDS.contains(&storage) || storage == "trace_state" {
         return None;
     }
-    for intrinsic in TraceIntrinsic::ALL {
-        if intrinsic.dictionary_field() == Some(storage) {
-            return Some((TagScope::Intrinsic, TagKey::Intrinsic(intrinsic)));
+    for builtin in BuiltinField::ALL {
+        if builtin.dictionary_field() == Some(storage) {
+            return Some((AttributeOwner::Builtin, AttributeKey::Builtin(builtin)));
         }
     }
     for scope in [
-        TagScope::Resource,
-        TagScope::Span,
-        TagScope::Instrumentation,
-        TagScope::Event,
-        TagScope::Link,
+        AttributeOwner::Resource,
+        AttributeOwner::Span,
+        AttributeOwner::Instrumentation,
+        AttributeOwner::Event,
+        AttributeOwner::Link,
     ] {
         let prefix = scope.attribute_prefix().expect("attribute scopes");
         if let Some(bare) = storage.strip_prefix(prefix) {
-            return Some((scope, TagKey::Attribute(bare.to_string())));
+            return Some((scope, AttributeKey::Attribute(bare.to_string())));
         }
     }
     None
@@ -177,35 +186,35 @@ mod tests {
     /// round-trips back to the storage name.
     #[test]
     fn storage_table_is_pinned_and_round_trips() {
-        let attr = |scope: TagScope, k: &str| Some((scope, TagKey::Attribute(k.to_string())));
-        let intr = |i: TraceIntrinsic| Some((TagScope::Intrinsic, TagKey::Intrinsic(i)));
-        let table: [(&str, Option<(TagScope, TagKey)>); 15] = [
-            ("resource.attributes.host", attr(TagScope::Resource, "host")),
-            ("attributes.http.method", attr(TagScope::Span, "http.method")),
-            ("scope.attributes.lib", attr(TagScope::Instrumentation, "lib")),
-            ("events.attributes.msg", attr(TagScope::Event, "msg")),
-            ("links.attributes.rel", attr(TagScope::Link, "rel")),
-            ("name", intr(TraceIntrinsic::Name)),
-            ("kind", intr(TraceIntrinsic::Kind)),
-            ("status_code", intr(TraceIntrinsic::Status)),
-            ("status_message", intr(TraceIntrinsic::StatusMessage)),
-            ("scope.name", intr(TraceIntrinsic::InstrumentationName)),
-            ("scope.version", intr(TraceIntrinsic::InstrumentationVersion)),
-            ("events.name", intr(TraceIntrinsic::EventName)),
+        let attr = |scope: AttributeOwner, k: &str| Some((scope, AttributeKey::Attribute(k.to_string())));
+        let intr = |i: BuiltinField| Some((AttributeOwner::Builtin, AttributeKey::Builtin(i)));
+        let table: [(&str, Option<(AttributeOwner, AttributeKey)>); 15] = [
+            ("resource.attributes.host", attr(AttributeOwner::Resource, "host")),
+            ("attributes.http.method", attr(AttributeOwner::Span, "http.method")),
+            ("scope.attributes.lib", attr(AttributeOwner::Instrumentation, "lib")),
+            ("events.attributes.msg", attr(AttributeOwner::Event, "msg")),
+            ("links.attributes.rel", attr(AttributeOwner::Link, "rel")),
+            ("name", intr(BuiltinField::Name)),
+            ("kind", intr(BuiltinField::Kind)),
+            ("status_code", intr(BuiltinField::Status)),
+            ("status_message", intr(BuiltinField::StatusMessage)),
+            ("scope.name", intr(BuiltinField::InstrumentationName)),
+            ("scope.version", intr(BuiltinField::InstrumentationVersion)),
+            ("events.name", intr(BuiltinField::EventName)),
             // Excluded from the vocabulary:
             ("_kind", None),
             ("_status_code", None),
             ("trace_state", None),
         ];
         for (storage, want) in table {
-            let got = storage_to_tag(storage);
+            let got = storage_to_attribute(storage);
             assert_eq!(got, want, "mapping of {storage:?}");
-            // Round trip: the tag resolves back to the same storage name.
+            // Round trip: the key resolves back to the same storage name.
             if let Some((scope, key)) = got {
                 let back = match (&key, scope.attribute_prefix()) {
-                    (TagKey::Attribute(bare), Some(prefix)) => format!("{prefix}{bare}"),
-                    (TagKey::Intrinsic(i), None) => {
-                        i.dictionary_field().expect("mapped intrinsic").to_string()
+                    (AttributeKey::Attribute(bare), Some(prefix)) => format!("{prefix}{bare}"),
+                    (AttributeKey::Builtin(i), None) => {
+                        i.dictionary_field().expect("mapped builtin").to_string()
                     }
                     other => panic!("inconsistent pair {other:?}"),
                 };
@@ -214,18 +223,18 @@ mod tests {
         }
     }
 
-    /// A span attribute literally named like an intrinsic's storage field
+    /// A span attribute literally named like a builtin's storage field
     /// stays a SPAN attribute (typed keys cannot collide — the 17A
     /// collision argument dissolved for exactly this reason).
     #[test]
     fn attribute_named_like_an_intrinsic_does_not_collide() {
         assert_eq!(
-            storage_to_tag("attributes.trace_state"),
-            Some((TagScope::Span, TagKey::Attribute("trace_state".to_string())))
+            storage_to_attribute("attributes.trace_state"),
+            Some((AttributeOwner::Span, AttributeKey::Attribute("trace_state".to_string())))
         );
         assert_eq!(
-            storage_to_tag("attributes.name"),
-            Some((TagScope::Span, TagKey::Attribute("name".to_string())))
+            storage_to_attribute("attributes.name"),
+            Some((AttributeOwner::Span, AttributeKey::Attribute("name".to_string())))
         );
     }
 
@@ -233,8 +242,8 @@ mod tests {
     /// sets; ALL enumerates every variant exactly once.
     #[test]
     fn intrinsic_split_is_pinned() {
-        use TraceIntrinsic::*;
-        let dictionary: Vec<TraceIntrinsic> = TraceIntrinsic::ALL
+        use BuiltinField::*;
+        let dictionary: Vec<BuiltinField> = BuiltinField::ALL
             .into_iter()
             .filter(|i| i.dictionary_field().is_some())
             .collect();
@@ -250,9 +259,9 @@ mod tests {
                 EventName
             ]
         );
-        let mut all = TraceIntrinsic::ALL.to_vec();
+        let mut all = BuiltinField::ALL.to_vec();
         all.sort();
         all.dedup();
-        assert_eq!(all.len(), TraceIntrinsic::ALL.len(), "ALL has duplicates");
+        assert_eq!(all.len(), BuiltinField::ALL.len(), "ALL has duplicates");
     }
 }

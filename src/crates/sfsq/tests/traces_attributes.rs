@@ -1,4 +1,4 @@
-//! Tag / tag-value enumeration acceptance suite (phase 4b).
+//! Attribute / attribute-value enumeration acceptance suite (phase 4b).
 //!
 //! The core criteria: keys and values come back as the typed neutral
 //! vocabulary, partitioned by scope, deterministically under source-order
@@ -21,13 +21,13 @@ use common::{
 };
 use sfsq::Source;
 use sfsq::traces::{
-    PartialReason, QueryStatus, SourceId, TagKey, TagNamesQuery, TagRequestError, TagScope,
-    TagValuesQuery, TimeWindow, TraceIntrinsic, TraceSfstCandidate, TraceSource, WalCoverage,
-    tag_names, tag_values,
+    PartialReason, QueryStatus, SourceId, AttributeKey, AttributeNamesQuery, AttributeRequestError, AttributeOwner,
+    AttributeValuesQuery, TimeWindow, BuiltinField, TraceSfstCandidate, TraceSource, WalCoverage,
+    attribute_names, attribute_values,
 };
 
-fn names(sources: Vec<TraceSource>, query: TagNamesQuery) -> sfsq::traces::TagNamesData {
-    tag_names(
+fn names(sources: Vec<TraceSource>, query: AttributeNamesQuery) -> sfsq::traces::AttributeNamesData {
+    attribute_names(
         sources,
         query,
         CancellationToken::new(),
@@ -36,8 +36,8 @@ fn names(sources: Vec<TraceSource>, query: TagNamesQuery) -> sfsq::traces::TagNa
     .expect("valid request")
 }
 
-fn values(sources: Vec<TraceSource>, query: TagValuesQuery) -> sfsq::traces::TagValuesData {
-    tag_values(
+fn values(sources: Vec<TraceSource>, query: AttributeValuesQuery) -> sfsq::traces::AttributeValuesData {
+    attribute_values(
         sources,
         query,
         CancellationToken::new(),
@@ -46,25 +46,25 @@ fn values(sources: Vec<TraceSource>, query: TagValuesQuery) -> sfsq::traces::Tag
     .expect("valid request")
 }
 
-fn value_strings(data: &sfsq::traces::TagValuesData) -> Vec<&str> {
+fn value_strings(data: &sfsq::traces::AttributeValuesData) -> Vec<&str> {
     data.values.iter().map(|v| v.value.as_str()).collect()
 }
 
 /// Attribute keys of one scope, as bare strings.
-fn scope_attrs(data: &sfsq::traces::TagNamesData, scope: TagScope) -> Vec<&str> {
+fn scope_attrs(data: &sfsq::traces::AttributeNamesData, scope: AttributeOwner) -> Vec<&str> {
     data.keys
         .iter()
         .filter(|(s, _)| *s == scope)
         .filter_map(|(_, k)| match k {
-            TagKey::Attribute(a) => Some(a.as_str()),
-            TagKey::Intrinsic(_) => None,
+            AttributeKey::Attribute(a) => Some(a.as_str()),
+            AttributeKey::Builtin(_) => None,
         })
         .collect()
 }
 
 /// Keys spread across every scope and all three source shapes, with
-/// mixed part_keys (distinct meta tags — D7): the key set must partition
-/// by scope, include the full static intrinsic set, exclude the internal
+/// mixed part_keys (distinct meta keys — D7): the key set must partition
+/// by owner, include the full static builtin set, exclude the internal
 /// facets and `trace_state`, and be identical under source permutations.
 #[test]
 fn keys_partition_scopes_deterministically_under_permutation() {
@@ -103,40 +103,40 @@ fn keys_partition_scopes_deterministically_under_permutation() {
         ]
     };
 
-    let data = names(build(), TagNamesQuery::new());
+    let data = names(build(), AttributeNamesQuery::new());
     assert_eq!(data.status, QueryStatus::Complete);
     assert!(!data.truncated);
 
-    assert_eq!(scope_attrs(&data, TagScope::Resource), ["host", "service.name"]);
+    assert_eq!(scope_attrs(&data, AttributeOwner::Resource), ["host", "service.name"]);
     // The span attribute named trace_state IS vocabulary (typed keys
-    // cannot collide with the excluded storage intrinsic).
+    // cannot collide with the excluded storage builtin).
     assert_eq!(
-        scope_attrs(&data, TagScope::Span),
+        scope_attrs(&data, AttributeOwner::Span),
         ["ratio", "retries", "trace_state"]
     );
-    assert_eq!(scope_attrs(&data, TagScope::Instrumentation), ["lang"]);
-    assert_eq!(scope_attrs(&data, TagScope::Event), ["attempt"]);
-    assert_eq!(scope_attrs(&data, TagScope::Link), ["rel"]);
+    assert_eq!(scope_attrs(&data, AttributeOwner::Instrumentation), ["lang"]);
+    assert_eq!(scope_attrs(&data, AttributeOwner::Event), ["attempt"]);
+    assert_eq!(scope_attrs(&data, AttributeOwner::Link), ["rel"]);
 
-    // The Intrinsic scope is the full static set (18B) and holds no
+    // The Builtin owner is the full static set (18B) and holds no
     // attributes; the internal facets never surface anywhere.
-    let intrinsics: Vec<TraceIntrinsic> = data
+    let builtins: Vec<BuiltinField> = data
         .keys
         .iter()
-        .filter(|(s, _)| *s == TagScope::Intrinsic)
+        .filter(|(s, _)| *s == AttributeOwner::Builtin)
         .map(|(_, k)| match k {
-            TagKey::Intrinsic(i) => *i,
-            TagKey::Attribute(a) => panic!("attribute {a:?} under Intrinsic"),
+            AttributeKey::Builtin(i) => *i,
+            AttributeKey::Attribute(a) => panic!("attribute {a:?} under Builtin"),
         })
         .collect();
-    let mut want: Vec<TraceIntrinsic> = TraceIntrinsic::ALL.to_vec();
+    let mut want: Vec<BuiltinField> = BuiltinField::ALL.to_vec();
     want.sort();
-    assert_eq!(intrinsics, want);
+    assert_eq!(builtins, want);
     for (_, key) in &data.keys {
-        if let TagKey::Attribute(a) = key {
+        if let AttributeKey::Attribute(a) = key {
             assert!(
                 a != "_kind" && a != "_status_code",
-                "internal facet {a:?} leaked into tags"
+                "internal facet {a:?} leaked into the key vocabulary"
             );
         }
     }
@@ -144,11 +144,11 @@ fn keys_partition_scopes_deterministically_under_permutation() {
     // Deterministic under permutation and scope-filterable.
     let mut sources = build();
     sources.rotate_left(1);
-    let rotated = names(sources, TagNamesQuery::new());
+    let rotated = names(sources, AttributeNamesQuery::new());
     assert_eq!(data.keys, rotated.keys);
-    let only_span = names(build(), TagNamesQuery::new().scope(TagScope::Span));
-    assert!(only_span.keys.iter().all(|(s, _)| *s == TagScope::Span));
-    assert_eq!(scope_attrs(&only_span, TagScope::Span), ["ratio", "retries", "trace_state"]);
+    let only_span = names(build(), AttributeNamesQuery::new().owner(AttributeOwner::Span));
+    assert!(only_span.keys.iter().all(|(s, _)| *s == AttributeOwner::Span));
+    assert_eq!(scope_attrs(&only_span, AttributeOwner::Span), ["ratio", "retries", "trace_state"]);
 }
 
 /// Values merge across a low-tier file, a mid-tier file (>100 distinct
@@ -189,7 +189,7 @@ fn values_merge_all_tiers_across_sources_with_exact_truncation() {
     };
 
     // Union of v: v0000..v0119 ∪ v1000..v1019 = 140 values, sorted.
-    let q = || TagValuesQuery::new(TagScope::Span, TagKey::Attribute("v".into()));
+    let q = || AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("v".into()));
     let data = values(sources(), q());
     assert_eq!(data.status, QueryStatus::Complete);
     assert!(!data.truncated);
@@ -206,7 +206,7 @@ fn values_merge_all_tiers_across_sources_with_exact_truncation() {
     // High tier enumerates through the arena.
     let hi = values(
         sources(),
-        TagValuesQuery::new(TagScope::Span, TagKey::Attribute("hi".into())),
+        AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("hi".into())),
     );
     assert_eq!(hi.values.len(), 1010);
 
@@ -222,7 +222,7 @@ fn values_merge_all_tiers_across_sources_with_exact_truncation() {
     // list-services: resource service.name values across the corpus.
     let svc = values(
         sources(),
-        TagValuesQuery::new(TagScope::Resource, TagKey::Attribute("service.name".into())),
+        AttributeValuesQuery::new(AttributeOwner::Resource, AttributeKey::Attribute("service.name".into())),
     );
     assert_eq!(value_strings(&svc), ["svc"]);
 }
@@ -247,7 +247,7 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
     let port = |wals: Vec<TraceSource>| {
         values(
             wals,
-            TagValuesQuery::new(TagScope::Span, TagKey::Attribute("port".into())),
+            AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("port".into())),
         )
     };
 
@@ -274,30 +274,30 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
         sealed_source(dir.path(), &wal_null, "null-sealed"),
         tail_source(&wal_null, "null-tail"),
     ] {
-        let keys = names(vec![source], TagNamesQuery::new());
+        let keys = names(vec![source], AttributeNamesQuery::new());
         // Rebuild the consumed source for the values call.
         assert!(
-            scope_attrs(&keys, TagScope::Span).contains(&"ghost"),
+            scope_attrs(&keys, AttributeOwner::Span).contains(&"ghost"),
             "null-only attr must stay vocabulary"
         );
     }
     let g = values(
         vec![sealed_source(dir.path(), &wal_null, "null-sealed-2")],
-        TagValuesQuery::new(TagScope::Span, TagKey::Attribute("ghost".into())),
+        AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("ghost".into())),
     );
     assert_eq!(value_strings(&g), [""]);
     assert_eq!(g.values[0].kind, None);
     let gt = values(
         vec![tail_source(&wal_null, "null-tail-2")],
-        TagValuesQuery::new(TagScope::Span, TagKey::Attribute("ghost".into())),
+        AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("ghost".into())),
     );
     assert_eq!(value_strings(&gt), [""]);
     assert_eq!(gt.values[0].kind, None);
 }
 
-/// Dictionary-backed intrinsics serve values (storage labels — the wire
-/// adapter maps vocabulary, decision 19-dissolved); virtual intrinsics
-/// are a request error (18B); the intrinsic key list never depends on
+/// Dictionary-backed builtins serve values (storage labels — the wire
+/// adapter maps vocabulary, decision 19-dissolved); virtual builtins
+/// are a request error (18B); the builtin key list never depends on
 /// the data (a status-less corpus still lists `Status`).
 #[test]
 fn intrinsic_values_serve_and_virtual_intrinsics_reject() {
@@ -316,48 +316,48 @@ fn intrinsic_values_serve_and_virtual_intrinsics_reject() {
         "i",
     );
     let src = || vec![sealed_source(dir.path(), &wal, "f")];
-    let intr = |i: TraceIntrinsic| {
+    let intr = |i: BuiltinField| {
         values(
             src(),
-            TagValuesQuery::new(TagScope::Intrinsic, TagKey::Intrinsic(i)),
+            AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(i)),
         )
     };
 
-    assert_eq!(value_strings(&intr(TraceIntrinsic::Name)), ["op-a"]);
-    assert_eq!(value_strings(&intr(TraceIntrinsic::Kind)), ["SERVER"]);
-    assert_eq!(value_strings(&intr(TraceIntrinsic::Status)), ["ERROR"]);
-    assert_eq!(value_strings(&intr(TraceIntrinsic::StatusMessage)), ["boom"]);
+    assert_eq!(value_strings(&intr(BuiltinField::Name)), ["op-a"]);
+    assert_eq!(value_strings(&intr(BuiltinField::Kind)), ["SERVER"]);
+    assert_eq!(value_strings(&intr(BuiltinField::Status)), ["ERROR"]);
+    assert_eq!(value_strings(&intr(BuiltinField::StatusMessage)), ["boom"]);
     assert_eq!(
-        value_strings(&intr(TraceIntrinsic::InstrumentationName)),
+        value_strings(&intr(BuiltinField::InstrumentationName)),
         ["mylib"]
     );
     assert_eq!(
-        value_strings(&intr(TraceIntrinsic::InstrumentationVersion)),
+        value_strings(&intr(BuiltinField::InstrumentationVersion)),
         ["1.2"]
     );
-    assert_eq!(value_strings(&intr(TraceIntrinsic::EventName)), ["retry"]);
+    assert_eq!(value_strings(&intr(BuiltinField::EventName)), ["retry"]);
 
     for virt in [
-        TraceIntrinsic::Duration,
-        TraceIntrinsic::SpanId,
-        TraceIntrinsic::ParentSpanId,
-        TraceIntrinsic::TraceId,
-        TraceIntrinsic::LinkSpanId,
-        TraceIntrinsic::LinkTraceId,
-        TraceIntrinsic::EventTimeSinceStart,
-        TraceIntrinsic::RootName,
-        TraceIntrinsic::RootServiceName,
-        TraceIntrinsic::TraceDuration,
+        BuiltinField::Duration,
+        BuiltinField::SpanId,
+        BuiltinField::ParentSpanId,
+        BuiltinField::TraceId,
+        BuiltinField::LinkSpanId,
+        BuiltinField::LinkTraceId,
+        BuiltinField::EventTimeSinceStart,
+        BuiltinField::RootName,
+        BuiltinField::RootServiceName,
+        BuiltinField::TraceDuration,
     ] {
-        let err = tag_values(
+        let err = attribute_values(
             src(),
-            TagValuesQuery::new(TagScope::Intrinsic, TagKey::Intrinsic(virt)),
+            AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(virt)),
             CancellationToken::new(),
             Arc::new(AtomicUsize::new(0)),
         )
         .unwrap_err();
         assert!(
-            matches!(err, TagRequestError::NotEnumerable(i) if i == virt),
+            matches!(err, AttributeRequestError::NotEnumerable(i) if i == virt),
             "virtual {virt:?} must be NotEnumerable"
         );
     }
@@ -366,16 +366,16 @@ fn intrinsic_values_serve_and_virtual_intrinsics_reject() {
     let plain = write_wal(dir.path(), vec![req(&[sp(9, 0, 1, "bare")])], "p");
     let keys = names(
         vec![sealed_source(dir.path(), &plain, "bare")],
-        TagNamesQuery::new().scope(TagScope::Intrinsic),
+        AttributeNamesQuery::new().owner(AttributeOwner::Builtin),
     );
     assert!(
         keys.keys
-            .contains(&(TagScope::Intrinsic, TagKey::Intrinsic(TraceIntrinsic::Status)))
+            .contains(&(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)))
     );
     // But its VALUES are an empty Complete result — a data condition.
     let sv = values(
         vec![sealed_source(dir.path(), &plain, "bare2")],
-        TagValuesQuery::new(TagScope::Intrinsic, TagKey::Intrinsic(TraceIntrinsic::Status)),
+        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)),
     );
     assert!(sv.values.is_empty());
     assert_eq!(sv.status, QueryStatus::Complete);
@@ -408,7 +408,7 @@ fn window_prunes_files_but_never_the_tail() {
     let who = |w: TimeWindow| {
         values(
             sources(),
-            TagValuesQuery::new(TagScope::Span, TagKey::Attribute("who".into()))
+            AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("who".into()))
                 .window(w),
         )
     };
@@ -430,11 +430,11 @@ fn window_prunes_files_but_never_the_tail() {
     // Keys are windowed the same way.
     let keys = names(
         sources(),
-        TagNamesQuery::new()
-            .scope(TagScope::Span)
+        AttributeNamesQuery::new()
+            .owner(AttributeOwner::Span)
             .window(TimeWindow::new(0, 10 * NS as i64).unwrap()),
     );
-    assert_eq!(scope_attrs(&keys, TagScope::Span), ["who"]);
+    assert_eq!(scope_attrs(&keys, AttributeOwner::Span), ["who"]);
 }
 
 /// Failed sources are reported (`SourceFailure`) while the rest serve —
@@ -472,13 +472,13 @@ fn failed_sources_reported_and_the_rest_served() {
         ]
     };
 
-    let keys = names(broken(), TagNamesQuery::new());
+    let keys = names(broken(), AttributeNamesQuery::new());
     assert!(keys.status.has(PartialReason::SourceFailure));
-    assert_eq!(scope_attrs(&keys, TagScope::Span), ["k"]);
+    assert_eq!(scope_attrs(&keys, AttributeOwner::Span), ["k"]);
 
     let vals = values(
         broken(),
-        TagValuesQuery::new(TagScope::Span, TagKey::Attribute("k".into())),
+        AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("k".into())),
     );
     assert!(vals.status.has(PartialReason::SourceFailure));
     assert_eq!(value_strings(&vals), ["v"]);
@@ -494,19 +494,19 @@ fn cancellation_is_all_or_empty() {
     let cancel = CancellationToken::new();
     cancel.cancel();
 
-    let keys = tag_names(
+    let keys = attribute_names(
         vec![sealed_source(dir.path(), &wal, "f")],
-        TagNamesQuery::new(),
+        AttributeNamesQuery::new(),
         cancel.clone(),
         Arc::new(AtomicUsize::new(0)),
     )
     .unwrap();
-    assert!(keys.keys.is_empty(), "no static intrinsics on cancellation");
+    assert!(keys.keys.is_empty(), "no static builtins on cancellation");
     assert!(keys.status.has(PartialReason::Cancelled));
 
-    let vals = tag_values(
+    let vals = attribute_values(
         Vec::new(),
-        TagValuesQuery::new(TagScope::Span, TagKey::Attribute("k".into())),
+        AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("k".into())),
         cancel,
         Arc::new(AtomicUsize::new(0)),
     )
@@ -515,7 +515,7 @@ fn cancellation_is_all_or_empty() {
     assert!(vals.status.has(PartialReason::Cancelled));
 }
 
-/// A tag absent from every source is a data condition: empty values,
+/// A key absent from every source is a data condition: empty values,
 /// `Complete`, not truncated (21A).
 #[test]
 fn absent_key_is_a_complete_empty() {
@@ -526,7 +526,7 @@ fn absent_key_is_a_complete_empty() {
             sealed_source(dir.path(), &wal, "f"),
             tail_source(&wal, "t"),
         ],
-        TagValuesQuery::new(TagScope::Link, TagKey::Attribute("nope".into())),
+        AttributeValuesQuery::new(AttributeOwner::Link, AttributeKey::Attribute("nope".into())),
     );
     assert!(data.values.is_empty());
     assert!(!data.truncated);
@@ -542,17 +542,17 @@ fn request_validation_rejects_bad_requests() {
     let counter = || Arc::new(AtomicUsize::new(0));
 
     assert!(matches!(
-        tag_names(Vec::new(), TagNamesQuery::new().max_keys(0), cancel(), counter()),
-        Err(TagRequestError::ZeroLimit)
+        attribute_names(Vec::new(), AttributeNamesQuery::new().max_keys(0), cancel(), counter()),
+        Err(AttributeRequestError::ZeroLimit)
     ));
     assert!(matches!(
-        tag_values(
+        attribute_values(
             Vec::new(),
-            TagValuesQuery::new(TagScope::Span, TagKey::Attribute("k".into())).max_values(0),
+            AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("k".into())).max_values(0),
             cancel(),
             counter()
         ),
-        Err(TagRequestError::ZeroLimit)
+        Err(AttributeRequestError::ZeroLimit)
     ));
     assert!(matches!(
         TimeWindow::new(5, 5),
@@ -563,25 +563,25 @@ fn request_validation_rejects_bad_requests() {
         Err(sfsq::traces::WindowError::Invalid { .. })
     ));
 
-    // Pin C4: intrinsic key outside the Intrinsic scope…
+    // Pin C4: builtin key outside the Builtin owner…
     assert!(matches!(
-        tag_values(
+        attribute_values(
             Vec::new(),
-            TagValuesQuery::new(TagScope::Span, TagKey::Intrinsic(TraceIntrinsic::Name)),
+            AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Builtin(BuiltinField::Name)),
             cancel(),
             counter()
         ),
-        Err(TagRequestError::IntrinsicKeyOutsideIntrinsicScope(TagScope::Span))
+        Err(AttributeRequestError::BuiltinKeyOutsideBuiltinOwner(AttributeOwner::Span))
     ));
     // …and attribute keys inside it.
     assert!(matches!(
-        tag_values(
+        attribute_values(
             Vec::new(),
-            TagValuesQuery::new(TagScope::Intrinsic, TagKey::Attribute("k".into())),
+            AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Attribute("k".into())),
             cancel(),
             counter()
         ),
-        Err(TagRequestError::AttributeKeyInIntrinsicScope(a)) if a == "k"
+        Err(AttributeRequestError::AttributeKeyUnderBuiltinOwner(a)) if a == "k"
     ));
 
     // Source-set hygiene runs on every operation.
@@ -599,46 +599,46 @@ fn request_validation_rejects_bad_requests() {
         })
     };
     assert!(matches!(
-        tag_names(
+        attribute_names(
             vec![dup("same"), dup("same")],
-            TagNamesQuery::new(),
+            AttributeNamesQuery::new(),
             cancel(),
             counter()
         ),
-        Err(TagRequestError::SourceSet(_))
+        Err(AttributeRequestError::SourceSet(_))
     ));
 }
 
 /// An empty source set with a live token is a Complete result: the
-/// static intrinsic vocabulary (18B) does not depend on sources
+/// static builtin vocabulary (18B) does not depend on sources
 /// existing, and attribute scopes are simply empty — pinned so a future
 /// change cannot gate the static set on "saw a source".
 #[test]
 fn empty_sources_still_yield_the_static_intrinsics() {
-    let data = names(Vec::new(), TagNamesQuery::new());
+    let data = names(Vec::new(), AttributeNamesQuery::new());
     assert_eq!(data.status, QueryStatus::Complete);
     assert!(!data.truncated);
-    let mut want: Vec<TraceIntrinsic> = TraceIntrinsic::ALL.to_vec();
+    let mut want: Vec<BuiltinField> = BuiltinField::ALL.to_vec();
     want.sort();
-    let got: Vec<TraceIntrinsic> = data
+    let got: Vec<BuiltinField> = data
         .keys
         .iter()
         .map(|(s, k)| match (s, k) {
-            (TagScope::Intrinsic, TagKey::Intrinsic(i)) => *i,
-            other => panic!("only static intrinsics expected, got {other:?}"),
+            (AttributeOwner::Builtin, AttributeKey::Builtin(i)) => *i,
+            other => panic!("only static builtins expected, got {other:?}"),
         })
         .collect();
     assert_eq!(got, want);
 
-    // A non-Intrinsic scope filter on zero sources: zero keys, Complete.
-    let span_only = names(Vec::new(), TagNamesQuery::new().scope(TagScope::Span));
+    // A non-Builtin owner filter on zero sources: zero keys, Complete.
+    let span_only = names(Vec::new(), AttributeNamesQuery::new().owner(AttributeOwner::Span));
     assert!(span_only.keys.is_empty());
     assert_eq!(span_only.status, QueryStatus::Complete);
 
     // Values on zero sources: an empty Complete (data condition).
     let vals = values(
         Vec::new(),
-        TagValuesQuery::new(TagScope::Span, TagKey::Attribute("k".into())),
+        AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("k".into())),
     );
     assert!(vals.values.is_empty());
     assert_eq!(vals.status, QueryStatus::Complete);

@@ -1,10 +1,10 @@
 //! Multi-source trace-query subsystem (phase 4a: cross-source
-//! trace-by-id; phase 4b: tag / tag-value enumeration).
+//! trace-by-id; phase 4b: attribute / attribute-value enumeration).
 //!
 //! Same philosophy as [`logs`](crate::logs): neutral, transport-free —
-//! plain Rust data in and out, no wire concerns; the consumer (the Tempo
-//! shim, phase 5) maps its own request/response format onto it. Design
-//! authority: the phase-4 design record in the traces plan repo — the
+//! plain Rust data in and out, no wire concerns; each consumer (the CLI,
+//! a future Netdata UI) maps its own request/response format onto it.
+//! Design authority: the phase-4 design record in the traces plan repo — the
 //! combiner, status, and identity contracts implemented here are pinned
 //! there.
 //!
@@ -26,7 +26,7 @@ mod predicate;
 mod search;
 mod sources;
 mod status;
-mod tags;
+mod attributes;
 mod vocab;
 mod wal_scan;
 mod window;
@@ -37,7 +37,7 @@ pub use predicate::{
     span_matches,
 };
 pub use search::{
-    DEFAULT_SEARCH_LIMIT, DEFAULT_SPSS, SPSS_MAX, SearchData, SearchQuery, SearchRequestError,
+    DEFAULT_SEARCH_LIMIT, DEFAULT_SPANS_PER_TRACE, SPANS_PER_TRACE_MAX, SearchData, SearchQuery, SearchRequestError,
     SearchSources, TraceSummary, search,
 };
 pub use sources::{
@@ -45,10 +45,10 @@ pub use sources::{
     validate_sources,
 };
 pub use status::{PartialReason, QueryStatus, StatusBuilder};
-pub use tags::{
-    TagNamesData, TagNamesQuery, TagRequestError, TagValue, TagValuesData, TagValuesQuery,
-    tag_names, tag_values,
+pub use attributes::{
+    AttributeNamesData, AttributeNamesQuery, AttributeRequestError, AttributeValue, AttributeValuesData, AttributeValuesQuery,
+    attribute_names, attribute_values,
 };
-pub use vocab::{TagKey, TagScope, TraceIntrinsic, storage_to_tag};
+pub use vocab::{AttributeKey, AttributeOwner, BuiltinField, storage_to_attribute};
 pub use wal_scan::{TraceScanError, TraceWalScan};
 pub use window::{TimeWindow, WindowError};

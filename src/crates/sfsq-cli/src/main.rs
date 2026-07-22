@@ -11,7 +11,7 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use sfsq_cli::traces::{
-    SearchArgs, TagValuesArgs, TagsArgs, TraceArgs, run_search, run_tag_values, run_tags,
+    SearchArgs, AttributeValuesArgs, AttributesArgs, TraceArgs, run_search, run_attribute_values, run_attributes,
     run_trace,
 };
 use sfsq_cli::{Args, init_tracing, is_broken_pipe, run};
@@ -36,11 +36,11 @@ enum Cmd {
     /// Reconstruct one trace across sealed SFSTs and traces WALs
     /// (cross-source trace-by-id over `sfsq::traces`).
     Trace(TraceArgs),
-    /// Enumerate tag keys across sealed SFSTs and traces WALs
-    /// (`sfsq::traces` tag enumeration).
-    Tags(TagsArgs),
-    /// Enumerate one tag's values across sealed SFSTs and traces WALs.
-    TagValues(TagValuesArgs),
+    /// Enumerate attribute and builtin-field keys across sealed SFSTs
+    /// and traces WALs (`sfsq::traces` key enumeration).
+    Attributes(AttributesArgs),
+    /// Enumerate one key's values across sealed SFSTs and traces WALs.
+    AttributeValues(AttributeValuesArgs),
     /// Search for traces across sealed SFSTs and traces WALs
     /// (`sfsq::traces` search: exact summaries, most-recent-first).
     Search(SearchArgs),
@@ -53,8 +53,8 @@ fn main() -> ExitCode {
     let mut out = stdout.lock();
     let subcommand = match &cli.cmd {
         Some(Cmd::Trace(args)) => Some(run_trace(args, &mut out)),
-        Some(Cmd::Tags(args)) => Some(run_tags(args, &mut out)),
-        Some(Cmd::TagValues(args)) => Some(run_tag_values(args, &mut out)),
+        Some(Cmd::Attributes(args)) => Some(run_attributes(args, &mut out)),
+        Some(Cmd::AttributeValues(args)) => Some(run_attribute_values(args, &mut out)),
         Some(Cmd::Search(args)) => Some(run_search(args, &mut out)),
         None => None,
     };
