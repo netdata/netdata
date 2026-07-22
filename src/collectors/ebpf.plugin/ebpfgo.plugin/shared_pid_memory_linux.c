@@ -21,7 +21,6 @@ struct shared_pid_memory {
     uint32_t update_every_s;
     int shm_fd;
     sem_t *sem;
-    bool shm_owned;        /* set on successful open; triggers unlink for the reused-takeover path */
     bool shm_name_created; /* set when this context created/recreated the SHM name; triggers unlink on any exit */
 };
 
@@ -205,7 +204,6 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
                 goto fail;
         }
     }
-    ctx->shm_owned = true;
     return ctx;
 
 fail:
@@ -272,18 +270,13 @@ void shared_pid_memory_close(struct shared_pid_memory *ctx)
     if (ctx->shm_fd >= 0)
         close(ctx->shm_fd);
 
-    /* Unlink the SHM name so /dev/shm is not littered across Netdata restarts
-     * or version-name bumps.  Two distinct conditions warrant unlinking:
-     * - shm_name_created: this context created/recreated the name, so it must
-     *   clean it up even if init failed later (prevents orphaned /dev/shm objects).
-     * - shm_owned: we fully completed as publisher; unlink on graceful exit so
-     *   the next restart gets a fresh inode (covers the reused-takeover path).
-     * A failed open on a pre-existing segment (both false) must not unlink a
-     * live publisher's name.
-     * The sem name is intentionally NOT unlinked: the sem object must outlive
-     * this process so consumers and the next writer both open the same
-     * underlying kernel object (P1 semaphore-desync lesson). */
-    if (ctx->shm_name_created || ctx->shm_owned)
+    /* Unlink only when this context created (or recreated) the SHM name.  A
+     * takeover of a pre-existing crashed segment (shm_name_created=false) must
+     * NOT unlink: the creator may have restarted and called replace_generation,
+     * and unlinking then would remove the new-generation name while the creator
+     * is still live.  The sem name is intentionally NOT unlinked: consumers and
+     * the next writer must share the same underlying kernel object. */
+    if (ctx->shm_name_created)
         (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
 
     free(ctx);

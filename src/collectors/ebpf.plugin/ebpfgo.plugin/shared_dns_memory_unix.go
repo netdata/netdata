@@ -15,7 +15,8 @@ package main
 static inline size_t dns_flow_off_timestamp_us_fn(void) { return offsetof(struct ebpfgo_dns_flow_record, timestamp_us); }
 static inline size_t dns_flow_off_domain_fn(void)       { return offsetof(struct ebpfgo_dns_flow_record, domain); }
 static inline size_t dns_flow_off_client_port_fn(void)  { return offsetof(struct ebpfgo_dns_flow_record, client_port); }
-static inline size_t dns_agg_off_queries_udp4_fn(void)  { return offsetof(struct ebpfgo_dns_aggregate, queries_udp4); }
+static inline size_t dns_agg_off_queries_udp4_fn(void)   { return offsetof(struct ebpfgo_dns_aggregate, queries_udp4); }
+static inline size_t dns_agg_off_responses_udp4_fn(void) { return offsetof(struct ebpfgo_dns_aggregate, responses_udp4); }
 */
 import "C"
 
@@ -73,6 +74,12 @@ func assertSharedDnsMemoryLayout() {
 	if got, want := unsafe.Offsetof(ebpfgoDnsAggregate{}.QueriesUDP4),
 		uintptr(C.dns_agg_off_queries_udp4_fn()); got != want {
 		panic(fmt.Sprintf("ebpfgo_dns_aggregate.QueriesUDP4 offset mismatch: Go=%d C=%d", got, want))
+	}
+	// ResponsesUDP4 is field 5 of 8 (offset 32). Checking a non-first same-typed
+	// field catches silent reorders that preserve total size.
+	if got, want := unsafe.Offsetof(ebpfgoDnsAggregate{}.ResponsesUDP4),
+		uintptr(C.dns_agg_off_responses_udp4_fn()); got != want {
+		panic(fmt.Sprintf("ebpfgo_dns_aggregate.ResponsesUDP4 offset mismatch: Go=%d C=%d", got, want))
 	}
 	if got, want := unsafe.Sizeof(ebpfgoDnsFlowRecord{}),
 		uintptr(C.sizeof_struct_ebpfgo_dns_flow_record); got != want {

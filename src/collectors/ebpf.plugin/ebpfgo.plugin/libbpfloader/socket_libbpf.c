@@ -154,10 +154,12 @@ struct netdata_ebpf_socket_runtime {
 
     /* Flat hash-table for per-PID accumulation during a snapshot cycle.
      * Allocated once in prepare(); reused every cycle (zeroed at start).
-     * pid_ht_size is a power of two >= SOCKET_PID_HT_MIN and >= nd_socket_size. */
+     * pid_ht_size is a power of two >= 2×SOCKET_PID_HT_MIN and >= 2×nd_socket_size
+     * to keep the open-addressing load factor at or below ~50%. */
     struct netdata_socket_per_pid_entry *pid_ht;
     uint32_t                             pid_ht_size;
     uint32_t                             pid_ht_mask;
+    uint32_t                             pid_ht_drops; /* PIDs dropped when table full (per cycle) */
 
     /* Compact sorted output array from last per-PID snapshot (reused). */
     struct netdata_socket_per_pid_entry *per_pid_entries;
@@ -232,11 +234,15 @@ static void socket_update_map_types(struct bpf_object *obj, int maps_per_core)
 
     enum bpf_map_type type = bpf_map__type(map);
     if (maps_per_core) {
-        if (type == BPF_MAP_TYPE_ARRAY)
-            bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_ARRAY);
+        if (type == BPF_MAP_TYPE_ARRAY) {
+            if (bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_ARRAY) != 0)
+                fprintf(stderr, "ebpf-go.plugin: socket: failed to set tbl_global_sock type to PERCPU_ARRAY\n");
+        }
     } else {
-        if (type == BPF_MAP_TYPE_PERCPU_ARRAY)
-            bpf_map__set_type(map, BPF_MAP_TYPE_ARRAY);
+        if (type == BPF_MAP_TYPE_PERCPU_ARRAY) {
+            if (bpf_map__set_type(map, BPF_MAP_TYPE_ARRAY) != 0)
+                fprintf(stderr, "ebpf-go.plugin: socket: failed to set tbl_global_sock type to ARRAY\n");
+        }
     }
 }
 
@@ -387,18 +393,20 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
      * A zero value means "keep the compiled-in default". */
     if (nd_socket_size > 0) {
         struct bpf_map *m = bpf_object__find_map_by_name(rt->obj, "tbl_nd_socket");
-        if (m)
-            bpf_map__set_max_entries(m, nd_socket_size);
+        if (m && bpf_map__set_max_entries(m, nd_socket_size) != 0)
+            fprintf(stderr, "ebpf-go.plugin: socket: failed to resize tbl_nd_socket to %u\n", nd_socket_size);
     }
     if (nv_udp_size > 0) {
         struct bpf_map *m = bpf_object__find_map_by_name(rt->obj, "tbl_nv_udp");
-        if (m)
-            bpf_map__set_max_entries(m, nv_udp_size);
+        if (m && bpf_map__set_max_entries(m, nv_udp_size) != 0)
+            fprintf(stderr, "ebpf-go.plugin: socket: failed to resize tbl_nv_udp to %u\n", nv_udp_size);
     }
 
-    /* Allocate per-CPU buffer for tbl_global_sock snapshot reads.
-     * Size depends on whether the map was switched to PERCPU_ARRAY. */
-    int ncpu = maps_per_core ? libbpf_num_possible_cpus() : 1;
+    /* Allocate per-CPU buffer for tbl_global_sock snapshot reads.  Always size
+     * for libbpf_num_possible_cpus() so the post-load type query in the
+     * snapshot path can safely use either ARRAY (count=1) or PERCPU_ARRAY
+     * (count=percpu_u64_cap) without a buffer overflow. */
+    int ncpu = libbpf_num_possible_cpus();
     if (ncpu <= 0)
         ncpu = 1;
 
@@ -424,13 +432,13 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
         return -1;
     rt->percpu_nd_socket_cap = lports_ncpu;
 
-    /* PID hash-table: sized to the next power of two at or above nd_socket_size,
-     * with SOCKET_PID_HT_MIN as the floor, so every BPF map entry has a slot.
-     * next_pow2_u32 wraps to zero for inputs > 2^31; reject those early. */
-    uint32_t ht_size = nd_socket_size > SOCKET_PID_HT_MIN ? nd_socket_size : SOCKET_PID_HT_MIN;
-    if (ht_size > 0x80000000u)
+    /* PID hash-table: 2× the expected entry count for ~50% max load factor,
+     * keeping open-addressing probe chains short and preventing silent drops.
+     * Guard against 2× overflow before calling next_pow2_u32. */
+    uint32_t ht_base = nd_socket_size > SOCKET_PID_HT_MIN ? nd_socket_size : SOCKET_PID_HT_MIN;
+    if (ht_base > 0x40000000u)
         return -1;
-    ht_size = next_pow2_u32(ht_size);
+    uint32_t ht_size = next_pow2_u32(ht_base * 2u);
     rt->pid_ht_size = ht_size;
     rt->pid_ht_mask = ht_size - 1u;
     rt->pid_ht = calloc(ht_size, sizeof(*rt->pid_ht));
@@ -483,8 +491,12 @@ int netdata_socket_runtime_snapshot(
     if (gfd < 0)
         return -1;
 
-    (void)maps_per_core; /* CPU count was fixed at prepare() time */
-    int count = rt->percpu_u64_cap > 0 ? rt->percpu_u64_cap : 1;
+    /* Query the actual post-load map type so the read count is correct even
+     * when bpf_map__set_type silently failed during prepare(). */
+    enum bpf_map_type gtype = bpf_map__type(gmap);
+    int count = (gtype == BPF_MAP_TYPE_PERCPU_ARRAY && rt->percpu_u64_cap > 0)
+                ? rt->percpu_u64_cap : 1;
+    (void)maps_per_core;
     uint64_t *ubuf = rt->percpu_u64;
     if (!ubuf)
         return -1;
@@ -594,8 +606,9 @@ static int pid_ht_compare(const void *a, const void *b)
     return (pa > pb) - (pa < pb);
 }
 
-/* Accumulate one BPF value into the per-PID hash table. */
-static void pid_ht_accumulate(struct netdata_socket_per_pid_entry *ht,
+/* Accumulate one BPF value into the per-PID hash table.
+ * Returns true on success, false when the table is full (PID dropped). */
+static bool pid_ht_accumulate(struct netdata_socket_per_pid_entry *ht,
                                uint32_t pid,
                                const netdata_socket_bpf_value_t *v,
                                uint32_t ht_size, uint32_t ht_mask)
@@ -618,10 +631,10 @@ static void pid_ht_accumulate(struct netdata_socket_per_pid_entry *ht,
             ht[s].call_close            += v->tcp.close;
             ht[s].call_tcp_v4_connection += v->tcp.ipv4_connect;
             ht[s].call_tcp_v6_connection += v->tcp.ipv6_connect;
-            return;
+            return true;
         }
     }
-    /* Hash table full — should not occur when pid_ht_size >= nd_socket_size. */
+    return false; /* table full */
 }
 
 /* Read tbl_nd_socket, aggregate per PID, and store a sorted result array.
@@ -649,8 +662,9 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
     enum bpf_map_type ndtype = bpf_map__type(ndmap);
     int ndcount = (ndtype == BPF_MAP_TYPE_PERCPU_HASH) ? rt->percpu_nd_socket_cap : 1;
 
-    /* Zero the hash table for this cycle. */
+    /* Zero the hash table for this cycle; reset per-cycle drop counter. */
     memset(rt->pid_ht, 0, rt->pid_ht_size * sizeof(*rt->pid_ht));
+    rt->pid_ht_drops = 0;
 
     /* Iterate all connection entries and accumulate per PID. */
     netdata_socket_bpf_key_t key = {}, next = {};
@@ -661,7 +675,8 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
         first_nditer = false;
         if (next.pid != 0 && bpf_map_lookup_elem(ndfd, &next, vbuf) == 0) {
             if (ndcount == 1) {
-                pid_ht_accumulate(rt->pid_ht, next.pid, vbuf, rt->pid_ht_size, rt->pid_ht_mask);
+                if (!pid_ht_accumulate(rt->pid_ht, next.pid, vbuf, rt->pid_ht_size, rt->pid_ht_mask))
+                    rt->pid_ht_drops++;
             } else {
                 /* PERCPU_HASH: sum per-CPU values into a temporary entry. */
                 netdata_socket_bpf_value_t agg = {0};
@@ -677,11 +692,16 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
                     agg.tcp.ipv4_connect        += vbuf[c].tcp.ipv4_connect;
                     agg.tcp.ipv6_connect        += vbuf[c].tcp.ipv6_connect;
                 }
-                pid_ht_accumulate(rt->pid_ht, next.pid, &agg, rt->pid_ht_size, rt->pid_ht_mask);
+                if (!pid_ht_accumulate(rt->pid_ht, next.pid, &agg, rt->pid_ht_size, rt->pid_ht_mask))
+                    rt->pid_ht_drops++;
             }
         }
         key = next;
     }
+
+    if (rt->pid_ht_drops > 0)
+        fprintf(stderr, "ebpf-go.plugin: socket: pid hash table full, %u PID(s) dropped this cycle\n",
+                rt->pid_ht_drops);
 
     /* Compact non-empty hash-table entries into the sorted output array. */
     int count = 0;

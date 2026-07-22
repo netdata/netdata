@@ -21,7 +21,6 @@ struct shared_dns_memory {
     uint32_t update_every_s;
     int shm_fd;
     sem_t *sem;
-    bool shm_owned;        /* set on successful open; triggers unlink for the reused-takeover path */
     bool shm_name_created; /* set when this context created/recreated the SHM name; triggers unlink on any exit */
 };
 
@@ -158,7 +157,6 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         }
     }
 
-    ctx->shm_owned = true;
     return ctx;
 
 fail:
@@ -222,12 +220,10 @@ void shared_dns_memory_close(struct shared_dns_memory *ctx)
         ctx->shm_fd = -1;
     }
 
-    /* Unlink the SHM name — see shared_pid_memory_linux.c for the full rationale.
-     * Unlink when shm_name_created (we created the name — clean up on any exit) or
-     * shm_owned (took over existing — clean up on graceful close).  Both false means
-     * a failed open on a pre-existing segment — must not unlink a live publisher's name.
-     * sem name is intentionally NOT unlinked here. */
-    if (ctx->shm_name_created || ctx->shm_owned)
+    /* See shared_pid_memory_linux.c for the full rationale.  Unlink only when
+     * this context created/recreated the name; a takeover must not unlink a
+     * name it did not create.  sem name is intentionally NOT unlinked. */
+    if (ctx->shm_name_created)
         (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
 
     free(ctx);

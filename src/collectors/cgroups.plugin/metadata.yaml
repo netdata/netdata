@@ -373,7 +373,7 @@ modules:
                 - name: received
                 - name: sent
             - name: cgroup.net_tcp_recv
-              description: TCP calls to cleanup buffer
+              description: TCP calls to clean up buffer
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -1129,7 +1129,7 @@ modules:
                 - name: received
                 - name: sent
             - name: systemd.service.net_tcp_recv
-              description: TCP calls to cleanup buffer
+              description: TCP calls to clean up buffer
               unit: "calls/s"
               chart_type: line
               dimensions:
