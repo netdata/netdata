@@ -739,6 +739,20 @@
 - Netdata fixes part 77 ([#23152](https://github.com/netdata/netdata/issues/23152))
 - Perflib Rework ([#23189](https://github.com/netdata/netdata/issues/23189))
 - Add missing information [#23151](https://github.com/netdata/netdata/issues/23151) ([#23186](https://github.com/netdata/netdata/issues/23186))
+- Bump go.d min go version go 1.26.2 ([#23204](https://github.com/netdata/netdata/issues/23204))
+- Netdata fixes part 69 ([#23140](https://github.com/netdata/netdata/issues/23140))
+- Netdata fixes part 72 ([#23143](https://github.com/netdata/netdata/issues/23143))
+- Netdata fixes part 74 ([#23145](https://github.com/netdata/netdata/issues/23145))
+- Netdata fixes part 76 ([#23151](https://github.com/netdata/netdata/issues/23151))
+- Docs: Add remote/LAN StatsD host binding guidance to statsd README ([#23025](https://github.com/netdata/netdata/issues/23025))
+- Docs: Add context discoverability guidance to charts docs ([#23051](https://github.com/netdata/netdata/issues/23051))
+- Docs: Add on-call rotation guidance to notifications overview ([#23052](https://github.com/netdata/netdata/issues/23052))
+- Perflib improvements ([#23205](https://github.com/netdata/netdata/issues/23205))
+- Docs: Clarify update every effect on tier granularity and retention ([#23106](https://github.com/netdata/netdata/issues/23106))
+- Migrate RPM package builds from netdata.spec.in to CPack ([#23194](https://github.com/netdata/netdata/issues/23194))
+- Update go version ([#23210](https://github.com/netdata/netdata/issues/23210))
+- Weights: method=anomaly-rate implies the anomaly-bit option on every path ([#23212](https://github.com/netdata/netdata/issues/23212))
+- Update minimum Go patch version to 2 ([#23215](https://github.com/netdata/netdata/issues/23215))
 
 ## [2.10.0] - 2026-04-09
 
