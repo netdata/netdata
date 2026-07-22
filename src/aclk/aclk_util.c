@@ -562,7 +562,7 @@ static int aclk_timeout_remaining_ms(usec_t start, int timeout_ms)
     if (timeout_ms <= 0)
         return 0;
 
-    usec_t elapsed_ms = (now_monotonic_usec() - start) / USEC_PER_MS;
+    usec_t elapsed_ms = clocks_usec_delta_or_zero(now_monotonic_usec(), start) / USEC_PER_MS;
     if (elapsed_ms >= (usec_t)timeout_ms)
         return 0;
 
@@ -586,7 +586,7 @@ static int aclk_write_all_timeout(int fd, const void *buf, size_t len, int timeo
         ssize_t n = write(fd, ((const uint8_t *)buf) + written, len - written);
         if (n < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-                if ((now_monotonic_usec() - start) / USEC_PER_MS > (usec_t)timeout_ms)
+                if (aclk_timeout_remaining_ms(start, timeout_ms) <= 0)
                     return 1;
                 continue;
             }
@@ -617,7 +617,7 @@ static int aclk_read_exact_timeout(int fd, void *buf, size_t len, int timeout_ms
             return 1;
         if (n < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
-                if ((now_monotonic_usec() - start) / USEC_PER_MS > (usec_t)timeout_ms)
+                if (aclk_timeout_remaining_ms(start, timeout_ms) <= 0)
                     return 1;
                 continue;
             }

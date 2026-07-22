@@ -560,13 +560,14 @@ static const char *mqtt_wss_error_tos(int ec)
 
 static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
 {
-    uint64_t exit_by_us = now_boottime_usec() + ((uint64_t)timeout_ms * USEC_PER_MS);
+    const usec_t start_ut = now_monotonic_usec();
+    const usec_t timeout_ut = (usec_t)timeout_ms * USEC_PER_MS;
     client->poll_fds[POLLFD_SOCKET].events |= POLLOUT; // TODO when entering mwtt_wss_service use out buffer size to arm POLLOUT
     while (rbuf_bytes_available(client->ws_client->buf_write)) {
-        const uint64_t now_us = now_boottime_usec();
-        if (now_us >= exit_by_us)
+        const usec_t elapsed_ut = clocks_usec_delta_or_zero(now_monotonic_usec(), start_ut);
+        if (elapsed_ut >= timeout_ut)
             return MWS_TIMED_OUT;
-        if (mqtt_wss_service(client, (int)((exit_by_us - now_us) / USEC_PER_MS)))
+        if (mqtt_wss_service(client, (int)((timeout_ut - elapsed_ut) / USEC_PER_MS)))
             return MWS_ERROR;
     }
     return MWS_OK;
@@ -639,7 +640,7 @@ static void set_socket_pollfds(mqtt_wss_client client, int ssl_ret) {
 }
 
 static bool mqtt_wss_io_watchdog_expired_at(mqtt_wss_client client, usec_t now_ut) {
-    return now_ut - client->last_io_progress_ut >
+    return clocks_usec_delta_or_zero(now_ut, client->last_io_progress_ut) >
            (usec_t)MQTT_WSS_IO_WATCHDOG_SECS * USEC_PER_SEC;
 }
 

@@ -481,7 +481,7 @@ static usec_t https_req_timeout_to_usec(time_t timeout_s) {
 }
 
 static bool https_req_timed_out_at(const https_req_ctx_t *ctx, usec_t now_ut) {
-    return now_ut - ctx->req_start_ut >= ctx->req_timeout_ut;
+    return clocks_usec_delta_or_zero(now_ut, ctx->req_start_ut) >= ctx->req_timeout_ut;
 }
 
 static int https_req_check_timedout(https_req_ctx_t *ctx) {
