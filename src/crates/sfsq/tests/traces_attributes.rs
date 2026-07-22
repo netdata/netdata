@@ -1,7 +1,7 @@
 //! Attribute / attribute-value enumeration acceptance suite (phase 4b).
 //!
 //! The core criteria: keys and values come back as the typed neutral
-//! vocabulary, partitioned by scope, deterministically under source-order
+//! vocabulary, partitioned by owner, deterministically under source-order
 //! permutation, merged across all dictionary tiers and the tail's pair
 //! table, with exact truncation flags — never touching sealed span rows
 //! (the access-pattern proof lives in sfst's unit tests, next to the
@@ -51,10 +51,10 @@ fn value_strings(data: &sfsq::traces::AttributeValuesData) -> Vec<&str> {
 }
 
 /// Attribute keys of one scope, as bare strings.
-fn scope_attrs(data: &sfsq::traces::AttributeNamesData, scope: AttributeOwner) -> Vec<&str> {
+fn owner_attrs(data: &sfsq::traces::AttributeNamesData, owner: AttributeOwner) -> Vec<&str> {
     data.keys
         .iter()
-        .filter(|(s, _)| *s == scope)
+        .filter(|(o, _)| *o == owner)
         .filter_map(|(_, k)| match k {
             AttributeKey::Attribute(a) => Some(a.as_str()),
             AttributeKey::Builtin(_) => None,
@@ -107,16 +107,16 @@ fn keys_partition_scopes_deterministically_under_permutation() {
     assert_eq!(data.status, QueryStatus::Complete);
     assert!(!data.truncated);
 
-    assert_eq!(scope_attrs(&data, AttributeOwner::Resource), ["host", "service.name"]);
+    assert_eq!(owner_attrs(&data, AttributeOwner::Resource), ["host", "service.name"]);
     // The span attribute named trace_state IS vocabulary (typed keys
     // cannot collide with the excluded storage builtin).
     assert_eq!(
-        scope_attrs(&data, AttributeOwner::Span),
+        owner_attrs(&data, AttributeOwner::Span),
         ["ratio", "retries", "trace_state"]
     );
-    assert_eq!(scope_attrs(&data, AttributeOwner::Instrumentation), ["lang"]);
-    assert_eq!(scope_attrs(&data, AttributeOwner::Event), ["attempt"]);
-    assert_eq!(scope_attrs(&data, AttributeOwner::Link), ["rel"]);
+    assert_eq!(owner_attrs(&data, AttributeOwner::Instrumentation), ["lang"]);
+    assert_eq!(owner_attrs(&data, AttributeOwner::Event), ["attempt"]);
+    assert_eq!(owner_attrs(&data, AttributeOwner::Link), ["rel"]);
 
     // The Builtin owner is the full static set (18B) and holds no
     // attributes; the internal facets never surface anywhere.
@@ -148,7 +148,7 @@ fn keys_partition_scopes_deterministically_under_permutation() {
     assert_eq!(data.keys, rotated.keys);
     let only_span = names(build(), AttributeNamesQuery::new().owner(AttributeOwner::Span));
     assert!(only_span.keys.iter().all(|(s, _)| *s == AttributeOwner::Span));
-    assert_eq!(scope_attrs(&only_span, AttributeOwner::Span), ["ratio", "retries", "trace_state"]);
+    assert_eq!(owner_attrs(&only_span, AttributeOwner::Span), ["ratio", "retries", "trace_state"]);
 }
 
 /// Values merge across a low-tier file, a mid-tier file (>100 distinct
@@ -277,7 +277,7 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
         let keys = names(vec![source], AttributeNamesQuery::new());
         // Rebuild the consumed source for the values call.
         assert!(
-            scope_attrs(&keys, AttributeOwner::Span).contains(&"ghost"),
+            owner_attrs(&keys, AttributeOwner::Span).contains(&"ghost"),
             "null-only attr must stay vocabulary"
         );
     }
@@ -300,7 +300,7 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
 /// are a request error (18B); the builtin key list never depends on
 /// the data (a status-less corpus still lists `Status`).
 #[test]
-fn intrinsic_values_serve_and_virtual_intrinsics_reject() {
+fn builtin_values_serve_and_virtual_builtins_reject() {
     let dir = tempfile::tempdir().unwrap();
     let mut a = sp(1, 0, 1_000, "op-a");
     a.kind = 2; // SERVER
@@ -434,7 +434,7 @@ fn window_prunes_files_but_never_the_tail() {
             .owner(AttributeOwner::Span)
             .window(TimeWindow::new(0, 10 * NS as i64).unwrap()),
     );
-    assert_eq!(scope_attrs(&keys, AttributeOwner::Span), ["who"]);
+    assert_eq!(owner_attrs(&keys, AttributeOwner::Span), ["who"]);
 }
 
 /// Failed sources are reported (`SourceFailure`) while the rest serve —
@@ -474,7 +474,7 @@ fn failed_sources_reported_and_the_rest_served() {
 
     let keys = names(broken(), AttributeNamesQuery::new());
     assert!(keys.status.has(PartialReason::SourceFailure));
-    assert_eq!(scope_attrs(&keys, AttributeOwner::Span), ["k"]);
+    assert_eq!(owner_attrs(&keys, AttributeOwner::Span), ["k"]);
 
     let vals = values(
         broken(),
@@ -563,6 +563,26 @@ fn request_validation_rejects_bad_requests() {
         Err(sfsq::traces::WindowError::Invalid { .. })
     ));
 
+    // `Any` is a predicate construct; enumeration takes a concrete owner.
+    assert!(matches!(
+        attribute_names(
+            Vec::new(),
+            AttributeNamesQuery::new().owner(AttributeOwner::Any),
+            cancel(),
+            counter()
+        ),
+        Err(AttributeRequestError::AnyOwnerNotEnumerable)
+    ));
+    assert!(matches!(
+        attribute_values(
+            Vec::new(),
+            AttributeValuesQuery::new(AttributeOwner::Any, AttributeKey::Attribute("k".into())),
+            cancel(),
+            counter()
+        ),
+        Err(AttributeRequestError::AnyOwnerNotEnumerable)
+    ));
+
     // Pin C4: builtin key outside the Builtin owner…
     assert!(matches!(
         attribute_values(
@@ -614,7 +634,7 @@ fn request_validation_rejects_bad_requests() {
 /// existing, and attribute scopes are simply empty — pinned so a future
 /// change cannot gate the static set on "saw a source".
 #[test]
-fn empty_sources_still_yield_the_static_intrinsics() {
+fn empty_sources_still_yield_the_static_builtins() {
     let data = names(Vec::new(), AttributeNamesQuery::new());
     assert_eq!(data.status, QueryStatus::Complete);
     assert!(!data.truncated);

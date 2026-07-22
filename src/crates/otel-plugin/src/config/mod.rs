@@ -895,8 +895,10 @@ logs:
     fn tempo_key_is_rejected() {
         // The Tempo shim was removed; strict parsing refuses its former key
         // so a stale config fails loudly instead of silently not listening.
-        assert!(resolve_with_user("traces:\n  tempo:\n    enabled: true\n").is_err());
-        assert!(resolve_with_user("logs:\n  tempo:\n    enabled: true\n").is_err());
+        let err = resolve_with_user("traces:\n  tempo:\n    enabled: true\n").unwrap_err();
+        assert!(format!("{err:#}").contains("unknown field `tempo`"), "{err:#}");
+        let err = resolve_with_user("logs:\n  tempo:\n    enabled: true\n").unwrap_err();
+        assert!(format!("{err:#}").contains("unknown field `tempo`"), "{err:#}");
     }
 
     // -- Validation --

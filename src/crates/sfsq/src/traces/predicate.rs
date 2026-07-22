@@ -646,7 +646,7 @@ impl Predicate {
                         PredicateTarget::Attribute(owner, key) => {
                             let prefix = owner
                                 .attribute_prefix()
-                                .expect("validated: not the Builtin owner");
+                                .expect("validated: a concrete attribute owner (not Builtin or Any)");
                             vec![format!("{prefix}{key}")]
                         }
                         PredicateTarget::Builtin(i) => vec![

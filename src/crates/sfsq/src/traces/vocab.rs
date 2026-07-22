@@ -227,7 +227,7 @@ mod tests {
     /// stays a SPAN attribute (typed keys cannot collide — the 17A
     /// collision argument dissolved for exactly this reason).
     #[test]
-    fn attribute_named_like_an_intrinsic_does_not_collide() {
+    fn attribute_named_like_a_builtin_does_not_collide() {
         assert_eq!(
             storage_to_attribute("attributes.trace_state"),
             Some((AttributeOwner::Span, AttributeKey::Attribute("trace_state".to_string())))
@@ -241,7 +241,7 @@ mod tests {
     /// The virtual/dictionary split is total and matches the pinned
     /// sets; ALL enumerates every variant exactly once.
     #[test]
-    fn intrinsic_split_is_pinned() {
+    fn builtin_split_is_pinned() {
         use BuiltinField::*;
         let dictionary: Vec<BuiltinField> = BuiltinField::ALL
             .into_iter()
