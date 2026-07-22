@@ -556,6 +556,7 @@ run_as_root() {
 }
 
 run_script() {
+  old_pwd="${PWD}"
   set_tmpdir
 
   export NETDATA_SCRIPT_STATUS_PATH="${tmpdir}/.script-status"
@@ -576,6 +577,7 @@ run_script() {
     rm -f "${NETDATA_SCRIPT_STATUS_PATH}"
   fi
 
+  cd "${old_pwd}" || true
   return "${ret}"
 }
 
@@ -725,7 +727,9 @@ handle_wget_result() {
 check_for_remote_file() {
   url="${1}"
 
+  old_pwd="${PWD}"
   set_tmpdir
+  cd "${old_pwd}" || true
   dl_log="${tmpdir}/download.log"
   rm -f "${dl_log}"
 
@@ -757,7 +761,9 @@ download() {
   url="${1}"
   dest="${2}"
 
+  old_pwd="${PWD}"
   set_tmpdir
+  cd "${old_pwd}" || true
   dl_log="${tmpdir}/download.log"
   rm -f "${dl_log}"
 
@@ -787,7 +793,9 @@ get_actual_version() {
     major="${1}"
     channel="${2}"
     url="${RELEASE_INFO_URL}/${channel}/${major}"
+    old_pwd="${PWD}"
     set_tmpdir
+    cd "${old_pwd}" || true
     tmp_file="${tmpdir}/version-info"
 
     if check_for_remote_file "${RELEASE_INFO_URL}"; then
@@ -804,7 +812,9 @@ get_actual_version() {
 
 get_redirect() {
   url="${1}"
+  old_pwd="${PWD}"
   set_tmpdir
+  cd "${old_pwd}" || true
   output="${tmpdir}/download.log"
   rm -f "${output}"
 
