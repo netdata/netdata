@@ -44,6 +44,9 @@ func dnsTestParseRawPacket(p unsafe.Pointer, buf []byte) bool {
 // exercise the overflow guard.  Returns the number of bytes consumed (0 on
 // error), matching the C function's contract.
 func dnsTestReadName(msg []byte, offset, outSize int) int {
+	if outSize <= 0 {
+		return 0
+	}
 	out := make([]byte, outSize)
 	var msgPtr *C.char
 	if len(msg) > 0 {
