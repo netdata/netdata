@@ -140,12 +140,14 @@ static struct json_object *create_hdr(const char *type, const char *msg_id)
     tmp = json_object_new_int64(ts_us);
     json_object_object_add(obj, "timestamp-offset-usec", tmp);
 
-    tmp = json_object_new_int64(aclk_session_sec);
+    usec_t session = aclk_session_load();
+
+    tmp = json_object_new_int64(session / USEC_PER_SEC);
     json_object_object_add(obj, "connect", tmp);
 
 // TODO handle this somehow see above
-//    tmp = json_object_new_uint64(0 /* TODO aclk_session_us */);
-    tmp = json_object_new_int64(aclk_session_us);
+//    tmp = json_object_new_uint64(session % USEC_PER_SEC);
+    tmp = json_object_new_int64(session % USEC_PER_SEC);
     json_object_object_add(obj, "connect-offset-usec", tmp);
 
     tmp = json_object_new_int(ACLK_HEADER_VERSION);
@@ -299,7 +301,7 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     update_agent_connection_t conn = {
         .reachable = (reachable ? 1 : 0),
         .lwt = 0,
-        .session_id = aclk_session_newarch,
+        .session_id = aclk_session_load(),
         .capabilities = aclk_get_agent_capas(),
     };
 
@@ -333,7 +335,7 @@ char *aclk_generate_lwt(size_t *size) {
     update_agent_connection_t conn = {
         .reachable = 0,
         .lwt = 1,
-        .session_id = aclk_session_newarch,
+        .session_id = aclk_session_load(),
         .capabilities = NULL
     };
 

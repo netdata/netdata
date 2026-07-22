@@ -30,7 +30,7 @@ int registry_log_open(void) {
     if(registry.log_fp)
         fclose(registry.log_fp);
 
-    registry.log_fp = fopen(registry.log_filename, "a");
+    registry.log_fp = registry_fopen_regular(registry.log_filename, "a");
     if(registry.log_fp) {
         if (setvbuf(registry.log_fp, NULL, _IOLBF, 0) != 0)
             netdata_log_error("Cannot set line buffering on registry log file.");
@@ -53,7 +53,7 @@ void registry_log_recreate(void) {
         registry_log_close();
 
         // open it with truncate
-        registry.log_fp = fopen(registry.log_filename, "w");
+        registry.log_fp = registry_fopen_regular(registry.log_filename, "w");
         if(registry.log_fp) fclose(registry.log_fp);
         else
             netdata_log_error("Cannot truncate registry log '%s'", registry.log_filename);
@@ -71,7 +71,7 @@ ssize_t registry_log_load(void) {
     registry_log_close();
 
     netdata_log_debug(D_REGISTRY, "Registry: loading active db from: %s", registry.log_filename);
-    FILE *fp = fopen(registry.log_filename, "r");
+    FILE *fp = registry_fopen_regular(registry.log_filename, "r");
     if(!fp)
         netdata_log_error("Registry: cannot open registry file: %s", registry.log_filename);
     else {

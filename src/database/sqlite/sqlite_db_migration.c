@@ -47,13 +47,17 @@ int db_table_count(sqlite3 *database)
 int table_exists_in_database(sqlite3 *database, const char *table)
 {
     char *err_msg = NULL;
-    char sql[128];
 
     int exists = 0;
 
-    snprintf(sql, sizeof(sql) - 1, "select 1 from sqlite_schema where type = 'table' and name = '%s'", table);
+    char *sql = sqlite3_mprintf("select 1 from sqlite_schema where type = 'table' and name = %Q", table);
+    if (unlikely(!sql)) {
+        netdata_log_info("Error checking table existence; failed to allocate SQL statement");
+        return 0;
+    }
 
     int rc = sqlite3_exec_monitored(database, sql, return_int_cb, (void *) &exists, &err_msg);
+    sqlite3_free(sql);
     if (rc != SQLITE_OK) {
         netdata_log_info("Error checking table existence; %s", err_msg);
         sqlite3_free(err_msg);
@@ -65,13 +69,17 @@ int table_exists_in_database(sqlite3 *database, const char *table)
 static int column_exists_in_table(sqlite3 *database, const char *table, const char *column)
 {
     char *err_msg = NULL;
-    char sql[128];
 
     int exists = 0;
 
-    snprintf(sql, sizeof(sql) - 1, "SELECT 1 FROM pragma_table_info('%s') where name = '%s'", table, column);
+    char *sql = sqlite3_mprintf("SELECT 1 FROM pragma_table_info(%Q) where name = %Q", table, column);
+    if (unlikely(!sql)) {
+        netdata_log_info("Error checking column existence; failed to allocate SQL statement");
+        return 0;
+    }
 
     int rc = sqlite3_exec_monitored(database, sql, return_int_cb, (void *) &exists, &err_msg);
+    sqlite3_free(sql);
     if (rc != SQLITE_OK) {
         netdata_log_info("Error checking column existence; %s", err_msg);
         sqlite3_free(err_msg);
@@ -187,18 +195,22 @@ static int do_migration_v2_v3(sqlite3 *database)
 }
 
 // For every table whose name matches 'like_pattern' and is missing 'column',
-// run each statement in 'stmts_fmt' (one '%s' placeholder for the table name).
+// run each SQLite-formatted statement in 'stmts_fmt' (one '%w' conversion inside double quotes).
 static int add_column_to_matching_tables(
     sqlite3 *database, const char *like_pattern, const char *column,
     const char *const *stmts_fmt, size_t stmt_count, const char *err_context)
 {
-    char sql[256];
-
-    snprintfz(sql, sizeof(sql) - 1,
-              "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE '%s'", like_pattern);
+    char *sql = sqlite3_mprintf(
+        "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE %Q", like_pattern);
+    if (unlikely(!sql)) {
+        error_report("Failed to allocate statement to alter %s tables", err_context);
+        return 1;
+    }
 
     sqlite3_stmt *res = NULL;
-    if (sqlite3_prepare_v2(database, sql, -1, &res, 0) != SQLITE_OK) {
+    int rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
+    sqlite3_free(sql);
+    if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to alter %s tables", err_context);
         return 1;
     }
@@ -210,8 +222,15 @@ static int add_column_to_matching_tables(
         char *table = strdupz(name);
         if (!column_exists_in_table(database, table, column)) {
             for (size_t i = 0; i < stmt_count; i++) {
-                snprintfz(sql, sizeof(sql) - 1, stmts_fmt[i], table);
+                sql = sqlite3_mprintf(stmts_fmt[i], table);
+                if (unlikely(!sql)) {
+                    error_report("Failed to allocate statement to alter %s tables", err_context);
+                    freez(table);
+                    SQLITE_FINALIZE(res);
+                    return 1;
+                }
                 sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+                sqlite3_free(sql);
             }
         }
         freez(table);
@@ -224,7 +243,7 @@ static int add_column_to_matching_tables(
 
 static int do_migration_v3_v4(sqlite3 *database)
 {
-    const char *stmts[] = { "ALTER TABLE %s ADD chart_context text" };
+    const char *stmts[] = { "ALTER TABLE \"%w\" ADD chart_context text" };
     return add_column_to_matching_tables(database, "health_log_%", "chart_context", stmts, 1, "health_log");
 }
 
@@ -241,15 +260,15 @@ static int do_migration_v5_v6(sqlite3 *database)
 static int do_migration_v6_v7(sqlite3 *database)
 {
     const char *stmts[] = {
-        "ALTER TABLE %s ADD filtered_alert_unique_id",
-        "UPDATE %s SET filtered_alert_unique_id = alert_unique_id",
+        "ALTER TABLE \"%w\" ADD filtered_alert_unique_id",
+        "UPDATE \"%w\" SET filtered_alert_unique_id = alert_unique_id",
     };
     return add_column_to_matching_tables(database, "aclk_alert_%", "filtered_alert_unique_id", stmts, 2, "aclk_alert");
 }
 
 static int do_migration_v7_v8(sqlite3 *database)
 {
-    const char *stmts[] = { "ALTER TABLE %s ADD transition_id blob" };
+    const char *stmts[] = { "ALTER TABLE \"%w\" ADD transition_id blob" };
     return add_column_to_matching_tables(database, "health_log_%", "transition_id", stmts, 1, "health_log");
 }
 
@@ -356,8 +375,8 @@ static int do_migration_v11_v12(sqlite3 *database)
     return rc;
 }
 
-// Run 'stmt_fmt' (one '%s' placeholder for the object name) against every name
-// returned by 'select_sql', batched into a single execution.
+// Run 'stmt_fmt' (one '%w' conversion inside double quotes) against every name returned
+// by 'select_sql', batched into a single execution.
 static int execute_on_matching_names(
     sqlite3 *database, const char *select_sql, const char *stmt_fmt, const char *err_context)
 {
@@ -373,7 +392,15 @@ static int execute_on_matching_names(
         const char *name = (const char *) sqlite3_column_text(res, 0);
         if (unlikely(!name))
             continue;
-        buffer_sprintf(wb, stmt_fmt, name);
+        char *sql = sqlite3_mprintf(stmt_fmt, name);
+        if (unlikely(!sql)) {
+            error_report("Failed to allocate statement to %s", err_context);
+            SQLITE_FINALIZE(res);
+            buffer_free(wb);
+            return 1;
+        }
+        buffer_strcat(wb, sql);
+        sqlite3_free(sql);
         count++;
     }
 
@@ -391,7 +418,7 @@ static int do_migration_v14_v15(sqlite3 *database)
     return execute_on_matching_names(
         database,
         "SELECT name FROM sqlite_schema WHERE type = \"index\" AND name LIKE \"aclk_alert_index@_%\" ESCAPE \"@\"",
-        "DROP INDEX IF EXISTS %s; ",
+        "DROP INDEX IF EXISTS \"%w\"; ",
         "drop unused indices");
 }
 
@@ -400,7 +427,7 @@ static int do_migration_v15_v16(sqlite3 *database)
     return execute_on_matching_names(
         database,
         "SELECT name FROM sqlite_schema WHERE type = \"table\" AND name LIKE \"aclk_alert_%\"",
-        "ANALYZE %s ; ",
+        "ANALYZE \"%w\"; ",
         "analyze aclk_alert tables");
 }
 

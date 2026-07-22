@@ -10,12 +10,12 @@
 
 include(ExternalProject)
 
-set(SQLITE_VERSION "3.50.4")
-set(SQLITE_VERSION_NUMBER "3500400")
-set(SQLITE_VERSION_YEAR "2025")
+set(SQLITE_VERSION "3.53.3")
+set(SQLITE_VERSION_NUMBER "3530300")
+set(SQLITE_VERSION_YEAR "2026")
 
-set(SQLITE_TARBALL_SHA256 "b7b4dc060f36053902fb65b344bbbed592e64b2291a26ac06fe77eec097850e9")
-set(SQLITE_GIT_SHA "8ed5e7365e6f12f427910188bbf6b254daad2ef6") # tag is: version-${SQLITE_VERSION}
+set(SQLITE_TARBALL_SHA256 "bb80bf8a3bffc19241ce8aba5a4bc74e9c3980013cb0b5f0f0976a99516942af")
+set(SQLITE_GIT_SHA "92a6c5c3636faa021ecc3be5403a00f50f65eda7") # tag is: version-${SQLITE_VERSION}
 
 option(SQLITE_USE_GIT "Fetch SQLite sources via git clone instead of tarball" OFF)
 
@@ -62,7 +62,7 @@ function(netdata_bundle_sqlite3)
                 set(_SQLITE_BUILD_CMD     "${_ND_SQLITE_BASH}" -c "make sqlite3.c sqlite3.h")
         else()
                 set(_SQLITE_CONFIGURE_CMD "${sqlite_SOURCE_DIR}/configure" --enable-update-limit)
-                set(_SQLITE_BUILD_CMD     make sqlite3.c sqlite3.h)
+                set(_SQLITE_BUILD_CMD     "${CMAKE_COMMAND}" -E env MAKEFLAGS= make sqlite3.c sqlite3.h)
         endif()
 
         ExternalProject_Add(
@@ -71,6 +71,7 @@ function(netdata_bundle_sqlite3)
                 SOURCE_DIR "${sqlite_SOURCE_DIR}"
                 BINARY_DIR "${sqlite_BINARY_DIR}"
                 CONFIGURE_COMMAND ${_SQLITE_CONFIGURE_CMD}
+                # GNU Make jobserver flags are not understood by FreeBSD make.
                 BUILD_COMMAND ${_SQLITE_BUILD_CMD}
                 INSTALL_COMMAND ${CMAKE_COMMAND} -E copy
                         "${sqlite_BINARY_DIR}/sqlite3.c"

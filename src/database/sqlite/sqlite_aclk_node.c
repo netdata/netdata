@@ -106,7 +106,7 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
     freez(node_info.node_instance_capabilities);
     freez(host_version);
 
-    aclk_host_config->node_collectors_send = now_realtime_sec();
+    aclk_send_timestamp_set(&aclk_host_config->node_collectors_send, now_realtime_sec());
 }
 
 void send_node_info_with_wait(RRDHOST *host)
@@ -204,7 +204,9 @@ void aclk_check_node_info_and_collectors(void)
             continue;
         }
 
-        if (!aclk_host_config->node_info_send_time && !aclk_host_config->node_collectors_send)
+        time_t node_info_send_time = aclk_send_timestamp_get(&aclk_host_config->node_info_send_time);
+        time_t node_collectors_send = aclk_send_timestamp_get(&aclk_host_config->node_collectors_send);
+        if (!node_info_send_time && !node_collectors_send)
             continue;
 
         if (unlikely(rrdhost_receiver_replicating_charts(host))) {
@@ -228,24 +230,26 @@ void aclk_check_node_info_and_collectors(void)
 
         bool pp_queue_empty = !rrdcontext_queue_entries(&host->rrdctx.pp_queue);
 
-        if (!pp_queue_empty && (aclk_host_config->node_info_send_time || aclk_host_config->node_collectors_send)) {
+        if (!pp_queue_empty && (node_info_send_time || node_collectors_send)) {
             context_pp++;
             hostname_snapshot_update(&context_pp_host, host);
         }
 
-        if (pp_queue_empty && aclk_host_config->node_info_send_time &&
-            aclk_host_config->node_info_send_time + 30 < now) {
-            aclk_host_config->node_info_send_time = 0;
+        node_info_send_time = aclk_send_timestamp_get(&aclk_host_config->node_info_send_time);
+        if (pp_queue_empty && node_info_send_time &&
+            nd_time_t_add_compare(node_info_send_time, 30, now) < 0 &&
+            aclk_send_timestamp_claim(&aclk_host_config->node_info_send_time, node_info_send_time)) {
             build_node_info(host, NULL);
             schedule_node_state_update(host, 10000);
             internal_error(true, "ACLK SYNC: Sending node info for %s", rrdhost_hostname(host));
         }
 
-        if (pp_queue_empty && aclk_host_config->node_collectors_send &&
-            aclk_host_config->node_collectors_send + 30 < now) {
+        node_collectors_send = aclk_send_timestamp_get(&aclk_host_config->node_collectors_send);
+        if (pp_queue_empty && node_collectors_send &&
+            nd_time_t_add_compare(node_collectors_send, 30, now) < 0 &&
+            aclk_send_timestamp_claim(&aclk_host_config->node_collectors_send, node_collectors_send)) {
             build_node_collectors(host);
             internal_error(true, "ACLK SYNC: Sending collectors for %s", rrdhost_hostname(host));
-            aclk_host_config->node_collectors_send = 0;
         }
     }
     dfe_done(host);

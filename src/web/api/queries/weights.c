@@ -4,6 +4,14 @@
 #include "KolmogorovSmirnovDist.h"
 
 #define MAX_POINTS 10000
+
+static bool weights_points_exceed_max(size_t points, uint32_t shifts) {
+    if(unlikely(shifts >= sizeof(points) * CHAR_BIT))
+        return points != 0;
+
+    return points > ((size_t)MAX_POINTS >> shifts);
+}
+
 int metric_correlations_version = 1;
 
 typedef struct weights_stats {
@@ -427,7 +435,6 @@ struct query_weights_data {
     struct query_timings timings;
 
     size_t examined_dimensions;
-    bool anomaly_bit_used;
     bool register_zero;
 
     DICTIONARY *results;
@@ -450,7 +457,6 @@ struct query_weights_thread_data {
     DICTIONARY *local_results;
     WEIGHTS_STATS local_stats;
     size_t local_examined_dimensions;
-    bool local_anomaly_bit_used;
     struct query_versions local_versions;
     RRDHOST **hosts;
     struct completion completion;
@@ -486,7 +492,6 @@ void query_weights_worker_thread(void *arg)
     // Initialize local statistics
     memset(&thread_data->local_stats, 0, sizeof(WEIGHTS_STATS));
     thread_data->local_examined_dimensions = 0;
-    thread_data->local_anomaly_bit_used = false;
     memset(&thread_data->local_versions, 0, sizeof(struct query_versions));
 
     // Copy only immutable query inputs; mutable state is shared atomically or owned by this worker.
@@ -505,7 +510,6 @@ void query_weights_worker_thread(void *arg)
         .timeout_us = main_qwd->timeout_us,
         .timings.received_ut = main_qwd->timings.received_ut,
         .examined_dimensions = thread_data->local_examined_dimensions,
-        .anomaly_bit_used = thread_data->local_anomaly_bit_used,
         .register_zero = main_qwd->register_zero,
         .results = thread_data->local_results,
         .host_snapshots = main_qwd->host_snapshots,
@@ -579,7 +583,6 @@ void query_weights_worker_thread(void *arg)
 
         // Process the host using the callback
         ssize_t ret = weights_do_node_callback(&local_qwd, host, queryable_host);
-        thread_data->local_anomaly_bit_used = local_qwd.anomaly_bit_used;
         if (ret < 0)
             break;
 
@@ -2216,12 +2219,11 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
             break;
 
         case WEIGHTS_METHOD_ANOMALY_RATE:
-            qwd->anomaly_bit_used = true;
             rrdset_weights_value(
                     host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
-                    qwr->options | RRDR_OPTION_ANOMALY_BIT,
+                    qwr->options,
                     qwr->time_group_method, qwr->time_group_options, qwr->tier,
                     &qwd->stats, qwd->register_zero
             );
@@ -2434,7 +2436,6 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
     // Wait for all threads to complete
     ssize_t total_added = 0;
-    bool anomaly_bit_used = false;
     for (size_t i = 0; i < num_threads; i++) {
         completion_wait_for(&thread_data[i].completion);
         completion_destroy(&thread_data[i].completion);
@@ -2445,7 +2446,6 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
         // Accumulate examined dimensions
         __atomic_fetch_add(&qwd->examined_dimensions, thread_data[i].local_examined_dimensions, __ATOMIC_RELAXED);
-        anomaly_bit_used |= thread_data[i].local_anomaly_bit_used;
 
         // Merge version hashes
         qwd->versions.contexts_hard_hash += thread_data[i].local_versions.contexts_hard_hash;
@@ -2457,7 +2457,6 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         register_result_destroy(thread_data[i].local_results);
     }
 
-    qwd->anomaly_bit_used |= anomaly_bit_used;
     total_added = (ssize_t) dictionary_entries(qwd->results);
 
     // Cleanup
@@ -2591,12 +2590,12 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
 
         // if the baseline size will not comply to MAX_POINTS
         // lower the window of the baseline
-        while(qwd.shifts && (qwr->points << qwd.shifts) > MAX_POINTS)
+        while(qwd.shifts && weights_points_exceed_max(qwr->points, qwd.shifts))
             qwd.shifts--;
 
         // if the baseline size still does not comply to MAX_POINTS
         // lower the resolution of the highlight and the baseline
-        while((qwr->points << qwd.shifts) > MAX_POINTS)
+        while(weights_points_exceed_max(qwr->points, qwd.shifts))
             qwr->points = qwr->points >> 1;
 
         if(qwr->points < 15) {
@@ -2616,24 +2615,22 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
         qwr->options &= ~RRDR_OPTION_NONZERO;
     }
 
+    if(qwr->method == WEIGHTS_METHOD_ANOMALY_RATE)
+        // the method means anomaly rates: imply the option on every
+        // path, so all paths rank by anomaly rates and the response
+        // reports the option
+        qwr->options |= RRDR_OPTION_ANOMALY_BIT;
+
     if(qwr->host && qwr->version == 1)
         weights_do_node_callback(&qwd, qwr->host, true);
     else {
         if((qwd.qwr->method == WEIGHTS_METHOD_VALUE || qwd.qwr->method == WEIGHTS_METHOD_ANOMALY_RATE) && (qwd.contexts_sp || qwd.scope_contexts_sp)) {
-
-            if(qwd.qwr->format == WEIGHTS_FORMAT_MCP && qwd.qwr->method == WEIGHTS_METHOD_ANOMALY_RATE)
-                qwd.qwr->options |= RRDR_OPTION_ANOMALY_BIT;
-
             rrdset_weights_multi_dimensional_value(&qwd);
         }
         else {
             query_scope_foreach_host_parallel(qwd.scope_nodes_sp, qwd.nodes_sp, &qwd);
         }
     }
-
-    // Preserve response metadata only after worker reads of the request have finished.
-    if(qwd.anomaly_bit_used)
-        qwr->options |= RRDR_OPTION_ANOMALY_BIT;
 
     if(!qwd.register_zero) {
         // put it back, to show it in the response
@@ -2853,6 +2850,44 @@ static int mc_unittest4(void) {
     return errors + ret;
 }
 
+static int weights_points_exceed_max_unittest(void) {
+    static const struct {
+        size_t points;
+        uint32_t shifts;
+        bool expected;
+        const char *description;
+    } cases[] = {
+        { 0, UINT32_MAX, false, "zero points at maximum shift" },
+        { MAX_POINTS - 1, 0, false, "below maximum" },
+        { MAX_POINTS, 0, false, "at maximum" },
+        { MAX_POINTS + 1, 0, true, "above maximum" },
+        { MAX_POINTS / 2, 1, false, "shifted value at maximum" },
+        { MAX_POINTS / 2 + 1, 1, true, "shifted value above maximum" },
+        { 1, 13, false, "one point below shift threshold" },
+        { 2, 13, true, "two points at shift threshold" },
+        { 1, 14, true, "one point above shift threshold" },
+        { (size_t)1 << (sizeof(size_t) * CHAR_BIT - 1), 1, true, "native-width wrap pair" },
+        { SIZE_MAX, 0, true, "maximum points" },
+        { SIZE_MAX, 29, true, "maximum points at source maximum shift" },
+        { 1, (uint32_t)(sizeof(size_t) * CHAR_BIT - 1), true, "one point at native maximum shift" },
+        { 1, (uint32_t)(sizeof(size_t) * CHAR_BIT), true, "one point at native width" },
+        { 1, UINT32_MAX, true, "one point at maximum shift" },
+    };
+
+    int errors = 0;
+    for(size_t i = 0; i < _countof(cases); i++) {
+        bool actual = weights_points_exceed_max(cases[i].points, cases[i].shifts);
+        int ret = actual == cases[i].expected ? 0 : 1;
+
+        fprintf(stderr, "%s weights point limit %s: points=%zu, shifts=%u, expected=%s, got=%s\n",
+                ret ? "FAILED" : "OK", cases[i].description, cases[i].points, cases[i].shifts,
+                cases[i].expected ? "true" : "false", actual ? "true" : "false");
+        errors += ret;
+    }
+
+    return errors;
+}
+
 int mc_unittest(void) {
     int errors = 0;
 
@@ -2860,6 +2895,7 @@ int mc_unittest(void) {
     errors += mc_unittest2();
     errors += mc_unittest3();
     errors += mc_unittest4();
+    errors += weights_points_exceed_max_unittest();
 
     return errors;
 }

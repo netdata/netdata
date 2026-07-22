@@ -410,9 +410,16 @@ MCP_FUNCTION_REGISTRY_ENTRY *mcp_functions_registry_get(RRDHOST *host, const cha
     MCP_FUNCTION_REGISTRY_ENTRY *entry = dictionary_get(functions_registry, key_str);
     MCP_FUNCTION_REGISTRY_ENTRY *old_entry = NULL;
 
-    if(entry && entry->last_update + MCP_FUNCTIONS_REGISTRY_TTL < now && spinlock_trylock(&entry->update_spinlock)) {
-        old_entry = entry;
-        entry = NULL;
+    if(entry) {
+        rw_spinlock_read_lock(&entry->spinlock);
+
+        if(entry->last_update + MCP_FUNCTIONS_REGISTRY_TTL < now && spinlock_trylock(&entry->update_spinlock)) {
+            rw_spinlock_read_unlock(&entry->spinlock);
+            old_entry = entry;
+            entry = NULL;
+        }
+        else
+            return entry;
     }
 
     if(!entry) {

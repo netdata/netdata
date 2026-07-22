@@ -375,13 +375,21 @@ int ctx_unittest(void)
     nd_uuid_t host_uuid;
     uuid_generate(host_uuid);
 
+    sqlite3 *saved_db_context_meta = db_context_meta;
+    bool owns_sqlite_lifecycle = !saved_db_context_meta;
+
     if (sqlite_library_init())
         return 1;
 
     int rc = sql_init_context_database(1);
 
-    if (rc != SQLITE_OK)
+    if (rc != SQLITE_OK) {
+        sql_close_database(db_context_meta, "CONTEXT");
+        db_context_meta = saved_db_context_meta;
+        if (owns_sqlite_lifecycle)
+            sqlite_library_shutdown();
         return 1;
+    }
 
     // Store a context
     VERSIONED_CONTEXT_DATA context_data;
@@ -453,7 +461,9 @@ int ctx_unittest(void)
     netdata_log_info("List context end after delete");
 
     sql_close_database(db_context_meta, "CONTEXT");
-    sqlite_library_shutdown();
+    db_context_meta = saved_db_context_meta;
+    if (owns_sqlite_lifecycle)
+        sqlite_library_shutdown();
 
     return 0;
 }

@@ -361,39 +361,149 @@ int hash256_string(const unsigned char *string, size_t size, char *hash) {
 }
 
 
+#if defined(__SIZEOF_INT128__)
+typedef __int128 rrdr_time_wide_t;
+
+static inline rrdr_time_wide_t rrdr_time_wide_from_time_t(time_t value) {
+    return value;
+}
+
+static inline rrdr_time_wide_t rrdr_time_wide_add(rrdr_time_wide_t a, rrdr_time_wide_t b) {
+    return a + b;
+}
+
+static inline rrdr_time_wide_t rrdr_time_wide_subtract(rrdr_time_wide_t a, rrdr_time_wide_t b) {
+    return a - b;
+}
+
+static inline rrdr_time_wide_t rrdr_time_wide_negate(rrdr_time_wide_t value) {
+    return -value;
+}
+
+static inline int rrdr_time_wide_compare(rrdr_time_wide_t a, rrdr_time_wide_t b) {
+    return (a > b) - (a < b);
+}
+#else
+// Some 32-bit targets have 64-bit time_t but no native 128-bit integer.
+typedef struct {
+    uintmax_t high;
+    uintmax_t low;
+} rrdr_time_wide_t;
+
+static inline rrdr_time_wide_t rrdr_time_wide_from_time_t(time_t value) {
+    return (rrdr_time_wide_t){
+        .high = value < 0 ? UINTMAX_MAX : 0,
+        .low = (uintmax_t)value,
+    };
+}
+
+static inline rrdr_time_wide_t rrdr_time_wide_add(rrdr_time_wide_t a, rrdr_time_wide_t b) {
+    rrdr_time_wide_t result = {
+        .low = a.low + b.low,
+        .high = a.high + b.high,
+    };
+    result.high += result.low < a.low;
+    return result;
+}
+
+static inline rrdr_time_wide_t rrdr_time_wide_subtract(rrdr_time_wide_t a, rrdr_time_wide_t b) {
+    rrdr_time_wide_t result = {
+        .low = a.low - b.low,
+        .high = a.high - b.high,
+    };
+    result.high -= a.low < b.low;
+    return result;
+}
+
+static inline rrdr_time_wide_t rrdr_time_wide_negate(rrdr_time_wide_t value) {
+    rrdr_time_wide_t result = {
+        .low = ~value.low + 1,
+        .high = ~value.high,
+    };
+    result.high += result.low == 0;
+    return result;
+}
+
+static inline int rrdr_time_wide_compare(rrdr_time_wide_t a, rrdr_time_wide_t b) {
+    const uintmax_t sign_bit = (uintmax_t)1 << (sizeof(uintmax_t) * CHAR_BIT - 1);
+    bool a_is_negative = a.high & sign_bit;
+    bool b_is_negative = b.high & sign_bit;
+
+    if(a_is_negative != b_is_negative)
+        return a_is_negative ? -1 : 1;
+
+    if(a.high != b.high)
+        return a.high > b.high ? 1 : -1;
+
+    return (a.low > b.low) - (a.low < b.low);
+}
+#endif
+
+_Static_assert((time_t)-1 < (time_t)0, "time-window normalization requires signed time_t");
+_Static_assert(sizeof(time_t) <= sizeof(uintmax_t), "time_t must fit in uintmax_t");
+
+static inline time_t rrdr_time_wide_to_time_t(rrdr_time_wide_t value) {
+    const time_t maximum = nd_time_t_max();
+    const time_t minimum = nd_time_t_min();
+    const rrdr_time_wide_t maximum_wide = rrdr_time_wide_from_time_t(maximum);
+    const rrdr_time_wide_t minimum_wide = rrdr_time_wide_from_time_t(minimum);
+
+    if(rrdr_time_wide_compare(value, maximum_wide) > 0)
+        return maximum;
+
+    if(rrdr_time_wide_compare(value, minimum_wide) < 0)
+        return minimum;
+
+#if defined(__SIZEOF_INT128__)
+    return (time_t)value;
+#else
+    if(rrdr_time_wide_compare(value, rrdr_time_wide_from_time_t(0)) >= 0)
+        return (time_t)value.low;
+
+    uintmax_t magnitude = ~value.low + 1;
+    if(magnitude == (uintmax_t)maximum + 1)
+        return minimum;
+
+    return -(time_t)magnitude;
+#endif
+}
+
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now) {
     if(!now) now = now_realtime_sec();
 
     int absolute_period_requested = -1;
-    time_t before_requested = *before;
-    time_t after_requested = *after;
+    const rrdr_time_wide_t zero = rrdr_time_wide_from_time_t(0);
+    rrdr_time_wide_t before_requested = rrdr_time_wide_from_time_t(*before);
+    rrdr_time_wide_t after_requested = rrdr_time_wide_from_time_t(*after);
+    rrdr_time_wide_t now_requested = rrdr_time_wide_from_time_t(now);
 
     // allow relative for before (smaller than API_RELATIVE_TIME_MAX)
-    if(ABS(before_requested) <= API_RELATIVE_TIME_MAX) {
+    if(rrdr_relative_window_value_is_relative(*before)) {
         // if the user asked for a positive relative time,
         // flip it to a negative
-        if(before_requested > 0)
-            before_requested = -before_requested;
+        if(rrdr_time_wide_compare(before_requested, zero) > 0)
+            before_requested = rrdr_time_wide_negate(before_requested);
 
-        before_requested = now + before_requested;
+        before_requested = rrdr_time_wide_add(now_requested, before_requested);
         absolute_period_requested = 0;
     }
 
     // allow relative for after (smaller than API_RELATIVE_TIME_MAX)
-    if(ABS(after_requested) <= API_RELATIVE_TIME_MAX) {
-        if(after_requested > 0)
-            after_requested = -after_requested;
+    if(rrdr_relative_window_value_is_relative(*after)) {
+        if(rrdr_time_wide_compare(after_requested, zero) > 0)
+            after_requested = rrdr_time_wide_negate(after_requested);
 
         // if the user didn't give an after, use the number of points
         // to give a sane default
-        if(after_requested == 0)
-            after_requested = -600;
+        if(rrdr_time_wide_compare(after_requested, zero) == 0)
+            after_requested = rrdr_time_wide_from_time_t(-600);
 
         // since the query engine now returns inclusive timestamps
         // it is awkward to return 6 points when after=-5 is given
         // so for relative queries we add 1 second, to give
         // more predictable results to users.
-        after_requested = before_requested + after_requested + 1;
+        after_requested = rrdr_time_wide_add(
+            rrdr_time_wide_add(before_requested, after_requested), rrdr_time_wide_from_time_t(1));
         absolute_period_requested = 0;
     }
 
@@ -401,8 +511,8 @@ bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now)
         absolute_period_requested = 1;
 
     // check if the parameters are flipped
-    if(after_requested > before_requested) {
-        long long t = before_requested;
+    if(rrdr_time_wide_compare(after_requested, before_requested) > 0) {
+        rrdr_time_wide_t t = before_requested;
         before_requested = after_requested;
         after_requested = t;
     }
@@ -410,21 +520,22 @@ bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now)
     // if the query requests future data
     // shift the query back to be in the present time
     // (this may also happen because of the rules above)
-    if(before_requested > now) {
-        time_t delta = before_requested - now;
-        before_requested -= delta;
-        after_requested  -= delta;
+    if(rrdr_time_wide_compare(before_requested, now_requested) > 0) {
+        rrdr_time_wide_t delta = rrdr_time_wide_subtract(before_requested, now_requested);
+        before_requested = rrdr_time_wide_subtract(before_requested, delta);
+        after_requested = rrdr_time_wide_subtract(after_requested, delta);
     }
 
-    *before = before_requested;
-    *after = after_requested;
+    *before = rrdr_time_wide_to_time_t(before_requested);
+    *after = rrdr_time_wide_to_time_t(after_requested);
 
     return (absolute_period_requested != 1);
 }
 
-// Returns 1 if an absolute period was requested or 0 if it was a relative period
+// Returns true if both endpoints were absolute.
 bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest) {
-    time_t now = now_realtime_sec() - 1;
+    time_t now = rrdr_time_wide_to_time_t(rrdr_time_wide_subtract(
+        rrdr_time_wide_from_time_t(now_realtime_sec()), rrdr_time_wide_from_time_t(1)));
 
     if(now_ptr)
         *now_ptr = now;
@@ -432,10 +543,12 @@ bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_
     time_t before_requested = *before;
     time_t after_requested = *after;
 
-    int absolute_period_requested = rrdr_relative_window_to_absolute(&after_requested, &before_requested, now);
+    bool relative_period_requested = rrdr_relative_window_to_absolute(&after_requested, &before_requested, now);
 
-    time_t absolute_minimum_time = now - (10 * 365 * 86400);
-    time_t absolute_maximum_time = now + (1 * 365 * 86400);
+    time_t absolute_minimum_time = rrdr_time_wide_to_time_t(rrdr_time_wide_subtract(
+        rrdr_time_wide_from_time_t(now), rrdr_time_wide_from_time_t(10 * 365 * 86400)));
+    time_t absolute_maximum_time = rrdr_time_wide_to_time_t(rrdr_time_wide_add(
+        rrdr_time_wide_from_time_t(now), rrdr_time_wide_from_time_t(1 * 365 * 86400)));
 
     if (after_requested < absolute_minimum_time && !unittest)
         after_requested = absolute_minimum_time;
@@ -452,7 +565,7 @@ bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_
     *before = before_requested;
     *after = after_requested;
 
-    return (absolute_period_requested != 1);
+    return !relative_period_requested;
 }
 
 

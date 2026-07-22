@@ -358,15 +358,64 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
         return false;
     }
 
+    // Do not let the callback child run the spawn server's private signal handlers before it can reset them.
+    sigset_t callback_signals, previous_mask;
+    sigemptyset(&callback_signals);
+    sigaddset(&callback_signals, SIGTERM);
+    sigaddset(&callback_signals, SIGCHLD);
+
+    int mask_rc = pthread_sigmask(SIG_BLOCK, &callback_signals, &previous_mask);
+    if(mask_rc != 0) {
+        errno = mask_rc;
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to block callback child signals before fork().");
+        return false;
+    }
+
     pid_t pid = fork();
+    int fork_errno = errno;
+
+    if(pid != 0) {
+        mask_rc = pthread_sigmask(SIG_SETMASK, &previous_mask, NULL);
+        if(mask_rc != 0) {
+            if(pid > 0) {
+                kill(pid, SIGKILL);
+
+                while(waitpid(pid, NULL, 0) == -1 && errno == EINTR) { }
+            }
+
+            spawn_server_exit = true;
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to restore signal mask after callback fork().");
+            errno = mask_rc;
+            return false;
+        }
+    }
+
     if (pid < 0) {
         // fork failed
 
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to fork() child for callback.");
+        errno = fork_errno;
         return false;
     }
     else if (pid == 0) {
         // the child
+
+        struct sigaction sa = {
+            .sa_handler = SIG_DFL,
+        };
+        sigemptyset(&sa.sa_mask);
+
+        if(sigaction(SIGTERM, &sa, NULL) == -1 || sigaction(SIGCHLD, &sa, NULL) == -1) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to reset callback child signal handlers.");
+            _exit(EXIT_FAILURE);
+        }
+
+        mask_rc = pthread_sigmask(SIG_SETMASK, &previous_mask, NULL);
+        if(mask_rc != 0) {
+            errno = mask_rc;
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Failed to restore callback child signal mask.");
+            _exit(EXIT_FAILURE);
+        }
 
         // close the server sockets;
         close(server->sock); server->sock = -1;
