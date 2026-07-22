@@ -34,6 +34,12 @@ enum aclk_database_opcode {
     ACLK_MAX_ENUMERATIONS_DEFINED
 };
 
+enum aclk_alert_snapshot_state {
+    ACLK_ALERT_SNAPSHOT_IDLE = 0,
+    ACLK_ALERT_SNAPSHOT_PENDING,
+    ACLK_ALERT_SNAPSHOT_READY,
+};
+
 typedef struct aclk_sync_cfg_t {
     RRDHOST *host;
     uv_timer_t timer;
@@ -49,8 +55,8 @@ typedef struct aclk_sync_cfg_t {
     uint64_t pending_ctx_version_hash;
     time_t pending_ctx_saved_monotonic_s;
 
-    int8_t send_snapshot;
-    bool stream_alerts;
+    int8_t send_snapshot; // atomic: shared by health, query, and alert-push workers
+    bool stream_alerts;   // atomic: published by query worker and read by alert-push/status threads
     int alert_count;
     int snapshot_count;
     int checkpoint_count;
@@ -58,6 +64,54 @@ typedef struct aclk_sync_cfg_t {
     time_t node_collectors_send;
     char node_id[UUID_STR_LEN];
 } aclk_sync_cfg_t;
+
+static inline enum aclk_alert_snapshot_state aclk_alert_snapshot_state_get(aclk_sync_cfg_t *aclk_host_config)
+{
+    return (enum aclk_alert_snapshot_state)__atomic_load_n(&aclk_host_config->send_snapshot, __ATOMIC_ACQUIRE);
+}
+
+static inline void aclk_alert_snapshot_request(aclk_sync_cfg_t *aclk_host_config)
+{
+    // A request arriving while READY is covered by the full snapshot already scheduled from the frozen health state.
+    int8_t expected = ACLK_ALERT_SNAPSHOT_IDLE;
+    (void)__atomic_compare_exchange_n(
+        &aclk_host_config->send_snapshot,
+        &expected,
+        ACLK_ALERT_SNAPSHOT_PENDING,
+        false,
+        __ATOMIC_RELAXED,
+        __ATOMIC_RELAXED);
+}
+
+static inline bool aclk_alert_snapshot_mark_ready(aclk_sync_cfg_t *aclk_host_config)
+{
+    int8_t expected = __atomic_load_n(&aclk_host_config->send_snapshot, __ATOMIC_RELAXED);
+    if (expected != ACLK_ALERT_SNAPSHOT_PENDING)
+        return false;
+
+    return __atomic_compare_exchange_n(
+        &aclk_host_config->send_snapshot,
+        &expected,
+        ACLK_ALERT_SNAPSHOT_READY,
+        false,
+        __ATOMIC_RELEASE,
+        __ATOMIC_RELAXED);
+}
+
+static inline void aclk_alert_snapshot_complete(aclk_sync_cfg_t *aclk_host_config)
+{
+    __atomic_store_n(&aclk_host_config->send_snapshot, ACLK_ALERT_SNAPSHOT_IDLE, __ATOMIC_RELEASE);
+}
+
+static inline bool aclk_alert_streaming_enabled(aclk_sync_cfg_t *aclk_host_config)
+{
+    return __atomic_load_n(&aclk_host_config->stream_alerts, __ATOMIC_ACQUIRE);
+}
+
+static inline void aclk_alert_streaming_set(aclk_sync_cfg_t *aclk_host_config, bool enabled)
+{
+    __atomic_store_n(&aclk_host_config->stream_alerts, enabled, __ATOMIC_RELEASE);
+}
 
 void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid, nd_uuid_t *node_id);
 void destroy_aclk_config(RRDHOST *host);

@@ -426,7 +426,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
     {
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        if (aclk_host_config && aclk_host_config->send_snapshot == 2)
+        if (aclk_host_config && aclk_alert_snapshot_state_get(aclk_host_config) == ACLK_ALERT_SNAPSHOT_READY)
             return;
     }
 
@@ -899,8 +899,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
     if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        if (aclk_host_config && aclk_host_config->send_snapshot == 1) {
-            aclk_host_config->send_snapshot = 2;
+        if (aclk_host_config && aclk_alert_snapshot_mark_ready(aclk_host_config)) {
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         } else {
             worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE);

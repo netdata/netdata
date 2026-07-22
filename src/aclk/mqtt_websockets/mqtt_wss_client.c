@@ -725,7 +725,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             worker_is_busy(WORKER_ACLK_SENT_PING);
         } else {
             if (ping_timeout && ping_timeout < now) {
-                disconnect_req = ACLK_PING_TIMEOUT;
+                __atomic_store_n(&disconnect_req, ACLK_PING_TIMEOUT, __ATOMIC_RELAXED);
                 ping_timeout = 0;
             }
             // if poll timed out and user requested timeout was being used

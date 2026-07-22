@@ -77,9 +77,6 @@ extern time_t last_disconnect_time;
 extern time_t next_connection_attempt;
 extern float last_backoff_value;
 
-extern usec_t aclk_session_us;
-extern time_t aclk_session_sec;
-
 extern time_t aclk_block_until;
 
 extern int aclk_connection_counter;
