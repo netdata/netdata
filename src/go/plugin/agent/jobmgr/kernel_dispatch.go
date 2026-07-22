@@ -9,10 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
-func taskClassForOperation(
-	operation *commandOperation,
-	lane *commandLane,
-) lifecycle.TaskClass {
+func taskClassForOperation(operation *commandOperation, lane *commandLane) lifecycle.TaskClass {
 	if operation.Source == lifecycle.SourceJobManager || lane.mapKey.resource {
 		return lifecycle.TaskClassFrameworkControl
 	}
@@ -35,11 +32,7 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 			(ck.shutdownPhase != commandShutdownActionDrain ||
 				operation.parent == nil ||
 				!operation.parent.ownershipChain) {
-			ck.run.Dirty(
-				errors.New(
-					"jobmgr kernel: non-continuation task scheduled after shutdown cut",
-				),
-			)
+			ck.run.Dirty(errors.New("jobmgr kernel: non-continuation task scheduled after shutdown cut"))
 			return false
 		}
 		if !operation.claimsHeld {
@@ -77,32 +70,18 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 			if lane.currentStopping ||
 				lane.retiringIdentity.Valid() ||
 				(lane.current == nil) != !lane.currentIdentity.Valid() {
-				ck.run.Dirty(
-					errors.New(
-						"jobmgr kernel: transaction encountered an invalid current resource slot",
-					),
-				)
+				ck.run.Dirty(errors.New("jobmgr kernel: transaction encountered an invalid current resource slot"))
 				return false
 			}
-			scope := lifecycle.ResourceTransactionScope{
-				ID:      transaction.ID,
-				Current: lane.currentIdentity,
-			}
+			scope := lifecycle.ResourceTransactionScope{ID: transaction.ID, Current: lane.currentIdentity}
 			if transaction.AllocateSuccessor {
 				ck.nextResourceGeneration++
 				generation := ck.nextResourceGeneration
 				if generation == 0 {
-					ck.run.Dirty(
-						errors.New(
-							"jobmgr kernel: transaction successor generation wrapped",
-						),
-					)
+					ck.run.Dirty(errors.New("jobmgr kernel: transaction successor generation wrapped"))
 					return false
 				}
-				scope.Successor = lifecycle.ResourceIdentity{
-					ID:         transaction.ID,
-					Generation: generation,
-				}
+				scope.Successor = lifecycle.ResourceIdentity{ID: transaction.ID, Generation: generation}
 			}
 			operation.transactionScope = scope
 			transactionWork := transaction.Prepare
@@ -115,19 +94,11 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 					scope lifecycle.ResourceTransactionScope,
 					permit lifecycle.LongLivedPermit,
 				) (lifecycle.PreparedResourceTransaction, error) {
-					prepared, prepareErr := prepare(
-						ctx,
-						current,
-						scope,
-						permit,
-					)
+					prepared, prepareErr := prepare(ctx, current, scope, permit)
 					if prepared == nil {
 						return nil, prepareErr
 					}
-					return &preparedCompositeBridge{
-						transaction: prepared,
-						scope:       composite,
-					}, prepareErr
+					return &preparedCompositeBridge{transaction: prepared, scope: composite}, prepareErr
 				}
 			}
 			var err error
@@ -156,10 +127,7 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 				return false
 			}
 		}
-		requestRef, err := ck.tasks.Enqueue(
-			taskClassForOperation(operation, lane),
-			taskPlan,
-		)
+		requestRef, err := ck.tasks.Enqueue(taskClassForOperation(operation, lane), taskPlan)
 		if err != nil {
 			for _, grantedOperation := range ck.releaseClaims(operation) {
 				ck.markReady(grantedOperation.lane)
@@ -180,11 +148,7 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 
 func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
 	var started [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
-	count, more, dispatchErr := ck.tasks.Dispatch(
-		context.Background(),
-		quantum,
-		&started,
-	)
+	count, more, dispatchErr := ck.tasks.Dispatch(context.Background(), quantum, &started)
 	for _, start := range started[:count] {
 		if cleanupRef, ok := ck.functionCleanupRequests[start.Request]; ok {
 			if _, exists := ck.functionCleanupTasks[start.Task]; exists {
@@ -195,11 +159,8 @@ func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
 			ck.functionCleanupTasks[start.Task] = functionCleanupTask{ref: cleanupRef}
 			continue
 		}
-		if ck.shutdownBarrierRequest.Valid() &&
-			start.Request == ck.shutdownBarrierRequest {
-			if ck.shutdownBarrierTask.Valid() ||
-				ck.shutdownBarrierDone ||
-				ck.shutdownBarrierFailed {
+		if ck.shutdownBarrierRequest.Valid() && start.Request == ck.shutdownBarrierRequest {
+			if ck.shutdownBarrierTask.Valid() || ck.shutdownBarrierDone || ck.shutdownBarrierFailed {
 				ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier start acknowledgement"))
 				return more
 			}

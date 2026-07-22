@@ -118,18 +118,10 @@ func TestFunctionPublicationInitialSnapshotExceedsMutationQuantum(t *testing.T) 
 	for index := range population {
 		record := publicationRecord(fmt.Sprintf("work-%03d", index), 1)
 		records = append(records, record)
-		changes = append(
-			changes,
-			PublicationChange{Name: record.Name, Record: &records[index]},
-		)
+		changes = append(changes, PublicationChange{Name: record.Name, Record: &records[index]})
 	}
 
-	require.NoError(t, publication.ApplyInitialSnapshot(
-		1,
-		1,
-		changes,
-	),
-	)
+	require.NoError(t, publication.ApplyInitialSnapshot(1, 1, changes))
 
 	require.EqualValues(t, len(records), len(port.active))
 }
@@ -147,10 +139,7 @@ func TestFunctionPublicationMutationExceedsFormerCountLimit(t *testing.T) {
 	for index := range population {
 		record := publicationRecord(fmt.Sprintf("work-%03d", index), 1)
 		records = append(records, record)
-		changes = append(
-			changes,
-			PublicationChange{Name: record.Name, Record: &records[index]},
-		)
+		changes = append(changes, PublicationChange{Name: record.Name, Record: &records[index]})
 	}
 	var quiesced, committed, aborted bool
 

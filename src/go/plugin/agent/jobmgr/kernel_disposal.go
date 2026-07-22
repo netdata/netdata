@@ -13,12 +13,11 @@ import (
 
 func (ck *CommandKernel) cancelOperation(uid string) {
 	operation := ck.operations[uid]
-	if operation != nil &&
-		operation.activeChild != nil &&
-		!operation.activeChild.compositeRollback {
+	if operation != nil && operation.activeChild != nil && !operation.activeChild.compositeRollback {
 		ck.cancelOperation(operation.activeChild.UID)
 	}
-	if operation == nil || operation.Response == lifecycle.ResponseCommitted || operation.Response == lifecycle.ResponsePoisoned {
+	if operation == nil || operation.Response == lifecycle.ResponseCommitted ||
+		operation.Response == lifecycle.ResponsePoisoned {
 		return
 	}
 	if operation.TimedOut() {
@@ -60,17 +59,13 @@ func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 			continue
 		}
 		ck.markOperationTimedOut(operation)
-		if operation.activeChild != nil &&
-			!operation.activeChild.compositeRollback {
+		if operation.activeChild != nil && !operation.activeChild.compositeRollback {
 			ck.cancelOperation(operation.activeChild.UID)
 		}
 		deferControl := requiresCooperativeDeadlineStart(operation) &&
 			(operation.Child == lifecycle.ChildNotStarted || operation.Child == lifecycle.ChildExecuting)
 		if operation.Child == lifecycle.ChildExecuting {
-			_ = ck.tasks.CancelWithCause(
-				operation.Task,
-				context.DeadlineExceeded,
-			)
+			_ = ck.tasks.CancelWithCause(operation.Task, context.DeadlineExceeded)
 			if operation.Response == lifecycle.ResponseNotRequired {
 				if err := ck.markRetainedTimeout(operation, true); err != nil {
 					ck.run.Dirty(err)
@@ -103,9 +98,7 @@ func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 }
 
 func requiresCooperativeDeadlineStart(operation *commandOperation) bool {
-	return operation != nil &&
-		operation.plan.Work != nil &&
-		operation.plan.CooperativeDeadline
+	return operation != nil && operation.plan.Work != nil && operation.plan.CooperativeDeadline
 }
 
 func (ck *CommandKernel) markOperationDeadlineIfDue(operation *commandOperation) {
@@ -128,18 +121,13 @@ func (ck *CommandKernel) markOperationDeadlineIfDue(operation *commandOperation)
 	}
 }
 
-func (ck *CommandKernel) markOperationTimedOut(
-	operation *commandOperation,
-) {
+func (ck *CommandKernel) markOperationTimedOut(operation *commandOperation) {
 	if operation == nil || operation.TimedOut() {
 		return
 	}
 	operation.MarkTimedOut()
 	if ck.runtimeObserver != nil {
-		ck.runtimeObserver.AddRuntimeCounter(
-			lifecycle.RuntimeCounterOperationTimeouts,
-			1,
-		)
+		ck.runtimeObserver.AddRuntimeCounter(lifecycle.RuntimeCounterOperationTimeouts, 1)
 	}
 }
 
@@ -158,7 +146,13 @@ func (ck *CommandKernel) serviceControls(quantum int) bool {
 		if operation.Response == lifecycle.ResponseOpen {
 			_ = operation.MarkResponsePending()
 		}
-		err := ck.frames.TryCommitControl(lifecycle.ControlFramePlan{UID: operation.UID, Status: operation.control, Expiry: lifecycle.ExpiryAt(ck.clock.Now())})
+		err := ck.frames.TryCommitControl(
+			lifecycle.ControlFramePlan{
+				UID:    operation.UID,
+				Status: operation.control,
+				Expiry: lifecycle.ExpiryAt(ck.clock.Now()),
+			},
+		)
 		if errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
 			return false
 		}
@@ -190,7 +184,8 @@ func (ck *CommandKernel) serviceControls(quantum int) bool {
 }
 
 func (ck *CommandKernel) markRetainedTimeout(operation *commandOperation, background bool) error {
-	if operation == nil || !operation.TimedOut() || operation.Child != lifecycle.ChildExecuting || !operation.Task.Valid() {
+	if operation == nil || !operation.TimedOut() || operation.Child != lifecycle.ChildExecuting ||
+		!operation.Task.Valid() {
 		return errors.New("jobmgr kernel: invalid retained-timeout mark")
 	}
 	saturated, err := ck.tasks.MarkRetainedTimeout(operation.Task)
@@ -207,9 +202,7 @@ func (ck *CommandKernel) markRetainedTimeout(operation *commandOperation, backgr
 }
 
 func (ck *CommandKernel) tryDispose(operation *commandOperation) {
-	if operation == nil ||
-		operation.activeChild != nil ||
-		operation.deferredCompletion != nil {
+	if operation == nil || operation.activeChild != nil || operation.deferredCompletion != nil {
 		return
 	}
 	if !operation.CanDisposeTerminal() {
@@ -256,11 +249,7 @@ func (ck *CommandKernel) tryDispose(operation *commandOperation) {
 	}
 	if operation.plan.Transaction != nil {
 		if lane.transactionPlanned <= 0 {
-			ck.run.Dirty(
-				errors.New(
-					"jobmgr kernel: transaction plan marker cleared twice",
-				),
-			)
+			ck.run.Dirty(errors.New("jobmgr kernel: transaction plan marker cleared twice"))
 			return
 		}
 		lane.transactionPlanned--
@@ -282,19 +271,13 @@ func (ck *CommandKernel) tryDispose(operation *commandOperation) {
 	if operation.Source == lifecycle.SourceFunction {
 		ck.functionOperations--
 		if ck.functionOperations < 0 {
-			ck.run.Dirty(
-				errors.New(
-					"jobmgr kernel: negative Function operation count",
-				),
-			)
+			ck.run.Dirty(errors.New("jobmgr kernel: negative Function operation count"))
 			return
 		}
 	}
 	ck.unlinkRuntimeOperation(operation)
 	ck.observeRuntimeOperations()
-	if ck.shutdownPhase == commandShutdownRunning ||
-		operation.shutdownVisited ||
-		operation.shutdownChild {
+	if ck.shutdownPhase == commandShutdownRunning || operation.shutdownVisited || operation.shutdownChild {
 		ck.unlinkOperation(operation)
 	}
 	ck.completeCompositeChild(operation)
@@ -302,11 +285,7 @@ func (ck *CommandKernel) tryDispose(operation *commandOperation) {
 		operation.ownershipChain = false
 		ck.ownershipChains--
 		if ck.ownershipChains < 0 {
-			ck.run.Dirty(
-				errors.New(
-					"jobmgr kernel: negative ownership continuation count",
-				),
-			)
+			ck.run.Dirty(errors.New("jobmgr kernel: negative ownership continuation count"))
 			return
 		}
 	}
@@ -335,13 +314,9 @@ func (ck *CommandKernel) appendOperation(operation *commandOperation) {
 	operation.allListed = true
 }
 
-func (ck *CommandKernel) appendRuntimeOperation(
-	operation *commandOperation,
-) {
+func (ck *CommandKernel) appendRuntimeOperation(operation *commandOperation) {
 	if operation == nil || operation.runtimeListed {
-		ck.run.Dirty(
-			errors.New("jobmgr kernel: invalid runtime operation append"),
-		)
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid runtime operation append"))
 		return
 	}
 	operation.runtimePrevious = ck.runtimeTail
@@ -354,13 +329,9 @@ func (ck *CommandKernel) appendRuntimeOperation(
 	operation.runtimeListed = true
 }
 
-func (ck *CommandKernel) unlinkRuntimeOperation(
-	operation *commandOperation,
-) {
+func (ck *CommandKernel) unlinkRuntimeOperation(operation *commandOperation) {
 	if operation == nil || !operation.runtimeListed {
-		ck.run.Dirty(
-			errors.New("jobmgr kernel: invalid runtime operation removal"),
-		)
+		ck.run.Dirty(errors.New("jobmgr kernel: invalid runtime operation removal"))
 		return
 	}
 	if operation.runtimePrevious != nil {
@@ -369,8 +340,7 @@ func (ck *CommandKernel) unlinkRuntimeOperation(
 		ck.runtimeHead = operation.runtimeNext
 	}
 	if operation.runtimeNext != nil {
-		operation.runtimeNext.runtimePrevious =
-			operation.runtimePrevious
+		operation.runtimeNext.runtimePrevious = operation.runtimePrevious
 	} else {
 		ck.runtimeTail = operation.runtimePrevious
 	}
@@ -383,22 +353,13 @@ func (ck *CommandKernel) observeRuntimeOperations() {
 	if ck == nil || ck.runtimeObserver == nil {
 		return
 	}
-	ck.runtimeObserver.SetRuntimeGauge(
-		lifecycle.RuntimeGaugeOperationsActive,
-		len(ck.operations),
-	)
-	ck.runtimeObserver.SetRuntimeGauge(
-		lifecycle.RuntimeGaugeFunctionInvocationsActive,
-		ck.functionOperations,
-	)
+	ck.runtimeObserver.SetRuntimeGauge(lifecycle.RuntimeGaugeOperationsActive, len(ck.operations))
+	ck.runtimeObserver.SetRuntimeGauge(lifecycle.RuntimeGaugeFunctionInvocationsActive, ck.functionOperations)
 	var oldest time.Time
 	if ck.runtimeHead != nil {
 		oldest = ck.runtimeHead.runtimeStarted
 	}
-	ck.runtimeObserver.SetRuntimeTimestamp(
-		lifecycle.RuntimeTimestampOldestOperation,
-		oldest,
-	)
+	ck.runtimeObserver.SetRuntimeTimestamp(lifecycle.RuntimeTimestampOldestOperation, oldest)
 }
 
 func (ck *CommandKernel) unlinkOperation(operation *commandOperation) {
@@ -450,14 +411,9 @@ func (ck *CommandKernel) unlinkQueued(operation *commandOperation) {
 		var err error
 		if operation.plan.Transaction != nil {
 			var outcome lifecycle.TaskOutcome
-			outcome, err = ck.tasks.CancelPendingOutcome(
-				operation.taskRequest,
-			)
+			outcome, err = ck.tasks.CancelPendingOutcome(operation.taskRequest)
 			if err == nil {
-				err = ck.restoreTransactionOutcome(
-					operation,
-					outcome,
-				)
+				err = ck.restoreTransactionOutcome(operation, outcome)
 			}
 		} else {
 			err = ck.tasks.CancelPending(operation.taskRequest)
@@ -548,12 +504,8 @@ func (ck *CommandKernel) unlink(operation *commandOperation) {
 	operation.next = nil
 }
 
-func (ck *CommandKernel) removingLaneOperation(
-	lane *commandLane,
-	operation *commandOperation,
-) {
-	if lane == nil || operation == nil ||
-		lane.continuationTail != operation {
+func (ck *CommandKernel) removingLaneOperation(lane *commandLane, operation *commandOperation) {
+	if lane == nil || operation == nil || lane.continuationTail != operation {
 		return
 	}
 	previous := operation.previous
@@ -565,11 +517,7 @@ func (ck *CommandKernel) removingLaneOperation(
 }
 
 func (ck *CommandKernel) markReady(lane *commandLane) {
-	if lane == nil ||
-		lane.active != nil ||
-		lane.head == nil ||
-		lane.head.fenceBlocked ||
-		ck.claims.waiting(lane.head) {
+	if lane == nil || lane.active != nil || lane.head == nil || lane.head.fenceBlocked || ck.claims.waiting(lane.head) {
 		return
 	}
 	lane.source = lane.head.Source

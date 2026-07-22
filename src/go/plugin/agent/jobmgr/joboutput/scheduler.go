@@ -44,9 +44,7 @@ func (s *Scheduler) bindAutoDetectionRetries(
 	failure func(error),
 ) error {
 	if s == nil {
-		return errors.New(
-			"job output: nil autodetection retry scheduler",
-		)
+		return errors.New("job output: nil autodetection retry scheduler")
 	}
 	return s.retries.bind(commands, plan, run, failure)
 }
@@ -57,13 +55,9 @@ func (s *Scheduler) StopAutoDetectionRetries() {
 	}
 }
 
-func (s *Scheduler) WaitAutoDetectionRetries(
-	ctx context.Context,
-) error {
+func (s *Scheduler) WaitAutoDetectionRetries(ctx context.Context) error {
 	if s == nil {
-		return errors.New(
-			"job output: nil autodetection retry scheduler",
-		)
+		return errors.New("job output: nil autodetection retry scheduler")
 	}
 	return s.retries.wait(ctx)
 }
@@ -72,12 +66,8 @@ func (s *Scheduler) AutoDetectionRetriesJoined() bool {
 	return s == nil || s.retries.joined()
 }
 
-func (s *Scheduler) Register(
-	identity lifecycle.ResourceIdentity,
-	job RuntimeJob,
-) error {
-	if s == nil || !identity.Valid() || job == nil ||
-		identity.ID != job.FullName() || job.ModuleName() == "" {
+func (s *Scheduler) Register(identity lifecycle.ResourceIdentity, job RuntimeJob) error {
+	if s == nil || !identity.Valid() || job == nil || identity.ID != job.FullName() || job.ModuleName() == "" {
 		return errors.New("job output: invalid scheduler registration")
 	}
 	s.mu.Lock()
@@ -90,10 +80,7 @@ func (s *Scheduler) Register(
 	return nil
 }
 
-func (s *Scheduler) Unregister(
-	identity lifecycle.ResourceIdentity,
-	job RuntimeJob,
-) error {
+func (s *Scheduler) Unregister(identity lifecycle.ResourceIdentity, job RuntimeJob) error {
 	if s == nil || !identity.Valid() || job == nil {
 		return errors.New("job output: invalid scheduler unregistration")
 	}

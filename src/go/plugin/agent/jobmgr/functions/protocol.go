@@ -17,18 +17,14 @@ type FramePublicationPort struct {
 	frames *lifecycle.FrameOwner // the one serialized stdout frame writer
 }
 
-func NewFramePublicationPort(
-	frames *lifecycle.FrameOwner,
-) (*FramePublicationPort, error) {
+func NewFramePublicationPort(frames *lifecycle.FrameOwner) (*FramePublicationPort, error) {
 	if frames == nil {
 		return nil, errors.New("jobmgr Function protocol: invalid publication port")
 	}
 	return &FramePublicationPort{frames: frames}, nil
 }
 
-func (fpp *FramePublicationPort) Publish(
-	record PublicationRecord,
-) error {
+func (fpp *FramePublicationPort) Publish(record PublicationRecord) error {
 	if fpp == nil {
 		return errors.New("jobmgr Function protocol: nil publication port")
 	}

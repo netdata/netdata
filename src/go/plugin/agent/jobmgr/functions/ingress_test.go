@@ -20,10 +20,7 @@ func TestFunctionIngressLeavesResourceSelectionToCatalog(t *testing.T) {
 		wantDeadline time.Time
 	}{
 		"collector method": {
-			call: functionwire.Call{
-				UID: "method", Method: "module:method",
-				Timeout: time.Second,
-			},
+			call:         functionwire.Call{UID: "method", Method: "module:method", Timeout: time.Second},
 			wantDeadline: now.Add(time.Second),
 		},
 		"DynCfg method without timeout": {
@@ -82,19 +79,12 @@ type recordingIngressPort struct {
 	done     chan struct{}
 }
 
-func (rip *recordingIngressPort) Submit(
-	_ context.Context,
-	request jobmgr.Request,
-) error {
+func (rip *recordingIngressPort) Submit(_ context.Context, request jobmgr.Request) error {
 	rip.requests = append(rip.requests, request)
 	return nil
 }
 
-func (*recordingIngressPort) Reject(
-	context.Context,
-	string,
-	lifecycle.ControlStatus,
-) error {
+func (*recordingIngressPort) Reject(context.Context, string, lifecycle.ControlStatus) error {
 	return nil
 }
 

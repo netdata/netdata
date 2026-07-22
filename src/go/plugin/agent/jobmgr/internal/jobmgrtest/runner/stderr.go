@@ -11,9 +11,7 @@ type captureResult struct {
 func captureStderr(reader io.ReadCloser, done chan<- captureResult) {
 	defer reader.Close()
 	buffer := make([]byte, readBufferBytes)
-	result := captureResult{
-		payload: make([]byte, 0, stderrLimit),
-	}
+	result := captureResult{payload: make([]byte, 0, stderrLimit)}
 	var total int64
 	for {
 		count, err := reader.Read(buffer)
@@ -21,10 +19,7 @@ func captureStderr(reader io.ReadCloser, done chan<- captureResult) {
 			total += int64(count)
 			remaining := stderrLimit - len(result.payload)
 			if remaining > 0 {
-				result.payload = append(
-					result.payload,
-					buffer[:min(count, remaining)]...,
-				)
+				result.payload = append(result.payload, buffer[:min(count, remaining)]...)
 			}
 			result.truncated = total > int64(stderrLimit)
 		}

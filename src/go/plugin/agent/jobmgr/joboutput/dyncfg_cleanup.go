@@ -29,8 +29,7 @@ func (dcjc *DynCfgJobController) configCreateCleanup(
 		dyncfg.CommandTest,
 		dyncfg.CommandUserconfig,
 	)
-	if sourceType == confgroup.TypeDyncfg &&
-		configType == dyncfg.ConfigTypeJob {
+	if sourceType == confgroup.TypeDyncfg && configType == dyncfg.ConfigTypeJob {
 		commands += " " + string(dyncfg.CommandRemove)
 	}
 	return dcjc.protocolCleanup(func(api *netdataapi.API) {
@@ -45,34 +44,22 @@ func (dcjc *DynCfgJobController) configCreateCleanup(
 	})
 }
 
-func (dcjc *DynCfgJobController) configStatusCleanup(
-	id string,
-	status dyncfg.Status,
-) lifecycle.TaskCleanup {
+func (dcjc *DynCfgJobController) configStatusCleanup(id string, status dyncfg.Status) lifecycle.TaskCleanup {
 	return dcjc.protocolCleanup(func(api *netdataapi.API) {
-		api.CONFIGSTATUS(
-			dcjc.externalID(id),
-			status.String(),
-		)
+		api.CONFIGSTATUS(dcjc.externalID(id), status.String())
 	})
 }
 
-func (dcjc *DynCfgJobController) configDeleteCleanup(
-	externalID string,
-) lifecycle.TaskCleanup {
+func (dcjc *DynCfgJobController) configDeleteCleanup(externalID string) lifecycle.TaskCleanup {
 	return dcjc.protocolCleanup(func(api *netdataapi.API) {
 		api.CONFIGDELETE(externalID)
 	})
 }
 
-func (dcjc *DynCfgJobController) protocolCleanup(
-	build func(*netdataapi.API),
-) lifecycle.TaskCleanup {
+func (dcjc *DynCfgJobController) protocolCleanup(build func(*netdataapi.API)) lifecycle.TaskCleanup {
 	if dcjc == nil || build == nil {
 		return func() error {
-			return errors.New(
-				"job output: invalid DynCfg protocol cleanup",
-			)
+			return errors.New("job output: invalid DynCfg protocol cleanup")
 		}
 	}
 	var payload bytes.Buffer

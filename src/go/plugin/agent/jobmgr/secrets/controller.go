@@ -65,9 +65,7 @@ func NewController(config ControllerConfig) (*Controller, error) {
 		config.Store == nil ||
 		config.Creators == nil ||
 		config.Dependencies == nil {
-		return nil, errors.New(
-			"jobmgr secrets: incomplete controller configuration",
-		)
+		return nil, errors.New("jobmgr secrets: incomplete controller configuration")
 	}
 	return &Controller{
 		epoch:  config.Epoch,
@@ -81,24 +79,16 @@ func NewController(config ControllerConfig) (*Controller, error) {
 	}, nil
 }
 
-func (c *Controller) Bind(
-	jobs DependentJobPort,
-) error {
+func (c *Controller) Bind(jobs DependentJobPort) error {
 	if c == nil || jobs == nil {
 		return errors.New("jobmgr secrets: invalid controller binding")
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.restarts != nil || c.published {
-		return errors.New(
-			"jobmgr secrets: duplicate or late controller binding",
-		)
+		return errors.New("jobmgr secrets: duplicate or late controller binding")
 	}
-	restarts, err := NewSecretRestartCommand(
-		c.epoch,
-		c.dependencies,
-		jobs,
-	)
+	restarts, err := NewSecretRestartCommand(c.epoch, c.dependencies, jobs)
 	if err != nil {
 		return err
 	}
@@ -121,9 +111,7 @@ func (c *Controller) Prepare(
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if c == nil || ctx == nil || !scope.Valid() {
-		return nil, errors.New(
-			"jobmgr secrets: invalid transaction preparation",
-		)
+		return nil, errors.New("jobmgr secrets: invalid transaction preparation")
 	}
 	c.mu.Lock()
 	published := c.published
@@ -139,13 +127,7 @@ func (c *Controller) Prepare(
 	}
 	target, failure := c.resolveTarget(input)
 	if failure != nil {
-		return c.noopMessageWithPermit(
-			scope,
-			current,
-			permit,
-			failure.code,
-			failure.message,
-		)
+		return c.noopMessageWithPermit(scope, current, permit, failure.code, failure.message)
 	}
 	switch target.command {
 	case dyncfg.CommandSchema:
@@ -153,55 +135,22 @@ func (c *Controller) Prepare(
 	case dyncfg.CommandGet:
 		return c.prepareGet(scope, current, target)
 	case dyncfg.CommandUserconfig:
-		return c.prepareUserConfig(
-			scope,
-			current,
-			input,
-			target,
-		)
+		return c.prepareUserConfig(scope, current, input, target)
 	case dyncfg.CommandTest:
-		return c.prepareTest(
-			ctx,
-			scope,
-			current,
-			input,
-			target,
-		)
+		return c.prepareTest(ctx, scope, current, input, target)
 	case dyncfg.CommandAdd:
-		return c.prepareAdd(
-			ctx,
-			scope,
-			current,
-			permit,
-			input,
-			target,
-		)
+		return c.prepareAdd(ctx, scope, current, permit, input, target)
 	case dyncfg.CommandUpdate:
-		return c.prepareUpdate(
-			ctx,
-			scope,
-			current,
-			permit,
-			input,
-			target,
-		)
+		return c.prepareUpdate(ctx, scope, current, permit, input, target)
 	case dyncfg.CommandRemove:
-		return c.prepareRemove(
-			scope,
-			current,
-			target,
-		)
+		return c.prepareRemove(scope, current, target)
 	default:
 		return c.noopMessageWithPermit(
 			scope,
 			current,
 			permit,
 			501,
-			fmt.Sprintf(
-				"Function '%s' command '%s' is not implemented.",
-				"config",
-				target.command,
-			),
+			fmt.Sprintf("Function '%s' command '%s' is not implemented.", "config", target.command),
 		)
 	}
 }
@@ -219,125 +168,86 @@ type targetFailure struct {
 	message string
 }
 
-func (c *Controller) resolveTarget(
-	input CommandInput,
-) (secretTarget, *targetFailure) {
+func (c *Controller) resolveTarget(input CommandInput) (secretTarget, *targetFailure) {
 	if len(input.Args) < 2 {
 		return secretTarget{}, &targetFailure{
-			code: 400,
-			message: fmt.Sprintf(
-				"missing required arguments: need 2, got %d",
-				len(input.Args),
-			),
+			code:    400,
+			message: fmt.Sprintf("missing required arguments: need 2, got %d", len(input.Args)),
 		}
 	}
 	id := input.Args[0]
 	rest, ok := strings.CutPrefix(id, c.prefix)
 	if !ok || rest == "" {
-		return secretTarget{}, &targetFailure{
-			code: 400, message: "invalid config ID format.",
-		}
+		return secretTarget{}, &targetFailure{code: 400, message: "invalid config ID format."}
 	}
 	command := dyncfg.Command(strings.ToLower(input.Args[1]))
 	target := secretTarget{command: command, id: id}
 	if command == dyncfg.CommandAdd {
 		if len(input.Args) < 3 {
 			return secretTarget{}, &targetFailure{
-				code: 400,
-				message: fmt.Sprintf(
-					"missing required arguments: need 3, got %d",
-					len(input.Args),
-				),
+				code:    400,
+				message: fmt.Sprintf("missing required arguments: need 3, got %d", len(input.Args)),
 			}
 		}
 		if strings.Contains(rest, ":") {
-			return secretTarget{}, &targetFailure{
-				code:    400,
-				message: "invalid secretstore template ID.",
-			}
+			return secretTarget{}, &targetFailure{code: 400, message: "invalid secretstore template ID."}
 		}
 		target.kind = secretstore.StoreKind(rest)
 		target.name = input.Args[2]
 		if _, ok := c.creators.Lookup(target.kind); !ok {
 			return secretTarget{}, &targetFailure{
-				code: 404,
-				message: fmt.Sprintf(
-					"The specified secretstore kind '%s' is not supported.",
-					target.kind,
-				),
+				code:    404,
+				message: fmt.Sprintf("The specified secretstore kind '%s' is not supported.", target.kind),
 			}
 		}
 		if err := dyncfg.JobNameRuleAllowDots(target.name); err != nil {
 			return secretTarget{}, &targetFailure{
-				code: 400,
-				message: fmt.Sprintf(
-					"invalid config name '%s': %v.",
-					target.name,
-					err,
-				),
+				code:    400,
+				message: fmt.Sprintf("invalid config name '%s': %v.", target.name, err),
 			}
 		}
-		target.key = secretstore.StoreKey(
-			target.kind,
-			target.name,
-		)
+		target.key = secretstore.StoreKey(target.kind, target.name)
 		return target, nil
 	}
 	if !strings.Contains(rest, ":") {
 		kind := secretstore.StoreKind(rest)
-		if command == dyncfg.CommandSchema ||
-			command == dyncfg.CommandUserconfig {
+		if command == dyncfg.CommandSchema || command == dyncfg.CommandUserconfig {
 			if _, ok := c.creators.Lookup(kind); ok {
 				target.kind = kind
 				return target, nil
 			}
 		}
-		return secretTarget{}, &targetFailure{
-			code: 400, message: "invalid config ID format.",
-		}
+		return secretTarget{}, &targetFailure{code: 400, message: "invalid config ID format."}
 	}
 	kind, name, err := secretstore.ParseStoreKey(rest)
 	if err != nil {
-		return secretTarget{}, &targetFailure{
-			code: 400, message: "invalid config ID format.",
-		}
+		return secretTarget{}, &targetFailure{code: 400, message: "invalid config ID format."}
 	}
-	target.key, target.kind, target.name =
-		secretstore.StoreKey(kind, name), kind, name
+	target.key, target.kind, target.name = secretstore.StoreKey(kind, name), kind, name
 	return target, nil
 }
 
-func (c *Controller) entry(
-	key string,
-) (secretEntry, bool) {
+func (c *Controller) entry(key string) (secretEntry, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	entry, ok := c.entries[key]
 	if ok {
 		entry.config, _ = c.store.Config(key)
 		if entry.config == nil {
-			entry.config = cloneSecretConfig(
-				c.entries[key].config,
-			)
+			entry.config = cloneSecretConfig(c.entries[key].config)
 		}
 	}
 	return entry, ok
 }
 
-func (c *Controller) commitEntry(
-	key string,
-	entry *secretEntry,
-) {
+func (c *Controller) commitEntry(key string, entry *secretEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if entry == nil {
 		delete(c.entries, key)
 		return
 	}
-	c.entries[key] = secretEntry{
-		config: cloneSecretConfig(entry.config),
-		status: entry.status,
-	}
+	c.entries[key] = secretEntry{config: cloneSecretConfig(entry.config), status: entry.status}
 }
 
 func cloneSecretConfig(config secretstore.Config) secretstore.Config {
@@ -355,10 +265,7 @@ func cloneSecretConfig(config secretstore.Config) secretstore.Config {
 	return cloned
 }
 
-func mustSecretMessage(
-	code int,
-	message string,
-) lifecycle.SealedResult {
+func mustSecretMessage(code int, message string) lifecycle.SealedResult {
 	result, err := lifecycle.NewSealedResult(
 		code,
 		"application/json",
@@ -370,14 +277,10 @@ func mustSecretMessage(
 	return result
 }
 
-func (c *Controller) protocolCleanup(
-	build func(*netdataapi.API),
-) lifecycle.TaskCleanup {
+func (c *Controller) protocolCleanup(build func(*netdataapi.API)) lifecycle.TaskCleanup {
 	if c == nil || build == nil {
 		return func() error {
-			return errors.New(
-				"jobmgr secrets: invalid protocol cleanup",
-			)
+			return errors.New("jobmgr secrets: invalid protocol cleanup")
 		}
 	}
 	var payload bytes.Buffer
@@ -391,9 +294,7 @@ func (c *Controller) protocolCleanup(
 	}
 }
 
-func (c *Controller) configCreateCleanup(
-	entry secretEntry,
-) lifecycle.TaskCleanup {
+func (c *Controller) configCreateCleanup(entry secretEntry) lifecycle.TaskCleanup {
 	commands := dyncfg.JoinCommands(
 		dyncfg.CommandSchema,
 		dyncfg.CommandGet,
@@ -417,9 +318,7 @@ func (c *Controller) configCreateCleanup(
 	})
 }
 
-func (c *Controller) configDeleteCleanup(
-	key string,
-) lifecycle.TaskCleanup {
+func (c *Controller) configDeleteCleanup(key string) lifecycle.TaskCleanup {
 	return c.protocolCleanup(func(api *netdataapi.API) {
 		api.CONFIGDELETE(c.prefix + key)
 	})
@@ -449,39 +348,24 @@ func (c *Controller) templateCleanup() lifecycle.TaskCleanup {
 	})
 }
 
-func parseSecretPayload(
-	input CommandInput,
-	target any,
-) error {
+func parseSecretPayload(input CommandInput, target any) error {
 	if !input.HasPayload || len(input.Payload) == 0 {
 		return errors.New("payload is required")
 	}
-	if strings.Contains(
-		strings.ToLower(input.ContentType),
-		"json",
-	) {
+	if strings.Contains(strings.ToLower(input.ContentType), "json") {
 		return json.Unmarshal(input.Payload, target)
 	}
 	return yaml.Unmarshal(input.Payload, target)
 }
 
-func typedSecretConfig(
-	creators *secretstore.CreatorCatalog,
-	kind secretstore.StoreKind,
-) (any, error) {
+func typedSecretConfig(creators *secretstore.CreatorCatalog, kind secretstore.StoreKind) (any, error) {
 	store, ok := creators.New(kind)
 	if !ok {
-		return nil, fmt.Errorf(
-			"the specified secretstore kind '%s' is not supported",
-			kind,
-		)
+		return nil, fmt.Errorf("the specified secretstore kind '%s' is not supported", kind)
 	}
 	config := store.Configuration()
 	if config == nil {
-		return nil, fmt.Errorf(
-			"secretstore kind '%s' does not provide configuration",
-			kind,
-		)
+		return nil, fmt.Errorf("secretstore kind '%s' does not provide configuration", kind)
 	}
 	return config, nil
 }
@@ -494,9 +378,7 @@ func secretResourceID(key string) string {
 	return "secretstore:" + string(kind) + "_" + name
 }
 
-func sortedInitialConfigs(
-	configs []secretstore.Config,
-) []secretstore.Config {
+func sortedInitialConfigs(configs []secretstore.Config) []secretstore.Config {
 	cloned := slices.Clone(configs)
 	slices.SortStableFunc(cloned, func(a, b secretstore.Config) int {
 		if a.ExposedKey() != b.ExposedKey() {

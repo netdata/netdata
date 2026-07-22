@@ -16,10 +16,8 @@ func TestDrainDependentTasksDoNotConsumeGlobalExecutionCapacity(t *testing.T) {
 	drainRequests := make(map[TaskRequestRef]struct{}, TaskStartServiceQuantum+1)
 	for index := range TaskStartServiceQuantum + 1 {
 		resource := &recordingReadyResource{
-			identity: ResourceIdentity{
-				ID: "job", Generation: uint64(index + 1),
-			},
-			events: &events,
+			identity: ResourceIdentity{ID: "job", Generation: uint64(index + 1)},
+			events:   &events,
 		}
 		plan := readyTaskPlan(t, SourceJobManager, time.Time{}, resource)
 		request, err := supervisor.Enqueue(TaskClassFrameworkControl, plan)
@@ -79,18 +77,10 @@ func TestDrainDependentTasksDoNotConsumeGlobalExecutionCapacity(t *testing.T) {
 	require.False(t, supervisor.Active() != 0 || supervisor.Pending() != 0)
 }
 
-func terminateAndReleaseTask(
-	t *testing.T,
-	supervisor *TaskSupervisor,
-	ref TaskRef,
-	sequence uint8,
-) {
+func terminateAndReleaseTask(t *testing.T, supervisor *TaskSupervisor, ref TaskRef, sequence uint8) {
 	t.Helper()
 
-	require.NoError(t, supervisor.SendAction(TaskAction{
-		Ref: ref, Sequence: sequence, Kind: TaskActionTerminate,
-	}),
-	)
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: sequence, Kind: TaskActionTerminate}))
 
 	ack := <-supervisor.AcknowledgementCh()
 	require.Nil(t, ack.Err)

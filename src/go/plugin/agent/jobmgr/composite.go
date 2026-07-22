@@ -13,10 +13,7 @@ import (
 // and claim scope.
 type PreparedCompositeResourceTransaction interface {
 	Scope() lifecycle.ResourceTransactionScope
-	ApplyComposite(
-		context.Context,
-		CompositeCommandScope,
-	) (lifecycle.AppliedResourceTransaction, error)
+	ApplyComposite(context.Context, CompositeCommandScope) (lifecycle.AppliedResourceTransaction, error)
 	Dispose(context.Context) (lifecycle.ReadyResource, error)
 }
 

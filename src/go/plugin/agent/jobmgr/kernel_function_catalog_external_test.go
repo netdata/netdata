@@ -20,10 +20,7 @@ import (
 
 type runShutdownBarrierFunc func(context.Context, uint64) error
 
-func (fn runShutdownBarrierFunc) BeforeFunctionCatalogClose(
-	ctx context.Context,
-	generation uint64,
-) error {
+func (fn runShutdownBarrierFunc) BeforeFunctionCatalogClose(ctx context.Context, generation uint64) error {
 	return fn(ctx, generation)
 }
 
@@ -86,7 +83,10 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	kernel.Stop()
 
 	require.NoError(t, kernel.Wait(context.Background()))
-	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN concrete-catalog 500 application/json ")))
+	require.True(
+		t,
+		bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN concrete-catalog 500 application/json ")),
+	)
 
 	require.True(t, catalog.LifecycleDrained())
 	require.EqualValues(t, 1, cleanupCalls.Load())
@@ -143,7 +143,13 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 			close(release)
 			kernel.Stop()
 			_ = kernel.Wait(context.Background())
-			require.FailNowf(t, "test failed", "same-route handlers entered=%d, want %d concurrent entries", len(seen), calls)
+			require.FailNowf(
+				t,
+				"test failed",
+				"same-route handlers entered=%d, want %d concurrent entries",
+				len(seen),
+				calls,
+			)
 		}
 	}
 	if !timer.Stop() {
@@ -202,10 +208,7 @@ func TestKernelSameRouteFunctionCancellationIsInvocationLocal(t *testing.T) {
 	for uid := range requests {
 		require.NoError(t, kernel.Submit(
 			context.Background(),
-			jobmgr.Request{
-				UID: uid, Source: lifecycle.SourceFunction,
-				Route: "direct",
-			},
+			jobmgr.Request{UID: uid, Source: lifecycle.SourceFunction, Route: "direct"},
 		))
 	}
 	seen := make(map[string]struct{}, len(requests))
@@ -289,10 +292,7 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 			return nil
 		},
 	}
-	replacement := functionadapter.Declaration{
-		ID: "method", Generation: newGeneration,
-		PublicName: "direct",
-	}
+	replacement := functionadapter.Declaration{ID: "method", Generation: newGeneration, PublicName: "direct"}
 	mutation, err := catalog.NewMutation(1, []functionadapter.RouteChange{{
 		PublicName: "direct", Declaration: &replacement,
 	}})
@@ -300,9 +300,7 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 
 	require.NoError(t, kernel.QuiesceFunctions(context.Background(), mutation))
 
-	rejected, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-		UID: "during-mutation", Route: "direct",
-	})
+	rejected, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "during-mutation", Route: "direct"})
 	require.NoError(t, err)
 	require.Equal(t, lifecycle.ControlUnavailable, rejected.Rejected)
 	version, err := kernel.CommitFunctions(context.Background(), mutation)
@@ -372,10 +370,7 @@ func TestFunctionCatalogShutdownCompletesResumedMultiTurnMutation(t *testing.T) 
 				},
 			},
 		}
-		changes[index] = functionadapter.RouteChange{
-			PublicName:  name,
-			Declaration: &replacements[index],
-		}
+		changes[index] = functionadapter.RouteChange{PublicName: name, Declaration: &replacements[index]}
 	}
 	catalog, err := functionadapter.NewCatalog(declarations)
 	require.NoError(t, err)
@@ -424,10 +419,7 @@ func TestFunctionCatalogShutdownCompletesResumedMultiTurnMutation(t *testing.T) 
 }
 
 func TestFunctionCatalogMutationCancellationAfterHandoffWaitsForDisposition(t *testing.T) {
-	catalog := &handoffMutationCatalog{
-		begun: make(chan struct{}),
-		allow: make(chan struct{}),
-	}
+	catalog := &handoffMutationCatalog{begun: make(chan struct{}), allow: make(chan struct{})}
 	kernel, _, uids := newExternalKernel(t, catalog)
 	ctx, cancel := context.WithCancel(context.Background())
 	type mutationResult struct {
@@ -482,10 +474,7 @@ func TestFunctionCatalogMutationCancellationAfterHandoffWaitsForDisposition(t *t
 }
 
 func TestFunctionCatalogPausedMutationAbortsDuringShutdown(t *testing.T) {
-	catalog := &handoffMutationCatalog{
-		begun: make(chan struct{}),
-		allow: make(chan struct{}),
-	}
+	catalog := &handoffMutationCatalog{begun: make(chan struct{}), allow: make(chan struct{})}
 	close(catalog.allow)
 	kernel, run, uids := newExternalKernel(t, catalog)
 	mutation := handoffMutation{}
@@ -501,25 +490,15 @@ func TestFunctionCatalogPausedMutationAbortsDuringShutdown(t *testing.T) {
 	require.False(t, catalog.active.Load() || !catalog.closed.Load())
 
 	_, err := kernel.CommitFunctions(context.Background(), mutation)
-	stopping, ok :=
-		errors.AsType[*lifecycle.StoppingRejection](err)
+	stopping, ok := errors.AsType[*lifecycle.StoppingRejection](err)
 	require.True(t, ok)
-	require.EqualValues(
-		t,
-		run.Generation(),
-		stopping.Generation,
-	)
+	require.EqualValues(t, run.Generation(), stopping.Generation)
 
 	closeExternalUIDLedger(t, uids)
 }
 
-func TestFunctionCatalogMutationAfterShutdownIsRejectedBeforeAdmission(
-	t *testing.T,
-) {
-	catalog := &handoffMutationCatalog{
-		begun: make(chan struct{}),
-		allow: make(chan struct{}),
-	}
+func TestFunctionCatalogMutationAfterShutdownIsRejectedBeforeAdmission(t *testing.T) {
+	catalog := &handoffMutationCatalog{begun: make(chan struct{}), allow: make(chan struct{})}
 	barrierEntered := make(chan struct{})
 	barrierRelease := make(chan struct{})
 	releaseBarrier := sync.OnceFunc(func() { close(barrierRelease) })
@@ -545,22 +524,14 @@ func TestFunctionCatalogMutationAfterShutdownIsRejectedBeforeAdmission(
 		require.FailNow(t, "test failed", "shutdown barrier did not start")
 	}
 
-	err := kernel.QuiesceFunctions(
-		context.Background(),
-		handoffMutation{},
-	)
-	stopping, ok :=
-		errors.AsType[*lifecycle.StoppingRejection](err)
+	err := kernel.QuiesceFunctions(context.Background(), handoffMutation{})
+	stopping, ok := errors.AsType[*lifecycle.StoppingRejection](err)
 	require.True(t, ok)
 	require.EqualValues(t, run.Generation(), stopping.Generation)
 	require.False(t, catalog.active.Load())
 	select {
 	case <-catalog.begun:
-		require.FailNow(
-			t,
-			"test failed",
-			"post-cut Function mutation reached catalog admission",
-		)
+		require.FailNow(t, "test failed", "post-cut Function mutation reached catalog admission")
 	default:
 	}
 
@@ -601,51 +572,34 @@ type handoffMutationCatalog struct {
 	closed atomic.Bool
 }
 
-func (*handoffMutationCatalog) ResolveAndAcquire(
-	jobmgr.FunctionLookup,
-) (jobmgr.FunctionCatalogDecision, error) {
+func (*handoffMutationCatalog) ResolveAndAcquire(jobmgr.FunctionLookup) (jobmgr.FunctionCatalogDecision, error) {
 	return jobmgr.FunctionCatalogDecision{}, nil
 }
 
-func (*handoffMutationCatalog) ReleaseInvocation(
-	jobmgr.FunctionInvocationRef,
-) (jobmgr.FunctionCleanupPlan, error) {
+func (*handoffMutationCatalog) ReleaseInvocation(jobmgr.FunctionInvocationRef) (jobmgr.FunctionCleanupPlan, error) {
 	return jobmgr.FunctionCleanupPlan{}, nil
 }
 
-func (*handoffMutationCatalog) CompleteCleanup(
-	jobmgr.FunctionCleanupRef,
-) error {
+func (*handoffMutationCatalog) CompleteCleanup(jobmgr.FunctionCleanupRef) error {
 	return nil
 }
 
-func (hmc *handoffMutationCatalog) BeginMutation(
-	jobmgr.FunctionCatalogMutation,
-) error {
+func (hmc *handoffMutationCatalog) BeginMutation(jobmgr.FunctionCatalogMutation) error {
 	hmc.active.Store(true)
 	close(hmc.begun)
 	return nil
 }
 
-func (hmc *handoffMutationCatalog) AdvanceMutationQuiesce(
-	int,
-) (jobmgr.FunctionCatalogMutationProgress, error) {
+func (hmc *handoffMutationCatalog) AdvanceMutationQuiesce(int) (jobmgr.FunctionCatalogMutationProgress, error) {
 	select {
 	case <-hmc.allow:
-		return jobmgr.FunctionCatalogMutationProgress{
-			Version:  1,
-			Quiesced: true,
-		}, nil
+		return jobmgr.FunctionCatalogMutationProgress{Version: 1, Quiesced: true}, nil
 	default:
-		return jobmgr.FunctionCatalogMutationProgress{
-			Version: 1,
-		}, nil
+		return jobmgr.FunctionCatalogMutationProgress{Version: 1}, nil
 	}
 }
 
-func (*handoffMutationCatalog) ResumeMutation(
-	jobmgr.FunctionCatalogMutation,
-) error {
+func (*handoffMutationCatalog) ResumeMutation(jobmgr.FunctionCatalogMutation) error {
 	return nil
 }
 
@@ -653,10 +607,7 @@ func (hmc *handoffMutationCatalog) AdvanceMutation(
 	int,
 ) (jobmgr.FunctionCatalogMutationProgress, []jobmgr.FunctionCleanupPlan) {
 	hmc.active.Store(false)
-	return jobmgr.FunctionCatalogMutationProgress{
-		Version: 2,
-		Done:    true,
-	}, nil
+	return jobmgr.FunctionCatalogMutationProgress{Version: 2, Done: true}, nil
 }
 
 func (hmc *handoffMutationCatalog) AbortMutation(jobmgr.FunctionCatalogMutation) error {
@@ -669,9 +620,7 @@ func (hmc *handoffMutationCatalog) BeginClose() error {
 	return nil
 }
 
-func (*handoffMutationCatalog) CloseStep(
-	int,
-) ([]jobmgr.FunctionCleanupPlan, bool, error) {
+func (*handoffMutationCatalog) CloseStep(int) ([]jobmgr.FunctionCleanupPlan, bool, error) {
 	return nil, false, nil
 }
 
@@ -679,7 +628,10 @@ func (hmc *handoffMutationCatalog) LifecycleDrained() bool {
 	return hmc.closed.Load() && !hmc.active.Load()
 }
 
-func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmgr.CommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger) {
+func newExternalKernel(
+	t *testing.T,
+	catalog jobmgr.FunctionCatalogPort,
+) (*jobmgr.CommandKernel, *lifecycle.RunSupervisor, *lifecycle.UIDLedger) {
 	return newExternalKernelWithBarrier(
 		t,
 		catalog,

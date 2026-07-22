@@ -88,17 +88,12 @@ type ResourcePolicy struct {
 
 // DynCfgJobResource derives a collector job resource from DynCfg arguments.
 func DynCfgJobResource(index uint16, prefix string) ResourcePolicy {
-	return ResourcePolicy{
-		Argument: index, Prefix: prefix,
-	}
+	return ResourcePolicy{Argument: index, Prefix: prefix}
 }
 
 // ScopedDynCfgJobResource additionally namespaces the derived resource.
 func ScopedDynCfgJobResource(index uint16, prefix, scopePrefix string) ResourcePolicy {
-	return ResourcePolicy{
-		Argument: index, Prefix: prefix,
-		ScopePrefix: scopePrefix,
-	}
+	return ResourcePolicy{Argument: index, Prefix: prefix, ScopePrefix: scopePrefix}
 }
 
 func (rp ResourcePolicy) validate() error {
@@ -109,9 +104,7 @@ func (rp ResourcePolicy) validate() error {
 		len(rp.Prefix)+len(rp.ScopePrefix) >
 			maximumDeclarationMetadataBytes ||
 		strings.TrimSpace(rp.ScopePrefix) != rp.ScopePrefix {
-		return errors.New(
-			"jobmgr Function catalog: invalid resource policy",
-		)
+		return errors.New("jobmgr Function catalog: invalid resource policy")
 	}
 	return nil
 }
@@ -127,17 +120,11 @@ func (rp ResourcePolicy) resolve(arguments []string) string {
 	return resourceID
 }
 
-func resolveDynCfgJobResource(
-	policy ResourcePolicy,
-	arguments []string,
-) string {
+func resolveDynCfgJobResource(policy ResourcePolicy, arguments []string) string {
 	if int(policy.Argument) >= len(arguments) {
 		return invalidDynCfgResourceID
 	}
-	target := strings.TrimPrefix(
-		arguments[policy.Argument],
-		policy.Prefix,
-	)
+	target := strings.TrimPrefix(arguments[policy.Argument], policy.Prefix)
 	target = strings.TrimPrefix(target, ":")
 	if target == "" {
 		if name, isAdd := addCommandJobName(arguments); isAdd && name != "" {
@@ -240,8 +227,7 @@ func (set routeSet) resolve(arguments []string) *route {
 
 func appendInitialPrefix(set routeSet, resolved *route) (routeSet, error) {
 	for _, existing := range set.prefixes {
-		if strings.HasPrefix(existing.prefix, resolved.prefix) ||
-			strings.HasPrefix(resolved.prefix, existing.prefix) {
+		if strings.HasPrefix(existing.prefix, resolved.prefix) || strings.HasPrefix(resolved.prefix, existing.prefix) {
 			return routeSet{}, errors.New("jobmgr Function catalog: overlapping prefix route")
 		}
 	}
@@ -262,8 +248,7 @@ func (is *invocationSlot) RunTask(ctx context.Context) (lifecycle.TaskOutcome, e
 	if is == nil || is.resolved == nil || is.resolved.handler == nil {
 		return lifecycle.NoValueOutcome(), errors.New("jobmgr Function catalog: invalid invocation work")
 	}
-	if is.input.HasPayload && len(is.input.Payload) != 0 && !is.resolved.rawPayload &&
-		!json.Valid(is.input.Payload) {
+	if is.input.HasPayload && len(is.input.Payload) != 0 && !is.resolved.rawPayload && !json.Valid(is.input.Payload) {
 		result, err := lifecycle.NewControlResult(lifecycle.ControlBadRequest)
 		if err != nil {
 			return lifecycle.NoValueOutcome(), err
@@ -283,21 +268,10 @@ func (is *invocationSlot) prepareResourceTransaction(
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if is == nil ||
-		is.resolved == nil ||
-		is.resolved.transaction == nil ||
-		is.resolved.transaction.Prepare == nil {
-		return nil, errors.New(
-			"jobmgr Function catalog: invalid resource transaction invocation",
-		)
+	if is == nil || is.resolved == nil || is.resolved.transaction == nil || is.resolved.transaction.Prepare == nil {
+		return nil, errors.New("jobmgr Function catalog: invalid resource transaction invocation")
 	}
-	return is.resolved.transaction.Prepare(
-		ctx,
-		is.input,
-		current,
-		scope,
-		permit,
-	)
+	return is.resolved.transaction.Prepare(ctx, is.input, current, scope, permit)
 }
 
 func (is *invocationSlot) prepareCompositeResourceTransaction(
@@ -310,17 +284,9 @@ func (is *invocationSlot) prepareCompositeResourceTransaction(
 		is.resolved == nil ||
 		is.resolved.transaction == nil ||
 		is.resolved.transaction.PrepareComposite == nil {
-		return nil, errors.New(
-			"jobmgr Function catalog: invalid composite transaction invocation",
-		)
+		return nil, errors.New("jobmgr Function catalog: invalid composite transaction invocation")
 	}
-	return is.resolved.transaction.PrepareComposite(
-		ctx,
-		is.input,
-		current,
-		scope,
-		permit,
-	)
+	return is.resolved.transaction.PrepareComposite(ctx, is.input, current, scope, permit)
 }
 
 type catalogSnapshot struct {
@@ -475,23 +441,16 @@ func validateDeclaration(declaration Declaration) error {
 		len(declaration.Prefix) > maximumDeclarationMetadataBytes {
 		return errors.New("jobmgr Function catalog: invalid declaration")
 	}
-	if err := validateResourceTransactionDeclaration(
-		declaration.Transaction,
-	); err != nil {
+	if err := validateResourceTransactionDeclaration(declaration.Transaction); err != nil {
 		return err
 	}
-	if declaration.Transaction != nil &&
-		declaration.Resource == (ResourcePolicy{}) {
-		return errors.New(
-			"jobmgr Function catalog: transaction has no resource policy",
-		)
+	if declaration.Transaction != nil && declaration.Resource == (ResourcePolicy{}) {
+		return errors.New("jobmgr Function catalog: transaction has no resource policy")
 	}
 	return declaration.Resource.validate()
 }
 
-func validateResourceTransactionDeclaration(
-	declaration *ResourceTransactionDeclaration,
-) error {
+func validateResourceTransactionDeclaration(declaration *ResourceTransactionDeclaration) error {
 	if declaration == nil {
 		return nil
 	}
@@ -500,43 +459,27 @@ func validateResourceTransactionDeclaration(
 		declaration.GlobalClaim == "" ||
 		len(declaration.GlobalClaim) > maximumDeclarationMetadataBytes ||
 		len(declaration.Commands) == 0 {
-		return errors.New(
-			"jobmgr Function catalog: invalid resource transaction declaration",
-		)
+		return errors.New("jobmgr Function catalog: invalid resource transaction declaration")
 	}
 	hasSuccessor := false
 	for index, command := range declaration.Commands {
-		if command.Name == "" ||
-			len(command.Name) > maximumDeclarationMetadataBytes {
-			return errors.New(
-				"jobmgr Function catalog: invalid resource transaction command",
-			)
+		if command.Name == "" || len(command.Name) > maximumDeclarationMetadataBytes {
+			return errors.New("jobmgr Function catalog: invalid resource transaction command")
 		}
 		for claimIndex, claim := range command.Claims {
-			if claim == "" ||
-				len(claim) > maximumDeclarationMetadataBytes ||
-				claim == declaration.GlobalClaim {
-				return errors.New(
-					"jobmgr Function catalog: invalid command claim",
-				)
+			if claim == "" || len(claim) > maximumDeclarationMetadataBytes || claim == declaration.GlobalClaim {
+				return errors.New("jobmgr Function catalog: invalid command claim")
 			}
 			for previous := range claimIndex {
 				if command.Claims[previous] == claim {
-					return errors.New(
-						"jobmgr Function catalog: duplicate command claim",
-					)
+					return errors.New("jobmgr Function catalog: duplicate command claim")
 				}
 			}
 		}
 		hasSuccessor = hasSuccessor || command.AllocateSuccessor
 		for previous := range index {
-			if strings.EqualFold(
-				declaration.Commands[previous].Name,
-				command.Name,
-			) {
-				return errors.New(
-					"jobmgr Function catalog: duplicate resource transaction command",
-				)
+			if strings.EqualFold(declaration.Commands[previous].Name, command.Name) {
+				return errors.New("jobmgr Function catalog: duplicate resource transaction command")
 			}
 		}
 	}
@@ -545,17 +488,13 @@ func validateResourceTransactionDeclaration(
 			return err
 		}
 	} else if declaration.Permit.Class() != 0 {
-		return errors.New(
-			"jobmgr Function catalog: transaction without successor has a permit",
-		)
+		return errors.New("jobmgr Function catalog: transaction without successor has a permit")
 	}
 	return nil
 }
 
 func cloneDeclaration(declaration Declaration) Declaration {
-	declaration.Transaction = cloneResourceTransactionDeclaration(
-		declaration.Transaction,
-	)
+	declaration.Transaction = cloneResourceTransactionDeclaration(declaration.Transaction)
 	return declaration
 }
 
@@ -568,9 +507,7 @@ func cloneResourceTransactionDeclaration(
 	cloned := *declaration
 	cloned.Commands = slices.Clone(declaration.Commands)
 	for index := range cloned.Commands {
-		cloned.Commands[index].Claims = slices.Clone(
-			declaration.Commands[index].Claims,
-		)
+		cloned.Commands[index].Claims = slices.Clone(declaration.Commands[index].Claims)
 	}
 	return &cloned
 }
@@ -579,8 +516,7 @@ func resourceTransactionCommand(
 	declaration *ResourceTransactionDeclaration,
 	arguments []string,
 ) (ResourceTransactionCommand, bool) {
-	if declaration == nil ||
-		int(declaration.CommandArgument) >= len(arguments) {
+	if declaration == nil || int(declaration.CommandArgument) >= len(arguments) {
 		return ResourceTransactionCommand{}, false
 	}
 	name := arguments[declaration.CommandArgument]
@@ -594,9 +530,7 @@ func resourceTransactionCommand(
 
 func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.FunctionCatalogDecision, error) {
 	if c == nil || c.closed {
-		return jobmgr.FunctionCatalogDecision{
-			Rejected: lifecycle.ControlUnavailable,
-		}, nil
+		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlUnavailable}, nil
 	}
 	snapshot := c.snapshot.Load()
 	if snapshot == nil {
@@ -605,29 +539,20 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 	set, ok := snapshot.routes[lookup.Route]
 	if !ok {
 		if len(c.retiring[lookup.Route]) != 0 {
-			return jobmgr.FunctionCatalogDecision{
-				Rejected: lifecycle.ControlUnavailable,
-			}, nil
+			return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlUnavailable}, nil
 		}
-		return jobmgr.FunctionCatalogDecision{
-			Rejected: lifecycle.ControlNotFound,
-		}, nil
+		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlNotFound}, nil
 	}
 	resolved := set.resolve(lookup.Args)
 	if resolved == nil {
-		return jobmgr.FunctionCatalogDecision{
-			Rejected: lifecycle.ControlNotFound,
-		}, nil
+		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlNotFound}, nil
 	}
 	resourceID := resolved.resource.resolve(lookup.Args)
 	generation := resolved.handler
 	if c.mutation != nil && c.mutation.quiesces(resolved) {
 		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlUnavailable}, nil
 	}
-	command, transactionCommand := resourceTransactionCommand(
-		resolved.transaction,
-		lookup.Args,
-	)
+	command, transactionCommand := resourceTransactionCommand(resolved.transaction, lookup.Args)
 	var transactionPermit lifecycle.LongLivedPlan
 	if transactionCommand && command.AllocateSuccessor {
 		transactionPermit = resolved.transaction.Permit
@@ -646,8 +571,7 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 	} else {
 		slot = c.invocations[slotIndex]
 		if slot == nil {
-			return jobmgr.FunctionCatalogDecision{},
-				errors.New("jobmgr Function catalog: invalid free invocation slot")
+			return jobmgr.FunctionCatalogDecision{}, errors.New("jobmgr Function catalog: invalid free invocation slot")
 		}
 		c.freeSlot = slot.freeNext
 	}
@@ -677,19 +601,14 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 			AllocateSuccessor: command.AllocateSuccessor,
 		}
 		if resolved.transaction.PrepareComposite != nil {
-			slot.transactionPlan.PrepareComposite =
-				slot.prepareCompositeResourceTransaction
+			slot.transactionPlan.PrepareComposite = slot.prepareCompositeResourceTransaction
 		} else {
-			slot.transactionPlan.Prepare =
-				slot.prepareResourceTransaction
+			slot.transactionPlan.Prepare = slot.prepareResourceTransaction
 		}
 		if command.AllocateSuccessor {
 			slot.transactionPlan.Permit = transactionPermit
 		}
-		plan = jobmgr.WorkPlan{
-			Claims:      slot.claims,
-			Transaction: &slot.transactionPlan,
-		}
+		plan = jobmgr.WorkPlan{Claims: slot.claims, Transaction: &slot.transactionPlan}
 	}
 	return jobmgr.FunctionCatalogDecision{
 		ResourceID: resourceID,
@@ -698,10 +617,7 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 	}, nil
 }
 
-func handlerInput(
-	lookup jobmgr.FunctionLookup,
-	method string,
-) HandlerInput {
+func handlerInput(lookup jobmgr.FunctionLookup, method string) HandlerInput {
 	return HandlerInput{
 		UID: lookup.UID, Method: method, Args: lookup.Args,
 		Payload: lookup.Payload, ContentType: lookup.ContentType,
@@ -722,9 +638,7 @@ func (c *Catalog) ReleaseInvocation(ref jobmgr.FunctionInvocationRef) (jobmgr.Fu
 		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: stale invocation release")
 	}
 	generation := slot.resolved.handler
-	if slot.resolved.invocationLeases <= 0 ||
-		generation.invocationLeases <= 0 ||
-		c.invocationCount <= 0 {
+	if slot.resolved.invocationLeases <= 0 || generation.invocationLeases <= 0 || c.invocationCount <= 0 {
 		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: invocation lease underflow")
 	}
 	if err := c.validateGenerationTransition(
@@ -859,10 +773,7 @@ func (c *Catalog) CloseStep(quantum int) ([]jobmgr.FunctionCleanupPlan, bool, er
 				references++
 			}
 		}
-		retirement := generationRetirement{
-			generation: generation,
-			references: references,
-		}
+		retirement := generationRetirement{generation: generation, references: references}
 		if err := c.validateRetirement(retirement); err != nil {
 			return nil, false, err
 		}

@@ -94,9 +94,7 @@ func newMethodGeneration(
 }
 
 func (mg *methodGeneration) declaration() *HandlerGenerationDeclaration {
-	return &HandlerGenerationDeclaration{
-		ID: mg.id, Handler: mg.handle, Cleanup: mg.cleanup,
-	}
+	return &HandlerGenerationDeclaration{ID: mg.id, Handler: mg.handle, Cleanup: mg.cleanup}
 }
 
 func (mg *methodGeneration) wait(ctx context.Context) error {
@@ -115,10 +113,7 @@ func (mg *methodGeneration) cleanup(ctx context.Context) error {
 	mg.cleanupOnce.Do(func() {
 		names := slices.Sorted(maps.Keys(mg.handlers))
 		for _, name := range names {
-			mg.cleanupErr = errors.Join(
-				mg.cleanupErr,
-				callMethodCleanup(ctx, mg.handlers[name]),
-			)
+			mg.cleanupErr = errors.Join(mg.cleanupErr, callMethodCleanup(ctx, mg.handlers[name]))
 		}
 		close(mg.done)
 	})
@@ -128,21 +123,14 @@ func (mg *methodGeneration) cleanup(ctx context.Context) error {
 func callMethodCleanup(ctx context.Context, handler funcapi.MethodHandler) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf(
-				"%w in Function handler Cleanup: %v",
-				lifecycle.ErrTaskPanic,
-				recovered,
-			)
+			err = fmt.Errorf("%w in Function handler Cleanup: %v", lifecycle.ErrTaskPanic, recovered)
 		}
 	}()
 	handler.Cleanup(ctx)
 	return nil
 }
 
-func (mg *methodGeneration) handle(
-	ctx context.Context,
-	input HandlerInput,
-) (lifecycle.SealedResult, error) {
+func (mg *methodGeneration) handle(ctx context.Context, input HandlerInput) (lifecycle.SealedResult, error) {
 	method, ok := mg.methods[input.Method]
 	if !ok {
 		return functionErrorResult(404, "unknown method %q", input.Method)
@@ -266,8 +254,7 @@ func (mg *methodGeneration) availableJobNames(methodID string) []string {
 // sharedJobSelectable reports whether this shared-module generation exposes the
 // __job instance selector (a shared module with more than one selectable job).
 func (mg *methodGeneration) sharedJobSelectable() bool {
-	return mg.kind == methodGenerationShared &&
-		mg.creator.InstancePolicy != collectorapi.InstancePolicySingle
+	return mg.kind == methodGenerationShared && mg.creator.InstancePolicy != collectorapi.InstancePolicySingle
 }
 
 // withJobParam prepends the __job instance selector to params when this
@@ -302,9 +289,7 @@ func functionResponseError(err error) (lifecycle.SealedResult, error) {
 	return lifecycle.SealedResult{}, err
 }
 
-func (mg *methodGeneration) infoResult(
-	method funcapi.FunctionConfig,
-) (lifecycle.SealedResult, error) {
+func (mg *methodGeneration) infoResult(method funcapi.FunctionConfig) (lifecycle.SealedResult, error) {
 	params := mg.withJobParam(method.ID, slices.Clone(method.RequiredParams))
 	help := method.Help
 	if help == "" {
@@ -375,11 +360,7 @@ func (mg *methodGeneration) responseResult(
 	return functionJSONResult(status, payload)
 }
 
-func functionErrorResult(
-	status int,
-	format string,
-	arguments ...any,
-) (lifecycle.SealedResult, error) {
+func functionErrorResult(status int, format string, arguments ...any) (lifecycle.SealedResult, error) {
 	return functionJSONResult(status, map[string]any{
 		"status": status, "errorMessage": fmt.Sprintf(format, arguments...),
 	})
@@ -454,11 +435,7 @@ func splitMethodCSV(value string) []string {
 	})
 }
 
-func methodParamValues(
-	arguments map[string][]string,
-	payload map[string]any,
-	key string,
-) []string {
+func methodParamValues(arguments map[string][]string, payload map[string]any, key string) []string {
 	if values := arguments[key]; len(values) != 0 {
 		return values
 	}
@@ -517,12 +494,7 @@ func validateMethodParamValues(
 				if jobName == "" {
 					return fmt.Errorf("parameter %q option %q is not supported", param.ID, value)
 				}
-				return fmt.Errorf(
-					"parameter %q option %q is not supported by job %q",
-					param.ID,
-					value,
-					jobName,
-				)
+				return fmt.Errorf("parameter %q option %q is not supported by job %q", param.ID, value, jobName)
 			}
 		}
 	}
@@ -532,14 +504,10 @@ func validateMethodParamValues(
 func buildFunctionJobParam(jobs []string) funcapi.ParamConfig {
 	options := make([]funcapi.ParamOption, 0, max(1, len(jobs)))
 	for index, job := range jobs {
-		options = append(options, funcapi.ParamOption{
-			ID: job, Name: job, Default: index == 0,
-		})
+		options = append(options, funcapi.ParamOption{ID: job, Name: job, Default: index == 0})
 	}
 	if len(options) == 0 {
-		options = append(options, funcapi.ParamOption{
-			Name: "(No instances configured)", Disabled: true,
-		})
+		options = append(options, funcapi.ParamOption{Name: "(No instances configured)", Disabled: true})
 	}
 	return funcapi.ParamConfig{
 		ID: functionJobParameter, Name: "Instance",

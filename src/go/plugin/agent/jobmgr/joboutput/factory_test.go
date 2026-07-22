@@ -112,17 +112,11 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			}
 			hooks := test.configure(state, &creator)
 			factory, output := newFactoryTestHarness(t, creator, hooks)
-			permit, tasks := issueTestJobPermit(
-				t,
-				"module_job",
-				1,
-			)
+			permit, tasks := issueTestJobPermit(t, "module_job", 1)
 			prepared, err := factory.Prepare(
 				context.Background(),
 				factoryTestConfig(creator.FunctionOnly),
-				lifecycle.ResourceIdentity{
-					ID: "module_job", Generation: 1,
-				},
+				lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
 				permit,
 			)
 			if err == nil {
@@ -139,11 +133,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			require.EqualValues(t, test.wantClose, state.handlerClose)
 			require.EqualValues(t, 0, output.Len())
 			require.Equal(t, test.wantRetained, lifecycle.OwnershipRetained(err))
-			require.Equal(
-				t,
-				test.wantRetained,
-				tasks.LongLivedCensus().Active != 0,
-			)
+			require.Equal(t, test.wantRetained, tasks.LongLivedCensus().Active != 0)
 		})
 	}
 }
@@ -154,12 +144,8 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 		checkErr     error
 		hooks        JobHooks
 	}{
-		"autodetection failure": {
-			checkErr: errors.New("check failed"),
-		},
-		"function-bearing job without hooks": {
-			functionOnly: true,
-		},
+		"autodetection failure":              {checkErr: errors.New("check failed")},
+		"function-bearing job without hooks": {functionOnly: true},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -167,27 +153,19 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			creator := collectorapi.Creator{
 				FunctionOnly: test.functionOnly,
 				CreateV2: func() collectorapi.CollectorV2 {
-					return &factoryTestV2{
-						state: state, checkErr: test.checkErr,
-					}
+					return &factoryTestV2{state: state, checkErr: test.checkErr}
 				},
 			}
 			if test.functionOnly {
 				creator.SharedFunctions = func() []funcapi.FunctionConfig { return nil }
 			}
 			factory, output := newFactoryTestHarness(t, creator, test.hooks)
-			permit, tasks := issueTestJobPermit(
-				t,
-				"module_job",
-				1,
-			)
+			permit, tasks := issueTestJobPermit(t, "module_job", 1)
 
 			prepared, err := factory.Prepare(
 				context.Background(),
 				factoryTestConfig(test.functionOnly),
-				lifecycle.ResourceIdentity{
-					ID: "module_job", Generation: 1,
-				},
+				lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
 				permit,
 			)
 			if err == nil {
@@ -199,11 +177,7 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 
 			require.EqualValues(t, 1, state.collectorCleanup)
 			require.EqualValues(t, 0, output.Len())
-			require.EqualValues(
-				t,
-				lifecycle.LongLivedCensus{},
-				tasks.LongLivedCensus(),
-			)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 		})
 	}
 }
@@ -219,11 +193,7 @@ func TestFactoryDefersAutoDetectionUntilPreparedJobAcceptance(t *testing.T) {
 		},
 	}
 	factory, _ := newFactoryTestHarness(t, creator, nil)
-	permit, tasks := issueTestJobPermit(
-		t,
-		"module_job",
-		1,
-	)
+	permit, tasks := issueTestJobPermit(t, "module_job", 1)
 
 	prepared, err := factory.Prepare(
 		context.Background(),
@@ -254,11 +224,7 @@ func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
 		},
 	}
 	factory, _ := newFactoryTestHarness(t, creator, nil)
-	permit, tasks := issueTestJobPermit(
-		t,
-		"module_job",
-		1,
-	)
+	permit, tasks := issueTestJobPermit(t, "module_job", 1)
 	prepared, err := factory.Prepare(
 		context.Background(),
 		factoryTestConfig(false),
@@ -271,11 +237,7 @@ func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
 	}
 	require.Error(t, err)
 	require.EqualValues(t, 1, state.collectorCleanup)
-	require.EqualValues(
-		t,
-		lifecycle.LongLivedCensus{},
-		tasks.LongLivedCensus(),
-	)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
 type factoryTestState struct {
@@ -342,11 +304,7 @@ func (fth *factoryTestHandlers) CloseAndDrain(context.Context) error {
 	return nil
 }
 
-func newFactoryTestHarness(
-	t *testing.T,
-	creator collectorapi.Creator,
-	hooks JobHooks,
-) (*Factory, *bytes.Buffer) {
+func newFactoryTestHarness(t *testing.T, creator collectorapi.Creator, hooks JobHooks) (*Factory, *bytes.Buffer) {
 	t.Helper()
 	output := &bytes.Buffer{}
 	frames, err := lifecycle.NewFrameOwner(output)
@@ -375,17 +333,10 @@ func newFactoryTestHarness(
 	return factory, output
 }
 
-func unavailableStoreScope(
-	[]string,
-) (secretresolver.AtomicScope, error) {
+func unavailableStoreScope([]string) (secretresolver.AtomicScope, error) {
 	return nil, errors.New("test Store scope is unavailable")
 }
 
 func factoryTestConfig(functionOnly bool) confgroup.Config {
-	return confgroup.Config{
-		"module":        "module",
-		"name":          "job",
-		"update_every":  1,
-		"function_only": functionOnly,
-	}
+	return confgroup.Config{"module": "module", "name": "job", "update_every": 1, "function_only": functionOnly}
 }

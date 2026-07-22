@@ -31,32 +31,19 @@ func NewFunctionAssembly(
 	if epoch == 0 || modules == nil || frames == nil {
 		return nil, errors.New("jobmgr composition: invalid Function assembly")
 	}
-	controller, catalog, err := functionadapter.NewController(
-		epoch,
-		modules,
-		initial...,
-	)
+	controller, catalog, err := functionadapter.NewController(epoch, modules, initial...)
 	if err != nil {
 		return nil, err
 	}
 	port, err := functionadapter.NewFramePublicationPort(frames)
 	if err != nil {
-		return nil, errors.Join(
-			err,
-			controller.AbortConstruction(context.Background()),
-		)
+		return nil, errors.Join(err, controller.AbortConstruction(context.Background()))
 	}
 	publication, err := functionadapter.NewPublication(epoch, port)
 	if err != nil {
-		return nil, errors.Join(
-			err,
-			controller.AbortConstruction(context.Background()),
-		)
+		return nil, errors.Join(err, controller.AbortConstruction(context.Background()))
 	}
-	assembly := &FunctionAssembly{
-		controller: controller, catalog: catalog,
-		publication: publication,
-	}
+	assembly := &FunctionAssembly{controller: controller, catalog: catalog, publication: publication}
 	return assembly, nil
 }
 
@@ -77,10 +64,7 @@ func (fa *FunctionAssembly) JobHooks() joboutput.JobHooks {
 	return functionJobHooks{controller: fa.controller}
 }
 
-func (fa *FunctionAssembly) ReconcileModule(
-	ctx context.Context,
-	module string,
-) error {
+func (fa *FunctionAssembly) ReconcileModule(ctx context.Context, module string) error {
 	if fa == nil {
 		return errors.New("jobmgr composition: nil Function reconciliation")
 	}
@@ -113,10 +97,7 @@ func (fa *FunctionAssembly) Activate() error {
 // BeforeFunctionCatalogClose is CommandKernel's supervised shutdown barrier.
 // It withdraws every externally published route before the loop begins catalog
 // close and before resource stop tasks can invoke their exact job handles.
-func (fa *FunctionAssembly) BeforeFunctionCatalogClose(
-	_ context.Context,
-	generation uint64,
-) error {
+func (fa *FunctionAssembly) BeforeFunctionCatalogClose(_ context.Context, generation uint64) error {
 	if fa == nil {
 		return nil
 	}
@@ -125,10 +106,7 @@ func (fa *FunctionAssembly) BeforeFunctionCatalogClose(
 
 // FinalizeRun terminalizes controller-owned Function state after the kernel has
 // drained the catalog and every job handle.
-func (fa *FunctionAssembly) FinalizeRun(
-	_ context.Context,
-	generation uint64,
-) error {
+func (fa *FunctionAssembly) FinalizeRun(_ context.Context, generation uint64) error {
 	if fa == nil {
 		return nil
 	}
@@ -139,17 +117,12 @@ type functionJobHooks struct {
 	controller *functionadapter.Controller
 }
 
-func (fjh functionJobHooks) Prepare(
-	published joboutput.PublishedJob,
-) (joboutput.HandlerLifecycle, error) {
+func (fjh functionJobHooks) Prepare(published joboutput.PublishedJob) (joboutput.HandlerLifecycle, error) {
 	if fjh.controller == nil ||
 		published.Identity.ID == "" ||
 		published.Identity.Generation == 0 ||
 		published.Job == nil {
 		return nil, errors.New("jobmgr composition: invalid Function job preparation")
 	}
-	return fjh.controller.PrepareJob(
-		published.Identity,
-		published.Job,
-	)
+	return fjh.controller.PrepareJob(published.Identity, published.Job)
 }

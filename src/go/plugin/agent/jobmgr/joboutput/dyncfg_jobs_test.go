@@ -25,10 +25,8 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 		apply     bool
 		wantGraph bool
 	}{
-		"apply response before notification": {
-			apply: true, wantGraph: true,
-		},
-		"dispose preserves empty graph": {},
+		"apply response before notification": {apply: true, wantGraph: true},
+		"dispose preserves empty graph":      {},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -53,13 +51,7 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 					taskScope lifecycle.ResourceTransactionScope,
 					permit lifecycle.LongLivedPermit,
 				) (lifecycle.PreparedResourceTransaction, error) {
-					return controller.Prepare(
-						ctx,
-						request,
-						current,
-						taskScope,
-						permit,
-					)
+					return controller.Prepare(ctx, request, current, taskScope, permit)
 				},
 			)
 			require.NoError(t, err)
@@ -72,10 +64,7 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 
 			if test.apply {
 				require.NoError(t, supervisor.SendAction(
-					lifecycle.TaskAction{
-						Ref: ref, Sequence: 2,
-						Kind: lifecycle.TaskActionApplyResourceTransaction,
-					},
+					lifecycle.TaskAction{Ref: ref, Sequence: 2, Kind: lifecycle.TaskActionApplyResourceTransaction},
 				),
 				)
 
@@ -84,8 +73,7 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 					second.Sequence != 2 ||
 					second.Kind != lifecycle.TaskOutcomeAppliedResourceTransaction ||
 					second.Err != nil)
-				disposition, current, err :=
-					supervisor.TakeAppliedResourceTransaction(ref, 2, scope)
+				disposition, current, err := supervisor.TakeAppliedResourceTransaction(ref, 2, scope)
 				require.NoError(t, err)
 				require.False(t, disposition != lifecycle.ResourceTransactionUnchanged || current != nil)
 
@@ -104,27 +92,18 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 				sendDynCfgJobTestAction(
 					t,
 					supervisor,
-					lifecycle.TaskAction{
-						Ref: ref, Sequence: 4,
-						Kind: lifecycle.TaskActionCleanup,
-					},
+					lifecycle.TaskAction{Ref: ref, Sequence: 4, Kind: lifecycle.TaskActionCleanup},
 				)
 				sendDynCfgJobTestAction(
 					t,
 					supervisor,
-					lifecycle.TaskAction{
-						Ref: ref, Sequence: 5,
-						Kind: lifecycle.TaskActionTerminate,
-					},
+					lifecycle.TaskAction{Ref: ref, Sequence: 5, Kind: lifecycle.TaskActionTerminate},
 				)
 			} else {
 				sendDynCfgJobTestAction(
 					t,
 					supervisor,
-					lifecycle.TaskAction{
-						Ref: ref, Sequence: 2,
-						Kind: lifecycle.TaskActionDispose,
-					},
+					lifecycle.TaskAction{Ref: ref, Sequence: 2, Kind: lifecycle.TaskActionDispose},
 				)
 				current, err := supervisor.TakeDisposedResourceTransaction(ref, 2, scope)
 				require.NoError(t, err)
@@ -132,10 +111,7 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 				sendDynCfgJobTestAction(
 					t,
 					supervisor,
-					lifecycle.TaskAction{
-						Ref: ref, Sequence: 3,
-						Kind: lifecycle.TaskActionTerminate,
-					},
+					lifecycle.TaskAction{Ref: ref, Sequence: 3, Kind: lifecycle.TaskActionTerminate},
 				)
 			}
 
@@ -181,15 +157,7 @@ func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
 				scope lifecycle.ResourceTransactionScope,
 				permit lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
-				return controller.prepareEnable(
-					ctx,
-					target,
-					record,
-					true,
-					nil,
-					scope,
-					permit,
-				)
+				return controller.prepareEnable(ctx, target, record, true, nil, scope, permit)
 			},
 		},
 		"restart": {
@@ -202,15 +170,7 @@ func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
 				scope lifecycle.ResourceTransactionScope,
 				permit lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
-				return controller.prepareRestart(
-					ctx,
-					target,
-					record,
-					true,
-					nil,
-					scope,
-					permit,
-				)
+				return controller.prepareRestart(ctx, target, record, true, nil, scope, permit)
 			},
 		},
 		"update": {
@@ -244,8 +204,7 @@ func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			controller, graph, _, _, state :=
-				newDynCfgJobTestHarness(t)
+			controller, graph, _, _, state := newDynCfgJobTestHarness(t)
 			creator := controller.modules["module"]
 			var constructions int
 			creator.Create = func() collectorapi.CollectorV1 {
@@ -273,30 +232,17 @@ func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
 			require.NoError(t, graph.Commit(mutation))
 			record, exists := graph.Lookup(config.FullName())
 			require.True(t, exists)
-			permit, permitTasks := issueTestJobPermit(
-				t,
-				config.FullName(),
-				1,
-			)
+			permit, permitTasks := issueTestJobPermit(t, config.FullName(), 1)
 			scope := lifecycle.ResourceTransactionScope{
-				ID: config.FullName(),
-				Successor: lifecycle.ResourceIdentity{
-					ID: config.FullName(), Generation: 1,
-				},
+				ID:        config.FullName(),
+				Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1},
 			}
 			target := dynCfgTarget{
 				module: config.Module(), name: config.Name(),
 				resourceID: config.FullName(), creator: creator,
 			}
 
-			transaction, err := test.prepare(
-				context.Background(),
-				controller,
-				target,
-				record,
-				scope,
-				permit,
-			)
+			transaction, err := test.prepare(context.Background(), controller, target, record, scope, permit)
 			require.Nil(t, transaction)
 			require.True(t, lifecycle.OwnershipRetained(err))
 			census := permitTasks.LongLivedCensus()
@@ -307,15 +253,9 @@ func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
 
 func TestResourceOnlyTransactionReplacesWithoutGraphMutation(t *testing.T) {
 	var events []string
-	currentIdentity := lifecycle.ResourceIdentity{
-		ID: "job", Generation: 1,
-	}
-	successorIdentity := lifecycle.ResourceIdentity{
-		ID: "job", Generation: 2,
-	}
-	current := &transactionTestReadyResource{
-		identity: currentIdentity, prefix: "current", events: &events,
-	}
+	currentIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
+	successorIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 2}
+	current := &transactionTestReadyResource{identity: currentIdentity, prefix: "current", events: &events}
 	successorReady := &transactionTestReadyResource{
 		identity: successorIdentity, prefix: "successor", events: &events,
 	}
@@ -340,20 +280,12 @@ func TestResourceOnlyTransactionReplacesWithoutGraphMutation(t *testing.T) {
 	_, applyErr := transaction.Apply(context.Background())
 	require.NoError(t, applyErr)
 
-	want := []string{
-		"current-stop",
-		"current-finalize",
-		"successor-accept",
-		"successor-publish",
-	}
+	want := []string{"current-stop", "current-finalize", "successor-accept", "successor-publish"}
 	require.EqualValues(t, strings.Join(want, ","), strings.Join(events, ","))
 }
 
-func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
-	t *testing.T,
-) {
-	controller, graph, _, _, state :=
-		newDynCfgJobTestHarness(t)
+func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(t *testing.T) {
+	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
 	var events []string
 	creator := controller.modules["module"]
 	creator.Create = func() collectorapi.CollectorV1 {
@@ -387,30 +319,18 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
 	}})
 	require.NoError(t, err)
 	require.NoError(t, graph.Commit(mutation))
-	currentIdentity := lifecycle.ResourceIdentity{
-		ID: config.FullName(), Generation: 1,
-	}
-	current := &transactionTestReadyResource{
-		identity: currentIdentity,
-		prefix:   "current",
-		events:   &events,
-	}
-	permit, tasks :=
-		issueTestJobPermit(t, config.FullName(), 2)
+	currentIdentity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
+	current := &transactionTestReadyResource{identity: currentIdentity, prefix: "current", events: &events}
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 2)
 	scope := lifecycle.ResourceTransactionScope{
-		ID:      config.FullName(),
-		Current: currentIdentity,
-		Successor: lifecycle.ResourceIdentity{
-			ID: config.FullName(), Generation: 2,
-		},
+		ID:        config.FullName(),
+		Current:   currentIdentity,
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
 	}
 
 	transaction, err := controller.prepareDiscovered(
 		context.Background(),
-		DiscoveredJobChange{
-			Config: config, Status: dyncfg.StatusRunning,
-			Restart: true,
-		},
+		DiscoveredJobChange{Config: config, Status: dyncfg.StatusRunning, Restart: true},
 		current,
 		scope,
 		permit,
@@ -418,34 +338,16 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
 	require.NoError(t, err)
 	_, err = transaction.Apply(context.Background())
 	require.NoError(t, err)
-	require.Equal(
-		t,
-		[]string{
-			"current-stop",
-			"current-finalize",
-			"autodetection",
-		},
-		events,
-	)
+	require.Equal(t, []string{"current-stop", "current-finalize", "autodetection"}, events)
 
 	record, ok := graph.Lookup(config.FullName())
 	require.True(t, ok)
 	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
 	require.EqualValues(t, 1, state.collectorCleanup)
-	require.EqualValues(
-		t,
-		lifecycle.LongLivedCensus{},
-		tasks.LongLivedCensus(),
-	)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 
-	require.NoError(t, controller.scheduler.Tick(
-		context.Background(),
-		0,
-	))
-	require.NoError(t, controller.scheduler.Tick(
-		context.Background(),
-		1,
-	))
+	require.NoError(t, controller.scheduler.Tick(context.Background(), 0))
+	require.NoError(t, controller.scheduler.Tick(context.Background(), 1))
 	commands.waitForSubmissions(t, 1)
 	submitted, plans, waited := commands.snapshot()
 	require.Len(t, submitted, 1)
@@ -471,43 +373,20 @@ func TestFailedAutoDetectionCommitsFailedStateAndSchedulesRetry(
 	)
 	require.NoError(t, err)
 	require.NoError(t, graph.Commit(replacementMutation))
-	retryPermit, retryTasks :=
-		issueTestJobPermit(t, config.FullName(), 3)
+	retryPermit, retryTasks := issueTestJobPermit(t, config.FullName(), 3)
 	retryScope := lifecycle.ResourceTransactionScope{
-		ID: config.FullName(),
-		Successor: lifecycle.ResourceIdentity{
-			ID: config.FullName(), Generation: 3,
-		},
+		ID:        config.FullName(),
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 3},
 	}
-	retryTransaction, err :=
-		plans[0].Transaction.Prepare(
-			context.Background(),
-			nil,
-			retryScope,
-			retryPermit,
-		)
+	retryTransaction, err := plans[0].Transaction.Prepare(context.Background(), nil, retryScope, retryPermit)
 	require.NoError(t, err)
 	_, err = retryTransaction.Apply(context.Background())
 	require.NoError(t, err)
-	require.Equal(
-		t,
-		[]string{
-			"current-stop",
-			"current-finalize",
-			"autodetection",
-		},
-		events,
-	)
-	require.EqualValues(
-		t,
-		lifecycle.LongLivedCensus{},
-		retryTasks.LongLivedCensus(),
-	)
+	require.Equal(t, []string{"current-stop", "current-finalize", "autodetection"}, events)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, retryTasks.LongLivedCensus())
 
 	controller.scheduler.StopAutoDetectionRetries()
-	require.NoError(t, controller.scheduler.WaitAutoDetectionRetries(
-		context.Background(),
-	))
+	require.NoError(t, controller.scheduler.WaitAutoDetectionRetries(context.Background()))
 }
 
 func TestNonRetryableAutoDetectionFailureSettlesExistingRetry(t *testing.T) {
@@ -540,34 +419,19 @@ func TestNonRetryableAutoDetectionFailureSettlesExistingRetry(t *testing.T) {
 	}})
 	require.NoError(t, err)
 	require.NoError(t, graph.Commit(mutation))
-	currentIdentity := lifecycle.ResourceIdentity{
-		ID: config.FullName(), Generation: 1,
-	}
+	currentIdentity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
 	var events []string
-	current := &transactionTestReadyResource{
-		identity: currentIdentity,
-		prefix:   "current",
-		events:   &events,
-	}
-	permit, tasks := issueTestJobPermit(
-		t,
-		config.FullName(),
-		2,
-	)
+	current := &transactionTestReadyResource{identity: currentIdentity, prefix: "current", events: &events}
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 2)
 	scope := lifecycle.ResourceTransactionScope{
-		ID:      config.FullName(),
-		Current: currentIdentity,
-		Successor: lifecycle.ResourceIdentity{
-			ID: config.FullName(), Generation: 2,
-		},
+		ID:        config.FullName(),
+		Current:   currentIdentity,
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
 	}
 
 	transaction, err := controller.prepareDiscovered(
 		context.Background(),
-		DiscoveredJobChange{
-			Config: config, Status: dyncfg.StatusRunning,
-			Restart: true,
-		},
+		DiscoveredJobChange{Config: config, Status: dyncfg.StatusRunning, Restart: true},
 		current,
 		scope,
 		permit,
@@ -575,18 +439,11 @@ func TestNonRetryableAutoDetectionFailureSettlesExistingRetry(t *testing.T) {
 	require.NoError(t, err)
 	_, err = transaction.Apply(context.Background())
 	require.NoError(t, err)
-	require.False(t, controller.scheduler.retries.isCurrent(
-		config.FullName(),
-		token,
-	))
+	require.False(t, controller.scheduler.retries.isCurrent(config.FullName(), token))
 	record, exists := graph.Lookup(config.FullName())
 	require.True(t, exists)
 	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
-	require.EqualValues(
-		t,
-		lifecycle.LongLivedCensus{},
-		tasks.LongLivedCensus(),
-	)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
 type nonRetryableAutoDetectionError struct{}
@@ -620,10 +477,7 @@ func TestManualNoChangeRemovalSettlesAutoDetectionRetry(t *testing.T) {
 	require.NoError(t, err)
 	_, err = transaction.Apply(context.Background())
 	require.NoError(t, err)
-	require.False(t, controller.scheduler.retries.isCurrent(
-		config.FullName(),
-		token,
-	))
+	require.False(t, controller.scheduler.retries.isCurrent(config.FullName(), token))
 }
 
 func TestPlainStockRetryCanRestartAfterFailedGraphRecordWasRemoved(t *testing.T) {
@@ -646,10 +500,8 @@ func TestPlainStockRetryCanRestartAfterFailedGraphRecordWasRemoved(t *testing.T)
 	controller.scheduler.retries.mu.Unlock()
 	permitPlan := lifecycle.NewJobLongLivedPlan()
 	scope := lifecycle.ResourceTransactionScope{
-		ID: config.FullName(),
-		Successor: lifecycle.ResourceIdentity{
-			ID: config.FullName(), Generation: 1,
-		},
+		ID:        config.FullName(),
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1},
 	}
 	plan, err := lifecycle.NewResourceTransactionPermitTaskPlan(
 		lifecycle.SourceJobManager,
@@ -666,10 +518,7 @@ func TestPlainStockRetryCanRestartAfterFailedGraphRecordWasRemoved(t *testing.T)
 		) (lifecycle.PreparedResourceTransaction, error) {
 			return controller.prepareDiscovered(
 				ctx,
-				DiscoveredJobChange{
-					Config: config, Status: dyncfg.StatusRunning,
-					Restart: true, retry: token,
-				},
+				DiscoveredJobChange{Config: config, Status: dyncfg.StatusRunning, Restart: true, retry: token},
 				current,
 				taskScope,
 				permit,
@@ -687,21 +536,14 @@ func TestPlainStockRetryCanRestartAfterFailedGraphRecordWasRemoved(t *testing.T)
 	}))
 	second := <-supervisor.CompletionCh()
 	require.NoError(t, second.Err)
-	disposition, current, err := supervisor.TakeAppliedResourceTransaction(
-		ref,
-		2,
-		scope,
-	)
+	disposition, current, err := supervisor.TakeAppliedResourceTransaction(ref, 2, scope)
 	require.NoError(t, err)
 	require.Equal(t, lifecycle.ResourceTransactionInstalled, disposition)
 	require.NotNil(t, current)
 	record, exists := graph.Lookup(config.FullName())
 	require.True(t, exists)
 	require.Equal(t, dyncfg.StatusRunning.String(), record.Status)
-	require.False(t, controller.scheduler.retries.isCurrent(
-		config.FullName(),
-		token,
-	))
+	require.False(t, controller.scheduler.retries.isCurrent(config.FullName(), token))
 
 	sendDynCfgJobTestAction(t, supervisor, lifecycle.TaskAction{
 		Ref: ref, Sequence: 3, Kind: lifecycle.TaskActionDispose,
@@ -715,11 +557,7 @@ func TestPlainStockRetryCanRestartAfterFailedGraphRecordWasRemoved(t *testing.T)
 	require.NoError(t, supervisor.Release(ref))
 	require.NoError(t, current.Stop(context.Background()))
 	require.NoError(t, current.Finalize())
-	require.EqualValues(
-		t,
-		lifecycle.LongLivedCensus{},
-		supervisor.LongLivedCensus(),
-	)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, supervisor.LongLivedCensus())
 }
 
 func TestRetryPreparationFailureSettlesExactToken(t *testing.T) {
@@ -735,48 +573,31 @@ func TestRetryPreparationFailureSettlesExactToken(t *testing.T) {
 	controller.scheduler.retries.mu.Lock()
 	token := controller.scheduler.retries.entries[config.FullName()].token
 	controller.scheduler.retries.mu.Unlock()
-	permit, tasks := issueTestJobPermit(
-		t,
-		config.FullName(),
-		1,
-	)
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
 	scope := lifecycle.ResourceTransactionScope{
-		ID: config.FullName(),
-		Successor: lifecycle.ResourceIdentity{
-			ID: config.FullName(), Generation: 1,
-		},
+		ID:        config.FullName(),
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1},
 	}
 
 	transaction, err := controller.prepareDiscovered(
 		context.Background(),
-		DiscoveredJobChange{
-			Config: config, Status: dyncfg.StatusRunning,
-			Restart: true, retry: token,
-		},
+		DiscoveredJobChange{Config: config, Status: dyncfg.StatusRunning, Restart: true, retry: token},
 		nil,
 		scope,
 		permit,
 	)
 	require.Nil(t, transaction)
 	require.Error(t, err)
-	require.False(t, controller.scheduler.retries.isCurrent(
-		config.FullName(),
-		token,
-	))
+	require.False(t, controller.scheduler.retries.isCurrent(config.FullName(), token))
 	require.NoError(t, permit.AbortUnused())
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
-func TestDependencyPreparationFailureLeavesPermitForTaskSupervisor(
-	t *testing.T,
-) {
+func TestDependencyPreparationFailureLeavesPermitForTaskSupervisor(t *testing.T) {
 	controller, _, _, _, state := newDynCfgJobTestHarness(t)
 	sentinel := errors.New("dependency preparation failed")
 	controller.dependencies = jobDependencyIndexFunc(
-		func(
-			string,
-			*dyncfg.GraphConfig,
-		) (func(), error) {
+		func(string, *dyncfg.GraphConfig) (func(), error) {
 			return nil, sentinel
 		},
 	)
@@ -784,20 +605,15 @@ func TestDependencyPreparationFailureLeavesPermitForTaskSupervisor(
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("user=test")
 	config.SetProvider("test")
-	permit, tasks :=
-		issueTestJobPermit(t, config.FullName(), 1)
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
 	scope := lifecycle.ResourceTransactionScope{
-		ID: config.FullName(),
-		Successor: lifecycle.ResourceIdentity{
-			ID: config.FullName(), Generation: 1,
-		},
+		ID:        config.FullName(),
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1},
 	}
 
 	transaction, err := controller.prepareDiscovered(
 		context.Background(),
-		DiscoveredJobChange{
-			Config: config, Status: dyncfg.StatusRunning,
-		},
+		DiscoveredJobChange{Config: config, Status: dyncfg.StatusRunning},
 		nil,
 		scope,
 		permit,
@@ -807,11 +623,7 @@ func TestDependencyPreparationFailureLeavesPermitForTaskSupervisor(
 	require.EqualValues(t, 1, state.collectorCleanup)
 
 	require.NoError(t, permit.AbortUnused())
-	require.EqualValues(
-		t,
-		lifecycle.LongLivedCensus{},
-		tasks.LongLivedCensus(),
-	)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
 func TestPrepareMutationLeavesUnusedPermitForTaskSupervisor(t *testing.T) {
@@ -834,9 +646,7 @@ func TestPrepareMutationLeavesUnusedPermitForTaskSupervisor(t *testing.T) {
 		nil,
 		permit,
 		lifecycle.ResourceTransactionUnchanged,
-		&dyncfg.GraphConfig{
-			ID: "module_job", Module: "module", Name: "job",
-		},
+		&dyncfg.GraphConfig{ID: "module_job", Module: "module", Name: "job"},
 		mustDynCfgMessage(200, ""),
 		func() error { return nil },
 	)
@@ -853,10 +663,7 @@ func TestPrepareMutationRollsBackAfterTransactionValidationFailure(t *testing.T)
 		identity: lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
 		events:   &events,
 	}
-	scope := lifecycle.ResourceTransactionScope{
-		ID:        "module_job",
-		Successor: successor.identity,
-	}
+	scope := lifecycle.ResourceTransactionScope{ID: "module_job", Successor: successor.identity}
 
 	transaction, err := controller.prepareMutation(
 		scope,
@@ -864,9 +671,7 @@ func TestPrepareMutationRollsBackAfterTransactionValidationFailure(t *testing.T)
 		successor,
 		lifecycle.LongLivedPermit{},
 		lifecycle.ResourceTransactionRemoved,
-		&dyncfg.GraphConfig{
-			ID: "module_job", Module: "module", Name: "job",
-		},
+		&dyncfg.GraphConfig{ID: "module_job", Module: "module", Name: "job"},
 		mustDynCfgMessage(200, ""),
 		func() error { return nil },
 	)
@@ -875,10 +680,8 @@ func TestPrepareMutationRollsBackAfterTransactionValidationFailure(t *testing.T)
 	require.Equal(t, []string{"successor-dispose"}, events)
 
 	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{
-		ID: "module_job",
-		Config: &dyncfg.GraphConfig{
-			ID: "module_job", Module: "module", Name: "job",
-		},
+		ID:     "module_job",
+		Config: &dyncfg.GraphConfig{ID: "module_job", Module: "module", Name: "job"},
 	}})
 	require.NoError(t, err)
 	require.NoError(t, graph.Abort(mutation))
@@ -914,10 +717,7 @@ func newDynCfgJobTestHarness(
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
 	configModules, err := NewConfigModuleFactory(
-		ConfigModuleFactoryConfig{
-			Modules: modules, Resolver: resolver,
-			StoreScope: unavailableStoreScope,
-		},
+		ConfigModuleFactoryConfig{Modules: modules, Resolver: resolver, StoreScope: unavailableStoreScope},
 	)
 	require.NoError(t, err)
 	factory, err := NewFactory(
@@ -935,12 +735,8 @@ func newDynCfgJobTestHarness(
 	controller, err := NewDynCfgJobController(
 		DynCfgJobControllerConfig{
 			PluginName: "go.d", Modules: modules,
-			Defaults: confgroup.Registry{
-				"module": {
-					UpdateEvery: 1,
-				},
-			},
-			Factory: factory, ConfigModules: configModules,
+			Defaults: confgroup.Registry{"module": {UpdateEvery: 1}},
+			Factory:  factory, ConfigModules: configModules,
 			Graph: graph, Frames: frames,
 		},
 	)
@@ -948,15 +744,9 @@ func newDynCfgJobTestHarness(
 	return controller, graph, supervisor, output, state
 }
 
-type jobDependencyIndexFunc func(
-	string,
-	*dyncfg.GraphConfig,
-) (func(), error)
+type jobDependencyIndexFunc func(string, *dyncfg.GraphConfig) (func(), error)
 
-func (fn jobDependencyIndexFunc) PrepareJobChange(
-	id string,
-	postimage *dyncfg.GraphConfig,
-) (func(), error) {
+func (fn jobDependencyIndexFunc) PrepareJobChange(id string, postimage *dyncfg.GraphConfig) (func(), error) {
 	return fn(id, postimage)
 }
 
@@ -976,15 +766,14 @@ func startDynCfgJobTestTask(
 	return starts[0].Task
 }
 
-func sendDynCfgJobTestAction(
-	t *testing.T,
-	supervisor *lifecycle.TaskSupervisor,
-	action lifecycle.TaskAction,
-) {
+func sendDynCfgJobTestAction(t *testing.T, supervisor *lifecycle.TaskSupervisor, action lifecycle.TaskAction) {
 	t.Helper()
 
 	require.NoError(t, supervisor.SendAction(action))
 
 	ack := <-supervisor.AcknowledgementCh()
-	require.False(t, ack.Ref != action.Ref || ack.Sequence != action.Sequence || ack.Kind != action.Kind || ack.Err != nil)
+	require.False(
+		t,
+		ack.Ref != action.Ref || ack.Sequence != action.Sequence || ack.Kind != action.Kind || ack.Err != nil,
+	)
 }

@@ -77,10 +77,7 @@ func (ul *UIDLedger) Admit(uid string, now time.Time) error {
 	} else {
 		ul.free = record.freeNext
 	}
-	*record = uidRecord{
-		state: uidStateActive,
-		key:   strings.Clone(uid),
-	}
+	*record = uidRecord{state: uidStateActive, key: strings.Clone(uid)}
 	ul.index[record.key] = record
 	ul.active++
 	return nil

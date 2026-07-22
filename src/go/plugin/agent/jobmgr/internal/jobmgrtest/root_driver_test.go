@@ -34,9 +34,7 @@ func TestRootProtocolObservationReportsEarlyProcessExit(t *testing.T) {
 	require.NotErrorIs(t, err, context.DeadlineExceeded)
 }
 
-func TestShippedRootQuitRejectsDelayedStartupSeparatorsAsKeepalive(
-	t *testing.T,
-) {
+func TestShippedRootQuitRejectsDelayedStartupSeparatorsAsKeepalive(t *testing.T) {
 	directory := t.TempDir()
 	executable := filepath.Join(directory, "startup-separators")
 	script := "#!/bin/sh\n" +
@@ -53,11 +51,7 @@ func TestShippedRootQuitRejectsDelayedStartupSeparatorsAsKeepalive(
 	err := runShippedRoot(
 		ctx,
 		directory,
-		shippedRoot{
-			name:       "startup-separators",
-			executable: executable,
-			module:     "fixture",
-		},
+		shippedRoot{name: "startup-separators", executable: executable, module: "fixture"},
 		shippedRootQuit,
 	)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
@@ -71,10 +65,7 @@ func TestShippedRootDriverValidatesConfigsBeforeAvailability(t *testing.T) {
 		wantError    bool
 	}{
 		"exact empty jobs": {},
-		"missing": {
-			removePath: "go.d/testrandom.conf",
-			wantError:  true,
-		},
+		"missing":          {removePath: "go.d/testrandom.conf", wantError: true},
 		"nonempty jobs": {
 			overridePath: "go.d/testrandom.conf",
 			payload:      "jobs:\n  - name: unexpected\n",
@@ -98,13 +89,9 @@ func TestShippedRootDriverValidatesConfigsBeforeAvailability(t *testing.T) {
 				))
 			}
 			if test.removePath != "" {
-				require.NoError(t, os.Remove(
-					filepath.Join(configDir, test.removePath),
-				))
+				require.NoError(t, os.Remove(filepath.Join(configDir, test.removePath)))
 			}
-			driver := ShippedRootDriver{
-				ConfigDir: configDir,
-			}
+			driver := ShippedRootDriver{ConfigDir: configDir}
 
 			missing, err := driver.RunMatrixAvailable(t.Context())
 			if test.wantError {
@@ -112,33 +99,20 @@ func TestShippedRootDriverValidatesConfigsBeforeAvailability(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			assert.ElementsMatch(
-				t,
-				[]string{"godplugin", "ibmdplugin", "scriptsdplugin"},
-				missing,
-			)
+			assert.ElementsMatch(t, []string{"godplugin", "ibmdplugin", "scriptsdplugin"}, missing)
 		})
 	}
 }
 
 func TestShippedRootDriverHasClosedRootMembership(t *testing.T) {
-	driver := ShippedRootDriver{
-		GoDPlugin:      "go",
-		IBMPlugin:      "ibm",
-		ScriptsDPlugin: "scripts",
-	}
+	driver := ShippedRootDriver{GoDPlugin: "go", IBMPlugin: "ibm", ScriptsDPlugin: "scripts"}
 	observed := make(map[string]shippedRoot)
 	for _, root := range driver.roots() {
 		observed[root.name] = root
 	}
 
 	require.Equal(t, map[string]shippedRoot{
-		"godplugin": {
-			name:       "godplugin",
-			executable: "go",
-			module:     "testrandom",
-			configFile: "go.d/testrandom.conf",
-		},
+		"godplugin": {name: "godplugin", executable: "go", module: "testrandom", configFile: "go.d/testrandom.conf"},
 		"ibmdplugin": {
 			name:       "ibmdplugin",
 			executable: "ibm",
@@ -219,11 +193,7 @@ func TestRootProtocolObservationPreservesChunkBoundaries(t *testing.T) {
 
 func writeEmptyRootConfigs(t *testing.T, configDir string) {
 	t.Helper()
-	for _, relative := range []string{
-		"go.d/testrandom.conf",
-		"ibm.d/websphere_mp.conf",
-		"scripts.d/nagios.conf",
-	} {
+	for _, relative := range []string{"go.d/testrandom.conf", "ibm.d/websphere_mp.conf", "scripts.d/nagios.conf"} {
 		path := filepath.Join(configDir, relative)
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 		require.NoError(t, os.WriteFile(path, []byte("jobs: []\n"), 0o600))

@@ -38,10 +38,7 @@ func (spec preparedSecretSpec) commitEntryDisposition() {
 	if spec.removeEntry {
 		spec.controller.commitEntry(spec.storeKey, nil)
 	} else if spec.entry != nil {
-		spec.controller.commitEntry(
-			spec.entry.config.ExposedKey(),
-			spec.entry,
-		)
+		spec.controller.commitEntry(spec.entry.config.ExposedKey(), spec.entry)
 	}
 }
 
@@ -52,25 +49,19 @@ type preparedSecretTransaction struct {
 	spec     preparedSecretSpec
 }
 
-func newPreparedSecretTransaction(
-	spec preparedSecretSpec,
-) (*preparedSecretTransaction, error) {
+func newPreparedSecretTransaction(spec preparedSecretSpec) (*preparedSecretTransaction, error) {
 	if !spec.scope.Valid() ||
 		(spec.current == nil) == spec.scope.Current.Valid() ||
 		spec.current != nil &&
 			spec.current.Identity() != spec.scope.Current ||
 		spec.cleanup == nil ||
 		spec.controller == nil {
-		return nil, errors.New(
-			"jobmgr secrets: invalid prepared transaction",
-		)
+		return nil, errors.New("jobmgr secrets: invalid prepared transaction")
 	}
 	if spec.mutation == nil && spec.permit.Valid() &&
 		(!spec.scope.Successor.Valid() ||
 			spec.permit.Owner() != spec.scope.Successor) {
-		return nil, errors.New(
-			"jobmgr secrets: no-op permit differs from scope",
-		)
+		return nil, errors.New("jobmgr secrets: no-op permit differs from scope")
 	}
 	return &preparedSecretTransaction{spec: spec}, nil
 }
@@ -87,9 +78,7 @@ func (pst *preparedSecretTransaction) Scope() lifecycle.ResourceTransactionScope
 	return pst.spec.scope
 }
 
-func (pst *preparedSecretTransaction) Apply(
-	ctx context.Context,
-) (lifecycle.AppliedResourceTransaction, error) {
+func (pst *preparedSecretTransaction) Apply(ctx context.Context) (lifecycle.AppliedResourceTransaction, error) {
 	return pst.apply(ctx, nil)
 }
 
@@ -98,8 +87,7 @@ func (pst *preparedSecretTransaction) ApplyComposite(
 	commands jobmgr.CompositeCommandScope,
 ) (lifecycle.AppliedResourceTransaction, error) {
 	if commands == nil {
-		return lifecycle.AppliedResourceTransaction{},
-			errors.New("jobmgr secrets: nil composite command scope")
+		return lifecycle.AppliedResourceTransaction{}, errors.New("jobmgr secrets: nil composite command scope")
 	}
 	return pst.apply(ctx, commands)
 }
@@ -113,15 +101,12 @@ func (pst *preparedSecretTransaction) apply(
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
 	if ctx == nil {
-		return lifecycle.AppliedResourceTransaction{},
-			errors.New("jobmgr secrets: nil transaction apply context")
+		return lifecycle.AppliedResourceTransaction{}, errors.New("jobmgr secrets: nil transaction apply context")
 	}
 	if spec.abort {
 		if spec.mutation == nil {
 			return lifecycle.AppliedResourceTransaction{},
-				errors.New(
-					"jobmgr secrets: validation transaction lost its mutation",
-				)
+				errors.New("jobmgr secrets: validation transaction lost its mutation")
 		}
 		if err := spec.mutation.Abort(); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
@@ -145,9 +130,7 @@ func (pst *preparedSecretTransaction) apply(
 	}
 
 	commitCalled := false
-	commit := func(
-		commitCtx context.Context,
-	) (secretstore.SecretMutationResult, error) {
+	commit := func(commitCtx context.Context) (secretstore.SecretMutationResult, error) {
 		commitCalled = true
 		return spec.mutation.Commit(commitCtx)
 	}
@@ -156,13 +139,7 @@ func (pst *preparedSecretTransaction) apply(
 	var postCommitErr error
 	var predecessorRestored bool
 	if spec.restarts != nil && !spec.remove {
-		result, message, predecessorRestored, postCommitErr =
-			spec.restarts.Apply(
-				ctx,
-				commands,
-				spec.storeKey,
-				commit,
-			)
+		result, message, predecessorRestored, postCommitErr = spec.restarts.Apply(ctx, commands, spec.storeKey, commit)
 	} else {
 		result, postCommitErr = commit(ctx)
 		predecessorRestored = !result.Retained
@@ -172,10 +149,7 @@ func (pst *preparedSecretTransaction) apply(
 		if !commitCalled {
 			if commands != nil {
 				_, rollbackErr := commands.RollbackContext()
-				postCommitErr = errors.Join(
-					postCommitErr,
-					rollbackErr,
-				)
+				postCommitErr = errors.Join(postCommitErr, rollbackErr)
 			}
 			abortErr = spec.mutation.Abort()
 		}
@@ -184,35 +158,18 @@ func (pst *preparedSecretTransaction) apply(
 				spec.scope,
 				lifecycle.ResourceTransactionUnchanged,
 				spec.current,
-				mustSecretMessage(
-					500,
-					"Secretstore change was not applied; dependent collectors were restored.",
-				),
+				mustSecretMessage(500, "Secretstore change was not applied; dependent collectors were restored."),
 				func() error { return nil },
 			)
 		}
 		return lifecycle.AppliedResourceTransaction{},
-			errors.Join(
-				postCommitErr,
-				abortErr,
-				errors.New(
-					"jobmgr secrets: Store mutation was not applied",
-				),
-			)
+			errors.Join(postCommitErr, abortErr, errors.New("jobmgr secrets: Store mutation was not applied"))
 	}
 
 	if current, ok := spec.current.(*storeGenerationResource); ok {
-		postCommitErr = errors.Join(
-			postCommitErr,
-			current.supersede(),
-		)
+		postCommitErr = errors.Join(postCommitErr, current.supersede())
 	} else if spec.current != nil {
-		postCommitErr = errors.Join(
-			postCommitErr,
-			errors.New(
-				"jobmgr secrets: current Store resource type differs",
-			),
-		)
+		postCommitErr = errors.Join(postCommitErr, errors.New("jobmgr secrets: current Store resource type differs"))
 	}
 
 	var next lifecycle.ReadyResource
@@ -225,8 +182,7 @@ func (pst *preparedSecretTransaction) apply(
 			result.Generation,
 		)
 		if resourceErr != nil {
-			return lifecycle.AppliedResourceTransaction{},
-				errors.Join(postCommitErr, resourceErr)
+			return lifecycle.AppliedResourceTransaction{}, errors.Join(postCommitErr, resourceErr)
 		}
 		next = resource
 		disposition = lifecycle.ResourceTransactionInstalled
@@ -246,26 +202,16 @@ func (pst *preparedSecretTransaction) apply(
 			return errors.Join(nextCleanup(), postCommitErr)
 		}
 	}
-	return lifecycle.NewAppliedResourceTransaction(
-		spec.scope,
-		disposition,
-		next,
-		resultFrame,
-		cleanup,
-	)
+	return lifecycle.NewAppliedResourceTransaction(spec.scope, disposition, next, resultFrame, cleanup)
 }
 
-func (pst *preparedSecretTransaction) Dispose(
-	ctx context.Context,
-) (lifecycle.ReadyResource, error) {
+func (pst *preparedSecretTransaction) Dispose(ctx context.Context) (lifecycle.ReadyResource, error) {
 	spec, err := pst.take()
 	if err != nil {
 		return nil, err
 	}
 	if ctx == nil {
-		return nil, errors.New(
-			"jobmgr secrets: nil transaction dispose context",
-		)
+		return nil, errors.New("jobmgr secrets: nil transaction dispose context")
 	}
 	if spec.mutation != nil {
 		err = spec.mutation.Abort()
@@ -275,21 +221,14 @@ func (pst *preparedSecretTransaction) Dispose(
 	return spec.current, err
 }
 
-func (pst *preparedSecretTransaction) take() (
-	preparedSecretSpec,
-	error,
-) {
+func (pst *preparedSecretTransaction) take() (preparedSecretSpec, error) {
 	if pst == nil {
-		return preparedSecretSpec{},
-			errors.New("jobmgr secrets: nil prepared transaction")
+		return preparedSecretSpec{}, errors.New("jobmgr secrets: nil prepared transaction")
 	}
 	pst.mu.Lock()
 	defer pst.mu.Unlock()
 	if pst.consumed {
-		return preparedSecretSpec{},
-			errors.New(
-				"jobmgr secrets: prepared transaction consumed",
-			)
+		return preparedSecretSpec{}, errors.New("jobmgr secrets: prepared transaction consumed")
 	}
 	pst.consumed = true
 	spec := pst.spec

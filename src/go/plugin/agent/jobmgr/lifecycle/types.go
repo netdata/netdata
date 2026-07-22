@@ -81,8 +81,7 @@ type PreparedResourceTransactionWork func(
 ) (PreparedResourceTransaction, error)
 
 func canonicalCancellationCause(cause error) (canonical error, deadline, ok bool) {
-	if stopping, ok := cause.(*StoppingRejection); ok &&
-		stopping.Generation != 0 {
+	if stopping, ok := cause.(*StoppingRejection); ok && stopping.Generation != 0 {
 		return stopping, false, true
 	}
 	cancelled := errors.Is(cause, context.Canceled)
@@ -98,10 +97,7 @@ func canonicalCancellationCause(cause error) (canonical error, deadline, ok bool
 
 const strictErrorTreeLimit = 32
 
-func allErrorLeavesMatch(
-	err error,
-	match func(error) bool,
-) bool {
+func allErrorLeavesMatch(err error, match func(error) bool) bool {
 	if err == nil || match == nil {
 		return false
 	}
@@ -123,9 +119,7 @@ func allErrorLeavesMatch(
 			Unwrap() []error
 		}); ok {
 			children := joined.Unwrap()
-			if len(children) == 0 ||
-				count+len(children) >
-					strictErrorTreeLimit {
+			if len(children) == 0 || count+len(children) > strictErrorTreeLimit {
 				return false
 			}
 			for _, child := range children {
@@ -141,8 +135,7 @@ func allErrorLeavesMatch(
 			Unwrap() error
 		}); ok {
 			child := wrapped.Unwrap()
-			if child == nil ||
-				count == strictErrorTreeLimit {
+			if child == nil || count == strictErrorTreeLimit {
 				return false
 			}
 			pending[count] = child
@@ -232,7 +225,13 @@ func NewResourceTransactionPermitTaskPlan(
 	return plan, nil
 }
 
-func NewShutdownReadyResourceTaskPlan(source Source, budget *ShutdownBudget, maxPhaseTransitions uint8, resource ReadyResource, identity ResourceIdentity) (TaskPlan, error) {
+func NewShutdownReadyResourceTaskPlan(
+	source Source,
+	budget *ShutdownBudget,
+	maxPhaseTransitions uint8,
+	resource ReadyResource,
+	identity ResourceIdentity,
+) (TaskPlan, error) {
 	if budget == nil || budget.Context() == nil {
 		return TaskPlan{}, errors.New("jobmgr lifecycle: nil shutdown budget")
 	}
@@ -248,7 +247,12 @@ func NewShutdownReadyResourceTaskPlan(source Source, budget *ShutdownBudget, max
 	return plan, nil
 }
 
-func NewShutdownWorkTaskPlan(source Source, budget *ShutdownBudget, maxPhaseTransitions uint8, work TaskWork) (TaskPlan, error) {
+func NewShutdownWorkTaskPlan(
+	source Source,
+	budget *ShutdownBudget,
+	maxPhaseTransitions uint8,
+	work TaskWork,
+) (TaskPlan, error) {
 	if budget == nil || budget.Context() == nil {
 		return TaskPlan{}, errors.New("jobmgr lifecycle: nil shutdown budget")
 	}
@@ -303,12 +307,12 @@ func (tp TaskPlan) Validate() error {
 			tp.initialIdentity != tp.transactionScope.Current {
 			return errors.New("jobmgr lifecycle: invalid resource transaction scope")
 		}
-	} else if tp.transactionScopeSet ||
-		tp.transactionScope != (ResourceTransactionScope{}) {
+	} else if tp.transactionScopeSet || tp.transactionScope != (ResourceTransactionScope{}) {
 		return errors.New("jobmgr lifecycle: unexpected resource transaction scope")
 	}
 	if tp.taskContext != nil {
-		if !tp.Deadline.IsZero() || tp.InitialCancellation != nil || (tp.initialReady == nil) == tp.preserveDisposeContext {
+		if !tp.Deadline.IsZero() || tp.InitialCancellation != nil ||
+			(tp.initialReady == nil) == tp.preserveDisposeContext {
 			return errors.New("jobmgr lifecycle: invalid shutdown task context")
 		}
 	} else if tp.preserveDisposeContext {
@@ -321,8 +325,7 @@ func (tp TaskPlan) Validate() error {
 		if err := tp.permitPlan.Validate(); err != nil {
 			return err
 		}
-		if tp.transactionWork != nil &&
-			tp.permitOwner != tp.transactionScope.Successor {
+		if tp.transactionWork != nil && tp.permitOwner != tp.transactionScope.Successor {
 			return errors.New("jobmgr lifecycle: transaction permit owner differs from successor")
 		}
 	} else if tp.permitOwner.Valid() || tp.permitPlan.class != 0 {

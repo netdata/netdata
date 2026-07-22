@@ -17,8 +17,7 @@ type ResourceTransactionScope struct {
 }
 
 func (rts ResourceTransactionScope) Valid() bool {
-	if rts.ID == "" ||
-		!rts.Current.Valid() && rts.Current != (ResourceIdentity{}) {
+	if rts.ID == "" || !rts.Current.Valid() && rts.Current != (ResourceIdentity{}) {
 		return false
 	}
 	if !rts.Successor.Valid() && rts.Successor != (ResourceIdentity{}) {
@@ -85,9 +84,7 @@ func NewAppliedResourceTransaction(
 		cleanup:     cleanup,
 	}
 	if !scope.Valid() || !disposition.Valid() || cleanup == nil {
-		return AppliedResourceTransaction{}, errors.New(
-			"jobmgr lifecycle: invalid applied resource transaction",
-		)
+		return AppliedResourceTransaction{}, errors.New("jobmgr lifecycle: invalid applied resource transaction")
 	}
 	outcome, err := appliedResourceTransactionOutcome(applied)
 	if err != nil {
@@ -105,18 +102,12 @@ func preparedResourceTransactionScope(
 	transaction PreparedResourceTransaction,
 ) (scope ResourceTransactionScope, err error) {
 	if transaction == nil {
-		return ResourceTransactionScope{}, errors.New(
-			"jobmgr lifecycle: nil prepared resource transaction",
-		)
+		return ResourceTransactionScope{}, errors.New("jobmgr lifecycle: nil prepared resource transaction")
 	}
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			scope = ResourceTransactionScope{}
-			err = fmt.Errorf(
-				"%w in prepared resource transaction scope: %v",
-				ErrTaskPanic,
-				recovered,
-			)
+			err = fmt.Errorf("%w in prepared resource transaction scope: %v", ErrTaskPanic, recovered)
 		}
 	}()
 	scope = transaction.Scope()

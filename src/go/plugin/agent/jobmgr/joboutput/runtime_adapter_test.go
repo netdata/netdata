@@ -150,9 +150,7 @@ func TestFrameWriterCommitsOutputAndStateAsOneTransaction(t *testing.T) {
 		wantOutput bool
 		wantPoison bool
 	}{
-		"success": {
-			wantEvents: []string{"write", "commit"}, wantOutput: true,
-		},
+		"success": {wantEvents: []string{"write", "commit"}, wantOutput: true},
 		"write failure aborts state": {
 			writeErr: writeErr, wantErr: writeErr,
 			wantEvents: []string{"write", "abort"}, wantPoison: true,
@@ -179,9 +177,7 @@ func TestFrameWriterCommitsOutputAndStateAsOneTransaction(t *testing.T) {
 
 			err = writer.CommitJobOutput(
 				[]byte("BEGIN x\nEND\n\n"),
-				&recordingFrameState{
-					events: &events, commitErr: test.commitErr,
-				},
+				&recordingFrameState{events: &events, commitErr: test.commitErr},
 			)
 			require.ErrorIs(t, err, test.wantErr)
 			assert.Equal(t, test.wantEvents, events)
@@ -221,10 +217,7 @@ type recordingManagedJob struct {
 }
 
 func newRecordingManagedJob() *recordingManagedJob {
-	return &recordingManagedJob{
-		started: make(chan struct{}),
-		stop:    make(chan struct{}),
-	}
+	return &recordingManagedJob{started: make(chan struct{}), stop: make(chan struct{})}
 }
 
 func (job *recordingManagedJob) StartManaged(ready chan<- struct{}) {
@@ -299,10 +292,7 @@ func equalStrings(left, right []string) bool {
 
 type testModuleReconciler struct{}
 
-func (testModuleReconciler) ReconcileModule(
-	context.Context,
-	string,
-) error {
+func (testModuleReconciler) ReconcileModule(context.Context, string) error {
 	return nil
 }
 

@@ -56,28 +56,16 @@ func NewPublication(epoch uint64, port PublicationPort) (*Publication, error) {
 
 // ApplyInitialSnapshot installs one complete catalog-backed snapshot before
 // Function ingress is published.
-func (p *Publication) ApplyInitialSnapshot(
-	epoch, version uint64,
-	changes []PublicationChange,
-) error {
+func (p *Publication) ApplyInitialSnapshot(epoch, version uint64, changes []PublicationChange) error {
 	if p == nil {
 		return errors.New("jobmgr Function publication: invalid initial snapshot")
 	}
-	if p.version != 0 ||
-		len(p.published) != 0 {
-		return p.poison(
-			errors.New(
-				"jobmgr Function publication: invalid initial snapshot",
-			),
-		)
+	if p.version != 0 || len(p.published) != 0 {
+		return p.poison(errors.New("jobmgr Function publication: invalid initial snapshot"))
 	}
 	for _, change := range changes {
 		if change.Record == nil {
-			return p.poison(
-				errors.New(
-					"jobmgr Function publication: initial snapshot contains a withdrawal",
-				),
-			)
+			return p.poison(errors.New("jobmgr Function publication: initial snapshot contains a withdrawal"))
 		}
 	}
 	return p.applyTransition(epoch, version, changes, func() error {
@@ -99,14 +87,7 @@ func (p *Publication) ApplyTransition(
 	if quiesce == nil || abort == nil {
 		return errors.New("jobmgr Function publication: incomplete transition boundary")
 	}
-	return p.applyTransition(
-		epoch,
-		version,
-		changes,
-		commit,
-		quiesce,
-		abort,
-	)
+	return p.applyTransition(epoch, version, changes, commit, quiesce, abort)
 }
 
 func (p *Publication) applyTransition(
@@ -122,11 +103,7 @@ func (p *Publication) applyTransition(
 	if (quiesce == nil) != (abort == nil) {
 		return errors.New("jobmgr Function publication: incomplete transition boundary")
 	}
-	if err := p.validateTransition(
-		epoch,
-		version,
-		changes,
-	); err != nil {
+	if err := p.validateTransition(epoch, version, changes); err != nil {
 		return err
 	}
 	if quiesce != nil {
@@ -168,10 +145,7 @@ func (p *Publication) applyTransition(
 	return nil
 }
 
-func (p *Publication) validateTransition(
-	epoch, version uint64,
-	changes []PublicationChange,
-) error {
+func (p *Publication) validateTransition(epoch, version uint64, changes []PublicationChange) error {
 	if p == nil || p.port == nil {
 		return errors.New("jobmgr Function publication: invalid state")
 	}
@@ -181,9 +155,7 @@ func (p *Publication) validateTransition(
 	if p.stopped {
 		return errors.New("jobmgr Function publication: apply after stop")
 	}
-	if epoch != p.epoch ||
-		version == 0 ||
-		version != p.version+1 {
+	if epoch != p.epoch || version == 0 || version != p.version+1 {
 		return p.poison(errors.New("jobmgr Function publication: stale or invalid transition"))
 	}
 	seen := make(map[string]struct{}, len(changes))
@@ -202,8 +174,7 @@ func (p *Publication) validateTransition(
 			}
 			continue
 		}
-		if change.Record.Name != change.Name || !change.Record.validCore() ||
-			change.Record.Access == "" {
+		if change.Record.Name != change.Name || !change.Record.validCore() || change.Record.Access == "" {
 			return p.poison(errors.New("jobmgr Function publication: invalid desired record"))
 		}
 	}

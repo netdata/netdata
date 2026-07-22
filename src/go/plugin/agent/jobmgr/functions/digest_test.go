@@ -22,9 +22,5 @@ func TestControllerGroupSignatureLayoutGolden(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.EqualValues(
-		t,
-		"059a7744aacc08166569b6f9546c82e8d9774d09c6b0b29c36ba55ec8f37d2cd",
-		controller,
-	)
+	require.EqualValues(t, "059a7744aacc08166569b6f9546c82e8d9774d09c6b0b29c36ba55ec8f37d2cd", controller)
 }

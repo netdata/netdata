@@ -19,12 +19,7 @@ const (
 	processJoinPeriod = 5 * time.Second
 )
 
-var childEnvironment = [...]string{
-	"PATH=/usr/bin:/bin",
-	"LANG=C",
-	"LC_ALL=C",
-	"TZ=UTC",
-}
+var childEnvironment = [...]string{"PATH=/usr/bin:/bin", "LANG=C", "LC_ALL=C", "TZ=UTC"}
 
 type OutputObserver func(chunk []byte) error
 
@@ -92,11 +87,7 @@ func Start(spec Spec) (*Process, error) {
 		return nil, fmt.Errorf("jobmgr root runner: start: %w", err)
 	}
 
-	process := &Process{
-		command: command,
-		stdin:   stdin,
-		done:    make(chan struct{}),
-	}
+	process := &Process{command: command, stdin: stdin, done: make(chan struct{})}
 	stdoutDone := make(chan error, 1)
 	stderrDone := make(chan captureResult, 1)
 	go process.observeOutput(stdout, spec.ObserveOut, stdoutDone)
@@ -109,10 +100,7 @@ func (p *Process) Done() <-chan struct{} {
 	return p.done
 }
 
-func (p *Process) WriteContext(
-	ctx context.Context,
-	payload []byte,
-) error {
+func (p *Process) WriteContext(ctx context.Context, payload []byte) error {
 	if ctx == nil {
 		return errors.New("jobmgr root runner: nil write context")
 	}
@@ -166,10 +154,7 @@ func (p *Process) Kill() error {
 		p.closeOnce.Do(func() {
 			p.closeErr = p.stdin.Close()
 		})
-		p.killErr = errors.Join(
-			p.closeErr,
-			killContained(p.command),
-		)
+		p.killErr = errors.Join(p.closeErr, killContained(p.command))
 	})
 	return p.killErr
 }
@@ -189,25 +174,13 @@ func (p *Process) Wait(ctx context.Context) (Result, error) {
 	defer timer.Stop()
 	select {
 	case <-p.done:
-		return p.result.result, errors.Join(
-			ctx.Err(),
-			killErr,
-			p.result.err,
-		)
+		return p.result.result, errors.Join(ctx.Err(), killErr, p.result.err)
 	case <-timer.C:
-		return Result{}, errors.Join(
-			ctx.Err(),
-			killErr,
-			errors.New("jobmgr root runner: process join timed out"),
-		)
+		return Result{}, errors.Join(ctx.Err(), killErr, errors.New("jobmgr root runner: process join timed out"))
 	}
 }
 
-func (p *Process) observeOutput(
-	stdout io.ReadCloser,
-	observer OutputObserver,
-	done chan<- error,
-) {
+func (p *Process) observeOutput(stdout io.ReadCloser, observer OutputObserver, done chan<- error) {
 	defer stdout.Close()
 	buffer := make([]byte, readBufferBytes)
 	var observerErr error
@@ -215,10 +188,7 @@ func (p *Process) observeOutput(
 		count, readErr := stdout.Read(buffer)
 		if count > 0 && observer != nil && observerErr == nil {
 			if err := observer(buffer[:count]); err != nil {
-				observerErr = fmt.Errorf(
-					"jobmgr root runner: observe stdout: %w",
-					err,
-				)
+				observerErr = fmt.Errorf("jobmgr root runner: observe stdout: %w", err)
 				_ = p.Kill()
 			}
 		}
@@ -226,10 +196,7 @@ func (p *Process) observeOutput(
 			if errors.Is(readErr, io.EOF) {
 				readErr = nil
 			} else {
-				readErr = fmt.Errorf(
-					"jobmgr root runner: read stdout: %w",
-					readErr,
-				)
+				readErr = fmt.Errorf("jobmgr root runner: read stdout: %w", readErr)
 			}
 			done <- errors.Join(observerErr, readErr)
 			return
@@ -237,20 +204,14 @@ func (p *Process) observeOutput(
 	}
 }
 
-func (p *Process) reap(
-	stdoutDone <-chan error,
-	stderrDone <-chan captureResult,
-) {
+func (p *Process) reap(stdoutDone <-chan error, stderrDone <-chan captureResult) {
 	stdoutErr := <-stdoutDone
 	stderrResult := <-stderrDone
 	waitErr := p.command.Wait()
 	p.killOnce.Do(func() {})
 	p.result = waitResult{
-		result: Result{
-			Stderr:          stderrResult.payload,
-			StderrTruncated: stderrResult.truncated,
-		},
-		err: errors.Join(stdoutErr, stderrResult.err, waitErr),
+		result: Result{Stderr: stderrResult.payload, StderrTruncated: stderrResult.truncated},
+		err:    errors.Join(stdoutErr, stderrResult.err, waitErr),
 	}
 	close(p.done)
 }

@@ -14,8 +14,7 @@ const MaximumUIDBytes = 128
 
 // ValidateUID checks whether uid is safe for line-oriented Function framing.
 func ValidateUID(uid string) error {
-	if uid == "" || len(uid) > MaximumUIDBytes ||
-		strings.ContainsAny(uid, " \t\r\n\x00") {
+	if uid == "" || len(uid) > MaximumUIDBytes || strings.ContainsAny(uid, " \t\r\n\x00") {
 		return errors.New("jobmgr lifecycle: invalid UID")
 	}
 	return nil
@@ -44,8 +43,7 @@ const (
 
 // Valid reports whether class is a known task scheduling class.
 func (tc TaskClass) Valid() bool {
-	return tc == TaskClassFrameworkControl ||
-		tc == TaskClassGenericFunction
+	return tc == TaskClassFrameworkControl || tc == TaskClassGenericFunction
 }
 
 // OperationID uniquely identifies an operation within one run generation.

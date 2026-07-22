@@ -40,21 +40,13 @@ type ConfigModuleFactory struct {
 	logger *logger.Logger
 }
 
-func NewConfigModuleFactory(
-	config ConfigModuleFactoryConfig,
-) (*ConfigModuleFactory, error) {
-	if config.Modules == nil ||
-		config.Resolver == nil ||
-		config.StoreScope == nil {
-		return nil, errors.New(
-			"job output: incomplete config-module factory configuration",
-		)
+func NewConfigModuleFactory(config ConfigModuleFactoryConfig) (*ConfigModuleFactory, error) {
+	if config.Modules == nil || config.Resolver == nil || config.StoreScope == nil {
+		return nil, errors.New("job output: incomplete config-module factory configuration")
 	}
 	return &ConfigModuleFactory{
 		config: config,
-		logger: logger.New().With(
-			slog.String("component", "config module factory"),
-		),
+		logger: logger.New().With(slog.String("component", "config module factory")),
 	}, nil
 }
 
@@ -63,46 +55,30 @@ func (cmf *ConfigModuleFactory) Configuration(
 	config confgroup.Config,
 ) (payload []byte, err error) {
 	if ctx == nil || config == nil {
-		return nil, errors.New(
-			"job output: invalid config-module configuration request",
-		)
+		return nil, errors.New("job output: invalid config-module configuration request")
 	}
 	probe, err := cmf.construct(config.Module())
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		err = errors.Join(
-			err,
-			probe.cleanup(context.WithoutCancel(ctx)),
-		)
+		err = errors.Join(err, probe.cleanup(context.WithoutCancel(ctx)))
 	}()
 	if err = applyConfigModuleRaw(config, probe.module); err != nil {
-		return nil, fmt.Errorf(
-			"job output: applying raw configuration: %w",
-			err,
-		)
+		return nil, fmt.Errorf("job output: applying raw configuration: %w", err)
 	}
 	value := probe.module.Configuration()
 	if value == nil {
-		return nil, errors.New(
-			"job output: collector does not provide configuration",
-		)
+		return nil, errors.New("job output: collector does not provide configuration")
 	}
 	payload, err = json.Marshal(value)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"job output: marshaling configuration: %w",
-			err,
-		)
+		return nil, fmt.Errorf("job output: marshaling configuration: %w", err)
 	}
 	return payload, nil
 }
 
-func (cmf *ConfigModuleFactory) Test(
-	ctx context.Context,
-	config confgroup.Config,
-) (err error) {
+func (cmf *ConfigModuleFactory) Test(ctx context.Context, config confgroup.Config) (err error) {
 	if ctx == nil || config == nil {
 		return errors.New("job output: invalid config-module test")
 	}
@@ -111,10 +87,7 @@ func (cmf *ConfigModuleFactory) Test(
 		return err
 	}
 	defer func() {
-		err = errors.Join(
-			err,
-			probe.cleanup(context.WithoutCancel(ctx)),
-		)
+		err = errors.Join(err, probe.cleanup(context.WithoutCancel(ctx)))
 	}()
 	if named, ok := probe.module.(interface{ SetJobName(string) }); ok {
 		named.SetJobName(config.Name())
@@ -135,10 +108,7 @@ func (cmf *ConfigModuleFactory) Test(
 	return nil
 }
 
-func (cmf *ConfigModuleFactory) Validate(
-	ctx context.Context,
-	config confgroup.Config,
-) (err error) {
+func (cmf *ConfigModuleFactory) Validate(ctx context.Context, config confgroup.Config) (err error) {
 	if ctx == nil || config == nil {
 		return errors.New("job output: invalid config-module validation")
 	}
@@ -147,10 +117,7 @@ func (cmf *ConfigModuleFactory) Validate(
 		return err
 	}
 	defer func() {
-		err = errors.Join(
-			err,
-			probe.cleanup(context.WithoutCancel(ctx)),
-		)
+		err = errors.Join(err, probe.cleanup(context.WithoutCancel(ctx)))
 	}()
 	if named, ok := probe.module.(interface{ SetJobName(string) }); ok {
 		named.SetJobName(config.Name())
@@ -158,25 +125,17 @@ func (cmf *ConfigModuleFactory) Validate(
 	return cmf.applyResolved(ctx, config, probe.module)
 }
 
-func (cmf *ConfigModuleFactory) construct(
-	module string,
-) (probe constructedConfigModule, err error) {
+func (cmf *ConfigModuleFactory) construct(module string) (probe constructedConfigModule, err error) {
 	if cmf == nil || module == "" {
-		return constructedConfigModule{},
-			errors.New("job output: invalid config-module construction")
+		return constructedConfigModule{}, errors.New("job output: invalid config-module construction")
 	}
 	creator, ok := cmf.config.Modules.Lookup(module)
 	if !ok {
-		return constructedConfigModule{},
-			fmt.Errorf("job output: module %q is not registered", module)
+		return constructedConfigModule{}, fmt.Errorf("job output: module %q is not registered", module)
 	}
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf(
-				"%w in config-module construction: %v",
-				lifecycle.ErrTaskPanic,
-				recovered,
-			)
+			err = fmt.Errorf("%w in config-module construction: %v", lifecycle.ErrTaskPanic, recovered)
 		}
 	}()
 	var constructed configModule
@@ -185,62 +144,32 @@ func (cmf *ConfigModuleFactory) construct(
 	} else if creator.Create != nil {
 		constructed = creator.Create()
 	} else {
-		return constructedConfigModule{},
-			fmt.Errorf(
-				"job output: module %q has no collector creator",
-				module,
-			)
+		return constructedConfigModule{}, fmt.Errorf("job output: module %q has no collector creator", module)
 	}
 	if constructed == nil {
-		return constructedConfigModule{},
-			fmt.Errorf(
-				"job output: module %q returned a nil config module",
-				module,
-			)
+		return constructedConfigModule{}, fmt.Errorf("job output: module %q returned a nil config module", module)
 	}
 	return constructedConfigModule{module: constructed}, nil
 }
 
-func (cmf *ConfigModuleFactory) applyResolved(
-	ctx context.Context,
-	config confgroup.Config,
-	module any,
-) error {
+func (cmf *ConfigModuleFactory) applyResolved(ctx context.Context, config confgroup.Config, module any) error {
 	resolveCtx := logger.ContextWithLogger(
 		ctx,
-		cmf.logger.With(
-			slog.String("collector", config.Module()),
-			slog.String("job", config.Name()),
-		),
+		cmf.logger.With(slog.String("collector", config.Module()), slog.String("job", config.Name())),
 	)
-	resolved, err := cmf.config.Resolver.Resolve(
-		resolveCtx,
-		map[string]any(config),
-		cmf.config.StoreScope,
-	)
+	resolved, err := cmf.config.Resolver.Resolve(resolveCtx, map[string]any(config), cmf.config.StoreScope)
 	if err != nil {
-		return fmt.Errorf(
-			"job output: resolving configuration secrets: %w",
-			err,
-		)
+		return fmt.Errorf("job output: resolving configuration secrets: %w", err)
 	}
 	payload, err := yaml.Marshal(resolved)
 	if err != nil {
-		return fmt.Errorf(
-			"job output: marshaling resolved configuration: %w",
-			err,
-		)
+		return fmt.Errorf("job output: marshaling resolved configuration: %w", err)
 	}
 	if len(payload) > secretresolver.MaximumAtomicResolvedBytes {
-		return errors.New(
-			"job output: serialized configuration exceeds maximum size",
-		)
+		return errors.New("job output: serialized configuration exceeds maximum size")
 	}
 	if err := yaml.Unmarshal(payload, module); err != nil {
-		return fmt.Errorf(
-			"job output: applying resolved configuration: %w",
-			err,
-		)
+		return fmt.Errorf("job output: applying resolved configuration: %w", err)
 	}
 	return nil
 }
@@ -267,10 +196,7 @@ func (ccm *constructedConfigModule) cleanup(ctx context.Context) error {
 	return ccm.err
 }
 
-func applyConfigModuleRaw(
-	config confgroup.Config,
-	module configModule,
-) error {
+func applyConfigModuleRaw(config confgroup.Config, module configModule) error {
 	payload, err := yaml.Marshal(config)
 	if err != nil {
 		return err

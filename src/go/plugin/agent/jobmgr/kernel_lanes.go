@@ -13,10 +13,7 @@ func (ck *CommandKernel) allocateLane(mapKey commandLaneKey, request Request) (*
 	} else {
 		ck.freeLane = lane.freeNext
 	}
-	*lane = commandLane{
-		mapKey: mapKey,
-		key:    request.LaneKey, source: request.Source,
-	}
+	*lane = commandLane{mapKey: mapKey, key: request.LaneKey, source: request.Source}
 	ck.lanes[mapKey] = lane
 	ck.appendLane(lane)
 	return lane, nil
@@ -34,8 +31,7 @@ func (ck *CommandKernel) releaseUnusedLane(lane *commandLane) {
 		lane.shutdownRequest.Valid() || lane.shutdownTask.Valid() || lane.shutdownAction != 0 {
 		return
 	}
-	if ck.shutdownPhase != commandShutdownRunning &&
-		!lane.shutdownVisited {
+	if ck.shutdownPhase != commandShutdownRunning && !lane.shutdownVisited {
 		return
 	}
 	delete(ck.lanes, lane.mapKey)

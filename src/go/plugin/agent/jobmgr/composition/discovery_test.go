@@ -19,22 +19,13 @@ import (
 )
 
 func TestDiscoveryShutdownCancelsSupervisorBeforeProviders(t *testing.T) {
-	identity := lifecycle.ResourceIdentity{
-		ID:         discoveryResourceID,
-		Generation: 1,
-	}
+	identity := lifecycle.ResourceIdentity{ID: discoveryResourceID, Generation: 1}
 	supervisorRef := lifecycle.InheritedTaskRef(1)
-	providerRefs := map[string]lifecycle.InheritedTaskRef{
-		"file":              2,
-		"service-discovery": 3,
-	}
+	providerRefs := map[string]lifecycle.InheritedTaskRef{"file": 2, "service-discovery": 3}
 	supervisorCancelled := false
 	var providers []string
 	err := cancelDiscoveryTasks(
-		func(
-			ref lifecycle.InheritedTaskRef,
-			gotIdentity lifecycle.ResourceIdentity,
-		) error {
+		func(ref lifecycle.InheritedTaskRef, gotIdentity lifecycle.ResourceIdentity) error {
 			if gotIdentity != identity {
 				return errors.New("identity differs")
 			}
@@ -67,10 +58,7 @@ func TestDiscoveryShutdownCancelsSupervisorBeforeProviders(t *testing.T) {
 
 func TestDiscoveryChildrenWaitForPublication(t *testing.T) {
 	entered := make(chan struct{})
-	prepared := newPublicationTestDiscovery(
-		t,
-		publicationTestDiscoverer{entered: entered},
-	)
+	prepared := newPublicationTestDiscovery(t, publicationTestDiscoverer{entered: entered})
 	ready, err := prepared.AcceptStart(context.Background(), 1)
 	require.NoError(t, err)
 
@@ -122,10 +110,7 @@ func TestDiscoveryPermitFailurePaths(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			prepared := newPublicationTestDiscovery(
-				t,
-				publicationTestDiscoverer{},
-			)
+			prepared := newPublicationTestDiscovery(t, publicationTestDiscoverer{})
 			test.fail(t, prepared)
 
 			require.EqualValues(t, lifecycle.LongLivedCensus{}, prepared.tasks.LongLivedCensus())
@@ -134,24 +119,20 @@ func TestDiscoveryPermitFailurePaths(t *testing.T) {
 }
 
 func TestDiscoverySupervisorReturnsContainedPanic(t *testing.T) {
-	config := confgroup.Config{}.SetName("job").SetModule("module").SetProvider("test").SetSourceType(confgroup.TypeStock).
+	config := confgroup.Config{}.SetName("job").SetModule("module").SetProvider("test").
+		SetSourceType(confgroup.TypeStock).
 		SetSource("source")
 	pipeline := newDiscoveryTestPipeline(
 		t,
 		publicationTestDiscoverer{
-			groups: []*confgroup.Group{{
-				Source:  "source",
-				Configs: []confgroup.Config{config},
-			}},
+			groups: []*confgroup.Group{{Source: "source", Configs: []confgroup.Config{config}}},
 		},
 	)
 	decisions, err := jobmgrdiscovery.NewDecisionIndex(
 		jobmgrdiscovery.DecisionConfig{
 			Generation: 1,
 			Commands:   discoveryTestCommands{},
-			Plan: func(
-				jobmgrdiscovery.DiscoveredChange,
-			) (jobmgr.WorkPlan, error) {
+			Plan: func(jobmgrdiscovery.DiscoveredChange) (jobmgr.WorkPlan, error) {
 				panic("decision panic")
 			},
 		},
@@ -163,11 +144,7 @@ func TestDiscoverySupervisorReturnsContainedPanic(t *testing.T) {
 	go func() {
 		providerErr <- pipeline.RunProvider(ctx, "provider")
 	}()
-	err = runDiscoverySupervisor(
-		ctx,
-		pipeline,
-		decisions,
-	)
+	err = runDiscoverySupervisor(ctx, pipeline, decisions)
 	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
 	cancel()
 
@@ -179,21 +156,13 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 		[]agentdiscovery.ProviderFactory{
 			agentdiscovery.NewProviderFactory(
 				"enabled",
-				func(agentdiscovery.BuildContext) (
-					agentdiscovery.Discoverer,
-					bool,
-					error,
-				) {
+				func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
 					return runTestDiscoverer{}, true, nil
 				},
 			),
 			agentdiscovery.NewProviderFactory(
 				"disabled",
-				func(agentdiscovery.BuildContext) (
-					agentdiscovery.Discoverer,
-					bool,
-					error,
-				) {
+				func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
 					return nil, false, nil
 				},
 			),
@@ -209,10 +178,8 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 		Modules: collectorapi.Registry{},
 		Jobs:    testRunJobServices(t),
 		Discovery: runDiscoveryServices{
-			BuildContext: agentdiscovery.BuildContext{
-				Registry: confgroup.Registry{"test": {}},
-			},
-			Providers: catalog,
+			BuildContext: agentdiscovery.BuildContext{Registry: confgroup.Registry{"test": {}}},
+			Providers:    catalog,
 		},
 	})
 	require.NoError(t, err)
@@ -234,19 +201,14 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 	closeRunTestUIDs(t, uids)
 }
 
-func newPublicationTestDiscovery(
-	t *testing.T,
-	discoverer agentdiscovery.Discoverer,
-) *preparedDiscovery {
+func newPublicationTestDiscovery(t *testing.T, discoverer agentdiscovery.Discoverer) *preparedDiscovery {
 	t.Helper()
 	pipeline := newDiscoveryTestPipeline(t, discoverer)
 	decisions, err := jobmgrdiscovery.NewDecisionIndex(
 		jobmgrdiscovery.DecisionConfig{
 			Generation: 1,
 			Commands:   discoveryTestCommands{},
-			Plan: func(
-				jobmgrdiscovery.DiscoveredChange,
-			) (jobmgr.WorkPlan, error) {
+			Plan: func(jobmgrdiscovery.DiscoveredChange) (jobmgr.WorkPlan, error) {
 				return jobmgr.WorkPlan{}, nil
 			},
 		},
@@ -256,22 +218,12 @@ func newPublicationTestDiscovery(
 	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
-	plan, err := lifecycle.NewPipelineLongLivedPlan(
-		[]string{"provider"},
-	)
+	plan, err := lifecycle.NewPipelineLongLivedPlan([]string{"provider"})
 	require.NoError(t, err)
-	identity := lifecycle.ResourceIdentity{
-		ID: discoveryResourceID, Generation: 1,
-	}
+	identity := lifecycle.ResourceIdentity{ID: discoveryResourceID, Generation: 1}
 	permit, err := tasks.IssueLongLivedPermit(identity, plan)
 	require.NoError(t, err)
-	prepared, err := newPreparedDiscovery(
-		pipeline,
-		decisions,
-		tasks,
-		identity,
-		permit,
-	)
+	prepared, err := newPreparedDiscovery(pipeline, decisions, tasks, identity, permit)
 	require.NoError(t, err)
 	return prepared
 }
@@ -285,11 +237,7 @@ func newDiscoveryTestPipeline(
 		[]agentdiscovery.ProviderFactory{
 			agentdiscovery.NewProviderFactory(
 				"provider",
-				func(agentdiscovery.BuildContext) (
-					agentdiscovery.Discoverer,
-					bool,
-					error,
-				) {
+				func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
 					return discoverer, true, nil
 				},
 			),
@@ -298,10 +246,8 @@ func newDiscoveryTestPipeline(
 	require.NoError(t, err)
 	pipeline, err := agentdiscovery.NewPipelineGeneration(
 		agentdiscovery.PipelineConfig{
-			BuildContext: agentdiscovery.BuildContext{
-				Registry: confgroup.Registry{"module": {}},
-			},
-			Providers: catalog,
+			BuildContext: agentdiscovery.BuildContext{Registry: confgroup.Registry{"module": {}}},
+			Providers:    catalog,
 		},
 	)
 	require.NoError(t, err)
@@ -313,10 +259,7 @@ type publicationTestDiscoverer struct {
 	groups  []*confgroup.Group
 }
 
-func (ptd publicationTestDiscoverer) Run(
-	ctx context.Context,
-	out chan<- []*confgroup.Group,
-) {
+func (ptd publicationTestDiscoverer) Run(ctx context.Context, out chan<- []*confgroup.Group) {
 	if ptd.entered != nil {
 		close(ptd.entered)
 	}
@@ -332,10 +275,6 @@ func (ptd publicationTestDiscoverer) Run(
 
 type discoveryTestCommands struct{}
 
-func (discoveryTestCommands) SubmitPreparedAndWait(
-	context.Context,
-	jobmgr.Request,
-	jobmgr.WorkPlan,
-) error {
+func (discoveryTestCommands) SubmitPreparedAndWait(context.Context, jobmgr.Request, jobmgr.WorkPlan) error {
 	return nil
 }

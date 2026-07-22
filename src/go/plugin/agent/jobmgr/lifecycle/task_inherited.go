@@ -67,21 +67,26 @@ type inheritedOwnerRole struct {
 	key   string
 }
 
-func (ts *TaskSupervisor) StartInherited(parent context.Context, owner ResourceIdentity, role InheritedTaskRole, work InheritedTaskWork) (InheritedTaskRef, error) {
-	if role == InheritedPipelineSupervisor ||
-		role == InheritedPipelineProvider {
-		return 0,
-			errors.New("jobmgr task supervisor: pipeline task requires a permit")
+func (ts *TaskSupervisor) StartInherited(
+	parent context.Context,
+	owner ResourceIdentity,
+	role InheritedTaskRole,
+	work InheritedTaskWork,
+) (InheritedTaskRef, error) {
+	if role == InheritedPipelineSupervisor || role == InheritedPipelineProvider {
+		return 0, errors.New("jobmgr task supervisor: pipeline task requires a permit")
 	}
-	return ts.startInherited(
-		parent, owner, role, "", work, 0,
-	)
+	return ts.startInherited(parent, owner, role, "", work, 0)
 }
 
-func (ts *TaskSupervisor) StartInheritedWithPermit(parent context.Context, owner ResourceIdentity, role InheritedTaskRole, permit LongLivedPermit, work InheritedTaskWork) (InheritedTaskRef, error) {
-	return ts.startInheritedWithPermit(
-		parent, owner, role, "", permit, work,
-	)
+func (ts *TaskSupervisor) StartInheritedWithPermit(
+	parent context.Context,
+	owner ResourceIdentity,
+	role InheritedTaskRole,
+	permit LongLivedPermit,
+	work InheritedTaskWork,
+) (InheritedTaskRef, error) {
+	return ts.startInheritedWithPermit(parent, owner, role, "", permit, work)
 }
 
 // StartInheritedWithPermitKey starts one independently owned child for a
@@ -95,12 +100,9 @@ func (ts *TaskSupervisor) StartInheritedWithPermitKey(
 	work InheritedTaskWork,
 ) (InheritedTaskRef, error) {
 	if key == "" || key != strings.TrimSpace(key) {
-		return 0,
-			errors.New("jobmgr task supervisor: invalid inherited task key")
+		return 0, errors.New("jobmgr task supervisor: invalid inherited task key")
 	}
-	return ts.startInheritedWithPermit(
-		parent, owner, role, key, permit, work,
-	)
+	return ts.startInheritedWithPermit(parent, owner, role, key, permit, work)
 }
 
 func (ts *TaskSupervisor) startInheritedWithPermit(
@@ -117,32 +119,24 @@ func (ts *TaskSupervisor) startInheritedWithPermit(
 	if _, ok := longLivedGKeyForInherited(role, key); !ok {
 		return 0, errors.New("jobmgr task supervisor: inherited role has no long-lived facet")
 	}
-	if err := ts.activateLongLivedG(
-		permit.ref,
-		owner,
-		role,
-		key,
-	); err != nil {
+	if err := ts.activateLongLivedG(permit.ref, owner, role, key); err != nil {
 		return 0, err
 	}
-	ref, err := ts.startInherited(
-		parent, owner, role, key, work, permit.ref,
-	)
+	ref, err := ts.startInherited(parent, owner, role, key, work, permit.ref)
 	if err != nil {
-		return 0, errors.Join(
-			err,
-			ts.restoreLongLivedG(
-				permit.ref,
-				owner,
-				role,
-				key,
-			),
-		)
+		return 0, errors.Join(err, ts.restoreLongLivedG(permit.ref, owner, role, key))
 	}
 	return ref, nil
 }
 
-func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceIdentity, role InheritedTaskRole, key string, work InheritedTaskWork, permit LongLivedPermitRef) (InheritedTaskRef, error) {
+func (ts *TaskSupervisor) startInherited(
+	parent context.Context,
+	owner ResourceIdentity,
+	role InheritedTaskRole,
+	key string,
+	work InheritedTaskWork,
+	permit LongLivedPermitRef,
+) (InheritedTaskRef, error) {
 	if ts == nil || parent == nil || !owner.Valid() || !role.valid() || work == nil {
 		return 0, errors.New("jobmgr task supervisor: invalid inherited task")
 	}
@@ -151,8 +145,7 @@ func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceI
 	if registry.sealed {
 		registry.mu.Unlock()
 		if ts.run != nil && ts.run.IsStopping() {
-			return 0,
-				ts.run.StoppingCause()
+			return 0, ts.run.StoppingCause()
 		}
 		return 0, errors.New("jobmgr task supervisor: inherited activation is sealed")
 	}
@@ -168,11 +161,7 @@ func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceI
 	}
 	ctx, cancel := context.WithCancelCause(parent)
 	done := make(chan struct{})
-	*slot = inheritedTaskSlot{
-		owner: owner, role: role,
-		key:    key,
-		cancel: cancel, done: done, permit: permit,
-	}
+	*slot = inheritedTaskSlot{owner: owner, role: role, key: key, cancel: cancel, done: done, permit: permit}
 	registry.active++
 	registry.owners[ownerKey] = ref
 	slot.activePrevious = registry.activeTail
@@ -192,15 +181,10 @@ func (ts *TaskSupervisor) startInherited(parent context.Context, owner ResourceI
 	return ref, nil
 }
 
-func (registry *inheritedTaskRegistry) allocateSlot() (
-	InheritedTaskRef,
-	*inheritedTaskSlot,
-	error,
-) {
+func (registry *inheritedTaskRegistry) allocateSlot() (InheritedTaskRef, *inheritedTaskSlot, error) {
 	next := registry.nextSlot + 1
 	if next == 0 {
-		return 0, nil,
-			errors.New("jobmgr task supervisor: inherited reference space exhausted")
+		return 0, nil, errors.New("jobmgr task supervisor: inherited reference space exhausted")
 	}
 	registry.nextSlot = next
 	ref := InheritedTaskRef(next)
@@ -235,7 +219,11 @@ func (ts *TaskSupervisor) CancelInherited(ref InheritedTaskRef, owner ResourceId
 	return nil
 }
 
-func (ts *TaskSupervisor) JoinInherited(ctx context.Context, ref InheritedTaskRef, owner ResourceIdentity) (bool, error) {
+func (ts *TaskSupervisor) JoinInherited(
+	ctx context.Context,
+	ref InheritedTaskRef,
+	owner ResourceIdentity,
+) (bool, error) {
 	if ts == nil || ctx == nil {
 		return false, errors.New("jobmgr task supervisor: invalid inherited join")
 	}
@@ -295,12 +283,7 @@ func (ts *TaskSupervisor) ReleaseInherited(ref InheritedTaskRef, owner ResourceI
 		role, taskKey := slot.role, slot.key
 		slot.releasing = true
 		registry.mu.Unlock()
-		if err := ts.releaseLongLivedG(
-			permit,
-			owner,
-			role,
-			taskKey,
-		); err != nil {
+		if err := ts.releaseLongLivedG(permit, owner, role, taskKey); err != nil {
 			registry.mu.Lock()
 			if current, lookupErr := registry.slot(ref, owner); lookupErr == nil {
 				current.releasing = false
@@ -315,11 +298,7 @@ func (ts *TaskSupervisor) ReleaseInherited(ref InheritedTaskRef, owner ResourceI
 			return errors.Join(err, errors.New("jobmgr task supervisor: inherited release changed"))
 		}
 	}
-	key := inheritedOwnerRole{
-		owner: slot.owner,
-		role:  slot.role,
-		key:   slot.key,
-	}
+	key := inheritedOwnerRole{owner: slot.owner, role: slot.role, key: slot.key}
 	previous, next := slot.activePrevious, slot.activeNext
 	if registry.shutdownCursor == ref {
 		registry.shutdownCursor = next
@@ -362,12 +341,9 @@ func (ts *TaskSupervisor) SealInherited() error {
 	return nil
 }
 
-func (ts *TaskSupervisor) CancelInheritedBatch(
-	quantum int,
-) (bool, error) {
+func (ts *TaskSupervisor) CancelInheritedBatch(quantum int) (bool, error) {
 	if ts == nil || quantum <= 0 || quantum > InheritedCancellationServiceQuantum {
-		return false,
-			errors.New("jobmgr task supervisor: invalid inherited cancellation batch")
+		return false, errors.New("jobmgr task supervisor: invalid inherited cancellation batch")
 	}
 	registry := &ts.inherited
 	var cancels [InheritedCancellationServiceQuantum]context.CancelCauseFunc
@@ -375,8 +351,7 @@ func (ts *TaskSupervisor) CancelInheritedBatch(
 	registry.mu.Lock()
 	if !registry.sealed {
 		registry.mu.Unlock()
-		return false,
-			errors.New("jobmgr task supervisor: inherited cancellation before seal")
+		return false, errors.New("jobmgr task supervisor: inherited cancellation before seal")
 	}
 	for visited := 0; visited < quantum && registry.shutdownCursor != 0; visited++ {
 		handle := registry.shutdownCursor
@@ -440,26 +415,17 @@ func (itr *inheritedTaskRegistry) slot(ref InheritedTaskRef, owner ResourceIdent
 	return slot, nil
 }
 
-func (ts *TaskSupervisor) completeInherited(
-	ref InheritedTaskRef,
-	taskErr error,
-) {
+func (ts *TaskSupervisor) completeInherited(ref InheritedTaskRef, taskErr error) {
 	if ts == nil {
 		return
 	}
 	cleanStop := false
 	normalized := taskErr
-	if ts.run != nil &&
-		ts.run.IsStopping() &&
-		onlyCurrentStoppingRejections(
-			taskErr,
-			ts.run.Generation(),
-		) {
+	if ts.run != nil && ts.run.IsStopping() && onlyCurrentStoppingRejections(taskErr, ts.run.Generation()) {
 		cleanStop = true
 		normalized = nil
 	}
-	spontaneousFailure, normalized :=
-		ts.inherited.complete(ref, normalized, cleanStop)
+	spontaneousFailure, normalized := ts.inherited.complete(ref, normalized, cleanStop)
 	if !spontaneousFailure || cleanStop {
 		return
 	}
@@ -471,11 +437,7 @@ func (ts *TaskSupervisor) completeInherited(
 	}
 }
 
-func (itr *inheritedTaskRegistry) complete(
-	ref InheritedTaskRef,
-	taskErr error,
-	cleanStop bool,
-) (bool, error) {
+func (itr *inheritedTaskRegistry) complete(ref InheritedTaskRef, taskErr error, cleanStop bool) (bool, error) {
 	itr.mu.Lock()
 	defer itr.mu.Unlock()
 	if !ref.valid() {
@@ -488,13 +450,9 @@ func (itr *inheritedTaskRegistry) complete(
 	if slot.finished {
 		return false, taskErr
 	}
-	spontaneousFailure := !slot.cancelled &&
-		(taskErr != nil ||
-			slot.role != InheritedPipelineProvider)
+	spontaneousFailure := !slot.cancelled && (taskErr != nil || slot.role != InheritedPipelineProvider)
 	if spontaneousFailure && taskErr == nil && !cleanStop {
-		taskErr = errors.New(
-			"jobmgr task supervisor: inherited task exited before cancellation",
-		)
+		taskErr = errors.New("jobmgr task supervisor: inherited task exited before cancellation")
 	}
 	slot.err = taskErr
 	slot.finished = true
@@ -502,10 +460,7 @@ func (itr *inheritedTaskRegistry) complete(
 	return spontaneousFailure, taskErr
 }
 
-func onlyCurrentStoppingRejections(
-	err error,
-	generation uint64,
-) bool {
+func onlyCurrentStoppingRejections(err error, generation uint64) bool {
 	if generation == 0 {
 		return false
 	}

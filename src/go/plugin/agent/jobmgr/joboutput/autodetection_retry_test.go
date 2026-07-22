@@ -16,22 +16,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAutoDetectionRetryIndexDispatchesOnlyCurrentDueEntries(
-	t *testing.T,
-) {
+func TestAutoDetectionRetryIndexDispatchesOnlyCurrentDueEntries(t *testing.T) {
 	tests := map[string]struct {
-		arrange func(
-			*autoDetectionRetryIndex,
-			confgroup.Config,
-		) confgroup.Config
+		arrange      func(*autoDetectionRetryIndex, confgroup.Config) confgroup.Config
 		clocks       []int
 		wantDispatch int
 	}{
 		"due retry dispatches": {
-			arrange: func(
-				index *autoDetectionRetryIndex,
-				config confgroup.Config,
-			) confgroup.Config {
+			arrange: func(index *autoDetectionRetryIndex, config confgroup.Config) confgroup.Config {
 				index.schedule(config, 2)
 				return config
 			},
@@ -39,10 +31,7 @@ func TestAutoDetectionRetryIndexDispatchesOnlyCurrentDueEntries(
 			wantDispatch: 1,
 		},
 		"replacement invalidates older token": {
-			arrange: func(
-				index *autoDetectionRetryIndex,
-				config confgroup.Config,
-			) confgroup.Config {
+			arrange: func(index *autoDetectionRetryIndex, config confgroup.Config) confgroup.Config {
 				index.schedule(config, 1)
 				replacement, err := config.Clone()
 				if err != nil {
@@ -56,10 +45,7 @@ func TestAutoDetectionRetryIndexDispatchesOnlyCurrentDueEntries(
 			wantDispatch: 1,
 		},
 		"cancel removes exact pending entry": {
-			arrange: func(
-				index *autoDetectionRetryIndex,
-				config confgroup.Config,
-			) confgroup.Config {
+			arrange: func(index *autoDetectionRetryIndex, config confgroup.Config) confgroup.Config {
 				index.schedule(config, 1)
 				index.cancel(config.FullName())
 				return config
@@ -74,10 +60,7 @@ func TestAutoDetectionRetryIndexDispatchesOnlyCurrentDueEntries(
 			var planned []autoDetectionRetryToken
 			require.NoError(t, index.bind(
 				commands,
-				func(
-					_ confgroup.Config,
-					token autoDetectionRetryToken,
-				) (jobmgr.WorkPlan, error) {
+				func(_ confgroup.Config, token autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
 					planned = append(planned, token)
 					return jobmgr.WorkPlan{}, nil
 				},
@@ -108,12 +91,8 @@ func TestAutoDetectionRetryIndexHasNoFixedPopulationLimit(t *testing.T) {
 	tests := map[string]struct {
 		population int
 	}{
-		"former active-job limit": {
-			population: 256,
-		},
-		"former active-job limit plus one": {
-			population: 257,
-		},
+		"former active-job limit":          {population: 256},
+		"former active-job limit plus one": {population: 257},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -121,22 +100,14 @@ func TestAutoDetectionRetryIndexHasNoFixedPopulationLimit(t *testing.T) {
 			commands := &autoDetectionRetryTestCommands{}
 			require.NoError(t, index.bind(
 				commands,
-				func(
-					confgroup.Config,
-					autoDetectionRetryToken,
-				) (jobmgr.WorkPlan, error) {
+				func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
 					return jobmgr.WorkPlan{}, nil
 				},
 				1,
 				func(error) {},
 			))
 			for number := range test.population {
-				index.schedule(
-					autoDetectionRetryTestConfig(
-						fmt.Sprintf("job-%03d", number),
-					),
-					1,
-				)
+				index.schedule(autoDetectionRetryTestConfig(fmt.Sprintf("job-%03d", number)), 1)
 			}
 			index.advance(0)
 			index.advance(1)
@@ -253,25 +224,16 @@ func TestAutoDetectionRetryReportsStructuralDispatchFailure(t *testing.T) {
 		planningErr error
 		submitErr   error
 	}{
-		"planning failure": {
-			planningErr: errors.New("retry planning failed"),
-		},
-		"submission failure": {
-			submitErr: errors.New("retry submission failed"),
-		},
+		"planning failure":   {planningErr: errors.New("retry planning failed")},
+		"submission failure": {submitErr: errors.New("retry submission failed")},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			failed := make(chan error, 1)
 			index := newAutoDetectionRetryIndex()
 			require.NoError(t, index.bind(
-				&autoDetectionRetryTestCommands{
-					submitErr: test.submitErr,
-				},
-				func(
-					confgroup.Config,
-					autoDetectionRetryToken,
-				) (jobmgr.WorkPlan, error) {
+				&autoDetectionRetryTestCommands{submitErr: test.submitErr},
+				func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
 					return jobmgr.WorkPlan{}, test.planningErr
 				},
 				1,
@@ -289,23 +251,11 @@ func TestAutoDetectionRetryReportsStructuralDispatchFailure(t *testing.T) {
 			}
 			select {
 			case err := <-failed:
-				require.ErrorIs(
-					t,
-					err,
-					wantErr,
-				)
+				require.ErrorIs(t, err, wantErr)
 			case <-time.After(time.Second):
-				require.FailNow(
-					t,
-					"test failed",
-					"retry dispatch failure was not reported",
-				)
+				require.FailNow(t, "test failed", "retry dispatch failure was not reported")
 			}
-			require.ErrorIs(
-				t,
-				index.wait(context.Background()),
-				wantErr,
-			)
+			require.ErrorIs(t, index.wait(context.Background()), wantErr)
 			index.stopWorker()
 		})
 	}
@@ -317,10 +267,7 @@ func TestAutoDetectionRetryWaitRequiresWorkerJoin(t *testing.T) {
 	index := newAutoDetectionRetryIndex()
 	require.NoError(t, index.bind(
 		commands,
-		func(
-			confgroup.Config,
-			autoDetectionRetryToken,
-		) (jobmgr.WorkPlan, error) {
+		func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
 			return jobmgr.WorkPlan{}, nil
 		},
 		1,
@@ -356,24 +303,13 @@ func TestAutoDetectionRetryClassifiesStoppingSubmission(t *testing.T) {
 		submitErr   error
 		wantFailure bool
 	}{
-		"exact current stopping token is clean": {
-			submitErr: &lifecycle.StoppingRejection{
-				Generation: 1,
-			},
-		},
+		"exact current stopping token is clean": {submitErr: &lifecycle.StoppingRejection{Generation: 1}},
 		"wrong generation is structural": {
-			submitErr: &lifecycle.StoppingRejection{
-				Generation: 2,
-			},
+			submitErr:   &lifecycle.StoppingRejection{Generation: 2},
 			wantFailure: true,
 		},
 		"joined structural error is not hidden": {
-			submitErr: errors.Join(
-				&lifecycle.StoppingRejection{
-					Generation: 1,
-				},
-				sentinel,
-			),
+			submitErr:   errors.Join(&lifecycle.StoppingRejection{Generation: 1}, sentinel),
 			wantFailure: true,
 		},
 	}
@@ -382,13 +318,8 @@ func TestAutoDetectionRetryClassifiesStoppingSubmission(t *testing.T) {
 			failed := make(chan error, 1)
 			index := newAutoDetectionRetryIndex()
 			require.NoError(t, index.bind(
-				&autoDetectionRetryTestCommands{
-					submitErr: test.submitErr,
-				},
-				func(
-					confgroup.Config,
-					autoDetectionRetryToken,
-				) (jobmgr.WorkPlan, error) {
+				&autoDetectionRetryTestCommands{submitErr: test.submitErr},
+				func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
 					return jobmgr.WorkPlan{}, nil
 				},
 				1,
@@ -396,10 +327,7 @@ func TestAutoDetectionRetryClassifiesStoppingSubmission(t *testing.T) {
 					failed <- err
 				},
 			))
-			index.schedule(
-				autoDetectionRetryTestConfig("job"),
-				1,
-			)
+			index.schedule(autoDetectionRetryTestConfig("job"), 1)
 			index.advance(0)
 			index.advance(1)
 
@@ -410,22 +338,13 @@ func TestAutoDetectionRetryClassifiesStoppingSubmission(t *testing.T) {
 				case err := <-failed:
 					require.ErrorIs(t, err, test.submitErr)
 				case <-time.After(time.Second):
-					require.FailNow(
-						t,
-						"test failed",
-						"retry failure was not reported",
-					)
+					require.FailNow(t, "test failed", "retry failure was not reported")
 				}
 			} else {
 				require.NoError(t, waitErr)
 				select {
 				case err := <-failed:
-					require.FailNowf(
-						t,
-						"test failed",
-						"stopping submission was reported as a failure: %v",
-						err,
-					)
+					require.FailNowf(t, "test failed", "stopping submission was reported as a failure: %v", err)
 				default:
 				}
 			}
@@ -480,22 +399,13 @@ func (artc *autoDetectionRetryTestCommands) SubmitPreparedAndWait(
 	return nil
 }
 
-func (artc *autoDetectionRetryTestCommands) snapshot() (
-	[]jobmgr.Request,
-	[]jobmgr.WorkPlan,
-	bool,
-) {
+func (artc *autoDetectionRetryTestCommands) snapshot() ([]jobmgr.Request, []jobmgr.WorkPlan, bool) {
 	artc.mu.Lock()
 	defer artc.mu.Unlock()
-	return append([]jobmgr.Request(nil), artc.submitted...),
-		append([]jobmgr.WorkPlan(nil), artc.plans...),
-		artc.waited
+	return append([]jobmgr.Request(nil), artc.submitted...), append([]jobmgr.WorkPlan(nil), artc.plans...), artc.waited
 }
 
-func (artc *autoDetectionRetryTestCommands) waitForSubmissions(
-	t *testing.T,
-	want int,
-) {
+func (artc *autoDetectionRetryTestCommands) waitForSubmissions(t *testing.T, want int) {
 	t.Helper()
 	if want == 0 {
 		select {
@@ -517,13 +427,7 @@ func (artc *autoDetectionRetryTestCommands) waitForSubmissions(
 		select {
 		case <-artc.notification():
 		case <-timeout.C:
-			require.FailNowf(
-				t,
-				"test failed",
-				"retry submissions=%d want=%d",
-				got,
-				want,
-			)
+			require.FailNowf(t, "test failed", "retry submissions=%d want=%d", got, want)
 		}
 	}
 }

@@ -11,11 +11,7 @@ import (
 )
 
 type PreparedCommandPort interface {
-	SubmitPreparedAndWait(
-		context.Context,
-		jobmgr.Request,
-		jobmgr.WorkPlan,
-	) error
+	SubmitPreparedAndWait(context.Context, jobmgr.Request, jobmgr.WorkPlan) error
 }
 
 type DiscoveredChange struct {

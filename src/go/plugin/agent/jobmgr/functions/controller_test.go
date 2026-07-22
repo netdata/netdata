@@ -41,13 +41,8 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 
 	require.NoError(t, controller.Activate())
 
-	job := &controllerTestJob{
-		fullName: "module_job", module: "module", name: "job", running: true,
-	}
-	handle, err := controller.PrepareJob(
-		lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1},
-		job,
-	)
+	job := &controllerTestJob{fullName: "module_job", module: "module", name: "job", running: true}
+	handle, err := controller.PrepareJob(lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}, job)
 	require.NoError(t, err)
 
 	require.NoError(t, handle.Publish())
@@ -60,9 +55,7 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 		}
 	})
 	require.EqualValues(t, 0, allocations)
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-		UID: "request", Route: "module:method",
-	})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "request", Route: "module:method"})
 	require.NoError(t, err)
 
 	_, runTaskErr := decision.Plan.Work(context.Background())
@@ -79,9 +72,7 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 	got := publicationPort.events
 	require.Equal(t, []string{"publish:module:method", "withdraw:module:method"}, got)
 
-	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-		UID: "after-close", Route: "module:method",
-	})
+	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "after-close", Route: "module:method"})
 	require.NoError(t, err)
 	require.NotEqualValues(t, 0, decision.Rejected)
 }
@@ -112,13 +103,8 @@ func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T)
 
 	require.NoError(t, controller.Activate())
 
-	job := &controllerTestJob{
-		fullName: "module_job", module: "module", name: "job", running: true,
-	}
-	handle, err := controller.PrepareJob(
-		lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1},
-		job,
-	)
+	job := &controllerTestJob{fullName: "module_job", module: "module", name: "job", running: true}
+	handle, err := controller.PrepareJob(lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}, job)
 	require.NoError(t, err)
 
 	require.NoError(t, handle.Publish())
@@ -309,34 +295,16 @@ func TestFunctionControllerRejectsInvalidDeclarations(t *testing.T) {
 	tests := map[string]struct {
 		methods []funcapi.FunctionConfig
 	}{
-		"empty method ID": {
-			methods: []funcapi.FunctionConfig{{}},
-		},
-		"duplicate method ID": {
-			methods: []funcapi.FunctionConfig{{ID: "same"}, {ID: "same"}},
-		},
-		"empty alias": {
-			methods: []funcapi.FunctionConfig{{ID: "method", Aliases: []string{""}}},
-		},
+		"empty method ID":     {methods: []funcapi.FunctionConfig{{}}},
+		"duplicate method ID": {methods: []funcapi.FunctionConfig{{ID: "same"}, {ID: "same"}}},
+		"empty alias":         {methods: []funcapi.FunctionConfig{{ID: "method", Aliases: []string{""}}}},
 		"duplicate primary alias": {
-			methods: []funcapi.FunctionConfig{{
-				ID: "method", Aliases: []string{"module:method"},
-			}},
+			methods: []funcapi.FunctionConfig{{ID: "method", Aliases: []string{"module:method"}}},
 		},
-		"duplicate alias": {
-			methods: []funcapi.FunctionConfig{{
-				ID: "method", Aliases: []string{"alias", "alias"},
-			}},
-		},
-		"invalid public name": {
-			methods: []funcapi.FunctionConfig{{
-				ID: "method", FunctionName: "invalid name",
-			}},
-		},
+		"duplicate alias":     {methods: []funcapi.FunctionConfig{{ID: "method", Aliases: []string{"alias", "alias"}}}},
+		"invalid public name": {methods: []funcapi.FunctionConfig{{ID: "method", FunctionName: "invalid name"}}},
 		"unmarshalable presentation": {
-			methods: []funcapi.FunctionConfig{(funcapi.FunctionConfig{
-				ID: "method",
-			}).WithPresentation(func() {})},
+			methods: []funcapi.FunctionConfig{(funcapi.FunctionConfig{ID: "method"}).WithPresentation(func() {})},
 		},
 	}
 	for name, test := range tests {
@@ -387,26 +355,13 @@ func TestFunctionControllerReportsInitialRouteCleanupFailure(t *testing.T) {
 				Cleanup: test.cleanup,
 			}
 			valid := InitialRoute{
-				Declaration: Declaration{
-					ID:         "initial",
-					Generation: generation,
-					PublicName: "initial",
-				},
-				Publication: PublicationRecord{
-					Name:       "initial",
-					Generation: 1,
-					Access:     "signed-id",
-				},
+				Declaration: Declaration{ID: "initial", Generation: generation, PublicName: "initial"},
+				Publication: PublicationRecord{Name: "initial", Generation: 1, Access: "signed-id"},
 			}
 			invalid := valid
 			invalid.Publication.Access = ""
 
-			_, _, err := NewController(
-				1,
-				collectorapi.Registry{},
-				valid,
-				invalid,
-			)
+			_, _, err := NewController(1, collectorapi.Registry{}, valid, invalid)
 			require.ErrorContains(t, err, "invalid initial publication")
 			test.assert(t, err)
 		})
@@ -530,26 +485,17 @@ type blockingWithdrawPublicationPort struct {
 	release chan struct{}
 }
 
-func (bwpp *blockingWithdrawPublicationPort) Withdraw(
-	name string,
-) error {
+func (bwpp *blockingWithdrawPublicationPort) Withdraw(name string) error {
 	close(bwpp.entered)
 	<-bwpp.release
 	return bwpp.recordingPublicationPort.Withdraw(name)
 }
 
-func (cth *controllerTestHandler) MethodParams(
-	context.Context,
-	string,
-) ([]funcapi.ParamConfig, error) {
+func (cth *controllerTestHandler) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
 	return nil, nil
 }
 
-func (cth *controllerTestHandler) Handle(
-	context.Context,
-	string,
-	funcapi.ResolvedParams,
-) *funcapi.FunctionResponse {
+func (cth *controllerTestHandler) Handle(context.Context, string, funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	return &funcapi.FunctionResponse{Status: 200}
 }
 

@@ -34,10 +34,7 @@ func TestVNodeBindingPreparesUpdates(t *testing.T) {
 			args:    []string{"go.d:vnode:missing", string(dyncfg.CommandUpdate)},
 			payload: `{"hostname":"changed","guid":"` + testVNodeGUID + `"}`,
 		},
-		"invalid payload": {
-			args:    []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)},
-			payload: `{`,
-		},
+		"invalid payload": {args: []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)}, payload: `{`},
 		"unchanged vnode": {
 			args:    []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)},
 			payload: `{"hostname":"db","guid":"` + testVNodeGUID + `"}`,
@@ -159,9 +156,7 @@ func TestVNodeBindingRejectsOwnedTransactionScope(t *testing.T) {
 	binding, _ := newTestVNodeBinding(t, confgroup.TypeDyncfg, nil)
 	_, err := binding.prepare(
 		context.Background(),
-		functionadapter.HandlerInput{
-			Args: []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)},
-		},
+		functionadapter.HandlerInput{Args: []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)}},
 		nil,
 		lifecycle.ResourceTransactionScope{
 			ID:      "vnode:db",
@@ -184,10 +179,7 @@ func newTestVNodeBinding(
 	}
 	configured, err := agentdiscovery.NewVNodeConfigurationWithInitial(
 		map[string]*vnodes.VirtualNode{
-			"db": {
-				Name: "db", Hostname: "db", GUID: testVNodeGUID,
-				Source: source, SourceType: sourceType,
-			},
+			"db": {Name: "db", Hostname: "db", GUID: testVNodeGUID, Source: source, SourceType: sourceType},
 		},
 	)
 	require.NoError(t, err)

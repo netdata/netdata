@@ -52,9 +52,7 @@ func preparedResourceTransactionOutcome(
 	return outcome, outcome.validate()
 }
 
-func appliedResourceTransactionOutcome(
-	applied AppliedResourceTransaction,
-) (TaskOutcome, error) {
+func appliedResourceTransactionOutcome(applied AppliedResourceTransaction) (TaskOutcome, error) {
 	outcome := TaskOutcome{
 		kind:        TaskOutcomeAppliedResourceTransaction,
 		frame:       applied.result,
@@ -106,11 +104,7 @@ func (to TaskOutcome) validate() error {
 			return errors.New("jobmgr lifecycle: nonempty no-value outcome")
 		}
 	case TaskOutcomeFrame:
-		if to.ready != nil ||
-			to.transaction != nil ||
-			to.scopeSet ||
-			to.disposition != 0 ||
-			to.identity.Valid() {
+		if to.ready != nil || to.transaction != nil || to.scopeSet || to.disposition != 0 || to.identity.Valid() {
 			return errors.New("jobmgr lifecycle: mixed frame outcome")
 		}
 		return to.frame.validate()
@@ -134,10 +128,7 @@ func (to TaskOutcome) validate() error {
 			return errors.New("jobmgr lifecycle: invalid prepared resource transaction outcome")
 		}
 	case TaskOutcomeAppliedResourceTransaction:
-		if to.transaction != nil ||
-			!to.scopeSet ||
-			!to.scope.Valid() ||
-			!to.disposition.Valid() {
+		if to.transaction != nil || !to.scopeSet || !to.scope.Valid() || !to.disposition.Valid() {
 			return errors.New("jobmgr lifecycle: invalid applied resource transaction outcome")
 		}
 		if err := to.frame.validate(); err != nil {
@@ -153,9 +144,7 @@ func (to TaskOutcome) validate() error {
 				return errors.New("jobmgr lifecycle: empty unchanged transaction installed a resource")
 			}
 		case ResourceTransactionRemoved:
-			if !to.scope.Current.Valid() ||
-				to.ready != nil ||
-				to.identity.Valid() {
+			if !to.scope.Current.Valid() || to.ready != nil || to.identity.Valid() {
 				return errors.New("jobmgr lifecycle: invalid removed transaction result")
 			}
 		case ResourceTransactionInstalled:
@@ -196,11 +185,7 @@ func readyResourceIdentity(resource ReadyResource) (identity ResourceIdentity, e
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			identity = ResourceIdentity{}
-			err = fmt.Errorf(
-				"%w in ready resource identity: %v",
-				ErrTaskPanic,
-				recovered,
-			)
+			err = fmt.Errorf("%w in ready resource identity: %v", ErrTaskPanic, recovered)
 		}
 	}()
 	identity = resource.Identity()

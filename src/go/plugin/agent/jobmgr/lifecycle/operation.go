@@ -53,7 +53,13 @@ type OperationGeneration struct {
 	childPhase uint8          // last child phase sequence acknowledged
 }
 
-func NewOperation(id OperationID, uid string, source Source, laneKey string, responseRequired bool) (*OperationGeneration, error) {
+func NewOperation(
+	id OperationID,
+	uid string,
+	source Source,
+	laneKey string,
+	responseRequired bool,
+) (*OperationGeneration, error) {
 	if id == 0 || uid == "" || laneKey == "" || !source.Valid() {
 		return nil, errors.New("jobmgr operation: invalid identity")
 	}
@@ -61,7 +67,15 @@ func NewOperation(id OperationID, uid string, source Source, laneKey string, res
 	if responseRequired {
 		response = ResponseOpen
 	}
-	return &OperationGeneration{ID: id, UID: uid, Source: source, LaneKey: laneKey, State: OperationAdmitted, Response: response, Child: ChildNotStarted}, nil
+	return &OperationGeneration{
+		ID:       id,
+		UID:      uid,
+		Source:   source,
+		LaneKey:  laneKey,
+		State:    OperationAdmitted,
+		Response: response,
+		Child:    ChildNotStarted,
+	}, nil
 }
 
 func (og *OperationGeneration) Advance(state OperationState) error {
@@ -106,13 +120,8 @@ func (og *OperationGeneration) ResultReady(ref TaskRef, sequence uint8) error {
 	return nil
 }
 
-func (og *OperationGeneration) PhaseResultReady(
-	ref TaskRef,
-	sequence uint8,
-) error {
-	if og.Child != ChildActionPending ||
-		og.Task != ref ||
-		sequence != og.childPhase {
+func (og *OperationGeneration) PhaseResultReady(ref TaskRef, sequence uint8) error {
+	if og.Child != ChildActionPending || og.Task != ref || sequence != og.childPhase {
 		return errors.New("jobmgr operation: stale child phase result")
 	}
 	og.Child = ChildResultReady
@@ -120,7 +129,8 @@ func (og *OperationGeneration) PhaseResultReady(
 }
 
 func (og *OperationGeneration) ActionPending(ref TaskRef, sequence uint8) error {
-	if (og.Child != ChildResultReady && og.Child != ChildActionAcknowledged) || og.Task != ref || sequence != og.childPhase+1 {
+	if (og.Child != ChildResultReady && og.Child != ChildActionAcknowledged) || og.Task != ref ||
+		sequence != og.childPhase+1 {
 		return errors.New("jobmgr operation: action without result")
 	}
 	og.Child = ChildActionPending
@@ -184,7 +194,9 @@ func (og *OperationGeneration) TimedOut() bool {
 }
 
 func (og *OperationGeneration) CanDisposeTerminal() bool {
-	responseTerminal := og.Response == ResponseNotRequired || og.Response == ResponseCommitted || og.Response == ResponsePoisoned
-	childTerminal := og.Child == ChildNotStarted || og.Child == ChildAbandonedBeforeStart || og.Child == ChildExitAcknowledged
+	responseTerminal := og.Response == ResponseNotRequired || og.Response == ResponseCommitted ||
+		og.Response == ResponsePoisoned
+	childTerminal := og.Child == ChildNotStarted || og.Child == ChildAbandonedBeforeStart ||
+		og.Child == ChildExitAcknowledged
 	return responseTerminal && childTerminal
 }

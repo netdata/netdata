@@ -17,11 +17,16 @@ func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	owner := ResourceIdentity{ID: "pipeline", Generation: 7}
 	entered := make(chan struct{})
-	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV1Runtime, func(ctx context.Context) error {
-		close(entered)
-		<-ctx.Done()
-		return nil
-	})
+	ref, err := supervisor.StartInherited(
+		context.Background(),
+		owner,
+		InheritedV1Runtime,
+		func(ctx context.Context) error {
+			close(entered)
+			<-ctx.Done()
+			return nil
+		},
+	)
 	require.NoError(t, err)
 	<-entered
 	require.EqualValues(t, 0, supervisor.Active())
@@ -53,10 +58,7 @@ func TestInheritedShutdownNormalizesOnlyCurrentStoppingCause(t *testing.T) {
 		},
 		"stopping cause joined with real error": {
 			result: func(ctx context.Context) error {
-				return errors.Join(
-					context.Cause(ctx),
-					cleanupErr,
-				)
+				return errors.Join(context.Cause(ctx), cleanupErr)
 			},
 			wantErr: cleanupErr,
 		},
@@ -64,17 +66,10 @@ func TestInheritedShutdownNormalizesOnlyCurrentStoppingCause(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			supervisor := newResourceTaskSupervisor(t)
-			run, err := NewRunSupervisor(
-				11,
-				RealClock{},
-				time.Second,
-			)
+			run, err := NewRunSupervisor(11, RealClock{}, time.Second)
 			require.NoError(t, err)
 			require.NoError(t, supervisor.BindRun(run, func() {}))
-			owner := ResourceIdentity{
-				ID:         "pipeline",
-				Generation: 1,
-			}
+			owner := ResourceIdentity{ID: "pipeline", Generation: 1}
 			ref, err := supervisor.StartInherited(
 				context.Background(),
 				owner,
@@ -88,38 +83,25 @@ func TestInheritedShutdownNormalizesOnlyCurrentStoppingCause(t *testing.T) {
 
 			run.BeginStopping()
 			require.NoError(t, supervisor.SealInherited())
-			more, err := supervisor.CancelInheritedBatch(
-				InheritedCancellationServiceQuantum,
-			)
+			more, err := supervisor.CancelInheritedBatch(InheritedCancellationServiceQuantum)
 			require.NoError(t, err)
 			require.False(t, more)
 
-			joined, err := supervisor.JoinInherited(
-				context.Background(),
-				ref,
-				owner,
-			)
+			joined, err := supervisor.JoinInherited(context.Background(), ref, owner)
 			require.True(t, joined)
 			if test.wantErr == nil {
 				require.NoError(t, err)
 			} else {
 				require.ErrorIs(t, err, test.wantErr)
 			}
-			require.NoError(
-				t,
-				supervisor.ReleaseInherited(ref, owner),
-			)
+			require.NoError(t, supervisor.ReleaseInherited(ref, owner))
 		})
 	}
 }
 
 func TestInheritedSpontaneousFailureDirtiesAndWakesRun(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	run, err := NewRunSupervisor(
-		13,
-		RealClock{},
-		time.Second,
-	)
+	run, err := NewRunSupervisor(13, RealClock{}, time.Second)
 	require.NoError(t, err)
 	wake := make(chan struct{}, 1)
 	require.NoError(t, supervisor.BindRun(run, func() {
@@ -128,10 +110,7 @@ func TestInheritedSpontaneousFailureDirtiesAndWakesRun(t *testing.T) {
 		default:
 		}
 	}))
-	owner := ResourceIdentity{
-		ID:         "pipeline",
-		Generation: 1,
-	}
+	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
 	release := make(chan struct{})
 	failure := errors.New("provider failed")
 	ref, err := supervisor.StartInherited(
@@ -149,21 +128,13 @@ func TestInheritedSpontaneousFailureDirtiesAndWakesRun(t *testing.T) {
 	select {
 	case <-wake:
 	case <-time.After(time.Second):
-		require.FailNow(
-			t,
-			"test failed",
-			"spontaneous failure did not wake the run",
-		)
+		require.FailNow(t, "test failed", "spontaneous failure did not wake the run")
 	}
 	require.ErrorIs(t, run.DirtyCause(), failure)
 	require.True(t, run.IsStopping())
 
 	require.NoError(t, supervisor.CancelInherited(ref, owner))
-	joined, err := supervisor.JoinInherited(
-		context.Background(),
-		ref,
-		owner,
-	)
+	joined, err := supervisor.JoinInherited(context.Background(), ref, owner)
 	require.True(t, joined)
 	require.ErrorIs(t, err, failure)
 	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
@@ -171,11 +142,7 @@ func TestInheritedSpontaneousFailureDirtiesAndWakesRun(t *testing.T) {
 
 func TestInheritedFiniteProviderCompletionDoesNotDirtyRun(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	run, err := NewRunSupervisor(
-		19,
-		RealClock{},
-		time.Second,
-	)
+	run, err := NewRunSupervisor(19, RealClock{}, time.Second)
 	require.NoError(t, err)
 	wake := make(chan struct{}, 1)
 	require.NoError(t, supervisor.BindRun(run, func() {
@@ -184,10 +151,7 @@ func TestInheritedFiniteProviderCompletionDoesNotDirtyRun(t *testing.T) {
 		default:
 		}
 	}))
-	owner := ResourceIdentity{
-		ID:         "pipeline",
-		Generation: 1,
-	}
+	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
 	plan, err := NewPipelineLongLivedPlan([]string{"finite"})
 	require.NoError(t, err)
 	permit, err := supervisor.IssueLongLivedPermit(owner, plan)
@@ -209,22 +173,14 @@ func TestInheritedFiniteProviderCompletionDoesNotDirtyRun(t *testing.T) {
 
 	select {
 	case <-wake:
-		require.FailNow(
-			t,
-			"test failed",
-			"finite provider completion woke the run",
-		)
+		require.FailNow(t, "test failed", "finite provider completion woke the run")
 	case <-time.After(25 * time.Millisecond):
 	}
 	require.NoError(t, run.DirtyCause())
 	require.False(t, run.IsStopping())
 
 	require.NoError(t, supervisor.CancelInherited(ref, owner))
-	joined, err := supervisor.JoinInherited(
-		context.Background(),
-		ref,
-		owner,
-	)
+	joined, err := supervisor.JoinInherited(context.Background(), ref, owner)
 	require.True(t, joined)
 	require.NoError(t, err)
 	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
@@ -241,44 +197,17 @@ func TestStoppingErrorTreeMatchingIsStrictAndBounded(t *testing.T) {
 		err  error
 		want bool
 	}{
-		"exact": {
-			err:  current,
-			want: true,
-		},
-		"wrapped exact": {
-			err:  fmt.Errorf("wrapped: %w", current),
-			want: true,
-		},
-		"joined exact": {
-			err:  errors.Join(current, current),
-			want: true,
-		},
-		"wrong generation": {
-			err: &StoppingRejection{Generation: 18},
-		},
-		"mixed real error": {
-			err: errors.Join(
-				current,
-				errors.New("cleanup failed"),
-			),
-		},
-		"generic cancellation": {
-			err: context.Canceled,
-		},
-		"tree over bound": {
-			err: deep,
-		},
+		"exact":                {err: current, want: true},
+		"wrapped exact":        {err: fmt.Errorf("wrapped: %w", current), want: true},
+		"joined exact":         {err: errors.Join(current, current), want: true},
+		"wrong generation":     {err: &StoppingRejection{Generation: 18}},
+		"mixed real error":     {err: errors.Join(current, errors.New("cleanup failed"))},
+		"generic cancellation": {err: context.Canceled},
+		"tree over bound":      {err: deep},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(
-				t,
-				test.want,
-				onlyCurrentStoppingRejections(
-					test.err,
-					current.Generation,
-				),
-			)
+			require.Equal(t, test.want, onlyCurrentStoppingRejections(test.err, current.Generation))
 		})
 	}
 }
@@ -309,7 +238,12 @@ func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {
 	got := observer.counter(RuntimeCounterTaskPanics)
 	require.EqualValues(t, 1, got)
 
-	_, startInheritedErr := supervisor.StartInherited(context.Background(), owner, 0, func(context.Context) error { return nil })
+	_, startInheritedErr := supervisor.StartInherited(
+		context.Background(),
+		owner,
+		0,
+		func(context.Context) error { return nil },
+	)
 	require.Error(t, startInheritedErr)
 
 }
@@ -324,10 +258,7 @@ func (*recordingRuntimeObserver) AddRuntimeGauge(RuntimeGauge, int) {}
 func (*recordingRuntimeObserver) SetRuntimeTimestamp(RuntimeTimestamp, time.Time) {
 }
 
-func (rro *recordingRuntimeObserver) AddRuntimeCounter(
-	kind RuntimeCounter,
-	delta uint64,
-) {
+func (rro *recordingRuntimeObserver) AddRuntimeCounter(kind RuntimeCounter, delta uint64) {
 	rro.mu.Lock()
 	defer rro.mu.Unlock()
 	if rro.counters == nil {
@@ -336,9 +267,7 @@ func (rro *recordingRuntimeObserver) AddRuntimeCounter(
 	rro.counters[kind] += delta
 }
 
-func (rro *recordingRuntimeObserver) counter(
-	kind RuntimeCounter,
-) uint64 {
+func (rro *recordingRuntimeObserver) counter(kind RuntimeCounter) uint64 {
 	rro.mu.Lock()
 	defer rro.mu.Unlock()
 	return rro.counters[kind]
@@ -378,10 +307,15 @@ func TestInheritedTasksGrowBeyondFormerDerivedLimit(t *testing.T) {
 	refs := make([]InheritedTaskRef, 0, population)
 	for index := range population {
 		owner := ResourceIdentity{ID: "pipeline", Generation: uint64(index + 1)}
-		ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV1Runtime, func(ctx context.Context) error {
-			<-ctx.Done()
-			return nil
-		})
+		ref, err := supervisor.StartInherited(
+			context.Background(),
+			owner,
+			InheritedV1Runtime,
+			func(ctx context.Context) error {
+				<-ctx.Done()
+				return nil
+			},
+		)
 		require.NoError(t, err)
 		refs = append(refs, ref)
 	}

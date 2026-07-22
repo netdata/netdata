@@ -28,16 +28,10 @@ func TestFunctionCatalogLookup(t *testing.T) {
 		},
 		"prefix route": {
 			declaration: testDeclaration("config", "job:", ResourcePolicy{}),
-			lookup: jobmgr.FunctionLookup{
-				UID: "prefix", Route: "config", Args: []string{"job:mysql"},
-			},
+			lookup:      jobmgr.FunctionLookup{UID: "prefix", Route: "config", Args: []string{"job:mysql"}},
 		},
 		"DynCfg resource": {
-			declaration: testDeclaration(
-				"config",
-				"go.d:collector:",
-				DynCfgJobResource(0, "go.d:collector:"),
-			),
+			declaration: testDeclaration("config", "go.d:collector:", DynCfgJobResource(0, "go.d:collector:")),
 			lookup: jobmgr.FunctionLookup{
 				UID: "resource", Route: "config",
 				Args: []string{"go.d:collector:mysql:production", "update"},
@@ -101,21 +95,10 @@ func TestFunctionCatalogInitialPrefixValidation(t *testing.T) {
 		prefixes []string
 		wantErr  bool
 	}{
-		"distinct prefixes": {
-			prefixes: []string{"job:", "module:"},
-		},
-		"duplicate prefix": {
-			prefixes: []string{"job:", "job:"},
-			wantErr:  true,
-		},
-		"shorter overlap": {
-			prefixes: []string{"job:", "job:mysql:"},
-			wantErr:  true,
-		},
-		"longer overlap": {
-			prefixes: []string{"job:mysql:", "job:"},
-			wantErr:  true,
-		},
+		"distinct prefixes": {prefixes: []string{"job:", "module:"}},
+		"duplicate prefix":  {prefixes: []string{"job:", "job:"}, wantErr: true},
+		"shorter overlap":   {prefixes: []string{"job:", "job:mysql:"}, wantErr: true},
+		"longer overlap":    {prefixes: []string{"job:mysql:", "job:"}, wantErr: true},
 	}
 
 	for name, test := range tests {
@@ -169,9 +152,7 @@ func TestFunctionCatalogResourceTransactionHasNoArbitraryCountLimits(t *testing.
 		for claimIndex := range claims {
 			claims[claimIndex] = fmt.Sprintf("claim-%02d-%02d", index, claimIndex)
 		}
-		commands[index] = ResourceTransactionCommand{
-			Name: fmt.Sprintf("command-%02d", index), Claims: claims,
-		}
+		commands[index] = ResourceTransactionCommand{Name: fmt.Sprintf("command-%02d", index), Claims: claims}
 	}
 	declaration := testDeclaration("config", "", DynCfgJobResource(0, "job:"))
 	declaration.Transaction = &ResourceTransactionDeclaration{
@@ -254,14 +235,10 @@ func TestFunctionCatalogMutationLifecycle(t *testing.T) {
 			progress, err := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
 			require.NoError(t, err)
 			require.True(t, progress.Quiesced)
-			oldDecision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-				UID: "old", Route: "work",
-			})
+			oldDecision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "old", Route: "work"})
 			require.NoError(t, err)
 			assert.Equal(t, test.wantOldStatus, oldDecision.Rejected)
-			otherDecision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-				UID: "other", Route: "other",
-			})
+			otherDecision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "other", Route: "other"})
 			require.NoError(t, err)
 			require.True(t, otherDecision.Lease.Valid())
 			_, err = catalog.ReleaseInvocation(otherDecision.Lease)
@@ -273,9 +250,7 @@ func TestFunctionCatalogMutationLifecycle(t *testing.T) {
 			assert.Empty(t, cleanups)
 			assert.EqualValues(t, 2, progress.Version)
 
-			decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-				UID: "new", Route: "work",
-			})
+			decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "new", Route: "work"})
 			require.NoError(t, err)
 			if test.wantNewMethod == "" {
 				assert.Equal(t, lifecycle.ControlNotFound, decision.Rejected)
@@ -296,9 +271,7 @@ func TestFunctionCatalogMutationAbortRestoresAdmission(t *testing.T) {
 	require.NoError(t, err)
 	replacement := testDeclaration("work", "", ResourcePolicy{})
 	replacement.ID = "replacement"
-	mutation, err := catalog.NewMutation(1, []RouteChange{{
-		PublicName: "work", Declaration: &replacement,
-	}})
+	mutation, err := catalog.NewMutation(1, []RouteChange{{PublicName: "work", Declaration: &replacement}})
 	require.NoError(t, err)
 	require.NoError(t, catalog.BeginMutation(mutation))
 	_, err = catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
@@ -318,13 +291,9 @@ func TestFunctionCatalogRejectsForeignMutationAbort(t *testing.T) {
 	require.NoError(t, err)
 	firstReplacement := testDeclaration("work", "", ResourcePolicy{})
 	secondReplacement := testDeclaration("work", "", ResourcePolicy{})
-	first, err := catalog.NewMutation(1, []RouteChange{{
-		PublicName: "work", Declaration: &firstReplacement,
-	}})
+	first, err := catalog.NewMutation(1, []RouteChange{{PublicName: "work", Declaration: &firstReplacement}})
 	require.NoError(t, err)
-	second, err := catalog.NewMutation(1, []RouteChange{{
-		PublicName: "work", Declaration: &secondReplacement,
-	}})
+	second, err := catalog.NewMutation(1, []RouteChange{{PublicName: "work", Declaration: &secondReplacement}})
 	require.NoError(t, err)
 	defer func() { require.NoError(t, second.Discard()) }()
 	require.NoError(t, catalog.BeginMutation(first))
@@ -342,9 +311,7 @@ func TestFunctionCatalogMutationRejectsDynamicPrefix(t *testing.T) {
 	catalog, err := NewCatalog(nil)
 	require.NoError(t, err)
 	declaration := testDeclaration("config", "job:", ResourcePolicy{})
-	_, err = catalog.NewMutation(1, []RouteChange{{
-		PublicName: "config", Declaration: &declaration,
-	}})
+	_, err = catalog.NewMutation(1, []RouteChange{{PublicName: "config", Declaration: &declaration}})
 	require.Error(t, err)
 }
 
@@ -409,9 +376,7 @@ func TestFunctionCatalogMutationPreflightIsBoundedAndClosesAdmission(t *testing.
 	progress, err := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
 	require.NoError(t, err)
 	assert.False(t, progress.Quiesced)
-	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
-		UID: "preflight", Route: "work-000",
-	})
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "preflight", Route: "work-000"})
 	require.NoError(t, err)
 	assert.Equal(t, lifecycle.ControlUnavailable, decision.Rejected)
 	require.Error(t, catalog.ResumeMutation(mutation))
@@ -442,13 +407,9 @@ func TestFunctionCatalogRejectsStalePreparedMutation(t *testing.T) {
 	require.NoError(t, err)
 	firstDeclaration := testDeclaration("first", "", ResourcePolicy{})
 	secondDeclaration := testDeclaration("second", "", ResourcePolicy{})
-	first, err := catalog.NewMutation(1, []RouteChange{{
-		PublicName: "first", Declaration: &firstDeclaration,
-	}})
+	first, err := catalog.NewMutation(1, []RouteChange{{PublicName: "first", Declaration: &firstDeclaration}})
 	require.NoError(t, err)
-	second, err := catalog.NewMutation(1, []RouteChange{{
-		PublicName: "second", Declaration: &secondDeclaration,
-	}})
+	second, err := catalog.NewMutation(1, []RouteChange{{PublicName: "second", Declaration: &secondDeclaration}})
 	require.NoError(t, err)
 	commitMutation(t, catalog, first)
 	require.Error(t, catalog.BeginMutation(second))
@@ -482,10 +443,7 @@ func TestFunctionCatalogMutationPreflightIsSideEffectFree(t *testing.T) {
 			firstGeneration := snapshot.routes["first"].direct.handler
 			secondGeneration := snapshot.routes["second"].direct.handler
 
-			mutation, err := catalog.NewMutation(1, []RouteChange{
-				{PublicName: "first"},
-				{PublicName: "second"},
-			})
+			mutation, err := catalog.NewMutation(1, []RouteChange{{PublicName: "first"}, {PublicName: "second"}})
 			require.NoError(t, err)
 			test.corrupt(catalog, secondGeneration)
 			require.NoError(t, catalog.BeginMutation(mutation))
@@ -507,10 +465,7 @@ func TestFunctionCatalogMutationPreflightAggregatesSharedGeneration(t *testing.T
 		testDeclarationForGeneration(generation, "second", "", ResourcePolicy{}),
 	})
 	require.NoError(t, err)
-	mutation, err := catalog.NewMutation(1, []RouteChange{
-		{PublicName: "first"},
-		{PublicName: "second"},
-	})
+	mutation, err := catalog.NewMutation(1, []RouteChange{{PublicName: "first"}, {PublicName: "second"}})
 	require.NoError(t, err)
 	shared := catalog.snapshot.Load().routes["first"].direct.handler
 	shared.routeReferences = 1
@@ -536,9 +491,7 @@ func TestFunctionCatalogCleanupWaitsForLastLease(t *testing.T) {
 	require.NoError(t, err)
 
 	replacement := testDeclaration("work", "", ResourcePolicy{})
-	mutation, err := catalog.NewMutation(1, []RouteChange{{
-		PublicName: "work", Declaration: &replacement,
-	}})
+	mutation, err := catalog.NewMutation(1, []RouteChange{{PublicName: "work", Declaration: &replacement}})
 	require.NoError(t, err)
 	cleanups := commitMutation(t, catalog, mutation)
 	assert.Empty(t, cleanups)
@@ -604,9 +557,7 @@ func TestFunctionCatalogRemovedRouteWaitsForEveryRetiredGeneration(t *testing.T)
 	commitMutation(t, catalog, removeFirst)
 
 	secondDeclaration := testDeclaration("work", "", ResourcePolicy{})
-	addSecond, err := catalog.NewMutation(2, []RouteChange{{
-		PublicName: "work", Declaration: &secondDeclaration,
-	}})
+	addSecond, err := catalog.NewMutation(2, []RouteChange{{PublicName: "work", Declaration: &secondDeclaration}})
 	require.NoError(t, err)
 	commitMutation(t, catalog, addSecond)
 	second, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "second", Route: "work"})
@@ -633,9 +584,7 @@ func TestFunctionCatalogRemovalWaitsForReplacedGeneration(t *testing.T) {
 	first, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "first", Route: "work"})
 	require.NoError(t, err)
 	secondDeclaration := testDeclaration("work", "", ResourcePolicy{})
-	replace, err := catalog.NewMutation(1, []RouteChange{{
-		PublicName: "work", Declaration: &secondDeclaration,
-	}})
+	replace, err := catalog.NewMutation(1, []RouteChange{{PublicName: "work", Declaration: &secondDeclaration}})
 	require.NoError(t, err)
 	commitMutation(t, catalog, replace)
 	second, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "second", Route: "work"})
@@ -829,11 +778,7 @@ func TestFunctionCatalogDeclarationMetadataBounds(t *testing.T) {
 	}
 }
 
-func commitMutation(
-	t *testing.T,
-	catalog *Catalog,
-	mutation *Mutation,
-) []jobmgr.FunctionCleanupPlan {
+func commitMutation(t *testing.T, catalog *Catalog, mutation *Mutation) []jobmgr.FunctionCleanupPlan {
 	t.Helper()
 	require.NoError(t, catalog.BeginMutation(mutation))
 	for {
@@ -864,9 +809,7 @@ func testGeneration(id string) *HandlerGenerationDeclaration {
 }
 
 func testDeclaration(publicName, prefix string, resource ResourcePolicy) Declaration {
-	return testDeclarationForGeneration(
-		testGeneration(publicName), publicName, prefix, resource,
-	)
+	return testDeclarationForGeneration(testGeneration(publicName), publicName, prefix, resource)
 }
 
 func testDeclarationForGeneration(

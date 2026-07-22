@@ -19,33 +19,15 @@ func TestControlFramePlanValidate(t *testing.T) {
 		plan    ControlFramePlan
 		wantErr bool
 	}{
-		"valid": {
-			plan: ControlFramePlan{UID: "request-1", Status: ControlDeadline, Expiry: 1},
-		},
-		"empty UID": {
-			plan:    ControlFramePlan{Status: ControlDeadline, Expiry: 1},
-			wantErr: true,
-		},
-		"unsafe UID": {
-			plan:    ControlFramePlan{UID: "request 1", Status: ControlDeadline, Expiry: 1},
-			wantErr: true,
-		},
+		"valid":      {plan: ControlFramePlan{UID: "request-1", Status: ControlDeadline, Expiry: 1}},
+		"empty UID":  {plan: ControlFramePlan{Status: ControlDeadline, Expiry: 1}, wantErr: true},
+		"unsafe UID": {plan: ControlFramePlan{UID: "request 1", Status: ControlDeadline, Expiry: 1}, wantErr: true},
 		"overlong UID": {
-			plan: ControlFramePlan{
-				UID:    strings.Repeat("u", MaximumUIDBytes+1),
-				Status: ControlDeadline,
-				Expiry: 1,
-			},
+			plan:    ControlFramePlan{UID: strings.Repeat("u", MaximumUIDBytes+1), Status: ControlDeadline, Expiry: 1},
 			wantErr: true,
 		},
-		"unknown status": {
-			plan:    ControlFramePlan{UID: "request-1", Status: 200, Expiry: 1},
-			wantErr: true,
-		},
-		"nonpositive expiry": {
-			plan:    ControlFramePlan{UID: "request-1", Status: ControlDeadline},
-			wantErr: true,
-		},
+		"unknown status":     {plan: ControlFramePlan{UID: "request-1", Status: 200, Expiry: 1}, wantErr: true},
+		"nonpositive expiry": {plan: ControlFramePlan{UID: "request-1", Status: ControlDeadline}, wantErr: true},
 	}
 
 	for name, tc := range tests {
@@ -60,39 +42,15 @@ func TestValidateUID(t *testing.T) {
 		uid     string
 		wantErr bool
 	}{
-		"valid": {
-			uid: "request-1",
-		},
-		"boundary": {
-			uid: strings.Repeat("u", MaximumUIDBytes),
-		},
-		"empty": {
-			wantErr: true,
-		},
-		"overlong": {
-			uid:     strings.Repeat("u", MaximumUIDBytes+1),
-			wantErr: true,
-		},
-		"space": {
-			uid:     "request 1",
-			wantErr: true,
-		},
-		"tab": {
-			uid:     "request\t1",
-			wantErr: true,
-		},
-		"carriage return": {
-			uid:     "request\r1",
-			wantErr: true,
-		},
-		"line feed": {
-			uid:     "request\n1",
-			wantErr: true,
-		},
-		"NUL": {
-			uid:     "request\x001",
-			wantErr: true,
-		},
+		"valid":           {uid: "request-1"},
+		"boundary":        {uid: strings.Repeat("u", MaximumUIDBytes)},
+		"empty":           {wantErr: true},
+		"overlong":        {uid: strings.Repeat("u", MaximumUIDBytes+1), wantErr: true},
+		"space":           {uid: "request 1", wantErr: true},
+		"tab":             {uid: "request\t1", wantErr: true},
+		"carriage return": {uid: "request\r1", wantErr: true},
+		"line feed":       {uid: "request\n1", wantErr: true},
+		"NUL":             {uid: "request\x001", wantErr: true},
 	}
 
 	for name, tc := range tests {

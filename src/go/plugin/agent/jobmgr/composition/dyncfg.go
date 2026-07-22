@@ -20,9 +20,7 @@ type dynCfgJobBinding struct {
 	controller atomic.Pointer[joboutput.DynCfgJobController]
 }
 
-func (dcjb *dynCfgJobBinding) bind(
-	controller *joboutput.DynCfgJobController,
-) error {
+func (dcjb *dynCfgJobBinding) bind(controller *joboutput.DynCfgJobController) error {
 	if dcjb == nil || controller == nil {
 		return errors.New("jobmgr composition: invalid DynCfg job binding")
 	}
@@ -38,8 +36,7 @@ func (dcjb *dynCfgJobBinding) handle(
 ) (lifecycle.SealedResult, error) {
 	controller := dcjb.controller.Load()
 	if controller == nil {
-		return lifecycle.SealedResult{},
-			errors.New("jobmgr composition: unbound DynCfg job handler")
+		return lifecycle.SealedResult{}, errors.New("jobmgr composition: unbound DynCfg job handler")
 	}
 	return controller.Handle(ctx, dynCfgJobRequest(input))
 }
@@ -53,22 +50,12 @@ func (dcjb *dynCfgJobBinding) prepare(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	controller := dcjb.controller.Load()
 	if controller == nil {
-		return nil, errors.New(
-			"jobmgr composition: unbound DynCfg job transaction",
-		)
+		return nil, errors.New("jobmgr composition: unbound DynCfg job transaction")
 	}
-	return controller.Prepare(
-		ctx,
-		dynCfgJobRequest(input),
-		current,
-		scope,
-		permit,
-	)
+	return controller.Prepare(ctx, dynCfgJobRequest(input), current, scope, permit)
 }
 
-func dynCfgJobRequest(
-	input functionadapter.HandlerInput,
-) joboutput.DynCfgJobRequest {
+func dynCfgJobRequest(input functionadapter.HandlerInput) joboutput.DynCfgJobRequest {
 	return joboutput.DynCfgJobRequest{
 		Args: input.Args, Payload: input.Payload,
 		ContentType:  input.ContentType,
@@ -83,8 +70,7 @@ func newDynCfgJobInitialRoute(
 	binding *dynCfgJobBinding,
 ) (functionadapter.InitialRoute, error) {
 	if epoch == 0 || prefix == "" || binding == nil {
-		return functionadapter.InitialRoute{},
-			errors.New("jobmgr composition: invalid DynCfg job route")
+		return functionadapter.InitialRoute{}, errors.New("jobmgr composition: invalid DynCfg job route")
 	}
 	permit := lifecycle.NewJobLongLivedPlan()
 	return functionadapter.InitialRoute{
@@ -101,18 +87,9 @@ func newDynCfgJobInitialRoute(
 				GlobalClaim:     joboutput.DynCfgJobGraphClaim,
 				Commands: []functionadapter.ResourceTransactionCommand{
 					{Name: string(dyncfg.CommandAdd)},
-					{
-						Name:              string(dyncfg.CommandUpdate),
-						AllocateSuccessor: true,
-					},
-					{
-						Name:              string(dyncfg.CommandEnable),
-						AllocateSuccessor: true,
-					},
-					{
-						Name:              string(dyncfg.CommandRestart),
-						AllocateSuccessor: true,
-					},
+					{Name: string(dyncfg.CommandUpdate), AllocateSuccessor: true},
+					{Name: string(dyncfg.CommandEnable), AllocateSuccessor: true},
+					{Name: string(dyncfg.CommandRestart), AllocateSuccessor: true},
 					{Name: string(dyncfg.CommandDisable)},
 					{Name: string(dyncfg.CommandRemove)},
 				},

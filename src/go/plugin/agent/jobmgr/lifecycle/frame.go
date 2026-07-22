@@ -97,14 +97,11 @@ func (fo *FrameOwner) BindRunNotifications(
 	poisoned func(error),
 	observer RuntimeObserver,
 ) error {
-	if fo == nil || generation == 0 || controlReady == nil ||
-		poisoned == nil {
+	if fo == nil || generation == 0 || controlReady == nil || poisoned == nil {
 		return errors.New("jobmgr frame owner: invalid run notification binding")
 	}
 	fo.stateMu.Lock()
-	if fo.runBinding != 0 ||
-		fo.onControlReady != nil ||
-		fo.onPoisoned != nil {
+	if fo.runBinding != 0 || fo.onControlReady != nil || fo.onPoisoned != nil {
 		fo.stateMu.Unlock()
 		return errors.New("jobmgr frame owner: notifications already bound")
 	}
@@ -130,9 +127,7 @@ func (fo *FrameOwner) ReleaseRunNotifications(generation uint64) error {
 	}
 	fo.stateMu.Lock()
 	defer fo.stateMu.Unlock()
-	if fo.runBinding != generation ||
-		fo.onControlReady == nil ||
-		fo.onPoisoned == nil {
+	if fo.runBinding != generation || fo.onControlReady == nil || fo.onPoisoned == nil {
 		return errors.New("jobmgr frame owner: stale run notification release")
 	}
 	fo.runBinding = 0
@@ -150,7 +145,9 @@ func PrepareFrame(uid string, result SealedResult, expiry int64) (PreparedFrame,
 	if err != nil {
 		return PreparedFrame{}, err
 	}
-	return PreparedFrame{state: &preparedFunctionFrame{uid: uid, result: result, expiry: expiry, encodedBytes: encodedBytes}}, nil
+	return PreparedFrame{
+		state: &preparedFunctionFrame{uid: uid, result: result, expiry: expiry, encodedBytes: encodedBytes},
+	}, nil
 }
 
 func NewControlResult(status ControlStatus) (SealedResult, error) {
@@ -176,14 +173,30 @@ func appendPreparedFrame(dst []byte, frame preparedFunctionFrameContent) ([]byte
 	if frame.encodedBytes <= 0 {
 		return dst, errors.New("jobmgr frame owner: unprepared frame")
 	}
-	return appendFrameBody(dst, frame.uid, frame.result.status, frame.result.contentType, frame.expiry, frame.result.payload, frame.encodedBytes)
+	return appendFrameBody(
+		dst,
+		frame.uid,
+		frame.result.status,
+		frame.result.contentType,
+		frame.expiry,
+		frame.result.payload,
+		frame.encodedBytes,
+	)
 }
 
 // appendFrameBody writes one FUNCTION_RESULT_BEGIN..END frame to dst, growing
 // dst once if needed, and verifies the appended length matches the precomputed
 // encodedBytes. It is the single wire-format writer shared by the prepared-frame
 // and direct-encode paths, so the protocol format lives in exactly one place.
-func appendFrameBody(dst []byte, uid string, status int, contentType string, expiry int64, payload []byte, encodedBytes int) ([]byte, error) {
+func appendFrameBody(
+	dst []byte,
+	uid string,
+	status int,
+	contentType string,
+	expiry int64,
+	payload []byte,
+	encodedBytes int,
+) ([]byte, error) {
 	start := len(dst)
 	if cap(dst)-len(dst) < encodedBytes {
 		grown := make([]byte, len(dst), len(dst)+encodedBytes)
@@ -265,10 +278,7 @@ func (fo *FrameOwner) CommitBorrowedProtocolFrame(payload []byte) error {
 
 // CommitBorrowedProtocolTransaction publishes bytes before making their
 // corresponding in-memory state visible. A failed write runs abort instead.
-func (fo *FrameOwner) CommitBorrowedProtocolTransaction(
-	payload []byte,
-	transaction ProtocolTransaction,
-) error {
+func (fo *FrameOwner) CommitBorrowedProtocolTransaction(payload []byte, transaction ProtocolTransaction) error {
 	if transaction == nil {
 		return errors.New("jobmgr frame owner: invalid borrowed protocol transaction")
 	}
@@ -304,10 +314,7 @@ func (fo *FrameOwner) commitOrdinaryTransaction(
 	}
 	if fo.poisoned {
 		fo.stateMu.Unlock()
-		return errors.Join(
-			ErrFrameOwnerPoisoned,
-			callFrameTransition("abort", transaction, false),
-		)
+		return errors.Join(ErrFrameOwnerPoisoned, callFrameTransition("abort", transaction, false))
 	}
 	fo.busy = true
 	fo.stateMu.Unlock()
@@ -333,7 +340,17 @@ func (fo *FrameOwner) TryCommitControl(plan ControlFramePlan) error {
 	fo.stateMu.Unlock()
 
 	payload := controlPayload(plan.Status)
-	encoded, err := encodeResult(fo.controlBuffer[:0], plan.UID, int(plan.Status), "application/json", plan.Expiry, payload, ControlFrameBytes, 0, 0)
+	encoded, err := encodeResult(
+		fo.controlBuffer[:0],
+		plan.UID,
+		int(plan.Status),
+		"application/json",
+		plan.Expiry,
+		payload,
+		ControlFrameBytes,
+		0,
+		0,
+	)
 	if err != nil {
 		fo.poison(encoded, err)
 		return err
@@ -344,7 +361,12 @@ func (fo *FrameOwner) TryCommitControl(plan ControlFramePlan) error {
 func (fo *FrameOwner) Census() FrameCensus {
 	fo.stateMu.Lock()
 	defer fo.stateMu.Unlock()
-	return FrameCensus{Poisoned: fo.poisoned, Busy: fo.busy, PendingControl: fo.pendingControl, RetainedBytes: len(fo.retained)}
+	return FrameCensus{
+		Poisoned:       fo.poisoned,
+		Busy:           fo.busy,
+		PendingControl: fo.pendingControl,
+		RetainedBytes:  len(fo.retained),
+	}
 }
 
 func (fo *FrameOwner) Poison(cause error) {
@@ -354,11 +376,7 @@ func (fo *FrameOwner) Poison(cause error) {
 	fo.poison(nil, cause)
 }
 
-func (fo *FrameOwner) writeAndRelease(
-	payload []byte,
-	borrowed bool,
-	transaction ProtocolTransaction,
-) error {
+func (fo *FrameOwner) writeAndRelease(payload []byte, borrowed bool, transaction ProtocolTransaction) error {
 	count, err := fo.writer.Write(payload)
 	if err != nil || count != len(payload) {
 		if err == nil {
@@ -372,10 +390,7 @@ func (fo *FrameOwner) writeAndRelease(
 		return resultErr
 	}
 	if err := callFrameTransition("commit", transaction, true); err != nil {
-		err = errors.Join(
-			err,
-			callFrameTransition("abort", transaction, false),
-		)
+		err = errors.Join(err, callFrameTransition("abort", transaction, false))
 		fo.poison(retainedFramePayload(payload, borrowed), err)
 		return err
 	}
@@ -402,22 +417,13 @@ func retainedFramePayload(payload []byte, borrowed bool) []byte {
 	return payload
 }
 
-func callFrameTransition(
-	name string,
-	transaction ProtocolTransaction,
-	commit bool,
-) (err error) {
+func callFrameTransition(name string, transaction ProtocolTransaction, commit bool) (err error) {
 	if transaction == nil {
 		return nil
 	}
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf(
-				"%w in frame protocol %s: %v",
-				ErrTaskPanic,
-				name,
-				recovered,
-			)
+			err = fmt.Errorf("%w in frame protocol %s: %v", ErrTaskPanic, name, recovered)
 		}
 	}()
 	if commit {
@@ -448,20 +454,62 @@ func (fo *FrameOwner) poison(payload []byte, cause error) {
 	}
 }
 
-func encodeResult(dst []byte, uid string, status int, contentType string, expiry int64, payload []byte, frameLimit, envelopeLimit, payloadLimit int) ([]byte, error) {
-	encodedBytes, _, err := resultFrameSize(uid, status, contentType, expiry, len(payload), frameLimit, envelopeLimit, payloadLimit)
+func encodeResult(
+	dst []byte,
+	uid string,
+	status int,
+	contentType string,
+	expiry int64,
+	payload []byte,
+	frameLimit, envelopeLimit, payloadLimit int,
+) ([]byte, error) {
+	encodedBytes, _, err := resultFrameSize(
+		uid,
+		status,
+		contentType,
+		expiry,
+		len(payload),
+		frameLimit,
+		envelopeLimit,
+		payloadLimit,
+	)
 	if err != nil {
 		return dst, err
 	}
 	return appendFrameBody(dst, uid, status, contentType, expiry, payload, encodedBytes)
 }
 
-func functionFrameSize(uid string, status int, contentType string, expiry int64, payloadBytes int) (frameBytes, envelopeBytes int, err error) {
-	return resultFrameSize(uid, status, contentType, expiry, payloadBytes, MaximumFunctionFrameBytes, FunctionEnvelopeBytes, FunctionPayloadBytes)
+func functionFrameSize(
+	uid string,
+	status int,
+	contentType string,
+	expiry int64,
+	payloadBytes int,
+) (frameBytes, envelopeBytes int, err error) {
+	return resultFrameSize(
+		uid,
+		status,
+		contentType,
+		expiry,
+		payloadBytes,
+		MaximumFunctionFrameBytes,
+		FunctionEnvelopeBytes,
+		FunctionPayloadBytes,
+	)
 }
 
-func resultFrameSize(uid string, status int, contentType string, expiry int64, payloadBytes, frameLimit, envelopeLimit, payloadLimit int) (frameBytes, envelopeBytes int, err error) {
-	if uid == "" || strings.ContainsAny(uid, " \t\r\n\x00") || contentType == "" || strings.ContainsAny(contentType, " \t\r\n\x00") || status < 100 || status > 599 || expiry <= 0 {
+func resultFrameSize(
+	uid string,
+	status int,
+	contentType string,
+	expiry int64,
+	payloadBytes, frameLimit, envelopeLimit, payloadLimit int,
+) (frameBytes, envelopeBytes int, err error) {
+	if uid == "" || strings.ContainsAny(uid, " \t\r\n\x00") || contentType == "" ||
+		strings.ContainsAny(contentType, " \t\r\n\x00") ||
+		status < 100 ||
+		status > 599 ||
+		expiry <= 0 {
 		return 0, 0, errors.New("jobmgr frame owner: unsafe frame header")
 	}
 	if payloadBytes < 0 || frameLimit <= 0 || envelopeLimit < 0 || payloadLimit < 0 {
@@ -490,8 +538,15 @@ func resultFrameSize(uid string, status int, contentType string, expiry int64, p
 	if !ok {
 		return 0, 0, fmt.Errorf("%w: frame size overflow", ErrFunctionResultTooLarge)
 	}
-	if (payloadLimit > 0 && deferredBytes > payloadLimit) || (envelopeLimit > 0 && envelopeBytes > envelopeLimit) || frameBytes > frameLimit {
-		return 0, 0, fmt.Errorf("%w: payload=%d envelope=%d frame=%d", ErrFunctionResultTooLarge, deferredBytes, envelopeBytes, frameBytes)
+	if (payloadLimit > 0 && deferredBytes > payloadLimit) || (envelopeLimit > 0 && envelopeBytes > envelopeLimit) ||
+		frameBytes > frameLimit {
+		return 0, 0, fmt.Errorf(
+			"%w: payload=%d envelope=%d frame=%d",
+			ErrFunctionResultTooLarge,
+			deferredBytes,
+			envelopeBytes,
+			frameBytes,
+		)
 	}
 	return frameBytes, envelopeBytes, nil
 }

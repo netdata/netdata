@@ -14,29 +14,16 @@ func (ck *CommandKernel) Submit(ctx context.Context, request Request) error {
 	return ck.submit(ctx, request, nil)
 }
 
-func (ck *CommandKernel) QuiesceFunctions(
-	ctx context.Context,
-	mutation FunctionCatalogMutation,
-) error {
-	_, err := ck.submitFunctionMutation(
-		ctx,
-		functionMutationQuiesce,
-		mutation,
-	)
+func (ck *CommandKernel) QuiesceFunctions(ctx context.Context, mutation FunctionCatalogMutation) error {
+	_, err := ck.submitFunctionMutation(ctx, functionMutationQuiesce, mutation)
 	return err
 }
 
-func (ck *CommandKernel) CommitFunctions(
-	ctx context.Context,
-	mutation FunctionCatalogMutation,
-) (uint64, error) {
+func (ck *CommandKernel) CommitFunctions(ctx context.Context, mutation FunctionCatalogMutation) (uint64, error) {
 	return ck.submitFunctionMutation(ctx, functionMutationCommit, mutation)
 }
 
-func (ck *CommandKernel) AbortFunctions(
-	ctx context.Context,
-	mutation FunctionCatalogMutation,
-) error {
+func (ck *CommandKernel) AbortFunctions(ctx context.Context, mutation FunctionCatalogMutation) error {
 	_, err := ck.submitFunctionMutation(ctx, functionMutationAbort, mutation)
 	return err
 }
@@ -46,16 +33,11 @@ func (ck *CommandKernel) submitFunctionMutation(
 	action functionMutationAction,
 	mutation FunctionCatalogMutation,
 ) (uint64, error) {
-	if ctx == nil || mutation == nil ||
-		action < functionMutationQuiesce || action > functionMutationAbort {
+	if ctx == nil || mutation == nil || action < functionMutationQuiesce || action > functionMutationAbort {
 		return 0, errors.New("jobmgr kernel: invalid Function mutation")
 	}
 	result := make(chan functionMutationResult, 1)
-	submission := functionMutationSubmission{
-		mutation: mutation,
-		result:   result,
-		action:   action,
-	}
+	submission := functionMutationSubmission{mutation: mutation, result: result, action: action}
 	select {
 	case ck.functionMutations <- submission:
 		ck.NotifyControlReady()
@@ -74,27 +56,16 @@ func (ck *CommandKernel) submitFunctionMutation(
 		case completed := <-result:
 			return completed.version, completed.err
 		default:
-			return 0, errors.Join(
-				ck.stoppingError(),
-				ck.doneErr,
-			)
+			return 0, errors.Join(ck.stoppingError(), ck.doneErr)
 		}
 	}
 }
 
-func (ck *CommandKernel) SubmitPrepared(
-	ctx context.Context,
-	request Request,
-	plan WorkPlan,
-) error {
+func (ck *CommandKernel) SubmitPrepared(ctx context.Context, request Request, plan WorkPlan) error {
 	return ck.submitPrepared(ctx, request, plan, nil)
 }
 
-func (ck *CommandKernel) SubmitPreparedAndWait(
-	ctx context.Context,
-	request Request,
-	plan WorkPlan,
-) error {
+func (ck *CommandKernel) SubmitPreparedAndWait(ctx context.Context, request Request, plan WorkPlan) error {
 	terminal := make(chan error, 1)
 	if err := ck.submitPrepared(ctx, request, plan, terminal); err != nil {
 		return err
@@ -117,10 +88,7 @@ func (ck *CommandKernel) SubmitPreparedAndWait(
 				case err := <-terminal:
 					return errors.Join(cancellation, err)
 				default:
-					return errors.Join(
-						cancellation,
-						ck.Wait(context.Background()),
-					)
+					return errors.Join(cancellation, ck.Wait(context.Background()))
 				}
 			}
 		case <-ck.done:
@@ -128,20 +96,13 @@ func (ck *CommandKernel) SubmitPreparedAndWait(
 			case err := <-terminal:
 				return errors.Join(cancellation, err)
 			default:
-				return errors.Join(
-					cancellation,
-					ck.Wait(context.Background()),
-				)
+				return errors.Join(cancellation, ck.Wait(context.Background()))
 			}
 		}
 	}
 }
 
-func (ck *CommandKernel) submit(
-	ctx context.Context,
-	request Request,
-	terminal chan error,
-) error {
+func (ck *CommandKernel) submit(ctx context.Context, request Request, terminal chan error) error {
 	return ck.submitWithPlan(ctx, request, WorkPlan{}, false, terminal)
 }
 
@@ -171,14 +132,10 @@ func (ck *CommandKernel) submitWithPlan(
 		return err
 	}
 	if prepared && request.Source != lifecycle.SourceJobManager {
-		return errors.New(
-			"jobmgr kernel: only Job Manager commands accept prepared plans",
-		)
+		return errors.New("jobmgr kernel: only Job Manager commands accept prepared plans")
 	}
 	if !prepared && request.Source != lifecycle.SourceFunction {
-		return errors.New(
-			"jobmgr kernel: Job Manager commands require prepared plans",
-		)
+		return errors.New("jobmgr kernel: Job Manager commands require prepared plans")
 	}
 	request.Args = slices.Clone(request.Args)
 	if prepared {
@@ -225,8 +182,7 @@ func (ck *CommandKernel) enqueueSubmission(ctx context.Context, source lifecycle
 	continuation := submitted.composite != nil
 	for {
 		ck.submissionMu.Lock()
-		if (!continuation && ck.submissionClosed) ||
-			(continuation && ck.continuationClosed) {
+		if (!continuation && ck.submissionClosed) || (continuation && ck.continuationClosed) {
 			ck.submissionMu.Unlock()
 			return ck.stoppingError()
 		}
@@ -286,7 +242,8 @@ func (ck *CommandKernel) Reject(ctx context.Context, uid string, status lifecycl
 	if err := (lifecycle.ControlFramePlan{UID: uid, Status: status, Expiry: 1}).Validate(); err != nil {
 		return err
 	}
-	if status != lifecycle.ControlBadRequest && status != lifecycle.ControlPayloadTooLarge && status != lifecycle.ControlCancelled {
+	if status != lifecycle.ControlBadRequest && status != lifecycle.ControlPayloadTooLarge &&
+		status != lifecycle.ControlCancelled {
 		return errors.New("jobmgr kernel: invalid pre-admission control status")
 	}
 	result := make(chan error, 1)

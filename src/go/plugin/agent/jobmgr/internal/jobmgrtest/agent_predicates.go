@@ -54,10 +54,7 @@ var agentRuntimeScenarios = map[AgentScenario]func(context.Context) error{
 }
 
 func AgentScenarios() map[AgentScenario]struct{} {
-	scenarios := make(
-		map[AgentScenario]struct{},
-		len(agentRuntimeScenarios),
-	)
+	scenarios := make(map[AgentScenario]struct{}, len(agentRuntimeScenarios))
 	for scenario := range agentRuntimeScenarios {
 		scenarios[scenario] = struct{}{}
 	}

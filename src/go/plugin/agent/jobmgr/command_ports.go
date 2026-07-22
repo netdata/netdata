@@ -43,9 +43,7 @@ type Request struct {
 // Validate checks the bounded request invariants independent of mutable
 // orchestration state.
 func (r Request) Validate() error {
-	if lifecycle.ValidateUID(r.UID) != nil ||
-		r.Route == "" ||
-		!r.Source.Valid() {
+	if lifecycle.ValidateUID(r.UID) != nil || r.Route == "" || !r.Source.Valid() {
 		return errors.New("jobmgr: invalid request")
 	}
 	if (r.Source == lifecycle.SourceJobManager && r.LaneKey == "") ||
@@ -67,8 +65,7 @@ func (r Request) Validate() error {
 		}
 		argumentBytes += len(argument)
 	}
-	if len(r.Payload) > functionwire.MaximumInputBodyBytes ||
-		!r.HasPayload && len(r.Payload) != 0 {
+	if len(r.Payload) > functionwire.MaximumInputBodyBytes || !r.HasPayload && len(r.Payload) != 0 {
 		return errors.New("jobmgr: invalid input payload")
 	}
 	return nil

@@ -17,25 +17,15 @@ func TestSchedulerTicksEachJobAndModuleOnce(t *testing.T) {
 	scheduler, err := NewScheduler(reconciler)
 	require.NoError(t, err)
 	jobs := map[string]*schedulerTestJob{
-		"first": {
-			id: "first", module: "module-a",
-		},
-		"second": {
-			id: "second", module: "module-a",
-		},
-		"third": {
-			id: "third", module: "module-b",
-		},
+		"first":  {id: "first", module: "module-a"},
+		"second": {id: "second", module: "module-a"},
+		"third":  {id: "third", module: "module-b"},
 	}
 	order := []string{"first", "second", "third"}
 	for _, name := range order {
 		job := jobs[name]
 
-		require.NoError(t, scheduler.Register(
-			lifecycle.ResourceIdentity{ID: name, Generation: 1},
-			job,
-		),
-		)
+		require.NoError(t, scheduler.Register(lifecycle.ResourceIdentity{ID: name, Generation: 1}, job))
 	}
 
 	require.NoError(t, scheduler.Tick(context.Background(), 7))
@@ -48,11 +38,7 @@ func TestSchedulerTicksEachJobAndModuleOnce(t *testing.T) {
 	require.ElementsMatch(t, []string{"module-a", "module-b"}, reconciler.snapshot())
 
 	for name, job := range jobs {
-		require.NoError(t, scheduler.Unregister(
-			lifecycle.ResourceIdentity{ID: name, Generation: 1},
-			job,
-		),
-		)
+		require.NoError(t, scheduler.Unregister(lifecycle.ResourceIdentity{ID: name, Generation: 1}, job))
 	}
 	require.NoError(t, scheduler.Tick(context.Background(), 8))
 
@@ -65,12 +51,8 @@ func TestSchedulerGrowsBeyondFormerActiveJobLimit(t *testing.T) {
 	tests := map[string]struct {
 		population int
 	}{
-		"former limit": {
-			population: 256,
-		},
-		"former limit plus one": {
-			population: 257,
-		},
+		"former limit":          {population: 256},
+		"former limit plus one": {population: 257},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -81,14 +63,7 @@ func TestSchedulerGrowsBeyondFormerActiveJobLimit(t *testing.T) {
 				id := fmt.Sprintf("dynamic-job-%03d", index)
 				job := &schedulerTestJob{id: id, module: "module"}
 
-				require.NoError(t, scheduler.Register(
-					lifecycle.ResourceIdentity{
-						ID:         id,
-						Generation: 1,
-					},
-					job,
-				),
-				)
+				require.NoError(t, scheduler.Register(lifecycle.ResourceIdentity{ID: id, Generation: 1}, job))
 
 				jobs = append(jobs, job)
 			}
@@ -97,14 +72,7 @@ func TestSchedulerGrowsBeyondFormerActiveJobLimit(t *testing.T) {
 				require.EqualValues(t, 1, job.ticks, "job=%s", job.id)
 			}
 			for _, job := range jobs {
-				require.NoError(t, scheduler.Unregister(
-					lifecycle.ResourceIdentity{
-						ID:         job.id,
-						Generation: 1,
-					},
-					job,
-				),
-				)
+				require.NoError(t, scheduler.Unregister(lifecycle.ResourceIdentity{ID: job.id, Generation: 1}, job))
 			}
 			require.NoError(t, scheduler.Tick(context.Background(), 2))
 			for _, job := range jobs {
@@ -148,10 +116,7 @@ type schedulerTestReconciler struct {
 	modules []string
 }
 
-func (str *schedulerTestReconciler) ReconcileModule(
-	_ context.Context,
-	module string,
-) error {
+func (str *schedulerTestReconciler) ReconcileModule(_ context.Context, module string) error {
 	str.mu.Lock()
 	str.modules = append(str.modules, module)
 	str.mu.Unlock()

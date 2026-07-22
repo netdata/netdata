@@ -30,9 +30,7 @@ func TestServiceDiscoveryBindingCapturesTypedInvocationOutput(t *testing.T) {
 		},
 		"result and notification": {
 			emit: func(binding *serviceDiscoveryBinding) {
-				binding.FunctionResult(dyncfg.Result{
-					UID: "uid", Code: 204, ContentType: "application/json",
-				})
+				binding.FunctionResult(dyncfg.Result{UID: "uid", Code: 204, ContentType: "application/json"})
 				binding.ConfigStatus("go.d:sd:type:job", dyncfg.StatusRunning)
 			},
 			wantResult: "FUNCTION_RESULT_BEGIN result 204 application/json 1\n" +
@@ -53,9 +51,7 @@ func TestServiceDiscoveryBindingCapturesTypedInvocationOutput(t *testing.T) {
 		},
 		"different result UID": {
 			emit: func(binding *serviceDiscoveryBinding) {
-				binding.FunctionResult(dyncfg.Result{
-					UID: "other", Code: 200, ContentType: "application/json",
-				})
+				binding.FunctionResult(dyncfg.Result{UID: "other", Code: 200, ContentType: "application/json"})
 			},
 			wantError: "result UID differs from invocation",
 		},
@@ -117,9 +113,7 @@ func TestServiceDiscoveryBindingRejectsResultOutsideInvocation(t *testing.T) {
 	binding, err := newServiceDiscoveryBinding("go.d", frames)
 	require.NoError(t, err)
 
-	binding.FunctionResult(dyncfg.Result{
-		UID: "late", Code: 200, ContentType: "application/json",
-	})
+	binding.FunctionResult(dyncfg.Result{UID: "late", Code: 200, ContentType: "application/json"})
 	_, _, err = binding.invoke("next", func() {})
 
 	require.ErrorContains(t, err, "result outside invocation")

@@ -55,10 +55,7 @@ type FunctionCleanupPlan struct {
 
 // NewFunctionCleanupPlan seals a non-empty cleanup plan before the catalog
 // enters a kernel-owned transition. The zero plan represents no cleanup.
-func NewFunctionCleanupPlan(
-	ref FunctionCleanupRef,
-	work lifecycle.TaskWork,
-) (FunctionCleanupPlan, error) {
+func NewFunctionCleanupPlan(ref FunctionCleanupRef, work lifecycle.TaskWork) (FunctionCleanupPlan, error) {
 	if !ref.Valid() || work == nil {
 		return FunctionCleanupPlan{}, errors.New("jobmgr kernel: invalid Function cleanup plan")
 	}
@@ -131,8 +128,7 @@ func (fcd FunctionCatalogDecision) validate() error {
 	if fcd.Plan.NoResponse {
 		return errors.New("jobmgr kernel: Function catalog returned internal work")
 	}
-	if fcd.Plan.Transaction != nil &&
-		fcd.Plan.Transaction.ID != fcd.ResourceID {
+	if fcd.Plan.Transaction != nil && fcd.Plan.Transaction.ID != fcd.ResourceID {
 		return errors.New("jobmgr kernel: Function transaction resource identity differs")
 	}
 	return fcd.Plan.validate()

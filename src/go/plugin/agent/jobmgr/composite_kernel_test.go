@@ -16,17 +16,10 @@ import (
 
 type compositeTestTransaction struct {
 	scope lifecycle.ResourceTransactionScope
-	apply func(
-		context.Context,
-		CompositeCommandScope,
-	) error
+	apply func(context.Context, CompositeCommandScope) error
 }
 
-func compositeTestPlan(
-	id string,
-	claims []string,
-	onApply func(),
-) WorkPlan {
+func compositeTestPlan(id string, claims []string, onApply func()) WorkPlan {
 	return WorkPlan{
 		Claims:     claims,
 		NoResponse: true,
@@ -38,10 +31,7 @@ func compositeTestPlan(
 				scope lifecycle.ResourceTransactionScope,
 				permit lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
-				return &simpleCompositeChildTransaction{
-					scope: scope,
-					apply: onApply, permit: permit,
-				}, nil
+				return &simpleCompositeChildTransaction{scope: scope, apply: onApply, permit: permit}, nil
 			},
 		},
 	}
@@ -63,19 +53,13 @@ func compositeParentTestPlan(
 				scope lifecycle.ResourceTransactionScope,
 				_ lifecycle.LongLivedPermit,
 			) (PreparedCompositeResourceTransaction, error) {
-				return &compositeTestTransaction{
-					scope: scope,
-					apply: apply,
-				}, nil
+				return &compositeTestTransaction{scope: scope, apply: apply}, nil
 			},
 		},
 	}
 }
 
-func stopCompositeTestKernel(
-	t *testing.T,
-	kernel *testCommandKernel,
-) {
+func stopCompositeTestKernel(t *testing.T, kernel *testCommandKernel) {
 	t.Helper()
 	kernel.Stop()
 	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -85,11 +69,7 @@ func stopCompositeTestKernel(
 	require.False(t, err != nil && !errors.Is(err, ErrStopped))
 }
 
-func waitForAdmittedOperations(
-	t *testing.T,
-	observer *kernelRuntimeObserver,
-	count int,
-) {
+func waitForAdmittedOperations(t *testing.T, observer *kernelRuntimeObserver, count int) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)
 	for {
@@ -117,9 +97,7 @@ func (ctt *compositeTestTransaction) ApplyComposite(
 	return compositeTestApplied(ctt.scope)
 }
 
-func (ctt *compositeTestTransaction) Dispose(
-	context.Context,
-) (lifecycle.ReadyResource, error) {
+func (ctt *compositeTestTransaction) Dispose(context.Context) (lifecycle.ReadyResource, error) {
 	return nil, nil
 }
 
@@ -133,9 +111,7 @@ func (scct *simpleCompositeChildTransaction) Scope() lifecycle.ResourceTransacti
 	return scct.scope
 }
 
-func (scct *simpleCompositeChildTransaction) Apply(
-	context.Context,
-) (lifecycle.AppliedResourceTransaction, error) {
+func (scct *simpleCompositeChildTransaction) Apply(context.Context) (lifecycle.AppliedResourceTransaction, error) {
 	if scct.apply != nil {
 		scct.apply()
 	}
@@ -148,9 +124,7 @@ func (scct *simpleCompositeChildTransaction) Apply(
 	return compositeTestApplied(scct.scope)
 }
 
-func (scct *simpleCompositeChildTransaction) Dispose(
-	context.Context,
-) (lifecycle.ReadyResource, error) {
+func (scct *simpleCompositeChildTransaction) Dispose(context.Context) (lifecycle.ReadyResource, error) {
 	if !scct.permit.Valid() {
 		return nil, nil
 	}
@@ -159,9 +133,7 @@ func (scct *simpleCompositeChildTransaction) Dispose(
 	return nil, err
 }
 
-func compositeTestApplied(
-	scope lifecycle.ResourceTransactionScope,
-) (lifecycle.AppliedResourceTransaction, error) {
+func compositeTestApplied(scope lifecycle.ResourceTransactionScope) (lifecycle.AppliedResourceTransaction, error) {
 	result, err := lifecycle.NewSealedResult(204, "text/plain", nil)
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
@@ -175,13 +147,8 @@ func compositeTestApplied(
 	)
 }
 
-func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
-	t *testing.T,
-) {
-	kernel, run, _, _ := newKernelWithPlanner(
-		t,
-		stoppedKernelPlanner{},
-	)
+func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(t *testing.T) {
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	startKernelLoop(t, kernel)
 
 	require.NoError(t, run.OpenAdmission())
@@ -193,10 +160,7 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 	normalApplied := make(chan struct{})
 	parentDone := make(chan error, 1)
 
-	transactionPlan := func(
-		id string,
-		onApply func(),
-	) *ResourceTransactionPlan {
+	transactionPlan := func(id string, onApply func()) *ResourceTransactionPlan {
 		return &ResourceTransactionPlan{
 			ID: id,
 			Prepare: func(
@@ -206,9 +170,7 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 				lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
 				return &simpleCompositeChildTransaction{
-					scope: lifecycle.ResourceTransactionScope{
-						ID: id,
-					},
+					scope: lifecycle.ResourceTransactionScope{ID: id},
 					apply: onApply,
 				}, nil
 			},
@@ -236,10 +198,7 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 			) (PreparedCompositeResourceTransaction, error) {
 				return &compositeTestTransaction{
 					scope: scope,
-					apply: func(
-						ctx context.Context,
-						commands CompositeCommandScope,
-					) error {
+					apply: func(ctx context.Context, commands CompositeCommandScope) error {
 						close(parentEntered)
 						select {
 						case <-submitChild:
@@ -313,7 +272,12 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 	select {
 	case <-normalApplied:
 	case <-time.After(time.Second):
-		require.FailNowf(t, "test failed", "normal claim waiter did not run after parent release: dirty=%v", run.DirtyCause())
+		require.FailNowf(
+			t,
+			"test failed",
+			"normal claim waiter did not run after parent release: dirty=%v",
+			run.DirtyCause(),
+		)
 	}
 	mu.Lock()
 	got := append([]string(nil), applied...)
@@ -333,61 +297,29 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 	tests := map[string]struct {
 		suffix string
-		submit func(
-			context.Context,
-			CompositeCommandScope,
-			Request,
-			WorkPlan,
-		) error
+		submit func(context.Context, CompositeCommandScope, Request, WorkPlan) error
 	}{
 		"normal child": {
 			suffix: "normal",
-			submit: func(
-				ctx context.Context,
-				commands CompositeCommandScope,
-				request Request,
-				plan WorkPlan,
-			) error {
-				return commands.SubmitPreparedAndWait(
-					ctx,
-					request,
-					plan,
-				)
+			submit: func(ctx context.Context, commands CompositeCommandScope, request Request, plan WorkPlan) error {
+				return commands.SubmitPreparedAndWait(ctx, request, plan)
 			},
 		},
 		"rollback child": {
 			suffix: "rollback",
-			submit: func(
-				_ context.Context,
-				commands CompositeCommandScope,
-				request Request,
-				plan WorkPlan,
-			) error {
-				return commands.SubmitRollbackAndWait(
-					request,
-					plan,
-				)
+			submit: func(_ context.Context, commands CompositeCommandScope, request Request, plan WorkPlan) error {
+				return commands.SubmitRollbackAndWait(request, plan)
 			},
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			kernel, run, _, _ := newKernelWithPlanner(
-				t,
-				stoppedKernelPlanner{},
-			)
+			kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 			startKernelLoop(t, kernel)
 			require.NoError(t, run.OpenAdmission())
-			probeCtx, cancelProbe := context.WithTimeout(
-				context.Background(),
-				time.Second,
-			)
+			probeCtx, cancelProbe := context.WithTimeout(context.Background(), time.Second)
 			defer cancelProbe()
-			probe, err := startShutdownProbe(
-				probeCtx,
-				kernel.CommandKernel,
-				"composite-shutdown-probe-"+test.suffix,
-			)
+			probe, err := startShutdownProbe(probeCtx, kernel.CommandKernel, "composite-shutdown-probe-"+test.suffix)
 			require.NoError(t, err)
 
 			parentEntered := make(chan struct{})
@@ -407,10 +339,7 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 					compositeParentTestPlan(
 						parentID,
 						[]string{"graph"},
-						func(
-							ctx context.Context,
-							commands CompositeCommandScope,
-						) error {
+						func(ctx context.Context, commands CompositeCommandScope) error {
 							close(parentEntered)
 							<-submitChild
 							return test.submit(
@@ -436,18 +365,11 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 			select {
 			case <-parentEntered:
 			case <-time.After(time.Second):
-				require.FailNow(
-					t,
-					"test failed",
-					"composite parent did not enter apply",
-				)
+				require.FailNow(t, "test failed", "composite parent did not enter apply")
 			}
 
 			kernel.Stop()
-			shutdownCtx, cancelShutdown := context.WithTimeout(
-				context.Background(),
-				time.Second,
-			)
+			shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), time.Second)
 			defer cancelShutdown()
 			require.NoError(t, probe.waitCancellation(shutdownCtx))
 			close(submitChild)
@@ -455,26 +377,15 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 			select {
 			case <-childApplied:
 			case <-time.After(time.Second):
-				require.FailNow(
-					t,
-					"test failed",
-					"post-cut composite child did not apply",
-				)
+				require.FailNow(t, "test failed", "post-cut composite child did not apply")
 			}
 			select {
 			case err := <-parentDone:
 				require.NoError(t, err)
 			case <-time.After(time.Second):
-				require.FailNow(
-					t,
-					"test failed",
-					"post-cut composite parent did not settle",
-				)
+				require.FailNow(t, "test failed", "post-cut composite parent did not settle")
 			}
-			waitCtx, cancelWait := context.WithTimeout(
-				context.Background(),
-				time.Second,
-			)
+			waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second)
 			defer cancelWait()
 			require.NoError(t, kernel.Wait(waitCtx))
 			require.NoError(t, probe.waitSettlement(waitCtx))
@@ -484,10 +395,7 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 }
 
 func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
-	kernel, run, _, _ := newKernelWithPlanner(
-		t,
-		stoppedKernelPlanner{},
-	)
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	startKernelLoop(t, kernel)
 
 	require.NoError(t, run.OpenAdmission())
@@ -496,10 +404,7 @@ func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
 	parentPlan := compositeParentTestPlan(
 		"parent",
 		[]string{"graph"},
-		func(
-			ctx context.Context,
-			commands CompositeCommandScope,
-		) error {
+		func(ctx context.Context, commands CompositeCommandScope) error {
 			childErr <- commands.SubmitPreparedAndWait(
 				ctx,
 				Request{
@@ -508,11 +413,7 @@ func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
 					Source:  lifecycle.SourceJobManager,
 					Route:   "internal/test/same-lane-child",
 				},
-				compositeTestPlan(
-					"parent",
-					[]string{"graph"},
-					nil,
-				),
+				compositeTestPlan("parent", []string{"graph"}, nil),
 			)
 			return nil
 		},
@@ -549,13 +450,8 @@ func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
 	stopCompositeTestKernel(t, kernel)
 }
 
-func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
-	t *testing.T,
-) {
-	kernel, run, _, _ := newKernelWithPlanner(
-		t,
-		stoppedKernelPlanner{},
-	)
+func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(t *testing.T) {
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	observer := &kernelRuntimeObserver{}
 	require.NoError(t, kernel.BindRuntimeObserver(observer))
 	startKernelLoop(t, kernel)
@@ -603,10 +499,7 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 			compositeParentTestPlan(
 				"parent",
 				[]string{"graph"},
-				func(
-					ctx context.Context,
-					commands CompositeCommandScope,
-				) error {
+				func(ctx context.Context, commands CompositeCommandScope) error {
 					close(parentEntered)
 					<-submitChild
 					return commands.SubmitPreparedAndWait(
@@ -688,13 +581,8 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 	stopCompositeTestKernel(t, kernel)
 }
 
-func TestCompositeFenceAcceptsButDefersConflictingWorkWithoutBlockingUnrelatedWork(
-	t *testing.T,
-) {
-	kernel, run, _, _ := newKernelWithPlanner(
-		t,
-		stoppedKernelPlanner{},
-	)
+func TestCompositeFenceAcceptsButDefersConflictingWorkWithoutBlockingUnrelatedWork(t *testing.T) {
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	startKernelLoop(t, kernel)
 
 	require.NoError(t, run.OpenAdmission())
@@ -714,10 +602,7 @@ func TestCompositeFenceAcceptsButDefersConflictingWorkWithoutBlockingUnrelatedWo
 			compositeParentTestPlan(
 				"fence-parent",
 				[]string{"graph"},
-				func(
-					ctx context.Context,
-					commands CompositeCommandScope,
-				) error {
+				func(ctx context.Context, commands CompositeCommandScope) error {
 					return commands.SubmitPreparedAndWait(
 						ctx,
 						Request{
@@ -849,13 +734,8 @@ func TestCompositeFenceAcceptsButDefersConflictingWorkWithoutBlockingUnrelatedWo
 	stopCompositeTestKernel(t, kernel)
 }
 
-func TestCompositeChildRunsWhileParentOwnsFence(
-	t *testing.T,
-) {
-	kernel, run, _, _ := newKernelWithPlanner(
-		t,
-		stoppedKernelPlanner{},
-	)
+func TestCompositeChildRunsWhileParentOwnsFence(t *testing.T) {
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	startKernelLoop(t, kernel)
 
 	require.NoError(t, run.OpenAdmission())
@@ -877,10 +757,7 @@ func TestCompositeChildRunsWhileParentOwnsFence(
 			compositeParentTestPlan(
 				"parent",
 				[]string{"graph"},
-				func(
-					ctx context.Context,
-					commands CompositeCommandScope,
-				) error {
+				func(ctx context.Context, commands CompositeCommandScope) error {
 					close(parentEntered)
 					<-submitChild
 					return commands.SubmitPreparedAndWait(

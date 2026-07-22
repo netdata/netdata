@@ -84,15 +84,11 @@ func NewProcess(config Config) (*Process, error) {
 		len(config.Modules) == 0 ||
 		len(config.Defaults) == 0 ||
 		len(config.DiscoveryProviders) == 0 {
-		return nil, errors.New(
-			"jobmgr composition: incomplete production configuration",
-		)
+		return nil, errors.New("jobmgr composition: incomplete production configuration")
 	}
 	modules := maps.Clone(config.Modules)
 	defaults := maps.Clone(config.Defaults)
-	providers, err := agentdiscovery.NewProviderCatalog(
-		slices.Clone(config.DiscoveryProviders),
-	)
+	providers, err := agentdiscovery.NewProviderCatalog(slices.Clone(config.DiscoveryProviders))
 	if err != nil {
 		return nil, err
 	}
@@ -104,16 +100,10 @@ func NewProcess(config Config) (*Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	initialVnodes := make(
-		map[string]*vnodes.VirtualNode,
-		len(config.InitialVnodes),
-	)
+	initialVnodes := make(map[string]*vnodes.VirtualNode, len(config.InitialVnodes))
 	for id, vnode := range config.InitialVnodes {
 		if vnode == nil {
-			return nil, fmt.Errorf(
-				"jobmgr composition: initial vnode %q is nil",
-				id,
-			)
+			return nil, fmt.Errorf("jobmgr composition: initial vnode %q is nil", id)
 		}
 		initialVnodes[id] = vnode.Copy()
 	}
@@ -122,9 +112,7 @@ func NewProcess(config Config) (*Process, error) {
 		build.Identity.Name = config.PluginName
 	}
 	if build.Identity.Name != config.PluginName {
-		return nil, errors.New(
-			"jobmgr composition: discovery identity differs from plugin",
-		)
+		return nil, errors.New("jobmgr composition: discovery identity differs from plugin")
 	}
 	build.Registry = defaults
 	build.DyncfgOutput = dyncfg.NewProtocolOutput(config.Output)
@@ -155,9 +143,7 @@ func NewProcess(config Config) (*Process, error) {
 			Vnodes:        vnoderegistry.New(),
 			InitialVnodes: initialVnodes,
 		},
-		Secrets: runSecretServices{
-			Initial: initialSecrets,
-		},
+		Secrets: runSecretServices{Initial: initialSecrets},
 		Discovery: runDiscoveryServices{
 			BuildContext: build,
 			Providers:    providers,
@@ -190,10 +176,7 @@ func (p *Process) Run(ctx context.Context) error {
 	p.mu.Unlock()
 
 	if p.runtime != nil {
-		p.runtime.Start(
-			p.pluginName,
-			joboutput.FrameWriter{Owner: p.core.frames},
-		)
+		p.runtime.Start(p.pluginName, joboutput.FrameWriter{Owner: p.core.frames})
 	}
 	result := p.core.run(ctx, p.commands)
 	p.mu.Lock()
@@ -211,10 +194,7 @@ func (p *Process) Terminate(ctx context.Context) error {
 	return p.send(ctx, processTerminate)
 }
 
-func (p *Process) send(
-	ctx context.Context,
-	command processCommand,
-) error {
+func (p *Process) send(ctx context.Context, command processCommand) error {
 	if p == nil || ctx == nil {
 		return errors.New("jobmgr composition: invalid process command")
 	}
@@ -232,10 +212,7 @@ func (p *Process) send(
 	}
 	result := make(chan error, 1)
 	select {
-	case p.commands <- processControl{
-		command: command,
-		result:  result,
-	}:
+	case p.commands <- processControl{command: command, result: result}:
 	case <-p.done:
 		return ErrProcessStopped
 	case <-ctx.Done():
@@ -256,24 +233,16 @@ func (p *Process) send(
 	}
 }
 
-func cloneSecretConfigs(
-	configs []secretstore.Config,
-) ([]secretstore.Config, error) {
+func cloneSecretConfigs(configs []secretstore.Config) ([]secretstore.Config, error) {
 	cloned := make([]secretstore.Config, len(configs))
 	for index, config := range configs {
 		payload, err := yaml.Marshal(config)
 		if err != nil {
-			return nil, errors.Join(
-				errors.New("jobmgr composition: clone initial secret configuration"),
-				err,
-			)
+			return nil, errors.Join(errors.New("jobmgr composition: clone initial secret configuration"), err)
 		}
 		var clone secretstore.Config
 		if err := yaml.Unmarshal(payload, &clone); err != nil {
-			return nil, errors.Join(
-				errors.New("jobmgr composition: clone initial secret configuration"),
-				err,
-			)
+			return nil, errors.Join(errors.New("jobmgr composition: clone initial secret configuration"), err)
 		}
 		cloned[index] = clone
 	}

@@ -16,25 +16,17 @@ import (
 
 type testRunShutdownBarrierFunc func(context.Context, uint64) error
 
-func (fn testRunShutdownBarrierFunc) BeforeFunctionCatalogClose(
-	ctx context.Context,
-	generation uint64,
-) error {
+func (fn testRunShutdownBarrierFunc) BeforeFunctionCatalogClose(ctx context.Context, generation uint64) error {
 	return fn(ctx, generation)
 }
 
 type testRunFinalizerFunc func(context.Context, uint64) error
 
-func (fn testRunFinalizerFunc) FinalizeRun(
-	ctx context.Context,
-	generation uint64,
-) error {
+func (fn testRunFinalizerFunc) FinalizeRun(ctx context.Context, generation uint64) error {
 	return fn(ctx, generation)
 }
 
-func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
-	t *testing.T,
-) {
+func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(t *testing.T) {
 	const population = 300
 
 	declarations := testCleanupDeclarations(population)
@@ -91,10 +83,7 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 	closeCleanupIntegrationUIDs(t, uids)
 }
 
-func closeCleanupIntegrationUIDs(
-	t *testing.T,
-	uids *lifecycle.UIDLedger,
-) {
+func closeCleanupIntegrationUIDs(t *testing.T, uids *lifecycle.UIDLedger) {
 	t.Helper()
 	for {
 		more, err := uids.CloseBatch(lifecycle.UIDReturnBatch)

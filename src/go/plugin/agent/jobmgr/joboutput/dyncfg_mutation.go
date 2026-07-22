@@ -49,11 +49,8 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 	retry autoDetectionRetryToken,
 	failurePlans ...successorFailurePlan,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if len(failurePlans) > 1 ||
-		len(failurePlans) == 1 && successor == nil {
-		return nil, errors.New(
-			"job output: invalid successor-failure plan",
-		)
+	if len(failurePlans) > 1 || len(failurePlans) == 1 && successor == nil {
+		return nil, errors.New("job output: invalid successor-failure plan")
 	}
 	var failurePlan *successorFailurePlan
 	if len(failurePlans) == 1 {
@@ -64,10 +61,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 	var removedDependencyCommit func()
 	if dcjc.dependencies != nil {
 		var err error
-		dependencyCommit, err = dcjc.dependencies.PrepareJobChange(
-			scope.ID,
-			postimage,
-		)
+		dependencyCommit, err = dcjc.dependencies.PrepareJobChange(scope.ID, postimage)
 		if err != nil {
 			if successor != nil {
 				err = rollbackSuccessorMutation(successor, err)
@@ -75,29 +69,16 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 			return nil, err
 		}
 		if failurePlan != nil {
-			failedDependencyCommit, err =
-				dcjc.dependencies.PrepareJobChange(
-					scope.ID,
-					&failurePlan.postimage,
-				)
-			if err == nil &&
-				failurePlan.removePlainStock {
-				removedDependencyCommit, err =
-					dcjc.dependencies.PrepareJobChange(
-						scope.ID,
-						nil,
-					)
+			failedDependencyCommit, err = dcjc.dependencies.PrepareJobChange(scope.ID, &failurePlan.postimage)
+			if err == nil && failurePlan.removePlainStock {
+				removedDependencyCommit, err = dcjc.dependencies.PrepareJobChange(scope.ID, nil)
 			}
 			if err != nil {
 				return nil, rollbackSuccessorMutation(successor, err)
 			}
 		}
 	}
-	mutation, err := dcjc.graph.PrepareMutation(
-		[]dyncfg.GraphChange{{
-			ID: scope.ID, Config: postimage,
-		}},
-	)
+	mutation, err := dcjc.graph.PrepareMutation([]dyncfg.GraphChange{{ID: scope.ID, Config: postimage}})
 	if errors.Is(err, dyncfg.ErrGraphNoChange) {
 		if successor != nil {
 			return dcjc.prepareResourceTransaction(
@@ -106,11 +87,8 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 					Current: current, Successor: successor,
 					Graph:            dcjc.graph,
 					AfterGraphCommit: dependencyCommit,
-					AfterApply: dcjc.retrySettlement(
-						scope.ID,
-						retry,
-					),
-					Result: result, Cleanup: cleanup,
+					AfterApply:       dcjc.retrySettlement(scope.ID, retry),
+					Result:           result, Cleanup: cleanup,
 					SuccessorFailure: successorFailureResolver(
 						failurePlan,
 						failedDependencyCommit,
@@ -144,19 +122,12 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 			AfterGraphCommit: dependencyCommit,
 			AfterApply:       dcjc.retrySettlement(scope.ID, retry),
 			Result:           result, Cleanup: cleanup,
-			SuccessorFailure: successorFailureResolver(
-				failurePlan,
-				failedDependencyCommit,
-				removedDependencyCommit,
-			),
+			SuccessorFailure: successorFailureResolver(failurePlan, failedDependencyCommit, removedDependencyCommit),
 		},
 	)
 }
 
-func (dcjc *DynCfgJobController) retrySettlement(
-	id string,
-	token autoDetectionRetryToken,
-) func() {
+func (dcjc *DynCfgJobController) retrySettlement(id string, token autoDetectionRetryToken) func() {
 	if token.generation == 0 {
 		return func() {
 			dcjc.scheduler.retries.cancel(id)
@@ -179,10 +150,7 @@ func (dcjc *DynCfgJobController) prepareResourceTransaction(
 		rollbackErr = spec.Graph.Abort(spec.Mutation)
 	}
 	if spec.Successor != nil {
-		rollbackErr = errors.Join(
-			rollbackErr,
-			rejectPreparedSuccessor(context.Background(), spec.Successor),
-		)
+		rollbackErr = errors.Join(rollbackErr, rejectPreparedSuccessor(context.Background(), spec.Successor))
 	}
 	err = errors.Join(err, rollbackErr)
 	if rollbackErr != nil {
@@ -191,20 +159,11 @@ func (dcjc *DynCfgJobController) prepareResourceTransaction(
 	return nil, err
 }
 
-func (dcjc *DynCfgJobController) scheduleAutoDetectionRetry(
-	config confgroup.Config,
-	failure *autoDetectionFailure,
-) {
-	if dcjc == nil ||
-		dcjc.scheduler == nil ||
-		failure == nil ||
-		!failure.retry {
+func (dcjc *DynCfgJobController) scheduleAutoDetectionRetry(config confgroup.Config, failure *autoDetectionFailure) {
+	if dcjc == nil || dcjc.scheduler == nil || failure == nil || !failure.retry {
 		return
 	}
-	dcjc.scheduler.retries.schedule(
-		config,
-		failure.retryAfter,
-	)
+	dcjc.scheduler.retries.schedule(config, failure.retryAfter)
 }
 
 type successorFailurePlan struct {
@@ -220,23 +179,15 @@ func successorFailureResolver(
 	plan *successorFailurePlan,
 	failedDependencyCommit func(),
 	removedDependencyCommit func(),
-) func(
-	*autoDetectionFailure,
-) (SuccessorFailureResolution, error) {
+) func(*autoDetectionFailure) (SuccessorFailureResolution, error) {
 	if plan == nil {
 		return nil
 	}
-	return func(
-		failure *autoDetectionFailure,
-	) (SuccessorFailureResolution, error) {
+	return func(failure *autoDetectionFailure) (SuccessorFailureResolution, error) {
 		if failure == nil {
-			return SuccessorFailureResolution{},
-				errors.New(
-					"job output: nil autodetection failure",
-				)
+			return SuccessorFailureResolution{}, errors.New("job output: nil autodetection failure")
 		}
-		removed := plan.removePlainStock &&
-			!failure.coded
+		removed := plan.removePlainStock && !failure.coded
 		postimage := plan.postimage
 		resolution := SuccessorFailureResolution{
 			Postimage:        &postimage,
@@ -245,8 +196,7 @@ func successorFailureResolver(
 		}
 		if removed {
 			resolution.Postimage = nil
-			resolution.AfterGraphCommit =
-				removedDependencyCommit
+			resolution.AfterGraphCommit = removedDependencyCommit
 			resolution.Cleanup = plan.removedCleanup
 		}
 		if plan.result != nil {
@@ -279,18 +229,13 @@ func autoDetectionFailureResultFunc(
 
 // scheduleRetryAfterApply adapts scheduleAutoDetectionRetry into a
 // successorFailurePlan.afterApply closure that reschedules the given config.
-func (dcjc *DynCfgJobController) scheduleRetryAfterApply(
-	config confgroup.Config,
-) func(*autoDetectionFailure) {
+func (dcjc *DynCfgJobController) scheduleRetryAfterApply(config confgroup.Config) func(*autoDetectionFailure) {
 	return func(failure *autoDetectionFailure) {
 		dcjc.scheduleAutoDetectionRetry(config, failure)
 	}
 }
 
-func rejectPreparedSuccessor(
-	ctx context.Context,
-	successor lifecycle.PreparedResource,
-) error {
+func rejectPreparedSuccessor(ctx context.Context, successor lifecycle.PreparedResource) error {
 	if prepared, ok := successor.(PreparedJob); ok {
 		return prepared.reject(ctx)
 	}
@@ -300,10 +245,7 @@ func rejectPreparedSuccessor(
 // rollbackSuccessorMutation rejects a prepared successor after a failed mutation
 // prep, joins the rejection error, and retains ownership when the rejection
 // itself fails so a leaked resource is never treated as released.
-func rollbackSuccessorMutation(
-	successor lifecycle.PreparedResource,
-	err error,
-) error {
+func rollbackSuccessorMutation(successor lifecycle.PreparedResource, err error) error {
 	rollbackErr := rejectPreparedSuccessor(context.Background(), successor)
 	err = errors.Join(err, rollbackErr)
 	if rollbackErr != nil {
@@ -319,14 +261,7 @@ func (dcjc *DynCfgJobController) noop(
 	result lifecycle.SealedResult,
 	cleanups ...lifecycle.TaskCleanup,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	return dcjc.noopWithAfterApply(
-		scope,
-		current,
-		permit,
-		result,
-		nil,
-		cleanups...,
-	)
+	return dcjc.noopWithAfterApply(scope, current, permit, result, nil, cleanups...)
 }
 
 func (dcjc *DynCfgJobController) noopWithAfterApply(
@@ -338,12 +273,5 @@ func (dcjc *DynCfgJobController) noopWithAfterApply(
 	cleanups ...lifecycle.TaskCleanup,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	cleanup := joinDynCfgCleanups(cleanups...)
-	return PrepareNoopResourceTransaction(
-		scope,
-		current,
-		permit,
-		result,
-		cleanup,
-		afterApply,
-	)
+	return PrepareNoopResourceTransaction(scope, current, permit, result, cleanup, afterApply)
 }

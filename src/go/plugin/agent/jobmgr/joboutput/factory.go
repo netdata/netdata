@@ -78,19 +78,13 @@ func NewFactory(config FactoryConfig) (*Factory, error) {
 	return &Factory{config: config}, nil
 }
 
-func (f *Factory) ValidateConfig(
-	ctx context.Context,
-	config confgroup.Config,
-) error {
+func (f *Factory) ValidateConfig(ctx context.Context, config confgroup.Config) error {
 	if f == nil || ctx == nil || config == nil {
 		return errors.New("job output: invalid factory validation")
 	}
 	creator, ok := f.config.Modules.Lookup(config.Module())
 	if !ok {
-		return fmt.Errorf(
-			"job output: module %q is not registered",
-			config.Module(),
-		)
+		return fmt.Errorf("job output: module %q is not registered", config.Module())
 	}
 	if err := validateFactoryConfigIdentity(config, creator); err != nil {
 		return err
@@ -99,10 +93,7 @@ func (f *Factory) ValidateConfig(
 		creator.SharedFunctions == nil &&
 		creator.AgentFunctions == nil &&
 		creator.InstanceFunctions == nil {
-		return fmt.Errorf(
-			"job output: function_only is set but module %q declares no Functions",
-			config.Module(),
-		)
+		return fmt.Errorf("job output: function_only is set but module %q declares no Functions", config.Module())
 	}
 	if _, err := f.lookupVNode(config); err != nil {
 		return err
@@ -110,11 +101,7 @@ func (f *Factory) ValidateConfig(
 	return f.config.ConfigModules.Validate(ctx, config)
 }
 
-func (f *Factory) build(
-	ctx context.Context,
-	config confgroup.Config,
-	generation uint64,
-) (ConstructedJob, error) {
+func (f *Factory) build(ctx context.Context, config confgroup.Config, generation uint64) (ConstructedJob, error) {
 	if f == nil || ctx == nil || config == nil || generation == 0 {
 		return ConstructedJob{}, errors.New("job output: invalid factory build")
 	}
@@ -126,9 +113,7 @@ func (f *Factory) build(
 		return ConstructedJob{}, err
 	}
 	functionOnly := creator.FunctionOnly || config.FunctionOnly()
-	hasFunctions := creator.SharedFunctions != nil ||
-		creator.AgentFunctions != nil ||
-		creator.InstanceFunctions != nil
+	hasFunctions := creator.SharedFunctions != nil || creator.AgentFunctions != nil || creator.InstanceFunctions != nil
 	if functionOnly && !hasFunctions {
 		return ConstructedJob{}, fmt.Errorf(
 			"job output: function_only is set but module %q declares no Functions",
@@ -139,9 +124,7 @@ func (f *Factory) build(
 	if err != nil {
 		return ConstructedJob{}, err
 	}
-	identity := lifecycle.ResourceIdentity{
-		ID: config.FullName(), Generation: generation,
-	}
+	identity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: generation}
 	var job RuntimeJob
 	var variant JobVariant
 	if creator.CreateV2 != nil {
@@ -155,23 +138,12 @@ func (f *Factory) build(
 		return ConstructedJob{}, err
 	}
 	cleanup := &factoryJobCleanup{job: job}
-	constructed, err := newManagedJob(
-		variant,
-		job,
-		f.config.Tasks,
-		identity,
-		f.config.Scheduler,
-		cleanup.reject,
-	)
+	constructed, err := newManagedJob(variant, job, f.config.Tasks, identity, f.config.Scheduler, cleanup.reject)
 	if err != nil {
-		return ConstructedJob{
-			Variant:          variant,
-			CollectorCleanup: cleanup.reject,
-		}, err
+		return ConstructedJob{Variant: variant, CollectorCleanup: cleanup.reject}, err
 	}
 	if hasFunctions && f.config.Hooks == nil {
-		return constructed,
-			errors.New("job output: function-bearing job has no handler lifecycle")
+		return constructed, errors.New("job output: function-bearing job has no handler lifecycle")
 	}
 	if hooks := f.config.Hooks; hasFunctions {
 		published := PublishedJob{Identity: identity, Job: job}
@@ -181,8 +153,7 @@ func (f *Factory) build(
 			return constructed, prepareErr
 		}
 		if handlers == nil {
-			return constructed,
-				errors.New("job output: nil prepared handler lifecycle")
+			return constructed, errors.New("job output: nil prepared handler lifecycle")
 		}
 	}
 	constructed.Observer = f.config.Observer
@@ -199,9 +170,7 @@ func (f *Factory) Prepare(
 	identity lifecycle.ResourceIdentity,
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResource, error) {
-	if f == nil || ctx == nil || config == nil ||
-		!identity.Valid() ||
-		identity.ID != config.FullName() {
+	if f == nil || ctx == nil || config == nil || !identity.Valid() || identity.ID != config.FullName() {
 		return nil, errors.New("job output: invalid factory preparation")
 	}
 	return prepareJob(
@@ -210,11 +179,7 @@ func (f *Factory) Prepare(
 		identity.Generation,
 		permit,
 		func(buildCtx context.Context) (ConstructedJob, error) {
-			return f.build(
-				buildCtx,
-				config,
-				identity.Generation,
-			)
+			return f.build(buildCtx, config, identity.Generation)
 		},
 	)
 }
@@ -245,10 +210,7 @@ func (fjc *factoryJobCleanup) final(context.Context) error {
 	return fjc.err
 }
 
-func callPrepareHandlers(
-	hooks JobHooks,
-	published PublishedJob,
-) (handlers HandlerLifecycle, err error) {
+func callPrepareHandlers(hooks JobHooks, published PublishedJob) (handlers HandlerLifecycle, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			handlers = nil
@@ -373,44 +335,29 @@ func (f *Factory) buildV2(
 	return jobruntime.NewJobV2(jobConfig), nil
 }
 
-func callFactoryModuleCleanup(
-	ctx context.Context,
-	cleanup func(context.Context),
-) error {
+func callFactoryModuleCleanup(ctx context.Context, cleanup func(context.Context)) error {
 	return callJobLifecycle("construction collector Cleanup", func() error {
 		cleanup(context.WithoutCancel(ctx))
 		return nil
 	})
 }
 
-func (f *Factory) lookupVNode(
-	config confgroup.Config,
-) (jobruntime.VnodeSnapshot, error) {
+func (f *Factory) lookupVNode(config confgroup.Config) (jobruntime.VnodeSnapshot, error) {
 	if config.Vnode() == "" {
 		return jobruntime.VnodeSnapshot{}, nil
 	}
 	if f.config.Vnode == nil {
-		return jobruntime.VnodeSnapshot{}, fmt.Errorf(
-			"job output: vnode %q is unavailable",
-			config.Vnode(),
-		)
+		return jobruntime.VnodeSnapshot{}, fmt.Errorf("job output: vnode %q is unavailable", config.Vnode())
 	}
 	vnode, ok := f.config.Vnode(config.Vnode())
 	if !ok || vnode.Vnode == nil {
-		return jobruntime.VnodeSnapshot{}, fmt.Errorf(
-			"job output: vnode %q is not registered",
-			config.Vnode(),
-		)
+		return jobruntime.VnodeSnapshot{}, fmt.Errorf("job output: vnode %q is not registered", config.Vnode())
 	}
 	return vnode, nil
 }
 
-func validateFactoryConfigIdentity(
-	config confgroup.Config,
-	creator collectorapi.Creator,
-) error {
-	if creator.InstancePolicy != collectorapi.InstancePolicySingle ||
-		config.Name() == config.Module() {
+func validateFactoryConfigIdentity(config confgroup.Config, creator collectorapi.Creator) error {
+	if creator.InstancePolicy != collectorapi.InstancePolicySingle || config.Name() == config.Module() {
 		return nil
 	}
 	return fmt.Errorf(

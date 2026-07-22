@@ -26,10 +26,6 @@ type DependentStartResult interface {
 // DependentJobPort supplies acknowledged stop/start plans without coupling the
 // secret adapter to the job-output implementation.
 type DependentJobPort interface {
-	PlanDependentStop(
-		string,
-	) (jobmgr.WorkPlan, DependentStopResult, error)
-	PlanDependentStart(
-		string,
-	) (jobmgr.WorkPlan, DependentStartResult, error)
+	PlanDependentStop(string) (jobmgr.WorkPlan, DependentStopResult, error)
+	PlanDependentStart(string) (jobmgr.WorkPlan, DependentStartResult, error)
 }

@@ -55,10 +55,7 @@ func testLongLivedJobGrowth(t *testing.T) {
 	permits := make([]LongLivedPermit, 0, formerFixedPopulation+1)
 	for index := 0; index <= formerFixedPopulation; index++ {
 		permit, issueErr := supervisor.IssueLongLivedPermit(
-			ResourceIdentity{
-				ID:         fmt.Sprintf("job-%03d", index),
-				Generation: 1,
-			},
+			ResourceIdentity{ID: fmt.Sprintf("job-%03d", index), Generation: 1},
 			plan,
 		)
 		require.NoError(t, issueErr)

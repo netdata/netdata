@@ -7,13 +7,9 @@ import (
 	"errors"
 )
 
-func (srd ShippedRootDriver) RunMatrixAvailable(
-	ctx context.Context,
-) ([]string, error) {
+func (srd ShippedRootDriver) RunMatrixAvailable(ctx context.Context) ([]string, error) {
 	if ctx == nil {
-		return nil, errors.New(
-			"jobmgr test: nil shipped-root matrix context",
-		)
+		return nil, errors.New("jobmgr test: nil shipped-root matrix context")
 	}
 	if err := srd.validateConfigs(); err != nil {
 		return nil, err

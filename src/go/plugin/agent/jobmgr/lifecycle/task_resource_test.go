@@ -15,7 +15,11 @@ import (
 func TestTaskSupervisorStopsAndFinalizesInitialReadyResource(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
-	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 3}, events: &events, panicAfterIdentity: true}
+	ready := &recordingReadyResource{
+		identity:           ResourceIdentity{ID: "job", Generation: 3},
+		events:             &events,
+		panicAfterIdentity: true,
+	}
 	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
 	completion := <-supervisor.CompletionCh()
 	require.False(t, completion.Kind != TaskOutcomeReadyResource || completion.Err != nil)
@@ -41,39 +45,18 @@ func TestTaskSupervisorStopsAndFinalizesInitialReadyResource(t *testing.T) {
 func TestTaskSupervisorStopsWithNonCancellableActionContext(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
-	ready := &recordingReadyResource{
-		identity: ResourceIdentity{ID: "job", Generation: 3},
-		events:   &events,
-	}
-	_, ref := enqueueAndDispatchTask(
-		t,
-		supervisor,
-		readyTaskPlan(
-			t,
-			SourceJobManager,
-			time.Time{},
-			ready,
-		),
-	)
+	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 3}, events: &events}
+	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
 	require.NoError(t, (<-supervisor.CompletionCh()).Err)
-	require.NoError(t, supervisor.CancelWithCause(
-		ref,
-		&StoppingRejection{Generation: 7},
-	))
+	require.NoError(t, supervisor.CancelWithCause(ref, &StoppingRejection{Generation: 7}))
 
-	require.NoError(t, supervisor.SendAction(TaskAction{
-		Ref: ref, Sequence: 2, Kind: TaskActionStopResource,
-	}))
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionStopResource}))
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
 	require.NoError(t, ready.stopContextErr)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{
-		Ref: ref, Sequence: 3, Kind: TaskActionFinalizeResource,
-	}))
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionFinalizeResource}))
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
-	require.NoError(t, supervisor.SendAction(TaskAction{
-		Ref: ref, Sequence: 4, Kind: TaskActionTerminate,
-	}))
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
 	require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
 	require.NoError(t, supervisor.Release(ref))
 }
@@ -133,10 +116,7 @@ func TestTaskSupervisorFinalizesResourceOffLoop(t *testing.T) {
 func TestTaskSupervisorDisposesResourcesWithoutExpiredWorkContext(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
-	ready := &recordingReadyResource{
-		identity: ResourceIdentity{ID: "job", Generation: 1},
-		events:   &events,
-	}
+	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events}
 	plan := readyTaskPlan(t, SourceJobManager, time.Now().Add(-time.Second), ready)
 	_, ref := enqueueAndDispatchTask(t, supervisor, plan)
 
@@ -162,7 +142,13 @@ func TestTaskSupervisorPreservesShutdownBudgetForResourceDisposal(t *testing.T) 
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events}
-	plan, err := NewShutdownReadyResourceTaskPlan(SourceJobManager, budget, TransactionTaskPhases, ready, ready.identity)
+	plan, err := NewShutdownReadyResourceTaskPlan(
+		SourceJobManager,
+		budget,
+		TransactionTaskPhases,
+		ready,
+		ready.identity,
+	)
 	require.NoError(t, err)
 	_, ref := enqueueAndDispatchTask(t, supervisor, plan)
 
@@ -209,7 +195,11 @@ func TestTaskSupervisorRetainsReadyResourceWhenAbortFails(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
 	wantFailure := errors.New("abort failed")
-	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events, abortErr: wantFailure}
+	ready := &recordingReadyResource{
+		identity: ResourceIdentity{ID: "job", Generation: 1},
+		events:   &events,
+		abortErr: wantFailure,
+	}
 	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
 	<-supervisor.CompletionCh()
 

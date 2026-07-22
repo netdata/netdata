@@ -136,17 +136,11 @@ func TestTaskSupervisorDynamicPopulationAndGenerationCheckedReuse(t *testing.T) 
 	generation, ok := previous[ref.Slot]
 	require.False(t, !ok || ref.Generation != generation+1)
 
-	stale := TaskRef{
-		Slot:       ref.Slot,
-		Generation: previous[ref.Slot],
-	}
+	stale := TaskRef{Slot: ref.Slot, Generation: previous[ref.Slot]}
 
 	require.Error(t, supervisor.Cancel(stale))
 
-	require.Error(t, supervisor.SendAction(TaskAction{
-		Ref: stale, Sequence: 2, Kind: TaskActionDispose,
-	}),
-	)
+	require.Error(t, supervisor.SendAction(TaskAction{Ref: stale, Sequence: 2, Kind: TaskActionDispose}))
 
 	require.Error(t, supervisor.Release(stale))
 
@@ -279,13 +273,14 @@ func TestTaskSupervisorPreservesAuthoritativeCancellationCause(t *testing.T) {
 		},
 	})
 
-	require.NoError(t, supervisor.CancelWithCause(
-		ref,
-		fmt.Errorf("wrapped deadline: %w", context.DeadlineExceeded),
-	))
+	require.NoError(t, supervisor.CancelWithCause(ref, fmt.Errorf("wrapped deadline: %w", context.DeadlineExceeded)))
 
 	got := <-observed
-	require.False(t, !got.ok || !got.deadline.Equal(deadline) || !errors.Is(got.err, context.DeadlineExceeded) || !errors.Is(got.cause, context.DeadlineExceeded))
+	require.False(
+		t,
+		!got.ok || !got.deadline.Equal(deadline) || !errors.Is(got.err, context.DeadlineExceeded) ||
+			!errors.Is(got.cause, context.DeadlineExceeded),
+	)
 	require.Equal(t, context.DeadlineExceeded, got.cause)
 
 	completion := <-supervisor.CompletionCh()
@@ -388,10 +383,7 @@ func TestTaskSupervisorDeliversCanonicalPendingCancellation(t *testing.T) {
 
 func TestTaskSupervisorRejectsAmbiguousPendingCancellation(t *testing.T) {
 	tests := map[string]error{
-		"joined cancellation causes": errors.Join(
-			context.Canceled,
-			context.DeadlineExceeded,
-		),
+		"joined cancellation causes":      errors.Join(context.Canceled, context.DeadlineExceeded),
 		"unrecognized cancellation cause": errors.New("test cancellation"),
 	}
 	for name, cause := range tests {
@@ -438,13 +430,23 @@ func TestTaskSupervisorChecksPhaseSequenceAndPublishesOwnedResult(t *testing.T) 
 	require.False(t, completion.Ref != ref || completion.Sequence != 1 || completion.Err != nil)
 	payload[10] = 'X'
 
-	require.Error(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionEncodeWrite, UID: "u1", Expiry: 1}))
+	require.Error(
+		t,
+		supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionEncodeWrite, UID: "u1", Expiry: 1}),
+	)
 
-	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionEncodeWrite, UID: "u1", Expiry: 1}))
+	require.NoError(
+		t,
+		supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionEncodeWrite, UID: "u1", Expiry: 1}),
+	)
 
 	ack := <-supervisor.AcknowledgementCh()
 	require.False(t, ack.Ref != ref || ack.Sequence != 2 || ack.Kind != TaskActionEncodeWrite || ack.Err != nil)
-	require.False(t, !bytes.Contains(output.Bytes(), []byte(`{"value":"original"}`)) || bytes.Contains(output.Bytes(), []byte(`{"value":"Xriginal"}`)))
+	require.False(
+		t,
+		!bytes.Contains(output.Bytes(), []byte(`{"value":"original"}`)) ||
+			bytes.Contains(output.Bytes(), []byte(`{"value":"Xriginal"}`)),
+	)
 
 	require.Error(t, supervisor.Release(ref))
 
@@ -515,7 +517,10 @@ func TestTaskSupervisorRunsCleanupBeforeExplicitTermination(t *testing.T) {
 	require.NoError(t, supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 3, Kind: TaskActionCleanup}))
 
 	acknowledgementCh := <-supervisor.AcknowledgementCh()
-	require.False(t, acknowledgementCh.Sequence != 3 || acknowledgementCh.Kind != TaskActionCleanup || acknowledgementCh.Err != nil)
+	require.False(
+		t,
+		acknowledgementCh.Sequence != 3 || acknowledgementCh.Kind != TaskActionCleanup || acknowledgementCh.Err != nil,
+	)
 
 	select {
 	case <-cleaned:
@@ -526,7 +531,11 @@ func TestTaskSupervisorRunsCleanupBeforeExplicitTermination(t *testing.T) {
 	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
 
 	acknowledgementCh2 := <-supervisor.AcknowledgementCh()
-	require.False(t, acknowledgementCh2.Sequence != 4 || acknowledgementCh2.Kind != TaskActionTerminate || acknowledgementCh2.Err != nil)
+	require.False(
+		t,
+		acknowledgementCh2.Sequence != 4 || acknowledgementCh2.Kind != TaskActionTerminate ||
+			acknowledgementCh2.Err != nil,
+	)
 
 	require.NoError(t, supervisor.Release(ref))
 }
@@ -581,10 +590,7 @@ func TestTaskSupervisorRejectsInvalidSchedulingClass(t *testing.T) {
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		}),
 	}
-	tests := map[string]TaskClass{
-		"zero":    0,
-		"unknown": 3,
-	}
+	tests := map[string]TaskClass{"zero": 0, "unknown": 3}
 	for name, class := range tests {
 		t.Run(name, func(t *testing.T) {
 			_, err := supervisor.Enqueue(class, plan)
@@ -724,7 +730,11 @@ func TestFrameOwnerControlReservationPrecedesLaterOrdinaryFrame(t *testing.T) {
 
 	require.True(t, bytes.Contains(<-writer.offered, []byte("FUNCTION_RESULT_BEGIN u1 ")))
 
-	require.ErrorIs(t, owner.TryCommitControl(ControlFramePlan{UID: "uc", Status: ControlDeadline, Expiry: 1}), ErrFrameOwnerBusy)
+	require.ErrorIs(
+		t,
+		owner.TryCommitControl(ControlFramePlan{UID: "uc", Status: ControlDeadline, Expiry: 1}),
+		ErrFrameOwnerBusy,
+	)
 
 	secondDone := make(chan error, 1)
 	go func() { secondDone <- owner.Commit(second) }()
@@ -962,7 +972,11 @@ func TestClosedControlResults(t *testing.T) {
 		ControlDeadline:        `{"errorMessage":"Deadline exceeded.","status":504}`,
 	} {
 		result, err := NewControlResult(status)
-		require.False(t, err != nil || result.status != int(status) || result.contentType != "application/json" || string(result.payload) != payload)
+		require.False(
+			t,
+			err != nil || result.status != int(status) || result.contentType != "application/json" ||
+				string(result.payload) != payload,
+		)
 	}
 
 	_, err := NewControlResult(418)
@@ -1006,13 +1020,33 @@ func TestFunctionFrameSizePreflightsBeforeAppend(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, exactEnvelope != FunctionEnvelopeBytes || exactFrame != baseFrame+len(exactUID)-1)
 	seed := []byte("unchanged")
-	encoded, err := encodeResult(seed, exactUID+"u", 200, "application/json", 1, nil, MaximumFunctionFrameBytes, FunctionEnvelopeBytes, FunctionPayloadBytes)
+	encoded, err := encodeResult(
+		seed,
+		exactUID+"u",
+		200,
+		"application/json",
+		1,
+		nil,
+		MaximumFunctionFrameBytes,
+		FunctionEnvelopeBytes,
+		FunctionPayloadBytes,
+	)
 	require.False(t, !errors.Is(err, ErrFunctionResultTooLarge) || !bytes.Equal(encoded, seed))
 
 	payload := []byte(`{"status":200}`)
 	wantSize, _, err := functionFrameSize("u-size", 200, "application/json", 1, len(payload))
 	require.NoError(t, err)
-	encoded, err = encodeResult(nil, "u-size", 200, "application/json", 1, payload, MaximumFunctionFrameBytes, FunctionEnvelopeBytes, FunctionPayloadBytes)
+	encoded, err = encodeResult(
+		nil,
+		"u-size",
+		200,
+		"application/json",
+		1,
+		payload,
+		MaximumFunctionFrameBytes,
+		FunctionEnvelopeBytes,
+		FunctionPayloadBytes,
+	)
 	require.NoError(t, err)
 	require.EqualValues(t, wantSize, len(encoded))
 }

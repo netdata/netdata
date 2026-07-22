@@ -12,24 +12,15 @@ import (
 )
 
 func TestRequestValidate(t *testing.T) {
-	valid := Request{
-		UID:     "request-1",
-		LaneKey: "job:a",
-		Source:  lifecycle.SourceJobManager,
-		Route:   "job/install",
-	}
+	valid := Request{UID: "request-1", LaneKey: "job:a", Source: lifecycle.SourceJobManager, Route: "job/install"}
 
 	tests := map[string]struct {
 		request Request
 		wantErr bool
 	}{
-		"no payload": {
-			request: valid,
-		},
+		"no payload": {request: valid},
 		"Function scheduling comes after ingress": {
-			request: Request{
-				UID: "function-1", Source: lifecycle.SourceFunction, Route: "function",
-			},
+			request: Request{UID: "function-1", Source: lifecycle.SourceFunction, Route: "function"},
 		},
 		"explicit empty payload": {
 			request: func() Request {

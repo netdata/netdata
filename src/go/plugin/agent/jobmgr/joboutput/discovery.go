@@ -36,12 +36,9 @@ func (dcjc *DynCfgJobController) planAutoDetectionRetry(
 // PlanDiscovered builds one typed, response-free graph/job reconciliation
 // plan. The caller submits it through jobmgr.PreparedCommandPort with the
 // config carried directly on the plan.
-func (dcjc *DynCfgJobController) PlanDiscovered(
-	change DiscoveredJobChange,
-) (jobmgr.WorkPlan, error) {
+func (dcjc *DynCfgJobController) PlanDiscovered(change DiscoveredJobChange) (jobmgr.WorkPlan, error) {
 	if dcjc == nil || change.Config == nil {
-		return jobmgr.WorkPlan{},
-			errors.New("job output: invalid discovered job change")
+		return jobmgr.WorkPlan{}, errors.New("job output: invalid discovered job change")
 	}
 	config, err := change.Config.Clone()
 	if err != nil {
@@ -49,36 +46,28 @@ func (dcjc *DynCfgJobController) PlanDiscovered(
 	}
 	creator, ok := dcjc.modules.Lookup(config.Module())
 	if !ok {
-		return jobmgr.WorkPlan{},
-			errors.New("job output: discovered module is not registered")
+		return jobmgr.WorkPlan{}, errors.New("job output: discovered module is not registered")
 	}
 	if err := validateFactoryConfigIdentity(config, creator); err != nil {
 		return jobmgr.WorkPlan{}, err
 	}
 	if config.FullName() == "" {
-		return jobmgr.WorkPlan{},
-			errors.New("job output: discovered config has no identity")
+		return jobmgr.WorkPlan{}, errors.New("job output: discovered config has no identity")
 	}
-	if !validDynCfgProtocolField(config.Source()) ||
-		!validDynCfgProtocolField(config.SourceType()) {
-		return jobmgr.WorkPlan{},
-			errors.New("job output: discovered config has invalid protocol metadata")
+	if !validDynCfgProtocolField(config.Source()) || !validDynCfgProtocolField(config.SourceType()) {
+		return jobmgr.WorkPlan{}, errors.New("job output: discovered config has invalid protocol metadata")
 	}
 	if change.Remove {
 		if change.Restart {
-			return jobmgr.WorkPlan{},
-				errors.New("job output: removed discovery config cannot restart")
+			return jobmgr.WorkPlan{}, errors.New("job output: removed discovery config cannot restart")
 		}
 		change.Status = ""
-	} else if change.Status != dyncfg.StatusAccepted &&
-		change.Status != dyncfg.StatusRunning {
-		return jobmgr.WorkPlan{},
-			errors.New("job output: invalid discovered config status")
+	} else if change.Status != dyncfg.StatusAccepted && change.Status != dyncfg.StatusRunning {
+		return jobmgr.WorkPlan{}, errors.New("job output: invalid discovered config status")
 	}
 	permit := lifecycle.LongLivedPlan{}
 	if change.Restart && change.Status != dyncfg.StatusRunning {
-		return jobmgr.WorkPlan{},
-			errors.New("job output: only a running discovery config can restart")
+		return jobmgr.WorkPlan{}, errors.New("job output: only a running discovery config can restart")
 	}
 	if change.Status == dyncfg.StatusRunning {
 		permit = lifecycle.NewJobLongLivedPlan()
@@ -126,27 +115,16 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 ) {
 	defer func() {
 		if resultErr != nil && change.retry.generation != 0 {
-			dcjc.scheduler.retries.cancelToken(
-				scope.ID,
-				change.retry,
-			)
+			dcjc.scheduler.retries.cancelToken(scope.ID, change.retry)
 		}
 	}()
 	record, exists := dcjc.graph.Lookup(scope.ID)
-	if err := validateGraphResourcePair(
-		record,
-		exists,
-		current,
-		scope,
-	); err != nil {
+	if err := validateGraphResourcePair(record, exists, current, scope); err != nil {
 		return nil, err
 	}
 	result := mustDynCfgMessage(204, "")
 	if change.retry.generation != 0 {
-		currentToken := dcjc.scheduler.retries.isCurrent(
-			scope.ID,
-			change.retry,
-		)
+		currentToken := dcjc.scheduler.retries.isCurrent(scope.ID, change.retry)
 		validRecord := true
 		if exists {
 			config, err := graphRecordConfig(record)
@@ -154,8 +132,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				record.Status == dyncfg.StatusFailed.String() &&
 				config.UID() == change.retry.uid
 		} else {
-			validRecord = change.Config.SourceType() ==
-				confgroup.TypeStock
+			validRecord = change.Config.SourceType() == confgroup.TypeStock
 		}
 		if !currentToken || !validRecord {
 			return dcjc.noopWithAfterApply(
@@ -163,10 +140,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				current,
 				permit,
 				result,
-				dcjc.retrySettlement(
-					scope.ID,
-					change.retry,
-				),
+				dcjc.retrySettlement(scope.ID, change.retry),
 			)
 		}
 	}
@@ -183,12 +157,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			disposition,
 			nil,
 			result,
-			dcjc.configDeleteCleanup(
-				dcjc.configID(
-					change.Config.Module(),
-					change.Config.Name(),
-				),
-			),
+			dcjc.configDeleteCleanup(dcjc.configID(change.Config.Module(), change.Config.Name())),
 			change.retry,
 		)
 	}
@@ -234,19 +203,11 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			current,
 			permit,
 			result,
-			dcjc.retrySettlement(
-				scope.ID,
-				change.retry,
-			),
+			dcjc.retrySettlement(scope.ID, change.retry),
 			cleanup,
 		)
 	}
-	successor, err := dcjc.factory.Prepare(
-		ctx,
-		change.Config,
-		scope.Successor,
-		permit,
-	)
+	successor, err := dcjc.factory.Prepare(ctx, change.Config, scope.Successor, permit)
 	if err != nil {
 		return nil, err
 	}
@@ -272,19 +233,10 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				failedPostimage,
 				change.Config.SourceType(),
 				change.Config.Source(),
-				dcjc.configType(
-					dcjc.modules[change.Config.Module()],
-				),
+				dcjc.configType(dcjc.modules[change.Config.Module()]),
 			),
-			removedCleanup: dcjc.configDeleteCleanup(
-				dcjc.configID(
-					change.Config.Module(),
-					change.Config.Name(),
-				),
-			),
-			result: func(
-				*autoDetectionFailure,
-			) lifecycle.SealedResult {
+			removedCleanup: dcjc.configDeleteCleanup(dcjc.configID(change.Config.Module(), change.Config.Name())),
+			result: func(*autoDetectionFailure) lifecycle.SealedResult {
 				return result
 			},
 			afterApply: dcjc.scheduleRetryAfterApply(change.Config),

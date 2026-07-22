@@ -121,12 +121,7 @@ func TestProductionConstructionBoundaries(t *testing.T) {
 	assertImportedCallCount(t, files, jobmgrImportPath, "NewCommandKernel", 1)
 }
 
-func assertImportedCallCount(
-	t *testing.T,
-	files []string,
-	importPath, function string,
-	want int,
-) {
+func assertImportedCallCount(t *testing.T, files []string, importPath, function string, want int) {
 	t.Helper()
 	count := 0
 	for _, path := range files {
@@ -187,8 +182,7 @@ func productionGoFiles(root string) ([]string, error) {
 	}
 	files := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") ||
-			strings.HasSuffix(entry.Name(), "_test.go") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") || strings.HasSuffix(entry.Name(), "_test.go") {
 			continue
 		}
 		files = append(files, filepath.Join(root, entry.Name()))

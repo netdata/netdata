@@ -77,9 +77,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 	}
 	defer func() {
 		stopDeadline()
-		if err := ck.frames.ReleaseRunNotifications(
-			ck.run.Generation(),
-		); err != nil {
+		if err := ck.frames.ReleaseRunNotifications(ck.run.Generation()); err != nil {
 			terminal = errors.Join(terminal, err)
 		}
 		ck.doneErr = terminal
@@ -111,9 +109,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		if ck.shutdownPhase != commandShutdownCleanupDrain {
 			moreFunctionMutation = ck.serviceFunctionMutation(16)
 		} else if ck.shutdownBarrierDone {
-			moreFunctionClose = ck.serviceFunctionCatalogClose(
-				MaximumFunctionCloseQuantum,
-			)
+			moreFunctionClose = ck.serviceFunctionCatalogClose(MaximumFunctionCloseQuantum)
 		}
 		if !shuttingDown {
 			if cause := ck.run.DirtyCause(); cause != nil {
@@ -121,9 +117,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 			}
 		}
 		moreFunctionCleanups = moreFunctionCleanups || ck.functionCleanupBacklog.count != 0
-		moreClaimSettlements := ck.serviceClaimSettlements(
-			maximumClaimSettlementQuantum,
-		)
+		moreClaimSettlements := ck.serviceClaimSettlements(maximumClaimSettlementQuantum)
 		moreCompositeFenceRechecks := false
 		moreTasks := false
 		moreTaskStarts := false
@@ -132,46 +126,35 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		moreInheritedCancellations := false
 		moreShutdownLanes := false
 		if !shuttingDown {
-			moreCompositeFenceRechecks =
-				ck.serviceCompositeFenceBlocked(4)
+			moreCompositeFenceRechecks = ck.serviceCompositeFenceBlocked(4)
 			moreTasks = ck.scheduleTasks(4)
 		}
-		servicedAsyncEvents := ck.serviceAsyncEvents(
-			asyncEventServiceQuantum,
-		)
+		servicedAsyncEvents := ck.serviceAsyncEvents(asyncEventServiceQuantum)
 		if !shuttingDown {
-			moreTaskStarts = ck.serviceTaskStarts(
-				lifecycle.TaskStartServiceQuantum,
-			)
+			moreTaskStarts = ck.serviceTaskStarts(lifecycle.TaskStartServiceQuantum)
 			if cause := ck.run.DirtyCause(); cause != nil {
 				beginShutdown(cause)
 			}
 		} else {
 			var shutdownErr error
 			if ck.shutdownPhase == commandShutdownActionDrain {
-				moreShutdownCancellation, shutdownErr =
-					ck.serviceShutdownCancellation(4)
+				moreShutdownCancellation, shutdownErr = ck.serviceShutdownCancellation(4)
 				if shutdownErr != nil {
 					ck.run.Dirty(shutdownErr)
 				}
 				if ck.shutdownCancelCursor == nil {
 					moreTasks = ck.scheduleTasks(4)
-					moreTaskStarts = ck.serviceTaskStarts(
-						lifecycle.TaskStartServiceQuantum,
-					)
+					moreTaskStarts = ck.serviceTaskStarts(lifecycle.TaskStartServiceQuantum)
 				}
 				phase := ck.shutdownPhase
 				if err := ck.advanceShutdownAuthority(); err != nil {
 					ck.run.Dirty(err)
 				}
-				shutdownAuthorityAdvanced =
-					phase != ck.shutdownPhase
+				shutdownAuthorityAdvanced = phase != ck.shutdownPhase
 			}
 			if ck.shutdownPhase == commandShutdownCleanupDrain {
 				moreInheritedCancellations, shutdownErr =
-					ck.tasks.CancelInheritedBatch(
-						lifecycle.InheritedCancellationServiceQuantum,
-					)
+					ck.tasks.CancelInheritedBatch(lifecycle.InheritedCancellationServiceQuantum)
 				if shutdownErr != nil {
 					ck.run.Dirty(shutdownErr)
 				}
@@ -179,8 +162,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 					ck.run.Dirty(err)
 				}
 				if ck.shutdownBarrierDone {
-					moreShutdownLanes, shutdownErr =
-						ck.serviceShutdownStops(4)
+					moreShutdownLanes, shutdownErr = ck.serviceShutdownStops(4)
 					if shutdownErr != nil {
 						ck.run.Dirty(shutdownErr)
 					}
@@ -188,9 +170,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 				if err := ck.advanceRunFinalizer(); err != nil {
 					ck.run.Dirty(err)
 				}
-				moreTaskStarts = ck.serviceTaskStarts(
-					lifecycle.TaskStartServiceQuantum,
-				) || moreTaskStarts
+				moreTaskStarts = ck.serviceTaskStarts(lifecycle.TaskStartServiceQuantum) || moreTaskStarts
 			}
 		}
 		if shuttingDown {
@@ -198,9 +178,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 				terminal = ck.shutdownDeadlineExceededTerminal(terminal)
 				return
 			}
-			if ck.shutdownQuiescent() ||
-				ck.runShutdownBarrierFailedTerminal() ||
-				ck.runFinalizerFailedTerminal() {
+			if ck.shutdownQuiescent() || ck.runShutdownBarrierFailedTerminal() || ck.runFinalizerFailedTerminal() {
 				terminal = errors.Join(terminal, ck.run.Terminal(ck.runCensus()))
 				return
 			}
@@ -239,8 +217,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 			armDeadline()
 		}
 		functionMutationC := (<-chan functionMutationSubmission)(ck.functionMutations)
-		if ck.shutdownPhase == commandShutdownCleanupDrain ||
-			ck.functionMutationActive {
+		if ck.shutdownPhase == commandShutdownCleanupDrain || ck.functionMutationActive {
 			functionMutationC = nil
 		}
 		select {
@@ -328,9 +305,7 @@ func (ck *CommandKernel) serviceOneAsyncEvent() bool {
 	return false
 }
 
-func (ck *CommandKernel) serviceAsyncEvents(
-	quantum int,
-) int {
+func (ck *CommandKernel) serviceAsyncEvents(quantum int) int {
 	count := 0
 	for count < quantum && ck.serviceOneAsyncEvent() {
 		count++
@@ -422,10 +397,7 @@ func (ck *CommandKernel) serviceSubmissions(quantum int) bool {
 			}
 			if submitted.controlStatus != 0 || err != nil {
 				if ck.runtimeObserver != nil {
-					ck.runtimeObserver.AddRuntimeCounter(
-						lifecycle.RuntimeCounterOperationsRejected,
-						1,
-					)
+					ck.runtimeObserver.AddRuntimeCounter(lifecycle.RuntimeCounterOperationsRejected, 1)
 				}
 				submitted.result <- err
 				if submitted.controlStatus != 0 && submitted.terminal != nil {

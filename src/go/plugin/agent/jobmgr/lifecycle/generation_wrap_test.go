@@ -11,9 +11,7 @@ import (
 )
 
 func TestGenerationWrapRetiresExhaustedFreelistHeads(t *testing.T) {
-	tests := map[string]func(*testing.T){
-		"queued task": testQueuedTaskGenerationRetirement,
-	}
+	tests := map[string]func(*testing.T){"queued task": testQueuedTaskGenerationRetirement}
 	for name, test := range tests {
 		t.Run(name, test)
 	}

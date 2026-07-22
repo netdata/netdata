@@ -35,10 +35,7 @@ func (ck *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 		cleanup := ck.functionCleanupBacklog.front()
 		request, err := ck.tasks.Enqueue(
 			lifecycle.TaskClassFrameworkControl,
-			lifecycle.TaskPlan{
-				Source: lifecycle.SourceFunction,
-				Work:   cleanup.Work(),
-			},
+			lifecycle.TaskPlan{Source: lifecycle.SourceFunction, Work: cleanup.Work()},
 		)
 		if err != nil {
 			ck.run.Dirty(err)
@@ -68,11 +65,7 @@ func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmiss
 			submitted.action == functionMutationQuiesce &&
 			ck.ownershipChains == 0) {
 		if submitted.result != nil {
-			err := error(
-				errors.New(
-					"jobmgr kernel: Function mutation admission closed",
-				),
-			)
+			err := error(errors.New("jobmgr kernel: Function mutation admission closed"))
 			if ck.shutdownPhase != commandShutdownRunning {
 				err = ck.run.StoppingCause()
 			}
@@ -84,30 +77,22 @@ func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmiss
 	case functionMutationQuiesce:
 		if ck.functionMutationPaused {
 			submitted.result <- functionMutationResult{
-				err: errors.New(
-					"jobmgr kernel: Function mutation already quiesced",
-				),
+				err: errors.New("jobmgr kernel: Function mutation already quiesced"),
 			}
 			return
 		}
-		if err := ck.functionCatalog.BeginMutation(
-			submitted.mutation,
-		); err != nil {
+		if err := ck.functionCatalog.BeginMutation(submitted.mutation); err != nil {
 			submitted.result <- functionMutationResult{err: err}
 			return
 		}
 	case functionMutationCommit:
 		if !ck.functionMutationPaused {
 			submitted.result <- functionMutationResult{
-				err: errors.New(
-					"jobmgr kernel: Function mutation is not quiesced",
-				),
+				err: errors.New("jobmgr kernel: Function mutation is not quiesced"),
 			}
 			return
 		}
-		if err := ck.functionCatalog.ResumeMutation(
-			submitted.mutation,
-		); err != nil {
+		if err := ck.functionCatalog.ResumeMutation(submitted.mutation); err != nil {
 			submitted.result <- functionMutationResult{err: err}
 			return
 		}
@@ -115,16 +100,12 @@ func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmiss
 	case functionMutationAbort:
 		if !ck.functionMutationPaused {
 			submitted.result <- functionMutationResult{
-				err: errors.New(
-					"jobmgr kernel: Function mutation is not quiesced",
-				),
+				err: errors.New("jobmgr kernel: Function mutation is not quiesced"),
 			}
 			return
 		}
 		abortErr := ck.abortFunctionMutation(submitted.mutation)
-		submitted.result <- functionMutationResult{
-			err: abortErr,
-		}
+		submitted.result <- functionMutationResult{err: abortErr}
 		ck.functionMutation = functionMutationSubmission{}
 		ck.functionMutationPaused = false
 		if abortErr != nil {
@@ -141,14 +122,10 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 		return false
 	}
 	if ck.functionMutation.action == functionMutationQuiesce {
-		progress, err := ck.functionCatalog.AdvanceMutationQuiesce(
-			quantum,
-		)
+		progress, err := ck.functionCatalog.AdvanceMutationQuiesce(quantum)
 		if err != nil {
 			abortErr := ck.abortFunctionMutation(ck.functionMutation.mutation)
-			ck.functionMutation.result <- functionMutationResult{
-				err: errors.Join(err, abortErr),
-			}
+			ck.functionMutation.result <- functionMutationResult{err: errors.Join(err, abortErr)}
 			ck.functionMutation = functionMutationSubmission{}
 			ck.functionMutationActive = false
 			if abortErr != nil {
@@ -159,22 +136,16 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 		if !progress.Quiesced {
 			return true
 		}
-		ck.functionMutation.result <- functionMutationResult{
-			version: progress.Version,
-		}
+		ck.functionMutation.result <- functionMutationResult{version: progress.Version}
 		ck.functionMutation.result = nil
 		ck.functionMutationActive = false
 		ck.functionMutationPaused = true
 		return false
 	}
 	if ck.functionMutation.action != functionMutationCommit {
-		invariantErr := errors.New(
-			"jobmgr kernel: invalid active Function mutation",
-		)
+		invariantErr := errors.New("jobmgr kernel: invalid active Function mutation")
 		abortErr := ck.abortFunctionMutation(ck.functionMutation.mutation)
-		ck.functionMutation.result <- functionMutationResult{
-			err: errors.Join(invariantErr, abortErr),
-		}
+		ck.functionMutation.result <- functionMutationResult{err: errors.Join(invariantErr, abortErr)}
 		ck.functionMutation = functionMutationSubmission{}
 		ck.functionMutationActive = false
 		ck.run.Dirty(errors.Join(invariantErr, abortErr))

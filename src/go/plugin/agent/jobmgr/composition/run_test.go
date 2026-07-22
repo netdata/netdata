@@ -28,11 +28,9 @@ import (
 
 func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 	modules := collectorapi.Registry{
-		"z-module": {},
-		"single-module": {
-			InstancePolicy: collectorapi.InstancePolicySingle,
-		},
-		"a-module": {},
+		"z-module":      {},
+		"single-module": {InstancePolicy: collectorapi.InstancePolicySingle},
+		"a-module":      {},
 	}
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
@@ -61,15 +59,11 @@ func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 	closeRunTestUIDs(t, uids)
 }
 
-func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(
-	t *testing.T,
-) {
+func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) {
 	tests := map[string]struct {
 		jobs int
 	}{
-		"one pipeline plus the former limit and one job": {
-			jobs: 257,
-		},
+		"one pipeline plus the former limit and one job": {jobs: 257},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -83,9 +77,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(
 									&collectorapi.Chart{
 										ID: "chart", Title: "chart",
 										Units: "value",
-										Dims: collectorapi.Dims{
-											&collectorapi.Dim{ID: "value"},
-										},
+										Dims:  collectorapi.Dims{&collectorapi.Dim{ID: "value"}},
 									},
 								}
 							},
@@ -103,9 +95,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(
 				},
 			}
 			jobs := testRunJobServices(t)
-			jobs.Defaults = confgroup.Registry{
-				"module": {UpdateEvery: 1},
-			}
+			jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
 			configs := fullCapacityDiscoveredJobs(test.jobs)
 
 			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
@@ -235,17 +225,12 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 			JobConfigSchema: collectorapi.MockConfigSchema,
 		},
 	}
-	config := confgroup.Config{
-		"module": "module", "name": "job",
-		"update_every": 1, "function_only": true,
-	}
+	config := confgroup.Config{"module": "module", "name": "job", "update_every": 1, "function_only": true}
 	config.SetProvider(confgroup.TypeDyncfg)
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
 	jobs := testRunJobServices(t)
-	jobs.Defaults = confgroup.Registry{
-		"module": {UpdateEvery: 1},
-	}
+	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
 
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
@@ -271,10 +256,7 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 			UID:    "enable",
 			Source: lifecycle.SourceFunction,
 			Route:  "config",
-			Args: []string{
-				"go.d:collector:module:job",
-				string(dyncfg.CommandEnable),
-			},
+			Args:   []string{"go.d:collector:module:job", string(dyncfg.CommandEnable)},
 		},
 	),
 	)
@@ -290,16 +272,20 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	wire := output.String()
 	resultAt := bytes.Index(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN enable 200 application/json"))
 	statusAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module:job status running"))
-	require.False(t, !bytes.Contains(output.Bytes(), []byte(`FUNCTION GLOBAL "config"`)) || resultAt < 0 || statusAt < 0 || resultAt >= statusAt, "wire=%q", wire)
+	require.False(
+		t,
+		!bytes.Contains(output.Bytes(), []byte(`FUNCTION GLOBAL "config"`)) || resultAt < 0 || statusAt < 0 ||
+			resultAt >= statusAt,
+		"wire=%q",
+		wire,
+	)
 
 	require.EqualValues(t, 1, cleanupCalls.Load())
 
 	closeRunTestUIDs(t, uids)
 }
 
-func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
-	t *testing.T,
-) {
+func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(t *testing.T) {
 	checkEntered := make(chan struct{})
 	checkRelease := make(chan struct{})
 	var cleanupCalls atomic.Int32
@@ -323,9 +309,7 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 			SharedFunctions: func() []funcapi.FunctionConfig {
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
-			MethodHandler: func(
-				collectorapi.RuntimeJob,
-			) funcapi.MethodHandler {
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 				return &runTestHandler{cleanup: func() {}}
 			},
 			JobConfigSchema: collectorapi.MockConfigSchema,
@@ -340,9 +324,7 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
 	jobs := testRunJobServices(t)
-	jobs.Defaults = confgroup.Registry{
-		"module": {UpdateEvery: 1},
-	}
+	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
 
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
@@ -360,16 +342,9 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 		record, ok := generation.vnodes.graph.Lookup(config.FullName())
 		return ok && record.Status == dyncfg.StatusAccepted.String()
 	}, time.Second, time.Millisecond)
-	probeCtx, cancelProbe := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
+	probeCtx, cancelProbe := context.WithTimeout(context.Background(), time.Second)
 	defer cancelProbe()
-	probe, err := startCompositionShutdownProbe(
-		probeCtx,
-		generation.kernel,
-		"run-generation-shutdown-probe",
-	)
+	probe, err := startCompositionShutdownProbe(probeCtx, generation.kernel, "run-generation-shutdown-probe")
 	require.NoError(t, err)
 
 	require.NoError(t, generation.kernel.Submit(
@@ -378,27 +353,17 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 			UID:    "shutdown-enable",
 			Source: lifecycle.SourceFunction,
 			Route:  "config",
-			Args: []string{
-				"go.d:collector:module:job",
-				string(dyncfg.CommandEnable),
-			},
+			Args:   []string{"go.d:collector:module:job", string(dyncfg.CommandEnable)},
 		},
 	))
 	select {
 	case <-checkEntered:
 	case <-time.After(time.Second):
-		require.FailNow(
-			t,
-			"test failed",
-			"managed autodetection did not enter",
-		)
+		require.FailNow(t, "test failed", "managed autodetection did not enter")
 	}
 
 	generation.Stop()
-	shutdownCtx, cancelShutdown := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), time.Second)
 	defer cancelShutdown()
 	require.NoError(t, probe.waitCancellation(shutdownCtx))
 	close(checkRelease)
@@ -406,23 +371,13 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(
 	require.NoError(t, probe.waitSettlement(shutdownCtx))
 	require.NoError(t, generation.run.DirtyCause())
 
-	publishedAt := bytes.Index(
-		output.Bytes(),
-		[]byte(`FUNCTION GLOBAL "module:method"`),
-	)
-	withdrawnAt := bytes.Index(
-		output.Bytes(),
-		[]byte(`FUNCTION_DEL GLOBAL "module:method"`),
-	)
+	publishedAt := bytes.Index(output.Bytes(), []byte(`FUNCTION GLOBAL "module:method"`))
+	withdrawnAt := bytes.Index(output.Bytes(), []byte(`FUNCTION_DEL GLOBAL "module:method"`))
 	require.GreaterOrEqual(t, publishedAt, 0)
 	require.Greater(t, withdrawnAt, publishedAt)
 	require.EqualValues(t, 1, cleanupCalls.Load())
 	require.Zero(t, generation.tasks.InheritedActive())
-	require.Equal(
-		t,
-		lifecycle.LongLivedCensus{},
-		generation.tasks.LongLivedCensus(),
-	)
+	require.Equal(t, lifecycle.LongLivedCensus{}, generation.tasks.LongLivedCensus())
 	closeRunTestUIDs(t, uids)
 }
 
@@ -460,38 +415,24 @@ func testRunJobServices(t testing.TB) runJobServices {
 	}
 }
 
-func testRunDiscoveryServices(
-	t testing.TB,
-	configs ...confgroup.Config,
-) runDiscoveryServices {
+func testRunDiscoveryServices(t testing.TB, configs ...confgroup.Config) runDiscoveryServices {
 	t.Helper()
 	factory := agentdiscovery.NewProviderFactory(
 		"test",
-		func(agentdiscovery.BuildContext) (
-			agentdiscovery.Discoverer,
-			bool,
-			error,
-		) {
+		func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
 			return runTestDiscoverer{configs: configs}, true, nil
 		},
 	)
-	catalog, err := agentdiscovery.NewProviderCatalog(
-		[]agentdiscovery.ProviderFactory{factory},
-	)
+	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
 	require.NoError(t, err)
 	return runDiscoveryServices{
-		BuildContext: agentdiscovery.BuildContext{
-			Registry: confgroup.Registry{"test": {}},
-		},
-		Providers:  catalog,
-		AutoEnable: true,
+		BuildContext: agentdiscovery.BuildContext{Registry: confgroup.Registry{"test": {}}},
+		Providers:    catalog,
+		AutoEnable:   true,
 	}
 }
 
-func testRunDiscoveryServicesAccepted(
-	t testing.TB,
-	configs ...confgroup.Config,
-) runDiscoveryServices {
+func testRunDiscoveryServicesAccepted(t testing.TB, configs ...confgroup.Config) runDiscoveryServices {
 	services := testRunDiscoveryServices(t, configs...)
 	services.AutoEnable = false
 	return services
@@ -501,10 +442,7 @@ type runTestDiscoverer struct {
 	configs []confgroup.Config
 }
 
-func (rtd runTestDiscoverer) Run(
-	ctx context.Context,
-	out chan<- []*confgroup.Group,
-) {
+func (rtd runTestDiscoverer) Run(ctx context.Context, out chan<- []*confgroup.Group) {
 	if len(rtd.configs) != 0 {
 		select {
 		case out <- []*confgroup.Group{{Source: "test", Configs: rtd.configs}}:
@@ -533,11 +471,7 @@ func (*runTestHandler) MethodParams(context.Context, string) ([]funcapi.ParamCon
 	return nil, nil
 }
 
-func (*runTestHandler) Handle(
-	context.Context,
-	string,
-	funcapi.ResolvedParams,
-) *funcapi.FunctionResponse {
+func (*runTestHandler) Handle(context.Context, string, funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	return &funcapi.FunctionResponse{Status: 200}
 }
 
@@ -552,10 +486,7 @@ func TestCloseProcessUIDsObservesShutdownContextBetweenBatches(t *testing.T) {
 		wantTombstones int
 		wantClosed     bool
 	}{
-		"live shutdown drains every batch": {
-			wantTombstones: 0,
-			wantClosed:     true,
-		},
+		"live shutdown drains every batch": {wantTombstones: 0, wantClosed: true},
 		"expired shutdown leaves process-exit containment": {
 			cancelled:      true,
 			wantErr:        context.Canceled,

@@ -29,11 +29,7 @@ func (dcjc *DynCfgJobController) PublishInitial(
 	if dcjc == nil || ctx == nil || commands == nil || epoch == 0 {
 		return errors.New("job output: invalid initial DynCfg publication")
 	}
-	return dcjc.publishInitialTemplates(
-		ctx,
-		commands,
-		epoch,
-	)
+	return dcjc.publishInitialTemplates(ctx, commands, epoch)
 }
 
 func (dcjc *DynCfgJobController) publishInitialTemplates(
@@ -41,11 +37,7 @@ func (dcjc *DynCfgJobController) publishInitialTemplates(
 	commands jobmgr.PreparedCommandPort,
 	epoch uint64,
 ) error {
-	result, err := lifecycle.NewSealedResult(
-		204,
-		"application/json",
-		nil,
-	)
+	result, err := lifecycle.NewSealedResult(204, "application/json", nil)
 	if err != nil {
 		return err
 	}
@@ -65,9 +57,7 @@ func (dcjc *DynCfgJobController) publishInitialTemplates(
 					scope.Current.Valid() ||
 					scope.Successor.Valid() ||
 					permit.Valid() {
-					return nil, errors.New(
-						"job output: invalid initial template scope",
-					)
+					return nil, errors.New("job output: invalid initial template scope")
 				}
 				return PrepareNoopResourceTransaction(
 					scope,

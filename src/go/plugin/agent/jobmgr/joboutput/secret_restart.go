@@ -23,8 +23,7 @@ type SecretDependentStop struct {
 
 func (sds *SecretDependentStop) Stopped() (bool, error) {
 	if sds == nil {
-		return false,
-			errors.New("job output: nil dependent stop")
+		return false, errors.New("job output: nil dependent stop")
 	}
 	sds.mu.Lock()
 	defer sds.mu.Unlock()
@@ -59,12 +58,9 @@ func (sds *SecretDependentStart) setError(err error) {
 	sds.mu.Unlock()
 }
 
-func (dcjc *DynCfgJobController) PlanSecretDependentStop(
-	id string,
-) (jobmgr.WorkPlan, *SecretDependentStop, error) {
+func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.WorkPlan, *SecretDependentStop, error) {
 	if dcjc == nil || id == "" {
-		return jobmgr.WorkPlan{}, nil,
-			errors.New("job output: invalid dependent stop")
+		return jobmgr.WorkPlan{}, nil, errors.New("job output: invalid dependent stop")
 	}
 	state := &SecretDependentStop{}
 	// The enclosing secret mutation owns DynCfgJobGraphClaim. Reacquiring it
@@ -80,24 +76,14 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(
 				permit lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
 				if permit.Valid() || scope.ID != id {
-					return nil, errors.New(
-						"job output: invalid dependent stop scope",
-					)
+					return nil, errors.New("job output: invalid dependent stop scope")
 				}
 				record, exists := dcjc.graph.Lookup(id)
-				if !exists ||
-					record.Status != dyncfg.StatusRunning.String() {
-					return dcjc.noop(
-						scope,
-						current,
-						lifecycle.LongLivedPermit{},
-						mustDynCfgMessage(204, ""),
-					)
+				if !exists || record.Status != dyncfg.StatusRunning.String() {
+					return dcjc.noop(scope, current, lifecycle.LongLivedPermit{}, mustDynCfgMessage(204, ""))
 				}
 				if current == nil || !scope.Current.Valid() {
-					return nil, errors.New(
-						"job output: running dependent has no current resource",
-					)
+					return nil, errors.New("job output: running dependent has no current resource")
 				}
 				return PrepareResourceTransaction(
 					ResourceTransactionSpec{
@@ -118,8 +104,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 	id string,
 ) (jobmgr.WorkPlan, *SecretDependentStart, error) {
 	if dcjc == nil || id == "" {
-		return jobmgr.WorkPlan{}, nil,
-			errors.New("job output: invalid dependent start")
+		return jobmgr.WorkPlan{}, nil, errors.New("job output: invalid dependent start")
 	}
 	permit := lifecycle.NewJobLongLivedPlan()
 	state := &SecretDependentStart{}
@@ -135,47 +120,27 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 				scope lifecycle.ResourceTransactionScope,
 				permit lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
-				if current != nil ||
-					scope.Current.Valid() ||
-					scope.ID != id {
-					return nil, errors.New(
-						"job output: invalid dependent start scope",
-					)
+				if current != nil || scope.Current.Valid() || scope.ID != id {
+					return nil, errors.New("job output: invalid dependent start scope")
 				}
 				record, exists := dcjc.graph.Lookup(id)
 				if !exists {
-					return dcjc.noop(
-						scope,
-						nil,
-						permit,
-						mustDynCfgMessage(204, ""),
-					)
+					return dcjc.noop(scope, nil, permit, mustDynCfgMessage(204, ""))
 				}
 				cloned, cloneErr := graphRecordConfig(record)
 				if cloneErr != nil {
 					return nil, cloneErr
 				}
 				if cloned.FullName() != id {
-					return nil, errors.New(
-						"job output: dependent start identity differs",
-					)
+					return nil, errors.New("job output: dependent start identity differs")
 				}
-				successor, prepareErr := dcjc.factory.Prepare(
-					ctx,
-					cloned,
-					scope.Successor,
-					permit,
-				)
+				successor, prepareErr := dcjc.factory.Prepare(ctx, cloned, scope.Successor, permit)
 				if prepareErr != nil {
-					if ctx.Err() != nil ||
-						lifecycle.OwnershipRetained(prepareErr) {
+					if ctx.Err() != nil || lifecycle.OwnershipRetained(prepareErr) {
 						return nil, prepareErr
 					}
 					state.setError(prepareErr)
-					postimage := graphConfig(
-						record,
-						dyncfg.StatusFailed,
-					)
+					postimage := graphConfig(record, dyncfg.StatusFailed)
 					return dcjc.prepareMutation(
 						scope,
 						nil,
@@ -184,20 +149,11 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 						lifecycle.ResourceTransactionUnchanged,
 						&postimage,
 						mustDynCfgMessage(204, ""),
-						dcjc.configStatusCleanup(
-							id,
-							dyncfg.StatusFailed,
-						),
+						dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
 					)
 				}
-				postimage := graphConfig(
-					record,
-					dyncfg.StatusRunning,
-				)
-				failedPostimage := graphConfig(
-					record,
-					dyncfg.StatusFailed,
-				)
+				postimage := graphConfig(record, dyncfg.StatusRunning)
+				failedPostimage := graphConfig(record, dyncfg.StatusFailed)
 				return dcjc.prepareMutation(
 					scope,
 					nil,
@@ -206,32 +162,17 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 					lifecycle.ResourceTransactionInstalled,
 					&postimage,
 					mustDynCfgMessage(204, ""),
-					dcjc.configStatusCleanup(
-						id,
-						dyncfg.StatusRunning,
-					),
+					dcjc.configStatusCleanup(id, dyncfg.StatusRunning),
 					successorFailurePlan{
-						postimage: failedPostimage,
-						failedCleanup: dcjc.configStatusCleanup(
-							id,
-							dyncfg.StatusFailed,
-						),
-						removedCleanup: dcjc.configDeleteCleanup(
-							dcjc.externalID(id),
-						),
-						result: func(
-							*autoDetectionFailure,
-						) lifecycle.SealedResult {
+						postimage:      failedPostimage,
+						failedCleanup:  dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
+						removedCleanup: dcjc.configDeleteCleanup(dcjc.externalID(id)),
+						result: func(*autoDetectionFailure) lifecycle.SealedResult {
 							return mustDynCfgMessage(204, "")
 						},
-						afterApply: func(
-							failure *autoDetectionFailure,
-						) {
+						afterApply: func(failure *autoDetectionFailure) {
 							state.setError(failure.cause)
-							dcjc.scheduleAutoDetectionRetry(
-								cloned,
-								failure,
-							)
+							dcjc.scheduleAutoDetectionRetry(cloned, failure)
 						},
 						removePlainStock: cloned.SourceType() ==
 							confgroup.TypeStock,

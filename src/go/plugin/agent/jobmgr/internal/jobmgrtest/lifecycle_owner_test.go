@@ -14,17 +14,11 @@ func TestAgentFixtureCloseIsIdempotentAndJoins(t *testing.T) {
 		t,
 		"Agent",
 		func(state *agentFixtureState) (fixtureCloseTarget, error) {
-			fixture, err := startAgentFixtureWithState(
-				context.Background(),
-				false,
-				state,
-			)
+			fixture, err := startAgentFixtureWithState(context.Background(), false, state)
 			if err != nil {
 				return fixtureCloseTarget{}, err
 			}
-			return fixtureCloseTarget{
-				state: fixture.state, close: fixture.close, done: fixture.done,
-			}, nil
+			return fixtureCloseTarget{state: fixture.state, close: fixture.close, done: fixture.done}, nil
 		},
 	)
 }
@@ -34,17 +28,11 @@ func TestProcessFixtureCloseIsIdempotentAndJoins(t *testing.T) {
 		t,
 		"Process",
 		func(state *agentFixtureState) (fixtureCloseTarget, error) {
-			fixture, err := startProcessFixture(
-				context.Background(),
-				state,
-				time.Hour,
-			)
+			fixture, err := startProcessFixture(context.Background(), state, time.Hour)
 			if err != nil {
 				return fixtureCloseTarget{}, err
 			}
-			return fixtureCloseTarget{
-				state: fixture.state, close: fixture.close, done: fixture.done,
-			}, nil
+			return fixtureCloseTarget{state: fixture.state, close: fixture.close, done: fixture.done}, nil
 		},
 	)
 }

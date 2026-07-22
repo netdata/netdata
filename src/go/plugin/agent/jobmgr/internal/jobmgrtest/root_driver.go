@@ -20,9 +20,7 @@ func shippedRootAvailable(root shippedRoot) bool {
 		return false
 	}
 	info, err := os.Stat(root.executable)
-	return err == nil &&
-		info.Mode().IsRegular() &&
-		info.Mode()&0o111 != 0
+	return err == nil && info.Mode().IsRegular() && info.Mode()&0o111 != 0
 }
 
 type shippedRootScenario string
@@ -33,21 +31,13 @@ const (
 	shippedRootShutdown    shippedRootScenario = "shutdown"
 )
 
-var shippedRootScenarios = [...]shippedRootScenario{
-	shippedRootQuit,
-	shippedRootRepeatedHUP,
-	shippedRootShutdown,
-}
+var shippedRootScenarios = [...]shippedRootScenario{shippedRootQuit, shippedRootRepeatedHUP, shippedRootShutdown}
 
 // RunMatrixAvailable executes every supported physical root under each
 // production-relevant process lifecycle.
-func (srd ShippedRootDriver) RunMatrixAvailable(
-	ctx context.Context,
-) ([]string, error) {
+func (srd ShippedRootDriver) RunMatrixAvailable(ctx context.Context) ([]string, error) {
 	if ctx == nil {
-		return nil, errors.New(
-			"jobmgr test: nil shipped-root matrix context",
-		)
+		return nil, errors.New("jobmgr test: nil shipped-root matrix context")
 	}
 	if err := srd.validateConfigs(); err != nil {
 		return nil, err
@@ -59,37 +49,19 @@ func (srd ShippedRootDriver) RunMatrixAvailable(
 			continue
 		}
 		for _, scenario := range shippedRootScenarios {
-			if err := runShippedRoot(
-				ctx,
-				srd.ConfigDir,
-				root,
-				scenario,
-			); err != nil {
-				return missing, fmt.Errorf(
-					"%s %s: %w",
-					root.name,
-					scenario,
-					err,
-				)
+			if err := runShippedRoot(ctx, srd.ConfigDir, root, scenario); err != nil {
+				return missing, fmt.Errorf("%s %s: %w", root.name, scenario, err)
 			}
 		}
 	}
 	return missing, nil
 }
 
-func runShippedRoot(
-	ctx context.Context,
-	configDir string,
-	root shippedRoot,
-	scenario shippedRootScenario,
-) error {
+func runShippedRoot(ctx context.Context, configDir string, root shippedRoot, scenario shippedRootScenario) error {
 	observer := newRootProtocolObservation()
 	spec := runner.Spec{
 		Executable: root.executable,
-		Arguments: []string{
-			"-m", root.module,
-			"-c", configDir,
-		},
+		Arguments:  []string{"-m", root.module, "-c", configDir},
 		Directory:  configDir,
 		ObserveOut: observer.observe,
 	}
@@ -99,17 +71,12 @@ func runShippedRoot(
 	}
 	defer func() {
 		_ = process.Kill()
-		joinCtx, cancel := context.WithTimeout(
-			context.Background(),
-			fixtureJoinPeriod,
-		)
+		joinCtx, cancel := context.WithTimeout(context.Background(), fixtureJoinPeriod)
 		defer cancel()
 		_, _ = process.Wait(joinCtx)
 	}()
 
-	if err := observer.wait(ctx, process, func(
-		publications, _, _ int,
-	) bool {
+	if err := observer.wait(ctx, process, func(publications, _, _ int) bool {
 		return publications >= 1
 	}); err != nil {
 		return err
@@ -117,20 +84,12 @@ func runShippedRoot(
 	switch scenario {
 	case shippedRootQuit:
 		_, _, keepalives := observer.snapshot()
-		if err := observer.wait(ctx, process, func(
-			_, _, observedKeepalives int,
-		) bool {
+		if err := observer.wait(ctx, process, func(_, _, observedKeepalives int) bool {
 			return observedKeepalives > keepalives
 		}); err != nil {
-			return fmt.Errorf(
-				"nonterminal root emitted no process keepalive: %w",
-				err,
-			)
+			return fmt.Errorf("nonterminal root emitted no process keepalive: %w", err)
 		}
-		if err := process.WriteContext(
-			ctx,
-			[]byte("QUIT\n"),
-		); err != nil {
+		if err := process.WriteContext(ctx, []byte("QUIT\n")); err != nil {
 			return err
 		}
 	case shippedRootShutdown:
@@ -139,33 +98,24 @@ func runShippedRoot(
 		}
 	case shippedRootRepeatedHUP:
 		for index := range 3 {
-			if err := process.Signal(os.Signal(
-				syscallSIGHUP(),
-			)); err != nil {
+			if err := process.Signal(os.Signal(syscallSIGHUP())); err != nil {
 				return err
 			}
 			if err := observer.wait(
 				ctx,
 				process,
 				func(publications, withdrawals, _ int) bool {
-					return publications >= index+2 &&
-						withdrawals >= index+1
+					return publications >= index+2 && withdrawals >= index+1
 				},
 			); err != nil {
 				return err
 			}
 		}
-		if err := process.WriteContext(
-			ctx,
-			[]byte("QUIT\n"),
-		); err != nil {
+		if err := process.WriteContext(ctx, []byte("QUIT\n")); err != nil {
 			return err
 		}
 	default:
-		return fmt.Errorf(
-			"jobmgr test: unknown shipped-root scenario %q",
-			scenario,
-		)
+		return fmt.Errorf("jobmgr test: unknown shipped-root scenario %q", scenario)
 	}
 	waitCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -174,12 +124,7 @@ func runShippedRoot(
 		publications, withdrawals, _ := observer.snapshot()
 		return errors.Join(
 			err,
-			fmt.Errorf(
-				"publications=%d withdrawals=%d stderr=%q",
-				publications,
-				withdrawals,
-				result.Stderr,
-			),
+			fmt.Errorf("publications=%d withdrawals=%d stderr=%q", publications, withdrawals, result.Stderr),
 		)
 	}
 	publications, withdrawals, _ := observer.snapshot()
@@ -221,9 +166,7 @@ func newRootProtocolObservation() *rootProtocolObservation {
 	return &rootProtocolObservation{changed: make(chan struct{}, 1)}
 }
 
-func (rpo *rootProtocolObservation) observe(
-	chunk []byte,
-) error {
+func (rpo *rootProtocolObservation) observe(chunk []byte) error {
 	rpo.mu.Lock()
 	defer rpo.mu.Unlock()
 	rpo.pending = append(rpo.pending, chunk...)
@@ -231,9 +174,7 @@ func (rpo *rootProtocolObservation) observe(
 		newline := bytes.IndexByte(rpo.pending, '\n')
 		if newline < 0 {
 			if len(rpo.pending) > maximumRootProtocolLineBytes {
-				return errors.New(
-					"jobmgr test: shipped-root protocol line exceeds bound",
-				)
+				return errors.New("jobmgr test: shipped-root protocol line exceeds bound")
 			}
 			return nil
 		}
@@ -248,26 +189,14 @@ func (rpo *rootProtocolObservation) observe(
 				observed = false
 			}
 			rpo.previousEmpty = true
-		case bytes.HasPrefix(
-			line,
-			[]byte(`FUNCTION GLOBAL "config"`),
-		):
+		case bytes.HasPrefix(line, []byte(`FUNCTION GLOBAL "config"`)):
 			rpo.previousEmpty = false
 			rpo.publications++
-			rpo.lifecycle = append(
-				rpo.lifecycle,
-				'P',
-			)
-		case bytes.Equal(
-			line,
-			[]byte(`FUNCTION_DEL GLOBAL "config"`),
-		):
+			rpo.lifecycle = append(rpo.lifecycle, 'P')
+		case bytes.Equal(line, []byte(`FUNCTION_DEL GLOBAL "config"`)):
 			rpo.previousEmpty = false
 			rpo.withdrawals++
-			rpo.lifecycle = append(
-				rpo.lifecycle,
-				'D',
-			)
+			rpo.lifecycle = append(rpo.lifecycle, 'D')
 		default:
 			rpo.previousEmpty = false
 			continue
@@ -282,14 +211,10 @@ func (rpo *rootProtocolObservation) observe(
 	}
 }
 
-func (rpo *rootProtocolObservation) snapshot() (
-	publications, withdrawals, keepalives int,
-) {
+func (rpo *rootProtocolObservation) snapshot() (publications, withdrawals, keepalives int) {
 	rpo.mu.Lock()
 	defer rpo.mu.Unlock()
-	return rpo.publications,
-		rpo.withdrawals,
-		rpo.keepalives
+	return rpo.publications, rpo.withdrawals, rpo.keepalives
 }
 
 func (rpo *rootProtocolObservation) wait(
@@ -311,8 +236,7 @@ func (rpo *rootProtocolObservation) wait(
 				ctx.Err(),
 			)
 		case <-process.Done():
-			publications, withdrawals, keepalives =
-				rpo.snapshot()
+			publications, withdrawals, keepalives = rpo.snapshot()
 			if predicate(publications, withdrawals, keepalives) {
 				return nil
 			}
@@ -336,11 +260,7 @@ func (rpo *rootProtocolObservation) validateAlternatingLifecycle() error {
 	rpo.mu.Lock()
 	defer rpo.mu.Unlock()
 	if string(rpo.lifecycle) != "PDPDPDPD" {
-		return fmt.Errorf(
-			"jobmgr test: shipped-root HUP lifecycle order=%q, want %q",
-			rpo.lifecycle,
-			"PDPDPDPD",
-		)
+		return fmt.Errorf("jobmgr test: shipped-root HUP lifecycle order=%q, want %q", rpo.lifecycle, "PDPDPDPD")
 	}
 	return nil
 }

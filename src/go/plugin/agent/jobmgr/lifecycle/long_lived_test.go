@@ -116,9 +116,7 @@ func TestPipelinePermitReleasesDisabledProviderClaim(t *testing.T) {
 	supervisor := newLongLivedTestSupervisor(t)
 	plan, err := NewPipelineLongLivedPlan([]string{"disabled", "enabled"})
 	require.NoError(t, err)
-	permit, err := supervisor.IssueLongLivedPermit(
-		ResourceIdentity{ID: "pipeline", Generation: 1}, plan,
-	)
+	permit, err := supervisor.IssueLongLivedPermit(ResourceIdentity{ID: "pipeline", Generation: 1}, plan)
 	require.NoError(t, err)
 
 	require.NoError(t, permit.ReleaseUnusedInherited(InheritedPipelineProvider, "disabled"))
@@ -157,9 +155,7 @@ func TestLongLivedPermitRejectsDuplicateOwnerAndAllowsMultiplePipelines(t *testi
 
 	_, err = supervisor.IssueLongLivedPermit(owner, NewJobLongLivedPlan())
 	require.Error(t, err)
-	second, err := supervisor.IssueLongLivedPermit(
-		ResourceIdentity{ID: "other-pipeline", Generation: 1}, pipeline,
-	)
+	second, err := supervisor.IssueLongLivedPermit(ResourceIdentity{ID: "other-pipeline", Generation: 1}, pipeline)
 	require.NoError(t, err)
 	require.NoError(t, second.AbortUnused())
 	require.NoError(t, permit.AbortUnused())
@@ -167,9 +163,7 @@ func TestLongLivedPermitRejectsDuplicateOwnerAndAllowsMultiplePipelines(t *testi
 
 func TestLongLivedPermitRemainsLiveAfterIssuanceIsSealed(t *testing.T) {
 	supervisor := newLongLivedTestSupervisor(t)
-	permit, err := supervisor.IssueLongLivedPermit(
-		ResourceIdentity{ID: "job", Generation: 1}, NewJobLongLivedPlan(),
-	)
+	permit, err := supervisor.IssueLongLivedPermit(ResourceIdentity{ID: "job", Generation: 1}, NewJobLongLivedPlan())
 	require.NoError(t, err)
 	require.NoError(t, supervisor.SealInherited())
 	require.NoError(t, permit.ValidateLive())

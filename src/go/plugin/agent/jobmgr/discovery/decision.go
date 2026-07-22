@@ -44,44 +44,29 @@ type decisionCandidateKey struct {
 }
 
 func NewDecisionIndex(config DecisionConfig) (*DecisionIndex, error) {
-	if config.Generation == 0 ||
-		config.Plan == nil ||
-		config.Commands == nil {
-		return nil, errors.New(
-			"jobmgr discovery: invalid decision index",
-		)
+	if config.Generation == 0 || config.Plan == nil || config.Commands == nil {
+		return nil, errors.New("jobmgr discovery: invalid decision index")
 	}
 	runJob := make(map[string]struct{}, len(config.RunJob))
 	for _, name := range config.RunJob {
 		if name == "" {
-			return nil, errors.New(
-				"jobmgr discovery: invalid run-job name",
-			)
+			return nil, errors.New("jobmgr discovery: invalid run-job name")
 		}
 		runJob[name] = struct{}{}
 	}
 	return &DecisionIndex{
-		generation: config.Generation,
-		runJob:     runJob,
-		autoEnable: config.AutoEnable,
-		plan:       config.Plan,
-		commands:   config.Commands,
-		sources: make(
-			map[string]map[uint64]confgroup.Config,
-		),
-		candidates: make(
-			map[string]map[decisionCandidateKey]confgroup.Config,
-		),
-		acknowledged: make(
-			map[string]confgroup.Config,
-		),
+		generation:   config.Generation,
+		runJob:       runJob,
+		autoEnable:   config.AutoEnable,
+		plan:         config.Plan,
+		commands:     config.Commands,
+		sources:      make(map[string]map[uint64]confgroup.Config),
+		candidates:   make(map[string]map[decisionCandidateKey]confgroup.Config),
+		acknowledged: make(map[string]confgroup.Config),
 	}, nil
 }
 
-func (di *DecisionIndex) Apply(
-	ctx context.Context,
-	batch []*confgroup.Group,
-) error {
+func (di *DecisionIndex) Apply(ctx context.Context, batch []*confgroup.Group) error {
 	if di == nil || ctx == nil || batch == nil {
 		return errors.New("jobmgr discovery: invalid decision batch")
 	}
@@ -93,12 +78,8 @@ func (di *DecisionIndex) Apply(
 	return nil
 }
 
-func (di *DecisionIndex) applyGroup(
-	ctx context.Context,
-	group *confgroup.Group,
-) error {
-	if di == nil || ctx == nil ||
-		group == nil || group.Source == "" {
+func (di *DecisionIndex) applyGroup(ctx context.Context, group *confgroup.Group) error {
+	if di == nil || ctx == nil || group == nil || group.Source == "" {
 		return errors.New("jobmgr discovery: invalid group")
 	}
 	affected := make(map[string]struct{})
@@ -106,10 +87,7 @@ func (di *DecisionIndex) applyGroup(
 		fullName := config.FullName()
 		affected[fullName] = struct{}{}
 		candidates := di.candidates[fullName]
-		delete(candidates, decisionCandidateKey{
-			source: group.Source,
-			hash:   hash,
-		})
+		delete(candidates, decisionCandidateKey{source: group.Source, hash: hash})
 		if len(candidates) == 0 {
 			delete(di.candidates, fullName)
 		}
@@ -130,15 +108,10 @@ func (di *DecisionIndex) applyGroup(
 		affected[fullName] = struct{}{}
 		candidates := di.candidates[fullName]
 		if candidates == nil {
-			candidates = make(
-				map[decisionCandidateKey]confgroup.Config,
-			)
+			candidates = make(map[decisionCandidateKey]confgroup.Config)
 			di.candidates[fullName] = candidates
 		}
-		candidates[decisionCandidateKey{
-			source: group.Source,
-			hash:   hash,
-		}] = cloned
+		candidates[decisionCandidateKey{source: group.Source, hash: hash}] = cloned
 	}
 	if len(next) == 0 {
 		delete(di.sources, group.Source)
@@ -163,18 +136,10 @@ func (di *DecisionIndex) allowed(config confgroup.Config) bool {
 	return ok
 }
 
-func (di *DecisionIndex) reconcile(
-	ctx context.Context,
-	fullName string,
-) error {
+func (di *DecisionIndex) reconcile(ctx context.Context, fullName string) error {
 	current, hasCurrent := di.acknowledged[fullName]
-	next, hasNext := di.selectConfig(
-		fullName,
-		current,
-		hasCurrent,
-	)
-	if hasCurrent && hasNext &&
-		current.UID() == next.UID() {
+	next, hasNext := di.selectConfig(fullName, current, hasCurrent)
+	if hasCurrent && hasNext && current.UID() == next.UID() {
 		return nil
 	}
 	var change DiscoveredChange
@@ -193,19 +158,13 @@ func (di *DecisionIndex) reconcile(
 		return err
 	}
 	if di.revision == ^uint64(0) {
-		return errors.New(
-			"jobmgr discovery: decision revision wrapped",
-		)
+		return errors.New("jobmgr discovery: decision revision wrapped")
 	}
 	revision := di.revision + 1
 	if err := di.commands.SubmitPreparedAndWait(
 		ctx,
 		jobmgr.Request{
-			UID: fmt.Sprintf(
-				"jobmgr-discovery-%d-%d",
-				di.generation,
-				revision,
-			),
+			UID:     fmt.Sprintf("jobmgr-discovery-%d-%d", di.generation, revision),
 			LaneKey: fullName,
 			Source:  lifecycle.SourceJobManager,
 			Route:   "internal/discovery/reconcile",
@@ -236,15 +195,12 @@ func (di *DecisionIndex) selectConfig(
 	maxPriority := -1
 	for _, candidate := range candidates {
 		priority := candidate.SourceTypePriority()
-		if priority > maxPriority ||
-			priority == maxPriority &&
-				(selected == nil || candidate.UID() < selected.UID()) {
+		if priority > maxPriority || priority == maxPriority && (selected == nil || candidate.UID() < selected.UID()) {
 			selected = candidate
 			maxPriority = priority
 		}
 	}
-	if hasCurrent &&
-		current.SourceTypePriority() == maxPriority {
+	if hasCurrent && current.SourceTypePriority() == maxPriority {
 		for _, candidate := range candidates {
 			if candidate.UID() == current.UID() {
 				return candidate, true

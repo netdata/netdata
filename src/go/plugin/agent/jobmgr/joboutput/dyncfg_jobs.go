@@ -46,10 +46,7 @@ type DynCfgJobControllerConfig struct {
 }
 
 type JobDependencyIndex interface {
-	PrepareJobChange(
-		string,
-		*dyncfg.GraphConfig,
-	) (func(), error)
+	PrepareJobChange(string, *dyncfg.GraphConfig) (func(), error)
 }
 
 // DynCfgJobController prepares collector configuration graph/resource
@@ -68,9 +65,7 @@ type DynCfgJobController struct {
 	scheduler     *Scheduler            // tick + retry scheduler
 }
 
-func NewDynCfgJobController(
-	config DynCfgJobControllerConfig,
-) (*DynCfgJobController, error) {
+func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobController, error) {
 	if config.PluginName == "" ||
 		config.Modules == nil ||
 		config.Defaults == nil ||
@@ -78,18 +73,13 @@ func NewDynCfgJobController(
 		config.ConfigModules == nil ||
 		config.Graph == nil ||
 		config.Frames == nil {
-		return nil, errors.New(
-			"job output: incomplete DynCfg job controller configuration",
-		)
+		return nil, errors.New("job output: incomplete DynCfg job controller configuration")
 	}
 	return &DynCfgJobController{
 		pluginName: config.PluginName,
 		prefix:     DynCfgJobPrefix(config.PluginName),
-		path: fmt.Sprintf(
-			dynCfgCollectorPathFormat,
-			config.PluginName,
-		),
-		modules: config.Modules, defaults: config.Defaults,
+		path:       fmt.Sprintf(dynCfgCollectorPathFormat, config.PluginName),
+		modules:    config.Modules, defaults: config.Defaults,
 		factory: config.Factory, configModules: config.ConfigModules,
 		graph: config.Graph, frames: config.Frames,
 		dependencies: config.Dependencies,
@@ -103,16 +93,9 @@ func (dcjc *DynCfgJobController) BindAutoDetectionRetries(
 	failure func(error),
 ) error {
 	if dcjc == nil || dcjc.scheduler == nil {
-		return errors.New(
-			"job output: invalid autodetection retry controller",
-		)
+		return errors.New("job output: invalid autodetection retry controller")
 	}
-	return dcjc.scheduler.bindAutoDetectionRetries(
-		commands,
-		dcjc.planAutoDetectionRetry,
-		run,
-		failure,
-	)
+	return dcjc.scheduler.bindAutoDetectionRetries(commands, dcjc.planAutoDetectionRetry, run, failure)
 }
 
 func DynCfgJobPrefix(pluginName string) string {
@@ -134,8 +117,7 @@ func (dcjc *DynCfgJobController) Handle(
 	request DynCfgJobRequest,
 ) (lifecycle.SealedResult, error) {
 	if dcjc == nil || ctx == nil {
-		return lifecycle.SealedResult{},
-			errors.New("job output: invalid DynCfg request")
+		return lifecycle.SealedResult{}, errors.New("job output: invalid DynCfg request")
 	}
 	target, result := dcjc.resolveRequest(request)
 	if result.valid {
@@ -144,27 +126,13 @@ func (dcjc *DynCfgJobController) Handle(
 	switch target.command {
 	case dyncfg.CommandSchema:
 		if target.creator.JobConfigSchema == "" {
-			return dynCfgMessage(
-				500,
-				fmt.Sprintf(
-					"Module %s configuration schema not found.",
-					target.module,
-				),
-			)
+			return dynCfgMessage(500, fmt.Sprintf("Module %s configuration schema not found.", target.module))
 		}
-		return lifecycle.NewSealedResult(
-			200,
-			"application/json",
-			[]byte(target.creator.JobConfigSchema),
-		)
+		return lifecycle.NewSealedResult(200, "application/json", []byte(target.creator.JobConfigSchema))
 	case dyncfg.CommandUserconfig:
 		return dcjc.userConfig(request, target)
 	case dyncfg.CommandTest:
-		config, failure := dcjc.parseConfig(
-			request,
-			target.module,
-			target.name,
-		)
+		config, failure := dcjc.parseConfig(request, target.module, target.name)
 		if failure.valid {
 			return failure.result, nil
 		}
@@ -177,37 +145,22 @@ func (dcjc *DynCfgJobController) Handle(
 		if !ok {
 			return dynCfgMessage(
 				404,
-				fmt.Sprintf(
-					"The specified module '%s' job '%s' is not registered.",
-					target.module,
-					target.name,
-				),
+				fmt.Sprintf("The specified module '%s' job '%s' is not registered.", target.module, target.name),
 			)
 		}
 		config, err := graphRecordConfig(record)
 		if err != nil {
 			return lifecycle.SealedResult{}, err
 		}
-		payload, err := dcjc.configModules.Configuration(
-			ctx,
-			config,
-		)
+		payload, err := dcjc.configModules.Configuration(ctx, config)
 		if err != nil {
 			return dynCfgMessage(500, err.Error())
 		}
-		return lifecycle.NewSealedResult(
-			200,
-			"application/json",
-			payload,
-		)
+		return lifecycle.NewSealedResult(200, "application/json", payload)
 	default:
 		return dynCfgMessage(
 			501,
-			fmt.Sprintf(
-				"Function '%s' command '%s' is not implemented.",
-				DynCfgFunctionName,
-				target.command,
-			),
+			fmt.Sprintf("Function '%s' command '%s' is not implemented.", DynCfgFunctionName, target.command),
 		)
 	}
 }
@@ -220,85 +173,33 @@ func (dcjc *DynCfgJobController) Prepare(
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if dcjc == nil || ctx == nil || !scope.Valid() {
-		return nil, errors.New(
-			"job output: invalid DynCfg transaction preparation",
-		)
+		return nil, errors.New("job output: invalid DynCfg transaction preparation")
 	}
 	target, failure := dcjc.resolveRequest(request)
 	if failure.valid {
 		return dcjc.noop(scope, current, permit, failure.result)
 	}
 	if target.resourceID != scope.ID {
-		return nil, errors.New(
-			"job output: DynCfg target differs from transaction scope",
-		)
+		return nil, errors.New("job output: DynCfg target differs from transaction scope")
 	}
 	record, exists := dcjc.graph.Lookup(target.resourceID)
-	if err := validateGraphResourcePair(
-		record,
-		exists,
-		current,
-		scope,
-	); err != nil {
+	if err := validateGraphResourcePair(record, exists, current, scope); err != nil {
 		return nil, err
 	}
 
 	switch target.command {
 	case dyncfg.CommandAdd:
-		return dcjc.prepareAdd(
-			ctx,
-			request,
-			target,
-			current,
-			scope,
-		)
+		return dcjc.prepareAdd(ctx, request, target, current, scope)
 	case dyncfg.CommandUpdate:
-		return dcjc.prepareUpdate(
-			ctx,
-			request,
-			target,
-			record,
-			exists,
-			current,
-			scope,
-			permit,
-		)
+		return dcjc.prepareUpdate(ctx, request, target, record, exists, current, scope, permit)
 	case dyncfg.CommandEnable:
-		return dcjc.prepareEnable(
-			ctx,
-			target,
-			record,
-			exists,
-			current,
-			scope,
-			permit,
-		)
+		return dcjc.prepareEnable(ctx, target, record, exists, current, scope, permit)
 	case dyncfg.CommandRestart:
-		return dcjc.prepareRestart(
-			ctx,
-			target,
-			record,
-			exists,
-			current,
-			scope,
-			permit,
-		)
+		return dcjc.prepareRestart(ctx, target, record, exists, current, scope, permit)
 	case dyncfg.CommandDisable:
-		return dcjc.prepareDisable(
-			target,
-			record,
-			exists,
-			current,
-			scope,
-		)
+		return dcjc.prepareDisable(target, record, exists, current, scope)
 	case dyncfg.CommandRemove:
-		return dcjc.prepareRemove(
-			target,
-			record,
-			exists,
-			current,
-			scope,
-		)
+		return dcjc.prepareRemove(target, record, exists, current, scope)
 	default:
 		return dcjc.noop(
 			scope,
@@ -306,23 +207,14 @@ func (dcjc *DynCfgJobController) Prepare(
 			permit,
 			mustDynCfgMessage(
 				501,
-				fmt.Sprintf(
-					"Function '%s' command '%s' is not implemented.",
-					DynCfgFunctionName,
-					target.command,
-				),
+				fmt.Sprintf("Function '%s' command '%s' is not implemented.", DynCfgFunctionName, target.command),
 			),
 		)
 	}
 }
 
-func (dcjc *DynCfgJobController) configID(
-	module string,
-	name string,
-) string {
-	if module == name ||
-		dcjc.modules[module].InstancePolicy ==
-			collectorapi.InstancePolicySingle {
+func (dcjc *DynCfgJobController) configID(module string, name string) string {
+	if module == name || dcjc.modules[module].InstancePolicy == collectorapi.InstancePolicySingle {
 		return dcjc.prefix + module
 	}
 	return dcjc.prefix + module + ":" + name
@@ -336,30 +228,18 @@ func (dcjc *DynCfgJobController) externalID(resourceID string) string {
 	return ""
 }
 
-func (dcjc *DynCfgJobController) configType(
-	creator collectorapi.Creator,
-) dyncfg.ConfigType {
+func (dcjc *DynCfgJobController) configType(creator collectorapi.Creator) dyncfg.ConfigType {
 	if creator.InstancePolicy == collectorapi.InstancePolicySingle {
 		return dyncfg.ConfigTypeSingle
 	}
 	return dyncfg.ConfigTypeJob
 }
 
-func dynCfgMessage(
-	code int,
-	message string,
-) (lifecycle.SealedResult, error) {
-	return lifecycle.NewSealedResult(
-		code,
-		"application/json",
-		frameworkfunctions.BuildJSONPayload(code, message),
-	)
+func dynCfgMessage(code int, message string) (lifecycle.SealedResult, error) {
+	return lifecycle.NewSealedResult(code, "application/json", frameworkfunctions.BuildJSONPayload(code, message))
 }
 
-func mustDynCfgMessage(
-	code int,
-	message string,
-) lifecycle.SealedResult {
+func mustDynCfgMessage(code int, message string) lifecycle.SealedResult {
 	result, err := dynCfgMessage(code, message)
 	if err != nil {
 		panic(err)
@@ -380,43 +260,22 @@ type dynCfgFailure struct {
 	result lifecycle.SealedResult
 }
 
-func newDynCfgFailure(
-	code int,
-	message string,
-) dynCfgFailure {
-	return dynCfgFailure{
-		valid:  true,
-		result: mustDynCfgMessage(code, message),
-	}
+func newDynCfgFailure(code int, message string) dynCfgFailure {
+	return dynCfgFailure{valid: true, result: mustDynCfgMessage(code, message)}
 }
 
-func graphRecordConfig(
-	record dyncfg.GraphRecord,
-) (confgroup.Config, error) {
+func graphRecordConfig(record dyncfg.GraphRecord) (confgroup.Config, error) {
 	var config confgroup.Config
-	if err := yaml.Unmarshal(
-		[]byte(record.Payload()),
-		&config,
-	); err != nil {
-		return nil, fmt.Errorf(
-			"job output: invalid stored DynCfg payload: %w",
-			err,
-		)
+	if err := yaml.Unmarshal([]byte(record.Payload()), &config); err != nil {
+		return nil, fmt.Errorf("job output: invalid stored DynCfg payload: %w", err)
 	}
-	if config == nil ||
-		config.Module() != record.Module ||
-		config.Name() != record.Name {
-		return nil, errors.New(
-			"job output: stored DynCfg identity differs from graph",
-		)
+	if config == nil || config.Module() != record.Module || config.Name() != record.Name {
+		return nil, errors.New("job output: stored DynCfg identity differs from graph")
 	}
 	return config, nil
 }
 
-func graphConfig(
-	record dyncfg.GraphRecord,
-	status dyncfg.Status,
-) dyncfg.GraphConfig {
+func graphConfig(record dyncfg.GraphRecord, status dyncfg.Status) dyncfg.GraphConfig {
 	return dyncfg.GraphConfig{
 		ID: record.ID, Module: record.Module, Name: record.Name,
 		Status: status.String(), Payload: []byte(record.Payload()),
@@ -430,23 +289,17 @@ func validateGraphResourcePair(
 	scope lifecycle.ResourceTransactionScope,
 ) error {
 	if (current == nil) != !scope.Current.Valid() {
-		return errors.New(
-			"job output: DynCfg transaction current differs from scope",
-		)
+		return errors.New("job output: DynCfg transaction current differs from scope")
 	}
 	if !exists {
 		if current != nil {
-			return errors.New(
-				"job output: missing DynCfg record retained a current job",
-			)
+			return errors.New("job output: missing DynCfg record retained a current job")
 		}
 		return nil
 	}
 	running := record.Status == dyncfg.StatusRunning.String()
 	if running != (current != nil) {
-		return errors.New(
-			"job output: DynCfg status differs from current-job slot",
-		)
+		return errors.New("job output: DynCfg status differs from current-job slot")
 	}
 	return nil
 }
@@ -460,14 +313,8 @@ func validDynCfgProtocolField(value string) bool {
 	return true
 }
 
-func joinDynCfgCleanups(
-	cleanups ...lifecycle.TaskCleanup,
-) lifecycle.TaskCleanup {
-	joined := make(
-		[]lifecycle.TaskCleanup,
-		0,
-		len(cleanups),
-	)
+func joinDynCfgCleanups(cleanups ...lifecycle.TaskCleanup) lifecycle.TaskCleanup {
+	joined := make([]lifecycle.TaskCleanup, 0, len(cleanups))
 	for _, cleanup := range cleanups {
 		if cleanup != nil {
 			joined = append(joined, cleanup)

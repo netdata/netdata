@@ -53,8 +53,7 @@ func (*Mutation) FunctionCatalogMutation() {}
 // NewMutation builds an immutable postimage outside the kernel loop. BeginMutation
 // verifies that the catalog still exposes the same preimage before claiming it.
 func (c *Catalog) NewMutation(expectedVersion uint64, changes []RouteChange) (*Mutation, error) {
-	if c == nil || expectedVersion == 0 || expectedVersion == ^uint64(0) ||
-		len(changes) == 0 {
+	if c == nil || expectedVersion == 0 || expectedVersion == ^uint64(0) || len(changes) == 0 {
 		return nil, errors.New("jobmgr Function catalog: invalid mutation")
 	}
 	preimage := c.snapshot.Load()
@@ -77,8 +76,7 @@ func (c *Catalog) NewMutation(expectedVersion uint64, changes []RouteChange) (*M
 	generationByDeclaration := make(map[*HandlerGenerationDeclaration]*handlerGeneration)
 	generationIDOwner := make(map[string]*HandlerGenerationDeclaration)
 	for index, change := range changes {
-		if change.PublicName == "" ||
-			len(change.PublicName) > maximumDeclarationMetadataBytes {
+		if change.PublicName == "" || len(change.PublicName) > maximumDeclarationMetadataBytes {
 			return nil, errors.New("jobmgr Function catalog: invalid mutation route")
 		}
 		if _, exists := seenRoutes[change.PublicName]; exists {
@@ -146,9 +144,7 @@ func (c *Catalog) NewMutation(expectedVersion uint64, changes []RouteChange) (*M
 			retirementIndex, exists := retirementIndices[generation]
 			if !exists {
 				retirementIndices[generation] = len(mutation.retirements)
-				mutation.retirements = append(mutation.retirements, generationRetirement{
-					generation: generation,
-				})
+				mutation.retirements = append(mutation.retirements, generationRetirement{generation: generation})
 				retirementIndex = len(mutation.retirements) - 1
 			}
 			mutation.retirements[retirementIndex].references++
@@ -175,11 +171,7 @@ func (c *Catalog) NewMutation(expectedVersion uint64, changes []RouteChange) (*M
 			active = append(active, transition.newRoute)
 		}
 	}
-	mutation.postimage = &catalogSnapshot{
-		version: expectedVersion + 1,
-		routes:  routes,
-		active:  active,
-	}
+	mutation.postimage = &catalogSnapshot{version: expectedVersion + 1, routes: routes, active: active}
 	return mutation, nil
 }
 
@@ -193,8 +185,7 @@ func (m *Mutation) Discard() error {
 }
 
 func (m *Mutation) claim(c *Catalog) error {
-	if m == nil || m.owner != c ||
-		!m.state.CompareAndSwap(mutationPrepared, mutationClaimed) {
+	if m == nil || m.owner != c || !m.state.CompareAndSwap(mutationPrepared, mutationClaimed) {
 		return errors.New("jobmgr Function catalog: stale mutation")
 	}
 	return nil
@@ -280,15 +271,12 @@ func (c *Catalog) AdvanceMutationQuiesce(quantum int) (jobmgr.FunctionCatalogMut
 		return jobmgr.FunctionCatalogMutationProgress{Version: c.version}, nil
 	}
 	builder.preflightComplete = true
-	return jobmgr.FunctionCatalogMutationProgress{
-		Version: c.version, Quiesced: true,
-	}, nil
+	return jobmgr.FunctionCatalogMutationProgress{Version: c.version, Quiesced: true}, nil
 }
 
 func (c *Catalog) validateRetirement(retirement generationRetirement) error {
 	generation := retirement.generation
-	if generation == nil || retirement.references <= 0 ||
-		generation.routeReferences < retirement.references {
+	if generation == nil || retirement.references <= 0 || generation.routeReferences < retirement.references {
 		return errors.New("jobmgr Function catalog: route reference underflow")
 	}
 	if err := c.validateGenerationTransition(

@@ -22,9 +22,7 @@ func TestProductionProcessRejectsInvalidInitialVnodes(t *testing.T) {
 	tests := map[string]struct {
 		vnodes map[string]*vnodes.VirtualNode
 	}{
-		"nil vnode": {
-			vnodes: map[string]*vnodes.VirtualNode{"missing": nil},
-		},
+		"nil vnode": {vnodes: map[string]*vnodes.VirtualNode{"missing": nil}},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -74,24 +72,14 @@ func TestProcessControlCancellationAfterHandoffWaitsForDisposition(t *testing.T)
 		call func(*Process, context.Context) error
 		want processCommand
 	}{
-		"restart": {
-			call: (*Process).Restart,
-			want: processRestart,
-		},
-		"terminate": {
-			call: (*Process).Terminate,
-			want: processTerminate,
-		},
+		"restart":   {call: (*Process).Restart, want: processRestart},
+		"terminate": {call: (*Process).Terminate, want: processTerminate},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			started := make(chan struct{})
 			close(started)
-			process := &Process{
-				commands: make(chan processControl),
-				started:  started,
-				done:     make(chan struct{}),
-			}
+			process := &Process{commands: make(chan processControl), started: started, done: make(chan struct{})}
 			accepted := make(chan struct{})
 			release := make(chan struct{})
 			go func() {
@@ -137,28 +125,19 @@ func TestProcessControlCancellationAfterHandoffWaitsForDisposition(t *testing.T)
 	}
 }
 
-func testProductionProcessConfig(
-	input io.Reader,
-	output io.Writer,
-) Config {
+func testProductionProcessConfig(input io.Reader, output io.Writer) Config {
 	factory := agentdiscovery.NewProviderFactory(
 		"test",
-		func(agentdiscovery.BuildContext) (
-			agentdiscovery.Discoverer,
-			bool,
-			error,
-		) {
+		func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
 			return runTestDiscoverer{}, true, nil
 		},
 	)
 	return Config{
 		Input: input, Output: output,
-		PluginName: "go.d",
-		Modules:    collectorapi.Registry{"test": {}},
-		Defaults:   confgroup.Registry{"test": {}},
-		DiscoveryProviders: []agentdiscovery.ProviderFactory{
-			factory,
-		},
-		ShutdownTimeout: time.Second,
+		PluginName:         "go.d",
+		Modules:            collectorapi.Registry{"test": {}},
+		Defaults:           confgroup.Registry{"test": {}},
+		DiscoveryProviders: []agentdiscovery.ProviderFactory{factory},
+		ShutdownTimeout:    time.Second,
 	}
 }

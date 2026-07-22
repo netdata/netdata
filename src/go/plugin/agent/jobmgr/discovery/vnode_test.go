@@ -102,14 +102,8 @@ func TestVNodeConfigCopiesMutableValues(t *testing.T) {
 
 func TestVNodeConfigInitialSnapshotIsDeterministicAndIndependent(t *testing.T) {
 	initial := map[string]*vnodes.VirtualNode{
-		"z": {
-			Name: "z", Hostname: "z-host", GUID: "z-guid",
-			Labels: map[string]string{"site": "z"},
-		},
-		"a": {
-			Name: "a", Hostname: "a-host", GUID: "a-guid",
-			Labels: map[string]string{"site": "a"},
-		},
+		"z": {Name: "z", Hostname: "z-host", GUID: "z-guid", Labels: map[string]string{"site": "z"}},
+		"a": {Name: "a", Hostname: "a-host", GUID: "a-guid", Labels: map[string]string{"site": "a"}},
 	}
 	configuration, err := NewVNodeConfigurationWithInitial(initial)
 	require.NoError(t, err)
@@ -125,11 +119,7 @@ func TestVNodeConfigInitialSnapshotIsDeterministicAndIndependent(t *testing.T) {
 }
 
 func TestVNodeConfigInitialIdentityMustMatchMapKey(t *testing.T) {
-	_, err := NewVNodeConfigurationWithInitial(
-		map[string]*vnodes.VirtualNode{
-			"map-name": {Name: "vnode-name"},
-		},
-	)
+	_, err := NewVNodeConfigurationWithInitial(map[string]*vnodes.VirtualNode{"map-name": {Name: "vnode-name"}})
 	require.Error(t, err)
 }
 

@@ -103,9 +103,7 @@ type ConstructedJob struct {
 }
 
 func (cj ConstructedJob) validate() error {
-	if !cj.Variant.Valid() ||
-		cj.Runtime == nil ||
-		cj.CollectorCleanup == nil {
+	if !cj.Variant.Valid() || cj.Runtime == nil || cj.CollectorCleanup == nil {
 		return errors.New("job output: incomplete constructed job")
 	}
 	return nil
@@ -159,16 +157,10 @@ func prepareJob(
 				cleanupConstructed(cleanupCtx, constructed),
 			))
 		}
-		return PreparedJob{}, errors.Join(
-			err,
-			rejectConstructed(cleanupCtx, constructed, permit),
-		)
+		return PreparedJob{}, errors.Join(err, rejectConstructed(cleanupCtx, constructed, permit))
 	}
 	if err := constructed.validate(); err != nil {
-		return PreparedJob{}, errors.Join(
-			err,
-			rejectConstructed(cleanupCtx, constructed, permit),
-		)
+		return PreparedJob{}, errors.Join(err, rejectConstructed(cleanupCtx, constructed, permit))
 	}
 	return PreparedJob{state: &preparedJobState{
 		id: id, generation: generation, constructed: constructed,
@@ -194,15 +186,10 @@ func (pj PreparedJob) Identity() lifecycle.ResourceIdentity {
 	if pj.state.consumed {
 		return lifecycle.ResourceIdentity{}
 	}
-	return lifecycle.ResourceIdentity{
-		ID: pj.state.id, Generation: pj.state.generation,
-	}
+	return lifecycle.ResourceIdentity{ID: pj.state.id, Generation: pj.state.generation}
 }
 
-func (pj PreparedJob) AcceptStart(
-	ctx context.Context,
-	expected uint64,
-) (lifecycle.ReadyResource, error) {
+func (pj PreparedJob) AcceptStart(ctx context.Context, expected uint64) (lifecycle.ReadyResource, error) {
 	generation, err := pj.Accept(ctx, expected)
 	if err != nil {
 		if errors.Is(err, ErrJobGenerationMismatch) {
@@ -219,10 +206,7 @@ func (pj PreparedJob) AcceptStart(
 	return generation, nil
 }
 
-func (pj PreparedJob) Accept(
-	ctx context.Context,
-	generation uint64,
-) (*JobGeneration, error) {
+func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGeneration, error) {
 	if ctx == nil {
 		return nil, errors.New("job output: nil job acceptance context")
 	}
@@ -236,12 +220,10 @@ func (pj PreparedJob) Accept(
 		}); err != nil {
 			failure := &autoDetectionFailure{cause: err}
 			if state.constructed.retryAutoDetection != nil {
-				failure.retry =
-					state.constructed.retryAutoDetection()
+				failure.retry = state.constructed.retryAutoDetection()
 			}
 			if state.constructed.autoDetectionEvery != nil {
-				failure.retryAfter =
-					state.constructed.autoDetectionEvery()
+				failure.retryAfter = state.constructed.autoDetectionEvery()
 			}
 			if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
 				failure.coded = true
@@ -250,11 +232,7 @@ func (pj PreparedJob) Accept(
 					failure.retry = false
 				}
 			}
-			cleanupErr := disposeConstructed(
-				context.WithoutCancel(ctx),
-				state.constructed,
-				state.permit,
-			)
+			cleanupErr := disposeConstructed(context.WithoutCancel(ctx), state.constructed, state.permit)
 			if cleanupErr != nil || ctx.Err() != nil {
 				return nil, errors.Join(err, cleanupErr)
 			}
@@ -262,8 +240,7 @@ func (pj PreparedJob) Accept(
 		}
 	}
 	if state.constructed.finalCleanup != nil {
-		state.constructed.CollectorCleanup =
-			state.constructed.finalCleanup
+		state.constructed.CollectorCleanup = state.constructed.finalCleanup
 	}
 	return &JobGeneration{
 		ID: state.id, Generation: state.generation,
@@ -314,9 +291,7 @@ func (pj PreparedJob) take() (*preparedJobState, error) {
 	return pj.state, nil
 }
 
-func (pj PreparedJob) takeForGeneration(
-	generation uint64,
-) (*preparedJobState, error) {
+func (pj PreparedJob) takeForGeneration(generation uint64) (*preparedJobState, error) {
 	if pj.state == nil {
 		return nil, errors.New("job output: unprepared job")
 	}
@@ -351,9 +326,7 @@ func (jg *JobGeneration) Identity() lifecycle.ResourceIdentity {
 	if jg == nil {
 		return lifecycle.ResourceIdentity{}
 	}
-	return lifecycle.ResourceIdentity{
-		ID: jg.ID, Generation: jg.Generation,
-	}
+	return lifecycle.ResourceIdentity{ID: jg.ID, Generation: jg.Generation}
 }
 
 func (jg *JobGeneration) Start(ctx context.Context) error {
@@ -372,11 +345,7 @@ func (jg *JobGeneration) Start(ctx context.Context) error {
 	if err := callJobLifecycle("runtime Start", func() error {
 		return jg.resources.Runtime.Start(ctx)
 	}); err != nil {
-		cleanupErr := disposeConstructed(
-			context.WithoutCancel(ctx),
-			jg.resources,
-			jg.permit,
-		)
+		cleanupErr := disposeConstructed(context.WithoutCancel(ctx), jg.resources, jg.permit)
 		state := JobAborted
 		if cleanupErr != nil {
 			state = JobRetained
@@ -416,10 +385,7 @@ func (jg *JobGeneration) Publish() error {
 	jg.observedActive = true
 	jg.mu.Unlock()
 	if observer != nil {
-		observer.AddRuntimeGauge(
-			lifecycle.RuntimeGaugeJobsActive,
-			1,
-		)
+		observer.AddRuntimeGauge(lifecycle.RuntimeGaugeJobsActive, 1)
 	}
 	return nil
 }
@@ -477,10 +443,7 @@ func (jg *JobGeneration) Stop(ctx context.Context) error {
 		jg.observedActive = false
 		jg.mu.Unlock()
 		if wasActive && observer != nil {
-			observer.AddRuntimeGauge(
-				lifecycle.RuntimeGaugeJobsActive,
-				-1,
-			)
+			observer.AddRuntimeGauge(lifecycle.RuntimeGaugeJobsActive, -1)
 		}
 	default:
 		state := jg.state
@@ -584,11 +547,7 @@ func (jg *JobGeneration) finishStop(state JobState, err error) error {
 	return err
 }
 
-func rejectConstructed(
-	ctx context.Context,
-	constructed ConstructedJob,
-	permit lifecycle.LongLivedPermit,
-) error {
+func rejectConstructed(ctx context.Context, constructed ConstructedJob, permit lifecycle.LongLivedPermit) error {
 	if err := cleanupConstructed(ctx, constructed); err != nil {
 		return lifecycle.RetainOwnership(err)
 	}
@@ -600,10 +559,7 @@ func rejectConstructed(
 	return nil
 }
 
-func cleanupConstructed(
-	ctx context.Context,
-	constructed ConstructedJob,
-) error {
+func cleanupConstructed(ctx context.Context, constructed ConstructedJob) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -631,11 +587,7 @@ func cleanupConstructed(
 	return nil
 }
 
-func disposeConstructed(
-	ctx context.Context,
-	constructed ConstructedJob,
-	permit lifecycle.LongLivedPermit,
-) error {
+func disposeConstructed(ctx context.Context, constructed ConstructedJob, permit lifecycle.LongLivedPermit) error {
 	if err := rejectConstructed(ctx, constructed, permit); err != nil {
 		return err
 	}
@@ -663,12 +615,7 @@ func callConstructJob(
 func callJobLifecycle(name string, call func() error) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf(
-				"%w in job %s: %v",
-				lifecycle.ErrTaskPanic,
-				name,
-				recovered,
-			)
+			err = fmt.Errorf("%w in job %s: %v", lifecycle.ErrTaskPanic, name, recovered)
 		}
 	}()
 	return call()

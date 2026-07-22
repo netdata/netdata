@@ -15,13 +15,7 @@ func BenchmarkBOperationTransition(b *testing.B) {
 	var id OperationID
 	for b.Loop() {
 		id++
-		operation, err := NewOperation(
-			id,
-			"uid",
-			SourceFunction,
-			"lane",
-			true,
-		)
+		operation, err := NewOperation(id, "uid", SourceFunction, "lane", true)
 		if err != nil {
 			require.FailNow(b, "benchmark failed", err)
 		}
@@ -93,10 +87,7 @@ func BenchmarkBLongLivedPermitLifecycle(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		generation++
-		permit, err := supervisor.IssueLongLivedPermit(
-			ResourceIdentity{ID: "job", Generation: generation},
-			plan,
-		)
+		permit, err := supervisor.IssueLongLivedPermit(ResourceIdentity{ID: "job", Generation: generation}, plan)
 		if err != nil {
 			require.FailNow(b, "benchmark failed", err)
 		}
@@ -170,19 +161,10 @@ func BenchmarkBTaskSupervisorDispatch(b *testing.B) {
 		count, more, err := supervisor.Dispatch(context.Background(), 1, &started)
 		b.StopTimer()
 		if err != nil || count != 1 || more {
-			require.FailNowf(b, "benchmark failed",
-				"dispatch count=%d more=%t err=%v",
-				count,
-				more,
-				err,
-			)
+			require.FailNowf(b, "benchmark failed", "dispatch count=%d more=%t err=%v", count, more, err)
 		}
 		if started[0].Request != pending {
-			require.FailNowf(b, "benchmark failed",
-				"started request=%+v, want %+v",
-				started[0].Request,
-				pending,
-			)
+			require.FailNowf(b, "benchmark failed", "started request=%+v, want %+v", started[0].Request, pending)
 		}
 		completion := <-supervisor.CompletionCh()
 		if err := supervisor.SendAction(TaskAction{
@@ -285,11 +267,7 @@ func BenchmarkBFrameCommit(b *testing.B) {
 }
 
 func BenchmarkBRunAdmitting(b *testing.B) {
-	supervisor, err := NewRunSupervisor(
-		1,
-		RealClock{},
-		time.Second,
-	)
+	supervisor, err := NewRunSupervisor(1, RealClock{}, time.Second)
 	if err != nil {
 		require.FailNow(b, "benchmark failed", err)
 	}

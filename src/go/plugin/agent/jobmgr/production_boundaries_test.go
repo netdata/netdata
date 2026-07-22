@@ -45,15 +45,8 @@ func TestProductionShippedRootScenarioMatrix(t *testing.T) {
 	missing, err := driver.RunMatrixAvailable(ctx)
 	require.NoError(t, err)
 	if len(missing) != 0 {
-		require.NotEqualValues(
-			t,
-			"1",
-			os.Getenv("JOBMGRTEST_REQUIRE_ALL_ROOTS"),
-		)
-		t.Skipf(
-			"prebuilt supported shipped-root binaries are required; missing=%v",
-			missing,
-		)
+		require.NotEqualValues(t, "1", os.Getenv("JOBMGRTEST_REQUIRE_ALL_ROOTS"))
+		t.Skipf("prebuilt supported shipped-root binaries are required; missing=%v", missing)
 	}
 }
 

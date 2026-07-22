@@ -35,32 +35,18 @@ func newManagedJob(
 		collectorCleanup == nil {
 		return ConstructedJob{}, errors.New("job output: invalid managed job")
 	}
-	support := &managedLoopSupport{
-		job: job, tasks: tasks, identity: identity,
-	}
-	scheduled := &scheduledJobSupport{
-		scheduler: scheduler,
-		identity:  identity,
-		job:       job,
-	}
+	support := &managedLoopSupport{job: job, tasks: tasks, identity: identity}
+	scheduled := &scheduledJobSupport{scheduler: scheduler, identity: identity, job: job}
 	var runtime jobruntime.Runtime
 	switch variant {
 	case JobVariantV1:
 		support.role = lifecycle.InheritedV1Runtime
-		runtime = jobruntime.NewV1Runtime(
-			[]jobruntime.Support{support, scheduled},
-		)
+		runtime = jobruntime.NewV1Runtime([]jobruntime.Support{support, scheduled})
 	case JobVariantV2:
 		support.role = lifecycle.InheritedV2Runner
-		runtime = jobruntime.NewV2Runtime(
-			[]jobruntime.Support{support, scheduled},
-		)
+		runtime = jobruntime.NewV2Runtime([]jobruntime.Support{support, scheduled})
 	}
-	return ConstructedJob{
-		Variant:          variant,
-		Runtime:          runtime,
-		CollectorCleanup: collectorCleanup,
-	}, nil
+	return ConstructedJob{Variant: variant, Runtime: runtime, CollectorCleanup: collectorCleanup}, nil
 }
 
 type scheduledJobSupport struct {
@@ -83,10 +69,7 @@ func (sjs *scheduledJobSupport) Start(context.Context) error {
 	if sjs.started || sjs.stopped || sjs.released {
 		return errors.New("job output: invalid scheduler support start")
 	}
-	if err := sjs.scheduler.Register(
-		sjs.identity,
-		sjs.job,
-	); err != nil {
+	if err := sjs.scheduler.Register(sjs.identity, sjs.job); err != nil {
 		return err
 	}
 	sjs.started = true
@@ -105,10 +88,7 @@ func (sjs *scheduledJobSupport) Stop(context.Context) error {
 	if sjs.stopped {
 		return nil
 	}
-	if err := sjs.scheduler.Unregister(
-		sjs.identity,
-		sjs.job,
-	); err != nil {
+	if err := sjs.scheduler.Unregister(sjs.identity, sjs.job); err != nil {
 		return err
 	}
 	sjs.stopped = true
@@ -191,11 +171,7 @@ func (mls *managedLoopSupport) abortStart(ref lifecycle.InheritedTaskRef) error 
 		joinErr = errors.Join(joinErr, errors.New("job output: managed loop did not join after failed start"))
 		return errors.Join(cancelErr, joinErr)
 	}
-	return errors.Join(
-		cancelErr,
-		joinErr,
-		mls.tasks.ReleaseInherited(ref, mls.identity),
-	)
+	return errors.Join(cancelErr, joinErr, mls.tasks.ReleaseInherited(ref, mls.identity))
 }
 
 func (mls *managedLoopSupport) Stop(ctx context.Context) error {
@@ -264,18 +240,12 @@ func (fw FrameWriter) Write(payload []byte) (int, error) {
 	return len(payload), nil
 }
 
-func (fw FrameWriter) CommitJobOutput(
-	payload []byte,
-	transaction jobruntime.OutputStateTransaction,
-) error {
+func (fw FrameWriter) CommitJobOutput(payload []byte, transaction jobruntime.OutputStateTransaction) error {
 	if transaction == nil {
 		return errors.New("job output: invalid FrameOwner transaction")
 	}
 	if fw.Owner == nil {
-		return errors.Join(
-			errors.New("job output: nil FrameOwner writer"),
-			transaction.Abort(),
-		)
+		return errors.Join(errors.New("job output: nil FrameOwner writer"), transaction.Abort())
 	}
 	return fw.Owner.CommitBorrowedProtocolTransaction(payload, transaction)
 }

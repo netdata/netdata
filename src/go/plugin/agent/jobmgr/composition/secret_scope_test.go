@@ -16,36 +16,19 @@ type releaseErrorAtomicScope struct {
 	err error
 }
 
-func (reas releaseErrorAtomicScope) Resolve(
-	context.Context,
-	string,
-	string,
-) ([]byte, error) {
+func (reas releaseErrorAtomicScope) Resolve(context.Context, string, string) ([]byte, error) {
 	return nil, nil
 }
 
-func (reas releaseErrorAtomicScope) Release(
-	context.Context,
-) error {
+func (reas releaseErrorAtomicScope) Release(context.Context) error {
 	return reas.err
 }
 
-func TestRunOwnedAtomicScopeDirtiesRunOnReleaseFailure(
-	t *testing.T,
-) {
+func TestRunOwnedAtomicScopeDirtiesRunOnReleaseFailure(t *testing.T) {
 	releaseErr := errors.New("store scope release failed")
-	run, err := lifecycle.NewRunSupervisor(
-		1,
-		lifecycle.RealClock{},
-		time.Second,
-	)
+	run, err := lifecycle.NewRunSupervisor(1, lifecycle.RealClock{}, time.Second)
 	require.NoError(t, err)
-	scope := &runOwnedAtomicScope{
-		run: run,
-		scope: releaseErrorAtomicScope{
-			err: releaseErr,
-		},
-	}
+	scope := &runOwnedAtomicScope{run: run, scope: releaseErrorAtomicScope{err: releaseErr}}
 
 	require.ErrorIs(t, scope.Release(t.Context()), releaseErr)
 

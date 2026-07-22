@@ -20,19 +20,10 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 		wantErr     bool
 		wantCreates int
 	}{
-		"configuration success": {
-			operation: "configuration", wantCreates: 1,
-		},
-		"test success": {
-			operation: "test", wantCreates: 1,
-		},
-		"test failure": {
-			operation: "test", checkErr: errors.New("check failed"),
-			wantErr: true, wantCreates: 1,
-		},
-		"validation success": {
-			operation: "validate", wantCreates: 1,
-		},
+		"configuration success": {operation: "configuration", wantCreates: 1},
+		"test success":          {operation: "test", wantCreates: 1},
+		"test failure":          {operation: "test", checkErr: errors.New("check failed"), wantErr: true, wantCreates: 1},
+		"validation success":    {operation: "validate", wantCreates: 1},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -51,9 +42,7 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 							},
 							CreateV2: func() collectorapi.CollectorV2 {
 								v2Creates++
-								return &factoryTestV2{
-									state: state, checkErr: test.checkErr,
-								}
+								return &factoryTestV2{state: state, checkErr: test.checkErr}
 							},
 						},
 					},
@@ -76,7 +65,10 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 				require.FailNowf(t, "test failed", "unknown operation %q", test.operation)
 			}
 			require.EqualValues(t, test.wantErr, err != nil)
-			require.False(t, v1Creates != 0 || v2Creates != test.wantCreates || state.collectorCleanup != test.wantCreates)
+			require.False(
+				t,
+				v1Creates != 0 || v2Creates != test.wantCreates || state.collectorCleanup != test.wantCreates,
+			)
 		})
 	}
 }

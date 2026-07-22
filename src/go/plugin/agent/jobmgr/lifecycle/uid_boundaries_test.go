@@ -12,26 +12,15 @@ func TestUIDLedgerTombstonePopulationGrowsBeyondFormerBoundary(t *testing.T) {
 	tests := map[string]struct {
 		population int
 	}{
-		"one below former limit": {
-			population: formerFixedUIDPopulation - 1,
-		},
-		"at former limit": {
-			population: formerFixedUIDPopulation,
-		},
-		"one above former limit": {
-			population: formerFixedUIDPopulation + 1,
-		},
+		"one below former limit": {population: formerFixedUIDPopulation - 1},
+		"at former limit":        {population: formerFixedUIDPopulation},
+		"one above former limit": {population: formerFixedUIDPopulation + 1},
 	}
 	now := time.Unix(100, 0)
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			ledger := NewUIDLedger()
-			seedUIDTombstones(
-				t,
-				ledger,
-				test.population,
-				now,
-			)
+			seedUIDTombstones(t, ledger, test.population, now)
 
 			require.NoError(t, ledger.Admit("fresh", now))
 		})
@@ -41,18 +30,9 @@ func TestUIDLedgerTombstonePopulationGrowsBeyondFormerBoundary(t *testing.T) {
 		offset    time.Duration
 		wantAdmit bool
 	}{
-		"before expiry": {
-			offset:    UIDTombstoneLifetime - time.Nanosecond,
-			wantAdmit: false,
-		},
-		"at expiry": {
-			offset:    UIDTombstoneLifetime,
-			wantAdmit: true,
-		},
-		"after expiry": {
-			offset:    UIDTombstoneLifetime + time.Nanosecond,
-			wantAdmit: true,
-		},
+		"before expiry": {offset: UIDTombstoneLifetime - time.Nanosecond, wantAdmit: false},
+		"at expiry":     {offset: UIDTombstoneLifetime, wantAdmit: true},
+		"after expiry":  {offset: UIDTombstoneLifetime + time.Nanosecond, wantAdmit: true},
 	}
 	for name, test := range expiryTests {
 		t.Run(name, func(t *testing.T) {
@@ -72,23 +52,14 @@ func TestUIDLedgerAdmissionReapsOneBoundedExpiredPrefix(t *testing.T) {
 	tests := map[string]struct {
 		incoming string
 	}{
-		"fresh tail": {
-			incoming: "fresh",
-		},
-		"expired duplicate at tail": {
-			incoming: fmt.Sprintf("uid-%05d", UIDReturnBatch),
-		},
+		"fresh tail":                {incoming: "fresh"},
+		"expired duplicate at tail": {incoming: fmt.Sprintf("uid-%05d", UIDReturnBatch)},
 	}
 	now := time.Unix(100, 0)
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			ledger := NewUIDLedger()
-			seedUIDTombstones(
-				t,
-				ledger,
-				UIDReturnBatch+1,
-				now,
-			)
+			seedUIDTombstones(t, ledger, UIDReturnBatch+1, now)
 
 			require.NoError(t, ledger.Admit(test.incoming, now.Add(UIDTombstoneLifetime)))
 
@@ -128,12 +99,7 @@ func TestUIDLedgerCloseUsesBoundedAcknowledgedBatches(t *testing.T) {
 	}
 }
 
-func seedUIDTombstones(
-	t *testing.T,
-	ledger *UIDLedger,
-	count int,
-	now time.Time,
-) {
+func seedUIDTombstones(t *testing.T, ledger *UIDLedger, count int, now time.Time) {
 	t.Helper()
 	for index := range count {
 		uid := fmt.Sprintf("uid-%05d", index)

@@ -123,23 +123,12 @@ type TaskSupervisor struct {
 	wake        func()                   // kernel wake callback
 }
 
-func (ts *TaskSupervisor) BindRun(
-	run *RunSupervisor,
-	wake func(),
-) error {
+func (ts *TaskSupervisor) BindRun(run *RunSupervisor, wake func()) error {
 	if ts == nil || run == nil || wake == nil {
-		return errors.New(
-			"jobmgr task supervisor: invalid run binding",
-		)
+		return errors.New("jobmgr task supervisor: invalid run binding")
 	}
-	if ts.run != nil ||
-		ts.wake != nil ||
-		ts.active != 0 ||
-		ts.Pending() != 0 ||
-		ts.InheritedActive() != 0 {
-		return errors.New(
-			"jobmgr task supervisor: run bound after activation",
-		)
+	if ts.run != nil || ts.wake != nil || ts.active != 0 || ts.Pending() != 0 || ts.InheritedActive() != 0 {
+		return errors.New("jobmgr task supervisor: run bound after activation")
 	}
 	ts.run = run
 	ts.wake = wake
@@ -162,14 +151,11 @@ func NewTaskSupervisor(frame *FrameOwner) (*TaskSupervisor, error) {
 	return supervisor, nil
 }
 
-func (ts *TaskSupervisor) BindRuntimeObserver(
-	observer RuntimeObserver,
-) error {
+func (ts *TaskSupervisor) BindRuntimeObserver(observer RuntimeObserver) error {
 	if ts == nil || observer == nil {
 		return errors.New("jobmgr task supervisor: invalid runtime observer")
 	}
-	if ts.observer != nil || ts.active != 0 ||
-		ts.Pending() != 0 {
+	if ts.observer != nil || ts.active != 0 || ts.Pending() != 0 {
 		return errors.New("jobmgr task supervisor: runtime observer bound after activation")
 	}
 	ts.observer = observer
@@ -185,9 +171,7 @@ func (ts *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskRequestRe
 		return TaskRequestRef{}, err
 	}
 	if plan.InitialCancellation != nil {
-		plan.InitialCancellation, _, _ = canonicalCancellationCause(
-			plan.InitialCancellation,
-		)
+		plan.InitialCancellation, _, _ = canonicalCancellationCause(plan.InitialCancellation)
 	}
 	var initial TaskOutcome
 	if plan.initialReady != nil {
@@ -283,7 +267,11 @@ func (ts *TaskSupervisor) CancelPendingOutcome(ref TaskRequestRef) (TaskOutcome,
 	return outcome, nil
 }
 
-func (ts *TaskSupervisor) Dispatch(parent context.Context, quantum int, started *[TaskStartServiceQuantum]TaskStart) (int, bool, error) {
+func (ts *TaskSupervisor) Dispatch(
+	parent context.Context,
+	quantum int,
+	started *[TaskStartServiceQuantum]TaskStart,
+) (int, bool, error) {
 	if parent == nil || started == nil || quantum < 0 || quantum > len(started) {
 		return 0, ts.Pending() > 0, errors.New("jobmgr task supervisor: invalid dispatch")
 	}
@@ -320,9 +308,7 @@ func (ts *TaskSupervisor) Pending() int {
 func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial TaskOutcome) (TaskRef, error) {
 	hasDirectWork := plan.Work != nil
 	if plan.transactionWork == nil {
-		if (hasDirectWork != initial.empty()) ||
-			plan.initialReady != nil ||
-			plan.initialIdentity.Valid() {
+		if (hasDirectWork != initial.empty()) || plan.initialReady != nil || plan.initialIdentity.Valid() {
 			return TaskRef{}, errors.New("jobmgr task supervisor: invalid sealed task request")
 		}
 	} else if hasDirectWork ||
@@ -350,22 +336,15 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 			current, ok = initial.ReadyResource()
 			identity, identityOK := initial.ResourceIdentity()
 			if !ok || !identityOK || identity != plan.transactionScope.Current {
-				return TaskRef{}, errors.New(
-					"jobmgr task supervisor: transaction current differs from sealed scope",
-				)
+				return TaskRef{}, errors.New("jobmgr task supervisor: transaction current differs from sealed scope")
 			}
 		} else if !initial.empty() {
-			return TaskRef{}, errors.New(
-				"jobmgr task supervisor: graph-only transaction has a current resource",
-			)
+			return TaskRef{}, errors.New("jobmgr task supervisor: graph-only transaction has a current resource")
 		}
 		initial = TaskOutcome{}
 		var permit LongLivedPermit
 		if plan.transactionScope.Successor.Valid() {
-			issued, err := ts.IssueLongLivedPermit(
-				plan.permitOwner,
-				plan.permitPlan,
-			)
+			issued, err := ts.IssueLongLivedPermit(plan.permitOwner, plan.permitPlan)
 			if err != nil {
 				return TaskRef{}, err
 			}
@@ -373,9 +352,7 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 		}
 		work := plan.transactionWork
 		scope := plan.transactionScope
-		plan.Work = func(
-			ctx context.Context,
-		) (outcome TaskOutcome, resultErr error) {
+		plan.Work = func(ctx context.Context) (outcome TaskOutcome, resultErr error) {
 			defer func() {
 				if recovered := recover(); recovered != nil {
 					var abortErr error
@@ -384,17 +361,10 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 					}
 					var outcomeErr error
 					if current != nil {
-						outcome, outcomeErr = readyResourceOutcome(
-							current,
-							scope.Current,
-						)
+						outcome, outcomeErr = readyResourceOutcome(current, scope.Current)
 					}
 					resultErr = errors.Join(
-						fmt.Errorf(
-							"%w in resource-transaction work: %v",
-							ErrTaskPanic,
-							recovered,
-						),
+						fmt.Errorf("%w in resource-transaction work: %v", ErrTaskPanic, recovered),
 						abortErr,
 						outcomeErr,
 					)
@@ -422,18 +392,9 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 				permit = LongLivedPermit{}
 				if restored != nil {
 					outcome, outcomeErr := readyResourceOutcome(restored, scope.Current)
-					return outcome, errors.Join(
-						workErr,
-						scopeErr,
-						disposeErr,
-						outcomeErr,
-					)
+					return outcome, errors.Join(workErr, scopeErr, disposeErr, outcomeErr)
 				}
-				return TaskOutcome{}, errors.Join(
-					workErr,
-					scopeErr,
-					disposeErr,
-				)
+				return TaskOutcome{}, errors.Join(workErr, scopeErr, disposeErr)
 			}
 			current = nil
 			permit = LongLivedPermit{}
@@ -501,8 +462,7 @@ func (ts *TaskSupervisor) allocateSlot() (uint32, *taskSlot, error) {
 }
 
 func (ts *TaskSupervisor) recycleUnusedSlot(index uint32, slot *taskSlot) {
-	if slot == nil || slot.active || uint64(index) >= uint64(len(ts.slots)) ||
-		ts.slots[index] != slot {
+	if slot == nil || slot.active || uint64(index) >= uint64(len(ts.slots)) || ts.slots[index] != slot {
 		panic("jobmgr task supervisor: invalid unused slot recycle")
 	}
 	slot.freeNext = ts.freeSlot
@@ -555,14 +515,14 @@ func (ts *TaskSupervisor) SendAction(action TaskAction) error {
 	if err != nil {
 		return err
 	}
-	if slot.joined || slot.actionPending || action.Sequence != slot.sequence+1 || action.Sequence > slot.maxPhaseTransitions {
+	if slot.joined || slot.actionPending || action.Sequence != slot.sequence+1 ||
+		action.Sequence > slot.maxPhaseTransitions {
 		return errors.New("jobmgr task supervisor: stale, duplicate, or wrong-sequence phase action")
 	}
 	if action.Kind == TaskActionEncodeWrite && (action.UID == "" || action.Expiry <= 0) {
 		return errors.New("jobmgr task supervisor: invalid encode/write action")
 	}
-	if action.Kind != TaskActionEncodeWrite &&
-		(action.UID != "" || action.Expiry != 0) {
+	if action.Kind != TaskActionEncodeWrite && (action.UID != "" || action.Expiry != 0) {
 		return errors.New("jobmgr task supervisor: unexpected action payload")
 	}
 	slot.actionPending = true
@@ -603,11 +563,7 @@ func (ts *TaskSupervisor) Release(ref TaskRef) error {
 	slot.cancel(context.Canceled)
 	generation := slot.generation
 	action := slot.action
-	*slot = taskSlot{
-		generation: generation,
-		freeNext:   ts.freeSlot,
-		action:     action,
-	}
+	*slot = taskSlot{generation: generation, freeNext: ts.freeSlot, action: action}
 	ts.freeSlot = ref.Slot + 1
 	ts.active--
 	ts.observeRuntimeState()
@@ -687,9 +643,7 @@ func (ts *TaskSupervisor) TakeAppliedResourceTransaction(
 		outcome.kind != TaskOutcomeAppliedResourceTransaction ||
 		!outcome.scopeSet ||
 		outcome.scope != expected {
-		return 0, nil, errors.New(
-			"jobmgr task supervisor: applied resource transaction is unavailable",
-		)
+		return 0, nil, errors.New("jobmgr task supervisor: applied resource transaction is unavailable")
 	}
 	if err := outcome.validate(); err != nil {
 		return 0, nil, err
@@ -708,40 +662,37 @@ func (ts *TaskSupervisor) TakeDisposedResourceTransaction(
 		return nil, err
 	}
 	if slot.actionPending || slot.sequence != sequence {
-		return nil, errors.New(
-			"jobmgr task supervisor: disposed resource transaction is unavailable",
-		)
+		return nil, errors.New("jobmgr task supervisor: disposed resource transaction is unavailable")
 	}
 	if expected.Current.Valid() {
 		if slot.outcome.kind != TaskOutcomeReadyResource ||
 			slot.outcome.ready == nil ||
 			slot.outcome.identity != expected.Current {
-			return nil, errors.New(
-				"jobmgr task supervisor: disposed transaction lost current resource",
-			)
+			return nil, errors.New("jobmgr task supervisor: disposed transaction lost current resource")
 		}
 		current := slot.outcome.ready
 		slot.outcome = TaskOutcome{}
 		return current, nil
 	}
 	if !slot.outcome.empty() {
-		return nil, errors.New(
-			"jobmgr task supervisor: empty disposed transaction retained an outcome",
-		)
+		return nil, errors.New("jobmgr task supervisor: empty disposed transaction retained an outcome")
 	}
 	return nil, nil
 }
 
-func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskSlot, plan TaskPlan, outcome TaskOutcome) {
+func (ts *TaskSupervisor) runChild(
+	ctx context.Context,
+	ref TaskRef,
+	slot *taskSlot,
+	plan TaskPlan,
+	outcome TaskOutcome,
+) {
 	var err error
 	if outcome.empty() {
 		outcome, err = runTaskWork(ctx, plan.Work)
 	}
 	if err != nil {
-		err = normalizeStoppingCancellation(
-			err,
-			context.Cause(ctx),
-		)
+		err = normalizeStoppingCancellation(err, context.Cause(ctx))
 	}
 	if publishErr := outcome.validate(); publishErr != nil {
 		err = errors.Join(err, publishErr)
@@ -750,12 +701,7 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 	}
 	outcome = TaskOutcome{}
 	slot.sequence = 1
-	ts.completions <- TaskCompletion{
-		Ref:      ref,
-		Sequence: 1,
-		Kind:     slot.outcome.kind,
-		Err:      err,
-	}
+	ts.completions <- TaskCompletion{Ref: ref, Sequence: 1, Kind: slot.outcome.kind, Err: err}
 	ts.observeTaskPanic(err)
 	for {
 		action := <-slot.action
@@ -785,9 +731,7 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 				ack.Err = errors.New("jobmgr task child: stop without ready resource")
 			} else {
 				ack.Err = callReadyResource("stop", func() error {
-					return slot.outcome.ready.Stop(
-						context.WithoutCancel(ctx),
-					)
+					return slot.outcome.ready.Stop(context.WithoutCancel(ctx))
 				})
 			}
 		case TaskActionFinalizeResource:
@@ -803,22 +747,15 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 			if slot.outcome.kind != TaskOutcomePreparedResourceTransaction ||
 				slot.outcome.transaction == nil ||
 				!slot.outcome.scopeSet {
-				ack.Err = errors.New(
-					"jobmgr task child: apply without prepared resource transaction",
-				)
+				ack.Err = errors.New("jobmgr task child: apply without prepared resource transaction")
 			} else {
 				transaction := slot.outcome.transaction
 				scope := slot.outcome.scope
-				applied, applyErr := runPreparedResourceTransactionApply(
-					context.WithoutCancel(ctx),
-					transaction,
-				)
+				applied, applyErr := runPreparedResourceTransactionApply(context.WithoutCancel(ctx), transaction)
 				if applyErr != nil {
 					ack.Err = applyErr
 				} else if applied.scope != scope {
-					ack.Err = errors.New(
-						"jobmgr task child: applied resource transaction changed scope",
-					)
+					ack.Err = errors.New("jobmgr task child: applied resource transaction changed scope")
 				} else {
 					next, outcomeErr := appliedResourceTransactionOutcome(applied)
 					ack.Err = outcomeErr
@@ -839,8 +776,7 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 			ts.observeTaskPanic(ack.Err)
 			continue
 		case TaskActionDispose:
-			if slot.outcome.kind == TaskOutcomePreparedResourceTransaction &&
-				slot.outcome.transaction != nil {
+			if slot.outcome.kind == TaskOutcomePreparedResourceTransaction && slot.outcome.transaction != nil {
 				transaction := slot.outcome.transaction
 				scope := slot.outcome.scope
 				current, disposeErr := runPreparedResourceTransactionDispose(
@@ -850,10 +786,7 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 				ack.Err = disposeErr
 				if disposeErr == nil {
 					if scope.Current.Valid() {
-						slot.outcome, ack.Err = readyResourceOutcome(
-							current,
-							scope.Current,
-						)
+						slot.outcome, ack.Err = readyResourceOutcome(current, scope.Current)
 					} else if current != nil {
 						ack.Err = errors.New(
 							"jobmgr task child: graph-only transaction disposal returned a resource",
@@ -863,11 +796,7 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 					}
 				}
 			} else {
-				ack.Err = disposeTaskOutcome(
-					ctx,
-					slot.outcome,
-					slot.preserveDisposeContext,
-				)
+				ack.Err = disposeTaskOutcome(ctx, slot.outcome, slot.preserveDisposeContext)
 				if ack.Err == nil {
 					slot.outcome = TaskOutcome{}
 				}
@@ -895,23 +824,15 @@ func (ts *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskS
 			ts.acks <- ack
 			return
 		}
-		if action.Kind == TaskActionDispose &&
-			ack.Err == nil &&
-			ts.observer != nil {
-			ts.observer.AddRuntimeCounter(
-				RuntimeCounterResultsDisposed,
-				1,
-			)
+		if action.Kind == TaskActionDispose && ack.Err == nil && ts.observer != nil {
+			ts.observer.AddRuntimeCounter(RuntimeCounterResultsDisposed, 1)
 		}
 		ts.observeTaskPanic(ack.Err)
 		ts.acks <- ack
 	}
 }
 
-func normalizeStoppingCancellation(
-	err error,
-	cause error,
-) error {
+func normalizeStoppingCancellation(err error, cause error) error {
 	stopping, ok := cause.(*StoppingRejection)
 	if !ok {
 		return err
@@ -947,11 +868,7 @@ func runPreparedResourceTransactionApply(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			applied = AppliedResourceTransaction{}
-			err = fmt.Errorf(
-				"%w in prepared resource transaction apply: %v",
-				ErrTaskPanic,
-				recovered,
-			)
+			err = fmt.Errorf("%w in prepared resource transaction apply: %v", ErrTaskPanic, recovered)
 		}
 	}()
 	return transaction.Apply(ctx)
@@ -964,11 +881,7 @@ func runPreparedResourceTransactionDispose(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			current = nil
-			err = fmt.Errorf(
-				"%w in prepared resource transaction dispose: %v",
-				ErrTaskPanic,
-				recovered,
-			)
+			err = fmt.Errorf("%w in prepared resource transaction dispose: %v", ErrTaskPanic, recovered)
 		}
 	}()
 	return transaction.Dispose(ctx)
@@ -989,13 +902,9 @@ func disposeTaskOutcome(ctx context.Context, outcome TaskOutcome, preserveContex
 	case TaskOutcomeReadyResource:
 		return callReadyResource("abort ready", func() error { return outcome.ready.AbortReady(cleanupCtx) })
 	case TaskOutcomePreparedResourceTransaction:
-		return errors.New(
-			"jobmgr task child: resource transaction requires transfer-aware disposal",
-		)
+		return errors.New("jobmgr task child: resource transaction requires transfer-aware disposal")
 	case TaskOutcomeAppliedResourceTransaction:
-		return errors.New(
-			"jobmgr task child: applied resource transaction requires kernel transfer",
-		)
+		return errors.New("jobmgr task child: applied resource transaction requires kernel transfer")
 	default:
 		return errors.New("jobmgr task child: cannot dispose unknown outcome")
 	}
@@ -1023,8 +932,7 @@ func (ts *TaskSupervisor) slot(ref TaskRef) (*taskSlot, error) {
 	if !ref.Valid() {
 		return nil, errors.New("jobmgr task supervisor: invalid task reference")
 	}
-	if uint64(ref.Slot) >= uint64(len(ts.slots)) ||
-		ts.slots[ref.Slot] == nil {
+	if uint64(ref.Slot) >= uint64(len(ts.slots)) || ts.slots[ref.Slot] == nil {
 		return nil, errors.New("jobmgr task supervisor: stale task reference")
 	}
 	slot := ts.slots[ref.Slot]
@@ -1038,8 +946,7 @@ func (ts *TaskSupervisor) request(ref TaskRequestRef) (*taskRequest, error) {
 	if !ref.Valid() {
 		return nil, errors.New("jobmgr task supervisor: invalid request reference")
 	}
-	if uint64(ref.Slot) >= uint64(len(ts.requests)) ||
-		ts.requests[ref.Slot] == nil {
+	if uint64(ref.Slot) >= uint64(len(ts.requests)) || ts.requests[ref.Slot] == nil {
 		return nil, errors.New("jobmgr task supervisor: stale request reference")
 	}
 	record := ts.requests[ref.Slot]
@@ -1073,14 +980,8 @@ func (ts *TaskSupervisor) observeRuntimeState() {
 	if ts == nil || ts.observer == nil {
 		return
 	}
-	ts.observer.SetRuntimeGauge(
-		RuntimeGaugeTasksActive,
-		ts.active,
-	)
-	ts.observer.SetRuntimeGauge(
-		RuntimeGaugeTasksQueued,
-		ts.Pending(),
-	)
+	ts.observer.SetRuntimeGauge(RuntimeGaugeTasksActive, ts.active)
+	ts.observer.SetRuntimeGauge(RuntimeGaugeTasksQueued, ts.Pending())
 	var oldest time.Time
 	for index := range ts.pending {
 		head := ts.pending[index].head
@@ -1092,10 +993,7 @@ func (ts *TaskSupervisor) observeRuntimeState() {
 			oldest = queuedAt
 		}
 	}
-	ts.observer.SetRuntimeTimestamp(
-		RuntimeTimestampOldestTaskWait,
-		oldest,
-	)
+	ts.observer.SetRuntimeTimestamp(RuntimeTimestampOldestTaskWait, oldest)
 }
 
 func taskClassIndex(class TaskClass) int {

@@ -38,18 +38,11 @@ type serviceDiscoveryInvocation struct {
 	err           error
 }
 
-func newServiceDiscoveryBinding(
-	pluginName string,
-	frames *lifecycle.FrameOwner,
-) (*serviceDiscoveryBinding, error) {
+func newServiceDiscoveryBinding(pluginName string, frames *lifecycle.FrameOwner) (*serviceDiscoveryBinding, error) {
 	if pluginName == "" || frames == nil {
-		return nil, errors.New(
-			"jobmgr composition: invalid service discovery binding",
-		)
+		return nil, errors.New("jobmgr composition: invalid service discovery binding")
 	}
-	return &serviceDiscoveryBinding{
-		pluginName: pluginName, frames: frames,
-	}, nil
+	return &serviceDiscoveryBinding{pluginName: pluginName, frames: frames}, nil
 }
 
 func (sdb *serviceDiscoveryBinding) prefix() string {
@@ -62,9 +55,7 @@ func (sdb *serviceDiscoveryBinding) RegisterPrefix(
 	fn func(frameworkfunctions.Function),
 ) {
 	if fn == nil {
-		sdb.recordRegistrationError(
-			errors.New("nil service discovery prefix Function"),
-		)
+		sdb.recordRegistrationError(errors.New("nil service discovery prefix Function"))
 		return
 	}
 	sdb.registerPrefix(
@@ -76,44 +67,28 @@ func (sdb *serviceDiscoveryBinding) RegisterPrefix(
 	)
 }
 
-func (sdb *serviceDiscoveryBinding) registerPrefix(
-	name string,
-	prefix string,
-	fn frameworkfunctions.Handler,
-) {
+func (sdb *serviceDiscoveryBinding) registerPrefix(name string, prefix string, fn frameworkfunctions.Handler) {
 	sdb.mu.Lock()
 	defer sdb.mu.Unlock()
 	if sdb.dirty != nil {
 		return
 	}
-	if name != joboutput.DynCfgFunctionName ||
-		prefix != sdb.prefix() ||
-		fn == nil ||
-		sdb.registered {
-		sdb.setDirtyLocked(errors.New(
-			"jobmgr composition: invalid service discovery Function registration",
-		))
+	if name != joboutput.DynCfgFunctionName || prefix != sdb.prefix() || fn == nil || sdb.registered {
+		sdb.setDirtyLocked(errors.New("jobmgr composition: invalid service discovery Function registration"))
 		return
 	}
 	sdb.handler = fn
 	sdb.registered = true
 }
 
-func (sdb *serviceDiscoveryBinding) UnregisterPrefix(
-	name string,
-	prefix string,
-) {
+func (sdb *serviceDiscoveryBinding) UnregisterPrefix(name string, prefix string) {
 	sdb.mu.Lock()
 	defer sdb.mu.Unlock()
 	if sdb.dirty != nil {
 		return
 	}
-	if name != joboutput.DynCfgFunctionName ||
-		prefix != sdb.prefix() ||
-		!sdb.registered {
-		sdb.setDirtyLocked(errors.New(
-			"jobmgr composition: invalid service discovery Function withdrawal",
-		))
+	if name != joboutput.DynCfgFunctionName || prefix != sdb.prefix() || !sdb.registered {
+		sdb.setDirtyLocked(errors.New("jobmgr composition: invalid service discovery Function withdrawal"))
 		return
 	}
 	sdb.handler = nil
@@ -138,9 +113,7 @@ func (sdb *serviceDiscoveryBinding) prepare(
 		scope.Successor.Valid() ||
 		permit.Valid() ||
 		!scope.Valid() {
-		return nil, errors.New(
-			"jobmgr composition: invalid service discovery transaction scope",
-		)
+		return nil, errors.New("jobmgr composition: invalid service discovery transaction scope")
 	}
 	sdb.mu.Lock()
 	handler, dirty := sdb.handler, sdb.dirty
@@ -172,14 +145,7 @@ func (sdb *serviceDiscoveryBinding) prepare(
 	if err != nil {
 		return nil, err
 	}
-	return joboutput.PrepareNoopResourceTransaction(
-		scope,
-		nil,
-		lifecycle.LongLivedPermit{},
-		result,
-		cleanup,
-		nil,
-	)
+	return joboutput.PrepareNoopResourceTransaction(scope, nil, lifecycle.LongLivedPermit{}, result, cleanup, nil)
 }
 
 func (sdb *serviceDiscoveryBinding) invoke(
@@ -187,17 +153,13 @@ func (sdb *serviceDiscoveryBinding) invoke(
 	call func(),
 ) (lifecycle.SealedResult, lifecycle.TaskCleanup, error) {
 	if sdb == nil || lifecycle.ValidateUID(uid) != nil || call == nil {
-		return lifecycle.SealedResult{}, nil,
-			errors.New("jobmgr composition: invalid service discovery invocation")
+		return lifecycle.SealedResult{}, nil, errors.New("jobmgr composition: invalid service discovery invocation")
 	}
 
 	invocation := &serviceDiscoveryInvocation{uid: uid}
 	sdb.mu.Lock()
 	if sdb.dirty != nil || sdb.active != nil {
-		err := errors.Join(
-			sdb.dirty,
-			errors.New("jobmgr composition: service discovery invocation unavailable"),
-		)
+		err := errors.Join(sdb.dirty, errors.New("jobmgr composition: service discovery invocation unavailable"))
 		sdb.mu.Unlock()
 		return lifecycle.SealedResult{}, nil, err
 	}
@@ -210,10 +172,7 @@ func (sdb *serviceDiscoveryBinding) invoke(
 	if sdb.active != invocation {
 		sdb.mu.Unlock()
 		return lifecycle.SealedResult{}, nil,
-			errors.Join(
-				callErr,
-				errors.New("jobmgr composition: service discovery invocation changed"),
-			)
+			errors.Join(callErr, errors.New("jobmgr composition: service discovery invocation changed"))
 	}
 	sdb.active = nil
 	result := invocation.result
@@ -228,11 +187,7 @@ func (sdb *serviceDiscoveryBinding) invoke(
 		return lifecycle.SealedResult{}, nil,
 			errors.New("jobmgr composition: service discovery handler produced no terminal result")
 	}
-	sealed, err := lifecycle.NewSealedResult(
-		result.Code,
-		result.ContentType,
-		[]byte(result.Payload),
-	)
+	sealed, err := lifecycle.NewSealedResult(result.Code, result.ContentType, []byte(result.Payload))
 	if err != nil {
 		return lifecycle.SealedResult{}, nil, err
 	}
@@ -252,11 +207,7 @@ func (sdb *serviceDiscoveryBinding) invoke(
 func callServiceDiscoveryHandler(call func()) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf(
-				"%w in service discovery Function handler: %v",
-				lifecycle.ErrTaskPanic,
-				recovered,
-			)
+			err = fmt.Errorf("%w in service discovery Function handler: %v", lifecycle.ErrTaskPanic, recovered)
 		}
 	}()
 	call()
@@ -268,9 +219,7 @@ func (sdb *serviceDiscoveryBinding) FunctionResult(result dyncfg.Result) {
 	defer sdb.mu.Unlock()
 
 	if sdb.active == nil {
-		sdb.setDirtyLocked(errors.New(
-			"jobmgr composition: service discovery result outside invocation",
-		))
+		sdb.setDirtyLocked(errors.New("jobmgr composition: service discovery result outside invocation"))
 		return
 	}
 	if sdb.active.result != nil {
@@ -308,9 +257,7 @@ func (sdb *serviceDiscoveryBinding) ConfigDelete(id string) {
 	})
 }
 
-func (sdb *serviceDiscoveryBinding) emitNotification(
-	emit func(dyncfg.Output),
-) {
+func (sdb *serviceDiscoveryBinding) emitNotification(emit func(dyncfg.Output)) {
 	var encoded bytes.Buffer
 	emit(dyncfg.NewProtocolOutput(&encoded))
 	payload := encoded.Bytes()
@@ -344,10 +291,7 @@ func newServiceDiscoveryInitialRoute(
 	binding *serviceDiscoveryBinding,
 ) (functionadapter.InitialRoute, error) {
 	if epoch == 0 || binding == nil {
-		return functionadapter.InitialRoute{},
-			errors.New(
-				"jobmgr composition: invalid service discovery route",
-			)
+		return functionadapter.InitialRoute{}, errors.New("jobmgr composition: invalid service discovery route")
 	}
 	commands := []functionadapter.ResourceTransactionCommand{
 		{Name: string(dyncfg.CommandAdd)},
@@ -364,14 +308,8 @@ func newServiceDiscoveryInitialRoute(
 		Declaration: functionadapter.Declaration{
 			ID: "dyncfg/service-discovery",
 			Generation: &functionadapter.HandlerGenerationDeclaration{
-				ID: fmt.Sprintf(
-					"dyncfg/service-discovery/%d",
-					epoch,
-				),
-				Handler: func(
-					context.Context,
-					functionadapter.HandlerInput,
-				) (lifecycle.SealedResult, error) {
+				ID: fmt.Sprintf("dyncfg/service-discovery/%d", epoch),
+				Handler: func(context.Context, functionadapter.HandlerInput) (lifecycle.SealedResult, error) {
 					return mustDynCfgMessage(501, "Service discovery command is not implemented."), nil
 				},
 			},
@@ -381,13 +319,9 @@ func newServiceDiscoveryInitialRoute(
 				GlobalClaim:     dynCfgServiceDiscoveryClaim,
 				Commands:        commands,
 			},
-			PublicName: joboutput.DynCfgFunctionName,
-			Prefix:     binding.prefix(),
-			Resource: functionadapter.ScopedDynCfgJobResource(
-				0,
-				binding.prefix(),
-				"sd:",
-			),
+			PublicName:          joboutput.DynCfgFunctionName,
+			Prefix:              binding.prefix(),
+			Resource:            functionadapter.ScopedDynCfgJobResource(0, binding.prefix(), "sd:"),
 			CooperativeCancel:   true,
 			CooperativeDeadline: true,
 			RawPayload:          true,

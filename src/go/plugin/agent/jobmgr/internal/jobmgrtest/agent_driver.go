@@ -33,19 +33,13 @@ const fixtureJoinPeriod = 5 * time.Second
 // AgentDriver exercises one behavior through the public Agent API.
 type AgentDriver struct{}
 
-func (d *AgentDriver) Run(
-	ctx context.Context,
-	scenario AgentScenario,
-) error {
+func (d *AgentDriver) Run(ctx context.Context, scenario AgentScenario) error {
 	if d == nil || ctx == nil {
 		return errors.New("jobmgr test: invalid Agent driver")
 	}
 	run := agentRuntimeScenarios[scenario]
 	if run == nil {
-		return fmt.Errorf(
-			"jobmgr test: unknown Agent scenario %q",
-			scenario,
-		)
+		return fmt.Errorf("jobmgr test: unknown Agent scenario %q", scenario)
 	}
 	return run(ctx)
 }
@@ -102,10 +96,7 @@ func (state *agentFixtureState) check() error {
 	return state.checkErr
 }
 
-func (state *agentFixtureState) handle(
-	ctx context.Context,
-	event string,
-) {
+func (state *agentFixtureState) handle(ctx context.Context, event string) {
 	state.record(event)
 	state.record(event + ":entered")
 	if state.handleEntered != nil {
@@ -187,12 +178,7 @@ func (buffer *synchronizedBuffer) String() string {
 	defer buffer.mu.Unlock()
 	if buffer.data.Len() > 8*1024 {
 		data := buffer.data.Bytes()
-		return fmt.Sprintf(
-			"%q...%q (%d bytes)",
-			data[:4*1024],
-			data[len(data)-4*1024:],
-			len(data),
-		)
+		return fmt.Sprintf("%q...%q (%d bytes)", data[:4*1024], data[len(data)-4*1024:], len(data))
 	}
 	return buffer.data.String()
 }
@@ -205,9 +191,7 @@ type observedFunctionResult struct {
 	payloadSHA   [sha256.Size]byte
 }
 
-func (buffer *synchronizedBuffer) functionResult(
-	uid string,
-) (observedFunctionResult, bool, error) {
+func (buffer *synchronizedBuffer) functionResult(uid string) (observedFunctionResult, bool, error) {
 	buffer.mu.Lock()
 	defer buffer.mu.Unlock()
 	prefix := []byte("FUNCTION_RESULT_BEGIN " + uid + " ")
@@ -217,9 +201,7 @@ func (buffer *synchronizedBuffer) functionResult(
 		return observedFunctionResult{}, false, nil
 	}
 	if start > 0 && data[start-1] != '\n' {
-		return observedFunctionResult{}, false, errors.New(
-			"jobmgr test: Function result prefix is not line-aligned",
-		)
+		return observedFunctionResult{}, false, errors.New("jobmgr test: Function result prefix is not line-aligned")
 	}
 	headerEnd := bytes.IndexByte(data[start:], '\n')
 	if headerEnd < 0 {
@@ -227,18 +209,12 @@ func (buffer *synchronizedBuffer) functionResult(
 	}
 	headerEnd += start
 	fields := bytes.Fields(data[start:headerEnd])
-	if len(fields) != 5 ||
-		string(fields[0]) != "FUNCTION_RESULT_BEGIN" ||
-		string(fields[1]) != uid {
-		return observedFunctionResult{}, false, errors.New(
-			"jobmgr test: malformed Function result header",
-		)
+	if len(fields) != 5 || string(fields[0]) != "FUNCTION_RESULT_BEGIN" || string(fields[1]) != uid {
+		return observedFunctionResult{}, false, errors.New("jobmgr test: malformed Function result header")
 	}
 	status, err := strconv.Atoi(string(fields[2]))
 	if err != nil {
-		return observedFunctionResult{}, false, errors.New(
-			"jobmgr test: malformed Function result status",
-		)
+		return observedFunctionResult{}, false, errors.New("jobmgr test: malformed Function result status")
 	}
 	const resultEnd = "FUNCTION_RESULT_END\n\n"
 	end := bytes.Index(data[headerEnd+1:], []byte(resultEnd))
@@ -250,9 +226,7 @@ func (buffer *synchronizedBuffer) functionResult(
 	payload := deferred
 	if len(payload) != 0 {
 		if payload[len(payload)-1] != '\n' {
-			return observedFunctionResult{}, false, errors.New(
-				"jobmgr test: Function result payload lacks final LF",
-			)
+			return observedFunctionResult{}, false, errors.New("jobmgr test: Function result payload lacks final LF")
 		}
 		payload = payload[:len(payload)-1]
 	}
@@ -283,29 +257,12 @@ type agentFixture struct {
 	forceErr      error
 }
 
-func startAgentFixture(
-	ctx context.Context,
-	v2 bool,
-) (*agentFixture, error) {
-	return startAgentFixtureWithState(
-		ctx,
-		v2,
-		&agentFixtureState{},
-	)
+func startAgentFixture(ctx context.Context, v2 bool) (*agentFixture, error) {
+	return startAgentFixtureWithState(ctx, v2, &agentFixtureState{})
 }
 
-func startAgentFixtureWithState(
-	ctx context.Context,
-	v2 bool,
-	state *agentFixtureState,
-) (*agentFixture, error) {
-	return startAgentFixtureConfiguredWithRegistry(
-		ctx,
-		state,
-		fixtureRegistry(state, v2),
-		nil,
-		policy.Agent(true),
-	)
+func startAgentFixtureWithState(ctx context.Context, v2 bool, state *agentFixtureState) (*agentFixture, error) {
+	return startAgentFixtureConfiguredWithRegistry(ctx, state, fixtureRegistry(state, v2), nil, policy.Agent(true))
 }
 
 func startAgentInstanceFixtureWithState(
@@ -322,10 +279,7 @@ func startAgentInstanceFixtureWithState(
 	)
 }
 
-func startAgentCapacityFixtureWithState(
-	ctx context.Context,
-	state *agentFixtureState,
-) (*agentFixture, error) {
+func startAgentCapacityFixtureWithState(ctx context.Context, state *agentFixtureState) (*agentFixture, error) {
 	return startAgentFixtureConfiguredWithRegistry(
 		ctx,
 		state,
@@ -362,11 +316,7 @@ func startAgentFixtureConfiguredWithRegistry(
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discovery.NewProviderFactory(
 				"dummy",
-				func(build discovery.BuildContext) (
-					discovery.Discoverer,
-					bool,
-					error,
-				) {
+				func(build discovery.BuildContext) (discovery.Discoverer, bool, error) {
 					provider, err := dummy.NewDiscovery(dummy.Config{
 						Registry: build.Registry,
 						Names:    build.DummyNames,
@@ -406,16 +356,9 @@ func (f *agentFixture) terminate(ctx context.Context) error {
 	f.terminateOnce.Do(func() {
 		terminateErr := f.agent.Terminate(ctx)
 		forceErr := f.force()
-		joinCtx, cancel := context.WithTimeout(
-			context.Background(),
-			fixtureJoinPeriod,
-		)
+		joinCtx, cancel := context.WithTimeout(context.Background(), fixtureJoinPeriod)
 		defer cancel()
-		f.terminateErr = errors.Join(
-			terminateErr,
-			forceErr,
-			f.wait(joinCtx),
-		)
+		f.terminateErr = errors.Join(terminateErr, forceErr, f.wait(joinCtx))
 	})
 	return f.terminateErr
 }
@@ -439,19 +382,12 @@ func (f *agentFixture) wait(ctx context.Context) error {
 
 func (f *agentFixture) close() {
 	_ = f.force()
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		fixtureJoinPeriod,
-	)
+	ctx, cancel := context.WithTimeout(context.Background(), fixtureJoinPeriod)
 	defer cancel()
 	_ = f.wait(ctx)
 }
 
-func runAgentCollectorLifecycle(
-	ctx context.Context,
-	v2 bool,
-	restart bool,
-) error {
+func runAgentCollectorLifecycle(ctx context.Context, v2 bool, restart bool) error {
 	fixture, err := startAgentFixture(ctx, v2)
 	if err != nil {
 		return err
@@ -494,36 +430,21 @@ func runAgentCollectorLifecycle(
 		}
 	}
 	if got := fixture.state.count("cleanup"); got != generations {
-		return fmt.Errorf(
-			"collector cleanup count=%d, want %d",
-			got,
-			generations,
-		)
+		return fmt.Errorf("collector cleanup count=%d, want %d", got, generations)
 	}
 	if restart {
 		events := fixture.state.snapshot()
 		firstCleanup := indexOf(events, "cleanup", 0)
 		secondInit := indexOf(events, "init", 1)
-		if firstCleanup < 0 ||
-			secondInit < 0 ||
-			firstCleanup >= secondInit {
-			return fmt.Errorf(
-				"replacement initialized before old cleanup: %v",
-				events,
-			)
+		if firstCleanup < 0 || secondInit < 0 || firstCleanup >= secondInit {
+			return fmt.Errorf("replacement initialized before old cleanup: %v", events)
 		}
 	}
 	return nil
 }
 
-func runAgentAcquiredAbort(
-	ctx context.Context,
-	v2 bool,
-	requirePublication bool,
-) error {
-	state := &agentFixtureState{
-		checkErr: errors.New("fixture autodetection failure"),
-	}
+func runAgentAcquiredAbort(ctx context.Context, v2 bool, requirePublication bool) error {
+	state := &agentFixtureState{checkErr: errors.New("fixture autodetection failure")}
 	fixture, err := startAgentFixtureWithState(ctx, v2, state)
 	if err != nil {
 		return err
@@ -531,60 +452,39 @@ func runAgentAcquiredAbort(
 	defer fixture.close()
 	if err := waitUntil(ctx, func() bool {
 		return state.count("check") >= 1 &&
-			(!requirePublication || fixture.output.contains(
-				`FUNCTION GLOBAL "jobmgrtest:echo"`,
-			))
+			(!requirePublication || fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`))
 	}); err != nil {
 		return errors.Join(
-			fmt.Errorf(
-				"acquired abort did not reach failure boundary: %w; events=%v",
-				err,
-				state.snapshot(),
-			),
+			fmt.Errorf("acquired abort did not reach failure boundary: %w; events=%v", err, state.snapshot()),
 			fixture.terminate(ctx),
 		)
 	}
 	terminationErr := fixture.terminate(ctx)
-	if state.count("cleanup") != 1 ||
-		state.count("handler-cleanup") != 1 {
+	if state.count("cleanup") != 1 || state.count("handler-cleanup") != 1 {
 		return errors.Join(
-			fmt.Errorf(
-				"acquired abort finalizers differ: events=%v",
-				state.snapshot(),
-			),
+			fmt.Errorf("acquired abort finalizers differ: events=%v", state.snapshot()),
 			terminationErr,
 		)
 	}
 	if requirePublication &&
-		(!fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:echo"`,
-		) || !fixture.output.contains(
-			`FUNCTION_DEL GLOBAL "jobmgrtest:echo"`,
-		)) {
+		(!fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`) ||
+			!fixture.output.contains(`FUNCTION_DEL GLOBAL "jobmgrtest:echo"`)) {
 		return errors.Join(
-			fmt.Errorf(
-				"published exposure was not reversed: output=%s",
-				fixture.output.String(),
-			),
+			fmt.Errorf("published exposure was not reversed: output=%s", fixture.output.String()),
 			terminationErr,
 		)
 	}
 	return terminationErr
 }
 
-func runAgentFunctionFlow(
-	ctx context.Context,
-	boundaries bool,
-) error {
+func runAgentFunctionFlow(ctx context.Context, boundaries bool) error {
 	fixture, err := startAgentFixture(ctx, false)
 	if err != nil {
 		return err
 	}
 	defer fixture.close()
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:echo"`,
-		)
+		return fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`)
 	}); err != nil {
 		_ = fixture.input.Close()
 		return fmt.Errorf("Function was not published: %w", err)
@@ -656,55 +556,25 @@ func runAgentFunctionHeaderBoundaries(ctx context.Context) error {
 				bytes  int
 				status int
 			}{
-				"exact command": {
-					bytes:  frameworkfunctions.MaximumCommandLineBytes,
-					status: 404,
-				},
-				"one byte over command": {
-					bytes:  frameworkfunctions.MaximumCommandLineBytes + 1,
-					status: 400,
-				},
-				"one byte over reader scratch": {
-					bytes:  64*1024 + 1,
-					status: 400,
-				},
+				"exact command":                {bytes: frameworkfunctions.MaximumCommandLineBytes, status: 404},
+				"one byte over command":        {bytes: frameworkfunctions.MaximumCommandLineBytes + 1, status: 400},
+				"one byte over reader scratch": {bytes: 64*1024 + 1, status: 400},
 			}
 			for name, test := range tests {
-				uid := "jobmgrtest-" + strings.ReplaceAll(
-					name,
-					" ",
-					"-",
-				)
-				line, err := functionCommandOfLength(
-					uid,
-					"30",
-					"missing:route",
-					test.bytes,
-				)
+				uid := "jobmgrtest-" + strings.ReplaceAll(name, " ", "-")
+				line, err := functionCommandOfLength(uid, "30", "missing:route", test.bytes)
 				if err != nil {
 					return err
 				}
-				if _, err := io.WriteString(
-					fixture.input,
-					line+"\n",
-				); err != nil {
+				if _, err := io.WriteString(fixture.input, line+"\n"); err != nil {
 					return err
 				}
-				result, err := waitFunctionResult(
-					ctx,
-					fixture.output,
-					uid,
-				)
+				result, err := waitFunctionResult(ctx, fixture.output, uid)
 				if err != nil {
 					return err
 				}
 				if result.status != test.status {
-					return fmt.Errorf(
-						"%s status=%d, want %d",
-						name,
-						result.status,
-						test.status,
-					)
+					return fmt.Errorf("%s status=%d, want %d", name, result.status, test.status)
 				}
 			}
 			return sendFunctionAndRequireStatus(
@@ -727,25 +597,12 @@ func runAgentFunctionBodyBoundaries(ctx context.Context) error {
 				size   int
 				status int
 			}{
-				"one byte below": {
-					size:   frameworkfunctions.MaximumInputBodyBytes - 1,
-					status: 200,
-				},
-				"exact": {
-					size:   frameworkfunctions.MaximumInputBodyBytes,
-					status: 200,
-				},
-				"one byte over": {
-					size:   frameworkfunctions.MaximumInputBodyBytes + 1,
-					status: 413,
-				},
+				"one byte below": {size: frameworkfunctions.MaximumInputBodyBytes - 1, status: 200},
+				"exact":          {size: frameworkfunctions.MaximumInputBodyBytes, status: 200},
+				"one byte over":  {size: frameworkfunctions.MaximumInputBodyBytes + 1, status: 413},
 			}
 			for name, test := range tests {
-				uid := "jobmgrtest-body-" + strings.ReplaceAll(
-					name,
-					" ",
-					"-",
-				)
+				uid := "jobmgrtest-body-" + strings.ReplaceAll(name, " ", "-")
 				before := fixture.state.count("raw:echo")
 				digest, err := writeAgentFunctionPayload(
 					fixture.input,
@@ -758,43 +615,24 @@ func runAgentFunctionBodyBoundaries(ctx context.Context) error {
 				if err != nil {
 					return err
 				}
-				result, err := waitFunctionResult(
-					ctx,
-					fixture.output,
-					uid,
-				)
+				result, err := waitFunctionResult(ctx, fixture.output, uid)
 				if err != nil {
 					return err
 				}
 				if result.status != test.status {
-					return fmt.Errorf(
-						"%s status=%d, want %d",
-						name,
-						result.status,
-						test.status,
-					)
+					return fmt.Errorf("%s status=%d, want %d", name, result.status, test.status)
 				}
 				if test.status == 200 {
-					if err := validatePayloadDigestResult(
-						result,
-						test.size,
-						digest,
-					); err != nil {
+					if err := validatePayloadDigestResult(result, test.size, digest); err != nil {
 						return fmt.Errorf("%s: %w", name, err)
 					}
 					continue
 				}
 				if fixture.state.count("raw:echo") != before {
-					return errors.New(
-						"oversized input reached the Function handler",
-					)
+					return errors.New("oversized input reached the Function handler")
 				}
-				if string(result.payload) !=
-					`{"errorMessage":"Payload too large.","status":413}` {
-					return fmt.Errorf(
-						"oversized input payload=%q",
-						result.payload,
-					)
+				if string(result.payload) != `{"errorMessage":"Payload too large.","status":413}` {
+					return fmt.Errorf("oversized input payload=%q", result.payload)
 				}
 			}
 			return sendFunctionAndRequireStatus(
@@ -825,19 +663,11 @@ func runAgentFunctionRawPayload(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			result, err := waitFunctionResult(
-				ctx,
-				fixture.output,
-				uid,
-			)
+			result, err := waitFunctionResult(ctx, fixture.output, uid)
 			if err != nil {
 				return err
 			}
-			return validatePayloadDigestResult(
-				result,
-				len(payload),
-				digest,
-			)
+			return validatePayloadDigestResult(result, len(payload), digest)
 		},
 	)
 }
@@ -850,37 +680,15 @@ func runAgentFunctionTimeoutBoundaries(ctx context.Context) error {
 				timeout string
 				status  int
 			}{
-				"negative": {
-					timeout: "-1",
-					status:  400,
-				},
-				"one over maximum": {
-					timeout: "901",
-					status:  400,
-				},
-				"integer overflow": {
-					timeout: "9223372036854775808",
-					status:  400,
-				},
-				"zero": {
-					timeout: "0",
-					status:  200,
-				},
-				"one second": {
-					timeout: "1",
-					status:  200,
-				},
-				"maximum": {
-					timeout: "900",
-					status:  200,
-				},
+				"negative":         {timeout: "-1", status: 400},
+				"one over maximum": {timeout: "901", status: 400},
+				"integer overflow": {timeout: "9223372036854775808", status: 400},
+				"zero":             {timeout: "0", status: 200},
+				"one second":       {timeout: "1", status: 200},
+				"maximum":          {timeout: "900", status: 200},
 			}
 			for name, test := range tests {
-				uid := "jobmgrtest-timeout-" + strings.ReplaceAll(
-					name,
-					" ",
-					"-",
-				)
+				uid := "jobmgrtest-timeout-" + strings.ReplaceAll(name, " ", "-")
 				if err := sendFunctionAndRequireStatus(
 					ctx,
 					fixture,
@@ -912,27 +720,15 @@ func runAgentFunctionInvalidJSON(ctx context.Context) error {
 			); err != nil {
 				return err
 			}
-			result, err := waitFunctionResult(
-				ctx,
-				fixture.output,
-				uid,
-			)
+			result, err := waitFunctionResult(ctx, fixture.output, uid)
 			if err != nil {
 				return err
 			}
-			if result.status != 400 ||
-				string(result.payload) !=
-					`{"errorMessage":"Bad request.","status":400}` {
-				return fmt.Errorf(
-					"invalid JSON result differs: status=%d payload=%q",
-					result.status,
-					result.payload,
-				)
+			if result.status != 400 || string(result.payload) != `{"errorMessage":"Bad request.","status":400}` {
+				return fmt.Errorf("invalid JSON result differs: status=%d payload=%q", result.status, result.payload)
 			}
 			if fixture.state.count("handle:json") != before {
-				return errors.New(
-					"invalid JSON reached the non-raw Function handler",
-				)
+				return errors.New("invalid JSON reached the non-raw Function handler")
 			}
 			return nil
 		},
@@ -949,28 +745,17 @@ func runAgentFunctionResultBoundaries(ctx context.Context) error {
 				fixture,
 				overUID,
 				"30",
-				fmt.Sprintf(
-					"jobmgrtest:echo result-deferred:%d",
-					lifecycle.FunctionPayloadBytes+1,
-				),
+				fmt.Sprintf("jobmgrtest:echo result-deferred:%d", lifecycle.FunctionPayloadBytes+1),
 				413,
 			); err != nil {
 				return err
 			}
-			over, err := waitFunctionResult(
-				ctx,
-				fixture.output,
-				overUID,
-			)
+			over, err := waitFunctionResult(ctx, fixture.output, overUID)
 			if err != nil {
 				return err
 			}
-			if string(over.payload) !=
-				`{"errorMessage":"Payload too large.","status":413}` {
-				return fmt.Errorf(
-					"oversized result payload=%q",
-					over.payload,
-				)
+			if string(over.payload) != `{"errorMessage":"Payload too large.","status":413}` {
+				return fmt.Errorf("oversized result payload=%q", over.payload)
 			}
 
 			const largeDeferredBytes = 32 * 1024 * 1024
@@ -980,20 +765,13 @@ func runAgentFunctionResultBoundaries(ctx context.Context) error {
 				fmt.Sprintf(
 					"FUNCTION %s 30 %q 0xFFFF %q\n",
 					largeUID,
-					fmt.Sprintf(
-						"jobmgrtest:echo result-deferred:%d",
-						largeDeferredBytes,
-					),
+					fmt.Sprintf("jobmgrtest:echo result-deferred:%d", largeDeferredBytes),
 					"method=api,role=test",
 				),
 			); err != nil {
 				return err
 			}
-			large, err := waitFunctionResult(
-				ctx,
-				fixture.output,
-				largeUID,
-			)
+			large, err := waitFunctionResult(ctx, fixture.output, largeUID)
 			if err != nil {
 				return err
 			}
@@ -1001,9 +779,7 @@ func runAgentFunctionResultBoundaries(ctx context.Context) error {
 			if large.status != 200 ||
 				large.contentType != "application/json" ||
 				large.payloadBytes != wantPayloadBytes ||
-				large.payloadSHA != repeatedJSONSHA256(
-					wantPayloadBytes,
-				) {
+				large.payloadSHA != repeatedJSONSHA256(wantPayloadBytes) {
 				return fmt.Errorf(
 					"large result differs: status=%d content=%q bytes=%d sha256=%x",
 					large.status,
@@ -1017,26 +793,17 @@ func runAgentFunctionResultBoundaries(ctx context.Context) error {
 	)
 }
 
-func runAgentFunctionScenario(
-	ctx context.Context,
-	exercise func(*agentFixture) error,
-) error {
+func runAgentFunctionScenario(ctx context.Context, exercise func(*agentFixture) error) error {
 	fixture, err := startAgentFixture(ctx, false)
 	if err != nil {
 		return err
 	}
 	defer fixture.close()
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:echo"`,
-		) && fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:json"`,
-		)
+		return fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`) &&
+			fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:json"`)
 	}); err != nil {
-		return errors.Join(
-			fmt.Errorf("Functions were not published: %w", err),
-			fixture.terminate(ctx),
-		)
+		return errors.Join(fmt.Errorf("Functions were not published: %w", err), fixture.terminate(ctx))
 	}
 	exerciseErr := exercise(fixture)
 	return errors.Join(exerciseErr, fixture.terminate(ctx))
@@ -1052,13 +819,7 @@ func sendFunctionAndRequireStatus(
 ) error {
 	if _, err := io.WriteString(
 		fixture.input,
-		fmt.Sprintf(
-			"FUNCTION %s %s %q 0xFFFF %q\n",
-			uid,
-			timeout,
-			call,
-			"method=api,role=test",
-		),
+		fmt.Sprintf("FUNCTION %s %s %q 0xFFFF %q\n", uid, timeout, call, "method=api,role=test"),
 	); err != nil {
 		return err
 	}
@@ -1067,12 +828,7 @@ func sendFunctionAndRequireStatus(
 		return err
 	}
 	if result.status != want {
-		return fmt.Errorf(
-			"Function result %s status=%d, want %d",
-			uid,
-			result.status,
-			want,
-		)
+		return fmt.Errorf("Function result %s status=%d, want %d", uid, result.status, want)
 	}
 	return nil
 }
@@ -1105,31 +861,16 @@ func waitFunctionResult(
 	}
 }
 
-func functionCommandOfLength(
-	uid string,
-	timeout string,
-	route string,
-	length int,
-) (string, error) {
-	prefix := fmt.Sprintf(
-		"FUNCTION %s %s \"%s ",
-		uid,
-		timeout,
-		route,
-	)
+func functionCommandOfLength(uid string, timeout string, route string, length int) (string, error) {
+	prefix := fmt.Sprintf("FUNCTION %s %s \"%s ", uid, timeout, route)
 	suffix := "\" 0xFFFF \"method=api,role=test\""
 	padding := length - len(prefix) - len(suffix)
 	if padding < 0 {
-		return "", fmt.Errorf(
-			"jobmgr test: command length %d is too small",
-			length,
-		)
+		return "", fmt.Errorf("jobmgr test: command length %d is too small", length)
 	}
 	command := prefix + strings.Repeat("x", padding) + suffix
 	if len(command) != length {
-		return "", errors.New(
-			"jobmgr test: constructed command length differs",
-		)
+		return "", errors.New("jobmgr test: constructed command length differs")
 	}
 	return command, nil
 }
@@ -1163,10 +904,7 @@ func writeAgentFunctionPayload(
 		_, _ = digest.Write(block[:count])
 		remaining -= count
 	}
-	if _, err := io.WriteString(
-		writer,
-		"\nFUNCTION_PAYLOAD_END\n",
-	); err != nil {
+	if _, err := io.WriteString(writer, "\nFUNCTION_PAYLOAD_END\n"); err != nil {
 		return [sha256.Size]byte{}, err
 	}
 	var result [sha256.Size]byte
@@ -1194,27 +932,15 @@ func writeAgentRawFunctionPayload(
 	if _, err := writer.Write(payload); err != nil {
 		return [sha256.Size]byte{}, err
 	}
-	if _, err := io.WriteString(
-		writer,
-		"\nFUNCTION_PAYLOAD_END\n",
-	); err != nil {
+	if _, err := io.WriteString(writer, "\nFUNCTION_PAYLOAD_END\n"); err != nil {
 		return [sha256.Size]byte{}, err
 	}
 	return sha256.Sum256(payload), nil
 }
 
-func validatePayloadDigestResult(
-	result observedFunctionResult,
-	wantBytes int,
-	wantSHA [sha256.Size]byte,
-) error {
-	if result.status != 200 ||
-		result.contentType != "application/json" {
-		return fmt.Errorf(
-			"payload digest status=%d content=%q",
-			result.status,
-			result.contentType,
-		)
+func validatePayloadDigestResult(result observedFunctionResult, wantBytes int, wantSHA [sha256.Size]byte) error {
+	if result.status != 200 || result.contentType != "application/json" {
+		return fmt.Errorf("payload digest status=%d content=%q", result.status, result.contentType)
 	}
 	var payload struct {
 		ContentType   string `json:"content_type"`
@@ -1229,10 +955,7 @@ func validatePayloadDigestResult(
 		payload.PayloadBytes != wantBytes ||
 		payload.PayloadSHA256 != hex.EncodeToString(wantSHA[:]) ||
 		payload.Status != 200 {
-		return fmt.Errorf(
-			"payload digest result differs: %+v",
-			payload,
-		)
+		return fmt.Errorf("payload digest result differs: %+v", payload)
 	}
 	return nil
 }
@@ -1255,30 +978,19 @@ func repeatedJSONSHA256(payloadBytes int) [sha256.Size]byte {
 	return result
 }
 
-func fixtureRegistry(
-	state *agentFixtureState,
-	v2 bool,
-) collectorapi.Registry {
+func fixtureRegistry(state *agentFixtureState, v2 bool) collectorapi.Registry {
 	return fixtureRegistryWithFunctions(state, v2, false, 2)
 }
 
-func fixtureInstanceRegistry(
-	state *agentFixtureState,
-	v2 bool,
-) collectorapi.Registry {
+func fixtureInstanceRegistry(state *agentFixtureState, v2 bool) collectorapi.Registry {
 	return fixtureRegistryWithFunctions(state, v2, true, 2)
 }
 
-func fixtureCapacityRegistry(
-	state *agentFixtureState,
-) collectorapi.Registry {
+func fixtureCapacityRegistry(state *agentFixtureState) collectorapi.Registry {
 	return fixtureRegistryWithFunctions(state, false, false, 2)
 }
 
-func fixtureOutputRegistry(
-	state *agentFixtureState,
-	v2 bool,
-) collectorapi.Registry {
+func fixtureOutputRegistry(state *agentFixtureState, v2 bool) collectorapi.Registry {
 	registry := fixtureRegistry(state, v2)
 	creator := registry[productionFixtureModule]
 	creator.FunctionOnly = false
@@ -1312,10 +1024,7 @@ func fixtureRegistryWithFunctions(
 	}
 	if v2 {
 		creator.CreateV2 = func() collectorapi.CollectorV2 {
-			return &fixtureCollectorV2{
-				state: state,
-				store: metrix.NewCollectorStore(),
-			}
+			return &fixtureCollectorV2{state: state, store: metrix.NewCollectorStore()}
 		}
 	} else {
 		creator.Create = func() collectorapi.CollectorV1 {
@@ -1341,9 +1050,7 @@ func fixtureRegistryWithFunctions(
 					return &collectorapi.Charts{
 						&collectorapi.Chart{
 							ID: "value", Title: "Value", Units: "value",
-							Dims: collectorapi.Dims{
-								&collectorapi.Dim{ID: "value"},
-							},
+							Dims: collectorapi.Dims{&collectorapi.Dim{ID: "value"}},
 						},
 					}
 				},
@@ -1358,14 +1065,8 @@ func fixtureRegistryWithFunctions(
 
 func fixtureFunctionConfigs(count int) []funcapi.FunctionConfig {
 	functions := []funcapi.FunctionConfig{
-		{
-			ID: "echo", FunctionName: "jobmgrtest:echo",
-			Name: "jobmgrtest:echo", RawRequest: true,
-		},
-		{
-			ID: "json", FunctionName: "jobmgrtest:json",
-			Name: "jobmgrtest:json",
-		},
+		{ID: "echo", FunctionName: "jobmgrtest:echo", Name: "jobmgrtest:echo", RawRequest: true},
+		{ID: "json", FunctionName: "jobmgrtest:json", Name: "jobmgrtest:json"},
 	}
 	for ordinal := 0; len(functions) < count; ordinal++ {
 		id := fmt.Sprintf("work-%03d", ordinal)
@@ -1395,10 +1096,7 @@ func (collector *fixtureCollectorV2) Check(context.Context) error {
 func (collector *fixtureCollectorV2) Collect(context.Context) error {
 	collector.state.record("collect")
 	if collector.state.emitCharts {
-		collector.store.Write().
-			SnapshotMeter("jobmgrtest").
-			Gauge("value").
-			Observe(1)
+		collector.store.Write().SnapshotMeter("jobmgrtest").Gauge("value").Observe(1)
 	}
 	return nil
 }
@@ -1439,10 +1137,7 @@ type fixtureFunctionHandler struct {
 	state *agentFixtureState
 }
 
-func (fixtureFunctionHandler) MethodParams(
-	context.Context,
-	string,
-) ([]funcapi.ParamConfig, error) {
+func (fixtureFunctionHandler) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
 	return nil, nil
 }
 
@@ -1452,10 +1147,7 @@ func (handler fixtureFunctionHandler) Handle(
 	_ funcapi.ResolvedParams,
 ) *funcapi.FunctionResponse {
 	handler.state.handle(ctx, "handle:"+method)
-	return funcapi.RawResponse(map[string]any{
-		"method": method,
-		"status": 200,
-	})
+	return funcapi.RawResponse(map[string]any{"method": method, "status": 200})
 }
 
 func (handler fixtureFunctionHandler) HandleRaw(
@@ -1466,17 +1158,9 @@ func (handler fixtureFunctionHandler) HandleRaw(
 	if deferred, ok := requestedDeferredBytes(request.Args); ok {
 		const fixedBytes = len(`{"pad":""}`)
 		if deferred <= fixedBytes {
-			return funcapi.ErrorResponse(
-				400,
-				"invalid result boundary",
-			)
+			return funcapi.ErrorResponse(400, "invalid result boundary")
 		}
-		return funcapi.RawResponse(map[string]any{
-			"pad": strings.Repeat(
-				"A",
-				deferred-1-fixedBytes,
-			),
-		})
+		return funcapi.RawResponse(map[string]any{"pad": strings.Repeat("A", deferred-1-fixedBytes)})
 	}
 	if len(request.Payload) != 0 {
 		digest := sha256.Sum256(request.Payload)
@@ -1500,10 +1184,7 @@ func (handler fixtureFunctionHandler) Cleanup(context.Context) {
 
 func requestedDeferredBytes(arguments []string) (int, bool) {
 	for _, argument := range arguments {
-		value, ok := strings.CutPrefix(
-			argument,
-			"result-deferred:",
-		)
+		value, ok := strings.CutPrefix(argument, "result-deferred:")
 		if !ok {
 			continue
 		}

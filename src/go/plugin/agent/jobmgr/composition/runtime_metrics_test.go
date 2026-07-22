@@ -29,9 +29,7 @@ type runMetricsService struct {
 	producerErr        error
 }
 
-func (rms *runMetricsService) RegisterComponent(
-	config runtimecomp.ComponentConfig,
-) error {
+func (rms *runMetricsService) RegisterComponent(config runtimecomp.ComponentConfig) error {
 	rms.mu.Lock()
 	defer rms.mu.Unlock()
 	rms.components = append(rms.components, config)
@@ -52,10 +50,7 @@ func (rms *runMetricsService) FinalizeComponent(name string) {
 	rms.componentFinalized = append(rms.componentFinalized, name)
 }
 
-func (rms *runMetricsService) RegisterProducer(
-	name string,
-	producer func() error,
-) error {
+func (rms *runMetricsService) RegisterProducer(name string, producer func() error) error {
 	rms.mu.Lock()
 	defer rms.mu.Unlock()
 	if rms.producerErr != nil {
@@ -128,10 +123,7 @@ func TestRunMetricsProjection(t *testing.T) {
 		},
 		"zero timestamp reports zero age": {
 			apply: func(metrics *runMetrics) {
-				metrics.SetRuntimeTimestamp(
-					lifecycle.RuntimeTimestampOldestOperation,
-					time.Time{},
-				)
+				metrics.SetRuntimeTimestamp(lifecycle.RuntimeTimestampOldestOperation, time.Time{})
 			},
 			name: runtimeMetricPrefix + ".oldest_operation_age",
 			want: 0,
@@ -172,10 +164,7 @@ func TestRunMetricsRegistration(t *testing.T) {
 		wantUnregistered int
 		wantProducers    int
 	}{
-		"registers component and producer": {
-			wantComponents: 1,
-			wantProducers:  1,
-		},
+		"registers component and producer": {wantComponents: 1, wantProducers: 1},
 		"producer failure rolls back component": {
 			producerErr:      errors.New("producer failed"),
 			wantErr:          true,
@@ -185,9 +174,7 @@ func TestRunMetricsRegistration(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			service := &runMetricsService{
-				producerErr: test.producerErr,
-			}
+			service := &runMetricsService{producerErr: test.producerErr}
 			metrics := newRunMetrics()
 			err := metrics.register(service)
 			require.EqualValues(t, test.wantErr, err != nil)
@@ -197,7 +184,10 @@ func TestRunMetricsRegistration(t *testing.T) {
 				len(producers) != test.wantProducers)
 			if len(components) == 1 {
 				config := components[0]
-				require.False(t, config.Name != runtimeComponentName || config.Store != metrics.store || !config.Autogen.Enabled)
+				require.False(
+					t,
+					config.Name != runtimeComponentName || config.Store != metrics.store || !config.Autogen.Enabled,
+				)
 			}
 		})
 	}
@@ -217,8 +207,7 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 		Discovery: testRunDiscoveryServices(t),
 	})
 	require.NoError(t, err)
-	components, removals, producers, producerRemovals :=
-		service.snapshot()
+	components, removals, producers, producerRemovals := service.snapshot()
 	require.False(t, len(components) != 1 || len(removals) != 0 || len(producers) != 1 || len(producerRemovals) != 0)
 
 	require.NoError(t, generation.start(context.Background()))

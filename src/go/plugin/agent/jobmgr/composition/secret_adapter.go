@@ -37,8 +37,7 @@ func (sdjb secretDependentJobBinding) PlanDependentStart(
 	result secretadapter.DependentStartResult,
 	err error,
 ) {
-	plan, result, err =
-		sdjb.controller.PlanSecretDependentStart(id)
+	plan, result, err = sdjb.controller.PlanSecretDependentStart(id)
 	return plan, result, err
 }
 
@@ -47,8 +46,7 @@ func newSecretInitialRoute(
 	controller *secretadapter.Controller,
 ) (functionadapter.InitialRoute, error) {
 	if epoch == 0 || controller == nil || controller.Prefix() == "" {
-		return functionadapter.InitialRoute{},
-			errors.New("jobmgr composition: invalid secret route")
+		return functionadapter.InitialRoute{}, errors.New("jobmgr composition: invalid secret route")
 	}
 	commands := []functionadapter.ResourceTransactionCommand{
 		{Name: string(dyncfg.CommandAdd), AllocateSuccessor: true},
@@ -57,18 +55,11 @@ func newSecretInitialRoute(
 		{
 			Name:              string(dyncfg.CommandUpdate),
 			AllocateSuccessor: true,
-			Claims: []string{
-				joboutput.DynCfgJobGraphClaim,
-			},
+			Claims:            []string{joboutput.DynCfgJobGraphClaim},
 		},
 		{Name: string(dyncfg.CommandTest)},
 		{Name: string(dyncfg.CommandUserconfig)},
-		{
-			Name: string(dyncfg.CommandRemove),
-			Claims: []string{
-				joboutput.DynCfgJobGraphClaim,
-			},
-		},
+		{Name: string(dyncfg.CommandRemove), Claims: []string{joboutput.DynCfgJobGraphClaim}},
 	}
 	prefix := controller.Prefix()
 	return functionadapter.InitialRoute{
@@ -76,14 +67,9 @@ func newSecretInitialRoute(
 			ID: "dyncfg/secretstores",
 			Generation: &functionadapter.HandlerGenerationDeclaration{
 				ID: fmt.Sprintf("dyncfg/secretstores/%d", epoch),
-				Handler: func(
-					context.Context,
-					functionadapter.HandlerInput,
-				) (lifecycle.SealedResult, error) {
+				Handler: func(context.Context, functionadapter.HandlerInput) (lifecycle.SealedResult, error) {
 					return lifecycle.SealedResult{},
-						errors.New(
-							"jobmgr composition: secret route requires a transaction",
-						)
+						errors.New("jobmgr composition: secret route requires a transaction")
 				},
 			},
 			Transaction: &functionadapter.ResourceTransactionDeclaration{
@@ -97,24 +83,15 @@ func newSecretInitialRoute(
 					jobmgr.PreparedCompositeResourceTransaction,
 					error,
 				) {
-					prepared, err := controller.Prepare(
-						ctx,
-						secretCommandInput(input),
-						current,
-						scope,
-						permit,
-					)
+					prepared, err := controller.Prepare(ctx, secretCommandInput(input), current, scope, permit)
 					if prepared == nil {
 						return nil, err
 					}
-					composite, ok :=
-						prepared.(jobmgr.PreparedCompositeResourceTransaction)
+					composite, ok := prepared.(jobmgr.PreparedCompositeResourceTransaction)
 					if !ok {
 						return nil, errors.Join(
 							err,
-							errors.New(
-								"jobmgr composition: secret transaction is not composite",
-							),
+							errors.New("jobmgr composition: secret transaction is not composite"),
 						)
 					}
 					return composite, err
@@ -124,13 +101,9 @@ func newSecretInitialRoute(
 				GlobalClaim:     secretadapter.SecretGraphClaim,
 				Commands:        commands,
 			},
-			PublicName: joboutput.DynCfgFunctionName,
-			Prefix:     prefix,
-			Resource: functionadapter.ScopedDynCfgJobResource(
-				0,
-				prefix,
-				"secretstore:",
-			),
+			PublicName:          joboutput.DynCfgFunctionName,
+			Prefix:              prefix,
+			Resource:            functionadapter.ScopedDynCfgJobResource(0, prefix, "secretstore:"),
 			CooperativeCancel:   true,
 			CooperativeDeadline: true,
 			RawPayload:          true,
@@ -139,9 +112,7 @@ func newSecretInitialRoute(
 	}, nil
 }
 
-func secretCommandInput(
-	input functionadapter.HandlerInput,
-) secretadapter.CommandInput {
+func secretCommandInput(input functionadapter.HandlerInput) secretadapter.CommandInput {
 	return secretadapter.CommandInput{
 		Args: input.Args, Payload: input.Payload,
 		ContentType: input.ContentType,

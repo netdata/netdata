@@ -25,11 +25,7 @@ func TestSecretJobSummariesAreBounded(t *testing.T) {
 				return names
 			}(),
 		},
-		"one oversized job": {
-			names: []string{
-				strings.Repeat("x", maximumSecretJobSummaryBytes*2),
-			},
-		},
+		"one oversized job": {names: []string{strings.Repeat("x", maximumSecretJobSummaryBytes*2)}},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -72,20 +68,13 @@ func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 			id: "module_one", status: dyncfg.StatusRunning,
 			references: []string{"vault:main", "aws-sm:prod"},
 		},
-		"accepted job": {
-			id: "module_two", status: dyncfg.StatusAccepted,
-			references: []string{"vault:main"},
-		},
+		"accepted job": {id: "module_two", status: dyncfg.StatusAccepted, references: []string{"vault:main"}},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			config := map[string]any{
-				"module": "module",
-				"name":   test.id[len("module_"):],
-			}
+			config := map[string]any{"module": "module", "name": test.id[len("module_"):]}
 			for keyIndex, key := range test.references {
-				config[fmt.Sprintf("secret_%d", keyIndex)] =
-					"${store:" + key + ":value}"
+				config[fmt.Sprintf("secret_%d", keyIndex)] = "${store:" + key + ":value}"
 			}
 			payload, err := yaml.Marshal(config)
 			require.NoError(t, err)

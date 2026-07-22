@@ -24,22 +24,16 @@ type LongLivedPlan struct {
 
 func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
 	if len(providerKeys) == 0 {
-		return LongLivedPlan{},
-			errors.New("jobmgr long-lived permit: invalid pipeline provider keys")
+		return LongLivedPlan{}, errors.New("jobmgr long-lived permit: invalid pipeline provider keys")
 	}
 	keys := slices.Clone(providerKeys)
 	slices.Sort(keys)
 	for index, key := range keys {
-		if key == "" || key != strings.TrimSpace(key) ||
-			index > 0 && key == keys[index-1] {
-			return LongLivedPlan{},
-				errors.New("jobmgr long-lived permit: invalid pipeline provider key")
+		if key == "" || key != strings.TrimSpace(key) || index > 0 && key == keys[index-1] {
+			return LongLivedPlan{}, errors.New("jobmgr long-lived permit: invalid pipeline provider key")
 		}
 	}
-	plan := LongLivedPlan{
-		class:        LongLivedPipeline,
-		providerKeys: keys,
-	}
+	plan := LongLivedPlan{class: LongLivedPipeline, providerKeys: keys}
 	return plan, plan.Validate()
 }
 
@@ -76,8 +70,7 @@ func validPipelineProviderKeys(keys []string) bool {
 		return false
 	}
 	for index, key := range keys {
-		if key == "" || key != strings.TrimSpace(key) ||
-			index > 0 && key <= keys[index-1] {
+		if key == "" || key != strings.TrimSpace(key) || index > 0 && key <= keys[index-1] {
 			return false
 		}
 	}
@@ -144,19 +137,11 @@ func (llp LongLivedPermit) ReleaseExternal() error {
 	return llp.supervisor.releaseLongLivedExternal(llp.ref, llp.owner)
 }
 
-func (llp LongLivedPermit) ReleaseUnusedInherited(
-	role InheritedTaskRole,
-	key string,
-) error {
+func (llp LongLivedPermit) ReleaseUnusedInherited(role InheritedTaskRole, key string) error {
 	if !llp.Valid() {
 		return errors.New("jobmgr long-lived permit: invalid unused inherited-task release")
 	}
-	return llp.supervisor.releaseUnusedLongLivedG(
-		llp.ref,
-		llp.owner,
-		role,
-		key,
-	)
+	return llp.supervisor.releaseUnusedLongLivedG(llp.ref, llp.owner, role, key)
 }
 
 func (llp LongLivedPermit) Return() error {
@@ -221,31 +206,19 @@ func longLivedGClaims(plan LongLivedPlan) map[longLivedGKey]longLivedGState {
 	if plan.class != LongLivedPipeline {
 		return nil
 	}
-	claims := make(
-		map[longLivedGKey]longLivedGState,
-		len(plan.providerKeys)+1,
-	)
-	claims[longLivedGKey{
-		role: InheritedPipelineSupervisor,
-	}] = longLivedGReserved
+	claims := make(map[longLivedGKey]longLivedGState, len(plan.providerKeys)+1)
+	claims[longLivedGKey{role: InheritedPipelineSupervisor}] = longLivedGReserved
 	for _, key := range plan.providerKeys {
-		claims[longLivedGKey{
-			role: InheritedPipelineProvider,
-			key:  key,
-		}] = longLivedGReserved
+		claims[longLivedGKey{role: InheritedPipelineProvider, key: key}] = longLivedGReserved
 	}
 	return claims
 }
 
-func longLivedGClaimsRetained(
-	claims map[longLivedGKey]longLivedGState,
-) bool {
+func longLivedGClaimsRetained(claims map[longLivedGKey]longLivedGState) bool {
 	return len(claims) != 0
 }
 
-func longLivedGClaimsActive(
-	claims map[longLivedGKey]longLivedGState,
-) bool {
+func longLivedGClaimsActive(claims map[longLivedGKey]longLivedGState) bool {
 	for _, state := range claims {
 		if state == longLivedGActive {
 			return true
@@ -272,19 +245,14 @@ func (ts *TaskSupervisor) IssueLongLivedPermit(owner ResourceIdentity, plan Long
 	registry.mu.Lock()
 	if _, exists := registry.owners[owner]; registry.sealed || exists {
 		registry.mu.Unlock()
-		return LongLivedPermit{}, errors.New(
-			"jobmgr long-lived permit: activation sealed or duplicate owner",
-		)
+		return LongLivedPermit{}, errors.New("jobmgr long-lived permit: activation sealed or duplicate owner")
 	}
 	ref, slot, allocationErr := registry.allocateSlot()
 	if allocationErr != nil {
 		registry.mu.Unlock()
 		return LongLivedPermit{}, allocationErr
 	}
-	*slot = longLivedSlot{
-		owner: owner, class: plan.class,
-		gClaims: gClaims, external: longLivedExternalReserved,
-	}
+	*slot = longLivedSlot{owner: owner, class: plan.class, gClaims: gClaims, external: longLivedExternalReserved}
 	registry.owners[owner] = ref
 	registry.census.Active++
 	if plan.class == LongLivedSecretStore {
@@ -294,15 +262,10 @@ func (ts *TaskSupervisor) IssueLongLivedPermit(owner ResourceIdentity, plan Long
 	return LongLivedPermit{supervisor: ts, ref: ref, owner: owner, class: plan.class}, nil
 }
 
-func (registry *longLivedRegistry) allocateSlot() (
-	LongLivedPermitRef,
-	*longLivedSlot,
-	error,
-) {
+func (registry *longLivedRegistry) allocateSlot() (LongLivedPermitRef, *longLivedSlot, error) {
 	next := registry.nextSlot + 1
 	if next == 0 {
-		return 0, nil,
-			errors.New("jobmgr long-lived permit: reference space exhausted")
+		return 0, nil, errors.New("jobmgr long-lived permit: reference space exhausted")
 	}
 	registry.nextSlot = next
 	ref := LongLivedPermitRef(next)
@@ -344,8 +307,7 @@ func (ts *TaskSupervisor) releaseLongLivedExternal(ref LongLivedPermitRef, owner
 	if err != nil {
 		return err
 	}
-	if slot.external == longLivedExternalReserved ||
-		slot.external == longLivedExternalActive {
+	if slot.external == longLivedExternalReserved || slot.external == longLivedExternalActive {
 		slot.external = longLivedExternalReleased
 		return nil
 	}
@@ -360,8 +322,7 @@ func (ts *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, owner Re
 	if err != nil {
 		return err
 	}
-	if longLivedGClaimsRetained(slot.gClaims) ||
-		slot.external != longLivedExternalReleased {
+	if longLivedGClaimsRetained(slot.gClaims) || slot.external != longLivedExternalReleased {
 		return errors.New("jobmgr long-lived permit: return with retained inherited-task/external facets")
 	}
 	delete(registry.owners, slot.owner)
@@ -403,10 +364,7 @@ func (llr *longLivedRegistry) slot(ref LongLivedPermitRef, owner ResourceIdentit
 	return slot, nil
 }
 
-func longLivedGKeyForInherited(
-	role InheritedTaskRole,
-	key string,
-) (longLivedGKey, bool) {
+func longLivedGKeyForInherited(role InheritedTaskRole, key string) (longLivedGKey, bool) {
 	switch role {
 	case InheritedPipelineSupervisor:
 		if key != "" {

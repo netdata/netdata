@@ -17,10 +17,7 @@ type StoppingRejection struct {
 }
 
 func (sr *StoppingRejection) Error() string {
-	return fmt.Sprintf(
-		"jobmgr run %d is stopping",
-		sr.Generation,
-	)
+	return fmt.Sprintf("jobmgr run %d is stopping", sr.Generation)
 }
 
 type RunSupervisor struct {
@@ -75,23 +72,17 @@ func NewRunSupervisor(generation uint64, clock Clock, shutdownTimeout time.Durat
 		generation: generation,
 		clock:      clock,
 		timeout:    shutdownTimeout,
-		stopCause: &StoppingRejection{
-			Generation: generation,
-		},
+		stopCause:  &StoppingRejection{Generation: generation},
 	}, nil
 }
 
-func (rs *RunSupervisor) BindRuntimeObserver(
-	observer RuntimeObserver,
-) error {
+func (rs *RunSupervisor) BindRuntimeObserver(observer RuntimeObserver) error {
 	if rs == nil || observer == nil {
 		return errors.New("jobmgr run supervisor: invalid runtime observer")
 	}
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	if rs.observer != nil || rs.admission ||
-		rs.shutdown != nil || rs.stopped || rs.terminal ||
-		rs.dirty != nil {
+	if rs.observer != nil || rs.admission || rs.shutdown != nil || rs.stopped || rs.terminal || rs.dirty != nil {
 		return errors.New("jobmgr run supervisor: runtime observer bound after activation")
 	}
 	rs.observer = observer
@@ -101,11 +92,7 @@ func (rs *RunSupervisor) BindRuntimeObserver(
 func (rs *RunSupervisor) OpenAdmission() error {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	if rs.terminal ||
-		rs.stopped ||
-		rs.dirty != nil ||
-		rs.admission ||
-		rs.shutdown != nil {
+	if rs.terminal || rs.stopped || rs.dirty != nil || rs.admission || rs.shutdown != nil {
 		return errors.New("jobmgr run supervisor: cannot open admission")
 	}
 	rs.admission = true
@@ -143,10 +130,7 @@ func (rs *RunSupervisor) FinishShutdown() error {
 func (rs *RunSupervisor) Admitting() bool {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-	return rs.admission &&
-		!rs.stopped &&
-		rs.dirty == nil &&
-		!rs.terminal
+	return rs.admission && !rs.stopped && rs.dirty == nil && !rs.terminal
 }
 
 func (rs *RunSupervisor) Dirty(cause error) {
@@ -220,16 +204,10 @@ func (rs *RunSupervisor) Terminal(census RunCensus) error {
 		first := rs.dirty == nil
 		rs.dirty = errors.Join(
 			rs.dirty,
-			fmt.Errorf(
-				"jobmgr run supervisor: terminal with nonzero process census: %+v",
-				census,
-			),
+			fmt.Errorf("jobmgr run supervisor: terminal with nonzero process census: %+v", census),
 		)
 		if first && rs.observer != nil {
-			rs.observer.AddRuntimeCounter(
-				RuntimeCounterDirtyRuns,
-				1,
-			)
+			rs.observer.AddRuntimeCounter(RuntimeCounterDirtyRuns, 1)
 		}
 	}
 	rs.terminal = true
@@ -250,29 +228,20 @@ func (rs *RunSupervisor) Generation() uint64 {
 // NewRollbackContext returns one run-owned context bounded by the configured
 // shutdown budget. It deliberately does not inherit a cancelled command
 // context.
-func (rs *RunSupervisor) NewRollbackContext() (
-	context.Context,
-	context.CancelFunc,
-	error,
-) {
+func (rs *RunSupervisor) NewRollbackContext() (context.Context, context.CancelFunc, error) {
 	if rs == nil {
-		return nil, nil,
-			errors.New("jobmgr run supervisor: nil rollback owner")
+		return nil, nil, errors.New("jobmgr run supervisor: nil rollback owner")
 	}
 	rs.mu.Lock()
 	if rs.terminal {
 		rs.mu.Unlock()
-		return nil, nil,
-			errors.New("jobmgr run supervisor: rollback after terminal")
+		return nil, nil, errors.New("jobmgr run supervisor: rollback after terminal")
 	}
 	timeout := rs.timeout
 	shutdown := rs.shutdown
 	rs.mu.Unlock()
 	if shutdown != nil {
-		ctx, cancel := context.WithDeadline(
-			context.Background(),
-			shutdown.Deadline(),
-		)
+		ctx, cancel := context.WithDeadline(context.Background(), shutdown.Deadline())
 		return ctx, cancel, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)

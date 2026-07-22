@@ -20,9 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
-	t *testing.T,
-) {
+func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(t *testing.T) {
 	starts := make(chan string, 4)
 	var cleanups atomic.Int32
 	modules := collectorapi.Registry{
@@ -45,9 +43,7 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 			AgentFunctions: func() []funcapi.FunctionConfig {
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
-			MethodHandler: func(
-				collectorapi.RuntimeJob,
-			) funcapi.MethodHandler {
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 				return &runTestHandler{cleanup: func() {}}
 			},
 			JobConfigSchema: collectorapi.MockConfigSchema,
@@ -63,9 +59,7 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
-	jobs.Defaults = confgroup.Registry{
-		"module": {UpdateEvery: 1},
-	}
+	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
 			Kind:   secretstore.KindVault,
@@ -91,9 +85,7 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 		Input: reader, Output: output,
 		ShutdownTimeout: time.Second,
 		Modules:         modules, Jobs: jobs,
-		Secrets: runSecretServices{
-			Initial: []secretstore.Config{initialStore},
-		},
+		Secrets:   runSecretServices{Initial: []secretstore.Config{initialStore}},
 		Discovery: testRunDiscoveryServices(t, jobConfig),
 	})
 	require.NoError(t, err)
@@ -106,7 +98,13 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	case got := <-starts:
 		require.EqualValues(t, "initial", got)
 	case err := <-done:
-		require.FailNowf(t, "test failed", "process stopped before initial collector start: %v; output=%q", err, output.String())
+		require.FailNowf(
+			t,
+			"test failed",
+			"process stopped before initial collector start: %v; output=%q",
+			err,
+			output.String(),
+		)
 	case <-time.After(3 * time.Second):
 		require.FailNowf(t, "test failed", "collector did not start with initial secret; output=%q", output.String())
 	}
@@ -135,9 +133,7 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	require.EqualValues(t, 2, cleanups.Load())
 }
 
-func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
-	t *testing.T,
-) {
+func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.T) {
 	starts := make(chan string, 4)
 	stopEntered := make(chan struct{})
 	releaseStop := make(chan struct{})
@@ -156,8 +152,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 					return nil
 				}
 				collector.CleanupFunc = func(context.Context) {
-					if armStop.Load() &&
-						cleanups.Add(1) == 1 {
+					if armStop.Load() && cleanups.Add(1) == 1 {
 						close(stopEntered)
 						<-releaseStop
 					}
@@ -170,9 +165,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 			AgentFunctions: func() []funcapi.FunctionConfig {
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
-			MethodHandler: func(
-				collectorapi.RuntimeJob,
-			) funcapi.MethodHandler {
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 				return &runTestHandler{cleanup: func() {}}
 			},
 			JobConfigSchema: collectorapi.MockConfigSchema,
@@ -188,9 +181,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
-	jobs.Defaults = confgroup.Registry{
-		"module": {UpdateEvery: 1},
-	}
+	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
 			Kind:   secretstore.KindVault,
@@ -216,9 +207,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 		Input: reader, Output: output,
 		ShutdownTimeout: time.Second,
 		Modules:         modules, Jobs: jobs,
-		Secrets: runSecretServices{
-			Initial: []secretstore.Config{initialStore},
-		},
+		Secrets:   runSecretServices{Initial: []secretstore.Config{initialStore}},
 		Discovery: testRunDiscoveryServices(t, jobConfig),
 	})
 	require.NoError(t, err)
@@ -231,7 +220,13 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(
 	case got := <-starts:
 		require.EqualValues(t, "initial", got)
 	case err := <-done:
-		require.FailNowf(t, "test failed", "process stopped before initial collector start: %v; output=%q", err, output.String())
+		require.FailNowf(
+			t,
+			"test failed",
+			"process stopped before initial collector start: %v; output=%q",
+			err,
+			output.String(),
+		)
 	case <-time.After(3 * time.Second):
 		require.FailNowf(t, "test failed", "collector did not start with initial secret; output=%q", output.String())
 	}
@@ -314,26 +309,14 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 			command: "config go.d:secretstore:vault add main",
 			payload: `{"value":"initial"}`, status: 200,
 		},
-		{
-			uid:     "secret-get",
-			command: "config go.d:secretstore:vault:main get",
-			status:  200,
-		},
-		{
-			uid:     "secret-test",
-			command: "config go.d:secretstore:vault:main test",
-			status:  202,
-		},
+		{uid: "secret-get", command: "config go.d:secretstore:vault:main get", status: 200},
+		{uid: "secret-test", command: "config go.d:secretstore:vault:main test", status: 202},
 		{
 			uid:     "secret-update",
 			command: "config go.d:secretstore:vault:main update",
 			payload: `{"value":"replacement"}`, status: 200,
 		},
-		{
-			uid:     "secret-remove",
-			command: "config go.d:secretstore:vault:main remove",
-			status:  200,
-		},
+		{uid: "secret-remove", command: "config go.d:secretstore:vault:main remove", status: 200},
 		{
 			uid:     "secret-invalid",
 			command: "config go.d:secretstore:vault add invalid",
@@ -343,7 +326,10 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	for _, step := range steps {
 		if step.payload == "" {
 
-			_, writeStringErr := io.WriteString(writer, "FUNCTION "+step.uid+" 30 \""+step.command+"\" 0xFFFF \"user=test\"\n")
+			_, writeStringErr := io.WriteString(
+				writer,
+				"FUNCTION "+step.uid+" 30 \""+step.command+"\" 0xFFFF \"user=test\"\n",
+			)
 			require.NoError(t, writeStringErr)
 
 		} else {
@@ -369,9 +355,7 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	}
 }
 
-func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
-	t *testing.T,
-) {
+func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(t *testing.T) {
 	restartEntered := make(chan struct{})
 	releaseRestart := make(chan struct{})
 	var releaseOnce sync.Once
@@ -398,9 +382,7 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 			AgentFunctions: func() []funcapi.FunctionConfig {
 				return []funcapi.FunctionConfig{{ID: "method"}}
 			},
-			MethodHandler: func(
-				collectorapi.RuntimeJob,
-			) funcapi.MethodHandler {
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 				return &runTestHandler{cleanup: func() {}}
 			},
 			JobConfigSchema: collectorapi.MockConfigSchema,
@@ -416,9 +398,7 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobs := testRunJobServices(t)
-	jobs.Defaults = confgroup.Registry{
-		"module": {UpdateEvery: 1},
-	}
+	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
 	creators, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
 			Kind:   secretstore.KindVault,
@@ -443,9 +423,7 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 		Input: reader, Output: output,
 		ShutdownTimeout: time.Second,
 		Modules:         modules, Jobs: jobs,
-		Secrets: runSecretServices{
-			Initial: []secretstore.Config{initialStore},
-		},
+		Secrets:   runSecretServices{Initial: []secretstore.Config{initialStore}},
 		Discovery: testRunDiscoveryServices(t, jobConfig),
 	})
 	require.NoError(t, err)
@@ -500,11 +478,7 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 	}
 }
 
-func waitActiveUIDs(
-	t *testing.T,
-	uids *lifecycle.UIDLedger,
-	want int,
-) {
+func waitActiveUIDs(t *testing.T, uids *lifecycle.UIDLedger, want int) {
 	t.Helper()
 	timeout := time.NewTimer(3 * time.Second)
 	defer timeout.Stop()
@@ -523,11 +497,7 @@ func waitActiveUIDs(
 	}
 }
 
-func waitSecretStart(
-	t *testing.T,
-	starts <-chan string,
-	want string,
-) {
+func waitSecretStart(t *testing.T, starts <-chan string, want string) {
 	t.Helper()
 	select {
 	case got := <-starts:
@@ -560,9 +530,6 @@ func (pss *processSecretStore) Publish() secretstore.PublishedStore {
 
 type processPublishedSecret string
 
-func (pps processPublishedSecret) Resolve(
-	context.Context,
-	secretstore.ResolveRequest,
-) (string, error) {
+func (pps processPublishedSecret) Resolve(context.Context, secretstore.ResolveRequest) (string, error) {
 	return string(pps), nil
 }

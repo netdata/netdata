@@ -17,10 +17,7 @@ func TestProcessRoundTripAndRepeatableWait(t *testing.T) {
 	var output bytes.Buffer
 	process, err := Start(Spec{
 		Executable: "/bin/sh",
-		Arguments: []string{
-			"-c",
-			`IFS= read -r line; printf '%s\n' "$line"; printf problem >&2`,
-		},
+		Arguments:  []string{"-c", `IFS= read -r line; printf '%s\n' "$line"; printf problem >&2`},
 		ObserveOut: func(chunk []byte) error {
 			_, err := output.Write(chunk)
 			return err
@@ -29,10 +26,7 @@ func TestProcessRoundTripAndRepeatableWait(t *testing.T) {
 	require.NoError(t, err)
 	defer process.Kill()
 
-	require.NoError(t, process.WriteContext(
-		t.Context(),
-		[]byte("FUNCTION request\n"),
-	))
+	require.NoError(t, process.WriteContext(t.Context(), []byte("FUNCTION request\n")))
 	first, firstErr := process.Wait(t.Context())
 	require.NoError(t, firstErr)
 	assert.Equal(t, "FUNCTION request\n", output.String())
@@ -46,10 +40,7 @@ func TestProcessRoundTripAndRepeatableWait(t *testing.T) {
 
 func TestProcessWaitCancellationKillsAndJoins(t *testing.T) {
 	requireShell(t)
-	process, err := Start(Spec{
-		Executable: "/bin/sh",
-		Arguments:  []string{"-c", "sleep 30 & wait"},
-	})
+	process, err := Start(Spec{Executable: "/bin/sh", Arguments: []string{"-c", "sleep 30 & wait"}})
 	require.NoError(t, err)
 	defer process.Kill()
 
@@ -116,20 +107,10 @@ func TestProcessObserverFailureTerminatesChild(t *testing.T) {
 
 func TestProcessRejectsInvalidSpecification(t *testing.T) {
 	tests := map[string]Spec{
-		"relative executable": {
-			Executable: "relative",
-		},
-		"relative directory": {
-			Executable: "/bin/cat",
-			Directory:  "relative",
-		},
-		"NUL executable": {
-			Executable: "/bin/cat\x00",
-		},
-		"NUL argument": {
-			Executable: "/bin/cat",
-			Arguments:  []string{"bad\x00argument"},
-		},
+		"relative executable": {Executable: "relative"},
+		"relative directory":  {Executable: "/bin/cat", Directory: "relative"},
+		"NUL executable":      {Executable: "/bin/cat\x00"},
+		"NUL argument":        {Executable: "/bin/cat", Arguments: []string{"bad\x00argument"}},
 	}
 	for name, spec := range tests {
 		t.Run(name, func(t *testing.T) {

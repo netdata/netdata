@@ -22,16 +22,10 @@ func runAgentStartAcknowledgement(ctx context.Context) error {
 	)
 }
 
-func runAgentStartAcknowledgementVariant(
-	ctx context.Context,
-	v2 bool,
-) error {
+func runAgentStartAcknowledgementVariant(ctx context.Context, v2 bool) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{
-		checkGate:    release,
-		checkEntered: entered,
-	}
+	state := &agentFixtureState{checkGate: release, checkEntered: entered}
 	fixture, err := startAgentInstanceFixtureWithState(ctx, v2, state)
 	if err != nil {
 		return err
@@ -49,21 +43,14 @@ func runAgentStartAcknowledgementVariant(
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-	if fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`) ||
-		fixture.output.contains(" status running") {
-		return fmt.Errorf(
-			"Start-dependent publication preceded Check acknowledgement: %s",
-			fixture.output.String(),
-		)
+	if fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`) || fixture.output.contains(" status running") {
+		return fmt.Errorf("Start-dependent publication preceded Check acknowledgement: %s", fixture.output.String())
 	}
 	close(release)
 	released = true
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:echo"`,
-		) && fixture.output.contains(
-			"CONFIG jobmgrtest:collector:jobmgrtest create running single ",
-		)
+		return fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`) &&
+			fixture.output.contains("CONFIG jobmgrtest:collector:jobmgrtest create running single ")
 	}); err != nil {
 		return fmt.Errorf(
 			"Start acknowledgement did not publish running generation: %w; output=%s",
@@ -81,16 +68,10 @@ func runAgentStartReplacementOrdering(ctx context.Context) error {
 	)
 }
 
-func runAgentStartReplacementOrderingVariant(
-	ctx context.Context,
-	v2 bool,
-) error {
+func runAgentStartReplacementOrderingVariant(ctx context.Context, v2 bool) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{
-		checkGate:    release,
-		checkEntered: entered,
-	}
+	state := &agentFixtureState{checkGate: release, checkEntered: entered}
 	fixture, err := startAgentInstanceFixtureWithState(ctx, v2, state)
 	if err != nil {
 		return err
@@ -109,28 +90,17 @@ func runAgentStartReplacementOrderingVariant(
 		return ctx.Err()
 	}
 	const uid = "jobmgrtest-held-start-disable"
-	if err := writeFunctionCall(
-		fixture.input,
-		uid,
-		"config jobmgrtest:collector:jobmgrtest disable",
-	); err != nil {
+	if err := writeFunctionCall(fixture.input, uid, "config jobmgrtest:collector:jobmgrtest disable"); err != nil {
 		return err
 	}
 	time.Sleep(50 * time.Millisecond)
-	if _, completed, parseErr := fixture.output.functionResult(
-		uid,
-	); parseErr != nil {
+	if _, completed, parseErr := fixture.output.functionResult(uid); parseErr != nil {
 		return parseErr
 	} else if completed {
-		return errors.New(
-			"disable completed before held Start acknowledgement",
-		)
+		return errors.New("disable completed before held Start acknowledgement")
 	}
 	if state.count("init") != 1 || state.count("cleanup") != 0 {
-		return fmt.Errorf(
-			"held Start ownership changed before acknowledgement: %v",
-			state.snapshot(),
-		)
+		return fmt.Errorf("held Start ownership changed before acknowledgement: %v", state.snapshot())
 	}
 	close(release)
 	released = true
@@ -153,13 +123,8 @@ func runAgentStartReplacementOrderingVariant(
 		)
 	}
 	events := state.snapshot()
-	if indexOf(events, "cleanup", 0) < 0 ||
-		state.count("init") != 1 ||
-		state.count("check") != 1 {
-		return fmt.Errorf(
-			"disable did not join exactly one held Start and Cleanup: %v",
-			events,
-		)
+	if indexOf(events, "cleanup", 0) < 0 || state.count("init") != 1 || state.count("check") != 1 {
+		return fmt.Errorf("disable did not join exactly one held Start and Cleanup: %v", events)
 	}
 	return fixture.terminate(ctx)
 }
@@ -167,10 +132,7 @@ func runAgentStartReplacementOrderingVariant(
 func runAgentBlockingStop(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{
-		cleanupGate:    release,
-		cleanupEntered: entered,
-	}
+	state := &agentFixtureState{cleanupGate: release, cleanupEntered: entered}
 	fixture, err := startAgentFixtureWithState(ctx, false, state)
 	if err != nil {
 		return err
@@ -197,10 +159,7 @@ func runAgentBlockingStop(ctx context.Context) error {
 	}
 	select {
 	case err := <-stopped:
-		return fmt.Errorf(
-			"Agent reported terminal success with live Stop: %v",
-			err,
-		)
+		return fmt.Errorf("Agent reported terminal success with live Stop: %v", err)
 	case <-time.After(50 * time.Millisecond):
 	}
 	close(release)
@@ -216,10 +175,7 @@ func runAgentBlockingStop(ctx context.Context) error {
 func runAgentHeldHandlerTerminal(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{
-		handleGate:    release,
-		handleEntered: entered,
-	}
+	state := &agentFixtureState{handleGate: release, handleEntered: entered}
 	fixture, err := startAgentFixtureWithState(ctx, false, state)
 	if err != nil {
 		return err
@@ -233,9 +189,7 @@ func runAgentHeldHandlerTerminal(ctx context.Context) error {
 		_ = fixture.input.Close()
 	}()
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:echo"`,
-		)
+		return fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`)
 	}); err != nil {
 		return err
 	}
@@ -256,10 +210,7 @@ func runAgentHeldHandlerTerminal(ctx context.Context) error {
 	go func() { stopped <- fixture.terminate(ctx) }()
 	select {
 	case err := <-stopped:
-		return fmt.Errorf(
-			"Agent returned with live handler: %v",
-			err,
-		)
+		return fmt.Errorf("Agent returned with live handler: %v", err)
 	case <-time.After(50 * time.Millisecond):
 	}
 	close(release)
@@ -272,25 +223,16 @@ func runAgentHeldHandlerTerminal(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-	if fixture.output.contains(
-		"FUNCTION_RESULT_BEGIN " + uid + " 200 ",
-	) {
-		return errors.New(
-			"old-generation handler committed a frame after shutdown quarantine",
-		)
+	if fixture.output.contains("FUNCTION_RESULT_BEGIN " + uid + " 200 ") {
+		return errors.New("old-generation handler committed a frame after shutdown quarantine")
 	}
 	return nil
 }
 
-func runAgentFunctionAdmissionClosesBeforeLeaseDrain(
-	ctx context.Context,
-) error {
+func runAgentFunctionAdmissionClosesBeforeLeaseDrain(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{
-		handleGate:    release,
-		handleEntered: entered,
-	}
+	state := &agentFixtureState{handleGate: release, handleEntered: entered}
 	fixture, err := startAgentInstanceFixtureWithState(ctx, false, state)
 	if err != nil {
 		return err
@@ -304,18 +246,12 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(
 		_ = fixture.input.Close()
 	}()
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:echo"`,
-		)
+		return fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`)
 	}); err != nil {
 		return err
 	}
 	const firstUID = "jobmgrtest-lease-active"
-	if err := writeFunctionCall(
-		fixture.input,
-		firstUID,
-		"jobmgrtest:echo active",
-	); err != nil {
+	if err := writeFunctionCall(fixture.input, firstUID, "jobmgrtest:echo active"); err != nil {
 		return err
 	}
 	select {
@@ -332,9 +268,7 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(
 		return err
 	}
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(
-			`FUNCTION_DEL GLOBAL "jobmgrtest:echo"`,
-		)
+		return fixture.output.contains(`FUNCTION_DEL GLOBAL "jobmgrtest:echo"`)
 	}); err != nil {
 		return fmt.Errorf(
 			"job stop did not close Function admission: %w; events=%v; output=%s",
@@ -344,41 +278,23 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(
 		)
 	}
 	const laterUID = "jobmgrtest-lease-later"
-	if err := writeFunctionCall(
-		fixture.input,
-		laterUID,
-		"jobmgrtest:echo later",
-	); err != nil {
+	if err := writeFunctionCall(fixture.input, laterUID, "jobmgrtest:echo later"); err != nil {
 		return err
 	}
-	result, err := waitFunctionResult(
-		ctx,
-		fixture.output,
-		laterUID,
-	)
+	result, err := waitFunctionResult(ctx, fixture.output, laterUID)
 	if err != nil {
 		return err
 	}
 	if result.status != 503 {
-		return fmt.Errorf(
-			"post-close invocation status=%d, want 503",
-			result.status,
-		)
+		return fmt.Errorf("post-close invocation status=%d, want 503", result.status)
 	}
 	if state.count("raw:echo") != 1 {
-		return fmt.Errorf(
-			"post-close invocation entered the handler: %v",
-			state.snapshot(),
-		)
+		return fmt.Errorf("post-close invocation entered the handler: %v", state.snapshot())
 	}
-	if _, completed, parseErr := fixture.output.functionResult(
-		disableUID,
-	); parseErr != nil {
+	if _, completed, parseErr := fixture.output.functionResult(disableUID); parseErr != nil {
 		return parseErr
 	} else if completed {
-		return errors.New(
-			"disable completed before the active Function lease drained",
-		)
+		return errors.New("disable completed before the active Function lease drained")
 	}
 	close(release)
 	released = true
@@ -387,18 +303,13 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(
 		return err
 	}
 	if first.status != 200 {
-		return fmt.Errorf(
-			"active invocation status=%d, want 200",
-			first.status,
-		)
+		return fmt.Errorf("active invocation status=%d, want 200", first.status)
 	}
 	disabled, err := waitFunctionResult(ctx, fixture.output, disableUID)
 	if err != nil {
 		return err
 	}
-	if disabled.status != 200 ||
-		state.count("cleanup") != 1 ||
-		state.count("handler-cleanup") != 1 {
+	if disabled.status != 200 || state.count("cleanup") != 1 || state.count("handler-cleanup") != 1 {
 		return fmt.Errorf(
 			"disable did not drain and clean the exact generation: status=%d events=%v",
 			disabled.status,
@@ -411,10 +322,7 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(
 func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{
-		handleGate:    release,
-		handleEntered: entered,
-	}
+	state := &agentFixtureState{handleGate: release, handleEntered: entered}
 	fixture, err := startAgentInstanceFixtureWithState(ctx, false, state)
 	if err != nil {
 		return err
@@ -431,8 +339,7 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 	const initialPublication = "CONFIG jobmgrtest:collector:jobmgrtest create running single "
 	const runningPublication = "CONFIG jobmgrtest:collector:jobmgrtest status running"
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(functionPublication) &&
-			fixture.output.contains(initialPublication)
+		return fixture.output.contains(functionPublication) && fixture.output.contains(initialPublication)
 	}); err != nil {
 		return fmt.Errorf(
 			"initial generation was not published: %w; events=%v; output=%s",
@@ -445,11 +352,7 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 	initialRunning := fixture.output.count(initialPublication)
 
 	const oldUID = "jobmgrtest-replace-old"
-	if err := writeFunctionCall(
-		fixture.input,
-		oldUID,
-		"jobmgrtest:echo old",
-	); err != nil {
+	if err := writeFunctionCall(fixture.input, oldUID, "jobmgrtest:echo old"); err != nil {
 		return err
 	}
 	select {
@@ -469,9 +372,7 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 		return err
 	}
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(
-			`FUNCTION_DEL GLOBAL "jobmgrtest:echo"`,
-		)
+		return fixture.output.contains(`FUNCTION_DEL GLOBAL "jobmgrtest:echo"`)
 	}); err != nil {
 		return fmt.Errorf(
 			"update did not withdraw the old Function generation: %w; events=%v; output=%s",
@@ -502,10 +403,7 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 		)
 	}
 	if old.status != 200 {
-		return fmt.Errorf(
-			"old invocation status=%d, want 200",
-			old.status,
-		)
+		return fmt.Errorf("old invocation status=%d, want 200", old.status)
 	}
 	updated, err := waitFunctionResult(ctx, fixture.output, updateUID)
 	if err != nil {
@@ -517,11 +415,7 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 		)
 	}
 	if updated.status != 200 {
-		return fmt.Errorf(
-			"update status=%d, want 200; payload=%s",
-			updated.status,
-			updated.payload,
-		)
+		return fmt.Errorf("update status=%d, want 200; payload=%s", updated.status, updated.payload)
 	}
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.count(functionPublication) ==
@@ -546,28 +440,15 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 			break
 		}
 	}
-	if returned < 0 ||
-		handlerCleanup <= returned ||
-		runtimeCleanup <= returned {
-		return fmt.Errorf(
-			"new running publication preceded old generation drain: %v",
-			events,
-		)
+	if returned < 0 || handlerCleanup <= returned || runtimeCleanup <= returned {
+		return fmt.Errorf("new running publication preceded old generation drain: %v", events)
 	}
 
 	const successorUID = "jobmgrtest-replace-successor"
-	if err := writeFunctionCall(
-		fixture.input,
-		successorUID,
-		"jobmgrtest:echo successor",
-	); err != nil {
+	if err := writeFunctionCall(fixture.input, successorUID, "jobmgrtest:echo successor"); err != nil {
 		return err
 	}
-	successor, err := waitFunctionResult(
-		ctx,
-		fixture.output,
-		successorUID,
-	)
+	successor, err := waitFunctionResult(ctx, fixture.output, successorUID)
 	if err != nil {
 		return fmt.Errorf(
 			"successor invocation did not complete: %w; events=%v; output=%s",
@@ -576,8 +457,7 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 			fixture.output.String(),
 		)
 	}
-	if successor.status != 200 ||
-		state.count("raw:echo") != 2 {
+	if successor.status != 200 || state.count("raw:echo") != 2 {
 		return fmt.Errorf(
 			"successor generation did not own the next invocation: status=%d events=%v",
 			successor.status,
@@ -608,17 +488,10 @@ func runAgentConcurrentSameRouteFunctionPopulation(ctx context.Context) error {
 	)
 }
 
-func runAgentHeldFunctionPopulation(
-	ctx context.Context,
-	admitted int,
-	route func(int) string,
-) error {
+func runAgentHeldFunctionPopulation(ctx context.Context, admitted int, route func(int) string) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{
-		handleGate:    release,
-		handleEntered: entered,
-	}
+	state := &agentFixtureState{handleGate: release, handleEntered: entered}
 	fixture, err := startAgentCapacityFixtureWithState(ctx, state)
 	if err != nil {
 		return err
@@ -632,9 +505,7 @@ func runAgentHeldFunctionPopulation(
 		_ = fixture.input.Close()
 	}()
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:echo"`,
-		)
+		return fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`)
 	}); err != nil {
 		return err
 	}
@@ -660,9 +531,7 @@ func runAgentHeldFunctionPopulation(
 	close(release)
 	released = true
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.count(
-			"FUNCTION_RESULT_BEGIN jobmgrtest-held-",
-		) >= admitted
+		return fixture.output.count("FUNCTION_RESULT_BEGIN jobmgrtest-held-") >= admitted
 	}); err != nil {
 		return err
 	}
@@ -673,11 +542,7 @@ func runAgentHeldFunctionPopulation(
 	for index := range admitted {
 		uid := fmt.Sprintf("jobmgrtest-held-%03d", index)
 		if statuses[uid] != 200 {
-			return fmt.Errorf(
-				"admitted Function %s status=%d, want 200",
-				uid,
-				statuses[uid],
-			)
+			return fmt.Errorf("admitted Function %s status=%d, want 200", uid, statuses[uid])
 		}
 	}
 	return fixture.terminate(ctx)
@@ -694,11 +559,7 @@ func heldFunctionStatuses(output []byte) (map[string]int, error) {
 		}
 		status, err := strconv.Atoi(string(fields[2]))
 		if err != nil {
-			return nil, fmt.Errorf(
-				"invalid held Function status %q: %w",
-				fields[2],
-				err,
-			)
+			return nil, fmt.Errorf("invalid held Function status %q: %w", fields[2], err)
 		}
 		statuses[string(fields[1])] = status
 	}
@@ -707,10 +568,7 @@ func heldFunctionStatuses(output []byte) (map[string]int, error) {
 
 func runAgentControlWithLargeOrdinaryPopulation(ctx context.Context) error {
 	release := make(chan struct{})
-	state := &agentFixtureState{
-		handleGate:          release,
-		handleCancelReturns: true,
-	}
+	state := &agentFixtureState{handleGate: release, handleCancelReturns: true}
 	fixture, err := startAgentCapacityFixtureWithState(ctx, state)
 	if err != nil {
 		return err
@@ -718,9 +576,7 @@ func runAgentControlWithLargeOrdinaryPopulation(ctx context.Context) error {
 	defer fixture.close()
 	defer fixture.input.Close()
 	if err := waitUntil(ctx, func() bool {
-		return fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:echo"`,
-		)
+		return fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`)
 	}); err != nil {
 		return err
 	}
@@ -733,25 +589,17 @@ func runAgentControlWithLargeOrdinaryPopulation(ctx context.Context) error {
 			return err
 		}
 	}
-	if _, err := io.WriteString(
-		fixture.input,
-		"FUNCTION_CANCEL jobmgrtest-control-000\nQUIT\n",
-	); err != nil {
+	if _, err := io.WriteString(fixture.input, "FUNCTION_CANCEL jobmgrtest-control-000\nQUIT\n"); err != nil {
 		return err
 	}
 	if runErr := fixture.wait(ctx); runErr != nil {
-		if errors.Is(runErr, context.DeadlineExceeded) ||
-			errors.Is(runErr, context.Canceled) {
-			return errors.New(
-				"CANCEL and QUIT did not progress with a large ordinary population",
-			)
+		if errors.Is(runErr, context.DeadlineExceeded) || errors.Is(runErr, context.Canceled) {
+			return errors.New("CANCEL and QUIT did not progress with a large ordinary population")
 		}
 		return runErr
 	}
 	if state.count("raw:echo:cancelled") == 0 {
-		return errors.New(
-			"CANCEL did not reach a live ordinary Function before QUIT",
-		)
+		return errors.New("CANCEL did not reach a live ordinary Function before QUIT")
 	}
 	return nil
 }
@@ -830,10 +678,7 @@ func (writer *predicateFaultWriter) Write(payload []byte) (int, error) {
 	return count, err
 }
 
-func runAgentOutputFaultCut(
-	ctx context.Context,
-	cut outputFaultCut,
-) error {
+func runAgentOutputFaultCut(ctx context.Context, cut outputFaultCut) error {
 	modes := map[string]injectedWriteMode{
 		"short nil":      injectedShortNil,
 		"short error":    injectedShortError,
@@ -841,22 +686,14 @@ func runAgentOutputFaultCut(
 		"EPIPE":          injectedEPIPE,
 	}
 	for name, mode := range modes {
-		if err := runAgentOutputFaultMode(
-			ctx,
-			cut,
-			mode,
-		); err != nil {
+		if err := runAgentOutputFaultMode(ctx, cut, mode); err != nil {
 			return fmt.Errorf("%s: %w", name, err)
 		}
 	}
 	return nil
 }
 
-func runAgentOutputFaultMode(
-	ctx context.Context,
-	cut outputFaultCut,
-	mode injectedWriteMode,
-) error {
+func runAgentOutputFaultMode(ctx context.Context, cut outputFaultCut, mode injectedWriteMode) error {
 	state := &agentFixtureState{
 		emitCharts: cut == outputFaultV1 ||
 			cut == outputFaultV2 ||
@@ -878,12 +715,7 @@ func runAgentOutputFaultMode(
 		state,
 		registry,
 		func(output *synchronizedBuffer) io.Writer {
-			return &predicateFaultWriter{
-				target:   output,
-				match:    match,
-				mode:     mode,
-				injected: injected,
-			}
+			return &predicateFaultWriter{target: output, match: match, mode: mode, injected: injected}
 		},
 		runPolicy,
 	)
@@ -895,32 +727,21 @@ func runAgentOutputFaultMode(
 	switch cut {
 	case outputFaultFunction:
 		if err := waitUntil(ctx, func() bool {
-			return fixture.output.contains(
-				`FUNCTION GLOBAL "jobmgrtest:echo"`,
-			)
+			return fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`)
 		}); err != nil {
 			return err
 		}
-		if err := writeFunctionCall(
-			fixture.input,
-			"jobmgrtest-fault",
-			"jobmgrtest:echo fault",
-		); err != nil {
+		if err := writeFunctionCall(fixture.input, "jobmgrtest-fault", "jobmgrtest:echo fault"); err != nil {
 			return err
 		}
 	case outputFaultCleanup:
 		if err := waitUntil(ctx, func() bool {
-			return fixture.output.contains(
-				`FUNCTION GLOBAL "jobmgrtest:echo"`,
-			)
+			return fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`)
 		}); err != nil {
 			return err
 		}
 		go func() {
-			terminationCtx, cancel := context.WithTimeout(
-				context.Background(),
-				fixtureJoinPeriod,
-			)
+			terminationCtx, cancel := context.WithTimeout(context.Background(), fixtureJoinPeriod)
 			defer cancel()
 			_ = fixture.terminate(terminationCtx)
 		}()
@@ -952,9 +773,7 @@ func runAgentOutputFaultMode(
 		return ctx.Err()
 	}
 	if runErr == nil {
-		return errors.New(
-			"output fault produced a clean Agent disposition",
-		)
+		return errors.New("output fault produced a clean Agent disposition")
 	}
 	return nil
 }
@@ -999,10 +818,7 @@ func outputFaultMatcher(cut outputFaultCut) func([]byte) bool {
 		frame := string(payload)
 		switch cut {
 		case outputFaultFunction:
-			return strings.Contains(
-				frame,
-				"FUNCTION_RESULT_BEGIN jobmgrtest-fault ",
-			)
+			return strings.Contains(frame, "FUNCTION_RESULT_BEGIN jobmgrtest-fault ")
 		case outputFaultConfig:
 			return strings.HasPrefix(frame, "CONFIG ")
 		case outputFaultV1:
@@ -1010,34 +826,16 @@ func outputFaultMatcher(cut outputFaultCut) func([]byte) bool {
 		case outputFaultV2:
 			return strings.Contains(frame, "CHART 'jobmgrtest.")
 		case outputFaultRuntime:
-			return strings.Contains(
-				frame,
-				".internal.",
-			)
+			return strings.Contains(frame, ".internal.")
 		case outputFaultCleanup:
-			return strings.Contains(
-				frame,
-				`FUNCTION_DEL GLOBAL "jobmgrtest:echo"`,
-			)
+			return strings.Contains(frame, `FUNCTION_DEL GLOBAL "jobmgrtest:echo"`)
 		default:
 			return false
 		}
 	}
 }
 
-func writeFunctionCall(
-	writer io.Writer,
-	uid string,
-	call string,
-) error {
-	_, err := io.WriteString(
-		writer,
-		fmt.Sprintf(
-			"FUNCTION %s 30 %q 0xFFFF %q\n",
-			uid,
-			call,
-			"method=api,role=test",
-		),
-	)
+func writeFunctionCall(writer io.Writer, uid string, call string) error {
+	_, err := io.WriteString(writer, fmt.Sprintf("FUNCTION %s 30 %q 0xFFFF %q\n", uid, call, "method=api,role=test"))
 	return err
 }

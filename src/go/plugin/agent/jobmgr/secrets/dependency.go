@@ -38,32 +38,23 @@ func NewSecretDependencyIndex() *SecretDependencyIndex {
 	}
 }
 
-func (sdi *SecretDependencyIndex) PrepareJobChange(
-	id string,
-	postimage *dyncfg.GraphConfig,
-) (func(), error) {
+func (sdi *SecretDependencyIndex) PrepareJobChange(id string, postimage *dyncfg.GraphConfig) (func(), error) {
 	if sdi == nil || id == "" {
 		return nil, errors.New("jobmgr secrets: invalid dependency change")
 	}
 	var next *jobDependency
 	if postimage != nil {
 		if postimage.ID != id {
-			return nil, errors.New(
-				"jobmgr secrets: dependency postimage identity differs",
-			)
+			return nil, errors.New("jobmgr secrets: dependency postimage identity differs")
 		}
 		var config confgroup.Config
 		if err := yaml.Unmarshal(postimage.Payload, &config); err != nil {
 			return nil, err
 		}
 		if config == nil || config.FullName() != id {
-			return nil, errors.New(
-				"jobmgr secrets: dependency configuration identity differs",
-			)
+			return nil, errors.New("jobmgr secrets: dependency configuration identity differs")
 		}
-		keys, err := secretresolver.StoreReferences(
-			map[string]any(config),
-		)
+		keys, err := secretresolver.StoreReferences(map[string]any(config))
 		if err != nil {
 			return nil, err
 		}
@@ -79,10 +70,7 @@ func (sdi *SecretDependencyIndex) PrepareJobChange(
 	}, nil
 }
 
-func (sdi *SecretDependencyIndex) Affected(
-	storeKey string,
-	runningOnly bool,
-) []secretstore.JobRef {
+func (sdi *SecretDependencyIndex) Affected(storeKey string, runningOnly bool) []secretstore.JobRef {
 	if sdi == nil || storeKey == "" {
 		return nil
 	}
@@ -94,9 +82,7 @@ func (sdi *SecretDependencyIndex) Affected(
 		if !ok || runningOnly && !dependency.running {
 			continue
 		}
-		refs = append(refs, secretstore.JobRef{
-			ID: id, Display: dependency.display,
-		})
+		refs = append(refs, secretstore.JobRef{ID: id, Display: dependency.display})
 	}
 	sdi.mu.RUnlock()
 	slices.SortFunc(refs, func(a, b secretstore.JobRef) int {
@@ -108,10 +94,7 @@ func (sdi *SecretDependencyIndex) Affected(
 	return refs
 }
 
-func (sdi *SecretDependencyIndex) commitJobChange(
-	id string,
-	next *jobDependency,
-) {
+func (sdi *SecretDependencyIndex) commitJobChange(id string, next *jobDependency) {
 	sdi.mu.Lock()
 	defer sdi.mu.Unlock()
 	if previous, ok := sdi.jobs[id]; ok {

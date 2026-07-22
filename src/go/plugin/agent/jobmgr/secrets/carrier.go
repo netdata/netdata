@@ -21,12 +21,8 @@ func newStoreGenerationCarrier(
 	permit lifecycle.LongLivedPermit,
 	owner lifecycle.ResourceIdentity,
 ) (*storeGenerationCarrier, error) {
-	if !permit.Valid() ||
-		permit.Owner() != owner ||
-		permit.Class() != lifecycle.LongLivedSecretStore {
-		return nil, errors.New(
-			"jobmgr secrets: invalid Store-generation carrier",
-		)
+	if !permit.Valid() || permit.Owner() != owner || permit.Class() != lifecycle.LongLivedSecretStore {
+		return nil, errors.New("jobmgr secrets: invalid Store-generation carrier")
 	}
 	return &storeGenerationCarrier{permit: permit}, nil
 }
@@ -42,32 +38,24 @@ func (sgc *storeGenerationCarrier) Valid() bool {
 
 func (sgc *storeGenerationCarrier) Activate() error {
 	if sgc == nil {
-		return errors.New(
-			"jobmgr secrets: nil Store-generation carrier",
-		)
+		return errors.New("jobmgr secrets: nil Store-generation carrier")
 	}
 	sgc.mu.Lock()
 	defer sgc.mu.Unlock()
 	if sgc.externalReleased || sgc.returned {
-		return errors.New(
-			"jobmgr secrets: Store-generation carrier cannot activate",
-		)
+		return errors.New("jobmgr secrets: Store-generation carrier cannot activate")
 	}
 	return sgc.permit.ActivateExternal()
 }
 
 func (sgc *storeGenerationCarrier) Release() error {
 	if sgc == nil {
-		return errors.New(
-			"jobmgr secrets: nil Store-generation carrier",
-		)
+		return errors.New("jobmgr secrets: nil Store-generation carrier")
 	}
 	sgc.mu.Lock()
 	defer sgc.mu.Unlock()
 	if sgc.returned {
-		return errors.New(
-			"jobmgr secrets: Store-generation carrier released twice",
-		)
+		return errors.New("jobmgr secrets: Store-generation carrier released twice")
 	}
 	if !sgc.externalReleased {
 		if err := sgc.permit.ReleaseExternal(); err != nil {

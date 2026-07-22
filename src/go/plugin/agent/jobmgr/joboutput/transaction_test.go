@@ -19,30 +19,25 @@ func TestPreparedResourceTransactionCommitsOrRestoresWholePostimage(t *testing.T
 		wantPayload string
 	}{
 		"apply graph and replacement": {
-			apply:       true,
-			wantEvents:  []string{"current-stop", "current-finalize", "successor-accept", "successor-publish", "after-apply"},
+			apply: true,
+			wantEvents: []string{
+				"current-stop",
+				"current-finalize",
+				"successor-accept",
+				"successor-publish",
+				"after-apply",
+			},
 			wantPayload: `{"version":2}`,
 		},
-		"dispose keeps graph and current": {
-			wantEvents:  []string{"successor-dispose"},
-			wantPayload: `{"version":1}`,
-		},
+		"dispose keeps graph and current": {wantEvents: []string{"successor-dispose"}, wantPayload: `{"version":1}`},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			var events []string
-			currentIdentity := lifecycle.ResourceIdentity{
-				ID: "job", Generation: 1,
-			}
-			successorIdentity := lifecycle.ResourceIdentity{
-				ID: "job", Generation: 2,
-			}
-			current := &transactionTestReadyResource{
-				identity: currentIdentity,
-				prefix:   "current",
-				events:   &events,
-			}
+			currentIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
+			successorIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 2}
+			current := &transactionTestReadyResource{identity: currentIdentity, prefix: "current", events: &events}
 			successorReady := &transactionTestReadyResource{
 				identity: successorIdentity,
 				prefix:   "successor",
@@ -115,22 +110,42 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 		configure func(*transactionTestReadyResource, *transactionTestPreparedResource, *transactionTestReadyResource, error)
 	}{
 		"current stop": {
-			configure: func(current *transactionTestReadyResource, _ *transactionTestPreparedResource, _ *transactionTestReadyResource, failure error) {
+			configure: func(
+				current *transactionTestReadyResource,
+				_ *transactionTestPreparedResource,
+				_ *transactionTestReadyResource,
+				failure error,
+			) {
 				current.stopErr = failure
 			},
 		},
 		"current finalize": {
-			configure: func(current *transactionTestReadyResource, _ *transactionTestPreparedResource, _ *transactionTestReadyResource, failure error) {
+			configure: func(
+				current *transactionTestReadyResource,
+				_ *transactionTestPreparedResource,
+				_ *transactionTestReadyResource,
+				failure error,
+			) {
 				current.finalizeErr = failure
 			},
 		},
 		"successor accept": {
-			configure: func(_ *transactionTestReadyResource, successor *transactionTestPreparedResource, _ *transactionTestReadyResource, failure error) {
+			configure: func(
+				_ *transactionTestReadyResource,
+				successor *transactionTestPreparedResource,
+				_ *transactionTestReadyResource,
+				failure error,
+			) {
 				successor.acceptErr = failure
 			},
 		},
 		"successor publish": {
-			configure: func(_ *transactionTestReadyResource, _ *transactionTestPreparedResource, successor *transactionTestReadyResource, failure error) {
+			configure: func(
+				_ *transactionTestReadyResource,
+				_ *transactionTestPreparedResource,
+				successor *transactionTestReadyResource,
+				failure error,
+			) {
 				successor.publishErr = failure
 			},
 		},
@@ -141,9 +156,7 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 			failure := errors.New("precommit failed")
 			currentIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
 			successorIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 2}
-			current := &transactionTestReadyResource{
-				identity: currentIdentity, prefix: "current", events: &events,
-			}
+			current := &transactionTestReadyResource{identity: currentIdentity, prefix: "current", events: &events}
 			successorReady := &transactionTestReadyResource{
 				identity: successorIdentity, prefix: "successor", events: &events,
 			}
@@ -206,20 +219,13 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPanic(t *testing.T) {
 	}
 	graph, err := dyncfg.NewGraph(nil)
 	require.NoError(t, err)
-	change := dyncfg.GraphChange{
-		ID: "job",
-		Config: &dyncfg.GraphConfig{
-			ID: "job", Module: "module", Name: "job",
-		},
-	}
+	change := dyncfg.GraphChange{ID: "job", Config: &dyncfg.GraphConfig{ID: "job", Module: "module", Name: "job"}}
 	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{change})
 	require.NoError(t, err)
 	result, err := lifecycle.NewSealedResult(200, "application/json", nil)
 	require.NoError(t, err)
 	transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
-		Scope: lifecycle.ResourceTransactionScope{
-			ID: "job", Successor: successorIdentity,
-		},
+		Scope:       lifecycle.ResourceTransactionScope{ID: "job", Successor: successorIdentity},
 		Disposition: lifecycle.ResourceTransactionInstalled,
 		Successor:   successor,
 		Graph:       graph, Mutation: mutation, MutationPrepared: true,
@@ -238,27 +244,17 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPanic(t *testing.T) {
 
 func TestPreparedResourceTransactionSettlesBeforeFailureResolution(t *testing.T) {
 	var events []string
-	successorIdentity := lifecycle.ResourceIdentity{
-		ID: "job", Generation: 1,
-	}
+	successorIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
 	successor := &transactionTestPreparedResource{
-		identity: successorIdentity,
-		events:   &events,
-		acceptErr: &autoDetectionFailure{
-			cause: errors.New("autodetection failed"),
-		},
+		identity:  successorIdentity,
+		events:    &events,
+		acceptErr: &autoDetectionFailure{cause: errors.New("autodetection failed")},
 	}
-	result, err := lifecycle.NewSealedResult(
-		422,
-		"application/json",
-		[]byte(`{"accepted":false}`),
-	)
+	result, err := lifecycle.NewSealedResult(422, "application/json", []byte(`{"accepted":false}`))
 	require.NoError(t, err)
 	transaction, err := PrepareResourceTransaction(
 		ResourceTransactionSpec{
-			Scope: lifecycle.ResourceTransactionScope{
-				ID: "job", Successor: successorIdentity,
-			},
+			Scope:       lifecycle.ResourceTransactionScope{ID: "job", Successor: successorIdentity},
 			Disposition: lifecycle.ResourceTransactionInstalled,
 			Successor:   successor,
 			AfterApply: func() {
@@ -266,9 +262,7 @@ func TestPreparedResourceTransactionSettlesBeforeFailureResolution(t *testing.T)
 			},
 			Result:  result,
 			Cleanup: func() error { return nil },
-			SuccessorFailure: func(
-				*autoDetectionFailure,
-			) (SuccessorFailureResolution, error) {
+			SuccessorFailure: func(*autoDetectionFailure) (SuccessorFailureResolution, error) {
 				return SuccessorFailureResolution{
 					Result:  result,
 					Cleanup: func() error { return nil },
@@ -283,11 +277,7 @@ func TestPreparedResourceTransactionSettlesBeforeFailureResolution(t *testing.T)
 
 	_, err = transaction.Apply(context.Background())
 	require.NoError(t, err)
-	require.Equal(
-		t,
-		[]string{"successor-accept", "settle", "resolve"},
-		events,
-	)
+	require.Equal(t, []string{"successor-accept", "settle", "resolve"}, events)
 }
 
 type transactionTestPreparedResource struct {
@@ -320,9 +310,7 @@ func (ttpr *transactionTestPreparedResource) AcceptStart(
 	return ttpr.ready, nil
 }
 
-func (ttpr *transactionTestPreparedResource) Dispose(
-	context.Context,
-) error {
+func (ttpr *transactionTestPreparedResource) Dispose(context.Context) error {
 	*ttpr.events = append(*ttpr.events, "successor-dispose")
 	return ttpr.disposeErr
 }
@@ -345,16 +333,12 @@ func (ttrr *transactionTestReadyResource) Publish() error {
 	return ttrr.publishErr
 }
 
-func (ttrr *transactionTestReadyResource) AbortReady(
-	context.Context,
-) error {
+func (ttrr *transactionTestReadyResource) AbortReady(context.Context) error {
 	*ttrr.events = append(*ttrr.events, ttrr.prefix+"-abort")
 	return nil
 }
 
-func (ttrr *transactionTestReadyResource) Stop(
-	context.Context,
-) error {
+func (ttrr *transactionTestReadyResource) Stop(context.Context) error {
 	*ttrr.events = append(*ttrr.events, ttrr.prefix+"-stop")
 	return ttrr.stopErr
 }

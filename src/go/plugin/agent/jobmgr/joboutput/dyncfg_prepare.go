@@ -25,35 +25,15 @@ func (dcjc *DynCfgJobController) prepareAdd(
 			scope,
 			current,
 			lifecycle.LongLivedPermit{},
-			mustDynCfgMessage(
-				400,
-				fmt.Sprintf(
-					"Single-instance collector %s does not support add.",
-					target.module,
-				),
-			),
+			mustDynCfgMessage(400, fmt.Sprintf("Single-instance collector %s does not support add.", target.module)),
 		)
 	}
-	config, failure := dcjc.parseConfig(
-		request,
-		target.module,
-		target.name,
-	)
+	config, failure := dcjc.parseConfig(request, target.module, target.name)
 	if failure.valid {
-		return dcjc.noop(
-			scope,
-			current,
-			lifecycle.LongLivedPermit{},
-			failure.result,
-		)
+		return dcjc.noop(scope, current, lifecycle.LongLivedPermit{}, failure.result)
 	}
 	if err := dcjc.factory.ValidateConfig(ctx, config); err != nil {
-		return dcjc.noop(
-			scope,
-			current,
-			lifecycle.LongLivedPermit{},
-			mustDynCfgMessage(400, err.Error()),
-		)
+		return dcjc.noop(scope, current, lifecycle.LongLivedPermit{}, mustDynCfgMessage(400, err.Error()))
 	}
 	payload, err := yaml.Marshal(config)
 	if err != nil {
@@ -75,12 +55,7 @@ func (dcjc *DynCfgJobController) prepareAdd(
 		disposition,
 		&postimage,
 		mustDynCfgMessage(202, ""),
-		dcjc.configCreateCleanup(
-			postimage,
-			confgroup.TypeDyncfg,
-			request.CallerSource,
-			dyncfg.ConfigTypeJob,
-		),
+		dcjc.configCreateCleanup(postimage, confgroup.TypeDyncfg, request.CallerSource, dyncfg.ConfigTypeJob),
 	)
 }
 
@@ -116,25 +91,11 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return dcjc.noop(
-			scope,
-			current,
-			permit,
-			mustDynCfgMessage(404, "config not found."),
-		)
+		return dcjc.noop(scope, current, permit, mustDynCfgMessage(404, "config not found."))
 	}
-	config, failure := dcjc.parseConfig(
-		request,
-		target.module,
-		target.name,
-	)
+	config, failure := dcjc.parseConfig(request, target.module, target.name)
 	if failure.valid {
-		return dcjc.noop(
-			scope,
-			current,
-			permit,
-			failure.result,
-		)
+		return dcjc.noop(scope, current, permit, failure.result)
 	}
 	if err := dcjc.factory.ValidateConfig(ctx, config); err != nil {
 		return dcjc.noop(
@@ -142,10 +103,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			current,
 			permit,
 			mustDynCfgMessage(400, err.Error()),
-			dcjc.configStatusCleanup(
-				target.resourceID,
-				dyncfg.Status(record.Status),
-			),
+			dcjc.configStatusCleanup(target.resourceID, dyncfg.Status(record.Status)),
 		)
 	}
 	if record.Status == dyncfg.StatusAccepted.String() {
@@ -153,14 +111,8 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			scope,
 			current,
 			permit,
-			mustDynCfgMessage(
-				403,
-				"updating is not allowed in 'accepted' state.",
-			),
-			dcjc.configStatusCleanup(
-				target.resourceID,
-				dyncfg.StatusAccepted,
-			),
+			mustDynCfgMessage(403, "updating is not allowed in 'accepted' state."),
+			dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusAccepted),
 		)
 	}
 	oldConfig, err := graphRecordConfig(record)
@@ -175,10 +127,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			current,
 			permit,
 			mustDynCfgMessage(200, ""),
-			dcjc.configStatusCleanup(
-				target.resourceID,
-				dyncfg.StatusRunning,
-			),
+			dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusRunning),
 		)
 	}
 	payload, err := yaml.Marshal(config)
@@ -190,9 +139,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		Status: record.Status, Payload: payload,
 	}
 	if record.Status == dyncfg.StatusDisabled.String() {
-		cleanup := dcjc.updateCleanup(
-			target, request, oldConfig, postimage, dyncfg.StatusDisabled,
-		)
+		cleanup := dcjc.updateCleanup(target, request, oldConfig, postimage, dyncfg.StatusDisabled)
 		return dcjc.prepareMutation(
 			scope,
 			current,
@@ -204,15 +151,9 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			cleanup,
 		)
 	}
-	successor, err := dcjc.factory.Prepare(
-		ctx,
-		config,
-		scope.Successor,
-		permit,
-	)
+	successor, err := dcjc.factory.Prepare(ctx, config, scope.Successor, permit)
 	if err != nil {
-		if ctx.Err() != nil ||
-			lifecycle.OwnershipRetained(err) {
+		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
 		return dcjc.noop(
@@ -220,10 +161,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			current,
 			permit,
 			mustDynCfgMessage(200, err.Error()),
-			dcjc.configStatusCleanup(
-				target.resourceID,
-				dyncfg.Status(record.Status),
-			),
+			dcjc.configStatusCleanup(target.resourceID, dyncfg.Status(record.Status)),
 		)
 	}
 	postimage.Status = dyncfg.StatusRunning.String()
@@ -231,14 +169,10 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 	if current != nil {
 		disposition = lifecycle.ResourceTransactionReplaced
 	}
-	cleanup := dcjc.updateCleanup(
-		target, request, oldConfig, postimage, dyncfg.StatusRunning,
-	)
+	cleanup := dcjc.updateCleanup(target, request, oldConfig, postimage, dyncfg.StatusRunning)
 	failedPostimage := postimage
 	failedPostimage.Status = dyncfg.StatusFailed.String()
-	failedCleanup := dcjc.updateCleanup(
-		target, request, oldConfig, failedPostimage, dyncfg.StatusFailed,
-	)
+	failedCleanup := dcjc.updateCleanup(target, request, oldConfig, failedPostimage, dyncfg.StatusFailed)
 	return dcjc.prepareMutation(
 		scope,
 		current,
@@ -249,16 +183,11 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		mustDynCfgMessage(200, ""),
 		cleanup,
 		successorFailurePlan{
-			postimage:     failedPostimage,
-			failedCleanup: failedCleanup,
-			removedCleanup: dcjc.configDeleteCleanup(
-				dcjc.configID(target.module, target.name),
-			),
-			result: autoDetectionFailureResultFunc(
-				422,
-				"config update failed: %v",
-			),
-			afterApply: dcjc.scheduleRetryAfterApply(config),
+			postimage:      failedPostimage,
+			failedCleanup:  failedCleanup,
+			removedCleanup: dcjc.configDeleteCleanup(dcjc.configID(target.module, target.name)),
+			result:         autoDetectionFailureResultFunc(422, "config update failed: %v"),
+			afterApply:     dcjc.scheduleRetryAfterApply(config),
 			removePlainStock: config.SourceType() ==
 				confgroup.TypeStock,
 		},
@@ -275,12 +204,7 @@ func (dcjc *DynCfgJobController) prepareEnable(
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return dcjc.noop(
-			scope,
-			current,
-			permit,
-			mustDynCfgMessage(404, "config not found."),
-		)
+		return dcjc.noop(scope, current, permit, mustDynCfgMessage(404, "config not found."))
 	}
 	if record.Status == dyncfg.StatusRunning.String() {
 		return dcjc.noop(
@@ -288,10 +212,7 @@ func (dcjc *DynCfgJobController) prepareEnable(
 			current,
 			permit,
 			mustDynCfgMessage(200, ""),
-			dcjc.configStatusCleanup(
-				target.resourceID,
-				dyncfg.StatusRunning,
-			),
+			dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusRunning),
 		)
 	}
 	return dcjc.prepareRunningTransition(
@@ -304,12 +225,7 @@ func (dcjc *DynCfgJobController) prepareEnable(
 		lifecycle.ResourceTransactionInstalled,
 		"job enable failed: %v",
 		func(err error) (lifecycle.PreparedResourceTransaction, error) {
-			return dcjc.noop(
-				scope,
-				current,
-				permit,
-				mustDynCfgMessage(200, err.Error()),
-			)
+			return dcjc.noop(scope, current, permit, mustDynCfgMessage(200, err.Error()))
 		},
 	)
 }
@@ -324,12 +240,7 @@ func (dcjc *DynCfgJobController) prepareRestart(
 	permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return dcjc.noop(
-			scope,
-			current,
-			permit,
-			mustDynCfgMessage(404, "config not found."),
-		)
+		return dcjc.noop(scope, current, permit, mustDynCfgMessage(404, "config not found."))
 	}
 	status := dyncfg.Status(record.Status)
 	if status != dyncfg.StatusRunning && status != dyncfg.StatusFailed {
@@ -337,17 +248,8 @@ func (dcjc *DynCfgJobController) prepareRestart(
 			scope,
 			current,
 			permit,
-			mustDynCfgMessage(
-				405,
-				fmt.Sprintf(
-					"restarting is not allowed in '%s' state.",
-					status,
-				),
-			),
-			dcjc.configStatusCleanup(
-				target.resourceID,
-				status,
-			),
+			mustDynCfgMessage(405, fmt.Sprintf("restarting is not allowed in '%s' state.", status)),
+			dcjc.configStatusCleanup(target.resourceID, status),
 		)
 	}
 	disposition := lifecycle.ResourceTransactionInstalled
@@ -368,14 +270,8 @@ func (dcjc *DynCfgJobController) prepareRestart(
 				scope,
 				current,
 				permit,
-				mustDynCfgMessage(
-					422,
-					fmt.Sprintf("config restart failed: %v", err),
-				),
-				dcjc.configStatusCleanup(
-					target.resourceID,
-					status,
-				),
+				mustDynCfgMessage(422, fmt.Sprintf("config restart failed: %v", err)),
+				dcjc.configStatusCleanup(target.resourceID, status),
 			)
 		},
 	)
@@ -401,24 +297,15 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 	if err != nil {
 		return nil, err
 	}
-	successor, err := dcjc.factory.Prepare(
-		ctx,
-		config,
-		scope.Successor,
-		permit,
-	)
+	successor, err := dcjc.factory.Prepare(ctx, config, scope.Successor, permit)
 	if err != nil {
-		if ctx.Err() != nil ||
-			lifecycle.OwnershipRetained(err) {
+		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
 		}
 		return onPrepareFailure(err)
 	}
 	postimage := graphConfig(record, dyncfg.StatusRunning)
-	failedPostimage := graphConfig(
-		record,
-		dyncfg.StatusFailed,
-	)
+	failedPostimage := graphConfig(record, dyncfg.StatusFailed)
 	return dcjc.prepareMutation(
 		scope,
 		current,
@@ -427,24 +314,13 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 		disposition,
 		&postimage,
 		mustDynCfgMessage(200, ""),
-		dcjc.configStatusCleanup(
-			target.resourceID,
-			dyncfg.StatusRunning,
-		),
+		dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusRunning),
 		successorFailurePlan{
-			postimage: failedPostimage,
-			failedCleanup: dcjc.configStatusCleanup(
-				target.resourceID,
-				dyncfg.StatusFailed,
-			),
-			removedCleanup: dcjc.configDeleteCleanup(
-				dcjc.externalID(target.resourceID),
-			),
-			result: autoDetectionFailureResultFunc(
-				422,
-				failureMessage,
-			),
-			afterApply: dcjc.scheduleRetryAfterApply(config),
+			postimage:      failedPostimage,
+			failedCleanup:  dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusFailed),
+			removedCleanup: dcjc.configDeleteCleanup(dcjc.externalID(target.resourceID)),
+			result:         autoDetectionFailureResultFunc(422, failureMessage),
+			afterApply:     dcjc.scheduleRetryAfterApply(config),
 			removePlainStock: config.SourceType() ==
 				confgroup.TypeStock,
 		},
@@ -459,12 +335,7 @@ func (dcjc *DynCfgJobController) prepareDisable(
 	scope lifecycle.ResourceTransactionScope,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return dcjc.noop(
-			scope,
-			current,
-			lifecycle.LongLivedPermit{},
-			mustDynCfgMessage(404, "config not found."),
-		)
+		return dcjc.noop(scope, current, lifecycle.LongLivedPermit{}, mustDynCfgMessage(404, "config not found."))
 	}
 	if record.Status == dyncfg.StatusDisabled.String() {
 		return dcjc.noop(
@@ -472,10 +343,7 @@ func (dcjc *DynCfgJobController) prepareDisable(
 			current,
 			lifecycle.LongLivedPermit{},
 			mustDynCfgMessage(200, ""),
-			dcjc.configStatusCleanup(
-				target.resourceID,
-				dyncfg.StatusDisabled,
-			),
+			dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusDisabled),
 		)
 	}
 	postimage := graphConfig(record, dyncfg.StatusDisabled)
@@ -491,10 +359,7 @@ func (dcjc *DynCfgJobController) prepareDisable(
 		disposition,
 		&postimage,
 		mustDynCfgMessage(200, ""),
-		dcjc.configStatusCleanup(
-			target.resourceID,
-			dyncfg.StatusDisabled,
-		),
+		dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusDisabled),
 	)
 }
 
@@ -506,12 +371,7 @@ func (dcjc *DynCfgJobController) prepareRemove(
 	scope lifecycle.ResourceTransactionScope,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return dcjc.noop(
-			scope,
-			current,
-			lifecycle.LongLivedPermit{},
-			mustDynCfgMessage(404, "config not found."),
-		)
+		return dcjc.noop(scope, current, lifecycle.LongLivedPermit{}, mustDynCfgMessage(404, "config not found."))
 	}
 	config, err := graphRecordConfig(record)
 	if err != nil {
@@ -554,8 +414,6 @@ func (dcjc *DynCfgJobController) prepareRemove(
 		disposition,
 		nil,
 		mustDynCfgMessage(200, ""),
-		dcjc.configDeleteCleanup(
-			dcjc.configID(record.Module, record.Name),
-		),
+		dcjc.configDeleteCleanup(dcjc.configID(record.Module, record.Name)),
 	)
 }

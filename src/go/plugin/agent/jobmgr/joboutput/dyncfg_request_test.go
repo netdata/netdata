@@ -14,32 +14,20 @@ func TestDynCfgResolveRequestReportsArgumentErrors(t *testing.T) {
 		wantFailure dynCfgFailure
 	}{
 		"empty Add name": {
-			args: []string{"go.d:collector:module", "add", ""},
-			wantFailure: newDynCfgFailure(
-				400,
-				"invalid or missing job name.",
-			),
+			args:        []string{"go.d:collector:module", "add", ""},
+			wantFailure: newDynCfgFailure(400, "invalid or missing job name."),
 		},
 		"missing Add name argument": {
-			args: []string{"go.d:collector:module", "add"},
-			wantFailure: newDynCfgFailure(
-				400,
-				"missing required arguments: need 3, got 2",
-			),
+			args:        []string{"go.d:collector:module", "add"},
+			wantFailure: newDynCfgFailure(400, "missing required arguments: need 3, got 2"),
 		},
 		"invalid non-empty Add name": {
-			args: []string{"go.d:collector:module", "add", "job.name"},
-			wantFailure: newDynCfgFailure(
-				400,
-				"Unacceptable job name 'job.name': contains '.'.",
-			),
+			args:        []string{"go.d:collector:module", "add", "job.name"},
+			wantFailure: newDynCfgFailure(400, "Unacceptable job name 'job.name': contains '.'."),
 		},
 		"non-Add command missing ID name": {
-			args: []string{"go.d:collector:module", "remove"},
-			wantFailure: newDynCfgFailure(
-				400,
-				"invalid config ID format.",
-			),
+			args:        []string{"go.d:collector:module", "remove"},
+			wantFailure: newDynCfgFailure(400, "invalid config ID format."),
 		},
 	}
 

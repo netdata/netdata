@@ -14,10 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
-type autoDetectionRetryPlanner func(
-	confgroup.Config,
-	autoDetectionRetryToken,
-) (jobmgr.WorkPlan, error)
+type autoDetectionRetryPlanner func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error)
 
 type autoDetectionRetryToken struct {
 	uid        string // config UID this retry targets
@@ -71,19 +68,13 @@ func (adri *autoDetectionRetryIndex) bind(
 	run uint64,
 	failure func(error),
 ) error {
-	if adri == nil || commands == nil || plan == nil || run == 0 ||
-		failure == nil {
-		return errors.New(
-			"job output: invalid autodetection retry binding",
-		)
+	if adri == nil || commands == nil || plan == nil || run == 0 || failure == nil {
+		return errors.New("job output: invalid autodetection retry binding")
 	}
 	adri.mu.Lock()
-	if adri.closed ||
-		adri.bound {
+	if adri.closed || adri.bound {
 		adri.mu.Unlock()
-		return errors.New(
-			"job output: autodetection retries already bound",
-		)
+		return errors.New("job output: autodetection retries already bound")
 	}
 	adri.commands = commands
 	adri.plan = plan
@@ -95,15 +86,8 @@ func (adri *autoDetectionRetryIndex) bind(
 	return nil
 }
 
-func (adri *autoDetectionRetryIndex) schedule(
-	config confgroup.Config,
-	after int,
-) {
-	if adri == nil ||
-		config == nil ||
-		config.FullName() == "" ||
-		config.UID() == "" ||
-		after <= 0 {
+func (adri *autoDetectionRetryIndex) schedule(config confgroup.Config, after int) {
+	if adri == nil || config == nil || config.FullName() == "" || config.UID() == "" || after <= 0 {
 		return
 	}
 	cloned, err := config.Clone()
@@ -125,19 +109,14 @@ func (adri *autoDetectionRetryIndex) schedule(
 	if adri.generation == 0 {
 		adri.failed = true
 		adri.mu.Unlock()
-		adri.fail(errors.New(
-			"job output: autodetection retry generation wrapped",
-		))
+		adri.fail(errors.New("job output: autodetection retry generation wrapped"))
 		return
 	}
 	retry := &autoDetectionRetry{
 		config: cloned,
-		token: autoDetectionRetryToken{
-			uid:        cloned.UID(),
-			generation: adri.generation,
-		},
-		due:   adri.logicalClock + int64(after),
-		index: -1,
+		token:  autoDetectionRetryToken{uid: cloned.UID(), generation: adri.generation},
+		due:    adri.logicalClock + int64(after),
+		index:  -1,
 	}
 	adri.entries[cloned.FullName()] = retry
 	heap.Push(&adri.queue, retry)
@@ -164,10 +143,7 @@ func (adri *autoDetectionRetryIndex) cancel(id string) {
 	delete(adri.entries, id)
 }
 
-func (adri *autoDetectionRetryIndex) cancelToken(
-	id string,
-	token autoDetectionRetryToken,
-) {
+func (adri *autoDetectionRetryIndex) cancelToken(id string, token autoDetectionRetryToken) {
 	if adri == nil || id == "" || token.generation == 0 {
 		return
 	}
@@ -183,10 +159,7 @@ func (adri *autoDetectionRetryIndex) cancelToken(
 	delete(adri.entries, id)
 }
 
-func (adri *autoDetectionRetryIndex) isCurrent(
-	id string,
-	token autoDetectionRetryToken,
-) bool {
+func (adri *autoDetectionRetryIndex) isCurrent(id string, token autoDetectionRetryToken) bool {
 	if adri == nil || id == "" || token.generation == 0 {
 		return false
 	}
@@ -213,13 +186,9 @@ func (adri *autoDetectionRetryIndex) stopWorker() {
 	adri.notify()
 }
 
-func (adri *autoDetectionRetryIndex) wait(
-	ctx context.Context,
-) error {
+func (adri *autoDetectionRetryIndex) wait(ctx context.Context) error {
 	if adri == nil || ctx == nil {
-		return errors.New(
-			"job output: invalid autodetection retry wait",
-		)
+		return errors.New("job output: invalid autodetection retry wait")
 	}
 	adri.mu.Lock()
 	bound := adri.bound
@@ -289,15 +258,12 @@ func (adri *autoDetectionRetryIndex) advance(processClock int) {
 	if processClock < adri.lastProcessClock {
 		adri.failed = true
 		adri.mu.Unlock()
-		adri.fail(errors.New(
-			"job output: autodetection retry process clock regressed",
-		))
+		adri.fail(errors.New("job output: autodetection retry process clock regressed"))
 		return
 	}
 	adri.logicalClock += int64(processClock - adri.lastProcessClock)
 	adri.lastProcessClock = processClock
-	due := len(adri.queue) > 0 &&
-		adri.queue[0].due <= adri.logicalClock
+	due := len(adri.queue) > 0 && adri.queue[0].due <= adri.logicalClock
 	adri.mu.Unlock()
 	if due {
 		adri.notify()
@@ -319,8 +285,7 @@ func (adri *autoDetectionRetryIndex) runWorker() {
 			}
 			if err := adri.dispatch(retry); err != nil {
 				stopping, clean := err.(*lifecycle.StoppingRejection)
-				if clean &&
-					stopping.Generation == adri.run {
+				if clean && stopping.Generation == adri.run {
 					return
 				}
 				adri.fail(err)
@@ -337,17 +302,13 @@ func (adri *autoDetectionRetryIndex) runWorker() {
 func (adri *autoDetectionRetryIndex) takeDue() *autoDetectionRetry {
 	adri.mu.Lock()
 	defer adri.mu.Unlock()
-	if adri.closed || adri.failed ||
-		len(adri.queue) == 0 ||
-		adri.queue[0].due > adri.logicalClock {
+	if adri.closed || adri.failed || len(adri.queue) == 0 || adri.queue[0].due > adri.logicalClock {
 		return nil
 	}
 	return heap.Pop(&adri.queue).(*autoDetectionRetry)
 }
 
-func (adri *autoDetectionRetryIndex) dispatch(
-	retry *autoDetectionRetry,
-) error {
+func (adri *autoDetectionRetryIndex) dispatch(retry *autoDetectionRetry) error {
 	work, err := adri.plan(retry.config, retry.token)
 	if err != nil {
 		return err
@@ -355,11 +316,7 @@ func (adri *autoDetectionRetryIndex) dispatch(
 	return adri.commands.SubmitPrepared(
 		context.Background(),
 		jobmgr.Request{
-			UID: fmt.Sprintf(
-				"jobmgr-autodetection-retry-%d-%d",
-				adri.run,
-				retry.token.generation,
-			),
+			UID:     fmt.Sprintf("jobmgr-autodetection-retry-%d-%d", adri.run, retry.token.generation),
 			LaneKey: retry.config.FullName(),
 			Source:  lifecycle.SourceJobManager,
 			Route:   "internal/jobs/autodetection-retry",
@@ -397,8 +354,7 @@ func (h autoDetectionRetryHeap) Len() int {
 
 func (h autoDetectionRetryHeap) Less(left, right int) bool {
 	if h[left].due == h[right].due {
-		return h[left].token.generation <
-			h[right].token.generation
+		return h[left].token.generation < h[right].token.generation
 	}
 	return h[left].due < h[right].due
 }

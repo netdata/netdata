@@ -28,12 +28,7 @@ type shippedRoot struct {
 
 func (srd ShippedRootDriver) roots() [3]shippedRoot {
 	return [3]shippedRoot{
-		{
-			name:       "godplugin",
-			executable: srd.GoDPlugin,
-			module:     "testrandom",
-			configFile: "go.d/testrandom.conf",
-		},
+		{name: "godplugin", executable: srd.GoDPlugin, module: "testrandom", configFile: "go.d/testrandom.conf"},
 		{
 			name:       "ibmdplugin",
 			executable: srd.IBMPlugin,
@@ -51,30 +46,19 @@ func (srd ShippedRootDriver) roots() [3]shippedRoot {
 
 func (srd ShippedRootDriver) validateConfigs() error {
 	if !filepath.IsAbs(srd.ConfigDir) {
-		return errors.New(
-			"jobmgr test: shipped-root config directory must be absolute",
-		)
+		return errors.New("jobmgr test: shipped-root config directory must be absolute")
 	}
 	info, err := os.Stat(srd.ConfigDir)
 	if err != nil {
-		return fmt.Errorf(
-			"jobmgr test: stat shipped-root config directory: %w",
-			err,
-		)
+		return fmt.Errorf("jobmgr test: stat shipped-root config directory: %w", err)
 	}
 	if !info.IsDir() {
-		return errors.New(
-			"jobmgr test: shipped-root config path is not a directory",
-		)
+		return errors.New("jobmgr test: shipped-root config path is not a directory")
 	}
 	for _, root := range srd.roots() {
 		path := filepath.Join(srd.ConfigDir, root.configFile)
 		if err := validateEmptyJobsConfig(path); err != nil {
-			return fmt.Errorf(
-				"jobmgr test: %s config: %w",
-				root.name,
-				err,
-			)
+			return fmt.Errorf("jobmgr test: %s config: %w", root.name, err)
 		}
 	}
 	return nil

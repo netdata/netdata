@@ -46,11 +46,7 @@ func TestJobFactoryRejectCleanup(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			events := &jobEventLog{}
-			permit, tasks := issueTestJobPermit(
-				t,
-				"job",
-				1,
-			)
+			permit, tasks := issueTestJobPermit(t, "job", 1)
 			prepared, err := prepareJob(
 				context.Background(),
 				"job",
@@ -67,11 +63,7 @@ func TestJobFactoryRejectCleanup(t *testing.T) {
 			require.Equal(t, test.want, got)
 
 			require.NoError(t, permit.AbortUnused())
-			require.EqualValues(
-				t,
-				lifecycle.LongLivedCensus{},
-				tasks.LongLivedCensus(),
-			)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 		})
 	}
 }
@@ -86,11 +78,7 @@ func TestJobPreparationLeavesCleanRejectedPermitWithTaskSupervisor(t *testing.T)
 		1,
 		permit,
 		func(context.Context) (ConstructedJob, error) {
-			return testConstructedJob(
-				t,
-				JobVariantV1,
-				events,
-			), errors.New("construction failed")
+			return testConstructedJob(t, JobVariantV1, events), errors.New("construction failed")
 		},
 	)
 	require.Error(t, err)
@@ -109,10 +97,8 @@ func TestPreparedTransactionRejectsStaleUnusedPermitAtConstruction(t *testing.T)
 
 	_, err = PrepareNoopResourceTransaction(
 		lifecycle.ResourceTransactionScope{
-			ID: "job",
-			Successor: lifecycle.ResourceIdentity{
-				ID: "job", Generation: 1,
-			},
+			ID:        "job",
+			Successor: lifecycle.ResourceIdentity{ID: "job", Generation: 1},
 		},
 		nil,
 		permit,
@@ -134,11 +120,7 @@ func TestJobGenerationV1V2(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			events := &jobEventLog{}
-			permit, tasks := issueTestJobPermit(
-				t,
-				"job",
-				7,
-			)
+			permit, tasks := issueTestJobPermit(t, "job", 7)
 			prepared, err := prepareJob(
 				context.Background(),
 				"job",
@@ -175,11 +157,7 @@ func TestJobGenerationV1V2(t *testing.T) {
 			require.Equal(t, want, got)
 
 			require.EqualValues(t, JobTerminal, generation.State())
-			require.EqualValues(
-				t,
-				lifecycle.LongLivedCensus{},
-				tasks.LongLivedCensus(),
-			)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 		})
 	}
 }
@@ -221,11 +199,7 @@ func TestJobGenerationPermitReturnLast(t *testing.T) {
 	require.EqualValues(t, 1, census.Active)
 
 	require.NoError(t, generation.Finalize())
-	require.EqualValues(
-		t,
-		lifecycle.LongLivedCensus{},
-		tasks.LongLivedCensus(),
-	)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
 func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
@@ -309,11 +283,7 @@ func TestJobLifecyclePanicsPreserveTaskClassification(t *testing.T) {
 func BenchmarkBJobFactoryCold(b *testing.B) {
 	for b.Loop() {
 		events := &jobEventLog{}
-		permit, _ := issueTestJobPermit(
-			b,
-			"job",
-			1,
-		)
+		permit, _ := issueTestJobPermit(b, "job", 1)
 		prepared, err := prepareJob(
 			context.Background(),
 			"job",
@@ -337,11 +307,7 @@ type testingHelper interface {
 	Helper()
 }
 
-func testConstructedJob(
-	t testingHelper,
-	variant JobVariant,
-	events *jobEventLog,
-) ConstructedJob {
+func testConstructedJob(t testingHelper, variant JobVariant, events *jobEventLog) ConstructedJob {
 	t.Helper()
 	return ConstructedJob{
 		Variant: variant,
@@ -390,10 +356,7 @@ func issueTestJobPermit(
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
 	require.NoError(t, err)
 	plan := lifecycle.NewJobLongLivedPlan()
-	permit, err := tasks.IssueLongLivedPermit(
-		lifecycle.ResourceIdentity{ID: id, Generation: generation},
-		plan,
-	)
+	permit, err := tasks.IssueLongLivedPermit(lifecycle.ResourceIdentity{ID: id, Generation: generation}, plan)
 	require.NoError(t, err)
 	return permit, tasks
 }

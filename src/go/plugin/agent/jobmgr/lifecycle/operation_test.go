@@ -37,16 +37,8 @@ func TestOperationAbandonedDeadlineStartBecomesTerminal(t *testing.T) {
 	require.True(t, operation.CanDisposeTerminal())
 }
 
-func TestOperationResponseCommitPrecedesDisposalAcknowledgement(
-	t *testing.T,
-) {
-	operation, err := NewOperation(
-		1,
-		"uid",
-		SourceFunction,
-		"lane",
-		true,
-	)
+func TestOperationResponseCommitPrecedesDisposalAcknowledgement(t *testing.T) {
+	operation, err := NewOperation(1, "uid", SourceFunction, "lane", true)
 	require.NoError(t, err)
 	ref := TaskRef{Slot: 1, Generation: 1}
 
@@ -76,26 +68,11 @@ func TestOperationResponseTerminalStatesRemainTerminalWhenPoisoned(t *testing.T)
 		response ResponseState
 		want     ResponseState
 	}{
-		"open becomes poisoned": {
-			response: ResponseOpen,
-			want:     ResponsePoisoned,
-		},
-		"pending becomes poisoned": {
-			response: ResponsePending,
-			want:     ResponsePoisoned,
-		},
-		"committed remains committed": {
-			response: ResponseCommitted,
-			want:     ResponseCommitted,
-		},
-		"not required remains not required": {
-			response: ResponseNotRequired,
-			want:     ResponseNotRequired,
-		},
-		"poisoned remains poisoned": {
-			response: ResponsePoisoned,
-			want:     ResponsePoisoned,
-		},
+		"open becomes poisoned":             {response: ResponseOpen, want: ResponsePoisoned},
+		"pending becomes poisoned":          {response: ResponsePending, want: ResponsePoisoned},
+		"committed remains committed":       {response: ResponseCommitted, want: ResponseCommitted},
+		"not required remains not required": {response: ResponseNotRequired, want: ResponseNotRequired},
+		"poisoned remains poisoned":         {response: ResponsePoisoned, want: ResponsePoisoned},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {

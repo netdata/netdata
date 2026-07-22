@@ -42,12 +42,7 @@ func (c *Controller) prepareSchema(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if target.key != "" {
 		if _, ok := c.entry(target.key); !ok {
-			return c.noopMessage(
-				scope,
-				current,
-				404,
-				fmt.Sprintf(msgSecretStoreNotConfigured, target.key),
-			)
+			return c.noopMessage(scope, current, 404, fmt.Sprintf(msgSecretStoreNotConfigured, target.key))
 		}
 	}
 	schema, ok := c.creators.Schema(target.kind)
@@ -59,22 +54,11 @@ func (c *Controller) prepareSchema(
 			fmt.Sprintf("The specified secretstore kind '%s' is not supported.", target.kind),
 		)
 	}
-	result, err := lifecycle.NewSealedResult(
-		200,
-		"application/json",
-		[]byte(schema),
-	)
+	result, err := lifecycle.NewSealedResult(200, "application/json", []byte(schema))
 	if err != nil {
 		return nil, err
 	}
-	return c.noop(
-		scope,
-		current,
-		lifecycle.LongLivedPermit{},
-		result,
-		nil,
-		nil,
-	)
+	return c.noop(scope, current, lifecycle.LongLivedPermit{}, result, nil, nil)
 }
 
 func (c *Controller) prepareGet(
@@ -84,17 +68,9 @@ func (c *Controller) prepareGet(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	entry, ok := c.entry(target.key)
 	if !ok {
-		return c.noopMessage(
-			scope,
-			current,
-			404,
-			fmt.Sprintf(msgSecretStoreNotConfigured, target.key),
-		)
+		return c.noopMessage(scope, current, 404, fmt.Sprintf(msgSecretStoreNotConfigured, target.key))
 	}
-	typed, err := typedSecretConfig(
-		c.creators,
-		entry.config.Kind(),
-	)
+	typed, err := typedSecretConfig(c.creators, entry.config.Kind())
 	if err == nil {
 		var payload []byte
 		payload, err = yaml.Marshal(entry.config)
@@ -103,33 +79,17 @@ func (c *Controller) prepareGet(
 		}
 	}
 	if err != nil {
-		return c.noopMessage(
-			scope,
-			current,
-			500,
-			"Failed to materialize secretstore configuration.",
-		)
+		return c.noopMessage(scope, current, 500, "Failed to materialize secretstore configuration.")
 	}
 	payload, err := json.Marshal(typed)
 	if err != nil {
 		return nil, err
 	}
-	result, err := lifecycle.NewSealedResult(
-		200,
-		"application/json",
-		payload,
-	)
+	result, err := lifecycle.NewSealedResult(200, "application/json", payload)
 	if err != nil {
 		return nil, err
 	}
-	return c.noop(
-		scope,
-		current,
-		lifecycle.LongLivedPermit{},
-		result,
-		nil,
-		nil,
-	)
+	return c.noop(scope, current, lifecycle.LongLivedPermit{}, result, nil, nil)
 }
 
 func (c *Controller) prepareUserConfig(
@@ -138,41 +98,22 @@ func (c *Controller) prepareUserConfig(
 	input CommandInput,
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	typed, err := typedSecretConfig(
-		c.creators,
-		target.kind,
-	)
+	typed, err := typedSecretConfig(c.creators, target.kind)
 	if err == nil {
 		err = parseSecretPayload(input, typed)
 	}
 	if err != nil {
-		return c.noopMessage(
-			scope,
-			current,
-			400,
-			msgInvalidSecretStoreConfig,
-		)
+		return c.noopMessage(scope, current, 400, msgInvalidSecretStoreConfig)
 	}
 	payload, err := yaml.Marshal(typed)
 	if err != nil {
 		return nil, err
 	}
-	result, err := lifecycle.NewSealedResult(
-		200,
-		"application/yaml",
-		payload,
-	)
+	result, err := lifecycle.NewSealedResult(200, "application/yaml", payload)
 	if err != nil {
 		return nil, err
 	}
-	return c.noop(
-		scope,
-		current,
-		lifecycle.LongLivedPermit{},
-		result,
-		nil,
-		nil,
-	)
+	return c.noop(scope, current, lifecycle.LongLivedPermit{}, result, nil, nil)
 }
 
 func (c *Controller) prepareTest(
@@ -184,15 +125,7 @@ func (c *Controller) prepareTest(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	entry, ok := c.entry(target.key)
 	if !ok {
-		return c.noopMessage(
-			scope,
-			current,
-			404,
-			fmt.Sprintf(
-				msgSecretStoreNotConfigured,
-				target.key,
-			),
-		)
+		return c.noopMessage(scope, current, 404, fmt.Sprintf(msgSecretStoreNotConfigured, target.key))
 	}
 	config := entry.config
 	validationOnly := true
@@ -200,51 +133,19 @@ func (c *Controller) prepareTest(
 		var err error
 		config, err = c.configFromPayload(input, target)
 		if err != nil {
-			return c.noopMessage(
-				scope,
-				current,
-				400,
-				msgInvalidSecretStoreConfig,
-			)
+			return c.noopMessage(scope, current, 400, msgInvalidSecretStoreConfig)
 		}
 		validationOnly = false
 	}
-	if err := c.store.Validate(
-		ctx,
-		c.creators,
-		config,
-	); err != nil {
-		return c.noopMessage(
-			scope,
-			current,
-			400,
-			msgSecretStoreValidationFailed,
-		)
+	if err := c.store.Validate(ctx, c.creators, config); err != nil {
+		return c.noopMessage(scope, current, 400, msgSecretStoreValidationFailed)
 	}
 	if !validationOnly && config.Hash() == entry.config.Hash() {
-		return c.noopMessage(
-			scope,
-			current,
-			202,
-			"Submitted configuration does not change the active secretstore.",
-		)
+		return c.noopMessage(scope, current, 202, "Submitted configuration does not change the active secretstore.")
 	}
-	affected := formatSecretJobs(
-		c.dependencies.Affected(target.key, false),
-	)
-	restartable := formatSecretJobs(
-		c.dependencies.Affected(target.key, true),
-	)
-	return c.noopMessage(
-		scope,
-		current,
-		202,
-		secretImpactMessage(
-			affected,
-			restartable,
-			validationOnly,
-		),
-	)
+	affected := formatSecretJobs(c.dependencies.Affected(target.key, false))
+	restartable := formatSecretJobs(c.dependencies.Affected(target.key, true))
+	return c.noopMessage(scope, current, 202, secretImpactMessage(affected, restartable, validationOnly))
 }
 
 func (c *Controller) prepareAdd(
@@ -262,31 +163,14 @@ func (c *Controller) prepareAdd(
 			current,
 			permit,
 			409,
-			fmt.Sprintf(
-				"The specified secretstore '%s' already exists.",
-				target.key,
-			),
+			fmt.Sprintf("The specified secretstore '%s' already exists.", target.key),
 		)
 	}
 	config, err := c.configFromPayload(input, target)
 	if err != nil {
-		return c.noopMessageWithPermit(
-			scope,
-			current,
-			permit,
-			400,
-			msgInvalidSecretStoreConfig,
-		)
+		return c.noopMessageWithPermit(scope, current, permit, 400, msgInvalidSecretStoreConfig)
 	}
-	return c.prepareStoreMutation(
-		ctx,
-		scope,
-		current,
-		permit,
-		config,
-		0,
-		true,
-	)
+	return c.prepareStoreMutation(ctx, scope, current, permit, config, 0, true)
 }
 
 func (c *Controller) prepareUpdate(
@@ -304,42 +188,18 @@ func (c *Controller) prepareUpdate(
 			current,
 			permit,
 			404,
-			fmt.Sprintf(
-				msgSecretStoreNotConfigured,
-				target.key,
-			),
+			fmt.Sprintf(msgSecretStoreNotConfigured, target.key),
 		)
 	}
 	config, err := c.configFromPayload(input, target)
 	if err != nil {
-		return c.noopMessageWithPermit(
-			scope,
-			current,
-			permit,
-			400,
-			msgInvalidSecretStoreConfig,
-		)
+		return c.noopMessageWithPermit(scope, current, permit, 400, msgInvalidSecretStoreConfig)
 	}
 	expected := c.store.Generation(target.key)
 	if expected != 0 && entry.config.Hash() == config.Hash() {
-		return c.noop(
-			scope,
-			current,
-			permit,
-			mustSecretMessage(200, ""),
-			nil,
-			c.configCreateCleanup(entry),
-		)
+		return c.noop(scope, current, permit, mustSecretMessage(200, ""), nil, c.configCreateCleanup(entry))
 	}
-	return c.prepareStoreMutation(
-		ctx,
-		scope,
-		current,
-		permit,
-		config,
-		expected,
-		false,
-	)
+	return c.prepareStoreMutation(ctx, scope, current, permit, config, expected, false)
 }
 
 func (c *Controller) prepareRemove(
@@ -349,26 +209,14 @@ func (c *Controller) prepareRemove(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	entry, exists := c.entry(target.key)
 	if !exists {
-		return c.noopMessage(
-			scope,
-			current,
-			404,
-			fmt.Sprintf(
-				msgSecretStoreNotConfigured,
-				target.key,
-			),
-		)
+		return c.noopMessage(scope, current, 404, fmt.Sprintf(msgSecretStoreNotConfigured, target.key))
 	}
 	if affected := formatSecretJobs(c.dependencies.Affected(target.key, false)); affected != "" {
 		return c.noopMessage(
 			scope,
 			current,
 			409,
-			fmt.Sprintf(
-				"The specified secretstore '%s' is used by jobs (%s).",
-				target.key,
-				affected,
-			),
+			fmt.Sprintf("The specified secretstore '%s' is used by jobs (%s).", target.key, affected),
 		)
 	}
 	if entry.config.SourceType() != confgroup.TypeDyncfg {
@@ -384,17 +232,9 @@ func (c *Controller) prepareRemove(
 	}
 	expected := c.store.Generation(target.key)
 	if expected == 0 || current == nil || !scope.Current.Valid() {
-		return c.noopMessage(
-			scope,
-			current,
-			409,
-			"Secretstore has no active generation.",
-		)
+		return c.noopMessage(scope, current, 409, "Secretstore has no active generation.")
 	}
-	mutation, err := c.store.PrepareRemoval(
-		target.key,
-		expected,
-	)
+	mutation, err := c.store.PrepareRemoval(target.key, expected)
 	if err != nil {
 		return nil, err
 	}
@@ -414,10 +254,7 @@ func (c *Controller) prepareRemove(
 	)
 }
 
-func (c *Controller) configFromPayload(
-	input CommandInput,
-	target secretTarget,
-) (secretstore.Config, error) {
+func (c *Controller) configFromPayload(input CommandInput, target secretTarget) (secretstore.Config, error) {
 	var config secretstore.Config
 	if err := parseSecretPayload(input, &config); err != nil {
 		return nil, err
@@ -444,40 +281,22 @@ func (c *Controller) prepareStoreMutation(
 	expected uint64,
 	installFailure bool,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if !permit.Valid() ||
-		!scope.Successor.Valid() ||
-		permit.Owner() != scope.Successor {
-		return nil, errors.New(
-			"jobmgr secrets: invalid Store mutation permit",
-		)
+	if !permit.Valid() || !scope.Successor.Valid() || permit.Owner() != scope.Successor {
+		return nil, errors.New("jobmgr secrets: invalid Store mutation permit")
 	}
-	carrier, err := newStoreGenerationCarrier(
-		permit,
-		scope.Successor,
-	)
+	carrier, err := newStoreGenerationCarrier(permit, scope.Successor)
 	if err != nil {
 		return nil, err
 	}
-	mutation, prepareErr := c.store.PrepareMutation(
-		ctx,
-		c.creators,
-		carrier,
-		config,
-		expected,
-	)
-	entry := secretEntry{
-		config: config, status: dyncfg.StatusRunning,
-	}
+	mutation, prepareErr := c.store.PrepareMutation(ctx, c.creators, carrier, config, expected)
+	entry := secretEntry{config: config, status: dyncfg.StatusRunning}
 	if prepareErr != nil {
 		spec := preparedSecretSpec{
 			scope: scope, current: current,
-			permit:   permit,
-			store:    c.store,
-			storeKey: config.ExposedKey(),
-			result: mustSecretMessage(
-				400,
-				msgSecretStoreValidationFailed,
-			),
+			permit:     permit,
+			store:      c.store,
+			storeKey:   config.ExposedKey(),
+			result:     mustSecretMessage(400, msgSecretStoreValidationFailed),
 			cleanup:    func() error { return nil },
 			controller: c,
 		}
@@ -539,13 +358,7 @@ func (c *Controller) noopMessage(
 	code int,
 	message string,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	return c.noopMessageWithPermit(
-		scope,
-		current,
-		lifecycle.LongLivedPermit{},
-		code,
-		message,
-	)
+	return c.noopMessageWithPermit(scope, current, lifecycle.LongLivedPermit{}, code, message)
 }
 
 func (c *Controller) noopMessageWithPermit(
@@ -555,14 +368,7 @@ func (c *Controller) noopMessageWithPermit(
 	code int,
 	message string,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	return c.noop(
-		scope,
-		current,
-		permit,
-		mustSecretMessage(code, message),
-		nil,
-		nil,
-	)
+	return c.noop(scope, current, permit, mustSecretMessage(code, message), nil, nil)
 }
 
 func formatSecretJobs(refs []secretstore.JobRef) string {
@@ -590,10 +396,7 @@ func formatBoundedSecretNames[T any](items []T, name func(T) string) string {
 		if builder.Len() != 0 {
 			separatorBytes = 2
 		}
-		if len(value) >
-			secretJobSummaryContentBytes-
-				builder.Len()-
-				separatorBytes {
+		if len(value) > secretJobSummaryContentBytes-builder.Len()-separatorBytes {
 			if builder.Len() != 0 {
 				builder.WriteString(", ")
 			}
@@ -610,11 +413,7 @@ func formatBoundedSecretNames[T any](items []T, name func(T) string) string {
 	return builder.String()
 }
 
-func secretImpactMessage(
-	affected string,
-	restartable string,
-	validationOnly bool,
-) string {
+func secretImpactMessage(affected string, restartable string, validationOnly bool) string {
 	var message string
 	if validationOnly {
 		if affected == "" {

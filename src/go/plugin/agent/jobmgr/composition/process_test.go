@@ -112,7 +112,10 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 		getResult < 0 ||
 		addResult >= configCreate ||
 		configCreate >= getResult ||
-		!strings.Contains(wire[getResult:], `"name":"db","hostname":"db","guid":"22222222-2222-2222-2222-222222222222"`))
+		!strings.Contains(
+			wire[getResult:],
+			`"name":"db","hostname":"db","guid":"22222222-2222-2222-2222-222222222222"`,
+		))
 	commands <- testProcessControl(processTerminate)
 	select {
 	case err := <-done:
@@ -188,9 +191,7 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 	require.EqualValues(t, 2, cleanups)
 }
 
-func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
-	t *testing.T,
-) {
+func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(t *testing.T) {
 	reader, writer := io.Pipe()
 	defer func() { require.NoError(t, writer.Close()) }()
 	started := make(chan struct{})
@@ -198,20 +199,11 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 	defer close(release)
 	factory := agentdiscovery.NewProviderFactory(
 		"noncooperative",
-		func(agentdiscovery.BuildContext) (
-			agentdiscovery.Discoverer,
-			bool,
-			error,
-		) {
-			return processNoncooperativeDiscovery{
-				started: started,
-				release: release,
-			}, true, nil
+		func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
+			return processNoncooperativeDiscovery{started: started, release: release}, true, nil
 		},
 	)
-	catalog, err := agentdiscovery.NewProviderCatalog(
-		[]agentdiscovery.ProviderFactory{factory},
-	)
+	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
 	require.NoError(t, err)
 	process, err := newProcessCore(processCoreConfig{
 		Input: reader, Output: newProcessSynchronizedBuffer(),
@@ -219,10 +211,8 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 		Modules:         collectorapi.Registry{},
 		Jobs:            testRunJobServices(t),
 		Discovery: runDiscoveryServices{
-			BuildContext: agentdiscovery.BuildContext{
-				Registry: confgroup.Registry{"test": {}},
-			},
-			Providers: catalog,
+			BuildContext: agentdiscovery.BuildContext{Registry: confgroup.Registry{"test": {}}},
+			Providers:    catalog,
 		},
 	})
 	require.NoError(t, err)
@@ -261,17 +251,11 @@ func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
 	cleanups := 0
 	factory := agentdiscovery.NewProviderFactory(
 		"panicked",
-		func(agentdiscovery.BuildContext) (
-			agentdiscovery.Discoverer,
-			bool,
-			error,
-		) {
+		func(agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
 			panic("provider construction")
 		},
 	)
-	catalog, err := agentdiscovery.NewProviderCatalog(
-		[]agentdiscovery.ProviderFactory{factory},
-	)
+	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
 	require.NoError(t, err)
 	process, err := newProcessCore(processCoreConfig{
 		Input: reader,
@@ -302,10 +286,8 @@ func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
 		},
 		Jobs: testRunJobServices(t),
 		Discovery: runDiscoveryServices{
-			BuildContext: agentdiscovery.BuildContext{
-				Registry: confgroup.Registry{"module": {}},
-			},
-			Providers: catalog,
+			BuildContext: agentdiscovery.BuildContext{Registry: confgroup.Registry{"module": {}}},
+			Providers:    catalog,
 		},
 	})
 	require.NoError(t, err)
@@ -330,20 +312,13 @@ func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
 }
 
 func TestProcessRetirementPreservesRunDirtyCause(t *testing.T) {
-	run, err := lifecycle.NewRunSupervisor(
-		1,
-		lifecycle.RealClock{},
-		time.Second,
-	)
+	run, err := lifecycle.NewRunSupervisor(1, lifecycle.RealClock{}, time.Second)
 	require.NoError(t, err)
 	cause := errors.New("discovery shutdown failed")
 
 	run.Dirty(cause)
 
-	err = (&processCore{}).retireRun(
-		context.Background(),
-		&runGeneration{run: run},
-	)
+	err = (&processCore{}).retireRun(context.Background(), &runGeneration{run: run})
 	require.False(t, !errors.Is(err, cause) || !strings.Contains(err.Error(), "run did not quiesce"))
 }
 
@@ -363,9 +338,7 @@ type processSynchronizedBuffer struct {
 }
 
 func newProcessSynchronizedBuffer() *processSynchronizedBuffer {
-	return &processSynchronizedBuffer{
-		writes: make(chan struct{}, 32),
-	}
+	return &processSynchronizedBuffer{writes: make(chan struct{}, 32)}
 }
 
 func (psb *processSynchronizedBuffer) Write(payload []byte) (int, error) {
@@ -385,10 +358,7 @@ func (psb *processSynchronizedBuffer) String() string {
 	return psb.buffer.String()
 }
 
-func (psb *processSynchronizedBuffer) waitContains(
-	t *testing.T,
-	want string,
-) {
+func (psb *processSynchronizedBuffer) waitContains(t *testing.T, want string) {
 	t.Helper()
 	timeout := time.NewTimer(3 * time.Second)
 	defer timeout.Stop()
@@ -404,33 +374,20 @@ func (psb *processSynchronizedBuffer) waitContains(
 	}
 }
 
-func testRunServiceDiscoveryServices(
-	t testing.TB,
-) runDiscoveryServices {
+func testRunServiceDiscoveryServices(t testing.TB) runDiscoveryServices {
 	t.Helper()
 	factory := agentdiscovery.NewProviderFactory(
 		"service-discovery-test",
-		func(build agentdiscovery.BuildContext) (
-			agentdiscovery.Discoverer,
-			bool,
-			error,
-		) {
-			return processServiceDiscovery{
-				registry: build.FnReg,
-				output:   build.DyncfgOutput,
-			}, true, nil
+		func(build agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
+			return processServiceDiscovery{registry: build.FnReg, output: build.DyncfgOutput}, true, nil
 		},
 	)
-	catalog, err := agentdiscovery.NewProviderCatalog(
-		[]agentdiscovery.ProviderFactory{factory},
-	)
+	catalog, err := agentdiscovery.NewProviderCatalog([]agentdiscovery.ProviderFactory{factory})
 	require.NoError(t, err)
 	return runDiscoveryServices{
 		BuildContext: agentdiscovery.BuildContext{
 			Registry: confgroup.Registry{"test": {}},
-			Paths: agentdiscovery.PathsConfig{
-				ServiceDiscoveryConfigDir: multipath.MultiPath{"enabled"},
-			},
+			Paths:    agentdiscovery.PathsConfig{ServiceDiscoveryConfigDir: multipath.MultiPath{"enabled"}},
 		},
 		Providers: catalog,
 	}
@@ -446,18 +403,12 @@ type processNoncooperativeDiscovery struct {
 	release <-chan struct{}
 }
 
-func (pnd processNoncooperativeDiscovery) Run(
-	context.Context,
-	chan<- []*confgroup.Group,
-) {
+func (pnd processNoncooperativeDiscovery) Run(context.Context, chan<- []*confgroup.Group) {
 	close(pnd.started)
 	<-pnd.release
 }
 
-func (psd processServiceDiscovery) Run(
-	ctx context.Context,
-	_ chan<- []*confgroup.Group,
-) {
+func (psd processServiceDiscovery) Run(ctx context.Context, _ chan<- []*confgroup.Group) {
 	psd.registry.RegisterPrefix(
 		"config",
 		"go.d:sd:",
@@ -492,8 +443,5 @@ func waitProcessEvent(t *testing.T, events <-chan string, want string) {
 }
 
 func testProcessControl(command processCommand) processControl {
-	return processControl{
-		command: command,
-		result:  make(chan error, 1),
-	}
+	return processControl{command: command, result: make(chan error, 1)}
 }

@@ -36,41 +36,20 @@ func decisionIndexCensus(index *DecisionIndex) decisionTestCensus {
 func TestDecisionIndexAcknowledgesSelectionAndFallback(t *testing.T) {
 	var changes []DiscoveredChange
 	commands := &decisionTestCommands{}
-	index := newDecisionTestIndex(t, commands, func(
-		change DiscoveredChange,
-	) (jobmgr.WorkPlan, error) {
+	index := newDecisionTestIndex(t, commands, func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
 		changes = append(changes, change)
 		return jobmgr.WorkPlan{}, nil
 	})
 	stock := decisionTestConfig("job", confgroup.TypeStock, "stock")
 	user := decisionTestConfig("job", confgroup.TypeUser, "user")
 	groups := map[string]*confgroup.Group{
-		"stock": {
-			Source:  "stock",
-			Configs: []confgroup.Config{stock},
-		},
-		"user": {
-			Source:  "user",
-			Configs: []confgroup.Config{user},
-		},
-		"remove user": {
-			Source: "user",
-		},
-		"remove stock": {
-			Source: "stock",
-		},
+		"stock":        {Source: "stock", Configs: []confgroup.Config{stock}},
+		"user":         {Source: "user", Configs: []confgroup.Config{user}},
+		"remove user":  {Source: "user"},
+		"remove stock": {Source: "stock"},
 	}
-	for _, name := range []string{
-		"stock",
-		"user",
-		"remove user",
-		"remove stock",
-	} {
-		require.NoError(t, index.Apply(
-			context.Background(),
-			[]*confgroup.Group{groups[name]},
-		),
-		)
+	for _, name := range []string{"stock", "user", "remove user", "remove stock"} {
+		require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{groups[name]}))
 	}
 	require.EqualValues(t, 4, len(changes))
 	require.False(t, changes[0].Config.UID() != stock.UID() ||
@@ -100,10 +79,7 @@ func TestDecisionIndexFailureKeepsLastAcknowledgedSelection(t *testing.T) {
 
 	commands.err = errors.New("acknowledgement failed")
 
-	err := index.Apply(context.Background(), []*confgroup.Group{{
-		Source:  "user",
-		Configs: []confgroup.Config{user},
-	}})
+	err := index.Apply(context.Background(), []*confgroup.Group{{Source: "user", Configs: []confgroup.Config{user}}})
 	require.ErrorIs(t, err, commands.err)
 
 	acknowledged := index.acknowledged[stock.FullName()]
@@ -151,9 +127,7 @@ func TestDecisionIndexConfigurationPolicy(t *testing.T) {
 				RunJob:     test.runJob,
 				AutoEnable: test.auto,
 				Commands:   &decisionTestCommands{},
-				Plan: func(
-					change DiscoveredChange,
-				) (jobmgr.WorkPlan, error) {
+				Plan: func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
 					changes = append(changes, change)
 					return jobmgr.WorkPlan{}, nil
 				},
@@ -162,10 +136,7 @@ func TestDecisionIndexConfigurationPolicy(t *testing.T) {
 
 			require.NoError(t, index.Apply(
 				context.Background(),
-				[]*confgroup.Group{{
-					Source:  "source",
-					Configs: []confgroup.Config{test.config},
-				}},
+				[]*confgroup.Group{{Source: "source", Configs: []confgroup.Config{test.config}}},
 			),
 			)
 
@@ -293,16 +264,12 @@ func BenchmarkBDecisionIndexApply(b *testing.B) {
 	}
 	groups := [2][]*confgroup.Group{
 		{{
-			Source: "source",
-			Configs: []confgroup.Config{
-				decisionTestConfig("job", confgroup.TypeStock, "source").Set("value", 1),
-			},
+			Source:  "source",
+			Configs: []confgroup.Config{decisionTestConfig("job", confgroup.TypeStock, "source").Set("value", 1)},
 		}},
 		{{
-			Source: "source",
-			Configs: []confgroup.Config{
-				decisionTestConfig("job", confgroup.TypeStock, "source").Set("value", 2),
-			},
+			Source:  "source",
+			Configs: []confgroup.Config{decisionTestConfig("job", confgroup.TypeStock, "source").Set("value", 2)},
 		}},
 	}
 	ctx := context.Background()
@@ -316,27 +283,14 @@ func BenchmarkBDecisionIndexApply(b *testing.B) {
 	}
 }
 
-func newDecisionTestIndex(
-	t *testing.T,
-	commands PreparedCommandPort,
-	plan PlanDiscovered,
-) *DecisionIndex {
+func newDecisionTestIndex(t *testing.T, commands PreparedCommandPort, plan PlanDiscovered) *DecisionIndex {
 	t.Helper()
-	index, err := NewDecisionIndex(DecisionConfig{
-		Generation: 1,
-		AutoEnable: true,
-		Commands:   commands,
-		Plan:       plan,
-	})
+	index, err := NewDecisionIndex(DecisionConfig{Generation: 1, AutoEnable: true, Commands: commands, Plan: plan})
 	require.NoError(t, err)
 	return index
 }
 
-func decisionTestConfig(
-	name string,
-	sourceType string,
-	source string,
-) confgroup.Config {
+func decisionTestConfig(name string, sourceType string, source string) confgroup.Config {
 	return confgroup.Config{}.SetName(name).SetModule("module").SetProvider("test").SetSourceType(sourceType).
 		SetSource(source)
 }
@@ -357,10 +311,6 @@ func (dtc *decisionTestCommands) SubmitPreparedAndWait(
 
 type decisionBenchmarkCommands struct{}
 
-func (decisionBenchmarkCommands) SubmitPreparedAndWait(
-	context.Context,
-	jobmgr.Request,
-	jobmgr.WorkPlan,
-) error {
+func (decisionBenchmarkCommands) SubmitPreparedAndWait(context.Context, jobmgr.Request, jobmgr.WorkPlan) error {
 	return nil
 }

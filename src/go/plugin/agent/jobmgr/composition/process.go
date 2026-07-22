@@ -72,16 +72,10 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &processCore{
-		config: config,
-		uids:   lifecycle.NewUIDLedger(), frames: frames, ingress: ingress,
-	}, nil
+	return &processCore{config: config, uids: lifecycle.NewUIDLedger(), frames: frames, ingress: ingress}, nil
 }
 
-func (pc *processCore) run(
-	ctx context.Context,
-	commands <-chan processControl,
-) error {
+func (pc *processCore) run(ctx context.Context, commands <-chan processControl) error {
 	if pc == nil || ctx == nil || commands == nil {
 		return errors.New("jobmgr composition: invalid process run")
 	}
@@ -104,10 +98,7 @@ func (pc *processCore) run(
 	}
 	inputDone := make(chan processInputCompletion, 1)
 	go func() {
-		inputDone <- processInputCompletion{
-			err:  pc.ingress.Run(ctx),
-			quit: quit,
-		}
+		inputDone <- processInputCompletion{err: pc.ingress.Run(ctx), quit: quit}
 	}()
 	ticks := ticker.New(time.Second)
 	defer ticks.Stop()
@@ -120,10 +111,7 @@ func (pc *processCore) run(
 			}
 			return pc.finalize(
 				generation,
-				errors.Join(
-					errors.New("jobmgr composition: Function input stopped"),
-					input.err,
-				),
+				errors.Join(errors.New("jobmgr composition: Function input stopped"), input.err),
 			)
 		case <-generation.kernel.Done():
 			return pc.finalize(
@@ -145,46 +133,28 @@ func (pc *processCore) run(
 				continue
 			}
 			if pc.config.KeepAlive {
-				if err := pc.frames.CommitProtocolFrame(
-					[]byte{'\n'},
-				); err == nil {
+				if err := pc.frames.CommitProtocolFrame([]byte{'\n'}); err == nil {
 					continue
 				} else {
 					return pc.finalize(
 						generation,
-						errors.Join(
-							errors.New(
-								"jobmgr composition: keepalive write failed",
-							),
-							err,
-						),
+						errors.Join(errors.New("jobmgr composition: keepalive write failed"), err),
 					)
 				}
 			}
 		case control := <-commands:
 			if control.result == nil {
-				return pc.finalize(
-					generation,
-					errors.New("jobmgr composition: invalid process control"),
-				)
+				return pc.finalize(generation, errors.New("jobmgr composition: invalid process control"))
 			}
 			switch control.command {
 			case processRestart:
 				nextID := generationID + 1
 				if nextID == 0 {
-					finalErr := pc.finalize(
-						generation,
-						errors.New("jobmgr composition: run generation wrapped"),
-					)
+					finalErr := pc.finalize(generation, errors.New("jobmgr composition: run generation wrapped"))
 					control.result <- finalErr
 					return finalErr
 				}
-				next, rotateErr := pc.rotate(
-					ctx,
-					generation,
-					nextID,
-					markQuit,
-				)
+				next, rotateErr := pc.rotate(ctx, generation, nextID, markQuit)
 				if rotateErr != nil {
 					finalErr := pc.finalize(next, rotateErr)
 					control.result <- finalErr
@@ -198,10 +168,7 @@ func (pc *processCore) run(
 				control.result <- finalErr
 				return finalErr
 			default:
-				finalErr := pc.finalize(
-					generation,
-					errors.New("jobmgr composition: invalid process command"),
-				)
+				finalErr := pc.finalize(generation, errors.New("jobmgr composition: invalid process command"))
 				control.result <- finalErr
 				return finalErr
 			}
@@ -209,9 +176,7 @@ func (pc *processCore) run(
 	}
 }
 
-func (pc *processCore) newRun(
-	generation uint64,
-) (*runGeneration, error) {
+func (pc *processCore) newRun(generation uint64) (*runGeneration, error) {
 	return newRunGeneration(runGenerationConfig{
 		Generation: generation, ShutdownTimeout: pc.config.ShutdownTimeout,
 		UIDs: pc.uids, Frames: pc.frames,
@@ -221,13 +186,9 @@ func (pc *processCore) newRun(
 	})
 }
 
-func (pc *processCore) binding(
-	generation *runGeneration,
-	quit func(),
-) (functionadapter.ProcessBinding, error) {
+func (pc *processCore) binding(generation *runGeneration, quit func()) (functionadapter.ProcessBinding, error) {
 	if pc == nil || generation == nil || quit == nil {
-		return functionadapter.ProcessBinding{},
-			errors.New("jobmgr composition: invalid process binding")
+		return functionadapter.ProcessBinding{}, errors.New("jobmgr composition: invalid process binding")
 	}
 	return functionadapter.NewProcessBinding(
 		generation.kernel,
@@ -278,15 +239,9 @@ func (pc *processCore) rotate(
 	return next, nil
 }
 
-func (pc *processCore) finalize(
-	current *runGeneration,
-	cause error,
-) error {
+func (pc *processCore) finalize(current *runGeneration, cause error) error {
 	finalErr := cause
-	shutdownCtx, cancel := context.WithTimeout(
-		context.Background(),
-		pc.config.ShutdownTimeout,
-	)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), pc.config.ShutdownTimeout)
 	defer cancel()
 	var finishRun *lifecycle.RunSupervisor
 	if current != nil && current.isStarted() {
@@ -319,15 +274,9 @@ func (pc *processCore) finalize(
 		finalErr = errors.Join(finalErr, pc.ingress.Fence(shutdownCtx))
 	case functionadapter.ProcessIngressContained:
 	case functionadapter.ProcessIngressLive:
-		finalErr = errors.Join(
-			finalErr,
-			errors.New("jobmgr composition: live Function ingress has no retiring run"),
-		)
+		finalErr = errors.Join(finalErr, errors.New("jobmgr composition: live Function ingress has no retiring run"))
 	default:
-		finalErr = errors.Join(
-			finalErr,
-			errors.New("jobmgr composition: invalid final Function ingress state"),
-		)
+		finalErr = errors.Join(finalErr, errors.New("jobmgr composition: invalid final Function ingress state"))
 	}
 	if err := closeProcessUIDs(shutdownCtx, pc.uids); err != nil {
 		finalErr = errors.Join(finalErr, err)
@@ -338,10 +287,7 @@ func (pc *processCore) finalize(
 		}
 	}
 	if pc.ingress.State() != functionadapter.ProcessIngressContained {
-		finalErr = errors.Join(
-			finalErr,
-			errors.New("jobmgr composition: Function ingress was not contained"),
-		)
+		finalErr = errors.Join(finalErr, errors.New("jobmgr composition: Function ingress was not contained"))
 	}
 	if pc.config.FinalizeOutput != nil {
 		pc.config.FinalizeOutput()
@@ -349,10 +295,7 @@ func (pc *processCore) finalize(
 	return finalErr
 }
 
-func (pc *processCore) retireRun(
-	ctx context.Context,
-	generation *runGeneration,
-) error {
+func (pc *processCore) retireRun(ctx context.Context, generation *runGeneration) error {
 	if generation == nil {
 		return nil
 	}
@@ -369,10 +312,7 @@ func (pc *processCore) retireRun(
 		generation.tasks.Pending() != 0 ||
 		generation.tasks.InheritedActive() != 0 ||
 		generation.tasks.LongLivedCensus() != (lifecycle.LongLivedCensus{}) {
-		return errors.Join(
-			waitErr,
-			errors.New("jobmgr composition: retired run retained tasks"),
-		)
+		return errors.Join(waitErr, errors.New("jobmgr composition: retired run retained tasks"))
 	}
 	return waitErr
 }

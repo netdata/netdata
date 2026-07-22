@@ -29,29 +29,20 @@ var processRuntimeScenarios = map[ProcessScenario]func(context.Context) error{
 }
 
 func ProcessScenarios() map[ProcessScenario]struct{} {
-	scenarios := make(
-		map[ProcessScenario]struct{},
-		len(processRuntimeScenarios),
-	)
+	scenarios := make(map[ProcessScenario]struct{}, len(processRuntimeScenarios))
 	for scenario := range processRuntimeScenarios {
 		scenarios[scenario] = struct{}{}
 	}
 	return scenarios
 }
 
-func (d *ProcessDriver) Run(
-	ctx context.Context,
-	scenario ProcessScenario,
-) error {
+func (d *ProcessDriver) Run(ctx context.Context, scenario ProcessScenario) error {
 	if d == nil || ctx == nil {
 		return errors.New("jobmgr test: invalid Process driver")
 	}
 	run := processRuntimeScenarios[scenario]
 	if run == nil {
-		return fmt.Errorf(
-			"jobmgr test: unknown Process scenario %q",
-			scenario,
-		)
+		return fmt.Errorf("jobmgr test: unknown Process scenario %q", scenario)
 	}
 	return run(ctx)
 }
@@ -75,30 +66,17 @@ func startProcessFixture(
 	logger.Level.SetByName("critical")
 	reader, writer := io.Pipe()
 	output := &synchronizedBuffer{}
-	defaults := confgroup.Registry{
-		productionFixtureModule: {
-			UpdateEvery: 1,
-		},
-	}
+	defaults := confgroup.Registry{productionFixtureModule: {UpdateEvery: 1}}
 	build := agentdiscovery.BuildContext{
-		RunMode: policy.Agent(true),
-		Identity: agentdiscovery.PluginIdentity{
-			Name: "jobmgrtest",
-		},
+		RunMode:    policy.Agent(true),
+		Identity:   agentdiscovery.PluginIdentity{Name: "jobmgrtest"},
 		Registry:   defaults,
 		DummyNames: []string{productionFixtureModule},
 	}
 	provider := agentdiscovery.NewProviderFactory(
 		"dummy",
-		func(build agentdiscovery.BuildContext) (
-			agentdiscovery.Discoverer,
-			bool,
-			error,
-		) {
-			discoverer, err := dummy.NewDiscovery(dummy.Config{
-				Registry: build.Registry,
-				Names:    build.DummyNames,
-			})
+		func(build agentdiscovery.BuildContext) (agentdiscovery.Discoverer, bool, error) {
+			discoverer, err := dummy.NewDiscovery(dummy.Config{Registry: build.Registry, Names: build.DummyNames})
 			return discoverer, err == nil, err
 		},
 	)
@@ -147,10 +125,7 @@ func (f *processFixture) close() {
 		f.cancel()
 		_ = f.input.Close()
 	})
-	joinCtx, cancelJoin := context.WithTimeout(
-		context.Background(),
-		fixtureJoinPeriod,
-	)
+	joinCtx, cancelJoin := context.WithTimeout(context.Background(), fixtureJoinPeriod)
 	defer cancelJoin()
 	_ = f.wait(joinCtx)
 }
@@ -158,14 +133,8 @@ func (f *processFixture) close() {
 func runProcessRestart(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{
-		cleanupGate: release, cleanupEntered: entered,
-	}
-	fixture, err := startProcessFixture(
-		ctx,
-		state,
-		time.Second,
-	)
+	state := &agentFixtureState{cleanupGate: release, cleanupEntered: entered}
+	fixture, err := startProcessFixture(ctx, state, time.Second)
 	if err != nil {
 		return err
 	}
@@ -194,17 +163,12 @@ func runProcessRestart(ctx context.Context) error {
 	select {
 	case err := <-restarted:
 		_ = fixture.input.Close()
-		return fmt.Errorf(
-			"restart returned before old Cleanup disposition: %v",
-			err,
-		)
+		return fmt.Errorf("restart returned before old Cleanup disposition: %v", err)
 	case <-time.After(50 * time.Millisecond):
 	}
 	if state.count("init") != 1 {
 		_ = fixture.input.Close()
-		return errors.New(
-			"replacement initialized before old Cleanup disposition",
-		)
+		return errors.New("replacement initialized before old Cleanup disposition")
 	}
 	releaseCleanup()
 	select {
@@ -241,11 +205,7 @@ func runProcessRestart(ctx context.Context) error {
 
 func runProcessInputFence(ctx context.Context) error {
 	state := &agentFixtureState{}
-	fixture, err := startProcessFixture(
-		ctx,
-		state,
-		time.Second,
-	)
+	fixture, err := startProcessFixture(ctx, state, time.Second)
 	if err != nil {
 		return err
 	}
@@ -275,14 +235,8 @@ func runProcessInputFence(ctx context.Context) error {
 func runProcessNoncooperativeShutdown(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{
-		cleanupGate: release, cleanupEntered: entered,
-	}
-	fixture, err := startProcessFixture(
-		ctx,
-		state,
-		100*time.Millisecond,
-	)
+	state := &agentFixtureState{cleanupGate: release, cleanupEntered: entered}
+	fixture, err := startProcessFixture(ctx, state, 100*time.Millisecond)
 	if err != nil {
 		return err
 	}
@@ -322,17 +276,10 @@ func runProcessNoncooperativeShutdown(ctx context.Context) error {
 		return ctx.Err()
 	}
 	if terminalErr == nil || runErr == nil {
-		return fmt.Errorf(
-			"noncooperative Cleanup reported success: terminate=%v run=%v",
-			terminalErr,
-			runErr,
-		)
+		return fmt.Errorf("noncooperative Cleanup reported success: terminate=%v run=%v", terminalErr, runErr)
 	}
 	if state.count("init") != 1 || state.count("cleanup") != 1 {
-		return fmt.Errorf(
-			"noncooperative Cleanup ownership changed: events=%v",
-			state.snapshot(),
-		)
+		return fmt.Errorf("noncooperative Cleanup ownership changed: events=%v", state.snapshot())
 	}
 	return closeErr
 }
@@ -340,15 +287,8 @@ func runProcessNoncooperativeShutdown(ctx context.Context) error {
 func runCollectorRepeatedStop(ctx context.Context) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
-	state := &agentFixtureState{
-		cleanupGate:    release,
-		cleanupEntered: entered,
-	}
-	fixture, err := startProcessFixture(
-		ctx,
-		state,
-		time.Second,
-	)
+	state := &agentFixtureState{cleanupGate: release, cleanupEntered: entered}
+	fixture, err := startProcessFixture(ctx, state, time.Second)
 	if err != nil {
 		return err
 	}
@@ -365,10 +305,7 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 	}); err != nil {
 		return err
 	}
-	results := []chan error{
-		make(chan error, 1),
-		make(chan error, 1),
-	}
+	results := []chan error{make(chan error, 1), make(chan error, 1)}
 	go func() {
 		results[0] <- fixture.process.Terminate(ctx)
 	}()
@@ -386,19 +323,12 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 	case secondErr = <-results[1]:
 		secondConsumed = true
 		if !errors.Is(secondErr, composition.ErrProcessStopped) {
-			return fmt.Errorf(
-				"repeated stop error=%v, want %w",
-				secondErr,
-				composition.ErrProcessStopped,
-			)
+			return fmt.Errorf("repeated stop error=%v, want %w", secondErr, composition.ErrProcessStopped)
 		}
 	case <-time.After(50 * time.Millisecond):
 	}
 	if got := state.count("cleanup"); got != 1 {
-		return fmt.Errorf(
-			"held repeated stop Cleanup count=%d, want 1",
-			got,
-		)
+		return fmt.Errorf("held repeated stop Cleanup count=%d, want 1", got)
 	}
 	close(release)
 	released = true
@@ -409,8 +339,7 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 		}
 		select {
 		case err := <-result:
-			if index == 1 &&
-				errors.Is(err, composition.ErrProcessStopped) {
+			if index == 1 && errors.Is(err, composition.ErrProcessStopped) {
 				continue
 			}
 			terminalErr = errors.Join(terminalErr, err)
@@ -422,10 +351,7 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 		return terminalErr
 	}
 	if got := state.count("cleanup"); got != 1 {
-		return fmt.Errorf(
-			"repeated stop invoked Cleanup %d times, want 1",
-			got,
-		)
+		return fmt.Errorf("repeated stop invoked Cleanup %d times, want 1", got)
 	}
 	if err := fixture.input.Close(); err != nil {
 		return err

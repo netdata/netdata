@@ -37,11 +37,7 @@ func (ck *CommandKernel) admitSubmission(
 	var parent *commandOperation
 	if composite != nil {
 		var err error
-		parent, err = ck.validateCompositeAdmission(
-			composite,
-			plan,
-			rollback,
-		)
+		parent, err = ck.validateCompositeAdmission(composite, plan, rollback)
 		if err != nil {
 			return err
 		}
@@ -53,10 +49,7 @@ func (ck *CommandKernel) admitSubmission(
 	now := ck.clock.Now()
 	if err := ck.uids.Admit(request.UID, now); err != nil {
 		if ck.runtimeObserver != nil {
-			ck.runtimeObserver.AddRuntimeCounter(
-				lifecycle.RuntimeCounterDuplicateUIDRejected,
-				1,
-			)
+			ck.runtimeObserver.AddRuntimeCounter(lifecycle.RuntimeCounterDuplicateUIDRejected, 1)
 		}
 		return err
 	}
@@ -85,10 +78,7 @@ func (ck *CommandKernel) admitSubmission(
 			}
 			return preAdmissionControl{
 				status: decision.Rejected,
-				cause: fmt.Errorf(
-					"jobmgr kernel: Function catalog rejected route %q",
-					request.Route,
-				),
+				cause:  fmt.Errorf("jobmgr kernel: Function catalog rejected route %q", request.Route),
 			}
 		}
 		plan = decision.Plan
@@ -117,31 +107,21 @@ func (ck *CommandKernel) admitSubmission(
 	} else if functionResourceID != "" {
 		laneID = resourceCommandLaneKey(functionResourceID)
 	} else {
-		laneID = commandLaneKey{
-			source:             request.Source,
-			functionInvocation: functionInvocation,
-		}
+		laneID = commandLaneKey{source: request.Source, functionInvocation: functionInvocation}
 	}
 	if plan.Transaction != nil {
 		laneID = resourceCommandLaneKey(request.LaneKey)
 	}
-	if parent != nil &&
-		parent.lane != nil &&
-		parent.lane.mapKey == laneID {
+	if parent != nil && parent.lane != nil && parent.lane.mapKey == laneID {
 		return errors.Join(
-			errors.New(
-				"jobmgr composite: child cannot use its active parent lane",
-			),
+			errors.New("jobmgr composite: child cannot use its active parent lane"),
 			ck.uids.Complete(request.UID, false, now),
 		)
 	}
 	lane := ck.lanes[laneID]
-	if plan.Transaction != nil && lane != nil &&
-		(lane.currentStopping || lane.retiringIdentity.Valid()) {
+	if plan.Transaction != nil && lane != nil && (lane.currentStopping || lane.retiringIdentity.Valid()) {
 		return errors.Join(
-			errors.New(
-				"jobmgr kernel: resource transaction overlaps retiring resource authority",
-			),
+			errors.New("jobmgr kernel: resource transaction overlaps retiring resource authority"),
 			ck.uids.Complete(request.UID, false, now),
 		)
 	}
@@ -152,7 +132,13 @@ func (ck *CommandKernel) admitSubmission(
 		}
 	}
 	ck.nextID++
-	operationGeneration, err := lifecycle.NewOperation(ck.nextID, request.UID, request.Source, request.LaneKey, !plan.NoResponse)
+	operationGeneration, err := lifecycle.NewOperation(
+		ck.nextID,
+		request.UID,
+		request.Source,
+		request.LaneKey,
+		!plan.NoResponse,
+	)
 	if err != nil {
 		ck.releaseUnusedLane(lane)
 		return errors.Join(err, ck.uids.Complete(request.UID, false, now))
@@ -160,10 +146,7 @@ func (ck *CommandKernel) admitSubmission(
 	if parent != nil {
 		if err := ck.beginCompositeFence(parent); err != nil {
 			ck.releaseUnusedLane(lane)
-			return errors.Join(
-				err,
-				ck.uids.Complete(request.UID, false, now),
-			)
+			return errors.Join(err, ck.uids.Complete(request.UID, false, now))
 		}
 	}
 	operation := &commandOperation{
@@ -205,18 +188,14 @@ func (ck *CommandKernel) admitSubmission(
 		ck.functionOperations++
 	}
 	if ck.runtimeObserver != nil {
-		ck.runtimeObserver.AddRuntimeCounter(
-			lifecycle.RuntimeCounterOperationsAdmitted,
-			1,
-		)
+		ck.runtimeObserver.AddRuntimeCounter(lifecycle.RuntimeCounterOperationsAdmitted, 1)
 	}
 	ck.observeRuntimeOperations()
 	releaseFunctionInvocation = false
 	if plan.Transaction != nil {
 		lane.transactionPlanned++
 	}
-	if plan.Transaction != nil &&
-		plan.Transaction.PrepareComposite != nil {
+	if plan.Transaction != nil && plan.Transaction.PrepareComposite != nil {
 		operation.composite = newKernelCompositeScope(ck, operation)
 	}
 	if !request.Deadline.IsZero() {
@@ -244,10 +223,7 @@ func (ck *CommandKernel) admitSubmission(
 
 func (ck *CommandKernel) rejectClosedAdmission() error {
 	if ck.runtimeObserver != nil {
-		ck.runtimeObserver.AddRuntimeCounter(
-			lifecycle.RuntimeCounterShutdownRejected,
-			1,
-		)
+		ck.runtimeObserver.AddRuntimeCounter(lifecycle.RuntimeCounterShutdownRejected, 1)
 	}
 	closedErr := errors.New("jobmgr kernel: admission closed")
 	if ck.run.IsStopping() {

@@ -14,9 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(
-	t *testing.T,
-) {
+func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
 	store, err := secretstore.NewSecretStore(resolver)
@@ -48,9 +46,7 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(
 	require.NoError(t, err)
 	transaction, err := newPreparedSecretTransaction(
 		preparedSecretSpec{
-			scope: lifecycle.ResourceTransactionScope{
-				ID: "secretstore:vault:main",
-			},
+			scope:      lifecycle.ResourceTransactionScope{ID: "secretstore:vault:main"},
 			store:      store,
 			storeKey:   "vault:main",
 			mutation:   mutation,
@@ -109,19 +105,11 @@ func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
 		display: "module:job", running: true,
 		storeKeys: []string{"vault:main"},
 	}
-	dependencies.byStore["vault:main"] = map[string]struct{}{
-		"module_two": {},
-	}
-	restarts, err := NewSecretRestartCommand(
-		1,
-		dependencies,
-		restartTestJobs{stopError: stopErr},
-	)
+	dependencies.byStore["vault:main"] = map[string]struct{}{"module_two": {}}
+	restarts, err := NewSecretRestartCommand(1, dependencies, restartTestJobs{stopError: stopErr})
 	require.NoError(t, err)
 	transaction, err := newPreparedSecretTransaction(preparedSecretSpec{
-		scope: lifecycle.ResourceTransactionScope{
-			ID: "secretstore:vault:main",
-		},
+		scope: lifecycle.ResourceTransactionScope{ID: "secretstore:vault:main"},
 		store: store, storeKey: "vault:main", mutation: mutation,
 		restarts:   restarts,
 		result:     mustSecretMessage(200, ""),
@@ -184,9 +172,6 @@ func (tts *transactionTestStore) Publish() secretstore.PublishedStore {
 
 type transactionTestPublished string
 
-func (ttp transactionTestPublished) Resolve(
-	context.Context,
-	secretstore.ResolveRequest,
-) (string, error) {
+func (ttp transactionTestPublished) Resolve(context.Context, secretstore.ResolveRequest) (string, error) {
 	return string(ttp), nil
 }

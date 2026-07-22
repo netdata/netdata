@@ -126,11 +126,7 @@ func TestRunSupervisorPublishesOneGenerationStoppingCut(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			run, err := NewRunSupervisor(
-				7,
-				RealClock{},
-				time.Second,
-			)
+			run, err := NewRunSupervisor(7, RealClock{}, time.Second)
 			require.NoError(t, err)
 			require.NoError(t, run.OpenAdmission())
 			cause := run.StoppingCause()
@@ -171,11 +167,7 @@ func TestFinishShutdownPublishesDueClockWithoutTimerBridge(t *testing.T) {
 }
 
 func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
-	census := RunCensus{
-		KernelDrained:          true,
-		FunctionCatalogDrained: true,
-		RunFinalizerComplete:   true,
-	}
+	census := RunCensus{KernelDrained: true, FunctionCatalogDrained: true, RunFinalizerComplete: true}
 	tests := map[string]struct {
 		run func(*testing.T, *RunSupervisor)
 	}{
@@ -238,11 +230,7 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 }
 
 func TestRunCensusQuiescenceRequiresExplicitOwnershipProofs(t *testing.T) {
-	base := RunCensus{
-		KernelDrained:          true,
-		FunctionCatalogDrained: true,
-		RunFinalizerComplete:   true,
-	}
+	base := RunCensus{KernelDrained: true, FunctionCatalogDrained: true, RunFinalizerComplete: true}
 	tests := map[string]struct {
 		mutate func(*RunCensus)
 	}{
@@ -268,11 +256,7 @@ func TestRunCensusQuiescenceRequiresExplicitOwnershipProofs(t *testing.T) {
 }
 
 func TestRunSupervisorProjectsFirstDirtyTransitionExactlyOnce(t *testing.T) {
-	census := RunCensus{
-		KernelDrained:          true,
-		FunctionCatalogDrained: true,
-		RunFinalizerComplete:   true,
-	}
+	census := RunCensus{KernelDrained: true, FunctionCatalogDrained: true, RunFinalizerComplete: true}
 	tests := map[string]struct {
 		run func(*testing.T, *RunSupervisor)
 	}{
@@ -322,9 +306,7 @@ func TestRunSupervisorProjectsFirstDirtyTransitionExactlyOnce(t *testing.T) {
 }
 
 func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
-	populations := map[string]int{
-		"one": 1, "thirty-two": 32, "two-hundred-fifty-seven": 257,
-	}
+	populations := map[string]int{"one": 1, "thirty-two": 32, "two-hundred-fifty-seven": 257}
 	for name, population := range populations {
 		t.Run(name, func(t *testing.T) {
 			frame, err := NewFrameOwner(io.Discard)
@@ -337,12 +319,17 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 			owners := make([]ResourceIdentity, population)
 			for index := range population {
 				owners[index] = ResourceIdentity{ID: "owner-" + strconv.Itoa(index+1), Generation: 1}
-				refs[index], err = supervisor.StartInherited(context.Background(), owners[index], InheritedV1Runtime, func(ctx context.Context) error {
-					<-ctx.Done()
-					observed <- struct{}{}
-					<-release
-					return nil
-				})
+				refs[index], err = supervisor.StartInherited(
+					context.Background(),
+					owners[index],
+					InheritedV1Runtime,
+					func(ctx context.Context) error {
+						<-ctx.Done()
+						observed <- struct{}{}
+						<-release
+						return nil
+					},
+				)
 				require.NoError(t, err)
 			}
 
@@ -364,7 +351,12 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 				}
 			}
 
-			_, startInheritedErr := supervisor.StartInherited(context.Background(), ResourceIdentity{ID: "late", Generation: 1}, InheritedV1Runtime, func(context.Context) error { return nil })
+			_, startInheritedErr := supervisor.StartInherited(
+				context.Background(),
+				ResourceIdentity{ID: "late", Generation: 1},
+				InheritedV1Runtime,
+				func(context.Context) error { return nil },
+			)
 			require.Error(t, startInheritedErr)
 
 			for index := range refs {
@@ -373,7 +365,11 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 			close(release)
 			for index := range refs {
 
-				joinInheritedJoined, joinInheritedErr := supervisor.JoinInherited(context.Background(), refs[index], owners[index])
+				joinInheritedJoined, joinInheritedErr := supervisor.JoinInherited(
+					context.Background(),
+					refs[index],
+					owners[index],
+				)
 				require.False(t, joinInheritedErr != nil || !joinInheritedJoined)
 
 				require.NoError(t, supervisor.ReleaseInherited(refs[index], owners[index]))

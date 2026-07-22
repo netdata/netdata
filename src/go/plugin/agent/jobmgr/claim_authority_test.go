@@ -63,7 +63,11 @@ func TestClaimAuthorityLexicographicOrderRetainsAndReleasesPrefix(t *testing.T) 
 	acquireGranted2, acquireErr2 := authority.acquire(parked)
 	require.False(t, acquireErr2 != nil || acquireGranted2)
 
-	require.False(t, parked.claimCursor != 1 || !parked.authorityClaimEdges[0].held || parked.authorityClaimEdges[0].claim != "a" || !parked.authorityClaimEdges[1].waiting)
+	require.False(
+		t,
+		parked.claimCursor != 1 || !parked.authorityClaimEdges[0].held || parked.authorityClaimEdges[0].claim != "a" ||
+			!parked.authorityClaimEdges[1].waiting,
+	)
 
 	acquireGranted3, acquireErr3 := authority.acquire(probe)
 	require.False(t, acquireErr3 != nil || acquireGranted3)
@@ -115,13 +119,7 @@ func TestClaimAuthoritySettlementUsesBoundedTurns(t *testing.T) {
 	for index := range claims {
 		claims[index] = fmt.Sprintf("claim-%03d", index)
 	}
-	holder := claimTestOperation(
-		t,
-		authority,
-		1,
-		"holder",
-		claims,
-	)
+	holder := claimTestOperation(t, authority, 1, "holder", claims)
 
 	acquireGranted, acquireErr := authority.acquire(holder)
 	require.False(t, acquireErr != nil || !acquireGranted)
@@ -212,7 +210,13 @@ func BenchmarkClaimAuthorityAcquireCancel(b *testing.B) {
 	}
 }
 
-func claimTestOperation(tb testing.TB, authority *claimAuthority, id lifecycle.OperationID, uid string, claims []string) *commandOperation {
+func claimTestOperation(
+	tb testing.TB,
+	authority *claimAuthority,
+	id lifecycle.OperationID,
+	uid string,
+	claims []string,
+) *commandOperation {
 	tb.Helper()
 	generation, err := lifecycle.NewOperation(id, uid, lifecycle.SourceJobManager, uid, true)
 	if err != nil {

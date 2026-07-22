@@ -47,17 +47,12 @@ func (wp WorkPlan) validate() error {
 		}
 		return nil
 	}
-	if wp.Transaction.ID == "" ||
-		(wp.Transaction.Prepare == nil) ==
-			(wp.Transaction.PrepareComposite == nil) {
+	if wp.Transaction.ID == "" || (wp.Transaction.Prepare == nil) == (wp.Transaction.PrepareComposite == nil) {
 		return errors.New("jobmgr kernel: invalid resource transaction plan")
 	}
 	if wp.Transaction.AllocateSuccessor {
 		if err := wp.Transaction.Permit.Validate(); err != nil {
-			return errors.Join(
-				errors.New("jobmgr kernel: transaction successor has no long-lived permit"),
-				err,
-			)
+			return errors.Join(errors.New("jobmgr kernel: transaction successor has no long-lived permit"), err)
 		}
 	} else if wp.Transaction.Permit.Class() != 0 {
 		return errors.New("jobmgr kernel: transaction without successor has a permit")

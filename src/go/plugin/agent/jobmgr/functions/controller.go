@@ -115,11 +115,7 @@ func (jh *JobHandle) Publish() error {
 	if jh.published || jh.closed {
 		return errors.New("jobmgr Function controller: invalid job-handle publication")
 	}
-	if err := jh.controller.publishJob(
-		context.Background(),
-		jh.identity,
-		jh.job,
-	); err != nil {
+	if err := jh.controller.publishJob(context.Background(), jh.identity, jh.job); err != nil {
 		return err
 	}
 	jh.published = true
@@ -171,14 +167,8 @@ func NewController(
 	cleanupConstruction := func(cause error) error {
 		return errors.Join(
 			cause,
-			controller.cleanupUnpublishedGroups(
-				context.Background(),
-				controller.groups,
-			),
-			controller.cleanupInitialRoutes(
-				context.Background(),
-				controller.fixedGenerations,
-			),
+			controller.cleanupUnpublishedGroups(context.Background(), controller.groups),
+			controller.cleanupInitialRoutes(context.Background(), controller.fixedGenerations),
 		)
 	}
 	slices.Sort(names)
@@ -205,41 +195,26 @@ func NewController(
 	if err != nil {
 		return nil, nil, cleanupConstruction(err)
 	}
-	declarations := make(
-		[]Declaration,
-		0,
-		len(routes)+len(initial),
-	)
-	fixedGenerations := make(
-		map[*HandlerGenerationDeclaration]struct{},
-		len(initial),
-	)
+	declarations := make([]Declaration, 0, len(routes)+len(initial))
+	fixedGenerations := make(map[*HandlerGenerationDeclaration]struct{}, len(initial))
 	for _, route := range initial {
 		if err := validateInitialRoute(route); err != nil {
 			return nil, nil, cleanupConstruction(err)
 		}
 		if _, exists := routes[route.Declaration.PublicName]; exists {
 			return nil, nil, cleanupConstruction(
-				errors.New(
-					"jobmgr Function controller: initial route collides with collector Function",
-				),
+				errors.New("jobmgr Function controller: initial route collides with collector Function"),
 			)
 		}
-		if current, exists := controller.fixed[route.Publication.Name]; exists &&
-			current != route.Publication {
+		if current, exists := controller.fixed[route.Publication.Name]; exists && current != route.Publication {
 			return nil, nil, cleanupConstruction(
-				errors.New(
-					"jobmgr Function controller: initial routes disagree on publication",
-				),
+				errors.New("jobmgr Function controller: initial routes disagree on publication"),
 			)
 		}
 		controller.fixed[route.Publication.Name] = route.Publication
 		if _, exists := fixedGenerations[route.Declaration.Generation]; !exists {
 			fixedGenerations[route.Declaration.Generation] = struct{}{}
-			controller.fixedGenerations = append(
-				controller.fixedGenerations,
-				route.Declaration.Generation,
-			)
+			controller.fixedGenerations = append(controller.fixedGenerations, route.Declaration.Generation)
 		}
 		declarations = append(declarations, route.Declaration)
 	}
@@ -255,17 +230,13 @@ func NewController(
 	return controller, catalog, nil
 }
 
-func (c *Controller) Bind(
-	mutations jobmgr.FunctionMutationPort,
-	publication *Publication,
-) error {
+func (c *Controller) Bind(mutations jobmgr.FunctionMutationPort, publication *Publication) error {
 	if c == nil || mutations == nil || publication == nil {
 		return errors.New("jobmgr Function controller: invalid binding")
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.mutations != nil || c.publication != nil ||
-		c.activated || c.draining || c.terminated || c.dirty != nil {
+	if c.mutations != nil || c.publication != nil || c.activated || c.draining || c.terminated || c.dirty != nil {
 		return errors.New("jobmgr Function controller: duplicate binding")
 	}
 	c.mutations = mutations
@@ -284,9 +255,7 @@ func (c *Controller) AbortConstruction(ctx context.Context) error {
 		return errors.New("jobmgr Function controller: nil construction abort context")
 	}
 	c.mu.Lock()
-	if c.activated ||
-		c.draining ||
-		c.terminated {
+	if c.activated || c.draining || c.terminated {
 		c.mu.Unlock()
 		return errors.New("jobmgr Function controller: construction abort after activation")
 	}
@@ -297,10 +266,7 @@ func (c *Controller) AbortConstruction(ctx context.Context) error {
 	c.routes = nil
 	c.fixedGenerations = nil
 	c.mu.Unlock()
-	return errors.Join(
-		c.cleanupUnpublishedGroups(ctx, groups),
-		c.cleanupInitialRoutes(ctx, fixed),
-	)
+	return errors.Join(c.cleanupUnpublishedGroups(ctx, groups), c.cleanupInitialRoutes(ctx, fixed))
 }
 
 func (c *Controller) Activate() error {
@@ -309,8 +275,7 @@ func (c *Controller) Activate() error {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.mutations == nil || c.publication == nil ||
-		c.activated || c.draining || c.terminated || c.dirty != nil {
+	if c.mutations == nil || c.publication == nil || c.activated || c.draining || c.terminated || c.dirty != nil {
 		return errors.New("jobmgr Function controller: invalid activation")
 	}
 	records := c.publicationRecordsLocked(c.routes)
@@ -319,11 +284,7 @@ func (c *Controller) Activate() error {
 		record := records[index]
 		changes = append(changes, PublicationChange{Name: record.Name, Record: &record})
 	}
-	if err := c.publication.ApplyInitialSnapshot(
-		c.epoch,
-		c.version,
-		changes,
-	); err != nil {
+	if err := c.publication.ApplyInitialSnapshot(c.epoch, c.version, changes); err != nil {
 		c.dirty = errors.Join(c.dirty, err)
 		return err
 	}
@@ -361,9 +322,7 @@ func (c *Controller) publishJob(
 	if creator.InstanceFunctions != nil {
 		methods = slices.Clone(creator.InstanceFunctions(job))
 	}
-	moduleJobs[job.Name()] = controllerJob{
-		identity: identity, job: job, methods: methods,
-	}
+	moduleJobs[job.Name()] = controllerJob{identity: identity, job: job, methods: methods}
 	if _, err := c.reconcileModuleLocked(ctx, job.ModuleName(), creator); err != nil {
 		if c.dirty == nil {
 			delete(moduleJobs, job.Name())
@@ -457,10 +416,7 @@ func (c *Controller) closeAndDrainJob(
 	return nil
 }
 
-func (c *Controller) ReconcileModule(
-	ctx context.Context,
-	module string,
-) error {
+func (c *Controller) ReconcileModule(ctx context.Context, module string) error {
 	if c == nil || ctx == nil || module == "" {
 		return errors.New("jobmgr Function controller: invalid module reconcile")
 	}
@@ -513,16 +469,10 @@ func (c *Controller) BeginShutdown(epoch uint64) error {
 	}
 	c.draining = true
 	if c.publication == nil {
-		c.dirty = errors.Join(
-			c.dirty,
-			errors.New("jobmgr Function controller: shutdown before binding"),
-		)
+		c.dirty = errors.Join(c.dirty, errors.New("jobmgr Function controller: shutdown before binding"))
 		return c.dirty
 	}
-	c.dirty = errors.Join(
-		c.dirty,
-		c.publication.Stop(epoch),
-	)
+	c.dirty = errors.Join(c.dirty, c.publication.Stop(epoch))
 	return c.dirty
 }
 
@@ -530,8 +480,7 @@ func (c *Controller) usableLocked() error {
 	if c.dirty != nil {
 		return c.dirty
 	}
-	if !c.activated || c.draining || c.terminated ||
-		c.mutations == nil || c.publication == nil {
+	if !c.activated || c.draining || c.terminated || c.mutations == nil || c.publication == nil {
 		return errors.New("jobmgr Function controller: not active")
 	}
 	return nil
@@ -549,10 +498,7 @@ func (c *Controller) reconcileModuleLocked(
 	cleanupUnpublished := true
 	defer func() {
 		if cleanupUnpublished {
-			_ = c.cleanupUnpublishedGroups(
-				context.WithoutCancel(ctx),
-				unpublished,
-			)
+			_ = c.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished)
 		}
 	}()
 
@@ -563,8 +509,7 @@ func (c *Controller) reconcileModuleLocked(
 		}
 	}
 	for key, group := range desired {
-		if current := c.groups[key]; current != nil &&
-			current.signature == group.signature {
+		if current := c.groups[key]; current != nil && current.signature == group.signature {
 			nextGroups[key] = current
 			delete(unpublished, key)
 		} else {
@@ -577,26 +522,18 @@ func (c *Controller) reconcileModuleLocked(
 	}
 	for name := range c.fixed {
 		if _, exists := nextRoutes[name]; exists {
-			return nil, errors.New(
-				"jobmgr Function controller: collector Function collides with initial route",
-			)
+			return nil, errors.New("jobmgr Function controller: collector Function collides with initial route")
 		}
 	}
 	routeChanges := controllerRouteChanges(c.routes, nextRoutes)
 	if len(routeChanges) == 0 {
 		c.groups = nextGroups
 		cleanupUnpublished = false
-		_ = c.cleanupUnpublishedGroups(
-			context.WithoutCancel(ctx),
-			unpublished,
-		)
+		_ = c.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished)
 		c.refreshModuleAvailabilityLocked(module)
 		return nil, nil
 	}
-	mutation, err := c.catalog.NewMutation(
-		c.version,
-		routeChanges,
-	)
+	mutation, err := c.catalog.NewMutation(c.version, routeChanges)
 	if err != nil {
 		return nil, err
 	}
@@ -615,10 +552,7 @@ func (c *Controller) reconcileModuleLocked(
 			return c.mutations.QuiesceFunctions(ctx, mutation)
 		},
 		func() error {
-			version, mutationErr := c.mutations.CommitFunctions(
-				transitionCtx,
-				mutation,
-			)
+			version, mutationErr := c.mutations.CommitFunctions(transitionCtx, mutation)
 			if mutationErr != nil {
 				return mutationErr
 			}
@@ -635,10 +569,7 @@ func (c *Controller) reconcileModuleLocked(
 			return nil
 		},
 		func() error {
-			return c.mutations.AbortFunctions(
-				transitionCtx,
-				mutation,
-			)
+			return c.mutations.AbortFunctions(transitionCtx, mutation)
 		},
 	)
 	err = errors.Join(err, mutation.Discard())
@@ -749,29 +680,15 @@ func (c *Controller) buildModuleGroups(
 	return desired, unpublished, nil
 }
 
-func (c *Controller) buildAgentGroup(
-	module string,
-	creator collectorapi.Creator,
-) (*controllerGroup, error) {
+func (c *Controller) buildAgentGroup(module string, creator collectorapi.Creator) (*controllerGroup, error) {
 	if creator.AgentFunctions == nil {
 		return nil, nil
 	}
 	methods := c.availableAgentMethods(module)
-	return c.buildGroup(
-		module+"/agent",
-		module,
-		methodGenerationAgent,
-		creator,
-		methods,
-		nil,
-		true,
-	)
+	return c.buildGroup(module+"/agent", module, methodGenerationAgent, creator, methods, nil, true)
 }
 
-func (c *Controller) buildSharedGroup(
-	module string,
-	creator collectorapi.Creator,
-) (*controllerGroup, error) {
+func (c *Controller) buildSharedGroup(module string, creator collectorapi.Creator) (*controllerGroup, error) {
 	if creator.SharedFunctions == nil || len(c.jobs[module]) == 0 {
 		return nil, nil
 	}
@@ -868,21 +785,14 @@ func (c *Controller) buildGroup(
 					PublicName: name, RawPayload: method.RawRequest,
 					CooperativeCancel: true, CooperativeDeadline: true,
 				},
-				publication: methodPublicationRecord(
-					name,
-					module,
-					method,
-					c.nextID,
-				),
+				publication: methodPublicationRecord(name, module, method, c.nextID),
 			}
 		}
 	}
 	return group, nil
 }
 
-func (c *Controller) availableAgentMethods(
-	module string,
-) []funcapi.FunctionConfig {
+func (c *Controller) availableAgentMethods(module string) []funcapi.FunctionConfig {
 	current := c.groups[module+"/agent"]
 	methods := make([]funcapi.FunctionConfig, 0, len(c.plans[module].agent))
 	for _, method := range c.plans[module].agent {
@@ -897,10 +807,7 @@ func (c *Controller) availableAgentMethods(
 	return methods
 }
 
-func validateConfiguredMethods(
-	module string,
-	methods []funcapi.FunctionConfig,
-) ([]funcapi.FunctionConfig, error) {
+func validateConfiguredMethods(module string, methods []funcapi.FunctionConfig) ([]funcapi.FunctionConfig, error) {
 	valid := make([]funcapi.FunctionConfig, 0, len(methods))
 	seen := make(map[string]struct{}, len(methods))
 	for _, method := range methods {
@@ -972,11 +879,7 @@ func controllerGroupSignature(
 		}
 		presentation, err := json.Marshal(method.Presentation())
 		if err != nil {
-			return "", fmt.Errorf(
-				"jobmgr Function controller: method %q presentation: %w",
-				method.ID,
-				err,
-			)
+			return "", fmt.Errorf("jobmgr Function controller: method %q presentation: %w", method.ID, err)
 		}
 		writeDigestString(digest, string(presentation))
 	}
@@ -1016,9 +919,7 @@ func methodPublicationRecord(
 	}
 }
 
-func indexControllerRoutes(
-	groups map[string]*controllerGroup,
-) (map[string]controllerRoute, error) {
+func indexControllerRoutes(groups map[string]*controllerGroup) (map[string]controllerRoute, error) {
 	routes := make(map[string]controllerRoute)
 	keys := slices.Sorted(maps.Keys(groups))
 	for _, key := range keys {
@@ -1060,10 +961,7 @@ func controllerChanges[T any](
 	return changes
 }
 
-func controllerRouteChanges(
-	current map[string]controllerRoute,
-	next map[string]controllerRoute,
-) []RouteChange {
+func controllerRouteChanges(current map[string]controllerRoute, next map[string]controllerRoute) []RouteChange {
 	return controllerChanges(current, next,
 		func(name string) RouteChange {
 			return RouteChange{PublicName: name}
@@ -1090,10 +988,7 @@ func controllerPublicationChanges(
 	)
 }
 
-func controllerChangedRouteNames(
-	current map[string]controllerRoute,
-	next map[string]controllerRoute,
-) []string {
+func controllerChangedRouteNames(current map[string]controllerRoute, next map[string]controllerRoute) []string {
 	changed := make(map[string]struct{})
 	for name, currentRoute := range current {
 		nextRoute, exists := next[name]
@@ -1118,16 +1013,10 @@ func sortedControllerRouteNames(routes map[string]controllerRoute) []string {
 	return slices.Sorted(maps.Keys(routes))
 }
 
-func (c *Controller) publicationRecordsLocked(
-	routes map[string]controllerRoute,
-) []PublicationRecord {
+func (c *Controller) publicationRecordsLocked(routes map[string]controllerRoute) []PublicationRecord {
 	names := sortedControllerRouteNames(routes)
 	fixedNames := slices.Sorted(maps.Keys(c.fixed))
-	records := make(
-		[]PublicationRecord,
-		0,
-		len(fixedNames)+len(names),
-	)
+	records := make([]PublicationRecord, 0, len(fixedNames)+len(names))
 	for _, name := range fixedNames {
 		records = append(records, c.fixed[name])
 	}
@@ -1142,12 +1031,8 @@ func validateInitialRoute(route InitialRoute) error {
 		return err
 	}
 	record := route.Publication
-	if record.Name != route.Declaration.PublicName ||
-		!record.validCore() ||
-		record.Access == "" {
-		return errors.New(
-			"jobmgr Function controller: invalid initial publication",
-		)
+	if record.Name != route.Declaration.PublicName || !record.validCore() || record.Access == "" {
+		return errors.New("jobmgr Function controller: invalid initial publication")
 	}
 	return nil
 }
@@ -1165,10 +1050,7 @@ func (c *Controller) cleanupInitialRoutes(
 				if recovered := recover(); recovered != nil {
 					err = errors.Join(
 						err,
-						fmt.Errorf(
-							"jobmgr Function controller: initial route cleanup panic: %v",
-							recovered,
-						),
+						fmt.Errorf("jobmgr Function controller: initial route cleanup panic: %v", recovered),
 					)
 				}
 			}()
@@ -1197,10 +1079,7 @@ func retiredMethodGenerations(
 	return retired
 }
 
-func generationReferencesJob(
-	generation *methodGeneration,
-	job collectorapi.RuntimeJob,
-) bool {
+func generationReferencesJob(generation *methodGeneration, job collectorapi.RuntimeJob) bool {
 	if generation == nil || job == nil {
 		return false
 	}
@@ -1212,10 +1091,7 @@ func generationReferencesJob(
 	return false
 }
 
-func (c *Controller) cleanupUnpublishedGroups(
-	ctx context.Context,
-	groups map[string]*controllerGroup,
-) (err error) {
+func (c *Controller) cleanupUnpublishedGroups(ctx context.Context, groups map[string]*controllerGroup) (err error) {
 	seen := make(map[*methodGeneration]struct{})
 	for _, group := range groups {
 		if group == nil || group.generation == nil {

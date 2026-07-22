@@ -15,10 +15,7 @@ import (
 )
 
 func TestSubmitPreparedAndWaitReturnsCleanTransactionPreparationError(t *testing.T) {
-	kernel, run, _, _ := newKernelWithPlanner(
-		t,
-		stoppedKernelPlanner{},
-	)
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 
@@ -172,11 +169,7 @@ func TestKernelDoesNotCancelStartedTransactionAction(t *testing.T) {
 }
 
 func TestKernelShutdownBudgetBoundsProtectedOwnershipAction(t *testing.T) {
-	kernel, run, _, _ := newKernelWithPlannerAndTimeout(
-		t,
-		stoppedKernelPlanner{},
-		20*time.Millisecond,
-	)
+	kernel, run, _, _ := newKernelWithPlannerAndTimeout(t, stoppedKernelPlanner{}, 20*time.Millisecond)
 	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 
@@ -211,21 +204,13 @@ func TestKernelShutdownBudgetBoundsProtectedOwnershipAction(t *testing.T) {
 	case err := <-actionDone:
 		require.NoError(t, err)
 	case <-time.After(time.Second):
-		require.FailNow(
-			t,
-			"test failed",
-			"blocked ownership action did not exit after release",
-		)
+		require.FailNow(t, "test failed", "blocked ownership action did not exit after release")
 	}
 	select {
 	case err := <-submitted:
 		require.ErrorContains(t, err, "shutdown deadline exceeded")
 	case <-time.After(time.Second):
-		require.FailNow(
-			t,
-			"test failed",
-			"blocked ownership submission did not observe shutdown expiry",
-		)
+		require.FailNow(t, "test failed", "blocked ownership submission did not observe shutdown expiry")
 	}
 }
 
@@ -243,16 +228,9 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 		)
 	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
-	probeCtx, cancelProbe := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
+	probeCtx, cancelProbe := context.WithTimeout(context.Background(), time.Second)
 	defer cancelProbe()
-	probe, err := startShutdownProbe(
-		probeCtx,
-		kernel.CommandKernel,
-		"function-mutation-handoff-shutdown-probe",
-	)
+	probe, err := startShutdownProbe(probeCtx, kernel.CommandKernel, "function-mutation-handoff-shutdown-probe")
 	require.NoError(t, err)
 
 	actionEntered := make(chan struct{})
@@ -281,9 +259,7 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 							kernel:  kernel,
 							entered: actionEntered,
 							release: actionRelease,
-							scope: lifecycle.ResourceTransactionScope{
-								ID: "shutdown-action-mutation",
-							},
+							scope:   lifecycle.ResourceTransactionScope{ID: "shutdown-action-mutation"},
 						}, nil
 					},
 				},
@@ -297,10 +273,7 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 	}
 
 	kernel.Stop()
-	shutdownCtx, cancelShutdown := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), time.Second)
 	defer cancelShutdown()
 	require.NoError(t, probe.waitCancellation(shutdownCtx))
 	close(actionRelease)
@@ -311,10 +284,7 @@ func TestKernelShutdownAllowsProtectedFunctionMutationHandoff(t *testing.T) {
 	case <-time.After(time.Second):
 		require.FailNow(t, "test failed", "transaction mutation did not settle")
 	}
-	waitCtx, cancelWait := context.WithTimeout(
-		context.Background(),
-		5*time.Second,
-	)
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelWait()
 	waitErr := kernel.Wait(waitCtx)
 	require.NoError(t, probe.waitSettlement(waitCtx))
@@ -352,29 +322,17 @@ func (samt *shutdownActionMutationTransaction) Scope() lifecycle.ResourceTransac
 	return samt.scope
 }
 
-func (samt *shutdownActionMutationTransaction) Apply(
-	context.Context,
-) (lifecycle.AppliedResourceTransaction, error) {
+func (samt *shutdownActionMutationTransaction) Apply(context.Context) (lifecycle.AppliedResourceTransaction, error) {
 	close(samt.entered)
 	<-samt.release
 	mutation := shutdownActionMutation{}
-	if err := samt.kernel.QuiesceFunctions(
-		context.Background(),
-		mutation,
-	); err != nil {
+	if err := samt.kernel.QuiesceFunctions(context.Background(), mutation); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
-	if _, err := samt.kernel.CommitFunctions(
-		context.Background(),
-		mutation,
-	); err != nil {
+	if _, err := samt.kernel.CommitFunctions(context.Background(), mutation); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
-	result, err := lifecycle.NewSealedResult(
-		204,
-		"text/plain",
-		nil,
-	)
+	result, err := lifecycle.NewSealedResult(204, "text/plain", nil)
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
@@ -387,9 +345,7 @@ func (samt *shutdownActionMutationTransaction) Apply(
 	)
 }
 
-func (*shutdownActionMutationTransaction) Dispose(
-	context.Context,
-) (lifecycle.ReadyResource, error) {
+func (*shutdownActionMutationTransaction) Dispose(context.Context) (lifecycle.ReadyResource, error) {
 	return nil, nil
 }
 
@@ -400,27 +356,19 @@ type shutdownActionMutationCatalog struct {
 	commitCalls atomic.Int32
 }
 
-func (*shutdownActionMutationCatalog) ResolveAndAcquire(
-	FunctionLookup,
-) (FunctionCatalogDecision, error) {
+func (*shutdownActionMutationCatalog) ResolveAndAcquire(FunctionLookup) (FunctionCatalogDecision, error) {
 	return FunctionCatalogDecision{}, nil
 }
 
-func (*shutdownActionMutationCatalog) ReleaseInvocation(
-	FunctionInvocationRef,
-) (FunctionCleanupPlan, error) {
+func (*shutdownActionMutationCatalog) ReleaseInvocation(FunctionInvocationRef) (FunctionCleanupPlan, error) {
 	return FunctionCleanupPlan{}, nil
 }
 
-func (*shutdownActionMutationCatalog) CompleteCleanup(
-	FunctionCleanupRef,
-) error {
+func (*shutdownActionMutationCatalog) CompleteCleanup(FunctionCleanupRef) error {
 	return nil
 }
 
-func (samc *shutdownActionMutationCatalog) BeginMutation(
-	FunctionCatalogMutation,
-) error {
+func (samc *shutdownActionMutationCatalog) BeginMutation(FunctionCatalogMutation) error {
 	if !samc.active.CompareAndSwap(false, true) {
 		return errors.New("test Function mutation began twice")
 	}
@@ -428,22 +376,14 @@ func (samc *shutdownActionMutationCatalog) BeginMutation(
 	return nil
 }
 
-func (samc *shutdownActionMutationCatalog) AdvanceMutationQuiesce(
-	int,
-) (FunctionCatalogMutationProgress, error) {
+func (samc *shutdownActionMutationCatalog) AdvanceMutationQuiesce(int) (FunctionCatalogMutationProgress, error) {
 	if !samc.active.Load() {
-		return FunctionCatalogMutationProgress{},
-			errors.New("test Function mutation is inactive")
+		return FunctionCatalogMutationProgress{}, errors.New("test Function mutation is inactive")
 	}
-	return FunctionCatalogMutationProgress{
-		Version:  1,
-		Quiesced: true,
-	}, nil
+	return FunctionCatalogMutationProgress{Version: 1, Quiesced: true}, nil
 }
 
-func (samc *shutdownActionMutationCatalog) ResumeMutation(
-	FunctionCatalogMutation,
-) error {
+func (samc *shutdownActionMutationCatalog) ResumeMutation(FunctionCatalogMutation) error {
 	if !samc.active.Load() {
 		return errors.New("test Function mutation is inactive")
 	}
@@ -457,10 +397,7 @@ func (samc *shutdownActionMutationCatalog) AdvanceMutation(
 		return FunctionCatalogMutationProgress{}, nil
 	}
 	samc.commitCalls.Add(1)
-	return FunctionCatalogMutationProgress{
-		Version: 2,
-		Done:    true,
-	}, nil
+	return FunctionCatalogMutationProgress{Version: 2, Done: true}, nil
 }
 
 func (samc *shutdownActionMutationCatalog) AbortMutation(FunctionCatalogMutation) error {
@@ -472,9 +409,7 @@ func (*shutdownActionMutationCatalog) BeginClose() error {
 	return nil
 }
 
-func (samc *shutdownActionMutationCatalog) CloseStep(
-	int,
-) ([]FunctionCleanupPlan, bool, error) {
+func (samc *shutdownActionMutationCatalog) CloseStep(int) ([]FunctionCleanupPlan, bool, error) {
 	samc.closed.Store(true)
 	return nil, false, nil
 }
@@ -483,11 +418,7 @@ func (samc *shutdownActionMutationCatalog) LifecycleDrained() bool {
 	return samc.closed.Load() && !samc.active.Load()
 }
 
-func atomicTransactionPlan(
-	entered chan<- struct{},
-	release <-chan struct{},
-	actionDone chan<- error,
-) WorkPlan {
+func atomicTransactionPlan(entered chan<- struct{}, release <-chan struct{}, actionDone chan<- error) WorkPlan {
 	return WorkPlan{
 		NoResponse: true,
 		Transaction: &ResourceTransactionPlan{
@@ -499,9 +430,7 @@ func atomicTransactionPlan(
 				lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
 				return &atomicPreparedTransaction{
-					scope: lifecycle.ResourceTransactionScope{
-						ID: "atomic-action",
-					},
+					scope:   lifecycle.ResourceTransactionScope{ID: "atomic-action"},
 					entered: entered,
 					release: release,
 					done:    actionDone,
@@ -522,9 +451,7 @@ func (apt *atomicPreparedTransaction) Scope() lifecycle.ResourceTransactionScope
 	return apt.scope
 }
 
-func (apt *atomicPreparedTransaction) Apply(
-	ctx context.Context,
-) (lifecycle.AppliedResourceTransaction, error) {
+func (apt *atomicPreparedTransaction) Apply(ctx context.Context) (lifecycle.AppliedResourceTransaction, error) {
 	close(apt.entered)
 	select {
 	case <-ctx.Done():
@@ -533,11 +460,7 @@ func (apt *atomicPreparedTransaction) Apply(
 	case <-apt.release:
 	}
 	apt.done <- nil
-	result, err := lifecycle.NewSealedResult(
-		200,
-		"application/json",
-		[]byte(`{"accepted":true}`),
-	)
+	result, err := lifecycle.NewSealedResult(200, "application/json", []byte(`{"accepted":true}`))
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
@@ -550,17 +473,12 @@ func (apt *atomicPreparedTransaction) Apply(
 	)
 }
 
-func (*atomicPreparedTransaction) Dispose(
-	context.Context,
-) (lifecycle.ReadyResource, error) {
+func (*atomicPreparedTransaction) Dispose(context.Context) (lifecycle.ReadyResource, error) {
 	return nil, nil
 }
 
 func TestShutdownCancellationPreservesGenerationStoppingCause(t *testing.T) {
-	kernel, run, _, _ := newKernelWithPlanner(
-		t,
-		stoppedKernelPlanner{},
-	)
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	require.NoError(t, kernel.Start(t.Context()))
 	require.NoError(t, run.OpenAdmission())
 
@@ -599,30 +517,17 @@ func TestShutdownCancellationPreservesGenerationStoppingCause(t *testing.T) {
 	select {
 	case <-started:
 	case <-time.After(time.Second):
-		require.FailNow(
-			t,
-			"test failed",
-			"prepared transaction did not start",
-		)
+		require.FailNow(t, "test failed", "prepared transaction did not start")
 	}
 
 	kernel.Stop()
 	select {
 	case err := <-returned:
-		stopping, ok :=
-			errors.AsType[*lifecycle.StoppingRejection](err)
+		stopping, ok := errors.AsType[*lifecycle.StoppingRejection](err)
 		require.True(t, ok)
-		require.EqualValues(
-			t,
-			run.Generation(),
-			stopping.Generation,
-		)
+		require.EqualValues(t, run.Generation(), stopping.Generation)
 	case <-time.After(time.Second):
-		require.FailNow(
-			t,
-			"test failed",
-			"shutdown cancellation did not complete",
-		)
+		require.FailNow(t, "test failed", "shutdown cancellation did not complete")
 	}
 	require.NoError(t, kernel.Wait(context.Background()))
 	state := run.TerminalState()
@@ -680,10 +585,7 @@ func TestShutdownPreparationCancellationDoesNotDirtyResource(t *testing.T) {
 }
 
 func TestSubmitPreparedAndWaitJoinsAcceptedCancellation(t *testing.T) {
-	kernel, run, _, _ := newKernelWithPlanner(
-		t,
-		stoppedKernelPlanner{},
-	)
+	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	require.NoError(t, kernel.Start(t.Context()))
 
 	require.NoError(t, run.OpenAdmission())
@@ -705,10 +607,7 @@ func TestSubmitPreparedAndWaitJoinsAcceptedCancellation(t *testing.T) {
 			},
 			WorkPlan{
 				Work: frameTaskWork(
-					func(context.Context) (
-						lifecycle.SealedResult,
-						error,
-					) {
+					func(context.Context) (lifecycle.SealedResult, error) {
 						close(started)
 						<-release
 						return result, nil

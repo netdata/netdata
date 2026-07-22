@@ -27,20 +27,10 @@ func newStoreGenerationResource(
 	key string,
 	storeGeneration uint64,
 ) (*storeGenerationResource, error) {
-	if !identity.Valid() ||
-		store == nil ||
-		key == "" ||
-		storeGeneration == 0 {
-		return nil, errors.New(
-			"jobmgr secrets: invalid Store-generation resource",
-		)
+	if !identity.Valid() || store == nil || key == "" || storeGeneration == 0 {
+		return nil, errors.New("jobmgr secrets: invalid Store-generation resource")
 	}
-	return &storeGenerationResource{
-		identity: identity,
-		store:    store,
-		key:      key,
-		storeGen: storeGeneration,
-	}, nil
+	return &storeGenerationResource{identity: identity, store: store, key: key, storeGen: storeGeneration}, nil
 }
 
 func (sgr *storeGenerationResource) Identity() lifecycle.ResourceIdentity {
@@ -52,9 +42,7 @@ func (sgr *storeGenerationResource) Identity() lifecycle.ResourceIdentity {
 
 func (*storeGenerationResource) Publish() error { return nil }
 
-func (sgr *storeGenerationResource) AbortReady(
-	ctx context.Context,
-) error {
+func (sgr *storeGenerationResource) AbortReady(ctx context.Context) error {
 	return sgr.retire(ctx)
 }
 
@@ -66,39 +54,28 @@ func (sgr *storeGenerationResource) Finalize() error {
 
 func (sgr *storeGenerationResource) supersede() error {
 	if sgr == nil {
-		return errors.New(
-			"jobmgr secrets: nil superseded Store resource",
-		)
+		return errors.New("jobmgr secrets: nil superseded Store resource")
 	}
 	sgr.mu.Lock()
 	defer sgr.mu.Unlock()
 	if sgr.retired {
-		return errors.New(
-			"jobmgr secrets: Store resource already retired",
-		)
+		return errors.New("jobmgr secrets: Store resource already retired")
 	}
 	sgr.retired = true
 	return nil
 }
 
-func (sgr *storeGenerationResource) retire(
-	ctx context.Context,
-) error {
+func (sgr *storeGenerationResource) retire(ctx context.Context) error {
 	if sgr == nil || ctx == nil {
-		return errors.New(
-			"jobmgr secrets: invalid Store resource retirement",
-		)
+		return errors.New("jobmgr secrets: invalid Store resource retirement")
 	}
 	sgr.mu.Lock()
 	if sgr.retired {
 		sgr.mu.Unlock()
-		return errors.New(
-			"jobmgr secrets: Store resource retired twice",
-		)
+		return errors.New("jobmgr secrets: Store resource retired twice")
 	}
 	sgr.retired = true
-	store, key, generation :=
-		sgr.store, sgr.key, sgr.storeGen
+	store, key, generation := sgr.store, sgr.key, sgr.storeGen
 	sgr.mu.Unlock()
 	return store.Retire(ctx, key, generation)
 }

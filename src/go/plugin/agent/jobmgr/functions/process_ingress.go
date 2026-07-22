@@ -43,11 +43,7 @@ func NewProcessBinding(
 	if runGeneration == 0 {
 		return ProcessBinding{}, errors.New("jobmgr Function process ingress: incomplete binding")
 	}
-	return ProcessBinding{
-		port: &boundProcessInput{
-			Ingress: ingress, runGeneration: runGeneration,
-		},
-	}, nil
+	return ProcessBinding{port: &boundProcessInput{Ingress: ingress, runGeneration: runGeneration}}, nil
 }
 
 type boundProcessInput struct {
@@ -77,10 +73,7 @@ func NewProcessIngress(reader io.Reader) (*ProcessIngress, error) {
 	if reader == nil {
 		return nil, errors.New("jobmgr Function process ingress: incomplete process authority")
 	}
-	ingress := &ProcessIngress{
-		state:   ProcessIngressPaused,
-		changed: make(chan struct{}),
-	}
+	ingress := &ProcessIngress{state: ProcessIngressPaused, changed: make(chan struct{})}
 	capsule, err := functionwire.NewInputCapsule(reader)
 	if err != nil {
 		return nil, err
@@ -104,16 +97,11 @@ func (pi *ProcessIngress) Run(ctx context.Context) error {
 }
 
 func (pi *ProcessIngress) Adopt(ctx context.Context, binding ProcessBinding) error {
-	if ctx == nil ||
-		binding.port == nil ||
-		binding.port.Generation() == 0 {
+	if ctx == nil || binding.port == nil || binding.port.Generation() == 0 {
 		return errors.New("jobmgr Function process ingress: invalid binding")
 	}
 	pi.mu.Lock()
-	if pi.state != ProcessIngressPaused ||
-		pi.active != nil ||
-		pi.deliveries != 0 ||
-		pi.parsing {
+	if pi.state != ProcessIngressPaused || pi.active != nil || pi.deliveries != 0 || pi.parsing {
 		pi.mu.Unlock()
 		return errors.New("jobmgr Function process ingress: adopt outside drained pause")
 	}
@@ -174,10 +162,7 @@ func (pi *ProcessIngress) Fence(ctx context.Context) error {
 		return errors.New("jobmgr Function process ingress: nil fence context")
 	}
 	pi.mu.Lock()
-	if pi.state != ProcessIngressPaused ||
-		pi.active != nil ||
-		pi.deliveries != 0 ||
-		pi.parsing {
+	if pi.state != ProcessIngressPaused || pi.active != nil || pi.deliveries != 0 || pi.parsing {
 		pi.mu.Unlock()
 		return errors.New("jobmgr Function process ingress: final fence outside drained pause")
 	}
@@ -202,9 +187,7 @@ func (pi *ProcessIngress) State() ProcessIngressState {
 // AcquireInputRead admits one returned reader segment into the parser. A read
 // may already have returned when pause is sealed, so it parks here until the
 // successor is adopted or the process input is contained.
-func (pi *ProcessIngress) AcquireInputRead(
-	ctx context.Context,
-) (bool, error) {
+func (pi *ProcessIngress) AcquireInputRead(ctx context.Context) (bool, error) {
 	if ctx == nil {
 		return false, errors.New("jobmgr Function process ingress: nil read context")
 	}
@@ -228,8 +211,7 @@ func (pi *ProcessIngress) AcquireInputRead(
 			pi.mu.Unlock()
 			return true, nil
 		}
-		paused := pi.state == ProcessIngressPaused ||
-			pi.state == ProcessIngressLive && pi.pauseSealed
+		paused := pi.state == ProcessIngressPaused || pi.state == ProcessIngressLive && pi.pauseSealed
 		if !paused {
 			pi.mu.Unlock()
 			return false, errors.New("jobmgr Function process ingress: invalid read-return gate state")
@@ -313,9 +295,7 @@ func (pi *ProcessIngress) HandleQuit(ctx context.Context) error {
 	return port.HandleQuit(ctx)
 }
 
-func (pi *ProcessIngress) acquireDelivery(
-	ctx context.Context,
-) (processInputPort, bool) {
+func (pi *ProcessIngress) acquireDelivery(ctx context.Context) (processInputPort, bool) {
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
 	for pi.state == ProcessIngressPaused {

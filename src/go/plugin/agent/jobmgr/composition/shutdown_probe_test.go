@@ -40,9 +40,7 @@ func startCompositionShutdownProbe(
 					close(started)
 					<-ctx.Done()
 					close(cancelled)
-					result, err := lifecycle.NewControlResult(
-						lifecycle.ControlInternal,
-					)
+					result, err := lifecycle.NewControlResult(lifecycle.ControlInternal)
 					if err != nil {
 						return lifecycle.TaskOutcome{}, err
 					}
@@ -53,23 +51,15 @@ func startCompositionShutdownProbe(
 	}()
 	select {
 	case <-started:
-		return compositionShutdownProbe{
-			cancelled: cancelled,
-			settled:   settled,
-		}, nil
+		return compositionShutdownProbe{cancelled: cancelled, settled: settled}, nil
 	case err := <-settled:
-		return compositionShutdownProbe{}, errors.Join(
-			errors.New("shutdown probe settled before starting"),
-			err,
-		)
+		return compositionShutdownProbe{}, errors.Join(errors.New("shutdown probe settled before starting"), err)
 	case <-ctx.Done():
 		return compositionShutdownProbe{}, ctx.Err()
 	}
 }
 
-func (probe compositionShutdownProbe) waitCancellation(
-	ctx context.Context,
-) error {
+func (probe compositionShutdownProbe) waitCancellation(ctx context.Context) error {
 	select {
 	case <-probe.cancelled:
 		return nil

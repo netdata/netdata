@@ -166,7 +166,10 @@ func TestProcessIngressDiscardsPartialBodyOnFence(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() { done <- ingress.Run(context.Background()) }()
-	_, err = io.WriteString(writer, "FUNCTION_PAYLOAD fenced 30 \"test:work\" 0xFFFF \"source\" application/octet-stream\npartial\n")
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD fenced 30 \"test:work\" 0xFFFF \"source\" application/octet-stream\npartial\n",
+	)
 	require.NoError(t, err)
 
 	require.NoError(t, ingress.SealPause())
