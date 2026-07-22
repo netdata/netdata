@@ -17,7 +17,9 @@
  * PAYLOAD
  * - The payload MUST have the member 'version'.
  * - The payload MAY have anything else.
- * - The maximum payload size in JSON is 20MiB.
+ * - The complete encoded request, including the JSON payload, must fit
+ *   within the Agent's 1 MiB request limit.
+ * - Stored settings files have a 20 MiB read ceiling.
  * - When updating the payload, the caller must specify the
  *   version of the existing file. If this check fails,
  *   Netdata will return 409 (conflict).
@@ -33,6 +35,7 @@
 
 #include "api_v3_calls.h"
 
+// Stored-file read ceiling and defense-in-depth PUT guard; ingress is limited to 1 MiB.
 #define MAX_SETTINGS_SIZE_BYTES (20 * 1024 * 1024)
 
 // we need an r/w spinlock to ensure that reads and write do not happen

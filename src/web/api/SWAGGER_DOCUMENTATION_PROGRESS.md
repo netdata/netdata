@@ -2927,7 +2927,7 @@ Per dimension:
 
 ### REQUEST BODY (PUT only)
 **Content-Type:** `application/json`
-**Max Size:** 20 MiB (20,971,520 bytes)
+**Max Size:** The complete encoded request is limited to 1,048,576 bytes. The JSON body must fit in the space remaining after the request line and headers.
 
 **Required Fields:**
 1. ✅ `version` - integer, required - Version number of the existing file (for conflict detection)
@@ -2949,7 +2949,7 @@ Per dimension:
 **Possible Error Scenarios:**
 - `400 Bad Request` - Invalid file parameter, invalid host, missing version in payload, invalid JSON payload, missing payload on PUT, unauthorized file access for anonymous users, invalid HTTP method
 - `409 Conflict` - Version mismatch (caller must reload and reapply changes)
-- `413 Content Too Large` - PUT payload exceeds 20 MiB (20,971,520 bytes)
+- `413 Content Too Large` - Complete encoded request exceeds 1,048,576 bytes
 - `500 Internal Server Error` - Settings path creation failure, file I/O errors
 
 ### SPECIAL BEHAVIORS
@@ -2967,7 +2967,7 @@ Per dimension:
 **Response Fields (PUT):** 1
 **Error Response Fields:** 1
 **Security:** ACL=HTTP_ACL_DASHBOARD + ACCESS=HTTP_ACCESS_ANONYMOUS_DATA
-**Max Payload Size:** 20 MiB (20,971,520 bytes); larger PUT payloads return 413
+**Max Payload Size:** Variable; the JSON body shares the 1,048,576-byte complete encoded-request budget with the request line and headers
 **File Storage:** `{varlib}/settings/{file}`
 **Dual-Agent Agreement:** ✅ Agent confirmed optimistic locking settings storage structure
 
