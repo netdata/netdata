@@ -9,14 +9,13 @@
 //! The query handler is [`OtelTracesHandler`], a stub that answers "not
 //! implemented": the traces query engine and its wire surface are deliberately
 //! deferred (plan decision D5 — request/response shapes are designed with the
-//! frontend team; the Tempo shim is the first consumer). Its declaration is
-//! not advertised to Netdata (see `Ledger::new`). When the query engine lands,
-//! this handler grows its own `rpc/` subsystem mirroring the logs handler.
+//! frontend team). Its declaration is not advertised to Netdata (see
+//! `Ledger::new`). When the query engine lands, this handler grows its own
+//! `rpc/` subsystem mirroring the logs handler.
 //!
 //! The whole registry/catalog/recovery machinery is reused verbatim through
 //! `build_pipeline`.
 
-use anyhow::Context as _;
 use async_trait::async_trait;
 use bridge::config::LifecycleConfig;
 use bridge::function::{FunctionCallContext, FunctionHandler, HandlerAdapter, RawFunctionHandler};
@@ -66,11 +65,7 @@ fn traces_arg_shim(_args: &[String], _payload: Option<&[u8]>) -> Option<Vec<u8>>
 /// Build the traces pipeline: spawn the shared [`Indexer`] with the traces
 /// seal, then delegate to [`super::pipeline::build_pipeline`] with a closure
 /// that wires the stub [`OtelTracesHandler`] (the Netdata Function stays a
-/// stub per plan decision D5 — the Tempo shim below is an HTTP surface, not
-/// a Function). When the `traces.tempo` config enables the shim, bind its
-/// listener before the ledger signals Ready and serve the Tempo endpoints
-/// from this worker over a live [`TracesSourceSupplier`]; a bind failure
-/// fails startup loudly (the operator asked for a listener they cannot get).
+/// stub per plan decision D5).
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn build_traces_pipeline(
     signal: Signal,
@@ -82,7 +77,6 @@ pub(crate) async fn build_traces_pipeline(
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
     storage: Option<&OpendalStorage>,
-    chunk_cache: Arc<file_lifecycle::chunk::ChunkCache>,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
     // The traces seal: decode ng-flatten trace frames (format 3) into a full
@@ -92,11 +86,7 @@ pub(crate) async fn build_traces_pipeline(
         cancel.child_token(),
     );
 
-    // Capture the pipeline's registries out of the handler closure: the
-    // Tempo shim reads the same live view the (stub) Function handler is
-    // offered. `make_handler` runs synchronously inside `build_pipeline`.
-    let mut captured_registries = None;
-    let pipeline = super::pipeline::build_pipeline(
+    super::pipeline::build_pipeline(
         signal,
         config,
         own_machine,
@@ -108,34 +98,11 @@ pub(crate) async fn build_traces_pipeline(
         storage,
         indexer,
         pipeline_tx,
-        |registries| {
-            captured_registries = Some(registries);
+        |_registries| {
             let handler: Arc<dyn RawFunctionHandler> =
                 Arc::new(HandlerAdapter::new(OtelTracesHandler));
             (handler, traces_arg_shim as ArgShim)
         },
     )
-    .await?;
-
-    if config.tempo.enabled {
-        let registries =
-            captured_registries.expect("make_handler runs during build_pipeline");
-        let supplier = Arc::new(super::traces_query::TracesSourceSupplier::new(
-            registries,
-            chunk_cache,
-            super::pipeline::CHUNK_MIN_ENTRIES,
-        ));
-        let listener = tokio::net::TcpListener::bind(&config.tempo.bind)
-            .await
-            .with_context(|| format!("tempo shim: cannot bind {}", config.tempo.bind))?;
-        tracing::info!(bind = %config.tempo.bind, "tempo shim listening");
-        let shutdown = cancel.child_token();
-        tokio::spawn(async move {
-            if let Err(e) = tempo_shim::serve(listener, supplier, shutdown).await {
-                tracing::error!("tempo shim server error: {e}");
-            }
-        });
-    }
-
-    Ok(pipeline)
+    .await
 }

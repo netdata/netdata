@@ -47,8 +47,7 @@ use super::{OtelLogsHandler, RemoteRead};
 
 /// Minimum records per chunk when indexing an active WAL's prefix at
 /// query time. A fixed default for now; made configurable with the rest
-/// of chunk-cache governance. Shared by the logs handler and the traces
-/// query supplier (`traces_query`).
+/// of chunk-cache governance.
 pub(crate) const CHUNK_MIN_ENTRIES: u64 = 16_384;
 /// Maximum time startup waits on remote object storage (LIST/stat
 /// reconciliation) per tenant before proceeding to Ready. A slow/unreachable

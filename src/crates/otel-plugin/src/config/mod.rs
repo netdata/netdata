@@ -292,17 +292,6 @@ fn validate(config: &PluginConfig) -> Result<()> {
         anyhow::bail!("remote_storage.uri must be set when remote_storage.enabled is true");
     }
 
-    // The Tempo shim serves the DEFAULT tenant with no authentication of
-    // its own. Combining it with tenant auth would silently expose one
-    // tenant's data on an unauthenticated port while hiding the rest —
-    // refuse the combination outright rather than serve it wrong.
-    if config.auth.enabled && config.traces.tempo.enabled {
-        anyhow::bail!(
-            "traces.tempo cannot be enabled together with auth: the Tempo shim has no \
-             authentication and serves only the default tenant; disable one of the two"
-        );
-    }
-
     if !config.endpoint.path.contains(':') {
         anyhow::bail!(
             "endpoint must be in format host:port, got: {}",
@@ -383,8 +372,6 @@ impl ConfigOverride {
     /// Reject overrides that parse but are not valid in their position.
     /// `journal_dir` (the former plugin's read-only journal location) is a
     /// logs-only key; there are no legacy traces journals to point at.
-    /// `tempo` (the Tempo HTTP shim) is traces-only; there is no logs
-    /// query surface behind it.
     fn validate(&self) -> Result<()> {
         if self
             .traces
@@ -394,12 +381,6 @@ impl ConfigOverride {
             anyhow::bail!(
                 "traces.journal_dir is not a valid option: journal_dir points at the \
                  former plugin's log journals and is only accepted under 'logs:'"
-            );
-        }
-        if self.logs.as_ref().is_some_and(|l| l.tempo.is_some()) {
-            anyhow::bail!(
-                "logs.tempo is not a valid option: the Tempo shim serves the traces \
-                 query engine and is only accepted under 'traces:'"
             );
         }
         Ok(())
@@ -911,44 +892,11 @@ logs:
     }
 
     #[test]
-    fn tempo_accepted_under_traces_only() {
-        // Stock default: disabled, localhost:3200.
-        let config = resolve_with_user("").unwrap();
-        assert!(!config.traces.tempo.enabled);
-        assert_eq!(config.traces.tempo.bind, "127.0.0.1:3200");
-
-        // The traces override merges into the lifecycle config.
-        let config =
-            resolve_with_user("traces:\n  tempo:\n    enabled: true\n    bind: \"0.0.0.0:3200\"\n")
-                .unwrap();
-        assert!(config.traces.tempo.enabled);
-        assert_eq!(config.traces.tempo.bind, "0.0.0.0:3200");
-        let lifecycle = config.lifecycle_for(bridge::signals::Signal::Traces);
-        assert!(lifecycle.tempo.enabled);
-        // Logs never grow a Tempo listener.
-        assert!(!config.logs.tempo.enabled);
-        let err = resolve_with_user("logs:\n  tempo:\n    enabled: true\n").unwrap_err();
-        assert!(
-            format!("{err:#}").contains("logs.tempo is not a valid option"),
-            "{err:#}"
-        );
-    }
-
-    #[test]
-    fn tempo_rejected_with_auth_enabled() {
-        // The shim has no auth and serves the default tenant only —
-        // combining it with tenant auth is refused at config load.
-        let err = resolve_with_user(
-            "auth:\n  enabled: true\ntraces:\n  tempo:\n    enabled: true\n",
-        )
-        .unwrap_err();
-        assert!(
-            format!("{err:#}").contains("traces.tempo cannot be enabled together with auth"),
-            "{err:#}"
-        );
-        // Either alone is fine.
-        assert!(resolve_with_user("auth:\n  enabled: true\n").is_ok());
-        assert!(resolve_with_user("traces:\n  tempo:\n    enabled: true\n").is_ok());
+    fn tempo_key_is_rejected() {
+        // The Tempo shim was removed; strict parsing refuses its former key
+        // so a stale config fails loudly instead of silently not listening.
+        assert!(resolve_with_user("traces:\n  tempo:\n    enabled: true\n").is_err());
+        assert!(resolve_with_user("logs:\n  tempo:\n    enabled: true\n").is_err());
     }
 
     // -- Validation --

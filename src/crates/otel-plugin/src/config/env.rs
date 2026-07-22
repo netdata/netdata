@@ -298,9 +298,6 @@ impl SignalOverride {
             } else {
                 None
             },
-            // The Tempo shim has no env-var surface (YAML-only; the
-            // scaffold keeps the knob count minimal).
-            tempo: None,
             // The legacy journal dir has no env var; it is a YAML-only key.
             journal_dir: None,
         })

@@ -28,7 +28,6 @@ otel-catalog = { workspace = true }
 sfst = { workspace = true }
 ng-index = { workspace = true }
 sfsq = { workspace = true }
-tempo-shim = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 # preserve_order: the log-table `columns` object must serialize in insertion
 # (index) order — the Netdata UI orders columns by their JSON key position.

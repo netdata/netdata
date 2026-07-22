@@ -78,10 +78,9 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     if let Err(e) = &result {
         tracing::error!("ledger event loop error: {e:#}");
     }
-    // Signal shutdown to the cancellation-driven tasks (the Tempo shim
-    // listener among them) on BOTH exit paths — an error exit would
-    // otherwise leave them to the runtime teardown, never the graceful
-    // drain.
+    // Signal shutdown to the cancellation-driven tasks on BOTH exit
+    // paths — an error exit would otherwise leave them to the runtime
+    // teardown, never the graceful drain.
     ledger.cancel.cancel();
     result.context("ledger event loop error")?;
 

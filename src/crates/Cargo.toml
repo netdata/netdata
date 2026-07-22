@@ -49,9 +49,6 @@ members = [
     "sfsq",
     "sfsq-cli",
 
-    # Tempo HTTP API shim (temporary scaffolding, SOW-20260712-traces-tempo-shim)
-    "tempo-shim",
-
     # OTLP→WAL/indexing experiment (SOW-20260627)
     "ng-ingest",
     "ng-index",
@@ -229,7 +226,6 @@ rdp = { path = "rdp" }
 treight = { path = "treight" }
 sfst = { path = "sfst" }
 sfsq = { path = "sfsq" }
-tempo-shim = { path = "tempo-shim" }
 sfsq-cli = { path = "sfsq-cli" }
 
 # Netdata plugin crates
