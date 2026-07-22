@@ -710,14 +710,14 @@ static void dns_drain_flow_socket(struct netdata_dns_runtime *rt)
  *
  * TODO: replace with a full port-53/5353 cBPF filter (IPv4 + IPv6, UDP +
  * TCP, ~30–40 instructions) or, better, add a dedicated filter-only eBPF
- * program to dns_buffer.bpf.c (SEC("socket"), returns SKF_AD_MAX for DNS
- * and 0 otherwise, no ring-buffer writes) and attach it here via
- * SO_ATTACH_BPF.  The obvious shortcut of re-using socket__dns_filter_buffer
- * is NOT safe: that program always returns 0 (drop — userspace reads via the
- * ring buffer, not recv()), so flow_fd would never deliver frames; worse,
- * both sock_fd and flow_fd see every physical packet, so the ring buffer
- * would receive two events per DNS packet and every aggregate counter would
- * double.
+ * program to dns_buffer.bpf.c (SEC("socket"), returns skb->len to accept DNS
+ * frames and 0 to drop everything else, no ring-buffer writes) and attach it
+ * here via SO_ATTACH_BPF.  The obvious shortcut of re-using
+ * socket__dns_filter_buffer is NOT safe: that program always returns 0 (drop —
+ * userspace reads via the ring buffer, not recv()), so flow_fd would never
+ * deliver frames; worse, both sock_fd and flow_fd see every physical packet,
+ * so the ring buffer would receive two events per DNS packet and every
+ * aggregate counter would double.
  * ---------------------------------------------------------------------- */
 static int dns_open_flow_socket(void)
 {

@@ -16,20 +16,20 @@ const pluginPrimaryConfigFile = "ebpf.d.conf"
 // pointers so that an absent key is distinguishable from an explicit value;
 // apply() merges a later file on top of an earlier one.
 type pluginConfigFile struct {
-	Cachestat       *bool // [ebpf programs] cachestat key
-	Socket          *bool // [ebpf programs] socket key
-	DNS             *bool // [ebpf programs] dns key
-	UpdateEvery     *int
-	AppsEnabled     *bool
-	Cgroups         *bool
+	Cachestat                 *bool // [ebpf programs] cachestat key
+	Socket                    *bool // [ebpf programs] socket key
+	DNS                       *bool // [ebpf programs] dns key
+	UpdateEvery               *int
+	AppsEnabled               *bool
+	Cgroups                   *bool
 	PidTable                  *uint32
 	SocketMonitoringTableSize *uint32
 	UDPConnectionTableSize    *uint32
 	MapsPerCore               *bool
-	BTFPath         *string
-	Lifetime        *int
-	ObjectFlavor    *string
-	CollectPidLevel *int // "collect pid" key → BPF apps collection level (0=real parent, 1=parent, 2=all)
+	BTFPath                   *string
+	Lifetime                  *int
+	ObjectFlavor              *string
+	CollectPidLevel           *int // "collect pid" key → BPF apps collection level (0=real parent, 1=parent, 2=all)
 }
 
 // loadPluginConfigFiles loads the plugin-wide ebpf.d.conf from stock then

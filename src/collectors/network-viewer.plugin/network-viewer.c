@@ -6193,7 +6193,7 @@ static BUFFER *network_viewer_result(char *function) {
                 RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,                  \
                 RRDF_FIELD_TRANSFORM_NONE, 0, unit, NAN,                           \
                 RRDF_FIELD_SORT_DESCENDING, NULL,                                  \
-                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,                   \
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,                   \
                 RRDF_FIELD_OPTS_NONE, NULL)
             NV_EBPF_FIELD("eBPFBytesSent",  "eBPF TCP Bytes Sent by PID",       "bytes");
             NV_EBPF_FIELD("eBPFBytesRecv",  "eBPF TCP Bytes Received by PID",   "bytes");

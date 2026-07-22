@@ -121,10 +121,10 @@ struct netdata_socket_per_pid_entry {
 };
 
 /* Per-PID hash table for accumulation during a snapshot cycle.
- * Open-addressing with linear probing; PID 0 = empty slot. */
-#define SOCKET_PID_HT_BITS 14u
-#define SOCKET_PID_HT_SIZE (1u << SOCKET_PID_HT_BITS) /* 16384 */
-#define SOCKET_PID_HT_MASK (SOCKET_PID_HT_SIZE - 1u)
+ * Open-addressing with linear probing; PID 0 = empty slot.
+ * The minimum size is 16384; if nd_socket_size is larger, the table grows to
+ * the next power of two at or above nd_socket_size to prevent silent PID drops. */
+#define SOCKET_PID_HT_MIN (1u << 14u) /* 16384 — default/minimum */
 
 enum netdata_ebpf_socket_runtime_kind {
     NETDATA_SOCKET_RUNTIME_LEGACY = 0,
@@ -153,8 +153,11 @@ struct netdata_ebpf_socket_runtime {
     int                         percpu_nd_socket_cap;
 
     /* Flat hash-table for per-PID accumulation during a snapshot cycle.
-     * Allocated once in prepare(); reused every cycle (zeroed at start). */
+     * Allocated once in prepare(); reused every cycle (zeroed at start).
+     * pid_ht_size is a power of two >= SOCKET_PID_HT_MIN and >= nd_socket_size. */
     struct netdata_socket_per_pid_entry *pid_ht;
+    uint32_t                             pid_ht_size;
+    uint32_t                             pid_ht_mask;
 
     /* Compact sorted output array from last per-PID snapshot (reused). */
     struct netdata_socket_per_pid_entry *per_pid_entries;
@@ -340,6 +343,14 @@ static uint64_t socket_sum_percpu_passive_counter(const netdata_passive_conn_t *
     return sum;
 }
 
+static uint32_t next_pow2_u32(uint32_t n)
+{
+    if (n == 0) return 1u;
+    n--;
+    n |= n >> 1; n |= n >> 2; n |= n >> 4; n |= n >> 8; n |= n >> 16;
+    return n + 1u;
+}
+
 /* -------------------------------------------------------------------------
  * Public API
  * ---------------------------------------------------------------------- */
@@ -413,8 +424,13 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
         return -1;
     rt->percpu_nd_socket_cap = lports_ncpu;
 
-    /* PID hash-table for per-PID accumulation: SOCKET_PID_HT_SIZE entries. */
-    rt->pid_ht = calloc(SOCKET_PID_HT_SIZE, sizeof(*rt->pid_ht));
+    /* PID hash-table: sized to the next power of two at or above nd_socket_size,
+     * with SOCKET_PID_HT_MIN as the floor, so every BPF map entry has a slot. */
+    uint32_t ht_size = nd_socket_size > SOCKET_PID_HT_MIN ? nd_socket_size : SOCKET_PID_HT_MIN;
+    ht_size = next_pow2_u32(ht_size);
+    rt->pid_ht_size = ht_size;
+    rt->pid_ht_mask = ht_size - 1u;
+    rt->pid_ht = calloc(ht_size, sizeof(*rt->pid_ht));
     if (!rt->pid_ht)
         return -1;
 
@@ -578,12 +594,13 @@ static int pid_ht_compare(const void *a, const void *b)
 /* Accumulate one BPF value into the per-PID hash table. */
 static void pid_ht_accumulate(struct netdata_socket_per_pid_entry *ht,
                                uint32_t pid,
-                               const netdata_socket_bpf_value_t *v)
+                               const netdata_socket_bpf_value_t *v,
+                               uint32_t ht_size, uint32_t ht_mask)
 {
-    /* Knuth multiplicative hash for 14-bit output. */
-    uint32_t slot = (pid * 2654435761u) & SOCKET_PID_HT_MASK;
-    for (uint32_t i = 0; i < SOCKET_PID_HT_SIZE; i++) {
-        uint32_t s = (slot + i) & SOCKET_PID_HT_MASK;
+    /* Knuth multiplicative hash, output masked to ht_mask bits. */
+    uint32_t slot = (pid * 2654435761u) & ht_mask;
+    for (uint32_t i = 0; i < ht_size; i++) {
+        uint32_t s = (slot + i) & ht_mask;
         if (ht[s].pid == 0) {
             ht[s].pid = pid;
         }
@@ -601,7 +618,7 @@ static void pid_ht_accumulate(struct netdata_socket_per_pid_entry *ht,
             return;
         }
     }
-    /* Hash table full — silent drop; should not occur for < 16384 unique PIDs. */
+    /* Hash table full — should not occur when pid_ht_size >= nd_socket_size. */
 }
 
 /* Read tbl_nd_socket, aggregate per PID, and store a sorted result array.
@@ -630,7 +647,7 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
     int ndcount = (ndtype == BPF_MAP_TYPE_PERCPU_HASH) ? rt->percpu_nd_socket_cap : 1;
 
     /* Zero the hash table for this cycle. */
-    memset(rt->pid_ht, 0, SOCKET_PID_HT_SIZE * sizeof(*rt->pid_ht));
+    memset(rt->pid_ht, 0, rt->pid_ht_size * sizeof(*rt->pid_ht));
 
     /* Iterate all connection entries and accumulate per PID. */
     netdata_socket_bpf_key_t key = {}, next = {};
@@ -641,7 +658,7 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
         first_nditer = false;
         if (next.pid != 0 && bpf_map_lookup_elem(ndfd, &next, vbuf) == 0) {
             if (ndcount == 1) {
-                pid_ht_accumulate(rt->pid_ht, next.pid, vbuf);
+                pid_ht_accumulate(rt->pid_ht, next.pid, vbuf, rt->pid_ht_size, rt->pid_ht_mask);
             } else {
                 /* PERCPU_HASH: sum per-CPU values into a temporary entry. */
                 netdata_socket_bpf_value_t agg = {0};
@@ -657,7 +674,7 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
                     agg.tcp.ipv4_connect        += vbuf[c].tcp.ipv4_connect;
                     agg.tcp.ipv6_connect        += vbuf[c].tcp.ipv6_connect;
                 }
-                pid_ht_accumulate(rt->pid_ht, next.pid, &agg);
+                pid_ht_accumulate(rt->pid_ht, next.pid, &agg, rt->pid_ht_size, rt->pid_ht_mask);
             }
         }
         key = next;
@@ -665,7 +682,7 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
 
     /* Compact non-empty hash-table entries into the sorted output array. */
     int count = 0;
-    for (uint32_t i = 0; i < SOCKET_PID_HT_SIZE; i++) {
+    for (uint32_t i = 0; i < rt->pid_ht_size; i++) {
         if (rt->pid_ht[i].pid == 0)
             continue;
 
