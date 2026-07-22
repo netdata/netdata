@@ -257,8 +257,12 @@ function Invoke-ObfuscatePiiLine([string]$line) {
     return $line
 }
 
-function Invoke-SanitizeLine([string]$line) {
-    $line = Invoke-RedactSecretLine $line
+function Invoke-SanitizeLine([string]$line, [bool]$secretScan = $true) {
+    # $secretScan can be disabled for content that structurally cannot hold
+    # credentials (the Windows perflib dump: counter/instance metadata only), so
+    # the expensive per-"key":"value" credential regexes are not run millions of
+    # times over a ~60 MB blob. PII obfuscation (host/IP names) is always applied.
+    if ($secretScan) { $line = Invoke-RedactSecretLine $line }
     if ($Obfuscate) { $line = Invoke-ObfuscatePiiLine $line }
     return $line
 }
@@ -281,7 +285,7 @@ function Test-FileHasNul([string]$path) {
     return $false
 }
 
-function Convert-SanitizedText([string[]]$lines) {
+function Convert-SanitizedText([string[]]$lines, [bool]$secretScan = $true) {
     # per-line redaction, plus whole-block withholding for PEM private keys
     # (clear BEGIN/END markers). Multi-line YAML block scalars are NOT specially
     # withheld - their indentation-based boundary can't be detected robustly by
@@ -300,18 +304,18 @@ function Convert-SanitizedText([string[]]$lines) {
             [void]$out.Add('[REDACTED PRIVATE KEY BLOCK]')
             continue
         }
-        [void]$out.Add((Invoke-SanitizeLine $l))
+        [void]$out.Add((Invoke-SanitizeLine $l $secretScan))
     }
     return $out
 }
 
-function Invoke-SanitizeFile([string]$path) {
+function Invoke-SanitizeFile([string]$path, [bool]$secretScan = $true) {
     if (-not (Test-Path $path)) { return }
     if (Test-FileHasNul $path) {
         Write-Utf8 $path '[content withheld: file contains NUL bytes (binary or UTF-16?)]'
         return
     }
-    $out = Convert-SanitizedText ([System.IO.File]::ReadAllLines($path))
+    $out = Convert-SanitizedText ([System.IO.File]::ReadAllLines($path)) $secretScan
     [System.IO.File]::WriteAllLines($path, $out, $script:Utf8NoBom)
 }
 
@@ -398,18 +402,74 @@ function Add-Manifest([string]$rel, [string]$kind, [string]$origin, [string]$tit
 }
 
 # --- collectors -------------------------------------------------------------------
-function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText) {
+# Launch a native netdata binary (netdata.exe / netdatacli.exe) DIRECTLY as a
+# foreground process. These MUST NOT go through Start-Job: they are MSYS2
+# binaries whose runtime does not initialize inside a PowerShell background-job
+# runspace, so they exit non-zero with no output (an empty dump / empty stdout).
+# A foreground child with an inherited console works. Notes:
+#  - System.Diagnostics.Process, not Start-Process: Start-Process -PassThru does
+#    not expose a reliable .ExitCode on Windows PowerShell 5.1 (it reads back
+#    empty even for `cmd /c exit 7`).
+#  - CreateNoWindow stays $false: detaching from the console reproduces the same
+#    empty-output failure. The bundle runs from a console PowerShell, so the
+#    child inherits it and no extra window appears.
+#  - both pipes are drained asynchronously so a full buffer cannot deadlock the
+#    wait, which is bounded by WaitForExit (kill on timeout).
+function Invoke-NativeProcess([string]$exe, [string[]]$argList, [int]$timeoutSec) {
+    $r = [pscustomobject]@{ StdOut = ''; StdErr = ''; ExitCode = $null; TimedOut = $false; LaunchError = '' }
+    $p = $null
+    try {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $exe
+        # PS 5.1 ProcessStartInfo has no ArgumentList; quote args containing spaces
+        $psi.Arguments = ($argList | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.CreateNoWindow = $false
+        $p = New-Object System.Diagnostics.Process
+        $p.StartInfo = $psi
+        [void]$p.Start()
+        $outTask = $p.StandardOutput.ReadToEndAsync()
+        $errTask = $p.StandardError.ReadToEndAsync()
+        if ($p.WaitForExit($timeoutSec * 1000)) {
+            $r.ExitCode = $p.ExitCode
+            $r.StdOut = $outTask.Result
+            $r.StdErr = $errTask.Result
+        } else {
+            try { $p.Kill() } catch { Write-Verbose "could not kill ${exe}: $_" }
+            $r.TimedOut = $true
+        }
+    } catch {
+        $r.LaunchError = "$_"
+    } finally {
+        if ($p) { $p.Dispose() }
+    }
+    return $r
+}
+
+function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText, [string]$nativeExe = '', [string[]]$nativeArgs = @()) {
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
     $header = "# netdata-support-bundle v$ToolVersion | command: $originText | captured: $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))"
-    try {
-        $job = Start-Job -ScriptBlock $cmd
-        $done = Wait-Job $job -Timeout $TimeoutSeconds
-        if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String } else { $result = "TIMEOUT after ${TimeoutSeconds}s" }
-        Stop-Job $job -ErrorAction SilentlyContinue
-        Remove-Job $job -Force
-    } catch { $result = "ERROR: $_" }
+    if ($nativeExe) {
+        # MSYS2 binary: direct launch, never Start-Job (see Invoke-NativeProcess).
+        # Text file, so merge stdout+stderr like the old `2>&1`; never silent.
+        $np = Invoke-NativeProcess $nativeExe $nativeArgs $TimeoutSeconds
+        if ($np.LaunchError) { $result = "ERROR: could not launch: $($np.LaunchError)" }
+        elseif ($np.TimedOut) { $result = "TIMEOUT after ${TimeoutSeconds}s" }
+        elseif ($np.ExitCode -ne 0) { $result = "ERROR: exit $($np.ExitCode)`r`n$($np.StdErr)$($np.StdOut)" }
+        else { $result = "$($np.StdOut)$($np.StdErr)" }
+    } else {
+        try {
+            $job = Start-Job -ScriptBlock $cmd
+            $done = Wait-Job $job -Timeout $TimeoutSeconds
+            if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String } else { $result = "TIMEOUT after ${TimeoutSeconds}s" }
+            Stop-Job $job -ErrorAction SilentlyContinue
+            Remove-Job $job -Force
+        } catch { $result = "ERROR: $_" }
+    }
     if ($result.Length -gt 2MB) {
         # truncate at a LINE boundary so a secret cannot straddle the cut
         $cut = $result.LastIndexOf("`n", 2MB)
@@ -421,7 +481,7 @@ function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$orig
     Add-Manifest $rel 'cmd' $originText $title
 }
 
-function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText) {
+function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText, [string]$nativeExe = '', [string[]]$nativeArgs = @()) {
     # like Save-Cmd but with NO header/trailer, for commands whose output must
     # stay parseable (JSON). Provenance lives in MANIFEST.json only. The file is
     # removed if the command produced nothing.
@@ -429,13 +489,21 @@ function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
     $result = ''
-    try {
-        $job = Start-Job -ScriptBlock $cmd
-        $done = Wait-Job $job -Timeout $TimeoutSeconds
-        if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String }
-        Stop-Job $job -ErrorAction SilentlyContinue
-        Remove-Job $job -Force
-    } catch { Write-Verbose "collector failed: $_" }
+    if ($nativeExe) {
+        # MSYS2 binary: direct launch, never Start-Job (see Invoke-NativeProcess).
+        # JSON output, so keep stdout ONLY (merging stderr would corrupt it); a
+        # failed/empty run leaves nothing and the file is dropped below.
+        $np = Invoke-NativeProcess $nativeExe $nativeArgs $TimeoutSeconds
+        if (-not $np.TimedOut -and -not $np.LaunchError -and $np.ExitCode -eq 0) { $result = $np.StdOut }
+    } else {
+        try {
+            $job = Start-Job -ScriptBlock $cmd
+            $done = Wait-Job $job -Timeout $TimeoutSeconds
+            if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String }
+            Stop-Job $job -ErrorAction SilentlyContinue
+            Remove-Job $job -Force
+        } catch { Write-Verbose "collector failed: $_" }
+    }
     if ($result -and $result.Trim().Length -gt 0) {
         # a truncated JSON document is worse than none: fail closed
         if ($result.Length -gt 2MB) { $result = '{"error":"output exceeded the cap and was withheld"}' }
@@ -702,9 +770,11 @@ if ($ApiOk) {
 # exited) so it is never evaluated on non-Windows self-test runs.
 $IsElevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (Test-Path $NetdataExe) {
-    Save-Cmd '07-runtime\buildinfo.txt' 'netdata -W buildinfo (verbatim; works with daemon down)' { & $using:NetdataExe -W buildinfo 2>&1 } 'netdata.exe -W buildinfo'
-    Save-CmdRaw '07-runtime\buildinfo.json' 'netdata -W buildinfojson (machine-readable; no header so it parses as JSON)' { & $using:NetdataExe -W buildinfojson 2>&1 } 'netdata.exe -W buildinfojson'
-    Save-Cmd '07-runtime\cmakecache.txt' 'netdata -W cmakecache: authoritative build config (flags, plugins, paths) - superset of buildinfo' { & $using:NetdataExe -W cmakecache 2>&1 } 'netdata.exe -W cmakecache'
+    # these MSYS2 netdata.exe invocations use the native direct-launch path, not
+    # Start-Job (which yields empty output for MSYS2 binaries - see Invoke-NativeProcess)
+    Save-Cmd '07-runtime\buildinfo.txt' 'netdata -W buildinfo (verbatim; works with daemon down)' $null 'netdata.exe -W buildinfo' -nativeExe $NetdataExe -nativeArgs '-W', 'buildinfo'
+    Save-CmdRaw '07-runtime\buildinfo.json' 'netdata -W buildinfojson (machine-readable; no header so it parses as JSON)' $null 'netdata.exe -W buildinfojson' -nativeExe $NetdataExe -nativeArgs '-W', 'buildinfojson'
+    Save-Cmd '07-runtime\cmakecache.txt' 'netdata -W cmakecache: authoritative build config (flags, plugins, paths) - superset of buildinfo' $null 'netdata.exe -W cmakecache' -nativeExe $NetdataExe -nativeArgs '-W', 'cmakecache'
     # Windows performance-library dump: counter/instance metadata used to
     # diagnose Windows collector issues (e.g. PerflibSMB). Written to a file via
     # -perflibfile (not a capped stdout capture) so a large dump is not
@@ -712,8 +782,14 @@ if (Test-Path $NetdataExe) {
     # share/host names). The dump reads HKEY_PERFORMANCE_DATA and needs an
     # elevated session, and enumerating every counter can exceed the default
     # per-command timeout, so perflib gets an elevation pre-check and a 30s
-    # floor. A failure is never silent: a JSON marker records why, mirroring the
-    # never-omit behaviour of Save-Cmd.
+    # floor. A failure is never silent: a JSON marker records why (incl. the
+    # exit code and captured stderr/stdout), mirroring the never-omit behaviour
+    # of Save-Cmd.
+    #
+    # Launched via Invoke-NativeProcess (direct foreground child, never
+    # Start-Job) since netdata.exe is an MSYS2 binary; the dump itself goes to
+    # -perflibfile, so stdout is normally empty and stderr carries the
+    # "written to" confirmation or the failure reason.
     $perfPath = Join-Path $Work '07-runtime\perflib.json'
     New-Item -ItemType Directory -Path (Split-Path $perfPath) -Force | Out-Null
     $perfOrigin = 'netdata.exe -W perflibdump -perflibfile'
@@ -722,25 +798,39 @@ if (Test-Path $NetdataExe) {
         Write-Utf8 $perfPath (@{ error = 'perflib dump skipped: not running elevated'; hint = 'Re-run the bundle in an elevated (Run as Administrator) PowerShell to collect it.' } | ConvertTo-Json -Compress)
     } else {
         $perfTimeout = [Math]::Max($TimeoutSeconds, 30)
-        $pjob = Start-Job -ScriptBlock { & $using:NetdataExe -W perflibdump -perflibfile $using:perfPath 2>&1 }
-        $perfDone = Wait-Job $pjob -Timeout $perfTimeout
-        $perfErr = if ($perfDone) { Receive-Job $pjob 2>&1 | Out-String } else { "TIMEOUT after ${perfTimeout}s" }
-        Stop-Job $pjob -ErrorAction SilentlyContinue
-        Remove-Job $pjob -Force
-        if ((Test-Path $perfPath) -and (Get-Item $perfPath).Length -gt 0) {
-            if ((Get-Item $perfPath).Length -gt 16MB) { Write-Utf8 $perfPath '{"error":"perflib dump exceeded 16 MB and was withheld"}' }
+        $np = Invoke-NativeProcess $NetdataExe @('-W', 'perflibdump', '-perflibfile', $perfPath) $perfTimeout
+        $perfExit = $np.ExitCode
+        $perfReason = if ($np.LaunchError) { "could not launch netdata.exe: $($np.LaunchError)" }
+                      elseif ($np.TimedOut) { "TIMEOUT after ${perfTimeout}s" }
+                      else { '' }
+        if (($perfExit -eq 0) -and (Test-Path $perfPath) -and ((Get-Item $perfPath).Length -gt 0)) {
+            # a full counter dump is legitimately large (~60 MB on a typical host,
+            # more on busy servers); it compresses ~10-20x in the zip. The ceiling
+            # only guards against a pathological runaway.
+            if ((Get-Item $perfPath).Length -gt 128MB) { Write-Utf8 $perfPath '{"error":"perflib dump exceeded 128 MB and was withheld"}' }
         } else {
-            # never silently drop it: leave a marker with the captured reason
-            $perfMsg = $perfErr.Trim()
-            if (-not $perfMsg) { $perfMsg = 'perflib dump produced no output and no error text' }
-            Write-Utf8 $perfPath (@{ error = 'perflib dump was not collected'; reason = $perfMsg; hint = 'If this timed out, re-run with a larger -TimeoutSeconds. If it reported an access error, ensure the bundle runs in an elevated PowerShell.' } | ConvertTo-Json -Compress)
+            # never silently drop it: record the exit code and both captured streams
+            if (-not $perfReason) {
+                $perfReason = (@($np.StdErr, $np.StdOut) | Where-Object { $_ -and $_.Trim() } | ForEach-Object { $_.Trim() }) -join ' | '
+                if (-not $perfReason) { $perfReason = 'perflib dump produced no output file and no error text' }
+            }
+            Write-Utf8 $perfPath (@{
+                    error    = 'perflib dump was not collected'
+                    exitcode = $perfExit
+                    reason   = $perfReason
+                    hint     = 'If this timed out, re-run with a larger -TimeoutSeconds. If it reported an access error, ensure the bundle runs in an elevated PowerShell. Requires a netdata.exe build new enough to support -perflibfile.'
+                } | ConvertTo-Json -Compress)
         }
     }
-    Invoke-SanitizeFile $perfPath
+    # PII obfuscation only: the dump is counter/instance metadata with no
+    # credential fields, and the full per-key credential scan over a ~60 MB blob
+    # would blow the global deadline and starve later sections.
+    Invoke-SanitizeFile $perfPath $false
     Add-Manifest '07-runtime\perflib.json' 'cmd' $perfOrigin $perfTitle
 }
 if ((Test-Path $NetdataCli) -and $NetdataProc) {
-    Save-CmdRaw '07-runtime\aclk-state.json' 'Cloud connectivity state (netdatacli aclk-state json; no header so it parses as JSON)' { & $using:NetdataCli aclk-state json 2>&1 } 'netdatacli.exe aclk-state json'
+    # netdatacli.exe is also MSYS2: native direct-launch, not Start-Job
+    Save-CmdRaw '07-runtime\aclk-state.json' 'Cloud connectivity state (netdatacli aclk-state json; no header so it parses as JSON)' $null 'netdatacli.exe aclk-state json' -nativeExe $NetdataCli -nativeArgs 'aclk-state', 'json'
 }
 
 # ============================================================================
