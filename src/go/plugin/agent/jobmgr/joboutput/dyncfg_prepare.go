@@ -192,7 +192,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			postimage:      failedPostimage,
 			failedCleanup:  failedCleanup,
 			removedCleanup: dcjc.configDeleteCleanup(dcjc.configID(target.module, target.name)),
-			result:         autoDetectionFailureResultFunc(422, "config update failed: %v"),
+			result:         autoDetectionFailureResultFunc(200, "config update failed: %v"),
 			afterApply:     dcjc.scheduleRetryAfterApply(config),
 			removePlainStock: config.SourceType() ==
 				confgroup.TypeStock,
@@ -229,6 +229,7 @@ func (dcjc *DynCfgJobController) prepareEnable(
 		scope,
 		permit,
 		lifecycle.ResourceTransactionInstalled,
+		200,
 		"job enable failed: %v",
 		func(err error) (lifecycle.PreparedResourceTransaction, error) {
 			return dcjc.noop(scope, current, permit, mustDynCfgMessage(200, err.Error()))
@@ -270,6 +271,7 @@ func (dcjc *DynCfgJobController) prepareRestart(
 		scope,
 		permit,
 		disposition,
+		422,
 		"config restart failed: %v",
 		func(err error) (lifecycle.PreparedResourceTransaction, error) {
 			return dcjc.noop(
@@ -287,7 +289,8 @@ func (dcjc *DynCfgJobController) prepareRestart(
 // successor from the record and, on success, prepare the install/replace
 // mutation to StatusRunning with the standard failure plan. A prepare failure
 // that is not context-cancelled or ownership-retained is handed to
-// onPrepareFailure so each caller can shape its own response.
+// onPrepareFailure; an apply-time autodetection failure uses the caller's
+// command-specific default code unless the collector supplies its own.
 func (dcjc *DynCfgJobController) prepareRunningTransition(
 	ctx context.Context,
 	target dynCfgTarget,
@@ -296,6 +299,7 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 	disposition lifecycle.ResourceTransactionDisposition,
+	autoDetectionFailureCode int,
 	failureMessage string,
 	onPrepareFailure func(error) (lifecycle.PreparedResourceTransaction, error),
 ) (lifecycle.PreparedResourceTransaction, error) {
@@ -325,7 +329,7 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 			postimage:      failedPostimage,
 			failedCleanup:  dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusFailed),
 			removedCleanup: dcjc.configDeleteCleanup(dcjc.externalID(target.resourceID)),
-			result:         autoDetectionFailureResultFunc(422, failureMessage),
+			result:         autoDetectionFailureResultFunc(autoDetectionFailureCode, failureMessage),
 			afterApply:     dcjc.scheduleRetryAfterApply(config),
 			removePlainStock: config.SourceType() ==
 				confgroup.TypeStock,

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -155,6 +156,237 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 			require.False(t, resultAt < 0 || notificationAt < 0 || resultAt >= notificationAt)
 		})
 	}
+}
+
+func TestDynCfgProtocolIDsMatchDeclaredConfigType(t *testing.T) {
+	tests := map[string]struct {
+		policy       collectorapi.InstancePolicy
+		name         string
+		wantID       string
+		wantType     dyncfg.ConfigType
+		wantTemplate bool
+	}{
+		"per-job config with distinct job name": {
+			name:         "job",
+			wantID:       "go.d:collector:module:job",
+			wantType:     dyncfg.ConfigTypeJob,
+			wantTemplate: true,
+		},
+		"per-job config with module job name": {
+			name:         "module",
+			wantID:       "go.d:collector:module:module",
+			wantType:     dyncfg.ConfigTypeJob,
+			wantTemplate: true,
+		},
+		"single-instance config": {
+			policy:   collectorapi.InstancePolicySingle,
+			name:     "module",
+			wantID:   "go.d:collector:module",
+			wantType: dyncfg.ConfigTypeSingle,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			controller, _, _, output, _ := newDynCfgJobTestHarness(t)
+			creator := controller.modules["module"]
+			creator.InstancePolicy = test.policy
+			controller.modules["module"] = creator
+
+			releaseTemplates := controller.templatePublicationCleanup()
+			require.NoError(t, releaseTemplates())
+			releaseConfig := controller.configCreateCleanup(
+				dyncfg.GraphConfig{
+					Module: "module",
+					Name:   test.name,
+					Status: dyncfg.StatusAccepted.String(),
+				},
+				confgroup.TypeStock,
+				"stock",
+				controller.configType(creator),
+			)
+			require.NoError(t, releaseConfig())
+
+			wire := output.String()
+			template := "CONFIG go.d:collector:module create accepted template"
+			require.Equal(t, test.wantTemplate, strings.Contains(wire, template))
+			require.Contains(t, wire, "CONFIG "+test.wantID+" create accepted "+test.wantType.String())
+			requireDynCfgJobTemplateParents(t, wire)
+		})
+	}
+}
+
+func TestManualDynCfgAutoDetectionFailureResponseContracts(t *testing.T) {
+	tests := map[string]struct {
+		command         dyncfg.Command
+		status          dyncfg.Status
+		checkErr        error
+		current         bool
+		payload         []byte
+		wantCode        int
+		wantCleanup     int
+		wantDisposition lifecycle.ResourceTransactionDisposition
+		wantMessage     string
+	}{
+		"enable ordinary failure preserves legacy success response": {
+			command:         dyncfg.CommandEnable,
+			status:          dyncfg.StatusDisabled,
+			checkErr:        errors.New("check failed"),
+			wantCode:        200,
+			wantCleanup:     1,
+			wantDisposition: lifecycle.ResourceTransactionUnchanged,
+			wantMessage:     "job enable failed: check failed",
+		},
+		"enable coded failure overrides default response": {
+			command: dyncfg.CommandEnable,
+			status:  dyncfg.StatusDisabled,
+			checkErr: dynCfgCodedAutoDetectionError{
+				code: 409,
+			},
+			wantCode:        409,
+			wantCleanup:     1,
+			wantDisposition: lifecycle.ResourceTransactionUnchanged,
+			wantMessage:     "job enable failed: coded check failed",
+		},
+		"update ordinary failure preserves legacy success response": {
+			command:         dyncfg.CommandUpdate,
+			status:          dyncfg.StatusRunning,
+			checkErr:        errors.New("check failed"),
+			current:         true,
+			payload:         []byte(`{"option":"replacement"}`),
+			wantCode:        200,
+			wantCleanup:     2,
+			wantDisposition: lifecycle.ResourceTransactionRemoved,
+			wantMessage:     "config update failed: check failed",
+		},
+		"restart ordinary failure remains unprocessable": {
+			command:         dyncfg.CommandRestart,
+			status:          dyncfg.StatusFailed,
+			checkErr:        errors.New("check failed"),
+			wantCode:        422,
+			wantCleanup:     1,
+			wantDisposition: lifecycle.ResourceTransactionUnchanged,
+			wantMessage:     "config restart failed: check failed",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			controller, graph, supervisor, output, state := newDynCfgJobTestHarness(t)
+			creator := controller.modules["module"]
+			creator.Create = func() collectorapi.CollectorV1 {
+				return state.module(func(context.Context) error { return test.checkErr }, false)
+			}
+			controller.modules["module"] = creator
+
+			config := factoryTestConfig(false)
+			config.SetSourceType(confgroup.TypeDyncfg)
+			config.SetSource("user=test")
+			config.SetProvider(confgroup.TypeDyncfg)
+			payload, err := yaml.Marshal(config)
+			require.NoError(t, err)
+			mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{
+				ID: config.FullName(),
+				Config: &dyncfg.GraphConfig{
+					ID:      config.FullName(),
+					Module:  config.Module(),
+					Name:    config.Name(),
+					Status:  test.status.String(),
+					Payload: payload,
+				},
+			}})
+			require.NoError(t, err)
+			require.NoError(t, graph.Commit(mutation))
+
+			var events []string
+			var current lifecycle.ReadyResource
+			scope := lifecycle.ResourceTransactionScope{
+				ID: config.FullName(),
+			}
+			nextGeneration := uint64(1)
+			if test.current {
+				scope.Current = lifecycle.ResourceIdentity{
+					ID:         config.FullName(),
+					Generation: 1,
+				}
+				current = &transactionTestReadyResource{
+					identity: scope.Current,
+					prefix:   "current",
+					events:   &events,
+				}
+				nextGeneration++
+			}
+			scope.Successor = lifecycle.ResourceIdentity{
+				ID:         config.FullName(),
+				Generation: nextGeneration,
+			}
+			request := DynCfgJobRequest{
+				Args:         []string{"go.d:collector:module:job", string(test.command)},
+				Payload:      test.payload,
+				ContentType:  "application/json",
+				CallerSource: "user=test",
+				HasPayload:   len(test.payload) != 0,
+			}
+			plan, err := lifecycle.NewResourceTransactionPermitTaskPlan(
+				lifecycle.SourceFunction,
+				time.Time{},
+				lifecycle.TransactionTaskPhases,
+				current,
+				scope,
+				lifecycle.NewJobLongLivedPlan(),
+				func(
+					ctx context.Context,
+					current lifecycle.ReadyResource,
+					taskScope lifecycle.ResourceTransactionScope,
+					permit lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResourceTransaction, error) {
+					return controller.Prepare(ctx, request, current, taskScope, permit)
+				},
+			)
+			require.NoError(t, err)
+
+			uid := strings.ReplaceAll(name, " ", "-")
+			disposition, active := applyAndEncodeDynCfgJobTestTask(t, supervisor, plan, scope, uid)
+			require.Equal(t, test.wantDisposition, disposition)
+			require.Nil(t, active)
+
+			wire := output.String()
+			require.Contains(t, wire, fmt.Sprintf("FUNCTION_RESULT_BEGIN %s %d application/json", uid, test.wantCode))
+			require.Contains(t, wire, test.wantMessage)
+			require.EqualValues(t, test.wantCleanup, state.collectorCleanup)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, supervisor.LongLivedCensus())
+		})
+	}
+}
+
+func requireDynCfgJobTemplateParents(t *testing.T, wire string) {
+	t.Helper()
+	templates := make(map[string]struct{})
+	for _, line := range strings.Split(strings.TrimSpace(wire), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 5 || fields[0] != "CONFIG" || fields[2] != "create" {
+			continue
+		}
+		switch fields[4] {
+		case dyncfg.ConfigTypeTemplate.String():
+			templates[fields[1]] = struct{}{}
+		case dyncfg.ConfigTypeJob.String():
+			separator := strings.LastIndexByte(fields[1], ':')
+			require.Positive(t, separator, "job config ID %q has no template parent", fields[1])
+			_, exists := templates[fields[1][:separator]]
+			require.True(t, exists, "job config ID %q was emitted without its template parent", fields[1])
+		}
+	}
+}
+
+type dynCfgCodedAutoDetectionError struct {
+	code int
+}
+
+func (err dynCfgCodedAutoDetectionError) Error() string {
+	return "coded check failed"
+}
+
+func (err dynCfgCodedAutoDetectionError) DyncfgCode() int {
+	return err.code
 }
 
 func TestDynCfgCommandsPropagateRetainedConstructionFailure(t *testing.T) {
@@ -912,6 +1144,50 @@ func startDynCfgJobTestTask(
 	require.EqualValues(t, 1, count)
 	require.Equal(t, request, starts[0].Request)
 	return starts[0].Task
+}
+
+func applyAndEncodeDynCfgJobTestTask(
+	t *testing.T,
+	supervisor *lifecycle.TaskSupervisor,
+	plan lifecycle.TaskPlan,
+	scope lifecycle.ResourceTransactionScope,
+	uid string,
+) (lifecycle.ResourceTransactionDisposition, lifecycle.ReadyResource) {
+	t.Helper()
+	ref := startDynCfgJobTestTask(t, supervisor, plan)
+	prepared := <-supervisor.CompletionCh()
+	require.NoError(t, prepared.Err)
+	require.Equal(t, lifecycle.TaskOutcomePreparedResourceTransaction, prepared.Kind)
+	require.NoError(t, supervisor.SendAction(lifecycle.TaskAction{
+		Ref:      ref,
+		Sequence: 2,
+		Kind:     lifecycle.TaskActionApplyResourceTransaction,
+	}))
+	applied := <-supervisor.CompletionCh()
+	require.NoError(t, applied.Err)
+	require.Equal(t, lifecycle.TaskOutcomeAppliedResourceTransaction, applied.Kind)
+	disposition, current, err := supervisor.TakeAppliedResourceTransaction(ref, 2, scope)
+	require.NoError(t, err)
+	require.NoError(t, supervisor.PreflightResult(ref, uid, 1))
+	sendDynCfgJobTestAction(t, supervisor, lifecycle.TaskAction{
+		Ref:      ref,
+		Sequence: 3,
+		Kind:     lifecycle.TaskActionEncodeWrite,
+		UID:      uid,
+		Expiry:   1,
+	})
+	sendDynCfgJobTestAction(t, supervisor, lifecycle.TaskAction{
+		Ref:      ref,
+		Sequence: 4,
+		Kind:     lifecycle.TaskActionCleanup,
+	})
+	sendDynCfgJobTestAction(t, supervisor, lifecycle.TaskAction{
+		Ref:      ref,
+		Sequence: 5,
+		Kind:     lifecycle.TaskActionTerminate,
+	})
+	require.NoError(t, supervisor.Release(ref))
+	return disposition, current
 }
 
 func sendDynCfgJobTestAction(t *testing.T, supervisor *lifecycle.TaskSupervisor, action lifecycle.TaskAction) {

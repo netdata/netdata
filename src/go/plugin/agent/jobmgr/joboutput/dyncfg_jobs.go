@@ -217,7 +217,7 @@ func (dcjc *DynCfgJobController) Prepare(
 }
 
 func (dcjc *DynCfgJobController) configID(module string, name string) string {
-	if module == name || dcjc.modules[module].InstancePolicy == collectorapi.InstancePolicySingle {
+	if dcjc.modules[module].InstancePolicy == collectorapi.InstancePolicySingle {
 		return dcjc.prefix + module
 	}
 	return dcjc.prefix + module + ":" + name

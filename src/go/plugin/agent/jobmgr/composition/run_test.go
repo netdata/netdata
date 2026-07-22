@@ -219,7 +219,7 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 	closeRunTestUIDs(t, uids)
 }
 
-func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
+func TestRunGenerationDynCfgEnableUsesSameNamePerJobProtocolID(t *testing.T) {
 	var cleanupCalls atomic.Int32
 	modules := collectorapi.Registry{
 		"module": {
@@ -246,7 +246,7 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	}
 	config := confgroup.Config{
 		"module":        "module",
-		"name":          "job",
+		"name":          "module",
 		"update_every":  1,
 		"function_only": true,
 	}
@@ -285,13 +285,13 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 			UID:    "enable",
 			Source: lifecycle.SourceFunction,
 			Route:  "config",
-			Args:   []string{"go.d:collector:module:job", string(dyncfg.CommandEnable)},
+			Args:   []string{"go.d:collector:module:module", string(dyncfg.CommandEnable)},
 		},
 	),
 	)
 
 	require.Eventually(t, func() bool {
-		record, ok := generation.vnodes.graph.Lookup("module_job")
+		record, ok := generation.vnodes.graph.Lookup(config.FullName())
 		return ok && record.Status == dyncfg.StatusRunning.String()
 	}, time.Second, time.Millisecond)
 
@@ -299,12 +299,15 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 
 	require.NoError(t, generation.Wait(context.Background()))
 	wire := output.String()
+	templateAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module create accepted template"))
+	createAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module:module create accepted job"))
 	resultAt := bytes.Index(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN enable 200 application/json"))
-	statusAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module:job status running"))
+	statusAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module:module status running"))
 	require.False(
 		t,
-		!bytes.Contains(output.Bytes(), []byte(`FUNCTION GLOBAL "config"`)) || resultAt < 0 || statusAt < 0 ||
-			resultAt >= statusAt,
+		!bytes.Contains(output.Bytes(), []byte(`FUNCTION GLOBAL "config"`)) ||
+			templateAt < 0 || createAt < 0 || templateAt >= createAt ||
+			resultAt < 0 || statusAt < 0 || resultAt >= statusAt,
 		"wire=%q",
 		wire,
 	)
