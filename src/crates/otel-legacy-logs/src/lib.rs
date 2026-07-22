@@ -4,6 +4,9 @@
 //! It registers a single `legacy-otel-logs` function and serves it over the
 //! journal files written by the former otel plugin, via the restored
 //! `journal-function` query stack. It never writes to those files.
+//!
+//! When the journal directory is absent or the handler fails to initialize,
+//! the worker reports `Disabled` and exits instead of lingering idle.
 
 mod handler;
 
@@ -46,27 +49,26 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
 
     // The former otel journal directory is absent on the vast majority of
     // installs (the former logs feature was experimental). When it is missing
-    // there is nothing to view: register no function and idle. This keeps the
-    // otel-plugin healthy and avoids surfacing a perpetually-empty function on
-    // installs that never used the former plugin.
+    // there is nothing to view: report Disabled and exit so no idle process
+    // lingers for the plugin's lifetime. An existing-but-empty directory
+    // intentionally keeps the worker: the handler watches the directory, so
+    // journal files restored into it later are picked up.
     if !config.journal_dir.is_dir() {
         tracing::info!(
             journal_dir = %config.journal_dir.display(),
             "former otel journal directory not present; legacy-otel-logs disabled"
         );
         supervisor
-            .send(LegacyLogsResponse::Ready {
-                declarations: vec![],
-            })
+            .send(LegacyLogsResponse::Disabled)
             .await
-            .context("failed to signal ready to supervisor")?;
-        return run_idle(supervisor).await;
+            .context("failed to signal disabled to supervisor")?;
+        return Ok(());
     }
 
-    // Init failure must not take down the otel-plugin: the legacy
-    // viewer is best-effort. On a handler-init error (e.g. unwritable cache dir,
-    // foyer init failure) self-disable exactly like the absent-dir path — register
-    // nothing and idle — instead of bailing the worker.
+    // Init failure must not take down the otel-plugin: the legacy viewer is
+    // best-effort. On a handler-init error (e.g. unwritable cache dir, foyer
+    // init failure) self-disable exactly like the absent-dir path — report
+    // Disabled and exit — instead of bailing the worker.
     let handler = match LegacyLogsHandler::new(&config).await {
         Ok(handler) => handler,
         Err(e) => {
@@ -75,12 +77,10 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
                 "failed to initialize legacy-logs handler; legacy-otel-logs disabled: {e:#}"
             );
             supervisor
-                .send(LegacyLogsResponse::Ready {
-                    declarations: vec![],
-                })
+                .send(LegacyLogsResponse::Disabled)
                 .await
-                .context("failed to signal ready to supervisor")?;
-            return run_idle(supervisor).await;
+                .context("failed to signal disabled to supervisor")?;
+            return Ok(());
         }
     };
     let declarations = vec![handler.declaration()];
@@ -106,22 +106,6 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
         tracing::error!("legacy-logs event loop error: {e:#}");
     }
     result.context("legacy-logs event loop error")
-}
-
-/// Idle loop used when the journal directory is absent: nothing is registered,
-/// so the worker only needs to react to a graceful Shutdown.
-async fn run_idle(mut supervisor: Connection<LegacyLogsResponse, LegacyLogsRequest>) -> Result<()> {
-    loop {
-        match supervisor.recv().await.context("supervisor recv failed")? {
-            LegacyLogsRequest::Shutdown => {
-                tracing::info!("received Shutdown from supervisor");
-                return Ok(());
-            }
-            other => {
-                tracing::debug!("ignoring request while disabled: {other:?}");
-            }
-        }
-    }
 }
 
 /// One run-loop iteration's input.

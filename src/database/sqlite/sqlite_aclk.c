@@ -760,7 +760,9 @@ static void aclk_synchronization_event_loop(void *arg)
                         create_aclk_config(host, &host->host_id.uuid, &host->node_id.uuid);
                         aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
                     }
-                    aclk_host_config->node_info_send_time = (host == localhost || immediate) ? 1 : now_realtime_sec();
+                    aclk_send_timestamp_set(
+                        &aclk_host_config->node_info_send_time,
+                        (host == localhost || immediate) ? 1 : now_realtime_sec());
                     break;
                 case ACLK_CANCEL_NODE_UPDATE_TIMER:
                     host = cmd.param[0];
@@ -1025,10 +1027,11 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
     // the CAS pairs with ACQUIRE loads of host->aclk_host_config in readers so they
     // cannot observe the pointer with zero-initialized fields (host == NULL etc.).
     aclk_host_config->host = host;
-    aclk_host_config->stream_alerts = false;
+    aclk_alert_streaming_set(aclk_host_config, false);
     time_t now = now_realtime_sec();
-    aclk_host_config->node_info_send_time =
-        (host == localhost || NULL == localhost) ? nd_time_t_add_saturating(now, -25) : now;
+    aclk_send_timestamp_set(
+        &aclk_host_config->node_info_send_time,
+        (host == localhost || NULL == localhost) ? nd_time_t_add_saturating(now, -25) : now);
 
     struct aclk_sync_cfg_t *expected = NULL;
     if (__atomic_compare_exchange_n(&host->aclk_host_config, &expected, aclk_host_config, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {

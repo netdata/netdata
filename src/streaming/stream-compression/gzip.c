@@ -104,7 +104,7 @@ void stream_decompressor_init_gzip(struct decompressor_state *state) {
             return;
         }
 
-        simple_ring_buffer_make_room(&state->output, COMPRESSION_MAX_CHUNK);
+        simple_ring_buffer_set_capacity(&state->output, COMPRESSION_MAX_CHUNK + 1);
         state->initialized = true;
     }
 }
@@ -145,9 +145,9 @@ size_t stream_decompress_gzip(struct decompressor_state *state, const char *comp
     }
 
     if(strm->avail_out == 0) {
-        netdata_log_error("STREAM_DECOMPRESS: inflate() needs a bigger output buffer than the one we provided "
-                          "(compressed payload %zu bytes, output buffer size %zu bytes)"
-                          , compressed_size, state->output.size);
+        netdata_log_error("STREAM_DECOMPRESS: inflate() produced at least %zu bytes, exceeding the max supported "
+                          "size of %zu bytes (compressed payload %zu bytes)",
+                          state->output.size, (size_t)COMPRESSION_MAX_CHUNK, compressed_size);
         return 0;
     }
 

@@ -137,7 +137,9 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, RRDSET *st, time_t now, time_t
             *next_run = rc->next_update;
         }
 
-        netdata_log_debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %d secs).", rrdcalc_chart_name(rc), rrdcalc_name(rc), (int) (rc->next_update - now));
+        netdata_log_debug(D_HEALTH, "Health not examining alarm '%s.%s' yet (will do in %" PRIdMAX " secs).",
+                          rrdcalc_chart_name(rc), rrdcalc_name(rc),
+                          (intmax_t)nd_time_t_elapsed_saturating(rc->next_update, now));
         return 0;
     }
 
@@ -192,8 +194,9 @@ static void health_sleep(time_t next_run, uint64_t loop __maybe_unused) {
     time_t now = now_realtime_sec();
     if(now < next_run) {
         worker_is_idle();
-        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %llu done. Next iteration in %d secs",
-                          (unsigned long long)loop, (int) (next_run - now));
+        netdata_log_debug(D_HEALTH, "Health monitoring iteration no %llu done. Next iteration in %" PRIdMAX " secs",
+                          (unsigned long long)loop,
+                          (intmax_t)nd_time_t_elapsed_saturating(next_run, now));
         while (now < next_run && service_running(SERVICE_HEALTH)) {
             sleep_usec(USEC_PER_SEC);
             now = now_realtime_sec();
@@ -426,7 +429,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
     {
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        if (aclk_host_config && aclk_host_config->send_snapshot == 2)
+        if (aclk_host_config && aclk_alert_snapshot_state_get(aclk_host_config) == ACLK_ALERT_SNAPSHOT_READY)
             return;
     }
 
@@ -501,7 +504,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     host,
                     rc,
                     now_tmp,
-                    now_tmp - rc->last_status_change,
+                    nd_time_t_elapsed_saturating(now_tmp, rc->last_status_change),
                     rc->value,
                     NAN,
                     rc->status,
@@ -743,7 +746,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     host,
                     rc,
                     now,
-                    now - rc->last_status_change,
+                    nd_time_t_elapsed_saturating(now, rc->last_status_change),
                     rc->old_value,
                     rc->value,
                     rc->status,
@@ -844,7 +847,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     host,
                     rc,
                     now,
-                    now - rc->last_status_change,
+                    nd_time_t_elapsed_saturating(now, rc->last_status_change),
                     rc->old_value,
                     rc->value,
                     rc->old_status,
@@ -899,8 +902,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
 
     if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        if (aclk_host_config && aclk_host_config->send_snapshot == 1) {
-            aclk_host_config->send_snapshot = 2;
+        if (aclk_host_config && aclk_alert_snapshot_mark_ready(aclk_host_config)) {
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
         } else {
             worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE);
