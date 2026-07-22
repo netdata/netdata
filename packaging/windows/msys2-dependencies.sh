@@ -23,6 +23,7 @@ pacman -S --noconfirm --needed \
     ninja \
     python \
     msys2-devel \
+    tcl \
     ucrt64/mingw-w64-ucrt-x86_64-rust \
     ucrt64/mingw-w64-ucrt-x86_64-toolchain \
     ucrt64/mingw-w64-ucrt-x86_64-brotli \

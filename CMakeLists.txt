@@ -4796,16 +4796,7 @@ install(CODE "
              DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
 ")
 
-#
-# vendor msys stuff on Windows
-#
-
 if(OS_WINDOWS)
-        install(FILES /usr/bin/msys-protobuf-32.dll
-                      /usr/bin/msys-yaml-0-2.dll
-                      /usr/bin/msys-uv-1.dll
-                      DESTINATION "${BINDIR}")
-
         # user-facing support-bundle tool (Windows PowerShell implementation)
         install(PROGRAMS packaging/installer/netdata-support-bundle.ps1
                 COMPONENT netdata

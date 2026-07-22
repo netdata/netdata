@@ -50,6 +50,17 @@ is_ignored_dll() {
     esac
 }
 
+is_msys_dll() {
+    case "${1,,}" in
+        msys-*.dll|msys2-*.dll)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 copy_missing_dlls_once() {
     local copied=0
     local unresolved=()
@@ -68,6 +79,11 @@ copy_missing_dlls_once() {
                 resolved="${resolved%%(*}"
                 resolved="${resolved#"${resolved%%[![:space:]]*}"}"
                 resolved="${resolved%"${resolved##*[![:space:]]}"}"
+
+                if is_msys_dll "${dll}"; then
+                    unresolved+=("${dll} (MSYS runtime dependency)")
+                    continue
+                fi
 
                 if is_ignored_dll "${dll}"; then
                     continue
