@@ -149,6 +149,17 @@ and exposes the collected data through the on-demand **`network-protocols`** fun
 > Removed per-app charts: `app.ebpf_call_tcp_v4_connection`, `app.ebpf_call_tcp_v6_connection`,
 > `app.ebpf_sock_total_bandwidth`, `app.ebpf_call_tcp_sendmsg`, `app.ebpf_call_tcp_cleanup_rbuf`,
 > `app.ebpf_call_tcp_retransmit`, `app.ebpf_call_udp_sendmsg`, `app.ebpf_call_udp_recvmsg`.
+>
+> **Configuration changes from `network.conf`** — The `network.conf` file has been replaced by
+> `socket.conf`. The following defaults changed silently:
+>
+> - `maps per core` changed from `no` to `yes`. Per-core BPF maps use more memory but reduce
+>   contention on multi-core systems. To restore the previous behaviour add `maps per core = no`
+>   to `socket.conf`.
+> - `ebpf co-re tracing` changed from `probe` (kprobe/legacy BPF) to `trampoline` (auto-detected).
+>   To force kprobes add `ebpf co-re tracing = probe` to `socket.conf`.
+> - The `[network connections]` and `[service name]` sections from `network.conf` have no
+>   equivalent in `socket.conf` and are not read; any per-port service name overrides are lost.
 
 ### `network-protocols` function columns
 

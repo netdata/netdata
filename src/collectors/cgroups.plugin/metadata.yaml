@@ -353,6 +353,55 @@ modules:
               chart_type: line
               dimensions:
                 - name: miss
+            - name: cgroup.net_conn_ipv4
+              description: TCP v4 outbound connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: outbound_conn_v4
+            - name: cgroup.net_conn_ipv6
+              description: TCP v6 outbound connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: outbound_conn_v6
+            - name: cgroup.net_total_bandwidth
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: cgroup.net_tcp_recv
+              description: TCP calls to cleanup buffer
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: bandwidth_tcp_recv
+            - name: cgroup.net_tcp_send
+              description: TCP calls to send
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: bandwidth_tcp_send
+            - name: cgroup.net_retransmit
+              description: TCP retransmits
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: bandwidth_tcp_retransmit
+            - name: cgroup.net_udp_send
+              description: UDP calls to send
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: bandwidth_udp_send
+            - name: cgroup.net_udp_recv
+              description: UDP calls to receive
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: bandwidth_udp_recv
         - name: cgroup network device
           description: ""
           labels:
@@ -1060,6 +1109,55 @@ modules:
               chart_type: line
               dimensions:
                 - name: miss
+            - name: systemd.service.net_conn_ipv4
+              description: TCP v4 outbound connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: outbound_conn_v4
+            - name: systemd.service.net_conn_ipv6
+              description: TCP v6 outbound connections
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: outbound_conn_v6
+            - name: systemd.service.net_total_bandwidth
+              description: Bandwidth
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: systemd.service.net_tcp_recv
+              description: TCP calls to cleanup buffer
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: bandwidth_tcp_recv
+            - name: systemd.service.net_tcp_send
+              description: TCP calls to send
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: bandwidth_tcp_send
+            - name: systemd.service.net_retransmit
+              description: TCP retransmits
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: bandwidth_tcp_retransmit
+            - name: systemd.service.net_udp_send
+              description: UDP calls to send
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: bandwidth_udp_send
+            - name: systemd.service.net_udp_recv
+              description: UDP calls to receive
+              unit: "calls/s"
+              chart_type: line
+              dimensions:
+                - name: bandwidth_udp_recv
   - <<: *module
     meta:
       <<: *meta
