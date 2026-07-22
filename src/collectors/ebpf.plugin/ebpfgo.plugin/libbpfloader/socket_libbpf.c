@@ -425,8 +425,11 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
     rt->percpu_nd_socket_cap = lports_ncpu;
 
     /* PID hash-table: sized to the next power of two at or above nd_socket_size,
-     * with SOCKET_PID_HT_MIN as the floor, so every BPF map entry has a slot. */
+     * with SOCKET_PID_HT_MIN as the floor, so every BPF map entry has a slot.
+     * next_pow2_u32 wraps to zero for inputs > 2^31; reject those early. */
     uint32_t ht_size = nd_socket_size > SOCKET_PID_HT_MIN ? nd_socket_size : SOCKET_PID_HT_MIN;
+    if (ht_size > 0x80000000u)
+        return -1;
     ht_size = next_pow2_u32(ht_size);
     rt->pid_ht_size = ht_size;
     rt->pid_ht_mask = ht_size - 1u;
