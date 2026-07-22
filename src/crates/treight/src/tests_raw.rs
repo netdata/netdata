@@ -1069,7 +1069,11 @@ fn test_from_range_empty() {
     assert!(bm.is_empty(&data));
 
     let mut data = Vec::new();
-    let bm = RawBitmap::from_range(20..10, 64, &mut data);
+    // The inverted range is deliberate: it pins that `start > end` is
+    // treated as empty, not as a panic or a wraparound match.
+    #[allow(clippy::reversed_empty_ranges)]
+    let inverted = 20..10;
+    let bm = RawBitmap::from_range(inverted, 64, &mut data);
     assert!(bm.is_empty(&data));
 }
 
@@ -1147,7 +1151,11 @@ fn test_range_cardinality_empty_bitmap() {
 fn test_range_cardinality_empty_range() {
     let (bm, data) = make_bitmap(64, &[0, 1, 2, 3]);
     assert_eq!(bm.range_cardinality(&data, 10..10), 0);
-    assert_eq!(bm.range_cardinality(&data, 10..5), 0);
+    // The inverted range is deliberate: it pins that `start > end` is
+    // treated as empty, not as a panic or a wraparound match.
+    #[allow(clippy::reversed_empty_ranges)]
+    let inverted = 10..5;
+    assert_eq!(bm.range_cardinality(&data, inverted), 0);
 }
 
 #[test]
