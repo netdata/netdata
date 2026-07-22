@@ -64,7 +64,13 @@ func (dcjc *DynCfgJobController) resolveRequest(
 			)
 		}
 		name = dynCfgJobNameReplacer.Replace(request.Args[2])
-		hasName = name != ""
+		if name == "" {
+			return dynCfgTarget{}, newDynCfgFailure(
+				400,
+				"invalid or missing job name.",
+			)
+		}
+		hasName = true
 	} else if creator.InstancePolicy == collectorapi.InstancePolicySingle {
 		if id != dcjc.prefix+module {
 			return dynCfgTarget{}, newDynCfgFailure(

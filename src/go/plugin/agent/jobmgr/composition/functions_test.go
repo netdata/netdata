@@ -400,13 +400,10 @@ func (amp *assemblyMutationPort) CommitFunctions(
 		return 0, err
 	}
 	for {
-		progress, cleanups, err := amp.catalog.AdvanceMutation(jobmgr.MaximumFunctionMutationQuantum)
-		if err != nil {
-			return 0, err
-		}
+		progress, cleanups := amp.catalog.AdvanceMutation(jobmgr.MaximumFunctionMutationQuantum)
 		for _, cleanup := range cleanups {
-			_, cleanupErr := cleanup.Work(context.Background())
-			if err := amp.catalog.CompleteCleanup(cleanup.Ref); err != nil {
+			_, cleanupErr := cleanup.Work()(context.Background())
+			if err := amp.catalog.CompleteCleanup(cleanup.Ref()); err != nil {
 				return 0, errors.Join(cleanupErr, err)
 			}
 		}

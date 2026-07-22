@@ -253,7 +253,7 @@ type CommandKernel struct {
 	nextExternalSource       lifecycle.Source                                // round-robin cursor for submission draining
 	nextAsyncEvent           uint8                                           // round-robin cursor across async event sources
 	deadlines                deadlineHeap                                    // operation deadline min-heap
-	controls                 []*commandOperation                             // pending terminal-control FIFO
+	controls                 fixedChunkQueue[*commandOperation]              // pending terminal-control FIFO
 	operationHead            *commandOperation                               // head of the all-operations list
 	operationTail            *commandOperation                               // tail of the all-operations list
 	compositeFenceClaims     map[string]int                                  // active composite fences per claim key
@@ -1606,7 +1606,7 @@ func (ck *CommandKernel) kernelStateDrained() bool {
 		ck.compositeFenceTail != nil ||
 		ck.compositeFenceCount != 0 ||
 		ck.compositeFenceRecheck ||
-		ck.tasks.Active() != 0 || ck.tasks.Pending() != 0 || len(ck.shutdownRequests) != 0 || len(ck.shutdownTasks) != 0 || len(ck.controls) != 0 || ck.deadlines.Len() != 0 ||
+		ck.tasks.Active() != 0 || ck.tasks.Pending() != 0 || len(ck.shutdownRequests) != 0 || len(ck.shutdownTasks) != 0 || ck.controls.count != 0 || ck.deadlines.Len() != 0 ||
 		len(ck.submissions[0]) != 0 || len(ck.submissions[1]) != 0 || ck.hasBlockedSubmission[0] || ck.hasBlockedSubmission[1] ||
 		ck.ready[0].len != 0 || ck.ready[1].len != 0 || ck.claims.waitingCount() != 0 || len(ck.claims.keys) != 0 {
 		return false

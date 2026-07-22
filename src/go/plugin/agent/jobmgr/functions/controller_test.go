@@ -70,7 +70,7 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 
 	cleanup, err := catalog.ReleaseInvocation(decision.Lease)
 	require.NoError(t, err)
-	require.False(t, cleanup.Ref.Valid())
+	require.False(t, cleanup.Valid())
 
 	require.NoError(t, handle.CloseAndDrain(context.Background()))
 
@@ -187,7 +187,7 @@ func TestFunctionControllerWithdrawalFailureCleansUnpublishedSuccessor(t *testin
 	require.True(t, decision.Lease.Valid())
 	cleanup, err := catalog.ReleaseInvocation(decision.Lease)
 	require.NoError(t, err)
-	require.False(t, cleanup.Ref.Valid())
+	require.False(t, cleanup.Valid())
 
 	require.NoError(t, catalog.BeginClose())
 	for {
@@ -242,7 +242,7 @@ func TestFunctionControllerRawRequestFidelity(t *testing.T) {
 	if cleanup, err := catalog.ReleaseInvocation(decision.Lease); err != nil {
 		require.FailNow(t, "test failed", err)
 	} else {
-		require.False(t, cleanup.Ref.Valid())
+		require.False(t, cleanup.Valid())
 	}
 	got := handler.rawRequest()
 	require.False(t, got.Method != "raw" || !got.Info ||
@@ -473,13 +473,10 @@ func (ctmp *controllerTestMutationPort) CommitFunctions(
 		return 0, err
 	}
 	for {
-		progress, cleanups, err := ctmp.catalog.AdvanceMutation(jobmgr.MaximumFunctionMutationQuantum)
-		if err != nil {
-			return 0, err
-		}
+		progress, cleanups := ctmp.catalog.AdvanceMutation(jobmgr.MaximumFunctionMutationQuantum)
 		for _, cleanup := range cleanups {
-			_, cleanupErr := cleanup.Work(context.Background())
-			if err := ctmp.catalog.CompleteCleanup(cleanup.Ref); err != nil {
+			_, cleanupErr := cleanup.Work()(context.Background())
+			if err := ctmp.catalog.CompleteCleanup(cleanup.Ref()); err != nil {
 				return 0, errors.Join(cleanupErr, err)
 			}
 		}

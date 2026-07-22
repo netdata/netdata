@@ -419,15 +419,15 @@ func TestFunctionHandlerCleanupRunsOffKernelLoop(t *testing.T) {
 			}, nil
 		},
 		release: func(FunctionInvocationRef) (FunctionCleanupPlan, error) {
-			return FunctionCleanupPlan{
-				Ref: FunctionCleanupRef(1),
-				Work: func(ctx context.Context) (lifecycle.TaskOutcome, error) {
+			return NewFunctionCleanupPlan(
+				FunctionCleanupRef(1),
+				func(ctx context.Context) (lifecycle.TaskOutcome, error) {
 					if err := kernel.Cancel(ctx, "cleanup-loop-barrier"); err != nil {
 						return lifecycle.NoValueOutcome(), err
 					}
 					return lifecycle.NoValueOutcome(), nil
 				},
-			}, nil
+			)
 		},
 		complete: func(FunctionCleanupRef) error {
 			cleanupCompleted <- nil
@@ -2786,11 +2786,11 @@ func TestKernelDeadlineServiceHasFixedQuantum(t *testing.T) {
 		heap.Push(&kernel.deadlines, &operation.deadline)
 	}
 
-	require.False(t, !kernel.serviceDeadlines(now, 4) || len(kernel.controls) != 4 || kernel.deadlines.Len() != 5)
+	require.False(t, !kernel.serviceDeadlines(now, 4) || kernel.controls.count != 4 || kernel.deadlines.Len() != 5)
 
-	require.False(t, !kernel.serviceDeadlines(now, 4) || len(kernel.controls) != 8 || kernel.deadlines.Len() != 1)
+	require.False(t, !kernel.serviceDeadlines(now, 4) || kernel.controls.count != 8 || kernel.deadlines.Len() != 1)
 
-	require.False(t, kernel.serviceDeadlines(now, 4) || len(kernel.controls) != 9 || kernel.deadlines.Len() != 0)
+	require.False(t, kernel.serviceDeadlines(now, 4) || kernel.controls.count != 9 || kernel.deadlines.Len() != 0)
 }
 
 func newStoppedKernel(t *testing.T) *testCommandKernel {
@@ -3040,8 +3040,8 @@ func (functionCatalogPortStub) ResumeMutation(FunctionCatalogMutation) error {
 	return errors.New("test Function catalog: no active mutation")
 }
 
-func (functionCatalogPortStub) AdvanceMutation(int) (FunctionCatalogMutationProgress, []FunctionCleanupPlan, error) {
-	return FunctionCatalogMutationProgress{}, nil, errors.New("test Function catalog: no active mutation")
+func (functionCatalogPortStub) AdvanceMutation(int) (FunctionCatalogMutationProgress, []FunctionCleanupPlan) {
+	return FunctionCatalogMutationProgress{}, nil
 }
 
 func (functionCatalogPortStub) AbortMutation(FunctionCatalogMutation) error {
@@ -3113,8 +3113,8 @@ func (*testFunctionCatalog) ResumeMutation(FunctionCatalogMutation) error {
 	return errors.New("test Function catalog: no active mutation")
 }
 
-func (*testFunctionCatalog) AdvanceMutation(int) (FunctionCatalogMutationProgress, []FunctionCleanupPlan, error) {
-	return FunctionCatalogMutationProgress{}, nil, errors.New("test Function catalog: no active mutation")
+func (*testFunctionCatalog) AdvanceMutation(int) (FunctionCatalogMutationProgress, []FunctionCleanupPlan) {
+	return FunctionCatalogMutationProgress{}, nil
 }
 
 func (*testFunctionCatalog) AbortMutation(FunctionCatalogMutation) error {

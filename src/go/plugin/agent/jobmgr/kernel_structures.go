@@ -11,60 +11,73 @@ type functionCleanupTask struct {
 	err error
 }
 
-type functionCleanupQueue struct {
-	plans []FunctionCleanupPlan
-	head  int
+// Fixed chunks keep every kernel-loop queue operation worst-case O(1). The
+// chunk size amortizes allocation; it does not cap the backlog.
+const kernelQueueChunkCapacity = 64
+
+type fixedChunkQueueChunk[T any] struct {
+	values [kernelQueueChunkCapacity]T
+	head   int
+	tail   int
+	next   *fixedChunkQueueChunk[T]
+}
+
+type fixedChunkQueue[T any] struct {
+	head  *fixedChunkQueueChunk[T]
+	tail  *fixedChunkQueueChunk[T]
 	count int
 }
 
-func (fcq *functionCleanupQueue) push(plan FunctionCleanupPlan) error {
-	if err := plan.validate(); err != nil {
-		return err
+func (fcq *fixedChunkQueue[T]) push(value T) {
+	if fcq.tail == nil || fcq.tail.tail == kernelQueueChunkCapacity {
+		chunk := &fixedChunkQueueChunk[T]{}
+		if fcq.tail == nil {
+			fcq.head = chunk
+		} else {
+			fcq.tail.next = chunk
+		}
+		fcq.tail = chunk
 	}
-	if !plan.Ref.Valid() {
-		return nil
-	}
-	fcq.compact()
-	fcq.plans = append(fcq.plans, plan)
+	fcq.tail.values[fcq.tail.tail] = value
+	fcq.tail.tail++
 	fcq.count++
-	return nil
 }
 
-func (fcq *functionCleanupQueue) compact() {
-	if fcq.head == 0 || fcq.head < len(fcq.plans)/2 {
-		return
-	}
-	if cap(fcq.plans) > 2*fcq.count {
-		plans := make([]FunctionCleanupPlan, fcq.count)
-		copy(plans, fcq.plans[fcq.head:])
-		fcq.plans = plans
-		fcq.head = 0
-		return
-	}
-	copy(fcq.plans, fcq.plans[fcq.head:])
-	clear(fcq.plans[fcq.count:])
-	fcq.plans = fcq.plans[:fcq.count]
-	fcq.head = 0
-}
-
-func (fcq *functionCleanupQueue) front() FunctionCleanupPlan {
+func (fcq *fixedChunkQueue[T]) front() (zero T) {
 	if fcq.count == 0 {
-		return FunctionCleanupPlan{}
+		return zero
 	}
-	return fcq.plans[fcq.head]
+	return fcq.head.values[fcq.head.head]
 }
 
-func (fcq *functionCleanupQueue) pop() {
+func (fcq *fixedChunkQueue[T]) pop() {
 	if fcq.count == 0 {
 		return
 	}
-	fcq.plans[fcq.head] = FunctionCleanupPlan{}
-	fcq.head++
+	chunk := fcq.head
+	var zero T
+	chunk.values[chunk.head] = zero
+	chunk.head++
 	fcq.count--
-	if fcq.count == 0 {
-		fcq.plans = nil
-		fcq.head = 0
+	if chunk.head != chunk.tail {
+		return
 	}
+	fcq.head = chunk.next
+	chunk.next = nil
+	if fcq.head == nil {
+		fcq.tail = nil
+	}
+}
+
+type functionCleanupQueue struct {
+	fixedChunkQueue[FunctionCleanupPlan]
+}
+
+func (fcq *functionCleanupQueue) push(plan FunctionCleanupPlan) {
+	if !plan.Valid() {
+		return
+	}
+	fcq.fixedChunkQueue.push(plan)
 }
 
 type readyQueue struct {

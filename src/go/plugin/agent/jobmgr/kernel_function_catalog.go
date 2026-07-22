@@ -13,16 +13,14 @@ func (ck *CommandKernel) releaseFunctionInvocation(ref FunctionInvocationRef) er
 	if err != nil {
 		return err
 	}
-	return ck.functionCleanupBacklog.push(cleanup)
+	ck.functionCleanupBacklog.push(cleanup)
+	return nil
 }
 
-func (ck *CommandKernel) pushFunctionCleanupBatch(cleanups []FunctionCleanupPlan) error {
+func (ck *CommandKernel) pushFunctionCleanupBatch(cleanups []FunctionCleanupPlan) {
 	for _, cleanup := range cleanups {
-		if err := ck.functionCleanupBacklog.push(cleanup); err != nil {
-			return err
-		}
+		ck.functionCleanupBacklog.push(cleanup)
 	}
-	return nil
 }
 
 func (ck *CommandKernel) abortFunctionMutation(mutation FunctionCatalogMutation) error {
@@ -39,7 +37,7 @@ func (ck *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 			lifecycle.TaskClassFrameworkControl,
 			lifecycle.TaskPlan{
 				Source: lifecycle.SourceFunction,
-				Work:   cleanup.Work,
+				Work:   cleanup.Work(),
 			},
 		)
 		if err != nil {
@@ -50,7 +48,7 @@ func (ck *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 			ck.run.Dirty(errors.New("jobmgr kernel: duplicate Function cleanup request"))
 			return true
 		}
-		ck.functionCleanupRequests[request] = cleanup.Ref
+		ck.functionCleanupRequests[request] = cleanup.Ref()
 		ck.functionCleanupBacklog.pop()
 		quantum--
 	}
@@ -182,24 +180,8 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 		ck.run.Dirty(errors.Join(invariantErr, abortErr))
 		return false
 	}
-	progress, cleanups, err := ck.functionCatalog.AdvanceMutation(quantum)
-	if err != nil {
-		abortErr := ck.abortFunctionMutation(ck.functionMutation.mutation)
-		ck.functionMutation.result <- functionMutationResult{err: errors.Join(err, abortErr)}
-		ck.functionMutation = functionMutationSubmission{}
-		ck.functionMutationActive = false
-		if abortErr != nil {
-			ck.run.Dirty(abortErr)
-		}
-		return false
-	}
-	if err := ck.pushFunctionCleanupBatch(cleanups); err != nil {
-		ck.functionMutation.result <- functionMutationResult{err: err}
-		ck.functionMutation = functionMutationSubmission{}
-		ck.functionMutationActive = false
-		ck.run.Dirty(err)
-		return false
-	}
+	progress, cleanups := ck.functionCatalog.AdvanceMutation(quantum)
+	ck.pushFunctionCleanupBatch(cleanups)
 	if !progress.Done {
 		return true
 	}
@@ -229,10 +211,7 @@ func (ck *CommandKernel) serviceFunctionCatalogClose(quantum int) bool {
 		ck.run.Dirty(err)
 		return false
 	}
-	if err := ck.pushFunctionCleanupBatch(cleanups); err != nil {
-		ck.run.Dirty(err)
-		return false
-	}
+	ck.pushFunctionCleanupBatch(cleanups)
 	ck.functionCatalogCloseMore = more
 	return more
 }

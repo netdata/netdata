@@ -49,8 +49,35 @@ func (ref FunctionCleanupRef) Valid() bool {
 // FunctionCleanupPlan is inert work returned by a catalog transition when a
 // closed handler generation becomes drained.
 type FunctionCleanupPlan struct {
-	Ref  FunctionCleanupRef
-	Work lifecycle.TaskWork
+	ref  FunctionCleanupRef
+	work lifecycle.TaskWork
+}
+
+// NewFunctionCleanupPlan seals a non-empty cleanup plan before the catalog
+// enters a kernel-owned transition. The zero plan represents no cleanup.
+func NewFunctionCleanupPlan(
+	ref FunctionCleanupRef,
+	work lifecycle.TaskWork,
+) (FunctionCleanupPlan, error) {
+	if !ref.Valid() || work == nil {
+		return FunctionCleanupPlan{}, errors.New("jobmgr kernel: invalid Function cleanup plan")
+	}
+	return FunctionCleanupPlan{ref: ref, work: work}, nil
+}
+
+// Valid reports whether this plan owns cleanup work.
+func (fcp FunctionCleanupPlan) Valid() bool {
+	return fcp.ref.Valid()
+}
+
+// Ref returns the catalog reference acknowledged after the cleanup completes.
+func (fcp FunctionCleanupPlan) Ref() FunctionCleanupRef {
+	return fcp.ref
+}
+
+// Work returns the sealed cleanup task.
+func (fcp FunctionCleanupPlan) Work() lifecycle.TaskWork {
+	return fcp.work
 }
 
 // FunctionCatalogMutation is an adapter-owned immutable mutation postimage
@@ -62,15 +89,8 @@ type FunctionCatalogMutation interface {
 
 type FunctionCatalogMutationProgress struct {
 	Version  uint64 // catalog version the mutation targets
-	Quiesced bool   // predecessor admission is closed
+	Quiesced bool   // predecessor admission is closed and preflight is complete
 	Done     bool   // the mutation has fully completed
-}
-
-func (fcp FunctionCleanupPlan) validate() error {
-	if fcp.Ref.Valid() != (fcp.Work != nil) {
-		return errors.New("jobmgr kernel: invalid Function cleanup plan")
-	}
-	return nil
 }
 
 // Valid reports whether the reference can identify a catalog-owned lease.
@@ -128,7 +148,9 @@ type FunctionCatalogPort interface {
 	BeginMutation(FunctionCatalogMutation) error
 	AdvanceMutationQuiesce(int) (FunctionCatalogMutationProgress, error)
 	ResumeMutation(FunctionCatalogMutation) error
-	AdvanceMutation(int) (FunctionCatalogMutationProgress, []FunctionCleanupPlan, error)
+	// AdvanceMutation is infallible after ResumeMutation validates the complete
+	// bounded preflight. The caller must provide a valid mutation quantum.
+	AdvanceMutation(int) (FunctionCatalogMutationProgress, []FunctionCleanupPlan)
 	AbortMutation(FunctionCatalogMutation) error
 	BeginClose() error
 	CloseStep(int) ([]FunctionCleanupPlan, bool, error)

@@ -583,15 +583,15 @@ type observedFunctionCatalog struct {
 
 func (ofc *observedFunctionCatalog) AdvanceMutation(
 	quantum int,
-) (jobmgr.FunctionCatalogMutationProgress, []jobmgr.FunctionCleanupPlan, error) {
-	progress, cleanups, err := ofc.FunctionCatalogPort.AdvanceMutation(quantum)
-	if err == nil && !progress.Done {
+) (jobmgr.FunctionCatalogMutationProgress, []jobmgr.FunctionCleanupPlan) {
+	progress, cleanups := ofc.FunctionCatalogPort.AdvanceMutation(quantum)
+	if !progress.Done {
 		ofc.once.Do(func() {
 			close(ofc.firstCommitStep)
 			<-ofc.resumeCommit
 		})
 	}
-	return progress, cleanups, err
+	return progress, cleanups
 }
 
 type handoffMutationCatalog struct {
@@ -651,12 +651,12 @@ func (*handoffMutationCatalog) ResumeMutation(
 
 func (hmc *handoffMutationCatalog) AdvanceMutation(
 	int,
-) (jobmgr.FunctionCatalogMutationProgress, []jobmgr.FunctionCleanupPlan, error) {
+) (jobmgr.FunctionCatalogMutationProgress, []jobmgr.FunctionCleanupPlan) {
 	hmc.active.Store(false)
 	return jobmgr.FunctionCatalogMutationProgress{
 		Version: 2,
 		Done:    true,
-	}, nil, nil
+	}, nil
 }
 
 func (hmc *handoffMutationCatalog) AbortMutation(jobmgr.FunctionCatalogMutation) error {

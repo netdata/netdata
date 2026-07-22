@@ -31,9 +31,15 @@ type Mutation struct {
 	preimage        *catalogSnapshot
 	postimage       *catalogSnapshot
 	transitions     []routeTransition
+	retirements     []generationRetirement
 	quiesced        map[*route]struct{}
 	state           atomic.Uint32
 	builder         MutationBuilder
+}
+
+type generationRetirement struct {
+	generation *handlerGeneration
+	references int
 }
 
 const (
@@ -67,6 +73,7 @@ func (c *Catalog) NewMutation(expectedVersion uint64, changes []RouteChange) (*M
 
 	routes := maps.Clone(preimage.routes)
 	seenRoutes := make(map[string]struct{}, len(changes))
+	retirementIndices := make(map[*handlerGeneration]int)
 	generationByDeclaration := make(map[*HandlerGenerationDeclaration]*handlerGeneration)
 	generationIDOwner := make(map[string]*HandlerGenerationDeclaration)
 	for index, change := range changes {
@@ -107,12 +114,8 @@ func (c *Catalog) NewMutation(expectedVersion uint64, changes []RouteChange) (*M
 					handler: generationDeclaration.Handler,
 					cleanup: generationDeclaration.Cleanup,
 				}
-				if generation.cleanup != nil {
-					ref, err := c.allocateCleanupRef()
-					if err != nil {
-						return nil, err
-					}
-					generation.cleanupRef = ref
+				if err := c.prepareGenerationCleanup(generation); err != nil {
+					return nil, err
 				}
 				generationByDeclaration[generationDeclaration] = generation
 			}
@@ -139,6 +142,16 @@ func (c *Catalog) NewMutation(expectedVersion uint64, changes []RouteChange) (*M
 		mutation.transitions[index] = routeTransition{oldRoute: oldRoute, newRoute: newRoute}
 		if oldRoute != nil {
 			mutation.quiesced[oldRoute] = struct{}{}
+			generation := oldRoute.handler
+			retirementIndex, exists := retirementIndices[generation]
+			if !exists {
+				retirementIndices[generation] = len(mutation.retirements)
+				mutation.retirements = append(mutation.retirements, generationRetirement{
+					generation: generation,
+				})
+				retirementIndex = len(mutation.retirements) - 1
+			}
+			mutation.retirements[retirementIndex].references++
 		}
 	}
 
@@ -194,15 +207,18 @@ func (m *Mutation) release() {
 }
 
 type MutationBuilder struct {
-	mutation *Mutation
-	index    int
-	quiesced bool
-	resumed  bool
-	finished bool
+	mutation                 *Mutation
+	index                    int
+	preflightTransitionIndex int
+	preflightRetirementIndex int
+	admissionClosed          bool
+	preflightComplete        bool
+	resumed                  bool
+	finished                 bool
 }
 
 func (mb *MutationBuilder) quiesces(resolved *route) bool {
-	if mb == nil || mb.mutation == nil || !mb.quiesced {
+	if mb == nil || mb.mutation == nil || !mb.admissionClosed {
 		return false
 	}
 	_, ok := mb.mutation.quiesced[resolved]
@@ -234,30 +250,72 @@ func (c *Catalog) BeginMutation(mutation jobmgr.FunctionCatalogMutation) error {
 
 func (c *Catalog) AdvanceMutationQuiesce(quantum int) (jobmgr.FunctionCatalogMutationProgress, error) {
 	if c == nil || c.mutation == nil || c.mutation.finished || c.mutation.resumed ||
+		c.mutation.preflightComplete ||
 		quantum <= 0 || quantum > MaximumMutationQuantum {
 		return jobmgr.FunctionCatalogMutationProgress{}, errors.New("jobmgr Function catalog: invalid mutation quiesce")
 	}
-	c.mutation.quiesced = true
+	builder := c.mutation
+	builder.admissionClosed = true
+	for quantum > 0 && builder.preflightTransitionIndex < len(builder.mutation.transitions) {
+		transition := builder.mutation.transitions[builder.preflightTransitionIndex]
+		if transition.oldRoute != nil &&
+			(transition.oldRoute.handler == nil || transition.oldRoute.invocationLeases < 0) {
+			return jobmgr.FunctionCatalogMutationProgress{},
+				errors.New("jobmgr Function catalog: invalid mutation route")
+		}
+		builder.preflightTransitionIndex++
+		quantum--
+	}
+	if builder.preflightTransitionIndex < len(builder.mutation.transitions) {
+		return jobmgr.FunctionCatalogMutationProgress{Version: c.version}, nil
+	}
+	for quantum > 0 && builder.preflightRetirementIndex < len(builder.mutation.retirements) {
+		if err := c.validateRetirement(builder.mutation.retirements[builder.preflightRetirementIndex]); err != nil {
+			return jobmgr.FunctionCatalogMutationProgress{}, err
+		}
+		builder.preflightRetirementIndex++
+		quantum--
+	}
+	if builder.preflightRetirementIndex < len(builder.mutation.retirements) {
+		return jobmgr.FunctionCatalogMutationProgress{Version: c.version}, nil
+	}
+	builder.preflightComplete = true
 	return jobmgr.FunctionCatalogMutationProgress{
 		Version: c.version, Quiesced: true,
 	}, nil
 }
 
+func (c *Catalog) validateRetirement(retirement generationRetirement) error {
+	generation := retirement.generation
+	if generation == nil || retirement.references <= 0 ||
+		generation.routeReferences < retirement.references {
+		return errors.New("jobmgr Function catalog: route reference underflow")
+	}
+	if err := c.validateGenerationTransition(
+		generation,
+		generation.routeReferences-retirement.references,
+		generation.invocationLeases,
+	); err != nil {
+		return err
+	}
+	if generation.routeReferences == retirement.references {
+		return c.validateCleanupOwnership(generation)
+	}
+	return nil
+}
+
 func (c *Catalog) ResumeMutation(mutation jobmgr.FunctionCatalogMutation) error {
 	prepared, ok := mutation.(*Mutation)
 	if c == nil || !ok || prepared == nil || c.mutation != &prepared.builder ||
-		c.mutation.finished || !c.mutation.quiesced || c.mutation.resumed {
+		c.mutation.finished || !c.mutation.admissionClosed ||
+		!c.mutation.preflightComplete || c.mutation.resumed {
 		return errors.New("jobmgr Function catalog: invalid mutation resume")
 	}
 	c.mutation.resumed = true
 	return nil
 }
 
-func (c *Catalog) AdvanceMutation(quantum int) (jobmgr.FunctionCatalogMutationProgress, []jobmgr.FunctionCleanupPlan, error) {
-	if c == nil || c.mutation == nil || c.mutation.finished || !c.mutation.resumed ||
-		quantum <= 0 || quantum > MaximumMutationQuantum {
-		return jobmgr.FunctionCatalogMutationProgress{}, nil, errors.New("jobmgr Function catalog: invalid mutation step")
-	}
+func (c *Catalog) AdvanceMutation(quantum int) (jobmgr.FunctionCatalogMutationProgress, []jobmgr.FunctionCleanupPlan) {
 	builder := c.mutation
 	cleanups := make([]jobmgr.FunctionCleanupPlan, 0, min(quantum, len(builder.mutation.transitions)-builder.index))
 	for quantum > 0 && builder.index < len(builder.mutation.transitions) {
@@ -268,10 +326,6 @@ func (c *Catalog) AdvanceMutation(quantum int) (jobmgr.FunctionCatalogMutationPr
 			continue
 		}
 		generation := transition.oldRoute.handler
-		if generation == nil || generation.routeReferences <= 0 {
-			return jobmgr.FunctionCatalogMutationProgress{}, cleanups,
-				errors.New("jobmgr Function catalog: route reference underflow")
-		}
 		generation.routeReferences--
 		if transition.oldRoute.invocationLeases != 0 {
 			name := transition.oldRoute.publicName
@@ -280,16 +334,13 @@ func (c *Catalog) AdvanceMutation(quantum int) (jobmgr.FunctionCatalogMutationPr
 			}
 			c.retiring[name][transition.oldRoute] = struct{}{}
 		}
-		cleanup, err := c.maybeCleanup(generation)
-		if err != nil {
-			return jobmgr.FunctionCatalogMutationProgress{}, cleanups, err
-		}
-		if cleanup.Ref.Valid() {
+		cleanup := c.cleanupIfDrained(generation)
+		if cleanup.Valid() {
 			cleanups = append(cleanups, cleanup)
 		}
 	}
 	if builder.index < len(builder.mutation.transitions) {
-		return jobmgr.FunctionCatalogMutationProgress{Version: c.version}, cleanups, nil
+		return jobmgr.FunctionCatalogMutationProgress{Version: c.version}, cleanups
 	}
 
 	c.snapshot.Store(builder.mutation.postimage)
@@ -298,7 +349,7 @@ func (c *Catalog) AdvanceMutation(quantum int) (jobmgr.FunctionCatalogMutationPr
 	c.mutation = nil
 	builder.finished = true
 	builder.mutation.release()
-	return jobmgr.FunctionCatalogMutationProgress{Version: c.version, Done: true}, cleanups, nil
+	return jobmgr.FunctionCatalogMutationProgress{Version: c.version, Done: true}, cleanups
 }
 
 func (c *Catalog) AbortMutation(mutation jobmgr.FunctionCatalogMutation) error {

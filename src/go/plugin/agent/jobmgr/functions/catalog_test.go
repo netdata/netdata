@@ -89,7 +89,7 @@ func TestFunctionCatalogLookup(t *testing.T) {
 
 			cleanup, err := catalog.ReleaseInvocation(decision.Lease)
 			require.NoError(t, err)
-			assert.False(t, cleanup.Ref.Valid())
+			assert.False(t, cleanup.Valid())
 			_, err = catalog.ReleaseInvocation(decision.Lease)
 			require.Error(t, err)
 		})
@@ -268,8 +268,7 @@ func TestFunctionCatalogMutationLifecycle(t *testing.T) {
 			require.NoError(t, err)
 
 			require.NoError(t, catalog.ResumeMutation(mutation))
-			progress, cleanups, err := catalog.AdvanceMutation(MaximumMutationQuantum)
-			require.NoError(t, err)
+			progress, cleanups := catalog.AdvanceMutation(MaximumMutationQuantum)
 			require.True(t, progress.Done)
 			assert.Empty(t, cleanups)
 			assert.EqualValues(t, 2, progress.Version)
@@ -362,15 +361,22 @@ func TestFunctionCatalogMutationExceedsFormerCountLimit(t *testing.T) {
 	mutation, err := catalog.NewMutation(1, changes)
 	require.NoError(t, err)
 	require.NoError(t, catalog.BeginMutation(mutation))
-	_, err = catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
-	require.NoError(t, err)
+	preflightTurns := 0
+	for {
+		preflightTurns++
+		progress, preflightErr := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
+		require.NoError(t, preflightErr)
+		if progress.Quiesced {
+			break
+		}
+	}
+	assert.Equal(t, 5, preflightTurns)
 	require.NoError(t, catalog.ResumeMutation(mutation))
 
 	turns := 0
 	for {
 		turns++
-		progress, cleanups, stepErr := catalog.AdvanceMutation(MaximumMutationQuantum)
-		require.NoError(t, stepErr)
+		progress, cleanups := catalog.AdvanceMutation(MaximumMutationQuantum)
 		assert.Empty(t, cleanups)
 		if progress.Done {
 			break
@@ -383,6 +389,52 @@ func TestFunctionCatalogMutationExceedsFormerCountLimit(t *testing.T) {
 	}
 	assert.Equal(t, 5, turns)
 	assert.Equal(t, population, catalog.census().Routes)
+}
+
+func TestFunctionCatalogMutationPreflightIsBoundedAndClosesAdmission(t *testing.T) {
+	const population = MaximumMutationQuantum + 1
+	declarations := make([]Declaration, 0, population)
+	changes := make([]RouteChange, 0, population)
+	for index := range population {
+		name := fmt.Sprintf("work-%03d", index)
+		declarations = append(declarations, testDeclaration(name, "", ResourcePolicy{}))
+		changes = append(changes, RouteChange{PublicName: name})
+	}
+	catalog, err := NewCatalog(declarations)
+	require.NoError(t, err)
+	mutation, err := catalog.NewMutation(1, changes)
+	require.NoError(t, err)
+	require.NoError(t, catalog.BeginMutation(mutation))
+
+	progress, err := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
+	require.NoError(t, err)
+	assert.False(t, progress.Quiesced)
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID: "preflight", Route: "work-000",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, lifecycle.ControlUnavailable, decision.Rejected)
+	require.Error(t, catalog.ResumeMutation(mutation))
+
+	preflightTurns := 1
+	for !progress.Quiesced {
+		preflightTurns++
+		progress, err = catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, 3, preflightTurns)
+	require.NoError(t, catalog.ResumeMutation(mutation))
+
+	commitTurns := 0
+	for {
+		commitTurns++
+		progress, cleanups := catalog.AdvanceMutation(MaximumMutationQuantum)
+		assert.Empty(t, cleanups)
+		if progress.Done {
+			break
+		}
+	}
+	assert.Equal(t, 2, commitTurns)
 }
 
 func TestFunctionCatalogRejectsStalePreparedMutation(t *testing.T) {
@@ -400,6 +452,75 @@ func TestFunctionCatalogRejectsStalePreparedMutation(t *testing.T) {
 	require.NoError(t, err)
 	commitMutation(t, catalog, first)
 	require.Error(t, catalog.BeginMutation(second))
+}
+
+func TestFunctionCatalogMutationPreflightIsSideEffectFree(t *testing.T) {
+	tests := map[string]struct {
+		corrupt func(*Catalog, *handlerGeneration)
+	}{
+		"route reference underflow": {
+			corrupt: func(_ *Catalog, generation *handlerGeneration) {
+				generation.routeReferences = 0
+			},
+		},
+		"cleanup dispatch collision": {
+			corrupt: func(catalog *Catalog, generation *handlerGeneration) {
+				catalog.cleanupByRef[generation.cleanupRef] = &handlerGeneration{}
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			first := testDeclaration("first", "", ResourcePolicy{})
+			first.Generation.Cleanup = func(context.Context) error { return nil }
+			second := testDeclaration("second", "", ResourcePolicy{})
+			second.Generation.Cleanup = func(context.Context) error { return nil }
+			catalog, err := NewCatalog([]Declaration{first, second})
+			require.NoError(t, err)
+			snapshot := catalog.snapshot.Load()
+			firstGeneration := snapshot.routes["first"].direct.handler
+			secondGeneration := snapshot.routes["second"].direct.handler
+
+			mutation, err := catalog.NewMutation(1, []RouteChange{
+				{PublicName: "first"},
+				{PublicName: "second"},
+			})
+			require.NoError(t, err)
+			test.corrupt(catalog, secondGeneration)
+			require.NoError(t, catalog.BeginMutation(mutation))
+
+			progress, err := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
+			require.Error(t, err)
+			assert.False(t, progress.Quiesced)
+			assert.Equal(t, 1, firstGeneration.routeReferences)
+			assert.Zero(t, catalog.pendingCleanups)
+			require.NoError(t, catalog.AbortMutation(mutation))
+		})
+	}
+}
+
+func TestFunctionCatalogMutationPreflightAggregatesSharedGeneration(t *testing.T) {
+	generation := testGeneration("shared")
+	catalog, err := NewCatalog([]Declaration{
+		testDeclarationForGeneration(generation, "first", "", ResourcePolicy{}),
+		testDeclarationForGeneration(generation, "second", "", ResourcePolicy{}),
+	})
+	require.NoError(t, err)
+	mutation, err := catalog.NewMutation(1, []RouteChange{
+		{PublicName: "first"},
+		{PublicName: "second"},
+	})
+	require.NoError(t, err)
+	shared := catalog.snapshot.Load().routes["first"].direct.handler
+	shared.routeReferences = 1
+	require.NoError(t, catalog.BeginMutation(mutation))
+
+	progress, err := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
+	require.Error(t, err)
+	assert.False(t, progress.Quiesced)
+	assert.Equal(t, 1, shared.routeReferences)
+	require.NoError(t, catalog.AbortMutation(mutation))
 }
 
 func TestFunctionCatalogCleanupWaitsForLastLease(t *testing.T) {
@@ -425,9 +546,33 @@ func TestFunctionCatalogCleanupWaitsForLastLease(t *testing.T) {
 
 	cleanup, err := catalog.ReleaseInvocation(decision.Lease)
 	require.NoError(t, err)
-	require.True(t, cleanup.Ref.Valid())
+	require.True(t, cleanup.Valid())
 	runCleanupPlan(t, catalog, cleanup)
 	assert.EqualValues(t, 1, cleanupCalls.Load())
+}
+
+func TestFunctionCatalogCleanupOwnershipSurvivesPausedLeaseRelease(t *testing.T) {
+	old := testDeclaration("work", "", ResourcePolicy{})
+	old.Generation.Cleanup = func(context.Context) error { return nil }
+	catalog, err := NewCatalog([]Declaration{old})
+	require.NoError(t, err)
+	held, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "held", Route: "work"})
+	require.NoError(t, err)
+	mutation, err := catalog.NewMutation(1, []RouteChange{{PublicName: "work"}})
+	require.NoError(t, err)
+	require.NoError(t, catalog.BeginMutation(mutation))
+	progress, err := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
+	require.NoError(t, err)
+	require.True(t, progress.Quiesced)
+
+	cleanup, err := catalog.ReleaseInvocation(held.Lease)
+	require.NoError(t, err)
+	assert.False(t, cleanup.Valid())
+	require.NoError(t, catalog.ResumeMutation(mutation))
+	progress, cleanups := catalog.AdvanceMutation(MaximumMutationQuantum)
+	require.True(t, progress.Done)
+	require.Len(t, cleanups, 1)
+	runCleanupPlan(t, catalog, cleanups[0])
 }
 
 func TestFunctionCatalogRemovedRouteStaysUnavailableUntilLeaseDrains(t *testing.T) {
@@ -568,6 +713,73 @@ func TestFunctionCatalogCloseIsBoundedAndCleansSharedGenerationOnce(t *testing.T
 	assert.EqualValues(t, 1, cleanupCalls.Load())
 }
 
+func TestFunctionCatalogCloseStepRejectsInvalidBatchBeforeMutation(t *testing.T) {
+	first := testDeclaration("first", "", ResourcePolicy{})
+	first.Generation.Cleanup = func(context.Context) error { return nil }
+	second := testDeclaration("second", "", ResourcePolicy{})
+	second.Generation.Cleanup = func(context.Context) error { return nil }
+	catalog, err := NewCatalog([]Declaration{first, second})
+	require.NoError(t, err)
+	firstGeneration := catalog.snapshot.Load().routes["first"].direct.handler
+	secondGeneration := catalog.snapshot.Load().routes["second"].direct.handler
+	secondGeneration.routeReferences = 0
+	require.NoError(t, catalog.BeginClose())
+
+	cleanups, more, err := catalog.CloseStep(2)
+	require.Error(t, err)
+	assert.Empty(t, cleanups)
+	assert.False(t, more)
+	assert.Zero(t, catalog.closeIndex)
+	assert.Equal(t, 2, catalog.routeCount)
+	assert.Equal(t, 1, firstGeneration.routeReferences)
+	assert.Zero(t, catalog.pendingCleanups)
+}
+
+func TestFunctionCatalogCloseStepAggregatesSharedGeneration(t *testing.T) {
+	generation := testGeneration("shared")
+	catalog, err := NewCatalog([]Declaration{
+		testDeclarationForGeneration(generation, "first", "", ResourcePolicy{}),
+		testDeclarationForGeneration(generation, "second", "", ResourcePolicy{}),
+	})
+	require.NoError(t, err)
+	shared := catalog.snapshot.Load().routes["first"].direct.handler
+	shared.routeReferences = 1
+	require.NoError(t, catalog.BeginClose())
+
+	cleanups, more, err := catalog.CloseStep(2)
+	require.Error(t, err)
+	assert.Empty(t, cleanups)
+	assert.False(t, more)
+	assert.Zero(t, catalog.closeIndex)
+	assert.Equal(t, 2, catalog.routeCount)
+	assert.Equal(t, 1, shared.routeReferences)
+}
+
+func TestFunctionCatalogReleaseValidatesCleanupBeforeReleasingLease(t *testing.T) {
+	declaration := testDeclaration("work", "", ResourcePolicy{})
+	declaration.Generation.Cleanup = func(context.Context) error { return nil }
+	catalog, err := NewCatalog([]Declaration{declaration})
+	require.NoError(t, err)
+	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "held", Route: "work"})
+	require.NoError(t, err)
+	resolved := catalog.snapshot.Load().routes["work"].direct
+	generation := resolved.handler
+	generation.routeReferences = 0
+	catalog.cleanupByRef[generation.cleanupRef] = &handlerGeneration{}
+
+	cleanup, err := catalog.ReleaseInvocation(decision.Lease)
+	require.Error(t, err)
+	assert.False(t, cleanup.Valid())
+	assert.Equal(t, 1, resolved.invocationLeases)
+	assert.Equal(t, 1, generation.invocationLeases)
+	assert.Equal(t, 1, catalog.invocationCount)
+
+	delete(catalog.cleanupByRef, generation.cleanupRef)
+	cleanup, err = catalog.ReleaseInvocation(decision.Lease)
+	require.NoError(t, err)
+	require.True(t, cleanup.Valid())
+}
+
 func TestFunctionCatalogInvocationPopulationExceedsFormerLimit(t *testing.T) {
 	const population = 300
 	catalog, err := NewCatalog([]Declaration{testDeclaration("work", "", ResourcePolicy{})})
@@ -624,14 +836,17 @@ func commitMutation(
 ) []jobmgr.FunctionCleanupPlan {
 	t.Helper()
 	require.NoError(t, catalog.BeginMutation(mutation))
-	progress, err := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
-	require.NoError(t, err)
-	require.True(t, progress.Quiesced)
+	for {
+		progress, err := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
+		require.NoError(t, err)
+		if progress.Quiesced {
+			break
+		}
+	}
 	require.NoError(t, catalog.ResumeMutation(mutation))
 	var cleanups []jobmgr.FunctionCleanupPlan
 	for {
-		progress, batch, stepErr := catalog.AdvanceMutation(MaximumMutationQuantum)
-		require.NoError(t, stepErr)
+		progress, batch := catalog.AdvanceMutation(MaximumMutationQuantum)
 		cleanups = append(cleanups, batch...)
 		if progress.Done {
 			return cleanups
@@ -676,11 +891,11 @@ func testCleanupDeclarations(count int) []Declaration {
 
 func runCleanupPlan(t *testing.T, catalog *Catalog, cleanup jobmgr.FunctionCleanupPlan) {
 	t.Helper()
-	require.True(t, cleanup.Ref.Valid())
-	require.NotNil(t, cleanup.Work)
-	_, err := cleanup.Work(context.Background())
+	require.True(t, cleanup.Valid())
+	require.NotNil(t, cleanup.Work())
+	_, err := cleanup.Work()(context.Background())
 	require.NoError(t, err)
-	require.NoError(t, catalog.CompleteCleanup(cleanup.Ref))
+	require.NoError(t, catalog.CompleteCleanup(cleanup.Ref()))
 }
 
 type catalogCensus struct {

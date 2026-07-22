@@ -149,12 +149,12 @@ func (ck *CommandKernel) enqueueControl(operation *commandOperation, status life
 	}
 	operation.control = status
 	operation.controlQueued = true
-	ck.controls = append(ck.controls, operation)
+	ck.controls.push(operation)
 }
 
 func (ck *CommandKernel) serviceControls(quantum int) bool {
-	for quantum > 0 && len(ck.controls) > 0 {
-		operation := ck.controls[0]
+	for quantum > 0 && ck.controls.count > 0 {
+		operation := ck.controls.front()
 		if operation.Response == lifecycle.ResponseOpen {
 			_ = operation.MarkResponsePending()
 		}
@@ -162,8 +162,7 @@ func (ck *CommandKernel) serviceControls(quantum int) bool {
 		if errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
 			return false
 		}
-		ck.controls[0] = nil // release the drained operation; append compacts on reallocation
-		ck.controls = ck.controls[1:]
+		ck.controls.pop()
 		operation.controlQueued = false
 		quantum--
 		if err != nil {
@@ -187,7 +186,7 @@ func (ck *CommandKernel) serviceControls(quantum int) bool {
 		}
 		ck.tryDispose(operation)
 	}
-	return len(ck.controls) > 0
+	return ck.controls.count > 0
 }
 
 func (ck *CommandKernel) markRetainedTimeout(operation *commandOperation, background bool) error {

@@ -452,16 +452,15 @@ func (samc *shutdownActionMutationCatalog) ResumeMutation(
 
 func (samc *shutdownActionMutationCatalog) AdvanceMutation(
 	int,
-) (FunctionCatalogMutationProgress, []FunctionCleanupPlan, error) {
+) (FunctionCatalogMutationProgress, []FunctionCleanupPlan) {
 	if !samc.active.CompareAndSwap(true, false) {
-		return FunctionCatalogMutationProgress{}, nil,
-			errors.New("test Function mutation is inactive")
+		return FunctionCatalogMutationProgress{}, nil
 	}
 	samc.commitCalls.Add(1)
 	return FunctionCatalogMutationProgress{
 		Version: 2,
 		Done:    true,
-	}, nil, nil
+	}, nil
 }
 
 func (samc *shutdownActionMutationCatalog) AbortMutation(FunctionCatalogMutation) error {
