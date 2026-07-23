@@ -383,3 +383,89 @@ log a few errors in error.log complaining about files it cannot find, but immedi
 
 Network interfaces inside containers are discovered and monitored by the cgroups plugin using
 [`cgroup-network-helper.sh`](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/cgroup-network-helper.sh).
+
+## Troubleshooting cgroup directory access errors
+
+When cgroups.plugin cannot read the cgroup filesystem, Netdata logs an error of
+the form:
+
+```text
+CGROUP: cannot open directory "/sys/fs/cgroup": <reason>
+```
+
+The `<reason>` is the system error reported by `opendir()` — most commonly
+`No such file or directory` (the path does not exist or is not mounted) or
+`Permission denied` (the `netdata` user cannot read or traverse it).
+
+### What the error disables
+
+Netdata opens the cgroup base mount once per discovery cycle: for cgroup v2 this
+is `/sys/fs/cgroup`, and for v1 each subsystem (`cpuacct`, `blkio`, `memory`)
+has its own base mount under `/sys/fs/cgroup`. When the base directory cannot be
+opened, Netdata disables statistics for that subsystem and logs a follow-up
+line, for example:
+
+```text
+CGROUP: disabled unified cgroups statistics.
+```
+
+On cgroup v1 you may see one or more of:
+
+```text
+CGROUP: disabled cpu statistics.
+CGROUP: disabled blkio statistics.
+CGROUP: disabled memory statistics.
+```
+
+While a subsystem is disabled, the corresponding container, virtual machine, and
+systemd-service cgroup charts stop appearing. Once a subsystem is disabled this
+way it is **not retried on later discovery cycles** — you must fix the access
+problem and restart Netdata for the subsystem to be re-enabled.
+
+:::note
+Permission errors on individual cgroup **subdirectories** (not the base mount)
+are logged at `DEBUG` level only and are harmless — Netdata skips that subtree
+and keeps collecting the rest. Only a failure on the **base mount** disables
+metrics.
+:::
+
+### Resolving the error
+
+**1. Confirm the cgroup filesystem is mounted and visible.**
+
+```sh
+stat -fc %T /sys/fs/cgroup
+```
+
+This prints `cgroup2fs` for cgroup v2 or `tmpfs` for cgroup v1 (the same check
+documented under [Monitoring systemd services](#monitoring-systemd-services)). If
+the command fails or reports the path is missing, the cgroup filesystem is not
+mounted or is not visible to Netdata.
+
+**2. Netdata running in a container.**
+
+As noted in [Monitoring ephemeral containers](#monitoring-ephemeral-containers),
+Netdata inside a container must see the host's `/proc` and `/sys` filesystems,
+which include `/sys/fs/cgroup`. If those mounts are missing, the cgroup base
+path does not exist inside the container and the error reports
+`No such file or directory`.
+
+The official Netdata Docker image already binds the host filesystem under
+`/host` (for example `-v /sys:/host/sys:ro`) and sets the host prefix so Netdata
+reads the host cgroups. If you use a custom or reduced container image, make
+sure the host cgroup filesystem is mounted into the container — either the host
+`/sys` (matching the official image) or the host `/sys/fs/cgroup` directly — and
+that the `netdata` user can read and traverse it.
+
+**3. Permission denied (EACCES).**
+
+If the error reason is `Permission denied`, the `netdata` user lacks read or
+traverse permission on the cgroup mount. Confirm the directory is accessible:
+
+```sh
+ls -ld /sys/fs/cgroup
+```
+
+On a host install, the Netdata installer grants the `netdata` user the access it
+needs. In a custom deployment, ensure the `netdata` user can read and traverse
+the cgroup base path.
