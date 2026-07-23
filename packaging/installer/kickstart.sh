@@ -1378,6 +1378,10 @@ is_netdata_running() {
 }
 
 write_claim_config() {
+  old_pwd="${PWD}"
+  set_tmpdir
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
+
   if [ -z "${INSTALL_PREFIX}" ] || [ "${INSTALL_PREFIX}" = "/" ]; then
     config_path="/etc/netdata"
     netdatacli="$(command -v netdatacli)"
@@ -1393,6 +1397,7 @@ write_claim_config() {
   fi
 
   claim_config="${config_path}/claim.conf"
+  claim_config_tmp="${tmpdir}/claim.conf"
 
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to write claiming configuration to ${claim_config}"
@@ -1414,11 +1419,10 @@ write_claim_config() {
       config="${config}\n    insecure = ${NETDATA_CLAIM_INSECURE}"
   fi
 
-  run_as_root touch "${claim_config}.tmp" || return 1
-  run_as_root chmod 0640 "${claim_config}.tmp" || return 1
-  run_as_root chown ":${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config}.tmp" || return 1
-  run_as_root sh -c "printf '${config}\\n' > \"${claim_config}.tmp\"" || return 1
-  run_as_root mv -f "${claim_config}.tmp" "${claim_config}" || return 1
+  printf "${config}\n" > "${claim_config_tmp}" || return 1
+  run_as_root chmod 0640 "${claim_config_tmp}" || return 1
+  run_as_root chown ":${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config_tmp}" || return 1
+  run_as_root mv -f "${claim_config_tmp}" "${claim_config}" || return 1
 
   if [ -z "${NETDATA_CLAIM_NORELOAD}" ]; then
     if [ -n "${netdatacli}" ]; then
