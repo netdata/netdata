@@ -39,7 +39,7 @@ The Netdata container requires specific **privileges** and **mounts** to provide
 |      apps.plugin       |  /etc/passwd, /etc/group   | Monitoring of host system resource usage by each user and user group.                                                                            |
 |      proc.plugin       |           /proc            | Host system monitoring (CPU, memory, network interfaces, disks, etc.).                                                                           |
 | systemd-journal.plugin |          /var/log          | Viewing, exploring and analyzing systemd journal logs.                                                                                           |
-| systemd-units.plugin |         /run/dbus          | Systemd-list-units function: information about all systemd units, including their active state, description, whether they are enabled, and more. |
+|  systemd-units.plugin  |         /run/dbus          | Systemd-list-units function: information about all systemd units, including their active state, description, whether they are enabled, and more. |
 |      go.d.plugin       |         /run/dbus          | [go.d/systemdunits](https://github.com/netdata/go.d.plugin/tree/master/modules/systemdunits#readme)                                              |
 
 </details>
@@ -640,10 +640,13 @@ If you prefer not to recreate the container, edit the Agent’s `netdata.conf` f
 Alternatively, use the **host’s hostname** by mounting `/etc/hostname` in the container:
 
 - **With `docker run`**, add:
+
   ```sh
   --volume /etc/hostname:/host/etc/hostname:ro
   ```  
+
 - **With Docker Compose**, add this to the `volumes` section:
+
   ```yaml
   - /etc/hostname:/host/etc/hostname:ro
   ```
@@ -652,17 +655,17 @@ Alternatively, use the **host’s hostname** by mounting `/etc/hostname` in the 
 
 The container's entrypoint reads these environment variables at startup. Set them with `docker run -e` or the `environment:` block in Docker Compose, the same way you set any container environment variable.
 
-| Variable | Default | What it controls |
-|:--|:--|:--|
-| [`NETDATA_LISTENER_PORT`](#netdata_listener_port) | `19999` | TCP port the Agent's web server and API listen on. |
-| [`NETDATA_HEALTHCHECK_TARGET`](#netdata_healthcheck_target) | `http://localhost:19999/api/v1/info` | What the Docker health check polls. |
-| [`DOCKER_USR`](#docker_usr) | `netdata` | System user the Agent runs as. |
-| [`DOCKER_HOST`](#docker_host-and-pgid) | Auto-detected | Location of the Docker daemon socket. |
-| [`PGID`](#docker_host-and-pgid) | Auto-detected | GID of the host Docker group. |
-| [`NETDATA_EXTRA_DEB_PACKAGES`](#netdata_extra_deb_packages) | *(empty)* | Extra Debian packages installed at container start. |
-| [`NETDATA_EXTRA_APK_PACKAGES`](#netdata_extra_apk_packages-deprecated) | *(unset)* | **Deprecated.** No longer installs anything. |
-| [`DISABLE_TELEMETRY`](#disable_telemetry-and-do_not_track) | `0` | Opts out of anonymous telemetry when set to a non-zero value. |
-| [`DO_NOT_TRACK`](#disable_telemetry-and-do_not_track) | `0` | Same as `DISABLE_TELEMETRY`. |
+| Variable                                                               | Default                              | What it controls                                              |
+|:-----------------------------------------------------------------------|:-------------------------------------|:--------------------------------------------------------------|
+| [`NETDATA_LISTENER_PORT`](#netdata_listener_port)                      | `19999`                              | TCP port the Agent's web server and API listen on.            |
+| [`NETDATA_HEALTHCHECK_TARGET`](#netdata_healthcheck_target)            | `http://localhost:19999/api/v1/info` | What the Docker health check polls.                           |
+| [`DOCKER_USR`](#docker_usr)                                            | `netdata`                            | System user the Agent runs as.                                |
+| [`DOCKER_HOST`](#docker_host-and-pgid)                                 | Auto-detected                        | Location of the Docker daemon socket.                         |
+| [`PGID`](#docker_host-and-pgid)                                        | Auto-detected                        | GID of the host Docker group.                                 |
+| [`NETDATA_EXTRA_DEB_PACKAGES`](#netdata_extra_deb_packages)            | _(empty)_                            | Extra Debian packages installed at container start.           |
+| [`NETDATA_EXTRA_APK_PACKAGES`](#netdata_extra_apk_packages-deprecated) | _(unset)_                            | **Deprecated.** No longer installs anything.                  |
+| [`DISABLE_TELEMETRY`](#disable_telemetry-and-do_not_track)             | `0`                                  | Opts out of anonymous telemetry when set to a non-zero value. |
+| [`DO_NOT_TRACK`](#disable_telemetry-and-do_not_track)                  | `0`                                  | Same as `DISABLE_TELEMETRY`.                                  |
 
 ### NETDATA_LISTENER_PORT
 
