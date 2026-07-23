@@ -66,3 +66,7 @@ layers; each layer declares which entries it consumes:
   in its own focused branch/PR, then flipped GREEN here.
 - The manifest tracks case -> proves-what -> agent status -> cloud status ->
   fixed-by.
+
+The full developer contract — how to run the suite, author fixtures and
+oracles, add red cases, flip them green, and change pins safely — is
+`.agents/skills/project-query-corpus/SKILL.md`.
