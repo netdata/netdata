@@ -227,9 +227,9 @@ Supported applications include databases (MySQL, PostgreSQL, Redis, MongoDB), we
 ```powershell
 # Silent installation for fleet deployment
 msiexec /i netdata-installer.msi /qn /norestart `
-        CLAIMING_TOKEN="YOUR_TOKEN" `
-        CLAIMING_ROOMS="YOUR_ROOM_ID" `
-        CLAIMING_URL="https://app.netdata.cloud"
+        TOKEN="YOUR_TOKEN" `
+        ROOMS="YOUR_ROOM_ID" `
+        URL="https://app.netdata.cloud"
 
 # Via Group Policy or SCCM
 # Deploy MSI with TRANSFORMS for site-specific configuration
