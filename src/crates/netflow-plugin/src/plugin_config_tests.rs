@@ -3,6 +3,92 @@ use clap::Parser;
 use tempfile::tempdir;
 
 #[test]
+fn netflow_state_limits_have_bounded_defaults() {
+    let cfg = PluginConfig::default();
+
+    assert_eq!(
+        cfg.protocols.v9_template_lifetime.get(),
+        Some(Duration::from_secs(90 * 60))
+    );
+    assert_eq!(cfg.protocols.sampling_cache_max_entries, 100_000);
+    assert_eq!(cfg.protocols.sampling_cache_max_entries_per_stream, 65_536);
+}
+
+#[test]
+fn yaml_null_disables_v9_template_lifetime() {
+    let protocols: ProtocolConfig = serde_yaml::from_str(
+        r#"
+v5: true
+v7: true
+v9: true
+ipfix: true
+sflow: true
+decapsulation_mode: none
+timestamp_source: input
+v9_template_lifetime: null
+sampling_cache_max_entries: 100000
+sampling_cache_max_entries_per_stream: 65536
+"#,
+    )
+    .expect("protocol YAML should parse");
+
+    assert_eq!(protocols.v9_template_lifetime.get(), None);
+}
+
+#[test]
+fn cli_null_disables_v9_template_lifetime() {
+    let cfg =
+        PluginConfig::try_parse_from(["netflow-plugin", "--netflow-v9-template-lifetime", "null"])
+            .expect("CLI null should parse");
+
+    assert_eq!(cfg.protocols.v9_template_lifetime.get(), None);
+}
+
+#[test]
+fn cli_template_lifetime_requires_lowercase_null() {
+    let err =
+        PluginConfig::try_parse_from(["netflow-plugin", "--netflow-v9-template-lifetime", "NULL"])
+            .expect_err("only lowercase null should disable the lifetime");
+
+    assert!(err.to_string().contains("invalid value"));
+}
+
+#[test]
+fn validation_rejects_zero_v9_template_lifetime() {
+    let mut cfg = PluginConfig::default();
+    cfg.protocols.v9_template_lifetime = "0s".parse().unwrap();
+
+    let err = cfg
+        .validate()
+        .expect_err("zero template lifetime must be rejected");
+    assert!(err.to_string().contains("must be greater than 0 or null"));
+}
+
+#[test]
+fn validation_rejects_zero_sampling_cache_limits() {
+    for per_stream in [false, true] {
+        let mut cfg = PluginConfig::default();
+        if per_stream {
+            cfg.protocols.sampling_cache_max_entries_per_stream = 0;
+        } else {
+            cfg.protocols.sampling_cache_max_entries = 0;
+        }
+
+        let err = cfg.validate().expect_err("zero limit must be rejected");
+        assert!(err.to_string().contains("must be greater than 0"));
+    }
+}
+
+#[test]
+fn per_stream_sampling_limit_is_clamped_to_global_limit() {
+    let mut cfg = PluginConfig::default();
+    cfg.protocols.sampling_cache_max_entries = 100;
+    cfg.protocols.sampling_cache_max_entries_per_stream = 200;
+
+    assert_eq!(cfg.protocols.effective_sampling_cache_limits(), (100, 100));
+}
+
+#[test]
 fn dynamic_bmp_decode_error_threshold_defaults_to_8() {
     let cfg = PluginConfig::default();
     assert_eq!(

@@ -1,9 +1,47 @@
 use super::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum DecoderStateProtocol {
+    V9,
+    Ipfix,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) struct DecoderStateNamespaceKey {
+    pub(crate) protocol: DecoderStateProtocol,
     pub(crate) exporter_ip: String,
+    pub(crate) source_port: u16,
     pub(crate) observation_domain_id: u32,
+}
+
+impl DecoderStateNamespaceKey {
+    pub(crate) fn parser_source(&self, source: SocketAddr) -> SocketAddr {
+        let exporter_ip = canonicalize_ip_addr(source.ip());
+        match self.protocol {
+            DecoderStateProtocol::V9 => SocketAddr::new(exporter_ip, source.port()),
+            DecoderStateProtocol::Ipfix => SocketAddr::new(exporter_ip, 0),
+        }
+    }
+
+    pub(crate) fn from_auto_source(source: AutoSourceKey) -> Option<Self> {
+        match source {
+            AutoSourceKey::V9(source) => Some(Self {
+                protocol: DecoderStateProtocol::V9,
+                exporter_ip: canonicalize_ip_addr(source.addr.ip()).to_string(),
+                source_port: source.addr.port(),
+                observation_domain_id: source.source_id,
+            }),
+            AutoSourceKey::Ipfix(source) => Some(Self {
+                protocol: DecoderStateProtocol::Ipfix,
+                exporter_ip: canonicalize_ip_addr(source.addr.ip()).to_string(),
+                source_port: 0,
+                observation_domain_id: source.observation_domain_id,
+            }),
+            AutoSourceKey::Legacy(_) => None,
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,16 +68,32 @@ pub(crate) struct PersistedV9TemplateField {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct PersistedV9Template {
-    pub(crate) template_id: u16,
-    pub(crate) fields: Vec<PersistedV9TemplateField>,
+pub(crate) enum PersistedV9TemplateDefinition {
+    Data {
+        fields: Vec<PersistedV9TemplateField>,
+    },
+    Options {
+        scope_fields: Vec<PersistedV9TemplateField>,
+        option_fields: Vec<PersistedV9TemplateField>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct PersistedV9OptionsTemplate {
+pub(crate) struct PersistedV9Template {
     pub(crate) template_id: u16,
-    pub(crate) scope_fields: Vec<PersistedV9TemplateField>,
-    pub(crate) option_fields: Vec<PersistedV9TemplateField>,
+    pub(crate) received_at_usec: u64,
+    pub(crate) nsel: bool,
+    pub(crate) definition: PersistedV9TemplateDefinition,
+}
+
+impl PersistedV9Template {
+    #[cfg(test)]
+    pub(crate) fn data_fields(&self) -> Option<&[PersistedV9TemplateField]> {
+        match &self.definition {
+            PersistedV9TemplateDefinition::Data { fields } => Some(fields),
+            PersistedV9TemplateDefinition::Options { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,77 +104,84 @@ pub(crate) struct PersistedIPFixTemplateField {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct PersistedIPFixTemplate {
-    pub(crate) template_id: u16,
-    pub(crate) fields: Vec<PersistedIPFixTemplateField>,
+pub(crate) enum PersistedIPFixTemplateDefinition {
+    Data {
+        fields: Vec<PersistedIPFixTemplateField>,
+    },
+    Options {
+        scope_field_count: u16,
+        fields: Vec<PersistedIPFixTemplateField>,
+    },
+    V9Data {
+        fields: Vec<PersistedV9TemplateField>,
+    },
+    V9Options {
+        scope_fields: Vec<PersistedV9TemplateField>,
+        option_fields: Vec<PersistedV9TemplateField>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct PersistedIPFixOptionsTemplate {
+pub(crate) struct PersistedIPFixTemplate {
     pub(crate) template_id: u16,
-    pub(crate) scope_field_count: u16,
-    pub(crate) fields: Vec<PersistedIPFixTemplateField>,
+    pub(crate) received_at_usec: u64,
+    pub(crate) definition: PersistedIPFixTemplateDefinition,
+}
+
+impl PersistedIPFixTemplate {
+    #[cfg(test)]
+    pub(crate) fn data_fields(&self) -> Option<&[PersistedIPFixTemplateField]> {
+        match &self.definition {
+            PersistedIPFixTemplateDefinition::Data { fields } => Some(fields),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct DecoderStateNamespace {
-    pub(crate) sampling_rates: BTreeMap<(u16, u64), PersistedSamplingRate>,
     pub(crate) v9_templates: BTreeMap<u16, PersistedV9Template>,
-    pub(crate) v9_options_templates: BTreeMap<u16, PersistedV9OptionsTemplate>,
     pub(crate) ipfix_templates: BTreeMap<u16, PersistedIPFixTemplate>,
-    pub(crate) ipfix_options_templates: BTreeMap<u16, PersistedIPFixOptionsTemplate>,
-    pub(crate) ipfix_v9_templates: BTreeMap<u16, PersistedV9Template>,
-    pub(crate) ipfix_v9_options_templates: BTreeMap<u16, PersistedV9OptionsTemplate>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct PersistedDecoderNamespaceFile {
     pub(crate) key: DecoderStateNamespaceKey,
     pub(crate) namespace: DecoderStateNamespace,
+    pub(crate) sampling_rates: Vec<PersistedSamplingRate>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) struct DecoderStateObservation {
     pub(crate) namespace_state_changed: bool,
     pub(crate) template_state_changed: bool,
+    pub(crate) dirty_sampling_namespaces: Vec<DecoderStateNamespaceKey>,
+    pub(crate) v9_nsel_flowsets: Vec<bool>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct DecoderStateBatchObservation {
+    pub(crate) template_state_changed: bool,
+    pub(crate) v9_nsel_flowsets_by_packet: Vec<Option<Vec<bool>>>,
 }
 
 impl DecoderStateNamespace {
     pub(crate) fn is_empty(&self) -> bool {
-        self.sampling_rates.is_empty()
-            && self.v9_templates.is_empty()
-            && self.v9_options_templates.is_empty()
-            && self.ipfix_templates.is_empty()
-            && self.ipfix_options_templates.is_empty()
-            && self.ipfix_v9_templates.is_empty()
-            && self.ipfix_v9_options_templates.is_empty()
-    }
-
-    pub(crate) fn set_sampling_rate(
-        &mut self,
-        version: u16,
-        sampler_id: u64,
-        sampling_rate: u64,
-    ) -> bool {
-        let row = PersistedSamplingRate {
-            version,
-            sampler_id,
-            sampling_rate,
-        };
-        self.sampling_rates
-            .insert((version, sampler_id), row.clone())
-            .as_ref()
-            != Some(&row)
+        self.v9_templates.is_empty() && self.ipfix_templates.is_empty()
     }
 
     pub(crate) fn set_v9_template(
         &mut self,
         template_id: u16,
         fields: Vec<PersistedV9TemplateField>,
+        received_at_usec: u64,
+        nsel: bool,
     ) -> bool {
         let template = PersistedV9Template {
             template_id,
-            fields,
+            received_at_usec,
+            nsel,
+            definition: PersistedV9TemplateDefinition::Data { fields },
         };
         self.v9_templates
             .insert(template_id, template.clone())
@@ -133,13 +194,18 @@ impl DecoderStateNamespace {
         template_id: u16,
         scope_fields: Vec<PersistedV9TemplateField>,
         option_fields: Vec<PersistedV9TemplateField>,
+        received_at_usec: u64,
     ) -> bool {
-        let template = PersistedV9OptionsTemplate {
+        let template = PersistedV9Template {
             template_id,
-            scope_fields,
-            option_fields,
+            received_at_usec,
+            nsel: false,
+            definition: PersistedV9TemplateDefinition::Options {
+                scope_fields,
+                option_fields,
+            },
         };
-        self.v9_options_templates
+        self.v9_templates
             .insert(template_id, template.clone())
             .as_ref()
             != Some(&template)
@@ -149,10 +215,12 @@ impl DecoderStateNamespace {
         &mut self,
         template_id: u16,
         fields: Vec<PersistedIPFixTemplateField>,
+        received_at_usec: u64,
     ) -> bool {
         let template = PersistedIPFixTemplate {
             template_id,
-            fields,
+            received_at_usec,
+            definition: PersistedIPFixTemplateDefinition::Data { fields },
         };
         self.ipfix_templates
             .insert(template_id, template.clone())
@@ -165,13 +233,17 @@ impl DecoderStateNamespace {
         template_id: u16,
         scope_field_count: u16,
         fields: Vec<PersistedIPFixTemplateField>,
+        received_at_usec: u64,
     ) -> bool {
-        let template = PersistedIPFixOptionsTemplate {
+        let template = PersistedIPFixTemplate {
             template_id,
-            scope_field_count,
-            fields,
+            received_at_usec,
+            definition: PersistedIPFixTemplateDefinition::Options {
+                scope_field_count,
+                fields,
+            },
         };
-        self.ipfix_options_templates
+        self.ipfix_templates
             .insert(template_id, template.clone())
             .as_ref()
             != Some(&template)
@@ -181,12 +253,14 @@ impl DecoderStateNamespace {
         &mut self,
         template_id: u16,
         fields: Vec<PersistedV9TemplateField>,
+        received_at_usec: u64,
     ) -> bool {
-        let template = PersistedV9Template {
+        let template = PersistedIPFixTemplate {
             template_id,
-            fields,
+            received_at_usec,
+            definition: PersistedIPFixTemplateDefinition::V9Data { fields },
         };
-        self.ipfix_v9_templates
+        self.ipfix_templates
             .insert(template_id, template.clone())
             .as_ref()
             != Some(&template)
@@ -197,13 +271,17 @@ impl DecoderStateNamespace {
         template_id: u16,
         scope_fields: Vec<PersistedV9TemplateField>,
         option_fields: Vec<PersistedV9TemplateField>,
+        received_at_usec: u64,
     ) -> bool {
-        let template = PersistedV9OptionsTemplate {
+        let template = PersistedIPFixTemplate {
             template_id,
-            scope_fields,
-            option_fields,
+            received_at_usec,
+            definition: PersistedIPFixTemplateDefinition::V9Options {
+                scope_fields,
+                option_fields,
+            },
         };
-        self.ipfix_v9_options_templates
+        self.ipfix_templates
             .insert(template_id, template.clone())
             .as_ref()
             != Some(&template)

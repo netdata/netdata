@@ -6,18 +6,44 @@ pub(crate) fn field_value_to_string(value: &FieldValue) -> String {
             format!(
                 "{}:{}",
                 app.classification_engine_id,
-                data_number_to_string(&app.selector_id)
+                app.selector_id
+                    .as_ref()
+                    .map(data_number_to_string)
+                    .unwrap_or_default()
             )
         }
-        FieldValue::String(v) => v.clone(),
+        FieldValue::String(v) => v.value.clone(),
         FieldValue::DataNumber(v) => data_number_to_string(v),
         FieldValue::Float64(v) => v.to_string(),
-        FieldValue::Duration(v) => v.as_millis().to_string(),
+        FieldValue::Duration(v) => v.as_duration().as_millis().to_string(),
         FieldValue::Ip4Addr(v) => v.to_string(),
         FieldValue::Ip6Addr(v) => v.to_string(),
-        FieldValue::MacAddr(v) => v.to_string(),
-        FieldValue::Vec(v) | FieldValue::Unknown(v) => bytes_to_hex(v),
+        FieldValue::MacAddr(v) => format!(
+            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+            v[0], v[1], v[2], v[3], v[4], v[5]
+        ),
+        FieldValue::Vec(v) => bytes_to_hex(v),
         FieldValue::ProtocolType(v) => u8::from(*v).to_string(),
+        FieldValue::ForwardingStatus(v) => u8::from(*v).to_string(),
+        FieldValue::FragmentFlags(v) => u8::from(*v).to_string(),
+        FieldValue::TcpControlBits(v, _) => u16::from(*v).to_string(),
+        FieldValue::Ipv6ExtensionHeaders(v) => u32::from(*v).to_string(),
+        FieldValue::Ipv4Options(v) => u32::from(*v).to_string(),
+        FieldValue::TcpOptions(v) => u64::from(*v).to_string(),
+        FieldValue::IsMulticast(v) => u8::from(*v).to_string(),
+        FieldValue::MplsLabelExp(v) => u8::from(*v).to_string(),
+        FieldValue::FlowEndReason(v) => u8::from(*v).to_string(),
+        FieldValue::NatEvent(v) => u8::from(*v).to_string(),
+        FieldValue::FirewallEvent(v) => u8::from(*v).to_string(),
+        FieldValue::MplsTopLabelType(v) => u8::from(*v).to_string(),
+        FieldValue::NatOriginatingAddressRealm(v) => u8::from(*v).to_string(),
+        other => {
+            let mut bytes = Vec::new();
+            other
+                .write_be_bytes(&mut bytes)
+                .map(|()| bytes_to_hex(&bytes))
+                .unwrap_or_default()
+        }
     }
 }
 
@@ -36,15 +62,19 @@ pub(crate) fn field_value_unsigned(value: &FieldValue) -> Option<u64> {
             DataNumber::I64(v) if *v >= 0 => Some(*v as u64),
             DataNumber::U128(v) => u64::try_from(*v).ok(),
             DataNumber::I128(v) if *v >= 0 => u64::try_from(*v).ok(),
+            DataNumber::Vec(v) => decode_be_unsigned(v).and_then(|v| u64::try_from(v).ok()),
             _ => None,
         },
+        FieldValue::Vec(bytes) if (1..=size_of::<u64>()).contains(&bytes.len()) => {
+            decode_be_unsigned(bytes).and_then(|value| u64::try_from(value).ok())
+        }
         _ => None,
     }
 }
 
 pub(crate) fn field_value_duration_usec(value: &FieldValue) -> Option<u64> {
     match value {
-        FieldValue::Duration(duration) => u64::try_from(duration.as_micros()).ok(),
+        FieldValue::Duration(duration) => u64::try_from(duration.as_duration().as_micros()).ok(),
         _ => None,
     }
 }
@@ -63,7 +93,22 @@ pub(crate) fn data_number_to_string(value: &DataNumber) -> String {
         DataNumber::U128(v) => v.to_string(),
         DataNumber::I128(v) => v.to_string(),
         DataNumber::I32(v) => v.to_string(),
+        DataNumber::Vec(v) => decode_be_unsigned(v)
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| bytes_to_hex(v)),
     }
+}
+
+fn decode_be_unsigned(bytes: &[u8]) -> Option<u128> {
+    if bytes.is_empty() || bytes.len() > size_of::<u128>() {
+        return None;
+    }
+
+    Some(
+        bytes
+            .iter()
+            .fold(0_u128, |value, byte| (value << 8) | u128::from(*byte)),
+    )
 }
 
 pub(crate) fn bytes_to_hex(bytes: &[u8]) -> String {
@@ -221,5 +266,25 @@ pub(crate) fn to_field_token(name: &str) -> String {
         "UNKNOWN".to_string()
     } else {
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn raw_field_values_decode_unsigned_widths_one_through_eight() {
+        for width in 1..=8 {
+            let mut bytes = vec![0_u8; width];
+            bytes[width - 1] = 0x10;
+            assert_eq!(field_value_unsigned(&FieldValue::Vec(bytes)), Some(16));
+        }
+    }
+
+    #[test]
+    fn raw_field_values_reject_empty_and_overwide_integers() {
+        assert_eq!(field_value_unsigned(&FieldValue::Vec(Vec::new())), None);
+        assert_eq!(field_value_unsigned(&FieldValue::Vec(vec![0_u8; 9])), None);
     }
 }

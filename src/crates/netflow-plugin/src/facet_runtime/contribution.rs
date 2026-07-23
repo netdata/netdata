@@ -13,6 +13,7 @@ const HASHMAP_ENTRY_OVERHEAD_BYTES: usize = size_of::<usize>() * 2;
 pub(crate) trait FacetValueSink {
     fn insert_text_static(&mut self, field: &'static str, value: &str);
     fn insert_u8_static(&mut self, field: &'static str, value: u8);
+    fn insert_u8_present_static(&mut self, field: &'static str, value: u8);
     fn insert_u16_static(&mut self, field: &'static str, value: u16);
     fn insert_u32_static(&mut self, field: &'static str, value: u32);
     fn insert_u64_static(&mut self, field: &'static str, value: u64);
@@ -196,6 +197,10 @@ impl FacetValueSink for FacetFileContribution {
         FacetFileContribution::insert_u8_static(self, field, value);
     }
 
+    fn insert_u8_present_static(&mut self, field: &'static str, value: u8) {
+        FacetFileContribution::insert_u8_present_static(self, field, value);
+    }
+
     fn insert_u16_static(&mut self, field: &'static str, value: u16) {
         FacetFileContribution::insert_u16_static(self, field, value);
     }
@@ -285,7 +290,12 @@ where
         }
 
         match field {
-            "PROTOCOL" => protocol = Some(value.into_owned()),
+            "PROTOCOL" => {
+                if let Some(spec) = facet_field_spec(field) {
+                    contribution.insert_raw_spec(*spec, value.as_ref());
+                }
+                protocol = Some(value.into_owned());
+            }
             "ICMPV4_TYPE" => icmpv4_type = Some(value.into_owned()),
             "ICMPV4_CODE" => icmpv4_code = Some(value.into_owned()),
             "ICMPV6_TYPE" => icmpv6_type = Some(value.into_owned()),
@@ -328,6 +338,7 @@ fn append_record_core_fields(sink: &mut impl FacetValueSink, record: &FlowRecord
     sink.insert_text_static("EXPORTER_SITE", &record.exporter_site);
     sink.insert_text_static("EXPORTER_REGION", &record.exporter_region);
     sink.insert_text_static("EXPORTER_TENANT", &record.exporter_tenant);
+    sink.insert_u8_present_static("PROTOCOL", record.protocol);
     if record.has_etype() {
         sink.insert_u16_static("ETYPE", record.etype);
     }
@@ -531,6 +542,7 @@ mod tests {
             dst_port: 443,
             ipttl: 64,
             ipv6_flow_label: 1234,
+            ip_fragment_id: 70_000,
             mpls_labels: "100-200".to_string(),
             ..FlowRecord::default()
         };
@@ -558,6 +570,46 @@ mod tests {
         assert_eq!(
             contribution_strings(&direct),
             contribution_strings(&encoded)
+        );
+        assert_eq!(
+            contribution_strings(&direct).get("IP_FRAGMENT_ID"),
+            Some(&vec!["70000".to_string()]),
+            "fragment IDs above u16::MAX must survive direct and encoded contribution paths"
+        );
+        assert_eq!(
+            contribution_strings(&direct).get("PROTOCOL"),
+            Some(&vec!["6".to_string()]),
+            "protocol must survive direct and encoded contribution paths"
+        );
+    }
+
+    #[test]
+    fn record_and_encoded_contributions_preserve_zero_protocol() {
+        let record = FlowRecord {
+            flow_version: "v9",
+            protocol: 0,
+            ..FlowRecord::default()
+        };
+        let mut data = Vec::new();
+        let mut refs = Vec::new();
+        record.encode_to_journal_buf(&mut data, &mut refs);
+        assert!(
+            refs.iter()
+                .any(|range| &data[range.clone()] == b"PROTOCOL=0"),
+            "the raw journal must encode required protocol zero explicitly"
+        );
+
+        let encoded = facet_contribution_from_encoded_fields(refs.iter().map(|r| &data[r.clone()]));
+        let direct = facet_contribution_from_record(&record);
+
+        assert_eq!(
+            contribution_strings(&direct),
+            contribution_strings(&encoded)
+        );
+        assert_eq!(
+            contribution_strings(&direct).get("PROTOCOL"),
+            Some(&vec!["0".to_string()]),
+            "protocol zero is a journaled value, not an absent optional field"
         );
     }
 }

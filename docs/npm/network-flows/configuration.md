@@ -94,6 +94,9 @@ protocols:
   sflow: true
   decapsulation_mode: none
   timestamp_source: input
+  v9_template_lifetime: 90m
+  sampling_cache_max_entries: 100000
+  sampling_cache_max_entries_per_stream: 65536
 ```
 
 | Key | CLI flag | Default | Values |
@@ -105,6 +108,9 @@ protocols:
 | `sflow` | `--netflow-enable-sflow` | `true` | Boolean. sFlow v5. |
 | `decapsulation_mode` | `--netflow-decapsulation-mode` | `none` | `none`, `srv6`, `vxlan`. Strips outer headers from the data-link section, surfaces the inner 5-tuple. |
 | `timestamp_source` | `--netflow-timestamp-source` | `input` | Which timestamp is stored as `_SOURCE_REALTIME_TIMESTAMP`. See below. |
+| `v9_template_lifetime` | `--netflow-v9-template-lifetime` | `90m` | Maximum age of a NetFlow v9 template since its last template refresh. Set YAML or the standalone CLI value to lowercase `null` to disable expiry. Zero is invalid. |
+| `sampling_cache_max_entries` | `--netflow-sampling-cache-max-entries` | `100000` | Maximum learned NetFlow v9/IPFIX sampling-rate entries across all exporter streams. Must be positive. |
+| `sampling_cache_max_entries_per_stream` | `--netflow-sampling-cache-max-entries-per-stream` | `65536` | Maximum learned sampling-rate entries for one exporter stream. Must be positive; values above the global limit are clamped to the global limit and logged at startup. |
 
 You must keep at least one protocol enabled or the plugin refuses to start.
 
@@ -115,6 +121,16 @@ You must keep at least one protocol enabled or the plugin refuses to start.
 - **`netflow_first_switched`** — the time the flow actually started, from the per-record first-switched field when the exporter provides it.
 
 The Network Flows view still uses journal entry time, which is the time the Netdata Agent received the datagram, for query windows and tier selection. `timestamp_source` controls the stored source timestamp metadata; it does not make the dashboard time picker query by exporter timestamps.
+
+### NetFlow v9 templates and exporter streams
+
+NetFlow v9 data records refer to a previously received template. Netdata persists learned templates to disk every 30 seconds and restores them after a normal restart. On the first start, or after a template expires or is evicted, data that arrives before a fresh template cannot be decoded and is counted as a template error.
+
+A NetFlow v9 stream is identified by the exporter IP, UDP source port, and Source ID. This keeps templates separate when clustered Cisco ASA devices share an address but use different source ports. If an exporter changes its UDP source port, it must send templates on the new stream before its data records can be decoded.
+
+`v9_template_lifetime` prevents a stale persisted definition from being used forever after an exporter changes or reuses a Template ID. The timer starts when a template is received; ordinary data does not extend it. The template receive time is persisted, so restarting Netdata does not reset the lifetime.
+
+The two sampling-cache limits bound learned sampling rates independently of template storage. They apply to NetFlow v9 and IPFIX. Reaching a limit evicts the least recently used sampling entry; subsequent records use another rate carried by the record or the normal unsampled/default-rate behavior until the exporter refreshes its sampling options.
 
 ## `journal`
 

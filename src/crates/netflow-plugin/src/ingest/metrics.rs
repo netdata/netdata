@@ -1,7 +1,7 @@
 use super::tier_commit::TierCommitTelemetry;
 use super::*;
 
-pub(super) const INGEST_STATS_SNAPSHOT_KEY_COUNT: usize = 57;
+pub(super) const INGEST_STATS_SNAPSHOT_KEY_COUNT: usize = 71;
 
 #[derive(Default)]
 pub(crate) struct IngestMetrics {
@@ -11,6 +11,20 @@ pub(crate) struct IngestMetrics {
     pub(crate) parsed_packets: AtomicU64,
     pub(crate) parse_errors: AtomicU64,
     pub(crate) template_errors: AtomicU64,
+    pub(crate) parser_source_evictions: AtomicU64,
+    pub(crate) partial_counter_records: AtomicU64,
+    pub(crate) nsel_records: AtomicU64,
+    pub(crate) nsel_update_records: AtomicU64,
+    pub(crate) nsel_create_records: AtomicU64,
+    pub(crate) nsel_teardown_records: AtomicU64,
+    pub(crate) nsel_denied_records: AtomicU64,
+    pub(crate) nsel_unsupported_event_records: AtomicU64,
+    pub(crate) nsel_malformed_records: AtomicU64,
+    pub(crate) nsel_counterless_update_records: AtomicU64,
+    pub(crate) nsel_partial_counter_records: AtomicU64,
+    pub(crate) nsel_zero_responder_records: AtomicU64,
+    pub(crate) nsel_forward_rows: AtomicU64,
+    pub(crate) nsel_reverse_rows: AtomicU64,
     pub(crate) netflow_v5_packets: AtomicU64,
     pub(crate) netflow_v7_packets: AtomicU64,
     pub(crate) netflow_v9_packets: AtomicU64,
@@ -74,6 +88,34 @@ impl IngestMetrics {
             .fetch_add(stats.parse_errors, Ordering::Relaxed);
         self.template_errors
             .fetch_add(stats.template_errors, Ordering::Relaxed);
+        self.parser_source_evictions
+            .fetch_add(stats.parser_source_evictions, Ordering::Relaxed);
+        self.partial_counter_records
+            .fetch_add(stats.partial_counter_records, Ordering::Relaxed);
+        self.nsel_records
+            .fetch_add(stats.nsel_records, Ordering::Relaxed);
+        self.nsel_update_records
+            .fetch_add(stats.nsel_update_records, Ordering::Relaxed);
+        self.nsel_create_records
+            .fetch_add(stats.nsel_create_records, Ordering::Relaxed);
+        self.nsel_teardown_records
+            .fetch_add(stats.nsel_teardown_records, Ordering::Relaxed);
+        self.nsel_denied_records
+            .fetch_add(stats.nsel_denied_records, Ordering::Relaxed);
+        self.nsel_unsupported_event_records
+            .fetch_add(stats.nsel_unsupported_event_records, Ordering::Relaxed);
+        self.nsel_malformed_records
+            .fetch_add(stats.nsel_malformed_records, Ordering::Relaxed);
+        self.nsel_counterless_update_records
+            .fetch_add(stats.nsel_counterless_update_records, Ordering::Relaxed);
+        self.nsel_partial_counter_records
+            .fetch_add(stats.nsel_partial_counter_records, Ordering::Relaxed);
+        self.nsel_zero_responder_records
+            .fetch_add(stats.nsel_zero_responder_records, Ordering::Relaxed);
+        self.nsel_forward_rows
+            .fetch_add(stats.nsel_forward_rows, Ordering::Relaxed);
+        self.nsel_reverse_rows
+            .fetch_add(stats.nsel_reverse_rows, Ordering::Relaxed);
         self.netflow_v5_packets
             .fetch_add(stats.netflow_v5_packets, Ordering::Relaxed);
         self.netflow_v7_packets
@@ -121,6 +163,32 @@ impl IngestMetrics {
         insert!("decoded_parsed_packets", parsed_packets);
         insert!("decoded_parse_errors", parse_errors);
         insert!("decoded_template_errors", template_errors);
+        insert!("decoded_parser_source_evictions", parser_source_evictions);
+        insert!("decoded_partial_counter_records", partial_counter_records);
+        insert!("decoded_nsel_records", nsel_records);
+        insert!("decoded_nsel_update_records", nsel_update_records);
+        insert!("decoded_nsel_create_records", nsel_create_records);
+        insert!("decoded_nsel_teardown_records", nsel_teardown_records);
+        insert!("decoded_nsel_denied_records", nsel_denied_records);
+        insert!(
+            "decoded_nsel_unsupported_event_records",
+            nsel_unsupported_event_records
+        );
+        insert!("decoded_nsel_malformed_records", nsel_malformed_records);
+        insert!(
+            "decoded_nsel_counterless_update_records",
+            nsel_counterless_update_records
+        );
+        insert!(
+            "decoded_nsel_partial_counter_records",
+            nsel_partial_counter_records
+        );
+        insert!(
+            "decoded_nsel_zero_responder_records",
+            nsel_zero_responder_records
+        );
+        insert!("decoded_nsel_forward_rows", nsel_forward_rows);
+        insert!("decoded_nsel_reverse_rows", nsel_reverse_rows);
         insert!("decoded_netflow_v5", netflow_v5_packets);
         insert!("decoded_netflow_v7", netflow_v7_packets);
         insert!("decoded_netflow_v9", netflow_v9_packets);

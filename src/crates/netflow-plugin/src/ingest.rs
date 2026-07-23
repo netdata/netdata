@@ -21,8 +21,9 @@ use journal_sdk_log_writer::{
     Compression, Config, EntryTimestamps, Log, RetentionPolicy, RotationPolicy,
 };
 use journal_sdk_registry::{Monitor, Origin, Registry, Source};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};

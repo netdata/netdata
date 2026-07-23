@@ -90,6 +90,7 @@ pub(crate) struct IngestService {
     pub(super) metrics: Arc<IngestMetrics>,
     pub(super) decoders: FlowDecoders,
     pub(super) decoder_state_dir: PathBuf,
+    pub(super) protected_decoder_state_namespaces: HashSet<DecoderStateNamespaceKey>,
     pub(super) last_decoder_state_persist_usec: u64,
     pub(super) raw_journal: Log,
     pub(super) journal_host: Arc<LocalJournalProvider>,

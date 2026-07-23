@@ -40,6 +40,106 @@ fn ingest_metrics_extend_snapshot_preserves_existing_query_stats_on_key_collisio
 }
 
 #[test]
+fn decode_stats_merge_accumulates_partial_counter_records() {
+    let mut stats = DecodeStats {
+        partial_counter_records: 2,
+        ..DecodeStats::default()
+    };
+
+    stats.merge(&DecodeStats {
+        partial_counter_records: 3,
+        ..DecodeStats::default()
+    });
+
+    assert_eq!(stats.partial_counter_records, 5);
+}
+
+#[test]
+fn ingest_metrics_apply_decode_stats_accumulates_partial_counter_records() {
+    let metrics = IngestMetrics::default();
+
+    metrics.apply_decode_stats(&DecodeStats {
+        partial_counter_records: 2,
+        ..DecodeStats::default()
+    });
+    metrics.apply_decode_stats(&DecodeStats {
+        partial_counter_records: 3,
+        ..DecodeStats::default()
+    });
+
+    assert_eq!(metrics.partial_counter_records.load(Ordering::Relaxed), 5);
+}
+
+#[test]
+fn ingest_metrics_snapshot_exposes_partial_counter_records() {
+    let metrics = IngestMetrics::default();
+    metrics.partial_counter_records.store(7, Ordering::Relaxed);
+
+    let stats = metrics.snapshot();
+
+    assert_eq!(
+        stats.get("decoded_partial_counter_records").copied(),
+        Some(7)
+    );
+}
+
+#[test]
+fn ingest_metrics_snapshot_exposes_parser_source_evictions() {
+    let metrics = IngestMetrics::default();
+    metrics.apply_decode_stats(&DecodeStats {
+        parser_source_evictions: 7,
+        ..DecodeStats::default()
+    });
+
+    let stats = metrics.snapshot();
+
+    assert_eq!(stats.get("decoded_parser_source_evictions"), Some(&7));
+}
+
+#[test]
+fn nsel_decode_stats_survive_merge_and_ingest_metrics() {
+    let one = DecodeStats {
+        nsel_records: 1,
+        nsel_update_records: 2,
+        nsel_create_records: 3,
+        nsel_teardown_records: 4,
+        nsel_denied_records: 5,
+        nsel_unsupported_event_records: 6,
+        nsel_malformed_records: 7,
+        nsel_counterless_update_records: 8,
+        nsel_partial_counter_records: 9,
+        nsel_zero_responder_records: 10,
+        nsel_forward_rows: 11,
+        nsel_reverse_rows: 12,
+        ..DecodeStats::default()
+    };
+    let mut merged = DecodeStats::default();
+    merged.merge(&one);
+    merged.merge(&one);
+
+    let metrics = IngestMetrics::default();
+    metrics.apply_decode_stats(&merged);
+    let snapshot = metrics.snapshot();
+
+    for (key, expected) in [
+        ("decoded_nsel_records", 2),
+        ("decoded_nsel_update_records", 4),
+        ("decoded_nsel_create_records", 6),
+        ("decoded_nsel_teardown_records", 8),
+        ("decoded_nsel_denied_records", 10),
+        ("decoded_nsel_unsupported_event_records", 12),
+        ("decoded_nsel_malformed_records", 14),
+        ("decoded_nsel_counterless_update_records", 16),
+        ("decoded_nsel_partial_counter_records", 18),
+        ("decoded_nsel_zero_responder_records", 20),
+        ("decoded_nsel_forward_rows", 22),
+        ("decoded_nsel_reverse_rows", 24),
+    ] {
+        assert_eq!(snapshot.get(key).copied(), Some(expected), "{key}");
+    }
+}
+
+#[test]
 fn ingest_service_with_decap_none_keeps_outer_header_view() {
     let (_tmp, mut service) = new_test_ingest_service(ConfigDecapsulationMode::None);
     let flows = decode_fixture_sequence(
@@ -161,6 +261,10 @@ fn ingest_service_restores_decoder_state_from_disk_after_restart() {
     );
 
     let mut second = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    assert!(
+        second.decoders.decoder_state_namespace_keys().is_empty(),
+        "restart must load decoder state only when that exporter sends traffic"
+    );
 
     let v9_flows = decode_fixture_sequence(&mut second, &["data.pcap"]);
     assert_eq!(
@@ -274,23 +378,237 @@ fn ingest_service_persist_decoder_state_skips_clean_namespaces() {
     );
 }
 
+fn v9_decoder_state_path(
+    service: &mut IngestService,
+) -> (DecoderStateNamespaceKey, std::path::PathBuf) {
+    let _ = decode_fixture_sequence(service, &["template.pcap"]);
+    let key = service
+        .decoders
+        .decoder_state_namespace_keys()
+        .into_iter()
+        .next()
+        .expect("expected v9 decoder namespace");
+    let path = service
+        .decoder_state_dir
+        .join(FlowDecoders::decoder_state_namespace_filename(&key));
+    (key, path)
+}
+
+fn decoder_state_quarantine_paths(path: &Path) -> Vec<std::path::PathBuf> {
+    let prefix = format!(
+        "{}.quarantine-",
+        path.file_name().unwrap().to_string_lossy()
+    );
+    let mut paths = std::fs::read_dir(path.parent().unwrap())
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|candidate| {
+            candidate
+                .file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with(&prefix))
+        })
+        .collect::<Vec<_>>();
+    paths.sort();
+    paths
+}
+
 #[test]
-fn ingest_service_preload_decoder_state_skips_oversized_namespace_file() {
+fn ingest_service_preserves_oversized_unknown_schema_namespace_file() {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let mut seed = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let (key, path) = v9_decoder_state_path(&mut seed);
+    drop(seed);
+
+    let file = std::fs::File::create(&path).unwrap();
+    file.set_len((crate::decoder::MAX_DECODER_STATE_FILE_LEN + 1) as u64)
+        .unwrap();
+
+    let mut reloaded = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let _ = decode_fixture_sequence(&mut reloaded, &["template.pcap"]);
+    reloaded.persist_decoder_state();
+
+    assert_eq!(
+        std::fs::metadata(&path).unwrap().len(),
+        (crate::decoder::MAX_DECODER_STATE_FILE_LEN + 1) as u64
+    );
+    assert!(reloaded.protected_decoder_state_namespaces.contains(&key));
+    assert!(decoder_state_quarantine_paths(&path).is_empty());
+}
+
+#[test]
+fn ingest_service_preserves_future_schema_namespace_file() {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let mut seed = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let (key, path) = v9_decoder_state_path(&mut seed);
+    drop(seed);
+
+    let mut future = b"NDFS".to_vec();
+    future.extend_from_slice(&6_u32.to_le_bytes());
+    future.extend_from_slice(b"future-format");
+    std::fs::write(&path, &future).unwrap();
+
+    let mut reloaded = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let _ = decode_fixture_sequence(&mut reloaded, &["template.pcap"]);
+    reloaded.persist_decoder_state();
+
+    assert_eq!(std::fs::read(&path).unwrap(), future);
+    assert!(reloaded.protected_decoder_state_namespaces.contains(&key));
+    assert!(decoder_state_quarantine_paths(&path).is_empty());
+}
+
+#[test]
+fn ingest_service_protects_non_regular_decoder_state() {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let mut seed = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let (key, path) = v9_decoder_state_path(&mut seed);
+    drop(seed);
+
+    std::fs::create_dir(&path).unwrap();
+
+    let mut reloaded = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let _ = decode_fixture_sequence(&mut reloaded, &["template.pcap"]);
+    reloaded.persist_decoder_state();
+
+    assert!(path.is_dir());
+    assert!(reloaded.protected_decoder_state_namespaces.contains(&key));
+    assert!(decoder_state_quarantine_paths(&path).is_empty());
+}
+
+#[test]
+fn ingest_service_startup_removes_obsolete_schema_two_three_and_four_state() {
     let tmp = tempfile::tempdir().expect("create temp dir");
     let service = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
-    let decoder_state_dir = service.decoder_state_dir.clone();
+    let dir = service.decoder_state_dir.clone();
     drop(service);
 
-    let path = decoder_state_dir.join("oversized_decoder_state.bin");
-    let persisted = vec![0_u8; crate::decoder::MAX_DECODER_STATE_FILE_LEN + 1];
-    std::fs::write(&path, &persisted)
-        .unwrap_or_else(|e| panic!("write oversized decoder state {}: {e}", path.display()));
+    let state_header = |version: u32| {
+        let mut bytes = b"NDFS".to_vec();
+        bytes.extend_from_slice(&version.to_le_bytes());
+        bytes
+    };
+    let obsolete_two = dir.join("schema-two.bin");
+    let obsolete_three = dir.join("schema-three.bin");
+    let obsolete_four = dir.join("schema-four.bin");
+    let quarantined_four = dir.join("schema-four.bin.quarantine-evidence");
+    let current = dir.join("schema-five.bin");
+    let future = dir.join("schema-six.bin");
+    let unrelated = dir.join("unrelated.bin");
+    std::fs::write(&obsolete_two, state_header(2)).unwrap();
+    std::fs::write(&obsolete_three, state_header(3)).unwrap();
+    std::fs::write(&obsolete_four, state_header(4)).unwrap();
+    std::fs::write(&quarantined_four, state_header(4)).unwrap();
+    std::fs::write(&current, state_header(5)).unwrap();
+    std::fs::write(&future, state_header(6)).unwrap();
+    std::fs::write(&unrelated, b"not decoder state").unwrap();
 
-    let reloaded = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
-    assert!(
-        reloaded.decoders.decoder_state_namespace_keys().is_empty(),
-        "oversized decoder-state file should be skipped during preload"
+    let _reloaded = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+
+    assert!(!obsolete_two.exists());
+    assert!(!obsolete_three.exists());
+    assert!(!obsolete_four.exists());
+    assert!(quarantined_four.exists());
+    assert!(current.exists());
+    assert!(future.exists());
+    assert!(unrelated.exists());
+}
+
+#[test]
+fn ingest_service_quarantines_corrupt_current_state_and_persists_relearned_state() {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let mut first = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let _ = decode_fixture_sequence(&mut first, &["template.pcap"]);
+    first.persist_decoder_state();
+    let key = first
+        .decoders
+        .decoder_state_namespace_keys()
+        .into_iter()
+        .next()
+        .expect("expected persisted namespace");
+    let path = first
+        .decoder_state_dir
+        .join(FlowDecoders::decoder_state_namespace_filename(&key));
+    drop(first);
+
+    let mut corrupt = b"NDFS".to_vec();
+    corrupt.extend_from_slice(&5_u32.to_le_bytes());
+    corrupt.extend_from_slice(b"broken");
+    std::fs::write(&path, &corrupt).unwrap();
+    let mut second = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let _ = decode_fixture_sequence(&mut second, &["template.pcap"]);
+    second.persist_decoder_state();
+
+    let quarantined = decoder_state_quarantine_paths(&path);
+    assert_eq!(quarantined.len(), 1);
+    assert_eq!(std::fs::read(&quarantined[0]).unwrap(), corrupt);
+    let replacement = std::fs::read(&path).unwrap();
+    assert_ne!(replacement, corrupt);
+    assert_eq!(
+        crate::decoder::decoder_state_schema_version(&replacement),
+        Some(5)
     );
+}
+
+#[test]
+fn ingest_service_quarantines_oversized_current_state_and_persists_relearned_state() {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let mut seed = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let (_key, path) = v9_decoder_state_path(&mut seed);
+    drop(seed);
+
+    let mut file = std::fs::File::create(&path).unwrap();
+    std::io::Write::write_all(&mut file, b"NDFS").unwrap();
+    std::io::Write::write_all(&mut file, &5_u32.to_le_bytes()).unwrap();
+    file.set_len((crate::decoder::MAX_DECODER_STATE_FILE_LEN + 1) as u64)
+        .unwrap();
+    drop(file);
+
+    let mut reloaded = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let _ = decode_fixture_sequence(&mut reloaded, &["template.pcap"]);
+    reloaded.persist_decoder_state();
+
+    let quarantined = decoder_state_quarantine_paths(&path);
+    assert_eq!(quarantined.len(), 1);
+    assert_eq!(
+        std::fs::metadata(&quarantined[0]).unwrap().len(),
+        (crate::decoder::MAX_DECODER_STATE_FILE_LEN + 1) as u64
+    );
+    let replacement = std::fs::read(&path).unwrap();
+    assert!(replacement.len() <= crate::decoder::MAX_DECODER_STATE_FILE_LEN);
+    assert_eq!(
+        crate::decoder::decoder_state_schema_version(&replacement),
+        Some(5)
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn ingest_service_protects_symlinked_decoder_state() {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let mut seed = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let (key, path) = v9_decoder_state_path(&mut seed);
+    drop(seed);
+
+    let target = tmp.path().join("external-state");
+    let mut corrupt = b"NDFS".to_vec();
+    corrupt.extend_from_slice(&5_u32.to_le_bytes());
+    corrupt.extend_from_slice(b"broken");
+    std::fs::write(&target, &corrupt).unwrap();
+    std::os::unix::fs::symlink(&target, &path).unwrap();
+
+    let mut reloaded = new_test_ingest_service_in_dir(tmp.path(), ConfigDecapsulationMode::None);
+    let _ = decode_fixture_sequence(&mut reloaded, &["template.pcap"]);
+    reloaded.persist_decoder_state();
+
+    assert!(
+        std::fs::symlink_metadata(&path)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    assert_eq!(std::fs::read(&target).unwrap(), corrupt);
+    assert!(reloaded.protected_decoder_state_namespaces.contains(&key));
+    assert!(decoder_state_quarantine_paths(&path).is_empty());
 }
 
 #[test]

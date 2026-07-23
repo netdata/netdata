@@ -74,7 +74,7 @@ Globe view, top-N at 500, rotated over the Atlantic. The 3D projection shows US 
 
 ### GeoIP is required
 
-Without a GeoIP database, country / state / city / coordinate fields are empty and the maps are blank. Native packages include a stock DB-IP database — see the [DB-IP integration card](/src/crates/netflow-plugin/integrations/db-ip_ip_intelligence.md) and the [Enrichment Intel Downloader](/docs/npm/network-flows/intel-downloader.md). Source builds need the operator to run the downloader once.
+Without a GeoIP database, country / state / city / coordinate fields are empty and the maps are blank. Native packages and static builds that include the NetFlow plugin (x86_64, ARMv7, and AArch64) include a stock DB-IP database — see the [DB-IP integration card](/src/crates/netflow-plugin/integrations/db-ip_ip_intelligence.md) and the [Enrichment Intel Downloader](/docs/npm/network-flows/intel-downloader.md). Source builds need the operator to run the downloader once.
 
 ### CDN traffic shifts
 

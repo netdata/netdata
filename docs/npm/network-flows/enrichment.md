@@ -131,7 +131,7 @@ When neither `asn_database` nor `geo_database` is configured, the plugin searche
 1. **`<cache_dir>/topology-ip-intel/`** — where `cache_dir` is the parent of `journal.journal_dir` if that path is absolute, otherwise `NETDATA_CACHE_DIR`. Typically `/var/cache/netdata/topology-ip-intel/`.
 2. **`<stock_data_dir>/topology-ip-intel/`** — typically `/usr/share/netdata/topology-ip-intel/`.
 
-The canonical filenames are `topology-ip-asn.mmdb` and `topology-ip-geo.mmdb`. Native packages ship stock DB-IP files under the stock data directory. The [Intel Downloader](/docs/npm/network-flows/intel-downloader.md) writes fresher copies to the cache directory, which takes precedence over stock files. Netdata does not install a downloader timer; schedule one if freshness matters.
+The canonical filenames are `topology-ip-asn.mmdb` and `topology-ip-geo.mmdb`. Native packages and static builds that include the NetFlow plugin (x86_64, ARMv7, and AArch64) ship stock DB-IP files under the stock data directory. The [Intel Downloader](/docs/npm/network-flows/intel-downloader.md) writes fresher copies to the cache directory, which takes precedence over stock files. Netdata does not install a downloader timer; schedule one if freshness matters.
 
 ### Composition: last non-empty wins, per field
 
