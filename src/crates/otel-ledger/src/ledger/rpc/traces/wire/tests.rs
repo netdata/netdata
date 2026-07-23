@@ -61,6 +61,38 @@ fn each_data_selector_selects_its_mode() {
 }
 
 #[test]
+fn a_present_but_null_selector_still_selects_its_mode() {
+    // serde's stock Option<Value> would swallow the null into "absent"
+    // and silently fall through to search; the presence-preserving
+    // deserializer keeps the selection so the typed parse can reject
+    // the null loudly.
+    assert_eq!(req(json!({"trace": null})).mode(), Ok(RequestMode::Trace));
+    assert_eq!(
+        req(json!({"overview": null})).mode(),
+        Ok(RequestMode::Overview)
+    );
+}
+
+#[test]
+fn trace_params_reject_null_and_malformed_selectors() {
+    let cases = [
+        (json!({"trace": null}), "invalid trace selector"),
+        (json!({"trace": 7}), "invalid trace selector"),
+        (json!({"trace": {}}), "missing field `id`"),
+        (json!({"trace": {"id": "00", "bogus": 1}}), "unknown field"),
+    ];
+    for (body, needle) in cases {
+        let err = req(body.clone()).trace_params().expect_err("must reject");
+        assert!(err.contains(needle), "for {body}: {err}");
+    }
+    let ok = req(json!({"trace": {"id": "00ff", "span_cap": 9}}))
+        .trace_params()
+        .unwrap();
+    assert_eq!(ok.id, "00ff");
+    assert_eq!(ok.span_cap, Some(9));
+}
+
+#[test]
 fn conflicting_data_selectors_are_a_client_error() {
     let err = req(json!({"trace": {}, "overview": {}}))
         .mode()

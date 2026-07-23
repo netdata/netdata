@@ -33,20 +33,23 @@ pub struct OtelTracesRequest {
     /// (`patch_args_into_payload`).
     #[serde(default)]
     pub info: bool,
-    /// Selects the single-trace mode (dumb span list by trace id). The
-    /// typed shape is pinned in step 1.2; until then any payload selects
-    /// the mode and gets the not-implemented error.
-    #[serde(default)]
+    /// Selects the single-trace mode (dumb span list by trace id). Kept
+    /// as a raw value so the selector's PRESENCE picks the mode (see
+    /// `present` — a present-but-`null` selector still selects, it does
+    /// NOT fall through to another mode) and the typed parse
+    /// ([`OtelTracesRequest::trace_params`]) turns a malformed body —
+    /// `null` included — into a clean client error.
+    #[serde(default, deserialize_with = "present")]
     pub trace: Option<serde_json::Value>,
     /// Selects attribute-name enumeration (facet keys). Typed in step 1.4.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "present")]
     pub attributes: Option<serde_json::Value>,
     /// Selects attribute-value enumeration (facet values). Typed in step 1.4.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "present")]
     pub attribute_values: Option<serde_json::Value>,
     /// Selects the overview grid (time × log-duration density). Typed in
     /// step 1.5.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "present")]
     pub overview: Option<serde_json::Value>,
     /// Query window, unix seconds. Common to every data mode.
     #[serde(default)]
@@ -62,6 +65,19 @@ pub struct OtelTracesRequest {
     pub tenant: Option<String>,
     #[serde(default)]
     pub timeout: Option<u32>,
+}
+
+/// Presence-preserving selector deserializer: serde's stock
+/// `Option<Value>` maps a present-but-`null` key to `None`, which would
+/// silently fall through to another mode — here it becomes
+/// `Some(Value::Null)` so the mode is selected and the typed parse
+/// rejects the null with a clean error. Absent keys never reach this
+/// function (`#[serde(default)]` covers them).
+fn present<'de, D>(d: D) -> Result<Option<serde_json::Value>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    serde_json::Value::deserialize(d).map(Some)
 }
 
 /// The mode a request resolves to. `Search` is the default data mode (a
@@ -131,6 +147,32 @@ impl OtelTracesRequest {
             _ => Err(ModeConflict(set.into_iter().map(|(n, _)| n).collect())),
         }
     }
+
+    /// Parse the `trace` selector into its typed params. Only called
+    /// after [`mode`](Self::mode) resolved to [`RequestMode::Trace`], so
+    /// the selector is present; anything but a well-formed object —
+    /// `null` included — is a client error.
+    pub fn trace_params(&self) -> Result<TraceParams, String> {
+        let v = self
+            .trace
+            .as_ref()
+            .expect("trace_params is only called on RequestMode::Trace");
+        serde_json::from_value(v.clone()).map_err(|e| format!("invalid trace selector: {e}"))
+    }
+}
+
+/// The `trace` mode's typed parameters. Unknown fields are rejected —
+/// a misspelled parameter on a two-field object is a client error, not
+/// a silent ignore.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TraceParams {
+    /// The trace id: 32 hex chars (16 bytes), case-insensitive — the
+    /// W3C trace-context text form.
+    pub id: String,
+    /// Span cap override (engine default 65,536; zero rejected).
+    #[serde(default)]
+    pub span_cap: Option<usize>,
 }
 
 // ── Response ────────────────────────────────────────────────────────
@@ -142,6 +184,96 @@ impl OtelTracesRequest {
 #[serde(untagged)]
 pub enum OtelTracesResponse {
     Info(InfoResponse),
+    Trace(Box<TraceResult>),
+}
+
+// ── Trace mode response ─────────────────────────────────────────────
+
+/// One assembled trace: the dumb span list plus the parent/child graph
+/// and the typed-field map — everything the UI needs to render a plain
+/// span table (a proper waterfall is deliberately future work).
+///
+/// The graph is node-index adjacency over `spans`: walk from `roots`
+/// via `children`; `children` can carry cycle edges (pathological
+/// input), so a walker MUST guard against revisiting a node.
+/// `summary_root` is the DISPLAY root (the OTLP root convention), a
+/// separate derivation from the reachability roots.
+#[derive(Debug, Serialize)]
+pub struct TraceResult {
+    pub version: u32,
+    /// The queried id, echoed in canonical lowercase hex.
+    pub trace_id: String,
+    /// Query-level completeness. An absent id yields a COMPLETE empty
+    /// trace (zero spans) — "nothing stored" is an answer, not an error.
+    pub status: StatusWire,
+    pub items: TraceItems,
+    pub summary_root: Option<usize>,
+    pub roots: Vec<usize>,
+    pub children: Vec<Vec<usize>>,
+    pub spans: Vec<SpanWire>,
+    pub field_kinds: FieldKindsWire,
+}
+
+/// Result accounting. `returned` counts the spans in this response —
+/// under a `size_cap` partial, more unique spans exist than returned.
+#[derive(Debug, Serialize)]
+pub struct TraceItems {
+    pub returned: usize,
+}
+
+/// One span, ids in W3C lowercase hex. `fields` are the engine's
+/// resolved row facets as `[name, value]` string pairs (order
+/// preserved; names are storage names — `field_kinds.fields` carries
+/// their schema kinds). `kind` is the raw OTLP span-kind int; the
+/// readable label is in `fields` under `kind`.
+#[derive(Debug, Serialize)]
+pub struct SpanWire {
+    pub span_id: String,
+    /// Absent for a root span (the OTLP unset-parent convention).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_span_id: Option<String>,
+    pub start_ns: i64,
+    pub duration_ns: i64,
+    pub kind: i32,
+    pub flags: u32,
+    pub dropped_attributes_count: u32,
+    pub dropped_events_count: u32,
+    pub dropped_links_count: u32,
+    pub fields: Vec<(String, String)>,
+    pub events: Vec<EventWire>,
+    pub links: Vec<LinkWire>,
+}
+
+/// One span event; attribute keys are prefix-stripped (`foo`, not
+/// `events.attributes.foo`).
+#[derive(Debug, Serialize)]
+pub struct EventWire {
+    pub time_unix_nano: u64,
+    pub name: String,
+    pub dropped_attributes_count: u32,
+    pub attributes: Vec<(String, String)>,
+}
+
+/// One span link, ids in W3C lowercase hex.
+#[derive(Debug, Serialize)]
+pub struct LinkWire {
+    pub trace_id: String,
+    pub span_id: String,
+    pub trace_state: String,
+    pub flags: u32,
+    pub dropped_attributes_count: u32,
+    pub attributes: Vec<(String, String)>,
+}
+
+/// The sectioned name→kind map (span fields / event attributes / link
+/// attributes — sectioned because an event attr and a link attr may
+/// share a name with different kinds). Kind words are pinned by the
+/// adapter's exhaustive mapping.
+#[derive(Debug, Serialize)]
+pub struct FieldKindsWire {
+    pub fields: Vec<(String, &'static str)>,
+    pub event_attributes: Vec<(String, &'static str)>,
+    pub link_attributes: Vec<(String, &'static str)>,
 }
 
 #[derive(Debug, Serialize)]

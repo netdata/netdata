@@ -47,3 +47,7 @@ bytesize = { workspace = true }
 sfst = { workspace = true, features = ["test-util"] }
 tempfile = { workspace = true }
 treight = { workspace = true }
+# The traces source-supplier tests build real trace WALs (OTLP requests
+# flattened into trace frames) to cover the chunk/tail resolution path.
+ng-flatten = { workspace = true }
+opentelemetry-proto = { workspace = true }
