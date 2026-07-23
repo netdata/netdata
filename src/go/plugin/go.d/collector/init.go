@@ -112,7 +112,6 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rspamd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/samba"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/scaleio"
-	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sensors"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smartctl"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/spigotmc"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sql"
