@@ -113,6 +113,12 @@ static bool etw_register_provider(void) {
     if(EventRegister(&NETDATA_ETW_PROVIDER_GUID, NULL, NULL, &regHandle) != ERROR_SUCCESS)
         return false;
 
+    // The event ID encodes the log source. The static source table starts at
+    // zero (NDLS_UNSET), so initialize the Windows-specific identity before
+    // any event can be queued.
+    for(size_t i = 0; i < _NDLS_MAX; i++)
+        nd_log.sources[i].source = i;
+
     etw_set_source_meta(&nd_log.sources[NDLS_DAEMON], CHANNEL_DAEMON, &ED_DAEMON_INFO_MESSAGE_ONLY);
     etw_set_source_meta(&nd_log.sources[NDLS_COLLECTORS], CHANNEL_COLLECTORS, &ED_COLLECTORS_INFO_MESSAGE_ONLY);
     etw_set_source_meta(&nd_log.sources[NDLS_ACCESS], CHANNEL_ACCESS, &ED_ACCESS_INFO_MESSAGE_ONLY);
