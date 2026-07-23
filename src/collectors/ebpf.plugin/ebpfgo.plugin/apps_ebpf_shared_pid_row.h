@@ -175,7 +175,12 @@ static inline uint64_t ebpfgo_shm_now_monotonic_usec(void)
     return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
 }
 
-/* Timed semaphore acquire: 200 ms deadline per attempt, retries on EINTR. */
+/* Timed semaphore acquire: 200 ms deadline, CLOCK_MONOTONIC.
+ *
+ * sem_timedwait requires a CLOCK_REALTIME absolute deadline; an NTP forward
+ * step can push that deadline into the past, causing immediate ETIMEDOUT and
+ * a spurious replace_generation.  We avoid that by measuring the deadline
+ * with CLOCK_MONOTONIC and polling with sem_trywait + clock_nanosleep. */
 static inline bool ebpfgo_shm_sem_wait(sem_t *sem)
 {
     if (!sem || sem == SEM_FAILED) {
@@ -183,24 +188,33 @@ static inline bool ebpfgo_shm_sem_wait(sem_t *sem)
         return false;
     }
 
+    struct timespec deadline;
+    if (clock_gettime(CLOCK_MONOTONIC, &deadline) == -1)
+        return false;
+
+    deadline.tv_nsec += 200 * 1000 * 1000;  /* +200 ms */
+    if (deadline.tv_nsec >= 1000000000L) {
+        deadline.tv_sec  += deadline.tv_nsec / 1000000000L;
+        deadline.tv_nsec %= 1000000000L;
+    }
+
     while (1) {
-        struct timespec ts;
-        if (clock_gettime(CLOCK_REALTIME, &ts) == -1)
-            return false;
-
-        ts.tv_nsec += 200 * 1000 * 1000;
-        if (ts.tv_nsec >= 1000000000L) {
-            ts.tv_sec  += ts.tv_nsec / 1000000000L;
-            ts.tv_nsec %= 1000000000L;
-        }
-
-        if (sem_timedwait(sem, &ts) == 0)
+        if (sem_trywait(sem) == 0)
             return true;
 
-        if (errno == EINTR)
-            continue;
+        if (errno != EAGAIN)
+            return false;
 
-        return false;
+        struct timespec now;
+        if (clock_gettime(CLOCK_MONOTONIC, &now) == -1)
+            return false;
+
+        if (now.tv_sec > deadline.tv_sec ||
+            (now.tv_sec == deadline.tv_sec && now.tv_nsec >= deadline.tv_nsec))
+            return false;  /* timed out */
+
+        struct timespec slp = { .tv_sec = 0, .tv_nsec = 1000000L };  /* 1 ms */
+        clock_nanosleep(CLOCK_MONOTONIC, 0, &slp, NULL);
     }
 }
 #endif /* __linux__ */

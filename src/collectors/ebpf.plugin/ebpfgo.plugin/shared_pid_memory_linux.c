@@ -51,6 +51,11 @@ static void shared_pid_memory_invalidate(struct shared_pid_memory *ctx)
             locked = true;
     }
 
+    /* The semaphore guards the large entries[] array during publish.  These two
+     * header scalars are written atomically (no tearing) and the reader detects
+     * staleness via last_publish_ut == 0, so the writes are safe whether or not
+     * we hold the semaphore.  This is the shutdown path; publish will not run
+     * again on this context. */
     __atomic_store_n(&ctx->header->flags, 0, __ATOMIC_RELEASE);
     __atomic_store_n(&ctx->header->last_publish_ut, 0, __ATOMIC_RELEASE);
 

@@ -37,6 +37,9 @@ static void shared_dns_memory_invalidate(struct shared_dns_memory *ctx)
             locked = true;
     }
 
+    /* Same rationale as shared_pid_memory_invalidate: these header scalars are
+     * written atomically and the reader detects staleness via last_publish_ut,
+     * so the writes are safe with or without the semaphore.  Shutdown path only. */
     __atomic_store_n(&ctx->data->hdr.live_count,      0, __ATOMIC_RELEASE);
     __atomic_store_n(&ctx->data->hdr.last_publish_ut, 0, __ATOMIC_RELEASE);
 
