@@ -163,11 +163,9 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 }
 
 func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
-	if ck.shutdownPhase == commandShutdownRunning && ck.tasks.Pending() != 0 {
-		deadline := ck.nextDeadline()
-		if !deadline.IsZero() && !deadline.After(ck.clock.Now()) {
-			return true
-		}
+	if ck.shutdownPhase == commandShutdownRunning && ck.tasks.Pending() != 0 && ck.hasDueDeadline(ck.clock.Now()) {
+		// Dispatch starts work immediately and cannot skip an expired request, so drain every due deadline first.
+		return true
 	}
 	var started [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
 	count, more, dispatchErr := ck.tasks.Dispatch(context.Background(), quantum, &started)

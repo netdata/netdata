@@ -187,7 +187,8 @@ func (dcjc *DynCfgJobController) Prepare(
 	target, failure := dcjc.resolveRequest(request)
 	if failure.valid {
 		transaction, err := dcjc.noop(scope, current, permit, failure.result)
-		return dcjc.observeTransaction(target, transaction, err)
+		command, resource := dynCfgRequestDiagnosticIdentity(request, scope)
+		return dcjc.observeTransaction(command, resource, transaction, err)
 	}
 	if target.resourceID != scope.ID {
 		return nil, errors.New("job output: DynCfg target differs from transaction scope")
@@ -223,7 +224,7 @@ func (dcjc *DynCfgJobController) Prepare(
 			),
 		)
 	}
-	return dcjc.observeTransaction(target, transaction, err)
+	return dcjc.observeTransaction(target.command, target.resourceID, transaction, err)
 }
 
 func (dcjc *DynCfgJobController) configID(module string, name string) string {

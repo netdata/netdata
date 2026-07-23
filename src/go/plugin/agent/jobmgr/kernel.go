@@ -504,11 +504,7 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		ck.completeResourceTransactionTask(operation, completion)
 		return
 	}
-	if (operation.cancelled || operation.TimedOut()) &&
-		operation.Response == lifecycle.ResponseOpen &&
-		!operation.controlQueued {
-		ck.enqueueControl(operation, cancellationControl(operation))
-	}
+	ck.enqueueCancellationControlIfNeeded(operation)
 	action := lifecycle.TaskAction{
 		Ref:      completion.Ref,
 		Sequence: completion.Sequence + 1,
@@ -618,11 +614,7 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 		}
 		operation.transactionApplied = true
 
-		if (operation.cancelled || operation.TimedOut()) &&
-			operation.Response == lifecycle.ResponseOpen &&
-			!operation.controlQueued {
-			ck.enqueueControl(operation, cancellationControl(operation))
-		}
+		ck.enqueueCancellationControlIfNeeded(operation)
 		if operation.Response == lifecycle.ResponseOpen && !operation.controlQueued {
 			if ck.beginResultEncode(operation, completion.Ref) {
 				return
@@ -1031,11 +1023,7 @@ func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 					return
 				}
 			}
-			if (operation.cancelled || operation.TimedOut()) &&
-				operation.Response == lifecycle.ResponseOpen &&
-				!operation.controlQueued {
-				ck.enqueueControl(operation, cancellationControl(operation))
-			}
+			ck.enqueueCancellationControlIfNeeded(operation)
 			ck.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 			return
 		}
@@ -1169,6 +1157,13 @@ func (ck *CommandKernel) cancelOperationForShutdown(operation *commandOperation)
 		return errors.New("jobmgr kernel: invalid shutdown child state")
 	}
 	return nil
+}
+
+func (ck *CommandKernel) enqueueCancellationControlIfNeeded(operation *commandOperation) {
+	if operation == nil || !operation.cancelled && !operation.TimedOut() {
+		return
+	}
+	ck.enqueueControl(operation, cancellationControl(operation))
 }
 
 func cancellationControl(operation *commandOperation) lifecycle.ControlStatus {

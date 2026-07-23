@@ -11,7 +11,7 @@ import (
 type WorkPlan struct {
 	Work                lifecycle.TaskWork       // command work (one work source)
 	Transaction         *ResourceTransactionPlan // resource transaction plan (one work source)
-	Claims              []string                 // write claim keys
+	Claims              []string                 // exclusive claim keys
 	NoResponse          bool                     // the command produces no terminal response frame
 	CooperativeCancel   bool                     // work honors cooperative cancellation
 	CooperativeDeadline bool                     // work honors the caller deadline

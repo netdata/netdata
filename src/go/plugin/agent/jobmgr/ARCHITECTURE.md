@@ -147,7 +147,7 @@ flowchart TD
     Submit("Submit<br/>adapter, off-loop")
     Admit("Admit<br/>UID dedupe · route · lane")
     Lane("Lane<br/>per-resource FIFO")
-    Claim("Claims<br/>read / write ordering")
+    Claim("Claims<br/>exclusive cross-lane ordering")
     Task("Run task<br/>goroutine, off-loop")
     Complete("Apply completion<br/>on-loop")
     Frame("FrameOwner<br/>terminal frame → stdout")

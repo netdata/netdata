@@ -104,7 +104,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 		}
 		moreDeadlines := false
 		if !shuttingDown {
-			if deadline := ck.nextDeadline(); !deadline.IsZero() && !deadline.After(ck.clock.Now()) {
+			if ck.hasDueDeadline(ck.clock.Now()) {
 				moreDeadlines = ck.serviceDeadlines(ck.clock.Now(), 4)
 			}
 		}

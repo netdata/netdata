@@ -100,7 +100,7 @@ func (ck *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 			ck.enqueueControl(operation, lifecycle.ControlDeadline)
 		}
 	}
-	return ck.deadlines.Len() > 0 && !ck.deadlines[0].when.After(now)
+	return ck.hasDueDeadline(now)
 }
 
 func requiresCooperativeDeadlineStart(operation *commandOperation) bool {
@@ -590,4 +590,8 @@ func (ck *CommandKernel) nextDeadline() time.Time {
 		return time.Time{}
 	}
 	return ck.deadlines[0].when
+}
+
+func (ck *CommandKernel) hasDueDeadline(now time.Time) bool {
+	return ck.deadlines.Len() != 0 && !ck.deadlines[0].when.After(now)
 }

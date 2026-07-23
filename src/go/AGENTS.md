@@ -141,7 +141,7 @@ wrapping tight and keyed struct literals readable:
    split lines past ~120 columns. SKIP this step if `golines` is not installed
    (`go install github.com/segmentio/golines@latest`).
 2. `go run ./tools/expandstructs <paths>` — put each keyed struct-literal field
-   on its own line. Runs `gofmt` internally.
+   on its own line. Formats source in-process with `go/format`.
 3. `goimports -w <paths>` — order imports.
 
 Conventions this encodes:

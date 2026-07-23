@@ -4,15 +4,18 @@ package joboutput
 
 import (
 	"context"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 type diagnosticJobTransaction struct {
 	transaction lifecycle.PreparedResourceTransaction
 	controller  *DynCfgJobController
-	target      dynCfgTarget
+	command     dyncfg.Command
+	resource    string
 }
 
 func (djt *diagnosticJobTransaction) Scope() lifecycle.ResourceTransactionScope {
@@ -29,14 +32,14 @@ func (djt *diagnosticJobTransaction) Apply(ctx context.Context) (lifecycle.Appli
 		name = "job configuration command failed"
 	}
 	state := "removed"
-	if record, ok := djt.controller.graph.Lookup(djt.target.resourceID); ok {
+	if record, ok := djt.controller.graph.Lookup(djt.resource); ok {
 		state = record.Status
 	}
 	jobmgr.ObserveDiagnostic(djt.controller.diagnostics, jobmgr.DiagnosticEvent{
 		Level:        level,
 		Name:         name,
-		Resource:     djt.target.resourceID,
-		Command:      string(djt.target.command),
+		Resource:     djt.resource,
+		Command:      string(djt.command),
 		State:        state,
 		Generation:   djt.controller.generation,
 		ResultStatus: status,
@@ -46,11 +49,13 @@ func (djt *diagnosticJobTransaction) Apply(ctx context.Context) (lifecycle.Appli
 }
 
 func (djt *diagnosticJobTransaction) Dispose(ctx context.Context) (lifecycle.ReadyResource, error) {
+	// Disposal is an unapplied rollback; only the kernel knows whether cancellation, deadline, or shutdown caused it.
 	return djt.transaction.Dispose(ctx)
 }
 
 func (dcjc *DynCfgJobController) observeTransaction(
-	target dynCfgTarget,
+	command dyncfg.Command,
+	resource string,
 	transaction lifecycle.PreparedResourceTransaction,
 	err error,
 ) (lifecycle.PreparedResourceTransaction, error) {
@@ -60,6 +65,23 @@ func (dcjc *DynCfgJobController) observeTransaction(
 	return &diagnosticJobTransaction{
 		transaction: transaction,
 		controller:  dcjc,
-		target:      target,
+		command:     command,
+		resource:    resource,
 	}, nil
+}
+
+func dynCfgRequestDiagnosticIdentity(
+	request DynCfgJobRequest,
+	scope lifecycle.ResourceTransactionScope,
+) (dyncfg.Command, string) {
+	var command dyncfg.Command
+	if len(request.Args) >= 2 {
+		command = dyncfg.Command(strings.ToLower(request.Args[1]))
+	}
+	resource := scope.ID
+	// Leading NUL identifies an internal fallback scope, not an operator-visible resource.
+	if strings.HasPrefix(resource, "\x00") {
+		resource = ""
+	}
+	return command, resource
 }

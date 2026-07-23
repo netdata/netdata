@@ -12,8 +12,8 @@ go run ./tools/expandstructs <paths>
 goimports -w <paths>
 ```
 
-`expandstructs` runs `gofmt` internally after each pass, so it leaves files
-gofmt-clean on its own.
+`expandstructs` formats source in-process with `go/format` after each pass, so
+it leaves files gofmt-clean without invoking an external formatter.
 
 ## Usage
 

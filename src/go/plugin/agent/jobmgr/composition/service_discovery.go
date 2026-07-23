@@ -366,6 +366,8 @@ func (sdb *serviceDiscoveryBinding) emitNotification(emit func(dyncfg.Output)) {
 	payload := encoded.Bytes()
 
 	sdb.mu.Lock()
+	// Keep the lock through a direct commit to linearize it with invocation-captured notifications.
+	// Supported output failures return as errors; this binding is not a panic-recovery boundary.
 	if sdb.active == nil {
 		commitErr := sdb.frames.CommitBorrowedProtocolFrame(payload)
 		if commitErr != nil {

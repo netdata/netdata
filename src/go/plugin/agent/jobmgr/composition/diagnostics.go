@@ -66,6 +66,7 @@ func (dl *diagnosticLogger) ObserveDiagnostic(event jobmgr.DiagnosticEvent) {
 		attributes = append(attributes, slog.String("error", event.Err.Error()))
 	}
 	log := dl.logger.With(attributes...)
+	// The jobmgr.ObserveDiagnostic production gateway rejects invalid levels before dispatch.
 	switch event.Level {
 	case jobmgr.DiagnosticInfo:
 		log.Info(event.Name)

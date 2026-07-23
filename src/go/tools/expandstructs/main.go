@@ -4,7 +4,7 @@
 // line. For every composite literal whose type is a named type (T / pkg.T /
 // T[X], optionally behind &) and whose elements are all key: value pairs, it
 // rewrites the brace body so each element sits on its own line with a trailing
-// comma; gofmt then re-indents and aligns.
+// comma; the Go formatter then re-indents and aligns.
 //
 // It is AST-based, so it never changes tokens. It skips map/slice/array
 // literals, positional (unkeyed) literals, empty literals, elided-type nested
@@ -28,11 +28,11 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -181,10 +181,14 @@ func onePass(path string) (bool, error) {
 		prev = r.end
 	}
 	out.Write(src[prev:])
-	if err := os.WriteFile(path, out.Bytes(), 0o644); err != nil {
+	formatted, err := format.Source(out.Bytes())
+	if err != nil {
+		return false, fmt.Errorf("format rewritten source: %w", err)
+	}
+	if err := os.WriteFile(path, formatted, 0o644); err != nil {
 		return false, err
 	}
-	return true, exec.Command("gofmt", "-w", path).Run()
+	return true, nil
 }
 
 // namedType reports whether t denotes a named type (so the literal is a struct,
