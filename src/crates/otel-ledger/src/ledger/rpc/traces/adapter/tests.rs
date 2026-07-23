@@ -135,6 +135,30 @@ fn every_builtin_has_a_wire_word_and_nothing_stale() {
 }
 
 #[test]
+fn every_engine_owner_is_deliberately_placed_in_the_wire_grammar() {
+    // Exhaustive match: a NEW engine owner fails compilation here until
+    // its wire spelling (or deliberate absence) is decided.
+    fn wire_spelling(owner: AttributeOwner) -> Option<&'static str> {
+        match owner {
+            AttributeOwner::Resource => Some("resource"),
+            AttributeOwner::Span => Some("span"),
+            AttributeOwner::Instrumentation => Some("instrumentation"),
+            AttributeOwner::Event => Some("event"),
+            AttributeOwner::Link => Some("link"),
+            // Bare builtin words, not an owner prefix.
+            AttributeOwner::Builtin => None,
+            // Not enumerable; selections are always owner-qualified.
+            AttributeOwner::Any => None,
+        }
+    }
+    for (word, owner) in OWNER_WORDS {
+        assert_eq!(wire_spelling(owner), Some(word));
+    }
+    assert_eq!(wire_spelling(AttributeOwner::Builtin), None);
+    assert_eq!(wire_spelling(AttributeOwner::Any), None);
+}
+
+#[test]
 fn selection_keys_parse_owners_builtins_and_dotted_attributes() {
     assert_eq!(
         parse_selection_key("resource.service.name").unwrap(),
@@ -324,6 +348,20 @@ fn straddling_trace_does_not_duplicate_below_the_boundary() {
     let r = to_search_result(data, 2, Some(&c), WIN);
     let ids: Vec<&str> = r.traces.iter().map(|t| t.trace_id.as_str()).collect();
     assert_eq!(ids, vec!["1b".repeat(16).as_str()], "only W is fresh");
+}
+
+#[test]
+fn a_walk_at_the_served_cap_emits_no_further_cursor() {
+    // The over-fetch allowance can't grow past the cap: the final page
+    // is full but carries no continuation.
+    let c = cursor(WIN.0, WIN.1, 500, 0x01, 9_999);
+    let data = search_data(vec![summary(0x02, 400), summary(0x03, 300), summary(0x04, 200)]);
+    let r = to_search_result(data, 2, Some(&c), WIN);
+    assert_eq!(r.items.returned, 2, "the page itself still fills");
+    assert!(
+        r.anchor.is_none(),
+        "served would exceed the cap — the walk ends here"
+    );
 }
 
 #[test]

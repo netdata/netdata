@@ -456,3 +456,59 @@ async fn anchor_pages_ignore_the_requests_own_window() {
     let v2 = serde_json::to_value(call_on(&h, body2).await.unwrap()).unwrap();
     assert_eq!(ids(&v2), vec!["0d", "0b"]);
 }
+
+#[tokio::test]
+async fn late_arrivals_above_the_key_shorten_pages_but_never_duplicate() {
+    // The documented live-data caveat: traces arriving INTO the frozen
+    // window ABOVE the after-key consume the over-fetch allowance —
+    // pages can come up short (here: early walk end) — but nothing
+    // duplicates and nothing already-served reappears.
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![
+            otlp_req_svc(0x0A, 1, base_ns(10), "svc"),
+            otlp_req_svc(0x0B, 1, base_ns(20), "svc"),
+            otlp_req_svc(0x0C, 1, base_ns(30), "svc"),
+            otlp_req_svc(0x0D, 1, base_ns(40), "svc"),
+        ],
+    )
+    .await;
+    let h = make_handler_over(registries.clone());
+
+    let mut body = window_body();
+    body["last"] = json!(2);
+    body["spans_per_trace"] = json!(0);
+    let v1 = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
+    assert_eq!(ids(&v1), vec!["0d", "0c"]);
+
+    // A burst of three late arrivals, all ranked above the key (0c@30).
+    install_wal(
+        &registries,
+        "default",
+        2,
+        vec![
+            otlp_req_svc(0x21, 1, base_ns(70), "svc"),
+            otlp_req_svc(0x22, 1, base_ns(80), "svc"),
+            otlp_req_svc(0x23, 1, base_ns(90), "svc"),
+        ],
+    )
+    .await;
+
+    // Page 2's over-fetch (2+2=4) is dominated by the burst + served:
+    // engine top-4 = [23, 22, 21, 0d]; everything at-or-above the key
+    // drops → a short (here empty) page, no duplicates, walk ends.
+    body["anchor"] = v1["anchor"]["next"].clone();
+    let v2 = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    let page2 = ids(&v2);
+    assert!(
+        !page2.contains(&"0d".to_string()) && !page2.contains(&"0c".to_string()),
+        "served traces never reappear: {page2:?}"
+    );
+    assert!(
+        page2.len() < 2,
+        "the burst consumed the allowance — a short page: {page2:?}"
+    );
+}

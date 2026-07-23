@@ -132,8 +132,10 @@ const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
 ];
 
 /// The attribute owners a selection key may name, as `<owner>.<key>`.
-/// `Any` is deliberately absent from the wire: enumeration (step 1.4)
-/// emits owner-qualified keys, so selections are always qualified.
+/// `Any` is deliberately absent from the wire (enumeration — step 1.4 —
+/// emits owner-qualified keys, so selections are always qualified) and
+/// `Builtin` is spelled as the bare words above. The exhaustive match in
+/// `owner_word_for` keeps this table in lockstep with the engine enum.
 const OWNER_WORDS: [(&str, AttributeOwner); 5] = [
     ("resource", AttributeOwner::Resource),
     ("span", AttributeOwner::Span),
@@ -240,9 +242,23 @@ pub(crate) fn build_predicate(
 ///   makes the pages an exact partition, tie runs and straddling
 ///   traces included.
 ///
-/// Late arrivals INTO the frozen window (an inherent property of
-/// most-recent-first pagination over live data) rank above the key and
-/// are simply never shown by this walk; re-query for fresh data.
+/// Live-data caveats (inherent to most-recent-first pagination; walk a
+/// window that ends in the past to avoid them):
+///
+/// - Late arrivals ranking ABOVE the key are never shown by this walk
+///   AND consume the over-fetch allowance — a burst larger than `last`
+///   can shorten a page below `last` and end the walk early (silently:
+///   indistinguishable from exhaustion). Late arrivals ranking BELOW
+///   the key appear on later pages normally.
+/// - The cursor freezes the window but NOT the filters: echoing it with
+///   different selections re-partitions a different result set. The
+///   client must keep the filters fixed for the walk's lifetime.
+///
+/// Cost note: each page reruns the query with `limit = served + last`,
+/// so a full walk of N traces does O(N²/last) engine ranking work —
+/// acceptable at human paging depths and hard-capped by
+/// [`CURSOR_SERVED_CAP`]; the engine's own ceilings bound any single
+/// request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SearchCursor {
     /// The frozen page-1 window, unix seconds.
