@@ -5,6 +5,7 @@ package functions
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -196,7 +197,7 @@ func TestProcessIngressDiscardsPartialBodyOnFence(t *testing.T) {
 	require.NoError(t, <-done)
 }
 
-func TestProcessIngressSealedPauseClassifiesExactStoppingDelivery(t *testing.T) {
+func TestProcessIngressSealedPauseClassifiesStoppingDelivery(t *testing.T) {
 	structuralErr := errors.New("structural delivery failure")
 	tests := map[string]struct {
 		deliveryErr    error
@@ -206,6 +207,23 @@ func TestProcessIngressSealedPauseClassifiesExactStoppingDelivery(t *testing.T) 
 			deliveryErr: &lifecycle.StoppingRejection{
 				Generation: 1,
 			},
+			wantSuppressed: true,
+		},
+		"wrapped current generation stopping rejection": {
+			deliveryErr: fmt.Errorf("wrapped: %w", &lifecycle.StoppingRejection{
+				Generation: 1,
+			}),
+			wantSuppressed: true,
+		},
+		"joined current generation stopping rejections": {
+			deliveryErr: errors.Join(
+				&lifecycle.StoppingRejection{
+					Generation: 1,
+				},
+				&lifecycle.StoppingRejection{
+					Generation: 1,
+				},
+			),
 			wantSuppressed: true,
 		},
 		"legacy exact stopped rejection": {

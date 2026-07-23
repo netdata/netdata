@@ -335,10 +335,8 @@ func (pi *ProcessIngress) dispositionDeliveryError(port processInputPort, err er
 	if err == nil {
 		return err
 	}
-	expectedStopping := err == jobmgr.ErrStopped
-	if stopping, ok := err.(*lifecycle.StoppingRejection); ok {
-		expectedStopping = stopping.Generation == port.Generation()
-	}
+	expectedStopping := err == jobmgr.ErrStopped ||
+		lifecycle.ContainsOnlyCurrentStoppingRejections(err, port.Generation())
 	if !expectedStopping {
 		return err
 	}

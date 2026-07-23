@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -101,6 +102,16 @@ func canonicalCancellationCause(cause error) (canonical error, deadline, ok bool
 
 const strictErrorTreeLimit = 32
 
+func isNilErrorValue(err error) bool {
+	value := reflect.ValueOf(err)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
+}
+
 func allErrorLeavesMatch(err error, match func(error) bool) bool {
 	if err == nil || match == nil {
 		return false
@@ -116,28 +127,24 @@ func allErrorLeavesMatch(err error, match func(error) bool) bool {
 		}
 		count--
 		current := pending[count]
-		if current == nil {
-			continue
+		if current == nil || isNilErrorValue(current) {
+			return false
 		}
-		if joined, ok := current.(interface {
-			Unwrap() []error
-		}); ok {
+		if joined, ok := current.(interface{ Unwrap() []error }); ok {
 			children := joined.Unwrap()
 			if len(children) == 0 || count+len(children) > strictErrorTreeLimit {
 				return false
 			}
 			for _, child := range children {
 				if child == nil {
-					continue
+					return false
 				}
 				pending[count] = child
 				count++
 			}
 			continue
 		}
-		if wrapped, ok := current.(interface {
-			Unwrap() error
-		}); ok {
+		if wrapped, ok := current.(interface{ Unwrap() error }); ok {
 			child := wrapped.Unwrap()
 			if child == nil || count == strictErrorTreeLimit {
 				return false

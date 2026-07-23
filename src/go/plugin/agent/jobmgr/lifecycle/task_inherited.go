@@ -436,7 +436,7 @@ func (ts *TaskSupervisor) completeInherited(ref InheritedTaskRef, taskErr error)
 	}
 	cleanStop := false
 	normalized := taskErr
-	if ts.run != nil && ts.run.IsStopping() && onlyCurrentStoppingRejections(taskErr, ts.run.Generation()) {
+	if ts.run != nil && ts.run.IsStopping() && ContainsOnlyCurrentStoppingRejections(taskErr, ts.run.Generation()) {
 		cleanStop = true
 		normalized = nil
 	}
@@ -473,16 +473,6 @@ func (itr *inheritedTaskRegistry) complete(ref InheritedTaskRef, taskErr error, 
 	slot.finished = true
 	close(slot.done)
 	return spontaneousFailure, taskErr
-}
-
-func onlyCurrentStoppingRejections(err error, generation uint64) bool {
-	if generation == 0 {
-		return false
-	}
-	return allErrorLeavesMatch(err, func(leaf error) bool {
-		stopping, ok := leaf.(*StoppingRejection)
-		return ok && stopping.Generation == generation
-	})
 }
 
 func runInheritedTask(ctx context.Context, work InheritedTaskWork) (err error) {
