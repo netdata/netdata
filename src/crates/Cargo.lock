@@ -2933,9 +2933,9 @@ dependencies = [
 
 [[package]]
 name = "netflow_parser"
-version = "1.0.5"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "936b0a3e36072aeaf301ba7e7b038cfcbe7a5ded3eb9be18dfd9e46b394f3669"
+checksum = "3bc1f33c09ed241b0a84429832caead3433804223a02a3cd97500b5d59e23bd2"
 dependencies = [
  "lru 0.18.1",
  "nom",
