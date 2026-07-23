@@ -4,8 +4,8 @@
 //! wire-neutral [`sfsq::traces`] engine. One Function, mode-selected by
 //! request shape (the `otel-logs` pattern): `info` for capability
 //! discovery, `trace` / `attributes` / `attribute_values` / `overview`
-//! selected by their sub-objects, and a request with none of those is a
-//! `search`. The full phase-1 mode catalog is implemented.
+//! / `slowest` selected by their sub-objects, and a request with none
+//! of those is a `search`.
 //!
 //! Nanosecond values (`*_ns`, `time_unix_nano`) go on the wire as JSON
 //! numbers and exceed 2^53: JavaScript consumers read them with ~256 ns
@@ -32,6 +32,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "attributes",
     "attribute_values",
     "overview",
+    "slowest",
     "tenant",
     "after",
     "before",
@@ -71,6 +72,10 @@ pub struct OtelTracesRequest {
     /// parse: [`OtelTracesRequest::overview_params`].
     #[serde(default, deserialize_with = "present")]
     pub overview: Option<serde_json::Value>,
+    /// Selects the slowest mode (duration-ranked top-K traces). Typed
+    /// parse: [`OtelTracesRequest::slowest_params`].
+    #[serde(default, deserialize_with = "present")]
+    pub slowest: Option<serde_json::Value>,
     /// Query window, unix seconds. Consumed by the WINDOWED data modes
     /// (search, both enumeration modes, and overview when it lands);
     /// the `trace` mode deliberately ignores it — a trace is an exact
@@ -143,6 +148,7 @@ pub enum RequestMode {
     Attributes,
     AttributeValues,
     Overview,
+    Slowest,
     Search,
 }
 
@@ -179,6 +185,9 @@ impl OtelTracesRequest {
         }
         if self.overview.is_some() {
             set.push(("overview", RequestMode::Overview));
+        }
+        if self.slowest.is_some() {
+            set.push(("slowest", RequestMode::Slowest));
         }
         match set.len() {
             0 => Ok(RequestMode::Search),
@@ -230,6 +239,26 @@ impl OtelTracesRequest {
             .expect("overview_params is only called on RequestMode::Overview");
         OverviewParams::deserialize(v).map_err(|e| format!("invalid overview selector: {e}"))
     }
+
+    /// Parse the `slowest` selector (same contract; an empty object
+    /// takes the engine default limit).
+    pub fn slowest_params(&self) -> Result<SlowestParams, String> {
+        let v = self
+            .slowest
+            .as_ref()
+            .expect("slowest_params is only called on RequestMode::Slowest");
+        SlowestParams::deserialize(v).map_err(|e| format!("invalid slowest selector: {e}"))
+    }
+}
+
+/// The `slowest` mode's typed parameters.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SlowestParams {
+    /// Result limit (top-K). Engine default 20; zero and beyond the
+    /// library maximum (1000) are client errors — no unbounded option.
+    #[serde(default)]
+    pub limit: Option<usize>,
 }
 
 /// The `overview` mode's typed parameters. Deliberately empty in v1:
@@ -294,6 +323,7 @@ pub enum OtelTracesResponse {
     Attributes(AttributesResult),
     AttributeValues(AttributeValuesResult),
     Overview(Box<OverviewResult>),
+    Slowest(Box<SlowestResult>),
 }
 
 // ── Overview response ───────────────────────────────────────────────
@@ -339,6 +369,44 @@ pub struct OverviewTotals {
     pub spans: u64,
     /// Of those spans, ERROR-status ones.
     pub errors: u64,
+}
+
+// ── Slowest response ────────────────────────────────────────────────
+
+/// The slowest mode's bounded list: the window's duration-ranked top-K
+/// traces (duration DESC, trace id ASC). Row numbers are STORED-ROW
+/// statistics (D9 — resends count); exact canonical figures live in
+/// the `trace` mode (the row click). The same envelope-start clipping
+/// as the overview applies (trace-envelope-aligned). NO pagination —
+/// a rank cursor over an unstable dataset re-ranks between pages, so
+/// top-K is a single bounded page by design.
+#[derive(Debug, Serialize)]
+pub struct SlowestResult {
+    pub version: u32,
+    pub status: StatusWire,
+    pub items: SearchItems,
+    pub traces: Vec<SlowestTraceWire>,
+}
+
+/// One ranked trace; ids in W3C lowercase hex.
+#[derive(Debug, Serialize)]
+pub struct SlowestTraceWire {
+    pub trace_id: String,
+    /// The merged root's `service.name`; absent when the trace has no
+    /// true root or the root carries none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub root_service: Option<String>,
+    /// The merged root's span name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub root_name: Option<String>,
+    /// Merged envelope start.
+    pub start_ns: i64,
+    /// The RANK key: merged envelope duration, saturating.
+    pub duration_ns: i64,
+    /// Stored spans across all sources (D9).
+    pub span_count: u64,
+    /// Of those spans, ERROR-status ones.
+    pub error_count: u64,
 }
 
 // ── Enumeration responses ───────────────────────────────────────────
@@ -624,6 +692,7 @@ pub enum PartialReasonWire {
     Cancelled,
     OverviewCeiling,
     RollupAbsent,
+    SlowestCeiling,
 }
 
 impl From<PartialReason> for PartialReasonWire {
@@ -635,6 +704,7 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::Cancelled => PartialReasonWire::Cancelled,
             PartialReason::OverviewCeiling => PartialReasonWire::OverviewCeiling,
             PartialReason::RollupAbsent => PartialReasonWire::RollupAbsent,
+            PartialReason::SlowestCeiling => PartialReasonWire::SlowestCeiling,
         }
     }
 }

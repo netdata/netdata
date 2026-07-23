@@ -25,6 +25,7 @@ mod by_id;
 mod overview;
 mod predicate;
 mod rollup;
+mod slowest;
 mod search;
 mod sources;
 mod status;
@@ -41,6 +42,10 @@ pub use overview::{
 pub use rollup::{
     TraceAggregate, TraceRootInfo, sealed_trace_aggregates, sealed_trace_envelopes,
     tail_trace_aggregates,
+};
+pub use slowest::{
+    DEFAULT_SLOWEST_LIMIT, SLOWEST_LIMIT_MAX, SlowTrace, SlowestData, SlowestQuery,
+    SlowestRequestError, slowest,
 };
 pub use predicate::{
     CompareOp, Condition, Predicate, PredicateError, PredicateTarget, PredicateValue,

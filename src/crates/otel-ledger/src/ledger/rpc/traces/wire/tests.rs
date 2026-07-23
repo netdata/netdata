@@ -58,6 +58,10 @@ fn each_data_selector_selects_its_mode() {
         req(json!({"overview": {}})).mode(),
         Ok(RequestMode::Overview)
     );
+    assert_eq!(
+        req(json!({"slowest": {}})).mode(),
+        Ok(RequestMode::Slowest)
+    );
 }
 
 #[test]
@@ -71,6 +75,7 @@ fn a_present_but_null_selector_still_selects_its_mode() {
         req(json!({"overview": null})).mode(),
         Ok(RequestMode::Overview)
     );
+    assert_eq!(req(json!({"slowest": null})).mode(), Ok(RequestMode::Slowest));
 }
 
 #[test]
@@ -130,7 +135,7 @@ fn info_response_shape_is_pinned() {
             "status": 200,
             "accepted_params": [
                 "info", "trace", "attributes", "attribute_values", "overview",
-                "tenant", "after", "before", "last", "anchor"
+                "slowest", "tenant", "after", "before", "last", "anchor"
             ],
             "required_params": [],
             "help": "Query and visualize OpenTelemetry traces.",
@@ -178,13 +183,31 @@ fn every_partial_reason_wire_name_is_pinned() {
     b.add(PartialReason::Cancelled);
     b.add(PartialReason::OverviewCeiling);
     b.add(PartialReason::RollupAbsent);
+    b.add(PartialReason::SlowestCeiling);
     let wire = StatusWire::from(&b.finish());
     assert_eq!(
         serde_json::to_value(&wire).unwrap(),
         json!({"partial": [
             "size_cap", "source_failure", "work_ceiling", "cancelled",
-            "overview_ceiling", "rollup_absent"
+            "overview_ceiling", "rollup_absent", "slowest_ceiling"
         ]})
+    );
+}
+
+#[test]
+fn slowest_params_reject_null_junk_and_unknown_fields() {
+    for (body, needle) in [
+        (json!({"slowest": null}), "invalid slowest selector"),
+        (json!({"slowest": 7}), "invalid slowest selector"),
+        (json!({"slowest": {"bogus": 1}}), "unknown field"),
+    ] {
+        let err = req(body.clone()).slowest_params().expect_err("must reject");
+        assert!(err.contains(needle), "for {body}: {err}");
+    }
+    assert_eq!(req(json!({"slowest": {}})).slowest_params().unwrap().limit, None);
+    assert_eq!(
+        req(json!({"slowest": {"limit": 5}})).slowest_params().unwrap().limit,
+        Some(5)
     );
 }
 

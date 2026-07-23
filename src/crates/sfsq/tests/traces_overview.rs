@@ -146,69 +146,7 @@ fn legacy_file_without_the_rollup_is_excluded_and_flagged_never_mixed() {
     let modern_wal = write_wal(dir.path(), vec![req(&corpus())], "modern");
     let modern = sealed_source(dir.path(), &modern_wal, "modern");
 
-    // Minimal valid SFST WITHOUT a TRSU chunk (the raw chunk writer).
-    let legacy_path = dir.path().join("legacy.sfst");
-    {
-        let counts = sfst::ChunkCounts {
-            columns: sfst::ColumnsPresent::default(),
-            trace_id_index: false,
-            trace_id_bloom: false,
-            event_index: false,
-            link_index: false,
-            trace_rollup: false,
-            mid_fields: 0,
-            high_fields: 0,
-            stream_batches: 1,
-        };
-        let summary = sfst::Summary {
-            min_timestamp_s: 0,
-            max_timestamp_s: 10,
-            record_count: 1,
-            content_meta: Vec::new(),
-        };
-        let metadata = sfst::Metadata {
-            histogram: sfst::Histogram {
-                timestamps: vec![0],
-                counts: vec![1],
-            },
-            id_ranges: sfst::IdRanges {
-                low_end: sfst::KvId(1),
-                mid_end: sfst::KvId(1),
-                high_end: sfst::KvId(1),
-            },
-            tree: sfst::SchemaTree::flat(
-                &vec![sfst::FieldEntry {
-                    name: "name".into(),
-                    cardinality: 1,
-                    tier: sfst::FieldTier::Low,
-                }]
-                .into(),
-            ),
-            columns: sfst::ColumnsTable::default(),
-        };
-        let mut w =
-            sfst::ChunkWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
-        w.summary(&summary).unwrap();
-        w.metadata(&metadata).unwrap();
-        w.timestamps(&[1_000_000_000]).unwrap();
-        w.primary(vec![("name=legacy", {
-            let mut data = Vec::new();
-            let desc = treight::Bitmap::from_sorted_iter([0u32].into_iter(), 1, &mut data);
-            sfst::BitmapValue { desc, data }
-        })])
-        .unwrap();
-        w.add_stream_batch(&sfst::StreamBatch::for_write(&[vec![sfst::KvId(0)]]))
-            .unwrap();
-        let bytes = w.finish().unwrap().into_inner();
-        std::fs::write(&legacy_path, &bytes).unwrap();
-    }
-    let legacy_summary = sfst::read_summary_path(&legacy_path).unwrap();
-    let legacy = TraceSource::Sfst(sfsq::traces::TraceSfstCandidate {
-        source_id: sfsq::traces::SourceId::new("legacy"),
-        summary: legacy_summary,
-        source: sfsq::Source::File(legacy_path),
-        coverage: None,
-    });
+    let legacy = common::legacy_sfst_source(dir.path(), "legacy");
 
     let data = run(vec![modern, legacy], OverviewQuery::new(grid()));
     assert!(data.status.has(PartialReason::RollupAbsent));

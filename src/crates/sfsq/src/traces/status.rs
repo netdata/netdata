@@ -46,6 +46,11 @@ pub enum PartialReason {
     /// trace-id file writes no chunk by the seal's `is_meaningful`
     /// rule, and exclusion loses nothing.
     RollupAbsent,
+    /// The slowest mode's own visited-rows ceiling was hit before every
+    /// in-window source was folded: the ranking covers the
+    /// deterministic prefix of sources (SourceId order) processed so
+    /// far — the true slowest trace may live in an unvisited source.
+    SlowestCeiling,
 }
 
 /// The status of one query's result.

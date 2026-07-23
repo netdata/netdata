@@ -45,7 +45,7 @@ async fn info_returns_the_descriptor() {
         v["accepted_params"],
         json!([
             "info", "trace", "attributes", "attribute_values", "overview",
-            "tenant", "after", "before", "last", "anchor"
+            "slowest", "tenant", "after", "before", "last", "anchor"
         ])
     );
     assert_eq!(v["required_params"], json!([]));
@@ -70,6 +70,7 @@ async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
     // not-implemented anymore; an empty agent answers each cleanly.
     for body in [
         json!({"overview": {}}),
+        json!({"slowest": {}}),
         json!({"attributes": {}}),
         json!({"attribute_values": {"key": "name"}}),
     ] {
@@ -609,6 +610,40 @@ async fn enumeration_invalid_requests_are_clean_client_errors() {
 }
 
 // ── The overview mode ───────────────────────────────────────────────
+
+#[tokio::test]
+async fn slowest_ranks_the_corpus_by_merged_envelope() {
+    // Envelope durations: E 2500ns > B 1500ns > A/C/D 500ns (the tie
+    // breaks by ascending trace id). Roots are each trace's span-1.
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    body["slowest"] = json!({});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(ids(&v), ["0e", "0b", "0a", "0c", "0d"]);
+    assert_eq!(v["items"], json!({"returned": 5, "max_to_return": 20}));
+    let top = &v["traces"][0];
+    assert_eq!(top["duration_ns"], 2500);
+    assert_eq!(top["root_service"], "svc-a");
+    assert_eq!(top["root_name"], "span-1");
+    assert_eq!(top["span_count"], 3);
+    assert_eq!(top["error_count"], 0);
+}
+
+#[tokio::test]
+async fn slowest_limit_truncates_and_zero_is_a_client_error() {
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    body["slowest"] = json!({"limit": 2});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v), ["0e", "0b"]);
+    assert_eq!(v["items"], json!({"returned": 2, "max_to_return": 2}));
+
+    let mut body = window_body();
+    body["slowest"] = json!({"limit": 0});
+    let err = call_on(&h, body).await.expect_err("zero limit");
+    assert!(err.to_string().contains("zero limit"), "{err}");
+}
 
 #[tokio::test]
 async fn overview_grid_matches_the_corpus_distribution() {

@@ -291,3 +291,69 @@ pub fn tail_source(wal_path: &Path, id: &str) -> TraceSource {
         },
     })
 }
+
+/// A minimal valid SFST WITHOUT a `TRSU` chunk — a hand-built
+/// pre-rollup ("legacy") file for the D10 exclusion tests. Returns the
+/// sealed-file source wrapping it.
+pub fn legacy_sfst_source(dir: &Path, name: &str) -> TraceSource {
+    let legacy_path = dir.join(format!("{name}.sfst"));
+    let counts = sfst::ChunkCounts {
+        columns: sfst::ColumnsPresent::default(),
+        trace_id_index: false,
+        trace_id_bloom: false,
+        event_index: false,
+        link_index: false,
+        trace_rollup: false,
+        mid_fields: 0,
+        high_fields: 0,
+        stream_batches: 1,
+    };
+    let summary = sfst::Summary {
+        min_timestamp_s: 0,
+        max_timestamp_s: 10,
+        record_count: 1,
+        content_meta: Vec::new(),
+    };
+    let metadata = sfst::Metadata {
+        histogram: sfst::Histogram {
+            timestamps: vec![0],
+            counts: vec![1],
+        },
+        id_ranges: sfst::IdRanges {
+            low_end: sfst::KvId(1),
+            mid_end: sfst::KvId(1),
+            high_end: sfst::KvId(1),
+        },
+        tree: sfst::SchemaTree::flat(
+            &vec![sfst::FieldEntry {
+                name: "name".into(),
+                cardinality: 1,
+                tier: sfst::FieldTier::Low,
+            }]
+            .into(),
+        ),
+        columns: sfst::ColumnsTable::default(),
+    };
+    let mut w = sfst::ChunkWriter::new(std::io::Cursor::new(Vec::new()), counts).unwrap();
+    w.summary(&summary).unwrap();
+    w.metadata(&metadata).unwrap();
+    w.timestamps(&[1_000_000_000]).unwrap();
+    w.primary(vec![("name=legacy", {
+        let mut data = Vec::new();
+        let desc = treight::Bitmap::from_sorted_iter([0u32].into_iter(), 1, &mut data);
+        sfst::BitmapValue { desc, data }
+    })])
+    .unwrap();
+    w.add_stream_batch(&sfst::StreamBatch::for_write(&[vec![sfst::KvId(0)]]))
+        .unwrap();
+    let bytes = w.finish().unwrap().into_inner();
+    std::fs::write(&legacy_path, &bytes).unwrap();
+
+    let legacy_summary = sfst::read_summary_path(&legacy_path).unwrap();
+    TraceSource::Sfst(TraceSfstCandidate {
+        source_id: SourceId::new(name),
+        summary: legacy_summary,
+        source: Source::File(legacy_path),
+        coverage: None,
+    })
+}
