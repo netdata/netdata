@@ -31,6 +31,7 @@ impl IngestService {
         let lifecycle_observer: Arc<dyn journal_sdk_log_writer::LogLifecycleObserver> =
             Arc::new(FacetLifecycleObserver {
                 runtime: Arc::clone(&facet_runtime),
+                metrics: Arc::clone(&metrics),
             });
         let build_journal_cfg = |tier: TierKind| {
             let origin = Origin {

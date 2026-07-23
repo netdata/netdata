@@ -67,15 +67,16 @@ If nothing matches, the plugin isn't listening. See "doesn't start" above.
 
 **Third check:** what do the plugin's own counters say?
 
-Open `netflow.input_packets` on the standard Netdata charts page. The dimensions tell the story:
+Open the plugin health charts on the standard Netdata charts page:
 
-- `udp_received > 0`, `parsed_packets == 0` — datagrams arriving, none decoding successfully. Wrong protocol on the listener, or all datagrams malformed.
-- `udp_received > 0`, `parsed_packets > 0`, but no per-protocol counter (`netflow_v9`, `ipfix`, etc.) is moving — the protocol you're sending may be disabled in the plugin config. Check `protocols.v9`, `protocols.ipfix`, etc. in `netflow.yaml`.
-- `parse_errors` rising in lockstep with `udp_received` — datagrams aren't valid for the protocols the plugin supports. Capture a small UDP sample with `tcpdump -w` and inspect it with Wireshark.
+- `netflow.input_packets` `udp_received` rising — datagrams are reaching the listener.
+- `netflow.protocol_packets` not rising — none of those datagrams decode as v5, v7, v9, IPFIX, or sFlow. Check `parse_errors` in `netflow.decoder_exceptions`, then capture a small UDP sample with `tcpdump -w`.
+- A protocol dimension rising together with `disabled_protocol_packets` — valid traffic is arriving, but that protocol is disabled in `netflow.yaml`.
+- `netflow.flow_records` rising but `netflow.flow_rows` `journaled` not rising — follow the row chart and decoder exceptions to find filtering, intentional suppression, or journal failure.
 
 ### sFlow packets arrive, but no sFlow rows appear
 
-sFlow datagrams can carry flow samples, counter samples, or both. Netdata's Network Flows view creates flow rows from sFlow flow samples only. Counter-only sFlow traffic is valid sFlow traffic, and `netflow.input_packets` can show `sflow` increasing, but there are no source/destination flow rows to display.
+sFlow datagrams can carry flow samples, counter samples, or both. Netdata's Network Flows view creates flow rows from sFlow flow samples only. Counter-only sFlow traffic is valid: `netflow.protocol_packets` shows `sflow` increasing and `netflow.sflow_samples` shows `counter` samples, but there are no source/destination flow rows to display.
 
 Capture a small sample and check the sFlow sample types:
 
@@ -96,12 +97,7 @@ Counters show received traffic but you suspect data loss.
 
 **Template errors (NetFlow v9, IPFIX):**
 
-```bash
-# Watch the template_errors dimension
-# In the dashboard: netflow.input_packets > template_errors
-```
-
-If it's climbing, the exporter is sending data records before their templates. Either:
+Watch `v9_missing_template` and `ipfix_missing_template` in `netflow.flow_sets`. If either is climbing, the exporter is sending Data Sets before their templates are available. Either:
 
 - The exporter restarted and the plugin's template cache is stale. Wait for the exporter to send the next template (the cadence depends on the exporter's `template-refresh` configuration — vendor defaults vary widely), or restart the exporter to force an immediate template refresh.
 - Templates are sent rarely. Cisco IOS / IOS-XE Flexible NetFlow ships a default `template data timeout` of **600 seconds (10 minutes)**; Juniper and others have their own defaults, often longer. After a plugin restart, you'll see template errors until the next template re-send. **Fix on the router side**: lower the template refresh interval to 60 seconds (the [Quick Start](/docs/npm/network-flows/quick-start.md) configurations show this).
@@ -118,13 +114,13 @@ NSEL exporter records and stored traffic rows are intentionally not one-to-one:
 - One update can create two rows: initiator traffic in the reported direction and nonzero responder traffic with endpoints swapped.
 - An all-zero initiator direction remains visible. An all-zero responder direction is suppressed and diagnosed. A direction with only bytes or only packets is stored with zero for the missing member and diagnosed as partial.
 
-The Network Flows function response exposes cumulative `decoded_nsel_*` statistics for received event types, malformed/counterless/partial records, suppressed zero responders, and emitted forward/reverse rows. These statistics are not yet dimensions of `netflow.input_packets`; the health-chart layout is tracked separately.
+Use `netflow.nsel_events` for received event types, `netflow.nsel_rows` for emitted directions, and `netflow.nsel_exceptions` for malformed counter outcomes and suppressed zero responders.
 
-If `template_errors` rises, check the v9 template refresh cadence. On first startup, Netdata cannot decode data received before the first template. Learned templates are persisted for later restarts, but v9 streams are separated by exporter IP, UDP source port, and Source ID; a new source port needs its own template.
+If `v9_missing_template` rises in `netflow.flow_sets`, check the v9 template refresh cadence. On first startup, Netdata cannot decode data received before the first template. Learned templates are persisted for later restarts, but v9 streams are separated by exporter IP, UDP source port, and Source ID; a new source port needs its own template.
 
 **UDP kernel drops:**
 
-The plugin doesn't count these. Check at the OS level:
+On Linux, watch `kernel_dropped` in `netflow.input_packets`. It is the sum of the kernel drop counters for the plugin's exact listener sockets. You can verify it at the OS level:
 
 ```bash
 sudo ss -uamn sport = :2055        # inspect the d<N> field inside skmem:(...)
@@ -271,7 +267,7 @@ sudo tcpdump -w /tmp/flow-sample.cap -c 200 'udp port 2055 or udp port 6343'
 Collect this before opening a bug report:
 
 - Plugin version (`netdata -V` from the running daemon).
-- A sample of `netflow.input_packets` chart for the failure window — all dimensions visible.
+- Samples of `netflow.input_packets`, `netflow.protocol_packets`, `netflow.decoder_exceptions`, and `netflow.flow_rows` for the failure window. For v9/IPFIX include `netflow.flow_sets`; for sFlow or NSEL include their protocol-specific charts.
 - A sample of `netflow.facet_values`, `netflow.tier_index_entries`, and `netflow.open_tiers` if performance-related. Include `netflow.memory_resident_bytes` only if memory diagnostics were enabled.
 - A small packet-capture file (`tcpdump -w` from the agent's interface) reproducing the issue.
 - Sanitised `netflow.yaml` (redact internal IPs, customer names, secrets).

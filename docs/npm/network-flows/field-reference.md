@@ -76,6 +76,8 @@ For recognized NSEL templates:
 
 This event policy means the number of NSEL exporter records is intentionally different from the number of stored traffic rows. It also means a lost UDP update remains a visible gap: Netdata does not use a later teardown total to fabricate traffic at the wrong time.
 
+The operational charts make this difference explicit: `netflow.nsel_events` counts event records, `netflow.nsel_rows` counts emitted forward/reverse rows, and `netflow.nsel_exceptions` explains missing or suppressed directions.
+
 ## Identity — who and what
 
 | Field | Type | v5 | v7 | v9 | IPFIX | sFlow | Description |

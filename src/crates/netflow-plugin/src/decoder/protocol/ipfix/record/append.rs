@@ -2,19 +2,20 @@ use super::*;
 
 pub(crate) fn append_ipfix_records(
     source: SocketAddr,
-    out: &mut Vec<DecodedFlow>,
+    batch: &mut DecodedBatch,
     packet: IPFix,
     sampling: &mut SamplingState,
     decapsulation_mode: DecapsulationMode,
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
-) -> u64 {
-    let mut partial_counter_records = 0_u64;
+) {
+    let DecodedBatch { flows: out, stats } = batch;
     let export_usec = unix_timestamp_to_usec(packet.header.export_time as u64, 0);
     let observation_domain_id = packet.header.observation_domain_id;
     let version = 10_u16;
 
     for flowset in packet.flowsets {
+        account_ipfix_flowset(&flowset.body, stats);
         match flowset.body {
             IPFixFlowSetBody::Data(data) => {
                 for record in data.fields {
@@ -32,7 +33,8 @@ pub(crate) fn append_ipfix_records(
                         );
                     }
 
-                    let Some((forward, reverse, partial_counter_record)) = finalize_ipfix_record(
+                    let reverse_present = state.reverse_present;
+                    let projection = finalize_ipfix_record(
                         rec,
                         state,
                         source,
@@ -42,12 +44,24 @@ pub(crate) fn append_ipfix_records(
                         export_usec,
                         timestamp_source,
                         input_realtime_usec,
-                    ) else {
-                        continue;
+                    );
+                    let (forward, reverse, partial_counter_record) = match projection {
+                        Ok(projected) => projected,
+                        Err(IPFixRecordRejection::SamplingOption) => {
+                            stats.sampling_option_records += 1;
+                            continue;
+                        }
+                        Err(IPFixRecordRejection::DecapsulationFailed) => {
+                            stats.decapsulation_failed_records += 1;
+                            continue;
+                        }
                     };
 
                     if partial_counter_record {
-                        partial_counter_records += 1;
+                        stats.partial_counter_records += 1;
+                    }
+                    if reverse_present && reverse.is_none() {
+                        stats.ipfix_zero_reverse_records += 1;
                     }
 
                     out.push(forward);
@@ -56,9 +70,7 @@ pub(crate) fn append_ipfix_records(
                     }
                 }
             }
-            _ => continue,
+            _ => {}
         }
     }
-
-    partial_counter_records
 }

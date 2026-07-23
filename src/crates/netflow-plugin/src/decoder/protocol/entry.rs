@@ -10,6 +10,7 @@ pub(crate) fn is_sflow_payload(payload: &[u8]) -> bool {
 pub(crate) fn decode_sflow(
     source: SocketAddr,
     payload: &[u8],
+    enabled: bool,
     decapsulation_mode: DecapsulationMode,
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
@@ -26,12 +27,17 @@ pub(crate) fn decode_sflow(
         Ok(datagram) => {
             batch.stats.parsed_packets = 1;
             batch.stats.sflow_datagrams = 1;
+            if !enabled {
+                batch.stats.disabled_protocol_packets = 1;
+            }
             batch.flows = extract_sflow_flows(
                 source,
                 datagram,
                 decapsulation_mode,
                 timestamp_source,
                 input_realtime_usec,
+                enabled,
+                &mut batch.stats,
             );
         }
         Err(_err) => {
@@ -40,30 +46,6 @@ pub(crate) fn decode_sflow(
     }
 
     batch
-}
-
-pub(crate) fn missing_template_ids(packets: &[NetflowPacket]) -> HashSet<u16> {
-    let mut ids = HashSet::new();
-    for packet in packets {
-        match packet {
-            NetflowPacket::V9(packet) => {
-                for flowset in &packet.flowsets {
-                    if let V9FlowSetBody::NoTemplate(info) = &flowset.body {
-                        ids.insert(info.template_id);
-                    }
-                }
-            }
-            NetflowPacket::IPFix(packet) => {
-                for flowset in &packet.flowsets {
-                    if let IPFixFlowSetBody::NoTemplate(info) = &flowset.body {
-                        ids.insert(info.template_id);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    ids
 }
 
 pub(crate) fn decode_netflow_result(
@@ -88,15 +70,13 @@ pub(crate) fn decode_netflow_result(
         ..Default::default()
     };
 
-    if !missing_template_ids(&result.packets).is_empty() {
-        batch.stats.template_errors = 1;
-    }
     batch.stats.parsed_packets = result.packets.len() as u64;
     for (packet_index, packet) in result.packets.into_iter().enumerate() {
         match packet {
             NetflowPacket::V5(v5) => {
+                batch.stats.netflow_v5_packets += 1;
+                batch.stats.netflow_v5_records += v5.flowsets.len() as u64;
                 if enable_v5 {
-                    batch.stats.netflow_v5_packets += 1;
                     append_v5_records(
                         source,
                         &mut batch.flows,
@@ -104,11 +84,14 @@ pub(crate) fn decode_netflow_result(
                         timestamp_source,
                         input_realtime_usec,
                     );
+                } else {
+                    batch.stats.disabled_protocol_packets += 1;
                 }
             }
             NetflowPacket::V7(v7) => {
+                batch.stats.netflow_v7_packets += 1;
+                batch.stats.netflow_v7_records += v7.flowsets.len() as u64;
                 if enable_v7 {
-                    batch.stats.netflow_v7_packets += 1;
                     append_v7_records(
                         source,
                         &mut batch.flows,
@@ -116,11 +99,13 @@ pub(crate) fn decode_netflow_result(
                         timestamp_source,
                         input_realtime_usec,
                     );
+                } else {
+                    batch.stats.disabled_protocol_packets += 1;
                 }
             }
             NetflowPacket::V9(v9) => {
+                batch.stats.netflow_v9_packets += 1;
                 if enable_v9 {
-                    batch.stats.netflow_v9_packets += 1;
                     append_v9_records(
                         source,
                         &mut batch.flows,
@@ -134,20 +119,26 @@ pub(crate) fn decode_netflow_result(
                         input_realtime_usec,
                         &mut batch.stats,
                     );
+                } else {
+                    batch.stats.disabled_protocol_packets += 1;
+                    account_v9_packet(&v9, &mut batch.stats);
                 }
             }
             NetflowPacket::IPFix(ipfix) => {
+                batch.stats.ipfix_packets += 1;
                 if enable_ipfix {
-                    batch.stats.ipfix_packets += 1;
-                    batch.stats.partial_counter_records += append_ipfix_records(
+                    append_ipfix_records(
                         source,
-                        &mut batch.flows,
+                        &mut batch,
                         ipfix,
                         sampling,
                         decapsulation_mode,
                         timestamp_source,
                         input_realtime_usec,
                     );
+                } else {
+                    batch.stats.disabled_protocol_packets += 1;
+                    account_ipfix_packet(&ipfix, &mut batch.stats);
                 }
             }
             _ => {}
@@ -156,7 +147,12 @@ pub(crate) fn decode_netflow_result(
 
     if let Some(err) = result.error {
         if is_template_error(&err.to_string()) {
-            batch.stats.template_errors = 1;
+            // Most missing templates are represented by an exact NoTemplate
+            // Set above. A parser-level template error has no Set object, so
+            // account for one unresolved Set only when none was returned.
+            if batch.stats.missing_template_sets == 0 {
+                batch.stats.missing_template_sets = 1;
+            }
         } else {
             batch.stats.parse_errors = 1;
         }

@@ -20,6 +20,7 @@ pub(crate) fn append_v9_records(
     );
 
     for (flowset_index, flowset) in packet.flowsets.into_iter().enumerate() {
+        account_v9_flowset(&flowset.body, stats);
         let nsel = nsel_flowsets
             .and_then(|flowsets| flowsets.get(flowset_index))
             .copied()
@@ -116,9 +117,6 @@ pub(crate) fn append_v9_records(
                     rec.flow_end_usec = flow_end_usec.unwrap_or(0);
                     if nsel {
                         let projection = project_nsel_record(rec, nsel_state, input_realtime_usec);
-                        stats.partial_counter_records = stats
-                            .partial_counter_records
-                            .saturating_add(projection.stats.partial_counter_records);
                         projection.stats.merge_into(stats);
                         if let Some(flow) = projection.forward {
                             out.push(flow);
@@ -140,9 +138,11 @@ pub(crate) fn append_v9_records(
                     );
 
                     if looks_like_sampling_option_record_from_rec(&rec, observed_sampling_rate) {
+                        stats.sampling_option_records += 1;
                         continue;
                     }
                     if decap_required && !decap_ok {
+                        stats.decapsulation_failed_records += 1;
                         continue;
                     }
 
@@ -166,7 +166,7 @@ pub(crate) fn append_v9_records(
                     });
                 }
             }
-            _ => continue,
+            _ => {}
         }
     }
 }

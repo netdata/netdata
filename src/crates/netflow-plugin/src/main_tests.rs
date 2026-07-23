@@ -596,6 +596,12 @@ async fn e2e_ingest_receives_from_multiple_listeners() {
     let ingest_task = tokio::spawn(async move { service.run(run_shutdown).await });
 
     tokio::time::sleep(Duration::from_millis(100)).await;
+    #[cfg(target_os = "linux")]
+    assert_eq!(
+        metrics.udp_listener_socket_inodes().len(),
+        2,
+        "each Linux UDP listener must publish its exact socket inode"
+    );
     let payloads = fixture_udp_payloads("nfv5.pcap");
     let expected_packets = (payloads.len() * 2) as u64;
     replay_payloads_udp(&listen_a, &payloads).await;

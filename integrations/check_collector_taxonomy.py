@@ -7,7 +7,7 @@ import sys
 from ruamel.yaml import YAML, YAMLError
 
 from gen_taxonomy import FATAL, Finding, build_taxonomy, dynamic_declarations, module_contexts, relpath
-from _common import REPO_PATH, get_collector_metadata_entries
+from _common import REPO_PATH, TAXONOMY_SOURCES, get_metadata_entries
 
 
 def run_git(*args):
@@ -78,7 +78,7 @@ def metadata_metrics_touched(diff_range, path):
 
 
 def collector_metadata_paths():
-    return {path.resolve() for _, path in get_collector_metadata_entries()}
+    return {path.resolve() for _, path in get_metadata_entries(TAXONOMY_SOURCES)}
 
 
 def touched_collectors(diff_range):

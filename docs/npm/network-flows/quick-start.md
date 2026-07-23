@@ -166,7 +166,7 @@ If the Sankey is empty after 60-90 seconds, work through this:
 
 3. **Plugin actually decoding.**
 
-   Open the standard Netdata charts page and find `netflow.input_packets`. If `udp_received` is rising but `parsed_packets` isn't, datagrams are arriving but failing to decode. Check `parse_errors` and `template_errors` to narrow down. See [Plugin Health Charts](/docs/npm/network-flows/visualization/dashboard-cards.md).
+   Open the standard Netdata charts page. `netflow.input_packets` confirms UDP arrival; `netflow.protocol_packets` shows whether the packets are v5, v7, v9, IPFIX, or sFlow. If UDP rises but no protocol does, check `parse_errors` in `netflow.decoder_exceptions`. For v9/IPFIX, check missing-template dimensions in `netflow.flow_sets`. See [Plugin Health Charts](/docs/npm/network-flows/visualization/dashboard-cards.md).
 
 4. **Plugin log lines.**
 

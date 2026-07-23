@@ -199,12 +199,12 @@ fn netflow_parser_fixtures_matrix() {
 
         assert!(
             pass,
-            "fixture {} failed: attempts={}, parsed={}, errors={}, template_errors={}, v5={}, v9={}, ipfix={}",
+            "fixture {} failed: attempts={}, parsed={}, errors={}, missing_template_sets={}, v5={}, v9={}, ipfix={}",
             fixture.name,
             stats.parse_attempts,
             stats.parsed_packets,
             stats.parse_errors,
-            stats.template_errors,
+            stats.missing_template_sets,
             stats.netflow_v5_packets,
             stats.netflow_v9_packets,
             stats.ipfix_packets
@@ -447,6 +447,59 @@ fn emits_flow_records_for_v5_fixture() {
 }
 
 #[test]
+fn disabled_v5_is_still_counted_without_emitting_rows() {
+    let mut decoders = FlowDecoders::with_protocols(false, true, true, true, true);
+    let (stats, records) = decode_pcap(&fixture_dir().join("nfv5.pcap"), &mut decoders);
+
+    assert!(stats.netflow_v5_packets > 0);
+    assert!(stats.netflow_v5_records > 0);
+    assert_eq!(stats.disabled_protocol_packets, stats.netflow_v5_packets);
+    assert_eq!(records, 0);
+}
+
+#[test]
+fn disabled_sflow_is_still_counted_without_emitting_rows() {
+    let mut decoders = FlowDecoders::with_protocols(true, true, true, true, false);
+    let (stats, records) = decode_pcap(
+        &fixture_dir().join("data-sflow-expanded-sample.pcap"),
+        &mut decoders,
+    );
+
+    assert!(stats.sflow_datagrams > 0);
+    assert!(stats.sflow_flow_samples > 0);
+    assert_eq!(stats.disabled_protocol_packets, stats.sflow_datagrams);
+    assert_eq!(stats.parse_errors, 0);
+    assert_eq!(records, 0);
+}
+
+#[test]
+fn ipfix_sampling_packet_ratio_data_record_is_counted_when_suppressed() {
+    const TEMPLATE_ID: u16 = 256;
+    const OBSERVATION_DOMAIN_ID: u32 = 42;
+    const SAMPLING_PACKET_INTERVAL: u16 = 305;
+    const SAMPLING_PACKET_SPACE: u16 = 306;
+
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 2055);
+    let fields = [
+        (SAMPLING_PACKET_INTERVAL, 1_u64.to_be_bytes().to_vec()),
+        (SAMPLING_PACKET_SPACE, 999_u64.to_be_bytes().to_vec()),
+    ];
+    let (template, data) =
+        synthetic_ipfix_raw_field_packets(TEMPLATE_ID, OBSERVATION_DOMAIN_ID, &fields);
+    let mut decoders = FlowDecoders::new();
+
+    let template_batch = decoders.decode_udp_payload(source, &template);
+    assert_eq!(template_batch.stats.parse_errors, 0);
+
+    let decoded = decoders.decode_udp_payload(source, &data);
+    assert_eq!(decoded.stats.parse_errors, 0);
+    assert_eq!(decoded.stats.ipfix_records, 1);
+    assert_eq!(decoded.stats.sampling_option_records, 1);
+    assert_eq!(decoded.stats.decapsulation_failed_records, 0);
+    assert!(decoded.flows.is_empty());
+}
+
+#[test]
 fn keeps_valid_flows_parsed_before_a_trailing_error() {
     let path = fixture_dir().join("nfv5.pcap");
     let file = File::open(&path).unwrap_or_else(|e| panic!("open {}: {e}", path.display()));
@@ -579,24 +632,21 @@ fn legacy_v7_records_populate_flow_window_timestamps() {
         }],
     };
 
-    let mut out = Vec::new();
-    super::append_v7_records(
-        source,
-        &mut out,
-        packet,
-        TimestampSource::Input,
-        TEST_INPUT_REALTIME_USEC,
-    );
+    let mut decoders = FlowDecoders::new();
+    let batch =
+        decoders.decode_udp_payload_at(source, &packet.to_be_bytes(), TEST_INPUT_REALTIME_USEC);
 
-    assert_eq!(out.len(), 1);
-    assert_eq!(out[0].record.flow_start_usec, 119_000_000);
-    assert_eq!(out[0].record.flow_end_usec, 120_000_000);
+    assert_eq!(batch.stats.netflow_v7_packets, 1);
+    assert_eq!(batch.stats.netflow_v7_records, 1);
+    assert_eq!(batch.flows.len(), 1);
+    assert_eq!(batch.flows[0].record.flow_start_usec, 119_000_000);
+    assert_eq!(batch.flows[0].record.flow_end_usec, 120_000_000);
     assert_eq!(
-        out[0].record.src_prefix,
+        batch.flows[0].record.src_prefix,
         Some(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))
     );
     assert_eq!(
-        out[0].record.dst_prefix,
+        batch.flows[0].record.dst_prefix,
         Some(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))
     );
 }
@@ -1442,7 +1492,7 @@ fn v9_nsel_update_projects_initiator_and_responder_directions() {
     let decoded = decoders.decode_udp_payload_at(source, &data, 77_000_000);
 
     assert_eq!(decoded.stats.parse_errors, 0);
-    assert_eq!(decoded.stats.template_errors, 0);
+    assert_eq!(decoded.stats.missing_template_sets, 0);
     assert_eq!(decoded.stats.nsel_records, 1);
     assert_eq!(decoded.stats.nsel_update_records, 1);
     assert_eq!(decoded.stats.nsel_forward_rows, 1);
@@ -1583,7 +1633,7 @@ fn v9_nsel_missing_counter_partner_is_zero_and_diagnosed() {
     let decoded = decoders.decode_udp_payload_at(source, &data, 2_000_000);
 
     assert_eq!(decoded.stats.nsel_partial_counter_records, 2);
-    assert_eq!(decoded.stats.partial_counter_records, 2);
+    assert_eq!(decoded.stats.partial_counter_records, 0);
     assert_eq!(decoded.flows.len(), 2);
     assert!(decoded.flows.iter().any(|flow| {
         flow.record.src_addr == Some("10.0.0.1".parse().unwrap())
@@ -3227,11 +3277,11 @@ fn v9_epoch_millisecond_fields_are_absolute_in_both_template_orders() {
 
         let template_batch = decoders.decode_udp_payload(source, &template);
         assert_eq!(template_batch.stats.parse_errors, 0);
-        assert_eq!(template_batch.stats.template_errors, 0);
+        assert_eq!(template_batch.stats.missing_template_sets, 0);
 
         let decoded = decoders.decode_udp_payload_at(source, &data, 1);
         assert_eq!(decoded.stats.parse_errors, 0);
-        assert_eq!(decoded.stats.template_errors, 0);
+        assert_eq!(decoded.stats.missing_template_sets, 0);
         assert_eq!(decoded.flows.len(), 1);
         assert_eq!(
             decoded.flows[0].record.flow_start_usec,
@@ -3699,7 +3749,7 @@ fn v9_parser_source_eviction_does_not_restore_evicted_state() {
 
     assert_eq!(decoded.stats.parse_attempts, 1);
     assert_eq!(decoded.stats.parser_source_evictions, 1);
-    assert_eq!(decoded.stats.template_errors, 1);
+    assert_eq!(decoded.stats.missing_template_sets, 1);
     assert!(decoded.flows.is_empty());
 }
 
@@ -3722,7 +3772,7 @@ fn ipfix_parser_source_eviction_does_not_restore_evicted_state() {
 
     assert_eq!(decoded.stats.parse_attempts, 1);
     assert_eq!(decoded.stats.parser_source_evictions, 1);
-    assert_eq!(decoded.stats.template_errors, 1);
+    assert_eq!(decoded.stats.missing_template_sets, 1);
     assert!(decoded.flows.is_empty());
 }
 
@@ -3778,7 +3828,7 @@ fn genuinely_unknown_v9_template_is_not_retried() {
     let decoded = FlowDecoders::new().decode_udp_payload(source, &data);
 
     assert_eq!(decoded.stats.parse_attempts, 1);
-    assert_eq!(decoded.stats.template_errors, 1);
+    assert_eq!(decoded.stats.missing_template_sets, 1);
     assert!(decoded.flows.is_empty());
 }
 
@@ -3911,7 +3961,7 @@ fn v9_template_lifetime_uses_collector_receive_time_and_data_does_not_refresh_it
     );
     let expired = decoders.decode_udp_payload_at(source, &data, learned_at + 10_000_000);
     assert!(expired.flows.is_empty());
-    assert_eq!(expired.stats.template_errors, 1);
+    assert_eq!(expired.stats.missing_template_sets, 1);
 }
 
 #[test]
@@ -3973,7 +4023,7 @@ fn persisted_v9_template_lifetime_survives_restart() {
 
     let expired = restored.decode_udp_payload_at(source, &data, learned_at + 10_000_000);
     assert!(expired.flows.is_empty());
-    assert_eq!(expired.stats.template_errors, 1);
+    assert_eq!(expired.stats.missing_template_sets, 1);
 }
 
 #[test]
@@ -4196,11 +4246,11 @@ fn v9_flowset_parses_more_than_parser_default_when_datagram_allows_it() {
 
     let template_batch = decoders.decode_udp_payload(source, &template);
     assert_eq!(template_batch.stats.parse_errors, 0);
-    assert_eq!(template_batch.stats.template_errors, 0);
+    assert_eq!(template_batch.stats.missing_template_sets, 0);
 
     let data_batch = decoders.decode_udp_payload(source, &data);
     assert_eq!(data_batch.stats.parse_errors, 0);
-    assert_eq!(data_batch.stats.template_errors, 0);
+    assert_eq!(data_batch.stats.missing_template_sets, 0);
     assert_eq!(data_batch.flows.len(), RECORD_COUNT);
     assert!(
         data_batch
@@ -4232,11 +4282,11 @@ fn ipfix_flowset_parses_more_than_parser_default_when_datagram_allows_it() {
 
     let template_batch = decoders.decode_udp_payload(source, &template);
     assert_eq!(template_batch.stats.parse_errors, 0);
-    assert_eq!(template_batch.stats.template_errors, 0);
+    assert_eq!(template_batch.stats.missing_template_sets, 0);
 
     let data_batch = decoders.decode_udp_payload(source, &data);
     assert_eq!(data_batch.stats.parse_errors, 0);
-    assert_eq!(data_batch.stats.template_errors, 0);
+    assert_eq!(data_batch.stats.missing_template_sets, 0);
     assert_eq!(data_batch.flows.len(), RECORD_COUNT);
     assert!(
         data_batch
@@ -4548,11 +4598,14 @@ fn decode_synthetic_counter_record(
 
     let template_batch = decoders.decode_udp_payload(source, &template);
     assert_eq!(template_batch.stats.parse_errors, 0, "{protocol:?}");
-    assert_eq!(template_batch.stats.template_errors, 0, "{protocol:?}");
+    assert_eq!(
+        template_batch.stats.missing_template_sets, 0,
+        "{protocol:?}"
+    );
 
     let decoded = decoders.decode_udp_payload(source, &data);
     assert_eq!(decoded.stats.parse_errors, 0, "{protocol:?}");
-    assert_eq!(decoded.stats.template_errors, 0, "{protocol:?}");
+    assert_eq!(decoded.stats.missing_template_sets, 0, "{protocol:?}");
     assert_eq!(decoded.flows.len(), 1, "{protocol:?}");
 
     (decoded.stats, decoded.flows[0].record.to_fields())
@@ -4604,11 +4657,11 @@ fn decode_synthetic_ipfix_raw_counter_flows_with_sampling(
 
     let template_batch = decoders.decode_udp_payload(source, &template);
     assert_eq!(template_batch.stats.parse_errors, 0);
-    assert_eq!(template_batch.stats.template_errors, 0);
+    assert_eq!(template_batch.stats.missing_template_sets, 0);
 
     let decoded = decoders.decode_udp_payload(source, &data);
     assert_eq!(decoded.stats.parse_errors, 0);
-    assert_eq!(decoded.stats.template_errors, 0);
+    assert_eq!(decoded.stats.missing_template_sets, 0);
 
     let mut counters = decoded
         .flows
@@ -4647,11 +4700,14 @@ fn decode_synthetic_raw_record(
 
     let template_batch = decoders.decode_udp_payload(source, &template);
     assert_eq!(template_batch.stats.parse_errors, 0, "{protocol:?}");
-    assert_eq!(template_batch.stats.template_errors, 0, "{protocol:?}");
+    assert_eq!(
+        template_batch.stats.missing_template_sets, 0,
+        "{protocol:?}"
+    );
 
     let decoded = decoders.decode_udp_payload(source, &data);
     assert_eq!(decoded.stats.parse_errors, 0, "{protocol:?}");
-    assert_eq!(decoded.stats.template_errors, 0, "{protocol:?}");
+    assert_eq!(decoded.stats.missing_template_sets, 0, "{protocol:?}");
     assert_eq!(decoded.flows.len(), 1, "{protocol:?}");
 
     (decoded.stats, decoded.flows[0].record.to_fields())
