@@ -1815,6 +1815,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdfunctions-inflight.h
         src/database/rrdfunctions-exporters.c
         src/database/rrdfunctions-exporters.h
+        src/database/rrdfunctions-unittest.c
         src/database/rrdfunctions-internals.h
         src/database/rrdcollector-internals.h
         src/database/rrd-database-mode.h
@@ -2021,6 +2022,7 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools-list-metadata.h
         src/web/mcp/mcp-tools-execute-function.c
         src/web/mcp/mcp-tools-execute-function.h
+        src/web/mcp/mcp-tools-execute-function-unittest.c
         src/web/mcp/mcp-tools-execute-function-internal.h
         src/web/mcp/mcp-tools-execute-function-registry.c
         src/web/mcp/mcp-tools-execute-function-registry.h
