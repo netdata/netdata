@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/overview.md"
-sidebar_label: "Overview"
-learn_status: "Published"
-learn_rel_path: "Network Flows/Visualization"
-keywords: ['visualization', 'overview', 'queries', 'fts', 'url sharing', 'group-by']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Visualization

@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/configuration.md"
-sidebar_label: "Configuration"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'configuration', 'snmpv3', 'community', 'profiles', 'credentials', 'update_every']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Configuration

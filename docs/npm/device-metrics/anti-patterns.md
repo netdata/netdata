@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/anti-patterns.md"
-sidebar_label: "Anti-patterns"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'anti-patterns', 'mistakes', 'pitfalls', 'polling', 'counters', 'security']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Anti-patterns and pitfalls

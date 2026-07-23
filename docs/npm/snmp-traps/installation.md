@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/installation.md"
-sidebar_label: "Installation"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp', 'traps', 'installation', 'go.d', 'udp', 'snmpv3']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Installation

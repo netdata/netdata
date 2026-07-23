@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/configuration.md"
-sidebar_label: "Configuration"
-learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['configuration', 'netflow.yaml', 'tuning', 'retention', 'listener']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Configuration
@@ -126,9 +118,9 @@ journal:
   query_max_groups: 50000
   tiers:
     raw:      { size_of_journal_files: 50GB, duration_of_journal_files: 24h }
-    minute_1: { size_of_journal_files: 5GB,  duration_of_journal_files: 14d }
-    minute_5: { size_of_journal_files: 5GB,  duration_of_journal_files: 30d }
-    hour_1:   { size_of_journal_files: 5GB,  duration_of_journal_files: 365d }
+    minute_1: { size_of_journal_files: 10GB, duration_of_journal_files: 14d }
+    minute_5: { size_of_journal_files: 10GB, duration_of_journal_files: 30d }
+    hour_1:   { size_of_journal_files: 10GB, duration_of_journal_files: 365d }
 ```
 
 ### Journal directory
@@ -147,13 +139,13 @@ tiers:
     size_of_journal_files: 50GB
     duration_of_journal_files: 24h
   minute_1:
-    size_of_journal_files: 5GB
+    size_of_journal_files: 10GB
     duration_of_journal_files: 14d
   minute_5:
-    size_of_journal_files: 5GB
+    size_of_journal_files: 10GB
     duration_of_journal_files: 30d
   hour_1:
-    size_of_journal_files: 5GB
+    size_of_journal_files: 10GB
     duration_of_journal_files: 365d
 ```
 

@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/filters-facets.md"
-sidebar_label: "Filters and Facets"
-learn_status: "Published"
-learn_rel_path: "Network Flows/Visualization"
-keywords: ['filters', 'facets', 'autocomplete', 'search', 'fts', 'negative match', 'visualization']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Filters and Facets

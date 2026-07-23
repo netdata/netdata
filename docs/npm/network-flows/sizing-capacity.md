@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/sizing-capacity.md"
-sidebar_label: "Sizing and Capacity Planning"
-learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['sizing', 'capacity', 'planning', 'storage', 'memory', 'scaling', 'distributed']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Sizing and Capacity Planning

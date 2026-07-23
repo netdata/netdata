@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/topology/README.md"
-sidebar_label: "Overview"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Topologies"
-keywords: ['topology', 'network topology', 'lldp', 'cdp', 'fdb', 'arp', 'stp', 'bgp', 'ospf', 'overview']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Network Topologies

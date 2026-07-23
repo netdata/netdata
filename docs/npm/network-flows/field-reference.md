@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/field-reference.md"
-sidebar_label: "Field Reference"
-learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['fields', 'flow record', 'schema', 'reference']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Field Reference

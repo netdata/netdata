@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/anti-patterns.md"
-sidebar_label: "Anti-Patterns"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'anti-patterns', 'security', 'operations', 'validation', 'capacity']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Anti-Patterns

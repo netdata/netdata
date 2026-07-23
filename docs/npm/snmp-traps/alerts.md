@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/alerts.md"
-sidebar_label: "Alerts"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'alerts', 'health', 'severity', 'routing', 'silencing']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # SNMP Trap Alerts

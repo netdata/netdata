@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/enrichment.md"
-sidebar_label: "Enrichment"
-learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: [enrichment, geoip, asn, bgp, classifiers, network labels, mmdb, ipam]
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Enrichment

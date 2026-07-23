@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/metrics.md"
-sidebar_label: "Metrics"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'metrics', 'health', 'deduplication', 'receiver pipeline']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # SNMP Trap Metrics

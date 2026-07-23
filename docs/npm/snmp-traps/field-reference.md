@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/field-reference.md"
-sidebar_label: "Field Reference"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'field reference', 'trap fields', 'journal fields', 'varbinds', 'otlp', 'siem']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Field Reference

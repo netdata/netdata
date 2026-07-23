@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/dashboard-cards.md"
-sidebar_label: "Plugin Health Charts"
-learn_status: "Published"
-learn_rel_path: "Network Flows/Visualization"
-keywords: ['plugin health', 'metrics', 'operational charts', 'monitoring']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Plugin Health Charts

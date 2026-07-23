@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/validation-and-data-quality.md"
-sidebar_label: "Validation and Data Quality"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'validation', 'data quality', 'source identity', 'trusted relays', 'otlp', 'siem']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Validation and Data Quality

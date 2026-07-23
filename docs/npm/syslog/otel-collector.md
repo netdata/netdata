@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/syslog/otel-collector.md"
-sidebar_label: "OpenTelemetry Collector Setup"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Syslog from Network Devices"
-keywords: ['syslog', 'opentelemetry', 'otel collector', 'otlp', 'configuration', 'setup']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # OpenTelemetry Collector Setup

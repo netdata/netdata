@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/quick-start.md"
-sidebar_label: "Quick Start"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'quick start', 'getting started', 'first device', 'auto-detection']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Quick Start

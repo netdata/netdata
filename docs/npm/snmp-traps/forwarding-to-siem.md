@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/forwarding-to-siem.md"
-sidebar_label: "Forwarding to SIEM"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'siem', 'forwarding', 'otlp', 'journal', 'logs']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Forwarding to SIEM

@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/intel-downloader.md"
-sidebar_label: "Enrichment Intel Downloader"
-learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['ip intelligence', 'mmdb', 'downloader', 'db-ip', 'iptoasn', 'topology-ip-intel-downloader', 'enrichment', 'refresh']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Enrichment Intel Downloader

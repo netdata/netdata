@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/licensing/README.md"
-sidebar_label: "Overview"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Licensing Monitoring"
-keywords: ['license', 'licensing', 'entitlement', 'expiry', 'snmp', 'overview']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Licensing Monitoring

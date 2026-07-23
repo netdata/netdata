@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/configuration.md"
-sidebar_label: "Configuration"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'configuration', 'snmpv3', 'usm', 'allowlist', 'dedup', 'otlp', 'journal']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Configuration
