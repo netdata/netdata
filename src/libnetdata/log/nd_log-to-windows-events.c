@@ -155,9 +155,9 @@ bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
 // WINEVT Channels registry path prefix
 #define WINEVT_CHANNELS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Channels\\"
 
-// Canonical channel-to-label table used by both wel_manifest_is_current() and
-// wel_ensure_manifest_installed().  A single definition prevents the two functions
-// from drifting out of sync and ensures every channel is validated and configured.
+// Canonical channel-to-label table.  The label is only used to identify and remove
+// the DisplayName overrides written by an earlier implementation; the manifest's
+// localized message is the authoritative Event Viewer display label.
 static const struct { const wchar_t *ch; const wchar_t *label; } wel_channels[] = {
     { L"Netdata/Daemon",     L"Daemon"     },
     { L"Netdata/Collectors", L"Collectors" },
@@ -165,6 +165,14 @@ static const struct { const wchar_t *ch; const wchar_t *label; } wel_channels[] 
     { L"Netdata/Health",     L"Health"     },
     { L"Netdata/Aclk",       L"Aclk"       },
 };
+
+static bool wel_has_stale_display_name(HKEY hCh, const wchar_t *label) {
+    wchar_t display_name[64] = {0};
+    DWORD type = 0;
+    DWORD size = sizeof(display_name);
+    return RegQueryValueExW(hCh, L"DisplayName", NULL, &type, (LPBYTE)display_name, &size) == ERROR_SUCCESS &&
+           type == REG_SZ && wcscmp(display_name, label) == 0;
+}
 
 // Classic EventLog keys with slash-containing names are displayed as flat logs
 // (for example, "Netdata\\Daemon") rather than WINEVT channel hierarchy.
@@ -211,10 +219,9 @@ static bool wel_manifest_is_current(void) {
         RegCloseKey(hKey);
     }
 
-    // Verify every channel: must exist, be Admin type (EVT_CHANNEL_TYPE_ADMIN = 0),
-    // and carry the correct short display name.  Checking all channels — not just
-    // Daemon — catches a partial registration where later label writes failed, which
-    // would otherwise be silently accepted as current and never repaired.
+    // Verify every channel: it must exist and be Admin type (EVT_CHANNEL_TYPE_ADMIN = 0).
+    // A DisplayName value equal to the old override marks a stale registration so that
+    // the migration below removes it and lets the manifest define the tree label.
     for (size_t i = 0; i < _countof(wel_channels); i++) {
         wchar_t chkey[MAX_PATH];
         swprintf(chkey, _countof(chkey), L"%ls%ls", WINEVT_CHANNELS_KEY, wel_channels[i].ch);
@@ -226,16 +233,14 @@ static bool wel_manifest_is_current(void) {
         DWORD sz = sizeof(chtype);
         RegQueryValueExW(hCh, L"Type", NULL, NULL, (LPBYTE)&chtype, &sz);
 
-        wchar_t dispName[64] = {0};
-        DWORD dnSz = sizeof(dispName);
-        LONG dnRc = RegQueryValueExW(hCh, L"DisplayName", NULL, NULL, (LPBYTE)dispName, &dnSz);
+        bool stale_display_name = wel_has_stale_display_name(hCh, wel_channels[i].label);
 
         RegCloseKey(hCh);
 
         if (chtype != 0)  // 0 = Admin
             return false;
 
-        if (dnRc != ERROR_SUCCESS || wcscmp(dispName, wel_channels[i].label) != 0)
+        if (stale_display_name)
             return false;
     }
 
@@ -435,20 +440,19 @@ static void wel_ensure_manifest_installed(void) {
     for (size_t j = 0; j < _countof(wel_flat_legacy_keys); j++)
         RegDeleteTreeW(HKEY_LOCAL_MACHINE, wel_flat_legacy_keys[j]);
 
-    // Set short display names on every channel so Event Viewer shows "Daemon" (not the
-    // full channel name "Netdata/Daemon") as the leaf label inside the Netdata folder.
-    // wevtutil im does not derive these from $(string.*) references in the embedded
-    // manifest, so we set them explicitly after registration.
+    // Remove only the DisplayName values written by the earlier implementation.
+    // Channel display metadata belongs in the manifest: its localized message and the
+    // Netdata/<leaf> channel name make Event Viewer show one Netdata folder containing
+    // the leaf logs. A registry override instead makes Event Viewer create an extra
+    // Netdata/<leaf> level with a duplicate full-name log beneath it.
     for (size_t cl = 0; cl < _countof(wel_channels); cl++) {
         wchar_t chregkey[MAX_PATH];
         swprintf(chregkey, _countof(chregkey), L"%ls%ls",
                  WINEVT_CHANNELS_KEY, wel_channels[cl].ch);
         HKEY hCh;
-        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, chregkey, 0, KEY_SET_VALUE, &hCh) == ERROR_SUCCESS) {
-            RegSetValueExW(hCh, L"DisplayName", 0, REG_SZ,
-                           (LPBYTE)wel_channels[cl].label,
-                           (DWORD)((wel_wcslen_bounded(wel_channels[cl].label,
-                                                       WEL_LABEL_MAX_CHARS) + 1) * sizeof(wchar_t)));
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, chregkey, 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &hCh) == ERROR_SUCCESS) {
+            if (wel_has_stale_display_name(hCh, wel_channels[cl].label))
+                RegDeleteValueW(hCh, L"DisplayName");
             RegCloseKey(hCh);
         }
     }
