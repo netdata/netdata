@@ -208,8 +208,8 @@ func (c *Conn) DefineChart(ch Chart) {
 	if ch.UpdateEvery <= 0 {
 		ch.UpdateEvery = 1
 	}
-	c.Linef("CHART %s '' '%s' '%s' '%s' '%s' %s %d %d '' fixture-pusher corpus",
-		ch.ID, ch.Title, ch.Units, ch.Family, ch.Context, ch.Type, ch.Priority, ch.UpdateEvery)
+	c.Linef("CHART %s '' %s %s %s %s %s %d %d '' fixture-pusher corpus",
+		qw(ch.ID), qw(ch.Title), qw(ch.Units), qw(ch.Family), qw(ch.Context), ch.Type, ch.Priority, ch.UpdateEvery)
 }
 
 // qw quotes one protocol word. The plugins.d splitter accepts both '
@@ -240,22 +240,13 @@ func (c *Conn) DimensionNamed(id, name, algorithm string, mul, div int) {
 
 // Dimension buffers a DIMENSION line for the current chart scope.
 func (c *Conn) Dimension(id, algorithm string, mul, div int) {
-	if algorithm == "" {
-		algorithm = "absolute"
-	}
-	if mul == 0 {
-		mul = 1
-	}
-	if div == 0 {
-		div = 1
-	}
-	c.Linef("DIMENSION %s '' %s %d %d ''", qw(id), algorithm, mul, div)
+	c.DimensionNamed(id, "", algorithm, mul, div)
 }
 
 // CLabel buffers one chart label (RRDLABEL_SRC_CONFIG) for the current
 // chart scope; commit with CLabelCommit.
 func (c *Conn) CLabel(name, value string) {
-	c.Linef("CLABEL '%s' '%s' 2", name, value)
+	c.Linef("CLABEL %s %s 2", qw(name), qw(value))
 }
 
 // CLabelCommit applies the buffered CLABEL lines to the current chart.
@@ -266,7 +257,7 @@ func (c *Conn) CLabelCommit() {
 // Begin2 opens one interpolated sample for the chart: endTime is the exact
 // per-sample timestamp; the wall-clock field is left unset ('#').
 func (c *Conn) Begin2(chartID string, updateEvery int, endTime int64) {
-	c.Linef("BEGIN2 '%s' %d %d #", chartID, updateEvery, endTime)
+	c.Linef("BEGIN2 %s %d %d #", qw(chartID), updateEvery, endTime)
 }
 
 // Set2 stores one dimension sample. flags is the SN flags text (Flag*
@@ -292,7 +283,7 @@ func (c *Conn) End2() {
 // advancing the chart's collection time by usecSinceLast (0 on the first
 // sample = "now").
 func (c *Conn) Begin(chartID string, usecSinceLast int64) {
-	c.Linef("BEGIN '%s' %d", chartID, usecSinceLast)
+	c.Linef("BEGIN %s %d", qw(chartID), usecSinceLast)
 }
 
 // Set buffers one v1 collected value — the RAW counter/gauge reading; the
@@ -396,7 +387,7 @@ func (c *Conn) ServeReplication(charts map[string]struct{ FirstT, LastT int64 },
 
 		if after != 0 && before != 0 {
 			for _, row := range handler(chart, after, before) {
-				c.Linef("RBEGIN '%s' %d %d %d", chart, row.T-1, row.T, childNow)
+				c.Linef("RBEGIN %s %d %d %d", qw(chart), row.T-1, row.T, childNow)
 				for _, dv := range row.Dims {
 					if dv.Flags == FlagEmpty {
 						c.Linef("RSET %s NAN E", qw(dv.ID))
