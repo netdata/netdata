@@ -60,6 +60,7 @@ mod reader;
 mod row_index;
 mod schema;
 mod span_extras;
+mod trace_rollup;
 mod trace_bloom;
 pub mod trace_combine;
 mod trace_index;
@@ -84,6 +85,7 @@ pub use reader::{read_summary, read_summary_path};
 pub use registry::{File, Registry, RetentionPolicy};
 pub use row_index::RowIndex;
 pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};
+pub use trace_rollup::{ROLLUP_NO_REF, TraceRollup, TraceRollupRows};
 pub use schema::join_value_kinds;
 pub use trace_bloom::TraceIdBloom;
 pub use trace_combine::{CombineOutcome, SpanRef, SpanSource};
@@ -168,6 +170,11 @@ const CHUNK_TRACE_INDEX: chunk_file::ChunkId = *b"TIDX";
 // `Span.links[]`. Same additive TOC-indexed contract as TIDX (see
 // `span_extras`).
 const CHUNK_EVENTS: chunk_file::ChunkId = *b"EVNB";
+// Optional per-file trace rollup (cold region, after the bloom): one row per
+// distinct set trace id — the trace-level aggregate for overview/slowest/facet
+// folds without assembly. Same additive TOC-indexed contract as TIDX (see
+// `trace_rollup`).
+const CHUNK_TRACE_ROLLUP: chunk_file::ChunkId = *b"TRSU";
 const CHUNK_LINKS: chunk_file::ChunkId = *b"LNKB";
 // Optional per-file trace-id bloom (cold region, after TIDX): a serialized
 // fastbloom filter over the file's distinct set trace ids — "definitely not in

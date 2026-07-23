@@ -418,6 +418,13 @@ pub(crate) fn build_into<W: Write + Seek>(
         // per-row columns.
         event_index: row_index.events.is_some(),
         link_index: row_index.links.is_some(),
+        // The trace rollup (traces seal only): declared when the producer
+        // accumulated any rows — an empty rollup is never written (the
+        // `is_meaningful` rule the span structures also follow).
+        trace_rollup: row_index
+            .trace_rollup
+            .as_ref()
+            .is_some_and(|r| r.is_meaningful()),
         mid_fields: u16::try_from(row_index.mid_fields().len())
             .expect("mid-card field count exceeds u16::MAX"),
         high_fields: u16::try_from(row_index.high_fields().len())
@@ -517,6 +524,18 @@ pub(crate) fn build_into<W: Write + Seek>(
     if let Some(links) = &row_index.links {
         check_column_len("links", links.num_rows(), n)?;
         w.link_index(&links.reordered(by_time(), &kv_to_file))?;
+    }
+
+    // Optional per-file trace rollup (TRSU), after the span structures:
+    // trace-keyed (no chronological permutation — emission sorts by trace
+    // id); slots translate through the SAME kv_to_file table, so the root
+    // refs point at exactly the ids the rows carry.
+    if counts.trace_rollup {
+        let rollup = row_index
+            .trace_rollup
+            .as_ref()
+            .expect("declared only when the accumulator exists");
+        w.trace_rollup(&rollup.sealed(&kv_to_file))?;
     }
 
     // Low/mid-cardinality FSTs, high-cardinality chunks, then the

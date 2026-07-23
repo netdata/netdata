@@ -181,6 +181,39 @@ nonzero dropped count that must survive), and are detected via the TOC
 (`IndexReader::has_event_index` / `has_link_index`). Rows are chronological
 like every per-row column; items within a row keep their original OTLP order.
 
+The optional `TRSU` chunk is the **per-file trace rollup** (traces signal):
+one row per DISTINCT set trace id in the file — the trace-level aggregate
+that lets a consumer fold trace counts/envelopes/roots across files WITHOUT
+assembling traces. A struct-of-arrays, index-parallel across every field,
+sorted ascending by trace id: `trace_ids` (16-byte arena), `root_span_ids`
+(8-byte arena; UNSET when the file holds no true root for the trace),
+`min_start_ns` / `max_end_ns` (`Vec<i64>`, the stored envelope — end is
+`start ⊕ duration`, saturating), `span_counts` / `error_counts` (`Vec<u32>`),
+`root_kinds` (`Vec<i32>`, raw OTLP kind; 0 when no true root),
+`root_is_true_root` (`Vec<u8>`, 1/0), and `root_service_refs` /
+`root_name_refs` (`Vec<u32>`, file `KvId`s of the root's resource
+`service.name` / span `name` tokens, or the `u32::MAX` sentinel for absent).
+
+Semantics are deliberate and part of the contract:
+
+- Counts are **stored-row statistics**: a resent span counts every time it
+  is stored. The canonical `(span_id, kind)` resend dedup belongs to
+  assembly (`trace_combine`) and is NOT replicated here; consumers must
+  label rollup-derived numbers accordingly.
+- The root columns are **honest-or-absent**: populated only from a span
+  with a genuinely unset parent stored in THIS file (the earliest such span
+  wins — the `summary_root` convention). `root_is_true_root == 0` means the
+  other root columns are sentinels; a reader never synthesizes a root.
+- The all-zero "unset" trace id is excluded (the `TIDX` rule).
+
+It lives after the span structures (`LNKB`), requires the `TRCE` column its
+data derives from, is written only when the file holds at least one set
+trace id, and is detected via the TOC (`IndexReader::has_trace_rollup`).
+Readers validate index-parallelism across all ten arrays at decode
+(`IndexReader::trace_rollup`). Same additive TOC-indexed contract as
+`TIDX`: presence needs no format version bump, and pre-rollup readers
+ignore it.
+
 The rows are listed in the order the canonical producer emits chunk
 bodies. This order is **not** part of the format contract — readers
 resolve chunks through the TOC and must not assume positions (see

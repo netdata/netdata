@@ -56,6 +56,7 @@ fn trace_file_with_bloom(
         trace_id_bloom: bloom.is_some(),
         event_index: false,
         link_index: false,
+        trace_rollup: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,

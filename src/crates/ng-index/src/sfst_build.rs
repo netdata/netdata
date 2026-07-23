@@ -381,6 +381,16 @@ fn populate_trace_row_index(
     let mut kv = String::new();
     let mut flattener = ng_flatten::Flattener::new();
 
+    // The producer-side storage keys the rollup captures by (this crate
+    // family DEFINES the storage paths via the flattener; the sfsq
+    // vocabulary mirrors them — a downstream lockstep test keeps both
+    // honest).
+    const ROLLUP_SERVICE_KEY: &str = "resource.attributes.service.name";
+    const ROLLUP_NAME_KEY: &str = "name";
+    const ROLLUP_KIND_RAW_KEY: &str = "_kind";
+    const ROLLUP_STATUS_KEY: &str = "status_code";
+
+    let mut rollup = sfst::TraceRollupRows::new();
     let mut trace_ids = TraceIds::default();
     let mut span_ids = SpanIds::default();
     let mut parent_span_ids = ParentSpanIds::default();
@@ -422,6 +432,13 @@ fn populate_trace_row_index(
         for rg in &flattened.resources {
             let resource_tokens =
                 intern_entries(row_index, &rg.resource, &paths, &mut kv, &mut stats);
+            // The rollup's root service ref: the resource group's
+            // `service.name` slot, constant across its spans.
+            let service_slot = rg
+                .resource
+                .iter()
+                .position(|e| paths[e.node as usize] == ROLLUP_SERVICE_KEY)
+                .map(|i| resource_tokens[i]);
             tokens.clear();
             tokens.extend_from_slice(&resource_tokens);
 
@@ -503,6 +520,42 @@ fn populate_trace_row_index(
                     events.end_row(span.dropped_events_count);
                     links.end_row(span.dropped_links_count);
 
+                    // The trace rollup folds this span: name/raw-kind/status
+                    // captured by storage key from the just-interned span
+                    // entries (tokens[base + j] is span.entries[j]'s slot).
+                    {
+                        let base = resource_tokens.len() + scope_tokens.len();
+                        let mut name_slot = None;
+                        let mut kind = 0i32;
+                        let mut is_error = false;
+                        for (j, e) in span.entries.iter().enumerate() {
+                            match paths[e.node as usize].as_str() {
+                                ROLLUP_NAME_KEY => name_slot = Some(tokens[base + j]),
+                                ROLLUP_KIND_RAW_KEY => {
+                                    if let ng_flatten::Value::Int(k) = &e.value {
+                                        kind = *k as i32;
+                                    }
+                                }
+                                ROLLUP_STATUS_KEY => {
+                                    is_error = matches!(&e.value,
+                                        ng_flatten::Value::Str(s) if s == "ERROR");
+                                }
+                                _ => {}
+                            }
+                        }
+                        rollup.record_span(
+                            TraceId::from(*span.trace_id.as_bytes()),
+                            SpanId::from(*span.span_id.as_bytes()),
+                            span.parent_span_id.as_bytes().iter().all(|&b| b == 0),
+                            span.ts,
+                            span.duration,
+                            kind,
+                            is_error,
+                            service_slot,
+                            name_slot,
+                        );
+                    }
+
                     // Per-row span columns, one value per row (parallel to the row
                     // just fed) so they stay aligned for the build-time remap. Ids
                     // are byte-copied from the typed ng_flatten ids to the sfst ones.
@@ -537,6 +590,9 @@ fn populate_trace_row_index(
     // nonzero span-level dropped count) — an all-empty accumulator writes no chunk.
     row_index.events = events.is_meaningful().then_some(events);
     row_index.links = links.is_meaningful().then_some(links);
+    // The trace rollup, same is-meaningful rule (an empty rollup — an
+    // all-UNSET-trace-id file — writes no chunk).
+    row_index.trace_rollup = rollup.is_meaningful().then_some(rollup);
 
     Ok(stats)
 }

@@ -70,6 +70,10 @@ pub struct RowIndex<'a> {
     /// Span link structure accumulator (`LNKB` chunk; traces seal only). Same
     /// row protocol as [`events`](Self::events). See [`crate::LinkRows`].
     pub links: Option<crate::LinkRows>,
+    /// Per-file trace rollup accumulator (`TRSU` chunk; traces seal only).
+    /// Trace-keyed (no per-row protocol); skipped at build when it holds no
+    /// rows. See [`crate::TraceRollupRows`].
+    pub trace_rollup: Option<crate::TraceRollupRows>,
     /// The typed schema tree to persist as the on-disk field descriptor
     /// (`Metadata.tree`). `Some` when a producer with typed flattening supplies
     /// it (the `ng-index` path) — structure + per-leaf `ValueKind`, leaf stats
@@ -98,6 +102,7 @@ impl<'a> RowIndex<'a> {
             build_trace_id_bloom: false,
             events: None,
             links: None,
+            trace_rollup: None,
             tree: None,
         }
     }

@@ -828,3 +828,53 @@ fn seal_writes_trace_id_bloom() {
     let tr = index.trace_by_id(absent).unwrap();
     assert!(tr.spans.is_empty() && tr.roots.is_empty());
 }
+
+// ── The trace rollup (TRSU) ─────────────────────────────────────────
+
+#[test]
+fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
+    // Two traces: A has a true root (unset parent) + a child; B has NO
+    // unset-parent span (a broken/partial trace) — its root columns must
+    // be sentinels, never a synthesized guess. A's child span is stored
+    // twice (a resend) and counts twice — stored-row semantics.
+    let a_root = span([0xA; 16], [1; 8], [0; 8], 1_000, 2_000, "root-op");
+    let a_child = span([0xA; 16], [2; 8], [1; 8], 1_200, 1_500, "child-op");
+    let b_orphan = span([0xB; 16], [3; 8], [9; 8], 5_000, 6_000, "orphan-op");
+    let bytes = seal(vec![req(vec![
+        a_root,
+        a_child.clone(),
+        a_child,
+        b_orphan,
+    ])]);
+
+    let reader = IndexReader::open(&bytes).unwrap();
+    assert!(reader.has_trace_rollup());
+    let rollup = reader.trace_rollup().unwrap();
+    assert_eq!(rollup.len(), 2);
+
+    // Rows sort by trace id: A (0x0A…) then B (0x0B…).
+    assert_eq!(rollup.trace_ids.get(0), TraceId::from([0xA; 16]));
+    assert_eq!(rollup.span_counts[0], 3, "the resent span counts twice (D9)");
+    assert_eq!(rollup.min_start_ns[0], 1_000);
+    assert_eq!(rollup.max_end_ns[0], 2_000);
+    assert_eq!(rollup.root_is_true_root[0], 1);
+    assert_eq!(rollup.root_span_ids.get(0), SpanId::from([1; 8]));
+    // The root refs resolve through the file interner to the real values.
+    let strings = reader.build_string_table(reader.field_table()).unwrap();
+    let resolve = |id: u32| strings[id as usize].clone();
+    assert_eq!(
+        resolve(rollup.root_service_refs[0]),
+        "resource.attributes.service.name=svc"
+    );
+    assert_eq!(resolve(rollup.root_name_refs[0]), "name=root-op");
+
+    assert_eq!(rollup.trace_ids.get(1), TraceId::from([0xB; 16]));
+    assert_eq!(rollup.root_is_true_root[1], 0, "no true root → honest absence");
+    assert!(rollup.root_span_ids.get(1).is_unset());
+    assert_eq!(rollup.root_service_refs[1], sfst::ROLLUP_NO_REF);
+
+    // And the file stays fully readable by the pre-rollup paths — the
+    // additive-chunk contract (assembly ignores TRSU entirely).
+    let tr = reader.trace_by_id(TraceId::from([0xA; 16])).unwrap();
+    assert_eq!(tr.spans.len(), 2, "assembly still dedups the resend");
+}

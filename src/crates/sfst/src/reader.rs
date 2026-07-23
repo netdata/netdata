@@ -490,6 +490,35 @@ impl<'a> ChunkReader<'a> {
         Ok(index)
     }
 
+    /// Whether the file carries the optional per-file trace rollup (`TRSU`).
+    pub fn has_trace_rollup(&self) -> bool {
+        self.container.has_chunk(crate::CHUNK_TRACE_ROLLUP)
+    }
+
+    /// Decode and validate the per-file trace rollup (`TRSU`): every
+    /// struct-of-arrays field must be index-parallel (the corrupt-file
+    /// guard — a length mismatch is a decode error, not a panic later).
+    pub fn trace_rollup(&self) -> Result<crate::TraceRollup, Error> {
+        let rollup: crate::TraceRollup =
+            unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_ROLLUP)?)?;
+        let n = rollup.min_start_ns.len();
+        let parallel = rollup.trace_ids.len() == n
+            && rollup.root_span_ids.len() == n
+            && rollup.max_end_ns.len() == n
+            && rollup.span_counts.len() == n
+            && rollup.error_counts.len() == n
+            && rollup.root_kinds.len() == n
+            && rollup.root_is_true_root.len() == n
+            && rollup.root_service_refs.len() == n
+            && rollup.root_name_refs.len() == n;
+        if !parallel {
+            return Err(Error::CorruptIndex(
+                "trace rollup fields are not index-parallel".into(),
+            ));
+        }
+        Ok(rollup)
+    }
+
     /// Decode and validate the span link structure (`LNKB`). See
     /// [`event_index`](Self::event_index).
     pub fn link_index(&self) -> Result<crate::LinkIndex, Error> {

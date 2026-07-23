@@ -374,6 +374,16 @@ impl<'a> IndexReader<'a> {
         self.sfst.durations()
     }
 
+    /// Whether the file carries the optional per-file trace rollup (`TRSU`).
+    pub fn has_trace_rollup(&self) -> bool {
+        self.sfst.has_trace_rollup()
+    }
+
+    /// Decode and validate the per-file trace rollup (`TRSU`).
+    pub fn trace_rollup(&self) -> Result<crate::TraceRollup, crate::Error> {
+        self.sfst.trace_rollup()
+    }
+
     /// Whether the file carries the optional `trace_id` index (`TIDX`).
     pub fn has_trace_id_index(&self) -> bool {
         self.sfst.has_trace_id_index()
