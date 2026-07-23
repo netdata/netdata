@@ -202,6 +202,11 @@ pub struct TraceSummary {
     pub root_name: Option<String>,
     /// Envelope start: the earliest retained canonical span start.
     pub start_ns: i64,
+    /// The trace's RANK key: the newest canonical matched-span start —
+    /// the value the most-recent-first ordering sorts by. Distinct from
+    /// the envelope `start_ns`, which can be much older; a consumer
+    /// paging by rank MUST anchor on this field, never the envelope.
+    pub newest_matched_start_ns: i64,
     /// Envelope duration: `max(start ⊕ duration) − min(start)`,
     /// SATURATING (ingest saturates pathological durations).
     pub duration_ns: i64,
@@ -967,6 +972,13 @@ fn summarize(
         root_service: root.and_then(|r| field_of(r, &service_field)),
         root_name: root.and_then(|r| field_of(r, name_field)),
         start_ns,
+        // Spans are in combiner total order (ascending start), so the
+        // last matched index is the newest matched span — the same
+        // derivation the caller's rank uses.
+        newest_matched_start_ns: matched
+            .last()
+            .map(|&i| trace.spans[i].start_ns)
+            .unwrap_or(start_ns),
         duration_ns: end_ns.saturating_sub(start_ns),
         span_count: trace.spans.len(),
         error_count: trace

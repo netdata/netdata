@@ -213,16 +213,24 @@ pub(crate) fn build_predicate(
 // ── Search: pagination cursor ───────────────────────────────────────
 
 /// The wire pagination state. The engine has no anchor concept — its
-/// deterministic rank is (start_ns DESC, trace_id ASC) — so the wire
-/// pages by narrowing the window's end to `start_ns + 1` (re-including
-/// ties) and dropping the `served_at_start` already-returned ties, which
-/// the engine re-emits first (same rank order) at a fixed corpus.
+/// deterministic rank is (newest matched-span start DESC, trace_id ASC)
+/// — so the wire pages by narrowing the window's end to the rank key
+/// `+ 1` (re-including rank ties) and dropping the `served_at_start`
+/// already-returned ties, which the engine re-emits first (same rank
+/// order) at a fixed corpus.
+///
+/// The anchor is the RANK key (`TraceSummary::newest_matched_start_ns`),
+/// NEVER the envelope `start_ns`: a trace's envelope can be much older
+/// than its rank, and anchoring on it both gaps (older-ranked traces'
+/// matching spans fall outside the narrowed window) and duplicates
+/// (a trace re-matching through an older span re-ranks below the
+/// anchor). Caught live against multi-span demo traces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SearchCursor {
-    /// The last returned trace's envelope start.
+    /// The last returned trace's rank key (newest matched-span start).
     pub start_ns: i64,
     /// How many returned traces (cumulative across pages) share exactly
-    /// `start_ns`. Always ≥ 1.
+    /// this rank key. Always ≥ 1.
     pub served_at_start: usize,
 }
 
@@ -321,7 +329,7 @@ pub(crate) fn to_search_result(
     if let Some(c) = incoming {
         let mut dropped = 0;
         traces.retain(|t| {
-            if t.start_ns == c.start_ns && dropped < c.served_at_start {
+            if t.newest_matched_start_ns == c.start_ns && dropped < c.served_at_start {
                 dropped += 1;
                 false
             } else {
@@ -333,15 +341,19 @@ pub(crate) fn to_search_result(
 
     let anchor = (traces.len() == last && last > 0).then(|| {
         let tail = traces.last().expect("page is full, last > 0");
+        let tail_rank = tail.newest_matched_start_ns;
         let carried = incoming
-            .filter(|c| c.start_ns == tail.start_ns)
+            .filter(|c| c.start_ns == tail_rank)
             .map(|c| c.served_at_start)
             .unwrap_or(0);
-        let at_tail_start = traces.iter().filter(|t| t.start_ns == tail.start_ns).count();
+        let at_tail_rank = traces
+            .iter()
+            .filter(|t| t.newest_matched_start_ns == tail_rank)
+            .count();
         AnchorWire {
             next: encode_cursor(&SearchCursor {
-                start_ns: tail.start_ns,
-                served_at_start: carried + at_tail_start,
+                start_ns: tail_rank,
+                served_at_start: carried + at_tail_rank,
             }),
         }
     });

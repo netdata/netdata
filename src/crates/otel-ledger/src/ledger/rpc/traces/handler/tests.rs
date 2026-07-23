@@ -375,3 +375,35 @@ async fn invalid_search_requests_are_clean_client_errors() {
         assert!(msg.contains(needle), "for {body}: {msg}");
     }
 }
+
+#[tokio::test]
+async fn pagination_survives_a_trace_whose_envelope_predates_its_rank() {
+    // F's spans start at T+15s and T+45s: envelope 15, rank 45 (its
+    // newest span). With an envelope-anchored cursor, page 2's window
+    // would end at 15s+1 and U (rank 30s) would be gapped out — the
+    // live-demo failure this pins.
+    use crate::ledger::rpc::traces::fixtures::otlp_req_at;
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![
+            otlp_req_at(0x0F, &[base_ns(15), base_ns(45)], "svc-f"),
+            otlp_req_at(0x1A, &[base_ns(30)], "svc-u"),
+            otlp_req_at(0x1B, &[base_ns(50)], "svc-v"),
+        ],
+    )
+    .await;
+    let h = make_handler_over(registries);
+
+    let mut body = window_body();
+    body["last"] = json!(2);
+    body["spans_per_trace"] = json!(0);
+    let v1 = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
+    assert_eq!(ids(&v1), vec!["1b", "0f"], "V (50s) then F (rank 45s)");
+    body["anchor"] = v1["anchor"]["next"].clone();
+    let v2 = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v2), vec!["1a"], "U (30s) must not be gapped out");
+    assert!(v2.get("anchor").is_none());
+}

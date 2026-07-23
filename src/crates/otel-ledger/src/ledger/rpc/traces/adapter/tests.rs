@@ -230,11 +230,18 @@ fn window_defaults_to_the_recent_span_and_narrows_for_anchors() {
 // ── Search: result mapping + tie-safe pagination ────────────────────
 
 fn summary(id_byte: u8, start_ns: i64) -> sfsq::traces::TraceSummary {
+    summary_ranked(id_byte, start_ns, start_ns)
+}
+
+/// A summary whose envelope start and RANK key (newest matched-span
+/// start) differ — the shape real multi-span traces have.
+fn summary_ranked(id_byte: u8, envelope_ns: i64, rank_ns: i64) -> sfsq::traces::TraceSummary {
     sfsq::traces::TraceSummary {
         trace_id: sfst::TraceId::from([id_byte; 16]),
         root_service: Some("svc".into()),
         root_name: Some("op".into()),
-        start_ns,
+        start_ns: envelope_ns,
+        newest_matched_start_ns: rank_ns,
         duration_ns: 100,
         span_count: 2,
         error_count: 0,
@@ -308,6 +315,30 @@ fn tie_run_spanning_pages_accumulates_served_at_start() {
         "t1:100:1",
         "count resets when the tail moves past the tie run"
     );
+}
+
+#[test]
+fn cursor_anchors_on_the_rank_key_not_the_envelope() {
+    // A page tail whose envelope start (100) is far older than its rank
+    // (300, its newest matched span). Anchoring on the envelope would
+    // gap every trace ranked between 100 and 300 — the cursor must
+    // carry the RANK key. Caught live against multi-span demo traces.
+    let r = to_search_result(
+        search_data(vec![summary(1, 400), summary_ranked(2, 100, 300)]),
+        2,
+        None,
+    );
+    assert_eq!(r.anchor.as_ref().unwrap().next, "t1:300:1");
+
+    // And the anchor page drops served ties by RANK, not envelope.
+    let c = parse_cursor("t1:300:1").unwrap();
+    let data = search_data(vec![
+        summary_ranked(2, 100, 300), // the served tail, re-emitted first
+        summary(3, 250),
+    ]);
+    let r = to_search_result(data, 2, Some(&c));
+    let ids: Vec<&str> = r.traces.iter().map(|t| t.trace_id.as_str()).collect();
+    assert_eq!(ids, vec!["03".repeat(16).as_str()]);
 }
 
 #[test]

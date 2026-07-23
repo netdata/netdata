@@ -96,6 +96,23 @@ pub(crate) fn otlp_req_svc(
     }
 }
 
+/// One trace whose spans start at the EXACT given times (ns) — for
+/// tests where a trace's envelope start differs materially from its
+/// newest span (the search rank key). Span 1 is the root.
+pub(crate) fn otlp_req_at(
+    trace_byte: u8,
+    span_starts_ns: &[u64],
+    service: &str,
+) -> ExportTraceServiceRequest {
+    let mut req = otlp_req_svc(trace_byte, span_starts_ns.len() as u8, 0, service);
+    let spans = &mut req.resource_spans[0].scope_spans[0].spans;
+    for (span, &start) in spans.iter_mut().zip(span_starts_ns) {
+        span.start_time_unix_nano = start;
+        span.end_time_unix_nano = start + 500;
+    }
+    req
+}
+
 /// Write `reqs` into a fresh traces WAL (one frame per request) in a
 /// throwaway dir and return the produced file's path. Mirrors the sfsq
 /// integration suites' fixture recipe.
