@@ -343,10 +343,9 @@ The `--pss` option controls PSS sampling behavior:
 
 ### Integration with eBPF
 
-To monitor network bandwidth (upload and download) per application, enable the [`socket` program](/src/collectors/ebpf.plugin/README.md#ebpf-programs-configuration-options) (disabled by default) in `ebpf.d.conf`, then enable the `apps` option in `ebpf.d/network.conf` for the [eBPF Socket](/src/collectors/ebpf.plugin/integrations/ebpf_socket.md) collector. This adds a per-application **Bandwidth** chart alongside the other eBPF apps charts.
+`apps.plugin` receives per-PID eBPF counters (page-cache hits, VFS calls, and socket statistics) from `ebpfgo.plugin` via a shared-memory segment. When `ebpfgo.plugin` is running and the relevant programs are enabled, `apps.plugin` merges those counters into its per-application view and emits eBPF charts under the **eBPF syscall** section.
 
-If you don't see charts under the **eBPF syscall** or **eBPF net** sections, you should edit your
-[`ebpf.d.conf`](/src/collectors/ebpf.plugin/README.md#configure-the-ebpf-collector) file to ensure the eBPF program is enabled.
+> **Note** — Per-application network bandwidth charts (previously provided by the C `socket` thread) have been removed. Per-cgroup and per-service network charts are now emitted by `cgroups.plugin`. Network-viewer provides on-demand per-connection detail through the `network-protocols` function.
 
 Also see our [guide on troubleshooting apps with eBPF metrics](/docs/developer-and-contributor-corner/monitor-debug-applications-ebpf.md) for ideas on how to interpret these charts in a few scenarios.
 
