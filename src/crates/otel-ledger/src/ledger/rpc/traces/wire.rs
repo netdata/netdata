@@ -18,10 +18,13 @@ use sfsq::traces::{PartialReason, QueryStatus};
 /// Request param names accepted by this function, advertised to the UI
 /// in [`InfoResponse::accepted_params`]. The UI gates which params it
 /// sends on this list, so it advertises only what the function honors:
-/// each data mode adds its top-level fields when it lands (`trace` and
-/// the mode-common `tenant` landed with the trace mode; the window and
-/// search params arrive with their modes).
-pub const ACCEPTED_PARAMS: &[&str] = &["info", "trace", "tenant"];
+/// each data mode adds its top-level fields when it lands. Mode-specific
+/// body fields (`selections`, `spans_per_trace`, the duration bounds)
+/// ride the request body like `trace` does; this list carries the
+/// generic UI params.
+pub const ACCEPTED_PARAMS: &[&str] = &[
+    "info", "trace", "tenant", "after", "before", "last", "anchor",
+];
 
 /// Request payload. A flat struct like the logs request: `info` and the
 /// per-mode sub-objects select the mode (see [`OtelTracesRequest::mode`]);
@@ -70,6 +73,32 @@ pub struct OtelTracesRequest {
     pub tenant: Option<String>,
     #[serde(default)]
     pub timeout: Option<u32>,
+    /// Search: result limit (top-K most-recent-first; the logs param
+    /// name). Zero is a client error — search has no unbounded option.
+    #[serde(default = "default_last")]
+    pub last: usize,
+    /// Search: matched spans attached per returned trace (engine default
+    /// 3, hard max 128, 0 = none).
+    #[serde(default)]
+    pub spans_per_trace: Option<usize>,
+    /// Search: facet selections. Keys are `<owner>.<key>` attributes
+    /// (resource/span/instrumentation/event/link) or bare builtin words
+    /// (see the adapter's grammar); values OR within a key, keys AND.
+    #[serde(default)]
+    pub selections: std::collections::HashMap<String, Vec<String>>,
+    /// Search: inclusive span-duration bounds, nanoseconds.
+    #[serde(default)]
+    pub min_duration_ns: Option<i64>,
+    #[serde(default)]
+    pub max_duration_ns: Option<i64>,
+    /// Search: opaque pagination cursor echoed from a previous
+    /// response's `anchor.next`.
+    #[serde(default)]
+    pub anchor: Option<String>,
+}
+
+fn default_last() -> usize {
+    sfsq::traces::DEFAULT_SEARCH_LIMIT
 }
 
 /// Presence-preserving selector deserializer: serde's stock
@@ -191,6 +220,67 @@ pub struct TraceParams {
 pub enum OtelTracesResponse {
     Info(InfoResponse),
     Trace(Box<TraceResult>),
+    Search(Box<SearchResult>),
+}
+
+// ── Search mode response ────────────────────────────────────────────
+
+/// One search page: bounded most-recent-first trace summaries. Summary
+/// numbers are EXACT canonical-assembly figures unless a row's `exact`
+/// is false (its assembly was capped or degraded — numbers may
+/// undercount).
+#[derive(Debug, Serialize)]
+pub struct SearchResult {
+    pub version: u32,
+    /// Query-level completeness — a work-ceiling breach or a lost
+    /// source shows up here, never silently.
+    pub status: StatusWire,
+    pub items: SearchItems,
+    pub traces: Vec<TraceSummaryWire>,
+    /// Schema kinds for the fields the attached `matched_spans` expose.
+    pub field_kinds: FieldKindsWire,
+    /// Present only when the page is FULL (`returned == max_to_return`)
+    /// — a short page means the window is exhausted. Echo `next` back as
+    /// the `anchor` param for the following page; treat it as opaque.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<AnchorWire>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SearchItems {
+    pub returned: usize,
+    pub max_to_return: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AnchorWire {
+    pub next: String,
+}
+
+/// One returned trace summary; ids in W3C lowercase hex.
+#[derive(Debug, Serialize)]
+pub struct TraceSummaryWire {
+    pub trace_id: String,
+    /// The summary root span's `service.name` resource attribute;
+    /// absent when the root carries none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub root_service: Option<String>,
+    /// The summary root span's name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub root_name: Option<String>,
+    /// Envelope start (earliest retained canonical span start).
+    pub start_ns: i64,
+    /// Envelope duration, saturating.
+    pub duration_ns: i64,
+    pub span_count: usize,
+    pub error_count: usize,
+    pub matched_count: usize,
+    /// False when this trace's assembly was capped or degraded — its
+    /// summary numbers may undercount.
+    pub exact: bool,
+    /// The matched subset, `min(spans_per_trace, matched_count)` spans
+    /// in the combiner's total order.
+    pub matched_spans: Vec<SpanWire>,
 }
 
 // ── Trace mode response ─────────────────────────────────────────────

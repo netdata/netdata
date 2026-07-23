@@ -4,10 +4,16 @@
 //! request-side parsing (hex ids) and the response-side conversion
 //! (engine data → wire, ids rendered as W3C lowercase hex).
 
-use sfsq::traces::{FieldKinds, TraceData};
+use std::collections::HashMap;
+
+use sfsq::traces::{
+    AttributeOwner, BuiltinField, CompareOp, Condition, FieldKinds, Predicate, PredicateTarget,
+    PredicateValue, SearchData, TraceData,
+};
 
 use super::wire::{
-    EventWire, FieldKindsWire, LinkWire, SpanWire, StatusWire, TraceItems, TraceResult,
+    AnchorWire, EventWire, FieldKindsWire, LinkWire, SearchItems, SearchResult, SpanWire,
+    StatusWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -95,6 +101,276 @@ fn field_kinds_wire(k: FieldKinds) -> FieldKindsWire {
         fields: section(k.fields),
         event_attributes: section(k.event_attributes),
         link_attributes: section(k.link_attributes),
+    }
+}
+
+// ── Search: selection-key grammar ───────────────────────────────────
+
+/// The wire word for each builtin field (snake_case). Also the key
+/// grammar step 1.4's enumeration emits, so filters and facet keys stay
+/// one vocabulary. The lockstep test walks `BuiltinField::ALL`, so a new
+/// engine builtin breaks the suite until it gets a wire word.
+const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
+    ("name", BuiltinField::Name),
+    ("kind", BuiltinField::Kind),
+    ("status", BuiltinField::Status),
+    ("status_message", BuiltinField::StatusMessage),
+    ("instrumentation_name", BuiltinField::InstrumentationName),
+    ("instrumentation_version", BuiltinField::InstrumentationVersion),
+    ("event_name", BuiltinField::EventName),
+    ("duration", BuiltinField::Duration),
+    ("span_id", BuiltinField::SpanId),
+    ("parent_span_id", BuiltinField::ParentSpanId),
+    ("trace_id", BuiltinField::TraceId),
+    ("link_span_id", BuiltinField::LinkSpanId),
+    ("link_trace_id", BuiltinField::LinkTraceId),
+    ("event_time_since_start", BuiltinField::EventTimeSinceStart),
+    ("root_name", BuiltinField::RootName),
+    ("root_service_name", BuiltinField::RootServiceName),
+    ("trace_duration", BuiltinField::TraceDuration),
+];
+
+/// The attribute owners a selection key may name, as `<owner>.<key>`.
+/// `Any` is deliberately absent from the wire: enumeration (step 1.4)
+/// emits owner-qualified keys, so selections are always qualified.
+const OWNER_WORDS: [(&str, AttributeOwner); 5] = [
+    ("resource", AttributeOwner::Resource),
+    ("span", AttributeOwner::Span),
+    ("instrumentation", AttributeOwner::Instrumentation),
+    ("event", AttributeOwner::Event),
+    ("link", AttributeOwner::Link),
+];
+
+/// Parse one selection key: `<owner>.<key>` (the key part verbatim, dots
+/// included — `resource.service.name` → the `service.name` resource
+/// attribute) or a bare builtin word.
+pub(crate) fn parse_selection_key(key: &str) -> Result<PredicateTarget, String> {
+    for (word, owner) in OWNER_WORDS {
+        if let Some(rest) = key.strip_prefix(word).and_then(|r| r.strip_prefix('.')) {
+            if rest.is_empty() {
+                return Err(format!("selection key {key:?} names no attribute"));
+            }
+            return Ok(PredicateTarget::Attribute(owner, rest.to_string()));
+        }
+    }
+    BUILTIN_WORDS
+        .iter()
+        .find(|(w, _)| *w == key)
+        .map(|(_, f)| PredicateTarget::Builtin(*f))
+        .ok_or_else(|| {
+            format!(
+                "unknown selection key {key:?}: use resource.<key> / span.<key> / \
+                 instrumentation.<key> / event.<key> / link.<key>, or a builtin \
+                 field word"
+            )
+        })
+}
+
+/// Build the engine predicate from the wire's filters: each selection
+/// key is one Eq condition (values OR within the key, keys AND — the
+/// engine's multi-value semantics); the duration bounds become builtin
+/// Duration comparisons. Keys iterate sorted so requests are
+/// deterministic. An empty value list is no constraint.
+pub(crate) fn build_predicate(
+    selections: &HashMap<String, Vec<String>>,
+    min_duration_ns: Option<i64>,
+    max_duration_ns: Option<i64>,
+) -> Result<Predicate, String> {
+    let mut conditions = Vec::new();
+    let mut keys: Vec<&String> = selections.keys().collect();
+    keys.sort();
+    for key in keys {
+        let values = &selections[key];
+        if values.is_empty() {
+            continue;
+        }
+        conditions.push(Condition {
+            target: parse_selection_key(key)?,
+            op: CompareOp::Eq,
+            values: values
+                .iter()
+                .map(|v| PredicateValue::Text(v.clone()))
+                .collect(),
+        });
+    }
+    if let Some(min) = min_duration_ns {
+        conditions.push(Condition {
+            target: PredicateTarget::Builtin(BuiltinField::Duration),
+            op: CompareOp::Gte,
+            values: vec![PredicateValue::Integer(min)],
+        });
+    }
+    if let Some(max) = max_duration_ns {
+        conditions.push(Condition {
+            target: PredicateTarget::Builtin(BuiltinField::Duration),
+            op: CompareOp::Lte,
+            values: vec![PredicateValue::Integer(max)],
+        });
+    }
+    Ok(Predicate { conditions })
+}
+
+// ── Search: pagination cursor ───────────────────────────────────────
+
+/// The wire pagination state. The engine has no anchor concept — its
+/// deterministic rank is (start_ns DESC, trace_id ASC) — so the wire
+/// pages by narrowing the window's end to `start_ns + 1` (re-including
+/// ties) and dropping the `served_at_start` already-returned ties, which
+/// the engine re-emits first (same rank order) at a fixed corpus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SearchCursor {
+    /// The last returned trace's envelope start.
+    pub start_ns: i64,
+    /// How many returned traces (cumulative across pages) share exactly
+    /// `start_ns`. Always ≥ 1.
+    pub served_at_start: usize,
+}
+
+/// Tie runs longer than this can't page (the engine limit grows by the
+/// count); the cursor is rejected with advice to narrow the filters.
+const CURSOR_SERVED_CAP: usize = 10_000;
+
+pub(crate) fn encode_cursor(c: &SearchCursor) -> String {
+    format!("t1:{}:{}", c.start_ns, c.served_at_start)
+}
+
+pub(crate) fn parse_cursor(s: &str) -> Result<SearchCursor, String> {
+    let malformed = || format!("malformed anchor {s:?}");
+    let mut parts = s.split(':');
+    let (Some("t1"), Some(ns), Some(count), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return Err(malformed());
+    };
+    let start_ns: i64 = ns.parse().map_err(|_| malformed())?;
+    let served_at_start: usize = count.parse().map_err(|_| malformed())?;
+    if served_at_start == 0 {
+        return Err(malformed());
+    }
+    if served_at_start > CURSOR_SERVED_CAP {
+        return Err(format!(
+            "anchor tie run exceeds {CURSOR_SERVED_CAP}; narrow the filters or window"
+        ));
+    }
+    Ok(SearchCursor {
+        start_ns,
+        served_at_start,
+    })
+}
+
+// ── Search: window canonicalization ─────────────────────────────────
+
+/// The canonicalized search window: the engine bounds (ns) plus the
+/// registry capture range (seconds — a safe superset for file pruning).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ResolvedWindow {
+    pub start_ns: i64,
+    pub end_ns: i64,
+    pub capture: std::ops::Range<u32>,
+}
+
+/// Canonicalize the wire window (unix seconds; the logs precedent for
+/// unspecified bounds: `before` → now, `after` → before − 900 s), then
+/// narrow the END ns-precise for an anchor page. `Ok(None)` means the
+/// anchor lies at/below the window start — the page is empty, not an
+/// error.
+pub(crate) fn resolve_window(
+    after_s: u32,
+    before_s: u32,
+    now_s: u32,
+    anchor: Option<&SearchCursor>,
+) -> Result<Option<ResolvedWindow>, String> {
+    let before = if before_s == 0 { now_s } else { before_s };
+    let after = if after_s == 0 {
+        before.saturating_sub(900)
+    } else {
+        after_s
+    };
+    if after >= before {
+        return Err(format!("invalid window: after {after} >= before {before}"));
+    }
+    let start_ns = i64::from(after) * 1_000_000_000;
+    let mut end_ns = i64::from(before) * 1_000_000_000;
+    if let Some(c) = anchor {
+        end_ns = end_ns.min(c.start_ns.saturating_add(1));
+    }
+    if end_ns <= start_ns {
+        return Ok(None);
+    }
+    Ok(Some(ResolvedWindow {
+        start_ns,
+        end_ns,
+        // Second-granular superset of the ns window; the ns bounds do
+        // the exact filtering inside the engine.
+        capture: after..before,
+    }))
+}
+
+// ── Search: engine data → wire ──────────────────────────────────────
+
+/// Shape one search result page. Drops the anchor page's already-served
+/// ties (the engine re-emits them first in its deterministic rank),
+/// trims to `last`, and emits the next cursor only for a FULL page —
+/// a short page means the window is exhausted.
+pub(crate) fn to_search_result(
+    data: SearchData,
+    last: usize,
+    incoming: Option<&SearchCursor>,
+) -> SearchResult {
+    let mut traces = data.traces;
+    if let Some(c) = incoming {
+        let mut dropped = 0;
+        traces.retain(|t| {
+            if t.start_ns == c.start_ns && dropped < c.served_at_start {
+                dropped += 1;
+                false
+            } else {
+                true
+            }
+        });
+    }
+    traces.truncate(last);
+
+    let anchor = (traces.len() == last && last > 0).then(|| {
+        let tail = traces.last().expect("page is full, last > 0");
+        let carried = incoming
+            .filter(|c| c.start_ns == tail.start_ns)
+            .map(|c| c.served_at_start)
+            .unwrap_or(0);
+        let at_tail_start = traces.iter().filter(|t| t.start_ns == tail.start_ns).count();
+        AnchorWire {
+            next: encode_cursor(&SearchCursor {
+                start_ns: tail.start_ns,
+                served_at_start: carried + at_tail_start,
+            }),
+        }
+    });
+
+    SearchResult {
+        version: 1,
+        status: StatusWire::from(&data.status),
+        items: SearchItems {
+            returned: traces.len(),
+            max_to_return: last,
+        },
+        traces: traces.into_iter().map(summary_wire).collect(),
+        field_kinds: field_kinds_wire(data.field_kinds),
+        anchor,
+    }
+}
+
+fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
+    TraceSummaryWire {
+        trace_id: t.trace_id.to_string(),
+        root_service: t.root_service,
+        root_name: t.root_name,
+        start_ns: t.start_ns,
+        duration_ns: t.duration_ns,
+        span_count: t.span_count,
+        error_count: t.error_count,
+        matched_count: t.matched_count,
+        exact: t.exact,
+        matched_spans: t.matched_spans.into_iter().map(span_wire).collect(),
     }
 }
 

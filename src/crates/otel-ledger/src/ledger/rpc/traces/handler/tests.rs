@@ -1,5 +1,5 @@
 use super::*;
-use crate::ledger::rpc::traces::fixtures::{install_wal, make_registries, otlp_req};
+use crate::ledger::rpc::traces::fixtures::{install_wal, make_registries, otlp_req, otlp_req_svc};
 use bridge::function::ProgressState;
 use file_lifecycle::registry::TenantRegistries;
 use serde_json::json;
@@ -41,19 +41,24 @@ async fn info_returns_the_descriptor() {
     let v = serde_json::to_value(&resp).unwrap();
     assert_eq!(v["version"], 1);
     assert_eq!(v["status"], 200);
-    assert_eq!(v["accepted_params"], json!(["info", "trace", "tenant"]));
+    assert_eq!(
+        v["accepted_params"],
+        json!(["info", "trace", "tenant", "after", "before", "last", "anchor"])
+    );
     assert_eq!(v["required_params"], json!([]));
 }
 
 #[tokio::test]
-async fn default_request_is_search_and_not_implemented() {
+async fn default_request_is_an_empty_complete_search() {
     // The bridge turns a missing payload into `{}` — the default data
-    // mode must answer with a clean, mode-naming error, never a panic
-    // or a silent empty result.
-    let err = call(json!({})).await.expect_err("search is not implemented yet");
-    let msg = err.to_string();
-    assert!(msg.contains("search"), "names the mode: {msg}");
-    assert!(msg.contains("not implemented"), "states why: {msg}");
+    // mode is a search over the default recent window; on an empty
+    // agent that's an empty COMPLETE page, never a panic or an error.
+    let resp = call(json!({})).await.unwrap();
+    let v = serde_json::to_value(&resp).unwrap();
+    assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(v["items"], json!({"returned": 0, "max_to_return": 20}));
+    assert_eq!(v["traces"], json!([]));
+    assert!(v.get("anchor").is_none(), "a short page has no next cursor");
 }
 
 #[tokio::test]
@@ -204,6 +209,168 @@ async fn malformed_trace_selectors_are_clean_client_errors() {
         ),
     ] {
         let err = call(body.clone()).await.expect_err("must be a client error");
+        let msg = err.to_string();
+        assert!(msg.contains(needle), "for {body}: {msg}");
+    }
+}
+
+// ── The search mode ─────────────────────────────────────────────────
+
+/// Corpus base, unix seconds (chosen inside an explicit query window).
+const T_S: u32 = 1_700_000_000;
+
+fn base_ns(offset_s: u64) -> u64 {
+    (T_S as u64 + offset_s) * 1_000_000_000
+}
+
+/// Five traces: A/C/E on svc-a, B/D on svc-b; C and D share the same
+/// start (a tie across a page boundary); E is newest.
+async fn handler_with_search_corpus() -> OtelTracesHandler {
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![
+            otlp_req_svc(0x0A, 1, base_ns(10), "svc-a"),
+            otlp_req_svc(0x0B, 2, base_ns(20), "svc-b"),
+            otlp_req_svc(0x0C, 1, base_ns(30), "svc-a"),
+            otlp_req_svc(0x0D, 1, base_ns(30), "svc-b"),
+            otlp_req_svc(0x0E, 3, base_ns(40), "svc-a"),
+        ],
+    )
+    .await;
+    make_handler_over(registries)
+}
+
+fn window_body() -> serde_json::Value {
+    json!({"after": T_S, "before": T_S + 100})
+}
+
+fn ids(v: &serde_json::Value) -> Vec<String> {
+    v["traces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["trace_id"].as_str().unwrap()[..2].to_string())
+        .collect()
+}
+
+#[tokio::test]
+async fn search_returns_most_recent_first_with_deterministic_ties() {
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    body["spans_per_trace"] = json!(1);
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["status"], json!({"complete": true}));
+    // Newest first; the C/D tie breaks by trace_id ascending.
+    assert_eq!(ids(&v), vec!["0e", "0c", "0d", "0b", "0a"]);
+    let e = &v["traces"][0];
+    assert_eq!(e["root_service"], "svc-a");
+    assert_eq!(e["root_name"], "span-1");
+    assert_eq!(e["span_count"], 3);
+    assert_eq!(e["exact"], true);
+    assert_eq!(e["matched_spans"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn selections_narrow_by_service_operation_and_attributes() {
+    let h = handler_with_search_corpus().await;
+
+    let mut body = window_body();
+    body["selections"] = json!({"resource.service.name": ["svc-a"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v), vec!["0e", "0c", "0a"]);
+
+    // Multi-value OR within a key.
+    let mut body = window_body();
+    body["selections"] = json!({"resource.service.name": ["svc-a", "svc-b"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v).len(), 5);
+
+    // Builtin word: only B and E have a second span.
+    let mut body = window_body();
+    body["selections"] = json!({"name": ["span-2"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v), vec!["0e", "0b"]);
+
+    // Keys AND across selections.
+    let mut body = window_body();
+    body["selections"] = json!({"name": ["span-2"], "resource.service.name": ["svc-b"]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v), vec!["0b"]);
+}
+
+#[tokio::test]
+async fn duration_bounds_filter_spans() {
+    let h = handler_with_search_corpus().await;
+    // Fixture spans last 500 ns each.
+    let mut body = window_body();
+    body["min_duration_ns"] = json!(501);
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v).len(), 0);
+
+    let mut body = window_body();
+    body["min_duration_ns"] = json!(100);
+    body["max_duration_ns"] = json!(500);
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v).len(), 5);
+}
+
+#[tokio::test]
+async fn pagination_walks_the_corpus_without_dups_or_gaps_across_the_tie() {
+    let h = handler_with_search_corpus().await;
+
+    // Page 1 (last=2): E, C — the tail C ties with D.
+    let mut body = window_body();
+    body["last"] = json!(2);
+    let v1 = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
+    assert_eq!(ids(&v1), vec!["0e", "0c"]);
+    let next1 = v1["anchor"]["next"].as_str().unwrap().to_string();
+
+    // Page 2: the tie partner D, then B.
+    body["anchor"] = json!(next1);
+    let v2 = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
+    assert_eq!(ids(&v2), vec!["0d", "0b"]);
+    let next2 = v2["anchor"]["next"].as_str().unwrap().to_string();
+
+    // Page 3: A alone; short page, walk over.
+    body["anchor"] = json!(next2);
+    let v3 = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
+    assert_eq!(ids(&v3), vec!["0a"]);
+    assert!(v3.get("anchor").is_none());
+}
+
+#[tokio::test]
+async fn spans_per_trace_zero_attaches_no_spans() {
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    body["spans_per_trace"] = json!(0);
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert!(
+        v["traces"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|t| t["matched_spans"].as_array().unwrap().is_empty())
+    );
+    // The counts still tell the story.
+    assert_eq!(v["traces"][0]["matched_count"], 3);
+}
+
+#[tokio::test]
+async fn invalid_search_requests_are_clean_client_errors() {
+    let h = handler_with_search_corpus().await;
+    for (body, needle) in [
+        (json!({"last": 0}), "zero 'last'"),
+        (json!({"spans_per_trace": 200}), "exceeds the library maximum"),
+        (json!({"selections": {"bogus": ["x"]}}), "unknown selection key"),
+        (json!({"anchor": "junk"}), "malformed anchor"),
+        (json!({"after": 500, "before": 400}), "invalid window"),
+    ] {
+        let err = call_on(&h, body.clone())
+            .await
+            .expect_err("must be a client error");
         let msg = err.to_string();
         assert!(msg.contains(needle), "for {body}: {msg}");
     }

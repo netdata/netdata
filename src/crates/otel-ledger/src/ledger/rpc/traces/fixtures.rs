@@ -7,6 +7,8 @@ use std::sync::Arc;
 
 use file_registry::{ByteSize, FileId, MonotonicClock, TenantId, TimestampNs, test_identity};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
+use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
 use tokio::sync::RwLock;
 
@@ -52,6 +54,17 @@ pub(crate) async fn install_sfst(
 /// starting at `base_ns`. Just enough shape for the seal to index. Span
 /// 1 is the root (unset parent); spans 2.. parent to span 1.
 pub(crate) fn otlp_req(trace_byte: u8, span_count: u8, base_ns: u64) -> ExportTraceServiceRequest {
+    otlp_req_svc(trace_byte, span_count, base_ns, "svc")
+}
+
+/// Like [`otlp_req`], with an explicit `service.name` resource attribute
+/// — the search filter tests select on it.
+pub(crate) fn otlp_req_svc(
+    trace_byte: u8,
+    span_count: u8,
+    base_ns: u64,
+    service: &str,
+) -> ExportTraceServiceRequest {
     let spans = (1..=span_count)
         .map(|i| Span {
             trace_id: vec![trace_byte; 16],
@@ -65,6 +78,15 @@ pub(crate) fn otlp_req(trace_byte: u8, span_count: u8, base_ns: u64) -> ExportTr
         .collect();
     ExportTraceServiceRequest {
         resource_spans: vec![ResourceSpans {
+            resource: Some(Resource {
+                attributes: vec![KeyValue {
+                    key: "service.name".into(),
+                    value: Some(AnyValue {
+                        value: Some(Av::StringValue(service.into())),
+                    }),
+                }],
+                ..Default::default()
+            }),
             scope_spans: vec![ScopeSpans {
                 spans,
                 ..Default::default()

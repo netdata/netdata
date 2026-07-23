@@ -24,11 +24,17 @@ use tokio::sync::RwLock;
 use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::TenantRegistries;
 
-use sfsq::traces::{TraceQuery, TraceRequestError, trace_by_id};
+use sfsq::traces::{
+    SearchQuery, SearchRequestError, SearchSources, TimeWindow, TraceQuery, TraceRequestError,
+    search, trace_by_id,
+};
 
-use super::adapter::{parse_trace_id, to_trace_result};
+use super::adapter::{
+    build_predicate, parse_cursor, parse_trace_id, resolve_window, to_search_result,
+    to_trace_result,
+};
 use super::sources::TracesSourceSupplier;
-use super::wire::{InfoResponse, OtelTracesRequest, OtelTracesResponse, RequestMode};
+use super::wire::{InfoResponse, OtelTracesRequest, OtelTracesResponse, RequestMode, SearchResult};
 
 /// Shorthand for the handler-level error every failure path maps to.
 fn handler_err(message: String) -> netdata_plugin_error::NetdataPluginError {
@@ -121,6 +127,114 @@ impl OtelTracesHandler {
             &trace_id, data,
         ))))
     }
+
+    /// The `search` mode: the engine's bounded most-recent-first trace
+    /// search over the request's (canonicalized) window, with wire-level
+    /// tie-safe pagination — see the adapter's cursor docs.
+    async fn search(
+        &self,
+        ctx: &FunctionCallContext,
+        req: &OtelTracesRequest,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        let client_err =
+            |e: String| handler_err(format!("invalid otel-traces request: {e}"));
+
+        // Zero must be rejected BEFORE the anchor allowance is added —
+        // `last=0` with a cursor would otherwise sneak a positive engine
+        // limit past the engine's own ZeroLimit check.
+        if req.last == 0 {
+            return Err(client_err(
+                "a zero 'last' would return nothing; search has no unbounded option".into(),
+            ));
+        }
+        let cursor = req
+            .anchor
+            .as_deref()
+            .map(parse_cursor)
+            .transpose()
+            .map_err(client_err)?;
+        let predicate = build_predicate(&req.selections, req.min_duration_ns, req.max_duration_ns)
+            .map_err(client_err)?;
+
+        let now_s = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .min(u64::from(u32::MAX)) as u32;
+        let Some(window) = resolve_window(req.after, req.before, now_s, cursor.as_ref())
+            .map_err(client_err)?
+        else {
+            // The anchor lies at/below the window start: the walk is
+            // done. An empty COMPLETE page, same shape as any other.
+            return Ok(OtelTracesResponse::Search(Box::new(to_search_result(
+                sfsq::traces::SearchData {
+                    traces: Vec::new(),
+                    status: sfsq::traces::QueryStatus::Complete,
+                    field_kinds: Default::default(),
+                },
+                req.last,
+                cursor.as_ref(),
+            ))));
+        };
+
+        let mut query = SearchQuery::new(predicate)
+            .window(
+                TimeWindow::new(window.start_ns, window.end_ns)
+                    .map_err(|e| client_err(e.to_string()))?,
+            )
+            // The anchor page re-includes the served ties; the extra
+            // allowance lets the drop still fill a whole page.
+            .limit(req.last + cursor.map_or(0, |c| c.served_at_start));
+        if let Some(spt) = req.spans_per_trace {
+            query = query.spans_per_trace(spt);
+        }
+
+        // ONE capture, two roles: search validates window ⊆ completion
+        // by source id, so both vectors must be copies of the same
+        // captured state.
+        let tenant = TenantId::resolve_query(req.tenant.as_deref());
+        let mut sets = self
+            .supplier
+            .capture(&tenant, window.capture.clone(), 2, &ctx.cancellation)
+            .await;
+        let completion = sets.pop().unwrap_or_default();
+        let window_sources = sets.pop().unwrap_or_default();
+
+        ctx.progress.set_total(completion.len());
+        let done = ctx.progress.done_counter();
+        let cancel = ctx.cancellation.clone();
+
+        let data = match tokio::task::spawn_blocking(move || {
+            search(
+                SearchSources {
+                    window: window_sources,
+                    completion,
+                },
+                query,
+                cancel,
+                done,
+            )
+        })
+        .await
+        {
+            Ok(Ok(data)) => data,
+            // These two are structurally impossible from one capture —
+            // an occurrence means the supplier broke its contract.
+            Ok(Err(e @ SearchRequestError::SourceSet(_)))
+            | Ok(Err(e @ SearchRequestError::WindowNotInCompletion(_))) => {
+                return Err(handler_err(format!(
+                    "otel-traces internal error: captured source set is inconsistent: {e}"
+                )));
+            }
+            Ok(Err(e)) => return Err(client_err(e.to_string())),
+            Err(e) => {
+                return Err(handler_err(format!("otel-traces search task failed: {e}")));
+            }
+        };
+
+        let result: SearchResult = to_search_result(data, req.last, cursor.as_ref());
+        Ok(OtelTracesResponse::Search(Box::new(result)))
+    }
 }
 
 #[async_trait]
@@ -139,6 +253,7 @@ impl FunctionHandler for OtelTracesHandler {
         match mode {
             RequestMode::Info => Ok(OtelTracesResponse::Info(InfoResponse::default())),
             RequestMode::Trace => self.trace(&ctx, &req).await,
+            RequestMode::Search => self.search(&ctx, &req).await,
             other => Err(handler_err(format!(
                 "otel-traces mode '{}' is not implemented yet",
                 other.name()
