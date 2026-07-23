@@ -10,10 +10,10 @@ func TestSocketDelta(t *testing.T) {
 		current, prev uint64
 		want          uint64
 	}{
-		"normal increment":    {current: 100, prev: 60, want: 40},
-		"no change":           {current: 50, prev: 50, want: 0},
-		"counter reset":       {current: 10, prev: 500, want: 0}, // must not return 490
-		"counter wrap":        {current: 1, prev: ^uint64(0), want: 0},
+		"normal increment": {current: 100, prev: 60, want: 40},
+		"no change":        {current: 50, prev: 50, want: 0},
+		"counter reset":    {current: 10, prev: 500, want: 0}, // must not return 490
+		"counter wrap":     {current: 1, prev: ^uint64(0), want: 0},
 		// prev=0 means the counter genuinely started at zero (eBPF maps clear
 		// on load); spike suppression is handled by socketGlobalState.Update's
 		// !initialized gate, not here.

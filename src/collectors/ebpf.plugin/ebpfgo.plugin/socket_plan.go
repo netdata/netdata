@@ -25,20 +25,20 @@ const (
 )
 
 type SocketLegacyConfig struct {
-	PluginsDir    string
-	Kernels       uint32
-	IsRHF         int
-	KernelVersion uint32
-	IsDebian      bool
-	HasBTF        bool
-	ConfigFound                 bool
-	Enabled                     bool
-	UpdateEvery                 int
-	MapsPerCore                 bool
-	ObjectFlavor                string
-	BTFPath                     string
-	SocketMonitoringTableSize   uint32 // max_entries for tbl_nd_socket
-	UDPConnectionTableSize      uint32 // max_entries for tbl_nv_udp
+	PluginsDir                string
+	Kernels                   uint32
+	IsRHF                     int
+	KernelVersion             uint32
+	IsDebian                  bool
+	HasBTF                    bool
+	ConfigFound               bool
+	Enabled                   bool
+	UpdateEvery               int
+	MapsPerCore               bool
+	ObjectFlavor              string
+	BTFPath                   string
+	SocketMonitoringTableSize uint32 // max_entries for tbl_nd_socket
+	UDPConnectionTableSize    uint32 // max_entries for tbl_nv_udp
 }
 
 type SocketLegacyHandle struct {
@@ -59,13 +59,13 @@ func (h *SocketLegacyHandle) Close() {
 
 func defaultSocketLegacyConfig() SocketLegacyConfig {
 	return SocketLegacyConfig{
-		PluginsDir:   defaultPluginsDir(),
-		Kernels:      socketKernelMask,
-		IsRHF:        -1,
-		IsDebian:     IsDebianFlavor(),
-		BTFPath:      socketDefaultBTFPath,
-		UpdateEvery:  socketDefaultUpdateEvery,
-		HasBTF:       kernelBTFSupported(socketDefaultBTFPath),
+		PluginsDir:                defaultPluginsDir(),
+		Kernels:                   socketKernelMask,
+		IsRHF:                     -1,
+		IsDebian:                  IsDebianFlavor(),
+		BTFPath:                   socketDefaultBTFPath,
+		UpdateEvery:               socketDefaultUpdateEvery,
+		HasBTF:                    kernelBTFSupported(socketDefaultBTFPath),
 		MapsPerCore:               true,
 		ObjectFlavor:              socketDefaultObjectFlavor,
 		Enabled:                   false, // stock ebpf.d.conf: socket = no

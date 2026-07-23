@@ -23,17 +23,17 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
 // ---- M10: parseMinimalFunctionLine ----------------------------------------
 
 func TestParseMinimalFunctionLine(t *testing.T) {
 	tests := map[string]struct {
-		line      string
-		wantUID   string
-		wantName  string
+		line     string
+		wantUID  string
+		wantName string
 	}{
 		"basic FUNCTION line": {
 			line:     `FUNCTION 12345 10 "network-protocols" 3 pluginsd`,
@@ -48,7 +48,7 @@ func TestParseMinimalFunctionLine(t *testing.T) {
 		"too few fields": {
 			line: `FUNCTION 99 10 "network-protocols"`,
 		},
-		"empty line": {line: ""},
+		"empty line":          {line: ""},
 		"not a FUNCTION line": {line: `CHART '' '' 'cpu' 'percentage' 'cpu' 'cpu.cpu0' 'line' 100 1 '' 'netdata' 'cpu'`},
 	}
 	for name, tc := range tests {

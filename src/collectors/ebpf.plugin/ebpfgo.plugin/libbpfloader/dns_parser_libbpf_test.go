@@ -88,25 +88,25 @@ func TestDNSParseRawPacketBoundaries(t *testing.T) {
 			want: false,
 		},
 		"IPv4 version field is 5 (not 4)": {
-			pkt: mutated(validDNSQuery, 14, 0x55), // upper nibble = 5
+			pkt:  mutated(validDNSQuery, 14, 0x55), // upper nibble = 5
 			want: false,
 		},
 		"non-DNS port (UDP dst 8080)": {
 			// offset 36 = 14(Eth) + 20(IP) + 2 (past src port)
-			pkt: mutated(validDNSQuery, 36, 0x1F, 0x90),
+			pkt:  mutated(validDNSQuery, 36, 0x1F, 0x90),
 			want: false,
 		},
 		"IPv6 EtherType but packet too short for IPv6 header": {
-			pkt: mutated(validDNSQuery[:14], 12, 0x86, 0xDD),
+			pkt:  mutated(validDNSQuery[:14], 12, 0x86, 0xDD),
 			want: false,
 		},
 		"VLAN tag (0x8100) without inner payload": {
 			pkt: []byte{
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // dst MAC
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // src MAC
-				0x81, 0x00,                         // EtherType: 802.1Q VLAN
-				0x00, 0x01,                         // VLAN TCI
-				0x08, 0x00,                         // inner EtherType: IPv4 — no payload
+				0x81, 0x00, // EtherType: 802.1Q VLAN
+				0x00, 0x01, // VLAN TCI
+				0x08, 0x00, // inner EtherType: IPv4 — no payload
 			},
 			want: false,
 		},

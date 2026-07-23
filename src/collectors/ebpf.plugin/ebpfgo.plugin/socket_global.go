@@ -49,7 +49,6 @@ func socketDelta(current, prev uint64) uint64 {
 	return current - prev
 }
 
-
 func (s *socketGlobalState) Update(snap libbpfloader.SocketSnapshot) (socketGlobalPublish, bool) {
 	if !s.initialized {
 		s.prev = snap
