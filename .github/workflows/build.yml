@@ -70,7 +70,9 @@ jobs:
             .github/scripts/get-static-cache-key.sh
             .github/scripts/gen-matrix-static.py
             .github/scripts/gen-matrix-build.py
+            .github/scripts/prepare-topology-ip-intel-stock.sh
             .github/scripts/run-updater-check.sh
+            src/go/tools/topology-ip-intel-downloader/
             packaging/cmake/
             packaging/makeself/
             packaging/installer/
@@ -79,7 +81,7 @@ jobs:
             packaging/*.version
             packaging/*.checksums
           files_ignore: |
-            **/*.md
+            packaging/**/*.md
             packaging/repoconfig/
       - name: Check static build files
         id: check-static-build-files
@@ -92,9 +94,11 @@ jobs:
             .github/scripts/build-static.sh
             .github/scripts/get-static-cache-key.sh
             .github/scripts/gen-matrix-static.py
+            .github/scripts/prepare-topology-ip-intel-stock.sh
+            src/go/tools/topology-ip-intel-downloader/
             packaging/makeself/
           files_ignore: |
-            **/*.md
+            packaging/**/*.md
             packaging/repoconfig/
       - name: List all changed files in pattern
         continue-on-error: true
