@@ -117,8 +117,8 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| interface_type | Either `virtual` (for virtual/software interfaces) or `real` (for physical interfaces). |
-| device | The network interface name (e.g., `eth0`, `wlan0`). |
+| interface_type | TBD |
+| device | TBD |
 
 Metrics:
 
