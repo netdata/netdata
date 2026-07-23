@@ -4,8 +4,7 @@ package fixture
 
 import (
 	"strconv"
-
-	"github.com/netdata/netdata/tests/query-corpus/stream"
+	"strings"
 )
 
 // The virtual-points view oracle: a faithful port of
@@ -115,7 +114,9 @@ func (d Dimension) DBPoints(ue int64) []DBPoint {
 	out := make([]DBPoint, 0, len(d.Points))
 	for _, p := range d.Points {
 		dp := DBPoint{Start: p.T - ue, End: p.T}
-		if v, err := strconv.ParseFloat(p.Collected, 64); err == nil && p.Flags != stream.FlagEmpty {
+		// gap detection matches the sibling oracles (fixture.go, tier.go):
+		// any E-carrying flags mark the slot empty
+		if v, err := strconv.ParseFloat(p.Collected, 64); err == nil && !strings.ContainsRune(p.Flags, 'E') {
 			dp.Value = SNRoundTrip(v)
 		} else {
 			dp.Gap = true
