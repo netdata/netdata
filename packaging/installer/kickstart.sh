@@ -1397,7 +1397,7 @@ write_claim_config() {
   fi
 
   claim_config="${config_path}/claim.conf"
-  claim_config_tmp="${tmpdir}/claim.conf"
+  claim_config_tmp="$(mktemp -p "${tmpdir}")"
 
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to write claiming configuration to ${claim_config}"
@@ -1419,9 +1419,9 @@ write_claim_config() {
       config="${config}\n    insecure = ${NETDATA_CLAIM_INSECURE}"
   fi
 
-  printf "${config}\n" > "${claim_config_tmp}" || return 1
+  printf "%s\n" "${config}" > "${claim_config_tmp}" || return 1
+  run_as_root chown "root:${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config_tmp}" || return 1
   run_as_root chmod 0640 "${claim_config_tmp}" || return 1
-  run_as_root chown ":${NETDATA_CLAIM_GROUP:-netdata}" "${claim_config_tmp}" || return 1
   run_as_root mv -f "${claim_config_tmp}" "${claim_config}" || return 1
 
   if [ -z "${NETDATA_CLAIM_NORELOAD}" ]; then
