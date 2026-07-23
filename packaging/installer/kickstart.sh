@@ -577,7 +577,7 @@ run_script() {
     rm -f "${NETDATA_SCRIPT_STATUS_PATH}"
   fi
 
-  cd "${old_pwd}" || true
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
   return "${ret}"
 }
 
@@ -729,7 +729,7 @@ check_for_remote_file() {
 
   old_pwd="${PWD}"
   set_tmpdir
-  cd "${old_pwd}" || true
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
   dl_log="${tmpdir}/download.log"
   rm -f "${dl_log}"
 
@@ -763,7 +763,7 @@ download() {
 
   old_pwd="${PWD}"
   set_tmpdir
-  cd "${old_pwd}" || true
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
   dl_log="${tmpdir}/download.log"
   rm -f "${dl_log}"
 
@@ -795,7 +795,7 @@ get_actual_version() {
     url="${RELEASE_INFO_URL}/${channel}/${major}"
     old_pwd="${PWD}"
     set_tmpdir
-    cd "${old_pwd}" || true
+    cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
     tmp_file="${tmpdir}/version-info"
 
     if check_for_remote_file "${RELEASE_INFO_URL}"; then
@@ -814,7 +814,7 @@ get_redirect() {
   url="${1}"
   old_pwd="${PWD}"
   set_tmpdir
-  cd "${old_pwd}" || true
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
   output="${tmpdir}/download.log"
   rm -f "${output}"
 
