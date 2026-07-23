@@ -51,7 +51,7 @@ async fn install_sfst(
 async fn empty_registries_yield_empty_copies() {
     let supplier = make_supplier();
     let sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 2)
+        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &CancellationToken::new())
         .await;
     assert_eq!(sets.len(), 2);
     assert!(sets.iter().all(|s| s.is_empty()));
@@ -63,7 +63,7 @@ async fn sealed_file_maps_to_a_path_identified_file_source() {
     let path = install_sfst(&supplier, "default", 1, 1000, 1005).await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 1)
+        .capture(&TenantId::from("default"), 0..u32::MAX, 1, &CancellationToken::new())
         .await;
     let sources = sets.pop().unwrap();
     assert_eq!(sources.len(), 1);
@@ -92,7 +92,7 @@ async fn copies_are_structurally_identical() {
     install_sfst(&supplier, "default", 2, 2000, 2005).await;
 
     let sets = supplier
-        .capture(&TenantId::from("default"), 0..u32::MAX, 2)
+        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &CancellationToken::new())
         .await;
     let ids: Vec<Vec<&SourceId>> = sets
         .iter()
@@ -116,7 +116,7 @@ async fn window_pruning_is_file_granular() {
     install_sfst(&supplier, "default", 2, 5000, 5005).await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("default"), 900..2000, 1)
+        .capture(&TenantId::from("default"), 900..2000, 1, &CancellationToken::new())
         .await;
     let sources = sets.pop().unwrap();
     assert_eq!(
@@ -132,7 +132,7 @@ async fn capture_is_tenant_scoped() {
     install_sfst(&supplier, "tenant-a", 1, 1000, 1005).await;
 
     let mut sets = supplier
-        .capture(&TenantId::from("tenant-b"), 0..u32::MAX, 1)
+        .capture(&TenantId::from("tenant-b"), 0..u32::MAX, 1, &CancellationToken::new())
         .await;
     assert!(
         sets.pop().unwrap().is_empty(),

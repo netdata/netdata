@@ -6,4 +6,4 @@ mod adapter;
 mod handler;
 mod wire;
 
-pub(crate) use handler::{OtelLogsHandler, RemoteRead, patch_args_into_payload};
+pub(crate) use handler::{OtelLogsHandler, RemoteRead};

@@ -179,14 +179,41 @@ impl Default for InfoResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum StatusWire {
-    Complete { complete: bool },
+    Complete { complete: CompleteTrue },
     Partial { partial: Vec<PartialReasonWire> },
+}
+
+/// The `complete` field's value — the JSON literal `true`, as a type.
+/// A complete status has no other truth, so `{"complete": false}` is an
+/// unrepresentable (and un-deserializable) shape rather than a value a
+/// future producer could construct by mistake.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "bool", into = "bool")]
+pub struct CompleteTrue;
+
+impl From<CompleteTrue> for bool {
+    fn from(_: CompleteTrue) -> bool {
+        true
+    }
+}
+
+impl TryFrom<bool> for CompleteTrue {
+    type Error = &'static str;
+    fn try_from(v: bool) -> Result<Self, Self::Error> {
+        if v {
+            Ok(CompleteTrue)
+        } else {
+            Err("`complete` must be true")
+        }
+    }
 }
 
 impl From<&QueryStatus> for StatusWire {
     fn from(status: &QueryStatus) -> Self {
         match status {
-            QueryStatus::Complete => StatusWire::Complete { complete: true },
+            QueryStatus::Complete => StatusWire::Complete {
+                complete: CompleteTrue,
+            },
             QueryStatus::Partial(reasons) => StatusWire::Partial {
                 // BTreeSet iteration keeps the wire rendering deterministic.
                 partial: reasons.iter().map(|&r| r.into()).collect(),

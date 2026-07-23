@@ -257,7 +257,10 @@ impl Ledger {
         // Query-time chunk cache, shared between every pipeline's handler (which
         // populates it) and its indexer-response path (which drops a WAL's
         // chunks on rotation). The budget and chunk size are fixed defaults for
-        // now; tuning is deferred with the rest of cache governance.
+        // now; tuning is deferred with the rest of cache governance — note the
+        // one budget now serves BOTH signals' queries (logs and traces can
+        // evict each other's chunks under pressure), so re-evaluate it when
+        // the traces data modes go live.
         let chunk_cache = Arc::new(ChunkCache::new(CHUNK_CACHE_BYTES));
 
         let (pipeline_tx, pipeline_rx) = mpsc::unbounded_channel();

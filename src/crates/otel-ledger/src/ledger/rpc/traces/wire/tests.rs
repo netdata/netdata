@@ -151,7 +151,9 @@ fn every_partial_reason_wire_name_is_pinned() {
 #[test]
 fn status_wire_round_trips() {
     for status in [
-        StatusWire::Complete { complete: true },
+        StatusWire::Complete {
+            complete: CompleteTrue,
+        },
         StatusWire::Partial {
             partial: vec![PartialReasonWire::SizeCap, PartialReasonWire::Cancelled],
         },
@@ -160,4 +162,11 @@ fn status_wire_round_trips() {
         let back: StatusWire = serde_json::from_value(v).unwrap();
         assert_eq!(back, status);
     }
+}
+
+#[test]
+fn complete_false_is_unrepresentable() {
+    // `{"complete": false}` means nothing — it must fail to
+    // deserialize rather than masquerade as a status.
+    assert!(serde_json::from_value::<StatusWire>(json!({"complete": false})).is_err());
 }

@@ -29,6 +29,7 @@ use file_lifecycle::registry::{TenantRegistries, WalDesc};
 use file_registry::TenantId;
 use sfsq::traces::{SourceId, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage};
 use tokio::sync::RwLock;
+use tokio_util::sync::CancellationToken;
 use wal::prefix::{chunk_boundaries, tail_start};
 
 /// One WAL resolved to buildable parts: everything needed to
@@ -73,6 +74,10 @@ impl TracesSourceSupplier {
     /// its roles must come from the same captured state — hence copies
     /// from one capture, never two captures. Chunk bytes are
     /// `Arc`-shared across copies.
+    ///
+    /// The chunk-building phase can be the slow one, so it polls `cancel`
+    /// between builds (the logs handler's discipline); a cancelled call
+    /// returns empty — the caller is about to discard the result anyway.
     // Consumed by the data modes (trace: step 1.2, search: step 1.3);
     // exercised by this module's tests until then.
     #[allow(dead_code)]
@@ -81,7 +86,11 @@ impl TracesSourceSupplier {
         tenant: &TenantId,
         time_range: std::ops::Range<u32>,
         copies: usize,
+        cancel: &CancellationToken,
     ) -> Vec<Vec<TraceSource>> {
+        if copies == 0 {
+            return Vec::new();
+        }
         let q = file_registry::Query {
             time_range,
             partition_keys: Vec::new(),
@@ -93,7 +102,10 @@ impl TracesSourceSupplier {
 
         let mut resolved = Vec::with_capacity(wal_descs.len());
         for wal in wal_descs {
-            if let Some(r) = self.resolve_wal(wal).await {
+            if cancel.is_cancelled() {
+                return Vec::new();
+            }
+            if let Some(r) = self.resolve_wal(wal, cancel).await {
                 resolved.push(r);
             }
         }
@@ -148,8 +160,10 @@ impl TracesSourceSupplier {
 
     /// Resolve one active WAL into chunk images + the tail range, or
     /// `None` to refuse the whole WAL (logs failure policy — see the
-    /// module docs).
-    async fn resolve_wal(&self, wal: WalDesc) -> Option<ResolvedWal> {
+    /// module docs). Polls `cancel` between chunk builds; a cancelled
+    /// call returns `None` (indistinguishable from refusal on purpose —
+    /// the capture's result is discarded either way).
+    async fn resolve_wal(&self, wal: WalDesc, cancel: &CancellationToken) -> Option<ResolvedWal> {
         let header = wal::HEADER_SIZE as u64;
         let scan_path = wal.path.clone();
         let valid_up_to = wal.valid_up_to;
@@ -172,6 +186,9 @@ impl TracesSourceSupplier {
         let boundaries = chunk_boundaries(&frames, header, self.min_entries);
         let mut chunks = Vec::with_capacity(boundaries.len());
         for chunk in &boundaries {
+            if cancel.is_cancelled() {
+                return None;
+            }
             let seq = wal.seq;
             let path = wal.path.clone();
             let (range, expected) = (chunk.range, chunk.entry_count);
