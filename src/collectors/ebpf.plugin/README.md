@@ -261,11 +261,8 @@ You can also enable the following eBPF programs:
 - `disk` : This eBPF program creates charts that show information about disk latency independent of filesystem.
 - `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
 - `swap` : This eBPF program creates charts that show information about swap access.
-- `mdflush`: This eBPF program creates charts that show information about
+- `mdflush`: This eBPF program creates charts that show information about multi-device software flushes.
 - `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
-- `socket`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
-    bandwidth consumed by each.
-    multi-device software flushes.
 - `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
 
 ### Configuring eBPF threads
@@ -282,7 +279,7 @@ To configure an eBPF thread:
 
 2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script to edit a thread configuration file. The following configuration files are available:
 
-    - `socket.conf`: Configuration for the socket thread. Lets you set BPF map sizes (`socket monitoring table size`, `udp connection table size`) and the standard `ebpf object flavor`/`maps per core` options.
+    - `socket.conf`: Configuration for the `ebpfgo.plugin` socket program (the C socket thread was removed). Controls BPF map sizes (`socket monitoring table size`, `udp connection table size`) and the standard `ebpf object flavor`/`maps per core` options.
     - `process.conf`: Configuration for the [`process` thread](#sync-configuration).
     - `cachestat.conf`: Configuration for the `cachestat` thread(#filesystem-configuration).
     - `dcstat.conf`: Configuration for the `dcstat` thread.
@@ -788,10 +785,11 @@ attaches kprobes or fentry/fexit trampolines to `tcp_sendmsg`, `tcp_cleanup_rbuf
 
 > **Migration note** — Prior versions of `ebpf.plugin` (the legacy C plugin) published standalone
 > charts for networking data: TCP/UDP connection counts, bandwidth, function call rates,
-> retransmits, and per-app, per-cgroup, and per-service equivalents. These standalone charts are
-> **permanently removed**. The data is now available on demand through the `network-protocols`
-> function in network-viewer. On-demand function output does not support alerting or metric
-> retention.
+> retransmits, and per-app equivalents. Those standalone charts are **permanently removed**; the
+> data is now available on demand through the `network-protocols` function in network-viewer.
+> Per-cgroup and per-service equivalents (`cgroup.net_*`, `systemd.service.net_*`) are **not
+> removed** — they are now emitted by `cgroups.plugin` via the shared-memory bridge to
+> `ebpfgo.plugin`. On-demand function output does not support alerting or metric retention.
 
 ### Apps
 
