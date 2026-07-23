@@ -51,7 +51,7 @@ in the `info` response:
 
 | Class | `has_history` | Frontend behavior | Examples |
 |---|---|---|---|
-| **Simple Table** | `false` | Backend returns the whole current dataset; frontend filters/sorts/searches in-memory | `processes`, `network-connections`, `network-interfaces`, `network-sockets-tracing`, `block-devices`, `mount-points`, `containers-vms`, `systemd-services`, `netdata-streaming`, `netdata-api-calls`, `netdata-metrics-cardinality`, `<db>:top-queries`, `<db>:running-queries`, `<db>:deadlock-info`, `<db>:error-info` |
+| **Simple Table** | `false` | Backend returns the whole current dataset; frontend filters/sorts/searches in-memory | `processes`, `network-connections`, `network-interfaces`, `block-devices`, `mount-points`, `containers-vms`, `systemd-services`, `netdata-streaming`, `netdata-api-calls`, `netdata-metrics-cardinality`, `<db>:top-queries`, `<db>:running-queries`, `<db>:deadlock-info`, `<db>:error-info` |
 | **Log Explorer** | `true` | Backend filters / facets / histograms before sending; supports infinite scroll, anchor pagination, delta and PLAY modes | `systemd-journal`, `windows-events`, `macos-logs`, `otel-logs` |
 
 Two additional `type` values are used by purpose-built Functions
