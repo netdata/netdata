@@ -383,9 +383,13 @@ PARSER_RC pluginsd_function(char **words, size_t num_words, PARSER *parser) {
         char sanitized_name[sizeof(PLUGINSD_FUNCTION_CONFIG) + 4];
         rrd_functions_sanitize(sanitized_name, name, sizeof(sanitized_name));
         if(rrd_function_name_is_dyncfg(sanitized_name)) {
+            // Log the sanitized name (what we actually classify on), not the raw name:
+            // a raw name with leading whitespace/control chars or embedded newlines
+            // would make this log line misleading or malformed. The id part of a
+            // "config <id>" name is truncated here, which is fine for a warning.
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "PLUGINSD: 'host:%s' attempted to register reserved dynamic-configuration function '%s' via FUNCTION. Ignoring it.",
-                   rrdhost_hostname(host), name);
+                   rrdhost_hostname(host), sanitized_name);
             return PARSER_RC_OK;
         }
     }
