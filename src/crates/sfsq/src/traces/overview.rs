@@ -72,6 +72,10 @@ const DURATION_BIN_EDGES_NS: [i64; DURATION_BIN_COUNT - 1] = [
 /// The default visited budget (rollup rows + tail spans examined).
 const VISITED_ROWS_CEILING: u64 = 4_000_000;
 
+/// How many values each root-facet list carries (the rest fold into
+/// `other`). Fixed — a UI-default, not a tuning surface.
+pub const FACET_TOP_K: usize = 10;
+
 /// Which duration bin an envelope duration falls in.
 fn duration_bin(duration_ns: i64) -> usize {
     DURATION_BIN_EDGES_NS.partition_point(|&edge| duration_ns >= edge)
@@ -83,6 +87,7 @@ fn duration_bin(duration_ns: i64) -> usize {
 pub struct OverviewQuery {
     grid: sfst::Grid,
     visited_ceiling: u64,
+    root_facets: bool,
 }
 
 impl OverviewQuery {
@@ -90,7 +95,17 @@ impl OverviewQuery {
         Self {
             grid,
             visited_ceiling: VISITED_ROWS_CEILING,
+            root_facets: false,
         }
+    }
+
+    /// Also compute the top-root-service/operation facet lists. OFF by
+    /// default: resolving roots makes the sealed path build the
+    /// whole-file string table, so the default paint stays cheap and
+    /// the facet rail opts in.
+    pub fn root_facets(mut self, on: bool) -> Self {
+        self.root_facets = on;
+        self
     }
 
     /// Test-only ceiling override — proves ceiling termination without a
@@ -109,6 +124,29 @@ pub enum OverviewRequestError {
     EmptyGrid,
     #[error(transparent)]
     SourceSet(#[from] SourceSetError),
+}
+
+/// One root-facet dimension's bounded list. The three parts partition
+/// the binned trace population exactly:
+/// `sum(top) + other + unattributed == total_traces`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct FacetList {
+    /// The top [`FACET_TOP_K`] values — count DESC, value ASC.
+    pub top: Vec<(String, u64)>,
+    /// Traces attributed to values beyond the top K.
+    pub other: u64,
+    /// Traces with NO usable value for this dimension: no true root in
+    /// any source (Indeterminate, D8) or a true root lacking the field
+    /// — bucketed explicitly, never attributed to a value.
+    pub unattributed: u64,
+}
+
+/// The trace-level facet lists (phase-2 step 2.5) — present only when
+/// [`OverviewQuery::root_facets`] requested them.
+#[derive(Debug, PartialEq, Eq)]
+pub struct RootFacets {
+    pub services: FacetList,
+    pub operations: FacetList,
 }
 
 /// One overview's grid plus everything needed to interpret it honestly.
@@ -130,6 +168,9 @@ pub struct OverviewData {
     pub total_spans: u64,
     /// Of those spans, ERROR-status ones.
     pub total_errors: u64,
+    /// The top-root facet lists over the SAME binned population —
+    /// `None` unless the query requested them.
+    pub root_facets: Option<RootFacets>,
     pub status: QueryStatus,
 }
 
@@ -140,6 +181,7 @@ impl OverviewData {
             total_traces: 0,
             total_spans: 0,
             total_errors: 0,
+            root_facets: None,
             status,
         }
     }
@@ -177,9 +219,9 @@ pub fn overview(
         op: "overview",
         visited_ceiling: query.visited_ceiling,
         ceiling_reason: PartialReason::OverviewCeiling,
-        // The grid discards roots — the sealed path must not pay for
-        // the file string table (the roots-free envelopes view).
-        resolve_roots: false,
+        // The grid itself discards roots — the sealed path pays for
+        // the file string table ONLY when the facet lists need them.
+        resolve_roots: query.root_facets,
     };
     let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status)
     else {
@@ -193,6 +235,7 @@ pub fn overview(
     let mut total_traces = 0u64;
     let mut total_spans = 0u64;
     let mut total_errors = 0u64;
+    let mut facets = query.root_facets.then(FacetCounts::default);
     for m in merged.values() {
         if m.min_start_ns < grid_start || m.min_start_ns >= grid_end {
             continue;
@@ -203,6 +246,9 @@ pub fn overview(
         total_traces = total_traces.saturating_add(1);
         total_spans = total_spans.saturating_add(m.span_count);
         total_errors = total_errors.saturating_add(m.error_count);
+        if let Some(f) = facets.as_mut() {
+            f.count(m.root.as_ref());
+        }
     }
 
     Ok(OverviewData {
@@ -210,6 +256,56 @@ pub fn overview(
         total_traces,
         total_spans,
         total_errors,
+        root_facets: facets.map(FacetCounts::finish),
         status: status.finish(),
     })
+}
+
+/// The facet accumulation over the binned population: full per-value
+/// count maps (the root service/operation vocabularies are small by
+/// nature), reduced to the bounded lists at the end.
+#[derive(Default)]
+struct FacetCounts {
+    services: std::collections::HashMap<String, u64>,
+    operations: std::collections::HashMap<String, u64>,
+    service_unattributed: u64,
+    operation_unattributed: u64,
+}
+
+impl FacetCounts {
+    fn count(&mut self, root: Option<&super::rollup::TraceRootInfo>) {
+        match root.and_then(|r| r.service.as_deref()) {
+            Some(svc) => *self.services.entry(svc.to_string()).or_insert(0) += 1,
+            None => self.service_unattributed += 1,
+        }
+        match root.and_then(|r| r.name.as_deref()) {
+            Some(op) => *self.operations.entry(op.to_string()).or_insert(0) += 1,
+            None => self.operation_unattributed += 1,
+        }
+    }
+
+    fn finish(self) -> RootFacets {
+        RootFacets {
+            services: reduce(self.services, self.service_unattributed),
+            operations: reduce(self.operations, self.operation_unattributed),
+        }
+    }
+}
+
+/// Reduce a full count map to the bounded list: count DESC, value ASC,
+/// the tail folded into `other`.
+fn reduce(counts: std::collections::HashMap<String, u64>, unattributed: u64) -> FacetList {
+    let mut entries: Vec<(String, u64)> = counts.into_iter().collect();
+    entries.sort_unstable_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    let other = entries
+        .iter()
+        .skip(FACET_TOP_K)
+        .map(|(_, n)| n)
+        .sum::<u64>();
+    entries.truncate(FACET_TOP_K);
+    FacetList {
+        top: entries,
+        other,
+        unattributed,
+    }
 }

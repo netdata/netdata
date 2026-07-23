@@ -267,3 +267,175 @@ fn empty_grid_is_a_request_error() {
     .unwrap_err();
     assert!(err.to_string().contains("empty"), "{err}");
 }
+
+// ── Root facets (phase-2 step 2.5) ──────────────────────────────────
+
+/// A CHILD span (parent set) of trace `t`.
+fn fspan(t: u8, id: u8, parent: u8, start_ns: u64, name: &'static str) -> common::SpanSpec {
+    let mut s = sp(id, parent, start_ns, name);
+    s.trace = [t; 16];
+    s.end = start_ns + 500;
+    s
+}
+
+/// Five traces across services (brute-force expectations inline):
+///  - A (svc-a): root "op-a" + a child          → svc-a / op-a
+///  - B (svc-a): root "op-b"                    → svc-a / op-b
+///  - C (svc-b): root "op-a"                    → svc-b / op-a
+///  - D (svc-b): only a child span (parent set) → Indeterminate
+///  - E (no service resource): root "op-e"      → service-less root
+fn facet_wal(dir: &std::path::Path) -> std::path::PathBuf {
+    use common::{kv_str, req_with};
+    write_wal(
+        dir,
+        vec![
+            req_with(
+                vec![kv_str("service.name", "svc-a")],
+                None,
+                &[
+                    tspan(0xA, 1, 1_000_000_000, 1_500_000_000, "op-a"),
+                    fspan(0xA, 2, 1, 1_100_000_000, "a-child"),
+                    tspan(0xB, 3, 2_000_000_000, 2_500_000_000, "op-b"),
+                ],
+            ),
+            req_with(
+                vec![kv_str("service.name", "svc-b")],
+                None,
+                &[
+                    tspan(0xC, 4, 3_000_000_000, 3_500_000_000, "op-a"),
+                    fspan(0xD, 5, 9, 4_000_000_000, "d-orphan"),
+                ],
+            ),
+            req_with(
+                vec![],
+                None,
+                &[tspan(0xE, 6, 5_000_000_000, 5_500_000_000, "op-e")],
+            ),
+        ],
+        "facets",
+    )
+}
+
+#[test]
+fn facets_are_absent_unless_requested_and_change_nothing_else() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = facet_wal(dir.path());
+    let plain = run(
+        vec![sealed_source(dir.path(), &wal, "s")],
+        OverviewQuery::new(grid()),
+    );
+    assert!(plain.root_facets.is_none(), "opt-in only");
+
+    let with = run(
+        vec![sealed_source(dir.path(), &wal, "s")],
+        OverviewQuery::new(grid()).root_facets(true),
+    );
+    assert!(with.root_facets.is_some());
+    assert_eq!(with.cells, plain.cells, "the grid is identical");
+    assert_eq!(with.total_traces, plain.total_traces);
+    assert_eq!(with.total_spans, plain.total_spans);
+    assert_eq!(with.status, plain.status);
+}
+
+#[test]
+fn facet_counts_match_brute_force_with_explicit_unattributed_buckets() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = facet_wal(dir.path());
+    let data = run(
+        vec![sealed_source(dir.path(), &wal, "s")],
+        OverviewQuery::new(grid()).root_facets(true),
+    );
+    assert_eq!(data.total_traces, 5);
+    let f = data.root_facets.expect("requested");
+
+    // Services: svc-a×2 (A,B) > svc-b×1 (C); D (Indeterminate) and E
+    // (service-less root) are bucketed, never attributed.
+    assert_eq!(
+        f.services.top,
+        vec![("svc-a".to_string(), 2), ("svc-b".to_string(), 1)]
+    );
+    assert_eq!((f.services.other, f.services.unattributed), (0, 2));
+
+    // Operations: op-a×2 (A,C) then value-ASC among the ×1s; only D
+    // lacks a root name.
+    assert_eq!(
+        f.operations.top,
+        vec![
+            ("op-a".to_string(), 2),
+            ("op-b".to_string(), 1),
+            ("op-e".to_string(), 1)
+        ]
+    );
+    assert_eq!((f.operations.other, f.operations.unattributed), (0, 1));
+
+    // The partition identity, both dimensions.
+    for list in [&f.services, &f.operations] {
+        let sum: u64 = list.top.iter().map(|(_, n)| n).sum();
+        assert_eq!(sum + list.other + list.unattributed, data.total_traces);
+    }
+}
+
+#[test]
+fn a_straddling_root_attributes_once_from_the_source_holding_it() {
+    // The root lives in the sealed part; the tail holds only a child.
+    // The merged trace attributes to the root's service exactly once.
+    let dir = tempfile::tempdir().unwrap();
+    let wal_1 = write_wal(
+        dir.path(),
+        vec![common::req_with(
+            vec![common::kv_str("service.name", "svc-root")],
+            None,
+            &[tspan(0xA, 1, 1_000_000_000, 1_500_000_000, "op-root")],
+        )],
+        "part1",
+    );
+    let wal_2 = write_wal(
+        dir.path(),
+        vec![common::req_with(
+            vec![common::kv_str("service.name", "svc-child")],
+            None,
+            &[fspan(0xA, 2, 1, 2_000_000_000, "op-child")],
+        )],
+        "part2",
+    );
+    let data = run(
+        vec![
+            sealed_source(dir.path(), &wal_1, "s1"),
+            tail_source(&wal_2, "t2"),
+        ],
+        OverviewQuery::new(grid()).root_facets(true),
+    );
+    assert_eq!(data.total_traces, 1);
+    let f = data.root_facets.unwrap();
+    assert_eq!(f.services.top, vec![("svc-root".to_string(), 1)]);
+    assert_eq!(f.operations.top, vec![("op-root".to_string(), 1)]);
+    assert_eq!((f.services.unattributed, f.operations.unattributed), (0, 0));
+}
+
+#[test]
+fn the_top_k_cap_folds_the_tail_into_other_deterministically() {
+    // Twelve services, one trace each: all counts tie, so the top 10
+    // are the value-ASC prefix and `other` carries the remaining two.
+    use common::{kv_str, req_with};
+    let dir = tempfile::tempdir().unwrap();
+    let reqs: Vec<_> = (0..12u8)
+        .map(|i| {
+            req_with(
+                vec![kv_str("service.name", &format!("svc-{:02}", i))],
+                None,
+                &[tspan(0x10 + i, 1, 1_000_000_000, 1_500_000_000, "op")],
+            )
+        })
+        .collect();
+    let wal = write_wal(dir.path(), reqs, "many");
+    let data = run(
+        vec![sealed_source(dir.path(), &wal, "s")],
+        OverviewQuery::new(grid()).root_facets(true),
+    );
+    let f = data.root_facets.unwrap();
+    assert_eq!(f.services.top.len(), 10);
+    assert_eq!(f.services.top[0].0, "svc-00");
+    assert_eq!(f.services.top[9].0, "svc-09");
+    assert_eq!(f.services.other, 2, "svc-10 and svc-11 fold into other");
+    assert_eq!(f.services.unattributed, 0);
+}

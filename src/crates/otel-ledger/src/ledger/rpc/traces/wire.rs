@@ -261,14 +261,19 @@ pub struct SlowestParams {
     pub limit: Option<usize>,
 }
 
-/// The `overview` mode's typed parameters. Deliberately empty in v1:
-/// the time-bucket geometry derives from `after`/`before` (the shared
-/// nice-width grid, like the logs histogram) and the duration bins are
-/// the fixed log-scale set. Typed anyway so a future knob lands without
-/// a shape change and so `null`/junk selectors error cleanly today.
+/// The `overview` mode's typed parameters. The time-bucket geometry
+/// derives from `after`/`before` (the shared nice-width grid, like the
+/// logs histogram) and the duration bins are the fixed log-scale set.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct OverviewParams {}
+pub struct OverviewParams {
+    /// Also compute the top-root-service/operation facet lists
+    /// (phase-2 step 2.5). OPT-IN: resolving roots costs the sealed
+    /// sources' string tables, so the default paint stays cheap and
+    /// the facet rail sets this.
+    #[serde(default)]
+    pub facets: Option<bool>,
+}
 
 /// The `attributes` mode's typed parameters.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -343,6 +348,33 @@ pub struct OverviewResult {
     pub status: StatusWire,
     pub grid: OverviewGridWire,
     pub totals: OverviewTotals,
+    /// The top-root facet lists over the SAME binned population as the
+    /// grid — present only when the request set `facets: true`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_root_services: Option<FacetListWire>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_root_operations: Option<FacetListWire>,
+}
+
+/// One root-facet dimension's bounded list. The three parts partition
+/// the binned population exactly:
+/// `sum(top[].traces) + other + unattributed == totals.traces`.
+#[derive(Debug, Serialize)]
+pub struct FacetListWire {
+    /// The top values — trace count DESC, value ASC.
+    pub top: Vec<FacetValueWire>,
+    /// Traces attributed to values beyond the top list.
+    pub other: u64,
+    /// Traces with NO usable value for this dimension — no true root
+    /// in any source (Indeterminate) or a root lacking the field.
+    /// Bucketed explicitly, never attributed to a value.
+    pub unattributed: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FacetValueWire {
+    pub value: String,
+    pub traces: u64,
 }
 
 #[derive(Debug, Serialize)]

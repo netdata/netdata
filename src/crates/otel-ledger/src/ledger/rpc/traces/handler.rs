@@ -343,15 +343,14 @@ impl OtelTracesHandler {
         req: &OtelTracesRequest,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
-        // v1 carries no knobs, but the parse still rejects null/junk.
-        let _params = req.overview_params().map_err(client_err)?;
+        let params = req.overview_params().map_err(client_err)?;
 
         let now_s = unix_now_s();
         let window: ResolvedWindow =
             resolve_window(req.after, req.before, now_s, None).map_err(client_err)?;
         let (grid, aligned_after, aligned_before) =
             super::super::grid::grid_for_window_s(window.capture.start, window.capture.end);
-        let query = OverviewQuery::new(grid);
+        let query = OverviewQuery::new(grid).root_facets(params.facets.unwrap_or(false));
 
         // Alignment can widen the window; prune files by the widened one.
         let tenant = TenantId::resolve_query(req.tenant.as_deref());

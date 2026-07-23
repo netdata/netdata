@@ -15,9 +15,9 @@ use sfsq::traces::{
 
 use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, EventWire,
-    FieldKindsWire, LinkWire, OverviewGridWire, OverviewResult, OverviewTotals, SearchItems,
-    SearchResult, SlowestResult, SlowestTraceWire, SpanWire, StatusWire, TraceItems, TraceResult,
-    TraceSummaryWire,
+    FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OverviewGridWire, OverviewResult,
+    OverviewTotals, SearchItems, SearchResult, SlowestResult, SlowestTraceWire, SpanWire,
+    StatusWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -321,6 +321,19 @@ pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> Overvi
     const NS_PER_S: i64 = 1_000_000_000;
     debug_assert_eq!(grid.bucket_start_ns % NS_PER_S, 0);
     debug_assert_eq!(grid.bucket_width_ns % NS_PER_S, 0);
+    let to_list = |l: sfsq::traces::FacetList| FacetListWire {
+        top: l
+            .top
+            .into_iter()
+            .map(|(value, traces)| FacetValueWire { value, traces })
+            .collect(),
+        other: l.other,
+        unattributed: l.unattributed,
+    };
+    let (top_root_services, top_root_operations) = match data.root_facets {
+        Some(f) => (Some(to_list(f.services)), Some(to_list(f.operations))),
+        None => (None, None),
+    };
     OverviewResult {
         version: 1,
         unit: "traces",
@@ -336,6 +349,8 @@ pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> Overvi
             spans: data.total_spans,
             errors: data.total_errors,
         },
+        top_root_services,
+        top_root_operations,
     }
 }
 

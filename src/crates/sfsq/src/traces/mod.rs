@@ -37,8 +37,8 @@ mod window;
 
 pub use by_id::{DEFAULT_SPAN_CAP, FieldKinds, TraceData, TraceQuery, TraceRequestError, trace_by_id};
 pub use overview::{
-    DURATION_BIN_COUNT, DURATION_BIN_LABELS, OverviewData, OverviewQuery, OverviewRequestError,
-    overview,
+    DURATION_BIN_COUNT, DURATION_BIN_LABELS, FACET_TOP_K, FacetList, OverviewData, OverviewQuery,
+    OverviewRequestError, RootFacets, overview,
 };
 pub use rollup::{
     TraceAggregate, TraceRootInfo, sealed_trace_aggregates, sealed_trace_envelopes,

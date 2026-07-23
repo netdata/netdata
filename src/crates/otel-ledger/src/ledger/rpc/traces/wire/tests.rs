@@ -216,6 +216,25 @@ fn slowest_params_reject_null_junk_and_unknown_fields() {
 }
 
 #[test]
+fn overview_facets_knob_parses_and_junk_is_rejected() {
+    assert_eq!(req(json!({"overview": {}})).overview_params().unwrap().facets, None);
+    assert_eq!(
+        req(json!({"overview": {"facets": true}}))
+            .overview_params()
+            .unwrap()
+            .facets,
+        Some(true)
+    );
+    for body in [
+        json!({"overview": {"facets": "yes"}}),
+        json!({"overview": {"bogus": 1}}),
+    ] {
+        let err = req(body.clone()).overview_params().expect_err("must reject");
+        assert!(err.contains("invalid overview selector"), "for {body}: {err}");
+    }
+}
+
+#[test]
 fn status_wire_round_trips() {
     for status in [
         StatusWire::Complete {

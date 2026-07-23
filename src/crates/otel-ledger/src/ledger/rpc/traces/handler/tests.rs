@@ -612,6 +612,43 @@ async fn enumeration_invalid_requests_are_clean_client_errors() {
 // ── The overview mode ───────────────────────────────────────────────
 
 #[tokio::test]
+async fn overview_facets_are_opt_in_and_partition_the_population() {
+    // Corpus roots are each trace's span-1: services svc-a×3 (A,C,E)
+    // and svc-b×2 (B,D); every root is named "span-1".
+    let h = handler_with_search_corpus().await;
+
+    let mut body = window_body();
+    body["overview"] = json!({});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert!(v.get("top_root_services").is_none(), "absent unless requested");
+    assert!(v.get("top_root_operations").is_none());
+
+    let mut body = window_body();
+    body["overview"] = json!({"facets": true});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["totals"]["traces"], 5);
+    assert_eq!(
+        v["top_root_services"],
+        json!({
+            "top": [
+                {"value": "svc-a", "traces": 3},
+                {"value": "svc-b", "traces": 2}
+            ],
+            "other": 0,
+            "unattributed": 0
+        })
+    );
+    assert_eq!(
+        v["top_root_operations"],
+        json!({
+            "top": [{"value": "span-1", "traces": 5}],
+            "other": 0,
+            "unattributed": 0
+        })
+    );
+}
+
+#[tokio::test]
 async fn slowest_ranks_the_corpus_by_merged_envelope() {
     // Envelope durations: E 2500ns > B 1500ns > A/C/D 500ns (the tie
     // breaks by ascending trace id). Roots are each trace's span-1.
