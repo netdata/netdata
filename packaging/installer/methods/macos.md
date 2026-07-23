@@ -134,6 +134,8 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
    brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl libtool cmake
    ```
 
+   To include the OpenTelemetry plugin (`otel-plugin`), also install a Rust toolchain — either `brew install rust` or a stable toolchain via [rustup](https://rustup.rs/). The plugin is built automatically when a toolchain covering the minimum version (`rust-version` in `src/crates/Cargo.toml`) is available; without one, the installer prints a warning and builds the agent without the plugin.
+
 4. Download Netdata from our GitHub repository:
 
    ```bash
@@ -159,3 +161,4 @@ Netdata works on macOS, albeit with some limitations.
 
 - The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](/src/plugins.d/README.md) to monitor any services you might have installed on your macOS system.
 - You could also use a macOS system as the parent node in a [streaming configuration](/src/streaming/README.md).
+- The OpenTelemetry plugin (`otel-plugin`) is built by default when a Rust toolchain is available, so a macOS node can also ingest OTLP metrics, logs, and traces.

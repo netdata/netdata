@@ -941,7 +941,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host \
-                 -v $PWD:/netdata -w /netdata \
+                 -v "$PWD":/netdata -w /netdata \
                  ubuntu:latest /bin/sh -x /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -1327,7 +1327,7 @@ jobs:
         id: build-source
         if: needs.file-check.outputs.run == 'true'
         run: |
-          sudo bash ./netdata-installer.sh --install-no-prefix /usr/local/netdata --dont-wait --dont-start-it --one-time-build
+          sudo bash ./netdata-installer.sh --install-no-prefix /usr/local/netdata --dont-wait --dont-start-it --one-time-build --enable-plugin-otel
       - name: Test Agent start up
         id: test-agent
         if: needs.file-check.outputs.run == 'true'
