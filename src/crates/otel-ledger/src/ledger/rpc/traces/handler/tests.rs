@@ -43,7 +43,10 @@ async fn info_returns_the_descriptor() {
     assert_eq!(v["status"], 200);
     assert_eq!(
         v["accepted_params"],
-        json!(["info", "trace", "tenant", "after", "before", "last", "anchor"])
+        json!([
+            "info", "trace", "attributes", "attribute_values",
+            "tenant", "after", "before", "last", "anchor"
+        ])
     );
     assert_eq!(v["required_params"], json!([]));
 }
@@ -561,6 +564,11 @@ async fn attribute_values_returns_storage_labels_with_kinds() {
     assert_eq!(v["truncated"], false);
     let values: Vec<&str> = v["values"].as_array().unwrap().iter().map(|x| x["value"].as_str().unwrap()).collect();
     assert!(values.contains(&"svc-a") && values.contains(&"svc-b"), "{values:?}");
+    assert!(
+        v["values"].as_array().unwrap().iter().all(|x| x["kind"] == "str"),
+        "service names carry their schema kind: {}",
+        v["values"]
+    );
 
     // Builtin `name`: the corpus's span names.
     let mut body = window_body();

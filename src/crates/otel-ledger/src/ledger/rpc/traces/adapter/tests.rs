@@ -172,6 +172,11 @@ fn rendered_keys_round_trip_through_the_selection_grammar() {
             AttributeKey::Attribute("http.method".into()),
         ),
         (AttributeOwner::Event, AttributeKey::Attribute("x".into())),
+        (AttributeOwner::Link, AttributeKey::Attribute("peer".into())),
+        (
+            AttributeOwner::Instrumentation,
+            AttributeKey::Attribute("telemetry.sdk".into()),
+        ),
     ];
     for (owner, key) in cases {
         let rendered = render_attribute_key(owner, &key);
@@ -199,6 +204,7 @@ fn owner_words_parse_including_builtin() {
     assert_eq!(parse_owner_word("builtin").unwrap(), AttributeOwner::Builtin);
     assert!(parse_owner_word("any").is_err(), "Any stays un-nameable");
     assert!(parse_owner_word("bogus").is_err());
+    assert!(parse_owner_word("Resource").is_err(), "case-sensitive by design");
 }
 
 #[test]

@@ -128,7 +128,10 @@ fn info_response_shape_is_pinned() {
         json!({
             "version": 1,
             "status": 200,
-            "accepted_params": ["info", "trace", "tenant", "after", "before", "last", "anchor"],
+            "accepted_params": [
+                "info", "trace", "attributes", "attribute_values",
+                "tenant", "after", "before", "last", "anchor"
+            ],
             "required_params": [],
             "help": "Query and visualize OpenTelemetry traces.",
         })

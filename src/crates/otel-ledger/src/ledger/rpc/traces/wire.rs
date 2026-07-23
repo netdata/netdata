@@ -5,9 +5,8 @@
 //! request shape (the `otel-logs` pattern): `info` for capability
 //! discovery, `trace` / `attributes` / `attribute_values` / `overview`
 //! selected by their sub-objects, and a request with none of those is a
-//! `search`. Implemented so far: `info`, `trace`; the remaining data
-//! modes land one per traces-ui phase-1 step, each replacing its
-//! `serde_json::Value` placeholder with its typed request shape.
+//! `search`. Implemented: everything but `overview` (the last traces-ui
+//! phase-1 step), which still errors as not-implemented.
 
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +22,15 @@ use sfsq::traces::{PartialReason, QueryStatus};
 /// ride the request body like `trace` does; this list carries the
 /// generic UI params.
 pub const ACCEPTED_PARAMS: &[&str] = &[
-    "info", "trace", "tenant", "after", "before", "last", "anchor",
+    "info",
+    "trace",
+    "attributes",
+    "attribute_values",
+    "tenant",
+    "after",
+    "before",
+    "last",
+    "anchor",
 ];
 
 /// Request payload. A flat struct like the logs request: `info` and the
@@ -59,9 +66,10 @@ pub struct OtelTracesRequest {
     #[serde(default, deserialize_with = "present")]
     pub overview: Option<serde_json::Value>,
     /// Query window, unix seconds. Consumed by the WINDOWED data modes
-    /// (search/attributes/overview); the `trace` mode deliberately
-    /// ignores it — a trace is an exact object whose spans straddle
-    /// files, so by-id always looks at the full range (see the handler).
+    /// (search, both enumeration modes, and overview when it lands);
+    /// the `trace` mode deliberately ignores it — a trace is an exact
+    /// object whose spans straddle files, so by-id always looks at the
+    /// full range (see the handler).
     #[serde(default)]
     pub after: u32,
     #[serde(default)]

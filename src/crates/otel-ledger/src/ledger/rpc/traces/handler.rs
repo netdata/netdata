@@ -160,11 +160,7 @@ impl OtelTracesHandler {
         let predicate = build_predicate(&req.selections, req.min_duration_ns, req.max_duration_ns)
             .map_err(client_err)?;
 
-        let now_s = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs()
-            .min(u64::from(u32::MAX)) as u32;
+        let now_s = unix_now_s();
         // An anchor page reruns the SAME query over the cursor's frozen
         // window (never narrowed — the rank is window-dependent) with an
         // over-fetch covering the served prefix; the adapter drops it.
@@ -240,11 +236,7 @@ impl OtelTracesHandler {
         ctx: &FunctionCallContext,
         req: &OtelTracesRequest,
     ) -> netdata_plugin_error::Result<(Vec<sfsq::traces::TraceSource>, TimeWindow)> {
-        let now_s = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs()
-            .min(u64::from(u32::MAX)) as u32;
+        let now_s = unix_now_s();
         let window: ResolvedWindow = resolve_window(req.after, req.before, now_s, None)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
         let engine_window = TimeWindow::new(window.start_ns, window.end_ns)
@@ -325,6 +317,16 @@ impl OtelTracesHandler {
             ))),
         }
     }
+}
+
+/// The wall clock as unix seconds, saturating at the u32 horizon (the
+/// registry's second-granular time type).
+fn unix_now_s() -> u32 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        .min(u64::from(u32::MAX)) as u32
 }
 
 /// Enumeration request errors: a rejected source set is the supplier's
