@@ -795,7 +795,7 @@ get_actual_version() {
     url="${RELEASE_INFO_URL}/${channel}/${major}"
     old_pwd="${PWD}"
     set_tmpdir
-    cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
+    cd "${old_pwd}" || true
     tmp_file="${tmpdir}/version-info"
 
     if check_for_remote_file "${RELEASE_INFO_URL}"; then
