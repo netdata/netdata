@@ -41,9 +41,16 @@ pub(crate) fn bucket_width_for_span_s(span_s: u32) -> u32 {
 /// boundaries (e.g. 15s buckets snap to `t % 15 == 0`). This keeps the
 /// chart x-axis stable across the UI's per-second polling: requests
 /// within the same bucket-width slot align to the same grid.
+///
+/// Ceiling near the u32 horizon saturates to the largest in-range
+/// multiple of `width_s` instead of overflowing (an adversarial
+/// `before` close to `u32::MAX` must not panic the request path).
 pub(crate) fn align_window(after: u32, before: u32, width_s: u32) -> (u32, u32) {
     let aligned_after = (after / width_s) * width_s;
-    let aligned_before = before.div_ceil(width_s) * width_s;
+    let max_aligned = (u32::MAX / width_s) * width_s;
+    let aligned_before = u32::try_from(u64::from(before).div_ceil(u64::from(width_s)) * u64::from(width_s))
+        .unwrap_or(max_aligned)
+        .min(max_aligned);
     (aligned_after, aligned_before)
 }
 
@@ -77,6 +84,32 @@ mod tests {
         assert_eq!(bucket_width_for_span_s(30), 1);
         assert_eq!(bucket_width_for_span_s(3600), 60);
         assert_eq!(bucket_width_for_span_s(86400), 900);
+    }
+
+    #[test]
+    fn jittered_requests_in_the_same_slot_share_one_grid() {
+        // The UI polls every second with a sliding window; requests
+        // within the same bucket-width slot must produce the SAME grid
+        // so the chart x-axis never jitters.
+        let (a, ..) = grid_for_window_s(7, 907);
+        let (b, ..) = grid_for_window_s(9, 909);
+        assert_eq!(a.bucket_start_ns, b.bucket_start_ns);
+        assert_eq!(a.bucket_width_ns, b.bucket_width_ns);
+        assert_eq!(a.num_buckets, b.num_buckets);
+    }
+
+    #[test]
+    fn adversarial_before_near_the_horizon_saturates_instead_of_overflowing() {
+        // before near u32::MAX with a large nice width: the ceil-multiply
+        // must saturate to the largest in-range multiple, never panic
+        // (debug) or wrap (release).
+        let (after, before) = align_window(1, u32::MAX, 2_592_000);
+        assert_eq!(after, 0);
+        assert_eq!(before, (u32::MAX / 2_592_000) * 2_592_000);
+        // And the whole derivation stays sane end to end.
+        let (grid, a, b) = grid_for_window_s(1, u32::MAX);
+        assert!(a < b);
+        assert!(grid.num_buckets > 0);
     }
 
     #[test]

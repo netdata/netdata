@@ -137,8 +137,8 @@ pub fn overview(
     validate_sources(&sources)?;
 
     let grid = query.grid;
-    let grid_start = grid.bucket_start_ns;
-    let grid_end = grid_start + grid.bucket_width_ns * grid.num_buckets as i64;
+    let grid_range = grid.range_ns();
+    let (grid_start, grid_end) = (grid_range.start, grid_range.end);
     // Storage name via the vocabulary — never hand-built.
     let status_field = BuiltinField::Status
         .dictionary_field()
@@ -220,6 +220,22 @@ pub fn overview(
                         }
                     };
                 let ts = timestamps.as_slice();
+                // The durations column is row-checked at load; the
+                // timestamps chunk is NOT — a corrupt TIMS with extra
+                // entries would push `hi` past the durations column and
+                // panic the zip below. Length parity is the source's
+                // problem, reported like any other source failure.
+                if ts.len() != durations.0.len() {
+                    tracing::warn!(
+                        "sfsq overview: source {} TIMS/DURN length mismatch ({} vs {})",
+                        c.source_id,
+                        ts.len(),
+                        durations.0.len()
+                    );
+                    status.add(PartialReason::SourceFailure);
+                    progress.fetch_add(1, Ordering::Relaxed);
+                    continue;
+                }
                 // Rows are chronological: the grid window is one
                 // contiguous row range.
                 let lo = ts.partition_point(|&t| t < grid_start);

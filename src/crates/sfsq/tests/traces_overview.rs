@@ -141,6 +141,8 @@ fn ceiling_terminates_with_the_deterministic_prefix_and_the_partial() {
     );
     assert!(data.status.has(PartialReason::OverviewCeiling));
     assert_eq!(data.total_spans, 3, "only the first source counted");
+    let cell_sum: u64 = data.cells.iter().flatten().sum();
+    assert_eq!(cell_sum, 3, "the gathered grid holds exactly the prefix");
 }
 
 #[test]
