@@ -134,11 +134,21 @@ pub fn overview(
     if query.grid.num_buckets == 0 || query.grid.bucket_width_ns <= 0 {
         return Err(OverviewRequestError::EmptyGrid);
     }
+    // The library boundary also refuses a grid whose end overflows i64
+    // (an adversarial width × count): every bucket-index computation
+    // below assumes a well-formed half-open range.
+    let Some(grid_end) = query
+        .grid
+        .bucket_width_ns
+        .checked_mul(query.grid.num_buckets as i64)
+        .and_then(|span| query.grid.bucket_start_ns.checked_add(span))
+    else {
+        return Err(OverviewRequestError::EmptyGrid);
+    };
     validate_sources(&sources)?;
 
     let grid = query.grid;
-    let grid_range = grid.range_ns();
-    let (grid_start, grid_end) = (grid_range.start, grid_range.end);
+    let grid_start = grid.bucket_start_ns;
     // Storage name via the vocabulary — never hand-built.
     let status_field = BuiltinField::Status
         .dictionary_field()

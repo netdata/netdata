@@ -5,8 +5,13 @@
 //! request shape (the `otel-logs` pattern): `info` for capability
 //! discovery, `trace` / `attributes` / `attribute_values` / `overview`
 //! selected by their sub-objects, and a request with none of those is a
-//! `search`. Implemented: everything but `overview` (the last traces-ui
-//! phase-1 step), which still errors as not-implemented.
+//! `search`. The full phase-1 mode catalog is implemented.
+//!
+//! Nanosecond values (`*_ns`, `time_unix_nano`) go on the wire as JSON
+//! numbers and exceed 2^53: JavaScript consumers read them with ~256 ns
+//! granularity — fine for display, NOT for arithmetic requiring ns
+//! exactness. Anything a client must echo back exactly (the pagination
+//! cursor) is a STRING for exactly this reason.
 
 use serde::{Deserialize, Serialize};
 
@@ -15,12 +20,12 @@ use sfsq::traces::{PartialReason, QueryStatus};
 // ── Request ─────────────────────────────────────────────────────────
 
 /// Request param names accepted by this function, advertised to the UI
-/// in [`InfoResponse::accepted_params`]. The UI gates which params it
-/// sends on this list, so it advertises only what the function honors:
-/// each data mode adds its top-level fields when it lands. Mode-specific
-/// body fields (`selections`, `spans_per_trace`, the duration bounds)
-/// ride the request body like `trace` does; this list carries the
-/// generic UI params.
+/// in [`InfoResponse::accepted_params`]. The list's rule (matching the
+/// logs precedent, where `selections` is likewise honored but not
+/// listed): it carries the GENERIC UI params and the MODE SELECTORS;
+/// mode/filter body fields (`selections`, `spans_per_trace`, the
+/// duration bounds) ride the request shape and are documented on the
+/// request type, not advertised individually.
 pub const ACCEPTED_PARAMS: &[&str] = &[
     "info",
     "trace",
@@ -82,6 +87,9 @@ pub struct OtelTracesRequest {
     /// all-tenant union.
     #[serde(default)]
     pub tenant: Option<String>,
+    /// Accepted for logs-request shape parity; the ENFORCING timeout is
+    /// the protocol-level one the bridge applies to the whole call
+    /// (`FunctionCall.timeout` → cancellation). Not consulted here.
     #[serde(default)]
     pub timeout: Option<u32>,
     /// Search: result limit (top-K most-recent-first; the logs param

@@ -670,3 +670,33 @@ async fn overview_invalid_selectors_are_clean_client_errors() {
         assert!(msg.contains(needle), "for {body}: {msg}");
     }
 }
+
+#[tokio::test]
+async fn tenant_scoping_isolates_and_defaults() {
+    // The tenant selector scopes every data mode: another tenant's data
+    // is invisible, an unknown tenant is empty (never an all-tenant
+    // union), and the omitted selector reads the default tenant.
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "tenant-a",
+        1,
+        vec![otlp_req_svc(0x0A, 1, base_ns(10), "svc")],
+    )
+    .await;
+    let h = make_handler_over(registries);
+
+    let mut body = window_body();
+    body["spans_per_trace"] = json!(0);
+    // Default tenant: tenant-a's data is invisible.
+    let v = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
+    assert_eq!(v["items"]["returned"], 0);
+    // The owning tenant sees it.
+    body["tenant"] = json!("tenant-a");
+    let v = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
+    assert_eq!(v["items"]["returned"], 1);
+    // An unknown tenant is empty, not an error and not a union.
+    body["tenant"] = json!("nope");
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["items"]["returned"], 0);
+}
