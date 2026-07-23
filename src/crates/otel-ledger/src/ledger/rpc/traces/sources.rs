@@ -21,6 +21,12 @@
 //! tail derive `{path}#chunk{i}` / `{path}#tail{start}` with
 //! [`WalCoverage`] over the WAL path, so the engine's overlap
 //! validation sees every WAL-derived byte range.
+//!
+//! The supplier takes its window verbatim: canonicalizing the wire
+//! request's window (the logs precedent defaults an unspecified
+//! `after`/`before` to a recent window before querying) is the CALLER's
+//! responsibility — the wire adapter of each data mode — not this
+//! module's. A raw `0..0` here is an empty query, deliberately.
 
 use std::sync::Arc;
 
@@ -102,12 +108,15 @@ impl TracesSourceSupplier {
 
         let mut resolved = Vec::with_capacity(wal_descs.len());
         for wal in wal_descs {
-            if cancel.is_cancelled() {
-                return Vec::new();
-            }
             if let Some(r) = self.resolve_wal(wal, cancel).await {
                 resolved.push(r);
             }
+        }
+        // One check dominates the per-WAL ones: nothing between here and
+        // the return blocks, so this is the last point cancellation can
+        // save the copy-materialization work.
+        if cancel.is_cancelled() {
+            return Vec::new();
         }
 
         (0..copies)
@@ -182,6 +191,11 @@ impl TracesSourceSupplier {
                 return None;
             }
         };
+        // The boundary scan is itself a blocking phase — poll on the way
+        // out of it, then again before each chunk build.
+        if cancel.is_cancelled() {
+            return None;
+        }
 
         let boundaries = chunk_boundaries(&frames, header, self.min_entries);
         let mut chunks = Vec::with_capacity(boundaries.len());

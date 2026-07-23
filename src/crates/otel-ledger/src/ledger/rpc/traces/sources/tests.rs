@@ -127,6 +127,20 @@ async fn window_pruning_is_file_granular() {
 }
 
 #[tokio::test]
+async fn cancelled_capture_returns_empty() {
+    // The documented contract: a cancelled call returns empty, even
+    // when sealed sources were already snapshotted.
+    let supplier = make_supplier();
+    install_sfst(&supplier, "default", 1, 1000, 1005).await;
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    let sets = supplier
+        .capture(&TenantId::from("default"), 0..u32::MAX, 2, &cancel)
+        .await;
+    assert!(sets.is_empty());
+}
+
+#[tokio::test]
 async fn capture_is_tenant_scoped() {
     let supplier = make_supplier();
     install_sfst(&supplier, "tenant-a", 1, 1000, 1005).await;
