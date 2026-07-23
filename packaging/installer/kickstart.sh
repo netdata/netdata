@@ -393,7 +393,7 @@ trap 'trap_handler 15 0' TERM
 
 # Check if a URL is valid, and ensure it uses one of the specified protocols.
 is_valid_url() {
-  echo "${1}" | grep -qE "^(${2})+://([^@\/:[:space:]]+(:[^@\/:[:space:]]*)?@)?(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9.-]+)(:[0-9]{1,5})?(/[-A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=]*)?$'" || return 1
+  echo "${1}" | grep -qE "^(${2})+://([^@\/:[:space:]]+(:[^@\/:[:space:]]*)?@)?(\[[0-9A-Fa-f:]+\]|[A-Za-z0-9.-]+)(:[0-9]{1,5})?(/[-A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=]*)?$" || return 1
 }
 
 sanitize_string() {
