@@ -3154,6 +3154,14 @@ add_executable(stream-receiver-hops-test EXCLUDE_FROM_ALL
         src/streaming/tests/stream-handshake-hops-test.c)
 target_link_libraries(stream-receiver-hops-test libnetdata)
 
+if(OS_LINUX)
+        add_executable(http-auth-bearer-test EXCLUDE_FROM_ALL
+                src/web/api/tests/http-auth-bearer-test.c)
+        target_compile_options(http-auth-bearer-test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(http-auth-bearer-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
+        target_link_libraries(http-auth-bearer-test libnetdata)
+endif()
+
 if(ENABLE_CGROUPS_LOOKUP_SERVER)
     add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL
             src/collectors/cgroups.plugin/tests/test_cgroup_lookup_netipc.c
