@@ -646,6 +646,21 @@ async fn overview_facets_are_opt_in_and_partition_the_population() {
             "unattributed": 0
         })
     );
+    // The wire-side partition identity, asserted structurally too.
+    for name in ["top_root_services", "top_root_operations"] {
+        let f = &v[name];
+        let sum: u64 = f["top"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["traces"].as_u64().unwrap())
+            .sum();
+        assert_eq!(
+            sum + f["other"].as_u64().unwrap() + f["unattributed"].as_u64().unwrap(),
+            v["totals"]["traces"].as_u64().unwrap(),
+            "{name}"
+        );
+    }
 }
 
 #[tokio::test]

@@ -23,11 +23,14 @@
 //!   totals (the same start-clipping rule spans followed in v1). A
 //!   long trace straddling the window's left edge is therefore
 //!   invisible here even though search returns its in-window spans.
-//! - **Roots are NOT resolved here**: the grid needs only envelopes
-//!   and counts, so the shared fold runs with `resolve_roots: false` —
-//!   the sealed path reads the roots-free envelopes view (no file
-//!   string table built). Root-consuming modes (slowest, facets) flip
-//!   the flag; the merge itself lives once in [`super::fold`].
+//! - **Roots are resolved only for the facet lists**: the grid needs
+//!   only envelopes and counts, so the shared fold (one merge, in
+//!   [`super::fold`]) runs roots-free by default — no file string
+//!   table built. Requesting [`OverviewQuery::root_facets`] flips the
+//!   flag and accumulates the top-root lists over the binned
+//!   population; the facet count maps are bounded by that population
+//!   (distinct values ≤ binned traces), the same order the visited
+//!   budget already governs through the merge map.
 //!
 //! Engine contracts mirrored from the siblings: sources process in
 //! `SourceId` order; a failed source is a
@@ -175,13 +178,16 @@ pub struct OverviewData {
 }
 
 impl OverviewData {
-    fn empty(num_buckets: usize, status: QueryStatus) -> Self {
+    fn empty(num_buckets: usize, facets_requested: bool, status: QueryStatus) -> Self {
         Self {
             cells: vec![[0; DURATION_BIN_COUNT]; num_buckets],
             total_traces: 0,
             total_spans: 0,
             total_errors: 0,
-            root_facets: None,
+            // A requested facet section stays PRESENT (empty lists) even
+            // on the all-or-empty paths — the response shape follows the
+            // request, not the outcome.
+            root_facets: facets_requested.then(|| FacetCounts::default().finish()),
             status,
         }
     }
@@ -225,7 +231,11 @@ pub fn overview(
     };
     let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status)
     else {
-        return Ok(OverviewData::empty(grid.num_buckets, status.finish()));
+        return Ok(OverviewData::empty(
+            grid.num_buckets,
+            query.root_facets,
+            status.finish(),
+        ));
     };
 
     // Bin the merged traces by envelope; totals fold alongside. Traces
@@ -274,12 +284,20 @@ struct FacetCounts {
 
 impl FacetCounts {
     fn count(&mut self, root: Option<&super::rollup::TraceRootInfo>) {
+        // Allocate the key only on first sight of a value, not per trace.
+        fn bump(map: &mut std::collections::HashMap<String, u64>, value: &str) {
+            if let Some(c) = map.get_mut(value) {
+                *c += 1;
+            } else {
+                map.insert(value.to_string(), 1);
+            }
+        }
         match root.and_then(|r| r.service.as_deref()) {
-            Some(svc) => *self.services.entry(svc.to_string()).or_insert(0) += 1,
+            Some(svc) => bump(&mut self.services, svc),
             None => self.service_unattributed += 1,
         }
         match root.and_then(|r| r.name.as_deref()) {
-            Some(op) => *self.operations.entry(op.to_string()).or_insert(0) += 1,
+            Some(op) => bump(&mut self.operations, op),
             None => self.operation_unattributed += 1,
         }
     }

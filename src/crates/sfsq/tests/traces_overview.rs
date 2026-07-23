@@ -15,8 +15,8 @@ use tokio_util::sync::CancellationToken;
 
 use common::{req, sp, sealed_source, tail_source, write_wal};
 use sfsq::traces::{
-    DURATION_BIN_COUNT, OverviewData, OverviewQuery, PartialReason, QueryStatus, TraceQuery,
-    TraceSource, overview, trace_by_id,
+    DURATION_BIN_COUNT, FACET_TOP_K, OverviewData, OverviewQuery, PartialReason, QueryStatus,
+    TraceQuery, TraceSource, overview, trace_by_id,
 };
 
 /// One second-wide bucket per second, 10 buckets from t=0.
@@ -433,9 +433,53 @@ fn the_top_k_cap_folds_the_tail_into_other_deterministically() {
         OverviewQuery::new(grid()).root_facets(true),
     );
     let f = data.root_facets.unwrap();
-    assert_eq!(f.services.top.len(), 10);
+    assert_eq!(f.services.top.len(), FACET_TOP_K);
     assert_eq!(f.services.top[0].0, "svc-00");
-    assert_eq!(f.services.top[9].0, "svc-09");
+    assert_eq!(f.services.top[FACET_TOP_K - 1].0, "svc-09");
     assert_eq!(f.services.other, 2, "svc-10 and svc-11 fold into other");
     assert_eq!(f.services.unattributed, 0);
+}
+
+#[test]
+fn the_partition_identity_holds_under_a_partial_and_facets_survive_it() {
+    // A legacy (rollup-absent) file beside the facet corpus: the
+    // partial fires, and the facet partition still describes the
+    // COUNTED population exactly.
+    let dir = tempfile::tempdir().unwrap();
+    let wal = facet_wal(dir.path());
+    let data = run(
+        vec![
+            sealed_source(dir.path(), &wal, "modern"),
+            common::legacy_sfst_source(dir.path(), "legacy"),
+        ],
+        OverviewQuery::new(grid()).root_facets(true),
+    );
+    assert!(data.status.has(PartialReason::RollupAbsent));
+    let f = data.root_facets.expect("requested facets survive the partial");
+    for list in [&f.services, &f.operations] {
+        let sum: u64 = list.top.iter().map(|(_, n)| n).sum();
+        assert_eq!(sum + list.other + list.unattributed, data.total_traces);
+    }
+}
+
+#[test]
+fn a_cancelled_call_keeps_the_requested_facet_shape_empty() {
+    // All-or-empty: the DATA is discarded but the response SHAPE
+    // follows the request — requested facets come back as empty lists,
+    // not as an absent section.
+    let dir = tempfile::tempdir().unwrap();
+    let wal = facet_wal(dir.path());
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    let data = overview(
+        vec![sealed_source(dir.path(), &wal, "s")],
+        OverviewQuery::new(grid()).root_facets(true),
+        cancel,
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .unwrap();
+    assert!(data.status.has(PartialReason::Cancelled));
+    let f = data.root_facets.expect("shape follows the request");
+    assert!(f.services.top.is_empty() && f.operations.top.is_empty());
+    assert_eq!((f.services.unattributed, f.operations.unattributed), (0, 0));
 }
