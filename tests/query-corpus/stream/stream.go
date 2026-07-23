@@ -212,6 +212,17 @@ func (c *Conn) DefineChart(ch Chart) {
 		ch.ID, ch.Title, ch.Units, ch.Family, ch.Context, ch.Type, ch.Priority, ch.UpdateEvery)
 }
 
+// qw quotes one protocol word. The plugins.d splitter accepts both '
+// and " as delimiters, so a word carrying an apostrophe ships
+// double-quoted (words carrying both quote kinds are not supported by
+// the protocol's incomplete escaping — the corpus never needs them).
+func qw(s string) string {
+	if strings.Contains(s, "'") {
+		return `"` + s + `"`
+	}
+	return "'" + s + "'"
+}
+
 // DimensionNamed buffers a DIMENSION line with an explicit name
 // (distinct from the id) — the match-ids/match-names surface.
 func (c *Conn) DimensionNamed(id, name, algorithm string, mul, div int) {
@@ -224,7 +235,7 @@ func (c *Conn) DimensionNamed(id, name, algorithm string, mul, div int) {
 	if div == 0 {
 		div = 1
 	}
-	c.Linef("DIMENSION '%s' '%s' %s %d %d ''", id, name, algorithm, mul, div)
+	c.Linef("DIMENSION %s %s %s %d %d ''", qw(id), qw(name), algorithm, mul, div)
 }
 
 // Dimension buffers a DIMENSION line for the current chart scope.
@@ -238,7 +249,7 @@ func (c *Conn) Dimension(id, algorithm string, mul, div int) {
 	if div == 0 {
 		div = 1
 	}
-	c.Linef("DIMENSION '%s' '' %s %d %d ''", id, algorithm, mul, div)
+	c.Linef("DIMENSION %s '' %s %d %d ''", qw(id), algorithm, mul, div)
 }
 
 // CLabel buffers one chart label (RRDLABEL_SRC_CONFIG) for the current
@@ -266,10 +277,10 @@ func (c *Conn) Begin2(chartID string, updateEvery int, endTime int64) {
 // values would be truncated.
 func (c *Conn) Set2(dimID, collected, flags string) {
 	if flags == FlagEmpty {
-		c.Linef("SET2 '%s' 0 NAN E", dimID)
+		c.Linef("SET2 %s 0 NAN E", qw(dimID))
 		return
 	}
-	c.Linef("SET2 '%s' %s %s %s", dimID, collected, collected, flags)
+	c.Linef("SET2 %s %s %s %s", qw(dimID), collected, collected, flags)
 }
 
 // End2 closes the sample opened by Begin2.
@@ -287,7 +298,7 @@ func (c *Conn) Begin(chartID string, usecSinceLast int64) {
 // Set buffers one v1 collected value — the RAW counter/gauge reading; the
 // parent applies the dimension's algorithm (rates, wraps, mul/div).
 func (c *Conn) Set(dimID, collected string) {
-	c.Linef("SET '%s' = %s", dimID, collected)
+	c.Linef("SET %s = %s", qw(dimID), collected)
 }
 
 // End closes a v1 sample block, triggering rrdset_done on the parent.
@@ -388,9 +399,9 @@ func (c *Conn) ServeReplication(charts map[string]struct{ FirstT, LastT int64 },
 				c.Linef("RBEGIN '%s' %d %d %d", chart, row.T-1, row.T, childNow)
 				for _, dv := range row.Dims {
 					if dv.Flags == FlagEmpty {
-						c.Linef("RSET '%s' NAN E", dv.ID)
+						c.Linef("RSET %s NAN E", qw(dv.ID))
 					} else {
-						c.Linef("RSET '%s' %s %s", dv.ID, dv.Collected, dv.Flags)
+						c.Linef("RSET %s %s %s", qw(dv.ID), dv.Collected, dv.Flags)
 					}
 				}
 				served[chart]++

@@ -9,6 +9,13 @@
 // properly (buffer_json), which is why the ladder's other layers never
 // tripped it. Same family as #23115, which fixed a different emission
 // site.
+//
+// The case also probes the two sibling emission sites of the same bug:
+// the options=objectrows row keys (json.c repeats the raw name as every
+// row's object key) and the google visualization flavor
+// (datatable + google_json), whose labels are single-quoted JavaScript
+// strings — there an apostrophe in the name is the breaking character,
+// and a JSON escaper alone would not cover it.
 package corpus
 
 import (
@@ -27,42 +34,69 @@ func TestCase019JsonNameEscaping(t *testing.T) {
 	ch := fixture.Chart{
 		ID: chart, Title: "escaping", Units: "units", Family: "fixture",
 		Context: chart, UpdateEvery: 1,
-		Dimensions: []fixture.Dimension{{ID: `dim"quote`}},
+		Dimensions: []fixture.Dimension{{ID: `dim"quote`}, {ID: `dim'apos`}},
 	}
-	for i := 1; i <= 5; i++ {
-		ch.Dimensions[0].Points = append(ch.Dimensions[0].Points, fixture.Point{
-			T: fixture.T0 + int64(i), Collected: strconv.Itoa(i), Flags: stream.FlagNotAnomalous,
-		})
+	for d := range ch.Dimensions {
+		for i := 1; i <= 5; i++ {
+			ch.Dimensions[d].Points = append(ch.Dimensions[d].Points, fixture.Point{
+				T: fixture.T0 + int64(i), Collected: strconv.Itoa(i), Flags: stream.FlagNotAnomalous,
+			})
+		}
 	}
 	pushLiveBurst(t, "c019", guid(91), ch)
 	if _, err := td.WaitRetention("c019", ch.Context, fixture.T0+1, fixture.T0+5, 15*time.Second); err != nil {
 		t.Fatal(err)
 	}
 
-	invalid := 0
-	for _, format := range []string{"json", "jsonp", "csvjsonarray", "datatable"} {
-		params := map[string][]string{
+	c019 := func(format, options string) string {
+		t.Helper()
+		body, err := td.DataV1Raw("c019", map[string][]string{
 			"chart":   {chart},
 			"after":   {strconv.FormatInt(fixture.T0, 10)},
 			"before":  {strconv.FormatInt(fixture.T0+5, 10)},
 			"points":  {"5"},
 			"group":   {"average"},
-			"options": {"seconds"},
+			"options": {options},
 			"format":  {format},
-		}
-		body, err := td.DataV1Raw("c019", params)
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		payload := body
-		if format == "jsonp" {
-			payload = strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(body), "callback("), ");")
-		}
+		return body
+	}
+
+	invalid := 0
+	mustParse := func(format, options, payload string) {
 		var v any
 		if err := json.Unmarshal([]byte(payload), &v); err != nil {
-			t.Logf("%s: invalid JSON with a double-quote in the dimension name: %v", format, err)
+			t.Logf("%s (options=%s): invalid JSON with a quote in a dimension name: %v", format, options, err)
 			invalid++
 		}
+	}
+
+	// the JSON shapes must parse — the double-quote name is the breaker
+	for _, format := range []string{"json", "jsonp", "csvjsonarray", "datatable"} {
+		payload := c019(format, "seconds")
+		if format == "jsonp" {
+			payload = strings.TrimSuffix(strings.TrimPrefix(strings.TrimSpace(payload), "callback("), ");")
+		}
+		mustParse(format, "seconds", payload)
+	}
+
+	// objectrows repeats the names as every row's object keys
+	mustParse("json", "seconds,objectrows", c019("json", "seconds,objectrows"))
+
+	// the google flavor emits single-quoted JavaScript labels: the
+	// apostrophe name must ship escaped, the double-quote name raw
+	// (a double-quote needs no escape between single quotes)
+	gviz := c019("datatable", "seconds,google_json")
+	if !strings.Contains(gviz, `dim\'apos`) {
+		t.Logf("google datatable: apostrophe in a dimension name not escaped:\n%.300s", gviz)
+		invalid++
+	}
+	if !strings.Contains(gviz, `dim"quote`) {
+		t.Logf("google datatable: double-quote name over-escaped:\n%.300s", gviz)
+		invalid++
 	}
 
 	expectAgentStatus(t, "CASE-019/v1-json-name-escaping", invalid == 0)

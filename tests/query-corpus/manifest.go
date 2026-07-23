@@ -210,7 +210,7 @@ var manifest = map[string]ManifestCase{
 		Agent:  Green,
 	},
 	"CASE-019/v1-json-name-escaping": {
-		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) emit dimension names UNESCAPED between quotes (json.c header loop) — a double-quote in a name (or a label value via group_by=label) produces invalid JSON; the v3 json2 path escapes properly",
+		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) emit dimension names UNESCAPED between quotes (json.c header loop) — a double-quote in a name (or a label value via group_by=label) produces invalid JSON; the objectrows row keys repeat the raw name, and the google flavor (datatable+google_json) leaves the apostrophe of its single-quoted JavaScript labels unescaped; the v3 json2 path escapes properly",
 		Agent:  Red,
 	},
 	"L9/virtual-points": {
