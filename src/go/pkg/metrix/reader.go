@@ -172,24 +172,15 @@ func (r *storeReader) SeriesMeta(name string, labels Labels) (SeriesMeta, bool) 
 }
 
 func (r *storeReader) MetricMeta(name string) (MetricMeta, bool) {
-	series := r.scopeIndex().byName[name]
-	if len(series) == 0 {
+	scope := r.scopeIndex()
+	if series := scope.byName[name]; len(series) > 0 {
+		return series[0].desc.meta, true
+	}
+	desc := scope.structuredMetaByName[name]
+	if desc == nil {
 		return MetricMeta{}, false
 	}
-	for _, s := range series {
-		if s.desc == nil {
-			continue
-		}
-		if r.raw || r.visible(s) {
-			return s.desc.meta, true
-		}
-	}
-	for _, s := range series {
-		if s.desc != nil {
-			return s.desc.meta, true
-		}
-	}
-	return MetricMeta{}, false
+	return desc.meta, true
 }
 
 func (r *storeReader) CollectMeta() CollectMeta {

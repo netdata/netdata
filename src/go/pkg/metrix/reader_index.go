@@ -20,7 +20,9 @@ type snapshotSeriesIndex struct {
 
 type snapshotScopeIndex struct {
 	byName map[string][]*committedSeries
-	names  []string
+	// Keep metadata separate so structured families never enter scalar iteration.
+	structuredMetaByName map[string]*instrumentDescriptor
+	names                []string
 }
 
 type indexedHostScope struct {
@@ -91,10 +93,17 @@ func buildSnapshotSeriesIndex(series map[string]*committedSeries, meta CollectMe
 			hostScope.fresh = hostScope.fresh || fresh
 			hostScopes[item.hostScopeKey] = hostScope
 		}
-		if item.desc == nil || !isScalarKind(item.desc.kind) {
+		if item.desc == nil {
 			continue
 		}
 		scope := index.ensureScope(item.hostScopeKey)
+		if !isScalarKind(item.desc.kind) {
+			if scope.structuredMetaByName == nil {
+				scope.structuredMetaByName = make(map[string]*instrumentDescriptor)
+			}
+			scope.structuredMetaByName[item.name] = item.desc
+			continue
+		}
 		if scope.byName == nil {
 			scope.byName = make(map[string][]*committedSeries)
 		}

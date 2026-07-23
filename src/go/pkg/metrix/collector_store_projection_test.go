@@ -195,11 +195,32 @@ func TestCollectorStoreSnapshotIndexShape(t *testing.T) {
 
 	indexedSeries := len(index.defaultScope.byName["projection.value"])
 	require.Equal(t, []string{"projection.value"}, index.defaultScope.names)
+	require.Empty(t, index.defaultScope.structuredMetaByName)
 	for _, scope := range index.byScope {
 		require.Equal(t, []string{"projection.value"}, scope.names)
+		require.Empty(t, scope.structuredMetaByName)
 		indexedSeries += len(scope.byName["projection.value"])
 	}
 	require.Equal(t, totalSeries, indexedSeries)
+}
+
+func TestCollectorStoreSnapshotIndexSeparatesStructuredMetadataFromScalarIteration(t *testing.T) {
+	store := NewCollectorStore()
+	cycle := cycleController(t, store)
+	histogram := store.Write().SnapshotMeter("svc").Histogram("latency", WithHistogramBounds(1))
+
+	cycle.BeginCycle()
+	histogram.ObservePoint(HistogramPoint{
+		Count:   1,
+		Sum:     0.5,
+		Buckets: []BucketPoint{{UpperBound: 1, CumulativeCount: 1}},
+	})
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	scope := store.Read().(*collectorReader).scopeIndex()
+	require.Empty(t, scope.byName)
+	require.Empty(t, scope.names)
+	require.Contains(t, scope.structuredMetaByName, "svc.latency")
 }
 
 func TestCollectorStoreWarmPathAllocationShape(t *testing.T) {

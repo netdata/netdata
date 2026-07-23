@@ -166,6 +166,108 @@ func TestMetricMetaScenarios(t *testing.T) {
 	}
 }
 
+func TestMetricMetaCanonicalStructuredFamilies(t *testing.T) {
+	tests := map[string]func(t *testing.T) Reader{
+		"collector": func(t *testing.T) Reader {
+			store := NewCollectorStore()
+			cycle := cycleController(t, store)
+			scope := HostScope{ScopeKey: "scope-a", GUID: "guid-a", Hostname: "host-a"}
+			meter := store.Write().SnapshotMeter("svc").WithHostScope(scope)
+			histogram := meter.Histogram("histogram", WithHistogramBounds(1), WithDescription("Histogram"))
+			summary := meter.Summary("summary", WithDescription("Summary"))
+			stateSet := meter.StateSet("state", WithStateSetStates("down", "up"), WithDescription("State set"))
+			measureSet := meter.MeasureSetGauge(
+				"measures",
+				WithMeasureSetFields(MeasureFieldSpec{Name: "value"}),
+				WithDescription("Measure set"),
+			)
+
+			cycle.BeginCycle()
+			histogram.ObservePoint(HistogramPoint{
+				Count:   1,
+				Sum:     0.5,
+				Buckets: []BucketPoint{{UpperBound: 1, CumulativeCount: 1}},
+			})
+			summary.ObservePoint(SummaryPoint{Count: 1, Sum: 0.5})
+			stateSet.Enable("up")
+			measureSet.ObservePoint(MeasureSetPoint{Values: []SampleValue{1}})
+			require.NoError(t, cycle.CommitCycleSuccess())
+
+			_, ok := store.Read().MetricMeta("svc.histogram")
+			require.False(t, ok, "structured metadata must not fall back from the default scope")
+			return store.Read(ReadHostScope(scope.ScopeKey))
+		},
+		"runtime": func(t *testing.T) Reader {
+			store := NewRuntimeStore()
+			meter := store.Write().StatefulMeter("svc")
+			meter.Histogram("histogram", WithHistogramBounds(1), WithDescription("Histogram")).Observe(0.5)
+			meter.Summary("summary", WithDescription("Summary")).Observe(0.5)
+			meter.StateSet("state", WithStateSetStates("down", "up"), WithDescription("State set")).Enable("up")
+			meter.MeasureSetGauge(
+				"measures",
+				WithMeasureSetFields(MeasureFieldSpec{Name: "value"}),
+				WithDescription("Measure set"),
+			).SetPoint(MeasureSetPoint{Values: []SampleValue{1}})
+			return store.Read()
+		},
+	}
+
+	for storeName, setup := range tests {
+		t.Run(storeName, func(t *testing.T) {
+			reader := setup(t)
+			assertStructuredMetricMeta(t, reader)
+		})
+	}
+}
+
+func assertStructuredMetricMeta(t *testing.T, reader Reader) {
+	t.Helper()
+
+	tests := map[string]struct {
+		description string
+		typed       func() bool
+	}{
+		"svc.histogram": {
+			description: "Histogram",
+			typed: func() bool {
+				_, ok := reader.Histogram("svc.histogram", nil)
+				return ok
+			},
+		},
+		"svc.summary": {
+			description: "Summary",
+			typed: func() bool {
+				_, ok := reader.Summary("svc.summary", nil)
+				return ok
+			},
+		},
+		"svc.state": {
+			description: "State set",
+			typed: func() bool {
+				_, ok := reader.StateSet("svc.state", nil)
+				return ok
+			},
+		},
+		"svc.measures": {
+			description: "Measure set",
+			typed: func() bool {
+				_, ok := reader.MeasureSet("svc.measures", nil)
+				return ok
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.True(t, tc.typed(), "typed getter must resolve the canonical structured family")
+
+			meta, ok := reader.MetricMeta(name)
+			require.True(t, ok, "MetricMeta must resolve the canonical structured family")
+			assert.Equal(t, tc.description, meta.Description)
+		})
+	}
+}
+
 func TestMetricMetaHostScopeIsolation(t *testing.T) {
 	store := NewCollectorStore()
 	cycle := cycleController(t, store)
