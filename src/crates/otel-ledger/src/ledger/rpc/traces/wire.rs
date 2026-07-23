@@ -118,6 +118,10 @@ pub struct OtelTracesRequest {
     /// Search: inclusive TRACE-envelope-duration bounds, nanoseconds —
     /// the overview strip's cell-click narrowing (the grid bins by
     /// trace envelope, so span-duration bounds would mismatch it).
+    /// Bin round-trip convention: the overview's duration bins are
+    /// HALF-OPEN `[edge, next_edge)`, these bounds are INCLUSIVE — a
+    /// cell click sends `min = edge, max = next_edge − 1` or an
+    /// exactly-on-edge trace leaks in from the next bin.
     #[serde(default)]
     pub min_trace_duration_ns: Option<i64>,
     #[serde(default)]
