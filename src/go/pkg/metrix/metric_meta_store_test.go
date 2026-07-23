@@ -199,6 +199,11 @@ func TestMetricMetaHostScopeIsolation(t *testing.T) {
 			meta, metaOK := store.Read(opts...).MetricMeta("svc.load")
 			require.True(t, metaOK)
 			assert.Equal(t, "Load", meta.Description)
+
+			rawOpts := append(append([]ReadOption(nil), opts...), ReadRaw())
+			rawMeta, rawOK := store.Read(rawOpts...).MetricMeta("svc.load")
+			require.True(t, rawOK)
+			assert.Equal(t, "Load", rawMeta.Description)
 		})
 
 		t.Run(name+"/missing_scope_never_falls_back_to_peer", func(t *testing.T) {

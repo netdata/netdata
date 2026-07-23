@@ -512,7 +512,7 @@ func (j *JobV2) postCheck() error {
 	if !ok {
 		return fmt.Errorf("metric store is not cycle-managed")
 	}
-	if _, ok := store.Read().(metrix.FreshVisibleHostScopesReader); !ok {
+	if _, ok := store.Read(metrix.ReadFlatten()).(metrix.FreshVisibleHostScopesReader); !ok {
 		return fmt.Errorf("metric store reader does not expose fresh-visible host scopes")
 	}
 

@@ -109,9 +109,36 @@ func TestCollectorStoreFreshVisibleHostScopesFollowExactSnapshot(t *testing.T) {
 	require.Equal(t, []HostScope{scopeA, scopeB}, freshVisibleHostScopes(t, successReader))
 }
 
+func TestCollectorStoreCommitErrorPublishesNewProjection(t *testing.T) {
+	store := NewCollectorStore()
+	cycle := cycleController(t, store)
+	meter := store.Write().SnapshotMeter("svc")
+
+	cycle.BeginCycle()
+	meter.Gauge("load").Observe(1)
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	success := store.Read(ReadFlatten()).(*collectorReader)
+	require.Equal(t, []HostScope{{}}, freshVisibleHostScopes(t, success))
+
+	cycle.BeginCycle()
+	meter.Gauge("load").Observe(2)
+	meter.Counter("load").ObserveTotal(3)
+	require.ErrorContains(t, cycle.CommitCycleSuccess(), "conflicting instrument kinds")
+
+	failed := store.Read(ReadFlatten()).(*collectorReader)
+	require.NotSame(t, success.snap, failed.snap)
+	require.Same(t, failed.snap, store.Read(ReadFlatten()).(*collectorReader).snap)
+	require.Equal(t, CollectStatusFailed, failed.CollectMeta().LastAttemptStatus)
+	require.Empty(t, freshVisibleHostScopes(t, failed))
+	mustValue(t, success, "svc.load", nil, 1)
+	mustValue(t, store.Read(ReadRaw(), ReadFlatten()), "svc.load", nil, 1)
+}
+
 func TestRuntimeStoreFlattenProjectionRemainsPerRead(t *testing.T) {
 	store := NewRuntimeStore()
-	store.Write().StatefulMeter("runtime").Gauge("load").Set(1)
+	gauge := store.Write().StatefulMeter("runtime").Gauge("load")
+	gauge.Set(1)
 
 	first := store.Read(ReadFlatten()).(*storeReader)
 	second := store.Read(ReadFlatten()).(*storeReader)
@@ -119,6 +146,11 @@ func TestRuntimeStoreFlattenProjectionRemainsPerRead(t *testing.T) {
 	assert.NotSame(t, first.snap, second.snap)
 	_, ok := any(first).(FreshVisibleHostScopesReader)
 	assert.False(t, ok)
+
+	gauge.Set(2)
+	current := store.Read(ReadFlatten())
+	mustValue(t, first, "runtime.load", nil, 1)
+	mustValue(t, current, "runtime.load", nil, 2)
 }
 
 func TestRetryableLazyPointerRetriesAfterPanic(t *testing.T) {
@@ -198,12 +230,36 @@ func TestCollectorStoreWarmPathAllocationShape(t *testing.T) {
 	require.Equal(t, smallScopeAllocs, largeScopeAllocs)
 }
 
-func TestCollectorStoreScopedIterationAllocationsIgnoreForeignSeries(t *testing.T) {
+func TestCollectorStoreScopedIterationDoesNotVisitForeignPartition(t *testing.T) {
 	withoutForeign := projectionForeignScopeStore(t, 0)
 	withForeign := projectionForeignScopeStore(t, 4096)
 	withoutForeignReader := withoutForeign.Read(ReadRaw(), ReadHostScope("target"))
 	withForeignReader := withForeign.Read(ReadRaw(), ReadHostScope("target"))
 	require.Equal(t, 16, projectionCountSeries(withoutForeignReader))
+	require.Equal(t, 16, projectionCountSeries(withForeignReader))
+
+	indexed := withForeignReader.(*collectorReader)
+	selected := indexed.scopeIndex()
+	require.Same(t, indexed.snapshotIndex().byScope["target"], selected)
+	require.Equal(t, 16, projectionCountIndexedSeries(selected))
+	foreign := indexed.snapshotIndex().byScope["foreign"]
+	require.Equal(t, 4096, projectionCountIndexedSeries(foreign))
+
+	// Poison the foreign records after immutable partition publication. A late
+	// global scan would now pass them through the target-scope visibility check
+	// and invoke the callback; selected-partition traversal never visits them.
+	for _, series := range foreign.byName {
+		for _, item := range series {
+			item.hostScopeKey = "target"
+		}
+	}
+	globalVisible := 0
+	for _, item := range indexed.snap.series {
+		if item.desc != nil && isScalarKind(item.desc.kind) && indexed.visible(item) {
+			globalVisible++
+		}
+	}
+	require.Equal(t, 16+4096, globalVisible, "poison must make late global filtering observable")
 	require.Equal(t, 16, projectionCountSeries(withForeignReader))
 
 	withoutForeignAllocs := testing.AllocsPerRun(100, func() {
@@ -292,5 +348,13 @@ func projectionCountSeries(reader Reader) int {
 	reader.ForEachSeries(func(string, LabelView, SampleValue) {
 		count++
 	})
+	return count
+}
+
+func projectionCountIndexedSeries(index *snapshotScopeIndex) int {
+	count := 0
+	for _, series := range index.byName {
+		count += len(series)
+	}
 	return count
 }
