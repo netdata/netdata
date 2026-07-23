@@ -41,7 +41,7 @@ type runSecretServices struct {
 type runGenerationConfig struct {
 	Generation      uint64                    // this run's generation number
 	ShutdownTimeout time.Duration             // per-run shutdown budget
-	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational logger and optional trace sink
+	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational log sink
 	UIDs            *lifecycle.UIDLedger      // process-lifetime UID ledger
 	Frames          *lifecycle.FrameOwner     // the one frame writer
 	Modules         collectorapi.Registry     // collector module registry
@@ -51,7 +51,7 @@ type runGenerationConfig struct {
 }
 
 type runGeneration struct {
-	diagnostics       jobmgr.DiagnosticObserver      // operational logger and optional trace sink
+	diagnostics       jobmgr.DiagnosticObserver      // operational log sink
 	run               *lifecycle.RunSupervisor       // run supervisor for this generation
 	tasks             *lifecycle.TaskSupervisor      // task supervisor
 	functions         *FunctionAssembly              // Function assembly (catalog + controller + publication)

@@ -28,7 +28,7 @@ type serviceDiscoveryBinding struct {
 	pluginName  string                      // owning plugin name
 	epoch       uint64                      // run generation
 	frames      *lifecycle.FrameOwner       // the one wire frame writer
-	diagnostics jobmgr.DiagnosticObserver   // operational logger and optional trace sink
+	diagnostics jobmgr.DiagnosticObserver   // operational log sink
 	handler     frameworkfunctions.Handler  // the registered service-discovery handler
 	active      *serviceDiscoveryInvocation // current synchronous invocation
 	registered  bool                        // the SD Function is registered
@@ -105,7 +105,6 @@ func (sdb *serviceDiscoveryBinding) registerPrefix(name string, prefix string, f
 	sdb.handler = fn
 	sdb.registered = true
 	sdb.mu.Unlock()
-	sdb.trace("service discovery Function registered", "", "", 0, nil)
 }
 
 func (sdb *serviceDiscoveryBinding) UnregisterPrefix(name string, prefix string) {
@@ -122,7 +121,6 @@ func (sdb *serviceDiscoveryBinding) UnregisterPrefix(name string, prefix string)
 	sdb.handler = nil
 	sdb.registered = false
 	sdb.mu.Unlock()
-	sdb.trace("service discovery Function withdrawn", "", "", 0, nil)
 }
 
 func (sdb *serviceDiscoveryBinding) recordRegistrationError(err error) {
@@ -204,9 +202,7 @@ func (psdt *preparedServiceDiscoveryTransaction) Apply(
 		)
 	}
 	command := serviceDiscoveryCommand(function.Args)
-	binding.trace("service discovery configuration invocation started", string(command), scope.ID, 0, nil)
 	result, cleanup, err := binding.invoke(function.UID, func() { handler(ctx, function) })
-	binding.trace("service discovery configuration invocation completed", string(command), scope.ID, 0, err)
 	if err != nil {
 		binding.observeCommand(command, scope.ID, 0, err)
 		return lifecycle.AppliedResourceTransaction{}, err
@@ -376,7 +372,6 @@ func (sdb *serviceDiscoveryBinding) emitNotification(emit func(dyncfg.Output)) {
 			sdb.setDirtyLocked(commitErr)
 		}
 		sdb.mu.Unlock()
-		sdb.trace("service discovery notification committed", "", "", len(payload), commitErr)
 		return
 	}
 	if len(payload) > lifecycle.MaximumOtherFrameBytes-len(sdb.active.notifications) {
@@ -386,32 +381,16 @@ func (sdb *serviceDiscoveryBinding) emitNotification(emit func(dyncfg.Output)) {
 			boundErr,
 		)
 		sdb.mu.Unlock()
-		sdb.trace("service discovery notification rejected", "", "", len(payload), boundErr)
 		return
 	}
 	sdb.active.notifications = append(sdb.active.notifications, payload...)
 	sdb.mu.Unlock()
-	sdb.trace("service discovery notification buffered", "", "", len(payload), nil)
 }
 
 func (sdb *serviceDiscoveryBinding) setDirtyLocked(err error) {
 	if sdb.dirty == nil {
 		sdb.dirty = err
 	}
-}
-
-func (sdb *serviceDiscoveryBinding) trace(name string, command string, resource string, count int, err error) {
-	if sdb == nil {
-		return
-	}
-	jobmgr.TraceDiagnostic(sdb.diagnostics, jobmgr.DiagnosticEvent{
-		Name:       name,
-		Command:    command,
-		Resource:   resource,
-		Generation: sdb.epoch,
-		Count:      count,
-		Err:        err,
-	})
 }
 
 func (sdb *serviceDiscoveryBinding) observeCommand(

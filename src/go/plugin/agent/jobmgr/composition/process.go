@@ -42,12 +42,12 @@ type processCoreConfig struct {
 	Secrets         runSecretServices         // process-lifetime secret services
 	Discovery       runDiscoveryServices      // discovery services (providers, build context)
 	FinalizeOutput  func()                    // stops the runtime service at process teardown
-	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational logger and trace sink
+	Diagnostics     jobmgr.DiagnosticObserver // process-wide operational log sink
 }
 
 type processCore struct {
 	config      processCoreConfig         // retained process configuration
-	diagnostics jobmgr.DiagnosticObserver // process-wide operational logger and optional trace sink
+	diagnostics jobmgr.DiagnosticObserver // process-wide operational log sink
 
 	uids    *lifecycle.UIDLedger            // process-lifetime UID ledger
 	frames  *lifecycle.FrameOwner           // the one process-lifetime frame writer
@@ -278,11 +278,6 @@ func (pc *processCore) finalize(current *runGeneration, cause error) error {
 	if current != nil && current.run != nil {
 		generation = current.run.Generation()
 	}
-	jobmgr.TraceDiagnostic(pc.diagnostics, jobmgr.DiagnosticEvent{
-		Name:       "job manager process finalization started",
-		Generation: generation,
-		Err:        cause,
-	})
 	finalErr := cause
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), pc.config.ShutdownTimeout)
 	defer cancel()

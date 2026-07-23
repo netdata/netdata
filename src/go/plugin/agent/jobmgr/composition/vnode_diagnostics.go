@@ -24,7 +24,6 @@ func (dvt *diagnosticVNodeTransaction) Scope() lifecycle.ResourceTransactionScop
 
 func (dvt *diagnosticVNodeTransaction) Apply(ctx context.Context) (lifecycle.AppliedResourceTransaction, error) {
 	applied, err := dvt.transaction.Apply(ctx)
-	dvt.binding.traceCommand("vnode configuration transaction applied", dvt.command, dvt.resource, err)
 	status := applied.ResultStatus()
 	level := jobmgr.DiagnosticInfo
 	name := "vnode configuration command completed"
@@ -52,9 +51,7 @@ func (dvt *diagnosticVNodeTransaction) Apply(ctx context.Context) (lifecycle.App
 }
 
 func (dvt *diagnosticVNodeTransaction) Dispose(ctx context.Context) (lifecycle.ReadyResource, error) {
-	current, err := dvt.transaction.Dispose(ctx)
-	dvt.binding.traceCommand("vnode configuration transaction disposed", dvt.command, dvt.resource, err)
-	return current, err
+	return dvt.transaction.Dispose(ctx)
 }
 
 func (vb *vnodeBinding) observeTransaction(
@@ -63,13 +60,8 @@ func (vb *vnodeBinding) observeTransaction(
 	transaction lifecycle.PreparedResourceTransaction,
 	err error,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if err != nil || transaction == nil {
-		vb.traceCommand("vnode configuration transaction preparation failed", command, resource, err)
+	if err != nil || transaction == nil || vb.diagnostics == nil {
 		return transaction, err
-	}
-	vb.traceCommand("vnode configuration transaction prepared", command, resource, nil)
-	if vb.diagnostics == nil {
-		return transaction, nil
 	}
 	return &diagnosticVNodeTransaction{
 		transaction: transaction,
@@ -77,19 +69,6 @@ func (vb *vnodeBinding) observeTransaction(
 		command:     command,
 		resource:    resource,
 	}, nil
-}
-
-func (vb *vnodeBinding) traceCommand(name string, command dyncfg.Command, resource string, err error) {
-	if vb == nil {
-		return
-	}
-	jobmgr.TraceDiagnostic(vb.diagnostics, jobmgr.DiagnosticEvent{
-		Name:       name,
-		Resource:   resource,
-		Command:    string(command),
-		Generation: vb.epoch,
-		Err:        err,
-	})
 }
 
 func vnodeConfigNameFromResource(resource string) (string, bool) {

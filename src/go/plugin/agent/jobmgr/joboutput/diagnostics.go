@@ -21,7 +21,6 @@ func (djt *diagnosticJobTransaction) Scope() lifecycle.ResourceTransactionScope 
 
 func (djt *diagnosticJobTransaction) Apply(ctx context.Context) (lifecycle.AppliedResourceTransaction, error) {
 	applied, err := djt.transaction.Apply(ctx)
-	djt.controller.traceCommand("job configuration transaction applied", djt.target, err)
 	status := applied.ResultStatus()
 	level := jobmgr.DiagnosticInfo
 	name := "job configuration command completed"
@@ -47,9 +46,7 @@ func (djt *diagnosticJobTransaction) Apply(ctx context.Context) (lifecycle.Appli
 }
 
 func (djt *diagnosticJobTransaction) Dispose(ctx context.Context) (lifecycle.ReadyResource, error) {
-	current, err := djt.transaction.Dispose(ctx)
-	djt.controller.traceCommand("job configuration transaction disposed", djt.target, err)
-	return current, err
+	return djt.transaction.Dispose(ctx)
 }
 
 func (dcjc *DynCfgJobController) observeTransaction(
@@ -57,27 +54,12 @@ func (dcjc *DynCfgJobController) observeTransaction(
 	transaction lifecycle.PreparedResourceTransaction,
 	err error,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if err != nil || transaction == nil {
-		dcjc.traceCommand("job configuration transaction preparation failed", target, err)
+	if err != nil || transaction == nil || dcjc.diagnostics == nil {
 		return transaction, err
 	}
-	dcjc.traceCommand("job configuration transaction prepared", target, nil)
 	return &diagnosticJobTransaction{
 		transaction: transaction,
 		controller:  dcjc,
 		target:      target,
 	}, nil
-}
-
-func (dcjc *DynCfgJobController) traceCommand(name string, target dynCfgTarget, err error) {
-	if dcjc == nil {
-		return
-	}
-	jobmgr.TraceDiagnostic(dcjc.diagnostics, jobmgr.DiagnosticEvent{
-		Name:       name,
-		Resource:   target.resourceID,
-		Command:    string(target.command),
-		Generation: dcjc.generation,
-		Err:        err,
-	})
 }

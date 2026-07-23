@@ -31,45 +31,12 @@ getarch() {
   local IFS=/ && read -ra array <<<"$1" && echo "${array[1]}"
 }
 
-usage() {
-  printf 'Usage: %s [--with-traces] [all|configs|vendor|GOOS/GOARCH]\n' "${0##*/}"
-}
-
-WITH_TRACES=0
-WHICH=
-while (($# > 0)); do
-  case "$1" in
-    --with-traces)
-      WITH_TRACES=1
-      ;;
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    --*)
-      printf >&2 'Unknown option: %s\n' "$1"
-      usage >&2
-      exit 2
-      ;;
-    *)
-      if [[ -n "$WHICH" ]]; then
-        printf >&2 'Only one build target may be specified: %s %s\n' "$WHICH" "$1"
-        usage >&2
-        exit 2
-      fi
-      WHICH="$1"
-      ;;
-  esac
-  shift
-done
+WHICH="$1"
 
 VERSION="${TRAVIS_TAG:-$(git describe --tags --always --dirty)}"
 
 GOLDFLAGS=${GLDFLAGS:-}
 GOLDFLAGS="$GOLDFLAGS -w -s -X github.com/netdata/netdata/go/plugins/pkg/buildinfo.Version=$VERSION"
-if ((WITH_TRACES)); then
-  GOLDFLAGS="$GOLDFLAGS -X github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition.jobManagerTrace=enabled"
-fi
 
 build() {
   echo "Building ${GOOS}/${GOARCH}"

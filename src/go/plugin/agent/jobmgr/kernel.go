@@ -269,7 +269,7 @@ type CommandKernel struct {
 	shutdownLaneCursor       *commandLane                                    // cursor sweeping lanes to stop during shutdown
 	functionCatalog          FunctionCatalogPort                             // Function catalog port (routing + lifecycle drain)
 	runtimeObserver          lifecycle.RuntimeObserver                       // sink for jobmgr.runtime metric atomics
-	diagnosticObserver       DiagnosticObserver                              // operational logger and optional developer trace sink
+	diagnosticObserver       DiagnosticObserver                              // operational log sink
 	runtimeHead              *commandOperation                               // head of the runtime-metrics op list
 	runtimeTail              *commandOperation                               // tail of the runtime-metrics op list
 	functionOperations       int                                             // count of active Function operations
@@ -435,13 +435,6 @@ func (ck *CommandKernel) beginResultEncode(operation *commandOperation, ref life
 }
 
 func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
-	ck.trace(DiagnosticEvent{
-		Name:       "task completion received",
-		Generation: ck.run.Generation(),
-		Task:       completion.Ref,
-		Sequence:   completion.Sequence,
-		Err:        completion.Err,
-	})
 	if errors.Is(completion.Err, lifecycle.ErrTaskPanic) {
 		ck.observe(DiagnosticEvent{
 			Level:      DiagnosticError,
@@ -483,24 +476,6 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		ck.completeShutdownTask(completion)
 		return
 	}
-	event := DiagnosticEvent{
-		Name:       "operation task phase completed",
-		UID:        operation.UID,
-		Route:      operation.request.Route,
-		Lane:       operation.LaneKey,
-		Generation: ck.run.Generation(),
-		Operation:  operation.ID,
-		Task:       completion.Ref,
-		Source:     operation.Source,
-		Sequence:   completion.Sequence,
-		Err:        completion.Err,
-		Rollback:   operation.compositeRollback,
-		Composite:  operation.parent != nil || operation.composite != nil,
-	}
-	if operation.plan.Transaction != nil {
-		event.Resource = operation.plan.Transaction.ID
-	}
-	ck.trace(event)
 	if operation.composite != nil && operation.activeChild != nil {
 		if operation.deferredCompletion != nil {
 			ck.run.Dirty(errors.New("jobmgr composite: parent completed twice with a live child"))
@@ -696,28 +671,7 @@ func (ck *CommandKernel) sendOperationAction(operation *commandOperation, action
 		operation.ownershipChain = true
 		ck.ownershipChains++
 	}
-	if err := ck.tasks.SendAction(action); err != nil {
-		return err
-	}
-	event := DiagnosticEvent{
-		Name:       "operation task action sent",
-		UID:        operation.UID,
-		Route:      operation.request.Route,
-		Lane:       operation.LaneKey,
-		Generation: ck.run.Generation(),
-		Operation:  operation.ID,
-		Task:       action.Ref,
-		Source:     operation.Source,
-		Action:     action.Kind,
-		Sequence:   action.Sequence,
-		Rollback:   operation.compositeRollback,
-		Composite:  operation.parent != nil || operation.composite != nil,
-	}
-	if operation.plan.Transaction != nil {
-		event.Resource = operation.plan.Transaction.ID
-	}
-	ck.trace(event)
-	return nil
+	return ck.tasks.SendAction(action)
 }
 
 func (ck *CommandKernel) ownershipActionAllowed(operation *commandOperation) bool {
@@ -828,22 +782,6 @@ func (ck *CommandKernel) applyTransactionDisposition(
 	lane.current = current
 	lane.currentIdentity = identity
 	lane.currentStopping = false
-	event := DiagnosticEvent{
-		Name:               "resource transaction applied",
-		UID:                operation.UID,
-		Route:              operation.request.Route,
-		Lane:               operation.LaneKey,
-		Resource:           scope.ID,
-		Generation:         ck.run.Generation(),
-		ResourceGeneration: identity.Generation,
-		Operation:          operation.ID,
-		Task:               operation.Task,
-		Source:             operation.Source,
-		Disposition:        disposition,
-		Rollback:           operation.compositeRollback,
-		Composite:          operation.parent != nil || operation.composite != nil,
-	}
-	ck.trace(event)
 	return nil
 }
 
@@ -979,14 +917,6 @@ func (ck *CommandKernel) sendEncodeAction(operation *commandOperation) error {
 }
 
 func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
-	ck.trace(DiagnosticEvent{
-		Name:       "task action acknowledged",
-		Generation: ck.run.Generation(),
-		Task:       ack.Ref,
-		Action:     ack.Kind,
-		Sequence:   ack.Sequence,
-		Err:        ack.Err,
-	})
 	if cleanup, ok := ck.functionCleanupTasks[ack.Ref]; ok {
 		if ack.Kind != lifecycle.TaskActionTerminate || ack.Sequence != 2 {
 			ck.run.Dirty(errors.New("jobmgr kernel: invalid Function cleanup acknowledgement"))
@@ -1017,25 +947,6 @@ func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 		ck.acknowledgeShutdownTask(ack)
 		return
 	}
-	event := DiagnosticEvent{
-		Name:       "operation task action acknowledged",
-		UID:        operation.UID,
-		Route:      operation.request.Route,
-		Lane:       operation.LaneKey,
-		Generation: ck.run.Generation(),
-		Operation:  operation.ID,
-		Task:       ack.Ref,
-		Source:     operation.Source,
-		Action:     ack.Kind,
-		Sequence:   ack.Sequence,
-		Err:        ack.Err,
-		Rollback:   operation.compositeRollback,
-		Composite:  operation.parent != nil || operation.composite != nil,
-	}
-	if operation.plan.Transaction != nil {
-		event.Resource = operation.plan.Transaction.ID
-	}
-	ck.trace(event)
 	if ack.Kind == lifecycle.TaskActionTerminate {
 		if err := operation.ChildExited(ack.Ref, ack.Sequence); err != nil {
 			ck.run.Dirty(err)
@@ -1181,10 +1092,6 @@ func (ck *CommandKernel) beginShutdown(deadline time.Time) error {
 	ck.shutdownPhase = commandShutdownActionDrain
 	ck.shutdownCancelCursor = ck.operationHead
 	ck.shutdownLaneCursor = nil
-	ck.trace(DiagnosticEvent{
-		Name:  "shutdown entered action drain",
-		Phase: "action_drain",
-	})
 	return nil
 }
 
@@ -1287,10 +1194,6 @@ func (ck *CommandKernel) advanceShutdownAuthority() error {
 		return errors.New("jobmgr kernel: Function mutation survived shutdown abort")
 	}
 	ck.shutdownPhase = commandShutdownCleanupDrain
-	ck.trace(DiagnosticEvent{
-		Name:  "shutdown entered cleanup drain",
-		Phase: "cleanup_drain",
-	})
 	close(ck.functionMutationStopped)
 	ck.closeContinuationIngress()
 	if err := ck.tasks.SealInherited(); err != nil {
@@ -1402,15 +1305,6 @@ func (ck *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
 	lane.currentStopping = true
 	lane.shutdownRequest = request
 	ck.shutdownRequests[request] = lane
-	ck.trace(DiagnosticEvent{
-		Name:               "shutdown resource stop enqueued",
-		Lane:               lane.key,
-		Resource:           identity.ID,
-		ResourceGeneration: identity.Generation,
-		TaskRequest:        request,
-		Source:             lane.resourceSource,
-		Phase:              "resource_stop",
-	})
 	return nil
 }
 
@@ -1446,22 +1340,10 @@ func (ck *CommandKernel) advanceShutdownBarrier() error {
 		return err
 	}
 	ck.shutdownBarrierRequest = request
-	ck.trace(DiagnosticEvent{
-		Name:        "shutdown function barrier enqueued",
-		TaskRequest: request,
-		Phase:       "function_barrier",
-	})
 	return nil
 }
 
 func (ck *CommandKernel) completeShutdownBarrier(completion lifecycle.TaskCompletion) {
-	ck.trace(DiagnosticEvent{
-		Name:     "shutdown function barrier completed",
-		Task:     completion.Ref,
-		Sequence: completion.Sequence,
-		Phase:    "function_barrier",
-		Err:      completion.Err,
-	})
 	if completion.Sequence != 1 ||
 		completion.Kind != lifecycle.TaskOutcomeNone ||
 		ck.shutdownBarrierAction != 0 ||
@@ -1505,10 +1387,6 @@ func (ck *CommandKernel) acknowledgeShutdownBarrier(ack lifecycle.TaskAcknowledg
 	ck.shutdownBarrierAction = 0
 	if !ck.shutdownBarrierFailed {
 		ck.shutdownBarrierDone = true
-		ck.trace(DiagnosticEvent{
-			Name:  "shutdown function barrier settled",
-			Phase: "function_barrier",
-		})
 	}
 }
 
@@ -1545,11 +1423,6 @@ func (ck *CommandKernel) advanceRunFinalizer() error {
 		return err
 	}
 	ck.finalizerRequest = request
-	ck.trace(DiagnosticEvent{
-		Name:        "run finalizer enqueued",
-		TaskRequest: request,
-		Phase:       "run_finalizer",
-	})
 	return nil
 }
 
@@ -1577,13 +1450,6 @@ func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
 }
 
 func (ck *CommandKernel) completeRunFinalizer(completion lifecycle.TaskCompletion) {
-	ck.trace(DiagnosticEvent{
-		Name:     "run finalizer completed",
-		Task:     completion.Ref,
-		Sequence: completion.Sequence,
-		Phase:    "run_finalizer",
-		Err:      completion.Err,
-	})
 	if completion.Sequence != 1 || completion.Kind != lifecycle.TaskOutcomeNone || ck.finalizerAction != 0 ||
 		ck.finalizerDone ||
 		ck.finalizerFailed {
@@ -1626,10 +1492,6 @@ func (ck *CommandKernel) acknowledgeRunFinalizer(ack lifecycle.TaskAcknowledgeme
 	ck.finalizerAction = 0
 	if !ck.finalizerFailed {
 		ck.finalizerDone = true
-		ck.trace(DiagnosticEvent{
-			Name:  "run finalizer settled",
-			Phase: "run_finalizer",
-		})
 	}
 }
 

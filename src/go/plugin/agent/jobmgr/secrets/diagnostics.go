@@ -37,16 +37,13 @@ func (dst *diagnosticSecretTransaction) ApplyComposite(
 }
 
 func (dst *diagnosticSecretTransaction) Dispose(ctx context.Context) (lifecycle.ReadyResource, error) {
-	current, err := dst.transaction.Dispose(ctx)
-	dst.controller.traceCommand("secretstore configuration transaction disposed", dst.target, err)
-	return current, err
+	return dst.transaction.Dispose(ctx)
 }
 
 func (dst *diagnosticSecretTransaction) observeApplied(
 	applied lifecycle.AppliedResourceTransaction,
 	err error,
 ) {
-	dst.controller.traceCommand("secretstore configuration transaction applied", dst.target, err)
 	if !secretMutationCommand(dst.target.command) {
 		return
 	}
@@ -78,35 +75,19 @@ func (c *Controller) observeTransaction(
 	transaction lifecycle.PreparedResourceTransaction,
 	err error,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if err != nil || transaction == nil {
-		c.traceCommand("secretstore configuration transaction preparation failed", target, err)
+	if err != nil || transaction == nil || c.diagnostics == nil {
 		return transaction, err
 	}
 	composite, ok := transaction.(jobmgr.PreparedCompositeResourceTransaction)
 	if !ok {
-		c.traceCommand("secretstore configuration transaction is not composite", target, nil)
 		return transaction, err
 	}
-	c.traceCommand("secretstore configuration transaction prepared", target, nil)
 	return &diagnosticSecretTransaction{
 		transaction: transaction,
 		composite:   composite,
 		controller:  c,
 		target:      target,
 	}, nil
-}
-
-func (c *Controller) traceCommand(name string, target secretTarget, err error) {
-	if c == nil {
-		return
-	}
-	jobmgr.TraceDiagnostic(c.diagnostics, jobmgr.DiagnosticEvent{
-		Name:       name,
-		Resource:   secretDiagnosticResource(target),
-		Command:    string(target.command),
-		Generation: c.epoch,
-		Err:        err,
-	})
 }
 
 func secretDiagnosticResource(target secretTarget) string {

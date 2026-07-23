@@ -45,11 +45,10 @@ func (rg *runGeneration) startDiscovery(ctx context.Context) error {
 	}
 	decisions, err := jobmgrdiscovery.NewDecisionIndex(
 		jobmgrdiscovery.DecisionConfig{
-			Generation:  rg.run.Generation(),
-			RunJob:      rg.discovery.RunJob,
-			AutoEnable:  rg.discovery.AutoEnable,
-			Commands:    rg.kernel,
-			Diagnostics: rg.diagnostics,
+			Generation: rg.run.Generation(),
+			RunJob:     rg.discovery.RunJob,
+			AutoEnable: rg.discovery.AutoEnable,
+			Commands:   rg.kernel,
 			Plan: func(change jobmgrdiscovery.DiscoveredChange) (jobmgr.WorkPlan, error) {
 				return rg.dyncfg.PlanDiscovered(
 					joboutput.DiscoveredJobChange{

@@ -44,7 +44,7 @@ type DynCfgJobControllerConfig struct {
 	Graph         *dyncfg.Graph             // dyncfg graph authority
 	Frames        *lifecycle.FrameOwner     // protocol frame sink
 	Dependencies  JobDependencyIndex        // secret-dependency index (optional)
-	Diagnostics   jobmgr.DiagnosticObserver // operational logger and optional trace sink
+	Diagnostics   jobmgr.DiagnosticObserver // operational log sink
 }
 
 type JobDependencyIndex interface {
@@ -65,7 +65,7 @@ type DynCfgJobController struct {
 	graph         *dyncfg.Graph             // dyncfg graph authority
 	frames        *lifecycle.FrameOwner     // protocol frame sink
 	dependencies  JobDependencyIndex        // secret-dependency index (optional)
-	diagnostics   jobmgr.DiagnosticObserver // operational logger and optional trace sink
+	diagnostics   jobmgr.DiagnosticObserver // operational log sink
 	scheduler     *Scheduler                // tick + retry scheduler
 }
 
@@ -130,10 +130,8 @@ func (dcjc *DynCfgJobController) Handle(
 	}
 	target, result := dcjc.resolveRequest(request)
 	if result.valid {
-		dcjc.traceCommand("job configuration request rejected", target, nil)
 		return result.result, nil
 	}
-	dcjc.traceCommand("job configuration request resolved", target, nil)
 	switch target.command {
 	case dyncfg.CommandSchema:
 		if target.creator.JobConfigSchema == "" {

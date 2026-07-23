@@ -36,7 +36,7 @@ type ControllerConfig struct {
 	Creators     *secretstore.CreatorCatalog // frozen creator catalog
 	Dependencies *SecretDependencyIndex      // secret dependency index
 	Initial      []secretstore.Config        // initial (stock/user) secret store configs
-	Diagnostics  jobmgr.DiagnosticObserver   // operational logger and optional trace sink
+	Diagnostics  jobmgr.DiagnosticObserver   // operational log sink
 }
 
 type Controller struct {
@@ -49,7 +49,7 @@ type Controller struct {
 	store        *secretstore.SecretStore    // per-run secret store
 	creators     *secretstore.CreatorCatalog // frozen creator catalog
 	dependencies *SecretDependencyIndex      // secret dependency index
-	diagnostics  jobmgr.DiagnosticObserver   // operational logger and optional trace sink
+	diagnostics  jobmgr.DiagnosticObserver   // operational log sink
 	initial      []secretstore.Config        // initial secret store configs
 	entries      map[string]secretEntry      // published store entries by key
 	restarts     *SecretRestartCommand       // dependent-job restart command (bound at Bind)
@@ -135,7 +135,6 @@ func (c *Controller) Prepare(
 		transaction, err := c.noopMessageWithPermit(scope, current, permit, failure.code, failure.message)
 		return c.observeTransaction(target, transaction, err)
 	}
-	c.traceCommand("secretstore configuration request resolved", target, nil)
 	var transaction lifecycle.PreparedResourceTransaction
 	var err error
 	switch target.command {

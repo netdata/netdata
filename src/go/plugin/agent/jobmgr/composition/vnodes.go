@@ -34,7 +34,7 @@ type vnodeBinding struct {
 	frames      *lifecycle.FrameOwner              // protocol frame sink
 	config      *agentdiscovery.VNodeConfiguration // configured-vnode authority it mutates
 	graph       *dyncfg.Graph                      // dyncfg graph for vnode config entries
-	diagnostics jobmgr.DiagnosticObserver          // operational logger and optional trace sink
+	diagnostics jobmgr.DiagnosticObserver          // operational log sink
 }
 
 func newVNodeBinding(

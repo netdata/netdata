@@ -31,23 +31,6 @@ func (ck *CommandKernel) cancelOperationWithCause(uid string, cause error) {
 		ck.recordCompositeChildTerminalCause(operation, cause)
 	}
 	operation.cancelled = true
-	event := DiagnosticEvent{
-		Name:       "operation cancelled",
-		UID:        operation.UID,
-		Route:      operation.request.Route,
-		Lane:       operation.LaneKey,
-		Generation: ck.run.Generation(),
-		Operation:  operation.ID,
-		Task:       operation.Task,
-		Source:     operation.Source,
-		Err:        cause,
-		Rollback:   operation.compositeRollback,
-		Composite:  operation.parent != nil || operation.composite != nil,
-	}
-	if operation.plan.Transaction != nil {
-		event.Resource = operation.plan.Transaction.ID
-	}
-	ck.trace(event)
 	if operation.Child == lifecycle.ChildExecuting {
 		_ = ck.tasks.CancelWithCause(operation.Task, cause)
 		if operation.Response != lifecycle.ResponseNotRequired && !operation.plan.CooperativeCancel {
@@ -179,7 +162,6 @@ func (ck *CommandKernel) markOperationTimedOut(operation *commandOperation) {
 		return
 	}
 	operation.MarkTimedOut()
-	ck.traceOperation("operation deadline reached", operation)
 	ck.recordCompositeChildTerminalCause(operation, context.DeadlineExceeded)
 	if ck.runtimeObserver != nil {
 		ck.runtimeObserver.AddRuntimeCounter(lifecycle.RuntimeCounterOperationTimeouts, 1)
@@ -202,21 +184,6 @@ func (ck *CommandKernel) enqueueControl(operation *commandOperation, status life
 	operation.control = status
 	operation.controlQueued = true
 	ck.controls.push(operation)
-	event := DiagnosticEvent{
-		Name:       "operation control queued",
-		UID:        operation.UID,
-		Route:      operation.request.Route,
-		Lane:       operation.LaneKey,
-		Generation: ck.run.Generation(),
-		Operation:  operation.ID,
-		Task:       operation.Task,
-		Source:     operation.Source,
-		Control:    status,
-	}
-	if operation.plan.Transaction != nil {
-		event.Resource = operation.plan.Transaction.ID
-	}
-	ck.trace(event)
 }
 
 func (ck *CommandKernel) serviceControls(quantum int) bool {
@@ -239,17 +206,6 @@ func (ck *CommandKernel) serviceControls(quantum int) bool {
 		operation.controlQueued = false
 		quantum--
 		if err != nil {
-			ck.trace(DiagnosticEvent{
-				Name:       "operation control frame failed",
-				UID:        operation.UID,
-				Route:      operation.request.Route,
-				Lane:       operation.LaneKey,
-				Generation: ck.run.Generation(),
-				Operation:  operation.ID,
-				Source:     operation.Source,
-				Control:    operation.control,
-				Err:        err,
-			})
 			operation.PoisonResponse()
 			ck.run.Dirty(err)
 			ck.tryDispose(operation)
@@ -259,16 +215,6 @@ func (ck *CommandKernel) serviceControls(quantum int) bool {
 			ck.run.Dirty(err)
 			continue
 		}
-		ck.trace(DiagnosticEvent{
-			Name:       "operation control frame committed",
-			UID:        operation.UID,
-			Route:      operation.request.Route,
-			Lane:       operation.LaneKey,
-			Generation: ck.run.Generation(),
-			Operation:  operation.ID,
-			Source:     operation.Source,
-			Control:    operation.control,
-		})
 		if err := ck.completeOperationUID(operation, true); err != nil {
 			ck.run.Dirty(err)
 			return false
@@ -335,9 +281,6 @@ func (ck *CommandKernel) tryDispose(operation *commandOperation) {
 	if operation.deadline.index >= 0 {
 		heap.Remove(&ck.deadlines, operation.deadline.index)
 	}
-	if operation.claimsHeld {
-		ck.traceOperation("operation claims released", operation)
-	}
 	for _, granted := range ck.releaseClaims(operation) {
 		ck.markReady(granted.lane)
 	}
@@ -370,7 +313,6 @@ func (ck *CommandKernel) tryDispose(operation *commandOperation) {
 		}
 	}
 	_ = operation.Advance(lifecycle.OperationDisposedTerminal)
-	ck.traceOperation("operation disposed", operation)
 	delete(ck.operations, operation.UID)
 	if operation.Source == lifecycle.SourceFunction {
 		ck.functionOperations--

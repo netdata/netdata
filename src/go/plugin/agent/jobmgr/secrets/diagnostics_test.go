@@ -14,8 +14,6 @@ type secretRecordingDiagnosticObserver struct {
 	events []jobmgr.DiagnosticEvent
 }
 
-func (*secretRecordingDiagnosticObserver) TraceEnabled() bool { return true }
-
 func (srdo *secretRecordingDiagnosticObserver) ObserveDiagnostic(event jobmgr.DiagnosticEvent) {
 	srdo.mu.Lock()
 	defer srdo.mu.Unlock()

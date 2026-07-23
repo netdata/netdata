@@ -239,7 +239,6 @@ func (ck *CommandKernel) admitSubmission(
 	if !operation.fenceBlocked && lane.active == nil && lane.head == operation {
 		ck.markReady(lane)
 	}
-	ck.traceOperation("operation admitted", operation)
 	return nil
 }
 

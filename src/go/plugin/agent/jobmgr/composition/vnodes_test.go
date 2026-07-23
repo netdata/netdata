@@ -206,13 +206,20 @@ func TestVNodeDiagnosticsFollowAppliedCommandWithoutPayload(t *testing.T) {
 	require.NoError(t, err)
 
 	events := diagnostics.snapshot()
-	names := make([]string, 0, len(events))
+	var completed *jobmgr.DiagnosticEvent
 	for _, event := range events {
-		names = append(names, event.Name)
+		if event.Name == "vnode configuration command completed" {
+			completed = &event
+			break
+		}
 	}
-	require.Contains(t, names, "vnode configuration transaction prepared")
-	require.Contains(t, names, "vnode configuration transaction applied")
-	require.Contains(t, names, "vnode configuration command completed")
+	require.NotNil(t, completed)
+	require.Equal(t, jobmgr.DiagnosticInfo, completed.Level)
+	require.Equal(t, "vnode:db", completed.Resource)
+	require.Equal(t, string(dyncfg.CommandUpdate), completed.Command)
+	require.Equal(t, "configured", completed.State)
+	require.EqualValues(t, 1, completed.Generation)
+	require.Equal(t, 202, completed.ResultStatus)
 	require.NotContains(t, fmt.Sprintf("%+v", events), payloadSentinel)
 }
 

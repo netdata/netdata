@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -223,13 +224,18 @@ func TestServiceDiscoveryDiagnosticsFollowAppliedCommandWithoutPayload(t *testin
 	require.NoError(t, err)
 
 	events := diagnostics.snapshot()
-	names := make([]string, 0, len(events))
+	var completed *jobmgr.DiagnosticEvent
 	for _, event := range events {
-		names = append(names, event.Name)
+		if event.Name == "service discovery configuration command completed" {
+			completed = &event
+			break
+		}
 	}
-	require.Contains(t, names, "service discovery Function registered")
-	require.Contains(t, names, "service discovery configuration invocation started")
-	require.Contains(t, names, "service discovery notification buffered")
-	require.Contains(t, names, "service discovery configuration command completed")
+	require.NotNil(t, completed)
+	require.Equal(t, jobmgr.DiagnosticInfo, completed.Level)
+	require.Equal(t, "go.d:sd:type:job", completed.Resource)
+	require.Equal(t, string(dyncfg.CommandEnable), completed.Command)
+	require.EqualValues(t, 3, completed.Generation)
+	require.Equal(t, 200, completed.ResultStatus)
 	require.NotContains(t, fmt.Sprintf("%+v", events), payloadSentinel)
 }

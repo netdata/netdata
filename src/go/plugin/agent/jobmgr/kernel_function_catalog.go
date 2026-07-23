@@ -49,11 +49,6 @@ func (ck *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 			return true
 		}
 		ck.functionCleanupRequests[request] = cleanup.Ref()
-		ck.trace(DiagnosticEvent{
-			Name:        "function cleanup enqueued",
-			Generation:  ck.run.Generation(),
-			TaskRequest: request,
-		})
 		ck.functionCleanupBacklog.pop()
 		quantum--
 	}
@@ -61,11 +56,6 @@ func (ck *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 }
 
 func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmission) {
-	ck.trace(DiagnosticEvent{
-		Name:       "function catalog mutation received",
-		Generation: ck.run.Generation(),
-		Command:    functionMutationDiagnosticCommand(submitted.action),
-	})
 	if submitted.mutation == nil || submitted.result == nil ||
 		submitted.action < functionMutationQuiesce ||
 		submitted.action > functionMutationAbort ||
@@ -85,12 +75,6 @@ func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmiss
 			submitted.result <- functionMutationResult{
 				err: err,
 			}
-			ck.trace(DiagnosticEvent{
-				Name:       "function catalog mutation rejected",
-				Generation: ck.run.Generation(),
-				Command:    functionMutationDiagnosticCommand(submitted.action),
-				Err:        err,
-			})
 		}
 		return
 	}
@@ -142,11 +126,6 @@ func (ck *CommandKernel) beginFunctionMutation(submitted functionMutationSubmiss
 	}
 	ck.functionMutation = submitted
 	ck.functionMutationActive = true
-	ck.trace(DiagnosticEvent{
-		Name:       "function catalog mutation started",
-		Generation: ck.run.Generation(),
-		Command:    functionMutationDiagnosticCommand(submitted.action),
-	})
 }
 
 func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
@@ -176,11 +155,6 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 		ck.functionMutation.result = nil
 		ck.functionMutationActive = false
 		ck.functionMutationPaused = true
-		ck.trace(DiagnosticEvent{
-			Name:       "function catalog mutation quiesced",
-			Generation: ck.run.Generation(),
-			Command:    functionMutationDiagnosticCommand(functionMutationQuiesce),
-		})
 		return false
 	}
 	if ck.functionMutation.action != functionMutationCommit {
@@ -204,11 +178,6 @@ func (ck *CommandKernel) serviceFunctionMutation(quantum int) bool {
 	}
 	ck.functionMutation = functionMutationSubmission{}
 	ck.functionMutationActive = false
-	ck.trace(DiagnosticEvent{
-		Name:       "function catalog mutation committed",
-		Generation: ck.run.Generation(),
-		Command:    functionMutationDiagnosticCommand(functionMutationCommit),
-	})
 	return false
 }
 
@@ -223,10 +192,6 @@ func (ck *CommandKernel) serviceFunctionCatalogClose(quantum int) bool {
 		}
 		ck.functionCatalogClosing = true
 		ck.functionCatalogCloseMore = true
-		ck.trace(DiagnosticEvent{
-			Name:       "function catalog close started",
-			Generation: ck.run.Generation(),
-		})
 	}
 	if !ck.functionCatalogCloseMore {
 		return false
@@ -238,24 +203,5 @@ func (ck *CommandKernel) serviceFunctionCatalogClose(quantum int) bool {
 	}
 	ck.pushFunctionCleanupBatch(cleanups)
 	ck.functionCatalogCloseMore = more
-	if !more {
-		ck.trace(DiagnosticEvent{
-			Name:       "function catalog close completed",
-			Generation: ck.run.Generation(),
-		})
-	}
 	return more
-}
-
-func functionMutationDiagnosticCommand(action functionMutationAction) string {
-	switch action {
-	case functionMutationQuiesce:
-		return "quiesce"
-	case functionMutationCommit:
-		return "commit"
-	case functionMutationAbort:
-		return "abort"
-	default:
-		return "unknown"
-	}
 }

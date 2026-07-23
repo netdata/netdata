@@ -43,7 +43,6 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 		if !operation.claimsHeld {
 			if operation.claimsInherited {
 				operation.claimsHeld = true
-				ck.traceOperation("operation claims inherited", operation)
 			} else {
 				if operation.State < lifecycle.OperationAcquiringClaims {
 					_ = operation.Advance(lifecycle.OperationAcquiringClaims)
@@ -54,23 +53,8 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 					return false
 				}
 				if !granted {
-					event := DiagnosticEvent{
-						Name:       "operation waiting for claim",
-						UID:        operation.UID,
-						Route:      operation.request.Route,
-						Lane:       operation.LaneKey,
-						Generation: ck.run.Generation(),
-						Operation:  operation.ID,
-						Source:     operation.Source,
-						Count:      len(operation.claims),
-					}
-					if operation.claimCursor < len(operation.authorityClaimEdges) {
-						event.Claim = operation.authorityClaimEdges[operation.claimCursor].claim
-					}
-					ck.trace(event)
 					continue
 				}
-				ck.traceOperation("operation claims acquired", operation)
 			}
 		}
 		if operation.State < lifecycle.OperationReady {
@@ -174,25 +158,6 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 		operation.taskRequest = requestRef
 		lane.active = operation
 		ck.tasksByRequest[requestRef] = operation
-		event := DiagnosticEvent{
-			Name:        "operation task enqueued",
-			UID:         operation.UID,
-			Route:       operation.request.Route,
-			Lane:        operation.LaneKey,
-			Resource:    operation.transactionScope.ID,
-			Generation:  ck.run.Generation(),
-			Operation:   operation.ID,
-			TaskRequest: requestRef,
-			Source:      operation.Source,
-			Rollback:    operation.compositeRollback,
-			Composite:   operation.parent != nil || operation.composite != nil,
-		}
-		if operation.transactionScope.Successor.Valid() {
-			event.ResourceGeneration = operation.transactionScope.Successor.Generation
-		} else if operation.transactionScope.Current.Valid() {
-			event.ResourceGeneration = operation.transactionScope.Current.Generation
-		}
-		ck.trace(event)
 	}
 	return deadlineProgress || ck.ready[0].len != 0 || ck.ready[1].len != 0
 }
@@ -266,7 +231,6 @@ func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
 			return more
 		}
 		ck.tasksByRef[start.Task] = operation
-		ck.traceOperation("operation task started", operation)
 	}
 	if dispatchErr != nil {
 		ck.run.Dirty(dispatchErr)

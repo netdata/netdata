@@ -20,8 +20,6 @@ type recordingDiagnosticObserver struct {
 	events []jobmgr.DiagnosticEvent
 }
 
-func (*recordingDiagnosticObserver) TraceEnabled() bool { return true }
-
 func (rdo *recordingDiagnosticObserver) ObserveDiagnostic(event jobmgr.DiagnosticEvent) {
 	rdo.mu.Lock()
 	defer rdo.mu.Unlock()
@@ -67,16 +65,11 @@ func TestDynCfgJobDiagnosticsFollowAppliedCommandWithoutRequestContents(t *testi
 	applyAndEncodeDynCfgJobTestTask(t, supervisor, plan, scope, "diagnostic-add")
 
 	events := diagnostics.snapshot()
-	names := make([]string, 0, len(events))
-	for _, event := range events {
-		names = append(names, event.Name)
-	}
-	require.Contains(t, names, "job configuration transaction prepared")
-	require.Contains(t, names, "job configuration transaction applied")
-	require.Contains(t, names, "job configuration command completed")
-	operational := events[slices.IndexFunc(events, func(event jobmgr.DiagnosticEvent) bool {
+	index := slices.IndexFunc(events, func(event jobmgr.DiagnosticEvent) bool {
 		return event.Name == "job configuration command completed"
-	})]
+	})
+	require.NotEqual(t, -1, index)
+	operational := events[index]
 	require.Equal(t, jobmgr.DiagnosticInfo, operational.Level)
 	require.Equal(t, "module_job", operational.Resource)
 	require.Equal(t, "add", operational.Command)
