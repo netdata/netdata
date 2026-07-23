@@ -294,11 +294,11 @@ impl FacetCounts {
         }
         match root.and_then(|r| r.service.as_deref()) {
             Some(svc) => bump(&mut self.services, svc),
-            None => self.service_unattributed += 1,
+            None => self.service_unattributed = self.service_unattributed.saturating_add(1),
         }
         match root.and_then(|r| r.name.as_deref()) {
             Some(op) => bump(&mut self.operations, op),
-            None => self.operation_unattributed += 1,
+            None => self.operation_unattributed = self.operation_unattributed.saturating_add(1),
         }
     }
 
@@ -314,13 +314,19 @@ impl FacetCounts {
 /// the tail folded into `other`.
 fn reduce(counts: std::collections::HashMap<String, u64>, unattributed: u64) -> FacetList {
     let mut entries: Vec<(String, u64)> = counts.into_iter().collect();
-    entries.sort_unstable_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-    let other = entries
-        .iter()
-        .skip(FACET_TOP_K)
-        .map(|(_, n)| n)
-        .sum::<u64>();
-    entries.truncate(FACET_TOP_K);
+    let rank = |a: &(String, u64), b: &(String, u64)| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0));
+    // Select-then-sort, like the slowest top-K: O(n + K log K).
+    let mut other = 0u64;
+    if entries.len() > FACET_TOP_K {
+        entries.select_nth_unstable_by(FACET_TOP_K - 1, rank);
+        other = entries
+            .iter()
+            .skip(FACET_TOP_K)
+            .map(|(_, n)| n)
+            .sum::<u64>();
+        entries.truncate(FACET_TOP_K);
+    }
+    entries.sort_unstable_by(rank);
     FacetList {
         top: entries,
         other,

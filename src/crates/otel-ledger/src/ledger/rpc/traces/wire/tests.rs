@@ -225,6 +225,21 @@ fn overview_facets_knob_parses_and_junk_is_rejected() {
             .facets,
         Some(true)
     );
+    assert_eq!(
+        req(json!({"overview": {"facets": false}}))
+            .overview_params()
+            .unwrap()
+            .facets,
+        Some(false)
+    );
+    assert_eq!(
+        req(json!({"overview": {"facets": null}}))
+            .overview_params()
+            .unwrap()
+            .facets,
+        None,
+        "null means off, not an error (Option<bool> semantics)"
+    );
     for body in [
         json!({"overview": {"facets": "yes"}}),
         json!({"overview": {"bogus": 1}}),

@@ -231,7 +231,8 @@ impl OtelTracesRequest {
     }
 
     /// Parse the `overview` selector (same contract; an empty object is
-    /// the whole v1 shape — bucket geometry derives from after/before).
+    /// the default grid — bucket geometry derives from after/before,
+    /// facets stay off).
     pub fn overview_params(&self) -> Result<OverviewParams, String> {
         let v = self
             .overview
@@ -270,7 +271,8 @@ pub struct OverviewParams {
     /// Also compute the top-root-service/operation facet lists
     /// (phase-2 step 2.5). OPT-IN: resolving roots costs the sealed
     /// sources' string tables, so the default paint stays cheap and
-    /// the facet rail sets this.
+    /// the facet rail sets this. `null`, `false`, and absent all mean
+    /// off; only `true` opts in.
     #[serde(default)]
     pub facets: Option<bool>,
 }

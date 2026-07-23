@@ -483,3 +483,54 @@ fn a_cancelled_call_keeps_the_requested_facet_shape_empty() {
     assert!(f.services.top.is_empty() && f.operations.top.is_empty());
     assert_eq!((f.services.unattributed, f.operations.unattributed), (0, 0));
 }
+
+#[test]
+fn all_traces_outside_the_grid_yield_empty_facets_with_the_zero_identity() {
+    // The merge succeeds but every envelope start misses the grid: the
+    // facet lists describe the (empty) binned population — identity
+    // 0 == 0 + 0 + 0.
+    let dir = tempfile::tempdir().unwrap();
+    let wal = facet_wal(dir.path());
+    let data = run(
+        vec![sealed_source(dir.path(), &wal, "s")],
+        // The corpus lives in [1s, 6s); this grid starts at 100s.
+        OverviewQuery::new(sfst::Grid::new(100_000_000_000, 1_000_000_000, 10))
+            .root_facets(true),
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(data.total_traces, 0);
+    let f = data.root_facets.unwrap();
+    for list in [&f.services, &f.operations] {
+        assert!(list.top.is_empty());
+        assert_eq!((list.other, list.unattributed), (0, 0));
+    }
+}
+
+#[test]
+fn the_ceiling_prefix_keeps_the_facet_identity() {
+    // Ceiling 0 with facets on: only the first source folds; the facet
+    // partition describes exactly that prefix's binned traces.
+    let dir = tempfile::tempdir().unwrap();
+    let wal_a = facet_wal(dir.path());
+    let wal_b = write_wal(
+        dir.path(),
+        vec![req(&[tspan(0x77, 1, 7_000_000_000, 7_500_000_000, "late")])],
+        "b",
+    );
+    let data = run(
+        vec![
+            sealed_source(dir.path(), &wal_a, "1-first"),
+            sealed_source(dir.path(), &wal_b, "2-second"),
+        ],
+        OverviewQuery::new(grid())
+            .root_facets(true)
+            .visited_rows_ceiling_for_tests(0),
+    );
+    assert!(data.status.has(PartialReason::OverviewCeiling));
+    assert_eq!(data.total_traces, 5, "the first source's corpus only");
+    let f = data.root_facets.unwrap();
+    for list in [&f.services, &f.operations] {
+        let sum: u64 = list.top.iter().map(|(_, n)| n).sum();
+        assert_eq!(sum + list.other + list.unattributed, data.total_traces);
+    }
+}
