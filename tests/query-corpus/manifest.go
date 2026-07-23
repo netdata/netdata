@@ -210,8 +210,8 @@ var manifest = map[string]ManifestCase{
 		Agent:  Green,
 	},
 	"CASE-019/v1-json-name-escaping": {
-		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) emit dimension names UNESCAPED between quotes (json.c header loop) — a double-quote in a name (or a label value via group_by=label) produces invalid JSON; the objectrows row keys repeat the raw name, and the google flavor (datatable+google_json) leaves the apostrophe of its single-quoted JavaScript labels unescaped; the v3 json2 path escapes properly",
-		Agent:  Red,
+		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",
+		Agent:  Green, FixedBy: "#23216",
 	},
 	"L9/virtual-points": {
 		Proves: "the virtual-points view oracle is engine-EXACT (fixture/viewpoints.go, the rrd2rrdr_query_execute port): grid boundaries cutting sample intervals serve a linearly interpolated boundary point per line; only freshly fetched points ending inside the line are added whole (a pending straddler shifts to the interpolation anchor WITHOUT re-adding, keeping its original bounds); off-grid charts re-time onto the absolute grid with exact interpolated slots; upsampling serves interpolated sub-ue slots, with the query's FIRST straddler raw — tier0 has no backward plan expansion, so it has no anchor (the CASE-017 asymmetry)",

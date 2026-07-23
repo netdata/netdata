@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// CASE-019 — the v1 JSON-family formatters (json, jsonp, csvjsonarray,
-// datatable) write dimension names RAW between quotes with no JSON
-// escaping (json.c header loop: buffer_strcat of the name), so a name
-// containing a double-quote produces INVALID JSON. Reachable with plain
+// CASE-019 — FIXED by #23216. The v1 JSON-family formatters (json,
+// jsonp, csvjsonarray, datatable) wrote dimension names RAW between
+// quotes with no JSON escaping (json.c header loop), so a name
+// containing a double-quote produced INVALID JSON. Reachable with plain
 // dimension names and — more commonly — through group_by=label, which
-// promotes label VALUES to result names. The v2/v3 json2 path escapes
-// properly (buffer_json), which is why the ladder's other layers never
-// tripped it. Same family as #23115, which fixed a different emission
-// site.
+// promotes label VALUES to result names. The v2/v3 json2 path always
+// escaped properly (buffer_json), which is why the ladder's other layers
+// never tripped it. Same family as #23115, which fixed a different
+// emission site.
 //
-// The case also probes the two sibling emission sites of the same bug:
-// the options=objectrows row keys (json.c repeats the raw name as every
-// row's object key) and the google visualization flavor
+// The case also pins the two sibling emission sites the fix PR's review
+// surfaced: the options=objectrows row keys (repeated the raw name as
+// every row's object key) and the google visualization flavor
 // (datatable + google_json), whose labels are single-quoted JavaScript
-// strings — there an apostrophe in the name is the breaking character,
-// and a JSON escaper alone would not cover it.
+// strings — there the apostrophe was the breaking character, and a JSON
+// escaper alone would not cover it (a double quote needs no escape
+// between single quotes, and must stay raw).
 package corpus
 
 import (
