@@ -58,9 +58,8 @@ type publishedStore struct {
 
 func New() secretstore.Creator {
 	return secretstore.Creator{
-		Kind:        secretstore.KindVault,
-		DisplayName: "Vault",
-		Schema:      configSchema,
+		Kind:   secretstore.KindVault,
+		Schema: configSchema,
 		Create: func() secretstore.Store {
 			return &store{
 				Config: Config{

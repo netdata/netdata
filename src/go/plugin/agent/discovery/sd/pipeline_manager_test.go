@@ -279,14 +279,15 @@ func TestPipelineManager_StopAll(t *testing.T) {
 		// Wait for pipelines to send groups
 		time.Sleep(100 * time.Millisecond)
 
-		assert.Len(t, m.Keys(), 3)
+		assert.True(t, m.IsRunning("pipeline1"))
+		assert.True(t, m.IsRunning("pipeline2"))
+		assert.True(t, m.IsRunning("pipeline3"))
 
 		m.StopAll()
 
 		// Wait for stop to complete
 		time.Sleep(100 * time.Millisecond)
 
-		assert.Empty(t, m.Keys())
 		assert.False(t, m.IsRunning("pipeline1"))
 		assert.False(t, m.IsRunning("pipeline2"))
 		assert.False(t, m.IsRunning("pipeline3"))
@@ -409,25 +410,6 @@ func TestPipelineManager_IsRunning(t *testing.T) {
 	assert.False(t, m.IsRunning("test"))
 }
 
-func TestPipelineManager_Keys(t *testing.T) {
-	ctx := t.Context()
-
-	m := NewPipelineManager(
-		logger.New(),
-		mockNewPipeline,
-		func(_ context.Context, _ []*confgroup.Group) {},
-	)
-
-	assert.Empty(t, m.Keys())
-
-	_ = m.Start(ctx, "p1", pipeline.Config{Name: "p1"})
-	_ = m.Start(ctx, "p2", pipeline.Config{Name: "p2"})
-
-	keys := m.Keys()
-	assert.Len(t, keys, 2)
-	assert.ElementsMatch(t, []string{"p1", "p2"}, keys)
-}
-
 func TestPipelineManager_ConcurrentOperations(t *testing.T) {
 	// Note: Concurrent operations on the SAME key are not supported and cannot
 	// happen in production (ServiceDiscovery.run() processes events sequentially).
@@ -470,17 +452,9 @@ func TestPipelineManager_ConcurrentOperations(t *testing.T) {
 		}(i)
 	}
 
-	// Concurrent Keys checks
-	for range 10 {
-		wg.Go(func() {
-			_ = m.Keys()
-		})
-	}
-
 	wg.Wait()
 
 	// Should have 10 pipelines running (one per unique key)
-	assert.Len(t, m.Keys(), 10)
 	for i := range 10 {
 		assert.True(t, m.IsRunning(fmt.Sprintf("pipeline-%d", i)))
 	}

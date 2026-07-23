@@ -44,14 +44,6 @@ type (
 	}
 )
 
-func (d *Discovery) String() string {
-	return d.Name()
-}
-
-func (d *Discovery) Name() string {
-	return fmt.Sprintf("file discovery: %v", d.discoverers)
-}
-
 func (d *Discovery) registerDiscoverers(cfg Config) error {
 	if len(cfg.Read) != 0 {
 		d.discoverers = append(d.discoverers, NewReader(cfg.Registry, cfg.Read))

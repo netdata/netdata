@@ -7,13 +7,15 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestProviderSchemaAndValidationParity(t *testing.T) {
-	svc := secretstore.NewService(backends.Creators()...)
+	store, catalog := newProviderAuthority(t)
+	t.Cleanup(func() {
+		require.NoError(t, store.Close(context.Background()))
+	})
 
 	tests := map[string]struct {
 		kind              secretstore.StoreKind
@@ -130,13 +132,9 @@ func TestProviderSchemaAndValidationParity(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			displayName, ok := svc.DisplayName(tc.kind)
+			schema, ok := catalog.Schema(tc.kind)
 			require.True(t, ok)
-			assert.NotEmpty(t, displayName)
-
-			schema, ok := svc.Schema(tc.kind)
-			require.True(t, ok)
-			schemaObj := decodeSchema(t, schema)
+			schemaObj := decodeProviderSchema(t, schema)
 			_, ok = schemaObj["jsonSchema"].(map[string]any)
 			require.True(t, ok)
 			_, ok = schemaObj["uiSchema"].(map[string]any)
@@ -145,10 +143,18 @@ func TestProviderSchemaAndValidationParity(t *testing.T) {
 				tc.assertSchemaShape(t, schemaObj)
 			}
 
-			err := svc.Validate(context.Background(), newStoreFromConfig(t, svc, tc.kind, tc.valid))
+			err := store.Validate(
+				context.Background(),
+				catalog,
+				providerStoreConfig(t, tc.kind, tc.valid),
+			)
 			require.NoError(t, err)
 
-			err = svc.Validate(context.Background(), newStoreFromConfig(t, svc, tc.kind, tc.invalid))
+			err = store.Validate(
+				context.Background(),
+				catalog,
+				providerStoreConfig(t, tc.kind, tc.invalid),
+			)
 			require.Error(t, err)
 			assert.ErrorContains(t, err, tc.wantErrContains)
 		})

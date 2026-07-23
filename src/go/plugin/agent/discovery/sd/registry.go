@@ -66,8 +66,7 @@ func NewDescriptor[T any](
 		NewDiscoverers: func(cfg any, source string) ([]model.Discoverer, error) {
 			v, ok := cfg.(T)
 			if !ok {
-				var z T
-				return nil, &typedConfigError{typ: typ, got: cfg, want: z}
+				return nil, &typedConfigError{typ: typ}
 			}
 			return newDiscs(v, source)
 		},
@@ -75,9 +74,7 @@ func NewDescriptor[T any](
 }
 
 type typedConfigError struct {
-	typ  string
-	got  any
-	want any
+	typ string
 }
 
 func (e *typedConfigError) Error() string {

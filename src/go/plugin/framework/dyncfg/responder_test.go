@@ -1,9 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Characterization tests (MUST-NOT-FLIP): pins of the responder's wire
-// contracts that both the serialized and the concurrent pipeline designs
-// depend on.
-
 package dyncfg
 
 import (
@@ -40,68 +36,111 @@ func testResponderFn(uid string) Function {
 	return NewFunction(functions.Function{UID: uid})
 }
 
-func TestResponder_CharacterizationContracts(t *testing.T) {
+type typedOutputRecorder struct {
+	results  []Result
+	creates  []netdataapi.ConfigOpts
+	statuses []struct {
+		id     string
+		status Status
+	}
+	deletes []string
+}
+
+func (recorder *typedOutputRecorder) FunctionResult(result Result) {
+	recorder.results = append(recorder.results, result)
+}
+
+func (recorder *typedOutputRecorder) ConfigCreate(opts netdataapi.ConfigOpts) {
+	recorder.creates = append(recorder.creates, opts)
+}
+
+func (recorder *typedOutputRecorder) ConfigStatus(id string, status Status) {
+	recorder.statuses = append(recorder.statuses, struct {
+		id     string
+		status Status
+	}{id: id, status: status})
+}
+
+func (recorder *typedOutputRecorder) ConfigDelete(id string) {
+	recorder.deletes = append(recorder.deletes, id)
+}
+
+func TestResponderEmitsTypedOutput(t *testing.T) {
 	tests := map[string]struct {
-		run func(t *testing.T, r *Responder, rec *writeRecorder)
+		run   func(*Responder)
+		check func(*testing.T, *typedOutputRecorder)
 	}{
-		"terminal gated by finalizer while CONFIG lines bypass": {
-			run: func(t *testing.T, r *Responder, rec *writeRecorder) {
-				// Simulate a tombstoned transaction: the finalizer refuses emission.
-				r.SetTerminalFinalizer(func(_, _ string, _ func()) bool { return false })
-
-				r.SendCodef(testResponderFn("tx-tombstoned"), 200, "late response")
-				r.SendJSON(testResponderFn("tx-tombstoned"), `{"late":true}`)
-				assert.Empty(t, rec.snapshot(), "terminal responses must be suppressed when the finalizer refuses emission")
-
-				r.ConfigStatus("test:collector:mod:job", StatusRunning)
-				r.ConfigDelete("test:collector:mod:gone")
-
-				writes := rec.snapshot()
-				require.Len(t, writes, 2, "CONFIG lines must bypass the terminal finalizer")
-				assert.Contains(t, writes[0], "CONFIG test:collector:mod:job status running")
-				assert.Contains(t, writes[1], "CONFIG test:collector:mod:gone delete")
+		"formatted code result": {
+			run: func(responder *Responder) {
+				responder.SendCodef(testResponderFn("tx1"), 400, "invalid %s", "config")
+			},
+			check: func(t *testing.T, recorder *typedOutputRecorder) {
+				require.Equal(t, []Result{{
+					UID:         "tx1",
+					Code:        400,
+					ContentType: "application/json",
+					Payload:     `{"status":400,"errorMessage":"invalid config"}`,
+				}}, recorder.results)
 			},
 		},
-		"terminal emits through finalizer closure": {
-			run: func(t *testing.T, r *Responder, rec *writeRecorder) {
-				var finalized []string
-				r.SetTerminalFinalizer(func(uid, source string, emit func()) bool {
-					finalized = append(finalized, uid+"|"+source)
-					emit()
-					return true
-				})
-
-				r.SendCodef(testResponderFn("tx1"), 200, "ok")
-
-				require.Len(t, finalized, 1)
-				assert.Equal(t, "tx1|dyncfg.responder.sendcodef", finalized[0])
-				writes := rec.snapshot()
-				require.Len(t, writes, 1)
-				assert.Contains(t, writes[0], "FUNCTION_RESULT_BEGIN tx1 200")
+		"payload result": {
+			run: func(responder *Responder) {
+				responder.SendYAML(testResponderFn("tx2"), "enabled: true")
+			},
+			check: func(t *testing.T, recorder *typedOutputRecorder) {
+				require.Equal(t, []Result{{
+					UID:         "tx2",
+					Code:        200,
+					ContentType: "application/yaml",
+					Payload:     "enabled: true",
+				}}, recorder.results)
 			},
 		},
-		"protocol messages are single writes": {
-			run: func(t *testing.T, r *Responder, rec *writeRecorder) {
-				r.SendCodef(testResponderFn("tx1"), 200, "ok")
-
-				writes := rec.snapshot()
-				require.Len(t, writes, 1, "a FUNCTION_RESULT block must be one Write")
-				assert.True(t, strings.HasPrefix(writes[0], "FUNCTION_RESULT_BEGIN tx1 200"))
-				assert.True(t, strings.HasSuffix(writes[0], "FUNCTION_RESULT_END\n\n"))
-
-				rec2 := &writeRecorder{}
-				r2 := NewResponder(netdataapi.New(rec2))
-				r2.ConfigStatus("id1", StatusRunning)
-				writes2 := rec2.snapshot()
-				require.Len(t, writes2, 1, "a CONFIG line must be one Write")
+		"empty UID suppresses result": {
+			run: func(responder *Responder) {
+				responder.SendJSON(testResponderFn(""), `{}`)
+			},
+			check: func(t *testing.T, recorder *typedOutputRecorder) {
+				assert.Empty(t, recorder.results)
+			},
+		},
+		"configuration notifications": {
+			run: func(responder *Responder) {
+				responder.ConfigCreate(netdataapi.ConfigOpts{ID: "template"})
+				responder.ConfigStatus("job", StatusRunning)
+				responder.ConfigDelete("gone")
+			},
+			check: func(t *testing.T, recorder *typedOutputRecorder) {
+				require.Equal(t, []netdataapi.ConfigOpts{{ID: "template"}}, recorder.creates)
+				require.Len(t, recorder.statuses, 1)
+				assert.Equal(t, "job", recorder.statuses[0].id)
+				assert.Equal(t, StatusRunning, recorder.statuses[0].status)
+				assert.Equal(t, []string{"gone"}, recorder.deletes)
 			},
 		},
 	}
 
-	for name, tc := range tests {
+	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			rec := &writeRecorder{}
-			tc.run(t, NewResponder(netdataapi.New(rec)), rec)
+			recorder := &typedOutputRecorder{}
+			test.run(NewResponder(recorder))
+			test.check(t, recorder)
 		})
 	}
+}
+
+func TestProtocolOutputWritesCompleteFrames(t *testing.T) {
+	recorder := &writeRecorder{}
+	output := NewProtocolOutput(recorder)
+
+	output.FunctionResult(Result{
+		UID: "tx1", Code: 200, ContentType: "application/json", Payload: `{}`,
+	})
+	output.ConfigStatus("id1", StatusRunning)
+
+	writes := recorder.snapshot()
+	require.Len(t, writes, 2)
+	assert.True(t, strings.HasPrefix(writes[0], "FUNCTION_RESULT_BEGIN tx1 200 application/json "))
+	assert.True(t, strings.HasSuffix(writes[0], "\n{}\nFUNCTION_RESULT_END\n\n"))
+	assert.Equal(t, "CONFIG id1 status running\n\n", writes[1])
 }

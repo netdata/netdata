@@ -130,7 +130,7 @@ func TestNagiosCollectorJobV2(t *testing.T) {
 
 			startDone := make(chan struct{})
 			go func() {
-				state.job.Start()
+				state.job.StartManaged(make(chan struct{}))
 				close(startDone)
 			}()
 
@@ -148,6 +148,7 @@ func TestNagiosCollectorJobV2(t *testing.T) {
 				case <-time.After(2 * time.Second):
 					require.FailNow(t, "timeout waiting for job start loop to exit")
 				}
+				state.job.Cleanup()
 			}
 		})
 	}
@@ -164,7 +165,7 @@ func newTestJobV2(t *testing.T, name string, coll *Collector, out io.Writer) *jo
 		Out:         out,
 		UpdateEvery: 1,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 	return job
 }
 
@@ -185,6 +186,7 @@ func stopAndWaitForJob(t *testing.T, job *jobruntime.JobV2, startDone <-chan str
 	case <-time.After(2 * time.Second):
 		require.FailNow(t, "timeout waiting for job start loop to exit")
 	}
+	job.Cleanup()
 }
 
 func writeExecutable(t *testing.T, path, content string) {

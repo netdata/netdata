@@ -74,57 +74,10 @@ func TestJob_Name(t *testing.T) {
 	assert.Equal(t, job.Name(), jobName)
 }
 
-func TestJob_Panicked(t *testing.T) {
-	job := newTestJob()
-
-	assert.Equal(t, job.Panicked(), job.panicked.Load())
-	job.panicked.Store(true)
-	assert.Equal(t, job.Panicked(), job.panicked.Load())
-}
-
-// Vnode() is read off-goroutine (the manager loop reads registered jobs'
-// vnodes) while the pre-Start snapshot write may still be in flight on the
-// starting goroutine: the accesses must be synchronized. This test fails
-// under -race without vnodeMu.
-func TestJob_VnodeAccessIsSynchronized(t *testing.T) {
-	job := newTestJob()
-	baseline := &vnodes.VirtualNode{Name: "v", Hostname: "baseline", GUID: "guid-b"}
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for range 200 {
-			_ = job.Vnode()
-		}
-	}()
-	for range 200 {
-		job.SetVnodeSnapshot(VnodeSnapshot{Vnode: baseline})
-	}
-	<-done
-}
-
-// The pre-Start snapshot commit is visible without a collection: a job stopped
-// before its first tick must clean up on the reconciled vnode, not the stale
-// creation-time vnode.
-func TestJob_SetVnodeSnapshotCommitsRevisionBeforeStart(t *testing.T) {
-	job := newTestJob()
-	snapshot := VnodeSnapshot{
-		Vnode:            &vnodes.VirtualNode{Name: "v", Hostname: "baseline", GUID: "guid-b"},
-		Revision:         7,
-		MetadataRevision: 5,
-	}
-
-	job.SetVnodeSnapshot(snapshot)
-	assert.Equal(t, "baseline", job.vnode.Hostname,
-		"the snapshot must be committed into the job, visible without a collection")
-	assert.Equal(t, uint64(7), job.vnodeRevision)
-	assert.Equal(t, uint64(5), job.vnodeMetadataRevision)
-}
-
 func TestJob_AutoDetectionEvery(t *testing.T) {
 	job := newTestJob()
 
-	assert.Equal(t, job.AutoDetectionEvery(), job.AutoDetectEvery)
+	assert.Equal(t, job.AutoDetectionEvery(), job.autoDetectEvery)
 }
 
 func TestJob_RetryAutoDetection(t *testing.T) {
@@ -139,22 +92,22 @@ func TestJob_RetryAutoDetection(t *testing.T) {
 		},
 	}
 	job.module = m
-	job.AutoDetectEvery = 1
+	job.autoDetectEvery = 1
 
 	assert.True(t, job.RetryAutoDetection())
-	assert.Equal(t, infTries, job.AutoDetectTries)
+	assert.Equal(t, infTries, job.autoDetectTries)
 	for range 1000 {
 		_ = job.check(context.Background())
 	}
 	assert.True(t, job.RetryAutoDetection())
-	assert.Equal(t, infTries, job.AutoDetectTries)
+	assert.Equal(t, infTries, job.autoDetectTries)
 
-	job.AutoDetectTries = 10
+	job.autoDetectTries = 10
 	for range 10 {
 		_ = job.check(context.Background())
 	}
 	assert.False(t, job.RetryAutoDetection())
-	assert.Equal(t, 0, job.AutoDetectTries)
+	assert.Equal(t, 0, job.autoDetectTries)
 }
 
 func TestJob_AutoDetection(t *testing.T) {
@@ -176,13 +129,13 @@ func TestJob_AutoDetection(t *testing.T) {
 	}
 	job.module = m
 
-	assert.NoError(t, job.AutoDetection(context.Background()))
+	assert.NoError(t, job.AutoDetectionManaged(context.Background()))
 	assert.Equal(t, 3, v)
 }
 
 func TestJob_AutoDetection_FailInit(t *testing.T) {
 	job := newTestJob()
-	job.AutoDetectEvery = 1
+	job.autoDetectEvery = 1
 	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			return errors.New("init error")
@@ -190,14 +143,16 @@ func TestJob_AutoDetection_FailInit(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection(context.Background()))
+	assert.Error(t, job.AutoDetectionManaged(context.Background()))
 	assert.False(t, job.RetryAutoDetection())
+	assert.False(t, m.CleanupDone)
+	job.CleanupRejected()
 	assert.True(t, m.CleanupDone)
 }
 
 func TestJob_AutoDetection_RetryableFailInitKeepsRetry(t *testing.T) {
 	job := newTestJob()
-	job.AutoDetectEvery = 1
+	job.autoDetectEvery = 1
 	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			return retryableTestError{error: errors.New("init error")}
@@ -205,14 +160,16 @@ func TestJob_AutoDetection_RetryableFailInitKeepsRetry(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection(context.Background()))
+	assert.Error(t, job.AutoDetectionManaged(context.Background()))
 	assert.True(t, job.RetryAutoDetection())
+	assert.False(t, m.CleanupDone)
+	job.CleanupRejected()
 	assert.True(t, m.CleanupDone)
 }
 
 func TestJob_AutoDetection_ForeignRetryableFailInitDisablesRetry(t *testing.T) {
 	job := newTestJob()
-	job.AutoDetectEvery = 1
+	job.autoDetectEvery = 1
 	m := &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			return foreignRetryableTestError{error: errors.New("init error")}
@@ -220,8 +177,10 @@ func TestJob_AutoDetection_ForeignRetryableFailInitDisablesRetry(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection(context.Background()))
+	assert.Error(t, job.AutoDetectionManaged(context.Background()))
 	assert.False(t, job.RetryAutoDetection())
+	assert.False(t, m.CleanupDone)
+	job.CleanupRejected()
 	assert.True(t, m.CleanupDone)
 }
 
@@ -237,7 +196,9 @@ func TestJob_AutoDetection_FailCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection(context.Background()))
+	assert.Error(t, job.AutoDetectionManaged(context.Background()))
+	assert.False(t, m.CleanupDone)
+	job.CleanupRejected()
 	assert.True(t, m.CleanupDone)
 }
 
@@ -256,7 +217,9 @@ func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection(context.Background()))
+	assert.Error(t, job.AutoDetectionManaged(context.Background()))
+	assert.False(t, m.CleanupDone)
+	job.CleanupRejected()
 	assert.True(t, m.CleanupDone)
 }
 
@@ -269,7 +232,9 @@ func TestJob_AutoDetection_PanicInit(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection(context.Background()))
+	assert.Error(t, job.AutoDetectionManaged(context.Background()))
+	assert.False(t, m.CleanupDone)
+	job.CleanupRejected()
 	assert.True(t, m.CleanupDone)
 }
 
@@ -285,7 +250,9 @@ func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection(context.Background()))
+	assert.Error(t, job.AutoDetectionManaged(context.Background()))
+	assert.False(t, m.CleanupDone)
+	job.CleanupRejected()
 	assert.True(t, m.CleanupDone)
 }
 
@@ -304,7 +271,9 @@ func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection(context.Background()))
+	assert.Error(t, job.AutoDetectionManaged(context.Background()))
+	assert.False(t, m.CleanupDone)
+	job.CleanupRejected()
 	assert.True(t, m.CleanupDone)
 }
 
@@ -343,8 +312,10 @@ func TestJob_Start(t *testing.T) {
 		job.Stop()
 	}()
 
-	job.Start()
+	job.StartManaged(make(chan struct{}))
 
+	assert.False(t, m.CleanupDone)
+	job.Cleanup()
 	assert.True(t, m.CleanupDone)
 }
 
@@ -382,10 +353,41 @@ func TestJob_MainLoop_Panic(t *testing.T) {
 		job.Stop()
 	}()
 
-	job.Start()
+	job.StartManaged(make(chan struct{}))
 
-	assert.True(t, job.Panicked())
+	assert.True(t, job.panicked.Load())
+	assert.False(t, m.CleanupDone)
+	job.Cleanup()
 	assert.True(t, m.CleanupDone)
+}
+
+func TestJob_OutputFailureDoesNotReportCollectorPanic(t *testing.T) {
+	mod := &collectorapi.MockCollectorV1{
+		ChartsFunc: func() *collectorapi.Charts {
+			return &collectorapi.Charts{
+				&collectorapi.Chart{
+					ID: "id", Title: "title", Units: "units",
+					Dims: collectorapi.Dims{&collectorapi.Dim{ID: "value"}},
+				},
+			}
+		},
+		CollectFunc: func(context.Context) map[string]int64 {
+			return map[string]int64{"value": 1}
+		},
+	}
+	job := NewJob(JobConfig{
+		PluginName: pluginName, Name: jobName, ModuleName: modName,
+		FullName: modName + "_" + jobName, Module: mod,
+		Out: writeFunc(func([]byte) (int, error) {
+			return 0, errors.New("write failed")
+		}),
+		UpdateEvery: 1,
+	})
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
+
+	job.runOnce()
+
+	assert.False(t, job.panicked.Load())
 }
 
 func TestJob_Tick(t *testing.T) {
@@ -428,7 +430,7 @@ func TestJob_PullVnodeUpdateDuringCollectAppliesBeforeSameCycleEmission(t *testi
 		VnodeMetadataRevision: 1,
 		VnodeLookup:           current.lookup,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	done := make(chan struct{})
 	go func() {
@@ -474,7 +476,7 @@ func TestJob_PullSourceOnlyUpdateDoesNotResendHostInfo(t *testing.T) {
 		VnodeMetadataRevision: 1,
 		VnodeLookup:           current.lookup,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 	job.runOnce()
 
 	out.Reset()
@@ -517,7 +519,7 @@ func TestJob_ModuleOwnedVnodeDoesNotOverrideConfiguredJobVnode(t *testing.T) {
 		VnodeMetadataRevision: 1,
 		VnodeLookup:           current.lookup,
 	})
-	require.NoError(t, job.AutoDetection(context.Background()))
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
 
 	job.runOnce()
 
@@ -577,14 +579,6 @@ func newTestFunctionOnlyJob() *Job {
 	)
 }
 
-func TestJob_IsFunctionOnly(t *testing.T) {
-	job := newTestJob()
-	assert.False(t, job.IsFunctionOnly())
-
-	foJob := newTestFunctionOnlyJob()
-	assert.True(t, foJob.IsFunctionOnly())
-}
-
 func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 	job := newTestFunctionOnlyJob()
 	m := &collectorapi.MockCollectorV1{
@@ -600,7 +594,7 @@ func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 	}
 	job.module = m
 
-	assert.NoError(t, job.AutoDetection(context.Background()))
+	assert.NoError(t, job.AutoDetectionManaged(context.Background()))
 }
 
 func TestJob_AutoDetection_FunctionOnlyFailCheckCleansUp(t *testing.T) {
@@ -619,7 +613,9 @@ func TestJob_AutoDetection_FunctionOnlyFailCheckCleansUp(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection(context.Background()))
+	assert.Error(t, job.AutoDetectionManaged(context.Background()))
+	assert.False(t, m.CleanupDone)
+	job.CleanupRejected()
 	assert.True(t, m.CleanupDone)
 	assert.Equal(t, 1, cleanupCalls)
 }
@@ -647,8 +643,10 @@ func TestJob_Start_FunctionOnly(t *testing.T) {
 		job.Stop()
 	}()
 
-	job.Start()
+	job.StartManaged(make(chan struct{}))
 
 	assert.False(t, collectCalled, "Collect should not be called for function-only jobs")
+	assert.False(t, m.CleanupDone)
+	job.Cleanup()
 	assert.True(t, m.CleanupDone)
 }

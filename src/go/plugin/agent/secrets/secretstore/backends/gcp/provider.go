@@ -51,9 +51,8 @@ type publishedStore struct {
 
 func New() secretstore.Creator {
 	return secretstore.Creator{
-		Kind:        secretstore.KindGCPSM,
-		DisplayName: "Google Secret Manager",
-		Schema:      configSchema,
+		Kind:   secretstore.KindGCPSM,
+		Schema: configSchema,
 		Create: func() secretstore.Store {
 			return &store{
 				Config: Config{

@@ -44,20 +44,10 @@ func (c *SeenCache[C]) Remove(cfg C) {
 }
 
 func (c *SeenCache[C]) Lookup(cfg C) (C, bool) {
-	return c.LookupByUID(cfg.UID())
-}
-
-func (c *SeenCache[C]) LookupByUID(uid string) (C, bool) {
 	c.mux.RLock()
 	defer c.mux.RUnlock()
-	v, ok := c.items[uid]
+	v, ok := c.items[cfg.UID()]
 	return v, ok
-}
-
-func (c *SeenCache[C]) Count() int {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	return len(c.items)
 }
 
 // ForEach iterates over all entries. Return false to stop iteration.
@@ -106,21 +96,4 @@ func (c *ExposedCache[C]) LookupByKey(key string) (*Entry[C], bool) {
 	defer c.mux.RUnlock()
 	v, ok := c.items[key]
 	return v, ok
-}
-
-// ForEach iterates over all entries. Return false to stop iteration.
-func (c *ExposedCache[C]) ForEach(fn func(key string, entry *Entry[C]) bool) {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	for k, e := range c.items {
-		if !fn(k, e) {
-			return
-		}
-	}
-}
-
-func (c *ExposedCache[C]) Count() int {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-	return len(c.items)
 }
