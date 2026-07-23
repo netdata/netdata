@@ -650,22 +650,11 @@ Alternatively, use the **host’s hostname** by mounting `/etc/hostname` in the 
 
 ## Adding extra packages at runtime
 
-By default, Netdata’s official container images exclude some optional runtime dependencies. You can install them at runtime by setting the `NETDATA_EXTRA_DEB_PACKAGES` environment variable.
-
-Commonly useful packages:
-
-- `apcupsd` – Monitors APC UPS devices.
-- `lm-sensors` – Monitors hardware sensors.
-- `netcat-openbsd` – Enables IRC alerts.
+By default, Netdata’s official container images exclude some optional runtime dependencies. You can install them at runtime with the `NETDATA_EXTRA_DEB_PACKAGES` environment variable. See [Docker container environment variables](/docs/deployment-guides/docker-container-environment-variables.md#netdata_extra_deb_packages) for details and examples.
 
 ## Health Checks
 
-Netdata’s Docker image supports **health checks** via standard Docker interfaces. You can control them using the `NETDATA_HEALTHCHECK_TARGET` environment variable:
-
-- **Unset** – Defaults to checking `/api/v1/info`.
-- **`cli`** – Uses `netdatacli ping` to confirm the Agent is running (but not full data collection).
-
-The default `/api/v1/info` check is usually sufficient. However, if the web server is disabled or API access is restricted, you'll need to customize the health check configuration.
+Netdata’s Docker image supports **health checks** via standard Docker interfaces, controlled with the `NETDATA_HEALTHCHECK_TARGET` environment variable. See [Docker container environment variables](/docs/deployment-guides/docker-container-environment-variables.md#netdata_healthcheck_target) for details and examples.
 
 ## Publish a test image to your own repository
 

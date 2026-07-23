@@ -90,7 +90,11 @@ If `/var/run/docker.sock` (or `/var/run/balena.sock`) **is** mounted into the co
 
 A space-separated list of Debian packages installed with `apt-get` at container start, before the Agent starts. The default is empty (nothing is installed).
 
-This is useful for optional runtime dependencies the image ships without. For example, to enable hardware sensors and IRC alerts:
+This is useful for optional runtime dependencies the image ships without. Commonly installed packages:
+
+- `apcupsd` — monitors APC UPS devices.
+- `lm-sensors` — monitors hardware sensors.
+- `netcat-openbsd` — enables IRC alerts.
 
 ```bash
 docker run -e NETDATA_EXTRA_DEB_PACKAGES="lm-sensors netcat-openbsd" netdata/netdata
@@ -122,7 +126,7 @@ docker run -e DO_NOT_TRACK=1 netdata/netdata
 
 A few environment variables are baked into the image at build time and are **not** meant to be set with `docker run -e`:
 
-- `NETDATA_OFFICIAL_IMAGE` — marks whether the image is an official Netdata build. It is set during the image build and feeds system/telemetry information. You do not need to set it.
+- `NETDATA_OFFICIAL_IMAGE` — marks whether the image is an official Netdata build. It is set during the image build and feeds the anonymous telemetry beacon. You do not need to set it.
 - `DOCKER_GRP` — the group name created in the image at build time.
 
 These are documented here for completeness. Changing them at runtime has no supported effect on the entrypoint behavior.
