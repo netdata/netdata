@@ -1,9 +1,10 @@
 //! `OtelTracesHandler` — typed `FunctionHandler` implementation for the
 //! `otel-traces` Function.
 //!
-//! Implemented modes: `info` (capability discovery) and `trace` (exact
-//! single-trace fetch); the remaining data modes resolve cleanly and
-//! return an explicit not-implemented error until their traces-ui
+//! Implemented modes: `info` (capability discovery), `trace` (exact
+//! single-trace fetch), and `search` (bounded most-recent-first trace
+//! search, the default mode); the remaining data modes resolve cleanly
+//! and return an explicit not-implemented error until their traces-ui
 //! phase-1 step lands. The wire contract lives in [`super::wire`], the
 //! engine mapping in [`super::adapter`], and source resolution in
 //! [`super::sources`].
@@ -161,30 +162,18 @@ impl OtelTracesHandler {
             .unwrap_or_default()
             .as_secs()
             .min(u64::from(u32::MAX)) as u32;
-        let Some(window) = resolve_window(req.after, req.before, now_s, cursor.as_ref())
-            .map_err(client_err)?
-        else {
-            // The anchor lies at/below the window start: the walk is
-            // done. An empty COMPLETE page, same shape as any other.
-            return Ok(OtelTracesResponse::Search(Box::new(to_search_result(
-                sfsq::traces::SearchData {
-                    traces: Vec::new(),
-                    status: sfsq::traces::QueryStatus::Complete,
-                    field_kinds: Default::default(),
-                },
-                req.last,
-                cursor.as_ref(),
-            ))));
-        };
+        // An anchor page reruns the SAME query over the cursor's frozen
+        // window (never narrowed — the rank is window-dependent) with an
+        // over-fetch covering the served prefix; the adapter drops it.
+        let window = resolve_window(req.after, req.before, now_s, cursor.as_ref())
+            .map_err(client_err)?;
 
         let mut query = SearchQuery::new(predicate)
             .window(
                 TimeWindow::new(window.start_ns, window.end_ns)
                     .map_err(|e| client_err(e.to_string()))?,
             )
-            // The anchor page re-includes the served ties; the extra
-            // allowance lets the drop still fill a whole page.
-            .limit(req.last + cursor.map_or(0, |c| c.served_at_start));
+            .limit(req.last.saturating_add(cursor.map_or(0, |c| c.served)));
         if let Some(spt) = req.spans_per_trace {
             query = query.spans_per_trace(spt);
         }
@@ -232,7 +221,12 @@ impl OtelTracesHandler {
             }
         };
 
-        let result: SearchResult = to_search_result(data, req.last, cursor.as_ref());
+        let result: SearchResult = to_search_result(
+            data,
+            req.last,
+            cursor.as_ref(),
+            (window.capture.start, window.capture.end),
+        );
         Ok(OtelTracesResponse::Search(Box::new(result)))
     }
 }

@@ -407,3 +407,52 @@ async fn pagination_survives_a_trace_whose_envelope_predates_its_rank() {
     assert_eq!(ids(&v2), vec!["1a"], "U (30s) must not be gapped out");
     assert!(v2.get("anchor").is_none());
 }
+
+#[tokio::test]
+async fn straddling_trace_above_the_tail_never_reappears() {
+    // The round-1 review's HIGH: F's matched spans (10s, 70s) straddle
+    // page 1's tail rank (U at 50s). The narrowed-window design let F
+    // re-enter page 2 at rank 10s — a duplicate. The frozen-window
+    // after-key walk keeps F at rank 70s (at-or-above the key) forever.
+    use crate::ledger::rpc::traces::fixtures::otlp_req_at;
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![
+            otlp_req_at(0x0F, &[base_ns(10), base_ns(70)], "svc-f"),
+            otlp_req_at(0x1A, &[base_ns(50)], "svc-u"),
+            otlp_req_at(0x1B, &[base_ns(30)], "svc-w"),
+        ],
+    )
+    .await;
+    let h = make_handler_over(registries);
+
+    let mut body = window_body();
+    body["last"] = json!(2);
+    body["spans_per_trace"] = json!(0);
+    let v1 = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
+    assert_eq!(ids(&v1), vec!["0f", "1a"], "F (rank 70s) then U (50s)");
+    body["anchor"] = v1["anchor"]["next"].clone();
+    let v2 = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
+    assert_eq!(ids(&v2), vec!["1b"], "only W is fresh — F must not duplicate");
+    assert!(v2.get("anchor").is_none());
+}
+
+#[tokio::test]
+async fn anchor_pages_ignore_the_requests_own_window() {
+    // The cursor freezes page 1's window; a page-2 request carrying a
+    // different (or defaulted) window must not shift the walk.
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    body["last"] = json!(2);
+    body["spans_per_trace"] = json!(0);
+    let v1 = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    let next = v1["anchor"]["next"].clone();
+
+    // Page 2 with a WRONG window — the frozen one must win.
+    let body2 = json!({"after": 1, "before": 2, "last": 2, "spans_per_trace": 0, "anchor": next});
+    let v2 = serde_json::to_value(call_on(&h, body2).await.unwrap()).unwrap();
+    assert_eq!(ids(&v2), vec!["0d", "0b"]);
+}

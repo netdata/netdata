@@ -974,7 +974,9 @@ fn summarize(
         start_ns,
         // Spans are in combiner total order (ascending start), so the
         // last matched index is the newest matched span — the same
-        // derivation the caller's rank uses.
+        // derivation the caller's rank uses. `matched` is non-empty at
+        // every call site (a no-match candidate never summarizes); the
+        // envelope fallback just keeps the function total.
         newest_matched_start_ns: matched
             .last()
             .map(|&i| trace.spans[i].start_ns)

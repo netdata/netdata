@@ -1,8 +1,9 @@
 //! Mapping between the `otel-traces` wire types and the wire-neutral
 //! [`sfsq::traces`] engine — the traces analogue of the logs `adapter`.
 //! Wire shapes live in [`super::wire`]; this module owns the
-//! request-side parsing (hex ids) and the response-side conversion
-//! (engine data → wire, ids rendered as W3C lowercase hex).
+//! request-side parsing (hex ids, the selection-key grammar, the
+//! pagination cursor, window canonicalization) and the response-side
+//! conversion (engine data → wire, ids rendered as W3C lowercase hex).
 
 use std::collections::HashMap;
 
@@ -176,16 +177,26 @@ pub(crate) fn build_predicate(
     min_duration_ns: Option<i64>,
     max_duration_ns: Option<i64>,
 ) -> Result<Predicate, String> {
+    if let (Some(min), Some(max)) = (min_duration_ns, max_duration_ns)
+        && min > max
+    {
+        return Err(format!(
+            "min_duration_ns {min} exceeds max_duration_ns {max}: nothing can match"
+        ));
+    }
     let mut conditions = Vec::new();
     let mut keys: Vec<&String> = selections.keys().collect();
     keys.sort();
     for key in keys {
+        // Validate the key even when its value list is empty — a typo'd
+        // key must not hide behind an empty selection.
+        let target = parse_selection_key(key)?;
         let values = &selections[key];
         if values.is_empty() {
             continue;
         }
         conditions.push(Condition {
-            target: parse_selection_key(key)?,
+            target,
             op: CompareOp::Eq,
             values: values
                 .iter()
@@ -212,58 +223,90 @@ pub(crate) fn build_predicate(
 
 // ── Search: pagination cursor ───────────────────────────────────────
 
-/// The wire pagination state. The engine has no anchor concept — its
-/// deterministic rank is (newest matched-span start DESC, trace_id ASC)
-/// — so the wire pages by narrowing the window's end to the rank key
-/// `+ 1` (re-including rank ties) and dropping the `served_at_start`
-/// already-returned ties, which the engine re-emits first (same rank
-/// order) at a fixed corpus.
+/// The wire pagination state. The engine has no anchor concept, and its
+/// rank — (newest matched-span start DESC, trace_id ASC) — is
+/// WINDOW-DEPENDENT: narrowing the window re-ranks any trace whose
+/// matched spans straddle the boundary through an older span,
+/// duplicating it on a later page (a review-caught flaw of the first
+/// design). So the cursor NEVER narrows the window. Instead it:
 ///
-/// The anchor is the RANK key (`TraceSummary::newest_matched_start_ns`),
-/// NEVER the envelope `start_ns`: a trace's envelope can be much older
-/// than its rank, and anchoring on it both gaps (older-ranked traces'
-/// matching spans fall outside the narrowed window) and duplicates
-/// (a trace re-matching through an older span re-ranks below the
-/// anchor). Caught live against multi-span demo traces.
+/// - FREEZES the canonicalized window of page 1, so every page ranks
+///   the same corpus the same way (and a default `now`-derived window
+///   can't drift between pages);
+/// - carries the AFTER-KEY — the last served trace's (rank, trace_id) —
+///   and the served count. The next page re-runs the SAME query with
+///   `limit = served + last` and drops everything ranked at-or-above
+///   the key: at a fixed corpus the engine's deterministic total order
+///   makes the pages an exact partition, tie runs and straddling
+///   traces included.
+///
+/// Late arrivals INTO the frozen window (an inherent property of
+/// most-recent-first pagination over live data) rank above the key and
+/// are simply never shown by this walk; re-query for fresh data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SearchCursor {
-    /// The last returned trace's rank key (newest matched-span start).
-    pub start_ns: i64,
-    /// How many returned traces (cumulative across pages) share exactly
-    /// this rank key. Always ≥ 1.
-    pub served_at_start: usize,
+    /// The frozen page-1 window, unix seconds.
+    pub after_s: u32,
+    pub before_s: u32,
+    /// The after-key: the last served trace's rank (newest matched-span
+    /// start) and id. A trace is already served iff it ranks at-or-above
+    /// this key.
+    pub rank_ns: i64,
+    pub trace_id: sfst::TraceId,
+    /// Total traces served so far — the engine over-fetch allowance.
+    pub served: usize,
 }
 
-/// Tie runs longer than this can't page (the engine limit grows by the
-/// count); the cursor is rejected with advice to narrow the filters.
+/// Walks deeper than this stop paging (the engine limit grows with the
+/// served count); the cursor is rejected with advice to narrow.
 const CURSOR_SERVED_CAP: usize = 10_000;
 
 pub(crate) fn encode_cursor(c: &SearchCursor) -> String {
-    format!("t1:{}:{}", c.start_ns, c.served_at_start)
+    format!(
+        "t2:{}:{}:{}:{}:{}",
+        c.after_s, c.before_s, c.rank_ns, c.trace_id, c.served
+    )
 }
 
 pub(crate) fn parse_cursor(s: &str) -> Result<SearchCursor, String> {
     let malformed = || format!("malformed anchor {s:?}");
     let mut parts = s.split(':');
-    let (Some("t1"), Some(ns), Some(count), None) =
-        (parts.next(), parts.next(), parts.next(), parts.next())
-    else {
+    let (Some("t2"), Some(after), Some(before), Some(rank), Some(id), Some(served), None) = (
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+    ) else {
         return Err(malformed());
     };
-    let start_ns: i64 = ns.parse().map_err(|_| malformed())?;
-    let served_at_start: usize = count.parse().map_err(|_| malformed())?;
-    if served_at_start == 0 {
+    let cursor = SearchCursor {
+        after_s: after.parse().map_err(|_| malformed())?,
+        before_s: before.parse().map_err(|_| malformed())?,
+        rank_ns: rank.parse().map_err(|_| malformed())?,
+        trace_id: parse_trace_id(id).map_err(|_| malformed())?,
+        served: served.parse().map_err(|_| malformed())?,
+    };
+    if cursor.served == 0 || cursor.after_s >= cursor.before_s {
         return Err(malformed());
     }
-    if served_at_start > CURSOR_SERVED_CAP {
+    if cursor.served > CURSOR_SERVED_CAP {
         return Err(format!(
-            "anchor tie run exceeds {CURSOR_SERVED_CAP}; narrow the filters or window"
+            "anchor walk exceeds {CURSOR_SERVED_CAP} traces; narrow the filters or window"
         ));
     }
-    Ok(SearchCursor {
-        start_ns,
-        served_at_start,
-    })
+    Ok(cursor)
+}
+
+/// Whether `t` was already served by the cursor's walk: it ranks
+/// at-or-above the after-key in the engine's total order — a higher
+/// rank, or the same rank with a trace id at-or-before the key's
+/// (equal ranks order by ascending id).
+fn is_served(c: &SearchCursor, t: &sfsq::traces::TraceSummary) -> bool {
+    t.newest_matched_start_ns > c.rank_ns
+        || (t.newest_matched_start_ns == c.rank_ns && t.trace_id <= c.trace_id)
 }
 
 // ── Search: window canonicalization ─────────────────────────────────
@@ -278,85 +321,82 @@ pub(crate) struct ResolvedWindow {
 }
 
 /// Canonicalize the wire window (unix seconds; the logs precedent for
-/// unspecified bounds: `before` → now, `after` → before − 900 s), then
-/// narrow the END ns-precise for an anchor page. `Ok(None)` means the
-/// anchor lies at/below the window start — the page is empty, not an
-/// error.
+/// unspecified bounds: `before` → now, `after` → before − 900 s). An
+/// anchor page uses the cursor's FROZEN window verbatim — the request's
+/// own window fields (and the drifting `now`) are ignored so every page
+/// of one walk ranks the same corpus.
 pub(crate) fn resolve_window(
     after_s: u32,
     before_s: u32,
     now_s: u32,
     anchor: Option<&SearchCursor>,
-) -> Result<Option<ResolvedWindow>, String> {
-    let before = if before_s == 0 { now_s } else { before_s };
-    let after = if after_s == 0 {
-        before.saturating_sub(900)
-    } else {
-        after_s
+) -> Result<ResolvedWindow, String> {
+    let (after, before) = match anchor {
+        Some(c) => (c.after_s, c.before_s), // parse_cursor validated after < before
+        None => {
+            let before = if before_s == 0 { now_s } else { before_s };
+            let after = if after_s == 0 {
+                before.saturating_sub(900)
+            } else {
+                after_s
+            };
+            if after >= before {
+                return Err(format!("invalid window: after {after} >= before {before}"));
+            }
+            (after, before)
+        }
     };
-    if after >= before {
-        return Err(format!("invalid window: after {after} >= before {before}"));
-    }
-    let start_ns = i64::from(after) * 1_000_000_000;
-    let mut end_ns = i64::from(before) * 1_000_000_000;
-    if let Some(c) = anchor {
-        end_ns = end_ns.min(c.start_ns.saturating_add(1));
-    }
-    if end_ns <= start_ns {
-        return Ok(None);
-    }
-    Ok(Some(ResolvedWindow {
-        start_ns,
-        end_ns,
-        // Second-granular superset of the ns window; the ns bounds do
-        // the exact filtering inside the engine.
+    Ok(ResolvedWindow {
+        start_ns: i64::from(after) * 1_000_000_000,
+        end_ns: i64::from(before) * 1_000_000_000,
+        // Second-granular equivalent for registry file pruning; the ns
+        // bounds do the exact filtering inside the engine.
         capture: after..before,
-    }))
+    })
 }
 
 // ── Search: engine data → wire ──────────────────────────────────────
 
-/// Shape one search result page. Drops the anchor page's already-served
-/// ties (the engine re-emits them first in its deterministic rank),
-/// trims to `last`, and emits the next cursor only for a FULL page —
-/// a short page means the window is exhausted.
+/// Shape one search result page. Drops everything the cursor's walk
+/// already served (the engine re-emits the served prefix first — same
+/// query, same deterministic total order), trims to `last`, and emits
+/// the next cursor only for a FULL page with a COMPLETE status: a short
+/// page means the walk is exhausted, and a PARTIAL page's continuation
+/// would not be a stable prefix (the engine's work ceilings scale with
+/// the limit), so the walk ends there with the status saying why.
+/// `frozen` is the window this page actually ran (carried into the next
+/// cursor).
 pub(crate) fn to_search_result(
     data: SearchData,
     last: usize,
     incoming: Option<&SearchCursor>,
+    frozen: (u32, u32),
 ) -> SearchResult {
     let mut traces = data.traces;
     if let Some(c) = incoming {
-        let mut dropped = 0;
-        traces.retain(|t| {
-            if t.newest_matched_start_ns == c.start_ns && dropped < c.served_at_start {
-                dropped += 1;
-                false
-            } else {
-                true
-            }
-        });
+        traces.retain(|t| !is_served(c, t));
     }
     traces.truncate(last);
 
-    let anchor = (traces.len() == last && last > 0).then(|| {
-        let tail = traces.last().expect("page is full, last > 0");
-        let tail_rank = tail.newest_matched_start_ns;
-        let carried = incoming
-            .filter(|c| c.start_ns == tail_rank)
-            .map(|c| c.served_at_start)
-            .unwrap_or(0);
-        let at_tail_rank = traces
-            .iter()
-            .filter(|t| t.newest_matched_start_ns == tail_rank)
-            .count();
-        AnchorWire {
-            next: encode_cursor(&SearchCursor {
-                start_ns: tail_rank,
-                served_at_start: carried + at_tail_rank,
-            }),
-        }
-    });
+    let complete = data.status.is_complete();
+    let served_before = incoming.map_or(0, |c| c.served);
+    let anchor = (traces.len() == last && last > 0 && complete)
+        .then(|| {
+            let tail = traces.last().expect("page is full, last > 0");
+            let served = served_before + traces.len();
+            // A walk past the cap can't over-fetch any further — end it
+            // here (the client sees a full page with no continuation).
+            (served <= CURSOR_SERVED_CAP).then(|| AnchorWire {
+                next: encode_cursor(&SearchCursor {
+                    after_s: frozen.0,
+                    before_s: frozen.1,
+                    rank_ns: tail.newest_matched_start_ns,
+                    trace_id: tail.trace_id,
+                    served,
+                }),
+            })
+        })
+        .flatten();
 
     SearchResult {
         version: 1,
@@ -377,6 +417,7 @@ fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
         root_service: t.root_service,
         root_name: t.root_name,
         start_ns: t.start_ns,
+        newest_matched_start_ns: t.newest_matched_start_ns,
         duration_ns: t.duration_ns,
         span_count: t.span_count,
         error_count: t.error_count,

@@ -270,6 +270,10 @@ pub struct TraceSummaryWire {
     pub root_name: Option<String>,
     /// Envelope start (earliest retained canonical span start).
     pub start_ns: i64,
+    /// The rank key: the newest matched-span start — what the
+    /// most-recent-first ordering sorts by. Can be much newer than the
+    /// envelope `start_ns`.
+    pub newest_matched_start_ns: i64,
     /// Envelope duration, saturating.
     pub duration_ns: i64,
     pub span_count: usize,
