@@ -255,7 +255,7 @@ sudo tcpdump -w /tmp/flow-sample.cap -c 200 'udp port 2055 or udp port 6343'
 
 Collect this before opening a bug report:
 
-- Plugin version (`netdata --version` from the running daemon).
+- Plugin version (`netdata -V` from the running daemon).
 - A sample of `netflow.input_packets` chart for the failure window — all dimensions visible.
 - A sample of `netflow.facet_values`, `netflow.tier_index_entries`, and `netflow.open_tiers` if performance-related. Include `netflow.memory_resident_bytes` only if memory diagnostics were enabled.
 - A small packet-capture file (`tcpdump -w` from the agent's interface) reproducing the issue.
