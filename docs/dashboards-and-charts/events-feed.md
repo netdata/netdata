@@ -62,10 +62,11 @@ These events log alert state transitions for node metrics:
 
 ## Who Can Access Events?
 
-| **User Role**      | **Event Domains Accessible**                    |
-|--------------------|-------------------------------------------------|
-| Administrators     | All event domains (Auditing, Topology, Alerts). |
-| Non-administrators | Topology and Alerts only.                       |
+| **Event Domain** |      **Admin**     |     **Manager**    | **Troubleshooter** |    **Observer**    | **Billing** |
+|------------------|:------------------:|:------------------:|:------------------:|:------------------:|:-----------:|
+| **Auditing**     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |
+| **Topology**     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |
+| **Alert**        | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |
 
 :::note
 
