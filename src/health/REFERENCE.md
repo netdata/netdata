@@ -381,6 +381,18 @@ For complete details on configuration loading order and precedence rules, see [A
 - The `every` line is **required** if not using `lookup`
 - Each entity **must** have at least one of the following lines: `lookup`, `calc`, `warn`, or `crit`
 
+While `lookup` or `calc` alone satisfies this minimum syntax requirement, an alert also needs at least one `warn` or `crit` expression to ever leave **UNDEFINED** status. Only a `warn` or `crit` expression can move an alert to CLEAR, WARNING, or CRITICAL (see [Alert Status Lifecycle](#alert-status-lifecycle) for the full status flow). With only `lookup` (or `calc`) and no `warn`/`crit`, the value is computed but nothing evaluates it against a threshold, so once the alert is first evaluated it stays UNDEFINED indefinitely.
+
+For example, this template adds `warn` and `crit` so the alert has something to evaluate:
+
+```text
+template: ram_avail_now
+      on: mem.available
+  lookup: median -15m unaligned of avail
+    warn: $this < 512
+    crit: $this < 128
+```
+
 :::
 
 **Special Syntax Rules:**
