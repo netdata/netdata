@@ -1,8 +1,26 @@
 use super::super::*;
 use super::IngestService;
 use std::future::poll_fn;
+#[cfg(target_os = "linux")]
+use std::os::fd::AsRawFd;
 use std::task::Poll;
 use tokio::io::ReadBuf;
+
+#[cfg(target_os = "linux")]
+fn udp_socket_inode(socket: &UdpSocket) -> Option<u64> {
+    let target = fs::read_link(format!("/proc/self/fd/{}", socket.as_raw_fd())).ok()?;
+    let target = target.to_str()?;
+    target
+        .strip_prefix("socket:[")?
+        .strip_suffix(']')?
+        .parse()
+        .ok()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn udp_socket_inode(_socket: &UdpSocket) -> Option<u64> {
+    None
+}
 
 async fn recv_from_any_listener(
     sockets: &[UdpSocket],
@@ -49,6 +67,9 @@ impl IngestService {
                     let (socket_index, received, source) = match recv {
                         Ok(result) => result,
                         Err(err) => {
+                            self.metrics
+                                .udp_receive_errors
+                                .fetch_add(1, Ordering::Relaxed);
                             tracing::warn!("udp recv error: {}", err);
                             continue;
                         }
@@ -79,9 +100,12 @@ impl IngestService {
             let socket = UdpSocket::bind(&listen)
                 .await
                 .with_context(|| format!("failed to bind {}", listen))?;
-            Self::expand_receive_buffer(&socket, &listen);
+            self.expand_receive_buffer(&socket, &listen);
             sockets.push(socket);
         }
+        self.metrics.replace_udp_listener_socket_inodes(
+            sockets.iter().filter_map(udp_socket_inode).collect(),
+        );
         self.spawn_tier_commit_workers();
         Ok(sockets)
     }
@@ -105,9 +129,7 @@ impl IngestService {
             // rotation and at shutdown. Facet state still persists on the tick
             // cadence, and the entry counter keeps accumulating so shutdown
             // performs one final sync.
-            if let Err(err) = self.facet_runtime.persist_if_dirty() {
-                tracing::warn!("facet runtime persist failed: {}", err);
-            }
+            self.persist_facets_if_dirty();
             entries_since_sync
         };
         self.persist_decoder_state_if_due(now);
@@ -124,10 +146,13 @@ impl IngestService {
     /// what absorbs those stalls; the OS default (typically ~208 KiB, only a
     /// few tens of datagrams) overflows after a few milliseconds at high flow
     /// rates. The kernel caps unprivileged requests at net.core.rmem_max.
-    fn expand_receive_buffer(socket: &UdpSocket, listen: &str) {
+    fn expand_receive_buffer(&self, socket: &UdpSocket, listen: &str) {
         const REQUESTED_RECV_BUFFER_BYTES: usize = 64 * 1024 * 1024;
         let sock_ref = socket2::SockRef::from(socket);
         if let Err(err) = sock_ref.set_recv_buffer_size(REQUESTED_RECV_BUFFER_BYTES) {
+            self.metrics
+                .udp_socket_setup_errors
+                .fetch_add(1, Ordering::Relaxed);
             tracing::warn!(
                 "failed to expand UDP receive buffer for {}: {}",
                 listen,
@@ -143,6 +168,9 @@ impl IngestService {
                 REQUESTED_RECV_BUFFER_BYTES
             ),
             Err(err) => {
+                self.metrics
+                    .udp_socket_setup_errors
+                    .fetch_add(1, Ordering::Relaxed);
                 tracing::warn!(
                     "failed to read back UDP receive buffer for {}: {}",
                     listen,
@@ -158,16 +186,19 @@ impl IngestService {
         payload: &[u8],
         mut entries_since_sync: usize,
     ) -> usize {
-        if payload.is_empty() {
-            return entries_since_sync;
-        }
-
         self.metrics
             .udp_packets_received
             .fetch_add(1, Ordering::Relaxed);
         self.metrics
             .udp_bytes_received
             .fetch_add(payload.len() as u64, Ordering::Relaxed);
+
+        if payload.is_empty() {
+            self.metrics
+                .udp_empty_packets
+                .fetch_add(1, Ordering::Relaxed);
+            return entries_since_sync;
+        }
 
         let receive_time_usec = now_usec();
         let packet_context = self.prepare_decoder_state_namespace(source, payload);
@@ -225,6 +256,9 @@ impl IngestService {
                 .facet_runtime
                 .observe_active_record(Path::new(&active_path), record)
         {
+            self.metrics
+                .facet_active_update_errors
+                .fetch_add(1, Ordering::Relaxed);
             tracing::warn!("facet runtime raw write update failed: {}", err);
         }
 
@@ -305,9 +339,7 @@ impl IngestService {
         self.tier_handoff.begin_shutdown();
         let _ = self.sync_if_needed(entries_since_sync);
         super::tier_commit::join_workers(std::mem::take(&mut self.tier_worker_handles));
-        if let Err(err) = self.facet_runtime.persist_if_dirty() {
-            tracing::warn!("facet runtime persist failed: {}", err);
-        }
+        self.persist_facets_if_dirty();
         self.persist_decoder_state();
     }
 
@@ -420,11 +452,18 @@ impl IngestService {
             tracing::warn!("journal sync failed: {}", err);
         }
 
-        if let Err(err) = self.facet_runtime.persist_if_dirty() {
-            tracing::warn!("facet runtime persist failed: {}", err);
-        }
+        self.persist_facets_if_dirty();
 
         0
+    }
+
+    fn persist_facets_if_dirty(&self) {
+        if let Err(err) = self.facet_runtime.persist_if_dirty() {
+            self.metrics
+                .facet_persist_errors
+                .fetch_add(1, Ordering::Relaxed);
+            tracing::warn!("facet runtime persist failed: {}", err);
+        }
     }
 
     /// Pre-worker mode only (in-process tests/benchmarks); after the workers
@@ -446,9 +485,7 @@ impl IngestService {
             tracing::warn!("tier journal sync failed: {}", err);
             return 1;
         }
-        if let Err(err) = self.facet_runtime.persist_if_dirty() {
-            tracing::warn!("facet runtime persist failed: {}", err);
-        }
+        self.persist_facets_if_dirty();
         0
     }
 

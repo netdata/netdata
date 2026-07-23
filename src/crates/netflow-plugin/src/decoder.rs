@@ -102,9 +102,44 @@ pub(crate) struct DecodeStats {
     pub(crate) parse_attempts: u64,
     pub(crate) parsed_packets: u64,
     pub(crate) parse_errors: u64,
-    pub(crate) template_errors: u64,
+    pub(crate) missing_template_sets: u64,
+    pub(crate) disabled_protocol_packets: u64,
     pub(crate) parser_source_evictions: u64,
     pub(crate) partial_counter_records: u64,
+    pub(crate) decapsulation_failed_records: u64,
+    pub(crate) sampling_option_records: u64,
+    pub(crate) unsupported_data_sets: u64,
+    pub(crate) decoded_rows: u64,
+    pub(crate) enrichment_filtered_rows: u64,
+    pub(crate) ipfix_zero_reverse_records: u64,
+    pub(crate) v9_data_sets: u64,
+    pub(crate) v9_options_data_sets: u64,
+    pub(crate) v9_template_sets: u64,
+    pub(crate) v9_options_template_sets: u64,
+    pub(crate) v9_missing_template_sets: u64,
+    pub(crate) v9_ignored_sets: u64,
+    pub(crate) ipfix_data_sets: u64,
+    pub(crate) ipfix_options_data_sets: u64,
+    pub(crate) ipfix_template_sets: u64,
+    pub(crate) ipfix_options_template_sets: u64,
+    pub(crate) ipfix_missing_template_sets: u64,
+    pub(crate) ipfix_ignored_sets: u64,
+    pub(crate) v9_data_templates: u64,
+    pub(crate) v9_options_templates: u64,
+    pub(crate) ipfix_data_templates: u64,
+    pub(crate) ipfix_options_templates: u64,
+    pub(crate) netflow_v5_records: u64,
+    pub(crate) netflow_v7_records: u64,
+    pub(crate) netflow_v9_records: u64,
+    pub(crate) ipfix_records: u64,
+    pub(crate) v9_options_records: u64,
+    pub(crate) ipfix_options_records: u64,
+    pub(crate) sflow_flow_samples: u64,
+    pub(crate) sflow_counter_samples: u64,
+    pub(crate) sflow_discarded_samples: u64,
+    pub(crate) sflow_rt_metric_samples: u64,
+    pub(crate) sflow_rt_flow_samples: u64,
+    pub(crate) sflow_unknown_samples: u64,
     pub(crate) nsel_records: u64,
     pub(crate) nsel_update_records: u64,
     pub(crate) nsel_create_records: u64,
@@ -129,9 +164,44 @@ impl DecodeStats {
         self.parse_attempts += other.parse_attempts;
         self.parsed_packets += other.parsed_packets;
         self.parse_errors += other.parse_errors;
-        self.template_errors += other.template_errors;
+        self.missing_template_sets += other.missing_template_sets;
+        self.disabled_protocol_packets += other.disabled_protocol_packets;
         self.parser_source_evictions += other.parser_source_evictions;
         self.partial_counter_records += other.partial_counter_records;
+        self.decapsulation_failed_records += other.decapsulation_failed_records;
+        self.sampling_option_records += other.sampling_option_records;
+        self.unsupported_data_sets += other.unsupported_data_sets;
+        self.decoded_rows += other.decoded_rows;
+        self.enrichment_filtered_rows += other.enrichment_filtered_rows;
+        self.ipfix_zero_reverse_records += other.ipfix_zero_reverse_records;
+        self.v9_data_sets += other.v9_data_sets;
+        self.v9_options_data_sets += other.v9_options_data_sets;
+        self.v9_template_sets += other.v9_template_sets;
+        self.v9_options_template_sets += other.v9_options_template_sets;
+        self.v9_missing_template_sets += other.v9_missing_template_sets;
+        self.v9_ignored_sets += other.v9_ignored_sets;
+        self.ipfix_data_sets += other.ipfix_data_sets;
+        self.ipfix_options_data_sets += other.ipfix_options_data_sets;
+        self.ipfix_template_sets += other.ipfix_template_sets;
+        self.ipfix_options_template_sets += other.ipfix_options_template_sets;
+        self.ipfix_missing_template_sets += other.ipfix_missing_template_sets;
+        self.ipfix_ignored_sets += other.ipfix_ignored_sets;
+        self.v9_data_templates += other.v9_data_templates;
+        self.v9_options_templates += other.v9_options_templates;
+        self.ipfix_data_templates += other.ipfix_data_templates;
+        self.ipfix_options_templates += other.ipfix_options_templates;
+        self.netflow_v5_records += other.netflow_v5_records;
+        self.netflow_v7_records += other.netflow_v7_records;
+        self.netflow_v9_records += other.netflow_v9_records;
+        self.ipfix_records += other.ipfix_records;
+        self.v9_options_records += other.v9_options_records;
+        self.ipfix_options_records += other.ipfix_options_records;
+        self.sflow_flow_samples += other.sflow_flow_samples;
+        self.sflow_counter_samples += other.sflow_counter_samples;
+        self.sflow_discarded_samples += other.sflow_discarded_samples;
+        self.sflow_rt_metric_samples += other.sflow_rt_metric_samples;
+        self.sflow_rt_flow_samples += other.sflow_rt_flow_samples;
+        self.sflow_unknown_samples += other.sflow_unknown_samples;
         self.nsel_records += other.nsel_records;
         self.nsel_update_records += other.nsel_update_records;
         self.nsel_create_records += other.nsel_create_records;

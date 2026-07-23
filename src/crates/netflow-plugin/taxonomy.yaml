@@ -1,0 +1,38 @@
+taxonomy_version: 1
+plugin_name: netflow-plugin
+module_name: netflow
+placements:
+  - id: network-flows
+    section_id: netdata
+    title: Network Flows
+    icon: network-wired
+    items:
+      - type: group
+        id: input
+        title: Input
+        items:
+          - netdata.netflow.input_packets
+          - netdata.netflow.protocol_packets
+      - type: group
+        id: decoding
+        title: Decoding
+        items:
+          - netdata.netflow.flow_sets
+          - netdata.netflow.templates
+          - netdata.netflow.flow_records
+          - netdata.netflow.options_records
+          - netdata.netflow.sflow_samples
+          - netdata.netflow.decoder_exceptions
+          - netdata.netflow.flow_rows
+      - type: group
+        id: cisco-nsel
+        title: Cisco NSEL
+        items:
+          - netdata.netflow.nsel_events
+          - netdata.netflow.nsel_rows
+          - netdata.netflow.nsel_exceptions
+      - type: group
+        id: state
+        title: Collector State
+        items:
+          - netdata.netflow.journal_io_ops

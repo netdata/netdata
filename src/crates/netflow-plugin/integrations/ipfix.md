@@ -132,7 +132,9 @@ protocols:
 ### Verifying flow data is arriving and diagnosing failures
 
 See [Troubleshooting](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting) for
-the full diagnostic recipe. For IPFIX specifically, watch the `template_errors` dimension
-on `netflow.input_packets` -- IPFIX is template-driven and data records arriving before
-their templates are dropped. See also
+the full diagnostic recipe. Use `netflow.input_packets` for UDP arrival,
+`netflow.protocol_packets` for v5/v7/v9/IPFIX/sFlow identification, and
+`netflow.decoder_exceptions` for parse failures. For v9/IPFIX, watch the
+missing-template dimensions on `netflow.flow_sets`; Data Sets arriving before
+their templates cannot be decoded. See also
 [Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality).

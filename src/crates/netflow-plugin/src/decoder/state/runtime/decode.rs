@@ -48,10 +48,11 @@ impl FlowDecoders {
             self.expire_v9_templates(context, input_realtime_usec);
         }
 
-        let mut batch = if is_sflow && self.enable_sflow {
+        let mut batch = if is_sflow {
             decode_sflow(
                 source,
                 payload,
+                self.enable_sflow,
                 self.decapsulation_mode,
                 self.timestamp_source,
                 input_realtime_usec,
@@ -112,10 +113,14 @@ impl FlowDecoders {
             apply_missing_flow_time_fallback(flow, input_realtime_usec);
         }
 
+        batch.stats.decoded_rows = batch.flows.len() as u64;
         if let Some(enricher) = &mut self.enricher {
+            let decoded_rows = batch.flows.len();
             batch
                 .flows
                 .retain_mut(|flow| enricher.enrich_record(&mut flow.record));
+            batch.stats.enrichment_filtered_rows =
+                decoded_rows.saturating_sub(batch.flows.len()) as u64;
         }
 
         if template_state_changed {

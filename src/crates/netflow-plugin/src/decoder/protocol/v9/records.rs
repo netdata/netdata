@@ -26,6 +26,8 @@ pub(crate) fn append_v9_records(
             .unwrap_or(false);
         match flowset.body {
             V9FlowSetBody::Data(data) => {
+                stats.v9_data_sets += 1;
+                stats.netflow_v9_records += data.fields.len() as u64;
                 for record in data.fields {
                     let mut rec = base_record("v9", source);
                     let mut sampler_id: Option<u64> = None;
@@ -116,9 +118,6 @@ pub(crate) fn append_v9_records(
                     rec.flow_end_usec = flow_end_usec.unwrap_or(0);
                     if nsel {
                         let projection = project_nsel_record(rec, nsel_state, input_realtime_usec);
-                        stats.partial_counter_records = stats
-                            .partial_counter_records
-                            .saturating_add(projection.stats.partial_counter_records);
                         projection.stats.merge_into(stats);
                         if let Some(flow) = projection.forward {
                             out.push(flow);
@@ -140,9 +139,11 @@ pub(crate) fn append_v9_records(
                     );
 
                     if looks_like_sampling_option_record_from_rec(&rec, observed_sampling_rate) {
+                        stats.sampling_option_records += 1;
                         continue;
                     }
                     if decap_required && !decap_ok {
+                        stats.decapsulation_failed_records += 1;
                         continue;
                     }
 
@@ -166,7 +167,25 @@ pub(crate) fn append_v9_records(
                     });
                 }
             }
-            _ => continue,
+            V9FlowSetBody::OptionsData(data) => {
+                stats.v9_options_data_sets += 1;
+                stats.v9_options_records += data.fields.len() as u64;
+            }
+            V9FlowSetBody::Template(templates) => {
+                stats.v9_template_sets += 1;
+                stats.v9_data_templates += templates.templates.len() as u64;
+            }
+            V9FlowSetBody::OptionsTemplate(templates) => {
+                stats.v9_options_template_sets += 1;
+                stats.v9_options_templates += templates.templates.len() as u64;
+            }
+            V9FlowSetBody::NoTemplate(_) => {
+                stats.v9_missing_template_sets += 1;
+                stats.missing_template_sets += 1;
+            }
+            V9FlowSetBody::Empty => {
+                stats.v9_ignored_sets += 1;
+            }
         }
     }
 }

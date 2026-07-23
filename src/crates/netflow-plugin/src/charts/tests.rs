@@ -8,6 +8,54 @@ use rt::PluginRuntime;
 
 #[test]
 fn chart_metadata_uses_honest_contexts_and_units() {
+    let input = InputPacketsMetrics::chart_metadata();
+    assert_eq!(input.context, "netdata.netflow.input_packets");
+    assert_eq!(input.units, "packets/s");
+
+    let protocols = ProtocolPacketsMetrics::chart_metadata();
+    assert_eq!(protocols.context, "netdata.netflow.protocol_packets");
+    assert_eq!(protocols.units, "packets/s");
+
+    let sets = FlowSetMetrics::chart_metadata();
+    assert_eq!(sets.context, "netdata.netflow.flow_sets");
+    assert_eq!(sets.units, "sets/s");
+
+    let templates = TemplateMetrics::chart_metadata();
+    assert_eq!(templates.context, "netdata.netflow.templates");
+    assert_eq!(templates.units, "templates/s");
+
+    let records = FlowRecordMetrics::chart_metadata();
+    assert_eq!(records.context, "netdata.netflow.flow_records");
+    assert_eq!(records.units, "records/s");
+
+    let options = OptionsRecordMetrics::chart_metadata();
+    assert_eq!(options.context, "netdata.netflow.options_records");
+    assert_eq!(options.units, "records/s");
+
+    let samples = SflowSampleMetrics::chart_metadata();
+    assert_eq!(samples.context, "netdata.netflow.sflow_samples");
+    assert_eq!(samples.units, "samples/s");
+
+    let exceptions = DecoderExceptionMetrics::chart_metadata();
+    assert_eq!(exceptions.context, "netdata.netflow.decoder_exceptions");
+    assert_eq!(exceptions.units, "events/s");
+
+    let rows = FlowRowMetrics::chart_metadata();
+    assert_eq!(rows.context, "netdata.netflow.flow_rows");
+    assert_eq!(rows.units, "rows/s");
+
+    let nsel_events = NselEventMetrics::chart_metadata();
+    assert_eq!(nsel_events.context, "netdata.netflow.nsel_events");
+    assert_eq!(nsel_events.units, "records/s");
+
+    let nsel_rows = NselRowMetrics::chart_metadata();
+    assert_eq!(nsel_rows.context, "netdata.netflow.nsel_rows");
+    assert_eq!(nsel_rows.units, "rows/s");
+
+    let nsel_exceptions = NselExceptionMetrics::chart_metadata();
+    assert_eq!(nsel_exceptions.context, "netdata.netflow.nsel_exceptions");
+    assert_eq!(nsel_exceptions.units, "events/s");
+
     let raw_bytes = RawJournalBytesMetrics::chart_metadata();
     assert_eq!(raw_bytes.context, "netdata.netflow.raw_journal_bytes");
     assert_eq!(raw_bytes.family, "netflow");
@@ -120,6 +168,32 @@ fn snapshot_collects_current_metric_totals_and_open_rows() {
     let metrics = IngestMetrics::default();
     metrics.udp_packets_received.store(11, Ordering::Relaxed);
     metrics.udp_bytes_received.store(22, Ordering::Relaxed);
+    metrics.udp_empty_packets.store(12, Ordering::Relaxed);
+    metrics.udp_kernel_drops.store(13, Ordering::Relaxed);
+    metrics.netflow_v5_packets.store(14, Ordering::Relaxed);
+    metrics.netflow_v7_packets.store(15, Ordering::Relaxed);
+    metrics.netflow_v9_packets.store(16, Ordering::Relaxed);
+    metrics.ipfix_packets.store(17, Ordering::Relaxed);
+    metrics.sflow_datagrams.store(18, Ordering::Relaxed);
+    metrics.v9_data_sets.store(19, Ordering::Relaxed);
+    metrics.ipfix_data_sets.store(20, Ordering::Relaxed);
+    metrics.v9_data_templates.store(21, Ordering::Relaxed);
+    metrics.netflow_v9_records.store(22, Ordering::Relaxed);
+    metrics.ipfix_records.store(23, Ordering::Relaxed);
+    metrics.v9_options_records.store(24, Ordering::Relaxed);
+    metrics.sampling_option_records.store(25, Ordering::Relaxed);
+    metrics.sflow_counter_samples.store(26, Ordering::Relaxed);
+    metrics.parse_errors.store(27, Ordering::Relaxed);
+    metrics.missing_template_sets.store(28, Ordering::Relaxed);
+    metrics.nsel_update_records.store(29, Ordering::Relaxed);
+    metrics.nsel_malformed_records.store(30, Ordering::Relaxed);
+    metrics.nsel_forward_rows.store(31, Ordering::Relaxed);
+    metrics
+        .nsel_counterless_update_records
+        .store(32, Ordering::Relaxed);
+    metrics.decoded_rows.store(40, Ordering::Relaxed);
+    metrics.enrichment_filtered_rows.store(3, Ordering::Relaxed);
+    metrics.journal_write_errors.store(4, Ordering::Relaxed);
     metrics.journal_entries_written.store(33, Ordering::Relaxed);
     metrics.raw_journal_syncs.store(44, Ordering::Relaxed);
     metrics
@@ -214,7 +288,36 @@ fn snapshot_collects_current_metric_totals_and_open_rows() {
         },
     );
     assert_eq!(snapshot.input_packets.udp_received, 11);
+    assert_eq!(snapshot.input_packets.empty, 12);
+    assert_eq!(snapshot.input_packets.kernel_dropped, 13);
     assert_eq!(snapshot.input_bytes.udp_received, 22);
+    assert_eq!(snapshot.protocol_packets.netflow_v5, 14);
+    assert_eq!(snapshot.protocol_packets.netflow_v7, 15);
+    assert_eq!(snapshot.protocol_packets.netflow_v9, 16);
+    assert_eq!(snapshot.protocol_packets.ipfix, 17);
+    assert_eq!(snapshot.protocol_packets.sflow, 18);
+    assert_eq!(snapshot.flow_sets.v9_data, 19);
+    assert_eq!(snapshot.flow_sets.ipfix_data, 20);
+    assert_eq!(snapshot.templates.v9_data, 21);
+    assert_eq!(snapshot.flow_records.netflow_v9, 22);
+    assert_eq!(snapshot.flow_records.ipfix, 23);
+    assert_eq!(snapshot.options_records.netflow_v9, 24);
+    assert_eq!(snapshot.options_records.sampling_data, 25);
+    assert_eq!(snapshot.sflow_samples.counter, 26);
+    assert_eq!(snapshot.decoder_exceptions.parse_errors, 27);
+    assert_eq!(snapshot.decoder_exceptions.missing_template_sets, 28);
+    assert_eq!(snapshot.nsel_events.update, 29);
+    assert_eq!(snapshot.nsel_events.malformed, 30);
+    assert_eq!(snapshot.nsel_rows.forward, 31);
+    assert_eq!(snapshot.nsel_exceptions.counterless_updates, 32);
+    assert_eq!(
+        snapshot.flow_rows.decoded,
+        snapshot
+            .flow_rows
+            .classifier_filtered
+            .saturating_add(snapshot.flow_rows.journaled)
+            .saturating_add(snapshot.flow_rows.write_failed)
+    );
     assert_eq!(snapshot.raw_journal_ops.entries_written, 33);
     assert_eq!(snapshot.raw_journal_ops.sync_calls, 44);
     assert_eq!(snapshot.raw_journal_bytes.logical_written, 55);

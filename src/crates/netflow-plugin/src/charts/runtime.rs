@@ -7,6 +7,17 @@ use tokio::io::{AsyncRead, AsyncWrite};
 pub(crate) struct NetflowCharts {
     input_packets: ChartHandle<InputPacketsMetrics>,
     input_bytes: ChartHandle<InputBytesMetrics>,
+    protocol_packets: ChartHandle<ProtocolPacketsMetrics>,
+    flow_sets: ChartHandle<FlowSetMetrics>,
+    templates: ChartHandle<TemplateMetrics>,
+    flow_records: ChartHandle<FlowRecordMetrics>,
+    options_records: ChartHandle<OptionsRecordMetrics>,
+    sflow_samples: ChartHandle<SflowSampleMetrics>,
+    decoder_exceptions: ChartHandle<DecoderExceptionMetrics>,
+    flow_rows: ChartHandle<FlowRowMetrics>,
+    nsel_events: ChartHandle<NselEventMetrics>,
+    nsel_rows: ChartHandle<NselRowMetrics>,
+    nsel_exceptions: ChartHandle<NselExceptionMetrics>,
     raw_journal_ops: ChartHandle<RawJournalOpsMetrics>,
     raw_journal_bytes: ChartHandle<RawJournalBytesMetrics>,
     materialized_tier_ops: ChartHandle<MaterializedTierOpsMetrics>,
@@ -42,6 +53,24 @@ impl NetflowCharts {
                 .register_chart(InputPacketsMetrics::default(), Duration::from_secs(1)),
             input_bytes: runtime
                 .register_chart(InputBytesMetrics::default(), Duration::from_secs(1)),
+            protocol_packets: runtime
+                .register_chart(ProtocolPacketsMetrics::default(), Duration::from_secs(1)),
+            flow_sets: runtime.register_chart(FlowSetMetrics::default(), Duration::from_secs(1)),
+            templates: runtime.register_chart(TemplateMetrics::default(), Duration::from_secs(1)),
+            flow_records: runtime
+                .register_chart(FlowRecordMetrics::default(), Duration::from_secs(1)),
+            options_records: runtime
+                .register_chart(OptionsRecordMetrics::default(), Duration::from_secs(1)),
+            sflow_samples: runtime
+                .register_chart(SflowSampleMetrics::default(), Duration::from_secs(1)),
+            decoder_exceptions: runtime
+                .register_chart(DecoderExceptionMetrics::default(), Duration::from_secs(1)),
+            flow_rows: runtime.register_chart(FlowRowMetrics::default(), Duration::from_secs(1)),
+            nsel_events: runtime
+                .register_chart(NselEventMetrics::default(), Duration::from_secs(1)),
+            nsel_rows: runtime.register_chart(NselRowMetrics::default(), Duration::from_secs(1)),
+            nsel_exceptions: runtime
+                .register_chart(NselExceptionMetrics::default(), Duration::from_secs(1)),
             raw_journal_ops: runtime
                 .register_chart(RawJournalOpsMetrics::default(), Duration::from_secs(1)),
             raw_journal_bytes: runtime
@@ -120,6 +149,7 @@ impl NetflowCharts {
                 tokio::select! {
                     _ = shutdown.cancelled() => break,
                     _ = interval.tick() => {
+                        sample_udp_kernel_drops(metrics.as_ref());
                         open_tier_sample = sample_open_tier_state(open_tiers.as_ref(), open_tier_sample);
                         tier_index_cardinality = sample_tier_index_cardinality(
                             tier_flow_indexes.as_ref(),
@@ -152,6 +182,24 @@ impl NetflowCharts {
             .update(|chart| *chart = snapshot.input_packets);
         self.input_bytes
             .update(|chart| *chart = snapshot.input_bytes);
+        self.protocol_packets
+            .update(|chart| *chart = snapshot.protocol_packets);
+        self.flow_sets.update(|chart| *chart = snapshot.flow_sets);
+        self.templates.update(|chart| *chart = snapshot.templates);
+        self.flow_records
+            .update(|chart| *chart = snapshot.flow_records);
+        self.options_records
+            .update(|chart| *chart = snapshot.options_records);
+        self.sflow_samples
+            .update(|chart| *chart = snapshot.sflow_samples);
+        self.decoder_exceptions
+            .update(|chart| *chart = snapshot.decoder_exceptions);
+        self.flow_rows.update(|chart| *chart = snapshot.flow_rows);
+        self.nsel_events
+            .update(|chart| *chart = snapshot.nsel_events);
+        self.nsel_rows.update(|chart| *chart = snapshot.nsel_rows);
+        self.nsel_exceptions
+            .update(|chart| *chart = snapshot.nsel_exceptions);
         self.raw_journal_ops
             .update(|chart| *chart = snapshot.raw_journal_ops);
         self.raw_journal_bytes

@@ -1,5 +1,6 @@
 use super::test_support::{
-    decode_fixture_sequence, find_flow, new_test_ingest_service, new_test_ingest_service_in_dir,
+    decode_fixture_sequence, extract_udp_payloads, find_flow, fixture_dir, new_test_ingest_service,
+    new_test_ingest_service_in_dir,
 };
 use super::*;
 use crate::plugin_config::DecapsulationMode as ConfigDecapsulationMode;
@@ -37,6 +38,50 @@ fn ingest_metrics_extend_snapshot_preserves_existing_query_stats_on_key_collisio
         "existing query stats must keep the old snapshot-then-query override behavior"
     );
     assert_eq!(stats.get("decoded_parse_attempts").copied(), Some(67));
+}
+
+#[test]
+fn empty_udp_datagram_is_received_but_not_decoded() {
+    let (_tmp, mut service) = new_test_ingest_service(ConfigDecapsulationMode::None);
+    let source = "192.0.2.1:2055".parse().expect("test source");
+
+    let entries = service.handle_received_packet_for_test(source, &[], 0);
+
+    assert_eq!(entries, 0);
+    assert_eq!(
+        service.metrics.udp_packets_received.load(Ordering::Relaxed),
+        1
+    );
+    assert_eq!(service.metrics.udp_empty_packets.load(Ordering::Relaxed), 1);
+    assert_eq!(service.metrics.parse_attempts.load(Ordering::Relaxed), 0);
+}
+
+#[test]
+fn decoded_row_accounting_reconciles_with_filter_and_journal_outcomes() {
+    let (_tmp, mut service) = new_test_ingest_service(ConfigDecapsulationMode::None);
+    let mut entries_since_sync = 0;
+    for payload in extract_udp_payloads(&fixture_dir().join("nfv5.pcap")) {
+        entries_since_sync = service.handle_received_packet_for_test(
+            payload.source,
+            &payload.data,
+            entries_since_sync,
+        );
+    }
+
+    let decoded = service.metrics.decoded_rows.load(Ordering::Relaxed);
+    let filtered = service
+        .metrics
+        .enrichment_filtered_rows
+        .load(Ordering::Relaxed);
+    let journaled = service
+        .metrics
+        .journal_entries_written
+        .load(Ordering::Relaxed);
+    let write_failed = service.metrics.journal_write_errors.load(Ordering::Relaxed);
+
+    assert!(decoded > 0);
+    assert_eq!(decoded, filtered + journaled + write_failed);
+    assert_eq!(entries_since_sync as u64, journaled);
 }
 
 #[test]
