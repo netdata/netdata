@@ -26,7 +26,12 @@
 //!   order) is kept. `TRSU` carries no root start, so "earliest" is
 //!   not computable across sources; single-root straddles have exactly
 //!   one candidate and resends carry the same id, so only genuine
-//!   multi-root traces reach the tie.
+//!   multi-root traces reach the tie. Consequence (accepted in D16):
+//!   for a CROSS-SOURCE multi-root trace this pick can differ from
+//!   trace-by-id's `summary_root` (which sees start times) — a list
+//!   row and the opened trace may then display different roots. The
+//!   per-source pick (earliest `(start_ns, span_id)`) agrees with
+//!   assembly; the divergence is confined to the pathological case.
 //!
 //! File-granularity caveat (all windowed aggregate modes): capture
 //! prunes by file time-range overlap, so a trace whose earlier or
@@ -56,10 +61,12 @@ pub(crate) struct SourceFoldSpec {
     pub visited_ceiling: u64,
     /// The caller's own ceiling reason (each op names its own).
     pub ceiling_reason: PartialReason,
-    /// Whether sealed sources resolve roots (the string-table-paying
-    /// [`sealed_trace_aggregates`] view) or skip them
-    /// ([`sealed_trace_envelopes`]). Tails always carry roots — with
-    /// `false` the merge simply never sees a sealed candidate.
+    /// Whether the merge carries roots. `true`: sealed sources resolve
+    /// them (the string-table-paying [`sealed_trace_aggregates`] view)
+    /// and tail-resolved roots merge. `false`: sealed sources read the
+    /// roots-free [`sealed_trace_envelopes`] view and the merge DROPS
+    /// the tail-resolved roots too, so `MergedTrace.root` is uniformly
+    /// absent.
     pub resolve_roots: bool,
 }
 

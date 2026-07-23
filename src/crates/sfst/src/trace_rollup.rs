@@ -66,6 +66,47 @@ pub struct TraceRollup {
 }
 
 impl TraceRollup {
+    /// Validate the decoded chunk's structural invariants (the reader
+    /// calls this; unit-testable without a file, the `LinkIndex`
+    /// precedent): index-parallel arrays, in-range root refs (`kv_total`
+    /// exclusive, [`ROLLUP_NO_REF`] allowed), 0/1 flags, and strictly
+    /// increasing trace ids (the seal sorts; a crafted duplicate would
+    /// silently double-count in every cross-source merge).
+    pub(crate) fn validate(&self, kv_total: u32) -> Result<(), crate::Error> {
+        let n = self.min_start_ns.len();
+        let parallel = self.trace_ids.len() == n
+            && self.root_span_ids.len() == n
+            && self.max_end_ns.len() == n
+            && self.span_counts.len() == n
+            && self.error_counts.len() == n
+            && self.root_kinds.len() == n
+            && self.root_is_true_root.len() == n
+            && self.root_service_refs.len() == n
+            && self.root_name_refs.len() == n;
+        if !parallel {
+            return Err(crate::Error::CorruptIndex(
+                "trace rollup fields are not index-parallel".into(),
+            ));
+        }
+        let ref_ok = |r: u32| r == ROLLUP_NO_REF || r < kv_total;
+        if !self.root_service_refs.iter().all(|&r| ref_ok(r))
+            || !self.root_name_refs.iter().all(|&r| ref_ok(r))
+            || !self.root_is_true_root.iter().all(|&f| f <= 1)
+        {
+            return Err(crate::Error::CorruptIndex(
+                "trace rollup carries out-of-range root refs or flags".into(),
+            ));
+        }
+        for i in 1..n {
+            if self.trace_ids.get(i - 1) >= self.trace_ids.get(i) {
+                return Err(crate::Error::CorruptIndex(
+                    "trace rollup ids are not strictly increasing".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Number of distinct set trace ids (rows).
     pub fn len(&self) -> usize {
         self.min_start_ns.len()
@@ -322,5 +363,53 @@ mod tests {
         assert_eq!(ids, vec![tid(2), tid(5), tid(9)]);
         assert_eq!(sealed.len(), 3);
         assert!(!sealed.is_empty());
+    }
+
+    #[test]
+    fn validate_rejects_each_corruption_class() {
+        let mut rows = TraceRollupRows::default();
+        rows.record_span(
+            TraceId::from([1u8; 16]),
+            SpanId::from([1u8; 8]),
+            true,
+            1,
+            1,
+            0,
+            false,
+            None,
+            None,
+        );
+        rows.record_span(
+            TraceId::from([2u8; 16]),
+            SpanId::from([2u8; 8]),
+            true,
+            2,
+            1,
+            0,
+            false,
+            None,
+            None,
+        );
+        let good = rows.sealed(&[]);
+        assert!(good.validate(0).is_ok(), "the sealed shape passes");
+
+        let mut broken = good.clone();
+        broken.span_counts.pop();
+        assert!(broken.validate(0).is_err(), "non-parallel arrays");
+
+        let mut broken = good.clone();
+        broken.root_service_refs[0] = 5; // kv_total is 0 → out of range
+        assert!(broken.validate(0).is_err(), "out-of-range ref");
+
+        let mut broken = good.clone();
+        broken.root_is_true_root[0] = 2;
+        assert!(broken.validate(0).is_err(), "flag beyond 0/1");
+
+        let mut broken = good.clone();
+        let dup = broken.trace_ids.get(0);
+        broken.trace_ids = TraceIds::default();
+        broken.trace_ids.push(dup);
+        broken.trace_ids.push(dup);
+        assert!(broken.validate(0).is_err(), "duplicate ids");
     }
 }

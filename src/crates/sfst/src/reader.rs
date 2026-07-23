@@ -501,34 +501,9 @@ impl<'a> ChunkReader<'a> {
     pub fn trace_rollup(&self) -> Result<crate::TraceRollup, Error> {
         let rollup: crate::TraceRollup =
             unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_ROLLUP)?)?;
-        let n = rollup.min_start_ns.len();
-        let parallel = rollup.trace_ids.len() == n
-            && rollup.root_span_ids.len() == n
-            && rollup.max_end_ns.len() == n
-            && rollup.span_counts.len() == n
-            && rollup.error_counts.len() == n
-            && rollup.root_kinds.len() == n
-            && rollup.root_is_true_root.len() == n
-            && rollup.root_service_refs.len() == n
-            && rollup.root_name_refs.len() == n;
-        if !parallel {
-            return Err(Error::CorruptIndex(
-                "trace rollup fields are not index-parallel".into(),
-            ));
-        }
-        // Ref/flag range checks, the EVNB/LNKB precedent: every root ref is
-        // either the sentinel or a real file KvId, and the flag is 0/1 — a
-        // crafted chunk must fail decode, never flow into consumers.
-        let kv_total = self.metadata()?.id_ranges.high_end.0;
-        let ref_ok = |r: u32| r == crate::ROLLUP_NO_REF || r < kv_total;
-        if !rollup.root_service_refs.iter().all(|&r| ref_ok(r))
-            || !rollup.root_name_refs.iter().all(|&r| ref_ok(r))
-            || !rollup.root_is_true_root.iter().all(|&f| f <= 1)
-        {
-            return Err(Error::CorruptIndex(
-                "trace rollup carries out-of-range root refs or flags".into(),
-            ));
-        }
+        // Structural validation lives on the type (unit-tested there):
+        // index-parallelism, ref ranges, flags, strictly increasing ids.
+        rollup.validate(self.metadata()?.id_ranges.high_end.0)?;
         Ok(rollup)
     }
 
