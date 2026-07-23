@@ -33,13 +33,8 @@ pub(crate) fn append_ipfix_records(
                         );
                     }
 
-                    let sampling_option_record = looks_like_sampling_option_record_from_rec(
-                        &rec,
-                        state.observed_sampling_rate,
-                    );
-                    let decapsulation_failed = state.decap_required && !state.decap_ok;
                     let reverse_present = state.reverse_present;
-                    let Some((forward, reverse, partial_counter_record)) = finalize_ipfix_record(
+                    let projection = finalize_ipfix_record(
                         rec,
                         state,
                         source,
@@ -49,13 +44,17 @@ pub(crate) fn append_ipfix_records(
                         export_usec,
                         timestamp_source,
                         input_realtime_usec,
-                    ) else {
-                        if sampling_option_record {
+                    );
+                    let (forward, reverse, partial_counter_record) = match projection {
+                        Ok(projected) => projected,
+                        Err(IPFixRecordRejection::SamplingOption) => {
                             stats.sampling_option_records += 1;
-                        } else if decapsulation_failed {
-                            stats.decapsulation_failed_records += 1;
+                            continue;
                         }
-                        continue;
+                        Err(IPFixRecordRejection::DecapsulationFailed) => {
+                            stats.decapsulation_failed_records += 1;
+                            continue;
+                        }
                     };
 
                     if partial_counter_record {

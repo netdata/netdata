@@ -473,6 +473,33 @@ fn disabled_sflow_is_still_counted_without_emitting_rows() {
 }
 
 #[test]
+fn ipfix_sampling_packet_ratio_data_record_is_counted_when_suppressed() {
+    const TEMPLATE_ID: u16 = 256;
+    const OBSERVATION_DOMAIN_ID: u32 = 42;
+    const SAMPLING_PACKET_INTERVAL: u16 = 305;
+    const SAMPLING_PACKET_SPACE: u16 = 306;
+
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 2055);
+    let fields = [
+        (SAMPLING_PACKET_INTERVAL, 1_u64.to_be_bytes().to_vec()),
+        (SAMPLING_PACKET_SPACE, 999_u64.to_be_bytes().to_vec()),
+    ];
+    let (template, data) =
+        synthetic_ipfix_raw_field_packets(TEMPLATE_ID, OBSERVATION_DOMAIN_ID, &fields);
+    let mut decoders = FlowDecoders::new();
+
+    let template_batch = decoders.decode_udp_payload(source, &template);
+    assert_eq!(template_batch.stats.parse_errors, 0);
+
+    let decoded = decoders.decode_udp_payload(source, &data);
+    assert_eq!(decoded.stats.parse_errors, 0);
+    assert_eq!(decoded.stats.ipfix_records, 1);
+    assert_eq!(decoded.stats.sampling_option_records, 1);
+    assert_eq!(decoded.stats.decapsulation_failed_records, 0);
+    assert!(decoded.flows.is_empty());
+}
+
+#[test]
 fn keeps_valid_flows_parsed_before_a_trailing_error() {
     let path = fixture_dir().join("nfv5.pcap");
     let file = File::open(&path).unwrap_or_else(|e| panic!("open {}: {e}", path.display()));

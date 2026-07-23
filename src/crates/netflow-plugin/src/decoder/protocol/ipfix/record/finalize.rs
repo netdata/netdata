@@ -1,6 +1,12 @@
 use super::state::IPFixRecordBuildState;
 use super::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IPFixRecordRejection {
+    SamplingOption,
+    DecapsulationFailed,
+}
+
 fn reverse_metric_value(reverse_overrides: &FlowFields, key: &'static str) -> u64 {
     reverse_overrides
         .get(key)
@@ -50,7 +56,7 @@ pub(crate) fn finalize_ipfix_record(
     export_usec: u64,
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
-) -> Option<(DecodedFlow, Option<DecodedFlow>, bool)> {
+) -> Result<(DecodedFlow, Option<DecodedFlow>, bool), IPFixRecordRejection> {
     state.apply_sampling_packet_ratio();
     apply_sampling_state_record(
         &mut rec,
@@ -63,10 +69,10 @@ pub(crate) fn finalize_ipfix_record(
     );
 
     if looks_like_sampling_option_record_from_rec(&rec, state.observed_sampling_rate) {
-        return None;
+        return Err(IPFixRecordRejection::SamplingOption);
     }
     if state.decap_required && !state.decap_ok {
-        return None;
+        return Err(IPFixRecordRejection::DecapsulationFailed);
     }
 
     // Session and observation-point counters measure different traffic.
@@ -92,7 +98,7 @@ pub(crate) fn finalize_ipfix_record(
         .then(|| build_reverse_ipfix_flow(&rec, &state.reverse_overrides, source_ts))
         .flatten();
 
-    Some((
+    Ok((
         DecodedFlow {
             record: rec,
             source_realtime_usec: source_ts,
@@ -332,11 +338,11 @@ mod tests {
             123,
         );
 
-        assert!(decoded.is_some());
+        assert!(decoded.is_ok());
     }
 
     #[test]
-    fn finalize_ipfix_record_drops_failed_datalink_decap_records() {
+    fn finalize_ipfix_record_reports_failed_datalink_decap() {
         let rec = forward_record();
         let mut sampling = SamplingState::default();
         let state = IPFixRecordBuildState {
@@ -357,6 +363,34 @@ mod tests {
             123,
         );
 
-        assert!(decoded.is_none());
+        assert!(matches!(
+            decoded,
+            Err(IPFixRecordRejection::DecapsulationFailed)
+        ));
+    }
+
+    #[test]
+    fn finalize_ipfix_record_reports_sampling_option_after_deriving_packet_ratio() {
+        let rec = FlowRecord::default();
+        let mut sampling = SamplingState::default();
+        let state = IPFixRecordBuildState {
+            sampling_packet_interval: Some(1),
+            sampling_packet_space: Some(999),
+            ..Default::default()
+        };
+
+        let decoded = finalize_ipfix_record(
+            rec,
+            state,
+            "127.0.0.1:2055".parse().unwrap(),
+            10,
+            42,
+            &mut sampling,
+            0,
+            TimestampSource::Input,
+            123,
+        );
+
+        assert!(matches!(decoded, Err(IPFixRecordRejection::SamplingOption)));
     }
 }

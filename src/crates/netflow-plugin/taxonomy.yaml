@@ -5,7 +5,7 @@ placements:
   - id: network-flows
     section_id: netdata
     title: Network Flows
-    icon: network-wired
+    icon: snmp
     items:
       - type: group
         id: input
