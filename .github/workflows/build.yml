@@ -257,11 +257,87 @@ jobs:
             && github.repository == 'netdata/netdata'
           }}
 
+  prepare-static-topology-ip-intel-stock:
+    name: Prepare static topology-ip-intel stock payload
+    runs-on: ubuntu-latest
+    needs:
+      - file-check
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Checkout
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Setup Go
+        id: setup-go
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: src/go/go.mod
+      - name: Prepare synthetic stock payload
+        id: prepare-synthetic
+        if: needs.file-check.outputs.run == 'true' && github.event_name == 'pull_request'
+        run: |
+          .github/scripts/prepare-topology-ip-intel-stock.sh \
+            --mode synthetic \
+            --output-dir "${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
+      - name: Prepare release stock payload
+        id: prepare-release
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
+        uses: nick-invision/retry@v4
+        with:
+          max_attempts: 3
+          retry_wait_seconds: 30
+          timeout_seconds: 1800
+          command: >
+            .github/scripts/prepare-topology-ip-intel-stock.sh
+            --mode release
+            --output-dir "${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
+      - name: Upload topology-ip-intel stock payload
+        id: upload-stock
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: static-topology-ip-intel-stock
+          path: ${{ github.workspace }}/.topology-ip-intel-stock/
+          include-hidden-files: true
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Static topology stock payload preparation failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to prepare the static topology-ip-intel stock payload.
+              Checkout: ${{ steps.checkout.outcome }}
+              Setup Go: ${{ steps.setup-go.outcome }}
+              Prepare synthetic payload: ${{ steps.prepare-synthetic.outcome }}
+              Prepare release payload: ${{ steps.prepare-release.outcome }}
+              Upload stock payload: ${{ steps.upload-stock.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: >-
+          ${{
+            failure()
+            && github.event_name != 'pull_request'
+            && startsWith(github.ref, 'refs/heads/master')
+            && github.repository == 'netdata/netdata'
+            && needs.file-check.outputs.run == 'true'
+          }}
+
   build-static: # Build the static binary archives, and store them as artifacts.
     name: Build Static
     needs:
       - file-check
       - static-matrix
+      - prepare-static-topology-ip-intel-stock
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.static-matrix.outputs.matrix) }}
@@ -306,12 +382,63 @@ jobs:
           sudo apt-get update
           sudo apt-get upgrade -y
           sudo apt-get install -y qemu-user-static
+      - name: Download topology-ip-intel stock payload
+        id: fetch-topology-stock
+        if: needs.file-check.outputs.run == 'true' && matrix.arch != 'armv6l'
+        uses: actions/download-artifact@v8
+        with:
+          name: static-topology-ip-intel-stock
+          path: ${{ github.workspace }}/.topology-ip-intel-stock
       - name: Build
         id: build
         if: needs.file-check.outputs.run == 'true'
         run: |
           [ "${{ matrix.qemu }}" == "true" ] || export SKIP_EMULATION=1
+          if [ "${{ matrix.arch }}" != "armv6l" ]; then
+            export NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR="${GITHUB_WORKSPACE}/.topology-ip-intel-stock"
+          fi
           .github/scripts/build-static.sh ${{ matrix.arch }}
+      - name: Verify topology-ip-intel stock payload
+        id: verify-topology-stock
+        if: needs.file-check.outputs.run == 'true' && matrix.arch != 'armv6l'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          archive="$(find "${GITHUB_WORKSPACE}/artifacts" \
+            -maxdepth 1 \
+            -type f \
+            -name 'netdata-${{ matrix.arch }}-*.gz.run' \
+            ! -name '*-latest.gz.run' \
+            -print \
+            -quit)"
+          if [ -z "${archive}" ]; then
+            printf >&2 'ERROR: static archive for %s was not produced\n' '${{ matrix.arch }}'
+            exit 1
+          fi
+
+          extract_dir="$(mktemp -d)"
+          trap 'rm -rf -- "${extract_dir}"' EXIT
+          (
+            cd "${extract_dir}"
+            sh "${archive}" --tar xf \
+              ./usr/share/netdata/topology-ip-intel/README.md \
+              ./usr/share/netdata/topology-ip-intel/topology-ip-asn.mmdb \
+              ./usr/share/netdata/topology-ip-intel/topology-ip-geo.mmdb \
+              ./usr/share/netdata/topology-ip-intel/topology-ip-intel.json
+          )
+
+          for path in \
+            README.md \
+            topology-ip-asn.mmdb \
+            topology-ip-geo.mmdb \
+            topology-ip-intel.json
+          do
+            if [ ! -s "${extract_dir}/usr/share/netdata/topology-ip-intel/${path}" ]; then
+              printf >&2 'ERROR: static archive has a missing or empty topology IP intelligence file: %s\n' "${path}"
+              exit 1
+            fi
+          done
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
@@ -335,7 +462,9 @@ jobs:
               Fix Tags: ${{ steps.fix-tags.outcome }}
               Mark stable: ${{ steps.channel.outcome }}
               Set up QEMU: ${{ steps.qemu.outcome }}
+              Download topology stock payload: ${{ steps.fetch-topology-stock.outcome }}
               Build: ${{ steps.build.outcome }}
+              Verify topology stock payload: ${{ steps.verify-topology-stock.outcome }}
               Store: ${{ steps.store.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
