@@ -73,6 +73,8 @@ jobs:
             .github/scripts/prepare-topology-ip-intel-stock.sh
             .github/scripts/run-updater-check.sh
             src/go/tools/topology-ip-intel-downloader/
+            src/go/go.mod
+            src/go/go.sum
             packaging/cmake/
             packaging/makeself/
             packaging/installer/
@@ -83,6 +85,7 @@ jobs:
           files_ignore: |
             packaging/**/*.md
             packaging/repoconfig/
+            src/go/tools/topology-ip-intel-downloader/README.md
       - name: Check static build files
         id: check-static-build-files
         uses: step-security/changed-files@v45
@@ -96,10 +99,13 @@ jobs:
             .github/scripts/gen-matrix-static.py
             .github/scripts/prepare-topology-ip-intel-stock.sh
             src/go/tools/topology-ip-intel-downloader/
+            src/go/go.mod
+            src/go/go.sum
             packaging/makeself/
           files_ignore: |
             packaging/**/*.md
             packaging/repoconfig/
+            src/go/tools/topology-ip-intel-downloader/README.md
       - name: List all changed files in pattern
         continue-on-error: true
         if: github.event_name != 'workflow_dispatch'
