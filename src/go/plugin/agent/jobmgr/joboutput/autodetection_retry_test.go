@@ -314,6 +314,21 @@ func TestAutoDetectionRetryClassifiesStoppingSubmission(t *testing.T) {
 		"exact current stopping token is clean": {submitErr: &lifecycle.StoppingRejection{
 			Generation: 1,
 		}},
+		"wrapped current stopping token is clean": {
+			submitErr: fmt.Errorf("wrapped: %w", &lifecycle.StoppingRejection{
+				Generation: 1,
+			}),
+		},
+		"joined current stopping tokens are clean": {
+			submitErr: errors.Join(
+				&lifecycle.StoppingRejection{
+					Generation: 1,
+				},
+				&lifecycle.StoppingRejection{
+					Generation: 1,
+				},
+			),
+		},
 		"wrong generation is structural": {
 			submitErr: &lifecycle.StoppingRejection{
 				Generation: 2,

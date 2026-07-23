@@ -285,8 +285,7 @@ func (adri *autoDetectionRetryIndex) runWorker() {
 				break
 			}
 			if err := adri.dispatch(retry); err != nil {
-				stopping, clean := err.(*lifecycle.StoppingRejection)
-				if clean && stopping.Generation == adri.run {
+				if lifecycle.ContainsOnlyCurrentStoppingRejections(err, adri.run) {
 					return
 				}
 				adri.fail(err)

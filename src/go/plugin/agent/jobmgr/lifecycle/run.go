@@ -20,6 +20,18 @@ func (sr *StoppingRejection) Error() string {
 	return fmt.Sprintf("jobmgr run %d is stopping", sr.Generation)
 }
 
+// ContainsOnlyCurrentStoppingRejections reports whether every leaf in err is a
+// stopping rejection for generation. Mixed or malformed error trees fail closed.
+func ContainsOnlyCurrentStoppingRejections(err error, generation uint64) bool {
+	if generation == 0 {
+		return false
+	}
+	return allErrorLeavesMatch(err, func(leaf error) bool {
+		stopping, ok := leaf.(*StoppingRejection)
+		return ok && stopping.Generation == generation
+	})
+}
+
 type RunSupervisor struct {
 	mu         sync.Mutex         // guards all fields
 	generation uint64             // this run's generation number

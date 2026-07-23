@@ -13,6 +13,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type malformedErrorTree struct {
+	children []error
+}
+
+func (met malformedErrorTree) Error() string {
+	return "malformed error tree"
+}
+
+func (met malformedErrorTree) Unwrap() []error {
+	return met.children
+}
+
+type malformedErrorWrapper struct {
+	child error
+}
+
+func (mew *malformedErrorWrapper) Error() string {
+	return "malformed error wrapper"
+}
+
+func (mew *malformedErrorWrapper) Unwrap() error {
+	return mew.child
+}
+
 func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	owner := ResourceIdentity{
@@ -220,10 +244,21 @@ func TestStoppingErrorTreeMatchingIsStrictAndBounded(t *testing.T) {
 		"mixed real error":     {err: errors.Join(current, errors.New("cleanup failed"))},
 		"generic cancellation": {err: context.Canceled},
 		"tree over bound":      {err: deep},
+		"typed nil stopping rejection": {
+			err: (*StoppingRejection)(nil),
+		},
+		"typed nil wrapper": {
+			err: (*malformedErrorWrapper)(nil),
+		},
+		"nil joined child": {
+			err: malformedErrorTree{
+				children: []error{current, nil},
+			},
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, test.want, onlyCurrentStoppingRejections(test.err, current.Generation))
+			require.Equal(t, test.want, ContainsOnlyCurrentStoppingRejections(test.err, current.Generation))
 		})
 	}
 }
