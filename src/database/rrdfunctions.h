@@ -96,6 +96,10 @@ int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd
                               HTTP_ACCESS user_access, bool allow_restricted,
                               const DICTIONARY_ITEM **out_acquired);
 
+// Regression test for rrd_function_verify_access() access gating (GHSA-6628-vxm3-4g8g).
+// Requires a prepared RRD (localhost). Returns the number of failures (0 = pass).
+int rrdfunctions_verify_access_unittest(void);
+
 bool rrd_function_available(RRDHOST *host, const char *function);
 bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host);
 

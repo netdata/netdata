@@ -226,6 +226,8 @@ int unittest_stream_compressions(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
+int rrdfunctions_verify_access_unittest(void);
+int mcp_execute_function_access_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
 int statistical_unittest(void);
@@ -484,6 +486,8 @@ int netdata_main(int argc, char **argv) {
                             if (uuid_unittest()) return 1;
                             if (os_socket_egress_interface_unittest()) return 1;
                             if (dyncfg_unittest()) return 1;
+                            if (rrdfunctions_verify_access_unittest()) return 1;
+                            if (mcp_execute_function_access_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
                             if (statistical_unittest()) return 1;
@@ -699,6 +703,36 @@ int netdata_main(int argc, char **argv) {
                             int rc = unittest_prepare_rrd(&user);
                             if (!rc)
                                 rc = dyncfg_unittest();
+
+                            sqlite_close_databases();
+                            sqlite_library_shutdown();
+                            rrdlabels_aral_destroy(false);
+                            return rc;
+                        }
+                        else if(strcmp(optarg, "functionsaccesstest") == 0) {
+                            unittest_running = true;
+                            if(sqlite_library_init())
+                                return 1;
+                            rrdlabels_aral_init(false);
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if (!rc)
+                                rc = rrdfunctions_verify_access_unittest();
+
+                            sqlite_close_databases();
+                            sqlite_library_shutdown();
+                            rrdlabels_aral_destroy(false);
+                            return rc;
+                        }
+                        else if(strcmp(optarg, "mcpfunctionaccesstest") == 0) {
+                            unittest_running = true;
+                            if(sqlite_library_init())
+                                return 1;
+                            rrdlabels_aral_init(false);
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if (!rc)
+                                rc = mcp_execute_function_access_unittest();
 
                             sqlite_close_databases();
                             sqlite_library_shutdown();
