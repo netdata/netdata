@@ -22,6 +22,7 @@
 //!   which deliberately never deduplicate.
 
 mod by_id;
+mod overview;
 mod predicate;
 mod search;
 mod sources;
@@ -32,6 +33,10 @@ mod wal_scan;
 mod window;
 
 pub use by_id::{DEFAULT_SPAN_CAP, FieldKinds, TraceData, TraceQuery, TraceRequestError, trace_by_id};
+pub use overview::{
+    DURATION_BIN_COUNT, DURATION_BIN_LABELS, OverviewData, OverviewQuery, OverviewRequestError,
+    overview,
+};
 pub use predicate::{
     CompareOp, Condition, Predicate, PredicateError, PredicateTarget, PredicateValue,
     span_matches,

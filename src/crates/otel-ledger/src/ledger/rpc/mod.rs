@@ -17,6 +17,7 @@
 //! this layer adapts the netdata function protocol to them.
 
 mod dispatch;
+mod grid;
 mod logs;
 mod traces;
 

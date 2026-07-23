@@ -30,6 +30,12 @@ pub enum PartialReason {
     /// result is empty; during the merge it is the deterministic merged
     /// prefix.
     Cancelled,
+    /// The overview's own visited-rows ceiling was hit before every
+    /// in-window source was binned: the grid holds the deterministic
+    /// prefix of sources (SourceId order) processed so far. Distinct
+    /// from [`WorkCeiling`] — the overview's cost is O(spans-in-window)
+    /// per source, a different budget than search's candidate loop.
+    OverviewCeiling,
 }
 
 /// The status of one query's result.

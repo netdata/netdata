@@ -9,7 +9,7 @@ use file_registry::{ByteSize, FileId, MonotonicClock, TenantId, TimestampNs, tes
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
 use opentelemetry_proto::tonic::resource::v1::Resource;
-use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
+use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
 use tokio::sync::RwLock;
 
 use file_lifecycle::registry::TenantRegistries;
@@ -94,6 +94,22 @@ pub(crate) fn otlp_req_svc(
             ..Default::default()
         }],
     }
+}
+
+/// Like [`otlp_req_svc`], with span 1 carrying an OTLP ERROR status —
+/// for the overview's error-totals coverage.
+pub(crate) fn otlp_req_err(
+    trace_byte: u8,
+    span_count: u8,
+    base_ns: u64,
+    service: &str,
+) -> ExportTraceServiceRequest {
+    let mut req = otlp_req_svc(trace_byte, span_count, base_ns, service);
+    req.resource_spans[0].scope_spans[0].spans[0].status = Some(Status {
+        code: 2, // STATUS_CODE_ERROR
+        message: "boom".into(),
+    });
+    req
 }
 
 /// One trace whose spans start at the EXACT given times (ns) — for

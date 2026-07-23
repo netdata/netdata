@@ -129,7 +129,7 @@ fn info_response_shape_is_pinned() {
             "version": 1,
             "status": 200,
             "accepted_params": [
-                "info", "trace", "attributes", "attribute_values",
+                "info", "trace", "attributes", "attribute_values", "overview",
                 "tenant", "after", "before", "last", "anchor"
             ],
             "required_params": [],
@@ -176,10 +176,13 @@ fn every_partial_reason_wire_name_is_pinned() {
     b.add(PartialReason::SourceFailure);
     b.add(PartialReason::WorkCeiling);
     b.add(PartialReason::Cancelled);
+    b.add(PartialReason::OverviewCeiling);
     let wire = StatusWire::from(&b.finish());
     assert_eq!(
         serde_json::to_value(&wire).unwrap(),
-        json!({"partial": ["size_cap", "source_failure", "work_ceiling", "cancelled"]})
+        json!({"partial": [
+            "size_cap", "source_failure", "work_ceiling", "cancelled", "overview_ceiling"
+        ]})
     );
 }
 

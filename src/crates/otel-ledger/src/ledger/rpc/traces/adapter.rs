@@ -9,14 +9,14 @@ use std::collections::HashMap;
 
 use sfsq::traces::{
     AttributeKey, AttributeNamesData, AttributeOwner, AttributeValuesData, BuiltinField,
-    CompareOp, Condition, FieldKinds, Predicate, PredicateTarget, PredicateValue, SearchData,
-    TraceData,
+    CompareOp, Condition, DURATION_BIN_LABELS, FieldKinds, OverviewData, Predicate,
+    PredicateTarget, PredicateValue, SearchData, TraceData,
 };
 
 use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, EventWire,
-    FieldKindsWire, LinkWire, SearchItems, SearchResult, SpanWire, StatusWire, TraceItems,
-    TraceResult, TraceSummaryWire,
+    FieldKindsWire, LinkWire, OverviewGridWire, OverviewResult, OverviewTotals, SearchItems,
+    SearchResult, SpanWire, StatusWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -307,6 +307,33 @@ pub(crate) fn to_attribute_values_result(
                 kind: v.kind.map(kind_word),
             })
             .collect(),
+    }
+}
+
+// ── Overview: engine data → wire ────────────────────────────────────
+
+/// Shape the span-density grid into the wire result. `bucket_start_s` /
+/// `bucket_width_s` are the ALIGNED second-granular geometry the grid
+/// was built from (the shared derivation guarantees whole seconds).
+pub(crate) fn to_overview_result(
+    data: OverviewData,
+    bucket_start_s: u32,
+    bucket_width_s: u32,
+) -> OverviewResult {
+    OverviewResult {
+        version: 1,
+        unit: "spans",
+        status: StatusWire::from(&data.status),
+        grid: OverviewGridWire {
+            bucket_start_s,
+            bucket_width_s,
+            duration_bins: DURATION_BIN_LABELS.to_vec(),
+            cells: data.cells.iter().map(|row| row.to_vec()).collect(),
+        },
+        totals: OverviewTotals {
+            spans: data.total_spans,
+            errors: data.total_errors,
+        },
     }
 }
 

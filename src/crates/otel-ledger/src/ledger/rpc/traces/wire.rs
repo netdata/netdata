@@ -26,6 +26,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "trace",
     "attributes",
     "attribute_values",
+    "overview",
     "tenant",
     "after",
     "before",
@@ -61,8 +62,8 @@ pub struct OtelTracesRequest {
     /// [`OtelTracesRequest::attribute_values_params`].
     #[serde(default, deserialize_with = "present")]
     pub attribute_values: Option<serde_json::Value>,
-    /// Selects the overview grid (time × log-duration density). Typed in
-    /// step 1.5.
+    /// Selects the overview grid (time × log-duration density). Typed
+    /// parse: [`OtelTracesRequest::overview_params`].
     #[serde(default, deserialize_with = "present")]
     pub overview: Option<serde_json::Value>,
     /// Query window, unix seconds. Consumed by the WINDOWED data modes
@@ -135,20 +136,6 @@ pub enum RequestMode {
     AttributeValues,
     Overview,
     Search,
-}
-
-impl RequestMode {
-    /// The wire name of the mode, for error messages and docs.
-    pub fn name(self) -> &'static str {
-        match self {
-            RequestMode::Info => "info",
-            RequestMode::Trace => "trace",
-            RequestMode::Attributes => "attributes",
-            RequestMode::AttributeValues => "attribute_values",
-            RequestMode::Overview => "overview",
-            RequestMode::Search => "search",
-        }
-    }
 }
 
 /// More than one data-mode selector was set: ambiguous, so a client
@@ -225,7 +212,26 @@ impl OtelTracesRequest {
         AttributeValuesParams::deserialize(v)
             .map_err(|e| format!("invalid attribute_values selector: {e}"))
     }
+
+    /// Parse the `overview` selector (same contract; an empty object is
+    /// the whole v1 shape — bucket geometry derives from after/before).
+    pub fn overview_params(&self) -> Result<OverviewParams, String> {
+        let v = self
+            .overview
+            .as_ref()
+            .expect("overview_params is only called on RequestMode::Overview");
+        OverviewParams::deserialize(v).map_err(|e| format!("invalid overview selector: {e}"))
+    }
 }
+
+/// The `overview` mode's typed parameters. Deliberately empty in v1:
+/// the time-bucket geometry derives from `after`/`before` (the shared
+/// nice-width grid, like the logs histogram) and the duration bins are
+/// the fixed log-scale set. Typed anyway so a future knob lands without
+/// a shape change and so `null`/junk selectors error cleanly today.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OverviewParams {}
 
 /// The `attributes` mode's typed parameters.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -279,6 +285,43 @@ pub enum OtelTracesResponse {
     Search(Box<SearchResult>),
     Attributes(AttributesResult),
     AttributeValues(AttributeValuesResult),
+    Overview(Box<OverviewResult>),
+}
+
+// ── Overview response ───────────────────────────────────────────────
+
+/// The span-density grid: time buckets × log-scale duration bins. All
+/// numbers count SPANS (stored rows) — the `unit` field says so and the
+/// UI renders it verbatim (phase 2 flips it to "traces" when the
+/// trace-level rollup lands; units are never mixed).
+#[derive(Debug, Serialize)]
+pub struct OverviewResult {
+    pub version: u32,
+    /// What the counts count. `"spans"` in phase 1 — render verbatim,
+    /// never hardcode.
+    pub unit: &'static str,
+    pub status: StatusWire,
+    pub grid: OverviewGridWire,
+    pub totals: OverviewTotals,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OverviewGridWire {
+    /// First bucket's start, unix seconds; buckets are contiguous.
+    pub bucket_start_s: u32,
+    pub bucket_width_s: u32,
+    /// The duration bins' labels, index-parallel to each cell row.
+    pub duration_bins: Vec<&'static str>,
+    /// Per time bucket, the per-duration-bin span counts.
+    pub cells: Vec<Vec<u64>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OverviewTotals {
+    /// Spans binned into the grid (= the sum of all cells).
+    pub spans: u64,
+    /// Of those, spans with ERROR status.
+    pub errors: u64,
 }
 
 // ── Enumeration responses ───────────────────────────────────────────
@@ -562,6 +605,7 @@ pub enum PartialReasonWire {
     SourceFailure,
     WorkCeiling,
     Cancelled,
+    OverviewCeiling,
 }
 
 impl From<PartialReason> for PartialReasonWire {
@@ -571,6 +615,7 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::SourceFailure => PartialReasonWire::SourceFailure,
             PartialReason::WorkCeiling => PartialReasonWire::WorkCeiling,
             PartialReason::Cancelled => PartialReasonWire::Cancelled,
+            PartialReason::OverviewCeiling => PartialReasonWire::OverviewCeiling,
         }
     }
 }

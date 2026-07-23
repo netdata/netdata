@@ -27,15 +27,15 @@ use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::TenantRegistries;
 
 use sfsq::traces::{
-    AttributeNamesQuery, AttributeRequestError, AttributeValuesQuery, SearchQuery,
-    SearchRequestError, SearchSources, TimeWindow, TraceQuery, TraceRequestError, attribute_names,
-    attribute_values, search, trace_by_id,
+    AttributeNamesQuery, AttributeRequestError, AttributeValuesQuery, OverviewQuery,
+    OverviewRequestError, SearchQuery, SearchRequestError, SearchSources, TimeWindow, TraceQuery,
+    TraceRequestError, attribute_names, attribute_values, overview, search, trace_by_id,
 };
 
 use super::adapter::{
     ResolvedWindow, build_predicate, parse_cursor, parse_enumeration_key, parse_owner_word,
     parse_trace_id, resolve_window, to_attribute_values_result, to_attributes_result,
-    to_search_result, to_trace_result,
+    to_overview_result, to_search_result, to_trace_result,
 };
 use super::sources::TracesSourceSupplier;
 use super::wire::{InfoResponse, OtelTracesRequest, OtelTracesResponse, RequestMode, SearchResult};
@@ -329,6 +329,56 @@ fn unix_now_s() -> u32 {
         .min(u64::from(u32::MAX)) as u32
 }
 
+impl OtelTracesHandler {
+    /// The `overview` mode: the span-density grid (time bucket ×
+    /// log-scale duration bin) — the UI's default paint. Geometry
+    /// derives from the canonicalized window via the shared nice-width
+    /// grid; counts are SPANS (the phase-1 unit, labeled on the wire).
+    async fn overview(
+        &self,
+        ctx: &FunctionCallContext,
+        req: &OtelTracesRequest,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
+        // v1 carries no knobs, but the parse still rejects null/junk.
+        let _params = req.overview_params().map_err(client_err)?;
+
+        let now_s = unix_now_s();
+        let window: ResolvedWindow =
+            resolve_window(req.after, req.before, now_s, None).map_err(client_err)?;
+        let (grid, aligned_after, aligned_before) =
+            super::super::grid::grid_for_window_s(window.capture.start, window.capture.end);
+        let query = OverviewQuery::new(grid);
+
+        // Alignment can widen the window; prune files by the widened one.
+        let tenant = TenantId::resolve_query(req.tenant.as_deref());
+        let sources = self
+            .supplier
+            .capture(&tenant, aligned_after..aligned_before, 1, &ctx.cancellation)
+            .await
+            .pop()
+            .unwrap_or_default();
+        ctx.progress.set_total(sources.len());
+        let done = ctx.progress.done_counter();
+        let cancel = ctx.cancellation.clone();
+
+        let width_s = (aligned_before - aligned_after)
+            / u32::try_from(grid.num_buckets.max(1)).unwrap_or(1);
+        match tokio::task::spawn_blocking(move || overview(sources, query, cancel, done)).await {
+            Ok(Ok(data)) => Ok(OtelTracesResponse::Overview(Box::new(to_overview_result(
+                data,
+                aligned_after,
+                width_s,
+            )))),
+            Ok(Err(OverviewRequestError::SourceSet(e))) => Err(handler_err(format!(
+                "otel-traces internal error: captured source set is inconsistent: {e}"
+            ))),
+            Ok(Err(e)) => Err(client_err(e.to_string())),
+            Err(e) => Err(handler_err(format!("otel-traces overview task failed: {e}"))),
+        }
+    }
+}
+
 /// Enumeration request errors: a rejected source set is the supplier's
 /// inconsistency (internal); everything else is the client's request.
 fn map_attribute_error(e: AttributeRequestError) -> netdata_plugin_error::NetdataPluginError {
@@ -359,10 +409,7 @@ impl FunctionHandler for OtelTracesHandler {
             RequestMode::Search => self.search(&ctx, &req).await,
             RequestMode::Attributes => self.attributes(&ctx, &req).await,
             RequestMode::AttributeValues => self.attribute_values(&ctx, &req).await,
-            other => Err(handler_err(format!(
-                "otel-traces mode '{}' is not implemented yet",
-                other.name()
-            ))),
+            RequestMode::Overview => self.overview(&ctx, &req).await,
         }
     }
 

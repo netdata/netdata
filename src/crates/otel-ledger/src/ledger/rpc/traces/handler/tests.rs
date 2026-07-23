@@ -44,7 +44,7 @@ async fn info_returns_the_descriptor() {
     assert_eq!(
         v["accepted_params"],
         json!([
-            "info", "trace", "attributes", "attribute_values",
+            "info", "trace", "attributes", "attribute_values", "overview",
             "tenant", "after", "before", "last", "anchor"
         ])
     );
@@ -65,13 +65,16 @@ async fn default_request_is_an_empty_complete_search() {
 }
 
 #[tokio::test]
-async fn remaining_data_modes_error_with_their_names() {
-    let err = call(json!({"overview": {}}))
-        .await
-        .expect_err("overview is not implemented yet");
-    let msg = err.to_string();
-    assert!(msg.contains("overview"), "names the mode: {msg}");
-    assert!(msg.contains("not implemented"), "states why: {msg}");
+async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
+    // The phase-1 mode catalog is complete: no selector errors as
+    // not-implemented anymore; an empty agent answers each cleanly.
+    for body in [
+        json!({"overview": {}}),
+        json!({"attributes": {}}),
+        json!({"attribute_values": {"key": "name"}}),
+    ] {
+        call(body.clone()).await.unwrap_or_else(|e| panic!("{body}: {e}"));
+    }
 }
 
 #[tokio::test]
@@ -598,6 +601,69 @@ async fn enumeration_invalid_requests_are_clean_client_errors() {
         // A virtual builtin has no value dictionary — the engine's own
         // message surfaces.
         (json!({"attribute_values": {"key": "duration"}}), "virtual"),
+    ] {
+        let err = call_on(&h, body.clone()).await.expect_err("must be a client error");
+        let msg = err.to_string();
+        assert!(msg.contains(needle), "for {body}: {msg}");
+    }
+}
+
+// ── The overview mode ───────────────────────────────────────────────
+
+#[tokio::test]
+async fn overview_grid_matches_the_corpus_distribution() {
+    // 100s window → 1s buckets aligned to [T_S, T_S+100). The corpus's
+    // 8 spans (A=1, B=2, C=1, D=1, E=3), all 500ns durations (bin 0).
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    body["overview"] = json!({});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["unit"], "spans");
+    assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(v["totals"], json!({"spans": 8, "errors": 0}));
+    assert_eq!(v["grid"]["bucket_start_s"], T_S);
+    assert_eq!(v["grid"]["bucket_width_s"], 1);
+    assert_eq!(
+        v["grid"]["duration_bins"],
+        json!(["<1ms", "1-10ms", "10-100ms", "100ms-1s", "1-10s", ">10s"])
+    );
+    let cells = v["grid"]["cells"].as_array().unwrap();
+    assert_eq!(cells.len(), 100);
+    let sum: u64 = cells.iter().flat_map(|r| r.as_array().unwrap()).map(|c| c.as_u64().unwrap()).sum();
+    assert_eq!(sum, 8, "cell sums equal totals");
+    // A's single span landed in bucket 10, bin 0; E's three in bucket 40.
+    assert_eq!(cells[10][0], 1);
+    assert_eq!(cells[40][0], 3);
+}
+
+#[tokio::test]
+async fn overview_counts_error_spans_in_totals() {
+    use crate::ledger::rpc::traces::fixtures::otlp_req_err;
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![
+            otlp_req_svc(0x0A, 2, base_ns(10), "svc"),
+            otlp_req_err(0x0B, 2, base_ns(20), "svc"), // span 1 = ERROR
+        ],
+    )
+    .await;
+    let h = make_handler_over(registries);
+    let mut body = window_body();
+    body["overview"] = json!({});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["totals"], json!({"spans": 4, "errors": 1}));
+}
+
+#[tokio::test]
+async fn overview_invalid_selectors_are_clean_client_errors() {
+    let h = handler_with_search_corpus().await;
+    for (body, needle) in [
+        (json!({"overview": null}), "invalid overview selector"),
+        (json!({"overview": {"bogus": 1}}), "unknown field"),
+        (json!({"overview": {}, "after": 500, "before": 400}), "invalid window"),
     ] {
         let err = call_on(&h, body.clone()).await.expect_err("must be a client error");
         let msg = err.to_string();
