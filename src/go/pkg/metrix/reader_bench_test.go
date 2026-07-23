@@ -13,13 +13,13 @@ var (
 	benchmarkReaderCountSink int
 )
 
-// Reader benchmarks guard lookup, flattening, and iteration paths before the
-// package-layout refactor. Latest results are measured on a developer laptop,
-// not CI, and should be treated as before/after trend indicators.
+// Reader benchmarks guard lookup and iteration paths. Latest results are
+// measured on a developer laptop, not CI, and should be treated as before/after
+// trend indicators. CollectorStore flatten construction and cached acquisition
+// have dedicated cold and warm benchmarks in collector_store_scope_bench_test.go.
 // Latest (developer laptop, -count=10): ValueLookup s1 76-79ns/2allocs, s1000
-// 82-84ns/2; FlattenConstruction s10 52us/1135allocs, s100 586us/10706;
-// ForEachSeriesIdentityRaw s100 371ns/2, s1000 4.7us/2; RuntimeOverlayValueLookup
-// d1 76ns/2, d64 440-468ns/2.
+// 82-84ns/2; ForEachSeriesIdentityRaw s100 371ns/2, s1000 4.7us/2;
+// RuntimeOverlayValueLookup d1 76ns/2, d64 440-468ns/2.
 func BenchmarkReaderValueLookup(b *testing.B) {
 	tests := []int{1, 1000}
 
@@ -37,26 +37,6 @@ func BenchmarkReaderValueLookup(b *testing.B) {
 					b.Fatal("expected value")
 				}
 				benchmarkReaderValueSink = v
-			}
-		})
-	}
-}
-
-func BenchmarkReaderFlattenConstruction(b *testing.B) {
-	tests := []int{10, 100}
-
-	for _, totalSeries := range tests {
-		b.Run(fmt.Sprintf("series_%d", totalSeries), func(b *testing.B) {
-			s := benchmarkCommittedMixedStore(b, totalSeries)
-
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				r := s.Read(ReadFlatten())
-				meta := r.CollectMeta()
-				if meta.LastSuccessSeq == 0 {
-					b.Fatal("expected committed snapshot")
-				}
 			}
 		})
 	}

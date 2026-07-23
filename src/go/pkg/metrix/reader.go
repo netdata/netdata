@@ -5,7 +5,6 @@ package metrix
 import (
 	"maps"
 	"slices"
-	"sort"
 	"sync"
 )
 
@@ -17,8 +16,14 @@ type storeReader struct {
 	seriesOnce   sync.Once
 	series       map[string]*committedSeries
 	indexOnce    sync.Once
-	index        map[string][]*committedSeries
+	index        *snapshotSeriesIndex
 }
+
+type collectorReader struct {
+	storeReader
+}
+
+var emptySnapshotScopeIndex snapshotScopeIndex
 
 type familyView struct {
 	name   string
@@ -167,25 +172,15 @@ func (r *storeReader) SeriesMeta(name string, labels Labels) (SeriesMeta, bool) 
 }
 
 func (r *storeReader) MetricMeta(name string) (MetricMeta, bool) {
-	index := r.byNameIndex()
-	series := index[name]
-	if len(series) == 0 {
+	scope := r.scopeIndex()
+	if series := scope.byName[name]; len(series) > 0 {
+		return series[0].desc.meta, true
+	}
+	desc := scope.structuredMetaByName[name]
+	if desc == nil {
 		return MetricMeta{}, false
 	}
-	for _, s := range series {
-		if s.desc == nil {
-			continue
-		}
-		if r.raw || r.visible(s) {
-			return s.desc.meta, true
-		}
-	}
-	for _, s := range series {
-		if s.desc != nil {
-			return s.desc.meta, true
-		}
-	}
-	return MetricMeta{}, false
+	return desc.meta, true
 }
 
 func (r *storeReader) CollectMeta() CollectMeta {
@@ -193,26 +188,23 @@ func (r *storeReader) CollectMeta() CollectMeta {
 }
 
 func (r *storeReader) HostScopes() []HostScope {
-	// Scope discovery intentionally ignores this reader's active scope filter so
-	// jobruntime can enumerate all host partitions from one snapshot.
-	scopes := make(map[string]HostScope)
-	for _, s := range r.seriesView() {
-		scopes[s.hostScopeKey] = cloneHostScope(s.hostScope)
-	}
-	return sortedHostScopes(scopes)
+	// Scope discovery intentionally ignores this reader's active scope filter.
+	return cloneHostScopes(r.snapshotIndex().hostScopes)
+}
+
+func (r *collectorReader) FreshVisibleHostScopes() []HostScope {
+	return cloneHostScopes(r.snapshotIndex().freshVisibleHostScopes)
 }
 
 func (r *storeReader) Family(name string) (FamilyView, bool) {
-	index := r.byNameIndex()
-	if slices.ContainsFunc(index[name], r.visible) {
+	if slices.ContainsFunc(r.scopeIndex().byName[name], r.visible) {
 		return familyView{name: name, reader: r}, true
 	}
 	return nil, false
 }
 
 func (r *storeReader) ForEachByName(name string, fn func(labels LabelView, v SampleValue)) {
-	index := r.byNameIndex()
-	for _, s := range index[name] {
+	for _, s := range r.scopeIndex().byName[name] {
 		if r.visible(s) {
 			fn(labelView{items: s.labels}, s.value)
 		}
@@ -232,14 +224,9 @@ func (r *storeReader) ForEachSeriesIdentity(fn func(identity SeriesIdentity, met
 }
 
 func (r *storeReader) ForEachSeriesIdentityRaw(fn func(identity SeriesIdentity, meta SeriesMeta, name string, labels []Label, v SampleValue)) {
-	index := r.byNameIndex()
-	names := make([]string, 0, len(index))
-	for name := range index {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		for _, s := range index[name] {
+	scope := r.scopeIndex()
+	for _, name := range scope.names {
+		for _, s := range scope.byName[name] {
 			if r.visible(s) {
 				hash := s.hash64
 				if hash == 0 {
@@ -255,8 +242,7 @@ func (r *storeReader) ForEachSeriesIdentityRaw(fn func(identity SeriesIdentity, 
 }
 
 func (r *storeReader) ForEachMatch(name string, match func(labels LabelView) bool, fn func(labels LabelView, v SampleValue)) {
-	index := r.byNameIndex()
-	for _, s := range index[name] {
+	for _, s := range r.scopeIndex().byName[name] {
 		if !r.visible(s) {
 			continue
 		}
@@ -285,12 +271,19 @@ func (r *storeReader) lookup(name string, labels Labels) (*committedSeries, bool
 	return lookupSnapshotSeries(r.snap, key)
 }
 
-func (r *storeReader) byNameIndex() map[string][]*committedSeries {
-	if r.snap.runtimeBase == nil && r.snap.byName != nil {
-		return r.snap.byName
+func (r *storeReader) scopeIndex() *snapshotScopeIndex {
+	if scope := r.snapshotIndex().scope(r.hostScopeKey); scope != nil {
+		return scope
+	}
+	return &emptySnapshotScopeIndex
+}
+
+func (r *storeReader) snapshotIndex() *snapshotSeriesIndex {
+	if r.snap.index != nil || r.snap.collector != nil {
+		return r.snap.seriesIndex()
 	}
 	r.indexOnce.Do(func() {
-		r.index = buildByName(r.seriesView())
+		r.index = buildSnapshotSeriesIndex(r.seriesView(), r.snap.collectMeta)
 	})
 	return r.index
 }
@@ -345,12 +338,10 @@ func (r *storeReader) visible(s *committedSeries) bool {
 	if r.raw {
 		return true
 	}
-	if s.desc == nil {
-		return false
-	}
-	if s.desc.freshness == FreshnessCommitted {
-		return true
-	}
-	meta := r.snap.collectMeta
-	return meta.LastAttemptStatus == CollectStatusSuccess && s.meta.LastSeenSuccessSeq == meta.LastSuccessSeq
+	return freshSeriesVisible(s, r.snap.collectMeta)
 }
+
+var _ Reader = (*storeReader)(nil)
+var _ Reader = (*collectorReader)(nil)
+var _ SeriesIdentityRawIterator = (*collectorReader)(nil)
+var _ FreshVisibleHostScopesReader = (*collectorReader)(nil)

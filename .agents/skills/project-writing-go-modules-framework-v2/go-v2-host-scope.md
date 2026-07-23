@@ -20,9 +20,22 @@ or virtual-node targets.
   in default scope and multiple non-default scopes without collision.
 - `Read()` without `ReadHostScope` returns default-scope series only.
 - `Read(ReadHostScope(key))` returns only that scope's series.
+- Scoped lookup, metadata, and iteration use immutable per-scope indexes. Their
+  work is proportional to the selected scope, not to peer-scope series.
 - `Reader.HostScopes()` enumerates all scopes present in the snapshot and is not
   filtered by the reader's active host scope.
+- `Reader.MetricMeta(name)` is scope-local. A fresh reader may fall back to stale
+  metadata only in the active scope; neither fresh nor raw readers may return
+  peer-scope metadata.
+- CollectorStore readers implement the optional
+  `metrix.FreshVisibleHostScopesReader` capability. It returns only scopes with a
+  series visible under freshness-filtered semantics.
 - Flattened synthetic series preserve the source host scope.
+- CollectorStore builds one complete flattened projection per exact published
+  snapshot and shares it across raw/fresh scoped readers. Success, failure, and
+  abort snapshots do not reuse a projection across their metadata boundary.
+- RuntimeStore remains per-read and does not expose the fresh-visible-scope
+  capability.
 - Scope metadata conflicts in one collect cycle are data errors surfaced through
   `CommitCycleSuccess() error`, not panics.
 
@@ -31,6 +44,11 @@ or virtual-node targets.
 - V2 jobruntime owns host/vnode orchestration. Chartengine remains host-agnostic.
 - One `chartengine.Engine` is used per host scope for a job.
 - Scope engines are created lazily.
+- `postCheck` requires `FreshVisibleHostScopesReader`; an incompatible metric
+  store fails before collection starts.
+- After a successful commit, jobruntime obtains live scopes directly from the
+  shared flattened snapshot's fresh-visible catalog. It does not probe every
+  scope with another flattened read.
 - Default-scope metrics continue to emit under the job-level vnode when one is
   configured, otherwise under the global host.
 - Explicit non-default scopes emit under their `metrix.HostScope` GUID and host

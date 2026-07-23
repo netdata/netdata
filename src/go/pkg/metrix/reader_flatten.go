@@ -9,7 +9,6 @@ func flattenSnapshot(src *readSnapshot) *readSnapshot {
 	dst := &readSnapshot{
 		collectMeta: src.collectMeta,
 		series:      make(map[string]*committedSeries, len(series)),
-		byName:      make(map[string][]*committedSeries),
 	}
 
 	for _, s := range series {
@@ -18,7 +17,7 @@ func flattenSnapshot(src *readSnapshot) *readSnapshot {
 		}
 		switch s.desc.kind {
 		case kindGauge, kindCounter:
-			dst.series[s.key] = cloneCommittedSeries(s)
+			dst.series[s.key] = s
 		case kindHistogram:
 			appendFlattenedHistogramSeries(dst, s)
 		case kindSummary:
@@ -30,7 +29,7 @@ func flattenSnapshot(src *readSnapshot) *readSnapshot {
 		}
 	}
 
-	dst.byName = buildByName(dst.series)
+	dst.index = buildSnapshotSeriesIndex(dst.series, dst.collectMeta)
 	return dst
 }
 
@@ -70,7 +69,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 			key:          key,
 			name:         name,
 			hostScopeKey: src.hostScopeKey,
-			hostScope:    cloneHostScope(src.hostScope),
+			hostScope:    src.hostScope,
 			labels:       labels,
 			labelsKey:    labelsKey,
 			desc: &instrumentDescriptor{
@@ -113,7 +112,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 			key:          infKey,
 			name:         infName,
 			hostScopeKey: src.hostScopeKey,
-			hostScope:    cloneHostScope(src.hostScope),
+			hostScope:    src.hostScope,
 			labels:       infLabels,
 			labelsKey:    infLabelsKey,
 			desc: &instrumentDescriptor{
@@ -184,7 +183,7 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, nam
 		key:          key,
 		name:         name,
 		hostScopeKey: src.hostScopeKey,
-		hostScope:    cloneHostScope(src.hostScope),
+		hostScope:    src.hostScope,
 		labels:       items,
 		labelsKey:    labelsKey,
 		desc: &instrumentDescriptor{
@@ -254,7 +253,7 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 			key:          key,
 			name:         src.name,
 			hostScopeKey: src.hostScopeKey,
-			hostScope:    cloneHostScope(src.hostScope),
+			hostScope:    src.hostScope,
 			labels:       labels,
 			labelsKey:    labelsKey,
 			desc: &instrumentDescriptor{
@@ -363,7 +362,7 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 			key:          key,
 			name:         src.name,
 			hostScopeKey: src.hostScopeKey,
-			hostScope:    cloneHostScope(src.hostScope),
+			hostScope:    src.hostScope,
 			labels:       labels,
 			labelsKey:    labelsKey,
 			desc: &instrumentDescriptor{
@@ -421,7 +420,7 @@ func appendFlattenedMeasureSetSeries(dst *readSnapshot, src *committedSeries) {
 			key:          key,
 			name:         name,
 			hostScopeKey: src.hostScopeKey,
-			hostScope:    cloneHostScope(src.hostScope),
+			hostScope:    src.hostScope,
 			labels:       labels,
 			labelsKey:    labelsKey,
 			desc: &instrumentDescriptor{
