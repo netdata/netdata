@@ -251,3 +251,6 @@ install.sh
 
 # Local AI/agent planning notes. Durable SOW/spec work lives under .agents/.
 TODO-*.md
+
+corrosion/
+_deps/

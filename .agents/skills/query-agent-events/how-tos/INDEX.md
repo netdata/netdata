@@ -19,12 +19,9 @@ the same analysis from scratch.
 
 ## Catalog
 
-(empty -- entries grow as assistants encounter
-not-yet-documented questions)
-
 | Topic | Slug | Notes |
 |---|---|---|
-| -- | -- | -- |
+| Trace a stack-symbol regression to a concurrent mutator | `trace-stack-symbol-regression-to-mutator.md` | Separates direct vs stack-only matches, finds the first affected build, maps the faulting call, and validates shared-state lifetime evidence. |
 
 ## How to add a how-to
 
