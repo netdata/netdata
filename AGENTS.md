@@ -591,6 +591,22 @@ SOW state lives in the file's `Status:` field:
   `.agents/sow/q/done/` as local history or deleted locally at the user's
   request. Never delete it without the user asking.
 
+### SOW Content Hygiene
+
+An active SOW is a current-state handoff, not an append-only transcript.
+
+- When a plan, assumption, or decision is superseded, replace the stale guidance
+  with the current truth. Retain prior history only when it is needed to explain
+  a current constraint, approval, or rejected alternative.
+- Preserve user approvals, durable evidence, and material checkpoints, but
+  consolidate repeated review rounds and remove duplicated analysis.
+- The execution log SHOULD record meaningful state transitions, deviations, and
+  validation results. It SHOULD NOT reproduce the conversation or every review
+  nit.
+- Before completion, prune stale history and verify that another contributor can
+  determine the current target, remaining work, decisions, and evidence without
+  reconstructing chronology.
+
 ### SOW Completion And Merge
 
 The successful terminal SOW status is `completed`.
@@ -652,6 +668,22 @@ When user decisions are needed:
 3. Explain pros, cons, implications, and risks.
 4. Recommend one option with reasoning.
 5. Record the user's decision in the SOW before implementation. For the goal/plan approval round, the bar is the "Plan before non-trivial work" Human approval gate.
+
+### Review Materiality And Stop Condition
+
+Review findings are leads until they are verified against the shipped code and
+its contracts.
+
+- A merge blocker MUST identify a production-reachable trigger, the violated
+  contract or invariant, the concrete consequence, and supporting code or test
+  evidence.
+- An unreachable defensive scenario, optional refactor, style preference, or
+  speculative future risk MUST NOT be promoted to a blocker. Reject it with
+  evidence, or track it separately when it has independent value.
+- After a validated material correction, repeat the required full review scope.
+  Stop when no verified material correctness, security, deadlock, leak,
+  protocol, resource-consumption, or test-coverage defect remains. Nits alone
+  MUST NOT keep a review cycle open.
 
 ### Followup Discipline
 
