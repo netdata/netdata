@@ -132,6 +132,25 @@ If `curl` fails to download the install script with `curl: (60) SSL certificate 
 
 If you see a message like `File not found when checking for remote file at https://repository.netdata.cloud/repos/repoconfig` while running `kickstart.sh`, it is an informational notice. It means a remote file check during installation did not succeed, but this does not stop or break the installation — the installer continues automatically to the next step. The message is not specific to any particular Linux distribution and can appear on any supported system.
 
+### Switching from a distribution-managed package to a static build
+
+Systems such as XCP-ng and XOA ship Netdata through their own package repositories, and these bundled packages are often older than the latest release. `kickstart.sh` cannot update, reinstall, or uninstall these distribution-managed installs. To replace a bundled package with the latest static build:
+
+1. Stop the Agent: `sudo systemctl stop netdata`
+2. Remove the distribution package with your system package manager:
+   - **XCP-ng** (RPM-based): `sudo yum remove netdata` or `sudo dnf remove netdata`
+   - **XOA** (Debian-based): `sudo apt remove netdata`
+3. To preserve your configuration and metric history, back up `/etc/netdata`, `/var/cache/netdata`, and `/var/lib/netdata`. Exclude the `.environment` and `.install-type` files — carrying them into a different install type breaks updates. After installing the static build, restore the contents to the matching paths under `/opt/netdata/`.
+4. Install the static build:
+
+   ```bash
+   sh /tmp/netdata-kickstart.sh --static-only
+   ```
+
+   If you have not downloaded the script yet, use the command from the [One-Line Install](#run-the-one-line-install-command) section and add `--static-only`.
+
+For general guidance on removing native packages, see the [Uninstall Guide](/packaging/installer/UNINSTALL.md).
+
 ## Related Docs
 
 - [Connect to Netdata Cloud](/src/claim/README.md)
