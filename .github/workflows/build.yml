@@ -290,7 +290,7 @@ jobs:
       - name: Prepare release stock payload
         id: prepare-release
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: nick-invision/retry@v4
+        uses: nick-invision/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
         with:
           max_attempts: 3
           retry_wait_seconds: 30
@@ -308,7 +308,7 @@ jobs:
           path: ${{ github.workspace }}/.topology-ip-intel-stock/
           include-hidden-files: true
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
