@@ -282,10 +282,11 @@ impl Ledger {
         )
         .await?;
 
-        // The traces pipeline: shares the same cleaner/uploader/storage but has
-        // its own `{base}/traces/...` dirs, the traces seal
-        // (`ng_index::build_sfst_traces_file`), and a stub Function handler
-        // (plan decision D5 — no traces Function/MCP surface yet).
+        // The traces pipeline: shares the same cleaner/uploader/storage (and
+        // the chunk cache — seqs are process-global, so cache keys never
+        // collide across signals) but has its own `{base}/traces/...` dirs,
+        // the traces seal (`ng_index::build_sfst_traces_file`), and the
+        // `otel-traces` Function handler.
         let traces = traces_pipeline::build_traces_pipeline(
             Signal::Traces,
             traces_lifecycle,
@@ -296,6 +297,7 @@ impl Ledger {
             &mut cleaner,
             uploader.as_mut(),
             storage.as_ref(),
+            chunk_cache.clone(),
             &pipeline_tx,
         )
         .await?;
@@ -314,15 +316,12 @@ impl Ledger {
         );
 
         // Signal Ready between pipeline construction and the ingestor accept;
-        // see the method docstring for the full ordering rationale.
-        //
-        // Only the logs function is advertised to Netdata. The traces query
-        // handler is a stub until the traces query engine lands (plan decision
-        // D5), so we deliberately do NOT declare `otel_traces` yet — the
-        // pipeline is still built and its ingest/seal/index run normally; it is
-        // simply not exposed as a queryable function. Advertise its declaration
-        // here once the query engine lands.
-        let declarations = vec![pipelines.logs.declaration().clone()];
+        // see the method docstring for the full ordering rationale. Both
+        // Functions are advertised: `otel-logs` and `otel-traces`.
+        let declarations = vec![
+            pipelines.logs.declaration().clone(),
+            pipelines.traces.declaration().clone(),
+        ];
         supervisor
             .send(LedgerResponse::Ready { declarations })
             .await

@@ -5,18 +5,20 @@
 //! - `dispatch` — the run-loop's entry points: `handle_supervisor_req`,
 //!   `handle_outbound_resp`, and the per-call `dispatch_function_call`
 //!   that spawns handler tasks driven by the `bridge::function` engine.
-//! - `handler` — `OtelLogsHandler`, the typed `FunctionHandler` impl,
-//!   its declaration, and the otel-logs–specific args→payload shim.
-//! - `wire` — the netdata function wire types for `otel-logs`
-//!   (request/response/envelope), and `adapter` — the mapping between
-//!   those and the wire-neutral [`sfsq::logs`] engine.
+//!   Signal-neutral: it routes by each pipeline's declared function name.
+//! - `logs` — the `otel-logs` Function: wire types, engine adapter, and
+//!   the `OtelLogsHandler` glue over the wire-neutral [`sfsq::logs`]
+//!   engine.
+//! - `traces` — the `otel-traces` Function: wire types, source
+//!   resolution, and the `OtelTracesHandler` glue over the wire-neutral
+//!   [`sfsq::traces`] engine.
 //!
-//! The multi-file query engine itself lives in the [`sfsq::logs`] crate
-//! module; this layer adapts the netdata function protocol to it.
+//! The multi-file query engines themselves live in the [`sfsq`] crate;
+//! this layer adapts the netdata function protocol to them.
 
-mod adapter;
 mod dispatch;
-mod handler;
-mod wire;
+mod logs;
+mod traces;
 
-pub(crate) use handler::{OtelLogsHandler, RemoteRead, patch_args_into_payload};
+pub(crate) use logs::{OtelLogsHandler, RemoteRead, patch_args_into_payload};
+pub(crate) use traces::OtelTracesHandler;
