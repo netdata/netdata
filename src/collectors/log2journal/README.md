@@ -924,6 +924,8 @@ tail -F /var/log/nginx/access.log |\
 
 The exact on-disk location depends on the install prefix. When Netdata is installed under `/opt/netdata` (for example, a static build), the stock directory is `/opt/netdata/usr/lib/netdata/conf.d/log2journal.d/`.
 
+`log2journal` and its stock configurations are only installed on builds compiled with PCRE2 support; on a build without PCRE2, `log2journal.d` is absent.
+
 ## `systemd-cat-native` options
 
 Read [the manual of systemd-cat-native](/src/libnetdata/log/systemd-cat-native.md).
