@@ -7,10 +7,13 @@ flowchart BT
     C1("**Netdata Child 1**<br/><br/>Production System")
     C2("**Netdata Child 2**<br/><br/>Production System")
     C3("**Netdata Child N**<br/><br/>Production System")
-    P1("**Netdata Parent 1**<br/><br/>Centralization Point")
+    P1("**Netdata Parent 1**<br/><br/>Cluster Node")
+    P2("**Netdata Parent 2**<br/><br/>Cluster Node")
     C1 -->|stream| P1
     C2 -->|stream| P1
     C3 -->|stream| P1
+    C1 & C2 & C3 -.->|failover| P2
+    P1 <-->|sync| P2
     
     %% Style definitions
     classDef child fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
@@ -18,8 +21,10 @@ flowchart BT
     
     %% Apply styles
     class C1,C2,C3 child
-    class P1 parent
+    class P1,P2 parent
 ```
+
+For full details on high-availability Parent clusters, including failover and maintenance procedures, see [Clustering and High Availability of Netdata Parents](/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md).
 
 ## Installation
 
