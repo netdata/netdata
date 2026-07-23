@@ -2,7 +2,7 @@
 
 repo_root="$(dirname "$(dirname "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null && pwd -P)")")"
 
-# shellcheck source=./win-build-dir.sh
+# shellcheck source=./win-build-dir.sh disable=SC1091
 . "${repo_root}/packaging/windows/win-build-dir.sh"
 
 set -eu -o pipefail
@@ -18,6 +18,7 @@ if [ -f /opt/netdata/usr/bin/bashbug ]; then
 fi
 
 ${GITHUB_ACTIONS+echo "::group::Installing"}
+# shellcheck disable=SC2154  # build is assigned by win-build-dir.sh
 cmake --install "${build}"
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
@@ -40,7 +41,7 @@ ${GITHUB_ACTIONS+echo "::endgroup::"}
 ${GITHUB_ACTIONS+echo "::group::Copy Files"}
 tar -xf /msys2-latest.tar.zst -C /opt/netdata/ || exit 1
 cp -R /opt/netdata/msys64/* /opt/netdata/ || exit 1
-cp packaging/windows/copy_files.ps1 /opt/netdata/usr/libexec/netdata/ || exit 1
+cp "${repo_root}/packaging/windows/copy_files.ps1" /opt/netdata/usr/libexec/netdata/ || exit 1
 rm -rf /opt/netdata/msys64/
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
