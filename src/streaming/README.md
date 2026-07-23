@@ -787,12 +787,12 @@ The Child node streams its metrics to the Parent node.
    sudo ./edit-config stream.conf
    ```
 
-2. Find the `[stream]` section and update it (replace PARENT_IP with your Parent's actual IP address):
+2. Find the `[stream]` section and update it (replace PARENT_HOSTNAME_OR_IP with your Parent's actual hostname/FQDN or IP address):
 
    ```ini
    [stream]
        enabled = yes
-       destination = PARENT_IP:19999
+       destination = PARENT_HOSTNAME_OR_IP:19999
        api key = 11111111-2222-3333-4444-555555555555
    ```
 
@@ -836,11 +836,11 @@ Check that streaming is working properly between your nodes.
 3. On the Child node, you should see:
 
    ```
-   STREAM xxx [send to PARENT_IP:19999]: connecting...
-   STREAM xxx [send to PARENT_IP:19999]: established communication - sending metrics...
+   STREAM xxx [send to PARENT_HOSTNAME_OR_IP:19999]: connecting...
+   STREAM xxx [send to PARENT_HOSTNAME_OR_IP:19999]: established communication - sending metrics...
    ```
 
-4. Open the Netdata dashboard on the Parent node (http://PARENT_IP:19999) and look for the Child node's hostname in the menu
+4. Open the Netdata dashboard on the Parent node (http://PARENT_HOSTNAME_OR_IP:19999) and look for the Child node's hostname in the menu
 
 :::tip
 
@@ -873,7 +873,7 @@ Add the following to the Child's `[stream]` section:
 
    ```ini
    [stream]
-       destination = PARENT_IP:19999:SSL
+       destination = PARENT_HOSTNAME_OR_IP:19999:SSL
    ```
 
 2. If using self-signed certificates, you may need to add:
@@ -889,7 +889,7 @@ Add the following to the Child's `[stream]` section:
 
    ```ini
    [stream]
-       destination = PARENT1_IP:19999 PARENT2_IP:19999
+       destination = PARENT1_HOSTNAME_OR_IP:19999 PARENT2_HOSTNAME_OR_IP:19999
    ```
 
 2. The Child will connect to the first available Parent and automatically switch if that connection fails
