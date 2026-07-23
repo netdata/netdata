@@ -728,6 +728,58 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
 
 // --------------------------------------------------------------------------------------------------------------------
 
+bool nd_log_stack_entry_is_valid(const struct log_stack_entry *entry) {
+    if(!entry || entry->id >= _NDF_MAX || !entry->set)
+        return false;
+
+    switch(entry->type) {
+        case NDFT_TXT:
+            return entry->txt && *entry->txt;
+
+        case NDFT_BFR:
+            return entry->bfr && buffer_strlen(entry->bfr);
+
+        case NDFT_STR:
+            return entry->str;
+
+        case NDFT_UUID:
+            return entry->uuid && !uuid_is_null(*entry->uuid);
+
+        case NDFT_CALLBACK:
+            return entry->cb.formatter;
+
+        case NDFT_UNSET:
+            return false;
+
+        default:
+            return true;
+    }
+}
+
+ND_LOG_SOURCES nd_log_resolve_source_from_stack(ND_LOG_SOURCES source) {
+    const struct log_stack_entry *source_entry = NULL;
+
+    for(size_t c = 0; c < thread_log_stack_next; c++) {
+        struct log_stack_entry *lgs = thread_log_stack_base[c];
+
+        for(size_t i = 0; lgs[i].id != NDF_STOP; i++) {
+            if(lgs[i].id == NDF_LOG_SOURCE && nd_log_stack_entry_is_valid(&lgs[i]))
+                source_entry = &lgs[i];
+        }
+    }
+
+    if(!source_entry)
+        return source;
+
+    if(source_entry->type == NDFT_TXT)
+        return nd_log_source2id(source_entry->txt, source);
+
+    if(source_entry->type == NDFT_U64 && source_entry->u64 < _NDLS_MAX)
+        return (ND_LOG_SOURCES)source_entry->u64;
+
+    return source;
+}
+
 void log_stack_pop(void *ptr) {
     if(!ptr) return;
 
@@ -832,6 +884,63 @@ int log_stack_unittest(void) {
 
     LOG_STACK_TEST(thread_log_stack_next == 0, "same-pointer successful entries still pop");
     LOG_STACK_TEST(thread_log_stack_dropped == 0, "same-pointer dropped counter is clear after cleanup");
+
+    struct log_stack_entry source_health[] = {
+        ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, "health"),
+        ND_LOG_FIELD_END(),
+    };
+    struct log_stack_entry source_access[] = {
+        ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, "access"),
+        ND_LOG_FIELD_END(),
+    };
+    struct log_stack_entry source_unknown[] = {
+        ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, "unknown"),
+        ND_LOG_FIELD_END(),
+    };
+    struct log_stack_entry source_empty[] = {
+        ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, ""),
+        ND_LOG_FIELD_END(),
+    };
+    struct log_stack_entry source_numeric[] = {
+        ND_LOG_FIELD_U64(NDF_LOG_SOURCE, NDLS_ACLK),
+        ND_LOG_FIELD_END(),
+    };
+    struct log_stack_entry source_invalid_numeric[] = {
+        ND_LOG_FIELD_U64(NDF_LOG_SOURCE, _NDLS_MAX),
+        ND_LOG_FIELD_END(),
+    };
+
+    log_stack_push(source_health);
+    LOG_STACK_TEST(nd_log_resolve_source_from_stack(NDLS_DAEMON) == NDLS_HEALTH,
+                   "text source override is resolved");
+
+    log_stack_push(source_access);
+    LOG_STACK_TEST(nd_log_resolve_source_from_stack(NDLS_DAEMON) == NDLS_ACCESS,
+                   "last source override wins");
+
+    log_stack_push(source_unknown);
+    LOG_STACK_TEST(nd_log_resolve_source_from_stack(NDLS_DAEMON) == NDLS_DAEMON,
+                   "unknown last source preserves the caller source");
+    log_stack_pop(&source_unknown);
+
+    log_stack_push(source_empty);
+    LOG_STACK_TEST(nd_log_resolve_source_from_stack(NDLS_DAEMON) == NDLS_ACCESS,
+                   "empty source entry is ignored");
+    log_stack_pop(&source_empty);
+    log_stack_pop(&source_access);
+    log_stack_pop(&source_health);
+
+    log_stack_push(source_numeric);
+    LOG_STACK_TEST(nd_log_resolve_source_from_stack(NDLS_DAEMON) == NDLS_ACLK,
+                   "numeric source override is resolved");
+    log_stack_pop(&source_numeric);
+
+    log_stack_push(source_invalid_numeric);
+    LOG_STACK_TEST(nd_log_resolve_source_from_stack(NDLS_DAEMON) == NDLS_DAEMON,
+                   "invalid numeric source preserves the caller source");
+    log_stack_pop(&source_invalid_numeric);
+
+    LOG_STACK_TEST(thread_log_stack_next == 0, "source override test frames are balanced");
 
     memset(thread_log_stack_base, 0, sizeof(thread_log_stack_base));
     thread_log_stack_next = 0;
