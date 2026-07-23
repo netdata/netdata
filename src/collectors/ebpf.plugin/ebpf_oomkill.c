@@ -37,53 +37,6 @@ static netdata_publish_syscall_t oomkill_publish_aggregated =
 
 static void ebpf_obsolete_specific_oomkill_charts(char *type, int update_every);
 
-/**
- * Obsolete services
- *
- * Obsolete all service charts created
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_oomkill_services(ebpf_module_t *em, char *id)
-{
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_OOMKILL_CHART,
-        "",
-        "Systemd service OOM kills.",
-        EBPF_OOMKILL_UNIT_KILLS,
-        NETDATA_EBPF_MEMORY_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_CGROUP_OOMKILLS_CONTEXT,
-        20191,
-        em->update_every);
-}
-
-/**
- * Obsolete cgroup chart
- *
- * Send obsolete for all charts created before to close.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static inline void ebpf_obsolete_oomkill_cgroup_charts(ebpf_module_t *em)
-{
-    netdata_mutex_lock(&mutex_cgroup_shm);
-
-    ebpf_cgroup_target_t *ect;
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->systemd) {
-            ebpf_obsolete_oomkill_services(em, ect->name);
-
-            continue;
-        }
-
-        ebpf_obsolete_specific_oomkill_charts(ect->name, em->update_every);
-    }
-    netdata_mutex_unlock(&mutex_cgroup_shm);
-}
-
-
 static void oomkill_cleanup(void *pptr)
 {
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);

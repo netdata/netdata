@@ -12,7 +12,7 @@
 #define NETDATA_APPS_FILE_GROUP "file_access"
 #define NETDATA_APPS_FILE_FDS "fds"
 #define NETDATA_APPS_PROCESS_GROUP "process"
-#define NETDATA_APPS_NET_GROUP "net"
+
 #define NETDATA_APPS_IPC_SHM_GROUP "ipc shm"
 
 #include "ebpf_process.h"
@@ -84,7 +84,6 @@ struct ebpf_target {
     netdata_fd_stat_t fd;
     netdata_publish_shm_t shm;
     ebpf_process_stat_t process;
-    ebpf_socket_publish_apps_t socket;
 
     kernel_uint_t starttime;
     kernel_uint_t collected_starttime;
@@ -138,7 +137,6 @@ typedef struct __attribute__((packed)) ebpf_pid_data {
     netdata_publish_dcstat_t *dc;
     netdata_publish_vfs_t *vfs;
     ebpf_publish_process_t *process;
-    ebpf_socket_publish_apps_t *socket;
 
 } ebpf_pid_data_t;
 
@@ -216,7 +214,6 @@ typedef struct ebpf_pid_stat {
     ebpf_process_stat_t process;
     netdata_publish_shm_t shm;
     netdata_publish_swap_t swap;
-    ebpf_socket_publish_apps_t socket;
     netdata_publish_vfs_t vfs;
 
     int not_updated;
