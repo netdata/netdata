@@ -24,6 +24,7 @@
 mod by_id;
 mod overview;
 mod predicate;
+mod rollup;
 mod search;
 mod sources;
 mod status;
@@ -37,6 +38,7 @@ pub use overview::{
     DURATION_BIN_COUNT, DURATION_BIN_LABELS, OverviewData, OverviewQuery, OverviewRequestError,
     overview,
 };
+pub use rollup::{TraceAggregate, TraceRootInfo, sealed_trace_aggregates, tail_trace_aggregates};
 pub use predicate::{
     CompareOp, Condition, Predicate, PredicateError, PredicateTarget, PredicateValue,
     span_matches,
