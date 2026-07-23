@@ -96,7 +96,21 @@ modules:
                   enable show all classes and qdiscs for all interfaces = yes
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: Recurring Cannot find file warnings for tc-qos-helper.conf
+            description: |
+              When `tc-qos-helper.sh` starts, it looks for its configuration in two places, in this order: the stock configuration directory (`/usr/lib/netdata/conf.d/tc-qos-helper.conf`) and the user configuration directory (`/etc/netdata/tc-qos-helper.conf`). Netdata does not ship a stock `tc-qos-helper.conf`, so on a default installation neither file exists and the script emits a `Cannot find file` warning for each missing path.
+
+              These warnings are harmless. When no configuration file is found the script keeps its built-in defaults (for example `tc_show="qdisc"`). They reappear every hour because the script exits and is restarted by Netdata every 3600 seconds (`qos_exit_every=3600`), which re-runs the same checks on each start.
+
+              Creating `/etc/netdata/tc-qos-helper.conf` with the desired setting silences the warning for the user configuration path. The warning for the stock path is expected to remain, because no stock `tc-qos-helper.conf` ships with Netdata, and it is benign.
+          - name: FireQOS is not installed warning
+            description: |
+              When `tc-qos-helper.sh` starts and cannot find FireQOS (neither the `/var/run/fireqos` directory nor the `fireqos` executable), it logs that FireQOS is not installed on this system. This is normal on systems that do not perform QoS traffic shaping with FireQOS.
+
+              Like the configuration warnings, this message repeats every hour because the script exits and is restarted by Netdata every 3600 seconds (`qos_exit_every=3600`), re-running the FireQOS presence check on each start.
+
+              FireQOS is only required to apply QoS and expose human-readable class names to Netdata. Without it the plugin still collects `tc` qdisc/class metrics directly from the `tc` command. To map numeric class IDs to readable names without FireQOS, list them in `/etc/iproute2/tc_cls` and set `tc_show="class"` in `/etc/netdata/tc-qos-helper.conf`.
     alerts: []
     metrics:
       folding:
