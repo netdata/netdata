@@ -44,8 +44,6 @@ modules:
               module_name: ceph
             - plugin_name: go.d.plugin
               module_name: smartctl
-            - plugin_name: go.d.plugin
-              module_name: sensors
             - plugin_name: proc.plugin
               module_name: /proc/net/dev
             - plugin_name: proc.plugin
