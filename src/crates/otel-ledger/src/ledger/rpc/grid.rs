@@ -57,7 +57,9 @@ pub(crate) fn align_window(after: u32, before: u32, width_s: u32) -> (u32, u32) 
 /// Derive the whole grid for a canonicalized second-granular window:
 /// nice width, outward alignment, exact [`sfst::Grid`]. Returns the
 /// grid plus the aligned `(after, before)` seconds (the alignment can
-/// widen the window the caller prunes files by).
+/// widen the window the caller prunes files by). The caller guarantees
+/// `after < before` (the canonicalizers do); the grid then always holds
+/// at least one bucket, horizon saturation included.
 pub(crate) fn grid_for_window_s(after: u32, before: u32) -> (sfst::Grid, u32, u32) {
     const NS_PER_S: i64 = 1_000_000_000;
     let width_s = bucket_width_for_span_s(before.saturating_sub(after));

@@ -1,14 +1,14 @@
 //! `OtelTracesHandler` — typed `FunctionHandler` implementation for the
 //! `otel-traces` Function.
 //!
-//! Implemented modes: `info` (capability discovery), `trace` (exact
-//! single-trace fetch), `search` (bounded most-recent-first trace
-//! search, the default mode), and the enumeration pair `attributes` /
-//! `attribute_values` (the facet rail's vocabulary); `overview` resolves
-//! cleanly and returns an explicit not-implemented error until its
-//! traces-ui phase-1 step lands. The wire contract lives in
-//! [`super::wire`], the engine mapping in [`super::adapter`], and
-//! source resolution in [`super::sources`].
+//! The full phase-1 mode catalog is implemented: `info` (capability
+//! discovery), `trace` (exact single-trace fetch), `search` (bounded
+//! most-recent-first trace search, the default mode), the enumeration
+//! pair `attributes` / `attribute_values` (the facet rail's
+//! vocabulary), and `overview` (the span-density grid — the UI's
+//! default paint). The wire contract lives in [`super::wire`], the
+//! engine mapping in [`super::adapter`], and source resolution in
+//! [`super::sources`].
 //!
 //! Netdata-plugin glue only, like the logs handler: the engine
 //! ([`sfsq::traces`]) stays wire-neutral; the bridge's `HandlerAdapter`
