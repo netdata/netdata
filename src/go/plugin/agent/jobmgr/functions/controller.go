@@ -517,9 +517,7 @@ func (c *Controller) reconcileModuleLocked(
 			nextGroups[key] = group
 		}
 	}
-	for key, group := range desired {
-		nextGroups[key] = group
-	}
+	maps.Copy(nextGroups, desired)
 	nextRoutes, err := indexControllerRoutes(nextGroups)
 	if err != nil {
 		return nil, err
