@@ -2102,7 +2102,8 @@ uint64_t rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
 /* return 0 on success */
 int init_rrd_files(struct rrdengine_instance *ctx)
 {
-    return init_data_files(ctx);
+    int ret = init_data_files(ctx);
+    return ret;
 }
 
 void finalize_rrd_files(struct rrdengine_instance *ctx)
@@ -2439,6 +2440,7 @@ static void timer_per_sec_cb(uv_timer_t *handle __maybe_unused)
 
 static void dbengine_initialize_structures(void) {
     pgd_init_arals();
+
     pgc_and_mrg_initialize();
 
     pdc_init();

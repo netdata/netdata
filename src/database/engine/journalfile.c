@@ -1358,11 +1358,29 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         journal_v1_file_size = (uint32_t)statbuf.st_size;
 
     journalfile_v2_generate_path(datafile, path_v2, sizeof(path_v2));
+
+    // fileno is always numeric (parsed via sscanf %u from directory entries),
+    // so path_v2 is structurally guaranteed to be inside dbfiles_path.
+    // We keep the strnlen bound to detect a genuinely malformed dbfiles_path
+    // (empty or not null-terminated), but the strncmp prefix check is omitted:
+    // it adds no security benefit and silently returns 1 on any path mismatch
+    // (including Windows separator variants), which destroys the data/journal
+    // pair when combined with an absent v1 journal on modern installations.
+    const char *dbpath = datafile_ctx(datafile)->config.dbfiles_path;
+    size_t dbpath_len = strnlen(dbpath, sizeof(((struct rrdengine_instance *)0)->config.dbfiles_path));
+    if (dbpath_len == 0 ||
+        dbpath_len >= sizeof(((struct rrdengine_instance *)0)->config.dbfiles_path)) {
+        netdata_log_error("DBENGINE: dbfiles_path is empty or not null-terminated");
+        return 1;
+    }
+
     fd = open(path_v2, O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
-        if (errno == ENOENT)
+        int open_errno = errno;
+        if (open_errno == ENOENT)
             return 1;
         ctx_fs_error(ctx);
+        errno = open_errno;
         netdata_log_error("DBENGINE: failed to open \"%s\"", path_v2);
         return 1;
     }

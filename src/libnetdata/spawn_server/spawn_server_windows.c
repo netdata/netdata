@@ -24,16 +24,23 @@ static void update_cygpath_env(void) {
 
     char win_path[MAX_PATH];
 
+#if defined(__CYGWIN__) || defined(__MSYS__)
     // Convert Cygwin root path to Windows path
     errno_clear();
     if(cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path)) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot convert Cygwin/MSYS2 base path to Windows path: %s", strerror(errno));
         return;
     }
-
     nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
-
     nd_log(NDLS_COLLECTORS, NDLP_INFO, "Cygwin/MSYS2 base path set to '%s'", win_path);
+#else
+    // On UCRT64 there is no Cygwin layer. NETDATA_WINDOWS_PATH_PREFIX is the
+    // Windows installation directory (e.g. "C:\Program Files\Netdata") where
+    // MSYS2 is bundled, baked in at build time via cmake config.h.
+    strncpyz(win_path, NETDATA_WINDOWS_PATH_PREFIX, sizeof(win_path));
+    nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Windows install prefix set to '%s'", win_path);
+#endif
 }
 
 SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name, spawn_request_callback_t cb  __maybe_unused, int argc __maybe_unused, const char **argv __maybe_unused) {
@@ -63,6 +70,7 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
 
 static BUFFER *argv_to_windows(const char **argv) {
     // argv[0] is the path
+#if defined(__CYGWIN__) || defined(__MSYS__)
     ssize_t converted_size = cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], NULL, 0);
     if(converted_size <= 0)
         return NULL;
@@ -71,6 +79,10 @@ static BUFFER *argv_to_windows(const char **argv) {
     CLEAN_CHAR_P *b = mallocz(b_size);
     if(cygwin_conv_path(CCP_POSIX_TO_WIN_A | CCP_ABSOLUTE, argv[0], b, b_size) != 0)
         return NULL;
+#else
+    CLEAN_CHAR_P *translated_argv0 = os_translate_msys_to_windows_path(argv[0]);
+    CLEAN_CHAR_P *b = strdupz(translated_argv0);
+#endif
 
     BUFFER *wb = buffer_create(0, NULL);
 
@@ -124,18 +136,10 @@ static BUFFER *argv_to_windows(const char **argv) {
 }
 
 int set_fd_blocking(int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: fcntl(F_GETFL) failed");
-        return -1;
-    }
-
-    flags &= ~O_NONBLOCK;
-    if (fcntl(fd, F_SETFL, flags) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: fcntl(F_SETFL) failed");
-        return -1;
-    }
-
+    // Windows anonymous pipes are blocking by default.  The fcntl(F_SETFL)
+    // stub in common.h uses ioctlsocket, which only accepts socket handles;
+    // calling it on a pipe handle yields WSAENOTSOCK (10038).  Nothing to do.
+    (void)fd;
     return 0;
 }
 
@@ -157,19 +161,6 @@ static void spawn_server_release_stderr_fd(SPAWN_SERVER *server, SPAWN_INSTANCE 
     si->stderr_fd = -1;
 }
 
-//static void print_environment_block(char *env_block) {
-//    if (env_block == NULL) {
-//        fprintf(stderr, "Environment block is NULL\n");
-//        return;
-//    }
-//
-//    char *env = env_block;
-//    while (*env) {
-//        fprintf(stderr, "ENVIRONMENT: %s\n", env);
-//        // Move to the next string in the block
-//        env += strlen(env) + 1;
-//    }
-//}
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_unused, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
@@ -256,40 +247,66 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
         goto cleanup;
     }
 
-    // Set up the STARTUPINFO structure
-    STARTUPINFO si;
+    // Build an explicit handle-inheritance list: PROC_THREAD_ATTRIBUTE_HANDLE_LIST
+    // restricts inheritance to exactly these three pipe ends.  No handle-table
+    // walk is needed; every other inheritable handle in the parent is excluded.
+    SIZE_T attr_size = 0;
+    InitializeProcThreadAttributeList(NULL, 1, 0, &attr_size);
+    LPPROC_THREAD_ATTRIBUTE_LIST attr_list = HeapAlloc(GetProcessHeap(), 0, attr_size);
+    if (!attr_list || !InitializeProcThreadAttributeList(attr_list, 1, 0, &attr_size)) {
+        spinlock_unlock(&spinlock);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot init attribute list for request No %zu, command: %s",
+               instance->request_id, command);
+        if (attr_list) HeapFree(GetProcessHeap(), 0, attr_list);
+        goto cleanup;
+    }
+    HANDLE inherit_handles[3] = { stdin_read_handle, stdout_write_handle, stderr_write_handle };
+    if (!UpdateProcThreadAttribute(attr_list, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+                                   inherit_handles, sizeof(inherit_handles), NULL, NULL)) {
+        spinlock_unlock(&spinlock);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot set handle list attribute for request No %zu, command: %s",
+               instance->request_id, command);
+        DeleteProcThreadAttributeList(attr_list);
+        HeapFree(GetProcessHeap(), 0, attr_list);
+        goto cleanup;
+    }
+
+    // Set up the STARTUPINFOEX structure
+    STARTUPINFOEX si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdInput = stdin_read_handle;
-    si.hStdOutput = stdout_write_handle;
-    si.hStdError = stderr_write_handle;
-
-    // Retrieve the current environment block
-    char* env_block = GetEnvironmentStrings();
-//    print_environment_block(env_block);
+    si.StartupInfo.cb = sizeof(si);
+    si.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    si.StartupInfo.hStdInput = stdin_read_handle;
+    si.StartupInfo.hStdOutput = stdout_write_handle;
+    si.StartupInfo.hStdError = stderr_write_handle;
+    si.lpAttributeList = attr_list;
 
     nd_log(NDLS_COLLECTORS, NDLP_INFO,
            "SPAWN PARENT: Running request No %zu, command: '%s'",
            instance->request_id, command);
 
-    int fds_to_keep_open[] = { pipe_stdin[PIPE_READ], pipe_stdout[PIPE_WRITE], pipe_stderr[PIPE_WRITE] };
-    os_close_all_non_std_open_fds_except(fds_to_keep_open, 3, CLOSE_RANGE_CLOEXEC);
-
-    // Spawn the process
+    // EXTENDED_STARTUPINFO_PRESENT tells CreateProcess to honour lpAttributeList,
+    // which restricts handle inheritance to the three pipe ends listed above.
+    // Pass NULL for lpEnvironment to inherit the parent's environment directly;
+    // an explicit ANSI block (GetEnvironmentStrings) is capped at 32,767 chars
+    // and fails with ERROR_INSUFFICIENT_BUFFER on machines with a large PATH.
     errno_clear();
-    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, env_block, NULL, &si, &pi)) {
+    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, EXTENDED_STARTUPINFO_PRESENT,
+                       NULL, NULL, &si.StartupInfo, &pi)) {
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: cannot CreateProcess() for request No %zu, command: %s",
                instance->request_id, command);
-        if(env_block)
-            FreeEnvironmentStrings(env_block);
+        DeleteProcThreadAttributeList(attr_list);
+        HeapFree(GetProcessHeap(), 0, attr_list);
         goto cleanup;
     }
 
-    FreeEnvironmentStrings(env_block);
+    DeleteProcThreadAttributeList(attr_list);
+    HeapFree(GetProcessHeap(), 0, attr_list);
 
     // When we create a process with the CreateProcess function, it returns two handles:
     // - one for the process (pi.hProcess) and
@@ -307,7 +324,12 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
 
     // Store process information in instance
     instance->dwProcessId = pi.dwProcessId;
+#if defined(__CYGWIN__) || defined(__MSYS__)
     instance->child_pid = cygwin_winpid_to_pid((pid_t)pi.dwProcessId);
+#else
+    // On UCRT64, the Windows process ID is the native PID directly.
+    instance->child_pid = (pid_t)pi.dwProcessId;
+#endif
     instance->process_handle = pi.hProcess;
 
     // Convert handles to POSIX file descriptors

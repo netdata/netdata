@@ -3,7 +3,19 @@
 #ifndef NETDATA_ND_LOG_COMMON_H
 #define NETDATA_ND_LOG_COMMON_H
 
+#if !defined(OS_WINDOWS) && !defined(_WIN32)
 #include <syslog.h>
+#else
+// syslog.h is not available on Windows; define the standardized POSIX priority values directly.
+#define LOG_EMERG   0
+#define LOG_ALERT   1
+#define LOG_CRIT    2
+#define LOG_ERR     3
+#define LOG_WARNING 4
+#define LOG_NOTICE  5
+#define LOG_INFO    6
+#define LOG_DEBUG   7
+#endif
 
 typedef enum  __attribute__((__packed__)) {
     NDLS_UNSET = 0,   // internal use only

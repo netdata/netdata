@@ -211,7 +211,11 @@ void rrdlabels_flush(RRDLABELS *labels) {
         delete_label((RRDLABEL *)Index);
     }
     JudyAllocThreadPulseReset();
+#ifndef OS_WINDOWS
     JudyLFreeArray(&labels->JudyL, PJE0);
+#else
+    labels->JudyL = NULL; // Windows Judy bug: skip free, null pointer so re-use is safe; nodes leaked
+#endif
     int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
     RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
     spinlock_unlock(&labels->spinlock);

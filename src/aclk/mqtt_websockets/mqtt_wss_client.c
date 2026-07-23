@@ -132,7 +132,7 @@ struct mqtt_wss_client_struct {
 static void mqtt_wss_close_sockfd(mqtt_wss_client client)
 {
     if (client->sockfd >= 0)
-        close(client->sockfd);
+        sock_close(client->sockfd);
 
     client->sockfd = -1;
     client->poll_fds[POLLFD_SOCKET].fd = -1;
@@ -441,7 +441,13 @@ int mqtt_wss_connect(
 
     client->ssl_ctx = SSL_CTX_new(SSLv23_client_method());
     if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
+#if defined(OS_WINDOWS)
+        if (!netdata_ssl_load_windows_ca_certs(client->ssl_ctx))
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "ACLK: failed to load CA certs from Windows Certificate Store; SSL verify will fail");
+#else
         SSL_CTX_set_default_verify_paths(client->ssl_ctx);
+#endif
         SSL_CTX_set_verify(client->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
     } else
         nd_log(NDLS_DAEMON, NDLP_ERR, "SSL Certificate checking completely disabled!!!");

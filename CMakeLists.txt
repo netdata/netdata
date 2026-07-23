@@ -191,7 +191,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
-cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" False "OS_LINUX OR OS_WINDOWS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
@@ -485,7 +485,7 @@ if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_
     endif()
 endif()
 
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
+if((ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS) AND NOT OS_WINDOWS)
     set(NEED_NDSUDO TRUE)
 else()
     set(NEED_NDSUDO FALSE)
@@ -689,7 +689,11 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     # -funwind-tables = generate unwind tables for all functions
     # -fasynchronous-unwind-tables = the unwind table generated is precise at instruction boundary, instead of function boundary
     add_compile_options(-fno-omit-frame-pointer -funwind-tables -fasynchronous-unwind-tables)
-    add_link_options(-rdynamic)
+    if(NOT OS_WINDOWS)
+        # -rdynamic exports all symbols to the dynamic symbol table for backtrace support.
+        # It is an ELF-only flag; MinGW-w64 targets PE/COFF and does not support it.
+        add_link_options(-rdynamic)
+    endif()
     message(STATUS "Added compiler and linker flags for better stack trace support")
 endif()
 
@@ -947,7 +951,6 @@ set(LIBJUDY_NEXT_FILES
 
 set(LIBJUDY_SOURCES
         src/libnetdata/libjudy/vendored/Judy.h
-        src/libnetdata/libjudy/vendored/JudyCommon/JudyMalloc.c
         src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivate.h
         src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivate1L.h
         src/libnetdata/libjudy/vendored/JudyCommon/JudyPrivateBranch.h
@@ -2442,9 +2445,11 @@ target_compile_options(judy PRIVATE
         -Wformat
 )
 
-target_compile_definitions(judy PRIVATE
-        JUDYL
-        $<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:JU_64BIT>
+target_compile_definitions(judy
+        PRIVATE JUDYL
+        # JU_64BIT must be PUBLIC so consumer headers (judyl-typed.h -> Judy.h)
+        # get the correct Word_t = unsigned long long on 64-bit Windows (LLP64).
+        PUBLIC $<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:JU_64BIT>
 )
 
 target_include_directories(judy PUBLIC
@@ -2569,7 +2574,7 @@ target_link_libraries(libnetdata PUBLIC
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread>"
         "$<$<BOOL:${HAVE_LIBRT}>:rt>"
-        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid;sensorsapi;iphlpapi>"
+        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid;sensorsapi;iphlpapi;crypt32>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 
@@ -2584,27 +2589,37 @@ endif()
 netdata_add_sqlite3_to_target(libnetdata)
 
 if(OS_WINDOWS)
+        # rand_s() is a UCRT extension gated by _CRT_RAND_S, which must be defined before
+        # stdlib.h is processed.  Injecting it here guarantees it fires before any header.
+        target_compile_definitions(libnetdata PUBLIC _CRT_RAND_S)
+
+        # The Windows build publishes one manifest-backed ETW provider.  Classic WEL
+        # cannot write to ETW channels, so falling back to ReportEventW produces a
+        # different Event Viewer layout and cannot provide Netdata's channel hierarchy.
+        # wevt_netdata_compile.sh validates the required Windows SDK (mc.exe, rc.exe)
+        # and MSVC (link.exe) tools and reports an actionable error when they are absent.
         set(HAVE_ETW True)
-        set(HAVE_WEL True)
+        set(HAVE_WEL False)
 
         # Output the results for debugging purposes
         message(STATUS "Have Event Tracing for Windows (ETW): ${HAVE_ETW}")
-        message(STATUS "Have Windows Event Log (WEL): ${HAVE_WEL}")
 
-        if(HAVE_WEL OR HAVE_ETW)
+        if(HAVE_ETW)
                 # Define the source and generated file paths
                 set(WEVT_GEN_SRC_H_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/nd_log-to-windows-common.h")
                 set(WEVT_GEN_SRC_C_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_mc_generate.c")
                 set(WEVT_GEN_BIN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_mc_generate")
 
                 set(WEVT_BUILD_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_compile.sh")
+                find_program(WEVT_BASH_EXECUTABLE NAMES bash.exe bash)
+                if(NOT WEVT_BASH_EXECUTABLE)
+                        message(FATAL_ERROR "bash is required to generate Windows ETW resources")
+                endif()
 
                 set(WEVT_MC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.mc")
                 set(WEVT_MAN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.xml")
-                set(WEVT_RC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.rc")
                 set(WEVT_MC_H_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.h")
                 set(WEVT_MAN_H_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.h")
-                set(WEVT_RES_OBJECT "${CMAKE_BINARY_DIR}/wevt_netdata_res.o")
 
                 set(WEVT_DLL_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.dll")
                 set(WEVT_ETW_INSTALL_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_install.bat")
@@ -2612,33 +2627,15 @@ if(OS_WINDOWS)
                 # we compile ${WEVT_GEN_BIN_FILE}, which generates the manifest, the .mc,
                 # and the headers required for compiling libnetdata/logs
 
-                if(HAVE_ETW)
-                        # ETW method also supports WEL
-                        # but it requires Microsoft tools mc, rc, and link
-                        add_custom_command(
-                                OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_MAN_H_FILE}" "${WEVT_DLL_FILE}"
-                                COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
-                                COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
-                                COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
-                                COMMAND "${WEVT_BUILD_SCRIPT}" "${CMAKE_SOURCE_DIR}/src/libnetdata/log" "${CMAKE_BINARY_DIR}"
-                                DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
-                                COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
-                        )
-                else()
-                        # WEL method can be built with windmc, windres and the normal linker
-                        add_custom_command(
-                                OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_DLL_FILE}"
-                                COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
-                                COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
-                                COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
-                                COMMAND windmc -r "${CMAKE_BINARY_DIR}" -h "${CMAKE_BINARY_DIR}" ${WEVT_MC_FILE}
-                                COMMAND echo "1 2004" "wevt_netdata_manifest.xml" >> "${WEVT_RC_FILE}"
-                                COMMAND windres ${WEVT_RC_FILE} -o ${WEVT_RES_OBJECT}
-                                COMMAND ${CMAKE_LINKER} -dll --entry 0 -nostdlib -o ${WEVT_DLL_FILE} ${WEVT_RES_OBJECT}
-                                DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
-                                COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
-                        )
-                endif()
+                add_custom_command(
+                        OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_MAN_H_FILE}" "${WEVT_MAN_FILE}" "${WEVT_DLL_FILE}"
+                        COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
+                        COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
+                        COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
+                        COMMAND "${WEVT_BASH_EXECUTABLE}" "${WEVT_BUILD_SCRIPT}" "${CMAKE_SOURCE_DIR}/src/libnetdata/log" "${CMAKE_BINARY_DIR}"
+                        DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
+                        COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
+                )
 
                 # Create a custom target for the DLL
                 add_custom_target(wevt_netdata ALL DEPENDS ${WEVT_DLL_FILE})
@@ -2646,20 +2643,12 @@ if(OS_WINDOWS)
                 set_source_files_properties(src/libnetdata/log/nd_log-to-windows-events.c PROPERTIES
                         OBJECT_DEPENDS "${WEVT_MC_H_FILE}")
 
-                if(HAVE_ETW)
-                        set_source_files_properties(src/libnetdata/log/nd_log-to-windows-events.c PROPERTIES
-                                OBJECT_DEPENDS "${WEVT_MAN_H_FILE}")
+                set_source_files_properties(src/libnetdata/log/nd_log-to-windows-events.c PROPERTIES
+                        OBJECT_DEPENDS "${WEVT_MAN_H_FILE}")
 
-                        install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}" "${WEVT_ETW_INSTALL_SCRIPT}"
-                                COMPONENT wevt_netdata_dll
-                                DESTINATION "${BINDIR}")
-                else()
-                        # do not install the manifest in this case
-                        # the nsi installer will skip registering the ETW publisher
-                        install(FILES "${WEVT_DLL_FILE}"
-                                COMPONENT wevt_netdata_dll
-                                DESTINATION "${BINDIR}")
-                endif()
+                install(FILES "${WEVT_DLL_FILE}" "${WEVT_MAN_FILE}" "${WEVT_ETW_INSTALL_SCRIPT}"
+                        COMPONENT wevt_netdata_dll
+                        DESTINATION "${BINDIR}")
         endif()
 endif()
 
@@ -2815,28 +2804,30 @@ list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
                        ${ACLK_PROTO_BUILT_HDRS})
 
 #
-# nd-run helper program
+# nd-run helper program (POSIX-only: uses grp.h, pwd.h, setuid/execvp)
 #
 
-if(OS_LINUX)
-  pkg_check_modules(CAP IMPORTED_TARGET libcap)
-else()
-  set(CAP_FOUND False)
-endif()
+if(NOT OS_WINDOWS)
+  if(OS_LINUX)
+    pkg_check_modules(CAP IMPORTED_TARGET libcap)
+  else()
+    set(CAP_FOUND False)
+  endif()
 
-if(CAP_FOUND)
-  set(HAVE_CAPABILITY True)
-endif()
+  if(CAP_FOUND)
+    set(HAVE_CAPABILITY True)
+  endif()
 
-set(NDRUN_FILES src/collectors/utils/nd-run.c)
-add_executable(nd-run ${NDRUN_FILES})
-if(CAP_FOUND)
-  target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
+  set(NDRUN_FILES src/collectors/utils/nd-run.c)
+  add_executable(nd-run ${NDRUN_FILES})
+  if(CAP_FOUND)
+    target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
+  endif()
+  target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
+  install(TARGETS nd-run
+          COMPONENT netdata
+          DESTINATION "${BINDIR}")
 endif()
-target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
-install(TARGETS nd-run
-        COMPONENT netdata
-        DESTINATION "${BINDIR}")
 
 #
 # build plugins
@@ -3589,6 +3580,7 @@ if(OS_WINDOWS)
         add_executable(NetdataClaim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
         target_link_libraries(NetdataClaim shell32 gdi32 msftedit)
         target_compile_options(NetdataClaim PUBLIC -mwindows)
+        target_link_options(NetdataClaim PRIVATE -mwindows)
 
         set(NETDATA_DRIVER_FILE "${CMAKE_BINARY_DIR}/netdata_driver.sys")
         set(NETDATA_DRIVER_FILE_INF "${CMAKE_BINARY_DIR}/netdata_driver.inf")
@@ -3597,7 +3589,13 @@ if(OS_WINDOWS)
         set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
         set_target_properties(netdata_driver PROPERTIES PREFIX "")
         set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
-        target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
+        # Derive the DDK include path from the compiler location so cmake stores
+        # a Windows-style path (e.g. C:/msys64/ucrt64/include/ddk).  A hardcoded
+        # POSIX path (/ucrt64/include/ddk) passes through cmake unchanged and UCRT64
+        # native GCC, invoked via CreateProcess with no MSYS2 shell, cannot translate
+        # it to the correct Windows path, causing "wdm.h: No such file or directory".
+        get_filename_component(_ddk_include "${CMAKE_C_COMPILER}/../../include/ddk" REALPATH)
+        target_include_directories(netdata_driver BEFORE PRIVATE "${_ddk_include}" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
         target_compile_options(netdata_driver PRIVATE
                 -Wall
                 -Wextra
@@ -3609,7 +3607,7 @@ if(OS_WINDOWS)
                 -mno-red-zone
         )
         target_link_options(netdata_driver PRIVATE
-                -Wl,--entry,DriverEntry@8
+                -Wl,--entry,DriverEntry
                 -nostdlib
                 -Wl,--subsystem,native
                 -Wl,--image-base,0x10000
@@ -3623,6 +3621,24 @@ if(OS_WINDOWS)
         install(FILES "${NETDATA_DRIVER_FILE_INF}"
                 COMPONENT netdata_driver_inf
                 DESTINATION "${BINDIR}")
+
+        # Remove Windows system DLLs that should never live in the build
+        # directory alongside netdata.exe. These get staged there by the old
+        # stage-runtime-dlls.sh logic (which had an inverted allow-list) and
+        # then shadow the real System32 versions, causing access violations
+        # in KernelBase.dll during DLL initialization before main() runs.
+        # Running this as a POST_BUILD command ensures incremental cmake --build
+        # runs also clean up leftover stale DLLs without needing a full rebuild.
+        foreach(_nd_stale_dll IN ITEMS
+                bcrypt.dll  Secur32.dll  USERENV.dll  SSPICLI.DLL
+                CRYPTBASE.DLL  dbghelp.dll  dbgcore.DLL
+                CRYPT32.dll  WLDAP32.dll  SHELL32.dll)
+                add_custom_command(TARGET netdata POST_BUILD
+                        COMMAND "${CMAKE_COMMAND}" -E rm -f
+                                "$<TARGET_FILE_DIR:netdata>/${_nd_stale_dll}"
+                        COMMENT "Removing stale system DLL: ${_nd_stale_dll}"
+                        VERBATIM)
+        endforeach()
 endif()
 
 target_compile_options(netdata PRIVATE
@@ -4743,16 +4759,7 @@ install(CODE "
              DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
 ")
 
-#
-# vendor msys stuff on Windows
-#
-
 if(OS_WINDOWS)
-        install(FILES /usr/bin/msys-protobuf-32.dll
-                      /usr/bin/msys-yaml-0-2.dll
-                      /usr/bin/msys-uv-1.dll
-                      DESTINATION "${BINDIR}")
-
         # user-facing support-bundle tool (Windows PowerShell implementation)
         install(PROGRAMS packaging/installer/netdata-support-bundle.ps1
                 COMPONENT netdata
@@ -4763,6 +4770,30 @@ if(OS_WINDOWS)
 
         # Make curl work with ssl
         install(DIRECTORY /usr/ssl DESTINATION usr)
+
+        # Install UCRT64 runtime DLLs to both usr/bin and plugins.d.
+        # compile-on-windows.sh stages all transitive lib*.dll and zlib1.dll
+        # for netdata.exe into the build root via stage-runtime-dlls.sh.
+        # Copying the same set to plugins.d covers plugin executables: they share
+        # the same UCRT64 toolchain and need their DLLs co-located because Windows
+        # loads DLLs from the executable's own directory first, and the SYSTEM
+        # service account has no MSYS2/UCRT64 bin in its search path.
+        # ${CMAKE_BINARY_DIR} is expanded at configure time to the build root path;
+        # file(GLOB ...) and file(COPY ...) run at cmake --install time.
+        install(CODE "
+            file(GLOB _runtime_dlls
+                \"${CMAKE_BINARY_DIR}/lib*.dll\"
+                \"${CMAKE_BINARY_DIR}/zlib1.dll\"
+            )
+            if(_runtime_dlls)
+                file(COPY \${_runtime_dlls}
+                     DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/bin\")
+                file(COPY \${_runtime_dlls}
+                     DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d\")
+            else()
+                message(WARNING \"No UCRT64 runtime DLLs found in build root; run compile-on-windows.sh first.\")
+            endif()
+        " COMPONENT netdata)
 endif()
 
 #

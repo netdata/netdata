@@ -97,8 +97,8 @@ int test1(int argc, char **argv) {
 	fprintf(stderr, "\n%u random users accessing a random server, out of the %u servers\n", users, machines);
 	now = time(NULL);
 	for(u = 0; u < users ; u++) {
-		uint32_t tu = random() * users / RAND_MAX;
-		uint32_t tm = random() * machines / RAND_MAX;
+		uint32_t tu = (uint32_t)os_random(users);
+		uint32_t tm = (uint32_t)os_random(machines);
 
 		PERSON *p = registry_request_access(users_guids[tu], machines_guids[tm], machines_urls[tm], "test", now);
 
@@ -111,8 +111,8 @@ int test1(int argc, char **argv) {
 	fprintf(stderr, "\n%u random users accessing a random server, out of %u servers\n", users, machines2);
 	now = time(NULL);
 	for(u = 0; u < users ; u++) {
-		uint32_t tu = random() * users / RAND_MAX;
-		uint32_t tm = random() * machines2 / RAND_MAX;
+		uint32_t tu = (uint32_t)os_random(users);
+		uint32_t tm = (uint32_t)os_random(machines2);
 
 		PERSON *p = registry_request_access(users_guids[tu], machines_guids[tm], machines_urls[tm], "test", now);
 
@@ -128,17 +128,17 @@ int test1(int argc, char **argv) {
 				users * 2, machines2);
 		now = time(NULL);
 		for (u = 0; u < users * 2; u++) {
-			uint32_t tu = random() * users / RAND_MAX;
-			uint32_t tm = random() * machines2 / RAND_MAX;
+			uint32_t tu = (uint32_t)os_random(users);
+			uint32_t tm = (uint32_t)os_random(machines2);
 
 			char *url = machines_urls[tm];
 			char buf[FILENAME_MAX + 1];
-			if (random() % 10000 == 1234) {
-				snprintfz(buf, FILENAME_MAX, "http://random.%ld.netdata.rocks/", random());
+			if (os_random(10000) == 1234) {
+				snprintfz(buf, FILENAME_MAX, "http://random.%lu.netdata.rocks/", (unsigned long)os_random(UINT32_MAX));
 				url = buf;
 			}
-			else if (random() % 1000 == 123)
-				url = machines_urls[random() * machines2 / RAND_MAX];
+			else if (os_random(1000) == 123)
+				url = machines_urls[(uint32_t)os_random(machines2)];
 
 			PERSON *p = registry_request_access(users_guids[tu], machines_guids[tm], url, "test", now);
 

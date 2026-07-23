@@ -32,7 +32,6 @@ For each log source, Netdata supports the following output methods:
 | **off**      | All      | Disable this log source                        | Reduce log volume for specific sources                           |
 | **journal**  | Linux    | systemd-journal with full structured fields    | **Recommended for Linux** - Native integration with journald     |
 | **etw**      | Windows  | Event Tracing for Windows with structured data | **Recommended for Windows** - Rich field support in Event Viewer |
-| **wel**      | Windows  | Windows Event Log with basic fields            | Fallback when ETW is unavailable                                 |
 | **syslog**   | Unix     | Traditional syslog protocol                    | Legacy system compatibility                                      |
 | **system**   | All      | Platform's default stderr/stdout               | Container environments                                           |
 | **stdout**   | All      | Direct to Netdata's stdout                     | Debugging, containers                                            |
@@ -45,9 +44,11 @@ On Linux, when systemd-journal is available, the default is `journal` for `daemo
 2. `/run/systemd/journal/socket` exists
 3. `/host/run/systemd/journal/socket` exists (`/host` is configurable in containers)
 
+Windows builds use the manifest-backed ETW provider and require the Windows SDK tools `mc.exe` and `rc.exe`, plus the MSVC `link.exe` linker. The build fails if those tools are unavailable; classic Windows Event Log fallback is intentionally not used because it cannot publish the `Netdata` channel hierarchy.
+
 If any of the above is detected, Netdata will select `journal` for `daemon` and `collector` sources.
 
-On Windows, the default is `etw` and if that is not available it falls back to `wel`. The availability of `etw` is decided at compile time.
+On Windows, Netdata uses manifest-backed `etw` channels.
 
 ## Log formats
 
@@ -57,7 +58,6 @@ Netdata supports multiple log formats to integrate with different systems:
 |-------------|---------------------------------------------------------|------------------------------------------------------------|---------------------------------|
 | **journal** | Native systemd-journal format with all fields preserved | Binary format with 65+ structured fields                   | Linux systems with journald     |
 | **etw**     | Event Tracing for Windows structured format             | Structured events in Windows Event Viewer                  | Windows monitoring and analysis |
-| **wel**     | Windows Event Log format with indexed fields            | String array format in Event Viewer                        | Windows legacy compatibility    |
 | **json**    | Structured JSON with all fields as key-value pairs      | `{"time":1234567890000000,"level":"info","msg":"Started"}` | Modern log aggregation systems  |
 | **logfmt**  | Space-separated key=value pairs                         | `time="2024-01-15T10:30:00.123Z" level=info msg="Started"` | Traditional log processors      |
 
@@ -65,7 +65,7 @@ The format is automatically selected based on the output destination, but can be
 
 ### Field Transformations (Annotators)
 
-The LOGFMT, ETW, and WEL formats apply special transformations (annotators) to certain fields for better human readability:
+The LOGFMT and ETW formats apply special transformations (annotators) to certain fields for better human readability:
 
 | Field                          | Raw Value               | Transformation                     | Example                                           |
 |--------------------------------|-------------------------|------------------------------------|---------------------------------------------------|
@@ -79,7 +79,6 @@ The LOGFMT, ETW, and WEL formats apply special transformations (annotators) to c
 
 - **LOGFMT** - All annotated fields are transformed for readability
 - **ETW** (Event Tracing for Windows) - Uses the same transformations
-- **WEL** (Windows Event Logs) - Uses the same transformations
 
 **Formats NOT using these transformations:**
 
@@ -260,7 +259,6 @@ Example logrotate configuration:
 |               `MESSAGE`                |             `msg`              |           `Message`           |  64   | the event message                                                                                         |
 |            `ND_STACK_TRACE`            |         `stack_trace`          |         `StackTrace`          |  65   | stack trace at time of logging (on fatal errors)                                                          |
 
-For `wel` (Windows Event Logs), all logs have an array of 64 fields strings, and their index number provides their meaning.
 For `etw` (Event Tracing for Windows), Netdata logs in a structured way, and field names are available.
 
 </details>
@@ -407,90 +405,9 @@ Retention can be configured per Channel via the Event Viewer. Netdata does not s
 > (the Unicode character `care of`). Visually, they look similar, but when copying IPv6 addresses
 > or URLs from the logs, you have to be careful to manually replace `℅` with `%` before using them.
 
-## Using Windows Event Logs (WEL)
-
-WEL has a different logs structure and unfortunately WEL and ETW need to use different names if they are to be used
-concurrently.
-
-For WEL, Netdata logs as follows:
-
-- Channel `NetdataWEL` (unfortunately `Netdata` cannot be used, it conflicts with the ETW Publisher name)
-    - Publisher `NetdataDaemon`: general messages about the Netdata service
-    - Publisher `NetdataCollector`: general messages about Netdata external plugins
-    - Publisher `NetdataHealth`: alert transitions and general messages generated by Netdata's health engine
-    - Publisher `NetdataAccess`: all accesses to Netdata APIs
-    - Publisher `NetdataAclk`: for Cloud connectivity tracing (disabled by default)
-
-Publishers must have unique names system-wide, so we had to prefix them with `Netdata`.
-
-Retention can be configured per Publisher via the Event Viewer or the Registry.
-Netdata sets by default 20MiB for all of them, except `NetdataAclk` (5MiB) and `NetdataAccess` (35MiB),
-for a total of 100MiB.
-
-For WEL some registry entries are needed. Netdata automatically takes care of them when it starts.
-
-WEL does not have the problem ETW has with the percent character `%`, so Netdata logs it as-is.
-
-## Differences between ETW and WEL
-
-There are key differences between ETW and WEL.
-
-### Publishers and Providers
-
-**Publishers** are collections of ETW Providers. A Publisher is implied by a manifest file,
-each of which is considered a Publisher, and each manifest file can define multiple **Providers** in it.
-Other than that there is no entity related to **Publishers** in the system.
-
-**Publishers** are not defined for WEL.
-
-**Providers** are the applications or modules logging. Provider names must be unique across the system,
-for ETW and WEL together.
-
-To define a **Provider**:
-
-- ETW requires a **Publisher** manifest coupled with resources DLLs and must be registered
-  via `wevtutil` (handled by the Netdata Windows installer automatically).
-- WEL requires some registry entries and a message resources DLL (handled by Netdata automatically on startup).
-
-The Provider appears as `Source` in the Event Viewer, for both WEL and ETW.
-
-### Channels
-
-- **Channels** for WEL are collections of WEL Providers, (each WEL Provider is a single Stream of logs).
-- **Channels** for ETW slice the logs of each Provider into multiple Streams.
-
-WEL Channels cannot have the same name as ETW Providers. This is why Netdata's ETW provider is
-called `Netdata`, and WEL channel is called `NetdataWEL`.
-
-Despite the fact that ETW **Publishers** and WEL **Channels** are both collections of Providers,
-they are not similar. In ETW a Publisher is a collection on the publisher's Providers, but in WEL
-a Channel may include independent WEL Providers (e.g. the "Applications" Channel). Additionally,
-WEL Channels cannot include ETW Providers.
-
-### Log Retention
-
-Retention is always defined per Stream.
-
-- Retention in ETW is defined per ETW Channel (ETW Provider Stream).
-- Retention in WEL is defined per WEL Provider (each WEL Provider is a single Stream).
-
-### Messages Formatting
-
-- ETW supports recursive fields expansion, and therefore `%N` in fields is expanded recursively
-  (or replaced with an error message if expansion fails). Netdata replaces `%N` with `℅N` to stop
-  recursive expansion (since `%N` cannot be logged otherwise).
-- WEL performs a single field expansion, and therefore the `%` character in fields is never expanded.
-
-### Usability
-
-- ETW names all the fields and allows multiple datatypes per field, enabling log consumers to know
-  what each field means and its datatype.
-- WEL uses a simple string table for fields, and consumers need to map these string fields based on
-  their index.
-
 ## SIEM Integration
 
-Netdata's structured logging system is designed for seamless integration with all major Security Information and Event Management (SIEM) platforms. Logs are emitted in **standards-compliant formats** — systemd-journal, JSON, logfmt, syslog (RFC5424), Windows Event Log (WEL), and Event Tracing for Windows (ETW).
+Netdata's structured logging system is designed for seamless integration with all major Security Information and Event Management (SIEM) platforms. Logs are emitted in **standards-compliant formats** — systemd-journal, JSON, logfmt, syslog (RFC5424), and Event Tracing for Windows (ETW).
 
 This guarantees compatibility with SIEMs including (but not limited to):  
 **Splunk, Elastic Security (ELK Stack / OpenSearch), IBM QRadar, Microsoft Sentinel, Wazuh, CrowdStrike Falcon LogScale, Datadog Security Monitoring, Sumo Logic, LogRhythm, Securonix, ArcSight, Graylog, Chronicle SIEM, AlienVault OSSIM, Devo, Exabeam, Rapid7 InsightIDR, McAfee Enterprise Security Manager (ESM), Fortinet FortiSIEM, SolarWinds SEM, AT&T Cybersecurity USM, RSA NetWitness.**
@@ -501,7 +418,6 @@ This guarantees compatibility with SIEMs including (but not limited to):
 |-----------------------------|--------------------------------------------------------------------|----------------------------------------------------------------------------------|
 | **systemd-journal**         | Native Linux logging with structured fields, tamper-proof with FSS | Splunk (journald input), Elastic Filebeat/Journalbeat, Wazuh, QRadar, Sentinel   |
 | **ETW (Event Tracing)**     | Rich structured events in Event Viewer (Windows native)            | Splunk UF (Win), Sentinel, QRadar, LogRhythm, ArcSight, Elastic Winlogbeat       |
-| **WEL (Windows Event Log)** | Legacy Windows Event Log array-based fields                        | All Windows SIEM agents (Splunk UF, Sentinel, QRadar, Wazuh, Elastic Winlogbeat) |
 | **JSON**                    | Structured JSON objects with key-value pairs                       | Elastic/Logstash, Splunk (indexed extractions), Datadog, Sumo Logic, Graylog     |
 | **logfmt**                  | Human-readable `key=value` logs                                    | Traditional syslog pipelines, Graylog, SolarWinds SEM, legacy SIEM integrations  |
 | **syslog (RFC5424)**        | Standard syslog protocol                                           | QRadar, ArcSight, LogRhythm, FortiSIEM, AlienVault OSSIM, RSA NetWitness, Devo   |
@@ -510,7 +426,7 @@ This guarantees compatibility with SIEMs including (but not limited to):
 
 1. **Structured Logs** – All Netdata events contain contextual fields, no regex parsing required.
 2. **Message IDs (UUIDs)** – Unique identifiers for alert transitions, service lifecycle events, configuration changes, and network connections. Enables precise rule building without pattern matching.
-3. **Multiple Output Options** – Select the best integration path for your SIEM: journald (Linux), ETW/WEL (Windows), JSON/logfmt (cross-platform), syslog (legacy).
+3. **Multiple Output Options** – Select the best integration path for your SIEM: journald (Linux), ETW (Windows), JSON/logfmt (cross-platform), syslog (legacy).
 4. **Security-Relevant Events** – Alert transitions, anomalous resource use, configuration changes, service errors, API access attempts.
 5. **Compliance Support** – Journald Forward Secure Sealing (FSS) and Windows Event Log immutability controls support PCI DSS, ISO 27001, SOC 2, HIPAA, and other frameworks.
 
@@ -533,7 +449,7 @@ Syslog is provided for legacy collectors.
 2. **Enable relevant sources** (`health` for alerts, `access` for audit trails, `daemon` for lifecycle events).
 3. **Configure SIEM collection**:
     - Journald → SIEM agent (Splunk UF, Filebeat, Wazuh agent, QRadar DSM)
-    - ETW/WEL → Windows Event Forwarding, Winlogbeat, Splunk UF, Sentinel Connector
+    - ETW → Windows Event Forwarding, Winlogbeat, Splunk UF, Sentinel Connector
     - JSON/logfmt → Filebeat, Logstash, Fluent Bit, Graylog input, Sumo Logic agent
     - Syslog → Direct to SIEM collector (QRadar, ArcSight, LogRhythm, FortiSIEM)
 4. **Use Message IDs** to build reliable detection rules:

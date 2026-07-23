@@ -6,6 +6,87 @@
 
 #include "../libnetdata.h"
 
+// =====================================================================================================================
+// Windows: derive runtime install prefix from binary location
+
+#if defined(OS_WINDOWS)
+void nd_windows_detect_prefix_and_override_paths(void) {
+    // Derive the install prefix from the running executable path.
+    // Netdata installs as <prefix>/usr/bin/netdata.exe, so stripping
+    // three path components gives <prefix> (e.g. C:\Program Files\Netdata).
+    char exe_path[MAX_PATH + 1];
+    DWORD len = GetModuleFileNameA(NULL, exe_path, MAX_PATH);
+    if (len == 0 || len >= MAX_PATH)
+        return;
+
+    // Normalize backslashes to forward slashes.
+    // UCRT64's CRT (no msys-2.0.dll) accepts C:/... everywhere that
+    // it accepts C:\... — forward slashes are valid Windows path separators.
+    for (char *p = exe_path; *p; p++)
+        if (*p == '\\') *p = '/';
+
+    // Strip three components: netdata.exe, bin, usr.
+    for (int i = 0; i < 3; i++) {
+        char *sep = strrchr(exe_path, '/');
+        if (!sep)
+            return;
+        *sep = '\0';
+    }
+    // exe_path is now: C:/Program Files/Netdata
+
+    // Validate that the expected config directory exists under this prefix
+    // before committing to the override.
+    char test_path[FILENAME_MAX + 1];
+    snprintfz(test_path, FILENAME_MAX, "%s/etc/netdata", exe_path);
+    DWORD attrs = GetFileAttributesA(test_path);
+    if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
+        return;
+
+    // Override all runtime path globals with Windows-native form (C:/...).
+    // reformat_path() in inicfg_api.c normalizes paths to this same form on every
+    // inicfg_get_path() call, so the globals remain C:/... throughout the lifetime
+    // of the process regardless of how the config file was authored.
+    //
+    // Small one-time startup leak: these strdupz() allocations are later
+    // overwritten by nd_runtime_paths_load_directories_from_inicfg() which
+    // stores the value in the config intern pool and returns a different
+    // pointer.  The strdupz() pointers are orphaned but not freed.  The
+    // total leaked memory is a few hundred bytes on every startup — acceptable
+    // for a long-running daemon.
+#define SET_PATH(var, suffix) \
+    do { \
+        char _buf[FILENAME_MAX + 1]; \
+        snprintfz(_buf, FILENAME_MAX, "%s" suffix, exe_path); \
+        (var) = strdupz(_buf); \
+    } while(0)
+
+    SET_PATH(netdata_configured_user_config_dir,     "/etc/netdata");
+    SET_PATH(netdata_configured_stock_config_dir,    "/usr/lib/netdata/conf.d");
+    SET_PATH(netdata_configured_stock_data_dir,      "/usr/share/netdata");
+    SET_PATH(netdata_configured_log_dir,             "/var/log/netdata");
+    SET_PATH(netdata_configured_primary_plugins_dir, "/usr/libexec/netdata/plugins.d");
+    SET_PATH(netdata_configured_web_dir,             "/usr/share/netdata/web");
+    SET_PATH(netdata_configured_cache_dir,           "/var/cache/netdata");
+    SET_PATH(netdata_configured_varlib_dir,          "/var/lib/netdata");
+    SET_PATH(netdata_configured_cloud_dir,           "/var/lib/netdata/cloud.d");
+    SET_PATH(netdata_configured_home_dir,            "/var/lib/netdata");
+
+#undef SET_PATH
+
+    // Pre-create the run directory and advertise it via NETDATA_RUN_DIR
+    // in the Windows-compatible C:/... form.  os_run_dir() calls stat()
+    // directly without POSIX translation, so the path must be in a form
+    // that UCRT64's CRT handles natively (C:/... works; /c/... does not).
+    char run_parent[FILENAME_MAX + 1];
+    char run_dir[FILENAME_MAX + 1];
+    snprintfz(run_parent, FILENAME_MAX, "%s/run",         exe_path);
+    snprintfz(run_dir,    FILENAME_MAX, "%s/run/netdata", exe_path);
+    (void)mkdir(run_parent, 0755);
+    (void)mkdir(run_dir,    0755);
+    nd_setenv("NETDATA_RUN_DIR", run_dir, 1);
+}
+#endif
+
 const char *netdata_configured_hostname            = NULL;
 const char *netdata_configured_user_config_dir     = CONFIG_DIR;
 const char *netdata_configured_stock_config_dir    = LIBCONFIG_DIR;

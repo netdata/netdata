@@ -100,11 +100,19 @@ bool status_file_io_load(const char *filename, bool (*cb)(const char *, void *),
     }
 
     // Load the newest file found
-    if(*newest && cb(newest, data))
-        return true;
+    if(*newest) {
+        if(cb(newest, data))
+            return true;
 
+        // File exists but couldn't be parsed — genuine error.
+        if(log)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot parse the status file '%s'", newest);
+        return false;
+    }
+
+    // No file found in any location — expected on first run, debug-only.
     if(log)
-        nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot find a status file in any location");
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "Cannot find a status file in any location (expected on first run)");
 
     return false;
 }
@@ -219,6 +227,11 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     }
 
     /* Rename temp file to target file */
+#if defined(OS_WINDOWS)
+    // POSIX rename() atomically replaces an existing destination; Windows rename()
+    // fails with EEXIST instead.  Unlink first to get the same replace semantics.
+    unlink(final);
+#endif
     if (rename(temp, final) != 0) {
         unlink(temp);
         return false;

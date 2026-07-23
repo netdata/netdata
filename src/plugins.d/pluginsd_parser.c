@@ -1416,7 +1416,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
                 schedule_node_state_update(virtual_host, 1000);
             }
         }
+#ifndef OS_WINDOWS
         (void) JudyLFreeArray(&parser->user.vnodes.JudyL, PJE0);
+#endif
     }
 
     // mark all charts of this plugin as obsolete

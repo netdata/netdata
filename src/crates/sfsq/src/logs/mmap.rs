@@ -11,7 +11,9 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
-use memmap2::{Mmap, UncheckedAdvice};
+use memmap2::Mmap;
+#[cfg(unix)]
+use memmap2::UncheckedAdvice;
 
 use super::engine::Source;
 
@@ -79,6 +81,10 @@ pub(super) fn map_file(path: &Path) -> Option<Mmap> {
 /// [`sfst::IndexReader::cold_region`]; it is aligned **inward** to whole
 /// pages so the advice never frees a hot-prefix edge page (e.g. the
 /// primary FST's tail), then released in a single `madvise` call.
+///
+/// On non-Unix platforms `madvise` does not exist; this is a no-op there
+/// and cold pages simply stay in the page cache (best-effort semantics).
+#[cfg(unix)]
 pub(super) fn release_cold_region(mapping: &Mmap, region: (usize, usize)) {
     let (offset, len) = region;
     let page = page_size();
@@ -97,6 +103,11 @@ pub(super) fn release_cold_region(mapping: &Mmap, region: (usize, usize)) {
         // Best-effort hint — on failure the cold pages simply stay cached.
         tracing::debug!("sfsq: releasing cold region failed: {e}");
     }
+}
+
+#[cfg(not(unix))]
+pub(super) fn release_cold_region(_mapping: &Mmap, _region: (usize, usize)) {
+    // madvise is not available on non-Unix platforms; cold pages stay cached.
 }
 
 #[cfg(test)]
@@ -125,6 +136,11 @@ mod tests {
 }
 
 /// The process's memory-page size, cached after the first lookup.
+/// `sysconf(_SC_PAGESIZE)` is POSIX-only; the non-Unix build never calls
+/// this function (it is only used inside the `#[cfg(unix)]` variant of
+/// `release_cold_region`), but the function itself is also gated to keep
+/// the `libc` reference from emitting a compile error on Windows.
+#[cfg(unix)]
 fn page_size() -> usize {
     use std::sync::OnceLock;
     static PAGE_SIZE: OnceLock<usize> = OnceLock::new();

@@ -29,6 +29,8 @@ parking_lot = { workspace = true }
 bytes = { workspace = true }
 itoa = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter", "json"] }
+
+[target.'cfg(unix)'.dependencies]
 tracing-journald = { workspace = true }
 
 [dev-dependencies]

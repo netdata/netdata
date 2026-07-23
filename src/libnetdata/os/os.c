@@ -46,6 +46,7 @@ char *os_translate_msys_to_windows_path(const char *src) {
         return strdupz("");
 
     if (src[0] == '/') {
+#if defined(__CYGWIN__) || defined(__MSYS__)
         ssize_t converted_size = cygwin_conv_path(CCP_POSIX_TO_WIN_A, src, NULL, 0);
         if (converted_size > 0) {
             char *converted_path = mallocz((size_t)converted_size);
@@ -54,6 +55,7 @@ char *os_translate_msys_to_windows_path(const char *src) {
 
             freez(converted_path);
         }
+#endif
     }
 
     size_t src_len = strnlen(src, OS_WINDOWS_PATH_TRANSLATION_MAX);
@@ -149,6 +151,7 @@ char *os_translate_windows_to_msys_path(const char *src) {
     if (src[0] == '/')
         return strdupz(src);
 
+#if defined(__CYGWIN__) || defined(__MSYS__)
     ssize_t converted_size = cygwin_conv_path(CCP_WIN_A_TO_POSIX, src, NULL, 0);
     if (converted_size > 0) {
         char *converted_path = mallocz((size_t)converted_size);
@@ -157,6 +160,7 @@ char *os_translate_windows_to_msys_path(const char *src) {
 
         freez(converted_path);
     }
+#endif
 
     size_t src_len = strnlen(src, OS_WINDOWS_PATH_TRANSLATION_MAX);
     char *converted_path = mallocz(src_len + 3);
@@ -186,4 +190,5 @@ char *os_translate_windows_to_msys_path(const char *src) {
     converted_path[j] = '\0';
     return converted_path;
 }
+
 #endif

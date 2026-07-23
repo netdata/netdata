@@ -271,6 +271,7 @@ static void fatal_status_file_save(void) {
     exit(1);
 }
 
+
 int netdata_main(int argc, char **argv) {
     libjudy_malloc_init();
     string_init();
@@ -1048,8 +1049,21 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("cd to user config dir");
 
     // cd into config_dir to allow the plugins refer to their config files using relative filenames
+#if defined(OS_WINDOWS)
+    // netdata_configured_user_config_dir is in POSIX/MSYS2 form (/c/...).
+    // UCRT64's chdir() calls SetCurrentDirectoryA() directly without POSIX
+    // translation — /c/... would resolve to C:\c\... which does not exist.
+    // Convert to Windows-native form first so SetCurrentDirectoryA() succeeds.
+    {
+        char win_config_dir[FILENAME_MAX + 1];
+        os_translate_path(win_config_dir, netdata_configured_user_config_dir, FILENAME_MAX);
+        if(chdir(win_config_dir) == -1)
+            fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+    }
+#else
     if(chdir(netdata_configured_user_config_dir) == -1)
         fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("analytics");
@@ -1101,8 +1115,9 @@ int netdata_main(int argc, char **argv) {
         if(st->config_name)
             st->enabled = inicfg_get_boolean(&netdata_config, st->config_section, st->config_name, st->enabled);
 
-        if(st->enabled && st->init_routine)
+        if(st->enabled && st->init_routine) {
             st->init_routine();
+        }
 
         if(st->env_name)
             nd_setenv(st->env_name, st->enabled?"YES":"NO", 1);
@@ -1121,8 +1136,9 @@ int netdata_main(int argc, char **argv) {
     web_server_threading_selection();
 
     delta_startup_time("web server sockets");
-    if(web_server_mode != WEB_SERVER_MODE_NONE)
+    if(web_server_mode != WEB_SERVER_MODE_NONE) {
         web_server_listen_sockets_setup();
+    }
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("sqlite");
@@ -1225,11 +1241,12 @@ int netdata_main(int argc, char **argv) {
     set_late_analytics_variables(system_info);
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("RRD structures");
-
     delta_startup_time("commands liveness support");
 
     commands_init();
+
+    // ----------------------------------------------------------------------------------------------------------------
+    delta_startup_time("RRD structures");
 
     abort_on_fatal_disable();
     if (rrd_init(netdata_configured_hostname, system_info, false))

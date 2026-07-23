@@ -1227,10 +1227,14 @@ int rrdeng_init(
     // Global contexts may already have MRG prepopulation accounting from the first DBEngine spawn.
     rrdeng_reset_accounting_if_fresh(ctx, freshly_initialized_ctx);
 
-    if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
-        // success - we run this ctx too
-        rrdeng_populate_mrg(ctx);
-        return 0;
+    bool spawn_ok = rrdeng_dbengine_spawn(ctx);
+    if (spawn_ok) {
+        int files_ret = init_rrd_files(ctx);
+        if (!files_ret) {
+            // success - we run this ctx too
+            rrdeng_populate_mrg(ctx);
+            return 0;
+        }
     }
 
     if (unittest_running) {

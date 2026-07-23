@@ -239,7 +239,9 @@ static void ebpf_socket_clean_judy_array_unsafe()
                 netdata_socket_plus_t *socket_clean = *socket_value;
                 aral_freez(aral_socket_table, socket_clean);
             }
+#ifndef OS_WINDOWS
             JudyLFreeArray(&pid_ptr->socket_stats.JudyLArray, PJE0);
+#endif
             pid_ptr->socket_stats.JudyLArray = NULL;
         }
         rw_spinlock_write_unlock(&pid_ptr->socket_stats.rw_spinlock);

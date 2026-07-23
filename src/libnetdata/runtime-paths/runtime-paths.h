@@ -36,4 +36,12 @@ void nd_runtime_paths_load_directories_from_inicfg(void);
 // Idempotent.
 void nd_runtime_paths_load_hostname_from_inicfg(void);
 
+#if defined(OS_WINDOWS)
+// Derive the install prefix from the running binary path and override all
+// netdata_configured_* directory globals to their correct installed locations.
+// Must be called before netdata_main() so that config loading and chdir()
+// use the real install tree rather than the compile-time staging paths.
+void nd_windows_detect_prefix_and_override_paths(void);
+#endif
+
 #endif // NETDATA_RUNTIME_PATHS_H

@@ -2,28 +2,130 @@
 
 #include "common.h"
 
+
+// Normalize a directory path for Win32/UCRT64 API use.
+// Accepts both POSIX form (/c/...) and Windows-native form (C:\... or C:/...);
+// output is always C:/... with forward slashes.  Non-Windows: straight copy.
+void nd_env_normalize_dir_path(const char *src, char *dst, size_t dst_size) {
+    if (!src || !dst || !dst_size) return;
+
+#if defined(OS_WINDOWS)
+    if (isalpha((unsigned char)src[0]) && src[1] == ':') {
+        // Windows-native: upper-case drive, \ → /
+        if (dst_size < 4) { dst[0] = '\0'; return; }
+        dst[0] = (char)toupper((unsigned char)src[0]);
+        dst[1] = ':';
+        if (src[2] == '\0') {
+            // Bare "C:" → "C:/" (drive-relative otherwise)
+            dst[2] = '/'; dst[3] = '\0';
+        } else {
+            size_t i = 2, j = 2;
+            for (; src[i] && j < dst_size - 1; i++, j++)
+                dst[j] = (src[i] == '\\') ? '/' : src[i];
+            dst[j] = '\0';
+        }
+    } else if (src[1] && isalpha((unsigned char)src[1]) && (src[2] == '/' || src[2] == '\0')) {
+        // POSIX (/c/... or bare /c): extract drive letter, keep forward slashes.
+        if (dst_size < 4) { dst[0] = '\0'; return; }
+        dst[0] = (char)toupper((unsigned char)src[1]);
+        dst[1] = ':';
+        if (src[2] == '\0') {
+            dst[2] = '/'; dst[3] = '\0';
+        } else {
+            strncpyz(dst + 2, src + 2, dst_size - 2);
+        }
+    } else {
+        strncpyz(dst, src, dst_size);
+    }
+#else
+    strncpyz(dst, src, dst_size);
+#endif
+}
+
+#if defined(OS_WINDOWS)
+// mkdir -p for Windows native paths (C:/foo/bar/baz).
+// Walk every '/' separator and create each prefix, ignoring failures
+// (the parent may already exist).  The drive root "X:" is skipped
+// because mkdir on a bare drive letter always fails.
+void mkdir_recursive(const char *native_path) {
+    char tmp[FILENAME_MAX + 1];
+    strncpyz(tmp, native_path, FILENAME_MAX);
+
+    // Start after the drive root ("X:/") so we never call mkdir on "X:".
+    char *walk_start = tmp;
+    if (isalpha((unsigned char)tmp[0]) && tmp[1] == ':' && (tmp[2] == '/' || tmp[2] == '\0'))
+        walk_start = tmp + 2;
+
+    // If walk_start is already at '\0' (empty path or bare drive letter), there
+    // are no intermediate components to create.  Skip the loop entirely so that
+    // walk_start + 1 is never read — that byte is uninitialized for such inputs.
+    if (!*walk_start)
+        return;
+
+    for (char *p = walk_start + 1; *p; p++) {
+        if (*p == '/') {
+            char saved = *p;
+            *p = '\0';
+            mkdir(tmp, 0775);  // ignore failure — may already exist
+            *p = saved;
+        }
+    }
+}
+#endif
+
 void verify_required_directory(const char *env, const char *dir, bool create_it, int perms) {
     errno_clear();
 
-    if (!dir || *dir != '/')
+    // `perms` is only consulted when `create_it` is true and the directory
+    // does not yet exist; mark it as intentionally unused otherwise so the
+    // compiler and SonarQube S1172 do not flag the parameter on the
+    // "verify-only" call sites (the majority of the call sites).
+    (void)perms;
+
+#if defined(OS_WINDOWS)
+    // Accept both POSIX form (/c/...) and Windows-native form (C:\... or C:/...).
+    // A bare "C:" (no trailing separator) is drive-relative on Windows — treat it
+    // as the root by requiring at least a separator or end-of-string after "X:".
+    bool is_absolute_path =
+        (dir && dir[0] == '/') ||
+        (dir && isalpha((unsigned char)dir[0]) && dir[1] == ':' &&
+         (dir[2] == '\\' || dir[2] == '/' || dir[2] == '\0'));
+#else
+    bool is_absolute_path = (dir && dir[0] == '/');
+#endif
+    if (!dir || !is_absolute_path)
         fatal("Invalid directory path (must be an absolute path): '%s' (%s)", dir, env?env:"");
 
-    if (chdir(dir) == 0) {
+#if defined(OS_WINDOWS)
+    char win_dir[FILENAME_MAX + 1];
+    nd_env_normalize_dir_path(dir, win_dir, sizeof(win_dir));
+    const char *native_dir = win_dir;
+#else
+    const char *native_dir = dir;
+#endif
+
+    bool dir_ok = (chdir(native_dir) == 0);
+
+    if (!dir_ok && create_it) {
+#if defined(OS_WINDOWS)
+        // On Windows, the WiX installer only creates static content directories;
+        // runtime directories like var/log/ may have no parent.  Create all
+        // intermediate components before attempting the final mkdir.
+        mkdir_recursive(native_dir);
+#endif
+        // Accept the case where mkdir_recursive already created the leaf.
+        if (mkdir(native_dir, perms) == 0 || chdir(native_dir) == 0)
+            dir_ok = true;
+    }
+
+    if (dir_ok) {
         if(env)
             nd_setenv(env, dir, 1);
         return;
     }
 
-    if(create_it) {
-        if(mkdir(dir, perms) == 0) {
-            if(env)
-                nd_setenv(env, dir, 1);
-            return;
-        }
-    }
-
     char path[PATH_MAX];
-    strncpyz(path, dir, sizeof(path) - 1);
+    strncpyz(path, native_dir, sizeof(path) - 1);
     struct stat st;
 
     char *p = path;
@@ -32,30 +134,35 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
             *p = '\0';
 
             errno_clear();
-            if (stat(path, &st) == -1)
+            if (stat(path, &st) == -1) {
                 fatal("Required directory: '%s' (%s) - Missing or inaccessible component: '%s'",
                       dir, env?env:"", path);
+            }
 
-            if (!S_ISDIR(st.st_mode))
+            if (!S_ISDIR(st.st_mode)) {
                 fatal("Required directory: '%s' (%s) - Component '%s' exists but is not a directory.",
                       dir, env?env:"", path);
+            }
 
             *p = '/';
         }
         p++;
     }
 
-    if (stat(dir, &st) == -1)
+    if (stat(native_dir, &st) == -1) {
         fatal("Required directory: '%s' (%s) - Missing or inaccessible: '%s'",
-              dir, env?env:"", dir);
+              dir, env?env:"", native_dir);
+    }
 
-    if (!S_ISDIR(st.st_mode))
+    if (!S_ISDIR(st.st_mode)) {
         fatal("Required directory: '%s' (%s) - '%s' exists but is not a directory.",
-              dir, env?env:"", dir);
+              dir, env?env:"", native_dir);
+    }
 
-    if (access(dir, R_OK | X_OK) == -1)
+    if (access(native_dir, R_OK | X_OK) == -1) {
         fatal("Required directory: '%s' (%s) - Insufficient permissions for: '%s'",
-              dir, env?env:"", dir);
+              dir, env?env:"", native_dir);
+    }
 
     fatal("Required directory: '%s' (%s) - Failed",
           dir, env?env:"");
@@ -73,7 +180,7 @@ void set_environment_for_plugins_and_scripts(void) {
     nd_setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
     verify_required_directory("NETDATA_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
-    verify_required_directory("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
+    nd_setenv("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir, 1);
     verify_required_directory("NETDATA_STOCK_CONFIG_DIR", netdata_configured_stock_config_dir, false, 0);
     verify_required_directory("NETDATA_STOCK_DATA_DIR", netdata_configured_stock_data_dir, false, 0);
     verify_required_directory("NETDATA_PLUGINS_DIR", netdata_configured_primary_plugins_dir, false, 0);
