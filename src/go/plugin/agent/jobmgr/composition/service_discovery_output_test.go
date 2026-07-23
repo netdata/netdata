@@ -174,6 +174,15 @@ func TestServiceDiscoveryMutationCommand(t *testing.T) {
 		"read-only": {
 			command: dyncfg.CommandGet,
 		},
+		"schema is read-only": {
+			command: dyncfg.CommandSchema,
+		},
+		"test is read-only": {
+			command: dyncfg.CommandTest,
+		},
+		"userconfig is read-only": {
+			command: dyncfg.CommandUserconfig,
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
