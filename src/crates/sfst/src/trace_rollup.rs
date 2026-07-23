@@ -290,6 +290,28 @@ mod tests {
     }
 
     #[test]
+    fn sealed_translates_root_slots_through_the_kv_table() {
+        use crate::kv_interner::KvSlot;
+        let mut rows = TraceRollupRows::new();
+        rows.record_span(
+            tid(1),
+            sid(1),
+            true,
+            10,
+            5,
+            2,
+            false,
+            Some(KvSlot(0)),
+            Some(KvSlot(2)),
+        );
+        // Slot 0 → file id 7; slot 2 → file id 9.
+        let table = [KvId(7), KvId(8), KvId(9)];
+        let sealed = rows.sealed(&table);
+        assert_eq!(sealed.root_service_refs, vec![7]);
+        assert_eq!(sealed.root_name_refs, vec![9]);
+    }
+
+    #[test]
     fn rows_emit_sorted_by_trace_id() {
         let mut rows = TraceRollupRows::new();
         rows.record_span(tid(9), sid(1), false, 1, 1, 0, false, None, None);
