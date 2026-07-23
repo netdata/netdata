@@ -48,6 +48,7 @@ int rrdfunctions_verify_access_unittest(void) {
                      HTTP_ACCESS_NONE, true, rrdfunctions_unittest_noop_cb, NULL);
 
     struct {
+        RRDHOST *host;
         const char *fn;
         HTTP_ACCESS user_access;
         bool allow_restricted;
@@ -56,27 +57,31 @@ int rrdfunctions_verify_access_unittest(void) {
     } cases[] = {
         // GHSA-6628-vxm3-4g8g: anonymous caller denied on the protected function.
         // (~SIGNED_ID -> 412, exactly what /api/v3/function returned in the report.)
-        { "protected-fn", HTTP_ACCESS_ANONYMOUS_DATA, false, HTTP_RESP_PRECOND_FAIL, false },
+        { host, "protected-fn", HTTP_ACCESS_ANONYMOUS_DATA, false, HTTP_RESP_PRECOND_FAIL, false },
 
         // Signed-in but still missing same-space + sensitive-data -> denied (403, has SIGNED_ID).
-        { "protected-fn", HTTP_ACCESS_SIGNED_ID, false, HTTP_RESP_FORBIDDEN, false },
+        { host, "protected-fn", HTTP_ACCESS_SIGNED_ID, false, HTTP_RESP_FORBIDDEN, false },
 
         // Fully authorized caller -> allowed, item acquired.
-        { "protected-fn", HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+        { host, "protected-fn", HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
           false, HTTP_RESP_OK, true },
 
         // Restricted function is blocked from this API even for a fully authorized caller.
-        { "__restricted-fn", HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+        { host, "__restricted-fn", HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
           false, HTTP_RESP_FORBIDDEN, false },
 
         // ... unless the internal caller explicitly allows restricted functions.
-        { "__restricted-fn", HTTP_ACCESS_ANONYMOUS_DATA, true, HTTP_RESP_OK, true },
+        { host, "__restricted-fn", HTTP_ACCESS_ANONYMOUS_DATA, true, HTTP_RESP_OK, true },
 
         // Public function stays reachable anonymously — the gate must not over-block.
-        { "public-fn", HTTP_ACCESS_ANONYMOUS_DATA, false, HTTP_RESP_OK, true },
+        { host, "public-fn", HTTP_ACCESS_ANONYMOUS_DATA, false, HTTP_RESP_OK, true },
 
         // Unknown function -> 404, no item.
-        { "does-not-exist", HTTP_ACCESS_ANONYMOUS_DATA, false, HTTP_RESP_NOT_FOUND, false },
+        { host, "does-not-exist", HTTP_ACCESS_ANONYMOUS_DATA, false, HTTP_RESP_NOT_FOUND, false },
+
+        // No host to route to -> 500, no item, error body populated. Guards the early
+        // !host branch that resets out_acquired before any function lookup.
+        { NULL, "protected-fn", HTTP_ACCESS_ANONYMOUS_DATA, false, HTTP_RESP_INTERNAL_SERVER_ERROR, false },
     };
 
     int errors = 0;
@@ -84,10 +89,10 @@ int rrdfunctions_verify_access_unittest(void) {
         CLEAN_BUFFER *wb = buffer_create(0, NULL);
         const DICTIONARY_ITEM *item = (const DICTIONARY_ITEM *)(uintptr_t)0x1; // poison: verify it is reset
 
-        int code = rrd_function_verify_access(host, wb, cases[i].fn,
+        int code = rrd_function_verify_access(cases[i].host, wb, cases[i].fn,
                                               cases[i].user_access, cases[i].allow_restricted, &item);
 
-        bool ok = false, item_ok = false;
+        bool ok = false, item_ok = false, body_ok = false;
 
         if(code != cases[i].expect_code) {
             fprintf(stderr, "  FAILED case %zu (%s, access 0x%x, allow_restricted=%d): "
@@ -113,10 +118,22 @@ int rrdfunctions_verify_access_unittest(void) {
         else
             item_ok = true;
 
-        if(item)
-            dictionary_acquired_item_release(host->functions, item);
+        // Denial must emit an error body (rrd_call_function_error), not silently return an
+        // empty result_wb. A regression that drops the message would still pass the code and
+        // item checks above but would leave the caller with nothing — the security fix
+        // requires the denial to be explicit. Authorized calls do not touch result_wb here.
+        if(cases[i].expect_code != HTTP_RESP_OK && buffer_strlen(wb) == 0) {
+            fprintf(stderr, "  FAILED case %zu (%s): denial produced an empty error body\n",
+                    i, cases[i].fn);
+            errors++;
+        }
+        else
+            body_ok = true;
 
-        if(ok && item_ok)
+        if(item)
+            dictionary_acquired_item_release(cases[i].host->functions, item);
+
+        if(ok && item_ok && body_ok)
             fprintf(stderr, "  OK case %zu: %s (access 0x%x, allow_restricted=%d) -> %d\n",
                     i, cases[i].fn, (unsigned)cases[i].user_access, cases[i].allow_restricted, code);
     }
