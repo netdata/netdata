@@ -755,8 +755,9 @@ static int cachestat_snapshot_from_acc(
     for (size_t i = 0; i < rt->acc_count; i++) {
         const struct netdata_ebpf_cachestat_pid_entry *src = &rt->acc[i];
         struct netdata_ebpf_cachestat_pid_snapshot *dst = &rt->items_buf[i];
-        dst->pid = src->tgid;
-        dst->ct  = src->ct;
+        dst->pid  = src->tgid;
+        dst->ppid = 0; /* acc path has no ppid; zero explicitly — buffer is reused across cycles */
+        dst->ct   = src->ct;
         memset(dst->comm, 0, sizeof(dst->comm));
         size_t nlen = strnlen(src->name, sizeof(src->name));
         memcpy(dst->comm, src->name, nlen < sizeof(dst->comm) - 1 ? nlen : sizeof(dst->comm) - 1);
