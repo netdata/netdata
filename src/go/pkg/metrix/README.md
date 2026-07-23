@@ -64,7 +64,7 @@ Current ownership map:
 | Runtime store, immediate writes, overlay snapshots | `runtime_store.go`, `runtime_model.go`, `runtime_write.go`, `runtime_commit.go` |
 | Write API, meters, Vec, instruments | `backend.go`, `meter.go`, `vec.go`, `vec_cache.go`, `vec_factory.go`, `vec_handles.go`, `gauge.go`, `counter.go`, `histogram.go`, `summary.go`, `summary_sketch.go`, `stateset.go`, `measureset.go`, `measureset_normalize.go`, `measureset_store.go`, `seeded.go` |
 | Labels, label sets, metadata, validation | `labels.go`, `labelset.go`, `meta.go`, `value_validation.go` |
-| Snapshot reads and flattening | `reader.go`, `reader_flatten.go` |
+| Snapshot reads, indexing, and flattening | `reader.go`, `reader_index.go`, `reader_flatten.go` |
 | Public-contract tests | `public_contract_test.go` (`package metrix_test`); white-box implementation tests remain in `package metrix` |
 | Selector expressions | `selector/` |
 
@@ -109,8 +109,10 @@ flowchart LR
 
 Key properties that fall out of this shape:
 
-- **Reads are lock-free.** A reader holds an immutable snapshot; commits swap in
-  a new one. Any number of goroutines read concurrently.
+- **Reads do not take the commit lock.** A reader holds an immutable snapshot;
+  commits swap in a new one. The first index or flattened-view request for a
+  CollectorStore snapshot synchronizes one builder; subsequent readers use the
+  published immutable result concurrently.
 - **Writes are invisible until commit.** A half-collected or failed cycle never
   leaks partial data to readers.
 - **Commit is transactional.** Either the whole cycle publishes, or (on
@@ -276,6 +278,41 @@ The `Reader` interface exposes typed getters
 (`Value/Delta/Histogram/Summary/StateSet/MeasureSet`), metadata
 (`SeriesMeta/MetricMeta/CollectMeta`), host scopes, and iteration helpers
 (`ForEachByName/ForEachSeries/ForEachMatch`).
+
+### Snapshot-owned projection and scope indexes
+
+`CollectorStore` owns read acceleration at the published-snapshot boundary:
+
+- The first `Read(ReadFlatten())` for one exact snapshot builds the complete
+  flattened scalar projection and its deterministic indexes.
+- Later flattened readers of that snapshot reuse the same immutable projection.
+- A successful commit and a failed/aborted attempt each publish a new exact
+  snapshot, so freshness metadata and cached projections cannot cross the
+  boundary.
+- Scalar gauge/counter series are shared with the canonical snapshot because
+  committed series are immutable. Structured families allocate their synthetic
+  flattened series once per snapshot.
+- Raw and flattened readers use immutable per-scope name indexes. Scoped lookup
+  and iteration therefore depend on that scope's series, not on peer-scope
+  cardinality.
+
+`RuntimeStore` deliberately keeps per-read flattening because its immediate-write
+overlay snapshots have a different lifetime and reuse profile. It still uses
+the same deterministic reader indexes within each read.
+
+### Host-scope reads and metadata
+
+- `Read()` selects the default host scope; `ReadHostScope(key)` selects one
+  explicit scope.
+- `HostScopes()` returns every scope present in the snapshot, independent of the
+  reader's active scope. Returned metadata is defensively cloned.
+- `MetricMeta(name)` is scope-local. Fresh readers prefer visible series and may
+  fall back to stale metadata only inside the active scope; raw readers may use
+  stale metadata in that scope. Neither mode falls back to a peer scope.
+- CollectorStore readers optionally implement
+  `FreshVisibleHostScopesReader`. Its `FreshVisibleHostScopes()` result contains
+  only scopes with at least one series visible under normal freshness rules and
+  is independent of `ReadRaw()`.
 
 ## Instruments
 
@@ -485,5 +522,6 @@ see [how-to-write-a-collector.md](/src/go/plugin/go.d/docs/how-to-write-a-collec
 | Descriptor resolution | Observed authorities per name are grouped in a fingerprint-indexed map (no cap); one canonical descriptor per accepted name. |
 | Descriptor eviction | One O(descriptor-universe) sweep at commit, after retention; `instrumentZeroSince` tracks idle-since on the successful-commit clock. |
 | Runtime commit | Overlay/compaction strategy with its own retention pruning. |
-| Iteration | Name-indexed deterministic iteration for reader traversal. |
+| Collector read projection | One failure-safe lazy flattened projection per exact published snapshot; concurrent first users synchronize on one complete build. |
+| Iteration | Immutable per-scope name indexes and pre-sorted names; scoped traversal is independent of foreign-scope series. |
 | Identity | Canonical metric+labels key with a stable `SeriesIdentity` hash. |

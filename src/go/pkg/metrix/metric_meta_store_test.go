@@ -165,3 +165,53 @@ func TestMetricMetaScenarios(t *testing.T) {
 		t.Run(name, tc.run)
 	}
 }
+
+func TestMetricMetaHostScopeIsolation(t *testing.T) {
+	store := NewCollectorStore()
+	cycle := cycleController(t, store)
+	scopeA := HostScope{ScopeKey: "scope-a", GUID: "guid-a", Hostname: "host-a"}
+	scopeB := HostScope{ScopeKey: "scope-b", GUID: "guid-b", Hostname: "host-b"}
+	meter := store.Write().SnapshotMeter("svc")
+	gaugeA := meter.WithHostScope(scopeA).Gauge("load", WithDescription("Load"))
+	gaugeB := meter.WithHostScope(scopeB).Gauge("load", WithDescription("Load"))
+
+	cycle.BeginCycle()
+	gaugeA.Observe(1)
+	gaugeB.Observe(2)
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	cycle.BeginCycle()
+	gaugeB.Observe(3)
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	for _, flattened := range []bool{false, true} {
+		name := "canonical"
+		opts := []ReadOption{ReadHostScope(scopeA.ScopeKey)}
+		if flattened {
+			name = "flattened"
+			opts = append(opts, ReadFlatten())
+		}
+
+		t.Run(name+"/stale_metadata_falls_back_within_scope", func(t *testing.T) {
+			_, valueOK := store.Read(opts...).Value("svc.load", nil)
+			require.False(t, valueOK, "stale cycle-fresh value must remain hidden")
+
+			meta, metaOK := store.Read(opts...).MetricMeta("svc.load")
+			require.True(t, metaOK)
+			assert.Equal(t, "Load", meta.Description)
+		})
+
+		t.Run(name+"/missing_scope_never_falls_back_to_peer", func(t *testing.T) {
+			missingOpts := []ReadOption{ReadHostScope("scope-missing")}
+			if flattened {
+				missingOpts = append(missingOpts, ReadFlatten())
+			}
+			_, freshOK := store.Read(missingOpts...).MetricMeta("svc.load")
+			require.False(t, freshOK)
+
+			missingOpts = append(missingOpts, ReadRaw())
+			_, rawOK := store.Read(missingOpts...).MetricMeta("svc.load")
+			require.False(t, rawOK)
+		})
+	}
+}
