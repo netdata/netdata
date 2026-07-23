@@ -85,6 +85,17 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
                      rrd_function_is_cancelled_cb_t is_cancelled_cb, void *is_cancelled_cb_data,
                      BUFFER *payload, const char *source, bool allow_restricted);
 
+// Verify the caller may invoke `cmd` on `host`, applying the same RESTRICTED and access-level
+// checks rrd_function_run() enforces, WITHOUT executing the function. This lets non-execution
+// paths (e.g. MCP metadata/help generation) authorize a caller before disclosing anything.
+// On success returns HTTP_RESP_OK; if out_acquired != NULL it receives an acquired dictionary
+// item the caller MUST release with dictionary_acquired_item_release(host->functions, *out_acquired),
+// otherwise the item is released internally. On failure it writes the error into result_wb,
+// releases any acquired item, sets *out_acquired (if any) to NULL, and returns the HTTP code.
+int rrd_function_verify_access(RRDHOST *host, BUFFER *result_wb, const char *cmd,
+                              HTTP_ACCESS user_access, bool allow_restricted,
+                              const DICTIONARY_ITEM **out_acquired);
+
 bool rrd_function_available(RRDHOST *host, const char *function);
 bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host);
 
