@@ -1,0 +1,14 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "llm-netdata-cloud": {
+      "models": {
+        "glm-5.2": {
+          "options": {
+            "reasoningEffort": "high"
+          }
+        }
+      }
+    }
+  }
+}
