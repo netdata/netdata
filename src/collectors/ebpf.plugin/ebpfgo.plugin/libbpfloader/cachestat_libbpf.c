@@ -261,17 +261,20 @@ static void cachestat_update_map_types(struct bpf_object *obj, int maps_per_core
         const char *name = bpf_map__name(map);
         if (!strcmp(name, "cstat_global") || !strcmp(name, "cstat_pid") || !strcmp(name, "cstat_ctrl")) {
             enum bpf_map_type type = bpf_map__type(map);
+            int ret = 0;
             if (maps_per_core) {
                 if (type == BPF_MAP_TYPE_HASH)
-                    bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_HASH);
+                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_HASH);
                 else if (type == BPF_MAP_TYPE_ARRAY)
-                    bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_ARRAY);
+                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_ARRAY);
             } else {
                 if (type == BPF_MAP_TYPE_PERCPU_HASH)
-                    bpf_map__set_type(map, BPF_MAP_TYPE_HASH);
+                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_HASH);
                 else if (type == BPF_MAP_TYPE_PERCPU_ARRAY)
-                    bpf_map__set_type(map, BPF_MAP_TYPE_ARRAY);
+                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_ARRAY);
             }
+            if (ret != 0)
+                fprintf(stderr, "ebpf-go.plugin: cachestat: bpf_map__set_type failed for map '%s': %d\n", name, ret);
         }
     }
 }
@@ -943,8 +946,12 @@ int netdata_cachestat_runtime_snapshot(
     if (fd < 0)
         return -1;
 
-    (void)maps_per_core; /* count is pre-stored in percpu_u64_cap by prepare() */
-    int count = rt->percpu_u64_cap > 0 ? rt->percpu_u64_cap : 1;
+    /* Re-query the actual post-load map type; bpf_map__set_type can silently
+     * fail before load, leaving a non-percpu map while percpu_u64_cap > 1. */
+    enum bpf_map_type mtype = bpf_map__type(map);
+    int count = (mtype == BPF_MAP_TYPE_PERCPU_ARRAY && rt->percpu_u64_cap > 0)
+                ? rt->percpu_u64_cap : 1;
+    (void)maps_per_core;
     uint64_t *values = rt->percpu_u64;
     if (!values)
         return -1;
@@ -1006,8 +1013,12 @@ int netdata_cachestat_runtime_snapshot_apps(
     if (fd < 0)
         return -1;
 
-    (void)maps_per_core; /* count pre-stored in percpu_entries_cap by prepare() */
-    int count = rt->percpu_entries_cap > 0 ? rt->percpu_entries_cap : 1;
+    /* Re-query the actual post-load map type; bpf_map__set_type can silently
+     * fail before load, leaving a non-percpu map while percpu_entries_cap > 1. */
+    enum bpf_map_type mtype = bpf_map__type(map);
+    int count = (mtype == BPF_MAP_TYPE_PERCPU_HASH && rt->percpu_entries_cap > 0)
+                ? rt->percpu_entries_cap : 1;
+    (void)maps_per_core;
 
     struct netdata_ebpf_cachestat_pid_entry *values = rt->percpu_entries;
     if (!values)
