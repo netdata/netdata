@@ -863,6 +863,10 @@ Runtime input skills:
   Trigger: creating or migrating a Go go.d collector to framework V2; touching `CollectorV2`, `metrix.CollectorStore`, `ChartTemplateYAML` / `charts.yaml`, `charttpl`, `chartengine`, V2 host scopes, or V2 collector tests.
   Purpose: mirror maintainer-preferred framework V2 patterns from accepted collectors so new or migrated modules blend with repository style.
 
+- `.agents/skills/project-query-corpus/`
+  Trigger: running or extending `tests/query-corpus/`; authoring corpus fixtures or oracles; adding a red case for a query-engine bug or flipping one green after a fix merges; changing a formatter byte-pin; validating a query-engine fix branch against the corpus.
+  Status: live. The developer contract for the query contract corpus: the three oracle classes and the anti-fit-to-engine rule, the manifest green/red ledger, fixture/settle/GUID discipline, the red→green bug workflow, and the known extension boundaries. Overview of the layered ladder stays in `tests/query-corpus/README.md`.
+
 - `.agents/skills/integrations-lifecycle/`
   Trigger: editing any `metadata.yaml` or collector `taxonomy.yaml`; modifying `integrations/` generators, schemas, taxonomy registries, or templates; debugging generated gitignored integration outputs (`integrations.js`, `integrations.json`, `integrations/taxonomy.json`); working with committed per-integration `.md` files / `COLLECTORS.md` / `SECRETS.md` / `SERVICE-DISCOVERY.md`; ibm.d module generation (`contexts.yaml` -> `metadata.yaml`); CI workflows `generate-integrations.yml` and `check-markdown.yml`; the collector-consistency rule.
   Status: live. SKILL.md plus per-domain guides (`pipeline.md`, `schema-reference.md`, `per-type-matrix.md`, `artifacts-and-banners.md`, `ibm-d.md`, `consistency.md`, `in-app-contract.md`, `gotchas.md`) and `recipes/`, `how-tos/` directories.
