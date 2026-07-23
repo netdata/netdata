@@ -151,10 +151,8 @@ struct nd_log {
     } syslog;
 
     struct {
-        bool etw; // when set use etw, otherwise wel
+        bool etw;
         bool initialized;
-        bool provider_enabled;  // track etw provider state
-        SPINLOCK provider_lock; // Protect etw provider state access
     } eventlog;
 
     struct {
