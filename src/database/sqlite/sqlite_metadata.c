@@ -2091,10 +2091,25 @@ static void ctx_hosts_load(uv_work_t *req)
     }
     dfe_done(host);
 
-    // then every remaining pending host, most recently connected first, all
-    // dispatched to the thread pool in this one pass. Reconnecting children are
-    // the most-recently-connected hosts, so they naturally sort to the front and
-    // become ready first, while the whole set still loads in parallel.
+    // then every remaining pending host, ordered by last known connection time
+    // (most recent first), dispatched to the thread pool in this one pass.
+    //
+    // The sort key is the last_connected timestamp loaded from the metadata DB
+    // (sqlite_aclk.c). A live child cannot refresh it here: while a host carries
+    // RRDHOST_FLAG_PENDING_CONTEXT_LOAD its streaming reconnects are rejected
+    // (stream-receiver-connection.c) and rrdhost_find_or_create() skips
+    // rrdhost_update() (rrdhost.c), so the reconnect does not refresh the host
+    // status. So the stored DB timestamp is the only signal available here, and
+    // it is the intended prioritization signal: the hosts most recently connected
+    // before this restart are the ones most likely to reconnect and be queried
+    // first.
+    //
+    // Storing raw RRDHOST* past dfe_done() is safe because a host cannot be freed
+    // while it carries PENDING_CONTEXT_LOAD: archived hosts are all created before
+    // this work is queued (aclk_synchronization_init), a concurrent reconnect does
+    // not free the host (rrdhost_find_or_create() only frees on a memory-mode
+    // mismatch, and skips even that while the flag is set), and the orphan reaper
+    // skips such hosts (rrdhost_should_be_cleaned_up).
     if (!SHUTDOWN_REQUESTED(config)) {
         size_t size = 0, used = 0;
         struct host_load_order *order = NULL;
