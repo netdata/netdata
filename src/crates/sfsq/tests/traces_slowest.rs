@@ -260,6 +260,33 @@ fn a_trace_starting_before_the_window_is_clipped() {
 }
 
 #[test]
+fn a_straddle_whose_merged_start_is_pre_window_is_clipped_whole() {
+    // Part 1 starts BEFORE the window, part 2 inside it. The clip
+    // tests the MERGED envelope start, not per-source starts — the
+    // trace disappears whole, it does not sneak in through part 2.
+    let dir = tempfile::tempdir().unwrap();
+    let wal_1 = write_wal(
+        dir.path(),
+        vec![req(&[tspan(0xA, 1, 1_000_000_000, 1_500_000_000, "early")])],
+        "part1",
+    );
+    let wal_2 = write_wal(
+        dir.path(),
+        vec![req(&[cspan(0xA, 2, 1, 3_000_000_000, 9_000_000_000, "late")])],
+        "part2",
+    );
+    let data = run(
+        vec![
+            sealed_source(dir.path(), &wal_1, "s1"),
+            tail_source(&wal_2, "t2"),
+        ],
+        SlowestQuery::new(TimeWindow::new(2_000_000_000, 100_000_000_000).unwrap()),
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert!(data.traces.is_empty(), "merged start 1s < window start 2s");
+}
+
+#[test]
 fn legacy_file_without_the_rollup_is_excluded_and_flagged() {
     // D10: identical to the overview — a pre-rollup file contributes
     // nothing and the exclusion is flagged.

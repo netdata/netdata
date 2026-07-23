@@ -24,6 +24,7 @@
 mod by_id;
 mod overview;
 mod predicate;
+mod fold;
 mod rollup;
 mod slowest;
 mod search;

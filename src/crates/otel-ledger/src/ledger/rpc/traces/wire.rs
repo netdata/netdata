@@ -377,9 +377,13 @@ pub struct OverviewTotals {
 /// traces (duration DESC, trace id ASC). Row numbers are STORED-ROW
 /// statistics (D9 — resends count); exact canonical figures live in
 /// the `trace` mode (the row click). The same envelope-start clipping
-/// as the overview applies (trace-envelope-aligned). NO pagination —
-/// a rank cursor over an unstable dataset re-ranks between pages, so
-/// top-K is a single bounded page by design.
+/// as the overview applies (trace-envelope-aligned), and — like every
+/// windowed aggregate mode — capture is file-granular: a trace whose
+/// earlier/later spans live only in files outside the window merges a
+/// TRUNCATED envelope, so a boundary-straddling long trace can rank by
+/// less than its true duration. NO pagination — a rank cursor over an
+/// unstable dataset re-ranks between pages, so top-K is a single
+/// bounded page by design.
 #[derive(Debug, Serialize)]
 pub struct SlowestResult {
     pub version: u32,

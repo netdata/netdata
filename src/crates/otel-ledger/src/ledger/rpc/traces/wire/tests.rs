@@ -107,6 +107,10 @@ fn conflicting_data_selectors_are_a_client_error() {
         err.to_string(),
         "conflicting mode selectors: trace, overview"
     );
+    let err = req(json!({"overview": {}, "slowest": {}}))
+        .mode()
+        .expect_err("slowest joins the conflict rule");
+    assert_eq!(err, ModeConflict(vec!["overview", "slowest"]));
 }
 
 #[test]

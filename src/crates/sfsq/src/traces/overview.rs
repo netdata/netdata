@@ -23,12 +23,11 @@
 //!   totals (the same start-clipping rule spans followed in v1). A
 //!   long trace straddling the window's left edge is therefore
 //!   invisible here even though search returns its in-window spans.
-//! - **Roots are NOT carried here**: the grid needs only envelopes and
-//!   counts, so the sealed path reads the roots-free
-//!   [`sealed_trace_envelopes`] view (no file string table built).
-//!   Root-consuming modes (slowest, facets — steps 2.4/2.5) fold
-//!   [`sealed_trace_aggregates`](super::rollup::sealed_trace_aggregates)
-//!   themselves, merging roots per D8.
+//! - **Roots are NOT resolved here**: the grid needs only envelopes
+//!   and counts, so the shared fold runs with `resolve_roots: false` —
+//!   the sealed path reads the roots-free envelopes view (no file
+//!   string table built). Root-consuming modes (slowest, facets) flip
+//!   the flag; the merge itself lives once in [`super::fold`].
 //!
 //! Engine contracts mirrored from the siblings: sources process in
 //! `SourceId` order; a failed source is a
@@ -44,17 +43,14 @@
 //! of a bounded overshoot. It bounds WORK, not memory — the merge map
 //! peaks at the processed prefix's distinct traces.
 
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
 
 use tokio_util::sync::CancellationToken;
 
-use super::rollup::{TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
+use super::fold::{SourceFoldSpec, merge_trace_sources};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
-use super::wal_scan::TraceWalScan;
-use crate::source::map_source;
 
 /// Number of log-scale duration bins (fixed in phase 1; unchanged).
 pub const DURATION_BIN_COUNT: usize = 6;
@@ -176,124 +172,19 @@ pub fn overview(
     let grid = query.grid;
     let grid_start = grid.bucket_start_ns;
 
-    // Deterministic processing order: SourceId, like every sibling.
-    let mut sources = sources;
-    sources.sort_by(|a, b| a.source_id().as_str().cmp(b.source_id().as_str()));
-
     let mut status = StatusBuilder::new();
-    // Polled up front — a zero-source or already-cancelled call can
-    // never report Complete.
-    if cancel.is_cancelled() {
-        status.add(PartialReason::Cancelled);
-        return Ok(OverviewData::empty(grid.num_buckets, status.finish()));
-    }
-
-    /// One trace's cross-source merge (D7): envelopes widen, stored-row
-    /// counts sum (D9). Roots are intentionally NOT carried — the grid
-    /// never reads them; root-consuming modes fold their own merge.
-    struct Merged {
-        min_start_ns: i64,
-        max_end_ns: i64,
-        span_count: u64,
-        error_count: u64,
-    }
-    let mut merged: HashMap<sfst::TraceId, Merged> = HashMap::new();
-    let fold = |aggs: Vec<TraceAggregate>, acc: &mut HashMap<sfst::TraceId, Merged>| {
-        for a in aggs {
-            let m = acc.entry(a.trace_id).or_insert(Merged {
-                min_start_ns: i64::MAX,
-                max_end_ns: i64::MIN,
-                span_count: 0,
-                error_count: 0,
-            });
-            m.min_start_ns = m.min_start_ns.min(a.min_start_ns);
-            m.max_end_ns = m.max_end_ns.max(a.max_end_ns);
-            m.span_count = m.span_count.saturating_add(a.span_count);
-            m.error_count = m.error_count.saturating_add(a.error_count);
-        }
+    let spec = SourceFoldSpec {
+        op: "overview",
+        visited_ceiling: query.visited_ceiling,
+        ceiling_reason: PartialReason::OverviewCeiling,
+        // The grid discards roots — the sealed path must not pay for
+        // the file string table (the roots-free envelopes view).
+        resolve_roots: false,
     };
-
-    let mut visited = 0u64;
-    for source in &sources {
-        if cancel.is_cancelled() {
-            status.add(PartialReason::Cancelled);
-            return Ok(OverviewData::empty(grid.num_buckets, status.finish()));
-        }
-        if visited > query.visited_ceiling {
-            status.add(PartialReason::OverviewCeiling);
-            break;
-        }
-        match source {
-            TraceSource::Sfst(c) => {
-                let mapped = match map_source(&c.source) {
-                    Ok(m) => m,
-                    Err(e) => {
-                        tracing::warn!("sfsq overview: source {} failed to map: {e}", c.source_id);
-                        status.add(PartialReason::SourceFailure);
-                        progress.fetch_add(1, Ordering::Relaxed);
-                        continue;
-                    }
-                };
-                let reader = match sfst::IndexReader::open(mapped.bytes()) {
-                    Ok(r) => r,
-                    Err(e) => {
-                        tracing::warn!(
-                            "sfsq overview: source {} failed to parse: {e}",
-                            c.source_id
-                        );
-                        status.add(PartialReason::SourceFailure);
-                        progress.fetch_add(1, Ordering::Relaxed);
-                        continue;
-                    }
-                };
-                // D10: a pre-rollup file cannot contribute trace-level
-                // numbers — excluded, flagged, never mixed in.
-                if !reader.has_trace_rollup() {
-                    tracing::debug!(
-                        "sfsq overview: source {} predates the trace rollup; excluded",
-                        c.source_id
-                    );
-                    status.add(PartialReason::RollupAbsent);
-                    progress.fetch_add(1, Ordering::Relaxed);
-                    continue;
-                }
-                let aggs = match reader.trace_rollup().map(|r| sealed_trace_envelopes(&r)) {
-                    Ok(a) => a,
-                    Err(e) => {
-                        tracing::warn!(
-                            "sfsq overview: source {} rollup failed to read: {e}",
-                            c.source_id
-                        );
-                        status.add(PartialReason::SourceFailure);
-                        progress.fetch_add(1, Ordering::Relaxed);
-                        continue;
-                    }
-                };
-                // The sealed side's cost is its TRSU rows (one per
-                // distinct trace).
-                visited += aggs.len() as u64;
-                fold(aggs, &mut merged);
-            }
-            TraceSource::Tail(t) => {
-                let scan = match TraceWalScan::scan_range(&t.path, t.coverage.range) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        tracing::warn!("sfsq overview: tail {} failed: {e}", t.source_id);
-                        status.add(PartialReason::SourceFailure);
-                        progress.fetch_add(1, Ordering::Relaxed);
-                        continue;
-                    }
-                };
-                let aggs = tail_trace_aggregates(&scan);
-                // The tail's cost is its decoded spans, not its distinct
-                // traces. (The fold skips unset-trace-id spans; charging
-                // them anyway just trips the ceiling marginally earlier.)
-                visited += scan.num_spans() as u64;
-                fold(aggs, &mut merged);
-            }
-        }
-        progress.fetch_add(1, Ordering::Relaxed);
-    }
+    let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status)
+    else {
+        return Ok(OverviewData::empty(grid.num_buckets, status.finish()));
+    };
 
     // Bin the merged traces by envelope; totals fold alongside. Traces
     // whose envelope START lies outside the grid are clipped (the same
