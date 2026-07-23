@@ -114,6 +114,10 @@ impl TraceRollupRows {
     /// span duration; `service`/`name` are the span's captured interner
     /// slots (resource `service.name`, span `name`) — consulted only
     /// when this span becomes the trace's root candidate.
+    ///
+    /// `parent_unset` is the typed all-zero check on the STORED parent
+    /// id — ingest normalizes an empty/malformed parent to UNSET, so the
+    /// check is exactly the OTLP root convention.
     #[allow(clippy::too_many_arguments)]
     pub fn record_span(
         &mut self,
@@ -145,12 +149,14 @@ impl TraceRollupRows {
             acc.error_count = acc.error_count.saturating_add(1);
         }
         // D8: the earliest genuinely-unset-parent span wins the root
-        // (the summary_root convention); later ties do not displace it.
+        // (the summary_root convention). Equal starts tie-break by
+        // ascending span id — the combiner total order's next key — so
+        // the pick is deterministic regardless of storage order.
         if parent_unset
             && acc
                 .root
                 .as_ref()
-                .is_none_or(|r| start_ns < r.start_ns)
+                .is_none_or(|r| (start_ns, span_id) < (r.start_ns, r.span_id))
         {
             acc.root = Some(Root {
                 start_ns,
@@ -267,6 +273,20 @@ mod tests {
         assert_eq!(sealed.root_service_refs[0], ROLLUP_NO_REF);
         assert_eq!(sealed.root_span_ids.get(1), sid(3));
         assert_eq!(sealed.root_kinds[1], 3);
+    }
+
+    #[test]
+    fn equal_start_root_ties_break_by_ascending_span_id() {
+        // Deterministic regardless of storage order — the combiner total
+        // order's next key after start.
+        let mut a = TraceRollupRows::new();
+        a.record_span(tid(1), sid(7), true, 100, 1, 0, false, None, None);
+        a.record_span(tid(1), sid(3), true, 100, 1, 0, false, None, None);
+        let mut b = TraceRollupRows::new();
+        b.record_span(tid(1), sid(3), true, 100, 1, 0, false, None, None);
+        b.record_span(tid(1), sid(7), true, 100, 1, 0, false, None, None);
+        assert_eq!(a.sealed(&[]).root_span_ids.get(0), sid(3));
+        assert_eq!(b.sealed(&[]).root_span_ids.get(0), sid(3));
     }
 
     #[test]

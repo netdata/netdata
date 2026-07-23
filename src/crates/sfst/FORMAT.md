@@ -104,6 +104,7 @@ within its tier in the trailing bytes.
     "TBLM"      TraceIdBloom  (per-file trace-id bloom filter)  No (optional)
     "EVNB"      EventIndex  (per-row span event structure)    No (optional)
     "LNKB"      LinkIndex  (per-row span link structure)      No (optional)
+    "TRSU"      TraceRollup  (per-file trace rollup rows)      No (optional)
     "MF{hi}{lo}" PrefixMap<BitmapValue>  (mid-card field)     No (one per mid field)
     "HF{hi}{lo}" HighField  (high-card field, columnar SoA)   No (one per high field)
     "SB0{N}"    StreamBatch  (stream-batch N, fixed-width arena)  Yes (at least 1)

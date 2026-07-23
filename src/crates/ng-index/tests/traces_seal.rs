@@ -878,3 +878,55 @@ fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
     let tr = reader.trace_by_id(TraceId::from([0xA; 16])).unwrap();
     assert_eq!(tr.spans.len(), 2, "assembly still dedups the resend");
 }
+
+#[test]
+fn rollup_captures_error_status_kind_and_service_absence() {
+    // Coverage for every capture arm: an ERROR-status root with a set
+    // kind, plus a second resource group WITHOUT service.name (the
+    // service ref must be the sentinel, not a neighbor's value).
+    use opentelemetry_proto::tonic::trace::v1 as otlp;
+    let mut root = span([0xC; 16], [1; 8], [0; 8], 1_000, 2_000, "err-root");
+    root.kind = 2; // SERVER
+    root.status = Some(otlp::Status {
+        code: 2, // STATUS_CODE_ERROR
+        message: "boom".into(),
+    });
+    let child = span([0xC; 16], [2; 8], [1; 8], 1_100, 1_200, "ok-child");
+
+    let mut svcless = req(vec![span([0xD; 16], [3; 8], [0; 8], 9_000, 9_100, "svcless-root")]);
+    svcless.resource_spans[0].resource = Some(Resource::default());
+
+    let bytes = seal(vec![req(vec![root, child]), svcless]);
+    let reader = IndexReader::open(&bytes).unwrap();
+    let rollup = reader.trace_rollup().unwrap();
+    assert_eq!(rollup.len(), 2);
+
+    // Trace C: ERROR counted once (the child is OK), kind captured raw.
+    assert_eq!(rollup.trace_ids.get(0), TraceId::from([0xC; 16]));
+    assert_eq!(rollup.span_counts[0], 2);
+    assert_eq!(rollup.error_counts[0], 1);
+    assert_eq!(rollup.root_kinds[0], 2);
+    assert_eq!(rollup.root_is_true_root[0], 1);
+
+    // Trace D: a true root whose resource has NO service.name — the ref
+    // is the sentinel, the name ref still resolves.
+    assert_eq!(rollup.trace_ids.get(1), TraceId::from([0xD; 16]));
+    assert_eq!(rollup.root_is_true_root[1], 1);
+    assert_eq!(rollup.root_service_refs[1], sfst::ROLLUP_NO_REF);
+    let strings = reader.build_string_table(reader.field_table()).unwrap();
+    assert_eq!(
+        strings[rollup.root_name_refs[1] as usize],
+        "name=svcless-root"
+    );
+}
+
+#[test]
+fn all_unset_trace_ids_seal_without_a_rollup_chunk() {
+    // The is-meaningful rule: a file whose spans all carry the unset
+    // trace id (not a trace) writes no TRSU chunk at all.
+    let s = span([0; 16], [1; 8], [0; 8], 1_000, 2_000, "no-trace");
+    let bytes = seal(vec![req(vec![s])]);
+    let reader = IndexReader::open(&bytes).unwrap();
+    assert!(!reader.has_trace_rollup());
+    assert!(reader.trace_rollup().is_err(), "no chunk to read");
+}

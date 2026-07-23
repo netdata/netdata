@@ -427,6 +427,16 @@ fn populate_trace_row_index(
         let _ = flattener.merge_tree(tree);
         let paths: Vec<String> = (0..tree.len() as NodeId).map(|id| tree.path(id)).collect();
 
+        // Resolve the rollup capture keys to this frame's NodeIds ONCE —
+        // the per-span capture below compares node ids, not path strings.
+        let node_of = |key: &str| -> Option<NodeId> {
+            (0..tree.len() as NodeId).find(|&id| paths[id as usize] == key)
+        };
+        let service_node = node_of(ROLLUP_SERVICE_KEY);
+        let name_node = node_of(ROLLUP_NAME_KEY);
+        let kind_node = node_of(ROLLUP_KIND_RAW_KEY);
+        let status_node = node_of(ROLLUP_STATUS_KEY);
+
         let mut tokens: Vec<KvSlot> = Vec::new();
         let mut records = 0u64;
         for rg in &flattened.resources {
@@ -434,11 +444,12 @@ fn populate_trace_row_index(
                 intern_entries(row_index, &rg.resource, &paths, &mut kv, &mut stats);
             // The rollup's root service ref: the resource group's
             // `service.name` slot, constant across its spans.
-            let service_slot = rg
-                .resource
-                .iter()
-                .position(|e| paths[e.node as usize] == ROLLUP_SERVICE_KEY)
-                .map(|i| resource_tokens[i]);
+            let service_slot = service_node.and_then(|n| {
+                rg.resource
+                    .iter()
+                    .position(|e| e.node == n)
+                    .map(|i| resource_tokens[i])
+            });
             tokens.clear();
             tokens.extend_from_slice(&resource_tokens);
 
@@ -529,24 +540,25 @@ fn populate_trace_row_index(
                         let mut kind = 0i32;
                         let mut is_error = false;
                         for (j, e) in span.entries.iter().enumerate() {
-                            match paths[e.node as usize].as_str() {
-                                ROLLUP_NAME_KEY => name_slot = Some(tokens[base + j]),
-                                ROLLUP_KIND_RAW_KEY => {
-                                    if let ng_flatten::Value::Int(k) = &e.value {
-                                        kind = *k as i32;
-                                    }
+                            if Some(e.node) == name_node {
+                                name_slot = Some(tokens[base + j]);
+                            } else if Some(e.node) == kind_node {
+                                if let ng_flatten::Value::Int(k) = &e.value {
+                                    kind = *k as i32;
                                 }
-                                ROLLUP_STATUS_KEY => {
-                                    is_error = matches!(&e.value,
-                                        ng_flatten::Value::Str(s) if s == "ERROR");
-                                }
-                                _ => {}
+                            } else if Some(e.node) == status_node {
+                                is_error = matches!(&e.value,
+                                    ng_flatten::Value::Str(s) if s == "ERROR");
                             }
                         }
+                        // An empty/malformed parent id normalized to the
+                        // all-zero UNSET at ingest — the typed check IS the
+                        // OTLP root convention.
+                        let parent = SpanId::from(*span.parent_span_id.as_bytes());
                         rollup.record_span(
                             TraceId::from(*span.trace_id.as_bytes()),
                             SpanId::from(*span.span_id.as_bytes()),
-                            span.parent_span_id.as_bytes().iter().all(|&b| b == 0),
+                            parent.is_unset(),
                             span.ts,
                             span.duration,
                             kind,

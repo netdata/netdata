@@ -516,6 +516,19 @@ impl<'a> ChunkReader<'a> {
                 "trace rollup fields are not index-parallel".into(),
             ));
         }
+        // Ref/flag range checks, the EVNB/LNKB precedent: every root ref is
+        // either the sentinel or a real file KvId, and the flag is 0/1 — a
+        // crafted chunk must fail decode, never flow into consumers.
+        let kv_total = self.metadata()?.id_ranges.high_end.0;
+        let ref_ok = |r: u32| r == crate::ROLLUP_NO_REF || r < kv_total;
+        if !rollup.root_service_refs.iter().all(|&r| ref_ok(r))
+            || !rollup.root_name_refs.iter().all(|&r| ref_ok(r))
+            || !rollup.root_is_true_root.iter().all(|&f| f <= 1)
+        {
+            return Err(Error::CorruptIndex(
+                "trace rollup carries out-of-range root refs or flags".into(),
+            ));
+        }
         Ok(rollup)
     }
 
