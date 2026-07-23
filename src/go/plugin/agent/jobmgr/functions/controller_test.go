@@ -390,9 +390,19 @@ func TestFunctionControllerRejectsInvalidDeclarations(t *testing.T) {
 	tests := map[string]struct {
 		methods []funcapi.FunctionConfig
 	}{
-		"empty method ID":     {methods: []funcapi.FunctionConfig{{}}},
-		"duplicate method ID": {methods: []funcapi.FunctionConfig{{ID: "same"}, {ID: "same"}}},
-		"empty alias":         {methods: []funcapi.FunctionConfig{{ID: "method", Aliases: []string{""}}}},
+		"empty method ID":       {methods: []funcapi.FunctionConfig{{}}},
+		"duplicate method ID":   {methods: []funcapi.FunctionConfig{{ID: "same"}, {ID: "same"}}},
+		"empty alias":           {methods: []funcapi.FunctionConfig{{ID: "method", Aliases: []string{""}}}},
+		"quote in help":         {methods: []funcapi.FunctionConfig{{ID: "method", Help: `invalid "help"`}}},
+		"quote in tags":         {methods: []funcapi.FunctionConfig{{ID: "method", Tags: `invalid "tags"`}}},
+		"backslash in help":     {methods: []funcapi.FunctionConfig{{ID: "method", Help: `invalid\help`}}},
+		"backslash in tags":     {methods: []funcapi.FunctionConfig{{ID: "method", Tags: `invalid\tags`}}},
+		"control in help":       {methods: []funcapi.FunctionConfig{{ID: "method", Help: "invalid\nhelp"}}},
+		"control in tags":       {methods: []funcapi.FunctionConfig{{ID: "method", Tags: "invalid\ttags"}}},
+		"delete in help":        {methods: []funcapi.FunctionConfig{{ID: "method", Help: "invalid\x7fhelp"}}},
+		"delete in tags":        {methods: []funcapi.FunctionConfig{{ID: "method", Tags: "invalid\x7ftags"}}},
+		"invalid UTF-8 in help": {methods: []funcapi.FunctionConfig{{ID: "method", Help: string([]byte{0xff})}}},
+		"invalid UTF-8 in tags": {methods: []funcapi.FunctionConfig{{ID: "method", Tags: string([]byte{0xff})}}},
 		"duplicate primary alias": {
 			methods: []funcapi.FunctionConfig{{ID: "method", Aliases: []string{"module:method"}}},
 		},
@@ -417,6 +427,238 @@ func TestFunctionControllerRejectsInvalidDeclarations(t *testing.T) {
 				},
 			})
 			require.Error(t, err)
+		})
+	}
+}
+
+func TestFunctionControllerRejectsInvalidInstanceMetadataBeforeMutation(t *testing.T) {
+	handler := &controllerTestHandler{}
+	constructions := 0
+	controller, catalog, err := NewController(1, collectorapi.Registry{
+		"module": {
+			InstanceFunctions: func(job collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+				help := "valid help"
+				if job.Name() == "invalid" {
+					help = `invalid "help"`
+				}
+				return []funcapi.FunctionConfig{{ID: job.Name() + ":method", Help: help}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				constructions++
+				return handler
+			},
+		},
+	})
+	require.NoError(t, err)
+	mutations := controllerTestMutationPort{
+		catalog: catalog,
+	}
+	publicationPort := newRecordingPublicationPort()
+	publication, err := NewPublication(1, publicationPort)
+	require.NoError(t, err)
+	require.NoError(t, controller.Bind(&mutations, publication))
+	require.NoError(t, controller.Activate())
+
+	invalidJob := &controllerTestJob{
+		fullName: "module_invalid",
+		module:   "module",
+		name:     "invalid",
+		running:  true,
+	}
+	invalidHandle, err := controller.PrepareJob(lifecycle.ResourceIdentity{
+		ID:         invalidJob.FullName(),
+		Generation: 1,
+	}, invalidJob)
+	require.NoError(t, err)
+	require.ErrorContains(t, invalidHandle.Publish(), "invalid Function help")
+	require.Empty(t, publicationPort.events)
+	require.Zero(t, constructions)
+
+	validJob := &controllerTestJob{
+		fullName: "module_valid",
+		module:   "module",
+		name:     "valid",
+		running:  true,
+	}
+	validHandle, err := controller.PrepareJob(lifecycle.ResourceIdentity{
+		ID:         validJob.FullName(),
+		Generation: 1,
+	}, validJob)
+	require.NoError(t, err)
+	require.NoError(t, validHandle.Publish())
+	require.Equal(t, []string{"publish:module:valid:method"}, publicationPort.events)
+	require.EqualValues(t, 1, constructions)
+
+	require.NoError(t, validHandle.CloseAndDrain(context.Background()))
+	require.Equal(t, []string{
+		"publish:module:valid:method",
+		"withdraw:module:valid:method",
+	}, publicationPort.events)
+	require.EqualValues(t, 1, handler.cleanupCount())
+}
+
+func TestFunctionControllerCleansNewGenerationWhenLaterGroupBuildFails(t *testing.T) {
+	tests := map[string]struct {
+		panic bool
+	}{
+		"returned error": {},
+		"panic":          {panic: true},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			handlers := make(map[string][]*controllerTestHandler)
+			fresh := &controllerPanickingCleanupHandler{}
+			failZ := false
+			controller, catalog, err := NewController(1, collectorapi.Registry{
+				"module": {
+					InstanceFunctions: func(job collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: job.Name() + ":method"}}
+					},
+					MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
+						if job.Name() == "z" && failZ {
+							if test.panic {
+								panic("test handler construction panic")
+							}
+							return nil
+						}
+						if job.Name() == "m" && failZ {
+							return fresh
+						}
+						handler := &controllerTestHandler{}
+						handlers[job.Name()] = append(handlers[job.Name()], handler)
+						return handler
+					},
+				},
+			})
+			require.NoError(t, err)
+			mutations := controllerTestMutationPort{
+				catalog: catalog,
+			}
+			publication, err := NewPublication(1, newRecordingPublicationPort())
+			require.NoError(t, err)
+			require.NoError(t, controller.Bind(&mutations, publication))
+			require.NoError(t, controller.Activate())
+
+			jobs := map[string]*controllerTestJob{
+				"a": {
+					fullName: "module_a",
+					module:   "module",
+					name:     "a",
+					running:  true,
+				},
+				"m": {
+					fullName: "module_m",
+					module:   "module",
+					name:     "m",
+					running:  true,
+				},
+				"z": {
+					fullName: "module_z",
+					module:   "module",
+					name:     "z",
+					running:  true,
+				},
+			}
+			handles := make(map[string]*JobHandle, len(jobs))
+			for _, jobName := range []string{"a", "m", "z"} {
+				job := jobs[jobName]
+				handle, err := controller.PrepareJob(lifecycle.ResourceIdentity{
+					ID:         job.FullName(),
+					Generation: 1,
+				}, job)
+				require.NoError(t, err)
+				require.NoError(t, handle.Publish())
+				handles[jobName] = handle
+				require.Len(t, handlers[jobName], 1)
+			}
+
+			jobs["m"].running = false
+			jobs["z"].running = false
+			failZ = true
+			reconcile := func() {
+				err = controller.ReconcileModule(context.Background(), "module")
+			}
+			if test.panic {
+				require.PanicsWithValue(t, "test handler construction panic", reconcile)
+			} else {
+				require.NotPanics(t, reconcile)
+				require.ErrorContains(t, err, `nil handler for job "z"`)
+				require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
+			}
+			require.EqualValues(t, 1, fresh.cleanupCount())
+			require.Zero(t, handlers["a"][0].cleanupCount())
+			require.Zero(t, handlers["m"][0].cleanupCount())
+			require.Zero(t, handlers["z"][0].cleanupCount())
+
+			failZ = false
+			jobs["m"].running = true
+			jobs["z"].running = true
+			for _, jobName := range []string{"a", "m", "z"} {
+				require.NoError(t, handles[jobName].CloseAndDrain(context.Background()))
+				require.EqualValues(t, 1, handlers[jobName][0].cleanupCount())
+			}
+			require.EqualValues(t, 1, fresh.cleanupCount())
+		})
+	}
+}
+
+func TestMethodGenerationCleansPartialHandlerConstruction(t *testing.T) {
+	tests := map[string]struct {
+		panic bool
+	}{
+		"nil handler": {},
+		"panic":       {panic: true},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			handler := &controllerTestHandler{}
+			constructions := 0
+			creator := collectorapi.Creator{
+				MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+					constructions++
+					if constructions != 2 {
+						return handler
+					}
+					if test.panic {
+						panic("test handler construction panic")
+					}
+					return nil
+				},
+			}
+			jobs := map[string]collectorapi.RuntimeJob{
+				"a": &controllerTestJob{
+					fullName: "module_a",
+					module:   "module",
+					name:     "a",
+					running:  true,
+				},
+				"b": &controllerTestJob{
+					fullName: "module_b",
+					module:   "module",
+					name:     "b",
+					running:  true,
+				},
+			}
+			var generation *methodGeneration
+			var err error
+			construct := func() {
+				generation, err = newMethodGeneration(
+					"generation",
+					"module",
+					methodGenerationShared,
+					creator,
+					[]funcapi.FunctionConfig{{ID: "method"}},
+					jobs,
+				)
+			}
+			if test.panic {
+				require.PanicsWithValue(t, "test handler construction panic", construct)
+			} else {
+				require.NotPanics(t, construct)
+				require.ErrorContains(t, err, "nil handler")
+			}
+			require.Nil(t, generation)
+			require.EqualValues(t, 1, handler.cleanupCount())
 		})
 	}
 }
@@ -575,7 +817,8 @@ type controllerPanickingCleanupHandler struct {
 	controllerTestHandler
 }
 
-func (*controllerPanickingCleanupHandler) Cleanup(context.Context) {
+func (handler *controllerPanickingCleanupHandler) Cleanup(ctx context.Context) {
+	handler.controllerTestHandler.Cleanup(ctx)
 	panic("test handler cleanup panic")
 }
 

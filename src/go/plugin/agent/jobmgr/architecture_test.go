@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -61,11 +62,18 @@ func TestActivePackageLayering(t *testing.T) {
 }
 
 func TestCommandKernelRoutesOperationActionsThroughOwnershipGate(t *testing.T) {
-	files, err := productionGoFiles(jobmgrSourceRoot(t))
+	root := jobmgrSourceRoot(t)
+	files, err := productionGoFilesRecursive(root)
 	require.NoError(t, err)
 
 	directSenders := make(map[string]int)
 	for _, path := range files {
+		relativeDirectory, err := filepath.Rel(root, filepath.Dir(path))
+		require.NoError(t, err)
+		packageName := "jobmgr"
+		if relativeDirectory != "." {
+			packageName += "/" + filepath.ToSlash(relativeDirectory)
+		}
 		file := parseGoFile(t, path)
 		for _, declaration := range file.Decls {
 			function, ok := declaration.(*ast.FuncDecl)
@@ -79,7 +87,7 @@ func TestCommandKernelRoutesOperationActionsThroughOwnershipGate(t *testing.T) {
 				}
 				selector, ok := call.Fun.(*ast.SelectorExpr)
 				if ok && selector.Sel.Name == "SendAction" {
-					directSenders[function.Name.Name]++
+					directSenders[packageName+"."+function.Name.Name]++
 				}
 				return true
 			})
@@ -89,11 +97,11 @@ func TestCommandKernelRoutesOperationActionsThroughOwnershipGate(t *testing.T) {
 	// These are the ownership boundary itself and the four lifecycle-event
 	// adapters that are allowed to enter it.
 	require.Equal(t, map[string]int{
-		"completeRunFinalizer":    1,
-		"completeShutdownBarrier": 1,
-		"completeTask":            1,
-		"sendOperationAction":     1,
-		"sendShutdownAction":      1,
+		"jobmgr.completeRunFinalizer":    1,
+		"jobmgr.completeShutdownBarrier": 1,
+		"jobmgr.completeTask":            1,
+		"jobmgr.sendOperationAction":     1,
+		"jobmgr.sendShutdownAction":      1,
 	}, directSenders)
 }
 
@@ -188,6 +196,31 @@ func productionGoFiles(root string) ([]string, error) {
 		files = append(files, filepath.Join(root, entry.Name()))
 	}
 	return files, nil
+}
+
+func productionGoFilesRecursive(root string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			relative, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			relative = filepath.ToSlash(relative)
+			if entry.Name() == "testdata" || relative == "internal/jobmgrtest" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if strings.HasSuffix(entry.Name(), ".go") && !strings.HasSuffix(entry.Name(), "_test.go") {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files, err
 }
 
 func parseGoFile(t *testing.T, path string) *ast.File {

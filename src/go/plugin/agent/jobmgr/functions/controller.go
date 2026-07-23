@@ -498,16 +498,18 @@ func (c *Controller) reconcileModuleLocked(
 	module string,
 	creator collectorapi.Creator,
 ) ([]*methodGeneration, error) {
-	desired, unpublished, err := c.buildModuleGroups(module, creator)
-	if err != nil {
-		return nil, err
-	}
+	unpublished := make(map[string]*controllerGroup)
 	cleanupUnpublished := true
 	defer func() {
 		if cleanupUnpublished {
 			_ = c.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished)
 		}
 	}()
+	desired, err := c.buildModuleGroups(module, creator, unpublished)
+	if err != nil {
+		cleanupUnpublished = false
+		return nil, errors.Join(err, c.cleanupUnpublishedGroups(context.WithoutCancel(ctx), unpublished))
+	}
 
 	nextGroups := make(map[string]*controllerGroup, len(c.groups)+len(desired))
 	for key, group := range c.groups {
@@ -516,12 +518,7 @@ func (c *Controller) reconcileModuleLocked(
 		}
 	}
 	for key, group := range desired {
-		if current := c.groups[key]; current != nil && current.signature == group.signature {
-			nextGroups[key] = current
-			delete(unpublished, key)
-		} else {
-			nextGroups[key] = group
-		}
+		nextGroups[key] = group
 	}
 	nextRoutes, err := indexControllerRoutes(nextGroups)
 	if err != nil {
@@ -654,37 +651,35 @@ func (c *Controller) refreshModuleAvailabilityLocked(module string) {
 func (c *Controller) buildModuleGroups(
 	module string,
 	creator collectorapi.Creator,
-) (
-	map[string]*controllerGroup,
-	map[string]*controllerGroup,
-	error,
-) {
+	unpublished map[string]*controllerGroup,
+) (map[string]*controllerGroup, error) {
 	desired := make(map[string]*controllerGroup)
-	unpublished := make(map[string]*controllerGroup)
 	add := func(group *controllerGroup, err error) error {
 		if err != nil {
 			return err
 		}
 		if group != nil {
 			desired[group.key] = group
-			unpublished[group.key] = group
+			if c.groups[group.key] != group {
+				unpublished[group.key] = group
+			}
 		}
 		return nil
 	}
 	if err := add(c.buildAgentGroup(module, creator)); err != nil {
-		return nil, unpublished, err
+		return nil, err
 	}
 	if err := add(c.buildSharedGroup(module, creator)); err != nil {
-		return nil, unpublished, err
+		return nil, err
 	}
 	jobs := c.jobs[module]
 	names := slices.Sorted(maps.Keys(jobs))
 	for _, name := range names {
 		if err := add(c.buildInstanceGroup(module, creator, jobs[name])); err != nil {
-			return nil, unpublished, err
+			return nil, err
 		}
 	}
-	return desired, unpublished, nil
+	return desired, nil
 }
 
 func (c *Controller) buildAgentGroup(module string, creator collectorapi.Creator) (*controllerGroup, error) {
@@ -831,6 +826,12 @@ func validateConfiguredMethods(module string, methods []funcapi.FunctionConfig) 
 			return nil, errors.New("jobmgr Function controller: duplicate method ID")
 		}
 		seen[method.ID] = struct{}{}
+		if !validQuotedProtocolField(method.Help) {
+			return nil, errors.New("jobmgr Function controller: invalid Function help")
+		}
+		if !validQuotedProtocolField(method.Tags) {
+			return nil, errors.New("jobmgr Function controller: invalid Function tags")
+		}
 		publicNames := make(map[string]struct{}, len(method.Aliases)+1)
 		primary := funcapi.FunctionName(module, method)
 		publicNames[primary] = struct{}{}

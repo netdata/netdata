@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress(t *testing.T) {
+func TestKernelFunctionResourceLaneGrowthDoesNotBlockOtherLaneAdmission(t *testing.T) {
 	const hotLanePopulation = 33
 	kernel, run, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 

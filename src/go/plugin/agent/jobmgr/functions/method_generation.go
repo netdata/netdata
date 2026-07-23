@@ -48,7 +48,7 @@ func newMethodGeneration(
 	creator collectorapi.Creator,
 	methods []funcapi.FunctionConfig,
 	jobs map[string]collectorapi.RuntimeJob,
-) (*methodGeneration, error) {
+) (result *methodGeneration, err error) {
 	if id == "" || module == "" || creator.MethodHandler == nil || len(methods) == 0 {
 		return nil, errors.New("jobmgr Function method generation: invalid construction")
 	}
@@ -62,6 +62,14 @@ func newMethodGeneration(
 		handlers: make(map[string]funcapi.MethodHandler, max(1, len(jobs))),
 		done:     make(chan struct{}),
 	}
+	transferred := false
+	defer func() {
+		if transferred {
+			return
+		}
+		result = nil
+		err = errors.Join(err, generation.cleanup(context.Background()))
+	}()
 	for _, method := range methods {
 		if method.ID == "" {
 			return nil, errors.New("jobmgr Function method generation: empty method ID")
@@ -77,6 +85,7 @@ func newMethodGeneration(
 			return nil, errors.New("jobmgr Function method generation: nil agent handler")
 		}
 		generation.handlers[""] = handler
+		transferred = true
 		return generation, nil
 	}
 	if len(jobs) == 0 {
@@ -93,6 +102,7 @@ func newMethodGeneration(
 		generation.jobs[name] = job
 		generation.handlers[name] = handler
 	}
+	transferred = true
 	return generation, nil
 }
 
