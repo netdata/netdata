@@ -105,3 +105,29 @@ fn the_fold_pins_every_rollup_semantic() {
     assert_eq!(c_root.span_id, sfst::SpanId::from([5; 8]));
     assert_eq!(c_root.name.as_deref(), Some("c-root-lo"));
 }
+
+#[test]
+fn sealed_root_without_service_resolves_the_sentinel_to_none() {
+    // The ROLLUP_NO_REF → None branch of the sealed resolver: a true
+    // root whose resource carries no service.name.
+    use common::req_with;
+    let mut root = sp(1, 0, 1_000, "svcless-root");
+    root.trace = [0xD4; 16];
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req_with(vec![], None, &[root])], "svcless");
+
+    let out = dir.path().join("svcless.sfst");
+    ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
+    let bytes = std::fs::read(&out).unwrap();
+    let reader = sfst::IndexReader::open(&bytes).unwrap();
+    let strings = reader.build_string_table(reader.field_table()).unwrap();
+    let sealed = sealed_trace_aggregates(&reader.trace_rollup().unwrap(), &strings);
+
+    let root = sealed[0].root.as_ref().expect("a true root");
+    assert_eq!(root.service, None, "the sentinel resolves to honest None");
+    assert_eq!(root.name.as_deref(), Some("svcless-root"));
+
+    // And the tail fold agrees — the parity holds here too.
+    let tail = tail_trace_aggregates(&TraceWalScan::scan(&wal).unwrap());
+    assert_eq!(tail, sealed);
+}

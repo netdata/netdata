@@ -177,6 +177,27 @@ pub fn storage_to_attribute(storage: &str) -> Option<(AttributeOwner, AttributeK
     None
 }
 
+/// The resource `service.name` attribute's full storage field — the one
+/// composite spelling several folds need (`summarize`, the trace
+/// aggregates). Built from the vocabulary, never hand-written.
+pub(crate) fn resource_service_field() -> String {
+    format!(
+        "{}service.name",
+        AttributeOwner::Resource
+            .attribute_prefix()
+            .expect("Resource is an attribute owner")
+    )
+}
+
+/// A span's resolved facet value by storage field name, borrowed (no
+/// per-lookup allocation — hot-loop callers check e.g. `== "ERROR"`).
+pub(crate) fn span_field<'a>(span: &'a sfst::TraceSpan, field: &str) -> Option<&'a str> {
+    span.fields
+        .iter()
+        .find(|(k, _)| k == field)
+        .map(|(_, v)| v.as_str())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -55,7 +55,7 @@ use super::by_id::{DEFAULT_SPAN_CAP, FieldKinds};
 use super::predicate::{EvalPredicate, Predicate, PredicateError, TraceLevelEval};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
-use super::vocab::{AttributeOwner, BuiltinField};
+use super::vocab::BuiltinField;
 use super::wal_scan::TraceWalScan;
 use super::window::{TimeWindow, WindowError};
 use crate::source::map_source;
@@ -940,12 +940,7 @@ fn summarize(
     exact: bool,
 ) -> TraceSummary {
     // Storage names via the vocabulary only — never hand-built.
-    let service_field = format!(
-        "{}service.name",
-        AttributeOwner::Resource
-            .attribute_prefix()
-            .expect("Resource is an attribute owner")
-    );
+    let service_field = super::vocab::resource_service_field();
     let name_field = BuiltinField::Name
         .dictionary_field()
         .expect("Name is dictionary-backed");

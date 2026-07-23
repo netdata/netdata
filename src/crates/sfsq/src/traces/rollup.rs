@@ -20,7 +20,7 @@
 
 use std::collections::HashMap;
 
-use super::vocab::{AttributeOwner, BuiltinField};
+use super::vocab::{BuiltinField, resource_service_field, span_field};
 use super::wal_scan::TraceWalScan;
 
 /// One trace's per-source aggregate, source-shape-neutral.
@@ -57,24 +57,13 @@ pub struct TraceRootInfo {
 pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
     // Storage names via the vocabulary — never hand-built (the same
     // spellings the seal-side capture and `summarize` use).
-    let service_field = format!(
-        "{}service.name",
-        AttributeOwner::Resource
-            .attribute_prefix()
-            .expect("Resource is an attribute owner")
-    );
+    let service_field = resource_service_field();
     let name_field = BuiltinField::Name
         .dictionary_field()
         .expect("Name is dictionary-backed");
     let status_field = BuiltinField::Status
         .dictionary_field()
         .expect("Status is dictionary-backed");
-    let field_of = |span: &sfst::TraceSpan, field: &str| -> Option<String> {
-        span.fields
-            .iter()
-            .find(|(k, _)| k == field)
-            .map(|(_, v)| v.clone())
-    };
 
     struct Acc {
         min_start_ns: i64,
@@ -102,9 +91,11 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
         });
         acc.min_start_ns = acc.min_start_ns.min(span.start_ns);
         acc.max_end_ns = acc.max_end_ns.max(end_ns);
-        acc.span_count += 1;
-        if field_of(span, status_field).as_deref() == Some("ERROR") {
-            acc.error_count += 1;
+        // Counts clamp at u32::MAX — the sealed rows' width — so the
+        // parity contract holds even at the (astronomical) wrap point.
+        acc.span_count = (acc.span_count + 1).min(u64::from(u32::MAX));
+        if span_field(span, status_field) == Some("ERROR") {
+            acc.error_count = (acc.error_count + 1).min(u64::from(u32::MAX));
         }
         // D8 + the seal accumulator's exact rule: earliest unset-parent
         // span wins; equal starts tie-break by ascending span id.
@@ -114,8 +105,8 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
             acc.root = Some(TraceRootInfo {
                 span_id: span.span_id,
                 kind: span.kind,
-                service: field_of(span, &service_field),
-                name: field_of(span, name_field),
+                service: span_field(span, &service_field).map(str::to_string),
+                name: span_field(span, name_field).map(str::to_string),
             });
         }
     }
@@ -139,6 +130,10 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
 /// is the file's `KvId → key=value` table
 /// ([`sfst::IndexReader::build_string_table`]); refs resolve to the
 /// VALUE half (the `kv_value` convention: split on the first `=`).
+///
+/// Precondition: `rollup` comes from `IndexReader::trace_rollup()` (the
+/// validating accessor) — the struct-of-arrays fields are indexed in
+/// parallel here on that guarantee.
 pub fn sealed_trace_aggregates(
     rollup: &sfst::TraceRollup,
     strings: &[String],
