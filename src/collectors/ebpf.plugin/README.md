@@ -279,15 +279,21 @@ To configure an eBPF thread:
 
 2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script to edit a thread configuration file. The following configuration files are available:
 
-    - `socket.conf`: Configuration for the `ebpfgo.plugin` socket program (the C socket thread was removed). Controls BPF map sizes (`socket monitoring table size`, `udp connection table size`) and the standard `ebpf object flavor`/`maps per core` options.
-    - `process.conf`: Configuration for the [`process` thread](#sync-configuration).
     - `cachestat.conf`: Configuration for the `cachestat` thread(#filesystem-configuration).
     - `dcstat.conf`: Configuration for the `dcstat` thread.
     - `disk.conf`: Configuration for the `disk` thread.
+    - `dns.conf`: Configuration for the `dns` thread.
     - `fd.conf`: Configuration for the `file descriptor` thread.
     - `filesystem.conf`: Configuration for the `filesystem` thread.
     - `hardirq.conf`: Configuration for the `hardirq` thread.
+    - `mdflush.conf`: Configuration for the `mdflush` thread.
+    - `mount.conf`: Configuration for the `mount` thread.
+    - `oomkill.conf`: Configuration for the `oomkill` thread.
+    - `process.conf`: Configuration for the [`process` thread](#sync-configuration).
+    - `shm.conf`: Configuration for the `shm` thread.
+    - `socket.conf`: Configuration for the `ebpfgo.plugin` socket program (the C socket thread was removed). Controls BPF map sizes (`socket monitoring table size`, `udp connection table size`) and the standard `ebpf object flavor`/`maps per core` options.
     - `softirq.conf`: Configuration for the `softirq` thread.
+    - `swap.conf`: Configuration for the `swap` thread.
     - `sync.conf`: Configuration for the `sync` thread.
     - `vfs.conf`: Configuration for the `vfs` thread.
 
