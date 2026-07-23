@@ -107,7 +107,16 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
 
     /* New SHM is kernel-zero-filled; no explicit memset needed. */
     ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
-    return ctx->sem != SEM_FAILED;
+    if (ctx->sem == SEM_FAILED) {
+        /* mapping is set but sem is not — next publish would write without a
+         * lock.  Null out mapping so the publish guard catches it. */
+        munmap(ctx->mapping, length);
+        ctx->mapping = NULL;
+        ctx->header  = NULL;
+        ctx->entries = NULL;
+        return false;
+    }
+    return true;
 }
 
 struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_every_s)
@@ -237,8 +246,10 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
                 fprintf(stderr,
                         "ebpf-go.plugin: pid shm: semaphore wedged (%u consecutive timeouts), replacing generation\n",
                         ctx->publish_timeouts);
-                (void)pid_shm_replace_generation(ctx, shared_pid_memory_nbytes(ctx));
-                ctx->publish_timeouts = 0;
+                if (pid_shm_replace_generation(ctx, shared_pid_memory_nbytes(ctx)))
+                    ctx->publish_timeouts = 0;
+                else
+                    fprintf(stderr, "ebpf-go.plugin: pid shm: replace_generation failed; pid publishing suspended\n");
             }
             return -1;
         }

@@ -83,7 +83,14 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
 
     /* New SHM is kernel-zero-filled; no explicit memset needed. */
     ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0660, 1);
-    return ctx->sem != SEM_FAILED;
+    if (ctx->sem == SEM_FAILED) {
+        /* mapping is set but sem is not — next publish would write without a
+         * lock.  Null out mapping so the publish guard catches it. */
+        munmap(ctx->data, length);
+        ctx->data = NULL;
+        return false;
+    }
+    return true;
 }
 
 struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
@@ -187,8 +194,10 @@ void shared_dns_memory_publish(
                 fprintf(stderr,
                         "ebpf-go.plugin: dns shm: semaphore wedged (%u consecutive timeouts), replacing generation\n",
                         ctx->publish_timeouts);
-                (void)dns_shm_replace_generation(ctx, sizeof(struct ebpfgo_dns_shared));
-                ctx->publish_timeouts = 0;
+                if (dns_shm_replace_generation(ctx, sizeof(struct ebpfgo_dns_shared)))
+                    ctx->publish_timeouts = 0;
+                else
+                    fprintf(stderr, "ebpf-go.plugin: dns shm: replace_generation failed; dns publishing suspended\n");
             }
             return;
         }

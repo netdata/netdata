@@ -214,7 +214,11 @@ static inline bool ebpfgo_shm_sem_wait(sem_t *sem)
             return false;  /* timed out */
 
         struct timespec slp = { .tv_sec = 0, .tv_nsec = 1000000L };  /* 1 ms */
-        clock_nanosleep(CLOCK_MONOTONIC, 0, &slp, NULL);
+        int r;
+        while ((r = clock_nanosleep(CLOCK_MONOTONIC, 0, &slp, &slp)) == EINTR)
+            ;  /* interrupted: slp holds remaining; retry before next probe */
+        if (r != 0)
+            return false;
     }
 }
 #endif /* __linux__ */

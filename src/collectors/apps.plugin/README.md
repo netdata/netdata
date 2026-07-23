@@ -343,7 +343,7 @@ The `--pss` option controls PSS sampling behavior:
 
 ### Integration with eBPF
 
-`apps.plugin` receives per-PID eBPF counters (page-cache hits, VFS calls, and socket statistics) from `ebpfgo.plugin` via a shared-memory segment. When `ebpfgo.plugin` is running and the relevant programs are enabled, `apps.plugin` merges those counters into its per-application view and emits eBPF charts under the **eBPF syscall** section.
+`apps.plugin` receives per-PID eBPF counters (page-cache hits, VFS calls, and socket statistics) from `ebpfgo.plugin` via a shared-memory segment. When `ebpfgo.plugin` is running with the `cachestat`, `vfs`, or `socket` programs enabled (configured via `ebpf.d/cachestat.conf`, `ebpf.d/vfs.conf`, and `ebpf.d/socket.conf` respectively), `apps.plugin` merges those counters into its per-application view and emits eBPF charts under the **eBPF syscall** section.
 
 > **Note** — Per-application network bandwidth charts (previously provided by the C `socket` thread) have been removed. Per-cgroup and per-service network charts are now emitted by `cgroups.plugin`. Network-viewer provides on-demand per-connection detail through the `network-protocols` function.
 
