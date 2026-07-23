@@ -37,6 +37,20 @@ type SuccessorFailureResolution struct {
 	Cleanup          lifecycle.TaskCleanup  // protocol-frame cleanup
 }
 
+func resourceRemovalDisposition(current lifecycle.ReadyResource) lifecycle.ResourceTransactionDisposition {
+	if current == nil {
+		return lifecycle.ResourceTransactionUnchanged
+	}
+	return lifecycle.ResourceTransactionRemoved
+}
+
+func resourceInstallationDisposition(current lifecycle.ReadyResource) lifecycle.ResourceTransactionDisposition {
+	if current == nil {
+		return lifecycle.ResourceTransactionInstalled
+	}
+	return lifecycle.ResourceTransactionReplaced
+}
+
 // PreparedResourceTransaction owns one unpublished graph postimage and the
 // optional prepared successor job until Apply or Dispose consumes both.
 type PreparedResourceTransaction struct {

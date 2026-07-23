@@ -74,6 +74,7 @@ func (dcjc *DynCfgJobController) PlanDiscovered(change DiscoveredJobChange) (job
 	if change.Status == dyncfg.StatusRunning {
 		permit = lifecycle.NewJobLongLivedPlan()
 	}
+	change.Config = config
 	return jobmgr.WorkPlan{
 		Claims:     []string{DynCfgJobGraphClaim},
 		NoResponse: true,
@@ -87,19 +88,7 @@ func (dcjc *DynCfgJobController) PlanDiscovered(change DiscoveredJobChange) (job
 				scope lifecycle.ResourceTransactionScope,
 				permit lifecycle.LongLivedPermit,
 			) (lifecycle.PreparedResourceTransaction, error) {
-				return dcjc.prepareDiscovered(
-					ctx,
-					DiscoveredJobChange{
-						Config:  config,
-						Status:  change.Status,
-						Remove:  change.Remove,
-						Restart: change.Restart,
-						retry:   change.retry,
-					},
-					current,
-					scope,
-					permit,
-				)
+				return dcjc.prepareDiscovered(ctx, change, current, scope, permit)
 			},
 		},
 	}, nil
@@ -147,16 +136,12 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		}
 	}
 	if change.Remove {
-		disposition := lifecycle.ResourceTransactionUnchanged
-		if current != nil {
-			disposition = lifecycle.ResourceTransactionRemoved
-		}
 		return dcjc.prepareMutationWithRetry(
 			scope,
 			current,
 			nil,
 			lifecycle.LongLivedPermit{},
-			disposition,
+			resourceRemovalDisposition(current),
 			nil,
 			result,
 			dcjc.configDeleteCleanup(dcjc.configID(change.Config.Module(), change.Config.Name())),
@@ -182,16 +167,12 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		dcjc.configType(dcjc.modules[change.Config.Module()]),
 	)
 	if change.Status == dyncfg.StatusAccepted {
-		disposition := lifecycle.ResourceTransactionUnchanged
-		if current != nil {
-			disposition = lifecycle.ResourceTransactionRemoved
-		}
 		return dcjc.prepareMutationWithRetry(
 			scope,
 			current,
 			nil,
 			lifecycle.LongLivedPermit{},
-			disposition,
+			resourceRemovalDisposition(current),
 			&postimage,
 			result,
 			cleanup,
@@ -215,10 +196,6 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	if err != nil {
 		return nil, err
 	}
-	disposition := lifecycle.ResourceTransactionInstalled
-	if current != nil {
-		disposition = lifecycle.ResourceTransactionReplaced
-	}
 	failedPostimage := postimage
 	failedPostimage.Status = dyncfg.StatusFailed.String()
 	return dcjc.prepareMutationWithRetry(
@@ -226,7 +203,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		current,
 		successor,
 		lifecycle.LongLivedPermit{},
-		disposition,
+		resourceInstallationDisposition(current),
 		&postimage,
 		result,
 		cleanup,

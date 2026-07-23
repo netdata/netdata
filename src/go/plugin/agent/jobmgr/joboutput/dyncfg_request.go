@@ -26,7 +26,7 @@ func (dcjc *DynCfgJobController) resolveRequest(request DynCfgJobRequest) (dynCf
 	if !strings.HasPrefix(id, dcjc.prefix) {
 		return dynCfgTarget{}, newDynCfgFailure(400, "invalid config ID format.")
 	}
-	command := dyncfg.Command(strings.ToLower(request.Args[1]))
+	command := dyncfg.CommandFromArgs(request.Args)
 	target := strings.TrimPrefix(id, dcjc.prefix)
 	module, name, hasName := strings.Cut(target, ":")
 	if module == "" {
@@ -46,7 +46,7 @@ func (dcjc *DynCfgJobController) resolveRequest(request DynCfgJobRequest) (dynCf
 				fmt.Sprintf("missing required arguments: need 3, got %d", len(request.Args)),
 			)
 		}
-		name = dynCfgJobNameReplacer.Replace(request.Args[2])
+		name = dyncfg.NormalizeJobName(request.Args[2])
 		if name == "" {
 			return dynCfgTarget{}, newDynCfgFailure(400, "invalid or missing job name.")
 		}
@@ -70,7 +70,7 @@ func (dcjc *DynCfgJobController) resolveRequest(request DynCfgJobRequest) (dynCf
 	}
 	if command == dyncfg.CommandUserconfig || command == dyncfg.CommandTest {
 		if len(request.Args) >= 3 && request.Args[2] != "" {
-			name = dynCfgJobNameReplacer.Replace(request.Args[2])
+			name = dyncfg.NormalizeJobName(request.Args[2])
 		} else if creator.InstancePolicy == collectorapi.InstancePolicySingle {
 			name = module
 		}

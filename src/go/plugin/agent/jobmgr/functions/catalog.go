@@ -13,15 +13,16 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 const (
 	maximumDeclarationMetadataBytes = jobmgr.MaximumPluginSDLineBytes
 	MaximumCloseQuantum             = jobmgr.MaximumFunctionCloseQuantum
-	invalidDynCfgResourceID         = "\x00dyncfg-invalid"
+	// The leading NUL reserves a lookup-failure identity that cannot collide
+	// with a valid DynCfg resource ID.
+	invalidDynCfgResourceID = "\x00dyncfg-invalid"
 )
-
-var dynCfgJobNameReplacer = strings.NewReplacer(" ", "_", ":", "_")
 
 type HandlerInput struct {
 	UID          string        // call UID
@@ -157,8 +158,8 @@ func resolveDynCfgJobResource(policy ResourcePolicy, arguments []string) string 
 // arguments. It reports whether this is an add command (arguments[1] == "add");
 // the returned name is the replacer-normalized arguments[2] and may be empty.
 func addCommandJobName(arguments []string) (string, bool) {
-	if len(arguments) > 2 && strings.EqualFold(arguments[1], "add") {
-		return dynCfgJobNameReplacer.Replace(arguments[2]), true
+	if len(arguments) > 2 && dyncfg.CommandFromArgs(arguments) == dyncfg.CommandAdd {
+		return dyncfg.NormalizeJobName(arguments[2]), true
 	}
 	return "", false
 }
@@ -395,17 +396,7 @@ func (c *Catalog) addInitial(snapshot *catalogSnapshot, declaration Declaration,
 	if err := c.prepareGenerationCleanup(generation); err != nil {
 		return err
 	}
-	resolved := &route{
-		publicName:          declaration.PublicName,
-		prefix:              declaration.Prefix,
-		method:              declaration.ID,
-		handler:             generation,
-		resource:            declaration.Resource,
-		cooperativeCancel:   declaration.CooperativeCancel,
-		cooperativeDeadline: declaration.CooperativeDeadline,
-		rawPayload:          declaration.RawPayload,
-		transaction:         cloneResourceTransactionDeclaration(declaration.Transaction),
-	}
+	resolved := materializeRoute(declaration, generation)
 	if declaration.Prefix == "" {
 		set.direct = resolved
 	} else {
@@ -420,6 +411,20 @@ func (c *Catalog) addInitial(snapshot *catalogSnapshot, declaration Declaration,
 	snapshot.active = append(snapshot.active, resolved)
 	c.routeCount++
 	return nil
+}
+
+func materializeRoute(declaration Declaration, generation *handlerGeneration) *route {
+	return &route{
+		publicName:          declaration.PublicName,
+		prefix:              declaration.Prefix,
+		method:              declaration.ID,
+		handler:             generation,
+		resource:            declaration.Resource,
+		cooperativeCancel:   declaration.CooperativeCancel,
+		cooperativeDeadline: declaration.CooperativeDeadline,
+		rawPayload:          declaration.RawPayload,
+		transaction:         cloneResourceTransactionDeclaration(declaration.Transaction),
+	}
 }
 
 func (c *Catalog) allocateCleanupRef() (jobmgr.FunctionCleanupRef, error) {

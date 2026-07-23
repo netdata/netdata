@@ -26,20 +26,20 @@ func (dvt *diagnosticVNodeTransaction) Apply(ctx context.Context) (lifecycle.App
 	applied, err := dvt.transaction.Apply(ctx)
 	status := applied.ResultStatus()
 	level := jobmgr.DiagnosticInfo
-	name := "vnode configuration command completed"
+	eventName := "vnode configuration command completed"
 	if err != nil || !jobmgr.DiagnosticResultSucceeded(status) {
 		level = jobmgr.DiagnosticWarning
-		name = "vnode configuration command failed"
+		eventName = "vnode configuration command failed"
 	}
 	state := "removed"
-	if name, ok := vnodeConfigNameFromResource(dvt.resource); ok {
-		if _, exists := dvt.binding.config.Lookup(name); exists {
+	if configName, ok := vnodeConfigNameFromResource(dvt.resource); ok {
+		if _, exists := dvt.binding.config.Lookup(configName); exists {
 			state = "configured"
 		}
 	}
 	jobmgr.ObserveDiagnostic(dvt.binding.diagnostics, jobmgr.DiagnosticEvent{
 		Level:        level,
-		Name:         name,
+		Name:         eventName,
 		Resource:     dvt.resource,
 		Command:      string(dvt.command),
 		State:        state,

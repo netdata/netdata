@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -422,10 +421,7 @@ func (sdb *serviceDiscoveryBinding) observeCommand(
 }
 
 func serviceDiscoveryCommand(args []string) dyncfg.Command {
-	if len(args) < 2 {
-		return ""
-	}
-	return dyncfg.Command(strings.ToLower(args[1]))
+	return dyncfg.CommandFromArgs(args)
 }
 
 func serviceDiscoveryMutationCommand(command dyncfg.Command) bool {
@@ -434,7 +430,6 @@ func serviceDiscoveryMutationCommand(command dyncfg.Command) bool {
 		dyncfg.CommandEnable,
 		dyncfg.CommandDisable,
 		dyncfg.CommandUpdate,
-		dyncfg.CommandRestart,
 		dyncfg.CommandRemove:
 		return true
 	default:

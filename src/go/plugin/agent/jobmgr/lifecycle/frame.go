@@ -519,7 +519,7 @@ func resultFrameSize(
 	expiry int64,
 	payloadBytes, frameLimit, envelopeLimit, payloadLimit int,
 ) (frameBytes, envelopeBytes int, err error) {
-	if uid == "" || strings.ContainsAny(uid, " \t\r\n\x00") || contentType == "" ||
+	if ValidateUID(uid) != nil || contentType == "" ||
 		strings.ContainsAny(contentType, " \t\r\n\x00") ||
 		status < 100 ||
 		status > 599 ||

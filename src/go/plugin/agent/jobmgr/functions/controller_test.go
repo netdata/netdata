@@ -16,6 +16,61 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestControllerChangedRouteNames(t *testing.T) {
+	firstGeneration := &HandlerGenerationDeclaration{
+		ID: "first",
+	}
+	secondGeneration := &HandlerGenerationDeclaration{
+		ID: "second",
+	}
+	base := controllerRoute{
+		declaration: Declaration{
+			Generation: firstGeneration,
+		},
+		publication: PublicationRecord{
+			Name:       "method",
+			Generation: 1,
+		},
+	}
+	publicationChanged := base
+	publicationChanged.publication.Generation++
+	handlerGenerationChanged := base
+	handlerGenerationChanged.declaration.Generation = secondGeneration
+	tests := map[string]struct {
+		current map[string]controllerRoute
+		next    map[string]controllerRoute
+		want    []string
+	}{
+		"unchanged": {
+			current: map[string]controllerRoute{"method": base},
+			next:    map[string]controllerRoute{"method": base},
+		},
+		"added": {
+			next: map[string]controllerRoute{"method": base},
+			want: []string{"method"},
+		},
+		"removed": {
+			current: map[string]controllerRoute{"method": base},
+			want:    []string{"method"},
+		},
+		"publication changed": {
+			current: map[string]controllerRoute{"method": base},
+			next:    map[string]controllerRoute{"method": publicationChanged},
+			want:    []string{"method"},
+		},
+		"handler generation changed": {
+			current: map[string]controllerRoute{"method": base},
+			next:    map[string]controllerRoute{"method": handlerGenerationChanged},
+			want:    []string{"method"},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, test.want, controllerChangedRouteNames(test.current, test.next))
+		})
+	}
+}
+
 func TestFunctionControllerJobLifecycle(t *testing.T) {
 	handler := &controllerTestHandler{}
 	constructions := 0

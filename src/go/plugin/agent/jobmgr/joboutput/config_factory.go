@@ -89,9 +89,7 @@ func (cmf *ConfigModuleFactory) Test(ctx context.Context, config confgroup.Confi
 	defer func() {
 		err = errors.Join(err, probe.cleanup(context.WithoutCancel(ctx)))
 	}()
-	if named, ok := probe.module.(interface{ SetJobName(string) }); ok {
-		named.SetJobName(config.Name())
-	}
+	setModuleJobName(probe.module, config.Name())
 	if err := cmf.applyResolved(ctx, config, probe.module); err != nil {
 		return err
 	}
@@ -119,9 +117,7 @@ func (cmf *ConfigModuleFactory) Validate(ctx context.Context, config confgroup.C
 	defer func() {
 		err = errors.Join(err, probe.cleanup(context.WithoutCancel(ctx)))
 	}()
-	if named, ok := probe.module.(interface{ SetJobName(string) }); ok {
-		named.SetJobName(config.Name())
-	}
+	setModuleJobName(probe.module, config.Name())
 	return cmf.applyResolved(ctx, config, probe.module)
 }
 

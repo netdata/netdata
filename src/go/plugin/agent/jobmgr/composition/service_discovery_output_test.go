@@ -143,6 +143,45 @@ func TestServiceDiscoveryBindingRejectsResultOutsideInvocation(t *testing.T) {
 	require.ErrorContains(t, err, "result outside invocation")
 }
 
+func TestServiceDiscoveryMutationCommand(t *testing.T) {
+	tests := map[string]struct {
+		command dyncfg.Command
+		want    bool
+	}{
+		"add": {
+			command: dyncfg.CommandAdd,
+			want:    true,
+		},
+		"enable": {
+			command: dyncfg.CommandEnable,
+			want:    true,
+		},
+		"disable": {
+			command: dyncfg.CommandDisable,
+			want:    true,
+		},
+		"update": {
+			command: dyncfg.CommandUpdate,
+			want:    true,
+		},
+		"remove": {
+			command: dyncfg.CommandRemove,
+			want:    true,
+		},
+		"restart is unsupported": {
+			command: dyncfg.CommandRestart,
+		},
+		"read-only": {
+			command: dyncfg.CommandGet,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, serviceDiscoveryMutationCommand(test.command))
+		})
+	}
+}
+
 func TestServiceDiscoveryHandlerPanicIsClassifiedAsTaskPanic(t *testing.T) {
 	err := callServiceDiscoveryHandler(func() {
 		panic("handler failed")

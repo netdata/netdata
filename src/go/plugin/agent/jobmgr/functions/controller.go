@@ -1027,11 +1027,8 @@ func controllerChangedRouteNames(current map[string]controllerRoute, next map[st
 			changed[name] = struct{}{}
 		}
 	}
-	for name, nextRoute := range next {
-		currentRoute, exists := current[name]
-		if !exists ||
-			currentRoute.publication != nextRoute.publication ||
-			currentRoute.declaration.Generation != nextRoute.declaration.Generation {
+	for name := range next {
+		if _, exists := current[name]; !exists {
 			changed[name] = struct{}{}
 		}
 	}

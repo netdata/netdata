@@ -100,10 +100,7 @@ func (adri *autoDetectionRetryIndex) schedule(config confgroup.Config, after int
 		return
 	}
 	if current := adri.entries[config.FullName()]; current != nil {
-		if current.index >= 0 {
-			heap.Remove(&adri.queue, current.index)
-		}
-		delete(adri.entries, config.FullName())
+		adri.removeLocked(config.FullName(), current)
 	}
 	adri.generation++
 	if adri.generation == 0 {
@@ -140,10 +137,7 @@ func (adri *autoDetectionRetryIndex) cancel(id string) {
 	if retry == nil {
 		return
 	}
-	if retry.index >= 0 {
-		heap.Remove(&adri.queue, retry.index)
-	}
-	delete(adri.entries, id)
+	adri.removeLocked(id, retry)
 }
 
 func (adri *autoDetectionRetryIndex) cancelToken(id string, token autoDetectionRetryToken) {
@@ -156,6 +150,10 @@ func (adri *autoDetectionRetryIndex) cancelToken(id string, token autoDetectionR
 	if retry == nil || retry.token != token {
 		return
 	}
+	adri.removeLocked(id, retry)
+}
+
+func (adri *autoDetectionRetryIndex) removeLocked(id string, retry *autoDetectionRetry) {
 	if retry.index >= 0 {
 		heap.Remove(&adri.queue, retry.index)
 	}

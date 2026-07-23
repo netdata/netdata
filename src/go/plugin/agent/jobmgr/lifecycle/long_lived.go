@@ -28,16 +28,13 @@ func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
 	}
 	keys := slices.Clone(providerKeys)
 	slices.Sort(keys)
-	for index, key := range keys {
-		if key == "" || key != strings.TrimSpace(key) || index > 0 && key == keys[index-1] {
-			return LongLivedPlan{}, errors.New("jobmgr long-lived permit: invalid pipeline provider key")
-		}
+	if !validPipelineProviderKeys(keys) {
+		return LongLivedPlan{}, errors.New("jobmgr long-lived permit: invalid pipeline provider key")
 	}
-	plan := LongLivedPlan{
+	return LongLivedPlan{
 		class:        LongLivedPipeline,
 		providerKeys: keys,
-	}
-	return plan, plan.Validate()
+	}, nil
 }
 
 func NewJobLongLivedPlan() LongLivedPlan {

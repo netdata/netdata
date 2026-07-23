@@ -2,7 +2,6 @@ package jobmgrtest
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -60,10 +59,7 @@ func assertFixtureCloseIsIdempotentAndJoins(
 	release := make(chan struct{})
 	cleanupEntered := make(chan struct{})
 	cleanupReturned := make(chan struct{})
-	var releaseOnce sync.Once
-	releaseCleanup := func() {
-		releaseOnce.Do(func() { close(release) })
-	}
+	releaseCleanup := onceClose(release)
 	t.Cleanup(releaseCleanup)
 
 	fixture, err := start(&agentFixtureState{

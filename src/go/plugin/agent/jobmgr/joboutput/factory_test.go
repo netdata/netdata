@@ -19,6 +19,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCreatorDeclaresFunctions(t *testing.T) {
+	tests := map[string]struct {
+		creator collectorapi.Creator
+		want    bool
+	}{
+		"none": {},
+		"shared": {
+			creator: collectorapi.Creator{
+				SharedFunctions: func() []funcapi.FunctionConfig { return nil },
+			},
+			want: true,
+		},
+		"agent": {
+			creator: collectorapi.Creator{
+				AgentFunctions: func() []funcapi.FunctionConfig { return nil },
+			},
+			want: true,
+		},
+		"instance": {
+			creator: collectorapi.Creator{
+				InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig { return nil },
+			},
+			want: true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, test.want, creatorDeclaresFunctions(test.creator))
+		})
+	}
+}
+
 func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 	tests := map[string]struct {
 		configure     func(*factoryTestState, *collectorapi.Creator) JobHooks

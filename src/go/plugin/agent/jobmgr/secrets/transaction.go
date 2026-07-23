@@ -27,15 +27,14 @@ type preparedSecretSpec struct {
 	result  lifecycle.SealedResult // sealed dyncfg response
 	cleanup lifecycle.TaskCleanup  // post-commit protocol emit
 
-	controller  *Controller  // controller to publish the entry into
-	entry       *secretEntry // the entry to commit
-	removeEntry bool         // delete the entry instead of committing it
+	controller *Controller  // controller to publish the entry into
+	entry      *secretEntry // the entry to commit
 }
 
 // commitEntryDisposition applies the entry side of a committed transaction:
 // delete the entry on removal, publish the committed entry, or do nothing.
 func (spec preparedSecretSpec) commitEntryDisposition() {
-	if spec.removeEntry {
+	if spec.remove {
 		spec.controller.commitEntry(spec.storeKey, nil)
 	} else if spec.entry != nil {
 		spec.controller.commitEntry(spec.entry.config.ExposedKey(), spec.entry)

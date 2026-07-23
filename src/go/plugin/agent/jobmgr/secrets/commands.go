@@ -240,16 +240,15 @@ func (c *Controller) prepareRemove(
 	}
 	return newPreparedSecretTransaction(
 		preparedSecretSpec{
-			scope:       scope,
-			current:     current,
-			store:       c.store,
-			storeKey:    target.key,
-			mutation:    mutation,
-			remove:      true,
-			result:      mustSecretMessage(200, ""),
-			cleanup:     c.configDeleteCleanup(target.key),
-			controller:  c,
-			removeEntry: true,
+			scope:      scope,
+			current:    current,
+			store:      c.store,
+			storeKey:   target.key,
+			mutation:   mutation,
+			remove:     true,
+			result:     mustSecretMessage(200, ""),
+			cleanup:    c.configDeleteCleanup(target.key),
+			controller: c,
 		},
 	)
 }

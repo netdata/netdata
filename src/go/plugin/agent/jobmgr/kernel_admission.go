@@ -137,10 +137,7 @@ func (ck *CommandKernel) admitSubmission(
 		)
 	}
 	if lane == nil {
-		lane, err = ck.allocateLane(laneID, request)
-		if err != nil {
-			return errors.Join(err, ck.uids.Complete(request.UID, false, now))
-		}
+		lane = ck.allocateLane(laneID, request)
 	}
 	ck.nextID++
 	operationGeneration, err := lifecycle.NewOperation(

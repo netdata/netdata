@@ -513,8 +513,7 @@ func TestKernelTerminalNoResponseDisposalCompletesUIDOwnership(t *testing.T) {
 		key:    request.LaneKey,
 		source: request.Source,
 	}
-	lane, err := kernel.allocateLane(laneKey, request)
-	require.NoError(t, err)
+	lane := kernel.allocateLane(laneKey, request)
 	generation, err := lifecycle.NewOperation(1, uid, request.Source, request.LaneKey, false)
 	require.NoError(t, err)
 	operation := &commandOperation{
@@ -2843,7 +2842,7 @@ func TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns(t *testing.T) {
 			for index := range population {
 				key := fmt.Sprintf("shutdown-lane-%d", index)
 
-				_, err := kernel.allocateLane(
+				kernel.allocateLane(
 					commandLaneKey{
 						source: lifecycle.SourceJobManager,
 						key:    key,
@@ -2853,7 +2852,6 @@ func TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns(t *testing.T) {
 						LaneKey: key,
 					},
 				)
-				require.NoError(t, err)
 			}
 
 			require.NoError(t, kernel.beginShutdown(time.Now().Add(time.Second)))

@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -23,8 +22,6 @@ const (
 	dynCfgCollectorPrefixFormat = "%s:collector:"
 	dynCfgCollectorPathFormat   = "/collectors/%s/Jobs"
 )
-
-var dynCfgJobNameReplacer = strings.NewReplacer(" ", "_", ":", "_")
 
 type DynCfgJobRequest struct {
 	Args         []string // dyncfg command arguments

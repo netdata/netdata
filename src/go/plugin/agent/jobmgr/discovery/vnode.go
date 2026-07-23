@@ -213,9 +213,10 @@ func (vc *VNodeConfiguration) Entries() []ConfiguredVNode {
 }
 
 func vnodeConfigurationEqual(left, right *vnodes.VirtualNode) bool {
-	return left.Name == right.Name && left.Hostname == right.Hostname &&
-		left.GUID == right.GUID && left.Source == right.Source &&
-		left.SourceType == right.SourceType && maps.Equal(left.Labels, right.Labels)
+	return left.Name == right.Name &&
+		left.Source == right.Source &&
+		left.SourceType == right.SourceType &&
+		vnodeMetadataEqual(left, right)
 }
 
 func vnodeMetadataEqual(left, right *vnodes.VirtualNode) bool {

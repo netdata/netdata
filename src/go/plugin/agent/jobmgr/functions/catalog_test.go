@@ -46,6 +46,15 @@ func TestFunctionCatalogLookup(t *testing.T) {
 			},
 			wantResource: "mysql_production",
 		},
+		"DynCfg Add resource normalizes job name": {
+			declaration: testDeclaration("config", "go.d:collector:", DynCfgJobResource(0, "go.d:collector:")),
+			lookup: jobmgr.FunctionLookup{
+				UID:   "resource-add",
+				Route: "config",
+				Args:  []string{"go.d:collector:mysql", "ADD", "production east:primary"},
+			},
+			wantResource: "mysql_production_east_primary",
+		},
 		"missing prefix argument": {
 			declaration: testDeclaration("config", "job:", ResourcePolicy{}),
 			lookup: jobmgr.FunctionLookup{

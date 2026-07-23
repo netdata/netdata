@@ -46,16 +46,12 @@ func (dcjc *DynCfgJobController) prepareAdd(
 		Status:  dyncfg.StatusAccepted.String(),
 		Payload: payload,
 	}
-	disposition := lifecycle.ResourceTransactionUnchanged
-	if current != nil {
-		disposition = lifecycle.ResourceTransactionRemoved
-	}
 	return dcjc.prepareMutation(
 		scope,
 		current,
 		nil,
 		lifecycle.LongLivedPermit{},
-		disposition,
+		resourceRemovalDisposition(current),
 		&postimage,
 		mustDynCfgMessage(202, ""),
 		dcjc.configCreateCleanup(postimage, confgroup.TypeDyncfg, request.CallerSource, dyncfg.ConfigTypeJob),
@@ -171,10 +167,6 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		)
 	}
 	postimage.Status = dyncfg.StatusRunning.String()
-	disposition := lifecycle.ResourceTransactionInstalled
-	if current != nil {
-		disposition = lifecycle.ResourceTransactionReplaced
-	}
 	cleanup := dcjc.updateCleanup(target, request, oldConfig, postimage, dyncfg.StatusRunning)
 	failedPostimage := postimage
 	failedPostimage.Status = dyncfg.StatusFailed.String()
@@ -184,7 +176,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		current,
 		successor,
 		lifecycle.LongLivedPermit{},
-		disposition,
+		resourceInstallationDisposition(current),
 		&postimage,
 		mustDynCfgMessage(200, ""),
 		cleanup,
@@ -259,10 +251,6 @@ func (dcjc *DynCfgJobController) prepareRestart(
 			dcjc.configStatusCleanup(target.resourceID, status),
 		)
 	}
-	disposition := lifecycle.ResourceTransactionInstalled
-	if current != nil {
-		disposition = lifecycle.ResourceTransactionReplaced
-	}
 	return dcjc.prepareRunningTransition(
 		ctx,
 		target,
@@ -270,7 +258,7 @@ func (dcjc *DynCfgJobController) prepareRestart(
 		current,
 		scope,
 		permit,
-		disposition,
+		resourceInstallationDisposition(current),
 		422,
 		"config restart failed: %v",
 		func(err error) (lifecycle.PreparedResourceTransaction, error) {
@@ -357,16 +345,12 @@ func (dcjc *DynCfgJobController) prepareDisable(
 		)
 	}
 	postimage := graphConfig(record, dyncfg.StatusDisabled)
-	disposition := lifecycle.ResourceTransactionUnchanged
-	if current != nil {
-		disposition = lifecycle.ResourceTransactionRemoved
-	}
 	return dcjc.prepareMutation(
 		scope,
 		current,
 		nil,
 		lifecycle.LongLivedPermit{},
-		disposition,
+		resourceRemovalDisposition(current),
 		&postimage,
 		mustDynCfgMessage(200, ""),
 		dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusDisabled),
@@ -412,16 +396,12 @@ func (dcjc *DynCfgJobController) prepareRemove(
 			),
 		)
 	}
-	disposition := lifecycle.ResourceTransactionUnchanged
-	if current != nil {
-		disposition = lifecycle.ResourceTransactionRemoved
-	}
 	return dcjc.prepareMutation(
 		scope,
 		current,
 		nil,
 		lifecycle.LongLivedPermit{},
-		disposition,
+		resourceRemovalDisposition(current),
 		nil,
 		mustDynCfgMessage(200, ""),
 		dcjc.configDeleteCleanup(dcjc.configID(record.Module, record.Name)),

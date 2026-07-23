@@ -118,16 +118,7 @@ func (c *Catalog) NewMutation(expectedVersion uint64, changes []RouteChange) (*M
 				generationByDeclaration[generationDeclaration] = generation
 			}
 
-			newRoute = &route{
-				publicName:          declaration.PublicName,
-				method:              declaration.ID,
-				handler:             generation,
-				resource:            declaration.Resource,
-				cooperativeCancel:   declaration.CooperativeCancel,
-				cooperativeDeadline: declaration.CooperativeDeadline,
-				rawPayload:          declaration.RawPayload,
-				transaction:         cloneResourceTransactionDeclaration(declaration.Transaction),
-			}
+			newRoute = materializeRoute(declaration, generation)
 			generation.routeReferences++
 			set.direct = newRoute
 		}

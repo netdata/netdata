@@ -183,6 +183,54 @@ func TestTaskSupervisorDynamicPopulationAndGenerationCheckedReuse(t *testing.T) 
 	require.NoError(t, supervisor.Release(ack.Ref))
 }
 
+func TestTaskSupervisorSendActionValidatesUIDBoundary(t *testing.T) {
+	tests := map[string]struct {
+		uid     string
+		wantErr bool
+	}{
+		"boundary": {uid: strings.Repeat("u", MaximumUIDBytes)},
+		"overlong": {uid: strings.Repeat("u", MaximumUIDBytes+1), wantErr: true},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			frame, err := NewFrameOwner(io.Discard)
+			require.NoError(t, err)
+			supervisor, err := NewTaskSupervisor(frame)
+			require.NoError(t, err)
+			_, _ = enqueueAndDispatchTask(t, supervisor, TaskPlan{
+				Source: SourceFunction,
+				Work: frameTaskWork(func(context.Context) (SealedResult, error) {
+					return NewSealedResult(200, "application/json", []byte(`{}`))
+				}),
+			})
+			completion := <-supervisor.CompletionCh()
+			action := TaskAction{
+				Ref:      completion.Ref,
+				Sequence: 2,
+				Kind:     TaskActionEncodeWrite,
+				UID:      test.uid,
+				Expiry:   1,
+			}
+			err = supervisor.SendAction(action)
+			require.Equal(t, test.wantErr, err != nil)
+			if test.wantErr {
+				action.UID = strings.Repeat("u", MaximumUIDBytes)
+				require.NoError(t, supervisor.SendAction(action))
+			}
+			ack := <-supervisor.AcknowledgementCh()
+			require.NoError(t, ack.Err)
+			require.NoError(t, supervisor.SendAction(TaskAction{
+				Ref:      ack.Ref,
+				Sequence: 3,
+				Kind:     TaskActionTerminate,
+			}))
+			ack = <-supervisor.AcknowledgementCh()
+			require.NoError(t, ack.Err)
+			require.NoError(t, supervisor.Release(ack.Ref))
+		})
+	}
+}
+
 func TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch(t *testing.T) {
 	frame, err := NewFrameOwner(io.Discard)
 	require.NoError(t, err)
@@ -535,45 +583,70 @@ func TestTaskSupervisorChecksPhaseSequenceAndPublishesOwnedResult(t *testing.T) 
 	require.NoError(t, supervisor.Release(ref))
 }
 
-func TestTaskSupervisorPreflightsResultEnvelopeBeforeAction(t *testing.T) {
-	frame, err := NewFrameOwner(io.Discard)
+func TestTaskSupervisorPreflightResultValidation(t *testing.T) {
+	_, baseEnvelope, err := functionFrameSize("u", 200, "application/json", 1, len(`{}`))
 	require.NoError(t, err)
-	supervisor, err := NewTaskSupervisor(frame)
-	require.NoError(t, err)
-	result, err := NewSealedResult(200, "application/json", []byte(`{}`))
-	require.NoError(t, err)
-	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
-		Source: SourceFunction,
-		Work: frameTaskWork(func(context.Context) (SealedResult, error) {
-			return result, nil
-		}),
-	})
-	completion := <-supervisor.CompletionCh()
-	require.Nil(t, completion.Err)
-	_, baseEnvelope, err := functionFrameSize("u", 200, "application/json", 1, len(result.payload))
-	require.NoError(t, err)
-	oversizedUID := strings.Repeat("u", 2+FunctionEnvelopeBytes-baseEnvelope)
+	oversizedContentType := strings.Repeat("a", len("application/json")+FunctionEnvelopeBytes-baseEnvelope+1)
+	tests := map[string]struct {
+		uid         string
+		contentType string
+		wantErr     bool
+		wantErrorIs error
+	}{
+		"UID boundary": {
+			uid:         strings.Repeat("u", MaximumUIDBytes),
+			contentType: "application/json",
+		},
+		"overlong UID": {
+			uid:         strings.Repeat("u", MaximumUIDBytes+1),
+			contentType: "application/json",
+			wantErr:     true,
+		},
+		"oversized envelope": {
+			uid:         "u",
+			contentType: oversizedContentType,
+			wantErr:     true,
+			wantErrorIs: ErrFunctionResultTooLarge,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			frame, err := NewFrameOwner(io.Discard)
+			require.NoError(t, err)
+			supervisor, err := NewTaskSupervisor(frame)
+			require.NoError(t, err)
+			result, err := NewSealedResult(200, test.contentType, []byte(`{}`))
+			require.NoError(t, err)
+			_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
+				Source: SourceFunction,
+				Work: frameTaskWork(func(context.Context) (SealedResult, error) {
+					return result, nil
+				}),
+			})
+			completion := <-supervisor.CompletionCh()
+			require.NoError(t, completion.Err)
 
-	preflightResultErr := supervisor.PreflightResult(ref, oversizedUID, 1)
-	require.ErrorIs(t, preflightResultErr, ErrFunctionResultTooLarge)
+			err = supervisor.PreflightResult(ref, test.uid, 1)
+			require.Equal(t, test.wantErr, err != nil)
+			if test.wantErrorIs != nil {
+				require.ErrorIs(t, err, test.wantErrorIs)
+			}
 
-	require.NoError(t, supervisor.SendAction(TaskAction{
-		Ref:      ref,
-		Sequence: 2,
-		Kind:     TaskActionDispose,
-	}))
-
-	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
-
-	require.NoError(t, supervisor.SendAction(TaskAction{
-		Ref:      ref,
-		Sequence: 3,
-		Kind:     TaskActionTerminate,
-	}))
-
-	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
-
-	require.NoError(t, supervisor.Release(ref))
+			require.NoError(t, supervisor.SendAction(TaskAction{
+				Ref:      ref,
+				Sequence: 2,
+				Kind:     TaskActionDispose,
+			}))
+			require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
+			require.NoError(t, supervisor.SendAction(TaskAction{
+				Ref:      ref,
+				Sequence: 3,
+				Kind:     TaskActionTerminate,
+			}))
+			require.NoError(t, (<-supervisor.AcknowledgementCh()).Err)
+			require.NoError(t, supervisor.Release(ref))
+		})
+	}
 }
 
 func TestTaskSupervisorRunsCleanupBeforeExplicitTermination(t *testing.T) {
@@ -1144,19 +1217,41 @@ func TestFunctionPayloadAndFrameCapacityAreSeparateFromControlReserve(t *testing
 	require.Zero(t, census.RetainedBytes)
 }
 
+func TestPrepareFrameValidatesUIDBoundary(t *testing.T) {
+	result, err := NewSealedResult(200, "application/json", []byte(`{}`))
+	require.NoError(t, err)
+	tests := map[string]struct {
+		uid     string
+		wantErr bool
+	}{
+		"boundary": {uid: strings.Repeat("u", MaximumUIDBytes)},
+		"overlong": {uid: strings.Repeat("u", MaximumUIDBytes+1), wantErr: true},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := PrepareFrame(test.uid, result, 1)
+			require.Equal(t, test.wantErr, err != nil)
+		})
+	}
+}
+
 func TestFunctionFrameSizePreflightsBeforeAppend(t *testing.T) {
 	baseFrame, baseEnvelope, err := functionFrameSize("u", 200, "application/json", 1, 0)
 	require.NoError(t, err)
-	exactUID := strings.Repeat("u", 1+FunctionEnvelopeBytes-baseEnvelope)
-	exactFrame, exactEnvelope, err := functionFrameSize(exactUID, 200, "application/json", 1, 0)
+	exactContentType := strings.Repeat("a", len("application/json")+FunctionEnvelopeBytes-baseEnvelope)
+	exactFrame, exactEnvelope, err := functionFrameSize("u", 200, exactContentType, 1, 0)
 	require.NoError(t, err)
-	require.False(t, exactEnvelope != FunctionEnvelopeBytes || exactFrame != baseFrame+len(exactUID)-1)
+	require.False(
+		t,
+		exactEnvelope != FunctionEnvelopeBytes ||
+			exactFrame != baseFrame+len(exactContentType)-len("application/json"),
+	)
 	seed := []byte("unchanged")
 	encoded, err := encodeResult(
 		seed,
-		exactUID+"u",
+		"u",
 		200,
-		"application/json",
+		exactContentType+"a",
 		1,
 		nil,
 		MaximumFunctionFrameBytes,

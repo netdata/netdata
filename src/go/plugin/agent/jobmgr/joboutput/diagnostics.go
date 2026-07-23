@@ -74,10 +74,7 @@ func dynCfgRequestDiagnosticIdentity(
 	request DynCfgJobRequest,
 	scope lifecycle.ResourceTransactionScope,
 ) (dyncfg.Command, string) {
-	var command dyncfg.Command
-	if len(request.Args) >= 2 {
-		command = dyncfg.Command(strings.ToLower(request.Args[1]))
-	}
+	command := dyncfg.CommandFromArgs(request.Args)
 	resource := scope.ID
 	// Leading NUL identifies an internal fallback scope, not an operator-visible resource.
 	if strings.HasPrefix(resource, "\x00") {

@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-func (ck *CommandKernel) allocateLane(mapKey commandLaneKey, request Request) (*commandLane, error) {
+func (ck *CommandKernel) allocateLane(mapKey commandLaneKey, request Request) *commandLane {
 	lane := ck.freeLane
 	if lane == nil {
 		lane = &commandLane{}
@@ -20,7 +20,7 @@ func (ck *CommandKernel) allocateLane(mapKey commandLaneKey, request Request) (*
 	}
 	ck.lanes[mapKey] = lane
 	ck.appendLane(lane)
-	return lane, nil
+	return lane
 }
 
 func resourceCommandLaneKey(id string) commandLaneKey {

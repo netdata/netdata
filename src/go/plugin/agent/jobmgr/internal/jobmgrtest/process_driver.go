@@ -140,6 +140,7 @@ func (f *processFixture) close() {
 
 func runProcessRestart(ctx context.Context) error {
 	release := make(chan struct{})
+	releaseCleanup := onceClose(release)
 	entered := make(chan struct{})
 	state := &agentFixtureState{
 		cleanupGate:    release,
@@ -150,10 +151,6 @@ func runProcessRestart(ctx context.Context) error {
 		return err
 	}
 	defer fixture.close()
-	var releaseOnce sync.Once
-	releaseCleanup := func() {
-		releaseOnce.Do(func() { close(release) })
-	}
 	defer releaseCleanup()
 	if err := waitUntil(ctx, func() bool {
 		return state.count("check") == 1
@@ -245,6 +242,7 @@ func runProcessInputFence(ctx context.Context) error {
 
 func runProcessNoncooperativeShutdown(ctx context.Context) error {
 	release := make(chan struct{})
+	releaseCleanup := onceClose(release)
 	entered := make(chan struct{})
 	state := &agentFixtureState{
 		cleanupGate:    release,
@@ -255,10 +253,6 @@ func runProcessNoncooperativeShutdown(ctx context.Context) error {
 		return err
 	}
 	defer fixture.close()
-	var releaseOnce sync.Once
-	releaseCleanup := func() {
-		releaseOnce.Do(func() { close(release) })
-	}
 	defer releaseCleanup()
 	if err := waitUntil(ctx, func() bool {
 		return state.count("check") == 1
@@ -300,6 +294,7 @@ func runProcessNoncooperativeShutdown(ctx context.Context) error {
 
 func runCollectorRepeatedStop(ctx context.Context) error {
 	release := make(chan struct{})
+	releaseCleanup := onceClose(release)
 	entered := make(chan struct{})
 	state := &agentFixtureState{
 		cleanupGate:    release,
@@ -310,11 +305,8 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 		return err
 	}
 	defer fixture.close()
-	released := false
 	defer func() {
-		if !released {
-			close(release)
-		}
+		releaseCleanup()
 		_ = fixture.input.Close()
 	}()
 	if err := waitUntil(ctx, func() bool {
@@ -347,8 +339,7 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 	if got := state.count("cleanup"); got != 1 {
 		return fmt.Errorf("held repeated stop Cleanup count=%d, want 1", got)
 	}
-	close(release)
-	released = true
+	releaseCleanup()
 	var terminalErr error
 	for index, result := range results {
 		if index == 1 && secondConsumed {

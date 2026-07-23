@@ -45,6 +45,10 @@ type JobHooks interface {
 	Prepare(PublishedJob) (HandlerLifecycle, error)
 }
 
+type jobNamedModule interface {
+	SetJobName(string)
+}
+
 type FactoryConfig struct {
 	PluginName    string                                        // owning plugin name stamped into job config
 	Modules       ModuleCatalog                                 // collector creator registry
@@ -91,10 +95,7 @@ func (f *Factory) ValidateConfig(ctx context.Context, config confgroup.Config) e
 	if err := validateFactoryConfigIdentity(config, creator); err != nil {
 		return err
 	}
-	if config.FunctionOnly() &&
-		creator.SharedFunctions == nil &&
-		creator.AgentFunctions == nil &&
-		creator.InstanceFunctions == nil {
+	if config.FunctionOnly() && !creatorDeclaresFunctions(creator) {
 		return fmt.Errorf("job output: function_only is set but module %q declares no Functions", config.Module())
 	}
 	if _, err := f.lookupVNode(config); err != nil {
@@ -115,7 +116,7 @@ func (f *Factory) build(ctx context.Context, config confgroup.Config, generation
 		return ConstructedJob{}, err
 	}
 	functionOnly := creator.FunctionOnly || config.FunctionOnly()
-	hasFunctions := creator.SharedFunctions != nil || creator.AgentFunctions != nil || creator.InstanceFunctions != nil
+	hasFunctions := creatorDeclaresFunctions(creator)
 	if functionOnly && !hasFunctions {
 		return ConstructedJob{}, fmt.Errorf(
 			"job output: function_only is set but module %q declares no Functions",
@@ -269,9 +270,7 @@ func (f *Factory) buildV1(
 	if module == nil {
 		return nil, fmt.Errorf("job output: module %q returned a nil V1 collector", config.Module())
 	}
-	if named, ok := module.(interface{ SetJobName(string) }); ok {
-		named.SetJobName(config.Name())
-	}
+	setModuleJobName(module, config.Name())
 	if err := f.config.ConfigModules.applyResolved(ctx, config, module); err != nil {
 		return nil, err
 	}
@@ -331,9 +330,7 @@ func (f *Factory) buildV2(
 	if module == nil {
 		return nil, fmt.Errorf("job output: module %q returned a nil V2 collector", config.Module())
 	}
-	if named, ok := module.(interface{ SetJobName(string) }); ok {
-		named.SetJobName(config.Name())
-	}
+	setModuleJobName(module, config.Name())
 	if err := f.config.ConfigModules.applyResolved(ctx, config, module); err != nil {
 		return nil, err
 	}
@@ -407,12 +404,22 @@ func factoryLogSource(config confgroup.Config) string {
 
 func factoryLabels(config confgroup.Config) map[string]string {
 	labels := make(map[string]string)
-	for name, value := range config.Labels() {
-		name, nameOK := name.(string)
-		value, valueOK := value.(string)
+	for rawName, rawValue := range config.Labels() {
+		name, nameOK := rawName.(string)
+		value, valueOK := rawValue.(string)
 		if nameOK && valueOK {
 			labels[name] = value
 		}
 	}
 	return labels
+}
+
+func creatorDeclaresFunctions(creator collectorapi.Creator) bool {
+	return creator.SharedFunctions != nil || creator.AgentFunctions != nil || creator.InstanceFunctions != nil
+}
+
+func setModuleJobName(module any, name string) {
+	if named, ok := module.(jobNamedModule); ok {
+		named.SetJobName(name)
+	}
 }

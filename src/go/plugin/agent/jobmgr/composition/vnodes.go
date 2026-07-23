@@ -26,6 +26,8 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+// The leading NUL reserves an internal-only identity that cannot collide with
+// DynCfg-valid vnode resource IDs.
 const vnodeBootResourceID = "\x00jobmgr-vnode-boot"
 
 type vnodeBinding struct {
@@ -673,14 +675,11 @@ func (pvt *preparedVNodeTransaction) take() (
 }
 
 func vnodeCommand(input functionadapter.HandlerInput) dyncfg.Command {
-	if len(input.Args) < 2 {
-		return ""
-	}
-	return dyncfg.Command(strings.ToLower(input.Args[1]))
+	return dyncfg.CommandFromArgs(input.Args)
 }
 
 func vnodeJobName(value string) string {
-	return strings.NewReplacer(" ", "_", ":", "_").Replace(value)
+	return dyncfg.NormalizeJobName(value)
 }
 
 func validVNodeTokenProtocolField(value string) bool {

@@ -372,6 +372,7 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 			payload: `{"value":"replacement"}`, status: 200,
 		},
 		{uid: "secret-remove", command: "config go.d:secretstore:vault:main remove", status: 200},
+		{uid: "secret-get-removed", command: "config go.d:secretstore:vault:main get", status: 404},
 		{
 			uid:     "secret-invalid",
 			command: "config go.d:secretstore:vault add invalid",

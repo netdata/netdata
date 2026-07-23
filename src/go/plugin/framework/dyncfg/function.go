@@ -4,7 +4,6 @@ package dyncfg
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
@@ -16,7 +15,9 @@ type Function struct {
 
 // NewFunction creates a new dyncfg Function wrapper.
 func NewFunction(fn functions.Function) Function {
-	return Function{fn: fn}
+	return Function{
+		fn: fn,
+	}
 }
 
 // UID returns the function's unique identifier.
@@ -37,10 +38,7 @@ func (f Function) Payload() []byte {
 // Command returns the dyncfg command from Args[1].
 // Returns empty Command if args has fewer than 2 elements.
 func (f Function) Command() Command {
-	if len(f.fn.Args) < 2 {
-		return ""
-	}
-	return Command(strings.ToLower(f.fn.Args[1]))
+	return CommandFromArgs(f.fn.Args)
 }
 
 // ID returns the config ID from Args[0].
@@ -59,9 +57,7 @@ func (f Function) JobName() string {
 	if len(f.fn.Args) < 3 {
 		return ""
 	}
-	name := strings.ReplaceAll(f.fn.Args[2], " ", "_")
-	name = strings.ReplaceAll(name, ":", "_")
-	return name
+	return NormalizeJobName(f.fn.Args[2])
 }
 
 // HasPayload returns true if the function has a non-empty payload.

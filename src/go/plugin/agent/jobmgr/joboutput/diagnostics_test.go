@@ -84,7 +84,7 @@ func TestDynCfgJobDiagnosticsIdentifyRejectedCommands(t *testing.T) {
 		},
 		"unknown module": {
 			request: DynCfgJobRequest{
-				Args: []string{"go.d:collector:unknown", "enable"},
+				Args: []string{"go.d:collector:unknown", "ENABLE"},
 			},
 			scope: lifecycle.ResourceTransactionScope{
 				ID: "unknown",

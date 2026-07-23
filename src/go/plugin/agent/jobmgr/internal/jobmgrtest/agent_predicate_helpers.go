@@ -24,6 +24,7 @@ func runAgentStartAcknowledgement(ctx context.Context) error {
 
 func runAgentStartAcknowledgementVariant(ctx context.Context, v2 bool) error {
 	release := make(chan struct{})
+	releaseGate := onceClose(release)
 	entered := make(chan struct{})
 	state := &agentFixtureState{
 		checkGate:    release,
@@ -34,11 +35,8 @@ func runAgentStartAcknowledgementVariant(ctx context.Context, v2 bool) error {
 		return err
 	}
 	defer fixture.close()
-	released := false
 	defer func() {
-		if !released {
-			close(release)
-		}
+		releaseGate()
 		_ = fixture.input.Close()
 	}()
 	select {
@@ -49,8 +47,7 @@ func runAgentStartAcknowledgementVariant(ctx context.Context, v2 bool) error {
 	if fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`) || fixture.output.contains(" status running") {
 		return fmt.Errorf("Start-dependent publication preceded Check acknowledgement: %s", fixture.output.String())
 	}
-	close(release)
-	released = true
+	releaseGate()
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.contains(`FUNCTION GLOBAL "jobmgrtest:echo"`) &&
 			fixture.output.contains("CONFIG jobmgrtest:collector:jobmgrtest create running single ")
@@ -73,6 +70,7 @@ func runAgentStartReplacementOrdering(ctx context.Context) error {
 
 func runAgentStartReplacementOrderingVariant(ctx context.Context, v2 bool) error {
 	release := make(chan struct{})
+	releaseGate := onceClose(release)
 	entered := make(chan struct{})
 	state := &agentFixtureState{
 		checkGate:    release,
@@ -83,11 +81,8 @@ func runAgentStartReplacementOrderingVariant(ctx context.Context, v2 bool) error
 		return err
 	}
 	defer fixture.close()
-	released := false
 	defer func() {
-		if !released {
-			close(release)
-		}
+		releaseGate()
 		_ = fixture.input.Close()
 	}()
 	select {
@@ -108,8 +103,7 @@ func runAgentStartReplacementOrderingVariant(ctx context.Context, v2 bool) error
 	if state.count("init") != 1 || state.count("cleanup") != 0 {
 		return fmt.Errorf("held Start ownership changed before acknowledgement: %v", state.snapshot())
 	}
-	close(release)
-	released = true
+	releaseGate()
 	result, err := waitFunctionResult(ctx, fixture.output, uid)
 	if err != nil {
 		return fmt.Errorf(
@@ -137,6 +131,7 @@ func runAgentStartReplacementOrderingVariant(ctx context.Context, v2 bool) error
 
 func runAgentBlockingStop(ctx context.Context) error {
 	release := make(chan struct{})
+	releaseGate := onceClose(release)
 	entered := make(chan struct{})
 	state := &agentFixtureState{
 		cleanupGate:    release,
@@ -147,11 +142,8 @@ func runAgentBlockingStop(ctx context.Context) error {
 		return err
 	}
 	defer fixture.close()
-	released := false
 	defer func() {
-		if !released {
-			close(release)
-		}
+		releaseGate()
 		_ = fixture.input.Close()
 	}()
 	if err := waitUntil(ctx, func() bool {
@@ -171,8 +163,7 @@ func runAgentBlockingStop(ctx context.Context) error {
 		return fmt.Errorf("Agent reported terminal success with live Stop: %v", err)
 	case <-time.After(50 * time.Millisecond):
 	}
-	close(release)
-	released = true
+	releaseGate()
 	select {
 	case err := <-stopped:
 		return err
@@ -183,6 +174,7 @@ func runAgentBlockingStop(ctx context.Context) error {
 
 func runAgentHeldHandlerTerminal(ctx context.Context) error {
 	release := make(chan struct{})
+	releaseGate := onceClose(release)
 	entered := make(chan struct{})
 	state := &agentFixtureState{
 		handleGate:    release,
@@ -193,11 +185,8 @@ func runAgentHeldHandlerTerminal(ctx context.Context) error {
 		return err
 	}
 	defer fixture.close()
-	released := false
 	defer func() {
-		if !released {
-			close(release)
-		}
+		releaseGate()
 		_ = fixture.input.Close()
 	}()
 	if err := waitUntil(ctx, func() bool {
@@ -225,8 +214,7 @@ func runAgentHeldHandlerTerminal(ctx context.Context) error {
 		return fmt.Errorf("Agent returned with live handler: %v", err)
 	case <-time.After(50 * time.Millisecond):
 	}
-	close(release)
-	released = true
+	releaseGate()
 	select {
 	case err := <-stopped:
 		if err != nil {
@@ -243,6 +231,7 @@ func runAgentHeldHandlerTerminal(ctx context.Context) error {
 
 func runAgentFunctionAdmissionClosesBeforeLeaseDrain(ctx context.Context) error {
 	release := make(chan struct{})
+	releaseGate := onceClose(release)
 	entered := make(chan struct{})
 	state := &agentFixtureState{
 		handleGate:    release,
@@ -253,11 +242,8 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(ctx context.Context) error 
 		return err
 	}
 	defer fixture.close()
-	released := false
 	defer func() {
-		if !released {
-			close(release)
-		}
+		releaseGate()
 		_ = fixture.input.Close()
 	}()
 	if err := waitUntil(ctx, func() bool {
@@ -311,8 +297,7 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(ctx context.Context) error 
 	} else if completed {
 		return errors.New("disable completed before the active Function lease drained")
 	}
-	close(release)
-	released = true
+	releaseGate()
 	first, err := waitFunctionResult(ctx, fixture.output, firstUID)
 	if err != nil {
 		return err
@@ -336,6 +321,7 @@ func runAgentFunctionAdmissionClosesBeforeLeaseDrain(ctx context.Context) error 
 
 func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 	release := make(chan struct{})
+	releaseGate := onceClose(release)
 	entered := make(chan struct{})
 	state := &agentFixtureState{
 		handleGate:    release,
@@ -346,11 +332,8 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 		return err
 	}
 	defer fixture.close()
-	released := false
 	defer func() {
-		if !released {
-			close(release)
-		}
+		releaseGate()
 		_ = fixture.input.Close()
 	}()
 	const functionPublication = `FUNCTION GLOBAL "jobmgrtest:echo"`
@@ -409,8 +392,7 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 		)
 	}
 
-	close(release)
-	released = true
+	releaseGate()
 	old, err := waitFunctionResult(ctx, fixture.output, oldUID)
 	if err != nil {
 		return fmt.Errorf(
@@ -508,6 +490,7 @@ func runAgentConcurrentSameRouteFunctionPopulation(ctx context.Context) error {
 
 func runAgentHeldFunctionPopulation(ctx context.Context, admitted int, route func(int) string) error {
 	release := make(chan struct{})
+	releaseGate := onceClose(release)
 	entered := make(chan struct{})
 	state := &agentFixtureState{
 		handleGate:    release,
@@ -518,11 +501,8 @@ func runAgentHeldFunctionPopulation(ctx context.Context, admitted int, route fun
 		return err
 	}
 	defer fixture.close()
-	released := false
 	defer func() {
-		if !released {
-			close(release)
-		}
+		releaseGate()
 		_ = fixture.input.Close()
 	}()
 	if err := waitUntil(ctx, func() bool {
@@ -549,8 +529,7 @@ func runAgentHeldFunctionPopulation(ctx context.Context, admitted int, route fun
 			err,
 		)
 	}
-	close(release)
-	released = true
+	releaseGate()
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.count("FUNCTION_RESULT_BEGIN jobmgrtest-held-") >= admitted
 	}); err != nil {

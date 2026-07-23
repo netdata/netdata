@@ -192,7 +192,7 @@ func (c *Controller) resolveTarget(input CommandInput) (secretTarget, *targetFai
 			message: "invalid config ID format.",
 		}
 	}
-	command := dyncfg.Command(strings.ToLower(input.Args[1]))
+	command := dyncfg.CommandFromArgs(input.Args)
 	target := secretTarget{
 		command: command,
 		id:      id,

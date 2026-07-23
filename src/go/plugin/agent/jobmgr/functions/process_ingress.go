@@ -109,7 +109,7 @@ func (pi *ProcessIngress) Adopt(ctx context.Context, binding ProcessBinding) err
 		return errors.New("jobmgr Function process ingress: invalid binding")
 	}
 	pi.mu.Lock()
-	if pi.state != ProcessIngressPaused || pi.active != nil || pi.deliveries != 0 || pi.parsing {
+	if !pi.drainedPauseLocked() {
 		pi.mu.Unlock()
 		return errors.New("jobmgr Function process ingress: adopt outside drained pause")
 	}
@@ -170,7 +170,7 @@ func (pi *ProcessIngress) Fence(ctx context.Context) error {
 		return errors.New("jobmgr Function process ingress: nil fence context")
 	}
 	pi.mu.Lock()
-	if pi.state != ProcessIngressPaused || pi.active != nil || pi.deliveries != 0 || pi.parsing {
+	if !pi.drainedPauseLocked() {
 		pi.mu.Unlock()
 		return errors.New("jobmgr Function process ingress: final fence outside drained pause")
 	}
@@ -184,6 +184,10 @@ func (pi *ProcessIngress) Fence(ctx context.Context) error {
 	pi.mu.Unlock()
 
 	return fenceErr
+}
+
+func (pi *ProcessIngress) drainedPauseLocked() bool {
+	return pi.state == ProcessIngressPaused && pi.active == nil && pi.deliveries == 0 && !pi.parsing
 }
 
 func (pi *ProcessIngress) State() ProcessIngressState {

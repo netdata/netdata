@@ -362,11 +362,10 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 		initial = TaskOutcome{}
 		var permit LongLivedPermit
 		if plan.transactionScope.Successor.Valid() {
-			issued, err := ts.IssueLongLivedPermit(plan.permitOwner, plan.permitPlan)
+			permit, err = ts.IssueLongLivedPermit(plan.permitOwner, plan.permitPlan)
 			if err != nil {
 				return TaskRef{}, err
 			}
-			permit = issued
 		}
 		work := plan.transactionWork
 		scope := plan.transactionScope
@@ -395,8 +394,8 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 					abortErr = permit.AbortUnused()
 				}
 				if current != nil {
-					outcome, outcomeErr := readyResourceOutcome(current, scope.Current)
-					return outcome, errors.Join(workErr, abortErr, outcomeErr)
+					restoredOutcome, outcomeErr := readyResourceOutcome(current, scope.Current)
+					return restoredOutcome, errors.Join(workErr, abortErr, outcomeErr)
 				}
 				return TaskOutcome{}, errors.Join(workErr, abortErr)
 			}
@@ -409,8 +408,8 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 				current = nil
 				permit = LongLivedPermit{}
 				if restored != nil {
-					outcome, outcomeErr := readyResourceOutcome(restored, scope.Current)
-					return outcome, errors.Join(workErr, scopeErr, disposeErr, outcomeErr)
+					restoredOutcome, outcomeErr := readyResourceOutcome(restored, scope.Current)
+					return restoredOutcome, errors.Join(workErr, scopeErr, disposeErr, outcomeErr)
 				}
 				return TaskOutcome{}, errors.Join(workErr, scopeErr, disposeErr)
 			}
@@ -545,7 +544,7 @@ func (ts *TaskSupervisor) SendAction(action TaskAction) error {
 		action.Sequence > slot.maxPhaseTransitions {
 		return errors.New("jobmgr task supervisor: stale, duplicate, or wrong-sequence phase action")
 	}
-	if action.Kind == TaskActionEncodeWrite && (action.UID == "" || action.Expiry <= 0) {
+	if action.Kind == TaskActionEncodeWrite && (ValidateUID(action.UID) != nil || action.Expiry <= 0) {
 		return errors.New("jobmgr task supervisor: invalid encode/write action")
 	}
 	if action.Kind != TaskActionEncodeWrite && (action.UID != "" || action.Expiry != 0) {

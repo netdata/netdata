@@ -13,6 +13,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
+// The leading NUL reserves an internal-only identity that cannot collide with
+// DynCfg-valid secretstore resource IDs.
 const secretBootResourceID = "\x00jobmgr-secret-boot"
 
 func (c *Controller) PublishInitial(ctx context.Context, commands jobmgr.PreparedCommandPort) error {

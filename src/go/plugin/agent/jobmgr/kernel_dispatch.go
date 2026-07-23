@@ -213,7 +213,7 @@ func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
 			ck.shutdownTasks[start.Task] = lane
 			continue
 		}
-		if operation == nil || operation.taskRequest != start.Request ||
+		if operation.taskRequest != start.Request ||
 			(operation.Child != lifecycle.ChildNotStarted && operation.Child != lifecycle.ChildDeadlineStartPending) {
 			ck.run.Dirty(errors.New("jobmgr kernel: invalid task start acknowledgement"))
 			return more
