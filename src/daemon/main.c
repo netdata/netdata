@@ -268,6 +268,26 @@ int unittest_prepare_rrd(const char **user) {
     return 0;
 }
 
+// Standalone `-W <name>` unittest driver: bring up sqlite + RRD, run one test,
+// tear everything down, and return the test's exit code.
+static int unittest_run_with_rrd(int (*test_fn)(void)) {
+    unittest_running = true;
+
+    if(sqlite_library_init())
+        return 1;
+    rrdlabels_aral_init(false);
+
+    const char *user = NULL;
+    int rc = unittest_prepare_rrd(&user);
+    if(!rc)
+        rc = test_fn();
+
+    sqlite_close_databases();
+    sqlite_library_shutdown();
+    rrdlabels_aral_destroy(false);
+    return rc;
+}
+
 static void fatal_status_file_save(void) {
     daemon_status_file_update_status(DAEMON_STATUS_NONE);
     exit(1);
@@ -694,51 +714,12 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return health_config_unittest();
                         }
-                        else if(strcmp(optarg, "dyncfgtest") == 0) {
-                            unittest_running = true;
-                            if(sqlite_library_init())
-                                return 1;
-                            rrdlabels_aral_init(false);
-
-                            int rc = unittest_prepare_rrd(&user);
-                            if (!rc)
-                                rc = dyncfg_unittest();
-
-                            sqlite_close_databases();
-                            sqlite_library_shutdown();
-                            rrdlabels_aral_destroy(false);
-                            return rc;
-                        }
-                        else if(strcmp(optarg, "functionsaccesstest") == 0) {
-                            unittest_running = true;
-                            if(sqlite_library_init())
-                                return 1;
-                            rrdlabels_aral_init(false);
-
-                            int rc = unittest_prepare_rrd(&user);
-                            if (!rc)
-                                rc = rrdfunctions_verify_access_unittest();
-
-                            sqlite_close_databases();
-                            sqlite_library_shutdown();
-                            rrdlabels_aral_destroy(false);
-                            return rc;
-                        }
-                        else if(strcmp(optarg, "mcpfunctionaccesstest") == 0) {
-                            unittest_running = true;
-                            if(sqlite_library_init())
-                                return 1;
-                            rrdlabels_aral_init(false);
-
-                            int rc = unittest_prepare_rrd(&user);
-                            if (!rc)
-                                rc = mcp_execute_function_access_unittest();
-
-                            sqlite_close_databases();
-                            sqlite_library_shutdown();
-                            rrdlabels_aral_destroy(false);
-                            return rc;
-                        }
+                        else if(strcmp(optarg, "dyncfgtest") == 0)
+                            return unittest_run_with_rrd(dyncfg_unittest);
+                        else if(strcmp(optarg, "functionsaccesstest") == 0)
+                            return unittest_run_with_rrd(rrdfunctions_verify_access_unittest);
+                        else if(strcmp(optarg, "mcpfunctionaccesstest") == 0)
+                            return unittest_run_with_rrd(mcp_execute_function_access_unittest);
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
