@@ -177,11 +177,13 @@ fn every_partial_reason_wire_name_is_pinned() {
     b.add(PartialReason::WorkCeiling);
     b.add(PartialReason::Cancelled);
     b.add(PartialReason::OverviewCeiling);
+    b.add(PartialReason::RollupAbsent);
     let wire = StatusWire::from(&b.finish());
     assert_eq!(
         serde_json::to_value(&wire).unwrap(),
         json!({"partial": [
-            "size_cap", "source_failure", "work_ceiling", "cancelled", "overview_ceiling"
+            "size_cap", "source_failure", "work_ceiling", "cancelled",
+            "overview_ceiling", "rollup_absent"
         ]})
     );
 }

@@ -298,15 +298,17 @@ pub enum OtelTracesResponse {
 
 // ── Overview response ───────────────────────────────────────────────
 
-/// The span-density grid: time buckets × log-scale duration bins. All
-/// numbers count SPANS (stored rows) — the `unit` field says so and the
-/// UI renders it verbatim (phase 2 flips it to "traces" when the
-/// trace-level rollup lands; units are never mixed).
+/// The TRACE-density grid: time buckets × log-scale duration bins. A
+/// trace bins by its cross-source merged envelope (D7 — straddling
+/// traces count once); span/error totals are STORED-ROW sums (D9 —
+/// resends count; canonical exactness lives in `search`/`trace`).
+/// Sources sealed before the rollup chunk existed are EXCLUDED under
+/// the `rollup_absent` partial — units are never mixed (D10).
 #[derive(Debug, Serialize)]
 pub struct OverviewResult {
     pub version: u32,
-    /// What the counts count. `"spans"` in phase 1 — render verbatim,
-    /// never hardcode.
+    /// What the counts count. `"traces"` since phase 2 — render
+    /// verbatim, never hardcode.
     pub unit: &'static str,
     pub status: StatusWire,
     pub grid: OverviewGridWire,
@@ -326,9 +328,11 @@ pub struct OverviewGridWire {
 
 #[derive(Debug, Serialize)]
 pub struct OverviewTotals {
-    /// Spans binned into the grid (= the sum of all cells).
+    /// Distinct traces binned into the grid (= the sum of all cells).
+    pub traces: u64,
+    /// Their stored spans, summed (D9 — resends included).
     pub spans: u64,
-    /// Of those, spans with ERROR status.
+    /// Of those spans, ERROR-status ones.
     pub errors: u64,
 }
 
@@ -614,6 +618,7 @@ pub enum PartialReasonWire {
     WorkCeiling,
     Cancelled,
     OverviewCeiling,
+    RollupAbsent,
 }
 
 impl From<PartialReason> for PartialReasonWire {
@@ -624,6 +629,7 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::WorkCeiling => PartialReasonWire::WorkCeiling,
             PartialReason::Cancelled => PartialReasonWire::Cancelled,
             PartialReason::OverviewCeiling => PartialReasonWire::OverviewCeiling,
+            PartialReason::RollupAbsent => PartialReasonWire::RollupAbsent,
         }
     }
 }

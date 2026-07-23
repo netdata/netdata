@@ -613,14 +613,15 @@ async fn enumeration_invalid_requests_are_clean_client_errors() {
 #[tokio::test]
 async fn overview_grid_matches_the_corpus_distribution() {
     // 100s window → 1s buckets aligned to [T_S, T_S+100). The corpus's
-    // 8 spans (A=1, B=2, C=1, D=1, E=3), all 500ns durations (bin 0).
+    // 5 TRACES (A=1 span, B=2, C=1, D=1, E=3 — 8 stored spans), every
+    // envelope sub-1ms (bin 0), binned at each trace's start second.
     let h = handler_with_search_corpus().await;
     let mut body = window_body();
     body["overview"] = json!({});
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(v["unit"], "spans");
+    assert_eq!(v["unit"], "traces");
     assert_eq!(v["status"], json!({"complete": true}));
-    assert_eq!(v["totals"], json!({"spans": 8, "errors": 0}));
+    assert_eq!(v["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
     assert_eq!(v["grid"]["bucket_start_s"], T_S);
     assert_eq!(v["grid"]["bucket_width_s"], 1);
     assert_eq!(
@@ -630,10 +631,12 @@ async fn overview_grid_matches_the_corpus_distribution() {
     let cells = v["grid"]["cells"].as_array().unwrap();
     assert_eq!(cells.len(), 100);
     let sum: u64 = cells.iter().flat_map(|r| r.as_array().unwrap()).map(|c| c.as_u64().unwrap()).sum();
-    assert_eq!(sum, 8, "cell sums equal totals");
-    // A's single span landed in bucket 10, bin 0; E's three in bucket 40.
+    assert_eq!(sum, 5, "cell sums equal totals.traces");
+    // A starts at second 10; the C/D pair share second 30 (two traces,
+    // one cell); E is ONE trace at second 40.
     assert_eq!(cells[10][0], 1);
-    assert_eq!(cells[40][0], 3);
+    assert_eq!(cells[30][0], 2);
+    assert_eq!(cells[40][0], 1);
 }
 
 #[tokio::test]
@@ -654,7 +657,7 @@ async fn overview_counts_error_spans_in_totals() {
     let mut body = window_body();
     body["overview"] = json!({});
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(v["totals"], json!({"spans": 4, "errors": 1}));
+    assert_eq!(v["totals"], json!({"traces": 2, "spans": 4, "errors": 1}));
 }
 
 #[tokio::test]

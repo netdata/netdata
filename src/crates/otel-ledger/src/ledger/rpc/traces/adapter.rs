@@ -322,7 +322,7 @@ pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> Overvi
     debug_assert_eq!(grid.bucket_width_ns % NS_PER_S, 0);
     OverviewResult {
         version: 1,
-        unit: "spans",
+        unit: "traces",
         status: StatusWire::from(&data.status),
         grid: OverviewGridWire {
             bucket_start_s: (grid.bucket_start_ns / NS_PER_S) as u32,
@@ -331,6 +331,7 @@ pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> Overvi
             cells: data.cells.iter().map(|row| row.to_vec()).collect(),
         },
         totals: OverviewTotals {
+            traces: data.total_traces,
             spans: data.total_spans,
             errors: data.total_errors,
         },

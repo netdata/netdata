@@ -36,6 +36,13 @@ pub enum PartialReason {
     /// from [`WorkCeiling`] — the overview's cost is O(spans-in-window)
     /// per source, a different budget than search's candidate loop.
     OverviewCeiling,
+    /// A sealed source predates the trace rollup chunk (`TRSU`) and was
+    /// EXCLUDED from trace-level aggregation: including it would
+    /// silently undercount, and mixing span-level numbers into a
+    /// trace-level result is forbidden (no mixed units — D10). The
+    /// data returns to trace-level results when the file is re-sealed
+    /// or ages out.
+    RollupAbsent,
 }
 
 /// The status of one query's result.

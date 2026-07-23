@@ -32,6 +32,10 @@ regex = { workspace = true }
 
 [dev-dependencies]
 clap = { workspace = true }
+# test-util exposes the chunk-level writer: the overview suite hand-builds a
+# pre-rollup ("legacy") traces SFST to pin the D10 exclusion partial.
+sfst = { workspace = true, features = ["test-util"] }
+treight = { workspace = true }
 opentelemetry-proto = { workspace = true }
 tempfile = { workspace = true }
 uuid = { workspace = true }

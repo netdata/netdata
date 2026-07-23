@@ -1,43 +1,51 @@
-//! Cross-source span-density overview — the traces UI's default paint
-//! (traces-ui design §5, phase 1).
+//! Cross-source TRACE-density overview — the traces UI's default paint
+//! (traces-ui design §5 phase 2: trace-level numbers, `unit:"traces"`).
 //!
-//! Bins SPANS by (time bucket × log-scale duration bin) straight from
-//! the per-row `TIMS` + `DURN` columns of sealed/chunk SFSTs, and from
-//! decoded spans for WAL tails — the logs Timeline pattern: exact, zero
-//! new structures, and a clean monoid (per-source shards sum cell-wise,
-//! so multi-node aggregation composes later). Error totals come from
-//! the `status=ERROR` dictionary bitmap (sealed) / the decoded `status`
-//! field (tails).
+//! Folds per-trace aggregates from BOTH source shapes — sealed files'
+//! `TRSU` rollup rows and WAL tails' decoded-span folds (parity
+//! test-pinned in step 2.2) — into one map keyed by trace id (traces
+//! STRADDLE sealed files: WAL rotation is content-agnostic, D7), then
+//! bins each merged trace into the (time bucket × log-scale duration
+//! bin) grid by its ENVELOPE (min start; saturating max end − min
+//! start).
 //!
-//! Same engine contracts as the sibling operations:
+//! Pinned semantics:
 //!
-//! - **No silent degradation**: a source that fails to map/open/decode
-//!   is a [`SourceFailure`](PartialReason::SourceFailure); the rest
-//!   still count.
-//! - **Deterministic**: sources process in `SourceId` order, so the
-//!   caller's ordering never changes a result — including which prefix
-//!   survived a ceiling breach.
-//! - **Own work ceiling**: cost is O(spans-in-window) per source; the
-//!   visited-rows budget terminates with the gathered grid and
-//!   [`OverviewCeiling`](PartialReason::OverviewCeiling). The check
-//!   runs between sources — one source may overshoot the budget, which
-//!   keeps per-source work whole (and the result deterministic) at the
-//!   price of a bounded overshoot.
-//! - **Cancellation all-or-empty**: polled between sources; a cancelled
-//!   call returns the empty grid + `Cancelled` (observed reasons kept).
+//! - **Stored-row statistics (D9)**: span/error totals sum the stored
+//!   rows; a resent span counts every time it is stored. Canonical
+//!   dedup remains assembly's property (`search`/`trace_by_id`).
+//! - **No mixed units (D10)**: a sealed source WITHOUT the rollup chunk
+//!   (legacy) is EXCLUDED and marked
+//!   [`RollupAbsent`](PartialReason::RollupAbsent) — its spans never
+//!   leak into trace-level numbers.
+//! - **Roots honest-or-absent (D8)**: the merged trace's root is the
+//!   earliest true root among its sources' picks (the same
+//!   `(start_ns, span_id)` tie-break both folds already apply); no
+//!   true root anywhere → absent. (Roots feed the 2.5 facets; the grid
+//!   itself doesn't need them, but the fold carries them so 2.4/2.5
+//!   reuse it.)
+//!
+//! Engine contracts mirrored from the siblings: sources process in
+//! `SourceId` order; a failed source is a
+//! [`SourceFailure`](PartialReason::SourceFailure) (the rest still
+//! count); cancellation is polled up front and between sources
+//! (all-or-empty); an OWN visited budget (rollup rows + tail spans
+//! examined) terminates with the deterministic prefix and
+//! [`OverviewCeiling`](PartialReason::OverviewCeiling).
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
+use super::rollup::{TraceAggregate, sealed_trace_aggregates, tail_trace_aggregates};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
-use super::vocab::BuiltinField;
 use super::wal_scan::TraceWalScan;
 use crate::source::map_source;
 
-/// Number of log-scale duration bins (fixed in phase 1).
+/// Number of log-scale duration bins (fixed in phase 1; unchanged).
 pub const DURATION_BIN_COUNT: usize = 6;
 
 /// The bins' wire labels, index-parallel to a cell row.
@@ -54,10 +62,10 @@ const DURATION_BIN_EDGES_NS: [i64; DURATION_BIN_COUNT - 1] = [
     10_000_000_000, // 10s
 ];
 
-/// The default visited-rows budget (the same order as search's).
+/// The default visited budget (rollup rows + tail spans examined).
 const VISITED_ROWS_CEILING: u64 = 4_000_000;
 
-/// Which duration bin a span falls in.
+/// Which duration bin an envelope duration falls in.
 fn duration_bin(duration_ns: i64) -> usize {
     DURATION_BIN_EDGES_NS.partition_point(|&edge| duration_ns >= edge)
 }
@@ -97,16 +105,20 @@ pub enum OverviewRequestError {
 }
 
 /// One overview's grid plus everything needed to interpret it honestly.
-/// All numbers count SPANS (stored rows) — the phase-1 unit; the wire
-/// labels them so (D9/D10: stored-row statistics, no mixed units).
+/// All numbers count TRACES (or their STORED spans — D9); the wire
+/// labels the unit.
 #[derive(Debug)]
 pub struct OverviewData {
-    /// Per time bucket (grid order), the per-duration-bin span counts.
-    /// Length = `grid.num_buckets`; each row length = [`DURATION_BIN_COUNT`].
+    /// Per time bucket (grid order), the per-duration-bin TRACE counts.
+    /// A trace bins by its merged envelope: bucket of `min_start_ns`,
+    /// duration bin of `max_end − min_start` (saturating). Length =
+    /// `grid.num_buckets`; each row = [`DURATION_BIN_COUNT`].
     pub cells: Vec<[u64; DURATION_BIN_COUNT]>,
-    /// Spans binned into the grid (= the sum of all cells).
+    /// Distinct traces binned into the grid (= the sum of all cells).
+    pub total_traces: u64,
+    /// Their STORED spans, summed (D9 — resends included).
     pub total_spans: u64,
-    /// Of those, spans with ERROR status.
+    /// Of those spans, ERROR-status ones.
     pub total_errors: u64,
     pub status: QueryStatus,
 }
@@ -115,6 +127,7 @@ impl OverviewData {
     fn empty(num_buckets: usize, status: QueryStatus) -> Self {
         Self {
             cells: vec![[0; DURATION_BIN_COUNT]; num_buckets],
+            total_traces: 0,
             total_spans: 0,
             total_errors: 0,
             status,
@@ -122,9 +135,9 @@ impl OverviewData {
     }
 }
 
-/// Run a cross-source overview. `progress` ticks once per source;
-/// callers that don't report pass a fresh counter. Pure sync — invoke
-/// off any async runtime thread (the engine contract).
+/// Run a cross-source trace-level overview. `progress` ticks once per
+/// source; callers that don't report pass a fresh counter. Pure sync —
+/// invoke off any async runtime thread (the engine contract).
 pub fn overview(
     sources: Vec<TraceSource>,
     query: OverviewQuery,
@@ -135,8 +148,7 @@ pub fn overview(
         return Err(OverviewRequestError::EmptyGrid);
     }
     // The library boundary also refuses a grid whose end overflows i64
-    // (an adversarial width × count): every bucket-index computation
-    // below assumes a well-formed half-open range.
+    // (an adversarial width × count).
     let Some(grid_end) = query
         .grid
         .bucket_width_ns
@@ -149,40 +161,45 @@ pub fn overview(
 
     let grid = query.grid;
     let grid_start = grid.bucket_start_ns;
-    // Storage name via the vocabulary — never hand-built.
-    let status_field = BuiltinField::Status
-        .dictionary_field()
-        .expect("Status is dictionary-backed");
-    let error_term = format!("{status_field}=ERROR").into_bytes();
 
-    // Deterministic processing order: SourceId, like search.
+    // Deterministic processing order: SourceId, like every sibling.
     let mut sources = sources;
     sources.sort_by(|a, b| a.source_id().as_str().cmp(b.source_id().as_str()));
 
     let mut status = StatusBuilder::new();
-    // Polled up front — like every sibling operation — so a zero-source
-    // or already-cancelled call can never report Complete.
+    // Polled up front — a zero-source or already-cancelled call can
+    // never report Complete.
     if cancel.is_cancelled() {
         status.add(PartialReason::Cancelled);
         return Ok(OverviewData::empty(grid.num_buckets, status.finish()));
     }
-    let mut cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
-    let mut total_spans = 0u64;
-    let mut total_errors = 0u64;
-    let mut visited = 0u64;
 
-    let bin_span = |cells: &mut Vec<[u64; DURATION_BIN_COUNT]>,
-                        start_ns: i64,
-                        duration_ns: i64|
-     -> bool {
-        if start_ns < grid_start || start_ns >= grid_end {
-            return false;
+    /// One trace's cross-source merge (D7): envelopes widen, stored-row
+    /// counts sum (D9). Roots are carried for the 2.4/2.5 consumers of
+    /// this fold but unused by the grid itself.
+    struct Merged {
+        min_start_ns: i64,
+        max_end_ns: i64,
+        span_count: u64,
+        error_count: u64,
+    }
+    let mut merged: HashMap<sfst::TraceId, Merged> = HashMap::new();
+    let fold = |aggs: Vec<TraceAggregate>, merged: &mut HashMap<sfst::TraceId, Merged>| {
+        for a in aggs {
+            let m = merged.entry(a.trace_id).or_insert(Merged {
+                min_start_ns: i64::MAX,
+                max_end_ns: i64::MIN,
+                span_count: 0,
+                error_count: 0,
+            });
+            m.min_start_ns = m.min_start_ns.min(a.min_start_ns);
+            m.max_end_ns = m.max_end_ns.max(a.max_end_ns);
+            m.span_count = m.span_count.saturating_add(a.span_count);
+            m.error_count = m.error_count.saturating_add(a.error_count);
         }
-        let bucket = ((start_ns - grid_start) / grid.bucket_width_ns) as usize;
-        cells[bucket][duration_bin(duration_ns)] += 1;
-        true
     };
 
+    let mut visited = 0u64;
     for source in &sources {
         if cancel.is_cancelled() {
             status.add(PartialReason::Cancelled);
@@ -215,53 +232,36 @@ pub fn overview(
                         continue;
                     }
                 };
-                let (timestamps, durations) =
-                    match (reader.load_timestamps(), reader.durations()) {
-                        (Ok(t), Ok(d)) => (t, d),
-                        (t, d) => {
-                            let e = t.err().or(d.err()).expect("one side failed");
-                            tracing::warn!(
-                                "sfsq overview: source {} lacks TIMS/DURN: {e}",
-                                c.source_id
-                            );
-                            status.add(PartialReason::SourceFailure);
-                            progress.fetch_add(1, Ordering::Relaxed);
-                            continue;
-                        }
-                    };
-                let ts = timestamps.as_slice();
-                // The durations column is row-checked at load; the
-                // timestamps chunk is NOT — a corrupt TIMS with extra
-                // entries would push `hi` past the durations column and
-                // panic the zip below. Length parity is the source's
-                // problem, reported like any other source failure.
-                if ts.len() != durations.0.len() {
-                    tracing::warn!(
-                        "sfsq overview: source {} TIMS/DURN length mismatch ({} vs {})",
-                        c.source_id,
-                        ts.len(),
-                        durations.0.len()
+                // D10: a pre-rollup file cannot contribute trace-level
+                // numbers — excluded, flagged, never mixed in.
+                if !reader.has_trace_rollup() {
+                    tracing::debug!(
+                        "sfsq overview: source {} predates the trace rollup; excluded",
+                        c.source_id
                     );
-                    status.add(PartialReason::SourceFailure);
+                    status.add(PartialReason::RollupAbsent);
                     progress.fetch_add(1, Ordering::Relaxed);
                     continue;
                 }
-                // Rows are chronological: the grid window is one
-                // contiguous row range.
-                let lo = ts.partition_point(|&t| t < grid_start);
-                let hi = ts.partition_point(|&t| t < grid_end);
-                for (&start_ns, &duration_ns) in ts[lo..hi].iter().zip(&durations.0[lo..hi]) {
-                    bin_span(&mut cells, start_ns, duration_ns);
-                }
-                total_spans += (hi - lo) as u64;
-                if let Some(bv) = reader.primary_lookup(&error_term) {
-                    total_errors += bv
-                        .desc
-                        .iter(&bv.data)
-                        .filter(|&p| (p as usize) >= lo && (p as usize) < hi)
-                        .count() as u64;
-                }
-                visited += (hi - lo) as u64;
+                let aggs = match reader
+                    .trace_rollup()
+                    .and_then(|r| {
+                        let strings = reader.build_string_table(reader.field_table())?;
+                        Ok(sealed_trace_aggregates(&r, &strings))
+                    }) {
+                    Ok(a) => a,
+                    Err(e) => {
+                        tracing::warn!(
+                            "sfsq overview: source {} rollup failed to read: {e}",
+                            c.source_id
+                        );
+                        status.add(PartialReason::SourceFailure);
+                        progress.fetch_add(1, Ordering::Relaxed);
+                        continue;
+                    }
+                };
+                visited += aggs.len() as u64;
+                fold(aggs, &mut merged);
             }
             TraceSource::Tail(t) => {
                 let scan = match TraceWalScan::scan_range(&t.path, t.coverage.range) {
@@ -273,30 +273,38 @@ pub fn overview(
                         continue;
                     }
                 };
-                // Every decoded span counts toward the budget — unlike
-                // the sealed path (which narrows to the window by binary
-                // search first), the tail's decoded spans are unsorted,
-                // so the loop genuinely examines each one.
-                for (_, span) in scan.spans_with_ids() {
-                    visited += 1;
-                    if bin_span(&mut cells, span.start_ns, span.duration_ns) {
-                        total_spans += 1;
-                        if span
-                            .fields
-                            .iter()
-                            .any(|(k, v)| k == status_field && v == "ERROR")
-                        {
-                            total_errors += 1;
-                        }
-                    }
-                }
+                let aggs = tail_trace_aggregates(&scan);
+                // The tail's cost is its decoded spans (all examined by
+                // the fold), not its distinct traces.
+                visited += scan.spans_with_ids().count() as u64;
+                fold(aggs, &mut merged);
             }
         }
         progress.fetch_add(1, Ordering::Relaxed);
     }
 
+    // Bin the merged traces by envelope; totals fold alongside. Traces
+    // whose envelope START lies outside the grid are clipped (the same
+    // rule spans followed in v1).
+    let mut cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
+    let mut total_traces = 0u64;
+    let mut total_spans = 0u64;
+    let mut total_errors = 0u64;
+    for m in merged.values() {
+        if m.min_start_ns < grid_start || m.min_start_ns >= grid_end {
+            continue;
+        }
+        let bucket = ((m.min_start_ns - grid_start) / grid.bucket_width_ns) as usize;
+        let duration = m.max_end_ns.saturating_sub(m.min_start_ns);
+        cells[bucket][duration_bin(duration)] += 1;
+        total_traces += 1;
+        total_spans += m.span_count;
+        total_errors += m.error_count;
+    }
+
     Ok(OverviewData {
         cells,
+        total_traces,
         total_spans,
         total_errors,
         status: status.finish(),
