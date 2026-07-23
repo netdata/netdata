@@ -15,10 +15,9 @@ pub(crate) fn append_ipfix_records(
     let version = 10_u16;
 
     for flowset in packet.flowsets {
+        account_ipfix_flowset(&flowset.body, stats);
         match flowset.body {
             IPFixFlowSetBody::Data(data) => {
-                stats.ipfix_data_sets += 1;
-                stats.ipfix_records += data.fields.len() as u64;
                 for record in data.fields {
                     let mut rec = base_record("ipfix", source);
                     let mut state = IPFixRecordBuildState::default();
@@ -72,50 +71,7 @@ pub(crate) fn append_ipfix_records(
                     }
                 }
             }
-            IPFixFlowSetBody::V9Data(data) => {
-                stats.ipfix_data_sets += 1;
-                stats.ipfix_records += data.fields.len() as u64;
-                stats.unsupported_data_sets += 1;
-            }
-            IPFixFlowSetBody::OptionsData(data) => {
-                stats.ipfix_options_data_sets += 1;
-                stats.ipfix_options_records += data.fields.len() as u64;
-            }
-            IPFixFlowSetBody::V9OptionsData(data) => {
-                stats.ipfix_options_data_sets += 1;
-                stats.ipfix_options_records += data.fields.len() as u64;
-            }
-            IPFixFlowSetBody::Template(_) | IPFixFlowSetBody::V9Template(_) => {
-                stats.ipfix_template_sets += 1;
-                stats.ipfix_data_templates += 1;
-            }
-            IPFixFlowSetBody::Templates(templates) => {
-                stats.ipfix_template_sets += 1;
-                stats.ipfix_data_templates += templates.len() as u64;
-            }
-            IPFixFlowSetBody::V9Templates(templates) => {
-                stats.ipfix_template_sets += 1;
-                stats.ipfix_data_templates += templates.len() as u64;
-            }
-            IPFixFlowSetBody::OptionsTemplate(_) | IPFixFlowSetBody::V9OptionsTemplate(_) => {
-                stats.ipfix_options_template_sets += 1;
-                stats.ipfix_options_templates += 1;
-            }
-            IPFixFlowSetBody::OptionsTemplates(templates) => {
-                stats.ipfix_options_template_sets += 1;
-                stats.ipfix_options_templates += templates.len() as u64;
-            }
-            IPFixFlowSetBody::V9OptionsTemplates(templates) => {
-                stats.ipfix_options_template_sets += 1;
-                stats.ipfix_options_templates += templates.len() as u64;
-            }
-            IPFixFlowSetBody::NoTemplate(_) => {
-                stats.ipfix_missing_template_sets += 1;
-                stats.missing_template_sets += 1;
-            }
-            IPFixFlowSetBody::Empty => {
-                stats.ipfix_ignored_sets += 1;
-            }
+            _ => {}
         }
     }
 }

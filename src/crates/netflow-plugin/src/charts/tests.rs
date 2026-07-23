@@ -310,6 +310,10 @@ fn snapshot_collects_current_metric_totals_and_open_rows() {
     assert_eq!(snapshot.nsel_events.malformed, 30);
     assert_eq!(snapshot.nsel_rows.forward, 31);
     assert_eq!(snapshot.nsel_exceptions.counterless_updates, 32);
+    assert_eq!(snapshot.flow_rows.decoded, 40);
+    assert_eq!(snapshot.flow_rows.classifier_filtered, 3);
+    assert_eq!(snapshot.flow_rows.journaled, 33);
+    assert_eq!(snapshot.flow_rows.write_failed, 4);
     assert_eq!(
         snapshot.flow_rows.decoded,
         snapshot

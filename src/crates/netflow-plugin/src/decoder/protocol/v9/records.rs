@@ -20,14 +20,13 @@ pub(crate) fn append_v9_records(
     );
 
     for (flowset_index, flowset) in packet.flowsets.into_iter().enumerate() {
+        account_v9_flowset(&flowset.body, stats);
         let nsel = nsel_flowsets
             .and_then(|flowsets| flowsets.get(flowset_index))
             .copied()
             .unwrap_or(false);
         match flowset.body {
             V9FlowSetBody::Data(data) => {
-                stats.v9_data_sets += 1;
-                stats.netflow_v9_records += data.fields.len() as u64;
                 for record in data.fields {
                     let mut rec = base_record("v9", source);
                     let mut sampler_id: Option<u64> = None;
@@ -167,25 +166,7 @@ pub(crate) fn append_v9_records(
                     });
                 }
             }
-            V9FlowSetBody::OptionsData(data) => {
-                stats.v9_options_data_sets += 1;
-                stats.v9_options_records += data.fields.len() as u64;
-            }
-            V9FlowSetBody::Template(templates) => {
-                stats.v9_template_sets += 1;
-                stats.v9_data_templates += templates.templates.len() as u64;
-            }
-            V9FlowSetBody::OptionsTemplate(templates) => {
-                stats.v9_options_template_sets += 1;
-                stats.v9_options_templates += templates.templates.len() as u64;
-            }
-            V9FlowSetBody::NoTemplate(_) => {
-                stats.v9_missing_template_sets += 1;
-                stats.missing_template_sets += 1;
-            }
-            V9FlowSetBody::Empty => {
-                stats.v9_ignored_sets += 1;
-            }
+            _ => {}
         }
     }
 }
