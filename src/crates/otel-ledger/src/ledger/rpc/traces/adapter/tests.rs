@@ -235,9 +235,10 @@ fn predicate_builds_sorted_eq_conditions_plus_duration_bounds() {
     );
     selections.insert("status".to_string(), vec!["ERROR".to_string()]);
     selections.insert("span.empty".to_string(), vec![]); // no constraint
-    let p = build_predicate(&selections, Some(5), Some(10)).unwrap();
-    assert_eq!(p.conditions.len(), 4);
-    // Sorted keys: resource.service.name, status; then min, max duration.
+    let p = build_predicate(&selections, Some(5), Some(10), Some(100), Some(200)).unwrap();
+    assert_eq!(p.conditions.len(), 6);
+    // Sorted keys: resource.service.name, status; then span-duration
+    // bounds, then trace-duration bounds.
     assert_eq!(
         p.conditions[0].target,
         PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into())
@@ -250,6 +251,23 @@ fn predicate_builds_sorted_eq_conditions_plus_duration_bounds() {
     );
     assert_eq!(p.conditions[2].op, CompareOp::Gte);
     assert_eq!(p.conditions[3].op, CompareOp::Lte);
+    assert_eq!(
+        p.conditions[4].target,
+        PredicateTarget::Builtin(BuiltinField::TraceDuration)
+    );
+    assert_eq!(p.conditions[4].op, CompareOp::Gte);
+    assert_eq!(
+        p.conditions[5].target,
+        PredicateTarget::Builtin(BuiltinField::TraceDuration)
+    );
+    assert_eq!(p.conditions[5].op, CompareOp::Lte);
+}
+
+#[test]
+fn inverted_trace_duration_bounds_are_a_client_error() {
+    let err = build_predicate(&HashMap::new(), None, None, Some(10), Some(5))
+        .expect_err("inverted bounds must reject");
+    assert!(err.contains("min_trace_duration_ns"), "{err}");
 }
 
 // ── Search: cursor ──────────────────────────────────────────────────

@@ -115,6 +115,13 @@ pub struct OtelTracesRequest {
     pub min_duration_ns: Option<i64>,
     #[serde(default)]
     pub max_duration_ns: Option<i64>,
+    /// Search: inclusive TRACE-envelope-duration bounds, nanoseconds —
+    /// the overview strip's cell-click narrowing (the grid bins by
+    /// trace envelope, so span-duration bounds would mismatch it).
+    #[serde(default)]
+    pub min_trace_duration_ns: Option<i64>,
+    #[serde(default)]
+    pub max_trace_duration_ns: Option<i64>,
     /// Search: opaque pagination cursor echoed from a previous
     /// response's `anchor.next`.
     #[serde(default)]

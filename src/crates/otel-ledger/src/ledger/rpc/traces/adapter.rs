@@ -181,12 +181,21 @@ pub(crate) fn build_predicate(
     selections: &HashMap<String, Vec<String>>,
     min_duration_ns: Option<i64>,
     max_duration_ns: Option<i64>,
+    min_trace_duration_ns: Option<i64>,
+    max_trace_duration_ns: Option<i64>,
 ) -> Result<Predicate, String> {
     if let (Some(min), Some(max)) = (min_duration_ns, max_duration_ns)
         && min > max
     {
         return Err(format!(
             "min_duration_ns {min} exceeds max_duration_ns {max}: nothing can match"
+        ));
+    }
+    if let (Some(min), Some(max)) = (min_trace_duration_ns, max_trace_duration_ns)
+        && min > max
+    {
+        return Err(format!(
+            "min_trace_duration_ns {min} exceeds max_trace_duration_ns {max}: nothing can match"
         ));
     }
     let mut conditions = Vec::new();
@@ -219,6 +228,20 @@ pub(crate) fn build_predicate(
     if let Some(max) = max_duration_ns {
         conditions.push(Condition {
             target: PredicateTarget::Builtin(BuiltinField::Duration),
+            op: CompareOp::Lte,
+            values: vec![PredicateValue::Integer(max)],
+        });
+    }
+    if let Some(min) = min_trace_duration_ns {
+        conditions.push(Condition {
+            target: PredicateTarget::Builtin(BuiltinField::TraceDuration),
+            op: CompareOp::Gte,
+            values: vec![PredicateValue::Integer(min)],
+        });
+    }
+    if let Some(max) = max_trace_duration_ns {
+        conditions.push(Condition {
+            target: PredicateTarget::Builtin(BuiltinField::TraceDuration),
             op: CompareOp::Lte,
             values: vec![PredicateValue::Integer(max)],
         });

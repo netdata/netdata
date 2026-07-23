@@ -158,8 +158,14 @@ impl OtelTracesHandler {
             .map(parse_cursor)
             .transpose()
             .map_err(client_err)?;
-        let predicate = build_predicate(&req.selections, req.min_duration_ns, req.max_duration_ns)
-            .map_err(client_err)?;
+        let predicate = build_predicate(
+            &req.selections,
+            req.min_duration_ns,
+            req.max_duration_ns,
+            req.min_trace_duration_ns,
+            req.max_trace_duration_ns,
+        )
+        .map_err(client_err)?;
 
         let now_s = unix_now_s();
         // An anchor page reruns the SAME query over the cursor's frozen
