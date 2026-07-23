@@ -18,20 +18,31 @@
 //!   (legacy) is EXCLUDED and marked
 //!   [`RollupAbsent`](PartialReason::RollupAbsent) — its spans never
 //!   leak into trace-level numbers.
-//! - **Roots honest-or-absent (D8)**: the merged trace's root is the
-//!   earliest true root among its sources' picks (the same
-//!   `(start_ns, span_id)` tie-break both folds already apply); no
-//!   true root anywhere → absent. (Roots feed the 2.5 facets; the grid
-//!   itself doesn't need them, but the fold carries them so 2.4/2.5
-//!   reuse it.)
+//! - **Bin-by-envelope-start**: a trace whose MERGED envelope starts
+//!   outside the grid is clipped — excluded from the cells AND the
+//!   totals (the same start-clipping rule spans followed in v1). A
+//!   long trace straddling the window's left edge is therefore
+//!   invisible here even though search returns its in-window spans.
+//! - **Roots are NOT carried here**: the grid needs only envelopes and
+//!   counts, so the sealed path reads the roots-free
+//!   [`sealed_trace_envelopes`] view (no file string table built).
+//!   Root-consuming modes (slowest, facets — steps 2.4/2.5) fold
+//!   [`sealed_trace_aggregates`](super::rollup::sealed_trace_aggregates)
+//!   themselves, merging roots per D8.
 //!
 //! Engine contracts mirrored from the siblings: sources process in
 //! `SourceId` order; a failed source is a
 //! [`SourceFailure`](PartialReason::SourceFailure) (the rest still
 //! count); cancellation is polled up front and between sources
-//! (all-or-empty); an OWN visited budget (rollup rows + tail spans
-//! examined) terminates with the deterministic prefix and
-//! [`OverviewCeiling`](PartialReason::OverviewCeiling).
+//! (all-or-empty); an OWN visited budget terminates with the
+//! deterministic prefix and
+//! [`OverviewCeiling`](PartialReason::OverviewCeiling). The budget
+//! charges each source shape its actual fold cost — rollup rows
+//! (sealed) or decoded spans (tails) — and is checked BETWEEN sources,
+//! so one source may overshoot it by that source's whole cost: work
+//! stays per-source-whole (and the result deterministic) at the price
+//! of a bounded overshoot. It bounds WORK, not memory — the merge map
+//! peaks at the processed prefix's distinct traces.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -39,7 +50,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
-use super::rollup::{TraceAggregate, sealed_trace_aggregates, tail_trace_aggregates};
+use super::rollup::{TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::wal_scan::TraceWalScan;
@@ -116,7 +127,10 @@ pub struct OverviewData {
     pub cells: Vec<[u64; DURATION_BIN_COUNT]>,
     /// Distinct traces binned into the grid (= the sum of all cells).
     pub total_traces: u64,
-    /// Their STORED spans, summed (D9 — resends included).
+    /// Their STORED spans, summed (D9 — resends included). Totals are
+    /// trace-envelope-aligned, not span-window-aligned: a trace clipped
+    /// by the bin-by-envelope-start rule contributes nothing, and a
+    /// binned trace contributes ALL its stored spans, in-window or not.
     pub total_spans: u64,
     /// Of those spans, ERROR-status ones.
     pub total_errors: u64,
@@ -175,8 +189,8 @@ pub fn overview(
     }
 
     /// One trace's cross-source merge (D7): envelopes widen, stored-row
-    /// counts sum (D9). Roots are carried for the 2.4/2.5 consumers of
-    /// this fold but unused by the grid itself.
+    /// counts sum (D9). Roots are intentionally NOT carried — the grid
+    /// never reads them; root-consuming modes fold their own merge.
     struct Merged {
         min_start_ns: i64,
         max_end_ns: i64,
@@ -243,12 +257,7 @@ pub fn overview(
                     progress.fetch_add(1, Ordering::Relaxed);
                     continue;
                 }
-                let aggs = match reader
-                    .trace_rollup()
-                    .and_then(|r| {
-                        let strings = reader.build_string_table(reader.field_table())?;
-                        Ok(sealed_trace_aggregates(&r, &strings))
-                    }) {
+                let aggs = match reader.trace_rollup().map(|r| sealed_trace_envelopes(&r)) {
                     Ok(a) => a,
                     Err(e) => {
                         tracing::warn!(
@@ -260,6 +269,8 @@ pub fn overview(
                         continue;
                     }
                 };
+                // The sealed side's cost is its TRSU rows (one per
+                // distinct trace).
                 visited += aggs.len() as u64;
                 fold(aggs, &mut merged);
             }
@@ -274,9 +285,10 @@ pub fn overview(
                     }
                 };
                 let aggs = tail_trace_aggregates(&scan);
-                // The tail's cost is its decoded spans (all examined by
-                // the fold), not its distinct traces.
-                visited += scan.spans_with_ids().count() as u64;
+                // The tail's cost is its decoded spans, not its distinct
+                // traces. (The fold skips unset-trace-id spans; charging
+                // them anyway just trips the ceiling marginally earlier.)
+                visited += scan.num_spans() as u64;
                 fold(aggs, &mut merged);
             }
         }
@@ -298,8 +310,8 @@ pub fn overview(
         let duration = m.max_end_ns.saturating_sub(m.min_start_ns);
         cells[bucket][duration_bin(duration)] += 1;
         total_traces += 1;
-        total_spans += m.span_count;
-        total_errors += m.error_count;
+        total_spans = total_spans.saturating_add(m.span_count);
+        total_errors = total_errors.saturating_add(m.error_count);
     }
 
     Ok(OverviewData {

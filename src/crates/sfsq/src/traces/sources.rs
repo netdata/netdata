@@ -64,6 +64,7 @@ pub struct WalCoverage {
 }
 
 /// A sealed or in-memory SFST source for trace queries.
+#[derive(Clone)]
 pub struct TraceSfstCandidate {
     pub source_id: SourceId,
     /// Cheap time/stream/size facts ([`sfst::Summary`]). Trace-by-id does
@@ -87,6 +88,7 @@ pub struct TraceSfstCandidate {
 /// The scanned byte range IS `coverage.range` — one field, one truth: a
 /// separate scan range could silently diverge from the validated
 /// coverage and bypass the overlap protection.
+#[derive(Clone)]
 pub struct TraceWalTail {
     pub source_id: SourceId,
     pub path: PathBuf,
@@ -98,6 +100,9 @@ pub struct TraceWalTail {
 
 /// A source of trace data: an SFST (sealed file or in-memory chunk)
 /// evaluated through the indexed reader, or a WAL tail row scan.
+/// Cloning is cheap — sources are descriptors (paths, ids, coverage),
+/// never data.
+#[derive(Clone)]
 pub enum TraceSource {
     Sfst(TraceSfstCandidate),
     Tail(TraceWalTail),

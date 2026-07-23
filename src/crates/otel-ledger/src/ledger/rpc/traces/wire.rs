@@ -322,10 +322,15 @@ pub struct OverviewGridWire {
     pub bucket_width_s: u32,
     /// The duration bins' labels, index-parallel to each cell row.
     pub duration_bins: Vec<&'static str>,
-    /// Per time bucket, the per-duration-bin span counts.
+    /// Per time bucket, the per-duration-bin TRACE counts (each trace
+    /// bins by its merged envelope).
     pub cells: Vec<Vec<u64>>,
 }
 
+/// Totals are trace-envelope-aligned, not span-window-aligned: a trace
+/// whose merged envelope starts before the window is clipped from the
+/// grid AND these totals (even though `search` returns its in-window
+/// spans), and a binned trace contributes ALL its stored spans.
 #[derive(Debug, Serialize)]
 pub struct OverviewTotals {
     /// Distinct traces binned into the grid (= the sum of all cells).

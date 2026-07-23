@@ -36,12 +36,14 @@ pub enum PartialReason {
     /// from [`WorkCeiling`] — the overview's cost is O(spans-in-window)
     /// per source, a different budget than search's candidate loop.
     OverviewCeiling,
-    /// A sealed source predates the trace rollup chunk (`TRSU`) and was
+    /// A sealed source has no trace rollup chunk (`TRSU`) and was
     /// EXCLUDED from trace-level aggregation: including it would
     /// silently undercount, and mixing span-level numbers into a
-    /// trace-level result is forbidden (no mixed units — D10). The
-    /// data returns to trace-level results when the file is re-sealed
-    /// or ages out.
+    /// trace-level result is forbidden (no mixed units — D10). Two
+    /// causes: the file predates the rollup (data returns when it
+    /// ages out), or the file stored no real traces — an all-UNSET
+    /// trace-id file writes no chunk by the seal's `is_meaningful`
+    /// rule, and exclusion loses nothing.
     RollupAbsent,
 }
 

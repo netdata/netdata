@@ -6,7 +6,9 @@
 mod common;
 
 use common::{req, sp, write_wal};
-use sfsq::traces::{TraceWalScan, sealed_trace_aggregates, tail_trace_aggregates};
+use sfsq::traces::{
+    TraceWalScan, sealed_trace_aggregates, sealed_trace_envelopes, tail_trace_aggregates,
+};
 
 /// A corpus covering every semantic the rollup pins:
 /// - trace A: a true root (unset parent, SERVER kind) + a child + a
@@ -70,6 +72,15 @@ fn tail_fold_matches_the_sealed_rollup_value_for_value() {
     let sealed = sealed_trace_aggregates(&reader.trace_rollup().unwrap(), &strings);
 
     assert_eq!(tail, sealed, "the parity contract");
+
+    // The roots-free grid view is the SAME rows minus root resolution —
+    // no string table involved, everything else value-for-value.
+    let envelopes = sealed_trace_envelopes(&reader.trace_rollup().unwrap());
+    let rootless: Vec<_> = sealed
+        .into_iter()
+        .map(|a| sfsq::traces::TraceAggregate { root: None, ..a })
+        .collect();
+    assert_eq!(envelopes, rootless, "the envelope view drops only roots");
 }
 
 #[test]

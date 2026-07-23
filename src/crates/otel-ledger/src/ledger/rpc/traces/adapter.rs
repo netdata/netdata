@@ -312,7 +312,7 @@ pub(crate) fn to_attribute_values_result(
 
 // ── Overview: engine data → wire ────────────────────────────────────
 
-/// Shape the span-density grid into the wire result. The wire's
+/// Shape the trace-density grid into the wire result. The wire's
 /// second-granular geometry derives from the SAME `grid` the engine
 /// binned on — one source of truth; the shared derivation guarantees
 /// whole seconds (debug-asserted).

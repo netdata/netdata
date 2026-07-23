@@ -5,7 +5,7 @@
 //! discovery), `trace` (exact single-trace fetch), `search` (bounded
 //! most-recent-first trace search, the default mode), the enumeration
 //! pair `attributes` / `attribute_values` (the facet rail's
-//! vocabulary), and `overview` (the span-density grid — the UI's
+//! vocabulary), and `overview` (the trace-density grid — the UI's
 //! default paint). The wire contract lives in [`super::wire`], the
 //! engine mapping in [`super::adapter`], and source resolution in
 //! [`super::sources`].
@@ -330,10 +330,11 @@ fn unix_now_s() -> u32 {
 }
 
 impl OtelTracesHandler {
-    /// The `overview` mode: the span-density grid (time bucket ×
+    /// The `overview` mode: the trace-density grid (time bucket ×
     /// log-scale duration bin) — the UI's default paint. Geometry
     /// derives from the canonicalized window via the shared nice-width
-    /// grid; counts are SPANS (the phase-1 unit, labeled on the wire).
+    /// grid; cells count TRACES by merged envelope, and the span/error
+    /// totals are their stored-row sums (labeled on the wire — D9/D10).
     async fn overview(
         &self,
         ctx: &FunctionCallContext,

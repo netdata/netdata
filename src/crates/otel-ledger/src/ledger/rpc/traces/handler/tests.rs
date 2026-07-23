@@ -632,9 +632,10 @@ async fn overview_grid_matches_the_corpus_distribution() {
     assert_eq!(cells.len(), 100);
     let sum: u64 = cells.iter().flat_map(|r| r.as_array().unwrap()).map(|c| c.as_u64().unwrap()).sum();
     assert_eq!(sum, 5, "cell sums equal totals.traces");
-    // A starts at second 10; the C/D pair share second 30 (two traces,
-    // one cell); E is ONE trace at second 40.
+    // A starts at second 10, B at 20; the C/D pair share second 30
+    // (two traces, one cell); E is ONE trace at second 40.
     assert_eq!(cells[10][0], 1);
+    assert_eq!(cells[20][0], 1);
     assert_eq!(cells[30][0], 2);
     assert_eq!(cells[40][0], 1);
 }

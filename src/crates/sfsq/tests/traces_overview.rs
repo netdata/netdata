@@ -123,7 +123,7 @@ fn resend_counts_stored_rows_where_assembly_dedups() {
     let wal = write_wal(dir.path(), vec![req(&[a.clone(), a])], "resend");
     let sources = vec![sealed_source(dir.path(), &wal, "s")];
 
-    let data = run(sources.clone_sources(), OverviewQuery::new(grid()));
+    let data = run(sources.clone(), OverviewQuery::new(grid()));
     assert_eq!(data.total_traces, 1);
     assert_eq!(data.total_spans, 2, "stored rows — the resend counts (D9)");
 
@@ -135,31 +135,6 @@ fn resend_counts_stored_rows_where_assembly_dedups() {
     )
     .unwrap();
     assert_eq!(tr.trace.spans.len(), 1, "assembly dedups the resend");
-}
-
-/// The overview consumes sources by value; tests that need two runs
-/// rebuild the same set. (Sealed sources are cheap descriptors.)
-trait CloneSources {
-    fn clone_sources(&self) -> Vec<TraceSource>;
-}
-impl CloneSources for Vec<TraceSource> {
-    fn clone_sources(&self) -> Vec<TraceSource> {
-        self.iter()
-            .map(|s| match s {
-                TraceSource::Sfst(c) => TraceSource::Sfst(sfsq::traces::TraceSfstCandidate {
-                    source_id: c.source_id.clone(),
-                    summary: c.summary.clone(),
-                    source: c.source.clone(),
-                    coverage: c.coverage.clone(),
-                }),
-                TraceSource::Tail(t) => TraceSource::Tail(sfsq::traces::TraceWalTail {
-                    source_id: t.source_id.clone(),
-                    path: t.path.clone(),
-                    coverage: t.coverage.clone(),
-                }),
-            })
-            .collect()
-    }
 }
 
 #[test]

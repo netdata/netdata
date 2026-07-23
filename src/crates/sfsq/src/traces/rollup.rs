@@ -126,6 +126,29 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
     out
 }
 
+/// The envelope-and-counts view of a sealed file's `TRSU` rows — the
+/// grid path. `root` is always `None` here (UNRESOLVED, not D8-absent):
+/// resolving roots needs the file string table, which is O(distinct
+/// kv pairs in the whole file) to build, and the overview grid discards
+/// roots anyway. Root-consuming callers (slowest, facets) use
+/// [`sealed_trace_aggregates`].
+///
+/// Precondition: `rollup` comes from `IndexReader::trace_rollup()` (the
+/// validating accessor) — the struct-of-arrays fields are indexed in
+/// parallel here on that guarantee.
+pub fn sealed_trace_envelopes(rollup: &sfst::TraceRollup) -> Vec<TraceAggregate> {
+    (0..rollup.len())
+        .map(|i| TraceAggregate {
+            trace_id: rollup.trace_ids.get(i),
+            min_start_ns: rollup.min_start_ns[i],
+            max_end_ns: rollup.max_end_ns[i],
+            span_count: u64::from(rollup.span_counts[i]),
+            error_count: u64::from(rollup.error_counts[i]),
+            root: None,
+        })
+        .collect()
+}
+
 /// Resolve a sealed file's `TRSU` rows into the neutral shape. `strings`
 /// is the file's `KvId → key=value` table
 /// ([`sfst::IndexReader::build_string_table`]); refs resolve to the
