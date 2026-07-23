@@ -2611,6 +2611,10 @@ if(OS_WINDOWS)
                 set(WEVT_GEN_BIN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_mc_generate")
 
                 set(WEVT_BUILD_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_compile.sh")
+                find_program(WEVT_BASH_EXECUTABLE NAMES bash.exe bash)
+                if(NOT WEVT_BASH_EXECUTABLE)
+                        message(FATAL_ERROR "bash is required to generate Windows ETW resources")
+                endif()
 
                 set(WEVT_MC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.mc")
                 set(WEVT_MAN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.xml")
@@ -2628,7 +2632,7 @@ if(OS_WINDOWS)
                         COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
                         COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
                         COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
-                        COMMAND "${WEVT_BUILD_SCRIPT}" "${CMAKE_SOURCE_DIR}/src/libnetdata/log" "${CMAKE_BINARY_DIR}"
+                        COMMAND "${WEVT_BASH_EXECUTABLE}" "${WEVT_BUILD_SCRIPT}" "${CMAKE_SOURCE_DIR}/src/libnetdata/log" "${CMAKE_BINARY_DIR}"
                         DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
                         COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
                 )

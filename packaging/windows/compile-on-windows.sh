@@ -202,9 +202,8 @@ ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 if [ "${build_rc}" -ne 0 ]; then
     echo "ERROR: cmake --build exited with ${build_rc}." >&2
-    echo "  The most common cause on Windows UCRT64 is the netdata.exe link" >&2
-    echo "  being killed (OOM, session timeout) or BFD ld.exe hanging." >&2
-    echo "  Ensure mingw-w64-ucrt-x86_64-lld is installed:" >&2
+    echo "  Inspect the first FAILED: entry in the build output for the failing target." >&2
+    echo "  For a netdata.exe link failure, ensure mingw-w64-ucrt-x86_64-lld is installed:" >&2
     echo "    pacman -S mingw-w64-ucrt-x86_64-lld" >&2
     exit "${build_rc}"
 fi
