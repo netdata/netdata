@@ -186,7 +186,6 @@ struct log_field {
 extern __thread struct log_stack_entry *thread_log_stack_base[THREAD_LOG_STACK_MAX];
 extern __thread size_t thread_log_stack_next;
 extern __thread struct log_field thread_log_fields[_NDF_MAX];
-bool nd_log_stack_entry_is_valid(const struct log_stack_entry *entry);
 ND_LOG_SOURCES nd_log_resolve_source_from_stack(ND_LOG_SOURCES source);
 
 // --------------------------------------------------------------------------------------------------------------------

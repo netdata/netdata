@@ -728,7 +728,7 @@ __thread struct log_field thread_log_fields[_NDF_MAX] = {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-bool nd_log_stack_entry_is_valid(const struct log_stack_entry *entry) {
+static bool nd_log_stack_entry_is_valid(const struct log_stack_entry *entry) {
     if(!entry || entry->id >= _NDF_MAX || !entry->set)
         return false;
 
@@ -761,6 +761,8 @@ ND_LOG_SOURCES nd_log_resolve_source_from_stack(ND_LOG_SOURCES source) {
 
     for(size_t c = 0; c < thread_log_stack_next; c++) {
         struct log_stack_entry *lgs = thread_log_stack_base[c];
+        if(!lgs)
+            continue;
 
         for(size_t i = 0; lgs[i].id != NDF_STOP; i++) {
             if(lgs[i].id == NDF_LOG_SOURCE && nd_log_stack_entry_is_valid(&lgs[i]))
