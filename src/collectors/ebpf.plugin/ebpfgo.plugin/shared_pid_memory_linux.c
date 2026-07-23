@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -19,6 +20,7 @@ struct shared_pid_memory {
     size_t total;
     size_t prev_count; /* entries written in the previous publish cycle */
     uint32_t update_every_s;
+    uint32_t publish_timeouts; /* consecutive publish-side sem_timedwait failures */
     int shm_fd;
     sem_t *sem;
     bool shm_name_created; /* set when this context created/recreated the SHM name; triggers unlink on any exit */
@@ -221,8 +223,21 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
 
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
-        if (!ebpfgo_shm_sem_wait(ctx->sem))
+        if (!ebpfgo_shm_sem_wait(ctx->sem)) {
+            /* A consumer killed while holding the semaphore wedges it permanently
+             * (POSIX semaphores are not released on process death).  After 3
+             * consecutive timeouts assume the semaphore is stuck and replace the
+             * generation so consumers detect the new inode and reconnect. */
+            if (++ctx->publish_timeouts >= 3) {
+                fprintf(stderr,
+                        "ebpf-go.plugin: pid shm: semaphore wedged (%u consecutive timeouts), replacing generation\n",
+                        ctx->publish_timeouts);
+                (void)pid_shm_replace_generation(ctx, shared_pid_memory_nbytes(ctx));
+                ctx->publish_timeouts = 0;
+            }
             return -1;
+        }
+        ctx->publish_timeouts = 0;
         locked = true;
     }
 

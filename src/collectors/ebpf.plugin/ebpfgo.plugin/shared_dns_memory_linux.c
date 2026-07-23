@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <semaphore.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -19,6 +20,7 @@
 struct shared_dns_memory {
     struct ebpfgo_dns_shared *data;
     uint32_t update_every_s;
+    uint32_t publish_timeouts; /* consecutive publish-side sem_timedwait failures */
     int shm_fd;
     sem_t *sem;
     bool shm_name_created; /* set when this context created/recreated the SHM name; triggers unlink on any exit */
@@ -175,8 +177,19 @@ void shared_dns_memory_publish(
 
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
-        if (!ebpfgo_shm_sem_wait(ctx->sem))
+        if (!ebpfgo_shm_sem_wait(ctx->sem)) {
+            /* Same wedge recovery as shared_pid_memory_linux.c: after 3 consecutive
+             * timeouts assume the semaphore is stuck and replace the generation. */
+            if (++ctx->publish_timeouts >= 3) {
+                fprintf(stderr,
+                        "ebpf-go.plugin: dns shm: semaphore wedged (%u consecutive timeouts), replacing generation\n",
+                        ctx->publish_timeouts);
+                (void)dns_shm_replace_generation(ctx, sizeof(struct ebpfgo_dns_shared));
+                ctx->publish_timeouts = 0;
+            }
             return;
+        }
+        ctx->publish_timeouts = 0;
         locked = true;
     }
 
