@@ -24,7 +24,7 @@ use tokio::sync::RwLock;
 use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::TenantRegistries;
 
-use sfsq::traces::{TraceQuery, trace_by_id};
+use sfsq::traces::{TraceQuery, TraceRequestError, trace_by_id};
 
 use super::adapter::{parse_trace_id, to_trace_result};
 use super::sources::TracesSourceSupplier;
@@ -91,13 +91,21 @@ impl OtelTracesHandler {
 
         // Sync engine (maps + decompresses files) — off the runtime
         // thread. Engine request errors (unset id, zero cap) are clean
-        // client errors; a panicked task is a handler failure.
+        // client errors; a rejected SOURCE SET is the supplier's
+        // inconsistency (duplicate ids / overlapping WAL coverage), not
+        // the client's — framed as internal so a debugger looks at the
+        // right side. A panicked task is a handler failure.
         let data = match tokio::task::spawn_blocking(move || {
             trace_by_id(sources, query, cancel, done)
         })
         .await
         {
             Ok(Ok(data)) => data,
+            Ok(Err(TraceRequestError::SourceSet(e))) => {
+                return Err(handler_err(format!(
+                    "otel-traces internal error: captured source set is inconsistent: {e}"
+                )));
+            }
             Ok(Err(e)) => {
                 return Err(handler_err(format!("invalid otel-traces request: {e}")));
             }

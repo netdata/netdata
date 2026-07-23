@@ -84,9 +84,6 @@ impl TracesSourceSupplier {
     /// The chunk-building phase can be the slow one, so it polls `cancel`
     /// between builds (the logs handler's discipline); a cancelled call
     /// returns empty — the caller is about to discard the result anyway.
-    // Consumed by the data modes (trace: step 1.2, search: step 1.3);
-    // exercised by this module's tests until then.
-    #[allow(dead_code)]
     pub(crate) async fn capture(
         &self,
         tenant: &TenantId,

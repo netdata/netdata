@@ -41,7 +41,7 @@ async fn info_returns_the_descriptor() {
     let v = serde_json::to_value(&resp).unwrap();
     assert_eq!(v["version"], 1);
     assert_eq!(v["status"], 200);
-    assert_eq!(v["accepted_params"], json!(["info"]));
+    assert_eq!(v["accepted_params"], json!(["info", "trace", "tenant"]));
     assert_eq!(v["required_params"], json!([]));
 }
 

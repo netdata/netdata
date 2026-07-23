@@ -146,6 +146,13 @@ pub(crate) async fn install_wal(
     seq: u64,
     reqs: Vec<ExportTraceServiceRequest>,
 ) -> std::path::PathBuf {
+    let frame_count = reqs.len() as u64;
+    let entry_count: u64 = reqs
+        .iter()
+        .flat_map(|r| r.resource_spans.iter())
+        .flat_map(|rs| rs.scope_spans.iter())
+        .map(|ss| ss.spans.len() as u64)
+        .sum();
     let staging = tempfile::tempdir().unwrap();
     let written = write_traces_wal(staging.path(), reqs);
     let bytes = std::fs::read(&written).unwrap();
@@ -167,8 +174,8 @@ pub(crate) async fn install_wal(
         .apply_event(&wal::FileEvent::Synced {
             file_id: id,
             valid_up_to: ByteSize(bytes.len() as u64),
-            frame_count: 1,
-            entry_count: 1,
+            frame_count,
+            entry_count,
             min_timestamp_ns: TimestampNs(1),
             max_timestamp_ns: TimestampNs(u64::MAX),
         })

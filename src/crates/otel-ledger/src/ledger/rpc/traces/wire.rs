@@ -5,8 +5,8 @@
 //! request shape (the `otel-logs` pattern): `info` for capability
 //! discovery, `trace` / `attributes` / `attribute_values` / `overview`
 //! selected by their sub-objects, and a request with none of those is a
-//! `search`. Only `info` is implemented at this step; the data modes
-//! land one per traces-ui phase-1 step, each replacing its
+//! `search`. Implemented so far: `info`, `trace`; the remaining data
+//! modes land one per traces-ui phase-1 step, each replacing its
 //! `serde_json::Value` placeholder with its typed request shape.
 
 use serde::{Deserialize, Serialize};
@@ -17,9 +17,11 @@ use sfsq::traces::{PartialReason, QueryStatus};
 
 /// Request param names accepted by this function, advertised to the UI
 /// in [`InfoResponse::accepted_params`]. The UI gates which params it
-/// sends on this list, so it advertises only what the function honors —
-/// today just `info`; each data mode extends it when it lands.
-pub const ACCEPTED_PARAMS: &[&str] = &["info"];
+/// sends on this list, so it advertises only what the function honors:
+/// each data mode adds its top-level fields when it lands (`trace` and
+/// the mode-common `tenant` landed with the trace mode; the window and
+/// search params arrive with their modes).
+pub const ACCEPTED_PARAMS: &[&str] = &["info", "trace", "tenant"];
 
 /// Request payload. A flat struct like the logs request: `info` and the
 /// per-mode sub-objects select the mode (see [`OtelTracesRequest::mode`]);
@@ -157,7 +159,8 @@ impl OtelTracesRequest {
             .trace
             .as_ref()
             .expect("trace_params is only called on RequestMode::Trace");
-        serde_json::from_value(v.clone()).map_err(|e| format!("invalid trace selector: {e}"))
+        // &Value is itself a Deserializer — no clone of the selector.
+        TraceParams::deserialize(v).map_err(|e| format!("invalid trace selector: {e}"))
     }
 }
 
@@ -305,9 +308,6 @@ impl Default for InfoResponse {
 /// Every data-mode response carries one beside its data; defined (and
 /// pinned by round-trip tests) here so the data modes share one
 /// serialization.
-// Consumed by the data-mode responses (steps 1.2+); until then only the
-// round-trip tests construct it.
-#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum StatusWire {
@@ -357,8 +357,6 @@ impl From<&QueryStatus> for StatusWire {
 /// Wire names of the engine's [`PartialReason`] variants (snake_case).
 /// The `From` match is exhaustive on purpose: a new engine reason fails
 /// compilation here until its wire name is decided.
-// Consumed by the data-mode responses (steps 1.2+), like `StatusWire`.
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PartialReasonWire {
