@@ -16,8 +16,21 @@ echo Uninstalling previous manifest (if any)...
 wevtutil um "%MAN_SRC%"
 
 echo.
-echo Removing legacy NetdataWEL registry entries (if any)...
-reg delete "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\NetdataWEL" /f 2>nul
+echo Removing legacy classic Event Log registrations (if any)...
+for %%K in (
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata"
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Daemon"
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Collectors"
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Access"
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Health"
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Aclk"
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\NetdataWEL"
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataDaemon"
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataCollectors"
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataAccess"
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataHealth"
+    "HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataAclk"
+) do reg delete "%%~K" /f >nul 2>nul
 
 echo.
 echo Copying %DLL_SRC% to %DLL_DST%

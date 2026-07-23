@@ -2,7 +2,7 @@
 
 #include "nd_log-internals.h"
 
-#if defined(OS_WINDOWS) && (defined(HAVE_ETW) || defined(HAVE_WEL))
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
 
 // Bounded wide-string length: like wcsnlen, but returns 0 (not maxlen) when the
 // string is not null-terminated within `maxlen`. Callers use the result for
@@ -14,26 +14,13 @@
 // Do NOT pass `_countof(ptr_to_string)` for a `const wchar_t *ptr` argument —
 // that evaluates to `sizeof(const wchar_t *) / sizeof(wchar_t)` (2 on 64-bit
 // Windows, 1 on 32-bit), which is the size of the POINTER, not the size of
-// the pointed-to string. Use a literal cap (e.g. WEL_LABEL_MAX_CHARS) or
-// `_countof(arr)` only when `arr` is a true wide-char array.
-static inline size_t wel_wcslen_bounded(const wchar_t *s, size_t maxlen) {
+// the pointed-to string. Use a literal cap or `_countof(arr)` only when `arr`
+// is a true wide-char array.
+static inline size_t etw_wcslen_bounded(const wchar_t *s, size_t maxlen) {
     if (!s) return 0;
     size_t n = wcsnlen(s, maxlen);
     return (n == maxlen) ? 0 : n;
 }
-
-// Max wide-char length (excluding the null terminator) of any entry in
-// wel_channels[].label. Used as the bound argument to wel_wcslen_bounded()
-// when writing a label to the registry.
-//
-// IMPORTANT: this must be a literal cap, not `_countof(wel_channels[i].label)`.
-// The wel_channels[] members are `const wchar_t *`, so `_countof(...)` evaluates
-// to `sizeof(const wchar_t *) / sizeof(wchar_t)` (2 on 64-bit Windows, 1 on 32-bit) —
-// the size of the POINTER, not the size of the pointed-to string. Using that as
-// the wcsnlen bound silently clips every label to 2 wide chars and writes an
-// empty string to the registry. 64 wide chars is comfortably more than the
-// longest current label ("Collectors" = 10 wide chars incl. null).
-#define WEL_LABEL_MAX_CHARS 64
 
 // --------------------------------------------------------------------------------------------------------------------
 // construct an event id
@@ -108,356 +95,6 @@ static bool check_event_id(ND_LOG_SOURCES source __maybe_unused, ND_LOG_FIELD_PR
 // --------------------------------------------------------------------------------------------------------------------
 // initialization
 
-// Define provider (source) names per source (only when not using ETW)
-static const wchar_t *wel_provider_per_source[_NDLS_MAX] = {
-        [NDLS_UNSET]        = NULL,                              // not used, linked to NDLS_DAEMON
-        [NDLS_ACCESS]       = NETDATA_WEL_PROVIDER_ACCESS_W,
-        [NDLS_ACLK]         = NETDATA_WEL_PROVIDER_ACLK_W,
-        [NDLS_COLLECTORS]   = NETDATA_WEL_PROVIDER_COLLECTORS_W,
-        [NDLS_DAEMON]       = NETDATA_WEL_PROVIDER_DAEMON_W,
-        [NDLS_HEALTH]       = NETDATA_WEL_PROVIDER_HEALTH_W,
-        [NDLS_DEBUG]        = NULL,                              // used, linked to NDLS_DAEMON
-};
-
-bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
-    const wchar_t *replacement = L"\\wevt_netdata.dll";
-
-    // Find the last occurrence of '\\' to isolate the filename
-    wchar_t *lastBackslash = wcsrchr(str, L'\\');
-
-    if (lastBackslash != NULL) {
-        // Calculate new length after replacement
-        size_t newLen = (lastBackslash - str) + wcslen(replacement);
-
-        // Ensure new length does not exceed buffer size
-        if (newLen >= size)
-            return false; // Not enough space in the buffer
-
-        // Terminate the string at the last backslash
-        *lastBackslash = L'\0';
-
-        // Append the replacement filename
-        wcsncat(str, replacement, size - wcslen(str) - 1);
-
-        // Check if the new file exists
-        if (GetFileAttributesW(str) != INVALID_FILE_ATTRIBUTES)
-            return true; // The file exists
-        else
-            return false; // The file does not exist
-    }
-
-    return false; // No backslash found (likely invalid input)
-}
-
-// Registry key where WINEVT stores registered publishers (providers).
-#define WINEVT_PUBLISHERS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Publishers\\"
-
-// WINEVT Channels registry path prefix
-#define WINEVT_CHANNELS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Channels\\"
-
-// Canonical channel-to-label table.  The label is only used to identify and remove
-// the DisplayName overrides written by an earlier implementation; the manifest's
-// localized message is the authoritative Event Viewer display label.
-static const struct { const wchar_t *ch; const wchar_t *label; } wel_channels[] = {
-    { L"Netdata/Daemon",     L"Daemon"     },
-    { L"Netdata/Collectors", L"Collectors" },
-    { L"Netdata/Access",     L"Access"     },
-    { L"Netdata/Health",     L"Health"     },
-    { L"Netdata/Aclk",       L"Aclk"       },
-};
-
-static bool wel_has_stale_display_name(HKEY hCh, const wchar_t *label) {
-    wchar_t display_name[64] = {0};
-    DWORD type = 0;
-    DWORD size = sizeof(display_name);
-    return RegQueryValueExW(hCh, L"DisplayName", NULL, &type, (LPBYTE)display_name, &size) == ERROR_SUCCESS &&
-           type == REG_SZ && wcscmp(display_name, label) == 0;
-}
-
-// Classic EventLog keys with slash-containing names are displayed as flat logs
-// (for example, "Netdata\\Daemon") rather than WINEVT channel hierarchy.
-// Keep this list shared by the current-manifest check and the post-install cleanup
-// so existing installations receive the one-time migration automatically.
-static const wchar_t *const wel_flat_legacy_keys[] = {
-    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Daemon",
-    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Collectors",
-    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Access",
-    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Health",
-    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Aclk",
-    L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL",
-};
-
-static bool wel_flat_legacy_keys_present(void) {
-    for (size_t i = 0; i < _countof(wel_flat_legacy_keys); i++) {
-        HKEY hKey;
-        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, wel_flat_legacy_keys[i], 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-            RegCloseKey(hKey);
-            return true;
-        }
-    }
-
-    return false;
-}
-
-static bool wel_manifest_is_current(void) {
-    // All five importChannel provider GUIDs must be present; a partial registration
-    // (e.g. only Daemon from an older version) must also trigger re-installation.
-    static const wchar_t *const provider_guids[] = {
-        NETDATA_WEL_PROVIDER_DAEMON_GUID_STR_W,
-        NETDATA_WEL_PROVIDER_COLLECTORS_GUID_STR_W,
-        NETDATA_WEL_PROVIDER_ACCESS_GUID_STR_W,
-        NETDATA_WEL_PROVIDER_HEALTH_GUID_STR_W,
-        NETDATA_WEL_PROVIDER_ACLK_GUID_STR_W,
-    };
-
-    for (size_t i = 0; i < _countof(provider_guids); i++) {
-        wchar_t key[MAX_PATH];
-        swprintf(key, _countof(key), L"%ls%ls", WINEVT_PUBLISHERS_KEY, provider_guids[i]);
-        HKEY hKey;
-        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &hKey) != ERROR_SUCCESS)
-            return false;
-        RegCloseKey(hKey);
-    }
-
-    // Verify every channel: it must exist and be Admin type (EVT_CHANNEL_TYPE_ADMIN = 0).
-    // A DisplayName value equal to the old override marks a stale registration so that
-    // the migration below removes it and lets the manifest define the tree label.
-    for (size_t i = 0; i < _countof(wel_channels); i++) {
-        wchar_t chkey[MAX_PATH];
-        swprintf(chkey, _countof(chkey), L"%ls%ls", WINEVT_CHANNELS_KEY, wel_channels[i].ch);
-        HKEY hCh;
-        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, chkey, 0, KEY_READ, &hCh) != ERROR_SUCCESS)
-            return false;
-
-        DWORD chtype = 1;
-        DWORD sz = sizeof(chtype);
-        RegQueryValueExW(hCh, L"Type", NULL, NULL, (LPBYTE)&chtype, &sz);
-
-        bool stale_display_name = wel_has_stale_display_name(hCh, wel_channels[i].label);
-
-        RegCloseKey(hCh);
-
-        if (chtype != 0)  // 0 = Admin
-            return false;
-
-        if (stale_display_name)
-            return false;
-    }
-
-    return !wel_flat_legacy_keys_present();
-}
-
-static bool wel_run_silent(const wchar_t *exe, const wchar_t *params) {
-    wchar_t cmdline[MAX_PATH * 6];
-    swprintf(cmdline, _countof(cmdline), L"\"%ls\" %ls", exe, params);
-
-    STARTUPINFOW si = { .cb = sizeof(si) };
-    PROCESS_INFORMATION pi = {0};
-    if (!CreateProcessW(NULL, cmdline, NULL, NULL, FALSE,
-                        CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP,
-                        NULL, NULL, &si, &pi))
-        return false;
-
-    WaitForSingleObject(pi.hProcess, 30000);
-    DWORD exitCode = 1;
-    GetExitCodeProcess(pi.hProcess, &exitCode);
-    CloseHandle(pi.hProcess);
-    CloseHandle(pi.hThread);
-    return exitCode == 0;
-}
-
-// Minimal manifest embedded in the binary so we can register the Netdata WINEVT
-// channels and importChannel links at runtime, regardless of how netdata.exe was
-// deployed (MSI, direct copy, dev build). Each %s is replaced with the System32
-// DLL path (12 substitutions: 2 per provider × 6 providers).
-// The template omits event/template definitions — wevtutil im only needs channels
-// and providers to set up routing; the DLL handles message formatting at query time.
-#define WEL_MANIFEST_XML_FMT \
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n" \
-    "<instrumentationManifest xmlns=\"http://schemas.microsoft.com/win/2004/08/events\">\r\n" \
-    "  <instrumentation\r\n" \
-    "    xmlns:win=\"http://manifests.microsoft.com/win/2004/08/windows/events\"\r\n" \
-    "    xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"\r\n" \
-    "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n" \
-    "    <events xmlns=\"http://schemas.microsoft.com/win/2004/08/events\">\r\n" \
-    "      <provider name=\"Netdata\"\r\n" \
-    "        guid=\"{96c5ca72-9bd8-4634-81e5-000014e7da7a}\"\r\n" \
-    "        resourceFileName=\"%s\"\r\n" \
-    "        messageFileName=\"%s\"\r\n" \
-    "        symbol=\"NETDATA_ETW_PROVIDER\">\r\n" \
-    "        <channels>\r\n" \
-    "          <channel chid=\"CHANNEL_DAEMON\" name=\"Netdata/Daemon\" symbol=\"CHANNEL_DAEMON\" type=\"Admin\" enabled=\"true\" message=\"$(string.Channel.Daemon)\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_COLLECTORS\" name=\"Netdata/Collectors\" symbol=\"CHANNEL_COLLECTORS\" type=\"Admin\" enabled=\"true\" message=\"$(string.Channel.Collectors)\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_ACCESS\" name=\"Netdata/Access\" symbol=\"CHANNEL_ACCESS\" type=\"Admin\" enabled=\"true\" message=\"$(string.Channel.Access)\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_HEALTH\" name=\"Netdata/Health\" symbol=\"CHANNEL_HEALTH\" type=\"Admin\" enabled=\"true\" message=\"$(string.Channel.Health)\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_ACLK\" name=\"Netdata/Aclk\" symbol=\"CHANNEL_ACLK\" type=\"Admin\" enabled=\"true\" message=\"$(string.Channel.Aclk)\"/>\r\n" \
-    "        </channels>\r\n" \
-    "      </provider>\r\n" \
-    "      <provider name=\"NetdataDaemon\"\r\n" \
-    "        guid=\"" NETDATA_WEL_PROVIDER_DAEMON_GUID_STR "\"\r\n" \
-    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
-    "        <channels><importChannel chid=\"IMPORT_DAEMON\" name=\"Netdata/Daemon\"/></channels>\r\n" \
-    "      </provider>\r\n" \
-    "      <provider name=\"NetdataCollectors\"\r\n" \
-    "        guid=\"" NETDATA_WEL_PROVIDER_COLLECTORS_GUID_STR "\"\r\n" \
-    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
-    "        <channels><importChannel chid=\"IMPORT_COLLECTORS\" name=\"Netdata/Collectors\"/></channels>\r\n" \
-    "      </provider>\r\n" \
-    "      <provider name=\"NetdataAccess\"\r\n" \
-    "        guid=\"" NETDATA_WEL_PROVIDER_ACCESS_GUID_STR "\"\r\n" \
-    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
-    "        <channels><importChannel chid=\"IMPORT_ACCESS\" name=\"Netdata/Access\"/></channels>\r\n" \
-    "      </provider>\r\n" \
-    "      <provider name=\"NetdataHealth\"\r\n" \
-    "        guid=\"" NETDATA_WEL_PROVIDER_HEALTH_GUID_STR "\"\r\n" \
-    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
-    "        <channels><importChannel chid=\"IMPORT_HEALTH\" name=\"Netdata/Health\"/></channels>\r\n" \
-    "      </provider>\r\n" \
-    "      <provider name=\"NetdataAclk\"\r\n" \
-    "        guid=\"" NETDATA_WEL_PROVIDER_ACLK_GUID_STR "\"\r\n" \
-    "        resourceFileName=\"%s\" messageFileName=\"%s\">\r\n" \
-    "        <channels><importChannel chid=\"IMPORT_ACLK\" name=\"Netdata/Aclk\"/></channels>\r\n" \
-    "      </provider>\r\n" \
-    "    </events>\r\n" \
-    "  </instrumentation>\r\n" \
-    "  <localization>\r\n" \
-    "    <resources culture=\"en-US\">\r\n" \
-    "      <stringTable>\r\n" \
-    "        <string id=\"ND_PROVIDER_NAME\" value=\"Netdata\"/>\r\n" \
-    "        <string id=\"Channel.Daemon\" value=\"Daemon\"/>\r\n" \
-    "        <string id=\"Channel.Collectors\" value=\"Collectors\"/>\r\n" \
-    "        <string id=\"Channel.Access\" value=\"Access\"/>\r\n" \
-    "        <string id=\"Channel.Health\" value=\"Health\"/>\r\n" \
-    "        <string id=\"Channel.Aclk\" value=\"Aclk\"/>\r\n" \
-    "      </stringTable>\r\n" \
-    "    </resources>\r\n" \
-    "  </localization>\r\n" \
-    "</instrumentationManifest>\r\n"
-
-// Runs at WEL startup when wel_manifest_is_current() returns false.
-// Works for every deployment: MSI install (DLL in System32), dev build (DLL next to
-// netdata.exe), or a bare netdata.exe copy (DLL in System32 from a prior install).
-// Generates the manifest XML from the embedded template and writes it to System32,
-// then registers it via wevtutil. No external manifest file is required.
-static void wel_ensure_manifest_installed(void) {
-    if (wel_manifest_is_current()) {
-        return;
-    }
-
-
-    wchar_t system32[MAX_PATH];
-    if (!GetSystemDirectoryW(system32, _countof(system32))) return;
-
-    wchar_t dllDst[MAX_PATH];
-    swprintf(dllDst, _countof(dllDst), L"%ls\\wevt_netdata.dll", system32);
-
-    // If wevt_netdata.dll exists next to netdata.exe (dev build / manual deploy),
-    // copy it to System32 so Event Viewer can resolve message strings.
-    {
-        wchar_t dllSrc[MAX_PATH];
-        if (GetModuleFileNameW(NULL, dllSrc, _countof(dllSrc)) &&
-            wel_replace_program_with_wevt_netdata_dll(dllSrc, _countof(dllSrc)))
-            CopyFileW(dllSrc, dllDst, FALSE);
-    }
-
-    // DLL must exist in System32 (either we just copied it or MSI put it there).
-    if (GetFileAttributesW(dllDst) == INVALID_FILE_ATTRIBUTES) {
-        return;
-    }
-
-    // Grant EventLog service read access to the DLL (required for manifest channels).
-    wchar_t icaclsPath[MAX_PATH];
-    swprintf(icaclsPath, _countof(icaclsPath), L"%ls\\icacls.exe", system32);
-    wchar_t icaclsParams[MAX_PATH * 2];
-    swprintf(icaclsParams, _countof(icaclsParams), L"\"%ls\" /grant \"NT SERVICE\\EventLog\":R", dllDst);
-    (void)wel_run_silent(icaclsPath, icaclsParams);
-
-    // Build manifest content from the embedded template. The manifest is generated
-    // at runtime so it always matches this binary's channel layout, regardless of
-    // what manifest file (if any) is on disk.
-    char dllDstNarrow[MAX_PATH];
-    if(!WideCharToMultiByte(CP_UTF8, 0, dllDst, -1, dllDstNarrow, _countof(dllDstNarrow), NULL, NULL)) {
-        return;
-    }
-
-    char manifest[8192];
-    int mlen = snprintf(manifest, sizeof(manifest), WEL_MANIFEST_XML_FMT,
-                        dllDstNarrow, dllDstNarrow,   // Netdata provider
-                        dllDstNarrow, dllDstNarrow,   // NetdataDaemon
-                        dllDstNarrow, dllDstNarrow,   // NetdataCollectors
-                        dllDstNarrow, dllDstNarrow,   // NetdataAccess
-                        dllDstNarrow, dllDstNarrow,   // NetdataHealth
-                        dllDstNarrow, dllDstNarrow);  // NetdataAclk
-    if (mlen <= 0 || mlen >= (int)sizeof(manifest)) {
-        return;
-    }
-
-    // Write manifest to System32 (same location as the MSI installer uses).
-    wchar_t manifestDst[MAX_PATH];
-    swprintf(manifestDst, _countof(manifestDst), L"%ls\\wevt_netdata_manifest.xml", system32);
-
-    HANDLE hFile = CreateFileW(manifestDst, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-                               FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hFile == INVALID_HANDLE_VALUE) {
-        return;
-    }
-    DWORD written;
-    BOOL fileOk = WriteFile(hFile, manifest, (DWORD)mlen, &written, NULL);
-    CloseHandle(hFile);
-    if (!fileOk || written != (DWORD)mlen) {
-        return;
-    }
-
-    wchar_t wevtutil[MAX_PATH];
-    swprintf(wevtutil, _countof(wevtutil), L"%ls\\wevtutil.exe", system32);
-
-
-    // Unregister any previously registered manifest (ignore errors — normal on first run).
-    wchar_t umParams[MAX_PATH * 2];
-    swprintf(umParams, _countof(umParams), L"um \"%ls\"", manifestDst);
-    (void)wel_run_silent(wevtutil, umParams);
-
-    // Register the new manifest. The /mf and /rf flags tell wevtutil where the DLL is,
-    // overriding the resourceFileName/messageFileName attributes in the XML.
-    wchar_t imParams[MAX_PATH * 4];
-    swprintf(imParams, _countof(imParams), L"im \"%ls\" \"/mf:%ls\" \"/rf:%ls\"",
-             manifestDst, dllDst, dllDst);
-    bool imOk = wel_run_silent(wevtutil, imParams);
-
-    // Only proceed with post-registration cleanup and display-name setting when
-    // wevtutil im succeeded.  Deleting stale keys before confirming the new
-    // registration is complete would leave the agent with no WEL routing if
-    // wevtutil im fails (locked channels, manifest validation error, etc.).
-    if (!imOk)
-        return;
-
-    // Remove flat classic WEL log entries that pre-manifest builds created directly.
-    // wevtutil um removes WINEVT publisher entries but leaves behind any EventLog\*
-    // keys our code created before the manifest approach; those flat logs appear as
-    // duplicate "Netdata/Daemon" entries in Event Viewer alongside the tree hierarchy.
-    // Safe to delete now because wevtutil im has already created the correct
-    // channel-linked entries that replace them.
-    for (size_t j = 0; j < _countof(wel_flat_legacy_keys); j++)
-        RegDeleteTreeW(HKEY_LOCAL_MACHINE, wel_flat_legacy_keys[j]);
-
-    // Remove only the DisplayName values written by the earlier implementation.
-    // Channel display metadata belongs in the manifest: its localized message and the
-    // Netdata/<leaf> channel name make Event Viewer show one Netdata folder containing
-    // the leaf logs. A registry override instead makes Event Viewer create an extra
-    // Netdata/<leaf> level with a duplicate full-name log beneath it.
-    for (size_t cl = 0; cl < _countof(wel_channels); cl++) {
-        wchar_t chregkey[MAX_PATH];
-        swprintf(chregkey, _countof(chregkey), L"%ls%ls",
-                 WINEVT_CHANNELS_KEY, wel_channels[cl].ch);
-        HKEY hCh;
-        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, chregkey, 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &hCh) == ERROR_SUCCESS) {
-            if (wel_has_stale_display_name(hCh, wel_channels[cl].label))
-                RegDeleteValueW(hCh, L"DisplayName");
-            RegCloseKey(hCh);
-        }
-    }
-}
-
 #if defined(HAVE_ETW)
 static void etw_set_source_meta(struct nd_log_source *source, USHORT channelID, const EVENT_DESCRIPTOR *ed) {
     // It turns out that the keyword varies per only per channel!
@@ -521,7 +158,7 @@ static bool etw_register_provider(void) {
 }
 #endif
 
-static void wel_queue_init(void);
+static void etw_queue_init(void);
 
 bool nd_log_init_windows(void) {
     if(nd_log.eventlog.initialized)
@@ -541,73 +178,13 @@ bool nd_log_init_windows(void) {
         return false;
 #endif
 
-    // Register WINEVT manifest channels when not already current — required for Event
-    // Viewer to show the Netdata tree hierarchy (Netdata → Daemon etc.) instead of flat
-    // "Netdata/Daemon" entries.  Previously gated on !HAVE_ETW, which meant ETW builds
-    // never auto-registered channels, producing the flat display.  The call is now
-    // unconditional: ETW dev builds and WEL builds both need channels; MSI-installed
-    // builds exit immediately via the registry check in wel_manifest_is_current().
-    wel_ensure_manifest_installed();
-
-    if(!nd_log.eventlog.etw) {
-        // Remove Application-log source entries left by a prior broken installation that
-        // registered sources under Application instead of their Netdata/* channel.  These
-        // entries redirect sources away from the WINEVT channels and cause message
-        // descriptions to fail because the Application log's DLL resolution path differs.
-        // Only leaf keys are deleted here (RegDeleteKeyW, no subtree needed).
-        static const wchar_t *const app_stale_keys[] = {
-            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\NetdataDaemon",
-            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\NetdataCollectors",
-            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\NetdataAccess",
-            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\NetdataHealth",
-            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\NetdataAclk",
-        };
-        for (size_t j = 0; j < _countof(app_stale_keys); j++)
-            RegDeleteKeyW(HKEY_LOCAL_MACHINE, app_stale_keys[j]);
-    }
-
-    // Loop through each source and add it to the registry
-    for(size_t i = 0; i < _NDLS_MAX; i++) {
-        nd_log.sources[i].source = i;
-
-        const wchar_t *sub_channel = wel_provider_per_source[i];
-
-        if(!sub_channel)
-            // we will map these to NDLS_DAEMON
-            continue;
-
-        if(!nd_log.eventlog.etw) {
-            // The installed manifest imports each classic provider into its WINEVT
-            // channel. Do not create parallel EventLog registry keys here: a key
-            // named "Netdata/Daemon" is displayed as a flat classic log rather
-            // than as the Netdata → Daemon WINEVT channel hierarchy.
-            nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, sub_channel);
-            if (!nd_log.sources[i].hEventLog) {
-                return false;
-            }
-        }
-    }
-
-    if(!nd_log.eventlog.etw) {
-        // Map the unset ones to NDLS_DAEMON
-        for (size_t i = 0; i < _NDLS_MAX; i++) {
-            if (!nd_log.sources[i].hEventLog)
-                nd_log.sources[i].hEventLog = nd_log.sources[NDLS_DAEMON].hEventLog;
-        }
-    }
-
     nd_log.eventlog.initialized = true;
-    wel_queue_init();
+    etw_queue_init();
     return true;
 }
 
 bool nd_log_init_etw(void) {
     nd_log.eventlog.etw = true;
-    return nd_log_init_windows();
-}
-
-bool nd_log_init_wel(void) {
-    nd_log.eventlog.etw = false;
     return nd_log_init_windows();
 }
 
@@ -622,7 +199,7 @@ bool nd_log_init_wel(void) {
 #define MEDIUM_WIDE_BUFFERS_SIZE 2048
 #define BIG_WIDE_BUFFERS_SIZE 16384
 // Largest per-field wide-char buffer (incl. null terminator). Used by
-// wel_wcslen_bounded() to satisfy SonarQube S5813 at ETW write sites.
+// etw_wcslen_bounded() to satisfy SonarQube S5813 at ETW write sites.
 #define NDF_FIELD_MAX_CHARS BIG_WIDE_BUFFERS_SIZE
 static wchar_t small_wide_buffers[_NDF_MAX][SMALL_WIDE_BUFFERS_SIZE];
 static wchar_t medium_wide_buffers[2][MEDIUM_WIDE_BUFFERS_SIZE];
@@ -649,42 +226,36 @@ __attribute__((constructor)) void wevents_initialize_buffers(void) {
 }
 
 // ----------------------------------------------------------------------------
-// Async WEL/ETW writer — decouples producers from ReportEventW/EventWrite
+// Async ETW writer — decouples producers from EventWrite.
 //
 // The global wchar buffers (small/medium/big) are shared state. The old design held a
-// single spinlock across BOTH field generation AND ReportEventW; if ReportEventW blocked
-// (e.g. a crashed prior run left the WEL channel in bad state) every logging thread spun
+// single spinlock across BOTH field generation AND EventWrite; if EventWrite blocked
+// (for example, a temporarily blocked Event Log service) every logging thread spun
 // indefinitely, blocking the main thread and the shutdown cleanup thread.
 //
 // New design:
-//   - wel_queue.mutex replaces the spinlock and covers only field generation + enqueue.
-//   - A single background thread (wel_async_writer) dequeues entries and calls ReportEventW.
-//   - If ReportEventW blocks, only the background thread stalls; producers enqueue and return.
+//   - etw_queue.mutex replaces the spinlock and covers only field generation + enqueue.
+//   - A single background thread (etw_async_writer) dequeues entries and calls EventWrite.
+//   - If EventWrite blocks, only the background thread stalls; producers enqueue and return.
 //   - When the queue is full the entry is dropped and the caller falls back to stderr.
 
-#define WEL_QUEUE_DEPTH 8
+#define ETW_QUEUE_DEPTH 8
 
-struct wel_queue_entry {
-    HANDLE          hEventLog;
-    WORD            wType;
+struct etw_queue_entry {
     DWORD           eventID;
-    ND_LOG_SOURCES  source_id;
-    bool            is_etw;
-#if defined(HAVE_ETW)
     USHORT          channelID;
     UCHAR           level;
     UCHAR           opcode;
     USHORT          task;
     ULONGLONG       keyword;
-#endif
-    // Snapshots of the three global wchar buffer pools (copied under wel_queue.mutex)
+    // Snapshots of the three global wchar buffer pools (copied under etw_queue.mutex)
     wchar_t small[_NDF_MAX][SMALL_WIDE_BUFFERS_SIZE];
     wchar_t medium[2][MEDIUM_WIDE_BUFFERS_SIZE];
     wchar_t big[2][BIG_WIDE_BUFFERS_SIZE];
 };
 
 static struct {
-    struct wel_queue_entry  slots[WEL_QUEUE_DEPTH];
+    struct etw_queue_entry  slots[ETW_QUEUE_DEPTH];
     size_t                  head, tail, count;
     bool                    stopped;
     uint64_t                dropped;
@@ -693,107 +264,93 @@ static struct {
     HANDLE                  drain_ack;  // auto-reset; consumer sets it on exit
     ND_THREAD              *thread;
     bool                    initialized;
-} wel_queue;
+} etw_queue;
 
 // Mirror the fields_buffers[] layout: return the right buffer from a queue entry.
-static inline const wchar_t *wel_entry_field(const struct wel_queue_entry *e, size_t i) {
+static inline const wchar_t *etw_entry_field(const struct etw_queue_entry *e, size_t i) {
     if(i == NDF_NIDL_INSTANCE) return e->medium[0];
     if(i == NDF_REQUEST)       return e->big[0];
     if(i == NDF_MESSAGE)       return e->big[1];
     return e->small[i];
 }
 
-static void wel_entry_process(struct wel_queue_entry *e) {
-    BOOL rc;
-
-#if defined(HAVE_ETW)
-    if(e->is_etw) {
-        EVENT_DATA_DESCRIPTOR desc[_NDF_MAX - 1];
-        for(size_t i = 1; i < _NDF_MAX; i++) {
-            const wchar_t *buf = wel_entry_field(e, i);
-            // Field buffers are fixed-size (small/medium/big) and always null-terminated
-            // when populated; the bounded helper is only here to satisfy SonarQube S5813
-            // and to return 0 on a malformed buffer rather than overread it.
-            EventDataDescCreate(&desc[i - 1], buf,
-                                (ULONG)((wel_wcslen_bounded(buf, NDF_FIELD_MAX_CHARS) + 1) * sizeof(WCHAR)));
-        }
-        EVENT_DESCRIPTOR ed = {
-            .Id      = e->eventID & EVENT_ID_CODE_MASK,
-            .Version = 0,
-            .Channel = (UCHAR)e->channelID,
-            .Level   = e->level,
-            .Opcode  = e->opcode,
-            .Task    = e->task,
-            .Keyword = e->keyword,
-        };
-        rc = ERROR_SUCCESS == EventWrite(regHandle, &ed, _NDF_MAX - 1, desc);
+static void etw_entry_process(struct etw_queue_entry *e) {
+    EVENT_DATA_DESCRIPTOR desc[_NDF_MAX - 1];
+    for(size_t i = 1; i < _NDF_MAX; i++) {
+        const wchar_t *buf = etw_entry_field(e, i);
+        // Field buffers are fixed-size (small/medium/big) and always null-terminated
+        // when populated; the bounded helper is only here to satisfy SonarQube S5813
+        // and to return 0 on a malformed buffer rather than overread it.
+        EventDataDescCreate(&desc[i - 1], buf,
+                            (ULONG)((etw_wcslen_bounded(buf, NDF_FIELD_MAX_CHARS) + 1) * sizeof(WCHAR)));
     }
-    else
-#endif
-    {
-        LPCWSTR msgs[_NDF_MAX - 1];
-        for(size_t i = 1; i < _NDF_MAX; i++)
-            msgs[i - 1] = wel_entry_field(e, i);
-        rc = ReportEventW(e->hEventLog, e->wType, 0, e->eventID, NULL, _NDF_MAX - 1, 0, msgs, NULL);
-    }
-
+    EVENT_DESCRIPTOR ed = {
+        .Id      = e->eventID & EVENT_ID_CODE_MASK,
+        .Version = 0,
+        .Channel = (UCHAR)e->channelID,
+        .Level   = e->level,
+        .Opcode  = e->opcode,
+        .Task    = e->task,
+        .Keyword = e->keyword,
+    };
+    (void)EventWrite(regHandle, &ed, _NDF_MAX - 1, desc);
 }
 
-static void wel_async_writer(void *arg __maybe_unused) {
+static void etw_async_writer(void *arg __maybe_unused) {
 
     for(;;) {
-        netdata_mutex_lock(&wel_queue.mutex);
+        netdata_mutex_lock(&etw_queue.mutex);
 
-        while(wel_queue.count == 0 && !wel_queue.stopped)
-            netdata_cond_wait(&wel_queue.not_empty, &wel_queue.mutex);
+        while(etw_queue.count == 0 && !etw_queue.stopped)
+            netdata_cond_wait(&etw_queue.not_empty, &etw_queue.mutex);
 
-        if(wel_queue.count == 0) {
+        if(etw_queue.count == 0) {
             // stopped and queue drained
-            netdata_mutex_unlock(&wel_queue.mutex);
+            netdata_mutex_unlock(&etw_queue.mutex);
             break;
         }
 
         // Snapshot head without advancing. count stays > 0, so producers cannot
         // wrap tail back to this slot while we process it outside the mutex.
-        size_t idx = wel_queue.head;
-        netdata_mutex_unlock(&wel_queue.mutex);
+        size_t idx = etw_queue.head;
+        netdata_mutex_unlock(&etw_queue.mutex);
 
-        // ReportEventW/EventWrite may block here — no lock held, producers unaffected
-        wel_entry_process(&wel_queue.slots[idx]);
+        // EventWrite may block here — no lock held, producers unaffected.
+        etw_entry_process(&etw_queue.slots[idx]);
 
         // Release the slot
-        netdata_mutex_lock(&wel_queue.mutex);
-        wel_queue.head = (wel_queue.head + 1) % WEL_QUEUE_DEPTH;
-        wel_queue.count--;
-        netdata_mutex_unlock(&wel_queue.mutex);
+        netdata_mutex_lock(&etw_queue.mutex);
+        etw_queue.head = (etw_queue.head + 1) % ETW_QUEUE_DEPTH;
+        etw_queue.count--;
+        netdata_mutex_unlock(&etw_queue.mutex);
     }
 
-    if(wel_queue.drain_ack)
-        SetEvent(wel_queue.drain_ack);
+    if(etw_queue.drain_ack)
+        SetEvent(etw_queue.drain_ack);
 }
 
-static void wel_queue_init(void) {
-    netdata_mutex_init(&wel_queue.mutex);
-    netdata_cond_init(&wel_queue.not_empty);
-    wel_queue.drain_ack = CreateEvent(NULL, FALSE, FALSE, NULL);
-    wel_queue.thread = nd_thread_create("WEL-ASYNC", NETDATA_THREAD_OPTION_DEFAULT,
-                                        wel_async_writer, NULL);
-    wel_queue.initialized = true;
+static void etw_queue_init(void) {
+    netdata_mutex_init(&etw_queue.mutex);
+    netdata_cond_init(&etw_queue.not_empty);
+    etw_queue.drain_ack = CreateEvent(NULL, FALSE, FALSE, NULL);
+    etw_queue.thread = nd_thread_create("ETW-ASYNC", NETDATA_THREAD_OPTION_DEFAULT,
+                                        etw_async_writer, NULL);
+    etw_queue.initialized = true;
 }
 
 void nd_log_stop_windows_async(void) {
-    if(!wel_queue.initialized)
+    if(!etw_queue.initialized)
         return;
 
-    netdata_mutex_lock(&wel_queue.mutex);
-    wel_queue.stopped = true;
-    netdata_cond_signal(&wel_queue.not_empty);
-    netdata_mutex_unlock(&wel_queue.mutex);
+    netdata_mutex_lock(&etw_queue.mutex);
+    etw_queue.stopped = true;
+    netdata_cond_signal(&etw_queue.not_empty);
+    netdata_mutex_unlock(&etw_queue.mutex);
 
     // Wait up to 2 s for the async writer to drain remaining entries.
-    // If WEL is still blocked we time out and let the process terminate normally.
-    if(wel_queue.drain_ack)
-        WaitForSingleObject(wel_queue.drain_ack, 2000);
+    // If ETW is still blocked we time out and let the process terminate normally.
+    if(etw_queue.drain_ack)
+        WaitForSingleObject(etw_queue.drain_ack, 2000);
 
 }
 
@@ -887,9 +444,8 @@ static void wevt_generate_all_fields_unsafe(struct log_field *fields, size_t fie
         if (s && *s) {
             utf8_to_utf16(fields_buffers[i].buf, (int) fields_buffers[i].size, s, -1);
 
-            if(nd_log.eventlog.etw)
-                // UNBELIEVABLE! they do recursive parameter expansion in ETW...
-                etw_replace_percent_with_unicode(fields_buffers[i].buf, fields_buffers[i].size);
+            // ETW recursively expands percent-prefixed fields.
+            etw_replace_percent_with_unicode(fields_buffers[i].buf, fields_buffers[i].size);
         }
     }
 }
@@ -910,21 +466,20 @@ static bool has_user_role_permissions(struct log_field *fields, size_t fields_ma
 }
 
 static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
-    if (!nd_log.eventlog.initialized || !wel_queue.initialized)
+    if (!nd_log.eventlog.initialized || !etw_queue.initialized)
         return false;
 
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
     if (fields[NDF_PRIORITY].entry.set)
         priority = (ND_LOG_FIELD_PRIORITY) fields[NDF_PRIORITY].entry.u64;
 
-    DWORD wType = get_event_type_from_priority(priority);
     CLEAN_BUFFER *tmp = NULL;
 
-    // wel_queue.mutex replaces the old spinlock:
+    // etw_queue.mutex replaces the old spinlock:
     //   - protects field generation into the shared global wchar buffers
     //   - protects queue head/tail/count while we claim a slot
-    //   - does NOT cover ReportEventW (that runs in the async writer thread)
-    netdata_mutex_lock(&wel_queue.mutex);
+    //   - does NOT cover EventWrite (that runs in the async writer thread)
+    netdata_mutex_lock(&etw_queue.mutex);
 
     wevt_generate_all_fields_unsafe(fields, fields_max, &tmp);
 
@@ -979,47 +534,35 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
     DWORD eventID = construct_event_id(source->source, priority, messageID);
 
     bool enqueued = false;
-    if(wel_queue.count < WEL_QUEUE_DEPTH) {
-        struct wel_queue_entry *e = &wel_queue.slots[wel_queue.tail];
-        wel_queue.tail = (wel_queue.tail + 1) % WEL_QUEUE_DEPTH;
-        wel_queue.count++;
+    if(etw_queue.count < ETW_QUEUE_DEPTH) {
+        struct etw_queue_entry *e = &etw_queue.slots[etw_queue.tail];
+        etw_queue.tail = (etw_queue.tail + 1) % ETW_QUEUE_DEPTH;
+        etw_queue.count++;
         enqueued = true;
 
-        e->hEventLog  = source->hEventLog;
-        e->wType      = wType;
         e->eventID    = eventID;
-        e->source_id  = source->source;
-        e->is_etw     = nd_log.eventlog.etw;
-#if defined(HAVE_ETW)
         e->channelID  = source->channelID;
         e->level      = get_level_from_priority(priority);
         e->opcode     = source->Opcode;
         e->task       = source->Task;
         e->keyword    = source->Keyword;
-#endif
         // Snapshot the global buffers into the queue slot before releasing the mutex.
         memcpy(e->small,  small_wide_buffers,  sizeof(small_wide_buffers));
         memcpy(e->medium, medium_wide_buffers, sizeof(medium_wide_buffers));
         memcpy(e->big,    big_wide_buffers,    sizeof(big_wide_buffers));
 
-        netdata_cond_signal(&wel_queue.not_empty);
+        netdata_cond_signal(&etw_queue.not_empty);
     } else {
-        wel_queue.dropped++;
+        etw_queue.dropped++;
     }
 
-    netdata_mutex_unlock(&wel_queue.mutex);
+    netdata_mutex_unlock(&etw_queue.mutex);
 
     return enqueued;
 }
 
 #if defined(HAVE_ETW)
 bool nd_logger_etw(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
-    return nd_logger_windows(source, fields, fields_max);
-}
-#endif
-
-#if defined(HAVE_WEL)
-bool nd_logger_wel(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
     return nd_logger_windows(source, fields, fields_max);
 }
 #endif

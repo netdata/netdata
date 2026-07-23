@@ -356,14 +356,13 @@
                 <Custom Action="UninstallManifest" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
             </InstallExecuteSequence>
 
-            <!-- Remove classic source registrations left by pre-manifest UCRT builds.
-                 They use the same source names as the earlier MSYS build, but register
-                 them under Netdata/* (or Application) instead of NetdataWEL.  wevtutil
-                 only removes WINEVT manifest state, so leaving these keys behind can
-                 cause a rollback build to resolve its sources to removed UCRT channels. -->
+            <!-- Remove classic registrations left by builds that predate the manifest.
+                 Classic Event Log keys named Netdata/* are distinct from ETW channels and
+                 make Event Viewer show duplicate Netdata folders. This runs after the
+                 manifest is registered so an upgrade repairs those stale entries in place. -->
             <SetProperty
                 Id="CleanupUcrtEventLogRegistrations"
-                Value="&quot;[System64Folder]cmd.exe&quot; /d /c &quot;&quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Daemon&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Collectors&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Access&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Health&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Aclk&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataDaemon&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataCollectors&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataAccess&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataHealth&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataAclk&quot; /f &amp; exit /b 0&quot;"
+                Value="&quot;[System64Folder]cmd.exe&quot; /d /c &quot;&quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Daemon&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Collectors&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Access&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Health&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Netdata/Aclk&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\NetdataWEL&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataDaemon&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataCollectors&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataAccess&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataHealth&quot; /f &amp; &quot;[System64Folder]reg.exe&quot; delete &quot;HKLM\SYSTEM\CurrentControlSet\Services\EventLog\Application\NetdataAclk&quot; /f &amp; exit /b 0&quot;"
                 Before="CleanupUcrtEventLogRegistrations"
                 Sequence="execute"
             />
@@ -376,7 +375,7 @@
                 Impersonate="no"
             />
             <InstallExecuteSequence>
-                <Custom Action="CleanupUcrtEventLogRegistrations" After="UninstallManifest" Condition="REMOVE=&quot;ALL&quot;" />
+                <Custom Action="CleanupUcrtEventLogRegistrations" After="InstallManifest" Condition="NOT REMOVE" />
             </InstallExecuteSequence>
 
             <!-- Unregister the manifest on upgrade before re-registering with the new one.
