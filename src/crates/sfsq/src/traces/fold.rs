@@ -93,6 +93,7 @@ pub(crate) fn merge_trace_sources(
     }
 
     let mut merged: HashMap<sfst::TraceId, MergedTrace> = HashMap::new();
+    let resolve_roots = spec.resolve_roots;
     let mut fold = |aggs: Vec<TraceAggregate>| {
         for a in aggs {
             let m = merged.entry(a.trace_id).or_insert(MergedTrace {
@@ -106,6 +107,13 @@ pub(crate) fn merge_trace_sources(
             m.max_end_ns = m.max_end_ns.max(a.max_end_ns);
             m.span_count = m.span_count.saturating_add(a.span_count);
             m.error_count = m.error_count.saturating_add(a.error_count);
+            // Tails resolve roots unconditionally (cheap — in-memory,
+            // no string table); a roots-free caller drops them HERE so
+            // `MergedTrace.root` is uniformly absent, never
+            // sealed-absent-but-tail-present.
+            if !resolve_roots {
+                continue;
+            }
             if let Some(candidate) = a.root {
                 match &m.root {
                     Some(current) if current.span_id <= candidate.span_id => {}

@@ -77,8 +77,8 @@ pub struct OtelTracesRequest {
     #[serde(default, deserialize_with = "present")]
     pub slowest: Option<serde_json::Value>,
     /// Query window, unix seconds. Consumed by the WINDOWED data modes
-    /// (search, both enumeration modes, and overview when it lands);
-    /// the `trace` mode deliberately ignores it — a trace is an exact
+    /// (search, both enumeration modes, overview, slowest); the
+    /// `trace` mode deliberately ignores it — a trace is an exact
     /// object whose spans straddle files, so by-id always looks at the
     /// full range (see the handler).
     #[serde(default)]

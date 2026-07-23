@@ -355,14 +355,20 @@ pub(crate) fn to_slowest_result(data: SlowestData, limit: usize) -> SlowestResul
         traces: data
             .traces
             .into_iter()
-            .map(|t| SlowestTraceWire {
-                trace_id: t.trace_id.to_string(),
-                root_service: t.root.as_ref().and_then(|r| r.service.clone()),
-                root_name: t.root.as_ref().and_then(|r| r.name.clone()),
-                start_ns: t.min_start_ns,
-                duration_ns: t.duration_ns,
-                span_count: t.span_count,
-                error_count: t.error_count,
+            .map(|t| {
+                let (root_service, root_name) = match t.root {
+                    Some(r) => (r.service, r.name),
+                    None => (None, None),
+                };
+                SlowestTraceWire {
+                    trace_id: t.trace_id.to_string(),
+                    root_service,
+                    root_name,
+                    start_ns: t.min_start_ns,
+                    duration_ns: t.duration_ns,
+                    span_count: t.span_count,
+                    error_count: t.error_count,
+                }
             })
             .collect(),
     }
