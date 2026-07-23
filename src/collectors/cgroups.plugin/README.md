@@ -390,7 +390,7 @@ When cgroups.plugin cannot read the cgroup filesystem, Netdata logs an error of
 the form:
 
 ```text
-CGROUP: cannot open directory "/sys/fs/cgroup": <reason>
+CGROUP: cannot open directory '/sys/fs/cgroup': <reason>
 ```
 
 The `<reason>` is the system error reported by `opendir()` — most commonly
