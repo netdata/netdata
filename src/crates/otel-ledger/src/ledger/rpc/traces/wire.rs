@@ -53,7 +53,10 @@ pub struct OtelTracesRequest {
     /// step 1.5.
     #[serde(default, deserialize_with = "present")]
     pub overview: Option<serde_json::Value>,
-    /// Query window, unix seconds. Common to every data mode.
+    /// Query window, unix seconds. Consumed by the WINDOWED data modes
+    /// (search/attributes/overview); the `trace` mode deliberately
+    /// ignores it — a trace is an exact object whose spans straddle
+    /// files, so by-id always looks at the full range (see the handler).
     #[serde(default)]
     pub after: u32,
     #[serde(default)]

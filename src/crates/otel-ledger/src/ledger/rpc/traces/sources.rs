@@ -170,6 +170,11 @@ impl TracesSourceSupplier {
     /// call returns `None` (indistinguishable from refusal on purpose —
     /// the capture's result is discarded either way).
     async fn resolve_wal(&self, wal: WalDesc, cancel: &CancellationToken) -> Option<ResolvedWal> {
+        // Poll before the boundary scan too — it is a blocking file read
+        // a cancelled call shouldn't pay for.
+        if cancel.is_cancelled() {
+            return None;
+        }
         let header = wal::HEADER_SIZE as u64;
         let scan_path = wal.path.clone();
         let valid_up_to = wal.valid_up_to;

@@ -207,7 +207,7 @@ async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
 }
 
 #[tokio::test]
-async fn cancelled_capture_with_a_wal_builds_nothing() {
+async fn cancelled_capture_with_a_wal_returns_empty_and_caches_nothing() {
     // The WAL loop polls before resolving each WAL: a pre-cancelled
     // call returns empty without touching the chunk cache.
     let supplier = make_supplier_with_min_entries(4);

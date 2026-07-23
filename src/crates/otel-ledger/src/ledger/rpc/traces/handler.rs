@@ -76,6 +76,9 @@ impl OtelTracesHandler {
         }
 
         let tenant = TenantId::resolve_query(req.tenant.as_deref());
+        // A cancelled capture returns NO copies; the empty default flows
+        // into the engine, which polls the same token up front and
+        // reports the Cancelled partial — one consistent cancel path.
         let sources = self
             .supplier
             .capture(&tenant, 0..u32::MAX, 1, &ctx.cancellation)
