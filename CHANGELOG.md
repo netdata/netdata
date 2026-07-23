@@ -753,6 +753,16 @@
 - Update go version ([#23210](https://github.com/netdata/netdata/issues/23210))
 - Weights: method=anomaly-rate implies the anomaly-bit option on every path ([#23212](https://github.com/netdata/netdata/issues/23212))
 - Update minimum Go patch version to 2 ([#23215](https://github.com/netdata/netdata/issues/23215))
+- Netdata fixes part 71 ([#23142](https://github.com/netdata/netdata/issues/23142))
+- Netdata fixes part 80 ([#23155](https://github.com/netdata/netdata/issues/23155))
+- Netdata fixes part 84 ([#23191](https://github.com/netdata/netdata/issues/23191))
+- Netdata fixes part 85 ([#23209](https://github.com/netdata/netdata/issues/23209))
+- Netdata fixes part 86 ([#23220](https://github.com/netdata/netdata/issues/23220))
+- Validate NETDATA_HOST_PREFIX in local_listeners ([#22923](https://github.com/netdata/netdata/issues/22923))
+- Fix agent compilation on FreeBSD ([#23221](https://github.com/netdata/netdata/issues/23221))
+- Otel-plugin: exit the legacy-logs worker when there is nothing to serve ([#23185](https://github.com/netdata/netdata/issues/23185))
+- Bump SQLite version to 3.53.3 ([#23218](https://github.com/netdata/netdata/issues/23218))
+- Add netdata-support-bundle: one-command sanitized support bundles ([#23157](https://github.com/netdata/netdata/issues/23157))
 
 ## [2.10.0] - 2026-04-09
 
