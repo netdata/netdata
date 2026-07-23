@@ -46,10 +46,12 @@ pub struct OtelTracesRequest {
     /// `null` included — into a clean client error.
     #[serde(default, deserialize_with = "present")]
     pub trace: Option<serde_json::Value>,
-    /// Selects attribute-name enumeration (facet keys). Typed in step 1.4.
+    /// Selects attribute-name enumeration (facet keys). Typed parse:
+    /// [`OtelTracesRequest::attributes_params`].
     #[serde(default, deserialize_with = "present")]
     pub attributes: Option<serde_json::Value>,
-    /// Selects attribute-value enumeration (facet values). Typed in step 1.4.
+    /// Selects attribute-value enumeration (facet values). Typed parse:
+    /// [`OtelTracesRequest::attribute_values_params`].
     #[serde(default, deserialize_with = "present")]
     pub attribute_values: Option<serde_json::Value>,
     /// Selects the overview grid (time × log-duration density). Typed in
@@ -194,6 +196,52 @@ impl OtelTracesRequest {
         // &Value is itself a Deserializer — no clone of the selector.
         TraceParams::deserialize(v).map_err(|e| format!("invalid trace selector: {e}"))
     }
+
+    /// Parse the `attributes` selector (same contract as
+    /// [`trace_params`](Self::trace_params); an empty object is valid —
+    /// all owners, engine-default cap).
+    pub fn attributes_params(&self) -> Result<AttributesParams, String> {
+        let v = self
+            .attributes
+            .as_ref()
+            .expect("attributes_params is only called on RequestMode::Attributes");
+        AttributesParams::deserialize(v).map_err(|e| format!("invalid attributes selector: {e}"))
+    }
+
+    /// Parse the `attribute_values` selector (same contract).
+    pub fn attribute_values_params(&self) -> Result<AttributeValuesParams, String> {
+        let v = self
+            .attribute_values
+            .as_ref()
+            .expect("attribute_values_params is only called on RequestMode::AttributeValues");
+        AttributeValuesParams::deserialize(v)
+            .map_err(|e| format!("invalid attribute_values selector: {e}"))
+    }
+}
+
+/// The `attributes` mode's typed parameters.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AttributesParams {
+    /// Restrict to one owner: `resource` / `span` / `instrumentation` /
+    /// `event` / `link` / `builtin`. Absent = every owner.
+    #[serde(default)]
+    pub owner: Option<String>,
+    /// Cap the key list (the response's `truncated` flag is exact).
+    #[serde(default)]
+    pub max_keys: Option<usize>,
+}
+
+/// The `attribute_values` mode's typed parameters.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AttributeValuesParams {
+    /// The key, in the selection grammar (`<owner>.<key>` or a bare
+    /// builtin word) — exactly what `attributes` returned.
+    pub key: String,
+    /// Cap the value list (the response's `truncated` flag is exact).
+    #[serde(default)]
+    pub max_values: Option<usize>,
 }
 
 /// The `trace` mode's typed parameters. Unknown fields are rejected —
@@ -221,6 +269,51 @@ pub enum OtelTracesResponse {
     Info(InfoResponse),
     Trace(Box<TraceResult>),
     Search(Box<SearchResult>),
+    Attributes(AttributesResult),
+    AttributeValues(AttributeValuesResult),
+}
+
+// ── Enumeration responses ───────────────────────────────────────────
+//
+// Window semantics for both: pruning is FILE-GRANULAR — a key or value
+// counted here comes from a file overlapping the window and may itself
+// lie just outside it. Exact per-row filtering belongs to `search`; the
+// facet rail needs the vocabulary, not row counts (counts arrive with
+// the phase-2 rollup).
+
+/// The facet keys, each in the selection grammar (`<owner>.<key>` or a
+/// bare builtin word) — feed them back as `selections` keys or an
+/// `attribute_values` request verbatim.
+#[derive(Debug, Serialize)]
+pub struct AttributesResult {
+    pub version: u32,
+    pub status: StatusWire,
+    /// Exact: true iff `max_keys` cut the list short.
+    pub truncated: bool,
+    pub keys: Vec<String>,
+}
+
+/// One key's values. Values are the engine's STORAGE labels (`status` ∈
+/// `OK`/`ERROR`, `kind` ∈ `INTERNAL`/`SERVER`/…) — exactly what search
+/// `selections` match on.
+#[derive(Debug, Serialize)]
+pub struct AttributeValuesResult {
+    pub version: u32,
+    pub status: StatusWire,
+    /// Exact: true iff `max_values` cut the list short.
+    pub truncated: bool,
+    /// The requested key, echoed in the selection grammar.
+    pub key: String,
+    pub values: Vec<AttributeValueWire>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AttributeValueWire {
+    pub value: String,
+    /// The value's schema kind (the shared kind words); absent when the
+    /// dictionaries carry no kind for it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<&'static str>,
 }
 
 // ── Search mode response ────────────────────────────────────────────

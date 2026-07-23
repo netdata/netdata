@@ -63,16 +63,12 @@ async fn default_request_is_an_empty_complete_search() {
 
 #[tokio::test]
 async fn remaining_data_modes_error_with_their_names() {
-    for (body, mode) in [
-        (json!({"attributes": {}}), "attributes"),
-        (json!({"attribute_values": {}}), "attribute_values"),
-        (json!({"overview": {}}), "overview"),
-    ] {
-        let err = call(body).await.expect_err("data modes are not implemented yet");
-        let msg = err.to_string();
-        assert!(msg.contains(mode), "names mode {mode}: {msg}");
-        assert!(msg.contains("not implemented"), "states why: {msg}");
-    }
+    let err = call(json!({"overview": {}}))
+        .await
+        .expect_err("overview is not implemented yet");
+    let msg = err.to_string();
+    assert!(msg.contains("overview"), "names the mode: {msg}");
+    assert!(msg.contains("not implemented"), "states why: {msg}");
 }
 
 #[tokio::test]
@@ -511,4 +507,92 @@ async fn late_arrivals_above_the_key_shorten_pages_but_never_duplicate() {
         page2.len() < 2,
         "the burst consumed the allowance — a short page: {page2:?}"
     );
+}
+
+// ── The enumeration modes ───────────────────────────────────────────
+
+#[tokio::test]
+async fn attributes_lists_keys_in_the_selection_grammar() {
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    body["attributes"] = json!({});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(v["truncated"], false);
+    let keys: Vec<&str> = v["keys"].as_array().unwrap().iter().map(|k| k.as_str().unwrap()).collect();
+    assert!(keys.contains(&"resource.service.name"), "{keys:?}");
+    assert!(keys.contains(&"name"), "builtin word: {keys:?}");
+    // The round-trip contract (every returned key feeds straight back
+    // as a selection or a values request) is pinned in the adapter
+    // tests; here we spot-check it end to end through the Function.
+    let mut body = window_body();
+    body["attribute_values"] = json!({"key": keys[0]});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["key"], keys[0]);
+}
+
+#[tokio::test]
+async fn attributes_owner_filter_and_truncation_are_exact() {
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    body["attributes"] = json!({"owner": "resource"});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    let keys = v["keys"].as_array().unwrap();
+    assert!(!keys.is_empty());
+    assert!(
+        keys.iter().all(|k| k.as_str().unwrap().starts_with("resource.")),
+        "{keys:?}"
+    );
+
+    let mut body = window_body();
+    body["attributes"] = json!({"max_keys": 1});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["keys"].as_array().unwrap().len(), 1);
+    assert_eq!(v["truncated"], true);
+}
+
+#[tokio::test]
+async fn attribute_values_returns_storage_labels_with_kinds() {
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    body["attribute_values"] = json!({"key": "resource.service.name"});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["key"], "resource.service.name");
+    assert_eq!(v["truncated"], false);
+    let values: Vec<&str> = v["values"].as_array().unwrap().iter().map(|x| x["value"].as_str().unwrap()).collect();
+    assert!(values.contains(&"svc-a") && values.contains(&"svc-b"), "{values:?}");
+
+    // Builtin `name`: the corpus's span names.
+    let mut body = window_body();
+    body["attribute_values"] = json!({"key": "name"});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    let values: Vec<&str> = v["values"].as_array().unwrap().iter().map(|x| x["value"].as_str().unwrap()).collect();
+    assert!(values.contains(&"span-1"), "{values:?}");
+
+    // Truncation flag exact.
+    let mut body = window_body();
+    body["attribute_values"] = json!({"key": "resource.service.name", "max_values": 1});
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(v["values"].as_array().unwrap().len(), 1);
+    assert_eq!(v["truncated"], true);
+}
+
+#[tokio::test]
+async fn enumeration_invalid_requests_are_clean_client_errors() {
+    let h = handler_with_search_corpus().await;
+    for (body, needle) in [
+        (json!({"attributes": null}), "invalid attributes selector"),
+        (json!({"attributes": {"owner": "bogus"}}), "unknown owner"),
+        (json!({"attributes": {"max_keys": 0}}), "zero key/value limit"),
+        (json!({"attribute_values": null}), "invalid attribute_values selector"),
+        (json!({"attribute_values": {}}), "missing field"),
+        (json!({"attribute_values": {"key": "bogus"}}), "unknown selection key"),
+        // A virtual builtin has no value dictionary — the engine's own
+        // message surfaces.
+        (json!({"attribute_values": {"key": "duration"}}), "virtual"),
+    ] {
+        let err = call_on(&h, body.clone()).await.expect_err("must be a client error");
+        let msg = err.to_string();
+        assert!(msg.contains(needle), "for {body}: {msg}");
+    }
 }

@@ -2,12 +2,13 @@
 //! `otel-traces` Function.
 //!
 //! Implemented modes: `info` (capability discovery), `trace` (exact
-//! single-trace fetch), and `search` (bounded most-recent-first trace
-//! search, the default mode); the remaining data modes resolve cleanly
-//! and return an explicit not-implemented error until their traces-ui
-//! phase-1 step lands. The wire contract lives in [`super::wire`], the
-//! engine mapping in [`super::adapter`], and source resolution in
-//! [`super::sources`].
+//! single-trace fetch), `search` (bounded most-recent-first trace
+//! search, the default mode), and the enumeration pair `attributes` /
+//! `attribute_values` (the facet rail's vocabulary); `overview` resolves
+//! cleanly and returns an explicit not-implemented error until its
+//! traces-ui phase-1 step lands. The wire contract lives in
+//! [`super::wire`], the engine mapping in [`super::adapter`], and
+//! source resolution in [`super::sources`].
 //!
 //! Netdata-plugin glue only, like the logs handler: the engine
 //! ([`sfsq::traces`]) stays wire-neutral; the bridge's `HandlerAdapter`
@@ -26,13 +27,15 @@ use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::TenantRegistries;
 
 use sfsq::traces::{
-    SearchQuery, SearchRequestError, SearchSources, TimeWindow, TraceQuery, TraceRequestError,
-    search, trace_by_id,
+    AttributeNamesQuery, AttributeRequestError, AttributeValuesQuery, SearchQuery,
+    SearchRequestError, SearchSources, TimeWindow, TraceQuery, TraceRequestError, attribute_names,
+    attribute_values, search, trace_by_id,
 };
 
 use super::adapter::{
-    build_predicate, parse_cursor, parse_trace_id, resolve_window, to_search_result,
-    to_trace_result,
+    ResolvedWindow, build_predicate, parse_cursor, parse_enumeration_key, parse_owner_word,
+    parse_trace_id, resolve_window, to_attribute_values_result, to_attributes_result,
+    to_search_result, to_trace_result,
 };
 use super::sources::TracesSourceSupplier;
 use super::wire::{InfoResponse, OtelTracesRequest, OtelTracesResponse, RequestMode, SearchResult};
@@ -229,6 +232,110 @@ impl OtelTracesHandler {
         );
         Ok(OtelTracesResponse::Search(Box::new(result)))
     }
+
+    /// Common setup for the enumeration modes: canonicalized window +
+    /// one captured source set + the engine window/progress plumbing.
+    async fn enumeration_setup(
+        &self,
+        ctx: &FunctionCallContext,
+        req: &OtelTracesRequest,
+    ) -> netdata_plugin_error::Result<(Vec<sfsq::traces::TraceSource>, TimeWindow)> {
+        let now_s = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .min(u64::from(u32::MAX)) as u32;
+        let window: ResolvedWindow = resolve_window(req.after, req.before, now_s, None)
+            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        let engine_window = TimeWindow::new(window.start_ns, window.end_ns)
+            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+
+        let tenant = TenantId::resolve_query(req.tenant.as_deref());
+        let sources = self
+            .supplier
+            .capture(&tenant, window.capture, 1, &ctx.cancellation)
+            .await
+            .pop()
+            .unwrap_or_default();
+        ctx.progress.set_total(sources.len());
+        Ok((sources, engine_window))
+    }
+
+    /// The `attributes` mode: exact dictionary-backed key enumeration —
+    /// the facet rail's vocabulary, in the selection grammar.
+    async fn attributes(
+        &self,
+        ctx: &FunctionCallContext,
+        req: &OtelTracesRequest,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
+        let params = req.attributes_params().map_err(client_err)?;
+        let mut query = AttributeNamesQuery::new();
+        if let Some(word) = params.owner.as_deref() {
+            query = query.owner(parse_owner_word(word).map_err(client_err)?);
+        }
+        if let Some(max) = params.max_keys {
+            query = query.max_keys(max);
+        }
+        let (sources, window) = self.enumeration_setup(ctx, req).await?;
+        query = query.window(window);
+
+        let done = ctx.progress.done_counter();
+        let cancel = ctx.cancellation.clone();
+        match tokio::task::spawn_blocking(move || attribute_names(sources, query, cancel, done))
+            .await
+        {
+            Ok(Ok(data)) => Ok(OtelTracesResponse::Attributes(to_attributes_result(data))),
+            Ok(Err(e)) => Err(map_attribute_error(e)),
+            Err(e) => Err(handler_err(format!(
+                "otel-traces attributes task failed: {e}"
+            ))),
+        }
+    }
+
+    /// The `attribute_values` mode: one key's exact value vocabulary
+    /// (storage labels — what search selections match on).
+    async fn attribute_values(
+        &self,
+        ctx: &FunctionCallContext,
+        req: &OtelTracesRequest,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
+        let params = req.attribute_values_params().map_err(client_err)?;
+        let (owner, key) = parse_enumeration_key(&params.key).map_err(client_err)?;
+        let mut query = AttributeValuesQuery::new(owner, key);
+        if let Some(max) = params.max_values {
+            query = query.max_values(max);
+        }
+        let (sources, window) = self.enumeration_setup(ctx, req).await?;
+        query = query.window(window);
+
+        let done = ctx.progress.done_counter();
+        let cancel = ctx.cancellation.clone();
+        let wire_key = params.key;
+        match tokio::task::spawn_blocking(move || attribute_values(sources, query, cancel, done))
+            .await
+        {
+            Ok(Ok(data)) => Ok(OtelTracesResponse::AttributeValues(
+                to_attribute_values_result(data, wire_key),
+            )),
+            Ok(Err(e)) => Err(map_attribute_error(e)),
+            Err(e) => Err(handler_err(format!(
+                "otel-traces attribute_values task failed: {e}"
+            ))),
+        }
+    }
+}
+
+/// Enumeration request errors: a rejected source set is the supplier's
+/// inconsistency (internal); everything else is the client's request.
+fn map_attribute_error(e: AttributeRequestError) -> netdata_plugin_error::NetdataPluginError {
+    match e {
+        AttributeRequestError::SourceSet(e) => handler_err(format!(
+            "otel-traces internal error: captured source set is inconsistent: {e}"
+        )),
+        other => handler_err(format!("invalid otel-traces request: {other}")),
+    }
 }
 
 #[async_trait]
@@ -248,6 +355,8 @@ impl FunctionHandler for OtelTracesHandler {
             RequestMode::Info => Ok(OtelTracesResponse::Info(InfoResponse::default())),
             RequestMode::Trace => self.trace(&ctx, &req).await,
             RequestMode::Search => self.search(&ctx, &req).await,
+            RequestMode::Attributes => self.attributes(&ctx, &req).await,
+            RequestMode::AttributeValues => self.attribute_values(&ctx, &req).await,
             other => Err(handler_err(format!(
                 "otel-traces mode '{}' is not implemented yet",
                 other.name()

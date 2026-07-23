@@ -8,13 +8,15 @@
 use std::collections::HashMap;
 
 use sfsq::traces::{
-    AttributeOwner, BuiltinField, CompareOp, Condition, FieldKinds, Predicate, PredicateTarget,
-    PredicateValue, SearchData, TraceData,
+    AttributeKey, AttributeNamesData, AttributeOwner, AttributeValuesData, BuiltinField,
+    CompareOp, Condition, FieldKinds, Predicate, PredicateTarget, PredicateValue, SearchData,
+    TraceData,
 };
 
 use super::wire::{
-    AnchorWire, EventWire, FieldKindsWire, LinkWire, SearchItems, SearchResult, SpanWire,
-    StatusWire, TraceItems, TraceResult, TraceSummaryWire,
+    AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, EventWire,
+    FieldKindsWire, LinkWire, SearchItems, SearchResult, SpanWire, StatusWire, TraceItems,
+    TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -221,6 +223,91 @@ pub(crate) fn build_predicate(
         });
     }
     Ok(Predicate { conditions })
+}
+
+// ── Enumeration: owner words + key rendering ────────────────────────
+
+/// Parse the `attributes.owner` word: an attribute owner or `builtin`.
+/// (`Any` stays un-nameable — the engine rejects enumerating it.)
+pub(crate) fn parse_owner_word(word: &str) -> Result<AttributeOwner, String> {
+    if word == "builtin" {
+        return Ok(AttributeOwner::Builtin);
+    }
+    OWNER_WORDS
+        .iter()
+        .find(|(w, _)| *w == word)
+        .map(|(_, o)| *o)
+        .ok_or_else(|| {
+            format!(
+                "unknown owner {word:?}: one of resource, span, instrumentation, \
+                 event, link, builtin"
+            )
+        })
+}
+
+/// Render one enumerated key into the selection grammar — the exact
+/// inverse of [`parse_selection_key`] (round-trip pinned by tests), so
+/// the facet rail can feed keys straight back as selections.
+pub(crate) fn render_attribute_key(owner: AttributeOwner, key: &AttributeKey) -> String {
+    match key {
+        AttributeKey::Builtin(b) => BUILTIN_WORDS
+            .iter()
+            .find(|(_, f)| f == b)
+            .map(|(w, _)| (*w).to_string())
+            .expect("the lockstep test pins a wire word for every builtin"),
+        AttributeKey::Attribute(a) => {
+            let word = OWNER_WORDS
+                .iter()
+                .find(|(_, o)| *o == owner)
+                .map(|(w, _)| *w)
+                .expect("attribute keys only ever carry attribute owners");
+            format!("{word}.{a}")
+        }
+    }
+}
+
+/// A selection-grammar key as the enumeration API's (owner, key) pair.
+pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, AttributeKey), String> {
+    Ok(match parse_selection_key(key)? {
+        PredicateTarget::Attribute(owner, a) => (owner, AttributeKey::Attribute(a)),
+        PredicateTarget::Builtin(f) => (AttributeOwner::Builtin, AttributeKey::Builtin(f)),
+    })
+}
+
+/// Shape the key enumeration into the wire result.
+pub(crate) fn to_attributes_result(data: AttributeNamesData) -> AttributesResult {
+    AttributesResult {
+        version: 1,
+        status: StatusWire::from(&data.status),
+        truncated: data.truncated,
+        keys: data
+            .keys
+            .iter()
+            .map(|(owner, key)| render_attribute_key(*owner, key))
+            .collect(),
+    }
+}
+
+/// Shape one key's value enumeration into the wire result. `key` is the
+/// request's key, echoed in the selection grammar.
+pub(crate) fn to_attribute_values_result(
+    data: AttributeValuesData,
+    key: String,
+) -> AttributeValuesResult {
+    AttributeValuesResult {
+        version: 1,
+        status: StatusWire::from(&data.status),
+        truncated: data.truncated,
+        key,
+        values: data
+            .values
+            .into_iter()
+            .map(|v| AttributeValueWire {
+                value: v.value,
+                kind: v.kind.map(kind_word),
+            })
+            .collect(),
+    }
 }
 
 // ── Search: pagination cursor ───────────────────────────────────────

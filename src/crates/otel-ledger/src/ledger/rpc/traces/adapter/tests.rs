@@ -159,6 +159,49 @@ fn every_engine_owner_is_deliberately_placed_in_the_wire_grammar() {
 }
 
 #[test]
+fn rendered_keys_round_trip_through_the_selection_grammar() {
+    // render ∘ parse = identity: every enumerated key feeds straight
+    // back as a selection key or a values request.
+    let cases: Vec<(AttributeOwner, AttributeKey)> = vec![
+        (
+            AttributeOwner::Resource,
+            AttributeKey::Attribute("service.name".into()),
+        ),
+        (
+            AttributeOwner::Span,
+            AttributeKey::Attribute("http.method".into()),
+        ),
+        (AttributeOwner::Event, AttributeKey::Attribute("x".into())),
+    ];
+    for (owner, key) in cases {
+        let rendered = render_attribute_key(owner, &key);
+        assert_eq!(
+            parse_enumeration_key(&rendered).unwrap(),
+            (owner, key),
+            "{rendered}"
+        );
+    }
+    // Every builtin word round-trips too.
+    for builtin in BuiltinField::ALL {
+        let rendered =
+            render_attribute_key(AttributeOwner::Builtin, &AttributeKey::Builtin(builtin));
+        assert_eq!(
+            parse_enumeration_key(&rendered).unwrap(),
+            (AttributeOwner::Builtin, AttributeKey::Builtin(builtin)),
+            "{rendered}"
+        );
+    }
+}
+
+#[test]
+fn owner_words_parse_including_builtin() {
+    assert_eq!(parse_owner_word("resource").unwrap(), AttributeOwner::Resource);
+    assert_eq!(parse_owner_word("builtin").unwrap(), AttributeOwner::Builtin);
+    assert!(parse_owner_word("any").is_err(), "Any stays un-nameable");
+    assert!(parse_owner_word("bogus").is_err());
+}
+
+#[test]
 fn selection_keys_parse_owners_builtins_and_dotted_attributes() {
     assert_eq!(
         parse_selection_key("resource.service.name").unwrap(),
