@@ -312,21 +312,21 @@ pub(crate) fn to_attribute_values_result(
 
 // ── Overview: engine data → wire ────────────────────────────────────
 
-/// Shape the span-density grid into the wire result. `bucket_start_s` /
-/// `bucket_width_s` are the ALIGNED second-granular geometry the grid
-/// was built from (the shared derivation guarantees whole seconds).
-pub(crate) fn to_overview_result(
-    data: OverviewData,
-    bucket_start_s: u32,
-    bucket_width_s: u32,
-) -> OverviewResult {
+/// Shape the span-density grid into the wire result. The wire's
+/// second-granular geometry derives from the SAME `grid` the engine
+/// binned on — one source of truth; the shared derivation guarantees
+/// whole seconds (debug-asserted).
+pub(crate) fn to_overview_result(data: OverviewData, grid: sfst::Grid) -> OverviewResult {
+    const NS_PER_S: i64 = 1_000_000_000;
+    debug_assert_eq!(grid.bucket_start_ns % NS_PER_S, 0);
+    debug_assert_eq!(grid.bucket_width_ns % NS_PER_S, 0);
     OverviewResult {
         version: 1,
         unit: "spans",
         status: StatusWire::from(&data.status),
         grid: OverviewGridWire {
-            bucket_start_s,
-            bucket_width_s,
+            bucket_start_s: (grid.bucket_start_ns / NS_PER_S) as u32,
+            bucket_width_s: (grid.bucket_width_ns / NS_PER_S) as u32,
             duration_bins: DURATION_BIN_LABELS.to_vec(),
             cells: data.cells.iter().map(|row| row.to_vec()).collect(),
         },

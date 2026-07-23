@@ -150,6 +150,12 @@ pub fn overview(
     sources.sort_by(|a, b| a.source_id().as_str().cmp(b.source_id().as_str()));
 
     let mut status = StatusBuilder::new();
+    // Polled up front — like every sibling operation — so a zero-source
+    // or already-cancelled call can never report Complete.
+    if cancel.is_cancelled() {
+        status.add(PartialReason::Cancelled);
+        return Ok(OverviewData::empty(grid.num_buckets, status.finish()));
+    }
     let mut cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
     let mut total_spans = 0u64;
     let mut total_errors = 0u64;
@@ -241,6 +247,10 @@ pub fn overview(
                         continue;
                     }
                 };
+                // Every decoded span counts toward the budget — unlike
+                // the sealed path (which narrows to the window by binary
+                // search first), the tail's decoded spans are unsorted,
+                // so the loop genuinely examines each one.
                 for (_, span) in scan.spans_with_ids() {
                     visited += 1;
                     if bin_span(&mut cells, span.start_ns, span.duration_ns) {

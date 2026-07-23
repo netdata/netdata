@@ -196,3 +196,20 @@ fn empty_grid_is_a_request_error() {
     .unwrap_err();
     assert!(err.to_string().contains("empty"), "{err}");
 }
+
+#[test]
+fn cancelled_zero_source_call_still_reports_cancelled() {
+    // The sibling-engine contract: a zero-source or already-cancelled
+    // call can never report Complete — the up-front poll guarantees it
+    // even when the source loop never runs.
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    let data = overview(
+        vec![],
+        OverviewQuery::new(grid()),
+        cancel,
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .unwrap();
+    assert!(data.status.has(PartialReason::Cancelled));
+}

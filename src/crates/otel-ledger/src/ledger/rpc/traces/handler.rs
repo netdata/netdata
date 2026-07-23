@@ -362,13 +362,9 @@ impl OtelTracesHandler {
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
 
-        let width_s = (aligned_before - aligned_after)
-            / u32::try_from(grid.num_buckets.max(1)).unwrap_or(1);
         match tokio::task::spawn_blocking(move || overview(sources, query, cancel, done)).await {
             Ok(Ok(data)) => Ok(OtelTracesResponse::Overview(Box::new(to_overview_result(
-                data,
-                aligned_after,
-                width_s,
+                data, grid,
             )))),
             Ok(Err(OverviewRequestError::SourceSet(e))) => Err(handler_err(format!(
                 "otel-traces internal error: captured source set is inconsistent: {e}"
