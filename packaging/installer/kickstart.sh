@@ -397,9 +397,8 @@ is_valid_url() {
 }
 
 sanitize_string() {
-  printf '%s\n' "${1}" | tr -cd "[:alnum:] ._-="
   v="${1}"
-  r="$(printf '%s\n' "${1}" | tr -cd "[:alnum:] ._-")"
+  r="$(printf '%s\n' "${1}" | tr -cd "[:alnum:] ._=-")"
   [ "${v}" = "${r}" ] || warning "Unsafe characters found in string, sanitized to ${r}"
   echo "${r}"
 }
