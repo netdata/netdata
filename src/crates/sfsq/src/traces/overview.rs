@@ -198,9 +198,9 @@ pub fn overview(
         error_count: u64,
     }
     let mut merged: HashMap<sfst::TraceId, Merged> = HashMap::new();
-    let fold = |aggs: Vec<TraceAggregate>, merged: &mut HashMap<sfst::TraceId, Merged>| {
+    let fold = |aggs: Vec<TraceAggregate>, acc: &mut HashMap<sfst::TraceId, Merged>| {
         for a in aggs {
-            let m = merged.entry(a.trace_id).or_insert(Merged {
+            let m = acc.entry(a.trace_id).or_insert(Merged {
                 min_start_ns: i64::MAX,
                 max_end_ns: i64::MIN,
                 span_count: 0,
@@ -309,7 +309,7 @@ pub fn overview(
         let bucket = ((m.min_start_ns - grid_start) / grid.bucket_width_ns) as usize;
         let duration = m.max_end_ns.saturating_sub(m.min_start_ns);
         cells[bucket][duration_bin(duration)] += 1;
-        total_traces += 1;
+        total_traces = total_traces.saturating_add(1);
         total_spans = total_spans.saturating_add(m.span_count);
         total_errors = total_errors.saturating_add(m.error_count);
     }

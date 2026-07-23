@@ -27,8 +27,9 @@ pub enum PartialReason {
     /// hardening is deferred whole).
     WorkCeiling,
     /// The caller cancelled: before all source heads were resolved the
-    /// result is empty; during the merge it is the deterministic merged
-    /// prefix.
+    /// result is empty; during the SEARCH merge it is the deterministic
+    /// merged prefix. The overview opts into all-or-empty instead — a
+    /// mid-loop cancel discards the partial fold.
     Cancelled,
     /// The overview's own visited-rows ceiling was hit before every
     /// in-window source was binned: the grid holds the deterministic
