@@ -454,7 +454,7 @@ cleanup() {
   if [ -z "${NO_CLEANUP}" ] && [ -n "${tmpdir}" ]; then
     cd || true
     DRY_RUN=0
-    run_as_root rm -rf "${tmpdir}"
+    run_as_root_silent rm -rf "${tmpdir}"
   fi
 }
 
@@ -562,6 +562,17 @@ run_as_root() {
   fi
 
   run ${ROOTCMD} "${@}"
+}
+
+# Only to be used in cleanup code.
+run_as_root_silent() {
+  confirm_root_support
+
+  if [ "$(id -u)" -ne "0" ]; then
+    printf >&2 "Root privileges required to run %s\n" "${*}"
+  fi
+
+  ${ROOTCMD} "${@}"
 }
 
 run_script() {
