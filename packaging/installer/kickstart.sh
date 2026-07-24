@@ -1223,7 +1223,7 @@ handle_existing_install() {
         return 0
       elif [ "${INSTALL_TYPE}" = "unknown" ]; then
         claimonly_notice="If you just want to claim this install, you should re-run this command with the --claim-only option instead."
-        if [ "${INTERACTIVE}" -eq 0 ] && [ "${ACTION}" != "claim" ]; then
+        if [ "${ACTION}" != "claim" ]; then
           if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
             fatal "Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice}" F0106
           else
