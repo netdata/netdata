@@ -24,9 +24,11 @@ pub use ng_flatten::{
 /// Errors reading a flattened WAL or building an SFST from it.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("wal error: {0}")]
+    // Wrapper variants are transparent: embedding the source in the message
+    // while also chaining it would print it twice in anyhow chains.
+    #[error(transparent)]
     Wal(#[from] wal::Error),
-    #[error("io error: {0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("no .wal file found in {0}")]
     NoWal(PathBuf),
@@ -37,12 +39,16 @@ pub enum Error {
          refusing to decode frames written by a different codec"
     )]
     PayloadFormat { found: u16, expected: u16 },
-    #[error("frame {frame}: bincode decode failed: {source}")]
+    // The decode error is embedded in the message, NOT chained (a field
+    // named `source` would be auto-chained by thiserror and then print
+    // twice in anyhow chains). Display-only consumers (the ledger indexer
+    // logs `{e}`) need the decode reason in the message itself.
+    #[error("frame {frame}: bincode decode failed: {err}")]
     BincodeDecode {
         frame: u64,
-        source: bincode::error::DecodeError,
+        err: bincode::error::DecodeError,
     },
-    #[error("sfst build failed: {0}")]
+    #[error(transparent)]
     Sfst(#[from] sfst::Error),
 }
 
