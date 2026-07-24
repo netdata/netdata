@@ -32,7 +32,7 @@ static inline void *mallocz(size_t size) {
 
 static inline void *reallocz(void *ptr, size_t size) {
     void *p = realloc(ptr, size);
-    if (!p) { fprintf(stderr, "reallocz: out of memory\n"); abort(); }
+    if (!p && size) { fprintf(stderr, "reallocz: out of memory\n"); abort(); }
     return p;
 }
 

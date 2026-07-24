@@ -502,7 +502,7 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
      * targets.  Re-sending CHART/DIMENSION for a target that got its charts in
      * the same cycle is benign -- the Netdata protocol treats it as an update. */
     static bool cachestat_charts_announced = false;
-    if (!cachestat_charts_announced && apps_ebpf_cachestat_is_available()) {
+    if (!cachestat_charts_announced && apps_ebpf_cachestat_is_available() && strcmp(type, NETDATA_APP_FAMILY) == 0) {
         for (w = root; w; w = w->next) {
             if (!w->exposed) continue;
             send_cachestat_charts_to_netdata(w, type, lbl_name);
