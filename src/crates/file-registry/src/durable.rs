@@ -46,6 +46,9 @@ fn tmp_path(final_path: &Path) -> PathBuf {
 /// `NotFound` tolerance) keeps working. `std::fs` errors carry no path;
 /// without this a production failure logs as a bare "Permission denied"
 /// with no hint of what was being written where.
+///
+/// The kind is the only structured field preserved: `raw_os_error()`
+/// and `source()` are intentionally flattened into the message text.
 fn annotate(e: io::Error, op: &str, path: &Path) -> io::Error {
     io::Error::new(e.kind(), format!("{op} {}: {e}", path.display()))
 }
@@ -135,7 +138,8 @@ impl Drop for AtomicFile {
 /// whole-buffer convenience over [`AtomicFile`].
 pub fn write_atomic(final_path: &Path, bytes: &[u8]) -> io::Result<()> {
     let (guard, mut file) = AtomicFile::create(final_path)?;
-    file.write_all(bytes)?;
+    file.write_all(bytes)
+        .map_err(|e| annotate(e, "write temp file", &tmp_path(final_path)))?;
     guard.commit(file)
 }
 
@@ -205,29 +209,36 @@ mod tests {
         std::fs::create_dir(&locked).unwrap();
         std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o555)).unwrap();
 
-        // Creating the temp file inside the read-only dir fails.
+        // Capture results, then restore permissions so the tempdir can be
+        // removed even if an assert below fails.
         let path = locked.join("seq_highwater");
-        let err = write_atomic(&path, b"x").unwrap_err();
-        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
-        let msg = err.to_string();
-        assert!(
-            msg.contains("create temp file") && msg.contains(&tmp_path(&path).display().to_string()),
-            "message must name the operation and path: {msg}"
-        );
-
-        // Creating a parent under the read-only dir fails in create_dir_all.
+        let created = write_atomic(&path, b"x");
         let nested = locked.join("shared").join("seq_highwater");
-        let err = write_atomic(&nested, b"x").unwrap_err();
-        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
-        let msg = err.to_string();
-        assert!(
-            msg.contains("create parent directory")
-                && msg.contains(&nested.parent().unwrap().display().to_string()),
-            "message must name the operation and parent path: {msg}"
-        );
-
-        // Restore so tempdir cleanup can remove it.
+        let nested_created = write_atomic(&nested, b"x");
         std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        // Under root the chmod doesn't deny anything; only assert when
+        // the writes actually failed.
+        if let Err(err) = created {
+            // Creating the temp file inside the read-only dir fails.
+            assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+            let msg = err.to_string();
+            assert!(
+                msg.contains("create temp file")
+                    && msg.contains(&tmp_path(&path).display().to_string()),
+                "message must name the operation and path: {msg}"
+            );
+        }
+        if let Err(err) = nested_created {
+            // Creating a parent under the read-only dir fails in create_dir_all.
+            assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+            let msg = err.to_string();
+            assert!(
+                msg.contains("create parent directory")
+                    && msg.contains(&nested.parent().unwrap().display().to_string()),
+                "message must name the operation and parent path: {msg}"
+            );
+        }
     }
 
     #[test]
