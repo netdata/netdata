@@ -251,20 +251,25 @@ enum CapacityOutcome {
     HarnessInvalid,
 }
 
-/// Controls which finalized journal artifacts a capacity case decodes.
+/// Controls the evidence collected for a capacity case.
 ///
-/// A peak search needs the raw journal to prove that the live ingest path
-/// retained every expected row and counter. Rollup artifact correctness and
-/// physical storage are validated by the dedicated storage matrix, so decoding
-/// every rollup after every peak probe only delays the next measurement.
+/// Discovery probes need enough telemetry to find a possible lossless rate.
+/// Only sustained proofs can become reported peaks, and those independently
+/// decode the raw journal. Rollup artifact correctness and physical storage
+/// are validated by the dedicated storage matrix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum CapacityReadbackScope {
     RawAndTiers,
     RawOnly,
+    TelemetryOnly,
 }
 
 impl CapacityReadbackScope {
+    const fn includes_raw(self) -> bool {
+        !matches!(self, Self::TelemetryOnly)
+    }
+
     const fn includes_tiers(self) -> bool {
         matches!(self, Self::RawAndTiers)
     }
@@ -503,7 +508,7 @@ fn bench_capacity_peak_matrix() {
         })
         .collect();
     let report = CapacityPeakMatrixReport {
-        methodology: "For every protocol, packet shape, and cardinality profile, an isolated loopback sender emits real UDP datagrams into a fresh collector and the controller reads finalized raw journals. A pass requires every sent datagram, zero collector errors, and exact raw journal rows, byte counters, packet counters, and ordinary-flow cardinality. Rollup work remains active and its errors are checked, while the dedicated storage matrix validates finalized rollup artifacts. The search doubles the offered exporter-record rate until a strict lossless failure, then narrows the pass/fail bracket to 1,000 records/s. The highest short-run pass is then required to pass twice for 60 seconds. If it does not, the same bracket search is repeated at the sustained duration. The reported peak is therefore the highest rate measured to pass twice for the stated duration, not a universal product limit.",
+        methodology: "For every protocol, packet shape, and cardinality profile, an isolated loopback sender emits real UDP datagrams into a fresh collector. Discovery probes verify sender delivery, every received datagram, decoder and journal telemetry, and zero collector errors, but do not decode journals because they cannot become a reported result. The highest discovery candidate is then required to pass twice for 60 seconds with independent final raw-journal verification of rows, byte counters, packet counters, and ordinary-flow cardinality. Rollup work remains active and its errors are checked, while the dedicated storage matrix validates finalized rollup artifacts. If confirmation fails, a sustained telemetry bracket is found before raw-journal confirmations resume. The reported peak is therefore the highest rate measured to pass twice for the stated duration, not a universal product limit.",
         created_unix_secs: unix_secs(),
         probe_duration_secs: config.probe_duration_secs,
         confirmation_duration_secs: config.confirmation_duration_secs,
@@ -706,7 +711,7 @@ fn find_capacity_peak_bracket(
     let mut rate = config.initial_rate_records_per_sec;
 
     loop {
-        let case = run_capacity_peak_case(CapacityCaseSpec {
+        let case = run_capacity_discovery_case(CapacityCaseSpec {
             protocol,
             packet_shape,
             cardinality,
@@ -763,7 +768,7 @@ fn find_capacity_peak_bracket(
     let mut high = lowest_failure.expect("capacity failure must set an upper probe");
     while high.saturating_sub(low) > config.rate_resolution_records_per_sec {
         let rate = midpoint_peak_probe_rate(low, high, config.rate_resolution_records_per_sec);
-        let case = run_capacity_peak_case(CapacityCaseSpec {
+        let case = run_capacity_discovery_case(CapacityCaseSpec {
             protocol,
             packet_shape,
             cardinality,
@@ -1103,12 +1108,43 @@ fn capacity_peak_case_reads_raw_without_redecoding_rollup_artifacts() {
     );
 }
 
+#[test]
+fn capacity_discovery_case_uses_telemetry_without_journal_readback() {
+    let report = run_capacity_discovery_case(CapacityCaseSpec {
+        protocol: WireProtocol::Ipfix,
+        packet_shape: PacketShape::NearMtuPacked,
+        cardinality: CardinalityProfile::Repeating256,
+        target_records_per_sec: 100,
+        active_duration_secs: 1,
+        warmup_records: 64,
+    });
+
+    assert_eq!(report.outcome, CapacityOutcome::Pass, "{report:#?}");
+    assert_eq!(report.readback_scope, CapacityReadbackScope::TelemetryOnly);
+    assert!(
+        report.raw.is_none(),
+        "discovery must not read the raw journal"
+    );
+    assert!(
+        report.tiers.is_empty(),
+        "discovery must not read rollup journals"
+    );
+    assert!(
+        report.rates.is_none(),
+        "only raw-journal cases may report accepted rates"
+    );
+}
+
 fn run_capacity_case(spec: CapacityCaseSpec) -> CapacityCaseReport {
     run_capacity_case_with_readback(spec, CapacityReadbackScope::RawAndTiers)
 }
 
 fn run_capacity_peak_case(spec: CapacityCaseSpec) -> CapacityCaseReport {
     run_capacity_case_with_readback(spec, CapacityReadbackScope::RawOnly)
+}
+
+fn run_capacity_discovery_case(spec: CapacityCaseSpec) -> CapacityCaseReport {
+    run_capacity_case_with_readback(spec, CapacityReadbackScope::TelemetryOnly)
 }
 
 fn run_capacity_case_with_readback(
@@ -1175,7 +1211,10 @@ fn run_capacity_case_inner(
 
         let journal_dir = artifact.path().join("flows");
         let raw_readback_started = Instant::now();
-        let raw = read_tier(&journal_dir.join("raw"), !spec.protocol.is_nsel())?;
+        let raw = readback_scope
+            .includes_raw()
+            .then(|| read_tier(&journal_dir.join("raw"), !spec.protocol.is_nsel()))
+            .transpose()?;
         let raw_readback_millis = raw_readback_started.elapsed().as_millis();
 
         let tier_readback_started = Instant::now();
@@ -1188,8 +1227,11 @@ fn run_capacity_case_inner(
         let tier_readback_millis = tier_readback_started.elapsed().as_millis();
 
         let (outcome, reason) =
-            validate_capacity_case(&spec, &sender_report, &collector_report, &raw);
-        let rates = capacity_rates(&spec, &sender_report, &collector_report, &raw)?;
+            validate_capacity_case(&spec, &sender_report, &collector_report, raw.as_ref());
+        let rates = raw
+            .as_ref()
+            .map(|raw| capacity_rates(&spec, &sender_report, &collector_report, raw))
+            .transpose()?;
         let nsel = spec
             .protocol
             .is_nsel()
@@ -1201,9 +1243,9 @@ fn run_capacity_case_inner(
             reason,
             sender: Some(sender_report),
             collector: Some(collector_report),
-            raw: Some(raw),
+            raw,
             tiers,
-            rates: Some(rates),
+            rates,
             nsel,
             timing: Some(CapacityCaseTiming {
                 collector_startup_millis,
@@ -1228,7 +1270,7 @@ fn validate_capacity_case(
     spec: &CapacityCaseSpec,
     sender: &SenderReport,
     collector: &CollectorReport,
-    raw: &TierReadback,
+    raw: Option<&TierReadback>,
 ) -> (CapacityOutcome, Option<String>) {
     let active_records = match spec.active_records() {
         Ok(records) => records,
@@ -1360,38 +1402,40 @@ fn validate_capacity_case(
         }
     }
 
-    if raw.rows != expected_rows
-        || raw.bytes != expected_rows * BENCHMARK_BYTES
-        || raw.packets != expected_rows * BENCHMARK_PACKETS
-    {
-        return (
-            CapacityOutcome::CapacityFailure,
-            Some(format!(
-                "raw journal has {} rows, {} bytes, {} packets; expected {}, {}, {}",
-                raw.rows,
-                raw.bytes,
-                raw.packets,
-                expected_rows,
-                expected_rows * BENCHMARK_BYTES,
-                expected_rows * BENCHMARK_PACKETS
-            )),
-        );
-    }
-    if !spec.protocol.is_nsel()
-        && raw.distinct_identities
-            != spec
-                .cardinality
-                .expected_distinct_identities(workload.records())
-    {
-        return (
-            CapacityOutcome::CapacityFailure,
-            Some(format!(
-                "raw journal has {} distinct identities; expected {}",
-                raw.distinct_identities,
-                spec.cardinality
+    if let Some(raw) = raw {
+        if raw.rows != expected_rows
+            || raw.bytes != expected_rows * BENCHMARK_BYTES
+            || raw.packets != expected_rows * BENCHMARK_PACKETS
+        {
+            return (
+                CapacityOutcome::CapacityFailure,
+                Some(format!(
+                    "raw journal has {} rows, {} bytes, {} packets; expected {}, {}, {}",
+                    raw.rows,
+                    raw.bytes,
+                    raw.packets,
+                    expected_rows,
+                    expected_rows * BENCHMARK_BYTES,
+                    expected_rows * BENCHMARK_PACKETS
+                )),
+            );
+        }
+        if !spec.protocol.is_nsel()
+            && raw.distinct_identities
+                != spec
+                    .cardinality
                     .expected_distinct_identities(workload.records())
-            )),
-        );
+        {
+            return (
+                CapacityOutcome::CapacityFailure,
+                Some(format!(
+                    "raw journal has {} distinct identities; expected {}",
+                    raw.distinct_identities,
+                    spec.cardinality
+                        .expected_distinct_identities(workload.records())
+                )),
+            );
+        }
     }
     (CapacityOutcome::Pass, None)
 }
