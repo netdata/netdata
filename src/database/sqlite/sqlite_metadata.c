@@ -2718,16 +2718,23 @@ static void start_metadata_hosts(uv_work_t *req)
     // still has to release the worker-owned Judy list on that path.
     store_ctx_cleanup_list(config, (struct judy_list_t *)worker->pending_ctx_cleanup_list);
 
+    // Process queued dimension deletions BEFORE storing host metadata. A
+    // dimension can be freed (which enqueues its uuid here) and then re-created
+    // reusing the same uuid; if we stored first and deleted after, the queued
+    // delete would wipe the freshly stored metadata of the now-live dimension
+    // (and RRDSET_FLAG_METADATA_UPDATE would already be cleared, so it would not
+    // be re-stored). Deleting first and storing after keeps the live dimension's
+    // metadata.
+    // This helper already skips dimension deletion once shutdown starts, but it
+    // still has to release the worker-owned Judy list on that path.
+    do_pending_uuid_deletion(config, (struct judy_list_t *)worker->pending_uuid_deletion);
+
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
     store_hosts_metadata(config, true, false);
 
     COMPUTE_DURATION(report_duration, "us", all_started_ut, now_monotonic_usec());
     nd_log_daemon(NDLP_DEBUG, "Checking all hosts completed in %s", report_duration);
-
-    // This helper already skips dimension deletion once shutdown starts, but it
-    // still has to release the worker-owned Judy list on that path.
-    do_pending_uuid_deletion(config, (struct judy_list_t *)worker->pending_uuid_deletion);
 
     if (!SHUTDOWN_REQUESTED(config)) {
         run_metadata_cleanup(config);
