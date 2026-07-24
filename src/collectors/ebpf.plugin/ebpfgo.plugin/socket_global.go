@@ -126,8 +126,10 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 			return
 		}
 
-		// Snapshot failures mean this cycle has no trustworthy per-PID socket
-		// data. Clear prior values so consumers see zeros, not stale activity.
+		// Callers invoke MarkSocketInactive() before clearSocketApps so the
+		// SOCKET flag is already cleared; the consumer will skip the update.
+		// Zero out per-PID socket data so the segment is clean when the flag
+		// is re-set on the next successful cycle.
 		store.UpdateSocketApps(nil)
 		if shmPublisher != nil {
 			if err := store.Publish(shmPublisher); err != nil {
@@ -137,17 +139,14 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 	}
 
 	collectAndPublish := func() {
-		// Mark the socket module active before any early return so the SOCKET
-		// SHM flag is set even when Snapshot or SnapshotPerPID fails.  Without
-		// this, a transient BPF error prevents socket_ok from becoming true and
-		// cgroup charts are never created for the cycle.
-		if store != nil {
-			store.MarkSocketActive()
-		}
-
 		snap, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {
 			logPluginErr("socket.snapshot", "socket", "snapshot", err)
+			if store != nil {
+				// No valid data this cycle: clear the SOCKET flag so the
+				// consumer does not see socket_ok = true with zero arrays.
+				store.MarkSocketInactive()
+			}
 			clearSocketApps()
 			return
 		}
@@ -159,6 +158,9 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 			pidEntries, pidErr := handle.Runtime.SnapshotPerPID()
 			if pidErr != nil {
 				logPluginErr("socket.snapshot_per_pid", "socket", "per-PID snapshot", pidErr)
+				// Global snapshot succeeded but per-PID data is missing.
+				// Clear the flag so the consumer skips this cycle's update.
+				store.MarkSocketInactive()
 				clearSocketApps()
 			} else {
 				store.UpdateSocketApps(pidEntries)

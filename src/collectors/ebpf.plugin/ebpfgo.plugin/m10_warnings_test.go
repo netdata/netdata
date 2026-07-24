@@ -8,7 +8,7 @@
 //   - handleNetworkProtocols (via netdataapi buffer)
 //   - buildNetworkProtocolsJSON JSON schema (golden output)
 //   - applySocketDataLocked and the SHM flag round-trip
-//   - MarkSocketActive and UpdateSocketApps edge cases
+//   - UpdateSocketApps flag semantics (nil vs non-nil, per-cycle clear)
 //   - runSocketGlobalCollector and runDNSGlobalCollector start-time guards
 //   - DNS fallback loader sequencing (plan builder / flavor selection)
 //   - Per-PID socket aggregation API shape (CGO-required)
@@ -181,31 +181,45 @@ func mustIndexString(v interface{}) string {
 	return ""
 }
 
-// ---- M10: MarkSocketActive / SHM flag round-trip --------------------------
+// ---- M10: UpdateSocketApps flag semantics / SHM flag round-trip -----------
 
-func TestMarkSocketActive_SetsFlag(t *testing.T) {
+// TestUpdateSocketApps_SetsFlag verifies that UpdateSocketApps sets the SOCKET
+// flag when called with a non-nil, non-empty slice.
+func TestUpdateSocketApps_SetsFlag(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
-	store.MarkSocketActive()
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 1}})
 	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
-		t.Fatal("MarkSocketActive did not set the SOCKET flag")
+		t.Fatal("UpdateSocketApps did not set the SOCKET flag")
 	}
 }
 
-func TestMarkSocketActive_Idempotent(t *testing.T) {
+// TestUpdateSocketApps_NilDoesNotSetFlag verifies that the failure-path caller
+// (clearSocketApps passes nil) does not set the SOCKET flag; the caller is
+// responsible for clearing it via MarkSocketInactive before calling here.
+func TestUpdateSocketApps_NilDoesNotSetFlag(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
-	store.MarkSocketActive()
-	store.MarkSocketActive()
-	store.MarkSocketActive()
-	// Flag is a single bit; idempotent means repeated calls do not change the
-	// value beyond the single bit being set.
-	if got := store.activeModules; got != ebpfgoSHMFlagSocket {
-		t.Fatalf("activeModules = %#x, want %#x", got, ebpfgoSHMFlagSocket)
+	store.UpdateSocketApps(nil)
+	if store.activeModules&ebpfgoSHMFlagSocket != 0 {
+		t.Fatal("UpdateSocketApps(nil) set the SOCKET flag; it must not")
+	}
+}
+
+// TestUpdateSocketApps_NilDoesNotClearExistingFlag verifies that a nil call
+// does not disturb a flag that was already set by a prior successful cycle.
+// The flag persists until MarkSocketInactive() clears it.
+func TestUpdateSocketApps_NilDoesNotClearExistingFlag(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 1}})
+	store.UpdateSocketApps(nil) // simulate a failed cycle without prior MarkSocketInactive
+	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
+		t.Fatal("UpdateSocketApps(nil) cleared the SOCKET flag; it must not")
 	}
 }
 
 func TestSHMFlagRoundTrip_ResetsAfterPublish(t *testing.T) {
 	store := NewCachestatSharedMemoryStore()
-	store.MarkSocketActive()
+	// The SOCKET flag is set by UpdateSocketApps when called with real data.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 100}})
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
 		{Pid: 1, Ppid: 1, Ct: 100},
 	})
@@ -213,7 +227,7 @@ func TestSHMFlagRoundTrip_ResetsAfterPublish(t *testing.T) {
 		t.Fatal("UpdateApps did not set the CACHESTAT flag")
 	}
 	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
-		t.Fatal("MarkSocketActive flag was lost across UpdateApps")
+		t.Fatal("UpdateSocketApps flag was lost across UpdateApps")
 	}
 
 	// Publish clears the CACHESTAT bit each cycle; the SOCKET bit persists

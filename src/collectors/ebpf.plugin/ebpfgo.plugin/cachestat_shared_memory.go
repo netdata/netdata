@@ -68,8 +68,8 @@ const (
 // the per-module validity flags.  Only the CACHESTAT bit is cleared after
 // each publish; the SOCKET bit persists across cachestat cycles so the C
 // consumer does not see socket_ok flap when socket runs at a slower cadence
-// than cachestat.  The SOCKET bit is cleared by MarkSocketInactive when the
-// socket goroutine exits.
+// than cachestat.  The SOCKET bit is cleared by MarkSocketInactive on goroutine
+// exit or per-cycle when collection fails.
 //
 // The lock is held for the duration of the C memcpy because
 // applySocketDataLocked writes s.entries[i].socket in place on the same
@@ -90,8 +90,9 @@ func (s *cachestatSharedMemoryStore) Publish(publisher *SharedPidMemoryPublisher
 }
 
 // MarkSocketInactive clears the SOCKET flag from activeModules.  Called via
-// defer when the socket goroutine exits so the C consumer stops gating on
-// socket_ok after the module shuts down.
+// defer when the socket goroutine exits (permanent shutdown) and also per-cycle
+// when Snapshot or SnapshotPerPID fails so the consumer does not see
+// socket_ok = true with zero data arrays.
 func (s *cachestatSharedMemoryStore) MarkSocketInactive() {
 	s.mu.Lock()
 	s.activeModules &^= ebpfgoSHMFlagSocket
@@ -293,17 +294,6 @@ func sortedEntriesContainPID(entries []ebpfPidStat, pid uint32) bool {
 	return false
 }
 
-// MarkSocketActive records that the socket module is running this cycle so the
-// SOCKET SHM flag is set even when a per-PID or global snapshot call fails.
-// Without this, a transient BPF error causes the cgroup consumer to see no
-// SOCKET flag, socket_ok = false, and no charts created for the cycle.
-// Must be called each collection cycle when the socket goroutine is alive.
-func (s *cachestatSharedMemoryStore) MarkSocketActive() {
-	s.mu.Lock()
-	s.activeModules |= ebpfgoSHMFlagSocket
-	s.mu.Unlock()
-}
-
 // UpdateSocketApps stores the latest per-PID socket snapshot and applies it to
 // the current entries.  Called by the socket collector each cycle.
 //
@@ -339,7 +329,12 @@ func (s *cachestatSharedMemoryStore) UpdateSocketApps(entries []libbpfloader.Soc
 			CallTCPV6Connection: e.CallTCPV6Connection,
 		}
 	}
-	s.activeModules |= ebpfgoSHMFlagSocket // mark socket as an active producer
+	// Set the SOCKET flag only on the success path (entries != nil).
+	// clearSocketApps() passes nil to signal a failed collection cycle;
+	// the caller clears the flag via MarkSocketInactive() before calling here.
+	if entries != nil {
+		s.activeModules |= ebpfgoSHMFlagSocket
+	}
 	if len(s.socketData) == 0 {
 		s.clearSocketDataFromEntriesLocked()
 		return
