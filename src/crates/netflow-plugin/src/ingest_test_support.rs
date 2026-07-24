@@ -263,12 +263,7 @@ pub(super) fn extract_udp_payloads(path: &Path) -> Vec<UdpPayload> {
 }
 
 fn new_disk_benchmark_tempdir(prefix: &str) -> TempDir {
-    let base = std::env::current_dir()
-        .expect("resolve current dir")
-        .join("src/crates/target/netflow-resource-bench");
-    std::fs::create_dir_all(&base)
-        .unwrap_or_else(|e| panic!("create disk benchmark root {}: {e}", base.display()));
-
+    let base = std::env::temp_dir();
     tempfile::Builder::new()
         .prefix(prefix)
         .tempdir_in(&base)
@@ -299,5 +294,11 @@ mod tests {
             new_production_benchmark_ingest_service(ConfigDecapsulationMode::None);
         assert_eq!(service.cfg.listener.sync_every_entries, 0);
         assert_eq!(service.cfg.listener.sync_interval, Duration::from_secs(1));
+    }
+
+    #[test]
+    fn disk_benchmark_helpers_use_the_system_temporary_directory() {
+        let (tmp, _service) = new_disk_benchmark_ingest_service(ConfigDecapsulationMode::None);
+        assert!(tmp.path().starts_with(std::env::temp_dir()));
     }
 }
