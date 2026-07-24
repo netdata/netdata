@@ -376,28 +376,43 @@ void netdata_conf_section_db(void) {
     }
 
 #ifdef ENABLE_DBENGINE
-    // Detect an actual dbengine datafile (".ndf"), not merely the directory: an
-    // empty dbengine dir left by a failed/aborted init is NOT persisted data and
-    // must not disable RAM-mode metadata cleanup. A datafile means this agent has
-    // dbengine data on disk even when currently running a non-dbengine mode, so
-    // RAM cleanup keeps dimension rows that still back that data (agent
-    // temporarily switched dbengine -> ram/alloc). Only meaningful in a
-    // dbengine-capable build; without dbengine the data can never be read back,
-    // so the flag stays false and RAM cleanup proceeds.
-    {
+    // Detect an actual dbengine datafile (".ndf") in ANY tier directory. Two
+    // reasons to scan datafiles across every tier rather than test one directory:
+    //   - an empty dbengine dir left by a failed/aborted init is NOT persisted
+    //     data and must not disable RAM-mode metadata cleanup;
+    //   - tier 0 (<cache>/dbengine) can have no datafiles while a higher tier
+    //     (<cache>/dbengine-tierN) still retains history, so a tier-0-only check
+    //     could wrongly report "no data" and delete metadata still backing
+    //     tier-N data (data loss).
+    // Iterate the compile-time maximum RRD_STORAGE_TIERS, not the configured
+    // nd_profile.storage_tiers: in a non-dbengine mode the configured count is
+    // forced to 1, but the on-disk data was written by a previous dbengine run
+    // that may have created up to RRD_STORAGE_TIERS tier directories. Tier dirs
+    // that do not exist are simply skipped.
+    // A datafile in any tier means this agent has dbengine data on disk even when
+    // currently running a non-dbengine mode, so RAM cleanup keeps dimension rows
+    // that still back that data (agent temporarily switched dbengine -> ram/alloc).
+    // Only meaningful in a dbengine-capable build; without dbengine the data can
+    // never be read back, so the flag stays false and RAM cleanup proceeds.
+    for (size_t tier = 0; tier < RRD_STORAGE_TIERS && !dbengine_datafiles_present; tier++) {
         char dbenginepath[FILENAME_MAX + 1];
-        snprintfz(dbenginepath, sizeof(dbenginepath) - 1, "%s/dbengine", netdata_configured_cache_dir);
+        if (tier == 0)
+            snprintfz(dbenginepath, sizeof(dbenginepath) - 1, "%s/dbengine", netdata_configured_cache_dir);
+        else
+            snprintfz(dbenginepath, sizeof(dbenginepath) - 1, "%s/dbengine-tier%zu", netdata_configured_cache_dir, tier);
+
         DIR *dir = opendir(dbenginepath);
-        if (dir) {
-            struct dirent *de;
-            while ((de = readdir(dir))) {
-                if (strendswith(de->d_name, ".ndf")) { // DATAFILE_EXTENSION
-                    dbengine_datafiles_present = true;
-                    break;
-                }
+        if (!dir)
+            continue;
+
+        struct dirent *de;
+        while ((de = readdir(dir))) {
+            if (strendswith(de->d_name, ".ndf")) { // DATAFILE_EXTENSION
+                dbengine_datafiles_present = true;
+                break;
             }
-            closedir(dir);
         }
+        closedir(dir);
     }
 #endif
 
