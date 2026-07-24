@@ -221,6 +221,11 @@ static void mock_server_thread(void *arg)
 
 int main(void)
 {
+    if (nd_environment_init() != 0 || nd_environment_freeze_process() != 0) {
+        fprintf(stderr, "failed to initialize and freeze the process environment: %s\n", strerror(errno));
+        return 1;
+    }
+
     char temp_dir[] = "./apps-cgroups-lookup-abort-test.XXXXXX";
     nipc_managed_server_t server = { 0 };
     ND_THREAD *server_thread = NULL;

@@ -6,14 +6,22 @@ on:
     branches:
       - master
     paths:
+      - '.github/workflows/tests.yml'
       - 'CMakeLists.txt'
       - '**.c'
       - '**.h'
+      - 'src/libnetdata/environment/**'
+      - 'src/libnetdata/spawn_server/**'
+      - 'tests/run-unit-tests.sh'
   pull_request:
     paths:
+      - '.github/workflows/tests.yml'
       - 'CMakeLists.txt'
       - '**.c'
       - '**.h'
+      - 'src/libnetdata/environment/**'
+      - 'src/libnetdata/spawn_server/**'
+      - 'tests/run-unit-tests.sh'
 env:
   DISABLE_TELEMETRY: 1
 concurrency:

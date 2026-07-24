@@ -5,6 +5,7 @@
 
 static char *cached_run_dir = NULL;
 static bool cached_run_dir_available = false;
+static bool cached_run_dir_published = false;
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
 static inline bool is_dir_accessible(const char *dir, bool rw) {
@@ -15,11 +16,32 @@ static inline bool is_dir_accessible(const char *dir, bool rw) {
     if (!S_ISDIR(st.st_mode))
         return false;
 
-    // Check if we can write to the directory
-    if (access(dir, rw ? W_OK : R_OK) == -1)
+    // Directory access always requires search permission.
+    if (access(dir, (rw ? W_OK : R_OK) | X_OK) == -1)
         return false;
 
     return true;
+}
+
+static bool make_dir_writable(const char *dir) {
+    struct stat st;
+    if(stat(dir, &st) == -1) {
+        if(errno != ENOENT)
+            return false;
+
+        if(mkdir(dir, 0755) == -1 && errno != EEXIST)
+            return false;
+
+        if(stat(dir, &st) == -1)
+            return false;
+    }
+
+    if(!S_ISDIR(st.st_mode)) {
+        errno = ENOTDIR;
+        return false;
+    }
+
+    return access(dir, W_OK | X_OK) == 0;
 }
 
 static inline bool netdata_dir_in_parent(const char *parent, char *out_path, size_t out_path_len, bool rw) {
@@ -42,7 +64,7 @@ static inline bool netdata_dir_in_parent(const char *parent, char *out_path, siz
 static char *detect_run_dir(bool rw) {
     char path[FILENAME_MAX + 1];
 
-    const char *env_dir = getenv("NETDATA_RUN_DIR");
+    CLEAN_CHAR_P *env_dir = nd_environment_get_dup("NETDATA_RUN_DIR");
     if (env_dir && *env_dir) {
         if (is_dir_accessible(env_dir, rw))
             return strdupz(env_dir);
@@ -108,16 +130,13 @@ static char *detect_run_dir(bool rw) {
         return NULL;
 
 success:
-    // Set the environment variable for child processes
-    if(rw)
-        nd_setenv("NETDATA_RUN_DIR", path, 1);
-
     return strdupz(path);
 }
 
 const char *os_run_dir(bool rw) {
     // Fast path - return cached directory if available
-    if(__atomic_load_n(&cached_run_dir_available, __ATOMIC_ACQUIRE))
+    if(__atomic_load_n(&cached_run_dir_available, __ATOMIC_ACQUIRE) &&
+       (!rw || __atomic_load_n(&cached_run_dir_published, __ATOMIC_ACQUIRE)))
         return cached_run_dir;
 
     spinlock_lock(&spinlock);
@@ -132,7 +151,22 @@ const char *os_run_dir(bool rw) {
             __atomic_store_n(&cached_run_dir_available, true, __ATOMIC_RELEASE);
     }
 
+    if(run_dir && rw && !__atomic_load_n(&cached_run_dir_published, __ATOMIC_RELAXED)) {
+        if(!make_dir_writable(run_dir))
+            run_dir = NULL;
+        else if(nd_environment_set("NETDATA_RUN_DIR", run_dir, true) == 0)
+            __atomic_store_n(&cached_run_dir_published, true, __ATOMIC_RELEASE);
+        else
+            run_dir = NULL;
+    }
+
+    int saved_errno = errno;
     spinlock_unlock(&spinlock);
+
+    if(!run_dir) {
+        errno = saved_errno ? saved_errno : EACCES;
+        return NULL;
+    }
 
     errno_clear();
     return run_dir;

@@ -16,10 +16,8 @@ const char *daemon_pipename(void) {
 
     const char *pipename = cached_pipename;
     if(!pipename) {
-        const char *env_pipename = getenv("NETDATA_PIPENAME");
-        if (env_pipename)
-            cached_pipename = strdupz(env_pipename);
-        else {
+        cached_pipename = nd_environment_get_dup("NETDATA_PIPENAME");
+        if (!cached_pipename) {
             //#if defined(OS_WINDOWS)
             // cached_pipename = strdupz("\\\\?\\pipe\\netdata-cli");
             //#else

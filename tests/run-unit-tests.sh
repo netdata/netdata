@@ -25,6 +25,19 @@ c_unit_tests() {
   "$HOME"/netdata/usr/sbin/netdata -W unittest
 }
 
+environment_spawn_unit_tests() {
+  echo "Building environment and spawn unit tests"
+
+  cmake --build ./build --target environment-unittest spawn-tester --parallel 2 || return 1
+
+  echo "Running environment and spawn unit tests"
+
+  ASAN_OPTIONS=detect_leaks=0 ./build/environment-unittest || return 1
+  ASAN_OPTIONS=detect_leaks=0 ./build/spawn-tester test
+}
+
 install_netdata || exit 1
+
+environment_spawn_unit_tests || exit 1
 
 c_unit_tests || exit 1

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ci.h"
+#include "libnetdata/libnetdata.h"
 
 #include <stdlib.h>
 
@@ -36,7 +37,8 @@ bool nd_is_running_under_ci(void) {
     };
 
     for (const char **env = ci_vars; *env; env++) {
-        if(getenv(*env))
+        CLEAN_CHAR_P *value = nd_environment_get_dup(*env);
+        if(value)
             return true;
     }
 

@@ -333,9 +333,12 @@ struct sockets_stats {
 
 static void nv_pid_append(uint32_t **pids, size_t *count, size_t *capacity, pid_t pid);
 
-static inline const char *network_viewer_machine_guid(void) {
-    const char *guid = getenv("NETDATA_REGISTRY_UNIQUE_ID");
-    return (guid && *guid) ? guid : NULL;
+static inline char *network_viewer_machine_guid(void) {
+    char *guid = nd_environment_get_dup("NETDATA_REGISTRY_UNIQUE_ID");
+    if(guid && !*guid)
+        freez(guid);
+
+    return guid;
 }
 
 static inline void topology_options_defaults(NV_TOPOLOGY_OPTIONS *opts) {
@@ -2225,7 +2228,7 @@ static bool topology_prepare_context(
     if(!os_hostname(ctx->hostname, sizeof(ctx->hostname), netdata_configured_host_prefix))
         snprintf(ctx->hostname, sizeof(ctx->hostname), "%s", "localhost");
 
-    const char *machine_guid = network_viewer_machine_guid();
+    CLEAN_CHAR_P *machine_guid = network_viewer_machine_guid();
     if(machine_guid)
         snprintf(ctx->machine_guid, sizeof(ctx->machine_guid), "%s", machine_guid);
 
@@ -7325,18 +7328,33 @@ int main(int argc, char **argv) {
 
     nd_thread_tag_set("NETWORK-VIEWER");
     nd_log_initialize_for_external_plugins("network-viewer.plugin");
-    netdata_threads_init_for_external_plugins(0);
 
-    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(!netdata_configured_host_prefix)
+        netdata_configured_host_prefix = "";
     if(verify_netdata_host_prefix(true) == -1) exit(1);
 
 #if defined(LOCAL_SOCKETS_USE_SETNS)
-    spawn_srv = spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, "setns", local_sockets_spawn_server_callback, argc, (const char **)argv);
+    const char *runtime_directory = os_run_dir(true);
+    spawn_srv = runtime_directory ?
+        spawn_server_create(SPAWN_SERVER_OPTION_CALLBACK, "setns", local_sockets_spawn_server_callback,
+                            argc, (const char **)argv, nd_environment_process(), runtime_directory) : NULL;
     if(spawn_srv == NULL) {
         fprintf(stderr, "Cannot create spawn server.\n");
         exit(1);
     }
 #endif
+
+    if(nd_environment_freeze_process() != 0) {
+        int error = errno;
+#if defined(LOCAL_SOCKETS_USE_SETNS)
+        spawn_server_destroy(spawn_srv);
+        spawn_srv = NULL;
+#endif
+        fprintf(stderr, "Cannot freeze the process environment: %s\n", strerror(error));
+        exit(1);
+    }
+
+    netdata_threads_init_for_external_plugins(0);
 
     cached_usernames_init();
     update_cached_host_users();

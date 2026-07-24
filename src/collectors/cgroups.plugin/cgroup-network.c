@@ -2,9 +2,8 @@
 
 #include "libnetdata/libnetdata.h"
 
-extern char **environ;
-
 static SPAWN_SERVER *spawn_server = NULL;
+static ND_ENVIRONMENT *spawn_environment = NULL;
 
 static char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
 static char env_netdata_log_method[FILENAME_MAX + 50] = "";
@@ -742,40 +741,6 @@ int verify_path(const char *path) {
     return 0;
 }
 
-/*
-char *fix_path_variable(void) {
-    const char *path = getenv("PATH");
-    if(!path || !*path) return 0;
-
-    char *p = strdupz(path);
-    char *safe_path = callocz(1, strlen(p) + strlen("PATH=") + 1);
-    strcpy(safe_path, "PATH=");
-
-    int added = 0;
-    char *ptr = p;
-    while(ptr && *ptr) {
-        char *s = strsep(&ptr, ":");
-        if(s && *s) {
-            if(verify_path(s) == -1) {
-                nd_log(NDLS_COLLECTORS, NDLP_ERR, "the PATH variable includes an invalid path '%s' - removed it.", s);
-            }
-            else {
-                nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "the PATH variable includes a valid path '%s'.", s);
-                if(added) strcat(safe_path, ":");
-                strcat(safe_path, s);
-                added++;
-            }
-        }
-    }
-
-    nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "unsafe PATH:      '%s'.", path);
-    nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "  safe PATH: '%s'.", safe_path);
-
-    freez(p);
-    return safe_path;
-}
-*/
-
 // ----------------------------------------------------------------------------
 // main
 
@@ -783,6 +748,11 @@ static void cleanup_spawn_server_on_fatal(void) {
     if(spawn_server) {
         spawn_server_destroy(spawn_server);
         spawn_server = NULL;
+    }
+
+    if(spawn_environment) {
+        nd_environment_destroy(spawn_environment);
+        spawn_environment = NULL;
     }
 }
 
@@ -805,14 +775,17 @@ int main(int argc, const char **argv) {
     // ------------------------------------------------------------------------
     // make sure NETDATA_HOST_PREFIX is safe
 
-    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(!netdata_configured_host_prefix)
+        netdata_configured_host_prefix = "";
     if(verify_netdata_host_prefix(false) == -1) exit(1);
 
     if(netdata_configured_host_prefix[0] != '\0' && verify_path(netdata_configured_host_prefix) == -1)
         fatal("invalid NETDATA_HOST_PREFIX '%s'", netdata_configured_host_prefix);
 
     int helper = 1;
-    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
+    CLEAN_CHAR_P *kubernetes_service_host = nd_environment_get_dup("KUBERNETES_SERVICE_HOST");
+    CLEAN_CHAR_P *kubernetes_service_port = nd_environment_get_dup("KUBERNETES_SERVICE_PORT");
+    if(kubernetes_service_host && kubernetes_service_port)
         helper = 0;
 
     // ------------------------------------------------------------------------
@@ -821,27 +794,37 @@ int main(int argc, const char **argv) {
     // the first environment variable is a fixed PATH=
     snprintfz(env_netdata_host_prefix, sizeof(env_netdata_host_prefix) - 1, "NETDATA_HOST_PREFIX=%s", netdata_configured_host_prefix);
 
-    char *s;
+    CLEAN_CHAR_P *log_method = nd_environment_get_dup("NETDATA_LOG_METHOD");
+    snprintfz(env_netdata_log_method, sizeof(env_netdata_log_method) - 1,
+              "NETDATA_LOG_METHOD=%s", nd_log_method_for_external_plugins(log_method));
 
-    s = getenv("NETDATA_LOG_METHOD");
-    snprintfz(env_netdata_log_method, sizeof(env_netdata_log_method) - 1, "NETDATA_LOG_METHOD=%s", nd_log_method_for_external_plugins(s));
+    CLEAN_CHAR_P *log_format = nd_environment_get_dup("NETDATA_LOG_FORMAT");
+    if(log_format)
+        snprintfz(env_netdata_log_format, sizeof(env_netdata_log_format) - 1, "NETDATA_LOG_FORMAT=%s", log_format);
 
-    s = getenv("NETDATA_LOG_FORMAT");
-    if (s)
-        snprintfz(env_netdata_log_format, sizeof(env_netdata_log_format) - 1, "NETDATA_LOG_FORMAT=%s", s);
-
-    s = getenv("NETDATA_LOG_LEVEL");
-    if (s)
-        snprintfz(env_netdata_log_level, sizeof(env_netdata_log_level) - 1, "NETDATA_LOG_LEVEL=%s", s);
+    CLEAN_CHAR_P *log_level = nd_environment_get_dup("NETDATA_LOG_LEVEL");
+    if(log_level)
+        snprintfz(env_netdata_log_level, sizeof(env_netdata_log_level) - 1, "NETDATA_LOG_LEVEL=%s", log_level);
 
     // ------------------------------------------------------------------------
 
     // This is a dedicated privileged process; no child may inherit its caller's environment.
-    environ = environment;
+    const char *runtime_directory = os_run_dir(true);
+    spawn_environment = nd_environment_create_isolated((const char *const *)environment);
+    spawn_server = runtime_directory && spawn_environment ?
+        spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback,
+                            argc, argv, spawn_environment, runtime_directory) : NULL;
+    if(!spawn_server) {
+        cleanup_spawn_server_on_fatal();
+        fatal("cannot create the restricted spawn server");
+    }
 
-    spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback, argc, argv);
-    // Spawn initialization may publish its detected runtime directory; do not pass it to helper requests.
-    environ = environment;
+    if(nd_environment_freeze_process() != 0) {
+        int error = errno;
+        cleanup_spawn_server_on_fatal();
+        fatal("cannot freeze the process environment: %s", strerror(error));
+    }
+
     nd_log_register_fatal_final_cb(cleanup_spawn_server_on_fatal);
 
     if(argc == 2 && (!strcmp(argv[1], "version") || !strcmp(argv[1], "-version") || !strcmp(argv[1], "--version") || !strcmp(argv[1], "-v") || !strcmp(argv[1], "-V"))) {
@@ -890,6 +873,8 @@ int main(int argc, const char **argv) {
 
     spawn_server_destroy(spawn_server);
     spawn_server = NULL;
+    nd_environment_destroy(spawn_environment);
+    spawn_environment = NULL;
 
     if(found <= 0) return 1;
     return 0;

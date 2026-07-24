@@ -306,7 +306,8 @@ void *pluginsd_main(void *ptr) {
     // it crashes (both threads) on Alpine after we made it multi-threaded
     // works with "--device /dev/ipmi0", but this is not default
     // see https://github.com/netdata/netdata/pull/15564 for details
-    if (getenv("NETDATA_LISTENER_PORT"))
+    CLEAN_CHAR_P *listener_port = nd_environment_get_dup("NETDATA_LISTENER_PORT");
+    if (listener_port)
         inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, "freeipmi", CONFIG_BOOLEAN_NO);
 
     // store the errno for each plugins directory

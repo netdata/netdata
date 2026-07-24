@@ -16,30 +16,42 @@ pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si) {
     return (pid_t)si->dwProcessId;
 }
 
-static void update_cygpath_env(void) {
-    static volatile bool done = false;
-
-    if(done) return;
-    done = true;
-
+bool spawn_server_windows_publish_cygwin_path(void) {
     char win_path[MAX_PATH];
 
     // Convert Cygwin root path to Windows path
     errno_clear();
     if(cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path)) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot convert Cygwin/MSYS2 base path to Windows path: %s", strerror(errno));
-        return;
+        return false;
     }
 
-    nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
+    if(nd_environment_set("NETDATA_CYGWIN_BASE_PATH", win_path, true) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot publish the Cygwin/MSYS2 base path");
+        return false;
+    }
 
     nd_log(NDLS_COLLECTORS, NDLP_INFO, "Cygwin/MSYS2 base path set to '%s'", win_path);
+    return true;
 }
 
-SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name, spawn_request_callback_t cb  __maybe_unused, int argc __maybe_unused, const char **argv __maybe_unused) {
-    update_cygpath_env();
+SPAWN_SERVER *spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name,
+                                  spawn_request_callback_t cb __maybe_unused, int argc __maybe_unused,
+                                  const char **argv __maybe_unused, ND_ENVIRONMENT *environment,
+                                  const char *runtime_directory __maybe_unused) {
+    if(!nd_environment_is_process_frozen()) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: refusing to start the Windows server before the environment freeze");
+        return NULL;
+    }
+
+    if(!environment) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: environment context is required");
+        return NULL;
+    }
 
     SPAWN_SERVER* server = callocz(1, sizeof(SPAWN_SERVER));
+    server->environment = environment;
     if(name)
         server->name = strdupz(name);
     else
@@ -157,22 +169,9 @@ static void spawn_server_release_stderr_fd(SPAWN_SERVER *server, SPAWN_INSTANCE 
     si->stderr_fd = -1;
 }
 
-//static void print_environment_block(char *env_block) {
-//    if (env_block == NULL) {
-//        fprintf(stderr, "Environment block is NULL\n");
-//        return;
-//    }
-//
-//    char *env = env_block;
-//    while (*env) {
-//        fprintf(stderr, "ENVIRONMENT: %s\n", env);
-//        // Move to the next string in the block
-//        env += strlen(env) + 1;
-//    }
-//}
-
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_unused, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
+    ND_ENV_SNAPSHOT *environment_snapshot = NULL;
 
     if (type != SPAWN_INSTANCE_TYPE_EXEC)
         return NULL;
@@ -228,6 +227,24 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
         goto cleanup;
     }
 
+    environment_snapshot = nd_environment_snapshot_acquire(server->environment);
+    if(!environment_snapshot) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot acquire environment for request No %zu, command: %s",
+               instance->request_id, command);
+        goto cleanup;
+    }
+
+    size_t environment_block_size = 0;
+    const char *environment_block =
+        nd_environment_snapshot_windows_block(environment_snapshot, &environment_block_size);
+    if(!environment_block || environment_block_size < 2) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Invalid Windows environment for request No %zu, command: %s",
+               instance->request_id, command);
+        goto cleanup;
+    }
+
     // do not run multiple times this section
     // to prevent handles leaking
     spinlock_lock(&spinlock);
@@ -266,10 +283,6 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     si.hStdOutput = stdout_write_handle;
     si.hStdError = stderr_write_handle;
 
-    // Retrieve the current environment block
-    char* env_block = GetEnvironmentStrings();
-//    print_environment_block(env_block);
-
     nd_log(NDLS_COLLECTORS, NDLP_INFO,
            "SPAWN PARENT: Running request No %zu, command: '%s'",
            instance->request_id, command);
@@ -279,17 +292,13 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
 
     // Spawn the process
     errno_clear();
-    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, env_block, NULL, &si, &pi)) {
+    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, (LPVOID)environment_block, NULL, &si, &pi)) {
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: cannot CreateProcess() for request No %zu, command: %s",
                instance->request_id, command);
-        if(env_block)
-            FreeEnvironmentStrings(env_block);
         goto cleanup;
     }
-
-    FreeEnvironmentStrings(env_block);
 
     // When we create a process with the CreateProcess function, it returns two handles:
     // - one for the process (pi.hProcess) and
@@ -299,6 +308,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
 
     // end of the critical section
     spinlock_unlock(&spinlock);
+
+    nd_environment_snapshot_release(environment_snapshot);
 
     // Close unused pipe ends
     close(pipe_stdin[PIPE_READ]); pipe_stdin[PIPE_READ] = -1;
@@ -334,6 +345,8 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     if (pipe_stdout[PIPE_WRITE] >= 0) close(pipe_stdout[PIPE_WRITE]);
     if (pipe_stderr[PIPE_READ] >= 0) close(pipe_stderr[PIPE_READ]);
     if (pipe_stderr[PIPE_WRITE] >= 0) close(pipe_stderr[PIPE_WRITE]);
+    if(environment_snapshot)
+        nd_environment_snapshot_release(environment_snapshot);
     freez(instance);
     return NULL;
 }

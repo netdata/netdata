@@ -2202,9 +2202,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused)
 {
     nd_thread_tag_set("sd-unit.plugin");
     nd_log_initialize_for_external_plugins("systemd-units.plugin");
-    netdata_threads_init_for_external_plugins(0);
 
-    netdata_configured_host_prefix = getenv("NETDATA_HOST_PREFIX");
+    if(!netdata_configured_host_prefix)
+        netdata_configured_host_prefix = "";
     if (verify_netdata_host_prefix(true) == -1)
         exit(1);
 
@@ -2218,6 +2218,11 @@ int main(int argc __maybe_unused, char **argv __maybe_unused)
             "123", "systemd-units", &stop_monotonic_ut, &cancelled, NULL, HTTP_ACCESS_ALL, NULL, NULL);
         exit(1);
     }
+
+    if(nd_environment_freeze_process() != 0)
+        fatal("Cannot freeze the process environment: %s", strerror(errno));
+
+    netdata_threads_init_for_external_plugins(0);
 
     // ------------------------------------------------------------------------
     // the event loop for functions

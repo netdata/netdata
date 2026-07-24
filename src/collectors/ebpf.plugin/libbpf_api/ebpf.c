@@ -204,7 +204,8 @@ static int kernel_is_rejected()
         version_string_len = strlen(version_string);
 
     // Open a file with a list of rejected kernels
-    char *config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    CLEAN_CHAR_P *user_config_dir = nd_environment_get_dup("NETDATA_USER_CONFIG_DIR");
+    const char *config_dir = user_config_dir;
     if (config_dir == NULL) {
         config_dir = CONFIG_DIR;
     }
@@ -219,7 +220,8 @@ static int kernel_is_rejected()
         kernel_reject_list = fopen(filename, "r");
 
         if (!kernel_reject_list) {
-            config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+            CLEAN_CHAR_P *stock_config_dir = nd_environment_get_dup("NETDATA_STOCK_CONFIG_DIR");
+            config_dir = stock_config_dir;
             if (config_dir == NULL) {
                 config_dir = LIBCONFIG_DIR;
             }

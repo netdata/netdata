@@ -73,14 +73,17 @@ bool os_hostname(char *dst, size_t dst_size, const char *filesystem_root __maybe
 #ifdef HAVE_LIBICONV
 #include <iconv.h>
 
-static const char *get_current_locale(void) {
-    const char *locale = getenv("LC_ALL");  // LC_ALL overrides all other locale settings
+static char *get_current_locale(void) {
+    char *locale = nd_environment_get_dup("LC_ALL");  // LC_ALL overrides all other locale settings
 
     if (!locale || !*locale) {
-        locale = getenv("LC_CTYPE");  // Check LC_CTYPE for character encoding
+        freez(locale);
+        locale = nd_environment_get_dup("LC_CTYPE");  // Check LC_CTYPE for character encoding
 
-        if (!locale || !*locale)
-            locale = getenv("LANG");  // Fallback to LANG
+        if (!locale || !*locale) {
+            freez(locale);
+            locale = nd_environment_get_dup("LANG");  // Fallback to LANG
+        }
     }
 
     return locale;
@@ -144,7 +147,7 @@ bool os_hostname(char *dst, size_t dst_size, const char *filesystem_root) {
     char *original_hostname = trim(buf);
 
 #ifdef HAVE_LIBICONV
-    const char *locale = get_current_locale();
+    CLEAN_CHAR_P *locale = get_current_locale();
     if (original_hostname && locale && *locale) {
         char utf8_output[HOST_NAME_MAX * 4 + 1] = "";
         if(iconv_convert_to_utf8(original_hostname, get_encoding_from_locale(locale), utf8_output, sizeof(utf8_output))) {

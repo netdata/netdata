@@ -13,6 +13,7 @@ pid_t spawn_server_instance_pid(SPAWN_INSTANCE *si) { return uv_process_get_pid(
 typedef struct work_item {
     int stderr_fd;
     const char **argv;
+    ND_ENV_SNAPSHOT *environment;
     uv_sem_t sem;
     SPAWN_INSTANCE *instance;
     struct work_item *prev;
@@ -114,19 +115,76 @@ static void server_thread(void *arg) {
            "SPAWN SERVER: ended");
 }
 
+static void on_process_closed(uv_handle_t *handle) {
+    SPAWN_INSTANCE *si = (SPAWN_INSTANCE *)handle->data;
+    if(si) {
+        uv_sem_post(&si->sem);
+        __atomic_store_n(&si->process_close_completed, true, __ATOMIC_RELEASE);
+    }
+}
+
+static void wait_for_process_close_callback(SPAWN_INSTANCE *si) {
+    while(!__atomic_load_n(&si->process_close_completed, __ATOMIC_ACQUIRE))
+        uv_sleep(0);
+}
+
+typedef struct inherited_fd_state {
+    int fd;
+    int original_flags;
+    bool changed;
+} inherited_fd_state;
+
+static bool inherited_fd_prepare_for_dup(inherited_fd_state *state, int inherited_fd, int std_fd) {
+    state->fd = inherited_fd;
+    if(inherited_fd == std_fd)
+        return true;
+
+    int flags = fcntl(inherited_fd, F_GETFD);
+    if(flags == -1)
+        return false;
+
+    state->original_flags = flags;
+    if(flags & FD_CLOEXEC)
+        return true;
+
+    if(fcntl(inherited_fd, F_SETFD, flags | FD_CLOEXEC) == -1)
+        return false;
+
+    state->changed = true;
+    return true;
+}
+
+static void inherited_fd_restore(const inherited_fd_state *state) {
+    if(state->changed && fcntl(state->fd, F_SETFD, state->original_flags) == -1)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: cannot restore inherited descriptor flags");
+}
+
 static void on_process_exit(uv_process_t *req, int64_t exit_status, int term_signal) {
     SPAWN_INSTANCE *si = (SPAWN_INSTANCE *)req->data;
+    SPAWN_SERVER *server = si->server;
     si->exit_code = (int)(term_signal ? term_signal : exit_status << 8);
-    uv_close((uv_handle_t *)req, NULL); // Properly close the process handle
+    uv_close((uv_handle_t *)req, on_process_closed);
+
+    if(server->live_processes > 0)
+        server->live_processes--;
+    else
+        internal_fatal(true, "SPAWN SERVER: live process accounting underflow");
+    if(__atomic_load_n(&server->stopping, __ATOMIC_RELAXED) &&
+       server->live_processes == 0 && server->shutdown_timer_initialized &&
+       !uv_is_closing((uv_handle_t *)&server->shutdown_timer)) {
+        uv_timer_stop(&server->shutdown_timer);
+        uv_close((uv_handle_t *)&server->shutdown_timer, NULL);
+    }
 
     nd_log(NDLS_COLLECTORS, NDLP_ERR,
            "SPAWN SERVER: process with pid %d exited with code %d and term_signal %d",
            si->child_pid, (int)exit_status, term_signal);
 
-    uv_sem_post(&si->sem); // Signal that the process has exited
 }
 
-static SPAWN_INSTANCE *spawn_process_with_libuv(uv_loop_t *loop, int stderr_fd, const char **argv) {
+static SPAWN_INSTANCE *spawn_process_with_libuv(SPAWN_SERVER *server, int stderr_fd, const char **argv,
+                                                const ND_ENV_SNAPSHOT *environment) {
     SPAWN_INSTANCE *si = NULL;
     bool si_sem_init = false;
 
@@ -160,20 +218,37 @@ static SPAWN_INSTANCE *spawn_process_with_libuv(uv_loop_t *loop, int stderr_fd, 
     stdio[2].flags = UV_INHERIT_FD;
     stdio[2].data.fd = stderr_fd;
 
+    inherited_fd_state inherited_fds[3] = { 0 };
+    bool inherited_fds_prepared =
+        inherited_fd_prepare_for_dup(&inherited_fds[0], stdio[0].data.fd, STDIN_FILENO) &&
+        inherited_fd_prepare_for_dup(&inherited_fds[1], stdio[1].data.fd, STDOUT_FILENO) &&
+        inherited_fd_prepare_for_dup(&inherited_fds[2], stdio[2].data.fd, STDERR_FILENO);
+    if(!inherited_fds_prepared) {
+        for(size_t i = 0; i < _countof(inherited_fds); i++)
+            inherited_fd_restore(&inherited_fds[i]);
+
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: cannot mark inherited descriptor close-on-exec");
+        goto cleanup;
+    }
+
     uv_process_options_t options = { 0 };
     options.stdio_count = 3;
     options.stdio = stdio;
     options.exit_cb = on_process_exit;
     options.file = argv[0];
     options.args = (char **)argv;
-    options.env = (char **)environ;
+    options.env = (char **)nd_environment_snapshot_envp(environment);
 
     // uv_spawn() does not close all other open file descriptors
     // we have to close them manually
     int fds[3] = { stdio[0].data.fd, stdio[1].data.fd, stdio[2].data.fd };
     os_close_all_non_std_open_fds_except(fds, 3, CLOSE_RANGE_CLOEXEC);
 
-    int rc = uv_spawn(loop, &si->process, &options);
+    int rc = uv_spawn(server->loop, &si->process, &options);
+    for(size_t i = 0; i < _countof(inherited_fds); i++)
+        inherited_fd_restore(&inherited_fds[i]);
+
     if (rc) {
         errno = uv_errno_to_errno(rc);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -183,6 +258,8 @@ static SPAWN_INSTANCE *spawn_process_with_libuv(uv_loop_t *loop, int stderr_fd, 
     }
 
     // Successfully spawned
+    si->server = server;
+    server->live_processes++;
 
     // get the pid of the process spawned
     si->child_pid = uv_process_get_pid(&si->process);
@@ -215,16 +292,60 @@ cleanup:
     return NULL;
 }
 
+static void signal_live_process(uv_handle_t *handle, void *arg) {
+    if(handle->type != UV_PROCESS || uv_is_closing(handle))
+        return;
+
+    int signal = *(int *)arg;
+    int rc = uv_process_kill((uv_process_t *)handle, signal);
+    if(rc != 0 && rc != UV_ESRCH)
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: cannot send signal %d to process %d: %s",
+               signal, uv_process_get_pid((uv_process_t *)handle), uv_strerror(rc));
+}
+
+static void shutdown_timer_callback(uv_timer_t *timer) {
+    SPAWN_SERVER *server = timer->data;
+    int signal = SIGKILL;
+    uv_walk(server->loop, signal_live_process, &signal);
+    uv_close((uv_handle_t *)timer, NULL);
+}
+
+static void begin_shutdown(SPAWN_SERVER *server) {
+    if(!uv_is_closing((uv_handle_t *)&server->async))
+        uv_close((uv_handle_t *)&server->async, NULL);
+
+    if(server->live_processes == 0)
+        return;
+
+    int signal = SIGTERM;
+    uv_walk(server->loop, signal_live_process, &signal);
+
+    int rc = uv_timer_init(server->loop, &server->shutdown_timer);
+    if(rc == 0) {
+        server->shutdown_timer_initialized = true;
+        server->shutdown_timer.data = server;
+        rc = uv_timer_start(
+            &server->shutdown_timer, shutdown_timer_callback, SPAWN_KILL_DEFAULT_GRACE_MS, 0);
+    }
+
+    if(rc != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: cannot start the shutdown grace timer: %s; sending SIGKILL now",
+               uv_strerror(rc));
+        signal = SIGKILL;
+        uv_walk(server->loop, signal_live_process, &signal);
+        if(server->shutdown_timer_initialized &&
+           !uv_is_closing((uv_handle_t *)&server->shutdown_timer))
+            uv_close((uv_handle_t *)&server->shutdown_timer, NULL);
+    }
+}
+
 static void async_callback(uv_async_t *handle) {
     nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: dequeue commands started");
     SPAWN_SERVER *server = (SPAWN_SERVER *)handle->data;
 
-    // Check if the server is stopping
-    if (__atomic_load_n(&server->stopping, __ATOMIC_RELAXED)) {
-        nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: stopping...");
-        uv_stop(server->loop);
-        return;
-    }
+    bool stopping = __atomic_load_n(&server->stopping, __ATOMIC_RELAXED);
 
     work_item *item;
     spinlock_lock(&server->spinlock);
@@ -233,19 +354,44 @@ static void async_callback(uv_async_t *handle) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(server->work_queue, item, prev, next);
         spinlock_unlock(&server->spinlock);
 
-        item->instance = spawn_process_with_libuv(server->loop, item->stderr_fd, item->argv);
+        if(stopping)
+            item->instance = NULL;
+        else
+            item->instance = spawn_process_with_libuv(server, item->stderr_fd, item->argv, item->environment);
+
+        ND_ENV_SNAPSHOT *environment = item->environment;
+        item->environment = NULL;
+        nd_environment_snapshot_release(environment);
         uv_sem_post(&item->sem);
 
         spinlock_lock(&server->spinlock);
     }
     spinlock_unlock(&server->spinlock);
 
+    if(stopping) {
+        nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: stopping...");
+        begin_shutdown(server);
+    }
+
     nd_log(NDLS_COLLECTORS, NDLP_INFO, "SPAWN SERVER: dequeue commands done");
 }
 
 
-SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name, spawn_request_callback_t cb  __maybe_unused, int argc __maybe_unused, const char **argv __maybe_unused) {
+SPAWN_SERVER *spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name,
+                                  spawn_request_callback_t cb __maybe_unused, int argc __maybe_unused,
+                                  const char **argv __maybe_unused, ND_ENVIRONMENT *environment,
+                                  const char *runtime_directory __maybe_unused) {
+    if(!nd_environment_is_process_frozen()) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: refusing to start the libuv server before the environment freeze");
+        return NULL;
+    }
+
+    if(!environment)
+        return NULL;
+
     SPAWN_SERVER* server = callocz(1, sizeof(SPAWN_SERVER));
+    server->environment = environment;
     spinlock_init(&server->spinlock);
 
     if (name)
@@ -264,7 +410,13 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, c
 
     if (uv_async_init(server->loop, &server->async, async_callback)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_async_init() failed");
-        uv_loop_close(server->loop);
+        int rc = uv_loop_close(server->loop);
+        if(rc != 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: uv_loop_close() failed after async initialization failure: %s",
+                   uv_strerror(rc));
+            return NULL;
+        }
         freez(server->loop);
         freez((void *)server->name);
         freez(server);
@@ -275,7 +427,14 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, c
     if (uv_thread_create(&server->thread, server_thread, server)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_thread_create() failed");
         uv_close((uv_handle_t*)&server->async, NULL);
-        uv_loop_close(server->loop);
+        uv_run(server->loop, UV_RUN_DEFAULT);
+        int rc = uv_loop_close(server->loop);
+        if(rc != 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: uv_loop_close() failed after thread creation failure: %s",
+                   uv_strerror(rc));
+            return NULL;
+        }
         freez(server->loop);
         freez((void *)server->name);
         freez(server);
@@ -286,9 +445,8 @@ SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, c
 }
 
 static void close_handle(uv_handle_t* handle, void* arg __maybe_unused) {
-    if (!uv_is_closing(handle)) {
+    if(!uv_is_closing(handle) && handle->type != UV_PROCESS)
         uv_close(handle, NULL);
-    }
 }
 
 void spawn_server_destroy(SPAWN_SERVER *server) {
@@ -302,13 +460,19 @@ void spawn_server_destroy(SPAWN_SERVER *server) {
     // Wait for the server thread to finish
     uv_thread_join(&server->thread);
 
-    uv_stop(server->loop);
-    uv_close((uv_handle_t*)&server->async, NULL);
-
-    // Walk through and close any remaining handles
+    // Close only non-process stragglers. Live process handles must reach on_process_exit()
+    // so libuv can reap the child before the handle is closed.
     uv_walk(server->loop, close_handle, NULL);
+    uv_run(server->loop, UV_RUN_DEFAULT);
 
-    uv_loop_close(server->loop);
+    int rc = uv_loop_close(server->loop);
+    if(rc != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: uv_loop_close() failed during shutdown: %s",
+               uv_strerror(rc));
+        return;
+    }
+
     freez(server->loop);
     freez((void *)server->name);
     freez(server);
@@ -324,6 +488,12 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
 
     if (uv_sem_init(&item.sem, 0)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: uv_sem_init() failed");
+        return NULL;
+    }
+
+    item.environment = nd_environment_snapshot_acquire(server->environment);
+    if(!item.environment) {
+        uv_sem_destroy(&item.sem);
         return NULL;
     }
 
@@ -398,6 +568,7 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server __maybe_
     }
 
     // the semaphore is consumed - finish exactly like spawn_server_exec_wait()
+    wait_for_process_close_callback(si);
     int st = si->exit_code;
     uv_sem_destroy(&si->sem);
     freez(si);
@@ -414,6 +585,7 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
 
     // Wait for the process to exit
     uv_sem_wait(&si->sem);
+    wait_for_process_close_callback(si);
     int exit_code = si->exit_code;
 
     uv_sem_destroy(&si->sem);

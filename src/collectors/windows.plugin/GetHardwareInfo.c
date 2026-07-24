@@ -6,7 +6,7 @@
 #include "driver/netdata_driver.h"
 
 static const char *srv_name = "NetdataDriver";
-static const char *drv_path = "%SystemRoot%\\system32\\drivers\\netdata_driver.sys";
+static const char driver_path_suffix[] = "\\drivers\\netdata_driver.sys";
 
 struct cpu_data {
     RRDDIM *rd_cpu_temp;
@@ -35,19 +35,20 @@ static const int IOCTL_RETRY_DELAY_MS = 10;
 static const int THREAD_JOIN_FALLBACK_WAIT_MS = 2000;
 #define INVALID_TEMP ((collected_number)(-1))
 
-static bool netdata_expand_driver_path(char *expanded_path, size_t expanded_path_size)
+static bool netdata_get_driver_path(char *path, size_t path_size)
 {
-    DWORD ret = ExpandEnvironmentStringsA(drv_path, expanded_path, (DWORD)expanded_path_size);
+    UINT ret = GetSystemDirectoryA(path, (UINT)path_size);
     if (ret == 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot expand environment strings. Error= %lu \n", GetLastError());
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot get the Windows system directory. Error= %lu\n", GetLastError());
         return false;
     }
 
-    if (ret > expanded_path_size) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Expanded driver path exceeds buffer size (%lu bytes needed)\n", ret);
+    if ((size_t)ret >= path_size || (size_t)ret + sizeof(driver_path_suffix) > path_size) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Windows driver path exceeds buffer size\n");
         return false;
     }
 
+    memcpy(&path[ret], driver_path_suffix, sizeof(driver_path_suffix));
     return true;
 }
 
@@ -94,8 +95,8 @@ int netdata_install_driver()
         return -1;
     }
 
-    char expanded_path[MAX_PATH];
-    if (!netdata_expand_driver_path(expanded_path, sizeof(expanded_path))) {
+    char driver_path[MAX_PATH];
+    if (!netdata_get_driver_path(driver_path, sizeof(driver_path))) {
         CloseServiceHandle(scm);
         return -1;
     }
@@ -109,7 +110,7 @@ int netdata_install_driver()
         SERVICE_KERNEL_DRIVER,
         SERVICE_DEMAND_START,
         SERVICE_ERROR_NORMAL,
-        expanded_path,
+        driver_path,
         NULL,
         NULL,
         NULL,
@@ -130,7 +131,7 @@ int netdata_install_driver()
                     SERVICE_KERNEL_DRIVER,
                     SERVICE_DEMAND_START,
                     SERVICE_ERROR_NORMAL,
-                    expanded_path,
+                    driver_path,
                     NULL,
                     NULL,
                     NULL,
@@ -404,17 +405,17 @@ static void netdata_detect_cpu()
 
 static int initialize()
 {
-    char expanded_path[MAX_PATH];
-    if (!netdata_expand_driver_path(expanded_path, sizeof(expanded_path))) {
+    char driver_path[MAX_PATH];
+    if (!netdata_get_driver_path(driver_path, sizeof(driver_path))) {
         return -1;
     }
 
-    if (GetFileAttributesA(expanded_path) == INVALID_FILE_ATTRIBUTES) {
+    if (GetFileAttributesA(driver_path) == INVALID_FILE_ATTRIBUTES) {
         nd_log(
             NDLS_COLLECTORS,
             NDLP_ERR,
             "Driver not found at '%s'. Please ensure the driver is properly installed.\n",
-            expanded_path);
+            driver_path);
         return -1;
     }
 
