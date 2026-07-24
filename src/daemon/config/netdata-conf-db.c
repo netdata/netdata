@@ -375,16 +375,31 @@ void netdata_conf_section_db(void) {
         }
     }
 
-    // The dbengine directory is created only by dbengine initialization, so its
-    // presence means this agent has dbengine data on disk even if it is currently
-    // running a non-dbengine memory mode. RAM-mode metadata cleanup uses this to
-    // avoid deleting dimension rows that still back on-disk dbengine data (agent
-    // temporarily switched dbengine -> ram/alloc).
+#ifdef ENABLE_DBENGINE
+    // Detect an actual dbengine datafile (".ndf"), not merely the directory: an
+    // empty dbengine dir left by a failed/aborted init is NOT persisted data and
+    // must not disable RAM-mode metadata cleanup. A datafile means this agent has
+    // dbengine data on disk even when currently running a non-dbengine mode, so
+    // RAM cleanup keeps dimension rows that still back that data (agent
+    // temporarily switched dbengine -> ram/alloc). Only meaningful in a
+    // dbengine-capable build; without dbengine the data can never be read back,
+    // so the flag stays false and RAM cleanup proceeds.
     {
         char dbenginepath[FILENAME_MAX + 1];
         snprintfz(dbenginepath, sizeof(dbenginepath) - 1, "%s/dbengine", netdata_configured_cache_dir);
-        dbengine_datafiles_present = (access(dbenginepath, F_OK) == 0);
+        DIR *dir = opendir(dbenginepath);
+        if (dir) {
+            struct dirent *de;
+            while ((de = readdir(dir))) {
+                if (strstr(de->d_name, ".ndf")) { // DATAFILE_EXTENSION
+                    dbengine_datafiles_present = true;
+                    break;
+                }
+            }
+            closedir(dir);
+        }
     }
+#endif
 
     // ------------------------------------------------------------------------
     // get default database size
