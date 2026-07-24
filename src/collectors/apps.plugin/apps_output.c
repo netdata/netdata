@@ -494,6 +494,22 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             fprintf(stdout, "DIMENSION max '' absolute 1 1\n");
         }
     }
+
+#if defined(OS_LINUX)
+    /* Targets exposed before ebpfgo.plugin published its first snapshot miss the
+     * chart-creation window above (it is one-shot per target).  When cachestat
+     * becomes available, do a single catch-up pass over all already-exposed
+     * targets.  Re-sending CHART/DIMENSION for a target that got its charts in
+     * the same cycle is benign -- the Netdata protocol treats it as an update. */
+    static bool cachestat_charts_announced = false;
+    if (!cachestat_charts_announced && apps_ebpf_cachestat_is_available()) {
+        for (w = root; w; w = w->next) {
+            if (!w->exposed) continue;
+            send_cachestat_charts_to_netdata(w, type, lbl_name);
+        }
+        cachestat_charts_announced = true;
+    }
+#endif
 }
 
 #if (PROCESSES_HAVE_STATE == 1)
