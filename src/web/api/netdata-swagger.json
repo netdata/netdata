@@ -7246,7 +7246,8 @@
             "trimmed-median20",
             "trimmed-median25",
             "ema",
-            "extremes"
+            "extremes",
+            "latest"
           ],
           "default": "average"
         }
@@ -7300,7 +7301,8 @@
             "trimmed-median20",
             "trimmed-median25",
             "ema",
-            "extremes"
+            "extremes",
+            "latest"
           ],
           "default": "average"
         }
