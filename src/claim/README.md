@@ -25,6 +25,12 @@ You can find this command in three places in the UI:
 3. Click the "Connect" button
 4. Follow the on-screen instructions to connect your Agent
 
+:::note
+
+If your pasted UUID is rejected with `invalid key`, it is single-use: every claim attempt (including failed ones) regenerates a new one. See [Pasted verification UUID rejected as invalid key](#pasted-verification-uuid-rejected-as-invalid-key).
+
+:::
+
 ### Method 2: Via Configuration File
 
 **Best for:** Automated deployments, multiple Agents
@@ -292,6 +298,28 @@ Used Cloud Protocol: New
 Use these keys and the information below to troubleshoot the ACLK.
 
 ### Common Issues
+
+#### Pasted verification UUID rejected as invalid key
+
+**Applies to:** [Method 1: Via UI](#method-1-via-ui-recommended).
+
+**Problem:** The claiming dialog verifies server ownership by asking you to run a command on the Agent and paste back the UUID it prints. The prefix depends on the install — `sudo cat` for service installs, `docker exec netdata cat` for Docker, and `more` on Windows — over the `netdata_random_session_id` file:
+
+```bash
+sudo cat /var/lib/netdata/netdata_random_session_id                  # service installs (default path)
+docker exec netdata cat /var/lib/netdata/netdata_random_session_id   # Docker (default container name)
+more <VARLIB>\netdata_random_session_id                              # Windows (Command Prompt)
+```
+
+Use the exact command the dialog shows — it fills in the correct path and container name for your install. Replace `/var/lib/netdata` with your Netdata library directory if it differs from the default. After pasting the UUID, the claim is rejected with `invalid key`, even though the value was copied exactly.
+
+**Why this happens:** The UUID in `netdata_random_session_id` is **single-use**. The Agent generates a new UUID and overwrites the file on **every** claim attempt — including failed ones — as a brute-force defense. The UUID is regenerated on the `invalid key` response, the `invalid parameters` response, and on every attempt that passes those checks (whether the claiming call to Cloud then succeeds or fails). So if any claim attempt occurred after you read the file (an earlier submit with a wrong or missing Space token/Rooms, a retry from another browser tab, or a concurrent claiming script), the value you copied is already stale.
+
+**Solution:** Read the file **again** to get the current UUID and submit once, in the same pass, with a valid Space token and Rooms — making sure no other claim attempt regenerates the UUID first:
+
+1. Re-run the command from the dialog (the value is different each time).
+2. Copy the new UUID.
+3. Paste it with the correct Space token and Rooms, then submit once. Do not re-submit the old value or retry from a second tab — each failed attempt invalidates the current UUID again.
 
 #### kickstart: unsupported Netdata installation
 
