@@ -69,8 +69,6 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Alma Linux               | 9.x            | x86\_64, AArch64              | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
 | Alma Linux               | 8.x            | x86\_64, AArch64              | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives                                |
 | Amazon Linux             | 2023           | x86\_64, AArch64              |                                                                                                                |
-| Amazon Linux             | 2              | x86\_64, AArch64              |                                                                                                                |
-| CentOS                   | 7.x            | x86\_64                       |                                                                                                                |
 | Docker                   | 19.03 or newer | x86\_64, ARMv7, AArch64       | See our [Docker documentation](/packaging/docker/README.md) for more info on using Netdata on Docker           |
 | Debian                   | 13.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
 | Debian                   | 12.x           | x86\_64, i386, ARMv7, AArch64 |                                                                                                                |
@@ -82,9 +80,9 @@ Our [static builds](#static-builds) are expected to work on these platforms if a
 | Oracle Linux             | 10.x           | x86\_64, AArch64              |                                                                                                                |
 | Oracle Linux             | 9.x            | x86\_64, AArch64              |                                                                                                                |
 | Oracle Linux             | 8.x            | x86\_64, AArch64              |                                                                                                                |
+| Red Hat Enterprise Linux | 10.x           | x86\_64, AArch64              |                                                                                                                |
 | Red Hat Enterprise Linux | 9.x            | x86\_64, AArch64              |                                                                                                                |
 | Red Hat Enterprise Linux | 8.x            | x86\_64, AArch64              |                                                                                                                |
-| Red Hat Enterprise Linux | 7.x            | x86\_64                       |                                                                                                                |
 | Rocky Linux              | 10.x           | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
 | Rocky Linux              | 9.x            | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
 | Rocky Linux              | 8.x            | x86\_64, AArch64              | Also includes support for Alma Linux and other ABI compatible RHEL derivatives                                 |
@@ -173,15 +171,18 @@ Platforms that meet these criteria will be immediately transitioned to the **Pre
 
 This is a list of platforms that we have supported in the recent past but no longer officially support:
 
-| Platform | Version   | Notes                |
-|----------|-----------|----------------------|
-| Debian   | 10.x      | EOL as of 2024-07-01 |
-| Fedora   | 42        | EOL as of 2026-05-13 |
-| Fedora   | 41        | EOL as of 2025-12-15 |
-| openSUSE | Leap 15.6 | EOL as of 2026-04-30 |
-| Ubuntu   | 25.04     | EOL as of 2026-01-17 |
-| Ubuntu   | 20.04     | EOL as of 2025-05-31 |
-| Ubuntu   | 18.04     | EOL as of 2023-04-02 |
+| Platform                 | Version   | Notes                |
+|--------------------------|-----------|----------------------|
+| Amazon Linux             | 2         | EOL as of 2026-06-30 |
+| CentOS                   | 7.x       | EOL as of 2026-06-30 |
+| Debian                   | 10.x      | EOL as of 2024-07-01 |
+| Fedora                   | 42        | EOL as of 2026-05-13 |
+| Fedora                   | 41        | EOL as of 2025-12-15 |
+| openSUSE                 | Leap 15.5 | EOL as of 2024-12-31 |
+| Red Hat Enterprise Linux | 7.x       | EOL as of 2026-06-30 |
+| Ubuntu                   | 25.04     | EOL as of 2026-01-17 |
+| Ubuntu                   | 20.04     | EOL as of 2025-05-31 |
+| Ubuntu                   | 18.04     | EOL as of 2023-04-02 |
 
 ## Static builds
 
