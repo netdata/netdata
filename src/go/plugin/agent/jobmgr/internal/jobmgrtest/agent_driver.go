@@ -683,11 +683,12 @@ func runAgentFunctionTimeoutBoundaries(ctx context.Context) error {
 				status  int
 			}{
 				"negative":         {timeout: "-1", status: 400},
-				"one over maximum": {timeout: "901", status: 400},
 				"integer overflow": {timeout: "9223372036854775808", status: 400},
 				"zero":             {timeout: "0", status: 200},
 				"one second":       {timeout: "1", status: 200},
-				"maximum":          {timeout: "900", status: 200},
+				"at maximum":       {timeout: "120", status: 200},
+				"over maximum":     {timeout: "121", status: 200},
+				"milliseconds":     {timeout: "60000", status: 200},
 			}
 			for name, test := range tests {
 				uid := "jobmgrtest-timeout-" + strings.ReplaceAll(name, " ", "-")
