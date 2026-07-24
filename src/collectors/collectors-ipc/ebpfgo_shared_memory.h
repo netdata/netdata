@@ -20,6 +20,7 @@ typedef struct netdata_ebpfgo_shared_pid_memory {
     uint32_t update_every_s;        /* publish interval from SHM header; 0 = unknown */
     uint64_t last_publish_ut;       /* monotonic usec of the payload in snapshot */
     size_t shm_total;
+    size_t mapped_size;             /* byte length passed to mmap; used verbatim by munmap */
     size_t snapshot_total;          /* valid sorted entries in snapshot (= live_count from header) */
     size_t snapshot_cap;            /* allocated capacity of the snapshot buffer */
     int shm_fd;

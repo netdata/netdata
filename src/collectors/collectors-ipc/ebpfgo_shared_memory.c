@@ -15,12 +15,6 @@ static inline size_t ebpfgo_shm_entries_nbytes(size_t total)
     return total * sizeof(struct ebpf_pid_stat);
 }
 
-/* Total SHM byte size: header + entries[]. */
-static inline size_t ebpfgo_shm_nbytes(size_t total)
-{
-    return sizeof(struct ebpfgo_shm_header) + ebpfgo_shm_entries_nbytes(total);
-}
-
 /* Returns the number of entries the SHM segment can hold, or 0 if the size is
  * invalid (too small to hold the header and at least one entry). */
 static inline size_t ebpfgo_shm_stat_entry_count(const struct stat *st)
@@ -57,9 +51,10 @@ static void netdata_ebpfgo_shared_pid_memory_close_internal(netdata_ebpfgo_share
     }
 
     if (ctx->mapping) {
-        nd_munmap(ctx->mapping, ebpfgo_shm_nbytes(ctx->shm_total));
+        nd_munmap(ctx->mapping, ctx->mapped_size);
         ctx->mapping = NULL;
         ctx->shm = NULL;
+        ctx->mapped_size = 0;
     }
 
     if (ctx->shm_fd >= 0) {
@@ -112,9 +107,11 @@ static bool netdata_ebpfgo_shared_pid_memory_open(
 
     ctx->shm_dev = st.st_dev;
     ctx->shm_ino = st.st_ino;
-    ctx->mapping = nd_mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_SHARED, ctx->shm_fd, 0);
+    ctx->mapped_size = (size_t)st.st_size;
+    ctx->mapping = nd_mmap(NULL, ctx->mapped_size, PROT_READ, MAP_SHARED, ctx->shm_fd, 0);
     if (ctx->mapping == MAP_FAILED) {
         ctx->mapping = NULL;
+        ctx->mapped_size = 0;
         goto fail;
     }
     /* entries[] follow the header; the header holds the per-module flags. */
