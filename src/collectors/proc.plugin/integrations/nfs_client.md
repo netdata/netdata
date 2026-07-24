@@ -75,11 +75,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -91,10 +93,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nfs.net | udp, tcp | operations/s |
-| nfs.rpc | calls, retransmits, auth_refresh | calls/s |
-| nfs.proc2 | a dimension per proc2 call | calls/s |
-| nfs.proc3 | a dimension per proc3 call | calls/s |
-| nfs.proc4 | a dimension per proc4 call | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nfs.net | NFS Client Network | udp, tcp | operations/s |
+| nfs.rpc | NFS Client Remote Procedure Calls Statistics | calls, retransmits, auth_refresh | calls/s |
+| nfs.proc2 | NFS v2 Client Remote Procedure Calls | a dimension per proc2 call | calls/s |
+| nfs.proc3 | NFS v3 Client Remote Procedure Calls | a dimension per proc3 call | calls/s |
+| nfs.proc4 | NFS v4 Client Remote Procedure Calls | a dimension per proc4 call | calls/s |

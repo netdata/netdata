@@ -325,11 +325,13 @@ The following alerts are available:
 | [ httpcheck_web_service_no_connection ](https://github.com/netdata/netdata/blob/master/src/health/health.d/httpcheck.conf) | httpcheck.status | Percentage of failed HTTP requests to ${label:url} in the last 5 minutes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -345,12 +347,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| httpcheck.response_time | time | ms |
-| httpcheck.response_length | length | characters |
-| httpcheck.status | success, timeout, redirect, no_connection, bad_content, bad_header, bad_status | boolean |
-| httpcheck.in_state | time | boolean |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| httpcheck.response_time | HTTP Response Time | time | ms |
+| httpcheck.response_length | HTTP Response Body Length | length | characters |
+| httpcheck.status | HTTP Check Status | success, timeout, redirect, no_connection, bad_content, bad_header, bad_status | boolean |
+| httpcheck.in_state | HTTP Current State Duration | time | boolean |
 
 
 

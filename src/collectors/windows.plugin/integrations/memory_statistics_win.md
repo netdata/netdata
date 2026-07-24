@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -120,18 +122,18 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.swap_iops | read, write | operations/s |
-| mem.swapio | in, out | KiB/s |
-| mem.system_pool_size | paged, non-paged | bytes |
-| mem.system_pool_paged | resident | bytes |
-| mem.system_pool_allocs | paged, non-paged | allocations/s |
-| mem.system_page_table_entries | free | pages |
-| mem.committed | committed, limit | bytes |
-| mem.system_cache | cache, peak, resident | bytes |
-| mem.page_lists | free, modified, standby_core, standby_normal, standby_reserve | bytes |
-| mem.system_code | resident, total | bytes |
-| mem.system_drivers | resident, total | bytes |
-| mem.page_faults_breakdown | cache, demand_zero, transition, write_copies | faults/s |
-| mem.transition_repurposed | repurposed | pages/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.swap_iops | Swap Operations | read, write | operations/s |
+| mem.swapio | Swap I/O | in, out | KiB/s |
+| mem.system_pool_size | System Memory Pool | paged, non-paged | bytes |
+| mem.system_pool_paged | Paged System Memory Pool | resident | bytes |
+| mem.system_pool_allocs | System Pool Allocations | paged, non-paged | allocations/s |
+| mem.system_page_table_entries | Unused page table entries. | free | pages |
+| mem.committed | Committed Memory | committed, limit | bytes |
+| mem.system_cache | System Cache Memory | cache, peak, resident | bytes |
+| mem.page_lists | Memory Page Lists | free, modified, standby_core, standby_normal, standby_reserve | bytes |
+| mem.system_code | System Code Memory | resident, total | bytes |
+| mem.system_drivers | System Driver Memory | resident, total | bytes |
+| mem.page_faults_breakdown | Memory Page Fault Breakdown | cache, demand_zero, transition, write_copies | faults/s |
+| mem.transition_repurposed | Transition Pages Repurposed | repurposed | pages/s |

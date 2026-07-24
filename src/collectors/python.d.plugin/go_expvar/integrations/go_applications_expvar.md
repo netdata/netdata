@@ -289,11 +289,13 @@ app1:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -305,15 +307,15 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| expvar.memstats.heap | alloc, inuse | KiB |
-| expvar.memstats.stack | inuse | KiB |
-| expvar.memstats.mspan | inuse | KiB |
-| expvar.memstats.mcache | inuse | KiB |
-| expvar.memstats.live_objects | live | objects |
-| expvar.memstats.sys | sys | KiB |
-| expvar.memstats.gc_pauses | avg | ns |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| expvar.memstats.heap | memory: size of heap memory structures | alloc, inuse | KiB |
+| expvar.memstats.stack | memory: size of stack memory structures | inuse | KiB |
+| expvar.memstats.mspan | memory: size of mspan memory structures | inuse | KiB |
+| expvar.memstats.mcache | memory: size of mcache memory structures | inuse | KiB |
+| expvar.memstats.live_objects | memory: number of live objects | live | objects |
+| expvar.memstats.sys | memory: size of reserved virtual address space | sys | KiB |
+| expvar.memstats.gc_pauses | memory: average duration of GC pauses | avg | ns |
 
 
 

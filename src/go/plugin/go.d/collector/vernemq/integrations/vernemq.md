@@ -228,11 +228,13 @@ The following alerts are available:
 | [ vernemq_mqtt_pubcomp_unexpected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf) | vernemq.node_mqtt_pubcomp_invalid_error | Node ${label:node} mqtt v${label:mqtt_version} received unexpected PUBCOMP packets in the last minute |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -248,39 +250,40 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vernemq.node_socket | open | sockets |
-| vernemq.node_socket_operations | open, close | sockets/s |
-| vernemq.node_client_keepalive_expired | closed | sockets/s |
-| vernemq.node_socket_close_timeout | closed | sockets/s |
-| vernemq.node_socket_errors | errors | errors/s |
-| vernemq.node_queue_processes | queue_processes | queue processes |
-| vernemq.node_queue_processes_operations | setup, teardown | events/s |
-| vernemq.node_queue_process_init_from_storage | queue_processes | queue processes/s |
-| vernemq.node_queue_messages | received, sent | messages/s |
-| vernemq.node_queued_messages | queued | messages |
-| vernemq.node_queue_undelivered_messages | dropped, expired, unhandled | messages/s |
-| vernemq.node_router_subscriptions | subscriptions | subscriptions |
-| vernemq.node_router_matched_subscriptions | local, remote | subscriptions/s |
-| vernemq.node_router_memory | used | bytes |
-| vernemq.node_average_scheduler_utilization | utilization | percentage |
-| vernemq.node_system_processes | processes | processes |
-| vernemq.node_system_reductions | reductions | ops/s |
-| vernemq.node_system_context_switches | context_switches | ops/s |
-| vernemq.node_system_io | received, sent | bytes/s |
-| vernemq.node_system_run_queue | ready | processes |
-| vernemq.node_system_gc_count | gc | ops/s |
-| vernemq.node_system_gc_words_reclaimed | words_reclaimed | ops/s |
-| vernemq.node_system_allocated_memory | processes, system | bytes |
-| vernemq.node_traffic | received, sent | bytes/s |
-| vernemq.node_retain_messages | messages | messages |
-| vernemq.node_retain_memory | used | bytes |
-| vernemq.node_cluster_traffic | received, sent | bytes/s |
-| vernemq.node_cluster_dropped | dropped | bytes/s |
-| vernemq.node_netsplit_unresolved | unresolved | netsplits |
-| vernemq.node_netsplits | resolved, detected | netsplits/s |
-| vernemq.node_uptime | time | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vernemq.node_socket | Open Sockets | open | sockets |
+| vernemq.node_socket_operations | Socket Open and Close Events | open, close | sockets/s |
+| vernemq.node_client_keepalive_expired | Closed Sockets due to Keepalive Time Expired | closed | sockets/s |
+| vernemq.node_socket_close_timeout | Closed Sockets due to no CONNECT Frame On Time | closed | sockets/s |
+| vernemq.node_socket_errors | Socket Errors | errors | errors/s |
+| vernemq.node_queue_processes | Living Queues in an Online or an Offline State | queue_processes | queue processes |
+| vernemq.node_queue_processes_operations | Queue Processes Setup and Teardown Events | setup, teardown | events/s |
+| vernemq.node_queue_process_init_from_storage | Queue Processes Initialized from Offline Storage | queue_processes | queue processes/s |
+| vernemq.node_queue_messages | Received and Sent PUBLISH Messages | received, sent | messages/s |
+| vernemq.node_queued_messages | Queued PUBLISH Messages | queued | messages |
+| vernemq.node_queue_undelivered_messages | Undelivered PUBLISH Messages | dropped, expired, unhandled | messages/s |
+| vernemq.node_router_subscriptions | Subscriptions in the Routing Table | subscriptions | subscriptions |
+| vernemq.node_router_matched_subscriptions | Matched Subscriptions | local, remote | subscriptions/s |
+| vernemq.node_router_memory | Routing Table Memory Usage | used | bytes |
+| vernemq.node_average_scheduler_utilization | Average Scheduler Utilization | utilization | percentage |
+| vernemq.node_system_processes | Erlang Processes | processes | processes |
+| vernemq.node_system_reductions | Reductions | reductions | ops/s |
+| vernemq.node_system_context_switches | Context Switches | context_switches | ops/s |
+| vernemq.node_system_io | Received and Sent Traffic through Ports | received, sent | bytes/s |
+| vernemq.node_system_run_queue | Processes that are Ready to Run on All Run-Queues | ready | processes |
+| vernemq.node_system_gc_count | GC Count | gc | ops/s |
+| vernemq.node_system_gc_words_reclaimed | GC Words Reclaimed | words_reclaimed | ops/s |
+| vernemq.node_system_allocated_memory | Memory Allocated by the Erlang Processes and by the Emulator | processes, system | bytes |
+| vernemq.node_traffic | Traffic | received, sent | bytes/s |
+| vernemq.node_retain_messages | Stored Retained Messages | messages | messages |
+| vernemq.node_retain_memory | Stored Retained Messages Memory Usage | used | bytes |
+| vernemq.node_cluster_traffic | Communication with Other Cluster Nodes | received, sent | bytes/s |
+| vernemq.node_cluster_dropped | Traffic Dropped During Communication with Other Cluster Nodes | dropped | bytes/s |
+| vernemq.node_netsplit_unresolved | Unresolved Netsplits | unresolved | netsplits |
+| vernemq.node_netsplits | Netsplits | resolved, detected | netsplits/s |
+| vernemq.node_uptime | Node Uptime | time | seconds |
+
 
 ### Per mqtt
 
@@ -295,41 +298,41 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| vernemq.node_mqtt_auth | received, sent | packets/s |
-| vernemq.node_mqtt_auth_received_by_reason_code | success, continue_authentication, reauthenticate | packets/s |
-| vernemq.node_mqtt_auth_sent_by_reason_code | success, continue_authentication, reauthenticate | packets/s |
-| vernemq.node_mqtt_connect | connect, connack | packets/s |
-| vernemq.node_mqtt_connack_sent_by_return_code | success, unsupported_protocol_version, client_identifier_not_valid, server_unavailable, bad_username_or_password, not_authorized | packets/s |
-| vernemq.node_mqtt_connack_sent_by_reason_code | success, unspecified_error, malformed_packet, protocol_error, impl_specific_error, unsupported_protocol_version, client_identifier_not_valid, bad_username_or_password, not_authorized, server_unavailable, server_busy, banned, bad_authentication_method, topic_name_invalid, packet_too_large, quota_exceeded, payload_format_invalid, retain_not_supported, qos_not_supported, use_another_server, server_moved, connection_rate_exceeded | packets/s |
-| vernemq.node_mqtt_disconnect | received, sent | packets/s |
-| vernemq.node_mqtt_disconnect_received_by_reason_code | normal_disconnect, disconnect_with_will_msg, unspecified_error, malformed_packet, protocol_error, impl_specific_error, topic_name_invalid, receive_max_exceeded, topic_alias_invalid, packet_too_large, message_rate_too_high, quota_exceeded, administrative_action, payload_format_invalid | packets/s |
-| node_mqtt_disconnect_sent_by_reason_code | normal_disconnect, unspecified_error, malformed_packet, protocol_error, impl_specific_error, not_authorized, server_busy, server_shutting_down, keep_alive_timeout, session_taken_over, topic_filter_invalid, topic_name_invalid, receive_max_exceeded, topic_alias_invalid, packet_too_large, message_rate_too_high, quota_exceeded, administrative_action, payload_format_invalid, retain_not_supported, qos_not_supported, use_another_server, server_moved, shared_subs_not_supported, connection_rate_exceeded, max_connect_time, subscription_ids_not_supported, wildcard_subs_not_supported | packets/s |
-| vernemq.node_mqtt_subscribe | subscribe, suback | packets/s |
-| vernemq.node_mqtt_subscribe_error | subscribe | errors/s |
-| vernemq.node_mqtt_subscribe_auth_error | subscribe_auth | errors/s |
-| vernemq.node_mqtt_unsubscribe | unsubscribe, unsuback | packets/s |
-| vernemq.node_mqtt_unsubscribe_error | unsubscribe | errors/s |
-| vernemq.node_mqtt_publish | received, sent | packets/s |
-| vernemq.node_mqtt_publish_errors | publish | errors/s |
-| vernemq.node_mqtt_publish_auth_errors | publish_auth | errors/s |
-| vernemq.node_mqtt_puback | received, sent | packets/s |
-| vernemq.node_mqtt_puback_received_by_reason_code | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
-| vernemq.node_mqtt_puback_sent_by_reason_code | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
-| vernemq.node_mqtt_puback_invalid_error | unexpected | messages/s |
-| vernemq.node_mqtt_pubrec | received, sent | packets/s |
-| vernemq.node_mqtt_pubrec_received_by_reason_code | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
-| vernemq.node_mqtt_pubrec_sent_by_reason_code | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
-| vernemq.node_mqtt_pubrec_invalid_error | unexpected | messages/s |
-| vernemq.node_mqtt_pubrel | received, sent | packets/s |
-| vernemq.node_mqtt_pubrel_received_by_reason_code | success, packet_id_not_found | packets/s |
-| vernemq.node_mqtt_pubrel_sent_by_reason_code | success, packet_id_not_found | packets/s |
-| vernemq.node_mqtt_pubcomp | received, sent | packets/s |
-| vernemq.node_mqtt_pubcomp_received_by_reason_code | success, packet_id_not_found | packets/s |
-| vernemq.node_mqtt_pubcomp_sent_by_reason_cod | success, packet_id_not_found | packets/s |
-| vernemq.node_mqtt_pubcomp_invalid_error | unexpected | messages/s |
-| vernemq.node_mqtt_ping | pingreq, pingresp | packets/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| vernemq.node_mqtt_auth | MQTT AUTH Packets | received, sent | packets/s |
+| vernemq.node_mqtt_auth_received_by_reason_code | MQTT AUTH Received by Reason | success, continue_authentication, reauthenticate | packets/s |
+| vernemq.node_mqtt_auth_sent_by_reason_code | MQTT AUTH Sent by Reason | success, continue_authentication, reauthenticate | packets/s |
+| vernemq.node_mqtt_connect | MQTT CONNECT and CONNACK | connect, connack | packets/s |
+| vernemq.node_mqtt_connack_sent_by_return_code | MQTT CONNACK Sent by Return Code | success, unsupported_protocol_version, client_identifier_not_valid, server_unavailable, bad_username_or_password, not_authorized | packets/s |
+| vernemq.node_mqtt_connack_sent_by_reason_code | MQTT CONNACK Sent by Reason | success, unspecified_error, malformed_packet, protocol_error, impl_specific_error, unsupported_protocol_version, client_identifier_not_valid, bad_username_or_password, not_authorized, server_unavailable, server_busy, banned, bad_authentication_method, topic_name_invalid, packet_too_large, quota_exceeded, payload_format_invalid, retain_not_supported, qos_not_supported, use_another_server, server_moved, connection_rate_exceeded | packets/s |
+| vernemq.node_mqtt_disconnect | MQTT DISCONNECT Packets | received, sent | packets/s |
+| vernemq.node_mqtt_disconnect_received_by_reason_code | MQTT DISCONNECT Received by Reason | normal_disconnect, disconnect_with_will_msg, unspecified_error, malformed_packet, protocol_error, impl_specific_error, topic_name_invalid, receive_max_exceeded, topic_alias_invalid, packet_too_large, message_rate_too_high, quota_exceeded, administrative_action, payload_format_invalid | packets/s |
+| node_mqtt_disconnect_sent_by_reason_code | MQTT DISCONNECT Sent by Reason | normal_disconnect, unspecified_error, malformed_packet, protocol_error, impl_specific_error, not_authorized, server_busy, server_shutting_down, keep_alive_timeout, session_taken_over, topic_filter_invalid, topic_name_invalid, receive_max_exceeded, topic_alias_invalid, packet_too_large, message_rate_too_high, quota_exceeded, administrative_action, payload_format_invalid, retain_not_supported, qos_not_supported, use_another_server, server_moved, shared_subs_not_supported, connection_rate_exceeded, max_connect_time, subscription_ids_not_supported, wildcard_subs_not_supported | packets/s |
+| vernemq.node_mqtt_subscribe | MQTT SUBSCRIBE and SUBACK Packets | subscribe, suback | packets/s |
+| vernemq.node_mqtt_subscribe_error | MQTT Failed SUBSCRIBE Operations due to a Netsplit | subscribe | errors/s |
+| vernemq.node_mqtt_subscribe_auth_error | MQTT Unauthorized SUBSCRIBE Attempts | subscribe_auth | errors/s |
+| vernemq.node_mqtt_unsubscribe | MQTT UNSUBSCRIBE and UNSUBACK Packets | unsubscribe, unsuback | packets/s |
+| vernemq.node_mqtt_unsubscribe_error | MQTT Failed UNSUBSCRIBE Operations due to a Netsplit | unsubscribe | errors/s |
+| vernemq.node_mqtt_publish | MQTT QoS 0,1,2 PUBLISH | received, sent | packets/s |
+| vernemq.node_mqtt_publish_errors | MQTT Failed PUBLISH Operations due to a Netsplit | publish | errors/s |
+| vernemq.node_mqtt_publish_auth_errors | MQTT Unauthorized PUBLISH Attempts | publish_auth | errors/s |
+| vernemq.node_mqtt_puback | vMQTT QoS 1 PUBACK Packets | received, sent | packets/s |
+| vernemq.node_mqtt_puback_received_by_reason_code | MQTT PUBACK QoS 1 Received by Reason | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
+| vernemq.node_mqtt_puback_sent_by_reason_code | MQTT PUBACK QoS 1 Sent by Reason | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
+| vernemq.node_mqtt_puback_invalid_error | MQTT PUBACK QoS 1 Received Unexpected Messages | unexpected | messages/s |
+| vernemq.node_mqtt_pubrec | MQTT PUBREC QoS 2 Packets | received, sent | packets/s |
+| vernemq.node_mqtt_pubrec_received_by_reason_code | MQTT PUBREC QoS 2 Received by Reason | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
+| vernemq.node_mqtt_pubrec_sent_by_reason_code | MQTT PUBREC QoS 2 Sent by Reason | success, no_matching_subscribers, unspecified_error, impl_specific_error, not_authorized, topic_name_invalid, packet_id_in_use, quota_exceeded, payload_format_invalid | packets/s |
+| vernemq.node_mqtt_pubrec_invalid_error | MQTT PUBREC QoS 2 Received Unexpected Messages | unexpected | messages/s |
+| vernemq.node_mqtt_pubrel | MQTT PUBREL QoS 2 Packets | received, sent | packets/s |
+| vernemq.node_mqtt_pubrel_received_by_reason_code | MQTT PUBREL QoS 2 Received by Reason | success, packet_id_not_found | packets/s |
+| vernemq.node_mqtt_pubrel_sent_by_reason_code | MQTT PUBREL QoS 2 Sent by Reason | success, packet_id_not_found | packets/s |
+| vernemq.node_mqtt_pubcomp | MQTT PUBCOMP QoS 2 Packets | received, sent | packets/s |
+| vernemq.node_mqtt_pubcomp_received_by_reason_code | MQTT PUBCOMP QoS 2 Received by Reason | success, packet_id_not_found | packets/s |
+| vernemq.node_mqtt_pubcomp_sent_by_reason_cod | MQTT PUBCOMP QoS 2 Sent by Reason | success, packet_id_not_found | packets/s |
+| vernemq.node_mqtt_pubcomp_invalid_error | MQTT PUBCOMP QoS 2 Received Unexpected Messages | unexpected | messages/s |
+| vernemq.node_mqtt_ping | MQTT PING Packets | pingreq, pingresp | packets/s |
 
 
 

@@ -873,6 +873,7 @@ The following alerts are available:
 | [ aws_cloudwatch_sns_notifications_failed_to_redrive_to_dlq ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.sns.dlq_redrive | SNS notifications failed to redrive to DLQ on ${label:topic_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -970,6 +971,7 @@ These disabled opt-in profiles are collected when a rule names them in `profiles
 **Cardinality warning.** These opt-in profiles include potentially high-cardinality data. **S3 Request Metrics** additionally require per-bucket request-metrics configuration in AWS and are billed at CloudWatch custom-metric rates; they collect nothing until enabled on the bucket. PrivateLink cardinality grows with endpoint subnets, service Availability Zones, load balancers, and consumer endpoints; the combined Availability Zone/load-balancer grain multiplies those dimensions. The Billing service/account grains grow with the payer's services and linked accounts.
 
 
+
 ### Per AWS account, region, and operation
 
 Collector-issued CloudWatch API work attributed to one resolved AWS account, region, and API operation.
@@ -984,9 +986,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cloudwatch.collector_api_calls | calls | calls |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cloudwatch.collector_api_calls | CloudWatch API calls issued in the interval since the preceding successfully committed collector frame. | calls | calls |
+
 
 ### Per AWS account and region
 
@@ -1001,9 +1004,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cloudwatch.collector_metric_requests | requests | requests |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cloudwatch.collector_metric_requests | Calculated billable `GetMetricData` metric requests submitted in the interval since the preceding successfully committed collector frame. | requests | requests |
+
 
 ### Per AWS account, region, and profile
 
@@ -1019,9 +1023,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cloudwatch.collector_queries | queries | queries |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cloudwatch.collector_queries | Raw `MetricDataQuery` items submitted in the interval since the preceding successfully committed collector frame. | queries | queries |
 
 
 

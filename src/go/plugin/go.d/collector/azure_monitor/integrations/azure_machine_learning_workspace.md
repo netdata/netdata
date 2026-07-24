@@ -651,11 +651,13 @@ The following alerts are available:
 | [ am_ml_storage_api_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_machine_learning.conf) | azure_monitor.machine_learning.storage_api_calls | ML storage API failure rate on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -677,38 +679,38 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.machine_learning.agent_events | agent_events, thread_events | events/s |
-| azure_monitor.machine_learning.agent_messages | messages | messages/s |
-| azure_monitor.machine_learning.agent_runs | runs | runs/s |
-| azure_monitor.machine_learning.agent_tokens | tokens | tokens/s |
-| azure_monitor.machine_learning.agent_tool_calls | tool_calls | calls/s |
-| azure_monitor.machine_learning.agent_indexed_files | indexed_files | files/s |
-| azure_monitor.machine_learning.model_deployments | started, succeeded, failed | deployments/s |
-| azure_monitor.machine_learning.model_registrations | succeeded, failed | registrations/s |
-| azure_monitor.machine_learning.cluster_cores | active, idle, leaving, preempted, unusable | cores |
-| azure_monitor.machine_learning.total_cores | total | cores |
-| azure_monitor.machine_learning.cluster_nodes | active, idle, leaving, preempted, unusable | nodes |
-| azure_monitor.machine_learning.total_nodes | total | nodes |
-| azure_monitor.machine_learning.quota_utilization | utilization | percentage |
-| azure_monitor.machine_learning.cpu_utilization | cluster_cpu, node_cpu | percentage |
-| azure_monitor.machine_learning.cpu_millicores | used, capacity | millicores |
-| azure_monitor.machine_learning.cpu_memory_utilization | utilization | percentage |
-| azure_monitor.machine_learning.cpu_memory_megabytes | used, capacity | megabytes |
-| azure_monitor.machine_learning.gpu_utilization | cluster_gpu, node_gpu | percentage |
-| azure_monitor.machine_learning.gpu_milligpus | used, capacity | milliGPUs |
-| azure_monitor.machine_learning.gpu_memory_utilization | cluster_gpu_memory, node_gpu_memory | percentage |
-| azure_monitor.machine_learning.gpu_memory_megabytes | used, capacity | megabytes |
-| azure_monitor.machine_learning.gpu_energy | energy | joules/s |
-| azure_monitor.machine_learning.disk_usage | used, available | megabytes |
-| azure_monitor.machine_learning.disk_io | read, write | megabytes/s |
-| azure_monitor.machine_learning.network_traffic | in, out | megabytes/s |
-| azure_monitor.machine_learning.infiniband_traffic | receive, transmit | megabytes/s |
-| azure_monitor.machine_learning.storage_api_calls | success, failure | calls/s |
-| azure_monitor.machine_learning.run_lifecycle | not_started, starting, preparing, provisioning, queued, started | runs/s |
-| azure_monitor.machine_learning.run_completion | completed, failed, finalizing, cancelled, cancel_requested, not_responding | runs/s |
-| azure_monitor.machine_learning.run_issues | errors, warnings | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.machine_learning.agent_events | Azure Machine Learning Agent Events | agent_events, thread_events | events/s |
+| azure_monitor.machine_learning.agent_messages | Azure Machine Learning Agent Messages | messages | messages/s |
+| azure_monitor.machine_learning.agent_runs | Azure Machine Learning Agent Runs | runs | runs/s |
+| azure_monitor.machine_learning.agent_tokens | Azure Machine Learning Agent Tokens | tokens | tokens/s |
+| azure_monitor.machine_learning.agent_tool_calls | Azure Machine Learning Agent Tool Calls | tool_calls | calls/s |
+| azure_monitor.machine_learning.agent_indexed_files | Azure Machine Learning Agent Indexed Files | indexed_files | files/s |
+| azure_monitor.machine_learning.model_deployments | Azure Machine Learning Model Deployments | started, succeeded, failed | deployments/s |
+| azure_monitor.machine_learning.model_registrations | Azure Machine Learning Model Registrations | succeeded, failed | registrations/s |
+| azure_monitor.machine_learning.cluster_cores | Azure Machine Learning Cluster Cores | active, idle, leaving, preempted, unusable | cores |
+| azure_monitor.machine_learning.total_cores | Azure Machine Learning Total Cores | total | cores |
+| azure_monitor.machine_learning.cluster_nodes | Azure Machine Learning Cluster Nodes | active, idle, leaving, preempted, unusable | nodes |
+| azure_monitor.machine_learning.total_nodes | Azure Machine Learning Total Nodes | total | nodes |
+| azure_monitor.machine_learning.quota_utilization | Azure Machine Learning Quota Utilization | utilization | percentage |
+| azure_monitor.machine_learning.cpu_utilization | Azure Machine Learning CPU Utilization | cluster_cpu, node_cpu | percentage |
+| azure_monitor.machine_learning.cpu_millicores | Azure Machine Learning CPU Millicores | used, capacity | millicores |
+| azure_monitor.machine_learning.cpu_memory_utilization | Azure Machine Learning CPU Memory Utilization | utilization | percentage |
+| azure_monitor.machine_learning.cpu_memory_megabytes | Azure Machine Learning CPU Memory | used, capacity | megabytes |
+| azure_monitor.machine_learning.gpu_utilization | Azure Machine Learning GPU Utilization | cluster_gpu, node_gpu | percentage |
+| azure_monitor.machine_learning.gpu_milligpus | Azure Machine Learning GPU MilliGPUs | used, capacity | milliGPUs |
+| azure_monitor.machine_learning.gpu_memory_utilization | Azure Machine Learning GPU Memory Utilization | cluster_gpu_memory, node_gpu_memory | percentage |
+| azure_monitor.machine_learning.gpu_memory_megabytes | Azure Machine Learning GPU Memory | used, capacity | megabytes |
+| azure_monitor.machine_learning.gpu_energy | Azure Machine Learning GPU Energy | energy | joules/s |
+| azure_monitor.machine_learning.disk_usage | Azure Machine Learning Disk Usage | used, available | megabytes |
+| azure_monitor.machine_learning.disk_io | Azure Machine Learning Disk I/O | read, write | megabytes/s |
+| azure_monitor.machine_learning.network_traffic | Azure Machine Learning Network Traffic | in, out | megabytes/s |
+| azure_monitor.machine_learning.infiniband_traffic | Azure Machine Learning InfiniBand Traffic | receive, transmit | megabytes/s |
+| azure_monitor.machine_learning.storage_api_calls | Azure Machine Learning Storage API Calls | success, failure | calls/s |
+| azure_monitor.machine_learning.run_lifecycle | Azure Machine Learning Run Lifecycle | not_started, starting, preparing, provisioning, queued, started | runs/s |
+| azure_monitor.machine_learning.run_completion | Azure Machine Learning Run Completion | completed, failed, finalizing, cancelled, cancel_requested, not_responding | runs/s |
+| azure_monitor.machine_learning.run_issues | Azure Machine Learning Run Issues | errors, warnings | events/s |
 
 
 

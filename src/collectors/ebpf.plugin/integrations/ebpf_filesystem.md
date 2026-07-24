@@ -129,11 +129,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -145,11 +147,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filesystem.read_latency | latency period | calls/s |
-| filesystem.open_latency | latency period | calls/s |
-| filesystem.sync_latency | latency period | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| filesystem.read_latency | ext4 latency for each read request. | latency period | calls/s |
+| filesystem.open_latency | ext4 latency for each open request. | latency period | calls/s |
+| filesystem.sync_latency | ext4 latency for each sync request. | latency period | calls/s |
+
 
 ### Per iilesystem
 
@@ -159,9 +162,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filesystem.write_latency | latency period | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| filesystem.write_latency | ext4 latency for each write request. | latency period | calls/s |
+
 
 ### Per eBPF Filesystem instance
 
@@ -171,6 +175,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filesystem.attributte_latency | latency period | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| filesystem.attributte_latency | nfs latency for each attribute request. | latency period | calls/s |

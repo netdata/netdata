@@ -181,11 +181,13 @@ The following alerts are available:
 | [ nvme_device_critical_warnings_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nvme.conf) | nvme.device_critical_warnings_state | NVMe device ${label:device} has critical warnings |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -202,24 +204,24 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nvme.device_estimated_endurance_perc | used | % |
-| nvme.device_available_spare_perc | spare | % |
-| nvme.device_composite_temperature | temperature | celsius |
-| nvme.device_io_transferred_count | read, written | bytes |
-| nvme.device_power_cycles_count | power | cycles |
-| nvme.device_power_on_time | power-on | seconds |
-| nvme.device_critical_warnings_state | available_spare, temp_threshold, nvm_subsystem_reliability, read_only, volatile_mem_backup_failed, persistent_memory_read_only | state |
-| nvme.device_unsafe_shutdowns_count | unsafe | shutdowns |
-| nvme.device_media_errors_rate | media | errors/s |
-| nvme.device_error_log_entries_rate | error_log | entries/s |
-| nvme.device_warning_composite_temperature_time | wctemp | seconds |
-| nvme.device_critical_composite_temperature_time | cctemp | seconds |
-| nvme.device_thermal_mgmt_temp1_transitions_rate | temp1 | transitions/s |
-| nvme.device_thermal_mgmt_temp2_transitions_rate | temp2 | transitions/s |
-| nvme.device_thermal_mgmt_temp1_time | temp1 | seconds |
-| nvme.device_thermal_mgmt_temp2_time | temp2 | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nvme.device_estimated_endurance_perc | Estimated endurance | used | % |
+| nvme.device_available_spare_perc | Remaining spare capacity | spare | % |
+| nvme.device_composite_temperature | Composite temperature | temperature | celsius |
+| nvme.device_io_transferred_count | Amount of data transferred to and from device | read, written | bytes |
+| nvme.device_power_cycles_count | Power cycles | power | cycles |
+| nvme.device_power_on_time | Power-on time | power-on | seconds |
+| nvme.device_critical_warnings_state | Critical warnings state | available_spare, temp_threshold, nvm_subsystem_reliability, read_only, volatile_mem_backup_failed, persistent_memory_read_only | state |
+| nvme.device_unsafe_shutdowns_count | Unsafe shutdowns | unsafe | shutdowns |
+| nvme.device_media_errors_rate | Media and data integrity errors | media | errors/s |
+| nvme.device_error_log_entries_rate | Error log entries | error_log | entries/s |
+| nvme.device_warning_composite_temperature_time | Warning composite temperature time | wctemp | seconds |
+| nvme.device_critical_composite_temperature_time | Critical composite temperature time | cctemp | seconds |
+| nvme.device_thermal_mgmt_temp1_transitions_rate | Thermal management temp1 transitions | temp1 | transitions/s |
+| nvme.device_thermal_mgmt_temp2_transitions_rate | Thermal management temp2 transitions | temp2 | transitions/s |
+| nvme.device_thermal_mgmt_temp1_time | Thermal management temp1 time | temp1 | seconds |
+| nvme.device_thermal_mgmt_temp2_time | Thermal management temp2 time | temp2 | seconds |
 
 
 

@@ -79,11 +79,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -99,9 +101,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.zram_usage | compressed, metadata | MiB |
-| mem.zram_savings | savings, original | MiB |
-| mem.zram_ratio | ratio | ratio |
-| mem.zram_efficiency | percent | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.zram_usage | ZRAM Memory Usage | compressed, metadata | MiB |
+| mem.zram_savings | ZRAM Memory Savings | savings, original | MiB |
+| mem.zram_ratio | ZRAM Compression Ratio (original to compressed) | ratio | ratio |
+| mem.zram_efficiency | ZRAM Efficiency | percent | percentage |

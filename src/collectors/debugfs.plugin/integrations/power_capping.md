@@ -114,6 +114,7 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -121,6 +122,7 @@ Metrics grouped by *scope*.
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
 Monitor the Intel RAPL zones Consumption.
+
 
 ### Per Power Capping instance
 
@@ -130,7 +132,7 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cpu.powercap_intel_rapl_zone | Power | Watts |
-| cpu.powercap_intel_rapl_subzones | dram, core, uncore | Watts |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cpu.powercap_intel_rapl_zone | Intel RAPL Zone Power Consumption | Power | Watts |
+| cpu.powercap_intel_rapl_subzones | Intel RAPL Subzones Power Consumption | dram, core, uncore | Watts |

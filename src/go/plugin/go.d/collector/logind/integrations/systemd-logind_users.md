@@ -121,11 +121,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -137,12 +139,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| logind.sessions | remote, local | sessions |
-| logind.sessions_type | console, graphical, other | sessions |
-| logind.sessions_state | online, closing, active | sessions |
-| logind.users_state | offline, closing, online, lingering, active | users |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| logind.sessions | Logind Sessions | remote, local | sessions |
+| logind.sessions_type | Logind Sessions By Type | console, graphical, other | sessions |
+| logind.sessions_state | Logind Sessions By State | online, closing, active | sessions |
+| logind.users_state | Logind Users By State | offline, closing, online, lingering, active | users |
 
 
 

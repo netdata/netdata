@@ -122,6 +122,7 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Netdata decodes **449 trap definitions** from Netbotz across **2 MIBs** into structured journal events. A trap is decoded **only if the device actually sends it**; inclusion here means the profile can decode it.

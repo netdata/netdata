@@ -212,11 +212,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -232,11 +234,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filecheck.file_existence_status | exist, not_exist | status |
-| filecheck.file_modification_time_ago | mtime_ago | seconds |
-| filecheck.file_size_bytes | size | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| filecheck.file_existence_status | File existence | exist, not_exist | status |
+| filecheck.file_modification_time_ago | File time since the last modification | mtime_ago | seconds |
+| filecheck.file_size_bytes | File size | size | bytes |
+
 
 ### Per directory
 
@@ -250,12 +253,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filecheck.dir_existence_status | exist, not_exist | status |
-| filecheck.dir_modification_time_ago | mtime_ago | seconds |
-| filecheck.dir_size_bytes | size | bytes |
-| filecheck.dir_files count | files | files |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| filecheck.dir_existence_status | Directory existence | exist, not_exist | status |
+| filecheck.dir_modification_time_ago | Directory time since the last modification | mtime_ago | seconds |
+| filecheck.dir_size_bytes | Directory size | size | bytes |
+| filecheck.dir_files count | Directory files count | files | files |
 
 
 

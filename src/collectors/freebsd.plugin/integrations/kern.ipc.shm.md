@@ -102,11 +102,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -118,7 +120,7 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.ipc_shared_mem_segs | segments | segments |
-| system.ipc_shared_mem_size | allocated | KiB |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.ipc_shared_mem_segs | IPC Shared Memory Segments | segments | segments |
+| system.ipc_shared_mem_size | IPC Shared Memory Segments Size | allocated | KiB |

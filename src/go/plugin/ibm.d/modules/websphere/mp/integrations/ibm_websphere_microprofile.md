@@ -115,6 +115,7 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -123,18 +124,6 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per IBM WebSphere MicroProfile instance
-
-These metrics refer to the entire monitored instance.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_mp.cpu_usage | process, utilization | percentage |
-| websphere_mp.cpu_time | total | seconds |
 
 ### Per IBM WebSphere MicroProfile instance
 
@@ -144,16 +133,31 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_mp.jvm_memory_heap_usage | used, free | bytes |
-| websphere_mp.jvm_memory_heap_committed | committed | bytes |
-| websphere_mp.jvm_memory_heap_max | limit | bytes |
-| websphere_mp.jvm_heap_utilization | utilization | percentage |
-| websphere_mp.jvm_gc_collections | rate | collections/s |
-| websphere_mp.jvm_gc_time | total, per_cycle | milliseconds |
-| websphere_mp.jvm_threads_current | daemon, other | threads |
-| websphere_mp.jvm_threads_peak | peak | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_mp.cpu_usage | JVM CPU Usage | process, utilization | percentage |
+| websphere_mp.cpu_time | JVM CPU Time | total | seconds |
+
+
+### Per IBM WebSphere MicroProfile instance
+
+These metrics refer to the entire monitored instance.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_mp.jvm_memory_heap_usage | JVM Heap Memory Usage | used, free | bytes |
+| websphere_mp.jvm_memory_heap_committed | JVM Heap Memory Committed | committed | bytes |
+| websphere_mp.jvm_memory_heap_max | JVM Heap Memory Maximum | limit | bytes |
+| websphere_mp.jvm_heap_utilization | JVM Heap Utilization | utilization | percentage |
+| websphere_mp.jvm_gc_collections | JVM Garbage Collection Rate | rate | collections/s |
+| websphere_mp.jvm_gc_time | JVM GC Time | total, per_cycle | milliseconds |
+| websphere_mp.jvm_threads_current | JVM Current Threads | daemon, other | threads |
+| websphere_mp.jvm_threads_peak | JVM Peak Threads | peak | threads |
+
 
 ### Per restendpoint
 
@@ -168,10 +172,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_mp.rest_requests | requests | requests/s |
-| websphere_mp.rest_response_time | average | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_mp.rest_requests | REST Request Rate | requests | requests/s |
+| websphere_mp.rest_response_time | REST Response Time | average | milliseconds |
+
 
 ### Per IBM WebSphere MicroProfile instance
 
@@ -181,7 +186,7 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_mp.threadpool_usage | active, idle | threads |
-| websphere_mp.threadpool_size | size | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_mp.threadpool_usage | Thread Pool Usage | active, idle | threads |
+| websphere_mp.threadpool_size | Thread Pool Size | size | threads |

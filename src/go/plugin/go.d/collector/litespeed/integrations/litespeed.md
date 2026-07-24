@@ -143,11 +143,13 @@ local:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -159,17 +161,17 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| litespeed.requests | requests | requests/s |
-| litespeed.requests_processing | processing | requests |
-| litespeed.net_throughput | in, out | kilobits/s |
-| litespeed.net_ssl_throughput | in, out | kilobits/s |
-| litespeed.connections | free, used | conns |
-| litespeed.ssl_connections | free, used | conns |
-| litespeed.public_cache | hits | hits/s |
-| litespeed.private_cache | hits | hits/s |
-| litespeed.static | hits | hits/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| litespeed.requests | Requests | requests | requests/s |
+| litespeed.requests_processing | Requests In Processing | processing | requests |
+| litespeed.net_throughput | Network Throughput HTTP | in, out | kilobits/s |
+| litespeed.net_ssl_throughput | Network Throughput HTTPS | in, out | kilobits/s |
+| litespeed.connections | Connections HTTP | free, used | conns |
+| litespeed.ssl_connections | Connections HTTPS | free, used | conns |
+| litespeed.public_cache | Public Cache Hits | hits | hits/s |
+| litespeed.private_cache | Private Cache Hits | hits | hits/s |
+| litespeed.static | Static Hits | hits | hits/s |
 
 
 

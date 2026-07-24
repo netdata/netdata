@@ -150,11 +150,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -166,10 +168,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| intelgpu.frequency | frequency | MHz |
-| intelgpu.power | gpu, package | Watts |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| intelgpu.frequency | Intel GPU frequency | frequency | MHz |
+| intelgpu.power | Intel GPU power | gpu, package | Watts |
+
 
 ### Per engine
 
@@ -184,9 +187,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| intelgpu.engine_busy_perc | busy | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| intelgpu.engine_busy_perc | Intel GPU engine busy time percentage | busy | percentage |
 
 
 

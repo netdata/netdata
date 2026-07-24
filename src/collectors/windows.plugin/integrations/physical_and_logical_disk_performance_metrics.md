@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -120,9 +122,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.io | reads, writes | KiB/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.io | Disk I/O | reads, writes | KiB/s |
+
 
 ### Per Logical Disk
 
@@ -139,9 +142,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.space | avail, used | GiB |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| disk.space | Disk Space Usage | avail, used | GiB |
+
 
 ### Per Physical Disk
 
@@ -158,15 +162,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.io | reads, writes | KiB/s |
-| disk.avgsz | reads, writes | KiB/operation |
-| disk.ops | reads, writes | operations/s |
-| disk.split | discards | operations/s |
-| disk.await | reads, writes | milliseconds/operation |
-| disk.svctm | svctm | milliseconds/operation |
-| disk.util | utilization | percent |
-| disk.busy | busy | milliseconds |
-| disk.iotime | reads, writes | milliseconds/s |
-| disk.qops | operations | operations |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| disk.io | Disk I/O Bandwidth | reads, writes | KiB/s |
+| disk.avgsz | Average Completed I/O Operation Bandwidth | reads, writes | KiB/operation |
+| disk.ops | Disk Completed I/O Operations | reads, writes | operations/s |
+| disk.split | Split I/O Operations | discards | operations/s |
+| disk.await | Average Completed I/O Operation Time | reads, writes | milliseconds/operation |
+| disk.svctm | Average Service Time | svctm | milliseconds/operation |
+| disk.util | Disk Utilization Time | utilization | percent |
+| disk.busy | Disk Busy Time | busy | milliseconds |
+| disk.iotime | Disk Total I/O Time | reads, writes | milliseconds/s |
+| disk.qops | Disk Current I/O Operations | operations | operations |

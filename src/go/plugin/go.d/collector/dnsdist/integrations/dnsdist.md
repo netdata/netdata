@@ -192,11 +192,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -208,20 +210,20 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dnsdist.queries | all, recursive, empty | queries/s |
-| dnsdist.queries_dropped | rule_drop, dynamic_blocked, no_policy, non_queries | queries/s |
-| dnsdist.packets_dropped | acl | packets/s |
-| dnsdist.answers | self_answered, nxdomain, refused, trunc_failures | answers/s |
-| dnsdist.backend_responses | responses | responses/s |
-| dnsdist.backend_commerrors | send_errors | errors/s |
-| dnsdist.backend_errors | timeouts, servfail, non_compliant | responses/s |
-| dnsdist.cache | hits, misses | answers/s |
-| dnsdist.servercpu | system_state, user_state | ms/s |
-| dnsdist.servermem | memory_usage | MiB |
-| dnsdist.query_latency | 1ms, 10ms, 50ms, 100ms, 1sec, slow | queries/s |
-| dnsdist.query_latency_avg | 100, 1k, 10k, 1000k | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| dnsdist.queries | Client queries received | all, recursive, empty | queries/s |
+| dnsdist.queries_dropped | Client queries dropped | rule_drop, dynamic_blocked, no_policy, non_queries | queries/s |
+| dnsdist.packets_dropped | Packets dropped | acl | packets/s |
+| dnsdist.answers | Answers statistics | self_answered, nxdomain, refused, trunc_failures | answers/s |
+| dnsdist.backend_responses | Backend responses | responses | responses/s |
+| dnsdist.backend_commerrors | Backend communication errors | send_errors | errors/s |
+| dnsdist.backend_errors | Backend error responses | timeouts, servfail, non_compliant | responses/s |
+| dnsdist.cache | Cache performance | hits, misses | answers/s |
+| dnsdist.servercpu | DNSdist server CPU utilization | system_state, user_state | ms/s |
+| dnsdist.servermem | DNSdist server memory utilization | memory_usage | MiB |
+| dnsdist.query_latency | Query latency | 1ms, 10ms, 50ms, 100ms, 1sec, slow | queries/s |
+| dnsdist.query_latency_avg | Average latency for the last N queries | 100, 1k, 10k, 1000k | microseconds |
 
 
 

@@ -637,11 +637,13 @@ The following alerts are available:
 | [ am_express_route_gateway_routes_learned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_learned | ExpressRoute GW routes learned on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -663,18 +665,18 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.express_route_gateway.connection_throughput | in, out | bits/s |
-| azure_monitor.express_route_gateway.gateway_throughput | average | bits/s |
-| azure_monitor.express_route_gateway.cpu_utilization | average | percentage |
-| azure_monitor.express_route_gateway.packets | average | packets/s |
-| azure_monitor.express_route_gateway.active_flows | average | flows |
-| azure_monitor.express_route_gateway.routes_advertised | maximum | routes |
-| azure_monitor.express_route_gateway.routes_learned | maximum | routes |
-| azure_monitor.express_route_gateway.route_changes | total | changes/s |
-| azure_monitor.express_route_gateway.max_flows_creation_rate | maximum | flows/s |
-| azure_monitor.express_route_gateway.vm_count | maximum | VMs |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.express_route_gateway.connection_throughput | Azure ExpressRoute Gateway Connection Throughput | in, out | bits/s |
+| azure_monitor.express_route_gateway.gateway_throughput | Azure ExpressRoute Gateway Throughput | average | bits/s |
+| azure_monitor.express_route_gateway.cpu_utilization | Azure ExpressRoute Gateway CPU Utilization | average | percentage |
+| azure_monitor.express_route_gateway.packets | Azure ExpressRoute Gateway Packets | average | packets/s |
+| azure_monitor.express_route_gateway.active_flows | Azure ExpressRoute Gateway Active Flows | average | flows |
+| azure_monitor.express_route_gateway.routes_advertised | Azure ExpressRoute Gateway Routes Advertised to Peer | maximum | routes |
+| azure_monitor.express_route_gateway.routes_learned | Azure ExpressRoute Gateway Routes Learned from Peer | maximum | routes |
+| azure_monitor.express_route_gateway.route_changes | Azure ExpressRoute Gateway Route Changes | total | changes/s |
+| azure_monitor.express_route_gateway.max_flows_creation_rate | Azure ExpressRoute Gateway Max Flow Creation Rate | maximum | flows/s |
+| azure_monitor.express_route_gateway.vm_count | Azure ExpressRoute Gateway VMs in VNet | maximum | VMs |
 
 
 

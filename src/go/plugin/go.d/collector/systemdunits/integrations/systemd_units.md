@@ -250,11 +250,13 @@ The following alerts are available:
 | [ systemd_timer_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.timer_unit_state | systemd timer unit in the failed state |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -270,19 +272,20 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| systemd.service_unit_state | active, inactive, activating, deactivating, failed | state |
-| systemd.socket_unit_state | active, inactive, activating, deactivating, failed | state |
-| systemd.target_unit_state | active, inactive, activating, deactivating, failed | state |
-| systemd.path_unit_state | active, inactive, activating, deactivating, failed | state |
-| systemd.device_unit_state | active, inactive, activating, deactivating, failed | state |
-| systemd.mount_unit_state | active, inactive, activating, deactivating, failed | state |
-| systemd.automount_unit_state | active, inactive, activating, deactivating, failed | state |
-| systemd.swap_unit_state | active, inactive, activating, deactivating, failed | state |
-| systemd.timer_unit_state | active, inactive, activating, deactivating, failed | state |
-| systemd.scope_unit_state | active, inactive, activating, deactivating, failed | state |
-| systemd.slice_unit_state | active, inactive, activating, deactivating, failed | state |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| systemd.service_unit_state | Service Unit State | active, inactive, activating, deactivating, failed | state |
+| systemd.socket_unit_state | Socket Unit State | active, inactive, activating, deactivating, failed | state |
+| systemd.target_unit_state | Target Unit State | active, inactive, activating, deactivating, failed | state |
+| systemd.path_unit_state | Path Unit State | active, inactive, activating, deactivating, failed | state |
+| systemd.device_unit_state | Device Unit State | active, inactive, activating, deactivating, failed | state |
+| systemd.mount_unit_state | Mount Unit State | active, inactive, activating, deactivating, failed | state |
+| systemd.automount_unit_state | Automount Unit State | active, inactive, activating, deactivating, failed | state |
+| systemd.swap_unit_state | Swap Unit State | active, inactive, activating, deactivating, failed | state |
+| systemd.timer_unit_state | Timer Unit State | active, inactive, activating, deactivating, failed | state |
+| systemd.scope_unit_state | Scope Unit State | active, inactive, activating, deactivating, failed | state |
+| systemd.slice_unit_state | Slice Unit State | active, inactive, activating, deactivating, failed | state |
+
 
 ### Per unit file
 
@@ -297,9 +300,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| systemd.unit_file_state | enabled, enabled-runtime, linked, linked-runtime, alias, masked, masked-runtime, static, disabled, indirect, generated, transient, bad | state |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| systemd.unit_file_state | Unit File State | enabled, enabled-runtime, linked, linked-runtime, alias, masked, masked-runtime, static, disabled, indirect, generated, transient, bad | state |
 
 
 

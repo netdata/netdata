@@ -75,11 +75,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -95,29 +97,30 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.cpu_utilization | user, system | percentage |
-| app.cpu_guest_utilization | guest | percentage |
-| app.cpu_context_switches | voluntary, involuntary | switches/s |
-| app.estimated_mem_usage | mem | MiB |
-| app.mem_usage | rss | MiB |
-| app.mem_private_usage | mem | MiB |
-| app.vmem_usage | vmem | MiB |
-| app.mem_page_faults | minor, major | pgfaults/s |
-| app.ebpf_cachestat_hit_ratio | ratio | % |
-| app.ebpf_cachestat_dirty_pages | pages | page/s |
-| app.ebpf_cachestat_access | hits | hits/s |
-| app.ebpf_cachestat_misses | misses | misses/s |
-| app.swap_usage | swap | MiB |
-| app.disk_physical_io | reads, writes | KiB/s |
-| app.disk_logical_io | reads, writes | KiB/s |
-| app.processes | processes | processes |
-| app.threads | threads | threads |
-| app.fds_open_limit | limit | percentage |
-| app.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
-| app.uptime | uptime | seconds |
-| app.uptime_summary | min, avg, max | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| app.cpu_utilization | Apps CPU utilization (100% = 1 core) | user, system | percentage |
+| app.cpu_guest_utilization | Apps CPU guest utilization (100% = 1 core) | guest | percentage |
+| app.cpu_context_switches | Apps CPU context switches | voluntary, involuntary | switches/s |
+| app.estimated_mem_usage | Apps estimated memory usage (RSS with shared scaling). Requires kernel 4.14+. Enabled by default, disable with --pss 0. | mem | MiB |
+| app.mem_usage | Apps memory RSS usage | rss | MiB |
+| app.mem_private_usage | Apps memory usage without shared | mem | MiB |
+| app.vmem_usage | Apps virtual memory size | vmem | MiB |
+| app.mem_page_faults | Apps memory page faults | minor, major | pgfaults/s |
+| app.ebpf_cachestat_hit_ratio | Hit ratio | ratio | % |
+| app.ebpf_cachestat_dirty_pages | Number of dirty pages | pages | page/s |
+| app.ebpf_cachestat_access | Number of accessed files | hits | hits/s |
+| app.ebpf_cachestat_misses | Files out of page cache | misses | misses/s |
+| app.swap_usage | Apps swap usage | swap | MiB |
+| app.disk_physical_io | Apps disk physical IO | reads, writes | KiB/s |
+| app.disk_logical_io | Apps disk logical IO | reads, writes | KiB/s |
+| app.processes | Apps processes | processes | processes |
+| app.threads | Apps threads | threads | threads |
+| app.fds_open_limit | Apps open file descriptors limit | limit | percentage |
+| app.fds_open | Apps open file descriptors | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
+| app.uptime | Apps uptime | uptime | seconds |
+| app.uptime_summary | Apps uptime summary | min, avg, max | seconds |
+
 
 ### Per apps plugin IPC
 
@@ -127,12 +130,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| netdata.collector.ipc.cgroups_lookup.client.requests | requests_sent, requests_responded, requests_timeout, requests_error | requests/s |
-| netdata.collector.ipc.cgroups_lookup.client.cache | cache_hits, cache_misses_retry, cache_misses_permanent, cache_evictions | events/s |
-| netdata.collector.ipc.cgroups_lookup.client.peer | peer_connect_attempts, peer_disconnects | events/s |
-| netdata.collector.ipc.cgroups_lookup.client.request_duration_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
-| netdata.collector.ipc.cgroups_lookup.client.queue_depth | queue_depth | paths |
-| netdata.collector.ipc.apps_lookup.server.requests | requests_responded, requests_error | requests/s |
-| netdata.collector.ipc.apps_lookup.server.request_duration_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| netdata.collector.ipc.cgroups_lookup.client.requests | CGROUPS_LOOKUP client request outcomes | requests_sent, requests_responded, requests_timeout, requests_error | requests/s |
+| netdata.collector.ipc.cgroups_lookup.client.cache | CGROUPS_LOOKUP client cache outcomes | cache_hits, cache_misses_retry, cache_misses_permanent, cache_evictions | events/s |
+| netdata.collector.ipc.cgroups_lookup.client.peer | CGROUPS_LOOKUP client peer connection events | peer_connect_attempts, peer_disconnects | events/s |
+| netdata.collector.ipc.cgroups_lookup.client.request_duration_ms | CGROUPS_LOOKUP client request duration buckets | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
+| netdata.collector.ipc.cgroups_lookup.client.queue_depth | CGROUPS_LOOKUP client queued cgroup paths | queue_depth | paths |
+| netdata.collector.ipc.apps_lookup.server.requests | APPS_LOOKUP server request outcomes | requests_responded, requests_error | requests/s |
+| netdata.collector.ipc.apps_lookup.server.request_duration_ms | APPS_LOOKUP server request duration buckets | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |

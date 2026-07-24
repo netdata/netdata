@@ -217,11 +217,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -233,14 +235,14 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| phpfpm.connections | active, max_active, idle | connections |
-| phpfpm.requests | requests | requests/s |
-| phpfpm.performance | max_children_reached, slow_requests | status |
-| phpfpm.request_duration | min, max, avg | milliseconds |
-| phpfpm.request_cpu | min, max, avg | percentage |
-| phpfpm.request_mem | min, max, avg | KB |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| phpfpm.connections | Active Connections | active, max_active, idle | connections |
+| phpfpm.requests | Requests | requests | requests/s |
+| phpfpm.performance | Performance | max_children_reached, slow_requests | status |
+| phpfpm.request_duration | Requests Duration Among All Idle Processes | min, max, avg | milliseconds |
+| phpfpm.request_cpu | Last Request CPU Usage Among All Idle Processes | min, max, avg | percentage |
+| phpfpm.request_mem | Last Request Memory Usage Among All Idle Processes | min, max, avg | KB |
 
 
 

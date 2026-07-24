@@ -113,11 +113,13 @@ The following alerts are available:
 | [ network_interface_output_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.queue_length | Output Queue Length on interface ${label:device} should be zero, otherwise there are delays and bottlenecks. |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -129,22 +131,23 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.net | received, sent | kilobits/s |
-| ip.tcppackets | received, sent | packets/s |
-| ipv4.packets | received, sent, forwarded, delivered | packets/s |
-| ipv4.tcppackets | received, sent | packets/s |
-| ipv4.udppackets | received, sent | packets/s |
-| ipv4.icmp | received, sent | packets/s |
-| ipv4.errors | InDiscards, OutDiscards, OutNoRoutes, InAddrErrors, InHdrErrors, InUnknownProtos | packets/s |
-| ipv4.icmpmsg | InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InRouterAdvert, OutRouterAdvert, InRouterSelect, OutRouterSelect, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps | packets/s |
-| ipv6.packets | received, sent, forwarded, delivered | packets/s |
-| ipv6.tcppackets | received, sent | packets/s |
-| ipv6.udppackets | received, sent | packets/s |
-| ipv6.icmp | received, sent | packets/s |
-| ipv6.errors | InDiscards, OutDiscards, OutNoRoutes, InAddrErrors, InHdrErrors, InUnknownProtos | packets/s |
-| ipv6.icmpmsg | InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InRouterAdvert, OutRouterAdvert, InRouterSelect, OutRouterSelect, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps | packets/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.net | Physical Network Interfaces Aggregated Bandwidth | received, sent | kilobits/s |
+| ip.tcppackets | TCP Packets | received, sent | packets/s |
+| ipv4.packets | IPv4 Packets | received, sent, forwarded, delivered | packets/s |
+| ipv4.tcppackets | IPv4 TCP Packets | received, sent | packets/s |
+| ipv4.udppackets | IPv4 UDP Packets | received, sent | packets/s |
+| ipv4.icmp | IPv4 ICMP Packets | received, sent | packets/s |
+| ipv4.errors | IPv4 Errors | InDiscards, OutDiscards, OutNoRoutes, InAddrErrors, InHdrErrors, InUnknownProtos | packets/s |
+| ipv4.icmpmsg | IPv4 ICMP Packets | InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InRouterAdvert, OutRouterAdvert, InRouterSelect, OutRouterSelect, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps | packets/s |
+| ipv6.packets | IPv6 Packets | received, sent, forwarded, delivered | packets/s |
+| ipv6.tcppackets | IPv6 TCP Packets | received, sent | packets/s |
+| ipv6.udppackets | IPv6 UDP Packets | received, sent | packets/s |
+| ipv6.icmp | IPv6 ICMP Packets | received, sent | packets/s |
+| ipv6.errors | IPv6 Errors | InDiscards, OutDiscards, OutNoRoutes, InAddrErrors, InHdrErrors, InUnknownProtos | packets/s |
+| ipv6.icmpmsg | IPv6 ICMP Packets | InEchoReps, OutEchoReps, InDestUnreachs, OutDestUnreachs, InRedirects, OutRedirects, InEchos, OutEchos, InRouterAdvert, OutRouterAdvert, InRouterSelect, OutRouterSelect, InTimeExcds, OutTimeExcds, InParmProbs, OutParmProbs, InTimestamps, OutTimestamps, InTimestampReps, OutTimestampReps | packets/s |
+
 
 ### Per network device
 
@@ -159,16 +162,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| net.net | received, sent | kilobits/s |
-| net.packets | received, sent | packets/s |
-| net.speed | speed | kilobits/s |
-| net.errors | inbound, outbound | errors/s |
-| net.drops | inbound, outbound | drops/s |
-| net.queue_length | length | packets |
-| net.rsc_connections | connections | connections |
-| net.rsc_packets | packets | packets/s |
-| net.rsc_exceptions | exceptions | exceptions/s |
-| net.rsc_average_packet_size | average | bytes |
-| net.chimney_connections | connections | connections |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| net.net | Bandwidth | received, sent | kilobits/s |
+| net.packets | Packets | received, sent | packets/s |
+| net.speed | Interface Speed | speed | kilobits/s |
+| net.errors | Interface Errors | inbound, outbound | errors/s |
+| net.drops | Interface Drops | inbound, outbound | drops/s |
+| net.queue_length | Interface Output Queue Length | length | packets |
+| net.rsc_connections | Active TCP Connections Offloaded by RSC | connections | connections |
+| net.rsc_packets | TCP RSC Coalesced Packets | packets | packets/s |
+| net.rsc_exceptions | TCP RSC Exceptions | exceptions | exceptions/s |
+| net.rsc_average_packet_size | TCP RSC Average Packet Size | average | bytes |
+| net.chimney_connections | Active TCP Connections Offloaded with Chimney | connections | connections |

@@ -75,11 +75,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -91,9 +93,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.pagetype_global | a dimension per pagesize | B |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.pagetype_global | System orders available | a dimension per pagesize | B |
+
 
 ### Per node, zone, type
 
@@ -109,6 +112,6 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.pagetype | a dimension per pagesize | B |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.pagetype | pagetype_Node{node}_{zone}_{type} | a dimension per pagesize | B |

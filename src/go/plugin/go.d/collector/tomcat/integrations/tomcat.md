@@ -196,11 +196,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -212,9 +214,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| tomcat.jvm_memory_usage | free, used | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| tomcat.jvm_memory_usage | Requests | free, used | bytes |
+
 
 ### Per jvm memory pool
 
@@ -229,9 +232,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| tomcat.jvm_mem_pool_memory_usage | commited, used, max | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| tomcat.jvm_mem_pool_memory_usage | JVM Mem Pool Memory Usage | commited, used, max | bytes |
+
 
 ### Per connector
 
@@ -245,13 +249,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| tomcat.connector_requests | requests | requests/s |
-| tomcat.connector_bandwidth | received, sent | bytes/s |
-| tomcat.connector_requests_processing_time | processing_time | milliseconds |
-| tomcat.connector_errors | errors | errors/s |
-| tomcat.connector_request_threads | idle, busy | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| tomcat.connector_requests | Connector Requests | requests | requests/s |
+| tomcat.connector_bandwidth | Connector Bandwidth | received, sent | bytes/s |
+| tomcat.connector_requests_processing_time | Connector Requests Processing Time | processing_time | milliseconds |
+| tomcat.connector_errors | Connector Errors | errors | errors/s |
+| tomcat.connector_request_threads | Connector Request Threads | idle, busy | threads |
 
 
 

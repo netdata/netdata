@@ -641,11 +641,13 @@ The following alerts are available:
 | [ am_front_door_waf_rate_limited ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_front_door.conf) | azure_monitor.front_door.origin_shield_requests | Front Door origin shield rate limiting on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -667,20 +669,20 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.front_door.latency | total, origin | milliseconds |
-| azure_monitor.front_door.origin_health | health | percentage |
-| azure_monitor.front_door.byte_hit_ratio | hit_ratio | percentage |
-| azure_monitor.front_door.error_rate | 4xx, 5xx | percentage |
-| azure_monitor.front_door.requests | client, origin | requests/s |
-| azure_monitor.front_door.data_transfer | request, response | bytes/s |
-| azure_monitor.front_door.origin_shield_requests | to_shield, to_origin, rate_limited | requests/s |
-| azure_monitor.front_door.origin_shield_data_transfer | request | bytes/s |
-| azure_monitor.front_door.waf_requests | total | requests/s |
-| azure_monitor.front_door.waf_challenges | captcha, js_challenge | requests/s |
-| azure_monitor.front_door.websocket_connections | requested, active | connections/s |
-| azure_monitor.front_door.websocket_duration | average | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.front_door.latency | Azure Front Door Latency | total, origin | milliseconds |
+| azure_monitor.front_door.origin_health | Azure Front Door Origin Health | health | percentage |
+| azure_monitor.front_door.byte_hit_ratio | Azure Front Door Byte Hit Ratio | hit_ratio | percentage |
+| azure_monitor.front_door.error_rate | Azure Front Door Error Rate | 4xx, 5xx | percentage |
+| azure_monitor.front_door.requests | Azure Front Door Requests | client, origin | requests/s |
+| azure_monitor.front_door.data_transfer | Azure Front Door Data Transfer | request, response | bytes/s |
+| azure_monitor.front_door.origin_shield_requests | Azure Front Door Origin Shield Requests | to_shield, to_origin, rate_limited | requests/s |
+| azure_monitor.front_door.origin_shield_data_transfer | Azure Front Door Origin Shield Data Transfer | request | bytes/s |
+| azure_monitor.front_door.waf_requests | Azure Front Door WAF Requests | total | requests/s |
+| azure_monitor.front_door.waf_challenges | Azure Front Door WAF Challenges | captcha, js_challenge | requests/s |
+| azure_monitor.front_door.websocket_connections | Azure Front Door WebSocket Connections | requested, active | connections/s |
+| azure_monitor.front_door.websocket_duration | Azure Front Door WebSocket Connection Duration | average | milliseconds |
 
 
 

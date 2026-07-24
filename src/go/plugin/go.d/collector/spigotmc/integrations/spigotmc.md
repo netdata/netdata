@@ -176,11 +176,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -192,11 +194,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| spigotmc.players | players | players |
-| spigotmc.avg_tps | 1min, 5min, 15min | ticks |
-| spigotmc.memory | used, alloc | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| spigotmc.players | Active Players | players | players |
+| spigotmc.avg_tps | Average Ticks Per Second | 1min, 5min, 15min | ticks |
+| spigotmc.memory | Memory Usage | used, alloc | bytes |
 
 
 

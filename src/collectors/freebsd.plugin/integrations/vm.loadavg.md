@@ -110,11 +110,13 @@ The following alerts are available:
 | [ load_average_1 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf) | system.load | system one-minute load average |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -126,6 +128,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.load | load1, load5, load15 | load |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.load | System Load Average | load1, load5, load15 | load |

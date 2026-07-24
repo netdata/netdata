@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -120,21 +122,22 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| hyperv.vms_health | ok, critical | vms |
-| hyperv.root_partition_io_tlb_flush | gpa | flushes/s |
-| hyperv.root_partition_virtual_tlb_flush_entries | flushes | flushes/s |
-| hyperv.root_partition_virtual_tlb_pages | used | pages |
-| hyperv.root_partition_address_space | address_spaces | address spaces |
-| hyperv.root_partition_attached_devices | attached | devices |
-| hyperv.root_partition_device_dma_errors | illegal_dma | requests |
-| hyperv.root_partition_device_interrupt_errors | illegal_interrupt | requests |
-| hyperv.root_partition_device_interrupt_throttle_events | throttling | events |
-| hyperv.root_partition_deposited_pages | gpa | pages |
-| hyperv.root_partition_device_space_pages | 4K, 2M, 1G | pages |
-| hyperv.root_partition_gpa_space_pages | 4K, 2M, 1G | pages |
-| hyperv.root_partition_gpa_space_modifications | gpa | modifications/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| hyperv.vms_health | Virtual machines health status | ok, critical | vms |
+| hyperv.root_partition_io_tlb_flush | Root partition flushes of I/O TLBs | gpa | flushes/s |
+| hyperv.root_partition_virtual_tlb_flush_entries | Root partition flushes of the entire virtual TLB | flushes | flushes/s |
+| hyperv.root_partition_virtual_tlb_pages | Root partition pages used by the virtual TLB | used | pages |
+| hyperv.root_partition_address_space | Root partition address spaces in the virtual TLB | address_spaces | address spaces |
+| hyperv.root_partition_attached_devices | Root partition attached devices | attached | devices |
+| hyperv.root_partition_device_dma_errors | Root partition illegal DMA requests | illegal_dma | requests |
+| hyperv.root_partition_device_interrupt_errors | Root partition illegal interrupt requests | illegal_interrupt | requests |
+| hyperv.root_partition_device_interrupt_throttle_events | Root partition throttled interrupts | throttling | events |
+| hyperv.root_partition_deposited_pages | Root partition deposited pages | gpa | pages |
+| hyperv.root_partition_device_space_pages | Root partition device space pages | 4K, 2M, 1G | pages |
+| hyperv.root_partition_gpa_space_pages | Root partition GPA space pages | 4K, 2M, 1G | pages |
+| hyperv.root_partition_gpa_space_modifications | Root partition GPA space modifications | gpa | modifications/s |
+
 
 ### Per Virtual Machine
 
@@ -148,15 +151,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| hyperv.vm_cpu_usage | usage | percentage |
-| hyperv.vm_cpu_usage_by_run_context | guest, hypervisor, remote | percentage |
-| hyperv.vm_memory_physical | assigned | bytes |
-| hyperv.vm_memory_physical_guest_visible | visible, available | bytes |
-| hyperv.vm_memory_pressure_current | pressure | percentage |
-| hyperv.vm_vid_physical_pages_allocated | allocated | pages |
-| hyperv.vm_vid_remote_physical_pages | remote_physical | pages |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| hyperv.vm_cpu_usage | VM CPU usage | usage | percentage |
+| hyperv.vm_cpu_usage_by_run_context | VM CPU usage by run context | guest, hypervisor, remote | percentage |
+| hyperv.vm_memory_physical | VM assigned memory | assigned | bytes |
+| hyperv.vm_memory_physical_guest_visible | VM guest visible memory | visible, available | bytes |
+| hyperv.vm_memory_pressure_current | VM Memory Pressure | pressure | percentage |
+| hyperv.vm_vid_physical_pages_allocated | VM physical pages allocated | allocated | pages |
+| hyperv.vm_vid_remote_physical_pages | VM physical pages not allocated from the preferred NUMA node | remote_physical | pages |
+
 
 ### Per Virtual Machine Storage Device
 
@@ -170,11 +174,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| hyperv.vm_storage_device_bytes | read, write | bytes/s |
-| hyperv.vm_storage_device_operations | read, write | operations/s |
-| hyperv.vm_storage_device_errors | errors | errors/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| hyperv.vm_storage_device_bytes | VM storage device IO | read, write | bytes/s |
+| hyperv.vm_storage_device_operations | VM storage device IOPS&#34; | read, write | operations/s |
+| hyperv.vm_storage_device_errors | VM storage device errors | errors | errors/s |
+
 
 ### Per Virtual Machine Network Interface
 
@@ -188,15 +193,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| hyperv.vm_net_interface_traffic | received, sent | kilobits/s |
-| hyperv.vm_net_interface_ipsec_traffic | received, sent | kilobits/s |
-| hyperv.vm_net_interface_packets | received, sent | packets/s |
-| hyperv.vm_net_interface_directed_packets | received, sent | packets/s |
-| hyperv.vm_net_interface_broadcast_packets | received, sent | packets/s |
-| hyperv.vm_net_interface_multicast_packets | received, sent | packets/s |
-| hyperv.vm_net_interface_packets_dropped | incoming, outgoing | drops/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| hyperv.vm_net_interface_traffic | VM interface traffic | received, sent | kilobits/s |
+| hyperv.vm_net_interface_ipsec_traffic | VM interface traffic | received, sent | kilobits/s |
+| hyperv.vm_net_interface_packets | VM interface packets | received, sent | packets/s |
+| hyperv.vm_net_interface_directed_packets | VM interface directed packets | received, sent | packets/s |
+| hyperv.vm_net_interface_broadcast_packets | VM interface broadcast | received, sent | packets/s |
+| hyperv.vm_net_interface_multicast_packets | VM interface multicast | received, sent | packets/s |
+| hyperv.vm_net_interface_packets_dropped | VM interface packets dropped | incoming, outgoing | drops/s |
+
 
 ### Per Virtual Switch
 
@@ -210,15 +216,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| hyperv.vswitch_traffic | received, sent | kilobits/s |
-| hyperv.vswitch_packets | received, sent | packets/s |
-| hyperv.vswitch_directed_packets | received, sent | packets/s |
-| hyperv.vswitch_broadcast_packets | received, sent | packets/s |
-| hyperv.vswitch_multicast_packets | received, sent | packets/s |
-| hyperv.vswitch_dropped_packets | incoming, outgoing | drops/s |
-| hyperv.vswitch_extensions_dropped_packets | incoming, outgoing | drops/s |
-| hyperv.vswitch_packets_flooded | flooded | packets/s |
-| hyperv.vswitch_learned_mac_addresses | learned | mac addresses/s |
-| hyperv.vswitch_purged_mac_addresses | purged | mac addresses/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| hyperv.vswitch_traffic | Virtual switch traffic | received, sent | kilobits/s |
+| hyperv.vswitch_packets | Virtual switch packets | received, sent | packets/s |
+| hyperv.vswitch_directed_packets | Virtual switch directed packets | received, sent | packets/s |
+| hyperv.vswitch_broadcast_packets | Virtual switch broadcast packets | received, sent | packets/s |
+| hyperv.vswitch_multicast_packets | Virtual switch multicast packets | received, sent | packets/s |
+| hyperv.vswitch_dropped_packets | Virtual switch dropped packets | incoming, outgoing | drops/s |
+| hyperv.vswitch_extensions_dropped_packets | Virtual switch extensions dropped packets | incoming, outgoing | drops/s |
+| hyperv.vswitch_packets_flooded | Virtual switch flooded packets | flooded | packets/s |
+| hyperv.vswitch_learned_mac_addresses | Virtual switch learned MAC addresses | learned | mac addresses/s |
+| hyperv.vswitch_purged_mac_addresses | Virtual switch purged MAC addresses | purged | mac addresses/s |

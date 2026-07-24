@@ -199,11 +199,13 @@ The following alerts are available:
 | [ ipfs_datastore_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipfs.conf) | ipfs.datastore_space_utilization | IPFS datastore utilization |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -215,14 +217,14 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipfs.bandwidth | in, out | bytes/s |
-| ipfs.peers | peers | peers |
-| ipfs.datastore_space_utilization | used | percent |
-| ipfs.repo_size | size | bytes |
-| ipfs.repo_objects | objects | objects |
-| ipfs.repo_pinned_objects | pinned, recursive_pins | objects |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ipfs.bandwidth | IPFS Bandwidth | in, out | bytes/s |
+| ipfs.peers | IPFS Peers | peers | peers |
+| ipfs.datastore_space_utilization | IPFS Datastore Space Utilization | used | percent |
+| ipfs.repo_size | IPFS Repo Size | size | bytes |
+| ipfs.repo_objects | IPFS Repo Objects | objects | objects |
+| ipfs.repo_pinned_objects | IPFS Repo Pinned Objects | pinned, recursive_pins | objects |
 
 
 

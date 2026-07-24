@@ -637,11 +637,13 @@ The following alerts are available:
 | [ am_event_grid_destination_processing_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_grid.conf) | azure_monitor.event_grid.destination_processing_duration | Event Grid destination processing duration on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -663,14 +665,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.event_grid.publish_rate | success, failed | events/s |
-| azure_monitor.event_grid.publish_latency | latency | milliseconds |
-| azure_monitor.event_grid.routing | matched, unmatched | events/s |
-| azure_monitor.event_grid.advanced_filter_evaluations | evaluations | evaluations/s |
-| azure_monitor.event_grid.delivery | delivered, failed, dropped, dead_lettered | events/s |
-| azure_monitor.event_grid.destination_processing_duration | average | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.event_grid.publish_rate | Azure Event Grid Publish Rate | success, failed | events/s |
+| azure_monitor.event_grid.publish_latency | Azure Event Grid Publish Latency | latency | milliseconds |
+| azure_monitor.event_grid.routing | Azure Event Grid Event Routing | matched, unmatched | events/s |
+| azure_monitor.event_grid.advanced_filter_evaluations | Azure Event Grid Advanced Filter Evaluations | evaluations | evaluations/s |
+| azure_monitor.event_grid.delivery | Azure Event Grid Event Delivery | delivered, failed, dropped, dead_lettered | events/s |
+| azure_monitor.event_grid.destination_processing_duration | Azure Event Grid Destination Processing Duration | average | milliseconds |
 
 
 

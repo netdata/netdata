@@ -128,11 +128,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -149,15 +151,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.bufferpool_instance_hit_ratio | overall | percentage |
-| db2.bufferpool_instance_detailed_hit_ratio | data, index, xda, column | percentage |
-| db2.bufferpool_instance_reads | logical, physical | reads/s |
-| db2.bufferpool_instance_data_reads | logical, physical | reads/s |
-| db2.bufferpool_instance_index_reads | logical, physical | reads/s |
-| db2.bufferpool_instance_pages | used, total | pages |
-| db2.bufferpool_instance_writes | writes | writes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.bufferpool_instance_hit_ratio | Buffer Pool Hit Ratio | overall | percentage |
+| db2.bufferpool_instance_detailed_hit_ratio | Buffer Pool Detailed Hit Ratios | data, index, xda, column | percentage |
+| db2.bufferpool_instance_reads | Buffer Pool Reads | logical, physical | reads/s |
+| db2.bufferpool_instance_data_reads | Buffer Pool Data Page Reads | logical, physical | reads/s |
+| db2.bufferpool_instance_index_reads | Buffer Pool Index Page Reads | logical, physical | reads/s |
+| db2.bufferpool_instance_pages | Buffer Pool Pages | used, total | pages |
+| db2.bufferpool_instance_writes | Buffer Pool Writes | writes | writes/s |
+
 
 ### Per bufferpoolgroup
 
@@ -171,15 +174,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.bufferpool_group_hit_ratio | overall | percentage |
-| db2.bufferpool_group_detailed_hit_ratio | data, index, xda, column | percentage |
-| db2.bufferpool_group_reads | logical, physical | reads/s |
-| db2.bufferpool_group_data_reads | logical, physical | reads/s |
-| db2.bufferpool_group_index_reads | logical, physical | reads/s |
-| db2.bufferpool_group_pages | used, total | pages |
-| db2.bufferpool_group_writes | writes | writes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.bufferpool_group_hit_ratio | Buffer Pool Group Hit Ratio | overall | percentage |
+| db2.bufferpool_group_detailed_hit_ratio | Buffer Pool Group Detailed Hit Ratios | data, index, xda, column | percentage |
+| db2.bufferpool_group_reads | Buffer Pool Group Reads | logical, physical | reads/s |
+| db2.bufferpool_group_data_reads | Buffer Pool Group Data Reads | logical, physical | reads/s |
+| db2.bufferpool_group_index_reads | Buffer Pool Group Index Reads | logical, physical | reads/s |
+| db2.bufferpool_group_pages | Buffer Pool Group Pages | used, total | pages |
+| db2.bufferpool_group_writes | Buffer Pool Group Writes | writes | writes/s |
+
 
 ### Per connection
 
@@ -198,12 +202,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.connection_state | state | state |
-| db2.connection_activity | read, written | rows/s |
-| db2.connection_wait_time | lock, log_disk, log_buffer, pool_read, pool_write, direct_read, direct_write, fcm_recv, fcm_send | milliseconds |
-| db2.connection_processing_time | routine, compile, section, commit, rollback | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.connection_state | Connection State | state | state |
+| db2.connection_activity | Connection Row Activity | read, written | rows/s |
+| db2.connection_wait_time | Connection Wait Time | lock, log_disk, log_buffer, pool_read, pool_write, direct_read, direct_write, fcm_recv, fcm_send | milliseconds |
+| db2.connection_processing_time | Connection Processing Time | routine, compile, section, commit, rollback | milliseconds |
+
 
 ### Per connectiongroup
 
@@ -217,13 +222,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.connection_group.count | count | connections |
-| db2.connection_group.state | state | state |
-| db2.connection_group.activity | read, written | rows/s |
-| db2.connection_group.wait_time | lock, log_disk, log_buffer, pool_read, pool_write, direct_read, direct_write, fcm_recv, fcm_send | milliseconds |
-| db2.connection_group.processing_time | routine, compile, section, commit, rollback | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.connection_group.count | Connection Group Count | count | connections |
+| db2.connection_group.state | Connection Group State Sum | state | state |
+| db2.connection_group.activity | Connection Group Row Activity | read, written | rows/s |
+| db2.connection_group.wait_time | Connection Group Wait Time | lock, log_disk, log_buffer, pool_read, pool_write, direct_read, direct_write, fcm_recv, fcm_send | milliseconds |
+| db2.connection_group.processing_time | Connection Group Processing Time | routine, compile, section, commit, rollback | milliseconds |
+
 
 ### Per database
 
@@ -238,10 +244,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.database_instance_status | status | status |
-| db2.database_applications | applications | applications |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.database_instance_status | Database Status | status | status |
+| db2.database_applications | Database Applications | applications | applications |
+
 
 ### Per index
 
@@ -255,9 +262,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.index_usage | index, full | scans/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.index_usage | Index Usage | index, full | scans/s |
+
 
 ### Per indexgroup
 
@@ -271,9 +279,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.index_group_usage | index, full | scans/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.index_group_usage | Index Group Usage | index, full | scans/s |
+
 
 ### Per memorypool
 
@@ -287,10 +296,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.memory_pool_usage | used | bytes |
-| db2.memory_pool_hwm | hwm | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.memory_pool_usage | Memory Pool Usage | used | bytes |
+| db2.memory_pool_hwm | Memory Pool High Water Mark | hwm | bytes |
+
 
 ### Per memoryset
 
@@ -307,13 +317,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.memory_set_usage | used | bytes |
-| db2.memory_set_committed | committed | bytes |
-| db2.memory_set_high_water_mark | hwm | bytes |
-| db2.memory_set_additional_committed | additional | bytes |
-| db2.memory_set_percent_used_hwm | used_hwm | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.memory_set_usage | Memory Set Usage | used | bytes |
+| db2.memory_set_committed | Memory Set Committed | committed | bytes |
+| db2.memory_set_high_water_mark | Memory Set High Water Mark | hwm | bytes |
+| db2.memory_set_additional_committed | Memory Set Additional Committed | additional | bytes |
+| db2.memory_set_percent_used_hwm | Memory Set Percent Used vs HWM | used_hwm | percentage |
+
 
 ### Per prefetcher
 
@@ -327,14 +338,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.prefetcher_prefetch_ratio | ratio | percentage |
-| db2.prefetcher_cleaner_ratio | ratio | percentage |
-| db2.prefetcher_physical_reads | reads | reads/s |
-| db2.prefetcher_async_reads | reads | reads/s |
-| db2.prefetcher_wait_time | wait_time | milliseconds |
-| db2.prefetcher_unread_pages | unread | pages/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.prefetcher_prefetch_ratio | Prefetcher Prefetch Ratio | ratio | percentage |
+| db2.prefetcher_cleaner_ratio | Prefetcher Cleaner Ratio | ratio | percentage |
+| db2.prefetcher_physical_reads | Prefetcher Physical Reads | reads | reads/s |
+| db2.prefetcher_async_reads | Prefetcher Asynchronous Reads | reads | reads/s |
+| db2.prefetcher_wait_time | Prefetcher Wait Time | wait_time | milliseconds |
+| db2.prefetcher_unread_pages | Prefetcher Unread Pages | unread | pages/s |
+
 
 ### Per IBM DB2 instance
 
@@ -344,46 +356,47 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.service_health | connection, database | status |
-| db2.connections | total, active, executing, idle, max_allowed | connections |
-| db2.locking | waits, timeouts, escalations | events/s |
-| db2.deadlocks | deadlocks | deadlocks/s |
-| db2.lock_details | active, waiting_agents, memory_pages | locks |
-| db2.lock_wait_time | wait_time | milliseconds |
-| db2.sorting | sorts, overflows | sorts/s |
-| db2.row_activity | read, returned, modified | rows/s |
-| db2.bufferpool_hit_ratio | hits, misses | percentage |
-| db2.bufferpool_data_hit_ratio | hits, misses | percentage |
-| db2.bufferpool_index_hit_ratio | hits, misses | percentage |
-| db2.bufferpool_xda_hit_ratio | hits, misses | percentage |
-| db2.bufferpool_column_hit_ratio | hits, misses | percentage |
-| db2.bufferpool_reads | logical, physical | reads/s |
-| db2.bufferpool_data_reads | logical, physical | reads/s |
-| db2.bufferpool_index_reads | logical, physical | reads/s |
-| db2.bufferpool_xda_reads | logical, physical | reads/s |
-| db2.bufferpool_column_reads | logical, physical | reads/s |
-| db2.bufferpool_writes | writes | writes/s |
-| db2.log_space | used, available | bytes |
-| db2.log_utilization | utilization | percentage |
-| db2.log_io | reads, writes | operations/s |
-| db2.log_operations | commits, rollbacks, reads, writes | operations/s |
-| db2.log_timing | avg_commit, avg_read, avg_write | milliseconds |
-| db2.log_buffer_events | buffer_full | events/s |
-| db2.long_running_queries | total, warning, critical | queries |
-| db2.backup_status | status | status |
-| db2.backup_age | full, incremental | hours |
-| db2.federation_connections | active, idle | connections |
-| db2.federation_operations | rows_read, selects, waits | operations/s |
-| db2.database_status | active, inactive | status |
-| db2.database_count | active, inactive | databases |
-| db2.cpu_usage | user, system, idle, iowait | percentage |
-| db2.active_connections | active, total | connections |
-| db2.memory_usage | database, instance, bufferpool, shared_sort | MiB |
-| db2.sql_statements | selects, modifications | statements/s |
-| db2.transaction_activity | committed, aborted | transactions/s |
-| db2.time_spent | direct_read, direct_write, pool_read, pool_write | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.service_health | Service Health Status | connection, database | status |
+| db2.connections | Database Connections | total, active, executing, idle, max_allowed | connections |
+| db2.locking | Database Locking | waits, timeouts, escalations | events/s |
+| db2.deadlocks | Database Deadlocks | deadlocks | deadlocks/s |
+| db2.lock_details | Lock Details | active, waiting_agents, memory_pages | locks |
+| db2.lock_wait_time | Average Lock Wait Time | wait_time | milliseconds |
+| db2.sorting | Database Sorting | sorts, overflows | sorts/s |
+| db2.row_activity | Row Activity | read, returned, modified | rows/s |
+| db2.bufferpool_hit_ratio | Buffer Pool Hit Ratio | hits, misses | percentage |
+| db2.bufferpool_data_hit_ratio | Buffer Pool Data Page Hit Ratio | hits, misses | percentage |
+| db2.bufferpool_index_hit_ratio | Buffer Pool Index Page Hit Ratio | hits, misses | percentage |
+| db2.bufferpool_xda_hit_ratio | Buffer Pool XDA Page Hit Ratio | hits, misses | percentage |
+| db2.bufferpool_column_hit_ratio | Buffer Pool Column Page Hit Ratio | hits, misses | percentage |
+| db2.bufferpool_reads | Buffer Pool Reads | logical, physical | reads/s |
+| db2.bufferpool_data_reads | Buffer Pool Data Page Reads | logical, physical | reads/s |
+| db2.bufferpool_index_reads | Buffer Pool Index Page Reads | logical, physical | reads/s |
+| db2.bufferpool_xda_reads | Buffer Pool XDA Page Reads | logical, physical | reads/s |
+| db2.bufferpool_column_reads | Buffer Pool Column Page Reads | logical, physical | reads/s |
+| db2.bufferpool_writes | Buffer Pool Writes | writes | writes/s |
+| db2.log_space | Log Space Usage | used, available | bytes |
+| db2.log_utilization | Log Space Utilization | utilization | percentage |
+| db2.log_io | Log I/O Operations | reads, writes | operations/s |
+| db2.log_operations | Log Operations | commits, rollbacks, reads, writes | operations/s |
+| db2.log_timing | Log Operation Times | avg_commit, avg_read, avg_write | milliseconds |
+| db2.log_buffer_events | Log Buffer Full Events | buffer_full | events/s |
+| db2.long_running_queries | Long Running Queries | total, warning, critical | queries |
+| db2.backup_status | Last Backup Status | status | status |
+| db2.backup_age | Time Since Last Backup | full, incremental | hours |
+| db2.federation_connections | Federated Connections | active, idle | connections |
+| db2.federation_operations | Federated Operations | rows_read, selects, waits | operations/s |
+| db2.database_status | Current Database Status | active, inactive | status |
+| db2.database_count | Database Count | active, inactive | databases |
+| db2.cpu_usage | CPU Usage (100% = 1 CPU core) | user, system, idle, iowait | percentage |
+| db2.active_connections | Active Connections | active, total | connections |
+| db2.memory_usage | Memory Usage | database, instance, bufferpool, shared_sort | MiB |
+| db2.sql_statements | SQL Statements | selects, modifications | statements/s |
+| db2.transaction_activity | Transaction Activity | committed, aborted | transactions/s |
+| db2.time_spent | Average Operation Times | direct_read, direct_write, pool_read, pool_write | milliseconds |
+
 
 ### Per table
 
@@ -397,10 +410,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.table_size | data, index, long_obj | bytes |
-| db2.table_activity | read, written | rows/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.table_size | Table Size | data, index, long_obj | bytes |
+| db2.table_activity | Table Activity | read, written | rows/s |
+
 
 ### Per tablegroup
 
@@ -414,10 +428,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.table_group_size | data, index, long_obj | bytes |
-| db2.table_group_activity | read, written | rows/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.table_group_size | Table Group Size | data, index, long_obj | bytes |
+| db2.table_group_activity | Table Group Activity | read, written | rows/s |
+
 
 ### Per tableio
 
@@ -431,12 +446,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.table_io_scans | scans | scans/s |
-| db2.table_io_rows | read | rows/s |
-| db2.table_io_activity | inserts, updates, deletes | operations/s |
-| db2.table_io_overflow | overflow | accesses/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.table_io_scans | Table Scans | scans | scans/s |
+| db2.table_io_rows | Table Row Operations | read | rows/s |
+| db2.table_io_activity | Table DML Activity | inserts, updates, deletes | operations/s |
+| db2.table_io_overflow | Table Overflow Accesses | overflow | accesses/s |
+
 
 ### Per tablespace
 
@@ -453,12 +469,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.tablespace_usage | used | percentage |
-| db2.tablespace_size | used, free | bytes |
-| db2.tablespace_usable_size | total, usable | bytes |
-| db2.tablespace_state | state | state |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.tablespace_usage | Tablespace Usage | used | percentage |
+| db2.tablespace_size | Tablespace Size | used, free | bytes |
+| db2.tablespace_usable_size | Tablespace Usable Size | total, usable | bytes |
+| db2.tablespace_state | Tablespace State | state | state |
+
 
 ### Per tablespacegroup
 
@@ -472,9 +489,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| db2.tablespace_group_usage | used | percentage |
-| db2.tablespace_group_size | used, free | bytes |
-| db2.tablespace_group_usable_size | total, usable | bytes |
-| db2.tablespace_group_state | state | state |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| db2.tablespace_group_usage | Tablespace Group Usage | used | percentage |
+| db2.tablespace_group_size | Tablespace Group Size | used, free | bytes |
+| db2.tablespace_group_usable_size | Tablespace Group Usable Size | total, usable | bytes |
+| db2.tablespace_group_state | Tablespace Group State | state | state |

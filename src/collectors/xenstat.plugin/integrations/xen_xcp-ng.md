@@ -20,9 +20,9 @@ Module: xenstat.plugin
 
 ## Overview
 
-This collector monitors XenServer and XCP-ng host and domains statistics.
+This collector monitors XenServer and XCP-ng host and domain statistics.
 
-
+Reads host and domain statistics directly from the local Xen hypervisor through the system Xen libraries. The plugin must run on the Xen hypervisor host itself (dom0, on a XenServer or XCP-ng host); it cannot collect from inside guest VMs and there is no option to connect to a remote or network Xen host.
 
 This collector is supported on all platforms.
 
@@ -56,6 +56,16 @@ The default configuration for this integration is not expected to impose a signi
   Note: On Cent-OS systems you will need `centos-release-xen` repository and the required package for xen is `xen-devel`
 
 2. Re-install Netdata from source. The installer will detect that the required libraries are now available and will also build xenstat.plugin.
+
+
+#### Host placement
+
+Install the Netdata Agent on the Xen hypervisor host (dom0, on a XenServer or XCP-ng host). Installing it inside a guest VM or on a non-Xen host will not expose Xen host or domain metrics, because the plugin reads the local Xen hypervisor only.
+
+
+#### Xen Orchestra Appliance (XOA)
+
+Netdata has no dedicated XOA integration. The xenstat.plugin collects XenServer/XCP-ng host and domain statistics from the hypervisor layer, not XOA-specific application metrics. The XOA VM can be monitored as a standard Linux system if access is available.
 
 
 
@@ -111,11 +121,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -127,12 +139,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| xenstat.mem | free, used | MiB |
-| xenstat.domains | domains | domains |
-| xenstat.cpus | cpus | cpus |
-| xenstat.cpu_freq | frequency | MHz |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| xenstat.mem | Memory Usage | free, used | MiB |
+| xenstat.domains | Number of Domains | domains | domains |
+| xenstat.cpus | Number of CPUs | cpus | cpus |
+| xenstat.cpu_freq | CPU Frequency | frequency | MHz |
+
 
 ### Per xendomain
 
@@ -142,12 +155,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| xendomain.states | running, blocked, paused, shutdown, crashed, dying | boolean |
-| xendomain.cpu | used | percentage |
-| xendomain.mem | maximum, current | MiB |
-| xendomain.vcpu | a dimension per vcpu | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| xendomain.states | Domain States | running, blocked, paused, shutdown, crashed, dying | boolean |
+| xendomain.cpu | CPU Usage (100% = 1 core) | used | percentage |
+| xendomain.mem | Memory Reservation | maximum, current | MiB |
+| xendomain.vcpu | CPU Usage per VCPU | a dimension per vcpu | percentage |
+
 
 ### Per xendomain vbd
 
@@ -157,11 +171,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| xendomain.oo_req_vbd | requests | requests/s |
-| xendomain.requests_vbd | read, write | requests/s |
-| xendomain.sectors_vbd | read, write | sectors/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| xendomain.oo_req_vbd | VBD{%u} Out Of Requests | requests | requests/s |
+| xendomain.requests_vbd | VBD{%u} Requests | read, write | requests/s |
+| xendomain.sectors_vbd | VBD{%u} Read/Written Sectors | read, write | sectors/s |
+
 
 ### Per xendomain network
 
@@ -171,9 +186,19 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| xendomain.bytes_network | received, sent | kilobits/s |
-| xendomain.packets_network | received, sent | packets/s |
-| xendomain.errors_network | received, sent | errors/s |
-| xendomain.drops_network | received, sent | drops/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| xendomain.bytes_network | Network{%u} Received/Sent Bytes | received, sent | kilobits/s |
+| xendomain.packets_network | Network{%u} Received/Sent Packets | received, sent | packets/s |
+| xendomain.errors_network | Network{%u} Receive/Transmit Errors | received, sent | errors/s |
+| xendomain.drops_network | Network{%u} Receive/Transmit Drops | received, sent | drops/s |
+
+
+
+## Troubleshooting
+
+### Xen XCP-ng host or domain metrics are not appearing
+
+**Cause:** The Netdata Agent is installed inside a guest VM or on a non-Xen host instead of the Xen hypervisor host (dom0). The plugin reads the local Xen hypervisor only, so a guest VM cannot report the host or other domains, and there is no remote-collection option.
+
+**Resolution:** Follow the Libraries and Host placement prerequisites above.

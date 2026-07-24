@@ -80,11 +80,13 @@ The following alerts are available:
 | [ power_supply_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/power_supply_capacity.conf) | powersupply.capacity | percentage of remaining power supply capacity |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -100,10 +102,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| powersupply.capacity | capacity | percentage |
-| powersupply.power | power | W |
-| powersupply.charge | empty_design, empty, now, full, full_design | Ah |
-| powersupply.energy | empty_design, empty, now, full, full_design | Wh |
-| powersupply.voltage | min_design, min, now, max, max_design | V |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| powersupply.capacity | Battery capacity | capacity | percentage |
+| powersupply.power | Battery discharge rate | power | W |
+| powersupply.charge | Battery charge | empty_design, empty, now, full, full_design | Ah |
+| powersupply.energy | Battery energy | empty_design, empty, now, full, full_design | Wh |
+| powersupply.voltage | Power supply voltage | min_design, min, now, max, max_design | V |

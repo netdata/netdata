@@ -160,11 +160,13 @@ The following alerts are available:
 | [ adaptec_raid_pd_health_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/adaptec_raid.conf) | adaptecraid.physical_device_state | Adaptec RAID physical device (number ${label:pd_number} location ${label:location}) health state is critical |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -182,9 +184,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| adaptecraid.logical_device_status | ok, critical | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| adaptecraid.logical_device_status | Logical Device status | ok, critical | status |
+
 
 ### Per physical device
 
@@ -201,11 +204,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| adaptecraid.physical_device_state | ok, critical | status |
-| adaptecraid.physical_device_smart_warnings | smart | warnings |
-| adaptecraid.physical_device_temperature | temperature | Celsius |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| adaptecraid.physical_device_state | Physical Device state | ok, critical | status |
+| adaptecraid.physical_device_smart_warnings | Physical Device SMART warnings | smart | warnings |
+| adaptecraid.physical_device_temperature | Physical Device temperature | temperature | Celsius |
 
 
 

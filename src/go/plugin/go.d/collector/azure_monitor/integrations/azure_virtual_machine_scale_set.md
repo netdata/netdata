@@ -663,11 +663,13 @@ The following alerts are available:
 | [ am_vmss_vm_uncached_burst_io_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_uncached_burst_credits | VMSS uncached burst IO credits depleting on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -689,44 +691,44 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.vmss.cpu | average | percentage |
-| azure_monitor.vmss.cpu_credits | consumed, remaining | credits |
-| azure_monitor.vmss.memory | available | bytes |
-| azure_monitor.vmss.memory_percentage | available | percentage |
-| azure_monitor.vmss.availability | average | state |
-| azure_monitor.vmss.network_traffic | in, out | bytes/s |
-| azure_monitor.vmss.network_flows | in, out | flows |
-| azure_monitor.vmss.network_flow_creation_rate | in, out | flows/s |
-| azure_monitor.vmss.disk_throughput | read, write | bytes/s |
-| azure_monitor.vmss.disk_iops | read, write | operations/s |
-| azure_monitor.vmss.os_disk_throughput | read, write | bytes/s |
-| azure_monitor.vmss.os_disk_iops | read, write | operations/s |
-| azure_monitor.vmss.os_disk_latency | average | milliseconds |
-| azure_monitor.vmss.os_disk_queue_depth | average | operations |
-| azure_monitor.vmss.os_disk_throttling | bandwidth, iops | percentage |
-| azure_monitor.vmss.os_disk_burst_capacity | max_burst, target | bytes/s |
-| azure_monitor.vmss.os_disk_burst_iops_capacity | max_burst, target | iops |
-| azure_monitor.vmss.os_disk_burst_credits | bandwidth, io | percentage |
-| azure_monitor.vmss.data_disk_throughput | read, write | bytes/s |
-| azure_monitor.vmss.data_disk_iops | read, write | operations/s |
-| azure_monitor.vmss.data_disk_latency | average | milliseconds |
-| azure_monitor.vmss.data_disk_queue_depth | average | operations |
-| azure_monitor.vmss.data_disk_throttling | bandwidth, iops | percentage |
-| azure_monitor.vmss.data_disk_burst_capacity | max_burst, target | bytes/s |
-| azure_monitor.vmss.data_disk_burst_iops_capacity | max_burst, target | iops |
-| azure_monitor.vmss.data_disk_burst_credits | bandwidth, io | percentage |
-| azure_monitor.vmss.temp_disk_throughput | read, write | bytes/s |
-| azure_monitor.vmss.temp_disk_iops | read, write | operations/s |
-| azure_monitor.vmss.temp_disk_latency | average | milliseconds |
-| azure_monitor.vmss.temp_disk_queue_depth | average | operations |
-| azure_monitor.vmss.premium_data_disk_cache | hit, miss | percentage |
-| azure_monitor.vmss.premium_os_disk_cache | hit, miss | percentage |
-| azure_monitor.vmss.vm_cached_throttling | bandwidth, iops | percentage |
-| azure_monitor.vmss.vm_uncached_throttling | bandwidth, iops | percentage |
-| azure_monitor.vmss.vm_cached_burst_credits | bandwidth, io | percentage |
-| azure_monitor.vmss.vm_uncached_burst_credits | bandwidth, io | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.vmss.cpu | Azure VMSS CPU Utilization | average | percentage |
+| azure_monitor.vmss.cpu_credits | Azure VMSS CPU Credits | consumed, remaining | credits |
+| azure_monitor.vmss.memory | Azure VMSS Available Memory | available | bytes |
+| azure_monitor.vmss.memory_percentage | Azure VMSS Available Memory Percentage | available | percentage |
+| azure_monitor.vmss.availability | Azure VMSS Availability | average | state |
+| azure_monitor.vmss.network_traffic | Azure VMSS Network Traffic | in, out | bytes/s |
+| azure_monitor.vmss.network_flows | Azure VMSS Network Flows | in, out | flows |
+| azure_monitor.vmss.network_flow_creation_rate | Azure VMSS Network Flow Creation Rate | in, out | flows/s |
+| azure_monitor.vmss.disk_throughput | Azure VMSS Disk Throughput | read, write | bytes/s |
+| azure_monitor.vmss.disk_iops | Azure VMSS Disk IOPS | read, write | operations/s |
+| azure_monitor.vmss.os_disk_throughput | Azure VMSS OS Disk Throughput | read, write | bytes/s |
+| azure_monitor.vmss.os_disk_iops | Azure VMSS OS Disk IOPS | read, write | operations/s |
+| azure_monitor.vmss.os_disk_latency | Azure VMSS OS Disk Latency | average | milliseconds |
+| azure_monitor.vmss.os_disk_queue_depth | Azure VMSS OS Disk Queue Depth | average | operations |
+| azure_monitor.vmss.os_disk_throttling | Azure VMSS OS Disk Throttling | bandwidth, iops | percentage |
+| azure_monitor.vmss.os_disk_burst_capacity | Azure VMSS OS Disk Burst Capacity | max_burst, target | bytes/s |
+| azure_monitor.vmss.os_disk_burst_iops_capacity | Azure VMSS OS Disk Burst IOPS Capacity | max_burst, target | iops |
+| azure_monitor.vmss.os_disk_burst_credits | Azure VMSS OS Disk Burst Credits Used | bandwidth, io | percentage |
+| azure_monitor.vmss.data_disk_throughput | Azure VMSS Data Disk Throughput | read, write | bytes/s |
+| azure_monitor.vmss.data_disk_iops | Azure VMSS Data Disk IOPS | read, write | operations/s |
+| azure_monitor.vmss.data_disk_latency | Azure VMSS Data Disk Latency | average | milliseconds |
+| azure_monitor.vmss.data_disk_queue_depth | Azure VMSS Data Disk Queue Depth | average | operations |
+| azure_monitor.vmss.data_disk_throttling | Azure VMSS Data Disk Throttling | bandwidth, iops | percentage |
+| azure_monitor.vmss.data_disk_burst_capacity | Azure VMSS Data Disk Burst Capacity | max_burst, target | bytes/s |
+| azure_monitor.vmss.data_disk_burst_iops_capacity | Azure VMSS Data Disk Burst IOPS Capacity | max_burst, target | iops |
+| azure_monitor.vmss.data_disk_burst_credits | Azure VMSS Data Disk Burst Credits Used | bandwidth, io | percentage |
+| azure_monitor.vmss.temp_disk_throughput | Azure VMSS Temp Disk Throughput | read, write | bytes/s |
+| azure_monitor.vmss.temp_disk_iops | Azure VMSS Temp Disk IOPS | read, write | operations/s |
+| azure_monitor.vmss.temp_disk_latency | Azure VMSS Temp Disk Latency | average | milliseconds |
+| azure_monitor.vmss.temp_disk_queue_depth | Azure VMSS Temp Disk Queue Depth | average | operations |
+| azure_monitor.vmss.premium_data_disk_cache | Azure VMSS Premium Data Disk Cache | hit, miss | percentage |
+| azure_monitor.vmss.premium_os_disk_cache | Azure VMSS Premium OS Disk Cache | hit, miss | percentage |
+| azure_monitor.vmss.vm_cached_throttling | Azure VMSS Cached IO Throttling | bandwidth, iops | percentage |
+| azure_monitor.vmss.vm_uncached_throttling | Azure VMSS Uncached IO Throttling | bandwidth, iops | percentage |
+| azure_monitor.vmss.vm_cached_burst_credits | Azure VMSS Cached Burst Credits Used | bandwidth, io | percentage |
+| azure_monitor.vmss.vm_uncached_burst_credits | Azure VMSS Uncached Burst Credits Used | bandwidth, io | percentage |
 
 
 

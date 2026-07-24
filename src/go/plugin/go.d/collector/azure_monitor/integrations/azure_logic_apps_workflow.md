@@ -645,11 +645,13 @@ The following alerts are available:
 | [ am_logic_apps_prompt_token_overflow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_logic_apps.conf) | azure_monitor.logic_apps.agent | Logic Apps prompt token overflow on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -671,21 +673,21 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.logic_apps.run_lifecycle | started, completed, succeeded, failed, cancelled | runs/s |
-| azure_monitor.logic_apps.run_latency | all, success | seconds |
-| azure_monitor.logic_apps.run_failure_rate | failure_rate | percentage |
-| azure_monitor.logic_apps.run_throttling | during_run, at_start | events/s |
-| azure_monitor.logic_apps.action_lifecycle | started, completed, succeeded, failed, skipped | actions/s |
-| azure_monitor.logic_apps.action_latency | all, success | seconds |
-| azure_monitor.logic_apps.action_throttling | total | events/s |
-| azure_monitor.logic_apps.trigger_lifecycle | started, completed, succeeded, fired, failed, skipped | triggers/s |
-| azure_monitor.logic_apps.trigger_latency | all, fire, success | seconds |
-| azure_monitor.logic_apps.trigger_throttling | total | events/s |
-| azure_monitor.logic_apps.billable_executions | total, actions, triggers | executions/s |
-| azure_monitor.logic_apps.billing_by_type | native, standard_connector, storage | operations/s |
-| azure_monitor.logic_apps.agent | loop_executions, completion_overflow, prompt_overflow | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.logic_apps.run_lifecycle | Azure Logic Apps Run Lifecycle | started, completed, succeeded, failed, cancelled | runs/s |
+| azure_monitor.logic_apps.run_latency | Azure Logic Apps Run Latency | all, success | seconds |
+| azure_monitor.logic_apps.run_failure_rate | Azure Logic Apps Run Failure Rate | failure_rate | percentage |
+| azure_monitor.logic_apps.run_throttling | Azure Logic Apps Run Throttling | during_run, at_start | events/s |
+| azure_monitor.logic_apps.action_lifecycle | Azure Logic Apps Action Lifecycle | started, completed, succeeded, failed, skipped | actions/s |
+| azure_monitor.logic_apps.action_latency | Azure Logic Apps Action Latency | all, success | seconds |
+| azure_monitor.logic_apps.action_throttling | Azure Logic Apps Action Throttling | total | events/s |
+| azure_monitor.logic_apps.trigger_lifecycle | Azure Logic Apps Trigger Lifecycle | started, completed, succeeded, fired, failed, skipped | triggers/s |
+| azure_monitor.logic_apps.trigger_latency | Azure Logic Apps Trigger Latency | all, fire, success | seconds |
+| azure_monitor.logic_apps.trigger_throttling | Azure Logic Apps Trigger Throttling | total | events/s |
+| azure_monitor.logic_apps.billable_executions | Azure Logic Apps Billable Executions | total, actions, triggers | executions/s |
+| azure_monitor.logic_apps.billing_by_type | Azure Logic Apps Billing by Type | native, standard_connector, storage | operations/s |
+| azure_monitor.logic_apps.agent | Azure Logic Apps AI Agent Activity | loop_executions, completion_overflow, prompt_overflow | events/s |
 
 
 

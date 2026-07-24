@@ -103,11 +103,13 @@ The following alerts are available:
 | [ bcache_cache_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf) | disk.bcache_cache_read_races | number of times data was read from the cache, the bucket was reused and invalidated in the last 10 minutes (when this occurs the data is reread from the backing device) |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -125,13 +127,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.bcache_cache_alloc | ununsed, dirty, clean, metadata, undefined | percentage |
-| disk.bcache_hit_ratio | 5min, 1hour, 1day, ever | percentage |
-| disk.bcache_rates | congested, writeback | KiB/s |
-| disk.bcache_size | dirty | MiB |
-| disk.bcache_usage | avail | percentage |
-| disk.bcache_cache_read_races | races, errors | operations/s |
-| disk.bcache | hits, misses, collisions, readaheads | operations/s |
-| disk.bcache_bypass | hits, misses | operations/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| disk.bcache_cache_alloc | BCache Cache Allocations | ununsed, dirty, clean, metadata, undefined | percentage |
+| disk.bcache_hit_ratio | BCache Cache Hit Ratio | 5min, 1hour, 1day, ever | percentage |
+| disk.bcache_rates | BCache Rates | congested, writeback | KiB/s |
+| disk.bcache_size | BCache Cache Sizes | dirty | MiB |
+| disk.bcache_usage | BCache Cache Usage | avail | percentage |
+| disk.bcache_cache_read_races | BCache Cache Read Races | races, errors | operations/s |
+| disk.bcache | BCache Cache I/O Operations | hits, misses, collisions, readaheads | operations/s |
+| disk.bcache_bypass | BCache Cache Bypass I/O Operations | hits, misses | operations/s |

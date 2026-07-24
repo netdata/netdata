@@ -102,11 +102,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -118,6 +120,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.pgfaults | memory, io_requiring, cow, cow_optimized, in_transit | page faults/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.pgfaults | Memory Page Faults | memory, io_requiring, cow, cow_optimized, in_transit | page faults/s |

@@ -143,11 +143,13 @@ You can read more about setting up the tc rules in rc.local in this [GitHub issu
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -165,10 +167,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| tc.qos | a dimension per class | kilobits/s |
-| tc.qos_packets | a dimension per class | packets/s |
-| tc.qos_dropped | a dimension per class | packets/s |
-| tc.qos_tokens | a dimension per class | tokens |
-| tc.qos_ctokens | a dimension per class | ctokens |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| tc.qos | Class Usage | a dimension per class | kilobits/s |
+| tc.qos_packets | Class Packets | a dimension per class | packets/s |
+| tc.qos_dropped | Class Dropped Packets | a dimension per class | packets/s |
+| tc.qos_tokens | Class Tokens | a dimension per class | tokens |
+| tc.qos_ctokens | Class cTokens | a dimension per class | ctokens |

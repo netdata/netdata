@@ -93,11 +93,13 @@ The following alerts are available:
 | [ k8s_cgroup_10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | k8s.cgroup.net_packets | ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -121,41 +123,42 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s.cgroup.cpu_limit | used | percentage |
-| k8s.cgroup.cpu | user, system | percentage |
-| k8s.cgroup.cpu_per_core | a dimension per core | percentage |
-| k8s.cgroup.throttled | throttled | percentage |
-| k8s.cgroup.throttled_duration | duration | ms |
-| k8s.cgroup.cpu_shares | shares | shares |
-| k8s.cgroup.mem | cache, rss, swap, rss_huge, mapped_file | MiB |
-| k8s.cgroup.writeback | dirty, writeback | MiB |
-| k8s.cgroup.mem_activity | in, out | MiB/s |
-| k8s.cgroup.pgfaults | pgfault, swap | MiB/s |
-| k8s.cgroup.mem_usage | ram, swap | MiB |
-| k8s.cgroup.mem_usage_limit | available, used | MiB |
-| k8s.cgroup.mem_utilization | utilization | percentage |
-| k8s.cgroup.mem_failcnt | failures | count |
-| k8s.cgroup.io | read, write | KiB/s |
-| k8s.cgroup.serviced_ops | read, write | operations/s |
-| k8s.cgroup.throttle_io | read, write | KiB/s |
-| k8s.cgroup.throttle_serviced_ops | read, write | operations/s |
-| k8s.cgroup.queued_ops | read, write | operations |
-| k8s.cgroup.merged_ops | read, write | operations/s |
-| k8s.cgroup.cpu_some_pressure | some10, some60, some300 | percentage |
-| k8s.cgroup.cpu_some_pressure_stall_time | time | ms |
-| k8s.cgroup.cpu_full_pressure | some10, some60, some300 | percentage |
-| k8s.cgroup.cpu_full_pressure_stall_time | time | ms |
-| k8s.cgroup.memory_some_pressure | some10, some60, some300 | percentage |
-| k8s.cgroup.memory_some_pressure_stall_time | time | ms |
-| k8s.cgroup.memory_full_pressure | some10, some60, some300 | percentage |
-| k8s.cgroup.memory_full_pressure_stall_time | time | ms |
-| k8s.cgroup.io_some_pressure | some10, some60, some300 | percentage |
-| k8s.cgroup.io_some_pressure_stall_time | time | ms |
-| k8s.cgroup.io_full_pressure | some10, some60, some300 | percentage |
-| k8s.cgroup.io_full_pressure_stall_time | time | ms |
-| k8s.cgroup.pids_current | pids | pids |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s.cgroup.cpu_limit | CPU Usage within the limits | used | percentage |
+| k8s.cgroup.cpu | CPU Usage (100% = 1000 mCPU) | user, system | percentage |
+| k8s.cgroup.cpu_per_core | CPU Usage (100% = 1000 mCPU) Per Core | a dimension per core | percentage |
+| k8s.cgroup.throttled | CPU Throttled Runnable Periods | throttled | percentage |
+| k8s.cgroup.throttled_duration | CPU Throttled Time Duration | duration | ms |
+| k8s.cgroup.cpu_shares | CPU Time Relative Share | shares | shares |
+| k8s.cgroup.mem | Memory Usage | cache, rss, swap, rss_huge, mapped_file | MiB |
+| k8s.cgroup.writeback | Writeback Memory | dirty, writeback | MiB |
+| k8s.cgroup.mem_activity | Memory Activity | in, out | MiB/s |
+| k8s.cgroup.pgfaults | Memory Page Faults | pgfault, swap | MiB/s |
+| k8s.cgroup.mem_usage | Used Memory | ram, swap | MiB |
+| k8s.cgroup.mem_usage_limit | Used RAM within the limits | available, used | MiB |
+| k8s.cgroup.mem_utilization | Memory Utilization | utilization | percentage |
+| k8s.cgroup.mem_failcnt | Memory Limit Failures | failures | count |
+| k8s.cgroup.io | I/O Bandwidth (all disks) | read, write | KiB/s |
+| k8s.cgroup.serviced_ops | Serviced I/O Operations (all disks) | read, write | operations/s |
+| k8s.cgroup.throttle_io | Throttle I/O Bandwidth (all disks) | read, write | KiB/s |
+| k8s.cgroup.throttle_serviced_ops | Throttle Serviced I/O Operations (all disks) | read, write | operations/s |
+| k8s.cgroup.queued_ops | Queued I/O Operations (all disks) | read, write | operations |
+| k8s.cgroup.merged_ops | Merged I/O Operations (all disks) | read, write | operations/s |
+| k8s.cgroup.cpu_some_pressure | CPU some pressure | some10, some60, some300 | percentage |
+| k8s.cgroup.cpu_some_pressure_stall_time | CPU some pressure stall time | time | ms |
+| k8s.cgroup.cpu_full_pressure | CPU full pressure | some10, some60, some300 | percentage |
+| k8s.cgroup.cpu_full_pressure_stall_time | CPU full pressure stall time | time | ms |
+| k8s.cgroup.memory_some_pressure | Memory some pressure | some10, some60, some300 | percentage |
+| k8s.cgroup.memory_some_pressure_stall_time | Memory some pressure stall time | time | ms |
+| k8s.cgroup.memory_full_pressure | Memory full pressure | some10, some60, some300 | percentage |
+| k8s.cgroup.memory_full_pressure_stall_time | Memory full pressure stall time | time | ms |
+| k8s.cgroup.io_some_pressure | I/O some pressure | some10, some60, some300 | percentage |
+| k8s.cgroup.io_some_pressure_stall_time | I/O some pressure stall time | time | ms |
+| k8s.cgroup.io_full_pressure | I/O some pressure | some10, some60, some300 | percentage |
+| k8s.cgroup.io_full_pressure_stall_time | I/O some pressure stall time | time | ms |
+| k8s.cgroup.pids_current | Number of processes | pids | pids |
+
 
 ### Per k8s cgroup network device
 
@@ -180,18 +183,19 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s.cgroup.net_net | received, sent | kilobits/s |
-| k8s.cgroup.net_packets | received, sent, multicast | pps |
-| k8s.cgroup.net_errors | inbound, outbound | errors/s |
-| k8s.cgroup.net_drops | inbound, outbound | errors/s |
-| k8s.cgroup.net_fifo | receive, transmit | errors/s |
-| k8s.cgroup.net_compressed | receive, sent | pps |
-| k8s.cgroup.net_events | frames, collisions, carrier | events/s |
-| k8s.cgroup.net_operstate | up, down, notpresent, lowerlayerdown, testing, dormant, unknown | state |
-| k8s.cgroup.net_carrier | up, down | state |
-| k8s.cgroup.net_mtu | mtu | octets |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s.cgroup.net_net | Bandwidth | received, sent | kilobits/s |
+| k8s.cgroup.net_packets | Packets | received, sent, multicast | pps |
+| k8s.cgroup.net_errors | Interface Errors | inbound, outbound | errors/s |
+| k8s.cgroup.net_drops | Interface Drops | inbound, outbound | errors/s |
+| k8s.cgroup.net_fifo | Interface FIFO Buffer Errors | receive, transmit | errors/s |
+| k8s.cgroup.net_compressed | Interface FIFO Buffer Errors | receive, sent | pps |
+| k8s.cgroup.net_events | Network Interface Events | frames, collisions, carrier | events/s |
+| k8s.cgroup.net_operstate | Interface Operational State | up, down, notpresent, lowerlayerdown, testing, dormant, unknown | state |
+| k8s.cgroup.net_carrier | Interface Physical Link State | up, down | state |
+| k8s.cgroup.net_mtu | Interface MTU | mtu | octets |
+
 
 ### Per cgroups plugin IPC
 
@@ -201,8 +205,8 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| netdata.collector.ipc.cgroups_lookup.server.requests | requests_responded, requests_error, lookup_miss_signals_sent, lookup_miss_signals_coalesced | requests/s |
-| netdata.collector.ipc.cgroups_lookup.server.request_duration_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
-| netdata.collector.cgroups.discovery.scans | discovery_scans_natural, discovery_scans_opportunistic | scans/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| netdata.collector.ipc.cgroups_lookup.server.requests | CGROUPS_LOOKUP server request outcomes | requests_responded, requests_error, lookup_miss_signals_sent, lookup_miss_signals_coalesced | requests/s |
+| netdata.collector.ipc.cgroups_lookup.server.request_duration_ms | CGROUPS_LOOKUP server request duration buckets | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
+| netdata.collector.cgroups.discovery.scans | cgroups discovery scans by trigger source | discovery_scans_natural, discovery_scans_opportunistic | scans/s |

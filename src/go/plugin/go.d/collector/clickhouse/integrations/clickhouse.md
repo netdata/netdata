@@ -239,11 +239,13 @@ The following alerts are available:
 | [ clickhouse_distributed_files_to_insert ](https://github.com/netdata/netdata/blob/master/src/health/health.d/clickhouse.conf) | clickhouse.distributed_files_to_insert | ClickHouse high number of pending files to process for asynchronous insertion into Distributed tables |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -255,64 +257,65 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| clickhouse.connections | tcp, http, mysql, postgresql, interserver | connections |
-| clickhouse.slow_reads | slow | reads/s |
-| clickhouse.read_backoff | read_backoff | events/s |
-| clickhouse.memory_usage | used | bytes |
-| clickhouse.running_queries | running | queries |
-| clickhouse.queries_preempted | preempted | queries |
-| clickhouse.queries | successful, failed | queries/s |
-| clickhouse.select_queries | successful, failed | selects/s |
-| clickhouse.insert_queries | successful, failed | inserts/s |
-| clickhouse.queries_memory_limit_exceeded | mem_limit_exceeded | queries/s |
-| clickhouse.longest_running_query_time | longest_query_time | seconds |
-| clickhouse.queries_latency | queries_time | microseconds |
-| clickhouse.select_queries_latency | selects_time | microseconds |
-| clickhouse.insert_queries_latency | inserts_time | microseconds |
-| clickhouse.io | reads, writes | bytes/s |
-| clickhouse.iops | reads, writes | ops/s |
-| clickhouse.io_errors | read, write | errors/s |
-| clickhouse.io_seeks | lseek | ops/s |
-| clickhouse.io_file_opens | file_open | ops/s |
-| clickhouse.replicated_parts_current_activity | fetch, send, check | parts |
-| clickhouse.replicas_max_absolute_dela | replication_delay | seconds |
-| clickhouse.replicated_readonly_tables | read_only | tables |
-| clickhouse.replicated_data_loss | data_loss | events |
-| clickhouse.replicated_part_fetches | successful, failed | fetches/s |
-| clickhouse.inserted_rows | inserted | rows/s |
-| clickhouse.inserted_bytes | inserted | bytes/s |
-| clickhouse.rejected_inserts | rejected | inserts/s |
-| clickhouse.delayed_inserts | delayed | inserts/s |
-| clickhouse.delayed_inserts_throttle_time | delayed_inserts_throttle_time | milliseconds |
-| clickhouse.selected_bytes | selected | bytes/s |
-| clickhouse.selected_rows | selected | rows/s |
-| clickhouse.selected_parts | selected | parts/s |
-| clickhouse.selected_ranges | selected | ranges/s |
-| clickhouse.selected_marks | selected | marks/s |
-| clickhouse.merges | merge | ops/s |
-| clickhouse.merges_latency | merges_time | milliseconds |
-| clickhouse.merged_uncompressed_bytes | merged_uncompressed | bytes/s |
-| clickhouse.merged_rows | merged | rows/s |
-| clickhouse.merge_tree_data_writer_inserted_rows | inserted | rows/s |
-| clickhouse.merge_tree_data_writer_uncompressed_bytes | inserted | bytes/s |
-| clickhouse.merge_tree_data_writer_compressed_bytes | written | bytes/s |
-| clickhouse.uncompressed_cache_requests | hits, misses | requests/s |
-| clickhouse.mark_cache_requests | hits, misses | requests/s |
-| clickhouse.max_part_count_for_partition | max_parts_partition | parts |
-| clickhouse.parts_count | temporary, pre_active, active, deleting, delete_on_destroy, outdated, wide, compact | parts |
-| distributed_connections | active | connections |
-| distributed_connections_attempts | connection | attempts/s |
-| distributed_connections_fail_retries | connection_retry | fails/s |
-| distributed_connections_fail_exhausted_retries | connection_retry_exhausted | fails/s |
-| distributed_files_to_insert | pending_insertions | files |
-| distributed_rejected_inserts | rejected | inserts/s |
-| distributed_delayed_inserts | delayed | inserts/s |
-| distributed_delayed_inserts_latency | delayed_time | milliseconds |
-| distributed_sync_insertion_timeout_exceeded | sync_insertion | timeouts/s |
-| distributed_async_insertions_failures | async_insertions | failures/s |
-| clickhouse.uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| clickhouse.connections | Connections | tcp, http, mysql, postgresql, interserver | connections |
+| clickhouse.slow_reads | Slow reads from a file | slow | reads/s |
+| clickhouse.read_backoff | Read backoff events | read_backoff | events/s |
+| clickhouse.memory_usage | Memory usage | used | bytes |
+| clickhouse.running_queries | Running queries | running | queries |
+| clickhouse.queries_preempted | Queries waiting due to priority | preempted | queries |
+| clickhouse.queries | Queries | successful, failed | queries/s |
+| clickhouse.select_queries | Select queries | successful, failed | selects/s |
+| clickhouse.insert_queries | Insert queries | successful, failed | inserts/s |
+| clickhouse.queries_memory_limit_exceeded | Memory limit exceeded for query | mem_limit_exceeded | queries/s |
+| clickhouse.longest_running_query_time | Longest running query time | longest_query_time | seconds |
+| clickhouse.queries_latency | Queries latency | queries_time | microseconds |
+| clickhouse.select_queries_latency | Select queries latency | selects_time | microseconds |
+| clickhouse.insert_queries_latency | Insert queries latency | inserts_time | microseconds |
+| clickhouse.io | Read and written data | reads, writes | bytes/s |
+| clickhouse.iops | Read and write operations | reads, writes | ops/s |
+| clickhouse.io_errors | Read and write errors | read, write | errors/s |
+| clickhouse.io_seeks | lseek function calls | lseek | ops/s |
+| clickhouse.io_file_opens | File opens | file_open | ops/s |
+| clickhouse.replicated_parts_current_activity | Replicated parts current activity | fetch, send, check | parts |
+| clickhouse.replicas_max_absolute_dela | Replicas max absolute delay | replication_delay | seconds |
+| clickhouse.replicated_readonly_tables | Replicated tables in readonly state | read_only | tables |
+| clickhouse.replicated_data_loss | Replicated data loss | data_loss | events |
+| clickhouse.replicated_part_fetches | Replicated part fetches | successful, failed | fetches/s |
+| clickhouse.inserted_rows | Inserted rows | inserted | rows/s |
+| clickhouse.inserted_bytes | Inserted data | inserted | bytes/s |
+| clickhouse.rejected_inserts | Rejected inserts | rejected | inserts/s |
+| clickhouse.delayed_inserts | Delayed inserts | delayed | inserts/s |
+| clickhouse.delayed_inserts_throttle_time | Delayed inserts throttle time | delayed_inserts_throttle_time | milliseconds |
+| clickhouse.selected_bytes | Selected data | selected | bytes/s |
+| clickhouse.selected_rows | Selected rows | selected | rows/s |
+| clickhouse.selected_parts | Selected parts | selected | parts/s |
+| clickhouse.selected_ranges | Selected ranges | selected | ranges/s |
+| clickhouse.selected_marks | Selected marks | selected | marks/s |
+| clickhouse.merges | Merge operations | merge | ops/s |
+| clickhouse.merges_latency | Time spent for background merges | merges_time | milliseconds |
+| clickhouse.merged_uncompressed_bytes | Uncompressed data read for background merges | merged_uncompressed | bytes/s |
+| clickhouse.merged_rows | Merged rows | merged | rows/s |
+| clickhouse.merge_tree_data_writer_inserted_rows | Rows INSERTed to MergeTree tables | inserted | rows/s |
+| clickhouse.merge_tree_data_writer_uncompressed_bytes | Data INSERTed to MergeTree tables | inserted | bytes/s |
+| clickhouse.merge_tree_data_writer_compressed_bytes | Data written to disk for data INSERTed to MergeTree tables | written | bytes/s |
+| clickhouse.uncompressed_cache_requests | Uncompressed cache requests | hits, misses | requests/s |
+| clickhouse.mark_cache_requests | Mark cache requests | hits, misses | requests/s |
+| clickhouse.max_part_count_for_partition | Max part count for partition | max_parts_partition | parts |
+| clickhouse.parts_count | Parts | temporary, pre_active, active, deleting, delete_on_destroy, outdated, wide, compact | parts |
+| distributed_connections | Active distributed connection | active | connections |
+| distributed_connections_attempts | Distributed connection attempts | connection | attempts/s |
+| distributed_connections_fail_retries | Distributed connection fails with retry | connection_retry | fails/s |
+| distributed_connections_fail_exhausted_retries | Distributed connection fails after all retries finished | connection_retry_exhausted | fails/s |
+| distributed_files_to_insert | Pending files to process for asynchronous insertion into Distributed tables | pending_insertions | files |
+| distributed_rejected_inserts | Rejected INSERTs to a Distributed table | rejected | inserts/s |
+| distributed_delayed_inserts | Delayed INSERTs to a Distributed table | delayed | inserts/s |
+| distributed_delayed_inserts_latency | Time spent while the INSERT of a block to a Distributed table was throttled | delayed_time | milliseconds |
+| distributed_sync_insertion_timeout_exceeded | Distributed table sync insertions timeouts | sync_insertion | timeouts/s |
+| distributed_async_insertions_failures | Distributed table async insertion failures | async_insertions | failures/s |
+| clickhouse.uptime | Uptime | uptime | seconds |
+
 
 ### Per disk
 
@@ -326,9 +329,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| clickhouse.disk_space_usage | free, used | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| clickhouse.disk_space_usage | Disk space usage | free, used | bytes |
+
 
 ### Per table
 
@@ -343,11 +347,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| clickhouse.database_table_size | size | bytes |
-| clickhouse.database_table_parts | parts | parts |
-| clickhouse.database_table_rows | rows | rows |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| clickhouse.database_table_size | Table size | size | bytes |
+| clickhouse.database_table_parts | Table parts | parts | parts |
+| clickhouse.database_table_rows | Table rows | rows | rows |
 
 
 

@@ -190,11 +190,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -206,19 +208,19 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dovecot.session | active | sessions |
-| dovecot.logins | logins | logins |
-| dovecot.auth | ok, failed | attempts/s |
-| dovecot.commands | commands | commands |
-| dovecot.context_switches | voluntary, voluntary | switches/s |
-| dovecot.io | read, write | KiB/s |
-| dovecot.net | read, write | kilobits/s |
-| dovecot.syscalls | read, write | syscalls/s |
-| dovecot.lookup | path, attr | lookups/s |
-| dovecot.cache | hits | hits/s |
-| dovecot.auth_cache | hits, misses | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| dovecot.session | Dovecot Active Sessions | active | sessions |
+| dovecot.logins | Dovecot Logins | logins | logins |
+| dovecot.auth | Dovecot Authentications | ok, failed | attempts/s |
+| dovecot.commands | Dovecot Commands | commands | commands |
+| dovecot.context_switches | Dovecot Context Switches | voluntary, voluntary | switches/s |
+| dovecot.io | Dovecot Disk I/O | read, write | KiB/s |
+| dovecot.net | Dovecot Network Bandwidth | read, write | kilobits/s |
+| dovecot.syscalls | Dovecot Number of SysCalls | read, write | syscalls/s |
+| dovecot.lookup | Dovecot Lookups | path, attr | lookups/s |
+| dovecot.cache | Dovecot Cache Hits | hits | hits/s |
+| dovecot.auth_cache | Dovecot Authentication Cache | hits, misses | requests/s |
 
 
 

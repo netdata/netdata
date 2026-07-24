@@ -103,11 +103,13 @@ The following alerts are available:
 | [ 1min_netdev_budget_ran_outs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last minute (this can be a cause for dropped packets) |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -119,9 +121,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.softnet_stat | processed, dropped, squeezed, received_rps, flow_limit_count | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.softnet_stat | System softnet_stat | processed, dropped, squeezed, received_rps, flow_limit_count | events/s |
+
 
 ### Per cpu core
 
@@ -131,6 +134,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cpu.softnet_stat | processed, dropped, squeezed, received_rps, flow_limit_count | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cpu.softnet_stat | CPU softnet_stat | processed, dropped, squeezed, received_rps, flow_limit_count | events/s |

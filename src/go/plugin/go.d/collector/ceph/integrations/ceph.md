@@ -201,11 +201,13 @@ The following alerts are available:
 | [ ceph_cluster_physical_capacity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ceph.conf) | ceph.cluster_physical_capacity_utilization | Ceph cluster ${label:fsid} disk space utilization |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -221,25 +223,26 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ceph.cluster_status | ok, err, warn | status |
-| ceph.cluster_hosts_count | hosts | hosts |
-| ceph.cluster_monitors_count | monitors | monitors |
-| ceph.cluster_osds_count | osds | osds |
-| ceph.cluster_osds_by_status_count | up, down, in, out | status |
-| ceph.cluster_managers_count | active, standby | managers |
-| ceph.cluster_object_gateways_count | object | gateways |
-| ceph.cluster_iscsi_gateways_count | iscsi | gateways |
-| ceph.cluster_iscsi_gateways_by_status_count | up, down | gateways |
-| ceph.cluster_physical_capacity_utilization | utilization | percent |
-| ceph.cluster_physical_capacity_usage | avail, used | bytes |
-| ceph.cluster_objects_count | objects | objects |
-| ceph.cluster_objects_by_status_distribution | healthy, misplaced, degraded, unfound | percent |
-| ceph.cluster_pools_count | pools | pools |
-| ceph.cluster_pgs_count | pgs | pgs |
-| ceph.cluster_pgs_by_status_count | clean, working, warning, unknown | pgs |
-| ceph.cluster_pgs_per_osd_count | per_osd | pgs |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ceph.cluster_status | Ceph Cluster Status | ok, err, warn | status |
+| ceph.cluster_hosts_count | Ceph Cluster Hosts | hosts | hosts |
+| ceph.cluster_monitors_count | Ceph Cluster Monitors | monitors | monitors |
+| ceph.cluster_osds_count | Ceph Cluster OSDs | osds | osds |
+| ceph.cluster_osds_by_status_count | Ceph Cluster OSDs by Status | up, down, in, out | status |
+| ceph.cluster_managers_count | Ceph Cluster Managers | active, standby | managers |
+| ceph.cluster_object_gateways_count | Ceph Cluster Object Gateways (RGW) | object | gateways |
+| ceph.cluster_iscsi_gateways_count | Ceph Cluster iSCSI Gateways | iscsi | gateways |
+| ceph.cluster_iscsi_gateways_by_status_count | Ceph Cluster iSCSI Gateways by Status | up, down | gateways |
+| ceph.cluster_physical_capacity_utilization | Ceph Cluster Physical Capacity Utilization | utilization | percent |
+| ceph.cluster_physical_capacity_usage | Ceph Cluster Physical Capacity Usage | avail, used | bytes |
+| ceph.cluster_objects_count | Ceph Cluster Objects | objects | objects |
+| ceph.cluster_objects_by_status_distribution | Ceph Cluster Objects by Status | healthy, misplaced, degraded, unfound | percent |
+| ceph.cluster_pools_count | Ceph Cluster Pools | pools | pools |
+| ceph.cluster_pgs_count | Ceph Cluster Placement Groups | pgs | pgs |
+| ceph.cluster_pgs_by_status_count | Ceph Cluster Placement Groups by Status | clean, working, warning, unknown | pgs |
+| ceph.cluster_pgs_per_osd_count | Ceph Cluster Placement Groups per OSD | per_osd | pgs |
+
 
 ### Per osd
 
@@ -256,13 +259,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ceph.osd_status | up, down, in, out | status |
-| ceph.osd_space_usage | avail, used | bytes |
-| ceph.osd_io | read, written | bytes/s |
-| ceph.osd_iops | read, write | ops/s |
-| ceph.osd_latency | commit, apply | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ceph.osd_status | Ceph OSD Status | up, down, in, out | status |
+| ceph.osd_space_usage | Ceph OSD Space Usage | avail, used | bytes |
+| ceph.osd_io | Ceph OSD IO | read, written | bytes/s |
+| ceph.osd_iops | Ceph OSD IOPS | read, write | ops/s |
+| ceph.osd_latency | Ceph OSD Latency | commit, apply | milliseconds |
+
 
 ### Per pool
 
@@ -277,13 +281,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ceph.pool_space_utilization | utilization | percent |
-| ceph.pool_space_usage | avail, used | bytes |
-| ceph.pool_objects_count | object | objects |
-| ceph.pool_io | read, written | bytes/s |
-| ceph.pool_iops | read, write | ops/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ceph.pool_space_utilization | Ceph Pool Space Utilization | utilization | percent |
+| ceph.pool_space_usage | Ceph Pool Space Usage | avail, used | bytes |
+| ceph.pool_objects_count | Ceph Pool Objects | object | objects |
+| ceph.pool_io | Ceph Pool IO | read, written | bytes/s |
+| ceph.pool_iops | Ceph Pool IOPS | read, write | ops/s |
 
 
 

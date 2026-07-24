@@ -153,11 +153,13 @@ The following alerts are available:
 | [ lvm_lv_metadata_space_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/lvm.conf) | lvm.lv_metadata_space_utilization | LVM logical volume high metadata space usage (LV ${label:lv_name} VG ${label:vg_name} Type ${label:volume_type}) |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -175,10 +177,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| lvm.lv_data_space_utilization | utilization | % |
-| lvm.lv_metadata_space_utilization | utilization | % |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| lvm.lv_data_space_utilization | Logical volume space allocated for data | utilization | % |
+| lvm.lv_metadata_space_utilization | Logical volume space allocated for metadata | utilization | % |
 
 
 
