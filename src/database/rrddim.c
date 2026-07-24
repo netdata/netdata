@@ -213,8 +213,20 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     netdata_log_debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
-    if (!rrddim_finalize_collection_and_check_retention(rd) && rd->rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
-        /* This metric has no data and no references */
+    // finalize collection first (tears down tier collect handles); its return
+    // means "the db still has retention for this dimension".
+    bool has_db_retention = rrddim_finalize_collection_and_check_retention(rd);
+
+    // Delete the dimension's SQLite metadata when freeing it leaves no queryable
+    // data behind:
+    //   - dbengine: only when no on-disk retention remains;
+    //   - ram/alloc/none: all use the in-memory rrddim storage backend, so data
+    //     lives only in RAM and a freed dimension is always orphaned (the
+    //     retention check above misreports these modes as retained).
+    if ((rd->rrd_memory_mode == RRD_DB_MODE_DBENGINE && !has_db_retention) ||
+        rd->rrd_memory_mode == RRD_DB_MODE_RAM ||
+        rd->rrd_memory_mode == RRD_DB_MODE_ALLOC ||
+        rd->rrd_memory_mode == RRD_DB_MODE_NONE) {
         metaqueue_delete_dimension_uuid(uuidmap_uuid_ptr(rd->uuid));
     }
 
