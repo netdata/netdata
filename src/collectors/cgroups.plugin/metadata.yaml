@@ -358,13 +358,13 @@ modules:
               unit: "connections/s"
               chart_type: line
               dimensions:
-                - name: outbound_conn_v4
+                - name: connections
             - name: cgroup.net_conn_ipv6
               description: TCP v6 outbound connections
               unit: "connections/s"
               chart_type: line
               dimensions:
-                - name: outbound_conn_v6
+                - name: connections
             - name: cgroup.net_total_bandwidth
               description: Bandwidth
               unit: "kilobits/s"
@@ -377,31 +377,31 @@ modules:
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: bandwidth_tcp_recv
+                - name: calls
             - name: cgroup.net_tcp_send
               description: TCP calls to send
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: bandwidth_tcp_send
+                - name: calls
             - name: cgroup.net_retransmit
               description: TCP retransmits
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: bandwidth_tcp_retransmit
+                - name: calls
             - name: cgroup.net_udp_send
               description: UDP calls to send
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: bandwidth_udp_send
+                - name: calls
             - name: cgroup.net_udp_recv
               description: UDP calls to receive
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: bandwidth_udp_recv
+                - name: calls
         - name: cgroup network device
           description: ""
           labels:
@@ -1114,13 +1114,13 @@ modules:
               unit: "connections/s"
               chart_type: line
               dimensions:
-                - name: outbound_conn_v4
+                - name: connections
             - name: systemd.service.net_conn_ipv6
               description: TCP v6 outbound connections
               unit: "connections/s"
               chart_type: line
               dimensions:
-                - name: outbound_conn_v6
+                - name: connections
             - name: systemd.service.net_total_bandwidth
               description: Bandwidth
               unit: "kilobits/s"
@@ -1133,31 +1133,31 @@ modules:
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: bandwidth_tcp_recv
+                - name: calls
             - name: systemd.service.net_tcp_send
               description: TCP calls to send
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: bandwidth_tcp_send
+                - name: calls
             - name: systemd.service.net_retransmit
               description: TCP retransmits
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: bandwidth_tcp_retransmit
+                - name: calls
             - name: systemd.service.net_udp_send
               description: UDP calls to send
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: bandwidth_udp_send
+                - name: calls
             - name: systemd.service.net_udp_recv
               description: UDP calls to receive
               unit: "calls/s"
               chart_type: line
               dimensions:
-                - name: bandwidth_udp_recv
+                - name: calls
   - <<: *module
     meta:
       <<: *meta
