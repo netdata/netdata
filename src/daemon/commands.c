@@ -410,7 +410,17 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
         marked = true;
     }
 
-    sql_set_host_label(&host->host_id.uuid, "_is_ephemeral", "true");
+    // the node info we send below transmits host->rrdlabels as the node's complete
+    // label set, so the in-memory label has to change too - the host_label row is
+    // only read back at startup. Archived hosts are created without labels, so load
+    // the existing ones instead of starting an empty set, which would wipe every
+    // other label of this node on the other side.
+    if (!host->rrdlabels)
+        host->rrdlabels = sql_load_host_labels(&host->host_id.uuid);
+
+    marked |= rrdlabels_add_changed(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, "true", RRDLABEL_SRC_CONFIG);
+
+    sql_set_host_label(&host->host_id.uuid, HOST_LABEL_IS_EPHEMERAL, "true");
     pulse_host_status(host, 0, 0);
 
     if (marked)
