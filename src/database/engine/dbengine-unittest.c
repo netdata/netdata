@@ -551,18 +551,27 @@ int dbengine_platform_unittest(void)
 {
     struct dbengine_platform_test_init init[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
     char test_root[RRDENG_PATH_MAX];
+    char test_template[RRDENG_PATH_MAX];
     char native_test_root[RRDENG_PATH_MAX];
+    size_t test_root_length = sizeof(test_root);
     volatile bool start = false;
     int errors = 0;
 
-    snprintfz(test_root, sizeof(test_root), "%s/dbengine-platform-unittest-%d-%" PRIu64,
-              netdata_configured_cache_dir, getpid(), os_random(UINT64_MAX));
-    os_translate_path(native_test_root, test_root, sizeof(native_test_root));
-
-    if (mkdir(native_test_root, 0775) != 0) {
-        fprintf(stderr, "DBENGINE platform unittest: cannot create test directory '%s'\n", test_root);
+    if (uv_os_tmpdir(test_root, &test_root_length) != 0 || !test_root_length) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot determine the temporary directory\n");
         return 1;
     }
+
+    snprintfz(test_template, sizeof(test_template), "%s/netdata-dbengine-platform-XXXXXX", test_root);
+    uv_fs_t mkdtemp_req;
+    if (uv_fs_mkdtemp(NULL, &mkdtemp_req, test_template, NULL) < 0) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot create a temporary test directory\n");
+        return 1;
+    }
+
+    strncpyz(test_root, mkdtemp_req.path, sizeof(test_root) - 1);
+    uv_fs_req_cleanup(&mkdtemp_req);
+    os_translate_path(native_test_root, test_root, sizeof(native_test_root));
 
     nd_profile.storage_tiers = DBENGINE_PLATFORM_TEST_TIERS;
     for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
