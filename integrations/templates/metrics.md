@@ -1,4 +1,5 @@
 [% if entry.metrics.scopes %]
+
 ## Metrics
 
 [% if entry.metrics.folding.enabled and not clean %]
@@ -7,6 +8,7 @@
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 [[ entry.metrics.description ]]
 
 [% for scope in entry.metrics.scopes %]
