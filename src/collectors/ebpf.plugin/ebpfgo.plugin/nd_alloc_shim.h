@@ -20,19 +20,19 @@
 
 static inline void *callocz(size_t nmemb, size_t size) {
     void *p = calloc(nmemb, size);
-    if (!p && nmemb && size) { fprintf(stderr, "callocz: out of memory\n"); abort(); }
+    if (!p) { fprintf(stderr, "callocz: out of memory\n"); abort(); }
     return p;
 }
 
 static inline void *mallocz(size_t size) {
     void *p = malloc(size);
-    if (!p && size) { fprintf(stderr, "mallocz: out of memory\n"); abort(); }
+    if (!p) { fprintf(stderr, "mallocz: out of memory\n"); abort(); }
     return p;
 }
 
 static inline void *reallocz(void *ptr, size_t size) {
     void *p = realloc(ptr, size);
-    if (!p && size) { fprintf(stderr, "reallocz: out of memory\n"); abort(); }
+    if (!p) { fprintf(stderr, "reallocz: out of memory\n"); abort(); }
     return p;
 }
 

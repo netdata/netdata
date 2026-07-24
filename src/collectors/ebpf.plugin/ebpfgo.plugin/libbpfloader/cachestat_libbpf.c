@@ -95,7 +95,7 @@ struct netdata_ebpf_cachestat_runtime {
     int       percpu_u64_cap;
     struct netdata_ebpf_cachestat_pid_entry *percpu_entries; /* apps snapshot: ncpus × entry */
     int       percpu_entries_cap;
-    /* Persistent output buffer for snapshot_apps — grows via realloc, owned by
+    /* Persistent output buffer for snapshot_apps — grows via reallocz, owned by
      * the runtime, freed in close().  Callers must not free out->items. */
     struct netdata_ebpf_cachestat_pid_snapshot *items_buf;
     size_t items_cap;
@@ -552,9 +552,7 @@ static bool acc_htable_rebuild(struct netdata_ebpf_cachestat_runtime *rt)
     while (cap < need) cap <<= 1;
 
     if (cap != rt->acc_htable_sz) {
-        uint32_t *p = reallocz(rt->acc_htable, cap * sizeof(*p));
-        if (!p) return false;
-        rt->acc_htable    = p;
+        rt->acc_htable    = reallocz(rt->acc_htable, cap * sizeof(*rt->acc_htable));
         rt->acc_htable_sz = cap;
     }
     memset(rt->acc_htable, 0, cap * sizeof(*rt->acc_htable));
@@ -590,9 +588,7 @@ static struct netdata_ebpf_cachestat_pid_entry *cachestat_acc_find_or_add(
     /* New TGID — grow acc[] if needed then insert. */
     if (rt->acc_count >= rt->acc_cap) {
         size_t new_cap = rt->acc_cap ? rt->acc_cap * 2 : 64;
-        struct netdata_ebpf_cachestat_pid_entry *p = reallocz(rt->acc, new_cap * sizeof(*p));
-        if (!p) return NULL;
-        rt->acc     = p;
+        rt->acc     = reallocz(rt->acc, new_cap * sizeof(*rt->acc));
         rt->acc_cap = new_cap;
         /* acc[] base address may have changed — rebuild and re-probe. */
         if (!acc_htable_rebuild(rt)) return NULL;
@@ -757,11 +753,7 @@ static int cachestat_snapshot_from_acc(
         return 0;
 
     if (rt->acc_count > rt->items_cap) {
-        struct netdata_ebpf_cachestat_pid_snapshot *p =
-            reallocz(rt->items_buf, rt->acc_count * sizeof(*p));
-        if (!p)
-            return -1;
-        rt->items_buf = p;
+        rt->items_buf = reallocz(rt->items_buf, rt->acc_count * sizeof(*rt->items_buf));
         rt->items_cap = rt->acc_count;
     }
 
@@ -1052,11 +1044,7 @@ int netdata_cachestat_runtime_snapshot_apps(
         /* Grow items_buf on demand — amortised O(1) per entry. */
         if (out_count >= rt->items_cap) {
             size_t new_cap = rt->items_cap ? rt->items_cap * 2 : 64;
-            struct netdata_ebpf_cachestat_pid_snapshot *p =
-                reallocz(rt->items_buf, new_cap * sizeof(*p));
-            if (!p)
-                goto next_key_iter; /* skip entry on OOM; retry next cycle */
-            rt->items_buf = p;
+            rt->items_buf = reallocz(rt->items_buf, new_cap * sizeof(*rt->items_buf));
             rt->items_cap = new_cap;
         }
 
@@ -1097,7 +1085,6 @@ int netdata_cachestat_runtime_snapshot_apps(
         }
         out_count++;
 
-next_key_iter:
         key = next_key;
         memset(values, 0, (size_t)count * sizeof(*values));
     }
