@@ -165,7 +165,7 @@ fallback_type:
 
 A list of relabeling blocks. Each block applies a list of Prometheus
 `metric_relabel_configs` rules to the metrics whose name matches `match`. See the
-[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md)
+[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/profile-format.md#metric-relabeling)
 for the full action set and more examples.
 
 - `match`: Netdata simple patterns matched against the full metric name — including
@@ -193,7 +193,9 @@ relabeling:
 <a id="option-customization-profiles"></a>
 ##### profiles
 
-Profiles ship curated charts for recognized exporters. `profiles.mode` selects them:
+Profiles ship curated charts for recognized exporters -- see the
+[profile format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/profile-format.md) for the
+file format and how to author your own. `profiles.mode` selects them:
 
 - `auto` (default): every profile whose `match` hits at least one scraped metric.
 - `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its check).

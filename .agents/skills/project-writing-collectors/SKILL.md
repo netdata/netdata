@@ -290,18 +290,21 @@ Aggregation temporality drives the chart algorithm: Gauge → absolute, Sum delt
 
 The plugin does **not** recognize OTel semantic conventions specifically (`host.name`, `service.name`, `deployment.environment`) — they pass through as labels. Cardinality control is `metrics.max_new_charts_per_request` in `otel.yaml`. Stock examples: `src/crates/otel-ingestor/configs/otel.d/v1/metrics/`.
 
-### 3.5 Prometheus — deterministic; shape upstream to shape dashboard
+### 3.5 Prometheus — deterministic mapping; shape with relabeling and profiles
 
-The generic Prometheus scraper (`src/go/plugin/go.d/collector/prometheus/`) auto-maps from the exposition format with no per-metric synthetic shaping:
+The generic Prometheus scraper (`src/go/plugin/go.d/collector/prometheus/`) auto-maps from the exposition format:
 
 - metric name → chart ID + dimension ID
-- Prometheus labels → Netdata chart labels (with optional `label_prefix`)
+- Prometheus labels → Netdata chart labels
 - type (`counter`, `gauge`, `histogram`, `summary`) → chart type and dimension algorithm
 - histograms and summaries explode into 3 charts each (buckets/quantiles, `_sum`, `_count`)
 - recognized suffixes: `_total` (counter), `_bucket` + `le` label (histogram), `_sum`, `_count`, `quantile` label (summary), `_info` (skipped)
 - unit suffixes drive the units string: `_seconds`, `_bytes`, `_hertz`
 
-Operator controls are **scoping, not shaping**: time-series **selectors** (allow/deny on metric name and label values, `src/go/plugin/go.d/collector/prometheus/README.md:110-127`) and `fallback_type` glob patterns for untyped metrics. There is **no** equivalent of statsd `synthetic_charts` — you cannot group disparate Prometheus metrics into a composite chart Netdata-side. To shape the dashboard, shape the upstream exporter: rename metrics, add labels, fix types upstream.
+Operator controls (all documented in `src/go/plugin/go.d/collector/prometheus/profile-format.md`):
+
+- **Scoping**: the time-series `selector` job option (allow/deny on metric name and label values, syntax in `src/go/pkg/prometheus/selector/README.md`) and `fallback_type` glob patterns for untyped metrics.
+- **Shaping**: the job-level `relabeling` option (Prometheus-compatible `metric_relabel_configs`; it replaced the removed `label_prefix`) renames metrics and rewrites labels before charts are built, and **chart profiles** (`match`/`app`/`template` YAMLs, stock under `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/`, user under `/etc/netdata/go.d/prometheus.profiles/`) ship curated per-exporter dashboards — the Prometheus analog of statsd `synthetic_charts`. Metrics not covered by a selected profile keep their autogen charts.
 
 ### 3.6 Chart priorities
 
@@ -332,7 +335,7 @@ A collector is *production-quality* when it satisfies all of:
 8. For remote targets: is vnode wiring done?
 9. For SNMP: did I extend a profile rather than hardcode OIDs?
 10. For statsd / OTEL: did I document and ship the operator-side config (synthetic_charts file or OTEL mapping YAML)?
-11. For Prometheus scraping: are selectors correct? Are untyped metrics handled?
+11. For Prometheus scraping: are selectors and relabeling rules correct? Are untyped metrics handled? Should the exporter get a stock chart profile (`profile-format.md`)?
 12. For cross-plugin enrichment: am I using netipc?
 13. For Functions: does the response conform to one of the six shapes? Non-blocking with respect to the collection loop? Schema-validated?
 14. For ibm.d only: did I run `go generate` after touching `contexts.yaml`?
@@ -576,6 +579,7 @@ Internal C plugins under `src/collectors/`. Reuse shared metric definitions from
 | SNMP stock profiles | starting from a known device | `src/go/plugin/go.d/config/go.d/snmp.profiles/default/` |
 | statsd synthetic_charts | operator-curated dashboards | `src/collectors/statsd.plugin/README.md` (lines 397-639) |
 | Prometheus mapping | generic exposition scrape | `src/go/plugin/go.d/collector/prometheus/README.md` |
+| Prometheus profiles & relabeling | curated exporter dashboards / metric reshaping | `src/go/plugin/go.d/collector/prometheus/profile-format.md` |
 | log2journal | parsing application logs into the journal | `src/collectors/log2journal/log2journal.d/` |
 | Auto-discovery rules | adding service-detection rules | `src/go/plugin/go.d/config/go.d/sd/{net_listeners,docker,snmp,http}.conf` |
 | Topology library | topology producers in Go | `src/go/pkg/topology/v1` |
