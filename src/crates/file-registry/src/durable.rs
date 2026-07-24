@@ -49,7 +49,11 @@ fn tmp_path(final_path: &Path) -> PathBuf {
 ///
 /// The kind is the only structured field preserved: `raw_os_error()`
 /// and `source()` are intentionally flattened into the message text.
-fn annotate(e: io::Error, op: &str, path: &Path) -> io::Error {
+///
+/// Public so streaming producers that write through the [`AtomicFile`]
+/// handle themselves (e.g. the SFST builder) can annotate their own
+/// write-phase failures with [`AtomicFile::tmp_path`].
+pub fn annotate(e: io::Error, op: &str, path: &Path) -> io::Error {
     io::Error::new(e.kind(), format!("{op} {}: {e}", path.display()))
 }
 
@@ -98,6 +102,13 @@ impl AtomicFile {
             },
             file,
         ))
+    }
+
+    /// The temp path this guard owns — for callers that stream through
+    /// the returned file themselves and want to [`annotate`] their own
+    /// write-phase failures with the actual path being written.
+    pub fn tmp_path(&self) -> &Path {
+        &self.tmp
     }
 
     /// Make the write durable: fsync `file` (which must be the one

@@ -2,9 +2,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    // Transparent: the io::Error (annotated with op + path by
-    // file_registry::durable) is the whole message. Embedding it here AND
-    // chaining it via #[from] would print it twice in anyhow chains.
+    // Transparent: the io::Error is the whole message (durable-write
+    // errors arrive already annotated with op + path by
+    // file_registry::durable). Embedding it here AND chaining it via
+    // #[from] would print it twice in anyhow chains.
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
