@@ -38,7 +38,7 @@ const POST_SEND_DRAIN: Duration = Duration::from_secs(1);
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
 const DEFAULT_DURATION_SECS: u64 = 30;
 const DEFAULT_WARMUP_RECORDS: u64 = 4_096;
-const DEFAULT_PEAK_PROBE_DURATION_SECS: u64 = 15;
+const DEFAULT_PEAK_PROBE_DURATION_SECS: u64 = 5;
 const DEFAULT_PEAK_CONFIRM_DURATION_SECS: u64 = 60;
 const PEAK_CONFIRMATION_RUNS: usize = 2;
 const PEAK_INITIAL_RATE: u64 = 10_000;
@@ -319,25 +319,24 @@ struct CapacityPeakCaseReport {
     packet_shape: PacketShape,
     cardinality: CardinalityProfile,
     rate_resolution_records_per_sec: u64,
-    short_probe: CapacityPeakBracket,
+    discovery: CapacityDiscoveryBracket,
     confirmations: Vec<CapacityCaseReport>,
-    sustained_refinement: Option<CapacityPeakBracket>,
     outcome: CapacityPeakOutcome,
     confirmed_peak_records_per_sec: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
-struct CapacityPeakBracket {
+struct CapacityDiscoveryBracket {
     active_duration_secs: u64,
     cases: Vec<CapacityCaseReport>,
     highest_pass_records_per_sec: Option<u64>,
     lowest_failure_records_per_sec: Option<u64>,
-    outcome: CapacityPeakBracketOutcome,
+    outcome: CapacityDiscoveryBracketOutcome,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-enum CapacityPeakBracketOutcome {
+enum CapacityDiscoveryBracketOutcome {
     Bracketed,
     NoLosslessRateAtResolution,
     HarnessInvalid,
@@ -360,6 +359,7 @@ struct CapacityPeakMatrixReport {
     created_unix_secs: u64,
     probe_duration_secs: u64,
     confirmation_duration_secs: u64,
+    confirmation_runs: usize,
     rate_resolution_records_per_sec: u64,
     collector_cpu_list: Option<String>,
     sender_cpu_list: Option<String>,
@@ -508,10 +508,11 @@ fn bench_capacity_peak_matrix() {
         })
         .collect();
     let report = CapacityPeakMatrixReport {
-        methodology: "For every protocol, packet shape, and cardinality profile, an isolated loopback sender emits real UDP datagrams into a fresh collector. Discovery probes verify sender delivery, every received datagram, decoder and journal telemetry, and zero collector errors, but do not decode journals because they cannot become a reported result. The highest discovery candidate is then required to pass twice for 60 seconds with independent final raw-journal verification of rows, byte counters, packet counters, and ordinary-flow cardinality. Rollup work remains active and its errors are checked, while the dedicated storage matrix validates finalized rollup artifacts. If confirmation fails, a sustained telemetry bracket is found before raw-journal confirmations resume. The reported peak is therefore the highest rate measured to pass twice for the stated duration, not a universal product limit.",
+        methodology: "For every protocol, packet shape, and cardinality profile, an isolated loopback sender emits real UDP datagrams into a fresh collector. Short configured discovery probes verify sender delivery, every received datagram, decoder and journal telemetry, and zero collector errors, but do not decode journals because they cannot become a reported result. The highest discovery candidate is then required to pass the configured number of sustained confirmation runs with independent final raw-journal verification of rows, byte counters, packet counters, and ordinary-flow cardinality. Rollup work remains active and its errors are checked, while the dedicated storage matrix validates finalized rollup artifacts. A failed confirmation marks only that case unstable; the controller never starts an unbounded sustained re-search. The reported peak is therefore the highest rate measured to pass every configured confirmation, not a universal product limit.",
         created_unix_secs: unix_secs(),
         probe_duration_secs: config.probe_duration_secs,
         confirmation_duration_secs: config.confirmation_duration_secs,
+        confirmation_runs: PEAK_CONFIRMATION_RUNS,
         rate_resolution_records_per_sec: config.rate_resolution_records_per_sec,
         collector_cpu_list: std::env::var(COLLECTOR_CPU_LIST_ENV).ok(),
         sender_cpu_list: std::env::var(SENDER_CPU_LIST_ENV).ok(),
@@ -575,7 +576,7 @@ fn run_capacity_peak_search(
     cardinality: CardinalityProfile,
     config: CapacityPeakSearchConfig,
 ) -> CapacityPeakCaseReport {
-    let short_probe = find_capacity_peak_bracket(
+    let discovery = find_capacity_discovery_bracket(
         protocol,
         packet_shape,
         cardinality,
@@ -583,83 +584,62 @@ fn run_capacity_peak_search(
         config,
     );
     let mut confirmations = Vec::new();
-    let mut sustained_refinement = None;
 
-    let (outcome, confirmed_peak_records_per_sec) = match short_probe.outcome {
-        CapacityPeakBracketOutcome::NoLosslessRateAtResolution => {
-            (CapacityPeakOutcome::NoLosslessRateAtResolution, None)
-        }
-        CapacityPeakBracketOutcome::HarnessInvalid => (CapacityPeakOutcome::HarnessInvalid, None),
-        CapacityPeakBracketOutcome::RateCeilingReached => {
-            (CapacityPeakOutcome::RateCeilingReached, None)
-        }
-        CapacityPeakBracketOutcome::Bracketed => {
-            let candidate = short_probe
-                .highest_pass_records_per_sec
-                .expect("a bracketed peak must have a successful lower bound");
-            let confirmed = run_peak_confirmations(
-                protocol,
-                packet_shape,
-                cardinality,
-                candidate,
-                config,
-                &mut confirmations,
-            );
-            if confirmed {
-                (CapacityPeakOutcome::Confirmed, Some(candidate))
-            } else {
-                let sustained = find_capacity_peak_bracket(
-                    protocol,
-                    packet_shape,
-                    cardinality,
-                    config.confirmation_duration_secs,
-                    config,
-                );
-                let sustained_outcome = sustained.outcome;
-                let sustained_candidate = sustained.highest_pass_records_per_sec;
-                sustained_refinement = Some(sustained);
-                match (sustained_outcome, sustained_candidate) {
-                    (CapacityPeakBracketOutcome::Bracketed, Some(candidate)) => {
-                        if run_peak_confirmations(
-                            protocol,
-                            packet_shape,
-                            cardinality,
-                            candidate,
-                            config,
-                            &mut confirmations,
-                        ) {
-                            (CapacityPeakOutcome::Confirmed, Some(candidate))
-                        } else {
-                            (CapacityPeakOutcome::UnstableAtCandidateRate, None)
-                        }
-                    }
-                    (CapacityPeakBracketOutcome::NoLosslessRateAtResolution, _) => {
-                        (CapacityPeakOutcome::NoLosslessRateAtResolution, None)
-                    }
-                    (CapacityPeakBracketOutcome::HarnessInvalid, _) => {
-                        (CapacityPeakOutcome::HarnessInvalid, None)
-                    }
-                    (CapacityPeakBracketOutcome::RateCeilingReached, _) => {
-                        (CapacityPeakOutcome::RateCeilingReached, None)
-                    }
-                    (CapacityPeakBracketOutcome::Bracketed, None) => {
-                        (CapacityPeakOutcome::HarnessInvalid, None)
-                    }
-                }
-            }
-        }
+    let confirmation_succeeded = if discovery.outcome == CapacityDiscoveryBracketOutcome::Bracketed
+    {
+        let candidate = discovery
+            .highest_pass_records_per_sec
+            .expect("a bracketed peak must have a successful lower bound");
+        Some(run_peak_confirmations(
+            protocol,
+            packet_shape,
+            cardinality,
+            candidate,
+            config,
+            &mut confirmations,
+        ))
+    } else {
+        None
     };
+    let (outcome, confirmed_peak_records_per_sec) =
+        resolve_capacity_peak(&discovery, confirmation_succeeded);
 
     CapacityPeakCaseReport {
         protocol,
         packet_shape,
         cardinality,
         rate_resolution_records_per_sec: config.rate_resolution_records_per_sec,
-        short_probe,
+        discovery,
         confirmations,
-        sustained_refinement,
         outcome,
         confirmed_peak_records_per_sec,
+    }
+}
+
+fn resolve_capacity_peak(
+    discovery: &CapacityDiscoveryBracket,
+    confirmation_succeeded: Option<bool>,
+) -> (CapacityPeakOutcome, Option<u64>) {
+    match discovery.outcome {
+        CapacityDiscoveryBracketOutcome::NoLosslessRateAtResolution => {
+            (CapacityPeakOutcome::NoLosslessRateAtResolution, None)
+        }
+        CapacityDiscoveryBracketOutcome::HarnessInvalid => {
+            (CapacityPeakOutcome::HarnessInvalid, None)
+        }
+        CapacityDiscoveryBracketOutcome::RateCeilingReached => {
+            (CapacityPeakOutcome::RateCeilingReached, None)
+        }
+        CapacityDiscoveryBracketOutcome::Bracketed => {
+            let candidate = discovery
+                .highest_pass_records_per_sec
+                .expect("a bracketed discovery must have a successful lower bound");
+            match confirmation_succeeded {
+                Some(true) => (CapacityPeakOutcome::Confirmed, Some(candidate)),
+                Some(false) => (CapacityPeakOutcome::UnstableAtCandidateRate, None),
+                None => (CapacityPeakOutcome::HarnessInvalid, None),
+            }
+        }
     }
 }
 
@@ -689,13 +669,13 @@ fn run_peak_confirmations(
     true
 }
 
-fn find_capacity_peak_bracket(
+fn find_capacity_discovery_bracket(
     protocol: WireProtocol,
     packet_shape: PacketShape,
     cardinality: CardinalityProfile,
     active_duration_secs: u64,
     config: CapacityPeakSearchConfig,
-) -> CapacityPeakBracket {
+) -> CapacityDiscoveryBracket {
     assert!(
         config.initial_rate_records_per_sec >= config.rate_resolution_records_per_sec,
         "initial peak probe rate must be at least the peak rate resolution"
@@ -722,24 +702,24 @@ fn find_capacity_peak_bracket(
         match case.outcome {
             CapacityOutcome::HarnessInvalid => {
                 cases.push(case);
-                return CapacityPeakBracket {
+                return CapacityDiscoveryBracket {
                     active_duration_secs,
                     cases,
                     highest_pass_records_per_sec: highest_pass,
                     lowest_failure_records_per_sec: lowest_failure,
-                    outcome: CapacityPeakBracketOutcome::HarnessInvalid,
+                    outcome: CapacityDiscoveryBracketOutcome::HarnessInvalid,
                 };
             }
             CapacityOutcome::Pass => {
                 highest_pass = Some(rate);
                 cases.push(case);
                 if rate == config.maximum_rate_records_per_sec {
-                    return CapacityPeakBracket {
+                    return CapacityDiscoveryBracket {
                         active_duration_secs,
                         cases,
                         highest_pass_records_per_sec: highest_pass,
                         lowest_failure_records_per_sec: lowest_failure,
-                        outcome: CapacityPeakBracketOutcome::RateCeilingReached,
+                        outcome: CapacityDiscoveryBracketOutcome::RateCeilingReached,
                     };
                 }
                 rate = next_peak_probe_rate(rate, config);
@@ -751,12 +731,12 @@ fn find_capacity_peak_bracket(
                     break;
                 }
                 let Some(lower_rate) = lower_peak_probe_rate(rate, config) else {
-                    return CapacityPeakBracket {
+                    return CapacityDiscoveryBracket {
                         active_duration_secs,
                         cases,
                         highest_pass_records_per_sec: highest_pass,
                         lowest_failure_records_per_sec: lowest_failure,
-                        outcome: CapacityPeakBracketOutcome::NoLosslessRateAtResolution,
+                        outcome: CapacityDiscoveryBracketOutcome::NoLosslessRateAtResolution,
                     };
                 };
                 rate = lower_rate;
@@ -781,24 +761,24 @@ fn find_capacity_peak_bracket(
             CapacityOutcome::CapacityFailure => high = rate,
             CapacityOutcome::HarnessInvalid => {
                 cases.push(case);
-                return CapacityPeakBracket {
+                return CapacityDiscoveryBracket {
                     active_duration_secs,
                     cases,
                     highest_pass_records_per_sec: Some(low),
                     lowest_failure_records_per_sec: Some(high),
-                    outcome: CapacityPeakBracketOutcome::HarnessInvalid,
+                    outcome: CapacityDiscoveryBracketOutcome::HarnessInvalid,
                 };
             }
         }
         cases.push(case);
     }
 
-    CapacityPeakBracket {
+    CapacityDiscoveryBracket {
         active_duration_secs,
         cases,
         highest_pass_records_per_sec: Some(low),
         lowest_failure_records_per_sec: Some(high),
-        outcome: CapacityPeakBracketOutcome::Bracketed,
+        outcome: CapacityDiscoveryBracketOutcome::Bracketed,
     }
 }
 
@@ -2238,6 +2218,19 @@ mod peak_selection_tests {
         }
     }
 
+    fn discovery(
+        outcome: CapacityDiscoveryBracketOutcome,
+        highest_pass_records_per_sec: Option<u64>,
+    ) -> CapacityDiscoveryBracket {
+        CapacityDiscoveryBracket {
+            active_duration_secs: DEFAULT_PEAK_PROBE_DURATION_SECS,
+            cases: Vec::new(),
+            highest_pass_records_per_sec,
+            lowest_failure_records_per_sec: None,
+            outcome,
+        }
+    }
+
     #[test]
     fn peak_selection_uses_the_highest_cpu_successful_100k_ordinary_case() {
         let cases = vec![
@@ -2342,5 +2335,31 @@ mod peak_selection_tests {
         assert_eq!(lower_peak_probe_rate(1_000, config), None);
         assert_eq!(midpoint_peak_probe_rate(64_000, 72_000, 1_000), 68_000);
         assert_eq!(midpoint_peak_probe_rate(68_000, 69_500, 1_000), 69_000);
+    }
+
+    #[test]
+    fn bounded_peak_policy_never_retries_a_failed_confirmation() {
+        assert_eq!(DEFAULT_PEAK_PROBE_DURATION_SECS, 5);
+        assert_eq!(DEFAULT_PEAK_CONFIRM_DURATION_SECS, 60);
+        assert_eq!(PEAK_CONFIRMATION_RUNS, 2);
+
+        let bracketed = discovery(CapacityDiscoveryBracketOutcome::Bracketed, Some(73_000));
+        assert_eq!(
+            resolve_capacity_peak(&bracketed, Some(true)),
+            (CapacityPeakOutcome::Confirmed, Some(73_000))
+        );
+        assert_eq!(
+            resolve_capacity_peak(&bracketed, Some(false)),
+            (CapacityPeakOutcome::UnstableAtCandidateRate, None)
+        );
+
+        let no_lossless = discovery(
+            CapacityDiscoveryBracketOutcome::NoLosslessRateAtResolution,
+            None,
+        );
+        assert_eq!(
+            resolve_capacity_peak(&no_lossless, None),
+            (CapacityPeakOutcome::NoLosslessRateAtResolution, None)
+        );
     }
 }
