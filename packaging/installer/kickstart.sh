@@ -1397,7 +1397,7 @@ write_claim_config() {
   fi
 
   claim_config="${config_path}/claim.conf"
-  claim_config_tmp="$(mktemp -p "${tmpdir}")"
+  claim_config_tmp="$(mktemp "${tmpdir}/claim.conf.XXXXXX")"
 
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to write claiming configuration to ${claim_config}"
