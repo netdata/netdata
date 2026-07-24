@@ -16,10 +16,27 @@ var (
 	validChartTypes = []string{"line", "area", "stacked", "heatmap"}
 )
 
+// Validation contains immutable runtime artifacts derived while validating a
+// spec. It is separate from Spec so validation never mutates caller-owned data.
+type Validation struct {
+	autogenExclude matcher.PositivePatternList
+}
+
+// AutogenExcludeMatcher returns the validated autogen exclusion matcher.
+func (v Validation) AutogenExcludeMatcher() matcher.PositivePatternList {
+	return v.autogenExclude
+}
+
 // Validate performs semantic checks for one chart template spec.
 func (s *Spec) Validate() error {
+	_, err := Validate(s)
+	return err
+}
+
+// Validate performs semantic checks and returns immutable derived artifacts.
+func Validate(s *Spec) (Validation, error) {
 	if s == nil {
-		return semErr("", "nil spec")
+		return Validation{}, semErr("", "nil spec")
 	}
 	var errs []error
 	if s.Version != VersionV1 {
@@ -28,12 +45,13 @@ func (s *Spec) Validate() error {
 	if len(s.Groups) == 0 {
 		errs = append(errs, semErr("groups", "groups[] is required"))
 	}
-	errs = append(errs, validateEngine(s.Engine))
+	exclude, err := validateEngine(s.Engine)
+	errs = append(errs, err)
 
 	for i := range s.Groups {
 		errs = append(errs, validateGroup(s.Groups[i], fmt.Sprintf("groups[%d]", i), nil))
 	}
-	return errors.Join(errs...)
+	return Validation{autogenExclude: exclude}, errors.Join(errs...)
 }
 
 func validateGroup(group Group, path string, inheritedMetrics map[string]struct{}) error {
@@ -222,12 +240,13 @@ func validateDimensions(dimensions []Dimension, path string, effectiveMetrics ma
 	return errors.Join(errs...)
 }
 
-func validateEngine(engine *Engine) error {
+func validateEngine(engine *Engine) (matcher.PositivePatternList, error) {
 	if engine == nil {
-		return nil
+		return matcher.PositivePatternList{}, nil
 	}
 
 	var errs []error
+	var exclude matcher.PositivePatternList
 	if engine.Selector != nil {
 		for i, expr := range engine.Selector.Allow {
 			if strings.TrimSpace(expr) == "" {
@@ -242,12 +261,10 @@ func validateEngine(engine *Engine) error {
 	}
 
 	if engine.Autogen != nil {
-		engine.Autogen.exclude = matcher.PositivePatternList{}
-		exclude, err := matcher.CompilePositivePatternList(engine.Autogen.Exclude)
+		var err error
+		exclude, err = matcher.CompilePositivePatternList(engine.Autogen.Exclude)
 		if err != nil {
 			errs = append(errs, semErr("engine.autogen.exclude", err.Error()))
-		} else {
-			engine.Autogen.exclude = exclude
 		}
 		if engine.Autogen.MaxTypeIDLen < 0 {
 			errs = append(errs, semErr("engine.autogen.max_type_id_len", "must be >= 0"))
@@ -257,7 +274,7 @@ func validateEngine(engine *Engine) error {
 		}
 	}
 
-	return errors.Join(errs...)
+	return exclude, errors.Join(errs...)
 }
 
 func validateLabelPromotion(labels []string, path string) error {

@@ -47,7 +47,7 @@ func TestWithEnginePolicySnapshotsAtOptionConstruction(t *testing.T) {
 }
 
 func TestResolveEffectivePolicyAutogenExclude(t *testing.T) {
-	spec, err := charttpl.DecodeYAML([]byte(`
+	spec, validation, err := charttpl.DecodeYAMLValidated([]byte(`
 version: v1
 engine:
   autogen:
@@ -66,7 +66,7 @@ groups:
 `))
 	require.NoError(t, err)
 
-	resolved, err := resolveEffectivePolicy(engineConfig{}, spec.Engine)
+	resolved, err := resolveEffectivePolicy(engineConfig{}, spec.Engine, validation.AutogenExcludeMatcher())
 	require.NoError(t, err)
 	assert.Equal(t, []string{"a*", "z*"}, resolved.autogen.Exclude)
 	assert.True(t, resolved.autogenExclude.MatchString("alpha"))

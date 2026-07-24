@@ -4,6 +4,7 @@ package chartengine
 
 import (
 	"sort"
+	"sync"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
@@ -611,4 +612,54 @@ func TestCompileScenarios(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCompileDoesNotMutateOrRaceOnSharedSpec(t *testing.T) {
+	newSpec := func() charttpl.Spec {
+		return charttpl.Spec{
+			Version: charttpl.VersionV1,
+			Engine: &charttpl.Engine{
+				Autogen: &charttpl.EngineAutogen{
+					Enabled: true,
+					Exclude: []string{"zeta_*", "alpha_*", "alpha_*"},
+				},
+			},
+			Groups: []charttpl.Group{
+				{
+					Family:  "Test",
+					Metrics: []string{"metric"},
+					Charts: []charttpl.Chart{
+						{
+							Title:      "Test",
+							Context:    "test",
+							Units:      "units",
+							Dimensions: []charttpl.Dimension{{Selector: "metric", Name: "metric"}},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	spec := newSpec()
+	want := newSpec()
+
+	const workers = 16
+	var wg sync.WaitGroup
+	errs := make(chan error, workers)
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(revision uint64) {
+			defer wg.Done()
+			_, err := Compile(&spec, revision)
+			errs <- err
+		}(uint64(i + 1))
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		require.NoError(t, err)
+	}
+	assert.Equal(t, want, spec)
 }

@@ -1087,11 +1087,12 @@ All rules below produce semantic validation errors unless noted:
 
 The package exposes a small Go surface for decoding, cloning, and re-emitting templates:
 
-| Function                                 | Purpose                                                                            |
-|------------------------------------------|------------------------------------------------------------------------------------|
-| `DecodeYAML([]byte) (*Spec, error)`      | Strict parse, apply decode-time defaults, then validate. The canonical read path.  |
-| `Group.Clone() Group`                    | Typed deep copy of a group and everything nested under it.                          |
-| `Spec.MarshalTemplate() (string, error)` | Validate (only) and serialize a runtime-built template to YAML.                    |
+| Function                                           | Purpose                                                                                         |
+|----------------------------------------------------|-------------------------------------------------------------------------------------------------|
+| `DecodeYAML([]byte) (*Spec, error)`                | Strict parse, apply decode-time defaults, then validate. The canonical read path.               |
+| `DecodeYAMLValidated([]byte) (*Spec, Validation, error)` | Decode plus immutable derived validation artifacts for runtime consumers such as chartengine. |
+| `Group.Clone() Group`                              | Typed deep copy of a group and everything nested under it.                                      |
+| `Spec.MarshalTemplate() (string, error)`           | Validate (only) and serialize a runtime-built template to YAML.                                 |
 
 ### Building a template at runtime
 

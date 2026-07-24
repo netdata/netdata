@@ -49,23 +49,22 @@ func New(opts ...Option) (*Engine, error) {
 
 // Load compiles and publishes a new immutable program revision.
 func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
-	return e.load(spec, revision, false)
+	if e == nil {
+		return fmt.Errorf("chartengine: nil engine")
+	}
+	validation, err := charttpl.Validate(spec)
+	if err != nil {
+		return fmt.Errorf("chartengine: invalid template spec: %w", err)
+	}
+	return e.load(spec, validation, revision)
 }
 
-func (e *Engine) load(spec *charttpl.Spec, revision uint64, validated bool) error {
+func (e *Engine) load(spec *charttpl.Spec, validation charttpl.Validation, revision uint64) error {
 	if e == nil {
 		return fmt.Errorf("chartengine: nil engine")
 	}
 
-	var (
-		compiled *program.Program
-		err      error
-	)
-	if validated {
-		compiled, err = compileValidated(spec, revision)
-	} else {
-		compiled, err = Compile(spec, revision)
-	}
+	compiled, err := compileValidated(spec, revision)
 	if err != nil {
 		e.logWarningf("chartengine load failed revision=%d: %v", revision, err)
 		return err
@@ -75,7 +74,7 @@ func (e *Engine) load(spec *charttpl.Spec, revision uint64, validated bool) erro
 	cfg := e.state.cfg
 	e.mu.RUnlock()
 
-	policy, err := resolveEffectivePolicy(cfg, spec.Engine)
+	policy, err := resolveEffectivePolicy(cfg, spec.Engine, validation.AutogenExcludeMatcher())
 	if err != nil {
 		e.logWarningf("chartengine load failed revision=%d: %v", revision, err)
 		return err
@@ -100,11 +99,11 @@ func (e *Engine) load(spec *charttpl.Spec, revision uint64, validated bool) erro
 
 // LoadYAML decodes chart-template YAML, compiles it, and publishes the program.
 func (e *Engine) LoadYAML(data []byte, revision uint64) error {
-	spec, err := charttpl.DecodeYAML(data)
+	spec, validation, err := charttpl.DecodeYAMLValidated(data)
 	if err != nil {
 		return err
 	}
-	return e.load(spec, revision, true)
+	return e.load(spec, validation, revision)
 }
 
 // ResetMaterialized clears only materialized chart/dimension lifecycle state.

@@ -16,7 +16,11 @@ type effectiveEnginePolicy struct {
 	selector       metrixselector.Selector
 }
 
-func resolveEffectivePolicy(cfg engineConfig, templatePolicy *charttpl.Engine) (effectiveEnginePolicy, error) {
+func resolveEffectivePolicy(
+	cfg engineConfig,
+	templatePolicy *charttpl.Engine,
+	validatedExclude matcher.PositivePatternList,
+) (effectiveEnginePolicy, error) {
 	autogen := defaultAutogenPolicy()
 	var autogenExclude matcher.PositivePatternList
 	var selector metrixselector.Selector
@@ -30,7 +34,7 @@ func resolveEffectivePolicy(cfg engineConfig, templatePolicy *charttpl.Engine) (
 					MaxTypeIDLen:             templatePolicy.Autogen.MaxTypeIDLen,
 					ExpireAfterSuccessCycles: templatePolicy.Autogen.ExpireAfterSuccessCycles,
 				},
-				templatePolicy.Autogen.ExcludeMatcher(),
+				validatedExclude,
 			)
 			if err != nil {
 				return effectiveEnginePolicy{}, fmt.Errorf("template engine.autogen: %w", err)

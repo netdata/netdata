@@ -186,14 +186,12 @@ groups:
 	tests := map[string]struct {
 		exclude string
 		wantErr string
-		match   string
 	}{
 		"empty list preserves current behavior": {
 			exclude: "    exclude: []\n",
 		},
 		"positive Unicode and internal whitespace are valid": {
 			exclude: "    exclude: [\"Business Unit\", \"μέτρο*\"]\n",
-			match:   "μέτρο_total",
 		},
 		"whitespace-only entry is invalid": {
 			exclude: "    exclude: [\"  \"]\n",
@@ -215,7 +213,7 @@ groups:
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			spec, err := DecodeYAML([]byte(prefix + test.exclude + groups))
+			spec, validation, err := DecodeYAMLValidated([]byte(prefix + test.exclude + groups))
 			if test.wantErr != "" {
 				require.ErrorContains(t, err, test.wantErr)
 				return
@@ -223,22 +221,20 @@ groups:
 			require.NoError(t, err)
 			require.NotNil(t, spec.Engine)
 			require.NotNil(t, spec.Engine.Autogen)
-			if test.match == "" {
-				assert.False(t, spec.Engine.Autogen.ExcludeMatcher().MatchString("metric"))
-			} else {
-				assert.True(t, spec.Engine.Autogen.ExcludeMatcher().MatchString(test.match))
+			if name == "positive Unicode and internal whitespace are valid" {
+				assert.True(t, validation.AutogenExcludeMatcher().MatchString("μέτρο_total"))
 			}
 		})
 	}
 }
 
-func TestEngineAutogenExcludeMatcherRefreshesOnValidation(t *testing.T) {
+func TestEngineAutogenValidationDoesNotMutateExclude(t *testing.T) {
 	spec, err := DecodeYAML([]byte(`
 version: v1
 engine:
   autogen:
     enabled: true
-    exclude: ["alpha*"]
+    exclude: ["zeta*", "alpha*", "alpha*"]
 groups:
   - family: Test
     metrics: [metric]
@@ -251,16 +247,17 @@ groups:
             name: metric
 `))
 	require.NoError(t, err)
-	assert.True(t, spec.Engine.Autogen.ExcludeMatcher().MatchString("alpha_total"))
+	assert.Equal(t, []string{"zeta*", "alpha*", "alpha*"}, spec.Engine.Autogen.Exclude)
+	require.NoError(t, spec.Validate())
+	assert.Equal(t, []string{"zeta*", "alpha*", "alpha*"}, spec.Engine.Autogen.Exclude)
 
 	spec.Engine.Autogen.Exclude = []string{"["}
 	require.Error(t, spec.Validate())
-	assert.False(t, spec.Engine.Autogen.ExcludeMatcher().MatchString("alpha_total"))
+	assert.Equal(t, []string{"["}, spec.Engine.Autogen.Exclude)
 
 	spec.Engine.Autogen.Exclude = []string{"beta*"}
 	require.NoError(t, spec.Validate())
-	assert.False(t, spec.Engine.Autogen.ExcludeMatcher().MatchString("alpha_total"))
-	assert.True(t, spec.Engine.Autogen.ExcludeMatcher().MatchString("beta_total"))
+	assert.Equal(t, []string{"beta*"}, spec.Engine.Autogen.Exclude)
 }
 
 func TestConfigSchemaJSON(t *testing.T) {

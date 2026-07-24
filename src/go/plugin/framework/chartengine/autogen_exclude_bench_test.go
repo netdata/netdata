@@ -234,6 +234,10 @@ func BenchmarkBuildPlanAutogenExcludeEnvelope(b *testing.B) {
 							patternLength,
 							target,
 						)
+						canonical, err := matcher.CanonicalizePositivePatterns(patterns)
+						if err != nil {
+							b.Fatalf("canonicalize patterns: %v", err)
+						}
 						engine := benchmarkAutogenExcludeEngine(b, patterns)
 						if cacheState == "warm" {
 							if _, err := buildPlan(engine, reader); err != nil {
@@ -243,7 +247,9 @@ func BenchmarkBuildPlanAutogenExcludeEnvelope(b *testing.B) {
 
 						b.ReportAllocs()
 						b.ResetTimer()
-						b.ReportMetric(patternCount, "input-patterns/op")
+						b.ReportMetric(float64(len(patterns)), "input-patterns/op")
+						b.ReportMetric(float64(len(canonical)), "patterns/op")
+						b.ReportMetric(float64(maxPatternBytes(canonical)), "max-pattern-bytes/op")
 						b.ReportMetric(float64(seriesCount), "series/pass")
 						for i := range b.N {
 							if cacheState == "cold" {
@@ -611,9 +617,17 @@ func internalStarPattern(token string, matches bool) string {
 	middle := len(token) / 2
 	suffix := token[middle+1:]
 	if !matches {
-		suffix = "never_" + suffix
+		suffix = "~" + suffix[1:]
 	}
 	return token[:middle] + "*" + suffix
+}
+
+func maxPatternBytes(patterns []string) int {
+	maxBytes := 0
+	for _, pattern := range patterns {
+		maxBytes = max(maxBytes, len(pattern))
+	}
+	return maxBytes
 }
 
 func lateHitBenchmarkPatterns(count, length int, target string) []string {
