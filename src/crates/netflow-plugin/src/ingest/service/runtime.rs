@@ -45,10 +45,19 @@ async fn recv_from_any_listener(
 }
 
 impl IngestService {
-    pub(crate) async fn run(mut self, shutdown: CancellationToken) -> Result<()> {
+    pub(crate) async fn run(self, shutdown: CancellationToken) -> Result<()> {
+        self.run_with_listener_ready(shutdown, |_| {}).await
+    }
+
+    async fn run_with_listener_ready(
+        mut self,
+        shutdown: CancellationToken,
+        listener_ready: impl FnOnce(&[UdpSocket]),
+    ) -> Result<()> {
         self.rebuild_materialized_from_raw().await?;
 
         let sockets = self.bind_listeners_and_start_workers().await?;
+        listener_ready(&sockets);
         let mut buffer = vec![0_u8; self.cfg.listener.max_packet_size];
         let mut next_socket_index = 0_usize;
         let mut entries_since_sync = 0_usize;
@@ -508,6 +517,23 @@ impl IngestService {
     pub(crate) async fn bind_listeners_and_start_workers_for_test(&mut self) -> Result<()> {
         let _sockets = self.bind_listeners_and_start_workers().await?;
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn run_with_listener_ready_for_test(
+        self,
+        shutdown: CancellationToken,
+        listener_ready: impl FnOnce(Vec<std::net::SocketAddr>),
+    ) -> Result<()> {
+        self.run_with_listener_ready(shutdown, |sockets| {
+            listener_ready(
+                sockets
+                    .iter()
+                    .map(|socket| socket.local_addr().expect("read bound listener address"))
+                    .collect(),
+            );
+        })
+        .await
     }
 
     #[cfg(test)]

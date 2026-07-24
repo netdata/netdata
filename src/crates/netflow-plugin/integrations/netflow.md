@@ -57,7 +57,7 @@ The stock configuration enables the plugin and listens on the configured UDP por
 
 #### Limits
 
-Operational limits are driven by sustained flow records/s, exporter batching, cardinality, retention, storage speed, and enrichment. On modern hardware with fast storage, plan around 50k-100k sustained flow records/s per well-provisioned agent for the full raw + rollup pipeline, provided the underlying disks can sustain the required journal write activity; use distributed agents for larger deployments.
+Operational limits are driven by sustained flow records/s, exporter batching, cardinality, retention, storage speed, and enrichment. A release benchmark on a modern NVMe host verified 50k/s for packed ordinary flow exports across the tested cardinality profiles; 100k/s is conditional, not a general promise, and one-record UDP exports can be materially lower. Validate the actual exporter shape before sizing a production boundary; use distributed agents for larger deployments.
 
 #### Performance Impact
 
