@@ -25,6 +25,14 @@ You can find this command in three places in the UI:
 3. Click the "Connect" button
 4. Follow the on-screen instructions to connect your Agent
 
+:::note
+
+**Verifying node ownership:** As part of the connection flow, Netdata Cloud displays a command such as `sudo cat /var/lib/netdata/netdata_random_session_id`. Run it directly on the machine whose Agent you are connecting — not on your local workstation or any other machine — to read a random session ID (a UUID) that the Agent generates at startup and writes to its library directory. Copy the output and paste it back into the Cloud UI. This proves you have administrative access to the node and prevents unauthorized claiming of machines you do not control.
+
+The default path is `/var/lib/netdata/`, but it follows your Agent's configured library directory (`lib` under the `[directories]` section of `netdata.conf`), so it may differ on custom or static installations — for example `sudo cat /mnt/encrypted/netdata/lib/netdata_random_session_id` when the library directory has been moved. For Docker nodes, the Cloud UI shows `docker exec netdata cat /var/lib/netdata/netdata_random_session_id` instead.
+
+:::
+
 ### Method 2: Via Configuration File
 
 **Best for:** Automated deployments, multiple Agents
