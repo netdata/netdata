@@ -95,6 +95,19 @@ Charts on custom dashboards are [fully interactive](/docs/dashboards-and-charts/
 - Zoom, pan, and highlight timeframes.
 - Synchronize charts across contexts and nodes.
 
+### Global Filters
+
+Custom dashboards include an **Apply global filters** toggle that controls how the node filter affects your dashboard cards:
+
+- **Enabled**: all cards in the dashboard are filtered by the nodes selected in the global filter.
+- **Disabled**: each card shows data only for the nodes it was individually configured with.
+
+:::tip
+
+Use this toggle when you want to quickly focus your entire dashboard on a specific subset of nodes without reconfiguring each card individually.
+
+:::
+
 ### Text Cards
 
 Text cards allow you to explain the arrangement or intent behind the dashboard. Share insights with your team directly on the dashboard.
