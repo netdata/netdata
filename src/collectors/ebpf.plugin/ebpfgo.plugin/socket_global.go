@@ -126,10 +126,12 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 			return
 		}
 
-		// Callers invoke MarkSocketInactive() before clearSocketApps so the
-		// SOCKET flag is already cleared; the consumer will skip the update.
-		// Zero out per-PID socket data so the segment is clean when the flag
-		// is re-set on the next successful cycle.
+		// ORDERING REQUIREMENT: callers MUST call store.MarkSocketInactive()
+		// before calling clearSocketApps.  Publish() reads activeModules to
+		// stamp the SHM header flags; the SOCKET bit must already be cleared
+		// before Publish runs, or the consumer will see socket_ok = true
+		// alongside zero data arrays.  UpdateSocketApps(nil) does not set the
+		// SOCKET bit (nil signals a failed cycle), so the bit stays cleared.
 		store.UpdateSocketApps(nil)
 		if shmPublisher != nil {
 			if err := store.Publish(shmPublisher); err != nil {
