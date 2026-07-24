@@ -407,7 +407,13 @@ void netdata_conf_section_db(void) {
 
         struct dirent *de;
         while ((de = readdir(dir))) {
-            if (strendswith(de->d_name, ".ndf")) { // DATAFILE_EXTENSION
+            // Validate the name exactly as dbengine generates and scans it
+            // ("datafile-<tier>-<fileno>.ndf"), using the same sscanf template as
+            // scan_data_files(). Requiring both numeric fields to parse means an
+            // unrelated *.ndf entry is not mistaken for persisted data.
+            unsigned int df_tier, df_fileno;
+            if (sscanf(de->d_name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION,
+                       &df_tier, &df_fileno) == 2) {
                 dbengine_datafiles_present = true;
                 break;
             }
