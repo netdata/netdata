@@ -142,7 +142,7 @@ var manifest = map[string]ManifestCase{
 		Agent:  Green,
 	},
 	"L3/registry-completeness": {
-		Proves: "the FULL time-grouping registry: all 46 accepted name strings answer (20 variants/aliases beyond L3/families, alias==canonical), the complete countif grammar (! !: >: <: <> : == spaces empty), numeric option overrides with clamps (percentile [0,100], trimmed-mean/median [0,50]), unknown names silently parse to average; PINNED QUIRK (rulings batch): bare-number countif options lose their first digit",
+		Proves: "the FULL time-grouping registry: all 47 accepted name strings (latest included since #23257) answer (20 variants/aliases beyond L3/families, alias==canonical), the complete countif grammar (! !: >: <: <> : == spaces empty), numeric option overrides with clamps (percentile [0,100], trimmed-mean/median [0,50]), unknown names silently parse to average; PINNED QUIRK (rulings batch): bare-number countif options lose their first digit",
 		Agent:  Green,
 	},
 	"L3/anomaly-bit-option": {
@@ -210,8 +210,8 @@ var manifest = map[string]ManifestCase{
 		Agent:  Green,
 	},
 	"CASE-022/time-group-latest": {
-		Proves: "the agent supports time_group=latest — per-bucket last collected value, empty buckets stay empty, and points=1 with before=0 anchors the window at the newest stored sample serving it from the collector cache (zero db reads, the RAW un-quantized double, anomaly rate 0 by design; the storage path keeps SN quantization and the engine-generic anomaly rate). STOCK agents have no such grouping: the name silently falls back to average",
-		Agent:  Red,
+		Proves: "time_group=latest works end to end: per-bucket last collected value, empty buckets stay empty, sign preserved without options=absolute and erased with it; points=1 with before at/near now (raw zero or resolved within one update_every of now) anchors the window at the newest stored sample and serves it from the collector cache — zero db reads, the RAW un-quantized double, anomaly rate 0 by design — while the storage path (selected-tier) keeps SN quantization and the engine-generic anomaly rate",
+		Agent:  Green, FixedBy: "#23257",
 	},
 	"CASE-019/v1-json-name-escaping": {
 		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",

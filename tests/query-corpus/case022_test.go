@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// CASE-022 — feature-pending red: the agent has no `latest` time-grouping
-// (an unknown time_group silently falls back to average), so the target
-// contract fails on stock. The contract under pin:
+// CASE-022 — GREEN since #23257 (the feature PR): the `latest`
+// time-grouping landed and this case is its end-to-end regression
+// guard. Before it, the unknown name silently fell back to average.
+// The contract under pin:
 //   - time_group=latest is accepted and echoed back;
 //   - each output bucket keeps the LAST collected value inside it;
 //     buckets without any collected sample stay EMPTY (gaps visible);
