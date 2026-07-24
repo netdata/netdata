@@ -38,7 +38,7 @@ type autogenSource struct {
 }
 
 type autogenSourceBuilder func(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
 	policy AutogenPolicy,
@@ -46,16 +46,17 @@ type autogenSourceBuilder func(
 ) (autogenRoute, bool, error)
 
 type autogenRoleBuilder func(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error)
 
 var autogenSourceBuilders = map[metrix.MetricKind]autogenSourceBuilder{
-	metrix.MetricKindHistogram: buildHistogramAutogenRoute,
-	metrix.MetricKindSummary:   buildSummaryAutogenRoute,
-	metrix.MetricKindStateSet:  buildStateSetAutogenRoute,
+	metrix.MetricKindHistogram:  buildHistogramAutogenRoute,
+	metrix.MetricKindSummary:    buildSummaryAutogenRoute,
+	metrix.MetricKindStateSet:   buildStateSetAutogenRoute,
+	metrix.MetricKindMeasureSet: buildMeasureSetAutogenRoute,
 }
 
 var histogramRoleBuilders = map[metrix.FlattenRole]autogenRoleBuilder{
@@ -148,14 +149,10 @@ func buildAutogenRoute(
 	if strings.TrimSpace(source.seriesName) == "" {
 		return autogenRoute{}, false, nil
 	}
-	if meta.SourceKind == metrix.MetricKindMeasureSet {
-		return buildMeasureSetAutogenRouteFromSource(source, labels, meta, policy, typeIDPrefix)
+	if builder, ok := autogenSourceBuilders[meta.SourceKind]; ok {
+		return builder(source, labels, meta, policy, typeIDPrefix)
 	}
-	builder := buildScalarAutogenRoute
-	if knownBuilder, ok := autogenSourceBuilders[meta.SourceKind]; ok {
-		builder = knownBuilder
-	}
-	return builder(source.seriesName, labels, meta, policy, typeIDPrefix)
+	return buildScalarAutogenRoute(source.seriesName, labels, meta, policy, typeIDPrefix)
 }
 
 func autogenMetricMeta(reader metrix.Reader, source autogenSource) (metrix.MetricMeta, bool) {
@@ -207,21 +204,29 @@ func sourceMetricName(metricName string, meta metrix.SeriesMeta) string {
 	case metrix.MetricKindHistogram:
 		switch meta.FlattenRole {
 		case metrix.FlattenRoleHistogramBucket:
-			return strings.TrimSuffix(metricName, "_bucket")
+			return trimAutogenSourceSuffix(metricName, "_bucket")
 		case metrix.FlattenRoleHistogramCount:
-			return strings.TrimSuffix(metricName, "_count")
+			return trimAutogenSourceSuffix(metricName, "_count")
 		case metrix.FlattenRoleHistogramSum:
-			return strings.TrimSuffix(metricName, "_sum")
+			return trimAutogenSourceSuffix(metricName, "_sum")
 		}
 	case metrix.MetricKindSummary:
 		switch meta.FlattenRole {
 		case metrix.FlattenRoleSummaryCount:
-			return strings.TrimSuffix(metricName, "_count")
+			return trimAutogenSourceSuffix(metricName, "_count")
 		case metrix.FlattenRoleSummarySum:
-			return strings.TrimSuffix(metricName, "_sum")
+			return trimAutogenSourceSuffix(metricName, "_sum")
 		}
 	}
 	return metricName
+}
+
+func trimAutogenSourceSuffix(metricName, suffix string) string {
+	sourceName := strings.TrimSuffix(metricName, suffix)
+	if sourceName == "" {
+		return metricName
+	}
+	return sourceName
 }
 
 func applyAutogenMetricMeta(route autogenRoute, meta metrix.MetricMeta, seriesMeta metrix.SeriesMeta) autogenRoute {
@@ -275,7 +280,7 @@ func normalizeAutogenUnitByAlgorithm(unit string, alg program.Algorithm) string 
 }
 
 func buildHistogramAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
 	policy AutogenPolicy,
@@ -285,11 +290,11 @@ func buildHistogramAutogenRoute(
 	if !ok {
 		return autogenRoute{}, false, nil
 	}
-	return builder(metricName, labels, policy, typeIDPrefix)
+	return builder(source, labels, policy, typeIDPrefix)
 }
 
 func buildSummaryAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
 	policy AutogenPolicy,
@@ -299,19 +304,16 @@ func buildSummaryAutogenRoute(
 	if !ok {
 		return autogenRoute{}, false, nil
 	}
-	return builder(metricName, labels, policy, typeIDPrefix)
+	return builder(source, labels, policy, typeIDPrefix)
 }
 
 func buildHistogramBucketAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	baseName := strings.TrimSuffix(metricName, "_bucket")
-	if baseName == "" {
-		baseName = metricName
-	}
+	baseName := source.familyName
 	upperBound, ok := labels.Get(metrix.HistogramBucketLabel)
 	if !ok || strings.TrimSpace(upperBound) == "" {
 		return autogenRoute{}, false, nil
@@ -337,33 +339,32 @@ func buildHistogramBucketAutogenRoute(
 }
 
 func buildHistogramCountAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	baseName := strings.TrimSuffix(metricName, "_count")
-	if baseName == "" {
-		baseName = metricName
-	}
-	return buildCounterComponentAutogenRoute(baseName, "_count", labels, policy, typeIDPrefix, "events/s")
+	return buildCounterComponentAutogenRoute(source.familyName, "_count", labels, policy, typeIDPrefix, "events/s")
 }
 
 func buildHistogramSumAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	baseName := strings.TrimSuffix(metricName, "_sum")
-	if baseName == "" {
-		baseName = metricName
-	}
-	return buildCounterComponentAutogenRoute(baseName, "_sum", labels, policy, typeIDPrefix, getAutogenCounterUnits(baseName))
+	return buildCounterComponentAutogenRoute(
+		source.familyName,
+		"_sum",
+		labels,
+		policy,
+		typeIDPrefix,
+		getAutogenCounterUnits(source.familyName),
+	)
 }
 
 func buildSummaryQuantileAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
@@ -372,51 +373,50 @@ func buildSummaryQuantileAutogenRoute(
 	if !ok || strings.TrimSpace(quantile) == "" {
 		return autogenRoute{}, false, nil
 	}
-	chartID := buildJoinedLabelAutogenID(metricName, labels, map[string]struct{}{
+	chartID := buildJoinedLabelAutogenID(source.familyName, labels, map[string]struct{}{
 		metrix.SummaryQuantileLabel: {},
 	})
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
 	}
-	units := getAutogenSummaryUnits(metricName)
+	units := getAutogenSummaryUnits(source.familyName)
 	return autogenRoute{
 		chartID:           chartID,
-		chartName:         metricName,
+		chartName:         source.familyName,
 		dimensionName:     "quantile_" + quantile,
 		dimensionKeyLabel: metrix.SummaryQuantileLabel,
 		algorithm:         program.AlgorithmAbsolute,
 		units:             units,
 		chartType:         chartTypeFromUnits(units),
-		family:            getAutogenChartFamily(metricName),
-		contextName:       metricName,
+		family:            getAutogenChartFamily(source.familyName),
+		contextName:       source.familyName,
 		staticDimension:   false,
 	}, true, nil
 }
 
 func buildSummaryCountAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	baseName := strings.TrimSuffix(metricName, "_count")
-	if baseName == "" {
-		baseName = metricName
-	}
-	return buildCounterComponentAutogenRoute(baseName, "_count", labels, policy, typeIDPrefix, "events/s")
+	return buildCounterComponentAutogenRoute(source.familyName, "_count", labels, policy, typeIDPrefix, "events/s")
 }
 
 func buildSummarySumAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	baseName := strings.TrimSuffix(metricName, "_sum")
-	if baseName == "" {
-		baseName = metricName
-	}
-	return buildCounterComponentAutogenRoute(baseName, "_sum", labels, policy, typeIDPrefix, getAutogenCounterUnits(baseName))
+	return buildCounterComponentAutogenRoute(
+		source.familyName,
+		"_sum",
+		labels,
+		policy,
+		typeIDPrefix,
+		getAutogenCounterUnits(source.familyName),
+	)
 }
 
 func buildCounterComponentAutogenRoute(
@@ -446,7 +446,7 @@ func buildCounterComponentAutogenRoute(
 }
 
 func buildStateSetAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
 	policy AutogenPolicy,
@@ -455,48 +455,31 @@ func buildStateSetAutogenRoute(
 	if meta.FlattenRole != metrix.FlattenRoleStateSetState {
 		return autogenRoute{}, false, nil
 	}
-	state, ok := labels.Get(metricName)
+	state, ok := labels.Get(source.familyName)
 	if !ok || strings.TrimSpace(state) == "" {
 		return autogenRoute{}, false, nil
 	}
-	chartID := buildJoinedLabelAutogenID(metricName, labels, map[string]struct{}{
-		metricName: {},
+	chartID := buildJoinedLabelAutogenID(source.familyName, labels, map[string]struct{}{
+		source.familyName: {},
 	})
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
 	}
 	return autogenRoute{
 		chartID:           chartID,
-		chartName:         metricName,
+		chartName:         source.familyName,
 		dimensionName:     state,
-		dimensionKeyLabel: metricName,
+		dimensionKeyLabel: source.familyName,
 		algorithm:         program.AlgorithmAbsolute,
 		units:             "state",
 		chartType:         program.ChartTypeLine,
-		family:            getAutogenChartFamily(metricName),
-		contextName:       metricName,
+		family:            getAutogenChartFamily(source.familyName),
+		contextName:       source.familyName,
 		staticDimension:   false,
 	}, true, nil
 }
 
 func buildMeasureSetAutogenRoute(
-	metricName string,
-	labels metrix.LabelView,
-	meta metrix.SeriesMeta,
-	policy AutogenPolicy,
-	typeIDPrefix string,
-) (autogenRoute, bool, error) {
-	if meta.FlattenRole != metrix.FlattenRoleMeasureSetField {
-		return autogenRoute{}, false, nil
-	}
-	source, ok := resolveAutogenSource(metricName, labels, meta)
-	if !ok {
-		return autogenRoute{}, false, nil
-	}
-	return buildMeasureSetAutogenRouteFromSource(source, labels, meta, policy, typeIDPrefix)
-}
-
-func buildMeasureSetAutogenRouteFromSource(
 	source autogenSource,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,

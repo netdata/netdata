@@ -22,6 +22,7 @@ type engineConfig struct {
 	autogenContextNamespace string
 	selector                metrixselector.Selector
 	autogenOverride         policyOverride[AutogenPolicy]
+	autogenExcludeOverride  policyOverride[matcher.PositivePatternList]
 	selectorOverride        policyOverride[metrixselector.Selector]
 	runtimeStore            metrix.RuntimeStore
 	runtimeStoreSet         bool
@@ -71,21 +72,29 @@ func defaultAutogenPolicy() AutogenPolicy {
 	}
 }
 
-func normalizeAutogenPolicy(policy AutogenPolicy) (AutogenPolicy, error) {
+func normalizeAutogenPolicy(policy AutogenPolicy) (AutogenPolicy, matcher.PositivePatternList, error) {
 	exclude, err := matcher.CompilePositivePatternList(policy.Exclude)
 	if err != nil {
-		return AutogenPolicy{}, fmt.Errorf("autogen exclude: %w", err)
+		return AutogenPolicy{}, matcher.PositivePatternList{}, fmt.Errorf("autogen exclude: %w", err)
 	}
+	return normalizeAutogenPolicyWithExclude(policy, exclude)
+}
+
+func normalizeAutogenPolicyWithExclude(
+	policy AutogenPolicy,
+	exclude matcher.PositivePatternList,
+) (AutogenPolicy, matcher.PositivePatternList, error) {
 	maxLen := policy.MaxTypeIDLen
 	if maxLen <= 0 {
 		maxLen = defaultMaxTypeIDLen
 	}
 	if maxLen < 4 {
-		return AutogenPolicy{}, fmt.Errorf("autogen max type.id len must be >= 4, got %d", maxLen)
+		return AutogenPolicy{}, matcher.PositivePatternList{},
+			fmt.Errorf("autogen max type.id len must be >= 4, got %d", maxLen)
 	}
 	policy.Exclude = exclude.Patterns()
 	policy.MaxTypeIDLen = maxLen
-	return policy, nil
+	return policy, exclude, nil
 }
 
 func compileEngineSelector(expr metrixselector.Expr) (metrixselector.Selector, error) {
@@ -100,12 +109,14 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 	policy = cloneEnginePolicy(policy)
 	return func(cfg *engineConfig) error {
 		if policy.Autogen != nil {
-			autogen, err := normalizeAutogenPolicy(*policy.Autogen)
+			autogen, exclude, err := normalizeAutogenPolicy(*policy.Autogen)
 			if err != nil {
 				return err
 			}
 			cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: autogen}
+			cfg.autogenExcludeOverride = policyOverride[matcher.PositivePatternList]{set: true, value: exclude}
 			cfg.autogen = autogen
+			cfg.autogenExclude = exclude
 		}
 		if policy.Selector != nil {
 			selector, err := compileEngineSelector(*policy.Selector)

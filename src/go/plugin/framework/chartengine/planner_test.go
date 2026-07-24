@@ -123,6 +123,75 @@ groups:
 	assert.Zero(t, sample.seriesAutogenMatched)
 }
 
+func TestBuildPlanAutogenExcludeStructuredKindsThroughFlattenedReader(t *testing.T) {
+	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
+		Enabled: true,
+		Exclude: []string{
+			"svc.latency_seconds",
+			"svc.request_seconds",
+			"svc.status",
+			"svc.usage",
+		},
+	}}))
+	require.NoError(t, err)
+	require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+groups:
+  - family: Test
+    metrics: [authored_metric]
+    charts:
+      - title: Authored
+        context: authored
+        units: units
+        dimensions:
+          - selector: authored_metric
+            name: authored
+`), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	meter := store.Write().SnapshotMeter("svc")
+	histogram := meter.Histogram("latency_seconds", metrix.WithHistogramBounds(0.5, 1))
+	summary := meter.Summary("request_seconds", metrix.WithSummaryQuantiles(0.5, 0.9))
+	stateSet := meter.StateSet(
+		"status",
+		metrix.WithStateSetStates("ready", "stopped"),
+		metrix.WithStateSetMode(metrix.ModeEnum),
+	)
+	measureSet := meter.MeasureSetGauge(
+		"usage",
+		metrix.WithMeasureSetFields(
+			metrix.MeasureFieldSpec{Name: "used"},
+			metrix.MeasureFieldSpec{Name: "free"},
+		),
+	)
+
+	cc.BeginCycle()
+	histogram.ObservePoint(metrix.HistogramPoint{
+		Count: 3,
+		Sum:   1.7,
+		Buckets: []metrix.BucketPoint{
+			{UpperBound: 0.5, CumulativeCount: 1},
+			{UpperBound: 1, CumulativeCount: 3},
+		},
+	})
+	summary.ObservePoint(metrix.SummaryPoint{
+		Count: 4,
+		Sum:   2.4,
+		Quantiles: []metrix.QuantilePoint{
+			{Quantile: 0.5, Value: 0.4},
+			{Quantile: 0.9, Value: 0.9},
+		},
+	})
+	stateSet.Enable("ready")
+	measureSet.ObservePoint(metrix.MeasureSetPoint{Values: []metrix.SampleValue{7, 3}})
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	assert.Empty(t, plan.Actions)
+}
+
 func TestBuildPlanResolvesInferDimensionNames(t *testing.T) {
 	tests := map[string]struct {
 		yaml           string

@@ -2,7 +2,10 @@
 
 package charttpl
 
-import metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+import (
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+)
 
 // VersionV1 is the supported chart-template schema version.
 const VersionV1 = "v1"
@@ -27,6 +30,7 @@ type EngineAutogen struct {
 
 	// Exclude suppresses autogen charts for matching unmatched metric families.
 	Exclude []string `yaml:"exclude,omitempty" json:"exclude,omitempty"`
+	exclude matcher.PositivePatternList
 
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
@@ -35,6 +39,15 @@ type EngineAutogen struct {
 	// successful collection cycles where the series is not seen.
 	// Zero disables expiry.
 	ExpireAfterSuccessCycles uint64 `yaml:"expire_after_success_cycles,omitempty" json:"expire_after_success_cycles,omitempty"`
+}
+
+// ExcludeMatcher returns the immutable matcher compiled by the most recent
+// autogen validation, or a zero matcher when that validation failed.
+func (a *EngineAutogen) ExcludeMatcher() matcher.PositivePatternList {
+	if a == nil {
+		return matcher.PositivePatternList{}
+	}
+	return a.exclude
 }
 
 // Group is a recursive chart-group container.

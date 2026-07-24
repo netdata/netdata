@@ -98,11 +98,11 @@ func (p *Profile) validateHeader() error {
 	if p.App != "" && !validProfileName.MatchString(p.App) {
 		return fmt.Errorf("profile %q: 'app' %q must match %s", p.Name, p.App, validProfileName.String())
 	}
-	exclude, err := matcher.CompilePositivePatternList(p.autogenExclude)
+	exclude, err := matcher.CanonicalizePositivePatterns(p.autogenExclude)
 	if err != nil {
 		return fmt.Errorf("profile %q: 'autogen.exclude': %w", p.Name, err)
 	}
-	p.autogenExclude = exclude.Patterns()
+	p.autogenExclude = exclude
 	return nil
 }
 

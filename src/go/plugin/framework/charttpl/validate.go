@@ -242,8 +242,12 @@ func validateEngine(engine *Engine) error {
 	}
 
 	if engine.Autogen != nil {
-		if _, err := matcher.CompilePositivePatternList(engine.Autogen.Exclude); err != nil {
+		engine.Autogen.exclude = matcher.PositivePatternList{}
+		exclude, err := matcher.CompilePositivePatternList(engine.Autogen.Exclude)
+		if err != nil {
 			errs = append(errs, semErr("engine.autogen.exclude", err.Error()))
+		} else {
+			engine.Autogen.exclude = exclude
 		}
 		if engine.Autogen.MaxTypeIDLen < 0 {
 			errs = append(errs, semErr("engine.autogen.max_type_id_len", "must be >= 0"))

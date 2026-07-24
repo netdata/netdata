@@ -1063,6 +1063,7 @@ All rules below produce semantic validation errors unless noted:
 | `label_promotion[]` entries must not be empty or whitespace-only                        | semantic                        |
 | Lifecycle numeric fields must be `>= 0`                                                 | semantic                        |
 | `engine.autogen.max_type_id_len` must be `0` or `>= 4`                                  | semantic                        |
+| `engine.autogen.exclude[]` entries must be valid, non-empty positive globs              | semantic                        |
 | Unknown YAML fields                                                                     | decode error (strict unmarshal) |
 
 ## Compiler-Derived Behavior

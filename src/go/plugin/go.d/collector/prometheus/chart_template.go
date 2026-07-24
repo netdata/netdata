@@ -70,11 +70,11 @@ func buildMergedChartTemplate(app string, profiles []promprofiles.Profile) (stri
 		}
 		spec.Groups = append(spec.Groups, g)
 	}
-	compiled, err := matcher.CompilePositivePatternList(exclude)
+	canonical, err := matcher.CanonicalizePositivePatterns(exclude)
 	if err != nil {
 		return "", fmt.Errorf("build prometheus chart template autogen exclusion: %w", err)
 	}
-	spec.Engine.Autogen.Exclude = compiled.Patterns()
+	spec.Engine.Autogen.Exclude = canonical
 	return marshalChartSpec(spec)
 }
 

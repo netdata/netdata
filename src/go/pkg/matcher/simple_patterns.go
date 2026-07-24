@@ -30,8 +30,35 @@ type (
 // CompilePositivePatternList validates, canonicalizes, and compiles positive
 // glob patterns. Empty input is valid and matches nothing.
 func CompilePositivePatternList(patterns []string) (PositivePatternList, error) {
-	if len(patterns) == 0 {
+	canonical, err := CanonicalizePositivePatterns(patterns)
+	if err != nil {
+		return PositivePatternList{}, err
+	}
+	if len(canonical) == 0 {
 		return PositivePatternList{}, nil
+	}
+	if len(canonical) == 1 && canonical[0] == "*" {
+		return PositivePatternList{
+			patterns: canonical,
+			matchers: []Matcher{TRUE()},
+		}, nil
+	}
+
+	compiled := PositivePatternList{
+		patterns: canonical,
+		matchers: make([]Matcher, len(canonical)),
+	}
+	for i, pattern := range canonical {
+		compiled.matchers[i] = newValidatedGlobMatcher(pattern)
+	}
+	return compiled, nil
+}
+
+// CanonicalizePositivePatterns validates and canonicalizes positive glob
+// patterns without retaining compiled matchers.
+func CanonicalizePositivePatterns(patterns []string) ([]string, error) {
+	if len(patterns) == 0 {
+		return nil, nil
 	}
 
 	unique := make(map[string]struct{}, len(patterns))
@@ -39,21 +66,18 @@ func CompilePositivePatternList(patterns []string) (PositivePatternList, error) 
 		pattern := strings.TrimSpace(raw)
 		switch {
 		case pattern == "":
-			return PositivePatternList{}, fmt.Errorf("pattern[%d]: must not be empty", i)
+			return nil, fmt.Errorf("pattern[%d]: must not be empty", i)
 		case strings.HasPrefix(pattern, "!"):
-			return PositivePatternList{}, fmt.Errorf("pattern[%d]: negative patterns are not allowed", i)
+			return nil, fmt.Errorf("pattern[%d]: negative patterns are not allowed", i)
 		}
-		if _, err := NewGlobMatcher(pattern); err != nil {
-			return PositivePatternList{}, fmt.Errorf("pattern[%d]: invalid pattern %q: %w", i, pattern, err)
+		if err := validateGlobPattern(pattern); err != nil {
+			return nil, fmt.Errorf("pattern[%d]: invalid pattern %q: %w", i, pattern, err)
 		}
 		unique[pattern] = struct{}{}
 	}
 
 	if _, ok := unique["*"]; ok {
-		return PositivePatternList{
-			patterns: []string{"*"},
-			matchers: []Matcher{TRUE()},
-		}, nil
+		return []string{"*"}, nil
 	}
 
 	canonical := make([]string, 0, len(unique))
@@ -62,18 +86,7 @@ func CompilePositivePatternList(patterns []string) (PositivePatternList, error) 
 	}
 	sort.Strings(canonical)
 
-	compiled := PositivePatternList{
-		patterns: canonical,
-		matchers: make([]Matcher, 0, len(canonical)),
-	}
-	for _, pattern := range canonical {
-		m, err := NewGlobMatcher(pattern)
-		if err != nil {
-			return PositivePatternList{}, fmt.Errorf("compile canonical pattern %q: %w", pattern, err)
-		}
-		compiled.matchers = append(compiled.matchers, m)
-	}
-	return compiled, nil
+	return canonical, nil
 }
 
 // Patterns returns a copy of the canonical patterns.

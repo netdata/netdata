@@ -145,6 +145,18 @@ http_request_duration_seconds_count 4
 	require.NoError(t, collector.Collect(context.Background()))
 	require.NoError(t, cc.CycleController().CommitCycleSuccess())
 
+	rawHistogram, ok := collector.MetricStore().Read(metrix.ReadRaw()).Histogram(
+		"http_request_duration_seconds",
+		nil,
+	)
+	require.True(t, ok)
+	assert.InDelta(t, 4, rawHistogram.Count, 1e-9)
+	assert.InDelta(t, 1.7, rawHistogram.Sum, 1e-9)
+	require.Len(t, rawHistogram.Buckets, 3)
+	assert.Equal(t, metrix.BucketPoint{UpperBound: 0.1, CumulativeCount: 1}, rawHistogram.Buckets[0])
+	assert.Equal(t, metrix.BucketPoint{UpperBound: 0.5, CumulativeCount: 3}, rawHistogram.Buckets[1])
+	assert.Equal(t, metrix.BucketPoint{UpperBound: 1, CumulativeCount: 4}, rawHistogram.Buckets[2])
+
 	engine, err := chartengine.New()
 	require.NoError(t, err)
 	require.NoError(t, engine.LoadYAML([]byte(collector.ChartTemplateYAML()), 1))

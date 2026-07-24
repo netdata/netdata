@@ -19,16 +19,28 @@ var (
 
 // NewGlobMatcher create a new matcher with glob format
 func NewGlobMatcher(expr string) (Matcher, error) {
+	if err := validateGlobPattern(expr); err != nil {
+		return nil, err
+	}
+	return newValidatedGlobMatcher(expr), nil
+}
+
+func validateGlobPattern(expr string) error {
+	if expr == "" || expr == "*" {
+		return nil
+	}
+	if !erGlobPattern.MatchString(expr) {
+		return errBadGlobPattern
+	}
+	return nil
+}
+
+func newValidatedGlobMatcher(expr string) Matcher {
 	switch expr {
 	case "":
-		return stringFullMatcher(""), nil
+		return stringFullMatcher("")
 	case "*":
-		return TRUE(), nil
-	}
-
-	// any strings pass this regexp check are valid pattern
-	if !erGlobPattern.MatchString(expr) {
-		return nil, errBadGlobPattern
+		return TRUE()
 	}
 
 	chars := []rune(expr)
@@ -54,13 +66,14 @@ func NewGlobMatcher(expr string) (Matcher, error) {
 			unescapedExpr = append(unescapedExpr, nextCh)
 			i++
 		} else if isGlobMeta(ch) {
-			return globMatcher(expr), nil
+			return globMatcher(expr)
 		} else {
 			unescapedExpr = append(unescapedExpr, ch)
 		}
 	}
 
-	return NewStringMatcher(string(unescapedExpr), startWith, endWith)
+	matcher, _ := NewStringMatcher(string(unescapedExpr), startWith, endWith)
+	return matcher
 }
 
 func isGlobMeta(ch rune) bool {

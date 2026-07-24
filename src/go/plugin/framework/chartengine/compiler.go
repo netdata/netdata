@@ -27,7 +27,10 @@ func Compile(spec *charttpl.Spec, revision uint64) (*program.Program, error) {
 	if err := spec.Validate(); err != nil {
 		return nil, fmt.Errorf("chartengine: invalid template spec: %w", err)
 	}
+	return compileValidated(spec, revision)
+}
 
+func compileValidated(spec *charttpl.Spec, revision uint64) (*program.Program, error) {
 	c := compiler{
 		metricsSet: make(map[string]struct{}),
 	}

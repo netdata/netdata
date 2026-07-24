@@ -186,12 +186,14 @@ groups:
 	tests := map[string]struct {
 		exclude string
 		wantErr string
+		match   string
 	}{
 		"empty list preserves current behavior": {
 			exclude: "    exclude: []\n",
 		},
 		"positive Unicode and internal whitespace are valid": {
 			exclude: "    exclude: [\"Business Unit\", \"μέτρο*\"]\n",
+			match:   "μέτρο_total",
 		},
 		"whitespace-only entry is invalid": {
 			exclude: "    exclude: [\"  \"]\n",
@@ -213,14 +215,52 @@ groups:
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := DecodeYAML([]byte(prefix + test.exclude + groups))
+			spec, err := DecodeYAML([]byte(prefix + test.exclude + groups))
 			if test.wantErr != "" {
 				require.ErrorContains(t, err, test.wantErr)
 				return
 			}
 			require.NoError(t, err)
+			require.NotNil(t, spec.Engine)
+			require.NotNil(t, spec.Engine.Autogen)
+			if test.match == "" {
+				assert.False(t, spec.Engine.Autogen.ExcludeMatcher().MatchString("metric"))
+			} else {
+				assert.True(t, spec.Engine.Autogen.ExcludeMatcher().MatchString(test.match))
+			}
 		})
 	}
+}
+
+func TestEngineAutogenExcludeMatcherRefreshesOnValidation(t *testing.T) {
+	spec, err := DecodeYAML([]byte(`
+version: v1
+engine:
+  autogen:
+    enabled: true
+    exclude: ["alpha*"]
+groups:
+  - family: Test
+    metrics: [metric]
+    charts:
+      - title: Test
+        context: test
+        units: units
+        dimensions:
+          - selector: metric
+            name: metric
+`))
+	require.NoError(t, err)
+	assert.True(t, spec.Engine.Autogen.ExcludeMatcher().MatchString("alpha_total"))
+
+	spec.Engine.Autogen.Exclude = []string{"["}
+	require.Error(t, spec.Validate())
+	assert.False(t, spec.Engine.Autogen.ExcludeMatcher().MatchString("alpha_total"))
+
+	spec.Engine.Autogen.Exclude = []string{"beta*"}
+	require.NoError(t, spec.Validate())
+	assert.False(t, spec.Engine.Autogen.ExcludeMatcher().MatchString("alpha_total"))
+	assert.True(t, spec.Engine.Autogen.ExcludeMatcher().MatchString("beta_total"))
 }
 
 func TestConfigSchemaJSON(t *testing.T) {

@@ -59,6 +59,14 @@ func TestResolveAutogenSource(t *testing.T) {
 			},
 			want: autogenSource{seriesName: "svc.latency_seconds_bucket", familyName: "svc.latency_seconds"},
 		},
+		"empty suffix trim preserves visible name": {
+			metricName: "_bucket",
+			meta: metrix.SeriesMeta{
+				SourceKind:  metrix.MetricKindHistogram,
+				FlattenRole: metrix.FlattenRoleHistogramBucket,
+			},
+			want: autogenSource{seriesName: "_bucket", familyName: "_bucket"},
+		},
 		"histogram count uses base family": {
 			metricName: "svc.latency_seconds_count",
 			meta: metrix.SeriesMeta{
@@ -377,9 +385,15 @@ func runTestBuildHistogramBucketAutogenRoute(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			labels := sortedLabelView(tc.labels)
+			source, ok := resolveAutogenSource(tc.metricName, labels, metrix.SeriesMeta{
+				SourceKind:  metrix.MetricKindHistogram,
+				FlattenRole: metrix.FlattenRoleHistogramBucket,
+			})
+			require.True(t, ok)
 			route, ok, err := buildHistogramBucketAutogenRoute(
-				tc.metricName,
-				sortedLabelView(tc.labels),
+				source,
+				labels,
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
 				"",
 			)
@@ -419,9 +433,15 @@ func runTestBuildSummaryQuantileAutogenRoute(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			labels := sortedLabelView(tc.labels)
+			source, ok := resolveAutogenSource(tc.metricName, labels, metrix.SeriesMeta{
+				SourceKind:  metrix.MetricKindSummary,
+				FlattenRole: metrix.FlattenRoleSummaryQuantile,
+			})
+			require.True(t, ok)
 			route, ok, err := buildSummaryQuantileAutogenRoute(
-				tc.metricName,
-				sortedLabelView(tc.labels),
+				source,
+				labels,
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
 				"",
 			)
@@ -460,9 +480,13 @@ func runTestBuildStateSetAutogenRoute(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			tc.meta.SourceKind = metrix.MetricKindStateSet
+			labels := sortedLabelView(tc.labels)
+			source, ok := resolveAutogenSource(tc.metricName, labels, tc.meta)
+			require.True(t, ok)
 			route, ok, err := buildStateSetAutogenRoute(
-				tc.metricName,
-				sortedLabelView(tc.labels),
+				source,
+				labels,
 				tc.meta,
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
 				"",
@@ -573,9 +597,15 @@ func runTestBuildMeasureSetAutogenRoute(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
+			labels := sortedLabelView(tc.labels)
+			source, sourceOK := resolveAutogenSource(tc.metricName, labels, tc.meta)
+			require.Equal(t, tc.wantOK, sourceOK)
+			if !sourceOK {
+				return
+			}
 			route, ok, err := buildMeasureSetAutogenRoute(
-				tc.metricName,
-				sortedLabelView(tc.labels),
+				source,
+				labels,
 				tc.meta,
 				AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
 				"",

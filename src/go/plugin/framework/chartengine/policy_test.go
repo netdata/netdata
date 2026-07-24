@@ -47,14 +47,26 @@ func TestWithEnginePolicySnapshotsAtOptionConstruction(t *testing.T) {
 }
 
 func TestResolveEffectivePolicyAutogenExclude(t *testing.T) {
-	templatePolicy := &charttpl.Engine{
-		Autogen: &charttpl.EngineAutogen{
-			Enabled: true,
-			Exclude: []string{" z*", "a*", "z*"},
-		},
-	}
+	spec, err := charttpl.DecodeYAML([]byte(`
+version: v1
+engine:
+  autogen:
+    enabled: true
+    exclude: [" z*", "a*", "z*"]
+groups:
+  - family: Test
+    metrics: [metric]
+    charts:
+      - title: Test
+        context: test
+        units: units
+        dimensions:
+          - selector: metric
+            name: metric
+`))
+	require.NoError(t, err)
 
-	resolved, err := resolveEffectivePolicy(engineConfig{}, templatePolicy)
+	resolved, err := resolveEffectivePolicy(engineConfig{}, spec.Engine)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"a*", "z*"}, resolved.autogen.Exclude)
 	assert.True(t, resolved.autogenExclude.MatchString("alpha"))
