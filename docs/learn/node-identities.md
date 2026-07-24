@@ -20,12 +20,13 @@ Netdata uses several identity mechanisms to uniquely identify nodes, authenticat
 
 Every Netdata Agent has a **Machine GUID** - a UUID that uniquely identifies this specific node.
 
-| Property        | Value                                                |
-|-----------------|------------------------------------------------------|
-| **File**        | `/var/lib/netdata/registry/netdata.public.unique.id` |
-| **Format**      | UUID (e.g., `a1b2c3d4-e5f6-7890-abcd-ef1234567890`)  |
-| **Generated**   | On first start, if missing                           |
-| **Persistence** | Permanent - never changes once created               |
+| Property          | Value                                                                                  |
+|-------------------|----------------------------------------------------------------------------------------|
+| **File (Linux)**  | `/var/lib/netdata/registry/netdata.public.unique.id`                                   |
+| **File (Windows)**| `C:\Program Files\Netdata\var\lib\netdata\registry\netdata.public.unique.id`            |
+| **Format**        | UUID (e.g., `a1b2c3d4-e5f6-7890-abcd-ef1234567890`)                                    |
+| **Generated**     | On first start, if missing                                                             |
+| **Persistence**   | Permanent - never changes once created                                                 |
 
 ### Generation Behavior
 
@@ -47,6 +48,17 @@ The Machine GUID is also stored in status files for crash recovery:
 | `/tmp/status-netdata.json`               | Fallback 2     |
 | `/run/status-netdata.json`               | Fallback 3     |
 | `/var/run/status-netdata.json`           | Fallback 4     |
+
+:::note
+
+**Windows status file paths**
+
+On Windows, the status file lives under the install directory (`C:\Program Files\Netdata`):
+
+- Primary: `C:\Program Files\Netdata\var\lib\netdata\status-netdata.json`
+- Fallback: `C:\Program Files\Netdata\var\cache\netdata\status-netdata.json`
+
+:::
 
 :::note
 
@@ -261,6 +273,14 @@ If you customized `[directories]` in `netdata.conf`:
 
 :::
 
+:::note
+
+**Windows ACLK paths**
+
+On Windows, the ACLK credentials live under `C:\Program Files\Netdata\var\lib\netdata\cloud.d\`.
+
+:::
+
 ## Parent: Children Identities
 
 When a Netdata Agent operates as a **Parent** (receiving metrics from Children), it stores metadata about all nodes it has seen.
@@ -303,7 +323,19 @@ This is normal for Parent nodes receiving data from Children, and for Agents usi
 <details>
 <summary>How do I find my node's Machine GUID?</summary>
 
-Read the file `/var/lib/netdata/registry/netdata.public.unique.id`.
+Read the GUID file:
+
+**Linux:**
+
+```bash
+cat /var/lib/netdata/registry/netdata.public.unique.id
+```
+
+**Windows (PowerShell):**
+
+```powershell
+Get-Content "C:\Program Files\Netdata\var\lib\netdata\registry\netdata.public.unique.id"
+```
 
 </details>
 

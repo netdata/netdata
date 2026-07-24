@@ -87,9 +87,19 @@ See [Node Ephemerality](/docs/nodes-ephemerality.md) for full documentation.
 
 ### 1. Stop Netdata
 
+#### Linux
+
 ```bash
 sudo systemctl stop netdata
 ```
+
+#### Windows (PowerShell)
+
+```powershell
+Stop-Service Netdata
+```
+
+Verify the service stopped with `Get-Service Netdata`. See [Service Control](/docs/netdata-agent/start-stop-restart.md) for details.
 
 ### 2. Delete All Identity and Data Files
 
@@ -100,6 +110,8 @@ sudo systemctl stop netdata
 The following commands permanently delete Netdata data. Verify you are on the template VM.
 
 :::
+
+#### Linux
 
 ```bash
 # Machine GUID (Agent Self Identity)
@@ -119,6 +131,27 @@ sudo rm -rf /var/lib/netdata/cloud.d/
 sudo rm -f /var/cache/netdata/netdata-meta.db*
 sudo rm -f /var/cache/netdata/context-meta.db*
 sudo rm -rf /var/cache/netdata/dbengine*
+```
+
+#### Windows (PowerShell)
+
+Paths assume the default Windows install location (`C:\Program Files\Netdata`).
+
+```powershell
+# Machine GUID (Agent Self Identity)
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\registry\netdata.public.unique.id" -Force -ErrorAction SilentlyContinue
+
+# Status file backups (GUID recovery locations)
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\status-netdata.json" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\status-netdata.json" -Force -ErrorAction SilentlyContinue
+
+# ACLK authentication (Claimed ID, RSA keys)
+Remove-Item "C:\Program Files\Netdata\var\lib\netdata\cloud.d\*" -Recurse -Force -ErrorAction SilentlyContinue
+
+# Databases and metrics (metadata, all dbengine tiers)
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\netdata-meta.db*" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\context-meta.db*" -Force -ErrorAction SilentlyContinue
+Remove-Item "C:\Program Files\Netdata\var\cache\netdata\dbengine*" -Recurse -Force -ErrorAction SilentlyContinue
 ```
 
 ### 3. Configure Auto-Claiming (Optional)
@@ -277,7 +310,7 @@ Run the following in an elevated PowerShell session on each affected clone. Path
 
 ```powershell
 # On each affected clone
-Stop-Service netdata
+Stop-Service Netdata
 
 # Machine GUID
 Remove-Item "C:\Program Files\Netdata\var\lib\netdata\registry\netdata.public.unique.id" -Force -ErrorAction SilentlyContinue
@@ -294,7 +327,7 @@ Remove-Item "C:\Program Files\Netdata\var\cache\netdata\netdata-meta.db*" -Force
 Remove-Item "C:\Program Files\Netdata\var\cache\netdata\context-meta.db*" -Force -ErrorAction SilentlyContinue
 Remove-Item "C:\Program Files\Netdata\var\cache\netdata\dbengine*" -Recurse -Force -ErrorAction SilentlyContinue
 
-Start-Service netdata
+Start-Service Netdata
 ```
 
 :::warning
