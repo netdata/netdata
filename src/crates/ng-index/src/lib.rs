@@ -39,13 +39,14 @@ pub enum Error {
          refusing to decode frames written by a different codec"
     )]
     PayloadFormat { found: u16, expected: u16 },
-    // The message keeps only the frame context; the `source` field is
-    // chained by thiserror (field named `source`), so embedding it here
-    // too would print it twice in anyhow chains.
-    #[error("frame {frame}: bincode decode failed")]
+    // The decode error is embedded in the message, NOT chained (a field
+    // named `source` would be auto-chained by thiserror and then print
+    // twice in anyhow chains). Display-only consumers (the ledger indexer
+    // logs `{e}`) need the decode reason in the message itself.
+    #[error("frame {frame}: bincode decode failed: {err}")]
     BincodeDecode {
         frame: u64,
-        source: bincode::error::DecodeError,
+        err: bincode::error::DecodeError,
     },
     #[error(transparent)]
     Sfst(#[from] sfst::Error),

@@ -139,7 +139,7 @@ impl Drop for AtomicFile {
 pub fn write_atomic(final_path: &Path, bytes: &[u8]) -> io::Result<()> {
     let (guard, mut file) = AtomicFile::create(final_path)?;
     file.write_all(bytes)
-        .map_err(|e| annotate(e, "write temp file", &tmp_path(final_path)))?;
+        .map_err(|e| annotate(e, "write temp file", &guard.tmp))?;
     guard.commit(file)
 }
 
