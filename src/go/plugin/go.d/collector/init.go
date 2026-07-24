@@ -110,6 +110,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rethinkdb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/riakkv"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rspamd"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/runit"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/samba"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/scaleio"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smartctl"
