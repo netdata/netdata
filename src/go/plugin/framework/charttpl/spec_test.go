@@ -222,6 +222,22 @@ groups:
 			rules:   "    rules: []\n",
 			wantErr: "engine.autogen.rules",
 		},
+		"null list is invalid in YAML": {
+			rules:   "    rules: null\n",
+			wantErr: "engine.autogen.rules",
+		},
+		"bare null list is invalid in YAML": {
+			rules:   "    rules:\n",
+			wantErr: "engine.autogen.rules",
+		},
+		"escaped key empty list is invalid in YAML": {
+			rules:   "    \"rule\\u0073\": []\n",
+			wantErr: "engine.autogen.rules",
+		},
+		"unknown autogen field remains a strict decode error": {
+			rules:   "    unknown: true\n",
+			wantErr: "field unknown not found",
+		},
 		"scoped Unicode selector is valid": {
 			rules: `    rules:
       - scope: "μέτρο*"
