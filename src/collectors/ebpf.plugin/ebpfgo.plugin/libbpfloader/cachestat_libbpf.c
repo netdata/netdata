@@ -253,7 +253,7 @@ static void cachestat_prepare_autoload(struct bpf_object *obj, const char *accou
     }
 }
 
-static void cachestat_update_map_types(struct bpf_object *obj, int maps_per_core)
+static int cachestat_update_map_types(struct bpf_object *obj, int maps_per_core)
 {
     struct bpf_map *map;
     bpf_object__for_each_map(map, obj)
@@ -273,10 +273,17 @@ static void cachestat_update_map_types(struct bpf_object *obj, int maps_per_core
                 else if (type == BPF_MAP_TYPE_PERCPU_ARRAY)
                     ret = bpf_map__set_type(map, BPF_MAP_TYPE_ARRAY);
             }
-            if (ret != 0)
-                fprintf(stderr, "ebpf-go.plugin: cachestat: bpf_map__set_type failed for map '%s': %d\n", name, ret);
+            if (ret != 0) {
+                /* A buffer sized for non-percpu maps would be too small for a
+                 * percpu kernel write — proceeding risks a heap overflow. */
+                fprintf(stderr,
+                        "ebpf-go.plugin: cachestat: bpf_map__set_type failed for map '%s': %d; refusing to load\n",
+                        name, ret);
+                return -1;
+            }
         }
     }
+    return 0;
 }
 
 static void cachestat_update_map_sizes(struct bpf_object *obj, unsigned int pid_table_size)
@@ -480,22 +487,27 @@ int netdata_cachestat_runtime_prepare(
         return -1;
 
     cachestat_prepare_autoload(obj, account_function, rt->flavor);
-    cachestat_update_map_types(obj, maps_per_core);
+    if (cachestat_update_map_types(obj, maps_per_core) != 0)
+        return -1;
     cachestat_update_map_sizes(obj, pid_table_size);
 
-    int ncpu = maps_per_core ? libbpf_num_possible_cpus() : 1;
-    if (ncpu < 1)
-        ncpu = 1;
+    /* buf_ncpu sizes the receive buffer for bpf_map_lookup_elem.  The kernel
+     * writes ncpu × value_size bytes regardless of maps_per_core; if
+     * bpf_map__set_type ever silently fails and a map stays PERCPU when we
+     * expected non-PERCPU, a 1-slot buffer would overflow.  Allocating the
+     * full per-CPU size makes the buffer safe under any post-load map type.
+     * percpu_{u64,entries}_cap still reflects the intended summation count
+     * (1 when maps_per_core==0) so the snapshot summation loops are unaffected. */
+    int buf_ncpu = libbpf_num_possible_cpus();
+    if (buf_ncpu < 1)
+        buf_ncpu = 1;
+    int map_ncpu = maps_per_core ? buf_ncpu : 1;
 
-    rt->percpu_u64 = calloc((size_t)ncpu, sizeof(*rt->percpu_u64));
-    if (!rt->percpu_u64)
-        return -1;
-    rt->percpu_u64_cap = ncpu;
+    rt->percpu_u64 = callocz((size_t)buf_ncpu, sizeof(*rt->percpu_u64));
+    rt->percpu_u64_cap = map_ncpu;
 
-    rt->percpu_entries = calloc((size_t)ncpu, sizeof(*rt->percpu_entries));
-    if (!rt->percpu_entries)
-        return -1;
-    rt->percpu_entries_cap = ncpu;
+    rt->percpu_entries = callocz((size_t)buf_ncpu, sizeof(*rt->percpu_entries));
+    rt->percpu_entries_cap = map_ncpu;
 
     /* items_buf starts NULL; grows lazily in snapshot_apps */
     return 0;
