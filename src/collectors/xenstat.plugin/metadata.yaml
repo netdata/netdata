@@ -75,7 +75,7 @@ modules:
             description: |
               **Cause:** The Netdata Agent is installed inside a guest VM or on a non-Xen host instead of the Xen hypervisor host (dom0). The plugin reads the local Xen hypervisor only, so a guest VM cannot report the host or other domains, and there is no remote-collection option.
 
-              **Resolution:** Install the Netdata Agent on the Xen hypervisor host (dom0), ensure `xen-dom0-libs-devel` and `yajl-devel` are present (on CentOS/RHEL-based hosts, enable the `centos-release-xen` repository and install `xen-devel`), and reinstall Netdata from source so that xenstat.plugin is built.
+              **Resolution:** See the Libraries and Host placement prerequisites above: install the Netdata Agent directly on the Xen hypervisor host (dom0), with the required Xen libraries in place.
     alerts: []
     metrics:
       folding:
