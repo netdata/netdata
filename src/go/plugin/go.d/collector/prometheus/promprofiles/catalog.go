@@ -85,14 +85,17 @@ func decodeProfile(data []byte, baseName string, isStock bool) (Profile, error) 
 	}
 
 	p := Profile{
-		Name:           baseName,
-		Match:          hdr.Match,
-		App:            hdr.App,
-		autogenExclude: nil,
-		lazy:           &lazyTemplate{raw: data},
+		Name:            baseName,
+		Match:           hdr.Match,
+		App:             hdr.App,
+		autogenSelector: nil,
+		lazy:            &lazyTemplate{raw: data},
 	}
 	if hdr.Autogen != nil {
-		p.autogenExclude = hdr.Autogen.Exclude
+		if hdr.Autogen.Selector == nil {
+			return Profile{}, fmt.Errorf("profile %q: 'autogen.selector' is required when 'autogen' is set", baseName)
+		}
+		p.autogenSelector = cloneSelectorExpr(hdr.Autogen.Selector)
 	}
 	if err := p.validateHeader(); err != nil {
 		return Profile{}, err

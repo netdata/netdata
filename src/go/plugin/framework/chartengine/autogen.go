@@ -9,6 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 const (
@@ -89,7 +90,7 @@ func (e *Engine) resolveAutogenRoute(
 	if !ok {
 		return nil, false, nil
 	}
-	if e.state.cfg.autogenExclude.MatchString(source.familyName) {
+	if !autogenRulesSelect(e.state.cfg.autogenRules, source.familyName, labels) {
 		return nil, false, nil
 	}
 
@@ -137,6 +138,15 @@ func (e *Engine) resolveAutogenRoute(
 			Lifecycle: autogenLifecyclePolicy(policy),
 		},
 	}, true, nil
+}
+
+func autogenRulesSelect(rules []charttpl.ValidatedAutogenRule, metricName string, labels metrix.LabelView) bool {
+	for _, rule := range rules {
+		if rule.ScopeMatches(metricName) && !rule.Selects(metricName, labels) {
+			return false
+		}
+	}
+	return true
 }
 
 func buildAutogenRoute(
@@ -583,7 +593,7 @@ func fitsTypeIDBudget(maxLen int, typeIDPrefix, chartID string) bool {
 	return len(typeIDPrefix)+1+len(chartID) <= maxLen
 }
 
-func buildJoinedLabelAutogenID(metricName string, labels metrix.LabelView, exclude map[string]struct{}) string {
+func buildJoinedLabelAutogenID(metricName string, labels metrix.LabelView, skipKeys map[string]struct{}) string {
 	var b strings.Builder
 	b.Grow(len(metricName) + labels.Len()*8)
 	b.WriteString(metricName)
@@ -591,7 +601,7 @@ func buildJoinedLabelAutogenID(metricName string, labels metrix.LabelView, exclu
 		if key == "" || value == "" {
 			return true
 		}
-		if _, skip := exclude[key]; skip {
+		if _, skip := skipKeys[key]; skip {
 			return true
 		}
 		b.WriteByte('-')

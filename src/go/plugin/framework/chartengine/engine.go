@@ -74,7 +74,7 @@ func (e *Engine) load(spec *charttpl.Spec, validation charttpl.Validation, revis
 	cfg := e.state.cfg
 	e.mu.RUnlock()
 
-	policy, err := resolveEffectivePolicy(cfg, spec.Engine, validation.AutogenExcludeMatcher())
+	policy, err := resolveEffectivePolicy(cfg, spec.Engine, validation.AutogenRules())
 	if err != nil {
 		e.logWarningf("chartengine load failed revision=%d: %v", revision, err)
 		return err
@@ -82,7 +82,7 @@ func (e *Engine) load(spec *charttpl.Spec, validation charttpl.Validation, revis
 
 	e.mu.Lock()
 	e.state.cfg.autogen = policy.autogen
-	e.state.cfg.autogenExclude = policy.autogenExclude
+	e.state.cfg.autogenRules = policy.autogenRules
 	e.state.cfg.selector = policy.selector
 	e.state.cfg.autogenContextNamespace = spec.ContextNamespace
 	e.state.program = compiled

@@ -2,15 +2,18 @@
 
 package runtimecomp
 
-import "github.com/netdata/netdata/go/plugins/pkg/metrix"
+import (
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+)
 
 // AutogenPolicy controls unmatched-series fallback chart generation
 // for runtime/internal components.
 type AutogenPolicy struct {
 	Enabled bool
 
-	// Exclude suppresses autogen charts for matching unmatched metric families.
-	Exclude []string
+	// Rules conditionally constrain autogen fallback for unmatched series.
+	Rules []AutogenRule
 
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
@@ -19,6 +22,12 @@ type AutogenPolicy struct {
 	// successful collection cycles where the series is not seen.
 	// Zero disables expiry.
 	ExpireAfterSuccessCycles uint64
+}
+
+// AutogenRule constrains fallback within a source metric-family scope.
+type AutogenRule struct {
+	Scope    string
+	Selector metrixselector.Expr
 }
 
 // ComponentConfig declares one runtime/internal metrics component.

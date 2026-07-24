@@ -47,6 +47,61 @@
         }
       }
     },
+    "autogen_selector_expr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "required": ["allow"],
+          "properties": {
+            "allow": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": ["deny"],
+          "properties": {
+            "deny": {
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    },
+    "engine_autogen_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "selector"
+      ],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "selector": {
+          "$ref": "#/$defs/autogen_selector_expr"
+        }
+      }
+    },
     "engine_autogen": {
       "type": "object",
       "additionalProperties": false,
@@ -54,11 +109,11 @@
         "enabled": {
           "type": "boolean"
         },
-        "exclude": {
+        "rules": {
           "type": "array",
+          "minItems": 1,
           "items": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/$defs/engine_autogen_rule"
           }
         },
         "max_type_id_len": {

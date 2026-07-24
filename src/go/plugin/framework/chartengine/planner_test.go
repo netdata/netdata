@@ -4,6 +4,7 @@ package chartengine
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,7 +73,7 @@ func TestInferDimensionLabelKeyScenarios(t *testing.T) {
 	}
 }
 
-func TestBuildPlanAutogenExcludeRunsOnlyAfterAuthoredRouting(t *testing.T) {
+func TestBuildPlanAutogenRulesRunOnlyAfterAuthoredRouting(t *testing.T) {
 	var sample PlanRuntimeSample
 	e, err := New(
 		WithRuntimeStore(nil),
@@ -86,7 +87,10 @@ version: v1
 engine:
   autogen:
     enabled: true
-    exclude: ["*"]
+    rules:
+      - scope: "*"
+        selector:
+          deny: ["*"]
 groups:
   - family: Test
     metrics: [authored_metric]
@@ -123,14 +127,34 @@ groups:
 	assert.Zero(t, sample.seriesAutogenMatched)
 }
 
-func TestBuildPlanAutogenExcludeStructuredKindsThroughFlattenedReader(t *testing.T) {
+func TestBuildPlanAutogenRulesStructuredKindsThroughFlattenedReader(t *testing.T) {
 	e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
 		Enabled: true,
-		Exclude: []string{
-			"svc.latency_seconds",
-			"svc.request_seconds",
-			"svc.status",
-			"svc.usage",
+		Rules: []AutogenRule{
+			{
+				Scope: "svc.latency_seconds",
+				Selector: metrixselector.Expr{
+					Allow: []string{`{le=~".+"}`},
+				},
+			},
+			{
+				Scope: "svc.request_seconds",
+				Selector: metrixselector.Expr{
+					Allow: []string{`{quantile=~".+"}`},
+				},
+			},
+			{
+				Scope: "status",
+				Selector: metrixselector.Expr{
+					Allow: []string{`{status="ready"}`},
+				},
+			},
+			{
+				Scope: "svc.usage",
+				Selector: metrixselector.Expr{
+					Allow: []string{`{measure_field="used"}`},
+				},
+			},
 		},
 	}}))
 	require.NoError(t, err)
@@ -153,7 +177,7 @@ groups:
 	meter := store.Write().SnapshotMeter("svc")
 	histogram := meter.Histogram("latency_seconds", metrix.WithHistogramBounds(0.5, 1))
 	summary := meter.Summary("request_seconds", metrix.WithSummaryQuantiles(0.5, 0.9))
-	stateSet := meter.StateSet(
+	stateSet := store.Write().SnapshotMeter("").StateSet(
 		"status",
 		metrix.WithStateSetStates("ready", "stopped"),
 		metrix.WithStateSetMode(metrix.ModeEnum),
@@ -189,7 +213,115 @@ groups:
 
 	plan, err := buildPlan(e, store.Read(metrix.ReadRaw(), metrix.ReadFlatten()))
 	require.NoError(t, err)
-	assert.Empty(t, plan.Actions)
+
+	var (
+		chartIDs       []string
+		dimensionNames []string
+	)
+	for _, action := range plan.Actions {
+		switch action := action.(type) {
+		case CreateChartAction:
+			chartIDs = append(chartIDs, action.ChartID)
+		case CreateDimensionAction:
+			dimensionNames = append(dimensionNames, action.Name)
+		}
+	}
+	require.Len(t, chartIDs, 4)
+	for _, chartID := range chartIDs {
+		assert.NotContains(t, chartID, "_count")
+		assert.NotContains(t, chartID, "_sum")
+	}
+	assert.ElementsMatch(
+		t,
+		[]string{"0.5", "1", "+Inf", "quantile_0.5", "quantile_0.9", "ready", "used"},
+		dimensionNames,
+	)
+}
+
+func TestBuildPlanAutogenRulesAreScopedConjunctiveAndOrderIndependent(t *testing.T) {
+	const template = `
+version: v1
+groups:
+  - family: Test
+    metrics: [authored_metric]
+    charts:
+      - title: Authored
+        context: authored
+        units: units
+        dimensions:
+          - selector: authored_metric
+            name: authored
+`
+	rules := []AutogenRule{
+		{
+			Scope: "service_*",
+			Selector: metrixselector.Expr{
+				Allow: []string{`{region="west"}`},
+			},
+		},
+		{
+			Scope: "service_*",
+			Selector: metrixselector.Expr{
+				Deny: []string{`{environment="dev"}`},
+			},
+		},
+		{
+			Scope: "authored_*",
+			Selector: metrixselector.Expr{
+				Deny: []string{"*"},
+			},
+		},
+	}
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	meter := store.Write().SnapshotMeter("")
+	cc.BeginCycle()
+	meter.Gauge("authored_metric").Observe(1)
+	meter.Gauge("service_good").Observe(1, meter.LabelSet(
+		metrix.Label{Key: "region", Value: "west"},
+		metrix.Label{Key: "environment", Value: "prod"},
+	))
+	meter.Gauge("service_denied").Observe(1, meter.LabelSet(
+		metrix.Label{Key: "region", Value: "west"},
+		metrix.Label{Key: "environment", Value: "dev"},
+	))
+	meter.Gauge("service_unallowed").Observe(1, meter.LabelSet(
+		metrix.Label{Key: "region", Value: "east"},
+		metrix.Label{Key: "environment", Value: "prod"},
+	))
+	meter.Gauge("outside_metric").Observe(1)
+	require.NoError(t, cc.CommitCycleSuccess())
+
+	var want []string
+	for i, configured := range [][]AutogenRule{rules, {rules[2], rules[1], rules[0]}} {
+		e, err := New(WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
+			Enabled: true,
+			Rules:   configured,
+		}}))
+		require.NoError(t, err)
+		require.NoError(t, e.LoadYAML([]byte(template), uint64(i+1)))
+
+		plan, err := buildPlan(e, store.Read(metrix.ReadRaw()))
+		require.NoError(t, err)
+		var chartIDs []string
+		for _, action := range plan.Actions {
+			if create, ok := action.(CreateChartAction); ok {
+				chartIDs = append(chartIDs, create.ChartID)
+			}
+		}
+		if i == 0 {
+			want = chartIDs
+			require.Len(t, want, 3)
+			assert.Contains(t, strings.Join(want, "\n"), "authored")
+			assert.Contains(t, strings.Join(want, "\n"), "service_good")
+			assert.Contains(t, strings.Join(want, "\n"), "outside_metric")
+			assert.NotContains(t, strings.Join(want, "\n"), "service_denied")
+			assert.NotContains(t, strings.Join(want, "\n"), "service_unallowed")
+		} else {
+			assert.Equal(t, want, chartIDs)
+		}
+	}
 }
 
 func TestBuildPlanResolvesInferDimensionNames(t *testing.T) {

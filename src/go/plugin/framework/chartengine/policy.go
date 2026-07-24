@@ -4,43 +4,54 @@ package chartengine
 
 import (
 	"fmt"
+	"slices"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
 
 type effectiveEnginePolicy struct {
-	autogen        AutogenPolicy
-	autogenExclude matcher.PositivePatternList
-	selector       metrixselector.Selector
+	autogen      AutogenPolicy
+	autogenRules []charttpl.ValidatedAutogenRule
+	selector     metrixselector.Selector
 }
 
 func resolveEffectivePolicy(
 	cfg engineConfig,
 	templatePolicy *charttpl.Engine,
-	validatedExclude matcher.PositivePatternList,
+	validatedRules []charttpl.ValidatedAutogenRule,
 ) (effectiveEnginePolicy, error) {
 	autogen := defaultAutogenPolicy()
-	var autogenExclude matcher.PositivePatternList
+	var autogenRules []charttpl.ValidatedAutogenRule
 	var selector metrixselector.Selector
 
 	if templatePolicy != nil {
 		if templatePolicy.Autogen != nil {
-			normalized, exclude, err := normalizeAutogenPolicyWithExclude(
+			rawRules := make([]runtimecomp.AutogenRule, len(templatePolicy.Autogen.Rules))
+			for i, rule := range templatePolicy.Autogen.Rules {
+				rawRules[i] = runtimecomp.AutogenRule{
+					Scope: rule.Scope,
+					Selector: metrixselector.Expr{
+						Allow: slices.Clone(rule.Selector.Allow),
+						Deny:  slices.Clone(rule.Selector.Deny),
+					},
+				}
+			}
+			normalized, rules, err := normalizeAutogenPolicyWithRules(
 				AutogenPolicy{
 					Enabled:                  templatePolicy.Autogen.Enabled,
-					Exclude:                  templatePolicy.Autogen.Exclude,
+					Rules:                    rawRules,
 					MaxTypeIDLen:             templatePolicy.Autogen.MaxTypeIDLen,
 					ExpireAfterSuccessCycles: templatePolicy.Autogen.ExpireAfterSuccessCycles,
 				},
-				validatedExclude,
+				validatedRules,
 			)
 			if err != nil {
 				return effectiveEnginePolicy{}, fmt.Errorf("template engine.autogen: %w", err)
 			}
 			autogen = normalized
-			autogenExclude = exclude
+			autogenRules = rules
 		}
 
 		if templatePolicy.Selector != nil {
@@ -53,16 +64,16 @@ func resolveEffectivePolicy(
 	}
 
 	if cfg.autogenOverride.set {
-		autogen = cfg.autogenOverride.value
-		autogenExclude = cfg.autogenExcludeOverride.value
+		autogen = cloneAutogenPolicy(cfg.autogenOverride.value)
+		autogenRules = slices.Clone(cfg.autogenRulesOverride.value)
 	}
 	if cfg.selectorOverride.set {
 		selector = cfg.selectorOverride.value
 	}
 
 	return effectiveEnginePolicy{
-		autogen:        autogen,
-		autogenExclude: autogenExclude,
-		selector:       selector,
+		autogen:      autogen,
+		autogenRules: autogenRules,
+		selector:     selector,
 	}, nil
 }

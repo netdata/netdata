@@ -276,11 +276,20 @@ func testProfileYAML(match string) string {
 	}, "\n") + "\n"
 }
 
-func testProfileYAMLWithAutogenExclude(match string, exclude ...string) string {
+func testProfileYAMLWithAutogenSelector(match string, allow, deny []string) string {
 	var autogen strings.Builder
-	autogen.WriteString("autogen:\n  exclude:\n")
-	for _, pattern := range exclude {
-		fmt.Fprintf(&autogen, "    - %q\n", pattern)
+	autogen.WriteString("autogen:\n  selector:\n")
+	if allow != nil {
+		autogen.WriteString("    allow:\n")
+		for _, item := range allow {
+			fmt.Fprintf(&autogen, "      - %q\n", item)
+		}
+	}
+	if deny != nil {
+		autogen.WriteString("    deny:\n")
+		for _, item := range deny {
+			fmt.Fprintf(&autogen, "      - %q\n", item)
+		}
 	}
 	base := testProfileYAML(match)
 	return strings.Replace(base, "template:\n", autogen.String()+"template:\n", 1)

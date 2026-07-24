@@ -137,7 +137,7 @@ groups:
 	}
 }
 
-func TestEngineLoadAutogenExcludeStateTransitions(t *testing.T) {
+func TestEngineLoadAutogenRuleStateTransitions(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 	require.NoError(t, e.LoadYAML([]byte(`
@@ -145,7 +145,10 @@ version: v1
 engine:
   autogen:
     enabled: true
-    exclude: ["a*"]
+    rules:
+      - scope: "a*"
+        selector:
+          deny: ["*"]
 groups:
   - family: Test
     metrics: [authored_metric]
@@ -181,7 +184,10 @@ version: v1
 engine:
   autogen:
     enabled: true
-    exclude: ["*", "["]
+    rules:
+      - scope: "["
+        selector:
+          deny: ["*"]
 groups:
   - family: Test
     metrics: [authored_metric]
@@ -201,8 +207,8 @@ groups:
 			_, ok := e.state.materialized.charts["sentinel"]
 			assert.True(t, ok)
 			assert.Equal(t, oldEpoch, e.state.engineEpoch)
-			assert.True(t, e.state.cfg.autogenExclude.MatchString("alpha"))
-			assert.False(t, e.state.cfg.autogenExclude.MatchString("beta"))
+			assert.False(t, autogenRulesSelect(e.state.cfg.autogenRules, "alpha", nil))
+			assert.True(t, autogenRulesSelect(e.state.cfg.autogenRules, "beta", nil))
 		})
 	}
 
@@ -211,7 +217,10 @@ version: v1
 engine:
   autogen:
     enabled: true
-    exclude: ["b*"]
+    rules:
+      - scope: "b*"
+        selector:
+          deny: ["*"]
 groups:
   - family: Test
     metrics: [authored_metric]
@@ -227,8 +236,8 @@ groups:
 	assert.NotSame(t, oldCache, e.state.routeCache)
 	assert.Empty(t, e.state.materialized.charts)
 	assert.Greater(t, e.state.engineEpoch, oldEpoch)
-	assert.False(t, e.state.cfg.autogenExclude.MatchString("alpha"))
-	assert.True(t, e.state.cfg.autogenExclude.MatchString("beta"))
+	assert.True(t, autogenRulesSelect(e.state.cfg.autogenRules, "alpha", nil))
+	assert.False(t, autogenRulesSelect(e.state.cfg.autogenRules, "beta", nil))
 }
 
 func validTemplateYAML() string {

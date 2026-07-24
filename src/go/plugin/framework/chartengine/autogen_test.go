@@ -6,7 +6,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -135,7 +135,7 @@ func TestResolveAutogenSource(t *testing.T) {
 	}
 }
 
-func TestResolveAutogenRouteExclude(t *testing.T) {
+func TestResolveAutogenRouteRulesUseSourceFamily(t *testing.T) {
 	structured := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -222,11 +222,18 @@ func TestResolveAutogenRouteExclude(t *testing.T) {
 
 	for name, test := range structured {
 		t.Run(name, func(t *testing.T) {
-			exclude, err := matcher.CompilePositivePatternList([]string{test.familyName})
+			_, rules, err := normalizeAutogenPolicy(AutogenPolicy{
+				Rules: []AutogenRule{{
+					Scope: test.familyName,
+					Selector: metrixselector.Expr{
+						Deny: []string{test.familyName},
+					},
+				}},
+			})
 			require.NoError(t, err)
 			e := &Engine{state: engineState{cfg: engineConfig{
-				autogen:        AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
-				autogenExclude: exclude,
+				autogen:      AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				autogenRules: rules,
 			}}}
 
 			routes, ok, err := e.resolveAutogenRoute(nil, test.metricName, sortedLabelView(test.labels), test.meta)
@@ -234,7 +241,14 @@ func TestResolveAutogenRouteExclude(t *testing.T) {
 			assert.False(t, ok)
 			assert.Empty(t, routes)
 
-			e.state.cfg.autogenExclude, err = matcher.CompilePositivePatternList([]string{"other_*"})
+			_, e.state.cfg.autogenRules, err = normalizeAutogenPolicy(AutogenPolicy{
+				Rules: []AutogenRule{{
+					Scope: "other_*",
+					Selector: metrixselector.Expr{
+						Deny: []string{"*"},
+					},
+				}},
+			})
 			require.NoError(t, err)
 			routes, ok, err = e.resolveAutogenRoute(nil, test.metricName, sortedLabelView(test.labels), test.meta)
 			require.NoError(t, err)
@@ -244,55 +258,75 @@ func TestResolveAutogenRouteExclude(t *testing.T) {
 	}
 }
 
-func TestResolveAutogenRouteExcludePatternSemantics(t *testing.T) {
+func TestResolveAutogenRouteRuleSemantics(t *testing.T) {
 	tests := map[string]struct {
-		patterns []string
-		enabled  bool
-		want     bool
+		rules   []AutogenRule
+		enabled bool
+		want    bool
 	}{
 		"disabled remains disabled": {
-			patterns: []string{"*"},
-			enabled:  false,
-			want:     false,
+			rules: []AutogenRule{{
+				Scope:    "*",
+				Selector: metrixselector.Expr{Deny: []string{"*"}},
+			}},
+			want: false,
 		},
-		"empty exclusion preserves autogen": {
+		"no rules preserve autogen": {
 			enabled: true,
 			want:    true,
 		},
-		"exact hit": {
-			patterns: []string{"svc.requests_total"},
-			enabled:  true,
-			want:     false,
+		"deny exact rejects": {
+			rules: []AutogenRule{{
+				Scope:    "*",
+				Selector: metrixselector.Expr{Deny: []string{"svc.requests_total"}},
+			}},
+			enabled: true,
+			want:    false,
 		},
-		"prefix hit": {
-			patterns: []string{"svc.requests*"},
-			enabled:  true,
-			want:     false,
+		"allow exact selects": {
+			rules: []AutogenRule{{
+				Scope:    "*",
+				Selector: metrixselector.Expr{Allow: []string{"svc.requests_total"}},
+			}},
+			enabled: true,
+			want:    true,
 		},
-		"general glob hit": {
-			patterns: []string{"svc.*_total"},
-			enabled:  true,
-			want:     false,
+		"allow miss rejects": {
+			rules: []AutogenRule{{
+				Scope:    "*",
+				Selector: metrixselector.Expr{Allow: []string{"other_*"}},
+			}},
+			enabled: true,
+			want:    false,
 		},
-		"wildcard hit": {
-			patterns: []string{"*"},
-			enabled:  true,
-			want:     false,
+		"allow and deny uses conjunction": {
+			rules: []AutogenRule{{
+				Scope: "*",
+				Selector: metrixselector.Expr{
+					Allow: []string{"svc.*"},
+					Deny:  []string{"*_total"},
+				},
+			}},
+			enabled: true,
+			want:    false,
 		},
-		"miss": {
-			patterns: []string{"other*"},
-			enabled:  true,
-			want:     true,
+		"scope miss is neutral": {
+			rules: []AutogenRule{{
+				Scope:    "other*",
+				Selector: metrixselector.Expr{Deny: []string{"*"}},
+			}},
+			enabled: true,
+			want:    true,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			exclude, err := matcher.CompilePositivePatternList(test.patterns)
+			_, rules, err := normalizeAutogenPolicy(AutogenPolicy{Rules: test.rules})
 			require.NoError(t, err)
 			e := &Engine{state: engineState{cfg: engineConfig{
-				autogen:        AutogenPolicy{Enabled: test.enabled, MaxTypeIDLen: defaultMaxTypeIDLen},
-				autogenExclude: exclude,
+				autogen:      AutogenPolicy{Enabled: test.enabled, MaxTypeIDLen: defaultMaxTypeIDLen},
+				autogenRules: rules,
 			}}}
 
 			routes, ok, err := e.resolveAutogenRoute(

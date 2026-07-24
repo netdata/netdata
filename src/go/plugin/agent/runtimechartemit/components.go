@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
@@ -165,7 +166,16 @@ func normalizeComponent(cfg ComponentConfig, pluginName string) (componentSpec, 
 
 func cloneAutogenPolicy(policy runtimecomp.AutogenPolicy) runtimecomp.AutogenPolicy {
 	out := policy
-	out.Exclude = slices.Clone(policy.Exclude)
+	out.Rules = make([]runtimecomp.AutogenRule, len(policy.Rules))
+	for i, rule := range policy.Rules {
+		out.Rules[i] = runtimecomp.AutogenRule{
+			Scope: rule.Scope,
+			Selector: metrixselector.Expr{
+				Allow: slices.Clone(rule.Selector.Allow),
+				Deny:  slices.Clone(rule.Selector.Deny),
+			},
+		}
+	}
 	return out
 }
 

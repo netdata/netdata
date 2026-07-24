@@ -5,6 +5,7 @@ package charttpl
 import (
 	"testing"
 
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,8 +109,15 @@ func richSpec() Spec {
 		ContextNamespace: "ns",
 		Engine: &Engine{
 			Autogen: &EngineAutogen{
-				Enabled:      true,
-				Exclude:      []string{"metric_*"},
+				Enabled: true,
+				Rules: []EngineAutogenRule{
+					{
+						Scope: "metric_*",
+						Selector: metrixselector.Expr{
+							Deny: []string{"metric_*"},
+						},
+					},
+				},
 				MaxTypeIDLen: 512,
 			},
 		},

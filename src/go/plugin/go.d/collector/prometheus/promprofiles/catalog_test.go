@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,14 +46,31 @@ template:
 `, match)
 }
 
-func profileYAMLWithAutogen(match string, exclude ...string) string {
-	var patterns string
-	for _, pattern := range exclude {
-		patterns += fmt.Sprintf("    - %q\n", pattern)
+func profileYAMLWithAutogenSelector(match string, allow, deny []string) string {
+	var selector strings.Builder
+	if allow != nil {
+		if len(allow) == 0 {
+			selector.WriteString("    allow: []\n")
+		} else {
+			selector.WriteString("    allow:\n")
+			for _, item := range allow {
+				fmt.Fprintf(&selector, "      - %q\n", item)
+			}
+		}
+	}
+	if deny != nil {
+		if len(deny) == 0 {
+			selector.WriteString("    deny: []\n")
+		} else {
+			selector.WriteString("    deny:\n")
+			for _, item := range deny {
+				fmt.Fprintf(&selector, "      - %q\n", item)
+			}
+		}
 	}
 	return fmt.Sprintf(`match: "%s"
 autogen:
-  exclude:
+  selector:
 %stemplate:
   family: test
   metrics:
@@ -64,7 +82,7 @@ autogen:
       dimensions:
         - selector: test_metric_total
           name: total
-`, match, patterns)
+`, match, selector.String())
 }
 
 // profileYAMLNoChart has a valid header but a structurally invalid template (a
@@ -115,30 +133,54 @@ func TestLoadFromDirs_headerDecodeAndValidation(t *testing.T) {
 			content: profileYAML(""),
 			wantErr: true,
 		},
-		"valid autogen exclude is accepted eagerly and by lazy template decode": {
-			content: profileYAMLWithAutogen("app_*", `\!literal`, "Business Unit", "μέτρο*"),
+		"valid autogen selector is accepted eagerly and by lazy template decode": {
+			content: profileYAMLWithAutogenSelector(
+				"app_*",
+				[]string{`app_metric{region=~"west|east"}`},
+				[]string{`app_metric{environment="dev"}`},
+			),
 		},
-		"explicit empty autogen exclude list is accepted": {
-			content: strings.Replace(profileYAMLWithAutogen("app_*"), "  exclude:\n", "  exclude: []\n", 1),
+		"empty autogen object is fatal": {
+			content: strings.Replace(profileYAML("app_*"), "template:\n", "autogen: {}\ntemplate:\n", 1),
+			wantErr: true,
+		},
+		"null autogen selector is fatal": {
+			content: strings.Replace(profileYAML("app_*"), "template:\n", "autogen:\n  selector: null\ntemplate:\n", 1),
+			wantErr: true,
+		},
+		"empty autogen selector is fatal": {
+			content: profileYAMLWithAutogenSelector("app_*", nil, nil),
+			wantErr: true,
+		},
+		"explicit empty selector lists are fatal": {
+			content: profileYAMLWithAutogenSelector("app_*", []string{}, []string{}),
+			wantErr: true,
 		},
 		"strict yaml rejects unknown autogen field": {
-			content: strings.Replace(profileYAMLWithAutogen("app_*", "metric*"), "  exclude:", "  unknown:", 1),
+			content: strings.Replace(
+				profileYAMLWithAutogenSelector("app_*", nil, []string{"metric*"}),
+				"  selector:",
+				"  unknown:",
+				1,
+			),
 			wantErr: true,
 		},
-		"whitespace-only autogen exclude entry is fatal": {
-			content: profileYAMLWithAutogen("app_*", "  "),
+		"whitespace-only autogen selector entry is fatal": {
+			content: profileYAMLWithAutogenSelector("app_*", nil, []string{"  "}),
 			wantErr: true,
 		},
-		"negative autogen exclude entry is fatal": {
-			content: profileYAMLWithAutogen("app_*", "!metric*"),
+		"invalid autogen selector is fatal": {
+			content: profileYAMLWithAutogenSelector("app_*", []string{`metric{region="west",}`}, nil),
 			wantErr: true,
 		},
-		"invalid autogen exclude glob is fatal": {
-			content: profileYAMLWithAutogen("app_*", "["),
-			wantErr: true,
+		"valid allow-only selector is accepted": {
+			content: profileYAMLWithAutogenSelector("app_*", []string{"app_*"}, nil),
 		},
-		"wildcard does not hide invalid autogen exclude glob": {
-			content: profileYAMLWithAutogen("app_*", "*", "["),
+		"valid deny-only selector is accepted": {
+			content: profileYAMLWithAutogenSelector("app_*", nil, []string{"app_*"}),
+		},
+		"invalid selector after a valid entry is fatal": {
+			content: profileYAMLWithAutogenSelector("app_*", []string{"app_*", `metric{region="west",}`}, nil),
 			wantErr: true,
 		},
 	}
@@ -155,65 +197,56 @@ func TestLoadFromDirs_headerDecodeAndValidation(t *testing.T) {
 	}
 }
 
-func TestProfileAutogenExcludeCanonicalizationAndOwnership(t *testing.T) {
+func TestProfileAutogenSelectorOwnership(t *testing.T) {
 	cat, err := loadCatalog(t, fileSpec{
 		stock: true,
 		name:  "app.yaml",
-		content: profileYAMLWithAutogen(
+		content: profileYAMLWithAutogenSelector(
 			"app_*",
-			" z* ",
-			"a*",
-			"z*",
-			`\!literal`,
-			"Business Unit",
-			"μέτρο*",
+			[]string{"app_*", `app_metric{region="west"}`},
+			[]string{`app_metric{environment="dev"}`, "μέτρο*"},
 		),
 	})
 	require.NoError(t, err)
-	want := []string{"Business Unit", `\!literal`, "a*", "z*", "μέτρο*"}
+	want := &metrixselector.Expr{
+		Allow: []string{"app_*", `app_metric{region="west"}`},
+		Deny:  []string{`app_metric{environment="dev"}`, "μέτρο*"},
+	}
 
 	fromGet, ok := cat.Get("app")
 	require.True(t, ok)
-	assert.Equal(t, want, fromGet.AutogenExclude())
-	accessorCopy := fromGet.AutogenExclude()
-	accessorCopy[0] = "accessor_mutation"
-	assert.Equal(t, want, fromGet.AutogenExclude())
+	assert.Equal(t, want, fromGet.AutogenSelector())
+	accessorCopy := fromGet.AutogenSelector()
+	accessorCopy.Allow[0] = "accessor_mutation"
+	accessorCopy.Deny[0] = "accessor_mutation"
+	assert.Equal(t, want, fromGet.AutogenSelector())
 
-	fromGet.autogenExclude[0] = "get_mutation"
+	fromGet.autogenSelector.Allow[0] = "get_mutation"
+	fromGet.autogenSelector.Deny[0] = "get_mutation"
 	afterGetMutation, ok := cat.Get("app")
 	require.True(t, ok)
-	assert.Equal(t, want, afterGetMutation.AutogenExclude())
+	assert.Equal(t, want, afterGetMutation.AutogenSelector())
 
 	ordered := cat.OrderedProfiles()
 	require.Len(t, ordered, 1)
-	ordered[0].autogenExclude[0] = "ordered_mutation"
+	ordered[0].autogenSelector.Allow[0] = "ordered_mutation"
+	ordered[0].autogenSelector.Deny[0] = "ordered_mutation"
 	afterOrderedMutation, ok := cat.Get("app")
 	require.True(t, ok)
-	assert.Equal(t, want, afterOrderedMutation.AutogenExclude())
+	assert.Equal(t, want, afterOrderedMutation.AutogenSelector())
 
 	resolved, err := cat.Resolve([]string{"app"})
 	require.NoError(t, err)
 	require.Len(t, resolved, 1)
-	resolved[0].autogenExclude[0] = "resolve_mutation"
+	resolved[0].autogenSelector.Allow[0] = "resolve_mutation"
+	resolved[0].autogenSelector.Deny[0] = "resolve_mutation"
 	afterResolveMutation, ok := cat.Get("app")
 	require.True(t, ok)
-	assert.Equal(t, want, afterResolveMutation.AutogenExclude())
+	assert.Equal(t, want, afterResolveMutation.AutogenSelector())
 
 	template, err := afterResolveMutation.Template()
 	require.NoError(t, err)
 	assert.NotEmpty(t, template.Charts)
-}
-
-func TestProfileAutogenExcludeWildcardCanonicalization(t *testing.T) {
-	cat, err := loadCatalog(t, fileSpec{
-		stock:   true,
-		name:    "app.yaml",
-		content: profileYAMLWithAutogen("app_*", "z*", "*", "a*"),
-	})
-	require.NoError(t, err)
-	profile, ok := cat.Get("app")
-	require.True(t, ok)
-	assert.Equal(t, []string{"*"}, profile.AutogenExclude())
 }
 
 // TestLoadFromDirs_stockTemplateHydratesLazily verifies a stock profile with a

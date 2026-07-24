@@ -8,16 +8,100 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 var (
-	benchmarkExcludeMatchSink bool
-	benchmarkExcludeRouteSink []routeBinding
+	benchmarkRuleMatchSink bool
+	benchmarkRuleRouteSink []routeBinding
 )
 
-func BenchmarkAutogenExcludeMatch(b *testing.B) {
+func BenchmarkAutogenRulesEvaluationMatrix(b *testing.B) {
+	const metricName = "service_target_total"
+
+	for _, ruleCount := range []int{1, 32, 256} {
+		for _, scenario := range []string{"all_scope_miss", "all_apply_allow", "first_reject", "last_reject"} {
+			b.Run(fmt.Sprintf("rules_%d/%s", ruleCount, scenario), func(b *testing.B) {
+				rules := benchmarkAutogenRuleSet(b, ruleCount, 1, scenario, "exact", metricName)
+				b.ReportAllocs()
+				b.ReportMetric(float64(ruleCount), "rules/op")
+				b.ResetTimer()
+				for range b.N {
+					benchmarkRuleMatchSink = autogenRulesSelect(rules, metricName, nil)
+				}
+			})
+		}
+	}
+
+	for _, innerCount := range []int{1, 32, 256} {
+		b.Run(fmt.Sprintf("inner_%d/one_rule", innerCount), func(b *testing.B) {
+			rules := benchmarkAutogenRuleSet(b, 1, innerCount, "all_apply_allow", "exact", metricName)
+			b.ReportAllocs()
+			b.ReportMetric(float64(innerCount), "selector-entries/op")
+			b.ResetTimer()
+			for range b.N {
+				benchmarkRuleMatchSink = autogenRulesSelect(rules, metricName, nil)
+			}
+		})
+	}
+
+	for _, scenario := range []string{"all_scope_miss", "all_apply_allow", "first_reject", "last_reject"} {
+		b.Run("rules_32/inner_32/"+scenario, func(b *testing.B) {
+			rules := benchmarkAutogenRuleSet(b, 32, 32, scenario, "exact", metricName)
+			b.ReportAllocs()
+			b.ReportMetric(32, "rules/op")
+			b.ReportMetric(32, "selector-entries/rule")
+			b.ResetTimer()
+			for range b.N {
+				benchmarkRuleMatchSink = autogenRulesSelect(rules, metricName, nil)
+			}
+		})
+	}
+
+	for _, kind := range []string{"exact", "simple", "general_glob", "regexp"} {
+		b.Run("matcher/"+kind, func(b *testing.B) {
+			rules := benchmarkAutogenRuleSet(b, 1, 32, "all_apply_allow", kind, metricName)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				benchmarkRuleMatchSink = autogenRulesSelect(rules, metricName, nil)
+			}
+		})
+	}
+
+	labelValues := make(map[string]string, 32)
+	for i := range 32 {
+		labelValues[fmt.Sprintf("label_%02d", i)] = fmt.Sprintf("value_%02d", i)
+	}
+	labels := sortedLabelView(labelValues)
+	for _, position := range []string{"early", "late", "missing"} {
+		b.Run("label/"+position, func(b *testing.B) {
+			key := "label_00"
+			value := "value_00"
+			switch position {
+			case "late":
+				key, value = "label_31", "value_31"
+			case "missing":
+				key, value = "label_99", "value_99"
+			}
+			rules := benchmarkCompiledAutogenRules(
+				b,
+				"*",
+				metrixselector.Expr{Allow: []string{fmt.Sprintf(`{%s=%q}`, key, value)}},
+			)
+			b.ReportAllocs()
+			b.ReportMetric(float64(labels.Len()), "labels/op")
+			b.ResetTimer()
+			for range b.N {
+				benchmarkRuleMatchSink = autogenRulesSelect(rules, metricName, labels)
+			}
+		})
+	}
+}
+
+func BenchmarkAutogenRulesMatch(b *testing.B) {
 	for _, length := range []int{16, 128} {
 		for _, count := range []int{1, 32, 256} {
 			for _, scenario := range []string{
@@ -32,17 +116,14 @@ func BenchmarkAutogenExcludeMatch(b *testing.B) {
 				"wildcard",
 			} {
 				b.Run(fmt.Sprintf("patterns_%d/length_%d/%s", count, length, scenario), func(b *testing.B) {
-					patterns, source := benchmarkExcludeMatchCase(count, length, scenario)
-					compiled, err := matcher.CompilePositivePatternList(patterns)
-					if err != nil {
-						b.Fatalf("compile patterns: %v", err)
-					}
+					patterns, source := benchmarkRuleMatchCase(count, length, scenario)
+					rules := benchmarkCompiledAutogenRules(b, "*", metrixselector.Expr{Deny: patterns})
 
 					b.ReportAllocs()
 					b.ResetTimer()
-					b.ReportMetric(float64(len(compiled.Patterns())), "patterns/op")
+					b.ReportMetric(float64(len(patterns)), "patterns/op")
 					for range b.N {
-						benchmarkExcludeMatchSink = compiled.MatchString(source)
+						benchmarkRuleMatchSink = !autogenRulesSelect(rules, source, nil)
 					}
 				})
 			}
@@ -50,32 +131,37 @@ func BenchmarkAutogenExcludeMatch(b *testing.B) {
 	}
 }
 
-func BenchmarkCompileAutogenExclude(b *testing.B) {
+func BenchmarkCompileAutogenRules(b *testing.B) {
 	for _, length := range []int{16, 128} {
 		for _, count := range []int{1, 32, 256} {
 			b.Run(fmt.Sprintf("patterns_%d/length_%d", count, length), func(b *testing.B) {
-				patterns, _ := benchmarkExcludeMatchCase(count, length, "miss")
+				patterns, _ := benchmarkRuleMatchCase(count, length, "miss")
 				b.ReportAllocs()
 				b.ResetTimer()
 				b.ReportMetric(float64(count), "patterns/op")
 				for range b.N {
-					compiled, err := matcher.CompilePositivePatternList(patterns)
+					_, compiled, err := normalizeAutogenPolicy(AutogenPolicy{
+						Rules: []AutogenRule{{
+							Scope:    "*",
+							Selector: metrixselector.Expr{Deny: patterns},
+						}},
+					})
 					if err != nil {
-						b.Fatalf("compile patterns: %v", err)
+						b.Fatalf("compile rules: %v", err)
 					}
-					benchmarkExcludeMatchSink = compiled.MatchString("never_matches")
+					benchmarkRuleMatchSink = autogenRulesSelect(compiled, "never_matches", nil)
 				}
 			})
 		}
 	}
 }
 
-func BenchmarkEngineLoadYAMLAutogenExclude(b *testing.B) {
+func BenchmarkEngineLoadYAMLAutogenRules(b *testing.B) {
 	for _, length := range []int{16, 128} {
 		for _, count := range []int{1, 32, 256} {
 			b.Run(fmt.Sprintf("patterns_%d/length_%d", count, length), func(b *testing.B) {
-				patterns, _ := benchmarkExcludeMatchCase(count, length, "exact_miss")
-				template := benchmarkAutogenExcludeTemplate(patterns)
+				patterns, _ := benchmarkRuleMatchCase(count, length, "exact_miss")
+				template := benchmarkAutogenRulesTemplate(patterns)
 				engine, err := New(WithRuntimeStore(nil))
 				if err != nil {
 					b.Fatalf("new engine: %v", err)
@@ -94,7 +180,7 @@ func BenchmarkEngineLoadYAMLAutogenExclude(b *testing.B) {
 	}
 }
 
-func BenchmarkResolveAutogenRouteExcludeStructuredKinds(b *testing.B) {
+func BenchmarkResolveAutogenRouteRulesStructuredKinds(b *testing.B) {
 	cases := map[string]struct {
 		metricName string
 		labels     map[string]string
@@ -186,13 +272,10 @@ func BenchmarkResolveAutogenRouteExcludeStructuredKinds(b *testing.B) {
 				if scenario == "miss" {
 					pattern = "other_*"
 				}
-				exclude, err := matcher.CompilePositivePatternList([]string{pattern})
-				if err != nil {
-					b.Fatalf("compile patterns: %v", err)
-				}
+				rules := benchmarkCompiledAutogenRules(b, pattern, metrixselector.Expr{Deny: []string{"*"}})
 				engine := &Engine{state: engineState{cfg: engineConfig{
-					autogen:        AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
-					autogenExclude: exclude,
+					autogen:      AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+					autogenRules: rules,
 				}}}
 				labels := sortedLabelView(test.labels)
 
@@ -203,14 +286,14 @@ func BenchmarkResolveAutogenRouteExcludeStructuredKinds(b *testing.B) {
 					if err != nil {
 						b.Fatalf("resolve route: %v", err)
 					}
-					benchmarkExcludeRouteSink = routes
+					benchmarkRuleRouteSink = routes
 				}
 			})
 		}
 	}
 }
 
-func BenchmarkBuildPlanAutogenExcludeEnvelope(b *testing.B) {
+func BenchmarkBuildPlanAutogenRulesEnvelope(b *testing.B) {
 	const (
 		patternCount  = 256
 		patternLength = 128
@@ -227,18 +310,14 @@ func BenchmarkBuildPlanAutogenExcludeEnvelope(b *testing.B) {
 						cacheState,
 					)
 					b.Run(name, func(b *testing.B) {
-						reader, target := benchmarkAutogenExcludeReader(b, shape, seriesCount, patternLength)
-						patterns := benchmarkPlanExcludePatterns(
+						reader, target := benchmarkAutogenRulesReader(b, shape, seriesCount, patternLength)
+						patterns := benchmarkRulePatterns(
 							scenario,
 							patternCount,
 							patternLength,
 							target,
 						)
-						canonical, err := matcher.CanonicalizePositivePatterns(patterns)
-						if err != nil {
-							b.Fatalf("canonicalize patterns: %v", err)
-						}
-						engine := benchmarkAutogenExcludeEngine(b, patterns)
+						engine := benchmarkAutogenRulesEngine(b, patterns)
 						if cacheState == "warm" {
 							if _, err := buildPlan(engine, reader); err != nil {
 								b.Fatalf("warm plan: %v", err)
@@ -248,8 +327,8 @@ func BenchmarkBuildPlanAutogenExcludeEnvelope(b *testing.B) {
 						b.ReportAllocs()
 						b.ResetTimer()
 						b.ReportMetric(float64(len(patterns)), "input-patterns/op")
-						b.ReportMetric(float64(len(canonical)), "patterns/op")
-						b.ReportMetric(float64(maxPatternBytes(canonical)), "max-pattern-bytes/op")
+						b.ReportMetric(float64(len(patterns)), "patterns/op")
+						b.ReportMetric(float64(maxPatternBytes(patterns)), "max-pattern-bytes/op")
 						b.ReportMetric(float64(seriesCount), "series/pass")
 						for i := range b.N {
 							if cacheState == "cold" {
@@ -275,7 +354,7 @@ func BenchmarkBuildPlanAutogenExcludeEnvelope(b *testing.B) {
 	}
 }
 
-func BenchmarkBuildPlanAutogenExcludeStructuredKinds(b *testing.B) {
+func BenchmarkBuildPlanAutogenRulesStructuredKinds(b *testing.B) {
 	for _, kind := range []string{"histogram", "summary", "stateset", "measureset"} {
 		for _, scenario := range []string{"hit", "miss"} {
 			b.Run(kind+"/"+scenario, func(b *testing.B) {
@@ -284,7 +363,7 @@ func BenchmarkBuildPlanAutogenExcludeStructuredKinds(b *testing.B) {
 				if scenario == "miss" {
 					pattern = "other_*"
 				}
-				engine := benchmarkAutogenExcludeEngine(b, []string{pattern})
+				engine := benchmarkAutogenRulesEngine(b, []string{pattern})
 				if _, err := buildPlan(engine, reader); err != nil {
 					b.Fatalf("warm plan: %v", err)
 				}
@@ -303,18 +382,21 @@ func BenchmarkBuildPlanAutogenExcludeStructuredKinds(b *testing.B) {
 	}
 }
 
-func BenchmarkBuildPlanAutogenExcludeForcedReplay(b *testing.B) {
+func BenchmarkBuildPlanAutogenRulesForcedReplay(b *testing.B) {
 	for _, length := range []int{16, 128} {
-		target := fixedBenchmarkToken("z_excluded", 0, length)
+		target := fixedBenchmarkToken("z_suppressed", 0, length)
 		for _, count := range []int{1, 32, 256} {
 			for _, scenario := range []string{"late_exact", "general_star_miss"} {
 				b.Run(fmt.Sprintf("patterns_%d/length_%d/%s", count, length, scenario), func(b *testing.B) {
-					patterns := benchmarkPlanExcludePatterns(scenario, count, length, target)
+					patterns := benchmarkRulePatterns(scenario, count, length, target)
 					engine, err := New(
 						WithRuntimeStore(nil),
 						WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
 							Enabled: true,
-							Exclude: patterns,
+							Rules: []AutogenRule{{
+								Scope:    "*",
+								Selector: metrixselector.Expr{Deny: patterns},
+							}},
 						}}),
 					)
 					if err != nil {
@@ -324,8 +406,8 @@ func BenchmarkBuildPlanAutogenExcludeForcedReplay(b *testing.B) {
 						b.Fatalf("load template: %v", err)
 					}
 
-					base := newAutogenExcludeReplayReader(b, target, "shard-b")
-					changed := newAutogenExcludeReplayReader(b, target, "shard-z")
+					base := newAutogenRulesReplayReader(b, target, "shard-b", 128)
+					changed := newAutogenRulesReplayReader(b, target, "shard-z", 128)
 					if _, err := buildPlan(engine, base); err != nil {
 						b.Fatalf("materialize initial plan: %v", err)
 					}
@@ -366,6 +448,60 @@ func BenchmarkBuildPlanAutogenExcludeForcedReplay(b *testing.B) {
 	}
 }
 
+func BenchmarkBuildPlanAutogenRulesPauseGate(b *testing.B) {
+	const (
+		metricName  = "service_target_total"
+		seriesCount = 10000
+	)
+	rules := benchmarkRawAutogenRuleSet(32, 32, "last_reject", "exact", metricName)
+	engine, err := New(
+		WithRuntimeStore(nil),
+		WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
+			Enabled: true,
+			Rules:   rules,
+		}}),
+	)
+	if err != nil {
+		b.Fatalf("new engine: %v", err)
+	}
+	if err := engine.LoadYAML([]byte(mutableLabelsTestTemplate), 1); err != nil {
+		b.Fatalf("load template: %v", err)
+	}
+
+	base := newAutogenRulesReplayReader(b, metricName, "shard-b", seriesCount)
+	changed := newAutogenRulesReplayReader(b, metricName, "shard-z", seriesCount)
+	if _, err := buildPlan(engine, base); err != nil {
+		b.Fatalf("materialize initial plan: %v", err)
+	}
+	changed.seq = 2
+	probe := &benchmarkCountingReplayReader{benchmarkSequenceReader: changed}
+	if _, err := buildPlan(engine, probe); err != nil {
+		b.Fatalf("probe forced replay: %v", err)
+	}
+	if probe.iterations != 2 {
+		b.Fatalf("forced replay fixture iterated %d times, want 2", probe.iterations)
+	}
+
+	b.ReportAllocs()
+	b.ReportMetric(32, "rules/pass")
+	b.ReportMetric(32, "selector-entries/rule")
+	b.ReportMetric(seriesCount, "series/pass")
+	b.ReportMetric(2, "passes/op")
+	b.ResetTimer()
+	for i := range b.N {
+		reader := changed
+		if i%2 == 1 {
+			reader = base
+		}
+		reader.seq = uint64(i) + 3
+		plan, err := buildPlan(engine, reader)
+		if err != nil {
+			b.Fatalf("build plan: %v", err)
+		}
+		benchmarkMutableLabelPlanSink = plan
+	}
+}
+
 type benchmarkCountingReplayReader struct {
 	*benchmarkSequenceReader
 	iterations int
@@ -387,7 +523,12 @@ func (r *benchmarkCountingReplayReader) ForEachSeriesIdentityRaw(
 	})
 }
 
-func newAutogenExcludeReplayReader(b *testing.B, excludedMetric, secondShard string) *benchmarkSequenceReader {
+func newAutogenRulesReplayReader(
+	b *testing.B,
+	suppressedMetric string,
+	secondShard string,
+	seriesCount int,
+) *benchmarkSequenceReader {
 	b.Helper()
 
 	store := metrix.NewCollectorStore()
@@ -398,7 +539,7 @@ func newAutogenExcludeReplayReader(b *testing.B, excludedMetric, secondShard str
 	cc := managed.CycleController()
 	meter := store.Write().SnapshotMeter("")
 	authored := meter.Gauge("service_value")
-	excluded := meter.Gauge(excludedMetric)
+	suppressed := meter.Gauge(suppressedMetric)
 
 	cc.BeginCycle()
 	for _, shard := range []string{"shard-a", secondShard} {
@@ -409,8 +550,8 @@ func newAutogenExcludeReplayReader(b *testing.B, excludedMetric, secondShard str
 			metrix.Label{Key: "shard", Value: shard},
 		))
 	}
-	for i := range 128 {
-		excluded.Observe(metrix.SampleValue(i), meter.LabelSet(
+	for i := range seriesCount {
+		suppressed.Observe(metrix.SampleValue(i), meter.LabelSet(
 			metrix.Label{Key: "series", Value: strconv.Itoa(i)},
 		))
 	}
@@ -426,13 +567,16 @@ func newAutogenExcludeReplayReader(b *testing.B, excludedMetric, secondShard str
 	return &benchmarkSequenceReader{Reader: reader, raw: raw, seq: 1}
 }
 
-func benchmarkAutogenExcludeEngine(b *testing.B, patterns []string) *Engine {
+func benchmarkAutogenRulesEngine(b *testing.B, patterns []string) *Engine {
 	b.Helper()
 	engine, err := New(
 		WithRuntimeStore(nil),
 		WithEnginePolicy(EnginePolicy{Autogen: &AutogenPolicy{
 			Enabled: true,
-			Exclude: patterns,
+			Rules: []AutogenRule{{
+				Scope:    "*",
+				Selector: metrixselector.Expr{Deny: patterns},
+			}},
 		}}),
 	)
 	if err != nil {
@@ -444,7 +588,7 @@ func benchmarkAutogenExcludeEngine(b *testing.B, patterns []string) *Engine {
 	return engine
 }
 
-func benchmarkAutogenExcludeReader(
+func benchmarkAutogenRulesReader(
 	b *testing.B,
 	shape string,
 	seriesCount int,
@@ -482,7 +626,7 @@ func benchmarkAutogenExcludeReader(
 	return store.Read(metrix.ReadRaw()), target
 }
 
-func benchmarkPlanExcludePatterns(scenario string, count, length int, target string) []string {
+func benchmarkRulePatterns(scenario string, count, length int, target string) []string {
 	switch scenario {
 	case "late_exact":
 		return lateHitBenchmarkPatterns(count, length, target)
@@ -491,7 +635,7 @@ func benchmarkPlanExcludePatterns(scenario string, count, length int, target str
 	case "wildcard":
 		return lateHitBenchmarkPatterns(count, length, "*")
 	default:
-		patterns, _ := benchmarkExcludeMatchCase(count, length, "general_star_miss")
+		patterns, _ := benchmarkRuleMatchCase(count, length, "general_star_miss")
 		return patterns
 	}
 }
@@ -553,7 +697,7 @@ func benchmarkStructuredAutogenReader(b *testing.B, kind string) (metrix.Reader,
 	return store.Read(metrix.ReadRaw(), metrix.ReadFlatten()), familyName
 }
 
-func benchmarkExcludeMatchCase(count, length int, scenario string) ([]string, string) {
+func benchmarkRuleMatchCase(count, length int, scenario string) ([]string, string) {
 	switch scenario {
 	case "exact_early":
 		source := fixedBenchmarkToken("a_target", 0, length)
@@ -646,17 +790,20 @@ func fixedBenchmarkToken(prefix string, index, length int) string {
 	return value + strings.Repeat("x", length-len(value))
 }
 
-func benchmarkAutogenExcludeTemplate(patterns []string) []byte {
+func benchmarkAutogenRulesTemplate(patterns []string) []byte {
 	var out strings.Builder
 	out.WriteString(`
 version: v1
 engine:
   autogen:
     enabled: true
-    exclude:
+    rules:
+      - scope: "*"
+        selector:
+          deny:
 `)
 	for _, pattern := range patterns {
-		fmt.Fprintf(&out, "      - %q\n", pattern)
+		fmt.Fprintf(&out, "            - %q\n", pattern)
 	}
 	out.WriteString(`groups:
   - family: Bench
@@ -670,4 +817,88 @@ engine:
             name: authored
 `)
 	return []byte(out.String())
+}
+
+func benchmarkCompiledAutogenRules(
+	b *testing.B,
+	scope string,
+	selector metrixselector.Expr,
+) []charttpl.ValidatedAutogenRule {
+	b.Helper()
+	_, rules, err := normalizeAutogenPolicy(AutogenPolicy{
+		Rules: []AutogenRule{{
+			Scope:    scope,
+			Selector: selector,
+		}},
+	})
+	if err != nil {
+		b.Fatalf("compile autogen rules: %v", err)
+	}
+	return rules
+}
+
+func benchmarkAutogenRuleSet(
+	b *testing.B,
+	ruleCount int,
+	innerCount int,
+	scenario string,
+	matcherKind string,
+	metricName string,
+) []charttpl.ValidatedAutogenRule {
+	b.Helper()
+	raw := benchmarkRawAutogenRuleSet(ruleCount, innerCount, scenario, matcherKind, metricName)
+	_, rules, err := normalizeAutogenPolicy(AutogenPolicy{Rules: raw})
+	if err != nil {
+		b.Fatalf("compile autogen rules: %v", err)
+	}
+	return rules
+}
+
+func benchmarkRawAutogenRuleSet(
+	ruleCount int,
+	innerCount int,
+	scenario string,
+	matcherKind string,
+	metricName string,
+) []AutogenRule {
+	rules := make([]AutogenRule, ruleCount)
+	for i := range rules {
+		scope := "*"
+		if scenario == "all_scope_miss" {
+			scope = "other_*"
+		}
+		selector := metrixselector.Expr{
+			Allow: benchmarkSelectorEntries(innerCount, matcherKind, metricName),
+		}
+		if scenario == "first_reject" && i == 0 || scenario == "last_reject" && i == ruleCount-1 {
+			selector.Deny = []string{metricName}
+		}
+		rules[i] = AutogenRule{
+			Scope:    scope,
+			Selector: selector,
+		}
+	}
+	return rules
+}
+
+func benchmarkSelectorEntries(count int, kind string, metricName string) []string {
+	items := make([]string, 0, count)
+	for i := 0; i < count-1; i++ {
+		switch kind {
+		case "regexp":
+			items = append(items, fmt.Sprintf(`{__name__=~"^other_%03d$"}`, i))
+		default:
+			items = append(items, fmt.Sprintf("other_%03d", i))
+		}
+	}
+	switch kind {
+	case "simple":
+		return append(items, "service_*")
+	case "general_glob":
+		return append(items, "service_*_total")
+	case "regexp":
+		return append(items, `{__name__=~"^service_.*_total$"}`)
+	default:
+		return append(items, metricName)
+	}
 }

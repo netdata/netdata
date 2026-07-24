@@ -27,8 +27,8 @@ type Engine struct {
 type EngineAutogen struct {
 	Enabled bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 
-	// Exclude suppresses autogen charts for matching unmatched metric families.
-	Exclude []string `yaml:"exclude,omitempty" json:"exclude,omitempty"`
+	// Rules constrain autogen fallback for matching unmatched metric families.
+	Rules []EngineAutogenRule `yaml:"rules,omitempty" json:"rules,omitempty"`
 
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
@@ -37,6 +37,12 @@ type EngineAutogen struct {
 	// successful collection cycles where the series is not seen.
 	// Zero disables expiry.
 	ExpireAfterSuccessCycles uint64 `yaml:"expire_after_success_cycles,omitempty" json:"expire_after_success_cycles,omitempty"`
+}
+
+// EngineAutogenRule conditionally constrains unmatched-series fallback.
+type EngineAutogenRule struct {
+	Scope    string              `yaml:"scope" json:"scope"`
+	Selector metrixselector.Expr `yaml:"selector" json:"selector"`
 }
 
 // Group is a recursive chart-group container.

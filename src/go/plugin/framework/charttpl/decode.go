@@ -3,6 +3,7 @@
 package charttpl
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 
@@ -22,6 +23,9 @@ func DecodeYAMLValidated(data []byte) (*Spec, Validation, error) {
 	if err := yaml.UnmarshalStrict(data, &spec); err != nil {
 		return nil, Validation{}, fmt.Errorf("%w: %v", errDecode, err)
 	}
+	if err := validateYAMLAutogenRulesPresence(data); err != nil {
+		return nil, Validation{}, err
+	}
 
 	applyDefaults(&spec)
 	validation, err := Validate(&spec)
@@ -29,6 +33,29 @@ func DecodeYAMLValidated(data []byte) (*Spec, Validation, error) {
 		return nil, Validation{}, err
 	}
 	return &spec, validation, nil
+}
+
+func validateYAMLAutogenRulesPresence(data []byte) error {
+	if !bytes.Contains(data, []byte("rules")) {
+		return nil
+	}
+	var doc struct {
+		Engine *struct {
+			Autogen *struct {
+				Rules *[]EngineAutogenRule `yaml:"rules"`
+			} `yaml:"autogen"`
+		} `yaml:"engine"`
+	}
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("%w: %v", errDecode, err)
+	}
+	if doc.Engine == nil || doc.Engine.Autogen == nil || doc.Engine.Autogen.Rules == nil {
+		return nil
+	}
+	if len(*doc.Engine.Autogen.Rules) == 0 {
+		return semErr("engine.autogen.rules", "must contain at least one rule when configured")
+	}
+	return nil
 }
 
 // DecodeYAMLFile reads and parses a YAML template file.

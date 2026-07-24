@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
@@ -60,44 +61,54 @@ func TestBuildChartTemplate(t *testing.T) {
 	}
 }
 
-func TestBuildMergedChartTemplateAutogenExcludeUnion(t *testing.T) {
+func TestBuildMergedChartTemplateAutogenRulesPreserveProfileScopes(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
-		"first":  testProfileYAMLWithAutogenExclude("test_*", " z*", "a*", "z*"),
-		"second": testProfileYAMLWithAutogenExclude("test_*", "Business Unit", "μέτρο*", "a*"),
-		"all":    testProfileYAMLWithAutogenExclude("test_*", "specific*", "*"),
+		"first": testProfileYAMLWithAutogenSelector(
+			"test_* !test_internal_*",
+			[]string{"test_*"},
+			[]string{`test_metric{environment="dev"}`},
+		),
+		"second": testProfileYAMLWithAutogenSelector(
+			"μέτρο*",
+			nil,
+			[]string{"μέτρο_debug_*"},
+		),
+		"plain": testProfileYAML("plain_*"),
 	})
 
-	firstOrder, err := catalog.Resolve([]string{"first", "second"})
+	profiles, err := catalog.Resolve([]string{"second", "plain", "first"})
 	require.NoError(t, err)
-	secondOrder, err := catalog.Resolve([]string{"second", "first"})
-	require.NoError(t, err)
-
-	for _, profiles := range [][]promprofiles.Profile{firstOrder, secondOrder} {
-		out, err := buildMergedChartTemplate("", profiles)
-		require.NoError(t, err)
-		spec, err := charttpl.DecodeYAML([]byte(out))
-		require.NoError(t, err)
-		require.NotNil(t, spec.Engine)
-		require.NotNil(t, spec.Engine.Autogen)
-		assert.Equal(t, []string{"Business Unit", "a*", "z*", "μέτρο*"}, spec.Engine.Autogen.Exclude)
-	}
-
-	all, err := catalog.Resolve([]string{"first", "all"})
-	require.NoError(t, err)
-	out, err := buildMergedChartTemplate("", all)
+	out, err := buildMergedChartTemplate("", profiles)
 	require.NoError(t, err)
 	spec, err := charttpl.DecodeYAML([]byte(out))
 	require.NoError(t, err)
-	assert.Equal(t, []string{"*"}, spec.Engine.Autogen.Exclude)
+	require.NotNil(t, spec.Engine)
+	require.NotNil(t, spec.Engine.Autogen)
+	assert.Equal(t, []charttpl.EngineAutogenRule{
+		{
+			Scope: "μέτρο*",
+			Selector: metrixselector.Expr{
+				Deny: []string{"μέτρο_debug_*"},
+			},
+		},
+		{
+			Scope: "test_* !test_internal_*",
+			Selector: metrixselector.Expr{
+				Allow: []string{"test_*"},
+				Deny:  []string{`test_metric{environment="dev"}`},
+			},
+		},
+	}, spec.Engine.Autogen.Rules)
 }
 
-func TestBuildMergedChartTemplateHistogramProfileExcludesFallbackComponents(t *testing.T) {
+func TestBuildMergedChartTemplateHistogramProfileSuppressesFallbackComponents(t *testing.T) {
 	catalog := loadTestCatalog(t, map[string]string{
 		"latency": `
 match: "http_request_duration_seconds"
 autogen:
-  exclude:
-    - "http_request_duration_seconds"
+  selector:
+    deny:
+      - "http_request_duration_seconds"
 template:
   family: HTTP
   metrics:

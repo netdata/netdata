@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/stretchr/testify/assert"
@@ -621,7 +622,12 @@ func TestCompileDoesNotMutateOrRaceOnSharedSpec(t *testing.T) {
 			Engine: &charttpl.Engine{
 				Autogen: &charttpl.EngineAutogen{
 					Enabled: true,
-					Exclude: []string{"zeta_*", "alpha_*", "alpha_*"},
+					Rules: []charttpl.EngineAutogenRule{{
+						Scope: "metric_*",
+						Selector: metrixselector.Expr{
+							Deny: []string{"zeta_*", "alpha_*", "alpha_*"},
+						},
+					}},
 				},
 			},
 			Groups: []charttpl.Group{
