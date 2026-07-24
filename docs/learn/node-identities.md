@@ -275,8 +275,6 @@ If you customized `[directories]` in `netdata.conf`:
 
 :::note
 
-**Windows ACLK paths**
-
 On Windows, the ACLK credentials live under `C:\Program Files\Netdata\var\lib\netdata\cloud.d\`.
 
 :::
