@@ -18,7 +18,7 @@ const (
 	MaximumInputLineBytes   = 64 * 1024
 	MaximumCommandLineBytes = 15_487
 	MaximumInputBodyBytes   = 20 * 1024 * 1024
-	MaximumFunctionTimeout  = 15 * time.Minute
+	MaximumFunctionTimeout  = 2 * time.Minute
 	initialBodyCapacity     = 64 * 1024
 )
 
@@ -254,9 +254,13 @@ func parseCapsuleCall(fields []string) (Call, bool, error) {
 		return Call{}, false, errors.New("Function ingress: payload content type is missing")
 	}
 	timeoutSeconds, err := strconv.ParseInt(fields[2], 10, 64)
-	if err != nil || timeoutSeconds < 0 ||
-		timeoutSeconds > int64(MaximumFunctionTimeout/time.Second) {
+	if err != nil || timeoutSeconds < 0 {
 		return Call{}, false, errors.New("Function ingress: invalid timeout")
+	}
+	// Callers may send an unset (0) or wrong-unit (e.g. milliseconds) timeout;
+	// clamp to the maximum and proceed rather than failing the whole call.
+	if maxSeconds := int64(MaximumFunctionTimeout / time.Second); timeoutSeconds == 0 || timeoutSeconds > maxSeconds {
+		timeoutSeconds = maxSeconds
 	}
 	callFields := strings.Fields(fields[3])
 	if len(callFields) == 0 {
