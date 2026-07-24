@@ -306,9 +306,24 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         query_debug_log(":resampling divisor " NETDATA_DOUBLE_FORMAT, resampling_divisor);
     }
 
+    // the LATEST grouping with a single point asking for the hot edge
+    // (before is zero, or an absolute before within one update_every of
+    // now) anchors the window end at the newest stored sample - the
+    // clamp to now-1 above would exclude an end-stamped sample that
+    // already exists, making the hot edge a race against the collector
+    bool latest_hot_edge = false;
+    if (group_method == RRDR_GROUPING_LATEST && points_requested == 1 && qt->db.last_time_s > 0 &&
+        (before_requested == 0 ||
+         (!rrdr_relative_window_value_is_relative(before_requested) &&
+          before_requested >= now_realtime_sec() - update_every))) {
+        latest_hot_edge = true;
+        before_wanted = qt->db.last_time_s;
+        query_debug_log(":latest hot edge before_wanted %ld", before_wanted);
+    }
+
     // now that we have group, align the requested timeframe to fit it.
     // The product is proven representable above; retain the original conversions for negative timestamps.
-    bool alignment_needed = aligned && before_wanted % (group * query_granularity);
+    bool alignment_needed = aligned && !latest_hot_edge && before_wanted % (group * query_granularity);
     time_t alignment = aligned ? before_wanted % view_update_every : 0;
     if (alignment_needed) {
         if (before_is_aligned_to_db_end) {

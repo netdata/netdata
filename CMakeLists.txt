@@ -1590,6 +1590,8 @@ set(API_PLUGIN_FILES
         src/web/api/queries/trimmed_mean/trimmed_mean.h
         src/web/api/queries/extremes/extremes.c
         src/web/api/queries/extremes/extremes.h
+        src/web/api/queries/latest/latest.c
+        src/web/api/queries/latest/latest.h
         src/web/api/queries/weights.c
         src/web/api/queries/weights.h
         src/web/api/formatters/rrd2json.c

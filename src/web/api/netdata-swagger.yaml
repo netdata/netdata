@@ -9238,6 +9238,7 @@ components:
           - trimmed-median25
           - ema
           - extremes
+          - latest
         default: average
     dataTimeGroup2:
       name: time_group
@@ -9290,6 +9291,7 @@ components:
           - trimmed-median25
           - ema
           - extremes
+          - latest
         default: average
     dataTimeGroupOptions1:
       name: group_options
