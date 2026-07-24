@@ -31,7 +31,7 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 	ch := fixture.Chart{
 		ID: chart, Title: "latest", Units: "units", Family: "fixture",
 		Context: chart, UpdateEvery: 1,
-		Dimensions: []fixture.Dimension{{ID: "plain"}, {ID: "big"}},
+		Dimensions: []fixture.Dimension{{ID: "plain"}, {ID: "big"}, {ID: "neg"}},
 	}
 	for i := 1; i <= 12; i++ {
 		var p fixture.Point
@@ -48,6 +48,9 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		ch.Dimensions[0].Points = append(ch.Dimensions[0].Points, p)
 		ch.Dimensions[1].Points = append(ch.Dimensions[1].Points, fixture.Point{
 			T: fixture.T0 + int64(i), Collected: strconv.Itoa(big), Flags: stream.FlagNotAnomalous,
+		})
+		ch.Dimensions[2].Points = append(ch.Dimensions[2].Points, fixture.Point{
+			T: fixture.T0 + int64(i), Collected: "-5", Flags: stream.FlagNotAnomalous,
 		})
 	}
 	pushLiveBurst(t, "c022", guid(200), ch)
@@ -206,6 +209,45 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		v, is := rowVal(respFast, 0, pi)
 		check(is && v == 10, "fast plain = %v, want 10", v)
 		check(rowAr(respFast, 0, pi) == 0, "fast plain ar = %v, want 0 by design", rowAr(respFast, 0, pi))
+	}
+	if ni := dimIndex(respFast, "neg"); ni >= 0 {
+		v, is := rowVal(respFast, 0, ni)
+		check(is && v == -5, "fast neg = %v, want -5 (sign preserved without absolute)", v)
+	}
+
+	// options=absolute keeps the fast path AND erases the sign, exactly
+	// like the storage path does at fetch
+	respAbs := get(map[string]string{
+		"after":   strconv.FormatInt(fixture.T0, 10),
+		"before":  "0",
+		"points":  "1",
+		"options": "absolute",
+	})
+	absTier, _ := dig(respAbs, "db", "per_tier").([]any)
+	if len(absTier) > 0 {
+		p0, _ := absTier[0].(map[string]any)
+		check(p0["points"] == float64(0), "absolute fast path read %v tier0 points, want 0", p0["points"])
+	}
+	if ni := dimIndex(respAbs, "neg"); ni >= 0 {
+		v, is := rowVal(respAbs, 0, ni)
+		check(is && v == 5, "absolute fast neg = %v, want 5", v)
+	}
+
+	// a relative before near now resolves to the hot edge the same way
+	// (the rule compares the RESOLVED before against now - update_every)
+	respRel := get(map[string]string{
+		"after":  strconv.FormatInt(fixture.T0, 10),
+		"before": "-1",
+		"points": "1",
+	})
+	relTier, _ := dig(respRel, "db", "per_tier").([]any)
+	if len(relTier) > 0 {
+		p0, _ := relTier[0].(map[string]any)
+		check(p0["points"] == float64(0), "relative-before fast path read %v tier0 points, want 0", p0["points"])
+	}
+	if bi := dimIndex(respRel, "big"); bi >= 0 {
+		v, is := rowVal(respRel, 0, bi)
+		check(is && v == float64(big), "relative-before fast big = %v, want the RAW %d", v, big)
 	}
 
 	// the storage path (selected-tier disables the fast path) returns the
