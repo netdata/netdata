@@ -2389,7 +2389,13 @@ static void do_pending_uuid_deletion(struct meta_config_s *config, struct judy_l
 
         nd_uuid_t *uuid = *Pvalue;
         if (likely(!SHUTDOWN_REQUESTED(config))) {
-            if (dimension_can_be_deleted(uuid, NULL, false))
+            // Every queued uuid came from the free path (rrddim_delete_callback)
+            // for a dimension with no persistent retention. When dbengine is
+            // disabled, dimension_can_be_deleted() always returns false, so a
+            // pure-RAM agent could never clean up; trust the free-path enqueue in
+            // that case. dbengine-enabled agents keep the retention re-check,
+            // which guards the replication/backfill race.
+            if (!dbengine_enabled || dimension_can_be_deleted(uuid, NULL, false))
                 delete_dimension_uuid(uuid, NULL, false);
         }
     }
