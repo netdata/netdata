@@ -4,6 +4,7 @@ package prometheus
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -273,4 +274,14 @@ func testProfileYAML(match string) string {
 		"        - selector: test_up",
 		"          name: up",
 	}, "\n") + "\n"
+}
+
+func testProfileYAMLWithAutogenExclude(match string, exclude ...string) string {
+	var autogen strings.Builder
+	autogen.WriteString("autogen:\n  exclude:\n")
+	for _, pattern := range exclude {
+		fmt.Fprintf(&autogen, "    - %q\n", pattern)
+	}
+	base := testProfileYAML(match)
+	return strings.Replace(base, "template:\n", autogen.String()+"template:\n", 1)
 }

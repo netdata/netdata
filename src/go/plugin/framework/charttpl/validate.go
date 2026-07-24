@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
 var (
@@ -240,6 +242,9 @@ func validateEngine(engine *Engine) error {
 	}
 
 	if engine.Autogen != nil {
+		if _, err := matcher.CompilePositivePatternList(engine.Autogen.Exclude); err != nil {
+			errs = append(errs, semErr("engine.autogen.exclude", err.Error()))
+		}
 		if engine.Autogen.MaxTypeIDLen < 0 {
 			errs = append(errs, semErr("engine.autogen.max_type_id_len", "must be >= 0"))
 		}

@@ -25,6 +25,9 @@ type Engine struct {
 type EngineAutogen struct {
 	Enabled bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 
+	// Exclude suppresses autogen charts for matching unmatched metric families.
+	Exclude []string `yaml:"exclude,omitempty" json:"exclude,omitempty"`
+
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
 	MaxTypeIDLen int `yaml:"max_type_id_len,omitempty" json:"max_type_id_len,omitempty"`

@@ -137,6 +137,100 @@ groups:
 	}
 }
 
+func TestEngineLoadAutogenExcludeStateTransitions(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+	require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+engine:
+  autogen:
+    enabled: true
+    exclude: ["a*"]
+groups:
+  - family: Test
+    metrics: [authored_metric]
+    charts:
+      - title: Authored
+        context: authored
+        units: units
+        dimensions:
+          - selector: authored_metric
+            name: authored
+`), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	gauge := store.Write().SnapshotMeter("").Gauge("authored_metric")
+	cc.BeginCycle()
+	gauge.Observe(1)
+	cc.CommitCycleSuccess()
+	_, err = buildPlan(e, store.Read(metrix.ReadRaw()))
+	require.NoError(t, err)
+
+	oldProgram := e.state.program
+	oldCache := e.state.routeCache
+	e.state.materialized.charts["sentinel"] = nil
+	oldEpoch := e.state.engineEpoch
+
+	for name, invalid := range map[string]string{
+		"decode failure": `
+version: [
+`,
+		"semantic validation failure": `
+version: v1
+engine:
+  autogen:
+    enabled: true
+    exclude: ["*", "["]
+groups:
+  - family: Test
+    metrics: [authored_metric]
+    charts:
+      - title: Authored
+        context: authored
+        units: units
+        dimensions:
+          - selector: authored_metric
+            name: authored
+`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Error(t, e.LoadYAML([]byte(invalid), 2))
+			assert.Same(t, oldProgram, e.state.program)
+			assert.Same(t, oldCache, e.state.routeCache)
+			_, ok := e.state.materialized.charts["sentinel"]
+			assert.True(t, ok)
+			assert.Equal(t, oldEpoch, e.state.engineEpoch)
+			assert.True(t, e.state.cfg.autogenExclude.MatchString("alpha"))
+			assert.False(t, e.state.cfg.autogenExclude.MatchString("beta"))
+		})
+	}
+
+	require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+engine:
+  autogen:
+    enabled: true
+    exclude: ["b*"]
+groups:
+  - family: Test
+    metrics: [authored_metric]
+    charts:
+      - title: Authored v2
+        context: authored
+        units: units
+        dimensions:
+          - selector: authored_metric
+            name: authored
+`), 2))
+	assert.NotSame(t, oldProgram, e.state.program)
+	assert.NotSame(t, oldCache, e.state.routeCache)
+	assert.Empty(t, e.state.materialized.charts)
+	assert.Greater(t, e.state.engineEpoch, oldEpoch)
+	assert.False(t, e.state.cfg.autogenExclude.MatchString("alpha"))
+	assert.True(t, e.state.cfg.autogenExclude.MatchString("beta"))
+}
+
 func validTemplateYAML() string {
 	return `
 version: v1

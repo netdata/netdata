@@ -63,6 +63,33 @@ func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
 				assert.NotEmpty(t, specs[0].TemplateYAML)
 			},
 		},
+		"registration and snapshots own autogen exclusions": {
+			run: func(t *testing.T) {
+				svc := New(nil)
+				svc.pluginName = "go.d"
+				exclude := []string{"private_*"}
+
+				err := svc.RegisterComponent(ComponentConfig{
+					Name:  "component",
+					Store: metrix.NewRuntimeStore(),
+					Autogen: runtimecomp.AutogenPolicy{
+						Enabled: true,
+						Exclude: exclude,
+					},
+				})
+				require.NoError(t, err)
+
+				exclude[0] = "caller_mutation"
+				first := svc.registry.snapshot()
+				require.Len(t, first, 1)
+				assert.Equal(t, []string{"private_*"}, first[0].Autogen.Exclude)
+
+				first[0].Autogen.Exclude[0] = "snapshot_mutation"
+				second := svc.registry.snapshot()
+				require.Len(t, second, 1)
+				assert.Equal(t, []string{"private_*"}, second[0].Autogen.Exclude)
+			},
+		},
 		"registration rejects empty template when autogen is disabled": {
 			run: func(t *testing.T) {
 				svc := New(nil)

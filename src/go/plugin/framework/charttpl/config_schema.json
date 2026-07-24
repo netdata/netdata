@@ -54,6 +54,13 @@
         "enabled": {
           "type": "boolean"
         },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
         "max_type_id_len": {
           "oneOf": [
             {

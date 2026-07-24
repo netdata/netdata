@@ -72,6 +72,57 @@ func TestInferDimensionLabelKeyScenarios(t *testing.T) {
 	}
 }
 
+func TestBuildPlanAutogenExcludeRunsOnlyAfterAuthoredRouting(t *testing.T) {
+	var sample PlanRuntimeSample
+	e, err := New(
+		WithRuntimeStore(nil),
+		WithRuntimeSampleObserver(func(observed PlanRuntimeSample) {
+			sample = observed
+		}),
+	)
+	require.NoError(t, err)
+	require.NoError(t, e.LoadYAML([]byte(`
+version: v1
+engine:
+  autogen:
+    enabled: true
+    exclude: ["*"]
+groups:
+  - family: Test
+    metrics: [authored_metric]
+    charts:
+      - title: Authored
+        context: authored
+        units: units
+        dimensions:
+          - selector: authored_metric
+            name: authored
+`), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	meter := store.Write().SnapshotMeter("")
+	authored := meter.Gauge("authored_metric")
+	excluded := meter.Gauge("excluded_metric")
+	cc.BeginCycle()
+	authored.Observe(1)
+	excluded.Observe(2)
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadRaw()))
+	require.NoError(t, err)
+	require.NotNil(t, findCreateChartByTitle(plan.Actions, "Authored"))
+	for _, action := range plan.Actions {
+		if create, ok := action.(CreateChartAction); ok {
+			assert.NotContains(t, create.ChartID, "excluded_metric")
+		}
+	}
+	assert.Equal(t, uint64(2), sample.seriesScanned)
+	assert.Equal(t, uint64(1), sample.seriesMatched)
+	assert.Equal(t, uint64(1), sample.seriesUnmatched)
+	assert.Zero(t, sample.seriesAutogenMatched)
+}
+
 func TestBuildPlanResolvesInferDimensionNames(t *testing.T) {
 	tests := map[string]struct {
 		yaml           string

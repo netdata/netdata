@@ -168,11 +168,17 @@ Default lifecycle policy when template omits lifecycle:
 | Topic                 | Behavior                                                                                                                                       |
 |-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
 | Trigger               | Unmatched series only when autogen is enabled                                                                                                  |
+| Authored precedence   | All authored routes are resolved first; exclusion and fallback apply only when none matched                                                     |
+| Exclusion             | `AutogenPolicy.Exclude` is an OR-list of canonical positive globs; matching suppresses charts, not stored samples                               |
 | Context namespace     | Autogen context = top-level `context_namespace` + the full metric name (which includes any `SnapshotMeter` prefix); empty namespace leaves the bare name. A non-empty meter prefix stacks after `context_namespace`, so pair `context_namespace` with `SnapshotMeter("")` to avoid a doubled prefix |
-| Structured families   | Autogen has dedicated source builders for flattened `Histogram`, `Summary`, `StateSet`, and `MeasureSet` families                              |
+| Structured families   | Histogram/summary components match exclusions by base family; StateSet keeps its name; MeasureSet fields match the source before `_<field>`     |
 | Metric metadata usage | Uses `metrix.MetricMeta` hints for title/family/unit where allowed                                                                             |
 | Type ID budget        | Enforced via `AutogenPolicy.MaxTypeIDLen` + effective emit type-id prefix (`WithEmitTypeIDBudgetPrefix(...)`)                                  |
 | Lifecycle             | Autogen applies `ExpireAfterSuccessCycles` to **both** chart and dimension expiry (unlike template lifecycle where they default independently) |
+
+Excluded series continue through collection and remain accounted as unmatched routing; no separate exclusion runtime
+counter is emitted. Use an upstream selector or relabeling/filtering mechanism when data, rather than only fallback
+charts, must be removed.
 
 Histogram bucket charts use non-overlapping range bucket totals from
 `metrix.ReadFlatten()` and are emitted as `heatmap` charts in both autogen and

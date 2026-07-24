@@ -182,7 +182,7 @@
       },
       "profiles": {
         "title": "Profiles",
-        "description": "Curated, exporter-specific chart profiles. `auto` (default) selects every profile whose match hits a scraped metric; `exact` selects only the named profiles (each must match); `combined` is auto plus the named profiles; `none` disables profiles (generic autogen charts only).",
+        "description": "Curated, exporter-specific chart profiles. `auto` (default) selects every profile whose match hits a scraped metric; `exact` selects only the named profiles (each must match); `combined` is auto plus the named profiles; `none` disables profiles (generic autogen charts only). A selected profile may use profile-root `autogen.exclude` to suppress fallback charts for unmatched source families while retaining their samples.",
         "type": "object",
         "properties": {
           "mode": {

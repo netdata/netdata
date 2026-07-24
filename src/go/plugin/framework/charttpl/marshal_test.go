@@ -107,7 +107,11 @@ func richSpec() Spec {
 		Version:          VersionV1,
 		ContextNamespace: "ns",
 		Engine: &Engine{
-			Autogen: &EngineAutogen{Enabled: true, MaxTypeIDLen: 512},
+			Autogen: &EngineAutogen{
+				Enabled:      true,
+				Exclude:      []string{"metric_*"},
+				MaxTypeIDLen: 512,
+			},
 		},
 		Groups: []Group{richGroup()},
 	}

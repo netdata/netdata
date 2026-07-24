@@ -5,6 +5,7 @@ package prometheus
 import (
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
 )
@@ -50,7 +51,9 @@ func buildChartTemplate(app string) (string, error) {
 // to buildChartTemplate.
 func buildMergedChartTemplate(app string, profiles []promprofiles.Profile) (string, error) {
 	spec := newAutogenSpec(app)
+	var exclude []string
 	for _, p := range profiles {
+		exclude = append(exclude, p.AutogenExclude()...)
 		// Template() returns an independent deep copy, so mutating g below cannot
 		// corrupt the shared process-wide catalog.
 		g, err := p.Template()
@@ -67,6 +70,11 @@ func buildMergedChartTemplate(app string, profiles []promprofiles.Profile) (stri
 		}
 		spec.Groups = append(spec.Groups, g)
 	}
+	compiled, err := matcher.CompilePositivePatternList(exclude)
+	if err != nil {
+		return "", fmt.Errorf("build prometheus chart template autogen exclusion: %w", err)
+	}
+	spec.Engine.Autogen.Exclude = compiled.Patterns()
 	return marshalChartSpec(spec)
 }
 

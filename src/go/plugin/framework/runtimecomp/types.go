@@ -9,6 +9,9 @@ import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 type AutogenPolicy struct {
 	Enabled bool
 
+	// Exclude suppresses autogen charts for matching unmatched metric families.
+	Exclude []string
+
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
 	MaxTypeIDLen int

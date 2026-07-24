@@ -4,16 +4,19 @@ package chartengine
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
 
 type engineConfig struct {
-	autogen       AutogenPolicy
-	autogenTypeID string
+	autogen        AutogenPolicy
+	autogenExclude matcher.PositivePatternList
+	autogenTypeID  string
 	// autogenContextNamespace prefixes autogen chart contexts (the spec's root
 	// context_namespace), so autogen and template charts share one namespace.
 	autogenContextNamespace string
@@ -69,6 +72,10 @@ func defaultAutogenPolicy() AutogenPolicy {
 }
 
 func normalizeAutogenPolicy(policy AutogenPolicy) (AutogenPolicy, error) {
+	exclude, err := matcher.CompilePositivePatternList(policy.Exclude)
+	if err != nil {
+		return AutogenPolicy{}, fmt.Errorf("autogen exclude: %w", err)
+	}
 	maxLen := policy.MaxTypeIDLen
 	if maxLen <= 0 {
 		maxLen = defaultMaxTypeIDLen
@@ -76,6 +83,7 @@ func normalizeAutogenPolicy(policy AutogenPolicy) (AutogenPolicy, error) {
 	if maxLen < 4 {
 		return AutogenPolicy{}, fmt.Errorf("autogen max type.id len must be >= 4, got %d", maxLen)
 	}
+	policy.Exclude = exclude.Patterns()
 	policy.MaxTypeIDLen = maxLen
 	return policy, nil
 }
@@ -89,6 +97,7 @@ func compileEngineSelector(expr metrixselector.Expr) (metrixselector.Selector, e
 
 // WithEnginePolicy configures chartengine matching/materialization policy.
 func WithEnginePolicy(policy EnginePolicy) Option {
+	policy = cloneEnginePolicy(policy)
 	return func(cfg *engineConfig) error {
 		if policy.Autogen != nil {
 			autogen, err := normalizeAutogenPolicy(*policy.Autogen)
@@ -108,6 +117,22 @@ func WithEnginePolicy(policy EnginePolicy) Option {
 		}
 		return nil
 	}
+}
+
+func cloneEnginePolicy(policy EnginePolicy) EnginePolicy {
+	out := policy
+	if policy.Autogen != nil {
+		autogen := *policy.Autogen
+		autogen.Exclude = slices.Clone(policy.Autogen.Exclude)
+		out.Autogen = &autogen
+	}
+	if policy.Selector != nil {
+		selector := *policy.Selector
+		selector.Allow = slices.Clone(policy.Selector.Allow)
+		selector.Deny = slices.Clone(policy.Selector.Deny)
+		out.Selector = &selector
+	}
+	return out
 }
 
 // WithRuntimeStore configures internal chartengine runtime metrics store.

@@ -5,6 +5,7 @@ package runtimechartemit
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -95,7 +96,7 @@ func (r *componentRegistry) snapshot() []componentSpec {
 			TemplateYAML: append([]byte(nil),
 				spec.TemplateYAML...),
 			UpdateEvery: spec.UpdateEvery,
-			Autogen:     spec.Autogen,
+			Autogen:     cloneAutogenPolicy(spec.Autogen),
 			EmitEnv:     cloneEmitEnv(spec.EmitEnv),
 		})
 	}
@@ -157,9 +158,15 @@ func normalizeComponent(cfg ComponentConfig, pluginName string) (componentSpec, 
 		Store:        cfg.Store,
 		TemplateYAML: append([]byte(nil), templateYAML...),
 		UpdateEvery:  updateEvery,
-		Autogen:      cfg.Autogen,
+		Autogen:      cloneAutogenPolicy(cfg.Autogen),
 		EmitEnv:      env,
 	}, nil
+}
+
+func cloneAutogenPolicy(policy runtimecomp.AutogenPolicy) runtimecomp.AutogenPolicy {
+	out := policy
+	out.Exclude = slices.Clone(policy.Exclude)
+	return out
 }
 
 func firstNotEmpty(items ...string) string {

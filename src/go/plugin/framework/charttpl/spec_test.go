@@ -28,6 +28,9 @@ engine:
       - mysql_queries_total{db="main"}
   autogen:
     enabled: true
+    exclude:
+      - " Business Unit "
+      - "μέτρο*"
     max_type_id_len: 512
     expire_after_success_cycles: 9
 groups:
@@ -64,6 +67,7 @@ groups:
 				assert.Equal(t, []string{`mysql_queries_total{db="main"}`}, spec.Engine.Selector.Allow)
 				require.NotNil(t, spec.Engine.Autogen)
 				assert.True(t, spec.Engine.Autogen.Enabled)
+				assert.Equal(t, []string{" Business Unit ", "μέτρο*"}, spec.Engine.Autogen.Exclude)
 				assert.Equal(t, 512, spec.Engine.Autogen.MaxTypeIDLen)
 				assert.Equal(t, uint64(9), spec.Engine.Autogen.ExpireAfterSuccessCycles)
 			},
@@ -159,6 +163,66 @@ groups:
 	}
 }
 
+func TestDecodeYAMLEngineAutogenExclude(t *testing.T) {
+	const prefix = `
+version: v1
+engine:
+  autogen:
+    enabled: true
+`
+	const groups = `
+groups:
+  - family: Test
+    metrics: [metric]
+    charts:
+      - title: Test
+        context: test
+        units: units
+        dimensions:
+          - selector: metric
+            name: metric
+`
+
+	tests := map[string]struct {
+		exclude string
+		wantErr string
+	}{
+		"empty list preserves current behavior": {
+			exclude: "    exclude: []\n",
+		},
+		"positive Unicode and internal whitespace are valid": {
+			exclude: "    exclude: [\"Business Unit\", \"μέτρο*\"]\n",
+		},
+		"whitespace-only entry is invalid": {
+			exclude: "    exclude: [\"  \"]\n",
+			wantErr: "engine.autogen.exclude",
+		},
+		"negative entry is invalid": {
+			exclude: "    exclude: [\"!metric*\"]\n",
+			wantErr: "negative patterns are not allowed",
+		},
+		"invalid glob is invalid": {
+			exclude: "    exclude: [\"[\"]\n",
+			wantErr: "invalid pattern",
+		},
+		"wildcard does not hide invalid entry": {
+			exclude: "    exclude: [\"*\", \"[\"]\n",
+			wantErr: "pattern[1]",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := DecodeYAML([]byte(prefix + test.exclude + groups))
+			if test.wantErr != "" {
+				require.ErrorContains(t, err, test.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestConfigSchemaJSON(t *testing.T) {
 	schema := ConfigSchemaJSON
 	require.NotEmpty(t, schema)
@@ -168,6 +232,13 @@ func TestConfigSchemaJSON(t *testing.T) {
 
 	defs, ok := doc["$defs"].(map[string]any)
 	require.True(t, ok)
+
+	engineAutogen, ok := defs["engine_autogen"].(map[string]any)
+	require.True(t, ok)
+	engineAutogenProps, ok := engineAutogen["properties"].(map[string]any)
+	require.True(t, ok)
+	_, ok = engineAutogenProps["exclude"]
+	assert.True(t, ok)
 
 	chart, ok := defs["chart"].(map[string]any)
 	require.True(t, ok)

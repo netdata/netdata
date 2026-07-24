@@ -63,15 +63,16 @@ func (e *Engine) Load(spec *charttpl.Spec, revision uint64) error {
 	cfg := e.state.cfg
 	e.mu.RUnlock()
 
-	autogenPolicy, selectorPolicy, err := resolveEffectivePolicy(cfg, spec.Engine)
+	policy, err := resolveEffectivePolicy(cfg, spec.Engine)
 	if err != nil {
 		e.logWarningf("chartengine load failed revision=%d: %v", revision, err)
 		return err
 	}
 
 	e.mu.Lock()
-	e.state.cfg.autogen = autogenPolicy
-	e.state.cfg.selector = selectorPolicy
+	e.state.cfg.autogen = policy.autogen
+	e.state.cfg.autogenExclude = policy.autogenExclude
+	e.state.cfg.selector = policy.selector
 	e.state.cfg.autogenContextNamespace = spec.ContextNamespace
 	e.state.program = compiled
 	e.state.matchIndex = buildMatchIndex(compiled.Charts())

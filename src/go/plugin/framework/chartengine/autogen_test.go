@@ -6,6 +6,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,266 @@ func TestAutogenRouteBuilderScenarios(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, tc.run)
+	}
+}
+
+func TestResolveAutogenSource(t *testing.T) {
+	tests := map[string]struct {
+		metricName string
+		labels     map[string]string
+		meta       metrix.SeriesMeta
+		want       autogenSource
+	}{
+		"scalar uses visible name": {
+			metricName: "svc.requests_total",
+			want:       autogenSource{seriesName: "svc.requests_total", familyName: "svc.requests_total"},
+		},
+		"histogram bucket uses base family": {
+			metricName: "svc.latency_seconds_bucket",
+			meta: metrix.SeriesMeta{
+				SourceKind:  metrix.MetricKindHistogram,
+				FlattenRole: metrix.FlattenRoleHistogramBucket,
+			},
+			want: autogenSource{seriesName: "svc.latency_seconds_bucket", familyName: "svc.latency_seconds"},
+		},
+		"histogram count uses base family": {
+			metricName: "svc.latency_seconds_count",
+			meta: metrix.SeriesMeta{
+				SourceKind:  metrix.MetricKindHistogram,
+				FlattenRole: metrix.FlattenRoleHistogramCount,
+			},
+			want: autogenSource{seriesName: "svc.latency_seconds_count", familyName: "svc.latency_seconds"},
+		},
+		"histogram sum uses base family": {
+			metricName: "svc.latency_seconds_sum",
+			meta: metrix.SeriesMeta{
+				SourceKind:  metrix.MetricKindHistogram,
+				FlattenRole: metrix.FlattenRoleHistogramSum,
+			},
+			want: autogenSource{seriesName: "svc.latency_seconds_sum", familyName: "svc.latency_seconds"},
+		},
+		"summary quantile already has base family name": {
+			metricName: "svc.latency_seconds",
+			meta: metrix.SeriesMeta{
+				SourceKind:  metrix.MetricKindSummary,
+				FlattenRole: metrix.FlattenRoleSummaryQuantile,
+			},
+			want: autogenSource{seriesName: "svc.latency_seconds", familyName: "svc.latency_seconds"},
+		},
+		"summary count uses base family": {
+			metricName: "svc.latency_seconds_count",
+			meta: metrix.SeriesMeta{
+				SourceKind:  metrix.MetricKindSummary,
+				FlattenRole: metrix.FlattenRoleSummaryCount,
+			},
+			want: autogenSource{seriesName: "svc.latency_seconds_count", familyName: "svc.latency_seconds"},
+		},
+		"summary sum uses base family": {
+			metricName: "svc.latency_seconds_sum",
+			meta: metrix.SeriesMeta{
+				SourceKind:  metrix.MetricKindSummary,
+				FlattenRole: metrix.FlattenRoleSummarySum,
+			},
+			want: autogenSource{seriesName: "svc.latency_seconds_sum", familyName: "svc.latency_seconds"},
+		},
+		"stateset keeps visible name": {
+			metricName: "svc.status",
+			meta: metrix.SeriesMeta{
+				SourceKind:  metrix.MetricKindStateSet,
+				FlattenRole: metrix.FlattenRoleStateSetState,
+			},
+			want: autogenSource{seriesName: "svc.status", familyName: "svc.status"},
+		},
+		"measureset derives source and field": {
+			metricName: "svc.usage_used",
+			labels:     map[string]string{metrix.MeasureSetFieldLabel: "used"},
+			meta: metrix.SeriesMeta{
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			want: autogenSource{seriesName: "svc.usage_used", familyName: "svc.usage", measureField: "used"},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, ok := resolveAutogenSource(test.metricName, sortedLabelView(test.labels), test.meta)
+			require.True(t, ok)
+			assert.Equal(t, test.want, got)
+		})
+	}
+}
+
+func TestResolveAutogenRouteExclude(t *testing.T) {
+	structured := map[string]struct {
+		metricName string
+		labels     map[string]string
+		meta       metrix.SeriesMeta
+		familyName string
+	}{
+		"histogram bucket": {
+			metricName: "svc.latency_seconds_bucket",
+			labels:     map[string]string{metrix.HistogramBucketLabel: "1"},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindHistogram,
+				FlattenRole: metrix.FlattenRoleHistogramBucket,
+			},
+			familyName: "svc.latency_seconds",
+		},
+		"histogram count": {
+			metricName: "svc.latency_seconds_count",
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindHistogram,
+				FlattenRole: metrix.FlattenRoleHistogramCount,
+			},
+			familyName: "svc.latency_seconds",
+		},
+		"histogram sum": {
+			metricName: "svc.latency_seconds_sum",
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindHistogram,
+				FlattenRole: metrix.FlattenRoleHistogramSum,
+			},
+			familyName: "svc.latency_seconds",
+		},
+		"summary quantile": {
+			metricName: "svc.latency_seconds",
+			labels:     map[string]string{metrix.SummaryQuantileLabel: "0.9"},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindGauge,
+				SourceKind:  metrix.MetricKindSummary,
+				FlattenRole: metrix.FlattenRoleSummaryQuantile,
+			},
+			familyName: "svc.latency_seconds",
+		},
+		"summary count": {
+			metricName: "svc.latency_seconds_count",
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindSummary,
+				FlattenRole: metrix.FlattenRoleSummaryCount,
+			},
+			familyName: "svc.latency_seconds",
+		},
+		"summary sum": {
+			metricName: "svc.latency_seconds_sum",
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindCounter,
+				SourceKind:  metrix.MetricKindSummary,
+				FlattenRole: metrix.FlattenRoleSummarySum,
+			},
+			familyName: "svc.latency_seconds",
+		},
+		"stateset": {
+			metricName: "svc.status",
+			labels:     map[string]string{"svc.status": "ok"},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindGauge,
+				SourceKind:  metrix.MetricKindStateSet,
+				FlattenRole: metrix.FlattenRoleStateSetState,
+			},
+			familyName: "svc.status",
+		},
+		"measureset": {
+			metricName: "svc.usage_used",
+			labels:     map[string]string{metrix.MeasureSetFieldLabel: "used"},
+			meta: metrix.SeriesMeta{
+				Kind:        metrix.MetricKindGauge,
+				SourceKind:  metrix.MetricKindMeasureSet,
+				FlattenRole: metrix.FlattenRoleMeasureSetField,
+			},
+			familyName: "svc.usage",
+		},
+	}
+
+	for name, test := range structured {
+		t.Run(name, func(t *testing.T) {
+			exclude, err := matcher.CompilePositivePatternList([]string{test.familyName})
+			require.NoError(t, err)
+			e := &Engine{state: engineState{cfg: engineConfig{
+				autogen:        AutogenPolicy{Enabled: true, MaxTypeIDLen: defaultMaxTypeIDLen},
+				autogenExclude: exclude,
+			}}}
+
+			routes, ok, err := e.resolveAutogenRoute(nil, test.metricName, sortedLabelView(test.labels), test.meta)
+			require.NoError(t, err)
+			assert.False(t, ok)
+			assert.Empty(t, routes)
+
+			e.state.cfg.autogenExclude, err = matcher.CompilePositivePatternList([]string{"other_*"})
+			require.NoError(t, err)
+			routes, ok, err = e.resolveAutogenRoute(nil, test.metricName, sortedLabelView(test.labels), test.meta)
+			require.NoError(t, err)
+			assert.True(t, ok)
+			assert.NotEmpty(t, routes)
+		})
+	}
+}
+
+func TestResolveAutogenRouteExcludePatternSemantics(t *testing.T) {
+	tests := map[string]struct {
+		patterns []string
+		enabled  bool
+		want     bool
+	}{
+		"disabled remains disabled": {
+			patterns: []string{"*"},
+			enabled:  false,
+			want:     false,
+		},
+		"empty exclusion preserves autogen": {
+			enabled: true,
+			want:    true,
+		},
+		"exact hit": {
+			patterns: []string{"svc.requests_total"},
+			enabled:  true,
+			want:     false,
+		},
+		"prefix hit": {
+			patterns: []string{"svc.requests*"},
+			enabled:  true,
+			want:     false,
+		},
+		"general glob hit": {
+			patterns: []string{"svc.*_total"},
+			enabled:  true,
+			want:     false,
+		},
+		"wildcard hit": {
+			patterns: []string{"*"},
+			enabled:  true,
+			want:     false,
+		},
+		"miss": {
+			patterns: []string{"other*"},
+			enabled:  true,
+			want:     true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			exclude, err := matcher.CompilePositivePatternList(test.patterns)
+			require.NoError(t, err)
+			e := &Engine{state: engineState{cfg: engineConfig{
+				autogen:        AutogenPolicy{Enabled: test.enabled, MaxTypeIDLen: defaultMaxTypeIDLen},
+				autogenExclude: exclude,
+			}}}
+
+			routes, ok, err := e.resolveAutogenRoute(
+				nil,
+				"svc.requests_total",
+				sortedLabelView(nil),
+				metrix.SeriesMeta{Kind: metrix.MetricKindCounter},
+			)
+			require.NoError(t, err)
+			assert.Equal(t, test.want, ok)
+			assert.Equal(t, test.want, len(routes) > 0)
+		})
 	}
 }
 

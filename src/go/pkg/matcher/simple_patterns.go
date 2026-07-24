@@ -5,6 +5,8 @@ package matcher
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"sort"
 	"strings"
 )
 
@@ -16,7 +18,83 @@ type (
 
 	// simplePatternsMatcher patterns.
 	simplePatternsMatcher []simplePatternTerm
+
+	// PositivePatternList is an immutable, canonical list of positive glob
+	// patterns compiled for OR matching.
+	PositivePatternList struct {
+		patterns []string
+		matchers []Matcher
+	}
 )
+
+// CompilePositivePatternList validates, canonicalizes, and compiles positive
+// glob patterns. Empty input is valid and matches nothing.
+func CompilePositivePatternList(patterns []string) (PositivePatternList, error) {
+	if len(patterns) == 0 {
+		return PositivePatternList{}, nil
+	}
+
+	unique := make(map[string]struct{}, len(patterns))
+	for i, raw := range patterns {
+		pattern := strings.TrimSpace(raw)
+		switch {
+		case pattern == "":
+			return PositivePatternList{}, fmt.Errorf("pattern[%d]: must not be empty", i)
+		case strings.HasPrefix(pattern, "!"):
+			return PositivePatternList{}, fmt.Errorf("pattern[%d]: negative patterns are not allowed", i)
+		}
+		if _, err := NewGlobMatcher(pattern); err != nil {
+			return PositivePatternList{}, fmt.Errorf("pattern[%d]: invalid pattern %q: %w", i, pattern, err)
+		}
+		unique[pattern] = struct{}{}
+	}
+
+	if _, ok := unique["*"]; ok {
+		return PositivePatternList{
+			patterns: []string{"*"},
+			matchers: []Matcher{TRUE()},
+		}, nil
+	}
+
+	canonical := make([]string, 0, len(unique))
+	for pattern := range unique {
+		canonical = append(canonical, pattern)
+	}
+	sort.Strings(canonical)
+
+	compiled := PositivePatternList{
+		patterns: canonical,
+		matchers: make([]Matcher, 0, len(canonical)),
+	}
+	for _, pattern := range canonical {
+		m, err := NewGlobMatcher(pattern)
+		if err != nil {
+			return PositivePatternList{}, fmt.Errorf("compile canonical pattern %q: %w", pattern, err)
+		}
+		compiled.matchers = append(compiled.matchers, m)
+	}
+	return compiled, nil
+}
+
+// Patterns returns a copy of the canonical patterns.
+func (m PositivePatternList) Patterns() []string {
+	return slices.Clone(m.patterns)
+}
+
+// Match matches when any positive pattern matches.
+func (m PositivePatternList) Match(b []byte) bool {
+	return m.MatchString(string(b))
+}
+
+// MatchString matches when any positive pattern matches.
+func (m PositivePatternList) MatchString(value string) bool {
+	for _, pattern := range m.matchers {
+		if pattern.MatchString(value) {
+			return true
+		}
+	}
+	return false
+}
 
 // NewSimplePatternsMatcher creates new simple patterns. It returns error in case one of patterns has bad syntax.
 func NewSimplePatternsMatcher(expr string) (Matcher, error) {

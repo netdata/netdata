@@ -23,7 +23,12 @@ import (
 type profileHeader struct {
 	Match    string    `yaml:"match"`
 	App      string    `yaml:"app,omitempty"`
+	Autogen  *autogen  `yaml:"autogen,omitempty"`
 	Template yaml.Node `yaml:"template"`
+}
+
+type autogen struct {
+	Exclude []string `yaml:"exclude,omitempty"`
 }
 
 // Profile is a curated, exporter-specific chart profile. Identity is the file
@@ -38,7 +43,8 @@ type Profile struct {
 	Match string
 	App   string
 
-	lazy *lazyTemplate
+	autogenExclude []string
+	lazy           *lazyTemplate
 }
 
 // lazyTemplate holds the deferred chart template. It is referenced by pointer so
@@ -68,9 +74,21 @@ func (p Profile) Template() (charttpl.Group, error) {
 	return p.lazy.tmpl.Clone(), nil
 }
 
+// AutogenExclude returns an independent copy of the canonical metric-family
+// patterns that suppress fallback chart generation.
+func (p Profile) AutogenExclude() []string {
+	return slices.Clone(p.autogenExclude)
+}
+
+func (p Profile) clone() Profile {
+	out := p
+	out.autogenExclude = slices.Clone(p.autogenExclude)
+	return out
+}
+
 // validateHeader validates the always-loaded fields (match + app). Template
 // structure is validated separately, at hydrate time.
-func (p Profile) validateHeader() error {
+func (p *Profile) validateHeader() error {
 	if strings.TrimSpace(p.Match) == "" {
 		return fmt.Errorf("profile %q: 'match' must not be empty", p.Name)
 	}
@@ -80,6 +98,11 @@ func (p Profile) validateHeader() error {
 	if p.App != "" && !validProfileName.MatchString(p.App) {
 		return fmt.Errorf("profile %q: 'app' %q must match %s", p.Name, p.App, validProfileName.String())
 	}
+	exclude, err := matcher.CompilePositivePatternList(p.autogenExclude)
+	if err != nil {
+		return fmt.Errorf("profile %q: 'autogen.exclude': %w", p.Name, err)
+	}
+	p.autogenExclude = exclude.Patterns()
 	return nil
 }
 
@@ -90,6 +113,7 @@ func parseTemplate(name string, raw []byte) (charttpl.Group, error) {
 	var doc struct {
 		Match    string         `yaml:"match"`
 		App      string         `yaml:"app,omitempty"`
+		Autogen  *autogen       `yaml:"autogen,omitempty"`
 		Template charttpl.Group `yaml:"template"`
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(raw))

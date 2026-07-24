@@ -31,8 +31,8 @@ func NewGlobMatcher(expr string) (Matcher, error) {
 		return nil, errBadGlobPattern
 	}
 
-	size := len(expr)
 	chars := []rune(expr)
+	size := len(chars)
 	startWith := true
 	endWith := true
 	startIdx := 0

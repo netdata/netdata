@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -42,6 +43,28 @@ template:
         - selector: test_metric_total
           name: total
 `, match)
+}
+
+func profileYAMLWithAutogen(match string, exclude ...string) string {
+	var patterns string
+	for _, pattern := range exclude {
+		patterns += fmt.Sprintf("    - %q\n", pattern)
+	}
+	return fmt.Sprintf(`match: "%s"
+autogen:
+  exclude:
+%stemplate:
+  family: test
+  metrics:
+    - test_metric_total
+  charts:
+    - title: Test Metric
+      context: test_metric
+      units: count
+      dimensions:
+        - selector: test_metric_total
+          name: total
+`, match, patterns)
 }
 
 // profileYAMLNoChart has a valid header but a structurally invalid template (a
@@ -92,6 +115,32 @@ func TestLoadFromDirs_headerDecodeAndValidation(t *testing.T) {
 			content: profileYAML(""),
 			wantErr: true,
 		},
+		"valid autogen exclude is accepted eagerly and by lazy template decode": {
+			content: profileYAMLWithAutogen("app_*", `\!literal`, "Business Unit", "μέτρο*"),
+		},
+		"explicit empty autogen exclude list is accepted": {
+			content: strings.Replace(profileYAMLWithAutogen("app_*"), "  exclude:\n", "  exclude: []\n", 1),
+		},
+		"strict yaml rejects unknown autogen field": {
+			content: strings.Replace(profileYAMLWithAutogen("app_*", "metric*"), "  exclude:", "  unknown:", 1),
+			wantErr: true,
+		},
+		"whitespace-only autogen exclude entry is fatal": {
+			content: profileYAMLWithAutogen("app_*", "  "),
+			wantErr: true,
+		},
+		"negative autogen exclude entry is fatal": {
+			content: profileYAMLWithAutogen("app_*", "!metric*"),
+			wantErr: true,
+		},
+		"invalid autogen exclude glob is fatal": {
+			content: profileYAMLWithAutogen("app_*", "["),
+			wantErr: true,
+		},
+		"wildcard does not hide invalid autogen exclude glob": {
+			content: profileYAMLWithAutogen("app_*", "*", "["),
+			wantErr: true,
+		},
 	}
 
 	for name, tc := range tests {
@@ -104,6 +153,67 @@ func TestLoadFromDirs_headerDecodeAndValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProfileAutogenExcludeCanonicalizationAndOwnership(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{
+		stock: true,
+		name:  "app.yaml",
+		content: profileYAMLWithAutogen(
+			"app_*",
+			" z* ",
+			"a*",
+			"z*",
+			`\!literal`,
+			"Business Unit",
+			"μέτρο*",
+		),
+	})
+	require.NoError(t, err)
+	want := []string{"Business Unit", `\!literal`, "a*", "z*", "μέτρο*"}
+
+	fromGet, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, want, fromGet.AutogenExclude())
+	accessorCopy := fromGet.AutogenExclude()
+	accessorCopy[0] = "accessor_mutation"
+	assert.Equal(t, want, fromGet.AutogenExclude())
+
+	fromGet.autogenExclude[0] = "get_mutation"
+	afterGetMutation, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, want, afterGetMutation.AutogenExclude())
+
+	ordered := cat.OrderedProfiles()
+	require.Len(t, ordered, 1)
+	ordered[0].autogenExclude[0] = "ordered_mutation"
+	afterOrderedMutation, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, want, afterOrderedMutation.AutogenExclude())
+
+	resolved, err := cat.Resolve([]string{"app"})
+	require.NoError(t, err)
+	require.Len(t, resolved, 1)
+	resolved[0].autogenExclude[0] = "resolve_mutation"
+	afterResolveMutation, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, want, afterResolveMutation.AutogenExclude())
+
+	template, err := afterResolveMutation.Template()
+	require.NoError(t, err)
+	assert.NotEmpty(t, template.Charts)
+}
+
+func TestProfileAutogenExcludeWildcardCanonicalization(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{
+		stock:   true,
+		name:    "app.yaml",
+		content: profileYAMLWithAutogen("app_*", "z*", "*", "a*"),
+	})
+	require.NoError(t, err)
+	profile, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, []string{"*"}, profile.AutogenExclude())
 }
 
 // TestLoadFromDirs_stockTemplateHydratesLazily verifies a stock profile with a

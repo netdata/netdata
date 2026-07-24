@@ -4,8 +4,10 @@ package matcher
 
 import (
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewGlobMatcher(t *testing.T) {
@@ -33,6 +35,60 @@ func TestNewGlobMatcher(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewGlobMatcherUnicode(t *testing.T) {
+	tests := map[string]struct {
+		pattern string
+		value   string
+		want    bool
+	}{
+		"literal": {
+			pattern: "μέτρο",
+			value:   "μέτρο",
+			want:    true,
+		},
+		"prefix": {
+			pattern: "μέτρο*",
+			value:   "μέτρο_total",
+			want:    true,
+		},
+		"suffix": {
+			pattern: "*μέτρο",
+			value:   "http_μέτρο",
+			want:    true,
+		},
+		"general glob": {
+			pattern: "μ?τρο_*",
+			value:   "μέτρο_total",
+			want:    true,
+		},
+		"miss": {
+			pattern: "μέτρο*",
+			value:   "metric_total",
+			want:    false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			m, err := NewGlobMatcher(test.pattern)
+			require.NoError(t, err)
+			assert.Equal(t, test.want, m.MatchString(test.value))
+		})
+	}
+}
+
+func FuzzNewGlobMatcherValidUTF8DoesNotPanic(f *testing.F) {
+	for _, seed := range []string{"μέτρο", "指标*", "*latency_秒", "a[β-ω]", `\!metric`} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, pattern string) {
+		if !utf8.ValidString(pattern) {
+			t.Skip()
+		}
+		_, _ = NewGlobMatcher(pattern)
+	})
 }
 
 func TestGlobMatcher_MatchString(t *testing.T) {
