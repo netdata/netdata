@@ -2392,8 +2392,9 @@ static void do_pending_uuid_deletion(struct meta_config_s *config, struct judy_l
             // Every queued uuid came from the free path (rrddim_delete_callback)
             // for a dimension with no persistent retention. When dbengine is
             // disabled AND there are no dbengine datafiles on disk, this is a
-            // pure-RAM agent that could never clean up otherwise, so trust the
-            // free-path enqueue. If dbengine datafiles exist (an agent temporarily
+            // pure in-memory agent (ram/alloc/none) that could never clean up
+            // otherwise, so trust the free-path enqueue. If dbengine datafiles
+            // exist (an agent temporarily
             // switched dbengine -> ram/alloc), the uuid may still back on-disk
             // data, so keep the row. dbengine-enabled agents keep the retention
             // re-check, which also guards the replication/backfill race.
@@ -2722,7 +2723,7 @@ static void start_metadata_hosts(uv_work_t *req)
     // dimension can be freed (which enqueues its uuid here) and then re-created
     // reusing the same uuid; if we stored first and deleted after, the queued
     // delete would wipe the freshly stored metadata of the now-live dimension
-    // (and RRDSET_FLAG_METADATA_UPDATE would already be cleared, so it would not
+    // (and RRDDIM_FLAG_METADATA_UPDATE would already be cleared, so it would not
     // be re-stored). Deleting first and storing after keeps the live dimension's
     // metadata.
     // This helper already skips dimension deletion once shutdown starts, but it
