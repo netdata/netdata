@@ -34,6 +34,7 @@
 #  - Opsgenie by @thiaoftsm #9858
 #  - Gotify by @coffeegrind123
 #  - ntfy.sh by @Dim-P
+#  - Pushmark by @IGA
 #shellcheck source=/dev/null disable=SC2086,SC2154
 
 # -----------------------------------------------------------------------------
@@ -272,6 +273,7 @@ syslog
 telegram
 twilio
 smseagle
+pushmark
 "
 
 # -----------------------------------------------------------------------------
@@ -526,6 +528,13 @@ else
   done
 fi
 
+# Backwards/alias handling for Pushmark default recipient variable.
+# Configuration uses DEFAULT_PUSHMARK_URL, but the generic recipient logic
+# expects DEFAULT_RECIPIENT_PUSHMARK.
+if [ -z "${DEFAULT_RECIPIENT_PUSHMARK}" ] && [ -n "${DEFAULT_PUSHMARK_URL}" ]; then
+  DEFAULT_RECIPIENT_PUSHMARK="${DEFAULT_PUSHMARK_URL}"
+fi
+
 if [[ ! $curl_options =~ .*\--connect-timeout ]]; then
   curl_options+=" --connect-timeout 5"
 fi
@@ -769,6 +778,9 @@ fi
 # check ntfy
 [ -z "${DEFAULT_RECIPIENT_NTFY}" ] && SEND_NTFY="NO"
 
+# check pushmark
+[ -z "${DEFAULT_PUSHMARK_URL}" ] && SEND_PUSHMARK="NO"
+
 # check msteams
 [ -z "${MSTEAMS_WEBHOOK_URL}" ] && SEND_MSTEAMS="NO"
 
@@ -818,6 +830,7 @@ check_supported_targets() {
     [ "${SEND_OPSGENIE}" = "YES" ] ||
     [ "${SEND_GOTIFY}" = "YES" ] ||
     [ "${SEND_NTFY}" = "YES" ] ||
+    [ "${SEND_PUSHMARK}" = "YES" ] ||
     [ "${SEND_ILERT}" = "YES" ] ||
     [ "${SEND_SIGNL4}" = "YES" ]; then
     # if we need curl, check for the curl command
@@ -850,6 +863,7 @@ check_supported_targets() {
       SEND_OPSGENIE="NO"
       SEND_GOTIFY="NO"
       SEND_NTFY="NO"
+      SEND_PUSHMARK="NO"
       SEND_ILERT="NO"
       SEND_SIGNL4="NO"
     fi
@@ -1009,6 +1023,7 @@ for method in "${SEND_EMAIL}" \
   "${SEND_OPSGENIE}" \
   "${SEND_GOTIFY}" \
   "${SEND_NTFY}" \
+  "${SEND_PUSHMARK}" \
   "${SEND_ILERT}" \
   "${SEND_SIGNL4}" ; do
 
@@ -2529,6 +2544,42 @@ send_ntfy() {
 }
 
 # -----------------------------------------------------------------------------
+# pushmark sender
+
+send_pushmark() {
+  local httpcode priority recipients=${1} sent=0
+
+  [ "${SEND_PUSHMARK}" != "YES" ] && return 1
+
+  local msg="${host}: ${severity} - ${name} ${value_string} (${chart}) ${raised_for}"
+  local type="info"
+
+  case "${status}" in
+      CLEAR)         type="success" ;;
+      WARNING)       type="warning" ;;
+      CRITICAL)      type="error" ;;
+      UNINITIALIZED|UNDEFINED|REMOVED) type="log" ;;
+  esac
+
+  for recipient in ${recipients}; do
+    httpcode=$(curl -s -o /dev/null -w "%{http_code}" -X POST ${recipient} \
+            -H "Content-Type: application/json" \
+            -d "{\"message\": \"$msg\", \"type\": \"$type\"}")
+
+    if [ "$httpcode" = "200" ]; then
+        info "sent custom notification to Pushmark: $msg"
+        sent=$((sent + 1))
+    else
+        error "failed to send custom notification to Pushmark with HTTP code $httpcode. Message: $msg"
+    fi
+  done
+
+  [ ${sent} -gt 0 ] && return 0
+
+  return 1
+}
+
+# -----------------------------------------------------------------------------
 # ilert sender
 
 send_ilert() {
@@ -3800,6 +3851,11 @@ send_ntfy "${DEFAULT_RECIPIENT_NTFY}"
 SENT_NTFY=$?
 
 # -----------------------------------------------------------------------------
+# send messages to pushmark
+send_pushmark "${DEFAULT_PUSHMARK_URL}"
+SENT_PUSHMARK=$?
+
+# -----------------------------------------------------------------------------
 # send messages to ilert
 send_ilert
 SENT_ILERT=$?
@@ -3840,6 +3896,7 @@ for state in "${SENT_EMAIL}" \
   "${SENT_OPSGENIE}" \
   "${SENT_GOTIFY}" \
   "${SENT_NTFY}" \
+  "${SENT_PUSHMARK}" \
   "${SENT_ILERT}" \
   "${SENT_SIGNL4}"; do
   if [ "${state}" -eq 0 ]; then
