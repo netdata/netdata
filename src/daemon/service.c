@@ -36,15 +36,21 @@ static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd, bool chart_obsolete) {
 
 // Returns the number of dimensions actually archived this call.
 //
+// chart_obsolete: the whole chart is being torn down (RRDSET_FLAG_OBSOLETE).
+// It selects every dimension as a candidate and authorizes archiving dimensions
+// that carry no per-dimension RRDDIM_FLAG_OBSOLETE (chart-level obsoletion does
+// not set the per-dimension flag). When false, only individually-flagged
+// dimensions are candidates (the RRDSET_FLAG_OBSOLETE_DIMENSIONS path).
+//
 // Two callable shapes:
-//   1. all_dimensions == false and RRDSET_FLAG_OBSOLETE_DIMENSIONS unset:
+//   1. chart_obsolete == false and RRDSET_FLAG_OBSOLETE_DIMENSIONS unset:
 //      early-return path. Nothing scanned, flag not touched, returns 0.
 //   2. Any other case: scans the dimensions. The flag is cleared up
 //      front, then re-set at the end iff some candidate could not be
 //      archived this pass. Callers on this path can detect "all
 //      candidates archived" by reading the flag after the call.
-static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensions) {
-    if(!all_dimensions && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
+static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool chart_obsolete) {
+    if(!chart_obsolete && !rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
         return 0;
 
     worker_is_busy(UV_EVENT_ARCHIVE_CHART_DIMENSIONS);
@@ -58,7 +64,7 @@ static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all
     size_t dim_archives = 0;
 
     dfe_start_write(st->rrddim_root_index, rd) {
-        bool candidate = (all_dimensions || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE));
+        bool candidate = (chart_obsolete || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE));
 
         if(candidate) {
             dim_candidates++;
@@ -66,12 +72,7 @@ static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all
             if(rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now) {
                 size_t references = dictionary_acquired_item_references(rd_dfe.item);
                 if(references == 1) {
-                    // all_dimensions is set only on the chart-obsolete path
-                    // (svc_rrdhost_cleanup_charts_marked_obsolete calls this with
-                    // all_dimensions=true for RRDSET_FLAG_OBSOLETE charts), so it
-                    // doubles as the chart_obsolete authorization to archive
-                    // dimensions that carry no per-dimension obsolete flag.
-                    if(svc_rrddim_obsolete_to_archive(rd, all_dimensions))
+                    if(svc_rrddim_obsolete_to_archive(rd, chart_obsolete))
                         dim_archives++;
                 }
             }
@@ -137,7 +138,7 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
             partial_candidates++;
 
             if(!is_replicating) {
-                archived_items += svc_rrdset_archive_obsolete_dimensions(st, false);
+                archived_items += svc_rrdset_archive_obsolete_dimensions(st, /* chart_obsolete = */ false);
 
                 // "all candidates archived" -> flag was not re-set inside.
                 if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS))
@@ -149,7 +150,7 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
             full_candidates++;
 
             if(!is_replicating && svc_rrdset_lock_for_deletion(st, now)) {
-                archived_items += svc_rrdset_archive_obsolete_dimensions(st, true);
+                archived_items += svc_rrdset_archive_obsolete_dimensions(st, /* chart_obsolete = */ true);
 
                 if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS)) {
                     full_archives++;
