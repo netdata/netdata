@@ -410,6 +410,17 @@ setup_terminal() {
   TPUT_BOLD=""
   TPUT_DIM=""
 
+  case "${COLUMNS}" in
+    "" | *[!0-9]*) TERM_WIDTH=80 ;;
+    *)
+      if [ "${COLUMNS}" -ge 0 ]; then
+        TERM_WIDTH="${COLUMNS}"
+      else
+        TERM_WIDTH="80"
+      fi
+      ;;
+  esac
+
   # Is stderr on the terminal? If not, then fail
   test -t 2 || return 1
 
@@ -468,8 +479,7 @@ deferred_warnings() {
 }
 
 fatal() {
-  width="${COLUMNS:-80}"
-  bracket="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}$(printf "%${width}s" " " | tr " " "X")${TPUT_RESET}"
+  bracket="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}$(printf "%${TERM_WIDTH}s" " " | tr " " "X")${TPUT_RESET}"
   printf >&2 "%s\n\n" "${bracket}"
   deferred_warnings
   printf >&2 "%s\n" "${bracket}"
@@ -602,8 +612,7 @@ run_script() {
 }
 
 warning() {
-  width="${COLUMNS:-80}"
-  bracket="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}$(printf "%${width}s" " " | tr " " "=")${TPUT_RESET}"
+  bracket="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}$(printf "%${TERM_WIDTH}s" " " | tr " " "=")${TPUT_RESET}"
   msg="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
   printf >&2 "%s\n%s\n%s\n" "${bracket}" "${msg}" "${bracket}"
   NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${*}"
