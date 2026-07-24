@@ -62,16 +62,8 @@ static MRG *mrg_create_internal(bool load_from_db) {
     }
     pulse_aral_register_statistics(&mrg_aral_statistics, "mrg");
 
-    if(load_from_db) {
-#ifndef OS_WINDOWS
-        // On Windows, db_meta is held by a background thread at this call site,
-        // so sqlite3_step blocks indefinitely. rrdeng_populate_mrg adds metrics
-        // from journal files and handles an empty MRG correctly via
-        // mrg_metric_add_and_acquire, so skipping the pre-population is safe.
+    if(load_from_db)
         mrg_load(mrg);
-#else
-#endif
-    }
 
     return mrg;
 }

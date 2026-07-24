@@ -2098,32 +2098,12 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
 size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid))
 {
     sqlite3_stmt *res = NULL;
-    sqlite3 *local_meta_db = NULL;
 
-
-    // On Windows a second sqlite3_open_v2() to the same file that db_meta already
-    // has open blocks indefinitely at the OS level (CreateFile/LockFileEx never
-    // returns). Use the db_meta fallback directly on Windows.
-#ifndef OS_WINDOWS
-    char sqlite_database[FILENAME_MAX + 1];
-    snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/netdata-meta.db", netdata_configured_cache_dir);
-    char native_meta_path[FILENAME_MAX + 1];
-    os_translate_path(native_meta_path, sqlite_database, sizeof(native_meta_path));
-    int rc = sqlite3_open_v2(native_meta_path, &local_meta_db, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX, NULL);
-    if (rc != SQLITE_OK) {
-        sqlite3_close_v2(local_meta_db);
-        local_meta_db = NULL;
-    }
-
-    if (local_meta_db)
-        (void)db_execute(local_meta_db, "PRAGMA cache_size=10000", NULL);
-#else
-#endif
-
-    if (!PREPARE_STATEMENT(local_meta_db ? local_meta_db : db_meta, GET_UUID_LIST, &res)) {
-        sqlite3_close_v2(local_meta_db);
+    // MRG construction is part of DBENGINE bootstrap, before metadata_sync_init()
+    // starts the metadata owner thread. Reuse the initialized connection instead
+    // of opening another handle to the same database.
+    if (!PREPARE_STATEMENT(db_meta, GET_UUID_LIST, &res))
         return 0;
-    }
 
     size_t count = 0;
 
@@ -2143,7 +2123,6 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
     }
 
     SQLITE_FINALIZE(res);
-    sqlite3_close_v2(local_meta_db);
     COMPUTE_DURATION(report_duration, "us", started_ut, now_monotonic_usec());
     nd_log_daemon(NDLP_INFO, "MRG: Loaded %zu metrics from database in %s", count, report_duration);
     return count;
