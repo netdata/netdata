@@ -355,9 +355,7 @@ static void ctx_get_context_list_to_cleanup(nd_uuid_t *host_uuid, void (*cleanup
             string_freez(ctx);
         }
     }
-#ifndef OS_WINDOWS
     (void)JudyLFreeArray(&CTX_JudyL, PJE0);
-#endif
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -2304,9 +2302,7 @@ static void do_pending_uuid_deletion(struct meta_config_s *config, struct judy_l
 
         freez(uuid);
     }
-#ifndef OS_WINDOWS
     (void) JudyLFreeArray(&pending_uuid_deletion->JudyL, PJE0);
-#endif
     freez(pending_uuid_deletion);
 
     usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
@@ -2345,9 +2341,7 @@ static void store_ctx_cleanup_list(struct meta_config_s *config, struct judy_lis
         string_freez(ctx_cleanup->context);
         freez(ctx_cleanup);
     }
-#ifndef OS_WINDOWS
     (void) JudyLFreeArray(&pending_ctx_cleanup_list->JudyL, PJE0);
-#endif
     freez(pending_ctx_cleanup_list);
     SQLITE_FINALIZE(res);
 
@@ -2402,9 +2396,7 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool
         worker_is_idle();
 
 done:
-#ifndef OS_WINDOWS
     (void) JudyLFreeArray(&pending_alert_list->JudyL, PJE0);
-#endif
     freez(pending_alert_list);
 }
 
@@ -2446,9 +2438,7 @@ static void store_sql_statements(struct judy_list_t *pending_sql_statement, bool
         sqlite3_stmt *stmt = *Pvalue;
         execute_statement(stmt, only_finalize);
     }
-#ifndef OS_WINDOWS
     (void) JudyLFreeArray(&pending_sql_statement->JudyL, PJE0);
-#endif
     freez(pending_sql_statement);
 
     COMPUTE_DURATION(report_duration, "us", started_ut, now_monotonic_usec());
@@ -2903,9 +2893,7 @@ static void metadata_event_loop(void *arg)
             string_freez(ctx_cleanup->context);
             freez(ctx_cleanup);
         }
-#ifndef OS_WINDOWS
         (void)JudyLFreeArray(&pending_ctx_cleanup_list->JudyL, PJE0);
-#endif
         freez(pending_ctx_cleanup_list);
     }
 
@@ -2919,9 +2907,7 @@ static void metadata_event_loop(void *arg)
             nd_uuid_t *uuid = *Pvalue;
             freez(uuid);
         }
-#ifndef OS_WINDOWS
         (void)JudyLFreeArray(&pending_uuid_deletion->JudyL, PJE0);
-#endif
         freez(pending_uuid_deletion);
     }
 

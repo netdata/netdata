@@ -161,15 +161,11 @@ size_t mrg_destroy(MRG *mrg) {
              uuid_pvalue != NULL && uuid_pvalue != PJERR;
              uuid_pvalue = JudyLNext(mrg->index[partition].uuid_judy, &uuid_index, PJE0)) {
 
-#ifndef OS_WINDOWS
             if(*uuid_pvalue)
                 JudyLFreeArray(uuid_pvalue, PJE0);
-#endif
         }
 
-#ifndef OS_WINDOWS
         JudyLFreeArray(&mrg->index[partition].uuid_judy, PJE0);
-#endif
     }
 
     // destroy the ARALs while still holding all partition locks:

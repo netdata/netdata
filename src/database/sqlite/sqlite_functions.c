@@ -225,9 +225,7 @@ void finalize_all_prepared_sql_statements()
                 local_stmt_pool->name);
             finalize_and_free_stmt_list(local_stmt_pool);
         }
-#ifndef OS_WINDOWS
         (void)JudyLFreeArray(&JudyL_thread_stmt_pool, PJE0);
-#endif
     }
     spinlock_unlock(&JudyL_thread_stmt_lock);
 }
