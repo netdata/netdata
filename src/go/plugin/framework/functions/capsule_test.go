@@ -34,7 +34,7 @@ func TestInputCapsuleParsesFunctionCancelAndQuit(t *testing.T) {
 
 func TestInputCapsuleResynchronizesSafeUIDHeaderErrors(t *testing.T) {
 	consumer := &recordingCapsuleConsumer{}
-	oversized := "FUNCTION oversized 30 \"" + strings.Repeat("x", MaximumInputLineBytes) + "\" 0xFFFF \"source\"\n"
+	oversized := "FUNCTION oversized 30 \"" + strings.Repeat("x", maximumInputLineBytes) + "\" 0xFFFF \"source\"\n"
 	input := "FUNCTION bad-time nope \"x\" 0xFFFF \"source\"\n" + oversized +
 		"FUNCTION good 30 \"perf:work-001 mode:F token:good\" 0xFFFF \"source\"\nQUIT\n"
 	capsule, err := NewInputCapsule(strings.NewReader(input))
@@ -101,11 +101,11 @@ func TestInputCapsuleCommandLineAndTimeoutBoundaries(t *testing.T) {
 		timeout time.Duration
 	}{
 		{uid: "line-exact", timeout: 30 * time.Second},
-		{uid: "timeout-zero", timeout: MaximumFunctionTimeout},
+		{uid: "timeout-zero", timeout: maximumFunctionTimeout},
 		{uid: "timeout-one", timeout: time.Second},
-		{uid: "timeout-at-max", timeout: MaximumFunctionTimeout},
-		{uid: "timeout-over", timeout: MaximumFunctionTimeout},
-		{uid: "timeout-millis", timeout: MaximumFunctionTimeout},
+		{uid: "timeout-at-max", timeout: maximumFunctionTimeout},
+		{uid: "timeout-over", timeout: maximumFunctionTimeout},
+		{uid: "timeout-millis", timeout: maximumFunctionTimeout},
 	}
 	if len(consumer.calls) != len(wantAccepted) {
 		t.Fatalf("accepted count differs: got=%d want=%d calls=%#v", len(consumer.calls), len(wantAccepted), consumer.calls)
