@@ -1201,6 +1201,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/parsers/size.h
         src/libnetdata/libjudy/judy-malloc.c
         src/libnetdata/libjudy/judy-malloc.h
+        src/libnetdata/libjudy/judy-unittest.c
         src/libnetdata/facets/logs_query_status.h
         src/libnetdata/os/timestamps.c
         src/libnetdata/os/timestamps.h

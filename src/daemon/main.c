@@ -478,6 +478,7 @@ int netdata_main(int argc, char **argv) {
                             if (string_unittest(10000)) return 1;
                             if (dictionary_unittest(10000)) return 1;
                             if (aral_unittest(10000)) return 1;
+                            if (judy_unittest()) return 1;
                             if (rrdlabels_unittest()) return 1;
                             if (rrdhost_labels_unittest()) return 1;
                             if (ctx_unittest()) return 1;
@@ -524,6 +525,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "araltest") == 0) {
                             unittest_running = true;
                             return aral_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "judytest") == 0) {
+                            unittest_running = true;
+                            return judy_unittest();
                         }
                         else if(strcmp(optarg, "aralconcurrency") == 0) {
                             unittest_running = true;
