@@ -8,7 +8,6 @@
 #include "ebpf_library.h"
 #include "../ebpf.h"
 #include "../ebpf_process.h"
-#include "../ebpf_socket.h"
 #include <ifaddrs.h>
 
 /*****************************************************************
@@ -364,6 +363,13 @@ void ebpf_update_load_mode(const char *str, netdata_ebpf_load_mode_t origin)
     ebpf_set_load_mode(load, origin);
 }
 
+void ebpf_update_object_flavor(const char *str, netdata_ebpf_load_mode_t origin)
+{
+    netdata_ebpf_load_mode_t load = ebpf_convert_object_flavor_to_load_mode(str);
+
+    ebpf_set_load_mode(load, origin);
+}
+
 void ebpf_update_map_per_core()
 {
     int value = inicfg_get_boolean(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_MAPS_PER_CORE, CONFIG_BOOLEAN_YES);
@@ -377,8 +383,6 @@ void ebpf_set_ipc_value(const char *integration)
 {
     if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SHM))
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_SHM;
-    else if (!strcmp(integration, NETDATA_EBPF_IPC_INTEGRATION_SOCKET))
-        integration_with_collectors = NETDATA_EBPF_INTEGRATION_SOCKET;
     else
         integration_with_collectors = NETDATA_EBPF_INTEGRATION_DISABLED;
 }
@@ -391,12 +395,6 @@ void ebpf_parse_ipc_section()
         NETDATA_EBPF_IPC_INTEGRATION,
         NETDATA_EBPF_IPC_INTEGRATION_DISABLED);
     ebpf_set_ipc_value(integration);
-
-    ipc_sockets.default_bind_to = inicfg_get(
-        &collector_config, NETDATA_EBPF_IPC_SECTION, NETDATA_EBPF_IPC_BIND_TO, NETDATA_EBPF_IPC_BIND_TO_DEFAULT);
-
-    ipc_sockets.backlog =
-        (int)inicfg_get_number(&collector_config, NETDATA_EBPF_IPC_SECTION, NETDATA_EBPF_IPC_BACKLOG, 20);
 }
 
 void ebpf_set_thread_mode(netdata_run_mode_t lmode)
@@ -478,6 +476,10 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
 
     ebpf_update_load_mode(value, origin);
 
+    value = inicfg_get(&collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_OBJECT_FLAVOR, NULL);
+    if (value)
+        ebpf_update_object_flavor(value, origin);
+
     ebpf_update_interval(update_every);
 
     ebpf_update_table_size();
@@ -508,17 +510,6 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
         ebpf_enable_chart(EBPF_MODULE_PROCESS_IDX, *disable_cgroups);
     }
 
-    enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network viewer", CONFIG_BOOLEAN_NO);
-    if (!enabled)
-        enabled = inicfg_get_boolean(
-            &collector_config,
-            EBPF_PROGRAMS_SECTION,
-            ebpf_modules[EBPF_MODULE_SOCKET_IDX].info.config_name,
-            CONFIG_BOOLEAN_NO);
-    if (enabled) {
-        ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_cgroups);
-    }
-
     enabled = inicfg_get_boolean(
         &collector_config, EBPF_PROGRAMS_SECTION, "network connection monitoring", CONFIG_BOOLEAN_YES);
     if (!enabled)
@@ -527,11 +518,7 @@ void read_collector_values(int *disable_cgroups, int update_every, netdata_ebpf_
 
     network_viewer_opt.enabled = enabled;
     if (enabled) {
-        if (!ebpf_module_enabled_get(&ebpf_modules[EBPF_MODULE_SOCKET_IDX]))
-            ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_cgroups);
-
         parse_network_viewer_section(&collector_config);
-        ebpf_parse_service_name_section(&collector_config);
     }
 
     enabled = inicfg_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "sync", CONFIG_BOOLEAN_YES);
@@ -1697,8 +1684,6 @@ void ebpf_print_help()
         "\n"
         " [-]-mount             Enable charts related to mount monitoring.\n"
         "\n"
-        " [-]-net               Enable network viewer charts.\n"
-        "\n"
         " [-]-oomkill           Enable chart related to OOM kill tracking.\n"
         "\n"
         " [-]-process           Enable charts related to process run time.\n"
@@ -1806,45 +1791,6 @@ uint32_t ebpf_enable_tracepoints(ebpf_tracepoint_t *tps)
  *  AUXILIARY FUNCTIONS USED DURING INITIALIZATION
  *
  *****************************************************************/
-
-/**
- *  Read Local Ports
- *
- *  Parse /proc/net/{tcp,udp} and get the ports Linux is listening.
- *
- *  @param filename the proc file to parse.
- *  @param proto is the magic number associated to the protocol file we are reading.
- */
-void read_local_ports(char *filename, uint8_t proto)
-{
-    procfile *ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
-    if (!ff)
-        return;
-
-    ff = procfile_readall(ff);
-    if (!ff)
-        return;
-
-    size_t lines = procfile_lines(ff), l;
-    netdata_passive_connection_t values = {.counter = 0, .tgid = 0, .pid = 0};
-    for (l = 0; l < lines; l++) {
-        size_t words = procfile_linewords(ff, l);
-        // This is header or end of file
-        if (unlikely(words < 14))
-            continue;
-
-        // https://elixir.bootlin.com/linux/v5.7.8/source/include/net/tcp_states.h
-        // 0A = TCP_LISTEN
-        if (strcmp("0A", procfile_lineword(ff, l, 5)))
-            continue;
-
-        // Read local port
-        uint16_t port = (uint16_t)strtol(procfile_lineword(ff, l, 2), NULL, 16);
-        update_listen_table(port, proto, &values);
-    }
-
-    procfile_close(ff);
-}
 
 /**
  * Read Local addresseses

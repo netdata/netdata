@@ -102,6 +102,20 @@ static inline void cgroup_free(struct cgroup *cg) {
     if(cg->st_merged_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_merged_ops);
     if(cg->st_pids) rrdset_is_obsolete___safe_from_collector_thread(cg->st_pids);
 
+    if(cg->st_cachestat_ratio)   rrdset_is_obsolete___safe_from_collector_thread(cg->st_cachestat_ratio);
+    if(cg->st_cachestat_dirties) rrdset_is_obsolete___safe_from_collector_thread(cg->st_cachestat_dirties);
+    if(cg->st_cachestat_hits)    rrdset_is_obsolete___safe_from_collector_thread(cg->st_cachestat_hits);
+    if(cg->st_cachestat_misses)  rrdset_is_obsolete___safe_from_collector_thread(cg->st_cachestat_misses);
+
+    if(cg->st_net_conn_ipv4)       rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_conn_ipv4);
+    if(cg->st_net_conn_ipv6)       rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_conn_ipv6);
+    if(cg->st_net_total_bandwidth) rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_total_bandwidth);
+    if(cg->st_net_tcp_recv)        rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_tcp_recv);
+    if(cg->st_net_tcp_send)        rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_tcp_send);
+    if(cg->st_net_retransmit)      rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_retransmit);
+    if(cg->st_net_udp_send)        rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_udp_send);
+    if(cg->st_net_udp_recv)        rrdset_is_obsolete___safe_from_collector_thread(cg->st_net_udp_recv);
+
     freez(cg->filename_cpuset_cpus);
     freez(cg->filename_cpu_cfs_period);
     freez(cg->filename_cpu_cfs_quota);

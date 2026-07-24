@@ -278,88 +278,6 @@ void dcstat_update_publish(netdata_publish_dcstat_t *out, uint64_t cache_access,
 static void ebpf_obsolete_specific_dc_charts(char *type, int update_every);
 
 /**
- * Obsolete services
- *
- * Obsolete all service charts created
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_dc_services(ebpf_module_t *em, char *id)
-{
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_DC_HIT_CHART,
-        "",
-        "Percentage of files inside directory cache",
-        EBPF_COMMON_UNITS_PERCENTAGE,
-        NETDATA_DIRECTORY_CACHE_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_SYSTEMD_DC_HIT_RATIO_CONTEXT,
-        21200,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_DC_REFERENCE_CHART,
-        "",
-        "Count file access",
-        EBPF_COMMON_UNITS_FILES,
-        NETDATA_DIRECTORY_CACHE_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_SYSTEMD_DC_REFERENCE_CONTEXT,
-        21201,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_DC_REQUEST_NOT_CACHE_CHART,
-        "",
-        "Files not present inside directory cache",
-        EBPF_COMMON_UNITS_FILES,
-        NETDATA_DIRECTORY_CACHE_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT,
-        21202,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_DC_REQUEST_NOT_FOUND_CHART,
-        "",
-        "Files not found",
-        EBPF_COMMON_UNITS_FILES,
-        NETDATA_DIRECTORY_CACHE_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT,
-        21203,
-        em->update_every);
-}
-
-/**
- * Obsolete cgroup chart
- *
- * Send obsolete for all charts created before to close.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static inline void ebpf_obsolete_dc_cgroup_charts(ebpf_module_t *em)
-{
-    netdata_mutex_lock(&mutex_cgroup_shm);
-
-    ebpf_cgroup_target_t *ect;
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->systemd) {
-            ebpf_obsolete_dc_services(em, ect->name);
-
-            continue;
-        }
-
-        ebpf_obsolete_specific_dc_charts(ect->name, em->update_every);
-    }
-    netdata_mutex_unlock(&mutex_cgroup_shm);
-}
-
-/**
  * Obsolette apps charts
  *
  * Obsolete apps charts.
@@ -428,39 +346,6 @@ void ebpf_obsolete_dc_apps_charts(struct ebpf_module *em)
     netdata_mutex_unlock(&collect_data_mutex);
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_dc_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_DC_HIT_CHART,
-        "",
-        "Percentage of files inside directory cache",
-        EBPF_COMMON_UNITS_PERCENTAGE,
-        NETDATA_DIRECTORY_CACHE_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_FS_DC_HIT_RATIO_CONTEXT,
-        21200,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_DC_REFERENCE_CHART,
-        "",
-        "Variables used to calculate hit ratio.",
-        EBPF_COMMON_UNITS_FILES,
-        NETDATA_DIRECTORY_CACHE_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_FS_DC_REFERENCE_CONTEXT,
-        21201,
-        em->update_every);
-}
 
 /**
  * DCstat exit
@@ -503,23 +388,6 @@ static void ebpf_dcstat_exit(void *pptr)
     if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
         netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_DCSTAT_IDX);
         sem_post(shm_mutex_ebpf_integration);
-    }
-
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        if (em->cgroup_charts) {
-            ebpf_obsolete_dc_cgroup_charts(em);
-            fflush(stdout);
-        }
-
-        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_obsolete_dc_apps_charts(em);
-        }
-
-        ebpf_obsolete_dc_global(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
     }
 
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)

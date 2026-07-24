@@ -4,12 +4,12 @@ package main
 
 type SharedPidMemoryPublisher struct{}
 
-func NewSharedPidMemoryPublisher(total uint32) (*SharedPidMemoryPublisher, error) {
+func NewSharedPidMemoryPublisher(total uint32, _ uint32) (*SharedPidMemoryPublisher, error) {
 	_ = total
 	return nil, ErrDisabled
 }
 
-func (p *SharedPidMemoryPublisher) Publish(entries []ebpfPidStat) error {
+func (p *SharedPidMemoryPublisher) Publish(entries []ebpfPidStat, _ uint32) error {
 	_ = entries
 	return ErrDisabled
 }

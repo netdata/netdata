@@ -397,92 +397,6 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
 static void ebpf_obsolete_specific_fd_charts(char *type, ebpf_module_t *em);
 
 /**
- * Obsolete services
- *
- * Obsolete all service charts created
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_fd_services(ebpf_module_t *em, char *id)
-{
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_FILE_OPEN,
-        "",
-        "Number of open files",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_FILE_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_CGROUP_FD_OPEN_CONTEXT,
-        NETDATA_EBPF_FD_CHART_PRIORITY_OPEN,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            id,
-            NETDATA_SYSCALL_APPS_FILE_OPEN_ERROR,
-            "",
-            "Fails to open files",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_APPS_FILE_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            NETDATA_CGROUP_FD_OPEN_ERR_CONTEXT,
-            NETDATA_EBPF_FD_CHART_PRIORITY_OPEN_ERR,
-            em->update_every);
-    }
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_FILE_CLOSED,
-        "",
-        "Files closed",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_FILE_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_CGROUP_FD_CLOSE_CONTEXT,
-        NETDATA_EBPF_FD_CHART_PRIORITY_CLOSE,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            id,
-            NETDATA_SYSCALL_APPS_FILE_CLOSE_ERROR,
-            "",
-            "Fails to close files",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_APPS_FILE_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            NETDATA_CGROUP_FD_CLOSE_ERR_CONTEXT,
-            NETDATA_EBPF_FD_CHART_PRIORITY_CLOSE_ERR,
-            em->update_every);
-    }
-}
-
-/**
- * Obsolete cgroup chart
- *
- * Send obsolete for all charts created before to close.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static inline void ebpf_obsolete_fd_cgroup_charts(ebpf_module_t *em)
-{
-    netdata_mutex_lock(&mutex_cgroup_shm);
-
-    ebpf_cgroup_target_t *ect;
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->systemd) {
-            ebpf_obsolete_fd_services(em, ect->name);
-
-            continue;
-        }
-
-        ebpf_obsolete_specific_fd_charts(ect->name, em);
-    }
-    netdata_mutex_unlock(&mutex_cgroup_shm);
-}
-
-/**
  * Obsolette apps charts
  *
  * Obsolete apps charts.
@@ -554,41 +468,6 @@ void ebpf_obsolete_fd_apps_charts(struct ebpf_module *em)
     netdata_mutex_unlock(&collect_data_mutex);
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_fd_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_FILESYSTEM_FAMILY,
-        NETDATA_FILE_OPEN_CLOSE_COUNT,
-        "",
-        "Open and close calls",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_FILE_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        NETDATA_FS_FILEDESCRIPTOR_CONTEXT,
-        NETDATA_CHART_PRIO_EBPF_FD_CHARTS,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            NETDATA_FILESYSTEM_FAMILY,
-            NETDATA_FILE_OPEN_ERR_COUNT,
-            "",
-            "Open fails",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_FILE_GROUP,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            NETDATA_FS_FILEDESCRIPTOR_ERROR_CONTEXT,
-            NETDATA_CHART_PRIO_EBPF_FD_CHARTS + 1,
-            em->update_every);
-    }
-}
 
 /**
  * FD Exit
@@ -640,23 +519,6 @@ static void ebpf_fd_exit(void *pptr)
     if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
         netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_FD_IDX);
         sem_post(shm_mutex_ebpf_integration);
-    }
-
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        if (em->cgroup_charts) {
-            ebpf_obsolete_fd_cgroup_charts(em);
-            fflush(stdout);
-        }
-
-        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_obsolete_fd_apps_charts(em);
-        }
-
-        ebpf_obsolete_fd_global(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
     }
 
     freez(fd_vector);

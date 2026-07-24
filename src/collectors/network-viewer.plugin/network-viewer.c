@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Function registration ownership split:
+//   - network-connections         : all OSes, served by this plugin
+//   - topology:network-connections: all OSes, served by this plugin
+//   - dns-queries                 : Linux only, served by this plugin
+//   - network-protocols           : FreeBSD only, served by this plugin
+//                                   (on Linux, network-protocols is served by
+//                                   ebpfgo.plugin via its stdin dispatcher;
+//                                   adding a Linux registration here would
+//                                   collide at runtime. The guard below turns
+//                                   such an attempt into a compile error.)
 #include "collectors/all.h"
 #include "libnetdata/libnetdata.h"
 #include "network-viewer-apps-lookup-client.h"
@@ -27,6 +37,11 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #include "libnetdata/local-sockets/local-sockets.h"
 #include "libnetdata/os/system-maps/system-services.h"
 
+#if defined(OS_LINUX)
+#include "network_viewer_ebpf_shared_memory.h"
+#include "network_viewer_dns_shared_memory.h"
+#endif
+
 #define NETWORK_CONNECTIONS_VIEWER_FUNCTION "network-connections"
 #define NETWORK_CONNECTIONS_VIEWER_HELP "Shows active network connections with protocol details, states, addresses, ports, and performance metrics."
 #define NETWORK_TOPOLOGY_VIEWER_FUNCTION "topology:network-connections"
@@ -34,6 +49,8 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #define NETWORK_VIEWER_RESPONSE_UPDATE_EVERY 5
 #define NETWORK_PROTOCOLS_FUNCTION      "network-protocols"
 #define NETWORK_PROTOCOLS_FUNCTION_HELP "TCP and UDP statistics (IPv4 and IPv6 combined)"
+#define NETWORK_DNS_QUERIES_FUNCTION      "dns-queries"
+#define NETWORK_DNS_QUERIES_FUNCTION_HELP "Linux eBPF DNS query and response statistics (UDP/TCP, IPv4/IPv6)"
 // Keep in sync with the topology schema contract used across topology producers.
 #define NETWORK_TOPOLOGY_SCHEMA_VERSION "netdata.topology.v1"
 #define NETWORK_TOPOLOGY_SOURCE "network-connections"
@@ -174,9 +191,6 @@ typedef struct {
     NV_TOPOLOGY_OPTIONS options;
 } NV_TOPOLOGY_CONTEXT;
 
-typedef struct {
-    uint64_t ppid;
-} NV_PPID_CACHE_ENTRY;
 
 typedef struct {
     uint64_t starttime;
@@ -739,24 +753,6 @@ static inline bool topology_ip_belongs_to_self(const NV_TOPOLOGY_CONTEXT *ctx, c
     return false;
 }
 
-static inline void topology_process_parent_lookup_key(
-    char *dst,
-    size_t dst_size,
-    uint64_t pid,
-    uint64_t net_ns_inode,
-    bool include_ns
-) {
-    if(!dst || !dst_size)
-        return;
-
-    if(include_ns)
-        snprintf(dst, dst_size, "ns=%llu|pid=%llu",
-                 (unsigned long long)net_ns_inode,
-                 (unsigned long long)pid);
-    else
-        snprintf(dst, dst_size, "pid=%llu",
-                 (unsigned long long)pid);
-}
 
 static inline void topology_pid_lookup_key(char *dst, size_t dst_size, uint64_t pid) {
     if(!dst || !dst_size)
@@ -766,38 +762,6 @@ static inline void topology_pid_lookup_key(char *dst, size_t dst_size, uint64_t 
 }
 
 #if defined(OS_LINUX)
-static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
-    if(!pid || !ppid)
-        return false;
-
-    char filename[FILENAME_MAX + 1];
-    char status_buf[1024];
-    snprintfz(filename, sizeof(filename), "%s/proc/%llu/status",
-              netdata_configured_host_prefix ? netdata_configured_host_prefix : "",
-              (unsigned long long)pid);
-
-    if(read_txt_file(filename, status_buf, sizeof(status_buf)))
-        return false;
-
-    char *p = strstr(status_buf, "PPid:");
-    if(!p)
-        return false;
-
-    p += 5;
-    while(isspace((unsigned char)*p))
-        p++;
-
-    if(*p < '0' || *p > '9')
-        return false;
-
-    uint64_t parent = strtoull(p, NULL, 10);
-    if(parent == pid)
-        parent = 0;
-
-    *ppid = parent;
-    return true;
-}
-
 static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
     if(!pid || !starttime)
         return false;
@@ -848,25 +812,6 @@ static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
 #include <netinet/tcp_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
-static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
-    if(!pid || !ppid)
-        return false;
-
-    struct kinfo_proc kp;
-    size_t size = sizeof(kp);
-    int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, (int)pid };
-
-    if(sysctl(mib, 4, &kp, &size, NULL, 0) != 0 || size == 0)
-        return false;
-
-    uint64_t parent = (uint64_t)kp.ki_ppid;
-    if(parent == pid)
-        parent = 0;
-
-    *ppid = parent;
-    return true;
-}
-
 static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
     if(starttime)
         *starttime = 0;
@@ -879,23 +824,6 @@ static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *
 #include <netinet/udp_var.h>
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
-
-static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
-    if(!pid || !ppid || pid > (uint64_t)INT_MAX)
-        return false;
-
-    struct proc_bsdinfo bsd;
-    int rc = proc_pidinfo((pid_t)pid, PROC_PIDTBSDINFO, 0, &bsd, sizeof(bsd));
-    if(rc != (int)sizeof(bsd))
-        return false;
-
-    uint64_t parent = (uint64_t)bsd.pbi_ppid;
-    if(parent == pid)
-        parent = 0;
-
-    *ppid = parent;
-    return true;
-}
 
 static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
     if(!pid || !starttime || pid > (uint64_t)INT_MAX)
@@ -913,12 +841,7 @@ static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
     return true;
 }
 #else
-static bool topology_read_proc_ppid(uint64_t pid __maybe_unused, uint64_t *ppid) {
-    if(ppid)
-        *ppid = 0;
 
-    return false;
-}
 
 static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
     if(starttime)
@@ -928,25 +851,6 @@ static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *
 }
 #endif
 
-static uint64_t topology_ppid_cache_get_or_load(DICTIONARY *ppid_cache, uint64_t pid) {
-    if(!ppid_cache || !pid)
-        return 0;
-
-    char pid_key[64];
-    topology_pid_lookup_key(pid_key, sizeof(pid_key), pid);
-
-    NV_PPID_CACHE_ENTRY *cached = dictionary_get(ppid_cache, pid_key);
-    if(cached)
-        return cached->ppid;
-
-    NV_PPID_CACHE_ENTRY tmp = { .ppid = 0 };
-    uint64_t ppid = 0;
-    if(topology_read_proc_ppid(pid, &ppid))
-        tmp.ppid = ppid;
-
-    cached = dictionary_set(ppid_cache, pid_key, &tmp, sizeof(tmp));
-    return cached ? cached->ppid : tmp.ppid;
-}
 
 static uint64_t topology_starttime_cache_get_or_load(DICTIONARY *pid_starttime_cache, uint64_t pid) {
     if(!pid_starttime_cache || !pid)
@@ -968,64 +872,25 @@ static uint64_t topology_starttime_cache_get_or_load(DICTIONARY *pid_starttime_c
     return cached ? cached->starttime : tmp.starttime;
 }
 
-static NV_ENDPOINT_OWNER *topology_find_process_parent_actor(
-    uint64_t ppid,
-    uint64_t net_ns_inode,
-    DICTIONARY *process_parent_ns_lookup,
-    DICTIONARY *process_parent_any_lookup,
-    DICTIONARY *ppid_cache
-) {
-    if(!ppid || !process_parent_ns_lookup || !process_parent_any_lookup)
-        return NULL;
 
-    uint64_t current_pid = ppid;
-    for(size_t depth = 0; depth < NV_TOPOLOGY_MAX_PPID_DEPTH && current_pid; depth++) {
-        char parent_key_ns[NV_TOPOLOGY_KEY_MAX];
-        char parent_key_any[NV_TOPOLOGY_KEY_MAX];
+// ip != NULL builds an exact key (ip+port); ip == NULL builds a service key (port only).
+static void topology_endpoint_owner_key(char *dst, size_t dst_size, uint64_t net_ns_inode, uint16_t protocol, const char *ip, uint16_t port, bool include_ns) {
+    if(!dst || !dst_size)
+        return;
 
-        topology_process_parent_lookup_key(parent_key_ns, sizeof(parent_key_ns), current_pid, net_ns_inode, true);
-        NV_ENDPOINT_OWNER *parent = dictionary_get(process_parent_ns_lookup, parent_key_ns);
-        if(!parent) {
-            topology_process_parent_lookup_key(parent_key_any, sizeof(parent_key_any), current_pid, 0, false);
-            parent = dictionary_get(process_parent_any_lookup, parent_key_any);
-        }
-
-        if(parent)
-            return parent;
-
-        if(!ppid_cache)
-            break;
-
-        uint64_t next_ppid = topology_ppid_cache_get_or_load(ppid_cache, current_pid);
-        if(!next_ppid || next_ppid == current_pid)
-            break;
-
-        current_pid = next_ppid;
+    if(ip) {
+        if(include_ns)
+            snprintf(dst, dst_size, "ns=%llu|proto=%u|ip=%s|port=%u",
+                     (unsigned long long)net_ns_inode, (unsigned)protocol, ip, (unsigned)port);
+        else
+            snprintf(dst, dst_size, "proto=%u|ip=%s|port=%u", (unsigned)protocol, ip, (unsigned)port);
+    } else {
+        if(include_ns)
+            snprintf(dst, dst_size, "ns=%llu|proto=%u|port=%u",
+                     (unsigned long long)net_ns_inode, (unsigned)protocol, (unsigned)port);
+        else
+            snprintf(dst, dst_size, "proto=%u|port=%u", (unsigned)protocol, (unsigned)port);
     }
-
-    return NULL;
-}
-
-static void topology_endpoint_owner_exact_key(char *dst, size_t dst_size, uint64_t net_ns_inode, uint16_t protocol, const char *ip, uint16_t port, bool include_ns) {
-    if(!dst || !dst_size)
-        return;
-
-    if(include_ns)
-        snprintf(dst, dst_size, "ns=%llu|proto=%u|ip=%s|port=%u",
-                 (unsigned long long)net_ns_inode, (unsigned)protocol, ip, (unsigned)port);
-    else
-        snprintf(dst, dst_size, "proto=%u|ip=%s|port=%u", (unsigned)protocol, ip, (unsigned)port);
-}
-
-static void topology_endpoint_owner_service_key(char *dst, size_t dst_size, uint64_t net_ns_inode, uint16_t protocol, uint16_t port, bool include_ns) {
-    if(!dst || !dst_size)
-        return;
-
-    if(include_ns)
-        snprintf(dst, dst_size, "ns=%llu|proto=%u|port=%u",
-                 (unsigned long long)net_ns_inode, (unsigned)protocol, (unsigned)port);
-    else
-        snprintf(dst, dst_size, "proto=%u|port=%u", (unsigned)protocol, (unsigned)port);
 }
 
 static void topology_register_endpoint_owner(
@@ -1052,22 +917,22 @@ static void topology_register_endpoint_owner(
     char key[NV_TOPOLOGY_KEY_MAX];
     if(ip && *ip && strcmp(ip, "*") != 0) {
         if(ctx->endpoint_owners_exact) {
-            topology_endpoint_owner_exact_key(key, sizeof(key), net_ns_inode, protocol, ip, port, true);
+            topology_endpoint_owner_key(key, sizeof(key), net_ns_inode, protocol, ip, port, true);
             dictionary_set(ctx->endpoint_owners_exact, key, &owner, sizeof(owner));
         }
         if(ctx->endpoint_owners_exact_any_ns) {
-            topology_endpoint_owner_exact_key(key, sizeof(key), 0, protocol, ip, port, false);
+            topology_endpoint_owner_key(key, sizeof(key), 0, protocol, ip, port, false);
             dictionary_set(ctx->endpoint_owners_exact_any_ns, key, &owner, sizeof(owner));
         }
     }
 
     if(service_candidate) {
         if(ctx->endpoint_owners_service) {
-            topology_endpoint_owner_service_key(key, sizeof(key), net_ns_inode, protocol, port, true);
+            topology_endpoint_owner_key(key, sizeof(key), net_ns_inode, protocol, NULL, port, true);
             dictionary_set(ctx->endpoint_owners_service, key, &owner, sizeof(owner));
         }
         if(ctx->endpoint_owners_service_any_ns) {
-            topology_endpoint_owner_service_key(key, sizeof(key), 0, protocol, port, false);
+            topology_endpoint_owner_key(key, sizeof(key), 0, protocol, NULL, port, false);
             dictionary_set(ctx->endpoint_owners_service_any_ns, key, &owner, sizeof(owner));
         }
     }
@@ -1089,14 +954,14 @@ static NV_ENDPOINT_OWNER *topology_lookup_endpoint_owner(
 
     if(ip && *ip && strcmp(ip, "*") != 0) {
         if(ctx->endpoint_owners_exact) {
-            topology_endpoint_owner_exact_key(key, sizeof(key), net_ns_inode, protocol, ip, port, true);
+            topology_endpoint_owner_key(key, sizeof(key), net_ns_inode, protocol, ip, port, true);
             owner = dictionary_get(ctx->endpoint_owners_exact, key);
             if(owner)
                 return owner;
         }
 
         if(ctx->endpoint_owners_exact_any_ns) {
-            topology_endpoint_owner_exact_key(key, sizeof(key), 0, protocol, ip, port, false);
+            topology_endpoint_owner_key(key, sizeof(key), 0, protocol, ip, port, false);
             owner = dictionary_get(ctx->endpoint_owners_exact_any_ns, key);
             if(owner)
                 return owner;
@@ -1107,14 +972,14 @@ static NV_ENDPOINT_OWNER *topology_lookup_endpoint_owner(
         return NULL;
 
     if(ctx->endpoint_owners_service) {
-        topology_endpoint_owner_service_key(key, sizeof(key), net_ns_inode, protocol, port, true);
+        topology_endpoint_owner_key(key, sizeof(key), net_ns_inode, protocol, NULL, port, true);
         owner = dictionary_get(ctx->endpoint_owners_service, key);
         if(owner)
             return owner;
     }
 
     if(ctx->endpoint_owners_service_any_ns) {
-        topology_endpoint_owner_service_key(key, sizeof(key), 0, protocol, port, false);
+        topology_endpoint_owner_key(key, sizeof(key), 0, protocol, NULL, port, false);
         owner = dictionary_get(ctx->endpoint_owners_service_any_ns, key);
         if(owner)
             return owner;
@@ -1623,6 +1488,35 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
 #else
         buffer_json_add_array_item_uint64(wb, 0);
 #endif
+#endif
+
+        // eBPF per-PID socket counters from ebpfgo.plugin shared memory
+#if defined(OS_LINUX)
+        {
+            struct ebpf_pid_stat es;
+            bool have_es = network_viewer_ebpf_shared_memory_lookup((pid_t)n->pid, &es);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.bytes_sent         : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.bytes_received      : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_sent       : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_received   : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.retransmit          : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_udp_sent       : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_udp_received   : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_close          : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_v4_connection : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_v6_connection : 0);
+        }
+#else
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
+        buffer_json_add_array_item_uint64(wb, 0);
 #endif
 
         // count
@@ -5206,6 +5100,52 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_actor_table(
     return topology_response_check(wb, ctx);
 }
 
+// Shared column-emit macros for topology-v1 emit functions.
+// Require 'wb', 'ctx', and 'abort_status' to be in scope at the call site.
+#define NV_TOPOLOGY_V1_EMIT_UINT_COL(arr, n, member) do { \
+        topology_v1_values_start(wb); \
+        for(size_t i = 0; i < (n); i++) { \
+            if(topology_abort_iteration_checkpoint(i) && \
+               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                return abort_status; \
+            buffer_json_add_array_item_uint64(wb, (arr)[i].member); \
+        } \
+        topology_v1_values_end(wb); \
+    } while(0)
+#define NV_TOPOLOGY_V1_EMIT_STRING_COL(arr, n, member) do { \
+        NV_TOPOLOGY_V1_STRING_COLUMN _col; \
+        topology_v1_string_column_init(&_col, (n)); \
+        for(size_t i = 0; i < (n); i++) { \
+            if(topology_abort_iteration_checkpoint(i) && \
+               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                break; \
+            topology_v1_string_column_add(&_col, (arr)[i].member); \
+        } \
+        if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
+            topology_v1_emit_auto_string_column(wb, &_col); \
+        topology_v1_string_column_free(&_col); \
+        if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
+            return abort_status; \
+    } while(0)
+#define NV_TOPOLOGY_V1_EMIT_RTT_COLUMNS(arr, n, rtt_m, rcv_rtt_m) do { \
+        topology_v1_values_start(wb); \
+        for(size_t i = 0; i < (n); i++) { \
+            if(topology_abort_iteration_checkpoint(i) && \
+               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                return abort_status; \
+            buffer_json_add_array_item_double(wb, (double)(arr)[i].rtt_m / (double)USEC_PER_MS); \
+        } \
+        topology_v1_values_end(wb); \
+        topology_v1_values_start(wb); \
+        for(size_t i = 0; i < (n); i++) { \
+            if(topology_abort_iteration_checkpoint(i) && \
+               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
+                return abort_status; \
+            buffer_json_add_array_item_double(wb, (double)(arr)[i].rcv_rtt_m / (double)USEC_PER_MS); \
+        } \
+        topology_v1_values_end(wb); \
+    } while(0)
+
 static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_link_table(
     BUFFER *wb,
     NV_TOPOLOGY_V1_PAYLOAD *payload,
@@ -5222,63 +5162,17 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_link_table(
         buffer_json_array_close(wb);
         buffer_json_member_add_array(wb, "values");
 
-#define NV_TOPOLOGY_V1_LINK_UINT_VALUES(member) do { \
-            topology_v1_values_start(wb); \
-            for(size_t i = 0; i < payload->links_used; i++) { \
-                if(topology_abort_iteration_checkpoint(i) && \
-                   (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                    return abort_status; \
-                buffer_json_add_array_item_uint64(wb, payload->links[i].member); \
-            } \
-            topology_v1_values_end(wb); \
-        } while(0)
-#define NV_TOPOLOGY_V1_LINK_STRING_VALUES(member) do { \
-            NV_TOPOLOGY_V1_STRING_COLUMN column; \
-            topology_v1_string_column_init(&column, payload->links_used); \
-            for(size_t i = 0; i < payload->links_used; i++) { \
-                if(topology_abort_iteration_checkpoint(i) && \
-                   (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                    break; \
-                topology_v1_string_column_add(&column, payload->links[i].member); \
-            } \
-            if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
-                topology_v1_emit_auto_string_column(wb, &column); \
-            topology_v1_string_column_free(&column); \
-            if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
-                return abort_status; \
-        } while(0)
-
-        NV_TOPOLOGY_V1_LINK_UINT_VALUES(src_actor);
-        NV_TOPOLOGY_V1_LINK_UINT_VALUES(dst_actor);
-        NV_TOPOLOGY_V1_LINK_STRING_VALUES(type);
-        NV_TOPOLOGY_V1_LINK_STRING_VALUES(protocol);
-        NV_TOPOLOGY_V1_LINK_STRING_VALUES(state);
-        NV_TOPOLOGY_V1_LINK_UINT_VALUES(evidence_count);
-        NV_TOPOLOGY_V1_LINK_UINT_VALUES(socket_count);
+        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links, payload->links_used, src_actor);
+        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links, payload->links_used, dst_actor);
+        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->links, payload->links_used, type);
+        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->links, payload->links_used, protocol);
+        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->links, payload->links_used, state);
+        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links, payload->links_used, evidence_count);
+        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links, payload->links_used, socket_count);
 #if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
-        NV_TOPOLOGY_V1_LINK_UINT_VALUES(retransmissions);
-
-        topology_v1_values_start(wb);
-        for(size_t i = 0; i < payload->links_used; i++) {
-            if(topology_abort_iteration_checkpoint(i) &&
-               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
-                return abort_status;
-            buffer_json_add_array_item_double(wb, (double)payload->links[i].max_rtt_usec / (double)USEC_PER_MS);
-        }
-        topology_v1_values_end(wb);
-
-        topology_v1_values_start(wb);
-        for(size_t i = 0; i < payload->links_used; i++) {
-            if(topology_abort_iteration_checkpoint(i) &&
-               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
-                return abort_status;
-            buffer_json_add_array_item_double(wb, (double)payload->links[i].max_rcv_rtt_usec / (double)USEC_PER_MS);
-        }
-        topology_v1_values_end(wb);
+        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->links, payload->links_used, retransmissions);
+        NV_TOPOLOGY_V1_EMIT_RTT_COLUMNS(payload->links, payload->links_used, max_rtt_usec, max_rcv_rtt_usec);
 #endif
-
-#undef NV_TOPOLOGY_V1_LINK_UINT_VALUES
-#undef NV_TOPOLOGY_V1_LINK_STRING_VALUES
 
         buffer_json_array_close(wb);
     }
@@ -5309,39 +5203,10 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                     buffer_json_array_close(wb);
                     buffer_json_member_add_array(wb, "values");
 
-#define NV_TOPOLOGY_V1_PORT_UINT_VALUES(member) do { \
-                    topology_v1_values_start(wb); \
-                    for(size_t i = 0; i < payload->ports_used; i++) { \
-                        if(topology_abort_iteration_checkpoint(i) && \
-                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                            return abort_status; \
-                        buffer_json_add_array_item_uint64(wb, payload->ports[i].member); \
-                    } \
-                    topology_v1_values_end(wb); \
-                } while(0)
-#define NV_TOPOLOGY_V1_PORT_STRING_VALUES(member) do { \
-                    NV_TOPOLOGY_V1_STRING_COLUMN column; \
-                    topology_v1_string_column_init(&column, payload->ports_used); \
-                    for(size_t i = 0; i < payload->ports_used; i++) { \
-                        if(topology_abort_iteration_checkpoint(i) && \
-                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                            break; \
-                        topology_v1_string_column_add(&column, payload->ports[i].member); \
-                    } \
-                    if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
-                        topology_v1_emit_auto_string_column(wb, &column); \
-                    topology_v1_string_column_free(&column); \
-                    if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
-                        return abort_status; \
-                } while(0)
-
-                    NV_TOPOLOGY_V1_PORT_UINT_VALUES(actor);
-                    NV_TOPOLOGY_V1_PORT_UINT_VALUES(port);
-                    NV_TOPOLOGY_V1_PORT_STRING_VALUES(protocol);
-                    NV_TOPOLOGY_V1_PORT_UINT_VALUES(socket_count);
-
-#undef NV_TOPOLOGY_V1_PORT_UINT_VALUES
-#undef NV_TOPOLOGY_V1_PORT_STRING_VALUES
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->ports, payload->ports_used, actor);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->ports, payload->ports_used, port);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->ports, payload->ports_used, protocol);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->ports, payload->ports_used, socket_count);
 
                     buffer_json_array_close(wb);
                 }
@@ -5360,46 +5225,17 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                     buffer_json_array_close(wb);
                     buffer_json_member_add_array(wb, "values");
 
-#define NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(member) do { \
-                    topology_v1_values_start(wb); \
-                    for(size_t i = 0; i < payload->processes_used; i++) { \
-                        if(topology_abort_iteration_checkpoint(i) && \
-                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                            return abort_status; \
-                        buffer_json_add_array_item_uint64(wb, payload->processes[i].member); \
-                    } \
-                    topology_v1_values_end(wb); \
-                } while(0)
-#define NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(member) do { \
-                    NV_TOPOLOGY_V1_STRING_COLUMN column; \
-                    topology_v1_string_column_init(&column, payload->processes_used); \
-                    for(size_t i = 0; i < payload->processes_used; i++) { \
-                        if(topology_abort_iteration_checkpoint(i) && \
-                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                            break; \
-                        topology_v1_string_column_add(&column, payload->processes[i].member); \
-                    } \
-                    if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
-                        topology_v1_emit_auto_string_column(wb, &column); \
-                    topology_v1_string_column_free(&column); \
-                    if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
-                        return abort_status; \
-                } while(0)
-
-                    NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(actor);
-                    NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(pid);
-                    NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(ppid);
-                    NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(uid);
-                    NV_TOPOLOGY_V1_PROCESS_UINT_VALUES(net_ns_inode);
-                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(process);
-                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(username);
-                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(namespace_type);
-                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(local_ip);
-                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(local_address_space);
-                    NV_TOPOLOGY_V1_PROCESS_STRING_VALUES(cmdline);
-
-#undef NV_TOPOLOGY_V1_PROCESS_UINT_VALUES
-#undef NV_TOPOLOGY_V1_PROCESS_STRING_VALUES
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes, payload->processes_used, actor);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes, payload->processes_used, pid);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes, payload->processes_used, ppid);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes, payload->processes_used, uid);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->processes, payload->processes_used, net_ns_inode);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, process);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, username);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, namespace_type);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, local_ip);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, local_address_space);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->processes, payload->processes_used, cmdline);
 
                     buffer_json_array_close(wb);
                 }
@@ -5418,50 +5254,21 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                     buffer_json_array_close(wb);
                     buffer_json_member_add_array(wb, "values");
 
-#define NV_TOPOLOGY_V1_CGROUP_UINT_VALUES(member) do { \
-                    topology_v1_values_start(wb); \
-                    for(size_t i = 0; i < payload->cgroups_used; i++) { \
-                        if(topology_abort_iteration_checkpoint(i) && \
-                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                            return abort_status; \
-                        buffer_json_add_array_item_uint64(wb, payload->cgroups[i].member); \
-                    } \
-                    topology_v1_values_end(wb); \
-                } while(0)
-#define NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(member) do { \
-                    NV_TOPOLOGY_V1_STRING_COLUMN column; \
-                    topology_v1_string_column_init(&column, payload->cgroups_used); \
-                    for(size_t i = 0; i < payload->cgroups_used; i++) { \
-                        if(topology_abort_iteration_checkpoint(i) && \
-                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                            break; \
-                        topology_v1_string_column_add(&column, payload->cgroups[i].member); \
-                    } \
-                    if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
-                        topology_v1_emit_auto_string_column(wb, &column); \
-                    topology_v1_string_column_free(&column); \
-                    if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
-                        return abort_status; \
-                } while(0)
-
-                    NV_TOPOLOGY_V1_CGROUP_UINT_VALUES(actor);
-                    NV_TOPOLOGY_V1_CGROUP_UINT_VALUES(pid);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(cgroup_status);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(cgroup_path);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(cgroup_name);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(container_name);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(orchestrator);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(actor_kind);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(k8s_pod_name);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(k8s_namespace);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(k8s_workload);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(docker_container_name);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(docker_image);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(systemd_unit_name);
-                    NV_TOPOLOGY_V1_CGROUP_STRING_VALUES(systemd_unit_kind);
-
-#undef NV_TOPOLOGY_V1_CGROUP_UINT_VALUES
-#undef NV_TOPOLOGY_V1_CGROUP_STRING_VALUES
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->cgroups, payload->cgroups_used, actor);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->cgroups, payload->cgroups_used, pid);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, cgroup_status);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, cgroup_path);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, cgroup_name);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, container_name);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, orchestrator);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, actor_kind);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, k8s_pod_name);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, k8s_namespace);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, k8s_workload);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, docker_container_name);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, docker_image);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, systemd_unit_name);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->cgroups, payload->cgroups_used, systemd_unit_kind);
 
                     buffer_json_array_close(wb);
                 }
@@ -5480,37 +5287,11 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                     buffer_json_array_close(wb);
                     buffer_json_member_add_array(wb, "values");
 
-#define NV_TOPOLOGY_V1_LABEL_UINT_VALUES(member) do { \
-                    topology_v1_values_start(wb); \
-                    for(size_t i = 0; i < payload->labels_used; i++) { \
-                        if(topology_abort_iteration_checkpoint(i) && \
-                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                            return abort_status; \
-                        buffer_json_add_array_item_uint64(wb, payload->labels[i].member); \
-                    } \
-                    topology_v1_values_end(wb); \
-                } while(0)
-#define NV_TOPOLOGY_V1_LABEL_STRING_VALUES(member) do { \
-                    NV_TOPOLOGY_V1_STRING_COLUMN column; \
-                    topology_v1_string_column_init(&column, payload->labels_used); \
-                    for(size_t i = 0; i < payload->labels_used; i++) { \
-                        if(topology_abort_iteration_checkpoint(i) && \
-                           (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                            break; \
-                        topology_v1_string_column_add(&column, payload->labels[i].member); \
-                    } \
-                    if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
-                        topology_v1_emit_auto_string_column(wb, &column); \
-                    topology_v1_string_column_free(&column); \
-                    if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
-                        return abort_status; \
-                } while(0)
-
-                    NV_TOPOLOGY_V1_LABEL_UINT_VALUES(actor);
-                    NV_TOPOLOGY_V1_LABEL_STRING_VALUES(key);
-                    NV_TOPOLOGY_V1_LABEL_STRING_VALUES(value);
-                    NV_TOPOLOGY_V1_LABEL_STRING_VALUES(source);
-                    NV_TOPOLOGY_V1_LABEL_STRING_VALUES(kind);
+                    NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->labels, payload->labels_used, actor);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels, payload->labels_used, key);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels, payload->labels_used, value);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels, payload->labels_used, source);
+                    NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->labels, payload->labels_used, kind);
 
                     topology_v1_values_start(wb);
                     for(size_t i = 0; i < payload->labels_used; i++) {
@@ -5520,9 +5301,6 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                         topology_v1_add_nullable_uint(wb, payload->labels[i].has_value_index, payload->labels[i].value_index);
                     }
                     topology_v1_values_end(wb);
-
-#undef NV_TOPOLOGY_V1_LABEL_UINT_VALUES
-#undef NV_TOPOLOGY_V1_LABEL_STRING_VALUES
 
                     buffer_json_array_close(wb);
                 }
@@ -5546,63 +5324,17 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                         buffer_json_array_close(wb);
                         buffer_json_member_add_array(wb, "values");
 
-#define NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(member) do { \
-                            topology_v1_values_start(wb); \
-                            for(size_t i = 0; i < payload->connections_used; i++) { \
-                                if(topology_abort_iteration_checkpoint(i) && \
-                                   (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                                    return abort_status; \
-                                buffer_json_add_array_item_uint64(wb, payload->connections[i].member); \
-                            } \
-                            topology_v1_values_end(wb); \
-                        } while(0)
-#define NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(member) do { \
-                            NV_TOPOLOGY_V1_STRING_COLUMN column; \
-                            topology_v1_string_column_init(&column, payload->connections_used); \
-                            for(size_t i = 0; i < payload->connections_used; i++) { \
-                                if(topology_abort_iteration_checkpoint(i) && \
-                                   (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                                    break; \
-                                topology_v1_string_column_add(&column, payload->connections[i].member); \
-                            } \
-                            if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
-                                topology_v1_emit_auto_string_column(wb, &column); \
-                            topology_v1_string_column_free(&column); \
-                            if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
-                                return abort_status; \
-                        } while(0)
-
-                        NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(src_actor);
-                        NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(dst_actor);
-                        NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(client_ip);
-                        NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(server_ip);
-                        NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(protocol);
-                        NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(state);
-                        NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(socket_count);
+                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections, payload->connections_used, src_actor);
+                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections, payload->connections_used, dst_actor);
+                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections, payload->connections_used, client_ip);
+                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections, payload->connections_used, server_ip);
+                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections, payload->connections_used, protocol);
+                        NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->connections, payload->connections_used, state);
+                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections, payload->connections_used, socket_count);
 #if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
-                        NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(retransmissions);
-
-                        topology_v1_values_start(wb);
-                        for(size_t i = 0; i < payload->connections_used; i++) {
-                            if(topology_abort_iteration_checkpoint(i) &&
-                               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
-                                return abort_status;
-                            buffer_json_add_array_item_double(wb, (double)payload->connections[i].max_rtt_usec / (double)USEC_PER_MS);
-                        }
-                        topology_v1_values_end(wb);
-
-                        topology_v1_values_start(wb);
-                        for(size_t i = 0; i < payload->connections_used; i++) {
-                            if(topology_abort_iteration_checkpoint(i) &&
-                               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
-                                return abort_status;
-                            buffer_json_add_array_item_double(wb, (double)payload->connections[i].max_rcv_rtt_usec / (double)USEC_PER_MS);
-                        }
-                        topology_v1_values_end(wb);
+                        NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->connections, payload->connections_used, retransmissions);
+                        NV_TOPOLOGY_V1_EMIT_RTT_COLUMNS(payload->connections, payload->connections_used, max_rtt_usec, max_rcv_rtt_usec);
 #endif
-
-#undef NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES
-#undef NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES
 
                         buffer_json_array_close(wb);
                     }
@@ -5638,85 +5370,28 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_evidence_table(
                 buffer_json_array_close(wb);
                 buffer_json_member_add_array(wb, "values");
 
-#define NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES(member) do { \
-                topology_v1_values_start(wb); \
-                for(size_t i = 0; i < payload->evidence_used; i++) { \
-                    if(topology_abort_iteration_checkpoint(i) && \
-                       (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                        return abort_status; \
-                    buffer_json_add_array_item_uint64(wb, payload->evidence[i].member); \
-                } \
-                topology_v1_values_end(wb); \
-            } while(0)
-#define NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(member) do { \
-                topology_v1_values_start(wb); \
-                for(size_t i = 0; i < payload->evidence_used; i++) { \
-                    if(topology_abort_iteration_checkpoint(i) && \
-                       (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                        return abort_status; \
-                    buffer_json_add_array_item_uint64(wb, payload->evidence[i].source->member); \
-                } \
-                topology_v1_values_end(wb); \
-            } while(0)
-#define NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(member) do { \
-                NV_TOPOLOGY_V1_STRING_COLUMN column; \
-                topology_v1_string_column_init(&column, payload->evidence_used); \
-                for(size_t i = 0; i < payload->evidence_used; i++) { \
-                    if(topology_abort_iteration_checkpoint(i) && \
-                       (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                        break; \
-                    topology_v1_string_column_add(&column, payload->evidence[i].source->member); \
-                } \
-                if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
-                    topology_v1_emit_auto_string_column(wb, &column); \
-                topology_v1_string_column_free(&column); \
-                if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
-                    return abort_status; \
-            } while(0)
-
-                NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES(link);
-                NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES(src_actor);
-                NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES(dst_actor);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(client_ip);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(client_port);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(server_ip);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(server_port);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(protocol);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(protocol_family);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(state);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(namespace_type);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(client_address_space);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(server_address_space);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(pid);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(uid);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(net_ns_inode);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(process);
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(sockets);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, link);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, src_actor);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, dst_actor);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->client_ip);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->client_port);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->server_ip);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->server_port);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->protocol);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->protocol_family);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->state);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->namespace_type);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->client_address_space);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->server_address_space);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->pid);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->uid);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->net_ns_inode);
+                NV_TOPOLOGY_V1_EMIT_STRING_COL(payload->evidence, payload->evidence_used, source->process);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->sockets);
 #if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
-                NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(retransmissions);
-
-                topology_v1_values_start(wb);
-                for(size_t i = 0; i < payload->evidence_used; i++) {
-                    if(topology_abort_iteration_checkpoint(i) &&
-                       (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
-                        return abort_status;
-                    buffer_json_add_array_item_double(wb, (double)payload->evidence[i].source->max_rtt_usec / (double)USEC_PER_MS);
-                }
-                topology_v1_values_end(wb);
-
-                topology_v1_values_start(wb);
-                for(size_t i = 0; i < payload->evidence_used; i++) {
-                    if(topology_abort_iteration_checkpoint(i) &&
-                       (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
-                        return abort_status;
-                    buffer_json_add_array_item_double(wb, (double)payload->evidence[i].source->max_rcv_rtt_usec / (double)USEC_PER_MS);
-                }
-                topology_v1_values_end(wb);
+                NV_TOPOLOGY_V1_EMIT_UINT_COL(payload->evidence, payload->evidence_used, source->retransmissions);
+                NV_TOPOLOGY_V1_EMIT_RTT_COLUMNS(payload->evidence, payload->evidence_used, source->max_rtt_usec, source->max_rcv_rtt_usec);
 #endif
-
-#undef NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES
-#undef NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES
-#undef NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES
 
                 buffer_json_array_close(wb);
             }
@@ -5761,27 +5436,9 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_correlation_table(
 
     topology_v1_const_string(wb, "socket_exact");
 
-#define NV_TOPOLOGY_V1_CORRELATION_STRING_VALUES(member) do { \
-        NV_TOPOLOGY_V1_STRING_COLUMN column; \
-        topology_v1_string_column_init(&column, rows_used); \
-        for(size_t i = 0; i < rows_used; i++) { \
-            if(topology_abort_iteration_checkpoint(i) && \
-               (abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE) \
-                break; \
-            topology_v1_string_column_add(&column, rows[i].member); \
-        } \
-        if(abort_status == NV_TOPOLOGY_ABORT_NONE) \
-            topology_v1_emit_auto_string_column(wb, &column); \
-        topology_v1_string_column_free(&column); \
-        if(abort_status != NV_TOPOLOGY_ABORT_NONE) \
-            return abort_status; \
-    } while(0)
-
-    NV_TOPOLOGY_V1_CORRELATION_STRING_VALUES(protocol);
-    NV_TOPOLOGY_V1_CORRELATION_STRING_VALUES(address_space);
-    NV_TOPOLOGY_V1_CORRELATION_STRING_VALUES(ip);
-
-#undef NV_TOPOLOGY_V1_CORRELATION_STRING_VALUES
+    NV_TOPOLOGY_V1_EMIT_STRING_COL(rows, rows_used, protocol);
+    NV_TOPOLOGY_V1_EMIT_STRING_COL(rows, rows_used, address_space);
+    NV_TOPOLOGY_V1_EMIT_STRING_COL(rows, rows_used, ip);
 
     topology_v1_values_start(wb);
     for(size_t i = 0; i < rows_used; i++) {
@@ -6042,6 +5699,24 @@ cleanup:
     return abort_status;
 }
 
+// Create and initialize a BUFFER for a JSON function response.
+// Ownership is transferred to the caller; do not use CLEAN_BUFFER on the return value.
+static BUFFER *nv_response_preamble(void) {
+    BUFFER *wb = buffer_create(0, NULL);
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    return wb;
+}
+
+// NV_DISPATCH calls the given result expression, emits the response for the
+// current transaction, then frees the buffer.  Requires `transaction` in scope.
+#define NV_DISPATCH(wb_expr) do { \
+    BUFFER *_nv_wb = (wb_expr); \
+    network_viewer_emit_response(transaction, _nv_wb); \
+    buffer_free(_nv_wb); \
+} while(0)
+
 static BUFFER *network_viewer_topology_result(
     char *function, usec_t *stop_monotonic_ut,
     bool *cancelled, BUFFER *payload) {
@@ -6070,10 +5745,7 @@ static BUFFER *network_viewer_topology_result(
             topology_abort_message(abort_status));
     }
 
-    BUFFER *wb = buffer_create(0, NULL);
-    buffer_flush(wb);
-    wb->content_type = CT_APPLICATION_JSON;
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    BUFFER *wb = nv_response_preamble();
 
     topology_write_response_metadata(wb);
 
@@ -6104,9 +5776,7 @@ static void network_viewer_topology_function(
     bool *cancelled, BUFFER *payload, HTTP_ACCESS access __maybe_unused,
     const char *source __maybe_unused, void *data __maybe_unused) {
 
-    BUFFER *wb = network_viewer_topology_result(function, stop_monotonic_ut, cancelled, payload);
-    network_viewer_emit_response(transaction, wb);
-    buffer_free(wb);
+    NV_DISPATCH(network_viewer_topology_result(function, stop_monotonic_ut, cancelled, payload));
 }
 
 static int local_sockets_compar(const void *a, const void *b) {
@@ -6119,10 +5789,11 @@ static BUFFER *network_viewer_result(char *function) {
     time_t now_s = now_realtime_sec();
     bool aggregated = false;
 
-    BUFFER *wb = buffer_create(0, NULL);
-    buffer_flush(wb);
-    wb->content_type = CT_APPLICATION_JSON;
-    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+#if defined(OS_LINUX)
+    network_viewer_ebpf_shared_memory_refresh();
+#endif
+
+    BUFFER *wb = nv_response_preamble();
 
     struct sockets_stats st = {
         .wb = wb,
@@ -6516,6 +6187,26 @@ static BUFFER *network_viewer_result(char *function) {
                                         NULL);
 #endif
 
+            // eBPF per-PID socket counters (populated on Linux when ebpfgo.plugin is running)
+#define NV_EBPF_FIELD(id, label, unit)                                             \
+            buffer_rrdf_table_add_field(wb, field_id++, id, label,                \
+                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE,                  \
+                RRDF_FIELD_TRANSFORM_NONE, 0, unit, NAN,                           \
+                RRDF_FIELD_SORT_DESCENDING, NULL,                                  \
+                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_RANGE,                   \
+                RRDF_FIELD_OPTS_NONE, NULL)
+            NV_EBPF_FIELD("eBPFBytesSent",  "eBPF TCP Bytes Sent by PID",       "bytes");
+            NV_EBPF_FIELD("eBPFBytesRecv",  "eBPF TCP Bytes Received by PID",   "bytes");
+            NV_EBPF_FIELD("eBPFTCPSent",    "eBPF TCP Send Calls by PID",       "calls");
+            NV_EBPF_FIELD("eBPFTCPRecv",    "eBPF TCP Receive Calls by PID",    "calls");
+            NV_EBPF_FIELD("eBPFRetransmit", "eBPF TCP Retransmissions by PID",  "calls");
+            NV_EBPF_FIELD("eBPFUDPSent",    "eBPF UDP Send Calls by PID",       "calls");
+            NV_EBPF_FIELD("eBPFUDPRecv",    "eBPF UDP Receive Calls by PID",    "calls");
+            NV_EBPF_FIELD("eBPFClose",      "eBPF TCP Close Calls by PID",      "calls");
+            NV_EBPF_FIELD("eBPFConnV4",     "eBPF IPv4 TCP Connections by PID", "connections");
+            NV_EBPF_FIELD("eBPFConnV6",     "eBPF IPv6 TCP Connections by PID", "connections");
+#undef NV_EBPF_FIELD
+
             // Count
             buffer_rrdf_table_add_field(wb, field_id++, "Count", "Number of sockets like this",
                                         RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
@@ -6540,38 +6231,19 @@ static BUFFER *network_viewer_result(char *function) {
 
         buffer_json_member_add_object(wb, "charts");
         {
-            buffer_json_member_add_object(wb, "Count by Direction");
-            {
-                buffer_json_member_add_string(wb, "type", "stacked-bar");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Direction");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Count by Process");
-            {
-                buffer_json_member_add_string(wb, "type", "stacked-bar");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Process");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Count by Protocol");
-            {
-                buffer_json_member_add_string(wb, "type", "stacked-bar");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Protocol");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
+#define NV_STACKED_BAR_CHART(name_, col_)                                          \
+            buffer_json_member_add_object(wb, name_);                              \
+            {                                                                      \
+                buffer_json_member_add_string(wb, "type", "stacked-bar");          \
+                buffer_json_member_add_array(wb, "columns");                       \
+                { buffer_json_add_array_item_string(wb, col_); }                   \
+                buffer_json_array_close(wb);                                       \
+            }                                                                      \
+            buffer_json_object_close(wb)
+            NV_STACKED_BAR_CHART("Count by Direction", "Direction");
+            NV_STACKED_BAR_CHART("Count by Process",   "Process");
+            NV_STACKED_BAR_CHART("Count by Protocol",  "Protocol");
+#undef NV_STACKED_BAR_CHART
         }
         buffer_json_object_close(wb); // charts
 
@@ -6591,95 +6263,26 @@ static BUFFER *network_viewer_result(char *function) {
 
         buffer_json_member_add_object(wb, "group_by");
         {
-            buffer_json_member_add_object(wb, "Direction");
-            {
-                buffer_json_member_add_string(wb, "name", "Direction");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Direction");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Protocol");
-            {
-                buffer_json_member_add_string(wb, "name", "Protocol");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Protocol");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Namespace");
-            {
-                buffer_json_member_add_string(wb, "name", "Namespace");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Namespace");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
-            buffer_json_member_add_object(wb, "Process");
-            {
-                buffer_json_member_add_string(wb, "name", "Process");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, "Process");
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-
+#define NV_GROUP_BY_SINGLE(key_, display_name_)                                    \
+            buffer_json_member_add_object(wb, key_);                               \
+            {                                                                      \
+                buffer_json_member_add_string(wb, "name", display_name_);          \
+                buffer_json_member_add_array(wb, "columns");                       \
+                { buffer_json_add_array_item_string(wb, key_); }                   \
+                buffer_json_array_close(wb);                                       \
+            }                                                                      \
+            buffer_json_object_close(wb)
+            NV_GROUP_BY_SINGLE("Direction", "Direction");
+            NV_GROUP_BY_SINGLE("Protocol",  "Protocol");
+            NV_GROUP_BY_SINGLE("Namespace", "Namespace");
+            NV_GROUP_BY_SINGLE("Process",   "Process");
             if(!aggregated) {
-                buffer_json_member_add_object(wb, "LocalIP");
-                {
-                    buffer_json_member_add_string(wb, "name", "Local IP");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "LocalIP");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
-
-                buffer_json_member_add_object(wb, "LocalPort");
-                {
-                    buffer_json_member_add_string(wb, "name", "Local Port");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "LocalPort");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
-
-                buffer_json_member_add_object(wb, "RemoteIP");
-                {
-                    buffer_json_member_add_string(wb, "name", "Remote IP");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "RemoteIP");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
-
-                buffer_json_member_add_object(wb, "RemotePort");
-                {
-                    buffer_json_member_add_string(wb, "name", "Remote Port");
-                    buffer_json_member_add_array(wb, "columns");
-                    {
-                        buffer_json_add_array_item_string(wb, "RemotePort");
-                    }
-                    buffer_json_array_close(wb);
-                }
-                buffer_json_object_close(wb);
+                NV_GROUP_BY_SINGLE("LocalIP",    "Local IP");
+                NV_GROUP_BY_SINGLE("LocalPort",  "Local Port");
+                NV_GROUP_BY_SINGLE("RemoteIP",   "Remote IP");
+                NV_GROUP_BY_SINGLE("RemotePort", "Remote Port");
             }
+#undef NV_GROUP_BY_SINGLE
         }
         buffer_json_object_close(wb); // group_by
     }
@@ -6699,10 +6302,272 @@ void network_viewer_function(
     BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
     const char *source __maybe_unused, void *data __maybe_unused) {
 
-    BUFFER *wb = network_viewer_result(function);
-    network_viewer_emit_response(transaction, wb);
-    buffer_free(wb);
+    NV_DISPATCH(network_viewer_result(function));
 }
+
+// ----------------------------------------------------------------------------------------------------------------
+// Linux: dns-queries function (data from ebpf-go.plugin via shared memory)
+
+#if defined(OS_LINUX)
+
+/* DNS query type name (QTYPE) — most common types for fast lookup. */
+static const char *nv_dns_qtype_name(uint16_t qtype)
+{
+    switch (qtype) {
+    case   1: return "A";
+    case   2: return "NS";
+    case   5: return "CNAME";
+    case   6: return "SOA";
+    case  12: return "PTR";
+    case  15: return "MX";
+    case  16: return "TXT";
+    case  28: return "AAAA";
+    case  33: return "SRV";
+    case  65: return "HTTPS";
+    case 255: return "ANY";
+    default:  return NULL;  /* caller formats numeric string */
+    }
+}
+
+/* DNS RCODE name — RFC 2929 / RFC 6895. */
+static const char *nv_dns_rcode_name(uint16_t rcode)
+{
+    switch (rcode) {
+    case 0: return "NOERROR";
+    case 1: return "FORMERR";
+    case 2: return "SERVFAIL";
+    case 3: return "NXDOMAIN";
+    case 4: return "NOTIMP";
+    case 5: return "REFUSED";
+    case 6: return "YXDOMAIN";
+    case 7: return "YXRRSET";
+    case 8: return "NXRRSET";
+    case 9: return "NOTAUTH";
+    default: return NULL;   /* caller formats numeric string */
+    }
+}
+
+/* update_every matches the 20-second per-query ring TTL. */
+#define NV_DNS_UPDATE_EVERY 20
+
+static BUFFER *network_viewer_dns_result(void)
+{
+    struct ebpfgo_dns_shared *dns = mallocz(sizeof(*dns));
+    if (!network_viewer_dns_shared_memory_snapshot(dns)) {
+        freez(dns);
+        return network_viewer_json_error_response(
+            HTTP_RESP_SERVICE_UNAVAILABLE,
+            "dns-queries: data not yet available (enable dns = yes in ebpf.d.conf)");
+    }
+
+    uint32_t flow_count = dns->hdr.live_count;
+    if (flow_count > NETDATA_EBPFGO_DNS_FLOW_RING_CAP)
+        flow_count = NETDATA_EBPFGO_DNS_FLOW_RING_CAP;
+
+    time_t now_s = now_realtime_sec();
+    BUFFER *wb = nv_response_preamble();
+
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", NV_DNS_UPDATE_EVERY);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", NETWORK_DNS_QUERIES_FUNCTION_HELP);
+
+    buffer_json_member_add_array(wb, "data");
+    {
+        char ip_buf[INET6_ADDRSTRLEN];
+        char num_buf[32];
+
+        for (uint32_t i = 0; i < flow_count; i++) {
+            const struct ebpfgo_dns_flow_record *r = &dns->ring[i];
+
+            /* Format server IP.  inet_ntop returns NULL on malformed input
+             * (e.g. ip_version lies about the family); fall back to a safe
+             * placeholder so ip_buf is never passed uninitialised to the
+             * JSON writer. */
+            const char *ip_str;
+            if (r->ip_version == 4) {
+                ip_str = inet_ntop(AF_INET, &r->server_ip[0], ip_buf, sizeof(ip_buf));
+            } else {
+                ip_str = inet_ntop(AF_INET6, r->server_ip, ip_buf, sizeof(ip_buf));
+            }
+            if (!ip_str)
+                ip_str = "(invalid)";
+
+            /* Format query type */
+            const char *qtype_name = nv_dns_qtype_name(r->query_type);
+            if (!qtype_name) {
+                snprintfz(num_buf, sizeof(num_buf), "%u", (unsigned)r->query_type);
+                qtype_name = num_buf;
+            }
+
+            /* Format rcode */
+            const char *rcode_name = nv_dns_rcode_name(r->rcode);
+            char rcode_buf[16];
+            if (!rcode_name) {
+                snprintfz(rcode_buf, sizeof(rcode_buf), "%u", (unsigned)r->rcode);
+                rcode_name = rcode_buf;
+            }
+
+            char domain_buf[NETDATA_EBPFGO_DNS_DOMAIN_MAX];
+            memcpy(domain_buf, r->domain, sizeof(domain_buf));
+            domain_buf[sizeof(domain_buf) - 1] = '\0';
+
+            buffer_json_add_array_item_array(wb);
+            buffer_json_add_array_item_string(wb, domain_buf[0] ? domain_buf : "(unknown)");
+            buffer_json_add_array_item_string(wb, qtype_name);
+            buffer_json_add_array_item_string(wb, (r->protocol == 17) ? "UDP" : "TCP");
+            buffer_json_add_array_item_string(wb, (r->ip_version == 4) ? "IPv4" : "IPv6");
+            buffer_json_add_array_item_string(wb, ip_str);
+            buffer_json_add_array_item_double(wb, (double)r->latency_us / 1e6);
+            buffer_json_add_array_item_string(wb, r->timed_out ? "Timeout" : "OK");
+            buffer_json_add_array_item_string(wb, rcode_name);
+            /* Synthetic columns for chart: 1 query per row; responses = non-timed-out */
+            buffer_json_add_array_item_uint64(wb, 1);
+            buffer_json_add_array_item_uint64(wb, r->timed_out ? 0 : 1);
+            buffer_json_array_close(wb);
+        }
+    }
+    buffer_json_array_close(wb); // data
+
+    size_t field_id = 0;
+    buffer_json_member_add_object(wb, "columns");
+    {
+        buffer_rrdf_table_add_field(wb, field_id++, "Domain", "Queried Domain Name",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_FACET,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_STICKY, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "QueryType", "DNS Query Type",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Transport", "Transport Protocol",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "IPFamily", "IP Protocol Family",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "ServerIP", "DNS Server IP Address",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Latency", "Query-to-Response Latency",
+            RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
+            0, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,
+            RRDF_FIELD_FILTER_RANGE,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Status", "Query Completion Status",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "RCode", "DNS Response Code",
+            RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+            0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL, RRDF_FIELD_SUMMARY_COUNT,
+            RRDF_FIELD_FILTER_MULTISELECT,
+            RRDF_FIELD_OPTS_VISIBLE, NULL);
+
+        /* Synthetic columns used by the aggregate chart only — hidden from table view. */
+        buffer_rrdf_table_add_field(wb, field_id++, "Queries", "DNS Queries (count)",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+            0, "queries", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Responses", "DNS Responses (count)",
+            RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+            0, "responses", NAN, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+            RRDF_FIELD_FILTER_RANGE, RRDF_FIELD_OPTS_NONE, NULL);
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_string(wb, "default_sort_column", "Latency");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        buffer_json_member_add_object(wb, "Traffic");
+        {
+            buffer_json_member_add_string(wb, "name", "Traffic");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Queries");
+                buffer_json_add_array_item_string(wb, "Responses");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb); // Traffic
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Traffic");
+        buffer_json_add_array_item_string(wb, "Transport");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb); // default_charts
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        buffer_json_member_add_object(wb, "Transport");
+        {
+            buffer_json_member_add_string(wb, "name", "Transport");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "Transport");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "IPFamily");
+        {
+            buffer_json_member_add_string(wb, "name", "IP Family");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "IPFamily");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Status");
+        {
+            buffer_json_member_add_string(wb, "name", "Status");
+            buffer_json_member_add_array(wb, "columns");
+            buffer_json_add_array_item_string(wb, "Status");
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group_by
+
+    network_viewer_finalize_response_buffer(wb, now_s);
+    freez(dns);
+    return wb;
+}
+
+static void network_viewer_dns_function(
+    const char *transaction, char *function __maybe_unused,
+    usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+    BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused)
+{
+    NV_DISPATCH(network_viewer_dns_result());
+}
+
+#endif /* OS_LINUX */
 
 // ----------------------------------------------------------------------------------------------------------------
 // FreeBSD/macOS: network-protocols function
@@ -7351,6 +7216,11 @@ int main(int argc, char **argv) {
         __atomic_store_n(&plugin_should_exit, true, __ATOMIC_RELEASE);
         nv_apps_lookup_stop();
 
+#if defined(OS_LINUX)
+        network_viewer_ebpf_shared_memory_close();
+        network_viewer_dns_shared_memory_close();
+#endif
+
 #if defined(LOCAL_SOCKETS_USE_SETNS)
         spawn_server_destroy(spawn_srv);
         spawn_srv = NULL;
@@ -7381,6 +7251,10 @@ int main(int argc, char **argv) {
 #if defined(LOCAL_SOCKETS_USE_SETNS)
         spawn_server_destroy(spawn_srv);
 #endif
+#if defined(OS_LINUX)
+        network_viewer_ebpf_shared_memory_close();
+        network_viewer_dns_shared_memory_close();
+#endif
         exit(1);
     }
 
@@ -7397,6 +7271,14 @@ int main(int argc, char **argv) {
         NETWORK_CONNECTIONS_VIEWER_HELP,
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
             RRDFUNCTIONS_PRIORITY_DEFAULT);
+
+#if defined(OS_LINUX)
+    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
+            NETWORK_DNS_QUERIES_FUNCTION, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
+            NETWORK_DNS_QUERIES_FUNCTION_HELP,
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE),
+            RRDFUNCTIONS_PRIORITY_DEFAULT);
+#endif
 
 #if defined(OS_FREEBSD) || defined(OS_MACOS)
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
@@ -7420,6 +7302,13 @@ int main(int argc, char **argv) {
                                   network_viewer_topology_function,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
                                   NULL);
+
+#if defined(OS_LINUX)
+    functions_evloop_add_function(wg, NETWORK_DNS_QUERIES_FUNCTION,
+                                  network_viewer_dns_function,
+                                  PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
+                                  NULL);
+#endif
 
 #if defined(OS_FREEBSD) || defined(OS_MACOS)
     functions_evloop_add_function(wg, NETWORK_PROTOCOLS_FUNCTION,
@@ -7464,6 +7353,11 @@ int main(int argc, char **argv) {
     functions_evloop_cancel_threads(wg);
     functions_evloop_join_threads(wg);
     nv_apps_lookup_stop();
+
+#if defined(OS_LINUX)
+    network_viewer_ebpf_shared_memory_close();
+    network_viewer_dns_shared_memory_close();
+#endif
 
 #if defined(LOCAL_SOCKETS_USE_SETNS)
     spawn_server_destroy(spawn_srv);

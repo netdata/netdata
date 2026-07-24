@@ -1,6 +1,6 @@
 <!--startmeta
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/integrations/ebpf_socket.md"
-meta_yaml: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/metadata.yaml"
+meta_yaml: "https://github.com/netdata/netdata/edit/master/src/collectors/ebpf.plugin/ebpfgo.plugin/metadata.yaml"
 sidebar_label: "eBPF Socket"
 learn_status: "Published"
 learn_rel_path: "Collecting Metrics/Collectors/Networking"
@@ -14,16 +14,16 @@ endmeta-->
 <img src="https://netdata.cloud/img/ebpf.jpg" width="150"/>
 
 
-Plugin: ebpf.plugin
+Plugin: ebpf-go.plugin
 Module: socket
 
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Overview
 
-Monitor bandwidth consumption per application for protocols TCP and UDP.
+Monitor TCP and UDP function calls, bandwidth, errors, and connection counts. Data is exposed through the on-demand `network-protocols` function consumed by the network-viewer.
 
-Attach tracing (kprobe, trampoline) to internal kernel functions according options used to compile kernel.
+Attach kprobe or fentry/fexit trampolines to the kernel functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, `tcp_connect` (IPv4 and IPv6), `tcp_close`, `udp_sendmsg`, and `udp_recvmsg`. Per-cycle deltas and byte counts are computed in userspace from the BPF map snapshots.
 
 This collector is only supported on the following platforms:
 
@@ -88,18 +88,11 @@ All options are defined inside section `[global]`. Options inside `network conne
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| update every | Data collection frequency. | 10 | no |
-| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
-| apps | Enable or disable integration with apps.plugin | no | no |
-| cgroups | Enable or disable integration with cgroup.plugin | no | no |
-| bandwidth table size | Number of elements stored inside hash tables used to monitor calls per PID. | 16384 | no |
-| ipv4 connection table size | Number of elements stored inside hash tables used to monitor calls per IPV4 connections. | 16384 | no |
-| ipv6 connection table size | Number of elements stored inside hash tables used to monitor calls per IPV6 connections. | 16384 | no |
-| udp connection table size | Number of temporary elements stored inside hash tables used to monitor UDP connections. | 4096 | no |
-| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | no |
-| ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | no |
-| maps per core | Define how plugin will load their hash maps. When enabled (`yes`) plugin will load one hash table per core, instead to have centralized information. | yes | no |
-| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
+| socket | Enable (`yes`) or disable (`no`) the socket monitoring module. | no | no |
+| update every | Data collection frequency in seconds. | 10 | no |
+| maps per core | When enabled (`yes`), the plugin allocates one BPF hash table per CPU core instead of a single shared table. Improves throughput on multi-core systems; ignored on kernels older than 4.15. | yes | no |
+| btf path | Path to the directory containing BTF files used for CO-RE (Compile Once, Run Everywhere) loading. | /sys/kernel/btf/ | no |
+| ebpf object flavor | Select the BPF object flavor. Available values are `arena`, `buffer ring` (also accepted as `buffer`), and `legacy` (also accepted as `tracing`). The collector falls back to the next available flavor when the requested one is not supported by the running kernel. | buffer | no |
 
 
 </details>
@@ -108,7 +101,7 @@ All options are defined inside section `[global]`. Options inside `network conne
 
 #### via File
 
-The configuration file name for this integration is `ebpf.d/network.conf`.
+The configuration file name for this integration is `ebpf.d.conf`.
 
 The file format is a modified INI syntax. The general structure is:
 
@@ -125,7 +118,7 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 
 ```bash
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config ebpf.d/network.conf
+sudo ./edit-config ebpf.d.conf
 ```
 
 ##### Examples
@@ -141,12 +134,53 @@ There are no alerts configured by default for this integration.
 
 ## Metrics
 
-Metrics grouped by *scope*.
+This module does not publish standalone Netdata charts. It attaches to kernel TCP/UDP functions
+and exposes the collected data through the on-demand **`network-protocols`** function
+(FUNCTIONGLOBAL) consumed by the network-viewer.
 
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+> **Migration note** — Prior versions of `ebpf.plugin` published the following standalone charts
+> that supported alerting and metric retention. These charts are **permanently removed**; the
+> data is now available through the `network-protocols` on-demand function in network-viewer.
+> On-demand function output does not support alerting or metric retention.
+>
+> Removed host-level charts: `ip.inbound_conn`, `ip.tcp_outbound_conn`, `ip.tcp_functions`,
+> `ip.total_tcp_bandwidth`, `ip.tcp_error`, `ip.tcp_retransmit`, `ip.udp_functions`,
+> `ip.total_udp_bandwidth`, `ip.udp_error`.
+>
+> Removed per-app charts: `app.ebpf_call_tcp_v4_connection`, `app.ebpf_call_tcp_v6_connection`,
+> `app.ebpf_sock_total_bandwidth`, `app.ebpf_call_tcp_sendmsg`, `app.ebpf_call_tcp_cleanup_rbuf`,
+> `app.ebpf_call_tcp_retransmit`, `app.ebpf_call_udp_sendmsg`, `app.ebpf_call_udp_recvmsg`.
+>
+> **Configuration changes from `network.conf`** — The `network.conf` file has been replaced by
+> `socket.conf`. The following defaults changed silently:
+>
+> - `maps per core` changed from `no` to `yes`. Per-core BPF maps use more memory but reduce
+>   contention on multi-core systems. To restore the previous behaviour add `maps per core = no`
+>   to `socket.conf`.
+> - `ebpf co-re tracing` changed from `probe` (kprobe/legacy BPF) to `trampoline` (auto-detected).
+>   To force kprobes add `ebpf co-re tracing = probe` to `socket.conf`.
+> - The `[network connections]` and `[service name]` sections from `network.conf` have no
+>   equivalent in `socket.conf` and are not read; any per-port service name overrides are lost.
 
+### `network-protocols` function columns
 
+The `network-protocols` function returns a table with one row per transport protocol and the
+following columns:
 
+| Column | Description |
+|:-------|:------------|
+| Transport | Protocol name (TCP or UDP) |
+| Family | IP family (IPv4+IPv6 combined) |
+| Received | Segments or datagrams received per second |
+| Sent | Segments or datagrams sent per second |
+| Errors | Send/receive errors per second |
+| ConnActive | Active connections opened per second |
+| ConnEstablished | Currently established connections |
+| ConnPassive | Passive connections opened per second |
+| ConnReset | Reset connections per second |
+| SegsTotal | Total segments per second |
+| SegsRetransmitted | Retransmitted segments per second |
+| DatagramsNoPort | Datagrams with no destination port per second |
 
 ### Per eBPF Socket instance
 

@@ -11,6 +11,7 @@
 
 bool cgroup_ebpfgo_shared_memory_refresh(void);
 const struct ebpf_pid_stat *cgroup_ebpfgo_shared_memory_lookup(pid_t pid);
+uint32_t cgroup_ebpfgo_shared_memory_flags(void);
 void cgroup_ebpfgo_shared_memory_close(void);
 
 #endif

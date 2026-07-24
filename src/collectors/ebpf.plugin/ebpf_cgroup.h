@@ -16,7 +16,6 @@ struct pid_on_target2 {
     ebpf_publish_process_t ps;
     netdata_dcstat_pid_t dc;
     netdata_publish_shm_t shm;
-    netdata_socket_t socket;
 
     struct pid_on_target2 *next;
 };
@@ -24,7 +23,6 @@ struct pid_on_target2 {
 enum ebpf_cgroup_flags {
     NETDATA_EBPF_CGROUP_HAS_PROCESS_CHART = 1,
     NETDATA_EBPF_CGROUP_HAS_SWAP_CHART = 1 << 2,
-    NETDATA_EBPF_CGROUP_HAS_SOCKET_CHART = 1 << 3,
     NETDATA_EBPF_CGROUP_HAS_FD_CHART = 1 << 4,
     NETDATA_EBPF_CGROUP_HAS_VFS_CHART = 1 << 5,
     NETDATA_EBPF_CGROUP_HAS_OOMKILL_CHART = 1 << 6,
@@ -33,7 +31,6 @@ enum ebpf_cgroup_flags {
 
     NETDATA_EBPF_SERVICES_HAS_PROCESS_CHART = 1 << 16,
     NETDATA_EBPF_SERVICES_HAS_SWAP_CHART = 1 << 17,
-    NETDATA_EBPF_SERVICES_HAS_SOCKET_CHART = 1 << 18,
     NETDATA_EBPF_SERVICES_HAS_FD_CHART = 1 << 19,
     NETDATA_EBPF_SERVICES_HAS_VFS_CHART = 1 << 20,
     NETDATA_EBPF_SERVICES_HAS_OOMKILL_CHART = 1 << 21,
@@ -55,7 +52,6 @@ typedef struct ebpf_cgroup_target {
     netdata_publish_dcstat_t publish_dc;
     int oomkill;
     netdata_publish_shm_t publish_shm;
-    ebpf_socket_publish_apps_t publish_socket;
 
     struct pid_on_target2 *pids;
     struct ebpf_cgroup_target *next;

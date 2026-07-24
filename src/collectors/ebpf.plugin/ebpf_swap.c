@@ -287,59 +287,6 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
 static void ebpf_obsolete_specific_swap_charts(char *type, int update_every);
 
 /**
- * Obsolete services
- *
- * Obsolete all service charts created
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_swap_services(ebpf_module_t *em, char *id)
-{
-    static const char *charts[] = {NETDATA_MEM_SWAP_READ_CHART, NETDATA_MEM_SWAP_WRITE_CHART};
-    static const char *contexts[] = {NETDATA_SYSTEMD_SWAP_READ_CONTEXT, NETDATA_CGROUP_SWAP_WRITE_CONTEXT};
-    static const uint32_t orders[] = {20191, 20192};
-
-    int i;
-    for (i = 0; i < NETDATA_SWAP_END; i++) {
-        ebpf_write_chart_obsolete(
-            id,
-            charts[i],
-            "",
-            (i == 0) ? "Calls to function swap_readpage." : "Calls to function swap_writepage.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_SYSTEM_SWAP_SUBMENU,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            contexts[i],
-            orders[i],
-            em->update_every);
-    }
-}
-
-/**
- * Obsolete cgroup chart
- *
- * Send obsolete for all charts created before to close.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static inline void ebpf_obsolete_swap_cgroup_charts(ebpf_module_t *em)
-{
-    netdata_mutex_lock(&mutex_cgroup_shm);
-
-    ebpf_cgroup_target_t *ect;
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->systemd) {
-            ebpf_obsolete_swap_services(em, ect->name);
-
-            continue;
-        }
-
-        ebpf_obsolete_specific_swap_charts(ect->name, em->update_every);
-    }
-    netdata_mutex_unlock(&mutex_cgroup_shm);
-}
-
-/**
  * Obsolete apps charts
  *
  * Obsolete apps charts.
@@ -383,27 +330,6 @@ void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
     netdata_mutex_unlock(&collect_data_mutex);
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_swap_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_MEMORY_GROUP,
-        NETDATA_MEM_SWAP_CHART,
-        "",
-        "Calls to access swap memory",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_SYSTEM_SWAP_SUBMENU,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "mem.swapcalls",
-        NETDATA_CHART_PRIO_MEM_SWAP_CALLS,
-        em->update_every);
-}
 
 /**
  * Swap exit
@@ -457,23 +383,6 @@ static void ebpf_swap_exit(void *pptr)
     if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
         netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_SWAP_IDX);
         sem_post(shm_mutex_ebpf_integration);
-    }
-
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        if (em->cgroup_charts) {
-            ebpf_obsolete_swap_cgroup_charts(em);
-            fflush(stdout);
-        }
-
-        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_obsolete_swap_apps_charts(em);
-        }
-
-        ebpf_obsolete_swap_global(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
     }
 
     if (!swap_safe_clean) {

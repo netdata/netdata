@@ -261,11 +261,8 @@ You can also enable the following eBPF programs:
 - `disk` : This eBPF program creates charts that show information about disk latency independent of filesystem.
 - `filesystem` : This eBPF program creates charts that show information about some filesystem latency.
 - `swap` : This eBPF program creates charts that show information about swap access.
-- `mdflush`: This eBPF program creates charts that show information about
+- `mdflush`: This eBPF program creates charts that show information about multi-device software flushes.
 - `sync`: Monitor calls to syscalls sync(2), fsync(2), fdatasync(2), syncfs(2), msync(2), and sync_file_range(2).
-- `socket`: This eBPF program creates charts with information about `TCP` and `UDP` functions, including the
-    bandwidth consumed by each.
-    multi-device software flushes.
 - `vfs`: This eBPF program creates charts that show information about VFS (Virtual File System) functions.
 
 ### Configuring eBPF threads
@@ -282,78 +279,27 @@ To configure an eBPF thread:
 
 2. Use the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script to edit a thread configuration file. The following configuration files are available:
 
-    - `network.conf`: Configuration for the [`network` thread](#network-configuration). This config file overwrites the global options and also
-        lets you specify which network the eBPF collector monitors.
-    - `process.conf`: Configuration for the [`process` thread](#sync-configuration).
     - `cachestat.conf`: Configuration for the `cachestat` thread(#filesystem-configuration).
     - `dcstat.conf`: Configuration for the `dcstat` thread.
     - `disk.conf`: Configuration for the `disk` thread.
+    - `dns.conf`: Configuration for the `dns` thread.
     - `fd.conf`: Configuration for the `file descriptor` thread.
     - `filesystem.conf`: Configuration for the `filesystem` thread.
     - `hardirq.conf`: Configuration for the `hardirq` thread.
+    - `mdflush.conf`: Configuration for the `mdflush` thread.
+    - `mount.conf`: Configuration for the `mount` thread.
+    - `oomkill.conf`: Configuration for the `oomkill` thread.
+    - `process.conf`: Configuration for the [`process` thread](#sync-configuration).
+    - `shm.conf`: Configuration for the `shm` thread.
+    - `socket.conf`: Configuration for the `ebpfgo.plugin` socket program (the C socket thread was removed). Controls BPF map sizes (`socket monitoring table size`, `udp connection table size`) and the standard `ebpf object flavor`/`maps per core` options.
     - `softirq.conf`: Configuration for the `softirq` thread.
+    - `swap.conf`: Configuration for the `swap` thread.
     - `sync.conf`: Configuration for the `sync` thread.
     - `vfs.conf`: Configuration for the `vfs` thread.
 
         ```bash
         ./edit-config FILE.conf
         ```
-
-### Network configuration
-
-The network configuration has specific options to configure which network(s) the eBPF collector monitors. These options
-are divided in the following sections:
-
-#### `[network connections]`
-
-You can configure the information shown with function `ebpf_socket` using the settings in this section.
-
-```text
-[network connections]
-    enabled = yes
-    resolve hostname ips = no
-    resolve service names = yes
-    ports = 1-1024 !145 !domain
-    hostnames = !example.com
-    ips = !127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7
-```
-
-When you define a `ports` setting, Netdata will collect network metrics for that specific port. For example, if you
-write `ports = 19999`, Netdata will collect only connections for itself. The `hostnames` setting accepts
-[simple patterns](/src/libnetdata/simple_pattern/README.md). The `ports`, and `ips` settings accept negation (`!`) to deny
-specific values or asterisk alone to define all values.
-
-In the above example, Netdata will collect metrics for all ports between `1` and `1024`, with the exception of `53` (domain)
-and `145`.
-
-The following options are available:
-
-- `enabled`: Disable network connections monitoring. This can affect directly some funcion output.
-- `resolve hostname ips`: Enable resolving IPs to hostnames. It is disabled by default because it can be too slow.
-- `resolve service names`: Convert destination ports into service names, for example, port `53` protocol `UDP` becomes `domain`.
-    all names are read from /etc/services.
-- `ports`: Define the destination ports for Netdata to monitor.
-- `hostnames`: The list of hostnames that can be resolved to an IP address.
-- `ips`: The IP or range of IPs that you want to monitor. You can use IPv4 or IPv6 addresses, use dashes to define a
-    range of IPs, or use CIDR values.
-
-By default the traffic table is created using the destination IPs and ports of the sockets. This can be
-changed, so that Netdata uses service names (if possible), by specifying `resolve service name = yes` in the configuration
-section.
-
-#### `[service name]`
-
-Netdata uses the list of services in `/etc/services` to plot network connection charts. If this file does not contain
-the name for a particular service you use in your infrastructure, you will need to add it to the `[service name]`
-section.
-
-For example, Netdata's default port (`19999`) is not listed in `/etc/services`. To associate that port with the Netdata
-service in network connection charts, and thus see the name of the service instead of its port, define it:
-
-```text
-[service name]
-    19999 = Netdata
-```
 
 ### Sync configuration
 
@@ -838,45 +784,18 @@ The following `tracing` are used to collect `mount` & `unmount` call counts:
 
 ### Networking Stack
 
-Netdata monitors socket bandwidth attaching `tracing` for internal functions.
+Socket monitoring is provided by `ebpfgo.plugin` and exposed through the on-demand
+**`network-protocols`** function (FUNCTIONGLOBAL) consumed by the network-viewer. The function
+attaches kprobes or fentry/fexit trampolines to `tcp_sendmsg`, `tcp_cleanup_rbuf`,
+`tcp_v4_connect`, `tcp_v6_connect`, `tcp_close`, `udp_sendmsg`, and `udp_recvmsg`.
 
-#### TCP outbound connections
-
-This chart demonstrates calls to `tcp_v4_connection` and `tcp_v6_connection` that start connections for IPV4 and IPV6, respectively.
-
-#### TCP inbound connections
-
-This chart demonstrates TCP and UDP connections that the host receives.
-To collect this information, netdata attaches a tracing to `inet_csk_accept`.
-
-#### TCP bandwidth functions
-
-This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, and `tcp_close`; these functions are used
-to send & receive data and to close connections when `TCP` protocol is used.
-
-#### TCP bandwidth
-
-This chart demonstrates calls to functions:
-
-- `tcp_sendmsg`: Function responsible to send data for a specified destination.
-- `tcp_cleanup_rbuf`: We use this function instead of `tcp_recvmsg`, because the last one misses `tcp_read_sock` traffic
-     and we would also need to add more `tracing` to get the socket and package size.
-- `tcp_close`: Function responsible to close connection.
-
-#### TCP retransmit
-
-This chart demonstrates calls to function `tcp_retransmit` that is responsible for executing TCP retransmission when the
-receiver did not return the packet during the expected time.
-
-#### UDP functions
-
-This chart demonstrates calls to functions `udp_sendmsg` and `udp_recvmsg`, which are responsible for sending &
-receiving data for connections when the `UDP` protocol is used.
-
-#### UDP bandwidth
-
-Like the previous chart, this one also monitors `udp_sendmsg` and `udp_recvmsg`, but instead of showing the number of
-calls, it monitors the number of bytes sent and received.
+> **Migration note** — Prior versions of `ebpf.plugin` (the legacy C plugin) published standalone
+> charts for networking data: TCP/UDP connection counts, bandwidth, function call rates,
+> retransmits, and per-app equivalents. Those standalone charts are **permanently removed**; the
+> data is now available on demand through the `network-protocols` function in network-viewer.
+> Per-cgroup and per-service equivalents (`cgroup.net_*`, `systemd.service.net_*`) are **not
+> removed** — they are now emitted by `cgroups.plugin` via the shared-memory bridge to
+> `ebpfgo.plugin`. On-demand function output does not support alerting or metric retention.
 
 ### Apps
 
@@ -991,83 +910,3 @@ shows how the lockdown module impacts `ebpf.plugin` based on the selected option
 
 If you or your distribution compiled the kernel with the last combination, your system cannot load shared libraries
 required to run `ebpf.plugin`.
-
-## Functions
-
-### ebpf_thread
-
-The eBPF plugin has a [function](/docs/top-monitoring-netdata-functions.md) named
-`ebpf_thread` that controls its internal threads and helps to reduce the overhead on host. Using the function you
-can run the plugin with all threads disabled and enable them only when you want to take a look in specific areas.
-
-#### List threads
-
-To list all threads status you can query directly the endpoint function:
-
-`http://localhost:19999/api/v1/function?function=ebpf_thread`
-
-It is also possible to query a specific thread adding keyword `thread` and thread name:
-
-`http://localhost:19999/api/v1/function?function=ebpf_thread%20thread:mount`
-
-#### Enable thread
-
-It is possible to enable a specific thread using the keyword `enable`:
-
-`http://localhost:19999/api/v1/function?function=ebpf_thread%20enable:mount`
-
-this will run thread `mount` during 300 seconds (5 minutes). You can specify a specific period by appending the period
-after the thread name:
-
-`http://localhost:19999/api/v1/function?function=ebpf_thread%20enable:mount:600`
-
-in this example thread `mount` will run during 600 seconds (10 minutes).
-
-#### Disable thread
-
-It is also possible to stop any thread running using the keyword `disable`. For example, to disable `cachestat` you can
-request:
-
-`http://localhost:19999/api/v1/function?function=ebpf_thread%20disable:cachestat`
-
-#### Debugging threads
-
-You can verify the impact of threads on the host by running the
-[ebpf_thread_function.sh](https://github.com/netdata/netdata/blob/master/tests/ebpf/ebpf_thread_function.sh)
-script on your environment.
-
-You can check the results of having threads running on your environment in the Netdata monitoring section on your
-dashboard
-
-<img src="https://github.com/netdata/netdata/assets/49162938/91823573-114c-4c16-b634-cc46f7bb1bcf" alt="Threads running." />
-
-### ebpf_socket
-
-The eBPF plugin has a [function](/docs/top-monitoring-netdata-functions.md) named
-`ebpf_socket` that shows the current status of open sockets on host.
-
-#### Families
-
-The plugin shows by default sockets for IPV4 and IPV6, but it is possible to select a specific family by passing the
-family as an argument:
-
-`http://localhost:19999/api/v1/function?function=ebpf_socket%20family:IPV4`
-
-#### Resolve
-
-The plugin resolves ports to service names by default. You can show the port number by disabling the name resolution:
-
-`http://localhost:19999/api/v1/function?function=ebpf_socket%20resolve:NO`
-
-#### CIDR
-
-The plugin shows connections for all possible destination IPs by default. You can limit the range by specifying the CIDR:
-
-`http://localhost:19999/api/v1/function?function=ebpf_socket%20cidr:192.168.1.0/24`
-
-#### PORT
-
-The plugin shows connections for all possible ports by default. You can limit the range by specifying a port or range
-of ports:
-
-`http://localhost:19999/api/v1/function?function=ebpf_socket%20port:1-1024`

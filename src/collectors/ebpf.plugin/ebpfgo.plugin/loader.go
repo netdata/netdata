@@ -348,6 +348,23 @@ func SelectObjectFlavor(kver uint32, hasResizableMaps bool, isDebian bool) Objec
 	return ObjectFlavorBase
 }
 
+// selectConfiguredObjectFlavor applies the user-requested flavor string from
+// config with a kernel-version gate.  Both cachestat and socket use the same
+// policy, so a single function prevents the two callers from diverging.
+func selectConfiguredObjectFlavor(requested string, kver uint32, isDebian bool) ObjectFlavor {
+	switch strings.ToLower(strings.TrimSpace(requested)) {
+	case "", "buffer":
+		if kver >= minimumKernelVersionBuffer {
+			return ObjectFlavorBuffer
+		}
+	case "arena":
+		if kver >= minimumKernelVersionArena && !isDebian {
+			return ObjectFlavorArena
+		}
+	}
+	return ObjectFlavorBase
+}
+
 func BuildObjectPathWithFlavor(
 	pluginsDir string,
 	selector uint32,
@@ -443,6 +460,113 @@ func BuildLoadPlan(req LoadPlanRequest) LoadPlan {
 		LoadMode:      resolvedLoad,
 		ProgramMode:   ConvertCoreType(req.CoreAttach, req.Mode),
 	}
+}
+
+// resolveKernelAndRH detects the running kernel version and the RedHat-family
+// release number.  isRHF is -1 in both "not RHEL" and "detection failed" cases.
+// That intentional ambiguity is safe: failing to read /etc/redhat-release is
+// almost always ENOENT (not RHEL), and on the rare EPERM case the caller will
+// attempt to load the non-.rhf objects which will fail fast; the error is
+// logged so the operator can investigate.
+// Every resolve*LegacyConfig function needs this pair, so it lives here.
+func resolveKernelAndRH() (kver uint32, isRHF int, err error) {
+	kver, err = KernelVersion()
+	if err != nil {
+		return 0, -1, err
+	}
+	isRHF = -1
+	if rhf, rherr := RedHatRelease(); rherr == nil {
+		isRHF = rhf
+	} else if !os.IsNotExist(rherr) {
+		// File present but unreadable — log once so the operator knows why
+		// RHEL-specific object paths and kernel indices will not be used.
+		fmt.Fprintf(os.Stderr,
+			"ebpf-go.plugin: warning: /etc/redhat-release unreadable (%v); treating host as non-RHEL\n",
+			rherr)
+	}
+	return kver, isRHF, nil
+}
+
+// kprobePlanRequest carries the inputs shared by kprobe/trampoline-based
+// collectors.  It exists solely to keep buildKprobeLegacyPlan within the
+// parameter-count limit while preserving all field names at call sites.
+type kprobePlanRequest struct {
+	PluginsDir      string
+	Kernels         uint32
+	IsRHF           int
+	KernelVersion   uint32
+	IsDebian        bool
+	HasBTF          bool
+	ObjectFlavor    string
+	Name            string
+	MaxBaseSelector int // highest selector index for which a base-flavor object exists
+}
+
+// buildKprobeLegacyPlan constructs the LoadPlan for kprobe/trampoline-based
+// collectors (cachestat, socket).  DNS uses a different load mode and is not
+// covered by this helper.
+func buildKprobeLegacyPlan(req kprobePlanRequest) LoadPlan {
+	flavor := selectConfiguredObjectFlavor(req.ObjectFlavor, req.KernelVersion, req.IsDebian)
+	loadMode := SelectLoadMode(req.HasBTF, LoadCore, req.KernelVersion, req.IsRHF)
+	selector := SelectIndex(req.Kernels, req.IsRHF, req.KernelVersion)
+	// Base-flavor objects are not built for every kernel the buffer/arena objects
+	// cover.  Cap the selector so we never construct a path that does not exist.
+	if flavor == ObjectFlavorBase && req.MaxBaseSelector > 0 && int(selector) > req.MaxBaseSelector {
+		selector = uint32(req.MaxBaseSelector)
+	}
+	return LoadPlan{
+		KernelVersion: req.KernelVersion,
+		IsRHF:         req.IsRHF,
+		Selector:      selector,
+		Flavor:        flavor,
+		ObjectPath:    BuildObjectPathWithFlavor(req.PluginsDir, selector, req.Name, false, req.IsRHF, flavor),
+		LoadMode:      loadMode,
+		ProgramMode:   LoadTrampoline,
+	}
+}
+
+// buildFallbackPlans returns plans in preference order: primary first, then
+// progressively less demanding flavors (arena -> buffer -> base).  RHF plans
+// also try the generic filename for each flavor because some object families
+// use the RHF kernel selector without shipping .rhf-suffixed object files.
+// maxBaseSelector is the highest selector index for which base-flavor objects
+// exist for this module; pass 0 to disable the cap.
+func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name string, maxBaseSelector int) []LoadPlan {
+	plans := make([]LoadPlan, 0, 6)
+	addPlan := func(plan LoadPlan) {
+		plans = append(plans, plan)
+		if isRHF == -1 {
+			return
+		}
+
+		generic := plan
+		generic.IsRHF = -1
+		generic.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, plan.Selector, name, false, -1, plan.Flavor)
+		plans = append(plans, generic)
+	}
+
+	addPlan(primary)
+
+	if primary.Flavor == ObjectFlavorArena {
+		fb := primary
+		fb.Flavor = ObjectFlavorBuffer
+		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, primary.Selector, name, false, isRHF, ObjectFlavorBuffer)
+		addPlan(fb)
+	}
+
+	if primary.Flavor != ObjectFlavorBase {
+		fb := primary
+		fb.Flavor = ObjectFlavorBase
+		fbSelector := primary.Selector
+		if maxBaseSelector > 0 && int(fbSelector) > maxBaseSelector {
+			fbSelector = uint32(maxBaseSelector)
+		}
+		fb.Selector = fbSelector
+		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, fbSelector, name, false, isRHF, ObjectFlavorBase)
+		addPlan(fb)
+	}
+
+	return plans
 }
 
 func readFirstExistingFile(paths ...string) (string, error) {

@@ -151,6 +151,115 @@ func TestCachestatSharedMemoryStoreUpdateApps(t *testing.T) {
 	}
 }
 
+func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsMergedSocketData(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
+		{Pid: 10, Ppid: 1, Ct: 100},
+		{Pid: 20, Ppid: 1, Ct: 200},
+	})
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 10, BytesSent: 1000, BytesReceived: 2000, CallTCPSent: 3},
+	})
+
+	withSocket := store.Snapshot()
+	if len(withSocket) != 2 {
+		t.Fatalf("Snapshot() len = %d, want 2", len(withSocket))
+	}
+	if withSocket[0].pid != 10 || withSocket[0].socket.BytesSent != 1000 {
+		t.Fatalf("Snapshot()[0] socket data = %+v, want bytes_sent=1000 for PID 10", withSocket[0].socket)
+	}
+
+	store.UpdateSocketApps(nil)
+
+	cleared := store.Snapshot()
+	if len(cleared) != 2 {
+		t.Fatalf("Snapshot() len after clear = %d, want 2", len(cleared))
+	}
+	for _, entry := range cleared {
+		if entry.socket != (ebpfSocketPublishApps{}) {
+			t.Fatalf("PID %d socket data after clear = %+v, want zero", entry.pid, entry.socket)
+		}
+	}
+	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
+		t.Fatal("UpdateSocketApps(nil) did not mark socket as active")
+	}
+}
+
+func TestCachestatSharedMemoryStoreUpdateSocketAppsClearsSocketOnlyEntries(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 30, BytesSent: 3000, CallUDPSent: 4},
+		{PID: 10, BytesReceived: 1000, CallTCPReceived: 2},
+	})
+
+	withSocket := store.Snapshot()
+	if len(withSocket) != 2 {
+		t.Fatalf("Snapshot() len = %d, want 2", len(withSocket))
+	}
+	if withSocket[0].pid != 10 || withSocket[1].pid != 30 {
+		t.Fatalf("Snapshot() pids = %d,%d, want 10,30", withSocket[0].pid, withSocket[1].pid)
+	}
+
+	store.UpdateSocketApps(nil)
+
+	cleared := store.Snapshot()
+	if len(cleared) != 0 {
+		t.Fatalf("Snapshot() len after socket-only clear = %d, want 0", len(cleared))
+	}
+	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
+		t.Fatal("UpdateSocketApps(nil) did not mark socket as active")
+	}
+}
+
+// TestCachestatSharedMemoryStoreSolePublisherEvictsExitedPIDs verifies that
+// when socket is the sole publisher (no cachestat entries), each call to
+// UpdateSocketApps rebuilds entries from the current snapshot rather than
+// accumulating entries for PIDs that are no longer in the snapshot.
+//
+// Regression: the old "len(s.entries) == 0" guard took the merge path from
+// cycle 2 onward, causing exited PIDs to remain in s.entries forever.
+func TestCachestatSharedMemoryStoreSolePublisherEjectsExitedPIDs(t *testing.T) {
+	store := NewCachestatSharedMemoryStore()
+
+	// Cycle 1: PIDs 10 and 20 are active.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 10, BytesSent: 100},
+		{PID: 20, BytesSent: 200},
+	})
+	snap1 := store.Snapshot()
+	if len(snap1) != 2 {
+		t.Fatalf("cycle 1: Snapshot() len = %d, want 2", len(snap1))
+	}
+
+	// Cycle 2: PID 10 has exited; PID 30 is new.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 20, BytesSent: 201},
+		{PID: 30, BytesSent: 300},
+	})
+	snap2 := store.Snapshot()
+	if len(snap2) != 2 {
+		t.Fatalf("cycle 2: Snapshot() len = %d, want 2 (exited PID 10 must be evicted)", len(snap2))
+	}
+	if snap2[0].pid != 20 || snap2[1].pid != 30 {
+		t.Fatalf("cycle 2: Snapshot() pids = %d,%d, want 20,30", snap2[0].pid, snap2[1].pid)
+	}
+	if snap2[0].socket.BytesSent != 201 {
+		t.Fatalf("cycle 2: PID 20 BytesSent = %d, want 201", snap2[0].socket.BytesSent)
+	}
+
+	// Cycle 3: PID 20 exits too; only PID 30 remains.
+	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
+		{PID: 30, BytesSent: 301},
+	})
+	snap3 := store.Snapshot()
+	if len(snap3) != 1 {
+		t.Fatalf("cycle 3: Snapshot() len = %d, want 1 (exited PID 20 must be evicted)", len(snap3))
+	}
+	if snap3[0].pid != 30 {
+		t.Fatalf("cycle 3: Snapshot() pid = %d, want 30", snap3[0].pid)
+	}
+}
+
 func BenchmarkCachestatSharedMemoryStoreUpdateAppsSorted(b *testing.B) {
 	const appsCount = 1024
 	apps := make([]libbpfloader.CachestatAppSnapshot, appsCount)

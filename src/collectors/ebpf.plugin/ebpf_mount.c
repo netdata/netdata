@@ -217,39 +217,6 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
  *
  *****************************************************************/
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_mount_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
-        NETDATA_EBPF_MOUNT_CALLS,
-        "",
-        "Calls to mount and umount syscalls",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_EBPF_MOUNT_FAMILY,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "mount_points.call",
-        NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_MOUNT_GLOBAL_FAMILY,
-        NETDATA_EBPF_MOUNT_ERRORS,
-        "",
-        "Errors to mount and umount file systems",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_EBPF_MOUNT_FAMILY,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "mount_points.error",
-        NETDATA_CHART_PRIO_EBPF_MOUNT_CHARTS + 1,
-        em->update_every);
-}
 
 /**
  * Mount Exit
@@ -278,15 +245,6 @@ static void ebpf_mount_exit(void *pptr)
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if (!em)
         return;
-
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-
-        ebpf_obsolete_mount_global(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
-    }
 
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);

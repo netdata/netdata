@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
@@ -12,6 +11,10 @@ const cachestatKernelMask uint32 = (1 << 12) - 1
 const cachestatDefaultPIDTableSize uint32 = 32768
 const cachestatMaxPIDTableSize uint32 = 32768
 const cachestatDefaultBTFFile = "vmlinux"
+
+// cachestatMaxBaseSelector is the highest SelectKernelName index for which a
+// base-flavor (no suffix) cachestat object file is shipped.
+const cachestatMaxBaseSelector = 9 // 5.16
 
 type CachestatLegacyConfig struct {
 	PluginsDir      string
@@ -85,7 +88,7 @@ func defaultCachestatLegacyConfig() CachestatLegacyConfig {
 		MapsPerCore:    true,
 		ObjectFlavor:   cachestatDefaultObjectFlavor,
 		Enabled:        true,
-		AppsEnabled:    false,
+		AppsEnabled:    true,
 		CgroupsEnabled: false,
 		AppsLevel:      0, // NETDATA_APPS_LEVEL_REAL_PARENT — matches stock cachestat.conf default
 		Targets:        defaultCachestatTargets(),
@@ -100,8 +103,8 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 		return CachestatLegacyConfig{}, err
 	}
 	cfg.ConfigFound = found
-	if fileCfg.Enabled != nil {
-		cfg.Enabled = *fileCfg.Enabled
+	if fileCfg.Cachestat != nil {
+		cfg.Enabled = *fileCfg.Cachestat
 	}
 	if fileCfg.UpdateEvery != nil && *fileCfg.UpdateEvery > 0 {
 		cfg.UpdateEvery = *fileCfg.UpdateEvery
@@ -135,15 +138,12 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
 	}
 
-	kver, err := KernelVersion()
+	kver, isRHF, err := resolveKernelAndRH()
 	if err != nil {
 		return CachestatLegacyConfig{}, err
 	}
 	cfg.KernelVersion = kver
-
-	if rhf, err := RedHatRelease(); err == nil {
-		cfg.IsRHF = rhf
-	}
+	cfg.IsRHF = isRHF
 
 	if err := cfg.Targets.ResolveAccountPageTarget(); err != nil {
 		return CachestatLegacyConfig{}, err
@@ -154,34 +154,17 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 }
 
 func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
-	flavor := selectCachestatObjectFlavor(cfg.ObjectFlavor, cfg.KernelVersion, cfg.IsDebian)
-	loadMode := SelectLoadMode(cfg.HasBTF, LoadCore, cfg.KernelVersion, cfg.IsRHF)
-
-	selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-	return LoadPlan{
-		KernelVersion: cfg.KernelVersion,
-		IsRHF:         cfg.IsRHF,
-		Selector:      selector,
-		Flavor:        flavor,
-		ObjectPath:    BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "cachestat", false, cfg.IsRHF, flavor),
-		LoadMode:      loadMode,
-		ProgramMode:   LoadTrampoline,
-	}
-}
-
-func selectCachestatObjectFlavor(requested string, kver uint32, isDebian bool) ObjectFlavor {
-	switch strings.ToLower(strings.TrimSpace(requested)) {
-	case "", "buffer":
-		if kver >= minimumKernelVersionBuffer {
-			return ObjectFlavorBuffer
-		}
-	case "arena":
-		if kver >= minimumKernelVersionArena && !isDebian {
-			return ObjectFlavorArena
-		}
-	}
-
-	return ObjectFlavorBase
+	return buildKprobeLegacyPlan(kprobePlanRequest{
+		PluginsDir:      cfg.PluginsDir,
+		Kernels:         cfg.Kernels,
+		IsRHF:           cfg.IsRHF,
+		KernelVersion:   cfg.KernelVersion,
+		IsDebian:        cfg.IsDebian,
+		HasBTF:          cfg.HasBTF,
+		ObjectFlavor:    cfg.ObjectFlavor,
+		Name:            "cachestat",
+		MaxBaseSelector: cachestatMaxBaseSelector,
+	})
 }
 
 func kernelBTFSupported(btfPath string) bool {

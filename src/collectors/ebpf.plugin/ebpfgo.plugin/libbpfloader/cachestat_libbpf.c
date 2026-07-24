@@ -14,6 +14,8 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
+#include "../nd_alloc_shim.h"
+
 /*
  * libbpf 0.0.9 (CentOS 7) does not define LIBBPF_MAJOR_VERSION and lacks
  * several APIs added in later releases.  Provide inline shims so the rest
@@ -93,7 +95,7 @@ struct netdata_ebpf_cachestat_runtime {
     int       percpu_u64_cap;
     struct netdata_ebpf_cachestat_pid_entry *percpu_entries; /* apps snapshot: ncpus × entry */
     int       percpu_entries_cap;
-    /* Persistent output buffer for snapshot_apps — grows via realloc, owned by
+    /* Persistent output buffer for snapshot_apps — grows via reallocz, owned by
      * the runtime, freed in close().  Callers must not free out->items. */
     struct netdata_ebpf_cachestat_pid_snapshot *items_buf;
     size_t items_cap;
@@ -253,7 +255,7 @@ static void cachestat_prepare_autoload(struct bpf_object *obj, const char *accou
     }
 }
 
-static void cachestat_update_map_types(struct bpf_object *obj, int maps_per_core)
+static int cachestat_update_map_types(struct bpf_object *obj, int maps_per_core)
 {
     struct bpf_map *map;
     bpf_object__for_each_map(map, obj)
@@ -261,19 +263,29 @@ static void cachestat_update_map_types(struct bpf_object *obj, int maps_per_core
         const char *name = bpf_map__name(map);
         if (!strcmp(name, "cstat_global") || !strcmp(name, "cstat_pid") || !strcmp(name, "cstat_ctrl")) {
             enum bpf_map_type type = bpf_map__type(map);
+            int ret = 0;
             if (maps_per_core) {
                 if (type == BPF_MAP_TYPE_HASH)
-                    bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_HASH);
+                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_HASH);
                 else if (type == BPF_MAP_TYPE_ARRAY)
-                    bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_ARRAY);
+                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_PERCPU_ARRAY);
             } else {
                 if (type == BPF_MAP_TYPE_PERCPU_HASH)
-                    bpf_map__set_type(map, BPF_MAP_TYPE_HASH);
+                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_HASH);
                 else if (type == BPF_MAP_TYPE_PERCPU_ARRAY)
-                    bpf_map__set_type(map, BPF_MAP_TYPE_ARRAY);
+                    ret = bpf_map__set_type(map, BPF_MAP_TYPE_ARRAY);
+            }
+            if (ret != 0) {
+                /* A buffer sized for non-percpu maps would be too small for a
+                 * percpu kernel write — proceeding risks a heap overflow. */
+                fprintf(stderr,
+                        "ebpf-go.plugin: cachestat: bpf_map__set_type failed for map '%s': %d; refusing to load\n",
+                        name, ret);
+                return -1;
             }
         }
     }
+    return 0;
 }
 
 static void cachestat_update_map_sizes(struct bpf_object *obj, unsigned int pid_table_size)
@@ -331,7 +343,7 @@ static void cachestat_destroy_links(struct netdata_ebpf_cachestat_runtime *rt)
             bpf_link__destroy(rt->links[i]);
     }
 
-    free(rt->links);
+    freez(rt->links);
     rt->links = NULL;
 }
 
@@ -418,7 +430,7 @@ int netdata_cachestat_runtime_supports_core(void)
 
 struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const char *path, int use_core)
 {
-    struct netdata_ebpf_cachestat_runtime *rt = calloc(1, sizeof(*rt));
+    struct netdata_ebpf_cachestat_runtime *rt = callocz(1, sizeof(*rt));
     if (!rt) {
         return NULL;
     }
@@ -444,7 +456,7 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
 
         if (!rt->obj || libbpf_get_error(rt->obj)) {
             cachestat_runtime_destroy_core(rt);
-            free(rt);
+            freez(rt);
             return NULL;
         }
     } else
@@ -456,7 +468,7 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
         if (!obj || libbpf_get_error(obj)) {
             if (obj && libbpf_get_error(obj))
                 bpf_object__close(obj);
-            free(rt);
+            freez(rt);
             return NULL;
         }
 
@@ -477,21 +489,22 @@ int netdata_cachestat_runtime_prepare(
         return -1;
 
     cachestat_prepare_autoload(obj, account_function, rt->flavor);
-    cachestat_update_map_types(obj, maps_per_core);
+    if (cachestat_update_map_types(obj, maps_per_core) != 0)
+        return -1;
     cachestat_update_map_sizes(obj, pid_table_size);
 
-    int ncpu = maps_per_core ? libbpf_num_possible_cpus() : 1;
+    /* Always allocate for libbpf_num_possible_cpus() so the post-load type
+     * re-query in the snapshot path can safely use either ARRAY (count=1 via
+     * the else branch) or PERCPU_ARRAY (count=cap) without a buffer overflow.
+     * Mirrors the pattern in socket_libbpf.c:prepare. */
+    int ncpu = libbpf_num_possible_cpus();
     if (ncpu < 1)
         ncpu = 1;
 
-    rt->percpu_u64 = calloc((size_t)ncpu, sizeof(*rt->percpu_u64));
-    if (!rt->percpu_u64)
-        return -1;
+    rt->percpu_u64 = callocz((size_t)ncpu, sizeof(*rt->percpu_u64));
     rt->percpu_u64_cap = ncpu;
 
-    rt->percpu_entries = calloc((size_t)ncpu, sizeof(*rt->percpu_entries));
-    if (!rt->percpu_entries)
-        return -1;
+    rt->percpu_entries = callocz((size_t)ncpu, sizeof(*rt->percpu_entries));
     rt->percpu_entries_cap = ncpu;
 
     /* items_buf starts NULL; grows lazily in snapshot_apps */
@@ -539,9 +552,7 @@ static bool acc_htable_rebuild(struct netdata_ebpf_cachestat_runtime *rt)
     while (cap < need) cap <<= 1;
 
     if (cap != rt->acc_htable_sz) {
-        uint32_t *p = realloc(rt->acc_htable, cap * sizeof(*p));
-        if (!p) return false;
-        rt->acc_htable    = p;
+        rt->acc_htable    = reallocz(rt->acc_htable, cap * sizeof(*rt->acc_htable));
         rt->acc_htable_sz = cap;
     }
     memset(rt->acc_htable, 0, cap * sizeof(*rt->acc_htable));
@@ -577,9 +588,7 @@ static struct netdata_ebpf_cachestat_pid_entry *cachestat_acc_find_or_add(
     /* New TGID — grow acc[] if needed then insert. */
     if (rt->acc_count >= rt->acc_cap) {
         size_t new_cap = rt->acc_cap ? rt->acc_cap * 2 : 64;
-        struct netdata_ebpf_cachestat_pid_entry *p = realloc(rt->acc, new_cap * sizeof(*p));
-        if (!p) return NULL;
-        rt->acc     = p;
+        rt->acc     = reallocz(rt->acc, new_cap * sizeof(*rt->acc));
         rt->acc_cap = new_cap;
         /* acc[] base address may have changed — rebuild and re-probe. */
         if (!acc_htable_rebuild(rt)) return NULL;
@@ -683,8 +692,8 @@ static void cachestat_destroy_ring_buffer(struct netdata_ebpf_cachestat_runtime 
         ring_buffer__free(rt->rb);
         rt->rb = NULL;
     }
-    free(rt->acc);
-    free(rt->acc_htable);
+    freez(rt->acc);
+    freez(rt->acc_htable);
     rt->acc          = NULL;
     rt->acc_htable   = NULL;
     rt->acc_cap      = 0;
@@ -744,19 +753,16 @@ static int cachestat_snapshot_from_acc(
         return 0;
 
     if (rt->acc_count > rt->items_cap) {
-        struct netdata_ebpf_cachestat_pid_snapshot *p =
-            realloc(rt->items_buf, rt->acc_count * sizeof(*p));
-        if (!p)
-            return -1;
-        rt->items_buf = p;
+        rt->items_buf = reallocz(rt->items_buf, rt->acc_count * sizeof(*rt->items_buf));
         rt->items_cap = rt->acc_count;
     }
 
     for (size_t i = 0; i < rt->acc_count; i++) {
         const struct netdata_ebpf_cachestat_pid_entry *src = &rt->acc[i];
         struct netdata_ebpf_cachestat_pid_snapshot *dst = &rt->items_buf[i];
-        dst->pid = src->tgid;
-        dst->ct  = src->ct;
+        dst->pid  = src->tgid;
+        dst->ppid = 0; /* acc path has no ppid; zero explicitly — buffer is reused across cycles */
+        dst->ct   = src->ct;
         memset(dst->comm, 0, sizeof(dst->comm));
         size_t nlen = strnlen(src->name, sizeof(src->name));
         memcpy(dst->comm, src->name, nlen < sizeof(dst->comm) - 1 ? nlen : sizeof(dst->comm) - 1);
@@ -829,7 +835,7 @@ int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, 
     if (!account_function)
         account_function = "account_page_dirtied";
 
-    rt->links = calloc(4, sizeof(*rt->links));
+    rt->links = callocz(4, sizeof(*rt->links));
     if (!rt->links)
         return -1;
 
@@ -905,7 +911,7 @@ int netdata_cachestat_runtime_update_controller(
         if (cpus <= 0)
             return -1;
 
-        uint64_t *percpu = calloc((size_t)cpus, sizeof(*percpu));
+        uint64_t *percpu = callocz((size_t)cpus, sizeof(*percpu));
         if (!percpu)
             return -1;
 
@@ -913,7 +919,7 @@ int netdata_cachestat_runtime_update_controller(
             percpu[cpu] = values[key];
 
         const int rc = bpf_map_update_elem(fd, &key, percpu, BPF_ANY);
-        free(percpu);
+        freez(percpu);
 
         if (rc)
             return -1;
@@ -942,8 +948,12 @@ int netdata_cachestat_runtime_snapshot(
     if (fd < 0)
         return -1;
 
-    (void)maps_per_core; /* count is pre-stored in percpu_u64_cap by prepare() */
-    int count = rt->percpu_u64_cap > 0 ? rt->percpu_u64_cap : 1;
+    /* Re-query the actual post-load map type; bpf_map__set_type can silently
+     * fail before load, leaving a non-percpu map while percpu_u64_cap > 1. */
+    enum bpf_map_type mtype = bpf_map__type(map);
+    int count = (mtype == BPF_MAP_TYPE_PERCPU_ARRAY && rt->percpu_u64_cap > 0)
+                ? rt->percpu_u64_cap : 1;
+    (void)maps_per_core;
     uint64_t *values = rt->percpu_u64;
     if (!values)
         return -1;
@@ -1005,8 +1015,12 @@ int netdata_cachestat_runtime_snapshot_apps(
     if (fd < 0)
         return -1;
 
-    (void)maps_per_core; /* count pre-stored in percpu_entries_cap by prepare() */
-    int count = rt->percpu_entries_cap > 0 ? rt->percpu_entries_cap : 1;
+    /* Re-query the actual post-load map type; bpf_map__set_type can silently
+     * fail before load, leaving a non-percpu map while percpu_entries_cap > 1. */
+    enum bpf_map_type mtype = bpf_map__type(map);
+    int count = (mtype == BPF_MAP_TYPE_PERCPU_HASH && rt->percpu_entries_cap > 0)
+                ? rt->percpu_entries_cap : 1;
+    (void)maps_per_core;
 
     struct netdata_ebpf_cachestat_pid_entry *values = rt->percpu_entries;
     if (!values)
@@ -1017,8 +1031,10 @@ int netdata_cachestat_runtime_snapshot_apps(
      * across cycles so steady-state has zero allocations. */
     size_t out_count = 0;
     uint32_t key = 0, next_key = 0;
+    bool first_iter = true;
 
-    while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
+    while (bpf_map_get_next_key(fd, first_iter ? NULL : &key, &next_key) == 0) {
+        first_iter = false;
         if (bpf_map_lookup_elem(fd, &next_key, values)) {
             key = next_key;
             memset(values, 0, (size_t)count * sizeof(*values));
@@ -1028,11 +1044,7 @@ int netdata_cachestat_runtime_snapshot_apps(
         /* Grow items_buf on demand — amortised O(1) per entry. */
         if (out_count >= rt->items_cap) {
             size_t new_cap = rt->items_cap ? rt->items_cap * 2 : 64;
-            struct netdata_ebpf_cachestat_pid_snapshot *p =
-                realloc(rt->items_buf, new_cap * sizeof(*p));
-            if (!p)
-                goto next_key_iter; /* skip entry on OOM; retry next cycle */
-            rt->items_buf = p;
+            rt->items_buf = reallocz(rt->items_buf, new_cap * sizeof(*rt->items_buf));
             rt->items_cap = new_cap;
         }
 
@@ -1073,7 +1085,6 @@ int netdata_cachestat_runtime_snapshot_apps(
         }
         out_count++;
 
-next_key_iter:
         key = next_key;
         memset(values, 0, (size_t)count * sizeof(*values));
     }
@@ -1242,9 +1253,9 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
         return;
 
     cachestat_destroy_links(rt);
-    free(rt->percpu_u64);
-    free(rt->percpu_entries);
-    free(rt->items_buf);
+    freez(rt->percpu_u64);
+    freez(rt->percpu_entries);
+    freez(rt->items_buf);
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
         cachestat_destroy_ring_buffer(rt);
@@ -1255,5 +1266,5 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
     if (rt->obj)
         bpf_object__close(rt->obj);
 #endif
-    free(rt);
+    freez(rt);
 }

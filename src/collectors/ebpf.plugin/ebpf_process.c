@@ -691,102 +691,6 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
 static void ebpf_obsolete_specific_process_charts(char *type, ebpf_module_t *em);
 
 /**
- * Obsolete services
- *
- * Obsolete all service charts created
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_process_services(ebpf_module_t *em, char *id)
-{
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_TASK_PROCESS,
-        "",
-        "Process started",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_PROCESS_CREATE_CONTEXT,
-        20065,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_TASK_THREAD,
-        "",
-        "Threads started",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_THREAD_CREATE_CONTEXT,
-        20066,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_TASK_CLOSE,
-        "",
-        "Tasks starts exit process.",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_PROCESS_EXIT_CONTEXT,
-        20067,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        id,
-        NETDATA_SYSCALL_APPS_TASK_EXIT,
-        "",
-        "Tasks closed",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_APPS_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_STACKED,
-        NETDATA_SYSTEMD_PROCESS_CLOSE_CONTEXT,
-        20068,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            id,
-            NETDATA_SYSCALL_APPS_TASK_ERROR,
-            "",
-            "Errors to create process or threads.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_APPS_PROCESS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            NETDATA_SYSTEMD_PROCESS_ERROR_CONTEXT,
-            20069,
-            em->update_every);
-    }
-}
-
-/**
- * Obsolete cgroup chart
- *
- * Send obsolete for all charts created before to close.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static inline void ebpf_obsolete_process_cgroup_charts(ebpf_module_t *em)
-{
-    netdata_mutex_lock(&mutex_cgroup_shm);
-
-    ebpf_cgroup_target_t *ect;
-    for (ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->systemd) {
-            ebpf_obsolete_process_services(em, ect->name);
-
-            continue;
-        }
-
-        ebpf_obsolete_specific_process_charts(ect->name, em);
-    }
-    netdata_mutex_unlock(&mutex_cgroup_shm);
-}
-
-/**
  * Obsolette apps charts
  *
  * Obsolete apps charts.
@@ -867,65 +771,6 @@ void ebpf_obsolete_process_apps_charts(struct ebpf_module *em)
     }
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_process_global(ebpf_module_t *em)
-{
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        NETDATA_PROCESS_SYSCALL,
-        "",
-        "Start process",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "system.process_thread",
-        21002,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        NETDATA_EXIT_SYSCALL,
-        "",
-        "Exit process",
-        EBPF_COMMON_UNITS_CALLS_PER_SEC,
-        NETDATA_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "system.exit",
-        21003,
-        em->update_every);
-
-    ebpf_write_chart_obsolete(
-        NETDATA_EBPF_SYSTEM_GROUP,
-        NETDATA_PROCESS_STATUS_NAME,
-        "",
-        "Process not closed",
-        EBPF_COMMON_UNITS_CALLS,
-        NETDATA_PROCESS_GROUP,
-        NETDATA_EBPF_CHART_TYPE_LINE,
-        "system.process_status",
-        21004,
-        em->update_every);
-
-    if (em->mode < MODE_ENTRY) {
-        ebpf_write_chart_obsolete(
-            NETDATA_EBPF_SYSTEM_GROUP,
-            NETDATA_PROCESS_ERROR_NAME,
-            "",
-            "Fails to create process",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_PROCESS_GROUP,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "system.task_error",
-            21005,
-            em->update_every);
-    }
-}
 
 /**
  * Process disable tracepoints
@@ -974,23 +819,6 @@ static void ebpf_process_exit(void *pptr)
     if (integration_shm && ebpf_shm_sem_wait_or_stop(shm_mutex_ebpf_integration)) {
         netdata_ebpf_sweep_shm_for_module_unsafe(NETDATA_EBPF_PIDS_PROCESS_IDX);
         sem_post(shm_mutex_ebpf_integration);
-    }
-
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        if (em->cgroup_charts) {
-            ebpf_obsolete_process_cgroup_charts(em);
-            fflush(stdout);
-        }
-
-        if (em->apps_charts & NETDATA_EBPF_APPS_FLAG_CHART_CREATED) {
-            ebpf_obsolete_process_apps_charts(em);
-        }
-
-        ebpf_obsolete_process_global(em);
-
-        fflush(stdout);
-        netdata_mutex_unlock(&lock);
     }
 
     freez(process_hash_values);

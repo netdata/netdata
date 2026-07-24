@@ -208,67 +208,6 @@ void ebpf_sync_cleanup_objects()
     }
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_sync_global(ebpf_module_t *em)
-{
-    if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
-        ebpf_write_chart_obsolete(
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_FILE_SYNC_CHART,
-            "",
-            "Monitor calls to fsync(2) and fdatasync(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_EBPF_SYNC_SUBMENU,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "mem.file_sync",
-            NETDATA_EBPF_FILE_SYNC_CHART_ORDER,
-            em->update_every);
-
-    if (local_syscalls[NETDATA_SYNC_MSYNC_IDX].enabled)
-        ebpf_write_chart_obsolete(
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_MSYNC_CHART,
-            "",
-            "Monitor calls to msync(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_EBPF_SYNC_SUBMENU,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "mem.memory_map",
-            NETDATA_EBPF_MSYNC_CHART_ORDER,
-            em->update_every);
-
-    if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled)
-        ebpf_write_chart_obsolete(
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_SYNC_CHART,
-            "",
-            "Monitor calls to sync(2) and syncfs(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_EBPF_SYNC_SUBMENU,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "mem.sync",
-            NETDATA_EBPF_SYNC_CHART_ORDER,
-            em->update_every);
-
-    if (local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].enabled)
-        ebpf_write_chart_obsolete(
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_FILE_SEGMENT_CHART,
-            "",
-            "Monitor calls to sync_file_range(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_EBPF_SYNC_SUBMENU,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "mem.file_segment",
-            NETDATA_EBPF_FILE_SEGMENT_CHART_ORDER,
-            em->update_every);
-}
 
 /**
  * Exit
@@ -287,12 +226,6 @@ static void ebpf_sync_exit(void *pptr)
     ebpf_module_t *em = CLEANUP_FUNCTION_GET_PTR(pptr);
     if (!em)
         return;
-
-    if (ebpf_module_enabled_get(em) == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        ebpf_obsolete_sync_global(em);
-        netdata_mutex_unlock(&lock);
-    }
 
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);

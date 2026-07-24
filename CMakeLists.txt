@@ -2136,6 +2136,7 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/cgroup-snapshot-store.c
         src/collectors/cgroups.plugin/cgroup-snapshot-store.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_cachestat.c
+        src/collectors/cgroups.plugin/cgroup_ebpfgo_socket.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.c
         src/collectors/collectors-ipc/ebpfgo_shared_memory.h
         src/collectors/cgroups.plugin/cgroup_ebpfgo_shared_memory.c
@@ -3269,10 +3270,6 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_process.h
             src/collectors/ebpf.plugin/ebpf_shm.c
             src/collectors/ebpf.plugin/ebpf_shm.h
-            src/collectors/ebpf.plugin/ebpf_socket.c
-            src/collectors/ebpf.plugin/ebpf_socket.h
-            src/collectors/ebpf.plugin/ebpf_socket_ipc.c
-            src/collectors/ebpf.plugin/ebpf_socket_ipc.h
             src/collectors/ebpf.plugin/ebpf_softirq.c
             src/collectors/ebpf.plugin/ebpf_softirq.h
             src/collectors/ebpf.plugin/ebpf_sync.c
@@ -3287,8 +3284,6 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf_cgroup.h
             src/collectors/ebpf.plugin/ebpf_unittest.c
             src/collectors/ebpf.plugin/ebpf_unittest.h
-            src/collectors/ebpf.plugin/ebpf_functions.c
-            src/collectors/ebpf.plugin/ebpf_functions.h
              src/collectors/ebpf.plugin/libbpf_api/ebpf.c
              src/collectors/ebpf.plugin/libbpf_api/ebpf.h
              src/collectors/ebpf.plugin/libbpf_api/ebpf_library.c
@@ -3385,12 +3380,13 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf.d/fd.conf
             src/collectors/ebpf.plugin/ebpf.d/filesystem.conf
             src/collectors/ebpf.plugin/ebpf.d/hardirq.conf
+            src/collectors/ebpf.plugin/ebpf.d/dns.conf
             src/collectors/ebpf.plugin/ebpf.d/mdflush.conf
             src/collectors/ebpf.plugin/ebpf.d/mount.conf
-            src/collectors/ebpf.plugin/ebpf.d/network.conf
             src/collectors/ebpf.plugin/ebpf.d/oomkill.conf
             src/collectors/ebpf.plugin/ebpf.d/process.conf
             src/collectors/ebpf.plugin/ebpf.d/shm.conf
+            src/collectors/ebpf.plugin/ebpf.d/socket.conf
             src/collectors/ebpf.plugin/ebpf.d/softirq.conf
             src/collectors/ebpf.plugin/ebpf.d/swap.conf
             src/collectors/ebpf.plugin/ebpf.d/sync.conf
@@ -3461,6 +3457,14 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets.h
                         src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
+                        src/collectors/collectors-ipc/ebpfgo_shared_memory.c
+                        src/collectors/collectors-ipc/ebpfgo_shared_memory.h
+                        src/collectors/collectors-ipc/ebpfgo_dns_shared_memory.c
+                        src/collectors/collectors-ipc/ebpfgo_dns_shared_memory.h
+                        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.c
+                        src/collectors/network-viewer.plugin/network_viewer_ebpf_shared_memory.h
+                        src/collectors/network-viewer.plugin/network_viewer_dns_shared_memory.c
+                        src/collectors/network-viewer.plugin/network_viewer_dns_shared_memory.h
                         ${NETWORK_VIEWER_COMMON_FILES}
                 )
         endif()
@@ -4427,15 +4431,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         configure_file(tests/urls/request.sh.in tests/urls/request.sh @ONLY)
         configure_file(tests/alarm_repetition/alarm.sh.in tests/alarm_repetition/alarm.sh @ONLY)
         configure_file(tests/template_dimension/template_dim.sh.in tests/template_dimension/template_dim.sh @ONLY)
-        configure_file(tests/ebpf/ebpf_thread_function.sh.in tests/ebpf/ebpf_thread_function.sh @ONLY)
-
         install(FILES
                 ${CMAKE_BINARY_DIR}/tests/health_mgmtapi/health-cmdapi-test.sh
                 ${CMAKE_BINARY_DIR}/tests/acls/acl.sh
                 ${CMAKE_BINARY_DIR}/tests/urls/request.sh
                 ${CMAKE_BINARY_DIR}/tests/alarm_repetition/alarm.sh
                 ${CMAKE_BINARY_DIR}/tests/template_dimension/template_dim.sh
-                ${CMAKE_BINARY_DIR}/tests/ebpf/ebpf_thread_function.sh
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
