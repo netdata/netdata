@@ -27,11 +27,10 @@ func NewCollectorStore(opts ...CollectorStoreOption) CollectorStore {
 			descriptorGraceCycles:    grace,
 		},
 	}
-	core.snapshot.Store(&readSnapshot{
+	core.snapshot.Store(attachCollectorSnapshot(&readSnapshot{
 		collectMeta: CollectMeta{LastAttemptStatus: CollectStatusUnknown},
 		series:      make(map[string]*committedSeries),
-		byName:      make(map[string][]*committedSeries),
-	})
+	}))
 	return &storeView{core: core}
 }
 
@@ -52,9 +51,14 @@ func (s *storeView) Read(opts ...ReadOption) Reader {
 	cfg := resolveReadConfig(opts...)
 	snap := s.core.snapshot.Load()
 	if cfg.flatten {
-		snap = flattenSnapshot(snap)
+		snap = snap.collectorFlattenedSnapshot()
 	}
-	return &storeReader{snap: snap, raw: cfg.raw, flattened: cfg.flatten, hostScopeKey: cfg.hostScopeKey}
+	return &collectorReader{storeReader: storeReader{
+		snap:         snap,
+		raw:          cfg.raw,
+		flattened:    cfg.flatten,
+		hostScopeKey: cfg.hostScopeKey,
+	}}
 }
 
 func (s *storeView) Write() Writer {

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
@@ -129,9 +128,9 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 		Logger:         logger.New(),
 		confProv:       confProv,
 		pluginName:     testPluginName,
-		fnReg:          functions.NewManager(),
+		fnReg:          waitTestFunctionRegistry{},
 		discoverers:    testDiscovererRegistry(),
-		dyncfgApi:      dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))),
+		dyncfgApi:      dyncfg.NewResponder(dyncfg.NewProtocolOutput(safewriter.New(&out))),
 		seen:           dyncfg.NewSeenCache[sdConfig](),
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
@@ -141,7 +140,6 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 	}
 	sd.sdCb = &sdCallbacks{sd: sd}
 	sd.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
-		Logger:    sd.Logger,
 		API:       sd.dyncfgApi,
 		Seen:      sd.seen,
 		Exposed:   sd.exposed,
@@ -150,8 +148,7 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 			return cfg.PipelineKey()
 		},
 
-		Path:           fmt.Sprintf(dyncfgSDPath, testPluginName),
-		EnableFailCode: 422,
+		Path: fmt.Sprintf(dyncfgSDPath, testPluginName),
 		ConfigCommands: []dyncfg.Command{
 			dyncfg.CommandSchema,
 			dyncfg.CommandGet,
@@ -177,6 +174,11 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 
 	return sd, confProv.ch, cancel, done
 }
+
+type waitTestFunctionRegistry struct{}
+
+func (waitTestFunctionRegistry) RegisterPrefix(string, string, func(functions.Function)) {}
+func (waitTestFunctionRegistry) UnregisterPrefix(string, string)                         {}
 
 func stopWaitTestServiceDiscovery(t *testing.T, sd *ServiceDiscovery, cancel context.CancelFunc, done <-chan struct{}) {
 	t.Helper()

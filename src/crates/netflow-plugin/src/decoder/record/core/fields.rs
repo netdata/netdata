@@ -1,18 +1,7 @@
 use crate::decoder::{
-    CANONICAL_FLOW_DEFAULTS, FlowFields, apply_icmp_port_fallback, canonicalize_ip_addr,
-    default_exporter_name, field_tracks_presence, infer_etype_from_endpoints,
-    normalize_direction_value,
+    CANONICAL_FLOW_DEFAULTS, FlowFields, apply_icmp_port_fallback, default_exporter_name,
+    field_tracks_presence, infer_etype_from_endpoints, normalize_direction_value,
 };
-use std::collections::BTreeMap;
-use std::net::SocketAddr;
-
-pub(crate) fn base_fields(version: &str, source: SocketAddr) -> FlowFields {
-    let mut fields = BTreeMap::new();
-    fields.insert("FLOW_VERSION", version.to_string());
-    fields.insert("EXPORTER_IP", canonicalize_ip_addr(source.ip()).to_string());
-    fields.insert("EXPORTER_PORT", source.port().to_string());
-    fields
-}
 
 pub(crate) fn finalize_canonical_flow_fields(fields: &mut FlowFields) {
     // Akvorado-style contract: protocol-specific fields are not part of the canonical record.

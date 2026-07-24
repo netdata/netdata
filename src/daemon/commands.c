@@ -371,6 +371,17 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
         return 0;
     }
 
+    // the context-load workers (sqlite_metadata.c) hold raw RRDHOST pointers to
+    // every host carrying this flag; freeing such a host is a use-after-free
+    // (marking ephemeral without unregistering does not free it, so it may proceed)
+    if (unregister && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
+        if (report_error)
+            buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy loading contexts - try again",
+                           rrdhost_hostname(host), host->machine_guid);
+        rrd_rdunlock();
+        return -1;
+    }
+
     bool locked = unregister ? rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)
                              : rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
     if (!locked) {

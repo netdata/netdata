@@ -1,0 +1,425 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package joboutput
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
+)
+
+type ModuleCatalog interface {
+	Lookup(string) (collectorapi.Creator, bool)
+}
+
+type RuntimeJob interface {
+	ManagedJob
+	collectorapi.RuntimeJob
+
+	AutoDetectionManaged(context.Context) error
+	AutoDetectionEvery() int
+	RetryAutoDetection() bool
+	CleanupRejected()
+	Tick(int)
+}
+
+type PublishedJob struct {
+	Identity lifecycle.ResourceIdentity
+	Job      RuntimeJob
+}
+
+type HandlerLifecycle interface {
+	Publish() error
+	CloseAndDrain(context.Context) error
+}
+
+type JobHooks interface {
+	Prepare(PublishedJob) (HandlerLifecycle, error)
+}
+
+type jobNamedModule interface {
+	SetJobName(string)
+}
+
+type FactoryConfig struct {
+	PluginName    string                                        // owning plugin name stamped into job config
+	Modules       ModuleCatalog                                 // collector creator registry
+	Tasks         *lifecycle.TaskSupervisor                     // supervisor owning inherited run-loop goroutines
+	Frames        *lifecycle.FrameOwner                         // frame owner used as the collector output sink
+	ConfigModules *ConfigModuleFactory                          // resolved config application and short-lived probes
+	Runtime       runtimecomp.Service                           // V2 runtime service dependency
+	Vnodes        *vnoderegistry.Registry                       // vnode registry for V2 jobs
+	Vnode         func(string) (jobruntime.VnodeSnapshot, bool) // vnode snapshot lookup by name
+	Hooks         JobHooks                                      // handler-lifecycle preparation for Function-bearing jobs
+	Scheduler     *Scheduler                                    // tick/registration scheduler
+	Observer      lifecycle.RuntimeObserver                     // runtime gauge sink
+}
+
+// Factory owns collector construction, validation, and transfer. It does not
+// own current-job indexing or lifecycle state.
+type Factory struct {
+	config FactoryConfig
+}
+
+func NewFactory(config FactoryConfig) (*Factory, error) {
+	if config.PluginName == "" ||
+		config.Modules == nil ||
+		config.Tasks == nil ||
+		config.Frames == nil ||
+		config.ConfigModules == nil ||
+		config.Vnodes == nil ||
+		config.Scheduler == nil {
+		return nil, errors.New("job output: incomplete factory configuration")
+	}
+	return &Factory{
+		config: config,
+	}, nil
+}
+
+func (f *Factory) ValidateConfig(ctx context.Context, config confgroup.Config) error {
+	if f == nil || ctx == nil || config == nil {
+		return errors.New("job output: invalid factory validation")
+	}
+	creator, ok := f.config.Modules.Lookup(config.Module())
+	if !ok {
+		return fmt.Errorf("job output: module %q is not registered", config.Module())
+	}
+	if err := validateFactoryConfigIdentity(config, creator); err != nil {
+		return err
+	}
+	if config.FunctionOnly() && !creatorDeclaresFunctions(creator) {
+		return fmt.Errorf("job output: function_only is set but module %q declares no Functions", config.Module())
+	}
+	if _, err := f.lookupVNode(config); err != nil {
+		return err
+	}
+	return f.config.ConfigModules.Validate(ctx, config)
+}
+
+func (f *Factory) build(ctx context.Context, config confgroup.Config, generation uint64) (ConstructedJob, error) {
+	if f == nil || ctx == nil || config == nil || generation == 0 {
+		return ConstructedJob{}, errors.New("job output: invalid factory build")
+	}
+	creator, ok := f.config.Modules.Lookup(config.Module())
+	if !ok {
+		return ConstructedJob{}, fmt.Errorf("job output: module %q is not registered", config.Module())
+	}
+	if err := validateFactoryConfigIdentity(config, creator); err != nil {
+		return ConstructedJob{}, err
+	}
+	functionOnly := creator.FunctionOnly || config.FunctionOnly()
+	hasFunctions := creatorDeclaresFunctions(creator)
+	if functionOnly && !hasFunctions {
+		return ConstructedJob{}, fmt.Errorf(
+			"job output: function_only is set but module %q declares no Functions",
+			config.Module(),
+		)
+	}
+	vnode, err := f.lookupVNode(config)
+	if err != nil {
+		return ConstructedJob{}, err
+	}
+	identity := lifecycle.ResourceIdentity{
+		ID:         config.FullName(),
+		Generation: generation,
+	}
+	var job RuntimeJob
+	var variant JobVariant
+	if creator.CreateV2 != nil {
+		job, err = f.buildV2(ctx, config, creator, functionOnly, vnode)
+		variant = JobVariantV2
+	} else {
+		job, err = f.buildV1(ctx, config, creator, functionOnly, vnode)
+		variant = JobVariantV1
+	}
+	if err != nil {
+		return ConstructedJob{}, err
+	}
+	cleanup := &factoryJobCleanup{
+		job: job,
+	}
+	constructed, err := newManagedJob(variant, job, f.config.Tasks, identity, f.config.Scheduler, cleanup.reject)
+	if err != nil {
+		return ConstructedJob{
+			Variant:          variant,
+			CollectorCleanup: cleanup.reject,
+		}, err
+	}
+	if hasFunctions && f.config.Hooks == nil {
+		return constructed, errors.New("job output: function-bearing job has no handler lifecycle")
+	}
+	if hooks := f.config.Hooks; hasFunctions {
+		published := PublishedJob{
+			Identity: identity,
+			Job:      job,
+		}
+		handlers, prepareErr := callPrepareHandlers(hooks, published)
+		constructed.Handlers = handlers
+		if prepareErr != nil {
+			return constructed, prepareErr
+		}
+		if handlers == nil {
+			return constructed, errors.New("job output: nil prepared handler lifecycle")
+		}
+	}
+	constructed.Observer = f.config.Observer
+	constructed.autoDetection = job.AutoDetectionManaged
+	constructed.autoDetectionEvery = job.AutoDetectionEvery
+	constructed.retryAutoDetection = job.RetryAutoDetection
+	constructed.finalCleanup = cleanup.final
+	return constructed, nil
+}
+
+func (f *Factory) Prepare(
+	ctx context.Context,
+	config confgroup.Config,
+	identity lifecycle.ResourceIdentity,
+	permit lifecycle.LongLivedPermit,
+) (lifecycle.PreparedResource, error) {
+	if f == nil || ctx == nil || config == nil || !identity.Valid() || identity.ID != config.FullName() {
+		return nil, errors.New("job output: invalid factory preparation")
+	}
+	return prepareJob(
+		ctx,
+		identity.ID,
+		identity.Generation,
+		permit,
+		func(buildCtx context.Context) (ConstructedJob, error) {
+			return f.build(buildCtx, config, identity.Generation)
+		},
+	)
+}
+
+type factoryJobCleanup struct {
+	once sync.Once
+	job  RuntimeJob
+	err  error
+}
+
+func (fjc *factoryJobCleanup) reject(context.Context) error {
+	fjc.once.Do(func() {
+		fjc.err = callJobLifecycle("rejected collector Cleanup", func() error {
+			fjc.job.CleanupRejected()
+			return nil
+		})
+	})
+	return fjc.err
+}
+
+func (fjc *factoryJobCleanup) final(context.Context) error {
+	fjc.once.Do(func() {
+		fjc.err = callJobLifecycle("collector Cleanup", func() error {
+			fjc.job.Cleanup()
+			return nil
+		})
+	})
+	return fjc.err
+}
+
+func callPrepareHandlers(hooks JobHooks, published PublishedJob) (handlers HandlerLifecycle, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			handlers = nil
+			err = lifecycle.RetainOwnership(fmt.Errorf(
+				"%w in handler preparation: %v",
+				lifecycle.ErrTaskPanic,
+				recovered,
+			))
+		}
+	}()
+	return hooks.Prepare(published)
+}
+
+func (f *Factory) buildV1(
+	ctx context.Context,
+	config confgroup.Config,
+	creator collectorapi.Creator,
+	functionOnly bool,
+	vnode jobruntime.VnodeSnapshot,
+) (job RuntimeJob, err error) {
+	if creator.Create == nil {
+		return nil, fmt.Errorf("job output: module %q has no V1 creator", config.Module())
+	}
+	var module collectorapi.CollectorV1
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			job = nil
+			err = lifecycle.RetainOwnership(fmt.Errorf(
+				"%w in V1 construction: %v",
+				lifecycle.ErrTaskPanic,
+				recovered,
+			))
+		}
+		if err != nil && module != nil {
+			cleanupErr := callFactoryModuleCleanup(ctx, module.Cleanup)
+			err = errors.Join(err, cleanupErr)
+			if cleanupErr != nil {
+				err = lifecycle.RetainOwnership(err)
+			}
+		}
+	}()
+	module = creator.Create()
+	if module == nil {
+		return nil, fmt.Errorf("job output: module %q returned a nil V1 collector", config.Module())
+	}
+	setModuleJobName(module, config.Name())
+	if err := f.config.ConfigModules.applyResolved(ctx, config, module); err != nil {
+		return nil, err
+	}
+	jobConfig := jobruntime.JobConfig{
+		PluginName: f.config.PluginName,
+		Name:       config.Name(),
+		ModuleName: config.Module(),
+		FullName:   config.FullName(),
+		Source:     factoryLogSource(config),
+		Module:     module,
+		Labels:     factoryLabels(config),
+		Out: FrameWriter{
+			Owner: f.config.Frames,
+		},
+		UpdateEvery:     config.UpdateEvery(),
+		AutoDetectEvery: config.AutoDetectionRetry(),
+		Priority:        config.Priority(),
+		IsStock:         config.SourceType() == confgroup.TypeStock,
+		FunctionOnly:    functionOnly,
+	}
+	if vnode.Vnode != nil {
+		jobConfig.Vnode = *vnode.Vnode.Copy()
+		jobConfig.VnodeName = config.Vnode()
+		jobConfig.VnodeRevision = vnode.Revision
+		jobConfig.VnodeMetadataRevision = vnode.MetadataRevision
+		jobConfig.VnodeLookup = f.config.Vnode
+	}
+	return jobruntime.NewJob(jobConfig), nil
+}
+
+func (f *Factory) buildV2(
+	ctx context.Context,
+	config confgroup.Config,
+	creator collectorapi.Creator,
+	functionOnly bool,
+	vnode jobruntime.VnodeSnapshot,
+) (job RuntimeJob, err error) {
+	var module collectorapi.CollectorV2
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			job = nil
+			err = lifecycle.RetainOwnership(fmt.Errorf(
+				"%w in V2 construction: %v",
+				lifecycle.ErrTaskPanic,
+				recovered,
+			))
+		}
+		if err != nil && module != nil {
+			cleanupErr := callFactoryModuleCleanup(ctx, module.Cleanup)
+			err = errors.Join(err, cleanupErr)
+			if cleanupErr != nil {
+				err = lifecycle.RetainOwnership(err)
+			}
+		}
+	}()
+	module = creator.CreateV2()
+	if module == nil {
+		return nil, fmt.Errorf("job output: module %q returned a nil V2 collector", config.Module())
+	}
+	setModuleJobName(module, config.Name())
+	if err := f.config.ConfigModules.applyResolved(ctx, config, module); err != nil {
+		return nil, err
+	}
+	jobConfig := jobruntime.JobV2Config{
+		PluginName: f.config.PluginName,
+		Name:       config.Name(),
+		ModuleName: config.Module(),
+		FullName:   config.FullName(),
+		Source:     factoryLogSource(config),
+		Module:     module,
+		Labels:     factoryLabels(config),
+		Out: FrameWriter{
+			Owner: f.config.Frames,
+		},
+		UpdateEvery:     config.UpdateEvery(),
+		AutoDetectEvery: config.AutoDetectionRetry(),
+		IsStock:         config.SourceType() == confgroup.TypeStock,
+		FunctionOnly:    functionOnly,
+		RuntimeService:  f.config.Runtime,
+		VnodeRegistry:   f.config.Vnodes,
+	}
+	if vnode.Vnode != nil {
+		jobConfig.Vnode = *vnode.Vnode.Copy()
+		jobConfig.VnodeName = config.Vnode()
+		jobConfig.VnodeRevision = vnode.Revision
+		jobConfig.VnodeMetadataRevision = vnode.MetadataRevision
+		jobConfig.VnodeLookup = f.config.Vnode
+	}
+	return jobruntime.NewJobV2(jobConfig), nil
+}
+
+func callFactoryModuleCleanup(ctx context.Context, cleanup func(context.Context)) error {
+	return callJobLifecycle("construction collector Cleanup", func() error {
+		cleanup(context.WithoutCancel(ctx))
+		return nil
+	})
+}
+
+func (f *Factory) lookupVNode(config confgroup.Config) (jobruntime.VnodeSnapshot, error) {
+	if config.Vnode() == "" {
+		return jobruntime.VnodeSnapshot{}, nil
+	}
+	if f.config.Vnode == nil {
+		return jobruntime.VnodeSnapshot{}, fmt.Errorf("job output: vnode %q is unavailable", config.Vnode())
+	}
+	vnode, ok := f.config.Vnode(config.Vnode())
+	if !ok || vnode.Vnode == nil {
+		return jobruntime.VnodeSnapshot{}, fmt.Errorf("job output: vnode %q is not registered", config.Vnode())
+	}
+	return vnode, nil
+}
+
+func validateFactoryConfigIdentity(config confgroup.Config, creator collectorapi.Creator) error {
+	if creator.InstancePolicy != collectorapi.InstancePolicySingle || config.Name() == config.Module() {
+		return nil
+	}
+	return fmt.Errorf(
+		"job output: single-instance module %q requires config name %q, got %q",
+		config.Module(),
+		config.Module(),
+		config.Name(),
+	)
+}
+
+func factoryLogSource(config confgroup.Config) string {
+	if config.SourceType() != "" && config.SourceType() == config.Provider() {
+		return config.SourceType()
+	}
+	return fmt.Sprintf("%s/%s", config.SourceType(), config.Provider())
+}
+
+func factoryLabels(config confgroup.Config) map[string]string {
+	labels := make(map[string]string)
+	for rawName, rawValue := range config.Labels() {
+		name, nameOK := rawName.(string)
+		value, valueOK := rawValue.(string)
+		if nameOK && valueOK {
+			labels[name] = value
+		}
+	}
+	return labels
+}
+
+func creatorDeclaresFunctions(creator collectorapi.Creator) bool {
+	return creator.SharedFunctions != nil || creator.AgentFunctions != nil || creator.InstanceFunctions != nil
+}
+
+func setModuleJobName(module any, name string) {
+	if named, ok := module.(jobNamedModule); ok {
+		named.SetJobName(name)
+	}
+}

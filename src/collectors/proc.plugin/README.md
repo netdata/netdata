@@ -440,6 +440,48 @@ Per interface configuration:
   # events = auto
 ```
 
+## Monitoring Network Statistics
+
+These metrics describe host-wide IPv4 and IPv6 protocol activity, rather than the per-interface traffic covered in [Monitoring Network Interfaces](#monitoring-network-interfaces). They come from `/proc/net/netstat`, `/proc/net/snmp`, and `/proc/net/snmp6`.
+
+### Key network statistics metric groups
+
+- **IPv4 and IPv6 packet errors (packets/s)**
+    Inbound and outbound discards and routing failures, plus receive-side header, address, protocol, size, truncation, and checksum failures where available. Correlate these host-level counters with routing and per-interface metrics to locate the cause.
+
+- **TCP connections (active connections)**
+    Connections currently in the `ESTABLISHED` or `CLOSE-WAIT` state.
+
+- **TCP opens (connections/s)**
+    Transitions from `CLOSED` to `SYN-SENT` for active opens and from `LISTEN` to `SYN-RCVD` for passive opens. These are connection-establishment attempts, not counts of completed or accepted connections.
+
+- **TCP traffic (packets/s)**
+    TCP segments received and sent by the host.
+
+- **TCP resets and establishment issues (events/s)**
+    Connections leaving `ESTABLISHED` or `CLOSE-WAIT` for `CLOSED`, resets sent, failed establishment attempts, and SYN retransmissions. Inspect each dimension separately because the reset counters are not limited to the handshake.
+
+- **TCP errors and retransmissions (packets/s)**
+    Received segment errors, receive checksum errors, and retransmitted segments. Retransmissions can be consistent with loss or congestion, but these counters alone do not identify the cause.
+
+- **TCP connection aborts (connections/s)**
+    Aborts associated with unexpected data, an early application close, memory pressure, timeout, linger timeout, or failure to send a reset because memory was unavailable.
+
+- **TCP reordering and out-of-order queue activity (packets/s)**
+    Reordered segments grouped by detection mechanism, plus segments queued, dropped, merged, or pruned by the out-of-order queue.
+
+- **TCP memory pressure, SYN cookies, and listen queues (events/s, packets/s)**
+    Kernel TCP memory-pressure events; SYN cookies sent, received, or failed; requests dropped or handled with cookies when the SYN queue is full; and accept-queue overflows and drops.
+
+- **UDP traffic and errors (packets/s, events/s)**
+    Datagrams received and sent, plus receive or send buffer failures, general input errors, datagrams received for unbound local ports, checksum errors, and ignored multicast where available.
+
+- **Broadcast and multicast traffic (kilobits/s, packets/s)**
+    IPv4 broadcast and IPv4/IPv6 multicast traffic received and sent. Linux also exposes kernel counters named `Ip6InBcastOctets` and `Ip6OutBcastOctets`; IPv6 itself has no broadcast addresses and uses multicast instead.
+
+- **ECN — Explicit Congestion Notification (packets/s)**
+    Received packets classified as Not-ECT, ECT(0), ECT(1), or Congestion Experienced (CE). CE means that congestion was marked on the packet; it does not show whether packet loss also occurred.
+
 ## Linux Anti-DDoS
 
 ![image6](https://cloud.githubusercontent.com/assets/2662304/14253733/53550b16-fa95-11e5-8d9d-4ed171df4735.gif)

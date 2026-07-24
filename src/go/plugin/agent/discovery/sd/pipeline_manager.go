@@ -35,7 +35,6 @@ type PipelineManager struct {
 }
 
 type runningPipeline struct {
-	cfg    pipeline.Config
 	cancel context.CancelFunc
 	done   chan struct{}
 }
@@ -138,7 +137,7 @@ func (m *PipelineManager) Restart(ctx context.Context, key string, cfg pipeline.
 	defer m.mux.Unlock()
 
 	// Start the already-created new pipeline
-	return m.startPipelineWithInstanceLocked(ctx, key, cfg, pl)
+	return m.startPipelineWithInstanceLocked(ctx, key, pl)
 }
 
 // StopAll stops all running pipelines with cleanup.
@@ -184,28 +183,16 @@ func (m *PipelineManager) IsRunning(key string) bool {
 	return ok
 }
 
-// Keys returns the keys of all running pipelines.
-func (m *PipelineManager) Keys() []string {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	keys := make([]string, 0, len(m.pipelines))
-	for k := range m.pipelines {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
 func (m *PipelineManager) startPipelineLocked(ctx context.Context, key string, cfg pipeline.Config) error {
 	pl, err := m.newPipeline(cfg)
 	if err != nil {
 		return err
 	}
 
-	return m.startPipelineWithInstanceLocked(ctx, key, cfg, pl)
+	return m.startPipelineWithInstanceLocked(ctx, key, pl)
 }
 
-func (m *PipelineManager) startPipelineWithInstanceLocked(ctx context.Context, key string, cfg pipeline.Config, pl sdPipeline) error {
+func (m *PipelineManager) startPipelineWithInstanceLocked(ctx context.Context, key string, pl sdPipeline) error {
 	// No check for existing pipeline needed here:
 	// All operations for the same pipeline key are processed sequentially
 	// in ServiceDiscovery.run()'s select loop (both file config events and
@@ -216,7 +203,6 @@ func (m *PipelineManager) startPipelineWithInstanceLocked(ctx context.Context, k
 	done := make(chan struct{})
 
 	rp := &runningPipeline{
-		cfg:    cfg,
 		cancel: cancel,
 		done:   done,
 	}

@@ -64,13 +64,19 @@ jobs:
             packaging/*.version
             packaging/*.checksums
             src/go/tools/topology-ip-intel-downloader/**
+            src/go/go.mod
+            src/go/go.sum
             src/crates/
             src/aclk/aclk-schemas/
             src/ml/dlib/
           files_ignore: |
             src/go/otel-collector/release-config.yaml.in
-            **/*.md
+            packaging/**/*.md
             packaging/repoconfig/
+            src/aclk/aclk-schemas/**/*.md
+            src/crates/**/*.md
+            src/go/tools/topology-ip-intel-downloader/README.md
+            src/ml/dlib/**/*.md
       - name: List all changed files in pattern
         continue-on-error: true
         env:

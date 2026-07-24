@@ -472,6 +472,11 @@ sidebar:
           edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/cloudwatch/profile-format.md
           description: Define CloudWatch namespaces, supported regions, resource dimensions, metrics, statistics, and dynamic charts in reusable profiles.
           keywords: [aws, cloudwatch, profiles, collectors, metrics]
+      - meta:
+          label: Prometheus Profile Format
+          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/profile-format.md
+          description: Define curated chart profiles for Prometheus endpoints and reshape scraped metrics with Prometheus-compatible relabeling rules.
+          keywords: [prometheus, profiles, relabeling, collectors, charts]
       - type: integration_placeholder
         integration_kind: collectors
   # Exporting Metrics

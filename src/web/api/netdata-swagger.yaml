@@ -1150,9 +1150,13 @@ paths:
           schema:
             type: string
             enum:
-              - yes
-              - no
-            default: no
+              - "yes"
+              - "no"
+              - "1"
+              - "0"
+              - "true"
+              - "false"
+            default: "no"
         - name: timestamps
           in: query
           description: |
@@ -1161,9 +1165,13 @@ paths:
           schema:
             type: string
             enum:
-              - yes
-              - no
-            default: yes
+              - "yes"
+              - "no"
+              - "1"
+              - "0"
+              - "true"
+              - "false"
+            default: "yes"
         - name: names
           in: query
           description: |
@@ -1172,9 +1180,13 @@ paths:
           schema:
             type: string
             enum:
-              - yes
-              - no
-            default: yes
+              - "yes"
+              - "no"
+              - "1"
+              - "0"
+              - "true"
+              - "false"
+            default: "yes"
         - name: oldunits
           in: query
           description: |
@@ -1183,9 +1195,13 @@ paths:
           schema:
             type: string
             enum:
-              - yes
-              - no
-            default: yes
+              - "yes"
+              - "no"
+              - "1"
+              - "0"
+              - "true"
+              - "false"
+            default: "yes"
         - name: hideunits
           in: query
           description: |
@@ -1194,9 +1210,13 @@ paths:
           schema:
             type: string
             enum:
-              - yes
-              - no
-            default: yes
+              - "yes"
+              - "no"
+              - "1"
+              - "0"
+              - "true"
+              - "false"
+            default: "yes"
         - name: server
           in: query
           description: |

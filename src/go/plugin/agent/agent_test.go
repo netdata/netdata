@@ -87,73 +87,118 @@ func TestAgent_setupRuntimeService(t *testing.T) {
 			require.NotNil(t, a)
 			a.Out = io.Discard
 
-			svc, stop := a.setupRuntimeService()
+			svc := a.setupRuntimeService()
 			if !test.wantEnabled {
 				assert.Nil(t, svc)
-				assert.Nil(t, stop)
 				return
 			}
 
 			require.NotNil(t, svc)
-			require.NotNil(t, stop)
-			stop()
 		})
 	}
 }
 
 func TestAgent_Run(t *testing.T) {
-	a := New(Config{
+	tests := map[string]struct {
+		restarts int
+	}{
+		"collects and terminates": {},
+		"acknowledged restart rotates the complete generation": {
+			restarts: 1,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			a := newLifecycleTestAgent()
+			var buf bytes.Buffer
+			a.Out = safewriter.New(&buf)
+			reader, writer := io.Pipe()
+			a.In = reader
+
+			var mux sync.Mutex
+			stats := make(map[string]int)
+			a.ModuleRegistry = prepareRegistry(&mux, stats, "module1", "module2")
+
+			runDone := make(chan error, 1)
+			go func() { runDone <- a.run(context.Background()) }()
+			waitForCollection(t, &mux, stats, 1)
+
+			for restart := 0; restart < test.restarts; restart++ {
+				ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+				require.NoError(t, a.Restart(ctx))
+				cancel()
+				waitForCollection(t, &mux, stats, restart+2)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+			require.NoError(t, a.Terminate(ctx))
+			cancel()
+			require.NoError(t, writer.Close())
+			require.NoError(t, <-runDone)
+			assert.ErrorIs(t, a.Restart(context.Background()), ErrNotRunning)
+			assert.ErrorIs(t, a.Terminate(context.Background()), ErrNotRunning)
+
+			generations := test.restarts + 1
+			for _, module := range []string{"module1", "module2"} {
+				assert.Equalf(t, generations, stats[module+"_init"], "%s init", module)
+				assert.Equalf(t, generations, stats[module+"_check"], "%s check", module)
+				assert.Equalf(t, generations, stats[module+"_charts"], "%s charts", module)
+				assert.GreaterOrEqualf(
+					t,
+					stats[module+"_collect"],
+					generations,
+					"%s collect",
+					module,
+				)
+				assert.Equalf(t, generations, stats[module+"_cleanup"], "%s cleanup", module)
+			}
+			assert.NotEmpty(t, buf.String())
+		})
+	}
+}
+
+func newLifecycleTestAgent() *Agent {
+	return New(Config{
 		Name: "test",
 		RunModePolicy: policy.RunModePolicy{
-			IsTerminal:               false,
-			AutoEnableDiscovered:     true,
-			UseFileStatusPersistence: true,
-			EnableRuntimeCharts:      true,
+			IsTerminal:           false,
+			AutoEnableDiscovered: true,
+			EnableRuntimeCharts:  true,
 		},
 		DiscoveryProviders: []discovery.ProviderFactory{
-			discovery.NewProviderFactory("dummy", func(ctx discovery.BuildContext) (discovery.Discoverer, bool, error) {
-				if len(ctx.DummyNames) == 0 {
-					return nil, false, nil
-				}
-				d, err := dummy.NewDiscovery(dummy.Config{
-					Registry: ctx.Registry,
-					Names:    ctx.DummyNames,
-				})
-				if err != nil {
-					return nil, false, err
-				}
-				return d, true, nil
-			}),
+			discovery.NewProviderFactory(
+				"dummy",
+				func(ctx discovery.BuildContext) (discovery.Discoverer, bool, error) {
+					if len(ctx.DummyNames) == 0 {
+						return nil, false, nil
+					}
+					d, err := dummy.NewDiscovery(dummy.Config{
+						Registry: ctx.Registry,
+						Names:    ctx.DummyNames,
+					})
+					if err != nil {
+						return nil, false, err
+					}
+					return d, true, nil
+				},
+			),
 		},
 	})
+}
 
-	var buf bytes.Buffer
-	a.Out = safewriter.New(&buf)
-
-	var mux sync.Mutex
-	stats := make(map[string]int)
-	a.ModuleRegistry = prepareRegistry(&mux, stats, "module1", "module2")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	var wg sync.WaitGroup
-
-	wg.Go(func() { a.run(ctx) })
-
-	time.Sleep(time.Second * 2)
-	cancel()
-	wg.Wait()
-
-	assert.Equalf(t, 1, stats["module1_init"], "module1 init")
-	assert.Equalf(t, 1, stats["module2_init"], "module2 init")
-	assert.Equalf(t, 1, stats["module1_check"], "module1 check")
-	assert.Equalf(t, 1, stats["module2_check"], "module2 check")
-	assert.Equalf(t, 1, stats["module1_charts"], "module1 charts")
-	assert.Equalf(t, 1, stats["module2_charts"], "module2 charts")
-	assert.Truef(t, stats["module1_collect"] > 0, "module1 collect")
-	assert.Truef(t, stats["module2_collect"] > 0, "module2 collect")
-	assert.Equalf(t, 1, stats["module1_cleanup"], "module1 cleanup")
-	assert.Equalf(t, 1, stats["module2_cleanup"], "module2 cleanup")
-	assert.True(t, buf.String() != "")
+func waitForCollection(
+	t *testing.T,
+	mux *sync.Mutex,
+	stats map[string]int,
+	generations int,
+) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		mux.Lock()
+		defer mux.Unlock()
+		return stats["module1_collect"] >= generations &&
+			stats["module2_collect"] >= generations
+	}, 4*time.Second, 50*time.Millisecond)
 }
 
 func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) collectorapi.Registry {

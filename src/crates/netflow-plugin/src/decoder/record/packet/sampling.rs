@@ -1,5 +1,6 @@
 use super::super::*;
 
+#[cfg(test)]
 fn has_positive_sampling_rate_field(fields: &FlowFields) -> bool {
     fields
         .get("SAMPLING_RATE")
@@ -9,12 +10,12 @@ fn has_positive_sampling_rate_field(fields: &FlowFields) -> bool {
 
 pub(crate) fn apply_sampling_state_record(
     rec: &mut FlowRecord,
-    exporter_ip: IpAddr,
+    exporter_source: SocketAddr,
     version: u16,
     observation_domain_id: u32,
     sampler_id: Option<u64>,
     observed_sampling_rate: Option<u64>,
-    sampling: &SamplingState,
+    sampling: &mut SamplingState,
 ) {
     if let Some(rate) = observed_sampling_rate.filter(|rate| *rate > 0) {
         rec.set_sampling_rate(rate);
@@ -23,26 +24,27 @@ pub(crate) fn apply_sampling_state_record(
 
     if !rec.has_sampling_rate() || rec.sampling_rate == 0 {
         if let Some(id) = sampler_id
-            && let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, id)
+            && let Some(rate) = sampling.get(exporter_source, version, observation_domain_id, id)
         {
             rec.set_sampling_rate(rate);
             return;
         }
 
-        if let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, 0) {
+        if let Some(rate) = sampling.get(exporter_source, version, observation_domain_id, 0) {
             rec.set_sampling_rate(rate);
         }
     }
 }
 
+#[cfg(test)]
 pub(crate) fn apply_sampling_state_fields(
     fields: &mut FlowFields,
-    exporter_ip: IpAddr,
+    exporter_source: SocketAddr,
     version: u16,
     observation_domain_id: u32,
     sampler_id: Option<u64>,
     observed_sampling_rate: Option<u64>,
-    sampling: &SamplingState,
+    sampling: &mut SamplingState,
 ) {
     if let Some(rate) = observed_sampling_rate.filter(|rate| *rate > 0) {
         fields.insert("SAMPLING_RATE", rate.to_string());
@@ -54,13 +56,13 @@ pub(crate) fn apply_sampling_state_fields(
     }
 
     if let Some(id) = sampler_id
-        && let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, id)
+        && let Some(rate) = sampling.get(exporter_source, version, observation_domain_id, id)
     {
         fields.insert("SAMPLING_RATE", rate.to_string());
         return;
     }
 
-    if let Some(rate) = sampling.get(exporter_ip, version, observation_domain_id, 0) {
+    if let Some(rate) = sampling.get(exporter_source, version, observation_domain_id, 0) {
         fields.insert("SAMPLING_RATE", rate.to_string());
     }
 }
@@ -85,10 +87,18 @@ mod tests {
     fn apply_sampling_state_fields_replaces_zero_with_learned_rate() {
         let mut fields = BTreeMap::from([("SAMPLING_RATE", "0".to_string())]);
         let mut sampling = SamplingState::default();
-        let exporter_ip = "192.0.2.10".parse().unwrap();
-        sampling.set(exporter_ip, 9, 20, 7, 4000);
+        let exporter_source = "192.0.2.10:2055".parse().unwrap();
+        sampling.set(exporter_source, 9, 20, 7, 4000);
 
-        apply_sampling_state_fields(&mut fields, exporter_ip, 9, 20, Some(7), None, &sampling);
+        apply_sampling_state_fields(
+            &mut fields,
+            exporter_source,
+            9,
+            20,
+            Some(7),
+            None,
+            &mut sampling,
+        );
 
         assert_eq!(
             fields.get("SAMPLING_RATE").map(String::as_str),
@@ -100,10 +110,18 @@ mod tests {
     fn apply_sampling_state_fields_replaces_invalid_with_learned_rate() {
         let mut fields = BTreeMap::from([("SAMPLING_RATE", "invalid".to_string())]);
         let mut sampling = SamplingState::default();
-        let exporter_ip = "192.0.2.10".parse().unwrap();
-        sampling.set(exporter_ip, 9, 20, 7, 4000);
+        let exporter_source = "192.0.2.10:2055".parse().unwrap();
+        sampling.set(exporter_source, 9, 20, 7, 4000);
 
-        apply_sampling_state_fields(&mut fields, exporter_ip, 9, 20, Some(7), None, &sampling);
+        apply_sampling_state_fields(
+            &mut fields,
+            exporter_source,
+            9,
+            20,
+            Some(7),
+            None,
+            &mut sampling,
+        );
 
         assert_eq!(
             fields.get("SAMPLING_RATE").map(String::as_str),
@@ -117,10 +135,18 @@ mod tests {
         rec.set_sampling_rate(0);
 
         let mut sampling = SamplingState::default();
-        let exporter_ip = "192.0.2.10".parse().unwrap();
-        sampling.set(exporter_ip, 9, 20, 7, 4000);
+        let exporter_source = "192.0.2.10:2055".parse().unwrap();
+        sampling.set(exporter_source, 9, 20, 7, 4000);
 
-        apply_sampling_state_record(&mut rec, exporter_ip, 9, 20, Some(7), None, &sampling);
+        apply_sampling_state_record(
+            &mut rec,
+            exporter_source,
+            9,
+            20,
+            Some(7),
+            None,
+            &mut sampling,
+        );
 
         assert!(rec.has_sampling_rate());
         assert_eq!(rec.sampling_rate, 4000);

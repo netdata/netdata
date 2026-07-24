@@ -1,637 +1,530 @@
 # Job Manager Architecture
 
-This document describes the current `jobmgr` architecture for maintainers.
-It is intentionally human-oriented: it explains the moving parts, command
-flows, state ownership, and test model without requiring the reader to
-reconstruct the system from individual review notes.
+This is a maintainer-oriented map of the Job Manager (`jobmgr`). It explains the
+main runtime path and package boundaries as a top-to-bottom journey: the big
+picture first, then the concurrency model, then how jobs, secrets, and vnodes
+are handled, and finally the package layout and the deep invariants.
 
-Read it top to bottom as a journey: the plain-language model first, then the
-building blocks (loop, lanes, claims, effects), then how real commands flow,
-and finally the precise contracts and the test model.
+It intentionally leaves collector internals opaque. How a specific collector
+walks SNMP, scrapes Prometheus, or renders charts lives in that collector and
+the framework packages it uses; Job Manager only orchestrates their lifecycle.
 
-## What jobmgr Does
+## Short Version
 
-`jobmgr` owns collector jobs at runtime. It accepts configuration changes
-from discovery and Dynamic Configuration (DynCfg), starts and stops jobs,
-coordinates secret stores and virtual nodes, and publishes Function routes.
+Job Manager is the orchestration boundary for a Go data-collection plugin
+process (`go.d`, `ibm.d`, `scripts.d`). It takes everything that wants to
+start, stop, reconfigure, or query a collector job and turns it into an
+ordered, safe stream of lifecycle commands run by **one single-threaded command
+kernel**.
 
-The central rule is simple:
+Three things can drive it:
 
-> The manager loop owns orchestration state. Blocking module work runs
-> outside the loop, then returns to the loop to commit.
+- **Function calls** arriving on the plugin's stdin from the Netdata daemon —
+  including dynamic configuration (DynCfg) commands to add / edit / enable /
+  disable / test / remove jobs.
+- **Discovery** — file configs and service discovery proposing jobs to run.
+- **Autodetection retries** — jobs that failed to detect their target, retried
+  later.
 
-## Job Concurrency In Plain Words
+Everything a plugin writes back — metrics, charts, Function registrations,
+config state, keepalives — leaves through **one serialized stdout writer**.
 
-`jobmgr` is not one goroutine doing all job work, and it is not many
-goroutines freely mutating job state. It is a small concurrency model. The
-table below introduces the vocabulary used throughout the rest of this
-document; later sections make each part precise.
+The whole process runs **one active "run generation"** at a time. A reload
+(SIGHUP) rotates that generation cleanly without rebuilding the process itself.
 
-| Part | Plain meaning | What it means for jobs |
-| --- | --- | --- |
-| Inputs | Concurrent inputs enter manager channels:<br/>• discovery configs appeared/disappeared<br/>• DynCfg user actions<br/>• effect completions<br/>• shutdown | Inputs do not freely mutate job state. The manager loop consumes them first. |
-| Manager loop | One goroutine makes one orchestration decision at a time. | It chooses:<br/>• domain/key<br/>• inline vs wait vs effect<br/>• visible state commit |
-| Per-key lane | One lane serializes one object. | For the same collector config:<br/>• actions do not overtake<br/>• discovery and DynCfg meet in the same lane |
-| Claims | Shared dependencies are reserved before work runs. | Jobs can block across different collector keys when they share:<br/>• secret stores<br/>• vnodes<br/>Unrelated jobs can proceed concurrently. |
-| Effect pool | Blocking work runs outside the manager loop. | The lane stays occupied while effects run:<br/>• validation<br/>• detection/start<br/>• stop waits<br/>• backend work |
-| Running job | A committed job runs separately from command orchestration. | The collector can collect/emit independently. `jobmgr` still owns:<br/>• lifecycle<br/>• routing<br/>• dependencies<br/>• cleanup |
-| Shutdown | Shutdown switches to the one-rule path. | During shutdown:<br/>• new non-terminal work does not start<br/>• unfinished DynCfg commands answer 503<br/>• unfinished work publishes no CONFIG state |
+## Where Job Manager Sits
+
+Every plugin binary follows the same startup path.
+
+```mermaid
+flowchart TD
+    Plugin("cmd/godplugin · ibmdplugin · scriptsdplugin<br/>main()")
+    New("agent.New(Config)")
+    Host("agenthost.Run<br/>forwards OS signals")
+    Proc("composition.NewProcess<br/>build the process")
+    Run("process.Run(ctx)<br/>outer loop")
+    Gen("run generation<br/>command kernel + adapters")
+
+    Plugin --> New --> Host --> Proc --> Run --> Gen
+    Host -. "SIGHUP → Restart" .-> Run
+    Host -. "SIGINT / SIGTERM → Terminate" .-> Run
+
+    classDef entry fill:#dbeafe,stroke:#2563eb,color:#0b1021;
+    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    class Plugin,New,Host entry;
+    class Proc,Run,Gen core;
+```
+
+- `cmd/*plugin/main.go` builds a `RunModePolicy`, registers discovery
+  providers, and calls `agent.New`.
+- `cmd/internal/agenthost/host.go` hosts one process-lifetime Agent and maps OS
+  signals to acknowledged controls: **SIGHUP → `Restart`**, **SIGINT/SIGTERM →
+  `Terminate`** (each bounded to 10s).
+- `plugin/agent/agent.go` loads config and modules, then calls
+  `composition.NewProcess` and `process.Run(ctx)`.
+
+**Run modes** (`plugin/agent/policy/runmode.go`) flip a few gates:
+
+- **Long-lived agent** (production, not a terminal): service discovery on,
+  runtime charts on, discovered jobs wait for the daemon's enable command.
+- **Terminal / debug** (attached to a TTY): service discovery off, runtime
+  charts off, discovered jobs auto-enable so a developer sees output
+  immediately.
+
+## The Big Picture
+
+Once running, Job Manager is a funnel: several sources of intent on the left,
+one ordered kernel in the middle, one stdout stream on the right.
 
 ```mermaid
 flowchart LR
-    discovery("Discovery<br/>config appeared/disappeared") --> input("Manager input channels")
-    dyncfg("DynCfg<br/>user action") --> input
-    finished("Effect completion") --> input
-    shutdown("Shutdown") --> input
+    Daemon("Netdata daemon")
+    Fn("Function ingress<br/>stdin")
+    Disc("Discovery<br/>files + service discovery")
+    Retry("Autodetection<br/>retries")
+    Kernel("Command Kernel<br/>single-threaded loop")
+    Jobs("Collector jobs<br/>V1 / V2")
+    Secrets("Secret resolver<br/>+ store")
+    Vnodes("Vnode registry")
+    Frame("FrameOwner<br/>one stdout writer")
 
-    input --> loop("Manager loop<br/>one decision at a time")
-    loop --> lane("Per-key lane<br/>same object order")
-    lane --> claims("Dependency claims<br/>stores/vnodes/jobs")
-    claims --> inline("Inline answer<br/>cheap or rejection-only")
-    claims --> effect("Effect pool<br/>blocking work")
-    effect --> loop
+    Daemon -->|"FUNCTION / DynCfg"| Fn --> Kernel
+    Disc --> Kernel
+    Retry --> Kernel
+    Kernel --> Jobs
+    Jobs -->|"resolve refs"| Secrets
+    Jobs -->|"attribute metrics"| Vnodes
+    Jobs --> Frame
+    Kernel --> Frame
+    Frame -->|"metrics · charts · CONFIG · FUNCTION"| Daemon
 
-    loop --> commit("Commit visible state")
-    commit --> running("Running job<br/>collects independently")
-    commit --> output("DynCfg terminal<br/>CONFIG records")
-
-    classDef loop fill:#cfe4ff,stroke:#1f6feb,stroke-width:3px,color:#0b2948;
-    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
-    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
-    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
-    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
-    classDef hard fill:#ffdcdc,stroke:#cf222e,color:#5a0b0b;
-
-    class loop loop;
-    class discovery,dyncfg,input input;
-    class shutdown hard;
-    class finished,effect effect;
-    class lane,claims sched;
-    class inline,commit,running,output commit;
+    classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
+    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
+    classDef sec fill:#fee2e2,stroke:#dc2626,color:#0b1021;
+    classDef vn fill:#ccfbf1,stroke:#0d9488,color:#0b1021;
+    classDef out fill:#e5e7eb,stroke:#4b5563,color:#0b1021;
+    class Daemon,Fn,Disc,Retry ext;
+    class Kernel core;
+    class Jobs job;
+    class Secrets sec;
+    class Vnodes vn;
+    class Frame out;
 ```
 
-Typical job lifecycle:
+A useful mental split for the rest of this document:
 
-| Step | What happens | Concurrency rule |
-| --- | --- | --- |
-| 1 | Discovery or DynCfg introduces a config. | The input enters the manager loop through a channel. |
-| 2 | The loop records the config and chooses:<br/>• start<br/>• wait<br/>• rejection | The decision is serialized by the config's lane. |
-| 3 | Starting a job runs validation/detection in an effect worker. | Blocking work leaves the loop, but the lane stays occupied. |
-| 4 | The effect result returns to the loop. | Only the loop commits the result. |
-| 5 | The loop publishes one terminal state:<br/>• running<br/>• failed<br/>• disabled<br/>• deleted<br/>• rejected | Visible state changes happen at commit. |
-| 6 | A running collector works until another lifecycle event arrives:<br/>• stop/restart/update/remove<br/>• dependency restart<br/>• shutdown | Collection is independent; lifecycle remains controlled by `jobmgr`. |
+- The **kernel** decides *what happens and in what order*.
+- **Adapters** (`functions`, `joboutput`, `secrets`, `discovery`) know *how* to
+  do the collector-specific work, behind narrow ports.
+- **`lifecycle`** provides the neutral machinery the kernel delegates to
+  (UID ownership, tasks, framing, and run control).
+- **`composition`** wires them all together.
 
-## Architecture Layers
+## The Concurrency Model
 
-With the plain-language model in mind, the same system in structural terms
-has four layers:
+This is the core idea. Job Manager does almost no locking in its business
+logic. Instead, **one goroutine — the `CommandKernel` run loop — owns all mutable
+orchestration state** and is the only thing allowed to change it. Everything
+else either hands work in over a channel or does blocking work off to the side
+and reports back.
 
-1. Inputs:
-   discovery add/remove, DynCfg functions, effect completions, shutdown.
-2. Manager loop:
-   the single goroutine that owns executor state, claim state, and commits.
-3. Executor:
-   per-key lanes plus a multi-key claim table.
-4. Effects:
-   blocking work on a bounded worker pool, with deadline abandon and late
-   return handling.
+Think of an **air-traffic control tower with a single controller**:
+
+- Aircraft (commands) queue on **runways** (lanes); one moves per runway at a
+  time, in arrival order (FIFO).
+- Before taxiing, a flight reserves **airspace corridors** (claims), always
+  requested in the same order so two flights never deadlock waiting on each
+  other.
+- The controller never leaves the tower. **Pilots** (off-loop task goroutines)
+  fly the actual missions and radio back completions. The controller only reads
+  radios and updates the board.
+
+### The command lifecycle
 
 ```mermaid
 flowchart TD
-    discovery("Discovery add/remove") --> loop("Manager.run")
-    dyncfg("DynCfg function") --> loop
-    done("Effect completion") --> loop
-    stop("Shutdown") --> loop
+    Submit("Submit<br/>adapter, off-loop")
+    Admit("Admit<br/>UID dedupe · route · lane")
+    Lane("Lane<br/>per-resource FIFO")
+    Claim("Claims<br/>exclusive cross-lane ordering")
+    Task("Run task<br/>goroutine, off-loop")
+    Complete("Apply completion<br/>on-loop")
+    Frame("FrameOwner<br/>terminal frame → stdout")
+    Dispose("Dispose<br/>release claims · lane")
 
-    loop --> exec("Executor")
-    exec --> lanes("Per-key lanes")
-    exec --> claims("Claim table")
-    exec --> domains("Domain handlers")
+    Submit --> Admit --> Lane --> Claim --> Task --> Complete --> Frame --> Dispose
+    Complete -. "advance / wake lanes" .-> Lane
 
-    domains --> collector("Collector config/job handler")
-    domains --> stores("Secretstore controller")
-    domains --> vnodes("Vnode controller")
-
-    collector --> effects("Effect pool")
-    stores --> effects
-    effects --> done
-
-    collector --> commit("Loop-side commit")
-    stores --> commit
-    vnodes --> commit
-    commit --> wire("DynCfg output and CONFIG records")
-    commit --> jobs("runningJobs / deps / funcctl / fileStatus")
-
-    classDef loop fill:#cfe4ff,stroke:#1f6feb,stroke-width:3px,color:#0b2948;
-    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
-    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
-    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
-    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
-    classDef hard fill:#ffdcdc,stroke:#cf222e,color:#5a0b0b;
-
-    class loop loop;
-    class discovery,dyncfg input;
-    class stop hard;
-    class done,effects effect;
-    class exec,lanes,claims,domains,collector,stores,vnodes sched;
-    class commit,wire,jobs commit;
+    classDef offloop fill:#e5e7eb,stroke:#4b5563,color:#0b1021;
+    classDef onloop fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    class Submit,Task offloop;
+    class Admit,Lane,Claim,Complete,Frame,Dispose onloop;
 ```
 
-## Main Objects
+1. **Submit** (off-loop): an adapter validates a `Request`, attaches a prepared
+   Job Manager plan or submits an unresolved Function request, pushes it onto a
+   submission queue, and wakes the loop. `command_ports.go`,
+   `kernel_ingress.go`.
+2. **Admit** (on-loop): the loop dedupes the command's UID, resolves the route,
+   derives the lane key, and installs the operation. Duplicate UIDs and invalid
+   routes are rejected here. `kernel_admission.go`, `lifecycle/uid.go`.
+3. **Lane**: same-resource commands share one FIFO lane; only the lane head
+   runs while the lane is active. Different lanes advance independently.
+4. **Claims**: cross-lane exclusion. Every claim is exclusive. Claims are
+   acquired in a stable global key order and waiters are FIFO per key, so the
+   design is deadlock-free and starvation-free.
+   `claim_authority.go`.
+5. **Run task** (off-loop): the actual blocking work — construct a collector,
+   run autodetection, call a Function handler, stop a job — runs on a
+   `TaskSupervisor` goroutine, never on the loop. `lifecycle/task.go`.
+6. **Apply completion** (on-loop): the task radios its result back; the loop
+   seals it and advances the lifecycle.
+7. **Frame**: the terminal response is committed to stdout through `FrameOwner`.
+8. **Dispose**: claims and the lane slot are released, waking any blocked lanes.
 
-This is the cast of characters: the plain concepts above mapped to the code
-types that implement them.
+### Who owns what
 
-| Object | Owner | Purpose |
-| --- | --- | --- |
-| `Manager.run` | One goroutine | Routes every accepted event and executes commits. |
-| `executor` | Manager loop | Serializes same-key work, manages effects, shutdown drain, and wedged keys. |
-| `keyState` | Manager loop | State for one domain key: FIFO, wait park, busy phase, grant, wedge. |
-| `claimTable` | Manager loop | Reserves cross-key dependencies before work can run. |
-| `dyncfg.Handler` | Manager loop plus callbacks | Generic collector config state machine. |
-| `secretsctl.Controller` | Manager loop plus effects | Secret store CRUD, validation, and dependent restarts. |
-| `vnodectl.Controller` | Manager loop | Vnode CRUD and validation. |
-| `runningJobs` | Locked helper | Registered runtime jobs. |
-| `secretStoreDeps` | Locked helper | Mapping from stores to dependent collector configs. |
-| `funcctl.Controller` | Locked helper plus reconciler | Function route publication. |
-| `emissionGates` | Locked helper | Output gate used to quarantine stopping or dropped jobs. |
-| `fileStatus` | Locked helper | File status persistence for dyncfg-managed jobs. |
+- **On-loop (exclusive to the `CommandKernel` run loop):** every lane, operation, deadline, claim
+  transition, and counter. The loop is the sole mutator. A test
+  (`architecture_test.go`) even pins that on-loop actions are dispatched through
+  the sanctioned kernel ownership funnel.
+- **Off-loop:** the actual collector / Function / stop / cleanup work, run by
+  `TaskSupervisor`. The loop and tasks talk only over channels.
 
-The loop owns orchestration decisions, but several helpers are locked
-because effects and auxiliary goroutines also need safe access.
+### Two fairness rules worth knowing
 
-## Event Domains And Keys
+- **`TaskSupervisor` runs two independent classes** — framework-control work
+  (lifecycle/DynCfg commands) and generic Function work — in strict round-robin.
+  One class can never starve the other, and there is **no fixed "N active
+  Functions" cap**. `lifecycle/task.go`.
+- **A timed-out task keeps its ownership.** If blocking work overruns its
+  deadline, the kernel only *cooperatively* cancels it; its claims, lane, and
+  resource authority stay held until it actually returns, because a late return
+  could still mutate that resource. Repeated overruns escalate to a fail-stop.
+  `kernel_disposal.go` and `kernel_runloop.go`.
 
-Every executor event has:
+Two more facts that catch newcomers:
 
-- kind: discovery add, discovery remove, or DynCfg command;
-- domain: collector, secretstore, vnode, or unknown;
-- key: the object identity inside the domain.
+- Lanes give per-resource *ordering*; **claims** give cross-resource *mutual
+  exclusion*. Two independent lanes still serialize if they declare the same
+  claim key.
+- A resource-less Function call gets a **unique lane per invocation**, so
+  concurrent calls to the same Function run in parallel — unless the resolved
+  plan declares claims.
+- DynCfg `config` prefix routes are **private catalog routes**, not Function
+  publications. Netdata owns the global `config` Function that serves the tree
+  and delegates per-config operations; go.d emits `CONFIG` object frames but
+  never `FUNCTION GLOBAL "config"` or its withdrawal.
 
-The lane key is domain-namespaced as `<domain>|<key>`, so collector job
-keys, store keys, and vnode names cannot collide.
+## How the Job Manager Manages Jobs
 
-| Domain | Key | Examples |
-| --- | --- | --- |
-| Collector | Exposed config key | `mysql_local`, `go.d_job` |
-| Secretstore | Store key | `vault:vault_prod` |
-| Vnode | Vnode name | `db-primary` |
-| Unknown | none | Rejected immediately. |
+A **job** is one running collector instance: a module plus a resolved config.
+Jobs are created from stock/user config files at startup, from discovery, or
+from DynCfg commands, and are retried after a failed autodetection.
 
-Underivable commands keep a domain fallback key and execute the existing
-handler rejection path. They are rejection-only by construction and do not
-claim dependencies.
-
-## Manager Loop
-
-`Manager.run` is the only consumer of:
-
-- discovery add/remove channels;
-- DynCfg command channel;
-- effect completion channel.
-
-It checks shutdown before every normal receive and again after the select
-chooses a work item. That bounds the shutdown race to the single event
-already being handled.
+The central guarantee is that **reconfiguring a job never disrupts the running
+one until the replacement is proven ready**. Think of a stage crew swapping
+actors mid-play: the understudy is fully costumed and rehearsed offstage while
+the current actor keeps performing; only on cue does the current actor exit,
+and only then does the understudy audition live.
 
 ```mermaid
 flowchart TD
-    start("Loop tick") --> pre("Check manager context")
-    pre -->|done| drain("Executor shutdown drain")
-    pre -->|active| receive("Receive one event")
-    receive --> add("Discovery add")
-    receive --> remove("Discovery remove")
-    receive --> fn("DynCfg command")
-    receive --> result("Effect result")
+    Cmd("add / update / discovered / retry")
+    Validate("Validate config<br/>throwaway probe")
+    Prepare("Prepare candidate<br/>construct + resolve secrets<br/>(current job still running)")
+    Apply("Apply")
+    StopOld("Stop + Finalize<br/>prior generation")
+    AutoD{"Managed autodetection<br/>AcceptStart"}
+    Live("Start + Publish<br/>new generation live")
+    Fail("Commit StatusFailed<br/>schedule retry")
 
-    add --> activeCheck("Context still active?")
-    remove --> activeCheck
-    fn --> activeCheck
-    result --> resultCheck("Context still active?")
+    Cmd --> Validate --> Prepare --> Apply --> StopOld --> AutoD
+    AutoD -->|"ok"| Live
+    AutoD -->|"failed"| Fail
+    Fail -. "logical clock due" .-> Prepare
 
-    activeCheck -->|yes| dispatch("executor.dispatch")
-    activeCheck -->|no| reject("drop discovery or answer DynCfg 503")
-    resultCheck -->|yes| commit("executor.onEffectDone")
-    resultCheck -->|no| shutdownResult("executor.onEffectDoneShutdown")
-
-    classDef loop fill:#cfe4ff,stroke:#1f6feb,stroke-width:3px,color:#0b2948;
-    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
-    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
-    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
-    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
-    classDef hard fill:#ffdcdc,stroke:#cf222e,color:#5a0b0b;
-
-    class start,pre,receive,activeCheck,resultCheck loop;
-    class add,remove,fn input;
-    class result effect;
-    class dispatch sched;
-    class commit commit;
-    class drain,reject,shutdownResult hard;
+    classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
+    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
+    class Cmd ext;
+    class Validate,Apply,StopOld,AutoD core;
+    class Prepare,Live,Fail job;
 ```
 
-The loop must not block on module code, external I/O, or unbounded channel
-sends. Blocking work must go through a `StepRunner` and return to the loop
-for commit.
+1. **Validate** — the config is checked with a short-lived throwaway module
+   probe, so a bad config is rejected without touching the live job.
+   `joboutput/config_factory.go`.
+2. **Prepare (non-disruptive)** — the `Factory` looks up the module creator,
+   resolves the config's secrets, builds a V1 or V2 collector, and hands back a
+   *candidate* holding a long-lived resource permit. The current job keeps
+   running.
+   `joboutput/factory.go`, `joboutput/generation.go`.
+3. **Apply** — the kernel stops and finalizes the prior generation, then calls
+   `AcceptStart` on the candidate. `joboutput/transaction.go`.
+4. **Managed autodetection** — the candidate runs its `Check`/autodetect *after*
+   the old generation is gone. On success the job starts, publishes its
+   Functions, and begins emitting. On a clean failure the graph is committed
+   truthfully as `StatusFailed` (never a fake success) and a retry is scheduled.
+5. **Emitting** — the collector writes protocol frames through a `FrameWriter`,
+   which commits whole frames through the one `FrameOwner`.
 
-## Executor Lanes
+### Job generations and fencing
 
-Each key has a lane. A lane may be:
+Every job carries a monotonic **generation** number. A prepared candidate is
+consumed only if its generation matches the accepting transaction, and output
+flows only from the generation that has been accepted and started. This is how a
+slow stop of an old job can never interleave its frames with a new one.
 
-- idle;
-- occupied by claim acquisition;
-- occupied by an effect;
-- occupied by a held claim after inline work;
-- wait-parked awaiting an enable/disable decision;
-- wedged after a deadline abandon.
+### V1 vs V2
 
-Same-key events never overtake each other. Different keys can run
-concurrently unless the claim table finds a dependency conflict.
+Job Manager orchestrates both collector contracts identically; only the runtime
+adapter differs (`joboutput/runtime_adapter.go`, `framework/jobruntime`):
 
-Wait-park is special: it applies to discovery events for a config awaiting
-the user's enable/disable decision. DynCfg commands against the same key do
-not wait-park; they execute and answer the state machine's current outcome.
+- **V1** declares `Charts()` and returns `Collect() map[string]int64`.
+- **V2** writes to a `metrix.CollectorStore`, supplies `ChartTemplateYAML()`
+  (rendered by the chart engine), and is wired to the runtime service. Each V2
+  scope owns its last successful host definition; the shared vnode registry
+  only diagnoses conflicting metadata after successful output.
 
-Effect completion, deadline abandon, and late-return ordering are planned in
-`executor_transition.go` and pinned by `executor_transition_test.go`. The
-diagram below is the conceptual lane shape, not the policy table.
+### Autodetection retries
+
+Retries are deliberately cheap. There is **no timer or goroutine per job**.
+Instead, one per-run map + heap + dispatcher owns all pending retries
+(`joboutput/autodetection_retry.go`, `joboutput/scheduler.go`):
+
+- The process's 1-second tick advances a **logical clock**.
+- When an entry is due, the single run-owned dispatcher resubmits it as a
+  restart through the ordinary command port — fire-and-forget — and keeps
+  authority over that config/retry token until the resulting transaction
+  settles.
+- Success, replacement, disable, removal, or shutdown invalidates the token.
+
+## Secrets
+
+Secrets keep credentials out of collector configs. A config value can carry a
+**reference** instead of a literal:
+
+- `${store:kind:name:key}` — looked up in a SecretStore (Vault, AWS Secrets
+  Manager, Azure Key Vault, GCP Secret Manager).
+- `${env:...}`, `${file:...}`, `${cmd:...}` — resolved from the plugin
+  process's own environment variables, files, or command output.
+
+Resolution happens only in memory, only when a job is built. The key property
+is that it is **atomic — all references resolve, or none do**. Picture a notary:
+photocopy the whole document, list every blank, check out the referenced files
+under one pass, fill every blank on the copy, check the files back in, and hand
+back a fully-filled copy or nothing at all.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Idle
-    Idle --> AcquiringClaims: mutating event
-    Idle --> InlineCommit: claimless event
-    Idle --> WaitParked: discovered config awaiting decision
-    WaitParked --> AcquiringClaims: enable or disable decision
-    AcquiringClaims --> BusyEffect: grant plus blocking phase
-    AcquiringClaims --> InlineCommit: grant plus inline command
-    BusyEffect --> Commit: effect completion
-    BusyEffect --> Wedged: deadline abandon
-    Wedged --> Commit: late return
-    InlineCommit --> Idle
-    Commit --> Idle
+flowchart TD
+    Ref("config with a secret reference")
+    Clone("Clone + validate whole config")
+    Compile("Compile references → distinct store keys")
+    Scope("Acquire ONE reader scope<br/>pin current store generations")
+    Resolve("Resolve the clone")
+    Release("Release scope · drain readers")
+    Post("Complete postimage → build job")
 
-    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
-    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
-    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
-    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
-    classDef hard fill:#ffdcdc,stroke:#cf222e,color:#5a0b0b;
+    Ref --> Clone --> Compile --> Scope --> Resolve --> Release --> Post
 
-    class Idle input
-    class AcquiringClaims,WaitParked sched
-    class BusyEffect effect
-    class Wedged hard
-    class InlineCommit,Commit commit
+    classDef sec fill:#fee2e2,stroke:#dc2626,color:#0b1021;
+    classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
+    class Ref,Clone,Compile,Scope,Resolve,Release sec;
+    class Post job;
 ```
 
-## Claim Table
+The resolver lives in `plugin/agent/secrets/resolver`; it never mutates the
+input config and returns `nil` on any error, so a half-resolved config can never
+reach a collector.
 
-Claims reserve cross-key dependencies before work runs.
+### Changing a store restarts its jobs
 
-| Command class | Claims |
-| --- | --- |
-| Collector mutation | Own collector key as write; referenced stores as read; referenced vnode as read. |
-| Collector update/replace | Union of old and new store/vnode references. |
-| Collector disable/remove | Old store/vnode references from the exposed config. |
-| Secretstore mutation | Store key as write; restartable dependent jobs as write. |
-| Secretstore test | Store key as read. |
-| Vnode mutation | Vnode name as write. |
-| Rejection-only command | No claims. |
+Backing stores are managed live over DynCfg (`add` / `update` / `remove`). The
+store (`plugin/agent/secrets/secretstore`) keeps **numbered, immutable
+generations** per `kind:name`:
 
-Claim rules:
+1. A new generation is prepared *outside* publication, then committed by
+   compare-and-swap against the expected generation.
+2. If any running jobs depend on that store key, they are restarted as **one
+   composite command** — stop dependents → commit the new generation → start
+   dependents — all under the store's ordering/claim scope
+   (`dyncfg:secretstores`), so nothing else mutates those jobs in between.
+   `secrets/restart.go`, `secrets/transaction.go`.
+3. The superseded generation is retired only after its last reader scope drains,
+   so an in-flight resolution never sees credentials vanish mid-read.
 
-- reads share;
-- writes exclude;
-- acquisition walks one global lexicographic order, including the primary;
-- a request holds the acquired prefix and parks at the first blocked key;
-- per-key waiter FIFO prevents barging;
-- claim sets recompute at every restage;
-- if the recomputed set changes, the old prefix is released and the new set
-  is acquired from the start;
-- claim waiters are pumped before lane release hooks can settle parked lane
-  events.
+## Vnodes (Virtual Nodes)
 
-This is the deadlock-avoidance core: no command waits for a later key while
-holding keys in an order that another command can invert.
+A single job often monitors many *remote* things — one job scraping 50
+switches, or one cloud collector pulling hundreds of resources. Netdata wants
+each to appear as its own **node** in the UI, with its own hostname and charts,
+not collapsed under the agent's host. A **vnode** is a lightweight,
+agent-declared "virtual host" (name, hostname, GUID, labels) that a job can
+attribute its metrics to.
 
-## Effects, Deadlines, And Wedges
+Think of **name badges at a conference**: the agent prints a batch up front and
+can print more on demand. When a job reports a metric it wears a badge, so the
+dashboard files it under that identity instead of "the agent."
 
-Blocking work runs as an effect with the manager context plus a flat
-deadline. Blocking work includes:
+- **Configured vnodes** are loaded from `vnodes/` config files at startup and
+  passed once as `InitialVnodes` (`agent/setup.go` → `agent/agent.go` →
+  `composition`). At startup they are published to the daemon as DynCfg config
+  entries.
+- **Runtime vnodes** can be added, edited, or removed live through a DynCfg
+  vnode Function (`composition/vnodes.go`).
+- The vnode authority (`discovery/vnode.go`) is **revision-versioned and
+  live-merged**: a job's `vnode:` name is resolved against the current set of
+  file-configured *and* runtime vnodes, not a frozen startup snapshot. The
+  resolved snapshot is attached to the job so its runtime emits under that
+  virtual host.
+- A vnode cannot be removed while a job references it (`409`), and only
+  runtime (DynCfg-sourced) vnodes are removable (`405`).
 
-- collector validation and detection;
-- job stop waits;
-- secretstore backend validation and activation;
-- dependent restarts.
+## Restart and Shutdown
 
-If an effect returns before the deadline, the result is committed on the
-loop. If the deadline fires first, the worker commits the deadline outcome
-and the leaked call keeps running in the background. The key is then wedged
-until the leaked call returns.
+Job Manager separates two lifetimes:
 
-`executor_transition.go` is the loop-side owner for completion, abandon, late
-return, warm continuation, late replay, and shutdown-late ordering. The prose
-below records the cross-file invariants that stay with the manager, effect
-worker, claim table, and domain controllers.
+- **The process is the building.** Built once by `composition.NewProcess`, it
+  survives every reload: the stdin reader, the one `FrameOwner`, the UID ledger,
+  the frozen module registry, the secret resolver, the vnode registry, and the
+  runtime metrics service.
+- **The run generation is the current tenant.** A complete, self-contained
+  occupant built by `composition/run.go`: the kernel and its loop, the task
+  supervisor, the run supervisor, the DynCfg graph, the per-generation secret
+  store, the Function catalog and publications, the job factory, the
+  autodetection scheduler, and the `jobmgr.runtime` metrics.
 
-While wedged:
-
-- the lane remains busy;
-- same-key events park;
-- read claims release at the abandon commit;
-- write claims remain held until late return;
-- claim waiters at the wedged key are re-attempted so commands that can
-  skip wedged keys do not wait for an unbounded leaked call.
-
-At late return:
-
-- late replay work runs before remaining write claims release;
-- a warm start resumes only if the config is still current, no stop intent
-  is queued, the manager is not shutting down, and referenced stores are
-  unchanged/not write-held;
-- dropped warm starts dispose silently behind a closed emission gate;
-- shutdown late returns only release state and publish nothing.
+A **SIGHUP reload evicts the whole tenant and moves a fresh one in without
+touching the building.**
 
 ```mermaid
-sequenceDiagram
-    participant L as Manager loop
-    participant E as Effect worker
-    participant M as Module call
+flowchart TD
+    HUP("SIGHUP → Restart")
+    Seal("Seal ingress")
+    Cut("Publish stopping cut<br/>begin shutdown budget (10s)")
+    Drain("Drain admitted work<br/>protected chains finish")
+    Census("Require exact-zero census<br/>run finalizer")
+    Next("Construct + adopt<br/>next generation")
 
-    L->>E: dispatch effect
-    E->>M: run blocking work
-    alt returns before deadline
-        rect rgba(46, 160, 67, 0.15)
-        M-->>E: result
-        E-->>L: normal completion
-        L->>L: commit, release claims, settle lane
-        end
-    else deadline fires first
-        rect rgba(248, 81, 73, 0.15)
-        E-->>L: abandoned result
-        L->>L: abandon transition, wedge key
-        M-->>E: late result
-        E-->>L: late completion
-        L->>L: late-return transition, release writes, settle lane
-        end
-    end
+    HUP --> Seal --> Cut --> Drain --> Census --> Next
+
+    classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
+    classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
+    class HUP ext;
+    class Seal,Cut,Drain,Census,Next core;
 ```
 
-## Domain Flows
+The rotation is an acknowledged sequence (`composition/process.go` `rotate`):
 
-### Collector Configs And Jobs
+1. Seal stdin ingress so no new external command enters.
+2. Publish the generation-bound **stopping cut**, close external command
+   ingress, and start the single shutdown budget (default 10s).
+3. Drain every ownership action admitted before the cut; work whose
+   ownership-changing phase already started (accept/apply/stop chains) is
+   allowed to finish to a provable disposition.
+4. Withdraw Function publications, close the catalog, cancel and join inherited
+   work, stop long-lived resources, and run the finalizer — all executed inside
+   the kernel loop.
+5. Require an **exact-zero authority census** (no active tasks, claims, permits,
+   or retained frame bytes). Any leftover marks the run **dirty** and fails the
+   handoff closed rather than silently proceeding.
+6. Construct, start, and adopt the next generation.
 
-Collector commands use the generic DynCfg handler plus jobmgr callbacks.
+**Termination** (SIGINT/SIGTERM) follows the same retirement path with no
+successor. Collector work still blocked at process exit is considered safe
+because process termination removes it; Job Manager does not add a second
+unbounded shutdown mechanism around that.
 
-| Command | Main flow |
+## Runtime Metrics
+
+In long-lived agent mode, one component — `jobmgr.runtime` — projects live
+orchestration counts: admitted / active / rejected operations, active Function
+invocations, claim keys and waiters, active and queued tasks, active jobs, frame
+commits and failures, timeouts, panics, and dirty runs
+(`composition/runtime_metrics.go`).
+
+Mutation owners write metric-owned atomics; the producer only snapshots them —
+it never reads kernel-private state. The component is registered before external
+admission opens and unregistered (with a final projection) when its generation
+retires, strictly before the successor re-registers, so no predecessor sample
+crosses a reload.
+
+## Package Map
+
+| Package | Responsibility |
 | --- | --- |
-| `add` | Validate payload, expose config, optionally replace old job, publish create/status. |
-| `enable` | Start an accepted/failed/disabled config and publish running or failed. |
-| `disable` | Stage stop, wait in effect, publish disabled. |
-| `remove` | Stage stop if needed, remove exposed/seen state, publish delete. |
-| `update` | For same-source update: stop old job, start replacement. For conversion: activate dyncfg config over file/user config. |
-| `restart` | Stop then start the same config. |
-| `get` / `schema` / `userconfig` | Read-only or cheap response paths. |
-| `test` | Keyless interactive validation on its own bounded pool. |
+| `jobmgr` (root) | Command ports, the `CommandKernel` run loop, lanes, claims, composite child commands |
+| `jobmgr/lifecycle` | Neutral authorities: UID, operation, task, frame, run, resource, transaction |
+| `jobmgr/functions` | Function stdin ingress, routing catalog, handler generations, publication to Netdata |
+| `jobmgr/joboutput` | Collector construction, job generations, output frames, DynCfg jobs, autodetection retries, vnode snapshots |
+| `jobmgr/secrets` | Secret dependency index, store command adapter, dependent-restart transaction |
+| `jobmgr/discovery` | Discovery add/remove decisions and the configured-vnode authority |
+| `jobmgr/composition` | The only assembler; process construction and run-generation rotation |
+| `framework/functions` | Passive Function values and the stdin input capsule |
+| `framework/dyncfg` | The dynamic-configuration `Graph` |
+| `framework/jobruntime` | V1 / V2 job runtime and host/vnode scope |
+| `framework/vnoderegistry` | Post-success vnode owner/conflict registry |
+| `agent/secrets/resolver` | Atomic config clone, reference compilation, scoped resolution |
+| `agent/secrets/secretstore` | Frozen creator catalog and per-run store generations |
+| `agent/discovery` | Provider catalog and the discovery pipeline generation |
 
-Collector mutations claim their own key and referenced store/vnode keys.
-Update-shaped commands claim both old and new references.
+### Dependency rules
 
-Function routing follows committed state:
+The layering is enforced by `architecture_test.go`, not just convention:
 
-- stop withdrawal happens at stage time, before the stop effect reaches a
-  worker;
-- start publication happens at commit time, when the config is running.
+- **`lifecycle` is neutral.** It imports no sibling, no adapter, and no Agent or
+  collector package — only the standard library. Domain policy (which frame is
+  a keepalive, when to go dirty) is supplied by the caller.
+- **Adapters do not import each other.** `functions`, `joboutput`, `secrets`,
+  and `discovery` may import the root command ports and `lifecycle`, but never a
+  sibling adapter.
+- **`composition` is the only assembler.** It is the single package allowed to
+  join adapters, break construction cycles, and own the process/run-generation
+  split.
 
-### Discovery
+`architecture_test.go` additionally checks the shipped-root/composition
+construction boundary and that on-loop actions are dispatched only through the
+sanctioned kernel funnel. Behavioral ownership guarantees belong in focused or
+black-box tests rather than an exact private-type or source-file manifest.
 
-Discovery does not mutate manager state directly. It sends add/remove
-intents to the loop.
+## Where To Change Things
 
-Discovery add:
+- Add or change a Function surface, routing, or publication:
+  - `functions/` (catalog, controller, publication, protocol).
+- Change how a collector job is built, started, stopped, or retried:
+  - `joboutput/` (factory, generation, transaction, scheduler,
+    autodetection_retry).
+- Change secret reference syntax or resolution:
+  - `agent/secrets/resolver`.
+- Change how a secret store commits or restarts dependents:
+  - `agent/secrets/secretstore` and `secrets/` (restart, transaction,
+    dependency).
+- Change discovery add/remove decisions or configured vnodes:
+  - `discovery/` (decision, vnode) and `composition/{discovery,vnodes}.go`.
+- Change the ordering model (lanes, claims, command acceptance, deadlines):
+  - `kernel*.go`, `claim_authority.go`, and `lifecycle/`.
+- Change how the process is assembled, reloaded, or shut down:
+  - `composition/` (process, run, public).
+- Change a package dependency or production construction boundary:
+  - update the durable checks in `architecture_test.go` in the same change.
 
-1. Validate identity.
-2. Remember the discovered config.
-3. If replacing an exposed config, stage the old stop.
-4. Publish create/status.
-5. If auto-enable applies, chain an enable command through the lane.
-6. Otherwise wait-park the key for an enable/disable decision.
+## Validation
 
-Discovery remove:
+Useful focused checks after changes:
 
-1. Stage stop if a matching exposed job exists.
-2. Remove active job state and exposed config at commit.
-3. Publish delete.
+```text
+cd src/go
+env GOCACHE=/tmp/netdata-go-build-cache go test -count=1 ./plugin/agent/jobmgr/...
+env GOCACHE=/tmp/netdata-go-build-cache go test -race -count=1 ./plugin/agent/jobmgr/...
+env GOCACHE=/tmp/netdata-go-build-cache go vet ./plugin/agent/jobmgr/...
+```
 
-Discovery replace/remove stops are final-phase staged stops. Their stop wait
-claims completion before disarming the deadline fence, so a completed stop
-cannot be misclassified as an unfenced timeout.
+Job Manager is concurrency-sensitive: the `-race` run is not optional for
+changes to the kernel, claims, tasks, or the run/shutdown paths.
 
-### Secretstores
-
-Secretstore commands run through `secretsctl.Controller.StepExec`.
-
-| Command | Main flow |
-| --- | --- |
-| `add` | Validate/activate store in effect, publish store config, restart dependents if needed. |
-| `update` | Validate/activate replacement, restart dependents. |
-| file/user conversion `update` | Activate dyncfg override in place, then restart dependents. |
-| `remove` | Reject if referenced; otherwise remove store. |
-| `test` | Validate candidate or stored config; read claim only. |
-| `get` / `schema` / `userconfig` | Cheap response paths. |
-
-Dependent restarts are one multi-key effect:
-
-1. The loop snapshots the restart plan after the store command has its
-   grant.
-2. The effect restarts dependents sequentially.
-3. Each completed dependent restart buffers a loop-side CONFIG STATUS replay.
-4. The store command flushes completed replay work before its terminal
-   response at normal commit or deadline-abandon commit.
-5. Restarts that finish only after a deadline abandon are replayed at the
-   late return, before the remaining write claims release.
-6. Wedged dependents are excluded from the claim set and reported as
-   skipped.
-
-The terminal message belongs to the command's own effect context, so
-overlapping store commands cannot cross-attribute messages.
-
-### Vnodes
-
-Vnode commands are loop-synchronous stage+commit operations under a vnode
-write claim.
-
-| Command | Main flow |
-| --- | --- |
-| `add` | Validate name, payload, GUID, and uniqueness; commit a versioned vnode snapshot. |
-| `update` | Validate payload/GUID/uniqueness; commit a new versioned vnode snapshot. |
-| `remove` | Reject if missing, non-dyncfg, or referenced; otherwise remove and publish delete. |
-| `test` | Validate candidate inline, no claim. |
-| `get` / `schema` / `userconfig` | Cheap response paths. |
-
-The vnode store is the authoritative config source. Lookups return cloned
-snapshots with:
-
-- a store revision that advances on every committed vnode config write;
-- a metadata revision that advances only when runtime-visible vnode metadata
-  changes.
-
-Jobs bind to an explicit vnode name and consume snapshots from the store:
-
-- job creation gets the current snapshot from the factory;
-- job registration reconciles the current snapshot before `Start`;
-- V1 jobs refresh after collection and before emission;
-- V2 jobs refresh before collection and emission;
-- cleanup never re-reads the live vnode store:
-  - V1 cleanup uses the job's committed local snapshot;
-  - V2 module-owned cleanup samples `VirtualNode()` before module cleanup;
-  - V2 jobmgr-owned cleanup uses the last successfully emitted HOST_DEFINE
-    cleanup info for owner and stale-suppression metadata.
-
-Runtime-equivalent vnode commits are still consumed by revision, but do not
-force redundant HOSTINFO/HOST_DEFINE output. Module-owned vnodes keep their
-runtime-specific precedence and are not overwritten by jobmgr snapshots.
-
-Collector commands that reference a vnode hold a read claim on the vnode.
-That prevents vnode removal/update from racing a collector stop/start window.
-
-Every job registration reconciles the job's vnode baseline before `Start`.
-This covers dependent restarts and warm resumes that were created before a
-vnode update but registered after it.
-
-## Command Planning And Rejection-Only Commands
-
-Every command is planned before it runs; the plan decides whether it reserves
-claims. There are three plan classes:
-
-| Plan class | Claims | Behavior |
-| --- | --- | --- |
-| Claimless | none | Answers inline, no claim-table serialization (rejection-only and read-only). |
-| Hold-aware claimless | none, normally | Answers inline, but parks behind a foreign write hold on its key. |
-| Claimed | full set | Acquires its claims before the first claim-protected access. |
-
-**Rejection-only** is the common claimless case — a command that answers before
-its first claim-protected access, so it claims nothing and never parks behind a
-foreign write hold. Examples: invalid identity; unknown or unsupported command;
-missing object or payload; most source/type gates; parse gates before state
-access.
-
-**The one exception is status-derived collector gates.** Enable, restart, and
-disable can answer from `Entry.Status`, which secretstore dependent-restart
-plans mutate — so they are *hold-aware*: while the collector key is
-foreign-write-held they park and answer after the hold resolves.
-
-Ownership:
-
-- each domain owns its plan — `dyncfg.Handler`, `secretsctl.Controller`, and
-  `vnodectl.Controller` each expose `CommandPlan`;
-- the executor wraps that plan in an event plan and owns claim-key computation:
-  `NeedsClaims(false)` drives intrinsic acquisition, `NeedsClaims(true)` drives
-  the foreign-write-hold bypass, and computation re-runs at every restage.
-
-Claim computation is dynamic: a parked command can become claimless or change
-its dependencies before it acts.
-
-## Shutdown
-
-Shutdown has one rule:
-
-> Every non-terminal DynCfg command answers 503, publishes nothing, and
-> disposes everything.
-
-Shutdown drain handles all places work can be stuck:
-
-- commands still in `dyncfgCh`;
-- pending effects that were not picked by a worker;
-- effect tasks sitting in the worker channel;
-- claim-parked commands;
-- in-flight effects that finish inside the bounded drain window;
-- still-busy keys after the drain window expires;
-- lane FIFO and wait FIFO entries.
-
-Late completions after the drain window are dropped through `lateDrop`.
-They must not publish state.
-
-## Function Publication
-
-Function routing follows committed state, asynchronously — separate from job
-start/stop mechanics:
-
-- stop withdrawal happens when a stop stages;
-- start publication happens when a running status commits;
-- a reconciler goroutine performs the actual publish outside the manager loop;
-- the manager loop may request reconciliation, but must not publish directly.
-
-This keeps routing aligned to committed state without blocking the loop on
-publication work.
-
-## Output Ordering Rules
-
-Important ordering contracts:
-
-- Collector shared-handler commands emit the terminal result before their
-  same-command CONFIG records.
-- Secretstore dependent restart CONFIG STATUS records that completed by the
-  command commit are replayed before the store command terminal. Restarts
-  completing after deadline abandon are replayed at the late return, before
-  the remaining write claims release.
-- Vnode remove emits CONFIG delete before its terminal.
-- Shutdown publishes no CONFIG records for non-terminal work.
-- Deadline abandon keeps the permanent deadline classification, not the
-  shutdown one-rule.
-
-These contracts are pinned by characterization and flow tests.
-
-## Testing Model
-
-The test suite should be read as a set of matrices, not as isolated tests.
-
-### Matrix Axes
-
-| Axis | Values to cover |
-| --- | --- |
-| Domain | collector, secretstore, vnode |
-| Object state | missing, accepted, running, failed, disabled, dyncfg, file/user, stock/internal |
-| Command class | read-only, rejection-only, stage+commit, effect, chained effect, keyless test |
-| Dependencies | no refs, store refs, vnode refs, dependent jobs, busy dependent, wedged dependent |
-| Ordering | same-key FIFO, wait-parked discovery, foreign write hold, read/read sharing, read/write conflict |
-| Failure boundary | validation failure, start failure, stop timeout, effect deadline, late return, shutdown |
-| Expected result | terminal code, CONFIG records, claim behavior, publication timing, retry behavior |
-
-Do not try to test the full Cartesian product. The useful target is
-equivalence-class coverage: one test per behavior boundary, plus parity
-tests that fail when a command gate moves without updating the command plan.
-
-### Existing Coverage Anchors
-
-| Area | Primary tests |
-| --- | --- |
-| Claim table ordering and fairness | `claims_test.go` |
-| Per-key dispatch, derivation, keyless collector test | `executor_test.go` |
-| Generic DynCfg command state machine | `plugin/framework/dyncfg/handler_test.go` |
-| Collector callbacks and command basics | `dyncfg_collector_test.go`, `manager_test.go` |
-| Discovery wait parking and wire order | `characterization_test.go` |
-| Secretstore flow and conversion | `secretstore_flow_test.go` |
-| Secretstore effects and dependent restart edge cases | `secretstore_effect_test.go`, `effect_deadline_test.go` |
-| Vnode and cross-domain claim interactions | `vnode_claims_test.go`, `dyncfg_vnode_test.go` |
-| Deadline, wedge, shutdown one-rule | `effect_deadline_test.go`, `effect_test.go`, `executor_test.go`, `executor_transition_test.go` |
-| Function publication timing | `manager_process_test.go`, `funcdispatch_test.go`, `funcctl/*_test.go` |
-| Command-plan parity | `handler_test.go`, `secretsctl/commandplan_test.go`, `vnodectl/commandplan_test.go`, `executor_test.go` |
-
-### Known Test-Gap Classes
-
-These are not known runtime defects. They are places where future test
-hardening should focus.
-
-| Gap class | Current state | Suggested next test shape |
-| --- | --- | --- |
-| Human-readable matrix | Coverage exists but is spread across many files. | Keep this section current when adding a command or state. |
-| Unsupported/inline command parity | End-to-end rejection pins exist for representative unsupported store/vnode commands; per-domain parity tables are not a full unsupported-command census. | Extend parity tables when command support changes, especially for unsupported commands that should remain claimless. |
-| Pairwise cross-domain interleavings | Representative read/write conflicts are pinned; every command pair is not enumerated. | Add pairwise tests only when a new claim mode or new cross-key writer is introduced. |
-| Shutdown matrix by every command | Shutdown one-rule is pinned at the main chokepoints and representative commands. | Add command-specific shutdown rows only when a command adds a new effect phase or publication path. |
-
-When adding tests, prefer:
-
-- table-driven gate parity tests for deterministic command plans;
-- property tests for claim-table ordering rules;
-- end-to-end choreography only for cross-domain ordering or publication
-  outcomes that cannot be proven at the plan/unit layer.
+When a change touches shared framework code that Job Manager consumes
+(`framework/jobruntime`, `metrix`, the chart engine), also build and test a
+couple of representative real collectors so the change is proven against real
+users, not only against Job Manager's own tests.

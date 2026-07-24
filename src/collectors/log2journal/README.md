@@ -902,7 +902,29 @@ You can find the most common fields at 'man systemd.journal-fields'.
 
 ````
 
-`log2journal` supports YAML configuration files, like the ones found [in this directory](https://github.com/netdata/netdata/tree/master/src/collectors/log2journal/log2journal.d).
+### Stock YAML configurations
+
+`log2journal` ships with ready-to-use YAML configurations. On a standard Linux installation these stock files are installed on disk at `/usr/lib/netdata/conf.d/log2journal.d/`. The bundled configurations are `nginx-combined.yaml`, `nginx-json.yaml`, and `default.yaml` (you can view their source in the [repository](https://github.com/netdata/netdata/tree/master/src/collectors/log2journal/log2journal.d)).
+
+To run `log2journal` with a stock configuration, pass its name (without the `.yaml` extension) to `-c` / `--config`. `log2journal` resolves the name to the matching `.yaml` file in the installed stock directory:
+
+```bash
+tail -F /var/log/nginx/access.log |\
+   log2journal -c nginx-combined |\
+   systemd-cat-native
+```
+
+To use a customized configuration instead, save your YAML file anywhere on disk and pass its path to `-f` / `--file`:
+
+```bash
+tail -F /var/log/nginx/access.log |\
+   log2journal -f /path/to/nginx.yaml |\
+   systemd-cat-native
+```
+
+The exact on-disk location depends on the install prefix. When Netdata is installed under `/opt/netdata` (for example, a static build), the stock directory is `/opt/netdata/usr/lib/netdata/conf.d/log2journal.d/`.
+
+`log2journal` and its stock configurations are only installed on builds compiled with PCRE2 support; on a build without PCRE2, `log2journal.d` is absent.
 
 ## `systemd-cat-native` options
 

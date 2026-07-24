@@ -94,7 +94,7 @@ To listen on different ports (for example, if `2055` or `6343` is in use on the 
 
 ## Source build
 
-Building from source requires a Rust toolchain (rustc + cargo, version 1.83 or later). When CMake detects Rust, the plugin is built and installed alongside the rest of Netdata.
+Building from source requires a Rust toolchain (rustc + cargo, version 1.91 or later). When CMake detects Rust, the plugin is built and installed alongside the rest of Netdata.
 
 ```bash
 git clone https://github.com/netdata/netdata.git

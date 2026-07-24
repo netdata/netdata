@@ -36,11 +36,10 @@ func (c *storeCycleController) BeginCycle() {
 // clears the active cycle, and returns err. All staged writes and staged
 // registrations from the aborted cycle are discarded (never merged).
 func (c *storeCycleController) abortWithError(oldSnap *readSnapshot, err error) error {
-	abortSnap := &readSnapshot{
+	abortSnap := attachCollectorSnapshot(&readSnapshot{
 		collectMeta: oldSnap.collectMeta,
 		series:      oldSnap.series,
-		byName:      oldSnap.byName,
-	}
+	})
 	abortSnap.collectMeta.LastAttemptSeq = c.core.active.seq
 	abortSnap.collectMeta.LastAttemptStatus = CollectStatusFailed
 	c.core.snapshot.Store(abortSnap)
@@ -91,7 +90,6 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 	next := &readSnapshot{
 		collectMeta: oldSnap.collectMeta,
 		series:      make(map[string]*committedSeries, len(oldSnap.series)),
-		byName:      nil,
 	}
 	commitHostScopes := make(map[string]HostScope)
 
@@ -282,7 +280,7 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 	next.collectMeta.EvictedDescriptors += evicted
 	next.collectMeta.DroppedNames += uint64(len(resolution.drop))
 
-	c.core.snapshot.Store(next)
+	c.core.snapshot.Store(attachCollectorSnapshot(next))
 	c.core.successSeq = successSeq
 	c.core.active = nil
 	return nil
@@ -339,11 +337,10 @@ func (c *storeCycleController) AbortCycle() {
 	oldSnap := c.core.snapshot.Load()
 	// Alias previous committed maps directly. Safe by invariant:
 	// committed series/snapshots are immutable after publish.
-	abortSnap := &readSnapshot{
+	abortSnap := attachCollectorSnapshot(&readSnapshot{
 		collectMeta: oldSnap.collectMeta,
 		series:      oldSnap.series,
-		byName:      oldSnap.byName,
-	}
+	})
 
 	abortSnap.collectMeta.LastAttemptSeq = c.core.active.seq
 	abortSnap.collectMeta.LastAttemptStatus = CollectStatusFailed

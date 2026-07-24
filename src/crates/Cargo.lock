@@ -2276,7 +2276,7 @@ name = "journal-common"
 version = "0.1.3"
 dependencies = [
  "allocative",
- "nix 0.30.1",
+ "nix",
  "rustc-hash",
  "serde",
  "uuid",
@@ -2299,7 +2299,7 @@ dependencies = [
  "lzma-rust2 0.15.8",
  "md5",
  "memmap2",
- "nix 0.30.1",
+ "nix",
  "notify",
  "parking_lot",
  "rand 0.9.5",
@@ -2337,7 +2337,7 @@ dependencies = [
  "journal-core",
  "journal-index",
  "journal-registry",
- "lru",
+ "lru 0.16.4",
  "parking_lot",
  "rayon",
  "serde",
@@ -2362,7 +2362,7 @@ dependencies = [
  "journal-engine",
  "journal-index",
  "journal-registry",
- "nix 0.30.1",
+ "nix",
  "rt",
  "schemars",
  "serde",
@@ -2399,7 +2399,7 @@ dependencies = [
  "journal-common",
  "journal-core",
  "journal-registry",
- "nix 0.30.1",
+ "nix",
  "rdp",
  "serde",
  "serde_json",
@@ -2523,6 +2523,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lru"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b6180140927ee907000b0aa540091f6ea512ead4447c92b8fc35bc72788a5a6"
+dependencies = [
+ "hashbrown 0.17.1",
+]
+
+[[package]]
 name = "lru-slab"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2575,16 +2584,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca93e534d1142d1d0dcca6d25fe302508a5dfb40b302802904577725ea0b695b"
 dependencies = [
  "sha2 0.11.0",
-]
-
-[[package]]
-name = "mac_address"
-version = "1.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0aeb26bf5e836cc1c341c8106051b573f1766dfa05aa87f0b98be5e51b02303"
-dependencies = [
- "nix 0.29.0",
- "winapi",
 ]
 
 [[package]]
@@ -2886,6 +2885,7 @@ dependencies = [
  "jaq-json",
  "jaq-std",
  "libc",
+ "lru 0.16.4",
  "maxminddb",
  "memchr",
  "memmap2",
@@ -2933,13 +2933,11 @@ dependencies = [
 
 [[package]]
 name = "netflow_parser"
-version = "0.9.0"
+version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5de8514e95cfcc83de161fcf47a6a2614356d446864b5985dddebf658a0e174"
+checksum = "3bc1f33c09ed241b0a84429832caead3433804223a02a3cd97500b5d59e23bd2"
 dependencies = [
- "byteorder",
- "lru",
- "mac_address",
+ "lru 0.18.1",
  "nom",
  "nom-derive",
  "serde",
@@ -3084,19 +3082,6 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "wal",
-]
-
-[[package]]
-name = "nix"
-version = "0.29.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
-dependencies = [
- "bitflags 2.13.1",
- "cfg-if",
- "cfg_aliases",
- "libc",
- "memoffset",
 ]
 
 [[package]]
@@ -5127,7 +5112,7 @@ dependencies = [
  "chrono",
  "foyer",
  "futures",
- "lru",
+ "lru 0.16.4",
  "parking_lot",
  "rayon",
  "serde",
@@ -5222,7 +5207,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -5828,7 +5813,7 @@ dependencies = [
  "crc32fast",
  "file-registry",
  "lz4_flex 0.12.2",
- "nix 0.30.1",
+ "nix",
  "serde",
  "tempfile",
  "thiserror 2.0.18",

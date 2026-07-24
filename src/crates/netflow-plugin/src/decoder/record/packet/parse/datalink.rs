@@ -15,17 +15,24 @@ pub(crate) fn parse_datalink_frame_section_record(
 
     let mut etype = u16::from_be_bytes([data[12], data[13]]);
     let mut cursor = &data[14..];
+    let mut vlan = 0_u16;
 
     while is_vlan_ethertype(etype) {
         if cursor.len() < 4 {
             return None;
         }
-        // VLAN extraction from 802.1Q tags is intentionally skipped for FlowRecord.
-        // The FlowFields version only extracts when SRC_VLAN was explicitly pre-set
-        // to "0" (V9 special decode), which uses the FlowFields-based parse function.
-        // For FlowRecord callers, VLANs come from other sources (ExtendedSwitch, etc.).
+        vlan = ((u16::from(cursor[0] & 0x0f)) << 8) | u16::from(cursor[1]);
         etype = u16::from_be_bytes([cursor[2], cursor[3]]);
         cursor = &cursor[4..];
+    }
+
+    if decapsulation_mode.is_none() && vlan > 0 {
+        if !rec.has_src_vlan() {
+            rec.set_src_vlan(vlan);
+        }
+        if !rec.has_dst_vlan() {
+            rec.set_dst_vlan(vlan);
+        }
     }
 
     if etype == ETYPE_MPLS_UNICAST {
@@ -88,10 +95,17 @@ mod tests {
         frame[38..42].copy_from_slice(&[10, 0, 0, 2]);
 
         let mut rec = FlowRecord::default();
+        frame[14] = 0;
+        frame[15] = 100;
+        frame[18] = 0;
+        frame[19] = 200;
+
         let parsed = parse_datalink_frame_section_record(&frame, &mut rec, DecapsulationMode::None);
 
         assert_eq!(parsed, Some(20));
         assert_eq!(rec.src_addr, Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))));
         assert_eq!(rec.dst_addr, Some(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2))));
+        assert_eq!(rec.src_vlan, 200);
+        assert_eq!(rec.dst_vlan, 200);
     }
 }

@@ -111,6 +111,12 @@ dots replaced by underscores — e.g. `endpoint.tls_cert_path` becomes
 | metrics.grace_period_secs | Grace period in seconds. After the last data point, the plugin waits this long before gap-filling. | 60 | no |
 | metrics.expiry_duration_secs | Expiry duration in seconds. Charts with no data for this long are removed. | 900 | no |
 | [metrics.max_new_charts_per_request](#option-metrics-max-new-charts-per-request) | Maximum new charts created per gRPC request. | 100 | no |
+| [base_dir](#option-base-dir) | Directory where OpenTelemetry logs and traces are stored on disk. | /var/log/netdata/otel/v2 | no |
+| logs.rotation.default.max_file_size | File size that triggers log rotation. A new file is started when the current one reaches this size. | 25MB | no |
+| logs.rotation.default.max_entries | Number of log entries that triggers log rotation. A new file is started when the current one reaches this count. | 50000 | no |
+| logs.retention.default.max_files | Maximum number of rotated log files kept on local disk. The oldest files are deleted when exceeded. | 100000 | no |
+| [logs.retention.default.max_total_size](#option-logs-retention-default-max-total-size) | Maximum total disk space used by log files on local disk. The oldest files are deleted when exceeded. | 1GB | no |
+| logs.retention.default.max_age | Maximum age of log files before they are deleted from local disk. | 7 days | no |
 
 <a id="option-metrics-chart-configs-dir"></a>
 ##### metrics.chart_configs_dir
@@ -125,6 +131,22 @@ ships stock mappings; user files in this directory take priority.
 ##### metrics.max_new_charts_per_request
 
 Limits cardinality explosion from high-cardinality label combinations.
+
+
+<a id="option-base-dir"></a>
+##### base_dir
+
+Must be an absolute path. The default lives under the Netdata log
+directory and is shared by both logs and traces.
+
+
+<a id="option-logs-retention-default-max-total-size"></a>
+##### logs.retention.default.max_total_size
+
+Local retention is bounded by whichever limit is reached first:
+total size, file count, or age. With the defaults, logs occupy at
+most 1 GB on the VM and are kept up to 7 days, regardless of
+incoming volume.
 
 
 

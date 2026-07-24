@@ -4,9 +4,10 @@ package agent
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -15,15 +16,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/runtimechartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
+
+var ErrNotRunning = errors.New("agent: process is not running")
 
 // Config is an Agent configuration.
 type Config struct {
@@ -35,10 +34,11 @@ type Config struct {
 	ServiceDiscoveryConfigDir []string
 	VarLibDir                 string
 
-	ModuleRegistry collectorapi.Registry
-	RunModule      string
-	RunJob         []string
-	MinUpdateEvery int
+	ModuleRegistry  collectorapi.Registry
+	RunModule       string
+	RunJob          []string
+	MinUpdateEvery  int
+	ShutdownTimeout time.Duration
 
 	DisableServiceDiscovery bool
 
@@ -47,10 +47,6 @@ type Config struct {
 	RunModePolicy policy.RunModePolicy
 
 	DiscoveryProviders []discovery.ProviderFactory
-
-	AuditDuration time.Duration
-	AuditSummary  bool
-	AuditDataDir  string
 }
 
 // Agent represents orchestrator.
@@ -66,9 +62,10 @@ type Agent struct {
 
 	VarLibDir string
 
-	RunModule      string
-	RunJob         []string
-	MinUpdateEvery int
+	RunModule       string
+	RunJob          []string
+	MinUpdateEvery  int
+	ShutdownTimeout time.Duration
 
 	DisableServiceDiscovery bool
 
@@ -79,20 +76,13 @@ type Agent struct {
 	DiscoveryProviders []discovery.ProviderFactory
 
 	ModuleRegistry collectorapi.Registry
+	In             io.Reader
 	Out            io.Writer
 
-	api *netdataapi.API
-
-	quitCh chan struct{}
-
-	// Metrics-audit mode.
-	auditDuration time.Duration
-	auditSummary  bool
-	auditAnalyzer *metricsaudit.Auditor
-
-	auditDataDir string
-	quitOnce     sync.Once
-	auditOnce    sync.Once
+	processMu    sync.Mutex
+	process      *composition.Process
+	processReady chan struct{}
+	readyOnce    sync.Once
 }
 
 // New creates a new Agent.
@@ -110,176 +100,101 @@ func New(cfg Config) *Agent {
 		RunModule:                 cfg.RunModule,
 		RunJob:                    cfg.RunJob,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
+		ShutdownTimeout:           cfg.ShutdownTimeout,
 		IsInsideK8s:               cfg.IsInsideK8s,
 		runModePolicy:             cfg.RunModePolicy,
 		ModuleRegistry:            cfg.ModuleRegistry,
 		DiscoveryProviders:        cfg.DiscoveryProviders,
+		In:                        os.Stdin,
 		Out:                       safewriter.Stdout,
-		api:                       netdataapi.New(safewriter.Stdout),
-		quitCh:                    make(chan struct{}, 1),
-		auditDuration:             cfg.AuditDuration,
-		auditSummary:              cfg.AuditSummary,
 		DisableServiceDiscovery:   cfg.DisableServiceDiscovery,
-	}
-
-	if a.auditDuration > 0 {
-		a.auditAnalyzer = metricsaudit.New()
-		a.Infof("metrics-audit mode enabled: will run for %v and analyze metric structure", a.auditDuration)
-		if a.auditSummary {
-			a.Infof("metrics-audit summary enabled: will show consolidated summary across all jobs")
-		}
-	}
-
-	if cfg.AuditDataDir != "" {
-		a.auditDataDir = cfg.AuditDataDir
-		if a.auditAnalyzer == nil {
-			a.auditAnalyzer = metricsaudit.New()
-		}
-		a.auditAnalyzer.EnableDataCapture(cfg.AuditDataDir, a.signalAuditComplete)
-		a.Infof("metrics-audit data directory: %s", cfg.AuditDataDir)
+		processReady:              make(chan struct{}),
 	}
 
 	return a
 }
 
 // RunContext runs one agent instance lifecycle on the provided context.
-func (a *Agent) RunContext(ctx context.Context) {
-	a.run(ctx)
+func (a *Agent) RunContext(ctx context.Context) error {
+	return a.run(ctx)
 }
 
-// IsTerminalMode reports whether run-mode policy is interactive terminal.
-func (a *Agent) IsTerminalMode() bool {
-	return a.runModePolicy.IsTerminal
-}
-
-// RunKeepAlive runs keepalive loop until context cancellation or too many failures.
-func (a *Agent) RunKeepAlive(ctx context.Context) error {
-	tk := time.NewTicker(time.Second)
-	defer tk.Stop()
-
-	var n int
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-tk.C:
-			if err := a.api.EMPTYLINE(); err != nil {
-				n++
-			} else {
-				n = 0
-			}
-			if n >= 30 {
-				return fmt.Errorf("too many keepAlive errors")
-			}
-		}
+func (a *Agent) Restart(ctx context.Context) error {
+	process, err := a.awaitProcess(ctx)
+	if err != nil {
+		return err
 	}
+	return normalizeProcessControlError(process.Restart(ctx))
 }
 
-// QuitCh returns agent quit notifications (e.g., metrics-audit completion).
-func (a *Agent) QuitCh() <-chan struct{} {
-	return a.quitCh
+func (a *Agent) Terminate(ctx context.Context) error {
+	process, err := a.awaitProcess(ctx)
+	if err != nil {
+		return err
+	}
+	return normalizeProcessControlError(process.Terminate(ctx))
 }
 
-// AuditDuration returns configured metrics-audit timer duration.
-func (a *Agent) AuditDuration() time.Duration {
-	return a.auditDuration
+func normalizeProcessControlError(err error) error {
+	if errors.Is(err, composition.ErrProcessStopped) {
+		return ErrNotRunning
+	}
+	return err
 }
 
-// FinalizeMetricsAudit prints metrics-audit analysis report once.
-func (a *Agent) FinalizeMetricsAudit(reason string) {
-	a.auditOnce.Do(func() {
-		if a.auditAnalyzer == nil {
-			return
-		}
-		if reason != "" {
-			a.Infof("finalizing metrics audit (%s)", reason)
-		}
-		a.printMetricsAudit()
-	})
-}
-
-func (a *Agent) run(ctx context.Context) {
+func (a *Agent) run(ctx context.Context) error {
 	a.Info("instance is started")
 	defer func() { a.Info("instance is stopped") }()
+	defer a.markProcessReady()
 
 	cfg := a.loadPluginConfig()
 	a.Infof("using config: %s", cfg.String())
 
 	if !cfg.Enabled {
 		a.Info("plugin is disabled in the configuration file, exiting...")
-		a.api.DISABLE()
-		return
+		netdataapi.New(a.Out).DISABLE()
+		return nil
 	}
 
 	enabledModules := a.loadEnabledModules(cfg)
 	if len(enabledModules) == 0 {
 		a.Info("no modules to run")
-		a.api.DISABLE()
-		return
+		netdataapi.New(a.Out).DISABLE()
+		return nil
 	}
 
-	fnMgr := functions.NewManager()
-
-	discCfg := a.buildDiscoveryConf(enabledModules, fnMgr)
-
-	discMgr, err := discovery.NewManager(discCfg)
-	if err != nil {
-		a.Error(err)
-		return
-	}
-
-	runtimeSvc, stopRuntimeSvc := a.setupRuntimeService()
-	if stopRuntimeSvc != nil {
-		defer stopRuntimeSvc()
-	}
-	fnMgr.SetRuntimeService(runtimeSvc)
+	discCfg := a.buildDiscoveryConf(enabledModules)
 
 	var runJob []string
 	if a.RunModule != "" && a.RunModule != "all" {
 		runJob = a.RunJob
 	}
-
-	jobMgr := jobmgr.New(jobmgr.Config{
-		PluginName:     a.Name,
-		Out:            a.Out,
-		RunModePolicy:  a.runModePolicy,
-		Modules:        enabledModules,
-		RunJob:         runJob,
-		ConfigDefaults: discCfg.Registry,
-		VarLibDir:      a.VarLibDir,
-		FnReg:          fnMgr,
-		Vnodes:         a.setupVnodeRegistry(),
-		SecretStores:   a.setupSecretStoreConfigs(),
-		AuditMode:      a.auditDuration > 0,
-		AuditAnalyzer:  a.auditAnalyzer,
-		AuditDataDir:   a.auditDataDir,
-		RuntimeService: runtimeSvc,
+	process, err := composition.NewProcess(composition.Config{
+		Input: a.In, Output: a.Out,
+		PluginName: a.Name, Modules: enabledModules,
+		Defaults:              discCfg.Defaults,
+		DiscoveryBuildContext: discCfg.BuildContext,
+		DiscoveryProviders:    discCfg.Providers,
+		RunJob:                runJob,
+		AutoEnable:            a.runModePolicy.AutoEnableDiscovered,
+		InitialSecrets:        a.setupSecretStoreConfigs(),
+		InitialVnodes:         a.setupVnodeRegistry(),
+		Runtime:               a.setupRuntimeService(),
+		KeepAlive:             !a.runModePolicy.IsTerminal,
+		ShutdownTimeout:       a.ShutdownTimeout,
 	})
-
-	in := make(chan []*confgroup.Group)
-	var wg sync.WaitGroup
-
-	wg.Go(func() { fnMgr.Run(ctx, a.quitCh) })
-
-	wg.Go(func() { jobMgr.Run(ctx, in) })
-
-	wg.Go(func() { discMgr.Run(ctx, in) })
-
-	wg.Wait()
-	<-ctx.Done()
-}
-
-func (a *Agent) printMetricsAudit() {
-	if a.auditAnalyzer == nil {
-		return
+	if err != nil {
+		return err
 	}
-
-	// Print the analysis report
-	if a.auditSummary {
-		a.auditAnalyzer.PrintSummary()
-	} else {
-		a.auditAnalyzer.PrintReport()
+	a.processMu.Lock()
+	if a.process != nil {
+		a.processMu.Unlock()
+		return errors.New("agent: process already constructed")
 	}
+	a.process = process
+	a.processMu.Unlock()
+	a.markProcessReady()
+	return process.Run(ctx)
 }
 
 func (a *Agent) serviceDiscoveryEnabled() bool {
@@ -289,22 +204,35 @@ func (a *Agent) serviceDiscoveryEnabled() bool {
 	return !a.DisableServiceDiscovery && a.runModePolicy.EnableServiceDiscovery
 }
 
-func (a *Agent) setupRuntimeService() (runtimecomp.Service, func()) {
+func (a *Agent) setupRuntimeService() composition.RuntimeService {
 	if a == nil || !a.runModePolicy.EnableRuntimeCharts {
-		return nil, nil
+		return nil
 	}
 
-	svc := runtimechartemit.New(a.Logger.With(slog.String("component", "runtime metrics service")))
-	svc.Start(a.Name, a.Out)
-	return svc, svc.Stop
+	return runtimechartemit.New(
+		a.Logger.With(slog.String("component", "runtime metrics service")),
+	)
 }
 
-func (a *Agent) signalAuditComplete() {
-	a.quitOnce.Do(func() {
-		a.Infof("metrics-audit data collection complete, shutting down")
-		select {
-		case a.quitCh <- struct{}{}:
-		default:
-		}
-	})
+func (a *Agent) markProcessReady() {
+	if a != nil {
+		a.readyOnce.Do(func() { close(a.processReady) })
+	}
+}
+
+func (a *Agent) awaitProcess(ctx context.Context) (*composition.Process, error) {
+	if a == nil || ctx == nil {
+		return nil, ErrNotRunning
+	}
+	select {
+	case <-a.processReady:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	a.processMu.Lock()
+	defer a.processMu.Unlock()
+	if a.process == nil {
+		return nil, ErrNotRunning
+	}
+	return a.process, nil
 }

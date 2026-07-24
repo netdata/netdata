@@ -3,11 +3,7 @@
 package dyncfg
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
-
-	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
@@ -19,13 +15,9 @@ type Function struct {
 
 // NewFunction creates a new dyncfg Function wrapper.
 func NewFunction(fn functions.Function) Function {
-	return Function{fn: fn}
-}
-
-// Fn returns the underlying functions.Function.
-// Use this when passing to APIs that expect functions.Function.
-func (f Function) Fn() functions.Function {
-	return f.fn
+	return Function{
+		fn: fn,
+	}
 }
 
 // UID returns the function's unique identifier.
@@ -43,18 +35,10 @@ func (f Function) Payload() []byte {
 	return f.fn.Payload
 }
 
-// ContentType returns the function's content type.
-func (f Function) ContentType() string {
-	return f.fn.ContentType
-}
-
 // Command returns the dyncfg command from Args[1].
 // Returns empty Command if args has fewer than 2 elements.
 func (f Function) Command() Command {
-	if len(f.fn.Args) < 2 {
-		return ""
-	}
-	return Command(strings.ToLower(f.fn.Args[1]))
+	return CommandFromArgs(f.fn.Args)
 }
 
 // ID returns the config ID from Args[0].
@@ -73,26 +57,7 @@ func (f Function) JobName() string {
 	if len(f.fn.Args) < 3 {
 		return ""
 	}
-	name := strings.ReplaceAll(f.fn.Args[2], " ", "_")
-	name = strings.ReplaceAll(name, ":", "_")
-	return name
-}
-
-// User returns the user value from the Source field.
-func (f Function) User() string {
-	return f.SourceValue("user")
-}
-
-// SourceValue extracts a value from the Source field.
-// Source format is "key1=value1,key2=value2,...".
-func (f Function) SourceValue(key string) string {
-	prefix := key + "="
-	for part := range strings.SplitSeq(f.fn.Source, ",") {
-		if v, ok := strings.CutPrefix(part, prefix); ok {
-			return strings.TrimSpace(v)
-		}
-	}
-	return ""
+	return NormalizeJobName(f.fn.Args[2])
 }
 
 // HasPayload returns true if the function has a non-empty payload.
@@ -116,34 +81,4 @@ func (f Function) ValidateHasPayload() error {
 		return fmt.Errorf("missing configuration payload")
 	}
 	return nil
-}
-
-// UnmarshalPayload unmarshals the payload into dst based on ContentType.
-// Uses JSON for "application/json", YAML otherwise.
-func (f Function) UnmarshalPayload(dst any) error {
-	if f.fn.ContentType == "application/json" {
-		return f.unmarshalJSON(dst)
-	}
-	return f.unmarshalYAML(dst)
-}
-
-// unmarshalJSON unmarshals the payload as JSON into dst.
-func (f Function) unmarshalJSON(dst any) error {
-	if err := json.Unmarshal(f.fn.Payload, dst); err != nil {
-		return fmt.Errorf("failed to unmarshal JSON payload: %w", err)
-	}
-	return nil
-}
-
-// unmarshalYAML unmarshals the payload as YAML into dst.
-func (f Function) unmarshalYAML(dst any) error {
-	if err := yaml.Unmarshal(f.fn.Payload, dst); err != nil {
-		return fmt.Errorf("failed to unmarshal YAML payload: %w", err)
-	}
-	return nil
-}
-
-// IsContentTypeJSON returns true if the content type is JSON.
-func (f Function) IsContentTypeJSON() bool {
-	return f.fn.ContentType == "application/json"
 }

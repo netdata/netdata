@@ -31,6 +31,7 @@ impl IngestService {
         let lifecycle_observer: Arc<dyn journal_sdk_log_writer::LogLifecycleObserver> =
             Arc::new(FacetLifecycleObserver {
                 runtime: Arc::clone(&facet_runtime),
+                metrics: Arc::clone(&metrics),
             });
         let build_journal_cfg = |tier: TierKind| {
             let origin = Origin {
@@ -70,8 +71,7 @@ impl IngestService {
             Arc::clone(&lifecycle_observer),
         )?;
         let tier_accumulators = Self::build_tier_accumulators();
-        let (mut decoders, routing_runtime, network_sources_runtime) =
-            Self::build_decoder_stack(&cfg)?;
+        let (decoders, routing_runtime, network_sources_runtime) = Self::build_decoder_stack(&cfg)?;
         let decoder_state_dir = cfg.journal.decoder_state_dir();
 
         if let Err(err) = fs::create_dir_all(&decoder_state_dir) {
@@ -81,13 +81,14 @@ impl IngestService {
                 err
             );
         }
-        Self::preload_decoder_state_namespaces(&mut decoders, &decoder_state_dir);
+        Self::cleanup_obsolete_decoder_state_namespaces(&decoder_state_dir);
 
         Ok(Self {
             cfg,
             metrics,
             decoders,
             decoder_state_dir,
+            protected_decoder_state_namespaces: HashSet::new(),
             last_decoder_state_persist_usec: now_usec(),
             raw_journal,
             journal_host,
@@ -194,7 +195,18 @@ impl IngestService {
             }
         };
 
-        let mut decoders = FlowDecoders::with_protocols_decap_and_timestamp(
+        let (sampling_cache_max_entries, sampling_cache_max_entries_per_stream) =
+            cfg.protocols.effective_sampling_cache_limits();
+        if cfg.protocols.sampling_cache_max_entries_per_stream > sampling_cache_max_entries {
+            tracing::error!(
+                "protocols.sampling_cache_max_entries_per_stream={} exceeds protocols.sampling_cache_max_entries={}; using effective per-stream limit {}",
+                cfg.protocols.sampling_cache_max_entries_per_stream,
+                sampling_cache_max_entries,
+                sampling_cache_max_entries_per_stream
+            );
+        }
+
+        let mut decoders = FlowDecoders::with_protocols_decap_timestamp_packet_and_state_limits(
             cfg.protocols.v5,
             cfg.protocols.v7,
             cfg.protocols.v9,
@@ -202,6 +214,10 @@ impl IngestService {
             cfg.protocols.sflow,
             decapsulation_mode,
             timestamp_source,
+            cfg.listener.max_packet_size,
+            cfg.protocols.v9_template_lifetime.get(),
+            sampling_cache_max_entries,
+            sampling_cache_max_entries_per_stream,
         );
         let enricher = FlowEnricher::from_config(&cfg.enrichment)
             .context("failed to initialize netflow enrichment pipeline")?;

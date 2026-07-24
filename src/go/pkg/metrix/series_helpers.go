@@ -4,7 +4,6 @@ package metrix
 
 import (
 	"maps"
-	"sort"
 )
 
 func newCommittedSeries(key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
@@ -93,26 +92,6 @@ func refreshCommittedHostScopes(old, next *readSnapshot, scopes map[string]HostS
 func markSeriesSeen(series *committedSeries, attemptSeq, successSeq uint64) {
 	series.meta.LastSeenSuccessSeq = attemptSeq
 	series.lastSeenSuccessCycle = successSeq
-}
-
-// buildByName builds deterministic per-name iteration lists for snapshot readers.
-func buildByName(series map[string]*committedSeries) map[string][]*committedSeries {
-	byName := make(map[string][]*committedSeries)
-	for _, s := range series {
-		if s.desc == nil || !isScalarKind(s.desc.kind) {
-			continue
-		}
-		byName[s.name] = append(byName[s.name], s)
-	}
-	for _, lst := range byName {
-		sort.Slice(lst, func(i, j int) bool {
-			if lst[i].hostScopeKey != lst[j].hostScopeKey {
-				return lst[i].hostScopeKey < lst[j].hostScopeKey
-			}
-			return lst[i].labelsKey < lst[j].labelsKey
-		})
-	}
-	return byName
 }
 
 // makeSeriesKey joins host scope, metric name, and canonical label key into one stable identity key.

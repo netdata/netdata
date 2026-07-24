@@ -48,9 +48,8 @@ type publishedStore struct {
 
 func New() secretstore.Creator {
 	return secretstore.Creator{
-		Kind:        secretstore.KindAWSSM,
-		DisplayName: "AWS Secrets Manager",
-		Schema:      configSchema,
+		Kind:   secretstore.KindAWSSM,
+		Schema: configSchema,
 		Create: func() secretstore.Store {
 			return &store{
 				Config: Config{

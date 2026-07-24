@@ -25,6 +25,22 @@ func (c testConfig) SourceTypePriority() int { return c.priority }
 func (c testConfig) Source() string          { return c.source }
 func (c testConfig) Hash() uint64            { return c.hash }
 
+func seenCacheCount(c *SeenCache[testConfig]) int {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+	return len(c.items)
+}
+
+func exposedCacheCount(c *ExposedCache[testConfig]) int {
+	c.mux.RLock()
+	defer c.mux.RUnlock()
+	return len(c.items)
+}
+
+func lookupSeenByUID(c *SeenCache[testConfig], uid string) (testConfig, bool) {
+	return c.Lookup(testConfig{uid: uid})
+}
+
 func TestSeenCache_AddAndLookup(t *testing.T) {
 	c := NewSeenCache[testConfig]()
 	cfg := testConfig{uid: "uid1", key: "key1"}
@@ -34,20 +50,6 @@ func TestSeenCache_AddAndLookup(t *testing.T) {
 	got, ok := c.Lookup(cfg)
 	require.True(t, ok)
 	assert.Equal(t, cfg, got)
-}
-
-func TestSeenCache_LookupByUID(t *testing.T) {
-	c := NewSeenCache[testConfig]()
-	cfg := testConfig{uid: "uid1", key: "key1"}
-
-	c.Add(cfg)
-
-	got, ok := c.LookupByUID("uid1")
-	require.True(t, ok)
-	assert.Equal(t, cfg, got)
-
-	_, ok = c.LookupByUID("nonexistent")
-	assert.False(t, ok)
 }
 
 func TestSeenCache_Remove(t *testing.T) {
@@ -69,7 +71,7 @@ func TestSeenCache_AddOverwrites(t *testing.T) {
 	c.Add(cfg1)
 	c.Add(cfg2)
 
-	got, ok := c.LookupByUID("uid1")
+	got, ok := c.Lookup(cfg2)
 	require.True(t, ok)
 	assert.Equal(t, uint64(200), got.Hash())
 }
@@ -145,47 +147,4 @@ func TestExposedCache_PointerMutationVisible(t *testing.T) {
 
 	got2, _ := c.LookupByKey("key1")
 	assert.Equal(t, StatusRunning, got2.Status)
-}
-
-func TestExposedCache_Count(t *testing.T) {
-	c := NewExposedCache[testConfig]()
-	assert.Equal(t, 0, c.Count())
-
-	c.Add(&Entry[testConfig]{Cfg: testConfig{key: "a"}})
-	c.Add(&Entry[testConfig]{Cfg: testConfig{key: "b"}})
-	assert.Equal(t, 2, c.Count())
-
-	c.Remove(testConfig{key: "a"})
-	assert.Equal(t, 1, c.Count())
-}
-
-func TestExposedCache_ForEach(t *testing.T) {
-	c := NewExposedCache[testConfig]()
-	c.Add(&Entry[testConfig]{Cfg: testConfig{key: "a"}, Status: StatusRunning})
-	c.Add(&Entry[testConfig]{Cfg: testConfig{key: "b"}, Status: StatusDisabled})
-
-	keys := make(map[string]Status)
-	c.ForEach(func(key string, entry *Entry[testConfig]) bool {
-		keys[key] = entry.Status
-		return true
-	})
-
-	assert.Len(t, keys, 2)
-	assert.Equal(t, StatusRunning, keys["a"])
-	assert.Equal(t, StatusDisabled, keys["b"])
-}
-
-func TestExposedCache_ForEach_EarlyStop(t *testing.T) {
-	c := NewExposedCache[testConfig]()
-	c.Add(&Entry[testConfig]{Cfg: testConfig{key: "a"}})
-	c.Add(&Entry[testConfig]{Cfg: testConfig{key: "b"}})
-	c.Add(&Entry[testConfig]{Cfg: testConfig{key: "c"}})
-
-	count := 0
-	c.ForEach(func(_ string, _ *Entry[testConfig]) bool {
-		count++
-		return false // stop after first
-	})
-
-	assert.Equal(t, 1, count)
 }

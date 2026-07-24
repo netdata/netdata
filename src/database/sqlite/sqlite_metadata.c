@@ -207,7 +207,6 @@ sqlite3 *db_meta = NULL;
 
 #define METADATA_HOST_CHECK_FIRST_CHECK (5)         // First check for pending metadata
 #define METADATA_HOST_CHECK_INTERVAL (5)            // Repeat check for pending metadata
-#define METADATA_MAX_BATCH_SIZE (64)                // Maximum commands to execute before running the event loop
 
 #define DATABASE_VACUUM_FREQUENCY_SECONDS (60)
 #define DATABASE_FREE_PAGES_THRESHOLD_PC (5)        // Percentage of free pages to trigger vacuum
@@ -228,6 +227,11 @@ enum metadata_opcode {
     // leave this last
     // we need it to check for worker utilization
     METADATA_MAX_ENUMERATIONS_DEFINED
+};
+
+struct judy_list_t {
+    Pvoid_t JudyL;
+    Word_t count;
 };
 
 struct meta_config_s {
@@ -1910,6 +1914,36 @@ static void restore_host_context(void *arg)
     __atomic_store_n(&hclt->finished, true, __ATOMIC_RELEASE);
 }
 
+// freez() is a macro under NETDATA_TRACE_ALLOCATIONS, so it cannot be passed
+// as a function pointer directly
+static void judy_value_freez(void *value)
+{
+    freez(value);
+}
+
+static void judy_list_free(struct judy_list_t *list, void (*free_value)(void *value))
+{
+    if (!list)
+        return;
+
+    Word_t Index = 0;
+    bool first = true;
+    Pvoid_t *Pvalue;
+    while ((Pvalue = JudyLFirstThenNext(list->JudyL, &Index, &first))) {
+        if (*Pvalue)
+            free_value(*Pvalue);
+    }
+    (void)JudyLFreeArray(&list->JudyL, PJE0);
+    freez(list);
+}
+
+static void host_ctx_cleanup_free(void *value)
+{
+    struct host_ctx_cleanup_s *ctx_cleanup = value;
+    string_freez(ctx_cleanup->context);
+    freez(ctx_cleanup);
+}
+
 // Callback after scan of hosts is done
 static void after_ctx_hosts_load(uv_work_t *req, int status __maybe_unused)
 {
@@ -1966,6 +2000,55 @@ void reset_host_context_load_flag()
     dfe_done(host);
 }
 
+// Dispatch one host context load to a free thread slot, or run it synchronously
+static void ctx_load_one_host(
+    struct host_context_load_thread *hclt,
+    size_t max_threads,
+    RRDHOST *host,
+    size_t *async_exec,
+    size_t *sync_exec)
+{
+    nd_log_daemon(NDLP_DEBUG, "Loading context for host %s", rrdhost_hostname(host));
+
+    int rc = 0;
+    size_t thread_index = 0;
+    bool thread_found = cleanup_finished_threads(hclt, max_threads, false, &thread_index);
+    if (thread_found) {
+        __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
+        hclt[thread_index].host = host;
+        hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_DEFAULT, restore_host_context, &hclt[thread_index]);
+        rc = (hclt[thread_index].thread == NULL);
+        *async_exec += (rc == 0);
+        // if it failed, mark the thread slot as free
+        if (rc)
+            __atomic_store_n(&hclt[thread_index].busy, false, __ATOMIC_RELAXED);
+    }
+    // if single thread, thread creation failure or failure to find slot
+    if (rc || !thread_found) {
+        (*sync_exec)++;
+        struct host_context_load_thread hclt_sync = {.host = host};
+        restore_host_context(&hclt_sync);
+    }
+}
+
+struct host_load_order {
+    RRDHOST *host;
+    time_t last_connected;
+};
+
+// most recently connected hosts first; a host with an invalidated
+// last_connected (== 1) sorts last, when it was created in memory at all
+// (unregistered ephemeral hosts with it are skipped at startup)
+static int compare_host_load_order(const void *a, const void *b)
+{
+    const struct host_load_order *ha = a, *hb = b;
+    if (ha->last_connected > hb->last_connected)
+        return -1;
+    if (ha->last_connected < hb->last_connected)
+        return 1;
+    return 0;
+}
+
 static void ctx_hosts_load(uv_work_t *req)
 {
     register_libuv_worker_jobs();
@@ -1985,48 +2068,84 @@ static void ctx_hosts_load(uv_work_t *req)
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Using %zu threads for context loading", max_threads);
     struct host_context_load_thread *hclt = max_threads > 1 ? callocz(max_threads, sizeof(*hclt)) : NULL;
 
-    size_t thread_index = 0;
     main_context_thread = true;
     size_t host_count = 0;
     size_t sync_exec = 0;
     size_t async_exec = 0;
 
-    for (int pass=0 ; pass < 2 ; pass++) {
+    // vnodes first: ACLK initialization blocks up to 60s until every vnode
+    // context is loaded (sqlite_aclk.c), so they must not wait behind the
+    // (potentially large) set of archived children.
+    dfe_start_reentrant(rrdhost_root_index, host) {
+        if (!IS_VIRTUAL_HOST_OS(host))
+            continue;
+
+        if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
+            continue;
+
+        if (unlikely(SHUTDOWN_REQUESTED(config)))
+            break;
+
+        ctx_load_one_host(hclt, max_threads, host, &async_exec, &sync_exec);
+        host_count++;
+    }
+    dfe_done(host);
+
+    // then every remaining pending host, ordered by last known connection time
+    // (most recent first), dispatched to the thread pool in this one pass.
+    //
+    // The sort key is the last_connected timestamp loaded from the metadata DB
+    // (sqlite_aclk.c). A live child cannot refresh it here: while a host carries
+    // RRDHOST_FLAG_PENDING_CONTEXT_LOAD its streaming reconnects are rejected
+    // (stream-receiver-connection.c) and rrdhost_find_or_create() skips
+    // rrdhost_update() (rrdhost.c), so the reconnect does not refresh the host
+    // status. So the stored DB timestamp is the only signal available here, and
+    // it is the intended prioritization signal: the hosts most recently connected
+    // before this restart are the ones most likely to reconnect and be queried
+    // first.
+    //
+    // Storing raw RRDHOST* past dfe_done() is safe because a host cannot be freed
+    // while it carries PENDING_CONTEXT_LOAD: archived hosts are all created before
+    // this work is queued (aclk_synchronization_init), a concurrent reconnect does
+    // not free the host (rrdhost_find_or_create() only frees on a memory-mode
+    // mismatch, and skips even that while the flag is set), the orphan reaper
+    // skips such hosts (rrdhost_should_be_cleaned_up), and remove-stale-node
+    // refuses to unregister them (remove_ephemeral_host).
+    if (!SHUTDOWN_REQUESTED(config)) {
+        size_t size = 0, used = 0;
+        struct host_load_order *order = NULL;
+
         dfe_start_reentrant(rrdhost_root_index, host) {
-            // pass 0 will do vnodes (skip the rest)
-            // pass 1 will do the rest (skip vnodes)
-            if (pass == IS_VIRTUAL_HOST_OS(host))
+            if (IS_VIRTUAL_HOST_OS(host))
                 continue;
 
             if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
                 continue;
 
+            if (used == size) {
+                size = size ? size * 2 : 256;
+                order = reallocz(order, size * sizeof(*order));
+            }
+            order[used] = (struct host_load_order){
+                .host = host,
+                .last_connected = host->stream.snd.status.last_connected,
+            };
+            used++;
+        }
+        dfe_done(host);
+
+        if (used)
+            qsort(order, used, sizeof(*order), compare_host_load_order);
+
+        for (size_t i = 0; i < used; i++) {
             if (unlikely(SHUTDOWN_REQUESTED(config)))
                 break;
 
-            nd_log_daemon(NDLP_DEBUG, "Loading context for host %s", rrdhost_hostname(host));
-
-            int rc = 0;
-            bool thread_found = cleanup_finished_threads(hclt, max_threads, false, &thread_index);
-            if (thread_found) {
-                __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
-                hclt[thread_index].host = host;
-                hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_DEFAULT, restore_host_context, &hclt[thread_index]);
-                rc = (hclt[thread_index].thread == NULL);
-                async_exec += (rc == 0);
-                // if it failed, mark the thread slot as free
-                if (rc)
-                    __atomic_store_n(&hclt[thread_index].busy, false, __ATOMIC_RELAXED);
-            }
-            // if single thread, thread creation failure or failure tofind slot
-            if (rc || !thread_found) {
-                sync_exec++;
-                struct host_context_load_thread hclt_sync = {.host = host};
-                restore_host_context(&hclt_sync);
-            }
+            ctx_load_one_host(hclt, max_threads, order[i].host, &async_exec, &sync_exec);
             host_count++;
         }
-        dfe_done(host);
+
+        freez(order);
     }
 
     bool should_clean_threads = cleanup_finished_threads(hclt, max_threads, true, NULL);
@@ -2251,11 +2370,6 @@ static void store_host_and_system_info(RRDHOST *host)
     }
 }
 
-struct judy_list_t {
-    Pvoid_t JudyL;
-    Word_t count;
-};
-
 static void do_pending_uuid_deletion(struct meta_config_s *config, struct judy_list_t *pending_uuid_deletion)
 {
     if (!pending_uuid_deletion)
@@ -2278,11 +2392,8 @@ static void do_pending_uuid_deletion(struct meta_config_s *config, struct judy_l
             if (dimension_can_be_deleted(uuid, NULL, false))
                 delete_dimension_uuid(uuid, NULL, false);
         }
-
-        freez(uuid);
     }
-    (void) JudyLFreeArray(&pending_uuid_deletion->JudyL, PJE0);
-    freez(pending_uuid_deletion);
+    judy_list_free(pending_uuid_deletion, judy_value_freez);
 
     usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
     nd_log_daemon(
@@ -2862,33 +2973,8 @@ static void metadata_event_loop(void *arg)
         nd_log_daemon(NDLP_WARNING,
                       "METADATA: skipping the final host metadata flush - a metadata scan is still running");
 
-    if (pending_ctx_cleanup_list) {
-        Word_t Index = 0;
-        bool first = true;
-        while ((Pvalue = JudyLFirstThenNext(pending_ctx_cleanup_list->JudyL, &Index, &first))) {
-            if (!*Pvalue)
-                continue;
-            struct host_ctx_cleanup_s *ctx_cleanup = *Pvalue;
-            string_freez(ctx_cleanup->context);
-            freez(ctx_cleanup);
-        }
-        (void)JudyLFreeArray(&pending_ctx_cleanup_list->JudyL, PJE0);
-        freez(pending_ctx_cleanup_list);
-    }
-
-    if (pending_uuid_deletion) {
-        Word_t Index = 0;
-        bool first = true;
-        Pvoid_t *Pvalue;
-        while ((Pvalue = JudyLFirstThenNext(pending_uuid_deletion->JudyL, &Index, &first))) {
-            if (!*Pvalue)
-                continue;
-            nd_uuid_t *uuid = *Pvalue;
-            freez(uuid);
-        }
-        (void)JudyLFreeArray(&pending_uuid_deletion->JudyL, PJE0);
-        freez(pending_uuid_deletion);
-    }
+    judy_list_free(pending_ctx_cleanup_list, host_ctx_cleanup_free);
+    judy_list_free(pending_uuid_deletion, judy_value_freez);
 
     release_cmd_pool(&config->cmd_pool);
     worker_unregister();

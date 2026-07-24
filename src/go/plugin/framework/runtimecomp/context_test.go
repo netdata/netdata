@@ -12,6 +12,7 @@ type mockService struct{}
 func (mockService) RegisterComponent(ComponentConfig) error { return nil }
 func (mockService) UnregisterComponent(string)              {}
 func (mockService) QuarantineComponent(string)              {}
+func (mockService) FinalizeComponent(string)                {}
 func (mockService) RegisterProducer(string, func() error) error {
 	return nil
 }

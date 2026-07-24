@@ -133,7 +133,9 @@ Open decisions:
 
 ### YYYY-MM-DD
 
-- <files touched, decisions, deviations, reviewers>
+- <Material state transitions, files touched, decisions, deviations, validation,
+  and reviewers. Keep this a current-state handoff: consolidate superseded rounds
+  and do not reproduce the conversation or every review nit.>
 
 ## Workflow Friction & Rule Gaps
 

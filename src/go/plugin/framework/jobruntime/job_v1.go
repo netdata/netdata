@@ -19,7 +19,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/tickstate"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
@@ -74,8 +73,6 @@ type JobConfig struct {
 	VnodeRevision         uint64
 	VnodeMetadataRevision uint64
 	VnodeLookup           VnodeLookup
-	AuditMode             bool
-	AuditAnalyzer         metricsaudit.Analyzer
 	FunctionOnly          bool
 }
 
@@ -87,8 +84,8 @@ func NewJob(cfg JobConfig) *Job {
 	}
 
 	j := &Job{
-		AutoDetectEvery: cfg.AutoDetectEvery,
-		AutoDetectTries: infTries,
+		autoDetectEvery: cfg.AutoDetectEvery,
+		autoDetectTries: infTries,
 
 		pluginName:            cfg.PluginName,
 		name:                  cfg.Name,
@@ -112,8 +109,6 @@ func NewJob(cfg JobConfig) *Job {
 		vnodeRevision:         cfg.VnodeRevision,
 		vnodeMetadataRevision: cfg.VnodeMetadataRevision,
 		vnodeLookup:           cfg.VnodeLookup,
-		auditMode:             cfg.AuditMode,
-		auditAnalyzer:         cfg.AuditAnalyzer,
 	}
 
 	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
@@ -134,8 +129,8 @@ type Job struct {
 	fullName   string
 
 	updateEvery     int
-	AutoDetectEvery int
-	AutoDetectTries int
+	autoDetectEvery int
+	autoDetectTries int
 	priority        int
 	labels          map[string]string
 
@@ -146,7 +141,7 @@ type Job struct {
 
 	module collectorapi.CollectorV1
 
-	// running tracks whether the job's main loop is active (set in Start, cleared in Start's defer)
+	// running tracks whether the managed job loop is active.
 	running atomic.Bool
 
 	initialized bool
@@ -161,9 +156,7 @@ type Job struct {
 	api                  *netdataapi.API
 
 	vnodeCreated bool
-	// vnodeMu covers j.vnode against off-goroutine readers (Vnode is
-	// called from the manager loop on registered jobs) racing the job
-	// goroutine's writes and the pre-Start baseline write.
+	// vnodeMu covers current vnode state while collection refreshes it.
 	vnodeMu               sync.RWMutex
 	vnode                 vnodes.VirtualNode
 	vnodeName             string
@@ -176,15 +169,11 @@ type Job struct {
 
 	stopCtrl stopController
 
-	// moduleCleanup guards the module's Cleanup to exactly once: it is
-	// reachable from the detection-failure defer, the main loop's tail, and
-	// Cleanup() (detected-but-never-started jobs are disposed through it).
+	// moduleCleanup guards explicit accepted/rejected lifecycle cleanup to
+	// exactly once.
 	moduleCleanup sync.Once
 
-	// Metrics-audit mode support.
-	auditMode     bool
-	auditAnalyzer metricsaudit.Analyzer
-	skipTracker   tickstate.SkipTracker
+	skipTracker tickstate.SkipTracker
 }
 
 type collectedMetrics struct {
@@ -218,34 +207,22 @@ func (j *Job) Name() string {
 	return j.name
 }
 
-// Panicked returns 'panicked' flag value.
-func (j *Job) Panicked() bool {
-	return j.panicked.Load()
-}
-
-// AutoDetectionEvery returns value of AutoDetectEvery.
+// AutoDetectionEvery returns the autodetection retry cadence.
 func (j *Job) AutoDetectionEvery() int {
-	return j.AutoDetectEvery
+	return j.autoDetectEvery
 }
 
 // RetryAutoDetection returns whether it is needed to retry autodetection.
 func (j *Job) RetryAutoDetection() bool {
-	return retryAutoDetection(j.AutoDetectEvery, j.AutoDetectTries)
+	return retryAutoDetection(j.autoDetectEvery, j.autoDetectTries)
 }
 
-func (j *Job) Configuration() any {
-	return j.module.Configuration()
+// AutoDetectionManaged leaves failure cleanup with the Job Manager factory.
+func (j *Job) AutoDetectionManaged(ctx context.Context) (err error) {
+	return j.autoDetection(ctx)
 }
 
-func (j *Job) Vnode() vnodes.VirtualNode {
-	j.vnodeMu.RLock()
-	defer j.vnodeMu.RUnlock()
-	return *j.vnode.Copy()
-}
-
-// AutoDetection invokes init, check and postCheck. It handles panic.
-// ctx flows into the module's Init/Check calls and must be non-nil.
-func (j *Job) AutoDetection(ctx context.Context) (err error) {
+func (j *Job) autoDetection(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic %v", r)
@@ -256,9 +233,6 @@ func (j *Job) AutoDetection(ctx context.Context) (err error) {
 			if logger.Level.Enabled(slog.LevelDebug) {
 				j.Errorf("STACK: %s", debug.Stack())
 			}
-		}
-		if err != nil {
-			j.cleanupModule()
 		}
 	}()
 
@@ -290,33 +264,7 @@ func (j *Job) AutoDetection(ctx context.Context) (err error) {
 		return err
 	}
 
-	// Record job structure for metrics-audit mode after successful detection.
-	if j.auditMode && j.auditAnalyzer != nil && j.charts != nil {
-		j.auditAnalyzer.RecordJobStructure(j.name, j.moduleName, j.charts)
-	}
-
 	return nil
-}
-
-// SetVnodeSnapshot commits the vnode config directly into the job BEFORE Start:
-// registration-time freshness must be visible to Cleanup even when the job
-// never collects. Pre-Start only: the job goroutine does not exist yet, and the
-// write is published to it by the Start goroutine launch. Module-owned vnode
-// state is never overridden.
-func (j *Job) SetVnodeSnapshot(snapshot VnodeSnapshot) {
-	if snapshot.Vnode == nil || (j.module != nil && j.module.VirtualNode() != nil) {
-		return
-	}
-	next := snapshot.Vnode.Copy()
-	j.vnodeMu.Lock()
-	j.vnode = *next
-	if snapshot.Revision != 0 {
-		j.vnodeRevision = snapshot.Revision
-	}
-	if snapshot.MetadataRevision != 0 {
-		j.vnodeMetadataRevision = snapshot.MetadataRevision
-	}
-	j.vnodeMu.Unlock()
 }
 
 func (j *Job) refreshVnodeSnapshot() bool {
@@ -333,6 +281,14 @@ func (j *Job) refreshVnodeSnapshot() bool {
 func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
 	if snapshot.Vnode == nil {
 		return false
+	}
+	if snapshot.Revision != 0 {
+		j.vnodeMu.Lock()
+		stale := snapshot.Revision <= j.vnodeRevision
+		j.vnodeMu.Unlock()
+		if stale {
+			return false
+		}
 	}
 	next := snapshot.Vnode.Copy()
 
@@ -369,26 +325,24 @@ func (j *Job) IsRunning() bool {
 	return j.running.Load()
 }
 
-// Module returns the underlying module instance.
-// This allows function handlers to access the collector for querying data.
-func (j *Job) Module() collectorapi.CollectorV1 {
-	return j.module
-}
-
 // Collector returns the underlying collector instance bound to this job.
 func (j *Job) Collector() any {
 	return j.module
 }
 
-// IsFunctionOnly returns true if this job is function-only (no metrics collection).
-func (j *Job) IsFunctionOnly() bool {
-	return j.functionOnly
+// StartManaged starts the collector loop while leaving Cleanup ownership with
+// the caller. It acknowledges readiness only after the loop has published its
+// running state.
+func (j *Job) StartManaged(ready chan<- struct{}) {
+	j.run(ready)
 }
 
-// Start starts job main loop.
-func (j *Job) Start() {
+func (j *Job) run(ready chan<- struct{}) {
 	j.stopCtrl.markStarted()
 	j.running.Store(true)
+	if ready != nil {
+		close(ready)
+	}
 	if j.functionOnly {
 		j.Info("started in function-only mode")
 	} else {
@@ -415,7 +369,6 @@ LOOP:
 			}
 		}
 	}
-	j.Cleanup()
 }
 
 // Stop stops job main loop. It blocks until the job is stopped.
@@ -428,7 +381,7 @@ func (j *Job) shouldCollect(clock int) bool {
 }
 
 func (j *Job) disableAutoDetection() {
-	disableAutoDetection(&j.AutoDetectEvery)
+	disableAutoDetection(&j.autoDetectEvery)
 }
 
 func (j *Job) cleanupModule() {
@@ -476,8 +429,16 @@ func (j *Job) Cleanup() {
 	}
 
 	if j.buf.Len() > 0 {
-		_, _ = io.Copy(j.out, j.buf)
+		if err := commitJobOutput(j.out, j.buf.Bytes()); err != nil {
+			j.Errorf("cleanup output failed: %v", err)
+		}
 	}
+}
+
+// CleanupRejected releases a constructed job without emitting cleanup output.
+func (j *Job) CleanupRejected() {
+	j.cleanupModule()
+	j.buf.Reset()
 }
 
 func (j *Job) init(ctx context.Context) error {
@@ -496,7 +457,7 @@ func (j *Job) init(ctx context.Context) error {
 
 func (j *Job) check(ctx context.Context) error {
 	if err := j.module.Check(ctx); err != nil {
-		consumeAutoDetectTry(&j.AutoDetectTries)
+		consumeAutoDetectTry(&j.autoDetectTries)
 		return err
 	}
 	return nil
@@ -536,7 +497,9 @@ func (j *Job) runOnce() {
 		j.retries.Add(1)
 	}
 
-	_, _ = io.Copy(j.out, j.buf)
+	if err := commitJobOutput(j.out, j.buf.Bytes()); err != nil {
+		j.Errorf("collection output failed: %v", err)
+	}
 	j.buf.Reset()
 }
 
@@ -554,12 +517,6 @@ func (j *Job) collect() collectedMetrics {
 
 	var mx collectedMetrics
 	mx.intMetrics = j.module.Collect(context.TODO())
-
-	// Record collected metrics for metrics-audit mode.
-	// TODO: The analyzer only records intMetrics but ignores floatMetrics.
-	if j.auditMode && j.auditAnalyzer != nil && mx.intMetrics != nil {
-		j.auditAnalyzer.RecordCollection(j.name, j.moduleName, mx.intMetrics)
-	}
 
 	return mx
 }
@@ -629,11 +586,6 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 	if !j.collectDurationChart.IsCreated() || createChart {
 		j.collectDurationChart.ID = fmt.Sprintf("%s_%s_data_collection_duration", cleanPluginName(j.pluginName), j.FullName())
 		j.createChart(j.collectDurationChart)
-	}
-
-	// Update analyzer with current chart structure for dynamic collectors.
-	if j.auditMode && j.auditAnalyzer != nil {
-		j.auditAnalyzer.UpdateJobStructure(j.name, j.moduleName, j.charts)
 	}
 
 	intMx := collectedMetrics{intMetrics: map[string]int64{"success": oldmetrix.Bool(updated > 0), "failed": oldmetrix.Bool(updated == 0)}}
@@ -816,10 +768,6 @@ func (j *Job) updateChart(chart *collectorapi.Chart, mx collectedMetrics, sinceL
 		chart.Retries++
 	}
 	return chart.IsUpdated()
-}
-
-func (j *Job) penalty() int {
-	return penaltyFromRetries(int(j.retries.Load()), j.updateEvery)
 }
 
 func getChartType(chart *collectorapi.Chart, j *Job) string {

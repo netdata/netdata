@@ -527,6 +527,9 @@ pub(super) fn commit_batch(
                 if let Err(err) = facet_runtime
                     .observe_active_contribution(Path::new(active_file.path()), &contribution)
                 {
+                    metrics
+                        .facet_active_update_errors
+                        .fetch_add(1, Ordering::Relaxed);
                     tracing::warn!("facet runtime tier {:?} write update failed: {}", tier, err);
                 }
             }
