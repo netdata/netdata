@@ -193,7 +193,11 @@ static inline bool is_function_restricted(const char *name, const char *tags) {
     return (name && name[0] == '_' && name[1] == '_') || (tags && strstr(tags, RRDFUNCTIONS_TAG_HIDDEN) != NULL);
 }
 
-static inline bool is_function_dyncfg(const char *name) {
+// Reports whether a function name is a reserved dynamic-configuration name -
+// the `config` catch-all or any per-config `config <id>` function. Exposed so
+// the pluginsd FUNCTION handler can refuse external registrations that would
+// otherwise overwrite (swap) the built-in dyncfg execute callback.
+bool rrd_function_name_is_dyncfg(const char *name) {
     if(!name || !*name)
         return false;
 
@@ -208,7 +212,7 @@ static inline bool is_function_dyncfg(const char *name) {
 }
 
 static inline RRD_FUNCTION_OPTIONS get_function_options(RRDSET *st, const char *name, const char *tags) {
-    if(is_function_dyncfg(name))
+    if(rrd_function_name_is_dyncfg(name))
         return RRD_FUNCTION_DYNCFG;
 
     RRD_FUNCTION_OPTIONS options = st ? RRD_FUNCTION_LOCAL : RRD_FUNCTION_GLOBAL;
