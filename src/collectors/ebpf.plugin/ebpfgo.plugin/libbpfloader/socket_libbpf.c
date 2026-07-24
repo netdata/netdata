@@ -617,10 +617,8 @@ static bool pid_ht_accumulate(struct netdata_socket_per_pid_entry *ht,
     uint32_t slot = (pid * 2654435761u) & ht_mask;
     for (uint32_t i = 0; i < ht_size; i++) {
         uint32_t s = (slot + i) & ht_mask;
-        if (ht[s].pid == 0) {
-            ht[s].pid = pid;
-        }
-        if (ht[s].pid == pid) {
+        if (ht[s].pid == 0 || ht[s].pid == pid) {
+            ht[s].pid = pid;  /* claim if empty; no-op if already ours */
             ht[s].bytes_sent            += v->tcp.tcp_bytes_sent;
             ht[s].bytes_received        += v->tcp.tcp_bytes_received;
             ht[s].call_tcp_sent         += v->tcp.call_tcp_sent;
