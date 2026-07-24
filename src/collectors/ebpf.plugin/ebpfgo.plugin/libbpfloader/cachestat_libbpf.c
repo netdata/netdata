@@ -493,23 +493,19 @@ int netdata_cachestat_runtime_prepare(
         return -1;
     cachestat_update_map_sizes(obj, pid_table_size);
 
-    /* buf_ncpu sizes the receive buffer for bpf_map_lookup_elem.  The kernel
-     * writes ncpu × value_size bytes regardless of maps_per_core; if
-     * bpf_map__set_type ever silently fails and a map stays PERCPU when we
-     * expected non-PERCPU, a 1-slot buffer would overflow.  Allocating the
-     * full per-CPU size makes the buffer safe under any post-load map type.
-     * percpu_{u64,entries}_cap still reflects the intended summation count
-     * (1 when maps_per_core==0) so the snapshot summation loops are unaffected. */
-    int buf_ncpu = libbpf_num_possible_cpus();
-    if (buf_ncpu < 1)
-        buf_ncpu = 1;
-    int map_ncpu = maps_per_core ? buf_ncpu : 1;
+    /* Always allocate for libbpf_num_possible_cpus() so the post-load type
+     * re-query in the snapshot path can safely use either ARRAY (count=1 via
+     * the else branch) or PERCPU_ARRAY (count=cap) without a buffer overflow.
+     * Mirrors the pattern in socket_libbpf.c:prepare. */
+    int ncpu = libbpf_num_possible_cpus();
+    if (ncpu < 1)
+        ncpu = 1;
 
-    rt->percpu_u64 = callocz((size_t)buf_ncpu, sizeof(*rt->percpu_u64));
-    rt->percpu_u64_cap = map_ncpu;
+    rt->percpu_u64 = callocz((size_t)ncpu, sizeof(*rt->percpu_u64));
+    rt->percpu_u64_cap = ncpu;
 
-    rt->percpu_entries = callocz((size_t)buf_ncpu, sizeof(*rt->percpu_entries));
-    rt->percpu_entries_cap = map_ncpu;
+    rt->percpu_entries = callocz((size_t)ncpu, sizeof(*rt->percpu_entries));
+    rt->percpu_entries_cap = ncpu;
 
     /* items_buf starts NULL; grows lazily in snapshot_apps */
     return 0;
