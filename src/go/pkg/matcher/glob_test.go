@@ -20,6 +20,9 @@ func TestNewGlobMatcher(t *testing.T) {
 		{"a*b", globMatcher("a*b")},
 		{`a*\b`, globMatcher(`a*\b`)},
 		{`a\[`, stringFullMatcher(`a[`)},
+		{`a\*`, stringFullMatcher(`a*`)},
+		{`a\\*`, stringPrefixMatcher(`a\`)},
+		{`a\\\*`, stringFullMatcher(`a\*`)},
 		{`ab\`, nil},
 		{`ab[`, nil},
 		{`ab]`, stringFullMatcher("ab]")},
@@ -108,9 +111,11 @@ func TestGlobMatcher_MatchString(t *testing.T) {
 		{true, "a[^bc]d", "add"},
 		{true, "a??d", "abcd"},
 		{true, `a\??d`, "a?cd"},
+		{true, `queue\*`, "queue*"},
 		{true, "a[b-z]d", "abd"},
 		{false, "/a/*/d", "a/b/c/d"},
 		{false, "/a/*/d", "This will fail!"},
+		{false, `queue\*`, "queue*errors"},
 	}
 
 	for _, c := range cases {

@@ -53,7 +53,7 @@ func newValidatedGlobMatcher(expr string) Matcher {
 		startWith = false
 		startIdx = 1
 	}
-	if chars[endIdx] == '*' {
+	if chars[endIdx] == '*' && !isEscapedGlobRune(chars, endIdx) {
 		endWith = false
 		endIdx--
 	}
@@ -74,6 +74,14 @@ func newValidatedGlobMatcher(expr string) Matcher {
 
 	matcher, _ := NewStringMatcher(string(unescapedExpr), startWith, endWith)
 	return matcher
+}
+
+func isEscapedGlobRune(chars []rune, index int) bool {
+	backslashes := 0
+	for i := index - 1; i >= 0 && chars[i] == '\\'; i-- {
+		backslashes++
+	}
+	return backslashes%2 == 1
 }
 
 func isGlobMeta(ch rune) bool {
