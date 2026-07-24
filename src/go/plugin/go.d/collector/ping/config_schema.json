@@ -94,7 +94,7 @@
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "update_every": {
-      "ui:help": "Sets the frequency at which a specified number of ping packets (determined by 'packets') are sent to designated hosts."
+      "ui:help": "Sets the frequency at which a specified number of ping packets (determined by 'packets') are sent to designated hosts. The ping collector has no separate timeout option: the per-host ping timeout is derived from this value (~90% of it when update_every is 1, ~95% otherwise). Increasing update_every gives each host more time to reply and reduces ping timeouts."
     },
     "network": {
       "ui:help": "`ip` selects IPv4 or IPv6 based on system configuration, `ipv4` forces resolution to IPv4 addresses, and `ipv6` forces resolution to IPv6 addresses.",
