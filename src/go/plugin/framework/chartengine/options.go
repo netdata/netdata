@@ -76,17 +76,7 @@ func defaultAutogenPolicy() AutogenPolicy {
 }
 
 func normalizeAutogenPolicy(policy AutogenPolicy) (AutogenPolicy, []charttpl.ValidatedAutogenRule, error) {
-	templateRules := make([]charttpl.EngineAutogenRule, len(policy.Rules))
-	for i, rule := range policy.Rules {
-		templateRules[i] = charttpl.EngineAutogenRule{
-			Scope: rule.Scope,
-			Selector: metrixselector.Expr{
-				Allow: slices.Clone(rule.Selector.Allow),
-				Deny:  slices.Clone(rule.Selector.Deny),
-			},
-		}
-	}
-	rules, err := charttpl.CompileAutogenRules(templateRules)
+	rules, err := charttpl.CompileAutogenRules(policy.Rules)
 	if err != nil {
 		return AutogenPolicy{}, nil, fmt.Errorf("autogen rules: %w", err)
 	}

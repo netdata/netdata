@@ -4,7 +4,7 @@ package runtimecomp
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 // AutogenPolicy controls unmatched-series fallback chart generation
@@ -24,11 +24,9 @@ type AutogenPolicy struct {
 	ExpireAfterSuccessCycles uint64
 }
 
-// AutogenRule constrains fallback within a source metric-family scope.
-type AutogenRule struct {
-	Scope    string
-	Selector metrixselector.Expr
-}
+// AutogenRule aliases the chart-template rule so programmatic and serialized
+// policies cannot drift.
+type AutogenRule = charttpl.EngineAutogenRule
 
 // ComponentConfig declares one runtime/internal metrics component.
 type ComponentConfig struct {

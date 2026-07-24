@@ -8,7 +8,6 @@ import (
 
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
 
 type effectiveEnginePolicy struct {
@@ -28,20 +27,10 @@ func resolveEffectivePolicy(
 
 	if templatePolicy != nil {
 		if templatePolicy.Autogen != nil {
-			rawRules := make([]runtimecomp.AutogenRule, len(templatePolicy.Autogen.Rules))
-			for i, rule := range templatePolicy.Autogen.Rules {
-				rawRules[i] = runtimecomp.AutogenRule{
-					Scope: rule.Scope,
-					Selector: metrixselector.Expr{
-						Allow: slices.Clone(rule.Selector.Allow),
-						Deny:  slices.Clone(rule.Selector.Deny),
-					},
-				}
-			}
 			normalized, rules, err := normalizeAutogenPolicyWithRules(
 				AutogenPolicy{
 					Enabled:                  templatePolicy.Autogen.Enabled,
-					Rules:                    rawRules,
+					Rules:                    templatePolicy.Autogen.Rules,
 					MaxTypeIDLen:             templatePolicy.Autogen.MaxTypeIDLen,
 					ExpireAfterSuccessCycles: templatePolicy.Autogen.ExpireAfterSuccessCycles,
 				},
