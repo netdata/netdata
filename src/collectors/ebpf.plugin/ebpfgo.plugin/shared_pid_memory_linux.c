@@ -116,6 +116,9 @@ static bool pid_shm_replace_generation(struct shared_pid_memory *ctx, size_t len
         ctx->entries = NULL;
         return false;
     }
+    /* Restore the prev_count==0 invariant so the first publish after replace
+     * skips the conditional memset (new segment is already kernel-zero-filled). */
+    ctx->prev_count = 0;
     return true;
 }
 
