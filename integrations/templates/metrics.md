@@ -31,12 +31,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Description | Dimensions | Unit |[% for a in entry.metrics.availability %] [[ a ]] |[% endfor %]
+[% set scope_has_description = scope.metrics|selectattr('description')|list|length > 0 %]
+| Metric |[% if scope_has_description %] Description |[% endif %] Dimensions | Unit |[% for a in entry.metrics.availability %] [[ a ]] |[% endfor %]
 
-|:------|:------------|:----------|:----|[% for a in entry.metrics.availability %]:---:|[% endfor %]
+|:------|[% if scope_has_description %]:------------|[% endif %]:----------|:----|[% for a in entry.metrics.availability %]:---:|[% endfor %]
 
 [% for metric in scope.metrics %]
-| [[ strfy(metric.name) ]] | [[ strfy(metric.description)|e ]] | [% for d in metric.dimensions %][[ strfy(d.name) ]][% if not loop.last %], [% endif %][% endfor %] | [[ strfy(metric.unit) ]] |[% for a in entry.metrics.availability %] [% if not metric.availability|length or a in metric.availability %]•[% else %] [% endif %] |[% endfor %]
+| [[ strfy(metric.name) ]] |[% if scope_has_description %] [[ strfy(metric.description)|e ]] |[% endif %] [% for d in metric.dimensions %][[ strfy(d.name) ]][% if not loop.last %], [% endif %][% endfor %] | [[ strfy(metric.unit) ]] |[% for a in entry.metrics.availability %] [% if not metric.availability|length or a in metric.availability %]•[% else %] [% endif %] |[% endfor %]
 
 [% endfor %]
 
