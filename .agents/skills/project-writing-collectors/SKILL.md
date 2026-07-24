@@ -306,12 +306,13 @@ Operator controls (all documented in `src/go/plugin/go.d/collector/prometheus/pr
 - **Scoping**: the time-series `selector` job option (allow/deny on metric name and label values, syntax in `src/go/pkg/prometheus/selector/README.md`) and `fallback_type` glob patterns for untyped metrics.
 - **Shaping**: the job-level `relabeling` option (Prometheus-compatible `metric_relabel_configs`; it replaced
   the removed `label_prefix`) renames metrics and rewrites labels before charts are built. **Chart profiles**
-  (`match`/`app`/`autogen.exclude`/`template` YAMLs, stock under
+  (`match`/`app`/`autogen.selector`/`template` YAMLs, stock under
   `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/`, user under
   `/etc/netdata/go.d/prometheus.profiles/`) ship curated per-exporter dashboards — the Prometheus analog of
-  statsd `synthetic_charts`. Metrics not covered by an authored profile chart keep their autogen charts unless
-  any selected profile's positive `autogen.exclude` glob matches the source family. This suppresses fallback
-  charts only; use the job selector or a relabeling `drop` action to discard samples.
+  statsd `synthetic_charts`. Metrics not covered by an authored profile chart keep their autogen charts unless an
+  applicable profile selector rejects them. Each selector is limited to its profile's `match` scope; when scopes
+  overlap, every applicable selector must accept the series. This changes fallback charts only; use the job selector
+  or a relabeling `drop` action to discard samples.
 
 ### 3.6 Chart priorities
 
@@ -344,7 +345,7 @@ A collector is *production-quality* when it satisfies all of:
 10. For statsd / OTEL: did I document and ship the operator-side config (synthetic_charts file or OTEL mapping YAML)?
 11. For Prometheus scraping: are selectors and relabeling rules correct? Are untyped metrics handled? Should the
     exporter get a stock chart profile (`profile-format.md`), and should that profile suppress unmatched fallback
-    charts with `autogen.exclude` while retaining their samples?
+    charts with a scoped `autogen.selector` while retaining their samples?
 12. For cross-plugin enrichment: am I using netipc?
 13. For Functions: does the response conform to one of the six shapes? Non-blocking with respect to the collection loop? Schema-validated?
 14. For ibm.d only: did I run `go generate` after touching `contexts.yaml`?

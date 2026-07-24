@@ -29,8 +29,8 @@ because the catalog is cached for the plugin's lifetime.
 
 A profile is a YAML file with two required top-level keys (`match` and `template`) plus optional `app` and `autogen`
 policy. `match` selects the profile by scraped metric names, `app` names the application the charts belong to,
-`autogen.exclude` suppresses unwanted fallback charts, and `template` defines the curated charts. Everything below
-`template` is Netdata's
+`autogen.selector` controls fallback charts within the profile's match scope, and `template` defines the curated
+charts. Everything below `template` is Netdata's
 [Chart Template Format](/src/go/plugin/framework/charttpl/README.md); inline comments explain each field.
 
 ```yaml
@@ -42,9 +42,10 @@ app: example                # optional. Application identity: charts appear unde
                             # Applications section in the UI, unless the job
                             # config sets its own `app`.
 
-autogen:                    # optional. Controls fallback charts for families that
-  exclude:                  # did not route to any authored template dimension.
-    - example_http_request_duration_seconds
+autogen:                    # optional. Controls fallback charts inside this
+  selector:                 # profile's match scope after authored routing fails.
+    deny:
+      - example_http_request_duration_seconds
 
 template:                   # REQUIRED. One chart-template group; at least one chart.
   family: Example           # top-level dashboard menu section
@@ -137,9 +138,10 @@ At runtime the collector uses profiles in four steps:
    provides it; the job name is the last resort. If selected profiles declare different apps, the first (in selection
    order) wins and the rest are logged -- set the job's `app` to disambiguate.
 4. **Charts** -- the selected profiles' templates are merged on top of the autogeneration base. Every series first gets
-   a chance to route to every authored template dimension. If no route matches, the selected profiles'
-   `autogen.exclude` patterns are ORed; a matching source family gets no fallback chart. Other unmatched families keep
-   generic autogen charts. Exclusion never removes samples from the metric store.
+   a chance to route to every authored template dimension. If no route matches, each selected profile's
+   `autogen.selector` is evaluated only when that profile's `match` applies to the source family. Every applicable
+   selector must accept the series; one rejection suppresses fallback, independent of profile order. If no selector
+   applies, the series keeps its generic autogen chart. A selector never removes samples from the metric store.
 
 Chart contexts compose as `prometheus.<app>.<template context_namespace>.<chart context>` -- in the example above,
 `prometheus.example.example.http_requests`. When the resolved app equals the profile's `context_namespace` (the common
@@ -153,7 +155,7 @@ contexts.
 |:-----------|:--------:|:--------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `match`    |   yes    | [Netdata simple pattern](/src/libnetdata/simple_pattern/README.md) tested against scraped metric family names. One hit makes the profile applicable.  |
 | `app`      |    no    | Application identity used as the `app` segment of chart contexts when the job does not set one. Must match `^[a-z][a-z0-9_]*$`.                       |
-| `autogen`  |    no    | Fallback-chart policy. `autogen.exclude` suppresses generic charts for selected source families while retaining their samples.                       |
+| `autogen`  |    no    | Fallback-chart policy. `autogen.selector` constrains generic charts inside this profile's `match` scope while retaining samples.                    |
 | `template` |   yes    | Chart template group defining the curated charts. At least one chart.                                                                                 |
 
 The filename must match `^[a-z][a-z0-9_]*$` (plus the `.yaml` or `.yml` extension): lowercase, starting with a letter,
@@ -179,21 +181,25 @@ Keep the pattern narrow -- anchored to the exporter's metric prefix, such as `ha
 every catalog profile whose `match` hits at least one scraped metric family is selected, so an over-broad pattern
 attaches the profile to unrelated jobs.
 
-### `autogen.exclude`
+### `autogen.selector`
 
-`autogen.exclude` is a list of positive glob patterns matched against source metric-family names. A series is tested
-only when no authored chart-template dimension matched it.
+`autogen.selector` uses the existing metric selector `allow`/`deny` shape to control fallback charts. It runs only
+after no authored chart-template dimension matched the flattened series, and only when this profile's `match` applies
+to the resolved source family.
 
-- Patterns are combined with OR semantics. `'*'` suppresses fallback charts for every unmatched family.
-- Surrounding whitespace is ignored; internal whitespace and Unicode remain literal.
-- Empty entries, invalid globs, and unescaped leading `!` terms are rejected. Negative patterns are deliberately not
-  supported because exclusions from every selected profile are unioned, independent of profile selection order.
-- Duplicate terms are removed and the merged list is deterministic. There is no A-Z "profile processing" behavior:
-  all selected profiles contribute one set union.
-- Histograms and summaries match by base family name: `foo_bucket`, `foo_sum`, and `foo_count` all test as `foo`.
-  Summary quantiles already use `foo`. StateSet series keep their visible name. MeasureSet fields named
-  `<source>_<field>` test as `<source>` using the `measure_field` metadata.
-- Authored routing wins. A profile can create a heatmap from `foo_bucket` and exclude `foo`; the bucket series still
+- `allow` alone keeps fallback only for selected series.
+- `deny` alone keeps fallback for everything except selected series.
+- With both, the result is `allow AND NOT deny`.
+- At least one non-empty `allow` or `deny` entry is required. Empty `autogen`, null or empty `selector`, both lists
+  absent or empty, whitespace-only entries, and invalid selector expressions are rejected.
+- Each entry accepts the same metric-name and label expression syntax as other metric selectors. The selector receives
+  the source family as `__name__` plus all current series labels.
+- When multiple selected profile scopes apply, every applicable selector must accept the series. One rejection
+  suppresses fallback, and profile order cannot change the result. Profiles without `autogen.selector` add no rule.
+- Histograms and summaries use their base family as `__name__`: `foo_bucket`, `foo_sum`, and `foo_count` all evaluate
+  as `foo`. Structural labels remain visible, including `le` and `quantile`. StateSet state labels and MeasureSet
+  `measure_field` are also available.
+- Authored routing wins. A profile can create a heatmap from `foo_bucket` and deny `foo`; the bucket series still
   reaches the heatmap, while unmatched fallback charts for `foo_sum` and `foo_count` are suppressed.
 - This is chart suppression, not ingestion filtering. Use the job `selector` or a relabeling `drop` rule when the
   matching samples must be discarded.
@@ -203,9 +209,12 @@ Example:
 ```yaml
 match: 'example_*'
 autogen:
-  exclude:
-    - example_http_request_duration_seconds
-    - 'example_debug_*'
+  selector:
+    allow:
+      - 'example_*{environment="production"}'
+    deny:
+      - example_http_request_duration_seconds
+      - 'example_debug_*'
 template:
   # ...
 ```
@@ -230,8 +239,8 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
   `groups`, and `chart_defaults`. `instances`, `lifecycle`, and `label_promotion` are per-chart fields, not group fields
   (`instances` and `label_promotion` can also be set once for a whole group via `chart_defaults`). The spec-level
   `version` and `engine` fields are rejected. The collector wraps your group into its per-job spec, where autogeneration
-  for uncovered, non-excluded metrics stays enabled. Configure fallback exclusion through the profile-root
-  `autogen.exclude`, not a nested `engine`.
+  for uncovered metrics stays enabled. Configure conditional fallback through the profile-root `autogen.selector`, not
+  a nested `engine`.
 - **Set `context_namespace` at the template root to the profile name.** This is the group-level `context_namespace`
   field -- a profile has no separate top-level one; the collector supplies the `prometheus.<app>` prefix. The emitted
   context is `prometheus.<app>.<context_namespace>.<chart context>`, with the namespace segment dropped when it equals
@@ -283,9 +292,9 @@ jobs:
 
 Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read, and a name that exists in neither
 the stock nor the user catalog is a configuration error in both modes. Scraped metrics not charted by any selected
-profile keep their generic autogen charts unless their source family matches any selected profile's
-`autogen.exclude`. Use `autogen.exclude` to hide fallback charts while retaining samples; use the job's `selector` or a
-`relabeling` drop rule to discard samples.
+profile keep their generic autogen charts unless an applicable profile `autogen.selector` rejects them. Use
+`autogen.selector` to constrain fallback charts while retaining samples; use the job's `selector` or a `relabeling`
+drop rule to discard samples.
 
 `profiles`, `relabeling`, `selector`, `fallback_type`, and `app` are all job options in `go.d/prometheus.conf` -- edit
 it with `sudo ./edit-config go.d/prometheus.conf` from your
@@ -346,16 +355,17 @@ it with `sudo ./edit-config go.d/prometheus.conf` from your
    ```
 
 5. Verify the dashboard: the curated charts appear in the node's left-hand menu under the section named by the
-   template's `family`, with `prometheus.<app>.*` contexts. Uncovered metrics remain as autogen charts unless their
-   source families are listed under `autogen.exclude`.
+   template's `family`, with `prometheus.<app>.*` contexts. Uncovered metrics remain as autogen charts unless an
+   applicable profile `autogen.selector` rejects them.
 
 If the profile is selected but a curated chart is missing or empty, the usual causes are: a dimension selector written
 with the metric family name instead of the suffixed exposition name (`foo` instead of `foo_bucket`);
 `instances.by_labels` or `name_from_label` naming a label the series does not carry; or the metric not being collected
-at all (untyped without `_total` or `fallback_type`). When the family is not excluded, the giveaway is the metric
-appearing as a generic autogen chart instead of in your curated one. Selector matching is not validated -- neither the
-job check nor debug mode flags a selector that matches nothing -- so re-run the commands from step 1 and compare the
-exact series names and label keys against your `metrics` lists, selectors, and labels.
+at all (untyped without `_total` or `fallback_type`). When fallback policy accepts the family, the giveaway is the
+metric appearing as a generic autogen chart instead of in your curated one. Whether a syntactically valid selector
+matches observed series is not validated -- neither the job check nor debug mode flags a selector that matches nothing
+-- so re-run the commands from step 1 and compare the exact series names and label keys against your `metrics` lists,
+selectors, and labels.
 
 To contribute a profile to Netdata, add it under `src/go/plugin/go.d/config/go.d/prometheus.profiles/default/`. Stock
 profiles are held to a stricter standard than user profiles: a broken stock profile is not skipped -- an invalid header,

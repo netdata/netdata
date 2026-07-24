@@ -173,7 +173,7 @@ modules:
                 ```
 
             - name: profiles
-              description: Curated, exporter-specific chart profiles. Profiles may suppress unmatched fallback charts with `autogen.exclude`; disable profiles with mode `none`.
+              description: Curated, exporter-specific chart profiles. Profiles may constrain unmatched fallback charts with scoped `autogen.selector` rules; disable profiles with mode `none`.
               default_value: auto
               required: false
               group: Customization
@@ -190,8 +190,9 @@ modules:
 
                 Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the
                 other block are ignored. Metrics not covered by an authored profile chart keep their generic autogen
-                charts unless any selected profile's `autogen.exclude` matches the source family. This suppresses
-                fallback charts only; use `selector` or a relabeling `drop` rule to discard samples.
+                charts unless an applicable profile `autogen.selector` rejects them. Every selector is limited to its
+                profile's `match` scope; when scopes overlap, every applicable selector must accept the series. This
+                changes fallback charts only; use `selector` or a relabeling `drop` rule to discard samples.
 
                 ```yaml
                 profiles:
