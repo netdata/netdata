@@ -307,18 +307,27 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     }
 
     // the LATEST grouping with a single point asking for the hot edge
-    // (before is zero, or an absolute before within one update_every of
-    // now) anchors the window end at the newest stored sample - the
-    // clamp to now-1 above would exclude an end-stamped sample that
-    // already exists, making the hot edge a race against the collector
+    // (the requested before resolves to zero or to within one
+    // update_every of now) anchors the window end at the newest stored
+    // sample - the clamp to now-1 above would exclude an end-stamped
+    // sample that already exists, making the hot edge a race against
+    // the collector. The anchored end needs no re-alignment: collectors
+    // end-stamp samples on update_every boundaries.
     bool latest_hot_edge = false;
-    if (group_method == RRDR_GROUPING_LATEST && points_requested == 1 && qt->db.last_time_s > 0 &&
-        (before_requested == 0 ||
-         (!rrdr_relative_window_value_is_relative(before_requested) &&
-          before_requested >= now_realtime_sec() - update_every))) {
-        latest_hot_edge = true;
-        before_wanted = qt->db.last_time_s;
-        query_debug_log(":latest hot edge before_wanted %ld", before_wanted);
+    if (group_method == RRDR_GROUPING_LATEST && points_requested == 1 && qt->db.last_time_s > 0) {
+        time_t now_s = now_realtime_sec();
+
+        // resolve the requested before to an absolute time the way the
+        // conversion above did (relative values are offsets from now)
+        time_t before_resolved = before_requested;
+        if (rrdr_relative_window_value_is_relative(before_requested))
+            before_resolved = now_s + ((before_requested > 0) ? -before_requested : before_requested);
+
+        if (before_requested == 0 || before_resolved >= now_s - update_every) {
+            latest_hot_edge = true;
+            before_wanted = qt->db.last_time_s;
+            query_debug_log(":latest hot edge before_wanted %ld", before_wanted);
+        }
     }
 
     // now that we have group, align the requested timeframe to fit it.

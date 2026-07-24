@@ -104,6 +104,11 @@ static void rrd2rrdr_query_execute_latest_fast_path(RRDR *r, size_t dim_id_in_rr
 
     NETDATA_DOUBLE value = ops->latest_fast_path_value;
 
+    // the storage path erases signs at fetch when absolute is requested
+    // (v2 forces it with percentage and non-dimension group-by) - mirror it
+    if(unlikely(qt->window.options & RRDR_OPTION_ABSOLUTE))
+        value = fabsndd(value);
+
     // the same timestamp the normal path computes for the first line
     time_t now_end_time = qt->window.after + (ops->view_update_every - ops->query_granularity);
     long rrdr_line = rrdr_line_init(r, now_end_time, -1);

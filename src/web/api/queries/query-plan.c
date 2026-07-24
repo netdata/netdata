@@ -521,9 +521,11 @@ static bool query_latest_fast_path(RRDR *r, QUERY_ENGINE_OPS *ops) {
     QUERY_TARGET *qt = r->internal.qt;
 
     // natural points are not excluded: with a single output point the
-    // whole window is one group, so natural and virtual points agree
+    // whole window is one group, so natural and virtual points agree;
+    // resampling is excluded conservatively (it reshapes the window)
     if(r->time_grouping.add_flush != RRDR_GROUPING_LATEST ||
         qt->window.points != 1 ||
+        qt->request.resampling_time > 0 ||
         (qt->window.options & (RRDR_OPTION_SELECTED_TIER|RRDR_OPTION_ANOMALY_BIT)))
         return false;
 
@@ -533,7 +535,12 @@ static bool query_latest_fast_path(RRDR *r, QUERY_ENGINE_OPS *ops) {
         return false;
 
     // NAN when there is no live dimension (archived metric), or when the
-    // collector's last sample is a gap - the storage query serves those
+    // collector's last sample is a gap - the storage query serves those.
+    // A collector tick between the query-target snapshot (db_last) and
+    // this read can make the value one sample fresher than the window
+    // end - accepted: latest serves the current value, freshness beats
+    // label fidelity here (same stance as serving the un-quantized
+    // double and zero anomaly/reset bits)
     QUERY_DIMENSION *qd = query_dimension(qt, ops->qm->link.query_dimension_id);
     NETDATA_DOUBLE v = rrdmetric_acquired_last_stored_value(qd->rma);
     if(!netdata_double_isnumber(v))
