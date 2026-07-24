@@ -410,6 +410,17 @@ setup_terminal() {
   TPUT_BOLD=""
   TPUT_DIM=""
 
+  case "${COLUMNS}" in
+    "" | *[!0-9]*) TERM_WIDTH=80 ;;
+    *)
+      if [ "${COLUMNS}" -ge 0 ]; then
+        TERM_WIDTH="${COLUMNS}"
+      else
+        TERM_WIDTH="80"
+      fi
+      ;;
+  esac
+
   # Is stderr on the terminal? If not, then fail
   test -t 2 || return 1
 
@@ -454,7 +465,7 @@ cleanup() {
   if [ -z "${NO_CLEANUP}" ] && [ -n "${tmpdir}" ]; then
     cd || true
     DRY_RUN=0
-    run_as_root rm -rf "${tmpdir}"
+    run_as_root_silent rm -rf "${tmpdir}"
   fi
 }
 
@@ -468,8 +479,16 @@ deferred_warnings() {
 }
 
 fatal() {
+  bracket="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}$(printf "%${TERM_WIDTH}s" " " | tr " " "X")${TPUT_RESET}"
+  printf >&2 "%s\n\n" "${bracket}"
   deferred_warnings
-  printf >&2 "%b\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
+  printf >&2 "%s\n" "${bracket}"
+  printf >&2 "%s\n" "${TPUT_BOLD} A FATAL ERROR WAS ENCOUNTERED! ${TPUT_RESET}"
+  printf >&2 "%s\n" "${TPUT_BOLD} \\/ \\/ \\/ \\/ \\/ \\/ \\/ \\/ \\/ \\/ ${TPUT_RESET}"
+  printf >&2 "\n%b\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
+  printf >&2 "%s\n" "${TPUT_BOLD} /\\ /\\ /\\ /\\ /\\ /\\ /\\ /\\ /\\ /\\ ${TPUT_RESET}"
+  printf >&2 "%s\n" "${TPUT_BOLD} A FATAL ERROR WAS ENCOUNTERED! ${TPUT_RESET}"
+  printf >&2 "%s\n" "${bracket}"
   printf >&2 "%s\n" "For community support, you can connect with us on:"
   support_list
   telemetry_event "INSTALL_FAILED" "${1}" "${2}"
@@ -555,6 +574,17 @@ run_as_root() {
   run ${ROOTCMD} "${@}"
 }
 
+# Only to be used in cleanup code.
+run_as_root_silent() {
+  confirm_root_support
+
+  if [ "$(id -u)" -ne "0" ]; then
+    printf >&2 "Root privileges required to run %s\n" "${*}"
+  fi
+
+  ${ROOTCMD} "${@}"
+}
+
 run_script() {
   old_pwd="${PWD}"
   set_tmpdir
@@ -582,7 +612,9 @@ run_script() {
 }
 
 warning() {
-  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
+  bracket="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}$(printf "%${TERM_WIDTH}s" " " | tr " " "=")${TPUT_RESET}"
+  msg="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
+  printf >&2 "%s\n%s\n%s\n" "${bracket}" "${msg}" "${bracket}"
   NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${*}"
 }
 
