@@ -524,4 +524,109 @@ int test_dbengine(void) {
     return (int)(errors + value_errors + time_errors);
 }
 
+#define DBENGINE_PLATFORM_TEST_TIERS 2
+#define DBENGINE_PLATFORM_TEST_TIMEOUT_S 30
+
+struct dbengine_platform_test_init {
+    uv_thread_t thread;
+    struct completion completed;
+    char path[RRDENG_PATH_MAX];
+    size_t tier;
+    int ret;
+    volatile bool *start;
+};
+
+static void dbengine_platform_test_init_tier(void *arg)
+{
+    struct dbengine_platform_test_init *init = arg;
+
+    while (!__atomic_load_n(init->start, __ATOMIC_ACQUIRE))
+        yield_the_processor();
+
+    init->ret = rrdeng_init(NULL, init->path, RRDENG_MIN_DISK_SPACE_MB, init->tier, 0);
+    completion_mark_complete(&init->completed);
+}
+
+int dbengine_platform_unittest(void)
+{
+    struct dbengine_platform_test_init init[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
+    char test_root[RRDENG_PATH_MAX];
+    char native_test_root[RRDENG_PATH_MAX];
+    volatile bool start = false;
+    int errors = 0;
+
+    snprintfz(test_root, sizeof(test_root), "%s/dbengine-platform-unittest-%d-%" PRIu64,
+              netdata_configured_cache_dir, getpid(), os_random(UINT64_MAX));
+    os_translate_path(native_test_root, test_root, sizeof(native_test_root));
+
+    if (mkdir(native_test_root, 0775) != 0) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot create test directory '%s'\n", test_root);
+        return 1;
+    }
+
+    nd_profile.storage_tiers = DBENGINE_PLATFORM_TEST_TIERS;
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        char tier_path[RRDENG_PATH_MAX];
+
+        snprintfz(tier_path, sizeof(tier_path), "%s/tier%zu", test_root, tier);
+        os_translate_path(init[tier].path, tier_path, sizeof(init[tier].path));
+        if (mkdir(init[tier].path, 0775) != 0) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot create tier %zu directory\n", tier);
+            errors++;
+            goto cleanup_directories;
+        }
+
+        init[tier].tier = tier;
+    }
+
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        completion_init(&init[tier].completed);
+        init[tier].start = &start;
+        if (uv_thread_create(&init[tier].thread, dbengine_platform_test_init_tier, &init[tier]) != 0) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot create tier %zu initialization thread\n", tier);
+            return 1;
+        }
+    }
+    __atomic_store_n(&start, true, __ATOMIC_RELEASE);
+
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        if (!completion_timedwait_for(&init[tier].completed, DBENGINE_PLATFORM_TEST_TIMEOUT_S)) {
+            fprintf(stderr, "DBENGINE platform unittest: tier %zu initialization timed out\n", tier);
+            return 1;
+        }
+
+        completion_destroy(&init[tier].completed);
+        if (uv_thread_join(&init[tier].thread) != 0 || init[tier].ret != 0) {
+            fprintf(stderr, "DBENGINE platform unittest: tier %zu initialization failed (%d)\n", tier, init[tier].ret);
+            return 1;
+        }
+
+        if (!completion_timedwait_for(&multidb_ctx[tier]->loading.load_mrg, DBENGINE_PLATFORM_TEST_TIMEOUT_S)) {
+            fprintf(stderr, "DBENGINE platform unittest: tier %zu MRG startup timed out\n", tier);
+            return 1;
+        }
+        completion_destroy(&multidb_ctx[tier]->loading.load_mrg);
+    }
+
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++)
+        (void)rrdeng_exit(multidb_ctx[tier]);
+    dbengine_shutdown();
+
+cleanup_directories:
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        if (init[tier].path[0] && rmdir(init[tier].path) != 0 && errno != ENOENT) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot remove tier %zu test directory\n", tier);
+            errors++;
+        }
+    }
+    if (rmdir(native_test_root) != 0 && errno != ENOENT) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot remove test directory\n");
+        errors++;
+    }
+
+    if (!errors)
+        fprintf(stderr, "DBENGINE platform unittest: OK\n");
+    return errors ? 1 : 0;
+}
+
 #endif

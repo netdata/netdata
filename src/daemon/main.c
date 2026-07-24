@@ -664,6 +664,23 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return mrg_unittest();
                         }
+                        else if(strcmp(optarg, "dbengineplatformtest") == 0) {
+                            unittest_running = true;
+                            if (sqlite_library_init())
+                                return 1;
+                            rrdlabels_aral_init(false);
+
+                            int rc = unittest_prepare_rrd(&user);
+                            if (!rc)
+                                rc = dbengine_platform_unittest();
+                            if (rc)
+                                return rc;
+
+                            sqlite_close_databases();
+                            sqlite_library_shutdown();
+                            rrdlabels_aral_destroy(false);
+                            return 0;
+                        }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;
                             return mrg_retention_benchmark();
