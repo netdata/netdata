@@ -148,7 +148,7 @@ modules:
               detailed_description: |
                 A list of relabeling blocks. Each block applies a list of Prometheus `metric_relabel_configs` rules to
                 the metrics whose name matches `match`. See the
-                [relabeling reference](/src/go/plugin/go.d/collector/prometheus/profile-format.md#metric-relabeling) for
+                [relabeling reference](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) for
                 the full action set and more examples.
 
                 - `match`: Netdata simple patterns matched against the full metric name — including any
@@ -173,7 +173,7 @@ modules:
                 ```
 
             - name: profiles
-              description: Curated, exporter-specific chart profiles. Disable with mode `none`.
+              description: Curated, exporter-specific chart profiles. Profiles may constrain unmatched fallback charts with scoped `autogen.selector` rules; disable profiles with mode `none`.
               default_value: auto
               required: false
               group: Customization
@@ -189,7 +189,10 @@ modules:
                 - `none`: no profiles — generic autogen charts only (the pre-profile behavior).
 
                 Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the
-                other block are ignored. Metrics not covered by a selected profile keep their generic autogen charts.
+                other block are ignored. Metrics not covered by an authored profile chart keep their generic autogen
+                charts unless an applicable profile `autogen.selector` rejects them. Every selector is limited to its
+                profile's `match` scope; when scopes overlap, every applicable selector must accept the series. This
+                changes fallback charts only; use `selector` or a relabeling `drop` rule to discard samples.
 
                 ```yaml
                 profiles:

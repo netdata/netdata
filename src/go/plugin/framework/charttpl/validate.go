@@ -7,6 +7,10 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 )
 
 var (
@@ -14,10 +18,43 @@ var (
 	validChartTypes = []string{"line", "area", "stacked", "heatmap"}
 )
 
+// Validation contains immutable runtime artifacts derived while validating a
+// spec. It is separate from Spec so validation never mutates caller-owned data.
+type Validation struct {
+	autogenRules []ValidatedAutogenRule
+}
+
+// ValidatedAutogenRule is an immutable compiled autogen rule.
+type ValidatedAutogenRule struct {
+	scope    matcher.Matcher
+	selector metrixselector.Selector
+}
+
+// ScopeMatches reports whether the rule applies to a source metric family.
+func (r ValidatedAutogenRule) ScopeMatches(metricName string) bool {
+	return r.scope != nil && r.scope.MatchString(metricName)
+}
+
+// Selects reports whether the rule permits fallback for a source series.
+func (r ValidatedAutogenRule) Selects(metricName string, labels metrix.LabelView) bool {
+	return r.selector != nil && r.selector.Matches(metricName, labels)
+}
+
+// AutogenRules returns the validated compiled autogen rules.
+func (v Validation) AutogenRules() []ValidatedAutogenRule {
+	return slices.Clone(v.autogenRules)
+}
+
 // Validate performs semantic checks for one chart template spec.
 func (s *Spec) Validate() error {
+	_, err := Validate(s)
+	return err
+}
+
+// Validate performs semantic checks and returns immutable derived artifacts.
+func Validate(s *Spec) (Validation, error) {
 	if s == nil {
-		return semErr("", "nil spec")
+		return Validation{}, semErr("", "nil spec")
 	}
 	var errs []error
 	if s.Version != VersionV1 {
@@ -26,12 +63,13 @@ func (s *Spec) Validate() error {
 	if len(s.Groups) == 0 {
 		errs = append(errs, semErr("groups", "groups[] is required"))
 	}
-	errs = append(errs, validateEngine(s.Engine))
+	rules, err := validateEngine(s.Engine)
+	errs = append(errs, err)
 
 	for i := range s.Groups {
 		errs = append(errs, validateGroup(s.Groups[i], fmt.Sprintf("groups[%d]", i), nil))
 	}
-	return errors.Join(errs...)
+	return Validation{autogenRules: rules}, errors.Join(errs...)
 }
 
 func validateGroup(group Group, path string, inheritedMetrics map[string]struct{}) error {
@@ -220,26 +258,23 @@ func validateDimensions(dimensions []Dimension, path string, effectiveMetrics ma
 	return errors.Join(errs...)
 }
 
-func validateEngine(engine *Engine) error {
+func validateEngine(engine *Engine) ([]ValidatedAutogenRule, error) {
 	if engine == nil {
-		return nil
+		return nil, nil
 	}
 
 	var errs []error
 	if engine.Selector != nil {
-		for i, expr := range engine.Selector.Allow {
-			if strings.TrimSpace(expr) == "" {
-				errs = append(errs, semErr(fmt.Sprintf("engine.selector.allow[%d]", i), "must not be empty"))
-			}
-		}
-		for i, expr := range engine.Selector.Deny {
-			if strings.TrimSpace(expr) == "" {
-				errs = append(errs, semErr(fmt.Sprintf("engine.selector.deny[%d]", i), "must not be empty"))
-			}
-		}
+		errs = append(errs, validateSelectorExpr(*engine.Selector, "engine.selector", false))
 	}
 
+	var rules []ValidatedAutogenRule
 	if engine.Autogen != nil {
+		var err error
+		rules, err = CompileAutogenRules(engine.Autogen.Rules)
+		if err != nil {
+			errs = append(errs, err)
+		}
 		if engine.Autogen.MaxTypeIDLen < 0 {
 			errs = append(errs, semErr("engine.autogen.max_type_id_len", "must be >= 0"))
 		}
@@ -248,6 +283,63 @@ func validateEngine(engine *Engine) error {
 		}
 	}
 
+	return rules, errors.Join(errs...)
+}
+
+// CompileAutogenRules validates and compiles generic conditional autogen rules.
+func CompileAutogenRules(rules []EngineAutogenRule) ([]ValidatedAutogenRule, error) {
+	if len(rules) == 0 {
+		return nil, nil
+	}
+
+	var errs []error
+	compiled := make([]ValidatedAutogenRule, len(rules))
+	for i, rule := range rules {
+		path := fmt.Sprintf("engine.autogen.rules[%d]", i)
+		scope := strings.TrimSpace(rule.Scope)
+		if scope == "" {
+			errs = append(errs, semErr(path+".scope", "must not be empty"))
+		} else {
+			m, err := matcher.NewSimplePatternsMatcher(scope)
+			if err != nil {
+				errs = append(errs, semErr(path+".scope", err.Error()))
+			} else {
+				compiled[i].scope = m
+			}
+		}
+
+		if err := validateSelectorExpr(rule.Selector, path+".selector", true); err != nil {
+			errs = append(errs, err)
+		} else {
+			selector, err := rule.Selector.Parse()
+			if err != nil {
+				errs = append(errs, semErr(path+".selector", err.Error()))
+			} else {
+				compiled[i].selector = selector
+			}
+		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	return compiled, nil
+}
+
+func validateSelectorExpr(expr metrixselector.Expr, path string, requireNonEmpty bool) error {
+	var errs []error
+	if requireNonEmpty && expr.Empty() {
+		errs = append(errs, semErr(path, "must contain at least one allow or deny selector"))
+	}
+	for i, item := range expr.Allow {
+		if strings.TrimSpace(item) == "" {
+			errs = append(errs, semErr(fmt.Sprintf("%s.allow[%d]", path, i), "must not be empty"))
+		}
+	}
+	for i, item := range expr.Deny {
+		if strings.TrimSpace(item) == "" {
+			errs = append(errs, semErr(fmt.Sprintf("%s.deny[%d]", path, i), "must not be empty"))
+		}
+	}
 	return errors.Join(errs...)
 }
 

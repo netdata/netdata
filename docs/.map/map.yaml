@@ -475,8 +475,13 @@ sidebar:
       - meta:
           label: Prometheus Profile Format
           edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/profile-format.md
-          description: Define curated chart profiles for Prometheus endpoints and reshape scraped metrics with Prometheus-compatible relabeling rules.
-          keywords: [prometheus, profiles, relabeling, collectors, charts]
+          description: Define curated chart profiles for Prometheus endpoints, with scoped autogen selectors that filter the fallback charts of unmatched metrics.
+          keywords: [prometheus, profiles, autogen, collectors, charts]
+      - meta:
+          label: Prometheus Metric Relabeling
+          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md
+          description: Rewrite, derive, or drop scraped Prometheus metrics and labels with Prometheus-compatible metric_relabel_configs rules before charts are built.
+          keywords: [prometheus, relabeling, metric_relabel_configs, labels, collectors]
       - type: integration_placeholder
         integration_kind: collectors
   # Exporting Metrics

@@ -42,6 +42,20 @@ func (m mapLabelView) CloneMap() map[string]string {
 
 var _ metrix.LabelView = mapLabelView{}
 
+var selectorMatchSink bool
+
+func TestSelectorMatchesDoesNotAllocate(t *testing.T) {
+	selector, err := Parse(`http_requests_total{job="api"}`)
+	require.NoError(t, err)
+	require.NotNil(t, selector)
+	labels := mapLabelView{"job": "api"}
+
+	allocs := testing.AllocsPerRun(1000, func() {
+		selectorMatchSink = selector.Matches("http_requests_total", labels)
+	})
+	assert.Zero(t, allocs)
+}
+
 func TestParseScenarios(t *testing.T) {
 	tests := map[string]struct {
 		expr      string

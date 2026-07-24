@@ -23,6 +23,20 @@ groups:
             name_from_label: id
 `
 
+const benchAutogenTemplateYAML = `
+version: v1
+groups:
+  - family: "Unused"
+    metrics: ["unused_metric"]
+    charts:
+      - title: "Unused metric"
+        context: "unused.metric"
+        units: "units"
+        dimensions:
+          - selector: unused_metric
+            name: unused
+`
+
 func BenchmarkBuildPlanBySeriesCardinality(b *testing.B) {
 	tests := map[string]int{
 		"series_100":   100,
@@ -39,6 +53,38 @@ func BenchmarkBuildPlanBySeriesCardinality(b *testing.B) {
 				b.Fatalf("new engine: %v", err)
 			}
 			if err := engine.LoadYAML([]byte(benchTemplateYAML), 1); err != nil {
+				b.Fatalf("load template: %v", err)
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := buildPlan(engine, reader); err != nil {
+					b.Fatalf("build plan: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkBuildPlanAutogenUnmatchedBaseline(b *testing.B) {
+	tests := map[string]int{
+		"series_100":   100,
+		"series_1000":  1000,
+		"series_10000": 10000,
+	}
+
+	for name, seriesCount := range tests {
+		b.Run(name, func(b *testing.B) {
+			reader := benchmarkCollectorReader(b, seriesCount)
+
+			engine, err := New(WithEnginePolicy(EnginePolicy{
+				Autogen: &AutogenPolicy{Enabled: true},
+			}))
+			if err != nil {
+				b.Fatalf("new engine: %v", err)
+			}
+			if err := engine.LoadYAML([]byte(benchAutogenTemplateYAML), 1); err != nil {
 				b.Fatalf("load template: %v", err)
 			}
 

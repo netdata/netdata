@@ -44,7 +44,7 @@ type DirSpec = profilecatalog.DirSpec
 // Catalog wraps the shared profile catalog with Prometheus-specific queries:
 // case-insensitive resolution and discovery-ordered listing.
 type Catalog struct {
-	profilecatalog.Catalog[Profile]
+	core profilecatalog.Catalog[Profile]
 }
 
 // LoadFromDefaultDirs builds the catalog from the stock and user directories.
@@ -68,7 +68,7 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 	if err != nil {
 		return Catalog{}, err
 	}
-	return Catalog{Catalog: core}, nil
+	return Catalog{core: core}, nil
 }
 
 // decodeProfile strict-decodes the profile header (match, app, and the template
@@ -85,10 +85,17 @@ func decodeProfile(data []byte, baseName string, isStock bool) (Profile, error) 
 	}
 
 	p := Profile{
-		Name:  baseName,
-		Match: hdr.Match,
-		App:   hdr.App,
-		lazy:  &lazyTemplate{raw: data},
+		Name:            baseName,
+		Match:           hdr.Match,
+		App:             hdr.App,
+		autogenSelector: nil,
+		lazy:            &lazyTemplate{raw: data},
+	}
+	if hdr.Autogen != nil {
+		if hdr.Autogen.Selector == nil {
+			return Profile{}, fmt.Errorf("profile %q: 'autogen.selector' is required when 'autogen' is set", baseName)
+		}
+		p.autogenSelector = cloneSelectorExpr(hdr.Autogen.Selector)
 	}
 	if err := p.validateHeader(); err != nil {
 		return Profile{}, err
@@ -101,12 +108,21 @@ func decodeProfile(data []byte, baseName string, isStock bool) (Profile, error) 
 	return p, nil
 }
 
+// Get returns an ownership-safe profile copy.
+func (c Catalog) Get(name string) (Profile, bool) {
+	profile, ok := c.core.Get(name)
+	if !ok {
+		return Profile{}, false
+	}
+	return profile.clone(), true
+}
+
 // OrderedProfiles returns all profiles in deterministic discovery order.
 func (c Catalog) OrderedProfiles() []Profile {
-	named := c.InOrder()
+	named := c.core.InOrder()
 	out := make([]Profile, 0, len(named))
 	for _, n := range named {
-		out = append(out, n.Profile)
+		out = append(out, n.Profile.clone())
 	}
 	return out
 }

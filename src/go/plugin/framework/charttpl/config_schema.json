@@ -47,12 +47,76 @@
         }
       }
     },
+    "autogen_selector_expr": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "required": ["allow"],
+          "properties": {
+            "allow": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "required": ["deny"],
+          "properties": {
+            "deny": {
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    },
+    "engine_autogen_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "selector"
+      ],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "selector": {
+          "$ref": "#/$defs/autogen_selector_expr"
+        }
+      }
+    },
     "engine_autogen": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "rules": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/engine_autogen_rule"
+          }
         },
         "max_type_id_len": {
           "oneOf": [

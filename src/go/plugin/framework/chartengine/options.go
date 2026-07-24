@@ -4,21 +4,25 @@ package chartengine
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 )
 
 type engineConfig struct {
 	autogen       AutogenPolicy
+	autogenRules  []charttpl.ValidatedAutogenRule
 	autogenTypeID string
 	// autogenContextNamespace prefixes autogen chart contexts (the spec's root
 	// context_namespace), so autogen and template charts share one namespace.
 	autogenContextNamespace string
 	selector                metrixselector.Selector
 	autogenOverride         policyOverride[AutogenPolicy]
+	autogenRulesOverride    policyOverride[[]charttpl.ValidatedAutogenRule]
 	selectorOverride        policyOverride[metrixselector.Selector]
 	runtimeStore            metrix.RuntimeStore
 	runtimeStoreSet         bool
@@ -51,6 +55,9 @@ const (
 // It aliases runtime component policy to keep one policy contract.
 type AutogenPolicy = runtimecomp.AutogenPolicy
 
+// AutogenRule conditionally constrains unmatched-series fallback.
+type AutogenRule = runtimecomp.AutogenRule
+
 // EnginePolicy controls chartengine matching/materialization behavior.
 type EnginePolicy struct {
 	// Selector filters input series globally before template/autogen routing.
@@ -68,16 +75,29 @@ func defaultAutogenPolicy() AutogenPolicy {
 	}
 }
 
-func normalizeAutogenPolicy(policy AutogenPolicy) (AutogenPolicy, error) {
+func normalizeAutogenPolicy(policy AutogenPolicy) (AutogenPolicy, []charttpl.ValidatedAutogenRule, error) {
+	rules, err := charttpl.CompileAutogenRules(policy.Rules)
+	if err != nil {
+		return AutogenPolicy{}, nil, fmt.Errorf("autogen rules: %w", err)
+	}
+	return normalizeAutogenPolicyWithRules(policy, rules)
+}
+
+func normalizeAutogenPolicyWithRules(
+	policy AutogenPolicy,
+	rules []charttpl.ValidatedAutogenRule,
+) (AutogenPolicy, []charttpl.ValidatedAutogenRule, error) {
 	maxLen := policy.MaxTypeIDLen
 	if maxLen <= 0 {
 		maxLen = defaultMaxTypeIDLen
 	}
 	if maxLen < 4 {
-		return AutogenPolicy{}, fmt.Errorf("autogen max type.id len must be >= 4, got %d", maxLen)
+		return AutogenPolicy{}, nil,
+			fmt.Errorf("autogen max type.id len must be >= 4, got %d", maxLen)
 	}
+	policy.Rules = cloneAutogenRules(policy.Rules)
 	policy.MaxTypeIDLen = maxLen
-	return policy, nil
+	return policy, slices.Clone(rules), nil
 }
 
 func compileEngineSelector(expr metrixselector.Expr) (metrixselector.Selector, error) {
@@ -89,25 +109,77 @@ func compileEngineSelector(expr metrixselector.Expr) (metrixselector.Selector, e
 
 // WithEnginePolicy configures chartengine matching/materialization policy.
 func WithEnginePolicy(policy EnginePolicy) Option {
+	policy = cloneEnginePolicy(policy)
+	var (
+		autogen          AutogenPolicy
+		autogenRules     []charttpl.ValidatedAutogenRule
+		autogenErr       error
+		compiledSelector metrixselector.Selector
+		selectorErr      error
+	)
+	if policy.Autogen != nil {
+		autogen, autogenRules, autogenErr = normalizeAutogenPolicy(*policy.Autogen)
+	}
+	if policy.Selector != nil {
+		compiledSelector, selectorErr = compileEngineSelector(*policy.Selector)
+	}
 	return func(cfg *engineConfig) error {
+		if autogenErr != nil {
+			return autogenErr
+		}
+		if selectorErr != nil {
+			return fmt.Errorf("invalid engine selector: %w", selectorErr)
+		}
 		if policy.Autogen != nil {
-			autogen, err := normalizeAutogenPolicy(*policy.Autogen)
-			if err != nil {
-				return err
+			cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: cloneAutogenPolicy(autogen)}
+			cfg.autogenRulesOverride = policyOverride[[]charttpl.ValidatedAutogenRule]{
+				set:   true,
+				value: slices.Clone(autogenRules),
 			}
-			cfg.autogenOverride = policyOverride[AutogenPolicy]{set: true, value: autogen}
-			cfg.autogen = autogen
+			cfg.autogen = cloneAutogenPolicy(autogen)
+			cfg.autogenRules = slices.Clone(autogenRules)
 		}
 		if policy.Selector != nil {
-			selector, err := compileEngineSelector(*policy.Selector)
-			if err != nil {
-				return fmt.Errorf("invalid engine selector: %w", err)
-			}
-			cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: true, value: selector}
-			cfg.selector = selector
+			cfg.selectorOverride = policyOverride[metrixselector.Selector]{set: true, value: compiledSelector}
+			cfg.selector = compiledSelector
 		}
 		return nil
 	}
+}
+
+func cloneEnginePolicy(policy EnginePolicy) EnginePolicy {
+	out := policy
+	if policy.Autogen != nil {
+		autogen := cloneAutogenPolicy(*policy.Autogen)
+		out.Autogen = &autogen
+	}
+	if policy.Selector != nil {
+		selector := *policy.Selector
+		selector.Allow = slices.Clone(policy.Selector.Allow)
+		selector.Deny = slices.Clone(policy.Selector.Deny)
+		out.Selector = &selector
+	}
+	return out
+}
+
+func cloneAutogenPolicy(policy AutogenPolicy) AutogenPolicy {
+	out := policy
+	out.Rules = cloneAutogenRules(policy.Rules)
+	return out
+}
+
+func cloneAutogenRules(rules []runtimecomp.AutogenRule) []runtimecomp.AutogenRule {
+	out := make([]runtimecomp.AutogenRule, len(rules))
+	for i, rule := range rules {
+		out[i] = runtimecomp.AutogenRule{
+			Scope: rule.Scope,
+			Selector: metrixselector.Expr{
+				Allow: slices.Clone(rule.Selector.Allow),
+				Deny:  slices.Clone(rule.Selector.Deny),
+			},
+		}
+	}
+	return out
 }
 
 // WithRuntimeStore configures internal chartengine runtime metrics store.
