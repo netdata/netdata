@@ -116,6 +116,7 @@ func TestGlobMatcher_MatchString(t *testing.T) {
 		{false, "/a/*/d", "a/b/c/d"},
 		{false, "/a/*/d", "This will fail!"},
 		{false, `queue\*`, "queue*errors"},
+		{false, "*??a", "€a"},
 	}
 
 	for _, c := range cases {

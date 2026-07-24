@@ -130,11 +130,11 @@ Pattern:
 			return false, err
 		}
 		if star {
-			// Look for match skipping i+1 bytes.
-			// Cannot skip /.
-			for i := 0; i < len(name); i++ {
-				//for i := 0; i < len(name) && name[i] != Separator; i++ {
-				t, ok, err := matchChunk(chunk, name[i+1:])
+			// Look for a match after skipping one or more runes.
+			for rest := name; len(rest) > 0; {
+				_, size := utf8.DecodeRuneInString(rest)
+				rest = rest[size:]
+				t, ok, err := matchChunk(chunk, rest)
 				if ok {
 					// if we're the last chunk, make sure we exhausted the name
 					if len(pattern) == 0 && len(t) > 0 {
