@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web_client.h"
+#include "web_server.h"
 #include "web/websocket/websocket.h"
 #include "web/mcp/adapters/mcp-http.h"
 #include "web/mcp/adapters/mcp-sse.h"
@@ -113,13 +114,33 @@ static inline char *strip_control_characters(char *url) {
     return url;
 }
 
-static void web_client_reset_allocations(struct web_client *w, bool free_all) {
+static inline void web_client_reset_or_recreate_buffer(
+    BUFFER **wb, size_t initial_size, size_t cache_max_size, size_t *statistics)
+{
+    if((*wb)->size > cache_max_size) {
+        buffer_free(*wb);
+        *wb = buffer_create(initial_size, statistics);
+    }
+    else
+        buffer_reset(*wb);
+}
 
-    if(free_all) {
+typedef enum {
+    WEB_CLIENT_ALLOCATIONS_FOR_NEXT_REQUEST,
+    WEB_CLIENT_ALLOCATIONS_FOR_CACHE,
+    WEB_CLIENT_ALLOCATIONS_FREE,
+} WEB_CLIENT_ALLOCATIONS_RESET_MODE;
+
+static void web_client_reset_allocations(struct web_client *w, WEB_CLIENT_ALLOCATIONS_RESET_MODE mode) {
+
+    if(mode == WEB_CLIENT_ALLOCATIONS_FREE) {
         // the web client is to be destroyed
 
         buffer_free(w->url_as_received);
         w->url_as_received = NULL;
+
+        buffer_free(w->url_for_logging);
+        w->url_for_logging = NULL;
 
         buffer_free(w->url_path_decoded);
         w->url_path_decoded = NULL;
@@ -140,18 +161,52 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
         w->payload = NULL;
     }
     else {
-        // the web client is to be re-used
+        // Oversized request-derived allocations should not remain attached to a keep-alive or cached client.
 
-        buffer_reset(w->url_as_received);
-        buffer_reset(w->url_path_decoded);
-        buffer_reset(w->url_query_string_decoded);
+        web_client_reset_or_recreate_buffer(&w->url_as_received,
+                                            NETDATA_WEB_DECODED_URL_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
+        web_client_reset_or_recreate_buffer(&w->url_for_logging,
+                                            NETDATA_WEB_DECODED_URL_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
+        web_client_reset_or_recreate_buffer(&w->url_path_decoded,
+                                            NETDATA_WEB_DECODED_URL_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
+        web_client_reset_or_recreate_buffer(&w->url_query_string_decoded,
+                                            NETDATA_WEB_DECODED_URL_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
 
-        buffer_reset(w->response.header_output);
-        buffer_reset(w->response.header);
-        buffer_reset(w->response.data);
+        web_client_reset_or_recreate_buffer(&w->response.header_output,
+                                            NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
+        web_client_reset_or_recreate_buffer(&w->response.header,
+                                            NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
+        if(mode == WEB_CLIENT_ALLOCATIONS_FOR_NEXT_REQUEST &&
+           w->response.data->len > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE) {
+            // Keep large-response capacity on an active keep-alive connection to avoid reallocating it every request.
+            buffer_reset(w->response.data);
+        }
+        else
+            web_client_reset_or_recreate_buffer(&w->response.data,
+                                                NETDATA_WEB_RESPONSE_INITIAL_SIZE,
+                                                NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                                w->statistics.memory_accounting);
 
-        if(w->payload)
-            buffer_reset(w->payload);
+        if(w->payload) {
+            if(w->payload->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE) {
+                buffer_free(w->payload);
+                w->payload = NULL;
+            }
+            else
+                buffer_reset(w->payload);
+        }
 
         // to add more items here,
         // web_client_reuse_from_cache() needs to be adjusted to maintain them
@@ -210,6 +265,10 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     web_client_reset_path_flags(w);
 }
 
+void web_client_reset_allocations_for_cache(struct web_client *w) {
+    web_client_reset_allocations(w, WEB_CLIENT_ALLOCATIONS_FOR_CACHE);
+}
+
 void web_client_log_completed_request(struct web_client *w, bool update_web_stats) {
     struct timeval tv;
     now_monotonic_high_precision_timeval(&tv);
@@ -220,14 +279,14 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
     usec_t prep_ut = w->timings.tv_ready.tv_sec ? dt_usec(&w->timings.tv_ready, &w->timings.tv_in) : 0;
     usec_t sent_ut = w->timings.tv_ready.tv_sec ? dt_usec(&tv, &w->timings.tv_ready) : 0;
     usec_t total_ut = dt_usec(&tv, &w->timings.tv_in);
-    strip_control_characters((char *)buffer_tostring(w->url_as_received));
+    strip_control_characters((char *)buffer_tostring(w->url_for_logging));
 
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
-            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_for_logging),
             ND_LOG_FIELD_U64(NDF_RESPONSE_CODE, w->response.code),
             ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_BYTES, sent),
             ND_LOG_FIELD_U64(NDF_RESPONSE_SIZE_BYTES, size),
@@ -260,7 +319,7 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
     }
 
     // access log
-    if(likely(buffer_strlen(w->url_as_received))) {
+    if(likely(buffer_strlen(w->url_for_logging))) {
         nd_log(NDLS_ACCESS, prio, NULL);
 
         if(update_web_stats)
@@ -269,13 +328,22 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
     }
 }
 
+static inline void web_client_request_parser_reset(struct web_client *w) {
+    w->header_parse_last_size = 0;
+    w->request_header_length = 0;
+    w->request_content_length = 0;
+    w->request_content_type = CT_TEXT_PLAIN;
+    w->request_content_length_valid = false;
+    w->request_too_large = false;
+}
+
 void web_client_request_done(struct web_client *w) {
     sock_setcork(w->fd, false);
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: Resetting client.", w->id);
 
     web_client_log_completed_request(w, true);
-    web_client_reset_allocations(w, false);
+    web_client_reset_allocations(w, WEB_CLIENT_ALLOCATIONS_FOR_NEXT_REQUEST);
 
     w->mode = HTTP_REQUEST_MODE_GET;
 
@@ -290,8 +358,8 @@ void web_client_request_done(struct web_client *w) {
     // request line, unsupported method).
     web_client_flag_clear(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
 
-    w->header_parse_tries = 0;
-    w->header_parse_last_size = 0;
+    web_client_request_parser_reset(w);
+    w->request_ingress_started_ut = 0;
 
     web_client_enable_wait_receive(w);
     web_client_disable_wait_send(w);
@@ -626,7 +694,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->user_auth.forwarded_for),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
-            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_for_logging),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->user_auth.cloud_account_id.uuid),
@@ -641,6 +709,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
         web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
         query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
                                        buffer_tostring(w->url_as_received),
+                                       buffer_strlen(w->url_as_received),
                                        w->payload,
                                        w->user_auth.forwarded_for[0] ? w->user_auth.forwarded_for : w->user_auth.client_ip);
     }
@@ -670,45 +739,55 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
 }
 
 
-/**
- * Valid Method
- *
- * Netdata accepts only three methods, including one of these three(STREAM) is an internal method.
- *
- * @param w is the structure with the client request
- * @param s is the start string to parse
- *
- * @return it returns the next address to parse case the method is valid and NULL otherwise.
- */
-static inline char *web_client_valid_method(struct web_client *w, char *s) {
-    // is is a valid request?
-    if(!strncmp(s, "GET ", 4)) {
-        s = &s[4];
-        w->mode = HTTP_REQUEST_MODE_GET;
-    }
-    else if(!strncmp(s, "OPTIONS ", 8)) {
-        s = &s[8];
-        w->mode = HTTP_REQUEST_MODE_OPTIONS;
-    }
-    else if(!strncmp(s, "POST ", 5)) {
-        s = &s[5];
-        w->mode = HTTP_REQUEST_MODE_POST;
-    }
-    else if(!strncmp(s, "PUT ", 4)) {
-        s = &s[4];
-        w->mode = HTTP_REQUEST_MODE_PUT;
-    }
-    else if(!strncmp(s, "DELETE ", 7)) {
-        s = &s[7];
-        w->mode = HTTP_REQUEST_MODE_DELETE;
-    }
-    else if(!strncmp(s, "STREAM ", 7)) {
-        s = &s[7];
+typedef struct web_client_http_method {
+    const char *text;
+    size_t length;
+    HTTP_REQUEST_MODE mode;
+} WEB_CLIENT_HTTP_METHOD;
 
+static const WEB_CLIENT_HTTP_METHOD web_client_http_methods[] = {
+    { "GET ",     4, HTTP_REQUEST_MODE_GET },
+    { "OPTIONS ", 8, HTTP_REQUEST_MODE_OPTIONS },
+    { "POST ",    5, HTTP_REQUEST_MODE_POST },
+    { "PUT ",     4, HTTP_REQUEST_MODE_PUT },
+    { "DELETE ",  7, HTTP_REQUEST_MODE_DELETE },
+    { "STREAM ",  7, HTTP_REQUEST_MODE_STREAM },
+};
+
+static inline void web_client_request_validation_end(struct web_client *w) {
+    web_client_request_parser_reset(w);
+    web_client_disable_wait_receive(w);
+}
+
+static inline char *web_client_valid_method(
+    struct web_client *w, char *s, size_t length, bool *incomplete)
+{
+    *incomplete = false;
+
+    const WEB_CLIENT_HTTP_METHOD *matched = NULL;
+    for(size_t i = 0; i < _countof(web_client_http_methods); i++) {
+        const WEB_CLIENT_HTTP_METHOD *method = &web_client_http_methods[i];
+        size_t comparable = MIN(length, method->length);
+        if(memcmp(s, method->text, comparable) != 0)
+            continue;
+
+        if(length < method->length) {
+            *incomplete = true;
+            continue;
+        }
+
+        matched = method;
+        s += method->length;
+        w->mode = method->mode;
+        break;
+    }
+
+    if(!matched)
+        return NULL;
+
+    if(matched->mode == HTTP_REQUEST_MODE_STREAM) {
         if (!SSL_connection(&w->ssl) && http_is_using_ssl_force(w)) {
-            w->header_parse_tries = 0;
-            w->header_parse_last_size = 0;
-            web_client_disable_wait_receive(w);
+            web_client_request_validation_end(w);
 
             char hostname[256];
             char *copyme = strstr(s,"hostname=");
@@ -716,9 +795,9 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
                 copyme += 9;
                 char *end = strchr(copyme,'&');
                 if(end){
-                    size_t length = MIN(255, end - copyme);
-                    memcpy(hostname,copyme,length);
-                    hostname[length] = 0X00;
+                    size_t hostname_length = MIN(255, end - copyme);
+                    memcpy(hostname, copyme, hostname_length);
+                    hostname[hostname_length] = 0X00;
                 }
                 else{
                     memcpy(hostname,"not available",13);
@@ -732,18 +811,239 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
             netdata_log_error("The server is configured to always use encrypted connections, please enable the SSL on child with hostname '%s'.",hostname);
             s = NULL;
         }
-
-        w->mode = HTTP_REQUEST_MODE_STREAM;
-    }
-    else {
-        s = NULL;
     }
 
     return s;
 }
 
+static const char *web_client_request_target_start(const char *request, size_t length) {
+    for(size_t i = 0; i < _countof(web_client_http_methods); i++) {
+        const WEB_CLIENT_HTTP_METHOD *method = &web_client_http_methods[i];
+        if(length >= method->length && !memcmp(request, method->text, method->length))
+            return request + method->length;
+    }
+
+    return NULL;
+}
+
+static size_t web_client_request_target_for_logging(const char *request, size_t length) {
+    const char *target = web_client_request_target_start(request, length);
+    if(!target)
+        return 0;
+
+    const char *request_end = request + length;
+    const char *request_line_end = memchr(target, '\r', (size_t)(request_end - target));
+    if(!request_line_end)
+        request_line_end = request_end;
+
+    const char *protocol = url_find_protocol((char *)target, request_line_end);
+    if(protocol < request_line_end && *protocol)
+        return (size_t)(protocol - target);
+
+    return (size_t)(request_line_end - target);
+}
+
+static size_t web_client_find_header_end(const char *request, size_t length, size_t previous_length) {
+    size_t start = MIN(length, previous_length);
+    start = start > 3 ? start - 3 : 0;
+
+    for(size_t i = start; i + 3 < length; i++) {
+        if(request[i] == '\r' && request[i + 1] == '\n' &&
+           request[i + 2] == '\r' && request[i + 3] == '\n')
+            return i + 4;
+    }
+
+    return 0;
+}
+
+static const char *web_client_find_header_value(
+    const char *request, size_t header_length, const char *name, size_t name_length, const char **value_end)
+{
+    const char *header_end = request + header_length;
+    const char *line = request;
+    bool request_line = true;
+
+    while(line + 1 < header_end) {
+        const char *line_end = line;
+        while(line_end + 1 < header_end && (line_end[0] != '\r' || line_end[1] != '\n'))
+            line_end++;
+        if(line_end + 1 >= header_end)
+            break;
+
+        if(!request_line && line_end == line)
+            break;
+
+        if(!request_line && (size_t)(line_end - line) >= name_length &&
+           strncasecmp(line, name, name_length) == 0) {
+            *value_end = line_end;
+            return line + name_length;
+        }
+
+        request_line = false;
+        line = line_end + 2;
+    }
+
+    return NULL;
+}
+
+static bool web_client_parse_content_length_field(
+    const char *value, const char *value_end, size_t *content_length, bool *content_length_found)
+{
+    while(value < value_end) {
+        while(value < value_end && (*value == ' ' || *value == '\t'))
+            value++;
+        if(value >= value_end || !isdigit((uint8_t)*value))
+            return false;
+
+        size_t parsed = 0;
+        while(value < value_end && isdigit((uint8_t)*value)) {
+            size_t digit = (size_t)(*value - '0');
+            if(parsed > (SIZE_MAX - digit) / 10)
+                return false;
+            parsed = parsed * 10 + digit;
+            value++;
+        }
+
+        while(value < value_end && (*value == ' ' || *value == '\t'))
+            value++;
+
+        if(*content_length_found && parsed != *content_length)
+            return false;
+
+        *content_length = parsed;
+        *content_length_found = true;
+
+        if(value == value_end)
+            return true;
+        if(*value != ',')
+            return false;
+
+        value++;
+    }
+
+    return false;
+}
+
+static HTTP_VALIDATION web_client_parse_content_metadata(struct web_client *w, const char *request) {
+    w->request_content_length_valid = false;
+    w->request_content_type = CT_TEXT_PLAIN;
+
+    const char content_length_header[] = "Content-Length:";
+    const char transfer_encoding_header[] = "Transfer-Encoding:";
+    const char *header_end = request + w->request_header_length;
+    const char *line = request;
+    bool request_line = true;
+    bool content_length_found = false;
+    bool transfer_encoding_found = false;
+    size_t content_length = 0;
+
+    while(line + 1 < header_end) {
+        const char *line_end = line;
+        while(line_end + 1 < header_end && (line_end[0] != '\r' || line_end[1] != '\n'))
+            line_end++;
+        if(line_end + 1 >= header_end || (!request_line && line_end == line))
+            break;
+
+        if(!request_line &&
+           (size_t)(line_end - line) >= sizeof(content_length_header) - 1 &&
+           strncasecmp(line, content_length_header, sizeof(content_length_header) - 1) == 0) {
+            const char *value = line + sizeof(content_length_header) - 1;
+            if(!web_client_parse_content_length_field(
+                   value, line_end, &content_length, &content_length_found))
+                return HTTP_VALIDATION_MALFORMED_REQUEST;
+        }
+        else if(!request_line &&
+                (size_t)(line_end - line) >= sizeof(transfer_encoding_header) - 1 &&
+                strncasecmp(line, transfer_encoding_header, sizeof(transfer_encoding_header) - 1) == 0)
+            transfer_encoding_found = true;
+
+        request_line = false;
+        line = line_end + 2;
+    }
+
+    if(transfer_encoding_found && content_length_found)
+        return HTTP_VALIDATION_MALFORMED_REQUEST;
+
+    if(!content_length_found)
+        return HTTP_VALIDATION_OK;
+
+    w->request_content_length = content_length;
+    w->request_content_length_valid = true;
+
+    const char content_type_header[] = "Content-Type:";
+    const char *value_end = NULL;
+    const char *ct = web_client_find_header_value(
+        request, w->request_header_length, content_type_header, sizeof(content_type_header) - 1, &value_end);
+    if(!ct)
+        return HTTP_VALIDATION_OK;
+
+    while(ct < value_end && isspace((uint8_t)*ct))
+        ct++;
+    const char *ct_end = ct;
+    while(ct_end < value_end && !isspace((uint8_t)*ct_end) && *ct_end != ';')
+        ct_end++;
+
+    size_t content_type_length = (size_t)(ct_end - ct);
+    if(!content_type_length)
+        return HTTP_VALIDATION_OK;
+
+    CLEAN_CHAR_P *content_type = mallocz(content_type_length + 1);
+    memcpy(content_type, ct, content_type_length);
+    content_type[content_type_length] = '\0';
+    w->request_content_type = content_type_string2id(content_type);
+    return HTTP_VALIDATION_OK;
+}
+
+static HTTP_VALIDATION web_client_request_complete_and_extract_payload(
+    struct web_client *w, const char *request, size_t length, size_t previous_length)
+{
+    if(!w->request_header_length) {
+        w->request_header_length = web_client_find_header_end(request, length, previous_length);
+        if(!w->request_header_length)
+            return HTTP_VALIDATION_INCOMPLETE;
+
+        if(w->mode == HTTP_REQUEST_MODE_POST || w->mode == HTTP_REQUEST_MODE_PUT) {
+            HTTP_VALIDATION validation = web_client_parse_content_metadata(w, request);
+            if(validation != HTTP_VALIDATION_OK)
+                return validation;
+        }
+    }
+
+    if(w->mode != HTTP_REQUEST_MODE_POST && w->mode != HTTP_REQUEST_MODE_PUT)
+        return HTTP_VALIDATION_OK;
+
+    if(!w->request_content_length_valid)
+        return HTTP_VALIDATION_INCOMPLETE;
+
+    size_t payload_length = length - w->request_header_length;
+    if(payload_length != w->request_content_length)
+        return HTTP_VALIDATION_INCOMPLETE;
+
+    if(!w->payload)
+        w->payload = buffer_create(payload_length + 1, NULL);
+
+    buffer_contents_replace(w->payload, &request[w->request_header_length], payload_length);
+    w->payload->content_type = w->request_content_type;
+    return HTTP_VALIDATION_OK;
+}
+
+static bool web_client_request_ingress_timed_out(struct web_client *w) {
+    usec_t now_ut = now_boottime_usec();
+    if(!w->request_ingress_started_ut)
+        w->request_ingress_started_ut = now_ut;
+
+    if(web_client_first_request_timeout <= 0)
+        return false;
+
+    usec_t timeout_ut = (usec_t)web_client_first_request_timeout * USEC_PER_SEC;
+    return now_ut - w->request_ingress_started_ut >= timeout_ut;
+}
+
 /**
  * Request validate
+ *
+ * Production callers must enforce web_client_request_size_validation() at their ingress boundary first.
+ * This parser intentionally accepts every request admitted by its caller.
  *
  * @param w is the structure with the client request
  *
@@ -753,50 +1053,36 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
 HTTP_VALIDATION http_request_validate(struct web_client *w) {
     char *request = (char *)buffer_tostring(w->response.data), *s = request, *encoded_url = NULL;
 
-    size_t last_pos = w->header_parse_last_size;
+    if(unlikely(web_client_request_ingress_timed_out(w))) {
+        web_client_request_validation_end(w);
+        return HTTP_VALIDATION_REQUEST_TIMEOUT;
+    }
 
-    w->header_parse_tries++;
-    w->header_parse_last_size = buffer_strlen(w->response.data);
-    char *request_end = request + w->header_parse_last_size;
+    size_t previous_length = w->header_parse_last_size;
+    size_t request_length = buffer_strlen(w->response.data);
+    w->header_parse_last_size = request_length;
+    char *request_end = request + request_length;
 
-    int is_it_valid;
-    if(w->header_parse_tries > 1) {
-        if(last_pos > 4) last_pos -= 4; // allow searching for \r\n\r\n
-        else last_pos = 0;
-
-        if(w->header_parse_last_size <= last_pos)
-            last_pos = 0;
-
-        is_it_valid = url_is_request_complete_and_extract_payload(s, &s[last_pos],
-                                                                  w->header_parse_last_size, &w->payload);
-
-        if(!is_it_valid) {
-            if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
-                netdata_log_info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
-                w->header_parse_tries = 0;
-                w->header_parse_last_size = 0;
-                web_client_disable_wait_receive(w);
-                return HTTP_VALIDATION_TOO_MANY_READ_RETRIES;
-            }
-
+    bool method_incomplete = false;
+    s = web_client_valid_method(w, s, (size_t)(request_end - s), &method_incomplete);
+    if (!s) {
+        if(method_incomplete && !web_client_find_header_end(request, request_length, previous_length)) {
+            web_client_enable_wait_receive(w);
             return HTTP_VALIDATION_INCOMPLETE;
         }
 
-        is_it_valid = 1;
-    } else {
-        last_pos = w->header_parse_last_size;
-        is_it_valid =
-            url_is_request_complete_and_extract_payload(s, &s[last_pos], w->header_parse_last_size, &w->payload);
+        web_client_request_validation_end(w);
+        return HTTP_VALIDATION_NOT_SUPPORTED;
     }
 
-    s = web_client_valid_method(w, s);
-    if (!s) {
-        w->header_parse_tries = 0;
-        w->header_parse_last_size = 0;
-        web_client_disable_wait_receive(w);
+    HTTP_VALIDATION completion =
+        web_client_request_complete_and_extract_payload(w, request, request_length, previous_length);
+    if(completion != HTTP_VALIDATION_OK) {
+        if(completion != HTTP_VALIDATION_INCOMPLETE) {
+            web_client_request_validation_end(w);
+            return completion;
+        }
 
-        return HTTP_VALIDATION_NOT_SUPPORTED;
-    } else if (!is_it_valid) {
         web_client_enable_wait_receive(w);
         return HTTP_VALIDATION_INCOMPLETE;
     }
@@ -819,6 +1105,7 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     // we have the end of encoded_url - remember it
     char *ue = s;
+    size_t encoded_url_length = (size_t)(ue - encoded_url);
 
     // make sure we have complete request
     // complete requests contain: \r\n\r\n
@@ -836,23 +1123,21 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
             if(unlikely(*s == '\r' && s[1] == '\n')) {
                 // a valid complete HTTP request found
 
-                char c = *ue;
-                *ue = '\0';
-                web_client_decode_path_and_query_string(w, encoded_url);
-                *ue = c;
+                HTTP_VALIDATION decode_status =
+                    web_client_decode_path_and_query_string(w, encoded_url, encoded_url_length);
+                if(unlikely(decode_status != HTTP_VALIDATION_OK)) {
+                    web_client_request_validation_end(w);
+                    return decode_status;
+                }
 
                 if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
                     if (!w->ssl.conn && (http_is_using_ssl_force(w) || http_is_using_ssl_default(w)) && (w->mode != HTTP_REQUEST_MODE_STREAM)) {
-                        w->header_parse_tries = 0;
-                        w->header_parse_last_size = 0;
-                        web_client_disable_wait_receive(w);
+                        web_client_request_validation_end(w);
                         return HTTP_VALIDATION_REDIRECT;
                     }
                 }
 
-                w->header_parse_tries = 0;
-                w->header_parse_last_size = 0;
-                web_client_disable_wait_receive(w);
+                web_client_request_validation_end(w);
                 return HTTP_VALIDATION_OK;
             }
 
@@ -864,6 +1149,22 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
     // incomplete request
     web_client_enable_wait_receive(w);
     return HTTP_VALIDATION_INCOMPLETE;
+}
+
+static inline void web_client_prepare_request_summary(struct web_client *w, const char *fallback) {
+    if(!buffer_strlen(w->url_for_logging)) {
+        const char *request = buffer_tostring(w->response.data);
+        size_t request_length = buffer_strlen(w->response.data);
+        const char *target = web_client_request_target_start(request, request_length);
+        size_t target_length = web_client_request_target_for_logging(request, request_length);
+
+        if(target && target_length)
+            buffer_content_summary(w->url_for_logging, target, target_length);
+        else
+            buffer_sprintf(w->url_for_logging, "%s (request_bytes=%zu)", fallback, request_length);
+    }
+
+    strip_control_characters((char *)buffer_tostring(w->url_for_logging));
 }
 
 static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,size_t len, int flags)
@@ -1210,7 +1511,7 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
 
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
-            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_for_logging),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->user_auth.cloud_account_id.uuid),
@@ -1413,7 +1714,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->user_auth.forwarded_for),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
-            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_for_logging),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->user_auth.cloud_account_id.uuid),
@@ -1431,12 +1732,21 @@ void web_client_process_request_from_web_server(struct web_client *w) {
     // start timing us
     web_client_timeout_checkpoint_init(w);
 
-    switch(http_request_validate(w)) {
+    HTTP_VALIDATION validation;
+    if(unlikely(w->request_too_large)) {
+        validation = HTTP_VALIDATION_REQUEST_TOO_LARGE;
+        web_client_request_validation_end(w);
+    }
+    else
+        validation = http_request_validate(w);
+
+    switch(validation) {
         case HTTP_VALIDATION_OK:
             if(!web_client_flag_check(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING)) {
                 web_client_flag_set(w, WEB_CLIENT_FLAG_PROGRESS_TRACKING);
                 query_progress_start_or_update(&w->transaction, 0, w->mode, w->acl,
                                                buffer_tostring(w->url_as_received),
+                                               buffer_strlen(w->url_as_received),
                                                w->payload,
                                                w->user_auth.forwarded_for[0] ? w->user_auth.forwarded_for : w->user_auth.client_ip);
             }
@@ -1561,26 +1871,27 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             break;
 
         case HTTP_VALIDATION_INCOMPLETE:
-            if(w->response.data->len > NETDATA_WEB_REQUEST_MAX_SIZE) {
-                buffer_flush(w->url_as_received);
-                buffer_strcat(w->url_as_received, "too big request");
+            // wait for more data
+            // set to normal to prevent web_server_rcv_callback
+            // from going into stream mode
+            if (w->mode == HTTP_REQUEST_MODE_STREAM || w->mode == HTTP_REQUEST_MODE_WEBSOCKET)
+                w->mode = HTTP_REQUEST_MODE_GET;
+            return;
 
-                netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zu bytes).", w->id, (size_t)w->response.data->len);
-
-                size_t len = w->response.data->len;
-                buffer_flush(w->response.data);
-                buffer_sprintf(w->response.data, "Received request is too big  (received %zu bytes, max is %zu bytes).\r\n", len, (size_t)NETDATA_WEB_REQUEST_MAX_SIZE);
-                w->response.code = HTTP_RESP_BAD_REQUEST;
-            }
-            else {
-                // wait for more data
-                // set to normal to prevent web_server_rcv_callback
-                // from going into stream mode
-                if (w->mode == HTTP_REQUEST_MODE_STREAM || w->mode == HTTP_REQUEST_MODE_WEBSOCKET)
-                    w->mode = HTTP_REQUEST_MODE_GET;
-                return;
-            }
+        case HTTP_VALIDATION_REQUEST_TOO_LARGE: {
+            size_t request_length = buffer_strlen(w->response.data);
+            web_client_prepare_request_summary(w, "request too large");
+            buffer_flush(w->url_as_received);
+            buffer_strcat(w->url_as_received, "request too large");
+            buffer_flush(w->response.data);
+            buffer_sprintf(w->response.data,
+                           "Request is too large (received at least %zu bytes, maximum is %zu bytes).\r\n",
+                           request_length,
+                           (size_t)NETDATA_WEB_REQUEST_MAX_SIZE);
+            w->response.code = http_validation_error_to_response_code(HTTP_VALIDATION_REQUEST_TOO_LARGE);
+            web_client_disable_keepalive(w);
             break;
+        }
 
         case HTTP_VALIDATION_REDIRECT:
         {
@@ -1599,21 +1910,41 @@ void web_client_process_request_from_web_server(struct web_client *w) {
         }
 
         case HTTP_VALIDATION_MALFORMED_URL:
-            netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Malformed URL '%s'.", w->id, w->response.data->buffer);
+            web_client_prepare_request_summary(w, "malformed request target");
+            netdata_log_debug(
+                D_WEB_CLIENT_ACCESS, "%llu: Malformed URL '%s'.", w->id, buffer_tostring(w->url_for_logging));
 
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "Malformed URL...\r\n");
-            w->response.code = HTTP_RESP_BAD_REQUEST;
+            w->response.code = http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_URL);
             break;
-        case HTTP_VALIDATION_TOO_MANY_READ_RETRIES:
-            netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Too many retries to read request '%s'.", w->id, w->response.data->buffer);
+        case HTTP_VALIDATION_MALFORMED_REQUEST:
+            web_client_prepare_request_summary(w, "malformed request framing");
+            buffer_flush(w->response.data);
+            buffer_strcat(w->response.data, "Malformed HTTP request framing.\r\n");
+            w->response.code = http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_REQUEST);
+            web_client_disable_keepalive(w);
+            break;
+        case HTTP_VALIDATION_REQUEST_TIMEOUT:
+            web_client_prepare_request_summary(w, "request timeout");
+            netdata_log_debug(
+                D_WEB_CLIENT_ACCESS,
+                "%llu: Timed out while receiving request '%s'.",
+                w->id,
+                buffer_tostring(w->url_for_logging));
 
             buffer_flush(w->response.data);
-            buffer_strcat(w->response.data, "Too many retries to read request.\r\n");
-            w->response.code = HTTP_RESP_BAD_REQUEST;
+            buffer_strcat(w->response.data, "Request timeout while receiving request.\r\n");
+            w->response.code = HTTP_RESP_REQUEST_TIMEOUT;
+            web_client_disable_keepalive(w);
             break;
         case HTTP_VALIDATION_NOT_SUPPORTED:
-            netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: HTTP method requested is not supported '%s'.", w->id, w->response.data->buffer);
+            web_client_prepare_request_summary(w, "unsupported request method");
+            netdata_log_debug(
+                D_WEB_CLIENT_ACCESS,
+                "%llu: HTTP method requested is not supported '%s'.",
+                w->id,
+                buffer_tostring(w->url_for_logging));
 
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "HTTP method requested is not supported...\r\n");
@@ -1958,25 +2289,34 @@ ssize_t web_client_send(struct web_client *w) {
 
 ssize_t web_client_receive(struct web_client *w) {
     ssize_t bytes;
+    size_t request_length = buffer_strlen(w->response.data);
+    if(unlikely(request_length >= NETDATA_WEB_REQUEST_MAX_SIZE + 1)) {
+        w->request_too_large = true;
+        return 0;
+    }
+
+    size_t boundary_bytes_left = NETDATA_WEB_REQUEST_MAX_SIZE + 1 - request_length;
+    size_t desired_free = MIN(boundary_bytes_left, (size_t)NETDATA_WEB_REQUEST_INITIAL_SIZE);
 
     // do we have any space for more data?
-    buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_INITIAL_SIZE);
+    buffer_need_bytes(w->response.data, desired_free);
 
     ssize_t left = (ssize_t)(w->response.data->size - w->response.data->len);
+    size_t bytes_to_read = MIN((size_t)(left - 1), boundary_bytes_left);
 
     errno_clear();
 
     if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
         if (SSL_connection(&w->ssl)) {
-            bytes = netdata_ssl_read(&w->ssl, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
+            bytes = netdata_ssl_read(&w->ssl, &w->response.data->buffer[w->response.data->len], bytes_to_read);
             web_client_enable_wait_from_ssl(w);
         }
         else {
-            bytes = recv(w->fd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+            bytes = recv(w->fd, &w->response.data->buffer[w->response.data->len], bytes_to_read, MSG_DONTWAIT);
         }
     }
     else if(web_client_check_conn_tcp(w) || web_client_check_conn_unix(w)) {
-        bytes = recv(w->fd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+        bytes = recv(w->fd, &w->response.data->buffer[w->response.data->len], bytes_to_read, MSG_DONTWAIT);
     }
     else // other connection methods
         bytes = -1;
@@ -1984,11 +2324,17 @@ ssize_t web_client_receive(struct web_client *w) {
     if(likely(bytes > 0)) {
         w->statistics.received_bytes += bytes;
 
+        if(unlikely(!w->request_ingress_started_ut && !buffer_strlen(w->response.data)))
+            w->request_ingress_started_ut = now_boottime_usec();
+
         size_t old = w->response.data->len;
         (void)old;
 
         w->response.data->len += bytes;
         w->response.data->buffer[w->response.data->len] = '\0';
+
+        if(unlikely(web_client_request_size_validation(w->response.data->len) != HTTP_VALIDATION_OK))
+            w->request_too_large = true;
 
         netdata_log_debug(D_WEB_CLIENT, "%llu: Received %zd bytes.", w->id, bytes);
         netdata_log_debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
@@ -2006,16 +2352,24 @@ ssize_t web_client_receive(struct web_client *w) {
     return(bytes);
 }
 
-void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string) {
-    char buffer[NETDATA_WEB_REQUEST_URL_SIZE + 2];
-    buffer[0] = '\0';
-
+// Production callers must enforce web_client_request_size_validation() before invoking this decoder.
+HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string, size_t length) {
     buffer_flush(w->url_path_decoded);
     buffer_flush(w->url_query_string_decoded);
 
-    if(buffer_strlen(w->url_as_received) == 0)
-        // do not overwrite this if it is already filled
-        buffer_strcat(w->url_as_received, path_and_query_string);
+    if(buffer_strlen(w->url_as_received) == 0) {
+        // Do not overwrite these if they are already filled.
+        buffer_contents_replace(w->url_as_received, path_and_query_string, length);
+        buffer_content_summary(w->url_for_logging, path_and_query_string, length);
+    }
+
+    CLEAN_CHAR_P *decoded = mallocz(length + 1);
+    size_t decoded_length = 0;
+    URL_DECODE_STATUS decode_status =
+        url_decode_r_len(decoded, length + 1, path_and_query_string, length, &decoded_length);
+
+    if(unlikely(decode_status != URL_DECODE_OK))
+        return HTTP_VALIDATION_MALFORMED_URL;
 
     // PATH_IS_MCP is a function of the URL alone; clear and re-derive on
     // every decode so keepalived connections reusing the same web_client
@@ -2024,11 +2378,7 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
 
     if(w->mode == HTTP_REQUEST_MODE_STREAM) {
         // in stream mode, there is no path
-
-        url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-
-        buffer[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
-        buffer_strcat(w->url_query_string_decoded, buffer);
+        buffer_contents_replace(w->url_query_string_decoded, decoded, decoded_length);
     }
     else {
         // in non-stream mode, there is a path
@@ -2037,18 +2387,13 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
         // dictionary and decode each of the parameters individually.
         // OR: in url_query_string_decoded use as separator a control character that cannot appear in the URL.
 
-        url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-
-        char *question_mark_start = strchr(buffer, '?');
+        char *question_mark_start = memchr(decoded, '?', decoded_length);
         if (question_mark_start) {
-            buffer_strcat(w->url_query_string_decoded, question_mark_start);
-            char c = *question_mark_start;
-            *question_mark_start = '\0';
-            buffer_strcat(w->url_path_decoded, buffer);
-            *question_mark_start = c;
+            size_t path_length = (size_t)(question_mark_start - decoded);
+            buffer_contents_replace(w->url_query_string_decoded, question_mark_start, decoded_length - path_length);
+            buffer_contents_replace(w->url_path_decoded, decoded, path_length);
         } else {
-            buffer_strcat(w->url_query_string_decoded, "");
-            buffer_strcat(w->url_path_decoded, buffer);
+            buffer_contents_replace(w->url_path_decoded, decoded, decoded_length);
         }
 
         // Classify path: set PATH_IS_MCP when the URL addresses one of
@@ -2065,12 +2410,14 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
            && (decoded_path_len == 4 || decoded_path[4] == '/'))
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
     }
+
+    return HTTP_VALIDATION_OK;
 }
 
 void web_client_reuse_from_cache(struct web_client *w) {
     // zero everything about it - but keep the buffers
 
-    web_client_reset_allocations(w, false);
+    web_client_reset_allocations_for_cache(w);
 
     // remember the pointers to the buffers
     BUFFER *b1 = w->response.data;
@@ -2080,6 +2427,7 @@ void web_client_reuse_from_cache(struct web_client *w) {
     BUFFER *b5 = w->url_as_received;
     BUFFER *b6 = w->url_query_string_decoded;
     BUFFER *b7 = w->payload;
+    BUFFER *b8 = w->url_for_logging;
 
     NETDATA_SSL ssl = w->ssl;
 
@@ -2103,6 +2451,7 @@ void web_client_reuse_from_cache(struct web_client *w) {
     w->url_as_received = b5;
     w->url_query_string_decoded = b6;
     w->payload = b7;
+    w->url_for_logging = b8;
 }
 
 struct web_client *web_client_create(size_t *statistics_memory_accounting) {
@@ -2114,6 +2463,7 @@ struct web_client *web_client_create(size_t *statistics_memory_accounting) {
     w->statistics.memory_accounting = statistics_memory_accounting;
 
     w->url_as_received = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
+    w->url_for_logging = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
     w->url_path_decoded = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
     w->url_query_string_decoded = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
     w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, w->statistics.memory_accounting);
@@ -2128,10 +2478,409 @@ struct web_client *web_client_create(size_t *statistics_memory_accounting) {
 void web_client_free(struct web_client *w) {
     netdata_ssl_close(&w->ssl);
 
-    web_client_reset_allocations(w, true);
+    web_client_reset_allocations(w, WEB_CLIENT_ALLOCATIONS_FREE);
 
     __atomic_sub_fetch(w->statistics.memory_accounting, sizeof(struct web_client), __ATOMIC_RELAXED);
     freez(w);
+}
+
+static void web_client_unittest_prepare_request(struct web_client *w, size_t request_length) {
+    static const char prefix[] = "GET ";
+    static const char suffix[] = " HTTP/1.1\r\n\r\n";
+    internal_fatal(
+        request_length < sizeof(prefix) - 1 + sizeof(suffix) - 1 + 1,
+        "WEB REQUEST unittest size is too small");
+
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, prefix);
+
+    size_t target_length = request_length - (sizeof(prefix) - 1) - (sizeof(suffix) - 1);
+    buffer_need_bytes(w->response.data, target_length + sizeof(suffix));
+    char *target = &w->response.data->buffer[w->response.data->len];
+    memset(target, 'a', target_length);
+    target[0] = '/';
+    w->response.data->len += target_length;
+    w->response.data->buffer[w->response.data->len] = '\0';
+    buffer_strcat(w->response.data, suffix);
+}
+
+int web_client_request_unittest(void) {
+    int errors = poll_events_unittest() + web_client_cache_unittest();
+    size_t memory_accounting = 0;
+    struct web_client *w = web_client_create(&memory_accounting);
+    w->fd = -1;
+
+    if(web_client_request_size_validation(NETDATA_WEB_REQUEST_MAX_SIZE - 1) != HTTP_VALIDATION_OK ||
+       web_client_request_size_validation(NETDATA_WEB_REQUEST_MAX_SIZE) != HTTP_VALIDATION_OK ||
+       web_client_request_size_validation(NETDATA_WEB_REQUEST_MAX_SIZE + 1) !=
+           HTTP_VALIDATION_REQUEST_TOO_LARGE ||
+       http_validation_error_to_response_code(HTTP_VALIDATION_REQUEST_TOO_LARGE) != HTTP_RESP_CONTENT_TOO_LARGE ||
+       strcmp(http_response_code2string(HTTP_RESP_CONTENT_TOO_LARGE), "Content Too Large") != 0 ||
+       http_validation_error_to_response_code(HTTP_VALIDATION_REQUEST_TIMEOUT) != HTTP_RESP_REQUEST_TIMEOUT ||
+       http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_REQUEST) != HTTP_RESP_BAD_REQUEST ||
+       http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_URL) != HTTP_RESP_BAD_REQUEST)
+        errors++;
+
+    web_client_unittest_prepare_request(w, NETDATA_WEB_REQUEST_MAX_SIZE);
+    if(http_request_validate(w) != HTTP_VALIDATION_OK ||
+       buffer_strlen(w->response.data) != NETDATA_WEB_REQUEST_MAX_SIZE ||
+       buffer_strlen(w->url_as_received) >= NETDATA_WEB_REQUEST_MAX_SIZE)
+        errors++;
+
+    // Boundary policy is intentionally absent from the parser and decoder.
+    web_client_reuse_from_cache(w);
+    web_client_unittest_prepare_request(w, NETDATA_WEB_REQUEST_MAX_SIZE + 1);
+    if(http_request_validate(w) != HTTP_VALIDATION_OK ||
+       buffer_strlen(w->response.data) != NETDATA_WEB_REQUEST_MAX_SIZE + 1)
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    static const char post_request[] =
+        "POST /api/v3/test HTTP/1.1\r\n"
+        "Content-Length: 13\r\n"
+        "Content-Type: application/json; charset=utf-8\r\n\r\n"
+        "payload-value";
+    static const char put_request[] =
+        "PUT /api/v3/test HTTP/1.1\r\n"
+        "Content-Length:13\r\n"
+        "Content-Type:application/json; charset=utf-8\r\n\r\n"
+        "payload-value";
+    static const struct {
+        const char *request;
+        size_t length;
+    } body_requests[] = {
+        { post_request, sizeof(post_request) - 1 },
+        { put_request, sizeof(put_request) - 1 },
+    };
+    for(size_t r = 0; r < _countof(body_requests); r++) {
+        for(size_t split = 1; split < body_requests[r].length; split++) {
+            web_client_reuse_from_cache(w);
+            buffer_strncat(w->response.data, body_requests[r].request, split);
+            if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE) {
+                errors++;
+                continue;
+            }
+
+            buffer_strncat(
+                w->response.data, &body_requests[r].request[split], body_requests[r].length - split);
+            if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->payload ||
+               buffer_strlen(w->payload) != 13 || strcmp(buffer_tostring(w->payload), "payload-value") ||
+               w->payload->content_type != CT_APPLICATION_JSON)
+                errors++;
+        }
+    }
+
+    web_client_reuse_from_cache(w);
+    for(size_t i = 0; i < sizeof(post_request) - 1; i++) {
+        buffer_strncat(w->response.data, &post_request[i], 1);
+        HTTP_VALIDATION expected =
+            i + 1 == sizeof(post_request) - 1 ? HTTP_VALIDATION_OK : HTTP_VALIDATION_INCOMPLETE;
+        if(http_request_validate(w) != expected) {
+            errors++;
+            break;
+        }
+    }
+    if(!w->payload || strcmp(buffer_tostring(w->payload), "payload-value"))
+        errors++;
+
+    // Once POST headers are complete, body fragments use only stored offsets and lengths.
+    web_client_reuse_from_cache(w);
+    static const char post_headers[] =
+        "POST /api HTTP/1.1\r\nContent-Length: 5\r\n\r\n";
+    buffer_strcat(w->response.data, post_headers);
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE ||
+       w->request_header_length != sizeof(post_headers) - 1 ||
+       !w->request_content_length_valid || w->request_content_length != 5 ||
+       w->request_content_type != CT_TEXT_PLAIN)
+        errors++;
+
+    for(size_t i = 0; i < sizeof("hello") - 1; i++) {
+        size_t header_length = w->request_header_length;
+        buffer_strncat(w->response.data, &"hello"[i], 1);
+        HTTP_VALIDATION expected = i + 1 == sizeof("hello") - 1 ? HTTP_VALIDATION_OK : HTTP_VALIDATION_INCOMPLETE;
+        if(http_request_validate(w) != expected ||
+           (expected == HTTP_VALIDATION_INCOMPLETE && w->request_header_length != header_length))
+            errors++;
+    }
+    if(!w->payload || strcmp(buffer_tostring(w->payload), "hello") ||
+       w->payload->content_type != CT_TEXT_PLAIN)
+        errors++;
+
+    // Header names must match at the beginning of an actual header line.
+    web_client_reuse_from_cache(w);
+    buffer_strcat(
+        w->response.data,
+        "POST /?Content-Length:%2099 HTTP/1.1\r\nX-Content-Length: 99\r\ncontent-length:0\r\n\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->payload || buffer_strlen(w->payload))
+        errors++;
+
+    static const char *equivalent_content_lengths[] = {
+        "POST / HTTP/1.1\r\nContent-Length: 5\r\nContent-Length: 005\r\n\r\nhello",
+        "POST / HTTP/1.1\r\nContent-Length: 5, 005, 5\r\n\r\nhello",
+        "POST / HTTP/1.1\r\nContent-Length: 5, 5\r\nContent-Length: 005\r\n\r\nhello",
+    };
+    for(size_t i = 0; i < _countof(equivalent_content_lengths); i++) {
+        web_client_reuse_from_cache(w);
+        buffer_strcat(w->response.data, equivalent_content_lengths[i]);
+        if(http_request_validate(w) != HTTP_VALIDATION_OK || !w->payload ||
+           strcmp(buffer_tostring(w->payload), "hello"))
+            errors++;
+    }
+
+    // Missing Content-Length preserves the existing incomplete-request behavior.
+    web_client_reuse_from_cache(w);
+    buffer_strcat(w->response.data, "POST / HTTP/1.1\r\n\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE ||
+       !w->request_header_length || w->request_content_length_valid)
+        errors++;
+    size_t missing_length_header = w->request_header_length;
+    buffer_strcat(w->response.data, "body");
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE ||
+       w->request_header_length != missing_length_header || w->request_content_length_valid)
+        errors++;
+
+    static const char *invalid_content_lengths[] = {
+        "POST / HTTP/1.1\r\nContent-Length: invalid\r\n\r\n",
+        "POST / HTTP/1.1\r\nContent-Length: -1\r\n\r\n",
+        "POST / HTTP/1.1\r\nContent-Length: 184467440737095516160\r\n\r\n",
+        "POST / HTTP/1.1\r\nContent-Length: 5,\r\n\r\n",
+        "POST / HTTP/1.1\r\nContent-Length: 5, 6\r\n\r\n",
+        "POST / HTTP/1.1\r\nContent-Length: 5\r\nContent-Length: 6\r\n\r\n",
+        "POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\nContent-Length: 5\r\n\r\n",
+    };
+    for(size_t i = 0; i < _countof(invalid_content_lengths); i++) {
+        web_client_reuse_from_cache(w);
+        buffer_strcat(w->response.data, invalid_content_lengths[i]);
+        if(http_request_validate(w) != HTTP_VALIDATION_MALFORMED_REQUEST ||
+           w->request_header_length || w->request_content_length_valid || web_client_has_wait_receive(w))
+            errors++;
+    }
+
+    // Transfer-Encoding-only requests remain unsupported and incomplete.
+    web_client_reuse_from_cache(w);
+    buffer_strcat(w->response.data, "POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE ||
+       !w->request_header_length || w->request_content_length_valid)
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    web_client_enable_keepalive(w);
+    buffer_strcat(
+        w->response.data,
+        "POST / HTTP/1.1\r\nContent-Length: 5\r\nContent-Length: 6\r\n\r\nhello");
+    web_client_process_request_from_web_server(w);
+    if(w->response.code != HTTP_RESP_BAD_REQUEST || web_client_has_keepalive(w) ||
+       !strstr(buffer_tostring(w->response.data), "Malformed HTTP request framing"))
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    buffer_strcat(w->response.data, "POST / HTTP/1.1\r\nContent-Length: 0\r\n\r\nx");
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE ||
+       !w->request_content_length_valid || w->request_content_length)
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    buffer_strcat(w->response.data, "PUT / HTTP/1.1\r\nContent-Length: 1048576\r\n\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE ||
+       !w->request_content_length_valid || w->request_content_length != NETDATA_WEB_REQUEST_MAX_SIZE)
+        errors++;
+
+    for(size_t m = 0; m < _countof(web_client_http_methods); m++) {
+        const WEB_CLIENT_HTTP_METHOD *method = &web_client_http_methods[m];
+        for(size_t split = 1; split < method->length; split++) {
+            web_client_reuse_from_cache(w);
+            buffer_strncat(w->response.data, method->text, split);
+            if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE || !web_client_has_wait_receive(w)) {
+                errors++;
+                continue;
+            }
+
+            buffer_strcat(w->response.data, &method->text[split]);
+            if(method->mode == HTTP_REQUEST_MODE_POST || method->mode == HTTP_REQUEST_MODE_PUT)
+                buffer_strcat(w->response.data, "/ HTTP/1.1\r\nContent-Length: 0\r\n\r\n");
+            else
+                buffer_strcat(w->response.data, "/ HTTP/1.1\r\n\r\n");
+
+            if(http_request_validate(w) != HTTP_VALIDATION_OK || web_client_has_wait_receive(w))
+                errors++;
+        }
+    }
+
+    web_client_reuse_from_cache(w);
+    buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_MAX_SIZE + 2);
+    memset(w->response.data->buffer, 'a', NETDATA_WEB_REQUEST_MAX_SIZE);
+    memcpy(w->response.data->buffer, "GET /", 5);
+    w->response.data->len = NETDATA_WEB_REQUEST_MAX_SIZE;
+    w->response.data->buffer[w->response.data->len] = '\0';
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE)
+        errors++;
+
+#ifndef OS_WINDOWS
+    int sockets[2];
+    int response_peer_fd = -1;
+    if(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) != 0)
+        errors++;
+    else {
+        w->fd = sockets[0];
+        response_peer_fd = sockets[1];
+        web_client_set_conn_unix(w);
+        if(send(sockets[1], "xy", 2, 0) != 2 || web_client_receive(w) != 1 ||
+           buffer_strlen(w->response.data) != NETDATA_WEB_REQUEST_MAX_SIZE + 1 || !w->request_too_large)
+            errors++;
+    }
+#else
+    buffer_strcat(w->response.data, "x");
+    w->request_too_large =
+        web_client_request_size_validation(buffer_strlen(w->response.data)) != HTTP_VALIDATION_OK;
+#endif
+
+    web_client_enable_keepalive(w);
+    web_client_process_request_from_web_server(w);
+    if(w->response.code != HTTP_RESP_CONTENT_TOO_LARGE ||
+       !strstr(buffer_tostring(w->response.data), "received at least 1048577 bytes") ||
+       w->request_too_large || web_client_has_wait_receive(w) || web_client_has_keepalive(w))
+        errors++;
+
+#ifndef OS_WINDOWS
+    if(response_peer_fd != -1) {
+        close(w->fd);
+        close(response_peer_fd);
+        w->fd = -1;
+    }
+#endif
+
+    web_client_reuse_from_cache(w);
+    int saved_ingress_timeout = web_client_first_request_timeout;
+    web_client_first_request_timeout = 1;
+    buffer_strcat(
+        w->response.data,
+        "GET /partial HTTP/1.1\r\nAuthorization: Bearer sentinel-auth-value\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE)
+        errors++;
+    w->request_ingress_started_ut -= 2 * USEC_PER_SEC;
+    web_client_enable_keepalive(w);
+    web_client_process_request_from_web_server(w);
+    if(w->response.code != HTTP_RESP_REQUEST_TIMEOUT || web_client_has_wait_receive(w) ||
+       web_client_has_keepalive(w) ||
+       !strstr(buffer_tostring(w->response.data), "Request timeout while receiving request"))
+        errors++;
+    if(!strstr(buffer_tostring(w->url_for_logging), "/partial") ||
+       strstr(buffer_tostring(w->url_for_logging), "sentinel-auth-value") ||
+       strstr(buffer_tostring(w->url_for_logging), "Authorization"))
+        errors++;
+    web_client_first_request_timeout = saved_ingress_timeout;
+
+    web_client_reuse_from_cache(w);
+    buffer_strcat(w->response.data, "GET /api?x=%GG HTTP/1.1\r\n\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_MALFORMED_URL || web_client_has_wait_receive(w))
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    buffer_strcat(
+        w->response.data,
+        "BOGUS / HTTP/1.1\r\nAuthorization: Bearer sentinel-auth-value\r\n"
+        "Cookie: session=sentinel-cookie-value\r\n\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_NOT_SUPPORTED ||
+       web_client_has_wait_receive(w))
+        errors++;
+    web_client_prepare_request_summary(w, "unsupported request method");
+    if(!strstr(buffer_tostring(w->url_for_logging), "unsupported request method") ||
+       strstr(buffer_tostring(w->url_for_logging), "sentinel-auth-value") ||
+       strstr(buffer_tostring(w->url_for_logging), "sentinel-cookie-value") ||
+       strstr(buffer_tostring(w->url_for_logging), "Authorization") ||
+       strstr(buffer_tostring(w->url_for_logging), "Cookie"))
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    buffer_strcat(
+        w->response.data,
+        "POST /safe-target HTTP/1.1\r\nAuthorization: Bearer sentinel-auth-value\r\n"
+        "Content-Length: 19\r\n\r\nsentinel-body-value");
+    web_client_prepare_request_summary(w, "request too large");
+    if(!strstr(buffer_tostring(w->url_for_logging), "/safe-target") ||
+       strstr(buffer_tostring(w->url_for_logging), "sentinel-auth-value") ||
+       strstr(buffer_tostring(w->url_for_logging), "sentinel-body-value") ||
+       strstr(buffer_tostring(w->url_for_logging), "Authorization"))
+        errors++;
+
+    w->header_parse_last_size = 11;
+    w->request_header_length = 22;
+    w->request_content_length = 33;
+    w->request_content_type = CT_APPLICATION_JSON;
+    w->request_content_length_valid = true;
+    w->request_too_large = true;
+    w->request_ingress_started_ut = 44;
+    w->fd = -1;
+    web_client_request_done(w);
+    if(w->header_parse_last_size || w->request_header_length || w->request_content_length ||
+       w->request_content_type != CT_TEXT_PLAIN || w->request_content_length_valid ||
+       w->request_too_large || w->request_ingress_started_ut)
+        errors++;
+    buffer_strcat(w->response.data, "GET /after-post HTTP/1.1\r\n\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_OK || w->mode != HTTP_REQUEST_MODE_GET ||
+       strcmp(buffer_tostring(w->url_path_decoded), "/after-post"))
+        errors++;
+
+    w->header_parse_last_size = 11;
+    w->request_header_length = 22;
+    w->request_content_length = 33;
+    w->request_content_type = CT_APPLICATION_JSON;
+    w->request_content_length_valid = true;
+    w->request_too_large = true;
+    w->request_ingress_started_ut = 44;
+    web_client_reuse_from_cache(w);
+    if(w->header_parse_last_size || w->request_header_length || w->request_content_length ||
+       w->request_content_type != CT_NONE || w->request_content_length_valid ||
+       w->request_too_large || w->request_ingress_started_ut)
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    if(web_client_decode_path_and_query_string(w, "/api?x=1", 8) != HTTP_VALIDATION_OK ||
+       strcmp(buffer_tostring(w->url_path_decoded), "/api") != 0 ||
+       strcmp(buffer_tostring(w->url_query_string_decoded), "?x=1") != 0)
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    if(web_client_decode_path_and_query_string(w, "/api?x=%GG", 10) != HTTP_VALIDATION_MALFORMED_URL)
+        errors++;
+
+    // Active keep-alive clients reuse large response capacity, but request-inflated capacity is released.
+    web_client_reuse_from_cache(w);
+    buffer_need_bytes(w->url_as_received, NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1);
+    buffer_need_bytes(w->response.data, NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1);
+    BUFFER *large_response_buffer = w->response.data;
+    size_t large_response_size = w->response.data->size;
+    if(large_response_size <= NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE)
+        errors++;
+    memset(w->response.data->buffer, 'x', NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1);
+    w->response.data->len = NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE + 1;
+    w->response.data->buffer[w->response.data->len] = '\0';
+    web_client_request_done(w);
+    if(w->response.data != large_response_buffer || w->response.data->size != large_response_size ||
+       buffer_strlen(w->response.data) ||
+       w->url_as_received->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE)
+        errors++;
+
+    // A later small response no longer justifies keeping the oversized capacity on the connection.
+    buffer_strcat(w->response.data, "ok");
+    web_client_request_done(w);
+    if(w->response.data->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE || buffer_strlen(w->response.data))
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    const char embedded_nul[] = { '/', 'a', 'p', 'i', '\0', 'x' };
+    if(web_client_decode_path_and_query_string(w, embedded_nul, sizeof(embedded_nul)) !=
+       HTTP_VALIDATION_MALFORMED_URL)
+        errors++;
+
+    web_client_free(w);
+    if(memory_accounting)
+        errors++;
+
+    if(errors)
+        fprintf(stderr, "WEB REQUEST: %d test(s) failed\n", errors);
+
+    return errors;
 }
 
 inline void web_client_timeout_checkpoint_init(struct web_client *w) {

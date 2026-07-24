@@ -74,8 +74,10 @@ Run this before `git push`. If it returns 0 findings, the Codacy gate on the PR 
 
 Operational gotcha: when the Dockerized Codacy CLI fails before a tool can emit
 results, the output file may have a `.json` suffix but contain tool-runner logs
-instead of JSON. Always verify with `jq empty <dump>` before treating a local
-dump as finding evidence. If GitHub check-run annotations are empty too, use
+instead of JSON. `analyze-local.sh` currently preserves that diagnostic output,
+prints the dump path, and can return zero even though the tool failed. Always
+verify with `jq empty <dump>` before treating a local dump or the wrapper exit
+status as finding evidence. If GitHub check-run annotations are empty too, use
 `pr-issues.sh` with `CODACY_TOKEN`; without that token, record the evidence gap
 and re-check after the next push.
 

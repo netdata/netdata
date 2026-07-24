@@ -519,8 +519,10 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     };
     
     // Prepare a query target request
+    ONEWAYALLOC *owa = onewayalloc_create(0);
     QUERY_TARGET_REQUEST qtr = {
         .version = 3,
+        .owa = owa,
         .scope_nodes = buffer_tostring(nodes_buffer),       // Use nodes as scope_nodes
         .scope_contexts = context,  // Use the single context as scope_contexts
         .scope_instances = buffer_tostring(instances_buffer), // Use instances as scope_instances for MCP
@@ -568,14 +570,12 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     QUERY_TARGET *qt = query_target_create(&qtr);
     if (!qt) {
         buffer_sprintf(mcpc->error, "Failed to prepare the query.");
+        onewayalloc_destroy(owa);
         return MCP_RC_INTERNAL_ERROR;
     }
 
     // Create a temporary buffer for the query result
     CLEAN_BUFFER *tmp_buffer = buffer_create(0, NULL);
-    
-    // Prepare onewayalloc for query execution
-    ONEWAYALLOC *owa = onewayalloc_create(0);
     
     // Execute the query and get the data
     time_t latest_timestamp = 0;

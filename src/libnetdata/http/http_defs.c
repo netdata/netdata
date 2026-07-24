@@ -95,7 +95,7 @@ const char *http_response_code2string(int code) {
         case 412:
             return "Precondition Failed";
         case 413:
-            return "Payload Too Large";
+            return "Content Too Large";
         case 414:
             return "URI Too Long";
         case 415:

@@ -2,7 +2,7 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Netdata API",
-    "description": "Real-time performance and health monitoring.\n\n## API Versions\n\nNetdata provides three API versions:\n- **v1**: The original API, focused on single-node operations\n- **v2**: Multi-node API with advanced grouping and aggregation capabilities\n- **v3**: The latest API version that combines v1 and v2 endpoints and may include additional features\n\n### v3 API Endpoints\n\nThe v3 API provides the current, actively maintained endpoints:\n- `/api/v3/data` - Multi-dimensional data queries\n- `/api/v3/weights` - Metric scoring/correlation\n- `/api/v3/contexts` - Context metadata\n- `/api/v3/nodes` - Node information\n- `/api/v3/q` - Full-text search\n- `/api/v3/alerts` - Alert information\n- `/api/v3/alert_transitions` - Alert state transitions\n- `/api/v3/alert_config` - Alert configuration\n- `/api/v3/functions` - Available functions\n- `/api/v3/function` - Execute functions\n- `/api/v3/info` - Agent information\n- `/api/v3/node_instances` - Node instance information\n- `/api/v3/stream_path` - Streaming topology\n- `/api/v3/versions` - Version information\n- `/api/v3/badge.svg` - Dynamic badges\n- `/api/v3/allmetrics` - Export metrics\n- `/api/v3/context` - Single context info\n- `/api/v3/variable` - Variable information\n- `/api/v3/config` - Dynamic configuration\n- `/api/v3/settings` - Agent settings\n- `/api/v3/me` - Current user information\n- `/api/v3/claim` - Agent claiming\n- Additional management and streaming endpoints\n\n**Note:** V1 and V2 APIs are deprecated and maintained for backwards compatibility only. New integrations should use V3 exclusively.\n",
+    "description": "Real-time performance and health monitoring.\n\n## API Versions\n\nNetdata provides three API versions:\n- **v1**: The original API, focused on single-node operations\n- **v2**: Multi-node API with advanced grouping and aggregation capabilities\n- **v3**: The latest API version that combines v1 and v2 endpoints and may include additional features\n\n### v3 API Endpoints\n\nThe v3 API provides the current, actively maintained endpoints:\n- `/api/v3/data` - Multi-dimensional data queries\n- `/api/v3/weights` - Metric scoring/correlation\n- `/api/v3/contexts` - Context metadata\n- `/api/v3/nodes` - Node information\n- `/api/v3/q` - Full-text search\n- `/api/v3/alerts` - Alert information\n- `/api/v3/alert_transitions` - Alert state transitions\n- `/api/v3/alert_config` - Alert configuration\n- `/api/v3/functions` - Available functions\n- `/api/v3/function` - Execute functions\n- `/api/v3/info` - Agent information\n- `/api/v3/node_instances` - Node instance information\n- `/api/v3/stream_path` - Streaming topology\n- `/api/v3/versions` - Version information\n- `/api/v3/badge.svg` - Dynamic badges\n- `/api/v3/allmetrics` - Export metrics\n- `/api/v3/context` - Single context info\n- `/api/v3/variable` - Variable information\n- `/api/v3/config` - Dynamic configuration\n- `/api/v3/settings` - Agent settings\n- `/api/v3/me` - Current user information\n- `/api/v3/claim` - Agent claiming\n- Additional management and streaming endpoints\n\n### Agent Request Limit\n\nThe Agent accepts a complete encoded HTTP request of up to 1,048,576 bytes, including the request line, headers, and body. It returns HTTP `413 Content Too Large` for a larger request. Intermediaries may enforce lower limits before the request reaches the Agent.\n\n**Note:** V1 and V2 APIs are deprecated and maintained for backwards compatibility only. New integrations should use V3 exclusively.\n",
     "version": "v1-rolling",
     "contact": {
       "name": "Netdata Agent API",
@@ -2220,7 +2220,7 @@
           {
             "name": "filter",
             "in": "query",
-            "description": "Simple pattern filter to include only specific charts. Uses Netdata simple pattern matching.\n\n**Pattern Syntax:**\n- Exact match: `system.cpu`\n- Wildcard: `system.*` (all system charts)\n- Multiple patterns: `system.* disk.*` (space-separated)\n- Negation: `!system.cpu` (exclude specific chart)\n\nWhen not specified, all charts are exported.\n\n**Examples:**\n- `system.*` - Export only system charts\n- `disk.* net.*` - Export disk and network charts\n- `* !*.mdstat` - Export all except mdstat charts\n",
+            "description": "Simple pattern filter to include only specific charts. Uses Netdata simple pattern matching.\n\n**Pattern Syntax:**\n- Exact match: `system.cpu`\n- Wildcard: `system.*` (all system charts)\n- Multiple patterns: `system.* disk.*` (space-separated)\n- Negation: `!system.cpu` (exclude specific chart)\n\nWhen not specified, all charts are exported.\n\n**Examples:**\n- `system.*` - Export only system charts\n- `disk.* net.*` - Export disk and network charts\n- `!*.mdstat *` - Export all except mdstat charts\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -2412,7 +2412,7 @@
           {
             "name": "alert",
             "in": "query",
-            "description": "Filter alerts by alert name pattern. Uses Netdata simple pattern matching.\n\n**Pattern Syntax:**\n- Exact match: `cpu_usage`\n- Wildcard: `cpu_*` (all CPU-related alerts)\n- Multiple patterns: `cpu_* ram_*` (space-separated)\n- Negation: `!cpu_usage` (all except this alert)\n\n**Common Alert Names:**\n- `ram_in_use` - RAM utilization\n- `disk_space_usage` - Disk space\n- `10min_cpu_usage` - CPU usage over 10 minutes\n- `tcp_listen_overflows` - TCP connection queue overflows\n- `disk_backlog` - Disk I/O backlog\n\nWhen not specified, all alerts are included.\n\n**Examples:**\n- `alert=ram_in_use` - Only RAM usage alert\n- `alert=*cpu*` - All CPU-related alerts\n- `alert=* !*_critical` - All alerts except those ending with _critical\n",
+            "description": "Filter alerts by alert name pattern. Uses Netdata simple pattern matching.\n\n**Pattern Syntax:**\n- Exact match: `cpu_usage`\n- Wildcard: `cpu_*` (all CPU-related alerts)\n- Multiple patterns: `cpu_*|ram_*` (pipe-separated)\n- Negation: `!cpu_usage` (all except this alert)\n\n**Common Alert Names:**\n- `ram_in_use` - RAM utilization\n- `disk_space_usage` - Disk space\n- `10min_cpu_usage` - CPU usage over 10 minutes\n- `tcp_listen_overflows` - TCP connection queue overflows\n- `disk_backlog` - Disk I/O backlog\n\nWhen not specified, all alerts are included.\n\n**Examples:**\n- `alert=ram_in_use` - Only RAM usage alert\n- `alert=*cpu*` - All CPU-related alerts\n- `alert=!*_critical|*` - All alerts except those ending with _critical\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -2539,7 +2539,7 @@
           {
             "name": "scope_nodes",
             "in": "query",
-            "description": "Filter transitions to only include specific nodes using simple pattern matching.\n\nThis parameter defines which nodes to include in the search using Netdata's simple pattern syntax (not regex).\n\n**Pattern Syntax:**\n- `*` matches any number of characters (including none)\n- `node1 node2` space-separated list matches any of the nodes\n- `!node3` exclude specific nodes (prefix with !)\n- Can combine inclusion and exclusion: `web* !web-test*`\n\n**Examples:**\n- `scope_nodes=web*` - All nodes starting with \"web\"\n- `scope_nodes=web* db*` - All web and database nodes\n- `scope_nodes=* !test*` - All nodes except test nodes\n- `scope_nodes=prod-web-01` - Specific node only\n\n**Use Cases:**\n- Focus on specific node groups (production vs staging)\n- Exclude test/development nodes from analysis\n- Investigate issues on specific infrastructure tiers\n\nWhen not specified, transitions from all nodes are included.\n",
+            "description": "Filter transitions to only include specific nodes using simple pattern matching.\n\nMatching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.\nA node requires a positive match, and a negative match on any identity vetoes it even if another\nidentity matches positively.\n\nThis parameter defines which nodes to include in the search using Netdata's simple pattern syntax (not regex).\n\n**Pattern Syntax:**\n- `*` matches any number of characters (including none)\n- `node1|node2` pipe-separated list matches any of the nodes\n- `!node3` exclude specific nodes (prefix with !)\n- Put exclusions first when combining rules: `!web-test*|web*`\n\n**Examples:**\n- `scope_nodes=web*` - All nodes starting with \"web\"\n- `scope_nodes=web*|db*` - All web and database nodes\n- `scope_nodes=!test*|*` - All nodes except test nodes\n- `scope_nodes=prod-web-01` - Specific node only\n\n**Use Cases:**\n- Focus on specific node groups (production vs staging)\n- Exclude test/development nodes from analysis\n- Investigate issues on specific infrastructure tiers\n\nWhen not specified, transitions from all nodes are included.\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -2550,7 +2550,7 @@
                 "summary": "All web servers"
               },
               "prod_only": {
-                "value": "* !test* !dev*",
+                "value": "!test*|!dev*|*",
                 "summary": "Production nodes only"
               }
             }
@@ -2558,7 +2558,7 @@
           {
             "name": "nodes",
             "in": "query",
-            "description": "Filter transitions to specific nodes by their exact names.\n\nUnlike `scope_nodes` which supports patterns, this parameter requires exact node names. Multiple nodes are separated by comma or pipe.\n\n**Format:** Comma or pipe-separated list of exact node names\n\n**Examples:**\n- `nodes=web-server-01` - Single specific node\n- `nodes=web-server-01,web-server-02,db-server-01` - Multiple specific nodes\n- `nodes=web-server-01|web-server-02` - Pipe separator also works\n\n**Difference from scope_nodes:**\n- `scope_nodes`: Pattern matching, filters at query time\n- `nodes`: Exact names, more efficient for known node names\n\n**Best Practice:** Use `nodes` when you know exact node names, use `scope_nodes` for pattern-based filtering.\n\nWhen not specified, transitions from all nodes matching scope_nodes (or all nodes if scope_nodes is also not specified) are included.\n",
+            "description": "Filter transitions to specific nodes using the same simple-pattern syntax as `scope_nodes`. Literal lists use fast exact lookup; wildcard rules are also supported. Multiple rules are separated by comma or pipe.\n\nMatching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.\nA node requires a positive match, and a negative match on any identity vetoes it even if another\nidentity matches positively.\n\n**Examples:**\n- `nodes=web-server-01` - Single specific node\n- `nodes=web-server-01,web-server-02,db-server-01` - Multiple specific nodes\n- `nodes=web-server-01|web-server-02` - Pipe separator also works\n\n`scope_nodes` defines the nodes in scope. `nodes` then selects the queryable subset from that scope.\n\nWhen not specified, transitions from all nodes matching scope_nodes (or all nodes if scope_nodes is also not specified) are included.\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -2568,7 +2568,7 @@
           {
             "name": "scope_contexts",
             "in": "query",
-            "description": "Filter transitions to only include alerts from specific metric contexts using pattern matching.\n\nContexts group similar metrics across instances (e.g., `system.cpu` groups CPU metrics from all nodes, `disk.io` groups disk I/O from all disks).\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- `context1 context2` space-separated list matches any of the contexts\n- `!context3` exclude specific contexts\n- Can combine: `system.* !system.io*`\n\n**Common Context Patterns:**\n- `system.*` - All system-level metrics\n- `disk.*` - All disk-related metrics\n- `net.*` - All network-related metrics\n- `mysql.*` - All MySQL metrics\n- `nginx.*` - All Nginx metrics\n\n**Examples:**\n- `scope_contexts=system.cpu` - Only CPU alerts\n- `scope_contexts=disk.* net.*` - All disk and network alerts\n- `scope_contexts=* !system.ip*` - All contexts except IP-related\n\n**Use Cases:**\n- Focus on specific subsystem (e.g., storage, network)\n- Exclude noisy alert types\n- Component-specific incident investigation\n\nWhen not specified, transitions from all contexts are included.\n",
+            "description": "Filter transitions to only include alerts from specific metric contexts using pattern matching.\n\nContexts group similar metrics across instances (e.g., `system.cpu` groups CPU metrics from all nodes, `disk.io` groups disk I/O from all disks).\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- `context1|context2` pipe-separated list matches any of the contexts\n- `!context3` exclude specific contexts\n- Put exclusions first when combining rules: `!system.io*|system.*`\n\n**Common Context Patterns:**\n- `system.*` - All system-level metrics\n- `disk.*` - All disk-related metrics\n- `net.*` - All network-related metrics\n- `mysql.*` - All MySQL metrics\n- `nginx.*` - All Nginx metrics\n\n**Examples:**\n- `scope_contexts=system.cpu` - Only CPU alerts\n- `scope_contexts=disk.*|net.*` - All disk and network alerts\n- `scope_contexts=!system.ip*|*` - All contexts except IP-related\n\n**Use Cases:**\n- Focus on specific subsystem (e.g., storage, network)\n- Exclude noisy alert types\n- Component-specific incident investigation\n\nWhen not specified, transitions from all contexts are included.\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -2579,7 +2579,7 @@
                 "summary": "All disk-related alerts"
               },
               "critical_systems": {
-                "value": "system.* disk.* net.*",
+                "value": "system.*|disk.*|net.*",
                 "summary": "System, disk, and network alerts"
               }
             }
@@ -2947,7 +2947,7 @@
           {
             "name": "scope_nodes",
             "in": "query",
-            "description": "Filter to specific nodes using simple pattern matching.\n\n**Pattern Syntax:**\n- `*` matches any characters\n- Space-separated list for multiple patterns\n- `!` prefix to exclude\n- Combine with: `web* !web-test*`\n\n**Examples:**\n- `scope_nodes=web*` - All web servers\n- `scope_nodes=prod-*` - All production nodes\n- `scope_nodes=* !test*` - All except test nodes\n\n**Use Cases:**\n- Focus on specific infrastructure tiers\n- Exclude development/test environments\n- Group by naming conventions\n\nWhen not specified, returns info for all nodes.\n",
+            "description": "Filter to specific nodes using simple pattern matching.\n\nMatching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.\nA node requires a positive match, and a negative match on any identity vetoes it even if another\nidentity matches positively.\n\n**Pattern Syntax:**\n- `*` matches any characters\n- Comma or pipe-separated list for multiple patterns\n- `!` prefix to exclude\n- Put exclusions first: `!web-test*|web*`\n\n**Examples:**\n- `scope_nodes=web*` - All web servers\n- `scope_nodes=prod-*` - All production nodes\n- `scope_nodes=!test*|*` - All except test nodes\n\n**Use Cases:**\n- Focus on specific infrastructure tiers\n- Exclude development/test environments\n- Group by naming conventions\n\nWhen not specified, returns info for all nodes.\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -2957,7 +2957,7 @@
           {
             "name": "nodes",
             "in": "query",
-            "description": "Filter to specific nodes by exact names.\n\nUnlike `scope_nodes`, this requires exact node names (no patterns).\n\n**Format:** Comma or pipe-separated list\n\n**Examples:**\n- `nodes=web-server-01` - Single node\n- `nodes=web-server-01,db-server-01` - Multiple nodes\n- `nodes=web-01|web-02` - Pipe separator\n\n**Best Practice:**\n- Use `nodes` when you know exact names\n- Use `scope_nodes` for pattern-based filtering\n\nWhen not specified, returns info for all nodes matching scope_nodes.\n",
+            "description": "Filter to specific nodes using the same simple-pattern syntax as `scope_nodes`.\n\nMatching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.\nA node requires a positive match, and a negative match on any identity vetoes it even if another\nidentity matches positively.\n\n**Format:** Comma or pipe-separated rules\n\n**Examples:**\n- `nodes=web-server-01` - Single node\n- `nodes=web-server-01,db-server-01` - Multiple nodes\n- `nodes=web-01|web-02` - Pipe separator\n\n`scope_nodes` defines the scope; `nodes` selects the queryable subset.\n\nWhen not specified, returns info for all nodes matching scope_nodes.\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -3043,7 +3043,7 @@
           {
             "name": "scope_nodes",
             "in": "query",
-            "description": "Filter to specific nodes using pattern matching.\n\n**Pattern Syntax:**\n- `*` matches any characters\n- Space-separated for multiple patterns\n- `!` prefix excludes\n- Example: `prod-* !prod-test*`\n\n**Examples:**\n- `scope_nodes=web*` - All web servers\n- `scope_nodes=db-* cache-*` - Database and cache nodes\n- `scope_nodes=* !test*` - All except test nodes\n\nWhen not specified, returns instances from all nodes.\n",
+            "description": "Filter to specific nodes using pattern matching.\n\nMatching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.\nA node requires a positive match, and a negative match on any identity vetoes it even if another\nidentity matches positively.\n\n**Pattern Syntax:**\n- `*` matches any characters\n- Comma or pipe-separated for multiple patterns\n- `!` prefix excludes\n- Example: `!prod-test*|prod-*`\n\n**Examples:**\n- `scope_nodes=web*` - All web servers\n- `scope_nodes=db-*|cache-*` - Database and cache nodes\n- `scope_nodes=!test*|*` - All except test nodes\n\nWhen not specified, returns instances from all nodes.\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -3053,7 +3053,7 @@
           {
             "name": "nodes",
             "in": "query",
-            "description": "Filter to specific nodes by exact names.\n\n**Format:** Comma or pipe-separated exact names\n\n**Examples:**\n- `nodes=web-server-01` - Single node\n- `nodes=web-01,db-01` - Multiple nodes\n\n**Best Practice:** Use `nodes` for exact names, `scope_nodes` for patterns.\n\nWhen not specified, returns instances from all nodes.\n",
+            "description": "Filter to specific nodes using simple-pattern rules.\n\nMatching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.\nA node requires a positive match, and a negative match on any identity vetoes it even if another\nidentity matches positively.\n\n**Format:** Comma or pipe-separated rules\n\n**Examples:**\n- `nodes=web-server-01` - Single node\n- `nodes=web-01,db-01` - Multiple nodes\n\n`scope_nodes` defines the scope; `nodes` selects the queryable subset.\n\nWhen not specified, returns instances from all nodes.\n",
             "required": false,
             "schema": {
               "type": "string"
@@ -3140,7 +3140,7 @@
             "name": "scope_nodes",
             "in": "query",
             "required": false,
-            "description": "Simple pattern to match node hostnames for scope filtering. Uses Netdata's simple pattern\nmatching (not regex). Matched nodes define the scope for topology analysis.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `|` to separate multiple patterns (OR logic)\n- Matches are case-insensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-web-*` - All web server nodes\n- `db-*|cache-*` - All database or cache nodes\n- `*` - All nodes (default)\n",
+            "description": "Case-sensitive simple pattern matched independently against each node's hostname, machine GUID,\nand node ID. Matched nodes define the scope for topology analysis. A positive match is required;\na negative match on any identity vetoes the node even if another identity matches positively.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `,` or `|` to separate multiple patterns\n- Put exclusions before a broad positive fallback, for example `!test*|*`\n- Matches are case-sensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-web-*` - All web server nodes\n- `db-*|cache-*` - All database or cache nodes\n- `*` - All nodes (default)\n",
             "schema": {
               "type": "string",
               "default": "*"
@@ -3151,7 +3151,7 @@
             "name": "nodes",
             "in": "query",
             "required": false,
-            "description": "Simple pattern to filter which nodes to include in the streaming path response.\nAfter scope is determined, this filters the results. Uses the same pattern syntax as scope_nodes.\n\n**Difference from scope_nodes:**\n- `scope_nodes` defines what nodes to analyze for relationships\n- `nodes` filters which nodes to include in the output\n\n**Examples:**\n- `web-*` - Only show web server nodes in output\n- `parent-*` - Only show parent nodes\n- Specific hostnames: `node1|node2|node3`\n",
+            "description": "Simple pattern to filter which nodes to include in the streaming path response.\nAfter scope is determined, this filters the results. Uses the same pattern syntax as scope_nodes.\n\nMatching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.\nA node requires a positive match, and a negative match on any identity vetoes it even if another\nidentity matches positively.\n\n**Difference from scope_nodes:**\n- `scope_nodes` defines what nodes to analyze for relationships\n- `nodes` filters which nodes to include in the output\n\n**Examples:**\n- `web-*` - Only show web server nodes in output\n- `parent-*` - Only show parent nodes\n- Specific hostnames: `node1|node2|node3`\n",
             "schema": {
               "type": "string",
               "default": "*"
@@ -3277,7 +3277,7 @@
             "name": "scope_nodes",
             "in": "query",
             "required": false,
-            "description": "Simple pattern to match node hostnames for scope filtering. Uses Netdata's simple pattern\nmatching (not regex). Matched nodes define the scope for version information retrieval.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `|` to separate multiple patterns (OR logic)\n- Matches are case-insensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-db-*` - All database nodes\n- `web-*|app-*` - All web or application nodes\n- `*` - All nodes (default)\n",
+            "description": "Case-sensitive simple pattern matched independently against each node's hostname, machine GUID,\nand node ID. Matched nodes define the scope for version information retrieval. A positive match is\nrequired; a negative match on any identity vetoes the node even if another identity matches positively.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `,` or `|` to separate multiple patterns\n- Put exclusions before a broad positive fallback, for example `!test*|*`\n- Matches are case-sensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-db-*` - All database nodes\n- `web-*|app-*` - All web or application nodes\n- `*` - All nodes (default)\n",
             "schema": {
               "type": "string",
               "default": "*"
@@ -3288,7 +3288,7 @@
             "name": "nodes",
             "in": "query",
             "required": false,
-            "description": "Simple pattern to filter which nodes to include in the version information response.\nAfter scope is determined, this filters the results. Uses the same pattern syntax as scope_nodes.\n\n**Difference from scope_nodes:**\n- `scope_nodes` defines what nodes to analyze\n- `nodes` filters which nodes appear in the output\n\n**Examples:**\n- `old-*` - Only show nodes matching \"old-*\" pattern\n- Specific hostnames: `node1|node2|node3`\n",
+            "description": "Simple pattern to filter which nodes to include in the version information response.\nAfter scope is determined, this filters the results. Uses the same pattern syntax as scope_nodes.\n\nMatching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.\nA node requires a positive match, and a negative match on any identity vetoes it even if another\nidentity matches positively.\n\n**Difference from scope_nodes:**\n- `scope_nodes` defines what nodes to analyze\n- `nodes` filters which nodes appear in the output\n\n**Examples:**\n- `old-*` - Only show nodes matching \"old-*\" pattern\n- Specific hostnames: `node1|node2|node3`\n",
             "schema": {
               "type": "string",
               "default": "*"
@@ -3762,7 +3762,7 @@
             "name": "scope_nodes",
             "in": "query",
             "required": false,
-            "description": "Simple pattern to match node hostnames for scope filtering. Uses Netdata's simple pattern\nmatching (not regex). Matched nodes define the scope for function discovery.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `|` to separate multiple patterns (OR logic)\n- Matches are case-insensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-web-*` - All web server nodes\n- `db-*|cache-*` - All database or cache nodes\n- `*` - All nodes (default)\n",
+            "description": "Case-sensitive simple pattern matched independently against each node's hostname, machine GUID,\nand node ID. Matched nodes define the scope for function discovery. A positive match is required;\na negative match on any identity vetoes the node even if another identity matches positively.\n\n**Pattern Syntax:**\n- `*` matches any number of characters\n- Use `,` or `|` to separate multiple patterns\n- Put exclusions before a broad positive fallback, for example `!test*|*`\n- Matches are case-sensitive\n- No regex support - only simple wildcards\n\n**Examples:**\n- `prod-*` - All production nodes\n- `*-web-*` - All web server nodes\n- `db-*|cache-*` - All database or cache nodes\n- `*` - All nodes (default)\n",
             "schema": {
               "type": "string",
               "default": "*"
@@ -3773,7 +3773,7 @@
             "name": "nodes",
             "in": "query",
             "required": false,
-            "description": "Simple pattern to filter which nodes to include in the functions list.\nAfter scope is determined, this filters the results. Uses the same pattern syntax as scope_nodes.\n\n**Difference from scope_nodes:**\n- `scope_nodes` defines what nodes to query for functions\n- `nodes` filters which nodes appear in the output\n\n**Examples:**\n- `web-*` - Only show functions from web servers\n- Specific hostnames: `node1|node2|node3`\n",
+            "description": "Simple pattern to filter which nodes to include in the functions list.\nAfter scope is determined, this filters the results. Uses the same pattern syntax as scope_nodes.\n\nMatching is case-sensitive and checks each node's hostname, machine GUID, and node ID independently.\nA node requires a positive match, and a negative match on any identity vetoes it even if another\nidentity matches positively.\n\n**Difference from scope_nodes:**\n- `scope_nodes` defines what nodes to query for functions\n- `nodes` filters which nodes appear in the output\n\n**Examples:**\n- `web-*` - Only show functions from web servers\n- Specific hostnames: `node1|node2|node3`\n",
             "schema": {
               "type": "string",
               "default": "*"
@@ -4176,7 +4176,7 @@
           "settings"
         ],
         "summary": "Retrieve user settings/preferences (GET)",
-        "description": "**V3 SPECIFIC ENDPOINT**\n\nRetrieves stored user settings and preferences from Netdata's settings storage.\nThe settings API provides persistent key-value storage for UI preferences, dashboard layouts,\nalert configurations, and other user-specific data.\n\n**Settings System:**\n- **Persistent storage**: Settings survive agent restarts\n- **Version-controlled**: Each update increments version for conflict detection\n- **User-scoped**: Authenticated users can have multiple named settings files\n- **Anonymous access**: Limited to 'default' file only\n- **JSON format**: All settings stored as JSON with mandatory 'version' field\n\n**File-Based Storage:**\nSettings are stored as individual files in Netdata's var/lib directory:\n- Anonymous users: Only `file=default` allowed\n- Authenticated users: Can create custom files (e.g., `file=my-dashboard`)\n- File names: Alphanumeric, dashes, underscores only\n\n**Version Control:**\nEach settings object has a `version` field:\n- Starts at version 1 for new files\n- Auto-incremented on each PUT operation\n- Used for optimistic locking to prevent conflicts\n\n**Use Cases:**\n- **Dashboard preferences**: Store layout, theme, selected metrics\n- **Alert customization**: Save user-specific alert thresholds\n- **UI state**: Remember filters, time ranges, node selections\n- **Multi-device sync**: Share settings across browsers/devices (for authenticated users)\n\n**Common Usage Patterns:**\n\n1. **Get default settings (anonymous user):**\n   ```\n   GET /api/v3/settings?file=default\n   ```\n\n2. **Get named settings file (authenticated):**\n   ```\n   GET /api/v3/settings?file=production-dashboard\n   ```\n\n**Response Structure:**\n```json\n{\n  \"version\": 3,\n  \"theme\": \"dark\",\n  \"defaultTimeRange\": \"-3600\",\n  \"favoriteMetrics\": [\"system.cpu\", \"system.ram\"]\n}\n```\n\n**New Files:**\nIf requested file doesn't exist, returns initial version:\n```json\n{\n  \"version\": 1\n}\n```\n\n**Size Limit:**\nMaximum settings file size: 20 MiB\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
+        "description": "**V3 SPECIFIC ENDPOINT**\n\nRetrieves stored user settings and preferences from Netdata's settings storage.\nThe settings API provides persistent key-value storage for UI preferences, dashboard layouts,\nalert configurations, and other user-specific data.\n\n**Settings System:**\n- **Persistent storage**: Settings survive agent restarts\n- **Version-controlled**: Each update increments version for conflict detection\n- **User-scoped**: Authenticated users can have multiple named settings files\n- **Anonymous access**: Limited to 'default' file only\n- **JSON format**: All settings stored as JSON with mandatory 'version' field\n\n**File-Based Storage:**\nSettings are stored as individual files in Netdata's var/lib directory:\n- Anonymous users: Only `file=default` allowed\n- Authenticated users: Can create custom files (e.g., `file=my-dashboard`)\n- File names: Alphanumeric, dashes, underscores only\n\n**Version Control:**\nEach settings object has a `version` field:\n- Starts at version 1 for new files\n- Auto-incremented on each PUT operation\n- Used for optimistic locking to prevent conflicts\n\n**Use Cases:**\n- **Dashboard preferences**: Store layout, theme, selected metrics\n- **Alert customization**: Save user-specific alert thresholds\n- **UI state**: Remember filters, time ranges, node selections\n- **Multi-device sync**: Share settings across browsers/devices (for authenticated users)\n\n**Common Usage Patterns:**\n\n1. **Get default settings (anonymous user):**\n   ```\n   GET /api/v3/settings?file=default\n   ```\n\n2. **Get named settings file (authenticated):**\n   ```\n   GET /api/v3/settings?file=production-dashboard\n   ```\n\n**Response Structure:**\n```json\n{\n  \"version\": 3,\n  \"theme\": \"dark\",\n  \"defaultTimeRange\": \"-3600\",\n  \"favoriteMetrics\": [\"system.cpu\", \"system.ram\"]\n}\n```\n\n**New Files:**\nIf requested file doesn't exist, returns initial version:\n```json\n{\n  \"version\": 1\n}\n```\n\n**Size Limit:**\nStored settings files have a 20 MiB read ceiling.\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
         "security": [
           {},
           {
@@ -4257,7 +4257,7 @@
           "settings"
         ],
         "summary": "Create or update user settings/preferences (PUT)",
-        "description": "**V3 SPECIFIC ENDPOINT**\n\nCreates or updates user settings with optimistic locking to prevent concurrent modification conflicts.\n\n**Update Process:**\n1. Client GET current settings (to get current version)\n2. Client modifies settings locally\n3. Client PUT updated settings WITH ORIGINAL VERSION\n4. Netdata validates version matches current file\n5. If match: Update succeeds, version auto-incremented\n6. If mismatch: Returns 409 Conflict\n\n**Conflict Resolution (409 Response):**\nWhen you receive 409 Conflict:\n1. Another client updated the file\n2. GET the file again to retrieve latest version\n3. Reapply your changes to the new version\n4. PUT again with the new version number\n\n**Optimistic Locking Flow:**\n```javascript\n// 1. Get current settings\nconst response = await fetch('/api/v3/settings?file=my-dashboard');\nconst settings = await response.json(); // { version: 3, ... }\n\n// 2. Modify settings\nsettings.theme = 'dark';\n\n// 3. PUT with ORIGINAL version (still 3)\nconst result = await fetch('/api/v3/settings?file=my-dashboard', {\n  method: 'PUT',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify(settings) // version: 3\n});\n\nif (result.status === 409) {\n  // Conflict! File was updated by another client\n  // Must GET again and retry\n}\n// If successful, file now has version: 4\n```\n\n**Payload Requirements:**\n- MUST be valid JSON\n- MUST include `version` field with current file version\n- MAY include any additional fields\n- Maximum size: 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large\n\n**Version Management:**\n- Client provides current version in payload\n- Netdata verifies version matches file on disk\n- Netdata increments version before saving\n- Saved file has version + 1\n\n**Use Cases:**\n- Save dashboard configuration changes\n- Update user preferences\n- Store UI state\n- Persist alert customizations\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
+        "description": "**V3 SPECIFIC ENDPOINT**\n\nCreates or updates user settings with optimistic locking to prevent concurrent modification conflicts.\n\n**Update Process:**\n1. Client GET current settings (to get current version)\n2. Client modifies settings locally\n3. Client PUT updated settings WITH ORIGINAL VERSION\n4. Netdata validates version matches current file\n5. If match: Update succeeds, version auto-incremented\n6. If mismatch: Returns 409 Conflict\n\n**Conflict Resolution (409 Response):**\nWhen you receive 409 Conflict:\n1. Another client updated the file\n2. GET the file again to retrieve latest version\n3. Reapply your changes to the new version\n4. PUT again with the new version number\n\n**Optimistic Locking Flow:**\n```javascript\n// 1. Get current settings\nconst response = await fetch('/api/v3/settings?file=my-dashboard');\nconst settings = await response.json(); // { version: 3, ... }\n\n// 2. Modify settings\nsettings.theme = 'dark';\n\n// 3. PUT with ORIGINAL version (still 3)\nconst result = await fetch('/api/v3/settings?file=my-dashboard', {\n  method: 'PUT',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify(settings) // version: 3\n});\n\nif (result.status === 409) {\n  // Conflict! File was updated by another client\n  // Must GET again and retry\n}\n// If successful, file now has version: 4\n```\n\n**Payload Requirements:**\n- MUST be valid JSON\n- MUST include `version` field with current file version\n- MAY include any additional fields\n- The complete encoded request, including the request line, headers, and JSON body, MUST fit within 1,048,576 bytes\n- The maximum JSON body size is therefore smaller and varies with the request line and headers\n- Larger complete requests return 413 Content Too Large before the settings handler runs\n\n**Version Management:**\n- Client provides current version in payload\n- Netdata verifies version matches file on disk\n- Netdata increments version before saving\n- Saved file has version + 1\n\n**Use Cases:**\n- Save dashboard configuration changes\n- Update user preferences\n- Store UI state\n- Persist alert customizations\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
         "security": [
           {},
           {
@@ -4279,7 +4279,7 @@
           }
         ],
         "requestBody": {
-          "description": "JSON object containing settings data with mandatory `version` field.\n\n**Required Fields:**\n- `version`: Integer matching current file version (or 0 for non-existent files)\n\n**Optional Fields:**\n- Any user-defined fields\n\n**Size Limit:**\nMaximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large\n\n**Version Rules:**\n- New file: version can be 0 or 1\n- Existing file: version MUST match current file version exactly\n- Mismatch causes 409 Conflict\n",
+          "description": "JSON object containing settings data with mandatory `version` field.\n\n**Required Fields:**\n- `version`: Integer matching current file version (or 0 for non-existent files)\n\n**Optional Fields:**\n- Any user-defined fields\n\n**Size Limit:**\nThe complete encoded request, including the request line, headers, and JSON body,\nmust fit within 1,048,576 bytes. The maximum JSON body size is therefore smaller\nand varies with the request line and headers. Larger complete requests return\n413 Content Too Large before the settings handler runs.\n\n**Version Rules:**\n- New file: version can be 0 or 1\n- Existing file: version MUST match current file version exactly\n- Mismatch causes 409 Conflict\n",
           "required": true,
           "content": {
             "application/json": {
@@ -4357,7 +4357,7 @@
             }
           },
           "413": {
-            "description": "Payload too large. The PUT payload exceeds the 20 MiB (20,971,520-byte) maximum."
+            "description": "The complete encoded request exceeds the 1,048,576-byte Agent request limit."
           },
           "500": {
             "description": "Internal server error during settings update."
@@ -4516,10 +4516,10 @@
                         "reconnects": 2,
                         "bytes_sent": 524288000,
                         "bytes_compressed": 104857600,
-                        "compression_ratio": 5,
+                        "compression_ratio": 5.0,
                         "buffer_used_bytes": 1048576,
                         "buffer_max_bytes": 10485760,
-                        "buffer_used_percentage": 10,
+                        "buffer_used_percentage": 10.0,
                         "drops": 0
                       },
                       "protocol_version": 3
@@ -4894,8 +4894,8 @@
               "enum": [
                 "on",
                 "off",
-                true,
-                false,
+                "true",
+                "false",
                 "yes",
                 "no"
               ]
@@ -5878,8 +5878,8 @@
               "enum": [
                 "on",
                 "off",
-                true,
-                false,
+                "true",
+                "false",
                 "yes",
                 "no"
               ]
@@ -6972,7 +6972,7 @@
       "scopeNodes": {
         "name": "scope_nodes",
         "in": "query",
-        "description": "A simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked against the nodes' machine guid, node id and hostname. The default nodes scope is all nodes for which this Agent has data for. Usually the nodes scope is used to slice the entire dashboard (e.g. the Global Nodes Selector at the Netdata Cloud overview dashboard). Both positive and negative simple pattern expressions are supported.\n",
+        "description": "A case-sensitive simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked independently against each node's machine GUID, node ID, and hostname. A node requires a positive match, and a negative match on any of its identities vetoes it even if another identity matches positively. The default nodes scope is all nodes for which this Agent has data. Put exclusions before a broad positive fallback because simple-pattern rules use first-match order for each identity, for example `!test*|*`. Both positive and negative expressions are supported.\n",
         "required": false,
         "schema": {
           "type": "string",
@@ -7027,7 +7027,7 @@
       "filterNodes": {
         "name": "nodes",
         "in": "query",
-        "description": "A simple pattern matching the nodes to be queried. This only controls the data response, not the metadata. The simple pattern is checked against the nodes' machine guid, node id, hostname. The default nodes selector is all the nodes matched by the nodes scope. Both positive and negative simple pattern expressions are supported.\n",
+        "description": "A case-sensitive simple pattern matching the nodes to be queried. This only controls the data response, not the metadata. The pattern is checked independently against each node's machine GUID, node ID, and hostname. A node requires a positive match, and a negative match on any identity vetoes it even if another identity matches positively. The default selector is all nodes matched by the nodes scope. Both positive and negative expressions are supported.\n",
         "required": false,
         "schema": {
           "type": "string",
@@ -8446,6 +8446,24 @@
               "before": {
                 "description": "The newest unix epoch timestamp of the data returned in the `result`.\n",
                 "type": "integer"
+              },
+              "cardinality": {
+                "description": "Present only when the query's `cardinality_limit` (or `limit`) folded dimensions into the `remaining` aggregate.\nAggregators merging limited responses from many agents use `cut` to prove whether their merged top-N is exact: a dimension this agent did not return contributes at most `cut`, so when the N-th ranked merged candidate exceeds the sum of all agents' cuts, no hidden dimension can outrank it.\n",
+                "type": "object",
+                "required": [
+                  "folded",
+                  "cut"
+                ],
+                "properties": {
+                  "folded": {
+                    "description": "The number of dimensions folded into the `remaining` aggregate.",
+                    "type": "integer"
+                  },
+                  "cut": {
+                    "description": "The largest folded absolute sum contribution - the ranking cut.",
+                    "type": "number"
+                  }
+                }
               },
               "partial_data_trimming": {
                 "description": "Information related to trimming of the last few points of the `result`, that was required to remove (increasing) partial data.\nFinal trimming is disabled when the `raw` option is given to the query, but this metadata is still available for raw responses.\nThis object is available when the `debug` or `raw` flag is set.\n",

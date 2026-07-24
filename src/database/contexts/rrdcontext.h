@@ -262,6 +262,7 @@ struct group_by_pass {
 
 typedef struct query_target_request {
     size_t version;
+    ONEWAYALLOC *owa;                    // required caller-owned arena, valid through query_target_release()
 
     const char *scope_nodes;
     const char *scope_contexts;
@@ -694,7 +695,8 @@ typedef ssize_t (*foreach_host_cb_t)(void *data, RRDHOST *host, bool queryable);
 ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
                                   foreach_host_cb_t cb, void *data,
                                   struct query_versions *versions,
-                                  char *host_node_id_str);
+                                  char *host_node_id_str,
+                                  ONEWAYALLOC *owa);
 
 typedef ssize_t (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
 ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data);
@@ -787,4 +789,3 @@ int32_t rrdcontext_queue_entries(RRDCONTEXT_QUEUE_JudyLSet *queue);
 #include "rrdcontext-context-registry.h"
 
 #endif // NETDATA_RRDCONTEXT_H
-

@@ -90,7 +90,8 @@ struct pattern_array *pattern_array_add_key_simple_pattern(struct pattern_array 
     return pa;
 }
 
-struct pattern_array *pattern_array_add_simple_pattern(struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep)
+struct pattern_array *pattern_array_add_simple_pattern(
+    struct pattern_array *pa, SIMPLE_PATTERN *pattern, char sep, ONEWAYALLOC *owa)
 {
     if (unlikely(!pattern))
         return pa;
@@ -109,7 +110,7 @@ struct pattern_array *pattern_array_add_simple_pattern(struct pattern_array *pa,
         strncpyz(key, label_key, RRDLABELS_MAX_NAME_LENGTH);
         *key_sep = sep;
 
-        pattern_array_add_lblkey_with_sp(pa, key, string_to_simple_pattern(label_key));
+        pattern_array_add_lblkey_with_sp(pa, key, string_to_simple_pattern_owa(owa, label_key));
     }
     return pa;
 }
@@ -155,4 +156,3 @@ void pattern_array_free(struct pattern_array *pa)
     JudyLFreeArray(&(pa->JudyL), PJE0);
     freez(pa);
 }
-
