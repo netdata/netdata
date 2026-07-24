@@ -45,11 +45,16 @@ To prepare a VM template:
 
 VMs cloned from templates can be configured as **ephemeral** (no alerts on disconnect, auto-cleanup after 24h — auto-scaling instances, spot VMs, short-lived workloads) or **permanent** (alerts trigger on disconnect, no automatic cleanup — the node stays visible until manually removed or its metrics fully rotate out via retention — long-running production systems).
 
-To make cloned VMs ephemeral by default, add to `/etc/netdata/netdata.conf` **in the template**:
+Set this **in the template** before conversion, in `/etc/netdata/netdata.conf`:
 
 ```ini
+# Ephemeral (auto-scaling, spot instances)
 [global]
 is ephemeral node = yes
+
+# Permanent (default - production systems)
+[global]
+is ephemeral node = no
 ```
 
 See [Node Ephemerality](/docs/nodes-ephemerality.md) for full documentation, cleanup rules, and alerting details.
