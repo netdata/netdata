@@ -1,0 +1,36 @@
+# receivers:
+#   prometheus:
+#     config:
+#       scrape_configs:
+#         - job_name: "my-application"
+#           scrape_interval: 10s
+#           static_configs:
+#             - targets: ["localhost:9090"]
+
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "node-exporter"
+          scrape_interval: 10s
+          static_configs:
+            - targets: ["localhost:9100"]
+        - job_name: "my-app"
+          scrape_interval: 10s
+          static_configs:
+            - targets: ["localhost:9090"]
+          metrics_path: "/metrics"
+
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [prometheus]
+      exporters: [otlp]
+
