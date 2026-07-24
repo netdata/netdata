@@ -216,6 +216,8 @@ int log_stack_unittest(void);
 int clocks_unittest(void);
 int ws_client_unittest(void);
 int mqtt_ng_unittest(void);
+int https_client_timeout_unittest(void);
+int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
 int pluginsd_parser_unittest(void);
@@ -487,6 +489,8 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_windows_virt_resolution()) return 1;
                             if (unit_test_windows_container()) return 1;
 #endif
+                            if (https_client_timeout_unittest()) return 1;
+                            if (mqtt_wss_client_timeout_unittest()) return 1;
 
                             // No call to load the config file on this code-path
                             if (unittest_prepare_rrd(&user)) return 1;
@@ -614,6 +618,11 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mqttngtest") == 0) {
                             unittest_running = true;
                             return mqtt_ng_unittest();
+                        }
+                        else if(strcmp(optarg, "aclktimeouttest") == 0) {
+                            unittest_running = true;
+                            if (https_client_timeout_unittest()) return 1;
+                            return mqtt_wss_client_timeout_unittest();
                         }
                         else if(strcmp(optarg, "test_cmd_pool_fifo") == 0) {
                             unittest_running = true;
