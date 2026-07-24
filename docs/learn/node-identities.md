@@ -23,7 +23,7 @@ Every Netdata Agent has a **Machine GUID** - a UUID that uniquely identifies thi
 | Property          | Value                                                                                  |
 |-------------------|----------------------------------------------------------------------------------------|
 | **File (Linux)**  | `/var/lib/netdata/registry/netdata.public.unique.id`                                   |
-| **File (Windows)**| `C:\Program Files\Netdata\var\lib\netdata\registry\netdata.public.unique.id`            |
+| **File (Windows)**| `C:\Program Files\Netdata\var\lib\netdata\registry\netdata.public.unique.id`           |
 | **Format**        | UUID (e.g., `a1b2c3d4-e5f6-7890-abcd-ef1234567890`)                                    |
 | **Generated**     | On first start, if missing                                                             |
 | **Persistence**   | Permanent - never changes once created                                                 |

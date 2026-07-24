@@ -135,7 +135,7 @@ sudo rm -rf /var/cache/netdata/dbengine*
 
 #### Windows (PowerShell)
 
-Paths assume the default Windows install location (`C:\Program Files\Netdata`).
+Run in an elevated (Administrator) PowerShell session — paths assume the default Windows install location (`C:\Program Files\Netdata`). Deleting a file you don't have permission for fails silently under `-ErrorAction SilentlyContinue`, so a non-elevated session can leave identity files in place with no error shown.
 
 ```powershell
 # Machine GUID (Agent Self Identity)
@@ -156,10 +156,18 @@ Remove-Item "C:\Program Files\Netdata\var\cache\netdata\dbengine*" -Recurse -For
 
 ### 3. Configure Auto-Claiming (Optional)
 
-To have clones automatically claim to Netdata Cloud on first boot, ensure `/etc/netdata/claim.conf` exists:
+To have clones automatically claim to Netdata Cloud on first boot, ensure `claim.conf` exists.
+
+#### Linux
 
 ```bash
 cat /etc/netdata/claim.conf
+```
+
+#### Windows (PowerShell)
+
+```powershell
+Get-Content "C:\Program Files\Netdata\etc\netdata\claim.conf"
 ```
 
 Should contain:
@@ -245,7 +253,7 @@ Solution: Delete **all** status file locations, not just the primary GUID file. 
 Cause: Either clones share the same [Machine GUID](/docs/learn/node-identities.md#agent-self-identity) (only one can connect at a time), or `stream.conf` wasn't configured in the template.
 
 Solution:
-- Verify each clone has a unique GUID: `cat /var/lib/netdata/registry/netdata.public.unique.id`
+- Verify each clone has a unique GUID: `cat /var/lib/netdata/registry/netdata.public.unique.id` (Linux) or `Get-Content "C:\Program Files\Netdata\var\lib\netdata\registry\netdata.public.unique.id"` (Windows PowerShell)
 - Verify `stream.conf` exists and has the correct Parent destination and API key
 - If GUIDs are duplicated, run the cleanup on each clone (loses metrics)
 
@@ -306,7 +314,7 @@ sudo systemctl start netdata
 
 #### Windows (PowerShell)
 
-Run the following in an elevated PowerShell session on each affected clone. Paths assume the default Windows install location (`C:\Program Files\Netdata`).
+Run the following in an elevated PowerShell session on each affected clone.
 
 ```powershell
 # On each affected clone
