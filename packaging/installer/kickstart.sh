@@ -1223,20 +1223,11 @@ handle_existing_install() {
         return 0
       elif [ "${INSTALL_TYPE}" = "unknown" ]; then
         claimonly_notice="If you just want to claim this install, you should re-run this command with the --claim-only option instead."
-        if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
-          failmsg="Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice}"
-          promptmsg="Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice} Are you sure you want to continue?"
-        else
-          failmsg="We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. ${claimonly_notice}"
-          promptmsg="Attempting to update an existing install with an unknown installation type is not officially supported. It may work, but it also might break your system. ${claimonly_notice} Are you sure you want to continue?"
-        fi
-        if [ "${INTERACTIVE}" -eq 0 ] && [ "${ACTION}" != "claim" ]; then
-          fatal "${failmsg}" F0106
-        elif [ "${INTERACTIVE}" -eq 1 ] && [ "${ACTION}" != "claim" ]; then
-          if confirm "${promptmsg}"; then
-            progress "OK, continuing"
+        if [ "${ACTION}" != "claim" ]; then
+          if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
+            fatal "Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice}" F0106
           else
-            fatal "Cancelling update of unknown installation type at user request." F050C
+            fatal "We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. ${claimonly_notice}" F0106
           fi
         fi
       fi
