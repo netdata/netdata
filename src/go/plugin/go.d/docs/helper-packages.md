@@ -1,9 +1,8 @@
 # Go Helper Packages For go.d Collectors
 
-Use existing helper packages before adding collector-local plumbing. A helper is
-not better because it is shared; it is better when it gives users the same
-configuration shape, the same safety behavior, or the same testable parsing path
-as other collectors.
+Use existing helper packages before adding collector-local plumbing. A helper is not better because it is shared; it is
+better when it gives users the same configuration shape, the same safety behavior, or the same testable parsing path as
+other collectors.
 
 This guide covers helper surfaces used by go.d collectors across:
 
@@ -11,8 +10,8 @@ This guide covers helper surfaces used by go.d collectors across:
 - `src/go/plugin/go.d/pkg/*` for go.d-specific helpers;
 - `src/go/logger` for the logger embedded through `collectorapi.Base`.
 
-It is not an exhaustive API reference. Before adding a local helper, search
-these roots for an existing package that already owns the behavior.
+It is not an exhaustive API reference. Before adding a local helper, search these roots for an existing package that
+already owns the behavior.
 
 ## Helper Roots
 
@@ -48,17 +47,13 @@ Use `src/go/pkg/confopt` for common configuration value types.
 
 When:
 
-- users configure durations that should accept strings such as `5s`, `30m`, or
-  numeric seconds;
-- users need explicit `auto` / `enabled` / `disabled` behavior instead of a
-  plain boolean;
-- a migration needs to preserve legacy pointer-boolean semantics without
-  keeping pointer plumbing in new code.
+- users configure durations that should accept strings such as `5s`, `30m`, or numeric seconds;
+- users need explicit `auto` / `enabled` / `disabled` behavior instead of a plain boolean;
+- a migration needs to preserve legacy pointer-boolean semantics without keeping pointer plumbing in new code.
 
 Why:
 
-- `confopt.Duration` and `confopt.LongDuration` centralize YAML/JSON duration
-  parsing and formatting;
+- `confopt.Duration` and `confopt.LongDuration` centralize YAML/JSON duration parsing and formatting;
 - `confopt.AutoBool` makes tri-state behavior explicit and schema-friendly;
 - collectors avoid ad hoc parsers and inconsistent boolean defaults.
 
@@ -69,18 +64,15 @@ Use `src/go/pkg/web` for HTTP-based collectors.
 When:
 
 - the collector talks to an HTTP or HTTPS endpoint;
-- users need the normal Netdata HTTP options: `url`, timeout, redirects, proxy,
-  basic auth, bearer token file, headers, body, method, and TLS fields;
+- users need the normal Netdata HTTP options: `url`, timeout, redirects, proxy, basic auth, bearer token file, headers,
+  body, method, and TLS fields;
 - the collector builds repeated requests against the same endpoint.
 
 Why:
 
-- `web.HTTPConfig` embeds `web.RequestConfig` and `web.ClientConfig` so HTTP
-  collectors expose the same option surface;
-- `web.NewHTTPClient(c.ClientConfig)` applies timeout, TLS, proxy, redirect, and
-  HTTP/2 behavior consistently;
-- `web.NewHTTPRequest(c.RequestConfig)` and
-  `web.NewHTTPRequestWithPath(c.RequestConfig, path)` apply user agent,
+- `web.HTTPConfig` embeds `web.RequestConfig` and `web.ClientConfig` so HTTP collectors expose the same option surface;
+- `web.NewHTTPClient(c.ClientConfig)` applies timeout, TLS, proxy, redirect, and HTTP/2 behavior consistently;
+- `web.NewHTTPRequest(c.RequestConfig)` and `web.NewHTTPRequestWithPath(c.RequestConfig, path)` apply user agent,
   authentication, headers, body, and safe path joining.
 
 Pattern:
@@ -91,14 +83,12 @@ type Config struct {
 }
 ```
 
-Use `src/go/pkg/tlscfg` directly only when the collector is not HTTP-based but
-still needs TLS, such as Redis or x509-style checks. HTTP collectors should get
-TLS behavior through `web.HTTPConfig`.
+Use `src/go/pkg/tlscfg` directly only when the collector is not HTTP-based but still needs TLS, such as Redis or
+x509-style checks. HTTP collectors should get TLS behavior through `web.HTTPConfig`.
 
 ## Prometheus Endpoints
 
-Use `src/go/pkg/prometheus` when the upstream endpoint exposes Prometheus text
-format.
+Use `src/go/pkg/prometheus` when the upstream endpoint exposes Prometheus text format.
 
 When:
 
@@ -110,8 +100,7 @@ Why:
 
 - it reuses `web.RequestConfig` and `*http.Client`;
 - it handles Prometheus text parsing and gzip responses;
-- selectors avoid parsing or processing metric families the collector will not
-  use.
+- selectors avoid parsing or processing metric families the collector will not use.
 
 Do not hand-roll text exposition parsing in a collector.
 
@@ -131,18 +120,16 @@ Why:
 - tests can cover selector behavior without custom parser logic;
 - existing logical matchers can combine conditions when needed.
 
-Do not invent a selector language unless the upstream API requires one. Prefer a
-single simple-pattern field for simple cases; add separate include/exclude fields
-only when the user problem needs that shape.
+Do not invent a selector language unless the upstream API requires one. Prefer a single simple-pattern field for simple
+cases; add separate include/exclude fields only when the user problem needs that shape.
 
-Do not use `src/go/pkg/selectorcore` for user-facing collector selectors. It is
-the lower-level selector metadata/parser surface used by template and selector
-engines, not the normal collector selector helper.
+Do not use `src/go/pkg/selectorcore` for user-facing collector selectors. It is the lower-level selector metadata/parser
+surface used by template and selector engines, not the normal collector selector helper.
 
 ## Limited Logging
 
-Collectors embed `collectorapi.Base`, which embeds `*logger.Logger`. Use the
-logger's built-in limiting before adding collector-local rate-limit state.
+Collectors embed `collectorapi.Base`, which embeds `*logger.Logger`. Use the logger's built-in limiting before adding
+collector-local rate-limit state.
 
 When:
 
@@ -152,13 +139,12 @@ When:
 
 Why:
 
-- in go.d jobs, `c.Once(key).Warningf(...)` is cycle-local because the runtime
-  resets `Once` state each `runOnce`; it is useful for suppressing duplicate
-  messages inside one cycle only;
-- `c.Limit(key, n, window).Warningf(...)` logs at most `n` messages per key per
-  window and is the right default for cross-cycle spam control;
-- the limiter is shared through the collector logger and already used by modern
-  collectors such as Cato Networks, PAN-OS, and vSphere.
+- in go.d jobs, `c.Once(key).Warningf(...)` is cycle-local because the runtime resets `Once` state each `runOnce`; it is
+  useful for suppressing duplicate messages inside one cycle only;
+- `c.Limit(key, n, window).Warningf(...)` logs at most `n` messages per key per window and is the right default for
+  cross-cycle spam control;
+- the limiter is shared through the collector logger and already used by modern collectors such as Cato Networks,
+  PAN-OS, and vSphere.
 
 Pattern:
 
@@ -167,19 +153,16 @@ c.Limit("mycollector:operation:error", 1, time.Hour).
     Warningf("operation failed: %v", err)
 ```
 
-Use stable keys. Include the operation and bounded error class when needed, but
-do not put unbounded IDs, URLs, query strings, customer names, or raw provider
-messages in the key.
+Use stable keys. Include the operation and bounded error class when needed, but do not put unbounded IDs, URLs, query
+strings, customer names, or raw provider messages in the key.
 
-Custom warning gates are justified only when the built-in count-per-window
-semantics are not the right behavior, for example when logging only on state
-transitions. Document that reason in the PR description or design note so
-reviewers can see why the built-in limiter was not enough.
+Custom warning gates are justified only when the built-in count-per-window semantics are not the right behavior, for
+example when logging only on state transitions. Document that reason in the PR description or design note so reviewers
+can see why the built-in limiter was not enough.
 
 ## Socket Clients
 
-Use `src/go/plugin/go.d/pkg/socket` for simple TCP, UDP, or Unix-socket
-line-protocol collectors.
+Use `src/go/plugin/go.d/pkg/socket` for simple TCP, UDP, or Unix-socket line-protocol collectors.
 
 When:
 
@@ -190,10 +173,8 @@ When:
 Why:
 
 - socket address parsing is shared across collectors;
-- connect, command, read, disconnect, deadline, and line-limit behavior stay
-  consistent;
-- tests can use the helper's fake TCP/UDP/Unix servers instead of custom socket
-  harnesses.
+- connect, command, read, disconnect, deadline, and line-limit behavior stay consistent;
+- tests can use the helper's fake TCP/UDP/Unix servers instead of custom socket harnesses.
 
 Do not hand-roll socket dial/read loops for common line-oriented protocols.
 
@@ -222,13 +203,11 @@ Use:
 - `RunDirect` only when direct execution is intentionally required;
 - `FindBinary` for PATH/default-path discovery.
 
-Do not call `exec.Command` directly unless the helper cannot support the case and
-the reason is documented.
+Do not call `exec.Command` directly unless the helper cannot support the case and the reason is documented.
 
 ## Log File Collectors
 
-Use `src/go/plugin/go.d/pkg/logs` for collectors that parse application log
-files.
+Use `src/go/plugin/go.d/pkg/logs` for collectors that parse application log files.
 
 When:
 
@@ -240,11 +219,9 @@ Why:
 
 - `logs.Reader` is log-rotation aware;
 - `logs.NewParser` centralizes supported parser types;
-- `logs.IsParseError` lets collection logic treat malformed rows differently
-  from source failures.
+- `logs.IsParseError` lets collection logic treat malformed rows differently from source failures.
 
-Do not open and seek log files manually unless the collector's source is not a
-normal file-tail workflow.
+Do not open and seek log files manually unless the collector's source is not a normal file-tail workflow.
 
 ## IP Ranges
 
@@ -267,8 +244,7 @@ Use `src/go/plugin/go.d/pkg/sqlquery` for repeated SQL row-scanning patterns.
 
 When:
 
-- the collector or Function scans rows into strings, integers, floats, or discard
-  columns;
+- the collector or Function scans rows into strings, integers, floats, or discard columns;
 - the collector needs table-column discovery with `?` or `$1` placeholders;
 - the row-to-value assignment is generic across queries.
 
@@ -280,8 +256,7 @@ Why:
 
 ## Cloud Auth Helpers
 
-Use `src/go/plugin/go.d/pkg/cloudauth` when a cloud collector needs supported
-cloud-provider credentials.
+Use `src/go/plugin/go.d/pkg/cloudauth` when a cloud collector needs supported cloud-provider credentials.
 
 When:
 
@@ -310,44 +285,35 @@ Why:
 
 ## Profile Catalog Helpers
 
-Use `src/go/plugin/go.d/pkg/profilecatalog` when a collector ships curated
-per-target "profiles" as YAML files (a profile's identity is its file basename)
-and loads them from stock plus user directories. Used by the `prometheus`,
+Use `src/go/plugin/go.d/pkg/profilecatalog` when a collector ships curated per-target "profiles" as YAML files (a
+profile's identity is its file basename) and loads them from stock plus user directories. Used by the `prometheus`,
 `azure_monitor`, and `cloudwatch` collectors.
 
 When:
 
-- the collector reads profiles from `config/go.d/<name>.profiles/` (stock) and
-  the user config dirs;
-- it needs stock/user override precedence (user overrides stock by basename),
-  the stock-fatal / user-skip error policy, and a process-wide cached catalog.
+- the collector reads profiles from `config/go.d/<name>.profiles/` (stock) and the user config dirs;
+- it needs stock/user override precedence (user overrides stock by basename), the stock-fatal / user-skip error policy,
+  and a process-wide cached catalog.
 
 Why:
 
-- one shared `Load[P]` + `Catalog[P]` + `Cached[T]` replaces per-collector copies
-  of the directory walk, override precedence, and singleton caching;
-- it is generic over the collector's profile type `P` and oblivious to matching
-  (matching stays in the collector);
-- decode depth is the collector's choice via `Options.Decode`: parse everything
-  eagerly, or parse a lightweight header now and hydrate the heavy part later
-  (as `prometheus` does for its chart templates).
+- one shared `Load[P]` + `Catalog[P]` + `Cached[T]` replaces per-collector copies of the directory walk, override
+  precedence, and singleton caching;
+- it is generic over the collector's profile type `P` and oblivious to matching (matching stays in the collector);
+- decode depth is the collector's choice via `Options.Decode`: parse everything eagerly, or parse a lightweight header
+  now and hydrate the heavy part later (as `prometheus` does for its chart templates).
 
-Do NOT put matching logic in this package; it is a catalog + loader, not a
-matcher. Keep the profile schema, its decode/validate, the `defaultDirSpecs`
-directory resolution (location-specific), and specialized queries in the
-collector's own `*profiles` package, wrapping `profilecatalog.Catalog[P]` by
-struct embedding.
+Do NOT put matching logic in this package; it is a catalog + loader, not a matcher. Keep the profile schema, its
+decode/validate, the `defaultDirSpecs` directory resolution (location-specific), and specialized queries in the
+collector's own `*profiles` package, wrapping `profilecatalog.Catalog[P]` by struct embedding.
 
 ## Legacy V1 Helpers
 
-`src/go/pkg/stm` converts structs into `map[string]int64`.
-`src/go/plugin/go.d/pkg/oldmetrix` provides V1 metric vector helper types such
-as counters, summaries, histograms, and boolean conversions used by existing V1
-collectors. Both helpers are V1-shaped. New V2 collectors MUST NOT use them as
-their metric path.
+`src/go/pkg/stm` converts structs into `map[string]int64`. `src/go/plugin/go.d/pkg/oldmetrix` provides V1 metric vector
+helper types such as counters, summaries, histograms, and boolean conversions used by existing V1 collectors. Both
+helpers are V1-shaped. New V2 collectors MUST NOT use them as their metric path.
 
 Acceptable uses:
 
 - maintaining an existing V1 collector;
-- temporary parity tests during V1-to-V2 migration, provided the helper is not
-  reachable from the final runtime path.
+- temporary parity tests during V1-to-V2 migration, provided the helper is not reachable from the final runtime path.

@@ -464,6 +464,8 @@ When writing or updating these artifacts:
   a multi-requirement paragraph; keep a single rule-plus-rationale as one bullet.
 - Preserve precision over brevity. Formatting is for readability, not for
   weakening contracts or removing necessary evidence.
+- Wrap markdown prose at ~120 columns (SHOULD), not 80. Code blocks, tables, and generated files keep their own
+  formats. Keep reflow-only (whitespace) changes in separate commits from content changes.
 
 ### Open-Source Reference Evidence
 

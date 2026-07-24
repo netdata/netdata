@@ -234,16 +234,12 @@ groups:
 | [**groups**](#4-groups)                       | Recursive chart groups — the core of the template. |
 
 > [!NOTE]
-> Some consumers embed a chart template as a **single group** instead of a full
-> spec — for example a
-> [Prometheus profile](/src/go/plugin/go.d/collector/prometheus/profile-format.md)'s
-> `template:` key holds one item of the `groups` list above (written without
-> the leading dash), and the collector supplies `version` and `engine` itself.
-> All group and chart fields documented below apply unchanged; the spec-level
-> `version`, top-level `context_namespace`, and `engine` fields do not. To
-> exclude noisy metrics in that setting, use the consumer's own mechanism --
-> for Prometheus profiles, the job `selector` or a relabeling `drop` rule --
-> since `engine.selector` is unavailable.
+> Some consumers embed a chart template as a **single group** instead of a full spec — for example a
+> [Prometheus profile](/src/go/plugin/go.d/collector/prometheus/profile-format.md)'s `template:` key holds one item of
+> the `groups` list above (written without the leading dash), and the collector supplies `version` and `engine` itself.
+> All group and chart fields documented below apply unchanged; the spec-level `version`, top-level `context_namespace`,
+> and `engine` fields do not. To exclude noisy metrics in that setting, use the consumer's own mechanism -- for
+> Prometheus profiles, the job `selector` or a relabeling `drop` rule -- since `engine.selector` is unavailable.
 
 ---
 

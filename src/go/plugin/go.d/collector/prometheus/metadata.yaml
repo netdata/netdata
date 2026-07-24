@@ -146,21 +146,21 @@ modules:
               required: false
               group: Customization
               detailed_description: |
-                A list of relabeling blocks. Each block applies a list of Prometheus
-                `metric_relabel_configs` rules to the metrics whose name matches `match`. See the
-                [relabeling reference](/src/go/plugin/go.d/collector/prometheus/profile-format.md#metric-relabeling)
-                for the full action set and more examples.
+                A list of relabeling blocks. Each block applies a list of Prometheus `metric_relabel_configs` rules to
+                the metrics whose name matches `match`. See the
+                [relabeling reference](/src/go/plugin/go.d/collector/prometheus/profile-format.md#metric-relabeling) for
+                the full action set and more examples.
 
-                - `match`: Netdata simple patterns matched against the full metric name — including
-                  any `_bucket`/`_sum`/`_count` suffix, so prefer globs like `app_lat*` over an exact
-                  `app_lat` (space-separated; `*` matches any sequence, `?` any character, a leading
-                  `!` negates). Use `*` to target every metric. Required.
-                - `metric_relabel_configs`: Prometheus relabel rules (`source_labels`, `separator`,
-                  `regex`, `modulus`, `target_label`, `replacement`, `action`), applied in order to
-                  the scraped samples before charts are built.
+                - `match`: Netdata simple patterns matched against the full metric name — including any
+                  `_bucket`/`_sum`/`_count` suffix, so prefer globs like `app_lat*` over an exact `app_lat`
+                  (space-separated; `*` matches any sequence, `?` any character, a leading `!` negates). Use `*` to
+                  target every metric. Required.
+                - `metric_relabel_configs`: Prometheus relabel rules (`source_labels`, `separator`, `regex`, `modulus`,
+                  `target_label`, `replacement`, `action`), applied in order to the scraped samples before charts are
+                  built.
 
-                Relabeling that would corrupt a histogram or summary — splitting it, dropping a
-                component, mutating the `le`/`quantile` label, or merging two families — is rejected.
+                Relabeling that would corrupt a histogram or summary — splitting it, dropping a component, mutating the
+                `le`/`quantile` label, or merging two families — is rejected.
 
                 ```yaml
                 relabeling:
@@ -179,15 +179,17 @@ modules:
               group: Customization
               detailed_description: |
                 Profiles ship curated charts for recognized exporters -- see the
-                [profile format](/src/go/plugin/go.d/collector/prometheus/profile-format.md) for the
-                file format and how to author your own. `profiles.mode` selects them:
+                [profile format](/src/go/plugin/go.d/collector/prometheus/profile-format.md) for the file format and how
+                to author your own. `profiles.mode` selects them:
 
                 - `auto` (default): every profile whose `match` hits at least one scraped metric.
-                - `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its check).
+                - `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its
+                  check).
                 - `combined`: `auto` plus the profiles named in `mode_combined.entries`.
                 - `none`: no profiles — generic autogen charts only (the pre-profile behavior).
 
-                Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the other block are ignored. Metrics not covered by a selected profile keep their generic autogen charts.
+                Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the
+                other block are ignored. Metrics not covered by a selected profile keep their generic autogen charts.
 
                 ```yaml
                 profiles:
