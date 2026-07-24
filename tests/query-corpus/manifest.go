@@ -209,6 +209,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "classic v1 formats over a hostile fixture: csv/tsv byte-exact (newest-first default, natural order option, unquoted header cells pinned as current contract), ssv/ssvcomma/array exact row-sum values, csvjsonarray VALID JSON with NUMERIC timestamps (#23115/#23117 pinned), markdown/html/json/datatable/jsonp structure",
 		Agent:  Green,
 	},
+	"CASE-022/time-group-latest": {
+		Proves: "the agent supports time_group=latest — per-bucket last collected value, empty buckets stay empty, and points=1 with before=0 anchors the window at the newest stored sample serving it from the collector cache (zero db reads, the RAW un-quantized double, anomaly rate 0 by design; the storage path keeps SN quantization and the engine-generic anomaly rate). STOCK agents have no such grouping: the name silently falls back to average",
+		Agent:  Red,
+	},
 	"CASE-019/v1-json-name-escaping": {
 		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",
 		Agent:  Green, FixedBy: "#23216",
