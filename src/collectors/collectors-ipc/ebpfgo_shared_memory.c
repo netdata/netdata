@@ -139,13 +139,19 @@ static bool netdata_ebpfgo_shared_pid_memory_copy_snapshot(netdata_ebpfgo_shared
         ctx->snapshot_cap = ctx->shm_total;
     }
 
-    /* Capture per-module validity flags, publish interval, and live entry
-     * count from the header under the same semaphore hold as the caller. */
+    /* Capture per-module validity flags, publish interval, and the commit
+     * timestamp from the header.  Field read order within the semaphore hold
+     * is unconstrained — no concurrent writer can run.  last_publish_ut is
+     * the producer's commit stamp (written last, after entries and live_count);
+     * reading it here gives the liveness timestamp for the post-snapshot check.
+     * Producer write order: update_every_s, flags, entries[], live_count,
+     * last_publish_ut.  If that order ever changes, update this comment. */
     const struct ebpfgo_shm_header *hdr = (const struct ebpfgo_shm_header *)ctx->mapping;
     ctx->shm_flags      = __atomic_load_n(&hdr->flags,            __ATOMIC_ACQUIRE);
     ctx->update_every_s = __atomic_load_n(&hdr->update_every_s,   __ATOMIC_ACQUIRE);
     ctx->last_publish_ut = __atomic_load_n(&hdr->last_publish_ut, __ATOMIC_ACQUIRE);
 
+    /* live_count is read separately because it bounds the memcpy below. */
     uint32_t live = __atomic_load_n(&hdr->live_count, __ATOMIC_ACQUIRE);
     if (live > (uint32_t)ctx->shm_total)
         live = (uint32_t)ctx->shm_total;
