@@ -44,7 +44,7 @@ modules:
               2. Re-install Netdata from source. The installer will detect that the required libraries are now available and will also build xenstat.plugin.
           - title: Host placement
             description: |
-              Install the Netdata Agent on the Xen hypervisor host (dom0), for example directly on an XCP-ng host. Installing it inside a guest VM or on a non-Xen host will not expose Xen host or domain metrics, because the plugin reads the local Xen hypervisor only.
+              Install the Netdata Agent on the Xen hypervisor host (dom0). Installing it inside a guest VM or on a non-Xen host will not expose Xen host or domain metrics, because the plugin reads the local Xen hypervisor only.
           - title: Xen Orchestra Appliance (XOA)
             description: |
               Netdata has no dedicated XOA integration. The xenstat.plugin collects Xen/XCP-ng host and domain statistics from the hypervisor layer, not XOA-specific application metrics. The XOA VM can be monitored as a standard Linux system if access is available.
