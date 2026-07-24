@@ -2108,8 +2108,9 @@ static void ctx_hosts_load(uv_work_t *req)
     // while it carries PENDING_CONTEXT_LOAD: archived hosts are all created before
     // this work is queued (aclk_synchronization_init), a concurrent reconnect does
     // not free the host (rrdhost_find_or_create() only frees on a memory-mode
-    // mismatch, and skips even that while the flag is set), and the orphan reaper
-    // skips such hosts (rrdhost_should_be_cleaned_up).
+    // mismatch, and skips even that while the flag is set), the orphan reaper
+    // skips such hosts (rrdhost_should_be_cleaned_up), and remove-stale-node
+    // refuses to unregister them (remove_ephemeral_host).
     if (!SHUTDOWN_REQUESTED(config)) {
         size_t size = 0, used = 0;
         struct host_load_order *order = NULL;
