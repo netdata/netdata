@@ -78,6 +78,10 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf
         metric: cgroup.mem_usage
         info: cgroup memory utilization
+      - name: cgroup_memory_limit_pressure
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf
+        metric: cgroup.mem_events
+        info: number of times the cgroup hit its memory limit (memory.max) in the last 10 minutes, forcing reclaim (OOM risk)
       - name: cgroup_1m_received_packets_rate
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf
         metric: cgroup.net_packets
@@ -197,6 +201,31 @@ modules:
               chart_type: line
               dimensions:
                 - name: failures
+            - name: cgroup.mem_events_oom
+              description: Out of Memory Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: oom
+                - name: oom_kill
+                - name: oom_group_kill
+            - name: cgroup.mem_events
+              description: Memory Usage Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: low
+                - name: high
+                - name: max
+                - name: sock_throttled
+            - name: cgroup.mem_events_swap
+              description: Swap Usage Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: high
+                - name: max
+                - name: fail
             - name: cgroup.io
               description: I/O Bandwidth (all disks)
               unit: "KiB/s"
@@ -501,6 +530,10 @@ modules:
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf
         metric: k8s.cgroup.mem_usage
         info: cgroup memory utilization
+      - name: k8s_cgroup_memory_limit_pressure
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf
+        metric: k8s.cgroup.mem_events
+        info: number of times the container hit its memory limit (memory.max) in the last 10 minutes, forcing reclaim (OOM risk)
       - name: k8s_cgroup_1m_received_packets_rate
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf
         metric: k8s.cgroup.net_packets
@@ -634,6 +667,31 @@ modules:
               chart_type: line
               dimensions:
                 - name: failures
+            - name: k8s.cgroup.mem_events_oom
+              description: Out of Memory Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: oom
+                - name: oom_kill
+                - name: oom_group_kill
+            - name: k8s.cgroup.mem_events
+              description: Memory Usage Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: low
+                - name: high
+                - name: max
+                - name: sock_throttled
+            - name: k8s.cgroup.mem_events_swap
+              description: Swap Usage Events
+              unit: "events/s"
+              chart_type: line
+              dimensions:
+                - name: high
+                - name: max
+                - name: fail
             - name: k8s.cgroup.io
               description: I/O Bandwidth (all disks)
               unit: "KiB/s"
@@ -957,6 +1015,31 @@ modules:
               unit: failures/s
               chart_type: line
               dimensions:
+                - name: fail
+            - name: systemd.service.memory.oom_events
+              description: Systemd Services Out of Memory Events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: oom
+                - name: oom_kill
+                - name: oom_group_kill
+            - name: systemd.service.memory.events
+              description: Systemd Services Memory Usage Events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: low
+                - name: high
+                - name: max
+                - name: sock_throttled
+            - name: systemd.service.memory.swap_events
+              description: Systemd Services Swap Usage Events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: high
+                - name: max
                 - name: fail
             - name: systemd.service.memory.ram.usage
               description: Systemd Services Memory

@@ -94,6 +94,9 @@ static inline void cgroup_free(struct cgroup *cg) {
     if(cg->st_mem_usage_limit) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_usage_limit);
     if(cg->st_mem_utilization) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_utilization);
     if(cg->st_mem_failcnt) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_failcnt);
+    if(cg->st_mem_events) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_events);
+    if(cg->st_mem_events_oom) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_events_oom);
+    if(cg->st_mem_events_swap) rrdset_is_obsolete___safe_from_collector_thread(cg->st_mem_events_swap);
     if(cg->st_io) rrdset_is_obsolete___safe_from_collector_thread(cg->st_io);
     if(cg->st_serviced_ops) rrdset_is_obsolete___safe_from_collector_thread(cg->st_serviced_ops);
     if(cg->st_throttle_io) rrdset_is_obsolete___safe_from_collector_thread(cg->st_throttle_io);
@@ -117,10 +120,14 @@ static inline void cgroup_free(struct cgroup *cg) {
     freez(cg->cpuacct_cpu_shares.filename);
 
     arl_free(cg->memory.arl_base);
+    arl_free(cg->memory.arl_events);
+    arl_free(cg->memory.arl_swap_events);
     freez(cg->memory.filename_detailed);
     freez(cg->memory.filename_failcnt);
     freez(cg->memory.filename_usage_in_bytes);
     freez(cg->memory.filename_msw_usage_in_bytes);
+    freez(cg->memory.filename_events);
+    freez(cg->memory.filename_swap_events);
 
     freez(cg->io_service_bytes.filename);
     freez(cg->io_serviced.filename);
@@ -723,6 +730,20 @@ static inline void discovery_update_filenames_cgroup_v2(struct cgroup *cg) {
         snprintfz(filename, FILENAME_MAX, "%s%s/memory.stat", cgroup_unified_base, cg->id);
         if (!(cg->memory.staterr_mem_stat = stat(filename, &buf) != 0)) {
             cg->memory.filename_detailed = strdupz(filename);
+        }
+    }
+
+    if (unlikely(!cg->memory.staterr_events && !cg->memory.filename_events)) {
+        snprintfz(filename, FILENAME_MAX, "%s%s/memory.events", cgroup_unified_base, cg->id);
+        if (!(cg->memory.staterr_events = stat(filename, &buf) != 0)) {
+            cg->memory.filename_events = strdupz(filename);
+        }
+    }
+
+    if (unlikely(!cg->memory.staterr_swap_events && !cg->memory.filename_swap_events)) {
+        snprintfz(filename, FILENAME_MAX, "%s%s/memory.swap.events", cgroup_unified_base, cg->id);
+        if (!(cg->memory.staterr_swap_events = stat(filename, &buf) != 0)) {
+            cg->memory.filename_swap_events = strdupz(filename);
         }
     }
 
