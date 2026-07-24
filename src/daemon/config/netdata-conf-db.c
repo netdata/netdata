@@ -391,7 +391,7 @@ void netdata_conf_section_db(void) {
         if (dir) {
             struct dirent *de;
             while ((de = readdir(dir))) {
-                if (strstr(de->d_name, ".ndf")) { // DATAFILE_EXTENSION
+                if (strendswith(de->d_name, ".ndf")) { // DATAFILE_EXTENSION
                     dbengine_datafiles_present = true;
                     break;
                 }
