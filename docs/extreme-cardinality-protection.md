@@ -45,6 +45,10 @@ The mechanism kicks in during tier0 (high-resolution) database rotations (i.e., 
     - **Clean-up Trigger:**
         - Only metrics that have lost their tier0 retention in a context that meets the thresholds (≥1000 instances and >50% ephemerality) will have their long-term retention cleared.
 
+## Metadata Database Disk Space Reclamation
+
+Metric metadata — chart definitions, dimensions, and labels — is stored in the SQLite database `netdata-meta.db` (typically under `/var/cache/netdata/`), which can grow significantly during periods of high cardinality. When the cardinality protection mechanism deletes obsolete metadata rows, Netdata automatically reclaims the freed SQLite disk space in the background — no manual intervention (such as running `VACUUM` or restarting the Agent) is required — so the metadata database grows under cardinality pressure and shrinks again as cleanup and space reclamation run.
+
 ## Configuration
 
 You can control the protection mechanism via the following settings in the `netdata.conf` file under the `[db]` section:

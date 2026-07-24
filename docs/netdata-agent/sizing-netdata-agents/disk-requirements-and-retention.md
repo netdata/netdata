@@ -61,6 +61,8 @@ In practice, with default settings and an ingestion rate of about 4,000 metrics 
 
 These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
+Under sustained high cardinality (for example, many short-lived containers or unbounded label values), the metric metadata database (`netdata-meta.db`) can grow beyond these defaults; see [Extreme Cardinality Protection](/docs/extreme-cardinality-protection.md) for how Netdata automatically cleans up obsolete metadata and reclaims that space.
+
 ### Parent Retention Sizing
 
 On Netdata Parents, retention size is enforced per tier for all metrics stored by that Parent, not per Child. All streaming Children share the Parent's tier quota, so there is no per-Child disk space limit.
