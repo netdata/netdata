@@ -51,7 +51,7 @@ The stock configuration enables the plugin and listens on the configured UDP por
 
 #### Limits
 
-Operational limits are driven by sustained flow records/s, exporter batching, template churn, cardinality, retention, storage speed, and enrichment. A release benchmark on a modern NVMe host verified packed IPFIX at 50k/s across the tested cardinality profiles and at 100k/s for repeated identities; one-record UDP exports and all-unique traffic can be lower. Validate the actual exporter shape before sizing a production boundary; use distributed agents for larger deployments.
+Operational limits are driven by sustained flow records/s, exporter batching, template churn, cardinality, retention, storage speed, and enrichment. On modern hardware with fast storage, plan around 50k-100k sustained flow records/s per well-provisioned agent for the full raw + rollup pipeline, provided the underlying disks can sustain the required journal write activity; use distributed agents for larger deployments.
 
 #### Performance Impact
 

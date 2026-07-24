@@ -371,42 +371,158 @@ To make a tier size-only, set `duration_of_journal_files: null`.
 
 ## Performance benchmarking
 
-The checked capacity benchmark uses real UDP and the production journal path.
-Run it from `src/crates` with a release build:
+The plugin ships two complementary benchmarks:
 
-```bash
-CARGO_TARGET_DIR=/tmp/netflow-benchmark-target \
-  cargo test -p netflow-plugin --release \
-  ingest::capacity_bench_tests::bench_capacity_matrix \
-  -- --ignored --exact --nocapture
-```
+- `cargo test -p netflow-plugin --manifest-path src/crates/Cargo.toml --release ingest::bench_tests::bench_ingestion_protocol_matrix -- --ignored --nocapture`
+  unpaced full UDP→journal max throughput per protocol, plus decode-only and
+  post-decode phases
+- `cargo test -p netflow-plugin --manifest-path src/crates/Cargo.toml --release ingest::resource_bench_tests::bench_resource_envelope_child -- --ignored --nocapture`
+  paced post-decode resource envelope at a configurable rate, controlled via
+  env vars: `NETFLOW_RESOURCE_BENCH_PROTOCOL`, `NETFLOW_RESOURCE_BENCH_PROFILE`,
+  `NETFLOW_RESOURCE_BENCH_LAYER`, `NETFLOW_RESOURCE_BENCH_FLOWS_PER_SEC`,
+  `NETFLOW_RESOURCE_BENCH_WARMUP_SECS`, `NETFLOW_RESOURCE_BENCH_MEASURE_SECS`,
+  `NETFLOW_RESOURCE_BENCH_SYNC_EVERY_ENTRIES`,
+  `NETFLOW_RESOURCE_BENCH_SYNC_INTERVAL_MILLIS`
 
-It covers NetFlow v5/v9, IPFIX, sFlow, and Cisco NSEL; one-record and
-near-MTU packet layouts; and repeating-256, repeating-4,096, and
-duration-bounded all-unique identities. Each case uses an isolated collector
-and sender, verifies sender rate and every received UDP datagram, then reads
-the finalized raw journal to verify rows, counters, and identities. It writes
-an aggregate JSON report under the system temporary directory.
+The resource-envelope benchmark scope:
 
-The companion storage benchmark measures completed physical archives across
-raw, 1m, 5m, and 1h tiers:
+- pre-decoded flow records pushed into the ingest pipeline (UDP receive and
+  protocol decode are excluded; measure decode separately with the protocol
+  matrix benchmark)
+- full pipeline active: raw journal + 1-minute + 5-minute + 1-hour tier
+  accumulation, real disk-backed journals
+- enrichment is NOT loaded (no GeoIP MMDB, no static metadata, no classifiers,
+  no static networks); cardinality fields are pre-populated by the harness
+- reports achieved flows/s, CPU% of one core, peak/final RSS, real disk read
+  and write bytes/s from `/proc/self/io`
+- `NETFLOW_RESOURCE_BENCH_LAYER=production-shaped` keeps production listener
+  sync defaults, runs tier commits on worker threads, includes low-rate cases,
+  and reports fixed overhead buckets for sync ticks, chart sampling, raw/tier
+  syncs, tier flushes, and decoder-state persistence
 
-```bash
-CARGO_TARGET_DIR=/tmp/netflow-benchmark-target \
-  cargo test -p netflow-plugin --release \
-  ingest::storage_bench_tests::bench_allocated_storage_matrix \
-  -- --ignored --exact --nocapture
-```
+`cpu_percent_of_one_core` is the sum of user+system ticks across all threads
+of the test process during the measurement window, divided by wall time, as a
+percent of one core. 100% means one core's worth of CPU was consumed; values
+above 100% are normal for multi-threaded saturation.
 
-It reports allocated disk space (`st_blocks * 512`) for archived journal files
-and their per-journal sidecars. It keeps ordinary traffic and Cisco NSEL
-separate because one NSEL update can project to two directional traffic rows.
+> **Note (2026-06):** the recorded tables below predate the migration of the
+> journal backend to `systemd-journal-sdk` (compact file format, no
+> compression, periodic fsync disabled by default). Spot re-runs after the
+> migration show roughly 20-40% higher throughput at every point (e.g.
+> high-cardinality post-decode saturation moved from ~37k to ~43-46k flows/s,
+> low-cardinality full ingest from ~85-95k to ~110-120k flows/s) and about
+> half the physical disk write per flow (~400 bytes/flow). Re-run the
+> commands above for current numbers on your host.
 
-Use [Sizing and Capacity Planning](/docs/npm/network-flows/sizing-capacity.md)
-for the current measured results and their limits. The older decode-only and
-post-decode benchmarks remain useful diagnostics, but they are not deployment
-capacity claims because they do not verify this complete UDP-to-final-journal
-path.
+Reference measurements:
+
+- CPU: `12th Gen Intel(R) Core(TM) i9-12900K`
+- storage: ext4 on `Seagate FireCuda 530`
+- methodology: release mode, `5s` warmup, `15s` measurement window,
+  disk-backed journals, post-decode paced ingest, all-tiers-batched layer
+
+### Paced post-decode resource envelope (3A)
+
+Per protocol, per cardinality, at 10 offered rates from 100 to 60 000 flows/s.
+Cardinality is synthetic: low-cardinality cycles 256 unique records, high-
+cardinality cycles 4 096 unique records. Real exporter data sits between the
+two.
+
+Low cardinality, NetFlow v9:
+
+| offered | achieved | CPU | disk write | RAM peak |
+|---:|---:|---:|---:|---:|
+| 100 | 80 | 0.3% | 95 KiB/s | 13 MiB |
+| 1 000 | 1 000 | 1.3% | 804 KiB/s | 23 MiB |
+| 10 000 | 10 000 | 12.6% | 7.7 MiB/s | 75 MiB |
+| 30 000 | 30 000 | 35.7% | 22.9 MiB/s | 83 MiB |
+| 60 000 | 60 000 | 70.3% | 45.6 MiB/s | 98 MiB |
+
+Low cardinality, IPFIX:
+
+| offered | achieved | CPU | disk write | RAM peak |
+|---:|---:|---:|---:|---:|
+| 100 | 61 | 0.1% | 75 KiB/s | 13 MiB |
+| 1 000 | 975 | 1.0% | 730 KiB/s | 24 MiB |
+| 10 000 | 9 996 | 11.5% | 6.8 MiB/s | 61 MiB |
+| 30 000 | 29 988 | 32.9% | 20.4 MiB/s | 83 MiB |
+| 60 000 | 59 977 | 64.1% | 40.8 MiB/s | 78 MiB |
+
+Low cardinality, sFlow:
+
+| offered | achieved | CPU | disk write | RAM peak |
+|---:|---:|---:|---:|---:|
+| 100 | 99 | 0.2% | 107 KiB/s | 13 MiB |
+| 1 000 | 985 | 1.5% | 847 KiB/s | 22 MiB |
+| 10 000 | 9 989 | 16.9% | 8.4 MiB/s | 75 MiB |
+| 30 000 | 29 967 | 46.2% | 25.2 MiB/s | 84 MiB |
+| 60 000 | 59 984 | 87.1% | 50.3 MiB/s | 80 MiB |
+
+High cardinality, NetFlow v9 (saturates around 30 000 flows/s):
+
+| offered | achieved | CPU | disk write | RAM peak |
+|---:|---:|---:|---:|---:|
+| 100 | 80 | 0.5% | 409 KiB/s | 25 MiB |
+| 1 000 | 1 000 | 4.3% | 2.0 MiB/s | 58 MiB |
+| 10 000 | 10 000 | 36.8% | 7.2 MiB/s | 104 MiB |
+| 30 000 | 29 331 | 98.0% | 24.9 MiB/s | 119 MiB |
+| 60 000 | 26 475 | 98.8% | 30.3 MiB/s | 247 MiB |
+
+High cardinality, IPFIX (saturates around 30-40 000 flows/s):
+
+| offered | achieved | CPU | disk write | RAM peak |
+|---:|---:|---:|---:|---:|
+| 100 | 60 | 0.2% | 214 KiB/s | 22 MiB |
+| 1 000 | 961 | 3.2% | 2.0 MiB/s | 61 MiB |
+| 10 000 | 9 970 | 28.0% | 7.7 MiB/s | 121 MiB |
+| 30 000 | 29 985 | 84.8% | 23.0 MiB/s | 121 MiB |
+| 60 000 | 28 835 | 98.5% | 36.8 MiB/s | 193 MiB |
+
+High cardinality, sFlow (saturates around 30 000 flows/s):
+
+| offered | achieved | CPU | disk write | RAM peak |
+|---:|---:|---:|---:|---:|
+| 100 | 100 | 0.6% | 604 KiB/s | 29 MiB |
+| 1 000 | 999 | 4.7% | 3.2 MiB/s | 77 MiB |
+| 10 000 | 9 990 | 35.3% | 9.9 MiB/s | 113 MiB |
+| 30 000 | 29 257 | 98.3% | 30.9 MiB/s | 129 MiB |
+| 60 000 | 30 227 | 98.6% | 29.1 MiB/s | 122 MiB |
+
+### Unpaced full UDP→journal protocol matrix (3B)
+
+Single-threaded peak throughput at native fixture cardinality:
+
+| protocol | full ingest (decode + journal) | decode only | post-decode only |
+|---|---:|---:|---:|
+| NetFlow v9 | 99 000 flows/s | 811 000 flows/s | 116 000 flows/s |
+| IPFIX | 107 000 flows/s | 807 000 flows/s | 124 000 flows/s |
+| sFlow | 88 000 flows/s | 2 392 000 flows/s | 99 000 flows/s |
+
+### Interpretation
+
+- The post-decode ingest hot path is currently single-threaded. CPU pins at
+  ~98-99% of one core at saturation; it does not scale further with more cores.
+- Low-cardinality saturation is above 60 000 flows/s for NetFlow v9 and IPFIX,
+  and around 70 000 flows/s for sFlow on this host (above 100 000 flows/s
+  post-decode after the systemd-journal-sdk migration). The matrix above does
+  not reach those ceilings on purpose; extrapolate from the CPU% column.
+- High-cardinality saturation is around 30 000 flows/s post-decode for all
+  three protocols (~43-46 000 flows/s after the migration). Above the knee,
+  achieved rate stays at the plateau while offered rate grows.
+- Adding decode (~10 µs/flow) on top of post-decode ingest brings the practical
+  full-path ceiling to roughly 22-25 000 flows/s at high cardinality on this
+  host (~40 000 flows/s after the migration), with the four-tier pipeline
+  running and no enrichment. UDP socket
+  receive is not measured; at these flow rates packet rate (1-5k pps) is well
+  below typical socket limits.
+- Disk reads stay near zero because the benchmark isolates the ingest path
+  from query workloads. The journals themselves are indexed and rewrite pages
+  during normal operation; this benchmark does not exercise that overhead at
+  steady state because it only runs for the warmup + measurement window.
+- Higher cardinality raises steady memory and per-flow encoding cost, lowering
+  the throughput ceiling.
+- These numbers are specific to this host. They do not include GeoIP/MMDB or
+  any other enrichment; loading enrichment adds per-lookup CPU cost on top.
 
 ## plugins.d protocol
 

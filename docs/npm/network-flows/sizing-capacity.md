@@ -16,46 +16,24 @@ A practical guide to choosing the host, the storage, and the deployment shape fo
 
 The netflow plugin is designed to receive, decode, and store flow records (NetFlow / IPFIX / sFlow) from one network — typically the routers and switches at one site — directly on a Netdata Agent.
 
-There is no unconditional “50k–100k flows/s” collector limit. The sustainable rate depends first on how many records each UDP packet carries, then on cardinality, enrichment, and storage contention. A sender that emits one record per packet exercises a much higher packet rate than a sender that fills normal near-MTU export packets.
+A single agent can ingest **50 000 to 100 000 flow records per second on modern hardware**, provided that the underlying disks can sustain the required journal write activity. This already approaches **ISP-level traffic capacities** for most enterprise / branch / data-centre profiles. Past that point you are at the scale of a regional service provider, and you should be running multiple agents (see "Distributed deployment" below), not pushing harder on one box.
 
-## Measured full-pipeline capacity
+If your worst-case sustained flow-record rate stays around **50 000 flow records/s** or lower, a modern NVMe-backed agent should have headroom when storage is not contended. If it does not, check your exporter batching, cardinality, and storage against the envelope below — or plan distributed before you plan harder iron.
 
-The current release benchmark was run on 2026-07-24 with a release build on a `12th Gen Intel(R) Core(TM) i9-12900K`, 125.6 GiB RAM, and an ext4 filesystem on a Seagate FireCuda 530 NVMe. The collector used loopback UDP, a quiet-start target drive, and the host's `net.core.rmem_max = 7 MiB` cap. Every case ran for 30 seconds after a 4,096-record warmup, followed by a one-second post-send drain before shutdown.
+## Plugin throughput cap
 
-The test starts an isolated collector and a separate sender, sends real privacy-safe UDP packets, shuts the collector down cleanly, and independently reads the final journals. A pass requires all of the following:
+The post-decode ingest path has a single-thread hot path. For planning, treat **50 000-100 000 flow records/s sustained** as the per-agent envelope for the full pipeline (raw + 1m + 5m + 1h tiers) on modern hardware with fast storage. Where a given deployment lands inside that envelope depends on three factors:
 
-- the sender sustained at least 99% of the requested record rate;
-- every UDP datagram reached the collector;
-- the collector reported no decode or journal errors; and
-- the final raw journal had the exact expected rows, bytes, packets, and ordinary-flow identity count.
+- **Exporter batching** — routers usually batch multiple flow records into one UDP export packet. Larger batches reduce packet-rate overhead; one-record-per-packet exports push the collector toward a UDP packet-rate ceiling before the journal write path is saturated.
+- **Traffic cardinality** — the per-flow CPU cost grows with how many *unique* flows the traffic contains (unique flows defeat journal deduplication and inflate index work). Low-cardinality traffic with normal exporter batching lands toward the high end of the envelope; high-cardinality traffic, expensive enrichment, or one-record-per-packet exports land toward the low end.
+- **Disk I/O** — the raw tier is an indexed write stream (~400 bytes/flow). By default the plugin does not fsync on the hot path (see `sync_every_entries` in [Configuration](/docs/npm/network-flows/configuration.md)); data reaches disk via kernel writeback and every file is fully synced when rotated. Fast NVMe absorbs this easily; slow or contended storage (SATA SSD, HDD, busy shared volumes) backpressures the receive loop and can push the achievable rate below the envelope.
 
-The matrix covered NetFlow v5, NetFlow v9, IPFIX, sFlow, and Cisco NSEL; one-record UDP datagrams and near-MTU packed datagrams; repeating 256 identities, repeating 4,096 identities, and duration-bounded all-unique identities. “All unique” is a stress profile for the measured interval, not a claim that every deployment has permanently unique flows.
+Practical guidance:
 
-| Wire format | Packet layout | Profiles verified at 50k exporter records/s | Profiles verified at 100k exporter records/s |
-|---|---|---|---|
-| NetFlow v5 | one record per UDP packet | 256, 4,096 | none |
-| NetFlow v5 | near-MTU packed | 256, 4,096, all unique | 256, 4,096 |
-| NetFlow v9 | one record per UDP packet | 256 | none |
-| NetFlow v9 | near-MTU packed | 256, 4,096, all unique | 256, 4,096, all unique |
-| IPFIX | one record per UDP packet | 256 | none |
-| IPFIX | near-MTU packed | 256, 4,096, all unique | 256, 4,096 |
-| sFlow | one record per UDP packet | 256, 4,096 | 256 |
-| sFlow | near-MTU packed | 256, 4,096, all unique | 256, 4,096 |
-| Cisco NSEL v9 update events | one record per UDP packet | 256 | none |
-| Cisco NSEL v9 update events | near-MTU packed | 256, 4,096, all unique | none |
-
-For Cisco NSEL, the rate is firewall update events. Every accepted update in this benchmark emitted two directional traffic rows, so the verified packed 50k-event/s result is 100k journal rows/s. The test also verified zero create, deny, malformed, counterless, partial-counter, zero-responder, or unsupported-event outcomes for its synthetic update traffic.
-
-Two bounded peak probes found a passing 100k ordinary-flow baseline and a first capacity failure at 125k records/s: one used sFlow with 256 repeating identities and one-record packets; the other used packed NetFlow v9 with all-unique identities. These are brackets for those selected cases, not a global 100k–125k ceiling.
-
-### Planning from the measurement
-
-- For ordinary flow exports that batch records into near-MTU UDP packets, **50k records/s is the verified baseline** on this host. Treat 100k records/s as a deployment-specific result to validate, not a default promise.
-- For Cisco NSEL, **50k packed update events/s** is the verified baseline on this host. It writes two directional rows per accepted update. This benchmark did not verify 100k NSEL update events/s.
-- Do not use one-record-per-datagram traffic as a generic 50k baseline. Its result varies materially by protocol and cardinality.
-- GeoIP, classifiers, concurrent queries, periodic fsync, a slower disk, and a different UDP receive-buffer limit can all lower these results. Validate the exact exporter and configuration before sizing a production boundary.
-- The collector requests a 64 MiB UDP receive buffer, but the operating system caps that request at `net.core.rmem_max`. Follow [Configuration](/docs/npm/network-flows/configuration.md#udp-listeners) before testing or operating at high packet rates.
-- The ingest receive path is single-threaded. To exceed the verified envelope, distribute exporters across agents rather than assuming additional CPU cores raise the per-agent packet-rate ceiling.
+- Plan with **~50 000 flow records/s as a conservative target** for a well-provisioned modern agent with fast NVMe storage. Treat rates toward 100 000 flow records/s as achievable when exporter batching, cardinality, enrichment, and disk activity are favorable.
+- Enabling periodic fsync (`sync_every_entries` > 0) trades throughput for a tighter crash-durability window: each fsync stalls the receive path, and on slow disks this causes `RcvbufErrors` (kernel-level UDP drops) well below the envelope.
+- Bursts above your sustainable rate cost UDP queue backpressure and eventually `RcvbufErrors`. The plugin requests a 64 MiB receive buffer at startup, capped by `net.core.rmem_max` — raise that sysctl (and `net.core.netdev_max_backlog`) for burst headroom.
+- The hot path is single-threaded. Adding cores does not raise the per-agent ceiling. The way to go past it is to add agents (next section).
 
 ## Distributed deployment is the scaling answer
 
@@ -72,39 +50,51 @@ For a multi-site / multi-data-centre / multi-branch deployment, this is the reco
 
 ## Storage
 
-Storage cost scales with received exporter records/events, cardinality, and the retention configured independently for each tier. The old single raw-tier estimate is not sufficient: it misses the physical allocation of the three rollup tiers and is wrong for traffic that cannot aggregate.
+Storage cost scales linearly with **sustained flow records per second** and the **retention** you configure on each tier.
 
-### Measured four-tier allocation
+### How ingestion rate maps to disk
 
-The storage benchmark modeled 50k and 100k input records/s in completed production-format archives for raw, 1-minute, 5-minute, and 1-hour tiers. It measured allocated disk space with `st_blocks * 512` for the archived `.journal` files and their journal-specific facet sidecars. It excluded active successor files and the shared `facet-state.bin`, because neither is a stable per-flow cost.
+Use **~400 bytes on disk per flow** as the journal sizing estimate for the raw tier. The journal uses the compact on-disk format, which roughly halves the per-flow footprint versus the legacy format (measured ~340 bytes/flow on low-cardinality traffic, ~490 bytes/flow on high-cardinality). For sustained ingestion this gives you:
 
-| Received source item | Repeating 256 identities | Repeating 4,096 identities | Duration-bounded all-unique stress |
-|---|---:|---:|---:|
-| Ordinary mixed NetFlow v5/v9, IPFIX, and sFlow record | 279 B | 294 B | 2.00 KiB |
-| Cisco NSEL v9 update event (two directional flow rows) | 498 B | 527 B | 4.09 KiB |
+| Sustained flow records/s | Disk used per day, raw tier |
+|---|---|
+| 1 000 | ~35 GB |
+| 5 000 | ~175 GB |
+| 10 000 | ~350 GB |
+| 30 000 | ~1.0 TB |
+| 50 000 | ~1.7 TB |
+| 100 000 | ~3.5 TB |
 
-These are **combined physical allocations for all four tiers per received source item**, not the apparent file length and not only the raw tier. The all-unique profile is intentionally an upper stress case: none of the tiers can combine its rows, so each tier retains one row per ordinary input or two rows per NSEL update.
+These numbers are dominated by raw-tier writes; rollup tiers (1m, 5m, 1h) add a small constant on top because each rollup row aggregates many raw rows.
 
-The benchmark's scalable component model was checked against literal all-tier archives for each profile and traffic type. Combined allocation differed by at most 1.33%; the largest individual-tier difference was 3.88%, below the 5% acceptance limit.
+The number is sensitive to traffic cardinality (how unique the 5-tuples are). Real-world traffic with many repeated flows trends toward the low end (~350 bytes/flow); pathological all-unique traffic trends toward the high end (~490 bytes/flow).
 
-For a daily write-allocation estimate, multiply the received event rate by 86,400 and by the applicable table value. At 50k received items/s, that is roughly:
+### Raw tier dominates — keep it bounded
 
-- 1.20 TB/day for ordinary traffic with 256 repeating identities, or 8.84 TB/day for all-unique ordinary traffic;
-- 2.15 TB/day for NSEL updates with 256 repeating identities, or 18.08 TB/day for all-unique NSEL updates.
+The raw tier carries every individual flow record. **Rollup tiers (1m, 5m, 1h) are tiny by comparison** — each row in a rollup tier aggregates many raw flows.
 
-Double those figures at 100k received items/s. They describe the archives generated from one day's input across all four tiers. **They are not the final retained-disk total** when tiers have different retention windows: calculate and provision each tier using its own retention period, then add the results.
+Set raw-tier retention to match your forensic window — typically **24 hours**. Rollup tiers can keep weeks to a year of history at a small fraction of raw-tier cost.
 
-### Size every tier from observed traffic
+The example below is sized for a busy agent sustaining **50 000 flow records/s** — the raw tier needs about 1.7 TB / day at that rate (see the table above), so the 2.5 TB raw budget gives a safety margin to keep the duration limit (24 h) the one that fires first. Scale the raw budget with the table above if your agent runs higher inside the envelope:
 
-The raw tier always has a row for each decoded flow row, but it does not always dominate total disk use. Repeated traffic collapses strongly in the rollups; all-unique traffic does not. Use the table above as the starting range, measure the actual `raw`, `1m`, `5m`, and `1h` directories after a representative period, and then set each tier's size and duration limit.
+```yaml
+journal:
+  tiers:
+    raw:      { size_of_journal_files: 2.5TB, duration_of_journal_files: 24h }
+    minute_1: { size_of_journal_files: 20GB,  duration_of_journal_files: 14d }
+    minute_5: { size_of_journal_files: 20GB,  duration_of_journal_files: 30d }
+    hour_1:   { size_of_journal_files: 20GB,  duration_of_journal_files: 365d }
+```
 
-Whichever limit is hit first rotates a journal. Size the per-tier file limit with a safety margin so the intended duration normally fires first and the size cap remains protection against bursts or a cardinality change.
+For lighter loads, scale `size_of_journal_files` on the raw tier down proportionally — at 10 000 flow records/s ~350 GB / 24 h is enough; at 1 000 flow records/s ~35 GB / 24 h is enough. Whichever limit (size or duration) is hit first triggers rotation; size your raw tier so the **duration limit fires first** under normal load and the size cap is a safety net for traffic surges.
 
-### Use fast NVMe for the journal directory
+### Use fast NVMe for the raw tier
 
-The raw tier is queried directly for any IP-level investigation, full-text search, city / latitude / longitude maps, and anything that filters on a raw-only field (see [Field Reference](/docs/npm/network-flows/field-reference.md) for which fields survive into rollups). The collector also writes the raw stream continuously, so a busy or slow device directly reduces sustainable UDP intake.
+The raw tier is queried directly for any IP-level investigation, full-text search, city / latitude / longitude maps, and anything that filters on a raw-only field (see [Field Reference](/docs/npm/network-flows/field-reference.md) for which fields survive into rollups). At 50 000 flow records/s sustained, the raw tier produces ~1.7 TB / day of indexed writes that you may also be reading back in real time.
 
-Use fast NVMe for the journal directory when operating near the measured throughput envelope. A slower or contended device can make the collector lose UDP datagrams below the figures above. Put all four tiers on the same fast device unless you have measured a separate layout under representative write and query load.
+This is **fast-NVMe territory** — and it is also half of what positions you inside the throughput envelope, because the receive loop's writes must keep flowing to this device. ~1.7 TB/day of raw-tier writes at 50 000 flow records/s is well within a modern PCIe Gen4 / Gen5 NVMe drive but punishes SATA SSDs (queue-depth and write-endurance) and HDDs (IOPS) once concurrent queries land on the same device — on slower devices write backpressure drops UDP packets well below the envelope. A modern PCIe Gen4 / Gen5 NVMe is what you want for the raw-tier directory. Rollup tiers (1m / 5m / 1h) are far less I/O-intensive and can live on slower storage if needed, but in practice it's easier to put the whole journal directory on one fast device.
+
+If the raw tier exceeds the device capacity for your retention target, **shorten raw-tier retention** before you switch to slower storage. A 12-hour raw tier on fast NVMe queries cleanly; a 7-day raw tier on slow storage will time out queries.
 
 ## Memory
 
@@ -124,17 +114,17 @@ The journal is **fully indexed**: every field is indexed, exact-match selections
 
 The exception is the **full-text search box** in the dashboard. FTS runs as a regex against the raw journal payload bytes — it is a **full scan** of the matching tier. Any non-empty FTS query also forces the query to the raw tier (FTS is meaningless on aggregated rollup rows). That means:
 
-- A full-text search over a wide raw-tier window can scan terabytes of indexed journal data. It runs but it is not fast.
+- A full-text search over a 24-hour raw tier with 50k flow records/s sustained scans on the order of multiple terabytes. It runs but it is not fast.
 - For fast queries, use **filters on indexed fields** (the filter ribbon, exact selections). Reserve full-text for the cases where you don't have an indexed handle.
 - The 30-second hard query timeout is a real ceiling for FTS over wide windows. Narrow the time range, add an indexed filter, or switch to a rollup tier (which means dropping the FTS).
 
 ## Practical checklist before you deploy
 
-1. **Capture the actual exporter packet shape and record rate.** Treat 50k packed ordinary records/s as the measured starting point, not a generic promise for one-record packets or NSEL.
-2. **Pick retention independently for raw, 1m, 5m, and 1h.** The raw forensic window is often 24 hours, but it is not the only disk cost.
-3. **Calculate storage per tier** from observed traffic and the measured four-tier range above; add a safety margin for bursts and changing cardinality.
-4. **Use NVMe** for the journal directory. Slower or contended storage reduces UDP headroom.
-5. **Leave RAM headroom** for the page cache and monitor the collector's state-cardinality charts.
+1. **Estimate sustained flow records/s** for the worst-case router or site. If it exceeds the per-agent envelope (50k-100k depending on exporter batching, cardinality, enrichment, and disk I/O), plan distributed before iron.
+2. **Pick raw-tier retention** that matches your forensic window — typically 24 hours.
+3. **Compute storage** for that retention from the table above; size the raw-tier directory with a realistic safety margin, usually **1.2× to 1.5×** depending on burstiness and available disk.
+4. **Use NVMe** for the raw tier. Slower storage shortens raw-tier retention until queries are responsive.
+5. **Leave RAM headroom** for the page cache on top of the agent's own ~1 GB RSS budget.
 6. **Tune kernel UDP buffers** for burst headroom (see [Troubleshooting](/docs/npm/network-flows/troubleshooting.md)).
 7. **For multi-site deployments**, run one Netdata Agent per router or per site rather than central aggregation.
 
