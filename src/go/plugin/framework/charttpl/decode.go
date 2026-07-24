@@ -22,9 +22,6 @@ func DecodeYAMLValidated(data []byte) (*Spec, Validation, error) {
 	if err := yaml.UnmarshalStrict(data, &spec); err != nil {
 		return nil, Validation{}, fmt.Errorf("%w: %v", errDecode, err)
 	}
-	if err := validateYAMLAutogenRulesPresence(&spec); err != nil {
-		return nil, Validation{}, err
-	}
 
 	applyDefaults(&spec)
 	validation, err := Validate(&spec)
@@ -32,33 +29,6 @@ func DecodeYAMLValidated(data []byte) (*Spec, Validation, error) {
 		return nil, Validation{}, err
 	}
 	return &spec, validation, nil
-}
-
-func validateYAMLAutogenRulesPresence(spec *Spec) error {
-	if spec.Engine == nil || spec.Engine.Autogen == nil {
-		return nil
-	}
-	configured := spec.Engine.Autogen.yamlRulesConfigured
-	spec.Engine.Autogen.yamlRulesConfigured = false
-	if configured && len(spec.Engine.Autogen.Rules) == 0 {
-		return semErr("engine.autogen.rules", "must contain at least one rule when configured")
-	}
-	return nil
-}
-
-func (a *EngineAutogen) UnmarshalYAML(unmarshal func(any) error) error {
-	type plain EngineAutogen
-	var decoded plain
-	if err := unmarshal(&decoded); err != nil {
-		return err
-	}
-	var fields map[string]any
-	if err := unmarshal(&fields); err != nil {
-		return err
-	}
-	*a = EngineAutogen(decoded)
-	_, a.yamlRulesConfigured = fields["rules"]
-	return nil
 }
 
 // DecodeYAMLFile reads and parses a YAML template file.

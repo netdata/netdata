@@ -110,8 +110,10 @@
           "type": "boolean"
         },
         "rules": {
-          "type": "array",
-          "minItems": 1,
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "$ref": "#/$defs/engine_autogen_rule"
           }

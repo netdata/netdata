@@ -327,6 +327,8 @@ selector:
   deny: ["app_debug_*"]
 ```
 
+An absent, null, or empty `autogen.rules` value means no conditional fallback rules.
+
 Rules run only after every authored dimension selector has had a chance to route the flattened series. A rule applies
 when `scope` matches the resolved source family. If no rule applies, fallback is permitted. When several rules apply,
 every selector must accept the series; one rejection suppresses fallback, independent of rule order. Within one
@@ -1080,7 +1082,6 @@ All rules below produce semantic validation errors unless noted:
 | `label_promotion[]` entries must not be empty or whitespace-only                        | semantic                        |
 | Lifecycle numeric fields must be `>= 0`                                                 | semantic                        |
 | `engine.autogen.max_type_id_len` must be `0` or `>= 4`                                  | semantic                        |
-| Configured `engine.autogen.rules` must contain at least one rule                        | semantic                        |
 | Every autogen rule requires a non-empty valid `scope` simple pattern                    | semantic                        |
 | Every autogen rule selector requires at least one non-empty valid `allow`/`deny` entry  | semantic                        |
 | Unknown YAML fields                                                                     | decode error (strict unmarshal) |

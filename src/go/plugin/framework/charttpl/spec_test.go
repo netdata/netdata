@@ -214,25 +214,28 @@ groups:
 `
 
 	tests := map[string]struct {
-		rules   string
-		wantErr string
+		rules       string
+		wantErr     string
+		wantNoRules bool
 	}{
-		"absent rules preserve current behavior": {},
-		"empty list is invalid in YAML": {
-			rules:   "    rules: []\n",
-			wantErr: "engine.autogen.rules",
+		"absent rules mean no rules": {
+			wantNoRules: true,
 		},
-		"null list is invalid in YAML": {
-			rules:   "    rules: null\n",
-			wantErr: "engine.autogen.rules",
+		"empty list means no rules": {
+			rules:       "    rules: []\n",
+			wantNoRules: true,
 		},
-		"bare null list is invalid in YAML": {
-			rules:   "    rules:\n",
-			wantErr: "engine.autogen.rules",
+		"null list means no rules": {
+			rules:       "    rules: null\n",
+			wantNoRules: true,
 		},
-		"escaped key empty list is invalid in YAML": {
-			rules:   "    \"rule\\u0073\": []\n",
-			wantErr: "engine.autogen.rules",
+		"bare null list means no rules": {
+			rules:       "    rules:\n",
+			wantNoRules: true,
+		},
+		"escaped key empty list means no rules": {
+			rules:       "    \"rule\\u0073\": []\n",
+			wantNoRules: true,
 		},
 		"unknown autogen field remains a strict decode error": {
 			rules:   "    unknown: true\n",
@@ -288,6 +291,10 @@ groups:
 			require.NoError(t, err)
 			require.NotNil(t, spec.Engine)
 			require.NotNil(t, spec.Engine.Autogen)
+			if test.wantNoRules {
+				assert.Empty(t, spec.Engine.Autogen.Rules)
+				assert.Empty(t, validation.AutogenRules())
+			}
 			if name == "scoped Unicode selector is valid" {
 				rules := validation.AutogenRules()
 				require.Len(t, rules, 1)
@@ -363,7 +370,9 @@ func TestConfigSchemaJSON(t *testing.T) {
 	require.True(t, ok)
 	rules, ok := engineAutogenProps["rules"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, float64(1), rules["minItems"])
+	assert.ElementsMatch(t, []any{"array", "null"}, rules["type"])
+	_, ok = rules["minItems"]
+	assert.False(t, ok)
 	assert.Len(t, engineAutogenProps, 4)
 
 	chart, ok := defs["chart"].(map[string]any)
@@ -387,13 +396,29 @@ func TestConfigSchemaJSON(t *testing.T) {
 	assert.Equal(t, `\S`, defaultLabelPromotionItems["pattern"])
 }
 
-func TestConfigSchemaAutogenRuleSelectorEmptyLists(t *testing.T) {
+func TestConfigSchemaAutogenRuleEmptyValues(t *testing.T) {
 	var schemaDoc any
 	require.NoError(t, json.Unmarshal([]byte(ConfigSchemaJSON), &schemaDoc))
 	compiler := jsonschema.NewCompiler()
 	require.NoError(t, compiler.AddResource("charttpl.schema.json", schemaDoc))
 	schema, err := compiler.Compile("charttpl.schema.json")
 	require.NoError(t, err)
+
+	for name, rulesValue := range map[string]any{
+		"empty rules": []any{},
+		"null rules":  nil,
+	} {
+		t.Run(name, func(t *testing.T) {
+			raw, err := json.Marshal(richSpec())
+			require.NoError(t, err)
+			var instance map[string]any
+			require.NoError(t, json.Unmarshal(raw, &instance))
+			engine := instance["engine"].(map[string]any)
+			autogen := engine["autogen"].(map[string]any)
+			autogen["rules"] = rulesValue
+			require.NoError(t, schema.Validate(instance))
+		})
+	}
 
 	tests := map[string]struct {
 		selector map[string]any

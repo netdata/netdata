@@ -29,9 +29,6 @@ type EngineAutogen struct {
 
 	// Rules constrain autogen fallback for matching unmatched metric families.
 	Rules []EngineAutogenRule `yaml:"rules,omitempty" json:"rules,omitempty"`
-	// yamlRulesConfigured is decode-only presence state. DecodeYAMLValidated
-	// consumes and clears it before returning the public spec.
-	yamlRulesConfigured bool
 
 	// MaxTypeIDLen is the max allowed full `type.id` length.
 	// Zero means default (1200).
