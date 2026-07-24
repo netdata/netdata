@@ -2,7 +2,9 @@ use super::capacity_bench_wire::{
     BENCHMARK_BYTES, BENCHMARK_PACKETS, CardinalityProfile, PacketShape, WireDatagramKind,
     WireIdentity, WireProtocol, WireWorkload,
 };
-use super::resource_bench_support::{cpu_percent_of_one_core, take_proc_snapshot};
+use super::resource_bench_support::{
+    ProcSnapshot, cpu_percent_for_ticks, cpu_percent_of_one_core, take_proc_snapshot,
+};
 use super::*;
 use crate::query;
 use anyhow::{Context, Result, anyhow, bail};
@@ -11,13 +13,16 @@ use journal_sdk_core::repository::File as RepoFile;
 use journal_sdk_core::{Direction, JournalFile, JournalReader, Location};
 use roaring::RoaringTreemap;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+#[cfg(target_os = "linux")]
+use std::collections::HashSet;
 use std::fs;
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
-use std::sync::{Arc, RwLock};
+use std::str::FromStr;
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio_util::sync::CancellationToken;
@@ -34,9 +39,20 @@ const POLL_INTERVAL: Duration = Duration::from_millis(10);
 const DEFAULT_DURATION_SECS: u64 = 30;
 const DEFAULT_WARMUP_RECORDS: u64 = 4_096;
 const DEFAULT_PEAK_PROBE_DURATION_SECS: u64 = 15;
+const DEFAULT_PEAK_CONFIRM_DURATION_SECS: u64 = 60;
+const PEAK_CONFIRMATION_RUNS: usize = 2;
+const PEAK_INITIAL_RATE: u64 = 10_000;
+const PEAK_MAX_RATE: u64 = 500_000;
+const PEAK_RATE_RESOLUTION: u64 = 1_000;
 const ORDINARY_RATES: &[u64] = &[50_000, 100_000];
 const NSEL_RATES: &[u64] = &[50_000, 100_000];
 const PEAK_PROBE_RATES: &[u64] = &[125_000, 150_000, 175_000, 200_000];
+const SELECTED_PROTOCOL_ENV: &str = "NETFLOW_CAPACITY_BENCH_PROTOCOL";
+const SELECTED_PACKET_SHAPE_ENV: &str = "NETFLOW_CAPACITY_BENCH_PACKET_SHAPE";
+const SELECTED_CARDINALITY_ENV: &str = "NETFLOW_CAPACITY_BENCH_CARDINALITY";
+const SELECTED_RATE_ENV: &str = "NETFLOW_CAPACITY_BENCH_RATE";
+const COLLECTOR_CPU_LIST_ENV: &str = "NETFLOW_CAPACITY_BENCH_COLLECTOR_CPU_LIST";
+const SENDER_CPU_LIST_ENV: &str = "NETFLOW_CAPACITY_BENCH_SENDER_CPU_LIST";
 const PEAK_CARDINALITY_PROFILES: &[CardinalityProfile] = &[
     CardinalityProfile::Repeating256,
     CardinalityProfile::DurationBoundedAllUnique,
@@ -116,6 +132,7 @@ impl CapacityCaseSpec {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CollectorReady {
     listener: String,
+    pid: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,6 +147,7 @@ struct SenderReport {
     active_data_payload_bytes: u64,
     active_data_packet_sizes: BTreeMap<u64, u64>,
     active_elapsed_nanos: u128,
+    process: ProcessObservation,
 }
 
 impl SenderReport {
@@ -149,6 +167,31 @@ struct CollectorReport {
     metrics: BTreeMap<String, u64>,
     elapsed_millis: u128,
     cpu_percent_of_one_core: f64,
+    process: ProcessObservation,
+    active_process: Option<ActiveProcessObservation>,
+    udp_receive_buffer_bytes: Option<usize>,
+    udp_kernel_drops: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ProcessObservation {
+    user_cpu_percent_of_one_core: f64,
+    system_cpu_percent_of_one_core: f64,
+    io_read_bytes: u64,
+    io_write_bytes: u64,
+    final_rss_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ActiveProcessObservation {
+    elapsed_millis: u128,
+    process: ProcessObservation,
+}
+
+#[derive(Default)]
+struct ActiveWindowSnapshots {
+    start: Option<(Instant, ProcSnapshot)>,
+    end: Option<(Instant, ProcSnapshot)>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -166,6 +209,22 @@ struct CapacityRateReport {
     accepted_exporter_records_per_sec: f64,
     accepted_journal_rows_per_sec: f64,
     raw_logical_bytes_per_journal_row: f64,
+}
+
+/// Controller wall-time breakdown for one benchmark case.
+///
+/// These timings are deliberately separate from collector CPU observations:
+/// they explain benchmark-controller overhead without attributing it to live
+/// ingest work.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CapacityCaseTiming {
+    collector_startup_millis: u128,
+    sender_run_millis: u128,
+    post_send_drain_millis: u128,
+    collector_shutdown_millis: u128,
+    raw_readback_millis: u128,
+    tier_readback_millis: u128,
+    controller_total_millis: u128,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -192,9 +251,29 @@ enum CapacityOutcome {
     HarnessInvalid,
 }
 
+/// Controls which finalized journal artifacts a capacity case decodes.
+///
+/// A peak search needs the raw journal to prove that the live ingest path
+/// retained every expected row and counter. Rollup artifact correctness and
+/// physical storage are validated by the dedicated storage matrix, so decoding
+/// every rollup after every peak probe only delays the next measurement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum CapacityReadbackScope {
+    RawAndTiers,
+    RawOnly,
+}
+
+impl CapacityReadbackScope {
+    const fn includes_tiers(self) -> bool {
+        matches!(self, Self::RawAndTiers)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CapacityCaseReport {
     spec: CapacityCaseSpec,
+    readback_scope: CapacityReadbackScope,
     outcome: CapacityOutcome,
     reason: Option<String>,
     sender: Option<SenderReport>,
@@ -203,6 +282,7 @@ struct CapacityCaseReport {
     tiers: BTreeMap<String, TierReadback>,
     rates: Option<CapacityRateReport>,
     nsel: Option<NselOutcomeReport>,
+    timing: Option<CapacityCaseTiming>,
 }
 
 #[derive(Debug, Serialize)]
@@ -223,6 +303,62 @@ struct CapacityPeakSearchReport {
     cases: Vec<CapacityCaseReport>,
     highest_confirmed_pass_records_per_sec: Option<u64>,
     lowest_capacity_failure_records_per_sec: Option<u64>,
+}
+
+/// A complete strict-lossless peak measurement for one protocol, packet shape,
+/// and cardinality profile. This is intentionally a test-only engineering
+/// report, not an operator-facing capacity claim.
+#[derive(Debug, Serialize)]
+struct CapacityPeakCaseReport {
+    protocol: WireProtocol,
+    packet_shape: PacketShape,
+    cardinality: CardinalityProfile,
+    rate_resolution_records_per_sec: u64,
+    short_probe: CapacityPeakBracket,
+    confirmations: Vec<CapacityCaseReport>,
+    sustained_refinement: Option<CapacityPeakBracket>,
+    outcome: CapacityPeakOutcome,
+    confirmed_peak_records_per_sec: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+struct CapacityPeakBracket {
+    active_duration_secs: u64,
+    cases: Vec<CapacityCaseReport>,
+    highest_pass_records_per_sec: Option<u64>,
+    lowest_failure_records_per_sec: Option<u64>,
+    outcome: CapacityPeakBracketOutcome,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum CapacityPeakBracketOutcome {
+    Bracketed,
+    NoLosslessRateAtResolution,
+    HarnessInvalid,
+    RateCeilingReached,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum CapacityPeakOutcome {
+    Confirmed,
+    NoLosslessRateAtResolution,
+    HarnessInvalid,
+    RateCeilingReached,
+    UnstableAtCandidateRate,
+}
+
+#[derive(Debug, Serialize)]
+struct CapacityPeakMatrixReport {
+    methodology: &'static str,
+    created_unix_secs: u64,
+    probe_duration_secs: u64,
+    confirmation_duration_secs: u64,
+    rate_resolution_records_per_sec: u64,
+    collector_cpu_list: Option<String>,
+    sender_cpu_list: Option<String>,
+    cases: Vec<CapacityPeakCaseReport>,
 }
 
 #[test]
@@ -319,6 +455,424 @@ fn bench_capacity_matrix() {
             .all(|case| case.outcome != CapacityOutcome::HarnessInvalid),
         "one or more benchmark cases were invalid; inspect the retained report"
     );
+}
+
+#[test]
+#[ignore = "manual selected real-UDP capacity case"]
+fn bench_capacity_selected_case() {
+    let spec = selected_capacity_case().expect("read selected capacity benchmark case");
+    let report = run_capacity_case(spec);
+    let path = std::env::temp_dir().join(format!(
+        "netflow-capacity-selected-case-{}.json",
+        unix_secs()
+    ));
+    write_json(&path, &report).expect("write selected capacity case report");
+    println!("NETFLOW_CAPACITY_SELECTED_CASE_REPORT={}", path.display());
+    println!("{report:#?}");
+    assert_ne!(
+        report.outcome,
+        CapacityOutcome::HarnessInvalid,
+        "selected capacity case was invalid"
+    );
+}
+
+#[test]
+#[ignore = "manual full strict-lossless UDP collector peak benchmark"]
+fn bench_capacity_peak_matrix() {
+    let config = CapacityPeakSearchConfig {
+        probe_duration_secs: env_u64(
+            "NETFLOW_CAPACITY_BENCH_PEAK_PROBE_DURATION_SECS",
+            DEFAULT_PEAK_PROBE_DURATION_SECS,
+        ),
+        confirmation_duration_secs: env_u64(
+            "NETFLOW_CAPACITY_BENCH_PEAK_CONFIRM_DURATION_SECS",
+            DEFAULT_PEAK_CONFIRM_DURATION_SECS,
+        ),
+        warmup_records: env_u64(
+            "NETFLOW_CAPACITY_BENCH_WARMUP_RECORDS",
+            DEFAULT_WARMUP_RECORDS,
+        ),
+        initial_rate_records_per_sec: PEAK_INITIAL_RATE,
+        maximum_rate_records_per_sec: PEAK_MAX_RATE,
+        rate_resolution_records_per_sec: PEAK_RATE_RESOLUTION,
+    };
+    let cases = capacity_peak_workloads()
+        .into_iter()
+        .map(|(protocol, packet_shape, cardinality)| {
+            run_capacity_peak_search(protocol, packet_shape, cardinality, config)
+        })
+        .collect();
+    let report = CapacityPeakMatrixReport {
+        methodology: "For every protocol, packet shape, and cardinality profile, an isolated loopback sender emits real UDP datagrams into a fresh collector and the controller reads finalized raw journals. A pass requires every sent datagram, zero collector errors, and exact raw journal rows, byte counters, packet counters, and ordinary-flow cardinality. Rollup work remains active and its errors are checked, while the dedicated storage matrix validates finalized rollup artifacts. The search doubles the offered exporter-record rate until a strict lossless failure, then narrows the pass/fail bracket to 1,000 records/s. The highest short-run pass is then required to pass twice for 60 seconds. If it does not, the same bracket search is repeated at the sustained duration. The reported peak is therefore the highest rate measured to pass twice for the stated duration, not a universal product limit.",
+        created_unix_secs: unix_secs(),
+        probe_duration_secs: config.probe_duration_secs,
+        confirmation_duration_secs: config.confirmation_duration_secs,
+        rate_resolution_records_per_sec: config.rate_resolution_records_per_sec,
+        collector_cpu_list: std::env::var(COLLECTOR_CPU_LIST_ENV).ok(),
+        sender_cpu_list: std::env::var(SENDER_CPU_LIST_ENV).ok(),
+        cases,
+    };
+    let path = std::env::temp_dir().join(format!(
+        "netflow-capacity-peak-benchmark-{}.json",
+        report.created_unix_secs
+    ));
+    write_json(&path, &report).expect("write capacity peak benchmark report");
+    println!("NETFLOW_CAPACITY_PEAK_BENCHMARK_REPORT={}", path.display());
+    for case in &report.cases {
+        println!(
+            "{} {} {}: {:?}, confirmed peak {:?} records/s",
+            case.protocol.label(),
+            case.packet_shape.label(),
+            case.cardinality.label(),
+            case.outcome,
+            case.confirmed_peak_records_per_sec,
+        );
+    }
+    assert!(
+        report
+            .cases
+            .iter()
+            .all(|case| case.outcome == CapacityPeakOutcome::Confirmed),
+        "one or more peak searches were incomplete; inspect the retained report"
+    );
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CapacityPeakSearchConfig {
+    probe_duration_secs: u64,
+    confirmation_duration_secs: u64,
+    warmup_records: u64,
+    initial_rate_records_per_sec: u64,
+    maximum_rate_records_per_sec: u64,
+    rate_resolution_records_per_sec: u64,
+}
+
+fn capacity_peak_workloads() -> Vec<(WireProtocol, PacketShape, CardinalityProfile)> {
+    let mut workloads = Vec::new();
+    for protocol in WireProtocol::ORDINARY {
+        for packet_shape in PacketShape::ALL {
+            for cardinality in CardinalityProfile::ALL {
+                workloads.push((protocol, packet_shape, cardinality));
+            }
+        }
+    }
+    for packet_shape in PacketShape::ALL {
+        for cardinality in CardinalityProfile::ALL {
+            workloads.push((WireProtocol::CiscoNsel, packet_shape, cardinality));
+        }
+    }
+    workloads
+}
+
+fn run_capacity_peak_search(
+    protocol: WireProtocol,
+    packet_shape: PacketShape,
+    cardinality: CardinalityProfile,
+    config: CapacityPeakSearchConfig,
+) -> CapacityPeakCaseReport {
+    let short_probe = find_capacity_peak_bracket(
+        protocol,
+        packet_shape,
+        cardinality,
+        config.probe_duration_secs,
+        config,
+    );
+    let mut confirmations = Vec::new();
+    let mut sustained_refinement = None;
+
+    let (outcome, confirmed_peak_records_per_sec) = match short_probe.outcome {
+        CapacityPeakBracketOutcome::NoLosslessRateAtResolution => {
+            (CapacityPeakOutcome::NoLosslessRateAtResolution, None)
+        }
+        CapacityPeakBracketOutcome::HarnessInvalid => (CapacityPeakOutcome::HarnessInvalid, None),
+        CapacityPeakBracketOutcome::RateCeilingReached => {
+            (CapacityPeakOutcome::RateCeilingReached, None)
+        }
+        CapacityPeakBracketOutcome::Bracketed => {
+            let candidate = short_probe
+                .highest_pass_records_per_sec
+                .expect("a bracketed peak must have a successful lower bound");
+            let confirmed = run_peak_confirmations(
+                protocol,
+                packet_shape,
+                cardinality,
+                candidate,
+                config,
+                &mut confirmations,
+            );
+            if confirmed {
+                (CapacityPeakOutcome::Confirmed, Some(candidate))
+            } else {
+                let sustained = find_capacity_peak_bracket(
+                    protocol,
+                    packet_shape,
+                    cardinality,
+                    config.confirmation_duration_secs,
+                    config,
+                );
+                let sustained_outcome = sustained.outcome;
+                let sustained_candidate = sustained.highest_pass_records_per_sec;
+                sustained_refinement = Some(sustained);
+                match (sustained_outcome, sustained_candidate) {
+                    (CapacityPeakBracketOutcome::Bracketed, Some(candidate)) => {
+                        if run_peak_confirmations(
+                            protocol,
+                            packet_shape,
+                            cardinality,
+                            candidate,
+                            config,
+                            &mut confirmations,
+                        ) {
+                            (CapacityPeakOutcome::Confirmed, Some(candidate))
+                        } else {
+                            (CapacityPeakOutcome::UnstableAtCandidateRate, None)
+                        }
+                    }
+                    (CapacityPeakBracketOutcome::NoLosslessRateAtResolution, _) => {
+                        (CapacityPeakOutcome::NoLosslessRateAtResolution, None)
+                    }
+                    (CapacityPeakBracketOutcome::HarnessInvalid, _) => {
+                        (CapacityPeakOutcome::HarnessInvalid, None)
+                    }
+                    (CapacityPeakBracketOutcome::RateCeilingReached, _) => {
+                        (CapacityPeakOutcome::RateCeilingReached, None)
+                    }
+                    (CapacityPeakBracketOutcome::Bracketed, None) => {
+                        (CapacityPeakOutcome::HarnessInvalid, None)
+                    }
+                }
+            }
+        }
+    };
+
+    CapacityPeakCaseReport {
+        protocol,
+        packet_shape,
+        cardinality,
+        rate_resolution_records_per_sec: config.rate_resolution_records_per_sec,
+        short_probe,
+        confirmations,
+        sustained_refinement,
+        outcome,
+        confirmed_peak_records_per_sec,
+    }
+}
+
+fn run_peak_confirmations(
+    protocol: WireProtocol,
+    packet_shape: PacketShape,
+    cardinality: CardinalityProfile,
+    candidate_rate_records_per_sec: u64,
+    config: CapacityPeakSearchConfig,
+    reports: &mut Vec<CapacityCaseReport>,
+) -> bool {
+    for _ in 0..PEAK_CONFIRMATION_RUNS {
+        let case = run_capacity_peak_case(CapacityCaseSpec {
+            protocol,
+            packet_shape,
+            cardinality,
+            target_records_per_sec: candidate_rate_records_per_sec,
+            active_duration_secs: config.confirmation_duration_secs,
+            warmup_records: config.warmup_records,
+        });
+        let pass = case.outcome == CapacityOutcome::Pass;
+        reports.push(case);
+        if !pass {
+            return false;
+        }
+    }
+    true
+}
+
+fn find_capacity_peak_bracket(
+    protocol: WireProtocol,
+    packet_shape: PacketShape,
+    cardinality: CardinalityProfile,
+    active_duration_secs: u64,
+    config: CapacityPeakSearchConfig,
+) -> CapacityPeakBracket {
+    assert!(
+        config.initial_rate_records_per_sec >= config.rate_resolution_records_per_sec,
+        "initial peak probe rate must be at least the peak rate resolution"
+    );
+    assert!(
+        config.maximum_rate_records_per_sec >= config.initial_rate_records_per_sec,
+        "maximum peak probe rate must be at least the initial probe rate"
+    );
+
+    let mut cases = Vec::new();
+    let mut highest_pass = None;
+    let mut lowest_failure = None;
+    let mut rate = config.initial_rate_records_per_sec;
+
+    loop {
+        let case = run_capacity_peak_case(CapacityCaseSpec {
+            protocol,
+            packet_shape,
+            cardinality,
+            target_records_per_sec: rate,
+            active_duration_secs,
+            warmup_records: config.warmup_records,
+        });
+        match case.outcome {
+            CapacityOutcome::HarnessInvalid => {
+                cases.push(case);
+                return CapacityPeakBracket {
+                    active_duration_secs,
+                    cases,
+                    highest_pass_records_per_sec: highest_pass,
+                    lowest_failure_records_per_sec: lowest_failure,
+                    outcome: CapacityPeakBracketOutcome::HarnessInvalid,
+                };
+            }
+            CapacityOutcome::Pass => {
+                highest_pass = Some(rate);
+                cases.push(case);
+                if rate == config.maximum_rate_records_per_sec {
+                    return CapacityPeakBracket {
+                        active_duration_secs,
+                        cases,
+                        highest_pass_records_per_sec: highest_pass,
+                        lowest_failure_records_per_sec: lowest_failure,
+                        outcome: CapacityPeakBracketOutcome::RateCeilingReached,
+                    };
+                }
+                rate = next_peak_probe_rate(rate, config);
+            }
+            CapacityOutcome::CapacityFailure => {
+                lowest_failure = Some(rate);
+                cases.push(case);
+                if highest_pass.is_some() {
+                    break;
+                }
+                let Some(lower_rate) = lower_peak_probe_rate(rate, config) else {
+                    return CapacityPeakBracket {
+                        active_duration_secs,
+                        cases,
+                        highest_pass_records_per_sec: highest_pass,
+                        lowest_failure_records_per_sec: lowest_failure,
+                        outcome: CapacityPeakBracketOutcome::NoLosslessRateAtResolution,
+                    };
+                };
+                rate = lower_rate;
+            }
+        }
+    }
+
+    let mut low = highest_pass.expect("capacity failure followed a successful lower probe");
+    let mut high = lowest_failure.expect("capacity failure must set an upper probe");
+    while high.saturating_sub(low) > config.rate_resolution_records_per_sec {
+        let rate = midpoint_peak_probe_rate(low, high, config.rate_resolution_records_per_sec);
+        let case = run_capacity_peak_case(CapacityCaseSpec {
+            protocol,
+            packet_shape,
+            cardinality,
+            target_records_per_sec: rate,
+            active_duration_secs,
+            warmup_records: config.warmup_records,
+        });
+        match case.outcome {
+            CapacityOutcome::Pass => low = rate,
+            CapacityOutcome::CapacityFailure => high = rate,
+            CapacityOutcome::HarnessInvalid => {
+                cases.push(case);
+                return CapacityPeakBracket {
+                    active_duration_secs,
+                    cases,
+                    highest_pass_records_per_sec: Some(low),
+                    lowest_failure_records_per_sec: Some(high),
+                    outcome: CapacityPeakBracketOutcome::HarnessInvalid,
+                };
+            }
+        }
+        cases.push(case);
+    }
+
+    CapacityPeakBracket {
+        active_duration_secs,
+        cases,
+        highest_pass_records_per_sec: Some(low),
+        lowest_failure_records_per_sec: Some(high),
+        outcome: CapacityPeakBracketOutcome::Bracketed,
+    }
+}
+
+fn next_peak_probe_rate(rate: u64, config: CapacityPeakSearchConfig) -> u64 {
+    rate.saturating_mul(2)
+        .min(config.maximum_rate_records_per_sec)
+}
+
+fn lower_peak_probe_rate(rate: u64, config: CapacityPeakSearchConfig) -> Option<u64> {
+    (rate > config.rate_resolution_records_per_sec).then(|| {
+        (rate / 2)
+            .max(config.rate_resolution_records_per_sec)
+            .div_ceil(config.rate_resolution_records_per_sec)
+            * config.rate_resolution_records_per_sec
+    })
+}
+
+fn midpoint_peak_probe_rate(low: u64, high: u64, resolution: u64) -> u64 {
+    debug_assert!(high > low.saturating_add(resolution));
+    let midpoint = low.saturating_add(high.saturating_sub(low) / 2);
+    let rounded = midpoint / resolution * resolution;
+    if rounded <= low {
+        low.saturating_add(resolution)
+    } else if rounded >= high {
+        high.saturating_sub(resolution)
+    } else {
+        rounded
+    }
+}
+
+fn selected_capacity_case() -> Result<CapacityCaseSpec> {
+    let protocol = parse_selected_variant(
+        SELECTED_PROTOCOL_ENV,
+        WireProtocol::ALL,
+        WireProtocol::label,
+    )?;
+    let packet_shape = parse_selected_variant(
+        SELECTED_PACKET_SHAPE_ENV,
+        PacketShape::ALL,
+        PacketShape::label,
+    )?;
+    let cardinality = parse_selected_variant(
+        SELECTED_CARDINALITY_ENV,
+        CardinalityProfile::ALL,
+        CardinalityProfile::label,
+    )?;
+    let target_records_per_sec = std::env::var(SELECTED_RATE_ENV)
+        .with_context(|| format!("{SELECTED_RATE_ENV} is required"))?
+        .parse::<u64>()
+        .with_context(|| format!("parse {SELECTED_RATE_ENV}"))?;
+    if target_records_per_sec == 0 {
+        bail!("{SELECTED_RATE_ENV} must be greater than zero");
+    }
+    Ok(CapacityCaseSpec {
+        protocol,
+        packet_shape,
+        cardinality,
+        target_records_per_sec,
+        active_duration_secs: env_u64(
+            "NETFLOW_CAPACITY_BENCH_DURATION_SECS",
+            DEFAULT_DURATION_SECS,
+        ),
+        warmup_records: env_u64(
+            "NETFLOW_CAPACITY_BENCH_WARMUP_RECORDS",
+            DEFAULT_WARMUP_RECORDS,
+        ),
+    })
+}
+
+fn parse_selected_variant<T: Copy>(
+    variable: &str,
+    variants: impl IntoIterator<Item = T>,
+    label: impl Fn(T) -> &'static str,
+) -> Result<T> {
+    let value = std::env::var(variable).with_context(|| format!("{variable} is required"))?;
+    variants
+        .into_iter()
+        .find(|variant| label(*variant) == value)
+        .ok_or_else(|| anyhow!("{variable} has unsupported value {value:?}"))
 }
 
 fn run_peak_searches(
@@ -506,14 +1060,66 @@ fn capacity_smoke_uses_real_udp_and_final_journal_readback() {
             warmup_records: 64,
         });
         assert_eq!(report.outcome, CapacityOutcome::Pass, "{report:#?}");
+        assert!(
+            report
+                .collector
+                .as_ref()
+                .and_then(|collector| collector.active_process.as_ref())
+                .is_some(),
+            "collector did not capture the sender's active window: {report:#?}"
+        );
+        let timing = report
+            .timing
+            .as_ref()
+            .expect("successful capacity case must report controller timings");
+        assert!(
+            timing.controller_total_millis >= timing.sender_run_millis,
+            "controller timing cannot be shorter than its sender phase: {timing:#?}"
+        );
+        assert!(
+            timing.raw_readback_millis <= timing.controller_total_millis,
+            "raw readback timing cannot exceed controller timing: {timing:#?}"
+        );
     }
 }
 
+#[test]
+fn capacity_peak_case_reads_raw_without_redecoding_rollup_artifacts() {
+    let report = run_capacity_peak_case(CapacityCaseSpec {
+        protocol: WireProtocol::Ipfix,
+        packet_shape: PacketShape::NearMtuPacked,
+        cardinality: CardinalityProfile::Repeating256,
+        target_records_per_sec: 100,
+        active_duration_secs: 1,
+        warmup_records: 64,
+    });
+
+    assert_eq!(report.outcome, CapacityOutcome::Pass, "{report:#?}");
+    assert_eq!(report.readback_scope, CapacityReadbackScope::RawOnly);
+    assert!(report.raw.is_some(), "peak report must retain raw proof");
+    assert!(
+        report.tiers.is_empty(),
+        "peak reports must not re-decode rollup artifacts"
+    );
+}
+
 fn run_capacity_case(spec: CapacityCaseSpec) -> CapacityCaseReport {
-    match run_capacity_case_inner(spec.clone()) {
+    run_capacity_case_with_readback(spec, CapacityReadbackScope::RawAndTiers)
+}
+
+fn run_capacity_peak_case(spec: CapacityCaseSpec) -> CapacityCaseReport {
+    run_capacity_case_with_readback(spec, CapacityReadbackScope::RawOnly)
+}
+
+fn run_capacity_case_with_readback(
+    spec: CapacityCaseSpec,
+    readback_scope: CapacityReadbackScope,
+) -> CapacityCaseReport {
+    match run_capacity_case_inner(spec.clone(), readback_scope) {
         Ok(report) => report,
         Err(error) => CapacityCaseReport {
             spec,
+            readback_scope,
             outcome: CapacityOutcome::HarnessInvalid,
             reason: Some(format!("{error:#}")),
             sender: None,
@@ -522,17 +1128,23 @@ fn run_capacity_case(spec: CapacityCaseSpec) -> CapacityCaseReport {
             tiers: BTreeMap::new(),
             rates: None,
             nsel: None,
+            timing: None,
         },
     }
 }
 
-fn run_capacity_case_inner(spec: CapacityCaseSpec) -> Result<CapacityCaseReport> {
+fn run_capacity_case_inner(
+    spec: CapacityCaseSpec,
+    readback_scope: CapacityReadbackScope,
+) -> Result<CapacityCaseReport> {
+    let controller_started = Instant::now();
     let artifact = tempfile::Builder::new()
         .prefix("netflow-capacity-bench-")
         .tempdir_in(std::env::temp_dir())
         .context("create capacity benchmark artifact directory")?;
     write_json(&artifact.path().join("case.json"), &spec)?;
 
+    let collector_startup_started = Instant::now();
     let mut collector = spawn_child("collector", artifact.path())?;
     let result = (|| -> Result<CapacityCaseReport> {
         let ready: CollectorReady =
@@ -541,24 +1153,39 @@ fn run_capacity_case_inner(spec: CapacityCaseSpec) -> Result<CapacityCaseReport>
             .listener
             .parse::<SocketAddr>()
             .context("parse collector listener address")?;
+        let collector_startup_millis = collector_startup_started.elapsed().as_millis();
 
+        let sender_run_started = Instant::now();
         let mut sender = spawn_child("sender", artifact.path())?;
         wait_for_child(&mut sender, sender_timeout(&spec))?;
         let sender_report: SenderReport = read_json(&artifact.path().join("sender-report.json"))?;
+        let sender_run_millis = sender_run_started.elapsed().as_millis();
 
+        let drain_started = Instant::now();
         thread::sleep(POST_SEND_DRAIN);
+        let post_send_drain_millis = drain_started.elapsed().as_millis();
+
+        let collector_shutdown_started = Instant::now();
         fs::write(artifact.path().join("shutdown"), b"complete")
             .context("request collector shutdown")?;
         wait_for_child(&mut collector, sender_timeout(&spec))?;
         let collector_report: CollectorReport =
             read_json(&artifact.path().join("collector-report.json"))?;
+        let collector_shutdown_millis = collector_shutdown_started.elapsed().as_millis();
 
         let journal_dir = artifact.path().join("flows");
+        let raw_readback_started = Instant::now();
         let raw = read_tier(&journal_dir.join("raw"), !spec.protocol.is_nsel())?;
+        let raw_readback_millis = raw_readback_started.elapsed().as_millis();
+
+        let tier_readback_started = Instant::now();
         let mut tiers = BTreeMap::new();
-        for tier in ["1m", "5m", "1h"] {
-            tiers.insert(tier.to_string(), read_tier(&journal_dir.join(tier), false)?);
+        if readback_scope.includes_tiers() {
+            for tier in ["1m", "5m", "1h"] {
+                tiers.insert(tier.to_string(), read_tier(&journal_dir.join(tier), false)?);
+            }
         }
+        let tier_readback_millis = tier_readback_started.elapsed().as_millis();
 
         let (outcome, reason) =
             validate_capacity_case(&spec, &sender_report, &collector_report, &raw);
@@ -569,6 +1196,7 @@ fn run_capacity_case_inner(spec: CapacityCaseSpec) -> Result<CapacityCaseReport>
             .then(|| nsel_outcomes(&collector_report));
         Ok(CapacityCaseReport {
             spec,
+            readback_scope,
             outcome,
             reason,
             sender: Some(sender_report),
@@ -577,6 +1205,15 @@ fn run_capacity_case_inner(spec: CapacityCaseSpec) -> Result<CapacityCaseReport>
             tiers,
             rates: Some(rates),
             nsel,
+            timing: Some(CapacityCaseTiming {
+                collector_startup_millis,
+                sender_run_millis,
+                post_send_drain_millis,
+                collector_shutdown_millis,
+                raw_readback_millis,
+                tier_readback_millis,
+                controller_total_millis: controller_started.elapsed().as_millis(),
+            }),
         })
     })();
 
@@ -653,6 +1290,12 @@ fn validate_capacity_case(
                 sender.active_records_per_sec(),
                 spec.target_records_per_sec
             )),
+        );
+    }
+    if collector.active_process.is_none() {
+        return (
+            CapacityOutcome::HarnessInvalid,
+            Some("collector did not capture the sender active window".to_string()),
         );
     }
 
@@ -827,10 +1470,19 @@ fn run_collector_child() -> Result<()> {
     )?;
     let ready_path = root.join("collector-ready.json");
     let shutdown_path = root.join("shutdown");
+    let active_started_path = root.join("active-started");
+    let active_finished_path = root.join("active-finished");
     let before_cpu = take_proc_snapshot();
     let started = Instant::now();
     let shutdown = CancellationToken::new();
     let watcher_shutdown = shutdown.clone();
+    let kernel_drops = Arc::new(Mutex::new(None));
+    let receive_buffer_bytes = Arc::new(Mutex::new(None));
+    let watcher_metrics = Arc::clone(&metrics);
+    let watcher_kernel_drops = Arc::clone(&kernel_drops);
+    let ready_receive_buffer_bytes = Arc::clone(&receive_buffer_bytes);
+    let active_window = Arc::new(Mutex::new(ActiveWindowSnapshots::default()));
+    let watcher_active_window = Arc::clone(&active_window);
 
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -839,7 +1491,25 @@ fn run_collector_child() -> Result<()> {
     let result = runtime.block_on(async move {
         let watcher = tokio::spawn(async move {
             while !watcher_shutdown.is_cancelled() {
+                match watcher_active_window.lock() {
+                    Ok(mut window) => update_active_window_snapshots(
+                        &mut window,
+                        &active_started_path,
+                        &active_finished_path,
+                    ),
+                    Err(poisoned) => update_active_window_snapshots(
+                        &mut poisoned.into_inner(),
+                        &active_started_path,
+                        &active_finished_path,
+                    ),
+                }
                 if shutdown_path.exists() {
+                    let listener_inodes = watcher_metrics.udp_listener_socket_inodes();
+                    let observed_drops = socket_kernel_drops(&listener_inodes);
+                    match watcher_kernel_drops.lock() {
+                        Ok(mut slot) => *slot = observed_drops,
+                        Err(poisoned) => *poisoned.into_inner() = observed_drops,
+                    }
                     watcher_shutdown.cancel();
                     break;
                 }
@@ -853,10 +1523,16 @@ fn run_collector_child() -> Result<()> {
                     1,
                     "collector must bind exactly one listener"
                 );
+                let (listener, actual_receive_buffer_bytes) = listeners[0];
+                match ready_receive_buffer_bytes.lock() {
+                    Ok(mut slot) => *slot = actual_receive_buffer_bytes,
+                    Err(poisoned) => *poisoned.into_inner() = actual_receive_buffer_bytes,
+                }
                 write_json(
                     &ready_path,
                     &CollectorReady {
-                        listener: listeners[0].to_string(),
+                        listener: listener.to_string(),
+                        pid: std::process::id(),
                     },
                 )
                 .expect("write collector readiness");
@@ -869,12 +1545,103 @@ fn run_collector_child() -> Result<()> {
     result.context("run collector service")?;
 
     let elapsed = started.elapsed();
+    let after_cpu = take_proc_snapshot();
     let report = CollectorReport {
         metrics: metrics.snapshot().into_iter().collect(),
         elapsed_millis: elapsed.as_millis(),
-        cpu_percent_of_one_core: cpu_percent_of_one_core(before_cpu, take_proc_snapshot(), elapsed),
+        cpu_percent_of_one_core: cpu_percent_of_one_core(before_cpu, after_cpu, elapsed),
+        process: process_observation(before_cpu, after_cpu, elapsed),
+        active_process: active_process_observation(&active_window),
+        udp_receive_buffer_bytes: match receive_buffer_bytes.lock() {
+            Ok(slot) => *slot,
+            Err(poisoned) => *poisoned.into_inner(),
+        },
+        udp_kernel_drops: match kernel_drops.lock() {
+            Ok(slot) => *slot,
+            Err(poisoned) => *poisoned.into_inner(),
+        },
     };
     write_json(&root.join("collector-report.json"), &report)
+}
+
+#[cfg(target_os = "linux")]
+fn socket_kernel_drops(listener_inodes: &[u64]) -> Option<u64> {
+    let listener_inodes = listener_inodes.iter().copied().collect::<HashSet<_>>();
+    if listener_inodes.is_empty() {
+        return None;
+    }
+
+    let mut found = HashSet::with_capacity(listener_inodes.len());
+    let mut drops = 0_u64;
+    for path in ["/proc/net/udp", "/proc/net/udp6"] {
+        let Ok(contents) = fs::read_to_string(path) else {
+            continue;
+        };
+        for line in contents.lines().skip(1) {
+            let mut columns = line.split_ascii_whitespace();
+            let (Some(inode), Some(socket_drops)) = (columns.nth(9), columns.nth(2)) else {
+                continue;
+            };
+            let (Ok(inode), Ok(socket_drops)) = (inode.parse::<u64>(), socket_drops.parse::<u64>())
+            else {
+                continue;
+            };
+            if listener_inodes.contains(&inode) && found.insert(inode) {
+                drops = drops.saturating_add(socket_drops);
+            }
+        }
+    }
+    (found.len() == listener_inodes.len()).then_some(drops)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn socket_kernel_drops(_listener_inodes: &[u64]) -> Option<u64> {
+    None
+}
+
+fn update_active_window_snapshots(
+    window: &mut ActiveWindowSnapshots,
+    active_started_path: &Path,
+    active_finished_path: &Path,
+) {
+    if window.start.is_none() && active_started_path.exists() {
+        window.start = Some((Instant::now(), take_proc_snapshot()));
+    }
+    if window.start.is_some() && window.end.is_none() && active_finished_path.exists() {
+        window.end = Some((Instant::now(), take_proc_snapshot()));
+    }
+}
+
+fn active_process_observation(
+    active_window: &Mutex<ActiveWindowSnapshots>,
+) -> Option<ActiveProcessObservation> {
+    let window = match active_window.lock() {
+        Ok(window) => window,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    let (started, start_snapshot) = window.start?;
+    let (finished, finish_snapshot) = window.end?;
+    let elapsed = finished.saturating_duration_since(started);
+    Some(ActiveProcessObservation {
+        elapsed_millis: elapsed.as_millis(),
+        process: process_observation(start_snapshot, finish_snapshot, elapsed),
+    })
+}
+
+fn process_observation(
+    before: ProcSnapshot,
+    after: ProcSnapshot,
+    elapsed: Duration,
+) -> ProcessObservation {
+    let user_ticks = after.user_ticks.saturating_sub(before.user_ticks);
+    let system_ticks = after.system_ticks.saturating_sub(before.system_ticks);
+    ProcessObservation {
+        user_cpu_percent_of_one_core: cpu_percent_for_ticks(user_ticks, elapsed),
+        system_cpu_percent_of_one_core: cpu_percent_for_ticks(system_ticks, elapsed),
+        io_read_bytes: after.read_bytes.saturating_sub(before.read_bytes),
+        io_write_bytes: after.write_bytes.saturating_sub(before.write_bytes),
+        final_rss_bytes: after.rss_bytes,
+    }
 }
 
 fn run_sender_child() -> Result<()> {
@@ -906,6 +1673,7 @@ fn run_sender_child() -> Result<()> {
     let total_records = workload.records();
     let pace_started = Instant::now();
     let mut active_started = None;
+    let mut active_process_before = None;
     let mut sent_records = 0_u64;
     let mut data_datagrams = 0_u64;
     let mut active_data_datagrams = 0_u64;
@@ -918,7 +1686,10 @@ fn run_sender_child() -> Result<()> {
                 + Duration::from_secs_f64(sent_records as f64 / spec.target_records_per_sec as f64),
         );
         if sent_records == warmup_records {
+            fs::write(root.join("active-started"), b"active")
+                .context("mark sender active phase started")?;
             active_started = Some(Instant::now());
+            active_process_before = Some(take_proc_snapshot());
         }
         let active = sent_records >= warmup_records;
         send_datagram(&socket, &datagram.payload)?;
@@ -938,6 +1709,11 @@ fn run_sender_child() -> Result<()> {
             + Duration::from_secs_f64(total_records as f64 / spec.target_records_per_sec as f64),
     );
     let active_started = active_started.context("sender never entered the active phase")?;
+    let active_process_before = active_process_before.expect("sender entered active phase");
+    let active_process_after = take_proc_snapshot();
+    let active_elapsed = active_started.elapsed();
+    fs::write(root.join("active-finished"), b"complete")
+        .context("mark sender active phase finished")?;
     let report = SenderReport {
         sent_records,
         active_records: spec.active_records()?,
@@ -948,7 +1724,8 @@ fn run_sender_child() -> Result<()> {
         active_data_datagrams,
         active_data_payload_bytes,
         active_data_packet_sizes,
-        active_elapsed_nanos: active_started.elapsed().as_nanos(),
+        active_elapsed_nanos: active_elapsed.as_nanos(),
+        process: process_observation(active_process_before, active_process_after, active_elapsed),
     };
     write_json(&root.join("sender-report.json"), &report)
 }
@@ -1010,7 +1787,8 @@ fn spawn_child(role: &'static str, root: &Path) -> Result<BenchmarkChild> {
     let log = fs::File::create(&log_path)
         .with_context(|| format!("create {role} child log {}", log_path.display()))?;
     let stderr = log.try_clone().context("clone child log handle")?;
-    let child = Command::new(std::env::current_exe().context("locate benchmark test binary")?)
+    let mut command = benchmark_child_command(role)?;
+    let child = command
         .arg("--ignored")
         .arg("--exact")
         .arg(test_name)
@@ -1028,6 +1806,34 @@ fn spawn_child(role: &'static str, root: &Path) -> Result<BenchmarkChild> {
         log_path,
         reaped: false,
     })
+}
+
+fn benchmark_child_command(role: &str) -> Result<Command> {
+    let executable = std::env::current_exe().context("locate benchmark test binary")?;
+    let cpu_list_variable = match role {
+        "collector" => COLLECTOR_CPU_LIST_ENV,
+        "sender" => SENDER_CPU_LIST_ENV,
+        _ => bail!("unsupported benchmark child role {role}"),
+    };
+    let cpu_list = std::env::var_os(cpu_list_variable);
+    if cpu_list.is_none() {
+        return Ok(Command::new(executable));
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let mut command = Command::new("taskset");
+        command
+            .arg("--cpu-list")
+            .arg(cpu_list.expect("checked CPU list"))
+            .arg(executable);
+        Ok(command)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = executable;
+        bail!("{cpu_list_variable} is supported only on Linux")
+    }
 }
 
 fn wait_for_child(child: &mut BenchmarkChild, timeout: Duration) -> Result<()> {
@@ -1131,65 +1937,114 @@ fn read_tier(path: &Path, collect_identities: bool) -> Result<TierReadback> {
         let mut reader = JournalReader::default();
         reader.set_location(Location::Head);
         let mut decompress = Vec::new();
+        let mut offsets = Vec::<NonZeroU64>::new();
         while reader
             .step(&journal, Direction::Forward)
             .with_context(|| format!("read journal {}", file_path.display()))?
         {
-            let mut offsets = Vec::<NonZeroU64>::new();
+            offsets.clear();
             reader
                 .entry_data_offsets(&journal, &mut offsets)
                 .with_context(|| format!("enumerate journal fields {}", file_path.display()))?;
-            let mut fields = HashMap::new();
+            let mut entry = JournalReadbackEntry::default();
             query::visit_journal_payloads(
                 &journal,
                 &file_path,
                 &offsets,
                 &mut decompress,
-                |payload| {
-                    if let Some(index) = payload.iter().position(|byte| *byte == b'=') {
-                        fields.insert(
-                            String::from_utf8_lossy(&payload[..index]).into_owned(),
-                            String::from_utf8_lossy(&payload[index + 1..]).into_owned(),
-                        );
-                    }
-                    Ok(())
-                },
+                |payload| entry.observe(payload, collect_identities),
             )
             .with_context(|| format!("decode journal fields {}", file_path.display()))?;
-            if !fields.contains_key("FLOW_VERSION") {
+            if !entry.has_flow_version {
                 continue;
             }
             readback.rows += 1;
-            readback.bytes += parse_counter(&fields, "BYTES")?;
-            readback.packets += parse_counter(&fields, "PACKETS")?;
+            readback.bytes += entry.required(entry.bytes, "BYTES")?;
+            readback.packets += entry.required(entry.packets, "PACKETS")?;
             if collect_identities {
-                let ordinal = WireIdentity::recover_ordinal(
-                    parse_field(&fields, "SRC_ADDR")?
-                        .parse::<IpAddr>()
-                        .context("parse SRC_ADDR")?,
-                    parse_field(&fields, "DST_ADDR")?
-                        .parse::<IpAddr>()
-                        .context("parse DST_ADDR")?,
-                    parse_field(&fields, "SRC_PORT")?
-                        .parse::<u16>()
-                        .context("parse SRC_PORT")?,
-                    parse_field(&fields, "DST_PORT")?
-                        .parse::<u16>()
-                        .context("parse DST_PORT")?,
-                    parse_field(&fields, "IN_IF")?
-                        .parse::<u32>()
-                        .context("parse IN_IF")?,
-                    parse_field(&fields, "OUT_IF")?
-                        .parse::<u32>()
-                        .context("parse OUT_IF")?,
-                )
-                .ok_or_else(|| anyhow!("journal row has no valid synthetic identity"))?;
-                identities.insert(ordinal);
+                identities.insert(entry.identity_ordinal()?);
             }
         }
     }
     readback.distinct_identities = identities.len();
     Ok(readback)
+}
+
+/// The capacity verifier needs a few known textual fields, not a generic
+/// journal query result. Keeping only these values avoids allocating a map and
+/// strings for every field of every benchmark row.
+#[derive(Default)]
+struct JournalReadbackEntry {
+    has_flow_version: bool,
+    bytes: Option<u64>,
+    packets: Option<u64>,
+    src_addr: Option<IpAddr>,
+    dst_addr: Option<IpAddr>,
+    src_port: Option<u16>,
+    dst_port: Option<u16>,
+    in_if: Option<u32>,
+    out_if: Option<u32>,
+}
+
+impl JournalReadbackEntry {
+    fn observe(&mut self, payload: &[u8], collect_identities: bool) -> Result<()> {
+        let Some(index) = payload.iter().position(|byte| *byte == b'=') else {
+            return Ok(());
+        };
+        let (name, value) = (&payload[..index], &payload[index + 1..]);
+        match name {
+            b"FLOW_VERSION" => self.has_flow_version = true,
+            b"BYTES" => self.bytes = Some(parse_journal_value(value, "BYTES")?),
+            b"PACKETS" => self.packets = Some(parse_journal_value(value, "PACKETS")?),
+            b"SRC_ADDR" if collect_identities => {
+                self.src_addr = Some(parse_journal_value(value, "SRC_ADDR")?)
+            }
+            b"DST_ADDR" if collect_identities => {
+                self.dst_addr = Some(parse_journal_value(value, "DST_ADDR")?)
+            }
+            b"SRC_PORT" if collect_identities => {
+                self.src_port = Some(parse_journal_value(value, "SRC_PORT")?)
+            }
+            b"DST_PORT" if collect_identities => {
+                self.dst_port = Some(parse_journal_value(value, "DST_PORT")?)
+            }
+            b"IN_IF" if collect_identities => {
+                self.in_if = Some(parse_journal_value(value, "IN_IF")?)
+            }
+            b"OUT_IF" if collect_identities => {
+                self.out_if = Some(parse_journal_value(value, "OUT_IF")?)
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn required<T: Copy>(&self, value: Option<T>, name: &str) -> Result<T> {
+        value.ok_or_else(|| anyhow!("journal row is missing {name}"))
+    }
+
+    fn identity_ordinal(&self) -> Result<u64> {
+        WireIdentity::recover_ordinal(
+            self.required(self.src_addr, "SRC_ADDR")?,
+            self.required(self.dst_addr, "DST_ADDR")?,
+            self.required(self.src_port, "SRC_PORT")?,
+            self.required(self.dst_port, "DST_PORT")?,
+            self.required(self.in_if, "IN_IF")?,
+            self.required(self.out_if, "OUT_IF")?,
+        )
+        .ok_or_else(|| anyhow!("journal row has no valid synthetic identity"))
+    }
+}
+
+fn parse_journal_value<T>(value: &[u8], name: &str) -> Result<T>
+where
+    T: FromStr,
+    T::Err: std::error::Error + Send + Sync + 'static,
+{
+    std::str::from_utf8(value)
+        .with_context(|| format!("decode {name}"))?
+        .parse::<T>()
+        .with_context(|| format!("parse {name}"))
 }
 
 fn journal_files(path: &Path) -> Result<Vec<PathBuf>> {
@@ -1225,19 +2080,6 @@ fn journal_files(path: &Path) -> Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-fn parse_field<'a>(fields: &'a HashMap<String, String>, name: &str) -> Result<&'a str> {
-    fields
-        .get(name)
-        .map(String::as_str)
-        .ok_or_else(|| anyhow!("journal row is missing {name}"))
-}
-
-fn parse_counter(fields: &HashMap<String, String>, name: &str) -> Result<u64> {
-    parse_field(fields, name)?
-        .parse::<u64>()
-        .with_context(|| format!("parse {name}"))
-}
-
 fn env_u64(name: &str, default: u64) -> u64 {
     std::env::var(name)
         .ok()
@@ -1251,6 +2093,57 @@ fn unix_secs() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod journal_readback_tests {
+    use super::*;
+
+    #[test]
+    fn readback_entry_keeps_only_required_fields() {
+        let mut entry = JournalReadbackEntry::default();
+        let identity = WireIdentity::from_ordinal(123);
+        let fields = [
+            "FLOW_VERSION=9".to_owned(),
+            "BYTES=123".to_owned(),
+            "PACKETS=7".to_owned(),
+            format!("SRC_ADDR={}", identity.src_addr),
+            format!("DST_ADDR={}", identity.dst_addr),
+            format!("SRC_PORT={}", identity.src_port),
+            format!("DST_PORT={}", identity.dst_port),
+            format!("IN_IF={}", identity.in_if),
+            format!("OUT_IF={}", identity.out_if),
+            "UNRELATED_FIELD=ignored".to_owned(),
+        ];
+        for field in &fields {
+            entry
+                .observe(field.as_bytes(), true)
+                .expect("observe journal field");
+        }
+
+        assert!(entry.has_flow_version);
+        assert_eq!(entry.required(entry.bytes, "BYTES").unwrap(), 123);
+        assert_eq!(entry.required(entry.packets, "PACKETS").unwrap(), 7);
+        assert_eq!(entry.identity_ordinal().unwrap(), identity.ordinal);
+    }
+
+    #[test]
+    fn readback_entry_skips_identity_parsing_when_not_requested() {
+        let mut entry = JournalReadbackEntry::default();
+        for payload in [
+            b"FLOW_VERSION=9".as_slice(),
+            b"BYTES=123".as_slice(),
+            b"PACKETS=7".as_slice(),
+            b"SRC_ADDR=not-an-address".as_slice(),
+        ] {
+            entry
+                .observe(payload, false)
+                .expect("observe non-identity journal field");
+        }
+
+        assert_eq!(entry.required(entry.bytes, "BYTES").unwrap(), 123);
+        assert!(entry.src_addr.is_none());
+    }
 }
 
 #[cfg(test)]
@@ -1274,6 +2167,7 @@ mod peak_selection_tests {
                 active_duration_secs: 1,
                 warmup_records: 1,
             },
+            readback_scope: CapacityReadbackScope::RawAndTiers,
             outcome,
             reason: None,
             sender: None,
@@ -1281,11 +2175,22 @@ mod peak_selection_tests {
                 metrics: BTreeMap::new(),
                 elapsed_millis: 1,
                 cpu_percent_of_one_core,
+                process: ProcessObservation {
+                    user_cpu_percent_of_one_core: 0.0,
+                    system_cpu_percent_of_one_core: 0.0,
+                    io_read_bytes: 0,
+                    io_write_bytes: 0,
+                    final_rss_bytes: 0,
+                },
+                active_process: None,
+                udp_receive_buffer_bytes: None,
+                udp_kernel_drops: None,
             }),
             raw: None,
             tiers: BTreeMap::new(),
             rates: None,
             nsel: None,
+            timing: None,
         }
     }
 
@@ -1353,5 +2258,45 @@ mod peak_selection_tests {
             lowest_capacity_failure(&cases, CardinalityProfile::DurationBoundedAllUnique),
             Some(100_000)
         );
+    }
+
+    #[test]
+    fn full_peak_matrix_covers_every_protocol_packet_shape_and_cardinality() {
+        let workloads = capacity_peak_workloads();
+
+        assert_eq!(workloads.len(), 30);
+        assert_eq!(
+            workloads
+                .iter()
+                .filter(|(protocol, _, _)| protocol.is_nsel())
+                .count(),
+            6
+        );
+        assert_eq!(
+            workloads
+                .iter()
+                .filter(|(protocol, _, _)| !protocol.is_nsel())
+                .count(),
+            24
+        );
+    }
+
+    #[test]
+    fn peak_probe_rates_expand_contract_and_binary_search_at_the_resolution() {
+        let config = CapacityPeakSearchConfig {
+            probe_duration_secs: 1,
+            confirmation_duration_secs: 1,
+            warmup_records: 1,
+            initial_rate_records_per_sec: 10_000,
+            maximum_rate_records_per_sec: 500_000,
+            rate_resolution_records_per_sec: 1_000,
+        };
+
+        assert_eq!(next_peak_probe_rate(80_000, config), 160_000);
+        assert_eq!(next_peak_probe_rate(400_000, config), 500_000);
+        assert_eq!(lower_peak_probe_rate(10_000, config), Some(5_000));
+        assert_eq!(lower_peak_probe_rate(1_000, config), None);
+        assert_eq!(midpoint_peak_probe_rate(64_000, 72_000, 1_000), 68_000);
+        assert_eq!(midpoint_peak_probe_rate(68_000, 69_500, 1_000), 69_000);
     }
 }

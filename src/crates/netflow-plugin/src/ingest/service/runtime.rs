@@ -523,13 +523,18 @@ impl IngestService {
     pub(crate) async fn run_with_listener_ready_for_test(
         self,
         shutdown: CancellationToken,
-        listener_ready: impl FnOnce(Vec<std::net::SocketAddr>),
+        listener_ready: impl FnOnce(Vec<(std::net::SocketAddr, Option<usize>)>),
     ) -> Result<()> {
         self.run_with_listener_ready(shutdown, |sockets| {
             listener_ready(
                 sockets
                     .iter()
-                    .map(|socket| socket.local_addr().expect("read bound listener address"))
+                    .map(|socket| {
+                        (
+                            socket.local_addr().expect("read bound listener address"),
+                            socket2::SockRef::from(socket).recv_buffer_size().ok(),
+                        )
+                    })
                     .collect(),
             );
         })
