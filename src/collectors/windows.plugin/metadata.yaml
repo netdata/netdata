@@ -2410,6 +2410,24 @@ modules:
               chart_type: line
               dimensions:
                 - name: committed
+            - name: netframework.clrloading_current_appdomains
+              description: Current application domains
+              unit: domains
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: netframework.clrloading_current_assemblies
+              description: Current loaded assemblies
+              unit: assemblies
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: netframework.clrloading_current_classes_loaded
+              description: Current loaded classes
+              unit: classes
+              chart_type: line
+              dimensions:
+                - name: current
             - name: netframework.clrloading_appdomains_loaded
               description: Loaded application domains
               unit: domain/s
@@ -2440,6 +2458,84 @@ modules:
               chart_type: line
               dimensions:
                 - name: class_load
+            - name: netframework.clrmemory_allocated_bytes
+              description: Allocated bytes on the GC heap
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: allocated
+            - name: netframework.clrmemory_finalization_survivors
+              description: Finalization survivors
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: survivors
+            - name: netframework.clrmemory_heap_size
+              description: Heap size by generation
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: gen0
+                - name: gen1
+                - name: gen2
+                - name: loh
+            - name: netframework.clrmemory_promoted_bytes
+              description: Promoted bytes by generation
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: gen0
+                - name: gen1
+            - name: netframework.clrmemory_gc_handles
+              description: GC handles in use
+              unit: handles
+              chart_type: line
+              dimensions:
+                - name: handles
+            - name: netframework.clrmemory_collections
+              description: Garbage collections by generation rate
+              unit: collections/s
+              chart_type: line
+              dimensions:
+                - name: gen0
+                - name: gen1
+                - name: gen2
+            - name: netframework.clrmemory_induced_gc
+              description: Induced garbage collections rate
+              unit: collections/s
+              chart_type: line
+              dimensions:
+                - name: induced
+            - name: netframework.clrmemory_pinned_objects
+              description: Pinned objects
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: pinned
+            - name: netframework.clrmemory_sink_blocks_in_use
+              description: Sink blocks in use
+              unit: blocks
+              chart_type: line
+              dimensions:
+                - name: in_use
+            - name: netframework.clrmemory_committed_bytes
+              description: Committed GC virtual memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: committed
+            - name: netframework.clrmemory_reserved_bytes
+              description: Reserved GC virtual memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: reserved
+            - name: netframework.clrmemory_gc_time
+              description: Time spent in garbage collection
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: time
             - name: netframework.clrremoting_channels
               description: Registered channels
               unit: channels/s
@@ -2464,6 +2560,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: objects
+            - name: netframework.clrremoting_contexts
+              description: Total of remoting contexts
+              unit: contexts
+              chart_type: line
+              dimensions:
+                - name: contexts
             - name: netframework.clrremoting_remote_calls
               description: Remote Procedure Calls (RPC) invoked
               unit: calls/s
@@ -2500,6 +2602,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: threads
+            - name: netframework.clrlocksandthreads_current_queue_length
+              description: Current managed lock waiters
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
             - name: netframework.clrlocksandthreads_current_logical_threads
               description: Logical threads
               unit: threads
@@ -2512,8 +2620,20 @@ modules:
               chart_type: line
               dimensions:
                 - name: physical
+            - name: netframework.clrlocksandthreads_current_recognized_threads
+              description: Current recognized threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
             - name: netframework.clrlocksandthreads_recognized_threads
               description: Threads recognized by the runtime
+              unit: threads/s
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: netframework.clrlocksandthreads_queue_length_peak
+              description: Threads waited to acquire a managed lock
               unit: threads/s
               chart_type: line
               dimensions:
