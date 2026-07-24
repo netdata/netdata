@@ -218,16 +218,18 @@ fn registry() -> &'static Mutex<HashMap<String, Box<dyn Any + Send + Sync>>> {
 /// Errors returned by [`Connection::send`] and [`Connection::recv`].
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// Transport-level I/O error.
-    #[error("io: {0}")]
+    /// Transport-level I/O error. Transparent (as are the codec wrappers
+    /// below): embedding the source in the message while also chaining it
+    /// would print it twice in anyhow chains.
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 
     /// Failed to serialize a message.
-    #[error("serialization: {0}")]
+    #[error(transparent)]
     Encode(#[from] bincode::error::EncodeError),
 
     /// Failed to deserialize a message.
-    #[error("deserialization: {0}")]
+    #[error(transparent)]
     Decode(#[from] bincode::error::DecodeError),
 
     /// The other side of the connection has been closed.

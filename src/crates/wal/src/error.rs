@@ -2,7 +2,11 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("I/O error: {0}")]
+    // Transparent: the io::Error is the whole message (durable-write
+    // errors arrive already annotated with op + path by
+    // file_registry::durable). Embedding it here AND chaining it via
+    // #[from] would print it twice in anyhow chains.
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 
     #[error("invalid WAL header: {0}")]

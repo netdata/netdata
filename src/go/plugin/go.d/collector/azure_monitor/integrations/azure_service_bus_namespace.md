@@ -647,11 +647,13 @@ The following alerts are available:
 | [ am_service_bus_replication_lag_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_service_bus.conf) | azure_monitor.service_bus.replication_lag_duration | Service Bus replication lag duration on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -673,24 +675,24 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.service_bus.message_flow | in, out | messages/s |
-| azure_monitor.service_bus.message_operations | completed, abandoned | messages/s |
-| azure_monitor.service_bus.queue_depth | active | messages |
-| azure_monitor.service_bus.problem_messages | dead_lettered, scheduled | messages |
-| azure_monitor.service_bus.requests | incoming, successful | requests/s |
-| azure_monitor.service_bus.errors | server, user, throttled | errors/s |
-| azure_monitor.service_bus.connections | active | connections |
-| azure_monitor.service_bus.connection_events | opened, closed | connections |
-| azure_monitor.service_bus.namespace_size | average | bytes |
-| azure_monitor.service_bus.data_throughput | in, out | bytes/s |
-| azure_monitor.service_bus.total_messages | total | messages |
-| azure_monitor.service_bus.namespace_resources | cpu, memory | percentage |
-| azure_monitor.service_bus.send_latency | average | milliseconds |
-| azure_monitor.service_bus.replication_lag | messages | messages |
-| azure_monitor.service_bus.replication_lag_duration | duration | seconds |
-| azure_monitor.service_bus.checkpoint_operations | pending | operations |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.service_bus.message_flow | Azure Service Bus Message Flow | in, out | messages/s |
+| azure_monitor.service_bus.message_operations | Azure Service Bus Message Operations | completed, abandoned | messages/s |
+| azure_monitor.service_bus.queue_depth | Azure Service Bus Queue Depth | active | messages |
+| azure_monitor.service_bus.problem_messages | Azure Service Bus Problem Messages | dead_lettered, scheduled | messages |
+| azure_monitor.service_bus.requests | Azure Service Bus Requests | incoming, successful | requests/s |
+| azure_monitor.service_bus.errors | Azure Service Bus Errors | server, user, throttled | errors/s |
+| azure_monitor.service_bus.connections | Azure Service Bus Active Connections | active | connections |
+| azure_monitor.service_bus.connection_events | Azure Service Bus Connection Events | opened, closed | connections |
+| azure_monitor.service_bus.namespace_size | Azure Service Bus Namespace Size | average | bytes |
+| azure_monitor.service_bus.data_throughput | Azure Service Bus Data Throughput | in, out | bytes/s |
+| azure_monitor.service_bus.total_messages | Azure Service Bus Total Messages | total | messages |
+| azure_monitor.service_bus.namespace_resources | Azure Service Bus Namespace Resources | cpu, memory | percentage |
+| azure_monitor.service_bus.send_latency | Azure Service Bus Send Latency | average | milliseconds |
+| azure_monitor.service_bus.replication_lag | Azure Service Bus Replication Lag | messages | messages |
+| azure_monitor.service_bus.replication_lag_duration | Azure Service Bus Replication Lag Duration | duration | seconds |
+| azure_monitor.service_bus.checkpoint_operations | Azure Service Bus Pending Checkpoint Operations | pending | operations |
 
 
 

@@ -197,11 +197,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -213,26 +215,27 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| scaleio.system_capacity_total | total | KiB |
-| scaleio.system_capacity_in_use | in_use | KiB |
-| scaleio.system_capacity_usage | thick, decreased, thin, snapshot, spare, unused | KiB |
-| scaleio.system_capacity_available_volume_allocation | available | KiB |
-| scaleio.system_capacity_health_state | protected, degraded, in_maintenance, failed, unavailable | KiB |
-| scaleio.system_workload_primary_bandwidth_total | total | KiB/s |
-| scaleio.system_workload_primary_bandwidth | read, write | KiB/s |
-| scaleio.system_workload_primary_iops_total | total | iops/s |
-| scaleio.system_workload_primary_iops | read, write | iops/s |
-| scaleio.system_workload_primary_io_size_total | io_size | KiB |
-| scaleio.system_rebalance | read, write | KiB/s |
-| scaleio.system_rebalance_left | left | KiB |
-| scaleio.system_rebalance_time_until_finish | time | seconds |
-| scaleio.system_rebuild | read, write | KiB/s |
-| scaleio.system_rebuild_left | left | KiB |
-| scaleio.system_defined_components | devices, fault_sets, protection_domains, rfcache_devices, sdc, sds, snapshots, storage_pools, volumes, vtrees | components |
-| scaleio.system_components_volumes_by_type | thick, thin | volumes |
-| scaleio.system_components_volumes_by_mapping | mapped, unmapped | volumes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| scaleio.system_capacity_total | Total Capacity | total | KiB |
+| scaleio.system_capacity_in_use | Capacity In Use | in_use | KiB |
+| scaleio.system_capacity_usage | Capacity Usage | thick, decreased, thin, snapshot, spare, unused | KiB |
+| scaleio.system_capacity_available_volume_allocation | Available For Volume Allocation | available | KiB |
+| scaleio.system_capacity_health_state | Capacity Health State | protected, degraded, in_maintenance, failed, unavailable | KiB |
+| scaleio.system_workload_primary_bandwidth_total | Primary Backend Bandwidth Total (Read and Write) | total | KiB/s |
+| scaleio.system_workload_primary_bandwidth | Primary Backend Bandwidth | read, write | KiB/s |
+| scaleio.system_workload_primary_iops_total | Primary Backend IOPS Total (Read and Write) | total | iops/s |
+| scaleio.system_workload_primary_iops | Primary Backend IOPS | read, write | iops/s |
+| scaleio.system_workload_primary_io_size_total | Primary Backend I/O Size Total (Read and Write) | io_size | KiB |
+| scaleio.system_rebalance | Rebalance | read, write | KiB/s |
+| scaleio.system_rebalance_left | Rebalance Pending Capacity | left | KiB |
+| scaleio.system_rebalance_time_until_finish | Rebalance Approximate Time Until Finish | time | seconds |
+| scaleio.system_rebuild | Rebuild Bandwidth Total (Forward, Backward and Normal) | read, write | KiB/s |
+| scaleio.system_rebuild_left | Rebuild Pending Capacity Total (Forward, Backward and Normal) | left | KiB |
+| scaleio.system_defined_components | Components | devices, fault_sets, protection_domains, rfcache_devices, sdc, sds, snapshots, storage_pools, volumes, vtrees | components |
+| scaleio.system_components_volumes_by_type | Volumes By Type | thick, thin | volumes |
+| scaleio.system_components_volumes_by_mapping | Volumes By Mapping | mapped, unmapped | volumes |
+
 
 ### Per storage pool
 
@@ -242,15 +245,16 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| scaleio.storage_pool_capacity_total | total | KiB |
-| scaleio.storage_pool_capacity_in_use | in_use | KiB |
-| scaleio.storage_pool_capacity_usage | thick, decreased, thin, snapshot, spare, unused | KiB |
-| scaleio.storage_pool_capacity_utilization | used | percentage |
-| scaleio.storage_pool_capacity_available_volume_allocation | available | KiB |
-| scaleio.storage_pool_capacity_health_state | protected, degraded, in_maintenance, failed, unavailable | KiB |
-| scaleio.storage_pool_components | devices, snapshots, volumes, vtrees | components |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| scaleio.storage_pool_capacity_total | Total Capacity | total | KiB |
+| scaleio.storage_pool_capacity_in_use | Capacity In Use | in_use | KiB |
+| scaleio.storage_pool_capacity_usage | Capacity Usage | thick, decreased, thin, snapshot, spare, unused | KiB |
+| scaleio.storage_pool_capacity_utilization | Capacity Utilization | used | percentage |
+| scaleio.storage_pool_capacity_available_volume_allocation | Available For Volume Allocation | available | KiB |
+| scaleio.storage_pool_capacity_health_state | Capacity Health State | protected, degraded, in_maintenance, failed, unavailable | KiB |
+| scaleio.storage_pool_components | Components | devices, snapshots, volumes, vtrees | components |
+
 
 ### Per sdc
 
@@ -260,13 +264,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| scaleio.sdc_mdm_connection_state | connected | boolean |
-| scaleio.sdc_bandwidth | read, write | KiB/s |
-| scaleio.sdc_iops | read, write | iops/s |
-| scaleio.sdc_io_size | read, write | KiB |
-| scaleio.sdc_num_of_mapped_volumed | mapped | volumes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| scaleio.sdc_mdm_connection_state | MDM Connection State | connected | boolean |
+| scaleio.sdc_bandwidth | Bandwidth | read, write | KiB/s |
+| scaleio.sdc_iops | IOPS | read, write | iops/s |
+| scaleio.sdc_io_size | IOPS Size | read, write | KiB |
+| scaleio.sdc_num_of_mapped_volumed | Mapped Volumes | mapped | volumes |
 
 
 

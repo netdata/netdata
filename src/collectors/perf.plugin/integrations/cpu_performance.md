@@ -151,11 +151,13 @@ Monitor CPU cycles.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -167,25 +169,25 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| perf.cpu_cycles | cpu, ref_cpu | cycles/s |
-| perf.instructions | instructions | instructions/s |
-| perf.instructions_per_cycle | ipc | instructions/cycle |
-| perf.branch_instructions | instructions, misses | instructions/s |
-| perf.cache | references, misses | operations/s |
-| perf.bus_cycles | bus | cycles/s |
-| perf.stalled_cycles | frontend, backend | cycles/s |
-| perf.migrations | migrations | migrations |
-| perf.alignment_faults | faults | faults |
-| perf.emulation_faults | faults | faults |
-| perf.l1d_cache | read_access, read_misses, write_access, write_misses | events/s |
-| perf.l1d_cache_prefetch | prefetches | prefetches/s |
-| perf.l1i_cache | read_access, read_misses | events/s |
-| perf.ll_cache | read_access, read_misses, write_access, write_misses | events/s |
-| perf.dtlb_cache | read_access, read_misses, write_access, write_misses | events/s |
-| perf.itlb_cache | read_access, read_misses | events/s |
-| perf.pbu_cache | read_access | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| perf.cpu_cycles | CPU cycles | cpu, ref_cpu | cycles/s |
+| perf.instructions | Instructions | instructions | instructions/s |
+| perf.instructions_per_cycle | Instructions per Cycle(IPC) | ipc | instructions/cycle |
+| perf.branch_instructions | Branch instructions | instructions, misses | instructions/s |
+| perf.cache | Cache operations | references, misses | operations/s |
+| perf.bus_cycles | Bus cycles | bus | cycles/s |
+| perf.stalled_cycles | Stalled frontend and backend cycles | frontend, backend | cycles/s |
+| perf.migrations | CPU migrations | migrations | migrations |
+| perf.alignment_faults | Alignment faults | faults | faults |
+| perf.emulation_faults | Emulation faults | faults | faults |
+| perf.l1d_cache | L1D cache operations | read_access, read_misses, write_access, write_misses | events/s |
+| perf.l1d_cache_prefetch | L1D prefetch cache operations | prefetches | prefetches/s |
+| perf.l1i_cache | L1I cache operations | read_access, read_misses | events/s |
+| perf.ll_cache | LL cache operations | read_access, read_misses, write_access, write_misses | events/s |
+| perf.dtlb_cache | DTLB cache operations | read_access, read_misses, write_access, write_misses | events/s |
+| perf.itlb_cache | ITLB cache operations | read_access, read_misses | events/s |
+| perf.pbu_cache | PBU cache operations | read_access | events/s |
 
 
 

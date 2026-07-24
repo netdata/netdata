@@ -202,11 +202,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -218,25 +220,25 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| zookeeper.requests | outstanding | requests |
-| zookeeper.requests_latency | min, avg, max | ms |
-| zookeeper.stale_requests | stale | requests/s |
-| zookeeper.stale_requests_dropped | dropped | requests/s |
-| zookeeper.connections | alive | connections |
-| zookeeper.connections_dropped | dropped | connections/s |
-| zookeeper.connections_rejected | rejected | connections/s |
-| zookeeper.auth_fails | auth | fails/s |
-| zookeeper.global_sessions | global | sessions |
-| zookeeper.server_state | leader, follower, observer, standalone | state |
-| zookeeper.throttled_ops | throttled | ops/s |
-| zookeeper.packets | received, sent | pps |
-| zookeeper.file_descriptor | open | file descriptors |
-| zookeeper.nodes | znode, ephemerals | nodes |
-| zookeeper.watches | watches | watches |
-| zookeeper.approximate_data_size | size | KiB |
-| zookeeper.uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| zookeeper.requests | Outstanding Requests | outstanding | requests |
+| zookeeper.requests_latency | Requests Latency | min, avg, max | ms |
+| zookeeper.stale_requests | Stale Requests | stale | requests/s |
+| zookeeper.stale_requests_dropped | Stale Requests Dropped | dropped | requests/s |
+| zookeeper.connections | Alive Connections | alive | connections |
+| zookeeper.connections_dropped | Dropped Connections | dropped | connections/s |
+| zookeeper.connections_rejected | Rejected Connections | rejected | connections/s |
+| zookeeper.auth_fails | Auth Fails | auth | fails/s |
+| zookeeper.global_sessions | Global Sessions | global | sessions |
+| zookeeper.server_state | Server State | leader, follower, observer, standalone | state |
+| zookeeper.throttled_ops | Throttled Operations | throttled | ops/s |
+| zookeeper.packets | Packets | received, sent | pps |
+| zookeeper.file_descriptor | Open File Descriptors | open | file descriptors |
+| zookeeper.nodes | Number of Nodes | znode, ephemerals | nodes |
+| zookeeper.watches | Number of Watches | watches | watches |
+| zookeeper.approximate_data_size | Approximate Data Tree Size | size | KiB |
+| zookeeper.uptime | Uptime | uptime | seconds |
 
 
 

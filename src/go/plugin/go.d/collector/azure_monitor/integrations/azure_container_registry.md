@@ -632,11 +632,13 @@ The following alerts are available:
 | [ am_container_registry_push_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf) | azure_monitor.container_registry.push_count | ACR push failures on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -658,13 +660,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.container_registry.storage_used | used | bytes |
-| azure_monitor.container_registry.pull_count | successful, total | pulls/s |
-| azure_monitor.container_registry.push_count | successful, total | pushes/s |
-| azure_monitor.container_registry.agentpool_cpu_time | cpu_time | seconds/s |
-| azure_monitor.container_registry.run_duration | duration | milliseconds/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.container_registry.storage_used | Azure Container Registry Storage Used | used | bytes |
+| azure_monitor.container_registry.pull_count | Azure Container Registry Image Pulls | successful, total | pulls/s |
+| azure_monitor.container_registry.push_count | Azure Container Registry Image Pushes | successful, total | pushes/s |
+| azure_monitor.container_registry.agentpool_cpu_time | Azure Container Registry AgentPool CPU Time | cpu_time | seconds/s |
+| azure_monitor.container_registry.run_duration | Azure Container Registry Task Run Duration | duration | milliseconds/s |
 
 
 

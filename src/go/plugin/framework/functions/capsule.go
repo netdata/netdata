@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	MaximumInputLineBytes   = 64 * 1024
+	maximumInputLineBytes   = 64 * 1024
 	MaximumCommandLineBytes = 15_487
 	MaximumInputBodyBytes   = 20 * 1024 * 1024
-	MaximumFunctionTimeout  = 15 * time.Minute
+	maximumFunctionTimeout  = 2 * time.Minute
 	initialBodyCapacity     = 64 * 1024
 )
 
@@ -36,9 +36,9 @@ type Call struct {
 	HasPayload  bool
 }
 
-// ReadReturnGate fences reader returns while process ingress changes Agent
+// readReturnGate fences reader returns while process ingress changes Agent
 // generation.
-type ReadReturnGate interface {
+type readReturnGate interface {
 	AcquireInputRead(context.Context) (bool, error)
 	ReleaseInputRead()
 }
@@ -71,17 +71,17 @@ type payloadState struct {
 
 func NewInputCapsule(reader io.Reader) (*InputCapsule, error) {
 	if reader == nil {
-		return nil, errors.New("Function ingress: nil input reader")
+		return nil, errors.New("function ingress: nil input reader")
 	}
 	return &InputCapsule{reader: reader}, nil
 }
 
 func (capsule *InputCapsule) Run(ctx context.Context, consumer Consumer) error {
 	if ctx == nil || consumer == nil {
-		return errors.New("Function ingress: invalid run")
+		return errors.New("function ingress: invalid run")
 	}
-	reader := bufio.NewReaderSize(capsule.reader, MaximumInputLineBytes+1)
-	gate, _ := consumer.(ReadReturnGate)
+	reader := bufio.NewReaderSize(capsule.reader, maximumInputLineBytes+1)
+	gate, _ := consumer.(readReturnGate)
 	for {
 		segment, readErr := reader.ReadSlice('\n')
 		if gate != nil {
@@ -94,7 +94,7 @@ func (capsule *InputCapsule) Run(ctx context.Context, consumer Consumer) error {
 					if errors.Is(readErr, io.EOF) {
 						return nil
 					}
-					return fmt.Errorf("Function ingress: read after containment: %w", readErr)
+					return fmt.Errorf("function ingress: read after containment: %w", readErr)
 				}
 				continue
 			}
@@ -116,7 +116,7 @@ func (capsule *InputCapsule) consumeRead(ctx context.Context, consumer Consumer,
 	complete := !errors.Is(readErr, bufio.ErrBufferFull)
 	if capsule.payload != nil {
 		if errors.Is(readErr, io.EOF) && (len(segment) == 0 || !hasLF(segment)) {
-			return false, false, errors.Join(errors.New("Function ingress: unterminated payload"), capsule.abortPayload())
+			return false, false, errors.Join(errors.New("function ingress: unterminated payload"), capsule.abortPayload())
 		}
 		quit, handleErr := capsule.handlePayloadSegment(ctx, consumer, segment, complete)
 		if handleErr != nil {
@@ -137,14 +137,14 @@ func (capsule *InputCapsule) consumeRead(ctx context.Context, consumer Consumer,
 	} else if !complete {
 		uid := rejectionUID(string(segment))
 		if uid == "" {
-			return false, false, errors.New("Function ingress: oversized line lacks safe UID")
+			return false, false, errors.New("function ingress: oversized line lacks safe UID")
 		}
 		capsule.discarding = true
 		capsule.discardingUID = strings.Clone(uid)
 	} else if len(segment) > 0 {
 		line, _, terminated := splitLine(segment)
 		if !terminated {
-			return false, false, errors.New("Function ingress: unterminated line")
+			return false, false, errors.New("function ingress: unterminated line")
 		}
 		if len(line) > MaximumCommandLineBytes {
 			if uid := rejectionUID(string(line)); uid != "" {
@@ -153,7 +153,7 @@ func (capsule *InputCapsule) consumeRead(ctx context.Context, consumer Consumer,
 				}
 				return false, false, nil
 			}
-			return false, false, errors.New("Function ingress: oversized command lacks safe UID")
+			return false, false, errors.New("function ingress: oversized command lacks safe UID")
 		}
 		quit, handleErr := capsule.handleCommandLine(ctx, consumer, string(line))
 		if handleErr != nil {
@@ -173,7 +173,7 @@ func (capsule *InputCapsule) consumeRead(ctx context.Context, consumer Consumer,
 		if errors.Is(readErr, io.EOF) {
 			return false, true, nil
 		}
-		return false, false, fmt.Errorf("Function ingress: read: %w", readErr)
+		return false, false, fmt.Errorf("function ingress: read: %w", readErr)
 	}
 	return false, false, nil
 }
@@ -244,23 +244,27 @@ func rejectionUID(line string) string {
 
 func parseCapsuleCall(fields []string) (Call, bool, error) {
 	if len(fields) != 6 && len(fields) != 7 {
-		return Call{}, false, errors.New("Function ingress: invalid command")
+		return Call{}, false, errors.New("function ingress: invalid command")
 	}
 	payload := fields[0] == "FUNCTION_PAYLOAD"
 	if fields[0] != "FUNCTION" && !payload {
-		return Call{}, false, errors.New("Function ingress: invalid command")
+		return Call{}, false, errors.New("function ingress: invalid command")
 	}
 	if payload && len(fields) != 7 {
-		return Call{}, false, errors.New("Function ingress: payload content type is missing")
+		return Call{}, false, errors.New("function ingress: payload content type is missing")
 	}
 	timeoutSeconds, err := strconv.ParseInt(fields[2], 10, 64)
-	if err != nil || timeoutSeconds < 0 ||
-		timeoutSeconds > int64(MaximumFunctionTimeout/time.Second) {
-		return Call{}, false, errors.New("Function ingress: invalid timeout")
+	if err != nil || timeoutSeconds < 0 {
+		return Call{}, false, errors.New("function ingress: invalid timeout")
+	}
+	// Callers may send an unset (0) or wrong-unit (e.g. milliseconds) timeout;
+	// clamp to the maximum and proceed rather than failing the whole call.
+	if maxSeconds := int64(maximumFunctionTimeout / time.Second); timeoutSeconds == 0 || timeoutSeconds > maxSeconds {
+		timeoutSeconds = maxSeconds
 	}
 	callFields := strings.Fields(fields[3])
 	if len(callFields) == 0 {
-		return Call{}, false, errors.New("Function ingress: empty call")
+		return Call{}, false, errors.New("function ingress: empty call")
 	}
 	call := Call{
 		UID: fields[1], Timeout: time.Duration(timeoutSeconds) * time.Second,
@@ -281,7 +285,7 @@ func (capsule *InputCapsule) handlePayloadSegment(ctx context.Context, consumer 
 		var terminated bool
 		content, ending, terminated = splitLine(segment)
 		if !terminated {
-			return false, errors.New("Function ingress: unterminated payload line")
+			return false, errors.New("function ingress: unterminated payload line")
 		}
 	}
 	if complete && !state.lineStarted {
@@ -296,7 +300,7 @@ func (capsule *InputCapsule) handlePayloadSegment(ctx context.Context, consumer 
 		case bytes.HasPrefix(content, []byte("FUNCTION_CANCEL")):
 			fields := strings.Fields(string(content))
 			if len(fields) != 2 || fields[0] != "FUNCTION_CANCEL" {
-				return false, errors.New("Function ingress: invalid payload cancel")
+				return false, errors.New("function ingress: invalid payload cancel")
 			}
 			if fields[1] == state.call.UID {
 				uid := state.call.UID
@@ -430,16 +434,16 @@ func tokenize(line string) ([]string, error) {
 			}
 		}
 		if end == len(line) {
-			return nil, errors.New("Function ingress: unterminated quote")
+			return nil, errors.New("function ingress: unterminated quote")
 		}
 		value, err := strconv.Unquote(line[offset : end+1])
 		if err != nil {
-			return nil, errors.New("Function ingress: invalid quoted field")
+			return nil, errors.New("function ingress: invalid quoted field")
 		}
 		fields = append(fields, value)
 		offset = end + 1
 		if offset < len(line) && line[offset] != ' ' {
-			return nil, errors.New("Function ingress: missing field separator")
+			return nil, errors.New("function ingress: missing field separator")
 		}
 	}
 	return fields, nil

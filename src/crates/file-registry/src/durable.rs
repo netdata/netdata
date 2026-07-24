@@ -41,9 +41,27 @@ fn tmp_path(final_path: &Path) -> PathBuf {
     PathBuf::from(os)
 }
 
+/// Wrap an `io::Error` with the failing operation and path, preserving
+/// the [`io::ErrorKind`] so callers' kind-based handling (e.g.
+/// `NotFound` tolerance) keeps working. `std::fs` errors carry no path;
+/// without this a production failure logs as a bare "Permission denied"
+/// with no hint of what was being written where.
+///
+/// The kind is the only structured field preserved: `raw_os_error()`
+/// and `source()` are intentionally flattened into the message text.
+///
+/// Public so streaming producers that write through the [`AtomicFile`]
+/// handle themselves (e.g. the SFST builder) can annotate their own
+/// write-phase failures with [`AtomicFile::tmp_path`].
+pub fn annotate(e: io::Error, op: &str, path: &Path) -> io::Error {
+    io::Error::new(e.kind(), format!("{op} {}: {e}", path.display()))
+}
+
 /// fsync a directory so a rename inside it survives power loss.
 pub fn fsync_dir(dir: &Path) -> io::Result<()> {
-    File::open(dir)?.sync_all()
+    File::open(dir)
+        .and_then(|f| f.sync_all())
+        .map_err(|e| annotate(e, "fsync directory", dir))
 }
 
 /// Guard for an in-progress atomic write.
@@ -71,10 +89,11 @@ impl AtomicFile {
     pub fn create(final_path: impl Into<PathBuf>) -> io::Result<(Self, File)> {
         let final_path = final_path.into();
         if let Some(parent) = final_path.parent() {
-            std::fs::create_dir_all(parent)?;
+            std::fs::create_dir_all(parent)
+                .map_err(|e| annotate(e, "create parent directory", parent))?;
         }
         let tmp = tmp_path(&final_path);
-        let file = File::create(&tmp)?;
+        let file = File::create(&tmp).map_err(|e| annotate(e, "create temp file", &tmp))?;
         Ok((
             Self {
                 tmp,
@@ -85,14 +104,23 @@ impl AtomicFile {
         ))
     }
 
+    /// The temp path this guard owns — for callers that stream through
+    /// the returned file themselves and want to [`annotate`] their own
+    /// write-phase failures with the actual path being written.
+    pub fn tmp_path(&self) -> &Path {
+        &self.tmp
+    }
+
     /// Make the write durable: fsync `file` (which must be the one
     /// returned by [`create`](AtomicFile::create), unwrapped from any
     /// buffering layers), rename the temp over the final path, and
     /// fsync the parent directory.
     pub fn commit(mut self, file: File) -> io::Result<()> {
-        file.sync_all()?;
+        file.sync_all()
+            .map_err(|e| annotate(e, "fsync temp file", &self.tmp))?;
         drop(file);
-        std::fs::rename(&self.tmp, &self.final_path)?;
+        std::fs::rename(&self.tmp, &self.final_path)
+            .map_err(|e| annotate(e, "rename temp file over", &self.final_path))?;
         self.committed = true;
         if let Some(parent) = self.final_path.parent() {
             fsync_dir(parent)?;
@@ -121,7 +149,8 @@ impl Drop for AtomicFile {
 /// whole-buffer convenience over [`AtomicFile`].
 pub fn write_atomic(final_path: &Path, bytes: &[u8]) -> io::Result<()> {
     let (guard, mut file) = AtomicFile::create(final_path)?;
-    file.write_all(bytes)?;
+    file.write_all(bytes)
+        .map_err(|e| annotate(e, "write temp file", &guard.tmp))?;
     guard.commit(file)
 }
 
@@ -175,6 +204,52 @@ mod tests {
         write_atomic(&path, b"v2").unwrap();
         assert_eq!(std::fs::read(&path).unwrap(), b"v2");
         assert!(!tmp_path(&path).exists());
+    }
+
+    /// A failed write must say what it was doing and where — the whole
+    /// point of `annotate`. An unwritable directory (the production
+    /// failure mode this was born from) must surface the operation and
+    /// the full path while preserving the ErrorKind callers branch on.
+    #[test]
+    #[cfg(unix)]
+    fn io_errors_carry_operation_path_and_kind() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let locked = dir.path().join("locked");
+        std::fs::create_dir(&locked).unwrap();
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o555)).unwrap();
+
+        // Capture results, then restore permissions so the tempdir can be
+        // removed even if an assert below fails.
+        let path = locked.join("seq_highwater");
+        let created = write_atomic(&path, b"x");
+        let nested = locked.join("shared").join("seq_highwater");
+        let nested_created = write_atomic(&nested, b"x");
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        // Under root the chmod doesn't deny anything; only assert when
+        // the writes actually failed.
+        if let Err(err) = created {
+            // Creating the temp file inside the read-only dir fails.
+            assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+            let msg = err.to_string();
+            assert!(
+                msg.contains("create temp file")
+                    && msg.contains(&tmp_path(&path).display().to_string()),
+                "message must name the operation and path: {msg}"
+            );
+        }
+        if let Err(err) = nested_created {
+            // Creating a parent under the read-only dir fails in create_dir_all.
+            assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+            let msg = err.to_string();
+            assert!(
+                msg.contains("create parent directory")
+                    && msg.contains(&nested.parent().unwrap().display().to_string()),
+                "message must name the operation and parent path: {msg}"
+            );
+        }
     }
 
     #[test]

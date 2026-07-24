@@ -290,11 +290,13 @@ The following alerts are available:
 | [ postgres_index_bloat_size_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.index_bloat_size_perc | bloat size percentage in db ${label:database} table ${label:table} index ${label:index} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -306,31 +308,32 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| postgres.connections_utilization | used | percentage |
-| postgres.connections_usage | available, used | connections |
-| postgres.connections_state_count | active, idle, idle_in_transaction, idle_in_transaction_aborted, disabled | connections |
-| postgres.transactions_duration | a dimension per bucket | transactions/s |
-| postgres.queries_duration | a dimension per bucket | queries/s |
-| postgres.locks_utilization | used | percentage |
-| postgres.checkpoints_rate | scheduled, requested | checkpoints/s |
-| postgres.checkpoints_time | write, sync | milliseconds |
-| postgres.bgwriter_halts_rate | maxwritten | events/s |
-| postgres.buffers_io_rate | checkpoint, backend, bgwriter | B/s |
-| postgres.buffers_backend_fsync_rate | fsync | calls/s |
-| postgres.buffers_allocated_rate | allocated | B/s |
-| postgres.wal_io_rate | write | B/s |
-| postgres.wal_files_count | written, recycled | files |
-| postgres.wal_archiving_files_count | ready, done | files/s |
-| postgres.autovacuum_workers_count | analyze, vacuum_analyze, vacuum, vacuum_freeze, brin_summarize | workers |
-| postgres.txid_exhaustion_towards_autovacuum_perc | emergency_autovacuum | percentage |
-| postgres.txid_exhaustion_perc | txid_exhaustion | percentage |
-| postgres.txid_exhaustion_oldest_txid_num | xid | xid |
-| postgres.catalog_relations_count | ordinary_table, index, sequence, toast_table, view, materialized_view, composite_type, foreign_table, partitioned_table, partitioned_index | relations |
-| postgres.catalog_relations_size | ordinary_table, index, sequence, toast_table, view, materialized_view, composite_type, foreign_table, partitioned_table, partitioned_index | B |
-| postgres.uptime | uptime | seconds |
-| postgres.databases_count | databases | databases |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| postgres.connections_utilization | Connections utilization | used | percentage |
+| postgres.connections_usage | Connections usage | available, used | connections |
+| postgres.connections_state_count | Connections in each state | active, idle, idle_in_transaction, idle_in_transaction_aborted, disabled | connections |
+| postgres.transactions_duration | Observed transactions time | a dimension per bucket | transactions/s |
+| postgres.queries_duration | Observed active queries time | a dimension per bucket | queries/s |
+| postgres.locks_utilization | Acquired locks utilization | used | percentage |
+| postgres.checkpoints_rate | Checkpoints | scheduled, requested | checkpoints/s |
+| postgres.checkpoints_time | Checkpoint time | write, sync | milliseconds |
+| postgres.bgwriter_halts_rate | Background writer scan halts | maxwritten | events/s |
+| postgres.buffers_io_rate | Buffers written rate | checkpoint, backend, bgwriter | B/s |
+| postgres.buffers_backend_fsync_rate | Backend fsync calls | fsync | calls/s |
+| postgres.buffers_allocated_rate | Buffers allocated | allocated | B/s |
+| postgres.wal_io_rate | Write-Ahead Log writes | write | B/s |
+| postgres.wal_files_count | Write-Ahead Log files | written, recycled | files |
+| postgres.wal_archiving_files_count | Write-Ahead Log archived files | ready, done | files/s |
+| postgres.autovacuum_workers_count | Autovacuum workers | analyze, vacuum_analyze, vacuum, vacuum_freeze, brin_summarize | workers |
+| postgres.txid_exhaustion_towards_autovacuum_perc | Percent towards emergency autovacuum | emergency_autovacuum | percentage |
+| postgres.txid_exhaustion_perc | Percent towards transaction ID wraparound | txid_exhaustion | percentage |
+| postgres.txid_exhaustion_oldest_txid_num | Oldest transaction XID | xid | xid |
+| postgres.catalog_relations_count | Relation count | ordinary_table, index, sequence, toast_table, view, materialized_view, composite_type, foreign_table, partitioned_table, partitioned_index | relations |
+| postgres.catalog_relations_size | Relation size | ordinary_table, index, sequence, toast_table, view, materialized_view, composite_type, foreign_table, partitioned_table, partitioned_index | B |
+| postgres.uptime | Uptime | uptime | seconds |
+| postgres.databases_count | Number of databases | databases | databases |
+
 
 ### Per repl application
 
@@ -344,10 +347,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| postgres.replication_app_wal_lag_size | sent_lag, write_lag, flush_lag, replay_lag | B |
-| postgres.replication_app_wal_lag_time | write_lag, flush_lag, replay_lag | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| postgres.replication_app_wal_lag_size | Standby application WAL lag size | sent_lag, write_lag, flush_lag, replay_lag | B |
+| postgres.replication_app_wal_lag_time | Standby application WAL lag time | write_lag, flush_lag, replay_lag | seconds |
+
 
 ### Per repl slot
 
@@ -361,9 +365,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| postgres.replication_slot_files_count | wal_keep, pg_replslot_files | files |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| postgres.replication_slot_files_count | Replication slot files | wal_keep, pg_replslot_files | files |
+
 
 ### Per database
 
@@ -377,25 +382,26 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| postgres.db_transactions_ratio | committed, rollback | percentage |
-| postgres.db_transactions_rate | committed, rollback | transactions/s |
-| postgres.db_connections_utilization | used | percentage |
-| postgres.db_connections_count | connections | connections |
-| postgres.db_cache_io_ratio | miss | percentage |
-| postgres.db_io_rate | memory, disk | B/s |
-| postgres.db_ops_fetched_rows_ratio | fetched | percentage |
-| postgres.db_ops_read_rows_rate | returned, fetched | rows/s |
-| postgres.db_ops_write_rows_rate | inserted, deleted, updated | rows/s |
-| postgres.db_conflicts_rate | conflicts | queries/s |
-| postgres.db_conflicts_reason_rate | tablespace, lock, snapshot, bufferpin, deadlock | queries/s |
-| postgres.db_deadlocks_rate | deadlocks | deadlocks/s |
-| postgres.db_locks_held_count | access_share, row_share, row_exclusive, share_update, share, share_row_exclusive, exclusive, access_exclusive | locks |
-| postgres.db_locks_awaited_count | access_share, row_share, row_exclusive, share_update, share, share_row_exclusive, exclusive, access_exclusive | locks |
-| postgres.db_temp_files_created_rate | created | files/s |
-| postgres.db_temp_files_io_rate | written | B/s |
-| postgres.db_size | size | B |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| postgres.db_transactions_ratio | Database transactions ratio | committed, rollback | percentage |
+| postgres.db_transactions_rate | Database transactions | committed, rollback | transactions/s |
+| postgres.db_connections_utilization | Database connections utilization | used | percentage |
+| postgres.db_connections_count | Database connections | connections | connections |
+| postgres.db_cache_io_ratio | Database buffer cache miss ratio | miss | percentage |
+| postgres.db_io_rate | Database reads | memory, disk | B/s |
+| postgres.db_ops_fetched_rows_ratio | Database rows fetched ratio | fetched | percentage |
+| postgres.db_ops_read_rows_rate | Database rows read | returned, fetched | rows/s |
+| postgres.db_ops_write_rows_rate | Database rows written | inserted, deleted, updated | rows/s |
+| postgres.db_conflicts_rate | Database canceled queries | conflicts | queries/s |
+| postgres.db_conflicts_reason_rate | Database canceled queries by reason | tablespace, lock, snapshot, bufferpin, deadlock | queries/s |
+| postgres.db_deadlocks_rate | Database deadlocks | deadlocks | deadlocks/s |
+| postgres.db_locks_held_count | Database locks held | access_share, row_share, row_exclusive, share_update, share, share_row_exclusive, exclusive, access_exclusive | locks |
+| postgres.db_locks_awaited_count | Database locks awaited | access_share, row_share, row_exclusive, share_update, share, share_row_exclusive, exclusive, access_exclusive | locks |
+| postgres.db_temp_files_created_rate | Database created temporary files | created | files/s |
+| postgres.db_temp_files_io_rate | Database temporary files data written to disk | written | B/s |
+| postgres.db_size | Database size | size | B |
+
 
 ### Per table
 
@@ -412,31 +418,32 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| postgres.table_rows_dead_ratio | dead | percentage |
-| postgres.table_rows_count | live, dead | rows |
-| postgres.table_ops_rows_rate | inserted, deleted, updated | rows/s |
-| postgres.table_ops_rows_hot_ratio | hot | percentage |
-| postgres.table_ops_rows_hot_rate | hot | rows/s |
-| postgres.table_cache_io_ratio | miss | percentage |
-| postgres.table_io_rate | memory, disk | B/s |
-| postgres.table_index_cache_io_ratio | miss | percentage |
-| postgres.table_index_io_rate | memory, disk | B/s |
-| postgres.table_toast_cache_io_ratio | miss | percentage |
-| postgres.table_toast_io_rate | memory, disk | B/s |
-| postgres.table_toast_index_cache_io_ratio | miss | percentage |
-| postgres.table_toast_index_io_rate | memory, disk | B/s |
-| postgres.table_scans_rate | index, sequential | scans/s |
-| postgres.table_scans_rows_rate | index, sequential | rows/s |
-| postgres.table_autovacuum_since_time | time | seconds |
-| postgres.table_vacuum_since_time | time | seconds |
-| postgres.table_autoanalyze_since_time | time | seconds |
-| postgres.table_analyze_since_time | time | seconds |
-| postgres.table_null_columns | null | columns |
-| postgres.table_size | size | B |
-| postgres.table_bloat_size_perc | bloat | percentage |
-| postgres.table_bloat_size | bloat | B |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| postgres.table_rows_dead_ratio | Table dead rows | dead | percentage |
+| postgres.table_rows_count | Table total rows | live, dead | rows |
+| postgres.table_ops_rows_rate | Table throughput | inserted, deleted, updated | rows/s |
+| postgres.table_ops_rows_hot_ratio | Table HOT updates ratio | hot | percentage |
+| postgres.table_ops_rows_hot_rate | Table HOT updates | hot | rows/s |
+| postgres.table_cache_io_ratio | Table I/O cache miss ratio | miss | percentage |
+| postgres.table_io_rate | Table I/O | memory, disk | B/s |
+| postgres.table_index_cache_io_ratio | Table index I/O cache miss ratio | miss | percentage |
+| postgres.table_index_io_rate | Table index I/O | memory, disk | B/s |
+| postgres.table_toast_cache_io_ratio | Table TOAST I/O cache miss ratio | miss | percentage |
+| postgres.table_toast_io_rate | Table TOAST I/O | memory, disk | B/s |
+| postgres.table_toast_index_cache_io_ratio | Table TOAST index I/O cache miss ratio | miss | percentage |
+| postgres.table_toast_index_io_rate | Table TOAST index I/O | memory, disk | B/s |
+| postgres.table_scans_rate | Table scans | index, sequential | scans/s |
+| postgres.table_scans_rows_rate | Table live rows fetched by scans | index, sequential | rows/s |
+| postgres.table_autovacuum_since_time | Table time since last auto VACUUM | time | seconds |
+| postgres.table_vacuum_since_time | Table time since last manual VACUUM | time | seconds |
+| postgres.table_autoanalyze_since_time | Table time since last auto ANALYZE | time | seconds |
+| postgres.table_analyze_since_time | Table time since last manual ANALYZE | time | seconds |
+| postgres.table_null_columns | Table null columns | null | columns |
+| postgres.table_size | Table total size | size | B |
+| postgres.table_bloat_size_perc | Table bloat size percentage | bloat | percentage |
+| postgres.table_bloat_size | Table bloat size | bloat | B |
+
 
 ### Per index
 
@@ -454,12 +461,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| postgres.index_size | size | B |
-| postgres.index_bloat_size_perc | bloat | percentage |
-| postgres.index_bloat_size | bloat | B |
-| postgres.index_usage_status | used, unused | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| postgres.index_size | Index size | size | B |
+| postgres.index_bloat_size_perc | Index bloat size percentage | bloat | percentage |
+| postgres.index_bloat_size | Index bloat size | bloat | B |
+| postgres.index_usage_status | Index usage status | used, unused | status |
 
 
 

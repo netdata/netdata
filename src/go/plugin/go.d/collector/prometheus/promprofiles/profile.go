@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
@@ -23,7 +24,12 @@ import (
 type profileHeader struct {
 	Match    string    `yaml:"match"`
 	App      string    `yaml:"app,omitempty"`
+	Autogen  *autogen  `yaml:"autogen,omitempty"`
 	Template yaml.Node `yaml:"template"`
+}
+
+type autogen struct {
+	Selector *metrixselector.Expr `yaml:"selector"`
 }
 
 // Profile is a curated, exporter-specific chart profile. Identity is the file
@@ -38,7 +44,8 @@ type Profile struct {
 	Match string
 	App   string
 
-	lazy *lazyTemplate
+	autogenSelector *metrixselector.Expr
+	lazy            *lazyTemplate
 }
 
 // lazyTemplate holds the deferred chart template. It is referenced by pointer so
@@ -68,9 +75,31 @@ func (p Profile) Template() (charttpl.Group, error) {
 	return p.lazy.tmpl.Clone(), nil
 }
 
+// AutogenSelector returns an independent copy of the profile-scoped fallback
+// selector, or nil when the profile does not configure one.
+func (p Profile) AutogenSelector() *metrixselector.Expr {
+	return cloneSelectorExpr(p.autogenSelector)
+}
+
+func (p Profile) clone() Profile {
+	out := p
+	out.autogenSelector = cloneSelectorExpr(p.autogenSelector)
+	return out
+}
+
+func cloneSelectorExpr(expr *metrixselector.Expr) *metrixselector.Expr {
+	if expr == nil {
+		return nil
+	}
+	out := *expr
+	out.Allow = slices.Clone(expr.Allow)
+	out.Deny = slices.Clone(expr.Deny)
+	return &out
+}
+
 // validateHeader validates the always-loaded fields (match + app). Template
 // structure is validated separately, at hydrate time.
-func (p Profile) validateHeader() error {
+func (p *Profile) validateHeader() error {
 	if strings.TrimSpace(p.Match) == "" {
 		return fmt.Errorf("profile %q: 'match' must not be empty", p.Name)
 	}
@@ -79,6 +108,24 @@ func (p Profile) validateHeader() error {
 	}
 	if p.App != "" && !validProfileName.MatchString(p.App) {
 		return fmt.Errorf("profile %q: 'app' %q must match %s", p.Name, p.App, validProfileName.String())
+	}
+	if p.autogenSelector != nil {
+		if p.autogenSelector.Empty() {
+			return fmt.Errorf("profile %q: 'autogen.selector' must contain at least one allow or deny selector", p.Name)
+		}
+		for i, item := range p.autogenSelector.Allow {
+			if strings.TrimSpace(item) == "" {
+				return fmt.Errorf("profile %q: 'autogen.selector.allow[%d]' must not be empty", p.Name, i)
+			}
+		}
+		for i, item := range p.autogenSelector.Deny {
+			if strings.TrimSpace(item) == "" {
+				return fmt.Errorf("profile %q: 'autogen.selector.deny[%d]' must not be empty", p.Name, i)
+			}
+		}
+		if _, err := p.autogenSelector.Parse(); err != nil {
+			return fmt.Errorf("profile %q: 'autogen.selector': %w", p.Name, err)
+		}
 	}
 	return nil
 }
@@ -90,6 +137,7 @@ func parseTemplate(name string, raw []byte) (charttpl.Group, error) {
 	var doc struct {
 		Match    string         `yaml:"match"`
 		App      string         `yaml:"app,omitempty"`
+		Autogen  *autogen       `yaml:"autogen,omitempty"`
 		Template charttpl.Group `yaml:"template"`
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(raw))

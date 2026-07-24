@@ -4,19 +4,20 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Underlying I/O failed during read/write/flush/sync. Auto-lifted
-    /// from [`std::io::Error`].
-    #[error("I/O error: {0}")]
+    /// from [`std::io::Error`]. Transparent: embedding the source in the
+    /// message while also chaining it would print it twice in anyhow chains.
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 
     /// `bincode::encode_to_vec` rejected a value while packing a chunk
     /// payload.
-    #[error("bincode encode error: {0}")]
+    #[error(transparent)]
     BincodeEncode(#[from] bincode::error::EncodeError),
 
     /// `bincode::decode_from_slice` failed while unpacking a chunk
     /// payload — the bytes don't match the expected shape, or are
     /// truncated.
-    #[error("bincode decode error: {0}")]
+    #[error(transparent)]
     BincodeDecode(#[from] bincode::error::DecodeError),
 
     /// `zstd` compression or decompression failed without surfacing as

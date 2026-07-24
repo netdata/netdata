@@ -168,11 +168,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -184,23 +186,23 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| chrony.stratum | stratum | level |
-| chrony.current_correction | current_correction | seconds |
-| chrony.root_delay | root_delay | seconds |
-| chrony.root_dispersion | root_delay | seconds |
-| chrony.last_offset | offset | seconds |
-| chrony.rms_offset | offset | seconds |
-| chrony.frequency | frequency | ppm |
-| chrony.residual_frequency | residual_frequency | ppm |
-| chrony.skew | skew | ppm |
-| chrony.update_interval | update_interval | seconds |
-| chrony.ref_measurement_time | ref_measurement_time | seconds |
-| chrony.leap_status | normal, insert_second, delete_second, unsynchronised | status |
-| chrony.activity | online, offline, burst_online, burst_offline, unresolved | sources |
-| chrony.ntp_packets | received, dropped | packets/s |
-| chrony.command_packets | received, dropped | packets/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| chrony.stratum | Distance to the reference clock | stratum | level |
+| chrony.current_correction | Current correction | current_correction | seconds |
+| chrony.root_delay | Network path delay to stratum-1 | root_delay | seconds |
+| chrony.root_dispersion | Dispersion accumulated back to stratum-1 | root_delay | seconds |
+| chrony.last_offset | Offset on the last clock update | offset | seconds |
+| chrony.rms_offset | Long-term average of the offset value | offset | seconds |
+| chrony.frequency | Frequency | frequency | ppm |
+| chrony.residual_frequency | Residual frequency | residual_frequency | ppm |
+| chrony.skew | Skew | skew | ppm |
+| chrony.update_interval | Interval between the last two clock updates | update_interval | seconds |
+| chrony.ref_measurement_time | Time since the last measurement | ref_measurement_time | seconds |
+| chrony.leap_status | Leap status | normal, insert_second, delete_second, unsynchronised | status |
+| chrony.activity | Peers activity | online, offline, burst_online, burst_offline, unresolved | sources |
+| chrony.ntp_packets | NTP packets | received, dropped | packets/s |
+| chrony.command_packets | Command packets | received, dropped | packets/s |
 
 
 

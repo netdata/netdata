@@ -172,11 +172,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -188,10 +190,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| gearman.queued_jobs_activity | running, waiting | jobs |
-| gearman.queued_jobs_priority | high, normal, low | jobs |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| gearman.queued_jobs_activity | Jobs Activity | running, waiting | jobs |
+| gearman.queued_jobs_priority | Jobs Priority | high, normal, low | jobs |
+
 
 ### Per Gearman instance
 
@@ -205,11 +208,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| gearman.function_queued_jobs_activity | running, waiting | jobs |
-| gearman.function_queued_jobs_priority | high, normal, low | jobs |
-| gearman.function_workers | available | workers |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| gearman.function_queued_jobs_activity | Function Jobs Activity | running, waiting | jobs |
+| gearman.function_queued_jobs_priority | Function Jobs Priority | high, normal, low | jobs |
+| gearman.function_workers | Function Workers | available | workers |
 
 
 

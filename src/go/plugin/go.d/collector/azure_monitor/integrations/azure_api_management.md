@@ -645,11 +645,13 @@ The following alerts are available:
 | [ am_api_management_eventhub_timedout_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_api_management.conf) | azure_monitor.api_management.eventhub_events | APIM EventHub timed out events on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -671,18 +673,18 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.api_management.capacity | capacity | percentage |
-| azure_monitor.api_management.gateway_cpu | cpu | percentage |
-| azure_monitor.api_management.gateway_memory | memory | percentage |
-| azure_monitor.api_management.requests | requests | requests/s |
-| azure_monitor.api_management.request_duration | overall, backend | milliseconds |
-| azure_monitor.api_management.eventhub_events | total, successful, failed, dropped, rejected, throttled, timed_out | events/s |
-| azure_monitor.api_management.eventhub_bytes | sent | bytes/s |
-| azure_monitor.api_management.websocket_connections | connection_attempts | attempts/s |
-| azure_monitor.api_management.websocket_messages | messages | messages/s |
-| azure_monitor.api_management.network_connectivity | connectivity | status |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.api_management.capacity | Azure API Management Capacity Utilization | capacity | percentage |
+| azure_monitor.api_management.gateway_cpu | Azure API Management Gateway CPU | cpu | percentage |
+| azure_monitor.api_management.gateway_memory | Azure API Management Gateway Memory | memory | percentage |
+| azure_monitor.api_management.requests | Azure API Management Gateway Requests | requests | requests/s |
+| azure_monitor.api_management.request_duration | Azure API Management Request Duration | overall, backend | milliseconds |
+| azure_monitor.api_management.eventhub_events | Azure API Management EventHub Events | total, successful, failed, dropped, rejected, throttled, timed_out | events/s |
+| azure_monitor.api_management.eventhub_bytes | Azure API Management EventHub Bytes Sent | sent | bytes/s |
+| azure_monitor.api_management.websocket_connections | Azure API Management WebSocket Connection Attempts | connection_attempts | attempts/s |
+| azure_monitor.api_management.websocket_messages | Azure API Management WebSocket Messages | messages | messages/s |
+| azure_monitor.api_management.network_connectivity | Azure API Management Network Connectivity Status | connectivity | status |
 
 
 

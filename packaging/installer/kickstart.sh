@@ -1640,8 +1640,13 @@ check_special_native_deps() {
     fi
 
     if [ "${DISTRO}" = "rhel" ]; then
+      if [ "${SYSVERSION}" -eq 7 ]; then
+        epel_url="https://archives.fedoraproject.org/pub/archive/epel/7/x86_64/Packages/e/epel-release-7-14.noarch.rpm"
+      else
+        epel_url="https://dl.fedoraproject.org/pub/epel/epel-release-latest-${SYSVERSION}.noarch.rpm"
+      fi
       # shellcheck disable=SC2086
-      if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "https://dl.fedoraproject.org/pub/epel/epel-release-latest-${SYSVERSION}.noarch.rpm"; then
+      if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "${epel_url}"; then
         warning "Failed to install EPEL, even though it is required to install native packages on this system."
         return 1
       fi

@@ -146,11 +146,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -162,9 +164,9 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| exim.qemails | emails | emails |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| exim.qemails | Exim Queue Emails | emails | emails |
 
 
 

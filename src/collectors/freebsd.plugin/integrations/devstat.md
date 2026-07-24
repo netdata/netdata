@@ -118,11 +118,13 @@ The following alerts are available:
 | [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | average percentage of time ${label:device} disk was busy over the last 10 minutes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -134,9 +136,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.io | io, out | KiB/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.io | Disk I/O | io, out | KiB/s |
+
 
 ### Per disk
 
@@ -146,13 +149,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.io | reads, writes, frees | KiB/s |
-| disk.ops | reads, writes, other, frees | operations/s |
-| disk.qops | operations | operations |
-| disk.util | utilization | % of time working |
-| disk.iotime | reads, writes, other, frees | milliseconds/s |
-| disk.await | reads, writes, other, frees | milliseconds/operation |
-| disk.avgsz | reads, writes, frees | KiB/operation |
-| disk.svctm | svctm | milliseconds/operation |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| disk.io | Disk I/O Bandwidth | reads, writes, frees | KiB/s |
+| disk.ops | Disk Completed I/O Operations | reads, writes, other, frees | operations/s |
+| disk.qops | Disk Current I/O Operations | operations | operations |
+| disk.util | Disk Utilization Time | utilization | % of time working |
+| disk.iotime | Disk Total I/O Time | reads, writes, other, frees | milliseconds/s |
+| disk.await | Average Completed I/O Operation Time | reads, writes, other, frees | milliseconds/operation |
+| disk.avgsz | Average Completed I/O Operation Bandwidth | reads, writes, frees | KiB/operation |
+| disk.svctm | Average Service Time | svctm | milliseconds/operation |

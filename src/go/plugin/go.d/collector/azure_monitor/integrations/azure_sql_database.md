@@ -653,11 +653,13 @@ The following alerts are available:
 | [ am_sql_database_ledger_digest_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.ledger_digest | SQL Database ledger digest failures on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -679,30 +681,30 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.sql_database.cpu | average, maximum | percentage |
-| azure_monitor.sql_database.instance_cpu | average | percentage |
-| azure_monitor.sql_database.instance_memory | average | percentage |
-| azure_monitor.sql_database.dtu_consumption | average | percentage |
-| azure_monitor.sql_database.io_utilization | data_read, log_write | percentage |
-| azure_monitor.sql_database.resource_utilization | workers, sessions | percentage |
-| azure_monitor.sql_database.availability | average | percentage |
-| azure_monitor.sql_database.connections | successful, failed_system, failed_user, firewall_blocked | connections/s |
-| azure_monitor.sql_database.deadlocks | total | deadlocks/s |
-| azure_monitor.sql_database.storage | used, allocated | bytes |
-| azure_monitor.sql_database.storage_utilization | average | percentage |
-| azure_monitor.sql_database.tempdb_size | data, log | KiB |
-| azure_monitor.sql_database.tempdb_log_utilization | average | percentage |
-| azure_monitor.sql_database.vcore_usage | used, limit | vCores |
-| azure_monitor.sql_database.dtu_usage | used, limit | DTU |
-| azure_monitor.sql_database.sessions_count | average | sessions |
-| azure_monitor.sql_database.replication_lag | average | seconds |
-| azure_monitor.sql_database.xtp_storage | average | percentage |
-| azure_monitor.sql_database.serverless_utilization | cpu, memory | percentage |
-| azure_monitor.sql_database.serverless_billing | total, ha_replicas | vCore-seconds/s |
-| azure_monitor.sql_database.free_tier_usage | consumed, remaining | vCore-seconds |
-| azure_monitor.sql_database.ledger_digest | success, failed | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.sql_database.cpu | Azure SQL Database CPU Utilization | average, maximum | percentage |
+| azure_monitor.sql_database.instance_cpu | Azure SQL Database Instance CPU Utilization | average | percentage |
+| azure_monitor.sql_database.instance_memory | Azure SQL Database Instance Memory Utilization | average | percentage |
+| azure_monitor.sql_database.dtu_consumption | Azure SQL Database DTU Consumption | average | percentage |
+| azure_monitor.sql_database.io_utilization | Azure SQL Database I/O Utilization | data_read, log_write | percentage |
+| azure_monitor.sql_database.resource_utilization | Azure SQL Database Resource Utilization | workers, sessions | percentage |
+| azure_monitor.sql_database.availability | Azure SQL Database Availability | average | percentage |
+| azure_monitor.sql_database.connections | Azure SQL Database Connection Events | successful, failed_system, failed_user, firewall_blocked | connections/s |
+| azure_monitor.sql_database.deadlocks | Azure SQL Database Deadlocks | total | deadlocks/s |
+| azure_monitor.sql_database.storage | Azure SQL Database Storage | used, allocated | bytes |
+| azure_monitor.sql_database.storage_utilization | Azure SQL Database Storage Utilization | average | percentage |
+| azure_monitor.sql_database.tempdb_size | Azure SQL Database Tempdb Size | data, log | KiB |
+| azure_monitor.sql_database.tempdb_log_utilization | Azure SQL Database Tempdb Log Utilization | average | percentage |
+| azure_monitor.sql_database.vcore_usage | Azure SQL Database vCore Usage | used, limit | vCores |
+| azure_monitor.sql_database.dtu_usage | Azure SQL Database DTU Usage | used, limit | DTU |
+| azure_monitor.sql_database.sessions_count | Azure SQL Database Sessions Count | average | sessions |
+| azure_monitor.sql_database.replication_lag | Azure SQL Database Replication Lag | average | seconds |
+| azure_monitor.sql_database.xtp_storage | Azure SQL Database In-Memory OLTP Storage | average | percentage |
+| azure_monitor.sql_database.serverless_utilization | Azure SQL Database Serverless Utilization | cpu, memory | percentage |
+| azure_monitor.sql_database.serverless_billing | Azure SQL Database Serverless Billing | total, ha_replicas | vCore-seconds/s |
+| azure_monitor.sql_database.free_tier_usage | Azure SQL Database Free Tier Usage | consumed, remaining | vCore-seconds |
+| azure_monitor.sql_database.ledger_digest | Azure SQL Database Ledger Digest Uploads | success, failed | events/s |
 
 
 

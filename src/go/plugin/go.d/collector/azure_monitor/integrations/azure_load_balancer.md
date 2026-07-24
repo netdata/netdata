@@ -635,11 +635,13 @@ The following alerts are available:
 | [ am_load_balancers_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.snat_ports | LB SNAT port utilization on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -661,16 +663,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.load_balancers.vip_availability | average | percentage |
-| azure_monitor.load_balancers.dip_availability | average | percentage |
-| azure_monitor.load_balancers.global_backend_availability | average | percentage |
-| azure_monitor.load_balancers.byte_throughput | total | bytes/s |
-| azure_monitor.load_balancers.packet_throughput | total | packets/s |
-| azure_monitor.load_balancers.syn_count | total | packets/s |
-| azure_monitor.load_balancers.snat_connections | total | connections/s |
-| azure_monitor.load_balancers.snat_ports | allocated, used | ports |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.load_balancers.vip_availability | Azure Load Balancer Data Path Availability | average | percentage |
+| azure_monitor.load_balancers.dip_availability | Azure Load Balancer Health Probe Status | average | percentage |
+| azure_monitor.load_balancers.global_backend_availability | Azure Load Balancer Global Backend Availability | average | percentage |
+| azure_monitor.load_balancers.byte_throughput | Azure Load Balancer Byte Throughput | total | bytes/s |
+| azure_monitor.load_balancers.packet_throughput | Azure Load Balancer Packet Throughput | total | packets/s |
+| azure_monitor.load_balancers.syn_count | Azure Load Balancer SYN Packets | total | packets/s |
+| azure_monitor.load_balancers.snat_connections | Azure Load Balancer SNAT Connections | total | connections/s |
+| azure_monitor.load_balancers.snat_ports | Azure Load Balancer SNAT Port Usage | allocated, used | ports |
 
 
 

@@ -135,11 +135,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -155,12 +157,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_dc_ratio | ratio | % |
-| app.ebpf_dc_reference | files | files |
-| app.ebpf_dc_not_cache | files | files |
-| app.ebpf_dc_not_found | files | files |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| app.ebpf_dc_ratio | Percentage of files inside directory cache | ratio | % |
+| app.ebpf_dc_reference | Count file access | files | files |
+| app.ebpf_dc_not_cache | Files not present inside directory cache | files | files |
+| app.ebpf_dc_not_found | Files not found | files | files |
+
 
 ### Per filesystem
 
@@ -170,10 +173,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filesystem.dc_reference | reference, slow, miss | files |
-| filesystem.dc_hit_ratio | ratio | % |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| filesystem.dc_reference | Variables used to calculate hit ratio. | reference, slow, miss | files |
+| filesystem.dc_hit_ratio | Percentage of files inside directory cache | ratio | % |
+
 
 ### Per cgroup
 
@@ -183,13 +187,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.dc_ratio | ratio | % |
-| cgroup.dc_reference | reference | files |
-| cgroup.dc_not_cache | slow | files |
-| cgroup.dc_not_found | miss | files |
-| services.dc_ratio | a dimension per systemd service | % |
-| services.dc_reference | a dimension per systemd service | files |
-| services.dc_not_cache | a dimension per systemd service | files |
-| services.dc_not_found | a dimension per systemd service | files |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.dc_ratio | Percentage of files inside directory cache | ratio | % |
+| cgroup.dc_reference | Count file access | reference | files |
+| cgroup.dc_not_cache | Files not present inside directory cache | slow | files |
+| cgroup.dc_not_found | Files not found | miss | files |
+| services.dc_ratio | Percentage of files inside directory cache | a dimension per systemd service | % |
+| services.dc_reference | Count file access | a dimension per systemd service | files |
+| services.dc_not_cache | Files not present inside directory cache | a dimension per systemd service | files |
+| services.dc_not_found | Files not found | a dimension per systemd service | files |

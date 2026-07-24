@@ -435,6 +435,7 @@ The following alerts are available:
 | [ snmp_bgp_peer_family_prefixes_accepted_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.route_counts.current | ML anomaly detection on accepted-prefix gauges where the vendor MIB exposes them |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -503,6 +504,7 @@ If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or
 - When the source model is peer-family scoped, alerts and chart labels include AFI/SAFI so operators can distinguish otherwise similar peers.
 
 
+
 ### Per device licensing
 
 Shared device-level licensing health metrics emitted when the matched SNMP profile provides licensing telemetry. Supported profile coverage includes Check Point licensing state and per-blade expiry, Fortinet FortiGate contract/service/account expirations, Cisco traditional licensing end-date/remaining-time/state/usage telemetry, Cisco Smart Licensing authorization, certificate, evaluation, and state telemetry, Sophos Firewall subscription state and per-license expiry telemetry, Blue Coat ProxySG application/feature/component expiry, expire-type, and state telemetry, and basic MikroTik RouterOS upgrade-entitlement telemetry. MikroTik support is intentionally limited to the RouterOS upgrade-entitlement fields exposed by SNMP, and epoch-like placeholder `mtxrLicUpgrUntil` values are ignored.
@@ -515,14 +517,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| snmp.license.remaining_time | remaining_time | seconds |
-| snmp.license.authorization_remaining_time | remaining_time | seconds |
-| snmp.license.certificate_remaining_time | remaining_time | seconds |
-| snmp.license.grace_remaining_time | remaining_time | seconds |
-| snmp.license.usage_percent | usage_percent | percentage |
-| snmp.license.state | healthy, informational, degraded, broken, ignored | licenses |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| snmp.license.remaining_time | Earliest remaining time to expiry across monitored licenses and subscriptions on the device. | remaining_time | seconds |
+| snmp.license.authorization_remaining_time | Earliest remaining time for licensing authorization timers on the device. | remaining_time | seconds |
+| snmp.license.certificate_remaining_time | Earliest remaining time for licensing certificate timers on the device. | remaining_time | seconds |
+| snmp.license.grace_remaining_time | Earliest remaining time for licensing grace or evaluation timers on the device. | remaining_time | seconds |
+| snmp.license.usage_percent | Highest usage pressure across finite licensing pools on the device. | usage_percent | percentage |
+| snmp.license.state | Count of licensing rows on the device by normalized state bucket: healthy, informational, degraded, broken, and ignored. | healthy, informational, degraded, broken, ignored | licenses |
 
 
 

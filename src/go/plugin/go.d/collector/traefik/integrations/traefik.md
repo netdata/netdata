@@ -202,11 +202,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -218,11 +220,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| traefik.entrypoint_requests | 1xx, 2xx, 3xx, 4xx, 5xx | requests/s |
-| traefik.entrypoint_request_duration_average | 1xx, 2xx, 3xx, 4xx, 5xx | milliseconds |
-| traefik.entrypoint_open_connections | a dimension per HTTP method | connections |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| traefik.entrypoint_requests | Processed HTTP requests | 1xx, 2xx, 3xx, 4xx, 5xx | requests/s |
+| traefik.entrypoint_request_duration_average | Average HTTP request processing time | 1xx, 2xx, 3xx, 4xx, 5xx | milliseconds |
+| traefik.entrypoint_open_connections | Open connections | a dimension per HTTP method | connections |
 
 
 

@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -124,36 +126,36 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| netframework.clrexception_thrown | exceptions | exceptions/s |
-| netframework.clrexception_filters | filters | filters/s |
-| netframework.clrexception_finallys | finallys | finallys/s |
-| netframework.clrexception_throw_to_catch_depth | traversed | stack_frames/s |
-| netframework.clrinterop_com_callable_wrappers | com_callable_wrappers | ccw/s |
-| netframework.clrinterop_interop_marshallings | marshallings | marshallings/s |
-| netframework.clrinterop_interop_stubs_created | created | stubs/s |
-| netframework.clrjit_methods | jit-compiled | methods/s |
-| netframework.clrjit_time | time | percentage |
-| netframework.clrjit_standard_failures | failures | failures/s |
-| netframework.clrjit_il_bytes | compiled_msil | bytes/s |
-| netframework.clrloading_loader_heap_size | committed | bytes |
-| netframework.clrloading_appdomains_loaded | loaded | domain/s |
-| netframework.clrloading_appdomains_unloaded | unloaded | domain/s |
-| netframework.clrloading_assemblies_loaded | loaded | assemblies/s |
-| netframework.clrloading_classes_loaded | loaded | classes/s |
-| netframework.clrloading_class_load_failures | class_load | failures/s |
-| netframework.clrremoting_channels | registered | channels/s |
-| netframework.clrremoting_context_bound_classes_loaded | loaded | classes |
-| netframework.clrremoting_context_bound_objects | allocated | objects/s |
-| netframework.clrremoting_context_proxies | objects | objects/s |
-| netframework.clrremoting_remote_calls | calls | calls/s |
-| netframework.clrsecurity_link_time_checks | linktime | checks/s |
-| netframework.clrsecurity_checks_time | time | percentage |
-| netframework.clrsecurity_stack_walk_depth | stack | depth |
-| netframework.clrsecurity_runtime_checks | runtime | checks/s |
-| netframework.clrlocksandthreads_queue_length | threads | threads/s |
-| netframework.clrlocksandthreads_current_logical_threads | logical | threads |
-| netframework.clrlocksandthreads_current_physical_threads | physical | threads |
-| netframework.clrlocksandthreads_recognized_threads | threads | threads/s |
-| netframework.clrlocksandthreads_contentions | contentions | contentions/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| netframework.clrexception_thrown | Thrown exceptions | exceptions | exceptions/s |
+| netframework.clrexception_filters | Thrown exceptions filters | filters | filters/s |
+| netframework.clrexception_finallys | Executed finally blocks | finallys | finallys/s |
+| netframework.clrexception_throw_to_catch_depth | Traversed stack frames | traversed | stack_frames/s |
+| netframework.clrinterop_com_callable_wrappers | COM callable wrappers (CCW) | com_callable_wrappers | ccw/s |
+| netframework.clrinterop_interop_marshallings | Arguments and return values marshallings | marshallings | marshallings/s |
+| netframework.clrinterop_interop_stubs_created | Created stubs | created | stubs/s |
+| netframework.clrjit_methods | JIT-compiled methods | jit-compiled | methods/s |
+| netframework.clrjit_time | Time spent in JIT compilation | time | percentage |
+| netframework.clrjit_standard_failures | JIT compiler failures | failures | failures/s |
+| netframework.clrjit_il_bytes | Compiled Microsoft intermediate language (MSIL) bytes | compiled_msil | bytes/s |
+| netframework.clrloading_loader_heap_size | Memory committed by class loader | committed | bytes |
+| netframework.clrloading_appdomains_loaded | Loaded application domains | loaded | domain/s |
+| netframework.clrloading_appdomains_unloaded | Unloaded application domains | unloaded | domain/s |
+| netframework.clrloading_assemblies_loaded | Loaded assemblies | loaded | assemblies/s |
+| netframework.clrloading_classes_loaded | Loaded classes in all assemblies | loaded | classes/s |
+| netframework.clrloading_class_load_failures | Class load failures | class_load | failures/s |
+| netframework.clrremoting_channels | Registered channels | registered | channels/s |
+| netframework.clrremoting_context_bound_classes_loaded | Loaded context-bound classes | loaded | classes |
+| netframework.clrremoting_context_bound_objects | Allocated context-bound objects | allocated | objects/s |
+| netframework.clrremoting_context_proxies | Remoting proxy objects | objects | objects/s |
+| netframework.clrremoting_remote_calls | Remote Procedure Calls (RPC) invoked | calls | calls/s |
+| netframework.clrsecurity_link_time_checks | Link-time code access security checks | linktime | checks/s |
+| netframework.clrsecurity_checks_time | Time spent performing runtime code access security checks | time | percentage |
+| netframework.clrsecurity_stack_walk_depth | Depth of the stack | stack | depth |
+| netframework.clrsecurity_runtime_checks | Runtime code access security checks performed | runtime | checks/s |
+| netframework.clrlocksandthreads_queue_length | Threads waited to acquire a managed lock | threads | threads/s |
+| netframework.clrlocksandthreads_current_logical_threads | Logical threads | logical | threads |
+| netframework.clrlocksandthreads_current_physical_threads | Physical threads | physical | threads |
+| netframework.clrlocksandthreads_recognized_threads | Threads recognized by the runtime | threads | threads/s |
+| netframework.clrlocksandthreads_contentions | Fails to acquire a managed lock | contentions | contentions/s |

@@ -120,6 +120,7 @@ The following alerts are available:
 | [ audit_lost_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf) | audit.lost | Linux audit subsystem is losing events (backlog overflow, rate limiting, or memory pressure). |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -127,6 +128,7 @@ Metrics grouped by *scope*.
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
 Monitor the Linux kernel audit subsystem status and backlog health.
+
 
 ### Per Linux Audit Subsystem instance
 
@@ -136,10 +138,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| audit.backlog | used, free | events |
-| audit.backlog_utilization | utilization | % |
-| audit.lost | lost | events/s |
-| audit.enabled | disabled, enabled, immutable | state |
-| audit.failure | silent, printk, panic | state |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| audit.backlog | Audit Backlog | used, free | events |
+| audit.backlog_utilization | Audit Backlog Utilization | utilization | % |
+| audit.lost | Audit Lost Events | lost | events/s |
+| audit.enabled | Audit Enabled State | disabled, enabled, immutable | state |
+| audit.failure | Audit Failure Mode | silent, printk, panic | state |

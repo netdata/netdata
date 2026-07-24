@@ -528,6 +528,7 @@ The following alerts are available:
 | [ nagios_job_perfdata_threshold_state_crit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf) | nagios.job.perfdata_threshold_state | Nagios job ${label:nagios_job} perfdata ${label:perfdata_value} is in CRITICAL threshold state |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -535,6 +536,7 @@ Metrics grouped by *scope*.
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
 Each configured job produces execution state and resource usage charts. When a check emits Nagios performance data, additional charts are created automatically for each metric. Non-counter perfdata with warning/critical thresholds also get threshold state charts for alerting.
+
 
 
 ### Per job
@@ -550,13 +552,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nagios.job.execution_state | ok, warning, critical, unknown, timeout, paused, retry | state |
-| nagios.job.perfdata_threshold_state | no_threshold, ok, warning, critical, retry | state |
-| nagios.job.execution_duration | duration | seconds |
-| nagios.job.execution_cpu_total | total | seconds |
-| nagios.job.execution_max_rss | rss | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nagios.job.execution_state | Current state of the check job. Values are ok, warning, critical, unknown, timeout (check exceeded configured timeout), or paused (outside check_period). The retry dimension indicates the check is retrying before reaching hard state. | ok, warning, critical, unknown, timeout, paused, retry | state |
+| nagios.job.perfdata_threshold_state | Threshold state derived from performance data warning/critical ranges. Use the `perfdata_value` label to identify the specific metric. Values are no_threshold (check provides no ranges), ok, warning, or critical. The retry dimension indicates the check is retrying. | no_threshold, ok, warning, critical, retry | state |
+| nagios.job.execution_duration | How long the check command took to run. | duration | seconds |
+| nagios.job.execution_cpu_total | CPU time (user + system) consumed by the check command. Available on non-Windows platforms. | total | seconds |
+| nagios.job.execution_max_rss | Peak memory (RSS) used by the check command. Available on non-Windows platforms. | rss | bytes |
 
 
 

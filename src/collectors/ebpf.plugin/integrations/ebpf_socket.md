@@ -131,6 +131,7 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 This module does not publish standalone Netdata charts. It attaches to kernel TCP/UDP functions
@@ -180,3 +181,75 @@ following columns:
 | SegsTotal | Total segments per second |
 | SegsRetransmitted | Retransmitted segments per second |
 | DatagramsNoPort | Datagrams with no destination port per second |
+
+### Per eBPF Socket instance
+
+These metrics show total number of calls to functions inside kernel.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ip.inbound_conn | Inbound connections. | connected_tcp, connected_udp | connections/s |
+| ip.tcp_outbound_conn | TCP outbound connections. | received | connections/s |
+| ip.tcp_functions | Calls to internal functions | received, send, closed | calls/s |
+| ip.total_tcp_bandwidth | TCP bandwidth | received, send | kilobits/s |
+| ip.tcp_error | TCP errors | received, send | calls/s |
+| ip.tcp_retransmit | Packages retransmitted | retransmitted | calls/s |
+| ip.udp_functions | UDP calls | received, send | calls/s |
+| ip.total_udp_bandwidth | UDP bandwidth | received, send | kilobits/s |
+| ip.udp_error | UDP errors | received, send | calls/s |
+
+
+### Per apps
+
+These metrics show grouped information per apps group.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app_group | The name of the group defined in the configuration. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| app.ebpf_call_tcp_v4_connection | Calls to tcp_v4_connection | connections | connections/s |
+| app.ebpf_call_tcp_v6_connection | Calls to tcp_v6_connection | connections | connections/s |
+| app.ebpf_sock_total_bandwidth | Bytes sent | received, sent | kilobits/s |
+| app.ebpf_call_tcp_sendmsg | Calls for tcp_sendmsg | calls | calls/s |
+| app.ebpf_call_tcp_cleanup_rbuf | Calls for tcp_cleanup_rbuf | calls | calls/s |
+| app.ebpf_call_tcp_retransmit | Calls for tcp_retransmit | calls | calls/s |
+| app.ebpf_call_udp_sendmsg | Calls for udp_sendmsg | calls | calls/s |
+| app.ebpf_call_udp_recvmsg | Calls for udp_recvmsg | calls | calls/s |
+
+
+### Per cgroup
+
+
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.net_conn_ipv4 | Calls to tcp_v4_connection | connections | connections/s |
+| cgroup.net_conn_ipv6 | Calls to tcp_v6_connection | connections | connections/s |
+| cgroup.net_total_bandwidth | Bytes received | received, sent | kilobits/s |
+| cgroup.net_tcp_recv | Calls to tcp_cleanup_rbuf. | calls | calls/s |
+| cgroup.net_tcp_send | Calls to tcp_sendmsg. | calls | calls/s |
+| cgroup.net_retransmit | Calls to tcp_retransmit. | calls | calls/s |
+| cgroup.net_udp_send | Calls to udp_sendmsg | calls | calls/s |
+| cgroup.net_udp_recv | Calls to udp_recvmsg | calls | calls/s |
+| services.net_conn_ipv4 | Calls to tcp_v4_connection | connections | connections/s |
+| services.net_conn_ipv6 | Calls to tcp_v6_connection | connections | connections/s |
+| services.net_total_bandwidth | Bytes received | received, sent | kilobits/s |
+| services.net_tcp_recv | Calls to tcp_cleanup_rbuf. | calls | calls/s |
+| services.net_tcp_send | Calls to tcp_sendmsg. | calls | calls/s |
+| services.net_tcp_retransmit | Calls to tcp_retransmit | calls | calls/s |
+| services.net_udp_send | Calls to udp_sendmsg | calls | calls/s |
+| services.net_udp_recv | Calls to udp_recvmsg | calls | calls/s |

@@ -643,11 +643,13 @@ The following alerts are available:
 | [ am_stream_analytics_function_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_stream_analytics.conf) | azure_monitor.stream_analytics.function_requests | Stream Analytics ML function failures on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -669,18 +671,18 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.stream_analytics.event_flow | in, out | events/s |
-| azure_monitor.stream_analytics.input_data_throughput | received | bytes/s |
-| azure_monitor.stream_analytics.input_sources_received | received | sources/s |
-| azure_monitor.stream_analytics.event_timing | late, early, out_of_order | events/s |
-| azure_monitor.stream_analytics.backlogged_events | backlogged | events |
-| azure_monitor.stream_analytics.watermark_delay | delay | seconds |
-| azure_monitor.stream_analytics.errors | runtime, data_conversion, deserialization | errors/s |
-| azure_monitor.stream_analytics.function_requests | total, failed | requests/s |
-| azure_monitor.stream_analytics.function_events | input | events/s |
-| azure_monitor.stream_analytics.resource_utilization | cpu, su_memory | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.stream_analytics.event_flow | Azure Stream Analytics Event Flow | in, out | events/s |
+| azure_monitor.stream_analytics.input_data_throughput | Azure Stream Analytics Input Data Throughput | received | bytes/s |
+| azure_monitor.stream_analytics.input_sources_received | Azure Stream Analytics Input Sources Received | received | sources/s |
+| azure_monitor.stream_analytics.event_timing | Azure Stream Analytics Event Timing Issues | late, early, out_of_order | events/s |
+| azure_monitor.stream_analytics.backlogged_events | Azure Stream Analytics Backlogged Events | backlogged | events |
+| azure_monitor.stream_analytics.watermark_delay | Azure Stream Analytics Watermark Delay | delay | seconds |
+| azure_monitor.stream_analytics.errors | Azure Stream Analytics Errors | runtime, data_conversion, deserialization | errors/s |
+| azure_monitor.stream_analytics.function_requests | Azure Stream Analytics Function Requests | total, failed | requests/s |
+| azure_monitor.stream_analytics.function_events | Azure Stream Analytics Function Events | input | events/s |
+| azure_monitor.stream_analytics.resource_utilization | Azure Stream Analytics Resource Utilization | cpu, su_memory | percentage |
 
 
 

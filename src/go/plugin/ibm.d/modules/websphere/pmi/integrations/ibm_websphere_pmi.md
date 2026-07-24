@@ -115,11 +115,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -137,9 +139,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.alarm_manager_events | created, cancelled, fired | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.alarm_manager_events | Alarm Manager Events | created, cancelled, fired | events/s |
+
 
 ### Per dynamiccache
 
@@ -155,10 +158,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.dynamic_cache_in_memory | entries | entries |
-| websphere_pmi.dynamic_cache_capacity | max_entries | entries |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.dynamic_cache_in_memory | Dynamic Cache Entries | entries | entries |
+| websphere_pmi.dynamic_cache_capacity | Dynamic Cache Capacity | max_entries | entries |
+
 
 ### Per enterprisebeans
 
@@ -174,12 +178,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.ejb_operations | create, remove, activate, passivate, instantiate, store, load | operations/s |
-| websphere_pmi.ejb_messages | received, backout | messages/s |
-| websphere_pmi.ejb_pool | ready, live, pooled, active_method, passive, server_session_pool, method_ready, async_queue | beans |
-| websphere_pmi.ejb_time | activation, passivation, create, remove, load, store, method_response, wait, async_wait, read_lock, write_lock | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.ejb_operations | EJB Operations | create, remove, activate, passivate, instantiate, store, load | operations/s |
+| websphere_pmi.ejb_messages | EJB Message Activity | received, backout | messages/s |
+| websphere_pmi.ejb_pool | EJB Pool Usage | ready, live, pooled, active_method, passive, server_session_pool, method_ready, async_queue | beans |
+| websphere_pmi.ejb_time | EJB Operation Time | activation, passivation, create, remove, load, store, method_response, wait, async_wait, read_lock, write_lock | milliseconds |
+
 
 ### Per extensionregistry
 
@@ -194,10 +199,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.extension_registry_requests | requests, hits, displacements | events/s |
-| websphere_pmi.extension_registry_hit_rate | hit_rate | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.extension_registry_requests | Extension Registry Requests | requests, hits, displacements | events/s |
+| websphere_pmi.extension_registry_hit_rate | Extension Registry Hit Rate | hit_rate | percentage |
+
 
 ### Per hamanager
 
@@ -212,11 +218,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.ha_manager_groups | local | groups |
-| websphere_pmi.ha_manager_bulletin_board | subjects, subscriptions, local_subjects, local_subscriptions | items |
-| websphere_pmi.ha_manager_rebuild_time | group_state, bulletin_board | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.ha_manager_groups | HA Manager Groups | local | groups |
+| websphere_pmi.ha_manager_bulletin_board | HA Manager Bulletin Board | subjects, subscriptions, local_subjects, local_subscriptions | items |
+| websphere_pmi.ha_manager_rebuild_time | HA Manager Rebuild Time | group_state, bulletin_board | milliseconds |
+
 
 ### Per jcapool
 
@@ -233,12 +240,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.jca_pool_operations | create, close, allocate, freed, faults | operations/s |
-| websphere_pmi.jca_pool_managed | managed_connections, connection_handles | resources |
-| websphere_pmi.jca_pool_utilization | percent_used, percent_maxed | percentage |
-| websphere_pmi.jca_pool_waiting | waiting_threads | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.jca_pool_operations | JCA Pool Operations | create, close, allocate, freed, faults | operations/s |
+| websphere_pmi.jca_pool_managed | JCA Pool Managed Resources | managed_connections, connection_handles | resources |
+| websphere_pmi.jca_pool_utilization | JCA Pool Utilization | percent_used, percent_maxed | percentage |
+| websphere_pmi.jca_pool_waiting | JCA Pool Waiting Threads | waiting_threads | threads |
+
 
 ### Per jdbcpool
 
@@ -254,13 +262,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.jdbc_pool_usage | percent_used, percent_maxed | percentage |
-| websphere_pmi.jdbc_pool_waiting | waiting_threads | threads |
-| websphere_pmi.jdbc_pool_connections | managed, handles | connections |
-| websphere_pmi.jdbc_pool_operations | created, closed, allocated, returned, faults, prep_stmt_cache_discard | operations/s |
-| websphere_pmi.jdbc_pool_time | use, wait, jdbc | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.jdbc_pool_usage | JDBC Pool Utilization | percent_used, percent_maxed | percentage |
+| websphere_pmi.jdbc_pool_waiting | JDBC Pool Waiting Threads | waiting_threads | threads |
+| websphere_pmi.jdbc_pool_connections | JDBC Pool Connections | managed, handles | connections |
+| websphere_pmi.jdbc_pool_operations | JDBC Pool Operations | created, closed, allocated, returned, faults, prep_stmt_cache_discard | operations/s |
+| websphere_pmi.jdbc_pool_time | JDBC Pool Time | use, wait, jdbc | milliseconds |
+
 
 ### Per jmsqueue
 
@@ -277,13 +286,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.jms_queue_messages_produced | total, best_effort, express, reliable_nonpersistent, reliable_persistent, assured_persistent | messages/s |
-| websphere_pmi.jms_queue_messages_consumed | total, best_effort, express, reliable_nonpersistent, reliable_persistent, assured_persistent, expired | messages/s |
-| websphere_pmi.jms_queue_clients | local_producers, local_producer_attaches, local_consumers, local_consumer_attaches | clients |
-| websphere_pmi.jms_queue_storage | available, unavailable, oldest_age | messages |
-| websphere_pmi.jms_queue_wait_time | aggregate, local | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.jms_queue_messages_produced | JMS Queue Messages Produced | total, best_effort, express, reliable_nonpersistent, reliable_persistent, assured_persistent | messages/s |
+| websphere_pmi.jms_queue_messages_consumed | JMS Queue Messages Consumed | total, best_effort, express, reliable_nonpersistent, reliable_persistent, assured_persistent, expired | messages/s |
+| websphere_pmi.jms_queue_clients | JMS Queue Clients | local_producers, local_producer_attaches, local_consumers, local_consumer_attaches | clients |
+| websphere_pmi.jms_queue_storage | JMS Queue Storage | available, unavailable, oldest_age | messages |
+| websphere_pmi.jms_queue_wait_time | JMS Queue Wait Time | aggregate, local | milliseconds |
+
 
 ### Per jmsstore
 
@@ -300,12 +310,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.jms_store_cache | add_stored, add_not_stored, stored_current, stored_bytes, not_stored_current, not_stored_bytes, discard_count, discard_bytes | events |
-| websphere_pmi.jms_store_datastore | insert_batches, update_batches, delete_batches, insert_count, update_count, delete_count, open_count, abort_count, transaction_ms | events/s |
-| websphere_pmi.jms_store_transactions | global_start, global_commit, global_abort, global_indoubt, local_start, local_commit, local_abort | transactions/s |
-| websphere_pmi.jms_store_expiry | index_items | items |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.jms_store_cache | JMS Store Cache | add_stored, add_not_stored, stored_current, stored_bytes, not_stored_current, not_stored_bytes, discard_count, discard_bytes | events |
+| websphere_pmi.jms_store_datastore | JMS Store Datastore Operations | insert_batches, update_batches, delete_batches, insert_count, update_count, delete_count, open_count, abort_count, transaction_ms | events/s |
+| websphere_pmi.jms_store_transactions | JMS Store Transactions | global_start, global_commit, global_abort, global_indoubt, local_start, local_commit, local_abort | transactions/s |
+| websphere_pmi.jms_store_expiry | JMS Store Expiry Index | index_items | items |
+
 
 ### Per jmstopic
 
@@ -322,13 +333,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.jms_topic_publications | assured, best_effort, express | messages/s |
-| websphere_pmi.jms_topic_subscription_hits | assured, best_effort, express | events/s |
-| websphere_pmi.jms_topic_subscriptions | durable_local | subscriptions |
-| websphere_pmi.jms_topic_events | incomplete_publications, publisher_attaches, subscriber_attaches | events/s |
-| websphere_pmi.jms_topic_age | local_oldest | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.jms_topic_publications | JMS Topic Publications | assured, best_effort, express | messages/s |
+| websphere_pmi.jms_topic_subscription_hits | JMS Topic Subscription Hits | assured, best_effort, express | events/s |
+| websphere_pmi.jms_topic_subscriptions | JMS Topic Subscriptions | durable_local | subscriptions |
+| websphere_pmi.jms_topic_events | JMS Topic Events | incomplete_publications, publisher_attaches, subscriber_attaches | events/s |
+| websphere_pmi.jms_topic_age | JMS Topic Oldest Publication Age | local_oldest | milliseconds |
+
 
 ### Per IBM WebSphere PMI instance
 
@@ -338,17 +350,18 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.jvm_heap_usage | used, free | bytes |
-| websphere_pmi.jvm_heap_committed | committed | bytes |
-| websphere_pmi.jvm_heap_max | limit | bytes |
-| websphere_pmi.jvm_uptime | uptime | seconds |
-| websphere_pmi.jvm_cpu | usage | percentage |
-| websphere_pmi.jvm_gc_collections | collections | collections/s |
-| websphere_pmi.jvm_gc_time | total | milliseconds |
-| websphere_pmi.jvm_threads | daemon, other | threads |
-| websphere_pmi.jvm_threads_peak | peak | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.jvm_heap_usage | JVM Heap Memory Usage | used, free | bytes |
+| websphere_pmi.jvm_heap_committed | JVM Heap Committed | committed | bytes |
+| websphere_pmi.jvm_heap_max | JVM Heap Maximum | limit | bytes |
+| websphere_pmi.jvm_uptime | JVM Uptime | uptime | seconds |
+| websphere_pmi.jvm_cpu | JVM CPU Usage | usage | percentage |
+| websphere_pmi.jvm_gc_collections | JVM GC Collections | collections | collections/s |
+| websphere_pmi.jvm_gc_time | JVM GC Time | total | milliseconds |
+| websphere_pmi.jvm_threads | JVM Threads | daemon, other | threads |
+| websphere_pmi.jvm_threads_peak | JVM Peak Threads | peak | threads |
+
 
 ### Per orb
 
@@ -363,10 +376,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.orb_concurrent | concurrent_requests | requests |
-| websphere_pmi.orb_requests | requests | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.orb_concurrent | ORB Concurrent Requests | concurrent_requests | requests |
+| websphere_pmi.orb_requests | ORB Requests | requests | requests/s |
+
 
 ### Per objectpool
 
@@ -382,10 +396,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.object_pool_operations | created | operations/s |
-| websphere_pmi.object_pool_size | allocated, returned, idle | objects |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.object_pool_operations | Object Pool Operations | created | operations/s |
+| websphere_pmi.object_pool_size | Object Pool Size | allocated, returned, idle | objects |
+
 
 ### Per pmiwebservicemodule
 
@@ -401,9 +416,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.pmi_web_service_module_services | loaded | services |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.pmi_web_service_module_services | PMI Web Service Module Services | loaded | services |
+
 
 ### Per portlet
 
@@ -419,12 +435,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.portlet_requests | requests | requests/s |
-| websphere_pmi.portlet_concurrent | concurrent | requests |
-| websphere_pmi.portlet_errors | errors | errors/s |
-| websphere_pmi.portlet_response_time | render, action, process_event, serve_resource | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.portlet_requests | Portlet Requests | requests | requests/s |
+| websphere_pmi.portlet_concurrent | Portlet Concurrent Requests | concurrent | requests |
+| websphere_pmi.portlet_errors | Portlet Errors | errors | errors/s |
+| websphere_pmi.portlet_response_time | Portlet Response Time | render, action, process_event, serve_resource | milliseconds |
+
 
 ### Per portletapplication
 
@@ -439,9 +456,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.portlet_application_loaded | loaded | portlets |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.portlet_application_loaded | Loaded Portlets | loaded | portlets |
+
 
 ### Per schedulers
 
@@ -457,9 +475,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.scheduler_activity | finished, failures, polls | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.scheduler_activity | Scheduler Activity | finished, failures, polls | events/s |
+
 
 ### Per securityauth
 
@@ -474,9 +493,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.security_auth_counts | web, tai, identity, basic, token, jaas_identity, jaas_basic, jaas_token, rmi | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.security_auth_counts | Security Authentication Counts | web, tai, identity, basic, token, jaas_identity, jaas_basic, jaas_token, rmi | events/s |
+
 
 ### Per securityauthz
 
@@ -491,9 +511,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.security_authz_time | web, ejb, admin, cwwja | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.security_authz_time | Security Authorization Time | web, ejb, admin, cwwja | milliseconds |
+
 
 ### Per sessionmanager
 
@@ -509,10 +530,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.session_manager_active | active, live | sessions |
-| websphere_pmi.session_manager_events | created, invalidated, timeout_invalidations, affinity_breaks, cache_discards, no_room, activate_non_exist | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.session_manager_active | Session Manager Active Sessions | active, live | sessions |
+| websphere_pmi.session_manager_events | Session Manager Events | created, invalidated, timeout_invalidations, affinity_breaks, cache_discards, no_room, activate_non_exist | events/s |
+
 
 ### Per IBM WebSphere PMI instance
 
@@ -522,9 +544,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.cpu_utilization | utilization | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.cpu_utilization | CPU Utilization | utilization | percentage |
+
 
 ### Per IBM WebSphere PMI instance
 
@@ -534,9 +557,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.system_data_usage | cpu_since_last, free_memory | value |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.system_data_usage | System Data Snapshot | cpu_since_last, free_memory | value |
+
 
 ### Per threadpool
 
@@ -550,9 +574,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.threadpool_usage | active, size | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.threadpool_usage | Thread Pool Usage | active, size | threads |
+
 
 ### Per transactionmanager
 
@@ -567,11 +592,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.transaction_counts | global_begun, global_committed, global_rolled_back, global_timeout, global_involved, optimizations, local_begun, local_committed, local_rolled_back, local_timeout | transactions/s |
-| websphere_pmi.transaction_active | global, local | transactions |
-| websphere_pmi.transaction_time | global_total, global_prepare, global_commit, global_before_completion, local_total, local_commit, local_before_completion | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.transaction_counts | Transaction Counts | global_begun, global_committed, global_rolled_back, global_timeout, global_involved, optimizations, local_begun, local_committed, local_rolled_back, local_timeout | transactions/s |
+| websphere_pmi.transaction_active | Active Transactions | global, local | transactions |
+| websphere_pmi.transaction_time | Transaction Durations | global_total, global_prepare, global_commit, global_before_completion, local_total, local_commit, local_before_completion | milliseconds |
+
 
 ### Per url
 
@@ -587,10 +613,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.url_requests | requests | requests/s |
-| websphere_pmi.url_time | service, async | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.url_requests | URL Requests | requests | requests/s |
+| websphere_pmi.url_time | URL Service Time | service, async | milliseconds |
+
 
 ### Per webapp
 
@@ -606,9 +633,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.webapp_load | loaded_servlets, reloads | events |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.webapp_load | Web Application Load | loaded_servlets, reloads | events |
+
 
 ### Per webservices
 
@@ -624,9 +652,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.web_services_loaded | loaded | services |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.web_services_loaded | Web Services Loaded | loaded | services |
+
 
 ### Per webservicesgateway
 
@@ -642,6 +671,6 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_pmi.web_services_gateway_requests | synchronous, synchronous_responses, asynchronous, asynchronous_responses | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_pmi.web_services_gateway_requests | Web Services Gateway Requests | synchronous, synchronous_responses, asynchronous, asynchronous_responses | requests/s |

@@ -156,11 +156,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -176,10 +178,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| fail2ban.jail_banned_ips | banned | addresses |
-| fail2ban.jail_active_failures | active_failures | failures |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| fail2ban.jail_banned_ips | Fail2Ban Jail banned IPs | banned | addresses |
+| fail2ban.jail_active_failures | Fail2Ban Jail active failures | active_failures | failures |
 
 
 

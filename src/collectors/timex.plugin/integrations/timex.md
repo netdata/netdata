@@ -123,11 +123,13 @@ The following alerts are available:
 | [ system_clock_sync_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/timex.conf) | system.clock_sync_state | when set to 0, the system kernel believes the system clock is not properly synchronized to a reliable server |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -139,8 +141,8 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.clock_sync_state | state | state |
-| system.clock_status | unsync, clockerr | status |
-| system.clock_sync_offset | offset | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.clock_sync_state | System Clock Synchronization State | state | state |
+| system.clock_status | System Clock Status | unsync, clockerr | status |
+| system.clock_sync_offset | Computed Time Offset Between Local System and Reference Clock | offset | milliseconds |

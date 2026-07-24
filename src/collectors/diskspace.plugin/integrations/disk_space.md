@@ -120,11 +120,13 @@ The following alerts are available:
 | [ disk_inode_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | disk ${label:mount_point} inode utilization |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -142,7 +144,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.space | avail, used, reserved_for_root | GiB |
-| disk.inodes | avail, used, reserved_for_root | inodes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| disk.space | Disk Space Usage | avail, used, reserved_for_root | GiB |
+| disk.inodes | Disk Files (inodes) Usage | avail, used, reserved_for_root | inodes |

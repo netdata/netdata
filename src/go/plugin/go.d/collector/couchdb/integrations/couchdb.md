@@ -203,11 +203,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -219,24 +221,24 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| couchdb.activity | db_reads, db_writes, view_reads | requests/s |
-| couchdb.request_methods | copy, delete, get, head, options, post, put | requests/s |
-| couchdb.response_codes | 200, 201, 202, 204, 206, 301, 302, 304, 400, 401, 403, 404, 406, 409, 412, 413, 414, 415, 416, 417, 500, 501, 503 | responses/s |
-| couchdb.response_code_classes | 2xx, 3xx, 4xx, 5xx | responses/s |
-| couchdb.active_tasks | indexer, db_compaction, replication, view_compaction | tasks |
-| couchdb.replicator_jobs | running, pending, crashed, internal_replication_jobs | jobs |
-| couchdb.open_files | files | files |
-| couchdb.erlang_vm_memory | atom, binaries, code, ets, procs, other | B |
-| couchdb.proccounts | os_procs, erl_procs | processes |
-| couchdb.peakmsgqueue | peak_size | messages |
-| couchdb.reductions | reductions | reductions |
-| couchdb.db_sizes_file | a dimension per database | KiB |
-| couchdb.db_sizes_external | a dimension per database | KiB |
-| couchdb.db_sizes_active | a dimension per database | KiB |
-| couchdb.db_doc_count | a dimension per database | docs |
-| couchdb.db_doc_del_count | a dimension per database | docs |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| couchdb.activity | Overall Activity | db_reads, db_writes, view_reads | requests/s |
+| couchdb.request_methods | HTTP request methods | copy, delete, get, head, options, post, put | requests/s |
+| couchdb.response_codes | HTTP response status codes | 200, 201, 202, 204, 206, 301, 302, 304, 400, 401, 403, 404, 406, 409, 412, 413, 414, 415, 416, 417, 500, 501, 503 | responses/s |
+| couchdb.response_code_classes | HTTP response status code classes | 2xx, 3xx, 4xx, 5xx | responses/s |
+| couchdb.active_tasks | Active task breakdown | indexer, db_compaction, replication, view_compaction | tasks |
+| couchdb.replicator_jobs | Replicator job breakdown | running, pending, crashed, internal_replication_jobs | jobs |
+| couchdb.open_files | Open files | files | files |
+| couchdb.erlang_vm_memory | Erlang VM memory usage | atom, binaries, code, ets, procs, other | B |
+| couchdb.proccounts | Process counts | os_procs, erl_procs | processes |
+| couchdb.peakmsgqueue | Peak message queue size | peak_size | messages |
+| couchdb.reductions | Erlang reductions | reductions | reductions |
+| couchdb.db_sizes_file | Database sizes (file) | a dimension per database | KiB |
+| couchdb.db_sizes_external | Database sizes (external) | a dimension per database | KiB |
+| couchdb.db_sizes_active | Database sizes (active) | a dimension per database | KiB |
+| couchdb.db_doc_count | Database # of docs | a dimension per database | docs |
+| couchdb.db_doc_del_count | Database # of deleted docs | a dimension per database | docs |
 
 
 

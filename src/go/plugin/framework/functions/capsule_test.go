@@ -34,7 +34,7 @@ func TestInputCapsuleParsesFunctionCancelAndQuit(t *testing.T) {
 
 func TestInputCapsuleResynchronizesSafeUIDHeaderErrors(t *testing.T) {
 	consumer := &recordingCapsuleConsumer{}
-	oversized := "FUNCTION oversized 30 \"" + strings.Repeat("x", MaximumInputLineBytes) + "\" 0xFFFF \"source\"\n"
+	oversized := "FUNCTION oversized 30 \"" + strings.Repeat("x", maximumInputLineBytes) + "\" 0xFFFF \"source\"\n"
 	input := "FUNCTION bad-time nope \"x\" 0xFFFF \"source\"\n" + oversized +
 		"FUNCTION good 30 \"perf:work-001 mode:F token:good\" 0xFFFF \"source\"\nQUIT\n"
 	capsule, err := NewInputCapsule(strings.NewReader(input))
@@ -80,11 +80,12 @@ func TestInputCapsuleCommandLineAndTimeoutBoundaries(t *testing.T) {
 	overLine := capsuleFunctionLineOfLength(t, "line-over", 30, MaximumCommandLineBytes+1)
 	input := exactLine + "\n" + overLine + "\n" +
 		"FUNCTION timeout-negative -1 \"perf:work\" 0xFFFF \"source\"\n" +
-		"FUNCTION timeout-over 901 \"perf:work\" 0xFFFF \"source\"\n" +
 		"FUNCTION timeout-overflow 9223372036854775808 \"perf:work\" 0xFFFF \"source\"\n" +
 		"FUNCTION timeout-zero 0 \"perf:work\" 0xFFFF \"source\"\n" +
 		"FUNCTION timeout-one 1 \"perf:work\" 0xFFFF \"source\"\n" +
-		"FUNCTION timeout-max 900 \"perf:work\" 0xFFFF \"source\"\nQUIT\n"
+		"FUNCTION timeout-at-max 120 \"perf:work\" 0xFFFF \"source\"\n" +
+		"FUNCTION timeout-over 121 \"perf:work\" 0xFFFF \"source\"\n" +
+		"FUNCTION timeout-millis 60000 \"perf:work\" 0xFFFF \"source\"\nQUIT\n"
 	consumer := &recordingCapsuleConsumer{}
 	capsule, err := NewInputCapsule(strings.NewReader(input))
 	if err != nil {
@@ -93,17 +94,31 @@ func TestInputCapsuleCommandLineAndTimeoutBoundaries(t *testing.T) {
 	if err := capsule.Run(context.Background(), consumer); err != nil {
 		t.Fatal(err)
 	}
-	if len(consumer.calls) != 4 ||
-		consumer.calls[0].UID != "line-exact" ||
-		consumer.calls[1].Timeout != 0 ||
-		consumer.calls[2].Timeout != time.Second ||
-		consumer.calls[3].Timeout != MaximumFunctionTimeout {
-		t.Fatalf("accepted command boundaries differ: %#v", consumer.calls)
+	// Unset (0) and any value above the maximum clamp to MaximumFunctionTimeout;
+	// 1..max pass through unchanged.
+	wantAccepted := []struct {
+		uid     string
+		timeout time.Duration
+	}{
+		{uid: "line-exact", timeout: 30 * time.Second},
+		{uid: "timeout-zero", timeout: maximumFunctionTimeout},
+		{uid: "timeout-one", timeout: time.Second},
+		{uid: "timeout-at-max", timeout: maximumFunctionTimeout},
+		{uid: "timeout-over", timeout: maximumFunctionTimeout},
+		{uid: "timeout-millis", timeout: maximumFunctionTimeout},
+	}
+	if len(consumer.calls) != len(wantAccepted) {
+		t.Fatalf("accepted count differs: got=%d want=%d calls=%#v", len(consumer.calls), len(wantAccepted), consumer.calls)
+	}
+	for i, want := range wantAccepted {
+		if consumer.calls[i].UID != want.uid || consumer.calls[i].Timeout != want.timeout {
+			t.Fatalf("accepted call %d differs: got uid=%q timeout=%v want uid=%q timeout=%v",
+				i, consumer.calls[i].UID, consumer.calls[i].Timeout, want.uid, want.timeout)
+		}
 	}
 	wantRejected := []recordedCapsuleRejection{
 		{uid: "line-over", status: 400},
 		{uid: "timeout-negative", status: 400},
-		{uid: "timeout-over", status: 400},
 		{uid: "timeout-overflow", status: 400},
 	}
 	if fmt.Sprint(consumer.rejections) != fmt.Sprint(wantRejected) || !consumer.quit {

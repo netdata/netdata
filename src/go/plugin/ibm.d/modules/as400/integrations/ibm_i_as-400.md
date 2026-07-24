@@ -249,11 +249,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -272,13 +274,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.activejob_cpu | cpu | percentage |
-| as400.activejob_resources | temp_storage | MiB |
-| as400.activejob_time | cpu_time, total_time | seconds |
-| as400.activejob_activity | disk_io, interactive_transactions | operations/s |
-| as400.activejob_threads | threads | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.activejob_cpu | Active Job CPU Usage | cpu | percentage |
+| as400.activejob_resources | Active Job Resources | temp_storage | MiB |
+| as400.activejob_time | Active Job Elapsed Time | cpu_time, total_time | seconds |
+| as400.activejob_activity | Active Job Activity | disk_io, interactive_transactions | operations/s |
+| as400.activejob_threads | Active Job Thread Count | threads | threads |
+
 
 ### Per disk
 
@@ -296,15 +299,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.disk_busy | busy | percentage |
-| as400.disk_io_requests | read, write | requests/s |
-| as400.disk_space_usage | used | percentage |
-| as400.disk_capacity | available, used | gigabytes |
-| as400.disk_blocks | read, write | blocks/s |
-| as400.disk_ssd_health | life_remaining | percentage |
-| as400.disk_ssd_age | power_on_days | days |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.disk_busy | Disk Busy Percentage | busy | percentage |
+| as400.disk_io_requests | Disk I/O Requests | read, write | requests/s |
+| as400.disk_space_usage | Disk Space Usage | used | percentage |
+| as400.disk_capacity | Disk Capacity | available, used | gigabytes |
+| as400.disk_blocks | Disk Block Operations | read, write | blocks/s |
+| as400.disk_ssd_health | Disk SSD Health | life_remaining | percentage |
+| as400.disk_ssd_age | Disk SSD Power On Days | power_on_days | days |
+
 
 ### Per httpserver
 
@@ -319,12 +323,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.http_server_connections | normal, ssl | connections |
-| as400.http_server_threads | active, idle | threads |
-| as400.http_server_requests | requests, responses, rejected | requests/s |
-| as400.http_server_bytes | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.http_server_connections | HTTP Server Connections | normal, ssl | connections |
+| as400.http_server_threads | HTTP Server Threads | active, idle | threads |
+| as400.http_server_requests | HTTP Server Requests | requests, responses, rejected | requests/s |
+| as400.http_server_bytes | HTTP Server Throughput | received, sent | bytes/s |
+
 
 ### Per jobqueue
 
@@ -340,9 +345,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.jobqueue_length | jobs | jobs |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.jobqueue_length | Job Queue Length | jobs | jobs |
+
 
 ### Per messagequeue
 
@@ -357,10 +363,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.message_queue_messages | total, informational, inquiry, diagnostic, escape, notify, sender_copy | messages |
-| as400.message_queue_severity | max | severity |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.message_queue_messages | Message Queue Messages | total, informational, inquiry, diagnostic, escape, notify, sender_copy | messages |
+| as400.message_queue_severity | Message Queue Severity | max | severity |
+
 
 ### Per networkinterface
 
@@ -379,10 +386,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.network_interface_status | active | status |
-| as400.network_interface_mtu | mtu | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.network_interface_status | Network Interface Status | active | status |
+| as400.network_interface_mtu | Network Interface MTU | mtu | bytes |
+
 
 ### Per IBM i (AS/400) instance
 
@@ -392,11 +400,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| netdata.plugin_ibm.as400_query_latency_fast | count_disks, count_http_servers, count_network_interfaces, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, memory_pools, network_connections, network_interfaces, serial_number, system_name, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, active_job | ms |
-| netdata.plugin_ibm.as400_query_latency_slow | analyze_plan_cache, count_subsystems, subsystems, message_queue_aggregates, job_queues, output_queue_info, plan_cache_summary | ms |
-| netdata.plugin_ibm.as400_query_latency_batch | message_queue_totals, job_queue_totals, output_queue_totals | ms |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| netdata.plugin_ibm.as400_query_latency_fast | AS400 Query Latency (Fast Path) | count_disks, count_http_servers, count_network_interfaces, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, memory_pools, network_connections, network_interfaces, serial_number, system_name, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, active_job | ms |
+| netdata.plugin_ibm.as400_query_latency_slow | AS400 Query Latency (Slow Path) | analyze_plan_cache, count_subsystems, subsystems, message_queue_aggregates, job_queues, output_queue_info, plan_cache_summary | ms |
+| netdata.plugin_ibm.as400_query_latency_batch | AS400 Query Latency (Batch Path) | message_queue_totals, job_queue_totals, output_queue_totals | ms |
+
 
 ### Per outputqueue
 
@@ -412,11 +421,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.output_queue_files | files | files |
-| as400.output_queue_writers | writers | writers |
-| as400.output_queue_status | released | state |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.output_queue_files | Output Queue Files | files | files |
+| as400.output_queue_writers | Output Queue Writers | writers | writers |
+| as400.output_queue_status | Output Queue Status | released | state |
+
 
 ### Per plancache
 
@@ -430,9 +440,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.plan_cache_summary | value | value |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.plan_cache_summary | Plan Cache Summary | value | value |
+
 
 ### Per queueoverview
 
@@ -447,10 +458,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.queues_count | queues | queues |
-| as400.queued_items | items | items |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.queues_count | Queue Counts | queues | queues |
+| as400.queued_items | Queued Items | items | items |
+
 
 ### Per subsystem
 
@@ -466,9 +478,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.subsystem_jobs | active, maximum | jobs |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.subsystem_jobs | Subsystem Jobs | active, maximum | jobs |
+
 
 ### Per IBM i (AS/400) instance
 
@@ -478,32 +491,33 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.cpu_utilization | utilization | percentage |
-| as400.cpu_utilization_entitled | utilization | percentage |
-| as400.cpu_configuration | configured | cpus |
-| as400.cpu_capacity | capacity | percentage |
-| as400.total_jobs | total | jobs |
-| as400.active_jobs_by_type | batch, interactive, active | jobs |
-| as400.job_queue_length | waiting | jobs |
-| as400.main_storage_size | total | bytes |
-| as400.temporary_storage | current, maximum | MiB |
-| as400.memory_pool_usage | machine, base, interactive, spool | bytes |
-| as400.memory_pool_defined | machine, base | bytes |
-| as400.memory_pool_reserved | machine, base | bytes |
-| as400.memory_pool_threads | machine, base | threads |
-| as400.memory_pool_max_threads | machine, base | threads |
-| as400.disk_busy_average | busy | percentage |
-| as400.system_asp_usage | used | percentage |
-| as400.system_asp_storage | total | MiB |
-| as400.total_auxiliary_storage | total | MiB |
-| as400.system_threads | active, per_processor | threads |
-| as400.network_connections | remote, total | connections |
-| as400.network_connection_states | listen, close_wait | connections |
-| as400.temp_storage_total | current, peak | bytes |
-| as400.system_activity_cpu_rate | average | percentage |
-| as400.system_activity_cpu_utilization | average, minimum, maximum | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.cpu_utilization | CPU Utilization (100% = 1 CPU core) | utilization | percentage |
+| as400.cpu_utilization_entitled | CPU Utilization (as % of entitlement) | utilization | percentage |
+| as400.cpu_configuration | CPU Configuration | configured | cpus |
+| as400.cpu_capacity | Current CPU Capacity | capacity | percentage |
+| as400.total_jobs | Total Jobs in System | total | jobs |
+| as400.active_jobs_by_type | Active Jobs by Type | batch, interactive, active | jobs |
+| as400.job_queue_length | Job Queue Length | waiting | jobs |
+| as400.main_storage_size | Main Storage Size | total | bytes |
+| as400.temporary_storage | Temporary Storage | current, maximum | MiB |
+| as400.memory_pool_usage | Memory Pool Usage | machine, base, interactive, spool | bytes |
+| as400.memory_pool_defined | Memory Pool Defined Size | machine, base | bytes |
+| as400.memory_pool_reserved | Memory Pool Reserved Size | machine, base | bytes |
+| as400.memory_pool_threads | Memory Pool Threads | machine, base | threads |
+| as400.memory_pool_max_threads | Memory Pool Maximum Threads | machine, base | threads |
+| as400.disk_busy_average | Average Disk Busy Percentage | busy | percentage |
+| as400.system_asp_usage | System ASP Usage | used | percentage |
+| as400.system_asp_storage | System ASP Storage | total | MiB |
+| as400.total_auxiliary_storage | Total Auxiliary Storage | total | MiB |
+| as400.system_threads | System Threads | active, per_processor | threads |
+| as400.network_connections | Network Connections | remote, total | connections |
+| as400.network_connection_states | Network Connection States | listen, close_wait | connections |
+| as400.temp_storage_total | Temporary Storage Total | current, peak | bytes |
+| as400.system_activity_cpu_rate | System CPU Rate | average | percentage |
+| as400.system_activity_cpu_utilization | System CPU Utilization | average, minimum, maximum | percentage |
+
 
 ### Per tempstoragebucket
 
@@ -517,6 +531,6 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| as400.temp_storage_bucket | current, peak | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| as400.temp_storage_bucket | Temporary Storage Bucket Usage | current, peak | bytes |

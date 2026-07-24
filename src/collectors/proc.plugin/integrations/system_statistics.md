@@ -135,11 +135,13 @@ The following alerts are available:
 | [ 20min_steal_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf) | system.cpu | average CPU steal time over the last 20 minutes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -151,16 +153,17 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.cpu | guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle | percentage |
-| system.intr | interrupts | interrupts/s |
-| system.ctxt | switches | context switches/s |
-| system.forks | started | processes/s |
-| system.processes | running, blocked | processes |
-| cpu.core_throttling | a dimension per cpu core | events/s |
-| cpu.package_throttling | a dimension per package | events/s |
-| cpu.cpufreq | a dimension per cpu core | MHz |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.cpu | Total CPU utilization | guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle | percentage |
+| system.intr | CPU Interrupts | interrupts | interrupts/s |
+| system.ctxt | CPU Context Switches | switches | context switches/s |
+| system.forks | Started Processes | started | processes/s |
+| system.processes | System Processes | running, blocked | processes |
+| cpu.core_throttling | Core Thermal Throttling Events | a dimension per cpu core | events/s |
+| cpu.package_throttling | Package Thermal Throttling Events | a dimension per package | events/s |
+| cpu.cpufreq | Current CPU Frequency | a dimension per cpu core | MHz |
+
 
 ### Per cpu core
 
@@ -174,7 +177,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cpu.cpu | guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle | percentage |
-| cpuidle.cpu_cstate_residency_time | a dimension per c-state | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cpu.cpu | Core utilization | guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle | percentage |
+| cpuidle.cpu_cstate_residency_time | C-state residency time | a dimension per c-state | percentage |

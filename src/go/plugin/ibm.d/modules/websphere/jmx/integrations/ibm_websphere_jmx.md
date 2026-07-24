@@ -111,11 +111,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -132,14 +134,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_jmx.app_requests | requests | requests |
-| websphere_jmx.app_response_time | response_time | milliseconds |
-| websphere_jmx.app_sessions_active | active | sessions |
-| websphere_jmx.app_sessions_live | live | sessions |
-| websphere_jmx.app_session_events | creates, invalidates | sessions |
-| websphere_jmx.app_transactions | committed, rolledback | transactions |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_jmx.app_requests | Application Requests | requests | requests |
+| websphere_jmx.app_response_time | Application Response Time | response_time | milliseconds |
+| websphere_jmx.app_sessions_active | Active Sessions | active | sessions |
+| websphere_jmx.app_sessions_live | Live Sessions | live | sessions |
+| websphere_jmx.app_session_events | Session Events | creates, invalidates | sessions |
+| websphere_jmx.app_transactions | Application Transactions | committed, rolledback | transactions |
+
 
 ### Per jca
 
@@ -153,14 +156,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_jmx.jca_pool_size | size | connections |
-| websphere_jmx.jca_pool_usage | active, free | connections |
-| websphere_jmx.jca_pool_wait_time | wait | milliseconds |
-| websphere_jmx.jca_pool_use_time | use | milliseconds |
-| websphere_jmx.jca_pool_connections | created, destroyed | connections |
-| websphere_jmx.jca_pool_waiting_threads | waiting | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_jmx.jca_pool_size | JCA Pool Size | size | connections |
+| websphere_jmx.jca_pool_usage | JCA Pool Usage | active, free | connections |
+| websphere_jmx.jca_pool_wait_time | JCA Average Wait Time | wait | milliseconds |
+| websphere_jmx.jca_pool_use_time | JCA Average Use Time | use | milliseconds |
+| websphere_jmx.jca_pool_connections | JCA Connections Totals | created, destroyed | connections |
+| websphere_jmx.jca_pool_waiting_threads | JCA Waiting Threads | waiting | threads |
+
 
 ### Per jdbc
 
@@ -174,14 +178,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_jmx.jdbc_pool_size | size | connections |
-| websphere_jmx.jdbc_pool_usage | active, free | connections |
-| websphere_jmx.jdbc_pool_wait_time | wait | milliseconds |
-| websphere_jmx.jdbc_pool_use_time | use | milliseconds |
-| websphere_jmx.jdbc_pool_connections | created, destroyed | connections |
-| websphere_jmx.jdbc_pool_waiting_threads | waiting | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_jmx.jdbc_pool_size | JDBC Pool Size | size | connections |
+| websphere_jmx.jdbc_pool_usage | JDBC Pool Usage | active, free | connections |
+| websphere_jmx.jdbc_pool_wait_time | JDBC Average Wait Time | wait | milliseconds |
+| websphere_jmx.jdbc_pool_use_time | JDBC Average Use Time | use | milliseconds |
+| websphere_jmx.jdbc_pool_connections | JDBC Connections Totals | created, destroyed | connections |
+| websphere_jmx.jdbc_pool_waiting_threads | JDBC Waiting Threads | waiting | threads |
+
 
 ### Per jms
 
@@ -196,12 +201,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_jmx.jms_messages_current | current | messages |
-| websphere_jmx.jms_messages_pending | pending | messages |
-| websphere_jmx.jms_messages_total | total | messages |
-| websphere_jmx.jms_consumers | consumers | consumers |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_jmx.jms_messages_current | JMS Messages Current Depth | current | messages |
+| websphere_jmx.jms_messages_pending | JMS Messages Pending | pending | messages |
+| websphere_jmx.jms_messages_total | JMS Messages Added Total | total | messages |
+| websphere_jmx.jms_consumers | JMS Consumers | consumers | consumers |
+
 
 ### Per IBM WebSphere JMX instance
 
@@ -211,18 +217,19 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_jmx.jvm_heap_memory | used, committed, max | bytes |
-| websphere_jmx.jvm_heap_usage | usage | percentage |
-| websphere_jmx.jvm_nonheap_memory | used, committed | bytes |
-| websphere_jmx.jvm_gc_count | collections | collections |
-| websphere_jmx.jvm_gc_time | time | milliseconds |
-| websphere_jmx.jvm_threads | total, daemon | threads |
-| websphere_jmx.jvm_thread_states | peak, started | threads |
-| websphere_jmx.jvm_classes | loaded, unloaded | classes |
-| websphere_jmx.jvm_process_cpu_usage | cpu | percentage |
-| websphere_jmx.jvm_uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_jmx.jvm_heap_memory | JVM Heap Memory | used, committed, max | bytes |
+| websphere_jmx.jvm_heap_usage | JVM Heap Usage | usage | percentage |
+| websphere_jmx.jvm_nonheap_memory | JVM Non-Heap Memory | used, committed | bytes |
+| websphere_jmx.jvm_gc_count | JVM Garbage Collection Count | collections | collections |
+| websphere_jmx.jvm_gc_time | JVM Garbage Collection Time | time | milliseconds |
+| websphere_jmx.jvm_threads | JVM Threads | total, daemon | threads |
+| websphere_jmx.jvm_thread_states | JVM Thread States | peak, started | threads |
+| websphere_jmx.jvm_classes | JVM Classes | loaded, unloaded | classes |
+| websphere_jmx.jvm_process_cpu_usage | JVM Process CPU Usage | cpu | percentage |
+| websphere_jmx.jvm_uptime | JVM Uptime | uptime | seconds |
+
 
 ### Per threadpools
 
@@ -236,7 +243,7 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| websphere_jmx.threadpool_size | size, max | threads |
-| websphere_jmx.threadpool_active | active | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| websphere_jmx.threadpool_size | Thread Pool Size | size, max | threads |
+| websphere_jmx.threadpool_active | Thread Pool Active Threads | active | threads |

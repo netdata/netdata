@@ -33,7 +33,7 @@ type coreMetrixSelector struct {
 }
 
 func (s coreMetrixSelector) Matches(metricName string, labels metrix.LabelView) bool {
-	return s.core.Matches(metricName, metrixLabelsView{labels: labels})
+	return s.core.Matches(metricName, labels)
 }
 
 func wrapCoreSelector(sel selectorcore.Selector) Selector {
@@ -41,15 +41,4 @@ func wrapCoreSelector(sel selectorcore.Selector) Selector {
 		return nil
 	}
 	return coreMetrixSelector{core: sel}
-}
-
-type metrixLabelsView struct {
-	labels metrix.LabelView
-}
-
-func (v metrixLabelsView) Get(key string) (string, bool) {
-	if v.labels == nil {
-		return "", false
-	}
-	return v.labels.Get(key)
 }

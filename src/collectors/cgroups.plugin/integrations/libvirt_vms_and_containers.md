@@ -85,11 +85,13 @@ The following alerts are available:
 | [ cgroup_10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | cgroup.net_packets | ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -106,45 +108,46 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.cpu_limit | used | percentage |
-| cgroup.cpu | user, system | percentage |
-| cgroup.cpu_per_core | a dimension per core | percentage |
-| cgroup.throttled | throttled | percentage |
-| cgroup.throttled_duration | duration | ms |
-| cgroup.cpu_shares | shares | shares |
-| cgroup.mem | cache, rss, swap, rss_huge, mapped_file | MiB |
-| cgroup.writeback | dirty, writeback | MiB |
-| cgroup.mem_activity | in, out | MiB/s |
-| cgroup.pgfaults | pgfault, swap | MiB/s |
-| cgroup.mem_usage | ram, swap | MiB |
-| cgroup.mem_usage_limit | available, used | MiB |
-| cgroup.mem_utilization | utilization | percentage |
-| cgroup.mem_failcnt | failures | count |
-| cgroup.io | read, write | KiB/s |
-| cgroup.serviced_ops | read, write | operations/s |
-| cgroup.throttle_io | read, write | KiB/s |
-| cgroup.throttle_serviced_ops | read, write | operations/s |
-| cgroup.queued_ops | read, write | operations |
-| cgroup.merged_ops | read, write | operations/s |
-| cgroup.cpu_some_pressure | some10, some60, some300 | percentage |
-| cgroup.cpu_some_pressure_stall_time | time | ms |
-| cgroup.cpu_full_pressure | some10, some60, some300 | percentage |
-| cgroup.cpu_full_pressure_stall_time | time | ms |
-| cgroup.memory_some_pressure | some10, some60, some300 | percentage |
-| cgroup.memory_some_pressure_stall_time | time | ms |
-| cgroup.memory_full_pressure | some10, some60, some300 | percentage |
-| cgroup.memory_full_pressure_stall_time | time | ms |
-| cgroup.io_some_pressure | some10, some60, some300 | percentage |
-| cgroup.io_some_pressure_stall_time | time | ms |
-| cgroup.io_full_pressure | some10, some60, some300 | percentage |
-| cgroup.io_full_pressure_stall_time | time | ms |
-| cgroup.pids_current | pids | pids |
-| cgroup.cachestat_ratio | ratio | % |
-| cgroup.cachestat_dirties | dirty | page/s |
-| cgroup.cachestat_hits | hit | hits/s |
-| cgroup.cachestat_misses | miss | misses/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.cpu_limit | CPU Usage within the limits | used | percentage |
+| cgroup.cpu | CPU Usage (100% = 1 core) | user, system | percentage |
+| cgroup.cpu_per_core | CPU Usage (100% = 1 core) Per Core | a dimension per core | percentage |
+| cgroup.throttled | CPU Throttled Runnable Periods | throttled | percentage |
+| cgroup.throttled_duration | CPU Throttled Time Duration | duration | ms |
+| cgroup.cpu_shares | CPU Time Relative Share | shares | shares |
+| cgroup.mem | Memory Usage | cache, rss, swap, rss_huge, mapped_file | MiB |
+| cgroup.writeback | Writeback Memory | dirty, writeback | MiB |
+| cgroup.mem_activity | Memory Activity | in, out | MiB/s |
+| cgroup.pgfaults | Memory Page Faults | pgfault, swap | MiB/s |
+| cgroup.mem_usage | Used Memory | ram, swap | MiB |
+| cgroup.mem_usage_limit | Used RAM within the limits | available, used | MiB |
+| cgroup.mem_utilization | Memory Utilization | utilization | percentage |
+| cgroup.mem_failcnt | Memory Limit Failures | failures | count |
+| cgroup.io | I/O Bandwidth (all disks) | read, write | KiB/s |
+| cgroup.serviced_ops | Serviced I/O Operations (all disks) | read, write | operations/s |
+| cgroup.throttle_io | Throttle I/O Bandwidth (all disks) | read, write | KiB/s |
+| cgroup.throttle_serviced_ops | Throttle Serviced I/O Operations (all disks) | read, write | operations/s |
+| cgroup.queued_ops | Queued I/O Operations (all disks) | read, write | operations |
+| cgroup.merged_ops | Merged I/O Operations (all disks) | read, write | operations/s |
+| cgroup.cpu_some_pressure | CPU some pressure | some10, some60, some300 | percentage |
+| cgroup.cpu_some_pressure_stall_time | CPU some pressure stall time | time | ms |
+| cgroup.cpu_full_pressure | CPU full pressure | some10, some60, some300 | percentage |
+| cgroup.cpu_full_pressure_stall_time | CPU full pressure stall time | time | ms |
+| cgroup.memory_some_pressure | Memory some pressure | some10, some60, some300 | percentage |
+| cgroup.memory_some_pressure_stall_time | Memory some pressure stall time | time | ms |
+| cgroup.memory_full_pressure | Memory full pressure | some10, some60, some300 | percentage |
+| cgroup.memory_full_pressure_stall_time | Memory full pressure stall time | time | ms |
+| cgroup.io_some_pressure | I/O some pressure | some10, some60, some300 | percentage |
+| cgroup.io_some_pressure_stall_time | I/O some pressure stall time | time | ms |
+| cgroup.io_full_pressure | I/O some pressure | some10, some60, some300 | percentage |
+| cgroup.io_full_pressure_stall_time | I/O some pressure stall time | time | ms |
+| cgroup.pids_current | Number of processes | pids | pids |
+| cgroup.cachestat_ratio | Hit ratio | ratio | % |
+| cgroup.cachestat_dirties | Number of dirty pages | dirty | page/s |
+| cgroup.cachestat_hits | Number of accessed files | hit | hits/s |
+| cgroup.cachestat_misses | Files out of page cache | miss | misses/s |
+
 
 ### Per cgroup network device
 
@@ -162,15 +165,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.net_net | received, sent | kilobits/s |
-| cgroup.net_packets | received, sent, multicast | pps |
-| cgroup.net_errors | inbound, outbound | errors/s |
-| cgroup.net_drops | inbound, outbound | errors/s |
-| cgroup.net_fifo | receive, transmit | errors/s |
-| cgroup.net_compressed | receive, sent | pps |
-| cgroup.net_events | frames, collisions, carrier | events/s |
-| cgroup.net_operstate | up, down, notpresent, lowerlayerdown, testing, dormant, unknown | state |
-| cgroup.net_carrier | up, down | state |
-| cgroup.net_mtu | mtu | octets |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.net_net | Bandwidth | received, sent | kilobits/s |
+| cgroup.net_packets | Packets | received, sent, multicast | pps |
+| cgroup.net_errors | Interface Errors | inbound, outbound | errors/s |
+| cgroup.net_drops | Interface Drops | inbound, outbound | errors/s |
+| cgroup.net_fifo | Interface FIFO Buffer Errors | receive, transmit | errors/s |
+| cgroup.net_compressed | Interface FIFO Buffer Errors | receive, sent | pps |
+| cgroup.net_events | Network Interface Events | frames, collisions, carrier | events/s |
+| cgroup.net_operstate | Interface Operational State | up, down, notpresent, lowerlayerdown, testing, dormant, unknown | state |
+| cgroup.net_carrier | Interface Physical Link State | up, down | state |
+| cgroup.net_mtu | Interface MTU | mtu | octets |

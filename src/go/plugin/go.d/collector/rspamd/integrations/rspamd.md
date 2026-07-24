@@ -201,11 +201,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -217,14 +219,14 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| rspamd.classifications | ham, spam | messages/s |
-| rspamd.actions | reject, soft_reject, rewrite_subject, add_header, greylist, custom, discard, quarantine, no_action | messages/s |
-| rspamd.scans | scanned | messages/s |
-| rspamd.learns | learned | messages/s |
-| rspamd.connections | connections | connections/s |
-| rspamd.control_connections | control_connections | connections/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| rspamd.classifications | Classifications | ham, spam | messages/s |
+| rspamd.actions | Actions | reject, soft_reject, rewrite_subject, add_header, greylist, custom, discard, quarantine, no_action | messages/s |
+| rspamd.scans | Scanned messages | scanned | messages/s |
+| rspamd.learns | Learned messages | learned | messages/s |
+| rspamd.connections | Connections | connections | connections/s |
+| rspamd.control_connections | Control connections | control_connections | connections/s |
 
 
 

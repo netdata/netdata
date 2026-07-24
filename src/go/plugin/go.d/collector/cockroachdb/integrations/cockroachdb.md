@@ -253,11 +253,13 @@ The following alerts are available:
 | [ cockroachdb_open_file_descriptors_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.process_file_descriptors | open file descriptors utilization (against softlimit) |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -269,68 +271,68 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cockroachdb.process_cpu_time_combined_percentage | used | percentage |
-| cockroachdb.process_cpu_time_percentage | user, sys | percentage |
-| cockroachdb.process_cpu_time | user, sys | ms |
-| cockroachdb.process_memory | rss | KiB |
-| cockroachdb.process_file_descriptors | open | fd |
-| cockroachdb.process_uptime | uptime | seconds |
-| cockroachdb.host_disk_bandwidth | read, write | KiB |
-| cockroachdb.host_disk_operations | reads, writes | operations |
-| cockroachdb.host_disk_iops_in_progress | in_progress | iops |
-| cockroachdb.host_network_bandwidth | received, sent | kilobits |
-| cockroachdb.host_network_packets | received, sent | packets |
-| cockroachdb.live_nodes | live_nodes | nodes |
-| cockroachdb.node_liveness_heartbeats | successful, failed | heartbeats |
-| cockroachdb.total_storage_capacity | total | KiB |
-| cockroachdb.storage_capacity_usability | usable, unusable | KiB |
-| cockroachdb.storage_usable_capacity | available, used | KiB |
-| cockroachdb.storage_used_capacity_percentage | total, usable | percentage |
-| cockroachdb.sql_connections | active | connections |
-| cockroachdb.sql_bandwidth | received, sent | KiB |
-| cockroachdb.sql_statements_total | started, executed | statements |
-| cockroachdb.sql_errors | statement, transaction | errors |
-| cockroachdb.sql_started_ddl_statements | ddl | statements |
-| cockroachdb.sql_executed_ddl_statements | ddl | statements |
-| cockroachdb.sql_started_dml_statements | select, update, delete, insert | statements |
-| cockroachdb.sql_executed_dml_statements | select, update, delete, insert | statements |
-| cockroachdb.sql_started_tcl_statements | begin, commit, rollback, savepoint, savepoint_cockroach_restart, release_savepoint_cockroach_restart, rollback_to_savepoint_cockroach_restart | statements |
-| cockroachdb.sql_executed_tcl_statements | begin, commit, rollback, savepoint, savepoint_cockroach_restart, release_savepoint_cockroach_restart, rollback_to_savepoint_cockroach_restart | statements |
-| cockroachdb.sql_active_distributed_queries | active | queries |
-| cockroachdb.sql_distributed_flows | active, queued | flows |
-| cockroachdb.live_bytes | applications, system | KiB |
-| cockroachdb.logical_data | keys, values | KiB |
-| cockroachdb.logical_data_count | keys, values | num |
-| cockroachdb.kv_transactions | committed, fast-path_committed, aborted | transactions |
-| cockroachdb.kv_transaction_restarts | write_too_old, write_too_old_multiple, forwarded_timestamp, possible_reply, async_consensus_failure, read_within_uncertainty_interval, aborted, push_failure, unknown | restarts |
-| cockroachdb.ranges | ranges | ranges |
-| cockroachdb.ranges_replication_problem | unavailable, under_replicated, over_replicated | ranges |
-| cockroachdb.range_events | split, add, remove, merge | events |
-| cockroachdb.range_snapshot_events | generated, applied_raft_initiated, applied_learner, applied_preemptive | events |
-| cockroachdb.rocksdb_read_amplification | reads | reads/query |
-| cockroachdb.rocksdb_table_operations | compactions, flushes | operations |
-| cockroachdb.rocksdb_cache_usage | used | KiB |
-| cockroachdb.rocksdb_cache_operations | hits, misses | operations |
-| cockroachdb.rocksdb_cache_hit_rate | hit_rate | percentage |
-| cockroachdb.rocksdb_sstables | sstables | sstables |
-| cockroachdb.replicas | replicas | replicas |
-| cockroachdb.replicas_quiescence | quiescent, active | replicas |
-| cockroachdb.replicas_leaders | leaders, not_leaseholders | replicas |
-| cockroachdb.replicas_leaseholders | leaseholders | leaseholders |
-| cockroachdb.queue_processing_failures | gc, replica_gc, replication, split, consistency, raft_log, raft_snapshot, time_series_maintenance | failures |
-| cockroachdb.rebalancing_queries | avg | queries/s |
-| cockroachdb.rebalancing_writes | avg | writes/s |
-| cockroachdb.timeseries_samples | written | samples |
-| cockroachdb.timeseries_write_errors | write | errors |
-| cockroachdb.timeseries_write_bytes | written | KiB |
-| cockroachdb.slow_requests | acquiring_latches, acquiring_lease, in_raft | requests |
-| cockroachdb.code_heap_memory_usage | go, cgo | KiB |
-| cockroachdb.goroutines | goroutines | goroutines |
-| cockroachdb.gc_count | gc | invokes |
-| cockroachdb.gc_pause | pause | us |
-| cockroachdb.cgo_calls | cgo | calls |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cockroachdb.process_cpu_time_combined_percentage | Combined CPU Time Percentage, Normalized 0-1 by Number of Cores | used | percentage |
+| cockroachdb.process_cpu_time_percentage | CPU Time Percentage | user, sys | percentage |
+| cockroachdb.process_cpu_time | CPU Time | user, sys | ms |
+| cockroachdb.process_memory | Memory Usage | rss | KiB |
+| cockroachdb.process_file_descriptors | File Descriptors | open | fd |
+| cockroachdb.process_uptime | Uptime | uptime | seconds |
+| cockroachdb.host_disk_bandwidth | Host Disk Cumulative Bandwidth | read, write | KiB |
+| cockroachdb.host_disk_operations | Host Disk Cumulative Operations | reads, writes | operations |
+| cockroachdb.host_disk_iops_in_progress | Host Disk Cumulative IOPS In Progress | in_progress | iops |
+| cockroachdb.host_network_bandwidth | Host Network Cumulative Bandwidth | received, sent | kilobits |
+| cockroachdb.host_network_packets | Host Network Cumulative Packets | received, sent | packets |
+| cockroachdb.live_nodes | Live Nodes in the Cluster | live_nodes | nodes |
+| cockroachdb.node_liveness_heartbeats | Node Liveness Heartbeats | successful, failed | heartbeats |
+| cockroachdb.total_storage_capacity | Total Storage Capacity | total | KiB |
+| cockroachdb.storage_capacity_usability | Storage Capacity Usability | usable, unusable | KiB |
+| cockroachdb.storage_usable_capacity | Storage Usable Capacity | available, used | KiB |
+| cockroachdb.storage_used_capacity_percentage | Storage Used Capacity Utilization | total, usable | percentage |
+| cockroachdb.sql_connections | Active SQL Connections | active | connections |
+| cockroachdb.sql_bandwidth | SQL Bandwidth | received, sent | KiB |
+| cockroachdb.sql_statements_total | SQL Statements Total | started, executed | statements |
+| cockroachdb.sql_errors | SQL Statements and Transaction Errors | statement, transaction | errors |
+| cockroachdb.sql_started_ddl_statements | SQL Started DDL Statements | ddl | statements |
+| cockroachdb.sql_executed_ddl_statements | SQL Executed DDL Statements | ddl | statements |
+| cockroachdb.sql_started_dml_statements | SQL Started DML Statements | select, update, delete, insert | statements |
+| cockroachdb.sql_executed_dml_statements | SQL Executed DML Statements | select, update, delete, insert | statements |
+| cockroachdb.sql_started_tcl_statements | SQL Started TCL Statements | begin, commit, rollback, savepoint, savepoint_cockroach_restart, release_savepoint_cockroach_restart, rollback_to_savepoint_cockroach_restart | statements |
+| cockroachdb.sql_executed_tcl_statements | SQL Executed TCL Statements | begin, commit, rollback, savepoint, savepoint_cockroach_restart, release_savepoint_cockroach_restart, rollback_to_savepoint_cockroach_restart | statements |
+| cockroachdb.sql_active_distributed_queries | Active Distributed SQL Queries | active | queries |
+| cockroachdb.sql_distributed_flows | Distributed SQL Flows | active, queued | flows |
+| cockroachdb.live_bytes | Used Live Data | applications, system | KiB |
+| cockroachdb.logical_data | Logical Data | keys, values | KiB |
+| cockroachdb.logical_data_count | Logical Data Count | keys, values | num |
+| cockroachdb.kv_transactions | KV Transactions | committed, fast-path_committed, aborted | transactions |
+| cockroachdb.kv_transaction_restarts | KV Transaction Restarts | write_too_old, write_too_old_multiple, forwarded_timestamp, possible_reply, async_consensus_failure, read_within_uncertainty_interval, aborted, push_failure, unknown | restarts |
+| cockroachdb.ranges | Ranges | ranges | ranges |
+| cockroachdb.ranges_replication_problem | Ranges Replication Problems | unavailable, under_replicated, over_replicated | ranges |
+| cockroachdb.range_events | Range Events | split, add, remove, merge | events |
+| cockroachdb.range_snapshot_events | Range Snapshot Events | generated, applied_raft_initiated, applied_learner, applied_preemptive | events |
+| cockroachdb.rocksdb_read_amplification | RocksDB Read Amplification | reads | reads/query |
+| cockroachdb.rocksdb_table_operations | RocksDB Table Operations | compactions, flushes | operations |
+| cockroachdb.rocksdb_cache_usage | RocksDB Block Cache Usage | used | KiB |
+| cockroachdb.rocksdb_cache_operations | RocksDB Block Cache Operations | hits, misses | operations |
+| cockroachdb.rocksdb_cache_hit_rate | RocksDB Block Cache Hit Rate | hit_rate | percentage |
+| cockroachdb.rocksdb_sstables | RocksDB SSTables | sstables | sstables |
+| cockroachdb.replicas | Number of Replicas | replicas | replicas |
+| cockroachdb.replicas_quiescence | Replicas Quiescence | quiescent, active | replicas |
+| cockroachdb.replicas_leaders | Number of Raft Leaders | leaders, not_leaseholders | replicas |
+| cockroachdb.replicas_leaseholders | Number of Leaseholders | leaseholders | leaseholders |
+| cockroachdb.queue_processing_failures | Queues Processing Failures | gc, replica_gc, replication, split, consistency, raft_log, raft_snapshot, time_series_maintenance | failures |
+| cockroachdb.rebalancing_queries | Rebalancing Average Queries | avg | queries/s |
+| cockroachdb.rebalancing_writes | Rebalancing Average Writes | avg | writes/s |
+| cockroachdb.timeseries_samples | Time Series Written Samples | written | samples |
+| cockroachdb.timeseries_write_errors | Time Series Write Errors | write | errors |
+| cockroachdb.timeseries_write_bytes | Time Series Bytes Written | written | KiB |
+| cockroachdb.slow_requests | Slow Requests | acquiring_latches, acquiring_lease, in_raft | requests |
+| cockroachdb.code_heap_memory_usage | Heap Memory Usage | go, cgo | KiB |
+| cockroachdb.goroutines | Number of Goroutines | goroutines | goroutines |
+| cockroachdb.gc_count | GC Runs | gc | invokes |
+| cockroachdb.gc_pause | GC Pause Time | pause | us |
+| cockroachdb.cgo_calls | Cgo Calls | cgo | calls |
 
 
 

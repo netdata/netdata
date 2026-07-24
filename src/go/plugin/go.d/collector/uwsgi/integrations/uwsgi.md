@@ -175,11 +175,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -191,12 +193,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| uwsgi.transmitted_data | tx | bytes/s |
-| uwsgi.requests | requests | requests/s |
-| uwsgi.harakiris | harakiris | harakiris/s |
-| uwsgi.respawns | respawns | respawns/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| uwsgi.transmitted_data | UWSGI Transmitted Data | tx | bytes/s |
+| uwsgi.requests | UWSGI Requests | requests | requests/s |
+| uwsgi.harakiris | UWSGI Dropped Requests | harakiris | harakiris/s |
+| uwsgi.respawns | UWSGI Respawns | respawns | respawns/s |
+
 
 ### Per worker
 
@@ -210,19 +213,19 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| uwsgi.worker_transmitted_data | tx | bytes/s |
-| uwsgi.worker_requests | requests | requests/s |
-| uwsgi.worker_delta_requests | delta_requests | requests/s |
-| uwsgi.worker_average_request_time | avg | milliseconds |
-| uwsgi.worker_harakiris | harakiris | harakiris/s |
-| uwsgi.worker_exceptions | exceptions | exceptions/s |
-| uwsgi.worker_status | idle, busy, cheap, pause, sig | status |
-| uwsgi.worker_request_handling_status | accepting, not_accepting | status |
-| uwsgi.worker_respawns | respawns | respawns/s |
-| uwsgi.worker_memory_rss | rss | bytes |
-| uwsgi.worker_memory_vsz | vsz | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| uwsgi.worker_transmitted_data | UWSGI Worker Transmitted Data | tx | bytes/s |
+| uwsgi.worker_requests | UWSGI Worker Requests | requests | requests/s |
+| uwsgi.worker_delta_requests | UWSGI Worker Delta Requests | delta_requests | requests/s |
+| uwsgi.worker_average_request_time | UWSGI Worker Average Request Time | avg | milliseconds |
+| uwsgi.worker_harakiris | UWSGI Worker Dropped Requests | harakiris | harakiris/s |
+| uwsgi.worker_exceptions | UWSGI Worker Raised Exceptions | exceptions | exceptions/s |
+| uwsgi.worker_status | UWSGI Worker Status | idle, busy, cheap, pause, sig | status |
+| uwsgi.worker_request_handling_status | UWSGI Worker Request Handling Status | accepting, not_accepting | status |
+| uwsgi.worker_respawns | UWSGI Worker Respawns | respawns | respawns/s |
+| uwsgi.worker_memory_rss | UWSGI Worker Memory RSS (Resident Set Size) | rss | bytes |
+| uwsgi.worker_memory_vsz | UWSGI Worker Memory VSZ (Virtual Memory Size) | vsz | bytes |
 
 
 

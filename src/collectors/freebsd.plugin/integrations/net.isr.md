@@ -110,11 +110,13 @@ The following alerts are available:
 | [ 10min_netisr_backlog_exceeded ](https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf) | system.softnet_stat | average number of drops in the last minute due to exceeded sysctl net.route.netisr_maxqlen (this can be a cause for dropped packets) |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -126,9 +128,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.softnet_stat | dispatched, hybrid_dispatched, qdrops, queued | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.softnet_stat | System softnet_stat | dispatched, hybrid_dispatched, qdrops, queued | events/s |
+
 
 ### Per core
 
@@ -138,6 +141,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cpu.softnet_stat | dispatched, hybrid_dispatched, qdrops, queued | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cpu.softnet_stat | Per CPU netisr statistics | dispatched, hybrid_dispatched, qdrops, queued | events/s |

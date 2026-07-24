@@ -199,11 +199,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -215,13 +217,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| typesense.health_status | ok, out_of_disk, out_of_memory | status |
-| typesense.total_requests | requests | requests/s |
-| typesense.requests_by_operation | search, write, import, delete | requests/s |
-| typesense.latency_by_operation | search, write, import, delete | milliseconds |
-| typesense.overloaded_requests | overloaded | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| typesense.health_status | Health Status | ok, out_of_disk, out_of_memory | status |
+| typesense.total_requests | Total Requests | requests | requests/s |
+| typesense.requests_by_operation | Requests by Operation | search, write, import, delete | requests/s |
+| typesense.latency_by_operation | Latency by Operation | search, write, import, delete | milliseconds |
+| typesense.overloaded_requests | Overloaded Requests | overloaded | requests/s |
 
 
 

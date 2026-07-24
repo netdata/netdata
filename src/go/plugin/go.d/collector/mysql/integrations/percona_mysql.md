@@ -305,11 +305,13 @@ The following alerts are available:
 | [ mysql_galera_cluster_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/mysql.conf) | mysql.galera_cluster_status | galera node is part of a nonoperational component. This occurs in cases of multiple membership changes that result in a loss of Quorum or in cases of split-brain situations. |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -321,71 +323,72 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit | MySQL | MariaDB | Percona |
-|:------|:----------|:----|:---:|:---:|:---:|
-| mysql.net | in, out | kilobits/s | • | • | • |
-| mysql.queries | queries, questions, slow_queries | queries/s | • | • | • |
-| mysql.queries_type | select, delete, update, insert, replace | queries/s | • | • | • |
-| mysql.handlers | commit, delete, prepare, read_first, read_key, read_next, read_prev, read_rnd, read_rnd_next, rollback, savepoint, savepointrollback, update, write | handlers/s | • | • | • |
-| mysql.table_open_cache_overflows | open_cache | overflows/s | • | • | • |
-| mysql.table_locks | immediate, waited | locks/s | • | • | • |
-| mysql.join_issues | full_join, full_range_join, range, range_check, scan | joins/s | • | • | • |
-| mysql.sort_issues | merge_passes, range, scan | issues/s | • | • | • |
-| mysql.tmp | disk_tables, files, tables | events/s | • | • | • |
-| mysql.connections | all, aborted | connections/s | • | • | • |
-| mysql.connections_active | active, limit, max_active | connections | • | • | • |
-| mysql.threads | connected, cached, running | threads | • | • | • |
-| mysql.threads_created | created | threads/s | • | • | • |
-| mysql.thread_cache_misses | misses | misses | • | • | • |
-| mysql.innodb_io | read, write | KiB/s | • | • | • |
-| mysql.innodb_io_ops | reads, writes, fsyncs | operations/s | • | • | • |
-| mysql.innodb_io_pending_ops | reads, writes, fsyncs | operations | • | • | • |
-| mysql.innodb_log | waits, write_requests, writes | operations/s | • | • | • |
-| mysql.innodb_redo_log_activity | redo_written, checkpointed | B/s | • | • | • |
-| mysql.innodb_redo_log_occupancy | occupancy | percentage | • | • | • |
-| mysql.innodb_redo_log_checkpoint_age | age | B | • | • | • |
-| mysql.innodb_cur_row_lock | current waits | operations | • | • | • |
-| mysql.innodb_rows | inserted, read, updated, deleted | operations/s | • | • | • |
-| mysql.innodb_buffer_pool_pages | data, dirty, free, misc, total | pages | • | • | • |
-| mysql.innodb_buffer_pool_pages_flushed | flush_pages | requests/s | • | • | • |
-| mysql.innodb_buffer_pool_bytes | data, dirty | MiB | • | • | • |
-| mysql.innodb_buffer_pool_read_ahead | all, evicted | pages/s | • | • | • |
-| mysql.innodb_buffer_pool_read_ahead_rnd | read-ahead | operations/s | • | • | • |
-| mysql.innodb_buffer_pool_ops | disk_reads, wait_free | operations/s | • | • | • |
-| mysql.innodb_os_log | fsyncs, writes | operations | • | • | • |
-| mysql.innodb_os_log_fsync_writes | fsyncs | operations/s | • | • | • |
-| mysql.innodb_os_log_io | write | KiB/s | • | • | • |
-| mysql.innodb_deadlocks | deadlocks | operations/s | • | • | • |
-| mysql.files | files | files | • | • | • |
-| mysql.files_rate | files | files/s | • | • | • |
-| mysql.connection_errors | accept, internal, max, peer_addr, select, tcpwrap | errors/s | • | • | • |
-| mysql.opened_tables | tables | tables/s | • | • | • |
-| mysql.open_tables | cache, tables | tables | • | • | • |
-| mysql.process_list_fetch_query_duration | duration | milliseconds | • | • | • |
-| mysql.process_list_queries_count | system, user | queries | • | • | • |
-| mysql.process_list_longest_query_duration | duration | seconds | • | • | • |
-| mysql.qcache_ops | hits, lowmem_prunes, inserts, not_cached | queries/s | • | • | • |
-| mysql.qcache | queries | queries | • | • | • |
-| mysql.qcache_freemem | free | MiB | • | • | • |
-| mysql.qcache_memblocks | free, total | blocks | • | • | • |
-| mysql.galera_writesets | rx, tx | writesets/s | • | • | • |
-| mysql.galera_bytes | rx, tx | KiB/s | • | • | • |
-| mysql.galera_queue | rx, tx | writesets | • | • | • |
-| mysql.galera_conflicts | bf_aborts, cert_fails | transactions | • | • | • |
-| mysql.galera_flow_control | paused | ms | • | • | • |
-| mysql.galera_cluster_status | primary, non_primary, disconnected | status | • | • | • |
-| mysql.galera_cluster_state | undefined, joining, donor, joined, synced, error | state | • | • | • |
-| mysql.galera_cluster_size | nodes | nodes | • | • | • |
-| mysql.galera_cluster_weight | weight | weight | • | • | • |
-| mysql.galera_connected | connected | boolean | • | • | • |
-| mysql.galera_ready | ready | boolean | • | • | • |
-| mysql.galera_open_transactions | open | transactions | • | • | • |
-| mysql.galera_thread_count | threads | threads | • | • | • |
-| mysql.key_blocks | unused, used, not_flushed | blocks | • | • | • |
-| mysql.key_requests | reads, writes | requests/s | • | • | • |
-| mysql.key_disk_ops | reads, writes | operations/s | • | • | • |
-| mysql.binlog_cache | disk, all | transactions/s | • | • | • |
-| mysql.binlog_stmt_cache | disk, all | statements/s | • | • | • |
+| Metric | Description | Dimensions | Unit | MySQL | MariaDB | Percona |
+|:------|:------------|:----------|:----|:---:|:---:|:---:|
+| mysql.net | Bandwidth | in, out | kilobits/s | • | • | • |
+| mysql.queries | Queries | queries, questions, slow_queries | queries/s | • | • | • |
+| mysql.queries_type | Queries By Type | select, delete, update, insert, replace | queries/s | • | • | • |
+| mysql.handlers | Handlers | commit, delete, prepare, read_first, read_key, read_next, read_prev, read_rnd, read_rnd_next, rollback, savepoint, savepointrollback, update, write | handlers/s | • | • | • |
+| mysql.table_open_cache_overflows | Table open cache overflows | open_cache | overflows/s | • | • | • |
+| mysql.table_locks | Table Locks | immediate, waited | locks/s | • | • | • |
+| mysql.join_issues | Table Select Join Issues | full_join, full_range_join, range, range_check, scan | joins/s | • | • | • |
+| mysql.sort_issues | Table Sort Issues | merge_passes, range, scan | issues/s | • | • | • |
+| mysql.tmp | Tmp Operations | disk_tables, files, tables | events/s | • | • | • |
+| mysql.connections | Connections | all, aborted | connections/s | • | • | • |
+| mysql.connections_active | Active Connections | active, limit, max_active | connections | • | • | • |
+| mysql.threads | Threads | connected, cached, running | threads | • | • | • |
+| mysql.threads_created | Threads Creation Rate | created | threads/s | • | • | • |
+| mysql.thread_cache_misses | Threads Cache Misses | misses | misses | • | • | • |
+| mysql.innodb_io | InnoDB I/O Bandwidth | read, write | KiB/s | • | • | • |
+| mysql.innodb_io_ops | InnoDB I/O Operations | reads, writes, fsyncs | operations/s | • | • | • |
+| mysql.innodb_io_pending_ops | InnoDB Pending I/O Operations | reads, writes, fsyncs | operations | • | • | • |
+| mysql.innodb_log | InnoDB Log Operations | waits, write_requests, writes | operations/s | • | • | • |
+| mysql.innodb_redo_log_activity | InnoDB Redo Log Activity | redo_written, checkpointed | B/s | • | • | • |
+| mysql.innodb_redo_log_occupancy | InnoDB Redo Log Occupancy | occupancy | percentage | • | • | • |
+| mysql.innodb_redo_log_checkpoint_age | InnoDB Redo Log Checkpoint Age | age | B | • | • | • |
+| mysql.innodb_cur_row_lock | InnoDB Current Row Locks | current waits | operations | • | • | • |
+| mysql.innodb_rows | InnoDB Row Operations | inserted, read, updated, deleted | operations/s | • | • | • |
+| mysql.innodb_buffer_pool_pages | InnoDB Buffer Pool Pages | data, dirty, free, misc, total | pages | • | • | • |
+| mysql.innodb_buffer_pool_pages_flushed | InnoDB Buffer Pool Flush Pages Requests | flush_pages | requests/s | • | • | • |
+| mysql.innodb_buffer_pool_bytes | InnoDB Buffer Pool Bytes | data, dirty | MiB | • | • | • |
+| mysql.innodb_buffer_pool_read_ahead | InnoDB Buffer Pool Read Pages | all, evicted | pages/s | • | • | • |
+| mysql.innodb_buffer_pool_read_ahead_rnd | InnoDB Buffer Pool Random Read-Aheads | read-ahead | operations/s | • | • | • |
+| mysql.innodb_buffer_pool_ops | InnoDB Buffer Pool Operations | disk_reads, wait_free | operations/s | • | • | • |
+| mysql.innodb_os_log | InnoDB OS Log Pending Operations | fsyncs, writes | operations | • | • | • |
+| mysql.innodb_os_log_fsync_writes | InnoDB OS Log Operations | fsyncs | operations/s | • | • | • |
+| mysql.innodb_os_log_io | InnoDB OS Log Bandwidth | write | KiB/s | • | • | • |
+| mysql.innodb_deadlocks | InnoDB Deadlocks | deadlocks | operations/s | • | • | • |
+| mysql.files | Open Files | files | files | • | • | • |
+| mysql.files_rate | Opened Files Rate | files | files/s | • | • | • |
+| mysql.connection_errors | Connection Errors | accept, internal, max, peer_addr, select, tcpwrap | errors/s | • | • | • |
+| mysql.opened_tables | Opened Tables | tables | tables/s | • | • | • |
+| mysql.open_tables | Open Tables | cache, tables | tables | • | • | • |
+| mysql.process_list_fetch_query_duration | Process List Fetch Duration | duration | milliseconds | • | • | • |
+| mysql.process_list_queries_count | Queries Count | system, user | queries | • | • | • |
+| mysql.process_list_longest_query_duration | Longest Query Duration | duration | seconds | • | • | • |
+| mysql.qcache_ops | QCache Operations | hits, lowmem_prunes, inserts, not_cached | queries/s | • | • | • |
+| mysql.qcache | QCache Queries in Cache | queries | queries | • | • | • |
+| mysql.qcache_freemem | QCache Free Memory | free | MiB | • | • | • |
+| mysql.qcache_memblocks | QCache Memory Blocks | free, total | blocks | • | • | • |
+| mysql.galera_writesets | Replicated Writesets | rx, tx | writesets/s | • | • | • |
+| mysql.galera_bytes | Replicated Bytes | rx, tx | KiB/s | • | • | • |
+| mysql.galera_queue | Galera Queue | rx, tx | writesets | • | • | • |
+| mysql.galera_conflicts | Replication Conflicts | bf_aborts, cert_fails | transactions | • | • | • |
+| mysql.galera_flow_control | Flow Control | paused | ms | • | • | • |
+| mysql.galera_cluster_status | Cluster Component Status | primary, non_primary, disconnected | status | • | • | • |
+| mysql.galera_cluster_state | Cluster Component State | undefined, joining, donor, joined, synced, error | state | • | • | • |
+| mysql.galera_cluster_size | Number of Nodes in the Cluster | nodes | nodes | • | • | • |
+| mysql.galera_cluster_weight | The Total Weight of the Current Members in the Cluster | weight | weight | • | • | • |
+| mysql.galera_connected | Cluster Connection Status | connected | boolean | • | • | • |
+| mysql.galera_ready | Accept Queries Readiness Status | ready | boolean | • | • | • |
+| mysql.galera_open_transactions | Open Transactions | open | transactions | • | • | • |
+| mysql.galera_thread_count | Total Number of WSRep (applier/rollbacker) Threads | threads | threads | • | • | • |
+| mysql.key_blocks | MyISAM Key Cache Blocks | unused, used, not_flushed | blocks | • | • | • |
+| mysql.key_requests | MyISAM Key Cache Requests | reads, writes | requests/s | • | • | • |
+| mysql.key_disk_ops | MyISAM Key Cache Disk Operations | reads, writes | operations/s | • | • | • |
+| mysql.binlog_cache | Binlog Cache | disk, all | transactions/s | • | • | • |
+| mysql.binlog_stmt_cache | Binlog Statement Cache | disk, all | statements/s | • | • | • |
+
 
 ### Per connection
 
@@ -395,10 +398,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit | MySQL | MariaDB | Percona |
-|:------|:----------|:----|:---:|:---:|:---:|
-| mysql.slave_behind | seconds | seconds | • | • | • |
-| mysql.slave_status | sql_running, io_running | boolean | • | • | • |
+| Metric | Description | Dimensions | Unit | MySQL | MariaDB | Percona |
+|:------|:------------|:----------|:----|:---:|:---:|:---:|
+| mysql.slave_behind | Slave Behind Seconds | seconds | seconds | • | • | • |
+| mysql.slave_status | I/O / SQL Thread Running State | sql_running, io_running | boolean | • | • | • |
+
 
 ### Per user
 
@@ -412,18 +416,18 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit | MySQL | MariaDB | Percona |
-|:------|:----------|:----|:---:|:---:|:---:|
-| mysql.userstats_cpu | used | percentage |   | • | • |
-| mysql.userstats_rows | read, sent, updated, inserted, deleted | operations/s |   | • | • |
-| mysql.userstats_commands | select, update, other | commands/s |   | • | • |
-| mysql.userstats_denied_commands | denied | commands/s |   | • | • |
-| mysql.userstats_created_transactions | commit, rollback | transactions/s |   | • | • |
-| mysql.userstats_binlog_written | written | B/s |   | • | • |
-| mysql.userstats_empty_queries | empty | queries/s |   | • | • |
-| mysql.userstats_connections | created | connections/s |   | • | • |
-| mysql.userstats_lost_connections | lost | connections/s |   | • | • |
-| mysql.userstats_denied_connections | denied | connections/s |   | • | • |
+| Metric | Description | Dimensions | Unit | MySQL | MariaDB | Percona |
+|:------|:------------|:----------|:----|:---:|:---:|:---:|
+| mysql.userstats_cpu | User CPU Time | used | percentage |   | • | • |
+| mysql.userstats_rows | User Rows Operations | read, sent, updated, inserted, deleted | operations/s |   | • | • |
+| mysql.userstats_commands | User Commands | select, update, other | commands/s |   | • | • |
+| mysql.userstats_denied_commands | User Denied Commands | denied | commands/s |   | • | • |
+| mysql.userstats_created_transactions | User Transactions | commit, rollback | transactions/s |   | • | • |
+| mysql.userstats_binlog_written | User Binlog Written | written | B/s |   | • | • |
+| mysql.userstats_empty_queries | User Empty Queries | empty | queries/s |   | • | • |
+| mysql.userstats_connections | User Created Connections | created | connections/s |   | • | • |
+| mysql.userstats_lost_connections | User Lost Connections | lost | connections/s |   | • | • |
+| mysql.userstats_denied_connections | User Denied Connections | denied | connections/s |   | • | • |
 
 
 

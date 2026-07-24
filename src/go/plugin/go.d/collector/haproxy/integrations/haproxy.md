@@ -216,11 +216,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -232,13 +234,14 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| haproxy.backend_current_sessions | a dimension per proxy | sessions |
-| haproxy.backend_sessions | a dimension per proxy | sessions/s |
-| haproxy.backend_response_time_average | a dimension per proxy | milliseconds |
-| haproxy.backend_queue_time_average | a dimension per proxy | milliseconds |
-| haproxy.backend_current_queue | a dimension per proxy | requests |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| haproxy.backend_current_sessions | Current number of active sessions | a dimension per proxy | sessions |
+| haproxy.backend_sessions | Sessions rate | a dimension per proxy | sessions/s |
+| haproxy.backend_response_time_average | Average response time for last 1024 successful connections | a dimension per proxy | milliseconds |
+| haproxy.backend_queue_time_average | Average queue time for last 1024 successful connections | a dimension per proxy | milliseconds |
+| haproxy.backend_current_queue | Current number of queued requests | a dimension per proxy | requests |
+
 
 ### Per proxy
 
@@ -248,10 +251,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| haproxy.backend_http_responses | 1xx, 2xx, 3xx, 4xx, 5xx, other | responses/s |
-| haproxy.backend_network_io | in, out | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| haproxy.backend_http_responses | HTTP responses by code class | 1xx, 2xx, 3xx, 4xx, 5xx, other | responses/s |
+| haproxy.backend_network_io | Network traffic | in, out | bytes/s |
 
 
 

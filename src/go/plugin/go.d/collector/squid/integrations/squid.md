@@ -182,11 +182,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -198,12 +200,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| squid.clients_net | in, out, hits | kilobits/s |
-| squid.clients_requests | requests, hits, errors | requests/s |
-| squid.servers_net | in, out | kilobits/s |
-| squid.servers_requests | requests, errors | requests/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| squid.clients_net | Squid Client Bandwidth | in, out, hits | kilobits/s |
+| squid.clients_requests | Squid Client Requests | requests, hits, errors | requests/s |
+| squid.servers_net | Squid Server Bandwidth | in, out | kilobits/s |
+| squid.servers_requests | Squid Server Requests | requests, errors | requests/s |
 
 
 

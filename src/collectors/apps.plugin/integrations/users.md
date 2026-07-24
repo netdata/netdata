@@ -75,11 +75,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -95,22 +97,22 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| user.cpu_utilization | user, system | percentage |
-| user.cpu_guest_utilization | guest | percentage |
-| user.cpu_context_switches | voluntary, involuntary | switches/s |
-| user.estimated_mem_usage | mem | MiB |
-| user.mem_usage | rss | MiB |
-| user.mem_private_usage | mem | MiB |
-| user.vmem_usage | vmem | MiB |
-| user.mem_page_faults | minor, major | pgfaults/s |
-| user.swap_usage | swap | MiB |
-| user.disk_physical_io | reads, writes | KiB/s |
-| user.disk_logical_io | reads, writes | KiB/s |
-| user.processes | processes | processes |
-| user.threads | threads | threads |
-| user.fds_open_limit | limit | percentage |
-| user.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
-| user.uptime | uptime | seconds |
-| user.uptime_summary | min, avg, max | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| user.cpu_utilization | User CPU utilization (100% = 1 core) | user, system | percentage |
+| user.cpu_guest_utilization | User CPU guest utilization (100% = 1 core) | guest | percentage |
+| user.cpu_context_switches | User CPU context switches | voluntary, involuntary | switches/s |
+| user.estimated_mem_usage | User memory estimated usage (RSS with shared scaling). Requires kernel 4.14+. Enabled by default, disable with --pss 0. | mem | MiB |
+| user.mem_usage | User memory RSS usage | rss | MiB |
+| user.mem_private_usage | User memory usage without shared | mem | MiB |
+| user.vmem_usage | User virtual memory size | vmem | MiB |
+| user.mem_page_faults | User memory page faults | minor, major | pgfaults/s |
+| user.swap_usage | User swap usage | swap | MiB |
+| user.disk_physical_io | User disk physical IO | reads, writes | KiB/s |
+| user.disk_logical_io | User disk logical IO | reads, writes | KiB/s |
+| user.processes | User processes | processes | processes |
+| user.threads | User threads | threads | threads |
+| user.fds_open_limit | User open file descriptors limit | limit | percentage |
+| user.fds_open | User open file descriptors | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
+| user.uptime | User uptime | uptime | seconds |
+| user.uptime_summary | User uptime summary | min, avg, max | seconds |

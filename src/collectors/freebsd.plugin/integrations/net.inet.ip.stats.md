@@ -105,11 +105,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -121,9 +123,9 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv4.packets | received, sent, forwarded, delivered | packets/s |
-| ipv4.fragsout | ok, failed, created | packets/s |
-| ipv4.fragsin | ok, failed, all | packets/s |
-| ipv4.errors | InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos | packets/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ipv4.packets | IPv4 Packets | received, sent, forwarded, delivered | packets/s |
+| ipv4.fragsout | IPv4 Fragments Sent | ok, failed, created | packets/s |
+| ipv4.fragsin | IPv4 Fragments Reassembly | ok, failed, all | packets/s |
+| ipv4.errors | IPv4 Errors | InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos | packets/s |

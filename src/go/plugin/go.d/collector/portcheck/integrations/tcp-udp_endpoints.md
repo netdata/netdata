@@ -257,11 +257,13 @@ The following alerts are available:
 | [ portcheck_connection_fails ](https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf) | portcheck.status | percentage of failed TCP connections to host ${label:host} port ${label:port} in the last 5 minutes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -278,11 +280,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| portcheck.status | success, failed, timeout | boolean |
-| portcheck.state_duration | time | seconds |
-| portcheck.latency | time | ms |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| portcheck.status | TCP Check Status | success, failed, timeout | boolean |
+| portcheck.state_duration | Current State Duration | time | seconds |
+| portcheck.latency | TCP Connection Latency | time | ms |
+
 
 ### Per UDP endpoint
 
@@ -297,10 +300,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| portcheck.udp_port_status | open/filtered, closed | status |
-| portcheck.udp_port_status_duration | time | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| portcheck.udp_port_status | UDP Port Check Status | open/filtered, closed | status |
+| portcheck.udp_port_status_duration | UDP Port Current Status Duration | time | seconds |
 
 
 

@@ -210,11 +210,13 @@ The following alerts are available:
 | [ x509check_revocation_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.revocation_status | SSL cert revoked (${label:source}) |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -232,10 +234,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| x509check.time_until_expiration | expiry | seconds |
-| x509check.revocation_status | not_revoked, revoked | boolean |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| x509check.time_until_expiration | Time Until Certificate Expiration | expiry | seconds |
+| x509check.revocation_status | Revocation Status | not_revoked, revoked | boolean |
 
 
 

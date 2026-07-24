@@ -183,11 +183,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -199,12 +201,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dnsmasq.servers_queries | success, failed | queries/s |
-| dnsmasq.cache_performance | hist, misses | events/s |
-| dnsmasq.cache_operations | insertions, evictions | operations/s |
-| dnsmasq.cache_size | size | entries |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| dnsmasq.servers_queries | Queries forwarded to the upstream servers | success, failed | queries/s |
+| dnsmasq.cache_performance | Cache performance | hist, misses | events/s |
+| dnsmasq.cache_operations | Cache operations | insertions, evictions | operations/s |
+| dnsmasq.cache_size | Cache size | size | entries |
 
 
 

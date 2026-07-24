@@ -178,11 +178,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -194,16 +196,16 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| openldap.current_connections | active | connections |
-| openldap.connections | connections | connections/s |
-| openldap.traffic | sent | bytes/s |
-| openldap.entries | sent | entries/s |
-| openldap.referrals | sent | referrals/s |
-| openldap.operations | completed, initiated | operations/s |
-| openldap.operations_by_type | bind, search, unbind, add, delete, modify, compare | operations/s |
-| openldap.waiters | write, read | waiters/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| openldap.current_connections | Current Connections | active | connections |
+| openldap.connections | Connections | connections | connections/s |
+| openldap.traffic | Traffic | sent | bytes/s |
+| openldap.entries | Entries | sent | entries/s |
+| openldap.referrals | Referrals | sent | referrals/s |
+| openldap.operations | Operations | completed, initiated | operations/s |
+| openldap.operations_by_type | Operations by Typ | bind, search, unbind, add, delete, modify, compare | operations/s |
+| openldap.waiters | Waiters | write, read | waiters/s |
 
 
 
