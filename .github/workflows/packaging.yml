@@ -107,10 +107,14 @@ jobs:
         id: prepare
         run: |
           sudo apt-get update || true
-          sudo apt-get install -y python3-ruamel.yaml
+          sudo apt-get install -y python3-venv
+          python3 -m venv ./virtualenv
+          source ./virtualenv/bin/activate
+          pip install ruamel.yaml pydantic
       - name: Read build matrix
         id: set-matrix
         run: |
+          source ./virtualenv/bin/activate
           if [ "${{ github.event_name }}" = "pull_request" ] && \
              [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/packaging') }}" = "true" ]; then
             matrix="$(.github/scripts/gen-matrix-packaging.py 1)"

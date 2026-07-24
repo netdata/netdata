@@ -238,10 +238,14 @@ jobs:
         id: prepare
         run: |
           sudo apt-get update || true
-          sudo apt-get install -y python3-ruamel.yaml
+          sudo apt-get install -y python3-venv
+          python3 -m venv ./virtualenv
+          source ./virtualenv/bin/activate
+          pip install ruamel.yaml pydantic
       - name: Read build matrix
         id: set-matrix
         run: |
+          source ./virtualenv/bin/activate
           matrix="$(.github/scripts/gen-matrix-static.py "${{ needs.file-check.outputs.static-native }}")"
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
@@ -1186,10 +1190,14 @@ jobs:
         id: prepare
         run: |
           sudo apt-get update || true
-          sudo apt-get install -y python3-ruamel.yaml
+          sudo apt-get install -y python3-venv
+          python3 -m venv ./virtualenv
+          source ./virtualenv/bin/activate
+          pip install ruamel.yaml pydantic
       - name: Read build matrix
         id: set-matrix
         run: |
+          source ./virtualenv/bin/activate
           matrix="$(.github/scripts/gen-matrix-build.py)"
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
@@ -1250,9 +1258,8 @@ jobs:
             load: true
             file: .github/dockerfiles/Dockerfile.build_test
             build-args: |
-              BASE=${{ matrix.distro }}
+              BASE=${{ matrix.base_image }}
               PRE=${{ matrix.env_prep }}
-              RMJSONC=${{ matrix.jsonc_removal }}
             tags: test:${{ matrix.artifact_key }}
           attempt_limit: 3
           attempt_delay: 15000

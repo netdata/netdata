@@ -3,7 +3,13 @@
 import json
 import re
 import sys
+
 from copy import deepcopy
+from pathlib import Path
+
+SELF = Path(__file__)
+
+sys.path.insert(0, str(SELF.parent.parent / 'packaging' / 'data'))
 
 from jsonschema import ValidationError
 
@@ -22,11 +28,12 @@ from _common import (
     warn,
 )
 
+import distros
+
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
 OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'
 JSON_PATH = INTEGRATIONS_PATH / 'integrations.json'
 CATEGORIES_FILE = INTEGRATIONS_PATH / 'categories.yaml'
-DISTROS_FILE = REPO_PATH / '.github' / 'data' / 'distros.yml'
 
 DEVICE_SOURCES = [
     (AGENT_REPO,
@@ -882,7 +889,7 @@ def render_collectors(categories, collectors, ids):
     return collectors, clean_collectors, ids
 
 
-def render_deploy(distros, categories, deploy, ids):
+def render_deploy(distro_data, categories, deploy, ids):
     debug('Sorting deployments.')
 
     sort_integrations(deploy)
@@ -902,11 +909,11 @@ def render_deploy(distros, categories, deploy, ids):
         if item['platform_info']['group']:
             entries = [
                 {
-                    'version': i['version'],
-                    'support': i['support_type'],
-                    'arches': i.get('packages', {'arches': []})['arches'],
-                    'notes': i['notes'],
-                } for i in distros[item['platform_info']['group']] if i['distro'] == item['platform_info']['distro']
+                    'version': i.version,
+                    'support': i.support_type,
+                    'arches': [] if i.packages is None else [str(x) for x in i.packages.arches],
+                    'notes': i.notes,
+                } for i in getattr(distro_data, item['platform_info']['group']) if i.distro == item['platform_info']['distro']
             ]
         else:
             entries = []
@@ -1356,7 +1363,7 @@ def render_json(categories, integrations):
 
 def main():
     categories = load_categories()
-    distros = load_yaml(DISTROS_FILE)
+    distro_data = distros.load_distro_data()
     collectors = load_collectors()
     deploy = load_deploy()
     exporters = load_exporters()
@@ -1370,7 +1377,7 @@ def main():
     service_discoveries = load_service_discoveries()
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
-    deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
+    deploy, clean_deploy, ids = render_deploy(distro_data, categories, deploy, ids)
     exporters, clean_exporters, ids = render_exporters(categories, exporters, ids)
     agent_notifications, clean_agent_notifications, ids = render_agent_notifications(categories, agent_notifications,
                                                                                      ids)

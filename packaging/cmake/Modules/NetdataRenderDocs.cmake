@@ -18,7 +18,7 @@ add_custom_command(
         OUTPUT "${_render_docs_venv_stamp}"
         DEPENDS "${_render_docs_scripts_dir}/pip.sh"
         COMMAND python3 -m venv "${_render_docs_venv_dir}"
-        COMMAND "${_render_docs_venv_dir}/bin/pip" install -q jsonschema referencing jinja2 ruamel.yaml
+        COMMAND "${_render_docs_venv_dir}/bin/pip" install -q jsonschema referencing jinja2 ruamel.yaml pydantic
         COMMAND "${CMAKE_COMMAND}" -E touch "${_render_docs_venv_stamp}"
         COMMENT "Creating Python venv for render-docs"
 )

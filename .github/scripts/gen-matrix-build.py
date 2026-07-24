@@ -1,36 +1,34 @@
 #!/usr/bin/env python3
 
 import json
+import sys
 
-from ruamel.yaml import YAML
+from pathlib import Path
 
-yaml = YAML(typ='safe')
+SELF = Path(__file__)
+
+sys.path.insert(0, str(SELF.parent.parent.parent / 'packaging' / 'data'))
+
+import distros
+
+data = distros.load_distro_data()
 entries = []
 
-with open('.github/data/distros.yml') as f:
-    data = yaml.load(f)
-
-for i, v in enumerate(data['include']):
-    if v['test'].get('skip-local-build', False):
+for item in data.include:
+    if item.test.skip_local_build:
         continue
 
-    e = {
-      'artifact_key': v['distro'] + str(v['version']).replace('.', ''),
-      'version': v['version'],
+    entry = {
+        'artifact_key': item.distro + item.version.replace('.', ''),
+        'base_image': item.base_image,
+        'distro': item.distro,
+        'version': item.version,
     }
 
-    if 'base_image' in v:
-        e['distro'] = v['base_image']
-    else:
-        e['distro'] = ':'.join([v['distro'], str(v['version'])])
+    if item.env_prep is not None:
+        entry['env_prep'] = item.env_prep
 
-    if 'env_prep' in v:
-        e['env_prep'] = v['env_prep']
-
-    if 'jsonc_removal' in v:
-        e['jsonc_removal'] = v['jsonc_removal']
-
-    entries.append(e)
+    entries.append(entry)
 
 entries.sort(key=lambda k: k['distro'])
 matrix = json.dumps({'include': entries}, sort_keys=True)
