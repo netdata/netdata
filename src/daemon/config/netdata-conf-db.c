@@ -7,6 +7,7 @@
 int default_rrd_history_entries = RRD_DEFAULT_HISTORY_ENTRIES;
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
+bool dbengine_datafiles_present = false; // detected at startup, regardless of the configured memory mode
 bool dbengine_use_direct_io = true;
 static size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = {1, 60, 60, 60, 60};
 static time_t storage_tiers_retention_time_s[RRD_STORAGE_TIERS] = {14 * DAYS, 90 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS, 2 * 365 * DAYS};
@@ -372,6 +373,17 @@ void netdata_conf_section_db(void) {
             netdata_log_error("Invalid memory mode '%s' given. Using '%s'", mode, rrd_memory_mode_name(default_rrd_memory_mode));
             inicfg_set(&netdata_config, CONFIG_SECTION_DB, "db", rrd_memory_mode_name(default_rrd_memory_mode));
         }
+    }
+
+    // The dbengine directory is created only by dbengine initialization, so its
+    // presence means this agent has dbengine data on disk even if it is currently
+    // running a non-dbengine memory mode. RAM-mode metadata cleanup uses this to
+    // avoid deleting dimension rows that still back on-disk dbengine data (agent
+    // temporarily switched dbengine -> ram/alloc).
+    {
+        char dbenginepath[FILENAME_MAX + 1];
+        snprintfz(dbenginepath, sizeof(dbenginepath) - 1, "%s/dbengine", netdata_configured_cache_dir);
+        dbengine_datafiles_present = (access(dbenginepath, F_OK) == 0);
     }
 
     // ------------------------------------------------------------------------
