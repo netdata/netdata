@@ -1685,14 +1685,15 @@ These transformations are typically used to:
 | `format`                        | Decode raw SNMP data into a value shape before other processing.                       | DateAndTime bytes → unix timestamp  |
 | `scale_factor`                  | Multiply values by a constant to adjust units.                                         | `"1.5" (MBps) × 8 → 12 (Mbps)`      |
 | `match_pattern` + `match_value` | Replace string metric values using regex groups or static text before numeric parsing. | `"state=2" → "2"`                   |
+| `transform`                     | Apply a Go `text/template` to compute arbitrary value/chart transformations.           | `°C value → °F value`               |
 
 **Combination & Behavior**:
 
 | Rule                      | Description                                                                                                                                                                                                                                                                                                                                              |
 |---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata.                                                                                                                                                                              |
-| **Order of application**  | For string-decoded metric values: 1️⃣ `format` (if present) → 2️⃣ `extract_value` (if present) → 3️⃣ `match_pattern` + `match_value` (if present) → 4️⃣ `mapping` → 5️⃣ numeric parsing → 6️⃣ `scale_factor`. Ordinary numeric PDUs skip the string-only `extract_value` and `match_pattern` steps and use numeric parsing → `mapping` → `scale_factor`. |
-| **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations. It cannot be combined with `mapping.mode: bitmask`.                                                                                                                                                                                                             |
+| **Where**                 | Metric value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`; `format` also applies when symbols are used for metric tags or device metadata. `transform` applies to metric symbols only (not tags or metadata).                                                                                                                                                                              |
+| **Order of application**  | For string-decoded metric values: 1️⃣ `format` (if present) → 2️⃣ `extract_value` (if present) → 3️⃣ `match_pattern` + `match_value` (if present) → 4️⃣ `mapping` → 5️⃣ numeric parsing → 6️⃣ `scale_factor` → 7️⃣ `transform`. Ordinary numeric PDUs skip the string-only `extract_value` and `match_pattern` steps and use numeric parsing → `mapping` → `scale_factor` → `transform`. |
+| **Scale factor position** | `scale_factor` is applied after the other decoding and scaling transformations, but before `transform`. It cannot be combined with `mapping.mode: bitmask`. `transform` runs last and sees the already-scaled value.                                                                                                                                                                                                             |
 | **String base parsing**   | String-like values are parsed as base-10 by default. If `format: hex` is set, extracted values are parsed as base-16.                                                                                                                                                                                                                                    |
 | **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.                                                                                                                                                                                                                                            |
 | **Error handling**        | `extract_value` keeps the original value when it does not match; `match_pattern` fails the metric value when it does not match; no-value `format` sentinels are treated as missing.                                                                                                                                                                      |
@@ -1745,6 +1746,13 @@ These transformations are typically used to:
 - `scale_factor`
     ```yaml
     scale_factor: 8   # Octets → bits
+    ```
+
+- `transform`
+    ```yaml
+    # °C → °F via a Go text/template (runs after scale_factor)
+    transform: |
+      {{- setValue .Metric (int64 (add (mul (float64 .Metric.Value) 1.8) 32.0)) -}}
     ```
 
 ### Mapping
@@ -1904,7 +1912,7 @@ metrics:
 ```
 
 The decoded value becomes the metric value seen by later processing steps,
-such as `extract_value`, `mapping`, `scale_factor`, or `transform`.
+such as `extract_value`, `mapping`, `scale_factor`, or [`transform`](#transform).
 
 ### Scale Factor
 
@@ -1951,6 +1959,120 @@ metrics:
 - Multiplies octet counters by `8`, reporting traffic in **bits per second** instead of bytes.
 - Converts `ifHighSpeed` from **megabits** to **bits**.
 - Ensures scaling happens **after** other transformations, such as value extraction or regex processing.
+
+### Transform
+
+Use `transform` to apply a **Go `text/template`** to a symbol's metric during SNMP data collection. It runs **after** every other value transformation on the same symbol (`format`, `extract_value`, `match_pattern`, `mapping`, and `scale_factor`), so the template sees the fully decoded and scaled value.
+
+Unlike `scale_factor`, which can only multiply, `transform` can compute arbitrary expressions (affine conversions such as `°F = °C × 1.8 + 32`, conditional logic, value lookups, bitmask expansion, unit/family/name overrides, and more). It is the most flexible value transformation, at the cost of writing a small template.
+
+`transform` works for **both scalar and table/column metric symbols**. It is not applied to metric tags or device metadata, and it is **not allowed** in `topology`, `bgp`, or `licensing` rows — profile validation rejects it there. It is also not applied to `virtual_metrics`.
+
+**The collector**:
+
+- Compiles the template once per symbol at profile load time. A parse error fails the profile.
+- Executes the compiled template once per collected value, with the metric available as `.Metric`.
+- Reads back any mutations the template made to the metric (value, unit, family, name, description, tags, multi-value dimensions) and uses them as the symbol's final output.
+- Executes against a struct with a single `Metric` field, so every field access uses the `.Metric.` prefix and every custom function receives `.Metric` as its first argument.
+
+**Template execution context**:
+
+The template's dot (`.`) is a struct that exposes the in-progress metric as `.Metric`. The underlying type is `ddsnmp.Metric` with these fields:
+
+| Field           | Type                  | Description                                                                                                  |
+|-----------------|-----------------------|--------------------------------------------------------------------------------------------------------------|
+| `.Metric.Value` | `int64`               | Current numeric value of the metric (already decoded and scaled by earlier transformations).                 |
+| `.Metric.Name`  | `string`              | Metric name derived from the symbol.                                                                         |
+| `.Metric.Unit`  | `string`              | Unit label (from `chart_meta.unit`, or empty).                                                               |
+| `.Metric.Family`| `string`              | Chart family (from `chart_meta.family`, or empty).                                                           |
+| `.Metric.Description` | `string`       | Chart description (from `chart_meta.description`, or empty).                                                 |
+| `.Metric.Tags`  | `map[string]string`   | Tags attached to the metric, including any tags collected from the same row (such as `sensor_type`).         |
+| `.Metric.MultiValue` | `map[string]int64` | Multi-value dimension map. Populated by `mapping` or by the `setMultivalue` template function.           |
+
+**Custom template functions**:
+
+In addition to the full [Sprig](https://masterminds.github.io/sprig/) function library (`add`, `sub`, `mul`, `div`, `int64`, `float64`, `dict`, `get`, `default`, `printf`, `eq`, and the rest), the following functions are available. Each one that takes `m` expects `.Metric`.
+
+| Function                          | Description                                                                                                                |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| `setValue .Metric N`              | Set the metric value to the int64 `N`.                                                                                     |
+| `setUnit .Metric U`               | Override the metric unit with string `U`.                                                                                  |
+| `setFamily .Metric F`             | Override the chart family with string `F`.                                                                                 |
+| `setDesc .Metric D`               | Override the chart description with string `D`.                                                                            |
+| `setName .Metric N`               | Override the metric name with string `N`.                                                                                  |
+| `setTag .Metric K V`              | Set tag `K` to string `V`, allocating the tag map if needed.                                                               |
+| `deleteTag .Metric K`             | Remove tag `K`.                                                                                                            |
+| `setMultivalue .Metric MAP`       | Replace `MultiValue` with the supplied `map[int64]string`. Use `i64map` to build the map inline.                           |
+| `i64map pairs...`                 | Build a `map[int64]string` from `key value` pairs, e.g. `i64map 0 "not_ok" 1 "ok"`.                                         |
+| `mask2cidr MASK`                  | Convert an IPv4 netmask string (e.g. `255.255.255.0`) to a CIDR prefix length (e.g. `24`).                                 |
+| `pow BASE EXP`                    | Return `BASE ** EXP` as a float64. `EXP` is an int.                                                                        |
+| `transformEntitySensorValue .Metric` | Normalize a value from `ENTITY-SENSOR-MIB` / `CISCO-ENTITY-SENSOR-MIB` using its `sensor_type`, `sensor_scale`, and `sensor_precision` tags. |
+| `transformHrStorage .Metric`      | Normalize a `hrStorageSize` / `hrStorageUsed` value from `HOST-RESOURCES-MIB` into bytes using `storage_type` and `storage_alloc_unit` tags. |
+
+When a custom function mutates the metric it returns an empty string; use the `{{- ... -}}` whitespace-trim form to keep that empty output out of the rendered template.
+
+**Celsius → Fahrenheit example**:
+
+A `scale_factor` of `1.8` alone gives `°C × 1.8`, not real Fahrenheit (no `+ 32`). A `transform` performs the full affine conversion. Because `setValue` takes an int64, cast through `float64` and back:
+
+```yaml
+metrics:
+  - table:
+      OID: 1.3.6.1.4.1.42229.1.2.3.1.1
+      name: shelfTable
+    symbols:
+      - OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.3
+        name: coriant.groove.shelfInletTemperature
+        chart_meta:
+          description: Shelf inlet temperature
+          family: 'Hardware/Shelf/Temperature/Inlet'
+          unit: "degF"
+        # °F = °C × 1.8 + 32
+        transform: |
+          {{- setValue .Metric (int64 (add (mul (float64 .Metric.Value) 1.8) 32.0)) -}}
+```
+
+**What this does**:
+
+- Receives the raw Celsius value as `.Metric.Value` (already decoded by any `format` / `extract_value` and multiplied by any `scale_factor`).
+- Computes `value * 1.8 + 32` using Sprig arithmetic, casts the result back to `int64`, and stores it back as the metric value.
+- Reports the metric in degrees Fahrenheit. Use `chart_meta.unit: degF` (or your project's preferred Fahrenheit unit code) so the chart label matches.
+- Truncates the fractional part. To preserve one decimal place, scale the result yourself (for example, store `(value * 18 + 320)` and document the implied scale, or change the chart unit accordingly).
+
+**Other examples**:
+
+Conditional rename and unit override based on a sibling tag (mirrors a real MikroTik profile):
+
+```yaml
+transform: |
+  {{- $sensorType := index .Metric.Tags "sensor_type" | default "" -}}
+  {{- if eq $sensorType "1" -}}
+    {{- setName .Metric (printf "%s_temperature" .Metric.Name) -}}
+    {{- setUnit .Metric "Cel" -}}
+    {{- setFamily .Metric "Health/Temperature" -}}
+  {{- else if eq $sensorType "3" -}}
+    {{- setName .Metric (printf "%s_voltage" .Metric.Name) -}}
+    {{- setUnit .Metric "V" -}}
+    {{- setValue .Metric (int64 (div (float64 .Metric.Value) 10.0)) -}}
+    {{- setFamily .Metric "Health/Power" -}}
+  {{- end -}}
+  {{- deleteTag .Metric "sensor_type" -}}
+```
+
+Decode an enumerated sensor into a multi-value metric using `i64map` + `setMultivalue`:
+
+```yaml
+transform: |
+  {{- setMultivalue .Metric (i64map 0 "not_ok" 1 "ok") -}}
+  {{- deleteTag .Metric "sensor_type" -}}
+```
+
+**Pipeline position and limits**:
+
+- `transform` runs **after** `scale_factor` and after every other per-symbol value transformation.
+- It executes once per collected value, so expensive work inside the template scales with the number of rows walked. Prefer `scale_factor`, `mapping`, or `extract_value` when they suffice.
+- A parse error in the template body fails profile load. A runtime execution error drops the affected metric for that collection cycle.
+- `transform` is rejected by profile validation inside `topology`, `bgp`, and `licensing` rows; it is allowed only on regular metric symbols.
 
 ## Virtual Metrics
 
