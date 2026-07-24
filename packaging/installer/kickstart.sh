@@ -468,8 +468,17 @@ deferred_warnings() {
 }
 
 fatal() {
+  width="${COLUMNS:-80}"
+  bracket="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}$(printf "%${width}s" " " | tr " " "X")${TPUT_RESET}"
+  printf >&2 "%s\n\n" "${bracket}"
   deferred_warnings
-  printf >&2 "%b\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
+  printf >&2 "%s\n" "${bracket}"
+  printf >&2 "%s\n" "${TPUT_BOLD} A FATAL ERROR WAS ENCOUNTERED! ${TPUT_RESET}"
+  printf >&2 "%s\n" "${TPUT_BOLD} \\/ \\/ \\/ \\/ \\/ \\/ \\/ \\/ \\/ \\/ ${TPUT_RESET}"
+  printf >&2 "\n%b\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${1}"
+  printf >&2 "%s\n" "${TPUT_BOLD} /\\ /\\ /\\ /\\ /\\ /\\ /\\ /\\ /\\ /\\ ${TPUT_RESET}"
+  printf >&2 "%s\n" "${TPUT_BOLD} A FATAL ERROR WAS ENCOUNTERED! ${TPUT_RESET}"
+  printf >&2 "%s\n" "${bracket}"
   printf >&2 "%s\n" "For community support, you can connect with us on:"
   support_list
   telemetry_event "INSTALL_FAILED" "${1}" "${2}"
@@ -582,7 +591,10 @@ run_script() {
 }
 
 warning() {
-  printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
+  width="${COLUMNS:-80}"
+  bracket="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}$(printf "%${width}s" " " | tr " " "=")${TPUT_RESET}"
+  msg="${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} WARNING ${TPUT_RESET} ${*}"
+  printf >&2 "%s\n%s\n%s\n" "${bracket}" "${msg}" "${bracket}"
   NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - ${*}"
 }
 
