@@ -170,7 +170,7 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| cpu | Identifier of the CPU core (e.g., core0, core1, core2). |
+| cpu | Identifier of the CPU core (e.g., cpu0, cpu1, cpu2). |
 
 Metrics:
 
