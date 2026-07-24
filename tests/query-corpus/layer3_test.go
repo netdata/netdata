@@ -155,7 +155,7 @@ func TestLayer3Families(t *testing.T) {
 	}{
 		{"average", ""}, {"avg", ""}, {"mean", ""},
 		{"sum", ""}, {"min", ""}, {"max", ""},
-		{"extremes", ""},
+		{"extremes", ""}, {"latest", ""},
 		{"stddev", ""}, {"cv", ""}, {"rsd", ""},
 		{"median", ""},
 		{"trimmed-median", ""}, {"trimmed-median1", ""}, {"trimmed-median25", ""},

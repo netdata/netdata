@@ -103,6 +103,14 @@ func tgSimple(name, options string, values []float64) TGResult {
 		}
 		return TGResult{Value: m}
 
+	case "latest":
+		// latest.h: the last (chronologically newest) non-gap value of
+		// the bucket; empty when nothing was collected in it
+		if n == 0 {
+			return TGResult{Empty: true}
+		}
+		return TGResult{Value: values[n-1]}
+
 	case "extremes":
 		// extremes.h: champion by sign; both signs → larger |abs|
 		var minNeg, maxPos float64

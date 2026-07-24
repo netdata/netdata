@@ -2,7 +2,7 @@
 
 // Layer 3 completeness — the FULL time-grouping registry
 // (src/web/api/queries/query-group-over-time.c): TestLayer3Families
-// covers 26 of the 46 accepted name strings; this file covers the
+// covers 27 of the 47 accepted name strings; this file covers the
 // remaining 20, the complete countif options grammar (countif.h), the
 // numeric group-options overrides with their clamps (percentile
 // [0,100]; trimmed-mean/median [0,50]), and the silent-fallback
