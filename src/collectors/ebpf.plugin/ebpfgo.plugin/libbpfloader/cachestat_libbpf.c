@@ -14,6 +14,8 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
+#include "../nd_alloc_shim.h"
+
 /*
  * libbpf 0.0.9 (CentOS 7) does not define LIBBPF_MAJOR_VERSION and lacks
  * several APIs added in later releases.  Provide inline shims so the rest
@@ -341,7 +343,7 @@ static void cachestat_destroy_links(struct netdata_ebpf_cachestat_runtime *rt)
             bpf_link__destroy(rt->links[i]);
     }
 
-    free(rt->links);
+    freez(rt->links);
     rt->links = NULL;
 }
 
@@ -428,7 +430,7 @@ int netdata_cachestat_runtime_supports_core(void)
 
 struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const char *path, int use_core)
 {
-    struct netdata_ebpf_cachestat_runtime *rt = calloc(1, sizeof(*rt));
+    struct netdata_ebpf_cachestat_runtime *rt = callocz(1, sizeof(*rt));
     if (!rt) {
         return NULL;
     }
@@ -454,7 +456,7 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
 
         if (!rt->obj || libbpf_get_error(rt->obj)) {
             cachestat_runtime_destroy_core(rt);
-            free(rt);
+            freez(rt);
             return NULL;
         }
     } else
@@ -466,7 +468,7 @@ struct netdata_ebpf_cachestat_runtime *netdata_cachestat_runtime_open_mode(const
         if (!obj || libbpf_get_error(obj)) {
             if (obj && libbpf_get_error(obj))
                 bpf_object__close(obj);
-            free(rt);
+            freez(rt);
             return NULL;
         }
 
@@ -554,7 +556,7 @@ static bool acc_htable_rebuild(struct netdata_ebpf_cachestat_runtime *rt)
     while (cap < need) cap <<= 1;
 
     if (cap != rt->acc_htable_sz) {
-        uint32_t *p = realloc(rt->acc_htable, cap * sizeof(*p));
+        uint32_t *p = reallocz(rt->acc_htable, cap * sizeof(*p));
         if (!p) return false;
         rt->acc_htable    = p;
         rt->acc_htable_sz = cap;
@@ -592,7 +594,7 @@ static struct netdata_ebpf_cachestat_pid_entry *cachestat_acc_find_or_add(
     /* New TGID — grow acc[] if needed then insert. */
     if (rt->acc_count >= rt->acc_cap) {
         size_t new_cap = rt->acc_cap ? rt->acc_cap * 2 : 64;
-        struct netdata_ebpf_cachestat_pid_entry *p = realloc(rt->acc, new_cap * sizeof(*p));
+        struct netdata_ebpf_cachestat_pid_entry *p = reallocz(rt->acc, new_cap * sizeof(*p));
         if (!p) return NULL;
         rt->acc     = p;
         rt->acc_cap = new_cap;
@@ -698,8 +700,8 @@ static void cachestat_destroy_ring_buffer(struct netdata_ebpf_cachestat_runtime 
         ring_buffer__free(rt->rb);
         rt->rb = NULL;
     }
-    free(rt->acc);
-    free(rt->acc_htable);
+    freez(rt->acc);
+    freez(rt->acc_htable);
     rt->acc          = NULL;
     rt->acc_htable   = NULL;
     rt->acc_cap      = 0;
@@ -760,7 +762,7 @@ static int cachestat_snapshot_from_acc(
 
     if (rt->acc_count > rt->items_cap) {
         struct netdata_ebpf_cachestat_pid_snapshot *p =
-            realloc(rt->items_buf, rt->acc_count * sizeof(*p));
+            reallocz(rt->items_buf, rt->acc_count * sizeof(*p));
         if (!p)
             return -1;
         rt->items_buf = p;
@@ -845,7 +847,7 @@ int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, 
     if (!account_function)
         account_function = "account_page_dirtied";
 
-    rt->links = calloc(4, sizeof(*rt->links));
+    rt->links = callocz(4, sizeof(*rt->links));
     if (!rt->links)
         return -1;
 
@@ -921,7 +923,7 @@ int netdata_cachestat_runtime_update_controller(
         if (cpus <= 0)
             return -1;
 
-        uint64_t *percpu = calloc((size_t)cpus, sizeof(*percpu));
+        uint64_t *percpu = callocz((size_t)cpus, sizeof(*percpu));
         if (!percpu)
             return -1;
 
@@ -929,7 +931,7 @@ int netdata_cachestat_runtime_update_controller(
             percpu[cpu] = values[key];
 
         const int rc = bpf_map_update_elem(fd, &key, percpu, BPF_ANY);
-        free(percpu);
+        freez(percpu);
 
         if (rc)
             return -1;
@@ -1055,7 +1057,7 @@ int netdata_cachestat_runtime_snapshot_apps(
         if (out_count >= rt->items_cap) {
             size_t new_cap = rt->items_cap ? rt->items_cap * 2 : 64;
             struct netdata_ebpf_cachestat_pid_snapshot *p =
-                realloc(rt->items_buf, new_cap * sizeof(*p));
+                reallocz(rt->items_buf, new_cap * sizeof(*p));
             if (!p)
                 goto next_key_iter; /* skip entry on OOM; retry next cycle */
             rt->items_buf = p;
@@ -1268,9 +1270,9 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
         return;
 
     cachestat_destroy_links(rt);
-    free(rt->percpu_u64);
-    free(rt->percpu_entries);
-    free(rt->items_buf);
+    freez(rt->percpu_u64);
+    freez(rt->percpu_entries);
+    freez(rt->items_buf);
 #ifdef NETDATA_LIBBPF_CORE_SUPPORTED
     if (rt->kind == NETDATA_CACHESTAT_RUNTIME_CORE) {
         cachestat_destroy_ring_buffer(rt);
@@ -1281,5 +1283,5 @@ void netdata_cachestat_runtime_close(struct netdata_ebpf_cachestat_runtime *rt)
     if (rt->obj)
         bpf_object__close(rt->obj);
 #endif
-    free(rt);
+    freez(rt);
 }

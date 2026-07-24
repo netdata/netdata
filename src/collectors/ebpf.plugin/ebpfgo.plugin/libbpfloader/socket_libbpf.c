@@ -11,6 +11,8 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
+#include "../nd_alloc_shim.h"
+
 /*
  * libbpf 0.0.9 (CentOS 7) compatibility shims — identical to those in
  * cachestat_libbpf.c so both files compile cleanly on old and new libbpf.
@@ -260,7 +262,7 @@ static void socket_destroy_links(struct netdata_ebpf_socket_runtime *rt)
             bpf_link__destroy(rt->links[i]);
     }
 
-    free(rt->links);
+    freez(rt->links);
     rt->links  = NULL;
     rt->nlinks = 0;
 }
@@ -298,7 +300,7 @@ static const struct socket_kprobe_target socket_kprobe_targets[] = {
 
 static int socket_attach_kprobes(struct netdata_ebpf_socket_runtime *rt)
 {
-    rt->links = calloc(SOCKET_KPROBE_TARGET_COUNT, sizeof(*rt->links));
+    rt->links = callocz(SOCKET_KPROBE_TARGET_COUNT, sizeof(*rt->links));
     if (!rt->links)
         return -1;
 
@@ -363,7 +365,7 @@ static uint32_t next_pow2_u32(uint32_t n)
 
 struct netdata_ebpf_socket_runtime *netdata_socket_runtime_open_mode(const char *path, int use_core)
 {
-    struct netdata_ebpf_socket_runtime *rt = calloc(1, sizeof(*rt));
+    struct netdata_ebpf_socket_runtime *rt = callocz(1, sizeof(*rt));
     if (!rt)
         return NULL;
 
@@ -371,7 +373,7 @@ struct netdata_ebpf_socket_runtime *netdata_socket_runtime_open_mode(const char 
     if (!obj || libbpf_get_error(obj)) {
         if (obj && libbpf_get_error(obj))
             bpf_object__close(obj);
-        free(rt);
+        freez(rt);
         return NULL;
     }
 
@@ -410,7 +412,7 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
     if (ncpu <= 0)
         ncpu = 1;
 
-    rt->percpu_u64 = calloc((size_t)ncpu, sizeof(*rt->percpu_u64));
+    rt->percpu_u64 = callocz((size_t)ncpu, sizeof(*rt->percpu_u64));
     if (!rt->percpu_u64)
         return -1;
     rt->percpu_u64_cap = ncpu;
@@ -421,13 +423,13 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
     int lports_ncpu = libbpf_num_possible_cpus();
     if (lports_ncpu <= 0)
         lports_ncpu = 1;
-    rt->percpu_passive = calloc((size_t)lports_ncpu, sizeof(*rt->percpu_passive));
+    rt->percpu_passive = callocz((size_t)lports_ncpu, sizeof(*rt->percpu_passive));
     if (!rt->percpu_passive)
         return -1;
     rt->percpu_passive_cap = lports_ncpu;
 
     /* tbl_nd_socket may also be PERCPU_HASH — allocate per-CPU value buffer. */
-    rt->percpu_nd_socket = calloc((size_t)lports_ncpu, sizeof(*rt->percpu_nd_socket));
+    rt->percpu_nd_socket = callocz((size_t)lports_ncpu, sizeof(*rt->percpu_nd_socket));
     if (!rt->percpu_nd_socket)
         return -1;
     rt->percpu_nd_socket_cap = lports_ncpu;
@@ -441,13 +443,13 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
     uint32_t ht_size = next_pow2_u32(ht_base * 2u);
     rt->pid_ht_size = ht_size;
     rt->pid_ht_mask = ht_size - 1u;
-    rt->pid_ht = calloc(ht_size, sizeof(*rt->pid_ht));
+    rt->pid_ht = callocz(ht_size, sizeof(*rt->pid_ht));
     if (!rt->pid_ht)
         return -1;
 
     /* Initial output array capacity = 256 unique PIDs (grows on demand). */
     rt->per_pid_cap = 256;
-    rt->per_pid_entries = calloc((size_t)rt->per_pid_cap, sizeof(*rt->per_pid_entries));
+    rt->per_pid_entries = callocz((size_t)rt->per_pid_cap, sizeof(*rt->per_pid_entries));
     if (!rt->per_pid_entries)
         return -1;
 
@@ -572,19 +574,19 @@ void netdata_socket_runtime_close(struct netdata_ebpf_socket_runtime *rt)
 
     socket_destroy_links(rt);
 
-    free(rt->percpu_u64);
+    freez(rt->percpu_u64);
     rt->percpu_u64 = NULL;
 
-    free(rt->percpu_passive);
+    freez(rt->percpu_passive);
     rt->percpu_passive = NULL;
 
-    free(rt->percpu_nd_socket);
+    freez(rt->percpu_nd_socket);
     rt->percpu_nd_socket = NULL;
 
-    free(rt->pid_ht);
+    freez(rt->pid_ht);
     rt->pid_ht = NULL;
 
-    free(rt->per_pid_entries);
+    freez(rt->per_pid_entries);
     rt->per_pid_entries = NULL;
     rt->per_pid_count = 0;
     rt->per_pid_cap   = 0;
@@ -592,7 +594,7 @@ void netdata_socket_runtime_close(struct netdata_ebpf_socket_runtime *rt)
     if (rt->obj)
         bpf_object__close(rt->obj);
 
-    free(rt);
+    freez(rt);
 }
 
 /* -------------------------------------------------------------------------
@@ -711,7 +713,7 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
         if (count >= rt->per_pid_cap) {
             int newcap = rt->per_pid_cap * 2;
             struct netdata_socket_per_pid_entry *tmp =
-                realloc(rt->per_pid_entries, (size_t)newcap * sizeof(*tmp));
+                reallocz(rt->per_pid_entries, (size_t)newcap * sizeof(*tmp));
             if (!tmp) {
                 /* Partial result is better than nothing. */
                 break;

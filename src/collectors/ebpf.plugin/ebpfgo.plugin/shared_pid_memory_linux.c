@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "shared_pid_memory.h"
+#include "nd_alloc_shim.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -127,7 +128,7 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
     if (!total)
         return NULL;
 
-    struct shared_pid_memory *ctx = calloc(1, sizeof(*ctx));
+    struct shared_pid_memory *ctx = callocz(1, sizeof(*ctx));
     if (!ctx)
         return NULL;
 
@@ -313,5 +314,5 @@ void shared_pid_memory_close(struct shared_pid_memory *ctx)
     if (ctx->shm_name_created)
         (void)shm_unlink(NETDATA_EBPFGO_INTEGRATION_NAME);
 
-    free(ctx);
+    freez(ctx);
 }

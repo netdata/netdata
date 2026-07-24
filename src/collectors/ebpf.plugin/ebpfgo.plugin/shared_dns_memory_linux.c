@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "shared_dns_memory.h"
+#include "nd_alloc_shim.h"
 
 /* ebpfgo_shm_sem_wait and ebpfgo_shm_now_monotonic_usec are defined in
  * apps_ebpf_shared_pid_row.h, included transitively via apps_ebpf_shared_dns_row.h */
@@ -95,7 +96,7 @@ static bool dns_shm_replace_generation(struct shared_dns_memory *ctx, size_t len
 
 struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
 {
-    struct shared_dns_memory *ctx = calloc(1, sizeof(*ctx));
+    struct shared_dns_memory *ctx = callocz(1, sizeof(*ctx));
     if (!ctx)
         return NULL;
 
@@ -251,5 +252,5 @@ void shared_dns_memory_close(struct shared_dns_memory *ctx)
     if (ctx->shm_name_created)
         (void)shm_unlink(NETDATA_EBPFGO_DNS_SHM_NAME);
 
-    free(ctx);
+    freez(ctx);
 }

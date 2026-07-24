@@ -16,6 +16,8 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
+#include "../nd_alloc_shim.h"
+
 /*
  * ring_buffer API was added in libbpf 0.2 (LIBBPF_MAJOR_VERSION defined).
  * Provide a compile-time gate so the base flavor still compiles without it.
@@ -814,7 +816,7 @@ struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int 
 {
     (void)use_core;
 
-    struct netdata_dns_runtime *rt = calloc(1, sizeof(*rt));
+    struct netdata_dns_runtime *rt = callocz(1, sizeof(*rt));
     if (!rt)
         return NULL;
 
@@ -826,7 +828,7 @@ struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int 
     if (!obj || libbpf_get_error(obj)) {
         if (obj && libbpf_get_error(obj))
             bpf_object__close(obj);
-        free(rt);
+        freez(rt);
         return NULL;
     }
 
@@ -839,7 +841,7 @@ struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int 
     else {
         fprintf(stderr, "ebpf-go: dns: no recognized program in %s\n", path);
         bpf_object__close(obj);
-        free(rt);
+        freez(rt);
         return NULL;
     }
 
@@ -1015,7 +1017,7 @@ void netdata_dns_runtime_close(struct netdata_dns_runtime *rt)
         rt->obj = NULL;
     }
 
-    free(rt);
+    freez(rt);
 }
 
 /* -------------------------------------------------------------------------
@@ -1027,7 +1029,7 @@ void netdata_dns_runtime_close(struct netdata_dns_runtime *rt)
 
 void *netdata_dns_alloc_test_runtime(void)
 {
-    struct netdata_dns_runtime *rt = calloc(1, sizeof(*rt));
+    struct netdata_dns_runtime *rt = callocz(1, sizeof(*rt));
     if (rt) {
         rt->sock_fd = -1;
         rt->flow_fd = -1;
@@ -1037,7 +1039,7 @@ void *netdata_dns_alloc_test_runtime(void)
 
 void netdata_dns_free_test_runtime(void *p)
 {
-    free(p);
+    freez(p);
 }
 
 /* Delegates to the static dns_parse_raw_packet with now_us=0 and NULL output
