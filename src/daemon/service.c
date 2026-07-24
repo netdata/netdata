@@ -2,11 +2,17 @@
 
 #include "common.h"
 
-static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
+// chart_obsolete: the whole chart is being torn down (RRDSET_FLAG_OBSOLETE), so
+// every dimension must be archived/freed even though chart-level obsoletion does
+// not set RRDDIM_FLAG_OBSOLETE on the dimensions. Without this authorization the
+// per-dimension flag gate below would reject every dimension of a chart-level
+// obsoletion, the caller could never reach rrdset_free(), and the chart plus its
+// ring buffers would be retained until process exit.
+static bool svc_rrddim_obsolete_to_archive(RRDDIM *rd, bool chart_obsolete) {
     RRDSET *st = rd->rrdset;
 
-    if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && spinlock_trylock(&rd->destroy_lock)) {
-        if(!rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+    if((chart_obsolete || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) && spinlock_trylock(&rd->destroy_lock)) {
+        if(!chart_obsolete && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
             spinlock_unlock(&rd->destroy_lock);
             return false;
         }
@@ -60,7 +66,12 @@ static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all
             if(rd->collector.last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now) {
                 size_t references = dictionary_acquired_item_references(rd_dfe.item);
                 if(references == 1) {
-                    if(svc_rrddim_obsolete_to_archive(rd))
+                    // all_dimensions is set only on the chart-obsolete path
+                    // (svc_rrdhost_cleanup_charts_marked_obsolete calls this with
+                    // all_dimensions=true for RRDSET_FLAG_OBSOLETE charts), so it
+                    // doubles as the chart_obsolete authorization to archive
+                    // dimensions that carry no per-dimension obsolete flag.
+                    if(svc_rrddim_obsolete_to_archive(rd, all_dimensions))
                         dim_archives++;
                 }
             }
