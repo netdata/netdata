@@ -168,3 +168,4 @@ When using `time_group` values other than `min`, `max`, `average`, or `sum`, you
 ```console
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/contexts
 ```
+
