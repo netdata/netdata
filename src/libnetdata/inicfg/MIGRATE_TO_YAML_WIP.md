@@ -1160,8 +1160,6 @@ Web server and dashboard configuration
 | `enable gzip compression` | boolean | Enable gzip compression for web responses to reduce bandwidth usage. Recommended for slow connections. Default is "yes". |
 | `mode` | string | Web server operation mode. Options: "static-threaded" (multithreaded for better performance), "none" (disable web server entirely). Default is "static-threaded". |
 | `respect do not track policy` | boolean | Honor browsers' "Do Not Track" headers by disabling web analytics and tracking features in the dashboard. Default is "no". |
-| `web files group` | string | Group ownership for web-accessible files. Used for file permission management. Default varies by installation. |
-| `web files owner` | string | User ownership for web-accessible files. Used for file permission management. Default varies by installation. |
 | `web server threads` | number | Number of threads for handling web requests. More threads can handle more concurrent users but use more memory. Automatically calculated based on CPU cores, minimum 6. For systems with OpenSSL < 1.1.0, forced to 1. |
 
 ### Section `CONFIG_SECTION_WEBRTC`

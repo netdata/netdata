@@ -181,7 +181,6 @@ void netdata_conf_section_global_run_as_user(const char **user) {
     // --------------------------------------------------------------------
     // get the user we should run
 
-    // IMPORTANT: this is required before web_files_uid()
     if(getuid() == 0) {
         *user = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "run as user", NETDATA_USER);
     }
@@ -190,4 +189,3 @@ void netdata_conf_section_global_run_as_user(const char **user) {
         *user = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
     }
 }
-

@@ -6798,7 +6798,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [on, off, true, false, yes, no]
+            enum: ["on", "off", "true", "false", "yes", "no"]
           description: |
             **Whether to enable or disable bearer token authentication requirement.**
 
@@ -7852,7 +7852,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [on, off, true, false, yes, no]
+            enum: ["on", "off", "true", "false", "yes", "no"]
           description: Enable or disable bearer protection
         - name: claim_id
           in: query

@@ -7,6 +7,9 @@ gcs-credentials.json
 # No trailing slash so the rule also ignores the per-worktree symlink.
 /.local
 
+# Local scout review tooling and run configuration.
+/.agents/scout
+
 # Local-only SOW working memory: queues (q/) and specs. Never committed; shared
 # across a developer's git worktrees via .agents/sow/worktree-link.sh. The SOW
 # framework files (SOW.template.md, audit.sh, scan-sensitive.sh, worktree-link.sh)
