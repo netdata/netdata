@@ -686,7 +686,7 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
     uint64_t soft_intr_number;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_soft", mib, soft_intr_number))) {
-        collector_error("DISABLED: system.dev_intr chart");
+        collector_error("DISABLED: system.soft_intr chart");
         collector_error("DISABLED: vm.stats.sys.v_soft module");
         return 1;
     } else {
@@ -760,6 +760,47 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
     return 0;
 }
 
+// vm.stats.sys.v_syscall
+
+int do_vm_stats_sys_v_syscalls(int update_every, usec_t dt) {
+    (void)dt;
+    static int mib[4] = {0, 0, 0, 0};
+    u_int64_t syscalls_number;
+
+    if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_syscall", mib, syscalls_number))) {
+            collector_error("DISABLED: system.syscalls chart");
+            collector_error("DISABLED: vm.stats.sys.v_syscall module");
+            return 1;
+    } else {
+            static RRDSET *st = NULL;
+            static RRDDIM *rd = NULL;
+
+            if (unlikely(!st)) {
+                    st = rrdset_create_localhost(
+                                    "system",
+                                    "syscalls",
+                                    NULL,
+                                    "processes",
+                                    NULL,
+                                    "System call",
+                                    "calls/s",
+                                    "freebsd.plugin",
+                                    "vm.stats.sys.v_syscall",
+                                    NETDATA_CHART_PRIO_SYSTEM_SYSCALLS,
+                                    update_every,
+                                    RRDSET_TYPE_LINE
+                                    );
+
+                    rd = rrddim_add(st, "calls", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+
+            rrddim_set_by_pointer(st, rd, syscalls_number);
+            rrdset_done(st);
+    }
+
+    return 0;
+}
+
 // vm.stats.vm.v_forks
 
 int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
@@ -769,7 +810,7 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_forks", mib, forks_number))) {
         collector_error("DISABLED: system.forks chart");
-        collector_error("DISABLED: vm.stats.sys.v_swtch module");
+        collector_error("DISABLED: vm.stats.vm.v_forks module");
         return 1;
     } else {
 
@@ -788,7 +829,7 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
                     "Started Processes",
                     "processes/s",
                     "freebsd.plugin",
-                    "vm.stats.sys.v_swtch",
+                    "vm.stats.vm.v_forks",
                     NETDATA_CHART_PRIO_SYSTEM_FORKS,
                     update_every,
                     RRDSET_TYPE_LINE
