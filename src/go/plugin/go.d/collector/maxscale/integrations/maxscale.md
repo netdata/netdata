@@ -209,11 +209,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -225,16 +227,17 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| maxscale.poll_events | reads, writes, accepts, errors, hangups | events/s |
-| maxscale.current_sessions | sessions | sessions |
-| maxscale.current_zombie_connections | zombie | connections |
-| maxscale.threads_by_state | active, draining, dormant | threads |
-| maxscale.current_fds | managed | fds |
-| maxscale.qc_cache_efficiency | hits, misses | requests/s |
-| maxscale.qc_cache_operations | inserts, evictions | operations/s |
-| maxscale.uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| maxscale.poll_events | Poll Events | reads, writes, accepts, errors, hangups | events/s |
+| maxscale.current_sessions | Current Sessions | sessions | sessions |
+| maxscale.current_zombie_connections | Current Zombie Connections | zombie | connections |
+| maxscale.threads_by_state | Threads Count by State | active, draining, dormant | threads |
+| maxscale.current_fds | Current Managed File Descriptors | managed | fds |
+| maxscale.qc_cache_efficiency | QC Cache Efficiency | hits, misses | requests/s |
+| maxscale.qc_cache_operations | QC Cache Operations | inserts, evictions | operations/s |
+| maxscale.uptime | Uptime | uptime | seconds |
+
 
 ### Per server
 
@@ -249,10 +252,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| maxscale.server_state | master, slave, running, down, maintenance, draining, drained, relay_master, binlog_relay, synced | state |
-| maxscale.server_current_connections | connections | connections |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| maxscale.server_state | Server State | master, slave, running, down, maintenance, draining, drained, relay_master, binlog_relay, synced | state |
+| maxscale.server_current_connections | Server Current connections | connections | connections |
 
 
 

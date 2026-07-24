@@ -140,11 +140,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -156,12 +158,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.process_thread | process | calls/s |
-| system.process_status | process, zombie | difference |
-| system.exit | process | calls/s |
-| system.task_error | task | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.process_thread | Start process | process | calls/s |
+| system.process_status | Process not closed | process, zombie | difference |
+| system.exit | Exit process | process | calls/s |
+| system.task_error | Fails to create process | task | calls/s |
+
 
 ### Per apps
 
@@ -175,13 +178,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.process_create | calls | calls/s |
-| app.thread_create | call | calls/s |
-| app.task_exit | call | calls/s |
-| app.task_close | call | calls/s |
-| app.task_error | app | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| app.process_create | Process started | calls | calls/s |
+| app.thread_create | Threads started | call | calls/s |
+| app.task_exit | Tasks starts exit process | call | calls/s |
+| app.task_close | Tasks closed | call | calls/s |
+| app.task_error | Errors to create process or threads | app | calls/s |
+
 
 ### Per cgroup
 
@@ -191,15 +195,15 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.process_create | process | calls/s |
-| cgroup.thread_create | thread | calls/s |
-| cgroup.task_exit | exit | calls/s |
-| cgroup.task_close | process | calls/s |
-| cgroup.task_error | process | calls/s |
-| services.process_create | a dimension per systemd service | calls/s |
-| services.thread_create | a dimension per systemd service | calls/s |
-| services.task_close | a dimension per systemd service | calls/s |
-| services.task_exit | a dimension per systemd service | calls/s |
-| services.task_error | a dimension per systemd service | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.process_create | Process started | process | calls/s |
+| cgroup.thread_create | Threads started | thread | calls/s |
+| cgroup.task_exit | Tasks starts exit process | exit | calls/s |
+| cgroup.task_close | Tasks closed | process | calls/s |
+| cgroup.task_error | Errors to create process or threads | process | calls/s |
+| services.process_create | Process started | a dimension per systemd service | calls/s |
+| services.thread_create | Threads started | a dimension per systemd service | calls/s |
+| services.task_close | Tasks starts exit process | a dimension per systemd service | calls/s |
+| services.task_exit | Tasks closed | a dimension per systemd service | calls/s |
+| services.task_error | Errors to create process or threads | a dimension per systemd service | calls/s |

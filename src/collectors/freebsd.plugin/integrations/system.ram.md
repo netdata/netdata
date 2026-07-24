@@ -110,11 +110,13 @@ The following alerts are available:
 | [ ram_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.available | percentage of estimated amount of RAM available for userspace processes, without causing swapping |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -126,7 +128,7 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.ram | free, active, inactive, wired, cache, laundry, buffers | MiB |
-| mem.available | avail | MiB |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.ram | System RAM | free, active, inactive, wired, cache, laundry, buffers | MiB |
+| mem.available | Available RAM for applications | avail | MiB |

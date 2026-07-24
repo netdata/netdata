@@ -636,11 +636,13 @@ The following alerts are available:
 | [ am_firewall_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.snat_port_utilization | Firewall SNAT port utilization on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -662,15 +664,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.firewall.health | average | percentage |
-| azure_monitor.firewall.latency | average | milliseconds |
-| azure_monitor.firewall.throughput | average | bits/s |
-| azure_monitor.firewall.data_processed | total | bytes/s |
-| azure_monitor.firewall.rule_hits | application, network | hits/s |
-| azure_monitor.firewall.snat_port_utilization | average | percentage |
-| azure_monitor.firewall.capacity | average | units |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.firewall.health | Azure Firewall Health State | average | percentage |
+| azure_monitor.firewall.latency | Azure Firewall Latency Probe | average | milliseconds |
+| azure_monitor.firewall.throughput | Azure Firewall Throughput | average | bits/s |
+| azure_monitor.firewall.data_processed | Azure Firewall Data Processed | total | bytes/s |
+| azure_monitor.firewall.rule_hits | Azure Firewall Rule Hits | application, network | hits/s |
+| azure_monitor.firewall.snat_port_utilization | Azure Firewall SNAT Port Utilization | average | percentage |
+| azure_monitor.firewall.capacity | Azure Firewall Observed Capacity Units | average | units |
 
 
 

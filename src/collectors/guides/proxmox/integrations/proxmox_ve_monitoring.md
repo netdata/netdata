@@ -118,6 +118,7 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 This guide does not collect metrics directly. Metrics are collected by the related integrations listed above. See each integration's page for detailed metric documentation.

@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -120,8 +122,8 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv4.icmp | received, sent | packets/s |
-| ipv4.icmp_errors | InErrors, OutErrors, InCsumErrors | packets/s |
-| ipv4.icmpmsg | InEchoReps, OutEchoReps, InEchos, OutEchos | packets/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ipv4.icmp | IPv4 ICMP Packets | received, sent | packets/s |
+| ipv4.icmp_errors | IPv4 ICMP Errors | InErrors, OutErrors, InCsumErrors | packets/s |
+| ipv4.icmpmsg | IPv4 ICMP Messages | InEchoReps, OutEchoReps, InEchos, OutEchos | packets/s |

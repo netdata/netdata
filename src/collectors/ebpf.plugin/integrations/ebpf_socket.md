@@ -138,11 +138,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -154,17 +156,18 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ip.inbound_conn | connected_tcp, connected_udp | connections/s |
-| ip.tcp_outbound_conn | received | connections/s |
-| ip.tcp_functions | received, send, closed | calls/s |
-| ip.total_tcp_bandwidth | received, send | kilobits/s |
-| ip.tcp_error | received, send | calls/s |
-| ip.tcp_retransmit | retransmitted | calls/s |
-| ip.udp_functions | received, send | calls/s |
-| ip.total_udp_bandwidth | received, send | kilobits/s |
-| ip.udp_error | received, send | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ip.inbound_conn | Inbound connections. | connected_tcp, connected_udp | connections/s |
+| ip.tcp_outbound_conn | TCP outbound connections. | received | connections/s |
+| ip.tcp_functions | Calls to internal functions | received, send, closed | calls/s |
+| ip.total_tcp_bandwidth | TCP bandwidth | received, send | kilobits/s |
+| ip.tcp_error | TCP errors | received, send | calls/s |
+| ip.tcp_retransmit | Packages retransmitted | retransmitted | calls/s |
+| ip.udp_functions | UDP calls | received, send | calls/s |
+| ip.total_udp_bandwidth | UDP bandwidth | received, send | kilobits/s |
+| ip.udp_error | UDP errors | received, send | calls/s |
+
 
 ### Per apps
 
@@ -178,16 +181,17 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_call_tcp_v4_connection | connections | connections/s |
-| app.ebpf_call_tcp_v6_connection | connections | connections/s |
-| app.ebpf_sock_total_bandwidth | received, sent | kilobits/s |
-| app.ebpf_call_tcp_sendmsg | calls | calls/s |
-| app.ebpf_call_tcp_cleanup_rbuf | calls | calls/s |
-| app.ebpf_call_tcp_retransmit | calls | calls/s |
-| app.ebpf_call_udp_sendmsg | calls | calls/s |
-| app.ebpf_call_udp_recvmsg | calls | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| app.ebpf_call_tcp_v4_connection | Calls to tcp_v4_connection | connections | connections/s |
+| app.ebpf_call_tcp_v6_connection | Calls to tcp_v6_connection | connections | connections/s |
+| app.ebpf_sock_total_bandwidth | Bytes sent | received, sent | kilobits/s |
+| app.ebpf_call_tcp_sendmsg | Calls for tcp_sendmsg | calls | calls/s |
+| app.ebpf_call_tcp_cleanup_rbuf | Calls for tcp_cleanup_rbuf | calls | calls/s |
+| app.ebpf_call_tcp_retransmit | Calls for tcp_retransmit | calls | calls/s |
+| app.ebpf_call_udp_sendmsg | Calls for udp_sendmsg | calls | calls/s |
+| app.ebpf_call_udp_recvmsg | Calls for udp_recvmsg | calls | calls/s |
+
 
 ### Per cgroup
 
@@ -197,21 +201,21 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.net_conn_ipv4 | connections | connections/s |
-| cgroup.net_conn_ipv6 | connections | connections/s |
-| cgroup.net_total_bandwidth | received, sent | kilobits/s |
-| cgroup.net_tcp_recv | calls | calls/s |
-| cgroup.net_tcp_send | calls | calls/s |
-| cgroup.net_retransmit | calls | calls/s |
-| cgroup.net_udp_send | calls | calls/s |
-| cgroup.net_udp_recv | calls | calls/s |
-| services.net_conn_ipv4 | connections | connections/s |
-| services.net_conn_ipv6 | connections | connections/s |
-| services.net_total_bandwidth | received, sent | kilobits/s |
-| services.net_tcp_recv | calls | calls/s |
-| services.net_tcp_send | calls | calls/s |
-| services.net_tcp_retransmit | calls | calls/s |
-| services.net_udp_send | calls | calls/s |
-| services.net_udp_recv | calls | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.net_conn_ipv4 | Calls to tcp_v4_connection | connections | connections/s |
+| cgroup.net_conn_ipv6 | Calls to tcp_v6_connection | connections | connections/s |
+| cgroup.net_total_bandwidth | Bytes received | received, sent | kilobits/s |
+| cgroup.net_tcp_recv | Calls to tcp_cleanup_rbuf. | calls | calls/s |
+| cgroup.net_tcp_send | Calls to tcp_sendmsg. | calls | calls/s |
+| cgroup.net_retransmit | Calls to tcp_retransmit. | calls | calls/s |
+| cgroup.net_udp_send | Calls to udp_sendmsg | calls | calls/s |
+| cgroup.net_udp_recv | Calls to udp_recvmsg | calls | calls/s |
+| services.net_conn_ipv4 | Calls to tcp_v4_connection | connections | connections/s |
+| services.net_conn_ipv6 | Calls to tcp_v6_connection | connections | connections/s |
+| services.net_total_bandwidth | Bytes received | received, sent | kilobits/s |
+| services.net_tcp_recv | Calls to tcp_cleanup_rbuf. | calls | calls/s |
+| services.net_tcp_send | Calls to tcp_sendmsg. | calls | calls/s |
+| services.net_tcp_retransmit | Calls to tcp_retransmit | calls | calls/s |
+| services.net_udp_send | Calls to udp_sendmsg | calls | calls/s |
+| services.net_udp_recv | Calls to udp_recvmsg | calls | calls/s |

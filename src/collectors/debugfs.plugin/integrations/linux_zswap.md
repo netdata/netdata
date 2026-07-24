@@ -114,6 +114,7 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -121,6 +122,7 @@ Metrics grouped by *scope*.
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
 Monitor the performance statistics of zswap.
+
 
 ### Per Linux ZSwap instance
 
@@ -130,13 +132,13 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.zswap_pool_compression_ratio | compression_ratio | ratio |
-| system.zswap_pool_compressed_size | compressed_size | bytes |
-| system.zswap_pool_raw_size | uncompressed_size | bytes |
-| system.zswap_rejections | compress_poor, kmemcache_fail, alloc_fail, reclaim_fail | rejections/s |
-| system.zswap_pool_limit_hit | limit | events/s |
-| system.zswap_written_back_raw_bytes | written_back | bytes/s |
-| system.zswap_same_filled_raw_size | same_filled | bytes |
-| system.zswap_duplicate_entry | duplicate | entries/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.zswap_pool_compression_ratio | Zswap compression ratio | compression_ratio | ratio |
+| system.zswap_pool_compressed_size | Zswap compressed bytes currently stored | compressed_size | bytes |
+| system.zswap_pool_raw_size | Zswap uncompressed bytes currently stored | uncompressed_size | bytes |
+| system.zswap_rejections | Zswap rejections | compress_poor, kmemcache_fail, alloc_fail, reclaim_fail | rejections/s |
+| system.zswap_pool_limit_hit | Zswap pool limit was reached | limit | events/s |
+| system.zswap_written_back_raw_bytes | Zswap uncomressed bytes written back when pool limit was reached | written_back | bytes/s |
+| system.zswap_same_filled_raw_size | Zswap same-value filled uncompressed bytes currently stored | same_filled | bytes |
+| system.zswap_duplicate_entry | Zswap duplicate store was encountered | duplicate | entries/s |

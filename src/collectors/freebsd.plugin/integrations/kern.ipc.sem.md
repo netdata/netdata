@@ -108,11 +108,13 @@ The following alerts are available:
 | [ semaphore_arrays_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphore_arrays | IPC semaphore arrays utilization |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -124,7 +126,7 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.ipc_semaphores | semaphores | semaphores |
-| system.ipc_semaphore_arrays | arrays | arrays |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.ipc_semaphores | IPC Semaphores | semaphores | semaphores |
+| system.ipc_semaphore_arrays | IPC Semaphore Arrays | arrays | arrays |

@@ -217,11 +217,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -233,9 +235,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| pgbouncer.client_connections_utilization | used | percentage |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| pgbouncer.client_connections_utilization | Client connections utilization | used | percentage |
+
 
 ### Per database
 
@@ -250,20 +253,20 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| pgbouncer.db_client_connections | active, waiting, cancel_req | connections |
-| pgbouncer.db_server_connections | active, idle, used, tested, login | connections |
-| pgbouncer.db_server_connections_utilization | used | percentage |
-| pgbouncer.db_clients_wait_time | time | seconds |
-| pgbouncer.db_client_max_wait_time | time | seconds |
-| pgbouncer.db_transactions | transactions | transactions/s |
-| pgbouncer.db_transactions_time | time | seconds |
-| pgbouncer.db_transaction_avg_time | time | seconds |
-| pgbouncer.db_queries | queries | queries/s |
-| pgbouncer.db_queries_time | time | seconds |
-| pgbouncer.db_query_avg_time | time | seconds |
-| pgbouncer.db_network_io | received, sent | B/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| pgbouncer.db_client_connections | Database client connections | active, waiting, cancel_req | connections |
+| pgbouncer.db_server_connections | Database server connections | active, idle, used, tested, login | connections |
+| pgbouncer.db_server_connections_utilization | Database server connections utilization | used | percentage |
+| pgbouncer.db_clients_wait_time | Database clients wait time | time | seconds |
+| pgbouncer.db_client_max_wait_time | Database client max wait time | time | seconds |
+| pgbouncer.db_transactions | Database pooled SQL transactions | transactions | transactions/s |
+| pgbouncer.db_transactions_time | Database transactions time | time | seconds |
+| pgbouncer.db_transaction_avg_time | Database transaction average time | time | seconds |
+| pgbouncer.db_queries | Database pooled SQL queries | queries | queries/s |
+| pgbouncer.db_queries_time | Database queries time | time | seconds |
+| pgbouncer.db_query_avg_time | Database query average time | time | seconds |
+| pgbouncer.db_network_io | Database traffic | received, sent | B/s |
 
 
 

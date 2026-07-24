@@ -136,11 +136,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -156,10 +158,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| wireguard.device_network_io | receive, transmit | B/s |
-| wireguard.device_peers | peers | peers |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| wireguard.device_network_io | Device traffic | receive, transmit | B/s |
+| wireguard.device_peers | Device peers | peers | peers |
+
 
 ### Per peer
 
@@ -174,10 +177,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| wireguard.peer_network_io | receive, transmit | B/s |
-| wireguard.peer_latest_handshake_ago | time | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| wireguard.peer_network_io | Peer traffic | receive, transmit | B/s |
+| wireguard.peer_latest_handshake_ago | Peer time elapsed since the latest handshake | time | seconds |
 
 
 

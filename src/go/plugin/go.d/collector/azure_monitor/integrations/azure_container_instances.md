@@ -634,11 +634,13 @@ The following alerts are available:
 | [ am_container_instances_network_tx ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf) | azure_monitor.container_instances.network | Container outbound traffic on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -660,11 +662,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.container_instances.cpu_usage | average, maximum | millicores |
-| azure_monitor.container_instances.memory_usage | average, maximum | bytes |
-| azure_monitor.container_instances.network | received, sent | bytes/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.container_instances.cpu_usage | Azure Container Instances CPU Usage | average, maximum | millicores |
+| azure_monitor.container_instances.memory_usage | Azure Container Instances Memory Usage | average, maximum | bytes |
+| azure_monitor.container_instances.network | Azure Container Instances Network Traffic | received, sent | bytes/s |
 
 
 

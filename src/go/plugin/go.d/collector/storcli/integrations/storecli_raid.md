@@ -162,11 +162,13 @@ The following alerts are available:
 | [ storcli_phys_drive_predictive_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/storcli.conf) | storcli.phys_drive_predictive_failures | RAID physical drive c${label:controller_number}/e${label:enclosure_number}/s${label:slot_number} predictive failures |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -184,12 +186,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| storcli.controller_health_status | healthy, unhealthy | status |
-| storcli.controller_status | optimal, degraded, partially_degraded, failed | status |
-| storcli.controller_bbu_status | healthy, unhealthy, na | status |
-| storcli.controller_roc_temperature | temperature | Celsius |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| storcli.controller_health_status | Controller health status | healthy, unhealthy | status |
+| storcli.controller_status | Controller status | optimal, degraded, partially_degraded, failed | status |
+| storcli.controller_bbu_status | Controller BBU status | healthy, unhealthy, na | status |
+| storcli.controller_roc_temperature | Controller ROC temperature | temperature | Celsius |
+
 
 ### Per physical drive
 
@@ -206,12 +209,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| storcli.phys_drive_errors | media, other | errors/s |
-| storcli.phys_drive_predictive_failures | predictive_failures | failures/s |
-| storcli.phys_drive_smart_alert_status | active, inactive | status |
-| storcli.phys_drive_temperature | temperature | Celsius |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| storcli.phys_drive_errors | Physical Drive media errors rate | media, other | errors/s |
+| storcli.phys_drive_predictive_failures | Physical Drive predictive failures rate | predictive_failures | failures/s |
+| storcli.phys_drive_smart_alert_status | Physical Drive SMART alert status | active, inactive | status |
+| storcli.phys_drive_temperature | Physical Drive temperature | temperature | Celsius |
+
 
 ### Per bbu
 
@@ -227,9 +231,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| storcli.bbu_temperature | temperature | Celsius |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| storcli.bbu_temperature | BBU temperature | temperature | Celsius |
 
 
 

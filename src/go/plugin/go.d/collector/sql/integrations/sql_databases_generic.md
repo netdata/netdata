@@ -797,6 +797,7 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics and charts are **defined by your SQL queries and metric blocks** at runtime. They differ by database engine, schema, and configuration, and may include, for example, connection counts, cache hit ratios, row throughput, lock statistics, or custom business KPIs. Use the **Metrics** tab on the job’s dashboard to see exactly what is collected for that job.

@@ -644,11 +644,13 @@ The following alerts are available:
 | [ am_event_hubs_replication_lag_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_event_hubs.conf) | azure_monitor.event_hubs.replication_lag_duration | Event Hubs replication lag duration on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -670,21 +672,21 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.event_hubs.message_flow | in, out | messages/s |
-| azure_monitor.event_hubs.data_throughput | in, out | bytes/s |
-| azure_monitor.event_hubs.requests | incoming, successful | requests/s |
-| azure_monitor.event_hubs.errors | server, user, throttled, quota_exceeded | errors/s |
-| azure_monitor.event_hubs.connections | active | connections |
-| azure_monitor.event_hubs.connection_events | opened, closed | connections |
-| azure_monitor.event_hubs.captured_messages | total | messages/s |
-| azure_monitor.event_hubs.captured_data | total | bytes/s |
-| azure_monitor.event_hubs.namespace_size | average | bytes |
-| azure_monitor.event_hubs.capture_backlog | backlog | messages |
-| azure_monitor.event_hubs.namespace_resources | cpu, memory | percentage |
-| azure_monitor.event_hubs.replication_lag | messages | messages |
-| azure_monitor.event_hubs.replication_lag_duration | duration | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.event_hubs.message_flow | Azure Event Hubs Message Flow | in, out | messages/s |
+| azure_monitor.event_hubs.data_throughput | Azure Event Hubs Data Throughput | in, out | bytes/s |
+| azure_monitor.event_hubs.requests | Azure Event Hubs Requests | incoming, successful | requests/s |
+| azure_monitor.event_hubs.errors | Azure Event Hubs Errors | server, user, throttled, quota_exceeded | errors/s |
+| azure_monitor.event_hubs.connections | Azure Event Hubs Active Connections | active | connections |
+| azure_monitor.event_hubs.connection_events | Azure Event Hubs Connection Events | opened, closed | connections |
+| azure_monitor.event_hubs.captured_messages | Azure Event Hubs Captured Messages | total | messages/s |
+| azure_monitor.event_hubs.captured_data | Azure Event Hubs Captured Data | total | bytes/s |
+| azure_monitor.event_hubs.namespace_size | Azure Event Hubs Namespace Size | average | bytes |
+| azure_monitor.event_hubs.capture_backlog | Azure Event Hubs Capture Backlog | backlog | messages |
+| azure_monitor.event_hubs.namespace_resources | Azure Event Hubs Namespace Resources | cpu, memory | percentage |
+| azure_monitor.event_hubs.replication_lag | Azure Event Hubs Replication Lag | messages | messages |
+| azure_monitor.event_hubs.replication_lag_duration | Azure Event Hubs Replication Lag Duration | duration | seconds |
 
 
 

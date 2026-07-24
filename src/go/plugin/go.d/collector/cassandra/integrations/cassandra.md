@@ -232,11 +232,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -248,32 +250,33 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cassandra.client_requests_rate | read, write | requests/s |
-| cassandra.client_request_read_latency_histogram | p50, p75, p95, p98, p99, p999 | seconds |
-| cassandra.client_request_write_latency_histogram | p50, p75, p95, p98, p99, p999 | seconds |
-| cassandra.client_requests_latency | read, write | seconds |
-| cassandra.row_cache_hit_ratio | hit_ratio | percentage |
-| cassandra.row_cache_hit_rate | hits, misses | events/s |
-| cassandra.row_cache_utilization | used | percentage |
-| cassandra.row_cache_size | size | bytes |
-| cassandra.key_cache_hit_ratio | hit_ratio | percentage |
-| cassandra.key_cache_hit_rate | hits, misses | events/s |
-| cassandra.key_cache_utilization | used | percentage |
-| cassandra.key_cache_size | size | bytes |
-| cassandra.storage_live_disk_space_used | used | bytes |
-| cassandra.compaction_completed_tasks_rate | completed | tasks/s |
-| cassandra.compaction_pending_tasks_count | pending | tasks |
-| cassandra.compaction_compacted_rate | compacted | bytes/s |
-| cassandra.jvm_memory_used | heap, nonheap | bytes |
-| cassandra.jvm_gc_rate | parnew, cms | gc/s |
-| cassandra.jvm_gc_time | parnew, cms | seconds |
-| cassandra.dropped_messages_rate | dropped | messages/s |
-| cassandra.client_requests_timeouts_rate | read, write | timeout/s |
-| cassandra.client_requests_unavailables_rate | read, write | exceptions/s |
-| cassandra.client_requests_failures_rate | read, write | failures/s |
-| cassandra.storage_exceptions_rate | storage | exceptions/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cassandra.client_requests_rate | Client requests rate | read, write | requests/s |
+| cassandra.client_request_read_latency_histogram | Client request read latency histogram | p50, p75, p95, p98, p99, p999 | seconds |
+| cassandra.client_request_write_latency_histogram | Client request write latency histogram | p50, p75, p95, p98, p99, p999 | seconds |
+| cassandra.client_requests_latency | Client requests total latency | read, write | seconds |
+| cassandra.row_cache_hit_ratio | Key cache hit ratio | hit_ratio | percentage |
+| cassandra.row_cache_hit_rate | Key cache hit rate | hits, misses | events/s |
+| cassandra.row_cache_utilization | Key cache utilization | used | percentage |
+| cassandra.row_cache_size | Key cache size | size | bytes |
+| cassandra.key_cache_hit_ratio | Row cache hit ratio | hit_ratio | percentage |
+| cassandra.key_cache_hit_rate | Row cache hit rate | hits, misses | events/s |
+| cassandra.key_cache_utilization | Row cache utilization | used | percentage |
+| cassandra.key_cache_size | Row cache size | size | bytes |
+| cassandra.storage_live_disk_space_used | Disk space used by live data | used | bytes |
+| cassandra.compaction_completed_tasks_rate | Completed compactions rate | completed | tasks/s |
+| cassandra.compaction_pending_tasks_count | Pending compactions | pending | tasks |
+| cassandra.compaction_compacted_rate | Compaction data rate | compacted | bytes/s |
+| cassandra.jvm_memory_used | Memory used | heap, nonheap | bytes |
+| cassandra.jvm_gc_rate | Garbage collections rate | parnew, cms | gc/s |
+| cassandra.jvm_gc_time | Garbage collection time | parnew, cms | seconds |
+| cassandra.dropped_messages_rate | Dropped messages rate | dropped | messages/s |
+| cassandra.client_requests_timeouts_rate | Client requests timeouts rate | read, write | timeout/s |
+| cassandra.client_requests_unavailables_rate | Client requests unavailable exceptions rate | read, write | exceptions/s |
+| cassandra.client_requests_failures_rate | Client requests failures rate | read, write | failures/s |
+| cassandra.storage_exceptions_rate | Storage exceptions rate | storage | exceptions/s |
+
 
 ### Per thread pool
 
@@ -287,12 +290,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cassandra.thread_pool_active_tasks_count | active | tasks |
-| cassandra.thread_pool_pending_tasks_count | pending | tasks |
-| cassandra.thread_pool_blocked_tasks_count | blocked | tasks |
-| cassandra.thread_pool_blocked_tasks_rate | blocked | tasks/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cassandra.thread_pool_active_tasks_count | Active tasks | active | tasks |
+| cassandra.thread_pool_pending_tasks_count | Pending tasks | pending | tasks |
+| cassandra.thread_pool_blocked_tasks_count | Blocked tasks | blocked | tasks |
+| cassandra.thread_pool_blocked_tasks_rate | Blocked tasks rate | blocked | tasks/s |
 
 
 

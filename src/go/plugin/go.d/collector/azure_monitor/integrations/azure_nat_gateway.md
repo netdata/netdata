@@ -635,11 +635,13 @@ The following alerts are available:
 | [ am_nat_gateway_total_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.total_connections | NAT Gateway total connections on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -661,14 +663,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.nat_gateway.datapath_availability | average | percentage |
-| azure_monitor.nat_gateway.byte_throughput | total | bytes/s |
-| azure_monitor.nat_gateway.packet_throughput | total | packets/s |
-| azure_monitor.nat_gateway.dropped_packets | total | packets/s |
-| azure_monitor.nat_gateway.snat_connections | total | connections/s |
-| azure_monitor.nat_gateway.total_connections | total | connections/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.nat_gateway.datapath_availability | Azure NAT Gateway Datapath Availability | average | percentage |
+| azure_monitor.nat_gateway.byte_throughput | Azure NAT Gateway Byte Throughput | total | bytes/s |
+| azure_monitor.nat_gateway.packet_throughput | Azure NAT Gateway Packet Throughput | total | packets/s |
+| azure_monitor.nat_gateway.dropped_packets | Azure NAT Gateway Dropped Packets | total | packets/s |
+| azure_monitor.nat_gateway.snat_connections | Azure NAT Gateway SNAT Connections | total | connections/s |
+| azure_monitor.nat_gateway.total_connections | Azure NAT Gateway Total SNAT Connections | total | connections/s |
 
 
 

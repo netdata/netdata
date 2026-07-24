@@ -213,11 +213,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -229,20 +231,21 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| logstash.jvm_threads | threads | count |
-| logstash.jvm_mem_heap_used | in_use | percentage |
-| logstash.jvm_mem_heap | committed, used | KiB |
-| logstash.jvm_mem_pools_eden | committed, used | KiB |
-| logstash.jvm_mem_pools_survivor | committed, used | KiB |
-| logstash.jvm_mem_pools_old | committed, used | KiB |
-| logstash.jvm_gc_collector_count | eden, old | counts/s |
-| logstash.jvm_gc_collector_time | eden, old | ms |
-| logstash.open_file_descriptors | open | fd |
-| logstash.event | in, filtered, out | events/s |
-| logstash.event_duration | event, queue | seconds |
-| logstash.uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| logstash.jvm_threads | JVM Threads | threads | count |
+| logstash.jvm_mem_heap_used | JVM Heap Memory Percentage | in_use | percentage |
+| logstash.jvm_mem_heap | JVM Heap Memory | committed, used | KiB |
+| logstash.jvm_mem_pools_eden | JVM Pool Eden Memory | committed, used | KiB |
+| logstash.jvm_mem_pools_survivor | JVM Pool Survivor Memory | committed, used | KiB |
+| logstash.jvm_mem_pools_old | JVM Pool Old Memory | committed, used | KiB |
+| logstash.jvm_gc_collector_count | Garbage Collection Count | eden, old | counts/s |
+| logstash.jvm_gc_collector_time | Time Spent On Garbage Collection | eden, old | ms |
+| logstash.open_file_descriptors | Open File Descriptors | open | fd |
+| logstash.event | Events Overview | in, filtered, out | events/s |
+| logstash.event_duration | Events Duration | event, queue | seconds |
+| logstash.uptime | Uptime | uptime | seconds |
+
 
 ### Per pipeline
 
@@ -256,10 +259,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| logstash.pipeline_event | in, filtered, out | events/s |
-| logstash.pipeline_event_duration | event, queue | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| logstash.pipeline_event | Pipeline Events | in, filtered, out | events/s |
+| logstash.pipeline_event_duration | Pipeline Events Duration | event, queue | seconds |
 
 
 

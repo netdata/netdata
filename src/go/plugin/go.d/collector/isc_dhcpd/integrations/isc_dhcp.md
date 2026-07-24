@@ -170,11 +170,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -186,9 +188,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| isc_dhcpd.active_leases_total | active | leases |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| isc_dhcpd.active_leases_total | Active Leases Total | active | leases |
+
 
 ### Per ISC DHCP instance
 
@@ -202,10 +205,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| isc_dhcpd.dhcp_pool_utilization | utilization | percent |
-| isc_dhcpd.dhcp_pool_active_leases | active | leases |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| isc_dhcpd.dhcp_pool_utilization | DHCP Pool Utilization | utilization | percent |
+| isc_dhcpd.dhcp_pool_active_leases | Active Leases Total | active | leases |
 
 
 

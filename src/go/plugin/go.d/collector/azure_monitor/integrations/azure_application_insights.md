@@ -649,11 +649,13 @@ The following alerts are available:
 | [ am_appinsights_page_view_load_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_application_insights.conf) | azure_monitor.application_insights.page_view_load_time | App Insights page view load time on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -675,29 +677,29 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.application_insights.availability_percentage | average | percentage |
-| azure_monitor.application_insights.availability_tests | tests | tests/s |
-| azure_monitor.application_insights.availability_duration | average | milliseconds |
-| azure_monitor.application_insights.server_requests | total, failed | requests/s |
-| azure_monitor.application_insights.server_request_rate | average | requests/s |
-| azure_monitor.application_insights.server_response_time | average | milliseconds |
-| azure_monitor.application_insights.dependency_calls | total, failed | calls/s |
-| azure_monitor.application_insights.dependency_duration | average | milliseconds |
-| azure_monitor.application_insights.exceptions | total, browser, server | exceptions/s |
-| azure_monitor.application_insights.browser_page_load_time | total | milliseconds |
-| azure_monitor.application_insights.browser_timing_breakdown | network, send, receive, processing | milliseconds |
-| azure_monitor.application_insights.cpu_utilization | process, processor | percentage |
-| azure_monitor.application_insights.memory | available, private | bytes |
-| azure_monitor.application_insights.process_io_rate | average | bytes/s |
-| azure_monitor.application_insights.exception_rate | average | exceptions/s |
-| azure_monitor.application_insights.http_request_execution_time | average | milliseconds |
-| azure_monitor.application_insights.http_request_queue | queued | requests |
-| azure_monitor.application_insights.http_request_rate | average | requests/s |
-| azure_monitor.application_insights.page_views | views | views/s |
-| azure_monitor.application_insights.page_view_load_time | average | milliseconds |
-| azure_monitor.application_insights.traces | traces | traces/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.application_insights.availability_percentage | Azure Application Insights Availability | average | percentage |
+| azure_monitor.application_insights.availability_tests | Azure Application Insights Availability Tests | tests | tests/s |
+| azure_monitor.application_insights.availability_duration | Azure Application Insights Availability Test Duration | average | milliseconds |
+| azure_monitor.application_insights.server_requests | Azure Application Insights Server Requests | total, failed | requests/s |
+| azure_monitor.application_insights.server_request_rate | Azure Application Insights Server Request Rate | average | requests/s |
+| azure_monitor.application_insights.server_response_time | Azure Application Insights Server Response Time | average | milliseconds |
+| azure_monitor.application_insights.dependency_calls | Azure Application Insights Dependency Calls | total, failed | calls/s |
+| azure_monitor.application_insights.dependency_duration | Azure Application Insights Dependency Duration | average | milliseconds |
+| azure_monitor.application_insights.exceptions | Azure Application Insights Exceptions | total, browser, server | exceptions/s |
+| azure_monitor.application_insights.browser_page_load_time | Azure Application Insights Browser Page Load Time | total | milliseconds |
+| azure_monitor.application_insights.browser_timing_breakdown | Azure Application Insights Browser Timing Breakdown | network, send, receive, processing | milliseconds |
+| azure_monitor.application_insights.cpu_utilization | Azure Application Insights CPU Utilization | process, processor | percentage |
+| azure_monitor.application_insights.memory | Azure Application Insights Memory | available, private | bytes |
+| azure_monitor.application_insights.process_io_rate | Azure Application Insights Process IO Rate | average | bytes/s |
+| azure_monitor.application_insights.exception_rate | Azure Application Insights Exception Rate | average | exceptions/s |
+| azure_monitor.application_insights.http_request_execution_time | Azure Application Insights HTTP Request Execution Time | average | milliseconds |
+| azure_monitor.application_insights.http_request_queue | Azure Application Insights HTTP Requests in Queue | queued | requests |
+| azure_monitor.application_insights.http_request_rate | Azure Application Insights HTTP Request Rate | average | requests/s |
+| azure_monitor.application_insights.page_views | Azure Application Insights Page Views | views | views/s |
+| azure_monitor.application_insights.page_view_load_time | Azure Application Insights Page View Load Time | average | milliseconds |
+| azure_monitor.application_insights.traces | Azure Application Insights Traces | traces | traces/s |
 
 
 

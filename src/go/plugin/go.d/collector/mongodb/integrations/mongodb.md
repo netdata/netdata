@@ -219,6 +219,7 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -231,6 +232,7 @@ storage engine.
 for [mongos](https://www.mongodb.com/docs/manual/reference/program/mongos/).
 
 
+
 ### Per MongoDB instance
 
 These metrics refer to the entire monitored application.
@@ -239,44 +241,45 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mongodb.operations_rate | reads, writes, commands | operations/s |
-| mongodb.operations_latency_time | reads, writes, commands | milliseconds |
-| mongodb.operations_by_type_rate | insert, query, update, delete, getmore, command | operations/s |
-| mongodb.document_operations_rate | inserted, deleted, returned, updated | operations/s |
-| mongodb.scanned_indexes_rate | scanned | indexes/s |
-| mongodb.scanned_documents_rate | scanned | documents/s |
-| mongodb.active_clients_count | readers, writers | clients |
-| mongodb.queued_operations_count | reads, writes | operations |
-| mongodb.cursors_open_count | open | cursors |
-| mongodb.cursors_open_no_timeout_count | open_no_timeout | cursors |
-| mongodb.cursors_opened_rate | opened | cursors/s |
-| mongodb.cursors_timed_out_rate | timed_out | cursors/s |
-| mongodb.cursors_by_lifespan_count | le_1s, 1s_5s, 5s_15s, 15s_30s, 30s_1m, 1m_10m, ge_10m | cursors |
-| mongodb.transactions_count | active, inactive, open, prepared | transactions |
-| mongodb.transactions_rate | started, aborted, committed, prepared | transactions/s |
-| mongodb.connections_usage | available, used | connections |
-| mongodb.connections_by_state_count | active, threaded, exhaust_is_master, exhaust_hello, awaiting_topology_changes | connections |
-| mongodb.connections_rate | created | connections/s |
-| mongodb.asserts_rate | regular, warning, msg, user, tripwire, rollovers | asserts/s |
-| mongodb.network_traffic_rate | in, out | bytes/s |
-| mongodb.network_requests_rate | requests | requests/s |
-| mongodb.network_slow_dns_resolutions_rate | slow_dns | resolutions/s |
-| mongodb.network_slow_ssl_handshakes_rate | slow_ssl | handshakes/s |
-| mongodb.memory_resident_size | used | bytes |
-| mongodb.memory_virtual_size | used | bytes |
-| mongodb.memory_page_faults_rate | pgfaults | pgfaults/s |
-| mongodb.memory_tcmalloc_stats | allocated, central_cache_freelist, transfer_cache_freelist, thread_cache_freelists, pageheap_freelist, pageheap_unmapped | bytes |
-| mongodb.wiredtiger_concurrent_read_transactions_usage | available, used | transactions |
-| mongodb.wiredtiger_concurrent_write_transactions_usage | available, used | transactions |
-| mongodb.wiredtiger_cache_usage | used | bytes |
-| mongodb.wiredtiger_cache_dirty_space_size | dirty | bytes |
-| mongodb.wiredtiger_cache_io_rate | read, written | pages/s |
-| mongodb.wiredtiger_cache_evictions_rate | unmodified, modified | pages/s |
-| mongodb.sharding_nodes_count | shard_aware, shard_unaware | nodes |
-| mongodb.sharding_sharded_databases_count | partitioned, unpartitioned | databases |
-| mongodb.sharding_sharded_collections_count | partitioned, unpartitioned | collections |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mongodb.operations_rate | Operations rate | reads, writes, commands | operations/s |
+| mongodb.operations_latency_time | Operations Latency | reads, writes, commands | milliseconds |
+| mongodb.operations_by_type_rate | Operations by type | insert, query, update, delete, getmore, command | operations/s |
+| mongodb.document_operations_rate | Document operations | inserted, deleted, returned, updated | operations/s |
+| mongodb.scanned_indexes_rate | Scanned indexes | scanned | indexes/s |
+| mongodb.scanned_documents_rate | Scanned documents | scanned | documents/s |
+| mongodb.active_clients_count | Connected clients | readers, writers | clients |
+| mongodb.queued_operations_count | Queued operations because of a lock | reads, writes | operations |
+| mongodb.cursors_open_count | Open cursors | open | cursors |
+| mongodb.cursors_open_no_timeout_count | Open cursors with disabled timeout | open_no_timeout | cursors |
+| mongodb.cursors_opened_rate | Opened cursors rate | opened | cursors/s |
+| mongodb.cursors_timed_out_rate | Timed-out cursors | timed_out | cursors/s |
+| mongodb.cursors_by_lifespan_count | Cursors lifespan | le_1s, 1s_5s, 5s_15s, 15s_30s, 30s_1m, 1m_10m, ge_10m | cursors |
+| mongodb.transactions_count | Current transactions | active, inactive, open, prepared | transactions |
+| mongodb.transactions_rate | Transactions rate | started, aborted, committed, prepared | transactions/s |
+| mongodb.connections_usage | Connections usage | available, used | connections |
+| mongodb.connections_by_state_count | Connections By State | active, threaded, exhaust_is_master, exhaust_hello, awaiting_topology_changes | connections |
+| mongodb.connections_rate | Connections Rate | created | connections/s |
+| mongodb.asserts_rate | Raised assertions | regular, warning, msg, user, tripwire, rollovers | asserts/s |
+| mongodb.network_traffic_rate | Network traffic | in, out | bytes/s |
+| mongodb.network_requests_rate | Network Requests | requests | requests/s |
+| mongodb.network_slow_dns_resolutions_rate | Slow DNS resolution operations | slow_dns | resolutions/s |
+| mongodb.network_slow_ssl_handshakes_rate | Slow SSL handshake operations | slow_ssl | handshakes/s |
+| mongodb.memory_resident_size | Used resident memory | used | bytes |
+| mongodb.memory_virtual_size | Used virtual memory | used | bytes |
+| mongodb.memory_page_faults_rate | Memory page faults | pgfaults | pgfaults/s |
+| mongodb.memory_tcmalloc_stats | TCMalloc statistics | allocated, central_cache_freelist, transfer_cache_freelist, thread_cache_freelists, pageheap_freelist, pageheap_unmapped | bytes |
+| mongodb.wiredtiger_concurrent_read_transactions_usage | Wired Tiger concurrent read transactions usage | available, used | transactions |
+| mongodb.wiredtiger_concurrent_write_transactions_usage | Wired Tiger concurrent write transactions usage | available, used | transactions |
+| mongodb.wiredtiger_cache_usage | Wired Tiger cache usage | used | bytes |
+| mongodb.wiredtiger_cache_dirty_space_size | Wired Tiger cache dirty space size | dirty | bytes |
+| mongodb.wiredtiger_cache_io_rate | Wired Tiger IO activity | read, written | pages/s |
+| mongodb.wiredtiger_cache_evictions_rate | Wired Tiger cache evictions | unmodified, modified | pages/s |
+| mongodb.sharding_nodes_count | Sharding Nodes | shard_aware, shard_unaware | nodes |
+| mongodb.sharding_sharded_databases_count | Sharded databases | partitioned, unpartitioned | databases |
+| mongodb.sharding_sharded_collections_count | Sharded collections | partitioned, unpartitioned | collections |
+
 
 ### Per lock type
 
@@ -290,9 +293,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mongodb.lock_acquisitions_rate | shared, exclusive, intent_shared, intent_exclusive | acquisitions/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mongodb.lock_acquisitions_rate | Lock acquisitions | shared, exclusive, intent_shared, intent_exclusive | acquisitions/s |
+
 
 ### Per commit type
 
@@ -306,10 +310,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mongodb.transactions_commits_rate | success, fail | commits/s |
-| mongodb.transactions_commits_duration_time | commits | milliseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mongodb.transactions_commits_rate | Transactions commits | success, fail | commits/s |
+| mongodb.transactions_commits_duration_time | Transactions successful commits duration | commits | milliseconds |
+
 
 ### Per database
 
@@ -323,15 +328,16 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mongodb.database_collection_count | collections | collections |
-| mongodb.database_indexes_count | indexes | indexes |
-| mongodb.database_views_count | views | views |
-| mongodb.database_documents_count | documents | documents |
-| mongodb.database_data_size | data_size | bytes |
-| mongodb.database_storage_size | storage_size | bytes |
-| mongodb.database_index_size | index_size | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mongodb.database_collection_count | Database collections | collections | collections |
+| mongodb.database_indexes_count | Database indexes | indexes | indexes |
+| mongodb.database_views_count | Database views | views | views |
+| mongodb.database_documents_count | Database documents | documents | documents |
+| mongodb.database_data_size | Database data size | data_size | bytes |
+| mongodb.database_storage_size | Database storage size | storage_size | bytes |
+| mongodb.database_index_size | Database index size | index_size | bytes |
+
 
 ### Per replica set member
 
@@ -345,14 +351,15 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mongodb.repl_set_member_state | primary, startup, secondary, recovering, startup2, unknown, arbiter, down, rollback, removed | state |
-| mongodb.repl_set_member_health_status | up, down | status |
-| mongodb.repl_set_member_replication_lag_time | replication_lag | milliseconds |
-| mongodb.repl_set_member_heartbeat_latency_time | heartbeat_latency | milliseconds |
-| mongodb.repl_set_member_ping_rtt_time | ping_rtt | milliseconds |
-| mongodb.repl_set_member_uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mongodb.repl_set_member_state | Replica Set member state | primary, startup, secondary, recovering, startup2, unknown, arbiter, down, rollback, removed | state |
+| mongodb.repl_set_member_health_status | Replica Set member health status | up, down | status |
+| mongodb.repl_set_member_replication_lag_time | Replica Set member replication lag | replication_lag | milliseconds |
+| mongodb.repl_set_member_heartbeat_latency_time | Replica Set member heartbeat latency | heartbeat_latency | milliseconds |
+| mongodb.repl_set_member_ping_rtt_time | Replica Set member ping RTT | ping_rtt | milliseconds |
+| mongodb.repl_set_member_uptime | Replica Set member uptime | uptime | seconds |
+
 
 ### Per shard
 
@@ -366,9 +373,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mongodb.sharding_shard_chunks_count | chunks | chunks |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mongodb.sharding_shard_chunks_count | Shard chunks | chunks | chunks |
 
 
 

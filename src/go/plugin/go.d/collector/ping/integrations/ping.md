@@ -103,7 +103,7 @@ The following options can be defined globally: update_every, autodetection_retry
 
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
-| **Collection** | update_every | Data collection interval (seconds). | 5 | no |
+| **Collection** | update_every | Data collection interval (seconds). The ping collector has no separate timeout option: the per-host ping timeout is derived from this value (approximately 90% of it when `update_every` is `1`, otherwise ~95%). Increasing `update_every` gives each host more time to reply and reduces ping timeouts. See **Troubleshooting** for details. | 5 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | hosts | List of hosts to ping. | [] | yes |
 | **Ping Settings** | network | DNS resolution mode. Options: `ip` (IPv4 or IPv6), `ip4` (IPv4 only), `ip6` (IPv6 only). | ip | no |
@@ -228,11 +228,13 @@ The following alerts are available:
 | [ ping_host_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_rtt | average latency to the network host ${label:host} over the last 10 seconds |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -248,14 +250,14 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ping.host_rtt | min, max, avg | milliseconds |
-| ping.host_std_dev_rtt | std_dev | milliseconds |
-| ping.host_jitter | mean, ewma, sma | milliseconds |
-| ping.host_rtt_variance | variance | ms² |
-| ping.host_packet_loss | loss | percentage |
-| ping.host_packets | received, sent | packets |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ping.host_rtt | Ping round-trip time | min, max, avg | milliseconds |
+| ping.host_std_dev_rtt | Ping round-trip time standard deviation | std_dev | milliseconds |
+| ping.host_jitter | Ping latency jitter | mean, ewma, sma | milliseconds |
+| ping.host_rtt_variance | Ping round-trip time variance | variance | ms² |
+| ping.host_packet_loss | Ping packet loss | loss | percentage |
+| ping.host_packets | Ping packets transferred | received, sent | packets |
 
 
 
@@ -325,3 +327,12 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep ping
 ```
+
+### Frequent ping timeouts
+
+The ping collector has no dedicated timeout setting. The per-host ping timeout is derived from `update_every` (approximately 90% of it when `update_every` is `1`, otherwise ~95%), and every host must complete all of its `packets` within that window.
+
+If you see frequent ping timeouts, try one or more of the following:
+  - Raise `update_every` (for example from `1` to `2` or `5`). This widens the window each host has to reply and helps with slow or temporarily unreachable hosts.
+  - Reduce `packets`. Each host must fit all of its packets within the window, so fewer packets means it finishes sooner and is less likely to exceed the timeout.
+  - Reduce the number of `hosts` per job, or split them across multiple jobs, so fewer hosts are probed concurrently. This lowers local network and CPU pressure when a large host list is saturating the probe cycle.

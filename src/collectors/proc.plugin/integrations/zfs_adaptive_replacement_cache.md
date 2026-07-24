@@ -80,11 +80,13 @@ The following alerts are available:
 | [ zfs_memory_throttle ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfs.memory_ops | number of times ZFS had to limit the ARC growth in the last 10 minutes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -96,31 +98,31 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| zfs.arc_size | arcsz, target, min, max | MiB |
-| zfs.l2_size | actual, size | MiB |
-| zfs.reads | arc, demand, prefetch, metadata, l2 | reads/s |
-| zfs.bytes | read, write | KiB/s |
-| zfs.hits | hits, misses | percentage |
-| zfs.hits_rate | hits, misses | events/s |
-| zfs.dhits | hits, misses | percentage |
-| zfs.dhits_rate | hits, misses | events/s |
-| zfs.phits | hits, misses | percentage |
-| zfs.phits_rate | hits, misses | events/s |
-| zfs.mhits | hits, misses | percentage |
-| zfs.mhits_rate | hits, misses | events/s |
-| zfs.l2hits | hits, misses | percentage |
-| zfs.l2hits_rate | hits, misses | events/s |
-| zfs.list_hits | mfu, mfu_ghost, mru, mru_ghost | hits/s |
-| zfs.arc_size_breakdown | recent, frequent | percentage |
-| zfs.memory_ops | direct, throttled, indirect | operations/s |
-| zfs.important_ops | evict_skip, deleted, mutex_miss, hash_collisions | operations/s |
-| zfs.actual_hits | hits, misses | percentage |
-| zfs.actual_hits_rate | hits, misses | events/s |
-| zfs.demand_data_hits | hits, misses | percentage |
-| zfs.demand_data_hits_rate | hits, misses | events/s |
-| zfs.prefetch_data_hits | hits, misses | percentage |
-| zfs.prefetch_data_hits_rate | hits, misses | events/s |
-| zfs.hash_elements | current, max | elements |
-| zfs.hash_chains | current, max | chains |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| zfs.arc_size | ZFS ARC Size | arcsz, target, min, max | MiB |
+| zfs.l2_size | ZFS L2 ARC Size | actual, size | MiB |
+| zfs.reads | ZFS Reads | arc, demand, prefetch, metadata, l2 | reads/s |
+| zfs.bytes | ZFS ARC L2 Read/Write Rate | read, write | KiB/s |
+| zfs.hits | ZFS ARC Hits | hits, misses | percentage |
+| zfs.hits_rate | ZFS ARC Hits Rate | hits, misses | events/s |
+| zfs.dhits | ZFS Demand Hits | hits, misses | percentage |
+| zfs.dhits_rate | ZFS Demand Hits Rate | hits, misses | events/s |
+| zfs.phits | ZFS Prefetch Hits | hits, misses | percentage |
+| zfs.phits_rate | ZFS Prefetch Hits Rate | hits, misses | events/s |
+| zfs.mhits | ZFS Metadata Hits | hits, misses | percentage |
+| zfs.mhits_rate | ZFS Metadata Hits Rate | hits, misses | events/s |
+| zfs.l2hits | ZFS L2 Hits | hits, misses | percentage |
+| zfs.l2hits_rate | ZFS L2 Hits Rate | hits, misses | events/s |
+| zfs.list_hits | ZFS List Hits | mfu, mfu_ghost, mru, mru_ghost | hits/s |
+| zfs.arc_size_breakdown | ZFS ARC Size Breakdown | recent, frequent | percentage |
+| zfs.memory_ops | ZFS Memory Operations | direct, throttled, indirect | operations/s |
+| zfs.important_ops | ZFS Important Operations | evict_skip, deleted, mutex_miss, hash_collisions | operations/s |
+| zfs.actual_hits | ZFS Actual Cache Hits | hits, misses | percentage |
+| zfs.actual_hits_rate | ZFS Actual Cache Hits Rate | hits, misses | events/s |
+| zfs.demand_data_hits | ZFS Data Demand Efficiency | hits, misses | percentage |
+| zfs.demand_data_hits_rate | ZFS Data Demand Efficiency Rate | hits, misses | events/s |
+| zfs.prefetch_data_hits | ZFS Data Prefetch Efficiency | hits, misses | percentage |
+| zfs.prefetch_data_hits_rate | ZFS Data Prefetch Efficiency Rate | hits, misses | events/s |
+| zfs.hash_elements | ZFS ARC Hash Elements | current, max | elements |
+| zfs.hash_chains | ZFS ARC Hash Chains | current, max | chains |

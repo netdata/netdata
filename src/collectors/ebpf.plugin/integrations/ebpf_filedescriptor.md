@@ -135,11 +135,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -151,16 +153,17 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.fd_open | open | calls/s |
-| cgroup.fd_open_error | open | calls/s |
-| cgroup.fd_closed | close | calls/s |
-| cgroup.fd_close_error | close | calls/s |
-| services.file_open | a dimension per systemd service | calls/s |
-| services.file_open_error | a dimension per systemd service | calls/s |
-| services.file_closed | a dimension per systemd service | calls/s |
-| services.file_close_error | a dimension per systemd service | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.fd_open | Number of open files | open | calls/s |
+| cgroup.fd_open_error | Fails to open files | open | calls/s |
+| cgroup.fd_closed | Files closed | close | calls/s |
+| cgroup.fd_close_error | Fails to close files | close | calls/s |
+| services.file_open | Number of open files | a dimension per systemd service | calls/s |
+| services.file_open_error | Fails to open files | a dimension per systemd service | calls/s |
+| services.file_closed | Files closed | a dimension per systemd service | calls/s |
+| services.file_close_error | Fails to close files | a dimension per systemd service | calls/s |
+
 
 ### Per eBPF Filedescriptor instance
 
@@ -170,10 +173,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| filesystem.file_descriptor | open, close | calls/s |
-| filesystem.file_error | open, close | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| filesystem.file_descriptor | Open and close calls | open, close | calls/s |
+| filesystem.file_error | Open fails | open, close | calls/s |
+
 
 ### Per apps
 
@@ -187,9 +191,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.ebpf_file_open | calls | calls/s |
-| app.ebpf_file_open_error | calls | calls/s |
-| app.ebpf_file_closed | calls | calls/s |
-| app.ebpf_file_close_error | calls | calls/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| app.ebpf_file_open | Number of open files | calls | calls/s |
+| app.ebpf_file_open_error | Fails to open files | calls | calls/s |
+| app.ebpf_file_closed | Files closed | calls | calls/s |
+| app.ebpf_file_close_error | Fails to close files | calls | calls/s |

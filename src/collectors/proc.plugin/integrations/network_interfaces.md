@@ -89,11 +89,13 @@ The following alerts are available:
 | [ 10min_fifo_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.fifo | number of FIFO errors for the network interface ${label:device} in the last 10 minutes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -105,9 +107,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.net | received, sent | kilobits/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.net | Physical Network Interfaces Aggregated Bandwidth | received, sent | kilobits/s |
+
 
 ### Per network device
 
@@ -122,17 +125,17 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| net.net | received, sent | kilobits/s |
-| net.speed | speed | kilobits/s |
-| net.duplex | full, half, unknown | state |
-| net.operstate | up, down, notpresent, lowerlayerdown, testing, dormant, unknown | state |
-| net.carrier | up, down | state |
-| net.mtu | mtu | octets |
-| net.packets | received, sent, multicast | packets/s |
-| net.errors | inbound, outbound | errors/s |
-| net.drops | inbound, outbound | drops/s |
-| net.fifo | receive, transmit | errors |
-| net.compressed | received, sent | packets/s |
-| net.events | frames, collisions, carrier | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| net.net | Bandwidth | received, sent | kilobits/s |
+| net.speed | Interface Speed | speed | kilobits/s |
+| net.duplex | Interface Duplex State | full, half, unknown | state |
+| net.operstate | Interface Operational State | up, down, notpresent, lowerlayerdown, testing, dormant, unknown | state |
+| net.carrier | Interface Physical Link State | up, down | state |
+| net.mtu | Interface MTU | mtu | octets |
+| net.packets | Packets | received, sent, multicast | packets/s |
+| net.errors | Interface Errors | inbound, outbound | errors/s |
+| net.drops | Interface Drops | inbound, outbound | drops/s |
+| net.fifo | Interface FIFO Buffer Errors | receive, transmit | errors |
+| net.compressed | Compressed Packets | received, sent | packets/s |
+| net.events | Network Interface Events | frames, collisions, carrier | events/s |

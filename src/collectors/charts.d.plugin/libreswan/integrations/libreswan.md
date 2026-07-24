@@ -153,11 +153,13 @@ libreswan_sudo=0
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -169,10 +171,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| libreswan.net | in, out | kilobits/s |
-| libreswan.uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| libreswan.net | LibreSWAN Tunnel ${name} Traffic | in, out | kilobits/s |
+| libreswan.uptime | LibreSWAN Tunnel ${name} Uptime | uptime | seconds |
 
 
 

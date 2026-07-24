@@ -156,11 +156,13 @@ The following alerts are available:
 | [ zfs_vdev_health_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf) | zfspool.vdev_health_state | ZFS vdev ${label:vdev} state is faulted or degraded |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -176,12 +178,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| zfspool.pool_space_utilization | utilization | % |
-| zfspool.pool_space_usage | free, used | bytes |
-| zfspool.pool_fragmentation | fragmentation | % |
-| zfspool.pool_health_state | online, degraded, faulted, offline, unavail, removed, suspended | state |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| zfspool.pool_space_utilization | Zpool space utilization | utilization | % |
+| zfspool.pool_space_usage | Zpool space usage | free, used | bytes |
+| zfspool.pool_fragmentation | Zpool fragmentation | fragmentation | % |
+| zfspool.pool_health_state | Zpool health state | online, degraded, faulted, offline, unavail, removed, suspended | state |
+
 
 ### Per zfs pool vdev
 
@@ -196,9 +199,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| zfspool.vdev_health_state | online, degraded, faulted, offline, unavail, removed, suspended | state |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| zfspool.vdev_health_state | Zpool Vdev health state | online, degraded, faulted, offline, unavail, removed, suspended | state |
 
 
 

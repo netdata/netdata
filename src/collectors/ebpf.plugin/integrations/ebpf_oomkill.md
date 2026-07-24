@@ -121,11 +121,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -137,10 +139,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| cgroup.oomkills | cgroup name | kills |
-| services.oomkills | a dimension per systemd service | kills |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| cgroup.oomkills | OOM kills. This chart is provided by eBPF plugin. | cgroup name | kills |
+| services.oomkills | OOM kills. This chart is provided by eBPF plugin. | a dimension per systemd service | kills |
+
 
 ### Per apps
 
@@ -154,9 +157,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| app.oomkill | kills | kills |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| app.oomkill | OOM kills | kills | kills |
 
 
 

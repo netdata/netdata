@@ -152,11 +152,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -174,24 +176,25 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nvidia_smi.gpu_pcie_bandwidth_usage | rx, tx | B/s |
-| nvidia_smi.gpu_pcie_bandwidth_utilization | rx, tx | % |
-| nvidia_smi.gpu_fan_speed_perc | fan_speed | % |
-| nvidia_smi.gpu_utilization | gpu | % |
-| nvidia_smi.gpu_memory_utilization | memory | % |
-| nvidia_smi.gpu_decoder_utilization | decoder | % |
-| nvidia_smi.gpu_encoder_utilization | encoder | % |
-| nvidia_smi.gpu_frame_buffer_memory_usage | free, used, reserved | B |
-| nvidia_smi.gpu_bar1_memory_usage | free, used | B |
-| nvidia_smi.gpu_temperature | temperature | Celsius |
-| nvidia_smi.gpu_voltage | voltage | V |
-| nvidia_smi.gpu_clock_freq | graphics, video, sm, mem | MHz |
-| nvidia_smi.gpu_power_draw | power_draw | Watts |
-| nvidia_smi.gpu_performance_state | P0-P15 | state |
-| nvidia_smi.gpu_mig_mode_current_status | enabled, disabled | status |
-| nvidia_smi.gpu_mig_devices_count | mig | devices |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nvidia_smi.gpu_pcie_bandwidth_usage | PCI Express Bandwidth Usage | rx, tx | B/s |
+| nvidia_smi.gpu_pcie_bandwidth_utilization | PCI Express Bandwidth Utilization | rx, tx | % |
+| nvidia_smi.gpu_fan_speed_perc | Fan speed | fan_speed | % |
+| nvidia_smi.gpu_utilization | GPU utilization | gpu | % |
+| nvidia_smi.gpu_memory_utilization | Memory utilization | memory | % |
+| nvidia_smi.gpu_decoder_utilization | Decoder utilization | decoder | % |
+| nvidia_smi.gpu_encoder_utilization | Encoder utilization | encoder | % |
+| nvidia_smi.gpu_frame_buffer_memory_usage | Frame buffer memory usage | free, used, reserved | B |
+| nvidia_smi.gpu_bar1_memory_usage | BAR1 memory usage | free, used | B |
+| nvidia_smi.gpu_temperature | Temperature | temperature | Celsius |
+| nvidia_smi.gpu_voltage | Voltage | voltage | V |
+| nvidia_smi.gpu_clock_freq | Clock current frequency | graphics, video, sm, mem | MHz |
+| nvidia_smi.gpu_power_draw | Power draw | power_draw | Watts |
+| nvidia_smi.gpu_performance_state | Performance state | P0-P15 | state |
+| nvidia_smi.gpu_mig_mode_current_status | MIG current mode | enabled, disabled | status |
+| nvidia_smi.gpu_mig_devices_count | MIG devices | mig | devices |
+
 
 ### Per mig
 
@@ -207,10 +210,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| nvidia_smi.gpu_mig_frame_buffer_memory_usage | free, used, reserved | B |
-| nvidia_smi.gpu_mig_bar1_memory_usage | free, used | B |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| nvidia_smi.gpu_mig_frame_buffer_memory_usage | Frame buffer memory usage | free, used, reserved | B |
+| nvidia_smi.gpu_mig_bar1_memory_usage | BAR1 memory usage | free, used | B |
 
 
 

@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -120,9 +122,9 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.processes | running | processes |
-| system.threads | threads | threads |
-| system.ctxt | switches | context switches/s |
-| system.processor_queue_length | threads | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.processes | System Processes | running | processes |
+| system.threads | System Threads | threads | threads |
+| system.ctxt | CPU Context Switches | switches | context switches/s |
+| system.processor_queue_length | The number of threads in the processor queue. | threads | threads |

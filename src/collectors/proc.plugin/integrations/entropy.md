@@ -113,11 +113,13 @@ The following alerts are available:
 | [ lowest_entropy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/entropy.conf) | system.entropy | minimum number of bits of entropy available for the kernel’s random number generator |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -129,6 +131,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.entropy | entropy | entropy |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.entropy | Available Entropy | entropy | entropy |

@@ -258,6 +258,7 @@ metrics:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics are dynamically created based on the OpenTelemetry data received.

@@ -85,11 +85,13 @@ The following alerts are available:
 | [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | average percentage of time ${label:device} disk was busy over the last 10 minutes |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -101,9 +103,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| system.io | in, out | KiB/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| system.io | Disk I/O | in, out | KiB/s |
+
 
 ### Per disk
 
@@ -119,22 +122,22 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| disk.io | reads, writes | KiB/s |
-| disk_ext.io | discards | KiB/s |
-| disk.ops | reads, writes | operations/s |
-| disk_ext.ops | discards, flushes | operations/s |
-| disk.qops | operations | operations |
-| disk.backlog | backlog | milliseconds |
-| disk.busy | busy | milliseconds |
-| disk.util | utilization | % of time working |
-| disk.mops | reads, writes | merged operations/s |
-| disk_ext.mops | discards | merged operations/s |
-| disk.iotime | reads, writes | milliseconds/s |
-| disk_ext.iotime | discards, flushes | milliseconds/s |
-| disk.await | reads, writes | milliseconds/operation |
-| disk_ext.await | discards, flushes | milliseconds/operation |
-| disk.avgsz | reads, writes | KiB/operation |
-| disk_ext.avgsz | discards | KiB/operation |
-| disk.svctm | svctm | milliseconds/operation |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| disk.io | Disk I/O Bandwidth | reads, writes | KiB/s |
+| disk_ext.io | Amount of Discarded Data | discards | KiB/s |
+| disk.ops | Disk Completed I/O Operations | reads, writes | operations/s |
+| disk_ext.ops | Disk Completed Extended I/O Operations | discards, flushes | operations/s |
+| disk.qops | Disk Current I/O Operations | operations | operations |
+| disk.backlog | Disk Backlog | backlog | milliseconds |
+| disk.busy | Disk Busy Time | busy | milliseconds |
+| disk.util | Disk Utilization Time | utilization | % of time working |
+| disk.mops | Disk Merged Operations | reads, writes | merged operations/s |
+| disk_ext.mops | Disk Merged Discard Operations | discards | merged operations/s |
+| disk.iotime | Disk Total I/O Time | reads, writes | milliseconds/s |
+| disk_ext.iotime | Disk Total I/O Time for Extended Operations | discards, flushes | milliseconds/s |
+| disk.await | Average Completed I/O Operation Time | reads, writes | milliseconds/operation |
+| disk_ext.await | Average Completed Extended I/O Operation Time | discards, flushes | milliseconds/operation |
+| disk.avgsz | Average Completed I/O Operation Bandwidth | reads, writes | KiB/operation |
+| disk_ext.avgsz | Average Amount of Discarded Data | discards | KiB/operation |
+| disk.svctm | Average Service Time | svctm | milliseconds/operation |

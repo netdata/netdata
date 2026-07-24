@@ -107,11 +107,13 @@ The following alerts are available:
 | [ tcp_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_conn.conf) | ipv4.tcpsock | IPv4 TCP connections utilization |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -123,6 +125,6 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ipv4.tcpsock | connections | active connections |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ipv4.tcpsock | IPv4 TCP Connections | connections | active connections |

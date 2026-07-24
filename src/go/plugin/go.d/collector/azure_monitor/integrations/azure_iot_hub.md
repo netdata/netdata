@@ -653,11 +653,13 @@ The following alerts are available:
 | [ am_iot_hub_routing_delivery_latency_preview ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_iot_hub.conf) | azure_monitor.iot_hub.routing_delivery_latency_preview | IoT Hub routing delivery latency on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -679,47 +681,47 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.iot_hub.c2d_commands | completed, abandoned, rejected | messages/s |
-| azure_monitor.iot_hub.c2d_messages_expired | expired | messages/s |
-| azure_monitor.iot_hub.c2d_methods | successful, failed | invocations/s |
-| azure_monitor.iot_hub.c2d_methods_request_size | average | bytes |
-| azure_monitor.iot_hub.c2d_methods_response_size | average | bytes |
-| azure_monitor.iot_hub.c2d_twin_reads | successful, failed | operations/s |
-| azure_monitor.iot_hub.c2d_twin_read_size | average | bytes |
-| azure_monitor.iot_hub.c2d_twin_updates | successful, failed | operations/s |
-| azure_monitor.iot_hub.c2d_twin_update_size | average | bytes |
-| azure_monitor.iot_hub.d2c_telemetry | attempted, sent | messages/s |
-| azure_monitor.iot_hub.d2c_telemetry_throttle | throttled | errors/s |
-| azure_monitor.iot_hub.d2c_twin_reads | successful, failed | operations/s |
-| azure_monitor.iot_hub.d2c_twin_read_size | average | bytes |
-| azure_monitor.iot_hub.d2c_twin_updates | successful, failed | operations/s |
-| azure_monitor.iot_hub.d2c_twin_update_size | average | bytes |
-| azure_monitor.iot_hub.routing_deliveries | delivered, dropped, orphaned, invalid, fallback | messages/s |
-| azure_monitor.iot_hub.routing_delivery_by_endpoint | builtin_events, event_hubs, service_bus_queues, service_bus_topics, storage | messages/s |
-| azure_monitor.iot_hub.routing_storage_blobs | blobs | blobs/s |
-| azure_monitor.iot_hub.routing_storage_data | bytes | bytes/s |
-| azure_monitor.iot_hub.routing_latency | builtin_events, event_hubs, service_bus_queues, service_bus_topics, storage | milliseconds |
-| azure_monitor.iot_hub.routing_deliveries_preview | deliveries | deliveries/s |
-| azure_monitor.iot_hub.routing_delivery_latency_preview | average | milliseconds |
-| azure_monitor.iot_hub.routing_data_size_preview | bytes | bytes/s |
-| azure_monitor.iot_hub.connections | successful | connections/s |
-| azure_monitor.iot_hub.connected_devices | connected | devices |
-| azure_monitor.iot_hub.total_devices | total | devices |
-| azure_monitor.iot_hub.daily_message_quota | used | messages |
-| azure_monitor.iot_hub.data_usage | data_usage, data_usage_v2 | bytes/s |
-| azure_monitor.iot_hub.configurations | operations | operations/s |
-| azure_monitor.iot_hub.event_grid_deliveries | deliveries | deliveries/s |
-| azure_monitor.iot_hub.event_grid_latency | average | milliseconds |
-| azure_monitor.iot_hub.jobs_status | completed, failed | operations/s |
-| azure_monitor.iot_hub.jobs_cancel | successful, failed | operations/s |
-| azure_monitor.iot_hub.jobs_create_method | successful, failed | operations/s |
-| azure_monitor.iot_hub.jobs_create_twin_update | successful, failed | operations/s |
-| azure_monitor.iot_hub.jobs_list | successful, failed | operations/s |
-| azure_monitor.iot_hub.jobs_query | successful, failed | operations/s |
-| azure_monitor.iot_hub.twin_queries | successful, failed | queries/s |
-| azure_monitor.iot_hub.twin_queries_result_size | average | bytes |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.iot_hub.c2d_commands | Azure IoT Hub Cloud-to-Device Commands | completed, abandoned, rejected | messages/s |
+| azure_monitor.iot_hub.c2d_messages_expired | Azure IoT Hub Cloud-to-Device Messages Expired | expired | messages/s |
+| azure_monitor.iot_hub.c2d_methods | Azure IoT Hub Direct Method Invocations | successful, failed | invocations/s |
+| azure_monitor.iot_hub.c2d_methods_request_size | Azure IoT Hub Direct Method Request Size | average | bytes |
+| azure_monitor.iot_hub.c2d_methods_response_size | Azure IoT Hub Direct Method Response Size | average | bytes |
+| azure_monitor.iot_hub.c2d_twin_reads | Azure IoT Hub Backend Twin Reads | successful, failed | operations/s |
+| azure_monitor.iot_hub.c2d_twin_read_size | Azure IoT Hub Backend Twin Read Size | average | bytes |
+| azure_monitor.iot_hub.c2d_twin_updates | Azure IoT Hub Backend Twin Updates | successful, failed | operations/s |
+| azure_monitor.iot_hub.c2d_twin_update_size | Azure IoT Hub Backend Twin Update Size | average | bytes |
+| azure_monitor.iot_hub.d2c_telemetry | Azure IoT Hub Device Telemetry | attempted, sent | messages/s |
+| azure_monitor.iot_hub.d2c_telemetry_throttle | Azure IoT Hub Telemetry Throttling Errors | throttled | errors/s |
+| azure_monitor.iot_hub.d2c_twin_reads | Azure IoT Hub Device Twin Reads | successful, failed | operations/s |
+| azure_monitor.iot_hub.d2c_twin_read_size | Azure IoT Hub Device Twin Read Size | average | bytes |
+| azure_monitor.iot_hub.d2c_twin_updates | Azure IoT Hub Device Twin Updates | successful, failed | operations/s |
+| azure_monitor.iot_hub.d2c_twin_update_size | Azure IoT Hub Device Twin Update Size | average | bytes |
+| azure_monitor.iot_hub.routing_deliveries | Azure IoT Hub Routing Message Deliveries | delivered, dropped, orphaned, invalid, fallback | messages/s |
+| azure_monitor.iot_hub.routing_delivery_by_endpoint | Azure IoT Hub Routing Deliveries by Endpoint | builtin_events, event_hubs, service_bus_queues, service_bus_topics, storage | messages/s |
+| azure_monitor.iot_hub.routing_storage_blobs | Azure IoT Hub Routing Blobs Delivered to Storage | blobs | blobs/s |
+| azure_monitor.iot_hub.routing_storage_data | Azure IoT Hub Routing Data Delivered to Storage | bytes | bytes/s |
+| azure_monitor.iot_hub.routing_latency | Azure IoT Hub Routing Latency | builtin_events, event_hubs, service_bus_queues, service_bus_topics, storage | milliseconds |
+| azure_monitor.iot_hub.routing_deliveries_preview | Azure IoT Hub Routing Deliveries (Preview) | deliveries | deliveries/s |
+| azure_monitor.iot_hub.routing_delivery_latency_preview | Azure IoT Hub Routing Delivery Latency (Preview) | average | milliseconds |
+| azure_monitor.iot_hub.routing_data_size_preview | Azure IoT Hub Routing Delivery Message Size (Preview) | bytes | bytes/s |
+| azure_monitor.iot_hub.connections | Azure IoT Hub Successful Connections | successful | connections/s |
+| azure_monitor.iot_hub.connected_devices | Azure IoT Hub Connected Devices | connected | devices |
+| azure_monitor.iot_hub.total_devices | Azure IoT Hub Total Devices | total | devices |
+| azure_monitor.iot_hub.daily_message_quota | Azure IoT Hub Daily Message Quota Used | used | messages |
+| azure_monitor.iot_hub.data_usage | Azure IoT Hub Device Data Usage | data_usage, data_usage_v2 | bytes/s |
+| azure_monitor.iot_hub.configurations | Azure IoT Hub Configuration Operations | operations | operations/s |
+| azure_monitor.iot_hub.event_grid_deliveries | Azure IoT Hub Event Grid Deliveries | deliveries | deliveries/s |
+| azure_monitor.iot_hub.event_grid_latency | Azure IoT Hub Event Grid Latency | average | milliseconds |
+| azure_monitor.iot_hub.jobs_status | Azure IoT Hub Job Completions | completed, failed | operations/s |
+| azure_monitor.iot_hub.jobs_cancel | Azure IoT Hub Job Cancellations | successful, failed | operations/s |
+| azure_monitor.iot_hub.jobs_create_method | Azure IoT Hub Direct Method Job Creations | successful, failed | operations/s |
+| azure_monitor.iot_hub.jobs_create_twin_update | Azure IoT Hub Twin Update Job Creations | successful, failed | operations/s |
+| azure_monitor.iot_hub.jobs_list | Azure IoT Hub Job List Calls | successful, failed | operations/s |
+| azure_monitor.iot_hub.jobs_query | Azure IoT Hub Job Queries | successful, failed | operations/s |
+| azure_monitor.iot_hub.twin_queries | Azure IoT Hub Twin Queries | successful, failed | queries/s |
+| azure_monitor.iot_hub.twin_queries_result_size | Azure IoT Hub Twin Query Result Size | average | bytes |
 
 
 

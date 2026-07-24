@@ -215,11 +215,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -231,62 +233,62 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| envoy.server_state | live, draining, pre_initializing, initializing | state |
-| envoy.server_connections_count | connections | connections |
-| envoy.server_parent_connections_count | connections | connections |
-| envoy.server_memory_allocated_size | allocated | bytes |
-| envoy.server_memory_heap_size | heap | bytes |
-| envoy.server_memory_physical_size | physical | bytes |
-| envoy.server_uptime | uptime | seconds |
-| envoy.cluster_manager_cluster_count | active, not_active | clusters |
-| envoy.cluster_manager_cluster_changes_rate | added, modified, removed | clusters/s |
-| envoy.cluster_manager_cluster_updates_rate | cluster | updates/s |
-| envoy.cluster_manager_cluster_updated_via_merge_rate | via_merge | updates/s |
-| envoy.cluster_manager_update_merge_cancelled_rate | merge_cancelled | updates/s |
-| envoy.cluster_manager_update_out_of_merge_window_rate | out_of_merge_window | updates/s |
-| envoy.cluster_membership_endpoints_count | healthy, degraded, excluded | endpoints |
-| envoy.cluster_membership_changes_rate | membership | changes/s |
-| envoy.cluster_membership_updates_rate | success, failure, empty, no_rebuild | updates/s |
-| envoy.cluster_upstream_cx_active_count | active | connections |
-| envoy.cluster_upstream_cx_rate | created | connections/s |
-| envoy.cluster_upstream_cx_http_rate | http1, http2, http3 | connections/s |
-| envoy.cluster_upstream_cx_destroy_rate | local, remote | connections/s |
-| envoy.cluster_upstream_cx_connect_fail_rate | failed | connections/s |
-| envoy.cluster_upstream_cx_connect_timeout_rate | timeout | connections/s |
-| envoy.cluster_upstream_cx_bytes_rate | received, sent | bytes/s |
-| envoy.cluster_upstream_cx_bytes_buffered_size | received, send | bytes |
-| envoy.cluster_upstream_rq_active_count | active | requests |
-| envoy.cluster_upstream_rq_rate | requests | requests/s |
-| envoy.cluster_upstream_rq_failed_rate | cancelled, maintenance_mode, timeout, max_duration_reached, per_try_timeout, reset_local, reset_remote | requests/s |
-| envoy.cluster_upstream_rq_pending_active_count | active_pending | requests |
-| envoy.cluster_upstream_rq_pending_rate | pending | requests/s |
-| envoy.cluster_upstream_rq_pending_failed_rate | overflow, failure_eject | requests/s |
-| envoy.cluster_upstream_rq_retry_rate | request | retries/s |
-| envoy.cluster_upstream_rq_retry_success_rate | success | retries/s |
-| envoy.cluster_upstream_rq_retry_backoff_rate | exponential, ratelimited | retries/s |
-| envoy.listener_manager_listeners_count | active, warming, draining | listeners |
-| envoy.listener_manager_listener_changes_rate | added, modified, removed, stopped | listeners/s |
-| envoy.listener_manager_listener_object_events_rate | create_success, create_failure, in_place_updated | objects/s |
-| envoy.listener_admin_downstream_cx_active_count | active | connections |
-| envoy.listener_admin_downstream_cx_rate | created | connections/s |
-| envoy.listener_admin_downstream_cx_destroy_rate | destroyed | connections/s |
-| envoy.listener_admin_downstream_cx_transport_socket_connect_timeout_rate | timeout | connections/s |
-| envoy.listener_admin_downstream_cx_rejected_rate | overflow, overload, global_overflow | connections/s |
-| envoy.listener_admin_downstream_listener_filter_remote_close_rate | closed | connections/s |
-| envoy.listener_admin_downstream_listener_filter_error_rate | read | errors/s |
-| envoy.listener_admin_downstream_pre_cx_active_count | active | sockets |
-| envoy.listener_admin_downstream_pre_cx_timeout_rate | timeout | sockets/s |
-| envoy.listener_downstream_cx_active_count | active | connections |
-| envoy.listener_downstream_cx_rate | created | connections/s |
-| envoy.listener_downstream_cx_destroy_rate | destroyed | connections/s |
-| envoy.listener_downstream_cx_transport_socket_connect_timeout_rate | timeout | connections/s |
-| envoy.listener_downstream_cx_rejected_rate | overflow, overload, global_overflow | connections/s |
-| envoy.listener_downstream_listener_filter_remote_close_rate | closed | connections/s |
-| envoy.listener_downstream_listener_filter_error_rate | read | errors/s |
-| envoy.listener_downstream_pre_cx_active_count | active | sockets |
-| envoy.listener_downstream_pre_cx_timeout_rate | timeout | sockets/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| envoy.server_state | Server current state | live, draining, pre_initializing, initializing | state |
+| envoy.server_connections_count | Server current connections | connections | connections |
+| envoy.server_parent_connections_count | Server current parent connections | connections | connections |
+| envoy.server_memory_allocated_size | Server memory allocated size | allocated | bytes |
+| envoy.server_memory_heap_size | Server memory heap size | heap | bytes |
+| envoy.server_memory_physical_size | Server memory physical size | physical | bytes |
+| envoy.server_uptime | Server uptime | uptime | seconds |
+| envoy.cluster_manager_cluster_count | Cluster manager current clusters | active, not_active | clusters |
+| envoy.cluster_manager_cluster_changes_rate | Cluster manager cluster changes | added, modified, removed | clusters/s |
+| envoy.cluster_manager_cluster_updates_rate | Cluster manager updates | cluster | updates/s |
+| envoy.cluster_manager_cluster_updated_via_merge_rate | Cluster manager updates applied as merged updates | via_merge | updates/s |
+| envoy.cluster_manager_update_merge_cancelled_rate | Cluster manager cancelled merged updates | merge_cancelled | updates/s |
+| envoy.cluster_manager_update_out_of_merge_window_rate | Cluster manager out of a merge window updates | out_of_merge_window | updates/s |
+| envoy.cluster_membership_endpoints_count | Cluster membership current endpoints | healthy, degraded, excluded | endpoints |
+| envoy.cluster_membership_changes_rate | Cluster membership changes | membership | changes/s |
+| envoy.cluster_membership_updates_rate | Cluster membership updates | success, failure, empty, no_rebuild | updates/s |
+| envoy.cluster_upstream_cx_active_count | Cluster upstream current active connections | active | connections |
+| envoy.cluster_upstream_cx_rate | Cluster upstream connections | created | connections/s |
+| envoy.cluster_upstream_cx_http_rate | Cluster upstream connections by HTTP version | http1, http2, http3 | connections/s |
+| envoy.cluster_upstream_cx_destroy_rate | Cluster upstream destroyed connections | local, remote | connections/s |
+| envoy.cluster_upstream_cx_connect_fail_rate | Cluster upstream failed connections | failed | connections/s |
+| envoy.cluster_upstream_cx_connect_timeout_rate | Cluster upstream timed out connections | timeout | connections/s |
+| envoy.cluster_upstream_cx_bytes_rate | Cluster upstream connection traffic | received, sent | bytes/s |
+| envoy.cluster_upstream_cx_bytes_buffered_size | Cluster upstream current connection buffered size | received, send | bytes |
+| envoy.cluster_upstream_rq_active_count | Cluster upstream current active requests | active | requests |
+| envoy.cluster_upstream_rq_rate | Cluster upstream requests | requests | requests/s |
+| envoy.cluster_upstream_rq_failed_rate | Cluster upstream failed requests | cancelled, maintenance_mode, timeout, max_duration_reached, per_try_timeout, reset_local, reset_remote | requests/s |
+| envoy.cluster_upstream_rq_pending_active_count | Cluster upstream current active pending requests | active_pending | requests |
+| envoy.cluster_upstream_rq_pending_rate | Cluster upstream pending requests | pending | requests/s |
+| envoy.cluster_upstream_rq_pending_failed_rate | Cluster upstream failed pending requests | overflow, failure_eject | requests/s |
+| envoy.cluster_upstream_rq_retry_rate | Cluster upstream request retries | request | retries/s |
+| envoy.cluster_upstream_rq_retry_success_rate | Cluster upstream request successful retries | success | retries/s |
+| envoy.cluster_upstream_rq_retry_backoff_rate | Cluster upstream request backoff retries | exponential, ratelimited | retries/s |
+| envoy.listener_manager_listeners_count | Listener manager current listeners | active, warming, draining | listeners |
+| envoy.listener_manager_listener_changes_rate | Listener manager listener changes | added, modified, removed, stopped | listeners/s |
+| envoy.listener_manager_listener_object_events_rate | Listener manager listener object events | create_success, create_failure, in_place_updated | objects/s |
+| envoy.listener_admin_downstream_cx_active_count | Listener admin downstream current active connections | active | connections |
+| envoy.listener_admin_downstream_cx_rate | Listener admin downstream connections | created | connections/s |
+| envoy.listener_admin_downstream_cx_destroy_rate | Listener admin downstream destroyed connections | destroyed | connections/s |
+| envoy.listener_admin_downstream_cx_transport_socket_connect_timeout_rate | Listener admin downstream timed out connections | timeout | connections/s |
+| envoy.listener_admin_downstream_cx_rejected_rate | Listener admin downstream rejected connections | overflow, overload, global_overflow | connections/s |
+| envoy.listener_admin_downstream_listener_filter_remote_close_rate | Listener admin downstream connections closed by remote when peek data for listener filters | closed | connections/s |
+| envoy.listener_admin_downstream_listener_filter_error_rate | Listener admin downstream read errors when peeking data for listener filters | read | errors/s |
+| envoy.listener_admin_downstream_pre_cx_active_count | Listener admin downstream current active sockets | active | sockets |
+| envoy.listener_admin_downstream_pre_cx_timeout_rate | Listener admin downstream timed out sockets | timeout | sockets/s |
+| envoy.listener_downstream_cx_active_count | Listener downstream current active connections | active | connections |
+| envoy.listener_downstream_cx_rate | Listener downstream connections | created | connections/s |
+| envoy.listener_downstream_cx_destroy_rate | Listener downstream destroyed connections | destroyed | connections/s |
+| envoy.listener_downstream_cx_transport_socket_connect_timeout_rate | Listener downstream timed out connections | timeout | connections/s |
+| envoy.listener_downstream_cx_rejected_rate | Listener downstream rejected connections | overflow, overload, global_overflow | connections/s |
+| envoy.listener_downstream_listener_filter_remote_close_rate | Listener downstream connections closed by remote when peek data for listener filters | closed | connections/s |
+| envoy.listener_downstream_listener_filter_error_rate | Listener downstream read errors when peeking data for listener filters | read | errors/s |
+| envoy.listener_downstream_pre_cx_active_count | Listener downstream current active sockets | active | sockets |
+| envoy.listener_downstream_pre_cx_timeout_rate | Listener downstream timed out sockets | timeout | sockets/s |
 
 
 

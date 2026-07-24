@@ -112,6 +112,7 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -119,6 +120,7 @@ Metrics grouped by *scope*.
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
 SLAB cache utilization metrics for the whole system.
+
 
 ### Per Linux kernel SLAB allocator statistics instance
 
@@ -128,8 +130,8 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| mem.slabmemory | a dimension per cache | B |
-| mem.slabfilling | a dimension per cache | % |
-| mem.slabwaste | a dimension per cache | B |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| mem.slabmemory | Memory Usage | a dimension per cache | B |
+| mem.slabfilling | Object Filling | a dimension per cache | % |
+| mem.slabwaste | Memory waste | a dimension per cache | B |

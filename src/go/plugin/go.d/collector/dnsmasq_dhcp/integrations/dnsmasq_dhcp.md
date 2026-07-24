@@ -179,11 +179,13 @@ The following alerts are available:
 | [ dnsmasq_dhcp_dhcp_range_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dnsmasq_dhcp.conf) | dnsmasq_dhcp.dhcp_range_utilization | DHCP range utilization |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -195,10 +197,11 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dnsmasq_dhcp.dhcp_ranges | ipv4, ipv6 | ranges |
-| dnsmasq_dhcp.dhcp_hosts | ipv4, ipv6 | hosts |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| dnsmasq_dhcp.dhcp_ranges | Number of DHCP Ranges | ipv4, ipv6 | ranges |
+| dnsmasq_dhcp.dhcp_hosts | Number of DHCP Hosts | ipv4, ipv6 | hosts |
+
 
 ### Per dhcp range
 
@@ -212,10 +215,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| dnsmasq_dhcp.dhcp_range_utilization | used | percentage |
-| dnsmasq_dhcp.dhcp_range_allocated_leases | allocated | leases |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| dnsmasq_dhcp.dhcp_range_utilization | DHCP Range utilization | used | percentage |
+| dnsmasq_dhcp.dhcp_range_allocated_leases | DHCP Range Allocated Leases | allocated | leases |
 
 
 

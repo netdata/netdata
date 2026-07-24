@@ -134,11 +134,13 @@ The following alerts are available:
 | [ k8s_state_cronjob_last_execution_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8sstate.conf) | k8s_state.cronjob_last_execution_status | CronJob ${label:k8s_cronjob_name} in ${label:k8s_namespace} failing |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -156,28 +158,29 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_state.node_allocatable_cpu_requests_utilization | requests | % |
-| k8s_state.node_allocatable_cpu_requests_used | requests | millicpu |
-| k8s_state.node_allocatable_cpu_limits_utilization | limits | % |
-| k8s_state.node_allocatable_cpu_limits_used | limits | millicpu |
-| k8s_state.node_allocatable_mem_requests_utilization | requests | % |
-| k8s_state.node_allocatable_mem_requests_used | requests | bytes |
-| k8s_state.node_allocatable_mem_limits_utilization | limits | % |
-| k8s_state.node_allocatable_mem_limits_used | limits | bytes |
-| k8s_state.node_allocatable_pods_utilization | allocated | % |
-| k8s_state.node_allocatable_pods_usage | available, allocated | pods |
-| k8s_state.node_condition | Ready, DiskPressure, MemoryPressure, NetworkUnavailable, PIDPressure | status |
-| k8s_state.node_schedulability | schedulable, unschedulable | state |
-| k8s_state.node_pods_readiness | ready | % |
-| k8s_state.node_pods_readiness_state | ready, unready | pods |
-| k8s_state.node_pods_condition | pod_ready, pod_scheduled, pod_initialized, containers_ready | pods |
-| k8s_state.node_pods_phase | running, failed, succeeded, pending | pods |
-| k8s_state.node_containers | containers, init_containers | containers |
-| k8s_state.node_containers_state | running, waiting, terminated | containers |
-| k8s_state.node_init_containers_state | running, waiting, terminated | containers |
-| k8s_state.node_age | age | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_state.node_allocatable_cpu_requests_utilization | CPU requests utilization | requests | % |
+| k8s_state.node_allocatable_cpu_requests_used | CPU requests used | requests | millicpu |
+| k8s_state.node_allocatable_cpu_limits_utilization | CPU limits utilization | limits | % |
+| k8s_state.node_allocatable_cpu_limits_used | CPU limits used | limits | millicpu |
+| k8s_state.node_allocatable_mem_requests_utilization | Memory requests utilization | requests | % |
+| k8s_state.node_allocatable_mem_requests_used | Memory requests used | requests | bytes |
+| k8s_state.node_allocatable_mem_limits_utilization | Memory limits utilization | limits | % |
+| k8s_state.node_allocatable_mem_limits_used | Memory limits used | limits | bytes |
+| k8s_state.node_allocatable_pods_utilization | Pods resource utilization | allocated | % |
+| k8s_state.node_allocatable_pods_usage | Pods resource usage | available, allocated | pods |
+| k8s_state.node_condition | Condition status | Ready, DiskPressure, MemoryPressure, NetworkUnavailable, PIDPressure | status |
+| k8s_state.node_schedulability | Schedulability | schedulable, unschedulable | state |
+| k8s_state.node_pods_readiness | Pods readiness | ready | % |
+| k8s_state.node_pods_readiness_state | Pods readiness state | ready, unready | pods |
+| k8s_state.node_pods_condition | Pods condition | pod_ready, pod_scheduled, pod_initialized, containers_ready | pods |
+| k8s_state.node_pods_phase | Pods phase | running, failed, succeeded, pending | pods |
+| k8s_state.node_containers | Containers | containers, init_containers | containers |
+| k8s_state.node_containers_state | Containers state | running, waiting, terminated | containers |
+| k8s_state.node_init_containers_state | Init containers state | running, waiting, terminated | containers |
+| k8s_state.node_age | Age | age | seconds |
+
 
 ### Per deployment
 
@@ -194,11 +197,12 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_state.deployment_conditions | available, replica_failure, progressing | status |
-| k8s_state.deployment_replicas | desired, current, ready | replicas |
-| k8s_state.deployment_age | age | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_state.deployment_conditions | Deployment Conditions | available, replica_failure, progressing | status |
+| k8s_state.deployment_replicas | Deployment Replicas | desired, current, ready | replicas |
+| k8s_state.deployment_age | Deployment Age | age | seconds |
+
 
 ### Per cronjob
 
@@ -215,16 +219,17 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_state.cronjob_jobs_count_by_status | completed, failed, running, suspended | jobs |
-| k8s_state.cronjob_jobs_failed_by_reason | pod_failure_policy, backoff_limit_exceeded, deadline_exceeded | jobs |
-| k8s_state.cronjob_last_execution_status | completed, failed | status |
-| k8s_state.cronjob_last_completion_duration | last_completion | seconds |
-| k8s_state.cronjob_last_completed_time_ago | last_completed_ago | seconds |
-| k8s_state.cronjob_last_schedule_time_ago | last_schedule_ago | seconds |
-| k8s_state.cronjob_suspend_status | enabled, suspended | status |
-| k8s_state.cronjob_age | age | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_state.cronjob_jobs_count_by_status | CronJob Jobs Count by Status | completed, failed, running, suspended | jobs |
+| k8s_state.cronjob_jobs_failed_by_reason | CronJob Jobs Failed by Reason | pod_failure_policy, backoff_limit_exceeded, deadline_exceeded | jobs |
+| k8s_state.cronjob_last_execution_status | CronJob Last Execution Status | completed, failed | status |
+| k8s_state.cronjob_last_completion_duration | CronJob Last Completion Duration | last_completion | seconds |
+| k8s_state.cronjob_last_completed_time_ago | CronJob Last Completed Time Ago | last_completed_ago | seconds |
+| k8s_state.cronjob_last_schedule_time_ago | CronJob Last Schedule Time Ago | last_schedule_ago | seconds |
+| k8s_state.cronjob_suspend_status | CronJob Suspend Status | enabled, suspended | status |
+| k8s_state.cronjob_age | CronJob Age | age | seconds |
+
 
 ### Per pod
 
@@ -245,19 +250,20 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_state.pod_cpu_requests_used | requests | millicpu |
-| k8s_state.pod_cpu_limits_used | limits | millicpu |
-| k8s_state.pod_mem_requests_used | requests | bytes |
-| k8s_state.pod_mem_limits_used | limits | bytes |
-| k8s_state.pod_condition | pod_ready, pod_scheduled, pod_initialized, containers_ready | state |
-| k8s_state.pod_phase | running, failed, succeeded, pending | state |
-| k8s_state.pod_status_reason | Evicted, NodeAffinity, NodeLost, Shutdown, UnexpectedAdmissionError, Other | status |
-| k8s_state.pod_age | age | seconds |
-| k8s_state.pod_containers | containers, init_containers | containers |
-| k8s_state.pod_containers_state | running, waiting, terminated | containers |
-| k8s_state.pod_init_containers_state | running, waiting, terminated | containers |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_state.pod_cpu_requests_used | CPU requests used | requests | millicpu |
+| k8s_state.pod_cpu_limits_used | CPU limits used | limits | millicpu |
+| k8s_state.pod_mem_requests_used | Memory requests used | requests | bytes |
+| k8s_state.pod_mem_limits_used | Memory limits used | limits | bytes |
+| k8s_state.pod_condition | Condition | pod_ready, pod_scheduled, pod_initialized, containers_ready | state |
+| k8s_state.pod_phase | Phase | running, failed, succeeded, pending | state |
+| k8s_state.pod_status_reason | Status reason | Evicted, NodeAffinity, NodeLost, Shutdown, UnexpectedAdmissionError, Other | status |
+| k8s_state.pod_age | Age | age | seconds |
+| k8s_state.pod_containers | Containers | containers, init_containers | containers |
+| k8s_state.pod_containers_state | Containers state | running, waiting, terminated | containers |
+| k8s_state.pod_init_containers_state | Init containers state | running, waiting, terminated | containers |
+
 
 ### Per container
 
@@ -279,13 +285,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_state.pod_container_readiness_state | ready | state |
-| k8s_state.pod_container_restarts | restarts | restarts |
-| k8s_state.pod_container_state | running, waiting, terminated | state |
-| k8s_state.pod_container_waiting_state_reason | ContainerCreating, CrashLoopBackOff, CreateContainerConfigError, CreateContainerError, ErrImagePull, ImagePullBackOff, InvalidImageName, PodInitializing, Other | state |
-| k8s_state.pod_container_terminated_state_reason | Completed, ContainerCannotRun, DeadlineExceeded, Error, Evicted, OOMKilled, Other | state |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_state.pod_container_readiness_state | Readiness state | ready | state |
+| k8s_state.pod_container_restarts | Restarts | restarts | restarts |
+| k8s_state.pod_container_state | Container state | running, waiting, terminated | state |
+| k8s_state.pod_container_waiting_state_reason | Container waiting state reason | ContainerCreating, CrashLoopBackOff, CreateContainerConfigError, CreateContainerError, ErrImagePull, ImagePullBackOff, InvalidImageName, PodInitializing, Other | state |
+| k8s_state.pod_container_terminated_state_reason | Container terminated state reason | Completed, ContainerCannotRun, DeadlineExceeded, Error, Evicted, OOMKilled, Other | state |
 
 
 

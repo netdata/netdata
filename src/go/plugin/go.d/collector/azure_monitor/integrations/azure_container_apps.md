@@ -645,11 +645,13 @@ The following alerts are available:
 | [ am_container_apps_jvm_gc_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_apps.conf) | azure_monitor.container_apps.jvm_gc_duration | Container Apps JVM GC duration on ${label:resource_name} |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -671,30 +673,30 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| azure_monitor.container_apps.cpu_usage | average, maximum | nanocores |
-| azure_monitor.container_apps.cpu_percentage | average, maximum | percentage |
-| azure_monitor.container_apps.memory_working_set | average, maximum | bytes |
-| azure_monitor.container_apps.memory_percentage | average, maximum | percentage |
-| azure_monitor.container_apps.replicas | average | replicas |
-| azure_monitor.container_apps.reserved_cores | per_revision, total | cores |
-| azure_monitor.container_apps.restart_count | restarts | restarts/s |
-| azure_monitor.container_apps.requests | requests | requests/s |
-| azure_monitor.container_apps.response_time | average | milliseconds |
-| azure_monitor.container_apps.network | received, sent | bytes/s |
-| azure_monitor.container_apps.resiliency_timeouts | connection, request | timeouts/s |
-| azure_monitor.container_apps.resiliency_retries | retries | retries/s |
-| azure_monitor.container_apps.resiliency_pending_connections | pending | requests/s |
-| azure_monitor.container_apps.resiliency_ejections | ejected, aborted | ejections/s |
-| azure_monitor.container_apps.gpu_utilization | average, maximum | percentage |
-| azure_monitor.container_apps.jvm_buffer_count | average | buffers |
-| azure_monitor.container_apps.jvm_buffer_memory | used, limit | bytes |
-| azure_monitor.container_apps.jvm_gc_count | collections | collections/s |
-| azure_monitor.container_apps.jvm_gc_duration | duration | milliseconds/s |
-| azure_monitor.container_apps.jvm_memory_pool | used, committed, limit | bytes |
-| azure_monitor.container_apps.jvm_memory_total | used, committed, limit | bytes |
-| azure_monitor.container_apps.jvm_thread_count | average | threads |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| azure_monitor.container_apps.cpu_usage | Azure Container Apps CPU Usage | average, maximum | nanocores |
+| azure_monitor.container_apps.cpu_percentage | Azure Container Apps CPU Percentage | average, maximum | percentage |
+| azure_monitor.container_apps.memory_working_set | Azure Container Apps Memory Working Set | average, maximum | bytes |
+| azure_monitor.container_apps.memory_percentage | Azure Container Apps Memory Percentage | average, maximum | percentage |
+| azure_monitor.container_apps.replicas | Azure Container Apps Replica Count | average | replicas |
+| azure_monitor.container_apps.reserved_cores | Azure Container Apps Reserved Cores | per_revision, total | cores |
+| azure_monitor.container_apps.restart_count | Azure Container Apps Replica Restarts | restarts | restarts/s |
+| azure_monitor.container_apps.requests | Azure Container Apps Requests | requests | requests/s |
+| azure_monitor.container_apps.response_time | Azure Container Apps Response Time | average | milliseconds |
+| azure_monitor.container_apps.network | Azure Container Apps Network Traffic | received, sent | bytes/s |
+| azure_monitor.container_apps.resiliency_timeouts | Azure Container Apps Resiliency Timeouts | connection, request | timeouts/s |
+| azure_monitor.container_apps.resiliency_retries | Azure Container Apps Resiliency Request Retries | retries | retries/s |
+| azure_monitor.container_apps.resiliency_pending_connections | Azure Container Apps Resiliency Pending Connection Pool | pending | requests/s |
+| azure_monitor.container_apps.resiliency_ejections | Azure Container Apps Resiliency Host Ejections | ejected, aborted | ejections/s |
+| azure_monitor.container_apps.gpu_utilization | Azure Container Apps GPU Utilization | average, maximum | percentage |
+| azure_monitor.container_apps.jvm_buffer_count | Azure Container Apps JVM Buffer Count | average | buffers |
+| azure_monitor.container_apps.jvm_buffer_memory | Azure Container Apps JVM Buffer Memory | used, limit | bytes |
+| azure_monitor.container_apps.jvm_gc_count | Azure Container Apps JVM Garbage Collections | collections | collections/s |
+| azure_monitor.container_apps.jvm_gc_duration | Azure Container Apps JVM GC Duration | duration | milliseconds/s |
+| azure_monitor.container_apps.jvm_memory_pool | Azure Container Apps JVM Memory per Pool | used, committed, limit | bytes |
+| azure_monitor.container_apps.jvm_memory_total | Azure Container Apps JVM Memory Total | used, committed, limit | bytes |
+| azure_monitor.container_apps.jvm_thread_count | Azure Container Apps JVM Thread Count | average | threads |
 
 
 

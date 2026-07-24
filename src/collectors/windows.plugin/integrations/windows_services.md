@@ -104,11 +104,13 @@ There are no configuration examples.
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -124,6 +126,6 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| windows.service_state | running, stopped, start_pending, stop_pending, continue_pending, pause_pending, paused, unknown | state |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| windows.service_state | Service state | running, stopped, start_pending, stop_pending, continue_pending, pause_pending, paused, unknown | state |

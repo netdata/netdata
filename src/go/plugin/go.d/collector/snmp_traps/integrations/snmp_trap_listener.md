@@ -555,6 +555,7 @@ The following alerts are available:
 | [ snmp_trap_high_dedup_suppression ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.dedup_suppressed | The SNMP trap listener is suppressing a high volume of duplicate traps. |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -588,6 +589,7 @@ Source-attributed receiver metrics are bounded to 2000 active sources per job an
 Trap profiles may define optional `metrics:` rules and `charts:`. Jobs enable those rules with `profile_metrics.mode` and `profile_metrics.include`; `include` is valid only with `exact` or `combined` mode. Profile metric contexts are generated at runtime from the profile chart definitions under the `snmp.trap.` context namespace. Profile rules can create counters, last trap-reported numeric samples, and trap-derived state gauges. They are updated only after the trap is successfully committed to the authoritative output backend.
 
 
+
 ### Per job
 
 Per-job self-metrics for a SNMP trap listener job.
@@ -600,16 +602,17 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| snmp.trap.pipeline | received, decoded, accepted, committed, dedup_suppressed, dropped, write_failed | events/s |
-| snmp.trap.events | state_change, config_change, security, auth, license, mobility, diagnostic, unknown | events/s |
-| snmp.trap.severity | emerg, alert, crit, err, warning, notice, info, debug | events/s |
-| snmp.trap.errors | unknown_oid, decode_failed, template_unresolved, malformed_pdu, dropped_allowlist, rate_limited, auth_failures, usm_failures, unknown_engine_id, inform_response_failed, binary_encoded, profile_load_failed, journal_write_failed, otlp_export_failed, listener_read_failed, listener_buffer_degraded | errors/s |
-| snmp.trap.dedup_suppressed | suppressed | events/s |
-| snmp.trap.sources | active | sources |
-| snmp.trap.source_attribution | vnode, fallback, ambiguous, failed, overflow_dropped, source_transitions | events/s |
-| snmp.trap.profile_metric_diagnostics | rule_missed, extraction_failed, attribution_failed, overflow_dropped, source_transitions | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| snmp.trap.pipeline | SNMP trap receiver pipeline progress by job | received, decoded, accepted, committed, dedup_suppressed, dropped, write_failed | events/s |
+| snmp.trap.events | SNMP trap events received, categorized by type | state_change, config_change, security, auth, license, mobility, diagnostic, unknown | events/s |
+| snmp.trap.severity | SNMP trap events received, categorized by severity | emerg, alert, crit, err, warning, notice, info, debug | events/s |
+| snmp.trap.errors | SNMP trap processing errors by type | unknown_oid, decode_failed, template_unresolved, malformed_pdu, dropped_allowlist, rate_limited, auth_failures, usm_failures, unknown_engine_id, inform_response_failed, binary_encoded, profile_load_failed, journal_write_failed, otlp_export_failed, listener_read_failed, listener_buffer_degraded | errors/s |
+| snmp.trap.dedup_suppressed | Per-second rate of traps suppressed by deduplication (only emitted when dedup is enabled) | suppressed | events/s |
+| snmp.trap.sources | Active source metric identities tracked by this listener job | active | sources |
+| snmp.trap.source_attribution | Source attribution diagnostics for built-in source receiver metrics | vnode, fallback, ambiguous, failed, overflow_dropped, source_transitions | events/s |
+| snmp.trap.profile_metric_diagnostics | Profile-defined trap metric extraction and attribution diagnostics (only emitted when profile_metrics selects at least one rule) | rule_missed, extraction_failed, attribution_failed, overflow_dropped, source_transitions | events/s |
+
 
 ### Per source
 
@@ -625,11 +628,11 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| snmp.trap.source_pipeline | accepted, committed, dedup_suppressed, write_failed | events/s |
-| snmp.trap.source_errors | unknown_oid, template_unresolved, profile_load_failed, journal_write_failed, otlp_export_failed | errors/s |
-| snmp.trap.source_last_seen | seconds_ago | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| snmp.trap.source_pipeline | Source-attributed receiver pipeline progress | accepted, committed, dedup_suppressed, write_failed | events/s |
+| snmp.trap.source_errors | Source-attributed processing errors | unknown_oid, template_unresolved, profile_load_failed, journal_write_failed, otlp_export_failed | errors/s |
+| snmp.trap.source_last_seen | Time since this source last produced an accepted trap | seconds_ago | seconds |
 
 
 

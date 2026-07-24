@@ -227,11 +227,13 @@ The following alerts are available:
 | [ k8s_apiserver_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.request_latency | API server request latency is high |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -243,31 +245,32 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_apiserver.requests_total | requests | requests/s |
-| k8s_apiserver.requests_dropped | dropped | requests/s |
-| k8s_apiserver.requests_by_verb | a dimension per HTTP verb | requests/s |
-| k8s_apiserver.requests_by_code | a dimension per HTTP status code | requests/s |
-| k8s_apiserver.requests_by_resource | a dimension per Kubernetes resource | requests/s |
-| k8s_apiserver.request_latency | p50, p90, p99 | milliseconds |
-| k8s_apiserver.response_size | p50, p90, p99 | bytes |
-| k8s_apiserver.inflight_requests | mutating, read_only | requests |
-| k8s_apiserver.longrunning_requests | longrunning | requests |
-| k8s_apiserver.rest_client_requests_by_code | a dimension per HTTP status code | requests/s |
-| k8s_apiserver.rest_client_requests_by_method | a dimension per HTTP method | requests/s |
-| k8s_apiserver.rest_client_latency | p50, p90, p99 | milliseconds |
-| k8s_apiserver.admission_step_latency | validate, admit | milliseconds |
-| k8s_apiserver.etcd_object_counts | a dimension per resource type | objects |
-| k8s_apiserver.audit_events | events, rejected | events/s |
-| k8s_apiserver.authentication_requests | authenticated | requests/s |
-| k8s_apiserver.goroutines | goroutines | goroutines |
-| k8s_apiserver.threads | threads | threads |
-| k8s_apiserver.process_memory | resident, virtual | bytes |
-| k8s_apiserver.heap_memory | alloc, inuse, stack | bytes |
-| k8s_apiserver.gc_duration | min, p25, p50, p75, max | seconds |
-| k8s_apiserver.open_fds | open, max | file descriptors |
-| k8s_apiserver.cpu_usage | cpu | seconds/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_apiserver.requests_total | API Server Request Rate | requests | requests/s |
+| k8s_apiserver.requests_dropped | API Server Dropped Requests | dropped | requests/s |
+| k8s_apiserver.requests_by_verb | API Server Requests By Verb | a dimension per HTTP verb | requests/s |
+| k8s_apiserver.requests_by_code | API Server Requests By Status Code | a dimension per HTTP status code | requests/s |
+| k8s_apiserver.requests_by_resource | API Server Requests By Resource | a dimension per Kubernetes resource | requests/s |
+| k8s_apiserver.request_latency | API Server Request Latency | p50, p90, p99 | milliseconds |
+| k8s_apiserver.response_size | API Server Response Size | p50, p90, p99 | bytes |
+| k8s_apiserver.inflight_requests | API Server Inflight Requests | mutating, read_only | requests |
+| k8s_apiserver.longrunning_requests | API Server Long-Running Requests | longrunning | requests |
+| k8s_apiserver.rest_client_requests_by_code | REST Client Requests By Status Code | a dimension per HTTP status code | requests/s |
+| k8s_apiserver.rest_client_requests_by_method | REST Client Requests By Method | a dimension per HTTP method | requests/s |
+| k8s_apiserver.rest_client_latency | REST Client Request Latency | p50, p90, p99 | milliseconds |
+| k8s_apiserver.admission_step_latency | Admission Step Latency | validate, admit | milliseconds |
+| k8s_apiserver.etcd_object_counts | Objects Stored In Etcd | a dimension per resource type | objects |
+| k8s_apiserver.audit_events | API Server Audit Events | events, rejected | events/s |
+| k8s_apiserver.authentication_requests | API Server Authenticated Requests | authenticated | requests/s |
+| k8s_apiserver.goroutines | Goroutines | goroutines | goroutines |
+| k8s_apiserver.threads | OS Threads | threads | threads |
+| k8s_apiserver.process_memory | Process Memory | resident, virtual | bytes |
+| k8s_apiserver.heap_memory | Go Heap Memory | alloc, inuse, stack | bytes |
+| k8s_apiserver.gc_duration | GC Duration | min, p25, p50, p75, max | seconds |
+| k8s_apiserver.open_fds | Open File Descriptors | open, max | file descriptors |
+| k8s_apiserver.cpu_usage | CPU Usage | cpu | seconds/s |
+
 
 ### Per workqueue
 
@@ -281,12 +284,13 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_apiserver.workqueue_depth | depth | items |
-| k8s_apiserver.workqueue_latency | p50, p90, p99 | microseconds |
-| k8s_apiserver.workqueue_adds | adds, retries | items/s |
-| k8s_apiserver.workqueue_duration | p50, p90, p99 | microseconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_apiserver.workqueue_depth | Work Queue Depth | depth | items |
+| k8s_apiserver.workqueue_latency | Work Queue Latency | p50, p90, p99 | microseconds |
+| k8s_apiserver.workqueue_adds | Work Queue Adds | adds, retries | items/s |
+| k8s_apiserver.workqueue_duration | Work Queue Work Duration | p50, p90, p99 | microseconds |
+
 
 ### Per admission controller
 
@@ -300,9 +304,10 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_apiserver.admission_controller_latency | 5ms, 25ms, 100ms, 500ms, 1s, 2.5s, +Inf | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_apiserver.admission_controller_latency | Admission Controller Latency | 5ms, 25ms, 100ms, 500ms, 1s, 2.5s, +Inf | events/s |
+
 
 ### Per admission webhook
 
@@ -316,9 +321,9 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| k8s_apiserver.admission_webhook_latency | 5ms, 25ms, 100ms, 500ms, 1s, 2.5s, +Inf | events/s |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_apiserver.admission_webhook_latency | Admission Webhook Latency | 5ms, 25ms, 100ms, 500ms, 1s, 2.5s, +Inf | events/s |
 
 
 

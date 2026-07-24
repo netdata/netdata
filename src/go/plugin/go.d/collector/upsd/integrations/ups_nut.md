@@ -176,11 +176,13 @@ The following alerts are available:
 | [ upsd_ups_last_collected_secs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/upsd.conf) | upsd.ups_load | UPS ${label:ups_name} number of seconds since the last successful data collection |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -201,28 +203,28 @@ Labels:
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| upsd.ups_load | load | percentage |
-| upsd.ups_load_usage | load_usage | Watts |
-| upsd.ups_status | on_line, on_battery, low_battery, high_battery, replace_battery, charging, discharging, bypass, calibration, offline, overloaded, trim_input_voltage, boost_input_voltage, forced_shutdown, other | status |
-| upsd.ups_temperature | temperature | Celsius |
-| upsd.ups_battery_charge | charge | percentage |
-| upsd.ups_battery_estimated_runtime | runtime | seconds |
-| upsd.ups_battery_voltage | voltage | Volts |
-| upsd.ups_battery_voltage_nominal | nominal_voltage | Volts |
-| upsd.ups_input_voltage | voltage | Volts |
-| upsd.ups_input_voltage_nominal | nominal_voltage | Volts |
-| upsd.ups_input_current | current | Ampere |
-| upsd.ups_input_current_nominal | nominal_current | Ampere |
-| upsd.ups_input_frequency | frequency | Hz |
-| upsd.ups_input_frequency_nominal | nominal_frequency | Hz |
-| upsd.ups_output_voltage | voltage | Volts |
-| upsd.ups_output_voltage_nominal | nominal_voltage | Volts |
-| upsd.ups_output_current | current | Ampere |
-| upsd.ups_output_current_nominal | nominal_current | Ampere |
-| upsd.ups_output_frequency | frequency | Hz |
-| upsd.ups_output_frequency_nominal | nominal_frequency | Hz |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| upsd.ups_load | UPS load | load | percentage |
+| upsd.ups_load_usage | UPS load usage (power output) | load_usage | Watts |
+| upsd.ups_status | UPS status | on_line, on_battery, low_battery, high_battery, replace_battery, charging, discharging, bypass, calibration, offline, overloaded, trim_input_voltage, boost_input_voltage, forced_shutdown, other | status |
+| upsd.ups_temperature | UPS temperature | temperature | Celsius |
+| upsd.ups_battery_charge | UPS Battery charge | charge | percentage |
+| upsd.ups_battery_estimated_runtime | UPS Battery estimated runtime | runtime | seconds |
+| upsd.ups_battery_voltage | UPS Battery voltage | voltage | Volts |
+| upsd.ups_battery_voltage_nominal | UPS Battery voltage nominal | nominal_voltage | Volts |
+| upsd.ups_input_voltage | UPS Input voltage | voltage | Volts |
+| upsd.ups_input_voltage_nominal | UPS Input voltage nominal | nominal_voltage | Volts |
+| upsd.ups_input_current | UPS Input current | current | Ampere |
+| upsd.ups_input_current_nominal | UPS Input current nominal | nominal_current | Ampere |
+| upsd.ups_input_frequency | UPS Input frequency | frequency | Hz |
+| upsd.ups_input_frequency_nominal | UPS Input frequency nominal | nominal_frequency | Hz |
+| upsd.ups_output_voltage | UPS Output voltage | voltage | Volts |
+| upsd.ups_output_voltage_nominal | UPS Output voltage nominal | nominal_voltage | Volts |
+| upsd.ups_output_current | UPS Output current | current | Ampere |
+| upsd.ups_output_current_nominal | UPS Output current nominal | nominal_current | Ampere |
+| upsd.ups_output_frequency | UPS Output frequency | frequency | Hz |
+| upsd.ups_output_frequency_nominal | UPS Output frequency nominal | nominal_frequency | Hz |
 
 
 

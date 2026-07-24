@@ -103,7 +103,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | max_time_series_per_metric | Per-metric time series limit. Metrics with more time series than this are skipped. | 200 | no |
 | **Customization** | [fallback_type](#option-customization-fallback-type) | Fallback type rules for untyped metrics. |  | no |
 |  | [relabeling](#option-customization-relabeling) | Prometheus-compatible metric relabeling, applied before charts are built. |  | no |
-|  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles. Disable with mode `none`. | auto | no |
+|  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles. Profiles may constrain unmatched fallback charts with scoped `autogen.selector` rules; disable profiles with mode `none`. | auto | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -163,21 +163,21 @@ fallback_type:
 <a id="option-customization-relabeling"></a>
 ##### relabeling
 
-A list of relabeling blocks. Each block applies a list of Prometheus
-`metric_relabel_configs` rules to the metrics whose name matches `match`. See the
-[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/profile-format.md#metric-relabeling)
-for the full action set and more examples.
+A list of relabeling blocks. Each block applies a list of Prometheus `metric_relabel_configs` rules to
+the metrics whose name matches `match`. See the
+[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md) for
+the full action set and more examples.
 
-- `match`: Netdata simple patterns matched against the full metric name — including
-  any `_bucket`/`_sum`/`_count` suffix, so prefer globs like `app_lat*` over an exact
-  `app_lat` (space-separated; `*` matches any sequence, `?` any character, a leading
-  `!` negates). Use `*` to target every metric. Required.
-- `metric_relabel_configs`: Prometheus relabel rules (`source_labels`, `separator`,
-  `regex`, `modulus`, `target_label`, `replacement`, `action`), applied in order to
-  the scraped samples before charts are built.
+- `match`: Netdata simple patterns matched against the full metric name — including any
+  `_bucket`/`_sum`/`_count` suffix, so prefer globs like `app_lat*` over an exact `app_lat`
+  (space-separated; `*` matches any sequence, `?` any character, a leading `!` negates). Use `*` to
+  target every metric. Required.
+- `metric_relabel_configs`: Prometheus relabel rules (`source_labels`, `separator`, `regex`, `modulus`,
+  `target_label`, `replacement`, `action`), applied in order to the scraped samples before charts are
+  built.
 
-Relabeling that would corrupt a histogram or summary — splitting it, dropping a
-component, mutating the `le`/`quantile` label, or merging two families — is rejected.
+Relabeling that would corrupt a histogram or summary — splitting it, dropping a component, mutating the
+`le`/`quantile` label, or merging two families — is rejected.
 
 ```yaml
 relabeling:
@@ -194,15 +194,20 @@ relabeling:
 ##### profiles
 
 Profiles ship curated charts for recognized exporters -- see the
-[profile format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/profile-format.md) for the
-file format and how to author your own. `profiles.mode` selects them:
+[profile format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/profile-format.md) for the file format and how
+to author your own. `profiles.mode` selects them:
 
 - `auto` (default): every profile whose `match` hits at least one scraped metric.
-- `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its check).
+- `exact`: only the profiles named in `mode_exact.entries` (each must match, or the job fails its
+  check).
 - `combined`: `auto` plus the profiles named in `mode_combined.entries`.
 - `none`: no profiles — generic autogen charts only (the pre-profile behavior).
 
-Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the other block are ignored. Metrics not covered by a selected profile keep their generic autogen charts.
+Only the block matching the selected mode (`mode_exact` or `mode_combined`) is read; entries under the
+other block are ignored. Metrics not covered by an authored profile chart keep their generic autogen
+charts unless an applicable profile `autogen.selector` rejects them. Every selector is limited to its
+profile's `match` scope; when scopes overlap, every applicable selector must accept the series. This
+changes fallback charts only; use `selector` or a relabeling `drop` rule to discard samples.
 
 ```yaml
 profiles:
@@ -392,6 +397,7 @@ jobs:
 ## Alerts
 
 There are no alerts configured by default for this integration.
+
 
 
 ## Metrics

@@ -179,11 +179,13 @@ jobs:
 There are no alerts configured by default for this integration.
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -195,10 +197,10 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| tor.traffic | read, write | KiB/s |
-| tor.uptime | uptime | seconds |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| tor.traffic | Tor Traffic | read, write | KiB/s |
+| tor.uptime | Tor Uptime | uptime | seconds |
 
 
 

@@ -81,11 +81,13 @@ The following alerts are available:
 | [ tcp_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_mem.conf) | ipv4.sockstat_tcp_mem | TCP memory utilization |
 
 
+
 ## Metrics
 
 Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 
 
 
@@ -97,14 +99,14 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| ip.sockstat_sockets | used | sockets |
-| ipv4.sockstat_tcp_sockets | alloc, orphan, inuse, timewait | sockets |
-| ipv4.sockstat_tcp_mem | mem | KiB |
-| ipv4.sockstat_udp_sockets | inuse | sockets |
-| ipv4.sockstat_udp_mem | mem | sockets |
-| ipv4.sockstat_udplite_sockets | inuse | sockets |
-| ipv4.sockstat_raw_sockets | inuse | sockets |
-| ipv4.sockstat_frag_sockets | inuse | fragments |
-| ipv4.sockstat_frag_mem | mem | KiB |
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ip.sockstat_sockets | Sockets used for all address families | used | sockets |
+| ipv4.sockstat_tcp_sockets | IPv4 TCP Sockets | alloc, orphan, inuse, timewait | sockets |
+| ipv4.sockstat_tcp_mem | IPv4 TCP Sockets Memory | mem | KiB |
+| ipv4.sockstat_udp_sockets | IPv4 UDP Sockets | inuse | sockets |
+| ipv4.sockstat_udp_mem | IPv4 UDP Sockets Memory | mem | sockets |
+| ipv4.sockstat_udplite_sockets | IPv4 UDPLITE Sockets | inuse | sockets |
+| ipv4.sockstat_raw_sockets | IPv4 RAW Sockets | inuse | sockets |
+| ipv4.sockstat_frag_sockets | IPv4 FRAG Sockets | inuse | fragments |
+| ipv4.sockstat_frag_mem | IPv4 FRAG Sockets Memory | mem | KiB |
