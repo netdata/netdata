@@ -366,9 +366,30 @@ struct CapacityPeakMatrixReport {
     cases: Vec<CapacityPeakCaseReport>,
 }
 
+fn require_release_capacity_build() {
+    assert!(
+        !cfg!(debug_assertions),
+        "capacity benchmarks must run with `cargo test --release`; debug builds do not produce publishable performance evidence"
+    );
+}
+
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "capacity benchmarks must run with `cargo test --release`")]
+fn capacity_benchmarks_reject_debug_builds() {
+    require_release_capacity_build();
+}
+
+#[cfg(not(debug_assertions))]
+#[test]
+fn capacity_benchmarks_accept_release_builds() {
+    require_release_capacity_build();
+}
+
 #[test]
 #[ignore = "manual full UDP collector capacity benchmark"]
 fn bench_capacity_matrix() {
+    require_release_capacity_build();
     let duration_secs = env_u64(
         "NETFLOW_CAPACITY_BENCH_DURATION_SECS",
         DEFAULT_DURATION_SECS,
@@ -465,6 +486,7 @@ fn bench_capacity_matrix() {
 #[test]
 #[ignore = "manual selected real-UDP capacity case"]
 fn bench_capacity_selected_case() {
+    require_release_capacity_build();
     let spec = selected_capacity_case().expect("read selected capacity benchmark case");
     let report = run_capacity_case(spec);
     let path = std::env::temp_dir().join(format!(
@@ -484,6 +506,7 @@ fn bench_capacity_selected_case() {
 #[test]
 #[ignore = "manual full strict-lossless UDP collector peak benchmark"]
 fn bench_capacity_peak_matrix() {
+    require_release_capacity_build();
     let config = CapacityPeakSearchConfig {
         probe_duration_secs: env_u64(
             "NETFLOW_CAPACITY_BENCH_PEAK_PROBE_DURATION_SECS",
