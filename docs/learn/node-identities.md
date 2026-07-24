@@ -58,6 +58,8 @@ On Windows, the status file lives under the install directory (`C:\Program Files
 - Primary: `C:\Program Files\Netdata\var\lib\netdata\status-netdata.json`
 - Fallback: `C:\Program Files\Netdata\var\cache\netdata\status-netdata.json`
 
+The same additional fallback locations used on Linux (`/tmp`, `/run`, `/var/run`) also apply on Windows builds, but they resolve through the runtime's own path translation rather than a fixed path under the install directory. If duplicate identities persist after cleaning the two locations above, check those locations too.
+
 :::
 
 :::note
