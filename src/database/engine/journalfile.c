@@ -653,9 +653,7 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
     char path[RRDENG_PATH_MAX];
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
-    UNLINK_FILE(ctx, path, ret);
-    if (ret == 0)
-        __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+    ret = rrdeng_file_deletion_schedule(ctx, path, 0, false);
 
     return ret;
 }
@@ -664,10 +662,10 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
     int ret;
-    uv_fs_t req_v2 = { 0 };
-    uv_fs_t req_v1 = { 0 };
     char path[RRDENG_PATH_MAX];
     char path_v2[RRDENG_PATH_MAX];
+    size_t journal_v1_bytes = journalfile_current_size(journalfile);
+    size_t journal_v2_bytes = journalfile_v2_data_size_get(journalfile);
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
     journalfile_v2_generate_path(datafile, path_v2, sizeof(path));
@@ -680,28 +678,17 @@ uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, st
     if(journalfile_v2_data_available(journalfile))
         journalfile_v2_data_unmap_permanently(journalfile);
 
-    // Now safe to delete the files - no threads are accessing them
+    // Now safe to schedule deletion; the queue owns copied paths and updates
+    // accounting only after the filesystem operation completes.
     uint8_t deleted = 0;
 
-    ret = uv_fs_unlink(NULL, &req_v2, path_v2, NULL);
+    ret = rrdeng_file_deletion_schedule(ctx, path_v2, journal_v2_bytes, false);
     if (ret == 0)
         deleted |= JOURNALFILE_DELETED_V2;
-    else if (ret != UV_ENOENT) {
-        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path_v2, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req_v2);
 
-    ret = uv_fs_unlink(NULL, &req_v1, path, NULL);
+    ret = rrdeng_file_deletion_schedule(ctx, path, journal_v1_bytes, false);
     if (ret == 0)
         deleted |= JOURNALFILE_DELETED_V1;
-    else if (ret != UV_ENOENT) {
-        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req_v1);
-
-    __atomic_add_fetch(&ctx->stats.journalfile_deletions, __builtin_popcount(deleted), __ATOMIC_RELAXED);
 
     return deleted;
 }

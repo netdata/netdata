@@ -231,6 +231,136 @@ static inline void work_done(struct rrdeng_work *work_request) {
     aral_freez(rrdeng_main.work_cmd.ar, work_request);
 }
 
+struct rrdeng_file_deletion {
+    uv_work_t work;
+    struct rrdengine_instance *ctx;
+    struct rrdeng_file_deletion *next;
+    char path[RRDENG_PATH_MAX];
+    size_t bytes;
+    bool datafile;
+    int result;
+};
+
+static void rrdeng_file_deletion_worker(uv_work_t *work) {
+    struct rrdeng_file_deletion *deletion = work->data;
+    uv_fs_t request = { 0 };
+
+    deletion->result = uv_fs_unlink(NULL, &request, deletion->path, NULL);
+    uv_fs_req_cleanup(&request);
+}
+
+static void rrdeng_file_deletion_after(uv_work_t *work, int status __maybe_unused);
+static void rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion);
+
+static void rrdeng_file_deletion_start(struct rrdeng_file_deletion *deletion) {
+    int rc = uv_queue_work(&rrdeng_main.loop, &deletion->work,
+                           rrdeng_file_deletion_worker, rrdeng_file_deletion_after);
+    if (unlikely(rc)) {
+        deletion->result = rc;
+        rrdeng_file_deletion_finish(deletion);
+    }
+}
+
+static void rrdeng_file_deletion_finish(struct rrdeng_file_deletion *deletion) {
+    struct rrdengine_instance *ctx = deletion->ctx;
+
+    if (deletion->result == 0) {
+        if (deletion->datafile)
+            __atomic_add_fetch(&ctx->stats.datafile_deletions, 1, __ATOMIC_RELAXED);
+        else
+            __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+
+        if (deletion->bytes)
+            ctx_current_disk_space_decrease(ctx, deletion->bytes);
+    }
+    else if (deletion->result != UV_ENOENT) {
+        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", deletion->path,
+                          uv_strerror(deletion->result));
+        ctx_fs_error(ctx);
+    }
+
+    if (deletion->bytes)
+        __atomic_sub_fetch(&ctx->atomic.pending_deletion_bytes, deletion->bytes, __ATOMIC_RELAXED);
+
+    spinlock_lock(&ctx->deletion.spinlock);
+    fatal_assert(__atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED) != 0);
+    __atomic_sub_fetch(&ctx->deletion.pending, 1, __ATOMIC_RELAXED);
+    struct rrdeng_file_deletion *next = ctx->deletion.head;
+    if (next) {
+        ctx->deletion.head = next->next;
+        if (!ctx->deletion.head)
+            ctx->deletion.tail = NULL;
+    }
+    else
+        ctx->deletion.running = false;
+    spinlock_unlock(&ctx->deletion.spinlock);
+
+    freez(deletion);
+
+    if (next)
+        rrdeng_file_deletion_start(next);
+}
+
+static void rrdeng_file_deletion_after(uv_work_t *work, int status __maybe_unused) {
+    rrdeng_file_deletion_finish(work->data);
+}
+
+int rrdeng_file_deletion_schedule(struct rrdengine_instance *ctx, const char *path, size_t bytes, bool datafile) {
+    if (unlikely(!ctx || !path || !*path))
+        return UV_EINVAL;
+
+    struct rrdeng_file_deletion *deletion = callocz(1, sizeof(*deletion));
+    deletion->work.data = deletion;
+    deletion->ctx = ctx;
+    deletion->bytes = bytes;
+    deletion->datafile = datafile;
+    strncpyz(deletion->path, path, sizeof(deletion->path) - 1);
+
+    spinlock_lock(&ctx->deletion.spinlock);
+    if (ctx->deletion.tail)
+        ctx->deletion.tail->next = deletion;
+    else
+        ctx->deletion.head = deletion;
+    ctx->deletion.tail = deletion;
+    __atomic_add_fetch(&ctx->deletion.pending, 1, __ATOMIC_RELAXED);
+
+    bool start = !ctx->deletion.running;
+    if (start) {
+        ctx->deletion.running = true;
+        ctx->deletion.head = deletion->next;
+        if (!ctx->deletion.head)
+            ctx->deletion.tail = NULL;
+    }
+    spinlock_unlock(&ctx->deletion.spinlock);
+
+    if (bytes)
+        __atomic_add_fetch(&ctx->atomic.pending_deletion_bytes, bytes, __ATOMIC_RELAXED);
+
+    if (start) {
+        int rc = uv_queue_work(&rrdeng_main.loop, &deletion->work,
+                               rrdeng_file_deletion_worker, rrdeng_file_deletion_after);
+        if (unlikely(rc)) {
+            rrdeng_file_deletion_finish(deletion);
+            return rc;
+        }
+    }
+
+    return 0;
+}
+
+void rrdeng_file_deletion_drain(struct rrdengine_instance *ctx) {
+    bool logged = false;
+    while (__atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED)) {
+        if (!logged) {
+            netdata_log_info("DBENGINE: tier %d: waiting for %zu queued file deletions...",
+                             ctx->config.tier,
+                             __atomic_load_n(&ctx->deletion.pending, __ATOMIC_RELAXED));
+            logged = true;
+        }
+        sleep_usec(10 * USEC_PER_MS);
+    }
+}
+
 static void work_standard_worker(uv_work_t *req) {
     __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
 
@@ -1754,10 +1884,10 @@ void datafile_delete(
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE);
 
     struct rrdengine_journalfile *journal_file;
-    size_t deleted_bytes, journal_file_bytes, datafile_bytes;
-    uint8_t deleted_journal_files = 0;
+    size_t scheduled_bytes, journal_file_bytes, datafile_bytes;
+    uint8_t scheduled_journal_files = 0;
     uint8_t expected_journal_files = JOURNALFILE_DELETED_V1;
-    bool deleted_datafile = false;
+    bool scheduled_datafile = false;
     unsigned datafile_tier = datafile->tier;
     int ret;
 
@@ -1771,19 +1901,17 @@ void datafile_delete(
     size_t journal_v2_bytes = journalfile_v2_data_size_get(journal_file);
     if (journalfile_v2_data_available(journal_file))
         expected_journal_files |= JOURNALFILE_DELETED_V2;
-    deleted_bytes = 0;
+    scheduled_bytes = 0;
 
-    // This will delete journalfile_v2 and journalfile_v1 (returns bitmask of JOURNALFILE_DELETED_V1/V2)
-    deleted_journal_files = journalfile_destroy_unsafe(journal_file, datafile);
-    if (deleted_journal_files & JOURNALFILE_DELETED_V1)
-        deleted_bytes += journal_file_bytes;
-    if (deleted_journal_files & JOURNALFILE_DELETED_V2)
-        deleted_bytes += journal_v2_bytes;
-    // This will delete the datafile
+    scheduled_journal_files = journalfile_destroy_unsafe(journal_file, datafile);
+    if (scheduled_journal_files & JOURNALFILE_DELETED_V1)
+        scheduled_bytes += journal_file_bytes;
+    if (scheduled_journal_files & JOURNALFILE_DELETED_V2)
+        scheduled_bytes += journal_v2_bytes;
     ret = destroy_data_file_unsafe(datafile);
     if (!ret) {
-        deleted_datafile = true;
-        deleted_bytes += datafile_bytes;
+        scheduled_datafile = true;
+        scheduled_bytes += datafile_bytes;
     }
 
     cleanup_datafile_epdl_structures(datafile);
@@ -1794,21 +1922,20 @@ void datafile_delete(
     freez(journal_file);
     freez(datafile);
 
-    ctx_current_disk_space_decrease(ctx, deleted_bytes);
     char size_for_humans[128];
-    size_snprintf(size_for_humans, sizeof(size_for_humans), deleted_bytes, "B", false);
+    size_snprintf(size_for_humans, sizeof(size_for_humans), scheduled_bytes, "B", false);
 
-    bool del_ndf = deleted_datafile;
-    bool del_njf = deleted_journal_files & JOURNALFILE_DELETED_V1;
-    bool del_njfv2 = deleted_journal_files & JOURNALFILE_DELETED_V2;
+    bool del_ndf = scheduled_datafile;
+    bool del_njf = scheduled_journal_files & JOURNALFILE_DELETED_V1;
+    bool del_njfv2 = scheduled_journal_files & JOURNALFILE_DELETED_V2;
     bool exp_njf = expected_journal_files & JOURNALFILE_DELETED_V1;
     bool exp_njfv2 = expected_journal_files & JOURNALFILE_DELETED_V2;
 
     if (del_ndf && del_njf && del_njfv2)
-        netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf, .njfv2), reclaimed %s.",
+        netdata_log_info("DBENGINE: tier %u: scheduled deletion of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf, .njfv2), reclaiming %s after completion.",
                          tier, datafile_tier, fileno, size_for_humans);
     else if (del_ndf && del_njf && !exp_njfv2)
-        netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf), reclaimed %s.",
+        netdata_log_info("DBENGINE: tier %u: scheduled deletion of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (.ndf, .njf), reclaiming %s after completion.",
                          tier, datafile_tier, fileno, size_for_humans);
     else if (del_ndf || del_njf || del_njfv2) {
         BUFFER *removed = buffer_create(0, NULL);
@@ -1826,12 +1953,12 @@ void datafile_delete(
         if (exp_njfv2 && !del_njfv2) { buffer_strcat(failed, sep); buffer_strcat(failed, ".njfv2"); }
 
         if(buffer_strlen(failed))
-            netdata_log_error("DBENGINE: tier %u: partial delete of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
-                              " - removed: %s, failed: %s, reclaimed %s.",
+            netdata_log_error("DBENGINE: tier %u: partial deletion scheduling of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL
+                              " - queued: %s, failed: %s, reclaiming %s after completion.",
                               tier, datafile_tier, fileno,
                               buffer_tostring(removed), buffer_tostring(failed), size_for_humans);
         else
-            netdata_log_info("DBENGINE: tier %u: deleted " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (%s), reclaimed %s.",
+            netdata_log_info("DBENGINE: tier %u: scheduled deletion of " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " (%s), reclaiming %s after completion.",
                              tier, datafile_tier, fileno, buffer_tostring(removed), size_for_humans);
         buffer_free(removed);
         buffer_free(failed);
@@ -2356,6 +2483,9 @@ uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_
     // We cant know the final v1/v2 journal size -- we let the current v1 size be part of the calculation by not
     // including it in the active_space
     uint64_t estimated_disk_space = ctx_current_disk_space_get(ctx) + rrdeng_target_data_file_size(ctx) - active_space;
+    uint64_t pending_deletion_bytes = ctx_pending_deletion_bytes_get(ctx);
+    estimated_disk_space = estimated_disk_space > pending_deletion_bytes ?
+                                   estimated_disk_space - pending_deletion_bytes : 0;
 
     uint64_t database_space = get_total_database_space();
     uint64_t adjusted_database_space =  database_space * ctx->config.disk_percentage / 100 ;

@@ -267,8 +267,8 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile);
 #define JOURNALFILE_DELETED_ALL (JOURNALFILE_DELETED_V1 | JOURNALFILE_DELETED_V2)
 /*
  * Destroys the journal file and returns a JOURNALFILE_DELETED_* bitmask
- * indicating which on-disk journal files were deleted. This is not a
- * 0 / -errno style status code.
+ * indicating which journal files were accepted by the asynchronous deletion
+ * queue. Completion updates the on-disk accounting and deletion statistics.
  */
 uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);

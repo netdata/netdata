@@ -212,9 +212,7 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
 
     generate_datafilepath(datafile, path, sizeof(path));
 
-    UNLINK_FILE(ctx, path, ret);
-    if (ret == 0)
-        __atomic_add_fetch(&ctx->stats.datafile_deletions, 1, __ATOMIC_RELAXED);
+    ret = rrdeng_file_deletion_schedule(ctx, path, 0, true);
 
     return ret;
 }
@@ -228,7 +226,7 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
     generate_datafilepath(datafile, path, sizeof(path));
 
     CLOSE_FILE(ctx, path,  datafile->file, ret);
-    ret = unlink_data_file(datafile);
+    ret = rrdeng_file_deletion_schedule(ctx, path, datafile->pos, true);
 
     return ret;
 }
@@ -464,19 +462,11 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     1U,
                     (unsigned)idx);
 
-#ifndef OS_WINDOWS
-                UNLINK_FILE(ctx, path, ret);
+                ret = rrdeng_file_deletion_schedule(ctx, path, 0, false);
                 if (ret == 0) {
-                    netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
-                    __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+                    netdata_log_info("DBENGINE: scheduled deletion of journal file without matching data file: %s", path);
                     deleted_journals++;
                 }
-#else
-                // On Windows, uv_fs_unlink (DeleteFileW) triggers Windows Defender
-                // content scanning per file, blocking ~17s each. Orphaned journals
-                // (no matching .ndf) are harmless; skip deletion at startup.
-                (void)ret;
-#endif
 
                 (void)snprintfz(
                     path,
@@ -486,15 +476,11 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                     1U,
                     (unsigned)idx);
 
-#ifndef OS_WINDOWS
-                UNLINK_FILE(ctx, path, ret);
+                ret = rrdeng_file_deletion_schedule(ctx, path, 0, false);
                 if (ret == 0) {
-                    netdata_log_info("DBENGINE: deleting journal file without matching data file: %s", path);
-                    __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+                    netdata_log_info("DBENGINE: scheduled deletion of journal file without matching data file: %s", path);
                     deleted_journals++;
                 }
-#else
-#endif
             }
         }
 

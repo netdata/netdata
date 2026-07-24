@@ -46,6 +46,7 @@ static inline void initialize_single_ctx(struct rrdengine_instance *ctx) {
     memset(ctx, 0, sizeof(*ctx));
     netdata_rwlock_init(&ctx->datafiles.rwlock);
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
+    spinlock_init(&ctx->deletion.spinlock);
 }
 
 __attribute__((constructor)) void initialize_multidb_ctx(void) {
@@ -1276,6 +1277,8 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     }
 
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
+
+    rrdeng_file_deletion_drain(ctx);
 
     struct completion completion = {};
     completion_init(&completion);
