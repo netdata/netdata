@@ -17,8 +17,8 @@ modules:
       keywords: []
     overview:
       data_collection:
-        metrics_description: "This collector monitors XenServer and XCP-ng host and domains statistics."
-        method_description: "Reads host and domain statistics directly from the local Xen hypervisor through the system Xen libraries. The plugin must run on the Xen hypervisor host itself (dom0, for example an XCP-ng host); it cannot collect from inside guest VMs and there is no option to connect to a remote or network Xen host."
+        metrics_description: "This collector monitors XenServer and XCP-ng host and domain statistics."
+        method_description: "Reads host and domain statistics directly from the local Xen hypervisor through the system Xen libraries. The plugin must run on the Xen hypervisor host itself (dom0, on a XenServer or XCP-ng host); it cannot collect from inside guest VMs and there is no option to connect to a remote or network Xen host."
       supported_platforms:
         include: []
         exclude: []
@@ -47,7 +47,7 @@ modules:
               Install the Netdata Agent on the Xen hypervisor host (dom0). Installing it inside a guest VM or on a non-Xen host will not expose Xen host or domain metrics, because the plugin reads the local Xen hypervisor only.
           - title: Xen Orchestra Appliance (XOA)
             description: |
-              Netdata has no dedicated XOA integration. The xenstat.plugin collects Xen/XCP-ng host and domain statistics from the hypervisor layer, not XOA-specific application metrics. The XOA VM can be monitored as a standard Linux system if access is available.
+              Netdata has no dedicated XOA integration. The xenstat.plugin collects XenServer/XCP-ng host and domain statistics from the hypervisor layer, not XOA-specific application metrics. The XOA VM can be monitored as a standard Linux system if access is available.
       configuration:
         file:
           name: "netdata.conf"
