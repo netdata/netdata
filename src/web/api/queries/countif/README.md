@@ -24,6 +24,9 @@ An invalid condition is rejected with an API error rather than returning an inac
 
 CountIf can be used in APIs and badges, and in health lookup expressions.
 
+`countif` is an alias of `percentage-of-samples`, which is the canonical name; both behave identically and report `%` units.
+For example, an alert may use `lookup: percentage-of-samples(>10) -5m`.
+
 For a non-empty group, `countif` returns the percentage of database points that matched the condition, from zero to 100.
 For example, with one or more observed values, the health lookup `countif(!=1) -15m unaligned of value` returns zero only
 when every observed value in the 15-minute lookup is exactly `1`.

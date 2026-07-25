@@ -241,7 +241,18 @@ static const db_lookup_test_case_t test_cases[] = {
     { "countif(<==5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "less double equals invalid" },
     { "countif(>::5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "colon after greater invalid" },
     { "countif(>=:5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "colon after greater-equal invalid" },
-    { "countif(<:5) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "colon after less invalid" },
+    // `<:` is less-or-equal, the same as `<=`: the query API has always
+    // read it that way and health now shares that grammar
+    { "countif(<:5) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL, 5.0, -600, 0, "colon after less" },
+
+    // the shared grammar: gap tokens and the predecessor keywords
+    { "percentage-of-time(==gap) -10m", true, RRDR_GROUPING_PERCENTAGE_OF_TIME, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, DC_VALUE, -600, 0, "percentage-of-time equals gap" },
+    { "percentage-of-time(!=nan) -10m", true, RRDR_GROUPING_PERCENTAGE_OF_TIME, ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, DC_VALUE, -600, 0, "percentage-of-time not nan" },
+    { "number-of-times(<previous) -10m", true, RRDR_GROUPING_NUMBER_OF_TIMES, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, DC_VALUE, -600, 0, "number-of-times less than previous" },
+    { "number-of-times(<last) -10m", true, RRDR_GROUPING_NUMBER_OF_TIMES, ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, DC_VALUE, -600, 0, "number-of-times less than last" },
+    { "number-of-flaps(>=10) -10m", true, RRDR_GROUPING_NUMBER_OF_FLAPS, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, 10.0, -600, 0, "number-of-flaps threshold" },
+    { "percentage-of-samples(>0) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 0.0, -600, 0, "percentage-of-samples canonical name" },
+    { "percentage-of-time(==bogus) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "unknown word operand invalid" },
 
     // Operators with no value (should default to 0)
     { "countif(=) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.0, -600, 0, "equals no value" },

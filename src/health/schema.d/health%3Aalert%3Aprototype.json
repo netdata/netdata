@@ -174,8 +174,32 @@
                     "title": "Double Exponential Smoothing"
                   },
                   {
+                    "const": "percentage-of-samples",
+                    "title": "Percentage of Samples"
+                  },
+                  {
                     "const": "countif",
-                    "title": "Count If"
+                    "title": "Count If (alias of Percentage of Samples)"
+                  },
+                  {
+                    "const": "percentage-of-time",
+                    "title": "Percentage of Time"
+                  },
+                  {
+                    "const": "number-of-flaps",
+                    "title": "Number of Flaps"
+                  },
+                  {
+                    "const": "number-of-times",
+                    "title": "Number of Times"
+                  },
+                  {
+                    "const": "extremes",
+                    "title": "Extremes"
+                  },
+                  {
+                    "const": "latest",
+                    "title": "Latest"
                   }
                 ],
                 "default": "average",
@@ -344,7 +368,13 @@
                 "if": {
                   "properties": {
                     "time_group": {
-                      "const": "countif"
+                      "enum": [
+                        "countif",
+                        "percentage-of-samples",
+                        "percentage-of-time",
+                        "number-of-flaps",
+                        "number-of-times"
+                      ]
                     }
                   }
                 },
@@ -378,8 +408,8 @@
                           "title": "<"
                         }
                       ],
-                      "default": "equal",
-                      "title": "Condition",
+                      "default": "=",
+                      "title": "Operator",
                       "description": ""
                     },
                     "time_group_value": {
@@ -387,6 +417,11 @@
                       "default": 1,
                       "title": "Value to match",
                       "description": ""
+                    },
+                    "time_group_options": {
+                      "type": "string",
+                      "title": "Condition",
+                      "description": "The condition, written as an operator and a value: a number (>10), a gap token (==gap, !=nan, ==null, ==empty) or the previous collected sample (<previous, <last). When set, this is authoritative and the condition/value pair above is derived from it."
                     }
                   },
                   "required": [

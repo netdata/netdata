@@ -74,11 +74,15 @@ void version_hashes_api_v2(BUFFER *wb, struct query_versions *versions) {
 }
 
 static void query_target_combined_units_v2(BUFFER *wb, QUERY_TARGET *qt, size_t contexts, bool ignore_percentage) {
-    if(!ignore_percentage && query_target_has_percentage_units(qt)) {
-        buffer_json_member_add_string(wb, "units", "%");
+    const char *units_override = ignore_percentage ? NULL : query_target_units_override(qt);
+    if(units_override) {
+        buffer_json_member_add_string(wb, "units", units_override);
     }
     else if(contexts == 1) {
-        buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(qt->contexts.array[0].rca));
+        char units_buf[64];
+        buffer_json_member_add_string(wb, "units",
+            query_target_rate_adjusted_units(
+                qt, rrdcontext_acquired_units(qt->contexts.array[0].rca), units_buf, sizeof(units_buf)));
     }
     else if(contexts > 1) {
         DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
@@ -256,17 +260,21 @@ static void rrdr_dimension_units_array_v2(BUFFER *wb, const char *key, RRDR *r, 
     if(!r->du)
         return;
 
-    bool percentage = !ignore_percentage && query_target_has_percentage_units(r->internal.qt);
+    const char *units_override = ignore_percentage ? NULL : query_target_units_override(r->internal.qt);
 
     buffer_json_member_add_array(wb, key);
     for(size_t c = 0; c < r->d ; c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
-        if(percentage)
-            buffer_json_add_array_item_string(wb, "%");
-        else
-            buffer_json_add_array_item_string(wb, string2str(r->du[c]));
+        if(units_override)
+            buffer_json_add_array_item_string(wb, units_override);
+        else {
+            char units_buf[64];
+            buffer_json_add_array_item_string(wb,
+                query_target_rate_adjusted_units(
+                    r->internal.qt, string2str(r->du[c]), units_buf, sizeof(units_buf)));
+        }
     }
     buffer_json_array_close(wb);
 }
