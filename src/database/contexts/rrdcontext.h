@@ -497,6 +497,7 @@ struct sql_alert_config_data {
             const char *method;
             ALERT_LOOKUP_TIME_GROUP_CONDITION time_group_condition;
             NETDATA_DOUBLE time_group_value;
+            const char *time_group_options;
             ALERT_LOOKUP_DIMS_GROUPING dims_group;
             ALERT_LOOKUP_DATA_SOURCE data_source;
             uint32_t options;
@@ -771,14 +772,82 @@ static inline bool query_target_needs_all_dimensions(QUERY_TARGET *qt) {
     return query_target_has_percentage_of_group(qt);
 }
 
-static inline bool query_target_has_percentage_units(QUERY_TARGET *qt) {
-    if(qt->window.time_group_method == RRDR_GROUPING_CV)
-        return true;
+// The units a query REPLACES the metric's own units with, or NULL to keep
+// them. Some time-aggregations answer a different question from the one the
+// metric measures - a share, a number of transitions, a number of events -
+// so reporting the metric's units would be wrong.
+static inline const char *query_target_units_override(QUERY_TARGET *qt) {
+    switch(qt->window.time_group_method) {
+        case RRDR_GROUPING_CV:
+        case RRDR_GROUPING_COUNTIF:            // percentage-of-samples
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+            return "%";
+
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+            return "flaps";
+
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
+            return "events";
+
+        default:
+            break;
+    }
 
     if((qt->request.options & RRDR_OPTION_PERCENTAGE) && !(qt->window.options & RRDR_OPTION_RETURN_RAW))
-        return true;
+        return "%";
 
-    return query_target_has_percentage_of_group(qt);
+    if(query_target_has_percentage_of_group(qt))
+        return "%";
+
+    return NULL;
+}
+
+// True when EVERY metric of the query is stored as a per-second rate.
+// The rate flag is per-metric (query_target.c), while the units string is
+// per-result, so a query mixing counters and gauges has no single honest
+// answer - and leaves the units alone.
+static inline bool query_target_all_metrics_stored_as_rates(QUERY_TARGET *qt) {
+    if(!qt->query.used)
+        return false;
+
+    for(uint32_t i = 0; i < qt->query.used ; i++)
+        if(!qt->query.array[i].values_stored_as_rates)
+            return false;
+
+    return true;
+}
+
+// sum-over-time multiplies each point by its duration, so summing a rate
+// yields a VOLUME: "requests/s" summed over a window is "requests". Only a
+// trailing "/s" can be removed deterministically; anything else is left
+// untouched.
+static inline const char *query_target_rate_adjusted_units(
+    QUERY_TARGET *qt, const char *units, char *buf, size_t buf_size) {
+
+    if(!units || !*units)
+        return units;
+
+    if(qt->window.time_group_method != RRDR_GROUPING_SUM)
+        return units;
+
+    if(!query_target_all_metrics_stored_as_rates(qt))
+        return units;
+
+    size_t len = strlen(units);
+    if(len < 3 || strcmp(units + len - 2, "/s") != 0)
+        return units;
+
+    if(len - 2 >= buf_size)
+        return units;
+
+    memcpy(buf, units, len - 2);
+    buf[len - 2] = '\0';
+    return buf;
+}
+
+static inline bool query_target_has_percentage_units(QUERY_TARGET *qt) {
+    const char *u = query_target_units_override(qt);
+    return u && strcmp(u, "%") == 0;
 }
 
 uint32_t rrdcontext_queue_version(RRDCONTEXT_QUEUE_JudyLSet *queue);

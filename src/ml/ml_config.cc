@@ -228,6 +228,24 @@ void ml_config_load(ml_config_t *cfg) {
     cfg->host_anomaly_rate_threshold = host_anomaly_rate_threshold;
     cfg->anomaly_detection_grouping_method =
         time_grouping_parse(anomaly_detection_grouping_method.c_str(), RRDR_GROUPING_AVERAGE);
+
+    // the expression groupings need a condition, and this path has no way
+    // to carry one (ad_charts.cc queries with NULL options), so accepting
+    // them here would silently apply their default condition
+    switch(cfg->anomaly_detection_grouping_method) {
+        case RRDR_GROUPING_COUNTIF:
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
+            netdata_log_error(
+                "ML: anomaly detection grouping method '%s' requires a condition, which cannot be given here - using 'average'",
+                anomaly_detection_grouping_method.c_str());
+            cfg->anomaly_detection_grouping_method = RRDR_GROUPING_AVERAGE;
+            break;
+
+        default:
+            break;
+    }
     cfg->anomaly_detection_query_duration = anomaly_detection_query_duration;
     cfg->dimension_anomaly_score_threshold = dimension_anomaly_rate_threshold;
 

@@ -169,3 +169,9 @@ void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap);
 void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap);
 
 #endif //NETDATA_HEALTH_INTERNALS_H
+
+// the lookup condition exactly as configured, or NULL when the alert did
+// not carry one
+static inline const char *rrdcalc_time_group_options(RRDCALC *rc) {
+    return rc->config.time_group_options ? string2str(rc->config.time_group_options) : NULL;
+}

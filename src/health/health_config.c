@@ -2,6 +2,19 @@
 
 #include "health.h"
 #include "health_internals.h"
+#include "../web/api/queries/tg-expression.h"
+
+static ALERT_LOOKUP_TIME_GROUP_CONDITION alert_lookup_condition_from_expression(TG_EXPRESSION_CMP cmp) {
+    switch(cmp) {
+        case TG_EXPRESSION_NOTEQUAL:     return ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL;
+        case TG_EXPRESSION_LESS:         return ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS;
+        case TG_EXPRESSION_LESSEQUAL:    return ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL;
+        case TG_EXPRESSION_GREATER:      return ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER;
+        case TG_EXPRESSION_GREATEREQUAL: return ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL;
+        case TG_EXPRESSION_EQUAL:
+        default:                         return ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
+    }
+}
 
 int health_parse_delay(
         size_t line, const char *filename, char *string,
@@ -213,76 +226,42 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
     }
 
     if(group_options) {
-        // skip leading whitespace inside parentheses
-        while(*s && isspace((uint8_t)*s)) s++;
-
-        if(*s == '!') {
-            s++;
-            if(*s == '=') s++;
-            ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL;
-        }
-        else if(*s == '<') {
-            s++;
-            if(*s == '>') {
-                s++;
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL;
-            }
-            else if(*s == '=') {
-                s++;
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL;
-            }
-            else
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS;
-        }
-        else if(*s == '>') {
-            s++;
-            if(*s == '=') {
-                s++;
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL;
-            }
-            else
-                ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER;
-        }
-        else if(*s == '=' || *s == ':') {
-            // explicit equal operator (=, == or :)
-            s++;
-            if(*s == '=') s++;  // support == as well
-            ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
-        }
-
-        while(*s && isspace((uint8_t)*s)) s++;
-
-        if(*s == ')') {
-            // empty options like countif() - allowed, will use defaults
-        }
-        else if((isdigit((uint8_t)*s)) ||
-                (*s == '.' && isdigit((uint8_t)s[1])) ||
-                ((*s == '-' || *s == '+') && s[1] &&
-                 ((isdigit((uint8_t)s[1])) || (s[1] == '.' && isdigit((uint8_t)s[2]))))) {
-            // parse numeric value (including negative numbers like >=-3, or >+5, or >-.5)
-            ac->time_group_value = str2ndd(s, &s);
-            while(s && *s && isspace((uint8_t)*s)) s++;
-
-            if(!s || *s != ')') {
-                netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after number in aggregation method on '%s'",
-                                  line, filename, key);
-                return 0;
-            }
-        }
-        else if(*s) {
-            // invalid character - not a valid start of a number or ')'
-            netdata_log_error("Health configuration at line %zu of file '%s': invalid character '%c' in aggregation method options on '%s'",
-                              line, filename, *s, key);
-            return 0;
-        }
-        else {
-            // end of string without closing parenthesis
+        // Everything up to the closing parenthesis is the condition, and
+        // the shared grammar owns its meaning. Health used to re-implement
+        // that grammar and the two drifted: a bare number lost its first
+        // digit through the API but not here, and `<:`/`>:` worked through
+        // the API but not here.
+        char *close = strchr(s, ')');
+        if(!close) {
             netdata_log_error("Health configuration at line %zu of file '%s': missing closing parenthesis after aggregation method on '%s'",
                               line, filename, key);
             return 0;
         }
 
-        s++;
+        *close = '\0';
+
+        char *expr = s;
+        while(*expr && isspace((uint8_t)*expr)) expr++;
+
+        if(*expr) {
+            TG_EXPRESSION e;
+            if(!tg_expression_parse(&e, expr)) {
+                netdata_log_error("Health configuration at line %zu of file '%s': invalid condition '%s' in aggregation method options on '%s'",
+                                  line, filename, expr, key);
+                return 0;
+            }
+
+            ac->time_group_options = string_strdupz(expr);
+            ac->time_group_condition = alert_lookup_condition_from_expression(e.cmp);
+
+            // the legacy numeric field stays populated whenever the
+            // condition can be expressed in it, so everything that reads
+            // it keeps working
+            if(e.operand == TG_EXPRESSION_OPERAND_NUMBER)
+                ac->time_group_value = e.target;
+        }
+
+        s = close + 1;
     }
 
     switch (ac->time_group) {

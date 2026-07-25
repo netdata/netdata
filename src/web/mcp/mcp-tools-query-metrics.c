@@ -365,15 +365,19 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         
         // Check if time_group_options is required based on time_group
         if (time_group_str && (
-            strcmp(time_group_str, "percentile") == 0 || 
-            strcmp(time_group_str, "countif") == 0)) {
+            strcmp(time_group_str, "percentile") == 0 ||
+            strcmp(time_group_str, "countif") == 0 ||
+            strcmp(time_group_str, "percentage-of-samples") == 0 ||
+            strcmp(time_group_str, "percentage-of-time") == 0 ||
+            strcmp(time_group_str, "number-of-flaps") == 0 ||
+            strcmp(time_group_str, "number-of-times") == 0)) {
             
             struct json_object *time_group_options_obj = NULL;
             if (!json_object_object_get_ex(params, "time_group_options", &time_group_options_obj) || !time_group_options_obj) {
                 if (strcmp(time_group_str, "percentile") == 0) {
                     buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='percentile'. You must specify a percentage value between 0-100 (e.g., '95' for 95th percentile).");
                 } else {
-                    buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='countif'. You must specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
+                    buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='%s'. You must specify a comparison operator and a value (e.g., '>0', '=0', '!=0', '<=10'), a gap token ('==gap'), or the previous sample ('<previous').", time_group_str);
                 }
                 return MCP_RC_BAD_REQUEST;
             }

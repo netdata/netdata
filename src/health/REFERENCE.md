@@ -590,11 +590,54 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 
 | Parameter          | Purpose                     | Details                                                                                    |
 |--------------------|-----------------------------|--------------------------------------------------------------------------------------------|
-| `GROUPING OPTIONS` | Conditional processing      | `CONDITION VALUE` where condition is `!=`, `=`, `==`, `<=`, `<`, `>`, `>=`                 |
+| `GROUPING OPTIONS` | Conditional processing      | A condition (see **Fleet queries** below) or a number, depending on the method              |
 | `at BEFORE`        | End of lookup timeframe     | Default is 0 (now)                                                                         |
 | `every DURATION`   | Update frequency            | Supports `s`, `m`, `h`, `d` units                                                          |
 | `OPTIONS`          | Processing modifiers        | See options table below                                                                    |
 | `of DIMENSIONS`    | Which dimensions to include | Comma- or pipe-separated list, supports patterns; prefer `user,system` over `user, system` |
+
+**Fleet queries:**
+
+Four grouping methods answer a question *about* the samples rather than
+reporting them, and each takes a condition:
+
+| Method | Answers | Units |
+|--------|---------|-------|
+| `percentage-of-samples` (alias `countif`) | what share of the samples matched | `%` |
+| `percentage-of-time` | what share of the *time* matched | `%` |
+| `number-of-flaps` | how many times it flipped from false to true | `flaps` |
+| `number-of-times` | how many samples matched | `events` |
+
+A condition is an operator followed by a value. The operators are `>`,
+`>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`) and `!=` (or `!`
+or `<>`); with no operator the value compares equal. The value is one of:
+
+- **a number** - `lookup: percentage-of-time(>90) -1h`
+- **a gap token** - `gap`, `nan`, `null` and `empty` all mean "no data was
+  collected". Naming one is what makes gaps count at all; without one they
+  stay invisible, as they are for every other method.
+- **the previous collected sample** - `previous` or `last`. Gaps are
+  skipped, so a drop across a gap still counts, and the first sample of the
+  window never matches.
+
+There are no `and`/`or` compounds.
+
+Examples:
+
+```text
+# the percentage of the last day a node was unreachable (an SLO)
+lookup: percentage-of-time(==0) -1d of connected
+
+# how many times a link went down and came back in the last hour
+lookup: number-of-flaps(==0) -1h of link_state
+
+# how many times the host rebooted in the last day: an uptime counter
+# going backwards is a reboot
+lookup: number-of-times(<previous) -1d of uptime
+
+# the share of the last hour with no data at all
+lookup: percentage-of-time(==gap) -1h
+```
 
 **Processing Options:**
 
