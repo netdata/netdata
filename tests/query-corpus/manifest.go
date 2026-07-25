@@ -213,6 +213,14 @@ var manifest = map[string]ManifestCase{
 		Proves: "time_group=latest works end to end: per-bucket last collected value, empty buckets stay empty, sign preserved without options=absolute and erased with it; points=1 with before at/near now (raw zero or resolved within one update_every of now) anchors the window at the newest stored sample and serves it from the collector cache — zero db reads, the RAW un-quantized double, anomaly rate 0 by design — while the storage path (selected-tier) keeps SN quantization and the engine-generic anomaly rate",
 		Agent:  Green, FixedBy: "#23257",
 	},
+	"CASE-023/fleet-time-groupings": {
+		Proves: "the four fleet time-aggregations and their shared expression grammar: percentage-of-samples (canonical, countif alias) / percentage-of-time / number-of-flaps / number-of-times, each echoing its canonical name and transforming the response units (%/%/flaps/events); gap tokens (nan|null|gap|empty) pull gap slots into the denominator while an expression without one keeps them invisible; previous|last compare against the previous COLLECTED sample so a counter reset is a reboot and the first sample never matches; flaps count observed false->true transitions only, carried across buckets; a gap contributes its SLOT width, not the zero span of QUERY_POINT_EMPTY",
+		Agent:  Red,
+	},
+	"CASE-023/countif-bare-number": {
+		Proves: "the shared expression parser fixes the bare-number digit swallow (countif.h:78 advances past the operator switch even when no operator matched, so options '5' targets 0) — the API is aligned to health, which has always parsed countif(5) as '=5' (health-config-unittest.c:96)",
+		Agent:  Red,
+	},
 	"CASE-019/v1-json-name-escaping": {
 		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",
 		Agent:  Green, FixedBy: "#23216",
