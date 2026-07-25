@@ -249,8 +249,8 @@ void netdata_conf_dbengine_init(const char *hostname) {
     }
 
 #ifdef OS_WINDOWS
-    // FIXME: for whatever reason joining the initialization threads
-    // fails on Windows.
+    // Concurrent tier initialization on UCRT64 can stall after both tiers enter
+    // MRG population; -W dbengineplatformtest covers this regression.
     bool parallel_initialization = false;
 #else
     bool parallel_initialization = (nd_profile.storage_tiers <= netdata_conf_cpus()) ? true : false;

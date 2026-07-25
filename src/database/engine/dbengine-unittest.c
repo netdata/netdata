@@ -536,6 +536,10 @@ struct dbengine_platform_test_init {
     volatile bool *start;
 };
 
+struct dbengine_platform_test_watchdog {
+    volatile bool finished;
+};
+
 static void dbengine_platform_test_init_tier(void *arg)
 {
     struct dbengine_platform_test_init *init = arg;
@@ -547,13 +551,36 @@ static void dbengine_platform_test_init_tier(void *arg)
     completion_mark_complete(&init->completed);
 }
 
+static void dbengine_platform_test_watchdog(void *arg)
+{
+    struct dbengine_platform_test_watchdog *watchdog = arg;
+    uint64_t deadline = uv_hrtime() + DBENGINE_PLATFORM_TEST_TIMEOUT_S * NSEC_PER_SEC;
+
+    while (!__atomic_load_n(&watchdog->finished, __ATOMIC_ACQUIRE)) {
+        if (uv_hrtime() >= deadline) {
+            fprintf(stderr, "DBENGINE platform unittest: timed out after %d seconds; terminating the test process\n",
+                    DBENGINE_PLATFORM_TEST_TIMEOUT_S);
+            fflush(stderr);
+            exit(EXIT_FAILURE);
+        }
+
+        sleep_usec(100 * USEC_PER_MS);
+    }
+}
+
 int dbengine_platform_unittest(void)
 {
     struct dbengine_platform_test_init init[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
+    struct dbengine_platform_test_watchdog watchdog = { 0 };
     char test_root[RRDENG_PATH_MAX];
     char test_template[RRDENG_PATH_MAX];
     char native_test_root[RRDENG_PATH_MAX];
     size_t test_root_length = sizeof(test_root);
+    uv_thread_t watchdog_thread;
+    bool watchdog_started = false;
+    bool init_thread_created[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
+    bool init_thread_joined[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
+    bool dbengine_initialized[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
     volatile bool start = false;
     int errors = 0;
 
@@ -588,38 +615,85 @@ int dbengine_platform_unittest(void)
         init[tier].tier = tier;
     }
 
+    if (uv_thread_create(&watchdog_thread, dbengine_platform_test_watchdog, &watchdog) != 0) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot create timeout watchdog\n");
+        errors++;
+        goto cleanup_directories;
+    }
+    watchdog_started = true;
+
     for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
         completion_init(&init[tier].completed);
         init[tier].start = &start;
         if (uv_thread_create(&init[tier].thread, dbengine_platform_test_init_tier, &init[tier]) != 0) {
             fprintf(stderr, "DBENGINE platform unittest: cannot create tier %zu initialization thread\n", tier);
-            return 1;
+            errors++;
+            goto cleanup_watchdog;
         }
+        init_thread_created[tier] = true;
     }
     __atomic_store_n(&start, true, __ATOMIC_RELEASE);
 
     for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
         if (!completion_timedwait_for(&init[tier].completed, DBENGINE_PLATFORM_TEST_TIMEOUT_S)) {
             fprintf(stderr, "DBENGINE platform unittest: tier %zu initialization timed out\n", tier);
-            return 1;
+            errors++;
+            goto cleanup_watchdog;
         }
 
         completion_destroy(&init[tier].completed);
-        if (uv_thread_join(&init[tier].thread) != 0 || init[tier].ret != 0) {
-            fprintf(stderr, "DBENGINE platform unittest: tier %zu initialization failed (%d)\n", tier, init[tier].ret);
-            return 1;
+        if (uv_thread_join(&init[tier].thread) != 0) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot join tier %zu initialization thread\n", tier);
+            errors++;
+            goto cleanup_watchdog;
         }
+        init_thread_joined[tier] = true;
+
+        if (init[tier].ret != 0) {
+            fprintf(stderr, "DBENGINE platform unittest: tier %zu initialization failed (%d)\n", tier, init[tier].ret);
+            errors++;
+            goto cleanup_watchdog;
+        }
+        dbengine_initialized[tier] = true;
 
         if (!completion_timedwait_for(&multidb_ctx[tier]->loading.load_mrg, DBENGINE_PLATFORM_TEST_TIMEOUT_S)) {
             fprintf(stderr, "DBENGINE platform unittest: tier %zu MRG startup timed out\n", tier);
-            return 1;
+            errors++;
+            goto cleanup_watchdog;
         }
         completion_destroy(&multidb_ctx[tier]->loading.load_mrg);
     }
 
-    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++)
+cleanup_watchdog:
+    __atomic_store_n(&start, true, __ATOMIC_RELEASE);
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        if (!init_thread_created[tier] || init_thread_joined[tier])
+            continue;
+
+        if (uv_thread_join(&init[tier].thread) != 0)
+            errors++;
+        else {
+            completion_destroy(&init[tier].completed);
+            init_thread_joined[tier] = true;
+            dbengine_initialized[tier] = init[tier].ret == 0;
+        }
+    }
+
+    bool dbengine_shutdown_required = false;
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        if (!dbengine_initialized[tier])
+            continue;
+
         (void)rrdeng_exit(multidb_ctx[tier]);
-    dbengine_shutdown();
+        dbengine_shutdown_required = true;
+    }
+    if (dbengine_shutdown_required)
+        dbengine_shutdown();
+
+    if (watchdog_started) {
+        __atomic_store_n(&watchdog.finished, true, __ATOMIC_RELEASE);
+        (void)uv_thread_join(&watchdog_thread);
+    }
 
 cleanup_directories:
     for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
