@@ -1,3 +1,5 @@
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.netdata%2Fmcp-server.svg)](https://mcptoplist.com/server/io.github.netdata%2Fmcp-server)
+
 <p align="center">
 <a href="https://www.netdata.cloud#gh-light-mode-only">
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_light.png" alt="Netdata" width="300"/>
