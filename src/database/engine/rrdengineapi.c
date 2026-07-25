@@ -1202,6 +1202,7 @@ int rrdeng_init(
     if(ctxp) {
         *ctxp = ctx = mallocz(sizeof(*ctx));
         initialize_single_ctx(ctx);
+        ctx->dynamically_allocated = true;
         freshly_initialized_ctx = true;
     }
     else
@@ -1238,7 +1239,7 @@ int rrdeng_init(
         }
     }
 
-    if (unittest_running) {
+    if (unittest_running && ctx->dynamically_allocated) {
         freez(ctx);
         if (ctxp)
             *ctxp = NULL;
@@ -1287,7 +1288,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
-    if(unittest_running)
+    if(unittest_running && ctx->dynamically_allocated)
         freez(ctx);
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);

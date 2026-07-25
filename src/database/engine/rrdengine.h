@@ -401,6 +401,8 @@ typedef struct tier_config_prototype {
 } TIER_CONFIG_PROTOTYPE;
 
 struct rrdengine_instance {
+    bool dynamically_allocated;
+
     TIER_CONFIG_PROTOTYPE config;
 
     struct {
