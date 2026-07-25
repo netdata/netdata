@@ -58,15 +58,20 @@ func TestLayer3RegistryCompleteness(t *testing.T) {
 		}
 	})
 
-	// tg_countif_create grammar beyond the spellings TestLayer3Families
+	// the shared expression grammar beyond the spellings TestLayer3Families
 	// sends: '!'/'!:'/'<>' are NOT-EQUAL, '>:'/'<:' are >=/<=, ':' and
 	// '==' are EQUAL, spaces are skipped around the operator, empty
-	// options compare EQUAL against 0.0, and a bare number hits the
-	// first-digit quirk pinned above
+	// options compare EQUAL against 0.0, and a bare number compares EQUAL
+	// against itself (it used to lose its first digit)
 	t.Run("countif-grammar", func(t *testing.T) {
+		// a BARE number ("40") is deliberately absent: the old parser lost
+		// its first digit, that was ruled a bug, and the shared expression
+		// grammar fixes it — so the spelling is contested behaviour and
+		// belongs to the manifest case that self-detects the flip
+		// (CASE-023/countif-bare-number), not to a hard assertion here.
 		for _, opts := range []string{
 			"!5", "!:5", ">:30", "<:20", "<>1", ":40", "==40",
-			"", "40", "  <>  1",
+			"", "  <>  1",
 		} {
 			t.Run("countif("+opts+")", func(t *testing.T) {
 				verifyTimeGroup(t, "l3-reg", ch, "countif", opts, 10)

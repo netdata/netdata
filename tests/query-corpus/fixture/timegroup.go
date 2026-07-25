@@ -454,13 +454,17 @@ func parseCountifOptions(options string) (cmp string, target float64) {
 		} else {
 			s = s[1:]
 		}
-	default:
-		// ':' compares EQUAL; for a bare number tg_countif_create's
-		// post-switch advance consumes one char even though no operator
-		// matched, so the first digit is swallowed ("40" targets 0,
-		// "440" targets 40) — pinned quirk. Both paths skip one char.
+	case ':':
+		// ':' compares EQUAL
 		cmp = "=="
 		s = s[1:]
+	default:
+		// a bare number stands alone and compares EQUAL. The old parser
+		// advanced one character here regardless of whether an operator
+		// matched, so "40" targeted 0 and "440" targeted 40; the shared
+		// expression grammar no longer does, which aligns the API with
+		// health (health_config.c has always parsed countif(40) as =40).
+		cmp = "=="
 	}
 	s = strings.TrimLeft(s, " \t")
 	target, _ = strconv.ParseFloat(s, 64)
