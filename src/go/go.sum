@@ -196,8 +196,8 @@ github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5y
 github.com/golang/protobuf v1.3.4/go.mod h1:vzj43D7+SQXF/4pzW/hwtAqwc6iTitCiVSaWz5lYuqw=
 github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
-github.com/golangsnmp/gomib v0.11.0 h1:JPAg5SOp5LqDlpmQy6jeKgwlFdOqAwTqQglylQnSDMo=
-github.com/golangsnmp/gomib v0.11.0/go.mod h1:kMhPC1hIlPUf2glrzy0uQV17TBQtwsm5zVuRW/emGbk=
+github.com/golangsnmp/gomib v0.12.0 h1:/8h6XA5PtECL1ede1ETCxWJ+S+JnpXgocxmHetc2Xl4=
+github.com/golangsnmp/gomib v0.12.0/go.mod h1:kMhPC1hIlPUf2glrzy0uQV17TBQtwsm5zVuRW/emGbk=
 github.com/google/certificate-transparency-go v1.1.7 h1:IASD+NtgSTJLPdzkthwvAG1ZVbF2WtFg4IvoA68XGSw=
 github.com/google/certificate-transparency-go v1.1.7/go.mod h1:FSSBo8fyMVgqptbfF6j5p/XNdgQftAhSmXcIxV9iphE=
 github.com/google/gnostic-models v0.7.0 h1:qwTtogB15McXDaNqTZdzPJRHvaVJlAl+HVQnLmJEJxo=
