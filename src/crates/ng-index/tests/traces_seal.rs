@@ -565,7 +565,7 @@ fn oracle_real_wal_self_consistency() {
     );
 }
 
-/// Round-trip oracle for the phase-1 lossless fields (events, links,
+/// Round-trip oracle for the lossless fields (events, links,
 /// trace_state, status_message, dropped counts): OTLP → WAL frame → seal →
 /// `trace_by_id` returns every field, with per-event grouping/order intact,
 /// while the flat `events.`/`links.` search tokens stay out of the span's
@@ -854,7 +854,7 @@ fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
 
     // Rows sort by trace id: A (0x0A…) then B (0x0B…).
     assert_eq!(rollup.trace_ids.get(0), TraceId::from([0xA; 16]));
-    assert_eq!(rollup.span_counts[0], 3, "the resent span counts twice (D9)");
+    assert_eq!(rollup.span_counts[0], 3, "the resent span counts twice");
     assert_eq!(rollup.min_start_ns[0], 1_000);
     assert_eq!(rollup.max_end_ns[0], 2_000);
     assert_eq!(rollup.root_is_true_root[0], 1);

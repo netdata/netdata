@@ -1,4 +1,4 @@
-//! The phase-2 parity contract: folding a WAL tail's decoded spans
+//! The tail/seal parity contract: folding a WAL tail's decoded spans
 //! ([`tail_trace_aggregates`]) equals reading the `TRSU` rollup of
 //! sealing the SAME data ([`sealed_trace_aggregates`]) — value-for-value
 //! across envelopes, stored-row counts, and honest roots.
@@ -45,7 +45,7 @@ fn corpus() -> Vec<common::SpanSpec> {
     vec![
         a_root,
         a_child.clone(),
-        a_child, // the resend — counts twice (D9)
+        a_child, // the resend — counts twice
         a_err,
         b_orphan,
         c_root_hi,
@@ -98,7 +98,7 @@ fn the_fold_pins_every_rollup_semantic() {
     // A: stored-row counts (4 = root + child + resend + err), one error,
     // envelope stretched by the error span's end, a true SERVER root
     // with service + name resolved.
-    assert_eq!(a.span_count, 4, "the resend counts (D9)");
+    assert_eq!(a.span_count, 4, "the resend counts");
     assert_eq!(a.error_count, 1);
     assert_eq!(a.min_start_ns, 1_000);
     assert_eq!(a.max_end_ns, 9_000);
@@ -109,7 +109,7 @@ fn the_fold_pins_every_rollup_semantic() {
 
     // B: honest absence — counts still fold, no synthesized root.
     assert_eq!(b.span_count, 1);
-    assert!(b.root.is_none(), "no unset-parent span → None (D8)");
+    assert!(b.root.is_none(), "no unset-parent span → None");
 
     // C: equal-start roots tie-break by ascending span id.
     let c_root = c.root.as_ref().expect("C has true roots");

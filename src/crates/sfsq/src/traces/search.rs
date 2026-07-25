@@ -1,4 +1,4 @@
-//! Cross-source trace search — the phase-4c operation.
+//! Cross-source trace search.
 //!
 //! [`search`] evaluates a span-local predicate (the positive stage-A
 //! subset of the [`Predicate`] grammar) across a validated pair of
@@ -60,7 +60,7 @@ use super::wal_scan::TraceWalScan;
 use super::window::{TimeWindow, WindowError};
 use crate::source::map_source;
 
-// ── The numeric knobs (decision 24, one module) ─────────────────────────
+// ── The numeric knobs (one module) ──────────────────────────────────────
 
 /// Default result limit; zero is rejected and there is no unbounded
 /// option — search is top-K by construction.
@@ -81,9 +81,9 @@ const ASSEMBLED_CEILING_FLOOR: usize = 64;
 /// rows, emitted phase-1 positions, and tail spans evaluated).
 const VISITED_ROWS_CEILING: u64 = 4_000_000;
 
-/// The two validated source sets of one search (decision 23A):
+/// The two validated source sets of one search:
 /// `window` drives phase-1 candidate discovery, `completion` (its
-/// superset — ENFORCED by [`SourceId`] membership, pin R2-7) drives
+/// superset — ENFORCED by [`SourceId`] membership) drives
 /// phase-2 assembly, so a matched trace's spans outside the window still
 /// complete it. Reusing a window source inside `completion` is the
 /// intended shape, not a duplicate; hygiene validates per role. Both
@@ -118,7 +118,7 @@ impl SearchQuery {
         }
     }
 
-    /// Restrict matches to spans STARTING in `window` (decision 5).
+    /// Restrict matches to spans STARTING in `window`.
     /// Without a window the search spans the whole retention the caller
     /// offered (the window source set is then typically the full
     /// completion set).
@@ -153,7 +153,7 @@ impl SearchQuery {
 
     /// Test-only override of the assembly span cap (must be non-zero) —
     /// the capped-candidate honesty paths are provable without a
-    /// 65k-span corpus. NOT a tuning surface (decision 23A: search's
+    /// 65k-span corpus. NOT a tuning surface (search's
     /// cap is not caller-tunable); production uses [`DEFAULT_SPAN_CAP`]
     /// unconditionally.
     #[doc(hidden)]
@@ -191,7 +191,7 @@ pub enum SearchRequestError {
 }
 
 /// One returned trace: EXACT summary numbers derived from the phase-2
-/// canonical assembly (never from raw phase-1 matches), pins R2-5.
+/// canonical assembly (never from raw phase-1 matches).
 #[derive(Debug)]
 pub struct TraceSummary {
     pub trace_id: TraceId,
@@ -236,8 +236,8 @@ pub struct SearchData {
     pub status: QueryStatus,
     /// Field → coalesced schema kind, merged from exactly the sources
     /// that contributed retained spans of the RETURNED traces, projected
-    /// onto the names the attached `matched_spans` expose (pin R2-13 —
-    /// the 4a rule).
+    /// onto the names the attached `matched_spans` expose (the same
+    /// projection rule as trace-by-id).
     pub field_kinds: FieldKinds,
 }
 
@@ -270,7 +270,7 @@ impl FileDiscovery {
     }
 
     /// Emit the next `count` newest matched positions below the current
-    /// band into `pool` (UNSET trace ids filtered, pin R2-6), moving the
+    /// band into `pool` (UNSET trace ids filtered), moving the
     /// band cursor down. Every emitted position counts into `work`.
     fn extend(&mut self, count: usize, work: &mut ScanWork, pool: &mut CandidatePool) {
         if self.exhausted() || count == 0 {
@@ -545,7 +545,7 @@ pub fn search(
         };
         // File-granular window pruning on the summary range — sharing
         // the key-enumeration overlap comparison; exact for span-start windows
-        // because file ranges are span-start-based (decision 5).
+        // because file ranges are span-start-based.
         if query
             .window
             .is_some_and(|w| !w.overlaps_summary(c.summary.min_timestamp_s, c.summary.max_timestamp_s))
@@ -605,7 +605,7 @@ pub fn search(
         }
         // The tail is small (bounded by rotation): evaluate every
         // decoded span through the SAME span-side evaluator phase 2
-        // uses; each visited span feeds the ceiling (pin R2-10), which
+        // uses; each visited span feeds the ceiling, which
         // is enforced PER SPAN — a between-sources check alone could
         // overshoot by a whole tail.
         for (trace_id, span) in scan.spans_with_ids() {
@@ -770,7 +770,7 @@ pub fn search(
                     !outcome.truncated && !merge_failed && !degraded_assembly,
                 );
                 // Trace-level conditions evaluate post-assembly as
-                // TRI-STATE (decision 15): an inexact trace's root and
+                // TRI-STATE: an inexact trace's root and
                 // envelope values are unreliable — the candidate is
                 // EXCLUDED as indeterminate (the underlying cause
                 // already marked the query Partial: SizeCap at the
@@ -826,7 +826,7 @@ pub fn search(
     });
     finals.truncate(query.limit);
 
-    // ── FieldKinds over the RETURNED traces (pin R2-13) ───────────────
+    // ── FieldKinds over the RETURNED traces ───────────────────────────
     let mut kinds: BTreeMap<String, sfst::ValueKind> = BTreeMap::new();
     let mut contributing: BTreeSet<usize> = BTreeSet::new();
     for f in &finals {

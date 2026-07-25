@@ -1,7 +1,7 @@
 //! Trace query sources and their validated identity.
 //!
 //! The library never inspects `part_key` or any other content of a
-//! source's identity (plan D7: part_key is opaque — the caller enumerates
+//! source's identity (part_key is opaque — the caller enumerates
 //! ALL of a tenant's trace files, whatever their stream). What it DOES
 //! validate, on every operation, is set hygiene:
 //!

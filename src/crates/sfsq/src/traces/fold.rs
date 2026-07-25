@@ -1,6 +1,6 @@
 //! The shared cross-source trace-aggregate merge — ONE implementation
-//! of the source loop and D7 fold consumed by every trace-level
-//! aggregate mode (overview, slowest, and the phase-2.5 facets), so
+//! of the source loop and cross-source fold consumed by every trace-level
+//! aggregate mode (overview, slowest, and the root facets), so
 //! the engine-op contract can never drift between them.
 //!
 //! Owned here, once:
@@ -9,8 +9,8 @@
 //! - Up-front + per-source cancellation polls (all-or-empty: a
 //!   cancelled merge returns `None`, never a partial map).
 //! - Per-source failure honesty
-//!   ([`SourceFailure`](PartialReason::SourceFailure)) and the D10
-//!   exclusion of pre-rollup sealed files
+//!   ([`SourceFailure`](PartialReason::SourceFailure)) and the
+//!   no-mixed-units exclusion of pre-rollup sealed files
 //!   ([`RollupAbsent`](PartialReason::RollupAbsent)).
 //! - The visited budget: rollup rows (sealed) / decoded spans (tails)
 //!   — each shape's actual fold cost — checked BETWEEN sources, so one
@@ -20,13 +20,13 @@
 //!   root-resolving path's string-table build — that cost is
 //!   O(distinct kv pairs in the file), bounded per file by the format
 //!   and by capture in file count.
-//! - The D7 merge itself: envelopes widen, stored-row counts saturate
-//!   (D9), and the cross-source root pick — the SMALLEST candidate
+//! - The merge itself: envelopes widen, stored-row counts saturate
+//!   (resends count), and the cross-source root pick — the SMALLEST candidate
 //!   root span id wins; on EQUAL ids the first candidate (SourceId
 //!   order) is kept. `TRSU` carries no root start, so "earliest" is
 //!   not computable across sources; single-root straddles have exactly
 //!   one candidate and resends carry the same id, so only genuine
-//!   multi-root traces reach the tie. Consequence (accepted in D16):
+//!   multi-root traces reach the tie. Accepted consequence:
 //!   for a CROSS-SOURCE multi-root trace this pick can differ from
 //!   trace-by-id's `summary_root` (which sees start times) — a list
 //!   row and the opened trace may then display different roots. The
@@ -70,8 +70,8 @@ pub(crate) struct SourceFoldSpec {
     pub resolve_roots: bool,
 }
 
-/// One trace's cross-source merge (D7): envelopes widen, stored-row
-/// counts sum (D9), the root merges per the pick rule above.
+/// One trace's cross-source merge: envelopes widen, stored-row
+/// counts sum (resends included), the root merges per the pick rule above.
 pub(crate) struct MergedTrace {
     pub min_start_ns: i64,
     pub max_end_ns: i64,
@@ -80,7 +80,7 @@ pub(crate) struct MergedTrace {
     pub root: Option<TraceRootInfo>,
 }
 
-/// Run the shared source loop and D7 merge. `sources` may arrive in any
+/// Run the shared source loop and merge. `sources` may arrive in any
 /// order — sorted here. Returns `None` when cancelled (the all-or-empty
 /// contract; the `Cancelled` reason is already added to `status`).
 pub(crate) fn merge_trace_sources(
@@ -168,7 +168,7 @@ pub(crate) fn merge_trace_sources(
                         continue;
                     }
                 };
-                // D10: a pre-rollup file cannot contribute trace-level
+                // No mixed units: a pre-rollup file cannot contribute trace-level
                 // numbers — excluded, flagged, never mixed in.
                 if !reader.has_trace_rollup() {
                     tracing::debug!(

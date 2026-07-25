@@ -7,8 +7,9 @@
 //! logs, differing only in its seal function + handler.
 //!
 //! The query handler is [`OtelTracesHandler`] (`rpc/traces/`), the
-//! `otel-traces` Function: `info` capability discovery today, data modes
-//! landing per traces-ui phase-1 step. It shares the logs pipeline's
+//! `otel-traces` Function: `info` capability discovery plus the
+//! `trace`/`search`/`attributes`/`attribute_values`/`overview`/`slowest`
+//! data modes. It shares the logs pipeline's
 //! chunk cache (seqs are process-global, so `(seq, index)` keys never
 //! collide across signals) and the signal-agnostic GET args→payload shim.
 //!

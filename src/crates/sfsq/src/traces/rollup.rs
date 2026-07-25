@@ -1,13 +1,13 @@
-//! Trace-level aggregates WITHOUT assembly (traces-ui phase 2): the
-//! neutral per-trace shape the cross-source folds (overview v2,
-//! slowest, root facets — steps 2.3+) consume from BOTH source kinds:
+//! Trace-level aggregates WITHOUT assembly: the neutral per-trace
+//! shape the cross-source folds (overview, slowest, root facets)
+//! consume from BOTH source kinds:
 //!
 //! - **Sealed files / chunks** carry the `TRSU` rollup chunk
 //!   ([`sfst::TraceRollup`]); [`sealed_trace_aggregates`] resolves its
 //!   interner refs to strings through the file's own string table.
 //! - **WAL tails** have no interner; [`tail_trace_aggregates`] folds the
 //!   scan's decoded spans directly, with the SAME pinned semantics the
-//!   seal accumulator applies (D8/D9):
+//!   seal accumulator applies:
 //!   - stored-row counts (a resent span counts every time it is stored;
 //!     canonical dedup belongs to assembly),
 //!   - honest-or-absent roots (only a genuinely unset-parent span;
@@ -31,11 +31,11 @@ pub struct TraceAggregate {
     pub min_start_ns: i64,
     /// Envelope end: max stored `start ⊕ duration` (saturating), ns.
     pub max_end_ns: i64,
-    /// Stored spans in THIS source (D9 — resends included).
+    /// Stored spans in THIS source (resends included).
     pub span_count: u64,
     /// Of those, spans with ERROR status.
     pub error_count: u64,
-    /// The TRUE root's fields, when this source stored one (D8);
+    /// The TRUE root's fields, when this source stored one;
     /// `None` is honest absence — never synthesize a root from it.
     pub root: Option<TraceRootInfo>,
 }
@@ -97,7 +97,7 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
         if span_field(span, status_field) == Some("ERROR") {
             acc.error_count = (acc.error_count + 1).min(u64::from(u32::MAX));
         }
-        // D8 + the seal accumulator's exact rule: earliest unset-parent
+        // The seal accumulator's exact rule: earliest unset-parent
         // span wins; equal starts tie-break by ascending span id.
         let key = (span.start_ns, span.span_id);
         if span.parent_span_id.is_unset() && acc.root_key.is_none_or(|k| key < k) {
@@ -127,7 +127,7 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
 }
 
 /// The envelope-and-counts view of a sealed file's `TRSU` rows — the
-/// grid path. `root` is always `None` here (UNRESOLVED, not D8-absent):
+/// grid path. `root` is always `None` here (UNRESOLVED, not honest-absent):
 /// resolving roots needs the file string table, which is O(distinct
 /// kv pairs in the whole file) to build, and the overview grid discards
 /// roots anyway. Root-consuming callers (slowest, facets) use

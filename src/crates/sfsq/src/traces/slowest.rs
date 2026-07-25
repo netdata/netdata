@@ -1,25 +1,25 @@
 //! Duration-ranked top-K traces — the UI's explicit "Slowest" sort
-//! mode (traces-ui design §3; phase-2 step 2.4).
+//! mode.
 //!
-//! The SAME cross-source merge as the overview (D7 — envelopes widen,
-//! stored-row counts saturate, D9) but KEEPING roots: the list rows
+//! The SAME cross-source merge as the overview (envelopes widen,
+//! stored-row counts saturate) but KEEPING roots: the list rows
 //! display root service/name, so the sealed side pays for the
 //! root-resolving [`sealed_trace_aggregates`] view (file string table)
 //! the grid path deliberately skips. Merged traces clip by
-//! envelope-start (the D15 alignment rule shared with the overview),
+//! envelope-start (the alignment rule shared with the overview),
 //! then rank by envelope duration DESC (`trace_id` ASC tie-break) and
 //! truncate to the requested top-K.
 //!
 //! Pinned semantics:
 //!
-//! - **Stored-row statistics (D9)**: per-row span/error counts sum the
+//! - **Stored-row statistics**: per-row span/error counts sum the
 //!   stored rows — a resend counts every time it is stored. Exact
 //!   canonical figures live in trace-by-id (the row click).
-//! - **No mixed units (D10)**: a sealed source without the rollup
+//! - **No mixed units**: a sealed source without the rollup
 //!   chunk is EXCLUDED and marked
 //!   [`RollupAbsent`](PartialReason::RollupAbsent) — identical to the
 //!   overview.
-//! - **Cross-source root pick (D8 across sources)**: `TRSU` carries no
+//! - **Cross-source root pick**: `TRSU` carries no
 //!   root start, so "earliest true root" is not computable across
 //!   sources; among the sources' `Some(root)` candidates the SMALLEST
 //!   root `span_id` wins. Exact in every non-pathological case — a
@@ -28,8 +28,8 @@
 //!   root is the same span id in both files; only genuine multi-root
 //!   traces reach the tie.
 //! - **No pagination**: top-K is a single bounded page — a rank cursor
-//!   over an unstable dataset re-ranks between pages (the step-1.3
-//!   trap), so it is deliberately absent.
+//!   over an unstable dataset re-ranks between pages, so it is
+//!   deliberately absent.
 //!
 //! Engine contracts mirrored from the siblings: sources process in
 //! `SourceId` order; a failed source is a
@@ -105,19 +105,19 @@ pub enum SlowestRequestError {
     SourceSet(#[from] SourceSetError),
 }
 
-/// One ranked trace. All numbers are STORED-ROW statistics (D9).
+/// One ranked trace. All numbers are STORED-ROW statistics (resends count).
 #[derive(Debug, PartialEq, Eq)]
 pub struct SlowTrace {
     pub trace_id: sfst::TraceId,
-    /// Merged envelope start (D7 — the cross-source minimum).
+    /// Merged envelope start (the cross-source minimum).
     pub min_start_ns: i64,
     /// The RANK key: merged envelope duration, saturating.
     pub duration_ns: i64,
-    /// Stored spans across all sources (D9 — resends included).
+    /// Stored spans across all sources (resends included).
     pub span_count: u64,
     /// Of those spans, ERROR-status ones.
     pub error_count: u64,
-    /// The merged root (honest-or-absent per D8; the cross-source pick
+    /// The merged root (honest-or-absent; the cross-source pick
     /// is the smallest root span id among the sources' candidates).
     pub root: Option<TraceRootInfo>,
 }
@@ -167,7 +167,7 @@ pub fn slowest(
     };
 
     // Rank the in-window merged traces: duration DESC, trace_id ASC.
-    // The same envelope-start clipping as the overview (D15 alignment).
+    // The same envelope-start clipping as the overview.
     let mut ranked: Vec<SlowTrace> = merged
         .into_iter()
         .filter(|(_, m)| query.window.contains(m.min_start_ns))

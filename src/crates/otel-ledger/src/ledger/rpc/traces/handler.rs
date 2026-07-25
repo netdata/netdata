@@ -1,7 +1,7 @@
 //! `OtelTracesHandler` — typed `FunctionHandler` implementation for the
 //! `otel-traces` Function.
 //!
-//! The full phase-1 mode catalog is implemented: `info` (capability
+//! The full mode catalog is implemented: `info` (capability
 //! discovery), `trace` (exact single-trace fetch), `search` (bounded
 //! most-recent-first trace search, the default mode), the enumeration
 //! pair `attributes` / `attribute_values` (the facet rail's
@@ -342,7 +342,7 @@ impl OtelTracesHandler {
     /// log-scale duration bin) — the UI's default paint. Geometry
     /// derives from the canonicalized window via the shared nice-width
     /// grid; cells count TRACES by merged envelope, and the span/error
-    /// totals are their stored-row sums (labeled on the wire — D9/D10).
+    /// totals are their stored-row sums (labeled on the wire).
     async fn overview(
         &self,
         ctx: &FunctionCallContext,
@@ -384,8 +384,8 @@ impl OtelTracesHandler {
 
     /// The `slowest` mode: the window's duration-ranked top-K traces —
     /// the UI's explicit "Slowest" sort. Row numbers are stored-row
-    /// sums (D9); pre-rollup files are excluded under `rollup_absent`
-    /// (D10); no pagination by design.
+    /// sums; pre-rollup files are excluded under `rollup_absent`;
+    /// no pagination by design.
     async fn slowest(
         &self,
         ctx: &FunctionCallContext,

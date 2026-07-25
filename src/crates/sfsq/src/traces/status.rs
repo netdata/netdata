@@ -40,7 +40,7 @@ pub enum PartialReason {
     /// A sealed source has no trace rollup chunk (`TRSU`) and was
     /// EXCLUDED from trace-level aggregation: including it would
     /// silently undercount, and mixing span-level numbers into a
-    /// trace-level result is forbidden (no mixed units — D10). Two
+    /// trace-level result is forbidden (no mixed units). Two
     /// causes: the file predates the rollup (data returns when it
     /// ages out), or the file stored no real traces — an all-UNSET
     /// trace-id file writes no chunk by the seal's `is_meaningful`

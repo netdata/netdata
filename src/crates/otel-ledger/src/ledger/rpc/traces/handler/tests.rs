@@ -66,7 +66,7 @@ async fn default_request_is_an_empty_complete_search() {
 
 #[tokio::test]
 async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
-    // The phase-1 mode catalog is complete: no selector errors as
+    // The mode catalog is complete: no selector errors as
     // not-implemented anymore; an empty agent answers each cleanly.
     for body in [
         json!({"overview": {}}),

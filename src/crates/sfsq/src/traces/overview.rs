@@ -1,20 +1,20 @@
 //! Cross-source TRACE-density overview — the traces UI's default paint
-//! (traces-ui design §5 phase 2: trace-level numbers, `unit:"traces"`).
+//! (trace-level numbers, `unit:"traces"`).
 //!
 //! Folds per-trace aggregates from BOTH source shapes — sealed files'
 //! `TRSU` rollup rows and WAL tails' decoded-span folds (parity
-//! test-pinned in step 2.2) — into one map keyed by trace id (traces
-//! STRADDLE sealed files: WAL rotation is content-agnostic, D7), then
+//! test-pinned) — into one map keyed by trace id (traces
+//! STRADDLE sealed files: WAL rotation is content-agnostic), then
 //! bins each merged trace into the (time bucket × log-scale duration
 //! bin) grid by its ENVELOPE (min start; saturating max end − min
 //! start).
 //!
 //! Pinned semantics:
 //!
-//! - **Stored-row statistics (D9)**: span/error totals sum the stored
+//! - **Stored-row statistics**: span/error totals sum the stored
 //!   rows; a resent span counts every time it is stored. Canonical
 //!   dedup remains assembly's property (`search`/`trace_by_id`).
-//! - **No mixed units (D10)**: a sealed source WITHOUT the rollup chunk
+//! - **No mixed units**: a sealed source WITHOUT the rollup chunk
 //!   (legacy) is EXCLUDED and marked
 //!   [`RollupAbsent`](PartialReason::RollupAbsent) — its spans never
 //!   leak into trace-level numbers.
@@ -55,7 +55,7 @@ use super::fold::{SourceFoldSpec, merge_trace_sources};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 
-/// Number of log-scale duration bins (fixed in phase 1; unchanged).
+/// Number of log-scale duration bins (fixed).
 pub const DURATION_BIN_COUNT: usize = 6;
 
 /// The bins' wire labels, index-parallel to a cell row.
@@ -139,12 +139,12 @@ pub struct FacetList {
     /// Traces attributed to values beyond the top K.
     pub other: u64,
     /// Traces with NO usable value for this dimension: no true root in
-    /// any source (Indeterminate, D8) or a true root lacking the field
+    /// any source (Indeterminate) or a true root lacking the field
     /// — bucketed explicitly, never attributed to a value.
     pub unattributed: u64,
 }
 
-/// The trace-level facet lists (phase-2 step 2.5) — present only when
+/// The trace-level facet lists — present only when
 /// [`OverviewQuery::root_facets`] requested them.
 #[derive(Debug, PartialEq, Eq)]
 pub struct RootFacets {
@@ -153,7 +153,7 @@ pub struct RootFacets {
 }
 
 /// One overview's grid plus everything needed to interpret it honestly.
-/// All numbers count TRACES (or their STORED spans — D9); the wire
+/// All numbers count TRACES (or their STORED spans — resends count); the wire
 /// labels the unit.
 #[derive(Debug)]
 pub struct OverviewData {
@@ -164,7 +164,7 @@ pub struct OverviewData {
     pub cells: Vec<[u64; DURATION_BIN_COUNT]>,
     /// Distinct traces binned into the grid (= the sum of all cells).
     pub total_traces: u64,
-    /// Their STORED spans, summed (D9 — resends included). Totals are
+    /// Their STORED spans, summed (resends included). Totals are
     /// trace-envelope-aligned, not span-window-aligned: a trace clipped
     /// by the bin-by-envelope-start rule contributes nothing, and a
     /// binned trace contributes ALL its stored spans, in-window or not.

@@ -163,7 +163,7 @@ impl Ledger {
         writer_socket_path: &str,
         // This node's machine identity (from the plugin config). Threaded into
         // each pipeline's remote reconcile so its LIST is filtered to own-machine
-        // objects (D6 key layout keeps the whole fleet under one prefix).
+        // objects (the key layout keeps the whole fleet under one prefix).
         own_machine: file_registry::MachineId,
         // Shared seq highwater file path (from `PluginConfig::seq_highwater_path`).
         // The startup catalog sync raises it to cover the remote max; the ingestor

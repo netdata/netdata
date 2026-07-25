@@ -279,8 +279,8 @@ pub struct SlowestParams {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OverviewParams {
-    /// Also compute the top-root-service/operation facet lists
-    /// (phase-2 step 2.5). OPT-IN: resolving roots costs the sealed
+    /// Also compute the top-root-service/operation facet lists.
+    /// OPT-IN: resolving roots costs the sealed
     /// sources' string tables, so the default paint stays cheap and
     /// the facet rail sets this. `null`, `false`, and absent all mean
     /// off; only `true` opts in.
@@ -347,15 +347,15 @@ pub enum OtelTracesResponse {
 // ── Overview response ───────────────────────────────────────────────
 
 /// The TRACE-density grid: time buckets × log-scale duration bins. A
-/// trace bins by its cross-source merged envelope (D7 — straddling
-/// traces count once); span/error totals are STORED-ROW sums (D9 —
-/// resends count; canonical exactness lives in `search`/`trace`).
+/// trace bins by its cross-source merged envelope (straddling
+/// traces count once); span/error totals are STORED-ROW sums (resends
+/// count; canonical exactness lives in `search`/`trace`).
 /// Sources sealed before the rollup chunk existed are EXCLUDED under
-/// the `rollup_absent` partial — units are never mixed (D10).
+/// the `rollup_absent` partial — units are never mixed.
 #[derive(Debug, Serialize)]
 pub struct OverviewResult {
     pub version: u32,
-    /// What the counts count. `"traces"` since phase 2 — render
+    /// What the counts count. Always `"traces"` here — render
     /// verbatim, never hardcode.
     pub unit: &'static str,
     pub status: StatusWire,
@@ -410,7 +410,7 @@ pub struct OverviewGridWire {
 pub struct OverviewTotals {
     /// Distinct traces binned into the grid (= the sum of all cells).
     pub traces: u64,
-    /// Their stored spans, summed (D9 — resends included).
+    /// Their stored spans, summed (resends included).
     pub spans: u64,
     /// Of those spans, ERROR-status ones.
     pub errors: u64,
@@ -420,7 +420,7 @@ pub struct OverviewTotals {
 
 /// The slowest mode's bounded list: the window's duration-ranked top-K
 /// traces (duration DESC, trace id ASC). Row numbers are STORED-ROW
-/// statistics (D9 — resends count); exact canonical figures live in
+/// statistics (resends count); exact canonical figures live in
 /// the `trace` mode (the row click). The same envelope-start clipping
 /// as the overview applies (trace-envelope-aligned), and — like every
 /// windowed aggregate mode — capture is file-granular: a trace whose
@@ -452,7 +452,7 @@ pub struct SlowestTraceWire {
     pub start_ns: i64,
     /// The RANK key: merged envelope duration, saturating.
     pub duration_ns: i64,
-    /// Stored spans across all sources (D9).
+    /// Stored spans across all sources (resends included).
     pub span_count: u64,
     /// Of those spans, ERROR-status ones.
     pub error_count: u64,
@@ -464,7 +464,7 @@ pub struct SlowestTraceWire {
 // counted here comes from a file overlapping the window and may itself
 // lie just outside it. Exact per-row filtering belongs to `search`; the
 // facet rail needs the vocabulary, not row counts (counts arrive with
-// the phase-2 rollup).
+// the trace-level overview).
 
 /// The facet keys, each in the selection grammar (`<owner>.<key>` or a
 /// bare builtin word) — feed them back as `selections` keys or an
@@ -678,8 +678,8 @@ impl Default for InfoResponse {
 // ── Status ──────────────────────────────────────────────────────────
 
 /// Wire form of the engine's [`QueryStatus`]: `{"complete": true}` or
-/// `{"partial": ["size_cap", ...]}` (the traces-ui design's response
-/// outline). Untagged — the distinct field names select the variant.
+/// `{"partial": ["size_cap", ...]}`.
+/// Untagged — the distinct field names select the variant.
 /// Every data-mode response carries one beside its data; defined (and
 /// pinned by round-trip tests) here so the data modes share one
 /// serialization.

@@ -1,4 +1,4 @@
-//! The typed, wire-neutral key vocabulary (phase-4b decision 16A):
+//! The typed, wire-neutral key vocabulary:
 //! owners and keys are ENUMS, never grammar strings. Each wire adapter —
 //! a future Netdata UI, the CLI — owns its own string rendering of this
 //! vocabulary, in both directions, and must round-trip it; the engine
@@ -54,7 +54,7 @@ impl AttributeOwner {
 
 /// The fixed builtin-field set — engine capabilities, not data
 /// properties, which is why key enumeration lists ALL of them
-/// unconditionally (decision 18B): filtering on `Status` is valid on a
+/// unconditionally: filtering on `Status` is valid on a
 /// corpus with no statuses (it matches nothing).
 ///
 /// Dictionary-backed builtins ([`dictionary_field`]
@@ -65,7 +65,7 @@ impl AttributeOwner {
 /// (`RootName`, `RootServiceName`, `TraceDuration`) — and value
 /// enumeration on them is a request error.
 ///
-/// `trace_state` is deliberately NOT a builtin (decision 17A): the key
+/// `trace_state` is deliberately NOT a builtin: the key
 /// vocabulary exists for filter autocomplete, and no query path filters
 /// on it; it stays visible in trace-by-id results.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -119,8 +119,7 @@ impl BuiltinField {
     /// Values come back as the STORAGE labels (`kind` ∈
     /// `INTERNAL/SERVER/CLIENT/PRODUCER/CONSUMER`, `status` ∈
     /// `OK/ERROR`); mapping those to a wire vocabulary is the wire
-    /// adapter's job, next to its name table (decision 19, dissolved
-    /// into 16A).
+    /// adapter's job, next to its name table.
     pub fn dictionary_field(self) -> Option<&'static str> {
         match self {
             BuiltinField::Name => Some("name"),

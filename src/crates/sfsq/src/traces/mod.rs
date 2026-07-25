@@ -1,12 +1,12 @@
-//! Multi-source trace-query subsystem (phase 4a: cross-source
-//! trace-by-id; phase 4b: attribute / attribute-value enumeration).
+//! Multi-source trace-query subsystem: cross-source trace-by-id,
+//! attribute / attribute-value enumeration, search, and the
+//! trace-level aggregates (overview, slowest).
 //!
 //! Same philosophy as [`logs`](crate::logs): neutral, transport-free —
 //! plain Rust data in and out, no wire concerns; each consumer (the CLI,
 //! a future Netdata UI) maps its own request/response format onto it.
-//! Design authority: the phase-4 design record in the traces plan repo — the
-//! combiner, status, and identity contracts implemented here are pinned
-//! there.
+//! The combiner, status, and identity contracts implemented here are
+//! pinned by the integration suites under `tests/`.
 //!
 //! Two deliberate differences from the logs engine:
 //!

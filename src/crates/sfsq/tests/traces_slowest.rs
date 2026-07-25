@@ -1,8 +1,9 @@
-//! Integration suite for the slowest mode (phase-2 step 2.4):
+//! Integration suite for the slowest mode:
 //! duration-ranked top-K against brute force on multi-source corpora,
-//! the D7 straddle (merged envelope ranks once), the D8 cross-source
-//! root pick (single-root straddles exact; multi-root ties by smallest
-//! span id), the D9 stored-row counts, the D10 legacy exclusion,
+//! the cross-source straddle (merged envelope ranks once), the
+//! cross-source root pick (single-root straddles exact; multi-root
+//! ties by smallest span id), the stored-row counts, the legacy
+//! (pre-rollup) exclusion,
 //! truncation, tie-breaks, window clipping, ceiling termination,
 //! cancellation, per-source failure honesty, and the request-error
 //! boundary.
@@ -100,7 +101,7 @@ fn top_k_matches_brute_force_on_the_corpus() {
     ];
     assert_eq!(got, expected, "full ranking matches brute force");
 
-    // Row fields carry the D9 stored-row counts and the D8 roots.
+    // Row fields carry the stored-row counts and the honest-or-absent roots.
     let c = &data.traces[0];
     assert_eq!(c.min_start_ns, 5_000_000_000);
     assert_eq!((c.span_count, c.error_count), (2, 0));
@@ -159,8 +160,8 @@ fn equal_durations_tie_break_by_ascending_trace_id() {
 #[test]
 fn straddling_trace_ranks_once_with_the_merged_envelope_and_root() {
     // Trace A's ROOT lands in the sealed file, its long-running CHILD in
-    // the tail. D7: one merged trace whose duration spans both parts;
-    // D8 across sources: the root comes from the ONLY source holding a
+    // the tail: one merged trace whose duration spans both parts;
+    // across sources, the root comes from the ONLY source holding a
     // true root — exact, no tie involved.
     let dir = tempfile::tempdir().unwrap();
     let wal_1 = write_wal(
@@ -224,7 +225,7 @@ fn multi_root_straddle_picks_the_smallest_root_span_id() {
 
 #[test]
 fn resend_counts_stored_rows() {
-    // D9: the SAME span stored twice counts twice in the row's numbers.
+    // The SAME span stored twice counts twice in the row's numbers.
     let dir = tempfile::tempdir().unwrap();
     let a = tspan(0xA, 1, 1_000_000_000, 1_200_000_000, "a-root");
     let wal = write_wal(dir.path(), vec![req(&[a.clone(), a])], "resend");
@@ -233,12 +234,12 @@ fn resend_counts_stored_rows() {
         SlowestQuery::new(window()),
     );
     assert_eq!(data.traces.len(), 1);
-    assert_eq!(data.traces[0].span_count, 2, "stored rows (D9)");
+    assert_eq!(data.traces[0].span_count, 2, "stored rows (resends count)");
 }
 
 #[test]
 fn a_trace_starting_before_the_window_is_clipped() {
-    // The D15 alignment rule shared with the overview: envelope-start
+    // The alignment rule shared with the overview: envelope-start
     // clipping. Trace A starts at 1s — outside a [2s, 100s) window —
     // and disappears entirely; D (8s) survives.
     let dir = tempfile::tempdir().unwrap();
@@ -288,7 +289,7 @@ fn a_straddle_whose_merged_start_is_pre_window_is_clipped_whole() {
 
 #[test]
 fn legacy_file_without_the_rollup_is_excluded_and_flagged() {
-    // D10: identical to the overview — a pre-rollup file contributes
+    // Identical to the overview: a pre-rollup file contributes
     // nothing and the exclusion is flagged.
     let dir = tempfile::tempdir().unwrap();
     let modern_wal = write_wal(dir.path(), vec![req(&corpus())], "modern");

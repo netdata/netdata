@@ -1,15 +1,15 @@
 //! The optional per-file trace rollup (`TRSU` chunk): one row per
 //! distinct set (non-UNSET) trace id in the file — the trace-level
 //! aggregate the traces overview/slowest/facet queries fold WITHOUT
-//! assembling traces (traces-ui design §5 phase 2, decisions D6–D10).
+//! assembling traces.
 //!
 //! Semantics (pinned):
 //!
-//! - **Stored-row statistics (D9)**: counts count what is on disk. A
+//! - **Stored-row statistics**: counts count what is on disk. A
 //!   resent span counts every time it is stored — the canonical
 //!   `(span_id, kind)` dedup belongs to assembly (`trace_combine`),
 //!   deliberately NOT replicated here. Consumers label the numbers so.
-//! - **Root honest-or-absent (D8)**: root fields are set only from a
+//! - **Root honest-or-absent**: root fields are set only from a
 //!   span with a genuinely UNSET parent seen in THIS file (the earliest
 //!   such span wins, mirroring `Trace::summary_root`'s convention);
 //!   otherwise `root_is_true_root` is false and the root fields are
@@ -48,7 +48,7 @@ pub struct TraceRollup {
     pub min_start_ns: Vec<i64>,
     /// Envelope end: max stored `start ⊕ duration` (saturating), ns.
     pub max_end_ns: Vec<i64>,
-    /// Stored spans of this trace in THIS file (D9 — resends included).
+    /// Stored spans of this trace in THIS file (resends included).
     pub span_counts: Vec<u32>,
     /// Of those, spans with ERROR status.
     pub error_counts: Vec<u32>,
@@ -124,7 +124,7 @@ struct Acc {
     max_end_ns: i64,
     span_count: u32,
     error_count: u32,
-    /// The earliest unset-parent span seen so far, when any (D8).
+    /// The earliest unset-parent span seen so far, when any.
     root: Option<Root>,
 }
 
@@ -189,7 +189,7 @@ impl TraceRollupRows {
         if is_error {
             acc.error_count = acc.error_count.saturating_add(1);
         }
-        // D8: the earliest genuinely-unset-parent span wins the root
+        // The earliest genuinely-unset-parent span wins the root
         // (the summary_root convention). Equal starts tie-break by
         // ascending span id — the combiner total order's next key — so
         // the pick is deterministic regardless of storage order.
@@ -275,7 +275,7 @@ mod tests {
     fn unset_trace_ids_are_excluded_and_counts_are_stored_rows() {
         let mut rows = TraceRollupRows::new();
         rows.record_span(TraceId::UNSET, sid(1), true, 10, 5, 1, false, None, None);
-        // The same span stored twice (a resend) counts twice — D9.
+        // The same span stored twice (a resend) counts twice.
         rows.record_span(tid(1), sid(1), true, 10, 5, 1, true, None, None);
         rows.record_span(tid(1), sid(1), true, 10, 5, 1, true, None, None);
         assert_eq!(rows.num_traces(), 1);
@@ -300,7 +300,7 @@ mod tests {
         let mut rows = TraceRollupRows::new();
         // No unset-parent span → no true root, sentinels everywhere.
         rows.record_span(tid(1), sid(1), false, 10, 5, 2, false, None, None);
-        // A true root, then an EARLIER true root displaces it (D8 /
+        // A true root, then an EARLIER true root displaces it (the
         // summary_root convention); a later one does not.
         rows.record_span(tid(2), sid(5), true, 50, 5, 2, false, None, None);
         rows.record_span(tid(2), sid(3), true, 30, 5, 3, false, None, None);

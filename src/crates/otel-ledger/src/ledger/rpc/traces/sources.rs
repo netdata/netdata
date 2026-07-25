@@ -1,7 +1,6 @@
 //! Live trace-query sources: the bridge between the traces pipeline's
 //! [`TenantRegistries`] view and the `sfsq::traces` source types. Feeds
-//! the `otel-traces` Function's data modes as they land (traces-ui
-//! phase-1 steps 1.2+).
+//! every one of the `otel-traces` Function's data modes.
 //!
 //! Mirrors the logs handler's snapshot discipline
 //! (`rpc/logs/handler.rs::resolve_wal`): descriptors captured under ONE

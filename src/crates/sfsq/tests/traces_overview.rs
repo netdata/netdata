@@ -1,7 +1,8 @@
-//! Integration suite for the TRACE-level overview (phase-2 v2): exact
-//! trace-density grids over known multi-trace corpora, the D7 straddle
-//! (one trace across sources counts once, envelope merged), the D9
-//! resend divergence from canonical assembly, the D10 legacy exclusion
+//! Integration suite for the TRACE-level overview: exact
+//! trace-density grids over known multi-trace corpora, the cross-source
+//! straddle (one trace across sources counts once, envelope merged),
+//! the stored-row resend divergence from canonical assembly, the
+//! legacy (pre-rollup) exclusion
 //! (a pre-rollup file is flagged, never mixed in), shard-merge
 //! associativity, ceiling termination, cancellation, and per-source
 //! failure honesty.
@@ -86,7 +87,7 @@ fn sealed_grid_counts_traces_by_merged_envelope() {
 #[test]
 fn straddling_trace_counts_once_with_the_merged_envelope() {
     // Trace A's two spans land in DIFFERENT sources (a sealed file and a
-    // tail) — D7: one merged trace, envelope spanning both parts.
+    // tail) — one merged trace, envelope spanning both parts.
     let dir = tempfile::tempdir().unwrap();
     let wal_1 = write_wal(
         dir.path(),
@@ -115,7 +116,7 @@ fn straddling_trace_counts_once_with_the_merged_envelope() {
 
 #[test]
 fn resend_counts_stored_rows_where_assembly_dedups() {
-    // The D9 divergence, shown side by side: the SAME span stored twice
+    // The stored-row divergence, shown side by side: the SAME span stored twice
     // counts twice in the overview's stored-row totals, while assembly
     // (trace_by_id over the same source) dedups it canonically.
     let dir = tempfile::tempdir().unwrap();
@@ -125,7 +126,7 @@ fn resend_counts_stored_rows_where_assembly_dedups() {
 
     let data = run(sources.clone(), OverviewQuery::new(grid()));
     assert_eq!(data.total_traces, 1);
-    assert_eq!(data.total_spans, 2, "stored rows — the resend counts (D9)");
+    assert_eq!(data.total_spans, 2, "stored rows — the resend counts");
 
     let tr = trace_by_id(
         sources,
@@ -140,7 +141,7 @@ fn resend_counts_stored_rows_where_assembly_dedups() {
 #[test]
 fn legacy_file_without_the_rollup_is_excluded_and_flagged_never_mixed() {
     // A hand-built pre-rollup ("legacy") SFST beside a modern sealed
-    // file: D10 — the legacy file's traces never leak into trace-level
+    // file: the legacy file's traces never leak into trace-level
     // numbers; the exclusion is flagged.
     let dir = tempfile::tempdir().unwrap();
     let modern_wal = write_wal(dir.path(), vec![req(&corpus())], "modern");
@@ -268,7 +269,7 @@ fn empty_grid_is_a_request_error() {
     assert!(err.to_string().contains("empty"), "{err}");
 }
 
-// ── Root facets (phase-2 step 2.5) ──────────────────────────────────
+// ── Root facets ─────────────────────────────────────────────────────
 
 /// A CHILD span (parent set) of trace `t`.
 fn fspan(t: u8, id: u8, parent: u8, start_ns: u64, name: &'static str) -> common::SpanSpec {

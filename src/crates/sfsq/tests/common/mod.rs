@@ -293,7 +293,7 @@ pub fn tail_source(wal_path: &Path, id: &str) -> TraceSource {
 }
 
 /// A minimal valid SFST WITHOUT a `TRSU` chunk — a hand-built
-/// pre-rollup ("legacy") file for the D10 exclusion tests. Returns the
+/// pre-rollup ("legacy") file for the no-mixed-units exclusion tests. Returns the
 /// sealed-file source wrapping it.
 pub fn legacy_sfst_source(dir: &Path, name: &str) -> TraceSource {
     let legacy_path = dir.join(format!("{name}.sfst"));
