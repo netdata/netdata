@@ -152,14 +152,17 @@ The `time_group` parameter in `aggregations.time` controls how data points withi
 | `des`              | Double exponential smoothing                                                       | Trend + seasonality smoothing             |
 | `incremental-sum`  | Difference between last and first value                                            | Change over interval                      |
 | `percentile`       | Generic percentile (set value in `time_group_options`)                             | e.g., 95th percentile latency             |
-| `countif`          | Count values matching condition (set condition in `time_group_options`)            | e.g., count samples above threshold       |
+| `percentage-of-samples` | Share of samples matching a condition (alias `countif`)                        | e.g., % of samples above a threshold      |
+| `percentage-of-time`    | Share of TIME matching a condition                                             | e.g., % of the window a node was down     |
+| `number-of-flaps`       | How many times a condition flipped from false to true                          | e.g., link flapping                       |
+| `number-of-times`       | How many samples matched a condition (`<previous` counts counter resets)       | e.g., reboots in the last day             |
 | `trimmed-mean`     | Mean after trimming outliers (set trim % in `time_group_options`)                  | Robust average excluding extremes         |
 | `trimmed-median`   | Median after trimming outliers (set trim % in `time_group_options`)                | Robust median excluding extremes          |
 | `extremes`         | Min and max values                                                                 | Show value range per interval             |
 
 :::important
 
-When using `time_group` values other than `min`, `max`, `average`, or `sum`, you MUST specify `"tier": 0` in the `window` object to ensure a non-aggregated storage tier is used. Without it, the query may use a pre-aggregated tier (per-minute or per-hour) where advanced functions like `median`, `stddev`, `ses`, `des`, `percentile`, `countif`, `trimmed-mean`, `trimmed-median`, and `extremes` cannot work correctly.
+When using `time_group` values other than `min`, `max`, `average`, or `sum`, you MUST specify `"tier": 0` in the `window` object to ensure a non-aggregated storage tier is used. Without it, the query may use a pre-aggregated tier (per-minute or per-hour) where advanced functions like `median`, `stddev`, `ses`, `des`, `percentile`, `countif`, `trimmed-mean`, `trimmed-median`, and `extremes` cannot work correctly. `percentage-of-time`, `number-of-flaps` and `number-of-times` do define a tier behaviour, but it is an estimate above tier 0 - request `"tier": 0` when you need the exact answer.
 
 :::
 

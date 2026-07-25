@@ -5,87 +5,28 @@
 
 #include "../query.h"
 #include "../rrdr.h"
+#include "../tg-expression.h"
 
-enum tg_countif_cmp {
-    TG_COUNTIF_EQUAL,
-    TG_COUNTIF_NOTEQUAL,
-    TG_COUNTIF_LESS,
-    TG_COUNTIF_LESSEQUAL,
-    TG_COUNTIF_GREATER,
-    TG_COUNTIF_GREATEREQUAL,
-};
+// percentage-of-samples (historically `countif`, still accepted as an
+// alias): the share of the samples in each bucket that matched the
+// condition.
+//
+// The values it returns are unchanged; what changed is that the condition
+// is now parsed by the shared grammar, so this understands gap tokens and
+// the predecessor keywords, and a bare number finally means what it says.
 
 struct tg_countif {
-    enum tg_countif_cmp comparison;
-    NETDATA_DOUBLE target;
+    TG_EXPRESSION expr;
     size_t count;
     size_t matched;
 };
 
-static inline void tg_countif_create(RRDR *r, const char *options __maybe_unused) {
+static inline void tg_countif_create(RRDR *r, const char *options) {
     struct tg_countif *g = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct tg_countif));
+    // the API has never rejected a malformed condition here
+    (void)tg_expression_parse(&g->expr, options);
     r->time_grouping.data = g;
-
-    if(options && *options) {
-        // skip any leading spaces
-        while(isspace((uint8_t)*options)) options++;
-
-        // find the comparison function
-        switch(*options) {
-            case '!':
-                options++;
-                if(*options != '=' && *options != ':')
-                    options--;
-                g->comparison = TG_COUNTIF_NOTEQUAL;
-                break;
-
-            case '>':
-                options++;
-                if(*options == '=' || *options == ':') {
-                    g->comparison = TG_COUNTIF_GREATEREQUAL;
-                }
-                else {
-                    options--;
-                    g->comparison = TG_COUNTIF_GREATER;
-                }
-                break;
-
-            case '<':
-                options++;
-                if(*options == '>') {
-                    g->comparison = TG_COUNTIF_NOTEQUAL;
-                }
-                else if(*options == '=' || *options == ':') {
-                    g->comparison = TG_COUNTIF_LESSEQUAL;
-                }
-                else {
-                    options--;
-                    g->comparison = TG_COUNTIF_LESS;
-                }
-                break;
-
-            case '=':
-                if(options[1] == '=')
-                    options++;  // support ==, skip to second '='
-                g->comparison = TG_COUNTIF_EQUAL;
-                break;
-
-            default:
-            case ':':
-                g->comparison = TG_COUNTIF_EQUAL;
-                break;
-        }
-        if(*options) options++;
-
-        // skip everything up to the first digit
-        while(isspace((uint8_t)*options)) options++;
-
-        g->target = str2ndd(options, NULL);
-    }
-    else {
-        g->target = 0.0;
-        g->comparison = TG_COUNTIF_EQUAL;
-    }
+    r->time_grouping.wants_gaps = tg_expression_wants_gaps(&g->expr);
 }
 
 // resets when switches dimensions
@@ -94,6 +35,7 @@ static inline void tg_countif_reset(RRDR *r) {
     struct tg_countif *g = (struct tg_countif *)r->time_grouping.data;
     g->matched = 0;
     g->count = 0;
+    tg_expression_reset(&g->expr);
 }
 
 static inline void tg_countif_free(RRDR *r) {
@@ -101,34 +43,19 @@ static inline void tg_countif_free(RRDR *r) {
     r->time_grouping.data = NULL;
 }
 
-static inline void tg_countif_add(RRDR *r, NETDATA_DOUBLE value) {
+static inline void tg_countif_add_point(
+    RRDR *r, NETDATA_DOUBLE value, bool is_gap, time_t duration __maybe_unused, size_t samples) {
     struct tg_countif *g = (struct tg_countif *)r->time_grouping.data;
-    switch(g->comparison) {
-        case TG_COUNTIF_GREATER:
-            if(value > g->target) g->matched++;
-            break;
 
-        case TG_COUNTIF_GREATEREQUAL:
-            if(value >= g->target) g->matched++;
-            break;
+    // a gap stands for every sample slot it covers, not for one point
+    if(tg_expression_eval(&g->expr, value, is_gap))
+        g->matched += samples;
 
-        case TG_COUNTIF_LESS:
-            if(value < g->target) g->matched++;
-            break;
+    g->count += samples;
+}
 
-        case TG_COUNTIF_LESSEQUAL:
-            if(value <= g->target) g->matched++;
-            break;
-
-        case TG_COUNTIF_EQUAL:
-            if(value == g->target) g->matched++;
-            break;
-
-        case TG_COUNTIF_NOTEQUAL:
-            if(value != g->target) g->matched++;
-            break;
-    }
-    g->count++;
+static inline void tg_countif_add(RRDR *r, NETDATA_DOUBLE value) {
+    tg_countif_add_point(r, value, false, 1, 1);
 }
 
 static inline NETDATA_DOUBLE tg_countif_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
@@ -146,6 +73,8 @@ static inline NETDATA_DOUBLE tg_countif_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_va
 
     g->matched = 0;
     g->count = 0;
+
+    // the predecessor survives the flush, so `<previous` spans buckets
 
     return value;
 }

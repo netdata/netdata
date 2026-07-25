@@ -85,6 +85,7 @@ struct rrd_alert_config {
     RRDR_TIME_GROUPING time_group;  // grouping method: average, max, etc.
     ALERT_LOOKUP_TIME_GROUP_CONDITION time_group_condition;
     NETDATA_DOUBLE time_group_value;
+    STRING *time_group_options;     // the condition exactly as written
     ALERT_LOOKUP_DIMS_GROUPING dims_group; // grouping method for dimensions
     ALERT_LOOKUP_DATA_SOURCE data_source;
     int before;                     // ending point in time-series

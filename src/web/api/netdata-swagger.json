@@ -7216,7 +7216,11 @@
             "ses",
             "des",
             "cv",
+            "percentage-of-samples",
             "countif",
+            "percentage-of-time",
+            "number-of-flaps",
+            "number-of-times",
             "percentile",
             "percentile25",
             "percentile50",
@@ -7271,7 +7275,11 @@
             "ses",
             "des",
             "cv",
+            "percentage-of-samples",
             "countif",
+            "percentage-of-time",
+            "number-of-flaps",
+            "number-of-times",
             "percentile",
             "percentile25",
             "percentile50",
@@ -7310,7 +7318,7 @@
       "dataTimeGroupOptions1": {
         "name": "group_options",
         "in": "query",
-        "description": "When the time grouping function supports additional parameters, this field can be used to pass them to it. Currently `countif`, `trimmed-mean`, `trimmed-median` and `percentile` support this. For `countif` the string may start with `<`, `<=`, `<:`, `<>`, `!=`, `>`, `>=`, `>:`. For all others just a number is expected.\n",
+        "description": "When the time grouping function supports additional parameters, this field can be used to pass them to it. `percentage-of-samples` (alias `countif`), `percentage-of-time`, `number-of-flaps` and `number-of-times` take a CONDITION; `trimmed-mean`, `trimmed-median` and `percentile` take a number.\nA condition is an operator followed by a value. The operators are `>`, `>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`) and `!=` (or `!` or `<>`); with no operator the value compares equal. The value is one of:\n- a number, e.g. `>10`\n- a gap token - `gap`, `nan`, `null` or `empty` are synonyms for \"no data was collected\", e.g. `==gap` matches the slots with no data and `!=gap` matches the collected ones. Naming a gap token is what makes gaps participate at all; without one they are invisible, as they are for every other aggregation.\n- the previous collected sample - `previous` or `last`, e.g. `<previous` matches every sample lower than the one before it, which counts counter resets (reboots). Gaps are skipped, so a drop across a gap is still a drop, and the first sample of a query never matches.\nThere are no and/or compounds.\n",
         "required": false,
         "schema": {
           "type": "string"
@@ -7319,7 +7327,7 @@
       "dataTimeGroupOptions2": {
         "name": "time_group_options",
         "in": "query",
-        "description": "When the time grouping function supports additional parameters, this field can be used to pass them to it. Currently `countif`, `trimmed-mean`, `trimmed-median` and `percentile` support this. For `countif` the string may start with `<`, `<=`, `<:`, `<>`, `!=`, `>`, `>=`, `>:`. For all others just a number is expected.\n",
+        "description": "When the time grouping function supports additional parameters, this field can be used to pass them to it. `percentage-of-samples` (alias `countif`), `percentage-of-time`, `number-of-flaps` and `number-of-times` take a CONDITION; `trimmed-mean`, `trimmed-median` and `percentile` take a number.\nA condition is an operator followed by a value. The operators are `>`, `>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`) and `!=` (or `!` or `<>`); with no operator the value compares equal. The value is one of:\n- a number, e.g. `>10`\n- a gap token - `gap`, `nan`, `null` or `empty` are synonyms for \"no data was collected\", e.g. `==gap` matches the slots with no data and `!=gap` matches the collected ones. Naming a gap token is what makes gaps participate at all; without one they are invisible, as they are for every other aggregation.\n- the previous collected sample - `previous` or `last`, e.g. `<previous` matches every sample lower than the one before it, which counts counter resets (reboots). Gaps are skipped, so a drop across a gap is still a drop, and the first sample of a query never matches.\nThere are no and/or compounds.\n",
         "required": false,
         "schema": {
           "type": "string"

@@ -593,6 +593,7 @@ void rrd_alert_match_cleanup(struct rrd_alert_match *am) {
 
 void rrd_alert_config_cleanup(struct rrd_alert_config *ac) {
     string_freez(ac->name);
+    string_freez(ac->time_group_options);
 
     string_freez(ac->exec);
     string_freez(ac->recipient);

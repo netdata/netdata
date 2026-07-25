@@ -105,6 +105,11 @@ typedef struct rrdresult {
 
         TIER_QUERY_FETCH tier_query_fetch;  // which value to use from STORAGE_POINT
 
+        // set by create() when the parsed expression names a gap token:
+        // the ONLY way gap slots reach a grouping (they are filtered out
+        // of the hot path for everyone else)
+        bool wants_gaps;
+
         size_t points_wanted;               // used by SES and DES
         size_t resampling_group;            // used by AVERAGE
         NETDATA_DOUBLE resampling_divisor;  // used by AVERAGE

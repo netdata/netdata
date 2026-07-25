@@ -62,6 +62,7 @@ typedef struct query_engine_ops {
     // aggregating points over time
     size_t group_points_non_zero;
     size_t group_points_added;
+    time_t group_covered_s;             // seconds of this bucket already accounted for
     STORAGE_POINT group_point;          // aggregates min, max, sum, count, anomaly count for each group point
     STORAGE_POINT query_point;          // aggregates min, max, sum, count, anomaly count across the whole query
     RRDR_VALUE_FLAGS group_value_flags;
@@ -106,7 +107,22 @@ void rrd2rrdr_query_ops_freeall(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache);
 void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops);
 
 // time aggregation
-void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING add_flush);
+// the groupings whose value is derived from a condition, not from the
+// sample values themselves
+static inline bool time_grouping_is_expression(RRDR_TIME_GROUPING g) {
+    switch(g) {
+        case RRDR_GROUPING_COUNTIF:
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, bool is_gap, time_t duration, size_t samples, const RRDR_TIME_GROUPING add_flush);
 NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, const RRDR_TIME_GROUPING add_flush);
 void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method);
 

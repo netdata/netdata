@@ -6,7 +6,7 @@
 
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 18
+#define DB_METADATA_VERSION 19
 
 #define COMPUTE_DURATION(var_name, unit, start, end)      \
     char var_name[64];                                    \
@@ -58,7 +58,7 @@ const char *database_config[] = {
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
     "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text, "
-    "summary text, time_group_condition INT, time_group_value DOUBLE, dims_group INT, data_source INT)",
+    "summary text, time_group_condition INT, time_group_value DOUBLE, time_group_options text, dims_group INT, data_source INT)",
 
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key))",

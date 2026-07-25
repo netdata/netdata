@@ -890,13 +890,13 @@ done:
     "green, red, warn, crit, exec, to_key, info, delay, options, repeat, host_labels, "                                \
     "p_db_lookup_dimensions, p_db_lookup_method, p_db_lookup_options, p_db_lookup_after, "                             \
     "p_db_lookup_before, p_update_every, source, chart_labels, summary, time_group_condition, "                        \
-    "time_group_value, dims_group, data_source) "                                                                      \
+    "time_group_value, time_group_options, dims_group, data_source) "                                                                      \
     "VALUES (@hash_id,UNIXEPOCH(),@alarm,@template,"                                                                   \
     "@on_key,@class,@component,@type,@lookup,@every,@units,@calc,"                                                     \
     "@green,@red,@warn,@crit,@exec,@to_key,@info,@delay,@options,@repeat,@host_labels,"                                \
     "@p_db_lookup_dimensions,@p_db_lookup_method,@p_db_lookup_options,@p_db_lookup_after,"                             \
     "@p_db_lookup_before,@p_update_every,@source,@chart_labels,@summary, @time_group_condition, "                      \
-    "@time_group_value, @dims_group, @data_source)"
+    "@time_group_value, @time_group_options, @dims_group, @data_source)"
 
 void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
 {
@@ -1003,6 +1003,7 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
 
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.time_group_condition));
     SQLITE_BIND_FAIL(done, sqlite3_bind_double(res, ++param, ap->config.time_group_value));
+    SQLITE_BIND_FAIL(done, SQLITE3_BIND_TRANSIENT_STRING_OR_NULL(res, ++param, ap->config.time_group_options));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.dims_group));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.data_source));
 
@@ -1660,7 +1661,7 @@ done_only_drop:
     " units, calc, families, green, red, warn, crit, "                                                                 \
     " exec, to_key, info, delay, options, repeat, host_labels, p_db_lookup_dimensions, p_db_lookup_method, "           \
     " p_db_lookup_options, p_db_lookup_after, p_db_lookup_before, p_update_every, source, chart_labels, summary,  "    \
-    " time_group_condition, time_group_value, dims_group, data_source "                                                \
+    " time_group_condition, time_group_value, time_group_options, dims_group, data_source "                            \
     " FROM alert_hash ah, c_%p t where ah.hash_id = t.hash_id"
 
 int sql_get_alert_configuration(
@@ -1768,6 +1769,7 @@ int sql_get_alert_configuration(
         acd.summary = (const char *) sqlite3_column_text(res, param++);
         acd.value.db.time_group_condition =(int32_t) sqlite3_column_int(res, param++);
         acd.value.db.time_group_value = sqlite3_column_double(res, param++);
+        acd.value.db.time_group_options = (const char *) sqlite3_column_text(res, param++);
         acd.value.db.dims_group = (int32_t) sqlite3_column_int(res, param++);
         acd.value.db.data_source = (int32_t) sqlite3_column_int(res, param++);
 

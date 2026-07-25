@@ -319,7 +319,10 @@ The query engine is a pipeline with two aggregation stages:
 | Average resource consumption (gauge metrics: memory, disk space, connections) | `average` or `max` | Gauges represent current state; max shows peak usage                  |
 | Find spikes or peaks (any metric type)                                        | `max`              | Captures the highest value within each interval                       |
 | Total volume transferred (counters: bytes, packets)                           | `sum`              | Sums the actual volume                                                |
-| Count events matching a condition                                             | `countif`          | Counts samples matching a threshold                                   |
+| Count events matching a condition                                             | `number-of-times`  | Counts the samples that matched (`<previous` counts counter resets)   |
+| Share of samples matching a condition                                         | `percentage-of-samples` | Alias `countif`                                                  |
+| Share of TIME matching a condition                                            | `percentage-of-time` | e.g. % of the window a node was down (an SLO)                       |
+| How many times a condition flipped on                                         | `number-of-flaps`  | Link flapping, a service bouncing                                     |
 
 #### Choosing aggregation Based on How to Combine Series
 
@@ -371,7 +374,10 @@ Controls how raw data points within each time interval are combined into one val
 | `ses`             |         | Single exponential smoothing                                                                              |
 | `des`             |         | Double exponential smoothing                                                                              |
 | `incremental-sum` |         | Difference between last and first value in interval                                                       |
-| `countif`         |         | Count values matching condition. Set condition in `time_group_options`: `">0"`, `"=0"`, `"!=0"`, `"<=10"` |
+| `percentage-of-samples` |   | Share of samples matching the condition in `time_group_options` (alias `countif`) |
+| `percentage-of-time`    |   | Share of TIME matching the condition |
+| `number-of-flaps`       |   | How many times the condition flipped from false to true |
+| `number-of-times`       |   | How many samples matched the condition |
 | `percentile`      |         | Percentile. Set percentile value in `time_group_options`: `"95"`, `"99"`                                  |
 | `trimmed-mean`    |         | Mean after trimming outliers. Set trim % in `time_group_options`                                          |
 | `trimmed-median`  |         | Median after trimming outliers. Set trim % in `time_group_options`                                        |
@@ -392,7 +398,7 @@ samples to work correctly.
 
 | Used with        | Value format                | Example                            |
 |------------------|-----------------------------|------------------------------------|
-| `countif`        | Comparison operator + value | `">0"`, `"=0"`, `"!=0"`, `"<=100"` |
+| `percentage-of-samples`, `percentage-of-time`, `number-of-flaps`, `number-of-times` | Operator + value | `">0"`, `"=0"`, `"<=100"`, a gap token `"==gap"` / `"!=nan"`, or the previous sample `"<previous"` / `"<last"` |
 | `percentile`     | Percentile value (0-100)    | `"95"`, `"99.5"`                   |
 | `trimmed-mean`   | Trim percentage             | `"5"`, `"10"`                      |
 | `trimmed-median` | Trim percentage             | `"5"`, `"10"`                      |

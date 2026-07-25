@@ -111,8 +111,14 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
         default:
             break;
 
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
         case RRDR_GROUPING_COUNTIF:
             JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group_condition", alerts_group_condition2id, config->time_group_condition, error, flags);
+            // the expression is authoritative when present; the legacy
+            // condition/value pair above stays for older consumers
+            JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "time_group_options", config->time_group_options, error, flags);
             // fall through
 
         case RRDR_GROUPING_TRIMMED_MEAN:
@@ -381,6 +387,7 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
                     buffer_json_member_add_string(wb, "time_group", time_grouping_id2txt(ap->config.time_group));
                     buffer_json_member_add_string(wb, "time_group_condition", alerts_group_conditions_id2txt(ap->config.time_group_condition));
                     buffer_json_member_add_double(wb, "time_group_value", ap->config.time_group_value);
+                    buffer_json_member_add_string_or_empty(wb, "time_group_options", string2str(ap->config.time_group_options));
                     buffer_json_member_add_string(wb, "dims_group", alerts_dims_grouping_id2group(ap->config.dims_group));
                     buffer_json_member_add_string(wb, "data_source", alerts_data_source_id2source(ap->config.data_source));
                     rrdr_options_to_buffer_json_array(wb, "options", RRDR_OPTIONS_REMOVE_OVERLAPPING(ap->config.options));
@@ -501,7 +508,15 @@ int dyncfg_health_prototype_to_conf(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, const c
                 break;
 
                 case RRDR_GROUPING_COUNTIF:
-                    buffer_sprintf(wb, "(%s%0.2f)", alerts_group_conditions_id2txt(nap->config.time_group_condition), nap->config.time_group_value);
+                case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+                case RRDR_GROUPING_NUMBER_OF_FLAPS:
+                case RRDR_GROUPING_NUMBER_OF_TIMES:
+                    // round-trip the condition as written, so gap tokens and
+                    // `previous` survive a config export
+                    if(nap->config.time_group_options)
+                        buffer_sprintf(wb, "(%s)", string2str(nap->config.time_group_options));
+                    else
+                        buffer_sprintf(wb, "(%s%0.2f)", alerts_group_conditions_id2txt(nap->config.time_group_condition), nap->config.time_group_value);
                 break;
 
                 default:

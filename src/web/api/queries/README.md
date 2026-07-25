@@ -20,7 +20,7 @@ Every data query accepts the following parameters:
 |`points`|no|The number of points to be returned. Netdata can reduce number of points by applying query grouping methods. If not given, the result will have the same granularity as the database (although this relates to `gtime`).|
 |`before`|no|The absolute timestamp or the relative (to now) time the query should finish evaluating data. If not given, it defaults to the timestamp of the latest point in the database.|
 |`after`|no|The absolute timestamp or the relative (to `before`) time the query should start evaluating data. if not given, it defaults to the timestamp of the oldest point in the database.|
-|`group`|no|The grouping method to use when reducing the points the database has. If not given, it defaults to `average`. See [Grouping methods](#grouping-methods) for the full list, including `trimmed-mean`, `trimmed-median`, `percentile`, `countif`, `extremes`, and `latest` variants.|
+|`group`|no|The grouping method to use when reducing the points the database has. If not given, it defaults to `average`. See [Grouping methods](#grouping-methods) for the full list, including `trimmed-mean`, `trimmed-median`, `percentile`, `percentage-of-samples` (alias `countif`), `percentage-of-time`, `number-of-flaps`, `number-of-times`, `extremes`, and `latest`.|
 |`gtime`|no|A resampling period to change the units of the metrics (i.e. setting this to `60` will convert `per second` metrics to `per minute`. If not given it defaults to granularity of the database.|
 |`options`|no|A bitmap of options that can affect the operation of the query. Only 2 options are used by the query engine: `unaligned` and `percentage`. All the other options are used by the output formatters. The default is to return aligned data.|
 |`dimensions`|no|A simple pattern to filter the dimensions to be queried. The default is to return all the dimensions of the chart.|
@@ -142,7 +142,17 @@ The following trimmed-median methods are available: `trimmed-median1`, `trimmed-
 #### group_options parameter
 
 Some grouping methods accept additional parameters via `group_options`:
-- `countif`: A comparison operator followed by a value (e.g., `>100`, `<=50`, `!=0`, `<:5`, `>:10`)
+- `percentage-of-samples` (alias `countif`), `percentage-of-time`, `number-of-flaps`, `number-of-times`: a CONDITION -
+  an operator followed by a value. Operators: `>`, `>=` (or `>:`), `<`, `<=` (or `<:`), `=` (or `==` or `:`), `!=` (or
+  `!` or `<>`); with no operator the value compares equal. The value is one of:
+  - a number, e.g. `>100`, `<=50`, `!=0`
+  - a gap token - `gap`, `nan`, `null`, `empty` all mean "no data was collected", e.g. `==gap` matches the empty slots
+    and `!=gap` the collected ones. Naming a gap token is what makes gaps count at all; without one they stay invisible.
+  - the previous collected sample - `previous` or `last`, e.g. `<previous` matches every sample lower than the one
+    before it, which counts counter resets. Gaps are skipped, so a drop across a gap still counts, and the first sample
+    of a query never matches.
+
+  There are no and/or compounds.
 - `percentile`: A number from 1-99 specifying the percentile
 - `trimmed-mean` / `trimmed-median`: A number specifying the percentage of values to trim from each end
 
