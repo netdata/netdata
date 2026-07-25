@@ -104,6 +104,24 @@ Check [Restoring a Netdata Parent after maintenance](/docs/observability-central
 </details>
 
 <details>
+<summary><strong>Should I back up my Netdata Parent nodes? How does replication work between the nodes?</strong></summary><br/>
+
+Yes. A Parent is the long-term store for all the metrics streamed to it by its Children, so it should be backed up like any standalone Netdata Agent. Use the standard [backup and restore procedure](/docs/netdata-agent/backup-and-restore-an-agent.md) — the same disaster-recovery workflow used for any Netdata Agent node.
+
+In an HA cluster, Parents [replicate past samples to each other](/docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md) to stay in sync, and a Child automatically fails over to another Parent if one becomes unavailable (see [Clustering and High Availability of Netdata Parents](/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md)). That replication provides redundancy, but it is **not a substitute for a backup**. It only back-fills recent missing samples under [known limitations](/docs/observability-centralization-points/metrics-centralization-points/replication-of-past-samples.md#understanding-limitations), and it cannot recover data lost to simultaneous Parent failure, corruption, or misconfiguration. To protect against those scenarios, back up at least one Parent in the cluster, and stagger backups across your Parents so a copy is always reasonably current.
+
+:::note
+
+**Backups vs. cloning a new Parent**
+
+The "Creating a new Parent from an existing one" procedure on the [clustering page](/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md) uses `rsync` to copy `/var/cache/netdata` from one Parent to another. That is a cluster-expansion step for adding a new Parent, not a disaster-recovery backup — it does not protect you if both Parents fail or the data is corrupted.
+
+:::
+
+<br/>
+</details>
+
+<details>
 <summary><strong>I have a cluster of parents. Which one is used by Netdata Cloud?</strong></summary><br/>
 
 When there are multiple data sources for the same node, Netdata Cloud follows this strategy:
