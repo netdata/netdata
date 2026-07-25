@@ -165,7 +165,9 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 		}
 		return rowVal(resp, 0, di)
 	}
-	near := func(got, want float64) bool { return math.Abs(got-want) < 1e-9 }
+	// json2 rounds values to seven decimals, so an exact ratio like 2/12
+	// arrives as 16.6666667
+	near := func(got, want float64) bool { return math.Abs(got-want) < 1e-6 }
 
 	// ------------------------------------------------------------------
 	// 1. the canonical name is echoed, and `countif` is an alias for it
