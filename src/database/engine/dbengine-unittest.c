@@ -568,6 +568,50 @@ static void dbengine_platform_test_watchdog(void *arg)
     }
 }
 
+static int dbengine_platform_test_empty_directory(const char *path, size_t tier)
+{
+    uv_fs_t scandir_req;
+    int ret = uv_fs_scandir(NULL, &scandir_req, path, 0, NULL);
+    if (ret < 0) {
+        fprintf(stderr, "DBENGINE platform unittest: cannot scan tier %zu test directory: %s\n",
+                tier, uv_strerror(ret));
+        uv_fs_req_cleanup(&scandir_req);
+        return 1;
+    }
+
+    int errors = 0;
+    uv_dirent_t entry;
+    while ((ret = uv_fs_scandir_next(&scandir_req, &entry)) != UV_EOF) {
+        if (ret < 0) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot read tier %zu test directory: %s\n",
+                    tier, uv_strerror(ret));
+            errors++;
+            break;
+        }
+
+        if (entry.type == UV_DIRENT_DIR) {
+            fprintf(stderr, "DBENGINE platform unittest: unexpected directory in tier %zu test directory\n", tier);
+            errors++;
+            continue;
+        }
+
+        char filename[RRDENG_PATH_MAX];
+        snprintfz(filename, sizeof(filename), "%s/%s", path, entry.name);
+
+        uv_fs_t unlink_req;
+        ret = uv_fs_unlink(NULL, &unlink_req, filename, NULL);
+        uv_fs_req_cleanup(&unlink_req);
+        if (ret < 0) {
+            fprintf(stderr, "DBENGINE platform unittest: cannot remove a file from tier %zu test directory: %s\n",
+                    tier, uv_strerror(ret));
+            errors++;
+        }
+    }
+    uv_fs_req_cleanup(&scandir_req);
+
+    return errors;
+}
+
 int dbengine_platform_unittest(void)
 {
     struct dbengine_platform_test_init init[DBENGINE_PLATFORM_TEST_TIERS] = { 0 };
@@ -697,6 +741,9 @@ cleanup_watchdog:
 
 cleanup_directories:
     for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        if (init[tier].path[0])
+            errors += dbengine_platform_test_empty_directory(init[tier].path, tier);
+
         if (init[tier].path[0] && rmdir(init[tier].path) != 0 && errno != ENOENT) {
             fprintf(stderr, "DBENGINE platform unittest: cannot remove tier %zu test directory\n", tier);
             errors++;
