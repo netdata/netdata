@@ -75,8 +75,8 @@ github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.31 h1:hyOxUyXdh3AyjE93gB
 github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.31/go.mod h1:OERqI9k0draSLB8O8woxY3q25ZWTELRK4RRoLMuMZFo=
 github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.32 h1:0MrUL35H/Y4kdFfItoR5jCgtDQ4Z/8LudAoIHRfA4hE=
 github.com/aws/aws-sdk-go-v2/internal/v4a v1.4.32/go.mod h1:2tNZkuWz54arj8mHVf+8Y7cKkcD8Wr/fBpENgEXpjLc=
-github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.63.1 h1:KmShXFvPzgolFsYnnDErV+Sj1/orgDaf4tbz+9N+d78=
-github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.63.1/go.mod h1:lipiF9DI3EmTTkEn2sgLug3iEO1dXM50FDFooey6vYU=
+github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.65.0 h1:mthzbb+JegG3ij6kCilO/tPPVT+ohq0dA/mc3kHFHDo=
+github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.65.0/go.mod h1:t3drm8DC/zlLUm3MvhkgD4Me6U6EJjzO+ZhcBzWxkcc=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.13 h1:mbRIur/BiHK6SKPjoBIXSE/hJ6g6JGRLuxQy1jGjlN4=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.13/go.mod h1:ITg9em2KbJx1s0y4aqRX5OYWG6HBZ5TVR//OdpEZ2CQ=
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.31 h1:w2SIhW92DZPFrSL4ksVCr8IYff5OZwIcxg8+95tzvAI=
