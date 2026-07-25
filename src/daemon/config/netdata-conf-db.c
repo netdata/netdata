@@ -248,13 +248,7 @@ void netdata_conf_dbengine_init(const char *hostname) {
         inicfg_set_size_mb(&netdata_config, CONFIG_SECTION_DB, "dbengine tier 0 retention size", default_multidb_disk_quota_mb);
     }
 
-#ifdef OS_WINDOWS
-    // Preserve serialized initialization until -W dbengineplatformtest verifies
-    // the concurrent UCRT64 startup and shutdown lifetime.
-    bool parallel_initialization = false;
-#else
     bool parallel_initialization = (nd_profile.storage_tiers <= netdata_conf_cpus()) ? true : false;
-#endif
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
 
