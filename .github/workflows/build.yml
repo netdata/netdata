@@ -73,8 +73,6 @@ jobs:
             .github/scripts/prepare-topology-ip-intel-stock.sh
             .github/scripts/run-updater-check.sh
             src/go/tools/topology-ip-intel-downloader/
-            src/go/go.mod
-            src/go/go.sum
             packaging/cmake/
             packaging/makeself/
             packaging/installer/
