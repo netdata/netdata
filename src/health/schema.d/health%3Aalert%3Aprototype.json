@@ -413,10 +413,13 @@
                       "description": ""
                     },
                     "time_group_value": {
-                      "type": "number",
+                      "type": [
+                        "number",
+                        "null"
+                      ],
                       "default": 1,
                       "title": "Value to match",
-                      "description": ""
+                      "description": "Null when the condition compares against something other than a number - a gap token or the previous sample - because it cannot be expressed here."
                     },
                     "time_group_options": {
                       "type": "string",

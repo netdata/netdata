@@ -152,7 +152,10 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_add_array_item_string(buffer, "coefficient-of-variation");    // relative standard deviation (cv)
         buffer_json_add_array_item_string(buffer, "ema");  // exponential moving average (alias "ses" or "ewma")
         buffer_json_add_array_item_string(buffer, "des");  // double exponential smoothing
-        buffer_json_add_array_item_string(buffer, "countif");  // requires time_group_options parameter
+        buffer_json_add_array_item_string(buffer, "percentage-of-samples");  // takes a condition; "countif" is an alias
+        buffer_json_add_array_item_string(buffer, "percentage-of-time");  // takes a condition
+        buffer_json_add_array_item_string(buffer, "number-of-flaps");  // takes a condition
+        buffer_json_add_array_item_string(buffer, "number-of-times");  // takes a condition
         buffer_json_add_array_item_string(buffer, "extremes");  // for each time frame, returns max for positive values and min for negative values
         buffer_json_add_array_item_string(buffer, "latest");  // for each time frame, returns the most recent collected value
         buffer_json_array_close(buffer);
@@ -166,8 +169,17 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_member_add_string(
             buffer, "description",
             "Additional options for time grouping.\n"
-            "For 'percentile', specify a percentage (0-100).\n"
-            "For 'countif', specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
+            "For 'percentile', 'trimmed-mean' and 'trimmed-median', specify a number.\n"
+            "For 'percentage-of-samples' (alias 'countif'), 'percentage-of-time', "
+            "'number-of-flaps' and 'number-of-times', specify a CONDITION: an operator "
+            "('>', '>=', '<', '<=', '=', '!=') followed by a value. The value is a number "
+            "(e.g. '>0'), a gap token ('==gap', '!=gap' - 'nan', 'null' and 'empty' are "
+            "synonyms - which is what makes uncollected time participate at all), or the "
+            "previous collected sample ('<previous', which counts counter resets such as "
+            "reboots). There are no and/or compounds.\n"
+            "Over a window long enough to read lower-resolution data these four return an "
+            "estimate, and the counting ones report at most one event per stored interval. "
+            "Pass tier=0 for exact answers.");
     }
     buffer_json_object_close(buffer); // time_group_options
 
