@@ -214,7 +214,7 @@ var manifest = map[string]ManifestCase{
 		Agent:  Green, FixedBy: "#23257",
 	},
 	"CASE-023/fleet-time-groupings": {
-		Proves: "the four fleet time-aggregations and their shared expression grammar: percentage-of-samples (canonical, countif alias) / percentage-of-time / number-of-flaps / number-of-times, each echoing its canonical name and transforming the response units (%/%/flaps/events); gap tokens (nan|null|gap|empty) pull gap slots into the denominator while an expression without one keeps them invisible; previous|last compare against the previous COLLECTED sample so a counter reset is a reboot and the first sample never matches; flaps count observed false->true transitions only, carried across buckets; a gap contributes its SLOT width, not the zero span of QUERY_POINT_EMPTY",
+		Proves: "the four fleet time-aggregations and their shared expression grammar: percentage-of-samples (canonical, countif alias) / percentage-of-time / number-of-flaps / number-of-times, each echoing its canonical name and transforming the response units (%/%/flaps/events); gap tokens (nan|null|gap|empty) pull gap slots in for percentage-of-samples, number-of-flaps and number-of-times while an expression without one keeps them invisible there (percentage-of-time always counts uncollected time - CASE-023/percentage-of-time-denominator); previous|last compare against the previous COLLECTED sample so a counter reset is a reboot and the first sample never matches; flaps count observed false->true transitions only, carried across buckets; a gap contributes its SLOT width, not the zero span of QUERY_POINT_EMPTY",
 		Agent:  Red,
 	},
 	"CASE-023/tier-estimation": {
