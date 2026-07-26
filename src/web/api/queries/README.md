@@ -160,8 +160,10 @@ Netdata keeps per-second detail only for a limited time; older data is kept
 at lower resolution. Over a window long enough to read that older data,
 these groupings return an **estimate**:
 
-- For a metric that is only ever 0 or 1 - an availability signal - the
-  estimate is exact.
+- For a metric that is only ever 0 or 1 - an availability signal - collected
+  at a steady interval, the estimate is exact. If the collection interval
+  changed inside a stored interval, that one is weighted by samples rather
+  than by time.
 - For other metrics it is approximate.
 - `number-of-flaps` and `number-of-times` count at most one event per stored
   interval, so bursts of events close together are reported as one.
