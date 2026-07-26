@@ -1066,6 +1066,35 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
 
                 default:
                     units = rrdset_units(st);
+
+                    // summing a rate integrates it into a volume, so the
+                    // trailing "/s" no longer describes the number shown.
+                    // The badge picks its units before the query runs and
+                    // never sees the query target, so it asks the chart:
+                    // every dimension a rate means every SELECTED dimension
+                    // is one too, whatever the filter picked. A chart with
+                    // any non-rate dimension keeps its units untouched,
+                    // which is the same "all contributing metrics or
+                    // nothing" rule the API follows.
+                    static __thread char units_volume_buf[64];
+                    if(group == RRDR_GROUPING_SUM && units && *units) {
+                        bool all_rates = true, any = false;
+                        RRDDIM *rd;
+                        rrddim_foreach_read(rd, st) {
+                            any = true;
+                            if(rd->algorithm != RRD_ALGORITHM_INCREMENTAL) {
+                                all_rates = false;
+                                break;
+                            }
+                        }
+                        rrddim_foreach_done(rd);
+
+                        size_t ulen = strlen(units);
+                        if(any && all_rates && ulen > 2 && strcmp(units + ulen - 2, "/s") == 0) {
+                            snprintfz(units_volume_buf, sizeof(units_volume_buf), "%.*s", (int)(ulen - 2), units);
+                            units = units_volume_buf;
+                        }
+                    }
                     break;
             }
         }
