@@ -848,6 +848,21 @@ static inline const char *query_target_rate_adjusted_units(
     return buf;
 }
 
+// The units a RESULT carries: the grouping's own units when it answers a
+// different question, otherwise the metric's units with a rate's trailing
+// "/s" removed if the query integrated it into a volume. Every consumer
+// that labels or keys a result should go through here, so the label a user
+// sees and the key a group is built from cannot disagree.
+static inline const char *query_target_result_units(
+    QUERY_TARGET *qt, const char *metric_units, char *buf, size_t buf_size) {
+
+    const char *units = query_target_units_override(qt);
+    if(units)
+        return units;
+
+    return query_target_rate_adjusted_units(qt, metric_units, buf, buf_size);
+}
+
 uint32_t rrdcontext_queue_version(RRDCONTEXT_QUEUE_JudyLSet *queue);
 int32_t rrdcontext_queue_entries(RRDCONTEXT_QUEUE_JudyLSet *queue);
 
