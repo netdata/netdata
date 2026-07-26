@@ -19,7 +19,7 @@ Billing options include monthly (pay-as-you-go) and yearly (annual prepayment).
 
 #### Active Nodes and Billing
 
-Billing is based solely on active nodes, excluding offline or stale instances. Daily and P90 metrics ensure fair pricing by mitigating transient increases in node activity.
+Billing is based solely on active nodes, excluding offline or stale instances. You're billed for the maximum number of concurrently running nodes throughout the month, excluding 10% of the top spikes (p90 over time).
 
 #### Committed Nodes
 
