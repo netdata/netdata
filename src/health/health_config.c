@@ -4,18 +4,6 @@
 #include "health_internals.h"
 #include "../web/api/queries/tg-expression.h"
 
-static ALERT_LOOKUP_TIME_GROUP_CONDITION alert_lookup_condition_from_expression(TG_EXPRESSION_CMP cmp) {
-    switch(cmp) {
-        case TG_EXPRESSION_NOTEQUAL:     return ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL;
-        case TG_EXPRESSION_LESS:         return ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS;
-        case TG_EXPRESSION_LESSEQUAL:    return ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL;
-        case TG_EXPRESSION_GREATER:      return ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER;
-        case TG_EXPRESSION_GREATEREQUAL: return ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL;
-        case TG_EXPRESSION_EQUAL:
-        default:                         return ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
-    }
-}
-
 int health_parse_delay(
         size_t line, const char *filename, char *string,
         int *delay_up_duration,
