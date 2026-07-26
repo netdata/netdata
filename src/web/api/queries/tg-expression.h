@@ -66,6 +66,15 @@ typedef struct tg_expression {
     // the highest value of the previous stored window, for the
     // monotone-drop rule above tier 0
     NETDATA_DOUBLE previous_max;
+
+    // The answer the FIRST delivery of the point being delivered reached.
+    //
+    // A stored point wider than the view bucket is handed to every bucket
+    // it spans. Only a `previous` condition reads this: its repeats arrive
+    // after the predecessor has moved on to the point itself, so they
+    // cannot be decided again - they replay this instead.
+    NETDATA_DOUBLE delivered_share;
+    bool has_delivered_share;
 } TG_EXPRESSION;
 
 // One delivered point, as the expression groupings see it.
@@ -126,6 +135,8 @@ static inline bool tg_expression_parse(TG_EXPRESSION *e, const char *options) {
     e->previous = 0.0;
     e->previous_max = 0.0;
     e->has_previous = false;
+    e->delivered_share = 0.0;
+    e->has_delivered_share = false;
 
     if(!options || !*options)
         return true;
@@ -246,6 +257,8 @@ static inline void tg_expression_reset(TG_EXPRESSION *e) {
     e->previous = 0.0;
     e->has_previous = false;
     e->previous_max = 0.0;
+    e->delivered_share = 0.0;
+    e->has_delivered_share = false;
 }
 
 static inline bool tg_expression_compare(TG_EXPRESSION_CMP cmp, NETDATA_DOUBLE value, NETDATA_DOUBLE target) {
@@ -295,6 +308,31 @@ static inline bool tg_expression_eval(TG_EXPRESSION *e, NETDATA_DOUBLE value, bo
     }
 
     return matched;
+}
+
+// the same question, answered without moving anything
+static inline bool tg_expression_peek(const TG_EXPRESSION *e, const TG_POINT *p) {
+    TG_EXPRESSION probe = *e;
+    return tg_expression_eval(&probe, p->value, p->is_gap);
+}
+
+// The answer for a REPEAT of a `previous` condition: a stored point wider
+// than the view bucket, handed again to the next bucket it spans.
+//
+// It is the same point, not the sample that followed it, and the predecessor
+// has already advanced to it - so deciding it again compares the point with
+// itself. Under `<previous` that reads as a drop in every bucket after the
+// first, turning one window into a string of phantom reboots. The verdict
+// belongs to the point, so every delivery of it answers the way its first
+// delivery did.
+static inline NETDATA_DOUBLE tg_expression_replay(const TG_EXPRESSION *e, const TG_POINT *p) {
+    if(likely(e->has_delivered_share))
+        return e->delivered_share;
+
+    // A point reaches a bucket only after being delivered once, so there is
+    // always a verdict on record. Should that ever stop holding, answer
+    // without touching the state rather than invent a comparison.
+    return tg_expression_peek(e, p) ? 1.0 : 0.0;
 }
 
 // The share of a STORED WINDOW that satisfied the condition, estimated
@@ -379,18 +417,27 @@ static inline NETDATA_DOUBLE tg_expression_window_fraction(
 static inline NETDATA_DOUBLE tg_expression_share(TG_EXPRESSION *e, const TG_POINT *p) {
     NETDATA_DOUBLE share;
 
-    if(e->operand == TG_EXPRESSION_OPERAND_PREVIOUS && !p->first) {
-        // A re-delivery is the SAME window seen again, not the sample that
-        // followed it. Comparing it would pit the window against the
-        // maximum its own first delivery stored - always a "drop" - so it
-        // is answered from the state the first delivery left, and changes
-        // nothing.
-        TG_EXPRESSION probe = *e;
-        if(p->count > 1 && probe.has_previous)
-            return (probe.cmp == TG_EXPRESSION_LESS &&
-                    netdata_double_isnumber(p->min) && p->min < probe.previous_max) ? 1.0 : 0.0;
+    if(unlikely(!p->first)) {
+        // A repeat: the same stored point handed to the next bucket it
+        // spans. Whatever the condition, it may not move the state - the
+        // point has already been accounted for.
+        //
+        // Only `previous` has to be replayed rather than re-decided,
+        // because it is the only condition that reads that state: by the
+        // time a repeat arrives the predecessor has advanced to this very
+        // point, so re-deciding compares it with itself. Every other
+        // condition is a question about the point alone and answers the
+        // same way it did the first time - from the window's own
+        // statistics where there is a window, and from the value the
+        // engine interpolated for THIS bucket where there is not, which is
+        // the engine's model for a view finer than the stored data.
+        if(e->operand == TG_EXPRESSION_OPERAND_PREVIOUS)
+            return tg_expression_replay(e, p);
 
-        return tg_expression_eval(&probe, p->value, p->is_gap) ? 1.0 : 0.0;
+        if(e->operand == TG_EXPRESSION_OPERAND_NUMBER && tg_point_is_window(p))
+            return tg_expression_window_fraction(e, p);
+
+        return tg_expression_peek(e, p) ? 1.0 : 0.0;
     }
 
     if(e->operand == TG_EXPRESSION_OPERAND_PREVIOUS && p->count > 1 && e->has_previous) {
@@ -433,32 +480,34 @@ static inline NETDATA_DOUBLE tg_expression_share(TG_EXPRESSION *e, const TG_POIN
         }
         else if(netdata_double_isnumber(p->max))
             e->previous_max = p->max;
-
-        return share;
     }
 
-    if(e->operand == TG_EXPRESSION_OPERAND_NUMBER && tg_point_is_window(p)) {
+    else if(e->operand == TG_EXPRESSION_OPERAND_NUMBER && tg_point_is_window(p)) {
         share = tg_expression_window_fraction(e, p);
 
-        if(p->first && !p->is_gap) {
+        if(!p->is_gap) {
             e->previous = tg_point_average(p);
             e->has_previous = true;
             if(netdata_double_isnumber(p->max))
                 e->previous_max = p->max;
         }
-        return share;
     }
 
-    if(!p->first) {
-        // a repeat of a point already accounted for: answer it, but leave
-        // the predecessor where the first delivery left it
-        TG_EXPRESSION probe = *e;
-        return tg_expression_eval(&probe, p->value, p->is_gap) ? 1.0 : 0.0;
+    else {
+        // tg_point_average() is the point's own value below tier 1, so this
+        // only differs for a window - the first window of a `previous`
+        // series, which has no predecessor to compare against yet. It has
+        // to leave the same predecessor behind as the branch above, or the
+        // window after it is compared against an interpolation instead of
+        // an average.
+        share = tg_expression_eval(e, tg_point_average(p), p->is_gap) ? 1.0 : 0.0;
+        if(!p->is_gap && netdata_double_isnumber(p->max))
+            e->previous_max = p->max;
     }
 
-    share = tg_expression_eval(e, p->value, p->is_gap) ? 1.0 : 0.0;
-    if(!p->is_gap && netdata_double_isnumber(p->max))
-        e->previous_max = p->max;
+    // what a repeat of this point replays - see tg_expression_replay()
+    e->delivered_share = share;
+    e->has_delivered_share = true;
 
     return share;
 }

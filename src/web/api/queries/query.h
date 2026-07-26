@@ -52,6 +52,11 @@ typedef enum rrdr_time_grouping {
     RRDR_GROUPING_PERCENTAGE_OF_TIME,
     RRDR_GROUPING_NUMBER_OF_FLAPS,
     RRDR_GROUPING_NUMBER_OF_TIMES,
+
+    // not a grouping - the bound anything walking them all stops at, so
+    // adding one above cannot leave a sweep silently short. RRDR_GROUPING_MAX
+    // is the max-over-time aggregation, hence the name.
+    RRDR_GROUPING_SENTINEL,
 } RRDR_TIME_GROUPING;
 
 const char *time_grouping_id2txt(RRDR_TIME_GROUPING group);
