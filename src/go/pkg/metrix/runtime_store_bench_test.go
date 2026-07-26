@@ -36,6 +36,17 @@ import "testing"
 // BenchmarkRuntimeStoreGaugeParallelSet/p4-14               3797656     314.0 ns/op    622 B/op     4 allocs/op
 // BenchmarkRuntimeStoreGaugeParallelSet/p16-14              3520359     341.7 ns/op    622 B/op     4 allocs/op
 // BenchmarkRuntimeStoreMixedTypedWriteAndReadFlatten-14       93160   12230   ns/op  15275 B/op   159 allocs/op
+//
+// After structured flatten allocation optimization (2026-07-27):
+// Merge-base -> optimized; medians of -count=10 on the same developer laptop.
+// ns/op is a trend indicator, while bytes and allocations describe the stable
+// structural improvement.
+//
+//	go test -run '^$' -bench '^BenchmarkRuntimeStoreMixedTypedWriteAndReadFlatten$' -benchmem -benchtime=100ms -count=10 ./pkg/metrix
+//
+// BenchmarkRuntimeStoreMixedTypedWriteAndReadFlatten:
+// 15,579 ns/op, 20,943 B/op, 157 allocs/op ->
+// 15,192 ns/op, 20,103 B/op, 148 allocs/op.
 func BenchmarkRuntimeStoreCounterParallelAdd(b *testing.B) {
 	tests := map[string]struct {
 		parallelism int

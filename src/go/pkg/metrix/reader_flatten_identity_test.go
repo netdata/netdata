@@ -108,6 +108,89 @@ func TestFlattenSnapshotReusesRoleDescriptorsWithinSourceSeries(t *testing.T) {
 	require.Same(t, stateMaintenance.desc, stateOperational.desc)
 }
 
+func TestFlattenSnapshotAllocationEnvelope(t *testing.T) {
+	const highCardinality = 512
+
+	// Scalar flattening shares canonical series and must stay cardinality-independent.
+	// Structured flattening must stay linear in source series and projected outputs;
+	// these limits also pin the reduced per-output allocation shape.
+	tests := map[string]struct {
+		store      func(testing.TB) CollectorStore
+		wantSeries int
+		maxAllocs  float64
+	}{
+		"scalar allocations stay O(1) with cardinality": {
+			store: func(tb testing.TB) CollectorStore {
+				return benchmarkCommittedScalarStore(tb, highCardinality)
+			},
+			wantSeries: highCardinality,
+			maxAllocs:  25,
+		},
+		"mixed structured allocations stay linear at low cardinality": {
+			store: func(tb testing.TB) CollectorStore {
+				return benchmarkCommittedMixedStore(tb, 32)
+			},
+			wantSeries: 15 * 32,
+			maxAllocs:  100 * 32,
+		},
+		"mixed structured allocations stay linear at high cardinality": {
+			store: func(tb testing.TB) CollectorStore {
+				return benchmarkCommittedMixedStore(tb, highCardinality)
+			},
+			wantSeries: 15 * highCardinality,
+			maxAllocs:  100 * highCardinality,
+		},
+		"histogram allocations stay linear with eight labels": {
+			store: func(tb testing.TB) CollectorStore {
+				return benchmarkCommittedHistogramStore(tb, 32, 8)
+			},
+			wantSeries: 15 * 32,
+			maxAllocs:  140 * 32,
+		},
+		"summary allocations stay linear with eight labels and quantiles": {
+			store: func(tb testing.TB) CollectorStore {
+				return benchmarkCommittedSummaryStore(tb, 32, 8, 8)
+			},
+			wantSeries: 10 * 32,
+			maxAllocs:  105 * 32,
+		},
+		"stateset allocations stay linear with eight labels and states": {
+			store: func(tb testing.TB) CollectorStore {
+				return benchmarkCommittedStateSetStore(tb, 32, 8, 8)
+			},
+			wantSeries: 8 * 32,
+			maxAllocs:  85 * 32,
+		},
+		"measureset gauge allocations stay linear with eight labels and fields": {
+			store: func(tb testing.TB) CollectorStore {
+				return benchmarkCommittedMeasureSetStore(tb, 32, 8, 8, MeasureSetSemanticsGauge)
+			},
+			wantSeries: 8 * 32,
+			maxAllocs:  105 * 32,
+		},
+		"measureset counter allocations stay linear with eight labels and fields": {
+			store: func(tb testing.TB) CollectorStore {
+				return benchmarkCommittedMeasureSetStore(tb, 32, 8, 8, MeasureSetSemanticsCounter)
+			},
+			wantSeries: 8 * 32,
+			maxAllocs:  105 * 32,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			store := tc.store(t)
+			snapshot := store.(*storeView).core.snapshot.Load()
+			requireFlattenProjectionSeries(t, snapshot, tc.wantSeries)
+
+			allocs := testing.AllocsPerRun(3, func() {
+				benchmarkReaderCountSink = len(flattenSnapshot(snapshot).series)
+			})
+			require.LessOrEqualf(t, allocs, tc.maxAllocs, "flatten allocations %.0f exceed limit %.0f", allocs, tc.maxAllocs)
+		})
+	}
+}
+
 func observeStructuredFlattenTestPoints(histogram SnapshotHistogram, summary SnapshotSummary, stateSet StateSetInstrument) {
 	histogram.ObservePoint(HistogramPoint{
 		Count: 3,

@@ -11,21 +11,41 @@ import (
 
 var benchmarkHostScopesSink []HostScope
 
+// Cold flatten construction is O(source series + projected outputs*labels). It
+// retains no global cache; CollectorStore owns one projection per exact snapshot.
+// The benchmarks keep setup outside the timer and verify the exact output count
+// before timing so skipped projection work cannot look like an optimization.
+//
+// Latest developer-laptop comparison (darwin/arm64, Apple M4 Pro, 2026-07-27).
+// Results are medians of -count=10; ns/op is a trend indicator, not a CI gate.
+//
+//	go test -run '^$' -bench 'FlattenProjectionCold$' -benchmem -benchtime=100ms -count=10 ./pkg/metrix
+//
+// Representative merge-base -> optimized results:
+//   - scalar/512: 65,776 ns/op, 37,400 B/op, 21 allocs/op ->
+//     65,700 ns/op, 37,400 B/op, 21 allocs/op.
+//   - mixed/512: 4,283,642 ns/op, 7,708,624 B/op, 54,445 allocs/op ->
+//     3,512,606 ns/op, 7,185,122 B/op, 45,741 allocs/op.
+//   - histogram labels_8/512: 9,491,069 ns/op, 17,264,506 B/op, 109,683 allocs/op ->
+//     4,872,335 ns/op, 10,581,270 B/op, 63,603 allocs/op.
+//   - summary no quantiles/512: 409,571 ns/op, 945,202 B/op, 6,182 allocs/op ->
+//     323,502 ns/op, 904,242 B/op, 4,134 allocs/op.
+//   - summary fanout_8/labels_8/512: 6,175,011 ns/op, 12,206,788 B/op, 72,786 allocs/op ->
+//     3,417,920 ns/op, 7,987,910 B/op, 45,650 allocs/op.
+//   - stateset fanout_8/labels_8/512: 5,057,474 ns/op, 10,526,588 B/op, 57,402 allocs/op ->
+//     2,872,449 ns/op, 6,954,871 B/op, 37,434 allocs/op.
+//   - measureset gauge fanout_8/labels_8/512: 5,365,286 ns/op, 10,578,861 B/op, 61,579 allocs/op ->
+//     3,105,037 ns/op, 7,465,883 B/op, 45,195 allocs/op.
+//   - measureset counter fanout_8/labels_8/512: 5,049,261 ns/op, 10,578,861 B/op, 61,579 allocs/op ->
+//     2,847,366 ns/op, 7,465,886 B/op, 45,195 allocs/op.
+//   - measureset gauge fanout_2/labels_1/512: 569,917 ns/op, 1,125,107 B/op, 9,254 allocs/op ->
+//     476,628 ns/op, 1,125,110 B/op, 9,254 allocs/op.
 func BenchmarkCollectorStoreFlattenProjectionCold(b *testing.B) {
 	for _, instances := range []int{32, 512} {
 		b.Run(fmt.Sprintf("structured_instances_%d", instances), func(b *testing.B) {
 			store := benchmarkCommittedMixedStore(b, instances)
 			snapshot := store.(*storeView).core.snapshot.Load()
-
-			b.ReportAllocs()
-			b.ResetTimer()
-			for b.Loop() {
-				flat := flattenSnapshot(snapshot)
-				if flat.collectMeta.LastSuccessSeq == 0 {
-					b.Fatal("expected committed snapshot")
-				}
-				benchmarkReaderCountSink = len(flat.series)
-			}
+			benchmarkFlattenProjectionCold(b, snapshot, 15*instances)
 		})
 	}
 }
@@ -35,13 +55,7 @@ func BenchmarkCollectorStoreScalarFlattenProjectionCold(b *testing.B) {
 		b.Run(fmt.Sprintf("instances_%d", instances), func(b *testing.B) {
 			store := benchmarkCommittedScalarStore(b, instances)
 			snapshot := store.(*storeView).core.snapshot.Load()
-
-			b.ReportAllocs()
-			b.ResetTimer()
-			for b.Loop() {
-				flat := flattenSnapshot(snapshot)
-				benchmarkReaderCountSink = len(flat.series)
-			}
+			benchmarkFlattenProjectionCold(b, snapshot, instances)
 		})
 	}
 }
@@ -52,13 +66,7 @@ func BenchmarkCollectorStoreHistogramFlattenProjectionCold(b *testing.B) {
 			b.Run(fmt.Sprintf("labels_%d/instances_%d", labels, instances), func(b *testing.B) {
 				store := benchmarkCommittedHistogramStore(b, instances, labels)
 				snapshot := store.(*storeView).core.snapshot.Load()
-
-				b.ReportAllocs()
-				b.ResetTimer()
-				for b.Loop() {
-					flat := flattenSnapshot(snapshot)
-					benchmarkReaderCountSink = len(flat.series)
-				}
+				benchmarkFlattenProjectionCold(b, snapshot, 15*instances)
 			})
 		}
 	}
@@ -69,23 +77,53 @@ func BenchmarkCollectorStoreSummaryNoQuantilesFlattenProjectionCold(b *testing.B
 		b.Run(fmt.Sprintf("instances_%d", instances), func(b *testing.B) {
 			store := benchmarkCommittedSummaryNoQuantilesStore(b, instances)
 			snapshot := store.(*storeView).core.snapshot.Load()
-
-			b.ReportAllocs()
-			b.ResetTimer()
-			for b.Loop() {
-				flat := flattenSnapshot(snapshot)
-				benchmarkReaderCountSink = len(flat.series)
-			}
+			benchmarkFlattenProjectionCold(b, snapshot, 2*instances)
 		})
 	}
+}
+
+func BenchmarkCollectorStoreSummaryFlattenProjectionCold(b *testing.B) {
+	benchmarkStructuredFlattenShapes(b, 3, func(b *testing.B, shape flattenProjectionBenchmarkShape) {
+		store := benchmarkCommittedSummaryStore(b, shape.instances, shape.labels, shape.fanout)
+		snapshot := store.(*storeView).core.snapshot.Load()
+		benchmarkFlattenProjectionCold(b, snapshot, (shape.fanout+2)*shape.instances)
+	})
+}
+
+func BenchmarkCollectorStoreStateSetFlattenProjectionCold(b *testing.B) {
+	benchmarkStructuredFlattenShapes(b, 2, func(b *testing.B, shape flattenProjectionBenchmarkShape) {
+		store := benchmarkCommittedStateSetStore(b, shape.instances, shape.labels, shape.fanout)
+		snapshot := store.(*storeView).core.snapshot.Load()
+		benchmarkFlattenProjectionCold(b, snapshot, shape.fanout*shape.instances)
+	})
+}
+
+func BenchmarkCollectorStoreMeasureSetGaugeFlattenProjectionCold(b *testing.B) {
+	benchmarkStructuredFlattenShapes(b, 2, func(b *testing.B, shape flattenProjectionBenchmarkShape) {
+		store := benchmarkCommittedMeasureSetStore(b, shape.instances, shape.labels, shape.fanout, MeasureSetSemanticsGauge)
+		snapshot := store.(*storeView).core.snapshot.Load()
+		benchmarkFlattenProjectionCold(b, snapshot, shape.fanout*shape.instances)
+	})
+}
+
+func BenchmarkCollectorStoreMeasureSetCounterFlattenProjectionCold(b *testing.B) {
+	benchmarkStructuredFlattenShapes(b, 2, func(b *testing.B, shape flattenProjectionBenchmarkShape) {
+		store := benchmarkCommittedMeasureSetStore(b, shape.instances, shape.labels, shape.fanout, MeasureSetSemanticsCounter)
+		snapshot := store.(*storeView).core.snapshot.Load()
+		benchmarkFlattenProjectionCold(b, snapshot, shape.fanout*shape.instances)
+	})
 }
 
 func BenchmarkCollectorStoreFlattenProjectionWarm(b *testing.B) {
 	for _, instances := range []int{32, 512} {
 		b.Run(fmt.Sprintf("structured_instances_%d", instances), func(b *testing.B) {
 			store := benchmarkCommittedMixedStore(b, instances)
-			if meta := store.Read(ReadFlatten()).CollectMeta(); meta.LastSuccessSeq == 0 {
+			reader := store.Read(ReadFlatten())
+			if meta := reader.CollectMeta(); meta.LastSuccessSeq == 0 {
 				b.Fatal("expected committed snapshot")
+			}
+			if got := benchmarkCountReaderSeries(reader); got != 15*instances {
+				b.Fatalf("expected %d flattened series, got %d", 15*instances, got)
 			}
 
 			b.ReportAllocs()
@@ -100,27 +138,102 @@ func BenchmarkCollectorStoreFlattenProjectionWarm(b *testing.B) {
 	}
 }
 
-func benchmarkCommittedHistogramStore(b *testing.B, totalSeries, totalLabels int) CollectorStore {
+type flattenProjectionBenchmarkShape struct {
+	instances int
+	labels    int
+	fanout    int
+}
+
+var flattenProjectionBenchmarkLabelNames = []string{
+	"instance",
+	"job",
+	"method",
+	"namespace",
+	"region",
+	"service",
+	"status",
+	"zone",
+}
+
+func benchmarkStructuredFlattenShapes(
+	b *testing.B,
+	lowFanout int,
+	run func(b *testing.B, shape flattenProjectionBenchmarkShape),
+) {
 	b.Helper()
 
+	shapes := []flattenProjectionBenchmarkShape{
+		{instances: 32, labels: 1, fanout: lowFanout},
+		{instances: 512, labels: 1, fanout: lowFanout},
+		{instances: 512, labels: 8, fanout: lowFanout},
+		{instances: 512, labels: 8, fanout: 8},
+	}
+	for _, shape := range shapes {
+		name := fmt.Sprintf("fanout_%d/labels_%d/instances_%d", shape.fanout, shape.labels, shape.instances)
+		b.Run(name, func(b *testing.B) {
+			run(b, shape)
+		})
+	}
+}
+
+func benchmarkFlattenProjectionCold(b *testing.B, snapshot *readSnapshot, wantSeries int) {
+	b.Helper()
+	requireFlattenProjectionSeries(b, snapshot, wantSeries)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		benchmarkReaderCountSink = len(flattenSnapshot(snapshot).series)
+	}
+}
+
+func requireFlattenProjectionSeries(tb testing.TB, snapshot *readSnapshot, wantSeries int) {
+	tb.Helper()
+
+	flat := flattenSnapshot(snapshot)
+	if flat.collectMeta.LastSuccessSeq == 0 {
+		tb.Fatal("expected committed snapshot")
+	}
+	if got := len(flat.series); got != wantSeries {
+		tb.Fatalf("expected %d flattened series, got %d", wantSeries, got)
+	}
+}
+
+func benchmarkFlattenLabelNames(tb testing.TB, totalLabels int) []string {
+	tb.Helper()
+
+	if totalLabels < 1 || totalLabels > len(flattenProjectionBenchmarkLabelNames) {
+		tb.Fatalf("invalid flatten fixture label count: %d", totalLabels)
+	}
+	return flattenProjectionBenchmarkLabelNames[:totalLabels]
+}
+
+func benchmarkFlattenLabelValues(totalLabels, series int) []string {
+	values := make([]string, totalLabels)
+	values[0] = strconv.Itoa(series)
+	for i := 1; i < totalLabels; i++ {
+		values[i] = fmt.Sprintf("value_%d", i)
+	}
+	return values
+}
+
+func benchmarkCommittedHistogramStore(tb testing.TB, totalSeries, totalLabels int) CollectorStore {
+	tb.Helper()
+
 	store := NewCollectorStore()
-	cycle := benchmarkCycleController(b, store)
+	cycle := benchmarkCycleController(tb, store)
 	meter := store.Write().SnapshotMeter("reader.flatten")
-	labelNames := []string{"instance", "job", "method", "namespace", "region", "service", "status", "zone"}[:totalLabels]
+	labelNames := benchmarkFlattenLabelNames(tb, totalLabels)
 	vector := meter.Vec(labelNames...).Histogram(
 		"latency",
 		WithHistogramBounds(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30),
 	)
 	handles := make([]SnapshotHistogram, totalSeries)
 	for i := range handles {
-		labelValues := make([]string, totalLabels)
-		labelValues[0] = strconv.Itoa(i)
-		for j := 1; j < totalLabels; j++ {
-			labelValues[j] = fmt.Sprintf("value_%d", j)
-		}
+		labelValues := benchmarkFlattenLabelValues(totalLabels, i)
 		handle, err := vector.GetWithLabelValues(labelValues...)
 		if err != nil {
-			b.Fatalf("create histogram handle: %v", err)
+			tb.Fatalf("create histogram handle: %v", err)
 		}
 		handles[i] = handle
 	}
@@ -148,22 +261,52 @@ func benchmarkCommittedHistogramStore(b *testing.B, totalSeries, totalLabels int
 		})
 	}
 	if err := cycle.CommitCycleSuccess(); err != nil {
-		b.Fatalf("commit histogram store: %v", err)
+		tb.Fatalf("commit histogram store: %v", err)
 	}
 	return store
 }
 
-func benchmarkCommittedSummaryNoQuantilesStore(b *testing.B, totalSeries int) CollectorStore {
-	b.Helper()
+func benchmarkCommittedSummaryNoQuantilesStore(tb testing.TB, totalSeries int) CollectorStore {
+	tb.Helper()
+	return benchmarkCommittedSummaryStoreWithLabels(tb, totalSeries, []string{"id"}, 0)
+}
+
+func benchmarkCommittedSummaryStore(tb testing.TB, totalSeries, totalLabels, totalQuantiles int) CollectorStore {
+	tb.Helper()
+	return benchmarkCommittedSummaryStoreWithLabels(
+		tb,
+		totalSeries,
+		benchmarkFlattenLabelNames(tb, totalLabels),
+		totalQuantiles,
+	)
+}
+
+func benchmarkCommittedSummaryStoreWithLabels(
+	tb testing.TB,
+	totalSeries int,
+	labelNames []string,
+	totalQuantiles int,
+) CollectorStore {
+	tb.Helper()
 
 	store := NewCollectorStore()
-	cycle := benchmarkCycleController(b, store)
-	vector := store.Write().SnapshotMeter("reader.flatten").Vec("id").Summary("duration")
+	cycle := benchmarkCycleController(tb, store)
+	quantiles := make([]float64, totalQuantiles)
+	for i := range quantiles {
+		quantiles[i] = float64(i+1) / float64(totalQuantiles+1)
+	}
+	meter := store.Write().SnapshotMeter("reader.flatten").Vec(labelNames...)
+	var vector SnapshotSummaryVec
+	if len(quantiles) == 0 {
+		vector = meter.Summary("duration")
+	} else {
+		vector = meter.Summary("duration", WithSummaryQuantiles(quantiles...))
+	}
 	handles := make([]SnapshotSummary, totalSeries)
 	for i := range handles {
-		handle, err := vector.GetWithLabelValues(strconv.Itoa(i))
+		handle, err := vector.GetWithLabelValues(benchmarkFlattenLabelValues(len(labelNames), i)...)
 		if err != nil {
-			b.Fatalf("create summary handle: %v", err)
+			tb.Fatalf("create summary handle: %v", err)
 		}
 		handles[i] = handle
 	}
@@ -171,10 +314,94 @@ func benchmarkCommittedSummaryNoQuantilesStore(b *testing.B, totalSeries int) Co
 	cycle.BeginCycle()
 	for i, handle := range handles {
 		value := SampleValue(i + 1)
-		handle.ObservePoint(SummaryPoint{Count: value, Sum: value * 10})
+		point := SummaryPoint{Count: value, Sum: value * 10}
+		for j, quantile := range quantiles {
+			point.Quantiles = append(point.Quantiles, QuantilePoint{
+				Quantile: quantile,
+				Value:    value + SampleValue(j),
+			})
+		}
+		handle.ObservePoint(point)
 	}
 	if err := cycle.CommitCycleSuccess(); err != nil {
-		b.Fatalf("commit summary store: %v", err)
+		tb.Fatalf("commit summary store: %v", err)
+	}
+	return store
+}
+
+func benchmarkCommittedStateSetStore(tb testing.TB, totalSeries, totalLabels, totalStates int) CollectorStore {
+	tb.Helper()
+
+	store := NewCollectorStore()
+	cycle := benchmarkCycleController(tb, store)
+	states := make([]string, totalStates)
+	for i := range states {
+		states[i] = fmt.Sprintf("state_%d", i)
+	}
+	vector := store.Write().SnapshotMeter("reader.flatten").
+		Vec(benchmarkFlattenLabelNames(tb, totalLabels)...).
+		StateSet("mode", WithStateSetStates(states...), WithStateSetMode(ModeEnum))
+	handles := make([]StateSetInstrument, totalSeries)
+	for i := range handles {
+		handle, err := vector.GetWithLabelValues(benchmarkFlattenLabelValues(totalLabels, i)...)
+		if err != nil {
+			tb.Fatalf("create stateset handle: %v", err)
+		}
+		handles[i] = handle
+	}
+
+	cycle.BeginCycle()
+	for i, handle := range handles {
+		handle.Enable(states[i%len(states)])
+	}
+	if err := cycle.CommitCycleSuccess(); err != nil {
+		tb.Fatalf("commit stateset store: %v", err)
+	}
+	return store
+}
+
+func benchmarkCommittedMeasureSetStore(
+	tb testing.TB,
+	totalSeries, totalLabels, totalFields int,
+	semantics MeasureSetSemantics,
+) CollectorStore {
+	tb.Helper()
+
+	store := NewCollectorStore()
+	cycle := benchmarkCycleController(tb, store)
+	fields := make([]MeasureFieldSpec, totalFields)
+	values := make([]SampleValue, totalFields)
+	for i := range fields {
+		fields[i] = MeasureFieldSpec{Name: fmt.Sprintf("field_%d", i)}
+		values[i] = SampleValue(i + 1)
+	}
+	meter := store.Write().SnapshotMeter("reader.flatten").Vec(benchmarkFlattenLabelNames(tb, totalLabels)...)
+
+	cycle.BeginCycle()
+	switch semantics {
+	case MeasureSetSemanticsGauge:
+		vector := meter.MeasureSetGauge("payload", WithMeasureSetFields(fields...))
+		for i := range totalSeries {
+			handle, err := vector.GetWithLabelValues(benchmarkFlattenLabelValues(totalLabels, i)...)
+			if err != nil {
+				tb.Fatalf("create measureset gauge handle: %v", err)
+			}
+			handle.ObservePoint(MeasureSetPoint{Values: values})
+		}
+	case MeasureSetSemanticsCounter:
+		vector := meter.MeasureSetCounter("payload", WithMeasureSetFields(fields...))
+		for i := range totalSeries {
+			handle, err := vector.GetWithLabelValues(benchmarkFlattenLabelValues(totalLabels, i)...)
+			if err != nil {
+				tb.Fatalf("create measureset counter handle: %v", err)
+			}
+			handle.ObserveTotalPoint(MeasureSetPoint{Values: values})
+		}
+	default:
+		tb.Fatalf("unsupported measureset semantics: %d", semantics)
+	}
+	if err := cycle.CommitCycleSuccess(); err != nil {
+		tb.Fatalf("commit measureset store: %v", err)
 	}
 	return store
 }
@@ -244,15 +471,12 @@ func BenchmarkCollectorStoreFlattenProjectionVisibilityCold(b *testing.B) {
 				cycle.AbortCycle()
 			}
 			snapshot := store.(*storeView).core.snapshot.Load()
+			requireFlattenProjectionSeries(b, snapshot, totalSeries)
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
-				flat := flattenSnapshot(snapshot)
-				if len(flat.series) != totalSeries {
-					b.Fatalf("expected %d series, got %d", totalSeries, len(flat.series))
-				}
-				benchmarkReaderCountSink = len(flat.series)
+				benchmarkReaderCountSink = len(flattenSnapshot(snapshot).series)
 			}
 		})
 	}
@@ -303,6 +527,9 @@ func BenchmarkCollectorStoreFlattenProjectionConcurrentFirst(b *testing.B) {
 			if reader.CollectMeta().LastSuccessSeq == 0 {
 				b.Fatal("expected committed snapshot")
 			}
+		}
+		if got := benchmarkCountReaderSeries(results[0]); got != totalSeries {
+			b.Fatalf("expected %d flattened series, got %d", totalSeries, got)
 		}
 		b.StartTimer()
 	}
