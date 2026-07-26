@@ -3,6 +3,7 @@
 package metrix
 
 import (
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -35,25 +36,7 @@ func TestFlattenSnapshotPreservesCanonicalSeriesIdentity(t *testing.T) {
 	require.NoError(t, err)
 
 	cycle.BeginCycle()
-	histogram.ObservePoint(HistogramPoint{
-		Count: 3,
-		Sum:   4,
-		Buckets: []BucketPoint{
-			{UpperBound: 1, CumulativeCount: 1},
-			{UpperBound: 2, CumulativeCount: 2},
-		},
-	})
-	summary.ObservePoint(SummaryPoint{
-		Count: 2,
-		Sum:   3,
-		Quantiles: []QuantilePoint{
-			{Quantile: 0.5, Value: 1},
-			{Quantile: 0.9, Value: 2},
-		},
-	})
-	stateSet.ObserveStateSet(StateSetPoint{
-		States: map[string]bool{"operational": true},
-	})
+	observeStructuredFlattenTestPoints(histogram, summary, stateSet)
 	measureSet.ObservePoint(MeasureSetPoint{Values: []SampleValue{128, 4}})
 	require.NoError(t, cycle.CommitCycleSuccess())
 
@@ -102,25 +85,7 @@ func TestFlattenSnapshotReusesRoleDescriptorsWithinSourceSeries(t *testing.T) {
 	)
 
 	cycle.BeginCycle()
-	histogram.ObservePoint(HistogramPoint{
-		Count: 3,
-		Sum:   4,
-		Buckets: []BucketPoint{
-			{UpperBound: 1, CumulativeCount: 1},
-			{UpperBound: 2, CumulativeCount: 2},
-		},
-	})
-	summary.ObservePoint(SummaryPoint{
-		Count: 2,
-		Sum:   3,
-		Quantiles: []QuantilePoint{
-			{Quantile: 0.5, Value: 1},
-			{Quantile: 0.9, Value: 2},
-		},
-	})
-	stateSet.ObserveStateSet(StateSetPoint{
-		States: map[string]bool{"operational": true},
-	})
+	observeStructuredFlattenTestPoints(histogram, summary, stateSet)
 	require.NoError(t, cycle.CommitCycleSuccess())
 
 	flat := flattenSnapshot(store.(*storeView).core.snapshot.Load())
@@ -141,6 +106,28 @@ func TestFlattenSnapshotReusesRoleDescriptorsWithinSourceSeries(t *testing.T) {
 	stateMaintenance := requireFlattenedSeries(t, flat, "svc.mode", map[string]string{"svc.mode": "maintenance"})
 	stateOperational := requireFlattenedSeries(t, flat, "svc.mode", map[string]string{"svc.mode": "operational"})
 	require.Same(t, stateMaintenance.desc, stateOperational.desc)
+}
+
+func observeStructuredFlattenTestPoints(histogram SnapshotHistogram, summary SnapshotSummary, stateSet StateSetInstrument) {
+	histogram.ObservePoint(HistogramPoint{
+		Count: 3,
+		Sum:   4,
+		Buckets: []BucketPoint{
+			{UpperBound: 1, CumulativeCount: 1},
+			{UpperBound: 2, CumulativeCount: 2},
+		},
+	})
+	summary.ObservePoint(SummaryPoint{
+		Count: 2,
+		Sum:   3,
+		Quantiles: []QuantilePoint{
+			{Quantile: 0.5, Value: 1},
+			{Quantile: 0.9, Value: 2},
+		},
+	})
+	stateSet.ObserveStateSet(StateSetPoint{
+		States: map[string]bool{"operational": true},
+	})
 }
 
 func requireFlattenedSeriesIdentity(t *testing.T, snapshot *readSnapshot, name string, labels map[string]string) {
@@ -182,9 +169,7 @@ func requireSnapshotSeriesByName(t *testing.T, snapshot *readSnapshot, name stri
 
 func labelsWith(base map[string]string, key, value string) map[string]string {
 	labels := make(map[string]string, len(base)+1)
-	for k, v := range base {
-		labels[k] = v
-	}
+	maps.Copy(labels, base)
 	labels[key] = value
 	return labels
 }

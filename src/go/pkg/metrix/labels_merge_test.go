@@ -3,6 +3,7 @@
 package metrix
 
 import (
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -52,9 +53,7 @@ func TestMergeCanonicalLabelMatchesCanonicalizeLabels(t *testing.T) {
 			require.NoError(t, err)
 
 			reference := make(map[string]string, len(tc.base)+1)
-			for key, value := range tc.base {
-				reference[key] = value
-			}
+			maps.Copy(reference, tc.base)
 			reference[tc.extra.Key] = tc.extra.Value
 			wantLabels, wantKey, err := canonicalizeLabels(reference)
 			require.NoError(t, err)
