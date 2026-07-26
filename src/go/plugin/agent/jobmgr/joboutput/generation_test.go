@@ -136,6 +136,7 @@ func TestJobGenerationV1V2(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
+			require.NoError(t, prepared.Probe(context.Background()))
 			generation, err := prepared.Accept(context.Background(), 7)
 			require.NoError(t, err)
 
@@ -186,6 +187,7 @@ func TestJobGenerationPermitReturnLast(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
+	require.NoError(t, prepared.Probe(context.Background()))
 	generation, err := prepared.Accept(context.Background(), 1)
 	require.NoError(t, err)
 
@@ -250,6 +252,7 @@ func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
+			require.NoError(t, prepared.Probe(context.Background()))
 			generation, err := prepared.Accept(context.Background(), 1)
 			require.NoError(t, err)
 			startErr := generation.Start(context.Background())

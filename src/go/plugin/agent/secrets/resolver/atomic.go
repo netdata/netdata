@@ -145,23 +145,38 @@ func (resolver *AtomicResolver) Resolve(
 	input any,
 	acquire AtomicScopeAcquirer,
 ) (any, error) {
+	resolved, _, err := resolver.ResolveWithReferences(ctx, input, acquire)
+	return resolved, err
+}
+
+// ResolveWithReferences resolves one value and reports whether its resolvable
+// surface contained any provider or Store reference. Callers use the flag to
+// avoid exposing errors derived from resolved values.
+func (resolver *AtomicResolver) ResolveWithReferences(
+	ctx context.Context,
+	input any,
+	acquire AtomicScopeAcquirer,
+) (any, bool, error) {
 	if resolver == nil {
-		return nil, errors.New("secret resolver: nil atomic resolver")
+		return nil, false, errors.New("secret resolver: nil atomic resolver")
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	compiler := atomicCompiler{
-		resolver: resolver, active: make(map[atomicContainerIdentity]struct{}),
-		storeKeys: make(map[string]struct{}),
+		providers:         resolver.providers,
+		validateProviders: true,
+		active:            make(map[atomicContainerIdentity]struct{}),
+		storeKeys:         make(map[string]struct{}),
 	}
 	cloned, err := compiler.clone(input, 0, true)
 	if err != nil {
-		return nil, err
+		return nil, compiler.references != 0, err
 	}
+	hasReferences := compiler.references != 0
 	keys := make([]string, 0, len(compiler.storeKeys))
 	for key := range compiler.storeKeys {
 		keys = append(keys, key)
@@ -171,7 +186,7 @@ func (resolver *AtomicResolver) Resolve(
 	var scope AtomicScope
 	if len(keys) != 0 {
 		if acquire == nil {
-			return nil, &AtomicResolveError{
+			return nil, hasReferences, &AtomicResolveError{
 				Kind: AtomicErrorScope, Cause: errors.New("no Store scope acquirer"),
 			}
 		}
@@ -180,10 +195,10 @@ func (resolver *AtomicResolver) Resolve(
 			if scope != nil {
 				err = errors.Join(err, callAtomicRelease(ctx, scope))
 			}
-			return nil, &AtomicResolveError{Kind: AtomicErrorScope, Cause: err}
+			return nil, hasReferences, &AtomicResolveError{Kind: AtomicErrorScope, Cause: err}
 		}
 		if scope == nil {
-			return nil, &AtomicResolveError{
+			return nil, hasReferences, &AtomicResolveError{
 				Kind: AtomicErrorScope, Cause: errors.New("acquirer returned nil scope"),
 			}
 		}
@@ -202,9 +217,9 @@ func (resolver *AtomicResolver) Resolve(
 		}
 	}
 	if resolveErr != nil || releaseErr != nil {
-		return nil, errors.Join(resolveErr, releaseErr)
+		return nil, hasReferences, errors.Join(resolveErr, releaseErr)
 	}
-	return resolved, nil
+	return resolved, hasReferences, nil
 }
 
 func callAtomicAcquire(
@@ -235,10 +250,12 @@ type atomicContainerIdentity struct {
 }
 
 type atomicCompiler struct {
-	resolver    *AtomicResolver
-	active      map[atomicContainerIdentity]struct{}
-	storeKeys   map[string]struct{}
-	resultBytes int
+	providers         map[string]AtomicProvider
+	active            map[atomicContainerIdentity]struct{}
+	storeKeys         map[string]struct{}
+	resultBytes       int
+	references        int
+	validateProviders bool
 }
 
 const (
@@ -467,6 +484,7 @@ func (compiler *atomicCompiler) compileReferences(value string) error {
 		if !reference.active {
 			return nil
 		}
+		compiler.references++
 		if err := compiler.addResultBytes(start - last); err != nil {
 			return err
 		}
@@ -475,7 +493,7 @@ func (compiler *atomicCompiler) compileReferences(value string) error {
 			compiler.storeKeys[reference.storeKey] = struct{}{}
 			return nil
 		}
-		if compiler.resolver.providers[reference.scheme] == nil {
+		if compiler.validateProviders && compiler.providers[reference.scheme] == nil {
 			return &AtomicResolveError{
 				Kind:  AtomicErrorReference,
 				Cause: boundedAtomicSchemeError("unknown provider", reference.scheme),

@@ -148,10 +148,6 @@ func (pst *preparedSecretTransaction) apply(
 	if !result.Applied {
 		var abortErr error
 		if !commitCalled {
-			if commands != nil {
-				_, rollbackErr := commands.RollbackContext()
-				postCommitErr = errors.Join(postCommitErr, rollbackErr)
-			}
 			abortErr = spec.mutation.Abort()
 		}
 		if predecessorRestored && abortErr == nil {

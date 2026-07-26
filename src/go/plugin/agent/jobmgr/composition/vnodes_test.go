@@ -37,6 +37,14 @@ func TestVNodeBindingPreparesUpdates(t *testing.T) {
 			payload: `{"hostname":"changed","guid":"` + testVNodeGUID + `"}`,
 		},
 		"invalid payload": {args: []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)}, payload: `{`},
+		"hostname unsafe for host emission": {
+			args:    []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)},
+			payload: `{"hostname":"operator's-db","guid":"` + testVNodeGUID + `"}`,
+		},
+		"hostname with trailing escape": {
+			args:    []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)},
+			payload: `{"hostname":"operator\\","guid":"` + testVNodeGUID + `"}`,
+		},
 		"unchanged vnode": {
 			args:    []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)},
 			payload: `{"hostname":"db","guid":"` + testVNodeGUID + `"}`,
@@ -90,6 +98,63 @@ func TestVNodeBindingPreparesUpdates(t *testing.T) {
 				require.Equal(t, "db", snapshot.Vnode.Hostname)
 				require.EqualValues(t, 1, snapshot.Revision)
 			}
+		})
+	}
+}
+
+func TestVNodeBindingRejectsSemanticallyDuplicateGUID(t *testing.T) {
+	binding, configured := newTestVNodeBinding(t, confgroup.TypeDyncfg, nil)
+	transaction, err := binding.prepare(
+		context.Background(),
+		functionadapter.HandlerInput{
+			Args:         []string{"go.d:vnode", string(dyncfg.CommandAdd), "second"},
+			Payload:      []byte(`{"hostname":"second","guid":"11111111111111111111111111111111"}`),
+			ContentType:  "application/json",
+			CallerSource: "user=test",
+			HasPayload:   true,
+		},
+		nil,
+		lifecycle.ResourceTransactionScope{ID: "vnode:second"},
+		lifecycle.LongLivedPermit{},
+	)
+	require.NoError(t, err)
+
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 400, applied.ResultStatus())
+	_, exists := configured.Lookup("second")
+	require.False(t, exists)
+}
+
+func TestVNodeBindingAddCollisionIsReplayUpsert(t *testing.T) {
+	for _, sourceType := range []string{confgroup.TypeDyncfg, confgroup.TypeUser} {
+		t.Run(sourceType, func(t *testing.T) {
+			binding, configured := newTestVNodeBinding(t, sourceType, nil)
+			transaction, err := binding.prepare(
+				context.Background(),
+				functionadapter.HandlerInput{
+					Args: []string{"go.d:vnode", string(dyncfg.CommandAdd), "db"},
+					Payload: []byte(
+						`{"hostname":"replacement","guid":"` + testVNodeGUID + `"}`,
+					),
+					ContentType:  "application/json",
+					CallerSource: "user=test",
+					HasPayload:   true,
+				},
+				nil,
+				lifecycle.ResourceTransactionScope{ID: "vnode:db"},
+				lifecycle.LongLivedPermit{},
+			)
+			require.NoError(t, err)
+
+			applied, err := transaction.Apply(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, 202, applied.ResultStatus())
+			snapshot, exists := configured.Lookup("db")
+			require.True(t, exists)
+			require.Equal(t, "replacement", snapshot.Vnode.Hostname)
+			require.Equal(t, confgroup.TypeDyncfg, snapshot.Vnode.SourceType)
+			require.EqualValues(t, 2, snapshot.Revision)
 		})
 	}
 }

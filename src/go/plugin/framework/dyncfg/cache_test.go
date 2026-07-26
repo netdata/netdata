@@ -13,17 +13,15 @@ type testConfig struct {
 	uid        string
 	key        string
 	sourceType string
-	priority   int
 	source     string
 	hash       uint64
 }
 
-func (c testConfig) UID() string             { return c.uid }
-func (c testConfig) ExposedKey() string      { return c.key }
-func (c testConfig) SourceType() string      { return c.sourceType }
-func (c testConfig) SourceTypePriority() int { return c.priority }
-func (c testConfig) Source() string          { return c.source }
-func (c testConfig) Hash() uint64            { return c.hash }
+func (c testConfig) UID() string        { return c.uid }
+func (c testConfig) ExposedKey() string { return c.key }
+func (c testConfig) SourceType() string { return c.sourceType }
+func (c testConfig) Source() string     { return c.source }
+func (c testConfig) Hash() uint64       { return c.hash }
 
 func seenCacheCount(c *SeenCache[testConfig]) int {
 	c.mux.RLock()

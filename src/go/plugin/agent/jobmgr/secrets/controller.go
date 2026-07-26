@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	SecretGraphClaim = "dyncfg:secretstores"
+	SecretGraphClaim = "dyncfg:dependency-graph"
 	dynCfgSecretPath = "/collectors/%s/SecretStores"
 )
 
@@ -40,20 +40,20 @@ type ControllerConfig struct {
 }
 
 type Controller struct {
-	mu sync.Mutex // guards entries, published, restarts, and initial
+	mu sync.Mutex // guards entries, commandsReady, restarts, and initial
 
-	epoch        uint64                      // run generation
-	prefix       string                      // "<plugin>:secretstore:" ID prefix
-	path         string                      // "/collectors/<plugin>/SecretStores" config path
-	frames       *lifecycle.FrameOwner       // protocol frame sink
-	store        *secretstore.SecretStore    // per-run secret store
-	creators     *secretstore.CreatorCatalog // frozen creator catalog
-	dependencies *SecretDependencyIndex      // secret dependency index
-	diagnostics  jobmgr.DiagnosticObserver   // operational log sink
-	initial      []secretstore.Config        // initial secret store configs
-	entries      map[string]secretEntry      // published store entries by key
-	restarts     *SecretRestartCommand       // dependent-job restart command (bound at Bind)
-	published    bool                        // initial snapshot has been published
+	epoch         uint64                      // run generation
+	prefix        string                      // "<plugin>:secretstore:" ID prefix
+	path          string                      // "/collectors/<plugin>/SecretStores" config path
+	frames        *lifecycle.FrameOwner       // protocol frame sink
+	store         *secretstore.SecretStore    // per-run secret store
+	creators      *secretstore.CreatorCatalog // frozen creator catalog
+	dependencies  *SecretDependencyIndex      // secret dependency index
+	diagnostics   jobmgr.DiagnosticObserver   // operational log sink
+	initial       []secretstore.Config        // initial secret store configs
+	entries       map[string]secretEntry      // published store entries by key
+	restarts      *SecretRestartCommand       // dependent-job restart command (bound at Bind)
+	commandsReady bool                        // templates are visible and commands may execute
 }
 
 type secretEntry struct {
@@ -90,7 +90,7 @@ func (c *Controller) Bind(jobs DependentJobPort) error {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.restarts != nil || c.published {
+	if c.restarts != nil || c.commandsReady {
 		return errors.New("jobmgr secrets: duplicate or late controller binding")
 	}
 	restarts, err := NewSecretRestartCommand(c.epoch, c.dependencies, jobs, c.diagnostics)
@@ -119,9 +119,9 @@ func (c *Controller) Prepare(
 		return nil, errors.New("jobmgr secrets: invalid transaction preparation")
 	}
 	c.mu.Lock()
-	published := c.published
+	commandsReady := c.commandsReady
 	c.mu.Unlock()
-	if !published {
+	if !commandsReady {
 		return c.noopMessageWithPermit(
 			scope,
 			current,
@@ -162,6 +162,22 @@ func (c *Controller) Prepare(
 		)
 	}
 	return c.observeTransaction(target, transaction, err)
+}
+
+func (c *Controller) CompositeChildLaneConflict(input CommandInput, lane string) bool {
+	if c == nil || lane == "" {
+		return false
+	}
+	target, failure := c.resolveTarget(input)
+	if failure != nil {
+		return false
+	}
+	switch target.command {
+	case dyncfg.CommandAdd, dyncfg.CommandUpdate:
+	default:
+		return false
+	}
+	return c.dependencies.Affects(target.key, lane, true)
 }
 
 type secretTarget struct {
@@ -304,14 +320,16 @@ func mustSecretMessage(code int, message string) lifecycle.SealedResult {
 	return result
 }
 
-func (c *Controller) protocolCleanup(build func(*netdataapi.API)) lifecycle.TaskCleanup {
+func (c *Controller) protocolCleanup(build func(*netdataapi.API) error) lifecycle.TaskCleanup {
 	if c == nil || build == nil {
 		return func() error {
 			return errors.New("jobmgr secrets: invalid protocol cleanup")
 		}
 	}
 	var payload bytes.Buffer
-	build(netdataapi.New(&payload))
+	if err := build(netdataapi.New(&payload)); err != nil {
+		return func() error { return err }
+	}
 	prepared, err := lifecycle.PrepareProtocolFrame(payload.Bytes())
 	if err != nil {
 		return func() error { return err }
@@ -332,8 +350,8 @@ func (c *Controller) configCreateCleanup(entry secretEntry) lifecycle.TaskCleanu
 	if entry.config.SourceType() == confgroup.TypeDyncfg {
 		commands += " " + string(dyncfg.CommandRemove)
 	}
-	return c.protocolCleanup(func(api *netdataapi.API) {
-		api.CONFIGCREATE(netdataapi.ConfigOpts{
+	return c.protocolCleanup(func(api *netdataapi.API) error {
+		return api.TryCONFIGCREATE(netdataapi.ConfigOpts{
 			ID:                c.prefix + entry.config.ExposedKey(),
 			Status:            entry.status.String(),
 			ConfigType:        dyncfg.ConfigTypeJob.String(),
@@ -346,19 +364,22 @@ func (c *Controller) configCreateCleanup(entry secretEntry) lifecycle.TaskCleanu
 }
 
 func (c *Controller) configDeleteCleanup(key string) lifecycle.TaskCleanup {
-	return c.protocolCleanup(func(api *netdataapi.API) {
-		api.CONFIGDELETE(c.prefix + key)
+	return c.protocolCleanup(func(api *netdataapi.API) error {
+		return api.TryCONFIGDELETE(c.prefix + key)
 	})
 }
 
 func (c *Controller) templateCleanup() lifecycle.TaskCleanup {
 	kinds := c.creators.Kinds()
 	if len(kinds) == 0 {
-		return func() error { return nil }
+		return func() error {
+			c.setCommandsReady(true)
+			return nil
+		}
 	}
-	return c.protocolCleanup(func(api *netdataapi.API) {
+	emit := c.protocolCleanup(func(api *netdataapi.API) error {
 		for _, kind := range kinds {
-			api.CONFIGCREATE(netdataapi.ConfigOpts{
+			if err := api.TryCONFIGCREATE(netdataapi.ConfigOpts{
 				ID:         c.prefix + string(kind),
 				Status:     dyncfg.StatusAccepted.String(),
 				ConfigType: dyncfg.ConfigTypeTemplate.String(),
@@ -370,9 +391,26 @@ func (c *Controller) templateCleanup() lifecycle.TaskCleanup {
 					dyncfg.CommandSchema,
 					dyncfg.CommandUserconfig,
 				),
-			})
+			}); err != nil {
+				return err
+			}
 		}
+		return nil
 	})
+	return func() error {
+		c.setCommandsReady(true)
+		if err := emit(); err != nil {
+			c.setCommandsReady(false)
+			return err
+		}
+		return nil
+	}
+}
+
+func (c *Controller) setCommandsReady(ready bool) {
+	c.mu.Lock()
+	c.commandsReady = ready
+	c.mu.Unlock()
 }
 
 func parseSecretPayload(input CommandInput, target any) error {

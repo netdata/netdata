@@ -304,6 +304,86 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(t *testing.T) {
 	require.False(t, err != nil && !errors.Is(err, ErrStopped))
 }
 
+func TestCompositeChildMovesAlreadyReadyLaneToItsSchedulingSource(t *testing.T) {
+	kernel, run, uids, tasks := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	require.NoError(t, run.OpenAdmission())
+	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "job" })
+
+	functionRequest := Request{
+		UID:    "ready-function",
+		Source: lifecycle.SourceFunction,
+		Route:  "route",
+	}
+	require.NoError(t, kernel.admit(functionRequest, WorkPlan{}))
+	require.Equal(t, 0, kernel.ready[0].len)
+	require.Equal(t, 1, kernel.ready[1].len)
+
+	parentEntered := make(chan struct{})
+	childPlan := compositeTestPlan("job", []string{"graph"}, nil)
+	parentPlan := compositeParentTestPlan(
+		"parent",
+		[]string{"graph"},
+		func(ctx context.Context, commands CompositeCommandScope) error {
+			close(parentEntered)
+			return commands.SubmitPreparedAndWait(
+				ctx,
+				Request{
+					UID:     "ready-composite-child",
+					LaneKey: "job",
+					Source:  lifecycle.SourceJobManager,
+					Route:   "internal/test/ready-child",
+				},
+				childPlan,
+			)
+		},
+	)
+	require.NoError(t, kernel.admit(
+		Request{
+			UID:     "ready-composite-parent",
+			LaneKey: "parent",
+			Source:  lifecycle.SourceJobManager,
+			Route:   "internal/test/ready-parent",
+		},
+		parentPlan,
+	))
+
+	require.False(t, kernel.serviceClaimSettlements(maximumClaimSettlementQuantum))
+	require.Equal(t, 1, kernel.ready[0].len)
+	kernel.nextSource = lifecycle.SourceJobManager
+	require.True(t, kernel.scheduleTasks(1))
+	require.False(t, kernel.serviceTaskStarts(1))
+	select {
+	case completion := <-tasks.CompletionCh():
+		kernel.completeTask(completion)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "composite parent preparation did not complete")
+	}
+	select {
+	case <-parentEntered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "composite parent did not begin child submission")
+	}
+	require.Eventually(t, func() bool {
+		kernel.serviceSubmissions(4)
+		return kernel.operations["ready-composite-child"] != nil
+	}, time.Second, time.Millisecond)
+
+	lane := kernel.lanes[resourceCommandLaneKey("job")]
+	require.NotNil(t, lane)
+	require.Equal(t, lifecycle.SourceJobManager, lane.head.Source)
+	require.Equal(t, 1, kernel.ready[0].len)
+	require.Same(t, lane, kernel.ready[0].head)
+	require.Equal(t, 0, kernel.ready[1].len)
+
+	startKernelLoop(t, kernel)
+	kernel.Stop()
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	err := kernel.Wait(waitCtx)
+	require.False(t, err != nil && !errors.Is(err, ErrStopped))
+	closeUIDLedger(t, uids)
+}
+
 func TestCompositeChildCancelledBeforeApplyReportsTerminalCause(t *testing.T) {
 	tests := map[string]struct {
 		deadline bool
@@ -422,10 +502,10 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 				return commands.SubmitPreparedAndWait(ctx, request, plan)
 			},
 		},
-		"rollback child": {
-			suffix: "rollback",
+		"recovery child": {
+			suffix: "recovery",
 			submit: func(_ context.Context, commands CompositeCommandScope, request Request, plan WorkPlan) error {
-				return commands.SubmitRollbackAndWait(request, plan)
+				return commands.SubmitRecoveryAndWait(context.Background(), request, plan)
 			},
 		},
 	}
@@ -511,6 +591,161 @@ func TestCompositeActionSubmitsChildAfterShutdownCut(t *testing.T) {
 			require.NoError(t, run.DirtyCause())
 		})
 	}
+}
+
+func TestCompositeRecoveryTimeoutStaysCleanAfterChildSettles(t *testing.T) {
+	kernel, run := newKernel(t)
+	require.NoError(t, run.OpenAdmission())
+	startKernelLoop(t, kernel)
+
+	recoveryResult := make(chan error, 1)
+	parentPlan := compositeParentTestPlan(
+		"parent",
+		[]string{"graph"},
+		func(_ context.Context, commands CompositeCommandScope) error {
+			recoveryCtx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+			defer cancel()
+			recoveryResult <- commands.SubmitRecoveryAndWait(
+				recoveryCtx,
+				Request{
+					UID:     "child",
+					LaneKey: "child",
+					Source:  lifecycle.SourceJobManager,
+					Route:   "internal/test/recovery-child",
+				},
+				WorkPlan{
+					Claims:     []string{"graph"},
+					NoResponse: true,
+					Transaction: &ResourceTransactionPlan{
+						ID: "child",
+						Prepare: func(
+							ctx context.Context,
+							_ lifecycle.ReadyResource,
+							_ lifecycle.ResourceTransactionScope,
+							_ lifecycle.LongLivedPermit,
+						) (lifecycle.PreparedResourceTransaction, error) {
+							<-ctx.Done()
+							return nil, context.Cause(ctx)
+						},
+					},
+				},
+			)
+			return nil
+		},
+	)
+	parentDone := make(chan error, 1)
+	go func() {
+		parentDone <- kernel.SubmitPreparedAndWait(
+			context.Background(),
+			Request{
+				UID:     "parent",
+				LaneKey: "parent",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test/recovery-parent",
+			},
+			parentPlan,
+		)
+	}()
+
+	select {
+	case err := <-recoveryResult:
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.NotErrorIs(t, err, ErrCompositeRecoveryUnresolved)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "bounded recovery child did not settle")
+	}
+	select {
+	case err := <-parentDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "parent did not settle after bounded recovery")
+	}
+	require.NoError(t, run.DirtyCause())
+	stopCompositeTestKernel(t, kernel)
+}
+
+func TestCompositeRecoveryMarksDirtyOnlyWhenChildRemainsUnresolved(t *testing.T) {
+	kernel, run := newKernel(t)
+	require.NoError(t, run.OpenAdmission())
+	startKernelLoop(t, kernel)
+
+	childEntered := make(chan struct{})
+	releaseChild := make(chan struct{})
+	recoveryResult := make(chan error, 1)
+	parentPlan := compositeParentTestPlan(
+		"parent",
+		[]string{"graph"},
+		func(_ context.Context, commands CompositeCommandScope) error {
+			recoveryCtx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+			defer cancel()
+			recoveryResult <- commands.SubmitRecoveryAndWait(
+				recoveryCtx,
+				Request{
+					UID:     "child",
+					LaneKey: "child",
+					Source:  lifecycle.SourceJobManager,
+					Route:   "internal/test/unresolved-recovery-child",
+				},
+				WorkPlan{
+					Claims:     []string{"graph"},
+					NoResponse: true,
+					Transaction: &ResourceTransactionPlan{
+						ID: "child",
+						Prepare: func(
+							_ context.Context,
+							_ lifecycle.ReadyResource,
+							scope lifecycle.ResourceTransactionScope,
+							permit lifecycle.LongLivedPermit,
+						) (lifecycle.PreparedResourceTransaction, error) {
+							close(childEntered)
+							<-releaseChild
+							return &simpleCompositeChildTransaction{scope: scope, permit: permit}, nil
+						},
+					},
+				},
+			)
+			return nil
+		},
+	)
+	parentDone := make(chan error, 1)
+	go func() {
+		parentDone <- kernel.SubmitPreparedAndWait(
+			context.Background(),
+			Request{
+				UID:     "parent",
+				LaneKey: "parent",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test/unresolved-recovery-parent",
+			},
+			parentPlan,
+		)
+	}()
+	select {
+	case <-childEntered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "unresolved recovery child did not start")
+	}
+	require.Eventually(t, func() bool {
+		return errors.Is(run.DirtyCause(), ErrCompositeRecoveryUnresolved)
+	}, 2*time.Second, time.Millisecond)
+	close(releaseChild)
+
+	select {
+	case err := <-recoveryResult:
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.ErrorIs(t, err, ErrCompositeRecoveryUnresolved)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "unresolved recovery child did not fail closed")
+	}
+	select {
+	case err := <-parentDone:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "parent did not settle after dirty recovery")
+	}
+	waitCtx, cancelWait := context.WithTimeout(context.Background(), time.Second)
+	defer cancelWait()
+	require.ErrorIs(t, kernel.Wait(waitCtx), ErrCompositeRecoveryUnresolved)
 }
 
 func TestCompositeChildRejectsActiveParentLane(t *testing.T) {

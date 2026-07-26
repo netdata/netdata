@@ -83,6 +83,119 @@ func TestClaimAuthorityLexicographicOrderRetainsAndReleasesPrefix(t *testing.T) 
 
 }
 
+func TestClaimAuthorityYieldConflictDoesNotRetainPrefixOrBlockUnrelatedWork(t *testing.T) {
+	authority := newClaimAuthority()
+	probe := claimTestOperation(t, authority, 1, "probe", []string{"graph"})
+	probe.request.LaneKey = "job-a"
+	probe.plan = WorkPlan{
+		YieldClaimOnPrepare: "graph",
+		Transaction: &ResourceTransactionPlan{
+			ID:      "job-a",
+			Prepare: unusedClaimYieldPrepare,
+		},
+	}
+	granted, err := authority.acquire(probe)
+	require.True(t, granted)
+	require.NoError(t, err)
+	woken, err := authority.yield(probe, "graph", probe.request.LaneKey)
+	require.Empty(t, woken)
+	require.NoError(t, err)
+
+	parent := claimTestOperation(t, authority, 2, "parent", []string{"dependency", "graph"})
+	parent.plan = WorkPlan{
+		Transaction: &ResourceTransactionPlan{
+			ID:               "secret",
+			PrepareComposite: unusedCompositeClaimYieldPrepare,
+			CompositeChildLaneConflict: func(lane string) bool {
+				return lane == "job-a"
+			},
+		},
+	}
+	granted, err = authority.acquire(parent)
+	require.False(t, granted)
+	require.NoError(t, err)
+	require.Zero(t, parent.claimCursor, "a yield-conflicted composite must not retain prefix claims")
+
+	unrelated := claimTestOperation(t, authority, 3, "unrelated", []string{"graph"})
+	granted, err = authority.acquire(unrelated)
+	require.True(t, granted, "unrelated work must use the otherwise-free yielded claim")
+	require.NoError(t, err)
+	woken, err = authority.release(unrelated)
+	require.Empty(t, woken)
+	require.NoError(t, err)
+
+	granted, err = authority.acquire(probe)
+	require.True(t, granted)
+	require.NoError(t, err)
+	woken, err = authority.release(probe)
+	require.NoError(t, err)
+	require.Equal(t, []*commandOperation{parent}, woken)
+
+	woken, err = authority.release(parent)
+	require.Empty(t, woken)
+	require.NoError(t, err)
+	require.Zero(t, authority.waitingCount())
+	require.Empty(t, authority.keys)
+}
+
+func TestClaimAuthorityYieldDemotesAndCancelsConflictedComposite(t *testing.T) {
+	authority := newClaimAuthority()
+	probe := claimTestOperation(t, authority, 1, "probe", []string{"graph"})
+	probe.request.LaneKey = "job-a"
+	granted, err := authority.acquire(probe)
+	require.True(t, granted)
+	require.NoError(t, err)
+
+	parent := claimTestOperation(t, authority, 2, "parent", []string{"dependency", "graph"})
+	parent.plan = WorkPlan{
+		Transaction: &ResourceTransactionPlan{
+			ID:               "secret",
+			PrepareComposite: unusedCompositeClaimYieldPrepare,
+			CompositeChildLaneConflict: func(lane string) bool {
+				return lane == "job-a"
+			},
+		},
+	}
+	granted, err = authority.acquire(parent)
+	require.False(t, granted)
+	require.NoError(t, err)
+	require.Equal(t, 1, parent.claimCursor)
+
+	unrelatedGraph := claimTestOperation(t, authority, 3, "job-c", []string{"graph"})
+	granted, err = authority.acquire(unrelatedGraph)
+	require.False(t, granted)
+	require.NoError(t, err)
+
+	woken, err := authority.yield(probe, "graph", probe.request.LaneKey)
+	require.NoError(t, err)
+	require.Equal(t, []*commandOperation{unrelatedGraph}, woken)
+	require.Zero(t, parent.claimCursor)
+	require.NotNil(t, parent.claimReservationKey)
+	woken, err = authority.release(unrelatedGraph)
+	require.Empty(t, woken)
+	require.NoError(t, err)
+
+	unrelated := claimTestOperation(t, authority, 4, "unrelated-secret", []string{"dependency"})
+	granted, err = authority.acquire(unrelated)
+	require.True(t, granted, "demotion must release the composite prefix")
+	require.NoError(t, err)
+	woken, err = authority.release(unrelated)
+	require.Empty(t, woken)
+	require.NoError(t, err)
+
+	woken, err = authority.cancel(parent)
+	require.Empty(t, woken)
+	require.NoError(t, err)
+	granted, err = authority.acquire(probe)
+	require.True(t, granted)
+	require.NoError(t, err)
+	woken, err = authority.release(probe)
+	require.Empty(t, woken)
+	require.NoError(t, err)
+	require.Zero(t, authority.waitingCount())
+	require.Empty(t, authority.keys)
+}
+
 func TestClaimAuthorityCancelAndReleaseAllocateNothing(t *testing.T) {
 	measure := func(cancel bool) float64 {
 		fixtures := [2]claimAllocationFixture{}

@@ -5,6 +5,7 @@ package joboutput
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,5 +40,19 @@ func TestDynCfgResolveRequestReportsArgumentErrors(t *testing.T) {
 			})
 			require.Equal(t, test.wantFailure, failure)
 		})
+	}
+}
+
+func TestDynCfgRequestSourceUsesQuotedProtocolGrammar(t *testing.T) {
+	tests := map[string]bool{
+		"safe":          true,
+		"user=test":     true,
+		`trailing\`:     false,
+		`embedded\path`: true,
+		"single'quote":  false,
+		"line\nbreak":   false,
+	}
+	for value, want := range tests {
+		require.Equal(t, want, netdataapi.ValidSingleQuotedProtocolField(value), value)
 	}
 }

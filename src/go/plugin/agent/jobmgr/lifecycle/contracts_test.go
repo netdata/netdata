@@ -73,6 +73,10 @@ func TestValidateUID(t *testing.T) {
 		"carriage return": {uid: "request\r1", wantErr: true},
 		"line feed":       {uid: "request\n1", wantErr: true},
 		"NUL":             {uid: "request\x001", wantErr: true},
+		"equals":          {uid: "request=1", wantErr: true},
+		"double quote":    {uid: `request"1`, wantErr: true},
+		"single quote":    {uid: "request'1", wantErr: true},
+		"backslash":       {uid: `request\1`, wantErr: true},
 	}
 
 	for name, tc := range tests {

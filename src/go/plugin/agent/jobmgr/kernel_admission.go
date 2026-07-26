@@ -32,17 +32,17 @@ func (ck *CommandKernel) admitSubmission(
 	submissionResult,
 	terminalResult chan error,
 	composite *kernelCompositeScope,
-	rollback bool,
+	recovery bool,
 ) error {
 	var parent *commandOperation
 	if composite != nil {
 		var err error
-		parent, err = ck.validateCompositeAdmission(composite, plan, rollback)
+		parent, err = ck.validateCompositeAdmission(composite, plan, recovery)
 		if err != nil {
 			return err
 		}
-	} else if rollback {
-		return errors.New("jobmgr kernel: rollback child has no parent")
+	} else if recovery {
+		return errors.New("jobmgr kernel: recovery child has no parent")
 	} else if !ck.run.Admitting() {
 		return ck.rejectClosedAdmission()
 	}
@@ -169,7 +169,7 @@ func (ck *CommandKernel) admitSubmission(
 		terminalResult:    terminalResult,
 		parent:            parent,
 		claimsInherited:   parent != nil,
-		compositeRollback: rollback,
+		compositeRecovery: recovery,
 		shutdownChild: parent != nil &&
 			ck.shutdownPhase == commandShutdownActionDrain,
 		runtimeStarted: now,

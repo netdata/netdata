@@ -51,19 +51,18 @@ type runGenerationConfig struct {
 }
 
 type runGeneration struct {
-	diagnostics       jobmgr.DiagnosticObserver      // operational log sink
-	run               *lifecycle.RunSupervisor       // run supervisor for this generation
-	tasks             *lifecycle.TaskSupervisor      // task supervisor
-	functions         *FunctionAssembly              // Function assembly (catalog + controller + publication)
-	scheduler         *joboutput.Scheduler           // tick + retry scheduler
-	dyncfg            *joboutput.DynCfgJobController // dyncfg job controller
-	secrets           *secretadapter.Controller      // secret store controller
-	vnodes            *vnodeBinding                  // dyncfg vnode binding
-	discovery         runDiscoveryServices           // discovery services
-	kernel            *jobmgr.CommandKernel          // the command kernel
-	metrics           *runMetrics                    // jobmgr.runtime metrics projection (nil when runtime charts off)
-	runtime           runtimecomp.Service            // runtime service
-	runtimeRegistered bool                           // guards double-unregister of jobmgr.runtime
+	diagnostics         jobmgr.DiagnosticObserver      // operational log sink
+	run                 *lifecycle.RunSupervisor       // run supervisor for this generation
+	tasks               *lifecycle.TaskSupervisor      // task supervisor
+	functions           *FunctionAssembly              // Function assembly (catalog + controller + publication)
+	scheduler           *joboutput.Scheduler           // tick + retry scheduler
+	dyncfg              *joboutput.DynCfgJobController // dyncfg job controller
+	secrets             *secretadapter.Controller      // secret store controller
+	vnodes              *vnodeBinding                  // dyncfg vnode binding
+	discovery           runDiscoveryServices           // discovery services
+	kernel              *jobmgr.CommandKernel          // the command kernel
+	metrics             *runMetrics                    // jobmgr.runtime metrics projection (nil when runtime charts off)
+	metricsRegistration *runMetricsRegistration        // synchronous runtime-writer lease
 
 	mu               sync.Mutex // guards started/startedAttempted
 	started          bool       // start succeeded
@@ -100,6 +99,7 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 	if config.Jobs.Runtime != nil {
 		metrics = newRunMetrics()
 	}
+	metricsRegistration := newRunMetricsRegistration(metrics, config.Jobs.Runtime)
 	tasks, err := lifecycle.NewTaskSupervisor(config.Frames)
 	if err != nil {
 		return nil, err
@@ -245,8 +245,9 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		lifecycle.RealClock{},
 		functions,
 		joinedRunFinalizer{
-			functions: functions,
-			secrets:   secretController,
+			functions:           functions,
+			secrets:             secretController,
+			metricsRegistration: metricsRegistration,
 		},
 		functions.Catalog(),
 	)
@@ -270,24 +271,23 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		if err := kernel.BindRuntimeObserver(metrics); err != nil {
 			return nil, err
 		}
-		if err := metrics.register(config.Jobs.Runtime); err != nil {
+		if err := metricsRegistration.register(); err != nil {
 			return nil, err
 		}
 	}
 	return &runGeneration{
-		diagnostics:       config.Diagnostics,
-		run:               run,
-		tasks:             tasks,
-		functions:         functions,
-		dyncfg:            dynCfgJobs,
-		scheduler:         scheduler,
-		secrets:           secretController,
-		vnodes:            vnodeBinding,
-		discovery:         config.Discovery,
-		kernel:            kernel,
-		metrics:           metrics,
-		runtime:           config.Jobs.Runtime,
-		runtimeRegistered: metrics != nil,
+		diagnostics:         config.Diagnostics,
+		run:                 run,
+		tasks:               tasks,
+		functions:           functions,
+		dyncfg:              dynCfgJobs,
+		scheduler:           scheduler,
+		secrets:             secretController,
+		vnodes:              vnodeBinding,
+		discovery:           config.Discovery,
+		kernel:              kernel,
+		metrics:             metrics,
+		metricsRegistration: metricsRegistration,
 	}, nil
 }
 
@@ -387,7 +387,7 @@ func (rg *runGeneration) abortConstruction() error {
 	if started {
 		return errors.New("jobmgr composition: run construction abort after start")
 	}
-	return errors.Join(rg.releaseRuntimeMetrics(), abortRunConstruction(rg.functions, rg.secrets, nil))
+	return errors.Join(rg.metricsRegistration.release(), abortRunConstruction(rg.functions, rg.secrets, nil))
 }
 
 func (rg *runGeneration) Stop() {
@@ -414,36 +414,71 @@ func (rg *runGeneration) Wait(ctx context.Context) error {
 		if !retryJoined {
 			return errors.Join(waitErr, retryErr)
 		}
-		return errors.Join(waitErr, retryErr, rg.releaseRuntimeMetrics())
+		return errors.Join(waitErr, retryErr)
 	default:
 		return errors.Join(waitErr, retryErr)
 	}
 }
 
-func (rg *runGeneration) releaseRuntimeMetrics() error {
-	if rg == nil {
+type runMetricsRegistration struct {
+	mu         sync.Mutex
+	metrics    *runMetrics
+	service    runtimecomp.Service
+	registered bool
+}
+
+func newRunMetricsRegistration(metrics *runMetrics, service runtimecomp.Service) *runMetricsRegistration {
+	return &runMetricsRegistration{
+		metrics: metrics,
+		service: service,
+	}
+}
+
+func (rmr *runMetricsRegistration) register() error {
+	if rmr == nil || rmr.metrics == nil || rmr.service == nil {
 		return nil
 	}
-	rg.mu.Lock()
-	if !rg.runtimeRegistered {
-		rg.mu.Unlock()
+	rmr.mu.Lock()
+	defer rmr.mu.Unlock()
+	if rmr.registered {
+		return errors.New("jobmgr composition: runtime metrics registered twice")
+	}
+	if err := rmr.metrics.register(rmr.service); err != nil {
+		return err
+	}
+	rmr.registered = true
+	return nil
+}
+
+func (rmr *runMetricsRegistration) release() error {
+	if rmr == nil {
 		return nil
 	}
-	rg.runtimeRegistered = false
-	metrics := rg.metrics
-	service := rg.runtime
-	rg.mu.Unlock()
+	rmr.mu.Lock()
+	if !rmr.registered {
+		rmr.mu.Unlock()
+		return nil
+	}
+	rmr.registered = false
+	metrics := rmr.metrics
+	service := rmr.service
+	rmr.mu.Unlock()
 	return metrics.unregister(service)
 }
 
 type joinedRunFinalizer struct {
-	functions *FunctionAssembly
-	secrets   *secretadapter.Controller
+	functions           *FunctionAssembly
+	secrets             *secretadapter.Controller
+	metricsRegistration *runMetricsRegistration
 }
 
 func (jrf joinedRunFinalizer) FinalizeRun(ctx context.Context, generation uint64) error {
 	if jrf.functions == nil || jrf.secrets == nil {
 		return errors.New("jobmgr composition: incomplete run finalizer")
 	}
-	return errors.Join(jrf.functions.FinalizeRun(ctx, generation), jrf.secrets.Close(ctx))
+	return errors.Join(
+		jrf.metricsRegistration.release(),
+		jrf.functions.FinalizeRun(ctx, generation),
+		jrf.secrets.Close(ctx),
+	)
 }

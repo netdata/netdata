@@ -6,12 +6,11 @@ import "sync"
 
 // Config is the constraint interface for configs stored in handler caches.
 type Config interface {
-	UID() string             // SeenCache key (globally unique per source)
-	ExposedKey() string      // ExposedCache key (one per logical name)
-	SourceType() string      // "dyncfg", "user", "stock"
-	SourceTypePriority() int // dyncfg=16, user=8, stock=2
-	Source() string          // source identifier
-	Hash() uint64            // content hash for change detection
+	UID() string        // SeenCache key (globally unique per source)
+	ExposedKey() string // ExposedCache key (one per logical name)
+	SourceType() string // "dyncfg", "user", "stock"
+	Source() string     // source identifier
+	Hash() uint64       // content hash for change detection
 }
 
 // Entry pairs a config with its current dyncfg status.

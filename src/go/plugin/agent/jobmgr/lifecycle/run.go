@@ -3,7 +3,6 @@
 package lifecycle
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -56,10 +55,11 @@ type RunCensus struct {
 	InheritedActive        int
 	LongLived              LongLivedCensus
 	Frame                  FrameCensus
+	Abandoned              TaskAbandonmentCensus
 	RunFinalizerComplete   bool
 }
 
-func (census RunCensus) Quiescent() bool {
+func (census RunCensus) Drained() bool {
 	frameDrained := !census.Frame.Poisoned && !census.Frame.Busy &&
 		!census.Frame.PendingControl && census.Frame.RetainedBytes == 0
 	return census.KernelDrained &&
@@ -68,6 +68,10 @@ func (census RunCensus) Quiescent() bool {
 		census.InheritedActive == 0 &&
 		census.LongLived == (LongLivedCensus{}) && frameDrained &&
 		census.RunFinalizerComplete
+}
+
+func (census RunCensus) Quiescent() bool {
+	return census.Drained() && census.Abandoned.Empty()
 }
 
 type RunTerminalState struct {
@@ -241,27 +245,4 @@ func (rs *RunSupervisor) TerminalState() RunTerminalState {
 
 func (rs *RunSupervisor) Generation() uint64 {
 	return rs.generation
-}
-
-// NewRollbackContext returns one run-owned context bounded by the configured
-// shutdown budget. It deliberately does not inherit a cancelled command
-// context.
-func (rs *RunSupervisor) NewRollbackContext() (context.Context, context.CancelFunc, error) {
-	if rs == nil {
-		return nil, nil, errors.New("jobmgr run supervisor: nil rollback owner")
-	}
-	rs.mu.Lock()
-	if rs.terminal {
-		rs.mu.Unlock()
-		return nil, nil, errors.New("jobmgr run supervisor: rollback after terminal")
-	}
-	timeout := rs.timeout
-	shutdown := rs.shutdown
-	rs.mu.Unlock()
-	if shutdown != nil {
-		ctx, cancel := context.WithDeadline(context.Background(), shutdown.Deadline())
-		return ctx, cancel, nil
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	return ctx, cancel, nil
 }

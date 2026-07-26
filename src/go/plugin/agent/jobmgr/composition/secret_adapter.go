@@ -49,7 +49,11 @@ func newSecretInitialRoute(
 		return functionadapter.InitialRoute{}, errors.New("jobmgr composition: invalid secret route")
 	}
 	commands := []functionadapter.ResourceTransactionCommand{
-		{Name: string(dyncfg.CommandAdd), AllocateSuccessor: true},
+		{
+			Name:              string(dyncfg.CommandAdd),
+			AllocateSuccessor: true,
+			Claims:            []string{joboutput.DynCfgJobGraphClaim},
+		},
 		{Name: string(dyncfg.CommandSchema)},
 		{Name: string(dyncfg.CommandGet)},
 		{
@@ -73,6 +77,12 @@ func newSecretInitialRoute(
 				},
 			},
 			Transaction: &functionadapter.ResourceTransactionDeclaration{
+				CompositeChildLaneConflict: func(
+					input functionadapter.HandlerInput,
+					lane string,
+				) bool {
+					return controller.CompositeChildLaneConflict(secretCommandInput(input), lane)
+				},
 				PrepareComposite: func(
 					ctx context.Context,
 					input functionadapter.HandlerInput,

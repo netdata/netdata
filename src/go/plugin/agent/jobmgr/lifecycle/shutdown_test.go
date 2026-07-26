@@ -253,6 +253,9 @@ func TestRunCensusQuiescenceRequiresExplicitOwnershipProofs(t *testing.T) {
 		"active UID ownership": {
 			mutate: func(census *RunCensus) { census.UIDActive = 1 },
 		},
+		"abandoned ownership": {
+			mutate: func(census *RunCensus) { census.Abandoned.ReadyResources = 1 },
+		},
 	}
 
 	require.True(t, base.Quiescent())
@@ -261,6 +264,9 @@ func TestRunCensusQuiescenceRequiresExplicitOwnershipProofs(t *testing.T) {
 			census := base
 			test.mutate(&census)
 			require.False(t, census.Quiescent())
+			if name == "abandoned ownership" {
+				require.True(t, census.Drained())
+			}
 		})
 	}
 }

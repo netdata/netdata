@@ -196,9 +196,10 @@ func TestFunctionCatalogResourceTransactionHasNoArbitraryCountLimits(t *testing.
 		) (lifecycle.PreparedResourceTransaction, error) {
 			return nil, nil
 		},
-		CommandArgument: commandArgument,
-		GlobalClaim:     "global",
-		Commands:        commands,
+		CommandArgument:           commandArgument,
+		GlobalClaim:               "global",
+		YieldGlobalClaimOnPrepare: true,
+		Commands:                  commands,
 	}
 	catalog, err := NewCatalog([]Declaration{declaration})
 	require.NoError(t, err)
@@ -218,6 +219,7 @@ func TestFunctionCatalogResourceTransactionHasNoArbitraryCountLimits(t *testing.
 	assert.Equal(t, "global", decision.Plan.Claims[0])
 	assert.True(t, decision.Plan.CooperativeCancel)
 	assert.True(t, decision.Plan.CooperativeDeadline)
+	assert.Equal(t, "global", decision.Plan.YieldClaimOnPrepare)
 	_, err = catalog.ReleaseInvocation(decision.Lease)
 	require.NoError(t, err)
 }

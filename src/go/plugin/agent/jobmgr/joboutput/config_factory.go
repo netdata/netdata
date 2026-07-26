@@ -90,17 +90,22 @@ func (cmf *ConfigModuleFactory) Test(ctx context.Context, config confgroup.Confi
 		err = errors.Join(err, probe.cleanup(context.WithoutCancel(ctx)))
 	}()
 	setModuleJobName(probe.module, config.Name())
-	if err := cmf.applyResolved(ctx, config, probe.module); err != nil {
+	redactLifecycle, err := cmf.applyResolved(ctx, config, probe.module)
+	probe.redact = redactLifecycle
+	if err != nil {
 		return err
 	}
-	probe.module.GetBase().Logger = cmf.logger.With(
-		slog.String("collector", config.Module()),
-		slog.String("job", config.Name()),
-	)
+	probe.module.GetBase().Logger = cmf.moduleLogger(config, redactLifecycle)
 	if err := probe.module.Init(ctx); err != nil {
+		if redactLifecycle {
+			err = redactResolvedLifecycleError(err)
+		}
 		return fmt.Errorf("job output: collector initialization: %w", err)
 	}
 	if err := probe.module.Check(ctx); err != nil {
+		if redactLifecycle {
+			err = redactResolvedLifecycleError(err)
+		}
 		return fmt.Errorf("job output: collector check: %w", err)
 	}
 	return nil
@@ -118,7 +123,9 @@ func (cmf *ConfigModuleFactory) Validate(ctx context.Context, config confgroup.C
 		err = errors.Join(err, probe.cleanup(context.WithoutCancel(ctx)))
 	}()
 	setModuleJobName(probe.module, config.Name())
-	return cmf.applyResolved(ctx, config, probe.module)
+	redactLifecycle, err := cmf.applyResolved(ctx, config, probe.module)
+	probe.redact = redactLifecycle
+	return err
 }
 
 func (cmf *ConfigModuleFactory) construct(module string) (probe constructedConfigModule, err error) {
@@ -150,30 +157,86 @@ func (cmf *ConfigModuleFactory) construct(module string) (probe constructedConfi
 	}, nil
 }
 
-func (cmf *ConfigModuleFactory) applyResolved(ctx context.Context, config confgroup.Config, module any) error {
+func (cmf *ConfigModuleFactory) applyResolved(
+	ctx context.Context,
+	config confgroup.Config,
+	module any,
+) (redactLifecycle bool, resultErr error) {
+	hasReferences := false
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			if hasReferences {
+				redactLifecycle = true
+				resultErr = invalidJobConfiguration(errors.New(
+					"job output: applying resolved configuration failed; details redacted",
+				))
+				return
+			}
+			redactLifecycle = false
+			resultErr = invalidJobConfiguration(
+				errors.New("job output: applying configuration panicked"),
+			)
+		}
+	}()
 	resolveCtx := logger.ContextWithLogger(
 		ctx,
 		cmf.logger.With(slog.String("collector", config.Module()), slog.String("job", config.Name())),
 	)
-	resolved, err := cmf.config.Resolver.Resolve(resolveCtx, map[string]any(config), cmf.config.StoreScope)
+	resolved, references, err :=
+		cmf.config.Resolver.ResolveWithReferences(resolveCtx, map[string]any(config), cmf.config.StoreScope)
+	hasReferences = references
 	if err != nil {
-		return fmt.Errorf("job output: resolving configuration secrets: %w", err)
+		err = fmt.Errorf("job output: resolving configuration secrets: %w", err)
+		if hasReferences {
+			return true, redactResolvedLifecycleError(err)
+		}
+		return false, err
+	}
+	if hasReferences {
+		if configured, ok := module.(interface{ GetBase() *collectorapi.Base }); ok && configured.GetBase() != nil {
+			configured.GetBase().Logger = cmf.moduleLogger(config, true)
+		}
 	}
 	payload, err := yaml.Marshal(resolved)
 	if err != nil {
-		return fmt.Errorf("job output: marshaling resolved configuration: %w", err)
+		return false, invalidJobConfiguration(
+			fmt.Errorf("job output: marshaling resolved configuration: %w", err),
+		)
 	}
 	if len(payload) > secretresolver.MaximumAtomicResolvedBytes {
-		return errors.New("job output: serialized configuration exceeds maximum size")
+		return false, invalidJobConfiguration(
+			errors.New("job output: serialized configuration exceeds maximum size"),
+		)
 	}
 	if err := yaml.Unmarshal(payload, module); err != nil {
-		return fmt.Errorf("job output: applying resolved configuration: %w", err)
+		if hasReferences {
+			return true, invalidJobConfiguration(
+				errors.New("job output: applying resolved configuration failed; details redacted"),
+			)
+		}
+		return false, invalidJobConfiguration(
+			fmt.Errorf("job output: applying resolved configuration: %w", err),
+		)
 	}
-	return nil
+	return hasReferences, nil
+}
+
+func (cmf *ConfigModuleFactory) moduleLogger(config confgroup.Config, redact bool) *logger.Logger {
+	log := cmf.logger.With(
+		slog.String("collector", config.Module()),
+		slog.String("job", config.Name()),
+	)
+	if !redact {
+		return log
+	}
+	return log.WithMessageSanitizer(func(message string) string {
+		return redactResolvedLifecycleError(errors.New(message)).Error()
+	})
 }
 
 type constructedConfigModule struct {
 	module configModule
+	redact bool
 	once   sync.Once
 	err    error
 }
@@ -190,6 +253,9 @@ func (ccm *constructedConfigModule) cleanup(ctx context.Context) error {
 				return nil
 			},
 		)
+		if ccm.redact {
+			ccm.err = redactResolvedLifecycleError(ccm.err)
+		}
 	})
 	return ccm.err
 }

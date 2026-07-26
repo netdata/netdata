@@ -22,19 +22,21 @@ func (c *Controller) PublishInitial(ctx context.Context, commands jobmgr.Prepare
 		return errors.New("jobmgr secrets: invalid initial publication")
 	}
 	c.mu.Lock()
-	if c.restarts == nil || c.published {
+	if c.restarts == nil || c.commandsReady {
 		c.mu.Unlock()
 		return errors.New("jobmgr secrets: unbound or duplicate initial publication")
 	}
 	initial := sortedInitialConfigs(c.initial)
 	c.mu.Unlock()
-	if err := c.publishTemplates(ctx, commands); err != nil {
-		return err
-	}
 	for index, config := range initial {
 		if config == nil || config.ExposedKey() == "" || config.Validate() != nil {
 			return fmt.Errorf("jobmgr secrets: invalid initial configuration %d", index)
 		}
+	}
+	if err := c.publishTemplates(ctx, commands); err != nil {
+		return err
+	}
+	for index, config := range initial {
 		plan, err := c.planInitial(config)
 		if err != nil {
 			return err
@@ -54,7 +56,6 @@ func (c *Controller) PublishInitial(ctx context.Context, commands jobmgr.Prepare
 	}
 	c.mu.Lock()
 	c.initial = nil
-	c.published = true
 	c.mu.Unlock()
 	return nil
 }
@@ -150,8 +151,6 @@ func (c *Controller) Close(ctx context.Context) error {
 	if c == nil || ctx == nil {
 		return errors.New("jobmgr secrets: invalid controller close")
 	}
-	c.mu.Lock()
-	c.published = false
-	c.mu.Unlock()
+	c.setCommandsReady(false)
 	return c.store.Close(ctx)
 }

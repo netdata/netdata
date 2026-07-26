@@ -92,3 +92,16 @@ func TestOperationResponseTerminalStatesRemainTerminalWhenPoisoned(t *testing.T)
 		})
 	}
 }
+
+func TestOperationDirtyAbandonmentHasADistinctTerminationTransition(t *testing.T) {
+	operation, err := NewOperation(1, "uid", SourceFunction, "lane", true)
+	require.NoError(t, err)
+	ref := TaskRef{Slot: 1, Generation: 1}
+	require.NoError(t, operation.StartChild(ref))
+	require.NoError(t, operation.ResultReady(ref, 1))
+
+	require.Error(t, operation.TerminationPending(ref, 2))
+	require.NoError(t, operation.AbandonChild(ref, 2))
+	require.Equal(t, ChildTerminationPending, operation.Child)
+	require.NoError(t, operation.ChildExited(ref, 2))
+}

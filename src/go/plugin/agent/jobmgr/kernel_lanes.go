@@ -16,7 +16,6 @@ func (ck *CommandKernel) allocateLane(mapKey commandLaneKey, request Request) *c
 	*lane = commandLane{
 		mapKey: mapKey,
 		key:    request.LaneKey,
-		source: request.Source,
 	}
 	ck.lanes[mapKey] = lane
 	ck.appendLane(lane)
@@ -33,7 +32,7 @@ func resourceCommandLaneKey(id string) commandLaneKey {
 func (ck *CommandKernel) releaseUnusedLane(lane *commandLane) {
 	if lane == nil || lane.owners != 0 || lane.head != nil ||
 		lane.tail != nil || lane.active != nil ||
-		lane.continuationTail != nil || lane.ready ||
+		lane.continuationTail != nil || lane.readyQueue != nil ||
 		lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || lane.retiringIdentity.Valid() ||
 		lane.shutdownRequest.Valid() || lane.shutdownTask.Valid() || lane.shutdownAction != 0 {
 		return
@@ -68,6 +67,9 @@ func (ck *CommandKernel) unlinkLane(lane *commandLane) {
 	if lane == nil || !lane.allListed {
 		ck.run.Dirty(errors.New("jobmgr kernel: invalid lane-list removal"))
 		return
+	}
+	if ck.shutdownLaneCursor == lane {
+		ck.shutdownLaneCursor = lane.allNext
 	}
 	if lane.allPrevious != nil {
 		lane.allPrevious.allNext = lane.allNext

@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -67,6 +66,7 @@ func (v *VirtualNode) Equal(vn *VirtualNode) bool {
 
 func readConfDir(dir string) map[string]*VirtualNode {
 	vnodes := make(map[string]*VirtualNode)
+	guids := make(map[string]string)
 
 	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -113,20 +113,6 @@ func readConfDir(dir string) map[string]*VirtualNode {
 		}
 
 		for _, v := range cfg {
-			if v.Hostname == "" || v.GUID == "" {
-				log.Warningf("skipping virtual node '%+v': required fields are missing (%s)", v, path)
-				continue
-			}
-			if err := uuid.Validate(v.GUID); err != nil {
-				log.Warningf("skipping virtual node '%+v': invalid GUID: %v (%s)", v, err, path)
-				continue
-			}
-			if _, ok := vnodes[v.Hostname]; ok {
-				log.Warningf("skipping virtual node '%+v': duplicate node (%s)", v, path)
-				continue
-			}
-
-			v := v
 
 			if v.Name != "" && v.Name != v.Hostname {
 				log.Warningf(
@@ -141,9 +127,26 @@ func readConfDir(dir string) map[string]*VirtualNode {
 			} else {
 				v.SourceType = "user"
 			}
+			guidKey, err := validateConfigured(&v)
+			if err != nil {
+				log.Warningf("skipping virtual node '%+v': %v (%s)", v, err, path)
+				continue
+			}
+			if _, ok := vnodes[v.Hostname]; ok {
+				log.Warningf("skipping virtual node '%+v': duplicate hostname (%s)", v, path)
+				continue
+			}
+			if other, ok := guids[guidKey]; ok {
+				log.Warningf(
+					"skipping virtual node '%+v': duplicate GUID already used by '%s' (%s)",
+					v, other, path,
+				)
+				continue
+			}
 
 			log.Debugf("adding virtual node'%+v' (%s)", v, path)
 			vnodes[v.Hostname] = &v
+			guids[guidKey] = v.Hostname
 		}
 
 		return nil

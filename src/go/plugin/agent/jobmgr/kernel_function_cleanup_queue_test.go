@@ -43,8 +43,10 @@ func TestFunctionCleanupQueuePreservesFIFOAndReleasesReferences(t *testing.T) {
 		queue.pop()
 	}
 	require.Zero(t, queue.count)
-	require.Nil(t, queue.head)
-	require.Nil(t, queue.tail)
+	require.NotNil(t, queue.head)
+	require.Same(t, queue.head, queue.tail)
+	require.Zero(t, queue.head.head)
+	require.Zero(t, queue.head.tail)
 
 	plan := queue.front()
 	require.False(t, plan.Valid() || plan.Work() != nil)
@@ -104,8 +106,22 @@ func TestFunctionCleanupQueueReleasesConsumedChunks(t *testing.T) {
 	assert.Equal(t, FunctionCleanupRef(population+1), queue.front().Ref())
 	queue.pop()
 	require.Zero(t, queue.count)
-	require.Nil(t, queue.head)
-	require.Nil(t, queue.tail)
+	require.NotNil(t, queue.head)
+	require.Same(t, queue.head, queue.tail)
+	require.Zero(t, queue.head.head)
+	require.Zero(t, queue.head.tail)
+}
+
+func TestFixedChunkQueueReusesItsDrainedChunk(t *testing.T) {
+	var queue fixedChunkQueue[int]
+	queue.push(1)
+	queue.pop()
+
+	allocations := testing.AllocsPerRun(1_000, func() {
+		queue.push(1)
+		queue.pop()
+	})
+	require.Zero(t, allocations)
 }
 
 func TestAbortFunctionMutationReturnsCatalogError(t *testing.T) {

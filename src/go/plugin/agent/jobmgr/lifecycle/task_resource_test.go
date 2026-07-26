@@ -315,6 +315,30 @@ func TestTaskSupervisorRetainsReadyResourceWhenAbortFails(t *testing.T) {
 	require.Error(t, supervisor.Release(ref))
 }
 
+func TestTaskSupervisorDirtyAbandonmentReportsAndClearsOwnedOutcome(t *testing.T) {
+	supervisor := newResourceTaskSupervisor(t)
+	run, err := NewRunSupervisor(1, RealClock{}, time.Second)
+	require.NoError(t, err)
+	require.NoError(t, supervisor.BindRun(run, func() {}))
+	ready := &recordingReadyResource{
+		identity: ResourceIdentity{ID: "job", Generation: 1},
+		events:   new([]string),
+	}
+	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
+	<-supervisor.CompletionCh()
+
+	require.Error(t, supervisor.Abandon(ref, 2))
+	run.Dirty(errors.New("test dirty run"))
+	require.NoError(t, supervisor.Abandon(ref, 2))
+	ack := <-supervisor.AcknowledgementCh()
+	require.Equal(t, TaskActionAbandon, ack.Kind)
+	require.NoError(t, ack.Err)
+	require.Equal(t, TaskOutcomeReadyResource, ack.Abandoned.Outcome)
+	require.False(t, ack.Abandoned.Cleanup)
+	require.NoError(t, supervisor.Release(ref))
+	require.Zero(t, supervisor.Active())
+}
+
 func newResourceTaskSupervisor(t *testing.T) *TaskSupervisor {
 	t.Helper()
 	frame, err := NewFrameOwner(io.Discard)

@@ -121,6 +121,8 @@ func TestPreparedResourceTransactionCommitsOrRestoresWholePostimage(t *testing.T
 func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *testing.T) {
 	tests := map[string]struct {
 		configure func(*transactionTestReadyResource, *transactionTestPreparedResource, *transactionTestReadyResource, error)
+		want      lifecycle.ResourceTransactionDisposition
+		successor bool
 	}{
 		"current stop": {
 			configure: func(
@@ -131,6 +133,7 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 			) {
 				current.stopErr = failure
 			},
+			want: lifecycle.ResourceTransactionUnchanged,
 		},
 		"current finalize": {
 			configure: func(
@@ -141,6 +144,7 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 			) {
 				current.finalizeErr = failure
 			},
+			want: lifecycle.ResourceTransactionUnchanged,
 		},
 		"successor accept": {
 			configure: func(
@@ -151,6 +155,8 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 			) {
 				successor.acceptErr = failure
 			},
+			want:      lifecycle.ResourceTransactionReplaced,
+			successor: true,
 		},
 		"successor publish": {
 			configure: func(
@@ -161,6 +167,8 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 			) {
 				successor.publishErr = failure
 			},
+			want:      lifecycle.ResourceTransactionReplaced,
+			successor: true,
 		},
 	}
 	for name, test := range tests {
@@ -208,12 +216,13 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 			require.NoError(t, err)
 			result, err := lifecycle.NewSealedResult(200, "application/json", []byte(`{"accepted":true}`))
 			require.NoError(t, err)
+			transactionScope := lifecycle.ResourceTransactionScope{
+				ID:        "job",
+				Current:   currentIdentity,
+				Successor: successorIdentity,
+			}
 			transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
-				Scope: lifecycle.ResourceTransactionScope{
-					ID:        "job",
-					Current:   currentIdentity,
-					Successor: successorIdentity,
-				},
+				Scope:            transactionScope,
 				Disposition:      lifecycle.ResourceTransactionReplaced,
 				Current:          current,
 				Successor:        successor,
@@ -225,8 +234,16 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 			})
 			require.NoError(t, err)
 
-			_, err = transaction.Apply(context.Background())
+			applied, err := transaction.Apply(context.Background())
 			require.ErrorIs(t, err, failure)
+			scope, disposition, owned := applied.Ownership()
+			require.Equal(t, transactionScope, scope)
+			require.Equal(t, test.want, disposition)
+			if test.successor {
+				require.Same(t, successorReady, owned)
+			} else {
+				require.Same(t, current, owned)
+			}
 			record, ok := graph.Lookup("job")
 			require.True(t, ok)
 			require.Equal(t, `{"version":1}`, record.Payload())
@@ -286,59 +303,16 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPanic(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Panics(t, func() {
-		_, _ = transaction.Apply(context.Background())
-	})
+	applied, err := transaction.Apply(context.Background())
+	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
+	scope, disposition, owned := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionScope{ID: "job", Successor: successorIdentity}, scope)
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Nil(t, owned)
 
 	next, err := graph.PrepareMutation([]dyncfg.GraphChange{change})
 	require.NoError(t, err)
 	require.NoError(t, graph.Abort(next))
-}
-
-func TestPreparedResourceTransactionSettlesBeforeFailureResolution(t *testing.T) {
-	var events []string
-	successorIdentity := lifecycle.ResourceIdentity{
-		ID:         "job",
-		Generation: 1,
-	}
-	successor := &transactionTestPreparedResource{
-		identity: successorIdentity,
-		events:   &events,
-		acceptErr: &autoDetectionFailure{
-			cause: errors.New("autodetection failed"),
-		},
-	}
-	result, err := lifecycle.NewSealedResult(422, "application/json", []byte(`{"accepted":false}`))
-	require.NoError(t, err)
-	transaction, err := PrepareResourceTransaction(
-		ResourceTransactionSpec{
-			Scope: lifecycle.ResourceTransactionScope{
-				ID:        "job",
-				Successor: successorIdentity,
-			},
-			Disposition: lifecycle.ResourceTransactionInstalled,
-			Successor:   successor,
-			AfterApply: func() {
-				events = append(events, "settle")
-			},
-			Result:  result,
-			Cleanup: func() error { return nil },
-			SuccessorFailure: func(*autoDetectionFailure) (SuccessorFailureResolution, error) {
-				return SuccessorFailureResolution{
-					Result:  result,
-					Cleanup: func() error { return nil },
-					AfterApply: func() {
-						events = append(events, "resolve")
-					},
-				}, nil
-			},
-		},
-	)
-	require.NoError(t, err)
-
-	_, err = transaction.Apply(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, []string{"successor-accept", "settle", "resolve"}, events)
 }
 
 type transactionTestPreparedResource struct {
@@ -363,7 +337,7 @@ func (ttpr *transactionTestPreparedResource) AcceptStart(
 		panic(ttpr.acceptPanic)
 	}
 	if ttpr.acceptErr != nil {
-		return nil, ttpr.acceptErr
+		return ttpr.ready, ttpr.acceptErr
 	}
 	if expected != ttpr.identity.Generation {
 		return nil, ErrJobGenerationMismatch

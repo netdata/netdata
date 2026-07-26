@@ -5,7 +5,6 @@ package lifecycle
 import (
 	"context"
 	"errors"
-	"strings"
 	"time"
 )
 
@@ -14,10 +13,30 @@ const MaximumUIDBytes = 128
 
 // ValidateUID checks whether uid is safe for line-oriented Function framing.
 func ValidateUID(uid string) error {
-	if uid == "" || len(uid) > MaximumUIDBytes || strings.ContainsAny(uid, " \t\r\n\x00") {
+	if uid == "" || len(uid) > MaximumUIDBytes || !validPluginsDBareField(uid) {
 		return errors.New("jobmgr lifecycle: invalid UID")
 	}
 	return nil
+}
+
+func validPluginsDBareField(value string) bool {
+	for index := 0; index < len(value); index++ {
+		char := value[index]
+		if char <= ' ' || char == 0x7f || char == '=' ||
+			char == '\'' || char == '"' || char == '\\' {
+			return false
+		}
+	}
+	return true
+}
+
+func pluginsDSeparator(char byte) bool {
+	switch char {
+	case ' ', '\t', '\r', '\n', '\f', '\v', '=':
+		return true
+	default:
+		return false
+	}
 }
 
 // Source identifies the ingress and lifecycle origin of an operation.

@@ -51,6 +51,7 @@ const (
 	TaskActionDispose
 	TaskActionCleanup
 	TaskActionTerminate
+	TaskActionAbandon
 )
 
 type TaskAction struct {
@@ -62,10 +63,63 @@ type TaskAction struct {
 }
 
 type TaskAcknowledgement struct {
-	Ref      TaskRef
-	Sequence uint8
-	Kind     TaskActionKind
-	Err      error
+	Ref       TaskRef
+	Sequence  uint8
+	Kind      TaskActionKind
+	Err       error
+	Abandoned TaskAbandonment
+}
+
+// TaskAbandonment records outcome ownership intentionally forfeited while a
+// dirty run joins a child that cannot complete its normal action protocol.
+type TaskAbandonment struct {
+	Outcome          TaskOutcomeKind
+	Cleanup          bool
+	LongLivedPermits int
+}
+
+type TaskAbandonmentCensus struct {
+	Results                      int
+	ReadyResources               int
+	PreparedResourceTransactions int
+	AppliedResourceTransactions  int
+	Cleanups                     int
+	LongLivedPermits             int
+}
+
+func (tac *TaskAbandonmentCensus) Record(abandonment TaskAbandonment) {
+	if tac == nil {
+		return
+	}
+	switch abandonment.Outcome {
+	case TaskOutcomeFrame:
+		tac.Results++
+	case TaskOutcomeReadyResource:
+		tac.ReadyResources++
+	case TaskOutcomePreparedResourceTransaction:
+		tac.PreparedResourceTransactions++
+	case TaskOutcomeAppliedResourceTransaction:
+		tac.AppliedResourceTransactions++
+	}
+	if abandonment.Cleanup {
+		tac.Cleanups++
+	}
+	tac.LongLivedPermits += abandonment.LongLivedPermits
+}
+
+func (tac TaskAbandonmentCensus) Empty() bool {
+	return tac == (TaskAbandonmentCensus{})
+}
+
+func (abandonment TaskAbandonment) OwnershipCount() int {
+	count := abandonment.LongLivedPermits
+	if abandonment.Outcome != TaskOutcomeNone {
+		count++
+	}
+	if abandonment.Cleanup {
+		count++
+	}
+	return count
 }
 
 type taskSlot struct {
@@ -91,6 +145,7 @@ type taskRequest struct {
 	previous   uint32      // previous request in its class queue
 	next       uint32      // next request in its class queue
 	active     bool        // request slot is in use
+	queued     bool        // request is linked in a runnable class queue
 	class      TaskClass   // task class (framework-control / generic Function)
 	plan       TaskPlan    // the task plan to run
 	initial    TaskOutcome // seed outcome carried into the child
@@ -213,6 +268,7 @@ func (ts *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskRequestRe
 		slot:       slot,
 		generation: generation,
 		active:     true,
+		queued:     true,
 		class:      class,
 		plan:       plan,
 		initial:    initial,
@@ -306,7 +362,9 @@ func (ts *TaskSupervisor) Dispatch(
 		}
 		taskRef, err := ts.start(parent, record.plan, record.initial)
 		if err != nil {
-			return count, true, err
+			ts.unlinkRequest(record)
+			ts.observeRuntimeState()
+			return count, ts.Pending() > 0, err
 		}
 		ts.removeRequest(record)
 		started[count] = TaskStart{
@@ -560,6 +618,34 @@ func (ts *TaskSupervisor) SendAction(action TaskAction) error {
 	}
 }
 
+func (ts *TaskSupervisor) Abandon(ref TaskRef, sequence uint8) error {
+	if !ref.Valid() || sequence == 0 {
+		return errors.New("jobmgr task supervisor: invalid task abandonment")
+	}
+	if ts.run == nil || ts.run.DirtyCause() == nil {
+		return errors.New("jobmgr task supervisor: abandonment requires a dirty run")
+	}
+	slot, err := ts.slot(ref)
+	if err != nil {
+		return err
+	}
+	if slot.joined || slot.actionPending || sequence != slot.sequence+1 {
+		return errors.New("jobmgr task supervisor: stale or duplicate task abandonment")
+	}
+	slot.actionPending = true
+	select {
+	case slot.action <- TaskAction{
+		Ref:      ref,
+		Sequence: sequence,
+		Kind:     TaskActionAbandon,
+	}:
+		return nil
+	default:
+		slot.actionPending = false
+		return errors.New("jobmgr task supervisor: full abandonment mailbox")
+	}
+}
+
 func (ts *TaskSupervisor) Cancel(ref TaskRef) error {
 	return ts.CancelWithCause(ref, context.Canceled)
 }
@@ -582,7 +668,8 @@ func (ts *TaskSupervisor) Release(ref TaskRef) error {
 	if err != nil {
 		return err
 	}
-	if !slot.joined || slot.actionPending || len(slot.action) != 0 || !slot.outcome.empty() || slot.retainedTimeout {
+	if !slot.joined || slot.actionPending || len(slot.action) != 0 ||
+		!slot.outcome.empty() || slot.cleanup != nil || slot.retainedTimeout {
 		return errors.New("jobmgr task supervisor: release before empty joined acknowledgement")
 	}
 	slot.cancel(context.Canceled)
@@ -747,7 +834,8 @@ func (ts *TaskSupervisor) runChild(
 			Sequence: action.Sequence,
 			Kind:     action.Kind,
 		}
-		if action.Ref != ref || action.Sequence != slot.sequence+1 || action.Sequence > slot.maxPhaseTransitions {
+		if action.Ref != ref || action.Sequence != slot.sequence+1 ||
+			action.Kind != TaskActionAbandon && action.Sequence > slot.maxPhaseTransitions {
 			ack.Err = errors.New("jobmgr task child: stale or wrong-sequence phase action")
 			slot.actionPending = false
 			slot.joined = true
@@ -793,13 +881,14 @@ func (ts *TaskSupervisor) runChild(
 				transaction := slot.outcome.transaction
 				scope := slot.outcome.scope
 				applied, applyErr := runPreparedResourceTransactionApply(context.WithoutCancel(ctx), transaction)
-				if applyErr != nil {
-					ack.Err = applyErr
-				} else if applied.scope != scope {
-					ack.Err = errors.New("jobmgr task child: applied resource transaction changed scope")
+				if applied.scope != scope {
+					ack.Err = errors.Join(
+						applyErr,
+						errors.New("jobmgr task child: applied resource transaction changed scope"),
+					)
 				} else {
 					next, outcomeErr := appliedResourceTransactionOutcome(applied)
-					ack.Err = outcomeErr
+					ack.Err = errors.Join(applyErr, outcomeErr)
 					if outcomeErr == nil {
 						slot.outcome = next
 						slot.cleanup = applied.cleanup
@@ -825,16 +914,19 @@ func (ts *TaskSupervisor) runChild(
 					transaction,
 				)
 				ack.Err = disposeErr
-				if disposeErr == nil {
-					if scope.Current.Valid() {
-						slot.outcome, ack.Err = readyResourceOutcome(current, scope.Current)
-					} else if current != nil {
-						ack.Err = errors.New(
-							"jobmgr task child: graph-only transaction disposal returned a resource",
-						)
-					} else {
-						slot.outcome = TaskOutcome{}
+				if scope.Current.Valid() {
+					next, outcomeErr := readyResourceOutcome(current, scope.Current)
+					ack.Err = errors.Join(ack.Err, outcomeErr)
+					if outcomeErr == nil {
+						slot.outcome = next
 					}
+				} else if current != nil {
+					ack.Err = errors.Join(
+						ack.Err,
+						errors.New("jobmgr task child: graph-only transaction disposal returned a resource"),
+					)
+				} else {
+					slot.outcome = TaskOutcome{}
 				}
 			} else {
 				ack.Err = disposeTaskOutcome(ctx, slot.outcome, slot.preserveDisposeContext)
@@ -855,12 +947,29 @@ func (ts *TaskSupervisor) runChild(
 			if !slot.outcome.empty() {
 				ack.Err = errors.New("jobmgr task child: terminate with published result")
 			}
+		case TaskActionAbandon:
+			ack.Abandoned = TaskAbandonment{
+				Outcome: slot.outcome.kind,
+				Cleanup: slot.cleanup != nil,
+			}
+			switch slot.outcome.kind {
+			case TaskOutcomeReadyResource, TaskOutcomeAppliedResourceTransaction:
+				ack.Abandoned.LongLivedPermits +=
+					ts.abandonLongLivedOwner(slot.outcome.identity)
+			case TaskOutcomePreparedResourceTransaction:
+				ack.Abandoned.LongLivedPermits +=
+					ts.abandonLongLivedOwner(slot.outcome.scope.Current)
+				ack.Abandoned.LongLivedPermits +=
+					ts.abandonLongLivedOwner(slot.outcome.scope.Successor)
+			}
+			slot.outcome = TaskOutcome{}
+			slot.cleanup = nil
 		default:
 			ack.Err = errors.New("jobmgr task child: unsupported phase action")
 		}
 		slot.sequence = action.Sequence
 		slot.actionPending = false
-		if action.Kind == TaskActionTerminate {
+		if action.Kind == TaskActionTerminate || action.Kind == TaskActionAbandon {
 			slot.joined = true
 			ts.acks <- ack
 			return
@@ -998,6 +1107,24 @@ func (ts *TaskSupervisor) request(ref TaskRequestRef) (*taskRequest, error) {
 }
 
 func (ts *TaskSupervisor) removeRequest(record *taskRequest) {
+	if record.queued {
+		ts.unlinkRequest(record)
+	}
+	slot := record.slot
+	generation := record.generation
+	*record = taskRequest{
+		slot:       slot,
+		generation: generation,
+		freeNext:   ts.freeRequest,
+	}
+	ts.freeRequest = slot
+	ts.observeRuntimeState()
+}
+
+func (ts *TaskSupervisor) unlinkRequest(record *taskRequest) {
+	if record == nil || !record.active || !record.queued {
+		return
+	}
 	queue := &ts.pending[taskClassIndex(record.class)]
 	if record.previous != 0 {
 		ts.requests[record.previous].next = record.next
@@ -1010,15 +1137,9 @@ func (ts *TaskSupervisor) removeRequest(record *taskRequest) {
 		queue.tail = record.previous
 	}
 	queue.count--
-	slot := record.slot
-	generation := record.generation
-	*record = taskRequest{
-		slot:       slot,
-		generation: generation,
-		freeNext:   ts.freeRequest,
-	}
-	ts.freeRequest = slot
-	ts.observeRuntimeState()
+	record.previous = 0
+	record.next = 0
+	record.queued = false
 }
 
 func (ts *TaskSupervisor) observeRuntimeState() {
