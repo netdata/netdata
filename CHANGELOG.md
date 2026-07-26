@@ -807,6 +807,9 @@
 - Fix metadata cleanup when agent is in RAM mode ([#23256](https://github.com/netdata/netdata/issues/23256))
 - Api: new time-grouping 'latest' with a collector-cache fast path ([#23257](https://github.com/netdata/netdata/issues/23257))
 - Fix(daemon): propagate ephemeral node marking to Netdata Cloud ([#23259](https://github.com/netdata/netdata/issues/23259))
+- Build(deps): bump k8s.io/client-go from 0.36.2 to 0.36.3 in /src/go ([#23263](https://github.com/netdata/netdata/issues/23263))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/credentials from 1.19.29 to 1.19.30 in /src/go ([#23265](https://github.com/netdata/netdata/issues/23265))
+- Build(deps): bump github.com/golangsnmp/gomib from 0.11.0 to 0.12.0 in /src/go ([#23266](https://github.com/netdata/netdata/issues/23266))
 
 ## [2.10.0] - 2026-04-09
 
