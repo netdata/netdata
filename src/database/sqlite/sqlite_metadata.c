@@ -6,8 +6,6 @@
 
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 19
-
 #define COMPUTE_DURATION(var_name, unit, start, end)      \
     char var_name[64];                                    \
     duration_snprintf(var_name, sizeof(var_name),         \
