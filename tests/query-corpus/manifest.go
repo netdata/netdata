@@ -222,11 +222,19 @@ var manifest = map[string]ManifestCase{
 		Agent:  Red,
 	},
 	"CASE-023/redelivery": {
-		Proves: "the same stored point handed to several result buckets means different things to different groupings: percentage-of-samples treats a delivery AS a sample and must answer in EVERY bucket (skipping repeats leaves EMPTY holes where a value used to be), while number-of-times and number-of-flaps must count a stored window at most once however many buckets it was delivered into",
+		Proves: "the same stored point handed to several result buckets means different things to different groupings: percentage-of-samples treats a delivery AS a sample and must answer in EVERY bucket (skipping repeats leaves EMPTY holes where a value used to be), while number-of-times and number-of-flaps must count a stored window at most once however many buckets it was delivered into. Counted-once and answered-everywhere are separate contracts and both hold: a bucket a wide point covers on its own carries no occurrence but is still a zero, not EMPTY - skipping the repeat entirely punches holes into a chart wherever the user zooms past the stored resolution",
 		Agent:  Red,
 	},
 	"CASE-023/reset-counted-once": {
 		Proves: "one counter reset counts once above tier 0, at any resolution: carrying the PRE-reset peak forward makes the window after the reset look like it dropped too, and re-delivering the reset window compares it against the maximum its own first delivery stored - both turn one reboot into several",
+		Agent:  Red,
+	},
+	"CASE-023/previous-survives-redelivery": {
+		Proves: "a counter that only climbs reports NO time below its predecessor, at any zoom: above tier 0 `<previous` is decided from the window's minimum against the PREVIOUS window's maximum, and by the time a wide window is re-delivered to the next bucket it spans that maximum has already advanced to the window's own - so re-deciding a repeat asks 'is this window's minimum below its own maximum', which is true of every window that moved at all, and percentage-of-time then reports a reboot in every bucket after the first",
+		Agent:  Red,
+	},
+	"CASE-023/previous-drop-at-every-zoom": {
+		Proves: "the mirror image: one real counter restart covers the SAME share of the span however finely the stored window is cut - the window it happened in counts as time below the predecessor for its whole duration, not just for the first bucket it was delivered into. Replaying the first delivery's verdict is what makes this and CASE-023/previous-survives-redelivery true at once; a repeat that re-decides itself reports the reset in the buckets that follow it and, once the post-reset floor is carried forward, stops reporting it in its own",
 		Agent:  Red,
 	},
 	"CASE-023/nonzero-follows-answer": {
