@@ -4,6 +4,22 @@
 #define NETDATA_HEALTH_INTERNALS_H
 
 #include "health.h"
+#include "../web/api/queries/tg-expression.h"
+
+// The legacy condition/value pair is DERIVED from the written expression,
+// so every parser that accepts one - the .conf reader and DYNCFG - maps it
+// the same way and the two can never disagree about what an alert does.
+static inline ALERT_LOOKUP_TIME_GROUP_CONDITION alert_lookup_condition_from_expression(TG_EXPRESSION_CMP cmp) {
+    switch(cmp) {
+        case TG_EXPRESSION_NOTEQUAL:     return ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL;
+        case TG_EXPRESSION_LESS:         return ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS;
+        case TG_EXPRESSION_LESSEQUAL:    return ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS_EQUAL;
+        case TG_EXPRESSION_GREATER:      return ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER;
+        case TG_EXPRESSION_GREATEREQUAL: return ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL;
+        case TG_EXPRESSION_EQUAL:
+        default:                         return ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
+    }
+}
 
 #define HEALTH_LOG_ENTRIES_DEFAULT 1000U
 #define HEALTH_LOG_ENTRIES_MAX 100000U
