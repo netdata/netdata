@@ -44,23 +44,23 @@ static inline void tg_percentage_of_time_free(RRDR *r) {
     r->time_grouping.data = NULL;
 }
 
-static inline void tg_percentage_of_time_add_point(
-    RRDR *r, NETDATA_DOUBLE value, bool is_gap, time_t duration, size_t samples __maybe_unused) {
+static inline void tg_percentage_of_time_add_point(RRDR *r, const TG_POINT *p) {
     struct tg_percentage_of_time *g = (struct tg_percentage_of_time *)r->time_grouping.data;
 
-    if(unlikely(duration <= 0))
+    if(unlikely(p->duration <= 0))
         return;
 
-    if(tg_expression_eval(&g->expr, value, is_gap))
-        g->matched += (NETDATA_DOUBLE)duration;
-
-    g->total += (NETDATA_DOUBLE)duration;
+    // above tier 0 the share is a fraction of the window, not a yes/no
+    g->matched += tg_expression_share(&g->expr, p) * (NETDATA_DOUBLE)p->duration;
+    g->total += (NETDATA_DOUBLE)p->duration;
 }
 
 // the registry's generic entry point (the dispatcher's default arm and
 // rrdr_set_grouping_function need every row to have one)
 static inline void tg_percentage_of_time_add(RRDR *r, NETDATA_DOUBLE value) {
-    tg_percentage_of_time_add_point(r, value, false, 1, 1);
+    TG_POINT p = { .value = value, .min = value, .max = value, .count = 1,
+                   .duration = 1, .samples = 1, .is_gap = false };
+    tg_percentage_of_time_add_point(r, &p);
 }
 
 static inline NETDATA_DOUBLE tg_percentage_of_time_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {

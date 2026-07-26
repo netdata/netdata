@@ -845,11 +845,6 @@ static inline const char *query_target_rate_adjusted_units(
     return buf;
 }
 
-static inline bool query_target_has_percentage_units(QUERY_TARGET *qt) {
-    const char *u = query_target_units_override(qt);
-    return u && strcmp(u, "%") == 0;
-}
-
 uint32_t rrdcontext_queue_version(RRDCONTEXT_QUEUE_JudyLSet *queue);
 int32_t rrdcontext_queue_entries(RRDCONTEXT_QUEUE_JudyLSet *queue);
 

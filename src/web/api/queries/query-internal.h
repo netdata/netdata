@@ -122,7 +122,9 @@ static inline bool time_grouping_is_expression(RRDR_TIME_GROUPING g) {
     }
 }
 
-void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, bool is_gap, time_t duration, size_t samples, const RRDR_TIME_GROUPING add_flush);
+// defined in tg-expression.h, which the grouping modules include
+struct tg_point;
+void time_grouping_add(RRDR *r, const struct tg_point *p, const RRDR_TIME_GROUPING add_flush);
 NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, const RRDR_TIME_GROUPING add_flush);
 void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method);
 
