@@ -128,6 +128,24 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
             // but an alert that runs a condition its author did not write
             // fires, or stays silent, for the wrong reason.
             if(config->time_group_options) {
+                // trimmed to the same canonical form the .conf reader
+                // produces (health_parse_db_lookup): the condition is
+                // hashed into the alert's identity, so the same rule
+                // spaced differently must not become a different alert
+                char _trimmed[128];
+                strncpyz(_trimmed, string2str(config->time_group_options), sizeof(_trimmed) - 1);
+                char *_c = trim(_trimmed);
+                if(!_c || !*_c) {
+                    string_freez(config->time_group_options);
+                    config->time_group_options = NULL;
+                }
+                else if(strcmp(_c, string2str(config->time_group_options)) != 0) {
+                    string_freez(config->time_group_options);
+                    config->time_group_options = string_strdupz(_c);
+                }
+            }
+
+            if(config->time_group_options) {
                 TG_EXPRESSION _e;
                 if(!tg_expression_parse(&_e, string2str(config->time_group_options))) {
                     buffer_sprintf(error, "invalid condition '%s' in '%s.time_group_options'",
