@@ -141,6 +141,21 @@ test as the regression guard, with `FixedBy: "#PR"`.
   contexts `first_time_t` (see `weightsSettle`), not only on retention.
 - **Tolerances**: exact comparison is the default. `Chart.ValueTolerance`
   is ONLY for quantization-probing fixtures, with the reason in a comment.
+- **Tier window alignment**: `TierWindows(gran)` keys on ABSOLUTE multiples
+  of the granularity, not on offsets from `T0`. `fixture.T0 % 60 == 20`, so
+  the first tier-1 window ends at `T0+40` and a fixture whose shape is
+  keyed on the sample index straddles two regimes per stored window. Anchor
+  tier queries at `T0+40`, and let the oracle — never the fixture's index
+  arithmetic — say what each window contains.
+- **Forcing wide-point re-delivery**: ask for a view grid FINER than the
+  stored data (`DataParamsTier(ctx, 1, after, before, buckets, ...)` with
+  `buckets` a multiple of the stored window count). Each stored point is
+  then delivered to several buckets, carrying its original start and an
+  INTERPOLATED value — so any grouping that reads `value` instead of the
+  window's own statistics answers differently per bucket. That is the only
+  way to reach the repeat path from a query, and it is how
+  CASE-023/tier-wide-point caught a constant window being judged on an
+  interpolated blend of two windows.
 
 ## Adding a green case
 
