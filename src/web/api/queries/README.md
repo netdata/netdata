@@ -154,45 +154,25 @@ Some grouping methods accept additional parameters via `group_options`:
 
   There are no and/or compounds.
 
-### Above tier 0
+### Accuracy over long windows
 
-Netdata keeps full detail only briefly; older data is stored as per-window
-minimum, maximum, average and count. A stored window is therefore not a
-sample, and asking a condition of its average is misleading: a minute that
-was up 30s and down 30s has an average of 0.5, so both `>=1` and `==0` would
-answer "never".
+Netdata keeps per-second detail only for a limited time; older data is kept
+at lower resolution. Over a window long enough to read that older data,
+these groupings return an **estimate**:
 
-These groupings instead estimate the share of each stored window that
-satisfied the condition, treating the window as if the value took only its
-minimum and its maximum, weighted so their mean is the recorded average.
-That is **exact for a 0/1 signal** - an availability metric - because there
-the average IS the fraction of time at 1.
+- For a metric that is only ever 0 or 1 - an availability signal - the
+  estimate is exact.
+- For other metrics it is approximate.
+- `number-of-flaps` and `number-of-times` count at most one event per stored
+  interval, so bursts of events close together are reported as one.
+- `number-of-times` with `previous` still detects a counter going backwards,
+  so reboot counting keeps working.
+- A gap inside a stored interval is not visible, so partially collected
+  intervals count as collected.
 
-Limits, all of which disappear at tier 0 (request `tier: 0`):
-
-- For a continuous metric the estimate inside the range does not move with
-  the threshold; it is a share of the window, not a precise crossing count.
-- `number-of-flaps` and `number-of-times` collapse everything inside one
-  stored window to a single event, because the rollup keeps no ordering.
-  This is an approximation in both directions, not a lower bound.
-- `previous`/`last` keeps only the monotone drop: a window whose minimum
-  falls below the previous window's maximum proves the value went backwards,
-  so reboot counting works. Other predecessor comparisons are answered on
-  the window average.
-- Gap tokens are not estimated across a window: a partly-collected window
-  counts as collected.
-- `percentage-of-samples` keeps its historical behaviour, where a stored
-  window counts as one sample.
-
-- `percentile`: A number from 1-99 specifying the percentile
-- `trimmed-mean` / `trimmed-median`: A number specifying the percentage of values to trim from each end
-
-The examples shown above show live information from the `received` traffic on the `eth0` interface of the global Netdata Registry.
-Inspect any of the badges to see the parameters provided. You can directly issue the request to the Registry server's API yourself, e.g. by passing the following to get the value shown on the badge for the sum of the values within the period:
-
-```
-https://registry.my-netdata.io/api/v1/data?chart=net.eth0&options=unaligned&dimensions=received&group=sum&units=kilobits&after=-60&label=sum&points=1
-```
+Add `"tier": 0` to the request for exact answers, and check `db.per_tier` in
+the response to confirm tier 0 actually served the query. Tier 0 retention is
+short on busy parents, so a long window will not always have it.
 
 ## Further processing
 
