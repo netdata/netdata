@@ -389,6 +389,7 @@ static int test_db_lookup_frequency_boundaries(int *passed) {
             (*passed)++;
 
         string_freez(ac.dimensions);
+        string_freez(ac.time_group_options);
     }
 
     return failed;

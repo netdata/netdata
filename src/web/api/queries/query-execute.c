@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "query-internal.h"
+#include "tg-expression.h"
 
 // ----------------------------------------------------------------------------
 // helpers to find our way in RRDR
@@ -138,17 +139,25 @@ static NETDATA_DOUBLE query_point_total_projection(
                                                                             \
         NETDATA_DOUBLE grouping_value =                                     \
             (point).value;              \
-        time_grouping_add(r, grouping_value, false, _duration, _samples, add_flush); \
+        TG_POINT _tgp = { .value = grouping_value,                          \
+                          .min = (point).sp.min, .max = (point).sp.max,     \
+                          .count = (point).sp.count,                        \
+                          .duration = _duration, .samples = _samples,       \
+                          .is_gap = false };                                \
+        time_grouping_add(r, &_tgp, add_flush);                             \
                                                                             \
         if((point).tier != 0 || _sample_in_row) \
             storage_point_merge_to((ops)->group_point, (point).sp);             \
         if(!(point).added)                                                  \
             storage_point_merge_to((ops)->query_point, (point).sp);         \
     }                                                                       \
-    else if(unlikely((r)->time_grouping.wants_gaps)) {                      \
+    else if(unlikely((r)->time_grouping.wants_gaps && _duration > 0)) {                      \
         /* a gap contributes neither a value nor retention: only the        \
          * expression groupings see it, and only as "no data here" */       \
-        time_grouping_add(r, NAN, true, _duration, _samples, add_flush);    \
+        TG_POINT _tgg = { .value = NAN, .min = NAN, .max = NAN, .count = 0, \
+                          .duration = _duration, .samples = _samples,       \
+                          .is_gap = true };                                 \
+        time_grouping_add(r, &_tgg, add_flush);                             \
     }                                                                       \
                                                                             \
     (ops)->group_points_added++;                                            \
