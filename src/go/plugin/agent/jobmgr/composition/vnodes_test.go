@@ -27,6 +27,7 @@ func TestVNodeBindingPreparesUpdates(t *testing.T) {
 		payload      string
 		wantMutation bool
 		wantHostname string
+		wantStatus   int
 	}{
 		"invalid config ID": {
 			args:    []string{"other:vnode:db", string(dyncfg.CommandUpdate)},
@@ -44,6 +45,11 @@ func TestVNodeBindingPreparesUpdates(t *testing.T) {
 		"hostname with trailing escape": {
 			args:    []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)},
 			payload: `{"hostname":"operator\\","guid":"` + testVNodeGUID + `"}`,
+		},
+		"label value changes during host emission preparation": {
+			args:       []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)},
+			payload:    `{"hostname":"db","guid":"` + testVNodeGUID + `","labels":{"site":"operator's"}}`,
+			wantStatus: 400,
 		},
 		"unchanged vnode": {
 			args:    []string{"go.d:vnode:db", string(dyncfg.CommandUpdate)},
@@ -86,8 +92,11 @@ func TestVNodeBindingPreparesUpdates(t *testing.T) {
 			} else {
 				require.IsType(t, &joboutput.PreparedNoopResourceTransaction{}, transaction)
 			}
-			_, err = transaction.Apply(context.Background())
+			applied, err := transaction.Apply(context.Background())
 			require.NoError(t, err)
+			if test.wantStatus != 0 {
+				require.Equal(t, test.wantStatus, applied.ResultStatus())
+			}
 
 			snapshot, ok := configured.Lookup("db")
 			require.True(t, ok)

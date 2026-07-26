@@ -515,6 +515,8 @@ func validateResourceTransactionDeclaration(declaration *ResourceTransactionDecl
 			if claim == "" || len(claim) > maximumDeclarationMetadataBytes || claim == declaration.GlobalClaim {
 				return errors.New("jobmgr Function catalog: invalid command claim")
 			}
+			// Claim acquisition follows normalized lexical order, so only its
+			// final claim can be yielded.
 			if declaration.YieldGlobalClaimOnPrepare && claim > declaration.GlobalClaim {
 				return errors.New("jobmgr Function catalog: yielded global claim is not the acquisition suffix")
 			}

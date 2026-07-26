@@ -56,9 +56,13 @@ func validateConfigured(vnode *VirtualNode) (string, error) {
 	if !netdataapi.ValidSingleQuotedProtocolField(prepared.Hostname) {
 		return "", fmt.Errorf("configured vnode hostname cannot be represented in the host protocol")
 	}
-	for key := range vnode.Labels {
-		if _, ok := prepared.Labels[key]; !ok {
+	for key, value := range vnode.Labels {
+		preparedValue, ok := prepared.Labels[key]
+		if !ok {
 			return "", fmt.Errorf("configured vnode label key %q changes during host emission preparation", key)
+		}
+		if preparedValue != value {
+			return "", fmt.Errorf("configured vnode label value for %q changes during host emission preparation", key)
 		}
 	}
 	for key, value := range prepared.Labels {

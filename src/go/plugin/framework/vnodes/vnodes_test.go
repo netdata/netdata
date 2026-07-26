@@ -57,6 +57,10 @@ func TestLoad_SkipsInvalidConfiguredVnodesIndividually(t *testing.T) {
   guid: urn:uuid:44444444-5555-6666-7777-888888888888
 - hostname: duplicate-guid
   guid: 11111111222233334444555555555555
+- hostname: changed-label-value
+  guid: 55555555-6666-7777-8888-999999999999
+  labels:
+    site: "operator's"
 `
 	require.NoError(t, os.WriteFile(cfgPath, []byte(cfg), 0o644))
 
@@ -82,29 +86,49 @@ func TestLoad_SkipsVNodeWhoseSourceCannotBePublished(t *testing.T) {
 	require.Empty(t, Load(dir))
 }
 
-func TestValidateConfiguredRejectsLabelKeyNormalization(t *testing.T) {
-	tests := map[string]map[string]string{
+func TestValidateConfiguredRejectsLabelNormalization(t *testing.T) {
+	tests := map[string]struct {
+		labels  map[string]string
+		wantErr string
+	}{
 		"trimmed key": {
-			" region ": "east",
+			labels:  map[string]string{" region ": "east"},
+			wantErr: "label key",
 		},
 		"normalization collision": {
-			" region ": "east",
-			"region":   "west",
+			labels:  map[string]string{" region ": "east", "region": "west"},
+			wantErr: "label key",
+		},
+		"single quote value": {
+			labels:  map[string]string{"site": "operator's"},
+			wantErr: "label value",
+		},
+		"line feed value": {
+			labels:  map[string]string{"site": "east\nwest"},
+			wantErr: "label value",
+		},
+		"carriage return value": {
+			labels:  map[string]string{"site": "east\rwest"},
+			wantErr: "label value",
+		},
+		"NUL value": {
+			labels:  map[string]string{"site": "east\x00west"},
+			wantErr: "label value",
 		},
 	}
 
-	for name, labels := range tests {
+	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			vnode := &VirtualNode{
 				Name:       "host-a",
 				Hostname:   "host-a",
 				GUID:       "11111111-2222-3333-4444-555555555555",
-				Labels:     labels,
+				Labels:     test.labels,
 				Source:     "file=/etc/netdata/vnodes/vnodes.yaml",
 				SourceType: "user",
 			}
 
-			require.ErrorContains(t, ValidateConfigured(vnode), "label key")
+			require.ErrorContains(t, ValidateConfigured(vnode), test.wantErr)
 		})
 	}
 }
