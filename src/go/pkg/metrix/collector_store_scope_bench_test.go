@@ -11,10 +11,13 @@ import (
 
 var benchmarkHostScopesSink []HostScope
 
-// Cold flatten construction is O(source series + projected outputs*labels). It
-// retains no global cache; CollectorStore owns one projection per exact snapshot.
-// The benchmarks keep setup outside the timer and verify the exact output count
-// before timing so skipped projection work cannot look like an optimization.
+// Cold flatten builds both projected series and their lookup index. Label/key
+// construction is O(source series + projected label/key bytes); index construction
+// adds sum(k log k) label-key comparisons across scope/name groups plus scope/name
+// catalog sorting. It retains no global cache, introduces no quadratic scan, and
+// CollectorStore owns one projection per exact snapshot. The benchmarks keep setup
+// outside the timer and verify the exact output count before timing so skipped
+// projection work cannot look like an optimization.
 //
 // Latest developer-laptop comparison (darwin/arm64, Apple M4 Pro, 2026-07-27).
 // Results are medians of -count=10; ns/op is a trend indicator, not a CI gate.

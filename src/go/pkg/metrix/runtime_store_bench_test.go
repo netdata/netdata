@@ -110,6 +110,22 @@ func BenchmarkRuntimeStoreMixedTypedWriteAndReadFlatten(b *testing.B) {
 	sum := m.Summary("request_time", WithSummaryQuantiles(0.5, 0.9, 0.99))
 	ss := m.StateSet("mode", WithStateSetStates("maintenance", "operational"), WithStateSetMode(ModeEnum))
 
+	// Seed stateful instruments so the preflight matches timed read visibility.
+	g.Set(0)
+	c.Add(1)
+	h.Observe(1)
+	sum.Observe(1)
+	ss.Enable("operational")
+
+	preflight := s.Read(ReadFlatten())
+	count := 0
+	preflight.ForEachSeries(func(_ string, _ LabelView, _ SampleValue) {
+		count++
+	})
+	if count != 15 {
+		b.Fatalf("expected 15 flattened series, got %d", count)
+	}
+
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -109,84 +109,108 @@ func TestFlattenSnapshotReusesRoleDescriptorsWithinSourceSeries(t *testing.T) {
 }
 
 func TestFlattenSnapshotAllocationEnvelope(t *testing.T) {
-	const highCardinality = 512
+	const (
+		lowCardinality  = 32
+		highCardinality = 512
+		cardinalityRate = highCardinality / lowCardinality
+		growthSlack     = 1.10
+	)
 
-	// Scalar flattening shares canonical series and must stay cardinality-independent.
-	// Structured flattening must stay linear in source series and projected outputs;
-	// these limits also pin the reduced per-output allocation shape.
+	measure := func(t *testing.T, store CollectorStore, wantSeries int) float64 {
+		t.Helper()
+		snapshot := store.(*storeView).core.snapshot.Load()
+		requireFlattenProjectionSeries(t, snapshot, wantSeries)
+		return testing.AllocsPerRun(3, func() {
+			benchmarkReaderCountSink = len(flattenSnapshot(snapshot).series)
+		})
+	}
+
+	t.Run("scalar projection allocation count stays bounded", func(t *testing.T) {
+		low := measure(t, benchmarkCommittedScalarStore(t, lowCardinality), lowCardinality)
+		high := measure(t, benchmarkCommittedScalarStore(t, highCardinality), highCardinality)
+
+		// Scalar projection shares committed series. Map and index growth may add
+		// a few allocation events, but must not add per-series object allocations.
+		require.LessOrEqualf(t, low, float64(20), "low-cardinality scalar allocations = %.0f", low)
+		require.LessOrEqualf(t, high, float64(25), "high-cardinality scalar allocations = %.0f", high)
+		require.LessOrEqualf(t, high, low*2, "%dx cardinality grew scalar allocations from %.0f to %.0f", cardinalityRate, low, high)
+	})
+
 	tests := map[string]struct {
-		store      func(testing.TB) CollectorStore
-		wantSeries int
-		maxAllocs  float64
+		store               func(testing.TB, int) CollectorStore
+		wantSeriesPerSource int
+		maxAllocsPerSource  float64
 	}{
-		"scalar allocations stay O(1) with cardinality": {
-			store: func(tb testing.TB) CollectorStore {
-				return benchmarkCommittedScalarStore(tb, highCardinality)
+		"mixed structured": {
+			store: func(tb testing.TB, totalSeries int) CollectorStore {
+				return benchmarkCommittedMixedStore(tb, totalSeries)
 			},
-			wantSeries: highCardinality,
-			maxAllocs:  25,
+			wantSeriesPerSource: 15,
+			maxAllocsPerSource:  100,
 		},
-		"mixed structured allocations stay linear at low cardinality": {
-			store: func(tb testing.TB) CollectorStore {
-				return benchmarkCommittedMixedStore(tb, 32)
+		"histogram with eight labels": {
+			store: func(tb testing.TB, totalSeries int) CollectorStore {
+				return benchmarkCommittedHistogramStore(tb, totalSeries, 8)
 			},
-			wantSeries: 15 * 32,
-			maxAllocs:  100 * 32,
+			wantSeriesPerSource: 15,
+			maxAllocsPerSource:  140,
 		},
-		"mixed structured allocations stay linear at high cardinality": {
-			store: func(tb testing.TB) CollectorStore {
-				return benchmarkCommittedMixedStore(tb, highCardinality)
+		"summary with eight labels and quantiles": {
+			store: func(tb testing.TB, totalSeries int) CollectorStore {
+				return benchmarkCommittedSummaryStore(tb, totalSeries, 8, 8)
 			},
-			wantSeries: 15 * highCardinality,
-			maxAllocs:  100 * highCardinality,
+			wantSeriesPerSource: 10,
+			maxAllocsPerSource:  105,
 		},
-		"histogram allocations stay linear with eight labels": {
-			store: func(tb testing.TB) CollectorStore {
-				return benchmarkCommittedHistogramStore(tb, 32, 8)
+		"stateset with eight labels and states": {
+			store: func(tb testing.TB, totalSeries int) CollectorStore {
+				return benchmarkCommittedStateSetStore(tb, totalSeries, 8, 8)
 			},
-			wantSeries: 15 * 32,
-			maxAllocs:  140 * 32,
+			wantSeriesPerSource: 8,
+			maxAllocsPerSource:  85,
 		},
-		"summary allocations stay linear with eight labels and quantiles": {
-			store: func(tb testing.TB) CollectorStore {
-				return benchmarkCommittedSummaryStore(tb, 32, 8, 8)
+		"measureset gauge with eight labels and fields": {
+			store: func(tb testing.TB, totalSeries int) CollectorStore {
+				return benchmarkCommittedMeasureSetStore(tb, totalSeries, 8, 8, MeasureSetSemanticsGauge)
 			},
-			wantSeries: 10 * 32,
-			maxAllocs:  105 * 32,
+			wantSeriesPerSource: 8,
+			maxAllocsPerSource:  105,
 		},
-		"stateset allocations stay linear with eight labels and states": {
-			store: func(tb testing.TB) CollectorStore {
-				return benchmarkCommittedStateSetStore(tb, 32, 8, 8)
+		"measureset counter with eight labels and fields": {
+			store: func(tb testing.TB, totalSeries int) CollectorStore {
+				return benchmarkCommittedMeasureSetStore(tb, totalSeries, 8, 8, MeasureSetSemanticsCounter)
 			},
-			wantSeries: 8 * 32,
-			maxAllocs:  85 * 32,
-		},
-		"measureset gauge allocations stay linear with eight labels and fields": {
-			store: func(tb testing.TB) CollectorStore {
-				return benchmarkCommittedMeasureSetStore(tb, 32, 8, 8, MeasureSetSemanticsGauge)
-			},
-			wantSeries: 8 * 32,
-			maxAllocs:  105 * 32,
-		},
-		"measureset counter allocations stay linear with eight labels and fields": {
-			store: func(tb testing.TB) CollectorStore {
-				return benchmarkCommittedMeasureSetStore(tb, 32, 8, 8, MeasureSetSemanticsCounter)
-			},
-			wantSeries: 8 * 32,
-			maxAllocs:  105 * 32,
+			wantSeriesPerSource: 8,
+			maxAllocsPerSource:  105,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			store := tc.store(t)
-			snapshot := store.(*storeView).core.snapshot.Load()
-			requireFlattenProjectionSeries(t, snapshot, tc.wantSeries)
+			low := measure(
+				t,
+				tc.store(t, lowCardinality),
+				tc.wantSeriesPerSource*lowCardinality,
+			)
+			high := measure(
+				t,
+				tc.store(t, highCardinality),
+				tc.wantSeriesPerSource*highCardinality,
+			)
 
-			allocs := testing.AllocsPerRun(3, func() {
-				benchmarkReaderCountSink = len(flattenSnapshot(snapshot).series)
-			})
-			require.LessOrEqualf(t, allocs, tc.maxAllocs, "flatten allocations %.0f exceed limit %.0f", allocs, tc.maxAllocs)
+			lowLimit := tc.maxAllocsPerSource * lowCardinality
+			highLimit := tc.maxAllocsPerSource * highCardinality
+			require.LessOrEqualf(t, low, lowLimit, "low-cardinality allocations %.0f exceed limit %.0f", low, lowLimit)
+			require.LessOrEqualf(t, high, highLimit, "high-cardinality allocations %.0f exceed limit %.0f", high, highLimit)
+			require.LessOrEqualf(
+				t,
+				high,
+				low*cardinalityRate*growthSlack,
+				"%dx cardinality grew allocations from %.0f to %.0f",
+				cardinalityRate,
+				low,
+				high,
+			)
 		})
 	}
 }
