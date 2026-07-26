@@ -3139,7 +3139,12 @@ void metadata_execute_store_statement(sqlite3_stmt *stmt)
     if (unlikely(!stmt))
         return;
 
-    (void) queue_metadata_cmd(METADATA_EXECUTE_STORE_STATEMENT, stmt, NULL);
+    // the queue owns the statement once it is accepted; if metasync is not
+    // running - shutdown, or before init - nobody will ever execute or
+    // finalize it, so it goes back here (metaqueue_delete_dimension_uuid
+    // does the same with its allocation)
+    if (!queue_metadata_cmd(METADATA_EXECUTE_STORE_STATEMENT, stmt, NULL))
+        SQLITE_FINALIZE(stmt);
 }
 
 void commit_alert_transitions(RRDHOST *host __maybe_unused)
