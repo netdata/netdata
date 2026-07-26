@@ -221,6 +221,18 @@ var manifest = map[string]ManifestCase{
 		Proves: "ABOVE tier 0 a stored point is min/max/avg over many samples, not a sample: percentage-of-time estimates the share of each stored window that satisfied the condition with the two-point mass model (weight(max) = (avg-min)/(max-min)), which is EXACT for a 0/1 availability signal because there the average IS the fraction of time at 1 — so up% and down% of a mixed window sum to 100 instead of both answering 'never', which is what evaluating the condition on the stored average does; a mixed window counts one flap and at most one occurrence (no ordering survives the rollup); percentage-of-samples keeps its historical tier behaviour",
 		Agent:  Red,
 	},
+	"CASE-023/redelivery": {
+		Proves: "the same stored point handed to several result buckets means different things to different groupings: percentage-of-samples treats a delivery AS a sample and must answer in EVERY bucket (skipping repeats leaves EMPTY holes where a value used to be), while number-of-times and number-of-flaps must count a stored window at most once however many buckets it was delivered into",
+		Agent:  Red,
+	},
+	"CASE-023/reset-counted-once": {
+		Proves: "one counter reset counts once above tier 0, at any resolution: carrying the PRE-reset peak forward makes the window after the reset look like it dropped too, and re-delivering the reset window compares it against the maximum its own first delivery stored - both turn one reboot into several",
+		Agent:  Red,
+	},
+	"CASE-023/nonzero-follows-answer": {
+		Proves: "the condition groupings answer a question ABOUT the samples, so options=nonzero judges them by the ANSWER: a dimension whose condition never holds is dropped even though every source sample is non-zero, while a dimension with a non-zero answer stays",
+		Agent:  Red,
+	},
 	"CASE-023/trailing-gaps": {
 		Proves: "a condition that names a gap keeps accounting to the END of the requested window: the query engine stops walking a few buckets after a dimension's storage is exhausted and lets the caller fill the rest with EMPTY, which is the same answer for every other aggregation but silently truncates an outage for `==gap` - a dimension that stops being collected while its chart keeps going must read 100% gap for every remaining bucket, not for eleven of them",
 		Agent:  Red,
