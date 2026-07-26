@@ -92,18 +92,18 @@ func BenchmarkRuntimeOverlayValueLookup(b *testing.B) {
 	}
 }
 
-func benchmarkCommittedScalarStore(b *testing.B, totalSeries int) CollectorStore {
-	b.Helper()
+func benchmarkCommittedScalarStore(tb testing.TB, totalSeries int) CollectorStore {
+	tb.Helper()
 
 	s := NewCollectorStore()
-	cc := benchmarkCycleController(b, s)
+	cc := benchmarkCycleController(tb, s)
 	gv := s.Write().SnapshotMeter("reader.scalar").Vec("id").Gauge("value")
 	handles := make([]SnapshotGauge, totalSeries)
 
 	for i := range totalSeries {
 		h, err := gv.GetWithLabelValues(strconv.Itoa(i))
 		if err != nil {
-			b.Fatalf("create gauge handle: %v", err)
+			tb.Fatalf("create gauge handle: %v", err)
 		}
 		handles[i] = h
 	}
@@ -113,17 +113,17 @@ func benchmarkCommittedScalarStore(b *testing.B, totalSeries int) CollectorStore
 		h.Observe(SampleValue(i))
 	}
 	if err := cc.CommitCycleSuccess(); err != nil {
-		b.Fatalf("commit scalar store: %v", err)
+		tb.Fatalf("commit scalar store: %v", err)
 	}
 
 	return s
 }
 
-func benchmarkCommittedMixedStore(b *testing.B, totalSeries int) CollectorStore {
-	b.Helper()
+func benchmarkCommittedMixedStore(tb testing.TB, totalSeries int) CollectorStore {
+	tb.Helper()
 
 	s := NewCollectorStore()
-	cc := benchmarkCycleController(b, s)
+	cc := benchmarkCycleController(tb, s)
 	m := s.Write().SnapshotMeter("reader.flatten")
 	hv := m.Vec("id").Histogram("latency", WithHistogramBounds(1, 2, 5))
 	sv := m.Vec("id").Summary("request_time", WithSummaryQuantiles(0.5, 0.9, 0.99))
@@ -143,25 +143,25 @@ func benchmarkCommittedMixedStore(b *testing.B, totalSeries int) CollectorStore 
 
 		h, err := hv.GetWithLabelValues(id)
 		if err != nil {
-			b.Fatalf("create histogram handle: %v", err)
+			tb.Fatalf("create histogram handle: %v", err)
 		}
 		hists[i] = h
 
 		sum, err := sv.GetWithLabelValues(id)
 		if err != nil {
-			b.Fatalf("create summary handle: %v", err)
+			tb.Fatalf("create summary handle: %v", err)
 		}
 		summaries[i] = sum
 
 		state, err := ssv.GetWithLabelValues(id)
 		if err != nil {
-			b.Fatalf("create stateset handle: %v", err)
+			tb.Fatalf("create stateset handle: %v", err)
 		}
 		states[i] = state
 
 		measureSet, err := msv.GetWithLabelValues(id)
 		if err != nil {
-			b.Fatalf("create measureset handle: %v", err)
+			tb.Fatalf("create measureset handle: %v", err)
 		}
 		measureSets[i] = measureSet
 	}
@@ -199,7 +199,7 @@ func benchmarkCommittedMixedStore(b *testing.B, totalSeries int) CollectorStore 
 		})
 	}
 	if err := cc.CommitCycleSuccess(); err != nil {
-		b.Fatalf("commit mixed store: %v", err)
+		tb.Fatalf("commit mixed store: %v", err)
 	}
 
 	return s
