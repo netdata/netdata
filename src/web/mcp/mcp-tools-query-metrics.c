@@ -177,9 +177,11 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
             "synonyms - which is what makes uncollected time participate at all), or the "
             "previous collected sample ('<previous', which counts counter resets such as "
             "reboots). There are no and/or compounds.\n"
-            "Over a window long enough to read lower-resolution data these four return an "
-            "estimate, and the counting ones report at most one event per stored interval. "
-            "Pass tier=0 for exact answers.");
+            "Over a window long enough to read lower-resolution data 'percentage-of-time', "
+            "'number-of-flaps' and 'number-of-times' return an estimate, and the counting ones "
+            "report at most one event per stored interval; 'percentage-of-samples' does not "
+            "estimate - it evaluates each stored point as one sample. Pass tier=0 for exact "
+            "answers.");
     }
     buffer_json_object_close(buffer); // time_group_options
 
