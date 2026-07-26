@@ -848,13 +848,6 @@ static inline const char *query_target_rate_adjusted_units_for(
     return buf;
 }
 
-// the whole-query answer, for a units string that describes the whole query
-static inline const char *query_target_rate_adjusted_units(
-    QUERY_TARGET *qt, const char *units, char *buf, size_t buf_size) {
-    return query_target_rate_adjusted_units_for(
-        qt, query_target_all_metrics_stored_as_rates(qt), units, buf, buf_size);
-}
-
 // The units a RESULT carries: the grouping's own units when it answers a
 // different question, otherwise the metric's units with a rate's trailing
 // "/s" removed if the query integrated it into a volume. Every consumer
@@ -872,12 +865,6 @@ static inline const char *query_target_result_units_for(
         return units;
 
     return query_target_rate_adjusted_units_for(qt, stored_as_rates, metric_units, buf, buf_size);
-}
-
-static inline const char *query_target_result_units(
-    QUERY_TARGET *qt, const char *metric_units, char *buf, size_t buf_size) {
-    return query_target_result_units_for(
-        qt, query_target_all_metrics_stored_as_rates(qt), metric_units, buf, buf_size);
 }
 
 uint32_t rrdcontext_queue_version(RRDCONTEXT_QUEUE_JudyLSet *queue);
