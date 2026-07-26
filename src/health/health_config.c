@@ -230,10 +230,14 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
 
         *close = '\0';
 
-        char *expr = s;
-        while(*expr && isspace((uint8_t)*expr)) expr++;
+        // The condition is stored, and the alert's configuration hash is
+        // computed over it, so leading and trailing whitespace is trimmed
+        // off: writing `countif( >5 )` instead of `countif(>5)` must not
+        // make it a different alert. Whitespace INSIDE the condition is
+        // part of what was written and is kept.
+        char *expr = trim(s);
 
-        if(*expr) {
+        if(expr && *expr) {
             TG_EXPRESSION e;
             if(!tg_expression_parse(&e, expr)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid condition '%s' in aggregation method options on '%s'",
@@ -247,19 +251,34 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
             // `percentile(gap)` into percentile 95 and `average(previous)`
             // into a plain average, both silently.
             if(!time_grouping_is_expression(ac->time_group)) {
-                if(e.operand != TG_EXPRESSION_OPERAND_NUMBER || e.cmp != TG_EXPRESSION_EQUAL) {
+                if(e.operand != TG_EXPRESSION_OPERAND_NUMBER) {
                     netdata_log_error("Health configuration at line %zu of file '%s': '%s' takes a number, not the condition '%s'",
                                       line, filename, key, expr);
                     return 0;
                 }
+
+                if(e.cmp != TG_EXPRESSION_EQUAL)
+                    // A comparison in front of the number means nothing to
+                    // these groupings, and this parser has quietly dropped
+                    // it for as long as it has accepted one. Saying so is
+                    // new; refusing the alert over it is not, because
+                    // `percentile(>=99)` has always run as percentile 99.
+                    netdata_log_error("Health configuration at line %zu of file '%s': '%s' takes a plain number - "
+                                      "the comparison in '%s' is ignored",
+                                      line, filename, key, expr);
             }
-            else {
-                // storing one for a numeric grouping would also change the
-                // identity of every such alert - the config hash is computed
-                // over this field
+            else
+                // the expression itself is kept only for the groupings that
+                // run one; storing it for a numeric grouping would change
+                // the identity of every such alert, because the config hash
+                // is computed over this field
                 ac->time_group_options = string_strdupz(expr);
-                ac->time_group_condition = alert_lookup_condition_from_expression(e.cmp);
-            }
+
+            // the condition, however, is recorded whatever the grouping -
+            // it always has been, and it is hashed into the alert's
+            // identity, so skipping it for a numeric grouping would give
+            // every `percentile(>=99)` alert a new hash on upgrade
+            ac->time_group_condition = alert_lookup_condition_from_expression(e.cmp);
 
             // the legacy numeric field stays populated whenever the
             // condition can be expressed in it, so everything that reads
@@ -763,7 +782,12 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, type);
         }
         else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-            health_parse_db_lookup(line, filename, value, ac);
+            if(!health_parse_db_lookup(line, filename, value, ac))
+                // the same treatment a non-parseable calc/warn/crit gets.
+                // The parser leaves a half-read lookup behind when it gives
+                // up - no grouping value, no window - and an alert running
+                // that queries garbage; the error above says why.
+                am->enabled = false;
         }
         else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
             if(!health_parse_update_every(value, &ac->update_every))

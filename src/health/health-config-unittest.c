@@ -17,9 +17,13 @@ typedef struct {
     const char *description;                        // test description
 } db_lookup_test_case_t;
 
-// mark value as "don't care" for tests that don't use it
+// mark value as "don't care" for tests that don't use it.
+//
+// DC_COND has to be OUTSIDE the enum: it used to be EQUAL, which is also
+// the value the parser defaults to, so every row that meant "and the
+// condition must come out EQUAL" was silently unchecked.
 #define DC_VALUE NAN
-#define DC_COND ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL
+#define DC_COND ((ALERT_LOOKUP_TIME_GROUP_CONDITION)0xFF)
 
 static const db_lookup_test_case_t test_cases[] = {
     // =========================================================================
@@ -255,16 +259,31 @@ static const db_lookup_test_case_t test_cases[] = {
     { "percentage-of-samples(>0) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 0.0, -600, 0, "percentage-of-samples canonical name" },
     { "percentage-of-time(==bogus) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "unknown word operand invalid" },
 
+    // whitespace inside the parentheses is not part of the condition: it is
+    // trimmed off both ends before the condition is stored, so writing it
+    // out spaced cannot make a different alert out of the same rule
+    { "countif( >5 ) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 5.0, -600, 0, "spaced condition" },
+    { "percentage-of-time( ==gap ) -10m", true, RRDR_GROUPING_PERCENTAGE_OF_TIME, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, DC_VALUE, -600, 0, "spaced gap token" },
+
     // the condition grammar belongs to the four condition groupings ONLY.
-    // A numeric grouping takes a number, so an operator or a word operand
-    // there is a mistake - accepting it would turn percentile(gap) into
-    // percentile 95 and average(previous) into a plain average, silently
+    // A numeric grouping takes a number, so a WORD operand there is a
+    // mistake - accepting it would turn percentile(gap) into percentile 95
+    // and average(previous) into a plain average, silently.
     { "percentile(95) -10m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 95, -600, 0, "percentile still takes its number" },
     { "percentile(gap) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "percentile rejects a gap token" },
-    { "percentile(>95) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "percentile rejects an operator" },
     { "percentile(previous) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "percentile rejects the predecessor" },
     { "trimmed-mean(gap) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "trimmed-mean rejects a gap token" },
     { "average(previous) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "average rejects the predecessor" },
+
+    // an operator in FRONT of the number is a different case: it means
+    // nothing to these groupings and this parser has always dropped it, so
+    // `percentile(>95)` has always run as percentile 95. Refusing it now
+    // would disable alerts that work today, so it is accepted and logged.
+    // and the condition it wrote is still recorded, exactly as upstream
+    // recorded it: it is hashed into the alert's identity, so dropping it
+    // would hand every such alert a new config hash on upgrade
+    { "percentile(>95) -10m", true, RRDR_GROUPING_PERCENTILE, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 95, -600, 0, "percentile ignores an operator, keeps the number" },
+    { "trimmed-mean(>=10) -10m", true, RRDR_GROUPING_TRIMMED_MEAN, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, 10, -600, 0, "trimmed-mean ignores an operator, keeps the number" },
 
     // an empty condition compares equal to zero, the way countif always
     // has. It MUST NOT fall through to the unset legacy value: formatting
@@ -414,6 +433,56 @@ static int test_db_lookup_frequency_boundaries(int *passed) {
         else
             (*passed)++;
 
+        string_freez(ac.dimensions);
+        string_freez(ac.time_group_options);
+    }
+
+    return failed;
+}
+
+// The condition is STORED as written, and the alert's configuration hash is
+// computed over it, so the same rule spaced differently must not become a
+// different alert. Whitespace inside the parentheses is trimmed off both
+// ends; everything between the operator and the operand is the condition.
+static int test_db_lookup_condition_is_trimmed(int *passed) {
+    static const struct {
+        const char *input;
+        const char *expected_options;
+        const char *description;
+    } tests[] = {
+        { "countif( >5 ) -10m", ">5", "spaces on both sides" },
+        { "countif(>5) -10m", ">5", "no spaces at all" },
+        { "countif(\t>5\t) -10m", ">5", "tabs on both sides" },
+        { "percentage-of-time( ==gap ) -10m", "==gap", "a spaced gap token" },
+        { "number-of-times( <previous ) -10m", "<previous", "a spaced predecessor" },
+        { "countif(> 5) -10m", "> 5", "the space INSIDE the condition is kept" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        char buffer[128];
+        strncpyz(buffer, tests[i].input, sizeof(buffer) - 1);
+
+        struct rrd_alert_config ac = { 0 };
+        ac.time_group_value = NAN;
+
+        const char *got = NULL;
+        if(!health_parse_db_lookup(1, "unittest", buffer, &ac))
+            fprintf(stderr, "FAILED [%s]: '%s' did not parse\n", tests[i].description, tests[i].input);
+
+        else if(!(got = ac.time_group_options ? string2str(ac.time_group_options) : NULL) ||
+                strcmp(got, tests[i].expected_options) != 0)
+            fprintf(stderr, "FAILED [%s]: stored condition '%s', want '%s'\n",
+                    tests[i].description, got ? got : "(none)", tests[i].expected_options);
+
+        else {
+            (*passed)++;
+            string_freez(ac.dimensions);
+            string_freez(ac.time_group_options);
+            continue;
+        }
+
+        failed++;
         string_freez(ac.dimensions);
         string_freez(ac.time_group_options);
     }
@@ -1078,6 +1147,7 @@ int health_config_unittest(void) {
     }
 
     failed += test_db_lookup_frequency_boundaries(&passed);
+    failed += test_db_lookup_condition_is_trimmed(&passed);
     failed += test_dyncfg_update_every_boundaries(&passed);
     failed += test_dyncfg_integer_destination_boundaries(&passed);
     failed += test_dyncfg_delay_multiplier_boundaries(&passed);
