@@ -86,7 +86,9 @@ static NETDATA_DOUBLE query_point_grouping_value(
 // sample count derived from the granularity, so a four-second hole at a
 // one-second cadence counts as four missing samples and not as one.
 //
-// Gaps reach a grouping ONLY when its expression named a gap token.
+// Which groupings see a gap: percentage-of-time ALWAYS does, because its
+// denominator is the selected duration and uncollected time belongs in
+// it. The others see one only when their condition names a gap token.
 #define query_add_point_to_group(r, point, ops, add_flush, now_end_time)   do {  \
     if(likely(!time_grouping_is_expression(add_flush))) {                   \
         /* the common path: unchanged, and none of the accounting below */  \

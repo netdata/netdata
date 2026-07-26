@@ -175,7 +175,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
             "'number-of-flaps' and 'number-of-times', specify a CONDITION: an operator "
             "('>', '>=', '<', '<=', '=', '!=') followed by a value. The value is a number "
             "(e.g. '>0'), a gap token ('==gap', '!=gap' - 'nan', 'null' and 'empty' are "
-            "synonyms - which is what makes uncollected time participate at all), or the "
+            "synonyms - which is what makes uncollected time participate for 'percentage-of-samples', 'number-of-flaps' and 'number-of-times' ('percentage-of-time' always counts it)), or the "
             "previous collected sample ('<previous', which counts counter resets such as "
             "reboots). There are no and/or compounds.\n"
             "Over a window long enough to read lower-resolution data 'percentage-of-time', "
