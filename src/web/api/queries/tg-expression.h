@@ -124,6 +124,7 @@ static inline bool tg_expression_parse(TG_EXPRESSION *e, const char *options) {
     e->operand = TG_EXPRESSION_OPERAND_NUMBER;
     e->target = 0.0;
     e->previous = 0.0;
+    e->previous_max = 0.0;
     e->has_previous = false;
 
     if(!options || !*options)

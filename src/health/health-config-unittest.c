@@ -310,18 +310,26 @@ static int run_db_lookup_test(const db_lookup_test_case_t *test) {
     int result = health_parse_db_lookup(1, "unittest", buffer, &ac);
     bool succeeded = (result != 0);
 
+    // every exit frees what the parser allocated, so a run under a leak
+    // checker reports only real leaks
+    #define run_db_lookup_test_return(rc) do {                              \
+        string_freez(ac.dimensions);                                        \
+        string_freez(ac.time_group_options);                                \
+        return (rc);                                                        \
+    } while(0)
+
     // check if success/failure matches expectation
     if(succeeded != test->should_succeed) {
         fprintf(stderr, "FAILED [%s]: expected %s but got %s\n",
                 test->description,
                 test->should_succeed ? "success" : "failure",
                 succeeded ? "success" : "failure");
-        return 1;
+        run_db_lookup_test_return(1);
     }
 
     // if test should fail, we're done
     if(!test->should_succeed)
-        return 0;
+        run_db_lookup_test_return(0);
 
     int errors = 0;
 
@@ -363,10 +371,8 @@ static int run_db_lookup_test(const db_lookup_test_case_t *test) {
         }
     }
 
-    // cleanup
-    string_freez(ac.dimensions);
-
-    return errors;
+    run_db_lookup_test_return(errors);
+    #undef run_db_lookup_test_return
 }
 
 static int test_db_lookup_frequency_boundaries(int *passed) {
