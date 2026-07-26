@@ -158,7 +158,8 @@ Some grouping methods accept additional parameters via `group_options`:
 
 Netdata keeps per-second detail only for a limited time; older data is kept
 at lower resolution. Over a window long enough to read that older data,
-these groupings return an **estimate**:
+`percentage-of-time`, `number-of-flaps` and `number-of-times` return an
+**estimate**:
 
 - For a metric that is only ever 0 or 1 - an availability signal - collected
   at a steady interval, the estimate is exact. If the collection interval
@@ -171,6 +172,13 @@ these groupings return an **estimate**:
   so reboot counting keeps working.
 - A gap inside a stored interval is not visible, so partially collected
   intervals count as collected.
+- When the requested resolution is finer than the stored one, every result
+  bucket covering the same stored interval reports that interval's estimate.
+
+`percentage-of-samples` does NOT estimate: it treats each stored point as one
+sample and evaluates the condition on it, which is what it has always done.
+Over lower-resolution data that means it answers about stored points rather
+than about the samples behind them.
 
 Add `"tier": 0` to the request for exact answers, and check `db.per_tier` in
 the response to confirm tier 0 actually served the query. Tier 0 retention is
