@@ -221,6 +221,14 @@ var manifest = map[string]ManifestCase{
 		Proves: "ABOVE tier 0 a stored point is min/max/avg over many samples, not a sample: percentage-of-time estimates the share of each stored window that satisfied the condition with the two-point mass model (weight(max) = (avg-min)/(max-min)), which is EXACT for a 0/1 availability signal because there the average IS the fraction of time at 1 — so up% and down% of a mixed window sum to 100 instead of both answering 'never', which is what evaluating the condition on the stored average does; a mixed window counts one flap and at most one occurrence (no ordering survives the rollup); percentage-of-samples keeps its historical tier behaviour",
 		Agent:  Red,
 	},
+	"CASE-023/tier-wide-point": {
+		Proves: "when the view grid is FINER than the stored data — a dashboard zoomed into a window only tier 1 still covers — a stored point is re-delivered to every bucket it spans, carrying its original start and an interpolated value; the share of time answers the SAME estimate in each of those buckets, and one stored window yields at most ONE occurrence and ONE flap, because a re-delivery is the same window seen again, not a second event (counting the repeats inflates an SLO by exactly the zoom factor)",
+		Agent:  Red,
+	},
+	"CASE-023/tier-anomaly-bit": {
+		Proves: "with options=anomaly-bit above tier 0 the value is the stored window's anomaly RATE while min/max still describe the metric, so the condition is answered on the rate itself — a window either satisfied it or it did not (100/0), never a fraction estimated across two unrelated domains; >=N and <N partition every window",
+		Agent:  Red,
+	},
 	"CASE-023/countif-bare-number": {
 		Proves: "the shared expression parser fixes the bare-number digit swallow (countif.h:78 advances past the operator switch even when no operator matched, so options '5' targets 0) — the API is aligned to health, which has always parsed countif(5) as '=5' (health-config-unittest.c:96)",
 		Agent:  Red,
