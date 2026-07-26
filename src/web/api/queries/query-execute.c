@@ -134,8 +134,14 @@ static NETDATA_DOUBLE query_point_grouping_value(
                                                                             \
     size_t _samples = 1;                                                    \
     if(unlikely(_is_gap)) {                                                 \
-        time_t _g = (ops)->query_granularity > 0 ?                          \
-                    (ops)->query_granularity : 1;                           \
+        /* a gap stands for the stored slots it covers, so it counts        \
+         * against the cadence the data is STORED at. The query grid is 1s  \
+         * for an ordinary query, which would let a gap outweigh the        \
+         * collected samples around it by the metric's update_every */      \
+        time_t _g = ((ops)->tier_ptr && (ops)->tier_ptr->db_update_every_s > 0) \
+                    ? (ops)->tier_ptr->db_update_every_s                    \
+                    : (((ops)->query_granularity > 0) ?                     \
+                       (ops)->query_granularity : 1);                       \
         _samples = (_duration > _g) ? (size_t)(_duration / _g) : 1;         \
     }                                                                       \
                                                                             \
