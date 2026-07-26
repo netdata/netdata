@@ -378,6 +378,20 @@ static inline NETDATA_DOUBLE tg_expression_window_fraction(
 static inline NETDATA_DOUBLE tg_expression_share(TG_EXPRESSION *e, const TG_POINT *p) {
     NETDATA_DOUBLE share;
 
+    if(e->operand == TG_EXPRESSION_OPERAND_PREVIOUS && !p->first) {
+        // A re-delivery is the SAME window seen again, not the sample that
+        // followed it. Comparing it would pit the window against the
+        // maximum its own first delivery stored - always a "drop" - so it
+        // is answered from the state the first delivery left, and changes
+        // nothing.
+        TG_EXPRESSION probe = *e;
+        if(p->count > 1 && probe.has_previous)
+            return (probe.cmp == TG_EXPRESSION_LESS &&
+                    netdata_double_isnumber(p->min) && p->min < probe.previous_max) ? 1.0 : 0.0;
+
+        return tg_expression_eval(&probe, p->value, p->is_gap) ? 1.0 : 0.0;
+    }
+
     if(e->operand == TG_EXPRESSION_OPERAND_PREVIOUS && p->count > 1 && e->has_previous) {
         // Only the monotone drop survives a rollup: a window whose minimum
         // falls below the previous window's maximum proves the value went
