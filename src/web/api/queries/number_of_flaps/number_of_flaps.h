@@ -55,7 +55,11 @@ static inline void tg_number_of_flaps_add_point(RRDR *r, const TG_POINT *p) {
 
     NETDATA_DOUBLE share = tg_expression_share(&g->expr, p);
 
-    if(tg_point_is_window(p) && share > 0.0 && share < 1.0) {
+    if(unlikely(!p->first))
+        // the same stored point cannot flip the state twice
+        return;
+
+    if(p->count > 1 && share > 0.0 && share < 1.0) {
         // the condition was both true and false inside this stored window,
         // so it changed at least once - counted as one, because the window
         // keeps no ordering. This is an approximation, not a lower bound:
@@ -79,7 +83,8 @@ static inline void tg_number_of_flaps_add_point(RRDR *r, const TG_POINT *p) {
 
 static inline void tg_number_of_flaps_add(RRDR *r, NETDATA_DOUBLE value) {
     TG_POINT p = { .value = value, .min = value, .max = value, .count = 1,
-                   .duration = 1, .samples = 1, .is_gap = false };
+                   .sum = value, .duration = 1, .samples = 1,
+                   .is_gap = false, .first = true };
     tg_number_of_flaps_add_point(r, &p);
 }
 
