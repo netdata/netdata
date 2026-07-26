@@ -73,7 +73,11 @@ static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_b
 
         if (group_by & RRDR_GROUP_BY_UNITS) {
             buffer_fast_strcat(key, "|", 1);
-            buffer_strcat(key, query_target_units_override(qt) ?: rrdinstance_acquired_units(qi->ria));
+            {
+                char _ub[64];
+                buffer_strcat(key, query_target_result_units(
+                    qt, rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+            }
         }
     }
 }
@@ -136,7 +140,11 @@ static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by
             if (buffer_strlen(key) != 0)
                 buffer_fast_strcat(key, ",", 1);
 
-            buffer_strcat(key, query_target_units_override(qt) ?: rrdinstance_acquired_units(qi->ria));
+            {
+                char _ub[64];
+                buffer_strcat(key, query_target_result_units(
+                    qt, rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+            }
         }
     }
 }
@@ -202,7 +210,11 @@ static void query_group_by_make_dimension_name(
             if (buffer_strlen(key) != 0)
                 buffer_fast_strcat(key, ",", 1);
 
-            buffer_strcat(key, query_target_units_override(qt) ?: rrdinstance_acquired_units(qi->ria));
+            {
+                char _ub[64];
+                buffer_strcat(key, query_target_result_units(
+                    qt, rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+            }
         }
     }
 }
