@@ -57,14 +57,30 @@ typedef struct tg_expression {
 // `count` raw samples. `duration` is the slice of the current bucket this
 // point covers, and `samples` the number of sample slots it stands for.
 typedef struct tg_point {
-    NETDATA_DOUBLE value;       // the fetched value - the average at tiers
+    NETDATA_DOUBLE value;       // the fetched value; INTERPOLATED on a re-delivery
+    NETDATA_DOUBLE sum;         // the window's own sum - interpolation never touches it
     NETDATA_DOUBLE min;
     NETDATA_DOUBLE max;
     size_t count;               // raw samples behind it; 1 at tier 0
     time_t duration;
     size_t samples;
     bool is_gap;
+
+    // false when this is a REPEAT of a stored point already delivered to an
+    // earlier bucket. A point wider than the bucket is delivered again with
+    // an interpolated value, so only the first delivery may advance state or
+    // count an occurrence - the time, however, is real every time.
+    bool first;
 } TG_POINT;
+
+// the average of the window itself, immune to the interpolation applied to
+// `value` when a wide point is re-delivered
+static inline NETDATA_DOUBLE tg_point_average(const TG_POINT *p) {
+    if(p->count > 1 && netdata_double_isnumber(p->sum))
+        return p->sum / (NETDATA_DOUBLE)p->count;
+
+    return p->value;
+}
 
 static inline bool tg_point_is_window(const TG_POINT *p) {
     // a stored point that aggregates more than one raw sample, and whose
@@ -168,7 +184,11 @@ static inline bool tg_expression_parse(TG_EXPRESSION *e, const char *options) {
         else
             return false;   // a word we do not know
 
-        return true;
+        // nothing may follow it: the grammar has one operand and no
+        // and/or compounds, so "gap and something" is not a condition
+        while(*s && !isspace((uint8_t)*s)) s++;
+        while(isspace((uint8_t)*s)) s++;
+        return *s == '\0';
     }
 
     // the operand must LOOK like a number before we trust str2ndd with it,
@@ -278,7 +298,7 @@ static inline bool tg_expression_eval(TG_EXPRESSION *e, NETDATA_DOUBLE value, bo
 static inline NETDATA_DOUBLE tg_expression_window_fraction(
     TG_EXPRESSION *e, const TG_POINT *p) {
 
-    NETDATA_DOUBLE w = (p->value - p->min) / (p->max - p->min);
+    NETDATA_DOUBLE w = (tg_point_average(p) - p->min) / (p->max - p->min);
     if(w < 0.0) w = 0.0;
     if(w > 1.0) w = 1.0;
 
@@ -330,25 +350,42 @@ static inline NETDATA_DOUBLE tg_expression_window_fraction(
 static inline NETDATA_DOUBLE tg_expression_share(TG_EXPRESSION *e, const TG_POINT *p) {
     NETDATA_DOUBLE share;
 
-    if(e->operand == TG_EXPRESSION_OPERAND_PREVIOUS && tg_point_is_window(p) && e->has_previous) {
-        bool dropped = (e->cmp == TG_EXPRESSION_LESS || e->cmp == TG_EXPRESSION_LESSEQUAL) &&
-                       netdata_double_isnumber(p->min) && p->min < e->previous_max;
+    if(e->operand == TG_EXPRESSION_OPERAND_PREVIOUS && p->count > 1 && e->has_previous) {
+        // Only the monotone drop survives a rollup: a window whose minimum
+        // falls below the previous window's maximum proves the value went
+        // backwards, which is what counts a reboot. Every other predecessor
+        // comparison is NOT estimated across a window - it is answered on
+        // the window's own average, which is documented, because a rollup
+        // keeps no ordering to compare against.
+        if(e->cmp == TG_EXPRESSION_LESS &&
+           netdata_double_isnumber(p->min) && p->min < e->previous_max)
+            share = 1.0;
+        else
+            share = tg_expression_eval(e, tg_point_average(p), p->is_gap) ? 1.0 : 0.0;
 
-        share = dropped ? 1.0 : (tg_expression_eval(e, p->value, p->is_gap) ? 1.0 : 0.0);
-        e->previous_max = p->max;
+        if(netdata_double_isnumber(p->max))
+            e->previous_max = p->max;
+
         return share;
     }
 
     if(e->operand == TG_EXPRESSION_OPERAND_NUMBER && tg_point_is_window(p)) {
         share = tg_expression_window_fraction(e, p);
 
-        // keep the predecessor chain intact for a later switch of operand
-        if(!p->is_gap) {
-            e->previous = p->value;
+        if(p->first && !p->is_gap) {
+            e->previous = tg_point_average(p);
             e->has_previous = true;
+            if(netdata_double_isnumber(p->max))
+                e->previous_max = p->max;
         }
-        e->previous_max = p->max;
         return share;
+    }
+
+    if(!p->first) {
+        // a repeat of a point already accounted for: answer it, but leave
+        // the predecessor where the first delivery left it
+        TG_EXPRESSION probe = *e;
+        return tg_expression_eval(&probe, p->value, p->is_gap) ? 1.0 : 0.0;
     }
 
     share = tg_expression_eval(e, p->value, p->is_gap) ? 1.0 : 0.0;

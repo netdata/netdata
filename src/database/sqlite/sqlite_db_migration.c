@@ -171,6 +171,8 @@ const char *database_migrate_v16_v17[] = {
 
 // Note: Same as database_migrate_v16_v17. This is not wrong
 //       Do additional migration to handle agents that created wrong alert_hash table
+// adds the alert lookup condition as written, so gap tokens and the
+// predecessor keyword survive a restart
 const char *database_migrate_v18_v19[] = {
     "ALTER TABLE alert_hash ADD time_group_options text",
     NULL

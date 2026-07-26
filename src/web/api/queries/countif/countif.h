@@ -46,6 +46,9 @@ static inline void tg_countif_free(RRDR *r) {
 static inline void tg_countif_add_point(RRDR *r, const TG_POINT *p) {
     struct tg_countif *g = (struct tg_countif *)r->time_grouping.data;
 
+    if(unlikely(!p->first))
+        return;
+
     // this one deliberately keeps its historical tier behaviour: a stored
     // point IS the sample here, so the condition is evaluated on it.
     // percentage-of-time is the grouping that estimates across a window.
@@ -58,7 +61,8 @@ static inline void tg_countif_add_point(RRDR *r, const TG_POINT *p) {
 
 static inline void tg_countif_add(RRDR *r, NETDATA_DOUBLE value) {
     TG_POINT p = { .value = value, .min = value, .max = value, .count = 1,
-                   .duration = 1, .samples = 1, .is_gap = false };
+                   .sum = value, .duration = 1, .samples = 1,
+                   .is_gap = false, .first = true };
     tg_countif_add_point(r, &p);
 }
 
