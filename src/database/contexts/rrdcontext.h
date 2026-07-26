@@ -777,6 +777,15 @@ static inline bool query_target_needs_all_dimensions(QUERY_TARGET *qt) {
 // metric measures - a share, a number of transitions, a number of events -
 // so reporting the metric's units would be wrong.
 static inline const char *query_target_units_override(QUERY_TARGET *qt) {
+    // a percentage transform rewrites the VALUES, so it wins over the
+    // grouping's own units - a flap count turned into a share of its group
+    // is a percentage, not a number of flaps
+    if((qt->request.options & RRDR_OPTION_PERCENTAGE) && !(qt->window.options & RRDR_OPTION_RETURN_RAW))
+        return "%";
+
+    if(query_target_has_percentage_of_group(qt))
+        return "%";
+
     switch(qt->window.time_group_method) {
         case RRDR_GROUPING_CV:
         case RRDR_GROUPING_COUNTIF:            // percentage-of-samples
@@ -792,12 +801,6 @@ static inline const char *query_target_units_override(QUERY_TARGET *qt) {
         default:
             break;
     }
-
-    if((qt->request.options & RRDR_OPTION_PERCENTAGE) && !(qt->window.options & RRDR_OPTION_RETURN_RAW))
-        return "%";
-
-    if(query_target_has_percentage_of_group(qt))
-        return "%";
 
     return NULL;
 }

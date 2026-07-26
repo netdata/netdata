@@ -86,11 +86,17 @@ static void query_target_combined_units_v2(BUFFER *wb, QUERY_TARGET *qt, size_t 
     }
     else if(contexts > 1) {
         DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
-        for(size_t c = 0; c < qt->contexts.used ;c++)
-            dictionary_set(dict, rrdcontext_acquired_units(qt->contexts.array[c].rca), NULL, 0);
+        for(size_t c = 0; c < qt->contexts.used ;c++) {
+            char ub[64];
+            dictionary_set(dict, query_target_rate_adjusted_units(
+                qt, rrdcontext_acquired_units(qt->contexts.array[c].rca), ub, sizeof(ub)), NULL, 0);
+        }
 
-        if(dictionary_entries(dict) == 1)
-            buffer_json_member_add_string(wb, "units", rrdcontext_acquired_units(qt->contexts.array[0].rca));
+        if(dictionary_entries(dict) == 1) {
+            char ub[64];
+            buffer_json_member_add_string(wb, "units", query_target_rate_adjusted_units(
+                qt, rrdcontext_acquired_units(qt->contexts.array[0].rca), ub, sizeof(ub)));
+        }
         else {
             buffer_json_member_add_array(wb, "units");
             const char *s;

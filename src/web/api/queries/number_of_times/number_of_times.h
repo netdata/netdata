@@ -48,7 +48,12 @@ static inline void tg_number_of_times_add_point(RRDR *r, const TG_POINT *p) {
 
     NETDATA_DOUBLE share = tg_expression_share(&g->expr, p);
 
-    if(tg_point_is_window(p)) {
+    if(unlikely(!p->first))
+        // a wide point re-delivered to a later bucket is the SAME
+        // occurrence; counting it again would multiply it
+        return;
+
+    if(p->count > 1) {
         // a stored window keeps no ordering, so occurrences inside it
         // collapse to one - the count-as-1 rule
         if(share > 0.0)
@@ -63,7 +68,8 @@ static inline void tg_number_of_times_add_point(RRDR *r, const TG_POINT *p) {
 
 static inline void tg_number_of_times_add(RRDR *r, NETDATA_DOUBLE value) {
     TG_POINT p = { .value = value, .min = value, .max = value, .count = 1,
-                   .duration = 1, .samples = 1, .is_gap = false };
+                   .sum = value, .duration = 1, .samples = 1,
+                   .is_gap = false, .first = true };
     tg_number_of_times_add_point(r, &p);
 }
 

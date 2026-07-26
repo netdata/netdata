@@ -9311,6 +9311,7 @@ components:
         - a gap token - `gap`, `nan`, `null` or `empty` are synonyms for "no data was collected", e.g. `==gap` matches the slots with no data and `!=gap` matches the collected ones. Naming a gap token is what makes gaps participate at all; without one they are invisible, as they are for every other aggregation.
         - the previous collected sample - `previous` or `last`, e.g. `<previous` matches every sample lower than the one before it, which counts counter resets (reboots). Gaps are skipped, so a drop across a gap is still a drop, and the first sample of a query never matches.
         There are no and/or compounds.
+        Above tier 0 a stored point is a window (min/max/average), not a sample: these groupings estimate the share of each window that satisfied the condition, which is exact for a 0/1 signal and an approximation otherwise; the counting groupings collapse everything inside one window to a single event. Request `tier: 0` for exact answers.
       required: false
       schema:
         type: string
@@ -9324,6 +9325,7 @@ components:
         - a gap token - `gap`, `nan`, `null` or `empty` are synonyms for "no data was collected", e.g. `==gap` matches the slots with no data and `!=gap` matches the collected ones. Naming a gap token is what makes gaps participate at all; without one they are invisible, as they are for every other aggregation.
         - the previous collected sample - `previous` or `last`, e.g. `<previous` matches every sample lower than the one before it, which counts counter resets (reboots). Gaps are skipped, so a drop across a gap is still a drop, and the first sample of a query never matches.
         There are no and/or compounds.
+        Above tier 0 a stored point is a window (min/max/average), not a sample: these groupings estimate the share of each window that satisfied the condition, which is exact for a 0/1 signal and an approximation otherwise; the counting groupings collapse everything inside one window to a single event. Request `tier: 0` for exact answers.
       required: false
       schema:
         type: string
