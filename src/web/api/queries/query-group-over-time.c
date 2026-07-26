@@ -792,8 +792,10 @@ void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method) {
     }
 }
 
+// the four condition groupings: they reason about the stored window a
+// point stands for, so they need more than its value
 ALWAYS_INLINE_HOT_FLATTEN
-void time_grouping_add(RRDR *r, const struct tg_point *p, const RRDR_TIME_GROUPING add_flush) {
+void time_grouping_add_point(RRDR *r, const struct tg_point *p, const RRDR_TIME_GROUPING add_flush) {
     switch(add_flush) {
         case RRDR_GROUPING_PERCENTAGE_OF_TIME:
             tg_percentage_of_time_add_point(r, p);
@@ -812,15 +814,18 @@ void time_grouping_add(RRDR *r, const struct tg_point *p, const RRDR_TIME_GROUPI
             return;
 
         default:
-            break;
+            // a gap never reaches the groupings below, and they read
+            // nothing but the value
+            if(unlikely(p->is_gap))
+                return;
+
+            time_grouping_add(r, p->value, add_flush);
+            return;
     }
+}
 
-    // only the four expression groupings above accept gap slots
-    if(unlikely(p->is_gap))
-        return;
-
-    const NETDATA_DOUBLE value = p->value;
-
+ALWAYS_INLINE_HOT_FLATTEN
+void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING add_flush) {
     switch(add_flush) {
         case RRDR_GROUPING_AVERAGE:
             tg_average_add(r, value);
