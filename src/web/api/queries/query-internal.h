@@ -106,21 +106,8 @@ void rrd2rrdr_query_ops_freeall(RRDR *r, QUERY_ENGINE_OPS_CACHE *cache);
 // query execution
 void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops);
 
-// time aggregation
-// the groupings whose value is derived from a condition, not from the
-// sample values themselves
-static inline bool time_grouping_is_expression(RRDR_TIME_GROUPING g) {
-    switch(g) {
-        case RRDR_GROUPING_COUNTIF:
-        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
-        case RRDR_GROUPING_NUMBER_OF_FLAPS:
-        case RRDR_GROUPING_NUMBER_OF_TIMES:
-            return true;
-
-        default:
-            return false;
-    }
-}
+// time aggregation: time_grouping_is_expression() lives with the grammar
+// it describes, in tg-expression.h
 
 // defined in tg-expression.h, which the grouping modules include
 struct tg_point;

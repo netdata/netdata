@@ -253,8 +253,14 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
                 return 0;
             }
 
-            ac->time_group_options = string_strdupz(expr);
-            ac->time_group_condition = alert_lookup_condition_from_expression(e.cmp);
+            // only the condition groupings carry an expression. percentile
+            // and the trimmed-* pair take a plain number, and storing one
+            // for them would change the identity of every such alert - the
+            // config hash is computed over this field.
+            if(time_grouping_is_expression(ac->time_group)) {
+                ac->time_group_options = string_strdupz(expr);
+                ac->time_group_condition = alert_lookup_condition_from_expression(e.cmp);
+            }
 
             // the legacy numeric field stays populated whenever the
             // condition can be expressed in it, so everything that reads

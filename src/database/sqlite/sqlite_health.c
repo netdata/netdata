@@ -3,6 +3,7 @@
 #include "sqlite_health.h"
 #include "sqlite_functions.h"
 #include "sqlite_db_migration.h"
+#include "sqlite_metadata.h"
 #include "health/health_internals.h"
 #include "health/health-alert-entry.h"
 
@@ -898,13 +899,15 @@ done:
     "@p_db_lookup_before,@p_update_every,@source,@chart_labels,@summary, @time_group_condition, "                      \
     "@time_group_value, @time_group_options, @dims_group, @data_source)"
 
-void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
+// bound but not executed, so the unit test can run the same binds against a
+// database of its own instead of the metadata thread's
+static sqlite3_stmt *alert_config_bind(RRD_ALERT_PROTOTYPE *ap)
 {
     sqlite3_stmt *res = NULL;
     int param = 0;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_STORE_ALERT_CONFIG_HASH, &res))
-        return;
+        return NULL;
 
     CLEAN_BUFFER *buf = buffer_create(128, NULL);
 
@@ -1007,11 +1010,16 @@ void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.dims_group));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ap->config.data_source));
 
-    metadata_execute_store_statement(res);
-    return;
+    return res;
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    return NULL;
+}
+
+void sql_alert_store_config(RRD_ALERT_PROTOTYPE *ap)
+{
+    metadata_execute_store_statement(alert_config_bind(ap));
 }
 
 #define SQL_SELECT_HEALTH_LAST_EXECUTED_EVENT                                                                          \
@@ -1789,4 +1797,137 @@ fail_only_drop:
     (void)db_execute(db_meta, sql, NULL);
     buffer_free(command);
     return added;
+}
+
+// ----------------------------------------------------------------------------
+// unit test: an alert condition has to survive an upgrade
+
+// the alert_hash of the release before the condition was stored as written.
+// Kept verbatim rather than derived, so the test still describes the schema
+// agents are actually upgrading FROM once sqlite_metadata.c moves on.
+#define SQL_CREATE_ALERT_HASH_V18                                                                                      \
+    "CREATE TABLE alert_hash(hash_id blob PRIMARY KEY, date_updated int, alarm text, template text, "                  \
+    "on_key text, class text, component text, type text, os text, hosts text, lookup text, "                           \
+    "every text, units text, calc text, families text, plugin text, module text, charts text, green text, "            \
+    "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "                    \
+    "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "   \
+    "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text, "              \
+    "summary text, time_group_condition INT, time_group_value DOUBLE, dims_group INT, data_source INT)"
+
+struct alert_config_readback {
+    bool called;
+    char options[128];
+    int32_t condition;
+    double value;
+    const char *method;
+};
+
+static void alert_config_readback_cb(struct sql_alert_config_data *acd, void *data)
+{
+    struct alert_config_readback *rb = data;
+    rb->called = true;
+    rb->condition = acd->value.db.time_group_condition;
+    rb->value = (double)acd->value.db.time_group_value;
+    if(acd->value.db.time_group_options)
+        strncpyz(rb->options, acd->value.db.time_group_options, sizeof(rb->options) - 1);
+}
+
+int sql_alert_config_unittest(void)
+{
+    sqlite3 *saved_db_meta = db_meta;
+    bool owns_sqlite_lifecycle = !saved_db_meta;
+    int failed = 0;
+
+    if (sqlite_library_init())
+        return 1;
+
+    db_meta = NULL;
+    if (sqlite3_open(":memory:", &db_meta) != SQLITE_OK) {
+        fprintf(stderr, "FAILED [alert config persistence]: cannot open an in-memory database\n");
+        db_meta = saved_db_meta;
+        if (owns_sqlite_lifecycle)
+            sqlite_library_shutdown();
+        return 1;
+    }
+
+    fprintf(stderr, "\nStarting alert config persistence unit tests\n");
+    fprintf(stderr, "===================================================\n\n");
+
+    // an agent that has been running since before this release
+    if (db_execute(db_meta, SQL_CREATE_ALERT_HASH_V18, NULL) ||
+        db_execute(db_meta, "PRAGMA user_version = 18", NULL)) {
+        fprintf(stderr, "FAILED [alert config persistence]: cannot build the pre-upgrade schema\n");
+        failed++;
+        goto cleanup;
+    }
+
+    if (perform_database_migration(db_meta, DB_METADATA_VERSION) != DB_METADATA_VERSION) {
+        fprintf(stderr, "FAILED [upgrade migrates the alert_hash table]: migration did not reach version %d\n",
+                DB_METADATA_VERSION);
+        failed++;
+        goto cleanup;
+    }
+
+    // store an alert whose condition only the expression can express
+    RRD_ALERT_PROTOTYPE ap = { 0 };
+    ap.match.on.chart = string_strdupz("chart");
+    ap.config.name = string_strdupz("unittest");
+    ap.config.source = string_strdupz("unittest");
+    ap.config.update_every = 1;
+    ap.config.after = -86400;
+    ap.config.time_group = RRDR_GROUPING_PERCENTAGE_OF_TIME;
+    ap.config.time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
+    ap.config.time_group_value = 0;
+    ap.config.time_group_options = string_strdupz("==gap");
+    uuid_generate(ap.config.hash_id);
+
+    sqlite3_stmt *res = alert_config_bind(&ap);
+    if (!res || sqlite3_step_monitored(res) != SQLITE_DONE) {
+        fprintf(stderr, "FAILED [a migrated database accepts an alert condition]: %s\n", sqlite3_errmsg(db_meta));
+        failed++;
+    }
+    SQLITE_FINALIZE(res);
+
+    // and read it back the way the alert configuration API does
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower(ap.config.hash_id, uuid_str);
+
+    DICTIONARY *configs = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+    dictionary_set(configs, uuid_str, NULL, 0);
+
+    struct alert_config_readback rb = { 0 };
+    int added = sql_get_alert_configuration(configs, alert_config_readback_cb, &rb, false);
+
+    if (added != 1 || !rb.called) {
+        fprintf(stderr, "FAILED [the stored alert reads back]: %d rows returned\n", added);
+        failed++;
+    }
+    else {
+        if (strcmp(rb.options, "==gap") != 0) {
+            fprintf(stderr, "FAILED [the condition reads back as written]: got '%s', want '==gap'\n", rb.options);
+            failed++;
+        }
+        if (rb.condition != (int32_t)ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL || rb.value != 0) {
+            fprintf(stderr, "FAILED [the legacy condition pair reads back]: condition=%d value=%f\n",
+                    rb.condition, rb.value);
+            failed++;
+        }
+    }
+
+    dictionary_destroy(configs);
+    string_freez(ap.match.on.chart);
+    string_freez(ap.config.name);
+    string_freez(ap.config.source);
+    string_freez(ap.config.time_group_options);
+
+cleanup:
+    fprintf(stderr, "\n===================================================\n");
+    fprintf(stderr, "Alert config persistence tests: %s\n\n", failed ? "FAILED" : "passed");
+
+    sql_close_database(db_meta, "META-UNITTEST");
+    db_meta = saved_db_meta;
+    if (owns_sqlite_lifecycle)
+        sqlite_library_shutdown();
+
+    return failed;
 }

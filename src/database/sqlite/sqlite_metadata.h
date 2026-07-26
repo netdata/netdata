@@ -6,6 +6,9 @@
 #include "sqlite3.h"
 #include "sqlite_functions.h"
 
+// the schema version an agent migrates its metadata database to on startup
+#define DB_METADATA_VERSION 19
+
 typedef enum event_log_type {
     EVENT_AGENT_START_TIME  = 1,
     EVENT_AGENT_SHUTDOWN_TIME,
