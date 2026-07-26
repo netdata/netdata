@@ -150,7 +150,10 @@ Some grouping methods accept additional parameters via `group_options`:
   `!` or `<>`); with no operator the value compares equal. The value is one of:
   - a number, e.g. `>100`, `<=50`, `!=0`
   - a gap token - `gap`, `nan`, `null`, `empty` all mean "no data was collected", e.g. `==gap` matches the empty slots
-    and `!=gap` the collected ones. Naming a gap token is what makes gaps count at all; without one they stay invisible.
+    and `!=gap` the collected ones. For `percentage-of-samples`, `number-of-flaps` and `number-of-times`, naming a gap
+    token is what makes gaps count at all; without one they stay invisible. `percentage-of-time` always counts
+    uncollected time in its denominator, whatever the condition compares against - see
+    [Accuracy over long windows](#accuracy-over-long-windows).
   - the previous collected sample - `previous` or `last`, e.g. `<previous` matches every sample lower than the one
     before it, which counts counter resets. Gaps are skipped, so a drop across a gap still counts, and the first sample
     of a query never matches.
