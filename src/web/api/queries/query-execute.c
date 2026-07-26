@@ -276,8 +276,17 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     size_t db_points_read_since_plan_switch = 0; (void)db_points_read_since_plan_switch;
     size_t query_is_finished_counter = 0;
 
-    // The main loop, based on the query granularity we need
-    for( ; points_added < points_wanted && query_is_finished_counter <= 10 ;
+    // The main loop, based on the query granularity we need.
+    //
+    // Once storage is exhausted the loop normally gives up after a few more
+    // buckets and the caller fills the rest with EMPTY - which is right when
+    // a gap has no value to contribute. A condition that NAMES gaps is the
+    // exception: every remaining bucket is uncollected time and has to be
+    // counted as such, or "the share of the last day a node was unreachable"
+    // stops counting a few buckets after the node went away. points_wanted
+    // still bounds the walk.
+    for( ; points_added < points_wanted &&
+          (query_is_finished_counter <= 10 || r->time_grouping.wants_gaps) ;
         now_start_time = now_end_time, now_end_time += ops->view_update_every) {
 
         if(unlikely(query_plan_should_switch_plan(ops, now_end_time))) {
