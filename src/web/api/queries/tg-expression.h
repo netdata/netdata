@@ -400,13 +400,24 @@ static inline NETDATA_DOUBLE tg_expression_share(TG_EXPRESSION *e, const TG_POIN
         // comparison is NOT estimated across a window - it is answered on
         // the window's own average, which is documented, because a rollup
         // keeps no ordering to compare against.
-        bool dropped = e->cmp == TG_EXPRESSION_LESS &&
-                       netdata_double_isnumber(p->min) && p->min < e->previous_max;
+        bool dropped = false;
 
-        if(dropped)
-            share = 1.0;
+        if(e->cmp == TG_EXPRESSION_LESS) {
+            // The drop inference is the WHOLE answer for this comparison.
+            // Falling back to "is this window's average below the previous
+            // one's" counts the same reboot again in the window that
+            // follows it: a counter that restarted is of course lower than
+            // it was before it restarted.
+            dropped = netdata_double_isnumber(p->min) && p->min < e->previous_max;
+            share = dropped ? 1.0 : 0.0;
+        }
         else
             share = tg_expression_eval(e, tg_point_average(p), p->is_gap) ? 1.0 : 0.0;
+
+        // the predecessor follows this window either way, so a later
+        // comparison is made against where the data actually is
+        e->previous = tg_point_average(p);
+        e->has_previous = true;
 
         // What the NEXT window is compared against. Normally that is this
         // window's maximum - where a counter that only climbs left off. But a
