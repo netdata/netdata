@@ -55,6 +55,11 @@ static inline void tg_number_of_flaps_add_point(RRDR *r, const TG_POINT *p) {
 
     NETDATA_DOUBLE share = tg_expression_share(&g->expr, p);
 
+    // a repeat still fills the bucket it lands in: a wide stored point can
+    // cover a whole bucket on its own, and leaving it uncounted would flush
+    // EMPTY - "nothing here" - instead of "no flaps here"
+    g->count += p->samples;
+
     if(unlikely(!p->first))
         // the same stored point cannot flip the state twice
         return;
@@ -78,7 +83,6 @@ static inline void tg_number_of_flaps_add_point(RRDR *r, const TG_POINT *p) {
     }
 
     g->has_state = true;
-    g->count += p->samples;
 }
 
 static inline void tg_number_of_flaps_add(RRDR *r, NETDATA_DOUBLE value) {
