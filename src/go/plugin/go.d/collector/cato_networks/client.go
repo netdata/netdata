@@ -4,6 +4,7 @@ package cato_networks
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,10 +19,28 @@ import (
 
 type apiClient interface {
 	Probe(ctx context.Context, accountID string) error
-	LookupSites(ctx context.Context, accountID string, limit, from int64) (*catosdk.EntityLookup, error)
-	AccountSnapshot(ctx context.Context, accountID string, siteIDs []string) (*catosdk.AccountSnapshot, error)
-	AccountMetrics(ctx context.Context, accountID string, siteIDs []string, timeFrame string, buckets int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error)
-	SiteBgpStatus(ctx context.Context, accountID, siteID string) ([]*catosdk.SiteBgpStatusResult, error)
+	LookupSites(
+		ctx context.Context,
+		accountID string,
+		limit, from int64,
+	) (*catosdk.EntityLookup, error)
+	AccountSnapshot(
+		ctx context.Context,
+		accountID string,
+		siteIDs []string,
+	) (*accountSnapshot, error)
+	AccountMetrics(
+		ctx context.Context,
+		accountID string,
+		siteIDs []string,
+		timeFrame string,
+		buckets int64,
+		groupInterfaces *bool,
+	) (*catosdk.AccountMetrics, error)
+	SiteBgpStatus(
+		ctx context.Context,
+		accountID, siteID string,
+	) ([]*catosdk.SiteBgpStatusResult, error)
 }
 
 type sdkAPIClient struct {
@@ -82,33 +101,69 @@ func hasCatoHeader(headers map[string]string, key string) bool {
 func (c *sdkAPIClient) Probe(ctx context.Context, accountID string) error {
 	limit := int64(1)
 	from := int64(0)
-	_, err := c.client.EntityLookup(ctx, accountID, catomodels.EntityTypeSite, &limit, &from, nil, nil, nil, nil, nil, nil)
+	_, err := c.client.EntityLookup(
+		ctx,
+		accountID,
+		catomodels.EntityTypeSite,
+		&limit,
+		&from,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
 	if err != nil {
 		return fmt.Errorf("entityLookup: %w", err)
 	}
 	return nil
 }
 
-func (c *sdkAPIClient) LookupSites(ctx context.Context, accountID string, limit, from int64) (*catosdk.EntityLookup, error) {
-	res, err := c.client.EntityLookup(ctx, accountID, catomodels.EntityTypeSite, &limit, &from, nil, nil, nil, nil, nil, nil)
+func (c *sdkAPIClient) LookupSites(
+	ctx context.Context,
+	accountID string,
+	limit, from int64,
+) (*catosdk.EntityLookup, error) {
+	res, err := c.client.EntityLookup(
+		ctx,
+		accountID,
+		catomodels.EntityTypeSite,
+		&limit,
+		&from,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("entityLookup: %w", err)
 	}
 	return res, nil
 }
 
-func (c *sdkAPIClient) AccountSnapshot(ctx context.Context, accountID string, siteIDs []string) (*catosdk.AccountSnapshot, error) {
-	res, err := c.client.AccountSnapshot(ctx, siteIDs, nil, &accountID)
-	if err != nil && isAccountSnapshotEnumDecodeError(err) {
-		res, err = c.raw.AccountSnapshot(ctx, accountID, siteIDs)
-	}
+func (c *sdkAPIClient) AccountSnapshot(
+	ctx context.Context,
+	accountID string,
+	siteIDs []string,
+) (*accountSnapshot, error) {
+	res, err := c.raw.AccountSnapshot(ctx, accountID, siteIDs)
 	if err != nil {
 		return nil, fmt.Errorf("accountSnapshot: %w", err)
 	}
 	return res, nil
 }
 
-func (c *sdkAPIClient) AccountMetrics(ctx context.Context, accountID string, siteIDs []string, timeFrame string, buckets int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error) {
+func (c *sdkAPIClient) AccountMetrics(
+	ctx context.Context,
+	accountID string,
+	siteIDs []string,
+	timeFrame string,
+	buckets int64,
+	groupInterfaces *bool,
+) (*catosdk.AccountMetrics, error) {
 	labels := []catomodels.TimeseriesMetricType{
 		catomodels.TimeseriesMetricTypeBytesUpstreamMax,
 		catomodels.TimeseriesMetricTypeBytesDownstreamMax,
@@ -137,7 +192,10 @@ func (c *sdkAPIClient) AccountMetrics(ctx context.Context, accountID string, sit
 	return res, nil
 }
 
-func (c *sdkAPIClient) SiteBgpStatus(ctx context.Context, accountID, siteID string) ([]*catosdk.SiteBgpStatusResult, error) {
+func (c *sdkAPIClient) SiteBgpStatus(
+	ctx context.Context,
+	accountID, siteID string,
+) ([]*catosdk.SiteBgpStatusResult, error) {
 	input := catomodels.SiteBgpStatusInput{
 		Site: &catomodels.SiteRefInput{
 			By:    catomodels.ObjectRefByID,
@@ -163,19 +221,26 @@ type rawGraphQLError struct {
 }
 
 type rawAccountSnapshotResponse struct {
-	Data          catosdk.AccountSnapshot `json:"data"`
+	Data          *rawAccountSnapshotData `json:"data"`
 	Errors        []rawGraphQLError       `json:"errors"`
 	NetworkErrors []rawGraphQLError       `json:"networkErrors"`
 	GraphQLErrors []rawGraphQLError       `json:"graphqlErrors"`
 }
 
-func (c rawGraphQLClient) AccountSnapshot(ctx context.Context, accountID string, siteIDs []string) (*catosdk.AccountSnapshot, error) {
+type rawAccountSnapshotData struct {
+	AccountSnapshot *accountSnapshot `json:"accountSnapshot"`
+}
+
+func (c rawGraphQLClient) AccountSnapshot(
+	ctx context.Context,
+	accountID string,
+	siteIDs []string,
+) (*accountSnapshot, error) {
 	payload := rawGraphQLRequest{
 		OperationName: "accountSnapshot",
-		Query:         catosdk.AccountSnapshotDocument,
+		Query:         accountSnapshotDocument,
 		Variables: map[string]any{
 			"siteIDs":   siteIDs,
-			"userIDs":   nil,
 			"accountID": accountID,
 		},
 	}
@@ -210,18 +275,36 @@ func (c rawGraphQLClient) AccountSnapshot(ctx context.Context, accountID string,
 		return nil, fmt.Errorf("http status %d", resp.StatusCode)
 	}
 
+	bodyReader := io.Reader(resp.Body)
+	if strings.EqualFold(strings.TrimSpace(resp.Header.Get("Content-Encoding")), "gzip") {
+		reader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("gzip decode: %w", err)
+		}
+		defer reader.Close()
+		bodyReader = reader
+	}
+
 	var decoded rawAccountSnapshotResponse
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
-		return nil, err
+	decoder := json.NewDecoder(bodyReader)
+	if err := decoder.Decode(&decoded); err != nil {
+		return nil, fmt.Errorf("json decode: %w", err)
+	}
+	var trailing any
+	switch err := decoder.Decode(&trailing); {
+	case err == nil:
+		return nil, errors.New("json decode: multiple JSON values")
+	case !errors.Is(err, io.EOF):
+		return nil, fmt.Errorf("json decode: %w", err)
 	}
 	if msg := firstRawGraphQLError(decoded.Errors, decoded.NetworkErrors, decoded.GraphQLErrors); msg != "" {
 		return nil, fmt.Errorf("graphql: %s", msg)
 	}
-	if decoded.Data.AccountSnapshot == nil {
+	if decoded.Data == nil || decoded.Data.AccountSnapshot == nil {
 		return nil, errors.New("graphql accountSnapshot returned no data")
 	}
 
-	return &decoded.Data, nil
+	return decoded.Data.AccountSnapshot, nil
 }
 
 func firstRawGraphQLError(groups ...[]rawGraphQLError) string {
@@ -242,12 +325,4 @@ func isCatoReservedHeader(key string) bool {
 	default:
 		return false
 	}
-}
-
-func isAccountSnapshotEnumDecodeError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "ConnectivityStatus") && strings.Contains(msg, "not a valid")
 }

@@ -17,7 +17,9 @@ func TestNormalizeBGP(t *testing.T) {
 	}{
 		"drops peers without remote identity": {
 			peers: []*catosdk.SiteBgpStatusResult{
-				{IncomingConnection: catosdk.IncomingConnection{State: "Established"}},
+				{IncomingConnection: catosdk.IncomingConnection{
+					State: "Established",
+				}},
 			},
 			wantIssues: []string{normalizationIssueEmptyPeer},
 			check: func(t *testing.T, peers []bgpPeerState) {
@@ -48,16 +50,16 @@ func TestNormalizeBGP(t *testing.T) {
 
 func TestNormalizeSnapshot(t *testing.T) {
 	tests := map[string]struct {
-		snapshot *catosdk.AccountSnapshot
+		snapshot *accountSnapshot
 		names    map[string]string
 		check    func(*testing.T, map[string]*siteState, []string)
 	}{
 		"defaults nil info and statuses": {
-			snapshot: &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{
-				Sites: []*catosdk.AccountSnapshot_AccountSnapshot_Sites{
+			snapshot: &accountSnapshot{
+				Sites: []*accountSnapshotSite{
 					{ID: new("1001")},
 				},
-			}},
+			},
 			names: map[string]string{"1001": "Site One"},
 			check: func(t *testing.T, sites map[string]*siteState, order []string) {
 				require.Equal(t, []string{"1001"}, order)
@@ -73,34 +75,83 @@ func TestNormalizeSnapshot(t *testing.T) {
 			},
 		},
 		"keeps same-named empty-id interfaces per device": {
-			snapshot: &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{
-				Sites: []*catosdk.AccountSnapshot_AccountSnapshot_Sites{
+			snapshot: &accountSnapshot{
+				Sites: []*accountSnapshotSite{
 					{
 						ID: new("1001"),
-						Devices: []*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices{
+						Devices: []*accountSnapshotDevice{
 							{
 								ID:   new("socket-a"),
 								Name: new("Socket A"),
-								Interfaces: []*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_Interfaces{
+								Interfaces: []*accountSnapshotInterface{
 									{Name: new("WAN 1"), Connected: new(true)},
 								},
 							},
 							{
 								ID:   new("socket-b"),
 								Name: new("Socket B"),
-								Interfaces: []*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_Interfaces{
+								Interfaces: []*accountSnapshotInterface{
 									{Name: new("WAN 1"), Connected: new(false)},
 								},
 							},
 						},
 					},
 				},
-			}},
+			},
 			check: func(t *testing.T, sites map[string]*siteState, _ []string) {
 				site := sites["1001"]
 				require.Len(t, site.Interfaces, 2)
-				require.Equal(t, "socket-a", site.Interfaces[snapshotInterfaceKey("socket-a", "", "WAN 1")].DeviceID)
-				require.Equal(t, "socket-b", site.Interfaces[snapshotInterfaceKey("socket-b", "", "WAN 1")].DeviceID)
+				require.Equal(
+					t,
+					"socket-a",
+					site.Interfaces[snapshotInterfaceKey("socket-a", "", "WAN 1")].DeviceID,
+				)
+				require.Equal(
+					t,
+					"socket-b",
+					site.Interfaces[snapshotInterfaceKey("socket-b", "", "WAN 1")].DeviceID,
+				)
+			},
+		},
+		"derives current schema connectivity statuses": {
+			snapshot: &accountSnapshot{
+				Sites: []*accountSnapshotSite{
+					{
+						ID:                 new("connected-degraded"),
+						ConnectivityStatus: new("connected"),
+						DegradedStatus: &accountSnapshotDegradedStatus{
+							IsDegraded: true,
+						},
+					},
+					{
+						ID:                 new("disconnected-degraded"),
+						ConnectivityStatus: new("disconnected"),
+						DegradedStatus: &accountSnapshotDegradedStatus{
+							IsDegraded: true,
+						},
+					},
+					{ID: new("invalid-degraded"), ConnectivityStatus: new("Degraded")},
+					{
+						ID:                 new("future"),
+						ConnectivityStatus: new("Initializing"),
+						DegradedStatus: &accountSnapshotDegradedStatus{
+							IsDegraded: true,
+						},
+					},
+					{
+						ID: new("missing"),
+						DegradedStatus: &accountSnapshotDegradedStatus{
+							IsDegraded: true,
+						},
+					},
+				},
+			},
+			check: func(t *testing.T, sites map[string]*siteState, _ []string) {
+				require.Equal(t, "degraded", sites["connected-degraded"].ConnectivityStatus)
+				require.Equal(t, "disconnected", sites["disconnected-degraded"].ConnectivityStatus)
+				require.Equal(t, "unknown", sites["invalid-degraded"].ConnectivityStatus)
+				require.Equal(t, "unknown", sites["future"].ConnectivityStatus)
+				require.Equal(t, "unknown", sites["missing"].ConnectivityStatus)
 			},
 		},
 	}
@@ -123,25 +174,30 @@ func TestMergeMetrics(t *testing.T) {
 			metrics: func() *catosdk.AccountMetrics {
 				siteBytesUpstream := float64(100)
 				siteRTT := int64(42)
-				return &catosdk.AccountMetrics{AccountMetrics: &catosdk.AccountMetrics_AccountMetrics{
-					Sites: []*catosdk.AccountMetrics_AccountMetrics_Sites{
-						{
-							ID: new("1001"),
-							Metrics: &catosdk.AccountMetrics_AccountMetrics_Sites_Metrics{
-								BytesUpstream: &siteBytesUpstream,
-								Rtt:           &siteRTT,
-							},
-							Interfaces: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces{
-								{
-									Name: new("all"),
-									Timeseries: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Timeseries{
-										{Label: "bytesDownstreamMax", Data: [][]float64{{1, 200}}},
+				return &catosdk.AccountMetrics{
+					AccountMetrics: &catosdk.AccountMetrics_AccountMetrics{
+						Sites: []*catosdk.AccountMetrics_AccountMetrics_Sites{
+							{
+								ID: new("1001"),
+								Metrics: &catosdk.AccountMetrics_AccountMetrics_Sites_Metrics{
+									BytesUpstream: &siteBytesUpstream,
+									Rtt:           &siteRTT,
+								},
+								Interfaces: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces{
+									{
+										Name: new("all"),
+										Timeseries: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Timeseries{
+											{
+												Label: "bytesDownstreamMax",
+												Data:  [][]float64{{1, 200}},
+											},
+										},
 									},
 								},
 							},
 						},
 					},
-				}}
+				}
 			}(),
 			sites: map[string]*siteState{
 				"1001": {ID: "1001", Interfaces: make(map[string]*interfaceState)},
@@ -154,24 +210,26 @@ func TestMergeMetrics(t *testing.T) {
 			},
 		},
 		"matches metrics interfaces to snapshot devices by socket info": {
-			metrics: &catosdk.AccountMetrics{AccountMetrics: &catosdk.AccountMetrics_AccountMetrics{
-				Sites: []*catosdk.AccountMetrics_AccountMetrics_Sites{
-					{
-						ID: new("1001"),
-						Interfaces: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces{
-							{
-								Name: new("WAN 1"),
-								SocketInfo: &catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_SocketInfo{
-									ID: new("socket-a"),
-								},
-								Metrics: &catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Metrics{
-									BytesUpstream: new(float64(100)),
+			metrics: &catosdk.AccountMetrics{
+				AccountMetrics: &catosdk.AccountMetrics_AccountMetrics{
+					Sites: []*catosdk.AccountMetrics_AccountMetrics_Sites{
+						{
+							ID: new("1001"),
+							Interfaces: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces{
+								{
+									Name: new("WAN 1"),
+									SocketInfo: &catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_SocketInfo{
+										ID: new("socket-a"),
+									},
+									Metrics: &catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Metrics{
+										BytesUpstream: new(float64(100)),
+									},
 								},
 							},
 						},
 					},
 				},
-			}},
+			},
 			sites: map[string]*siteState{
 				"1001": {
 					ID:   "1001",

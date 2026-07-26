@@ -21,7 +21,6 @@ import (
 
 	catosdk "github.com/catonetworks/cato-go-sdk"
 	catomodels "github.com/catonetworks/cato-go-sdk/models"
-	catoscalars "github.com/catonetworks/cato-go-sdk/scalars"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -33,7 +32,7 @@ type fakeAPIClient struct {
 	lookup          *catosdk.EntityLookup
 	lookupErr       error
 	lookupPages     map[int64]*catosdk.EntityLookup
-	snapshot        *catosdk.AccountSnapshot
+	snapshot        *accountSnapshot
 	snapshotErr     error
 	metrics         *catosdk.AccountMetrics
 	bgp             map[string][]*catosdk.SiteBgpStatusResult
@@ -55,7 +54,12 @@ func (f *fakeAPIClient) Probe(context.Context, string) error {
 	return f.probeErr
 }
 
-func (f *fakeAPIClient) LookupSites(_ context.Context, _ string, _ int64, from int64) (*catosdk.EntityLookup, error) {
+func (f *fakeAPIClient) LookupSites(
+	_ context.Context,
+	_ string,
+	_ int64,
+	from int64,
+) (*catosdk.EntityLookup, error) {
 	f.lookupCalls++
 	if f.lookupErr != nil {
 		return nil, f.lookupErr
@@ -66,7 +70,11 @@ func (f *fakeAPIClient) LookupSites(_ context.Context, _ string, _ int64, from i
 	return f.lookup, nil
 }
 
-func (f *fakeAPIClient) AccountSnapshot(context.Context, string, []string) (*catosdk.AccountSnapshot, error) {
+func (f *fakeAPIClient) AccountSnapshot(
+	context.Context,
+	string,
+	[]string,
+) (*accountSnapshot, error) {
 	f.snapshotCalls++
 	if f.snapshotErr != nil {
 		return nil, f.snapshotErr
@@ -74,7 +82,14 @@ func (f *fakeAPIClient) AccountSnapshot(context.Context, string, []string) (*cat
 	return f.snapshot, nil
 }
 
-func (f *fakeAPIClient) AccountMetrics(ctx context.Context, _ string, siteIDs []string, _ string, _ int64, groupInterfaces *bool) (*catosdk.AccountMetrics, error) {
+func (f *fakeAPIClient) AccountMetrics(
+	ctx context.Context,
+	_ string,
+	siteIDs []string,
+	_ string,
+	_ int64,
+	groupInterfaces *bool,
+) (*catosdk.AccountMetrics, error) {
 	f.mu.Lock()
 
 	f.metricsCalls++
@@ -103,7 +118,11 @@ func (f *fakeAPIClient) AccountMetrics(ctx context.Context, _ string, siteIDs []
 	return metrics, nil
 }
 
-func (f *fakeAPIClient) SiteBgpStatus(_ context.Context, _ string, siteID string) ([]*catosdk.SiteBgpStatusResult, error) {
+func (f *fakeAPIClient) SiteBgpStatus(
+	_ context.Context,
+	_ string,
+	siteID string,
+) ([]*catosdk.SiteBgpStatusResult, error) {
 	f.bgpCalls++
 	if f.bgpErrSites != nil {
 		if err := f.bgpErrSites[siteID]; err != nil {
@@ -184,13 +203,16 @@ func newRawCatoFixtureServer(t *testing.T) *httptest.Server {
 	return newRawCatoFixtureServerWithResponses(t, nil)
 }
 
-func newRawCatoFixtureServerWithResponses(t *testing.T, overrides map[string]rawCatoResponse) *httptest.Server {
+func newRawCatoFixtureServerWithResponses(
+	t *testing.T,
+	overrides map[string]rawCatoResponse,
+) *httptest.Server {
 	t.Helper()
 
 	responses := map[string]rawCatoResponse{
-		operationDiscovery: {body: loadSDKCompatibleMockoonResponseBody(t, "entityLookup")},
-		operationSnapshot:  {body: loadSDKCompatibleMockoonResponseBody(t, "accountSnapshot")},
-		operationMetrics:   {body: loadSDKCompatibleMockoonResponseBody(t, "accountMetrics")},
+		operationDiscovery: {body: loadMockoonResponseBody(t, "entityLookup")},
+		operationSnapshot:  {body: loadTestdata(t, "cato-account-snapshot.schema-shaped.json")},
+		operationMetrics:   {body: loadMockoonResponseBody(t, "accountMetrics")},
 		operationBGP:       {body: loadTestdata(t, "cato-site-bgp-status.schema-shaped.json")},
 	}
 	maps.Copy(responses, overrides)
@@ -202,7 +224,11 @@ func newRawCatoFixtureServerWithResponses(t *testing.T, overrides map[string]raw
 			return
 		}
 		if r.Header.Get("x-api-key") != "secret" || r.Header.Get("x-account-id") != "12345" {
-			t.Errorf("unexpected auth headers: x-api-key present=%v x-account-id present=%v", r.Header.Get("x-api-key") != "", r.Header.Get("x-account-id") != "")
+			t.Errorf(
+				"unexpected auth headers: x-api-key present=%v x-account-id present=%v",
+				r.Header.Get("x-api-key") != "",
+				r.Header.Get("x-account-id") != "",
+			)
 			http.Error(w, "unexpected auth headers", http.StatusUnauthorized)
 			return
 		}
@@ -255,7 +281,10 @@ func loadMockoonResponseBody(t *testing.T, label string) string {
 			} `json:"responses"`
 		} `json:"routes"`
 	}
-	require.NoError(t, json.Unmarshal([]byte(loadTestdata(t, "centreon-cato-api.mockoon.json")), &env))
+	require.NoError(
+		t,
+		json.Unmarshal([]byte(loadTestdata(t, "centreon-cato-api.mockoon.json")), &env),
+	)
 	for _, route := range env.Routes {
 		for _, response := range route.Responses {
 			if response.Label == label {
@@ -265,44 +294,6 @@ func loadMockoonResponseBody(t *testing.T, label string) string {
 	}
 	t.Fatalf("Mockoon response %q not found", label)
 	return ""
-}
-
-func loadSDKCompatibleMockoonResponseBody(t *testing.T, label string) string {
-	t.Helper()
-
-	body := loadMockoonResponseBody(t, label)
-	switch label {
-	case "accountSnapshot":
-		body = adaptAccountSnapshotFixtureForSDK(t, body)
-	}
-	return body
-}
-
-func adaptAccountSnapshotFixtureForSDK(t *testing.T, body string) string {
-	t.Helper()
-
-	var payload map[string]any
-	require.NoError(t, json.Unmarshal([]byte(body), &payload))
-	sites := payload["data"].(map[string]any)["accountSnapshot"].(map[string]any)["sites"].([]any)
-	for _, rawSite := range sites {
-		site := rawSite.(map[string]any)
-		if v, ok := site["connectivityStatus"]; ok {
-			site["connectivityStatusSiteSnapshot"] = strings.ToLower(strings.TrimSpace(fmt.Sprint(v)))
-			delete(site, "connectivityStatus")
-		}
-		if v, ok := site["operationalStatus"]; ok {
-			site["operationalStatusSiteSnapshot"] = strings.ToLower(strings.TrimSpace(fmt.Sprint(v)))
-			delete(site, "operationalStatus")
-		}
-		if v, ok := site["info"]; ok {
-			site["infoSiteSnapshot"] = v
-			delete(site, "info")
-		}
-		delete(site, "operationalStats")
-	}
-	data, err := json.Marshal(payload)
-	require.NoError(t, err)
-	return string(data)
 }
 
 func loadTestdata(t *testing.T, name string) string {
@@ -339,13 +330,27 @@ func newFixtureAPIClient() *fakeAPIClient {
 func fixtureLookup() *catosdk.EntityLookup {
 	total := int64(2)
 	siteType := catomodels.EntityTypeSite
-	return &catosdk.EntityLookup{EntityLookup: catosdk.EntityLookup_EntityLookup{
-		Total: &total,
-		Items: []*catosdk.EntityLookup_EntityLookup_Items{
-			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1001", Name: new("Paris Office"), Type: siteType}},
-			{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1002", Name: new("Toulouse Office"), Type: siteType}},
+	return &catosdk.EntityLookup{
+		EntityLookup: catosdk.EntityLookup_EntityLookup{
+			Total: &total,
+			Items: []*catosdk.EntityLookup_EntityLookup_Items{
+				{
+					Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{
+						ID:   "1001",
+						Name: new("Paris Office"),
+						Type: siteType,
+					},
+				},
+				{
+					Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{
+						ID:   "1002",
+						Name: new("Toulouse Office"),
+						Type: siteType,
+					},
+				},
+			},
 		},
-	}}
+	}
 }
 
 func fixtureLookupPage(total int64, ids ...string) *catosdk.EntityLookup {
@@ -353,13 +358,19 @@ func fixtureLookupPage(total int64, ids ...string) *catosdk.EntityLookup {
 	items := make([]*catosdk.EntityLookup_EntityLookup_Items, 0, len(ids))
 	for _, id := range ids {
 		items = append(items, &catosdk.EntityLookup_EntityLookup_Items{
-			Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: id, Name: new("Site " + id), Type: siteType},
+			Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{
+				ID:   id,
+				Name: new("Site " + id),
+				Type: siteType,
+			},
 		})
 	}
-	return &catosdk.EntityLookup{EntityLookup: catosdk.EntityLookup_EntityLookup{
-		Total: &total,
-		Items: items,
-	}}
+	return &catosdk.EntityLookup{
+		EntityLookup: catosdk.EntityLookup_EntityLookup{
+			Total: &total,
+			Items: items,
+		},
+	}
 }
 
 func numberedSiteIDs(start, count int) []string {
@@ -370,45 +381,45 @@ func numberedSiteIDs(start, count int) []string {
 	return ids
 }
 
-func fixtureSnapshotForSiteIDs(ids ...string) *catosdk.AccountSnapshot {
-	sites := make([]*catosdk.AccountSnapshot_AccountSnapshot_Sites, 0, len(ids))
+func fixtureSnapshotForSiteIDs(ids ...string) *accountSnapshot {
+	sites := make([]*accountSnapshotSite, 0, len(ids))
 	for _, siteID := range ids {
-		sites = append(sites, &catosdk.AccountSnapshot_AccountSnapshot_Sites{
-			ID:                             new(siteID),
-			ConnectivityStatusSiteSnapshot: connectivityPtr("connected"),
-			OperationalStatusSiteSnapshot:  operationalPtr("active"),
-			PopName:                        new("POP-" + siteID),
-			InfoSiteSnapshot: &catosdk.AccountSnapshot_AccountSnapshot_Sites_InfoSiteSnapshot{
+		sites = append(sites, &accountSnapshotSite{
+			ID:                 new(siteID),
+			ConnectivityStatus: new("connected"),
+			OperationalStatus:  new("active"),
+			PopName:            new("POP-" + siteID),
+			Info: &accountSnapshotSiteInfo{
 				Name: new("Site " + siteID),
 			},
 		})
 	}
-	return &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{Sites: sites}}
+	return &accountSnapshot{
+		Sites: sites,
+	}
 }
 
-func fixtureSnapshot() *catosdk.AccountSnapshot {
-	return &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{
-		Sites: []*catosdk.AccountSnapshot_AccountSnapshot_Sites{
+func fixtureSnapshot() *accountSnapshot {
+	return &accountSnapshot{
+		Sites: []*accountSnapshotSite{
 			{
-				ID:                             new("1001"),
-				ConnectivityStatusSiteSnapshot: connectivityPtr("connected"),
-				OperationalStatusSiteSnapshot:  operationalPtr("active"),
-				PopName:                        new("POP-Paris"),
-				HostCount:                      new(int64(42)),
-				ConnectedSince:                 new("2026-05-01T10:00:00Z"),
-				InfoSiteSnapshot: &catosdk.AccountSnapshot_AccountSnapshot_Sites_InfoSiteSnapshot{
+				ID:                 new("1001"),
+				ConnectivityStatus: new("connected"),
+				OperationalStatus:  new("active"),
+				PopName:            new("POP-Paris"),
+				HostCount:          new(int64(42)),
+				Info: &accountSnapshotSiteInfo{
 					Name:        new("Paris Office"),
 					Description: new("Main site"),
 					CountryCode: new("FR"),
 					CountryName: new("France"),
 				},
-				Devices: []*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices{
+				Devices: []*accountSnapshotDevice{
 					{
 						ID:        new("dev-1"),
 						Name:      new("Socket 1"),
-						Type:      new("socket"),
 						Connected: new(true),
-						Interfaces: []*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_Interfaces{
+						Interfaces: []*accountSnapshotInterface{
 							{
 								ID:             new("wan1"),
 								Name:           new("WAN 1"),
@@ -422,44 +433,59 @@ func fixtureSnapshot() *catosdk.AccountSnapshot {
 				},
 			},
 			{
-				ID:                             new("1002"),
-				ConnectivityStatusSiteSnapshot: connectivityPtr("Degraded"),
-				OperationalStatusSiteSnapshot:  operationalPtr("locked"),
-				PopName:                        new("POP-Toulouse"),
-				HostCount:                      new(int64(7)),
-				InfoSiteSnapshot: &catosdk.AccountSnapshot_AccountSnapshot_Sites_InfoSiteSnapshot{
+				ID:                 new("1002"),
+				ConnectivityStatus: new("connected"),
+				DegradedStatus: &accountSnapshotDegradedStatus{
+					IsDegraded: true,
+				},
+				OperationalStatus: new("locked"),
+				PopName:           new("POP-Toulouse"),
+				HostCount:         new(int64(7)),
+				Info: &accountSnapshotSiteInfo{
 					Name: new("Toulouse Office"),
 				},
 			},
 		},
-	}}
+	}
 }
 
 func fixtureMetrics() *catosdk.AccountMetrics {
-	return &catosdk.AccountMetrics{AccountMetrics: &catosdk.AccountMetrics_AccountMetrics{
-		Sites: []*catosdk.AccountMetrics_AccountMetrics_Sites{
-			{
-				ID:   new("1001"),
-				Name: new("Paris Office"),
-				Interfaces: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces{
-					{
-						Name: new("all"),
-						Timeseries: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Timeseries{
-							{Label: "bytesUpstreamMax", Data: [][]float64{{1, 6008}, {2, 7168}}},
-							{Label: "bytesDownstreamMax", Data: [][]float64{{1, 12008}, {2, 11168}}},
-							{Label: "lostUpstreamPcnt", Data: [][]float64{{1, 0.2}}},
-							{Label: "packetsDiscardedUpstream", Data: [][]float64{{1, 1}, {2, 2}}},
-							{Label: "packetsDiscardedDownstream", Data: [][]float64{{1, 3}, {2, 4}}},
-							{Label: "rtt", Data: [][]float64{{1, 15}}},
+	return &catosdk.AccountMetrics{
+		AccountMetrics: &catosdk.AccountMetrics_AccountMetrics{
+			Sites: []*catosdk.AccountMetrics_AccountMetrics_Sites{
+				{
+					ID:   new("1001"),
+					Name: new("Paris Office"),
+					Interfaces: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces{
+						{
+							Name: new("all"),
+							Timeseries: []*catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Timeseries{
+								{Label: "bytesUpstreamMax", Data: [][]float64{{1, 6008}, {2, 7168}}},
+								{
+									Label: "bytesDownstreamMax",
+									Data:  [][]float64{{1, 12008}, {2, 11168}},
+								},
+								{Label: "lostUpstreamPcnt", Data: [][]float64{{1, 0.2}}},
+								{Label: "packetsDiscardedUpstream", Data: [][]float64{{1, 1}, {2, 2}}},
+								{
+									Label: "packetsDiscardedDownstream",
+									Data:  [][]float64{{1, 3}, {2, 4}},
+								},
+								{Label: "rtt", Data: [][]float64{{1, 15}}},
+							},
 						},
 					},
 				},
 			},
 		},
-	}}
+	}
 }
 
-func requireMetricValues(t *testing.T, got map[string]metrix.SampleValue, want map[string]metrix.SampleValue) {
+func requireMetricValues(
+	t *testing.T,
+	got map[string]metrix.SampleValue,
+	want map[string]metrix.SampleValue,
+) {
 	t.Helper()
 	for key, wantValue := range want {
 		gotValue, ok := got[key]
@@ -479,7 +505,12 @@ func scalarSeriesFromAllHostScopes(store metrix.CollectorStore) map[string]metri
 	out := make(map[string]metrix.SampleValue)
 	reader := store.Read(metrix.ReadFlatten())
 	for _, scope := range reader.HostScopes() {
-		maps.Copy(out, scalarSeriesFromReader(store.Read(metrix.ReadFlatten(), metrix.ReadHostScope(scope.ScopeKey))))
+		maps.Copy(
+			out,
+			scalarSeriesFromReader(
+				store.Read(metrix.ReadFlatten(), metrix.ReadHostScope(scope.ScopeKey)),
+			),
+		)
 	}
 	return out
 }
@@ -537,14 +568,4 @@ func mustCycleController(t *testing.T, s metrix.CollectorStore) metrix.CycleCont
 	managed, ok := metrix.AsCycleManagedStore(s)
 	require.True(t, ok)
 	return managed.CycleController()
-}
-
-func connectivityPtr(v string) *catomodels.ConnectivityStatus {
-	status := catomodels.ConnectivityStatus(v)
-	return &status
-}
-
-func operationalPtr(v string) *catoscalars.OperationalStatus {
-	status := catoscalars.OperationalStatus(v)
-	return &status
 }

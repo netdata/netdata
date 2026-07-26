@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cato_networks/catofunc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -59,10 +60,17 @@ func TestCollector_Collect(t *testing.T) {
 					require.Equal(t, 3, topo.Links.Rows)
 					requireSiteHostScope(t, c, "1001", "Paris Office", "POP-Paris")
 					requireSiteHostScope(t, c, "1002", "Toulouse Office", "POP-Toulouse")
-					require.Empty(t, scalarSeriesFromReader(c.store.Read(metrix.ReadFlatten(), metrix.ReadHostScope(""))))
+					require.Empty(
+						t,
+						scalarSeriesFromReader(
+							c.store.Read(metrix.ReadFlatten(), metrix.ReadHostScope("")),
+						),
+					)
 					scoped1001 := scalarSeriesFromReader(c.store.Read(
 						metrix.ReadFlatten(),
-						metrix.ReadHostScope(c.siteHostScope(&siteState{ID: "1001"}).ScopeKey),
+						metrix.ReadHostScope(c.siteHostScope(&siteState{
+							ID: "1001",
+						}).ScopeKey),
 					))
 					requireMetricValues(t, scoped1001, map[string]metrix.SampleValue{
 						stateMetricKey("site_connectivity_status", "connected", siteLabels("1001", "Paris Office", "POP-Paris")):           1,
@@ -74,7 +82,7 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			}},
 		},
-		"raw Centreon fixture through SDK": {
+		"raw schema-shaped fixture through client": {
 			setup: func(t *testing.T, c *Collector, _ *fakeAPIClient) {
 				server := newRawCatoFixtureServer(t)
 				t.Cleanup(server.Close)
@@ -84,15 +92,85 @@ func TestCollector_Collect(t *testing.T) {
 			steps: []collectStep{{
 				name: "decodes raw fixture",
 				wantMetrics: map[string]metrix.SampleValue{
-					stateMetricKey("site_connectivity_status", "connected", siteLabels("1001", "Paris Office", "POP-Paris")):          1,
-					stateMetricKey("site_connectivity_status", "disconnected", siteLabels("1002", "Toulouse Office", "POP-Toulouse")): 1,
-					stateMetricKey("site_connectivity_status", "degraded", siteLabels("1003", "Saint Girons Office", "POP-Ariege")):   1,
-					metricKey("site_bytes_upstream_max", siteLabels("1001", "Paris Office", "POP-Paris")):                             4684,
-					metricKey("site_packets_discarded_downstream", siteLabels("1001", "Paris Office", "POP-Paris")):                   1,
-					stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):              1,
-					metricKey("bgp_routes", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                                 12,
-					metricKey("bgp_routes_limit", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                           100,
-					metricKey("bgp_rib_out_routes", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                         1,
+					stateMetricKey("site_connectivity_status", "connected", siteLabels("1001", "Paris Office", "POP-Paris")):                                  1,
+					stateMetricKey("site_connectivity_status", "disconnected", siteLabels("1002", "Toulouse Office", "POP-Toulouse")):                         1,
+					stateMetricKey("site_connectivity_status", "degraded", siteLabels("1003", "Saint Girons Office", "POP-Ariege")):                           1,
+					stateMetricKey("device_connection_status", "connected", deviceLabels("1001", "Paris Office", "dev-1", "Socket 1")):                        1,
+					stateMetricKey("interface_connection_status", "connected", interfaceLabels("1001", "Paris Office", "dev-1", "Socket 1", "wan1", "WAN 1")): 1,
+					metricKey("interface_tunnel_uptime_seconds", interfaceLabels("1001", "Paris Office", "dev-1", "Socket 1", "wan1", "WAN 1")):               3600,
+					metricKey("site_bytes_upstream_max", siteLabels("1001", "Paris Office", "POP-Paris")):                                                     4684,
+					metricKey("site_packets_discarded_downstream", siteLabels("1001", "Paris Office", "POP-Paris")):                                           1,
+					stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                                      1,
+					metricKey("bgp_routes", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                                                         12,
+					metricKey("bgp_routes_limit", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                                                   100,
+					metricKey("bgp_rib_out_routes", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")):                                                 1,
+				},
+				wantMissing: []string{
+					metricKey("site_hosts", siteLabels("1001", "Paris Office", "POP-Paris")),
+					stateMetricKey(
+						"device_connection_status",
+						"connected",
+						deviceLabels("1001", "Paris Office", "dev-missing", "Unknown Socket"),
+					),
+					stateMetricKey(
+						"device_connection_status",
+						"disconnected",
+						deviceLabels("1001", "Paris Office", "dev-missing", "Unknown Socket"),
+					),
+					stateMetricKey(
+						"interface_connection_status",
+						"connected",
+						interfaceLabels(
+							"1001",
+							"Paris Office",
+							"dev-missing",
+							"Unknown Socket",
+							"wan-missing",
+							"Unknown WAN",
+						),
+					),
+					stateMetricKey(
+						"interface_connection_status",
+						"disconnected",
+						interfaceLabels(
+							"1001",
+							"Paris Office",
+							"dev-missing",
+							"Unknown Socket",
+							"wan-missing",
+							"Unknown WAN",
+						),
+					),
+					metricKey(
+						"interface_tunnel_uptime_seconds",
+						interfaceLabels(
+							"1001",
+							"Paris Office",
+							"dev-missing",
+							"Unknown Socket",
+							"wan-missing",
+							"Unknown WAN",
+						),
+					),
+				},
+				check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
+					topo, ok := c.topology.CurrentTopology()
+					require.True(t, ok)
+
+					actors := topologyTableRows(t, topo.Actors, topo.Dictionaries)
+					site := requireTopologyRow(t, actors, "id", catoSiteActorID("1001"))
+					require.Nil(t, site["host_count"])
+					device := requireTopologyRow(t, actors, "display_name", "Unknown Socket")
+					require.Nil(t, device["connected"])
+
+					interfaces := topologyTableRows(
+						t,
+						topo.Tables.Actor[catofunc.ActorTableInterfaces].Table,
+						topo.Dictionaries,
+					)
+					iface := requireTopologyRow(t, interfaces, "name", "Unknown WAN")
+					require.Nil(t, iface["connected"])
+					require.Nil(t, iface["tunnel_uptime"])
 				},
 			}},
 		},
@@ -133,7 +211,9 @@ func TestCollector_Collect(t *testing.T) {
 				steps    []collectStep
 			}{
 				setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
-					fake.metricsErrSites = map[string]error{"1002": errors.New("rate limit exceeded")}
+					fake.metricsErrSites = map[string]error{
+						"1002": errors.New("rate limit exceeded"),
+					}
 					fake.metricsHook = func(_ context.Context, siteIDs []string) {
 						if len(siteIDs) == 1 && siteIDs[0] == "1002" {
 							cancel()
@@ -159,10 +239,13 @@ func TestCollector_Collect(t *testing.T) {
 		"unknown timeseries labels do not fail collection": {
 			setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
 				iface := fake.metrics.GetAccountMetrics().GetSites()[0].GetInterfaces()[0]
-				iface.Timeseries = append(iface.Timeseries, &catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Timeseries{
-					Label: "renamedByVendor",
-					Data:  [][]float64{{1, 42}},
-				})
+				iface.Timeseries = append(
+					iface.Timeseries,
+					&catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces_Timeseries{
+						Label: "renamedByVendor",
+						Data:  [][]float64{{1, 42}},
+					},
+				)
 			},
 			steps: []collectStep{{
 				name: "still emits known metrics",
@@ -215,7 +298,9 @@ func TestCollector_Collect(t *testing.T) {
 					{
 						name: "omit failed site peer next cycle",
 						setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
-							fake.bgpErrSites = map[string]error{"1002": errors.New("site bgp failed")}
+							fake.bgpErrSites = map[string]error{
+								"1002": errors.New("site bgp failed"),
+							}
 						},
 						wantMetrics: map[string]metrix.SampleValue{
 							stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")): 1,
@@ -229,19 +314,19 @@ func TestCollector_Collect(t *testing.T) {
 		}(),
 		"unrecognized statuses map to unknown": {
 			setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
-				fake.snapshot = &catosdk.AccountSnapshot{AccountSnapshot: &catosdk.AccountSnapshot_AccountSnapshot{
-					Sites: []*catosdk.AccountSnapshot_AccountSnapshot_Sites{
+				fake.snapshot = &accountSnapshot{
+					Sites: []*accountSnapshotSite{
 						{
-							ID:                             new("1001"),
-							ConnectivityStatusSiteSnapshot: connectivityPtr("Initializing"),
-							OperationalStatusSiteSnapshot:  operationalPtr("Maintenance"),
-							PopName:                        new("POP-Paris"),
-							InfoSiteSnapshot: &catosdk.AccountSnapshot_AccountSnapshot_Sites_InfoSiteSnapshot{
+							ID:                 new("1001"),
+							ConnectivityStatus: new("Initializing"),
+							OperationalStatus:  new("Maintenance"),
+							PopName:            new("POP-Paris"),
+							Info: &accountSnapshotSiteInfo{
 								Name: new("Paris Office"),
 							},
 						},
 					},
-				}}
+				}
 			},
 			steps: []collectStep{{
 				name: "emits unknown states",
@@ -254,7 +339,11 @@ func TestCollector_Collect(t *testing.T) {
 		"empty discovery fails collection": {
 			setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
 				total := int64(0)
-				fake.lookup = &catosdk.EntityLookup{EntityLookup: catosdk.EntityLookup_EntityLookup{Total: &total}}
+				fake.lookup = &catosdk.EntityLookup{
+					EntityLookup: catosdk.EntityLookup_EntityLookup{
+						Total: &total,
+					},
+				}
 			},
 			steps: []collectStep{{
 				name:      "returns empty error",
@@ -285,14 +374,34 @@ func TestCollector_Collect(t *testing.T) {
 				c.SiteSelector = "!Toulouse* Paris*"
 				total := int64(3)
 				siteType := catomodels.EntityTypeSite
-				fake.lookup = &catosdk.EntityLookup{EntityLookup: catosdk.EntityLookup_EntityLookup{
-					Total: &total,
-					Items: []*catosdk.EntityLookup_EntityLookup_Items{
-						{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1001", Name: new("Paris Office"), Type: siteType}},
-						{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1002", Name: new("Toulouse Office"), Type: siteType}},
-						{Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{ID: "1003", Name: new("Madrid Office"), Type: siteType}},
+				fake.lookup = &catosdk.EntityLookup{
+					EntityLookup: catosdk.EntityLookup_EntityLookup{
+						Total: &total,
+						Items: []*catosdk.EntityLookup_EntityLookup_Items{
+							{
+								Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{
+									ID:   "1001",
+									Name: new("Paris Office"),
+									Type: siteType,
+								},
+							},
+							{
+								Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{
+									ID:   "1002",
+									Name: new("Toulouse Office"),
+									Type: siteType,
+								},
+							},
+							{
+								Entity: catosdk.EntityLookup_EntityLookup_Items_Entity{
+									ID:   "1003",
+									Name: new("Madrid Office"),
+									Type: siteType,
+								},
+							},
+						},
 					},
-				}}
+				}
 			},
 			steps: []collectStep{{
 				name: "collects selected site only",
@@ -300,7 +409,11 @@ func TestCollector_Collect(t *testing.T) {
 					stateMetricKey("site_connectivity_status", "connected", siteLabels("1001", "Paris Office", "POP-Paris")): 1,
 				},
 				wantMissing: []string{
-					stateMetricKey("site_connectivity_status", "degraded", siteLabels("1002", "Toulouse Office", "POP-Toulouse")),
+					stateMetricKey(
+						"site_connectivity_status",
+						"degraded",
+						siteLabels("1002", "Toulouse Office", "POP-Toulouse"),
+					),
 				},
 				check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
 					require.Equal(t, []string{"1001"}, c.discovery.siteIDs)
@@ -310,9 +423,9 @@ func TestCollector_Collect(t *testing.T) {
 		"collects all interfaces and BGP peers": {
 			setup: func(_ *testing.T, _ *Collector, fake *fakeAPIClient) {
 				snapshot := fixtureSnapshot()
-				snapshot.GetAccountSnapshot().GetSites()[0].GetDevices()[0].Interfaces = append(
-					snapshot.GetAccountSnapshot().GetSites()[0].GetDevices()[0].GetInterfaces(),
-					&catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_Interfaces{
+				snapshot.Sites[0].Devices[0].Interfaces = append(
+					snapshot.Sites[0].Devices[0].Interfaces,
+					&accountSnapshotInterface{
 						ID:        new("wan2"),
 						Name:      new("WAN 2"),
 						Connected: new(true),
@@ -345,7 +458,8 @@ func TestCollector_Collect(t *testing.T) {
 				{
 					name: "uses cache after refresh failure",
 					setup: func(_ *testing.T, c *Collector, fake *fakeAPIClient) {
-						now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC).Add(seconds(defaultDiscoveryEvery) + time.Second)
+						now := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC).
+							Add(seconds(defaultDiscoveryEvery) + time.Second)
 						c.now = func() time.Time { return now }
 						fake.lookupErr = errors.New("connection refused")
 					},
@@ -354,7 +468,11 @@ func TestCollector_Collect(t *testing.T) {
 					},
 					check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
 						require.Equal(t, []string{"1001", "1002"}, c.discovery.siteIDs)
-						require.Equal(t, time.Date(2026, 5, 1, 13, 0, 1, 0, time.UTC), c.discovery.fetchedAt)
+						require.Equal(
+							t,
+							time.Date(2026, 5, 1, 13, 0, 1, 0, time.UTC),
+							c.discovery.fetchedAt,
+						)
 					},
 				},
 			},
@@ -370,7 +488,11 @@ func TestCollector_Collect(t *testing.T) {
 				{
 					name: "first failed BGP cycle",
 					wantMissing: []string{
-						stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "192.0.2.10", "64512")),
+						stateMetricKey(
+							"bgp_session_status",
+							"up",
+							bgpLabels("1001", "Paris Office", "192.0.2.10", "64512"),
+						),
 					},
 					check: func(t *testing.T, c *Collector, fake *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
 						require.Equal(t, 2, fake.bgpCalls)
@@ -393,7 +515,11 @@ func TestCollector_Collect(t *testing.T) {
 			steps: []collectStep{{
 				name: "omits empty peer label set",
 				wantMissing: []string{
-					stateMetricKey("bgp_session_status", "up", bgpLabels("1001", "Paris Office", "", "")),
+					stateMetricKey(
+						"bgp_session_status",
+						"up",
+						bgpLabels("1001", "Paris Office", "", ""),
+					),
 				},
 				check: func(t *testing.T, c *Collector, _ *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
 					require.NotContains(t, c.bgp.noBGPUntil, "1001")
@@ -414,7 +540,11 @@ func TestCollector_Collect(t *testing.T) {
 					check: func(t *testing.T, c *Collector, fake *fakeAPIClient, _ map[string]metrix.SampleValue, _ error) {
 						require.Equal(t, 2, fake.bgpCalls)
 						require.NotContains(t, c.bgp.noBGPUntil, "1001")
-						require.Equal(t, c.noBGPCacheUntil("1002", fixedCatoTestNow()), c.bgp.noBGPUntil["1002"])
+						require.Equal(
+							t,
+							c.noBGPCacheUntil("1002", fixedCatoTestNow()),
+							c.bgp.noBGPUntil["1002"],
+						)
 					},
 				},
 				{
@@ -721,10 +851,16 @@ func TestNoBGPCacheJitter(t *testing.T) {
 }
 
 func siteLabels(siteID, siteName, popName string) metrix.Labels {
-	return metrix.Labels{"site_id": siteID, "site_name": siteName, "pop_name": popName}
+	return metrix.Labels{
+		"site_id":   siteID,
+		"site_name": siteName,
+		"pop_name":  popName,
+	}
 }
 
-func interfaceLabels(siteID, siteName, deviceID, deviceName, interfaceID, interfaceName string) metrix.Labels {
+func interfaceLabels(
+	siteID, siteName, deviceID, deviceName, interfaceID, interfaceName string,
+) metrix.Labels {
 	return metrix.Labels{
 		"site_id":        siteID,
 		"site_name":      siteName,
@@ -736,11 +872,21 @@ func interfaceLabels(siteID, siteName, deviceID, deviceName, interfaceID, interf
 }
 
 func deviceLabels(siteID, siteName, deviceID, deviceName string) metrix.Labels {
-	return metrix.Labels{"site_id": siteID, "site_name": siteName, "device_id": deviceID, "device_name": deviceName}
+	return metrix.Labels{
+		"site_id":     siteID,
+		"site_name":   siteName,
+		"device_id":   deviceID,
+		"device_name": deviceName,
+	}
 }
 
 func bgpLabels(siteID, siteName, peerIP, peerASN string) metrix.Labels {
-	return metrix.Labels{"site_id": siteID, "site_name": siteName, "peer_ip": peerIP, "peer_asn": peerASN}
+	return metrix.Labels{
+		"site_id":   siteID,
+		"site_name": siteName,
+		"peer_ip":   peerIP,
+		"peer_asn":  peerASN,
+	}
 }
 
 func mapKeys[V any](m map[string]V) []string {
@@ -763,7 +909,11 @@ func metricKeyFromLabelView(name string, labels metrix.LabelView) string {
 func requireSiteHostScope(t *testing.T, c *Collector, siteID, siteName, popName string) {
 	t.Helper()
 
-	want := c.siteHostScope(&siteState{ID: siteID, Name: siteName, PopName: popName})
+	want := c.siteHostScope(&siteState{
+		ID:      siteID,
+		Name:    siteName,
+		PopName: popName,
+	})
 	require.False(t, want.IsDefault())
 
 	for _, scope := range c.store.Read(metrix.ReadFlatten()).HostScopes() {

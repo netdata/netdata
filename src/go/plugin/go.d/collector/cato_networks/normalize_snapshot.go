@@ -2,18 +2,22 @@
 
 package cato_networks
 
-import (
-	"fmt"
+func normalizeSnapshot(
+	snapshot *accountSnapshot,
+	siteNames map[string]string,
+) (map[string]*siteState, []string) {
+	if snapshot == nil {
+		return map[string]*siteState{}, nil
+	}
 
-	catosdk "github.com/catonetworks/cato-go-sdk"
-)
+	out := make(map[string]*siteState, len(snapshot.Sites))
+	order := make([]string, 0, len(snapshot.Sites))
 
-func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]string) (map[string]*siteState, []string) {
-	out := make(map[string]*siteState)
-	var order []string
-
-	for _, raw := range snapshot.GetAccountSnapshot().GetSites() {
-		siteID := derefZero(raw.GetID())
+	for _, raw := range snapshot.Sites {
+		if raw == nil {
+			continue
+		}
+		siteID := derefZero(raw.ID)
 		if siteID == "" {
 			continue
 		}
@@ -27,71 +31,72 @@ func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]s
 			siteType    string
 			connType    string
 		)
-		if info := raw.GetInfoSiteSnapshot(); info != nil {
-			infoName = derefZero(info.GetName())
-			description = derefZero(info.GetDescription())
-			countryCode = derefZero(info.GetCountryCode())
-			countryName = derefZero(info.GetCountryName())
-			region = derefZero(info.GetRegion())
-			if info.GetType() != nil {
-				siteType = fmt.Sprint(*info.GetType())
-			}
-			if info.GetConnType() != nil {
-				connType = fmt.Sprint(*info.GetConnType())
-			}
+		if info := raw.Info; info != nil {
+			infoName = derefZero(info.Name)
+			description = derefZero(info.Description)
+			countryCode = derefZero(info.CountryCode)
+			countryName = derefZero(info.CountryName)
+			region = derefZero(info.Region)
+			siteType = derefZero(info.Type)
+			connType = derefZero(info.ConnType)
 		}
 		site := &siteState{
-			ID:                 siteID,
-			Name:               siteDisplayName(siteID, siteNames, infoName, ""),
-			Description:        description,
-			ConnectivityStatus: normalizeStatus(connectivityStatusString(raw.GetConnectivityStatusSiteSnapshot())),
-			OperationalStatus:  normalizeStatus(operationalStatusString(raw.GetOperationalStatusSiteSnapshot())),
-			PopName:            derefZero(raw.GetPopName()),
-			CountryCode:        countryCode,
-			CountryName:        countryName,
-			Region:             region,
-			SiteType:           siteType,
-			ConnectionType:     connType,
-			LastConnected:      derefZero(raw.GetLastConnected()),
-			ConnectedSince:     derefZero(raw.GetConnectedSince()),
-			HostCount:          derefZero(raw.GetHostCount()),
-			Interfaces:         make(map[string]*interfaceState),
+			ID:          siteID,
+			Name:        siteDisplayName(siteID, siteNames, infoName, ""),
+			Description: description,
+			ConnectivityStatus: normalizeSnapshotConnectivity(
+				raw.ConnectivityStatus,
+				raw.DegradedStatus,
+			),
+			OperationalStatus: normalizeStatus(derefZero(raw.OperationalStatus)),
+			PopName:           derefZero(raw.PopName),
+			CountryCode:       countryCode,
+			CountryName:       countryName,
+			Region:            region,
+			SiteType:          siteType,
+			ConnectionType:    connType,
+			HostCount:         raw.HostCount,
+			Interfaces:        make(map[string]*interfaceState),
 		}
 
-		for _, dev := range raw.GetDevices() {
-			device := deviceState{
-				ID:             derefZero(dev.GetID()),
-				Identifier:     derefZero(dev.GetIdentifier()),
-				Name:           derefZero(dev.GetName()),
-				Type:           derefZero(dev.GetType()),
-				Connected:      derefZero(dev.GetConnected()),
-				HaRole:         derefZero(dev.GetHaRole()),
-				InternalIP:     derefZero(dev.GetInternalIP()),
-				LastPopName:    derefZero(dev.GetLastPopName()),
-				ConnectedSince: derefZero(dev.GetConnectedSince()),
+		for _, dev := range raw.Devices {
+			if dev == nil {
+				continue
 			}
-			if socket := dev.GetSocketInfo(); socket != nil {
-				device.SocketID = derefZero(socket.GetID())
-				if platform := socket.GetPlatformSocketInfo(); platform != nil {
-					device.SocketPlatform = fmt.Sprint(*platform)
-					if device.Type == "" {
-						device.Type = device.SocketPlatform
-					}
-				}
-				device.SocketSerial = derefZero(socket.GetSerial())
-				device.SocketVersion = derefZero(socket.GetVersion())
+			device := deviceState{
+				ID:          derefZero(dev.ID),
+				Identifier:  derefZero(dev.Identifier),
+				Name:        derefZero(dev.Name),
+				Connected:   dev.Connected,
+				HaRole:      derefZero(dev.HaRole),
+				InternalIP:  derefZero(dev.InternalIP),
+				LastPopName: derefZero(dev.LastPopName),
+			}
+			if socket := dev.SocketInfo; socket != nil {
+				device.SocketID = derefZero(socket.ID)
+				device.SocketSerial = derefZero(socket.Serial)
+				device.SocketVersion = derefZero(socket.Version)
 			}
 			site.Devices = append(site.Devices, device)
 			deviceID := stableDeviceID(device)
 			deviceName := deviceDisplayName(device)
 
-			linkStateByID := make(map[string]*catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_InterfacesLinkState)
-			for _, linkState := range dev.GetInterfacesLinkState() {
-				if id := derefZero(linkState.GetID()); id != "" {
+			linkStateByID := make(
+				map[string]*accountSnapshotInterfaceLinkState,
+				len(dev.InterfacesLinkState),
+			)
+			for _, linkState := range dev.InterfacesLinkState {
+				if linkState == nil {
+					continue
+				}
+				if id := derefZero(linkState.ID); id != "" {
 					linkStateByID[id] = linkState
 				}
 			}
-			for _, rawIface := range dev.GetInterfaces() {
+			for _, rawIface := range dev.Interfaces {
+				if rawIface == nil {
+					continue
+				}
 				iface := normalizeSnapshotInterface(rawIface)
 				if iface.ID == "" && iface.Name == "" {
 					continue
@@ -101,7 +106,7 @@ func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]s
 				iface.DeviceSocketID = device.SocketID
 				iface.DeviceSocketSerial = device.SocketSerial
 				if linkState := linkStateByID[iface.ID]; linkState != nil {
-					iface.LinkUp = derefZero(linkState.GetUp())
+					iface.LinkUp = linkState.Up
 				}
 				key := snapshotInterfaceKey(iface.DeviceID, iface.ID, iface.Name)
 				site.Interfaces[key] = &iface
@@ -115,27 +120,40 @@ func normalizeSnapshot(snapshot *catosdk.AccountSnapshot, siteNames map[string]s
 	return out, order
 }
 
-func normalizeSnapshotInterface(raw *catosdk.AccountSnapshot_AccountSnapshot_Sites_Devices_Interfaces) interfaceState {
-	iface := interfaceState{
-		ID:             derefZero(raw.GetID()),
-		Name:           derefZero(raw.GetName()),
-		Type:           derefZero(raw.GetType()),
-		Connected:      derefZero(raw.GetConnected()),
-		PopName:        derefZero(raw.GetPopName()),
-		TunnelRemoteIP: derefZero(raw.GetTunnelRemoteIP()),
-		TunnelUptime:   derefZero(raw.GetTunnelUptime()),
-		PhysicalPort:   derefZero(raw.GetPhysicalPort()),
+func normalizeSnapshotConnectivity(status *string, degraded *accountSnapshotDegradedStatus) string {
+	normalized := normalizeStatus(derefZero(status))
+	switch normalized {
+	case "connected":
+		if degraded != nil && degraded.IsDegraded {
+			return "degraded"
+		}
+		return "connected"
+	case "disconnected":
+		return "disconnected"
+	default:
+		return "unknown"
 	}
-	if info := raw.GetInfoInterfaceSnapshot(); info != nil {
+}
+
+func normalizeSnapshotInterface(raw *accountSnapshotInterface) interfaceState {
+	iface := interfaceState{
+		ID:             derefZero(raw.ID),
+		Name:           derefZero(raw.Name),
+		Type:           derefZero(raw.Type),
+		Connected:      raw.Connected,
+		PopName:        derefZero(raw.PopName),
+		TunnelRemoteIP: derefZero(raw.TunnelRemoteIP),
+		TunnelUptime:   raw.TunnelUptime,
+	}
+	if info := raw.Info; info != nil {
 		if iface.ID == "" {
-			iface.ID = info.GetID()
+			iface.ID = info.ID
 		}
 		if iface.Name == "" {
-			iface.Name = derefZero(info.GetName())
+			iface.Name = derefZero(info.Name)
 		}
-		iface.DestType = derefZero(info.GetDestType())
-		iface.UpstreamBandwidth = derefZero(info.GetUpstreamBandwidth())
-		iface.DownstreamBandwidth = derefZero(info.GetDownstreamBandwidth())
+		iface.UpstreamBandwidth = derefZero(info.UpstreamBandwidth)
+		iface.DownstreamBandwidth = derefZero(info.DownstreamBandwidth)
 	}
 	return iface
 }

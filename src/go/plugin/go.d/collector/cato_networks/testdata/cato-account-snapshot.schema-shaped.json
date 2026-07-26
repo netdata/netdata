@@ -1,0 +1,96 @@
+{
+  "data": {
+    "accountSnapshot": {
+      "sites": [
+        {
+          "id": "1001",
+          "connectivityStatus": "connected",
+          "degradedStatus": {
+            "isDegraded": false
+          },
+          "operationalStatus": "active",
+          "info": {
+            "name": "Paris Office",
+            "description": "HQ in Paris - main datacenter"
+          },
+          "popName": "POP-Paris",
+          "devices": [
+            {
+              "id": "dev-1",
+              "name": "Socket 1",
+              "identifier": "device-1",
+              "connected": true,
+              "haRole": "primary",
+              "lastPopName": "POP-Paris",
+              "internalIP": "192.0.2.1",
+              "socketInfo": {
+                "id": "socket-1",
+                "serial": "SERIAL-1",
+                "version": "21.0"
+              },
+              "interfaces": [
+                {
+                  "connected": false,
+                  "id": "wan1",
+                  "name": "WAN 1",
+                  "popName": "POP-Paris",
+                  "tunnelUptime": 3600,
+                  "tunnelRemoteIP": "198.51.100.10",
+                  "type": "WAN",
+                  "info": {
+                    "id": "wan1",
+                    "name": "WAN 1",
+                    "upstreamBandwidth": 100000,
+                    "downstreamBandwidth": 200000
+                  }
+                }
+              ],
+              "interfacesLinkState": [
+                {
+                  "id": "wan1",
+                  "up": true
+                }
+              ]
+            },
+            {
+              "id": "dev-missing",
+              "name": "Unknown Socket",
+              "interfaces": [
+                {
+                  "id": "wan-missing",
+                  "name": "Unknown WAN"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "1002",
+          "connectivityStatus": "disconnected",
+          "degradedStatus": {
+            "isDegraded": false
+          },
+          "operationalStatus": "disabled",
+          "info": {
+            "name": "Toulouse Office",
+            "description": "Sud !"
+          },
+          "popName": "POP-Toulouse"
+        },
+        {
+          "id": "1003",
+          "connectivityStatus": "connected",
+          "degradedStatus": {
+            "isDegraded": true
+          },
+          "operationalStatus": "locked",
+          "info": {
+            "name": "Saint Girons Office",
+            "description": "Ariege"
+          },
+          "popName": "POP-Ariege"
+        }
+      ]
+    }
+  }
+}

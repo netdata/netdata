@@ -75,7 +75,9 @@ func mergeMetrics(metrics *catosdk.AccountMetrics, sites map[string]*siteState) 
 	return issues
 }
 
-func normalizeMetricsInterface(raw *catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces) (interfaceState, []string) {
+func normalizeMetricsInterface(
+	raw *catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces,
+) (interfaceState, []string) {
 	iface := interfaceState{
 		Name:           derefZero(raw.GetName()),
 		TunnelRemoteIP: derefZero(raw.GetRemoteIP()),
@@ -86,7 +88,6 @@ func normalizeMetricsInterface(raw *catosdk.AccountMetrics_AccountMetrics_Sites_
 		if iface.Name == "" {
 			iface.Name = derefZero(info.GetName())
 		}
-		iface.DestType = derefZero(info.GetDestType())
 		iface.UpstreamBandwidth = derefZero(info.GetUpstreamBandwidth())
 		iface.DownstreamBandwidth = derefZero(info.GetDownstreamBandwidth())
 	}
@@ -108,7 +109,10 @@ func normalizeMetricsInterface(raw *catosdk.AccountMetrics_AccountMetrics_Sites_
 	return iface, issues
 }
 
-func mergeRawInterfaceTrafficMetrics(base trafficMetrics, raw *catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces) (trafficMetrics, []string) {
+func mergeRawInterfaceTrafficMetrics(
+	base trafficMetrics,
+	raw *catosdk.AccountMetrics_AccountMetrics_Sites_Interfaces,
+) (trafficMetrics, []string) {
 	if raw == nil {
 		return base, nil
 	}
