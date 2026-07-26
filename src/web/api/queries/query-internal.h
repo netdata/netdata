@@ -109,9 +109,15 @@ void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *op
 // time aggregation: time_grouping_is_expression() lives with the grammar
 // it describes, in tg-expression.h
 
+// The hot path takes a bare value: every grouping except the four
+// condition ones needs nothing else, and building a point for them would
+// cost every query engine-wide. Only the condition groupings, which reason
+// about a stored window, take the richer point.
+void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, const RRDR_TIME_GROUPING add_flush);
+
 // defined in tg-expression.h, which the grouping modules include
 struct tg_point;
-void time_grouping_add(RRDR *r, const struct tg_point *p, const RRDR_TIME_GROUPING add_flush);
+void time_grouping_add_point(RRDR *r, const struct tg_point *p, const RRDR_TIME_GROUPING add_flush);
 NETDATA_DOUBLE time_grouping_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr, const RRDR_TIME_GROUPING add_flush);
 void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method);
 
