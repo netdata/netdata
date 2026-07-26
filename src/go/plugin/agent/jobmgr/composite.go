@@ -4,9 +4,14 @@ package jobmgr
 
 import (
 	"context"
+	"errors"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
+
+// ErrCompositeRecoveryUnresolved reports recovery work that did not reach a
+// terminal ownership state after its bounded context was cancelled.
+var ErrCompositeRecoveryUnresolved = errors.New("jobmgr composite: recovery child remained unresolved after cancellation")
 
 // PreparedCompositeResourceTransaction is a resource transaction whose Apply
 // phase may execute acknowledged child commands inside the parent's ordering
@@ -28,10 +33,9 @@ type CompositeResourceTransactionWork func(
 
 // CompositeCommandScope owns acknowledged child execution for one running
 // parent transaction. SubmitPreparedAndWait follows caller/parent
-// cancellation. SubmitRollbackAndWait and RollbackContext use one lazily
-// created, run-owned bounded rollback context.
+// cancellation. SubmitRecoveryAndWait uses the adapter-owned bounded recovery
+// context and remains eligible as an ownership continuation after cancellation.
 type CompositeCommandScope interface {
 	SubmitPreparedAndWait(context.Context, Request, WorkPlan) error
-	SubmitRollbackAndWait(Request, WorkPlan) error
-	RollbackContext() (context.Context, error)
+	SubmitRecoveryAndWait(context.Context, Request, WorkPlan) error
 }

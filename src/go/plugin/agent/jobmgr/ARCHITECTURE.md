@@ -175,6 +175,19 @@ flowchart TD
    acquired in a stable global key order and waiters are FIFO per key, so the
    design is deadlock-free and starvation-free.
    `claim_authority.go`.
+   A transaction may explicitly yield only its acquisition-suffix claim while
+   bounded preparation work runs, then must reacquire it before preparation
+   completes. Its resource lane remains active, so another command for the same
+   resource cannot overlap the yielded work. Reacquisition has priority over
+   ordinary waiters. A composite declares the resource lanes its children may
+   use. If one conflicts with an active yielder, the parent is parked before it
+   acquires any claim; an already-waiting parent releases its prefix claims.
+   Its original ticket is retained, while unrelated work remains serviceable on
+   the otherwise-free claim. This prevents both child/lane cycles and
+   head-of-line blocking. When a child of an already-running composite yields,
+   only the matching admission-fence claim is suspended; the parent's other
+   claims remain held. `claim_authority.go`, `claim_yield.go`,
+   `claim_yield_kernel.go`.
 5. **Run task** (off-loop): the actual blocking work — construct a collector,
    run autodetection, call a Function handler, stop a job — runs on a
    `TaskSupervisor` goroutine, never on the loop. `lifecycle/task.go`.
@@ -216,12 +229,51 @@ Two more facts that catch newcomers:
   publications. Netdata owns the global `config` Function that serves the tree
   and delegates per-config operations; go.d emits `CONFIG` object frames but
   never `FUNCTION GLOBAL "config"` or its withdrawal.
+- Go `CONFIG` emission fails closed at the shared `netdataapi` boundary. Bare
+  protocol identities remain strict; single-quoted metadata accepts ordinary
+  internal backslashes (including Windows paths) but rejects controls, the
+  quote delimiter, and a trailing escape that would consume the closing quote.
+
+### Config validation boundary
+
+External configuration is untrusted batch input. Production producers validate
+successfully decoded entries against the exact downstream contracts before
+process construction or WorkPlan submission:
+
+- the vnode file loader and DynCfg vnode adapter validate CONFIG identity and
+  source fields, host-emission metadata, daemon-compatible UUID syntax, and
+  semantic hostname/GUID uniqueness;
+- the secret-store file loader validates each fully stamped config, including
+  kind type and provider support, before passing accepted entries to a run
+  generation;
+- discovered collector proposals validate their final CONFIG job name and
+  source metadata before graph mutation.
+
+An invalid decoded file entry is reported and skipped; a YAML structural/type
+error may reject its containing file without stopping Job Manager. An invalid
+dynamic proposal is a typed proposal rejection and quarantined while sibling
+proposals continue.
+Strict constructor/controller checks remain as defensive invariant enforcement:
+programmatic state that bypasses a production producer is still rejected rather
+than silently normalized or recovered after admission.
 
 ## How the Job Manager Manages Jobs
 
 A **job** is one running collector instance: a module plus a resolved config.
 Jobs are created from stock/user config files at startup, from discovery, or
 from DynCfg commands, and are retried after a failed autodetection.
+
+### Configuration source ownership
+
+Go plugin configurations use one source order: **DynCfg > user > discovered >
+stock > internal/unknown**. Each domain keeps its own lifecycle authority, and
+the collector graph rechecks that order when committing a discovered change;
+candidate selection alone is not authoritative.
+
+A plugin-side DynCfg `add` is replay/upsert-capable because the daemon uses it
+to restore persisted configurations. Ordinary user duplicate adds remain
+create-only at the daemon boundary. Removal targets only the current DynCfg
+override and does not immediately reactivate a masked lower-priority source.
 
 The central guarantee is that **reconfiguring a job never disrupts the running
 one until the replacement is proven ready**. Think of a stage crew swapping
@@ -234,14 +286,14 @@ flowchart TD
     Cmd("add / update / discovered / retry")
     Validate("Validate config<br/>throwaway probe")
     Prepare("Prepare candidate<br/>construct + resolve secrets<br/>(current job still running)")
+    AutoD{"Managed autodetection<br/>yield global jobs claim"}
     Apply("Apply")
     StopOld("Stop + Finalize<br/>prior generation")
-    AutoD{"Managed autodetection<br/>AcceptStart"}
     Live("Start + Publish<br/>new generation live")
     Fail("Commit StatusFailed<br/>schedule retry")
 
-    Cmd --> Validate --> Prepare --> Apply --> StopOld --> AutoD
-    AutoD -->|"ok"| Live
+    Cmd --> Validate --> Prepare --> AutoD
+    AutoD -->|"ok"| Apply --> StopOld --> Live
     AutoD -->|"failed"| Fail
     Fail -. "logical clock due" .-> Prepare
 
@@ -261,12 +313,19 @@ flowchart TD
    *candidate* holding a long-lived resource permit. The current job keeps
    running.
    `joboutput/factory.go`, `joboutput/generation.go`.
-3. **Apply** — the kernel stops and finalizes the prior generation, then calls
-   `AcceptStart` on the candidate. `joboutput/transaction.go`.
-4. **Managed autodetection** — the candidate runs its `Check`/autodetect *after*
-   the old generation is gone. On success the job starts, publishes its
-   Functions, and begins emitting. On a clean failure the graph is committed
-   truthfully as `StatusFailed` (never a fake success) and a retry is scheduled.
+3. **Managed autodetection (non-disruptive)** — the candidate runs its
+   `Check`/autodetect with the caller's task context before acceptance and while
+   the old generation is still live. Job Manager propagates caller cancellation
+   but does not invent a module-agnostic deadline. The transaction temporarily
+   yields the global `dyncfg:jobs` claim but retains its resource lane, so
+   unrelated job-graph work may proceed without allowing a duplicate probe for
+   the same job. On a clean failure the graph is committed truthfully as
+   `StatusFailed` (never a fake success) and a retry is scheduled. Failed
+   candidates are rejected and cleaned before the yielded claim is reacquired,
+   so collector cleanup cannot retain the global claim.
+4. **Apply** — after a successful probe, the kernel stops and finalizes the
+   prior generation, accepts the candidate, starts it, and publishes its
+   Functions. `joboutput/transaction.go`.
 5. **Emitting** — the collector writes protocol frames through a `FrameWriter`,
    which commits whole frames through the one `FrameOwner`.
 
@@ -337,7 +396,13 @@ flowchart TD
 
 The resolver lives in `plugin/agent/secrets/resolver`; it never mutates the
 input config and returns `nil` on any error, so a half-resolved config can never
-reach a collector.
+reach a collector. Once a configuration containing secret references has been
+applied to a collector, Job Manager replaces lifecycle failures with a generic
+redacted error before logging or publishing them. The collector's own logger
+also sanitizes messages and newly attached attributes, so an internally logged
+request error cannot bypass the runtime boundary. Cancellation, DynCfg
+code/retryability, panic classification, and retained-ownership state survive;
+the raw collector cause does not.
 
 ### Changing a store restarts its jobs
 
@@ -349,8 +414,15 @@ generations** per `kind:name`:
    compare-and-swap against the expected generation.
 2. If any running jobs depend on that store key, they are restarted as **one
    composite command** — stop dependents → commit the new generation → start
-   dependents — all under the store's ordering/claim scope
-   (`dyncfg:secretstores`), so nothing else mutates those jobs in between.
+   dependents. The parent retains `dyncfg:dependency-graph` throughout. Each
+   start child temporarily yields only the `dyncfg:jobs` acquisition suffix
+   while its probe runs, so unrelated job-graph work may proceed while
+   dependency mutations remain fenced. Restart recovery has both a bounded
+   aggregate cancellation budget and a fair-share per-child cancellation
+   budget; those budgets bound cooperative collector work, but cannot forcibly
+   stop collector lifecycle code that ignores context. A timed-out child is
+   operational failure only after it reaches a known terminal ownership state;
+   unresolved admitted ownership makes the run dirty.
    `secrets/restart.go`, `secrets/transaction.go`.
 3. The superseded generation is retired only after its last reader scope drains,
    so an in-flight resolution never sees credentials vanish mid-read.
@@ -427,9 +499,12 @@ The rotation is an acknowledged sequence (`composition/process.go` `rotate`):
 4. Withdraw Function publications, close the catalog, cancel and join inherited
    work, stop long-lived resources, and run the finalizer — all executed inside
    the kernel loop.
-5. Require an **exact-zero authority census** (no active tasks, claims, permits,
-   or retained frame bytes). Any leftover marks the run **dirty** and fails the
-   handoff closed rather than silently proceeding.
+5. Require a fully **drained authority census** (no active tasks, claims,
+   permits, or retained frame bytes). A dirty-run-only abandonment may drain an
+   otherwise unjoinable child, but it is recorded by ownership category,
+   diagnosed, and can never satisfy clean quiescence. Any live leftover or
+   abandonment marks the terminal state **dirty** rather than silently claiming
+   a clean handoff.
 6. Construct, start, and adopt the next generation.
 
 **Termination** (SIGINT/SIGTERM) follows the same retirement path with no

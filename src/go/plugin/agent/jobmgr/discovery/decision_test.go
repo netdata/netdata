@@ -18,6 +18,7 @@ type decisionTestCensus struct {
 	sources      int
 	candidates   int
 	acknowledged int
+	pending      int
 	revision     uint64
 }
 
@@ -25,12 +26,135 @@ func decisionIndexCensus(index *DecisionIndex) decisionTestCensus {
 	census := decisionTestCensus{
 		sources:      len(index.sources),
 		acknowledged: len(index.acknowledged),
+		pending:      len(index.pending),
 		revision:     index.revision,
 	}
 	for _, candidates := range index.candidates {
 		census.candidates += len(candidates)
 	}
 	return census
+}
+
+func TestDecisionIndexQuarantinesTypedProposalAndContinuesBatch(t *testing.T) {
+	commands := &decisionTestCommands{}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+			if change.Config.Name() == "bad" {
+				return jobmgr.WorkPlan{}, jobmgr.RejectProposal(errors.New("unsupported discovered config"))
+			}
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	bad := decisionTestConfig("bad", confgroup.TypeStock, "source")
+	good := decisionTestConfig("good", confgroup.TypeStock, "source")
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "source",
+		Configs: []confgroup.Config{bad, good},
+	}}))
+	require.Len(t, commands.requests, 1)
+	require.Equal(t, good.FullName(), commands.requests[0].LaneKey)
+	require.Equal(t, good.UID(), index.acknowledged[good.FullName()].UID())
+	require.EqualValues(t, decisionTestCensus{
+		sources:      1,
+		candidates:   2,
+		acknowledged: 1,
+		pending:      1,
+		revision:     1,
+	}, decisionIndexCensus(index))
+}
+
+func TestDecisionIndexQuarantinesCloneFailureAndContinuesBatch(t *testing.T) {
+	commands := &decisionTestCommands{}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(DiscoveredChange) (jobmgr.WorkPlan, error) {
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	bad := decisionTestConfig("bad", confgroup.TypeStock, "source").
+		Set("unsupported", make(chan struct{}))
+	good := decisionTestConfig("good", confgroup.TypeStock, "source")
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "source",
+		Configs: []confgroup.Config{bad, good},
+	}}))
+	require.Len(t, commands.requests, 1)
+	require.Equal(t, good.FullName(), commands.requests[0].LaneKey)
+	require.NotContains(t, index.pending, bad.FullName())
+
+	fixed := decisionTestConfig("bad", confgroup.TypeStock, "source")
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "source",
+		Configs: []confgroup.Config{fixed, good},
+	}}))
+	require.Len(t, commands.requests, 2)
+	require.Equal(t, fixed.FullName(), commands.requests[1].LaneKey)
+	require.NotContains(t, index.pending, bad.FullName())
+}
+
+func TestDecisionIndexCloneFailureDoesNotSuppressValidSameNameCandidate(t *testing.T) {
+	good := decisionTestConfig("job", confgroup.TypeStock, "good")
+	bad := decisionTestConfig("job", confgroup.TypeUser, "bad").
+		Set("unsupported", make(chan struct{}))
+	groups := map[string]*confgroup.Group{
+		"good": {Source: "good", Configs: []confgroup.Config{good}},
+		"bad":  {Source: "bad", Configs: []confgroup.Config{bad}},
+	}
+	for _, order := range [][]string{{"good", "bad"}, {"bad", "good"}} {
+		t.Run(order[0]+" before "+order[1], func(t *testing.T) {
+			commands := &decisionTestCommands{}
+			index := newDecisionTestIndex(
+				t,
+				commands,
+				func(DiscoveredChange) (jobmgr.WorkPlan, error) {
+					return jobmgr.WorkPlan{}, nil
+				},
+			)
+
+			require.NoError(t, index.Apply(
+				context.Background(),
+				[]*confgroup.Group{groups[order[0]], groups[order[1]]},
+			))
+			require.Len(t, commands.requests, 1)
+			require.Equal(t, good.FullName(), commands.requests[0].LaneKey)
+			require.Equal(t, good.UID(), index.acknowledged[good.FullName()].UID())
+		})
+	}
+}
+
+func TestDecisionIndexRetainsAndRetriesRejectedRemoval(t *testing.T) {
+	commands := &decisionTestCommands{}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(DiscoveredChange) (jobmgr.WorkPlan, error) {
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	config := decisionTestConfig("job", confgroup.TypeStock, "source")
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "source",
+		Configs: []confgroup.Config{config},
+	}}))
+
+	commands.err = jobmgr.RejectProposal(errors.New("temporary proposal rejection"))
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{Source: "source"}}))
+	require.Contains(t, index.acknowledged, config.FullName())
+	require.EqualValues(t, decisionTestCensus{
+		acknowledged: 1,
+		pending:      1,
+		revision:     2,
+	}, decisionIndexCensus(index))
+
+	commands.err = nil
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{Source: "tick"}}))
+	require.NotContains(t, index.acknowledged, config.FullName())
+	require.EqualValues(t, decisionTestCensus{revision: 3}, decisionIndexCensus(index))
 }
 
 func TestDecisionIndexAcknowledgesSelectionAndFallback(t *testing.T) {
@@ -90,8 +214,44 @@ func TestDecisionIndexFailureKeepsLastAcknowledgedSelection(t *testing.T) {
 		sources:      2,
 		candidates:   2,
 		acknowledged: 1,
-		revision:     1,
+		revision:     2,
 	}, decisionIndexCensus(index))
+}
+
+func TestDecisionIndexRejectedHigherPrioritySelectionKeepsIncumbent(t *testing.T) {
+	rejectUser := true
+	commands := &decisionTestCommands{}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(change DiscoveredChange) (jobmgr.WorkPlan, error) {
+			if rejectUser && change.Config.SourceType() == confgroup.TypeUser {
+				return jobmgr.WorkPlan{}, jobmgr.RejectProposal(errors.New("invalid user config"))
+			}
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	stock := decisionTestConfig("job", confgroup.TypeStock, "stock")
+	user := decisionTestConfig("job", confgroup.TypeUser, "user")
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "stock",
+		Configs: []confgroup.Config{stock},
+	}}))
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
+		Source:  "user",
+		Configs: []confgroup.Config{user},
+	}}))
+	require.Equal(t, stock.UID(), index.acknowledged[stock.FullName()].UID())
+	require.Contains(t, index.pending, stock.FullName())
+
+	rejectUser = false
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{Source: "tick"}}))
+	require.Equal(t, user.UID(), index.acknowledged[user.FullName()].UID())
+	require.NotContains(t, index.pending, user.FullName())
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{Source: "user"}}))
+	require.Equal(t, stock.UID(), index.acknowledged[stock.FullName()].UID())
 }
 
 func TestDecisionIndexConfigurationPolicy(t *testing.T) {

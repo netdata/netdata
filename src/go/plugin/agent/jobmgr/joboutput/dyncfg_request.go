@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -124,7 +125,7 @@ func (dcjc *DynCfgJobController) parseConfig(
 	if config == nil {
 		return nil, newDynCfgFailure(400, "invalid configuration format: payload contains no configuration object")
 	}
-	if !validDynCfgProtocolField(request.CallerSource) {
+	if !netdataapi.ValidSingleQuotedProtocolField(request.CallerSource) {
 		return nil, newDynCfgFailure(400, "invalid Function source")
 	}
 	config.SetProvider(confgroup.TypeDyncfg)

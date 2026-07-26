@@ -136,6 +136,7 @@ func TestJobGenerationV1V2(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
+			require.NoError(t, prepared.Probe(context.Background()))
 			generation, err := prepared.Accept(context.Background(), 7)
 			require.NoError(t, err)
 
@@ -186,6 +187,7 @@ func TestJobGenerationPermitReturnLast(t *testing.T) {
 		},
 	)
 	require.NoError(t, err)
+	require.NoError(t, prepared.Probe(context.Background()))
 	generation, err := prepared.Accept(context.Background(), 1)
 	require.NoError(t, err)
 
@@ -250,6 +252,7 @@ func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
 				},
 			)
 			require.NoError(t, err)
+			require.NoError(t, prepared.Probe(context.Background()))
 			generation, err := prepared.Accept(context.Background(), 1)
 			require.NoError(t, err)
 			startErr := generation.Start(context.Background())
@@ -286,6 +289,60 @@ func TestJobLifecyclePanicsPreserveTaskClassification(t *testing.T) {
 			require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
 		})
 	}
+}
+
+func TestPreparedJobProbeOwnsResourcesThroughFailureClassification(t *testing.T) {
+	events := &jobEventLog{}
+	permit, tasks := issueTestJobPermit(t, "job", 1)
+	retryEntered := make(chan struct{})
+	allowRetry := make(chan struct{})
+	var releaseRetry sync.Once
+	release := func() {
+		releaseRetry.Do(func() {
+			close(allowRetry)
+		})
+	}
+	defer release()
+
+	prepared, err := prepareJob(
+		context.Background(),
+		"job",
+		1,
+		permit,
+		func(context.Context) (ConstructedJob, error) {
+			constructed := testConstructedJob(t, JobVariantV1, events)
+			constructed.autoDetection = func(context.Context) error {
+				return errors.New("probe failed")
+			}
+			constructed.retryAutoDetection = func() bool {
+				close(retryEntered)
+				<-allowRetry
+				return true
+			}
+			return constructed, nil
+		},
+	)
+	require.NoError(t, err)
+
+	probeDone := make(chan error, 1)
+	go func() {
+		probeDone <- prepared.Probe(context.Background())
+	}()
+
+	select {
+	case <-retryEntered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "probe did not enter failure classification")
+	}
+	disposeErr := prepared.Dispose(context.Background())
+	release()
+	probeErr := <-probeDone
+
+	require.ErrorContains(t, disposeErr, "probe is active")
+	require.ErrorContains(t, probeErr, "probe failed")
+	require.NoError(t, prepared.Dispose(context.Background()))
+	require.Equal(t, []string{"handler-close", "runtime-abort", "collector"}, events.snapshot())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
 func BenchmarkBJobFactoryCold(b *testing.B) {

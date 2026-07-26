@@ -156,21 +156,33 @@ func (c *Controller) prepareAdd(
 	input CommandInput,
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	_, exists := c.entry(target.key)
-	if current != nil || scope.Current.Valid() || exists {
-		return c.noopMessageWithPermit(
-			scope,
-			current,
-			permit,
-			409,
-			fmt.Sprintf("The specified secretstore '%s' already exists.", target.key),
-		)
-	}
 	config, err := c.configFromPayload(input, target)
 	if err != nil {
 		return c.noopMessageWithPermit(scope, current, permit, 400, msgInvalidSecretStoreConfig)
 	}
-	return c.prepareStoreMutation(ctx, scope, current, permit, config, 0, true)
+	entry, exists := c.entry(target.key)
+	expected := c.store.Generation(target.key)
+	if expected != 0 {
+		if !exists || current == nil || !scope.Current.Valid() {
+			return nil, errors.New("jobmgr secrets: active Store differs from command resource")
+		}
+	} else if current != nil || scope.Current.Valid() {
+		return nil, errors.New("jobmgr secrets: command resource has no active Store")
+	}
+	if expected != 0 &&
+		entry.status == dyncfg.StatusRunning &&
+		entry.config.SourceType() == confgroup.TypeDyncfg &&
+		entry.config.Hash() == config.Hash() {
+		return c.noop(
+			scope,
+			current,
+			permit,
+			mustSecretMessage(200, ""),
+			nil,
+			c.configCreateCleanup(entry),
+		)
+	}
+	return c.prepareStoreMutation(ctx, scope, current, permit, config, expected, expected == 0)
 }
 
 func (c *Controller) prepareUpdate(

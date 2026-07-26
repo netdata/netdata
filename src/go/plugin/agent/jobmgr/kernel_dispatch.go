@@ -117,6 +117,21 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 					}, prepareErr
 				}
 			}
+			if operation.plan.YieldClaimOnPrepare != "" {
+				prepare := transactionWork
+				lease := kernelClaimYieldLease{
+					kernel:    ck,
+					operation: operation,
+				}
+				transactionWork = func(
+					ctx context.Context,
+					current lifecycle.ReadyResource,
+					scope lifecycle.ResourceTransactionScope,
+					permit lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResourceTransaction, error) {
+					return prepare(withClaimYieldLease(ctx, lease), current, scope, permit)
+				}
+			}
 			var err error
 			if scope.Successor.Valid() {
 				taskPlan, err = lifecycle.NewResourceTransactionPermitTaskPlan(
@@ -146,7 +161,7 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 		requestRef, err := ck.tasks.Enqueue(taskClassForOperation(operation, lane), taskPlan)
 		if err != nil {
 			for _, grantedOperation := range ck.releaseClaims(operation) {
-				ck.markReady(grantedOperation.lane)
+				ck.completeClaimGrant(grantedOperation)
 			}
 			ck.markReady(lane)
 			return false

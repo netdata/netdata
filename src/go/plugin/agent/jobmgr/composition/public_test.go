@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +25,87 @@ func TestProductionProcessRejectsInvalidInitialVnodes(t *testing.T) {
 		vnodes map[string]*vnodes.VirtualNode
 	}{
 		"nil vnode": {vnodes: map[string]*vnodes.VirtualNode{"missing": nil}},
+		"source type with separator": {
+			vnodes: map[string]*vnodes.VirtualNode{
+				"node": {
+					Name:       "node",
+					Hostname:   "node",
+					GUID:       "11111111-1111-1111-1111-111111111111",
+					SourceType: "user type",
+					Source:     "file=/etc/netdata/vnodes.conf",
+				},
+			},
+		},
+		"hostname unsafe for host emission": {
+			vnodes: map[string]*vnodes.VirtualNode{
+				"node": {
+					Name:       "node",
+					Hostname:   "operator's-node",
+					GUID:       "11111111-1111-1111-1111-111111111111",
+					SourceType: confgroup.TypeUser,
+					Source:     "file=/etc/netdata/vnodes.conf",
+				},
+			},
+		},
+		"unsupported GUID spelling": {
+			vnodes: map[string]*vnodes.VirtualNode{
+				"node": {
+					Name:       "node",
+					Hostname:   "node",
+					GUID:       "urn:uuid:11111111-1111-1111-1111-111111111111",
+					SourceType: confgroup.TypeUser,
+					Source:     "file=/etc/netdata/vnodes.conf",
+				},
+			},
+		},
+		"semantically duplicate GUID": {
+			vnodes: map[string]*vnodes.VirtualNode{
+				"first": {
+					Name:       "first",
+					Hostname:   "first",
+					GUID:       "11111111-1111-1111-1111-111111111111",
+					SourceType: confgroup.TypeUser,
+					Source:     "file=/etc/netdata/vnodes.conf",
+				},
+				"second": {
+					Name:       "second",
+					Hostname:   "second",
+					GUID:       "11111111111111111111111111111111",
+					SourceType: confgroup.TypeUser,
+					Source:     "file=/etc/netdata/vnodes.conf",
+				},
+			},
+		},
+		"host label with trailing escape": {
+			vnodes: map[string]*vnodes.VirtualNode{
+				"node": {
+					Name:       "node",
+					Hostname:   "node",
+					GUID:       "11111111-1111-1111-1111-111111111111",
+					Labels:     map[string]string{"site": `value\`},
+					SourceType: confgroup.TypeUser,
+					Source:     "file=/etc/netdata/vnodes.conf",
+				},
+			},
+		},
+		"hostnames collide after host emission preparation": {
+			vnodes: map[string]*vnodes.VirtualNode{
+				"first": {
+					Name:       "first",
+					Hostname:   "host",
+					GUID:       "11111111-1111-1111-1111-111111111111",
+					SourceType: confgroup.TypeUser,
+					Source:     "file=/etc/netdata/vnodes.conf",
+				},
+				"second": {
+					Name:       "second",
+					Hostname:   " host ",
+					GUID:       "22222222-2222-2222-2222-222222222222",
+					SourceType: confgroup.TypeUser,
+					Source:     "file=/etc/netdata/vnodes.conf",
+				},
+			},
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -33,6 +116,57 @@ func TestProductionProcessRejectsInvalidInitialVnodes(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
+}
+
+func TestProductionProcessAcceptsIndividuallyValidatedVNodeLoad(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "vnodes.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(`
+- hostname: valid
+  guid: 11111111-1111-1111-1111-111111111111
+- hostname: bad=name
+  guid: 22222222-2222-2222-2222-222222222222
+`), 0o644))
+
+	initial := vnodes.Load(dir)
+	require.Len(t, initial, 1)
+	config := testProductionProcessConfig(strings.NewReader(""), io.Discard)
+	config.InitialVnodes = initial
+
+	_, err := NewProcess(config)
+	require.NoError(t, err)
+}
+
+func TestProductionProcessAcceptsCompactInitialVNodeGUID(t *testing.T) {
+	config := testProductionProcessConfig(strings.NewReader(""), io.Discard)
+	config.InitialVnodes = map[string]*vnodes.VirtualNode{
+		"node": {
+			Name:       "node",
+			Hostname:   "node",
+			GUID:       "11111111111111111111111111111111",
+			SourceType: confgroup.TypeUser,
+			Source:     "file=/etc/netdata/vnodes.conf",
+		},
+	}
+
+	_, err := NewProcess(config)
+	require.NoError(t, err)
+}
+
+func TestProductionProcessAcceptsWindowsInitialVNodeSource(t *testing.T) {
+	config := testProductionProcessConfig(strings.NewReader(""), io.Discard)
+	config.InitialVnodes = map[string]*vnodes.VirtualNode{
+		"node": {
+			Name:       "node",
+			Hostname:   "node",
+			GUID:       "11111111-1111-1111-1111-111111111111",
+			SourceType: confgroup.TypeUser,
+			Source:     `file=C:\Program Files\Netdata\vnodes.conf`,
+		},
+	}
+
+	_, err := NewProcess(config)
+	require.NoError(t, err)
 }
 
 func TestProductionProcessIsSingleUse(t *testing.T) {

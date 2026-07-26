@@ -3,12 +3,14 @@
 package sd
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
@@ -109,6 +111,46 @@ func TestServiceDiscovery_UnsupportedDiscovererConfigIsIgnored(t *testing.T) {
 		wantExposed:   []wantExposedCfg{},
 	}
 	sim.run(t)
+}
+
+func TestServiceDiscovery_WindowsSourcePathIsPublished(t *testing.T) {
+	const source = `C:\Program Files\Netdata\etc\netdata\sd\windows.conf`
+	sim := &discoverySimExt{
+		configs: []confFile{
+			prepareConfigFile(source, "windows"),
+		},
+		wantPipelines: []*mockPipeline{
+			{name: "windows", started: true, stopped: false},
+		},
+		wantExposed: []wantExposedCfg{{
+			discovererType: "net_listeners",
+			name:           "windows",
+			source:         source,
+			sourceType:     sourceTypeFromPath(source),
+			status:         dyncfg.StatusRunning,
+		}},
+		wantOutputContains: `'C:\Program Files\Netdata\etc\netdata\sd\windows.conf'`,
+	}
+	sim.run(t)
+}
+
+func TestServiceDiscovery_UnpublishableConfigDoesNotEnterStateOrWaitGate(t *testing.T) {
+	var output bytes.Buffer
+	discovery, err := NewServiceDiscovery(Config{
+		PluginName:   testPluginName,
+		DyncfgOutput: dyncfg.NewProtocolOutput(&output),
+		Discoverers:  testDiscovererRegistry(),
+	})
+	require.NoError(t, err)
+
+	discovery.addPipeline(
+		t.Context(),
+		prepareConfigFile("/etc/netdata/sd.d/operator.conf", "operator's"),
+	)
+
+	require.Zero(t, exposedCacheCount(discovery.exposed))
+	require.False(t, discovery.handler.WaitingForDecision())
+	require.Empty(t, output.String())
 }
 
 func prepareConfigFile(source, name string) confFile {

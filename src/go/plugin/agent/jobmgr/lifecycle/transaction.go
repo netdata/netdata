@@ -75,6 +75,16 @@ func (art AppliedResourceTransaction) ResultStatus() int {
 	return art.result.status
 }
 
+// Ownership returns the exact resource ownership described by the applied
+// transaction, including when Apply returned it alongside an error.
+func (art AppliedResourceTransaction) Ownership() (
+	ResourceTransactionScope,
+	ResourceTransactionDisposition,
+	ReadyResource,
+) {
+	return art.scope, art.disposition, art.current
+}
+
 func NewAppliedResourceTransaction(
 	scope ResourceTransactionScope,
 	disposition ResourceTransactionDisposition,

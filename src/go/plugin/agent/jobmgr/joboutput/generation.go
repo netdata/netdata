@@ -15,6 +15,7 @@ import (
 
 var (
 	ErrPreparedJobConsumed   = errors.New("job output: prepared job consumed")
+	ErrPreparedJobUnprobed   = errors.New("job output: prepared job was not probed")
 	ErrJobGenerationMismatch = errors.New("job output: job generation mismatch")
 )
 
@@ -96,10 +97,11 @@ type ConstructedJob struct {
 	Observer           lifecycle.RuntimeObserver   // runtime gauge sink for active-job accounting
 	CollectorCleanup   func(context.Context) error // opaque collector teardown; swapped reject->final on Accept
 	Variant            JobVariant                  // V1 or V2 collector shape
-	autoDetection      func(context.Context) error // managed auto-detection probe run during Accept
+	autoDetection      func(context.Context) error // managed auto-detection probe run before acceptance
 	autoDetectionEvery func() int                  // retry cadence (seconds) reported by the collector
 	finalCleanup       func(context.Context) error // Cleanup() variant installed once the job is accepted
 	retryAutoDetection func() bool                 // whether a failed auto-detection should be rescheduled
+	resolvedReferences bool                        // lifecycle failures may contain resolved secret values
 }
 
 func (cj ConstructedJob) validate() error {
@@ -116,6 +118,8 @@ type PreparedJob struct {
 type preparedJobState struct {
 	mu          sync.Mutex                // guards consumed
 	consumed    bool                      // the prepared job has been taken (accept/dispose/reject)
+	probing     bool                      // managed auto-detection is currently running
+	probed      bool                      // managed auto-detection completed successfully
 	id          string                    // job full name
 	generation  uint64                    // job generation this candidate targets
 	constructed ConstructedJob            // the assembled but not-yet-started job
@@ -224,33 +228,6 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 	if err != nil {
 		return nil, err
 	}
-	if state.constructed.autoDetection != nil {
-		if err := callJobLifecycle("collector autodetection", func() error {
-			return state.constructed.autoDetection(ctx)
-		}); err != nil {
-			failure := &autoDetectionFailure{
-				cause: err,
-			}
-			if state.constructed.retryAutoDetection != nil {
-				failure.retry = state.constructed.retryAutoDetection()
-			}
-			if state.constructed.autoDetectionEvery != nil {
-				failure.retryAfter = state.constructed.autoDetectionEvery()
-			}
-			if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
-				failure.coded = true
-				failure.code = coded.DyncfgCode()
-				if !dyncfg.IsRetryableError(err) {
-					failure.retry = false
-				}
-			}
-			cleanupErr := disposeConstructed(context.WithoutCancel(ctx), state.constructed, state.permit)
-			if cleanupErr != nil || ctx.Err() != nil {
-				return nil, errors.Join(err, cleanupErr)
-			}
-			return nil, failure
-		}
-	}
 	if state.constructed.finalCleanup != nil {
 		state.constructed.CollectorCleanup = state.constructed.finalCleanup
 	}
@@ -262,6 +239,47 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 		stopDone:   make(chan struct{}),
 		permit:     state.permit,
 	}, nil
+}
+
+func (pj PreparedJob) Probe(ctx context.Context) (result error) {
+	if ctx == nil || pj.state == nil {
+		return errors.New("job output: invalid prepared job probe")
+	}
+	state := pj.state
+	state.mu.Lock()
+	if state.consumed {
+		state.mu.Unlock()
+		return ErrPreparedJobConsumed
+	}
+	if state.probing || state.probed {
+		state.mu.Unlock()
+		return errors.New("job output: prepared job probe already started")
+	}
+	state.probing = true
+	probe := state.constructed.autoDetection
+	state.mu.Unlock()
+
+	defer func() {
+		state.mu.Lock()
+		state.probing = false
+		if result == nil {
+			state.probed = true
+		}
+		state.mu.Unlock()
+	}()
+
+	if probe != nil {
+		result = callJobLifecycle("collector autodetection", func() error {
+			return probe(ctx)
+		})
+	}
+	if result == nil {
+		return nil
+	}
+	if state.constructed.resolvedReferences {
+		result = redactResolvedLifecycleError(result)
+	}
+	return autoDetectionFailureFor(state.constructed, result)
 }
 
 func (pj PreparedJob) Dispose(ctx context.Context) error {
@@ -289,6 +307,9 @@ func (pj PreparedJob) validateLivePermit() error {
 	if pj.state.consumed {
 		return ErrPreparedJobConsumed
 	}
+	if pj.state.probing || !pj.state.probed {
+		return ErrPreparedJobUnprobed
+	}
 	return pj.state.permit.ValidateLive()
 }
 
@@ -300,6 +321,9 @@ func (pj PreparedJob) take() (*preparedJobState, error) {
 	defer pj.state.mu.Unlock()
 	if pj.state.consumed {
 		return nil, ErrPreparedJobConsumed
+	}
+	if pj.state.probing {
+		return nil, errors.New("job output: prepared job probe is active")
 	}
 	pj.state.consumed = true
 	return pj.state, nil
@@ -314,11 +338,37 @@ func (pj PreparedJob) takeForGeneration(generation uint64) (*preparedJobState, e
 	if pj.state.consumed {
 		return nil, ErrPreparedJobConsumed
 	}
+	if pj.state.probing {
+		return nil, errors.New("job output: prepared job probe is active")
+	}
 	if generation != pj.state.generation {
 		return nil, ErrJobGenerationMismatch
 	}
+	if !pj.state.probed {
+		return nil, ErrPreparedJobUnprobed
+	}
 	pj.state.consumed = true
 	return pj.state, nil
+}
+
+func autoDetectionFailureFor(constructed ConstructedJob, err error) *autoDetectionFailure {
+	failure := &autoDetectionFailure{
+		cause: err,
+	}
+	if constructed.retryAutoDetection != nil {
+		failure.retry = constructed.retryAutoDetection()
+	}
+	if constructed.autoDetectionEvery != nil {
+		failure.retryAfter = constructed.autoDetectionEvery()
+	}
+	if coded, ok := errors.AsType[dyncfg.CodedError](err); ok {
+		failure.coded = true
+		failure.code = coded.DyncfgCode()
+		if !dyncfg.IsRetryableError(err) {
+			failure.retry = false
+		}
+	}
+	return failure
 }
 
 type JobGeneration struct {
@@ -362,6 +412,9 @@ func (jg *JobGeneration) Start(ctx context.Context) error {
 	if err := callJobLifecycle("runtime Start", func() error {
 		return jg.resources.Runtime.Start(ctx)
 	}); err != nil {
+		if jg.resources.resolvedReferences {
+			err = redactResolvedLifecycleError(err)
+		}
 		cleanupErr := disposeConstructed(context.WithoutCancel(ctx), jg.resources, jg.permit)
 		state := JobAborted
 		if cleanupErr != nil {
@@ -390,6 +443,9 @@ func (jg *JobGeneration) Publish() error {
 	jg.mu.Unlock()
 	if handlers != nil {
 		if err := callJobLifecycle("job publication", handlers.Publish); err != nil {
+			if jg.resources.resolvedReferences {
+				err = redactResolvedLifecycleError(err)
+			}
 			jg.mu.Lock()
 			jg.state = JobReady
 			jg.mu.Unlock()
@@ -472,22 +528,34 @@ func (jg *JobGeneration) Stop(ctx context.Context) error {
 		if err := callJobLifecycle("handler close/drain", func() error {
 			return jg.resources.Handlers.CloseAndDrain(ctx)
 		}); err != nil {
+			if jg.resources.resolvedReferences {
+				err = redactResolvedLifecycleError(err)
+			}
 			return jg.finishStop(JobRetained, err)
 		}
 	}
 	if err := callJobLifecycle("runtime Stop", func() error {
 		return jg.resources.Runtime.Stop(ctx)
 	}); err != nil {
+		if jg.resources.resolvedReferences {
+			err = redactResolvedLifecycleError(err)
+		}
 		return jg.finishStop(JobRetained, err)
 	}
 	if err := callJobLifecycle("runtime post-cleanup release", func() error {
 		return jg.resources.Runtime.ReleaseAfterCleanup(ctx)
 	}); err != nil {
+		if jg.resources.resolvedReferences {
+			err = redactResolvedLifecycleError(err)
+		}
 		return jg.finishStop(JobRetained, err)
 	}
 	if err := callJobLifecycle("collector Cleanup", func() error {
 		return jg.resources.CollectorCleanup(ctx)
 	}); err != nil {
+		if jg.resources.resolvedReferences {
+			err = redactResolvedLifecycleError(err)
+		}
 		return jg.finishStop(JobRetained, err)
 	}
 	if err := callJobLifecycle("job external resource release", func() error {
@@ -576,10 +644,15 @@ func rejectConstructed(ctx context.Context, constructed ConstructedJob, permit l
 	return nil
 }
 
-func cleanupConstructed(ctx context.Context, constructed ConstructedJob) error {
+func cleanupConstructed(ctx context.Context, constructed ConstructedJob) (err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	defer func() {
+		if constructed.resolvedReferences {
+			err = redactResolvedLifecycleError(err)
+		}
+	}()
 	if constructed.Handlers != nil {
 		if err := callJobLifecycle("handler close/drain", func() error {
 			return constructed.Handlers.CloseAndDrain(ctx)

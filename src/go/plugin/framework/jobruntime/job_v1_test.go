@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/assert"
@@ -359,6 +360,59 @@ func TestJob_MainLoop_Panic(t *testing.T) {
 	assert.False(t, m.CleanupDone)
 	job.Cleanup()
 	assert.True(t, m.CleanupDone)
+}
+
+func TestJobSteadyStateCollectorPanicIsSanitizedBeforeLogging(t *testing.T) {
+	const marker = "resolved-v1-runtime-marker"
+	mod := &collectorapi.MockCollectorV1{
+		CollectFunc: func(context.Context) map[string]int64 {
+			panic(marker)
+		},
+	}
+	job := NewJob(JobConfig{
+		PluginName: pluginName, Name: jobName, ModuleName: modName,
+		FullName: modName + "_" + jobName, Module: mod, Out: io.Discard,
+		LifecycleErrorSanitizer: func(error) error {
+			return errors.New("sanitized collector failure")
+		},
+	})
+	var logs bytes.Buffer
+	captured := logger.NewWithWriter(&logs)
+	job.Logger = captured
+	mod.GetBase().Logger = captured
+
+	_ = job.collect()
+
+	require.NotContains(t, logs.String(), marker)
+	require.Contains(t, logs.String(), "sanitized collector failure")
+}
+
+func TestJobPostCheckFailureIsSanitizedBeforeEveryLog(t *testing.T) {
+	const marker = "resolved-v1-chart-marker"
+	mod := &collectorapi.MockCollectorV1{
+		ChartsFunc: func() *collectorapi.Charts {
+			return &collectorapi.Charts{
+				&collectorapi.Chart{
+					ID: marker + " invalid", Title: "title", Units: "units",
+				},
+			}
+		},
+	}
+	job := NewJob(JobConfig{
+		PluginName: pluginName, Name: jobName, ModuleName: modName,
+		FullName: modName + "_" + jobName, Module: mod, Out: io.Discard,
+		LifecycleErrorSanitizer: func(error) error {
+			return errors.New("sanitized chart failure")
+		},
+	})
+	var logs bytes.Buffer
+	captured := logger.NewWithWriter(&logs)
+	job.Logger = captured
+	mod.GetBase().Logger = captured
+
+	require.Error(t, job.AutoDetectionManaged(context.Background()))
+	require.NotContains(t, logs.String(), marker)
+	require.Contains(t, logs.String(), "sanitized chart failure")
 }
 
 func TestJob_OutputFailureDoesNotReportCollectorPanic(t *testing.T) {

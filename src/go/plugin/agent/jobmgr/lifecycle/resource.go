@@ -17,6 +17,23 @@ const (
 	TaskOutcomeAppliedResourceTransaction
 )
 
+func (kind TaskOutcomeKind) String() string {
+	switch kind {
+	case TaskOutcomeNone:
+		return "none"
+	case TaskOutcomeFrame:
+		return "frame"
+	case TaskOutcomeReadyResource:
+		return "ready resource"
+	case TaskOutcomePreparedResourceTransaction:
+		return "prepared resource transaction"
+	case TaskOutcomeAppliedResourceTransaction:
+		return "applied resource transaction"
+	default:
+		return "invalid"
+	}
+}
+
 type TaskOutcome struct {
 	kind        TaskOutcomeKind                // discriminant selecting which payload field is set
 	frame       SealedResult                   // sealed result (Frame / applied transaction) payload

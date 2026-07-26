@@ -4,6 +4,7 @@ package jobmgr
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
@@ -15,14 +16,16 @@ type WorkPlan struct {
 	NoResponse          bool                     // the command produces no terminal response frame
 	CooperativeCancel   bool                     // work honors cooperative cancellation
 	CooperativeDeadline bool                     // work honors the caller deadline
+	YieldClaimOnPrepare string                   // preparation may temporarily yield this acquisition-suffix claim
 }
 
 type ResourceTransactionPlan struct {
-	ID                string                                    // resource ID the transaction targets
-	AllocateSuccessor bool                                      // whether a successor resource is prepared
-	Permit            lifecycle.LongLivedPlan                   // long-lived permit for the successor
-	Prepare           lifecycle.PreparedResourceTransactionWork // single-resource transaction work
-	PrepareComposite  CompositeResourceTransactionWork          // composite (multi-resource) transaction work
+	ID                         string                                    // resource ID the transaction targets
+	AllocateSuccessor          bool                                      // whether a successor resource is prepared
+	Permit                     lifecycle.LongLivedPlan                   // long-lived permit for the successor
+	Prepare                    lifecycle.PreparedResourceTransactionWork // single-resource transaction work
+	PrepareComposite           CompositeResourceTransactionWork          // composite (multi-resource) transaction work
+	CompositeChildLaneConflict func(string) bool                         // whether a resource lane may be used by a child
 }
 
 func (wp WorkPlan) validate() error {
@@ -49,6 +52,19 @@ func (wp WorkPlan) validate() error {
 	}
 	if wp.Transaction.ID == "" || (wp.Transaction.Prepare == nil) == (wp.Transaction.PrepareComposite == nil) {
 		return errors.New("jobmgr kernel: invalid resource transaction plan")
+	}
+	if wp.Transaction.PrepareComposite == nil && wp.Transaction.CompositeChildLaneConflict != nil {
+		return errors.New("jobmgr kernel: plain transaction declares composite child lanes")
+	}
+	if wp.YieldClaimOnPrepare != "" &&
+		(wp.Transaction.Prepare == nil || !slices.Contains(wp.Claims, wp.YieldClaimOnPrepare)) {
+		return errors.New("jobmgr kernel: invalid claim-yielding transaction plan")
+	}
+	if wp.YieldClaimOnPrepare != "" {
+		claims, err := normalizeAuthorityClaims(wp.Claims)
+		if err != nil || len(claims) == 0 || claims[len(claims)-1] != wp.YieldClaimOnPrepare {
+			return errors.New("jobmgr kernel: yielded claim must be the acquisition suffix")
+		}
 	}
 	if wp.Transaction.AllocateSuccessor {
 		if err := wp.Transaction.Permit.Validate(); err != nil {

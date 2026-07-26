@@ -97,6 +97,19 @@ func (sdi *SecretDependencyIndex) Affected(storeKey string, runningOnly bool) []
 	return refs
 }
 
+func (sdi *SecretDependencyIndex) Affects(storeKey, id string, runningOnly bool) bool {
+	if sdi == nil || storeKey == "" || id == "" {
+		return false
+	}
+	sdi.mu.RLock()
+	defer sdi.mu.RUnlock()
+	if _, ok := sdi.byStore[storeKey][id]; !ok {
+		return false
+	}
+	dependency, ok := sdi.jobs[id]
+	return ok && (!runningOnly || dependency.running)
+}
+
 func (sdi *SecretDependencyIndex) commitJobChange(id string, next *jobDependency) {
 	sdi.mu.Lock()
 	defer sdi.mu.Unlock()

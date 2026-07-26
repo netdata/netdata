@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 )
@@ -136,6 +135,8 @@ func (fo *FrameOwner) ReleaseRunNotifications(generation uint64) error {
 	fo.onControlReady = nil
 	fo.onPoisoned = nil
 	fo.runtimeObserver = nil
+	fo.pendingControl = false
+	fo.available.Broadcast()
 	return nil
 }
 
@@ -520,7 +521,7 @@ func resultFrameSize(
 	payloadBytes, frameLimit, envelopeLimit, payloadLimit int,
 ) (frameBytes, envelopeBytes int, err error) {
 	if ValidateUID(uid) != nil || contentType == "" ||
-		strings.ContainsAny(contentType, " \t\r\n\x00") ||
+		!validPluginsDBareField(contentType) ||
 		status < 100 ||
 		status > 599 ||
 		expiry <= 0 {
@@ -606,5 +607,8 @@ func controlPayload(status ControlStatus) []byte {
 }
 
 func ExpiryAt(now time.Time) int64 {
-	return now.Unix()
+	if expiry := now.Unix(); expiry > 0 {
+		return expiry
+	}
+	return 1
 }

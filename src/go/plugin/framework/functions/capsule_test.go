@@ -210,6 +210,55 @@ func TestInputCapsulePayloadBoundariesAndResynchronization(t *testing.T) {
 	}
 }
 
+func TestInputCapsuleKeepsUnknownOrMalformedFunctionTextInPayload(t *testing.T) {
+	consumer := &recordingCapsuleConsumer{}
+	input := "FUNCTION_PAYLOAD raw 30 \"raw:echo\" 0xFFFF \"source\" application/yaml\n" +
+		"FUNCTION_X: value\n" +
+		"FUNCTION_CANCEL raw extra\n" +
+		"FUNCTION_PROGRESS raw extra\n" +
+		"FUNCTION malformed\n" +
+		"tail\nFUNCTION_PAYLOAD_END\n" +
+		"FUNCTION successor 30 \"perf:work\" 0xFFFF \"source\"\nQUIT\n"
+	capsule, err := NewInputCapsule(strings.NewReader(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := capsule.Run(context.Background(), consumer); err != nil {
+		t.Fatal(err)
+	}
+	if len(consumer.calls) != 2 {
+		t.Fatalf("payload flow stopped: calls=%#v rejections=%#v", consumer.calls, consumer.rejections)
+	}
+	wantPayload := "FUNCTION_X: value\n" +
+		"FUNCTION_CANCEL raw extra\n" +
+		"FUNCTION_PROGRESS raw extra\n" +
+		"FUNCTION malformed\n" +
+		"tail"
+	if consumer.calls[0].UID != "raw" || string(consumer.calls[0].Payload) != wantPayload ||
+		consumer.calls[1].UID != "successor" || len(consumer.rejections) != 0 || !consumer.quit {
+		t.Fatalf("payload flow differs: calls=%#v rejections=%#v quit=%v", consumer.calls, consumer.rejections, consumer.quit)
+	}
+}
+
+func TestInputCapsuleRejectsAbandonedPayloadBeforeValidResynchronization(t *testing.T) {
+	consumer := &recordingCapsuleConsumer{}
+	input := "FUNCTION_PAYLOAD abandoned 30 \"raw:echo\" 0xFFFF \"source\" application/octet-stream\n" +
+		"partial\n" +
+		"FUNCTION successor 30 \"perf:work\" 0xFFFF \"source\"\nQUIT\n"
+	capsule, err := NewInputCapsule(strings.NewReader(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := capsule.Run(context.Background(), consumer); err != nil {
+		t.Fatal(err)
+	}
+	if len(consumer.rejections) != 1 ||
+		consumer.rejections[0] != (recordedCapsuleRejection{uid: "abandoned", status: 400}) ||
+		len(consumer.calls) != 1 || consumer.calls[0].UID != "successor" || !consumer.quit {
+		t.Fatalf("resynchronization differs: calls=%#v rejections=%#v quit=%v", consumer.calls, consumer.rejections, consumer.quit)
+	}
+}
+
 type recordingCapsuleConsumer struct {
 	calls      []Call
 	rejections []recordedCapsuleRejection

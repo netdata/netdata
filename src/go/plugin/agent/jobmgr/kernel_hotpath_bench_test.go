@@ -9,9 +9,7 @@ import (
 
 func BenchmarkBCommandKernelLaneOps(b *testing.B) {
 	var ring readyQueue
-	lane := &commandLane{
-		source: lifecycle.SourceJobManager,
-	}
+	lane := &commandLane{}
 	b.ReportAllocs()
 	for b.Loop() {
 		ring.push(lane)
@@ -25,16 +23,12 @@ func BenchmarkBKernelMixedTurn(b *testing.B) {
 	kernel := &CommandKernel{
 		nextSource: lifecycle.SourceJobManager,
 	}
-	jobManagerLane := &commandLane{
-		source: lifecycle.SourceJobManager,
-	}
-	functionLane := &commandLane{
-		source: lifecycle.SourceFunction,
-	}
+	jobManagerLane := &commandLane{}
+	functionLane := &commandLane{}
 	b.ReportAllocs()
 	for b.Loop() {
-		kernel.ready[sourceIndex(jobManagerLane.source)].push(jobManagerLane)
-		kernel.ready[sourceIndex(functionLane.source)].push(functionLane)
+		kernel.ready[sourceIndex(lifecycle.SourceJobManager)].push(jobManagerLane)
+		kernel.ready[sourceIndex(lifecycle.SourceFunction)].push(functionLane)
 		if kernel.nextReadyLane() == nil || kernel.nextReadyLane() == nil {
 			require.FailNow(b, "benchmark failed", "mixed turn lost a ready lane")
 		}

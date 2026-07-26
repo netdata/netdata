@@ -253,6 +253,26 @@ func TestResolverStoreScopeLinear(t *testing.T) {
 	}
 }
 
+func TestStoreReferencesIgnoresNonStoreProviderReferences(t *testing.T) {
+	input := map[string]any{
+		"store":   "${store:vault:main:key}",
+		"env":     "${env:HOST}",
+		"file":    "${file:/run/secret}",
+		"cmd":     "${cmd:printf value}",
+		"custom":  "${custom:operand}",
+		"shell":   "${HOST:-localhost}",
+		"literal": "plain",
+	}
+
+	keys, err := StoreReferences(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(keys, []string{"vault:main"}) {
+		t.Fatalf("keys=%v", keys)
+	}
+}
+
 func BenchmarkBResolverTraversal(b *testing.B) {
 	resolver, err := NewAtomicResolver(map[string]AtomicProvider{
 		"test": AtomicProviderFunc(func(context.Context, string) ([]byte, error) {

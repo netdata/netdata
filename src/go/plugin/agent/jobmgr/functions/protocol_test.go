@@ -5,6 +5,7 @@ package functions
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -103,6 +104,35 @@ func TestFunctionPublicationFrameRejectsInjection(t *testing.T) {
 			require.EqualValues(t, 0, output.Len())
 		})
 	}
+}
+
+func TestFunctionPublicationFramesRespectPluginsDLineLimit(t *testing.T) {
+	registration := PublicationRecord{
+		Name:       "module:method",
+		Generation: 1,
+		Timeout:    1,
+		Tags:       "top",
+		Access:     "0x0000",
+	}
+	base, err := encodeFunctionRegistration(registration)
+	require.NoError(t, err)
+	registration.Help = strings.Repeat("h", maximumDeclarationMetadataBytes-(len(base)-2))
+	exact, err := encodeFunctionRegistration(registration)
+	require.NoError(t, err)
+	require.Len(t, exact, maximumDeclarationMetadataBytes+2)
+
+	registration.Help += "h"
+	_, err = encodeFunctionRegistration(registration)
+	require.Error(t, err)
+
+	const withdrawalOverhead = len(`FUNCTION_DEL GLOBAL ""`)
+	name := strings.Repeat("n", maximumDeclarationMetadataBytes-withdrawalOverhead)
+	exact, err = encodeFunctionWithdrawal(name)
+	require.NoError(t, err)
+	require.Len(t, exact, maximumDeclarationMetadataBytes+2)
+
+	_, err = encodeFunctionWithdrawal(name + "n")
+	require.Error(t, err)
 }
 
 func TestFunctionPublicationFrameCommitFailurePoisonsOwner(t *testing.T) {

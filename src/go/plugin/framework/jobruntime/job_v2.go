@@ -28,25 +28,26 @@ import (
 )
 
 type JobV2Config struct {
-	PluginName            string
-	Name                  string
-	ModuleName            string
-	FullName              string
-	Source                string
-	Module                collectorapi.CollectorV2
-	Labels                map[string]string
-	Out                   io.Writer
-	UpdateEvery           int
-	AutoDetectEvery       int
-	IsStock               bool
-	Vnode                 vnodes.VirtualNode
-	VnodeName             string
-	VnodeRevision         uint64
-	VnodeMetadataRevision uint64
-	VnodeLookup           VnodeLookup
-	VnodeRegistry         *vnoderegistry.Registry
-	FunctionOnly          bool
-	RuntimeService        runtimecomp.Service
+	PluginName              string
+	Name                    string
+	ModuleName              string
+	FullName                string
+	Source                  string
+	Module                  collectorapi.CollectorV2
+	Labels                  map[string]string
+	Out                     io.Writer
+	UpdateEvery             int
+	AutoDetectEvery         int
+	IsStock                 bool
+	Vnode                   vnodes.VirtualNode
+	VnodeName               string
+	VnodeRevision           uint64
+	VnodeMetadataRevision   uint64
+	VnodeLookup             VnodeLookup
+	VnodeRegistry           *vnoderegistry.Registry
+	FunctionOnly            bool
+	RuntimeService          runtimecomp.Service
+	LifecycleErrorSanitizer func(error) error
 }
 
 func NewJobV2(cfg JobV2Config) *JobV2 {
@@ -60,29 +61,30 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	}
 
 	j := &JobV2{
-		pluginName:            cfg.PluginName,
-		name:                  cfg.Name,
-		moduleName:            cfg.ModuleName,
-		fullName:              cfg.FullName,
-		updateEvery:           cfg.UpdateEvery,
-		autoDetectEvery:       cfg.AutoDetectEvery,
-		autoDetectTries:       infTries,
-		isStock:               cfg.IsStock,
-		functionOnly:          cfg.FunctionOnly,
-		module:                cfg.Module,
-		labels:                cloneLabels(cfg.Labels),
-		out:                   cfg.Out,
-		stopCtrl:              newStopController(),
-		tick:                  make(chan int),
-		buf:                   &buf,
-		api:                   netdataapi.New(&buf),
-		vnode:                 cfg.Vnode,
-		vnodeName:             cfg.VnodeName,
-		vnodeRevision:         cfg.VnodeRevision,
-		vnodeMetadataRevision: cfg.VnodeMetadataRevision,
-		vnodeLookup:           cfg.VnodeLookup,
-		vnodeRegistry:         registry,
-		runtimeService:        cfg.RuntimeService,
+		pluginName:              cfg.PluginName,
+		name:                    cfg.Name,
+		moduleName:              cfg.ModuleName,
+		fullName:                cfg.FullName,
+		updateEvery:             cfg.UpdateEvery,
+		autoDetectEvery:         cfg.AutoDetectEvery,
+		autoDetectTries:         infTries,
+		isStock:                 cfg.IsStock,
+		functionOnly:            cfg.FunctionOnly,
+		module:                  cfg.Module,
+		labels:                  cloneLabels(cfg.Labels),
+		out:                     cfg.Out,
+		stopCtrl:                newStopController(),
+		tick:                    make(chan int),
+		buf:                     &buf,
+		api:                     netdataapi.New(&buf),
+		vnode:                   cfg.Vnode,
+		vnodeName:               cfg.VnodeName,
+		vnodeRevision:           cfg.VnodeRevision,
+		vnodeMetadataRevision:   cfg.VnodeMetadataRevision,
+		vnodeLookup:             cfg.VnodeLookup,
+		vnodeRegistry:           registry,
+		runtimeService:          cfg.RuntimeService,
+		lifecycleErrorSanitizer: cfg.LifecycleErrorSanitizer,
 	}
 	if j.out == nil {
 		j.out = io.Discard
@@ -91,7 +93,11 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
 	j.Logger = log
 	if j.module != nil {
-		j.module.GetBase().Logger = log
+		moduleLog := log
+		if sanitize := lifecycleLogMessageSanitizer(cfg.LifecycleErrorSanitizer); sanitize != nil {
+			moduleLog = moduleLog.WithMessageSanitizer(sanitize)
+		}
+		j.module.GetBase().Logger = moduleLog
 		if vnode := j.module.VirtualNode(); vnode != nil {
 			*vnode = *cfg.Vnode.Copy()
 		}
@@ -113,7 +119,8 @@ type JobV2 struct {
 
 	*logger.Logger
 
-	module collectorapi.CollectorV2
+	module                  collectorapi.CollectorV2
+	lifecycleErrorSanitizer func(error) error
 
 	running atomic.Bool
 
@@ -328,10 +335,10 @@ func (j *JobV2) AutoDetectionManaged(ctx context.Context) (err error) {
 func (j *JobV2) autoDetection(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("panic %v", r)
+			err = sanitizeLifecycleError(j.lifecycleErrorSanitizer, fmt.Errorf("panic %v", r))
 			j.panicked.Store(true)
 			j.disableAutoDetection()
-			j.Errorf("PANIC %v", r)
+			j.Errorf("PANIC %v", err)
 			if logger.Level.Enabled(slog.LevelDebug) {
 				j.Errorf("STACK: %s", debug.Stack())
 			}
@@ -341,22 +348,25 @@ func (j *JobV2) autoDetection(ctx context.Context) (err error) {
 		j.Mute()
 	}
 
-	if err = j.init(ctx); err != nil {
-		j.Errorf("init failed: %v", err)
-		j.Unmute()
-		if !isRetryableError(err) {
+	if rawErr := j.init(ctx); rawErr != nil {
+		if !isRetryableError(rawErr) {
 			j.disableAutoDetection()
 		}
+		err = sanitizeLifecycleError(j.lifecycleErrorSanitizer, rawErr)
+		j.Errorf("init failed: %v", err)
+		j.Unmute()
 		return err
 	}
-	if err = j.check(ctx); err != nil {
+	if rawErr := j.check(ctx); rawErr != nil {
+		err = sanitizeLifecycleError(j.lifecycleErrorSanitizer, rawErr)
 		j.Errorf("check failed: %v", err)
 		j.Unmute()
 		return err
 	}
 	j.Unmute()
 	j.Info("check success")
-	if err = j.postCheck(); err != nil {
+	if rawErr := j.postCheck(); rawErr != nil {
+		err = sanitizeLifecycleError(j.lifecycleErrorSanitizer, rawErr)
 		j.Errorf("postCheck failed: %v", err)
 		j.disableAutoDetection()
 		return err
@@ -434,8 +444,8 @@ func (j *JobV2) runCollectorRunner(ctx context.Context, runner collectorapi.Coll
 	defer func() {
 		if r := recover(); r != nil {
 			j.panicked.Store(true)
-			err = fmt.Errorf("panic %v", r)
-			j.Errorf("PANIC: %v", r)
+			err = sanitizeLifecycleError(j.lifecycleErrorSanitizer, fmt.Errorf("panic %v", r))
+			j.Errorf("PANIC: %v", err)
 			if logger.Level.Enabled(slog.LevelDebug) {
 				j.Errorf("STACK: %s", debug.Stack())
 			}
@@ -446,7 +456,7 @@ func (j *JobV2) runCollectorRunner(ctx context.Context, runner collectorapi.Coll
 	if err != nil && ctx.Err() != nil && errors.Is(err, ctx.Err()) {
 		return nil
 	}
-	return err
+	return sanitizeLifecycleError(j.lifecycleErrorSanitizer, err)
 }
 
 func (j *JobV2) waitCollectorRunner(ctx context.Context, done <-chan error) {
@@ -603,7 +613,8 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 			}
 			j.abortPreparedEmission(prepared)
 			j.panicked.Store(true)
-			j.Errorf("PANIC: %v", r)
+			err := sanitizeLifecycleError(j.lifecycleErrorSanitizer, fmt.Errorf("panic %v", r))
+			j.Errorf("PANIC: %v", err)
 			if logger.Level.Enabled(slog.LevelDebug) {
 				j.Errorf("STACK: %s", debug.Stack())
 			}
@@ -615,6 +626,7 @@ func (j *JobV2) collectAndEmit(sinceLastRun int) (prepared jobV2PreparedEmission
 	if err := j.module.Collect(j.moduleContext()); err != nil {
 		j.cycle.AbortCycle()
 		cycleOpen = false
+		err = sanitizeLifecycleError(j.lifecycleErrorSanitizer, err)
 		j.Warningf("collect failed: %v", err)
 		return jobV2PreparedEmission{}, false
 	}

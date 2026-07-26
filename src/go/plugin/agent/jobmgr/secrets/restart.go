@@ -7,10 +7,16 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+)
+
+const (
+	defaultDependentRestartChildTimeout = 20 * time.Second
+	maximumDependentRestartBudget       = 2 * time.Minute
 )
 
 // SecretRestartCommand serializes acknowledged dependent stop, Store commit,
@@ -23,6 +29,8 @@ type SecretRestartCommand struct {
 	jobs         DependentJobPort          // port used to stop/start dependent jobs
 	diagnostics  jobmgr.DiagnosticObserver // operational log sink
 	nextUID      uint64                    // next child-command UID to assign
+	childTimeout time.Duration             // maximum recovery work time for one dependent
+	budgetLimit  time.Duration             // aggregate recovery budget ceiling
 }
 
 func NewSecretRestartCommand(
@@ -39,6 +47,8 @@ func NewSecretRestartCommand(
 		dependencies: dependencies,
 		jobs:         jobs,
 		diagnostics:  diagnostics,
+		childTimeout: defaultDependentRestartChildTimeout,
+		budgetLimit:  maximumDependentRestartBudget,
 	}, nil
 }
 
@@ -122,7 +132,15 @@ func (src *SecretRestartCommand) start(
 	failures := make([]string, 0)
 	var integrityErr error
 	var operationalErr error
-	for _, id := range ids {
+	if len(ids) == 0 {
+		return failures, nil, nil
+	}
+	recoveryCtx, cancelRecovery := context.WithTimeout(
+		context.Background(),
+		src.aggregateRestartBudget(len(ids)),
+	)
+	defer cancelRecovery()
+	for index, id := range ids {
 		display := displayByID[id]
 		if display == "" {
 			display = id
@@ -133,8 +151,16 @@ func (src *SecretRestartCommand) start(
 			failures = append(failures, display)
 			continue
 		}
-		if err := src.submit(context.Background(), commands, id, "start", plan, true); err != nil {
-			integrityErr = errors.Join(integrityErr, err)
+		childCtx, cancelChild := src.childRestartContext(recoveryCtx, len(ids)-index)
+		err = src.submit(childCtx, commands, id, "start", plan, true)
+		cancelChild()
+		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) &&
+				!errors.Is(err, jobmgr.ErrCompositeRecoveryUnresolved) {
+				operationalErr = errors.Join(operationalErr, err)
+			} else {
+				integrityErr = errors.Join(integrityErr, err)
+			}
 			failures = append(failures, display)
 			continue
 		}
@@ -146,13 +172,40 @@ func (src *SecretRestartCommand) start(
 	return failures, integrityErr, operationalErr
 }
 
+func (src *SecretRestartCommand) aggregateRestartBudget(count int) time.Duration {
+	if src == nil || count <= 0 || src.childTimeout <= 0 || src.budgetLimit <= 0 {
+		return 0
+	}
+	if count > int(src.budgetLimit/src.childTimeout) {
+		return src.budgetLimit
+	}
+	return min(time.Duration(count)*src.childTimeout, src.budgetLimit)
+}
+
+func (src *SecretRestartCommand) childRestartContext(
+	parent context.Context,
+	remainingChildren int,
+) (context.Context, context.CancelFunc) {
+	timeout := src.childTimeout
+	if deadline, ok := parent.Deadline(); ok && remainingChildren > 0 {
+		fairShare := time.Until(deadline) / time.Duration(remainingChildren)
+		timeout = min(timeout, fairShare)
+	}
+	if timeout <= 0 {
+		ctx, cancel := context.WithCancel(parent)
+		cancel()
+		return ctx, cancel
+	}
+	return context.WithTimeout(parent, timeout)
+}
+
 func (src *SecretRestartCommand) submit(
 	ctx context.Context,
 	commands jobmgr.CompositeCommandScope,
 	id string,
 	phase string,
 	plan jobmgr.WorkPlan,
-	rollback bool,
+	recovery bool,
 ) error {
 	src.mu.Lock()
 	src.nextUID++
@@ -167,8 +220,8 @@ func (src *SecretRestartCommand) submit(
 		Source:  lifecycle.SourceJobManager,
 		Route:   "internal/secrets/" + phase,
 	}
-	if rollback {
-		return commands.SubmitRollbackAndWait(request, plan)
+	if recovery {
+		return commands.SubmitRecoveryAndWait(ctx, request, plan)
 	}
 	return commands.SubmitPreparedAndWait(ctx, request, plan)
 }

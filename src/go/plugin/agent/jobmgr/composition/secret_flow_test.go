@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -17,8 +19,127 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRunGenerationStartsWithIndividuallyValidatedFileSecretConfigs(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "etc", "netdata", "go.d")
+	path := filepath.Join(root, "ss", "custom.conf")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(`
+jobs:
+  - name: valid
+    kind: vault
+    value: initial
+  - name: inferred_unknown
+    value: ignored
+  - name: non_string_kind
+    kind: 123
+    value: ignored
+`), 0o644))
+
+	initial, loadErrs := secretstore.LoadFileConfigs([]string{root})
+	started := make(chan struct{}, 1)
+	modules := collectorapi.Registry{
+		"module": {
+			Create: func() collectorapi.CollectorV1 {
+				return &collectorapi.MockCollectorV1{
+					InitFunc: func(context.Context) error {
+						started <- struct{}{}
+						return nil
+					},
+					ChartsFunc: func() *collectorapi.Charts {
+						return &collectorapi.Charts{
+							&collectorapi.Chart{
+								ID:    "chart",
+								Title: "chart",
+								Units: "value",
+								Dims: collectorapi.Dims{&collectorapi.Dim{
+									ID: "value",
+								}},
+							},
+						}
+					},
+					CollectFunc: func(context.Context) map[string]int64 {
+						return map[string]int64{"value": 1}
+					},
+				}
+			},
+			Config: func() any {
+				return &collectorapi.MockConfiguration{}
+			},
+			JobConfigSchema: collectorapi.MockConfigSchema,
+		},
+	}
+	jobConfig := confgroup.Config{
+		"module":        "module",
+		"name":          "unrelated",
+		"update_every":  1,
+		"function_only": false,
+		"option_str":    "work",
+		"option_int":    1,
+	}
+	jobConfig.SetProvider(confgroup.TypeUser)
+	jobConfig.SetSourceType(confgroup.TypeUser)
+	jobConfig.SetSource("file=test")
+	creators, err := secretstore.NewCreatorCatalog(
+		[]secretstore.Creator{{
+			Kind:   secretstore.KindVault,
+			Schema: `{}`,
+			Create: func() secretstore.Store {
+				return &processSecretStore{}
+			},
+		}},
+	)
+	require.NoError(t, err)
+	jobs := testRunJobServices(t)
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
+	jobs.StoreCreators = creators
+	output := newProcessSynchronizedBuffer()
+	frames, err := lifecycle.NewFrameOwner(output)
+	require.NoError(t, err)
+	uids := lifecycle.NewUIDLedger()
+	generation, err := newRunGeneration(runGenerationConfig{
+		Generation:      1,
+		ShutdownTimeout: time.Second,
+		UIDs:            uids,
+		Frames:          frames,
+		Modules:         modules,
+		Jobs:            jobs,
+		Secrets: runSecretServices{
+			Initial: initial,
+		},
+		Discovery: testRunDiscoveryServices(t, jobConfig),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		generation.Stop()
+		require.NoError(t, generation.Wait(context.Background()))
+		closeRunTestUIDs(t, uids)
+	})
+
+	require.NoError(t, generation.start(context.Background()))
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "unrelated collector did not start")
+	}
+	require.Eventually(t, func() bool {
+		record, ok := generation.vnodes.graph.Lookup(jobConfig.FullName())
+		return ok && record.Status == dyncfg.StatusRunning.String()
+	}, time.Second, time.Millisecond)
+
+	require.Len(t, initial, 1)
+	require.Len(t, loadErrs, 2)
+	require.Contains(t, output.String(), "CONFIG go.d:secretstore:vault:valid create running job")
+	require.Contains(t, output.String(), "CONFIG go.d:collector:module:unrelated create running job")
+	require.NotContains(t, output.String(), "inferred_unknown")
+	require.NotContains(t, output.String(), "non_string_kind")
+	require.NoError(t, generation.run.DirtyCause())
+}
 
 func TestProcessCoreSecretUpdateDependentRestart(t *testing.T) {
 	tests := map[string]struct {
@@ -32,12 +153,20 @@ func TestProcessCoreSecretUpdateDependentRestart(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			testProcessCoreSecretUpdateDependentRestart(t, test.restartErr)
+			testProcessCoreSecretMutationDependentRestart(t, "update", test.restartErr)
 		})
 	}
 }
 
-func testProcessCoreSecretUpdateDependentRestart(t *testing.T, restartErr error) {
+func TestProcessCoreSecretAddReplayDependentRestart(t *testing.T) {
+	testProcessCoreSecretMutationDependentRestart(t, "add", nil)
+}
+
+func testProcessCoreSecretMutationDependentRestart(
+	t *testing.T,
+	command string,
+	restartErr error,
+) {
 	t.Helper()
 	starts := make(chan string, 4)
 	var cleanups atomic.Int32
@@ -49,10 +178,12 @@ func testProcessCoreSecretUpdateDependentRestart(t *testing.T, restartErr error)
 						cleanups.Add(1)
 					},
 				}
-				collector.InitFunc = func(context.Context) error {
+				collector.InitFunc = func(ctx context.Context) error {
 					starts <- collector.Config.OptionStr
-					if collector.Config.OptionStr == "replacement" && restartErr != nil {
-						return restartErr
+					if collector.Config.OptionStr == "replacement" {
+						if restartErr != nil {
+							return restartErr
+						}
 					}
 					return nil
 				}
@@ -142,10 +273,15 @@ func testProcessCoreSecretUpdateDependentRestart(t *testing.T, restartErr error)
 		require.FailNowf(t, "test failed", "collector did not start with initial secret; output=%q", output.String())
 	}
 
+	uid := "secret-" + command
+	target := "go.d:secretstore:vault:main update"
+	if command == "add" {
+		target = "go.d:secretstore:vault add main"
+	}
 	_, writeStringErr := io.WriteString(
 		writer,
-		"FUNCTION_PAYLOAD secret-update 30 "+
-			"\"config go.d:secretstore:vault:main update\" "+
+		"FUNCTION_PAYLOAD "+uid+" 30 "+
+			"\"config "+target+"\" "+
 			"0xFFFF \"user=test\" application/json\n"+
 			"{\"value\":\"replacement\"}\n"+
 			"FUNCTION_PAYLOAD_END\n",
@@ -153,7 +289,7 @@ func testProcessCoreSecretUpdateDependentRestart(t *testing.T, restartErr error)
 	require.NoError(t, writeStringErr)
 
 	waitSecretStart(t, starts, "replacement")
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-update 200 application/json")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN "+uid+" 200 application/json")
 	if restartErr == nil {
 		require.EqualValues(t, 1, cleanups.Load())
 	} else {
@@ -161,6 +297,11 @@ func testProcessCoreSecretUpdateDependentRestart(t *testing.T, restartErr error)
 		wire := output.String()
 		require.Contains(t, wire, "dependent collector restarts failed for jobs: module:job")
 		require.NotContains(t, wire, "backend-sensitive-detail")
+	}
+	select {
+	case err := <-done:
+		require.FailNowf(t, "test failed", "process stopped after operational restart failure: %v", err)
+	default:
 	}
 
 	commands <- testProcessControl(processTerminate)
@@ -411,7 +552,7 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	}
 }
 
-func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(t *testing.T) {
+func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 	restartEntered := make(chan struct{})
 	releaseRestart := make(chan struct{})
 	var releaseOnce sync.Once
@@ -528,14 +669,11 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(t *testing.T) {
 	)
 	require.NoError(t, writeStringErr2)
 
-	waitActiveUIDs(t, process.uids, 2)
-
-	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN job-add")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN job-add 202 application/json")
+	output.waitContains(t, "CONFIG go.d:collector:module:other create accepted job")
 
 	releaseOnce.Do(func() { close(releaseRestart) })
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-rotation 200 application/json")
-	output.waitContains(t, "FUNCTION_RESULT_BEGIN job-add 202 application/json")
-	output.waitContains(t, "CONFIG go.d:collector:module:other create accepted job")
 
 	commands <- testProcessControl(processTerminate)
 	select {
@@ -543,25 +681,6 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(t *testing.T) {
 		require.NoError(t, err)
 	case <-time.After(3 * time.Second):
 		require.FailNow(t, "test failed", "process did not terminate")
-	}
-}
-
-func waitActiveUIDs(t *testing.T, uids *lifecycle.UIDLedger, want int) {
-	t.Helper()
-	timeout := time.NewTimer(3 * time.Second)
-	defer timeout.Stop()
-	tick := time.NewTicker(time.Millisecond)
-	defer tick.Stop()
-	for {
-		active, _, _ := uids.Census()
-		if active >= want {
-			return
-		}
-		select {
-		case <-tick.C:
-		case <-timeout.C:
-			require.FailNowf(t, "test failed", "active UIDs=%d want at least %d", active, want)
-		}
 	}
 }
 

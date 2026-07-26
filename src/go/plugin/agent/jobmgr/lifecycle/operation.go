@@ -155,6 +155,38 @@ func (og *OperationGeneration) TerminationPending(ref TaskRef, sequence uint8) e
 	return nil
 }
 
+// AbandonChild is the dirty-run-only route that joins a parked child without
+// pretending its normal action protocol completed.
+func (og *OperationGeneration) AbandonChild(ref TaskRef, sequence uint8) error {
+	if og.Task != ref || !ref.Valid() || sequence == 0 ||
+		og.Child < ChildExecuting || og.Child > ChildTerminationPending {
+		return errors.New("jobmgr operation: invalid child abandonment")
+	}
+	switch og.Child {
+	case ChildExecuting:
+		if sequence <= og.childPhase || sequence > og.childPhase+2 {
+			return errors.New("jobmgr operation: invalid executing-child abandonment sequence")
+		}
+	case ChildResultReady, ChildActionAcknowledged:
+		if sequence != og.childPhase+1 {
+			return errors.New("jobmgr operation: invalid parked-child abandonment sequence")
+		}
+	case ChildActionPending:
+		if sequence != og.childPhase && sequence != og.childPhase+1 {
+			return errors.New("jobmgr operation: invalid pending-child abandonment sequence")
+		}
+	case ChildTerminationPending:
+		if sequence != og.childPhase {
+			return errors.New("jobmgr operation: invalid terminating-child abandonment sequence")
+		}
+	default:
+		return errors.New("jobmgr operation: invalid child abandonment state")
+	}
+	og.Child = ChildTerminationPending
+	og.childPhase = sequence
+	return nil
+}
+
 func (og *OperationGeneration) ChildExited(ref TaskRef, sequence uint8) error {
 	if og.Child != ChildTerminationPending || og.Task != ref || sequence != og.childPhase {
 		return errors.New("jobmgr operation: stale child exit")
