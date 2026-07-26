@@ -103,12 +103,21 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 	}
 
 	// the counting groupings answer at most once per stored window, however
-	// many buckets that window was delivered into
+	// many buckets that window was delivered into - and they answer in
+	// every one of those buckets.
+	//
+	// "counted once" and "answered everywhere" are different contracts and
+	// both have to hold. A bucket a wide point covers on its own carries no
+	// occurrence, but it is not EMPTY either: nothing happened there, which
+	// is a zero. Returning EMPTY instead punches holes into a chart wherever
+	// the user zooms past the stored resolution.
 	for _, group := range []string{"number-of-times", "number-of-flaps"} {
 		col := query(group, "==0")
 		perStored := map[int64]float64{}
+		empty := 0
 		for _, pt := range col {
 			if pt.Value == nil {
+				empty++
 				continue
 			}
 			perStored[tierWindowEnd(pt.T, tier1Gran)] += *pt.Value
@@ -118,6 +127,10 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 				"%s totalled %v across the buckets of the stored window ending %d, want at most 1",
 				group, total, end)
 		}
+		check(empty == 0,
+			"%s left %d of %d buckets EMPTY — the buckets a wide stored point covers on its own "+
+				"report 'nothing here' instead of 'nothing happened'",
+			group, empty, len(col))
 	}
 
 	expectAgentStatus(t, "CASE-023/redelivery", ok)
