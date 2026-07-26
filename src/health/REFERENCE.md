@@ -596,6 +596,34 @@ lookup: METHOD(GROUPING OPTIONS) AFTER [at BEFORE] [every DURATION] [OPTIONS] [o
 | `OPTIONS`          | Processing modifiers        | See options table below                                                                    |
 | `of DIMENSIONS`    | Which dimensions to include | Comma- or pipe-separated list, supports patterns; prefer `user,system` over `user, system` |
 
+
+**Processing Options:**
+
+| Option        | Effect                                                                                             |
+|---------------|----------------------------------------------------------------------------------------------------|
+| `percentage`  | Calculate percentage of selected dimensions over total                                             |
+| `absolute`    | Turn all sample values positive                                                                    |
+| `min`         | Return minimum of all dimensions after time-aggregation                                            |
+| `max`         | Return maximum of all dimensions after time-aggregation                                            |
+| `average`     | Return average of all dimensions after time-aggregation                                            |
+| `sum`         | Return sum of all dimensions (default)                                                             |
+| `min2max`     | Return delta between min and max of dimensions                                                     |
+| `unaligned`   | Prevent shifting query window to multiples of duration                                             |
+| `anomaly-bit` | Query anomaly-rate percentages (0-100) instead of raw values, enabling anomaly-rate-based alerting |
+| `match-ids`   | Match dimensions by IDs (default)                                                                  |
+| `match-names` | Match dimensions by names                                                                          |
+
+When `anomaly-bit` is used, each data point returns the anomaly rate as a percentage from 0 to 100. At native resolution this is typically 0 (normal) or 100 (anomalous), while aggregated or lower-resolution data can yield intermediate values such as 12.5. For more details and practical examples, see the [ML anomaly detection documentation](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md).
+
+**Example:**
+
+```text
+lookup: average -10m unaligned of user,system,softirq,irq,guest
+```
+
+This looks back 10 minutes, calculates the average of the specified CPU dimensions, without aligning to time boundaries.
+
+
 **Fleet queries:**
 
 Four grouping methods answer a question *about* the samples rather than
