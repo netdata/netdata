@@ -152,7 +152,8 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_add_array_item_string(buffer, "coefficient-of-variation");    // relative standard deviation (cv)
         buffer_json_add_array_item_string(buffer, "ema");  // exponential moving average (alias "ses" or "ewma")
         buffer_json_add_array_item_string(buffer, "des");  // double exponential smoothing
-        buffer_json_add_array_item_string(buffer, "percentage-of-samples");  // takes a condition; "countif" is an alias
+        buffer_json_add_array_item_string(buffer, "percentage-of-samples");  // takes a condition
+        buffer_json_add_array_item_string(buffer, "countif");  // the historical name of percentage-of-samples, still accepted
         buffer_json_add_array_item_string(buffer, "percentage-of-time");  // takes a condition
         buffer_json_add_array_item_string(buffer, "number-of-flaps");  // takes a condition
         buffer_json_add_array_item_string(buffer, "number-of-times");  // takes a condition
