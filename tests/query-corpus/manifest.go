@@ -221,6 +221,14 @@ var manifest = map[string]ManifestCase{
 		Proves: "ABOVE tier 0 a stored point is min/max/avg over many samples, not a sample: percentage-of-time estimates the share of each stored window that satisfied the condition with the two-point mass model (weight(max) = (avg-min)/(max-min)), which is EXACT for a 0/1 availability signal because there the average IS the fraction of time at 1 — so up% and down% of a mixed window sum to 100 instead of both answering 'never', which is what evaluating the condition on the stored average does; a mixed window counts one flap and at most one occurrence (no ordering survives the rollup); percentage-of-samples keeps its historical tier behaviour",
 		Agent:  Red,
 	},
+	"CASE-023/trailing-gaps": {
+		Proves: "a condition that names a gap keeps accounting to the END of the requested window: the query engine stops walking a few buckets after a dimension's storage is exhausted and lets the caller fill the rest with EMPTY, which is the same answer for every other aggregation but silently truncates an outage for `==gap` - a dimension that stops being collected while its chart keeps going must read 100% gap for every remaining bucket, not for eleven of them",
+		Agent:  Red,
+	},
+	"CASE-023/gap-weight": {
+		Proves: "a gap counts in stored SLOTS, not seconds: percentage-of-samples weighs uncollected time against the collection interval, so on a 10s metric a 100s hole is ten missing samples and not a hundred - measuring it against the query grid (1s for an ordinary query) would let one missing slot outweigh ten collected ones",
+		Agent:  Red,
+	},
 	"CASE-023/tier-wide-point": {
 		Proves: "when the view grid is FINER than the stored data — a dashboard zoomed into a window only tier 1 still covers — a stored point is re-delivered to every bucket it spans, carrying its original start and an interpolated value; the share of time answers the SAME estimate in each of those buckets, and one stored window yields at most ONE occurrence and ONE flap, because a re-delivery is the same window seen again, not a second event (counting the repeats inflates an SLO by exactly the zoom factor)",
 		Agent:  Red,
