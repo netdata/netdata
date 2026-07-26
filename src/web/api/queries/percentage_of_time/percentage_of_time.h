@@ -28,7 +28,17 @@ static inline void tg_percentage_of_time_create(RRDR *r, const char *options) {
     // the API has never rejected a malformed condition here
     (void)tg_expression_parse(&g->expr, options);
     r->time_grouping.data = g;
-    r->time_grouping.wants_gaps = tg_expression_wants_gaps(&g->expr);
+
+    // ALWAYS - whatever the condition compares against.
+    //
+    // The denominator of this grouping is the selected duration, not the
+    // collected part of it. Uncollected time is time during which the
+    // condition did not hold, so it belongs in the denominator: one
+    // collected sample reading 1 followed by ninety-nine missing ones is
+    // 1% of the window at `==1`, not 100% of the only sample that was
+    // there. Every other grouping stays blind to gaps unless its condition
+    // names one; this one cannot, or it stops measuring time.
+    r->time_grouping.wants_gaps = true;
 }
 
 // resets when the query switches dimensions
@@ -50,7 +60,9 @@ static inline void tg_percentage_of_time_add_point(RRDR *r, const TG_POINT *p) {
     if(unlikely(p->duration <= 0))
         return;
 
-    // above tier 0 the share is a fraction of the window, not a yes/no
+    // above tier 0 the share is a fraction of the window, not a yes/no.
+    // A gap contributes 0 to the numerator for every condition that does
+    // not name one, and its duration to the denominator either way.
     g->matched += tg_expression_share(&g->expr, p) * (NETDATA_DOUBLE)p->duration;
     g->total += (NETDATA_DOUBLE)p->duration;
 }
