@@ -277,7 +277,15 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
             break;
 
         case RRDR_GROUPING_COUNTIF:
-            if(isnan(ac->time_group_value))
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
+            // with no condition written at all these compare equal to zero,
+            // exactly as countif always has. A condition whose operand is
+            // not a number - a gap token, the predecessor - leaves the
+            // legacy value unset on purpose: it cannot be expressed there,
+            // and the expression above is what the query actually runs.
+            if(!ac->time_group_options && isnan(ac->time_group_value))
                 ac->time_group_value = 0;
             break;
 

@@ -255,6 +255,14 @@ static const db_lookup_test_case_t test_cases[] = {
     { "percentage-of-samples(>0) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 0.0, -600, 0, "percentage-of-samples canonical name" },
     { "percentage-of-time(==bogus) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "unknown word operand invalid" },
 
+    // an empty condition compares equal to zero, the way countif always
+    // has. It MUST NOT fall through to the unset legacy value: formatting
+    // that produces "nan", which the grammar reads as a GAP token, so the
+    // alert would silently become "the share of time with no data"
+    { "percentage-of-time() -10m", true, RRDR_GROUPING_PERCENTAGE_OF_TIME, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0, -600, 0, "empty condition compares equal to zero" },
+    { "number-of-flaps() -10m", true, RRDR_GROUPING_NUMBER_OF_FLAPS, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0, -600, 0, "empty flaps condition compares equal to zero" },
+    { "number-of-times() -10m", true, RRDR_GROUPING_NUMBER_OF_TIMES, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0, -600, 0, "empty times condition compares equal to zero" },
+
     // Operators with no value (should default to 0)
     { "countif(=) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.0, -600, 0, "equals no value" },
     { "countif(==) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0.0, -600, 0, "double equals no value" },
