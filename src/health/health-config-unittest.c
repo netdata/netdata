@@ -3,6 +3,7 @@
 #include "health_internals.h"
 #include "health-config-unittest.h"
 #include "web/api/queries/query.h"
+#include "database/sqlite/sqlite_health.h"
 
 // test case structure for db lookup parsing
 typedef struct {
@@ -884,6 +885,153 @@ static int test_prototype_rejects_non_positive_update_every(int *passed) {
     return failed;
 }
 
+// An alert reaches the agent as JSON (dyncfg) and leaves it as a `.conf`
+// line, so the condition has to survive that round trip byte for byte -
+// otherwise exporting and re-importing an alert silently rewrites it, and
+// its configuration hash churns on every restart.
+static int test_dyncfg_time_group_round_trip(int *passed) {
+    static const struct {
+        const char *time_group;
+        const char *members;             // condition members of database_lookup
+        const char *expected_lookup;     // the `lookup:` value the export must produce
+        RRDR_TIME_GROUPING expected_group;
+        const char *expected_options;    // NULL when the grouping keeps no expression
+        ALERT_LOOKUP_TIME_GROUP_CONDITION expected_condition;
+        NETDATA_DOUBLE expected_value;
+        const char *description;
+    } tests[] = {
+        { "percentage-of-time", "\"time_group_condition\":\">=\",\"time_group_value\":1,\"time_group_options\":\">=1\"",
+          "percentage-of-time(>=1) -1m", RRDR_GROUPING_PERCENTAGE_OF_TIME, ">=1",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER_EQUAL, 1,
+          "percentage-of-time keeps its threshold" },
+
+        { "number-of-flaps", "\"time_group_condition\":\"==\",\"time_group_value\":0,\"time_group_options\":\"==gap\"",
+          "number-of-flaps(==gap) -1m", RRDR_GROUPING_NUMBER_OF_FLAPS, "==gap",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, NAN,
+          "a gap token survives the round trip" },
+
+        { "number-of-times", "\"time_group_condition\":\"<\",\"time_group_value\":0,\"time_group_options\":\"<previous\"",
+          "number-of-times(<previous) -1m", RRDR_GROUPING_NUMBER_OF_TIMES, "<previous",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_LESS, NAN,
+          "the predecessor keyword survives the round trip" },
+
+        // the legacy shape: alerts written before the expression existed
+        // carry only the condition/value pair. The export normalises the
+        // name to the canonical one and writes the pair out as the
+        // equivalent expression; the alert MUST come back as the same
+        // grouping running the same condition
+        { "countif", "\"time_group_condition\":\"!=\",\"time_group_value\":0",
+          "percentage-of-samples(!=0.00) -1m", RRDR_GROUPING_COUNTIF, "!=0.00",
+          ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 0,
+          "a legacy countif alert round trips on its condition pair" },
+
+        // untouched by the expression grammar - proves we did not widen it.
+        // `percentile95` is the canonical echo of the percentile enum and
+        // predates this work
+        { "percentile", "\"time_group_value\":95",
+          "percentile95(95.00) -1m", RRDR_GROUPING_PERCENTILE, NULL,
+          DC_COND, 95,
+          "percentile still round trips on its numeric argument" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        CLEAN_BUFFER *payload = buffer_create(0, NULL);
+        CLEAN_BUFFER *result = buffer_create(0, NULL);
+
+        buffer_sprintf(payload,
+                       "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                       "\"config\":{\"value\":{\"update_every\":1,\"database_lookup\":{"
+                       "\"after\":-60,\"time_group\":\"%s\",%s}},"
+                       "\"match\":{\"on\":\"chart\"}}}]}",
+                       tests[i].time_group, tests[i].members);
+
+        int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                    payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+        if(code != HTTP_RESP_OK) {
+            fprintf(stderr, "FAILED [%s]: export failed with code=%d response='%s'\n",
+                    tests[i].description, code, buffer_tostring(result));
+            failed++;
+            continue;
+        }
+
+        // pull the `lookup:` line back out of the exported configuration
+        const char *found = strstr(buffer_tostring(result), "lookup: ");
+        if(!found) {
+            fprintf(stderr, "FAILED [%s]: no lookup line in the exported config:\n%s\n",
+                    tests[i].description, buffer_tostring(result));
+            failed++;
+            continue;
+        }
+
+        char lookup[512];
+        found += strlen("lookup: ");
+        const char *eol = strchr(found, '\n');
+        size_t len = eol ? (size_t)(eol - found) : strlen(found);
+        if(len >= sizeof(lookup)) len = sizeof(lookup) - 1;
+        memcpy(lookup, found, len);
+        lookup[len] = '\0';
+
+        if(strcmp(lookup, tests[i].expected_lookup) != 0) {
+            fprintf(stderr, "FAILED [%s]: exported 'lookup: %s', want 'lookup: %s'\n",
+                    tests[i].description, lookup, tests[i].expected_lookup);
+            failed++;
+            continue;
+        }
+
+        // and feed it back through the config parser, the way a restart does
+        struct rrd_alert_config ac = { 0 };
+        ac.time_group_value = NAN;
+
+        if(!health_parse_db_lookup(1, "unittest", lookup, &ac)) {
+            fprintf(stderr, "FAILED [%s]: the exported lookup does not parse back: '%s'\n",
+                    tests[i].description, tests[i].expected_lookup);
+            failed++;
+        }
+        else {
+            int errors = 0;
+
+            if(ac.time_group != tests[i].expected_group) {
+                fprintf(stderr, "FAILED [%s]: re-parsed group %u, want %u\n",
+                        tests[i].description, (unsigned)ac.time_group, (unsigned)tests[i].expected_group);
+                errors++;
+            }
+
+            const char *options = ac.time_group_options ? string2str(ac.time_group_options) : NULL;
+            if((options == NULL) != (tests[i].expected_options == NULL) ||
+               (options && strcmp(options, tests[i].expected_options) != 0)) {
+                fprintf(stderr, "FAILED [%s]: re-parsed options '%s', want '%s'\n",
+                        tests[i].description, options ? options : "(none)",
+                        tests[i].expected_options ? tests[i].expected_options : "(none)");
+                errors++;
+            }
+
+            if(tests[i].expected_condition != DC_COND && ac.time_group_condition != tests[i].expected_condition) {
+                fprintf(stderr, "FAILED [%s]: re-parsed condition %d, want %d\n",
+                        tests[i].description, ac.time_group_condition, tests[i].expected_condition);
+                errors++;
+            }
+
+            if(!isnan(tests[i].expected_value) &&
+               (isnan(ac.time_group_value) || fabsl(ac.time_group_value - tests[i].expected_value) > 0.0001)) {
+                fprintf(stderr, "FAILED [%s]: re-parsed value %f, want %f\n",
+                        tests[i].description, (double)ac.time_group_value, (double)tests[i].expected_value);
+                errors++;
+            }
+
+            if(errors)
+                failed += errors;
+            else
+                (*passed)++;
+        }
+
+        string_freez(ac.dimensions);
+        string_freez(ac.time_group_options);
+    }
+
+    return failed;
+}
+
 int health_config_unittest(void) {
     int passed = 0;
     int failed = 0;
@@ -912,9 +1060,14 @@ int health_config_unittest(void) {
     failed += test_delay_multiplier_runtime_boundaries(&passed);
     failed += test_prototype_rejects_non_finite_delay_multiplier(&passed);
     failed += test_prototype_rejects_non_positive_update_every(&passed);
+    failed += test_dyncfg_time_group_round_trip(&passed);
 
     fprintf(stderr, "\n===================================================\n");
     fprintf(stderr, "Health config parser tests: %d passed, %d failed\n\n", passed, failed);
+
+    // the same alert configuration, taken through the metadata database
+    // instead of the parser
+    failed += sql_alert_config_unittest();
 
     return failed;
 }

@@ -22,6 +22,23 @@
 // There are deliberately no and/or compounds: a single comparison keeps
 // the feature explainable, and gaps are reachable as a VALUE instead.
 
+// the groupings whose value is derived from a condition, not from the
+// sample values themselves - the only ones that carry an expression.
+// percentile and the trimmed-* pair also take a parenthesised argument,
+// but theirs is a plain number.
+static inline bool time_grouping_is_expression(RRDR_TIME_GROUPING g) {
+    switch(g) {
+        case RRDR_GROUPING_COUNTIF:
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 typedef enum tg_expression_cmp {
     TG_EXPRESSION_EQUAL,
     TG_EXPRESSION_NOTEQUAL,
