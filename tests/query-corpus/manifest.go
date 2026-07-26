@@ -233,6 +233,14 @@ var manifest = map[string]ManifestCase{
 		Proves: "the condition groupings answer a question ABOUT the samples, so options=nonzero judges them by the ANSWER: a dimension whose condition never holds is dropped even though every source sample is non-zero, while a dimension with a non-zero answer stays",
 		Agent:  Red,
 	},
+	"L4/three-tier-join": {
+		Proves: "three tiers with DIFFERENT retention depths, joined inside one query: every tier at the engine's 25MiB floor and the tiers brought close together (1s/5s/10s) so each fills its own quota from one fixture — tier0 keeps the newest slice, tier1 outlives it, tier2 outlives them both. The whole retained duration is then read at five resolutions from 845s buckets down to 2.9s: no bucket inside the span is ever empty, time never runs backwards, every value stays inside the generator range, and across the resolutions all three tiers contribute (the planner picks the coarsest tier that can supply the requested density, so WHICH tier answers changes with the zoom). Pins that alignment rounds the grid OUTWARD, so the leading buckets can precede retention and are legitimately empty; and that asking for buckets finer than the serving tier is upsampling, not a seam defect",
+		Agent:  Green,
+	},
+	"CASE-024/zoom-into-slow-metrics": {
+		Proves: "a metric collected once a minute, once per ten minutes or once an hour still answers when the dashboard zooms BELOW its collection interval: a 60-point request over a window shorter than one sample interval, fully inside the collected span, returns rows that carry the value - a chart that empties out when the user zooms in is indistinguishable from an outage",
+		Agent:  Green,
+	},
 	"CASE-023/trailing-gaps": {
 		Proves: "a condition that names a gap keeps accounting to the END of the requested window: the query engine stops walking a few buckets after a dimension's storage is exhausted and lets the caller fill the rest with EMPTY, which is the same answer for every other aggregation but silently truncates an outage for `==gap` - a dimension that stops being collected while its chart keeps going must read 100% gap for every remaining bucket, not for eleven of them",
 		Agent:  Red,

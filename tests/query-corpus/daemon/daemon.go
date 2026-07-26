@@ -32,11 +32,19 @@ type Options struct {
 	RunDir       string // scratch directory for etc/cache/lib/log
 	Port         int    // 0 picks a free port
 	StorageTiers int    // defaults to 3
-	// Tier0DiskSpaceMB, when non-zero, caps tier0's dbengine disk quota
-	// so old tier0 datafiles rotate out while higher tiers keep the full
-	// history — the layer-4 plan-switching scenario. Retention TIME knobs
-	// are unusable at the fixed 2023 fixture epoch (wall-clock enforced).
-	Tier0DiskSpaceMB int
+	// TierRetentionMB caps a tier's dbengine disk quota (index = tier), so
+	// its oldest datafiles rotate out while the tiers above keep more
+	// history — the plan-switching scenario. Retention TIME knobs are
+	// unusable at the fixed 2023 fixture epoch (wall-clock enforced), so
+	// rotation has to be driven by VOLUME. The engine floors any quota at
+	// RRDENG_MIN_DISK_SPACE_MB (25MiB).
+	TierRetentionMB [3]int
+	// TierGrouping sets "dbengine tier N update every iterations" (index
+	// 1..2, default 60 each). Lowering it brings the tiers closer together
+	// in points-per-second, which is what makes a tier ABOVE tier0 fill its
+	// own quota with a fixture of practical size: at the default 60, tier1
+	// would need ~60x more data than tier0 to rotate at all.
+	TierGrouping [3]int
 	// ReplicationStepSeconds, when non-zero, bounds the parent's per-request
 	// replication window, so a streaming fixture can generate rows per
 	// request instead of materializing millions of points.
@@ -152,8 +160,15 @@ func Start(o Options) (*Daemon, error) {
 		step = fmt.Sprintf("%ds", o.ReplicationStepSeconds)
 	}
 	extraDB := ""
-	if o.Tier0DiskSpaceMB > 0 {
-		extraDB = fmt.Sprintf("    dbengine tier 0 retention size = %dMiB\n", o.Tier0DiskSpaceMB)
+	for tier, mb := range o.TierRetentionMB {
+		if mb > 0 {
+			extraDB += fmt.Sprintf("    dbengine tier %d retention size = %dMiB\n", tier, mb)
+		}
+	}
+	for tier, every := range o.TierGrouping {
+		if tier > 0 && every > 0 {
+			extraDB += fmt.Sprintf("    dbengine tier %d update every iterations = %d\n", tier, every)
+		}
 	}
 	conf := fmt.Sprintf(netdataConfTemplate, o.RunDir, o.Port, o.StorageTiers, step, extraDB)
 	confPath := filepath.Join(o.RunDir, "etc", "netdata.conf")

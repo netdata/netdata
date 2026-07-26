@@ -61,7 +61,7 @@ func TestLayer4PlanSwitching(t *testing.T) {
 	dd, err := daemon.Start(daemon.Options{
 		Binary:                 netdataBinary,
 		RunDir:                 t.TempDir(),
-		Tier0DiskSpaceMB:       25, // RRDENG_MIN_DISK_SPACE_MB — the floor
+		TierRetentionMB:        [3]int{25}, // RRDENG_MIN_DISK_SPACE_MB — the floor
 		ReplicationStepSeconds: 3600,
 	})
 	if err != nil {
