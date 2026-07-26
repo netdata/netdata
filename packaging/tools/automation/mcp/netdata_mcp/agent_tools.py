@@ -1148,14 +1148,18 @@ AGENT_TOOLS: dict[str, dict[str, Any]] = {
                         "coefficient-of-variation",
                         "ema",
                         "des",
+                        "percentage-of-samples",
                         "countif",
+                        "percentage-of-time",
+                        "number-of-flaps",
+                        "number-of-times",
                         "extremes"
                     ]
                 },
                 "time_group_options": {
                     "type": "string",
                     "title": "Time Group Options",
-                    "description": "Additional options for time grouping.\nFor 'percentile', specify a percentage (0-100).\nFor 'countif', specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10')."
+                    "description": "Additional options for time grouping.\nFor 'percentile', 'trimmed-mean' and 'trimmed-median', specify a number.\nFor 'percentage-of-samples' (alias 'countif'), 'percentage-of-time', 'number-of-flaps' and 'number-of-times', specify a CONDITION: an operator ('>', '>=', '<', '<=', '=', '!=') followed by a number (e.g. '>0'), a gap token ('==gap', '!=gap'), or the previous collected sample ('<previous')."
                 },
                 "tier": {
                     "type": "number",
