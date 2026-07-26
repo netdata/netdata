@@ -385,13 +385,27 @@ static inline NETDATA_DOUBLE tg_expression_share(TG_EXPRESSION *e, const TG_POIN
         // comparison is NOT estimated across a window - it is answered on
         // the window's own average, which is documented, because a rollup
         // keeps no ordering to compare against.
-        if(e->cmp == TG_EXPRESSION_LESS &&
-           netdata_double_isnumber(p->min) && p->min < e->previous_max)
+        bool dropped = e->cmp == TG_EXPRESSION_LESS &&
+                       netdata_double_isnumber(p->min) && p->min < e->previous_max;
+
+        if(dropped)
             share = 1.0;
         else
             share = tg_expression_eval(e, tg_point_average(p), p->is_gap) ? 1.0 : 0.0;
 
-        if(netdata_double_isnumber(p->max))
+        // What the NEXT window is compared against. Normally that is this
+        // window's maximum - where a counter that only climbs left off. But a
+        // window that already counted a drop ended somewhere after the drop,
+        // not at its pre-drop peak, so carrying the peak forward would make
+        // the next window look like it went backwards too and count the same
+        // reboot twice. Its minimum is the floor the counter restarted from,
+        // which is the honest bound; the cost is that a second reset inside
+        // the very next window is only seen if it goes below that floor.
+        if(dropped) {
+            if(netdata_double_isnumber(p->min))
+                e->previous_max = p->min;
+        }
+        else if(netdata_double_isnumber(p->max))
             e->previous_max = p->max;
 
         return share;
