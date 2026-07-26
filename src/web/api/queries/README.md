@@ -174,9 +174,17 @@ at lower resolution. Over a window long enough to read that older data,
 - `number-of-times` with `previous` still detects a counter going backwards,
   so reboot counting keeps working.
 - A gap inside a stored interval is not visible, so partially collected
-  intervals count as collected.
+  intervals count as collected. This understates `percentage-of-time`
+  over long windows: uncollected time inside a stored interval cannot be
+  separated from collected time there.
 - When the requested resolution is finer than the stored one, every result
   bucket covering the same stored interval reports that interval's estimate.
+
+`percentage-of-time` always measures against the **selected duration**, not
+against the part of it that was collected. Uncollected time is time the
+condition did not hold, so a metric with one collected sample matching the
+condition and the rest of the window missing answers a small percentage,
+not 100%. That is what makes it usable for availability.
 
 `percentage-of-samples` does NOT estimate: it treats each stored point as one
 sample and evaluates the condition on it, which is what it has always done.
