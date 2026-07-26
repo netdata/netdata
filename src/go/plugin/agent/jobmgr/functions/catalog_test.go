@@ -224,6 +224,32 @@ func TestFunctionCatalogResourceTransactionHasNoArbitraryCountLimits(t *testing.
 	require.NoError(t, err)
 }
 
+func TestFunctionCatalogRejectsYieldedGlobalClaimBeforeCommandClaim(t *testing.T) {
+	declaration := testDeclaration("config", "", DynCfgJobResource(0, "job:"))
+	declaration.Transaction = &ResourceTransactionDeclaration{
+		Prepare: func(
+			context.Context,
+			HandlerInput,
+			lifecycle.ReadyResource,
+			lifecycle.ResourceTransactionScope,
+			lifecycle.LongLivedPermit,
+		) (lifecycle.PreparedResourceTransaction, error) {
+			return nil, nil
+		},
+		GlobalClaim:               "global",
+		YieldGlobalClaimOnPrepare: true,
+		Commands: []ResourceTransactionCommand{
+			{
+				Name:   "update",
+				Claims: []string{"z-resource"},
+			},
+		},
+	}
+
+	_, err := NewCatalog([]Declaration{declaration})
+	require.ErrorContains(t, err, "yielded global claim")
+}
+
 func TestFunctionCatalogMutationLifecycle(t *testing.T) {
 	tests := map[string]struct {
 		change        func() RouteChange

@@ -53,6 +53,8 @@ func TestDynCfgRequestSourceUsesQuotedProtocolGrammar(t *testing.T) {
 		"line\nbreak":   false,
 	}
 	for value, want := range tests {
-		require.Equal(t, want, netdataapi.ValidSingleQuotedProtocolField(value), value)
+		t.Run(value, func(t *testing.T) {
+			require.Equal(t, want, netdataapi.ValidSingleQuotedProtocolField(value))
+		})
 	}
 }

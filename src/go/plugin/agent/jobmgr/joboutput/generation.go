@@ -241,7 +241,7 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 	}, nil
 }
 
-func (pj PreparedJob) Probe(ctx context.Context) error {
+func (pj PreparedJob) Probe(ctx context.Context) (result error) {
 	if ctx == nil || pj.state == nil {
 		return errors.New("job output: invalid prepared job probe")
 	}
@@ -259,26 +259,27 @@ func (pj PreparedJob) Probe(ctx context.Context) error {
 	probe := state.constructed.autoDetection
 	state.mu.Unlock()
 
-	var err error
+	defer func() {
+		state.mu.Lock()
+		state.probing = false
+		if result == nil {
+			state.probed = true
+		}
+		state.mu.Unlock()
+	}()
+
 	if probe != nil {
-		err = callJobLifecycle("collector autodetection", func() error {
+		result = callJobLifecycle("collector autodetection", func() error {
 			return probe(ctx)
 		})
 	}
-
-	state.mu.Lock()
-	state.probing = false
-	if err == nil {
-		state.probed = true
-	}
-	state.mu.Unlock()
-	if err == nil {
+	if result == nil {
 		return nil
 	}
 	if state.constructed.resolvedReferences {
-		err = redactResolvedLifecycleError(err)
+		result = redactResolvedLifecycleError(result)
 	}
-	return autoDetectionFailureFor(state.constructed, err)
+	return autoDetectionFailureFor(state.constructed, result)
 }
 
 func (pj PreparedJob) Dispose(ctx context.Context) error {

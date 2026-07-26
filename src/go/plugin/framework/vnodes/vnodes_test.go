@@ -81,3 +81,30 @@ func TestLoad_SkipsVNodeWhoseSourceCannotBePublished(t *testing.T) {
 
 	require.Empty(t, Load(dir))
 }
+
+func TestValidateConfiguredRejectsLabelKeyNormalization(t *testing.T) {
+	tests := map[string]map[string]string{
+		"trimmed key": {
+			" region ": "east",
+		},
+		"normalization collision": {
+			" region ": "east",
+			"region":   "west",
+		},
+	}
+
+	for name, labels := range tests {
+		t.Run(name, func(t *testing.T) {
+			vnode := &VirtualNode{
+				Name:       "host-a",
+				Hostname:   "host-a",
+				GUID:       "11111111-2222-3333-4444-555555555555",
+				Labels:     labels,
+				Source:     "file=/etc/netdata/vnodes/vnodes.yaml",
+				SourceType: "user",
+			}
+
+			require.ErrorContains(t, ValidateConfigured(vnode), "label key")
+		})
+	}
+}

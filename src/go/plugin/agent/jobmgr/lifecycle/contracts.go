@@ -19,7 +19,13 @@ func ValidateUID(uid string) error {
 	return nil
 }
 
+// validPluginsDBareField stays local because lifecycle is deliberately
+// standard-library-only. TestValidPluginsDBareFieldParity pins its semantics to
+// netdataapi.ValidBareProtocolField.
 func validPluginsDBareField(value string) bool {
+	if value == "" {
+		return false
+	}
 	for index := 0; index < len(value); index++ {
 		char := value[index]
 		if char <= ' ' || char == 0x7f || char == '=' ||
