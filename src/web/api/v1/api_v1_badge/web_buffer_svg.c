@@ -1070,17 +1070,45 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
                     // summing a rate integrates it into a volume, so the
                     // trailing "/s" no longer describes the number shown.
                     // The badge picks its units before the query runs and
-                    // never sees the query target, so it asks the chart:
-                    // every dimension a rate means every SELECTED dimension
-                    // is one too, whatever the filter picked. A chart with
-                    // any non-rate dimension keeps its units untouched,
-                    // which is the same "all contributing metrics or
-                    // nothing" rule the API follows.
+                    // never sees the query target, so it asks the chart -
+                    // through the SAME dimension filter the query will
+                    // apply, or a rate-only selection on a chart that also
+                    // carries a gauge would keep a "/s" the query already
+                    // integrated away. A selection that is not all rates
+                    // keeps the chart's units untouched, which is the same
+                    // "all contributing metrics or nothing" rule the API
+                    // follows.
                     static __thread char units_volume_buf[64];
                     if(group == RRDR_GROUPING_SUM && units && *units) {
+                        SIMPLE_PATTERN *filter = dimensions ?
+                            string_to_simple_pattern(buffer_tostring(dimensions)) : NULL;
+
+                        // ids and names both, unless the request narrowed it
+                        bool match_ids = options & RRDR_OPTION_MATCH_IDS;
+                        bool match_names = options & RRDR_OPTION_MATCH_NAMES;
+                        if(!match_ids && !match_names)
+                            match_ids = match_names = true;
+
                         bool all_rates = true, any = false;
                         RRDDIM *rd;
                         rrddim_foreach_read(rd, st) {
+                            if(filter) {
+                                SIMPLE_PATTERN_RESULT m = SP_NOT_MATCHED;
+
+                                if(match_ids)
+                                    m = simple_pattern_matches_string_extract(filter, rd->id, NULL, 0);
+
+                                if(m == SP_NOT_MATCHED && match_names && (rd->name != rd->id || !match_ids))
+                                    m = simple_pattern_matches_string_extract(filter, rd->name, NULL, 0);
+
+                                if(m != SP_MATCHED_POSITIVE)
+                                    continue;
+                            }
+                            else if(rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN))
+                                // with no pattern the query takes every dimension
+                                // that is not hidden, so neither does this
+                                continue;
+
                             any = true;
                             if(rd->algorithm != RRD_ALGORITHM_INCREMENTAL) {
                                 all_rates = false;
@@ -1088,9 +1116,14 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
                             }
                         }
                         rrddim_foreach_done(rd);
+                        simple_pattern_free(filter);
 
                         size_t ulen = strlen(units);
-                        if(any && all_rates && ulen > 2 && strcmp(units + ulen - 2, "/s") == 0) {
+                        // a units string too long to hold the volume form is
+                        // left alone rather than truncated - the same bound
+                        // query_target_rate_adjusted_units_for() applies
+                        if(any && all_rates && ulen > 2 && strcmp(units + ulen - 2, "/s") == 0 &&
+                           ulen - 2 < sizeof(units_volume_buf)) {
                             snprintfz(units_volume_buf, sizeof(units_volume_buf), "%.*s", (int)(ulen - 2), units);
                             units = units_volume_buf;
                         }
