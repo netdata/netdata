@@ -75,8 +75,9 @@ static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_b
             buffer_fast_strcat(key, "|", 1);
             {
                 char _ub[64];
-                buffer_strcat(key, query_target_result_units(
-                    qt, rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+                buffer_strcat(key, query_target_result_units_for(
+                    qt, qm->values_stored_as_rates,
+                    rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
             }
         }
     }
@@ -142,8 +143,9 @@ static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by
 
             {
                 char _ub[64];
-                buffer_strcat(key, query_target_result_units(
-                    qt, rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+                buffer_strcat(key, query_target_result_units_for(
+                    qt, qm->values_stored_as_rates,
+                    rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
             }
         }
     }
@@ -212,8 +214,9 @@ static void query_group_by_make_dimension_name(
 
             {
                 char _ub[64];
-                buffer_strcat(key, query_target_result_units(
-                    qt, rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+                buffer_strcat(key, query_target_result_units_for(
+                    qt, qm->values_stored_as_rates,
+                    rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
             }
         }
     }
