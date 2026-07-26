@@ -19,30 +19,32 @@ var benchmarkHostScopesSink []HostScope
 // outside the timer and verify the exact output count before timing so skipped
 // projection work cannot look like an optimization.
 //
-// Latest developer-laptop comparison (darwin/arm64, Apple M4 Pro, 2026-07-27).
-// Results are medians of -count=10; ns/op is a trend indicator, not a CI gate.
+// Reproducible comparison (darwin/arm64, Apple M4 Pro, 2026-07-27):
+//   - merge-base production: beede2920e18ec0e0efa3c522367ce26deec1281
+//   - optimized production: 1f59fa84ba593a0560663d1ce185542485eddf7d
+//   - identical benchmark harness: 759296896a6758c2d8919df169a3d14807d6650d
+//
+// The merge base predates most of this matrix. The harness versions of
+// collector_store_scope_bench_test.go, reader_bench_test.go, and
+// summary_bench_test.go were therefore overlaid unchanged onto clean trees at
+// both production revisions. Results are medians of -count=10; ns/op is a
+// developer-laptop trend indicator, not a CI gate.
 //
 //	go test -run '^$' -bench 'FlattenProjectionCold$' -benchmem -benchtime=100ms -count=10 ./pkg/metrix
 //
-// Representative merge-base -> optimized results:
-//   - scalar/512: 65,776 ns/op, 37,400 B/op, 21 allocs/op ->
-//     65,700 ns/op, 37,400 B/op, 21 allocs/op.
-//   - mixed/512: 4,283,642 ns/op, 7,708,624 B/op, 54,445 allocs/op ->
-//     3,512,606 ns/op, 7,185,122 B/op, 45,741 allocs/op.
-//   - histogram labels_8/512: 9,491,069 ns/op, 17,264,506 B/op, 109,683 allocs/op ->
-//     4,872,335 ns/op, 10,581,270 B/op, 63,603 allocs/op.
-//   - summary no quantiles/512: 409,571 ns/op, 945,202 B/op, 6,182 allocs/op ->
-//     323,502 ns/op, 904,242 B/op, 4,134 allocs/op.
-//   - summary fanout_8/labels_8/512: 6,175,011 ns/op, 12,206,788 B/op, 72,786 allocs/op ->
-//     3,417,920 ns/op, 7,987,910 B/op, 45,650 allocs/op.
-//   - stateset fanout_8/labels_8/512: 5,057,474 ns/op, 10,526,588 B/op, 57,402 allocs/op ->
-//     2,872,449 ns/op, 6,954,871 B/op, 37,434 allocs/op.
-//   - measureset gauge fanout_8/labels_8/512: 5,365,286 ns/op, 10,578,861 B/op, 61,579 allocs/op ->
-//     3,105,037 ns/op, 7,465,883 B/op, 45,195 allocs/op.
-//   - measureset counter fanout_8/labels_8/512: 5,049,261 ns/op, 10,578,861 B/op, 61,579 allocs/op ->
-//     2,847,366 ns/op, 7,465,886 B/op, 45,195 allocs/op.
-//   - measureset gauge fanout_2/labels_1/512: 569,917 ns/op, 1,125,107 B/op, 9,254 allocs/op ->
-//     476,628 ns/op, 1,125,110 B/op, 9,254 allocs/op.
+// Representative merge-base -> optimized results (`ns/op` is the local trend):
+//   - scalar/512: ns/op +1.9%; 37,400 -> 37,400 B/op; 21 -> 21 allocs/op.
+//   - mixed/512: ns/op -18.1%; 7,709,253 -> 7,182,939 B/op;
+//     54,445 -> 45,741 allocs/op.
+//   - histogram labels_8/512: ns/op -47.5%; 17,267,578 -> 10,579,147 B/op;
+//     109,683 -> 63,603 allocs/op.
+//   - summary fanout_8/labels_8/512: ns/op -44.1%; 12,206,783 -> 7,987,898 B/op;
+//     72,786 -> 45,650 allocs/op.
+//   - stateset fanout_8/labels_8/512: ns/op -42.7%; 10,526,587 -> 6,954,869 B/op;
+//     57,402 -> 37,434 allocs/op.
+//   - measureset gauge/counter fanout_8/labels_8/512:
+//     ns/op -39.8%/-41.7%; 10,578,865/10,578,856 ->
+//     7,465,884/7,465,880 B/op; 61,579 -> 45,195 allocs/op.
 func BenchmarkCollectorStoreFlattenProjectionCold(b *testing.B) {
 	for _, instances := range []int{32, 512} {
 		b.Run(fmt.Sprintf("structured_instances_%d", instances), func(b *testing.B) {
