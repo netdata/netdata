@@ -241,11 +241,22 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
                 return 0;
             }
 
-            // only the condition groupings carry an expression. percentile
-            // and the trimmed-* pair take a plain number, and storing one
-            // for them would change the identity of every such alert - the
-            // config hash is computed over this field.
-            if(time_grouping_is_expression(ac->time_group)) {
+            // Only the condition groupings speak this grammar. percentile
+            // and the trimmed-* pair take a plain number, so an operator or
+            // a word operand there is a mistake - accepting it would turn
+            // `percentile(gap)` into percentile 95 and `average(previous)`
+            // into a plain average, both silently.
+            if(!time_grouping_is_expression(ac->time_group)) {
+                if(e.operand != TG_EXPRESSION_OPERAND_NUMBER || e.cmp != TG_EXPRESSION_EQUAL) {
+                    netdata_log_error("Health configuration at line %zu of file '%s': '%s' takes a number, not the condition '%s'",
+                                      line, filename, key, expr);
+                    return 0;
+                }
+            }
+            else {
+                // storing one for a numeric grouping would also change the
+                // identity of every such alert - the config hash is computed
+                // over this field
                 ac->time_group_options = string_strdupz(expr);
                 ac->time_group_condition = alert_lookup_condition_from_expression(e.cmp);
             }

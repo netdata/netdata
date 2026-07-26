@@ -255,6 +255,17 @@ static const db_lookup_test_case_t test_cases[] = {
     { "percentage-of-samples(>0) -10m", true, RRDR_GROUPING_COUNTIF, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 0.0, -600, 0, "percentage-of-samples canonical name" },
     { "percentage-of-time(==bogus) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "unknown word operand invalid" },
 
+    // the condition grammar belongs to the four condition groupings ONLY.
+    // A numeric grouping takes a number, so an operator or a word operand
+    // there is a mistake - accepting it would turn percentile(gap) into
+    // percentile 95 and average(previous) into a plain average, silently
+    { "percentile(95) -10m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 95, -600, 0, "percentile still takes its number" },
+    { "percentile(gap) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "percentile rejects a gap token" },
+    { "percentile(>95) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "percentile rejects an operator" },
+    { "percentile(previous) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "percentile rejects the predecessor" },
+    { "trimmed-mean(gap) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "trimmed-mean rejects a gap token" },
+    { "average(previous) -10m", false, RRDR_GROUPING_UNDEFINED, DC_COND, DC_VALUE, 0, 0, "average rejects the predecessor" },
+
     // an empty condition compares equal to zero, the way countif always
     // has. It MUST NOT fall through to the unset legacy value: formatting
     // that produces "nan", which the grammar reads as a GAP token, so the
