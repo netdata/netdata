@@ -7,6 +7,7 @@
 package fixture
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -93,19 +94,54 @@ func (c Chart) Define(conn *stream.Conn) {
 }
 
 // PushLive buffers the chart's full point series as BEGIN2/SET2/END2
-// samples, row by row across dimensions (dimensions must share timestamps).
+// samples, row by row.
+//
+// Dimensions are matched by TIMESTAMP, not by position, so a dimension may
+// carry fewer points than its siblings: a dimension that stops being
+// collected while its chart keeps going simply gets no SET2 in the later
+// rows, which is how a removed disk or a departed container looks on the
+// wire. That is different from pushing an empty slot - there is no stored
+// point at all, so the dimension's storage genuinely runs out.
 func (c Chart) PushLive(conn *stream.Conn) {
 	ue := c.UpdateEvery
 	if ue <= 0 {
 		ue = 1
 	}
-	for i, p := range c.Dimensions[0].Points {
-		conn.Begin2(c.ID, ue, p.T)
-		for _, d := range c.Dimensions {
-			conn.Set2(d.ID, d.Points[i].Collected, d.Points[i].Flags)
+
+	byTime := make([]map[int64]Point, len(c.Dimensions))
+	for di, d := range c.Dimensions {
+		byTime[di] = make(map[int64]Point, len(d.Points))
+		for _, p := range d.Points {
+			byTime[di][p.T] = p
+		}
+	}
+
+	for _, p := range c.rowTimes() {
+		conn.Begin2(c.ID, ue, p)
+		for di, d := range c.Dimensions {
+			if dp, has := byTime[di][p]; has {
+				conn.Set2(d.ID, dp.Collected, dp.Flags)
+			}
 		}
 		conn.End2()
 	}
+}
+
+// rowTimes is every timestamp any dimension carries, in order.
+func (c Chart) rowTimes() []int64 {
+	seen := make(map[int64]struct{})
+	var out []int64
+	for _, d := range c.Dimensions {
+		for _, p := range d.Points {
+			if _, has := seen[p.T]; has {
+				continue
+			}
+			seen[p.T] = struct{}{}
+			out = append(out, p.T)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
 }
 
 // ReplayWindow returns the chart's rows inside (after, before] in the
