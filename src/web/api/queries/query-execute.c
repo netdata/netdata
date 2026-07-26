@@ -110,12 +110,9 @@ static NETDATA_DOUBLE query_point_total_projection(
             if(unlikely((point).sp.flags & SN_FLAG_RESET) && _sample_in_row)                  \
                 (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
                                                                             \
-            NETDATA_DOUBLE _v =                                             \
-                (point).value;          \
-            TG_POINT _tgs = { .value = _v, .sum = _v, .min = _v, .max = _v, \
-                              .count = 1, .duration = 1, .samples = 1,      \
-                              .is_gap = false, .first = true };             \
-            time_grouping_add(r, &_tgs, add_flush);                         \
+            time_grouping_add(r,                                            \
+                (point).value,           \
+                add_flush);                                                 \
                                                                             \
             if((point).tier != 0 || _sample_in_row) \
                 storage_point_merge_to((ops)->group_point, (point).sp);         \
@@ -178,7 +175,7 @@ static NETDATA_DOUBLE query_point_total_projection(
                           .count = _pcount,                                 \
                           .duration = _duration, .samples = _samples,       \
                           .is_gap = false, .first = !(point).added };       \
-        time_grouping_add(r, &_tgp, add_flush);                             \
+        time_grouping_add_point(r, &_tgp, add_flush);                       \
                                                                             \
         if((point).tier != 0 || _sample_in_row) \
             storage_point_merge_to((ops)->group_point, (point).sp);             \
@@ -192,7 +189,7 @@ static NETDATA_DOUBLE query_point_total_projection(
                           .min = NAN, .max = NAN, .count = 0,               \
                           .duration = _duration, .samples = _samples,       \
                           .is_gap = true, .first = true };                  \
-        time_grouping_add(r, &_tgg, add_flush);                             \
+        time_grouping_add_point(r, &_tgg, add_flush);                       \
     }                                                                       \
                                                                             \
     (ops)->group_points_added++;                                            \
@@ -638,8 +635,11 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             // find the place to store our values
             RRDR_VALUE_FLAGS *rrdr_value_options_ptr = &r->o[rrdr_o_v_index];
 
-            // update the dimension options
-            if(likely(ops->group_points_non_zero))
+            // update the dimension options - for the expression groupings
+            // the source samples say nothing about the answer, so their
+            // visibility is decided from the flushed value below INSTEAD,
+            // never from the samples that went in
+            if(likely(ops->group_points_non_zero && !time_grouping_is_expression(add_flush)))
                 r->od[dim_id_in_rrdr] |= RRDR_DIMENSION_NONZERO;
 
             // store the specific point options
