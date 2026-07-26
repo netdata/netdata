@@ -217,6 +217,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "the four fleet time-aggregations and their shared expression grammar: percentage-of-samples (canonical, countif alias) / percentage-of-time / number-of-flaps / number-of-times, each echoing its canonical name and transforming the response units (%/%/flaps/events); gap tokens (nan|null|gap|empty) pull gap slots into the denominator while an expression without one keeps them invisible; previous|last compare against the previous COLLECTED sample so a counter reset is a reboot and the first sample never matches; flaps count observed false->true transitions only, carried across buckets; a gap contributes its SLOT width, not the zero span of QUERY_POINT_EMPTY",
 		Agent:  Red,
 	},
+	"CASE-023/tier-estimation": {
+		Proves: "ABOVE tier 0 a stored point is min/max/avg over many samples, not a sample: percentage-of-time estimates the share of each stored window that satisfied the condition with the two-point mass model (weight(max) = (avg-min)/(max-min)), which is EXACT for a 0/1 availability signal because there the average IS the fraction of time at 1 — so up% and down% of a mixed window sum to 100 instead of both answering 'never', which is what evaluating the condition on the stored average does; a mixed window counts one flap and at most one occurrence (no ordering survives the rollup); percentage-of-samples keeps its historical tier behaviour",
+		Agent:  Red,
+	},
 	"CASE-023/countif-bare-number": {
 		Proves: "the shared expression parser fixes the bare-number digit swallow (countif.h:78 advances past the operator switch even when no operator matched, so options '5' targets 0) — the API is aligned to health, which has always parsed countif(5) as '=5' (health-config-unittest.c:96)",
 		Agent:  Red,

@@ -321,6 +321,41 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 	}
 
 	// ------------------------------------------------------------------
+	// 5b. a fully collected dimension has NO gaps, in every bucket shape
+	//
+	// `bool` is collected at every one of the 12 slots, so `==gap` must be
+	// 0 whatever the bucket layout. A delivery that covers no time must not
+	// be counted as a missing sample.
+	{
+		for _, points := range []string{"1", "2", "3", "6", "12"} {
+			r := whole("percentage-of-samples", "==gap", map[string]string{"points": points, "options": "flip"})
+			bi := dimIndex(r, "bool")
+			check(bi >= 0, "bool dimension missing from the %s-bucket gap sweep", points)
+			if bi < 0 {
+				continue
+			}
+			data, _ := dig(r, "result", "data").([]any)
+			for row := range data {
+				v, is := rowVal(r, row, bi)
+				check(!is || near(v, 0),
+					"points=%s row %d: percentage-of-samples ==gap on the fully collected bool = %v, want 0",
+					points, row, v)
+			}
+
+			rt := whole("number-of-times", "==gap", map[string]string{"points": points, "options": "flip"})
+			if ti := dimIndex(rt, "bool"); ti >= 0 {
+				dt, _ := dig(rt, "result", "data").([]any)
+				for row := range dt {
+					v, is := rowVal(rt, row, ti)
+					check(!is || near(v, 0),
+						"points=%s row %d: number-of-times ==gap on the fully collected bool = %v, want 0",
+						points, row, v)
+				}
+			}
+		}
+	}
+
+	// ------------------------------------------------------------------
 	// 6. units transform (D5)
 	{
 		for _, tc := range []struct{ group, units string }{
