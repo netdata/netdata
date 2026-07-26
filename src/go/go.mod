@@ -78,7 +78,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.31
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.30
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.65.0
-	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.34.1
+	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.35.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.45.0
 	github.com/aws/smithy-go v1.27.4
 	github.com/catonetworks/cato-go-sdk v0.2.6
