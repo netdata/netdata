@@ -30,6 +30,56 @@ func BenchmarkCollectorStoreFlattenProjectionCold(b *testing.B) {
 	}
 }
 
+func BenchmarkCollectorStoreScalarFlattenProjectionCold(b *testing.B) {
+	for _, instances := range []int{32, 512} {
+		b.Run(fmt.Sprintf("instances_%d", instances), func(b *testing.B) {
+			store := benchmarkCommittedScalarStore(b, instances)
+			snapshot := store.(*storeView).core.snapshot.Load()
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				flat := flattenSnapshot(snapshot)
+				benchmarkReaderCountSink = len(flat.series)
+			}
+		})
+	}
+}
+
+func BenchmarkCollectorStoreHistogramFlattenProjectionCold(b *testing.B) {
+	for _, labels := range []int{1, 8} {
+		for _, instances := range []int{32, 512} {
+			b.Run(fmt.Sprintf("labels_%d/instances_%d", labels, instances), func(b *testing.B) {
+				store := benchmarkCommittedHistogramStore(b, instances, labels)
+				snapshot := store.(*storeView).core.snapshot.Load()
+
+				b.ReportAllocs()
+				b.ResetTimer()
+				for b.Loop() {
+					flat := flattenSnapshot(snapshot)
+					benchmarkReaderCountSink = len(flat.series)
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkCollectorStoreSummaryNoQuantilesFlattenProjectionCold(b *testing.B) {
+	for _, instances := range []int{32, 512} {
+		b.Run(fmt.Sprintf("instances_%d", instances), func(b *testing.B) {
+			store := benchmarkCommittedSummaryNoQuantilesStore(b, instances)
+			snapshot := store.(*storeView).core.snapshot.Load()
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				flat := flattenSnapshot(snapshot)
+				benchmarkReaderCountSink = len(flat.series)
+			}
+		})
+	}
+}
+
 func BenchmarkCollectorStoreFlattenProjectionWarm(b *testing.B) {
 	for _, instances := range []int{32, 512} {
 		b.Run(fmt.Sprintf("structured_instances_%d", instances), func(b *testing.B) {
@@ -48,6 +98,85 @@ func BenchmarkCollectorStoreFlattenProjectionWarm(b *testing.B) {
 			}
 		})
 	}
+}
+
+func benchmarkCommittedHistogramStore(b *testing.B, totalSeries, totalLabels int) CollectorStore {
+	b.Helper()
+
+	store := NewCollectorStore()
+	cycle := benchmarkCycleController(b, store)
+	meter := store.Write().SnapshotMeter("reader.flatten")
+	labelNames := []string{"instance", "job", "method", "namespace", "region", "service", "status", "zone"}[:totalLabels]
+	vector := meter.Vec(labelNames...).Histogram(
+		"latency",
+		WithHistogramBounds(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30),
+	)
+	handles := make([]SnapshotHistogram, totalSeries)
+	for i := range handles {
+		labelValues := make([]string, totalLabels)
+		labelValues[0] = strconv.Itoa(i)
+		for j := 1; j < totalLabels; j++ {
+			labelValues[j] = fmt.Sprintf("value_%d", j)
+		}
+		handle, err := vector.GetWithLabelValues(labelValues...)
+		if err != nil {
+			b.Fatalf("create histogram handle: %v", err)
+		}
+		handles[i] = handle
+	}
+
+	buckets := []BucketPoint{
+		{UpperBound: 0.005, CumulativeCount: 1},
+		{UpperBound: 0.01, CumulativeCount: 2},
+		{UpperBound: 0.025, CumulativeCount: 3},
+		{UpperBound: 0.05, CumulativeCount: 4},
+		{UpperBound: 0.1, CumulativeCount: 5},
+		{UpperBound: 0.25, CumulativeCount: 6},
+		{UpperBound: 0.5, CumulativeCount: 7},
+		{UpperBound: 1, CumulativeCount: 8},
+		{UpperBound: 2.5, CumulativeCount: 9},
+		{UpperBound: 5, CumulativeCount: 10},
+		{UpperBound: 10, CumulativeCount: 11},
+		{UpperBound: 30, CumulativeCount: 12},
+	}
+	cycle.BeginCycle()
+	for _, handle := range handles {
+		handle.ObservePoint(HistogramPoint{
+			Count:   13,
+			Sum:     42,
+			Buckets: buckets,
+		})
+	}
+	if err := cycle.CommitCycleSuccess(); err != nil {
+		b.Fatalf("commit histogram store: %v", err)
+	}
+	return store
+}
+
+func benchmarkCommittedSummaryNoQuantilesStore(b *testing.B, totalSeries int) CollectorStore {
+	b.Helper()
+
+	store := NewCollectorStore()
+	cycle := benchmarkCycleController(b, store)
+	vector := store.Write().SnapshotMeter("reader.flatten").Vec("id").Summary("duration")
+	handles := make([]SnapshotSummary, totalSeries)
+	for i := range handles {
+		handle, err := vector.GetWithLabelValues(strconv.Itoa(i))
+		if err != nil {
+			b.Fatalf("create summary handle: %v", err)
+		}
+		handles[i] = handle
+	}
+
+	cycle.BeginCycle()
+	for i, handle := range handles {
+		value := SampleValue(i + 1)
+		handle.ObservePoint(SummaryPoint{Count: value, Sum: value * 10})
+	}
+	if err := cycle.CommitCycleSuccess(); err != nil {
+		b.Fatalf("commit summary store: %v", err)
+	}
+	return store
 }
 
 func BenchmarkCollectorStoreHostScopes(b *testing.B) {
