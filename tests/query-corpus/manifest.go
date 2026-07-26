@@ -241,6 +241,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "a metric collected once a minute, once per ten minutes or once an hour still answers when the dashboard zooms BELOW its collection interval: a 60-point request over a window shorter than one sample interval, fully inside the collected span, returns rows that carry the value - a chart that empties out when the user zooms in is indistinguishable from an outage",
 		Agent:  Green,
 	},
+	"CASE-023/percentage-of-time-denominator": {
+		Proves: "the denominator of percentage-of-time is the SELECTED duration, not the collected part of it: one collected second reading 1 followed by 99 seconds with nothing collected is 1% at `==1` and 99% at `==gap`, because uncollected time is time the condition did not hold - answering 100% would turn a node that went silent into a perfectly healthy one. percentage-of-samples keeps the opposite contract and reads 100%, because it answers about the samples it was handed",
+		Agent:  Red,
+	},
 	"CASE-023/trailing-gaps": {
 		Proves: "a condition that names a gap keeps accounting to the END of the requested window: the query engine stops walking a few buckets after a dimension's storage is exhausted and lets the caller fill the rest with EMPTY, which is the same answer for every other aggregation but silently truncates an outage for `==gap` - a dimension that stops being collected while its chart keeps going must read 100% gap for every remaining bucket, not for eleven of them",
 		Agent:  Red,
