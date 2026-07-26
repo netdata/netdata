@@ -121,6 +121,20 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
             // optional even under JSONC_REQUIRED: every alert written
             // before this field existed omits it
             JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "time_group_options", config->time_group_options, error, 0);
+
+            // and it has to parse, exactly as it does when the same alert
+            // arrives in a .conf file. The query API is lenient - an
+            // unreadable condition there silently compares equal to zero -
+            // but an alert that runs a condition its author did not write
+            // fires, or stays silent, for the wrong reason.
+            if(config->time_group_options) {
+                TG_EXPRESSION _e;
+                if(!tg_expression_parse(&_e, string2str(config->time_group_options))) {
+                    buffer_sprintf(error, "invalid condition '%s' in '%s.time_group_options'",
+                                   string2str(config->time_group_options), path);
+                    return false;
+                }
+            }
             // fall through
 
         case RRDR_GROUPING_TRIMMED_MEAN:
@@ -128,6 +142,18 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
         case RRDR_GROUPING_PERCENTILE:
             JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "time_group_value", config->time_group_value, error, flags);
             break;
+    }
+
+    // the written expression wins: the pair it implies replaces whatever the
+    // payload carried, so an alert cannot be stored claiming one condition
+    // and running another
+    if(config->time_group_options) {
+        TG_EXPRESSION e;
+        if(tg_expression_parse(&e, string2str(config->time_group_options))) {
+            config->time_group_condition = alert_lookup_condition_from_expression(e.cmp);
+            config->time_group_value =
+                (e.operand == TG_EXPRESSION_OPERAND_NUMBER) ? e.target : NAN;
+        }
     }
 
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", rrdr_options_parse_one, config->options, error, flags);
