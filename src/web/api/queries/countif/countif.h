@@ -46,12 +46,13 @@ static inline void tg_countif_free(RRDR *r) {
 static inline void tg_countif_add_point(RRDR *r, const TG_POINT *p) {
     struct tg_countif *g = (struct tg_countif *)r->time_grouping.data;
 
-    if(unlikely(!p->first))
-        return;
-
-    // this one deliberately keeps its historical tier behaviour: a stored
-    // point IS the sample here, so the condition is evaluated on it.
-    // percentage-of-time is the grouping that estimates across a window.
+    // this one deliberately keeps its historical behaviour: a delivered
+    // point IS a sample here, so the condition is evaluated on it and every
+    // delivery counts - including a wide point re-delivered to the buckets
+    // it spans, which is what the query engine has always fed this
+    // grouping. Skipping repeats would leave those buckets EMPTY and change
+    // results that predate this work. percentage-of-time is the grouping
+    // that reasons about a window instead.
     // a gap stands for every sample slot it covers, not for one point
     if(tg_expression_eval(&g->expr, p->value, p->is_gap))
         g->matched += p->samples;
