@@ -470,19 +470,20 @@ fn extend_active_hours_preserves_existing_hours_and_adds_accumulator_hours() {
 }
 
 #[test]
-fn open_tier_state_publishes_counts_without_row_heap() {
+fn open_tier_state_publishes_counts_and_accumulator_heap_without_rows() {
     let mut state = OpenTierState {
         generation: 42,
         minute_1_rows: 8,
         minute_5_rows: 4,
         hour_1_rows: 2,
+        accumulator_heap_bytes: 1_024,
     };
 
-    state.replace_counts(43, 80, 40, 20);
+    state.replace_snapshot(43, 80, 40, 20, 4_096);
 
     assert_eq!(state.generation, 43);
     assert_eq!(state.counts(), (80, 40, 20));
-    assert_eq!(state.estimated_heap_bytes(), 0);
+    assert_eq!(state.estimated_heap_bytes(), 4_096);
 }
 
 #[test]
@@ -490,6 +491,7 @@ fn recycled_container_capacity_is_reused_without_allocation() {
     let mut store = TierFlowIndexStore::default();
     let mut acc = TierAccumulator::new(TierKind::Minute1);
     let minute = 60_000_000_u64;
+    assert_eq!(acc.estimated_heap_bytes(), 0);
 
     // Fill one bucket with many unique flows to grow the container.
     for i in 0..512_u32 {
@@ -503,6 +505,10 @@ fn recycled_container_capacity_is_reused_without_allocation() {
             .expect("intern flow");
         acc.observe_flow(minute + 1, flow_ref, FlowMetrics::from_record(&rec));
     }
+    assert!(
+        acc.estimated_heap_bytes() > 0,
+        "active bucket allocation must be accounted"
+    );
 
     let taken = acc.take_closed_buckets(2 * minute);
     assert_eq!(taken.len(), 1);
@@ -512,6 +518,11 @@ fn recycled_container_capacity_is_reused_without_allocation() {
 
     acc.recycle(container);
     assert_eq!(acc.free_pool_len(), 1);
+    assert_eq!(acc.open_row_count(2 * minute), 0);
+    assert!(
+        acc.estimated_heap_bytes() > 0,
+        "recycled high-water capacity must remain accounted"
+    );
 
     // The next opened bucket must consume the recycled container and start at
     // the previous high-water capacity.
@@ -527,5 +538,9 @@ fn recycled_container_capacity_is_reused_without_allocation() {
     assert!(
         acc.bucket_capacity(2 * minute).expect("open bucket") >= grown_capacity,
         "recycled capacity must be retained"
+    );
+    assert!(
+        acc.estimated_heap_bytes() > 0,
+        "reused active capacity must remain accounted"
     );
 }

@@ -86,20 +86,23 @@ pub(crate) struct OpenTierState {
     pub(crate) minute_1_rows: u64,
     pub(crate) minute_5_rows: u64,
     pub(crate) hour_1_rows: u64,
+    pub(crate) accumulator_heap_bytes: usize,
 }
 
 impl OpenTierState {
-    pub(crate) fn replace_counts(
+    pub(crate) fn replace_snapshot(
         &mut self,
         generation: u64,
         minute_1_rows: u64,
         minute_5_rows: u64,
         hour_1_rows: u64,
+        accumulator_heap_bytes: usize,
     ) {
         self.generation = generation;
         self.minute_1_rows = minute_1_rows;
         self.minute_5_rows = minute_5_rows;
         self.hour_1_rows = hour_1_rows;
+        self.accumulator_heap_bytes = accumulator_heap_bytes;
     }
 
     pub(crate) fn counts(&self) -> (u64, u64, u64) {
@@ -107,9 +110,7 @@ impl OpenTierState {
     }
 
     pub(crate) const fn estimated_heap_bytes(&self) -> usize {
-        // This is deliberately count-only state. Keeping row copies here
-        // would duplicate every open rollup solely for chart sampling.
-        0
+        self.accumulator_heap_bytes
     }
 }
 

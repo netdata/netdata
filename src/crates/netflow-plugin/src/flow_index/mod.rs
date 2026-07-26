@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::hash::Hasher;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use crate::memory_estimation::hash_table_allocation_bytes;
 use hashbrown::HashTable;
 use std::mem::size_of;
 use storage::{FlowStorage, implicit_default_field_value};
@@ -1075,10 +1076,6 @@ impl FieldStore {
             Self::IpAddr(store) => store.estimated_heap_bytes(),
         }
     }
-}
-
-fn hash_table_allocation_bytes(capacity: usize, element_size: usize) -> usize {
-    capacity.saturating_mul(element_size.saturating_add(1))
 }
 
 #[cfg(test)]

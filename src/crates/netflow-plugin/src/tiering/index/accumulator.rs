@@ -2,7 +2,9 @@
 use super::super::model::OpenTierRow;
 use super::super::model::{FlowMetrics, TierFlowRef, TierKind};
 use super::super::rollup::{HOUR_BUCKET_USEC, bucket_start_usec};
+use crate::memory_estimation::{btree_container_overhead_bytes, hash_table_allocation_bytes};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::mem::size_of;
 
 pub(crate) type MetricBucket = HashMap<TierFlowRef, FlowMetrics>;
 
@@ -161,6 +163,33 @@ impl TierAccumulator {
             .sum()
     }
 
+    pub(crate) fn estimated_heap_bytes(&self) -> usize {
+        let active_bucket_storage = self
+            .buckets
+            .len()
+            .saturating_mul(size_of::<(u64, MetricBucket)>())
+            .saturating_add(btree_container_overhead_bytes(self.buckets.len()));
+        let active_entry_storage = self
+            .buckets
+            .values()
+            .map(metric_bucket_allocation_bytes)
+            .fold(0, usize::saturating_add);
+        let recycled_bucket_storage = self
+            .free
+            .capacity()
+            .saturating_mul(size_of::<MetricBucket>());
+        let recycled_entry_storage = self
+            .free
+            .iter()
+            .map(metric_bucket_allocation_bytes)
+            .fold(0, usize::saturating_add);
+
+        active_bucket_storage
+            .saturating_add(active_entry_storage)
+            .saturating_add(recycled_bucket_storage)
+            .saturating_add(recycled_entry_storage)
+    }
+
     pub(crate) fn extend_active_hours(&self, hours: &mut BTreeSet<u64>) {
         for bucket_start_usec in self.buckets.keys().copied() {
             // Every materialized bucket duration divides an hour, so all rows
@@ -168,4 +197,8 @@ impl TierAccumulator {
             hours.insert(bucket_start_usec / HOUR_BUCKET_USEC * HOUR_BUCKET_USEC);
         }
     }
+}
+
+fn metric_bucket_allocation_bytes(bucket: &MetricBucket) -> usize {
+    hash_table_allocation_bytes(bucket.capacity(), size_of::<(TierFlowRef, FlowMetrics)>())
 }

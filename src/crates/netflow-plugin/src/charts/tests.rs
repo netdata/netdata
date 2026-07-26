@@ -519,6 +519,7 @@ fn try_sample_open_tier_state_reads_current_counts() {
         minute_1_rows: 2,
         minute_5_rows: 1,
         hour_1_rows: 0,
+        accumulator_heap_bytes: 0,
     });
 
     let sample = try_sample_open_tier_state(&state).expect("open tier sample");
@@ -551,6 +552,7 @@ fn try_sample_open_tier_state_recovers_from_poison_and_clears_poisoned_state() {
         minute_1_rows: 1,
         minute_5_rows: 0,
         hour_1_rows: 0,
+        accumulator_heap_bytes: 0,
     }));
 
     let poisoned_state = Arc::clone(&state);
@@ -580,6 +582,7 @@ fn chart_sampler_work_helper_collects_production_sampler_inputs() {
         minute_1_rows: 1,
         minute_5_rows: 0,
         hour_1_rows: 0,
+        accumulator_heap_bytes: 0,
     });
     let tier_flow_indexes = RwLock::new(TierFlowIndexStore::default());
     let facet_runtime = FacetRuntime::new(tmp.path());
@@ -621,6 +624,7 @@ fn chart_sampler_work_helper_collects_memory_diagnostics_only_when_enabled() {
         minute_1_rows: 1,
         minute_5_rows: 0,
         hour_1_rows: 0,
+        accumulator_heap_bytes: 4_096,
     });
     let tier_flow_indexes = RwLock::new(TierFlowIndexStore::default());
     let facet_runtime = FacetRuntime::new(tmp.path());
@@ -669,7 +673,7 @@ fn chart_sampler_work_helper_collects_memory_diagnostics_only_when_enabled() {
         enabled_sample.memory_diagnostics.process_memory,
         ProcessMemorySample::default()
     );
-    assert_eq!(enabled_sample.memory_diagnostics.open_tier_bytes, 0);
+    assert_eq!(enabled_sample.memory_diagnostics.open_tier_bytes, 4_096);
 }
 
 #[test]
@@ -681,6 +685,7 @@ fn chart_sampler_work_helper_refreshes_memory_diagnostics_on_configured_cadence(
         minute_1_rows: 1,
         minute_5_rows: 0,
         hour_1_rows: 0,
+        accumulator_heap_bytes: 4_096,
     });
     let tier_flow_indexes = RwLock::new(TierFlowIndexStore::default());
     let facet_runtime = FacetRuntime::new(tmp.path());
@@ -710,7 +715,12 @@ fn chart_sampler_work_helper_refreshes_memory_diagnostics_on_configured_cadence(
         &mut state,
     );
     let first_bytes = first.memory_diagnostics.open_tier_bytes;
-    assert_eq!(first_bytes, 0);
+    assert_eq!(first_bytes, 4_096);
+
+    open_tiers
+        .write()
+        .expect("update open-tier heap estimate")
+        .accumulator_heap_bytes = 8_192;
 
     let second = sample_chart_sampler_work_for_test(
         &metrics,
@@ -732,5 +742,5 @@ fn chart_sampler_work_helper_refreshes_memory_diagnostics_on_configured_cadence(
         &config,
         &mut state,
     );
-    assert_eq!(third.memory_diagnostics.open_tier_bytes, first_bytes);
+    assert_eq!(third.memory_diagnostics.open_tier_bytes, 8_192);
 }

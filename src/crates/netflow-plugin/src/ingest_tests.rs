@@ -690,13 +690,16 @@ fn refresh_open_tier_state_publishes_complete_counts_under_concurrent_reads() {
             match open_tiers.try_read() {
                 Ok(state) => {
                     let counts = state.counts();
-                    let valid_empty = state.generation == 0 && counts == (0, 0, 0);
+                    let heap_bytes = state.estimated_heap_bytes();
+                    let valid_empty =
+                        state.generation == 0 && counts == (0, 0, 0) && heap_bytes == 0;
                     let valid_complete = state.generation == generation
-                        && counts == (FLOW_COUNT as u64, FLOW_COUNT as u64, FLOW_COUNT as u64);
+                        && counts == (FLOW_COUNT as u64, FLOW_COUNT as u64, FLOW_COUNT as u64)
+                        && heap_bytes > 0;
                     if !valid_empty && !valid_complete {
                         *reader_failure.lock().expect("record reader failure") = Some(format!(
-                            "observed partial open-tier state: generation={}, counts={:?}",
-                            state.generation, counts
+                            "observed partial open-tier state: generation={}, counts={:?}, heap_bytes={}",
+                            state.generation, counts, heap_bytes
                         ));
                         reader_stop.store(true, Ordering::Relaxed);
                         break;
@@ -733,6 +736,10 @@ fn refresh_open_tier_state_publishes_complete_counts_under_concurrent_reads() {
     assert_eq!(
         state.counts(),
         (FLOW_COUNT as u64, FLOW_COUNT as u64, FLOW_COUNT as u64)
+    );
+    assert!(
+        state.estimated_heap_bytes() > 0,
+        "published accumulator heap must be non-zero"
     );
 }
 
