@@ -1766,9 +1766,10 @@ static void rrdset_metric_correlations_volume(
         return;
     }
 
-    // this represents the percentage of time
-    // the highlighted window was above/below the baseline window
-    // (above or below depending on their averages)
+    // this is the percentage of SAMPLES (not of time) that the
+    // highlighted window was above/below the baseline window - the
+    // grouping used here is percentage-of-samples; percentage-of-time
+    // exists separately and is NOT what weights ranks on
     highlight_countif.value = highlight_countif.value / 100.0; // countif returns 0 - 100.0
 
     RESULT_FLAGS flags;

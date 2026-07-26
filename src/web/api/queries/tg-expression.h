@@ -45,7 +45,33 @@ typedef struct tg_expression {
     // the predecessor, carried across buckets and cleared per dimension
     NETDATA_DOUBLE previous;
     bool has_previous;
+
+    // the highest value of the previous stored window, for the
+    // monotone-drop rule above tier 0
+    NETDATA_DOUBLE previous_max;
 } TG_EXPRESSION;
+
+// One delivered point, as the expression groupings see it.
+//
+// Above tier 0 a stored point is not a sample: it is min/max/avg over
+// `count` raw samples. `duration` is the slice of the current bucket this
+// point covers, and `samples` the number of sample slots it stands for.
+typedef struct tg_point {
+    NETDATA_DOUBLE value;       // the fetched value - the average at tiers
+    NETDATA_DOUBLE min;
+    NETDATA_DOUBLE max;
+    size_t count;               // raw samples behind it; 1 at tier 0
+    time_t duration;
+    size_t samples;
+    bool is_gap;
+} TG_POINT;
+
+static inline bool tg_point_is_window(const TG_POINT *p) {
+    // a stored point that aggregates more than one raw sample, and whose
+    // extremes actually differ - otherwise it behaves like a sample
+    return p->count > 1 && netdata_double_isnumber(p->min) &&
+           netdata_double_isnumber(p->max) && p->max > p->min;
+}
 
 static inline bool tg_expression_token(const char *s, const char *token, size_t len) {
     // a token must be followed by the end of the string or whitespace, so
@@ -179,6 +205,7 @@ static inline bool tg_expression_wants_gaps(const TG_EXPRESSION *e) {
 static inline void tg_expression_reset(TG_EXPRESSION *e) {
     e->previous = 0.0;
     e->has_previous = false;
+    e->previous_max = 0.0;
 }
 
 static inline bool tg_expression_compare(TG_EXPRESSION_CMP cmp, NETDATA_DOUBLE value, NETDATA_DOUBLE target) {
@@ -228,6 +255,107 @@ static inline bool tg_expression_eval(TG_EXPRESSION *e, NETDATA_DOUBLE value, bo
     }
 
     return matched;
+}
+
+// The share of a STORED WINDOW that satisfied the condition, estimated
+// from the only statistics a tier keeps: min, max and the average.
+//
+// The model treats the window as if the value took just two values, min
+// and max, weighted so their mean is the recorded average:
+//
+//     weight(max) = (avg - min) / (max - min)
+//
+// That is EXACT for a 0/1 dimension - the shape a fleet availability
+// signal has - because there the average IS the fraction of time at 1. It
+// is an approximation for a continuous metric, where the interior estimate
+// does not move with the threshold; tier 0 is exact, so a query that needs
+// precision on a continuous threshold should ask for tier 0.
+//
+// Evaluating the condition on the average instead (what the engine does
+// for every other aggregation) is not usable here: a minute that was up
+// 30s and down 30s records avg=0.5, and both `>=1` and `==0` would then
+// answer "never".
+static inline NETDATA_DOUBLE tg_expression_window_fraction(
+    TG_EXPRESSION *e, const TG_POINT *p) {
+
+    NETDATA_DOUBLE w = (p->value - p->min) / (p->max - p->min);
+    if(w < 0.0) w = 0.0;
+    if(w > 1.0) w = 1.0;
+
+    const NETDATA_DOUBLE t = e->target;
+
+    switch(e->cmp) {
+        case TG_EXPRESSION_GREATEREQUAL:
+            if(t <= p->min) return 1.0;
+            if(t >  p->max) return 0.0;
+            return w;
+
+        case TG_EXPRESSION_GREATER:
+            if(t <  p->min) return 1.0;
+            if(t >= p->max) return 0.0;
+            return w;
+
+        case TG_EXPRESSION_LESSEQUAL:
+            if(t >= p->max) return 1.0;
+            if(t <  p->min) return 0.0;
+            return 1.0 - w;
+
+        case TG_EXPRESSION_LESS:
+            if(t >  p->max) return 1.0;
+            if(t <= p->min) return 0.0;
+            return 1.0 - w;
+
+        case TG_EXPRESSION_EQUAL:
+            // only the two mass points carry any weight under this model
+            if(t == p->min) return 1.0 - w;
+            if(t == p->max) return w;
+            return 0.0;
+
+        case TG_EXPRESSION_NOTEQUAL:
+            if(t == p->min) return w;
+            if(t == p->max) return 1.0 - w;
+            return 1.0;
+    }
+
+    return 0.0;
+}
+
+// The share of one delivered point that satisfied the condition: 0 or 1
+// for a sample, an estimate in between for a stored window.
+//
+// Gap and predecessor operands are NOT estimated across a window - a
+// stored window keeps no gap positions and no ordering. `<previous` is the
+// exception: a window whose minimum falls below the previous window's
+// maximum proves at least one drop, which is what counts a reboot.
+static inline NETDATA_DOUBLE tg_expression_share(TG_EXPRESSION *e, const TG_POINT *p) {
+    NETDATA_DOUBLE share;
+
+    if(e->operand == TG_EXPRESSION_OPERAND_PREVIOUS && tg_point_is_window(p) && e->has_previous) {
+        bool dropped = (e->cmp == TG_EXPRESSION_LESS || e->cmp == TG_EXPRESSION_LESSEQUAL) &&
+                       netdata_double_isnumber(p->min) && p->min < e->previous_max;
+
+        share = dropped ? 1.0 : (tg_expression_eval(e, p->value, p->is_gap) ? 1.0 : 0.0);
+        e->previous_max = p->max;
+        return share;
+    }
+
+    if(e->operand == TG_EXPRESSION_OPERAND_NUMBER && tg_point_is_window(p)) {
+        share = tg_expression_window_fraction(e, p);
+
+        // keep the predecessor chain intact for a later switch of operand
+        if(!p->is_gap) {
+            e->previous = p->value;
+            e->has_previous = true;
+        }
+        e->previous_max = p->max;
+        return share;
+    }
+
+    share = tg_expression_eval(e, p->value, p->is_gap) ? 1.0 : 0.0;
+    if(!p->is_gap && netdata_double_isnumber(p->max))
+        e->previous_max = p->max;
+
+    return share;
 }
 
 #endif //NETDATA_API_QUERY_TG_EXPRESSION_H

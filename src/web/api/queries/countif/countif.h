@@ -43,19 +43,23 @@ static inline void tg_countif_free(RRDR *r) {
     r->time_grouping.data = NULL;
 }
 
-static inline void tg_countif_add_point(
-    RRDR *r, NETDATA_DOUBLE value, bool is_gap, time_t duration __maybe_unused, size_t samples) {
+static inline void tg_countif_add_point(RRDR *r, const TG_POINT *p) {
     struct tg_countif *g = (struct tg_countif *)r->time_grouping.data;
 
+    // this one deliberately keeps its historical tier behaviour: a stored
+    // point IS the sample here, so the condition is evaluated on it.
+    // percentage-of-time is the grouping that estimates across a window.
     // a gap stands for every sample slot it covers, not for one point
-    if(tg_expression_eval(&g->expr, value, is_gap))
-        g->matched += samples;
+    if(tg_expression_eval(&g->expr, p->value, p->is_gap))
+        g->matched += p->samples;
 
-    g->count += samples;
+    g->count += p->samples;
 }
 
 static inline void tg_countif_add(RRDR *r, NETDATA_DOUBLE value) {
-    tg_countif_add_point(r, value, false, 1, 1);
+    TG_POINT p = { .value = value, .min = value, .max = value, .count = 1,
+                   .duration = 1, .samples = 1, .is_gap = false };
+    tg_countif_add_point(r, &p);
 }
 
 static inline NETDATA_DOUBLE tg_countif_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {

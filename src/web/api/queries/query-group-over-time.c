@@ -757,7 +757,10 @@ RRDR_TIME_GROUPING time_grouping_parse(const char *name, RRDR_TIME_GROUPING def)
 }
 
 // the historical name of time_grouping_id2txt(): both walked the registry
-// and returned the first row matching the value, so they were one function
+// and returned the first row matching the value. They differed only for an
+// enum value that is not in the registry, where this one used to answer
+// "unknown" - "average" is the truthful answer, because that is what
+// rrdr_set_grouping_function() actually falls back to.
 const char *time_grouping_tostring(RRDR_TIME_GROUPING group) {
     return time_grouping_id2txt(group);
 }
@@ -790,22 +793,22 @@ void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method) {
 }
 
 ALWAYS_INLINE_HOT_FLATTEN
-void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, bool is_gap, time_t duration, size_t samples, const RRDR_TIME_GROUPING add_flush) {
+void time_grouping_add(RRDR *r, const struct tg_point *p, const RRDR_TIME_GROUPING add_flush) {
     switch(add_flush) {
         case RRDR_GROUPING_PERCENTAGE_OF_TIME:
-            tg_percentage_of_time_add_point(r, value, is_gap, duration, samples);
+            tg_percentage_of_time_add_point(r, p);
             return;
 
         case RRDR_GROUPING_NUMBER_OF_FLAPS:
-            tg_number_of_flaps_add_point(r, value, is_gap, duration, samples);
+            tg_number_of_flaps_add_point(r, p);
             return;
 
         case RRDR_GROUPING_NUMBER_OF_TIMES:
-            tg_number_of_times_add_point(r, value, is_gap, duration, samples);
+            tg_number_of_times_add_point(r, p);
             return;
 
         case RRDR_GROUPING_COUNTIF:
-            tg_countif_add_point(r, value, is_gap, duration, samples);
+            tg_countif_add_point(r, p);
             return;
 
         default:
@@ -813,8 +816,10 @@ void time_grouping_add(RRDR *r, NETDATA_DOUBLE value, bool is_gap, time_t durati
     }
 
     // only the four expression groupings above accept gap slots
-    if(unlikely(is_gap))
+    if(unlikely(p->is_gap))
         return;
+
+    const NETDATA_DOUBLE value = p->value;
 
     switch(add_flush) {
         case RRDR_GROUPING_AVERAGE:

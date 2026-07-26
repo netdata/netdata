@@ -1046,8 +1046,29 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
         }
         else if(options & RRDR_OPTION_PERCENTAGE)
             units = "%";
-        else
-            units = rrdset_units(st);
+        else {
+            // the groupings that answer a question ABOUT the samples report
+            // their own units, not the metric's
+            switch(group) {
+                case RRDR_GROUPING_CV:
+                case RRDR_GROUPING_COUNTIF:
+                case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+                    units = "%";
+                    break;
+
+                case RRDR_GROUPING_NUMBER_OF_FLAPS:
+                    units = "flaps";
+                    break;
+
+                case RRDR_GROUPING_NUMBER_OF_TIMES:
+                    units = "events";
+                    break;
+
+                default:
+                    units = rrdset_units(st);
+                    break;
+            }
+        }
     }
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: API command 'badge.svg' for chart '%s', alarm '%s', dimensions '%s', after '%lld', before '%lld', points '%d', group '%d', options '0x%08x'"

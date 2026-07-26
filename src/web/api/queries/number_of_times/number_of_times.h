@@ -43,19 +43,28 @@ static inline void tg_number_of_times_free(RRDR *r) {
     r->time_grouping.data = NULL;
 }
 
-static inline void tg_number_of_times_add_point(
-    RRDR *r, NETDATA_DOUBLE value, bool is_gap, time_t duration __maybe_unused, size_t samples) {
+static inline void tg_number_of_times_add_point(RRDR *r, const TG_POINT *p) {
     struct tg_number_of_times *g = (struct tg_number_of_times *)r->time_grouping.data;
 
-    // a gap stands for every sample slot it covers, not for one point
-    if(tg_expression_eval(&g->expr, value, is_gap))
-        g->times += samples;
+    NETDATA_DOUBLE share = tg_expression_share(&g->expr, p);
 
-    g->count += samples;
+    if(tg_point_is_window(p)) {
+        // a stored window keeps no ordering, so occurrences inside it
+        // collapse to one - the count-as-1 rule
+        if(share > 0.0)
+            g->times++;
+    }
+    else if(share > 0.0)
+        // a gap stands for every sample slot it covers, not for one point
+        g->times += p->samples;
+
+    g->count += p->samples;
 }
 
 static inline void tg_number_of_times_add(RRDR *r, NETDATA_DOUBLE value) {
-    tg_number_of_times_add_point(r, value, false, 1, 1);
+    TG_POINT p = { .value = value, .min = value, .max = value, .count = 1,
+                   .duration = 1, .samples = 1, .is_gap = false };
+    tg_number_of_times_add_point(r, &p);
 }
 
 static inline NETDATA_DOUBLE tg_number_of_times_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
