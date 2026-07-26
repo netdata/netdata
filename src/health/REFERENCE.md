@@ -622,6 +622,37 @@ or `<>`); with no operator the value compares equal. The value is one of:
 
 There are no `and`/`or` compounds.
 
+### Above tier 0
+
+Netdata keeps full detail only briefly; older data is stored as per-window
+minimum, maximum, average and count. A stored window is therefore not a
+sample, and asking a condition of its average is misleading: a minute that
+was up 30s and down 30s has an average of 0.5, so both `>=1` and `==0` would
+answer "never".
+
+These groupings instead estimate the share of each stored window that
+satisfied the condition, treating the window as if the value took only its
+minimum and its maximum, weighted so their mean is the recorded average.
+That is **exact for a 0/1 signal** - an availability metric - because there
+the average IS the fraction of time at 1.
+
+Limits, all of which disappear at tier 0 (request `tier: 0`):
+
+- For a continuous metric the estimate inside the range does not move with
+  the threshold; it is a share of the window, not a precise crossing count.
+- `number-of-flaps` and `number-of-times` collapse everything inside one
+  stored window to a single event, because the rollup keeps no ordering.
+  This is an approximation in both directions, not a lower bound.
+- `previous`/`last` keeps only the monotone drop: a window whose minimum
+  falls below the previous window's maximum proves the value went backwards,
+  so reboot counting works. Other predecessor comparisons are answered on
+  the window average.
+- Gap tokens are not estimated across a window: a partly-collected window
+  counts as collected.
+- `percentage-of-samples` keeps its historical behaviour, where a stored
+  window counts as one sample.
+
+
 Examples:
 
 ```text

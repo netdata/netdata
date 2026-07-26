@@ -59,7 +59,8 @@ static inline void tg_percentage_of_time_add_point(RRDR *r, const TG_POINT *p) {
 // rrdr_set_grouping_function need every row to have one)
 static inline void tg_percentage_of_time_add(RRDR *r, NETDATA_DOUBLE value) {
     TG_POINT p = { .value = value, .min = value, .max = value, .count = 1,
-                   .duration = 1, .samples = 1, .is_gap = false };
+                   .sum = value, .duration = 1, .samples = 1,
+                   .is_gap = false, .first = true };
     tg_percentage_of_time_add_point(r, &p);
 }
 

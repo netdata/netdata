@@ -88,6 +88,30 @@ static NETDATA_DOUBLE query_point_grouping_value(
 //
 // Gaps reach a grouping ONLY when its expression named a gap token.
 #define query_add_point_to_group(r, point, ops, add_flush, now_end_time)   do {  \
+    if(likely(!time_grouping_is_expression(add_flush))) {                   \
+        /* the common path: unchanged, and none of the accounting below */  \
+        if(likely(netdata_double_isnumber((point).value))) {                \
+            if(likely(fpclassify((point).value) != FP_ZERO))                \
+                (ops)->group_points_non_zero++;                             \
+                                                                            \
+            if(unlikely((point).sp.flags & SN_FLAG_RESET))                  \
+                (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
+                                                                            \
+            NETDATA_DOUBLE _v =                                             \
+                query_point_grouping_value(point, ops, add_flush);          \
+            TG_POINT _tgs = { .value = _v, .sum = _v, .min = _v, .max = _v, \
+                              .count = 1, .duration = 1, .samples = 1,      \
+                              .is_gap = false, .first = true };             \
+            time_grouping_add(r, &_tgs, add_flush);                         \
+                                                                            \
+            storage_point_merge_to((ops)->group_point, (point).sp);         \
+            if(!(point).added)                                              \
+                storage_point_merge_to((ops)->query_point, (point).sp);     \
+        }                                                                   \
+        (ops)->group_points_added++;                                        \
+        break;                                                              \
+    }                                                                       \
+                                                                            \
     time_t _slot_from = (now_end_time) - (ops)->view_update_every           \
                         + (time_t)(ops)->group_covered_s;                   \
     time_t _from, _to;                                                      \
@@ -127,11 +151,20 @@ static NETDATA_DOUBLE query_point_grouping_value(
                                                                             \
         NETDATA_DOUBLE grouping_value =                                     \
             query_point_grouping_value(point, ops, add_flush);              \
+        /* under anomaly-bit the value is an anomaly RATE while sp.min and \
+         * sp.max stay in the metric's own domain, so the window model      \
+         * would compare unrelated numbers - count 1 forces the stepwise    \
+         * evaluation on the delivered value */                             \
+        size_t _pcount = (point).sp.count;                                  \
+        if(unlikely((r)->internal.qt->window.options & RRDR_OPTION_ANOMALY_BIT)) \
+            _pcount = 1;                                                    \
+                                                                            \
         TG_POINT _tgp = { .value = grouping_value,                          \
+                          .sum = (point).sp.sum,                            \
                           .min = (point).sp.min, .max = (point).sp.max,     \
-                          .count = (point).sp.count,                        \
+                          .count = _pcount,                                 \
                           .duration = _duration, .samples = _samples,       \
-                          .is_gap = false };                                \
+                          .is_gap = false, .first = !(point).added };       \
         time_grouping_add(r, &_tgp, add_flush);                             \
                                                                             \
         storage_point_merge_to((ops)->group_point, (point).sp);             \
@@ -141,9 +174,10 @@ static NETDATA_DOUBLE query_point_grouping_value(
     else if(unlikely((r)->time_grouping.wants_gaps && _duration > 0)) {                      \
         /* a gap contributes neither a value nor retention: only the        \
          * expression groupings see it, and only as "no data here" */       \
-        TG_POINT _tgg = { .value = NAN, .min = NAN, .max = NAN, .count = 0, \
+        TG_POINT _tgg = { .value = NAN, .sum = NAN,                         \
+                          .min = NAN, .max = NAN, .count = 0,               \
                           .duration = _duration, .samples = _samples,       \
-                          .is_gap = true };                                 \
+                          .is_gap = true, .first = true };                  \
         time_grouping_add(r, &_tgg, add_flush);                             \
     }                                                                       \
                                                                             \

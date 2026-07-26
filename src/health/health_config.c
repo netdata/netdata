@@ -198,6 +198,8 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
     ac->before = 0;
     ac->update_every = 0;
     ac->options = 0;
+    string_freez(ac->time_group_options);
+    ac->time_group_options = NULL;
     ac->time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
     ac->time_group_value = NAN;
 

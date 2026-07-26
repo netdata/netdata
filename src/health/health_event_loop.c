@@ -568,6 +568,19 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                         group_options = group_options_buf;
                         break;
 
+                    case RRDR_GROUPING_COUNTIF:
+                    case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+                    case RRDR_GROUPING_NUMBER_OF_FLAPS:
+                    case RRDR_GROUPING_NUMBER_OF_TIMES:
+                        // an alert stored before the expression column
+                        // existed carries only the condition/value pair
+                        snprintfz(group_options_buf, sizeof(group_options_buf),
+                                  "%s" NETDATA_DOUBLE_FORMAT_AUTO,
+                                  alerts_group_conditions_id2txt(rc->config.time_group_condition),
+                                  rc->config.time_group_value);
+                        group_options = group_options_buf;
+                        break;
+
                     default:
                         break;
                 }
