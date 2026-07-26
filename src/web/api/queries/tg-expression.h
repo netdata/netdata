@@ -304,11 +304,14 @@ static inline bool tg_expression_eval(TG_EXPRESSION *e, NETDATA_DOUBLE value, bo
 //
 //     weight(max) = (avg - min) / (max - min)
 //
-// That is EXACT for a 0/1 dimension - the shape a fleet availability
-// signal has - because there the average IS the fraction of time at 1. It
-// is an approximation for a continuous metric, where the interior estimate
-// does not move with the threshold; tier 0 is exact, so a query that needs
-// precision on a continuous threshold should ask for tier 0.
+// For a 0/1 dimension - the shape a fleet availability signal has - that
+// is exact whenever the window's samples are evenly spaced, because the
+// average is then the fraction of time at 1. A rollup keeps a count and a
+// span but not per-sample durations, so a window whose cadence changed
+// mid-way is weighted by SAMPLES rather than by time and the two differ.
+// It is an approximation for a continuous metric in any case, because the
+// interior estimate does not move with the threshold. tier 0 is exact, so
+// a query that needs precision should ask for tier 0.
 //
 // Evaluating the condition on the average instead (what the engine does
 // for every other aggregation) is not usable here: a minute that was up
