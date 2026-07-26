@@ -622,26 +622,6 @@ or `<>`); with no operator the value compares equal. The value is one of:
 
 There are no `and`/`or` compounds.
 
-### Accuracy over long windows
-
-Netdata keeps per-second detail only for a limited time; older data is kept
-at lower resolution. Over a window long enough to read that older data,
-these groupings return an **estimate**:
-
-- For a metric that is only ever 0 or 1 - an availability signal - the
-  estimate is exact.
-- For other metrics it is approximate.
-- `number-of-flaps` and `number-of-times` count at most one event per stored
-  interval, so bursts of events close together are reported as one.
-- `number-of-times` with `previous` still detects a counter going backwards,
-  so reboot counting keeps working.
-- A gap inside a stored interval is not visible, so partially collected
-  intervals count as collected.
-
-Add `"tier": 0` to the request for exact answers, and check `db.per_tier` in
-the response to confirm tier 0 actually served the query. Tier 0 retention is
-short on busy parents, so a long window will not always have it.
-
 ### Expressions Overview
 
 **Why This Matters:** Netdata has an internal infix expression parser that allows you to create complex alert logic using mathematical operations, comparisons, and conditional statements.
