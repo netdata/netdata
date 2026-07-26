@@ -622,6 +622,325 @@ or `<>`); with no operator the value compares equal. The value is one of:
 
 There are no `and`/`or` compounds.
 
+The result of the lookup will be available as `$this` and `$NAME` in expressions. The timestamps of the timeframe evaluated by the database lookup are available as variables `$after` and `$before` (both are unix timestamps).
+
+#### Alert Line `calc`
+
+**Purpose:** You can design a `calc` to apply some calculation to the values or variables available to the entity.
+
+**Key Points:**
+
+- The result becomes available as `$this` variable
+- Overwrites the value from your `lookup`
+- Can be used without `lookup` if using [other available variables](#variables-reference)
+- Uses [expressions](#expressions-overview) for syntax
+
+```text
+calc: EXPRESSION
+```
+
+**When to Use:**
+
+- **With `lookup`:** Perform calculation after database retrieval
+- **Without `lookup`:** When using other available variables
+- **For complex logic:** Mathematical operations, conditions, transformations
+
+#### Alert Line `every`
+
+**Purpose:** Sets the update frequency of this alert.
+
+```text
+every: DURATION
+```
+
+**Supported Units:**
+
+- `s` for seconds
+- `m` for minutes
+- `h` for hours
+- `d` for days
+
+**Example:** `every: 30s` checks the alert every 30 seconds.
+
+#### Alert Lines `green` and `red`
+
+**Purpose:** Set the green and red thresholds of a chart for visualization.
+
+```text
+green: NUMBER
+red: NUMBER
+```
+
+**Important Notes:**
+
+- Both values are available as `$green` and `$red` in expressions
+- If multiple alerts define different thresholds, the first alert's values are used
+- For multiple threshold sets, use absolute numbers instead of variables
+
+#### Alert Lines `warn` and `crit`
+
+**Purpose:** Define the expressions that trigger warning or critical alerts.
+
+```text
+warn: EXPRESSION
+crit: EXPRESSION
+```
+
+**Key Points:**
+
+- Optional (but you need at least one)
+- Should evaluate to true/false (or zero/non-zero)
+- Uses Netdata's [expression syntax](#expressions-overview)
+- Can reference variables like `$this`, `$green`, `$red`
+
+**Examples:**
+
+```text
+warn: $this > 80
+crit: $this > 95
+```
+
+#### Alert Line `to`
+
+**Purpose:** Specifies who receives notifications when the alert changes status.
+
+```text
+to: ROLE1 ROLE2 ROLE3 ...
+```
+
+**How It Works:**
+
+- First parameter passed to the `exec` script
+- Default script (`alarm-notify.sh`) treats this as a space-separated list of roles
+- Roles are consulted to find exact recipients per notification method
+
+#### Alert Line `exec`
+
+**Purpose:** Script to execute when the alert status changes.
+
+```text
+exec: SCRIPT
+```
+
+**Default Behavior:**
+
+- Default script is Netdata's `alarm-notify.sh`
+- Supports all notification methods Netdata supports
+- Includes custom hooks
+
+#### Alert Line `delay`
+
+**Purpose:** Provide optional hysteresis settings to prevent notification floods.
+
+:::important
+
+These settings don't affect the actual alert - only when the `exec` script is executed.
+
+:::
+
+**Full Syntax:**
+
+```text
+delay: [[[up U] [down D] multiplier M] max X]
+```
+
+**Parameters:**
+
+| Parameter      | Purpose                                                      | Default       |
+|----------------|--------------------------------------------------------------|---------------|
+| `up U`         | Delay for status increases (CLEAR→WARNING, WARNING→CRITICAL) | 0             |
+| `down D`       | Delay for status decreases (CRITICAL→WARNING, WARNING→CLEAR) | 0             |
+| `multiplier M` | Multiplies U and D when alert changes state during delay     | 1.0           |
+| `max X`        | Maximum absolute notification delay                          | max(U×M, D×M) |
+
+**Example with Timeline:**
+
+```text
+delay: up 10s down 15m multiplier 2 max 1h
+```
+
+Starting at `00:00:00` with CLEAR status:
+
+| Time     | New Status | Delay Applied  | Notification At | Reason                                    |
+|----------|------------|----------------|-----------------|-------------------------------------------|
+| 00:00:01 | WARNING    | `up 10s`       | 00:00:11        | First state switch                        |
+| 00:00:05 | CLEAR      | `down 15m x2`  | 00:30:05        | Alert changed during delay, so multiplied |
+| 00:00:06 | WARNING    | `up 10s x2 x2` | 00:00:26        | Multiplied twice                          |
+
+#### Alert Line `repeat`
+
+**Purpose:** Defines the interval between repeating notifications for alerts in CRITICAL or WARNING mode.
+
+```text
+repeat: [off] [warning DURATION] [critical DURATION]
+```
+
+**Options:**
+
+| Option              | Effect                                                   |
+|---------------------|----------------------------------------------------------|
+| `off`               | Turns off repeating for this alert                       |
+| `warning DURATION`  | Repeat interval for WARNING state (use `0s` to disable)  |
+| `critical DURATION` | Repeat interval for CRITICAL state (use `0s` to disable) |
+
+**Why Use This:** Overrides default repeat settings from `netdata.conf` health configuration.
+
+#### Alert Line `options`
+
+**Purpose:** Special alert behavior options.
+
+```text
+options: no-clear-notification
+```
+
+**Available Options:**
+
+- `no-clear-notification` - Prevents clearing the alert notification
+
+**When to Use `no-clear-notification`:**
+
+- Alerts comparing two time frames (e.g., last 3 minutes vs last hour)
+- When newer data might "pollute" the baseline comparison
+- When clearing conditions are unreliable due to data characteristics
+
+**Example Use Case:** HTTP response time alert comparing recent average to historical average - as time passes, the recent slow responses become part of the historical data, making the alert appear "cleared" even though the underlying issue wasn't resolved.
+
+#### Alert Line `host labels`
+
+**Purpose:** Restricts alerts to hosts with matching labels.
+
+**Prerequisites:** See our [host labels guide](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md) for setup instructions.
+
+**Example Configuration:**
+
+```text
+[host labels]
+    installed = 20191211
+    room = server
+```
+
+**Usage in Alerts:**
+
+```text
+host labels: room = server
+```
+
+**Pattern Support:**
+
+```text
+host labels: installed = 201*  # Matches all hosts installed in 2010s
+```
+
+**How It Works:**
+
+- Space-separated list
+- Accepts [simple patterns](/src/libnetdata/simple_pattern/README.md)
+- Alert only loads on matching hosts
+
+#### Alert Line `chart labels`
+
+**Purpose:** Filters alerts based on chart labels.
+
+**How to Find Chart Labels:** Check `http://localhost:19999/api/v1/charts?all`
+
+**Example Use Case:**
+Each `disk_space` chart has a `mount_point` label. To exclude external disk alerts:
+
+```text
+chart labels: mount_point=!/mnt/disk1 *
+```
+
+**Multiple Label Logic:**
+
+```text
+chart labels: mount_point=/mnt/disk1 device=sda
+```
+
+This requires BOTH conditions to be true (AND logic).
+
+:::important
+
+- Space-separated list with [simple patterns](/src/libnetdata/simple_pattern/README.md) support
+- If a specified label doesn't exist on the chart, the chart won't match
+- Multiple labels use AND logic
+- Alerts based on `chart labels` require the underlying chart to exist. For example, a `disk.space` chart is only created when a mount point is present and collected. For example, if a CIFS mount fails to mount after a system reboot, no `disk.space` chart will exist for that mount point, and the alert will not activate
+
+:::
+
+#### Alert Line `summary`
+
+**Purpose:** Brief title of the alert used in notifications and dashboard.
+
+```text
+summary: Available Ram
+```
+
+**Variable Support:**
+
+| Variable              | Replaced With                |
+|-----------------------|------------------------------|
+| `${family}`           | Family instance (e.g., eth0) |
+| `${label:LABEL_NAME}` | Chart label value            |
+
+**Example with Variables:**
+
+```text
+summary: 1 minute received traffic overflow for ${label:device}
+```
+
+Renders as: `1 minute received traffic overflow for eth0`
+
+:::note
+
+Variable names are case-sensitive.
+
+:::
+
+#### Alert Line `info`
+
+**Purpose:** Detailed description of the alert for notifications and UI elements.
+
+```text
+info: Percentage of estimated amount of RAM available for userspace processes, without causing swapping
+```
+
+**Variable Support:**
+
+| Variable              | Replaced With                |
+|-----------------------|------------------------------|
+| `${family}`           | Family instance (e.g., eth0) |
+| `${label:LABEL_NAME}` | Chart label value            |
+
+**Examples with Variables:**
+
+**Family Variable:**
+
+```text
+info: average inbound utilization for the network interface ${family} over the last minute
+```
+
+Renders as: `average inbound utilization for the network interface eth0 over the last minute`
+
+**Label Variable:**
+
+```text
+info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site ${label:target}
+```
+
+Renders as: `average ratio of HTTP responses with unexpected status over the last 5 minutes for the site https://netdata.cloud/`
+
+**Next Steps:** Continue to [Expressions and Variables](#expressions-and-variables) to understand the calculation syntax, or jump to [Alert Examples](#alert-examples) for practical implementations.
+
+## Expressions and Variables
+
+:::tip
+
+**What You'll Learn**
+
+How to write calculations and use variables in your alert definitions. Essential for creating custom logic and accessing chart data.
+
+:::
+
 ### Expressions Overview
 
 **Why This Matters:** Netdata has an internal infix expression parser that allows you to create complex alert logic using mathematical operations, comparisons, and conditional statements.
