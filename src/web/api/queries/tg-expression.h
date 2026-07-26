@@ -100,10 +100,12 @@ static inline NETDATA_DOUBLE tg_point_average(const TG_POINT *p) {
 }
 
 static inline bool tg_point_is_window(const TG_POINT *p) {
-    // a stored point that aggregates more than one raw sample, and whose
-    // extremes actually differ - otherwise it behaves like a sample
+    // a stored point that aggregates more than one raw sample. A window
+    // whose extremes are equal is still a window, not a sample: its value
+    // is its own average, never the interpolated value the query engine
+    // hands to a view bucket narrower than the window.
     return p->count > 1 && netdata_double_isnumber(p->min) &&
-           netdata_double_isnumber(p->max) && p->max > p->min;
+           netdata_double_isnumber(p->max);
 }
 
 static inline bool tg_expression_token(const char *s, const char *token, size_t len) {
@@ -314,6 +316,12 @@ static inline bool tg_expression_eval(TG_EXPRESSION *e, NETDATA_DOUBLE value, bo
 // answer "never".
 static inline NETDATA_DOUBLE tg_expression_window_fraction(
     TG_EXPRESSION *e, const TG_POINT *p) {
+
+    if(p->max <= p->min)
+        // the window never moved, so there is nothing to estimate: it held
+        // one value for its whole duration and either satisfied the
+        // condition or did not
+        return tg_expression_compare(e->cmp, tg_point_average(p), e->target) ? 1.0 : 0.0;
 
     NETDATA_DOUBLE w = (tg_point_average(p) - p->min) / (p->max - p->min);
     if(w < 0.0) w = 0.0;
