@@ -171,18 +171,18 @@ const char *database_migrate_v16_v17[] = {
 
 // Note: Same as database_migrate_v16_v17. This is not wrong
 //       Do additional migration to handle agents that created wrong alert_hash table
-// adds the alert lookup condition as written, so gap tokens and the
-// predecessor keyword survive a restart
-const char *database_migrate_v18_v19[] = {
-    "ALTER TABLE alert_hash ADD time_group_options text",
-    NULL
-};
-
 const char *database_migrate_v17_v18[] = {
     "ALTER TABLE alert_hash ADD time_group_condition INT",
     "ALTER TABLE alert_hash ADD time_group_value DOUBLE",
     "ALTER TABLE alert_hash ADD dims_group INT",
     "ALTER TABLE alert_hash ADD data_source INT",
+    NULL
+};
+
+// adds the alert lookup condition as written, so gap tokens and the
+// predecessor keyword survive a restart
+const char *database_migrate_v18_v19[] = {
+    "ALTER TABLE alert_hash ADD time_group_options text",
     NULL
 };
 
@@ -446,18 +446,18 @@ static int do_migration_v16_v17(sqlite3 *database)
     return 0;
 }
 
-static int do_migration_v18_v19(sqlite3 *database)
-{
-    if (table_exists_in_database(database, "alert_hash") && !column_exists_in_table(database, "alert_hash", "time_group_options"))
-        return init_database_batch(database, &database_migrate_v18_v19[0], "meta_migrate");
-
-    return 0;
-}
-
 static int do_migration_v17_v18(sqlite3 *database)
 {
     if (table_exists_in_database(database, "alert_hash") && !column_exists_in_table(database, "alert_hash", "time_group_condition"))
         return init_database_batch(database, &database_migrate_v17_v18[0], "meta_migrate");
+
+    return 0;
+}
+
+static int do_migration_v18_v19(sqlite3 *database)
+{
+    if (table_exists_in_database(database, "alert_hash") && !column_exists_in_table(database, "alert_hash", "time_group_options"))
+        return init_database_batch(database, &database_migrate_v18_v19[0], "meta_migrate");
 
     return 0;
 }
