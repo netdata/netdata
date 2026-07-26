@@ -5492,7 +5492,24 @@ fn flow_record_encode_journal_round_trip() {
     // Encode to journal buffer
     let mut data = Vec::new();
     let mut refs = Vec::new();
-    rec.encode_to_journal_buf(&mut data, &mut refs);
+    let mut value_starts = Vec::new();
+    rec.encode_to_journal_buf(&mut data, &mut refs, &mut value_starts);
+
+    assert_eq!(refs.len(), value_starts.len());
+    for (index, (range, value_start)) in refs.iter().zip(&value_starts).enumerate() {
+        assert_eq!(data[*value_start - 1], b'=');
+        assert!(
+            refs[..index]
+                .iter()
+                .all(|previous| data[previous.clone()] != data[range.clone()]),
+            "journal encoder must not emit duplicate KEY=value payloads"
+        );
+
+        let mut reconstructed = data[range.start..(*value_start - 1)].to_vec();
+        reconstructed.push(b'=');
+        reconstructed.extend_from_slice(&data[*value_start..range.end]);
+        assert_eq!(reconstructed, data[range.clone()]);
+    }
 
     // Parse back: each ref points to a "KEY=VALUE" slice in data
     let mut parsed = FlowFields::new();
@@ -5561,7 +5578,8 @@ fn flow_record_encode_journal_omits_undefined_direction() {
 
     let mut data = Vec::new();
     let mut refs = Vec::new();
-    rec.encode_to_journal_buf(&mut data, &mut refs);
+    let mut value_starts = Vec::new();
+    rec.encode_to_journal_buf(&mut data, &mut refs, &mut value_starts);
 
     let encoded = refs
         .iter()

@@ -1,5 +1,7 @@
-use super::super::model::{FlowMetrics, OpenTierRow, TierFlowRef, TierKind};
-use super::super::rollup::bucket_start_usec;
+#[cfg(test)]
+use super::super::model::OpenTierRow;
+use super::super::model::{FlowMetrics, TierFlowRef, TierKind};
+use super::super::rollup::{HOUR_BUCKET_USEC, bucket_start_usec};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 pub(crate) type MetricBucket = HashMap<TierFlowRef, FlowMetrics>;
@@ -125,6 +127,7 @@ impl TierAccumulator {
         rows
     }
 
+    #[cfg(test)]
     pub(crate) fn snapshot_open_rows_into(&self, now_usec: u64, rows: &mut Vec<OpenTierRow>) {
         rows.clear();
         for (start, entries) in &self.buckets {
@@ -150,11 +153,19 @@ impl TierAccumulator {
         rows
     }
 
+    pub(crate) fn open_row_count(&self, now_usec: u64) -> u64 {
+        self.buckets
+            .iter()
+            .filter(|(start, _)| start.saturating_add(self.bucket_usec) > now_usec)
+            .map(|(_, entries)| entries.len() as u64)
+            .sum()
+    }
+
     pub(crate) fn extend_active_hours(&self, hours: &mut BTreeSet<u64>) {
-        for entries in self.buckets.values() {
-            for flow_ref in entries.keys() {
-                hours.insert(flow_ref.hour_start_usec);
-            }
+        for bucket_start_usec in self.buckets.keys().copied() {
+            // Every materialized bucket duration divides an hour, so all rows
+            // in a bucket reference this same hourly flow index.
+            hours.insert(bucket_start_usec / HOUR_BUCKET_USEC * HOUR_BUCKET_USEC);
         }
     }
 }

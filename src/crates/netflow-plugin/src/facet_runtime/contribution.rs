@@ -448,35 +448,20 @@ fn append_record_header_fields(sink: &mut impl FacetValueSink, record: &FlowReco
 }
 
 fn append_record_virtual_icmp_fields(sink: &mut impl FacetValueSink, record: &FlowRecord) {
-    let protocol = (record.protocol != 0).then_some(record.protocol.to_string());
-    let icmpv4_type = record
-        .has_icmpv4_type()
-        .then_some(record.icmpv4_type.to_string());
-    let icmpv4_code = record
-        .has_icmpv4_code()
-        .then_some(record.icmpv4_code.to_string());
-    let icmpv6_type = record
-        .has_icmpv6_type()
-        .then_some(record.icmpv6_type.to_string());
-    let icmpv6_code = record
-        .has_icmpv6_code()
-        .then_some(record.icmpv6_code.to_string());
+    let (field, icmp_type, icmp_code) = match record.protocol {
+        1 if record.has_icmpv4_type() && record.has_icmpv4_code() => {
+            ("ICMPV4", record.icmpv4_type, record.icmpv4_code)
+        }
+        58 if record.has_icmpv6_type() && record.has_icmpv6_code() => {
+            ("ICMPV6", record.icmpv6_type, record.icmpv6_code)
+        }
+        _ => return,
+    };
 
-    if let Some(value) = presentation::icmp_virtual_value(
-        "ICMPV4",
-        protocol.as_deref(),
-        icmpv4_type.as_deref(),
-        icmpv4_code.as_deref(),
-    ) {
-        sink.insert_text_static("ICMPV4", &value);
-    }
-    if let Some(value) = presentation::icmp_virtual_value(
-        "ICMPV6",
-        protocol.as_deref(),
-        icmpv6_type.as_deref(),
-        icmpv6_code.as_deref(),
-    ) {
-        sink.insert_text_static("ICMPV6", &value);
+    if let Some(value) =
+        presentation::icmp_virtual_value_from_parts(record.protocol, icmp_type, icmp_code)
+    {
+        sink.insert_text_static(field, value.as_ref());
     }
 }
 
@@ -562,7 +547,8 @@ mod tests {
 
         let mut data = Vec::new();
         let mut refs = Vec::new();
-        record.encode_to_journal_buf(&mut data, &mut refs);
+        let mut value_starts = Vec::new();
+        record.encode_to_journal_buf(&mut data, &mut refs, &mut value_starts);
 
         let encoded = facet_contribution_from_encoded_fields(refs.iter().map(|r| &data[r.clone()]));
         let direct = facet_contribution_from_record(&record);
@@ -592,7 +578,8 @@ mod tests {
         };
         let mut data = Vec::new();
         let mut refs = Vec::new();
-        record.encode_to_journal_buf(&mut data, &mut refs);
+        let mut value_starts = Vec::new();
+        record.encode_to_journal_buf(&mut data, &mut refs, &mut value_starts);
         assert!(
             refs.iter()
                 .any(|range| &data[range.clone()] == b"PROTOCOL=0"),

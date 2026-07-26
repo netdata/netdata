@@ -130,20 +130,25 @@ impl IngestService {
             .map(|tier_flow_indexes| tier_flow_indexes.generation())
             .unwrap_or_default();
 
+        let minute_1_rows = self
+            .tier_accumulators
+            .get(&TierKind::Minute1)
+            .map(|acc| acc.open_row_count(now_usec))
+            .unwrap_or_default();
+        let minute_5_rows = self
+            .tier_accumulators
+            .get(&TierKind::Minute5)
+            .map(|acc| acc.open_row_count(now_usec))
+            .unwrap_or_default();
+        let hour_1_rows = self
+            .tier_accumulators
+            .get(&TierKind::Hour1)
+            .map(|acc| acc.open_row_count(now_usec))
+            .unwrap_or_default();
+
         let Ok(mut guard) = self.open_tiers.write() else {
             return;
         };
-
-        guard.clear_retain_capacity();
-        guard.generation = generation;
-        if let Some(acc) = self.tier_accumulators.get(&TierKind::Minute1) {
-            acc.snapshot_open_rows_into(now_usec, &mut guard.minute_1);
-        }
-        if let Some(acc) = self.tier_accumulators.get(&TierKind::Minute5) {
-            acc.snapshot_open_rows_into(now_usec, &mut guard.minute_5);
-        }
-        if let Some(acc) = self.tier_accumulators.get(&TierKind::Hour1) {
-            acc.snapshot_open_rows_into(now_usec, &mut guard.hour_1);
-        }
+        guard.replace_counts(generation, minute_1_rows, minute_5_rows, hour_1_rows);
     }
 }

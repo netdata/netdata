@@ -6,14 +6,20 @@ use std::ops::Range;
 pub(super) struct JournalBufWriter<'a> {
     data: &'a mut Vec<u8>,
     refs: &'a mut Vec<Range<usize>>,
+    value_starts: &'a mut Vec<usize>,
     ibuf: itoa::Buffer,
 }
 
 impl<'a> JournalBufWriter<'a> {
-    pub(super) fn new(data: &'a mut Vec<u8>, refs: &'a mut Vec<Range<usize>>) -> Self {
+    pub(super) fn new(
+        data: &'a mut Vec<u8>,
+        refs: &'a mut Vec<Range<usize>>,
+        value_starts: &'a mut Vec<usize>,
+    ) -> Self {
         Self {
             data,
             refs,
+            value_starts,
             ibuf: itoa::Buffer::new(),
         }
     }
@@ -23,8 +29,9 @@ impl<'a> JournalBufWriter<'a> {
             let start = self.data.len();
             self.data.extend_from_slice(name.as_bytes());
             self.data.push(b'=');
+            let value_start = self.data.len();
             self.data.extend_from_slice(value.as_bytes());
-            self.refs.push(start..self.data.len());
+            self.finish_field(start, value_start);
         }
     }
 
@@ -75,8 +82,9 @@ impl<'a> JournalBufWriter<'a> {
             let start = self.data.len();
             self.data.extend_from_slice(name.as_bytes());
             self.data.push(b'=');
+            let value_start = self.data.len();
             let _ = write!(self.data, "{}", ip);
-            self.refs.push(start..self.data.len());
+            self.finish_field(start, value_start);
         }
     }
 
@@ -84,8 +92,9 @@ impl<'a> JournalBufWriter<'a> {
         if present && value != DIRECTION_UNDEFINED {
             let start = self.data.len();
             self.data.extend_from_slice(b"DIRECTION=");
+            let value_start = self.data.len();
             self.data.extend_from_slice(value.as_bytes());
-            self.refs.push(start..self.data.len());
+            self.finish_field(start, value_start);
         }
     }
 
@@ -94,13 +103,14 @@ impl<'a> JournalBufWriter<'a> {
             let start = self.data.len();
             self.data.extend_from_slice(name.as_bytes());
             self.data.push(b'=');
+            let value_start = self.data.len();
             let _ = write!(self.data, "{}", ip);
             if mask > 0 {
                 self.data.push(b'/');
                 self.data
                     .extend_from_slice(self.ibuf.format(mask as u64).as_bytes());
             }
-            self.refs.push(start..self.data.len());
+            self.finish_field(start, value_start);
         }
     }
 
@@ -109,12 +119,13 @@ impl<'a> JournalBufWriter<'a> {
             let start = self.data.len();
             self.data.extend_from_slice(name.as_bytes());
             self.data.push(b'=');
+            let value_start = self.data.len();
             let _ = write!(
                 self.data,
                 "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
                 value[0], value[1], value[2], value[3], value[4], value[5]
             );
-            self.refs.push(start..self.data.len());
+            self.finish_field(start, value_start);
         }
     }
 
@@ -122,8 +133,14 @@ impl<'a> JournalBufWriter<'a> {
         let start = self.data.len();
         self.data.extend_from_slice(name.as_bytes());
         self.data.push(b'=');
+        let value_start = self.data.len();
         self.data
             .extend_from_slice(self.ibuf.format(value).as_bytes());
+        self.finish_field(start, value_start);
+    }
+
+    fn finish_field(&mut self, start: usize, value_start: usize) {
         self.refs.push(start..self.data.len());
+        self.value_starts.push(value_start);
     }
 }

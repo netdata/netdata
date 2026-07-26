@@ -1382,6 +1382,7 @@ mod tests {
             .expect("create archived fragment journal writer");
         let mut encoded = Vec::new();
         let mut fields = Vec::new();
+        let mut value_starts = Vec::new();
 
         for (index, fragment_id) in fragment_ids.iter().copied().enumerate() {
             let record = FlowRecord {
@@ -1390,7 +1391,7 @@ mod tests {
                 ip_fragment_id: fragment_id,
                 ..FlowRecord::default()
             };
-            record.encode_to_journal_buf(&mut encoded, &mut fields);
+            record.encode_to_journal_buf(&mut encoded, &mut fields, &mut value_starts);
             let realtime_usec = 1_000_000 + index as u64;
             let source_realtime = format!("_SOURCE_REALTIME_TIMESTAMP={realtime_usec}");
             let mut payloads = fields
