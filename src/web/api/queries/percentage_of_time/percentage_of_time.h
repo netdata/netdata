@@ -57,13 +57,20 @@ static inline void tg_percentage_of_time_free(RRDR *r) {
 static inline void tg_percentage_of_time_add_point(RRDR *r, const TG_POINT *p) {
     struct tg_percentage_of_time *g = (struct tg_percentage_of_time *)r->time_grouping.data;
 
+    // Above tier 0 the share is a fraction of the window, not a yes/no.
+    // A gap contributes 0 to the numerator for every condition that does
+    // not name one, and its duration to the denominator either way.
+    //
+    // A point that covers no time still passes through here: it adds
+    // nothing to either side, but the condition must see it, or this
+    // grouping's predecessor drifts away from the one the other three
+    // carry over the same data.
+    NETDATA_DOUBLE share = tg_expression_share(&g->expr, p);
+
     if(unlikely(p->duration <= 0))
         return;
 
-    // above tier 0 the share is a fraction of the window, not a yes/no.
-    // A gap contributes 0 to the numerator for every condition that does
-    // not name one, and its duration to the denominator either way.
-    g->matched += tg_expression_share(&g->expr, p) * (NETDATA_DOUBLE)p->duration;
+    g->matched += share * (NETDATA_DOUBLE)p->duration;
     g->total += (NETDATA_DOUBLE)p->duration;
 }
 

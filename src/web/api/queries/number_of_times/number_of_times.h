@@ -48,6 +48,11 @@ static inline void tg_number_of_times_add_point(RRDR *r, const TG_POINT *p) {
 
     NETDATA_DOUBLE share = tg_expression_share(&g->expr, p);
 
+    // a repeat still fills the bucket it lands in: a wide stored point can
+    // cover a whole bucket on its own, and leaving it uncounted would flush
+    // EMPTY - "nothing here" - instead of "nothing happened here"
+    g->count += p->samples;
+
     if(unlikely(!p->first))
         // a wide point re-delivered to a later bucket is the SAME
         // occurrence; counting it again would multiply it
@@ -62,8 +67,6 @@ static inline void tg_number_of_times_add_point(RRDR *r, const TG_POINT *p) {
     else if(share > 0.0)
         // a gap stands for every sample slot it covers, not for one point
         g->times += p->samples;
-
-    g->count += p->samples;
 }
 
 static inline void tg_number_of_times_add(RRDR *r, NETDATA_DOUBLE value) {
