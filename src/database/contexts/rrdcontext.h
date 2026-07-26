@@ -824,8 +824,8 @@ static inline bool query_target_all_metrics_stored_as_rates(QUERY_TARGET *qt) {
 // yields a VOLUME: "requests/s" summed over a window is "requests". Only a
 // trailing "/s" can be removed deterministically; anything else is left
 // untouched.
-static inline const char *query_target_rate_adjusted_units(
-    QUERY_TARGET *qt, const char *units, char *buf, size_t buf_size) {
+static inline const char *query_target_rate_adjusted_units_for(
+    QUERY_TARGET *qt, bool stored_as_rates, const char *units, char *buf, size_t buf_size) {
 
     if(!units || !*units)
         return units;
@@ -833,7 +833,7 @@ static inline const char *query_target_rate_adjusted_units(
     if(qt->window.time_group_method != RRDR_GROUPING_SUM)
         return units;
 
-    if(!query_target_all_metrics_stored_as_rates(qt))
+    if(!stored_as_rates)
         return units;
 
     size_t len = strlen(units);
@@ -848,19 +848,36 @@ static inline const char *query_target_rate_adjusted_units(
     return buf;
 }
 
+// the whole-query answer, for a units string that describes the whole query
+static inline const char *query_target_rate_adjusted_units(
+    QUERY_TARGET *qt, const char *units, char *buf, size_t buf_size) {
+    return query_target_rate_adjusted_units_for(
+        qt, query_target_all_metrics_stored_as_rates(qt), units, buf, buf_size);
+}
+
 // The units a RESULT carries: the grouping's own units when it answers a
 // different question, otherwise the metric's units with a rate's trailing
 // "/s" removed if the query integrated it into a volume. Every consumer
 // that labels or keys a result should go through here, so the label a user
 // sees and the key a group is built from cannot disagree.
-static inline const char *query_target_result_units(
-    QUERY_TARGET *qt, const char *metric_units, char *buf, size_t buf_size) {
+//
+// `stored_as_rates` is the answer for the THING being labelled. A key built
+// per metric passes that metric's own flag: asking the whole query would let
+// one gauge anywhere keep the "/s" on an unrelated group.
+static inline const char *query_target_result_units_for(
+    QUERY_TARGET *qt, bool stored_as_rates, const char *metric_units, char *buf, size_t buf_size) {
 
     const char *units = query_target_units_override(qt);
     if(units)
         return units;
 
-    return query_target_rate_adjusted_units(qt, metric_units, buf, buf_size);
+    return query_target_rate_adjusted_units_for(qt, stored_as_rates, metric_units, buf, buf_size);
+}
+
+static inline const char *query_target_result_units(
+    QUERY_TARGET *qt, const char *metric_units, char *buf, size_t buf_size) {
+    return query_target_result_units_for(
+        qt, query_target_all_metrics_stored_as_rates(qt), metric_units, buf, buf_size);
 }
 
 uint32_t rrdcontext_queue_version(RRDCONTEXT_QUEUE_JudyLSet *queue);
