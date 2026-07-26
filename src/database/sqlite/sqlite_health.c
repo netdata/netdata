@@ -1776,7 +1776,12 @@ int sql_get_alert_configuration(
         acd.selectors.chart_labels = (const char *) sqlite3_column_text(res, param++);
         acd.summary = (const char *) sqlite3_column_text(res, param++);
         acd.value.db.time_group_condition =(int32_t) sqlite3_column_int(res, param++);
-        acd.value.db.time_group_value = sqlite3_column_double(res, param++);
+        // a condition that compares against a gap or the previous sample has
+        // no numeric value and is stored NULL; sqlite3_column_double() would
+        // turn that into a real 0 and the API would publish it as one
+        acd.value.db.time_group_value =
+            (sqlite3_column_type(res, param) == SQLITE_NULL) ? NAN : sqlite3_column_double(res, param);
+        param++;
         acd.value.db.time_group_options = (const char *) sqlite3_column_text(res, param++);
         acd.value.db.dims_group = (int32_t) sqlite3_column_int(res, param++);
         acd.value.db.data_source = (int32_t) sqlite3_column_int(res, param++);
@@ -1877,7 +1882,10 @@ int sql_alert_config_unittest(void)
     ap.config.after = -86400;
     ap.config.time_group = RRDR_GROUPING_PERCENTAGE_OF_TIME;
     ap.config.time_group_condition = ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL;
-    ap.config.time_group_value = 0;
+    // `==gap` compares against no number, so the legacy value stays unset -
+    // which sqlite stores as NULL. Asserting a real 0 here would hide a
+    // readback that turns the absence of a value into a value.
+    ap.config.time_group_value = NAN;
     ap.config.time_group_options = string_strdupz("==gap");
     uuid_generate(ap.config.hash_id);
 
@@ -1907,8 +1915,8 @@ int sql_alert_config_unittest(void)
             fprintf(stderr, "FAILED [the condition reads back as written]: got '%s', want '==gap'\n", rb.options);
             failed++;
         }
-        if (rb.condition != (int32_t)ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL || rb.value != 0) {
-            fprintf(stderr, "FAILED [the legacy condition pair reads back]: condition=%d value=%f\n",
+        if (rb.condition != (int32_t)ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL || !isnan(rb.value)) {
+            fprintf(stderr, "FAILED [the legacy condition pair reads back]: condition=%d value=%f, want value unset\n",
                     rb.condition, rb.value);
             failed++;
         }
