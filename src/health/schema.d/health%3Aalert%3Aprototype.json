@@ -142,8 +142,12 @@
                     "title": "Sum"
                   },
                   {
-                    "const": "incremental_sum",
+                    "const": "incremental-sum",
                     "title": "Incremental Sum"
+                  },
+                  {
+                    "const": "incremental_sum",
+                    "title": "Incremental Sum (legacy spelling)"
                   },
                   {
                     "const": "stddev",
@@ -200,6 +204,30 @@
                   {
                     "const": "latest",
                     "title": "Latest"
+                  },
+                  {
+                    "const": "avg",
+                    "title": "Average (alias)"
+                  },
+                  {
+                    "const": "mean",
+                    "title": "Average (alias)"
+                  },
+                  {
+                    "const": "coefficient-of-variation",
+                    "title": "Coefficient of Variation (alias)"
+                  },
+                  {
+                    "const": "rsd",
+                    "title": "Relative Standard Deviation (alias)"
+                  },
+                  {
+                    "const": "ema",
+                    "title": "Exponential Moving Average (alias of SES)"
+                  },
+                  {
+                    "const": "ewma",
+                    "title": "Exponential Weighted Moving Average (alias of SES)"
                   }
                 ],
                 "default": "average",
