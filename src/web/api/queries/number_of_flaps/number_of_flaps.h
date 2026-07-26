@@ -50,23 +50,37 @@ static inline void tg_number_of_flaps_free(RRDR *r) {
     r->time_grouping.data = NULL;
 }
 
-static inline void tg_number_of_flaps_add_point(
-    RRDR *r, NETDATA_DOUBLE value, bool is_gap, time_t duration __maybe_unused, size_t samples) {
+static inline void tg_number_of_flaps_add_point(RRDR *r, const TG_POINT *p) {
     struct tg_number_of_flaps *g = (struct tg_number_of_flaps *)r->time_grouping.data;
 
-    bool now = tg_expression_eval(&g->expr, value, is_gap);
+    NETDATA_DOUBLE share = tg_expression_share(&g->expr, p);
 
-    if(likely(g->has_state) && !g->state && now)
+    if(tg_point_is_window(p) && share > 0.0 && share < 1.0) {
+        // the condition was both true and false inside this stored window,
+        // so it changed at least once - counted as one, because the window
+        // keeps no ordering. This is an approximation, not a lower bound:
+        // [true,false] and [false,true] leave identical statistics behind.
         g->flaps++;
+        g->state = true;
+    }
+    else {
+        bool now = (share > 0.0);
 
-    // a contiguous hole is ONE state change however many slots it spans
-    g->state = now;
+        if(likely(g->has_state) && !g->state && now)
+            g->flaps++;
+
+        // a contiguous hole is ONE state change however many slots it spans
+        g->state = now;
+    }
+
     g->has_state = true;
-    g->count += samples;
+    g->count += p->samples;
 }
 
 static inline void tg_number_of_flaps_add(RRDR *r, NETDATA_DOUBLE value) {
-    tg_number_of_flaps_add_point(r, value, false, 1, 1);
+    TG_POINT p = { .value = value, .min = value, .max = value, .count = 1,
+                   .duration = 1, .samples = 1, .is_gap = false };
+    tg_number_of_flaps_add_point(r, &p);
 }
 
 static inline NETDATA_DOUBLE tg_number_of_flaps_flush(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
