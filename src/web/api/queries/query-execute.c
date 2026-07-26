@@ -292,8 +292,9 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
     bool query_can_switch_plan = true;
 
     // Exhausting one tier must not suppress a later tier in the query plan.
+    // Gap conditions also need every remaining bucket in the requested window.
     for( ; points_added < points_wanted &&
-           (query_is_finished_counter <= 10 ||
+           (query_is_finished_counter <= 10 || r->time_grouping.wants_gaps ||
             (query_can_switch_plan && ops->current_plan + 1 < qm->plan.used)) ;
         now_start_time = now_end_time, now_end_time += ops->view_update_every) {
 
