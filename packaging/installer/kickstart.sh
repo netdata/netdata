@@ -1227,7 +1227,7 @@ handle_existing_install() {
           if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
             fatal "Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice}" F0106
           else
-            fatal "We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. ${claimonly_notice}" F0106
+            fatal "We do not support trying to update installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. ${claimonly_notice}" F0106
           fi
         fi
       fi
