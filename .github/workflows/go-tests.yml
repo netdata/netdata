@@ -34,6 +34,7 @@ jobs:
             packaging/cmake/
             src/go/**
             src/collectors/cgroups.plugin/cgroup-name/**
+            src/collectors/ebpf.plugin/ebpfgo.plugin/**
           files_ignore: |
             **/*.md
             src/go/**/metadata.yaml
