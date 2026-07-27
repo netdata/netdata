@@ -2,10 +2,27 @@
 
 #include "rrdcontext-internal.h"
 #include "database/pattern-array.h"
+#include "web/api/queries/tg-expression.h"
 
 #define QUERY_TARGET_MAX_REALLOC_INCREASE 500
 #define query_target_realloc_size(size, start) \
             (size) ? ((size) < QUERY_TARGET_MAX_REALLOC_INCREASE ? (size) * 2 : (size) + QUERY_TARGET_MAX_REALLOC_INCREASE) : (start)
+
+// True when the query's time-aggregation gives uncollected time a value of
+// its own, rather than skipping over it: percentage-of-time always does
+// (its denominator is the selected duration), and the other expression
+// groupings do when their condition names a gap token.
+static inline bool query_target_accounts_for_uncollected_time(QUERY_TARGET *qt) {
+    if(qt->request.time_group_method == RRDR_GROUPING_PERCENTAGE_OF_TIME)
+        return true;
+
+    if(!time_grouping_is_expression(qt->request.time_group_method))
+        return false;
+
+    TG_EXPRESSION e;
+    tg_expression_parse(&e, qt->request.time_group_options);
+    return tg_expression_wants_gaps(&e);
+}
 
 static void query_metric_release(QUERY_TARGET *qt, QUERY_METRIC *qm);
 static void query_dimension_release(QUERY_DIMENSION *qd);
@@ -327,9 +344,17 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             qt->db.tiers[tier].retention.last_time_s = tier_retention[tier].db_last_time_s;
     }
 
+    // A metric whose retention does not reach the window is normally not
+    // worth querying - it can only answer "nothing here", which is what an
+    // absent dimension already says. A grouping that ACCOUNTS for
+    // uncollected time is the exception: for it, "nothing here" IS the
+    // answer, and it is 100%. Dropping the metric turns "this node was
+    // unreachable for the whole day" into an empty chart, which is the one
+    // reading such a query must never produce.
     bool timeframe_matches =
             (tiers_added &&
-             query_matches_retention(qt->window.after, qt->window.before, common_first_time_s, common_last_time_s, common_update_every_s))
+             (query_matches_retention(qt->window.after, qt->window.before, common_first_time_s, common_last_time_s, common_update_every_s) ||
+              query_target_accounts_for_uncollected_time(qt)))
             ? true : false;
 
     if(timeframe_matches) {

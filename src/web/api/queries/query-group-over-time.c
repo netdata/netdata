@@ -767,6 +767,11 @@ const char *time_grouping_tostring(RRDR_TIME_GROUPING group) {
 
 void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method) {
     int i, found = 0;
+
+    // only the four condition groupings ask for gaps, and they say so from
+    // their create(). Clearing it here keeps the answer tied to the
+    // grouping actually installed, including the fallback below.
+    r->time_grouping.wants_gaps = false;
     for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
         if(api_v1_data_groups[i].value == group_method) {
             r->time_grouping.create  = api_v1_data_groups[i].create;
