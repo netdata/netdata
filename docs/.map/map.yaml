@@ -175,6 +175,16 @@ sidebar:
               label: Disk & Retention
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md
           - meta:
+              label: Extreme Cardinality Protection
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/extreme-cardinality-protection.md
+              description: How Netdata limits long-term resource use from short-lived chart instances, and how metadata cleanup affects disk space.
+              keywords:
+                - cardinality
+                - ephemerality
+                - retention
+                - metadata
+                - netdata-meta.db
+          - meta:
               label: Impact on Cloud VMs
               edit_url: https://github.com/netdata/netdata/edit/master/docs/impact-on-resources.md
               description: Recommended VM sizing and the resource impact of running Netdata on cloud VMs (AWS, Azure, GCP).
