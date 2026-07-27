@@ -14,6 +14,8 @@ Netdata can collect, store, and visualise network flow data from your routers an
 
 This section is for network engineers, security analysts, and IT managers who want to understand what's happening on the wire. The same dashboard answers all three audiences from the same data.
 
+Opening Network Flows requires an Agent connected to Netdata Cloud and a signed-in user whose Space role permits sensitive functions. See the [Network Flows access requirement](/docs/npm/network-flows/installation.md#connect-this-agent-to-netdata-to-use-this-function).
+
 ## What flow data is
 
 A network flow is a *summary of a conversation*. Routers and switches watch packets as they pass through, group them by source IP, destination IP, source port, destination port, and protocol, and produce one record per flow when the conversation ends or after a timeout. That record contains:
