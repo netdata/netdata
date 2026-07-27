@@ -18,6 +18,7 @@ type chartRef struct {
 	groupPath  []int
 	chartIndex int
 	path       string
+	family     string
 	chart      charttpl.Chart
 }
 
@@ -51,13 +52,15 @@ func enumerateChartRefs(spec *charttpl.Spec) []chartRef {
 		return nil
 	}
 	var refs []chartRef
-	var walk func(group charttpl.Group, indexes []int, path string)
-	walk = func(group charttpl.Group, indexes []int, path string) {
+	var walk func(group charttpl.Group, indexes []int, path string, familyParts []string)
+	walk = func(group charttpl.Group, indexes []int, path string, familyParts []string) {
+		parts := appendFamilyPart(familyParts, group.Family)
 		for i, chart := range group.Charts {
 			refs = append(refs, chartRef{
 				groupPath:  slices.Clone(indexes),
 				chartIndex: i,
 				path:       fmt.Sprintf("%s.charts[%d]", path, i),
+				family:     composeDisplayedFamily(parts, chart.Family),
 				chart:      chart,
 			})
 		}
@@ -66,13 +69,45 @@ func enumerateChartRefs(spec *charttpl.Spec) []chartRef {
 				child,
 				append(slices.Clone(indexes), i),
 				fmt.Sprintf("%s.groups[%d](%s)", path, i, child.Family),
+				parts,
 			)
 		}
 	}
 	for i, group := range spec.Groups {
-		walk(group, []int{i}, fmt.Sprintf("groups[%d](%s)", i, group.Family))
+		walk(group, []int{i}, fmt.Sprintf("groups[%d](%s)", i, group.Family), nil)
 	}
 	return refs
+}
+
+func buildAuthoredMapping(refs []chartRef) []authoredChartMappingReport {
+	mapping := make([]authoredChartMappingReport, 0, len(refs))
+	for _, ref := range refs {
+		item := authoredChartMappingReport{
+			Path:             ref.path,
+			DisplayedFamily:  ref.family,
+			Title:            ref.chart.Title,
+			Context:          ref.chart.Context,
+			Units:            ref.chart.Units,
+			Algorithm:        ref.chart.Algorithm,
+			Type:             ref.chart.Type,
+			Priority:         ref.chart.Priority,
+			InstanceByLabels: make([]string, 0),
+			Dimensions:       make([]authoredDimensionMappingReport, 0, len(ref.chart.Dimensions)),
+		}
+		if ref.chart.Instances != nil {
+			item.InstanceByLabels = slices.Clone(ref.chart.Instances.ByLabels)
+		}
+		for _, dimension := range ref.chart.Dimensions {
+			item.Dimensions = append(item.Dimensions, authoredDimensionMappingReport{
+				Selector:      dimension.Selector,
+				Name:          dimension.Name,
+				NameFromLabel: dimension.NameFromLabel,
+				Hidden:        dimension.Options != nil && dimension.Options.Hidden,
+			})
+		}
+		mapping = append(mapping, item)
+	}
+	return mapping
 }
 
 func inspectChartsInIsolation(

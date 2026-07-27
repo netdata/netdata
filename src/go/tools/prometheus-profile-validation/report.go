@@ -22,6 +22,7 @@ type report struct {
 	Counts              countReport                          `json:"counts"`
 	RawFamilies         []rawFamilyReport                    `json:"raw_families,omitempty"`
 	PipelineExcluded    []pipelineExcludedReport             `json:"pipeline_excluded,omitempty"`
+	AuthoredMapping     []authoredChartMappingReport         `json:"authored_mapping,omitempty"`
 	Charts              []materializedChart                  `json:"charts,omitempty"`
 	DeadCharts          []deadChartReport                    `json:"dead_charts,omitempty"`
 	DeadDimensions      []deadDimensionReport                `json:"dead_dimensions,omitempty"`
@@ -87,6 +88,26 @@ type pipelineExcludedReport struct {
 	WriterSourceSeries int    `json:"writer_source_series"`
 }
 
+type authoredChartMappingReport struct {
+	Path             string                           `json:"path"`
+	DisplayedFamily  string                           `json:"displayed_family"`
+	Title            string                           `json:"title"`
+	Context          string                           `json:"context"`
+	Units            string                           `json:"units"`
+	Algorithm        string                           `json:"algorithm"`
+	Type             string                           `json:"type"`
+	Priority         int                              `json:"priority"`
+	InstanceByLabels []string                         `json:"instance_by_labels"`
+	Dimensions       []authoredDimensionMappingReport `json:"dimensions"`
+}
+
+type authoredDimensionMappingReport struct {
+	Selector      string `json:"selector"`
+	Name          string `json:"name,omitempty"`
+	NameFromLabel string `json:"name_from_label,omitempty"`
+	Hidden        bool   `json:"hidden,omitempty"`
+}
+
 type materializedChart struct {
 	TemplateID            string   `json:"template_id"`
 	IDFingerprint         string   `json:"id_fingerprint"`
@@ -94,6 +115,7 @@ type materializedChart struct {
 	Title                 string   `json:"title"`
 	Family                string   `json:"family"`
 	Units                 string   `json:"units"`
+	Algorithm             string   `json:"algorithm"`
 	Priority              int      `json:"priority"`
 	Autogen               bool     `json:"autogen"`
 	DimensionFingerprints []string `json:"dimension_fingerprints,omitempty"`
@@ -246,6 +268,46 @@ func writeTextReport(w io.Writer, r report) error {
 			)
 		}
 	}
+	if len(r.AuthoredMapping) > 0 {
+		fmt.Fprintln(&b, "\nAuthored selector-to-display mapping (source order):")
+		for _, chart := range r.AuthoredMapping {
+			algorithm := chart.Algorithm
+			if algorithm == "" {
+				algorithm = "<inferred>"
+			}
+			identity := "<global>"
+			if len(chart.InstanceByLabels) > 0 {
+				identity = strings.Join(chart.InstanceByLabels, ",")
+			}
+			fmt.Fprintf(
+				&b,
+				"  - %s family=%q title=%q context=%q units=%q algorithm=%q type=%q priority=%d identity=[%s]\n",
+				chart.Path,
+				chart.DisplayedFamily,
+				chart.Title,
+				chart.Context,
+				chart.Units,
+				algorithm,
+				chart.Type,
+				chart.Priority,
+				identity,
+			)
+			for _, dimension := range chart.Dimensions {
+				name := "<runtime>"
+				switch {
+				case dimension.Name != "":
+					name = "name:" + dimension.Name
+				case dimension.NameFromLabel != "":
+					name = "name_from_label:" + dimension.NameFromLabel
+				}
+				visibility := "visible"
+				if dimension.Hidden {
+					visibility = "hidden"
+				}
+				fmt.Fprintf(&b, "      selector=%q %s %s\n", dimension.Selector, name, visibility)
+			}
+		}
+	}
 	if len(r.Charts) > 0 {
 		fmt.Fprintln(&b, "\nMaterialized charts:")
 		for _, chart := range r.Charts {
@@ -255,10 +317,12 @@ func writeTextReport(w io.Writer, r report) error {
 			}
 			fmt.Fprintf(
 				&b,
-				"  - [%s] %s context=%s priority=%d dims=%s\n",
+				"  - [%s] %s context=%s units=%q algorithm=%s priority=%d dims=%s\n",
 				kind,
 				chart.IDFingerprint,
 				chart.Context,
+				chart.Units,
+				chart.Algorithm,
 				chart.Priority,
 				strings.Join(chart.DimensionFingerprints, ","),
 			)

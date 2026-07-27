@@ -114,6 +114,7 @@ func validateProfile(opts validationOptions) report {
 	}
 	defer coll.Cleanup(context.Background())
 	addJobDenyReview(policy.Selector, rawSamples, r.RawFamilies, &r)
+	addRelabelDiscardReview(policy.Selector, policy.Relabeling, rawSamples, &r)
 	if err := coll.Check(ctx); err != nil {
 		r.addError("collector_check", opts.dumpPath, err.Error(), "The candidate must match the post-policy scrape and pass the collector startup gates.")
 		return r
@@ -152,6 +153,8 @@ func validateProfile(opts validationOptions) report {
 		r.addError("template_decode", "", err.Error(), "The collector's merged template must round-trip through the authoritative decoder.")
 		return r
 	}
+	refs := enumerateChartRefs(merged)
+	r.AuthoredMapping = buildAuthoredMapping(refs)
 	addDashboardHeuristics(merged, &r)
 	addObservedLabelAggregationHeuristics(merged, reader, &r)
 
@@ -177,6 +180,7 @@ func validateProfile(opts validationOptions) report {
 	addObservedScaleHeuristics(plan, &r)
 
 	r.Charts = materializeCharts(plan)
+	addIncrementalUnitHeuristics(r.Charts, &r)
 	for _, chart := range r.Charts {
 		r.Counts.ChartDimensions += len(chart.DimensionFingerprints)
 		if chart.Autogen {
@@ -282,7 +286,6 @@ func validateProfile(opts validationOptions) report {
 		*destination = value
 	}
 
-	refs := enumerateChartRefs(merged)
 	unavailableIdentities, identityAuditErrs := inspectUnavailableInstanceIdentities(refs, reader)
 	for _, item := range identityAuditErrs {
 		r.addError(
@@ -621,6 +624,7 @@ func materializeCharts(plan chartengine.Plan) []materializedChart {
 				Title:         item.Meta.Title,
 				Family:        item.Meta.Family,
 				Units:         item.Meta.Units,
+				Algorithm:     string(item.Meta.Algorithm),
 				Priority:      item.Meta.Priority,
 				Autogen:       strings.HasPrefix(item.ChartTemplateID, "__autogen__:"),
 			}

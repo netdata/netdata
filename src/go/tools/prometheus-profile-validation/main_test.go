@@ -137,6 +137,30 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 	if result.report.Counts.AuthoredCharts != 4 || result.report.Counts.CuratedCharts != 4 {
 		t.Fatalf("unexpected chart counts: %#v", result.report.Counts)
 	}
+	if len(result.report.AuthoredMapping) != 4 {
+		t.Fatalf("authored mapping count: got %d, want 4", len(result.report.AuthoredMapping))
+	}
+	first := result.report.AuthoredMapping[0]
+	if first.DisplayedFamily != "Example" ||
+		first.Title != "Temperature" ||
+		first.Type != "line" ||
+		first.Priority != 100 ||
+		!slices.Equal(first.InstanceByLabels, []string{"instance"}) {
+		t.Fatalf("unexpected first authored mapping: %#v", first)
+	}
+	if len(first.Dimensions) != 1 ||
+		first.Dimensions[0].Selector != "app_temperature" ||
+		first.Dimensions[0].Name != "temperature" {
+		t.Fatalf("unexpected authored dimension mapping: %#v", first.Dimensions)
+	}
+	if result.report.AuthoredMapping[2].Dimensions[0].NameFromLabel != "le" {
+		t.Fatalf("authored mapping lost dynamic naming mechanism: %#v", result.report.AuthoredMapping[2].Dimensions)
+	}
+	if result.report.AuthoredMapping[1].Priority != 110 ||
+		result.report.AuthoredMapping[2].Priority != 120 ||
+		result.report.AuthoredMapping[3].Priority != 130 {
+		t.Fatalf("authored mapping lost source order: %#v", result.report.AuthoredMapping)
+	}
 	if !hasFinding(result.report, "default_validation_job", "warning") {
 		t.Fatalf("missing warning that the deployable job policy was not validated: %#v", result.report.Findings)
 	}
@@ -144,6 +168,22 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 		if !strings.HasPrefix(chart.IDFingerprint, "sha256:") {
 			t.Fatalf("materialized chart ID was not fingerprinted: %#v", chart)
 		}
+	}
+}
+
+func TestValidateProfileReportsComposedDisplayedFamily(t *testing.T) {
+	profile := strings.Replace(
+		validProfile,
+		"    - title: Temperature\n",
+		"    - title: Temperature\n      family: Environment\n",
+		1,
+	)
+	result := runValidation(t, profile, validDump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("expected PASS\nreport:\n%s", result.stdout)
+	}
+	if got := result.report.AuthoredMapping[0].DisplayedFamily; got != "Example/Environment" {
+		t.Fatalf("displayed family: got %q, want %q", got, "Example/Environment")
 	}
 }
 
@@ -723,6 +763,89 @@ app_removed{instance="sensitive-value"} 1
 	}
 }
 
+func TestValidateProfileAuditsEverySampleDiscardingRelabelAction(t *testing.T) {
+	dump := validDump + `
+# TYPE app_drop gauge
+app_drop{identity="sensitive-drop"} 1
+# TYPE app_keep gauge
+app_keep{identity="sensitive-keep",mode="discard"} 1
+# TYPE app_dropequal gauge
+app_dropequal{identity="sensitive-dropequal",left="same",right="same"} 1
+# TYPE app_keepequal gauge
+app_keepequal{identity="sensitive-keepequal",left="one",right="two"} 1
+`
+	job := `
+relabeling:
+  - match: app_drop
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: app_drop
+        action: drop
+  - match: app_keep
+    metric_relabel_configs:
+      - source_labels: [mode]
+        regex: retain
+        action: keep
+  - match: app_dropequal
+    metric_relabel_configs:
+      - source_labels: [left]
+        target_label: right
+        action: dropequal
+  - match: app_keepequal
+    metric_relabel_configs:
+      - source_labels: [left]
+        target_label: right
+        action: keepequal
+`
+	result := runValidation(t, validProfile, dump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("discard review must preserve author judgment\nreport:\n%s", result.stdout)
+	}
+	var findings []finding
+	for _, item := range result.report.Findings {
+		if item.Code == "job_relabel_discard_review" {
+			findings = append(findings, item)
+		}
+	}
+	if len(findings) != 4 {
+		t.Fatalf("discard findings: got %d, want 4: %#v", len(findings), findings)
+	}
+	for i, item := range findings {
+		if !strings.Contains(item.Path, fmt.Sprintf("relabeling[%d]", i)) ||
+			!strings.Contains(item.Message, "removes 1 observed logical identities") {
+			t.Fatalf("unexpected relabel discard finding %d: %#v", i, item)
+		}
+	}
+	if strings.Contains(result.stdout, "sensitive-") {
+		t.Fatalf("relabel discard review leaked observed label values:\n%s", result.stdout)
+	}
+}
+
+func TestValidateProfileAuditsUnobservedSampleDiscardingRelabelAction(t *testing.T) {
+	job := `
+relabeling:
+  - match: future_*
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: future_.*
+        action: drop
+`
+	result := runValidation(t, validProfile, validDump, job)
+	if result.exitCode != 0 {
+		t.Fatalf("unobserved discard review must preserve author judgment\nreport:\n%s", result.stdout)
+	}
+	var found *finding
+	for i := range result.report.Findings {
+		if result.report.Findings[i].Code == "job_relabel_discard_review" {
+			found = &result.report.Findings[i]
+			break
+		}
+	}
+	if found == nil || !strings.Contains(found.Message, "dropped no samples") {
+		t.Fatalf("missing unobserved discard review: %#v", result.report.Findings)
+	}
+}
+
 func TestValidateProfileDoesNotPromptForWriterSkippedInfoDeny(t *testing.T) {
 	dump := validDump + `
 # TYPE app_build_info gauge
@@ -1030,6 +1153,54 @@ func TestValidateProfileWarnsWhenMatchAcceptsGenericRuntimeFamilies(t *testing.T
 	}
 	if !hasFinding(result.report, "generic_profile_match", "warning") {
 		t.Fatalf("missing generic profile-match review prompt: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileWarnsWhenIncrementalUnitsOmitRateSemantics(t *testing.T) {
+	profile := strings.Replace(
+		validProfile,
+		"      units: requests/s\n      algorithm: incremental\n",
+		"      units: requests\n",
+		1,
+	)
+	result := runValidation(t, profile, validDump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("incremental unit review must preserve author judgment\nreport:\n%s", result.stdout)
+	}
+	if !hasFinding(result.report, "incremental_units_review", "warning") {
+		t.Fatalf("missing incremental unit review: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAcceptsCompoundIncrementalRateUnits(t *testing.T) {
+	profile := strings.Replace(
+		validProfile,
+		"      units: requests/s\n      algorithm: incremental\n",
+		"      units: seconds/item/s\n",
+		1,
+	)
+	result := runValidation(t, profile, validDump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("compound rate units should pass\nreport:\n%s", result.stdout)
+	}
+	if hasFinding(result.report, "incremental_units_review", "warning") {
+		t.Fatalf("compound observed units retain a per-second denominator: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAcceptsDerivedIncrementalRateUnits(t *testing.T) {
+	profile := strings.Replace(
+		validProfile,
+		"      units: requests/s\n      algorithm: incremental\n",
+		"      units: in-flight\n",
+		1,
+	)
+	result := runValidation(t, profile, validDump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("derived rate-equivalent units should pass\nreport:\n%s", result.stdout)
+	}
+	if hasFinding(result.report, "incremental_units_review", "warning") {
+		t.Fatalf("a duration-total rate can truthfully express concurrent work: %#v", result.report.Findings)
 	}
 }
 
@@ -1629,6 +1800,39 @@ func TestRuntimeMetricIntRejectsMissingEvidence(t *testing.T) {
 func TestWriteTextReportReturnsWriterError(t *testing.T) {
 	if err := writeTextReport(errorWriter{}, newReport()); err == nil {
 		t.Fatal("expected output writer failure")
+	}
+}
+
+func TestWriteTextReportIncludesAuthoredMapping(t *testing.T) {
+	r := newReport()
+	r.AuthoredMapping = []authoredChartMappingReport{{
+		Path:             "groups[0](Service).charts[0]",
+		DisplayedFamily:  "Service/Requests",
+		Title:            "Requests",
+		Context:          "requests",
+		Units:            "requests/s",
+		Priority:         100,
+		Type:             "line",
+		InstanceByLabels: []string{"instance"},
+		Dimensions: []authoredDimensionMappingReport{{
+			Selector: "service_requests_total",
+			Name:     "requests",
+		}},
+	}}
+	var out bytes.Buffer
+	if err := writeTextReport(&out, r); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"Authored selector-to-display mapping (source order):",
+		`family="Service/Requests"`,
+		`selector="service_requests_total"`,
+		"algorithm=\"<inferred>\"",
+		"identity=[instance]",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("text report missing %q:\n%s", want, out.String())
+		}
 	}
 }
 

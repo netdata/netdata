@@ -48,6 +48,7 @@ Skill-relative sources (resolve from this skill directory):
 10. `profile-schema.md`
 11. `metric-types.md`
 12. `chart-design.md`
+13. `ownership-proof.md`
 
 The repository root is `../../..` from this skill directory. Do not resolve
 skill-relative sources from that root, and do not assume the task's working
@@ -72,9 +73,9 @@ A profile is complete only when both its runtime behavior and its semantic
 design are proved. Do not describe or deliver a candidate as complete while any
 of these proofs fails:
 
-- **Operator-model proof:** source-backed entities/containment,
-  modules/capabilities, and operations/processing stages explain what operators
-  expect to see independently of the metric inventory.
+- **Operator-model proof:** `OPERATOR-MODEL.md` records source-backed
+  entities/containment, modules/capabilities, and operations/processing stages
+  before YAML, then reconciles those decisions against the emitted profile.
 - **Navigation proof:** every first- and second-level family has one coherent
   operator owner. The author can state what entity/function it represents and
   what work or state it performs, receives, produces, stores, routes, or
@@ -210,8 +211,9 @@ the role from the label name alone.
 
 ### Classify the evidence against that model
 
-Classify every observed writer-capable family before grouping it. The format is
-up to the author, but the reasoning must make these fields explicit:
+Create `OPERATOR-MODEL.md` in the deliverable directory **before** profile YAML.
+Classify every observed writer-capable family before grouping it. The document's
+layout is up to the author, but these evidence fields are mandatory:
 
 - **Owner:** the entity, module/capability, or operation/stage this signal
   explains.
@@ -230,9 +232,16 @@ up to the author, but the reasoning must make these fields explicit:
   unresolved limitation.
 - **Destination:** intended family/chart or one binding exclusion case.
 
-This inventory is a reasoning aid, not a fixed worksheet or dashboard
-generator. It prevents metric names, suffixes, and units from becoming the
+This proof is not a fixed worksheet or dashboard generator. The model chooses
+the domain owners and navigation. The required evidence makes that judgment
+traceable and prevents metric names, suffixes, and units from becoming the
 information architecture accidentally.
+
+After YAML authoring, reconcile every selector against the validator's generated
+`authored_mapping`. An intended hierarchy in prose is not evidence that the
+emitted family, identity, units, and priority actually implement it. See
+`ownership-proof.md` for the required source evidence, conflict reasoning, and
+selector-level reconciliation.
 
 ### Group diagnostic roles under their owner
 
@@ -454,6 +463,11 @@ A `PASS` proves, for that evidence:
 
 The report lists raw families absent after selector/relabel/writer processing
 under `pipeline_excluded`; they are not misreported as chart coverage.
+The `authored_mapping` section lists the actual source-ordered
+selector-to-displayed-family mapping, including effective inherited instance
+identity, units, algorithm intent, naming mechanisms, and priority. It is the
+objective input to the operator-ownership reconciliation; it does not score
+whether the chosen application model is good.
 A job-policy exclusion summary shows how much otherwise writer-capable evidence
 was removed before coverage was measured. A `PASS` over a deliberately reduced
 denominator is mechanically valid but is not a complete dashboard unless every
@@ -464,11 +478,12 @@ generic auto-selection signatures, observed labels with no authored role,
 the job-policy exclusion summary, observed per-rule allow/deny impact, unused
 metric declarations, authored/runtime heatmap divergence, ambiguous or
 physical-rate filled charts, repeated sibling family paths, mixed leaf identity,
-parent identity loss, and sibling identity mismatch. Each can be intentional,
-but its UX or diagnostic trade-off must be explained. Do not mechanically add
-identity, promotion, or dimensions merely to silence a label warning; explain
-intentional aggregation or an intentional entity-level boundary when it is the
-correct design.
+parent identity loss, sibling identity mismatch, sample-discarding relabel
+actions, and incremental counter/distribution charts whose units omit rate
+semantics. Each can be intentional, but its UX or diagnostic trade-off must be
+explained. Do not mechanically add identity, promotion, dimensions, or unit
+suffixes merely to silence a warning; explain intentional aggregation,
+entity-level boundaries, and truthful unit algebra when they are correct.
 
 The gate cannot judge whether the dashboard is useful, and it cannot prove
 behavior for unseen metrics or label values. Exact candidate selection also
@@ -481,6 +496,8 @@ boundary.
 
 Review the rendered design, not merely the YAML:
 
+- Does every `authored_mapping` selector agree with its source-family owner,
+  identity, population, unit algebra, and destination in `OPERATOR-MODEL.md`?
 - Does the first screen answer the most urgent operator questions?
 - Does the family tree express the entities/containment, modules/capabilities,
   and operations/processing stages that operators actually use?
@@ -522,7 +539,8 @@ Deliver:
 
 - the profile YAML;
 - the recommended structured job policy (or exact changes to an existing job);
-- a concise mapping from operator questions to families/charts;
+- `OPERATOR-MODEL.md`, including the post-authoring selector-level
+  reconciliation against `authored_mapping`;
 - validation inputs/hashes and the `PASS` summary;
 - explicit evidence limitations or optional surfaces still needing fixtures.
 
@@ -543,6 +561,8 @@ left to lifecycle/retention, and for the exceptional approval boundary.
 - `profile-schema.md` — schema navigation and runtime consequences.
 - `metric-types.md` — collector/writer behavior and per-type design choices.
 - `chart-design.md` — dashboard reasoning, hierarchy, conflicts, and UX.
+- `ownership-proof.md` — source-backed ownership evidence and emitted-profile
+  reconciliation.
 - `how-tos/capture-metrics-dump.md` — safe evidence capture.
 - `sqlite-metadata-reset.md` — destructive metadata-reset decision boundary.
 - `scripts/validate-profile.py` — thin launcher for the authoritative Go tool.

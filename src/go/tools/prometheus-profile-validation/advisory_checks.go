@@ -17,6 +17,8 @@ import (
 	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	promcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
+	promrelabel "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	commonmodel "github.com/prometheus/common/model"
 	promlabels "github.com/prometheus/prometheus/model/labels"
 )
@@ -197,6 +199,136 @@ func addJobDenyReview(
 	}
 }
 
+type relabelDiscardAudit struct {
+	action            promrelabel.Action
+	blockMatch        string
+	families          map[string]struct{}
+	logicalIdentities map[string]struct{}
+	rawSeries         int
+}
+
+type relabelDiscardRuleKey struct {
+	block int
+	rule  int
+}
+
+// addRelabelDiscardReview replays the validated job rules over the captured
+// samples so every sample-discarding rule has an explicit evidence boundary.
+func addRelabelDiscardReview(
+	expr promselector.Expr,
+	blocks []promcollector.RelabelBlock,
+	batch prompkg.SampleBatch,
+	r *report,
+) {
+	if len(blocks) == 0 {
+		return
+	}
+
+	effectiveSelector, err := expr.Parse()
+	if err != nil {
+		return // Collector.Init reports the authoritative selector error.
+	}
+
+	type compiledBlock struct {
+		match matcher.Matcher
+		proc  *promrelabel.Processor
+	}
+	compiled := make([]compiledBlock, 0, len(blocks))
+	audits := make(map[relabelDiscardRuleKey]*relabelDiscardAudit)
+	for blockIndex, block := range blocks {
+		m, err := matcher.NewSimplePatternsMatcher(block.Match)
+		if err != nil {
+			return // Collector.Init reports the authoritative block error.
+		}
+		proc, err := promrelabel.New(block.MetricRelabelConfigs)
+		if err != nil {
+			return // Collector.Init reports the authoritative rule error.
+		}
+		compiled = append(compiled, compiledBlock{match: m, proc: proc})
+		for ruleIndex, config := range block.MetricRelabelConfigs {
+			action, ok := sampleDiscardingRelabelAction(config.Action)
+			if !ok {
+				continue
+			}
+			audits[relabelDiscardRuleKey{block: blockIndex, rule: ruleIndex}] = &relabelDiscardAudit{
+				action:            action,
+				blockMatch:        block.Match,
+				families:          make(map[string]struct{}),
+				logicalIdentities: make(map[string]struct{}),
+			}
+		}
+	}
+	if len(audits) == 0 {
+		return
+	}
+
+	for _, raw := range batch.Samples {
+		if effectiveSelector != nil && !effectiveSelector.Matches(sampleLabelsWithName(raw)) {
+			continue
+		}
+		sample := raw
+		for blockIndex, block := range compiled {
+			if !block.match.MatchString(sample.Name) {
+				continue
+			}
+			out, drop := block.proc.Apply(sample)
+			if drop.Dropped() {
+				key := relabelDiscardRuleKey{block: blockIndex, rule: drop.RuleIndex}
+				if audit := audits[key]; audit != nil {
+					family := sampleSourceFamilyName(raw)
+					audit.families[family] = struct{}{}
+					audit.logicalIdentities[logicalSampleIdentityKey(family, raw)] = struct{}{}
+					audit.rawSeries++
+				}
+				break
+			}
+			sample = out
+		}
+	}
+
+	keys := slices.SortedFunc(maps.Keys(audits), func(a, b relabelDiscardRuleKey) int {
+		if a.block != b.block {
+			return a.block - b.block
+		}
+		return a.rule - b.rule
+	})
+	for _, key := range keys {
+		audit := audits[key]
+		path := fmt.Sprintf("relabeling[%d].metric_relabel_configs[%d]", key.block, key.rule)
+		message := fmt.Sprintf(
+			"sample-discarding relabel action %q in block match %q dropped no samples in the supplied dump",
+			audit.action,
+			audit.blockMatch,
+		)
+		if audit.rawSeries > 0 {
+			message = fmt.Sprintf(
+				"sample-discarding relabel action %q in block match %q removes %d observed logical identities across %d source families (%d raw exposition series)",
+				audit.action,
+				audit.blockMatch,
+				len(audit.logicalIdentities),
+				len(audit.families),
+				audit.rawSeries,
+			)
+		}
+		r.addWarning(
+			"job_relabel_discard_review",
+			path,
+			message,
+			"Drop, keep, dropequal, and keepequal change the evidence denominator before profile coverage is measured. Confirm authoritative semantics and state which operator question is lost; zero observed drops do not prove the rule is harmless for unseen values.",
+		)
+	}
+}
+
+func sampleDiscardingRelabelAction(action promrelabel.Action) (promrelabel.Action, bool) {
+	action = promrelabel.Action(strings.ToLower(strings.TrimSpace(string(action))))
+	switch action {
+	case promrelabel.Drop, promrelabel.DropEqual, promrelabel.Keep, promrelabel.KeepEqual:
+		return action, true
+	default:
+		return "", false
+	}
+}
+
 func sampleSourceFamilyName(sample prompkg.Sample) string {
 	switch sample.Kind {
 	case prompkg.SampleKindHistogramBucket:
@@ -368,17 +500,17 @@ func handledChartLabels(chart charttpl.Chart) (map[string]struct{}, bool) {
 	if chart.Instances == nil {
 		return handled, wildcard
 	}
-	for _, token := range chart.Instances.ByLabels {
-		token = strings.TrimSpace(token)
+	for _, identityToken := range chart.Instances.ByLabels {
+		identityToken = strings.TrimSpace(identityToken)
 		switch {
-		case token == "*":
+		case identityToken == "*":
 			wildcard = true
-		case strings.HasPrefix(token, "!"):
-			if key := strings.TrimSpace(strings.TrimPrefix(token, "!")); key != "" {
+		case strings.HasPrefix(identityToken, "!"):
+			if key := strings.TrimSpace(strings.TrimPrefix(identityToken, "!")); key != "" {
 				handled[key] = struct{}{}
 			}
-		case token != "":
-			handled[token] = struct{}{}
+		case identityToken != "":
+			handled[identityToken] = struct{}{}
 		}
 	}
 	return handled, wildcard
@@ -535,6 +667,56 @@ func rateLikeUnits(units string) bool {
 	return strings.Contains(units, "/s") ||
 		strings.Contains(units, "/sec") ||
 		strings.Contains(units, "per second")
+}
+
+// addIncrementalUnitHeuristics uses the compiler-resolved runtime algorithm,
+// avoiding a second implementation of chartengine's selector-kind inference.
+func addIncrementalUnitHeuristics(charts []materializedChart, r *report) {
+	type templateSummary struct {
+		title     string
+		units     string
+		instances int
+	}
+	templates := make(map[string]*templateSummary)
+	for _, chart := range charts {
+		if chart.Autogen || chart.Algorithm != "incremental" {
+			continue
+		}
+		item := templates[chart.TemplateID]
+		if item == nil {
+			item = &templateSummary{title: chart.Title, units: chart.Units}
+			templates[chart.TemplateID] = item
+		}
+		item.instances++
+	}
+	for _, templateID := range slices.Sorted(maps.Keys(templates)) {
+		item := templates[templateID]
+		if rateLikeUnits(item.units) || incrementalRateEquivalentUnits(item.units) {
+			continue
+		}
+		r.addWarning(
+			"incremental_units_review",
+			templateID,
+			fmt.Sprintf(
+				"incremental chart %q materializes %d instance(s) with non-rate units %q",
+				item.title,
+				item.instances,
+				item.units,
+			),
+			"Netdata renders incremental values as per-second deltas. Use rate-bearing units that preserve the measured object, or document a truthful derived equivalent such as CPU cores or utilization; plain count/quantity units hide the temporal denominator.",
+		)
+	}
+}
+
+func incrementalRateEquivalentUnits(units string) bool {
+	units = strings.ToLower(strings.TrimSpace(units))
+	switch units {
+	case "%", "percent", "percentage", "ratio", "utilization",
+		"core", "cores", "concurrent", "concurrency", "in-flight", "in flight":
+		return true
+	default:
+		return false
+	}
 }
 
 func physicalVolumeUnits(units string) bool {

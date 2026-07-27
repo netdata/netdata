@@ -102,6 +102,19 @@ generic when selector or relabeling rules make the precise cause ambiguous.
 Raw logical series and flattened writer series are different counts for
 histograms and summaries.
 
+`authored_mapping` reports the effective profile in source order:
+
+- composed displayed family;
+- title, context, units, authored algorithm intent, type, and priority;
+- effective `instances.by_labels` after inheritance; and
+- exact dimension selectors, static/dynamic naming mechanisms, and visibility.
+
+This mapping is deterministic evidence for semantic review. It lets the author
+reconcile the emitted selector-to-display design against a source-backed
+operator model without claiming that the validator understands the
+application's causal structure. Materialized chart records separately report
+the compiler-resolved runtime algorithm.
+
 Rendered chart IDs and dimension names can contain label values, so reports
 fingerprint them instead of emitting the raw values. Public-emitter failures
 are classified and fingerprinted rather than copied verbatim for the same
@@ -130,12 +143,17 @@ Warnings identify designs that deserve explanation but can be correct:
   effective job selector before profile coverage is measured;
 - each allow list's observed exclusion of otherwise writer-capable families;
 - each deny expression's observed impact on otherwise writer-capable families;
+- every `drop`, `dropequal`, `keep`, or `keepequal` relabel rule, including its
+  observed logical-identity impact or the absence of matching evidence;
 - metric declarations unused by any authored dimension in their scope;
 - histogram bucket charts whose authored type differs from the compiler-forced
   heatmap;
 - `area`/`stacked` charts with physical-rate or ambiguous units, where volume
   semantics may or may not justify a filled visual;
 - charts that mix distribution shape/count/sum roles under one unit;
+- compiler-resolved incremental charts whose rendered units omit the
+  per-second denominator and are not a recognized derived equivalent such as
+  cores, concurrency, or utilization;
 - absolute chart dimensions whose observed non-zero magnitudes differ by at
   least 20x and may flatten the smaller signal.
 
@@ -153,6 +171,16 @@ shrinking denominator among many per-rule warnings. It remains advisory because
 the tool cannot prove why the user chose a collection boundary. Dashboard focus
 alone is not a collection boundary: use hierarchy and priority rather than
 discarding distinct writer-capable diagnostics.
+
+Relabel discard warnings replay the validated ordered blocks over the captured
+samples and attribute observed drops to the exact rule. A rule with no observed
+drop still warns because one dump cannot prove its future exclusion surface.
+The warning never reports observed label values.
+
+Incremental-unit warnings use chartengine's compiler-resolved algorithm rather
+than duplicating suffix inference. Compound observed units such as
+`duration/item/s` retain rate semantics and are not rejected merely for having
+more than one denominator.
 
 Hidden dimensions are excluded from the visible-scale comparison because they
 do not control the chart's default visible axis. A chart may hide supporting
