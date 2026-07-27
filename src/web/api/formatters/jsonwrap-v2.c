@@ -271,7 +271,6 @@ static void rrdr_dimension_units_array_v2(BUFFER *wb, const char *key, RRDR *r, 
         return;
 
     const char *units_override = source_units ? NULL : query_target_units_override(r->internal.qt);
-    const bool rates = !source_units && query_target_all_metrics_stored_as_rates(r->internal.qt);
 
     buffer_json_member_add_array(wb, key);
     for(size_t c = 0; c < r->d ; c++) {
@@ -281,6 +280,13 @@ static void rrdr_dimension_units_array_v2(BUFFER *wb, const char *key, RRDR *r, 
         if(units_override)
             buffer_json_add_array_item_string(wb, units_override);
         else {
+            // per RESULT dimension, because sum integrates per METRIC: in a
+            // query mixing counters and gauges the counter's volume must not
+            // keep the "/s" the sum just integrated away, and the gauge's
+            // must not lose one it never had. This is the same answer the
+            // group-by key is built from (query-group-by-init.c)
+            const bool rates = !source_units && !(r->od[c] & RRDR_DIMENSION_NOT_RATE);
+
             char units_buf[64];
             buffer_json_add_array_item_string(wb,
                 query_target_rate_adjusted_units_for(
