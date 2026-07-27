@@ -3,6 +3,7 @@
 #include "health_internals.h"
 #include "health-config-unittest.h"
 #include "web/api/queries/query.h"
+#include "web/api/queries/tg-expression.h"
 #include "database/sqlite/sqlite_health.h"
 
 // test case structure for db lookup parsing
@@ -485,6 +486,56 @@ static int test_db_lookup_condition_is_trimmed(int *passed) {
         failed++;
         string_freez(ac.dimensions);
         string_freez(ac.time_group_options);
+    }
+
+    return failed;
+}
+
+// A condition the parser cannot read must leave the DEFAULT behind, never
+// the part of itself it managed to read. Health refuses such an alert, but
+// the query API has always accepted one and answered `==0` - and a half-read
+// `>=gap junk` that kept its gap token would silently answer a different
+// question from the one `==0` answers.
+static int test_expression_rejects_leave_the_default(int *passed) {
+    static const struct {
+        const char *condition;
+        bool valid;
+        const char *description;
+    } tests[] = {
+        { ">=gap junk", false, "a gap token followed by junk" },
+        { "<previous and >5", false, "there are no and/or compounds" },
+        { ">5 5", false, "a number followed by junk" },
+        { ">nonsense", false, "a word that is not an operand" },
+        { ".", false, "a lone dot is not a number" },
+        { ">=gap", true, "the same condition without the junk (control)" },
+        { "!:5", true, "the colon spellings countif has always accepted" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        TG_EXPRESSION e;
+        bool ok = tg_expression_parse(&e, tests[i].condition);
+
+        if(ok != tests[i].valid) {
+            fprintf(stderr, "FAILED [%s]: '%s' parsed=%s, want %s\n",
+                    tests[i].description, tests[i].condition,
+                    ok ? "true" : "false", tests[i].valid ? "true" : "false");
+            failed++;
+            continue;
+        }
+
+        if(!ok && (e.cmp != TG_EXPRESSION_EQUAL ||
+                   e.operand != TG_EXPRESSION_OPERAND_NUMBER ||
+                   e.target != 0.0 ||
+                   tg_expression_wants_gaps(&e))) {
+            fprintf(stderr, "FAILED [%s]: rejected '%s' left cmp=%d operand=%d target=%f behind, want the ==0 default\n",
+                    tests[i].description, tests[i].condition,
+                    (int)e.cmp, (int)e.operand, (double)e.target);
+            failed++;
+            continue;
+        }
+
+        (*passed)++;
     }
 
     return failed;
@@ -1126,6 +1177,46 @@ static int test_dyncfg_time_group_round_trip(int *passed) {
     return failed;
 }
 
+// The written condition is trimmed before it is stored, and the trim must
+// not put a ceiling on how long it may be: a condition padded past a fixed
+// buffer used to come back empty, and the alert then ran the legacy
+// condition/value pair instead of what its author wrote.
+static int test_dyncfg_long_condition_is_not_truncated(int *passed) {
+    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    CLEAN_BUFFER *result = buffer_create(0, NULL);
+
+    // padding wide enough that any fixed buffer would have to cut it
+    char padding[512];
+    memset(padding, ' ', sizeof(padding) - 1);
+    padding[sizeof(padding) - 1] = '\0';
+
+    buffer_sprintf(payload,
+                   "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                   "\"config\":{\"value\":{\"update_every\":1,\"database_lookup\":{"
+                   "\"after\":-60,\"time_group\":\"percentage-of-time\","
+                   "\"time_group_condition\":\">=\",\"time_group_value\":1,"
+                   "\"time_group_options\":\"%s>=1%s\"}},"
+                   "\"match\":{\"on\":\"chart\"}}}]}",
+                   padding, padding);
+
+    int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+    if(code != HTTP_RESP_OK) {
+        fprintf(stderr, "FAILED [a long padded condition]: export failed with code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        return 1;
+    }
+
+    if(!strstr(buffer_tostring(result), "lookup: percentage-of-time(>=1) -1m")) {
+        fprintf(stderr, "FAILED [a long padded condition]: the exported config does not carry "
+                        "'lookup: percentage-of-time(>=1) -1m':\n%s\n", buffer_tostring(result));
+        return 1;
+    }
+
+    (*passed)++;
+    return 0;
+}
+
 int health_config_unittest(void) {
     int passed = 0;
     int failed = 0;
@@ -1156,13 +1247,16 @@ int health_config_unittest(void) {
     failed += test_prototype_rejects_non_finite_delay_multiplier(&passed);
     failed += test_prototype_rejects_non_positive_update_every(&passed);
     failed += test_dyncfg_time_group_round_trip(&passed);
+    failed += test_dyncfg_long_condition_is_not_truncated(&passed);
+    failed += test_expression_rejects_leave_the_default(&passed);
+
+    // the same alert configuration, taken through the metadata database
+    // instead of the parser - counted BEFORE the summary, or a failure here
+    // is printed above a line claiming nothing failed
+    failed += sql_alert_config_unittest();
 
     fprintf(stderr, "\n===================================================\n");
     fprintf(stderr, "Health config parser tests: %d passed, %d failed\n\n", passed, failed);
-
-    // the same alert configuration, taken through the metadata database
-    // instead of the parser
-    failed += sql_alert_config_unittest();
 
     return failed;
 }

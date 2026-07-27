@@ -131,18 +131,22 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
                 // trimmed to the same canonical form the .conf reader
                 // produces (health_parse_db_lookup): the condition is
                 // hashed into the alert's identity, so the same rule
-                // spaced differently must not become a different alert
-                char _trimmed[128];
-                strncpyz(_trimmed, string2str(config->time_group_options), sizeof(_trimmed) - 1);
-                char *_c = trim(_trimmed);
+                // spaced differently must not become a different alert.
+                // The copy is as long as the condition written - a fixed
+                // buffer would silently truncate a long one and store a
+                // condition its author did not write.
+                const char *_written = string2str(config->time_group_options);
+                char *_copy = strdupz(_written);
+                char *_c = trim(_copy);
                 if(!_c || !*_c) {
                     string_freez(config->time_group_options);
                     config->time_group_options = NULL;
                 }
-                else if(strcmp(_c, string2str(config->time_group_options)) != 0) {
+                else if(strcmp(_c, _written) != 0) {
                     string_freez(config->time_group_options);
                     config->time_group_options = string_strdupz(_c);
                 }
+                freez(_copy);
             }
 
             if(config->time_group_options) {

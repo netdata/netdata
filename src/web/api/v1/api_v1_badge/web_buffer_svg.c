@@ -1110,7 +1110,13 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
                                 continue;
 
                             any = true;
-                            if(rd->algorithm != RRD_ALGORITHM_INCREMENTAL) {
+                            // through the RRDMETRIC, which is where the query
+                            // reads the algorithm from (query_target.c) - the
+                            // RRDDIM field is written by the collector thread
+                            // and the badge would disagree with the number it
+                            // is labelling while a change is being published
+                            RRDMETRIC_ACQUIRED *rma = rd->rrdcontexts.rrdmetric;
+                            if(!rma || !rrdmetric_acquired_stored_as_rates(rma)) {
                                 all_rates = false;
                                 break;
                             }

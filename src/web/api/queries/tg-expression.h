@@ -15,7 +15,11 @@
 //
 // The grammar is an operator plus one operand:
 //
-//   operator  >  >=|>:  <  <=|<:  =|==|:  !=|!|<>
+//   operator  >  >=|>:  <  <=|<:  =|==|:  !=|!:|!|<>
+//
+// The `:` spellings are the ones `countif()` has always accepted (the
+// colon reads as an equals inside a URL); they are listed here because
+// health now shares this parser and therefore accepts them too.
 //   operand   a number, a gap token (nan|null|gap|empty), or the
 //             predecessor keyword (previous|last)
 //
@@ -123,12 +127,10 @@ static inline bool tg_expression_token(const char *s, const char *token, size_t 
     return strncasecmp(s, token, len) == 0 && (s[len] == '\0' || isspace((uint8_t)s[len]));
 }
 
-// Returns false when the operand is malformed. The query API has always
-// been lenient here (an unparsable condition silently compares equal to
-// zero) and stays that way; health checks the result and refuses to load
-// an alert whose condition it cannot read, which is what it has always
-// done.
-static inline bool tg_expression_parse(TG_EXPRESSION *e, const char *options) {
+// what an absent or unreadable condition compares against: `==0`, which
+// is what the query API has always answered when it could not read the
+// options it was given
+static inline void tg_expression_set_default(TG_EXPRESSION *e) {
     e->cmp = TG_EXPRESSION_EQUAL;
     e->operand = TG_EXPRESSION_OPERAND_NUMBER;
     e->target = 0.0;
@@ -137,6 +139,13 @@ static inline bool tg_expression_parse(TG_EXPRESSION *e, const char *options) {
     e->has_previous = false;
     e->delivered_share = 0.0;
     e->has_delivered_share = false;
+}
+
+// The parse itself. It writes into `e` as it goes, so a condition that is
+// valid up to a point leaves that much behind - tg_expression_parse() is
+// what callers use, and it undoes a partial read.
+static inline bool tg_expression_parse_partial(TG_EXPRESSION *e, const char *options) {
+    tg_expression_set_default(e);
 
     if(!options || !*options)
         return true;
@@ -242,6 +251,25 @@ static inline bool tg_expression_parse(TG_EXPRESSION *e, const char *options) {
         return false;       // trailing junk
 
     return true;
+}
+
+// Returns false when the condition is malformed. The query API has always
+// been lenient here (an unreadable condition silently compares equal to
+// zero) and stays that way; health checks the result and refuses to load
+// an alert whose condition it cannot read, which is what it has always
+// done.
+//
+// A rejected condition leaves the DEFAULT behind, never the fragment that
+// parsed: `>=gap junk` reads the gap token before it hits the junk, and
+// keeping that would quietly turn a query the caller wrote wrong into a
+// gap-aware one - a different question from the `==0` the API answers
+// when it cannot read the options.
+static inline bool tg_expression_parse(TG_EXPRESSION *e, const char *options) {
+    if(likely(tg_expression_parse_partial(e, options)))
+        return true;
+
+    tg_expression_set_default(e);
+    return false;
 }
 
 // true when the expression names a gap token, which is the ONLY way gap

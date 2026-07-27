@@ -37,6 +37,10 @@ typedef enum __attribute__ ((__packed__)) rrdr_dimension_flag {
     RRDR_DIMENSION_QUERIED  = (1 << 3), // the dimension has been queried
     RRDR_DIMENSION_FAILED   = (1 << 4), // the dimension failed to be queried
     RRDR_DIMENSION_GROUPED  = (1 << 5), // the dimension has been grouped in this RRDR
+    RRDR_DIMENSION_NOT_RATE = (1 << 6), // at least one metric behind it is NOT stored as a
+                                        // per-second rate. Stated negatively so it survives
+                                        // the OR that merges metrics into a group: "every
+                                        // contributor is a rate" is the absence of this flag
 } RRDR_DIMENSION_FLAGS;
 
 // RRDR result options
