@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"net/url"
 	"strconv"
 	"testing"
 	"time"
@@ -260,10 +261,13 @@ func l10Fixture(t *testing.T) {
 func l10Query(t *testing.T, group string, tier int, after, before, points int64, dims string) map[string][]canon.Pt {
 	t.Helper()
 
-	var params = daemon.DataParams(l10Context, after, before, points)
+	// DataParamsTier already builds on DataParams, so only one of them is
+	// ever needed
+	var params url.Values
 	if tier >= 0 {
 		params = daemon.DataParamsTier(l10Context, tier, after, before, points, group)
 	} else {
+		params = daemon.DataParams(l10Context, after, before, points)
 		params.Set("time_group", group)
 	}
 	params.Set("options", "jsonwrap|unaligned")

@@ -44,8 +44,13 @@ func engineSrcDir() (string, error) {
 }
 
 var (
-	// a member of the enum, one per line, ignoring comments
-	reGroupingEnumMember = regexp.MustCompile(`^\s*(RRDR_GROUPING_[A-Z0-9_]+)\s*(?:=\s*[^,]+)?,`)
+	// A member of the enum. The character class is deliberately wide and the
+	// comma may be preceded by a C block comment: this regex is the SOLE gate
+	// that notices a new grouping, so anything it fails to match is a
+	// grouping nothing tests. Better to accept a spelling the codebase does
+	// not use than to miss one it might.
+	reGroupingEnumMember = regexp.MustCompile(
+		`^\s*(RRDR_GROUPING_[A-Za-z0-9_]+)\s*(?:=\s*[^,/]+)?\s*(?:/\*.*?\*/\s*)*,`)
 	// the registry's canonical name and the value it stands for
 	reRegistryName  = regexp.MustCompile(`\.name\s*=\s*"([^"]+)"`)
 	reRegistryValue = regexp.MustCompile(`\.value\s*=\s*(RRDR_GROUPING_[A-Z0-9_]+)`)

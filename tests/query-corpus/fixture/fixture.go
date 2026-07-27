@@ -147,17 +147,37 @@ func (c Chart) rowTimes() []int64 {
 // ReplayWindow returns the chart's rows inside (after, before] in the
 // stream.ReplayHandler contract.
 func (c Chart) ReplayWindow(after, before int64) []stream.ReplayRow {
+	// Matched by TIMESTAMP, like PushLive. Pairing by position assumes every
+	// dimension carries the same number of points at the same moments, which
+	// a chart whose dimensions stop at different times does not - and that
+	// shape is deliberately used (a dimension whose storage runs out while
+	// its chart keeps going). Indexing the shorter dimension by the longer
+	// one's position reads the wrong sample, or runs off the end.
+	byTime := make([]map[int64]Point, len(c.Dimensions))
+	for di, d := range c.Dimensions {
+		byTime[di] = make(map[int64]Point, len(d.Points))
+		for _, p := range d.Points {
+			byTime[di][p.T] = p
+		}
+	}
+
 	var rows []stream.ReplayRow
-	for i, p := range c.Dimensions[0].Points {
-		if p.T <= after || p.T > before {
+	for _, ts := range c.rowTimes() {
+		if ts <= after || ts > before {
 			continue
 		}
-		row := stream.ReplayRow{T: p.T}
-		for _, d := range c.Dimensions {
+		row := stream.ReplayRow{T: ts}
+		for di, d := range c.Dimensions {
+			dp, has := byTime[di][ts]
+			if !has {
+				// this dimension has nothing at this moment - the same
+				// thing PushLive does, which is to say nothing at all
+				continue
+			}
 			row.Dims = append(row.Dims, stream.ReplayValue{
 				ID:        d.ID,
-				Collected: d.Points[i].Collected,
-				Flags:     d.Points[i].Flags,
+				Collected: dp.Collected,
+				Flags:     dp.Flags,
 			})
 		}
 		rows = append(rows, row)
