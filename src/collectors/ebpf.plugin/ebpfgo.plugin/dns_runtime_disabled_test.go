@@ -29,8 +29,8 @@ func TestDNSRuntimeDisabledBuild(t *testing.T) {
 	if err := rt.Attach(); !errors.Is(err, libbpfloader.ErrDisabled) {
 		t.Fatalf("Attach: got %v, want ErrDisabled", err)
 	}
-	if _, err := rt.Snapshot(); !errors.Is(err, libbpfloader.ErrDisabled) {
-		t.Fatalf("Snapshot: got %v, want ErrDisabled", err)
+	if _, err := rt.FlowSnapshot(); !errors.Is(err, libbpfloader.ErrDisabled) {
+		t.Fatalf("FlowSnapshot: got %v, want ErrDisabled", err)
 	}
 	rt.Close() // must not panic
 }

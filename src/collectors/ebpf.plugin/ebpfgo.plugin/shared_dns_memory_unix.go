@@ -15,8 +15,6 @@ package main
 static inline size_t dns_flow_off_timestamp_us_fn(void) { return offsetof(struct ebpfgo_dns_flow_record, timestamp_us); }
 static inline size_t dns_flow_off_domain_fn(void)       { return offsetof(struct ebpfgo_dns_flow_record, domain); }
 static inline size_t dns_flow_off_client_port_fn(void)  { return offsetof(struct ebpfgo_dns_flow_record, client_port); }
-static inline size_t dns_agg_off_queries_udp4_fn(void)   { return offsetof(struct ebpfgo_dns_aggregate, queries_udp4); }
-static inline size_t dns_agg_off_responses_udp4_fn(void) { return offsetof(struct ebpfgo_dns_aggregate, responses_udp4); }
 */
 import "C"
 
@@ -26,19 +24,6 @@ import (
 
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
-
-// ebpfgoDnsAggregate mirrors struct ebpfgo_dns_aggregate for CGo ABI verification.
-// Field order and types must match the C struct exactly.
-type ebpfgoDnsAggregate struct {
-	QueriesUDP4   uint64
-	QueriesUDP6   uint64
-	QueriesTCP4   uint64
-	QueriesTCP6   uint64
-	ResponsesUDP4 uint64
-	ResponsesUDP6 uint64
-	ResponsesTCP4 uint64
-	ResponsesTCP6 uint64
-}
 
 // ebpfgoDnsFlowRecord mirrors struct ebpfgo_dns_flow_record (320 bytes).
 // Must stay in sync with apps_ebpf_shared_dns_row.h — verified by
@@ -67,20 +52,6 @@ func copyDNSDomain(dst *[256]byte, domain string) {
 // their C counterparts.  Checks total size and key field offsets so a field
 // reorder that preserves struct size is also caught.
 func assertSharedDnsMemoryLayout() {
-	if got, want := unsafe.Sizeof(ebpfgoDnsAggregate{}),
-		uintptr(C.sizeof_struct_ebpfgo_dns_aggregate); got != want {
-		panic(fmt.Sprintf("ebpfgo_dns_aggregate ABI mismatch: Go=%d C=%d", got, want))
-	}
-	if got, want := unsafe.Offsetof(ebpfgoDnsAggregate{}.QueriesUDP4),
-		uintptr(C.dns_agg_off_queries_udp4_fn()); got != want {
-		panic(fmt.Sprintf("ebpfgo_dns_aggregate.QueriesUDP4 offset mismatch: Go=%d C=%d", got, want))
-	}
-	// ResponsesUDP4 is field 5 of 8 (offset 32). Checking a non-first same-typed
-	// field catches silent reorders that preserve total size.
-	if got, want := unsafe.Offsetof(ebpfgoDnsAggregate{}.ResponsesUDP4),
-		uintptr(C.dns_agg_off_responses_udp4_fn()); got != want {
-		panic(fmt.Sprintf("ebpfgo_dns_aggregate.ResponsesUDP4 offset mismatch: Go=%d C=%d", got, want))
-	}
 	if got, want := unsafe.Sizeof(ebpfgoDnsFlowRecord{}),
 		uintptr(C.sizeof_struct_ebpfgo_dns_flow_record); got != want {
 		panic(fmt.Sprintf("ebpfgo_dns_flow_record ABI mismatch: Go=%d C=%d", got, want))
@@ -114,23 +85,10 @@ func NewSharedDnsMemoryPublisher(updateEverySec uint32) (*SharedDnsMemoryPublish
 	return &SharedDnsMemoryPublisher{ptr: ctx}, nil
 }
 
-func (p *SharedDnsMemoryPublisher) Publish(snap libbpfloader.DNSSnapshot, flows []libbpfloader.DNSFlowRecord) {
+func (p *SharedDnsMemoryPublisher) Publish(flows []libbpfloader.DNSFlowRecord) {
 	if p == nil || p.ptr == nil {
 		return
 	}
-
-	agg := ebpfgoDnsAggregate{
-		QueriesUDP4:   snap.QueriesUDPv4,
-		QueriesUDP6:   snap.QueriesUDPv6,
-		QueriesTCP4:   snap.QueriesTCPv4,
-		QueriesTCP6:   snap.QueriesTCPv6,
-		ResponsesUDP4: snap.ResponsesUDPv4,
-		ResponsesUDP6: snap.ResponsesUDPv6,
-		ResponsesTCP4: snap.ResponsesTCPv4,
-		ResponsesTCP6: snap.ResponsesTCPv6,
-	}
-
-	cagg := (*C.struct_ebpfgo_dns_aggregate)(unsafe.Pointer(&agg))
 
 	if len(flows) > 0 {
 		// Build a C-layout array using the Go mirror struct. The buf slice is kept
@@ -155,11 +113,11 @@ func (p *SharedDnsMemoryPublisher) Publish(snap libbpfloader.DNSSnapshot, flows 
 			r.ClientIP = f.ClientIP
 		}
 		C.shared_dns_memory_publish(
-			p.ptr, cagg,
+			p.ptr,
 			(*C.struct_ebpfgo_dns_flow_record)(unsafe.Pointer(&buf[0])),
 			C.uint32_t(len(buf)))
 	} else {
-		C.shared_dns_memory_publish(p.ptr, cagg, nil, 0)
+		C.shared_dns_memory_publish(p.ptr, nil, 0)
 	}
 }
 

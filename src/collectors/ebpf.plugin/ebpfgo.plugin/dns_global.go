@@ -24,17 +24,10 @@ func runDNSGlobalCollector(handle *DNSLegacyHandle, stop <-chan struct{}, update
 	}()
 
 	collectAndPublish := func() {
-		snap, err := handle.Runtime.Snapshot()
-		if err != nil {
-			logPluginErr("dns.snapshot", "dns", "snapshot", err)
-			return
-		}
-
 		flows, err := handle.Runtime.FlowSnapshot()
 		if err != nil {
-			// FlowSnapshot failure is non-fatal; publish aggregate only.
 			logPluginErr("dns.flow_snapshot", "dns", "flow snapshot", err)
-			flows = nil
+			return
 		}
 
 		// Lazy SHM open: retry every cycle so a transient open failure at
@@ -48,7 +41,7 @@ func runDNSGlobalCollector(handle *DNSLegacyHandle, stop <-chan struct{}, update
 			}
 		}
 		if shm != nil {
-			shm.Publish(snap, flows)
+			shm.Publish(flows)
 		}
 	}
 

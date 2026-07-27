@@ -139,14 +139,13 @@ bool netdata_ebpfgo_dns_shared_memory_refresh(
         locked = true;
     }
 
-    /* Partial copy: header + aggregate + only the live flow records.
+    /* Partial copy: header + only the live flow records.
      * Avoids memcpy-ing the full ~312 KB ring when flow_count is small. */
     uint32_t live = __atomic_load_n(&ctx->shm->hdr.live_count, __ATOMIC_ACQUIRE);
     if (live > NETDATA_EBPFGO_DNS_FLOW_RING_CAP)
         live = NETDATA_EBPFGO_DNS_FLOW_RING_CAP;
 
     memcpy(&ctx->data.hdr, &ctx->shm->hdr, sizeof(ctx->data.hdr));
-    memcpy(&ctx->data.agg, &ctx->shm->agg, sizeof(ctx->data.agg));
     if (live)
         memcpy(ctx->data.ring, ctx->shm->ring, live * sizeof(ctx->data.ring[0]));
     ctx->data.hdr.live_count = live; /* re-apply cap in the local copy */

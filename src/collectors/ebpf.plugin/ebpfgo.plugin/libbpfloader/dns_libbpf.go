@@ -12,17 +12,6 @@ package libbpfloader
 
 struct netdata_dns_runtime;
 
-struct netdata_dns_snapshot {
-    uint64_t queries_udp_ipv4;
-    uint64_t queries_udp_ipv6;
-    uint64_t queries_tcp_ipv4;
-    uint64_t queries_tcp_ipv6;
-    uint64_t responses_udp_ipv4;
-    uint64_t responses_udp_ipv6;
-    uint64_t responses_tcp_ipv4;
-    uint64_t responses_tcp_ipv6;
-};
-
 struct netdata_dns_flow_record {
     uint64_t timestamp_us;
     uint64_t latency_us;
@@ -42,7 +31,6 @@ struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int 
 int netdata_dns_runtime_prepare(struct netdata_dns_runtime *rt);
 int netdata_dns_runtime_load(struct netdata_dns_runtime *rt);
 int netdata_dns_runtime_attach(struct netdata_dns_runtime *rt);
-int netdata_dns_runtime_snapshot(struct netdata_dns_runtime *rt, struct netdata_dns_snapshot *out);
 int netdata_dns_runtime_flow_snapshot(struct netdata_dns_runtime *rt,
                                       struct netdata_dns_flow_record *out, int max_records);
 void netdata_dns_runtime_close(struct netdata_dns_runtime *rt);
@@ -114,28 +102,6 @@ func (r *DNSRuntime) Attach() error {
 	}
 
 	return nil
-}
-
-func (r *DNSRuntime) Snapshot() (DNSSnapshot, error) {
-	if r == nil || r.ptr == nil {
-		return DNSSnapshot{}, ErrDisabled
-	}
-
-	var csnap C.struct_netdata_dns_snapshot
-	if ret := C.netdata_dns_runtime_snapshot(r.ptr, &csnap); ret != 0 {
-		return DNSSnapshot{}, fmt.Errorf("DNS snapshot failed: %d", int(ret))
-	}
-
-	return DNSSnapshot{
-		QueriesUDPv4:   uint64(csnap.queries_udp_ipv4),
-		QueriesUDPv6:   uint64(csnap.queries_udp_ipv6),
-		QueriesTCPv4:   uint64(csnap.queries_tcp_ipv4),
-		QueriesTCPv6:   uint64(csnap.queries_tcp_ipv6),
-		ResponsesUDPv4: uint64(csnap.responses_udp_ipv4),
-		ResponsesUDPv6: uint64(csnap.responses_udp_ipv6),
-		ResponsesTCPv4: uint64(csnap.responses_tcp_ipv4),
-		ResponsesTCPv6: uint64(csnap.responses_tcp_ipv6),
-	}, nil
 }
 
 // FlowSnapshot returns per-query DNS flow records from the 20-second ring.

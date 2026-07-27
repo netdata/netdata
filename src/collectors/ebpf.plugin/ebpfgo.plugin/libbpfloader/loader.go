@@ -157,10 +157,6 @@ func (r *DNSRuntime) Attach() error {
 	return ErrDisabled
 }
 
-func (r *DNSRuntime) Snapshot() (DNSSnapshot, error) {
-	return DNSSnapshot{}, ErrDisabled
-}
-
 func (r *DNSRuntime) FlowSnapshot() ([]DNSFlowRecord, error) {
 	return nil, ErrDisabled
 }

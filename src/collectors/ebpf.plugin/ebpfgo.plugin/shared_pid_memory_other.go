@@ -2,16 +2,18 @@
 
 package main
 
+import "github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
+
 type SharedPidMemoryPublisher struct{}
 
 func NewSharedPidMemoryPublisher(total uint32, _ uint32) (*SharedPidMemoryPublisher, error) {
 	_ = total
-	return nil, ErrDisabled
+	return nil, libbpfloader.ErrDisabled
 }
 
 func (p *SharedPidMemoryPublisher) Publish(entries []ebpfPidStat, _ uint32) error {
 	_ = entries
-	return ErrDisabled
+	return libbpfloader.ErrDisabled
 }
 
 func (p *SharedPidMemoryPublisher) Close() {

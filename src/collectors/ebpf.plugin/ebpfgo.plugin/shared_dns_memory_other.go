@@ -7,10 +7,10 @@ import "github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libb
 type SharedDnsMemoryPublisher struct{}
 
 func NewSharedDnsMemoryPublisher(_ uint32) (*SharedDnsMemoryPublisher, error) {
-	return nil, ErrDisabled
+	return nil, libbpfloader.ErrDisabled
 }
 
-func (p *SharedDnsMemoryPublisher) Publish(_ libbpfloader.DNSSnapshot, _ []libbpfloader.DNSFlowRecord) {
+func (p *SharedDnsMemoryPublisher) Publish(_ []libbpfloader.DNSFlowRecord) {
 	// No shared-memory segment is available on non-Linux or non-CGo builds.
 }
 func (p *SharedDnsMemoryPublisher) Close() {

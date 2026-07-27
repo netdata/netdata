@@ -179,7 +179,6 @@ fail:
 
 void shared_dns_memory_publish(
     struct shared_dns_memory *ctx,
-    const struct ebpfgo_dns_aggregate *agg,
     const struct ebpfgo_dns_flow_record *flows,
     uint32_t flow_count)
 {
@@ -205,9 +204,6 @@ void shared_dns_memory_publish(
         ctx->publish_timeouts = 0;
         locked = true;
     }
-
-    if (agg)
-        memcpy(&ctx->data->agg, agg, sizeof(ctx->data->agg));
 
     uint32_t n = flow_count < NETDATA_EBPFGO_DNS_FLOW_RING_CAP
                  ? flow_count : NETDATA_EBPFGO_DNS_FLOW_RING_CAP;

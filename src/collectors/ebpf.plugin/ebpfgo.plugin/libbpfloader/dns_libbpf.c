@@ -18,16 +18,6 @@
 
 #include "../nd_alloc_shim.h"
 
-/*
- * ring_buffer API was added in libbpf 0.2 (LIBBPF_MAJOR_VERSION defined).
- * Provide a compile-time gate so the base flavor still compiles without it.
- */
-#ifdef LIBBPF_MAJOR_VERSION
-#  define DNS_HAS_RINGBUF 1
-#else
-#  define DNS_HAS_RINGBUF 0
-#endif
-
 /* -------------------------------------------------------------------------
  * Protocol / Ethernet constants (manual definitions avoid linux/ header issues)
  * ---------------------------------------------------------------------- */
@@ -136,17 +126,6 @@ struct netdata_dns_flow_ring {
 /* -------------------------------------------------------------------------
  * Runtime types
  * ---------------------------------------------------------------------- */
-struct netdata_dns_snapshot {
-    uint64_t queries_udp_ipv4;
-    uint64_t queries_udp_ipv6;
-    uint64_t queries_tcp_ipv4;
-    uint64_t queries_tcp_ipv6;
-    uint64_t responses_udp_ipv4;
-    uint64_t responses_udp_ipv6;
-    uint64_t responses_tcp_ipv4;
-    uint64_t responses_tcp_ipv6;
-};
-
 enum netdata_dns_runtime_kind {
     DNS_RUNTIME_BASE    = 0,
     DNS_RUNTIME_RINGBUF = 1,
@@ -174,54 +153,9 @@ struct netdata_dns_runtime {
     int sock_fd;   /* BPF-attached socket (base: carries packets; ringbuf: empty) */
     int flow_fd;   /* dedicated AF_PACKET + classic-BPF socket (ringbuf mode only) */
     int per_query; /* when false, skip the flow socket and per-query tracking */
-#if DNS_HAS_RINGBUF
-    struct ring_buffer *rb;
-#else
-    void *rb;
-#endif
-    struct netdata_dns_snapshot   acc;
     struct netdata_dns_pending    pending[DNS_PENDING_CAP];
     struct netdata_dns_flow_ring  flows;
 };
-
-/* -------------------------------------------------------------------------
- * Shared counter accumulator
- * ---------------------------------------------------------------------- */
-static void dns_acc_event(struct netdata_dns_snapshot *a,
-                          int is_query, int is_udp, int is_ipv4)
-{
-    if (is_query) {
-        if      (is_udp &&  is_ipv4) a->queries_udp_ipv4++;
-        else if (is_udp && !is_ipv4) a->queries_udp_ipv6++;
-        else if (!is_udp &&  is_ipv4) a->queries_tcp_ipv4++;
-        else                          a->queries_tcp_ipv6++;
-    } else {
-        if      (is_udp &&  is_ipv4) a->responses_udp_ipv4++;
-        else if (is_udp && !is_ipv4) a->responses_udp_ipv6++;
-        else if (!is_udp &&  is_ipv4) a->responses_tcp_ipv4++;
-        else                          a->responses_tcp_ipv6++;
-    }
-}
-
-/* -------------------------------------------------------------------------
- * Ring buffer callback (buffer / arena variants only)
- * ---------------------------------------------------------------------- */
-#if DNS_HAS_RINGBUF
-static int dns_rb_callback(void *ctx, void *data, size_t data_sz)
-{
-    if (data_sz < offsetof(struct netdata_dns_event_t, direction) + 1)
-        return 0;
-
-    struct netdata_dns_runtime *rt = ctx;
-    const struct netdata_dns_event_t *ev = data;
-
-    dns_acc_event(&rt->acc,
-                  ev->direction == DNS_DIRECTION_QUERY,
-                  ev->protocol  == DNS_IPPROTO_UDP,
-                  ev->ip_version == 4);
-    return 0;
-}
-#endif /* DNS_HAS_RINGBUF */
 
 /* -------------------------------------------------------------------------
  * Port helpers
@@ -676,18 +610,12 @@ static void dns_drain_socket(struct netdata_dns_runtime *rt)
     ssize_t n;
     uint64_t now_us = dns_now_us();
 
-    while ((n = recv(rt->sock_fd, buf, sizeof(buf), MSG_DONTWAIT)) > 0) {
-        int is_query, is_udp, is_ipv4;
-        if (dns_parse_raw_packet(rt, buf, n, now_us,
-                                 &is_query, &is_udp, &is_ipv4))
-            dns_acc_event(&rt->acc, is_query, is_udp, is_ipv4);
-    }
+    while ((n = recv(rt->sock_fd, buf, sizeof(buf), MSG_DONTWAIT)) > 0)
+        dns_parse_raw_packet(rt, buf, n, now_us, NULL, NULL, NULL);
 }
 
 /* -------------------------------------------------------------------------
- * Ring buffer mode: drain dedicated flow-capture socket.
- * Aggregate counting is done by the ring buffer callback; this path
- * exists only to feed the per-query DNS payload parser.
+ * Ring buffer mode: drain dedicated flow-capture socket for per-query tracking.
  * ---------------------------------------------------------------------- */
 static void dns_drain_flow_socket(struct netdata_dns_runtime *rt)
 {
@@ -879,79 +807,18 @@ int netdata_dns_runtime_attach(struct netdata_dns_runtime *rt)
     if (dns_attach_filter(rt, prog_name) < 0)
         return -1;
 
-    if (rt->kind == DNS_RUNTIME_RINGBUF) {
-#if DNS_HAS_RINGBUF
-        struct bpf_map *map = bpf_object__find_map_by_name(rt->obj, "dns_events");
-        if (!map) {
-            fprintf(stderr, "ebpf-go: dns: dns_events map not found\n");
-            close(rt->sock_fd);
-            rt->sock_fd = -1;
-            return -1;
-        }
-
-        int fd = bpf_map__fd(map);
-        if (fd < 0) {
-            close(rt->sock_fd);
-            rt->sock_fd = -1;
-            return -1;
-        }
-
-        rt->rb = ring_buffer__new(fd, dns_rb_callback, rt, NULL);
-        if (!rt->rb) {
-            fprintf(stderr, "ebpf-go: dns: ring_buffer__new failed\n");
-            close(rt->sock_fd);
-            rt->sock_fd = -1;
-            return -1;
-        }
-
-        /* Per-query DNS payload tracking requires a dedicated AF_PACKET
-         * capture socket. The ring buffer path still emits aggregate counters
-         * regardless of this flag. When the operator (or this Go side) does
-         * not need per-query tracking, skip the flow socket entirely so the
-         * kernel does not spend CPU on a capture socket no consumer reads. */
-        if (rt->per_query) {
-            rt->flow_fd = dns_open_flow_socket();
-            if (rt->flow_fd < 0)
-                fprintf(stderr,
-                        "ebpf-go: dns: flow socket unavailable; per-query tracking disabled\n");
-        }
-#else
-        fprintf(stderr,
-                "ebpf-go: dns: ring buffer variant requires libbpf >= 0.2\n");
-        close(rt->sock_fd);
-        rt->sock_fd = -1;
-        return -1;
-#endif
+    if (rt->kind == DNS_RUNTIME_RINGBUF && rt->per_query) {
+        rt->flow_fd = dns_open_flow_socket();
+        if (rt->flow_fd < 0)
+            fprintf(stderr,
+                    "ebpf-go: dns: flow socket unavailable; per-query tracking disabled\n");
     }
-
-    return 0;
-}
-
-int netdata_dns_runtime_snapshot(
-    struct netdata_dns_runtime *rt,
-    struct netdata_dns_snapshot *out)
-{
-    if (!rt || !out)
-        return -1;
-
-    if (rt->kind == DNS_RUNTIME_RINGBUF) {
-#if DNS_HAS_RINGBUF
-        if (rt->rb)
-            ring_buffer__poll(rt->rb, 0);
-#endif
-        dns_drain_flow_socket(rt);
-    } else {
-        if (rt->sock_fd >= 0)
-            dns_drain_socket(rt);
-    }
-
-    *out = rt->acc;
-    memset(&rt->acc, 0, sizeof(rt->acc));
 
     return 0;
 }
 
 /* Return per-query flow records that fall within the 20-second live window.
+ * Drains pending BPF events before reading so the current cycle is included.
  * Records are written into out[0..max_records-1].
  * Returns the number of records written, or -1 on error. When the runtime
  * was attached with per_query disabled, returns 0 (no flow socket was ever
@@ -963,6 +830,11 @@ int netdata_dns_runtime_flow_snapshot(
 {
     if (!rt || !out || max_records <= 0)
         return -1;
+
+    if (rt->kind == DNS_RUNTIME_RINGBUF)
+        dns_drain_flow_socket(rt);
+    else if (rt->sock_fd >= 0)
+        dns_drain_socket(rt);
 
     if (!rt->per_query)
         return 0;
@@ -994,13 +866,6 @@ void netdata_dns_runtime_close(struct netdata_dns_runtime *rt)
 {
     if (!rt)
         return;
-
-#if DNS_HAS_RINGBUF
-    if (rt->rb) {
-        ring_buffer__free(rt->rb);
-        rt->rb = NULL;
-    }
-#endif
 
     if (rt->flow_fd >= 0) {
         close(rt->flow_fd);
