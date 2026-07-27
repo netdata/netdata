@@ -222,16 +222,23 @@ Relabeling is powerful because it changes the data contract:
 - mutating `le` or `quantile` can invalidate distribution structure;
 - changing an instance label changes chart identity and cardinality.
 
+The same whole-family caution applies to job selectors. Filtering a histogram
+or summary `_count`, `_sum`, bucket, or quantile sample before family assembly
+can make the writer reject the entire family; it is not a way to keep only the
+visually convenient member. Curate every required structural role, or exclude
+the whole family only when the exclusion policy permits losing its operator
+question.
+
 Read the relabel README in full and validate the exact ordered rules with the
 profile.
 
-Every exclusion trades away diagnostic capability. Strong reasons include an
-unusable creation timestamp, immutable epoch metadata, a writer-skipped info
-family, or a deprecated family with an observed replacement. Weak reasons
-include “zero in this dump,” “not interesting,” or “too hard to design.”
+Every exclusion trades away diagnostic capability. The binding exclusion cases
+are defined in `SKILL.md`; a writer rejection is a pipeline limitation rather
+than successful policy filtering. Weak reasons include “zero in this dump,”
+“not interesting,” “deep dive,” “dashboard focus,” or “too hard to design.”
 Process/runtime metrics are not categorically noise: CPU, memory, descriptors,
 and GC can explain application failures. Keep or exclude them based on the
-operator story and evidence, not a fixed deny-class quota.
+operator story and the binding cases, not a fixed deny-count quota.
 
 ### Proving a replacement is actually redundant
 

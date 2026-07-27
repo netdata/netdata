@@ -97,9 +97,17 @@ reason.
 
 Warnings identify designs that deserve explanation but can be correct:
 
+- profile `match` expressions that also accept common `go_*`, `http_*`,
+  `process_*`, or `python_*` families and can therefore auto-select on an
+  unrelated endpoint;
 - duplicate priorities or priority order that diverges from source order;
 - open-ended `instances.by_labels: ['*']` identity;
 - sibling family subtrees with no common explicit identity label;
+- observed label keys that selected chart series carry but the chart neither
+  uses nor explicitly excludes for identity, dimensions, promoted metadata, or
+  selector routing;
+- one union summary of the observed writer-capable evidence removed by the
+  effective job selector before profile coverage is measured;
 - each allow list's observed exclusion of otherwise writer-capable families;
 - each deny expression's observed impact on otherwise writer-capable families;
 - metric declarations unused by any authored dimension in their scope;
@@ -114,8 +122,16 @@ Warnings identify designs that deserve explanation but can be correct:
 
 The validator does not turn these heuristics into policy. For example, sibling
 families can intentionally represent different entity levels, and tied
-priorities can be deliberate. A bandwidth rate can justify area while an
-ordinary request rate usually does not.
+priorities can be deliberate. A label can be intentionally aggregated, but its
+lost comparison/filtering and expected cardinality still need explanation. A
+bandwidth rate can justify area while an ordinary request rate usually does
+not.
+
+The exclusion summary prevents a mechanically clean report from hiding a
+shrinking denominator among many per-rule warnings. It remains advisory because
+the tool cannot prove why the user chose a collection boundary. Dashboard focus
+alone is not a collection boundary: use hierarchy and priority rather than
+discarding distinct writer-capable diagnostics.
 
 Hidden dimensions are excluded from the visible-scale comparison because they
 do not control the chart's default visible axis. Their discoverability and the
@@ -133,7 +149,8 @@ This is an objective correctness gate, not a dashboard designer:
   dimensions in a larger configuration.
 - The tool forces exact candidate selection. It does not prove that the
   profile's `match` expression uniquely auto-selects this exporter instead of
-  an unrelated endpoint.
+  an unrelated endpoint. The generic-match warning catches common unsafe
+  classes, not every possible false-positive signature.
 - Writer-rejected source series are reported but are not profile coverage gaps,
   because chartengine never receives them.
 - A `PASS` does not establish that hierarchy, chart composition, titles, units,

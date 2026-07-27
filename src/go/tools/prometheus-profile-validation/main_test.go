@@ -722,6 +722,9 @@ app_removed{instance="sensitive-value"} 1
 	if !hasFinding(result.report, "job_deny_review", "warning") {
 		t.Fatalf("missing deny review prompt: %#v", result.report.Findings)
 	}
+	if !hasFinding(result.report, "job_policy_exclusion_summary", "warning") {
+		t.Fatalf("missing job-policy denominator summary: %#v", result.report.Findings)
+	}
 	if strings.Contains(result.stdout, "sensitive-value") {
 		t.Fatalf("deny review leaked an observed label value:\n%s", result.stdout)
 	}
@@ -895,6 +898,66 @@ func TestReportStatesExactModeDoesNotProveAutomaticProfileSelection(t *testing.T
 		}
 	}
 	t.Fatalf("missing automatic profile-selection evidence limit: %#v", result.report.EvidenceLimits)
+}
+
+func TestValidateProfileWarnsWhenMatchAcceptsGenericRuntimeFamilies(t *testing.T) {
+	profile := strings.Replace(validProfile, "match: app_*", "match: 'app_* process_* python_*'", 1)
+	result := runValidation(t, profile, validDump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("generic detection review must preserve author judgment\nreport:\n%s", result.stdout)
+	}
+	if !hasFinding(result.report, "generic_profile_match", "warning") {
+		t.Fatalf("missing generic profile-match review prompt: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileWarnsAboutObservedLabelsWithoutAnAuthoredRole(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  metrics: [app_value]
+  charts:
+    - title: Value
+      context: value
+      units: values
+      priority: 100
+      instances:
+        by_labels: [instance]
+      dimensions:
+        - selector: 'app_value{mode="sync"}'
+          name: value
+`
+	dump := `
+# TYPE app_value gauge
+app_value{instance="node-a",mode="sync",engine="sensitive-engine-value"} 1
+`
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("label-role review must preserve author judgment\nreport:\n%s", result.stdout)
+	}
+
+	var message string
+	for _, item := range result.report.Findings {
+		if item.Code == "observed_label_aggregation" && item.Severity == "warning" {
+			message = item.Message
+			break
+		}
+	}
+	if message == "" {
+		t.Fatalf("missing observed-label aggregation prompt: %#v", result.report.Findings)
+	}
+	if !strings.Contains(message, "engine") {
+		t.Fatalf("unaccounted label key is absent from warning: %q", message)
+	}
+	if strings.Contains(message, "instance") || strings.Contains(message, "mode") {
+		t.Fatalf("identity and selector-routing labels were misreported as aggregated: %q", message)
+	}
+	if strings.Contains(result.stdout, "sensitive-engine-value") {
+		t.Fatalf("label-role review leaked an observed label value:\n%s", result.stdout)
+	}
 }
 
 func TestValidateProfileWarnsOnSiblingIdentityMismatchWithoutReplacingJudgment(t *testing.T) {

@@ -150,6 +150,15 @@ The design review must account for every observed label key, including labels
 intentionally aggregated away. Aggregation is a decision because it removes
 the ability to compare that label in the dashboard.
 
+The validator warns when selected series carry a label that the chart does not
+use for identity, dimension naming, promoted metadata, selector routing, or an
+explicit `by_labels` exclusion. One observed value does not make the warning
+irrelevant: a later second value may be a distinct entity that would be merged.
+Resolve the warning by reasoning about the exporter's label contract and
+expected cardinality. Do not mechanically promote every label or add it to
+identity; intentional aggregation is valid when the lost comparison is stated
+and correct for the operator story.
+
 ### Promoted labels
 
 Promotion is metadata, not identity. Use it for stable attributes that help the
@@ -192,6 +201,13 @@ flatten all movement in the open count. If the schema cannot compute a useful
 utilization ratio, separate current and capacity charts rather than sacrificing
 the operational signal. The validator's observed-scale warning is evidence from
 one dump, not proof of every deployment.
+
+“These values are conventionally shown together” does not resolve a scale
+warning. Relatedness explains why an operator may compare the signals; it does
+not make the smaller line visible. Keeping the shared chart requires evidence
+that the UI still exposes meaningful movement or that the deployment range
+keeps the ratio readable. Otherwise use adjacent charts so the relationship
+remains clear without flattening the actionable signal.
 
 ### Same metric, multiple entity levels
 

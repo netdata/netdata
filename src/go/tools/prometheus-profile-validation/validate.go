@@ -75,6 +75,7 @@ func validateProfile(opts validationOptions) report {
 		return r
 	}
 	r.Profile = profileReport{Name: profile.Name, Match: profile.Match, App: profile.App}
+	addProfileMatchHeuristics(profile.Match, &r)
 
 	authored, err := inspectAuthoredCharts(profile, &r)
 	if err != nil {
@@ -152,6 +153,7 @@ func validateProfile(opts validationOptions) report {
 		return r
 	}
 	addDashboardHeuristics(merged, &r)
+	addObservedLabelAggregationHeuristics(merged, reader, &r)
 
 	engine, err := chartengine.New()
 	if err != nil {

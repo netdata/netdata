@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	promselector "github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
@@ -17,6 +19,42 @@ import (
 	commonmodel "github.com/prometheus/common/model"
 	promlabels "github.com/prometheus/prometheus/model/labels"
 )
+
+// addProfileMatchHeuristics checks whether the auto-selection signature also
+// accepts common runtime/instrumentation families. Those families can be
+// charted, but one generic hit is enough to select the entire profile.
+func addProfileMatchHeuristics(expression string, r *report) {
+	m, err := matcher.NewSimplePatternsMatcher(expression)
+	if err != nil {
+		return // The strict profile loader reports the authoritative syntax error.
+	}
+
+	probes := []struct {
+		class string
+		name  string
+	}{
+		{class: "go_*", name: "go_memstats_alloc_bytes"},
+		{class: "http_*", name: "http_requests_total"},
+		{class: "process_*", name: "process_cpu_seconds_total"},
+		{class: "python_*", name: "python_gc_collections_total"},
+	}
+	var matched []string
+	for _, probe := range probes {
+		if m.MatchString(probe.name) {
+			matched = append(matched, probe.class)
+		}
+	}
+	if len(matched) == 0 {
+		return
+	}
+
+	r.addWarning(
+		"generic_profile_match",
+		"profile.match",
+		fmt.Sprintf("profile detection also accepts generic family classes %v", matched),
+		"Automatic selection needs only one matching scraped family. Generic runtime and instrumentation families can be charted without participating in detection; keep match exporter-specific unless broad selection is deliberate.",
+	)
+}
 
 // addJobDenyReview reports observed impact, not a policy verdict. A deny can be
 // correct, but its diagnostic loss must be a conscious dashboard decision.
@@ -52,6 +90,41 @@ func addJobDenyReview(
 	allow, err := (promselector.Expr{Allow: expr.Allow}).Parse()
 	if err != nil {
 		return // Collector.Init reports the authoritative selector error.
+	}
+	effective, err := expr.Parse()
+	if err == nil && effective != nil {
+		allIdentities := make(map[string]struct{})
+		excludedIdentities := make(map[string]struct{})
+		excludedFamilies := make(map[string]struct{})
+		excludedRawSeries := 0
+		for _, sample := range batch.Samples {
+			family := sampleSourceFamilyName(sample)
+			if _, ok := eligible[family]; !ok {
+				continue
+			}
+			identity := logicalSampleIdentityKey(family, sample)
+			allIdentities[identity] = struct{}{}
+			if effective.Matches(sampleLabelsWithName(sample)) {
+				continue
+			}
+			excludedIdentities[identity] = struct{}{}
+			excludedFamilies[family] = struct{}{}
+			excludedRawSeries++
+		}
+		if len(excludedIdentities) > 0 {
+			r.addWarning(
+				"job_policy_exclusion_summary",
+				"selector",
+				fmt.Sprintf(
+					"job selector removes %d of %d observed writer-capable logical identities across %d families (%d raw exposition series) before profile coverage is measured",
+					len(excludedIdentities),
+					len(allIdentities),
+					len(excludedFamilies),
+					excludedRawSeries,
+				),
+				"A mechanical PASS covers only the post-policy denominator. Use hierarchy and priority for dashboard focus; filtering distinct writer-capable diagnostics merely makes the gate easier by deleting evidence.",
+			)
+		}
 	}
 	if len(expr.Allow) > 0 {
 		families := make(map[string]struct{})
@@ -161,6 +234,153 @@ func logicalSampleIdentityKey(family string, sample prompkg.Sample) string {
 		fmt.Fprintf(&b, "%d:%s=%d:%s;", len(label.Name), label.Name, len(label.Value), label.Value)
 	}
 	return b.String()
+}
+
+type observedLabelDimension struct {
+	spec     charttpl.Dimension
+	selector metrixselector.Compiled
+}
+
+type observedLabelAggregation struct {
+	keys   []string
+	paths  []string
+	titles []string
+}
+
+// addObservedLabelAggregationHeuristics identifies labels that selected series
+// carry but the authored chart does not use for identity, dimensions, promoted
+// metadata, selector routing, or explicit by_labels exclusion. Aggregation can
+// be intentional; the warning makes the lost comparison/filter explicit.
+func addObservedLabelAggregationHeuristics(spec *charttpl.Spec, reader metrix.Reader, r *report) {
+	if spec == nil {
+		return
+	}
+
+	grouped := make(map[string]*observedLabelAggregation)
+	for _, ref := range enumerateChartRefs(spec) {
+		handled, wildcard := handledChartLabels(ref.chart)
+		dimensions := make([]observedLabelDimension, 0, len(ref.chart.Dimensions))
+		for _, dimension := range ref.chart.Dimensions {
+			compiled, err := metrixselector.ParseCompiled(dimension.Selector)
+			if err != nil {
+				continue // The authoritative compiler reports selector errors.
+			}
+			for _, key := range compiled.Meta().ConstrainedLabelKeys {
+				handled[strings.TrimSpace(key)] = struct{}{}
+			}
+			if key := strings.TrimSpace(dimension.NameFromLabel); key != "" {
+				handled[key] = struct{}{}
+			}
+			dimensions = append(dimensions, observedLabelDimension{spec: dimension, selector: compiled})
+		}
+		if wildcard {
+			continue
+		}
+
+		aggregated := make(map[string]struct{})
+		reader.ForEachSeriesIdentity(func(
+			_ metrix.SeriesIdentity,
+			meta metrix.SeriesMeta,
+			name string,
+			labels metrix.LabelView,
+			_ metrix.SampleValue,
+		) {
+			matched := false
+			for _, dimension := range dimensions {
+				if dimension.selector.Matches(name, labels) &&
+					dimensionNameMaterializes(dimension.spec, name, labels, meta) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return
+			}
+			labels.Range(func(key, _ string) bool {
+				key = strings.TrimSpace(key)
+				if key == "" || key == metrix.HistogramBucketLabel || key == metrix.SummaryQuantileLabel {
+					return true
+				}
+				if _, ok := handled[key]; !ok {
+					aggregated[key] = struct{}{}
+				}
+				return true
+			})
+		})
+		if len(aggregated) == 0 {
+			continue
+		}
+
+		keys := slices.Sorted(maps.Keys(aggregated))
+		groupKey := strings.Join(keys, "\x00")
+		group := grouped[groupKey]
+		if group == nil {
+			group = &observedLabelAggregation{keys: keys}
+			grouped[groupKey] = group
+		}
+		group.paths = append(group.paths, ref.path)
+		group.titles = append(group.titles, ref.chart.Title)
+	}
+
+	groupKeys := slices.Sorted(maps.Keys(grouped))
+	for _, groupKey := range groupKeys {
+		group := grouped[groupKey]
+		path := "template"
+		message := fmt.Sprintf(
+			"%d charts aggregate observed label keys %v without an authored role",
+			len(group.paths),
+			group.keys,
+		)
+		if len(group.paths) == 1 {
+			path = group.paths[0]
+			message = fmt.Sprintf(
+				"chart %q aggregates observed label keys %v without an authored role",
+				group.titles[0],
+				group.keys,
+			)
+		} else {
+			exampleCount := min(3, len(group.titles))
+			examples := make([]string, 0, exampleCount)
+			for _, title := range group.titles[:exampleCount] {
+				examples = append(examples, fmt.Sprintf("%q", title))
+			}
+			message += " (examples: " + strings.Join(examples, ", ") + ")"
+		}
+		r.addWarning(
+			"observed_label_aggregation",
+			path,
+			message,
+			"An omitted label removes that comparison and may merge distinct entities when new values appear. Aggregation can be correct, but explain the lost filtering/comparison and expected cardinality; do not add identity or promotion merely to silence the warning.",
+		)
+	}
+}
+
+func handledChartLabels(chart charttpl.Chart) (map[string]struct{}, bool) {
+	handled := make(map[string]struct{})
+	for _, key := range chart.LabelPromoted {
+		if key = strings.TrimSpace(key); key != "" {
+			handled[key] = struct{}{}
+		}
+	}
+
+	wildcard := false
+	if chart.Instances == nil {
+		return handled, wildcard
+	}
+	for _, token := range chart.Instances.ByLabels {
+		token = strings.TrimSpace(token)
+		switch {
+		case token == "*":
+			wildcard = true
+		case strings.HasPrefix(token, "!"):
+			if key := strings.TrimSpace(strings.TrimPrefix(token, "!")); key != "" {
+				handled[key] = struct{}{}
+			}
+		case token != "":
+			handled[token] = struct{}{}
+		}
+	}
+	return handled, wildcard
 }
 
 type metricDeclaration struct {

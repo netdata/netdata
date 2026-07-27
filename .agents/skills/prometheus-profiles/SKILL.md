@@ -23,6 +23,8 @@ good result; neither is a beautiful design that the runtime cannot materialize.
 Read these files **in full, without skimming, before authoring or materially
 reviewing a profile**:
 
+Repository-relative sources (resolve from the repository root):
+
 1. `docs/NIDL-Framework.md`
 2. `src/go/plugin/framework/charttpl/README.md`
 3. `src/go/plugin/go.d/collector/prometheus/README.md`
@@ -31,15 +33,18 @@ reviewing a profile**:
 6. `src/go/pkg/prometheus/selector/README.md`
 7. `src/go/plugin/framework/chartengine/README.md`
 8. `src/go/pkg/metrix/README.md`
-9. `profile-schema.md`
-10. `metric-types.md`
-11. `chart-design.md`
-12. `src/go/tools/prometheus-profile-validation/README.md`
+9. `src/go/tools/prometheus-profile-validation/README.md`
+
+Skill-relative sources (resolve from this skill directory):
+
+10. `profile-schema.md`
+11. `metric-types.md`
+12. `chart-design.md`
 13. `applications/<app>.md`, when present
 
-Resolve repository paths from the repository root, which is `../../..` from
-this skill directory. Do not assume the task's working directory is the
-repository.
+The repository root is `../../..` from this skill directory. Do not resolve
+skill-relative sources from that root, and do not assume the task's working
+directory is the repository.
 
 Why this is mandatory:
 
@@ -134,10 +139,32 @@ Choose the least surprising mechanism:
   only when a runtime dimension selector actually routes its written series.
 
 Keep exclusions conservative and explain the lost diagnostic capability.
-Typical justified exclusions include creation timestamps, frozen epoch
-metadata, writer-skipped `_info` families, and deprecated families with a
-validated replacement. “Not interesting” and “zero in this dump” are not
-reasons.
+Typical justified policy exclusions include creation timestamps or frozen
+epoch metadata that the schema cannot transform, and deprecated families with a
+validated replacement. Writer-skipped `_info` families are pipeline
+limitations to document, not evidence that a job deny improved the profile.
+“Not interesting” and “zero in this dump” are not reasons.
+
+For every observed writer-capable family that answers a distinct operator
+question, the default is to curate it. A job exclusion is acceptable only when
+at least one of these cases is evidenced:
+
+1. **Unrenderable raw form:** the available value cannot answer its question
+   without an unsupported transform, such as `now - epoch`.
+2. **Authoritatively superseded:** a supported replacement answers the same
+   question across the intended versions, types, labels, and distribution
+   population.
+3. **Concrete collection hazard:** bounded evidence shows a privacy,
+   cardinality, correctness, or resource risk that cannot be made safe in the
+   profile.
+4. **Verified scope delegation:** another enabled integration owns and answers
+   the same question, and this dashboard intentionally defines that boundary.
+
+Writer-rejected families are pipeline limitations, not successful job
+exclusions. “Dashboard focus,” “deep-dive metric,” “too many charts,”
+correlation with another signal, or making validation pass are not exclusion
+cases. Achieve focus with hierarchy and priority; filtering changes the
+evidence available for troubleshooting.
 
 Treat redundancy as a claim that needs proof, not as a visual resemblance:
 
@@ -195,6 +222,12 @@ families. Prefer exporter-unique families. Generic `process_*`, `python_*`, or
 `http_*` families can be charted without putting them in `match`; including
 them can make unrelated endpoints eligible for the profile.
 
+Automatic selection needs only one family hit. Never broaden `match` to make a
+coverage failure disappear: `match` chooses the profile, while group `metrics`,
+dimension selectors, job policy, and writer behavior determine routing. The
+validator forces exact selection, so changing `match` cannot repair its
+curation result; diagnose the actual scope or selector failure instead.
+
 ## Run the objective gate
 
 From `src/go`:
@@ -232,11 +265,19 @@ A `PASS` proves, for that evidence:
 
 The report lists raw families absent after selector/relabel/writer processing
 under `pipeline_excluded`; they are not misreported as chart coverage.
+A job-policy exclusion summary shows how much otherwise writer-capable evidence
+was removed before coverage was measured. A `PASS` over a deliberately reduced
+denominator is mechanically valid but is not a complete dashboard unless every
+exclusion satisfies the policy above.
 
 Warnings are prompts for model review, not policy decisions. They include
-observed allow/deny impact, unused metric declarations, authored/runtime
-heatmap divergence, filled non-volume charts, and sibling identity mismatch.
-Each can be intentional, but its UX or diagnostic trade-off must be explained.
+generic auto-selection signatures, observed labels with no authored role,
+the job-policy exclusion summary, observed per-rule allow/deny impact, unused
+metric declarations, authored/runtime heatmap divergence, filled non-volume
+charts, and sibling identity mismatch. Each can be intentional, but its UX or
+diagnostic trade-off must be explained. Do not mechanically add identity,
+promotion, or dimensions merely to silence a label warning; explain intentional
+aggregation when losing that comparison is the correct design.
 
 The gate cannot judge whether the dashboard is useful, and it cannot prove
 behavior for unseen metrics or label values. Exact candidate selection also
