@@ -26,6 +26,21 @@ type isolatedChartError struct {
 	err  error
 }
 
+type unavailableInstanceIdentity struct {
+	path          string
+	chartTitle    string
+	selector      string
+	missingLabels []string
+	series        int
+}
+
+type instanceIdentityPolicy struct {
+	explicitKeys []string
+	explicitSet  map[string]struct{}
+	excludedKeys map[string]struct{}
+	includeAll   bool
+}
+
 const (
 	globalChartIdentity   = "<global>"
 	wildcardChartIdentity = "<wildcard>"
@@ -186,6 +201,108 @@ func inspectChartsInIsolation(
 		})
 	}
 	return dead, deadDimensions, dimensionLosses, collisions, instanceLosses, errs
+}
+
+// inspectUnavailableInstanceIdentities checks the selected writer evidence
+// before chartengine applies instance routing. This exposes the direct cause of
+// charts that inherit an identity label their series do not carry.
+func inspectUnavailableInstanceIdentities(
+	refs []chartRef,
+	reader metrix.Reader,
+) ([]unavailableInstanceIdentity, []isolatedChartError) {
+	var findings []unavailableInstanceIdentity
+	var errs []isolatedChartError
+
+	for _, ref := range refs {
+		required := explicitInstanceIdentityLabels(ref.chart.Instances)
+		if len(required) == 0 {
+			continue
+		}
+		for dimensionIndex, dimension := range ref.chart.Dimensions {
+			selector, err := metrixselector.Parse(dimension.Selector)
+			if err != nil {
+				errs = append(errs, isolatedChartError{
+					path: fmt.Sprintf("%s.dimensions[%d]", ref.path, dimensionIndex),
+					err:  fmt.Errorf("parse dimension selector for instance identity audit: %w", err),
+				})
+				continue
+			}
+
+			missingCounts := make(map[string]int)
+			reader.ForEachSeriesIdentity(func(
+				_ metrix.SeriesIdentity,
+				meta metrix.SeriesMeta,
+				metricName string,
+				labels metrix.LabelView,
+				_ metrix.SampleValue,
+			) {
+				if !selector.Matches(metricName, labels) ||
+					!dimensionNameMaterializes(dimension, metricName, labels, meta) {
+					return
+				}
+				var missing []string
+				for _, label := range required {
+					if _, ok := labels.Get(label); !ok {
+						missing = append(missing, label)
+					}
+				}
+				if len(missing) > 0 {
+					missingCounts[strings.Join(missing, "\x00")]++
+				}
+			})
+
+			for _, key := range slices.Sorted(maps.Keys(missingCounts)) {
+				findings = append(findings, unavailableInstanceIdentity{
+					path:          fmt.Sprintf("%s.dimensions[%d]", ref.path, dimensionIndex),
+					chartTitle:    ref.chart.Title,
+					selector:      dimension.Selector,
+					missingLabels: strings.Split(key, "\x00"),
+					series:        missingCounts[key],
+				})
+			}
+		}
+	}
+	return findings, errs
+}
+
+func explicitInstanceIdentityLabels(instances *charttpl.Instances) []string {
+	return parseInstanceIdentityPolicy(instances).explicitKeys
+}
+
+func parseInstanceIdentityPolicy(instances *charttpl.Instances) instanceIdentityPolicy {
+	policy := instanceIdentityPolicy{
+		explicitSet:  make(map[string]struct{}),
+		excludedKeys: make(map[string]struct{}),
+	}
+	if instances == nil {
+		return policy
+	}
+	for _, labelSpec := range instances.ByLabels {
+		labelSpec = strings.TrimSpace(labelSpec)
+		switch {
+		case labelSpec == "*":
+			policy.includeAll = true
+		case strings.HasPrefix(labelSpec, "!"):
+			if label := strings.TrimSpace(strings.TrimPrefix(labelSpec, "!")); label != "" {
+				policy.excludedKeys[label] = struct{}{}
+			}
+		}
+	}
+	for _, labelSpec := range instances.ByLabels {
+		label := strings.TrimSpace(labelSpec)
+		if label == "" || label == "*" || strings.HasPrefix(label, "!") {
+			continue
+		}
+		if _, blocked := policy.excludedKeys[label]; blocked {
+			continue
+		}
+		if _, ok := policy.explicitSet[label]; ok {
+			continue
+		}
+		policy.explicitSet[label] = struct{}{}
+		policy.explicitKeys = append(policy.explicitKeys, label)
+	}
+	return policy
 }
 
 func planIsolatedSpec(
@@ -416,48 +533,21 @@ func rawInstanceIdentityKey(instances *charttpl.Instances, labels metrix.LabelVi
 		return "global", true
 	}
 
-	excluded := make(map[string]struct{})
-	includeAll := false
-	for _, labelSpec := range instances.ByLabels {
-		labelSpec = strings.TrimSpace(labelSpec)
-		switch {
-		case labelSpec == "*":
-			includeAll = true
-		case strings.HasPrefix(labelSpec, "!"):
-			key := strings.TrimSpace(strings.TrimPrefix(labelSpec, "!"))
-			if key != "" {
-				excluded[key] = struct{}{}
-			}
-		}
-	}
-
-	var keys []string
-	explicit := make(map[string]struct{})
-	for _, labelSpec := range instances.ByLabels {
-		key := strings.TrimSpace(labelSpec)
-		if key == "" || key == "*" || strings.HasPrefix(key, "!") {
-			continue
-		}
-		if _, blocked := excluded[key]; blocked {
-			continue
-		}
-		if _, seen := explicit[key]; seen {
-			continue
-		}
+	policy := parseInstanceIdentityPolicy(instances)
+	keys := slices.Clone(policy.explicitKeys)
+	for _, key := range policy.explicitKeys {
 		if _, ok := labels.Get(key); !ok {
 			return "", false
 		}
-		explicit[key] = struct{}{}
-		keys = append(keys, key)
 	}
 
-	if includeAll {
+	if policy.includeAll {
 		var wildcard []string
 		labels.Range(func(key, _ string) bool {
-			if _, blocked := excluded[key]; blocked {
+			if _, blocked := policy.excludedKeys[key]; blocked {
 				return true
 			}
-			if _, seen := explicit[key]; seen {
+			if _, seen := policy.explicitSet[key]; seen {
 				return true
 			}
 			wildcard = append(wildcard, key)
@@ -781,28 +871,13 @@ func chartIdentityLabels(instances *charttpl.Instances) map[string]struct{} {
 		out[globalChartIdentity] = struct{}{}
 		return out
 	}
-	excluded := make(map[string]struct{})
-	wildcard := false
-	for _, labelSpec := range instances.ByLabels {
-		labelSpec = strings.TrimSpace(labelSpec)
-		if labelSpec == "*" {
-			wildcard = true
-		} else if strings.HasPrefix(labelSpec, "!") {
-			excluded[strings.TrimSpace(strings.TrimPrefix(labelSpec, "!"))] = struct{}{}
-		}
-	}
-	if wildcard {
+	policy := parseInstanceIdentityPolicy(instances)
+	if policy.includeAll {
 		out[wildcardChartIdentity] = struct{}{}
 		return out
 	}
-	for _, labelSpec := range instances.ByLabels {
-		labelSpec = strings.TrimSpace(labelSpec)
-		if labelSpec == "" || labelSpec == "*" || strings.HasPrefix(labelSpec, "!") {
-			continue
-		}
-		if _, ok := excluded[labelSpec]; !ok {
-			out[labelSpec] = struct{}{}
-		}
+	for _, label := range policy.explicitKeys {
+		out[label] = struct{}{}
 	}
 	if len(out) == 0 {
 		out[globalChartIdentity] = struct{}{}

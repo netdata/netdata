@@ -283,6 +283,29 @@ func validateProfile(opts validationOptions) report {
 	}
 
 	refs := enumerateChartRefs(merged)
+	unavailableIdentities, identityAuditErrs := inspectUnavailableInstanceIdentities(refs, reader)
+	for _, item := range identityAuditErrs {
+		r.addError(
+			"instance_identity_audit",
+			item.path,
+			item.err.Error(),
+			"The validator must resolve each authored dimension against the effective chart instance identity.",
+		)
+	}
+	for _, item := range unavailableIdentities {
+		r.addError(
+			"instance_identity_label_unavailable",
+			item.path,
+			fmt.Sprintf(
+				"chart %q effective instance identity requires labels %v, but selector %q matched %d writer series missing those labels",
+				item.chartTitle,
+				item.missingLabels,
+				item.selector,
+				item.series,
+			),
+			"Every explicit instance label must exist on every selected series. Move the chart to the correct entity boundary or override instances.by_labels with labels the series actually carries; never add a nonexistent label merely to satisfy the hierarchy.",
+		)
+	}
 	dead, deadDimensions, dimensionLosses, collisions, instanceLosses, isolationErrs := inspectChartsInIsolation(merged, refs, reader)
 	r.DeadCharts = dead
 	r.DeadDimensions = deadDimensions

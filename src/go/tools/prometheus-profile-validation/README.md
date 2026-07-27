@@ -69,6 +69,8 @@ For the supplied dump and job policy, a pass establishes that:
 - required chartengine runtime coverage counters exist and are valid;
 - every writer series is curated: zero autogen and zero unmatched series;
 - every authored chart and every authored dimension materializes;
+- every selected writer series carries every label required by its chart's
+  effective explicit instance identity;
 - observed cross-template rendered-ID collisions are absent;
 - observed same-template instance identities do not collapse into fewer chart
   IDs;
@@ -86,6 +88,13 @@ For the supplied dump and job policy, a pass establishes that:
 - histogram bucket charts use observation-rate units and incremental semantics;
   and
 - charts with unambiguously non-volume units do not use filled presentation.
+
+`instance_identity_label_unavailable` reports the direct cause when a chart's
+effective inherited/explicit `instances.by_labels` requires keys absent from
+writer series selected by one of its dimensions. It reports only the chart,
+selector, missing label keys, and affected count—not observed label values.
+Changing the entity boundary or overriding identity can be correct; inventing a
+label that the series does not carry is not.
 
 `pipeline_excluded` reports raw logical source series that are wholly or partly
 absent after job policy and writer processing. Categories are deliberately

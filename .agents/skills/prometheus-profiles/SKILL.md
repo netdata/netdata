@@ -72,12 +72,13 @@ A profile is complete only when both its runtime behavior and its semantic
 design are proved. Do not describe or deliver a candidate as complete while any
 of these proofs fails:
 
-- **Domain proof:** source-backed capabilities, causal stages, entity
-  boundaries, and support subsystems explain what the application does
-  independently of its metric inventory.
-- **Navigation proof:** every first- and second-level family names the closest
-  domain owner of its charts. The author can state what work that owner
-  performs, receives, produces, stores, routes, or controls.
+- **Operator-model proof:** source-backed entities/containment,
+  modules/capabilities, and operations/processing stages explain what operators
+  expect to see independently of the metric inventory.
+- **Navigation proof:** every first- and second-level family has one coherent
+  operator owner. The author can state what entity/function it represents and
+  what work or state it performs, receives, produces, stores, routes, or
+  controls.
 - **Holistic-diagnosis proof:** available workload, outcome, error, latency,
   saturation, capacity, and resource signals remain with the function that can
   cause them, except for a deliberately small service-impact overview.
@@ -143,129 +144,133 @@ Treat dumps as potentially sensitive. Keep them in ignored `.local/` or user
 temporary storage, and never copy customer/user label values into committed
 fixtures or documentation.
 
-## Build the semantic inventory before the YAML
+## Model what operators expect to see
 
-First build a source-backed domain map without using metric type, unit, or name
-shape as its organizing principle. Record:
+The central design question is:
 
-- what the application does in operator vocabulary;
-- its capabilities, subsystems, and causal or processing stages;
-- how work and failures propagate between them;
-- its entity types and containment relationships; and
-- the runtime/platform surfaces that support the application but are not one of
-  its domain capabilities.
+> What do operators expect to see about this application, entity, module, or
+> operation when they investigate it?
 
-Why: starting from a sorted metric list invites the exporter to design the
-dashboard accidentally. A domain map provides independent semantic owners for
-the signals. Metrics can then explain the application instead of becoming the
-application's navigation.
+Do not begin with “where do the latency metrics go?” Every metric is some form
+of workload, outcome, error, latency, saturation, capacity, or resource use.
+Those roles explain an owner; they do not identify the owner.
 
-Represent the important causal relationships, not just a bag of nouns. For each
-candidate navigation owner, be able to state:
+### Turn flat exposition into Netdata metadata
 
-- what work or state it owns;
-- what it receives from and hands to adjacent owners;
-- what it can delay, reject, corrupt, exhaust, or saturate; and
-- which domain entity an operator filters there.
+Prometheus exposition presents a flat set of labeled time series. In common
+Prometheus dashboard workflows, panel queries and dashboard layout supply many
+of the relationships between those series.
 
-If the only explanation is “these metrics all measure latency,” “these all
-count the same object,” or “these are distributions,” the candidate is a
-measurement category, not a causal owner.
+A Netdata profile must encode those relationships into the metrics metadata:
 
-Classify every observed writer-capable family against that map before grouping
-it. The format is up to the author, but the reasoning must make these fields
-explicit:
+- recursive `family` paths define navigation;
+- `context` identifies the semantic chart type;
+- `instances.by_labels` defines the monitored entities;
+- dimensions define bounded aspects compared on one chart;
+- promoted labels provide filterable metadata; and
+- priority defines the reading order.
 
-- **Operator capability:** the application function, subsystem, or causal stage
-  this signal explains.
-- **Entity type:** the thing one series describes, such as service, cluster,
-  server, database, table, worker, endpoint, device, or queue.
-- **Identity labels:** the smallest stable label set that identifies that
-  entity, including every parent identity label it inherits.
+Netdata's generic dashboards organize charts from this metadata. The profile is
+therefore not one hand-authored panel layout; it is the reusable semantic model
+the dashboard follows. A shared prefix, unit, Prometheus type, or label does not
+by itself establish a Netdata relationship.
+
+### Discover the operator's mental model
+
+Most applications combine three kinds of structure:
+
+1. **Entities and containment:** service, cluster, server, database, table,
+   index, workload, pod, container, endpoint, worker, device, or queue.
+2. **Modules and capabilities:** scheduler, cache, router, storage engine,
+   frontend, backend pool, executor, or another operator-recognized subsystem.
+3. **Operations and processing stages:** accept, authenticate, queue, plan,
+   read, write, execute, persist, replicate, forward, retry, and respond.
+
+Research documentation and source to discover which structures operators
+actually use. Model hand-offs and containment, not just a bag of nouns:
+
+- What work or state does each entity/module/stage own?
+- What does it receive, process, store, control, and hand off?
+- What can it delay, reject, corrupt, exhaust, or saturate?
+- At which entity level does an operator expect filtering to work?
+
+Labels are evidence for this model, not an automatic answer. For every observed
+label, determine whether it represents:
+
+- stable entity identity;
+- a bounded comparable aspect/dimension;
+- promoted metadata;
+- selector/routing information; or
+- detail that is intentionally aggregated.
+
+Use source semantics, observed label combinations, stability, and cardinality
+to decide. A label named `handler`, `database`, or `pod` may identify an entity;
+`status`, `method`, or `operation` may instead be a bounded aspect. Do not infer
+the role from the label name alone.
+
+### Classify the evidence against that model
+
+Classify every observed writer-capable family before grouping it. The format is
+up to the author, but the reasoning must make these fields explicit:
+
+- **Owner:** the entity, module/capability, or operation/stage this signal
+  explains.
+- **Entity type:** the thing one series describes.
+- **Identity labels:** the smallest stable labels identifying that entity,
+  including inherited parent identity.
 - **Signal role:** workload, outcome, error, latency, saturation, capacity,
   utilization, resource use, configuration, or another domain role.
-- **Observation population:** what one counter increment, histogram
-  observation, summary observation, or gauge value represents.
-- **Unit algebra:** the raw unit, algorithm, conversion, final rendered unit,
-  and exact counted or measured object. A broad noun such as `events`,
-  `operations`, `items`, or `observations` does not make different objects
-  interchangeable merely because all become rates.
-- **Label roles and cardinality:** identity, bounded dimension, promoted
-  metadata, selector routing, or intentional aggregation.
-- **Evidence and uncertainty:** the observed or authoritative source supporting
-  the classification and any unresolved limitation.
-- **Destination:** the intended functional family/chart, or one of the binding
-  exclusion cases below.
+- **Observation population:** what one increment, observation, or gauge value
+  represents.
+- **Unit algebra:** raw unit, algorithm, conversion, rendered unit, and exact
+  counted/measured object.
+- **Label roles/cardinality:** identity, dimension, metadata, routing, or
+  intentional aggregation.
+- **Evidence/uncertainty:** the observed or authoritative support and any
+  unresolved limitation.
+- **Destination:** intended family/chart or one binding exclusion case.
 
 This inventory is a reasoning aid, not a fixed worksheet or dashboard
-generator. Its purpose is to prevent the author from discovering semantic
-conflicts only after metrics have already been grouped by name or unit.
+generator. It prevents metric names, suffixes, and units from becoming the
+information architecture accidentally.
 
-Then answer the operator questions:
+### Group diagnostic roles under their owner
 
-1. What does the application do, in the operator's vocabulary and causal order?
-2. What will the operator ask first: Is useful work flowing? Are outcomes
-   failing? Where is work waiting? Which resource or limit is saturated?
-3. Which entity level should a filter select at each navigation level?
-4. Which signal roles give a holistic view of each function?
-5. Which signals are genuinely comparable on one chart?
+Keep an owner's available workload, outcomes, errors, latency, saturation,
+capacity, and resource pressure together or in nearby subfamilies. For example:
 
-Functional capability drives navigation. Signal role and unit constrain chart
-composition *inside* that story; they are not application-wide navigation
-categories. A top-level “Latency,” “Errors,” or “Bytes” section forces the
-operator to reconstruct the application's causal path.
+- stage-specific latency belongs with that processing stage;
+- end-to-end latency belongs with the operation or nearest lifecycle owner it
+  spans;
+- requested limits/options belong with admission or the operation they shape;
+- resource pressure belongs with its consumer unless the resource is itself an
+  operator-managed entity/subsystem; and
+- measurements of the same object at different lifecycle stages remain with
+  those stages unless the object is itself the operator entity.
 
-Before writing YAML, audit the first two levels of the proposed family tree:
+HTTP is not automatically one owner merely because every metric counts HTTP
+requests. If operators manage two endpoints, modules, routes, or processing
+paths as distinct entities/functions, their requests should not be mixed into
+one context merely because the final unit is `requests/s`. Conversely, method or
+status can be dimensions when they are bounded aspects of one entity and one
+operator question.
 
-- Read only the family names, without metric names. They SHOULD describe what
-  the application does, where work is, or which domain entity owns it.
-- A family whose main meaning is `Latency`, `Workload`, `Errors`,
-  `Distributions`, `Parameters`, `Counters`, or a unit is an observability or
-  exposition taxonomy, not a domain owner. Move those signals under the
-  capability they explain. A deliberately small service-level SLI overview is
-  the exception, not a coverage bucket.
-- For each capability, check whether its available workload, outcomes, errors,
-  latency, saturation, capacity, and resource-pressure signals are close enough
-  to form one diagnosis. If they have been scattered into application-wide role
-  sections, the tree is not yet an operator mental model.
-- Every writer-capable signal MUST have a domain owner or a documented
-  service/runtime boundary before its signal role or unit affects placement.
-  “It is a histogram,” “it has the same units,” or “it is a request parameter”
-  is not an owner.
+Audit the first two family levels without looking at chart names:
 
-This audit is a semantic guardrail, not a prescribed tree. Different authors may
-choose different defensible capability boundaries and orders; they must not
-replace application reasoning with a measurement taxonomy.
+- They SHOULD describe entities, modules/capabilities, operations, or processing
+  stages that operators recognize.
+- A global `Latency`, `Throughput`, `Errors`, `Distributions`, `Parameters`, or
+  unit-based branch usually describes a diagnostic role, not what owns it.
+- Every signal MUST have an owner or an explicit service/runtime boundary before
+  its role or unit influences placement.
 
-Resolve signals that span the domain by causal ownership:
+Different authors may choose different defensible owners and ordering. The
+guardrail forbids replacing operator reasoning with a metric taxonomy; it does
+not prescribe one universal tree.
 
-- Put a stage-specific workload, outcome, latency, saturation, or resource
-  signal with the stage that produces, consumes, queues, or controls it.
-- Put a true end-to-end signal with the nearest lifecycle owner common to all
-  the stages it spans, usually the domain operation or service-impact view.
-- Put a client-requested limit or option with the intake/admission/operation
-  owner whose behavior it shapes, not in an application-wide `Parameters`
-  drawer.
-- Use a shared resource as a navigation owner only when operators manage it as
-  its own subsystem or entity. Otherwise keep pressure and consumption with the
-  capability that causes them.
-- Treat a domain object name with the same skepticism as a unit. Measurements
-  of an object at different lifecycle stages belong with those stages unless
-  the object itself is the filterable operator entity.
-
-Why: nearest ownership preserves causal adjacency without pretending every
-signal belongs to exactly one physical component. It also gives overlapping and
-end-to-end metrics a principled home instead of recreating global `Latency`,
-`Throughput`, `Parameters`, or `Resources` buckets.
-
-See `chart-design.md` for the consequences and conflict-resolution guidance.
-See `metric-types.md` for what the collector actually writes for each
-Prometheus type.
-
-Inventory every observed label key. For each one, record whether it is
-identity, dimension, promoted metadata, selector-only routing, or intentionally
-aggregated. A label omitted from the design review is not evidence that
-aggregation is safe.
+See `chart-design.md` for database, proxy, and Kubernetes-hosted microservice
+examples, UX consequences, and conflict resolution. See `metric-types.md` for
+the collector behavior of each Prometheus type.
 
 ## Design the collection policy with the profile
 
@@ -432,6 +437,8 @@ A `PASS` proves, for that evidence:
 - the real writer and flattening behavior are exercised;
 - every written series is curated, with zero autogen and zero unmatched;
 - every authored chart and dimension materializes;
+- every selected writer series carries the labels required by the chart's
+  effective explicit instance identity;
 - isolated planning finds no observed cross-template collision or
   same-template instance-ID collapse;
 - observed per-instance dimensions are not discarded by lifecycle caps or
@@ -475,12 +482,13 @@ boundary.
 Review the rendered design, not merely the YAML:
 
 - Does the first screen answer the most urgent operator questions?
-- Does the family tree follow application functions and entity hierarchy?
-- If only the first two family levels are read, do they teach the application's
-  capabilities and causal path rather than list signal roles, metric forms,
-  parameter kinds, or units?
-- Does each capability keep its available workload, outcomes, latency,
-  saturation, and pressure signals together enough for holistic diagnosis?
+- Does the family tree express the entities/containment, modules/capabilities,
+  and operations/processing stages that operators actually use?
+- For each first- and second-level family, is the answer to “what do operators
+  expect to see about this?” coherent without relying on a shared signal role,
+  metric form, parameter kind, or unit?
+- Does each owner keep its available workload, outcomes, errors, latency,
+  saturation, capacity, and resources close enough for holistic diagnosis?
 - Does every context represent one homogeneous instance type?
 - Does each displayed leaf family contain one effective entity identity?
 - Are dimensions bounded aspects rather than hidden entity explosions?

@@ -1472,6 +1472,76 @@ template:
 	}
 }
 
+func TestValidateProfileReportsUnavailableInheritedInstanceLabels(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  chart_defaults:
+    instances:
+      by_labels: [server]
+  metrics: [app_http_requests]
+  charts:
+    - title: HTTP Requests
+      context: http_requests
+      units: requests/s
+      algorithm: incremental
+      priority: 100
+      dimensions:
+        - selector: app_http_requests
+          name_from_label: status
+`
+	dump := "# TYPE app_http_requests counter\napp_http_requests{handler=\"sensitive-handler\",status=\"200\"} 1\n"
+	result := runValidation(t, profile, dump, "")
+	requireFinding(t, result, "instance_identity_label_unavailable")
+	for _, item := range result.report.Findings {
+		if item.Code != "instance_identity_label_unavailable" {
+			continue
+		}
+		for _, expected := range []string{"HTTP Requests", "app_http_requests", "server"} {
+			if !strings.Contains(item.Message, expected) {
+				t.Fatalf("identity finding %q does not contain %q", item.Message, expected)
+			}
+		}
+		if strings.Contains(item.Message, "sensitive-handler") {
+			t.Fatalf("identity finding leaked an observed label value: %q", item.Message)
+		}
+		return
+	}
+	t.Fatal("missing direct unavailable instance identity finding")
+}
+
+func TestValidateProfileInstanceIdentityExclusionWins(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  metrics: [app_http_requests]
+  charts:
+    - title: HTTP Requests
+      context: http_requests
+      units: requests/s
+      algorithm: incremental
+      priority: 100
+      instances:
+        by_labels: [server, "!server", "*"]
+      dimensions:
+        - selector: app_http_requests
+          name_from_label: status
+`
+	dump := "# TYPE app_http_requests counter\napp_http_requests{handler=\"api\",status=\"200\"} 1\n"
+	result := runValidation(t, profile, dump, "")
+	for _, item := range result.report.Findings {
+		if item.Code == "instance_identity_label_unavailable" {
+			t.Fatalf("excluded identity label must not be required: %q", item.Message)
+		}
+	}
+}
+
 func TestValidateProfileRejectsMultipleJobDocuments(t *testing.T) {
 	result := runValidation(t, validProfile, validDump, "name: first\n---\nname: second\n")
 	requireFinding(t, result, "job_policy")

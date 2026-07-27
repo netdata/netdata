@@ -159,8 +159,10 @@ Presentation invariants enforced by the validator:
 
 Use instance labels for the entity the operator selects: server, database,
 table, backend, queue, endpoint, and so on. If a required identity label is
-absent, the series does not route to that chart. Different raw identity values
-may also normalize to the same chart ID, so validate observed values.
+absent, the series does not route to that chart; the validator reports the
+effective inherited identity, selector, and missing label keys directly.
+Different raw identity values may also normalize to the same chart ID, so
+validate observed values.
 
 Treat nested identities as a lattice: a child entity retains its parent's
 identity labels and adds the labels required for the narrower entity. Because

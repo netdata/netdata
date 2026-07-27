@@ -7,8 +7,10 @@ consequences deliberately.
 
 ## Contents
 
-- [Start with operator questions](#start-with-operator-questions)
-- [Build the application and entity hierarchy](#build-the-application-and-entity-hierarchy)
+- [Start with operator expectations](#start-with-operator-expectations)
+- [Make flat metrics self-describing](#make-flat-metrics-self-describing)
+- [Model entities, modules, and operations](#model-entities-modules-and-operations)
+- [Learn from common operator models](#learn-from-common-operator-models)
 - [Assign labels by role](#assign-labels-by-role)
 - [Compose charts around one comparison](#compose-charts-around-one-comparison)
 - [Resolve common design conflicts](#resolve-common-design-conflicts)
@@ -19,26 +21,19 @@ consequences deliberately.
 - [Recognize bad patterns by their effects](#recognize-bad-patterns-by-their-effects)
 - [Semantic review](#semantic-review)
 
-## Start with operator questions
+## Start with operator expectations
 
-Write the questions before the charts. Typical first questions are:
+Begin with:
 
-- Is the service doing useful work?
-- Are users receiving errors or degraded responses?
-- Where is work waiting?
-- Which resource or limit is saturated?
-- Which entity is responsible?
+> What do operators expect to see about this entity, module, or operation?
+
+Then ask the diagnostic questions at that owner:
+
+- Is it doing useful work?
+- Are its outcomes failing or degraded?
+- Where does its work wait?
+- Which resource or limit constrains it?
 - Is the condition transient, growing, or stuck?
-
-The right set depends on the application. A request-processing service may lead
-with throughput, outcomes, queueing, and latency. A database may lead with
-workload, transactions, locks, buffer/cache behavior, and storage. Use the
-application's vocabulary, not Prometheus mechanics such as “Counters,”
-“Gauges,” or “Histograms.”
-
-Why: operators arrive with a system problem, not a metric type. Organizing by
-export format makes them translate the exporter before they can diagnose the
-application.
 
 For every proposed chart, be able to finish this sentence:
 
@@ -46,101 +41,147 @@ For every proposed chart, be able to finish this sentence:
 
 If the sentence has several unrelated answers, split or redesign the chart.
 
-## Build the application and entity hierarchy
+## Make flat metrics self-describing
 
-NIDL families are recursive navigation. Use them to tell a stable story:
+Prometheus exposition provides flat labeled time series. A separately authored
+dashboard can supply relationships by placing particular queries and panels
+together.
 
-1. application capability, operator-recognized function, or causal stage;
-2. its subsystem, causal substage, or explicit entity boundary;
-3. signal-role detail inside that domain owner where it improves diagnosis.
+Netdata's generic dashboards instead organize charts from the metadata created
+by the profile:
 
-This is guidance, not a fixed tree. The best hierarchy follows causal reasoning:
-traffic enters, work queues, execution consumes resources, output succeeds or
-fails. Put high-signal health/workload views before supporting internals.
+- families are navigation;
+- contexts are semantic chart types;
+- instances are monitored entities;
+- dimensions are bounded comparisons;
+- labels are filtering/explanatory metadata; and
+- priority is reading order.
 
-Cross-cutting overview charts can be valuable, but a generic observability class
-must not become a dumping ground. Keep a small service-level SLI overview when
-it answers “are users affected?” across stages. Put stage-specific latency,
-throughput, saturation, and errors with the stage that causes them, because that
-placement turns a symptom into a causal path. A family named “Latency” that
-contains queue, read, compute, and write timings forces the operator to rebuild
-the pipeline mentally.
+The profile must therefore make the relationships reusable and self-describing.
+It is not enough that one reviewer can infer a dashboard from metric names.
 
-Classify signal roles, but use them as diagnostic lenses *inside* each
-capability. A useful capability section can place its workload, outcomes,
-errors, latency, saturation, and resource pressure together or in adjacent
-subfamilies so the operator sees a holistic explanation of that function. Do
-not gather every workload signal, every error, or every same-unit metric from
-unrelated functions into application-wide buckets. Shared role or unit tells
-how signals may be compared; it does not tell where the operator looks for
-their cause.
+This difference is especially important for common protocols. Two metrics can
+both be HTTP request rates without belonging to one Netdata context:
 
-Build the capability model before sorting metrics. Documentation and source
-should reveal what the application does, how work moves, where it can wait or
-fail, and which entities own those functions. Only then assign signals. If the
-tree is derived from metric names first, shared suffixes and units will tend to
-become false navigation categories.
+- If endpoint/module/path X and Y are distinct operator-managed entities or
+  processing functions, give them distinct entity instances or semantic
+  families.
+- If method and status are bounded aspects of one endpoint and one operator
+  question, they can be chart dimensions.
+- Do not mix X and Y merely because both render as `requests/s`; the shared unit
+  permits comparison only after ownership and entity scope agree.
 
-Model the important nodes and hand-offs in that causal path. For every proposed
-first- or second-level family, state what work it owns, what it receives or
-produces, what condition it can cause, and which entity it scopes. A branch that
-can be justified only with “these charts are all latency,” “these metrics count
-the same object,” or “these are distributions” has no causal owner and fails the
-navigation proof.
+## Model entities, modules, and operations
 
-Use an operator-vocabulary test on the proposed first two levels:
+Operators commonly understand an application through a combination of three
+structures:
 
-- Hide the chart and metric names and read only the family tree.
-- Ask whether those names teach an operator the application's functions and
-  causal path.
-- Treat `Latency`, `Workload`, `Errors`, `Distributions`, `Parameters`, metric
-  types, and units as warning signs when they own unrelated application-wide
-  signals. They describe how something was observed, not what caused it.
-- Allow a small cross-cutting SLI overview only when it answers one
-  service-level impact question. It must not become a route for leftover
-  coverage.
+1. **Entities and containment:** service → server → database → table → index, or
+   cluster → workload → pod → container.
+2. **Modules and capabilities:** listener, scheduler, cache, router, storage
+   engine, backend pool, executor.
+3. **Operations and processing stages:** receive → authenticate → queue →
+   process → persist → respond, or accept → route → forward → retry.
 
-Then audit every capability holistically. Its workload, outcomes, errors,
-latency, saturation, capacity, and resource pressure should be together or in
-nearby subfamilies when the exporter provides them. Scattering those lenses into
-global role sections makes operators jump between branches to explain one
-function.
+NIDL families should express those structures in the vocabulary operators use.
+For each proposed first- or second-level family, ask:
 
-Assign each signal to the closest defensible causal owner:
+- What entity, module, operation, or stage does it represent?
+- What work/state does it own?
+- What does it receive, process, store, or hand off?
+- What condition can it cause?
+- At which entity level should dashboard filtering apply?
+
+Then place workload, outcomes, errors, latency, saturation, capacity, and
+resource pressure under that owner. These signal roles form a holistic
+diagnostic view of the owner; they are not normally application-wide navigation.
+
+Use the closest defensible owner:
 
 - stage-local signals stay with the stage that produces, consumes, queues, or
   controls them;
-- end-to-end signals stay with the nearest common lifecycle owner or a small
-  service-impact overview;
-- requested limits/options stay with intake, admission, or the operation they
-  shape;
-- resource pressure stays with its consuming capability unless the shared
-  resource is itself an operator-managed subsystem/entity; and
-- measurements of the same domain object stay separate when they describe
-  different lifecycle owners.
+- end-to-end signals stay with the operation or nearest lifecycle owner they
+  span;
+- requested limits/options stay with admission or the operation they shape;
+- resource pressure stays with its consumer unless the resource is itself an
+  operator-managed entity/subsystem; and
+- the same data object can belong to different stages when it is received,
+  cached, transformed, persisted, or emitted.
 
-This rule resolves overlap without pretending the system is a strict tree. A
-chart may compare adjacent stages when the operator question requires it, but
-its family still names their common domain owner rather than the chart's unit or
-signal role.
+A small service-impact overview can answer “are users affected?” across owners.
+It must not become a dumping ground for every workload, latency, error, or
+resource metric.
 
-Entity level and functional hierarchy are independent axes. A service-level
-section can contain HTTP, process, runtime, and garbage-collection signals, but
-sharing global identity does not make a long flat list coherent. Nest those
-subsystems under the service entity so navigation still reflects what the
-application does.
+Labels help reveal entities, but do not define them automatically. Check source
+semantics, observed combinations, cardinality, and stability. A `database`,
+`backend`, `pod`, or `handler` label may be entity identity. A `status`,
+`method`, `reason`, or `operation` label may be a bounded dimension. The name
+alone is insufficient.
 
-Entity level matters as much as application stage. Distinguish, for example:
+## Learn from common operator models
 
-- service-wide state;
-- cluster/server/database instance;
-- worker/replica;
-- endpoint/operation;
-- device/table/queue.
+These examples illustrate the reasoning; they are not fixed trees.
 
-A context should represent one homogeneous entity type. Mixing service-wide and
-per-worker charts under the same semantic context produces confusing filters,
-cardinality, and history.
+### Database server
+
+Operators may need a containment lattice such as:
+
+```text
+server:   {server}
+database: {server, database}
+table:    {server, database, table}
+index:    {server, database, table, index}
+```
+
+Place each signal at the entity that owns it:
+
+- server-wide connections, process resources, and a shared buffer pool remain
+  server-level;
+- per-database transactions, locks, failures, and cache behavior belong to the
+  database when the exporter actually labels them that way;
+- table reads, writes, scans, latency, and storage belong to the table;
+- index lookups, misses, maintenance, and size belong to the index.
+
+“Connections” or “cache” does not have one universal level. Ownership and labels
+decide whether it is server-wide, database-specific, or table-specific.
+
+### Proxy
+
+Operators may think in terms of:
+
+```text
+proxy service → frontend/listener → route or backend pool → backend server
+```
+
+- Frontend acceptance, client-facing outcomes, and client latency belong near
+  the frontend/listener.
+- Routing decisions, misses, and reroutes belong to routing.
+- Upstream connections, retries, failures, and response latency belong to the
+  backend pool/server that causes them.
+
+A global `Latency` family mixing client, routing, connection, and upstream
+timings destroys that causal path even though every chart uses seconds.
+
+### Kubernetes-hosted microservice
+
+Two structures can coexist:
+
+```text
+platform entities: cluster → namespace → workload → pod → container
+application flow:  API → queue → worker → datastore
+```
+
+- Container CPU/memory belongs to the container or workload entity represented
+  by the labels.
+- API request outcomes and latency belong to the API operation/module.
+- Queue depth and wait time belong to the queue.
+- Worker throughput, retries, and processing latency belong to the worker stage.
+- Datastore calls belong to the datastore/client operation, not a global
+  application latency section.
+
+Pod names may be short-lived while workload identity is stable. Do not turn
+every Kubernetes label into chart identity; choose the entity level operators
+expect to filter and whose history should remain meaningful.
 
 ### Build a monotonic identity lattice
 
@@ -195,10 +236,12 @@ That mismatch can be intentional. Resolve it explicitly:
 - retain the mismatch only when the UI boundary is meant to change entity level,
   and explain it.
 
-The validator reports mixed leaf identities, descendant loss of an explicitly
-declared parent identity, and siblings with no common explicit identity. These
-are structural prompts, not a domain verdict: it cannot decide which entity
-boundary matches the operator's mental model.
+The validator fails when a selected writer series lacks a label required by the
+chart's effective instance identity: that chart cannot materialize at the
+declared entity level. It also reports mixed leaf identities, descendant loss of
+an explicitly declared parent identity, and siblings with no common explicit
+identity as review prompts. The tool can prove structural contradictions; it
+cannot decide which valid entity boundary matches the operator's mental model.
 
 ## Assign labels by role
 
@@ -515,15 +558,14 @@ contexts, and dimensions. Unseen future values remain a review risk.
 
 After objective validation passes, review the dashboard design:
 
-- Can the first screen distinguish traffic loss, user-visible failure,
-  queueing, and saturation?
-- Does navigation follow application capabilities and causal diagnosis?
-- Do the first two family levels pass the operator-vocabulary test without
-  relying on signal roles, metric forms, parameter kinds, or units?
-- Can every first- and second-level family name the work/entity it owns, its
-  hand-offs, and the condition it can cause?
-- Does each capability keep its available diagnostic lenses together rather
-  than scattering them into application-wide role sections?
+- Does the first screen answer the application's most urgent operator questions?
+- Does navigation express the entities/containment, modules/capabilities, and
+  operations/processing stages that operators actually use?
+- For each first- and second-level family, is the answer to “what do operators
+  expect to see about this?” coherent without relying on a shared signal role,
+  metric form, parameter kind, or unit?
+- Does each owner keep its available workload, outcomes, errors, latency,
+  saturation, capacity, and resources close enough for holistic diagnosis?
 - Is each context homogeneous in entity type?
 - Does each displayed leaf family contain one effective entity identity?
 - Does descendant identity retain its parent labels?
@@ -536,7 +578,7 @@ After objective validation passes, review the dashboard design:
   `observations`?
 - Are rare failures visible beside high-volume traffic?
 - Are titles and units mathematically true?
-- Is each exclusion justified by the capability lost?
+- Is each exclusion justified by the operator question lost?
 - Do file order and explicit priorities tell the intended operator story?
 
 Warnings demand reasoning, not mechanical edits. Record why the design is
