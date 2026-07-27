@@ -11,6 +11,12 @@ import (
 
 var benchmarkLifecycleRemovalCount int
 
+// BenchmarkEnforceLifecycleCaps measures the stable no-overflow planner path; fixture construction is outside the
+// timer. Timings are machine-specific trend evidence, while TestEnforceLifecycleCapsAllocationEnvelope is the portable
+// regression gate. With all caps disabled, enforcement retains two O(charts) map scans but allocates no cap-specific
+// memory. Enabled chart caps scan observed and materialized charts, then sort only enabled templates, instances, and
+// eviction candidates. Enabled dimension caps scan all charts, sort enabled chart IDs, and scan or sort dimensions only
+// for enabled charts. The dimension chart-ID slice reserves O(total charts) capacity; no lifecycle-cap path is quadratic.
 func BenchmarkEnforceLifecycleCaps(b *testing.B) {
 	tests := map[string]struct {
 		chartCount int
@@ -96,6 +102,69 @@ func BenchmarkEnforceLifecycleCaps(b *testing.B) {
 				removalCount = len(removeDims) + len(removeCharts)
 			}
 			benchmarkLifecycleRemovalCount = removalCount
+		})
+	}
+}
+
+func TestEnforceLifecycleCapsAllocationEnvelope(t *testing.T) {
+	tests := map[string]struct {
+		chartCount int
+		dimCount   int
+		chartCaps  int
+		dimCaps    int
+		maxAllocs  float64
+	}{
+		"disabled/charts_4096": {
+			chartCount: 4096,
+			dimCount:   8,
+			maxAllocs:  0,
+		},
+		"sparse/charts_4096_enabled_8": {
+			chartCount: 4096,
+			dimCount:   8,
+			chartCaps:  8,
+			dimCaps:    8,
+			maxAllocs:  16,
+		},
+		"dimension_only/charts_4096": {
+			chartCount: 4096,
+			dimCount:   8,
+			dimCaps:    4096,
+			maxAllocs:  2,
+		},
+		"both_enabled/charts_4096": {
+			chartCount: 4096,
+			dimCount:   8,
+			chartCaps:  4096,
+			dimCaps:    4096,
+			maxAllocs:  64,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			const currentSeq = uint64(10)
+			chartsByID, state := benchmarkLifecycleCapFixture(
+				currentSeq,
+				tc.chartCount,
+				tc.dimCount,
+				tc.chartCaps,
+				tc.dimCaps,
+			)
+
+			allocs := testing.AllocsPerRun(25, func() {
+				removeDims, removeCharts := enforceLifecycleCaps(currentSeq, chartsByID, &state)
+				if len(removeDims) != 0 || len(removeCharts) != 0 {
+					t.Fatalf(
+						"unexpected lifecycle removals: dimensions=%d charts=%d",
+						len(removeDims),
+						len(removeCharts),
+					)
+				}
+			})
+			if allocs > tc.maxAllocs {
+				t.Fatalf("allocation envelope exceeded: got %.0f allocs, want <= %.0f", allocs, tc.maxAllocs)
+			}
 		})
 	}
 }
