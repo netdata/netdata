@@ -53,7 +53,7 @@ default_sentry: &default_sentry # Default configuration for Sentry usage
   armhfp: false
   arm64: false
   aarch64: false
-default_builder_rev: &def_builder_rev v1
+default_builder_rev: &def_builder_rev v2
 include:
   - &alpine
     distro: alpine
