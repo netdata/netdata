@@ -15,7 +15,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const DynCfgJobGraphClaim = "dyncfg:jobs"
+const DynCfgJobGraphClaim = jobmgr.DynCfgJobGraphClaim
 
 type DiscoveredJobChange struct {
 	Config  confgroup.Config        // discovered job configuration

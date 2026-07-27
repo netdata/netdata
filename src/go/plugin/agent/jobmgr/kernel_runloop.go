@@ -246,6 +246,8 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 			ck.acknowledgeTask(acknowledgement)
 		case request := <-ck.claimYields:
 			ck.serviceClaimYield(request)
+		case stage := <-ck.preClaimStages:
+			ck.servicePreClaimStage(stage)
 		case <-deadlineC:
 			deadlineC = nil
 			cancelDeadline = nil
@@ -276,7 +278,7 @@ func (ck *CommandKernel) serviceClaimSettlements(quantum int) bool {
 }
 
 func (ck *CommandKernel) serviceOneAsyncEvent() bool {
-	const sources = 5
+	const sources = 6
 	for offset := range sources {
 		source := (int(ck.nextAsyncEvent) + offset) % sources
 		switch source {
@@ -321,6 +323,14 @@ func (ck *CommandKernel) serviceOneAsyncEvent() bool {
 			select {
 			case request := <-ck.claimYields:
 				ck.serviceClaimYield(request)
+				ck.nextAsyncEvent = 5
+				return true
+			default:
+			}
+		case 5:
+			select {
+			case stage := <-ck.preClaimStages:
+				ck.servicePreClaimStage(stage)
 				ck.nextAsyncEvent = 0
 				return true
 			default:

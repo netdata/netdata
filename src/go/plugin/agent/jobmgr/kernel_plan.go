@@ -9,9 +9,21 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
+const DynCfgJobGraphClaim = "dyncfg:jobs"
+
+// PreClaimStage is framework-owned preparation that may outlive the run. Start,
+// Cancel, and Release must return without waiting for plugin-authored work.
+type PreClaimStage interface {
+	Start()
+	Ready() <-chan struct{}
+	Cancel(error)
+	Release()
+}
+
 type WorkPlan struct {
 	Work                lifecycle.TaskWork       // command work (one work source)
 	Transaction         *ResourceTransactionPlan // resource transaction plan (one work source)
+	Stage               PreClaimStage            // optional process-owned preparation before any claim is acquired
 	Claims              []string                 // exclusive claim keys
 	NoResponse          bool                     // the command produces no terminal response frame
 	CooperativeCancel   bool                     // work honors cooperative cancellation
@@ -45,10 +57,16 @@ func (wp WorkPlan) validate() error {
 		return errors.New("jobmgr kernel: plan must have exactly one work kind")
 	}
 	if wp.Work != nil {
+		if wp.Stage != nil {
+			return errors.New("jobmgr kernel: non-transaction work has a pre-claim stage")
+		}
 		if wp.NoResponse {
 			return errors.New("jobmgr kernel: frame work cannot suppress its response")
 		}
 		return nil
+	}
+	if wp.Stage != nil && wp.Stage.Ready() == nil {
+		return errors.New("jobmgr kernel: transaction has an invalid pre-claim stage")
 	}
 	if wp.Transaction.ID == "" || (wp.Transaction.Prepare == nil) == (wp.Transaction.PrepareComposite == nil) {
 		return errors.New("jobmgr kernel: invalid resource transaction plan")

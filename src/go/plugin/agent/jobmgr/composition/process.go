@@ -489,6 +489,7 @@ func (pc *processCore) newRun(generation uint64) (*runGeneration, error) {
 		Secrets:         pc.config.Secrets,
 		Discovery:       pc.config.Discovery,
 		SecretEpoch:     epoch,
+		Attempts:        pc.attempts,
 	})
 	if err != nil {
 		return nil, errors.Join(err, pc.storeEpochs.seal(epoch))

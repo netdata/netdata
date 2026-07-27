@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -505,7 +506,12 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 			command: "config go.d:secretstore:vault add main",
 			payload: `{"value":"initial"}`, status: 200,
 		},
-		{uid: "secret-get", command: "config go.d:secretstore:vault:main get", status: 200},
+		{
+			uid:     "secret-update-invalid",
+			command: "config go.d:secretstore:vault:main update",
+			payload: `{"value":"backend-sensitive-detail"}`, status: 400,
+		},
+		{uid: "secret-get-after-invalid", command: "config go.d:secretstore:vault:main get", status: 200},
 		{uid: "secret-test", command: "config go.d:secretstore:vault:main test", status: 202},
 		{
 			uid:     "secret-update",
@@ -541,7 +547,395 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		}
 		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+step.uid+" "+strconv.Itoa(step.status)+" application/json")
 	}
+	require.Contains(t, output.String(), `"Value":"initial"`)
 	require.NotContains(t, output.String(), "backend-sensitive-detail")
+
+	controls.send(testProcessControl(processTerminate))
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "test failed", "process did not terminate")
+	}
+}
+
+func TestProcessCoreCancelledStoreMaterializationDoesNotHoldJobGraph(t *testing.T) {
+	gate := newProcessBlockingStoreGate()
+	t.Cleanup(gate.release)
+	modules := collectorapi.Registry{
+		"module": {
+			Create: func() collectorapi.CollectorV1 {
+				return &collectorapi.MockCollectorV1{
+					InitFunc: func(context.Context) error { return nil },
+					ChartsFunc: func() *collectorapi.Charts {
+						return &collectorapi.Charts{&collectorapi.Chart{
+							ID:    "chart",
+							Title: "chart",
+							Units: "value",
+							Dims: collectorapi.Dims{&collectorapi.Dim{
+								ID: "value",
+							}},
+						}}
+					},
+					CollectFunc: func(context.Context) map[string]int64 {
+						return map[string]int64{"value": 1}
+					},
+				}
+			},
+			Config: func() any {
+				return &collectorapi.MockConfiguration{}
+			},
+			JobConfigSchema: collectorapi.MockConfigSchema,
+		},
+	}
+	jobs := testRunJobServices(t)
+	jobs.Defaults = confgroup.Registry{"module": {UpdateEvery: 1}}
+	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
+		Kind:   secretstore.KindVault,
+		Schema: `{}`,
+		Create: func() secretstore.Store {
+			return &processBlockingSecretStore{gate: gate}
+		},
+	}})
+	require.NoError(t, err)
+	jobs.StoreCreators = creators
+
+	reader, writer := io.Pipe()
+	defer func() { require.NoError(t, writer.Close()) }()
+	output := newProcessSynchronizedBuffer()
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          output,
+		ShutdownTimeout: time.Second,
+		Modules:         modules,
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServices(t),
+		Diagnostics:     testProcessDiagnostics(),
+	})
+	require.NoError(t, err)
+	controls := newTestProcessControls(1)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
+
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD secret-blocked 30 "+
+			"\"config go.d:secretstore:vault add main\" "+
+			"0xFFFF \"user=test\" application/json\n"+
+			"{\"value\":\"blocked\"}\n"+
+			"FUNCTION_PAYLOAD_END\n",
+	)
+	require.NoError(t, err)
+	select {
+	case <-gate.entered:
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "test failed", "Store provider did not enter blocking Init")
+	}
+
+	_, err = io.WriteString(writer, "FUNCTION_CANCEL secret-blocked\n")
+	require.NoError(t, err)
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD job-add-while-store-blocked 30 "+
+			"\"config go.d:collector:module add unrelated\" "+
+			"0xFFFF \"user=test\" application/json\n"+
+			"{\"option_str\":\"plain\",\"option_int\":1}\n"+
+			"FUNCTION_PAYLOAD_END\n",
+	)
+	require.NoError(t, err)
+
+	progressBeforeRelease := false
+	timeout := time.NewTimer(500 * time.Millisecond)
+	for !progressBeforeRelease {
+		if strings.Contains(
+			output.String(),
+			"FUNCTION_RESULT_BEGIN job-add-while-store-blocked 202 application/json",
+		) {
+			progressBeforeRelease = true
+			break
+		}
+		select {
+		case <-output.writes:
+		case <-timeout.C:
+			goto release
+		}
+	}
+
+release:
+	if !timeout.Stop() {
+		select {
+		case <-timeout.C:
+		default:
+		}
+	}
+	gate.release()
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-blocked 499 application/json")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN job-add-while-store-blocked 202 application/json")
+
+	controls.send(testProcessControl(processTerminate))
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "test failed", "process did not terminate")
+	}
+	require.True(t, progressBeforeRelease, "Store materialization held the job graph after cancellation")
+}
+
+func TestProcessCoreRotationFencesLateStoreMaterializationAndFreshEpochProceeds(t *testing.T) {
+	gate := newProcessBlockingStoreGate()
+	t.Cleanup(gate.release)
+	jobs := testRunJobServices(t)
+	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
+		Kind:   secretstore.KindVault,
+		Schema: `{}`,
+		Create: func() secretstore.Store {
+			return &processBlockingSecretStore{gate: gate}
+		},
+	}})
+	require.NoError(t, err)
+	jobs.StoreCreators = creators
+
+	reader, writer := io.Pipe()
+	defer func() { require.NoError(t, writer.Close()) }()
+	output := newProcessSynchronizedBuffer()
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          output,
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{},
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServices(t),
+		Diagnostics:     testProcessDiagnostics(),
+	})
+	require.NoError(t, err)
+	controls := newTestProcessControls(2)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
+
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD secret-old-epoch 30 "+
+			"\"config go.d:secretstore:vault add main\" "+
+			"0xFFFF \"user=test\" application/json\n"+
+			"{\"value\":\"blocked\"}\n"+
+			"FUNCTION_PAYLOAD_END\n",
+	)
+	require.NoError(t, err)
+	select {
+	case <-gate.entered:
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "test failed", "old-epoch Store provider did not enter blocking Init")
+	}
+
+	restart := testProcessControl(processRestart)
+	controls.send(restart)
+	select {
+	case err := <-restart.result:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "test failed", "rotation waited for old-epoch Store materialization")
+	}
+
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD secret-fresh-epoch 30 "+
+			"\"config go.d:secretstore:vault add main\" "+
+			"0xFFFF \"user=test\" application/json\n"+
+			"{\"value\":\"replacement\"}\n"+
+			"FUNCTION_PAYLOAD_END\n",
+	)
+	require.NoError(t, err)
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-fresh-epoch 200 application/json")
+
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION secret-fresh-get 30 "+
+			"\"config go.d:secretstore:vault:main get\" "+
+			"0xFFFF \"user=test\"\n",
+	)
+	require.NoError(t, err)
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-fresh-get 200 application/json")
+	require.Contains(t, output.String(), `"Value":"replacement"`)
+
+	gate.release()
+	terminate := testProcessControl(processTerminate)
+	controls.send(terminate)
+	require.NoError(t, <-terminate.result)
+	require.NoError(t, <-done)
+}
+
+func TestProcessCoreStoreRemovalCancelsPendingMaterializationAuthoritatively(t *testing.T) {
+	gate := newProcessBlockingStoreGate()
+	t.Cleanup(gate.release)
+	jobs := testRunJobServices(t)
+	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
+		Kind:   secretstore.KindVault,
+		Schema: `{}`,
+		Create: func() secretstore.Store {
+			return &processBlockingSecretStore{gate: gate}
+		},
+	}})
+	require.NoError(t, err)
+	jobs.StoreCreators = creators
+
+	reader, writer := io.Pipe()
+	defer func() { require.NoError(t, writer.Close()) }()
+	output := newProcessSynchronizedBuffer()
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          output,
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{},
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServices(t),
+		Diagnostics:     testProcessDiagnostics(),
+	})
+	require.NoError(t, err)
+	controls := newTestProcessControls(1)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
+
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD secret-remove-add 30 "+
+			"\"config go.d:secretstore:vault add main\" "+
+			"0xFFFF \"user=test\" application/json\n"+
+			"{\"value\":\"initial\"}\n"+
+			"FUNCTION_PAYLOAD_END\n",
+	)
+	require.NoError(t, err)
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-add 200 application/json")
+
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD secret-remove-update 30 "+
+			"\"config go.d:secretstore:vault:main update\" "+
+			"0xFFFF \"user=test\" application/json\n"+
+			"{\"value\":\"blocked\"}\n"+
+			"FUNCTION_PAYLOAD_END\n",
+	)
+	require.NoError(t, err)
+	select {
+	case <-gate.entered:
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "test failed", "Store update did not enter blocking Init")
+	}
+
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION secret-remove 30 "+
+			"\"config go.d:secretstore:vault:main remove\" "+
+			"0xFFFF \"user=test\"\n",
+	)
+	require.NoError(t, err)
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-update 503 application/json")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove 200 application/json")
+
+	gate.release()
+	require.Eventually(t, func() bool {
+		return process.attempts.Census().Active == 0
+	}, time.Second, 10*time.Millisecond)
+
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION secret-remove-get 30 "+
+			"\"config go.d:secretstore:vault:main get\" "+
+			"0xFFFF \"user=test\"\n",
+	)
+	require.NoError(t, err)
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-remove-get 404 application/json")
+
+	controls.send(testProcessControl(processTerminate))
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "test failed", "process did not terminate")
+	}
+}
+
+func TestProcessCoreRetriesLatestPendingStoreAfterStuckIdentityReleases(t *testing.T) {
+	gate := newProcessBlockingStoreGate()
+	t.Cleanup(gate.release)
+	jobs := testRunJobServices(t)
+	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
+		Kind:   secretstore.KindVault,
+		Schema: `{}`,
+		Create: func() secretstore.Store {
+			return &processBlockingSecretStore{gate: gate}
+		},
+	}})
+	require.NoError(t, err)
+	jobs.StoreCreators = creators
+
+	reader, writer := io.Pipe()
+	defer func() { require.NoError(t, writer.Close()) }()
+	output := newProcessSynchronizedBuffer()
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          output,
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{},
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServices(t),
+		Diagnostics:     testProcessDiagnostics(),
+	})
+	require.NoError(t, err)
+	controls := newTestProcessControls(1)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
+
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD secret-pending-v1 30 "+
+			"\"config go.d:secretstore:vault add main\" "+
+			"0xFFFF \"user=test\" application/json\n"+
+			"{\"value\":\"blocked\"}\n"+
+			"FUNCTION_PAYLOAD_END\n",
+	)
+	require.NoError(t, err)
+	select {
+	case <-gate.entered:
+	case <-time.After(3 * time.Second):
+		require.FailNow(t, "test failed", "first Store provider did not enter blocking Init")
+	}
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD secret-pending-v2 30 "+
+			"\"config go.d:secretstore:vault add main\" "+
+			"0xFFFF \"user=test\" application/json\n"+
+			"{\"value\":\"replacement\"}\n"+
+			"FUNCTION_PAYLOAD_END\n",
+	)
+	require.NoError(t, err)
+
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-pending-v1 503 application/json")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-pending-v2 503 application/json")
+	gate.release()
+	output.waitContains(t, "CONFIG go.d:secretstore:vault:main create running job")
+
+	_, err = io.WriteString(
+		writer,
+		"FUNCTION secret-pending-get 30 "+
+			"\"config go.d:secretstore:vault:main get\" "+
+			"0xFFFF \"user=test\"\n",
+	)
+	require.NoError(t, err)
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-pending-get 200 application/json")
+	require.Contains(t, output.String(), `"Value":"replacement"`)
 
 	controls.send(testProcessControl(processTerminate))
 	select {
@@ -698,6 +1092,53 @@ type processSecretStore struct {
 	config struct {
 		Value string `yaml:"value"`
 	}
+}
+
+type processBlockingStoreGate struct {
+	entered  chan struct{}
+	releaseC chan struct{}
+	once     sync.Once
+}
+
+func newProcessBlockingStoreGate() *processBlockingStoreGate {
+	return &processBlockingStoreGate{
+		entered:  make(chan struct{}),
+		releaseC: make(chan struct{}),
+	}
+}
+
+func (gate *processBlockingStoreGate) release() {
+	gate.once.Do(func() {
+		close(gate.releaseC)
+	})
+}
+
+type processBlockingSecretStore struct {
+	gate   *processBlockingStoreGate
+	config struct {
+		Value string `yaml:"value"`
+	}
+}
+
+func (store *processBlockingSecretStore) Configuration() any {
+	return &store.config
+}
+
+func (store *processBlockingSecretStore) Init(context.Context) error {
+	if store.config.Value != "blocked" {
+		return nil
+	}
+	select {
+	case <-store.gate.entered:
+	default:
+		close(store.gate.entered)
+	}
+	<-store.gate.releaseC
+	return nil
+}
+
+func (store *processBlockingSecretStore) Publish() secretstore.PublishedStore {
+	return processPublishedSecret(store.config.Value)
 }
 
 func (pss *processSecretStore) Configuration() any {

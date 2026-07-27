@@ -579,6 +579,141 @@ func BenchmarkBSecretMutationControl(b *testing.B) {
 	}
 }
 
+func TestSecretStoreRemovalTombstonesTwoReaderPinnedGenerations(t *testing.T) {
+	store := newGenerationTestSecretStore(t)
+	catalog := newGenerationTestCatalog(t)
+	key := StoreKey(KindVault, "main")
+
+	initial, err := store.PrepareMutation(
+		t.Context(),
+		catalog,
+		generationTestConfig("main", "initial"),
+		0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialResult, err := initial.Commit(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialScope, err := store.AcquireScope([]string{key})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	replacement, err := store.PrepareMutation(
+		t.Context(),
+		catalog,
+		generationTestConfig("main", "replacement"),
+		initialResult.Generation,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacementResult, err := replacement.Commit(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacementScope, err := store.AcquireScope([]string{key})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	removal, err := store.PrepareRemoval(key, replacementResult.Generation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	removalResult, err := removal.Commit(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !removalResult.Applied {
+		t.Fatal("removal did not apply")
+	}
+	if generation := store.Generation(key); generation != 0 {
+		t.Fatalf("removed Store remained admitted as generation %d", generation)
+	}
+	if _, ok := store.Config(key); ok {
+		t.Fatal("removed Store configuration remained admitted")
+	}
+	if _, err := store.AcquireScope([]string{key}); err == nil {
+		t.Fatal("removed Store admitted a new scope")
+	}
+	census := store.Census()
+	if census.Current != 0 ||
+		census.Retiring != 2 ||
+		census.Generations != 2 ||
+		census.Readers != 2 {
+		t.Fatalf("removed Store retained unexpected ownership: %+v", census)
+	}
+
+	if err := initialScope.Release(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := replacementScope.Release(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSecretStoreRetireCurrentWhilePriorGenerationIsReaderPinned(t *testing.T) {
+	store := newGenerationTestSecretStore(t)
+	catalog := newGenerationTestCatalog(t)
+	key := StoreKey(KindVault, "main")
+
+	initial, err := store.PrepareMutation(
+		t.Context(),
+		catalog,
+		generationTestConfig("main", "initial"),
+		0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialResult, err := initial.Commit(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialScope, err := store.AcquireScope([]string{key})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	replacement, err := store.PrepareMutation(
+		t.Context(),
+		catalog,
+		generationTestConfig("main", "replacement"),
+		initialResult.Generation,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacementResult, err := replacement.Commit(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Retire(t.Context(), key, replacementResult.Generation); err != nil {
+		t.Fatal(err)
+	}
+	census := store.Census()
+	if census.Current != 0 ||
+		census.Retiring != 1 ||
+		census.Generations != 1 ||
+		census.Readers != 1 {
+		t.Fatalf("Store retirement retained unexpected ownership: %+v", census)
+	}
+
+	if err := initialScope.Release(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 type generationTestStore struct {
 	config struct {
 		Value string `yaml:"value"`

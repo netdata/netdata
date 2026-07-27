@@ -22,11 +22,12 @@ func (c *Controller) PublishInitial(ctx context.Context, commands jobmgr.Prepare
 		return errors.New("jobmgr secrets: invalid initial publication")
 	}
 	c.mu.Lock()
-	if c.restarts == nil || c.commandsReady {
+	if c.restarts == nil || c.commandsReady || c.commands != nil {
 		c.mu.Unlock()
 		return errors.New("jobmgr secrets: unbound or duplicate initial publication")
 	}
-	initial := sortedInitialConfigs(c.initial)
+	c.commands = commands
+	initial := selectInitialConfigs(c.initial)
 	c.mu.Unlock()
 	for index, config := range initial {
 		if config == nil || config.ExposedKey() == "" || config.Validate() != nil {
@@ -36,8 +37,49 @@ func (c *Controller) PublishInitial(ctx context.Context, commands jobmgr.Prepare
 	if err := c.publishTemplates(ctx, commands); err != nil {
 		return err
 	}
+	stages := make([]*PreparedStoreOperation, len(initial))
+	defer func() {
+		for _, stage := range stages {
+			stage.Release()
+		}
+	}()
 	for index, config := range initial {
-		plan, err := c.planInitial(config)
+		desiredVersion, err := c.allocateDesiredVersion()
+		if err != nil {
+			return err
+		}
+		target := secretTarget{
+			key:     config.ExposedKey(),
+			kind:    config.Kind(),
+			name:    config.Name(),
+			command: dyncfg.CommandAdd,
+		}
+		stage, err := c.operations.prepare(storeOperationSpec{
+			target:         target,
+			config:         config,
+			expected:       c.store.Generation(target.key),
+			mode:           storeOperationMutation,
+			supersede:      true,
+			desiredVersion: desiredVersion,
+		})
+		if err != nil {
+			return err
+		}
+		stages[index] = stage
+		stage.Start()
+	}
+	for _, stage := range stages {
+		select {
+		case <-stage.Ready():
+		case <-ctx.Done():
+			for _, pending := range stages {
+				pending.Cancel(context.Cause(ctx))
+			}
+			return context.Cause(ctx)
+		}
+	}
+	for index, config := range initial {
+		plan, err := c.planInitial(config, stages[index])
 		if err != nil {
 			return err
 		}
@@ -101,7 +143,10 @@ func (c *Controller) publishTemplates(ctx context.Context, commands jobmgr.Prepa
 	)
 }
 
-func (c *Controller) planInitial(config secretstore.Config) (jobmgr.WorkPlan, error) {
+func (c *Controller) planInitial(
+	config secretstore.Config,
+	stage *PreparedStoreOperation,
+) (jobmgr.WorkPlan, error) {
 	key := config.ExposedKey()
 	resourceID := secretResourceID(key)
 	return jobmgr.WorkPlan{
@@ -135,8 +180,26 @@ func (c *Controller) planInitial(config secretstore.Config) (jobmgr.WorkPlan, er
 						)
 					}
 				}
+				materialized, err := takeStoreOperation(stage)
+				if err != nil {
+					return nil, err
+				}
 				expected := c.store.Generation(key)
-				return c.prepareStoreMutation(ctx, scope, current, config, expected, true)
+				if materialized.expected != expected {
+					if materialized.mutation != nil {
+						_ = materialized.mutation.Abort()
+						materialized.mutation = nil
+					}
+					materialized.retryable = true
+					materialized.err = errors.New(
+						"jobmgr secrets: initial Store changed while preparation was staged",
+					)
+					return c.prepareRetryableResult(scope, current, materialized, expected == 0)
+				}
+				if materialized.retryable {
+					return c.prepareRetryableResult(scope, current, materialized, expected == 0)
+				}
+				return c.prepareStoreMutation(scope, current, materialized, true)
 			},
 		},
 		CooperativeCancel:   true,
@@ -148,6 +211,21 @@ func (c *Controller) CloseProjection() error {
 	if c == nil {
 		return errors.New("jobmgr secrets: invalid controller projection close")
 	}
-	c.setCommandsReady(false)
+	c.mu.Lock()
+	c.commandsReady = false
+	closeContext := c.closeContext
+	c.closeContext = nil
+	c.commands = nil
+	for key, state := range c.pending {
+		delete(c.pending, key)
+		select {
+		case state.update <- struct{}{}:
+		default:
+		}
+	}
+	c.mu.Unlock()
+	if closeContext != nil {
+		closeContext()
+	}
 	return nil
 }

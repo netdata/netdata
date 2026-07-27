@@ -25,13 +25,13 @@ const (
 )
 
 var (
-	ErrIdentityBusy        = errors.New("jobmgr containment: identity busy")
-	ErrContainmentDeadline = errors.New("jobmgr containment: attempt crossed the containment fuse")
-	ErrSuperseded          = errors.New("jobmgr containment: attempt superseded")
-	ErrTargetRetired       = errors.New("jobmgr containment: target generation retired")
-	ErrAuthorityStopped    = errors.New("jobmgr containment: process authority stopped")
-	ErrAttemptSettled      = errors.New("jobmgr containment: attempt already settled")
-	ErrWorkerPanic         = errors.New("jobmgr containment: worker panic")
+	ErrIdentityBusy        = jobmgr.ErrProcessAttemptBusy
+	ErrContainmentDeadline = jobmgr.ErrProcessAttemptDeadline
+	ErrSuperseded          = jobmgr.ErrProcessAttemptSuperseded
+	ErrTargetRetired       = jobmgr.ErrProcessAttemptRetired
+	ErrAuthorityStopped    = jobmgr.ErrProcessAttemptStopped
+	ErrAttemptSettled      = jobmgr.ErrProcessAttemptSettled
+	ErrWorkerPanic         = jobmgr.ErrProcessAttemptWorkerPanic
 )
 
 // Namespace keeps operational work and same-payload tests in independent
@@ -231,6 +231,20 @@ func (authority *Authority) Start(plan Plan) (*Attempt, error) {
 
 	go attempt.run(plan.Work)
 	return attempt, nil
+}
+
+func (authority *Authority) StartProcessAttempt(
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	return authority.Start(Plan{
+		Identity: Identity{
+			Namespace: Namespace(plan.Identity.Namespace),
+			Key:       plan.Identity.Key,
+			Resource:  plan.Identity.Resource,
+		},
+		Target: plan.Target,
+		Work:   plan.Work,
+	})
 }
 
 func (attempt *Attempt) run(work func(context.Context) error) {
@@ -444,6 +458,53 @@ func (authority *Authority) Census() Census {
 	return authority.census
 }
 
+// CutIdentity logically settles one identity without waiting for its physical
+// worker to return.
+func (authority *Authority) CutIdentity(identity Identity, cause error) bool {
+	if authority == nil || !identity.valid() {
+		return false
+	}
+	authority.mu.Lock()
+	attempt := authority.attempts[identity.mapKey()]
+	authority.mu.Unlock()
+	return attempt != nil && attempt.Cut(cause)
+}
+
+func (authority *Authority) CutProcessAttempt(
+	identity jobmgr.ProcessAttemptIdentity,
+	cause error,
+) bool {
+	return authority.CutIdentity(Identity{
+		Namespace: Namespace(identity.Namespace),
+		Key:       identity.Key,
+		Resource:  identity.Resource,
+	}, cause)
+}
+
+// IdentityReleased returns the current physical owner's release signal.
+func (authority *Authority) IdentityReleased(identity Identity) (<-chan struct{}, bool) {
+	if authority == nil || !identity.valid() {
+		return nil, false
+	}
+	authority.mu.Lock()
+	attempt := authority.attempts[identity.mapKey()]
+	authority.mu.Unlock()
+	if attempt == nil {
+		return nil, false
+	}
+	return attempt.Released(), true
+}
+
+func (authority *Authority) ProcessAttemptReleased(
+	identity jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	return authority.IdentityReleased(Identity{
+		Namespace: Namespace(identity.Namespace),
+		Key:       identity.Key,
+		Resource:  identity.Resource,
+	})
+}
+
 // Supersede cancels one identity and waits only the fixed grace for physical
 // release. A still-live worker remains the exclusive owner.
 func (authority *Authority) Supersede(ctx context.Context, identity Identity) error {
@@ -467,6 +528,17 @@ func (authority *Authority) Supersede(ctx context.Context, identity Identity) er
 	case <-timer.C:
 		return ErrIdentityBusy
 	}
+}
+
+func (authority *Authority) SupersedeProcessAttempt(
+	ctx context.Context,
+	identity jobmgr.ProcessAttemptIdentity,
+) error {
+	return authority.Supersede(ctx, Identity{
+		Namespace: Namespace(identity.Namespace),
+		Key:       identity.Key,
+		Resource:  identity.Resource,
+	})
 }
 
 // CutTarget permanently fences every live attempt associated with target.

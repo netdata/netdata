@@ -195,7 +195,7 @@ func (store *SecretStore) releaseScope(ref scopeRef) error {
 		generation.readers--
 		store.readers--
 		if generation.readers == 0 &&
-			generation.record.retiring == generation {
+			generation.record.isRetiring(generation) {
 			retiring = append(retiring, generation)
 		}
 	}

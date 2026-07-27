@@ -167,7 +167,7 @@ func (store *SecretStore) PrepareRemoval(
 		record == nil ||
 		record.current == nil ||
 		record.current.generation != expected ||
-		record.retiring != nil {
+		record.retirementFull() {
 		return nil, errors.New("secretstore: removal generation differs")
 	}
 	index, slot, err := store.allocatePreparation()
@@ -210,7 +210,7 @@ func (store *SecretStore) reservePreparation(
 	if record != nil && record.current != nil {
 		current = record.current.generation
 	}
-	if record != nil && record.retiring != nil {
+	if record != nil && record.hasRetiring() {
 		return preparationRef{}, errors.New("secretstore: prior generation is still retiring")
 	}
 	if current != expected {
@@ -360,7 +360,7 @@ func (store *SecretStore) commitRemoval(
 		record.current.generation != expected ||
 		slot.record != record ||
 		slot.expectedState != record.stateVersion ||
-		record.retiring != nil {
+		record.retirementFull() {
 		store.mu.Unlock()
 		abortErr := store.abortRemoval(ref)
 		return SecretMutationResult{Retained: abortErr != nil},
@@ -371,8 +371,16 @@ func (store *SecretStore) commitRemoval(
 			)
 	}
 	old := record.current
+	if !record.addRetiring(old) {
+		store.mu.Unlock()
+		abortErr := store.abortRemoval(ref)
+		return SecretMutationResult{Retained: abortErr != nil},
+			errors.Join(
+				errors.New("secretstore: removal retirement capacity exhausted"),
+				abortErr,
+			)
+	}
 	record.current = nil
-	record.retiring = old
 	record.stateVersion++
 	store.clearPreparation(ref.slot, slot)
 	releaseOld := old.readers == 0
@@ -421,7 +429,7 @@ func (store *SecretStore) commitPreparation(
 		slot.record != record ||
 		record == nil ||
 		slot.expectedState != record.stateVersion ||
-		record != nil && record.retiring != nil {
+		record != nil && record.hasRetiring() {
 		store.mu.Unlock()
 		abortErr := store.abortPreparation(ref)
 		return SecretMutationResult{Retained: abortErr != nil},
@@ -450,10 +458,18 @@ func (store *SecretStore) commitPreparation(
 		published:  slot.prepared.published,
 	}
 	old := record.current
-	record.current = generation
 	if old != nil {
-		record.retiring = old
+		if !record.addRetiring(old) {
+			store.mu.Unlock()
+			abortErr := store.abortPreparation(ref)
+			return SecretMutationResult{Retained: abortErr != nil},
+				errors.Join(
+					errors.New("secretstore: mutation retirement capacity exhausted"),
+					abortErr,
+				)
+		}
 	}
+	record.current = generation
 	record.stateVersion++
 	store.linkGeneration(generation)
 	store.clearPreparation(ref.slot, slot)
@@ -533,7 +549,7 @@ func (store *SecretStore) clearPreparation(
 	record.preparations--
 	if record.preparations == 0 &&
 		record.current == nil &&
-		record.retiring == nil &&
+		!record.hasRetiring() &&
 		store.records[record.key] == record {
 		delete(store.records, record.key)
 	}

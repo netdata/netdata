@@ -49,7 +49,74 @@ type generationRecord struct {
 	stateVersion uint64
 	preparations int
 	current      *StoreGeneration
-	retiring     *StoreGeneration
+	retiring     [2]*StoreGeneration
+}
+
+func (record *generationRecord) retirementCount() int {
+	if record == nil {
+		return 0
+	}
+	count := 0
+	for _, generation := range record.retiring {
+		if generation != nil {
+			count++
+		}
+	}
+	return count
+}
+
+func (record *generationRecord) hasRetiring() bool {
+	return record.retirementCount() != 0
+}
+
+func (record *generationRecord) retirementFull() bool {
+	if record == nil {
+		return false
+	}
+	return record.retirementCount() == len(record.retiring)
+}
+
+func (record *generationRecord) addRetiring(generation *StoreGeneration) bool {
+	if record == nil ||
+		generation == nil ||
+		generation.record != record ||
+		record.isRetiring(generation) {
+		return false
+	}
+	for index := range record.retiring {
+		if record.retiring[index] == nil {
+			record.retiring[index] = generation
+			return true
+		}
+	}
+	return false
+}
+
+func (record *generationRecord) isRetiring(generation *StoreGeneration) bool {
+	if record == nil || generation == nil {
+		return false
+	}
+	for _, current := range record.retiring {
+		if current == generation {
+			return true
+		}
+	}
+	return false
+}
+
+func (record *generationRecord) removeRetiring(generation *StoreGeneration) bool {
+	if record == nil || generation == nil {
+		return false
+	}
+	for index, current := range record.retiring {
+		if current != generation {
+			continue
+		}
+		copy(record.retiring[index:], record.retiring[index+1:])
+		record.retiring[len(record.retiring)-1] = nil
+		return true
+	}
+	return false
 }
 
 // StoreGeneration is one immutable published provider generation.
@@ -111,9 +178,7 @@ func (store *SecretStore) Census() SecretStoreCensus {
 		if record.current != nil {
 			census.Current++
 		}
-		if record.retiring != nil {
-			census.Retiring++
-		}
+		census.Retiring += record.retirementCount()
 	}
 	return census
 }
@@ -161,13 +226,16 @@ func (store *SecretStore) Retire(
 	if record == nil ||
 		record.current == nil ||
 		record.current.generation != generation ||
-		record.retiring != nil {
+		record.retirementFull() {
 		store.mu.Unlock()
 		return errors.New("secretstore: current generation differs")
 	}
 	retiring := record.current
+	if !record.addRetiring(retiring) {
+		store.mu.Unlock()
+		return errors.New("secretstore: current generation retirement capacity exhausted")
+	}
 	record.current = nil
-	record.retiring = retiring
 	record.stateVersion++
 	release := retiring.readers == 0
 	store.mu.Unlock()
@@ -245,17 +313,16 @@ func (store *SecretStore) releaseGeneration(
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	record := generation.record
-	if record == nil || record.retiring != generation {
+	if record == nil || !record.removeRetiring(generation) {
 		store.dirty = errors.Join(
 			store.dirty,
 			errors.New("secretstore: generation release lost ownership"),
 		)
 		return store.dirty
 	}
-	record.retiring = nil
 	record.stateVersion++
 	store.unlinkGeneration(generation)
-	if record.current == nil && record.preparations == 0 {
+	if record.current == nil && record.preparations == 0 && !record.hasRetiring() {
 		delete(store.records, record.key)
 	}
 	store.finishCloseLocked()

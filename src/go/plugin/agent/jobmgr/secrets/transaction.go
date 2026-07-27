@@ -25,6 +25,7 @@ type preparedSecretSpec struct {
 
 	result  lifecycle.SealedResult // sealed dyncfg response
 	cleanup lifecycle.TaskCleanup  // post-commit protocol emit
+	commit  func()                 // process desired-state update committed with this transaction
 
 	controller *Controller  // controller to publish the entry into
 	entry      *secretEntry // the entry to commit
@@ -37,6 +38,9 @@ func (spec preparedSecretSpec) commitEntryDisposition() {
 		spec.controller.commitEntry(spec.storeKey, nil)
 	} else if spec.entry != nil {
 		spec.controller.commitEntry(spec.entry.config.ExposedKey(), spec.entry)
+	}
+	if spec.commit != nil {
+		spec.commit()
 	}
 }
 
@@ -140,6 +144,9 @@ func (pst *preparedSecretTransaction) apply(
 			abortErr = spec.mutation.Abort()
 		}
 		if predecessorRestored && abortErr == nil {
+			if spec.commit != nil {
+				spec.commit()
+			}
 			return lifecycle.NewAppliedResourceTransaction(
 				spec.scope,
 				lifecycle.ResourceTransactionUnchanged,

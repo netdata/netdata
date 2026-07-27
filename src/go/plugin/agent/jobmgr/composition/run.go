@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/discovery"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
@@ -49,6 +50,7 @@ type runGenerationConfig struct {
 	Secrets         runSecretServices         // secret services
 	Discovery       runDiscoveryServices      // discovery services
 	SecretEpoch     *processSecretEpoch       // process-owned Store epoch for this run
+	Attempts        *containment.Authority    // process-owned opaque-work authority
 }
 
 type runGeneration struct {
@@ -90,6 +92,7 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		config.Jobs.StoreCreators == nil ||
 		config.Jobs.Vnodes == nil ||
 		config.SecretEpoch == nil ||
+		config.Attempts == nil ||
 		config.SecretEpoch.generation != config.Generation ||
 		config.SecretEpoch.store == nil ||
 		!config.Discovery.valid() {
@@ -113,6 +116,16 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		return nil, err
 	}
 	stores := config.SecretEpoch.store
+	storeOperations, err := secretadapter.NewStoreOperations(secretadapter.StoreOperationsConfig{
+		Epoch:       config.Generation,
+		Attempts:    config.Attempts,
+		Store:       stores,
+		Creators:    config.Jobs.StoreCreators,
+		Diagnostics: config.Diagnostics,
+	})
+	if err != nil {
+		return nil, err
+	}
 	dependencies := secretadapter.NewSecretDependencyIndex()
 	vnodeConfig, err := agentdiscovery.NewVNodeConfigurationWithInitial(config.Jobs.InitialVnodes)
 	if err != nil {
@@ -148,6 +161,7 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 			PluginName:   config.Jobs.PluginName,
 			Frames:       config.Frames,
 			Store:        stores,
+			Operations:   storeOperations,
 			Creators:     config.Jobs.StoreCreators,
 			Dependencies: dependencies,
 			Initial:      config.Secrets.Initial,

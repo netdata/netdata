@@ -54,23 +54,43 @@ type CompositeResourceTransactionHandler func(
 	lifecycle.LongLivedPermit,
 ) (jobmgr.PreparedCompositeResourceTransaction, error)
 
+// CompositeResourceTransactionStage owns process-lifetime preparation until
+// the kernel releases it after the transaction reaches a terminal state.
+type CompositeResourceTransactionStage interface {
+	jobmgr.PreClaimStage
+	PrepareComposite(
+		context.Context,
+		lifecycle.ReadyResource,
+		lifecycle.ResourceTransactionScope,
+		lifecycle.LongLivedPermit,
+	) (jobmgr.PreparedCompositeResourceTransaction, error)
+}
+
+// CompositeResourceTransactionStageHandler must not run plugin-authored work
+// synchronously. The returned stage starts that work when the kernel calls Start.
+type CompositeResourceTransactionStageHandler func(
+	HandlerInput,
+) (CompositeResourceTransactionStage, error)
+
 type CompositeChildLaneConflictHandler func(HandlerInput, string) bool
 
 type ResourceTransactionCommand struct {
 	Name              string
 	AllocateSuccessor bool
+	Stage             bool
 	Claims            []string
 }
 
 type ResourceTransactionDeclaration struct {
 	Prepare                    ResourceTransactionHandler          // prepares a plain resource transaction
 	PrepareComposite           CompositeResourceTransactionHandler // prepares a composite resource transaction (child commands)
-	CompositeChildLaneConflict CompositeChildLaneConflictHandler   // identifies resource lanes a composite may submit to
-	Permit                     lifecycle.LongLivedPlan             // optional run-owned lifetime behind the successor
-	CommandArgument            uint16                              // argument index carrying the dyncfg command
-	GlobalClaim                string                              // claim key held for the whole transaction domain
-	YieldGlobalClaimOnPrepare  bool                                // plain preparation may temporarily yield GlobalClaim
-	Commands                   []ResourceTransactionCommand        // accepted transaction commands
+	StageComposite             CompositeResourceTransactionStageHandler
+	CompositeChildLaneConflict CompositeChildLaneConflictHandler // identifies resource lanes a composite may submit to
+	Permit                     lifecycle.LongLivedPlan           // optional run-owned lifetime behind the successor
+	CommandArgument            uint16                            // argument index carrying the dyncfg command
+	GlobalClaim                string                            // claim key held for the whole transaction domain
+	YieldGlobalClaimOnPrepare  bool                              // plain preparation may temporarily yield GlobalClaim
+	Commands                   []ResourceTransactionCommand      // accepted transaction commands
 }
 
 // HandlerGenerationDeclaration describes one job- or module-owned handler
@@ -254,6 +274,7 @@ type invocationSlot struct {
 	input           HandlerInput                   // materialized handler input for the call
 	claims          []string                       // global claim followed by command claims
 	transactionPlan jobmgr.ResourceTransactionPlan // resource-transaction plan when the route is transactional
+	stage           CompositeResourceTransactionStage
 }
 
 func (is *invocationSlot) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
@@ -297,6 +318,9 @@ func (is *invocationSlot) prepareCompositeResourceTransaction(
 		is.resolved.transaction == nil ||
 		is.resolved.transaction.PrepareComposite == nil {
 		return nil, errors.New("jobmgr Function catalog: invalid composite transaction invocation")
+	}
+	if is.stage != nil {
+		return is.stage.PrepareComposite(ctx, current, scope, permit)
 	}
 	return is.resolved.transaction.PrepareComposite(ctx, is.input, current, scope, permit)
 }
@@ -498,6 +522,8 @@ func validateResourceTransactionDeclaration(declaration *ResourceTransactionDecl
 		(declaration.PrepareComposite == nil) ||
 		(declaration.PrepareComposite != nil &&
 			declaration.CompositeChildLaneConflict == nil) ||
+		(declaration.StageComposite != nil &&
+			declaration.PrepareComposite == nil) ||
 		declaration.GlobalClaim == "" ||
 		len(declaration.GlobalClaim) > maximumDeclarationMetadataBytes ||
 		len(declaration.Commands) == 0 {
@@ -507,6 +533,7 @@ func validateResourceTransactionDeclaration(declaration *ResourceTransactionDecl
 		return errors.New("jobmgr Function catalog: composite transaction cannot yield its global claim")
 	}
 	hasSuccessor := false
+	hasStage := false
 	for index, command := range declaration.Commands {
 		if command.Name == "" || len(command.Name) > maximumDeclarationMetadataBytes {
 			return errors.New("jobmgr Function catalog: invalid resource transaction command")
@@ -527,11 +554,15 @@ func validateResourceTransactionDeclaration(declaration *ResourceTransactionDecl
 			}
 		}
 		hasSuccessor = hasSuccessor || command.AllocateSuccessor
+		hasStage = hasStage || command.Stage
 		for previous := range index {
 			if strings.EqualFold(declaration.Commands[previous].Name, command.Name) {
 				return errors.New("jobmgr Function catalog: duplicate resource transaction command")
 			}
 		}
+	}
+	if hasStage != (declaration.StageComposite != nil) {
+		return errors.New("jobmgr Function catalog: staged transaction command differs from declaration")
 	}
 	if hasSuccessor {
 		if declaration.Permit.Class() != 0 {
@@ -621,6 +652,28 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 	if transactionCommand && command.AllocateSuccessor {
 		transactionPermit = resolved.transaction.Permit
 	}
+	input := handlerInput(lookup, resolved.method)
+	var stage CompositeResourceTransactionStage
+	if transactionCommand && command.Stage {
+		var err error
+		stage, err = resolved.transaction.StageComposite(input)
+		if err != nil {
+			return jobmgr.FunctionCatalogDecision{}, err
+		}
+		if stage == nil || stage.Ready() == nil {
+			if stage != nil {
+				stage.Release()
+			}
+			return jobmgr.FunctionCatalogDecision{},
+				errors.New("jobmgr Function catalog: invalid composite transaction stage")
+		}
+	}
+	releaseStage := stage != nil
+	defer func() {
+		if releaseStage {
+			stage.Release()
+		}
+	}()
 
 	slotIndex := c.freeSlot
 	var slot *invocationSlot
@@ -648,7 +701,8 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 	*slot = invocationSlot{
 		generation: nextGeneration,
 		resolved:   resolved,
-		input:      handlerInput(lookup, resolved.method),
+		input:      input,
+		stage:      stage,
 	}
 	resolved.invocationLeases++
 	generation.invocationLeases++
@@ -677,6 +731,7 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 		plan = jobmgr.WorkPlan{
 			Claims:              slot.claims,
 			Transaction:         &slot.transactionPlan,
+			Stage:               stage,
 			CooperativeCancel:   resolved.cooperativeCancel,
 			CooperativeDeadline: resolved.cooperativeDeadline,
 		}
@@ -684,6 +739,7 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 			plan.YieldClaimOnPrepare = resolved.transaction.GlobalClaim
 		}
 	}
+	releaseStage = false
 	return jobmgr.FunctionCatalogDecision{
 		ResourceID: resourceID,
 		Plan:       plan,

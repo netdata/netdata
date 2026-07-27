@@ -42,6 +42,7 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 		0,
 	)
 	require.NoError(t, err)
+	desiredCommitted := false
 	transaction, err := newPreparedSecretTransaction(
 		preparedSecretSpec{
 			scope: lifecycle.ResourceTransactionScope{
@@ -53,6 +54,9 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 			result:     mustSecretMessage(200, ""),
 			cleanup:    func() error { return nil },
 			controller: &Controller{},
+			commit: func() {
+				desiredCommitted = true
+			},
 		},
 	)
 	require.NoError(t, err)
@@ -64,6 +68,7 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 
 	census := store.Census()
 	require.EqualValues(t, secretstore.SecretStoreCensus{}, census)
+	require.True(t, desiredCommitted)
 
 	require.NoError(t, store.Close(t.Context()))
 }
@@ -138,7 +143,11 @@ func (tts *transactionTestStore) Configuration() any {
 	return &tts.config
 }
 
-func (*transactionTestStore) Init(context.Context) error {
+func (tts *transactionTestStore) Init(context.Context) error {
+	switch tts.config.Value {
+	case "provider-failure-one", "provider-failure-two":
+		return errors.New("provider validation failed")
+	}
 	return nil
 }
 

@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -508,7 +509,20 @@ func newTestRunGeneration(
 		diagnostics: config.Diagnostics,
 	}
 	config.SecretEpoch = epoch
+	ownsAttempts := config.Attempts == nil
+	if ownsAttempts {
+		config.Attempts, err = containment.NewAuthority(config.Diagnostics)
+		if err != nil {
+			return nil, err
+		}
+	}
 	t.Cleanup(func() {
+		if ownsAttempts {
+			config.Attempts.BeginShutdown()
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			require.NoError(t, config.Attempts.Shutdown(shutdownCtx))
+		}
 		require.NoError(t, epoch.seal())
 		select {
 		case <-epoch.done():

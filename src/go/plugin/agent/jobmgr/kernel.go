@@ -102,12 +102,19 @@ func (pac preAdmissionControl) Unwrap() error {
 	return pac.cause
 }
 
+type preClaimStageReady struct {
+	operation *commandOperation
+}
+
 // commandOperation is one command's full lifecycle record, owned exclusively by
 // CommandKernel's run loop (the sole mutator of every field below).
 type commandOperation struct {
 	*lifecycle.OperationGeneration                                    // embedded neutral lifecycle state machine (state, response, child)
 	request                        Request                            // immutable admitted command
 	plan                           WorkPlan                           // prepared work for the command
+	stageStarted                   bool                               // pre-claim stage Start has been called
+	stagePending                   bool                               // pre-claim stage has not settled logically
+	stageReleased                  bool                               // pre-claim stage ownership has been returned
 	claims                         []string                           // normalized claim set (sorted, deduped)
 	authorityClaimEdges            []authorityClaimEdge               // per-claim edge state in the claim authority
 	claimCursor                    int                                // index of the next claim edge to acquire
@@ -230,6 +237,7 @@ type CommandKernel struct {
 	functionCleanupRequests  map[lifecycle.TaskRequestRef]FunctionCleanupRef // in-flight Function cleanup requests by request ref
 	functionCleanupBacklog   functionCleanupQueue                            // queued Function cleanup work awaiting dispatch
 	functionMutations        chan functionMutationSubmission                 // inbound Function catalog mutation submissions
+	preClaimStages           chan preClaimStageReady                         // logically settled process-owned preparation stages
 	claimYields              chan claimYieldRequest                          // task-child claim release/reacquire requests
 	functionMutationStopped  chan struct{}                                   // closed when mutation ingress is drained
 	functionMutation         functionMutationSubmission                      // the mutation currently being applied
@@ -322,6 +330,7 @@ func NewCommandKernel(
 		shutdownRequests:        make(map[lifecycle.TaskRequestRef]*commandLane),
 		shutdownTasks:           make(map[lifecycle.TaskRef]*commandLane),
 		functionMutations:       make(chan functionMutationSubmission),
+		preClaimStages:          make(chan preClaimStageReady),
 		claimYields:             make(chan claimYieldRequest, lifecycle.TaskStartServiceQuantum),
 		functionMutationStopped: make(chan struct{}),
 		lanes:                   make(map[commandLaneKey]*commandLane),
