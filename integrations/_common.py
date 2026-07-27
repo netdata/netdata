@@ -18,6 +18,7 @@ METADATA_PATTERN = '*/metadata.yaml'
 COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'charts.d.plugin', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'metadata.yaml', False),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'python.d.plugin', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'guides', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector', True),
