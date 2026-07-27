@@ -175,13 +175,13 @@ base64 = "0.22"
 # Published systemd-journal-sdk crates (netflow-plugin). Keys use the
 # journal-sdk-* prefix because the plain journal-* names are taken by the
 # internal path crates elsewhere in this file; in-code idents are journal_sdk_*.
-journal-sdk-common = { package = "systemd-journal-sdk-common", version = "0.7.8" }
-journal-sdk-core = { package = "systemd-journal-sdk-core", version = "0.7.8" }
-journal-sdk-engine = { package = "systemd-journal-sdk-engine", version = "0.7.8" }
-journal-sdk-host = { package = "systemd-journal-sdk-host", version = "0.7.8" }
-journal-sdk-index = { package = "systemd-journal-sdk-index", version = "0.7.8" }
-journal-sdk-log-writer = { package = "systemd-journal-sdk-log-writer", version = "0.7.8" }
-journal-sdk-registry = { package = "systemd-journal-sdk-registry", version = "0.7.8" }
+journal-sdk-common = { package = "systemd-journal-sdk-common", version = "0.8.0" }
+journal-sdk-core = { package = "systemd-journal-sdk-core", version = "0.8.0" }
+journal-sdk-engine = { package = "systemd-journal-sdk-engine", version = "0.8.0" }
+journal-sdk-host = { package = "systemd-journal-sdk-host", version = "0.8.0" }
+journal-sdk-index = { package = "systemd-journal-sdk-index", version = "0.8.0" }
+journal-sdk-log-writer = { package = "systemd-journal-sdk-log-writer", version = "0.8.0" }
+journal-sdk-registry = { package = "systemd-journal-sdk-registry", version = "0.8.0" }
 
 # NetFlow-specific dependencies
 jaq-core = "3.0.0"
