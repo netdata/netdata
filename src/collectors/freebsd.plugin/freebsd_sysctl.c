@@ -765,37 +765,37 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
 int do_vm_stats_sys_v_syscalls(int update_every, usec_t dt) {
     (void)dt;
     static int mib[4] = {0, 0, 0, 0};
-    u_int64_t syscalls_number = 0; // make misra happy
+    uint64_t syscalls_number = 0;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_syscall", mib, syscalls_number))) {
-            collector_error("DISABLED: system.syscalls chart");
-            collector_error("DISABLED: vm.stats.sys.v_syscall module");
-            return 1;
+        collector_error("DISABLED: system.syscalls chart");
+        collector_error("DISABLED: vm.stats.sys.v_syscall module");
+        return 1;
     } else {
-            static RRDSET *st = NULL;
-            static RRDDIM *rd = NULL;
+        static RRDSET *st = NULL;
+        static RRDDIM *rd = NULL;
 
-            if (unlikely(!st)) {
-                    st = rrdset_create_localhost(
-                                    "system",
-                                    "syscalls",
-                                    NULL,
-                                    "processes",
-                                    NULL,
-                                    "System call",
-                                    "calls/s",
-                                    "freebsd.plugin",
-                                    "vm.stats.sys.v_syscall",
-                                    NETDATA_CHART_PRIO_SYSTEM_SYSCALLS,
-                                    update_every,
-                                    RRDSET_TYPE_LINE
-                                    );
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "system",
+                    "syscalls",
+                    NULL,
+                    "processes",
+                    NULL,
+                    "System calls",
+                    "calls/s",
+                    "freebsd.plugin",
+                    "vm.stats.sys.v_syscall",
+                    NETDATA_CHART_PRIO_SYSTEM_SYSCALLS,
+                    update_every,
+                    RRDSET_TYPE_LINE
+                    );
 
-                    rd = rrddim_add(st, "calls", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            }
+            rd = rrddim_add(st, "calls", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
 
-            rrddim_set_by_pointer(st, rd, syscalls_number);
-            rrdset_done(st);
+        rrddim_set_by_pointer(st, rd, syscalls_number);
+        rrdset_done(st);
     }
 
     return 0;
