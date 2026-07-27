@@ -253,6 +253,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "a condition that names a gap keeps accounting to the END of the requested window: the query engine stops walking a few buckets after a dimension's storage is exhausted and lets the caller fill the rest with EMPTY, which is the same answer for every other aggregation but silently truncates an outage for `==gap` - a dimension that stops being collected while its chart keeps going must read 100% gap for every remaining bucket, not for eleven of them",
 		Agent:  Red,
 	},
+	"CASE-023/window-outside-retention": {
+		Proves: "the limit of the trailing-gap contract: a window that does not touch the dimension's retention at all. A node silent for three days, asked what share of the last hour it was unreachable, must answer 100% - the same answer it gives for the tail of a window it partly covers. Metric selection is what stands in the way: a metric whose retention misses the window is dropped because it can only answer 'nothing here', which is true for every other aggregation and exactly backwards for one that accounts for uncollected time - dropping it turns a total outage into an empty chart",
+		Agent:  Red,
+	},
 	"CASE-023/gap-weight": {
 		Proves: "a gap counts in stored SLOTS, not seconds: percentage-of-samples weighs uncollected time against the collection interval, so on a 10s metric a 100s hole is ten missing samples and not a hundred - measuring it against the query grid (1s for an ordinary query) would let one missing slot outweigh ten collected ones",
 		Agent:  Red,

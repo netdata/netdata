@@ -296,3 +296,85 @@ func TestCase023PercentageOfTimeCountsTheWholeWindow(t *testing.T) {
 
 	expectAgentStatus(t, "CASE-023/percentage-of-time-denominator", ok)
 }
+
+// The limit of the trailing-gap contract: a window that does not touch the
+// dimension's retention AT ALL.
+//
+// A node that went silent three days ago, asked "what share of the last
+// hour were you unreachable", must answer 100% - the same answer it gives
+// for the tail of a window it partly covers. The engine's metric selection
+// is what stands in the way: a metric whose retention misses the window is
+// normally not worth querying, because it can only answer "nothing here",
+// and an absent dimension already says that. For a grouping that ACCOUNTS
+// for uncollected time, "nothing here" is not the absence of an answer -
+// it IS the answer, and dropping the metric turns a total outage into an
+// empty chart, which reads like a healthy node nobody asked about.
+func TestCase023WindowOutsideRetention(t *testing.T) {
+	const samples = 300
+
+	ch := fixture.Chart{
+		ID: "fixture.c023gone", Title: "gone before the window", Units: "units",
+		Family: "fixture", Context: "fixture.c023gone", UpdateEvery: 1,
+		Dimensions: []fixture.Dimension{{ID: "gone"}},
+	}
+	for i := 1; i <= samples; i++ {
+		ch.Dimensions[0].Points = append(ch.Dimensions[0].Points,
+			fixture.Point{T: fixture.T0 + int64(i), Collected: "1", Flags: stream.FlagNotAnomalous})
+	}
+
+	pushLiveBurst(t, "c023gone", guid(215), ch)
+	if _, err := td.WaitRetention("c023gone", ch.Context, ch.FirstT(), ch.LastT(), 20*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	ok := true
+
+	// a window that starts well after the last stored sample and never
+	// overlaps retention by a single second
+	const (
+		bucketSpan = 20
+		buckets    = 30
+	)
+	after := fixture.T0 + int64(samples) + 600
+	before := after + buckets*bucketSpan
+
+	params := daemon.DataParams(ch.Context, after, before, buckets)
+	params.Set("time_group", "percentage-of-time")
+	params.Set("time_group_options", "==gap")
+	doc, err := td.DataV3("c023gone", params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the dimension is dropped from the result entirely when the bug is
+	// present, so there are no columns to read at all - that IS the red
+	// condition, not a harness failure
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Logf("a window entirely past the dimension's retention returned no dimension columns "+
+			"at all (%v), want %d buckets of 100%% gap", err, buckets)
+		expectAgentStatus(t, "CASE-023/window-outside-retention", false)
+		return
+	}
+
+	col, has := cols["gone"]
+	if !has || len(col) == 0 {
+		t.Logf("a window entirely past the dimension's retention returned no rows for it at all, "+
+			"want %d buckets of 100%% gap", buckets)
+		expectAgentStatus(t, "CASE-023/window-outside-retention", false)
+		return
+	}
+
+	for _, pt := range col {
+		if pt.Value == nil {
+			t.Logf("bucket t0%+d, entirely past retention, is EMPTY, want 100%% gap", pt.T-fixture.T0)
+			ok = false
+			continue
+		}
+		if math.Abs(*pt.Value-100) > 1e-6 {
+			t.Logf("bucket t0%+d, entirely past retention, reads %v, want 100", pt.T-fixture.T0, *pt.Value)
+			ok = false
+		}
+	}
+
+	expectAgentStatus(t, "CASE-023/window-outside-retention", ok)
+}
