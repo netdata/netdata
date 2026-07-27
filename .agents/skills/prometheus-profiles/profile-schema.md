@@ -142,7 +142,7 @@ Presentation invariants enforced by the validator:
   `units: observations/s`. It MUST use `algorithm: incremental` or omit the
   algorithm so suffix inference selects incremental, and SHOULD declare
   `type: heatmap` explicitly even though the compiler forces that runtime type.
-- Event, token, request, count, state, and time units MUST use `line`.
+- Discrete work/event, count, state, and time units MUST use `line`.
   `area`/`stacked` require physical volume, space, bandwidth, or I/O semantics.
 
 ## Instances, dimensions, and labels
@@ -157,10 +157,17 @@ Presentation invariants enforced by the validator:
 - `!label` excludes a key; excludes win regardless of order.
 - An `instances` block needs at least one positive token.
 
-Use instance labels for the entity the operator selects: model, backend,
-database, queue, endpoint, and so on. If a required identity label is absent,
-the series does not route to that chart. Different raw identity values may also
-normalize to the same chart ID, so validate observed values.
+Use instance labels for the entity the operator selects: server, database,
+table, backend, queue, endpoint, and so on. If a required identity label is
+absent, the series does not route to that chart. Different raw identity values
+may also normalize to the same chart ID, so validate observed values.
+
+Treat nested identities as a lattice: a child entity retains its parent's
+identity labels and adds the labels required for the narrower entity. Because
+group and chart defaults replace lists rather than merging them, a child
+`by_labels` override must repeat the parent labels deliberately. Charts that
+compose to the same final family path should use one effective identity set;
+otherwise the displayed leaf cannot filter as one entity type.
 
 ### Dimensions
 

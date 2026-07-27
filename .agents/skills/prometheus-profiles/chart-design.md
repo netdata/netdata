@@ -30,11 +30,11 @@ Write the questions before the charts. Typical first questions are:
 - Which entity is responsible?
 - Is the condition transient, growing, or stuck?
 
-The right set depends on the application. A serving system may lead with
-throughput, request outcomes, queueing, and latency. A database may lead with
+The right set depends on the application. A request-processing service may lead
+with throughput, outcomes, queueing, and latency. A database may lead with
 workload, transactions, locks, buffer/cache behavior, and storage. Use the
-application's vocabulary, not Prometheus mechanics such as “Counters,” “Gauges,”
-or “Histograms.”
+application's vocabulary, not Prometheus mechanics such as “Counters,”
+“Gauges,” or “Histograms.”
 
 Why: operators arrive with a system problem, not a metric type. Organizing by
 export format makes them translate the exporter before they can diagnose the
@@ -66,6 +66,15 @@ placement turns a symptom into a causal path. A family named “Latency” that
 contains queue, read, compute, and write timings forces the operator to rebuild
 the pipeline mentally.
 
+Classify signal roles, but use them as diagnostic lenses *inside* each
+capability. A useful capability section can place its workload, outcomes,
+errors, latency, saturation, and resource pressure together or in adjacent
+subfamilies so the operator sees a holistic explanation of that function. Do
+not gather every workload signal, every error, or every same-unit metric from
+unrelated functions into application-wide buckets. Shared role or unit tells
+how signals may be compared; it does not tell where the operator looks for
+their cause.
+
 Entity level and functional hierarchy are independent axes. A service-level
 section can contain HTTP, process, runtime, and garbage-collection signals, but
 sharing global identity does not make a long flat list coherent. Nest those
@@ -75,7 +84,7 @@ application does.
 Entity level matters as much as application stage. Distinguish, for example:
 
 - service-wide state;
-- model/backend/database instance;
+- cluster/server/database instance;
 - worker/replica;
 - endpoint/operation;
 - device/table/queue.
@@ -84,23 +93,63 @@ A context should represent one homogeneous entity type. Mixing service-wide and
 per-worker charts under the same semantic context produces confusing filters,
 cardinality, and history.
 
+### Build a monotonic identity lattice
+
+Treat each entity type as an identity-label set. A narrower descendant retains
+the labels that identify its parent and adds only what identifies the narrower
+entity. For example:
+
+```text
+service:  {}
+server:   {server}
+database: {server, database}
+table:    {server, database, table}
+index:    {server, database, table, index}
+```
+
+The names are illustrative; derive the real entity types and stable labels
+from the exporter. The structural property is the subset relationship:
+
+```text
+parent identity ⊆ child identity
+```
+
+This matters because a filter applied at the parent should continue to select
+every descendant. If a database child drops `server`, or an index child drops
+`database`, the hierarchy may look nested while filtering no longer describes
+one coherent entity path.
+
+Each displayed leaf family should contain charts for one effective entity
+identity. Do not place a global chart, a per-server chart, and a per-table chart
+under the same displayed leaf merely because they explain the same capability.
+Move them to explicit entity-level branches, or choose a common identity only
+when every selected series truly carries it.
+
+Group `chart_defaults.instances.by_labels` can make an entity boundary explicit
+and reduce repetition. A child override replaces rather than extends the
+parent default, so repeat the parent labels when adding a narrower entity label.
+Never add a label that the selected series does not actually carry merely to
+make the lattice look consistent.
+
 ### Shared identity across sibling families
 
 Sibling second-level families often participate in one section-wide filter. In
 that case their charts should share the parent entity identity labels. If one
-subtree is per-model and another is global, a model filter cannot behave
+subtree is per-database and another is global, a database filter cannot behave
 uniformly.
 
 That mismatch can be intentional. Resolve it explicitly:
 
 - move global charts to a service-level sibling;
 - add the common parent identity when the series truly carries it;
-- nest worker-specific charts under the model-level section;
+- nest table-specific charts under the database-level section;
 - retain the mismatch only when the UI boundary is meant to change entity level,
   and explain it.
 
-The validator warns about missing common explicit identity; it cannot decide
-which resolution matches the domain.
+The validator reports mixed leaf identities, descendant loss of an explicitly
+declared parent identity, and siblings with no common explicit identity. These
+are structural prompts, not a domain verdict: it cannot decide which entity
+boundary matches the operator's mental model.
 
 ## Assign labels by role
 
@@ -108,7 +157,7 @@ A label can play several roles, but each role has different UX and cardinality:
 
 | Role | Mechanism | Effect | Good candidates |
 |---|---|---|---|
-| Entity identity | `instances.by_labels` | creates separate chart instances and filter identity | model, backend, database, device |
+| Entity identity | `instances.by_labels` | creates separate chart instances and filter identity | server, database, table, device |
 | Comparable aspect | `name_from_label` or selector-specific static names | creates dimensions within one chart | status class, method, bounded phase |
 | Descriptive metadata | `label_promotion` | adds filter/group metadata without splitting identity | region, version-like stable attribute |
 | Routing constraint | selector label match | includes only the intended series | role, operation, state |
@@ -280,9 +329,9 @@ Use chart type as visual semantics, not decoration:
   by the compiler. Declare `type: heatmap` explicitly so source intent matches
   the UI that runs.
 
-Event, token, request, count, state, and time charts MUST use line. Their
+Discrete work/event, count, state, and time charts MUST use line. Their
 dimensions may add to a total, but additive categories are not physical volume:
-stacking status classes, GC generations, request outcomes, or token sources
+stacking status classes, GC generations, request outcomes, or operation types
 turns diagnostic trends into an area-composition display the user did not ask
 for. Bandwidth remains a valid filled rate because the fill represents physical
 flow. The validator rejects filled charts when units make the non-volume
@@ -297,7 +346,7 @@ outbound traffic, and make the title/units clear.
 
 A title is a promise about what the chart computes.
 
-- “by model” requires actual per-model instances or dimensions.
+- “by database” requires actual per-database instances or dimensions.
 - “by endpoint,” “per backend,” and similar titles require an instance label,
   dynamic dimension, or selector split that preserves that entity/aspect.
   Merely carrying the label in the source is insufficient: if it is used by
@@ -388,6 +437,8 @@ After objective validation passes, review the dashboard design:
   queueing, and saturation?
 - Does navigation follow application capabilities and causal diagnosis?
 - Is each context homogeneous in entity type?
+- Does each displayed leaf family contain one effective entity identity?
+- Does descendant identity retain its parent labels?
 - Are identity labels minimal, stable, and filterable?
 - Are dimensions bounded comparable aspects?
 - Do sibling families share the intended parent identity?

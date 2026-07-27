@@ -58,9 +58,9 @@ or state the limitation.
 
 ## Keep dumps private and immutable
 
-Metrics may contain model names, routes, users, teams, hashed keys, endpoints,
-or other identifiers. Store dumps under ignored `.local/` or user temporary
-storage and never commit real operational dumps.
+Metrics may contain workload names, routes, users, teams, hashed keys,
+endpoints, or other identifiers. Store dumps under ignored `.local/` or user
+temporary storage and never commit real operational dumps.
 
 Record a hash for a validation run and do not edit the captured file in place.
 The repository validator snapshots it again before the collector performs its

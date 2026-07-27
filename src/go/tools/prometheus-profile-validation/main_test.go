@@ -1162,6 +1162,185 @@ template:
 	}
 }
 
+func TestValidateProfileWarnsWhenDisplayedFamilyMixesEntityIdentity(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  metrics: [app_global_value, app_server_value]
+  charts:
+    - title: Global Value
+      context: global_value
+      units: values
+      priority: 100
+      dimensions:
+        - selector: app_global_value
+          name: value
+    - title: Server Value
+      context: server_value
+      units: values
+      priority: 110
+      instances:
+        by_labels: [server]
+      dimensions:
+        - selector: app_server_value
+          name: value
+`
+	dump := "# TYPE app_global_value gauge\napp_global_value 1\n# TYPE app_server_value gauge\napp_server_value{server=\"a\"} 2\n"
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("mixed family identity must remain an advisory\nreport:\n%s", result.stdout)
+	}
+	if !hasFinding(result.report, "family_identity_mixed", "warning") {
+		t.Fatalf("missing mixed displayed-family identity warning: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileWarnsWhenChildDropsDeclaredParentIdentity(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  chart_defaults:
+    instances:
+      by_labels: [server]
+  metrics: [app_server_value, app_database_value]
+  charts:
+    - title: Server Value
+      family: Servers
+      context: server_value
+      units: values
+      priority: 100
+      dimensions:
+        - selector: app_server_value
+          name: value
+    - title: Database Value
+      family: Databases
+      context: database_value
+      units: values
+      priority: 110
+      instances:
+        by_labels: [database]
+      dimensions:
+        - selector: app_database_value
+          name: value
+`
+	dump := "# TYPE app_server_value gauge\napp_server_value{server=\"sensitive-server\"} 1\n# TYPE app_database_value gauge\napp_database_value{server=\"sensitive-server\",database=\"sensitive-database\"} 2\n"
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("parent identity loss must remain an advisory\nreport:\n%s", result.stdout)
+	}
+	if !hasFinding(result.report, "identity_parent_labels_dropped", "warning") {
+		t.Fatalf("missing parent identity loss warning: %#v", result.report.Findings)
+	}
+	if strings.Contains(result.stdout, "sensitive-") {
+		t.Fatalf("identity hierarchy warning leaked an observed label value:\n%s", result.stdout)
+	}
+}
+
+func TestValidateProfileWarnsWhenGroupOverrideDropsParentIdentity(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  chart_defaults:
+    instances:
+      by_labels: [server]
+  groups:
+    - family: Databases
+      chart_defaults:
+        instances:
+          by_labels: [database]
+      metrics: [app_database_value]
+      charts:
+        - title: Database Value
+          context: database_value
+          units: values
+          priority: 100
+          dimensions:
+            - selector: app_database_value
+              name: value
+`
+	dump := "# TYPE app_database_value gauge\napp_database_value{server=\"a\",database=\"main\"} 2\n"
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("group parent identity loss must remain an advisory\nreport:\n%s", result.stdout)
+	}
+	if !hasFinding(result.report, "identity_parent_labels_dropped", "warning") {
+		t.Fatalf("missing group parent identity loss warning: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAcceptsMonotonicNestedEntityIdentity(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  chart_defaults:
+    instances:
+      by_labels: [server]
+  metrics: [app_server_value]
+  charts:
+    - title: Server Value
+      context: server_value
+      units: values
+      priority: 100
+      dimensions:
+        - selector: app_server_value
+          name: value
+  groups:
+    - family: Databases
+      chart_defaults:
+        instances:
+          by_labels: [server, database]
+      metrics: [app_database_value]
+      charts:
+        - title: Database Value
+          context: database_value
+          units: values
+          priority: 110
+          dimensions:
+            - selector: app_database_value
+              name: value
+      groups:
+        - family: Tables
+          chart_defaults:
+            instances:
+              by_labels: [server, database, table]
+          metrics: [app_table_value]
+          charts:
+            - title: Table Value
+              context: table_value
+              units: values
+              priority: 120
+              dimensions:
+                - selector: app_table_value
+                  name: value
+`
+	dump := "# TYPE app_server_value gauge\napp_server_value{server=\"a\"} 1\n# TYPE app_database_value gauge\napp_database_value{server=\"a\",database=\"main\"} 2\n# TYPE app_table_value gauge\napp_table_value{server=\"a\",database=\"main\",table=\"orders\"} 3\n"
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("expected PASS\nreport:\n%s", result.stdout)
+	}
+	for _, code := range []string{
+		"family_identity_mixed",
+		"identity_parent_labels_dropped",
+		"sibling_identity_mismatch",
+	} {
+		if hasFinding(result.report, code, "warning") {
+			t.Fatalf("unexpected %s warning: %#v", code, result.report.Findings)
+		}
+	}
+}
+
 func TestValidateProfileRejectsMalformedAndEmptyDumps(t *testing.T) {
 	tests := map[string]string{
 		"malformed": "# TYPE app_temperature gauge\napp_temperature not-a-number\n",

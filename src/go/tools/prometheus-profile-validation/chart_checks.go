@@ -26,7 +26,10 @@ type isolatedChartError struct {
 	err  error
 }
 
-const globalChartIdentity = "<global>"
+const (
+	globalChartIdentity   = "<global>"
+	wildcardChartIdentity = "<wildcard>"
+)
 
 func enumerateChartRefs(spec *charttpl.Spec) []chartRef {
 	if spec == nil {
@@ -415,13 +418,13 @@ func rawInstanceIdentityKey(instances *charttpl.Instances, labels metrix.LabelVi
 
 	excluded := make(map[string]struct{})
 	includeAll := false
-	for _, token := range instances.ByLabels {
-		token = strings.TrimSpace(token)
+	for _, labelSpec := range instances.ByLabels {
+		labelSpec = strings.TrimSpace(labelSpec)
 		switch {
-		case token == "*":
+		case labelSpec == "*":
 			includeAll = true
-		case strings.HasPrefix(token, "!"):
-			key := strings.TrimSpace(strings.TrimPrefix(token, "!"))
+		case strings.HasPrefix(labelSpec, "!"):
+			key := strings.TrimSpace(strings.TrimPrefix(labelSpec, "!"))
 			if key != "" {
 				excluded[key] = struct{}{}
 			}
@@ -430,8 +433,8 @@ func rawInstanceIdentityKey(instances *charttpl.Instances, labels metrix.LabelVi
 
 	var keys []string
 	explicit := make(map[string]struct{})
-	for _, token := range instances.ByLabels {
-		key := strings.TrimSpace(token)
+	for _, labelSpec := range instances.ByLabels {
+		key := strings.TrimSpace(labelSpec)
 		if key == "" || key == "*" || strings.HasPrefix(key, "!") {
 			continue
 		}
@@ -482,8 +485,28 @@ func addDashboardHeuristics(spec *charttpl.Spec, r *report) {
 	if spec == nil {
 		return
 	}
-	var walk func(group charttpl.Group, path string)
-	walk = func(group charttpl.Group, path string) {
+	addDisplayedFamilyIdentityHeuristics(spec, r)
+
+	var walk func(group charttpl.Group, path string, parentDefault *charttpl.Instances)
+	walk = func(group charttpl.Group, path string, parentDefault *charttpl.Instances) {
+		effectiveDefault := parentDefault
+		if group.ChartDefaults != nil && group.ChartDefaults.Instances != nil {
+			effectiveDefault = group.ChartDefaults.Instances
+			if parentDefault != nil &&
+				!identityRetainsParent(
+					chartIdentityLabels(effectiveDefault),
+					chartIdentityLabels(parentDefault),
+				) {
+				addParentIdentityLossWarning(
+					r,
+					path+".chart_defaults.instances.by_labels",
+					"group identity",
+					chartIdentityLabels(parentDefault),
+					chartIdentityLabels(effectiveDefault),
+				)
+			}
+		}
+
 		for i, chart := range group.Charts {
 			if chart.Instances != nil && slices.Contains(chart.Instances.ByLabels, "*") {
 				r.addWarning(
@@ -491,6 +514,19 @@ func addDashboardHeuristics(spec *charttpl.Spec, r *report) {
 					fmt.Sprintf("%s.charts[%d]", path, i),
 					fmt.Sprintf("chart %q derives instance identity from every non-excluded label", chart.Title),
 					"Future exporter labels can silently change chart identity and cardinality; prefer explicit entity labels unless the open-ended identity is intentional.",
+				)
+			}
+			if effectiveDefault != nil &&
+				!identityRetainsParent(
+					chartIdentityLabels(chart.Instances),
+					chartIdentityLabels(effectiveDefault),
+				) {
+				addParentIdentityLossWarning(
+					r,
+					fmt.Sprintf("%s.charts[%d].instances.by_labels", path, i),
+					fmt.Sprintf("chart %q", chart.Title),
+					chartIdentityLabels(effectiveDefault),
+					chartIdentityLabels(chart.Instances),
 				)
 			}
 		}
@@ -530,6 +566,9 @@ func addDashboardHeuristics(spec *charttpl.Spec, r *report) {
 					names = append(names, label)
 				}
 				slices.Sort(names)
+				if len(names) == 0 {
+					names = append(names, "<none-shared>")
+				}
 				detail = append(detail, fmt.Sprintf("%s=%v", child.path, names))
 			}
 			if chartedChildren > 1 && len(common) == 0 {
@@ -543,12 +582,138 @@ func addDashboardHeuristics(spec *charttpl.Spec, r *report) {
 		}
 
 		for i, child := range group.Groups {
-			walk(child, fmt.Sprintf("%s.groups[%d](%s)", path, i, child.Family))
+			walk(child, fmt.Sprintf("%s.groups[%d](%s)", path, i, child.Family), effectiveDefault)
 		}
 	}
 	for i, group := range spec.Groups {
-		walk(group, fmt.Sprintf("groups[%d](%s)", i, group.Family))
+		walk(group, fmt.Sprintf("groups[%d](%s)", i, group.Family), nil)
 	}
+}
+
+type displayedFamilyIdentity struct {
+	charts     int
+	identities map[string]identitySetSummary
+}
+
+type identitySetSummary struct {
+	labels []string
+	charts int
+}
+
+// addDisplayedFamilyIdentityHeuristics checks the actual family path rendered
+// by group and chart family composition. Charts in one displayed leaf share a
+// filter scope, so different effective identities deserve explicit review.
+func addDisplayedFamilyIdentityHeuristics(spec *charttpl.Spec, r *report) {
+	families := make(map[string]*displayedFamilyIdentity)
+	var walk func(group charttpl.Group, familyParts []string)
+	walk = func(group charttpl.Group, familyParts []string) {
+		parts := appendFamilyPart(familyParts, group.Family)
+		for _, chart := range group.Charts {
+			family := composeDisplayedFamily(parts, chart.Family)
+			item := families[family]
+			if item == nil {
+				item = &displayedFamilyIdentity{identities: make(map[string]identitySetSummary)}
+				families[family] = item
+			}
+			item.charts++
+			labels := identityLabelNames(chartIdentityLabels(chart.Instances))
+			key := strings.Join(labels, "\x00")
+			summary := item.identities[key]
+			if summary.labels == nil {
+				summary.labels = labels
+			}
+			summary.charts++
+			item.identities[key] = summary
+		}
+		for _, child := range group.Groups {
+			walk(child, parts)
+		}
+	}
+	for _, group := range spec.Groups {
+		walk(group, nil)
+	}
+
+	for _, family := range slices.Sorted(maps.Keys(families)) {
+		item := families[family]
+		if len(item.identities) < 2 {
+			continue
+		}
+		keys := slices.Sorted(maps.Keys(item.identities))
+		detail := make([]string, 0, len(keys))
+		for _, key := range keys {
+			summary := item.identities[key]
+			detail = append(detail, fmt.Sprintf("%v (%d charts)", summary.labels, summary.charts))
+		}
+		r.addWarning(
+			"family_identity_mixed",
+			family,
+			fmt.Sprintf(
+				"displayed family %q contains %d charts with different effective identities: %s",
+				family,
+				item.charts,
+				strings.Join(detail, "; "),
+			),
+			"One displayed leaf should represent one entity type so its charts filter together. Move charts to explicit entity-level branches or use a common identity only when every selected series truly carries it.",
+		)
+	}
+}
+
+func appendFamilyPart(parts []string, part string) []string {
+	out := slices.Clone(parts)
+	if part = strings.TrimSpace(part); part != "" {
+		out = append(out, part)
+	}
+	return out
+}
+
+func composeDisplayedFamily(parts []string, leaf string) string {
+	out := appendFamilyPart(parts, leaf)
+	return strings.Join(out, "/")
+}
+
+func addParentIdentityLossWarning(
+	r *report,
+	path string,
+	subject string,
+	parent map[string]struct{},
+	child map[string]struct{},
+) {
+	r.addWarning(
+		"identity_parent_labels_dropped",
+		path,
+		fmt.Sprintf(
+			"%s identity %v does not retain parent identity %v",
+			subject,
+			identityLabelNames(child),
+			identityLabelNames(parent),
+		),
+		"A narrower entity should retain its parent identity labels so parent-level filtering remains valid for descendants. Repeat inherited labels in an overriding by_labels list, or move the chart to an intentional entity-level sibling.",
+	)
+}
+
+func identityRetainsParent(child, parent map[string]struct{}) bool {
+	if _, ok := parent[globalChartIdentity]; ok {
+		return true
+	}
+	if _, ok := parent[wildcardChartIdentity]; ok {
+		return true // The effective parent label set cannot be inferred statically.
+	}
+	if _, ok := child[wildcardChartIdentity]; ok {
+		return true // The wildcard may retain the parent; its own warning covers uncertainty.
+	}
+	if _, ok := child[globalChartIdentity]; ok {
+		return false
+	}
+	for label := range parent {
+		if _, ok := child[label]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func identityLabelNames(identity map[string]struct{}) []string {
+	return slices.Sorted(maps.Keys(identity))
 }
 
 func subtreeCommonIdentity(group charttpl.Group) (map[string]struct{}, int) {
@@ -587,20 +752,30 @@ func chartIdentityLabels(instances *charttpl.Instances) map[string]struct{} {
 		return out
 	}
 	excluded := make(map[string]struct{})
-	for _, token := range instances.ByLabels {
-		token = strings.TrimSpace(token)
-		if strings.HasPrefix(token, "!") {
-			excluded[strings.TrimSpace(strings.TrimPrefix(token, "!"))] = struct{}{}
+	wildcard := false
+	for _, labelSpec := range instances.ByLabels {
+		labelSpec = strings.TrimSpace(labelSpec)
+		if labelSpec == "*" {
+			wildcard = true
+		} else if strings.HasPrefix(labelSpec, "!") {
+			excluded[strings.TrimSpace(strings.TrimPrefix(labelSpec, "!"))] = struct{}{}
 		}
 	}
-	for _, token := range instances.ByLabels {
-		token = strings.TrimSpace(token)
-		if token == "" || token == "*" || strings.HasPrefix(token, "!") {
+	if wildcard {
+		out[wildcardChartIdentity] = struct{}{}
+		return out
+	}
+	for _, labelSpec := range instances.ByLabels {
+		labelSpec = strings.TrimSpace(labelSpec)
+		if labelSpec == "" || labelSpec == "*" || strings.HasPrefix(labelSpec, "!") {
 			continue
 		}
-		if _, ok := excluded[token]; !ok {
-			out[token] = struct{}{}
+		if _, ok := excluded[labelSpec]; !ok {
+			out[labelSpec] = struct{}{}
 		}
+	}
+	if len(out) == 0 {
+		out[globalChartIdentity] = struct{}{}
 	}
 	return out
 }

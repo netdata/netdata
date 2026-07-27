@@ -68,7 +68,7 @@ Writer behavior:
 Design behavior:
 
 - chart event/work rates when they answer an operator question: requests/s,
-  errors/s, tokens/s, retries/s, bytes/s;
+  errors/s, operations/s, retries/s, bytes/s;
 - preserve related dimensions when comparison is useful, such as response
   classes, but split a tiny error signal from huge traffic if the shared scale
   hides it;
@@ -129,8 +129,8 @@ collect unrelated histogram mechanics under generic “Counts” or “Sums”
 families.
 
 Name one observation before combining `_count` rates. `observations/s` is a
-transport unit, not a population: requests, token intervals, engine steps,
-database rows, and retries remain different things even when every selector
+transport unit, not a population: requests, batches, database rows,
+transactions, and retries remain different things even when every selector
 ends in `_count`. The chart title and dimension names must describe the real
 population rather than relabel all observations as requests.
 
@@ -143,10 +143,10 @@ beside compatible components, but it must not imply a decomposition the
 exporter does not guarantee.
 
 Do not assume component distributions replace a directly exported total
-distribution. Prefill/decode, read/write, or client/server histograms no longer
-carry the per-observation correlation needed to reconstruct the total. Their
-bucket sums can describe component marginals while the direct total histogram
-answers the end-to-end question.
+distribution. Read/write, client/server, or enqueue/process histograms no
+longer carry the per-observation correlation needed to reconstruct the total.
+Their bucket sums can describe component marginals while the direct total
+histogram answers the end-to-end question.
 
 Keep bucket, count, and sum in separate charts when their units differ. Their
 relationship belongs in nearby families/order, not in one chart with dishonest
@@ -158,8 +158,8 @@ The roles are not made comparable by putting them all on an incremental chart:
 - `_count` is observations/s;
 - `_sum` is observed-units/s.
 
-For a tokens-per-step histogram, count is engine steps/s while sum is tokens/s.
-One `tokens/s` chart containing both would mislabel the count dimension.
+For an items-per-batch histogram, count is batches/s while sum is items/s. One
+`items/s` chart containing both would mislabel the count dimension.
 
 ## Summary
 

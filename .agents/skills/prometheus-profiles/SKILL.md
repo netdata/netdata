@@ -40,7 +40,6 @@ Skill-relative sources (resolve from this skill directory):
 10. `profile-schema.md`
 11. `metric-types.md`
 12. `chart-design.md`
-13. `applications/<app>.md`, when present
 
 The repository root is `../../..` from this skill directory. Do not resolve
 skill-relative sources from that root, and do not assume the task's working
@@ -59,7 +58,7 @@ Why this is mandatory:
 When a reference and current source disagree, follow current source and repair
 the stale reference as coupled work.
 
-## Separate evidence, inference, and product judgment
+## Research the application from evidence
 
 Maintain three mental buckets:
 
@@ -69,6 +68,27 @@ Maintain three mental buckets:
   that explains what a metric means or what optional surfaces exist.
 - **Design judgment:** the operator story, hierarchy, instance identity,
   dimension choice, chart composition, and ordering.
+
+The supplied dump is the observed inventory, not the complete application
+model. Research unfamiliar or ambiguous semantics before designing:
+
+1. Read the matching application/exporter documentation.
+2. Search the matching source revision for metric registration and update
+   callsites. Registration shows declared meaning; update sites show what one
+   increment or observation actually represents, which labels are attached,
+   and at what lifecycle scope.
+3. Use upstream issues, release notes, or version history when a contract has
+   changed.
+4. Compare other monitoring integrations or dashboards for questions and
+   terminology, but verify their assumptions against primary evidence.
+5. Treat model memory and naming intuition as hypotheses until corroborated.
+
+Use every research capability available for the task: supplied source trees,
+web browsing, repository search, and mirrored open-source repositories. Do not
+stop at `HELP` when it leaves the observation population, identity, reset
+behavior, or unit meaning ambiguous. Conversely, do not copy another
+dashboard's hierarchy merely because it already exists; it may encode a
+different deployment model or repeat an upstream mistake.
 
 Do not present an inference as observed fact. One dump proves only one
 configuration and moment:
@@ -87,26 +107,48 @@ Treat dumps as potentially sensitive. Keep them in ignored `.local/` or user
 temporary storage, and never copy customer/user label values into committed
 fixtures or documentation.
 
-## Reason from the operator experience
+## Build the semantic inventory before the YAML
 
-Before writing YAML, answer:
+Classify every observed writer-capable family before grouping it. The format is
+up to the author, but the reasoning must make these fields explicit:
 
-1. **What will the operator ask first?**
-   Examples: Is traffic flowing? Are users seeing failures? Where is work
-   waiting? Which resource is saturated?
-2. **What does the application do?**
-   Use its domain language and pipeline/subsystems, not metric types such as
-   “Latencies” or “Counters.”
-3. **What entity does each series describe?**
-   Distinguish service, node, model, queue, database, table, endpoint, and other
-   hierarchy levels.
-4. **Which labels identify that entity, and which describe an aspect of it?**
-   Identity labels usually belong in `instances.by_labels`; bounded aspect
-   labels often become dimensions; useful non-identity metadata may be
-   promoted.
-5. **Which signals are genuinely comparable?**
-   Shared units are necessary but not sufficient. Dimensions must answer one
-   coherent question and remain readable on one scale.
+- **Operator capability:** the application function, subsystem, or causal stage
+  this signal explains.
+- **Entity type:** the thing one series describes, such as service, cluster,
+  server, database, table, worker, endpoint, device, or queue.
+- **Identity labels:** the smallest stable label set that identifies that
+  entity, including every parent identity label it inherits.
+- **Signal role:** workload, outcome, error, latency, saturation, capacity,
+  utilization, resource use, configuration, or another domain role.
+- **Observation population:** what one counter increment, histogram
+  observation, summary observation, or gauge value represents.
+- **Unit algebra:** the raw unit, algorithm, conversion, and final rendered
+  unit. Name the counted object; `operations/s` and `items/s` are not
+  interchangeable merely because both are rates.
+- **Label roles and cardinality:** identity, bounded dimension, promoted
+  metadata, selector routing, or intentional aggregation.
+- **Evidence and uncertainty:** the observed or authoritative source supporting
+  the classification and any unresolved limitation.
+- **Destination:** the intended functional family/chart, or one of the binding
+  exclusion cases below.
+
+This inventory is a reasoning aid, not a fixed worksheet or dashboard
+generator. Its purpose is to prevent the author from discovering semantic
+conflicts only after metrics have already been grouped by name or unit.
+
+Then answer the operator questions:
+
+1. What does the application do, in the operator's vocabulary and causal order?
+2. What will the operator ask first: Is useful work flowing? Are outcomes
+   failing? Where is work waiting? Which resource or limit is saturated?
+3. Which entity level should a filter select at each navigation level?
+4. Which signal roles give a holistic view of each function?
+5. Which signals are genuinely comparable on one chart?
+
+Functional capability drives navigation. Signal role and unit constrain chart
+composition *inside* that story; they are not application-wide navigation
+categories. A top-level “Latency,” “Errors,” or “Bytes” section forces the
+operator to reconstruct the application's causal path.
 
 See `chart-design.md` for the consequences and conflict-resolution guidance.
 See `metric-types.md` for what the collector actually writes for each
@@ -201,7 +243,7 @@ Required authoring policy:
 - Every chart MUST have an explicit positive `priority`.
 - YAML family/chart order MUST mirror intended dashboard presentation order.
 - Explicit priorities MUST NOT decrease as the profile is read in YAML order.
-- Event, token, request, count, state, and time charts MUST use `line`.
+- Discrete work/event, count, state, and time charts MUST use `line`.
   `area`/`stacked` MAY be used only when fill represents physical volume,
   space, bandwidth, or I/O rather than merely categories that add to a total.
 - Prefer unique, increasing priorities when the dashboard has a total order.
@@ -298,11 +340,11 @@ Warnings are prompts for model review, not policy decisions. They include
 generic auto-selection signatures, observed labels with no authored role,
 the job-policy exclusion summary, observed per-rule allow/deny impact, unused
 metric declarations, authored/runtime heatmap divergence, ambiguous or
-physical-rate filled charts, and sibling identity mismatch. Each can be
-intentional, but its UX or diagnostic trade-off must be explained. Do not
-mechanically add identity, promotion, or dimensions merely to silence a label
-warning; explain intentional aggregation when losing that comparison is the
-correct design.
+physical-rate filled charts, mixed leaf identity, parent identity loss, and
+sibling identity mismatch. Each can be intentional, but its UX or diagnostic
+trade-off must be explained. Do not mechanically add identity, promotion, or
+dimensions merely to silence a label warning; explain intentional aggregation
+or an intentional entity-level boundary when it is the correct design.
 
 The gate cannot judge whether the dashboard is useful, and it cannot prove
 behavior for unseen metrics or label values. Exact candidate selection also
@@ -318,9 +360,12 @@ Review the rendered design, not merely the YAML:
 - Does the first screen answer the most urgent operator questions?
 - Does the family tree follow application functions and entity hierarchy?
 - Does every context represent one homogeneous instance type?
+- Does each displayed leaf family contain one effective entity identity?
 - Are dimensions bounded aspects rather than hidden entity explosions?
-- Do sibling sections share parent identity labels where section-wide
-  filtering is intended?
+- Does descendant identity retain the parent labels and add only the labels
+  needed for the narrower entity?
+- Do sibling sections share the parent's identity where section-wide filtering
+  is intended?
 - Do chart titles promise only what the selected data computes?
 - Are units, algorithms, and conversions honest?
 - Are distribution shape, observation count, and observed-value sum kept as
@@ -366,7 +411,6 @@ left to lifecycle/retention, and for the exceptional approval boundary.
 - `profile-schema.md` — schema navigation and runtime consequences.
 - `metric-types.md` — collector/writer behavior and per-type design choices.
 - `chart-design.md` — dashboard reasoning, hierarchy, conflicts, and UX.
-- `applications/` — application facts; evidence aids, not schema authority.
 - `how-tos/capture-metrics-dump.md` — safe evidence capture.
 - `sqlite-metadata-reset.md` — destructive metadata-reset decision boundary.
 - `scripts/validate-profile.py` — thin launcher for the authoritative Go tool.

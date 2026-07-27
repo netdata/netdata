@@ -107,6 +107,10 @@ Warnings identify designs that deserve explanation but can be correct:
   unrelated endpoint;
 - duplicate priorities, whose runtime placement falls back to chart-ID order;
 - open-ended `instances.by_labels: ['*']` identity;
+- displayed leaf families whose charts use different effective entity
+  identities;
+- child group/chart identities that drop labels from an explicitly declared
+  parent `chart_defaults.instances.by_labels` identity;
 - sibling family subtrees with no common explicit identity label;
 - observed label keys that selected chart series carry but the chart neither
   uses nor explicitly excludes for identity, dimensions, promoted metadata, or
@@ -125,11 +129,13 @@ Warnings identify designs that deserve explanation but can be correct:
   least 20x and may flatten the smaller signal.
 
 The validator does not turn these heuristics into policy. For example, sibling
-families can intentionally represent different entity levels, and tied
-priorities can be deliberate. A label can be intentionally aggregated, but its
-lost comparison/filtering and expected cardinality still need explanation. A
-bandwidth rate can justify area while an ordinary request rate usually does
-not.
+families can intentionally represent different entity levels, a leaf can mark
+an intentional filter boundary, and tied priorities can be deliberate.
+Identity findings report effective label keys only; they cannot determine the
+application's entity types or invent a missing label. A label can be
+intentionally aggregated, but its lost comparison/filtering and expected
+cardinality still need explanation. A bandwidth rate can justify area while an
+ordinary request rate usually does not.
 
 The exclusion summary prevents a mechanically clean report from hiding a
 shrinking denominator among many per-rule warnings. It remains advisory because
