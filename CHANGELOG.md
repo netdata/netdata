@@ -810,6 +810,16 @@
 - Build(deps): bump k8s.io/client-go from 0.36.2 to 0.36.3 in /src/go ([#23263](https://github.com/netdata/netdata/issues/23263))
 - Build(deps): bump github.com/aws/aws-sdk-go-v2/credentials from 1.19.29 to 1.19.30 in /src/go ([#23265](https://github.com/netdata/netdata/issues/23265))
 - Build(deps): bump github.com/golangsnmp/gomib from 0.11.0 to 0.12.0 in /src/go ([#23266](https://github.com/netdata/netdata/issues/23266))
+- Update packaging.yml to exclude go.mod and go.sum ([#23272](https://github.com/netdata/netdata/issues/23272))
+- Build(deps): bump github.com/mattn/go-isatty from 0.0.23 to 0.0.24 in /src/go ([#23269](https://github.com/netdata/netdata/issues/23269))
+- Build(deps): bump go.opentelemetry.io/proto/otlp from 1.9.0 to 1.11.0 in /src/go ([#23270](https://github.com/netdata/netdata/issues/23270))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.63.1 to 1.65.0 in /src/go ([#23268](https://github.com/netdata/netdata/issues/23268))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.32.30 to 1.32.31 in /src/go ([#23275](https://github.com/netdata/netdata/issues/23275))
+- Build(deps): bump github.com/klauspost/compress from 1.19.0 to 1.19.1 in /src/go ([#23274](https://github.com/netdata/netdata/issues/23274))
+- Build(deps): bump github.com/prometheus/common from 0.70.0 to 0.70.1 in /src/go ([#23276](https://github.com/netdata/netdata/issues/23276))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi from 1.34.1 to 1.35.0 in /src/go ([#23267](https://github.com/netdata/netdata/issues/23267))
+- Fix(go.d/jobmgr): harden lifecycle and configuration reconciliation ([#23279](https://github.com/netdata/netdata/issues/23279))
+- Perf(go.d/metrix): reduce structured flatten allocations ([#23278](https://github.com/netdata/netdata/issues/23278))
 
 ## [2.10.0] - 2026-04-09
 
