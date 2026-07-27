@@ -188,24 +188,24 @@ func TestLayer5MultiKeyGroupBy(t *testing.T) {
 		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")
 	}
 
-	// composite tuples against the member-enumeration oracle
-	cases := []struct {
-		request string   // as sent
-		keys    []string // canonical key set for the oracle
-		agg     string
+	// composite tuples against the member-enumeration oracle, keyed by the
+	// group_by request as sent
+	cases := map[string]struct {
+		keys []string // canonical key set for the oracle
+		agg  string
 	}{
-		{"dimension,node", []string{"dimension", "node"}, "sum"},
-		{"instance,node", []string{"instance", "node"}, "sum"}, // bare instance id
-		{"label,node", []string{"label", "node"}, "average"},
-		{"dimension,instance", []string{"dimension", "instance"}, "max"},
-		{"dimension,units", []string{"dimension", "units"}, "sum"},
-		{"node,context", []string{"node", "context"}, "sum"},
+		"dimension,node":     {[]string{"dimension", "node"}, "sum"},
+		"instance,node":      {[]string{"instance", "node"}, "sum"}, // bare instance id
+		"label,node":         {[]string{"label", "node"}, "average"},
+		"dimension,instance": {[]string{"dimension", "instance"}, "max"},
+		"dimension,units":    {[]string{"dimension", "units"}, "sum"},
+		"node,context":       {[]string{"node", "context"}, "sum"},
 		// request order must not matter: same oracle as dimension,node
-		{"node,dimension", []string{"dimension", "node"}, "sum"},
+		"node,dimension": {[]string{"dimension", "node"}, "sum"},
 	}
-	for _, tc := range cases {
-		t.Run(tc.request+"-"+tc.agg, func(t *testing.T) {
-			assertGroups(t, multiKeyParams(tc.request, tc.agg), l5MultiKeyGroups(tc.keys, members), tc.agg)
+	for request, tc := range cases {
+		t.Run(request+"-"+tc.agg, func(t *testing.T) {
+			assertGroups(t, multiKeyParams(request, tc.agg), l5MultiKeyGroups(tc.keys, members), tc.agg)
 		})
 	}
 

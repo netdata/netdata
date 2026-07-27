@@ -173,6 +173,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "queries spanning tiers with DIFFERENT retention are served by multiple plans: a dedicated daemon with tier0 at the 25MB quota floor rotates its head out (boundary DISCOVERED from db.per_tier, ~19h evicted at 10M samples), a straddling query reads tier1 (head) + tier0 (tail) with per-side oracle values, and a head-only query is served by tier1 alone",
 		Agent:  Green,
 	},
+	"L4/three-tier-join": {
+		Proves: "three tiers with DIFFERENT retention depths, joined inside one query: every tier at the engine's 25MiB floor and the tiers brought close together (1s/5s/10s) so each fills its own quota from one fixture — tier0 keeps the newest slice, tier1 outlives it, tier2 outlives them both. The whole retained duration is then read at five resolutions from 845s buckets down to 2.9s: no bucket inside the span is ever empty, time never runs backwards, every value stays inside the generator range, and across the resolutions all three tiers contribute (the planner picks the coarsest tier that can supply the requested density, so WHICH tier answers changes with the zoom). Pins that alignment rounds the grid OUTWARD, so the leading buckets can precede retention and are legitimately empty; and that asking for buckets finer than the serving tier is upsampling, not a seam defect",
+		Agent:  Green,
+	},
 	"L5/group-by-matrix": {
 		Proves: "level-1 group-by, BOTH contracts: every key (selected, dimension, instance, node, label, context, units) x every aggregation (average, min, max, sum, extremes) over a 2-node x 2-instance x 3-dim palette equals the member-enumeration oracle — non-raw converts (average divides, ar/gbc), raw defers (sums undivided, ar accumulated, per-point counts on the wire); PARTIAL stamping and group naming pinned (instance = id@guid, node = machine guid, label = value)",
 		Agent:  Green,
@@ -241,14 +245,6 @@ var manifest = map[string]ManifestCase{
 		Proves: "the condition groupings answer a question ABOUT the samples, so options=nonzero judges them by the ANSWER: a dimension whose condition never holds is dropped even though every source sample is non-zero, while a dimension with a non-zero answer stays",
 		Agent:  Red,
 	},
-	"L4/three-tier-join": {
-		Proves: "three tiers with DIFFERENT retention depths, joined inside one query: every tier at the engine's 25MiB floor and the tiers brought close together (1s/5s/10s) so each fills its own quota from one fixture — tier0 keeps the newest slice, tier1 outlives it, tier2 outlives them both. The whole retained duration is then read at five resolutions from 845s buckets down to 2.9s: no bucket inside the span is ever empty, time never runs backwards, every value stays inside the generator range, and across the resolutions all three tiers contribute (the planner picks the coarsest tier that can supply the requested density, so WHICH tier answers changes with the zoom). Pins that alignment rounds the grid OUTWARD, so the leading buckets can precede retention and are legitimately empty; and that asking for buckets finer than the serving tier is upsampling, not a seam defect",
-		Agent:  Green,
-	},
-	"CASE-024/zoom-into-slow-metrics": {
-		Proves: "a metric collected once a minute, once per ten minutes or once an hour still answers when the dashboard zooms BELOW its collection interval: a 60-point request over a window shorter than one sample interval, fully inside the collected span, returns rows that carry the value - a chart that empties out when the user zooms in is indistinguishable from an outage",
-		Agent:  Green,
-	},
 	"CASE-023/percentage-of-time-denominator": {
 		Proves: "the denominator of percentage-of-time is the SELECTED duration, not the collected part of it: one collected second reading 1 followed by 99 seconds with nothing collected is 1% at `==1` and 99% at `==gap`, because uncollected time is time the condition did not hold - answering 100% would turn a node that went silent into a perfectly healthy one. percentage-of-samples keeps the opposite contract and reads 100%, because it answers about the samples it was handed",
 		Agent:  Red,
@@ -272,6 +268,10 @@ var manifest = map[string]ManifestCase{
 	"CASE-023/countif-bare-number": {
 		Proves: "the shared expression parser fixes the bare-number digit swallow (countif.h:78 advances past the operator switch even when no operator matched, so options '5' targets 0) — the API is aligned to health, which has always parsed countif(5) as '=5' (health-config-unittest.c:96)",
 		Agent:  Red,
+	},
+	"CASE-024/zoom-into-slow-metrics": {
+		Proves: "a metric collected once a minute, once per ten minutes or once an hour still answers when the dashboard zooms BELOW its collection interval: a 60-point request over a window shorter than one sample interval, fully inside the collected span, returns rows that carry the value - a chart that empties out when the user zooms in is indistinguishable from an outage",
+		Agent:  Green,
 	},
 	"CASE-019/v1-json-name-escaping": {
 		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",

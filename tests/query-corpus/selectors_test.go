@@ -44,30 +44,29 @@ func TestSelectors(t *testing.T) {
 		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")
 	}
 
-	cases := []struct {
-		name     string
-		set      func(p map[string][]string)
-		key      string // group_by
-		keep     func(l5Member) bool
+	cases := map[string]struct {
+		set  func(p map[string][]string)
+		key  string // group_by
+		keep func(l5Member) bool
 	}{
-		{"nodes-positive", func(p map[string][]string) { p["nodes"] = []string{"l5-a"} },
+		"nodes-positive": {func(p map[string][]string) { p["nodes"] = []string{"l5-a"} },
 			"node", func(m l5Member) bool { return m.Host == "l5-a" }},
-		{"nodes-negation", func(p map[string][]string) { p["nodes"] = []string{"!l5-a,*"} },
+		"nodes-negation": {func(p map[string][]string) { p["nodes"] = []string{"!l5-a,*"} },
 			"node", func(m l5Member) bool { return m.Host != "l5-a" }},
-		{"instances-positive", func(p map[string][]string) { p["instances"] = []string{l5Context + "_one"} },
+		"instances-positive": {func(p map[string][]string) { p["instances"] = []string{l5Context + "_one"} },
 			"instance", func(m l5Member) bool { return strings.HasSuffix(m.Inst, "_one") }},
-		{"scope-instances", func(p map[string][]string) { p["scope_instances"] = []string{l5Context + "_two"} },
+		"scope-instances": {func(p map[string][]string) { p["scope_instances"] = []string{l5Context + "_two"} },
 			"instance", func(m l5Member) bool { return strings.HasSuffix(m.Inst, "_two") }},
-		{"labels-key-value", func(p map[string][]string) { p["labels"] = []string{"team:alpha"} },
+		"labels-key-value": {func(p map[string][]string) { p["labels"] = []string{"team:alpha"} },
 			"node", func(m l5Member) bool { return m.Team == "alpha" }},
-		{"scope-labels", func(p map[string][]string) { p["scope_labels"] = []string{"team:gamma"} },
+		"scope-labels": {func(p map[string][]string) { p["scope_labels"] = []string{"team:gamma"} },
 			"instance", func(m l5Member) bool { return m.Team == "gamma" }},
-		{"dimensions-negation", func(p map[string][]string) { p["dimensions"] = []string{"!da,*"} },
+		"dimensions-negation": {func(p map[string][]string) { p["dimensions"] = []string{"!da,*"} },
 			"dimension", func(m l5Member) bool { return m.Dim != "da" }},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
 			params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
 			params.Set("group_by", tc.key)
 			params.Set("aggregation", "sum")

@@ -31,15 +31,14 @@ import (
 
 func TestCase024ZoomIntoSlowMetrics(t *testing.T) {
 	// one chart per collection interval, each constant
-	cases := []struct {
-		name    string
+	cases := map[string]struct {
 		ue      int
 		samples int
 		guid    int
 	}{
-		{"ue60", 60, 240, 220},    // 4 hours at one sample per minute
-		{"ue600", 600, 144, 221},  // 24 hours at one sample per 10 minutes
-		{"ue3600", 3600, 48, 222}, // 2 days at one sample per hour
+		"ue60":   {60, 240, 220},  // 4 hours at one sample per minute
+		"ue600":  {600, 144, 221}, // 24 hours at one sample per 10 minutes
+		"ue3600": {3600, 48, 222}, // 2 days at one sample per hour
 	}
 
 	const constant = 42.0
@@ -51,16 +50,16 @@ func TestCase024ZoomIntoSlowMetrics(t *testing.T) {
 		ok = false
 	}
 
-	for _, tc := range cases {
+	for name, tc := range cases {
 		// samples sit on the absolute update_every grid: storage keeps
 		// pushed timestamps, but every view re-grids to absolute multiples
 		base := fixture.T0 - fixture.T0%int64(tc.ue)
-		ctx := "fixture.c024" + tc.name
+		ctx := "fixture.c024" + name
 		ch := fixture.Series(ctx, ctx, base, tc.samples, tc.ue,
 			func(int) string { return "42" },
 			func(int) string { return stream.FlagNotAnomalous })
 
-		host := "c024" + tc.name
+		host := "c024" + name
 		pushLiveBurst(t, host, guid(tc.guid), ch)
 		if _, err := td.WaitRetention(host, ch.Context, ch.FirstT(), ch.LastT(), 20*time.Second); err != nil {
 			t.Fatal(err)
