@@ -160,7 +160,7 @@ If you select **Network Flows** on the Live tab and see the message **Connect th
 
 To use Network Flows from your standalone host:
 
-1. **Sign in to Netdata Cloud** at [app.netdata.cloud](https://app.netdata.cloud) and **claim/connect this agent** to your Netdata Cloud Space. Your Space role must allow you to run sensitive functions; see the **Functions** table under [Detailed Permissions](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#detailed-permissions). The free Community tier is sufficient — no paid plan is required.
+1. **Sign in to Netdata Cloud** at [app.netdata.cloud](https://app.netdata.cloud). If the Agent is not connected yet, a Space Admin must claim/connect it to the Space. After it is connected, your own Space role must allow you to run sensitive functions; see the **Node Management** and **Functions** tables under [Detailed Permissions](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#detailed-permissions). The free Community tier is sufficient — no paid plan is required.
 2. After the agent is connected, open Network Flows either from the authenticated local Agent dashboard or through Netdata Cloud:
    - **Local Agent dashboard:** stay on `http://<agent-ip>:19999` while signed in. Function query results travel directly from the Agent to your browser.
    - **Netdata Cloud:** open the connected node and select Network Flows. Cloud proxies the Function request and response between your browser and the Agent.
@@ -169,7 +169,7 @@ Connecting the agent does **not** move or offload its persistent flow storage. C
 
 Anonymous dashboard access to the Network Flows function is not supported; Netdata Cloud authentication is required for either dashboard path.
 
-If the Agent is connected and you are signed in but receive an authorization error, confirm that you belong to its Space and that your role permits sensitive functions. This is different from the **Connect this agent to Netdata** message shown for an unclaimed Agent.
+If the Agent is connected and you are signed in but receive an authorization error, confirm that you belong to its Space and that your role permits sensitive functions. This is different from the **Connect this agent to Netdata** message shown for an unclaimed Agent, which requires a Space Admin to connect it.
 
 See [Netdata Access Control and Feature Availability](/docs/netdata-oss-limitations.md) for the full Anonymous / Community / Paid access model.
 
