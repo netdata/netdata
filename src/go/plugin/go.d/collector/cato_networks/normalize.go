@@ -4,9 +4,6 @@ package cato_networks
 
 import (
 	"strings"
-
-	catomodels "github.com/catonetworks/cato-go-sdk/models"
-	catoscalars "github.com/catonetworks/cato-go-sdk/scalars"
 )
 
 func derefZero[T any](v *T) T {
@@ -29,21 +26,11 @@ func normalizeStatus(v string) string {
 	return strings.ToLower(strings.ReplaceAll(v, " ", "_"))
 }
 
-func connectivityStatusString(v *catomodels.ConnectivityStatus) string {
-	if v == nil {
-		return ""
-	}
-	return string(*v)
-}
-
-func operationalStatusString(v *catoscalars.OperationalStatus) string {
-	if v == nil {
-		return ""
-	}
-	return v.GetString()
-}
-
-func siteDisplayName(siteID string, siteNames map[string]string, infoName, fallbackName string) string {
+func siteDisplayName(
+	siteID string,
+	siteNames map[string]string,
+	infoName, fallbackName string,
+) string {
 	switch {
 	case normalizeName(infoName) != "":
 		return normalizeName(infoName)
@@ -112,11 +99,13 @@ func resolveMetricInterfaceDevice(site *siteState, iface *interfaceState) {
 
 func deviceMatchesMetricInterface(dev deviceState, socketID, socketSerial string) bool {
 	if socketID = strings.TrimSpace(socketID); socketID != "" {
-		if socketID == strings.TrimSpace(dev.SocketID) || socketID == strings.TrimSpace(dev.ID) || socketID == strings.TrimSpace(dev.Identifier) {
+		if socketID == strings.TrimSpace(dev.SocketID) || socketID == strings.TrimSpace(dev.ID) ||
+			socketID == strings.TrimSpace(dev.Identifier) {
 			return true
 		}
 	}
-	if socketSerial = strings.TrimSpace(socketSerial); socketSerial != "" && socketSerial == strings.TrimSpace(dev.SocketSerial) {
+	if socketSerial = strings.TrimSpace(socketSerial); socketSerial != "" &&
+		socketSerial == strings.TrimSpace(dev.SocketSerial) {
 		return true
 	}
 	return false

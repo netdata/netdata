@@ -73,7 +73,6 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 }
 
 func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
-	rollbackErr := errors.New("rollback context unavailable")
 	stopErr := errors.New("dependent stop failed")
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
@@ -126,9 +125,7 @@ func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
 		controller: &Controller{},
 	})
 	require.NoError(t, err)
-	commands := &restartTestCommandScope{
-		rollbackContextErr: rollbackErr,
-	}
+	commands := &restartTestCommandScope{}
 
 	_, applyErr := transaction.ApplyComposite(t.Context(), commands)
 

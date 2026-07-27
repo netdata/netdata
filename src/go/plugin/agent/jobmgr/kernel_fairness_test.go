@@ -71,9 +71,8 @@ func TestKernelReadyLaneFairnessAtBoundaries(t *testing.T) {
 						OperationGeneration: generation,
 					}
 					lane := &commandLane{
-						key:    uid,
-						source: source,
-						head:   operation,
+						key:  uid,
+						head: operation,
 					}
 					expected[sourceIndex] = append(expected[sourceIndex], lane)
 					kernel.markReady(lane)
@@ -83,7 +82,7 @@ func TestKernelReadyLaneFairnessAtBoundaries(t *testing.T) {
 			for decision := 0; decision < 2*population; decision++ {
 				lane := kernel.nextReadyLane()
 				require.NotNil(t, lane)
-				source := sourceIndex(lane.source)
+				source := sourceIndex(lane.head.Source)
 				want := expected[source][positions[source]]
 				require.EqualValues(t, want, lane)
 				positions[source]++

@@ -5,7 +5,9 @@ package joboutput
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -44,20 +46,37 @@ func (dcjc *DynCfgJobController) PlanDiscovered(change DiscoveredJobChange) (job
 	}
 	config, err := change.Config.Clone()
 	if err != nil {
-		return jobmgr.WorkPlan{}, err
+		return jobmgr.WorkPlan{}, jobmgr.RejectProposal(fmt.Errorf(
+			"job output: clone discovered config: %w",
+			err,
+		))
+	}
+	if config.Module() == "" || config.Name() == "" {
+		return jobmgr.WorkPlan{}, jobmgr.RejectProposal(
+			errors.New("job output: discovered config has no identity"),
+		)
+	}
+	if err := dyncfg.JobNameRuleStrict(config.Name()); err != nil {
+		return jobmgr.WorkPlan{}, jobmgr.RejectProposal(fmt.Errorf(
+			"job output: discovered config has an unpublishable name %q: %w",
+			config.Name(),
+			err,
+		))
 	}
 	creator, ok := dcjc.modules.Lookup(config.Module())
 	if !ok {
-		return jobmgr.WorkPlan{}, errors.New("job output: discovered module is not registered")
+		return jobmgr.WorkPlan{}, jobmgr.RejectProposal(
+			errors.New("job output: discovered module is not registered"),
+		)
 	}
 	if err := validateFactoryConfigIdentity(config, creator); err != nil {
-		return jobmgr.WorkPlan{}, err
+		return jobmgr.WorkPlan{}, jobmgr.RejectProposal(err)
 	}
-	if config.FullName() == "" {
-		return jobmgr.WorkPlan{}, errors.New("job output: discovered config has no identity")
-	}
-	if !validDynCfgProtocolField(config.Source()) || !validDynCfgProtocolField(config.SourceType()) {
-		return jobmgr.WorkPlan{}, errors.New("job output: discovered config has invalid protocol metadata")
+	if !netdataapi.ValidSingleQuotedProtocolField(config.Source()) ||
+		!netdataapi.ValidBareProtocolField(config.SourceType()) {
+		return jobmgr.WorkPlan{}, jobmgr.RejectProposal(
+			errors.New("job output: discovered config has invalid protocol metadata"),
+		)
 	}
 	if change.Remove {
 		if change.Restart {
@@ -76,8 +95,9 @@ func (dcjc *DynCfgJobController) PlanDiscovered(change DiscoveredJobChange) (job
 	}
 	change.Config = config
 	return jobmgr.WorkPlan{
-		Claims:     []string{DynCfgJobGraphClaim},
-		NoResponse: true,
+		Claims:              []string{DynCfgJobGraphClaim},
+		NoResponse:          true,
+		YieldClaimOnPrepare: DynCfgJobGraphClaim,
 		Transaction: &jobmgr.ResourceTransactionPlan{
 			ID:                config.FullName(),
 			AllocateSuccessor: change.Status == dyncfg.StatusRunning,
@@ -135,7 +155,24 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			)
 		}
 	}
+	var incumbent confgroup.Config
+	if exists {
+		var err error
+		incumbent, err = graphRecordConfig(record)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if change.Remove {
+		if !exists || incumbent.UID() != change.Config.UID() {
+			return dcjc.noopWithAfterApply(
+				scope,
+				current,
+				permit,
+				result,
+				dcjc.retrySettlement(scope.ID, change.retry),
+			)
+		}
 		return dcjc.prepareMutationWithRetry(
 			scope,
 			current,
@@ -148,10 +185,21 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			change.retry,
 		)
 	}
+	if exists &&
+		confgroup.SourceTypePriority(incumbent.SourceType()) >
+			confgroup.SourceTypePriority(change.Config.SourceType()) {
+		return dcjc.noopWithAfterApply(
+			scope,
+			current,
+			permit,
+			result,
+			dcjc.retrySettlement(scope.ID, change.retry),
+		)
+	}
 
 	payload, err := yaml.Marshal(change.Config)
 	if err != nil {
-		return nil, err
+		return nil, jobmgr.RejectProposal(fmt.Errorf("job output: marshal discovered config: %w", err))
 	}
 	postimage := dyncfg.GraphConfig{
 		ID:      scope.ID,
@@ -194,10 +242,67 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	}
 	successor, err := dcjc.factory.Prepare(ctx, change.Config, scope.Successor, permit)
 	if err != nil {
-		return nil, err
+		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
+			return nil, err
+		}
+		switch classifyConstructionError(err) {
+		case constructionErrorTransient:
+			failedPostimage := postimage
+			failedPostimage.Status = dyncfg.StatusFailed.String()
+			return dcjc.prepareTransientConstructionFailure(
+				scope,
+				current,
+				permit,
+				failedPostimage,
+				result,
+				dcjc.configCreateCleanup(
+					failedPostimage,
+					change.Config.SourceType(),
+					change.Config.Source(),
+					dcjc.configType(dcjc.modules[change.Config.Module()]),
+				),
+				change.retry,
+				change.Config,
+				err,
+			)
+		case constructionErrorProposal:
+			return nil, jobmgr.RejectProposal(err)
+		default:
+			return nil, err
+		}
 	}
 	failedPostimage := postimage
 	failedPostimage.Status = dyncfg.StatusFailed.String()
+	probeFailure, err := dcjc.factory.Probe(ctx, successor)
+	if err != nil {
+		return nil, err
+	}
+	if probeFailure != nil {
+		return dcjc.prepareProbeFailure(
+			scope,
+			current,
+			permit,
+			change.retry,
+			probeFailure,
+			probeFailurePlan{
+				postimage: failedPostimage,
+				failedCleanup: dcjc.configCreateCleanup(
+					failedPostimage,
+					change.Config.SourceType(),
+					change.Config.Source(),
+					dcjc.configType(dcjc.modules[change.Config.Module()]),
+				),
+				removedCleanup: dcjc.configDeleteCleanup(
+					dcjc.configID(change.Config.Module(), change.Config.Name()),
+				),
+				result: func(*autoDetectionFailure) lifecycle.SealedResult {
+					return result
+				},
+				afterApply:       dcjc.scheduleRetryAfterApply(change.Config),
+				removePlainStock: change.Config.SourceType() == confgroup.TypeStock,
+			},
+		)
+	}
 	return dcjc.prepareMutationWithRetry(
 		scope,
 		current,
@@ -208,21 +313,5 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		result,
 		cleanup,
 		change.retry,
-		successorFailurePlan{
-			postimage: failedPostimage,
-			failedCleanup: dcjc.configCreateCleanup(
-				failedPostimage,
-				change.Config.SourceType(),
-				change.Config.Source(),
-				dcjc.configType(dcjc.modules[change.Config.Module()]),
-			),
-			removedCleanup: dcjc.configDeleteCleanup(dcjc.configID(change.Config.Module(), change.Config.Name())),
-			result: func(*autoDetectionFailure) lifecycle.SealedResult {
-				return result
-			},
-			afterApply: dcjc.scheduleRetryAfterApply(change.Config),
-			removePlainStock: change.Config.SourceType() ==
-				confgroup.TypeStock,
-		},
 	)
 }

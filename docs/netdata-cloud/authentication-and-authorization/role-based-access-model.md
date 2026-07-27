@@ -170,7 +170,7 @@ The **Groups** tab under **User Management** only appears after [SCIM integratio
 | **See all functions in Room**      | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |           |
 | **Run any function in Room**       | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |           |
 | **Run read-only function in Room** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |      -      |           |
-| **Run sensitive function in Room** | :heavy_check_mark: | :heavy_check_mark: |         -          |         -          |      -      |           |
+| **Run sensitive function in Room** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |         -          |      -      |           |
 
 </details>
 

@@ -44,43 +44,41 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		return
 	}
 
+	bucketName := src.name + "_bucket"
+	bucketDesc := &instrumentDescriptor{
+		name:      bucketName,
+		kind:      kindCounter,
+		mode:      src.desc.mode,
+		freshness: src.desc.freshness,
+		window:    src.desc.window,
+		meta:      src.desc.meta,
+	}
 	prevCumulative := SampleValue(0)
 	for i, ub := range schema.bounds {
 		cumulative := src.histogramCumulative[i]
 		bucketValue := cumulative - prevCumulative
 		prevCumulative = cumulative
 
-		labelsMap := make(map[string]string, len(src.labels)+1)
-		for _, lbl := range src.labels {
-			labelsMap[lbl.Key] = lbl.Value
-		}
-		labelsMap[HistogramBucketLabel] = formatHistogramBucketLabel(ub)
-
-		labels, labelsKey, err := canonicalizeLabels(labelsMap)
+		labels, labelsKey, err := mergeCanonicalLabel(src.labels, Label{
+			Key:   HistogramBucketLabel,
+			Value: formatHistogramBucketLabel(ub),
+		})
 		if err != nil {
 			continue
 		}
 
-		name := src.name + "_bucket"
-		key := makeSeriesKey(src.hostScopeKey, name, labelsKey)
+		key := makeSeriesKey(src.hostScopeKey, bucketName, labelsKey)
 		series := &committedSeries{
 			id:           SeriesID(key),
 			hash64:       seriesIDHash(SeriesID(key)),
 			key:          key,
-			name:         name,
+			name:         bucketName,
 			hostScopeKey: src.hostScopeKey,
 			hostScope:    src.hostScope,
 			labels:       labels,
 			labelsKey:    labelsKey,
-			desc: &instrumentDescriptor{
-				name:      name,
-				kind:      kindCounter,
-				mode:      src.desc.mode,
-				freshness: src.desc.freshness,
-				window:    src.desc.window,
-				meta:      src.desc.meta,
-			},
-			value: bucketValue,
+			desc:         bucketDesc,
+			value:        bucketValue,
 			meta: flattenedSeriesMeta(
 				src.meta,
 				MetricKindCounter,
@@ -97,33 +95,23 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		dst.series[key] = series
 	}
 
-	infMap := make(map[string]string, len(src.labels)+1)
-	for _, lbl := range src.labels {
-		infMap[lbl.Key] = lbl.Value
-	}
-	infMap[HistogramBucketLabel] = formatHistogramBucketLabel(math.Inf(1))
-	infLabels, infLabelsKey, err := canonicalizeLabels(infMap)
+	infLabels, infLabelsKey, err := mergeCanonicalLabel(src.labels, Label{
+		Key:   HistogramBucketLabel,
+		Value: formatHistogramBucketLabel(math.Inf(1)),
+	})
 	if err == nil {
-		infName := src.name + "_bucket"
-		infKey := makeSeriesKey(src.hostScopeKey, infName, infLabelsKey)
+		infKey := makeSeriesKey(src.hostScopeKey, bucketName, infLabelsKey)
 		series := &committedSeries{
 			id:           SeriesID(infKey),
 			hash64:       seriesIDHash(SeriesID(infKey)),
 			key:          infKey,
-			name:         infName,
+			name:         bucketName,
 			hostScopeKey: src.hostScopeKey,
 			hostScope:    src.hostScope,
 			labels:       infLabels,
 			labelsKey:    infLabelsKey,
-			desc: &instrumentDescriptor{
-				name:      infName,
-				kind:      kindCounter,
-				mode:      src.desc.mode,
-				freshness: src.desc.freshness,
-				window:    src.desc.window,
-				meta:      src.desc.meta,
-			},
-			value: src.histogramCount - prevCumulative,
+			desc:         bucketDesc,
+			value:        src.histogramCount - prevCumulative,
 			meta: flattenedSeriesMeta(
 				src.meta,
 				MetricKindCounter,
@@ -147,36 +135,24 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		dst,
 		src,
 		src.name+"_count",
-		src.labels,
 		src.histogramCount,
 		src.histogramPreviousCount,
 		flattenedCounterDeltaSupported(src) && src.histogramHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindHistogram, FlattenRoleHistogramCount),
-		src.desc,
 	)
 	appendFlattenedHistogramScalar(
 		dst,
 		src,
 		src.name+"_sum",
-		src.labels,
 		src.histogramSum,
 		src.histogramPreviousSum,
 		flattenedCounterDeltaSupported(src) && src.histogramHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindHistogram, FlattenRoleHistogramSum),
-		src.desc,
 	)
 }
 
-func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, name string, labels []Label, value, previous SampleValue, hasPrev bool, meta SeriesMeta, desc *instrumentDescriptor) {
-	labelsMap := make(map[string]string, len(labels))
-	for _, lbl := range labels {
-		labelsMap[lbl.Key] = lbl.Value
-	}
-	items, labelsKey, err := canonicalizeLabels(labelsMap)
-	if err != nil {
-		return
-	}
-	key := makeSeriesKey(src.hostScopeKey, name, labelsKey)
+func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, name string, value, previous SampleValue, hasPrev bool, meta SeriesMeta) {
+	key := makeSeriesKey(src.hostScopeKey, name, src.labelsKey)
 	series := &committedSeries{
 		id:           SeriesID(key),
 		hash64:       seriesIDHash(SeriesID(key)),
@@ -184,15 +160,15 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, nam
 		name:         name,
 		hostScopeKey: src.hostScopeKey,
 		hostScope:    src.hostScope,
-		labels:       items,
-		labelsKey:    labelsKey,
+		labels:       src.labels,
+		labelsKey:    src.labelsKey,
 		desc: &instrumentDescriptor{
 			name:      name,
 			kind:      kindCounter,
-			mode:      desc.mode,
-			freshness: desc.freshness,
-			window:    desc.window,
-			meta:      desc.meta,
+			mode:      src.desc.mode,
+			freshness: src.desc.freshness,
+			window:    src.desc.window,
+			meta:      src.desc.meta,
 		},
 		value: value,
 		meta:  meta,
@@ -212,37 +188,38 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 		dst,
 		src,
 		src.name+"_count",
-		src.labels,
 		src.summaryCount,
 		src.summaryPreviousCount,
 		flattenedCounterDeltaSupported(src) && src.summaryHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindSummary, FlattenRoleSummaryCount),
-		src.desc,
 	)
 	appendFlattenedHistogramScalar(
 		dst,
 		src,
 		src.name+"_sum",
-		src.labels,
 		src.summarySum,
 		src.summaryPreviousSum,
 		flattenedCounterDeltaSupported(src) && src.summaryHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindSummary, FlattenRoleSummarySum),
-		src.desc,
 	)
 
-	if schema == nil {
+	if schema == nil || len(schema.quantiles) == 0 {
 		return
 	}
 
+	quantileDesc := &instrumentDescriptor{
+		name:      src.name,
+		kind:      kindGauge,
+		mode:      src.desc.mode,
+		freshness: src.desc.freshness,
+		window:    src.desc.window,
+		meta:      src.desc.meta,
+	}
 	for i, q := range schema.quantiles {
-		labelsMap := make(map[string]string, len(src.labels)+1)
-		for _, lbl := range src.labels {
-			labelsMap[lbl.Key] = lbl.Value
-		}
-		labelsMap[SummaryQuantileLabel] = formatSummaryQuantileLabel(q)
-
-		labels, labelsKey, err := canonicalizeLabels(labelsMap)
+		labels, labelsKey, err := mergeCanonicalLabel(src.labels, Label{
+			Key:   SummaryQuantileLabel,
+			Value: formatSummaryQuantileLabel(q),
+		})
 		if err != nil {
 			continue
 		}
@@ -256,15 +233,8 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 			hostScope:    src.hostScope,
 			labels:       labels,
 			labelsKey:    labelsKey,
-			desc: &instrumentDescriptor{
-				name:      src.name,
-				kind:      kindGauge,
-				mode:      src.desc.mode,
-				freshness: src.desc.freshness,
-				window:    src.desc.window,
-				meta:      src.desc.meta,
-			},
-			value: src.summaryQuantiles[i],
+			desc:         quantileDesc,
+			value:        src.summaryQuantiles[i],
 			meta: flattenedSeriesMeta(
 				src.meta,
 				MetricKindGauge,
@@ -338,19 +308,24 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 		return
 	}
 
+	stateDesc := &instrumentDescriptor{
+		name:      src.name,
+		kind:      kindGauge,
+		mode:      src.desc.mode,
+		freshness: src.desc.freshness,
+		window:    src.desc.window,
+		meta:      src.desc.meta,
+	}
 	for _, state := range schema.states {
 		value := SampleValue(0)
 		if src.stateSetValues[state] {
 			value = 1
 		}
 
-		labelsMap := make(map[string]string, len(src.labels)+1)
-		for _, lbl := range src.labels {
-			labelsMap[lbl.Key] = lbl.Value
-		}
-		labelsMap[src.name] = state
-
-		labels, labelsKey, err := canonicalizeLabels(labelsMap)
+		labels, labelsKey, err := mergeCanonicalLabel(src.labels, Label{
+			Key:   src.name,
+			Value: state,
+		})
 		if err != nil {
 			continue
 		}
@@ -365,15 +340,8 @@ func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {
 			hostScope:    src.hostScope,
 			labels:       labels,
 			labelsKey:    labelsKey,
-			desc: &instrumentDescriptor{
-				name:      src.name,
-				kind:      kindGauge,
-				mode:      src.desc.mode,
-				freshness: src.desc.freshness,
-				window:    src.desc.window,
-				meta:      src.desc.meta,
-			},
-			value: value,
+			desc:         stateDesc,
+			value:        value,
 			meta: flattenedSeriesMeta(
 				src.meta,
 				MetricKindGauge,
@@ -398,13 +366,10 @@ func appendFlattenedMeasureSetSeries(dst *readSnapshot, src *committedSeries) {
 	}
 
 	for i, field := range schema.fields {
-		labelsMap := make(map[string]string, len(src.labels)+1)
-		for _, lbl := range src.labels {
-			labelsMap[lbl.Key] = lbl.Value
-		}
-		labelsMap[MeasureSetFieldLabel] = field.Name
-
-		labels, labelsKey, err := canonicalizeLabels(labelsMap)
+		labels, labelsKey, err := mergeCanonicalLabel(src.labels, Label{
+			Key:   MeasureSetFieldLabel,
+			Value: field.Name,
+		})
 		if err != nil {
 			continue
 		}

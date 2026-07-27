@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -18,11 +17,9 @@ type kernelCompositeScope struct {
 	parent *commandOperation // parent composite operation
 	closed atomic.Bool       // scope closed to new child submissions
 	fenced bool              // the composite fence is installed
-
-	rollbackMu     sync.Mutex         // guards the lazily-created rollback context
-	rollbackCtx    context.Context    // run-owned bounded rollback context
-	rollbackCancel context.CancelFunc // cancels rollbackCtx
 }
+
+const compositeRecoverySettlementTimeout = time.Second
 
 func newKernelCompositeScope(kernel *CommandKernel, parent *commandOperation) *kernelCompositeScope {
 	return &kernelCompositeScope{
@@ -35,53 +32,25 @@ func (kcs *kernelCompositeScope) SubmitPreparedAndWait(ctx context.Context, requ
 	return kcs.submitAndWait(ctx, request, plan, false)
 }
 
-func (kcs *kernelCompositeScope) SubmitRollbackAndWait(request Request, plan WorkPlan) error {
-	ctx, err := kcs.RollbackContext()
-	if err != nil {
-		return err
-	}
+func (kcs *kernelCompositeScope) SubmitRecoveryAndWait(
+	ctx context.Context,
+	request Request,
+	plan WorkPlan,
+) error {
 	return kcs.submitAndWait(ctx, request, plan, true)
-}
-
-func (kcs *kernelCompositeScope) RollbackContext() (context.Context, error) {
-	if kcs == nil || kcs.kernel == nil || kcs.parent == nil || kcs.closed.Load() {
-		return nil, errors.New("jobmgr composite: rollback outside active parent")
-	}
-	kcs.rollbackMu.Lock()
-	defer kcs.rollbackMu.Unlock()
-	if kcs.closed.Load() {
-		return nil, errors.New("jobmgr composite: rollback outside active parent")
-	}
-	if kcs.rollbackCtx != nil {
-		return kcs.rollbackCtx, nil
-	}
-	ctx, cancel, err := kcs.kernel.run.NewRollbackContext()
-	if err != nil {
-		return nil, err
-	}
-	kcs.rollbackCtx = ctx
-	kcs.rollbackCancel = cancel
-	return ctx, nil
 }
 
 func (kcs *kernelCompositeScope) close() {
 	if kcs == nil || !kcs.closed.CompareAndSwap(false, true) {
 		return
 	}
-	kcs.rollbackMu.Lock()
-	if kcs.rollbackCancel != nil {
-		kcs.rollbackCancel()
-	}
-	kcs.rollbackCtx = nil
-	kcs.rollbackCancel = nil
-	kcs.rollbackMu.Unlock()
 }
 
 func (kcs *kernelCompositeScope) submitAndWait(
 	ctx context.Context,
 	request Request,
 	plan WorkPlan,
-	rollback bool,
+	recovery bool,
 ) error {
 	if kcs == nil || kcs.kernel == nil || kcs.parent == nil || kcs.closed.Load() || ctx == nil {
 		return errors.New("jobmgr composite: invalid child submission")
@@ -93,7 +62,7 @@ func (kcs *kernelCompositeScope) submitAndWait(
 		return errors.New("jobmgr composite: child must be a response-free Job Manager command")
 	}
 	request.Deadline = earliestDeadline(request.Deadline, contextDeadline(ctx))
-	if !rollback {
+	if !recovery {
 		request.Deadline = earliestDeadline(request.Deadline, kcs.parent.request.Deadline)
 	}
 	if err := request.Validate(); err != nil {
@@ -114,7 +83,7 @@ func (kcs *kernelCompositeScope) submitAndWait(
 			plan:      owned,
 			context:   ctx,
 			composite: kcs,
-			rollback:  rollback,
+			recovery:  recovery,
 			result:    result,
 			terminal:  terminal,
 		},
@@ -126,7 +95,7 @@ func (kcs *kernelCompositeScope) submitAndWait(
 	if !accepted {
 		return err
 	}
-	return errors.Join(err, kcs.waitChildTerminal(ctx, request.UID, terminal, rollback))
+	return errors.Join(err, kcs.waitChildTerminal(ctx, request.UID, terminal, recovery))
 }
 
 func (kcs *kernelCompositeScope) waitChildAdmission(
@@ -161,7 +130,7 @@ func (kcs *kernelCompositeScope) waitChildTerminal(
 	ctx context.Context,
 	uid string,
 	terminal <-chan error,
-	rollback bool,
+	recovery bool,
 ) error {
 	var cancellation error
 	done := ctx.Done()
@@ -172,12 +141,6 @@ func (kcs *kernelCompositeScope) waitChildTerminal(
 		case <-done:
 			cancellation = context.Cause(ctx)
 			done = nil
-			if rollback {
-				kcs.kernel.run.Dirty(
-					errors.Join(errors.New("jobmgr composite: rollback deadline exceeded"), cancellation),
-				)
-				kcs.kernel.NotifyControlReady()
-			}
 			select {
 			case kcs.kernel.cancel <- uid:
 			case err := <-terminal:
@@ -185,8 +148,35 @@ func (kcs *kernelCompositeScope) waitChildTerminal(
 			case <-kcs.kernel.done:
 				return errors.Join(cancellation, ErrStopped)
 			}
+			if recovery {
+				timer := time.NewTimer(compositeRecoverySettlementTimeout)
+				select {
+				case err := <-terminal:
+					stopCompositeRecoveryTimer(timer)
+					return errors.Join(cancellation, err)
+				case <-timer.C:
+					cancellation = errors.Join(
+						cancellation,
+						ErrCompositeRecoveryUnresolved,
+					)
+					kcs.kernel.run.Dirty(cancellation)
+					kcs.kernel.NotifyControlReady()
+				case <-kcs.kernel.done:
+					stopCompositeRecoveryTimer(timer)
+					return errors.Join(cancellation, ErrStopped)
+				}
+			}
 		case <-kcs.kernel.done:
 			return errors.Join(cancellation, ErrStopped)
+		}
+	}
+}
+
+func stopCompositeRecoveryTimer(timer *time.Timer) {
+	if timer != nil && !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
 		}
 	}
 }
@@ -241,7 +231,7 @@ func (pcb *preparedCompositeBridge) Dispose(ctx context.Context) (lifecycle.Read
 func (ck *CommandKernel) validateCompositeAdmission(
 	scope *kernelCompositeScope,
 	plan WorkPlan,
-	rollback bool,
+	recovery bool,
 ) (*commandOperation, error) {
 	if scope == nil || scope.kernel != ck || scope.parent == nil || scope.closed.Load() {
 		return nil, errors.New("jobmgr composite: stale parent scope")
@@ -260,7 +250,7 @@ func (ck *CommandKernel) validateCompositeAdmission(
 			!parent.ownershipChain) {
 		return nil, errors.New("jobmgr composite: continuation authority is closed")
 	}
-	if !rollback && (parent.cancelled || parent.TimedOut()) && !parent.ownershipChain {
+	if !recovery && (parent.cancelled || parent.TimedOut()) && !parent.ownershipChain {
 		return nil, errors.New("jobmgr composite: cancelled parent rejected normal child")
 	}
 	childClaims, err := normalizeAuthorityClaims(plan.Claims)
@@ -269,6 +259,10 @@ func (ck *CommandKernel) validateCompositeAdmission(
 	}
 	if !claimsCoveredByParent(parent.claims, childClaims) {
 		return nil, errors.New("jobmgr composite: child claim is outside parent scope")
+	}
+	if plan.YieldClaimOnPrepare != "" &&
+		parent.claims[len(parent.claims)-1] != plan.YieldClaimOnPrepare {
+		return nil, errors.New("jobmgr composite: yielded child claim is not the parent acquisition suffix")
 	}
 	return parent, nil
 }
@@ -335,6 +329,9 @@ func (ck *CommandKernel) endCompositeFence(parent *commandOperation) error {
 	if ck == nil || parent == nil || parent.composite == nil || !parent.composite.fenced {
 		return nil
 	}
+	if parent.claimYieldFence {
+		return errors.New("jobmgr composite: ended with a yielded fence claim")
+	}
 	for _, claim := range parent.claims {
 		use := ck.compositeFenceClaims[claim] - 1
 		if use < 0 {
@@ -352,6 +349,37 @@ func (ck *CommandKernel) endCompositeFence(parent *commandOperation) error {
 		return errors.New("jobmgr composite: admission fence generation wrapped")
 	}
 	ck.compositeFenceRecheck = ck.compositeFenceHead != nil
+	return nil
+}
+
+func (ck *CommandKernel) suspendCompositeFenceClaim(parent *commandOperation, claim string) error {
+	if ck == nil || parent == nil || parent.composite == nil ||
+		!parent.composite.fenced || parent.claimYieldFence ||
+		ck.compositeFenceClaims[claim] <= 0 {
+		return errors.New("jobmgr composite: invalid yielded fence claim")
+	}
+	use := ck.compositeFenceClaims[claim] - 1
+	if use == 0 {
+		delete(ck.compositeFenceClaims, claim)
+	} else {
+		ck.compositeFenceClaims[claim] = use
+	}
+	parent.claimYieldFence = true
+	ck.compositeFenceGeneration++
+	if ck.compositeFenceGeneration == 0 {
+		return errors.New("jobmgr composite: admission fence generation wrapped")
+	}
+	ck.compositeFenceRecheck = ck.compositeFenceHead != nil
+	return nil
+}
+
+func (ck *CommandKernel) restoreCompositeFenceClaim(parent *commandOperation, claim string) error {
+	if ck == nil || parent == nil || parent.composite == nil ||
+		!parent.composite.fenced || !parent.claimYieldFence {
+		return errors.New("jobmgr composite: invalid yielded fence restoration")
+	}
+	ck.compositeFenceClaims[claim]++
+	parent.claimYieldFence = false
 	return nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -219,6 +220,10 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 }
 
 func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile) {
+	if !netdataapi.ValidSingleQuotedProtocolField(conf.source) {
+		d.Errorf("config source '%s' cannot be represented in the plugins.d CONFIG protocol", conf.source)
+		return
+	}
 	// Create sdConfig directly from YAML (cleans name for dyncfg compatibility)
 	sourceType := sourceTypeFromPath(conf.source)
 	pipelineKey := pipelineKeyFromSource(conf.source)
@@ -257,6 +262,11 @@ func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile) {
 // addConfig handles adding a config with priority handling.
 // This is the core logic matching jobmgr pattern.
 func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
+	if err := d.handler.ValidateConfigCreate(scfg, dyncfg.StatusAccepted); err != nil {
+		d.Errorf("config '%s' cannot be represented in the plugins.d CONFIG protocol: %v", scfg.ExposedKey(), err)
+		return
+	}
+
 	// For file sources: One file = one config. If the file previously provided a different config,
 	// remove the old one first. This handles the case where a file config name changes.
 	if scfg.SourceType() != confgroup.TypeDyncfg {

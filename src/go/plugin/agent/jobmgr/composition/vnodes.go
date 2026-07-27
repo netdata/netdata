@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/discovery"
@@ -187,8 +186,6 @@ func (vb *vnodeBinding) prepareAdd(
 	}
 	prepared, err := vb.config.PrepareUpsert(name, expected, next)
 	if errors.Is(err, agentdiscovery.ErrVNodeNoChange) {
-		// Unlike prepareUpdate, add re-emits the CONFIG CREATE on a no-op: an
-		// idempotent re-declaration of an already-identical vnode entry.
 		return vb.noop(scope, mustDynCfgMessage(202, ""), vb.configCreateCleanup(next))
 	}
 	if err != nil {
@@ -355,18 +352,14 @@ func (vb *vnodeBinding) parseVNode(
 		)
 		return nil, &result
 	}
-	if err := uuid.Validate(config.GUID); err != nil {
+	normalizeVNode(&config, name, input.CallerSource)
+	if err := vnodes.ValidateConfigured(&config); err != nil {
 		result := mustDynCfgMessage(
 			400,
-			fmt.Sprintf("Failed to create configuration from payload. Invalid guid format: %v.", err),
+			fmt.Sprintf("Failed to create configuration from payload. Invalid vnode configuration: %v.", err),
 		)
 		return nil, &result
 	}
-	if !validVNodeQuotedProtocolField(input.CallerSource) {
-		result := mustDynCfgMessage(400, "Failed to create configuration from payload. Invalid Function source.")
-		return nil, &result
-	}
-	normalizeVNode(&config, name, input.CallerSource)
 	if err := vb.validateUnique(&config); err != nil {
 		result := mustDynCfgMessage(400, fmt.Sprintf("Failed to create configuration from payload: %v.", err))
 		return nil, &result
@@ -383,6 +376,10 @@ func (vb *vnodeBinding) configName(input functionadapter.HandlerInput) (string, 
 }
 
 func (vb *vnodeBinding) validateUnique(next *vnodes.VirtualNode) error {
+	nextGUID, err := vnodes.ConfiguredGUIDKey(next.GUID)
+	if err != nil {
+		return err
+	}
 	for _, entry := range vb.config.Entries() {
 		current := entry.Snapshot.Vnode
 		if entry.ID == next.Name {
@@ -391,7 +388,11 @@ func (vb *vnodeBinding) validateUnique(next *vnodes.VirtualNode) error {
 		if current.Hostname == next.Hostname {
 			return fmt.Errorf("duplicate virtual node hostname detected (job '%s')", entry.ID)
 		}
-		if current.GUID == next.GUID {
+		currentGUID, err := vnodes.ConfiguredGUIDKey(current.GUID)
+		if err != nil {
+			return fmt.Errorf("invalid existing virtual node guid (job '%s'): %w", entry.ID, err)
+		}
+		if currentGUID == nextGUID {
 			return fmt.Errorf("duplicate virtual node guid detected (job '%s')", entry.ID)
 		}
 	}
@@ -399,31 +400,16 @@ func (vb *vnodeBinding) validateUnique(next *vnodes.VirtualNode) error {
 }
 
 func (vb *vnodeBinding) validateInitial() error {
-	seenHostnames := make(map[string]string)
-	seenGUIDs := make(map[string]string)
+	initial := make(map[string]*vnodes.VirtualNode)
 	for _, entry := range vb.config.Entries() {
-		vnode := entry.Snapshot.Vnode
-		if vnode == nil || vnode.Name != entry.ID ||
-			vnode.Hostname == "" ||
-			uuid.Validate(vnode.GUID) != nil ||
-			dyncfg.JobNameRuleAllowDots(entry.ID) != nil ||
-			!validVNodeTokenProtocolField(vnode.SourceType) ||
-			!validVNodeQuotedProtocolField(vnode.Source) {
-			return errors.New("jobmgr composition: invalid initial vnode configuration")
-		}
-		if other := seenHostnames[vnode.Hostname]; other != "" {
-			return fmt.Errorf(
-				"jobmgr composition: duplicate vnode hostname %q (%s and %s)",
-				vnode.Hostname,
-				other,
-				entry.ID,
-			)
-		}
-		if other := seenGUIDs[vnode.GUID]; other != "" {
-			return fmt.Errorf("jobmgr composition: duplicate vnode GUID (%s and %s)", other, entry.ID)
-		}
-		seenHostnames[vnode.Hostname] = entry.ID
-		seenGUIDs[vnode.GUID] = entry.ID
+		initial[entry.ID] = entry.Snapshot.Vnode
+	}
+	return validateInitialVNodeSet(initial)
+}
+
+func validateInitialVNodeSet(initial map[string]*vnodes.VirtualNode) error {
+	if err := vnodes.ValidateConfiguredSet(initial); err != nil {
+		return fmt.Errorf("jobmgr composition: invalid initial vnode configuration: %w", err)
 	}
 	return nil
 }
@@ -457,7 +443,7 @@ func (vb *vnodeBinding) noop(
 
 // configCreateVNodeJob emits the CONFIG CREATE that declares one vnode as a
 // dyncfg job entry, with the removable command added for dyncfg-sourced vnodes.
-func (vb *vnodeBinding) configCreateVNodeJob(api *netdataapi.API, vnode *vnodes.VirtualNode) {
+func (vb *vnodeBinding) configCreateVNodeJob(api *netdataapi.API, vnode *vnodes.VirtualNode) error {
 	commands := dyncfg.JoinCommands(
 		dyncfg.CommandUserconfig,
 		dyncfg.CommandSchema,
@@ -468,7 +454,7 @@ func (vb *vnodeBinding) configCreateVNodeJob(api *netdataapi.API, vnode *vnodes.
 	if vnode.SourceType == confgroup.TypeDyncfg {
 		commands += " " + string(dyncfg.CommandRemove)
 	}
-	api.CONFIGCREATE(netdataapi.ConfigOpts{
+	return api.TryCONFIGCREATE(netdataapi.ConfigOpts{
 		ID:                vb.prefix() + ":" + vnode.Name,
 		Status:            dyncfg.StatusRunning.String(),
 		ConfigType:        dyncfg.ConfigTypeJob.String(),
@@ -480,20 +466,20 @@ func (vb *vnodeBinding) configCreateVNodeJob(api *netdataapi.API, vnode *vnodes.
 }
 
 func (vb *vnodeBinding) configCreateCleanup(vnode *vnodes.VirtualNode) lifecycle.TaskCleanup {
-	return vb.protocolCleanup(func(api *netdataapi.API) {
-		vb.configCreateVNodeJob(api, vnode)
+	return vb.protocolCleanup(func(api *netdataapi.API) error {
+		return vb.configCreateVNodeJob(api, vnode)
 	})
 }
 
 func (vb *vnodeBinding) configDeleteCleanup(name string) lifecycle.TaskCleanup {
-	return vb.protocolCleanup(func(api *netdataapi.API) {
-		api.CONFIGDELETE(vb.prefix() + ":" + name)
+	return vb.protocolCleanup(func(api *netdataapi.API) error {
+		return api.TryCONFIGDELETE(vb.prefix() + ":" + name)
 	})
 }
 
 func (vb *vnodeBinding) initialCleanup() lifecycle.TaskCleanup {
-	return vb.protocolCleanup(func(api *netdataapi.API) {
-		api.CONFIGCREATE(netdataapi.ConfigOpts{
+	return vb.protocolCleanup(func(api *netdataapi.API) error {
+		if err := api.TryCONFIGCREATE(netdataapi.ConfigOpts{
 			ID:         vb.prefix(),
 			Status:     dyncfg.StatusAccepted.String(),
 			ConfigType: dyncfg.ConfigTypeTemplate.String(),
@@ -506,16 +492,23 @@ func (vb *vnodeBinding) initialCleanup() lifecycle.TaskCleanup {
 				dyncfg.CommandUserconfig,
 				dyncfg.CommandTest,
 			),
-		})
-		for _, entry := range vb.config.Entries() {
-			vb.configCreateVNodeJob(api, entry.Snapshot.Vnode)
+		}); err != nil {
+			return err
 		}
+		for _, entry := range vb.config.Entries() {
+			if err := vb.configCreateVNodeJob(api, entry.Snapshot.Vnode); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
-func (vb *vnodeBinding) protocolCleanup(build func(*netdataapi.API)) lifecycle.TaskCleanup {
+func (vb *vnodeBinding) protocolCleanup(build func(*netdataapi.API) error) lifecycle.TaskCleanup {
 	var payload bytes.Buffer
-	build(netdataapi.New(&payload))
+	if err := build(netdataapi.New(&payload)); err != nil {
+		return func() error { return err }
+	}
 	prepared, err := lifecycle.PrepareProtocolFrame(payload.Bytes())
 	if err != nil {
 		return func() error { return err }
@@ -680,27 +673,6 @@ func vnodeCommand(input functionadapter.HandlerInput) dyncfg.Command {
 
 func vnodeJobName(value string) string {
 	return dyncfg.NormalizeJobName(value)
-}
-
-func validVNodeTokenProtocolField(value string) bool {
-	if value == "" {
-		return false
-	}
-	for _, char := range value {
-		if char <= ' ' || char == 0x7f || char == '\'' {
-			return false
-		}
-	}
-	return true
-}
-
-func validVNodeQuotedProtocolField(value string) bool {
-	for _, char := range value {
-		if char < ' ' || char == 0x7f || char == '\'' {
-			return false
-		}
-	}
-	return true
 }
 
 func normalizeVNode(vnode *vnodes.VirtualNode, name string, source string) {

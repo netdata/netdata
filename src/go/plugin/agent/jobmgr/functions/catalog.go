@@ -54,6 +54,8 @@ type CompositeResourceTransactionHandler func(
 	lifecycle.LongLivedPermit,
 ) (jobmgr.PreparedCompositeResourceTransaction, error)
 
+type CompositeChildLaneConflictHandler func(HandlerInput, string) bool
+
 type ResourceTransactionCommand struct {
 	Name              string
 	AllocateSuccessor bool
@@ -61,12 +63,14 @@ type ResourceTransactionCommand struct {
 }
 
 type ResourceTransactionDeclaration struct {
-	Prepare          ResourceTransactionHandler          // prepares a plain resource transaction
-	PrepareComposite CompositeResourceTransactionHandler // prepares a composite resource transaction (child commands)
-	Permit           lifecycle.LongLivedPlan             // long-lived plan for the successor
-	CommandArgument  uint16                              // argument index carrying the dyncfg command
-	GlobalClaim      string                              // claim key held for the whole transaction domain
-	Commands         []ResourceTransactionCommand        // accepted transaction commands
+	Prepare                    ResourceTransactionHandler          // prepares a plain resource transaction
+	PrepareComposite           CompositeResourceTransactionHandler // prepares a composite resource transaction (child commands)
+	CompositeChildLaneConflict CompositeChildLaneConflictHandler   // identifies resource lanes a composite may submit to
+	Permit                     lifecycle.LongLivedPlan             // long-lived plan for the successor
+	CommandArgument            uint16                              // argument index carrying the dyncfg command
+	GlobalClaim                string                              // claim key held for the whole transaction domain
+	YieldGlobalClaimOnPrepare  bool                                // plain preparation may temporarily yield GlobalClaim
+	Commands                   []ResourceTransactionCommand        // accepted transaction commands
 }
 
 // HandlerGenerationDeclaration describes one job- or module-owned handler
@@ -297,6 +301,20 @@ func (is *invocationSlot) prepareCompositeResourceTransaction(
 	return is.resolved.transaction.PrepareComposite(ctx, is.input, current, scope, permit)
 }
 
+func (is *invocationSlot) compositeChildLaneConflict(lane string) (conflicts bool) {
+	conflicts = true
+	defer func() {
+		_ = recover()
+	}()
+	if is == nil ||
+		is.resolved == nil ||
+		is.resolved.transaction == nil ||
+		is.resolved.transaction.CompositeChildLaneConflict == nil {
+		return true
+	}
+	return is.resolved.transaction.CompositeChildLaneConflict(is.input, lane)
+}
+
 type catalogSnapshot struct {
 	version uint64
 	routes  map[string]routeSet
@@ -478,10 +496,15 @@ func validateResourceTransactionDeclaration(declaration *ResourceTransactionDecl
 	}
 	if (declaration.Prepare == nil) ==
 		(declaration.PrepareComposite == nil) ||
+		(declaration.PrepareComposite != nil &&
+			declaration.CompositeChildLaneConflict == nil) ||
 		declaration.GlobalClaim == "" ||
 		len(declaration.GlobalClaim) > maximumDeclarationMetadataBytes ||
 		len(declaration.Commands) == 0 {
 		return errors.New("jobmgr Function catalog: invalid resource transaction declaration")
+	}
+	if declaration.YieldGlobalClaimOnPrepare && declaration.Prepare == nil {
+		return errors.New("jobmgr Function catalog: composite transaction cannot yield its global claim")
 	}
 	hasSuccessor := false
 	for index, command := range declaration.Commands {
@@ -491,6 +514,11 @@ func validateResourceTransactionDeclaration(declaration *ResourceTransactionDecl
 		for claimIndex, claim := range command.Claims {
 			if claim == "" || len(claim) > maximumDeclarationMetadataBytes || claim == declaration.GlobalClaim {
 				return errors.New("jobmgr Function catalog: invalid command claim")
+			}
+			// Claim acquisition follows normalized lexical order, so only its
+			// final claim can be yielded.
+			if declaration.YieldGlobalClaimOnPrepare && claim > declaration.GlobalClaim {
+				return errors.New("jobmgr Function catalog: yielded global claim is not the acquisition suffix")
 			}
 			for previous := range claimIndex {
 				if command.Claims[previous] == claim {
@@ -637,6 +665,7 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 		}
 		if resolved.transaction.PrepareComposite != nil {
 			slot.transactionPlan.PrepareComposite = slot.prepareCompositeResourceTransaction
+			slot.transactionPlan.CompositeChildLaneConflict = slot.compositeChildLaneConflict
 		} else {
 			slot.transactionPlan.Prepare = slot.prepareResourceTransaction
 		}
@@ -648,6 +677,9 @@ func (c *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.Functi
 			Transaction:         &slot.transactionPlan,
 			CooperativeCancel:   resolved.cooperativeCancel,
 			CooperativeDeadline: resolved.cooperativeDeadline,
+		}
+		if resolved.transaction.YieldGlobalClaimOnPrepare {
+			plan.YieldClaimOnPrepare = resolved.transaction.GlobalClaim
 		}
 	}
 	return jobmgr.FunctionCatalogDecision{

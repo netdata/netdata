@@ -78,6 +78,9 @@ func encodeFunctionRegistration(record PublicationRecord) ([]byte, error) {
 	payload = strconv.AppendInt(payload, int64(record.Priority), 10)
 	payload = append(payload, ' ')
 	payload = strconv.AppendInt(payload, int64(record.Version), 10)
+	if len(payload) > maximumDeclarationMetadataBytes {
+		return nil, errors.New("jobmgr Function protocol: registration exceeds line limit")
+	}
 	payload = append(payload, '\n', '\n')
 	return payload, nil
 }
@@ -89,6 +92,9 @@ func encodeFunctionWithdrawal(name string) ([]byte, error) {
 	payload := make([]byte, 0, len(name)+24)
 	payload = append(payload, "FUNCTION_DEL GLOBAL "...)
 	payload = appendQuotedFunctionName(payload, name)
+	if len(payload) > maximumDeclarationMetadataBytes {
+		return nil, errors.New("jobmgr Function protocol: withdrawal exceeds line limit")
+	}
 	payload = append(payload, '\n', '\n')
 	return payload, nil
 }

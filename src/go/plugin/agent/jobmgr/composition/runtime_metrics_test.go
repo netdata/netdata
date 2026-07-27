@@ -27,6 +27,8 @@ type runMetricsService struct {
 	producers          map[string]func() error
 	producerRemovals   []string
 	producerErr        error
+	finalizeEntered    chan<- struct{}
+	finalizeRelease    <-chan struct{}
 }
 
 func (rms *runMetricsService) RegisterComponent(config runtimecomp.ComponentConfig) error {
@@ -46,8 +48,18 @@ func (*runMetricsService) QuarantineComponent(string) {}
 
 func (rms *runMetricsService) FinalizeComponent(name string) {
 	rms.mu.Lock()
-	defer rms.mu.Unlock()
+	entered := rms.finalizeEntered
+	release := rms.finalizeRelease
+	rms.mu.Unlock()
+	if entered != nil {
+		close(entered)
+	}
+	if release != nil {
+		<-release
+	}
+	rms.mu.Lock()
 	rms.componentFinalized = append(rms.componentFinalized, name)
+	rms.mu.Unlock()
 }
 
 func (rms *runMetricsService) RegisterProducer(name string, producer func() error) error {
@@ -234,5 +246,47 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 	got, ok := reader.Value(runtimeMetricPrefix+".dirty_runs_total", nil)
 	require.False(t, !ok || got != 1)
 
+	closeRunTestUIDs(t, uids)
+}
+
+func TestRunGenerationFinalizerStopsRuntimeWriterBeforeTerminalCensus(t *testing.T) {
+	finalizeEntered := make(chan struct{})
+	finalizeRelease := make(chan struct{})
+	service := &runMetricsService{
+		finalizeEntered: finalizeEntered,
+		finalizeRelease: finalizeRelease,
+	}
+	jobs := testRunJobServices(t)
+	jobs.Runtime = service
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	require.NoError(t, err)
+	uids := lifecycle.NewUIDLedger()
+	generation, err := newRunGeneration(runGenerationConfig{
+		Generation:      1,
+		ShutdownTimeout: time.Second,
+		UIDs:            uids,
+		Frames:          frames,
+		Modules:         collectorapi.Registry{},
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServices(t),
+	})
+	require.NoError(t, err)
+	require.NoError(t, generation.start(context.Background()))
+
+	generation.Stop()
+	waited := make(chan error, 1)
+	go func() { waited <- generation.Wait(context.Background()) }()
+	select {
+	case <-finalizeEntered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "runtime component did not enter finalization")
+	}
+	select {
+	case <-generation.kernel.Done():
+		require.FailNow(t, "test failed", "kernel reached terminal before runtime writer stopped")
+	default:
+	}
+	close(finalizeRelease)
+	require.NoError(t, <-waited)
 	closeRunTestUIDs(t, uids)
 }

@@ -353,6 +353,30 @@ func (ts *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, owner Re
 	return nil
 }
 
+func (ts *TaskSupervisor) abandonLongLivedOwner(owner ResourceIdentity) int {
+	if ts == nil || !owner.Valid() {
+		return 0
+	}
+	registry := &ts.longLived
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	ref := registry.owners[owner]
+	if !ref.valid() {
+		return 0
+	}
+	slot := registry.slots[ref]
+	if slot == nil || slot.owner != owner {
+		return 0
+	}
+	delete(registry.owners, owner)
+	delete(registry.slots, ref)
+	registry.census.Active--
+	if slot.class == LongLivedSecretStore {
+		registry.census.SecretStores--
+	}
+	return 1
+}
+
 func (ts *TaskSupervisor) releaseReservedLongLivedFacets(ref LongLivedPermitRef, owner ResourceIdentity) error {
 	registry := &ts.longLived
 	registry.mu.Lock()

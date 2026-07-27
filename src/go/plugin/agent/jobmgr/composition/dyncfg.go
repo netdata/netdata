@@ -82,10 +82,11 @@ func newDynCfgJobInitialRoute(
 				Handler: binding.handle,
 			},
 			Transaction: &functionadapter.ResourceTransactionDeclaration{
-				Prepare:         binding.prepare,
-				Permit:          permit,
-				CommandArgument: 1,
-				GlobalClaim:     joboutput.DynCfgJobGraphClaim,
+				Prepare:                   binding.prepare,
+				Permit:                    permit,
+				CommandArgument:           1,
+				GlobalClaim:               joboutput.DynCfgJobGraphClaim,
+				YieldGlobalClaimOnPrepare: true,
 				Commands: []functionadapter.ResourceTransactionCommand{
 					{Name: string(dyncfg.CommandAdd)},
 					{Name: string(dyncfg.CommandUpdate), AllocateSuccessor: true},

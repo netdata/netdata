@@ -1121,6 +1121,11 @@ func TestJobNameRuleStrict(t *testing.T) {
 		"tab":                {input: "my\tjob", wantErr: true},
 		"dot":                {input: "my.job", wantErr: true},
 		"colon":              {input: "my:job", wantErr: true},
+		"equals":             {input: "my=job", wantErr: true},
+		"single quote":       {input: "my'job", wantErr: true},
+		"double quote":       {input: `my"job`, wantErr: true},
+		"backslash":          {input: `my\job`, wantErr: true},
+		"NUL":                {input: "my\x00job", wantErr: true},
 		"empty":              {input: ""},
 	}
 
@@ -1149,6 +1154,11 @@ func TestJobNameRuleAllowDots(t *testing.T) {
 		"space":              {input: "my job", wantErr: true},
 		"tab":                {input: "my\tjob", wantErr: true},
 		"colon":              {input: "my:job", wantErr: true},
+		"equals":             {input: "my=job", wantErr: true},
+		"single quote":       {input: "my'job", wantErr: true},
+		"double quote":       {input: `my"job`, wantErr: true},
+		"backslash":          {input: `my\job`, wantErr: true},
+		"NUL":                {input: "my\x00job", wantErr: true},
 		"empty":              {input: ""},
 	}
 

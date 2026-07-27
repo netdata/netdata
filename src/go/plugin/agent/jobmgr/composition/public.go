@@ -20,7 +20,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -107,6 +106,9 @@ func NewProcess(config Config) (*Process, error) {
 		}
 		initialVnodes[id] = vnode.Copy()
 	}
+	if err := validateInitialVNodeSet(initialVnodes); err != nil {
+		return nil, err
+	}
 	build := config.DiscoveryBuildContext
 	if build.Identity.Name == "" {
 		build.Identity.Name = config.PluginName
@@ -115,7 +117,7 @@ func NewProcess(config Config) (*Process, error) {
 		return nil, errors.New("jobmgr composition: discovery identity differs from plugin")
 	}
 	build.Registry = defaults
-	build.DyncfgOutput = dyncfg.NewProtocolOutput(config.Output)
+	build.DyncfgOutput = nil
 	build.FnReg = nil
 	shutdownTimeout := config.ShutdownTimeout
 	if shutdownTimeout == 0 {

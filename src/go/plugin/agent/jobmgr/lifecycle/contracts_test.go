@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -73,12 +74,33 @@ func TestValidateUID(t *testing.T) {
 		"carriage return": {uid: "request\r1", wantErr: true},
 		"line feed":       {uid: "request\n1", wantErr: true},
 		"NUL":             {uid: "request\x001", wantErr: true},
+		"equals":          {uid: "request=1", wantErr: true},
+		"double quote":    {uid: `request"1`, wantErr: true},
+		"single quote":    {uid: "request'1", wantErr: true},
+		"backslash":       {uid: `request\1`, wantErr: true},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tc.wantErr, ValidateUID(tc.uid) != nil)
 		})
+	}
+}
+
+func TestValidPluginsDBareFieldParity(t *testing.T) {
+	assert.Equal(t, netdataapi.ValidBareProtocolField(""), validPluginsDBareField(""))
+	for value := range 256 {
+		field := string([]byte{byte(value)})
+		assert.Equal(
+			t,
+			netdataapi.ValidBareProtocolField(field),
+			validPluginsDBareField(field),
+			"byte 0x%02x",
+			value,
+		)
+	}
+	for _, field := range []string{"ascii", "κόσμος", "世 界", "é=west", string([]byte{0xff, 'x'})} {
+		assert.Equal(t, netdataapi.ValidBareProtocolField(field), validPluginsDBareField(field), "%q", field)
 	}
 }
 

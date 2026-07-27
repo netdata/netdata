@@ -147,7 +147,8 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     }
 
     // convert our before_wanted and after_wanted to absolute
-    rrdr_relative_window_to_absolute_query(&after_wanted, &before_wanted, NULL, unittest_running);
+    time_t query_now_s = 0;
+    rrdr_relative_window_to_absolute_query(&after_wanted, &before_wanted, &query_now_s, unittest_running);
     query_debug_log(":relative2absolute after %ld, before %ld", after_wanted, before_wanted);
 
     if (natural_points && (options & RRDR_OPTION_SELECTED_TIER) &&
@@ -306,9 +307,32 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         query_debug_log(":resampling divisor " NETDATA_DOUBLE_FORMAT, resampling_divisor);
     }
 
+    // the LATEST grouping with a single point asking for the hot edge
+    // (the requested before resolves to zero or to within one
+    // update_every of now) anchors the window end at the newest stored
+    // sample - the clamp to now-1 above would exclude an end-stamped
+    // sample that already exists, making the hot edge a race against
+    // the collector. The anchored end needs no re-alignment: collectors
+    // end-stamp samples on update_every boundaries.
+    bool latest_hot_edge = false;
+    if (group_method == RRDR_GROUPING_LATEST && points_requested == 1 && qt->db.last_time_s > 0) {
+        // resolve the requested before against the SAME now snapshot the
+        // conversion above used, so the hot-edge classification and the
+        // window math cannot disagree on a boundary request
+        time_t before_resolved = before_requested;
+        if (rrdr_relative_window_value_is_relative(before_requested))
+            before_resolved = query_now_s + ((before_requested > 0) ? -before_requested : before_requested);
+
+        if (before_requested == 0 || before_resolved >= query_now_s - update_every) {
+            latest_hot_edge = true;
+            before_wanted = qt->db.last_time_s;
+            query_debug_log(":latest hot edge before_wanted %ld", before_wanted);
+        }
+    }
+
     // now that we have group, align the requested timeframe to fit it.
     // The product is proven representable above; retain the original conversions for negative timestamps.
-    bool alignment_needed = aligned && before_wanted % (group * query_granularity);
+    bool alignment_needed = aligned && !latest_hot_edge && before_wanted % (group * query_granularity);
     time_t alignment = aligned ? before_wanted % view_update_every : 0;
     if (alignment_needed) {
         if (before_is_aligned_to_db_end) {

@@ -71,6 +71,44 @@ func canonicalizeLabels(input map[string]string) ([]Label, string, error) {
 	return labels, b.String(), nil
 }
 
+// mergeCanonicalLabel inserts or replaces one label in an immutable, sorted canonical label slice.
+func mergeCanonicalLabel(base []Label, extra Label) ([]Label, string, error) {
+	if extra.Key == "" {
+		return nil, "", errInvalidLabelKey
+	}
+
+	out := make([]Label, 0, len(base)+1)
+	var b strings.Builder
+	inserted := false
+
+	for _, label := range base {
+		if !inserted && extra.Key <= label.Key {
+			out = append(out, extra)
+			b.WriteString(extra.Key)
+			b.WriteByte('\xff')
+			b.WriteString(extra.Value)
+			b.WriteByte('\xff')
+			inserted = true
+			if extra.Key == label.Key {
+				continue
+			}
+		}
+		out = append(out, label)
+		b.WriteString(label.Key)
+		b.WriteByte('\xff')
+		b.WriteString(label.Value)
+		b.WriteByte('\xff')
+	}
+	if !inserted {
+		out = append(out, extra)
+		b.WriteString(extra.Key)
+		b.WriteByte('\xff')
+		b.WriteString(extra.Value)
+		b.WriteByte('\xff')
+	}
+	return out, b.String(), nil
+}
+
 // labelsFromSet merges precompiled label sets and validates ownership/duplicates.
 func labelsFromSet(sets []LabelSet, owner meterBackend) ([]Label, string, error) {
 	if len(sets) == 0 {

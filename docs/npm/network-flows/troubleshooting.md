@@ -48,6 +48,8 @@ sudo systemctl restart netdata
 
 The plugin is running, but the Network Flows view is empty.
 
+If the view shows **Connect this agent to Netdata** or an authorization error instead of opening, this is an access-control issue rather than a collection failure. Follow the [Network Flows access requirement](/docs/npm/network-flows/installation.md#connect-this-agent-to-netdata-to-use-this-function) before continuing with the packet and listener checks below.
+
 **First check:** is anything reaching the plugin?
 
 ```bash

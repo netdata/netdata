@@ -154,10 +154,30 @@ Lines for `netflow-plugin` confirm the stock listeners are up.
 
 Open the Netdata UI in your browser. Click the **Live** tab in the top navigation; **Network Flows** appears in the Functions list on the right (see [Live tab](/docs/dashboards-and-charts/live-tab.md)). Selecting it opens the Sankey + Table view. The plugin's operational charts also appear under the standard charts page in the `netflow` family.
 
-If Network Flows doesn't appear under Live, or the view is empty:
+### "Connect this agent to Netdata to use this function"
+
+If you select **Network Flows** on the Live tab and see the message **Connect this agent to Netdata to use this function**, the plugin is working — the block is access control, not a plugin failure. Network Flows (`flows:netflow`) is a [sensitive function](/docs/netdata-oss-limitations.md): the local dashboard you reach anonymously at `http://<agent-ip>:19999` does not serve sensitive functions to anonymous (signed-out) users.
+
+To use Network Flows from your standalone host:
+
+1. **Sign in to Netdata Cloud** at [app.netdata.cloud](https://app.netdata.cloud). If the Agent is not connected yet, a Space Admin must claim/connect it to the Space. After it is connected, your own Space role must allow you to run sensitive functions; see the **Node Management** and **Functions** tables under [Detailed Permissions](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#detailed-permissions). The free Community tier is sufficient — no paid plan is required.
+2. After the agent is connected, open Network Flows either from the authenticated local Agent dashboard or through Netdata Cloud:
+   - **Local Agent dashboard:** stay on `http://<agent-ip>:19999` while signed in. Function query results travel directly from the Agent to your browser.
+   - **Netdata Cloud:** open the connected node and select Network Flows. Cloud proxies the Function request and response between your browser and the Agent.
+
+Connecting the agent does **not** move or offload its persistent flow storage. Collection and the four-tier journal (raw + 1-minute + 5-minute + 1-hour rollups) remain on the Agent under the configured `journal_dir`. The default relative directory is `${NETDATA_CACHE_DIR}/flows`, typically `/var/cache/netdata/flows/` for native packages; see [Configuration](/docs/npm/network-flows/configuration.md#move-the-journal-directory). When you use the Cloud dashboard, the Function query results transit Cloud on their way to your browser; when you use the authenticated local dashboard, they travel directly from the Agent to your browser.
+
+Anonymous dashboard access to the Network Flows function is not supported; Netdata Cloud authentication is required for either dashboard path.
+
+If the Agent is connected and you are signed in but receive an authorization error, confirm that you belong to its Space and that your role permits sensitive functions. This is different from the **Connect this agent to Netdata** message shown for an unclaimed Agent, which requires a Space Admin to connect it.
+
+See [Netdata Access Control and Feature Availability](/docs/netdata-oss-limitations.md) for the full Anonymous / Community / Paid access model.
+
+### Network Flows doesn't appear, or the view is empty
+
+If Network Flows doesn't appear under Live at all, or the view is empty after you have authenticated through Netdata Cloud:
 
 - Check that the plugin process is running: `pgrep -fa netflow-plugin`.
-- Check Netdata Cloud SSO: Functions require authenticated access to the agent's space.
 - See [Troubleshooting](/docs/npm/network-flows/troubleshooting.md).
 
 ## Configuring flow sources

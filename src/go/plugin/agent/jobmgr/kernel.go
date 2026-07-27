@@ -28,7 +28,7 @@ type submission struct {
 	plan          WorkPlan                // prepared work for the command
 	context       context.Context         // caller context
 	composite     *kernelCompositeScope   // parent composite scope for a child submission
-	rollback      bool                    // submission is a composite rollback
+	recovery      bool                    // submission is a composite recovery continuation
 	controlStatus lifecycle.ControlStatus // pre-decided control status (rejections)
 	result        chan error              // channel released once admitted
 	terminal      chan error              // channel delivering the terminal disposition
@@ -120,6 +120,10 @@ type commandOperation struct {
 	claimWaitPrevious              *commandOperation                  // previous op in the claim wait list
 	claimWaitNext                  *commandOperation                  // next op in the claim wait list
 	claimWaitListed                bool                               // linked into the claim wait list
+	claimReservationKey            *authorityClaimKey                 // yielded key parking this composite before acquisition
+	claimReservationPrevious       *commandOperation                  // previous op in the yielded-key reservation list
+	claimReservationNext           *commandOperation                  // next op in the yielded-key reservation list
+	claimYieldLane                 string                             // borrower resource lane protected by the active yield
 	lane                           *commandLane                       // owning lane
 	previous                       *commandOperation                  // previous op in the lane FIFO
 	next                           *commandOperation                  // next op in the lane FIFO
@@ -154,7 +158,11 @@ type commandOperation struct {
 	fenceChecked                   uint64                             // fence generation last checked against
 	deferredCompletion             *lifecycle.TaskCompletion          // task completion deferred until the op can accept it
 	claimsInherited                bool                               // claims inherited from the parent composite (not self-registered)
-	compositeRollback              bool                               // op is executing a composite rollback
+	claimsYielded                  bool                               // active transaction temporarily released one owned claim
+	claimYieldBorrower             *commandOperation                  // transaction whose preparation borrowed the owner's claim authority
+	claimYieldResult               chan error                         // pending claim-reacquisition acknowledgement
+	claimYieldFence                bool                               // composite fence excludes the temporarily yielded claim
+	compositeRecovery              bool                               // op is executing a composite recovery continuation
 	ownershipChain                 bool                               // part of a protected ownership chain (survives the first shutdown cut)
 	shutdownChild                  bool                               // child spawned during shutdown drain
 }
@@ -166,12 +174,11 @@ type commandLane struct {
 	owners             int                        // refcount of operations currently referencing the lane
 	freeNext           *commandLane               // next recycled lane while on the freelist
 	key                string                     // resource/invocation identity this lane serializes
-	source             lifecycle.Source           // ingress source (JobManager vs Function) that owns the lane
 	head               *commandOperation          // first queued operation (FIFO head)
 	tail               *commandOperation          // last queued operation (FIFO tail)
 	active             *commandOperation          // operation currently dispatched as a task; nil when idle
 	continuationTail   *commandOperation          // insertion anchor for composite child continuations
-	ready              bool                       // lane is enqueued in a ready queue awaiting scheduling
+	readyQueue         *readyQueue                // exact ready queue containing this lane; nil when not queued
 	readyPrev          *commandLane               // previous lane in the ready queue
 	readyNext          *commandLane               // next lane in the ready queue
 	allPrevious        *commandLane               // previous lane in the all-lanes list
@@ -223,6 +230,7 @@ type CommandKernel struct {
 	functionCleanupRequests  map[lifecycle.TaskRequestRef]FunctionCleanupRef // in-flight Function cleanup requests by request ref
 	functionCleanupBacklog   functionCleanupQueue                            // queued Function cleanup work awaiting dispatch
 	functionMutations        chan functionMutationSubmission                 // inbound Function catalog mutation submissions
+	claimYields              chan claimYieldRequest                          // task-child claim release/reacquire requests
 	functionMutationStopped  chan struct{}                                   // closed when mutation ingress is drained
 	functionMutation         functionMutationSubmission                      // the mutation currently being applied
 	functionMutationActive   bool                                            // a catalog mutation is in progress
@@ -266,6 +274,7 @@ type CommandKernel struct {
 	shutdownPhase            commandShutdownPhase                            // current shutdown phase
 	shutdownCancelCursor     *commandOperation                               // cursor sweeping operations to cancel during shutdown
 	ownershipChains          int                                             // count of protected ownership chains still running
+	abandoned                lifecycle.TaskAbandonmentCensus                 // dirty-run outcomes explicitly forfeited to join children
 	shutdownLaneCursor       *commandLane                                    // cursor sweeping lanes to stop during shutdown
 	functionCatalog          FunctionCatalogPort                             // Function catalog port (routing + lifecycle drain)
 	runtimeObserver          lifecycle.RuntimeObserver                       // sink for jobmgr.runtime metric atomics
@@ -313,6 +322,7 @@ func NewCommandKernel(
 		shutdownRequests:        make(map[lifecycle.TaskRequestRef]*commandLane),
 		shutdownTasks:           make(map[lifecycle.TaskRef]*commandLane),
 		functionMutations:       make(chan functionMutationSubmission),
+		claimYields:             make(chan claimYieldRequest, lifecycle.TaskStartServiceQuantum),
 		functionMutationStopped: make(chan struct{}),
 		lanes:                   make(map[commandLaneKey]*commandLane),
 		compositeFenceClaims:    make(map[string]int),
@@ -429,7 +439,11 @@ func (ck *CommandKernel) beginResultEncode(operation *commandOperation, ref life
 	}
 	operation.resultExpiry = expiry
 	if err := ck.sendEncodeAction(operation); err != nil {
-		ck.run.Dirty(err)
+		sequence := uint8(2)
+		if operation.plan.Transaction != nil {
+			sequence = 3
+		}
+		ck.failTaskClosed(operation, ref, sequence, err)
 	}
 	return true
 }
@@ -451,6 +465,10 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 				completion.Err,
 				errors.New("jobmgr kernel: invalid Function cleanup completion"),
 			)
+			cleanup.err = completion.Err
+			ck.functionCleanupTasks[completion.Ref] = cleanup
+			ck.abandonTask(completion.Ref, completion.Sequence+1, completion.Err)
+			return
 		}
 		cleanup.err = completion.Err
 		ck.functionCleanupTasks[completion.Ref] = cleanup
@@ -459,7 +477,7 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 			Sequence: 2,
 			Kind:     lifecycle.TaskActionTerminate,
 		}); err != nil {
-			ck.run.Dirty(err)
+			ck.abandonTask(completion.Ref, 2, err)
 		}
 		return
 	}
@@ -478,7 +496,12 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 	}
 	if operation.composite != nil && operation.activeChild != nil {
 		if operation.deferredCompletion != nil {
-			ck.run.Dirty(errors.New("jobmgr composite: parent completed twice with a live child"))
+			ck.failTaskClosed(
+				operation,
+				completion.Ref,
+				completion.Sequence+1,
+				errors.New("jobmgr composite: parent completed twice with a live child"),
+			)
 			return
 		}
 		pending := completion
@@ -486,7 +509,7 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		return
 	}
 	if _, err := ck.tasks.ClearRetainedTimeout(operation.Task); err != nil {
-		ck.run.Dirty(err)
+		ck.failTaskClosed(operation, completion.Ref, completion.Sequence+1, err)
 		return
 	}
 	var resultErr error
@@ -496,7 +519,7 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		resultErr = operation.ResultReady(completion.Ref, completion.Sequence)
 	}
 	if resultErr != nil {
-		ck.run.Dirty(resultErr)
+		ck.failTaskClosed(operation, completion.Ref, completion.Sequence+1, resultErr)
 		return
 	}
 	ck.markOperationDeadlineIfDue(operation)
@@ -519,13 +542,14 @@ func (ck *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		status := lifecycle.ControlUnavailable
 		if errors.Is(completion.Err, lifecycle.ErrFunctionResultTooLarge) {
 			status = lifecycle.ControlPayloadTooLarge
-		} else if errors.Is(completion.Err, lifecycle.ErrTaskPanic) {
+		} else if errors.Is(completion.Err, lifecycle.ErrTaskPanic) ||
+			errors.Is(completion.Err, lifecycle.ErrUnsafeFunctionResult) {
 			status = lifecycle.ControlInternal
 		}
 		ck.enqueueControl(operation, status)
 	}
 	if err := ck.sendOperationAction(operation, action); err != nil {
-		ck.run.Dirty(err)
+		ck.failTaskClosed(operation, action.Ref, action.Sequence, err)
 	}
 }
 
@@ -542,7 +566,7 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 				operation.transactionScope,
 			)
 			if err != nil {
-				ck.run.Dirty(errors.Join(
+				ck.failTaskClosed(operation, completion.Ref, completion.Sequence+1, errors.Join(
 					errors.New("jobmgr kernel: failed transaction preparation lost current resource"),
 					completion.Err,
 					err,
@@ -550,7 +574,12 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 				return
 			}
 			if err := ck.restoreTransactionCurrent(operation, current); err != nil {
-				ck.run.Dirty(errors.Join(completion.Err, err))
+				ck.failTaskClosed(
+					operation,
+					completion.Ref,
+					completion.Sequence+1,
+					errors.Join(completion.Err, err),
+				)
 				return
 			}
 			if lifecycle.OwnershipRetained(completion.Err) {
@@ -570,7 +599,12 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 			return
 		}
 		if completion.Kind != lifecycle.TaskOutcomePreparedResourceTransaction {
-			ck.run.Dirty(errors.New("jobmgr kernel: transaction preparation returned the wrong outcome"))
+			ck.failTaskClosed(
+				operation,
+				completion.Ref,
+				completion.Sequence+1,
+				errors.New("jobmgr kernel: transaction preparation returned the wrong outcome"),
+			)
 			return
 		}
 		ownershipAllowed := ck.ownershipActionAllowed(operation)
@@ -591,25 +625,55 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 		ck.sendTransactionAction(operation, completion.Ref, completion.Sequence+1, action)
 	case 2:
 		if completion.Err != nil {
-			operation.terminalErr = errors.Join(operation.terminalErr, completion.Err)
-			ck.run.Dirty(errors.Join(
+			if completion.Kind == lifecycle.TaskOutcomeAppliedResourceTransaction {
+				disposition, current, err := ck.tasks.TakeAppliedResourceTransaction(
+					completion.Ref,
+					completion.Sequence,
+					operation.transactionScope,
+				)
+				if err == nil {
+					err = ck.applyTransactionDisposition(operation, disposition, current)
+				}
+				if err == nil {
+					operation.transactionApplied = true
+					ck.recordAbandonment(operation.request.LaneKey, completion.Ref, lifecycle.TaskAbandonment{
+						Outcome: lifecycle.TaskOutcomeAppliedResourceTransaction,
+					})
+				} else if current != nil {
+					ck.recordAbandonment(operation.request.LaneKey, completion.Ref, lifecycle.TaskAbandonment{
+						Outcome: lifecycle.TaskOutcomeReadyResource,
+					})
+				}
+				completion.Err = errors.Join(completion.Err, err)
+			}
+			ck.failTaskClosed(operation, completion.Ref, completion.Sequence+1, errors.Join(
 				errors.New("jobmgr kernel: resource transaction apply left unprovable state"),
 				completion.Err,
 			))
 			return
 		}
 		if completion.Kind != lifecycle.TaskOutcomeAppliedResourceTransaction {
-			ck.run.Dirty(errors.New("jobmgr kernel: transaction apply returned the wrong outcome"))
+			ck.failTaskClosed(
+				operation,
+				completion.Ref,
+				completion.Sequence+1,
+				errors.New("jobmgr kernel: transaction apply returned the wrong outcome"),
+			)
 			return
 		}
 		disposition, current, err :=
 			ck.tasks.TakeAppliedResourceTransaction(completion.Ref, completion.Sequence, operation.transactionScope)
 		if err != nil {
-			ck.run.Dirty(err)
+			ck.failTaskClosed(operation, completion.Ref, completion.Sequence+1, err)
 			return
 		}
 		if err := ck.applyTransactionDisposition(operation, disposition, current); err != nil {
-			ck.run.Dirty(err)
+			if current != nil {
+				ck.recordAbandonment(operation.request.LaneKey, completion.Ref, lifecycle.TaskAbandonment{
+					Outcome: lifecycle.TaskOutcomeReadyResource,
+				})
+			}
+			ck.failTaskClosed(operation, completion.Ref, completion.Sequence+1, err)
 			return
 		}
 		operation.transactionApplied = true
@@ -622,7 +686,12 @@ func (ck *CommandKernel) completeResourceTransactionTask(
 		}
 		ck.sendTransactionAction(operation, completion.Ref, completion.Sequence+1, lifecycle.TaskActionDispose)
 	default:
-		ck.run.Dirty(errors.New("jobmgr kernel: unexpected transaction completion"))
+		ck.failTaskClosed(
+			operation,
+			completion.Ref,
+			completion.Sequence+1,
+			errors.New("jobmgr kernel: unexpected transaction completion"),
+		)
 	}
 }
 
@@ -638,7 +707,7 @@ func (ck *CommandKernel) sendTransactionAction(
 		Kind:     kind,
 	}
 	if err := ck.sendOperationAction(operation, action); err != nil {
-		ck.run.Dirty(err)
+		ck.failTaskClosed(operation, action.Ref, action.Sequence, err)
 	}
 }
 
@@ -664,6 +733,50 @@ func (ck *CommandKernel) sendOperationAction(operation *commandOperation, action
 		ck.ownershipChains++
 	}
 	return ck.tasks.SendAction(action)
+}
+
+func (ck *CommandKernel) failTaskClosed(
+	operation *commandOperation,
+	ref lifecycle.TaskRef,
+	sequence uint8,
+	cause error,
+) {
+	if cause == nil {
+		cause = errors.New("jobmgr kernel: task failed closed without a cause")
+	}
+	ck.run.Dirty(cause)
+	if operation == nil || !ref.Valid() {
+		return
+	}
+	operation.terminalErr = errors.Join(operation.terminalErr, cause)
+	operation.PoisonResponse()
+	ck.observe(DiagnosticEvent{
+		Level:      DiagnosticError,
+		Name:       "job manager task abandoned after dirty failure",
+		Resource:   operation.LaneKey,
+		State:      "dirty-abandon",
+		Generation: ck.run.Generation(),
+		Task:       ref,
+		Sequence:   sequence,
+		Err:        cause,
+	})
+	if err := operation.AbandonChild(ref, sequence); err != nil {
+		ck.run.Dirty(errors.Join(cause, err))
+		return
+	}
+	if err := ck.tasks.Abandon(ref, sequence); err != nil {
+		ck.run.Dirty(errors.Join(cause, err))
+	}
+}
+
+func (ck *CommandKernel) abandonTask(ref lifecycle.TaskRef, sequence uint8, cause error) {
+	if cause == nil {
+		cause = errors.New("jobmgr kernel: task abandoned without a cause")
+	}
+	ck.run.Dirty(cause)
+	if err := ck.tasks.Abandon(ref, sequence); err != nil {
+		ck.run.Dirty(errors.Join(cause, err))
+	}
 }
 
 func (ck *CommandKernel) ownershipActionAllowed(operation *commandOperation) bool {
@@ -785,15 +898,25 @@ func (ck *CommandKernel) completeShutdownTask(completion lifecycle.TaskCompletio
 	lane := ck.shutdownTasks[completion.Ref]
 	if lane == nil || lane.shutdownTask != completion.Ref || lane.shutdownAction != 0 || completion.Sequence != 1 ||
 		!lane.currentStopping || lane.current != nil || !lane.currentIdentity.Valid() || lane.retiringIdentity.Valid() {
-		ck.run.Dirty(errors.New("jobmgr kernel: completion for unknown or invalid shutdown task"))
+		cause := errors.New("jobmgr kernel: completion for unknown or invalid shutdown task")
+		if lane != nil {
+			ck.abandonShutdownTask(lane, completion.Ref, completion.Sequence+1, cause)
+		} else {
+			ck.run.Dirty(cause)
+		}
 		return
 	}
 	if completion.Err != nil {
-		ck.run.Dirty(completion.Err)
+		ck.abandonShutdownTask(lane, completion.Ref, completion.Sequence+1, completion.Err)
 		return
 	}
 	if completion.Kind != lifecycle.TaskOutcomeReadyResource {
-		ck.run.Dirty(errors.New("jobmgr kernel: shutdown Stop task returned the wrong outcome"))
+		ck.abandonShutdownTask(
+			lane,
+			completion.Ref,
+			completion.Sequence+1,
+			errors.New("jobmgr kernel: shutdown Stop task returned the wrong outcome"),
+		)
 		return
 	}
 	ck.sendShutdownAction(lane, lifecycle.TaskActionStopResource, 2)
@@ -809,6 +932,23 @@ func (ck *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowledgeme
 		ck.run.Dirty(errors.New("jobmgr kernel: acknowledgement for unknown or invalid shutdown task"))
 		return
 	}
+	if ack.Kind == lifecycle.TaskActionAbandon {
+		ck.recordAbandonment(lane.key, ack.Ref, ack.Abandoned)
+		if err := ck.tasks.Release(ack.Ref); err != nil {
+			ck.run.Dirty(errors.Join(ack.Err, err))
+			return
+		}
+		delete(ck.shutdownTasks, ack.Ref)
+		lane.shutdownTask = lifecycle.TaskRef{}
+		lane.shutdownAction = 0
+		lane.current = nil
+		lane.currentIdentity = lifecycle.ResourceIdentity{}
+		lane.currentStopping = false
+		lane.retiringIdentity = lifecycle.ResourceIdentity{}
+		lane.resourceSource = 0
+		ck.releaseUnusedLane(lane)
+		return
+	}
 	wantSequence := uint8(0)
 	switch ack.Kind {
 	case lifecycle.TaskActionStopResource:
@@ -822,11 +962,16 @@ func (ck *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowledgeme
 		return
 	}
 	if ack.Sequence != wantSequence {
-		ck.run.Dirty(errors.New("jobmgr kernel: stale shutdown task acknowledgement"))
+		ck.abandonShutdownTask(
+			lane,
+			ack.Ref,
+			ack.Sequence+1,
+			errors.New("jobmgr kernel: stale shutdown task acknowledgement"),
+		)
 		return
 	}
 	if ack.Err != nil && ack.Kind != lifecycle.TaskActionTerminate {
-		ck.run.Dirty(ack.Err)
+		ck.abandonShutdownTask(lane, ack.Ref, ack.Sequence+1, ack.Err)
 		return
 	}
 	lane.shutdownAction = 0
@@ -834,7 +979,12 @@ func (ck *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowledgeme
 	case lifecycle.TaskActionStopResource:
 		identity := lane.currentIdentity
 		if !lane.currentStopping || lane.current != nil || !identity.Valid() || lane.retiringIdentity.Valid() {
-			ck.run.Dirty(errors.New("jobmgr kernel: shutdown stopped resource differs from current slot"))
+			ck.abandonShutdownTask(
+				lane,
+				ack.Ref,
+				ack.Sequence+1,
+				errors.New("jobmgr kernel: shutdown stopped resource differs from current slot"),
+			)
 			return
 		}
 		lane.currentIdentity = lifecycle.ResourceIdentity{}
@@ -844,7 +994,12 @@ func (ck *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowledgeme
 	case lifecycle.TaskActionFinalizeResource:
 		if lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping ||
 			!lane.retiringIdentity.Valid() {
-			ck.run.Dirty(errors.New("jobmgr kernel: shutdown finalized resource differs from retiring slot"))
+			ck.abandonShutdownTask(
+				lane,
+				ack.Ref,
+				ack.Sequence+1,
+				errors.New("jobmgr kernel: shutdown finalized resource differs from retiring slot"),
+			)
 			return
 		}
 		lane.retiringIdentity = lifecycle.ResourceIdentity{}
@@ -880,7 +1035,26 @@ func (ck *CommandKernel) sendShutdownAction(lane *commandLane, kind lifecycle.Ta
 			Kind:     kind,
 		},
 	); err != nil {
-		ck.run.Dirty(err)
+		ck.abandonShutdownTask(lane, lane.shutdownTask, sequence, err)
+	}
+}
+
+func (ck *CommandKernel) abandonShutdownTask(
+	lane *commandLane,
+	ref lifecycle.TaskRef,
+	sequence uint8,
+	cause error,
+) {
+	if cause == nil {
+		cause = errors.New("jobmgr kernel: shutdown task abandoned without a cause")
+	}
+	ck.run.Dirty(cause)
+	if lane == nil || lane.shutdownTask != ref {
+		return
+	}
+	lane.shutdownAction = lifecycle.TaskActionAbandon
+	if err := ck.tasks.Abandon(ref, sequence); err != nil {
+		ck.run.Dirty(errors.Join(cause, err))
 	}
 }
 
@@ -910,9 +1084,13 @@ func (ck *CommandKernel) sendEncodeAction(operation *commandOperation) error {
 
 func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 	if cleanup, ok := ck.functionCleanupTasks[ack.Ref]; ok {
-		if ack.Kind != lifecycle.TaskActionTerminate || ack.Sequence != 2 {
+		if (ack.Kind != lifecycle.TaskActionTerminate && ack.Kind != lifecycle.TaskActionAbandon) ||
+			ack.Sequence != 2 {
 			ck.run.Dirty(errors.New("jobmgr kernel: invalid Function cleanup acknowledgement"))
 			return
+		}
+		if ack.Kind == lifecycle.TaskActionAbandon {
+			ck.recordAbandonment("function-cleanup", ack.Ref, ack.Abandoned)
 		}
 		if err := ck.tasks.Release(ack.Ref); err != nil {
 			ck.run.Dirty(err)
@@ -939,6 +1117,25 @@ func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 		ck.acknowledgeShutdownTask(ack)
 		return
 	}
+	if ack.Kind == lifecycle.TaskActionAbandon {
+		if err := operation.ChildExited(ack.Ref, ack.Sequence); err != nil {
+			ck.run.Dirty(errors.Join(ack.Err, err))
+			return
+		}
+		ck.recordAbandonment(operation.request.LaneKey, ack.Ref, ack.Abandoned)
+		if operation.plan.Transaction != nil &&
+			!operation.transactionApplied &&
+			!operation.transactionRestored {
+			ck.abandonTransactionOwnership(operation)
+		}
+		if err := ck.tasks.Release(ack.Ref); err != nil {
+			ck.run.Dirty(errors.Join(ack.Err, err))
+			return
+		}
+		delete(ck.tasksByRef, ack.Ref)
+		ck.tryDispose(operation)
+		return
+	}
 	if ack.Kind == lifecycle.TaskActionTerminate {
 		if err := operation.ChildExited(ack.Ref, ack.Sequence); err != nil {
 			ck.run.Dirty(err)
@@ -958,7 +1155,7 @@ func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 	}
 	ck.markOperationDeadlineIfDue(operation)
 	if err := operation.ActionAcknowledged(ack.Ref, ack.Sequence); err != nil {
-		ck.run.Dirty(err)
+		ck.failTaskClosed(operation, ack.Ref, ack.Sequence+1, err)
 		return
 	}
 	if operation.plan.Transaction != nil {
@@ -973,7 +1170,7 @@ func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 			ck.run.Dirty(err)
 		}
 		if err := ck.completeOperationUID(operation, false); err != nil {
-			ck.run.Dirty(err)
+			ck.failTaskClosed(operation, ack.Ref, ack.Sequence+1, err)
 			return
 		}
 	}
@@ -983,7 +1180,7 @@ func (ck *CommandKernel) acknowledgeTask(ack lifecycle.TaskAcknowledgement) {
 		Kind:     lifecycle.TaskActionTerminate,
 	}
 	if err := ck.sendOperationAction(operation, termination); err != nil {
-		ck.run.Dirty(err)
+		ck.failTaskClosed(operation, termination.Ref, termination.Sequence, err)
 	}
 }
 
@@ -991,23 +1188,33 @@ func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 	operation *commandOperation,
 	ack lifecycle.TaskAcknowledgement,
 ) {
+	if ack.Kind == lifecycle.TaskActionDispose &&
+		!operation.transactionApplied &&
+		!operation.transactionRestored {
+		current, err := ck.tasks.TakeDisposedResourceTransaction(
+			ack.Ref,
+			ack.Sequence,
+			operation.transactionScope,
+		)
+		if err == nil {
+			err = ck.restoreTransactionCurrent(operation, current)
+		}
+		if err != nil {
+			ack.Err = errors.Join(ack.Err, err)
+		}
+	}
 	if ack.Err != nil {
 		operation.terminalErr = errors.Join(operation.terminalErr, ack.Err)
 		if ack.Kind == lifecycle.TaskActionEncodeWrite {
 			operation.PoisonResponse()
 		}
-		ck.run.Dirty(ack.Err)
-		if ack.Kind == lifecycle.TaskActionDispose && !operation.transactionApplied {
-			return
-		}
+		ck.failTaskClosed(operation, ack.Ref, ack.Sequence+1, ack.Err)
+		return
 	}
 
 	switch ack.Kind {
 	case lifecycle.TaskActionDispose:
 		if !operation.transactionApplied {
-			if ack.Err != nil {
-				return
-			}
 			if !operation.transactionRestored {
 				current, err := ck.tasks.TakeDisposedResourceTransaction(
 					ack.Ref,
@@ -1015,11 +1222,11 @@ func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 					operation.transactionScope,
 				)
 				if err != nil {
-					ck.run.Dirty(err)
+					ck.failTaskClosed(operation, ack.Ref, ack.Sequence+1, err)
 					return
 				}
 				if err := ck.restoreTransactionCurrent(operation, current); err != nil {
-					ck.run.Dirty(err)
+					ck.failTaskClosed(operation, ack.Ref, ack.Sequence+1, err)
 					return
 				}
 			}
@@ -1030,18 +1237,23 @@ func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 	case lifecycle.TaskActionEncodeWrite:
 		if ack.Err == nil {
 			if err := operation.CommitResponse(); err != nil {
-				ck.run.Dirty(err)
+				ck.failTaskClosed(operation, ack.Ref, ack.Sequence+1, err)
 				return
 			}
 			if err := ck.completeOperationUID(operation, false); err != nil {
-				ck.run.Dirty(err)
+				ck.failTaskClosed(operation, ack.Ref, ack.Sequence+1, err)
 				return
 			}
 		}
 	case lifecycle.TaskActionCleanup:
 		operation.cleanupDone = true
 	default:
-		ck.run.Dirty(errors.New("jobmgr kernel: unexpected resource transaction acknowledgement"))
+		ck.failTaskClosed(
+			operation,
+			ack.Ref,
+			ack.Sequence+1,
+			errors.New("jobmgr kernel: unexpected resource transaction acknowledgement"),
+		)
 		return
 	}
 
@@ -1052,7 +1264,7 @@ func (ck *CommandKernel) acknowledgeResourceTransactionTask(
 			Kind:     lifecycle.TaskActionCleanup,
 		}
 		if err := ck.sendOperationAction(operation, cleanup); err != nil {
-			ck.run.Dirty(err)
+			ck.failTaskClosed(operation, cleanup.Ref, cleanup.Sequence, err)
 		}
 		return
 	}
@@ -1066,8 +1278,26 @@ func (ck *CommandKernel) sendResourceTermination(operation *commandOperation, re
 		Kind:     lifecycle.TaskActionTerminate,
 	}
 	if err := ck.sendOperationAction(operation, termination); err != nil {
-		ck.run.Dirty(err)
+		ck.failTaskClosed(operation, termination.Ref, termination.Sequence, err)
 	}
+}
+
+func (ck *CommandKernel) abandonTransactionOwnership(operation *commandOperation) {
+	if operation == nil || operation.plan.Transaction == nil ||
+		operation.transactionApplied || operation.transactionRestored {
+		return
+	}
+	lane := operation.lane
+	scope := operation.transactionScope
+	if lane != nil && scope.Current.Valid() &&
+		lane.current == nil &&
+		lane.currentStopping &&
+		lane.currentIdentity == scope.Current {
+		lane.currentIdentity = lifecycle.ResourceIdentity{}
+		lane.currentStopping = false
+		lane.resourceSource = 0
+	}
+	operation.transactionRestored = true
 }
 
 func (ck *CommandKernel) beginShutdown(deadline time.Time) error {
@@ -1259,7 +1489,7 @@ func (ck *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
 	if lane.owners != 0 {
 		return nil
 	}
-	if lane.head != nil || lane.tail != nil || lane.active != nil || lane.ready {
+	if lane.head != nil || lane.tail != nil || lane.active != nil || lane.readyQueue != nil {
 		return errors.New("jobmgr kernel: owner-free resource lane retains operation state")
 	}
 	identity := lane.currentIdentity
@@ -1344,7 +1574,10 @@ func (ck *CommandKernel) completeShutdownBarrier(completion lifecycle.TaskComple
 		ck.shutdownBarrierAction != 0 ||
 		ck.shutdownBarrierDone ||
 		ck.shutdownBarrierFailed {
-		ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier completion"))
+		cause := errors.New("jobmgr kernel: invalid shutdown barrier completion")
+		ck.shutdownBarrierFailed = true
+		ck.shutdownBarrierAction = lifecycle.TaskActionAbandon
+		ck.abandonTask(completion.Ref, completion.Sequence+1, cause)
 		return
 	}
 	if completion.Err != nil {
@@ -1357,14 +1590,16 @@ func (ck *CommandKernel) completeShutdownBarrier(completion lifecycle.TaskComple
 		Sequence: 2,
 		Kind:     lifecycle.TaskActionTerminate,
 	}); err != nil {
-		ck.run.Dirty(err)
+		ck.shutdownBarrierFailed = true
+		ck.shutdownBarrierAction = lifecycle.TaskActionAbandon
+		ck.abandonTask(completion.Ref, 2, err)
 	}
 }
 
 func (ck *CommandKernel) acknowledgeShutdownBarrier(ack lifecycle.TaskAcknowledgement) {
 	if ack.Sequence != 2 ||
-		ack.Kind != lifecycle.TaskActionTerminate ||
-		ck.shutdownBarrierAction != lifecycle.TaskActionTerminate ||
+		(ack.Kind != lifecycle.TaskActionTerminate && ack.Kind != lifecycle.TaskActionAbandon) ||
+		ck.shutdownBarrierAction != ack.Kind ||
 		ck.shutdownBarrierDone {
 		ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier acknowledgement"))
 		return
@@ -1372,6 +1607,10 @@ func (ck *CommandKernel) acknowledgeShutdownBarrier(ack lifecycle.TaskAcknowledg
 	if ack.Err != nil {
 		ck.shutdownBarrierFailed = true
 		ck.run.Dirty(ack.Err)
+	}
+	if ack.Kind == lifecycle.TaskActionAbandon {
+		ck.shutdownBarrierFailed = true
+		ck.recordAbandonment("shutdown-barrier", ack.Ref, ack.Abandoned)
 	}
 	if err := ck.tasks.Release(ack.Ref); err != nil {
 		ck.shutdownBarrierFailed = true
@@ -1448,7 +1687,10 @@ func (ck *CommandKernel) completeRunFinalizer(completion lifecycle.TaskCompletio
 	if completion.Sequence != 1 || completion.Kind != lifecycle.TaskOutcomeNone || ck.finalizerAction != 0 ||
 		ck.finalizerDone ||
 		ck.finalizerFailed {
-		ck.run.Dirty(errors.New("jobmgr kernel: invalid run finalizer completion"))
+		cause := errors.New("jobmgr kernel: invalid run finalizer completion")
+		ck.finalizerFailed = true
+		ck.finalizerAction = lifecycle.TaskActionAbandon
+		ck.abandonTask(completion.Ref, completion.Sequence+1, cause)
 		return
 	}
 	if completion.Err != nil {
@@ -1463,13 +1705,16 @@ func (ck *CommandKernel) completeRunFinalizer(completion lifecycle.TaskCompletio
 			Kind:     lifecycle.TaskActionTerminate,
 		},
 	); err != nil {
-		ck.run.Dirty(err)
+		ck.finalizerFailed = true
+		ck.finalizerAction = lifecycle.TaskActionAbandon
+		ck.abandonTask(completion.Ref, 2, err)
 	}
 }
 
 func (ck *CommandKernel) acknowledgeRunFinalizer(ack lifecycle.TaskAcknowledgement) {
-	if ack.Sequence != 2 || ack.Kind != lifecycle.TaskActionTerminate ||
-		ck.finalizerAction != lifecycle.TaskActionTerminate ||
+	if ack.Sequence != 2 ||
+		(ack.Kind != lifecycle.TaskActionTerminate && ack.Kind != lifecycle.TaskActionAbandon) ||
+		ck.finalizerAction != ack.Kind ||
 		ck.finalizerDone {
 		ck.run.Dirty(errors.New("jobmgr kernel: invalid run finalizer acknowledgement"))
 		return
@@ -1477,6 +1722,10 @@ func (ck *CommandKernel) acknowledgeRunFinalizer(ack lifecycle.TaskAcknowledgeme
 	if ack.Err != nil {
 		ck.finalizerFailed = true
 		ck.run.Dirty(ack.Err)
+	}
+	if ack.Kind == lifecycle.TaskActionAbandon {
+		ck.finalizerFailed = true
+		ck.recordAbandonment("run-finalizer", ack.Ref, ack.Abandoned)
 	}
 	if err := ck.tasks.Release(ack.Ref); err != nil {
 		ck.finalizerFailed = true
@@ -1495,7 +1744,7 @@ func (ck *CommandKernel) runFinalizerFailedTerminal() bool {
 }
 
 func (ck *CommandKernel) shutdownQuiescent() bool {
-	return ck.runCensus().Quiescent()
+	return ck.runCensus().Drained()
 }
 
 func (ck *CommandKernel) kernelOwnershipDrained() bool {
@@ -1554,6 +1803,7 @@ func (ck *CommandKernel) runCensus() lifecycle.RunCensus {
 		InheritedActive:        ck.tasks.InheritedActive(),
 		LongLived:              ck.tasks.LongLivedCensus(),
 		Frame:                  ck.frames.Census(),
+		Abandoned:              ck.abandoned,
 		RunFinalizerComplete:   ck.finalizerDone && !ck.finalizerFailed,
 	}
 }

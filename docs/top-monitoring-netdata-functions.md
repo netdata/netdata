@@ -32,9 +32,9 @@ Beyond their primary roles of collecting metrics, collectors can execute specifi
 
 When streaming is enabled, function definitions propagate from Child nodes to their Parent node. If this Parent node is connected to Netdata Cloud, it can trigger function execution on any of its connected Child nodes.
 
-## Why are some functions only available on Netdata Cloud?
+## Why do some functions require Netdata Cloud authentication?
 
-Some functions are exclusively available through Netdata Cloud for security reasons. Since functions can execute node-level routines that may access sensitive information, we restrict their exposure through the Agent's API. This security concern is addressed by our [ACLK](/src/aclk/README.md) protocol, which provides secure communication between Netdata Agent and Netdata Cloud.
+Some functions can execute node-level routines that access sensitive information, so anonymous dashboard users cannot run them. Connect the Agent to Netdata Cloud and sign in with a Space role that permits the function. You can then run it either from the authenticated local Agent dashboard, where results travel directly from the Agent to your browser, or from Netdata Cloud, which proxies the request and response over the secure [ACLK](/src/aclk/README.md) connection.
 
 ## Feedback
 

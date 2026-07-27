@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
-	"strings"
 	"time"
 )
 
-var ErrFunctionResultTooLarge = errors.New("jobmgr lifecycle: Function result exceeds bound")
+var (
+	ErrFunctionResultTooLarge = errors.New("jobmgr lifecycle: Function result exceeds bound")
+	ErrUnsafeFunctionResult   = errors.New("jobmgr lifecycle: unsafe Function result payload")
+)
 
 const (
 	TaskStartServiceQuantum             = 4
@@ -68,10 +70,38 @@ func (sr SealedResult) validate() error {
 	if sr.status < 100 || sr.status > 599 {
 		return errors.New("jobmgr lifecycle: invalid result status")
 	}
-	if sr.contentType == "" || strings.ContainsAny(sr.contentType, " \t\r\n\x00") {
+	if sr.contentType == "" || !validPluginsDBareField(sr.contentType) {
 		return errors.New("jobmgr lifecycle: invalid result content type")
 	}
+	if functionResultPayloadHasTerminator(sr.payload) {
+		return ErrUnsafeFunctionResult
+	}
 	return validateFunctionPayloadSize(len(sr.payload))
+}
+
+func functionResultPayloadHasTerminator(payload []byte) bool {
+	const terminator = "FUNCTION_RESULT_END"
+	for lineStart := 0; lineStart <= len(payload); {
+		lineEnd := lineStart
+		for lineEnd < len(payload) && payload[lineEnd] != '\n' {
+			lineEnd++
+		}
+		tokenStart := lineStart
+		for tokenStart < lineEnd && pluginsDSeparator(payload[tokenStart]) {
+			tokenStart++
+		}
+		tokenEnd := tokenStart + len(terminator)
+		if tokenEnd <= lineEnd &&
+			string(payload[tokenStart:tokenEnd]) == terminator &&
+			(tokenEnd == lineEnd || payload[tokenEnd] == 0 || pluginsDSeparator(payload[tokenEnd])) {
+			return true
+		}
+		if lineEnd == len(payload) {
+			return false
+		}
+		lineStart = lineEnd + 1
+	}
+	return false
 }
 
 type TaskWork func(context.Context) (TaskOutcome, error)

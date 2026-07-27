@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -479,6 +480,97 @@ func TestJobV2RunnerPanicRecovered(t *testing.T) {
 	case <-stopped:
 	case <-time.After(time.Second):
 		t.Fatal("job did not stop")
+	}
+}
+
+func TestJobV2SteadyStateCollectorFailuresAreSanitizedBeforeLogging(t *testing.T) {
+	tests := []struct {
+		name    string
+		collect func(context.Context) error
+	}{
+		{
+			name: "error",
+			collect: func(context.Context) error {
+				return errors.New("resolved-v2-collect-error-marker")
+			},
+		},
+		{
+			name: "panic",
+			collect: func(context.Context) error {
+				panic("resolved-v2-collect-panic-marker")
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			const safeMarker = "sanitized v2 collect failure"
+			mod := &mockModuleV2{
+				store:       metrix.NewCollectorStore(),
+				template:    chartTemplateV2(),
+				collectFunc: test.collect,
+			}
+			job := NewJobV2(JobV2Config{
+				PluginName: pluginName, Name: jobName, ModuleName: modName,
+				FullName: modName + "_" + jobName, Module: mod, Out: &bytes.Buffer{},
+				LifecycleErrorSanitizer: func(error) error { return errors.New(safeMarker) },
+			})
+			require.NoError(t, job.AutoDetectionManaged(context.Background()))
+			var logs bytes.Buffer
+			captured := logger.NewWithWriter(&logs)
+			job.Logger = captured
+			mod.GetBase().Logger = captured
+
+			_, _ = job.collectAndEmit(0)
+
+			require.NotContains(t, logs.String(), "resolved-v2-collect-error-marker")
+			require.NotContains(t, logs.String(), "resolved-v2-collect-panic-marker")
+			require.Contains(t, logs.String(), safeMarker)
+		})
+	}
+}
+
+func TestJobV2RunnerFailuresAreSanitizedBeforeLogging(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(context.Context) error
+	}{
+		{
+			name: "error",
+			run: func(context.Context) error {
+				return errors.New("resolved-v2-runner-error-marker")
+			},
+		},
+		{
+			name: "panic",
+			run: func(context.Context) error {
+				panic("resolved-v2-runner-panic-marker")
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			const safeMarker = "sanitized v2 runner failure"
+			mod := &mockRunnerModuleV2{
+				mockModuleV2: &mockModuleV2{},
+				runFunc:      test.run,
+			}
+			job := NewJobV2(JobV2Config{
+				PluginName: pluginName, Name: jobName, ModuleName: modName,
+				FullName: modName + "_" + jobName, Module: mod, Out: &bytes.Buffer{},
+				LifecycleErrorSanitizer: func(error) error { return errors.New(safeMarker) },
+			})
+			var logs bytes.Buffer
+			captured := logger.NewWithWriter(&logs)
+			job.Logger = captured
+			mod.GetBase().Logger = captured
+
+			err := job.runCollectorRunner(context.Background(), mod)
+			job.handleCollectorRunnerExit(context.Background(), err)
+
+			require.NotContains(t, logs.String(), "resolved-v2-runner-error-marker")
+			require.NotContains(t, logs.String(), "resolved-v2-runner-panic-marker")
+			require.Contains(t, logs.String(), safeMarker)
+		})
 	}
 }
 

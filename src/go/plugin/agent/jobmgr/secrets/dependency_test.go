@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -97,6 +98,38 @@ func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 
 	refs := index.Affected("vault:main", true)
 	require.False(t, len(refs) != 1 || refs[0].ID != "module_one")
+	require.True(t, index.Affects("vault:main", "module_one", true))
+	require.False(t, index.Affects("vault:main", "module_two", true))
+	require.True(t, index.Affects("vault:main", "module_two", false))
+
+	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
+		Kind: secretstore.KindVault,
+		Create: func() secretstore.Store {
+			return &transactionTestStore{}
+		},
+	}})
+	require.NoError(t, err)
+	controller := &Controller{
+		prefix:       "go.d:secretstore:",
+		creators:     creators,
+		dependencies: index,
+	}
+	require.True(t, controller.CompositeChildLaneConflict(
+		CommandInput{Args: []string{"go.d:secretstore:vault:main", "update"}},
+		"module_one",
+	))
+	require.True(t, controller.CompositeChildLaneConflict(
+		CommandInput{Args: []string{"go.d:secretstore:vault", "add", "main"}},
+		"module_one",
+	))
+	require.False(t, controller.CompositeChildLaneConflict(
+		CommandInput{Args: []string{"go.d:secretstore:vault:main", "update"}},
+		"module_two",
+	))
+	require.False(t, controller.CompositeChildLaneConflict(
+		CommandInput{Args: []string{"go.d:secretstore:vault:main", "remove"}},
+		"module_one",
+	))
 
 	commit, err := index.PrepareJobChange("module_one", nil)
 	require.NoError(t, err)
@@ -106,6 +139,36 @@ func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 
 	refs = index.Affected("vault:main", false)
 	require.False(t, len(refs) != 1 || refs[0].ID != "module_two")
+}
+
+func TestSecretDependencyIndexAcceptsMixedReferenceProviders(t *testing.T) {
+	index := NewSecretDependencyIndex()
+	payload, err := yaml.Marshal(map[string]any{
+		"module": "module",
+		"name":   "mixed",
+		"token":  "${store:vault:main:value}",
+		"host":   "${HOST:-localhost}",
+		"path":   "${file:/run/config}",
+		"custom": "${custom:operand}",
+	})
+	require.NoError(t, err)
+
+	commit, err := index.PrepareJobChange(
+		"module_mixed",
+		&dyncfg.GraphConfig{
+			ID:      "module_mixed",
+			Module:  "module",
+			Name:    "mixed",
+			Status:  dyncfg.StatusRunning.String(),
+			Payload: payload,
+		},
+	)
+	require.NoError(t, err)
+	commit()
+
+	refs := index.Affected("vault:main", true)
+	require.Len(t, refs, 1)
+	require.Equal(t, "module_mixed", refs[0].ID)
 }
 
 func BenchmarkBSecretDependencyLookup(b *testing.B) {

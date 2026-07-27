@@ -96,7 +96,7 @@ func (dcjc *DynCfgJobController) templatePublicationCleanup() lifecycle.TaskClea
 	var payload bytes.Buffer
 	api := netdataapi.New(&payload)
 	for _, name := range names {
-		api.CONFIGCREATE(netdataapi.ConfigOpts{
+		if err := api.TryCONFIGCREATE(netdataapi.ConfigOpts{
 			ID:         dcjc.prefix + name,
 			Status:     dyncfg.StatusAccepted.String(),
 			ConfigType: dyncfg.ConfigTypeTemplate.String(),
@@ -111,7 +111,9 @@ func (dcjc *DynCfgJobController) templatePublicationCleanup() lifecycle.TaskClea
 				dyncfg.CommandTest,
 				dyncfg.CommandUserconfig,
 			),
-		})
+		}); err != nil {
+			return func() error { return err }
+		}
 	}
 	prepared, err := lifecycle.PrepareProtocolFrame(payload.Bytes())
 	if err != nil {

@@ -3,16 +3,58 @@
 package collector
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
+	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	snmptraps "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 )
+
+var serviceModulePattern = regexp.MustCompile(`(?m)^\s*(?:-\s*)?module:\s*([A-Za-z0-9_.-]+)\s*$`)
+
+func TestStockServiceDiscoveryRulesTargetRegisteredCollectors(t *testing.T) {
+	files, err := filepath.Glob("../config/go.d/sd/*.conf")
+	require.NoError(t, err)
+	require.NotEmpty(t, files)
+
+	for _, file := range files {
+		bs, err := os.ReadFile(file)
+		require.NoError(t, err, file)
+
+		var cfg pipeline.Config
+		require.NoError(t, yaml.Unmarshal(bs, &cfg), file)
+
+		for _, rule := range cfg.Services {
+			if strings.TrimSpace(rule.ConfigTemplate) == "" {
+				continue
+			}
+			if strings.Contains(rule.ConfigTemplate, "toYaml") {
+				// Pass-through templates provide the complete job, including module,
+				// from the discovered item.
+				continue
+			}
+
+			modules := serviceModulePattern.FindAllStringSubmatch(rule.ConfigTemplate, -1)
+			if len(modules) == 0 {
+				modules = [][]string{{"", rule.ID}}
+			}
+			for _, match := range modules {
+				_, ok := collectorapi.DefaultRegistry.Lookup(match[1])
+				assert.Truef(t, ok, "%s service rule %q targets unregistered collector %q", filepath.Base(file), rule.ID, match[1])
+			}
+		}
+	}
+}
 
 func TestSNMPFamilyRegistrationUsesSharedDependencies(t *testing.T) {
 	snmpCreator := requireCreator(t, "snmp")

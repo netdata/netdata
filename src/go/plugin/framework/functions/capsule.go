@@ -298,30 +298,40 @@ func (capsule *InputCapsule) handlePayloadSegment(ctx context.Context, consumer 
 			}
 			return true, consumer.HandleQuit(ctx)
 		case bytes.HasPrefix(content, []byte("FUNCTION_CANCEL")):
-			fields := strings.Fields(string(content))
-			if len(fields) != 2 || fields[0] != "FUNCTION_CANCEL" {
-				return false, errors.New("function ingress: invalid payload cancel")
-			}
-			if fields[1] == state.call.UID {
-				uid := state.call.UID
-				if err := capsule.abortPayload(); err != nil {
-					return false, err
+			fields, err := tokenize(string(content))
+			if err == nil && len(fields) == 2 && fields[0] == "FUNCTION_CANCEL" {
+				if fields[1] == state.call.UID {
+					uid := state.call.UID
+					if err := capsule.abortPayload(); err != nil {
+						return false, err
+					}
+					return false, consumer.HandleReject(ctx, uid, 499)
 				}
-				return false, consumer.HandleReject(ctx, uid, 499)
+				return false, consumer.HandleCancel(ctx, fields[1])
 			}
-			return false, consumer.HandleCancel(ctx, fields[1])
 		case bytes.HasPrefix(content, []byte("FUNCTION_PROGRESS")):
-			return false, nil
-		case isPayloadInterruptCommand(content):
-			if state.overflow {
-				if err := consumer.HandleReject(ctx, state.call.UID, 413); err != nil {
-					return false, err
-				}
+			fields, err := tokenize(string(content))
+			if err == nil && len(fields) == 2 && fields[0] == "FUNCTION_PROGRESS" {
+				return false, nil
 			}
+		}
+		if call, payload, ok := parsePayloadReplacement(content); ok {
+			status := 400
+			if state.overflow {
+				status = 413
+			}
+			abandonedUID := state.call.UID
 			if err := capsule.abortPayload(); err != nil {
 				return false, err
 			}
-			return capsule.handleCommandLine(ctx, consumer, string(content))
+			if err := consumer.HandleReject(ctx, abandonedUID, status); err != nil {
+				return false, err
+			}
+			if payload {
+				capsule.payload = &payloadState{call: call}
+				return false, nil
+			}
+			return false, consumer.HandleCall(ctx, call)
 		}
 	}
 	if state.overflow {
@@ -347,12 +357,14 @@ func (capsule *InputCapsule) handlePayloadSegment(ctx context.Context, consumer 
 	return false, nil
 }
 
-func isPayloadInterruptCommand(line []byte) bool {
-	return bytes.Equal(line, []byte("FUNCTION")) ||
-		bytes.Equal(line, []byte("FUNCTION_PAYLOAD")) ||
-		bytes.HasPrefix(line, []byte("FUNCTION ")) ||
-		bytes.HasPrefix(line, []byte("FUNCTION_PAYLOAD ")) ||
-		bytes.HasPrefix(line, []byte("FUNCTION_"))
+func parsePayloadReplacement(line []byte) (Call, bool, bool) {
+	fields, err := tokenize(string(line))
+	if err != nil || len(fields) == 0 ||
+		(fields[0] != "FUNCTION" && fields[0] != "FUNCTION_PAYLOAD") {
+		return Call{}, false, false
+	}
+	call, payload, err := parseCapsuleCall(fields)
+	return call, payload, err == nil
 }
 
 func (capsule *InputCapsule) appendPayload(ctx context.Context, value []byte) error {

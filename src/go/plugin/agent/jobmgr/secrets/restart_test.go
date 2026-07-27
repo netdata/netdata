@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
@@ -18,26 +19,28 @@ import (
 )
 
 type restartTestCommandScope struct {
-	normalErr          error
-	rollbackErr        error
-	rollbackContextErr error
-	rollbackCalls      int
+	normalErr     error
+	recoveryErr   error
+	recovery      func(context.Context) error
+	recoveryCalls int
+	recoveryCtx   []context.Context
 }
 
 func (rtcs *restartTestCommandScope) SubmitPreparedAndWait(context.Context, jobmgr.Request, jobmgr.WorkPlan) error {
 	return rtcs.normalErr
 }
 
-func (rtcs *restartTestCommandScope) SubmitRollbackAndWait(jobmgr.Request, jobmgr.WorkPlan) error {
-	rtcs.rollbackCalls++
-	return rtcs.rollbackErr
-}
-
-func (rtcs *restartTestCommandScope) RollbackContext() (context.Context, error) {
-	if rtcs.rollbackContextErr != nil {
-		return nil, rtcs.rollbackContextErr
+func (rtcs *restartTestCommandScope) SubmitRecoveryAndWait(
+	ctx context.Context,
+	_ jobmgr.Request,
+	_ jobmgr.WorkPlan,
+) error {
+	rtcs.recoveryCalls++
+	rtcs.recoveryCtx = append(rtcs.recoveryCtx, ctx)
+	if rtcs.recovery != nil {
+		return rtcs.recovery(ctx)
 	}
-	return context.Background(), nil
+	return rtcs.recoveryErr
 }
 
 type restartTestStop struct {
@@ -185,8 +188,84 @@ func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(t *testi
 	)
 	require.ErrorIs(t, err, context.Canceled)
 	require.True(t, restored)
-	require.EqualValues(t, 1, scope.rollbackCalls)
+	require.EqualValues(t, 1, scope.recoveryCalls)
 	require.False(t, commitCalled)
+}
+
+func TestSecretRestartTimeoutAfterAppliedMutationIsOperational(t *testing.T) {
+	index := NewSecretDependencyIndex()
+	config := confgroup.Config{
+		"module": "module",
+		"name":   "one",
+		"secret": "${store:vault:main:value}",
+	}
+	payload, err := yaml.Marshal(config)
+	require.NoError(t, err)
+	commitDependency, err := index.PrepareJobChange(
+		config.FullName(),
+		&dyncfg.GraphConfig{
+			ID:      config.FullName(),
+			Module:  config.Module(),
+			Name:    config.Name(),
+			Status:  dyncfg.StatusRunning.String(),
+			Payload: payload,
+		},
+	)
+	require.NoError(t, err)
+	commitDependency()
+
+	command, err := NewSecretRestartCommand(1, index, restartTestJobs{}, nil)
+	require.NoError(t, err)
+	command.childTimeout = 10 * time.Millisecond
+	command.budgetLimit = 20 * time.Millisecond
+	scope := &restartTestCommandScope{
+		recovery: func(ctx context.Context) error {
+			<-ctx.Done()
+			return context.Cause(ctx)
+		},
+	}
+	result, message, restored, err := command.Apply(
+		context.Background(),
+		scope,
+		"vault:main",
+		func(context.Context) (secretstore.SecretMutationResult, error) {
+			return secretstore.SecretMutationResult{
+				Generation: 1,
+				Applied:    true,
+			}, nil
+		},
+	)
+
+	require.NoError(t, err)
+	require.True(t, result.Applied)
+	require.False(t, restored)
+	require.Contains(t, message, "module:one")
+	require.EqualValues(t, 1, scope.recoveryCalls)
+	require.ErrorIs(t, scope.recoveryCtx[0].Err(), context.DeadlineExceeded)
+}
+
+func TestSecretRestartBudgetsCapAggregateAndFairShareChildren(t *testing.T) {
+	command := &SecretRestartCommand{
+		childTimeout: 100 * time.Millisecond,
+		budgetLimit:  150 * time.Millisecond,
+	}
+	require.Equal(t, 100*time.Millisecond, command.aggregateRestartBudget(1))
+	require.Equal(t, 150*time.Millisecond, command.aggregateRestartBudget(2))
+	require.Equal(t, 150*time.Millisecond, command.aggregateRestartBudget(100))
+
+	aggregate, cancelAggregate := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancelAggregate()
+	first, cancelFirst := command.childRestartContext(aggregate, 2)
+	defer cancelFirst()
+	second, cancelSecond := command.childRestartContext(aggregate, 1)
+	defer cancelSecond()
+	firstDeadline, firstOK := first.Deadline()
+	secondDeadline, secondOK := second.Deadline()
+	require.True(t, firstOK && secondOK)
+	aggregateDeadline, aggregateOK := aggregate.Deadline()
+	require.True(t, aggregateOK)
+	require.WithinDuration(t, aggregateDeadline.Add(-75*time.Millisecond), firstDeadline, 10*time.Millisecond)
+	require.WithinDuration(t, aggregateDeadline.Add(-50*time.Millisecond), secondDeadline, 10*time.Millisecond)
 }
 
 func TestSecretRestartCommandRedactsAppliedRestartFailure(t *testing.T) {

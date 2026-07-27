@@ -251,8 +251,17 @@ func (h *Handler[C]) SyncDecision(fn Function) {
 
 // NotifyConfigCreate registers/updates a config in the dyncfg API (upsert).
 func (h *Handler[C]) NotifyConfigCreate(cfg C, status Status) {
+	h.api.ConfigCreate(h.configCreateOpts(cfg, status))
+}
+
+// ValidateConfigCreate checks the exact CONFIG create frame generated for cfg.
+func (h *Handler[C]) ValidateConfigCreate(cfg C, status Status) error {
+	return h.configCreateOpts(cfg, status).Validate()
+}
+
+func (h *Handler[C]) configCreateOpts(cfg C, status Status) netdataapi.ConfigOpts {
 	isDyncfg := cfg.SourceType() == "dyncfg"
-	h.api.ConfigCreate(netdataapi.ConfigOpts{
+	return netdataapi.ConfigOpts{
 		ID:                h.cb.ConfigID(cfg),
 		Status:            status.String(),
 		ConfigType:        h.cb.ConfigType(cfg).String(),
@@ -260,7 +269,7 @@ func (h *Handler[C]) NotifyConfigCreate(cfg C, status Status) {
 		SourceType:        cfg.SourceType(),
 		Source:            cfg.Source(),
 		SupportedCommands: h.configSupportedCommands(cfg, isDyncfg),
-	})
+	}
 }
 
 // NotifyConfigStatus sends a status update for a config.
@@ -302,6 +311,10 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 	}
 	if h.cb.ConfigType(newCfg) != ConfigTypeJob {
 		h.api.SendCodef(fn, 405, "adding configurations of type '%s' is not supported, only 'job' configurations can be added.", h.cb.ConfigType(newCfg))
+		return
+	}
+	if err := h.ValidateConfigCreate(newCfg, StatusAccepted); err != nil {
+		h.api.SendCodef(fn, 400, "configuration cannot be represented in the plugins.d CONFIG protocol: %v", err)
 		return
 	}
 
@@ -440,6 +453,11 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 	newCfg, err := h.cb.ParseAndValidate(fn, name)
 	if err != nil {
 		h.api.SendCodef(fn, 400, "%v", err)
+		h.NotifyConfigStatus(entry.Cfg, entry.Status)
+		return
+	}
+	if err := h.ValidateConfigCreate(newCfg, StatusAccepted); err != nil {
+		h.api.SendCodef(fn, 400, "configuration cannot be represented in the plugins.d CONFIG protocol: %v", err)
 		h.NotifyConfigStatus(entry.Cfg, entry.Status)
 		return
 	}

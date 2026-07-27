@@ -46,8 +46,8 @@ func dyncfgTemplateJobName(fn dyncfg.Function) string {
 	return "test"
 }
 
-func (d *ServiceDiscovery) dyncfgSDTemplateCreate(discovererType string) {
-	d.dyncfgApi.ConfigCreate(netdataapi.ConfigOpts{
+func (d *ServiceDiscovery) dyncfgSDTemplateCreate(discovererType string) error {
+	opts := netdataapi.ConfigOpts{
 		ID:                d.dyncfgTemplateID(discovererType),
 		Status:            dyncfg.StatusAccepted.String(),
 		ConfigType:        dyncfg.ConfigTypeTemplate.String(),
@@ -55,7 +55,12 @@ func (d *ServiceDiscovery) dyncfgSDTemplateCreate(discovererType string) {
 		SourceType:        "internal",
 		Source:            "internal",
 		SupportedCommands: dyncfgSDTemplateCmds(),
-	})
+	}
+	if err := opts.Validate(); err != nil {
+		return err
+	}
+	d.dyncfgApi.ConfigCreate(opts)
+	return nil
 }
 
 // sdCallbacks implements dyncfg.Callbacks[sdConfig]
@@ -91,6 +96,9 @@ func (cb *sdCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (sdConf
 	dt, _, _ := cb.sd.extractDiscovererAndName(fn.ID())
 	if _, err := parseDyncfgPayload(fn.Payload(), dt, name, cb.sd.configDefaults, cb.sd.discovererRegistry(), true); err != nil {
 		return nil, err
+	}
+	if !netdataapi.ValidSingleQuotedProtocolField(fn.Source()) {
+		return nil, fmt.Errorf("invalid Function source")
 	}
 	pkey := pipelineKey(dt, name)
 	cfg, err := newSDConfigFromJSON(fn.Payload(), name, fn.Source(), confgroup.TypeDyncfg, dt, pkey)
@@ -357,7 +365,10 @@ func (d *ServiceDiscovery) registerDyncfgTemplates(ctx context.Context) {
 
 	// Register templates for each discoverer type
 	for _, dt := range d.discovererRegistry().Types() {
-		d.dyncfgSDTemplateCreate(dt)
+		if err := d.dyncfgSDTemplateCreate(dt); err != nil {
+			d.Errorf("failed to register dyncfg template for discoverer type '%s': %v", dt, err)
+			continue
+		}
 		d.Infof("registered dyncfg template for discoverer type '%s'", dt)
 	}
 }

@@ -62,6 +62,58 @@ func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 	closeRunTestUIDs(t, uids)
 }
 
+func TestRunGenerationQuarantinesUnpublishableDiscoveredConfigAndContinues(t *testing.T) {
+	config := func(name string) confgroup.Config {
+		cfg := confgroup.Config{
+			"module":       "module",
+			"name":         name,
+			"update_every": 1,
+		}
+		cfg.SetProvider(confgroup.TypeUser)
+		cfg.SetSourceType(confgroup.TypeUser)
+		cfg.SetSource("file=test")
+		return cfg
+	}
+	invalid := config("bad=name")
+	valid := config("good")
+	output := newProcessSynchronizedBuffer()
+	frames, err := lifecycle.NewFrameOwner(output)
+	require.NoError(t, err)
+	uids := lifecycle.NewUIDLedger()
+	generation, err := newRunGeneration(runGenerationConfig{
+		Generation:      1,
+		ShutdownTimeout: time.Second,
+		UIDs:            uids,
+		Frames:          frames,
+		Modules: collectorapi.Registry{
+			"module": {},
+		},
+		Jobs:      testRunJobServices(t),
+		Discovery: testRunDiscoveryServicesAccepted(t, invalid, valid),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		generation.Stop()
+		require.NoError(t, generation.Wait(context.Background()))
+		closeRunTestUIDs(t, uids)
+	})
+
+	require.NoError(t, generation.start(context.Background()))
+	validFrame := "CONFIG go.d:collector:module:good create accepted job"
+	require.Eventually(t, func() bool {
+		record, ok := generation.vnodes.graph.Lookup(valid.FullName())
+		return ok &&
+			record.Status == dyncfg.StatusAccepted.String() &&
+			strings.Contains(output.String(), validFrame)
+	}, time.Second, time.Millisecond)
+
+	_, invalidPublished := generation.vnodes.graph.Lookup(invalid.FullName())
+	require.False(t, invalidPublished)
+	require.Contains(t, output.String(), validFrame)
+	require.NotContains(t, output.String(), "bad=name")
+	require.NoError(t, generation.run.DirtyCause())
+}
+
 func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) {
 	tests := map[string]struct {
 		jobs int
@@ -318,7 +370,7 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 	closeRunTestUIDs(t, uids)
 }
 
-func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(t *testing.T) {
+func TestRunGenerationShutdownRejectsInFlightJobProbeBeforePublication(t *testing.T) {
 	checkEntered := make(chan struct{})
 	checkRelease := make(chan struct{})
 	var cleanupCalls atomic.Int32
@@ -414,10 +466,8 @@ func TestRunGenerationShutdownDrainsJobActivationAndFunctionPublication(t *testi
 	require.NoError(t, probe.waitSettlement(shutdownCtx))
 	require.NoError(t, generation.run.DirtyCause())
 
-	publishedAt := bytes.Index(output.Bytes(), []byte(`FUNCTION GLOBAL "module:method"`))
-	withdrawnAt := bytes.Index(output.Bytes(), []byte(`FUNCTION_DEL GLOBAL "module:method"`))
-	require.GreaterOrEqual(t, publishedAt, 0)
-	require.Greater(t, withdrawnAt, publishedAt)
+	require.NotContains(t, output.String(), `FUNCTION GLOBAL "module:method"`)
+	require.NotContains(t, output.String(), `FUNCTION_DEL GLOBAL "module:method"`)
 	require.EqualValues(t, 1, cleanupCalls.Load())
 	require.Zero(t, generation.tasks.InheritedActive())
 	require.Equal(t, lifecycle.LongLivedCensus{}, generation.tasks.LongLivedCensus())

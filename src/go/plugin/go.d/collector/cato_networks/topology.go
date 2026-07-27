@@ -16,7 +16,12 @@ const (
 	topologyLayer  = "network"
 )
 
-func buildTopology(accountID string, sites map[string]*siteState, order []string, collectedAt time.Time) (*topologyv1.Data, error) {
+func buildTopology(
+	accountID string,
+	sites map[string]*siteState,
+	order []string,
+	collectedAt time.Time,
+) (*topologyv1.Data, error) {
 	stringsDict := topologyv1.NewStringDictionary()
 	actors := topologyv1.NewTableBuilder(catoTopologyActorColumns()...)
 	links := topologyv1.NewTableBuilder(catoTopologyLinkColumns()...)
@@ -99,7 +104,13 @@ func buildTopology(accountID string, sites map[string]*siteState, order []string
 	return data, nil
 }
 
-func addSiteActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, accountID string, site *siteState, siteActorID string) int {
+func addSiteActor(
+	table *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	accountID string,
+	site *siteState,
+	siteActorID string,
+) int {
 	return table.Add(
 		dict.Ref(catofunc.ActorTypeSite),
 		dict.Ref(topologyLayer),
@@ -119,7 +130,7 @@ func addSiteActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDiction
 		site.CountryCode,
 		site.CountryName,
 		site.Region,
-		site.HostCount,
+		optionalInt64(site.HostCount),
 		nil,
 		"",
 		"",
@@ -128,7 +139,11 @@ func addSiteActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDiction
 	)
 }
 
-func addPopActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, accountID, popName, popActorID string) int {
+func addPopActor(
+	table *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	accountID, popName, popActorID string,
+) int {
 	return table.Add(
 		dict.Ref(catofunc.ActorTypePop),
 		dict.Ref(topologyLayer),
@@ -148,7 +163,7 @@ func addPopActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDictiona
 		"",
 		"",
 		"",
-		int64(0),
+		nil,
 		nil,
 		"",
 		"",
@@ -157,7 +172,12 @@ func addPopActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDictiona
 	)
 }
 
-func addSitePopLink(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, site *siteState, siteActor, popActor int) {
+func addSitePopLink(
+	table *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	site *siteState,
+	siteActor, popActor int,
+) {
 	table.Add(
 		dict.Ref(catofunc.LinkTypeTunnel),
 		siteActor,
@@ -179,7 +199,14 @@ func addSitePopLink(table *topologyv1.TableBuilder, dict *topologyv1.StringDicti
 	)
 }
 
-func addDeviceTopology(actors, links *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, actorIndexes map[string]int, popSeen map[string]bool, accountID string, site *siteState) map[string]int {
+func addDeviceTopology(
+	actors, links *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	actorIndexes map[string]int,
+	popSeen map[string]bool,
+	accountID string,
+	site *siteState,
+) map[string]int {
 	deviceActors := make(map[string]int, len(site.Devices))
 
 	sortedDevices := append([]deviceState(nil), site.Devices...)
@@ -220,7 +247,14 @@ func addDeviceTopology(actors, links *topologyv1.TableBuilder, dict *topologyv1.
 	return deviceActors
 }
 
-func addDeviceActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, accountID string, site *siteState, dev deviceState, deviceID, deviceActorID string) int {
+func addDeviceActor(
+	table *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	accountID string,
+	site *siteState,
+	dev deviceState,
+	deviceID, deviceActorID string,
+) int {
 	displayName := deviceDisplayName(dev)
 	if displayName == "" {
 		displayName = deviceID
@@ -241,15 +275,15 @@ func addDeviceActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDicti
 		popName,
 		"",
 		"",
-		boolState(dev.Connected, "connected", "disconnected"),
+		firstNonEmpty(optionalBoolState(dev.Connected, "connected", "disconnected"), "unknown"),
 		"",
 		"",
 		"",
 		"",
 		"",
 		"",
-		int64(0),
-		dev.Connected,
+		nil,
+		optionalBool(dev.Connected),
 		dev.HaRole,
 		dev.SocketSerial,
 		dev.SocketVersion,
@@ -257,13 +291,18 @@ func addDeviceActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDicti
 	)
 }
 
-func addDevicePopLink(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, dev deviceState, deviceActor, popActor int) {
+func addDevicePopLink(
+	table *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	dev deviceState,
+	deviceActor, popActor int,
+) {
 	table.Add(
 		dict.Ref(catofunc.LinkTypeTunnel),
 		deviceActor,
 		popActor,
 		dict.Ref("cato"),
-		dict.Ref(boolState(dev.Connected, "connected", "disconnected")),
+		dict.Ref(firstNonEmpty(optionalBoolState(dev.Connected, "connected", "disconnected"), "unknown")),
 		dict.Ref("bidirectional"),
 		1,
 		nil,
@@ -279,7 +318,13 @@ func addDevicePopLink(table *topologyv1.TableBuilder, dict *topologyv1.StringDic
 	)
 }
 
-func addBGPPeerTopology(actors, links *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, actorIndexes map[string]int, site *siteState, siteActor int) {
+func addBGPPeerTopology(
+	actors, links *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	actorIndexes map[string]int,
+	site *siteState,
+	siteActor int,
+) {
 	seen := make(map[string]bool)
 
 	for _, peer := range site.BGPPeers {
@@ -297,7 +342,13 @@ func addBGPPeerTopology(actors, links *topologyv1.TableBuilder, dict *topologyv1
 	}
 }
 
-func addBGPPeerActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, site *siteState, peer bgpPeerState, peerActorID string) int {
+func addBGPPeerActor(
+	table *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	site *siteState,
+	peer bgpPeerState,
+	peerActorID string,
+) int {
 	displayName := peer.RemoteIP
 	if displayName == "" {
 		displayName = peer.RemoteASN
@@ -330,7 +381,12 @@ func addBGPPeerActor(table *topologyv1.TableBuilder, dict *topologyv1.StringDict
 	)
 }
 
-func addBGPLink(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionary, siteActor, peerActor int, peer bgpPeerState) {
+func addBGPLink(
+	table *topologyv1.TableBuilder,
+	dict *topologyv1.StringDictionary,
+	siteActor, peerActor int,
+	peer bgpPeerState,
+) {
 	table.Add(
 		dict.Ref(catofunc.LinkTypeBGP),
 		siteActor,
@@ -352,7 +408,12 @@ func addBGPLink(table *topologyv1.TableBuilder, dict *topologyv1.StringDictionar
 	)
 }
 
-func addInterfaceTopologyTable(interfaces *topologyv1.TableBuilder, siteActor int, deviceActors map[string]int, site *siteState) {
+func addInterfaceTopologyTable(
+	interfaces *topologyv1.TableBuilder,
+	siteActor int,
+	deviceActors map[string]int,
+	site *siteState,
+) {
 	ifaceKeys := make([]string, 0, len(site.Interfaces))
 	for key := range site.Interfaces {
 		ifaceKeys = append(ifaceKeys, key)
@@ -383,15 +444,20 @@ func addInterfaceTopologyTable(interfaces *topologyv1.TableBuilder, siteActor in
 				actor = devActor
 			}
 		}
+		connected, connectedKnown := interfaceConnected(iface)
+		var connectedValue any
+		if connectedKnown {
+			connectedValue = connected
+		}
 		interfaces.Add(
 			actor,
 			iface.ID,
 			iface.Name,
 			iface.Type,
-			iface.Connected || iface.LinkUp,
+			connectedValue,
 			iface.PopName,
 			iface.TunnelRemoteIP,
-			iface.TunnelUptime,
+			optionalInt64(iface.TunnelUptime),
 			iface.UpstreamBandwidth,
 			iface.DownstreamBandwidth,
 		)
@@ -403,6 +469,27 @@ func trafficMetricValue(metrics trafficMetrics, metric trafficMetricPresence, va
 		return nil
 	}
 	return value
+}
+
+func optionalBoolState(value *bool, trueState, falseState string) string {
+	if value == nil {
+		return ""
+	}
+	return boolState(*value, trueState, falseState)
+}
+
+func optionalBool(value *bool) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func optionalInt64(value *int64) any {
+	if value == nil {
+		return nil
+	}
+	return *value
 }
 
 func catoSiteActorID(siteID string) string {
@@ -470,7 +557,7 @@ func catoTopologyActorColumns() []topologyv1.Column {
 		topologyv1.NewColumn("country_code", "string"),
 		topologyv1.NewColumn("country_name", "string"),
 		topologyv1.NewColumn("region", "string"),
-		topologyv1.NewColumn("host_count", "uint", topologyv1.WithAggregation("sum")),
+		topologyv1.NewColumn("host_count", "uint", topologyv1.WithNullable(), topologyv1.WithAggregation("sum")),
 		topologyv1.NewColumn("connected", "bool", topologyv1.WithNullable()),
 		topologyv1.NewColumn("ha_role", "string"),
 		topologyv1.NewColumn("socket_serial", "string"),
@@ -488,14 +575,57 @@ func catoTopologyLinkColumns() []topologyv1.Column {
 		topologyv1.NewColumn("state", "string_ref", topologyv1.WithDictionary("strings")),
 		topologyv1.NewColumn("direction", "string_ref", topologyv1.WithDictionary("strings")),
 		topologyv1.NewColumn("evidence_count", "uint", topologyv1.WithAggregation("sum")),
-		topologyv1.NewColumn("bytes_upstream_max", "float", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("max")),
-		topologyv1.NewColumn("bytes_downstream_max", "float", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("max")),
-		topologyv1.NewColumn("lost_upstream_percent", "float", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("avg")),
-		topologyv1.NewColumn("rtt_ms", "float", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithUnit("ms"), topologyv1.WithAggregation("avg")),
-		topologyv1.NewColumn("routes", "int", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("sum")),
-		topologyv1.NewColumn("routes_limit", "int", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("max")),
+		topologyv1.NewColumn(
+			"bytes_upstream_max",
+			"float",
+			topologyv1.WithNullable(),
+			topologyv1.WithRole("metric"),
+			topologyv1.WithAggregation("max"),
+		),
+		topologyv1.NewColumn(
+			"bytes_downstream_max",
+			"float",
+			topologyv1.WithNullable(),
+			topologyv1.WithRole("metric"),
+			topologyv1.WithAggregation("max"),
+		),
+		topologyv1.NewColumn(
+			"lost_upstream_percent",
+			"float",
+			topologyv1.WithNullable(),
+			topologyv1.WithRole("metric"),
+			topologyv1.WithAggregation("avg"),
+		),
+		topologyv1.NewColumn(
+			"rtt_ms",
+			"float",
+			topologyv1.WithNullable(),
+			topologyv1.WithRole("metric"),
+			topologyv1.WithUnit("ms"),
+			topologyv1.WithAggregation("avg"),
+		),
+		topologyv1.NewColumn(
+			"routes",
+			"int",
+			topologyv1.WithNullable(),
+			topologyv1.WithRole("metric"),
+			topologyv1.WithAggregation("sum"),
+		),
+		topologyv1.NewColumn(
+			"routes_limit",
+			"int",
+			topologyv1.WithNullable(),
+			topologyv1.WithRole("metric"),
+			topologyv1.WithAggregation("max"),
+		),
 		topologyv1.NewColumn("routes_limit_exceeded", "bool", topologyv1.WithNullable()),
-		topologyv1.NewColumn("rib_out_routes", "int", topologyv1.WithNullable(), topologyv1.WithRole("metric"), topologyv1.WithAggregation("sum")),
+		topologyv1.NewColumn(
+			"rib_out_routes",
+			"int",
+			topologyv1.WithNullable(),
+			topologyv1.WithRole("metric"),
+			topologyv1.WithAggregation("sum"),
+		),
 		topologyv1.NewColumn("incoming_connection_state", "string", topologyv1.WithNullable()),
 		topologyv1.NewColumn("outgoing_connection_state", "string", topologyv1.WithNullable()),
 	}
@@ -507,10 +637,10 @@ func catoTopologyInterfaceColumns() []topologyv1.Column {
 		topologyv1.NewColumn("id", "string"),
 		topologyv1.NewColumn("name", "string"),
 		topologyv1.NewColumn("type", "string"),
-		topologyv1.NewColumn("connected", "bool"),
+		topologyv1.NewColumn("connected", "bool", topologyv1.WithNullable()),
 		topologyv1.NewColumn("pop_name", "string"),
 		topologyv1.NewColumn("tunnel_remote_ip", "ip"),
-		topologyv1.NewColumn("tunnel_uptime", "duration"),
+		topologyv1.NewColumn("tunnel_uptime", "duration", topologyv1.WithNullable()),
 		topologyv1.NewColumn("upstream_bandwidth", "int"),
 		topologyv1.NewColumn("downstream_bandwidth", "int"),
 	}

@@ -62,11 +62,13 @@ func (fcq *fixedChunkQueue[T]) pop() {
 	if chunk.head != chunk.tail {
 		return
 	}
+	if chunk.next == nil {
+		chunk.head = 0
+		chunk.tail = 0
+		return
+	}
 	fcq.head = chunk.next
 	chunk.next = nil
-	if fcq.head == nil {
-		fcq.tail = nil
-	}
 }
 
 type functionCleanupQueue struct {
@@ -87,10 +89,13 @@ type readyQueue struct {
 }
 
 func (rq *readyQueue) push(lane *commandLane) {
-	if lane.ready {
-		return
+	if owner := lane.readyQueue; owner != nil {
+		if owner == rq {
+			return
+		}
+		owner.remove(lane)
 	}
-	lane.ready = true
+	lane.readyQueue = rq
 	lane.readyPrev = rq.tail
 	if rq.tail != nil {
 		rq.tail.readyNext = lane
@@ -112,7 +117,7 @@ func (rq *readyQueue) pop() *commandLane {
 	} else {
 		rq.tail = nil
 	}
-	lane.ready = false
+	lane.readyQueue = nil
 	lane.readyPrev = nil
 	lane.readyNext = nil
 	rq.len--
@@ -120,7 +125,7 @@ func (rq *readyQueue) pop() *commandLane {
 }
 
 func (rq *readyQueue) remove(lane *commandLane) {
-	if !lane.ready {
+	if lane.readyQueue != rq {
 		return
 	}
 	if lane.readyPrev != nil {
@@ -133,7 +138,7 @@ func (rq *readyQueue) remove(lane *commandLane) {
 	} else {
 		rq.tail = lane.readyPrev
 	}
-	lane.ready = false
+	lane.readyQueue = nil
 	lane.readyPrev = nil
 	lane.readyNext = nil
 	rq.len--

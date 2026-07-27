@@ -321,15 +321,6 @@ func validateGraphResourcePair(
 	return nil
 }
 
-func validDynCfgProtocolField(value string) bool {
-	for _, char := range value {
-		if char < ' ' || char == 0x7f || char == '\'' {
-			return false
-		}
-	}
-	return true
-}
-
 func joinDynCfgCleanups(cleanups ...lifecycle.TaskCleanup) lifecycle.TaskCleanup {
 	joined := make([]lifecycle.TaskCleanup, 0, len(cleanups))
 	for _, cleanup := range cleanups {

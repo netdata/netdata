@@ -410,11 +410,29 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
         marked = true;
     }
 
-    sql_set_host_label(&host->host_id.uuid, "_is_ephemeral", "true");
+    // host->rrdlabels is the copy that matters: build_node_info() transmits it as the
+    // node's complete label set, and meta_store_host_labels() rewrites the host_label
+    // rows from it. Updating only the row below leaves the cloud believing the node is
+    // permanent, and lets a later metadata store revert that row. Update the dictionary
+    // in place - RRDLABELS is internally locked, while replacing the pointer would race
+    // readers that assume it stays valid for the lifetime of the host.
+    bool label_changed = host->rrdlabels &&
+        rrdlabels_add_changed(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, "true", RRDLABEL_SRC_CONFIG);
+    marked |= label_changed;
+
+    sql_set_host_label(&host->host_id.uuid, HOST_LABEL_IS_EPHEMERAL, "true");
     pulse_host_status(host, 0, 0);
 
-    if (marked)
+    // only a change in the transmitted labels needs an update; a host that has none in
+    // memory gets no update at all, because that would publish an empty set and drop
+    // every other label this node has
+    if (label_changed)
         send_node_info_with_wait(host);
+    else if (!host->rrdlabels)
+        nd_log_daemon(NDLP_WARNING,
+                      "Node '%s' (machine guid: %s) has no labels in memory - "
+                      "could not inform Netdata Cloud that it is ephemeral",
+                      rrdhost_hostname(host), host->machine_guid);
 
     if (unregister) {
         send_node_update_with_wait(host, 0, 0);

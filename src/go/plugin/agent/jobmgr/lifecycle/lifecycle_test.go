@@ -1009,6 +1009,38 @@ func TestFrameOwnerLateControlReadyBindingReplaysPendingWake(t *testing.T) {
 	require.Error(t, owner.BindRunNotifications(2, func() {}, func(error) {}, nil))
 }
 
+func TestFrameOwnerRunReleaseAbandonsPendingControlReservation(t *testing.T) {
+	writer := newStepWriter()
+	owner, err := NewFrameOwner(writer)
+	require.NoError(t, err)
+	require.NoError(t, owner.BindRunNotifications(1, func() {}, func(error) {}, nil))
+
+	firstDone := make(chan error, 1)
+	go func() { firstDone <- owner.CommitBorrowedProtocolFrame([]byte("first")) }()
+	require.Equal(t, []byte("first"), <-writer.offered)
+	require.ErrorIs(t, owner.TryCommitControl(ControlFramePlan{
+		UID:    "control",
+		Status: ControlInternal,
+		Expiry: 1,
+	}), ErrFrameOwnerBusy)
+
+	require.NoError(t, owner.ReleaseRunNotifications(1))
+	secondDone := make(chan error, 1)
+	go func() { secondDone <- owner.CommitBorrowedProtocolFrame([]byte("second")) }()
+	writer.release <- struct{}{}
+	require.NoError(t, <-firstDone)
+
+	select {
+	case payload := <-writer.offered:
+		require.Equal(t, []byte("second"), payload)
+	case <-time.After(100 * time.Millisecond):
+		require.FailNow(t, "test failed", "retired run left ordinary writer behind pending control")
+	}
+	writer.release <- struct{}{}
+	require.NoError(t, <-secondDone)
+	require.False(t, owner.Census().PendingControl)
+}
+
 func TestFrameOwnerShortWritePoisonsAndRetains(t *testing.T) {
 	owner, err := NewFrameOwner(shortWriter{})
 	require.NoError(t, err)
@@ -1186,6 +1218,65 @@ func TestClosedControlResults(t *testing.T) {
 
 	_, err := NewControlResult(418)
 	require.Error(t, err)
+}
+
+func TestSealedResultRejectsPluginsDTerminatorPayload(t *testing.T) {
+	tests := map[string]struct {
+		payload []byte
+		unsafe  bool
+	}{
+		"payload start":      {payload: []byte("FUNCTION_RESULT_END"), unsafe: true},
+		"space":              {payload: []byte(" FUNCTION_RESULT_END"), unsafe: true},
+		"tab":                {payload: []byte("\tFUNCTION_RESULT_END"), unsafe: true},
+		"carriage return":    {payload: []byte("\rFUNCTION_RESULT_END"), unsafe: true},
+		"form feed":          {payload: []byte("\fFUNCTION_RESULT_END"), unsafe: true},
+		"vertical tab":       {payload: []byte("\vFUNCTION_RESULT_END"), unsafe: true},
+		"equals":             {payload: []byte("=FUNCTION_RESULT_END"), unsafe: true},
+		"later line":         {payload: []byte("safe\n FUNCTION_RESULT_END"), unsafe: true},
+		"trailing token":     {payload: []byte("FUNCTION_RESULT_END ignored"), unsafe: true},
+		"keyword suffix":     {payload: []byte("FUNCTION_RESULT_END_extra")},
+		"not first token":    {payload: []byte("safe FUNCTION_RESULT_END")},
+		"ordinary multiline": {payload: []byte("first\nsecond")},
+		"empty":              {},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewSealedResult(200, "text/plain", test.payload)
+			if test.unsafe {
+				require.ErrorIs(t, err, ErrUnsafeFunctionResult)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestFunctionResultTerminatorValidationDoesNotAllocate(t *testing.T) {
+	payload := bytes.Repeat([]byte("safe payload\n"), 100)
+	allocations := testing.AllocsPerRun(1_000, func() {
+		require.False(t, functionResultPayloadHasTerminator(payload))
+	})
+	require.Zero(t, allocations)
+}
+
+func TestSealedResultRejectsUnsafeContentType(t *testing.T) {
+	for name, contentType := range map[string]string{
+		"equals":       "application/json=shift",
+		"double quote": `application/"json`,
+		"single quote": "application/'json",
+		"backslash":    `application/json\`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewSealedResult(200, contentType, nil)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestExpiryAtIsPositiveWithoutARealTimeClock(t *testing.T) {
+	require.EqualValues(t, 1, ExpiryAt(time.Unix(0, 0)))
+	require.EqualValues(t, 1, ExpiryAt(time.Unix(-1, 0)))
+	require.EqualValues(t, 2, ExpiryAt(time.Unix(2, 0)))
 }
 
 func TestFunctionPayloadAndFrameCapacityAreSeparateFromControlReserve(t *testing.T) {
