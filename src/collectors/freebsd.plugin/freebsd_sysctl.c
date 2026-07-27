@@ -765,7 +765,7 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
 int do_vm_stats_sys_v_syscalls(int update_every, usec_t dt) {
     (void)dt;
     static int mib[4] = {0, 0, 0, 0};
-    u_int64_t syscalls_number;
+    u_int64_t syscalls_number = 0; // make misra happy
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_syscall", mib, syscalls_number))) {
             collector_error("DISABLED: system.syscalls chart");
