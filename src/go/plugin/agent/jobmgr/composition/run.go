@@ -48,6 +48,7 @@ type runGenerationConfig struct {
 	Jobs            runJobServices            // job services
 	Secrets         runSecretServices         // secret services
 	Discovery       runDiscoveryServices      // discovery services
+	SecretEpoch     *processSecretEpoch       // process-owned Store epoch for this run
 }
 
 type runGeneration struct {
@@ -63,6 +64,7 @@ type runGeneration struct {
 	kernel              *jobmgr.CommandKernel          // the command kernel
 	metrics             *runMetrics                    // jobmgr.runtime metrics projection (nil when runtime charts off)
 	metricsRegistration *runMetricsRegistration        // synchronous runtime-writer lease
+	secretEpoch         *processSecretEpoch            // process-owned Store epoch used by this run
 
 	mu               sync.Mutex // guards started/startedAttempted
 	started          bool       // start succeeded
@@ -70,12 +72,11 @@ type runGeneration struct {
 }
 
 func newRunGeneration(config runGenerationConfig) (generation *runGeneration, resultErr error) {
-	var stores *secretstore.SecretStore
 	var secretController *secretadapter.Controller
 	var functions *FunctionAssembly
 	defer func() {
 		if resultErr != nil {
-			resultErr = errors.Join(resultErr, abortRunConstruction(functions, secretController, stores))
+			resultErr = errors.Join(resultErr, abortRunConstruction(functions, secretController))
 		}
 	}()
 	if config.Generation == 0 ||
@@ -88,6 +89,9 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		config.Jobs.Resolver == nil ||
 		config.Jobs.StoreCreators == nil ||
 		config.Jobs.Vnodes == nil ||
+		config.SecretEpoch == nil ||
+		config.SecretEpoch.generation != config.Generation ||
+		config.SecretEpoch.store == nil ||
 		!config.Discovery.valid() {
 		return nil, errors.New("jobmgr composition: invalid run construction")
 	}
@@ -108,10 +112,7 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 	if err != nil {
 		return nil, err
 	}
-	stores, err = secretstore.NewSecretStore(config.Jobs.Resolver)
-	if err != nil {
-		return nil, err
-	}
+	stores := config.SecretEpoch.store
 	dependencies := secretadapter.NewSecretDependencyIndex()
 	vnodeConfig, err := agentdiscovery.NewVNodeConfigurationWithInitial(config.Jobs.InitialVnodes)
 	if err != nil {
@@ -189,7 +190,7 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		return nil, err
 	}
 	storeScope := func(keys []string) (secretresolver.AtomicScope, error) {
-		return acquireRunOwnedStoreScope(run, stores, keys)
+		return config.SecretEpoch.acquireScope(keys)
 	}
 	configModules, err := joboutput.NewConfigModuleFactory(
 		joboutput.ConfigModuleFactoryConfig{
@@ -288,20 +289,17 @@ func newRunGeneration(config runGenerationConfig) (generation *runGeneration, re
 		kernel:              kernel,
 		metrics:             metrics,
 		metricsRegistration: metricsRegistration,
+		secretEpoch:         config.SecretEpoch,
 	}, nil
 }
 
 func abortRunConstruction(
 	functions *FunctionAssembly,
 	controller *secretadapter.Controller,
-	stores *secretstore.SecretStore,
 ) error {
 	functionErr := functions.abortConstruction()
 	if controller != nil {
-		return errors.Join(functionErr, controller.Close(context.Background()))
-	}
-	if stores != nil {
-		return errors.Join(functionErr, stores.Close(context.Background()))
+		return errors.Join(functionErr, controller.CloseProjection())
 	}
 	return functionErr
 }
@@ -387,7 +385,7 @@ func (rg *runGeneration) abortConstruction() error {
 	if started {
 		return errors.New("jobmgr composition: run construction abort after start")
 	}
-	return errors.Join(rg.metricsRegistration.release(), abortRunConstruction(rg.functions, rg.secrets, nil))
+	return errors.Join(rg.metricsRegistration.release(), abortRunConstruction(rg.functions, rg.secrets))
 }
 
 func (rg *runGeneration) Stop() {
@@ -479,6 +477,6 @@ func (jrf joinedRunFinalizer) FinalizeRun(ctx context.Context, generation uint64
 	return errors.Join(
 		jrf.metricsRegistration.release(),
 		jrf.functions.FinalizeRun(ctx, generation),
-		jrf.secrets.Close(ctx),
+		jrf.secrets.CloseProjection(),
 	)
 }

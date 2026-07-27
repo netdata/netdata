@@ -2774,15 +2774,12 @@ func TestKernelFourthBackgroundTransactionTimeoutDirtiesWithoutResponseCommit(t 
 	closeUIDLedger(t, uids)
 }
 
-func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
+func TestKernelRunFinalizerWaitsForEveryLongLivedPermit(t *testing.T) {
 	var permit lifecycle.LongLivedPermit
 	called := make(chan struct{}, 1)
 	finalizer := runFinalizerFunc(func(context.Context, uint64) error {
 		called <- struct{}{}
-		if err := permit.ReleaseExternal(); err != nil {
-			return err
-		}
-		return permit.Return()
+		return nil
 	})
 	kernel, run, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(
 		t,
@@ -2791,7 +2788,7 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 		finalizer,
 		time.Second,
 	)
-	plan := lifecycle.NewSecretStoreLongLivedPlan()
+	plan := lifecycle.NewJobLongLivedPlan()
 	var err error
 	permit, err = tasks.IssueLongLivedPermit(lifecycle.ResourceIdentity{
 		ID:         "secret-store",
@@ -2806,19 +2803,24 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 	startKernelLoop(t, kernel)
 	kernel.Stop()
 
-	require.NoError(t, kernel.Wait(context.Background()))
+	select {
+	case <-called:
+		require.FailNow(t, "test failed", "run finalizer started while a long-lived permit was active")
+	case <-time.After(25 * time.Millisecond):
+	}
+
+	require.NoError(t, permit.ReleaseExternal())
+	require.NoError(t, permit.Return())
+	kernel.NotifyControlReady()
 
 	select {
 	case <-called:
-	default:
-		require.FailNow(t, "test failed", "typed finalizer-owned permit prevented finalizer dispatch")
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "run finalizer did not start after long-lived ownership drained")
 	}
-
-	census := tasks.LongLivedCensus()
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, census)
-
-	terminal := run.TerminalState()
-	require.False(t, !terminal.Quiescent || terminal.Dirty != nil)
+	require.NoError(t, kernel.Wait(context.Background()))
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+	require.True(t, run.TerminalState().Quiescent)
 }
 
 func TestKernelRunFinalizerFailureReleasesTaskWithoutQuiescence(t *testing.T) {

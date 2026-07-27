@@ -102,7 +102,7 @@ jobs:
 	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,

@@ -155,16 +155,19 @@ func (scope *ResolutionScope) Resolve(
 }
 
 func (scope *ResolutionScope) Release(context.Context) error {
-	if scope == nil || scope.owner == nil {
+	if scope == nil {
 		return errors.New("secretstore: empty scope")
 	}
 	scope.mu.Lock()
-	if scope.released {
+	if scope.owner == nil || scope.released {
 		scope.mu.Unlock()
 		return errors.New("secretstore: scope released twice")
 	}
 	scope.released = true
 	owner, ref := scope.owner, scope.ref
+	scope.owner = nil
+	scope.ref = scopeRef{}
+	scope.pins = nil
 	scope.mu.Unlock()
 	return owner.releaseScope(ref)
 }

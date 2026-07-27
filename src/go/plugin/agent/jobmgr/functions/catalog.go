@@ -66,7 +66,7 @@ type ResourceTransactionDeclaration struct {
 	Prepare                    ResourceTransactionHandler          // prepares a plain resource transaction
 	PrepareComposite           CompositeResourceTransactionHandler // prepares a composite resource transaction (child commands)
 	CompositeChildLaneConflict CompositeChildLaneConflictHandler   // identifies resource lanes a composite may submit to
-	Permit                     lifecycle.LongLivedPlan             // long-lived plan for the successor
+	Permit                     lifecycle.LongLivedPlan             // optional run-owned lifetime behind the successor
 	CommandArgument            uint16                              // argument index carrying the dyncfg command
 	GlobalClaim                string                              // claim key held for the whole transaction domain
 	YieldGlobalClaimOnPrepare  bool                                // plain preparation may temporarily yield GlobalClaim
@@ -534,8 +534,10 @@ func validateResourceTransactionDeclaration(declaration *ResourceTransactionDecl
 		}
 	}
 	if hasSuccessor {
-		if err := declaration.Permit.Validate(); err != nil {
-			return err
+		if declaration.Permit.Class() != 0 {
+			if err := declaration.Permit.Validate(); err != nil {
+				return err
+			}
 		}
 	} else if declaration.Permit.Class() != 0 {
 		return errors.New("jobmgr Function catalog: transaction without successor has a permit")

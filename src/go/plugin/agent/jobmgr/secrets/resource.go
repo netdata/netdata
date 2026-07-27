@@ -67,6 +67,9 @@ func (sgr *storeGenerationResource) supersede() error {
 		return errors.New("jobmgr secrets: Store resource already retired")
 	}
 	sgr.retired = true
+	sgr.store = nil
+	sgr.key = ""
+	sgr.storeGen = 0
 	return nil
 }
 
@@ -81,6 +84,9 @@ func (sgr *storeGenerationResource) retire(ctx context.Context) error {
 	}
 	sgr.retired = true
 	store, key, generation := sgr.store, sgr.key, sgr.storeGen
+	sgr.store = nil
+	sgr.key = ""
+	sgr.storeGen = 0
 	sgr.mu.Unlock()
 	return store.Retire(ctx, key, generation)
 }

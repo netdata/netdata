@@ -32,7 +32,7 @@ type ControllerConfig struct {
 	Epoch        uint64                      // run generation this controller belongs to
 	PluginName   string                      // owning plugin name
 	Frames       *lifecycle.FrameOwner       // protocol frame sink
-	Store        *secretstore.SecretStore    // per-run secret store
+	Store        *secretstore.SecretStore    // process-owned Store epoch
 	Creators     *secretstore.CreatorCatalog // frozen creator catalog
 	Dependencies *SecretDependencyIndex      // secret dependency index
 	Initial      []secretstore.Config        // initial (stock/user) secret store configs
@@ -46,7 +46,7 @@ type Controller struct {
 	prefix        string                      // "<plugin>:secretstore:" ID prefix
 	path          string                      // "/collectors/<plugin>/SecretStores" config path
 	frames        *lifecycle.FrameOwner       // protocol frame sink
-	store         *secretstore.SecretStore    // per-run secret store
+	store         *secretstore.SecretStore    // process-owned Store epoch
 	creators      *secretstore.CreatorCatalog // frozen creator catalog
 	dependencies  *SecretDependencyIndex      // secret dependency index
 	diagnostics   jobmgr.DiagnosticObserver   // operational log sink
@@ -118,21 +118,23 @@ func (c *Controller) Prepare(
 	if c == nil || ctx == nil || !scope.Valid() {
 		return nil, errors.New("jobmgr secrets: invalid transaction preparation")
 	}
+	if permit.Valid() {
+		return nil, errors.New("jobmgr secrets: unexpected run-owned Store permit")
+	}
 	c.mu.Lock()
 	commandsReady := c.commandsReady
 	c.mu.Unlock()
 	if !commandsReady {
-		return c.noopMessageWithPermit(
+		return c.noopMessage(
 			scope,
 			current,
-			permit,
 			503,
 			"Secretstore configuration is not published yet.",
 		)
 	}
 	target, failure := c.resolveTarget(input)
 	if failure != nil {
-		transaction, err := c.noopMessageWithPermit(scope, current, permit, failure.code, failure.message)
+		transaction, err := c.noopMessage(scope, current, failure.code, failure.message)
 		return c.observeTransaction(target, transaction, err)
 	}
 	var transaction lifecycle.PreparedResourceTransaction
@@ -147,16 +149,15 @@ func (c *Controller) Prepare(
 	case dyncfg.CommandTest:
 		transaction, err = c.prepareTest(ctx, scope, current, input, target)
 	case dyncfg.CommandAdd:
-		transaction, err = c.prepareAdd(ctx, scope, current, permit, input, target)
+		transaction, err = c.prepareAdd(ctx, scope, current, input, target)
 	case dyncfg.CommandUpdate:
-		transaction, err = c.prepareUpdate(ctx, scope, current, permit, input, target)
+		transaction, err = c.prepareUpdate(ctx, scope, current, input, target)
 	case dyncfg.CommandRemove:
 		transaction, err = c.prepareRemove(scope, current, target)
 	default:
-		transaction, err = c.noopMessageWithPermit(
+		transaction, err = c.noopMessage(
 			scope,
 			current,
-			permit,
 			501,
 			fmt.Sprintf("Function '%s' command '%s' is not implemented.", "config", target.command),
 		)

@@ -1677,7 +1677,7 @@ func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
 	if !census.KernelDrained || !census.FunctionCatalogDrained ||
 		census.UIDActive != 0 || census.TransientActive != 0 ||
 		census.TransientPending != 0 || census.InheritedActive != 0 ||
-		census.LongLived.Active != census.LongLived.SecretStores {
+		census.LongLived.Active != 0 {
 		return false
 	}
 	return true

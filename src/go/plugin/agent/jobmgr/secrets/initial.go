@@ -82,7 +82,6 @@ func (c *Controller) publishTemplates(ctx context.Context, commands jobmgr.Prepa
 				return c.noop(
 					scope,
 					nil,
-					lifecycle.LongLivedPermit{},
 					mustSecretMessage(204, ""),
 					nil,
 					c.templateCleanup(),
@@ -111,7 +110,6 @@ func (c *Controller) planInitial(config secretstore.Config) (jobmgr.WorkPlan, er
 		Transaction: &jobmgr.ResourceTransactionPlan{
 			ID:                resourceID,
 			AllocateSuccessor: true,
-			Permit:            lifecycle.NewSecretStoreLongLivedPlan(),
 			Prepare: func(
 				ctx context.Context,
 				current lifecycle.ReadyResource,
@@ -131,7 +129,6 @@ func (c *Controller) planInitial(config secretstore.Config) (jobmgr.WorkPlan, er
 						return c.noop(
 							scope,
 							current,
-							permit,
 							mustSecretMessage(204, ""),
 							nil,
 							c.configCreateCleanup(existing),
@@ -139,7 +136,7 @@ func (c *Controller) planInitial(config secretstore.Config) (jobmgr.WorkPlan, er
 					}
 				}
 				expected := c.store.Generation(key)
-				return c.prepareStoreMutation(ctx, scope, current, permit, config, expected, true)
+				return c.prepareStoreMutation(ctx, scope, current, config, expected, true)
 			},
 		},
 		CooperativeCancel:   true,
@@ -147,10 +144,10 @@ func (c *Controller) planInitial(config secretstore.Config) (jobmgr.WorkPlan, er
 	}, nil
 }
 
-func (c *Controller) Close(ctx context.Context) error {
-	if c == nil || ctx == nil {
-		return errors.New("jobmgr secrets: invalid controller close")
+func (c *Controller) CloseProjection() error {
+	if c == nil {
+		return errors.New("jobmgr secrets: invalid controller projection close")
 	}
 	c.setCommandsReady(false)
-	return c.store.Close(ctx)
+	return nil
 }

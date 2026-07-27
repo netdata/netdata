@@ -99,6 +99,94 @@ func TestProcessCoreTerminateInterruptsSuccessorStartup(t *testing.T) {
 	close(release)
 }
 
+func TestProcessCoreRotationRetainsOldStoreScopeOutsideRun(t *testing.T) {
+	reader, writer := io.Pipe()
+	output := newProcessSynchronizedBuffer()
+	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
+		Kind:   secretstore.KindVault,
+		Schema: `{}`,
+		Create: func() secretstore.Store {
+			return &processSecretStore{}
+		},
+	}})
+	require.NoError(t, err)
+	jobs := testRunJobServices(t)
+	jobs.StoreCreators = creators
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          output,
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{},
+		Jobs:            jobs,
+		Secrets: runSecretServices{
+			Initial: []secretstore.Config{{
+				"name":            "main",
+				"kind":            string(secretstore.KindVault),
+				"value":           "old",
+				"__source__":      confgroup.TypeUser,
+				"__source_type__": confgroup.TypeUser,
+			}},
+		},
+		Discovery:   testRunDiscoveryServices(t),
+		Diagnostics: testProcessDiagnostics(),
+	})
+	require.NoError(t, err)
+	controls := newTestProcessControls(2)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	t.Cleanup(func() {
+		_ = writer.Close()
+	})
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+		require.FailNow(t, "test failed", "process stopped before publishing its Store configuration")
+	case <-time.After(25 * time.Millisecond):
+	}
+
+	output.waitContains(t, "CONFIG go.d:secretstore:vault:main create running job")
+	oldEpoch, ok := process.storeEpochs.testLookup(1)
+	require.True(t, ok)
+	key := secretstore.StoreKey(secretstore.KindVault, "main")
+	scope, err := oldEpoch.acquireScope([]string{key})
+	require.NoError(t, err)
+
+	restart := testProcessControl(processRestart)
+	controls.send(restart)
+	select {
+	case err := <-restart.result:
+		require.NoError(t, err)
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "test failed", "restart waited for a process-owned Store scope")
+	}
+
+	require.True(t, oldEpoch.store.Census().Closing)
+	select {
+	case <-oldEpoch.done():
+		require.FailNow(t, "test failed", "old Store epoch closed while its scope remained live")
+	default:
+	}
+	value, err := scope.Resolve(t.Context(), key, "key")
+	require.NoError(t, err)
+	require.Equal(t, "old", string(value))
+	_, ok = process.storeEpochs.testLookup(2)
+	require.True(t, ok)
+
+	require.NoError(t, scope.Release(t.Context()))
+	select {
+	case <-oldEpoch.done():
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "old Store epoch was retained after its scope drained")
+	}
+
+	terminate := testProcessControl(processTerminate)
+	controls.send(terminate)
+	require.NoError(t, <-terminate.result)
+	require.NoError(t, <-done)
+}
+
 func TestProcessTransitionCancellationClassificationRejectsMixedFailures(t *testing.T) {
 	cleanupErr := errors.New("cleanup failed")
 	tests := map[string]struct {

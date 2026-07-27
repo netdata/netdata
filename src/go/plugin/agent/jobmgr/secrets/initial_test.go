@@ -19,7 +19,6 @@ func TestTemplatePublicationAcceptsReplayBeforeFrameBecomesVisible(t *testing.T)
 	resourceID := secretResourceID("vault:replay")
 	successor := lifecycle.ResourceIdentity{ID: resourceID, Generation: 1}
 	var controller *Controller
-	var permit lifecycle.LongLivedPermit
 	var owned lifecycle.ReadyResource
 	status := 0
 	writer := secretTestWriteFunc(func(payload []byte) (int, error) {
@@ -37,7 +36,7 @@ func TestTemplatePublicationAcceptsReplayBeforeFrameBecomesVisible(t *testing.T)
 					ID:        resourceID,
 					Successor: successor,
 				},
-				permit,
+				lifecycle.LongLivedPermit{},
 			)
 			require.NoError(t, err)
 			applied, err := transaction.Apply(t.Context())
@@ -48,12 +47,8 @@ func TestTemplatePublicationAcceptsReplayBeforeFrameBecomesVisible(t *testing.T)
 		return len(payload), nil
 	})
 	var store *secretstore.SecretStore
-	var supervisor *lifecycle.TaskSupervisor
-	controller, store, supervisor = newSecretControllerTestHarnessWithWriter(t, nil, writer)
+	controller, store = newSecretControllerTestHarnessWithWriter(t, nil, writer)
 	require.NoError(t, controller.Bind(restartTestJobs{}))
-	issuedPermit, err := supervisor.IssueLongLivedPermit(successor, lifecycle.NewSecretStoreLongLivedPlan())
-	require.NoError(t, err)
-	permit = issuedPermit
 
 	require.NoError(t, controller.templateCleanup()())
 	if owned != nil {
@@ -61,13 +56,12 @@ func TestTemplatePublicationAcceptsReplayBeforeFrameBecomesVisible(t *testing.T)
 	}
 	require.NoError(t, store.Close(t.Context()))
 	require.Equal(t, 200, status)
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, supervisor.LongLivedCensus())
 }
 
 func TestConfigPublicationPreservesWindowsSourcePath(t *testing.T) {
 	const source = `file=C:\Program Files\Netdata\etc\netdata\ss\vault.conf`
 	var output bytes.Buffer
-	controller, store, _ := newSecretControllerTestHarnessWithWriter(t, nil, &output)
+	controller, store := newSecretControllerTestHarnessWithWriter(t, nil, &output)
 	config := secretstore.Config{
 		"name":            "main",
 		"kind":            string(secretstore.KindVault),
@@ -84,13 +78,12 @@ func TestConfigPublicationPreservesWindowsSourcePath(t *testing.T) {
 }
 
 func TestSecretAddCollisionIsReplayUpsert(t *testing.T) {
-	controller, store, supervisor := newSecretControllerTestHarness(t, nil)
+	controller, store := newSecretControllerTestHarness(t, nil)
 	require.NoError(t, controller.Bind(restartTestJobs{}))
 	controller.setCommandsReady(true)
 
 	existing := secretTestConfig(confgroup.TypeUser, "original")
-	carrier := &transactionTestCarrier{}
-	mutation, err := store.PrepareMutation(t.Context(), controller.creators, carrier, existing, 0)
+	mutation, err := store.PrepareMutation(t.Context(), controller.creators, existing, 0)
 	require.NoError(t, err)
 	result, err := mutation.Commit(t.Context())
 	require.NoError(t, err)
@@ -110,11 +103,6 @@ func TestSecretAddCollisionIsReplayUpsert(t *testing.T) {
 	)
 	require.NoError(t, err)
 	successorIdentity := lifecycle.ResourceIdentity{ID: resourceID, Generation: 2}
-	permit, err := supervisor.IssueLongLivedPermit(
-		successorIdentity,
-		lifecycle.NewSecretStoreLongLivedPlan(),
-	)
-	require.NoError(t, err)
 
 	add := CommandInput{
 		Args:        []string{"go.d:secretstore:vault", "add", "main"},
@@ -131,7 +119,7 @@ func TestSecretAddCollisionIsReplayUpsert(t *testing.T) {
 			Current:   currentIdentity,
 			Successor: successorIdentity,
 		},
-		permit,
+		lifecycle.LongLivedPermit{},
 	)
 	require.NoError(t, err)
 	applied, err := transaction.Apply(t.Context())
@@ -144,13 +132,11 @@ func TestSecretAddCollisionIsReplayUpsert(t *testing.T) {
 	require.Equal(t, lifecycle.ResourceTransactionReplaced, disposition)
 	require.Equal(t, confgroup.TypeDyncfg, active.SourceType())
 	require.Equal(t, "replacement", active["value"])
+	require.Nil(t, current.store)
+	require.Empty(t, current.key)
+	require.Zero(t, current.storeGen)
 
 	repeatSuccessor := lifecycle.ResourceIdentity{ID: resourceID, Generation: 3}
-	repeatPermit, err := supervisor.IssueLongLivedPermit(
-		repeatSuccessor,
-		lifecycle.NewSecretStoreLongLivedPlan(),
-	)
-	require.NoError(t, err)
 	repeat, err := controller.Prepare(
 		t.Context(),
 		add,
@@ -160,7 +146,7 @@ func TestSecretAddCollisionIsReplayUpsert(t *testing.T) {
 			Current:   successorIdentity,
 			Successor: repeatSuccessor,
 		},
-		repeatPermit,
+		lifecycle.LongLivedPermit{},
 	)
 	require.NoError(t, err)
 	repeated, err := repeat.Apply(t.Context())
@@ -171,14 +157,18 @@ func TestSecretAddCollisionIsReplayUpsert(t *testing.T) {
 	require.Same(t, owned, repeatOwned)
 
 	require.NoError(t, repeatOwned.Finalize())
+	resource, ok := repeatOwned.(*storeGenerationResource)
+	require.True(t, ok)
+	require.Nil(t, resource.store)
+	require.Empty(t, resource.key)
+	require.Zero(t, resource.storeGen)
 	require.NoError(t, store.Close(t.Context()))
-	require.EqualValues(t, lifecycle.LongLivedCensus{}, supervisor.LongLivedCensus())
 }
 
 func newSecretControllerTestHarness(
 	t *testing.T,
 	initial []secretstore.Config,
-) (*Controller, *secretstore.SecretStore, *lifecycle.TaskSupervisor) {
+) (*Controller, *secretstore.SecretStore) {
 	return newSecretControllerTestHarnessWithWriter(t, initial, io.Discard)
 }
 
@@ -186,7 +176,7 @@ func newSecretControllerTestHarnessWithWriter(
 	t *testing.T,
 	initial []secretstore.Config,
 	writer io.Writer,
-) (*Controller, *secretstore.SecretStore, *lifecycle.TaskSupervisor) {
+) (*Controller, *secretstore.SecretStore) {
 	t.Helper()
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
@@ -202,8 +192,6 @@ func newSecretControllerTestHarnessWithWriter(
 	require.NoError(t, err)
 	frames, err := lifecycle.NewFrameOwner(writer)
 	require.NoError(t, err)
-	supervisor, err := lifecycle.NewTaskSupervisor(frames)
-	require.NoError(t, err)
 	controller, err := NewController(ControllerConfig{
 		Epoch:        1,
 		PluginName:   "go.d",
@@ -214,7 +202,7 @@ func newSecretControllerTestHarnessWithWriter(
 		Initial:      initial,
 	})
 	require.NoError(t, err)
-	return controller, store, supervisor
+	return controller, store
 }
 
 type secretTestWriteFunc func([]byte) (int, error)

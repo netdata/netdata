@@ -133,7 +133,7 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 				}
 			}
 			var err error
-			if scope.Successor.Valid() {
+			if scope.Successor.Valid() && transaction.Permit.Class() != 0 {
 				taskPlan, err = lifecycle.NewResourceTransactionPermitTaskPlan(
 					operation.Source,
 					operation.request.Deadline,

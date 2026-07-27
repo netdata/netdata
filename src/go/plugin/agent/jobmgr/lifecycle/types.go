@@ -200,7 +200,7 @@ type TaskPlan struct {
 	Cleanup                TaskCleanup                     // post-disposal cleanup
 	permitOwner            ResourceIdentity                // owning resource identity for the permit
 	permitPlan             LongLivedPlan                   // long-lived plan terms
-	transactionWork        PreparedResourceTransactionWork // permit-bound transaction work (one variant)
+	transactionWork        PreparedResourceTransactionWork // prepared-resource transaction work
 	transactionScope       ResourceTransactionScope        // current/successor identities a transaction may touch
 	transactionScopeSet    bool                            // distinguishes a zero scope from unset
 	initialReady           ReadyResource                   // pre-existing ready resource threaded in as the work source
@@ -364,18 +364,18 @@ func (tp TaskPlan) Validate() error {
 	} else if tp.preserveDisposeContext {
 		return errors.New("jobmgr lifecycle: unexpected preserved disposal context")
 	}
-	if tp.transactionWork != nil && tp.transactionScope.Successor.Valid() {
-		if !tp.permitOwner.Valid() {
+	if tp.permitOwner.Valid() || tp.permitPlan.class != 0 {
+		if tp.transactionWork == nil ||
+			!tp.transactionScope.Successor.Valid() ||
+			!tp.permitOwner.Valid() {
 			return errors.New("jobmgr lifecycle: incomplete prepared-resource permit work")
 		}
 		if err := tp.permitPlan.Validate(); err != nil {
 			return err
 		}
-		if tp.transactionWork != nil && tp.permitOwner != tp.transactionScope.Successor {
+		if tp.permitOwner != tp.transactionScope.Successor {
 			return errors.New("jobmgr lifecycle: transaction permit owner differs from successor")
 		}
-	} else if tp.permitOwner.Valid() || tp.permitPlan.class != 0 {
-		return errors.New("jobmgr lifecycle: unexpected prepared-resource permit terms")
 	}
 	limit := tp.phaseLimit()
 	if limit < 3 || limit > TransactionTaskPhases {

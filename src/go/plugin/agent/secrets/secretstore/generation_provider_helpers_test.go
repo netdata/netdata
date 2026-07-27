@@ -4,7 +4,6 @@ package secretstore_test
 
 import (
 	"encoding/json"
-	"errors"
 	"maps"
 	"testing"
 
@@ -104,29 +103,4 @@ func decodeProviderSchema(t *testing.T, raw string) map[string]any {
 	var schema map[string]any
 	require.NoError(t, json.Unmarshal([]byte(raw), &schema))
 	return schema
-}
-
-type providerGenerationCarrier struct {
-	activated bool
-	released  bool
-}
-
-func (carrier *providerGenerationCarrier) Valid() bool {
-	return carrier != nil && !carrier.released
-}
-
-func (carrier *providerGenerationCarrier) Activate() error {
-	if !carrier.Valid() || carrier.activated {
-		return errors.New("invalid provider generation activation")
-	}
-	carrier.activated = true
-	return nil
-}
-
-func (carrier *providerGenerationCarrier) Release() error {
-	if !carrier.Valid() {
-		return errors.New("invalid provider generation release")
-	}
-	carrier.released = true
-	return nil
 }

@@ -408,7 +408,8 @@ the raw collector cause does not.
 
 Backing stores are managed live over DynCfg (`add` / `update` / `remove`). The
 store (`plugin/agent/secrets/secretstore`) keeps **numbered, immutable
-generations** per `kind:name`:
+generations** per `kind:name`. Each run receives a fresh Store epoch, but the
+process owns that epoch's preparations, generations, and reader scopes:
 
 1. A new generation is prepared *outside* publication, then committed by
    compare-and-swap against the expected generation.
@@ -426,6 +427,10 @@ generations** per `kind:name`:
    `secrets/restart.go`, `secrets/transaction.go`.
 3. The superseded generation is retired only after its last reader scope drains,
    so an in-flight resolution never sees credentials vanish mid-read.
+4. Reload seals the old epoch before retiring its run. Sealing rejects new
+   scopes and late mutation commits, while already-pinned immutable generations
+   remain readable. The old epoch closes after its exact retained-state census
+   drains; it does not enter or dirty the retired run's census.
 
 ## Vnodes (Virtual Nodes)
 
@@ -460,13 +465,14 @@ Job Manager separates two lifetimes:
 
 - **The process is the building.** Built once by `composition.NewProcess`, it
   survives every reload: the stdin reader, the one `FrameOwner`, the UID ledger,
-  the frozen module registry, the secret resolver, the vnode registry, and the
-  runtime metrics service.
+  the frozen module registry, the secret resolver, the process-owned Store
+  epoch authority, the vnode registry, and the runtime metrics service.
 - **The run generation is the current tenant.** A complete, self-contained
   occupant built by `composition/run.go`: the kernel and its loop, the task
-  supervisor, the run supervisor, the DynCfg graph, the per-generation secret
-  store, the Function catalog and publications, the job factory, the
-  autodetection scheduler, and the `jobmgr.runtime` metrics.
+  supervisor, the run supervisor, the DynCfg graph, the run-owned SecretStore
+  controller/dependency projections, the Function catalog and publications,
+  the job factory, the autodetection scheduler, and the `jobmgr.runtime`
+  metrics.
 
 A **SIGHUP reload evicts the whole tenant and moves a fresh one in without
 touching the building.**
@@ -474,7 +480,7 @@ touching the building.**
 ```mermaid
 flowchart TD
     HUP("SIGHUP → Restart")
-    Seal("Seal ingress")
+    Seal("Seal Store epoch + ingress")
     Cut("Publish stopping cut<br/>begin shutdown budget (10s)")
     Drain("Drain admitted work<br/>protected chains finish")
     Census("Require exact-zero census<br/>run finalizer")
@@ -542,7 +548,7 @@ crosses a reload.
 | `framework/jobruntime` | V1 / V2 job runtime and host/vnode scope |
 | `framework/vnoderegistry` | Post-success vnode owner/conflict registry |
 | `agent/secrets/resolver` | Atomic config clone, reference compilation, scoped resolution |
-| `agent/secrets/secretstore` | Frozen creator catalog and per-run store generations |
+| `agent/secrets/secretstore` | Frozen creator catalog and process-owned Store epoch generations |
 | `agent/discovery` | Provider catalog and the discovery pipeline generation |
 
 ### Dependency rules

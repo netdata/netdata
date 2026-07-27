@@ -77,10 +77,11 @@ type processCore struct {
 	config      processCoreConfig         // retained process configuration
 	diagnostics jobmgr.DiagnosticObserver // process-wide operational log sink
 
-	uids     *lifecycle.UIDLedger            // process-lifetime UID ledger
-	frames   *lifecycle.FrameOwner           // the one process-lifetime frame writer
-	ingress  *functionadapter.ProcessIngress // the one process-lifetime stdin reader
-	attempts *containment.Authority          // process-lifetime opaque-work authority
+	uids        *lifecycle.UIDLedger            // process-lifetime UID ledger
+	frames      *lifecycle.FrameOwner           // the one process-lifetime frame writer
+	ingress     *functionadapter.ProcessIngress // the one process-lifetime stdin reader
+	attempts    *containment.Authority          // process-lifetime opaque-work authority
+	storeEpochs *processSecretEpochs            // process-owned per-run secret Store epochs
 }
 
 func newProcessCore(config processCoreConfig) (*processCore, error) {
@@ -109,6 +110,10 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 	if err != nil {
 		return nil, err
 	}
+	storeEpochs, err := newProcessSecretEpochs(config.Jobs.Resolver, config.Diagnostics)
+	if err != nil {
+		return nil, err
+	}
 	return &processCore{
 		config:      config,
 		diagnostics: config.Diagnostics,
@@ -116,6 +121,7 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		frames:      frames,
 		ingress:     ingress,
 		attempts:    attempts,
+		storeEpochs: storeEpochs,
 	}, nil
 }
 
@@ -142,7 +148,7 @@ type processTransition struct {
 }
 
 func (pc *processCore) run(ctx context.Context, controls processControls) error {
-	if pc == nil || ctx == nil || !controls.valid() || pc.attempts == nil {
+	if pc == nil || ctx == nil || !controls.valid() || pc.attempts == nil || pc.storeEpochs == nil {
 		return errors.New("jobmgr composition: invalid process run")
 	}
 	generationID := uint64(1)
@@ -468,7 +474,11 @@ func (pc *processCore) startGeneration(
 }
 
 func (pc *processCore) newRun(generation uint64) (*runGeneration, error) {
-	return newRunGeneration(runGenerationConfig{
+	epoch, err := pc.storeEpochs.create(generation)
+	if err != nil {
+		return nil, err
+	}
+	run, err := newRunGeneration(runGenerationConfig{
 		Generation:      generation,
 		ShutdownTimeout: pc.config.ShutdownTimeout,
 		Diagnostics:     pc.diagnostics,
@@ -478,7 +488,12 @@ func (pc *processCore) newRun(generation uint64) (*runGeneration, error) {
 		Jobs:            pc.config.Jobs,
 		Secrets:         pc.config.Secrets,
 		Discovery:       pc.config.Discovery,
+		SecretEpoch:     epoch,
 	})
+	if err != nil {
+		return nil, errors.Join(err, pc.storeEpochs.seal(epoch))
+	}
+	return run, nil
 }
 
 func (pc *processCore) binding(generation *runGeneration, quit func()) (functionadapter.ProcessBinding, error) {
@@ -525,6 +540,13 @@ func (pc *processCore) retireForSuccessor(current *runGeneration, nextID uint64)
 	if current == nil {
 		return nil
 	}
+	if err := pc.storeEpochs.seal(current.secretEpoch); err != nil {
+		pc.storeEpochs.observeFailure(
+			current.run.Generation(),
+			"secret Store epoch seal failed",
+			err,
+		)
+	}
 	if !current.isStarted() {
 		return current.abortConstruction()
 	}
@@ -562,6 +584,9 @@ func (pc *processCore) finalize(current *runGeneration, cause error) error {
 	finalErr := cause
 	if pc.attempts != nil {
 		pc.attempts.BeginShutdown()
+	}
+	if pc.storeEpochs != nil {
+		pc.storeEpochs.beginShutdown()
 	}
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), pc.config.ShutdownTimeout)
 	defer cancel()
@@ -602,6 +627,11 @@ func (pc *processCore) finalize(current *runGeneration, cause error) error {
 	}
 	if pc.attempts != nil {
 		if err := pc.attempts.Shutdown(shutdownCtx); err != nil {
+			finalErr = errors.Join(finalErr, err)
+		}
+	}
+	if pc.storeEpochs != nil {
+		if err := pc.storeEpochs.shutdown(shutdownCtx); err != nil {
 			finalErr = errors.Join(finalErr, err)
 		}
 	}

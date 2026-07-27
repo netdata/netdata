@@ -58,7 +58,7 @@ func (c *Controller) prepareSchema(
 	if err != nil {
 		return nil, err
 	}
-	return c.noop(scope, current, lifecycle.LongLivedPermit{}, result, nil, nil)
+	return c.noop(scope, current, result, nil, nil)
 }
 
 func (c *Controller) prepareGet(
@@ -89,7 +89,7 @@ func (c *Controller) prepareGet(
 	if err != nil {
 		return nil, err
 	}
-	return c.noop(scope, current, lifecycle.LongLivedPermit{}, result, nil, nil)
+	return c.noop(scope, current, result, nil, nil)
 }
 
 func (c *Controller) prepareUserConfig(
@@ -113,7 +113,7 @@ func (c *Controller) prepareUserConfig(
 	if err != nil {
 		return nil, err
 	}
-	return c.noop(scope, current, lifecycle.LongLivedPermit{}, result, nil, nil)
+	return c.noop(scope, current, result, nil, nil)
 }
 
 func (c *Controller) prepareTest(
@@ -152,13 +152,12 @@ func (c *Controller) prepareAdd(
 	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
-	permit lifecycle.LongLivedPermit,
 	input CommandInput,
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	config, err := c.configFromPayload(input, target)
 	if err != nil {
-		return c.noopMessageWithPermit(scope, current, permit, 400, msgInvalidSecretStoreConfig)
+		return c.noopMessage(scope, current, 400, msgInvalidSecretStoreConfig)
 	}
 	entry, exists := c.entry(target.key)
 	expected := c.store.Generation(target.key)
@@ -176,42 +175,39 @@ func (c *Controller) prepareAdd(
 		return c.noop(
 			scope,
 			current,
-			permit,
 			mustSecretMessage(200, ""),
 			nil,
 			c.configCreateCleanup(entry),
 		)
 	}
-	return c.prepareStoreMutation(ctx, scope, current, permit, config, expected, expected == 0)
+	return c.prepareStoreMutation(ctx, scope, current, config, expected, expected == 0)
 }
 
 func (c *Controller) prepareUpdate(
 	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
-	permit lifecycle.LongLivedPermit,
 	input CommandInput,
 	target secretTarget,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	entry, exists := c.entry(target.key)
 	if !exists {
-		return c.noopMessageWithPermit(
+		return c.noopMessage(
 			scope,
 			current,
-			permit,
 			404,
 			fmt.Sprintf(msgSecretStoreNotConfigured, target.key),
 		)
 	}
 	config, err := c.configFromPayload(input, target)
 	if err != nil {
-		return c.noopMessageWithPermit(scope, current, permit, 400, msgInvalidSecretStoreConfig)
+		return c.noopMessage(scope, current, 400, msgInvalidSecretStoreConfig)
 	}
 	expected := c.store.Generation(target.key)
 	if expected != 0 && entry.config.Hash() == config.Hash() {
-		return c.noop(scope, current, permit, mustSecretMessage(200, ""), nil, c.configCreateCleanup(entry))
+		return c.noop(scope, current, mustSecretMessage(200, ""), nil, c.configCreateCleanup(entry))
 	}
-	return c.prepareStoreMutation(ctx, scope, current, permit, config, expected, false)
+	return c.prepareStoreMutation(ctx, scope, current, config, expected, false)
 }
 
 func (c *Controller) prepareRemove(
@@ -287,19 +283,14 @@ func (c *Controller) prepareStoreMutation(
 	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
-	permit lifecycle.LongLivedPermit,
 	config secretstore.Config,
 	expected uint64,
 	installFailure bool,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	if !permit.Valid() || !scope.Successor.Valid() || permit.Owner() != scope.Successor {
-		return nil, errors.New("jobmgr secrets: invalid Store mutation permit")
+	if !scope.Successor.Valid() {
+		return nil, errors.New("jobmgr secrets: invalid Store mutation successor")
 	}
-	carrier, err := newStoreGenerationCarrier(permit, scope.Successor)
-	if err != nil {
-		return nil, err
-	}
-	mutation, prepareErr := c.store.PrepareMutation(ctx, c.creators, carrier, config, expected)
+	mutation, prepareErr := c.store.PrepareMutation(ctx, c.creators, config, expected)
 	entry := secretEntry{
 		config: config,
 		status: dyncfg.StatusRunning,
@@ -308,7 +299,6 @@ func (c *Controller) prepareStoreMutation(
 		spec := preparedSecretSpec{
 			scope:      scope,
 			current:    current,
-			permit:     permit,
 			store:      c.store,
 			storeKey:   config.ExposedKey(),
 			result:     mustSecretMessage(400, msgSecretStoreValidationFailed),
@@ -330,7 +320,6 @@ func (c *Controller) prepareStoreMutation(
 		preparedSecretSpec{
 			scope:      scope,
 			current:    current,
-			permit:     permit,
 			store:      c.store,
 			storeKey:   config.ExposedKey(),
 			mutation:   mutation,
@@ -352,7 +341,6 @@ func (c *Controller) restartCommand() *SecretRestartCommand {
 func (c *Controller) noop(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
-	permit lifecycle.LongLivedPermit,
 	result lifecycle.SealedResult,
 	entry *secretEntry,
 	cleanup lifecycle.TaskCleanup,
@@ -364,7 +352,6 @@ func (c *Controller) noop(
 		preparedSecretSpec{
 			scope:      scope,
 			current:    current,
-			permit:     permit,
 			result:     result,
 			cleanup:    cleanup,
 			controller: c,
@@ -379,17 +366,7 @@ func (c *Controller) noopMessage(
 	code int,
 	message string,
 ) (lifecycle.PreparedResourceTransaction, error) {
-	return c.noopMessageWithPermit(scope, current, lifecycle.LongLivedPermit{}, code, message)
-}
-
-func (c *Controller) noopMessageWithPermit(
-	scope lifecycle.ResourceTransactionScope,
-	current lifecycle.ReadyResource,
-	permit lifecycle.LongLivedPermit,
-	code int,
-	message string,
-) (lifecycle.PreparedResourceTransaction, error) {
-	return c.noop(scope, current, permit, mustSecretMessage(code, message), nil, nil)
+	return c.noop(scope, current, mustSecretMessage(code, message), nil, nil)
 }
 
 func formatSecretJobs(refs []secretstore.JobRef) string {

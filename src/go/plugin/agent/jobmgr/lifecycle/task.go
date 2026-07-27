@@ -419,7 +419,7 @@ func (ts *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial T
 		}
 		initial = TaskOutcome{}
 		var permit LongLivedPermit
-		if plan.transactionScope.Successor.Valid() {
+		if plan.permitPlan.Class() != 0 {
 			permit, err = ts.IssueLongLivedPermit(plan.permitOwner, plan.permitPlan)
 			if err != nil {
 				return TaskRef{}, err

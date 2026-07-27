@@ -214,7 +214,7 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -261,7 +261,7 @@ func TestRunGenerationFinalizerStopsRuntimeWriterBeforeTerminalCensus(t *testing
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,

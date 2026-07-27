@@ -29,11 +29,9 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 		}},
 	)
 	require.NoError(t, err)
-	carrier := &transactionTestCarrier{}
 	mutation, err := store.PrepareMutation(
 		t.Context(),
 		catalog,
-		carrier,
 		secretstore.Config{
 			"name":            "main",
 			"kind":            string(secretstore.KindVault),
@@ -64,8 +62,6 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(t *testing.T) {
 	_, applyErr := transaction.Apply(ctx)
 	require.NoError(t, applyErr)
 
-	require.True(t, carrier.released)
-
 	census := store.Census()
 	require.EqualValues(t, secretstore.SecretStoreCensus{}, census)
 
@@ -86,11 +82,9 @@ func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
 		},
 	}})
 	require.NoError(t, err)
-	carrier := &transactionTestCarrier{}
 	mutation, err := store.PrepareMutation(
 		t.Context(),
 		catalog,
-		carrier,
 		secretstore.Config{
 			"name":            "main",
 			"kind":            string(secretstore.KindVault),
@@ -130,34 +124,8 @@ func TestSecretTransactionAlwaysAbortsUncommittedMutation(t *testing.T) {
 	_, applyErr := transaction.ApplyComposite(t.Context(), commands)
 
 	require.NoError(t, applyErr)
-	require.True(t, carrier.released)
 	require.Zero(t, store.Census().Preparations)
 	require.NoError(t, store.Close(t.Context()))
-}
-
-type transactionTestCarrier struct {
-	activated bool
-	released  bool
-}
-
-func (ttc *transactionTestCarrier) Valid() bool {
-	return ttc != nil && !ttc.released
-}
-
-func (ttc *transactionTestCarrier) Activate() error {
-	if !ttc.Valid() || ttc.activated {
-		return errors.New("invalid activation")
-	}
-	ttc.activated = true
-	return nil
-}
-
-func (ttc *transactionTestCarrier) Release() error {
-	if !ttc.Valid() {
-		return errors.New("invalid release")
-	}
-	ttc.released = true
-	return nil
 }
 
 type transactionTestStore struct {

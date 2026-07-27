@@ -22,7 +22,7 @@ type WorkPlan struct {
 type ResourceTransactionPlan struct {
 	ID                         string                                    // resource ID the transaction targets
 	AllocateSuccessor          bool                                      // whether a successor resource is prepared
-	Permit                     lifecycle.LongLivedPlan                   // long-lived permit for the successor
+	Permit                     lifecycle.LongLivedPlan                   // optional run-owned lifetime behind the successor
 	Prepare                    lifecycle.PreparedResourceTransactionWork // single-resource transaction work
 	PrepareComposite           CompositeResourceTransactionWork          // composite (multi-resource) transaction work
 	CompositeChildLaneConflict func(string) bool                         // whether a resource lane may be used by a child
@@ -67,8 +67,10 @@ func (wp WorkPlan) validate() error {
 		}
 	}
 	if wp.Transaction.AllocateSuccessor {
-		if err := wp.Transaction.Permit.Validate(); err != nil {
-			return errors.Join(errors.New("jobmgr kernel: transaction successor has no long-lived permit"), err)
+		if wp.Transaction.Permit.Class() != 0 {
+			if err := wp.Transaction.Permit.Validate(); err != nil {
+				return errors.Join(errors.New("jobmgr kernel: transaction successor has invalid long-lived permit"), err)
+			}
 		}
 	} else if wp.Transaction.Permit.Class() != 0 {
 		return errors.New("jobmgr kernel: transaction without successor has a permit")

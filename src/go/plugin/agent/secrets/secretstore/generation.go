@@ -10,21 +10,14 @@ import (
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 )
 
-// GenerationCarrier owns the admitted memory and external-resource facets of
-// one configured Store generation.
-type GenerationCarrier interface {
-	Valid() bool
-	Activate() error
-	Release() error
-}
-
-// SecretStore is the single per-run authority for configured Store
+// SecretStore is the single per-epoch authority for configured Store
 // generations and lexical reader scopes.
 type SecretStore struct {
 	mu sync.Mutex
 
 	state storeAuthorityState
 	dirty error
+	done  chan struct{}
 
 	records map[string]*generationRecord
 	head    *StoreGeneration
@@ -66,7 +59,6 @@ type StoreGeneration struct {
 	config     Config
 	hash       uint64
 	published  PublishedStore
-	carrier    GenerationCarrier
 	readers    int
 	previous   *StoreGeneration
 	next       *StoreGeneration
@@ -96,6 +88,7 @@ func NewSecretStore(
 		state:    storeAuthorityOpen,
 		records:  make(map[string]*generationRecord),
 		resolver: resolver,
+		done:     make(chan struct{}),
 	}, nil
 }
 
@@ -184,6 +177,31 @@ func (store *SecretStore) Retire(
 	return nil
 }
 
+// Seal closes mutation and scope admission. Physical ownership may drain after
+// Seal returns; Done closes when the exact retained-state census reaches zero.
+func (store *SecretStore) Seal() error {
+	if store == nil {
+		return errors.New("secretstore: nil Store authority")
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if store.state == storeAuthorityClosed {
+		return store.dirty
+	}
+	store.state = storeAuthorityClosing
+	store.finishCloseLocked()
+	return store.dirty
+}
+
+// Done closes after a sealed Store releases every generation, reader scope,
+// and preparation.
+func (store *SecretStore) Done() <-chan struct{} {
+	if store == nil {
+		return nil
+	}
+	return store.done
+}
+
 // Close seals mutation/scope admission and acknowledges only an exact-zero
 // generation census.
 func (store *SecretStore) Close(context.Context) error {
@@ -196,32 +214,36 @@ func (store *SecretStore) Close(context.Context) error {
 		return store.dirty
 	}
 	store.state = storeAuthorityClosing
-	if store.activeScopes != 0 ||
+	store.finishCloseLocked()
+	if store.state == storeAuthorityClosed {
+		return store.dirty
+	}
+	return errors.Join(
+		errors.New("secretstore: close with retained ownership"),
+		store.dirty,
+	)
+}
+
+func (store *SecretStore) finishCloseLocked() {
+	if store.state != storeAuthorityClosing ||
+		store.activeScopes != 0 ||
 		store.activePreparations != 0 ||
 		store.generations != 0 ||
 		store.readers != 0 {
-		return errors.Join(
-			errors.New("secretstore: close with retained ownership"),
-			store.dirty,
-		)
+		return
 	}
 	store.state = storeAuthorityClosed
-	return store.dirty
+	close(store.done)
 }
 
 func (store *SecretStore) releaseGeneration(
 	generation *StoreGeneration,
 ) error {
-	if generation == nil || generation.carrier == nil {
+	if generation == nil {
 		return errors.New("secretstore: invalid generation release")
 	}
-	releaseErr := callGenerationCarrierRelease(generation.carrier)
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	if releaseErr != nil {
-		store.dirty = errors.Join(store.dirty, releaseErr)
-		return releaseErr
-	}
 	record := generation.record
 	if record == nil || record.retiring != generation {
 		store.dirty = errors.Join(
@@ -236,6 +258,7 @@ func (store *SecretStore) releaseGeneration(
 	if record.current == nil && record.preparations == 0 {
 		delete(store.records, record.key)
 	}
+	store.finishCloseLocked()
 	return nil
 }
 
@@ -264,28 +287,4 @@ func (store *SecretStore) unlinkGeneration(generation *StoreGeneration) {
 	generation.previous = nil
 	generation.next = nil
 	store.generations--
-}
-
-func callGenerationCarrierActivate(carrier GenerationCarrier) (err error) {
-	if carrier == nil || !carrier.Valid() {
-		return errors.New("secretstore: invalid generation carrier")
-	}
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			err = errors.New("secretstore: generation carrier activation panic")
-		}
-	}()
-	return carrier.Activate()
-}
-
-func callGenerationCarrierRelease(carrier GenerationCarrier) (err error) {
-	if carrier == nil {
-		return errors.New("secretstore: nil generation carrier")
-	}
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			err = errors.New("secretstore: generation carrier release panic")
-		}
-	}()
-	return carrier.Release()
 }

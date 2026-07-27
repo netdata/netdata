@@ -36,7 +36,7 @@ func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      7,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -80,7 +80,7 @@ func TestRunGenerationQuarantinesUnpublishableDiscoveredConfigAndContinues(t *te
 	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -161,7 +161,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 			require.NoError(t, err)
 			uids := lifecycle.NewUIDLedger()
-			generation, err := newRunGeneration(runGenerationConfig{
+			generation, err := newTestRunGeneration(t, runGenerationConfig{
 				Generation:      1,
 				ShutdownTimeout: 10 * time.Second,
 				UIDs:            uids,
@@ -230,7 +230,7 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 		},
 	}
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -314,7 +314,7 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -422,7 +422,7 @@ func TestRunGenerationShutdownRejectsInFlightJobProbeBeforePublication(t *testin
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
-	generation, err := newRunGeneration(runGenerationConfig{
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -491,6 +491,32 @@ func fullCapacityDiscoveredJobs(count int) []confgroup.Config {
 		configs[ordinal] = config
 	}
 	return configs
+}
+
+func newTestRunGeneration(
+	t testing.TB,
+	config runGenerationConfig,
+) (*runGeneration, error) {
+	t.Helper()
+	store, err := secretstore.NewSecretStore(config.Jobs.Resolver)
+	if err != nil {
+		return nil, err
+	}
+	epoch := &processSecretEpoch{
+		generation:  config.Generation,
+		store:       store,
+		diagnostics: config.Diagnostics,
+	}
+	config.SecretEpoch = epoch
+	t.Cleanup(func() {
+		require.NoError(t, epoch.seal())
+		select {
+		case <-epoch.done():
+		case <-time.After(time.Second):
+			require.FailNow(t, "test failed", "test Store epoch retained ownership")
+		}
+	})
+	return newRunGeneration(config)
 }
 
 func testRunJobServices(t testing.TB) runJobServices {
