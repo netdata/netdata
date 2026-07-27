@@ -195,11 +195,11 @@ static int dns_read_name(const char *msg, int msg_len, int off,
 {
     int  current   = off;
     int  out_len   = 0;
-    int  jumps     = 0;
+    int  ptrs      = 0; /* compression-pointer-follow count; guards against pointer loops */
     int  first_end = -1;
     bool jumped    = false;
 
-    while (current < msg_len && jumps < 32) {
+    while (current < msg_len && ptrs < 32) {
         uint8_t label = (uint8_t)msg[current];
 
         if ((label & 0xC0u) == 0xC0u) {
@@ -211,7 +211,7 @@ static int dns_read_name(const char *msg, int msg_len, int off,
             int ptr = ((label & 0x3Fu) << 8) | (uint8_t)msg[current + 1];
             current = ptr;
             jumped  = true;
-            jumps++;
+            ptrs++;
             continue;
         }
 
@@ -245,7 +245,8 @@ static int dns_read_name(const char *msg, int msg_len, int off,
         }
 
         current += (int)label;
-        jumps++;
+        /* ptrs is NOT incremented here: regular labels advance current and are
+         * bounded by msg_len; only pointer follows need the loop-guard counter. */
     }
 
     return 0;

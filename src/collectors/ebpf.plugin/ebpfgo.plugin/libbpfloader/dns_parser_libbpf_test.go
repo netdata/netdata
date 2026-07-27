@@ -203,4 +203,33 @@ func TestDNSReadNameBoundaries(t *testing.T) {
 			t.Errorf("got %d, want 8", got)
 		}
 	})
+
+	t.Run("valid 35-label name — must not be rejected by pointer-loop guard", func(t *testing.T) {
+		// Build a wire-format name with 35 single-character labels "a.b.c...z.aa.ab...ai."
+		// Each label: 0x01 <char>.  Root: 0x00.
+		// Before the fix, ptrs (then called jumps) was incremented for every label,
+		// so this name hit the jumps<32 guard and returned 0 (error).
+		labels := []string{
+			"a", "b", "c", "d", "e", "f", "g", "h", "i", "j",
+			"k", "l", "m", "n", "o", "p", "q", "r", "s", "t",
+			"u", "v", "w", "x", "y", "z",
+			"aa", "ab", "ac", "ad", "ae", "af", "ag", "ah", "ai",
+		}
+		var msg []byte
+		var want string
+		for i, lbl := range labels {
+			msg = append(msg, byte(len(lbl)))
+			msg = append(msg, []byte(lbl)...)
+			if i > 0 {
+				want += "."
+			}
+			want += lbl
+		}
+		msg = append(msg, 0x00) // root label
+		wantConsumed := len(msg)
+		got := call(msg, 0, 512)
+		if got != wantConsumed {
+			t.Errorf("got consumed=%d, want %d (35-label name was rejected, check ptrs counter)", got, wantConsumed)
+		}
+	})
 }
