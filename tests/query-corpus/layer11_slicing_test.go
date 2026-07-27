@@ -171,6 +171,27 @@ func sliceTotal(t *testing.T, a sliceAxes, after, before int64) (float64, int) {
 	return sum, n
 }
 
+// sliceTierCovers reports whether the tier being asked actually holds the
+// whole window. A rollup is built as the data lands, so a tier that has not
+// caught up yet answers with less than was pushed - which looks exactly like
+// a conservation defect and is not one. Nothing is asserted against a tier
+// that cannot answer.
+func sliceTierCovers(t *testing.T, a sliceAxes, after, before int64) bool {
+	t.Helper()
+	params := daemon.DataParamsTier(sliceContext(a.Shape, a.UE), a.Tier, after, before, 1, "average")
+	params.Set("options", "jsonwrap|unaligned")
+	doc, err := td.DataV3(sliceHost(a.Shape, a.UE), params)
+	if err != nil {
+		return false
+	}
+	tiers := perTierRetention(doc)
+	if a.Tier >= len(tiers) {
+		return false
+	}
+	r := tiers[a.Tier]
+	return r.FirstEntry > 0 && r.FirstEntry <= after && r.LastEntry >= before
+}
+
 // sliceWindow is a window well inside the fixture, offset from the grid.
 func sliceWindow(a sliceAxes) (after, before int64) {
 	base := int64(fixture.T0) - int64(fixture.T0)%int64(a.UE)
@@ -272,10 +293,22 @@ func TestLayer11SlicingIsAdditive(t *testing.T) {
 	expectAgentStatus(t, "L11/slicing-is-additive", ok)
 }
 
-// Conservation against the fixture's own arithmetic, where the window aligns
-// with stored records so the expected total is exact rather than bounded.
+// Conservation against the fixture's own arithmetic.
+//
+// This one has a precondition, and it is not a convenience: it only applies
+// while the chart points are at least as wide as the COLLECTION INTERVAL.
+// Ask for points narrower than that and the engine is no longer dividing
+// stored records - it is manufacturing values between them, interpolating a
+// sub-sample series that was never collected. Adding those up is a different
+// quantity from adding up what was collected, and layer 9 owns that contract.
+//
+// The precondition is on the collection interval, not on the stored record:
+// at tier 1 a 1-second chart point is still one point per collected sample,
+// and that regime is precisely where sum-over-time multiplies a total by the
+// zoom - so excluding it would throw away the check that matters most.
 func TestLayer11TotalsMatchWhatWasPushed(t *testing.T) {
 	ok := true
+	checked := 0
 	for _, shape := range sliceShapes {
 		for _, ue := range sliceUEs {
 			sliceFixture(t, shape, ue)
@@ -283,7 +316,21 @@ func TestLayer11TotalsMatchWhatWasPushed(t *testing.T) {
 			for _, tier := range []int{0, 1} {
 				for _, pointsPer := range slicePoints {
 					a := sliceAxes{Shape: shape, UE: ue, Tier: tier, PointsPer: pointsPer}
+
+					// bucket width = the stored record's width / the zoom
+					recordEvery := ue
+					if tier > 0 {
+						recordEvery = ue * int(tier1Gran)
+					}
+					if recordEvery/pointsPer < ue {
+						continue // upsampling - see above
+					}
 					after, before := sliceWindow(a)
+					if !sliceTierCovers(t, a, after, before) {
+						t.Logf("skipped %s: tier %d does not cover the window yet", a, tier)
+						continue
+					}
+					checked++
 
 					want := 0.0
 					base := int64(fixture.T0) - int64(fixture.T0)%int64(ue)
@@ -312,5 +359,9 @@ func TestLayer11TotalsMatchWhatWasPushed(t *testing.T) {
 		}
 	}
 
+	if checked == 0 {
+		t.Fatalf("no configuration met the precondition - the check tested nothing")
+	}
+	t.Logf("%d configurations checked (the rest upsample)", checked)
 	expectAgentStatus(t, "L11/totals-match-what-was-pushed", ok)
 }

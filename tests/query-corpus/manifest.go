@@ -342,7 +342,7 @@ var manifest = map[string]ManifestCase{
 		Agent:  Green,
 	},
 	"L11/totals-match-what-was-pushed": {
-		Proves: "a total equals what the fixture actually pushed into the window, at every tier and every zoom, for dense, gapped and sparse data at 1s and 10s collection intervals - conservation against arithmetic rather than against another query. A stored record straddling either end of the window is legitimately divided, so one record of slack is allowed at each edge; everything inside must be accounted exactly once",
+		Proves: "a total equals what the fixture actually pushed into the window - conservation against arithmetic rather than against another query. Two preconditions, both principled and both enforced: the chart points must be at least as wide as the COLLECTION INTERVAL (below that the engine is no longer dividing stored records but manufacturing values between them, which layer 9 owns), and the tier being asked must actually cover the window (a rollup still catching up answers with less than was pushed, which looks like a defect and is not). The precondition is on the collection interval and NOT on the stored record, because at tier 1 a 1-second chart point is still one point per collected sample - and that regime is exactly where sum-over-time multiplies a total by the zoom. Currently RED on 2 of 24 qualifying configurations: at tier 1 with one bucket per stored record, sum returns 40% of what was pushed (1680 of 4200 dense, 840 of 2100 gapped) - the same ratio on both, and unchanged by the sum apportionment work, so it is a distinct defect still to be diagnosed",
 		Agent:  Red,
 	},
 	"L9/virtual-points": {
