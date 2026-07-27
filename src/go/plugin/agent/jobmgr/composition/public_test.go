@@ -214,14 +214,14 @@ func TestProcessControlCancellationAfterHandoffWaitsForDisposition(t *testing.T)
 			started := make(chan struct{})
 			close(started)
 			process := &Process{
-				commands: make(chan processControl),
+				controls: newProcessControls(),
 				started:  started,
 				done:     make(chan struct{}),
 			}
 			accepted := make(chan struct{})
 			release := make(chan struct{})
 			go func() {
-				control := <-process.commands
+				control := <-process.controls.channel(test.want)
 				if control.command != test.want {
 					control.result <- errors.New("unexpected command")
 					return

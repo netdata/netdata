@@ -3,14 +3,51 @@
 package agenthost
 
 import (
+	"context"
 	"errors"
+	"os"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSignalLoopTerminatesWhileRestartIsInProgress(t *testing.T) {
+	hosted := newBlockingRestartAgent()
+	signals := make(chan os.Signal, 2)
+	done := make(chan error, 1)
+	go func() {
+		done <- runSignals(hosted, signals)
+	}()
+
+	signals <- syscall.SIGHUP
+	select {
+	case <-hosted.restartEntered:
+	case <-time.After(time.Second):
+		t.Fatal("restart did not start")
+	}
+
+	signals <- syscall.SIGTERM
+	select {
+	case <-hosted.terminateCalled:
+	case <-time.After(time.Second):
+		t.Fatal("signal loop waited for restart before delivering termination")
+	}
+
+	close(hosted.releaseRestart)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("host returned %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("host did not stop")
+	}
+}
 
 func TestRestartControlErrorTreatsStoppedProcessAsBenign(t *testing.T) {
 	sentinel := errors.New("restart failed")
@@ -81,3 +118,43 @@ func completedRun(err error) chan error {
 	done <- err
 	return done
 }
+
+type blockingRestartAgent struct {
+	restartEntered  chan struct{}
+	releaseRestart  chan struct{}
+	terminateCalled chan struct{}
+	stopRun         chan struct{}
+	terminateOnce   sync.Once
+}
+
+func newBlockingRestartAgent() *blockingRestartAgent {
+	return &blockingRestartAgent{
+		restartEntered:  make(chan struct{}),
+		releaseRestart:  make(chan struct{}),
+		terminateCalled: make(chan struct{}),
+		stopRun:         make(chan struct{}),
+	}
+}
+
+func (agent *blockingRestartAgent) RunContext(context.Context) error {
+	<-agent.stopRun
+	return nil
+}
+
+func (agent *blockingRestartAgent) Restart(context.Context) error {
+	close(agent.restartEntered)
+	<-agent.releaseRestart
+	return nil
+}
+
+func (agent *blockingRestartAgent) Terminate(context.Context) error {
+	agent.terminateOnce.Do(func() {
+		close(agent.terminateCalled)
+		close(agent.stopRun)
+	})
+	return nil
+}
+
+func (*blockingRestartAgent) Info(...any)           {}
+func (*blockingRestartAgent) Infof(string, ...any)  {}
+func (*blockingRestartAgent) Errorf(string, ...any) {}

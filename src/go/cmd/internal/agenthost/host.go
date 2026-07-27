@@ -23,51 +23,83 @@ func Run(a *agent.Agent) error {
 	defer signal.Stop(ch)
 	signal.Ignore(syscall.SIGPIPE)
 
+	return runSignals(a, ch)
+}
+
+type hostedAgent interface {
+	RunContext(context.Context) error
+	Restart(context.Context) error
+	Terminate(context.Context) error
+	Info(...any)
+	Infof(string, ...any)
+	Errorf(string, ...any)
+}
+
+func runSignals(a hostedAgent, signals <-chan os.Signal) error {
+	if a == nil || signals == nil {
+		return errors.New("agent host: invalid signal loop")
+	}
 	collectorapi.ObsoleteCharts(true)
 	runDone := make(chan error, 1)
 	go func() {
 		runDone <- a.RunContext(context.Background())
 	}()
+	var restartDone <-chan error
+	restartPending := false
+	startRestart := func(sig os.Signal) {
+		a.Infof("received %s signal (%d). Restarting running instance", sig, sig)
+		done := make(chan error, 1)
+		restartDone = done
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			done <- a.Restart(ctx)
+		}()
+	}
+	terminate := func(restartErr error) error {
+		collectorapi.ObsoleteCharts(false)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err := a.Terminate(ctx)
+		cancel()
+		if err != nil && !errors.Is(err, agent.ErrNotRunning) {
+			a.Errorf("terminating the Agent failed: %v", err)
+		}
+		if errors.Is(err, agent.ErrNotRunning) {
+			err = nil
+		}
+		runErr := waitForRun(runDone, 10*time.Second)
+		if runErr != nil {
+			a.Errorf("agent shutdown failed: %v", runErr)
+		}
+		return errors.Join(restartErr, err, runErr)
+	}
 	for {
 		select {
-		case sig := <-ch:
-			var restartErr error
+		case sig := <-signals:
 			if sig == syscall.SIGHUP {
-				a.Infof("received %s signal (%d). Restarting running instance", sig, sig)
-				ctx, cancel := context.WithTimeout(
-					context.Background(),
-					10*time.Second,
-				)
-				err := a.Restart(ctx)
-				cancel()
-				if err == nil {
-					continue
+				if restartDone != nil {
+					restartPending = true
+				} else {
+					startRestart(sig)
 				}
-				restartErr = restartControlError(err)
-				if restartErr != nil {
-					a.Errorf("restarting the Agent failed: %v", err)
+				continue
+			}
+			a.Infof("received %s signal (%d). Terminating...", sig, sig)
+			return terminate(nil)
+		case err := <-restartDone:
+			restartDone = nil
+			if err == nil {
+				if restartPending {
+					restartPending = false
+					startRestart(syscall.SIGHUP)
 				}
-			} else {
-				a.Infof("received %s signal (%d). Terminating...", sig, sig)
+				continue
 			}
-			collectorapi.ObsoleteCharts(false)
-			ctx, cancel := context.WithTimeout(
-				context.Background(),
-				10*time.Second,
-			)
-			err := a.Terminate(ctx)
-			cancel()
-			if err != nil && !errors.Is(err, agent.ErrNotRunning) {
-				a.Errorf("terminating the Agent failed: %v", err)
+			restartErr := restartControlError(err)
+			if restartErr != nil {
+				a.Errorf("restarting the Agent failed: %v", err)
 			}
-			if errors.Is(err, agent.ErrNotRunning) {
-				err = nil
-			}
-			runErr := waitForRun(runDone, 10*time.Second)
-			if runErr != nil {
-				a.Errorf("agent shutdown failed: %v", runErr)
-			}
-			return errors.Join(restartErr, err, runErr)
+			return terminate(restartErr)
 		case err := <-runDone:
 			a.Info("agent run loop stopped. Terminating...")
 			collectorapi.ObsoleteCharts(false)

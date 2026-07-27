@@ -346,26 +346,26 @@ func (rg *runGeneration) start(ctx context.Context) error {
 		return err
 	}
 	if err := rg.vnodes.publishInitial(ctx, rg.kernel); err != nil {
-		rg.run.Dirty(err)
-		rg.Stop()
-		return err
+		return rg.stopAfterStartFailure(ctx, err)
 	}
 	if err := rg.secrets.PublishInitial(ctx, rg.kernel); err != nil {
-		rg.run.Dirty(err)
-		rg.Stop()
-		return err
+		return rg.stopAfterStartFailure(ctx, err)
 	}
 	if err := rg.dyncfg.PublishInitial(ctx, rg.kernel, rg.run.Generation()); err != nil {
-		rg.run.Dirty(err)
-		rg.Stop()
-		return err
+		return rg.stopAfterStartFailure(ctx, err)
 	}
 	if err := rg.startDiscovery(ctx); err != nil {
-		rg.run.Dirty(err)
-		rg.Stop()
-		return err
+		return rg.stopAfterStartFailure(ctx, err)
 	}
 	return nil
+}
+
+func (rg *runGeneration) stopAfterStartFailure(ctx context.Context, err error) error {
+	if !errors.Is(context.Cause(ctx), errProcessTransitionInterrupted) {
+		rg.run.Dirty(err)
+	}
+	rg.Stop()
+	return err
 }
 
 func (rg *runGeneration) isStarted() bool {

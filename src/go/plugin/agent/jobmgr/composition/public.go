@@ -63,10 +63,10 @@ type Config struct {
 // generations. Restart and Terminate are acknowledged by Run returning from
 // the resulting transition or final shutdown.
 type Process struct {
-	core     *processCore        // the process core (owns ledgers, ingress, frames)
-	commands chan processControl // inbound Restart/Terminate controls
-	started  chan struct{}       // closed once Run starts
-	done     chan struct{}       // closed once Run returns
+	core     *processCore    // the process core (owns ledgers, ingress, frames)
+	controls processControls // independent Restart/Terminate delivery
+	started  chan struct{}   // closed once Run starts
+	done     chan struct{}   // closed once Run returns
 
 	mu        sync.Mutex // guards attempted/result
 	attempted bool       // Run has been attempted (once)
@@ -163,7 +163,7 @@ func NewProcess(config Config) (*Process, error) {
 	}
 	return &Process{
 		core:       core,
-		commands:   make(chan processControl),
+		controls:   newProcessControls(),
 		started:    make(chan struct{}),
 		done:       make(chan struct{}),
 		runtime:    config.Runtime,
@@ -189,7 +189,7 @@ func (p *Process) Run(ctx context.Context) error {
 			Owner: p.core.frames,
 		})
 	}
-	result := p.core.run(ctx, p.commands)
+	result := p.core.run(ctx, p.controls)
 	p.mu.Lock()
 	p.result = result
 	close(p.done)
@@ -222,8 +222,12 @@ func (p *Process) send(ctx context.Context, command processCommand) error {
 		return ctx.Err()
 	}
 	result := make(chan error, 1)
+	controls := p.controls.channel(command)
+	if controls == nil {
+		return errors.New("jobmgr composition: invalid process command")
+	}
 	select {
-	case p.commands <- processControl{
+	case controls <- processControl{
 		command: command,
 		result:  result,
 	}:

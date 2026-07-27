@@ -253,10 +253,10 @@ func testProcessCoreSecretMutationDependentRestart(
 		Diagnostics: testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
-	commands := make(chan processControl, 1)
+	controls := newTestProcessControls(1)
 	done := make(chan error, 1)
 	go func() {
-		done <- process.run(context.Background(), commands)
+		done <- process.run(context.Background(), controls)
 	}()
 	select {
 	case got := <-starts:
@@ -304,7 +304,7 @@ func testProcessCoreSecretMutationDependentRestart(
 	default:
 	}
 
-	commands <- testProcessControl(processTerminate)
+	controls.send(testProcessControl(processTerminate))
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -404,10 +404,10 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 		Diagnostics: testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
-	commands := make(chan processControl, 1)
+	controls := newTestProcessControls(1)
 	done := make(chan error, 1)
 	go func() {
-		done <- process.run(context.Background(), commands)
+		done <- process.run(context.Background(), controls)
 	}()
 	select {
 	case got := <-starts:
@@ -450,7 +450,7 @@ func TestProcessCoreCancelledSecretUpdateCompletesStartedReplacement(t *testing.
 
 	require.EqualValues(t, 1, cleanups.Load())
 
-	commands <- testProcessControl(processTerminate)
+	controls.send(testProcessControl(processTerminate))
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -487,10 +487,10 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 		Diagnostics:     testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
-	commands := make(chan processControl, 1)
+	controls := newTestProcessControls(1)
 	done := make(chan error, 1)
 	go func() {
-		done <- process.run(context.Background(), commands)
+		done <- process.run(context.Background(), controls)
 	}()
 	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
 
@@ -543,7 +543,7 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	}
 	require.NotContains(t, output.String(), "backend-sensitive-detail")
 
-	commands <- testProcessControl(processTerminate)
+	controls.send(testProcessControl(processTerminate))
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -636,10 +636,10 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 		Diagnostics: testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
-	commands := make(chan processControl, 1)
+	controls := newTestProcessControls(1)
 	done := make(chan error, 1)
 	go func() {
-		done <- process.run(context.Background(), commands)
+		done <- process.run(context.Background(), controls)
 	}()
 	output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
 
@@ -675,7 +675,7 @@ func TestProcessCoreSecretUpdateYieldsJobGraphDuringRestartProbe(t *testing.T) {
 	releaseOnce.Do(func() { close(releaseRestart) })
 	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-rotation 200 application/json")
 
-	commands <- testProcessControl(processTerminate)
+	controls.send(testProcessControl(processTerminate))
 	select {
 	case err := <-done:
 		require.NoError(t, err)

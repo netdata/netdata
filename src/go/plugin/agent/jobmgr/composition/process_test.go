@@ -18,6 +18,7 @@ import (
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -25,6 +26,111 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/require"
 )
+
+func TestProcessCoreRestartSupersedesInitialStartup(t *testing.T) {
+	process, entered, release := newStartupControlTestProcess(t, 1)
+	controls := newTestProcessControls(2)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	require.EqualValues(t, 1, waitStartupControlStore(t, entered))
+
+	restart := testProcessControl(processRestart)
+	controls.send(restart)
+	select {
+	case err := <-restart.result:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "restart was unavailable during initial startup")
+	}
+
+	terminate := testProcessControl(processTerminate)
+	controls.send(terminate)
+	require.NoError(t, <-terminate.result)
+	require.NoError(t, <-done)
+	close(release)
+}
+
+func TestProcessCoreTerminateInterruptsInitialStartup(t *testing.T) {
+	process, entered, release := newStartupControlTestProcess(t, 1)
+	controls := newTestProcessControls(2)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	require.EqualValues(t, 1, waitStartupControlStore(t, entered))
+
+	terminate := testProcessControl(processTerminate)
+	controls.send(terminate)
+	select {
+	case err := <-terminate.result:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "termination was unavailable during initial startup")
+	}
+	require.NoError(t, <-done)
+	close(release)
+}
+
+func TestProcessCoreTerminateInterruptsSuccessorStartup(t *testing.T) {
+	process, entered, release := newStartupControlTestProcess(t, 2)
+	controls := newTestProcessControls(2)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), controls)
+	}()
+	require.EqualValues(t, 1, waitStartupControlStore(t, entered))
+
+	restart := testProcessControl(processRestart)
+	controls.send(restart)
+	require.EqualValues(t, 2, waitStartupControlStore(t, entered))
+
+	terminate := testProcessControl(processTerminate)
+	controls.send(terminate)
+	select {
+	case err := <-terminate.result:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "termination waited behind successor startup")
+	}
+	require.ErrorIs(t, <-restart.result, ErrProcessStopped)
+	require.NoError(t, <-done)
+	close(release)
+}
+
+func TestProcessTransitionCancellationClassificationRejectsMixedFailures(t *testing.T) {
+	cleanupErr := errors.New("cleanup failed")
+	tests := map[string]struct {
+		err  error
+		want bool
+	}{
+		"none": {},
+		"transition cut": {
+			err:  errProcessTransitionInterrupted,
+			want: true,
+		},
+		"context cancellation": {
+			err:  context.Canceled,
+			want: true,
+		},
+		"joined expected cuts": {
+			err:  errors.Join(errProcessTransitionInterrupted, context.Canceled),
+			want: true,
+		},
+		"mixed cleanup failure": {
+			err: errors.Join(errProcessTransitionInterrupted, context.Canceled, cleanupErr),
+		},
+		"deadline is not a transition cut": {
+			err: context.DeadlineExceeded,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, test.want, processTransitionCancellationOnly(test.err))
+		})
+	}
+}
 
 func TestProcessCoreServiceDiscoverySendsFunctionResultBeforeStatus(t *testing.T) {
 	reader, writer := io.Pipe()
@@ -40,10 +146,10 @@ func TestProcessCoreServiceDiscoverySendsFunctionResultBeforeStatus(t *testing.T
 		Diagnostics:     testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
-	commands := make(chan processControl, 1)
+	controls := newTestProcessControls(1)
 	done := make(chan error, 1)
 	go func() {
-		done <- process.run(context.Background(), commands)
+		done <- process.run(context.Background(), controls)
 	}()
 	output.waitContains(t, "CONFIG go.d:sd:test create accepted template")
 
@@ -58,7 +164,7 @@ func TestProcessCoreServiceDiscoverySendsFunctionResultBeforeStatus(t *testing.T
 	result := strings.Index(wire, "FUNCTION_RESULT_BEGIN sd-get 200 application/json")
 	notification := strings.Index(wire, "CONFIG go.d:sd:test:job status running")
 	require.False(t, result < 0 || notification < 0 || result >= notification)
-	commands <- testProcessControl(processTerminate)
+	controls.send(testProcessControl(processTerminate))
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -91,10 +197,10 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 		Diagnostics:     testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
-	commands := make(chan processControl, 1)
+	controls := newTestProcessControls(1)
 	done := make(chan error, 1)
 	go func() {
-		done <- process.run(context.Background(), commands)
+		done <- process.run(context.Background(), controls)
 	}()
 	output.waitContains(t, "CONFIG go.d:vnode:initial create running job")
 	input := "" +
@@ -120,7 +226,7 @@ func TestProcessCoreVnodeDynCfgOrdersAddCreateAndGet(t *testing.T) {
 			wire[getResult:],
 			`"name":"db","hostname":"db","guid":"22222222-2222-2222-2222-222222222222"`,
 		))
-	commands <- testProcessControl(processTerminate)
+	controls.send(testProcessControl(processTerminate))
 	select {
 	case err := <-done:
 		require.NoError(t, err)
@@ -175,16 +281,26 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 		Diagnostics: diagnostics,
 	})
 	require.NoError(t, err)
-	commands := make(chan processControl, 2)
+	controls := newTestProcessControls(2)
 	done := make(chan error, 1)
 	go func() {
-		done <- process.run(context.Background(), commands)
+		done <- process.run(context.Background(), controls)
 	}()
 	waitProcessEvent(t, events, "publish")
-	commands <- testProcessControl(processRestart)
+	require.Eventually(t, func() bool {
+		for _, event := range diagnostics.snapshot() {
+			if event.Name == "job manager generation started" && event.Generation == 1 {
+				return true
+			}
+		}
+		return false
+	}, time.Second, time.Millisecond)
+	restart := testProcessControl(processRestart)
+	controls.send(restart)
 	waitProcessEvent(t, events, "withdraw")
 	waitProcessEvent(t, events, "publish")
-	commands <- testProcessControl(processTerminate)
+	require.NoError(t, <-restart.result)
+	controls.send(testProcessControl(processTerminate))
 	waitProcessEvent(t, events, "withdraw")
 	select {
 	case err := <-done:
@@ -242,10 +358,10 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(t *testing.
 		Diagnostics: testProcessDiagnostics(),
 	})
 	require.NoError(t, err)
-	commands := make(chan processControl, 1)
+	controls := newTestProcessControls(1)
 	done := make(chan error, 1)
 	go func() {
-		done <- process.run(context.Background(), commands)
+		done <- process.run(context.Background(), controls)
 	}()
 	select {
 	case <-started:
@@ -253,7 +369,7 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(t *testing.
 		require.FailNow(t, "test failed", "discovery provider did not start")
 	}
 	control := testProcessControl(processRestart)
-	commands <- control
+	controls.send(control)
 	select {
 	case err := <-control.result:
 		require.False(t, err == nil ||
@@ -328,7 +444,7 @@ func TestProcessCoreContainsProviderConstructionPanic(t *testing.T) {
 	require.NoError(t, err)
 	done := make(chan error, 1)
 	go func() {
-		done <- process.run(context.Background(), make(chan processControl, 1))
+		done <- process.run(context.Background(), newTestProcessControls(1))
 	}()
 	waitProcessEvent(t, events, "publish")
 	waitProcessEvent(t, events, "withdraw")
@@ -357,6 +473,105 @@ func TestProcessRetirementPreservesRunDirtyCause(t *testing.T) {
 		run: run,
 	})
 	require.False(t, !errors.Is(err, cause) || !strings.Contains(err.Error(), "run did not quiesce"))
+}
+
+func newStartupControlTestProcess(
+	t *testing.T,
+	blockStart int,
+) (*processCore, <-chan int, chan struct{}) {
+	t.Helper()
+	entered := make(chan int, 4)
+	release := make(chan struct{})
+	var starts int
+	var startsMu sync.Mutex
+	creators, err := secretstore.NewCreatorCatalog([]secretstore.Creator{{
+		Kind:   secretstore.KindVault,
+		Schema: `{}`,
+		Create: func() secretstore.Store {
+			return &processStartupControlStore{
+				blockStart: blockStart,
+				entered:    entered,
+				release:    release,
+				nextStart: func() int {
+					startsMu.Lock()
+					defer startsMu.Unlock()
+					starts++
+					return starts
+				},
+			}
+		},
+	}})
+	require.NoError(t, err)
+	jobs := testRunJobServices(t)
+	jobs.StoreCreators = creators
+	reader, writer := io.Pipe()
+	process, err := newProcessCore(processCoreConfig{
+		Input:           reader,
+		Output:          newProcessSynchronizedBuffer(),
+		ShutdownTimeout: time.Second,
+		Modules:         collectorapi.Registry{},
+		Jobs:            jobs,
+		Secrets: runSecretServices{
+			Initial: []secretstore.Config{{
+				"name":            "main",
+				"kind":            string(secretstore.KindVault),
+				"__source__":      confgroup.TypeUser,
+				"__source_type__": confgroup.TypeUser,
+			}},
+		},
+		Discovery:   testRunDiscoveryServices(t),
+		Diagnostics: testProcessDiagnostics(),
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = writer.Close()
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	return process, entered, release
+}
+
+func waitStartupControlStore(t *testing.T, entered <-chan int) int {
+	t.Helper()
+	select {
+	case start := <-entered:
+		return start
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "initial Store materialization did not start")
+		return 0
+	}
+}
+
+type processStartupControlStore struct {
+	blockStart int
+	entered    chan<- int
+	release    <-chan struct{}
+	nextStart  func() int
+}
+
+func (*processStartupControlStore) Configuration() any {
+	return &struct{}{}
+}
+
+func (store *processStartupControlStore) Init(ctx context.Context) error {
+	start := store.nextStart()
+	store.entered <- start
+	if start != store.blockStart {
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-store.release:
+		return nil
+	}
+}
+
+func (*processStartupControlStore) Publish() secretstore.PublishedStore {
+	return processPublishedSecret("test")
 }
 
 type processRecordingWriter struct {
@@ -496,4 +711,15 @@ func testProcessControl(command processCommand) processControl {
 		command: command,
 		result:  make(chan error, 1),
 	}
+}
+
+func newTestProcessControls(capacity int) processControls {
+	return processControls{
+		restart:   make(chan processControl, capacity),
+		terminate: make(chan processControl, capacity),
+	}
+}
+
+func (controls processControls) send(control processControl) {
+	controls.channel(control.command) <- control
 }

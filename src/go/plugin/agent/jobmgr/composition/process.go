@@ -10,6 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -25,6 +26,33 @@ const (
 type processControl struct {
 	command processCommand
 	result  chan error
+}
+
+type processControls struct {
+	restart   chan processControl
+	terminate chan processControl
+}
+
+func newProcessControls() processControls {
+	return processControls{
+		restart:   make(chan processControl),
+		terminate: make(chan processControl),
+	}
+}
+
+func (controls processControls) valid() bool {
+	return controls.restart != nil && controls.terminate != nil
+}
+
+func (controls processControls) channel(command processCommand) chan processControl {
+	switch command {
+	case processRestart:
+		return controls.restart
+	case processTerminate:
+		return controls.terminate
+	default:
+		return nil
+	}
 }
 
 type processInputCompletion struct {
@@ -49,9 +77,10 @@ type processCore struct {
 	config      processCoreConfig         // retained process configuration
 	diagnostics jobmgr.DiagnosticObserver // process-wide operational log sink
 
-	uids    *lifecycle.UIDLedger            // process-lifetime UID ledger
-	frames  *lifecycle.FrameOwner           // the one process-lifetime frame writer
-	ingress *functionadapter.ProcessIngress // the one process-lifetime stdin reader
+	uids     *lifecycle.UIDLedger            // process-lifetime UID ledger
+	frames   *lifecycle.FrameOwner           // the one process-lifetime frame writer
+	ingress  *functionadapter.ProcessIngress // the one process-lifetime stdin reader
+	attempts *containment.Authority          // process-lifetime opaque-work authority
 }
 
 func newProcessCore(config processCoreConfig) (*processCore, error) {
@@ -76,62 +105,224 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 	if err != nil {
 		return nil, err
 	}
+	attempts, err := containment.NewAuthority(config.Diagnostics)
+	if err != nil {
+		return nil, err
+	}
 	return &processCore{
 		config:      config,
 		diagnostics: config.Diagnostics,
 		uids:        lifecycle.NewUIDLedger(),
 		frames:      frames,
 		ingress:     ingress,
+		attempts:    attempts,
 	}, nil
 }
 
-func (pc *processCore) run(ctx context.Context, commands <-chan processControl) error {
-	if pc == nil || ctx == nil || commands == nil {
+var errProcessTransitionInterrupted = errors.New("jobmgr composition: process transition interrupted")
+
+type processTransitionKind uint8
+
+const (
+	processTransitionStart processTransitionKind = iota + 1
+	processTransitionRotate
+)
+
+type processTransitionResult struct {
+	generation *runGeneration
+	err        error
+}
+
+type processTransition struct {
+	kind    processTransitionKind
+	target  uint64
+	control *processControl
+	cancel  context.CancelCauseFunc
+	done    <-chan processTransitionResult
+}
+
+func (pc *processCore) run(ctx context.Context, controls processControls) error {
+	if pc == nil || ctx == nil || !controls.valid() || pc.attempts == nil {
 		return errors.New("jobmgr composition: invalid process run")
 	}
 	generationID := uint64(1)
-	generation, err := pc.newRun(generationID)
-	if err != nil {
-		return pc.finalize(nil, err)
-	}
-	if err := generation.start(ctx); err != nil {
-		return pc.finalize(generation, err)
-	}
-	jobmgr.ObserveDiagnostic(pc.diagnostics, jobmgr.DiagnosticEvent{
-		Level:      jobmgr.DiagnosticInfo,
-		Name:       "job manager generation started",
-		Generation: generationID,
-	})
+	var generation *runGeneration
 	quit := false
 	markQuit := func() { quit = true }
-	binding, err := pc.binding(generation, markQuit)
-	if err != nil {
-		return pc.finalize(generation, err)
-	}
-	if err := pc.ingress.Adopt(ctx, binding); err != nil {
-		return pc.finalize(generation, err)
-	}
+	transition := pc.beginStartTransition(ctx, generationID, markQuit, nil)
+	var supersedingInitial *processControl
+	var terminatingControl *processControl
+	var terminalCause error
+	terminating := false
+
 	inputDone := make(chan processInputCompletion, 1)
-	go func() {
-		inputDone <- processInputCompletion{
-			err:  pc.ingress.Run(ctx),
-			quit: quit,
+	inputStarted := false
+	startInput := func() {
+		if inputStarted {
+			return
 		}
-	}()
+		inputStarted = true
+		go func() {
+			inputDone <- processInputCompletion{
+				err:  pc.ingress.Run(ctx),
+				quit: quit,
+			}
+		}()
+	}
 	ticks := ticker.New(time.Second)
 	defer ticks.Stop()
 
 	for {
-		select {
-		case input := <-inputDone:
-			if input.quit {
-				return pc.finalize(generation, input.err)
+		var transitionDone <-chan processTransitionResult
+		var restartControls <-chan processControl
+		var terminateControls <-chan processControl
+		var activeInput <-chan processInputCompletion
+		var kernelDone <-chan struct{}
+		var processDone <-chan struct{}
+		var tick <-chan int
+		if transition != nil {
+			transitionDone = transition.done
+			if transition.kind == processTransitionStart &&
+				transition.control == nil &&
+				supersedingInitial == nil &&
+				!terminating {
+				restartControls = controls.restart
 			}
-			return pc.finalize(
-				generation,
-				errors.Join(errors.New("jobmgr composition: Function input stopped"), input.err),
-			)
-		case <-generation.kernel.Done():
+		} else if generation != nil && !terminating {
+			restartControls = controls.restart
+			kernelDone = generation.kernel.Done()
+			tick = ticks.C
+		}
+		if !terminating {
+			terminateControls = controls.terminate
+			processDone = ctx.Done()
+			if inputStarted {
+				activeInput = inputDone
+			}
+		}
+
+		select {
+		case result := <-transitionDone:
+			active := transition
+			transition = nil
+			if terminating {
+				cause := terminalCause
+				if result.err != nil && !processTransitionCancellationOnly(result.err) {
+					cause = errors.Join(cause, result.err)
+				}
+				finalErr := pc.finalize(result.generation, cause)
+				if terminalCause == nil && processTransitionCancellationOnly(finalErr) {
+					finalErr = nil
+				}
+				if active.control != nil {
+					active.control.result <- errors.Join(ErrProcessStopped, finalErr)
+				}
+				if supersedingInitial != nil {
+					supersedingInitial.result <- errors.Join(ErrProcessStopped, finalErr)
+				}
+				if terminatingControl != nil {
+					terminatingControl.result <- finalErr
+				}
+				return finalErr
+			}
+
+			if supersedingInitial != nil {
+				control := supersedingInitial
+				supersedingInitial = nil
+				nextID := active.target + 1
+				if nextID == 0 {
+					finalErr := pc.finalize(
+						result.generation,
+						errors.New("jobmgr composition: run generation wrapped"),
+					)
+					control.result <- finalErr
+					return finalErr
+				}
+				retireErr := pc.retireForSuccessor(result.generation, nextID)
+				transitionErr := errors.Join(result.err, retireErr)
+				if transitionErr != nil && !processTransitionCancellationOnly(transitionErr) {
+					finalErr := pc.finalize(result.generation, transitionErr)
+					control.result <- finalErr
+					return finalErr
+				}
+				generationID = nextID
+				transition = pc.beginStartTransition(ctx, nextID, markQuit, control)
+				continue
+			}
+
+			if result.err != nil {
+				active.cancel(errProcessTransitionInterrupted)
+				finalErr := pc.finalize(result.generation, result.err)
+				if active.control != nil {
+					active.control.result <- finalErr
+				}
+				return finalErr
+			}
+			generation = result.generation
+			generationID = active.target
+			startInput()
+			if active.control != nil {
+				active.control.result <- nil
+			}
+		case control := <-restartControls:
+			if control.result == nil || control.command != processRestart {
+				finalErr := pc.finalize(generation, errors.New("jobmgr composition: invalid restart control"))
+				if control.result != nil {
+					control.result <- finalErr
+				}
+				return finalErr
+			}
+			if transition != nil {
+				supersedingInitial = &control
+				transition.cancel(errProcessTransitionInterrupted)
+				continue
+			}
+			nextID := generationID + 1
+			if nextID == 0 {
+				finalErr := pc.finalize(generation, errors.New("jobmgr composition: run generation wrapped"))
+				control.result <- finalErr
+				return finalErr
+			}
+			transition = pc.beginRotateTransition(ctx, generation, nextID, markQuit, control)
+			generation = nil
+		case control := <-terminateControls:
+			if control.result == nil || control.command != processTerminate {
+				cause := errors.New("jobmgr composition: invalid terminate control")
+				if transition == nil {
+					finalErr := pc.finalize(generation, cause)
+					if control.result != nil {
+						control.result <- finalErr
+					}
+					return finalErr
+				}
+				terminalCause = cause
+			} else {
+				terminatingControl = &control
+			}
+			terminating = true
+			if transition == nil {
+				finalErr := pc.finalize(generation, terminalCause)
+				if terminatingControl != nil {
+					terminatingControl.result <- finalErr
+				}
+				return finalErr
+			}
+			transition.cancel(errProcessTransitionInterrupted)
+		case input := <-activeInput:
+			terminating = true
+			if !input.quit {
+				terminalCause = errors.Join(
+					errors.New("jobmgr composition: Function input stopped"),
+					input.err,
+				)
+			} else {
+				terminalCause = input.err
+			}
+			if transition == nil {
+				return pc.finalize(generation, terminalCause)
+			}
+			transition.cancel(errProcessTransitionInterrupted)
+		case <-kernelDone:
 			return pc.finalize(
 				generation,
 				errors.Join(
@@ -139,9 +330,14 @@ func (pc *processCore) run(ctx context.Context, commands <-chan processControl) 
 					generation.Wait(context.Background()),
 				),
 			)
-		case <-ctx.Done():
-			return pc.finalize(generation, ctx.Err())
-		case clock := <-ticks.C:
+		case <-processDone:
+			terminating = true
+			terminalCause = ctx.Err()
+			if transition == nil {
+				return pc.finalize(generation, terminalCause)
+			}
+			transition.cancel(errProcessTransitionInterrupted)
+		case clock := <-tick:
 			if generation.run.IsStopping() {
 				continue
 			}
@@ -160,38 +356,115 @@ func (pc *processCore) run(ctx context.Context, commands <-chan processControl) 
 					)
 				}
 			}
-		case control := <-commands:
-			if control.result == nil {
-				return pc.finalize(generation, errors.New("jobmgr composition: invalid process control"))
-			}
-			switch control.command {
-			case processRestart:
-				nextID := generationID + 1
-				if nextID == 0 {
-					finalErr := pc.finalize(generation, errors.New("jobmgr composition: run generation wrapped"))
-					control.result <- finalErr
-					return finalErr
-				}
-				next, rotateErr := pc.rotate(ctx, generation, nextID, markQuit)
-				if rotateErr != nil {
-					finalErr := pc.finalize(next, rotateErr)
-					control.result <- finalErr
-					return finalErr
-				}
-				generation = next
-				generationID = nextID
-				control.result <- nil
-			case processTerminate:
-				finalErr := pc.finalize(generation, nil)
-				control.result <- finalErr
-				return finalErr
-			default:
-				finalErr := pc.finalize(generation, errors.New("jobmgr composition: invalid process command"))
-				control.result <- finalErr
-				return finalErr
-			}
 		}
 	}
+}
+
+func processTransitionCancellationOnly(err error) bool {
+	if err == nil {
+		return false
+	}
+	leaves := 0
+	var visit func(error, int) bool
+	visit = func(current error, depth int) bool {
+		if current == nil || depth > 32 {
+			return false
+		}
+		if joined, ok := current.(interface{ Unwrap() []error }); ok {
+			children := joined.Unwrap()
+			if len(children) == 0 {
+				return false
+			}
+			for _, child := range children {
+				if !visit(child, depth+1) {
+					return false
+				}
+			}
+			return true
+		}
+		if wrapped, ok := current.(interface{ Unwrap() error }); ok {
+			return visit(wrapped.Unwrap(), depth+1)
+		}
+		leaves++
+		return current == errProcessTransitionInterrupted || current == context.Canceled
+	}
+	return visit(err, 0) && leaves > 0
+}
+
+func (pc *processCore) beginStartTransition(
+	parent context.Context,
+	target uint64,
+	quit func(),
+	control *processControl,
+) *processTransition {
+	ctx, cancel := context.WithCancelCause(parent)
+	done := make(chan processTransitionResult, 1)
+	go func() {
+		generation, err := pc.startGeneration(ctx, target, quit)
+		done <- processTransitionResult{
+			generation: generation,
+			err:        err,
+		}
+	}()
+	return &processTransition{
+		kind:    processTransitionStart,
+		target:  target,
+		control: control,
+		cancel:  cancel,
+		done:    done,
+	}
+}
+
+func (pc *processCore) beginRotateTransition(
+	parent context.Context,
+	current *runGeneration,
+	target uint64,
+	quit func(),
+	control processControl,
+) *processTransition {
+	ctx, cancel := context.WithCancelCause(parent)
+	done := make(chan processTransitionResult, 1)
+	go func() {
+		generation, err := pc.rotate(ctx, current, target, quit)
+		done <- processTransitionResult{
+			generation: generation,
+			err:        err,
+		}
+	}()
+	return &processTransition{
+		kind:    processTransitionRotate,
+		target:  target,
+		control: &control,
+		cancel:  cancel,
+		done:    done,
+	}
+}
+
+func (pc *processCore) startGeneration(
+	ctx context.Context,
+	generationID uint64,
+	quit func(),
+) (*runGeneration, error) {
+	generation, err := pc.newRun(generationID)
+	if err != nil {
+		return nil, err
+	}
+	if err := generation.start(ctx); err != nil {
+		return generation, err
+	}
+	binding, err := pc.binding(generation, quit)
+	if err != nil {
+		return generation, err
+	}
+	if err := pc.ingress.Adopt(ctx, binding); err != nil {
+		return generation, err
+	}
+	jobmgr.ObserveDiagnostic(pc.diagnostics, jobmgr.DiagnosticEvent{
+		Level:      jobmgr.DiagnosticInfo,
+		Name:       "job manager generation started",
+		Generation: generationID,
+	})
+	return generation, nil
 }
 
 func (pc *processCore) newRun(generation uint64) (*runGeneration, error) {
@@ -232,36 +505,11 @@ func (pc *processCore) rotate(
 		Generation: current.run.Generation(),
 		State:      "rotating",
 	})
-	if err := pc.ingress.SealPause(); err != nil {
+	if err := pc.retireForSuccessor(current, nextID); err != nil {
 		return current, err
 	}
-	current.Stop()
-	budget, err := current.run.BeginShutdown()
+	next, err := pc.startGeneration(ctx, nextID, quit)
 	if err != nil {
-		return current, err
-	}
-	shutdownCtx := budget.Context()
-	if err := pc.ingress.DrainPause(shutdownCtx, nextID); err != nil {
-		return current, err
-	}
-	if err := pc.retireRun(shutdownCtx, current); err != nil {
-		return current, err
-	}
-	if err := current.run.FinishShutdown(); err != nil {
-		return current, err
-	}
-	next, err := pc.newRun(nextID)
-	if err != nil {
-		return nil, err
-	}
-	if err := next.start(ctx); err != nil {
-		return next, err
-	}
-	binding, err := pc.binding(next, quit)
-	if err != nil {
-		return next, err
-	}
-	if err := pc.ingress.Adopt(ctx, binding); err != nil {
 		return next, err
 	}
 	jobmgr.ObserveDiagnostic(pc.diagnostics, jobmgr.DiagnosticEvent{
@@ -273,12 +521,48 @@ func (pc *processCore) rotate(
 	return next, nil
 }
 
+func (pc *processCore) retireForSuccessor(current *runGeneration, nextID uint64) error {
+	if current == nil {
+		return nil
+	}
+	if !current.isStarted() {
+		return current.abortConstruction()
+	}
+	if pc.attempts != nil {
+		pc.attempts.CutTarget(current.run.Generation())
+	}
+	ingressLive := pc.ingress.State() == functionadapter.ProcessIngressLive
+	if ingressLive {
+		if err := pc.ingress.SealPause(); err != nil {
+			return err
+		}
+	}
+	current.Stop()
+	budget, err := current.run.BeginShutdown()
+	if err != nil {
+		return err
+	}
+	shutdownCtx := budget.Context()
+	if ingressLive {
+		if err := pc.ingress.DrainPause(shutdownCtx, nextID); err != nil {
+			return err
+		}
+	}
+	if err := pc.retireRun(shutdownCtx, current); err != nil {
+		return err
+	}
+	return current.run.FinishShutdown()
+}
+
 func (pc *processCore) finalize(current *runGeneration, cause error) error {
 	generation := uint64(0)
 	if current != nil && current.run != nil {
 		generation = current.run.Generation()
 	}
 	finalErr := cause
+	if pc.attempts != nil {
+		pc.attempts.BeginShutdown()
+	}
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), pc.config.ShutdownTimeout)
 	defer cancel()
 	var finishRun *lifecycle.RunSupervisor
@@ -315,6 +599,11 @@ func (pc *processCore) finalize(current *runGeneration, cause error) error {
 		finalErr = errors.Join(finalErr, errors.New("jobmgr composition: live Function ingress has no retiring run"))
 	default:
 		finalErr = errors.Join(finalErr, errors.New("jobmgr composition: invalid final Function ingress state"))
+	}
+	if pc.attempts != nil {
+		if err := pc.attempts.Shutdown(shutdownCtx); err != nil {
+			finalErr = errors.Join(finalErr, err)
+		}
 	}
 	if err := closeProcessUIDs(shutdownCtx, pc.uids); err != nil {
 		finalErr = errors.Join(finalErr, err)

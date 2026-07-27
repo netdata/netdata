@@ -62,6 +62,9 @@ func (dl *diagnosticLogger) ObserveDiagnostic(event jobmgr.DiagnosticEvent) {
 	if event.ResultStatus != 0 {
 		attributes = append(attributes, slog.Int("result_status", event.ResultStatus))
 	}
+	if event.Age > 0 {
+		attributes = append(attributes, slog.Duration("age", event.Age))
+	}
 	if event.Err != nil {
 		attributes = append(attributes, slog.String("error", event.Err.Error()))
 	}
