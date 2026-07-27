@@ -25,6 +25,12 @@ You can find this command in three places in the UI:
 3. Click the "Connect" button
 4. Follow the on-screen instructions to connect your Agent
 
+:::note
+
+**Verifying node ownership:** As part of the connection flow, your Agent's local dashboard displays a command to run directly on the machine whose Agent you are connecting — not on your local workstation or any other machine. The command reads a random session ID (a UUID) that the Agent generates at startup and writes to its library directory (`/var/lib/netdata/` by default, following the `lib` option under the `[directories]` section of `netdata.conf`). Copy the output and paste it back into the dialog. This proves you have administrative access to the node and prevents unauthorized claiming of machines you do not control.
+
+:::
+
 ### Method 2: Via Configuration File
 
 **Best for:** Automated deployments, multiple Agents
@@ -40,7 +46,7 @@ Create `/INSTALL_PREFIX/etc/netdata/claim.conf`:
    insecure = no
 ```
 
-:::info 
+:::info
 
 **File Permissions and Ownership:**
 
@@ -150,6 +156,7 @@ The proxy only sees encrypted TLS traffic flowing through the tunnel it establis
 Netdata uses **two connection libraries**: **libcurl for claiming and MQTToWSoHTTPS for the actual Cloud connection**. While libcurl supports encrypted proxy connections, MQTToWSoHTTPS does not - so encrypted proxy connections will fail during the Cloud connection phase. The proxy configuration patterns above work for both libraries and provide end-to-end encryption for Netdata Cloud communication.
 
 For SOCKS proxies:
+
 - `socks5://` resolves target hostnames locally on the Agent and sends IP to the proxy.
 - `socks5h://` sends hostname to the proxy and resolves DNS remotely on the proxy side.
 
@@ -202,20 +209,24 @@ To remove a node from your Space and connect it to another, follow these steps:
 3. **Stop and remove the container**
 
    **Docker CLI:**
+
     ```bash
     docker stop CONTAINER_NAME
     docker rm CONTAINER_NAME
     ```
+
    Replace `CONTAINER_NAME` with either the container's name or ID.
 
    **Docker Compose:**  
    Inside the directory that has the `docker-compose.yml` file, run:
+
     ```bash
     docker compose down
     ```
 
    **Docker Swarm:**  
    Run the following, and replace `STACK` with your Stack's name:
+
     ```bash
     docker stack rm STACK
     ```
@@ -230,12 +241,12 @@ To remove a node from your Space and connect it to another, follow these steps:
 
 When an Agent is claimed to Netdata Cloud, the `cloud.d/` directory (located in your Netdata library directory, typically `/var/lib/netdata/cloud.d/`) stores the credentials and identity information for the Agent-Cloud Link (ACLK). The directory typically includes the following core files:
 
-| File | Description |
-|------|-------------|
-| `cloud.conf` | Primary Cloud configuration file, including the canonical `claimed_id` and other ACLK settings |
-| `private.pem` | RSA private key for ACLK authentication |
-| `public.pem` | RSA public key for ACLK authentication |
-| `claimed_id` | Legacy file duplicating the `claimed_id` from `cloud.conf`, kept mainly for backwards compatibility and fallback |
+| File          | Description                                                                                                      |
+|---------------|------------------------------------------------------------------------------------------------------------------|
+| `cloud.conf`  | Primary Cloud configuration file, including the canonical `claimed_id` and other ACLK settings                   |
+| `private.pem` | RSA private key for ACLK authentication                                                                          |
+| `public.pem`  | RSA public key for ACLK authentication                                                                           |
+| `claimed_id`  | Legacy file duplicating the `claimed_id` from `cloud.conf`, kept mainly for backwards compatibility and fallback |
 
 In addition to these, depending on your configuration and features in use, you may also see the following optional files:
 
