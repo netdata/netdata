@@ -8,12 +8,12 @@
  * header protocol (flags, update_every_s, last_publish_ut, live_count). */
 #include "apps_ebpf_shared_pid_row.h"
 
-/* v1: initial versioned release; struct ebpfgo_shm_header moved to the
- * front of ebpfgo_dns_shared, replacing the embedded last_publish_ut /
- * ring_count / update_every_s fields.  Version suffix prevents old readers
- * from mapping the new layout at the wrong offset. */
-#define NETDATA_EBPFGO_DNS_SHM_NAME "/netdata_shm_ebpfgo_dns_v1"
-#define NETDATA_EBPFGO_DNS_SEM_NAME "/netdata_sem_ebpfgo_dns_v1"
+/* v2: removed struct ebpfgo_dns_aggregate (aggregate counters were collected
+ * but never consumed by any reader).  ring[] now starts at offset 24
+ * (immediately after the header), down from offset 88 in v1.
+ * Version suffix prevents old readers from mapping the new layout. */
+#define NETDATA_EBPFGO_DNS_SHM_NAME "/netdata_shm_ebpfgo_dns_v2"
+#define NETDATA_EBPFGO_DNS_SEM_NAME "/netdata_sem_ebpfgo_dns_v2"
 
 /* Maximum per-query flow records kept in one SHM publish. */
 #define NETDATA_EBPFGO_DNS_FLOW_RING_CAP 1000
@@ -38,18 +38,6 @@ struct ebpfgo_dns_flow_record {
     uint8_t  _pad[7];                                  /* explicit pad → sizeof == 320     */
 };
 
-/* Aggregate DNS packet counters (one set per collection cycle). */
-struct ebpfgo_dns_aggregate {
-    uint64_t queries_udp4;
-    uint64_t queries_udp6;
-    uint64_t queries_tcp4;
-    uint64_t queries_tcp6;
-    uint64_t responses_udp4;
-    uint64_t responses_udp6;
-    uint64_t responses_tcp4;
-    uint64_t responses_tcp6;
-};
-
 /* Full SHM region.  struct ebpfgo_shm_header is at offset 0, matching the PID
  * SHM layout so both segments share the same liveness protocol.
  *
@@ -59,12 +47,11 @@ struct ebpfgo_dns_aggregate {
  *   hdr.flags            — reserved; 0 for this segment
  *
  * Writer publishes the current 20-second live set as ring[0..hdr.live_count-1].
- * Reader copies hdr + agg + only the live ring entries under semaphore. */
+ * Reader copies hdr + only the live ring entries under semaphore. */
 struct ebpfgo_dns_shared {
     struct ebpfgo_shm_header hdr;                                    /* offset   0 size  24 */
-    struct ebpfgo_dns_aggregate agg;                                 /* offset  24 size  64 */
-    struct ebpfgo_dns_flow_record ring[NETDATA_EBPFGO_DNS_FLOW_RING_CAP]; /* offset  88 size 320000 */
+    struct ebpfgo_dns_flow_record ring[NETDATA_EBPFGO_DNS_FLOW_RING_CAP]; /* offset  24 size 320000 */
 };
-/* sizeof(struct ebpfgo_dns_shared) == 320088 (~312 KB) */
+/* sizeof(struct ebpfgo_dns_shared) == 320024 (~312 KB) */
 
 #endif /* NETDATA_APPS_EBPF_SHARED_DNS_ROW_H */

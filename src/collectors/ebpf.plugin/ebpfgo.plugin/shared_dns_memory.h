@@ -13,7 +13,6 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s);
 
 void shared_dns_memory_publish(
     struct shared_dns_memory *ctx,
-    const struct ebpfgo_dns_aggregate *agg,
     const struct ebpfgo_dns_flow_record *flows,
     uint32_t flow_count);
 /* Close invalidates the liveness marker before releasing local handles so
