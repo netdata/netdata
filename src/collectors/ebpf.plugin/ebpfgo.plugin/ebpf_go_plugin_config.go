@@ -29,7 +29,8 @@ type pluginConfigFile struct {
 	BTFPath                   *string
 	Lifetime                  *int
 	ObjectFlavor              *string
-	CollectPidLevel           *int // "collect pid" key → BPF apps collection level (0=real parent, 1=parent, 2=all)
+	CollectPidLevel           *int  // "collect pid" key → BPF apps collection level (0=real parent, 1=parent, 2=all)
+	PerQueryTracking          *bool // "per query tracking" key → DNS per-query flow capture
 }
 
 // loadPluginConfigFiles loads the plugin-wide ebpf.d.conf from stock then
@@ -293,6 +294,14 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 				cfg.CollectPidLevel = intPtr(level)
 			}
 			found = true
+		case "per query tracking":
+			b, ok := parseConfigBool(value)
+			if !ok {
+				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: %s: invalid per query tracking %q, using default\n", path, value)
+			} else {
+				cfg.PerQueryTracking = boolPtr(b)
+			}
+			found = true
 		}
 	}
 
@@ -345,6 +354,9 @@ func (c *pluginConfigFile) apply(other pluginConfigFile) {
 	}
 	if other.CollectPidLevel != nil {
 		c.CollectPidLevel = other.CollectPidLevel
+	}
+	if other.PerQueryTracking != nil {
+		c.PerQueryTracking = other.PerQueryTracking
 	}
 }
 

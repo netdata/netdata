@@ -42,8 +42,6 @@
 #define DNS_ETH_P_ALL   0x0003u
 #define DNS_ETH_P_IP    0x0800u
 #define DNS_ETH_P_IPV6  0x86DDu
-#define DNS_ETH_P_8021Q 0x8100u
-#define DNS_ETH_P_8021AD 0x88A8u
 
 /* IP protocol numbers */
 #define DNS_IPPROTO_UDP 17u
@@ -497,13 +495,6 @@ static bool dns_parse_raw_packet(
     uint16_t ethertype = dns_read_u16be(buf, 12);
     int off = 14;
 
-    while (ethertype == DNS_ETH_P_8021Q || ethertype == DNS_ETH_P_8021AD) {
-        if (off + 4 > (int)n)
-            return false;
-        ethertype = dns_read_u16be(buf, off + 2);
-        off += 4;
-    }
-
     uint8_t  ip_version;
     uint8_t  proto;
     uint32_t saddr[4] = {0}, daddr[4] = {0};
@@ -633,39 +624,67 @@ static void dns_drain_flow_socket(struct netdata_dns_runtime *rt)
 /* -------------------------------------------------------------------------
  * Open the dedicated per-query capture socket (ring buffer mode only).
  *
- * Uses a 5-instruction classic BPF (cBPF) filter that accepts IPv4 and
- * IPv6 frames and drops everything else.  Port filtering is done in user
- * space inside dns_parse_raw_packet(), so all IPv4/IPv6 traffic crosses
- * the kernel-userspace boundary — including non-DNS packets.
+ * A 27-instruction classic BPF (cBPF) filter accepts only IPv4/IPv6 frames
+ * carrying TCP or UDP with src or dst port 53 (DNS) or 5353 (mDNS).
+ * Everything else is dropped in the kernel before recv() is called.
  *
- * TODO: replace with a full port-53/5353 cBPF filter (IPv4 + IPv6, UDP +
- * TCP, ~30–40 instructions) or, better, add a dedicated filter-only eBPF
- * program to dns_buffer.bpf.c (SEC("socket"), returns skb->len to accept DNS
- * frames and 0 to drop everything else, no ring-buffer writes) and attach it
- * here via SO_ATTACH_BPF.  The obvious shortcut of re-using
- * socket__dns_filter_buffer is NOT safe: that program always returns 0 (drop —
- * userspace reads via the ring buffer, not recv()), so flow_fd would never
- * deliver frames; worse, both sock_fd and flow_fd see every physical packet,
- * so the ring buffer would receive two events per DNS packet and every
- * aggregate counter would double.
+ * Limitation: assumes no IPv4 options (IHL=5) and no IPv6 extension headers.
+ * IPv4 with options or IPv6 with extension headers will be missed by the
+ * filter; those packets are uncommon in DNS traffic in practice.
+ * VLAN-tagged frames (802.1Q/802.1AD) are not supported and are dropped.
+ *
+ * Opcode reference (raw values, no <linux/filter.h> dependency):
+ *   0x28 = BPF_LD  | BPF_H | BPF_ABS  (load 16-bit half-word at abs offset)
+ *   0x30 = BPF_LD  | BPF_B | BPF_ABS  (load 8-bit byte at abs offset)
+ *   0x15 = BPF_JMP | BPF_JEQ | BPF_K  (jump if A == K; jt/jf skip counts)
+ *   0x06 = BPF_RET | BPF_K             (return K)
+ *
+ * NOTE: re-using socket__dns_filter_buffer here is NOT safe.  That program
+ * always returns 0 (drop — userspace reads via ring buffer, not recv()),
+ * so flow_fd would never deliver frames.
  * ---------------------------------------------------------------------- */
 static int dns_open_flow_socket(void)
 {
-    /* Classic BPF (cBPF) filter: accept IPv4 and IPv6 Ethernet frames only.
-     * Raw opcode values avoid any dependency on <linux/filter.h>:
-     *   0x28 = LD H ABS   (load 16-bit half-word at absolute offset)
-     *   0x15 = JEQ K      (jump if equal to constant)
-     *   0x06 = RET K      (return constant) */
-    static struct netdata_sock_filter flow_filter_code[5] = {
-        { 0x28u, 0, 0, 12u          },  /* LD  H  ABS 12         → load EtherType */
-        { 0x15u, 2, 0, 0x0800u      },  /* JEQ 0x0800, jt=2      → IPv4 → accept  */
-        { 0x15u, 1, 0, 0x86DDu      },  /* JEQ 0x86DD, jt=1      → IPv6 → accept  */
-        { 0x06u, 0, 0, 0u           },  /* RET 0                  → drop           */
-        { 0x06u, 0, 0, 0xffffffffu  },  /* RET 0xffffffff         → accept all     */
+    /* 27-instruction cBPF: IPv4/IPv6, TCP/UDP, (src|dst) port 53 or 5353.
+     * IPv4 transport starts at offset 34 (eth=14, no IP options → IP=20).
+     * IPv6 transport starts at offset 54 (eth=14, no ext headers → IPv6=40). */
+    static struct netdata_sock_filter flow_filter_code[27] = {
+        /* EtherType dispatch ------------------------------------------------ */
+        /* [0]  */ { 0x28u,  0,  0, 12u       },  /* LD H ABS 12  → EtherType    */
+        /* [1]  */ { 0x15u,  2,  0, 0x0800u   },  /* JEQ IPv4     → [4]          */
+        /* [2]  */ { 0x15u, 12,  0, 0x86DDu   },  /* JEQ IPv6     → [15]         */
+        /* [3]  */ { 0x06u,  0,  0, 0u        },  /* RET 0        → drop         */
+        /* IPv4 protocol at eth(14)+IP(9)=23 -------------------------------- */
+        /* [4]  */ { 0x30u,  0,  0, 23u       },  /* LD B ABS 23  → IP proto     */
+        /* [5]  */ { 0x15u,  2,  0, 17u       },  /* JEQ UDP      → [8]          */
+        /* [6]  */ { 0x15u,  1,  0, 6u        },  /* JEQ TCP      → [8]          */
+        /* [7]  */ { 0x06u,  0,  0, 0u        },  /* RET 0        → drop         */
+        /* IPv4 ports: src=34, dst=36 --------------------------------------- */
+        /* [8]  */ { 0x28u,  0,  0, 34u       },  /* LD H ABS 34  → src port     */
+        /* [9]  */ { 0x15u, 16,  0, 53u       },  /* JEQ 53       → [26] accept  */
+        /* [10] */ { 0x15u, 15,  0, 5353u     },  /* JEQ 5353     → [26] accept  */
+        /* [11] */ { 0x28u,  0,  0, 36u       },  /* LD H ABS 36  → dst port     */
+        /* [12] */ { 0x15u, 13,  0, 53u       },  /* JEQ 53       → [26] accept  */
+        /* [13] */ { 0x15u, 12,  0, 5353u     },  /* JEQ 5353     → [26] accept  */
+        /* [14] */ { 0x06u,  0,  0, 0u        },  /* RET 0        → drop         */
+        /* IPv6 next header at eth(14)+IPv6(6)=20 --------------------------- */
+        /* [15] */ { 0x30u,  0,  0, 20u       },  /* LD B ABS 20  → next header  */
+        /* [16] */ { 0x15u,  2,  0, 17u       },  /* JEQ UDP      → [19]         */
+        /* [17] */ { 0x15u,  1,  0, 6u        },  /* JEQ TCP      → [19]         */
+        /* [18] */ { 0x06u,  0,  0, 0u        },  /* RET 0        → drop         */
+        /* IPv6 ports: src=54, dst=56 --------------------------------------- */
+        /* [19] */ { 0x28u,  0,  0, 54u       },  /* LD H ABS 54  → src port     */
+        /* [20] */ { 0x15u,  5,  0, 53u       },  /* JEQ 53       → [26] accept  */
+        /* [21] */ { 0x15u,  4,  0, 5353u     },  /* JEQ 5353     → [26] accept  */
+        /* [22] */ { 0x28u,  0,  0, 56u       },  /* LD H ABS 56  → dst port     */
+        /* [23] */ { 0x15u,  2,  0, 53u       },  /* JEQ 53       → [26] accept  */
+        /* [24] */ { 0x15u,  1,  0, 5353u     },  /* JEQ 5353     → [26] accept  */
+        /* [25] */ { 0x06u,  0,  0, 0u        },  /* RET 0        → drop         */
+        /* [26] */ { 0x06u,  0,  0, 0xffffffffu }, /* RET -1       → accept       */
     };
     struct netdata_sock_fprog flow_filter;
     memset(&flow_filter, 0, sizeof(flow_filter));
-    flow_filter.len    = 5;
+    flow_filter.len    = 27;
     flow_filter.filter = flow_filter_code;
 
     int sock = socket(AF_PACKET, SOCK_RAW, htons(DNS_ETH_P_ALL));

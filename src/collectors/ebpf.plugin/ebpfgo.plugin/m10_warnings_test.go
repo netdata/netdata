@@ -380,7 +380,7 @@ func TestBuildDNSLegacyPlan_FlavorAndSelectorInvariantToPerQuery(t *testing.T) {
 func TestDNSLegacyConfig_DefaultEnablesPerQuery(t *testing.T) {
 	c := defaultDNSLegacyConfig()
 	if !c.PerQueryTracking {
-		t.Fatal("defaultDNSLegacyConfig().PerQueryTracking = false, want true (preserve current behavior)")
+		t.Fatal("defaultDNSLegacyConfig().PerQueryTracking = false, want true (dns-queries function requires it)")
 	}
 }
 

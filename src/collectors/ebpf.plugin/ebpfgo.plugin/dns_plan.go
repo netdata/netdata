@@ -23,11 +23,10 @@ type DNSLegacyConfig struct {
 	Enabled       bool
 	UpdateEvery   int
 	ObjectFlavor  string
-	// PerQueryTracking controls whether the dedicated AF_PACKET capture
-	// socket used for per-query DNS payload parsing is opened during attach.
-	// When false, the DNS runtime still emits aggregate counters via the ring
-	// buffer but per-query flow records are empty. Defaults to true to keep
-	// behavior unchanged for operators who rely on the dns-queries function.
+	// PerQueryTracking controls whether the dedicated AF_PACKET flow-capture
+	// socket is opened during attach. When false, per-query flow records are
+	// empty and the dns-queries network-viewer function returns no rows.
+	// Configurable via "per query tracking" in ebpf.d/dns.conf [global].
 	PerQueryTracking bool
 }
 
@@ -55,7 +54,7 @@ func defaultDNSLegacyConfig() DNSLegacyConfig {
 		UpdateEvery:      dnsDefaultUpdateEvery,
 		ObjectFlavor:     dnsDefaultObjectFlavor,
 		Enabled:          false, // stock ebpf.d.conf: dns = no
-		PerQueryTracking: true,  // preserve current behavior; opt-out path is plumbing-ready
+		PerQueryTracking: true,
 	}
 }
 
@@ -75,6 +74,9 @@ func resolveDNSLegacyConfig() (DNSLegacyConfig, error) {
 	}
 	if fileCfg.ObjectFlavor != nil && *fileCfg.ObjectFlavor != "" {
 		cfg.ObjectFlavor = *fileCfg.ObjectFlavor
+	}
+	if fileCfg.PerQueryTracking != nil {
+		cfg.PerQueryTracking = *fileCfg.PerQueryTracking
 	}
 
 	kver, isRHF, err := resolveKernelAndRH()
