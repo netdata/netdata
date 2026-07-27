@@ -316,7 +316,7 @@ func TestCase018MultipassAverage(t *testing.T) {
 	}
 
 	t.Logf("avg-of-sums reproduced on %d/%d rows", reproduced, len(col))
-	expectAgentStatus(t, "CASE-018/multipass-average", reproduced == 0)
+	assertContract(t, "CASE-018/multipass-average", reproduced == 0)
 }
 
 // TestLayer6TwoPassPercentage pins percentage as the PASS-2 aggregation.

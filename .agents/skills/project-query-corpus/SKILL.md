@@ -1,6 +1,6 @@
 ---
 name: project-query-corpus
-description: Developer contract for the query contract corpus (tests/query-corpus) — the black-box correctness suite for the Netdata query engine. Use when running the corpus, adding or extending corpus cases, authoring fixtures, changing an oracle or a byte-pin, adding a red case for a query-engine bug, flipping a red case green after a fix merges, or validating a query-engine fix branch against the corpus.
+description: Developer contract for the query contract corpus (tests/query-corpus) — the black-box correctness suite for the Netdata query engine. Use when running the corpus, adding or extending corpus cases, authoring fixtures, changing an oracle or a byte-pin, adding a case for a query-engine bug, recording the fixing PR after it merges, or validating a query-engine fix branch against the corpus.
 type: project
 ---
 
@@ -18,7 +18,7 @@ The suite is a self-contained Go module
 (`github.com/netdata/netdata/tests/query-corpus`). Always run `go` commands
 from inside `tests/query-corpus/`.
 
-## Correctness model — why a green suite means something
+## Correctness model — why this suite means something
 
 The founding rule: **expectations MUST be derived from the fixture
 definitions, never captured from the engine.** A harness whose expected
@@ -40,7 +40,7 @@ corpus belongs to one of three classes, with different rules:
   reading the C source** — never captures of engine output. Rules:
   - A port MUST cite the C source it mirrors (file:line in comments).
   - Every divergence found between a port and the engine MUST be resolved
-    explicitly: either it is an engine bug (author a red case) or an engine
+    explicitly: either it is an engine bug (author a case for it) or an engine
     quirk adopted into the oracle **with a recorded pending ruling** in the
     manifest/SOW. Silently adjusting a port until the engine passes is the
     cardinal sin of this suite ("fit-to-engine") and is prohibited.
@@ -58,9 +58,12 @@ corpus belongs to one of three classes, with different rules:
     started failing".
 
 **Falsifiability discipline:** when an expectation and the engine disagree,
-there are exactly two exits — a red case (engine bug) or a recorded ruling
-(intended behavior, pinned green with the quirk documented). There is no
-third option where the oracle is quietly bent to match.
+there are exactly two exits — the engine is wrong (the case stays as written
+and joins the broken list until it is fixed) or a recorded ruling says the
+behavior is intended (the case is rewritten to assert the ruled behavior,
+with the quirk documented). There is no third option where the oracle is
+quietly bent to match, and none where the disagreement is filed away as
+acceptable.
 
 ## Architecture map
 
@@ -86,22 +89,30 @@ third option where the oracle is quietly bent to match.
 - `reference-python/` — local-only cross-check implementation. It is NOT
   tracked and MUST NOT be committed.
 
-## The manifest ledger
+## The manifest
 
-Every contract case has an entry in `manifest.go` (`Proves`, `Agent:
-Green|Red`, optional `FixedBy`) mirrored as a row in `MANIFEST.md`. Tests
-report through `expectAgentStatus(t, name, observedPass)`:
+Every contract case has an entry in `manifest.go` (`Proves`, optional
+`FixedBy`) mirrored as a row in `MANIFEST.md`. Tests report through
+`assertContract(t, name, held)`.
 
-- **Green** = the contract holds; an observed failure is a regression and
-  fails the suite.
-- **Red** = a known, deterministic bug reproduction; the case PASSES while
-  the bug reproduces and **fails loudly the moment the bug stops
-  reproducing**, demanding the flip. A red case is therefore also the
-  detector of its own fix.
+**A broken contract fails. Always.** On master, on a feature branch,
+whether or not the break is already known.
+
+- The manifest records NO expected outcome. There is no "known broken, and
+  therefore fine" state, and adding one is prohibited: it makes a broken
+  query engine report success, and this suite exists to name what is
+  broken, not to keep a list of exceptions.
+- A run ends with the full list of contracts the engine does not hold
+  (`brokenSummary()`, printed from `TestMain`). **That list is the corpus's
+  answer** — the open-defect list for the query engine, produced by
+  measurement rather than by hand.
+- `go test ./...` therefore exits non-zero while any contract is broken.
+  That is the intended signal, not a problem to suppress. The corpus is not
+  wired into CI.
 
 A case name is `<layer-or-CASE-id>/<slug>`; `Proves` is one sentence a
-maintainer can read as the contract claim. Cases flipped green keep their
-test as the regression guard, with `FixedBy: "#PR"`.
+maintainer can read as the contract claim. A case whose bug is fixed keeps
+its test as the regression guard and records `FixedBy: "#PR"`.
 
 ## Running
 
@@ -116,7 +127,10 @@ test as the regression guard, with `FixedBy: "#PR"`.
   always kept on failure; the path is printed as `daemon run dir kept:`).
 - Capture the verdict honestly: `go test ... ; echo "exit=$?"` — piping
   through `tail` masks the exit code.
-- **The full suite MUST be green before every push of the corpus branch.**
+- **Before every push of the corpus branch, run the full suite and compare
+  the broken list to the previous run.** It must not grow, and no case may
+  break that was holding before. The list being non-empty is expected while
+  the query engine still has open defects.
 
 ## Authoring fixtures
 
@@ -157,7 +171,7 @@ test as the regression guard, with `FixedBy: "#PR"`.
   CASE-023/tier-wide-point caught a constant window being judged on an
   interpolated blend of two windows.
 
-## Adding a green case
+## Adding a case
 
 1. Author the fixture (Class A first; reach for a Class B oracle only when
    the transform requires it).
@@ -165,33 +179,39 @@ test as the regression guard, with `FixedBy: "#PR"`.
    the ingestion path is the thing under test), settle, query.
 3. Compute expectations in Go from the fixture definition. Never paste a
    number you got from the engine.
-4. Add the manifest entry (`Agent: Green`) and the `MANIFEST.md` row.
+4. Add the manifest entry and the `MANIFEST.md` row.
 5. Run the full suite; a new case MUST NOT destabilize existing cases
    (watch for GUID collisions and shared-host mutations).
 
-## Adding a red case (bug workflow)
+## Adding a case for a bug (bug workflow)
+
+A case for a known bug is written exactly like any other case: it states
+the CORRECT behavior and fails while the engine gets it wrong. It is not
+marked, excused, or inverted — it joins the broken list until the fix
+lands, and the broken list is what the corpus is for.
 
 1. Reproduce the divergence deterministically in its own `caseNNN_test.go`
-   with a minimal fixture. The check asserts the CORRECT behavior and
-   feeds the observed result into `expectAgentStatus` — so the case passes
-   (red-as-expected) on today's daemon and screams when the bug is fixed.
-2. Add the manifest entry with `Agent: Red` and a `Proves` sentence that
-   states the bug precisely (what is wrong, where, and what correct is).
-3. The fix goes in its OWN branch/PR — never mixed into the corpus branch.
-4. Validate the fix branch against the corpus before opening the PR:
+   with a minimal fixture. The check asserts the CORRECT behavior and feeds
+   the result into `assertContract`.
+2. Add the manifest entry with a `Proves` sentence stating the contract
+   precisely (what correct is), not the bug's symptoms.
+3. Confirm it fails on today's daemon, and that the failure names the real
+   defect — a case that fails for the wrong reason is worse than none.
+4. The fix goes in its OWN branch/PR — never mixed into the corpus branch.
+5. Validate the fix branch against the corpus before opening the PR:
    - build the fix branch, save the binary aside;
    - from the corpus checkout:
      `QUERY_CORPUS_NETDATA=<fix-binary> go test -count=1 -run '<the case
      plus neighboring pins>' .`
-   - the red case MUST fail with "expected RED but the bug no longer
-     reproduces", and every other pin MUST stay green (zero collateral).
-5. When the fix merges: rebase the corpus branch onto the merge, flip the
-   case (`Agent: Green, FixedBy: "#PR"`), reword the case comment and
-   `Proves` to past tense, run the full suite, push. The case lives on as
-   the regression guard.
-6. If the divergence is ruled intended behavior instead: pin it green,
-   document the quirk in the oracle comment and the `Proves` text, and
-   record the ruling.
+   - the case MUST now hold, and every other case that was holding MUST
+     still hold (zero collateral).
+6. When the fix merges: rebase the corpus branch onto the merge, record
+   `FixedBy: "#PR"`, reword the case comment and `Proves` to describe the
+   contract in force, run the full suite, push. The case lives on as the
+   regression guard.
+7. If the divergence is ruled intended behavior instead: change the case to
+   assert the ruled behavior, document the quirk in the oracle comment and
+   the `Proves` text, and record the ruling.
 
 ## Changing oracles, pins, and the harness
 

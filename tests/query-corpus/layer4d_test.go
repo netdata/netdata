@@ -250,5 +250,5 @@ func TestLayer4ThreeTierJoin(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "L4/three-tier-join", ok)
+	assertContract(t, "L4/three-tier-join", ok)
 }

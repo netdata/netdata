@@ -67,5 +67,5 @@ func TestCase016FreshHostForgottenOnRestart(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "CASE-016/fresh-host-forgotten-on-restart", !reproduced)
+	assertContract(t, "CASE-016/fresh-host-forgotten-on-restart", !reproduced)
 }

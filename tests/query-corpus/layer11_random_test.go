@@ -223,5 +223,5 @@ func TestLayer11RandomisedSlicing(t *testing.T) {
 	}
 
 	t.Logf("%d randomised cases, %d distinct minimal failures", rounds, len(seen))
-	expectAgentStatus(t, "L11/randomised-slicing", ok)
+	assertContract(t, "L11/randomised-slicing", ok)
 }

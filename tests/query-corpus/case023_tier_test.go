@@ -247,7 +247,7 @@ func TestCase023TierEstimation(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "CASE-023/tier-estimation", ok)
+	assertContract(t, "CASE-023/tier-estimation", ok)
 }
 
 // tierWindowEnd is the stored window a view bucket ending at t belongs to:
@@ -414,7 +414,7 @@ func TestCase023TierWidePointRedelivery(t *testing.T) {
 			checked, windows)
 	}
 
-	expectAgentStatus(t, "CASE-023/tier-wide-point", ok)
+	assertContract(t, "CASE-023/tier-wide-point", ok)
 }
 
 // CASE-023 anomaly bit above tier 0 — RED: with options=anomaly-bit the
@@ -518,5 +518,5 @@ func TestCase023TierAnomalyBit(t *testing.T) {
 			checked, above, under)
 	}
 
-	expectAgentStatus(t, "CASE-023/tier-anomaly-bit", ok)
+	assertContract(t, "CASE-023/tier-anomaly-bit", ok)
 }

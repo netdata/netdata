@@ -372,7 +372,7 @@ func TestCase023FleetTimeGroupings(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "CASE-023/fleet-time-groupings", ok)
+	assertContract(t, "CASE-023/fleet-time-groupings", ok)
 }
 
 // TestCase023CountifBareNumber pins the shared parser's bare-number fix
@@ -429,5 +429,5 @@ func TestCase023CountifBareNumber(t *testing.T) {
 	v, _ := point[0].(float64)
 
 	t.Logf("countif with a bare '5' on a 0/1 series reads %v (50 = the swallowed digit, 0 = parsed as =5)", v)
-	expectAgentStatus(t, "CASE-023/countif-bare-number", math.Abs(v-0) < 1e-9)
+	assertContract(t, "CASE-023/countif-bare-number", math.Abs(v-0) < 1e-9)
 }

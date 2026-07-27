@@ -123,5 +123,5 @@ func TestCase024ZoomIntoSlowMetrics(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "CASE-024/zoom-into-slow-metrics", ok)
+	assertContract(t, "CASE-024/zoom-into-slow-metrics", ok)
 }

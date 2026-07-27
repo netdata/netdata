@@ -67,6 +67,10 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	_ = td.Stop()
 
+	// the run's actual answer: which contracts the query engine does not
+	// hold. Printed last so it is the thing left on screen.
+	fmt.Fprint(os.Stderr, brokenSummary())
+
 	if code == 0 && os.Getenv("QUERY_CORPUS_KEEP") == "" {
 		_ = os.RemoveAll(runDir)
 	} else {
