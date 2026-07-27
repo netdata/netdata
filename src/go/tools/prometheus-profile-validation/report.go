@@ -1,0 +1,326 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"sort"
+	"strings"
+)
+
+const (
+	verdictPass = "PASS"
+	verdictFail = "FAIL"
+)
+
+type report struct {
+	Verdict             string                               `json:"verdict"`
+	Profile             profileReport                        `json:"profile"`
+	Job                 effectiveJobReport                   `json:"job"`
+	Counts              countReport                          `json:"counts"`
+	RawFamilies         []rawFamilyReport                    `json:"raw_families,omitempty"`
+	PipelineExcluded    []pipelineExcludedReport             `json:"pipeline_excluded,omitempty"`
+	Charts              []materializedChart                  `json:"charts,omitempty"`
+	DeadCharts          []deadChartReport                    `json:"dead_charts,omitempty"`
+	DeadDimensions      []deadDimensionReport                `json:"dead_dimensions,omitempty"`
+	DimensionLosses     []dimensionMaterializationLossReport `json:"dimension_materialization_losses,omitempty"`
+	Collisions          []collisionReport                    `json:"collisions,omitempty"`
+	InstanceLosses      []instanceMaterializationLossReport  `json:"instance_materialization_losses,omitempty"`
+	ChartWireCollisions []wireChartCollisionReport           `json:"chart_wire_collisions,omitempty"`
+	ContextCollisions   []wireContextCollisionReport         `json:"context_wire_collisions,omitempty"`
+	DimensionCollisions []dimensionCollisionReport           `json:"dimension_collisions,omitempty"`
+	Findings            []finding                            `json:"findings,omitempty"`
+	EvidenceLimits      []string                             `json:"evidence_limits,omitempty"`
+}
+
+type profileReport struct {
+	Name  string `json:"name,omitempty"`
+	Match string `json:"match,omitempty"`
+	App   string `json:"app,omitempty"`
+}
+
+type effectiveJobReport struct {
+	Name               string   `json:"name"`
+	App                string   `json:"app,omitempty"`
+	SelectorAllow      []string `json:"selector_allow,omitempty"`
+	SelectorDeny       []string `json:"selector_deny,omitempty"`
+	RelabelBlocks      int      `json:"relabel_blocks"`
+	FallbackGauge      []string `json:"fallback_gauge,omitempty"`
+	FallbackCounter    []string `json:"fallback_counter,omitempty"`
+	ExpectedPrefix     string   `json:"expected_prefix,omitempty"`
+	MaxTimeSeries      int      `json:"max_time_series"`
+	MaxSeriesPerMetric int      `json:"max_time_series_per_metric"`
+}
+
+type countReport struct {
+	RawFamilies      int `json:"raw_families"`
+	RawLogicalSeries int `json:"raw_logical_series"`
+	WriterSeries     int `json:"writer_series"`
+	SeriesScanned    int `json:"series_scanned"`
+	SeriesAutogen    int `json:"series_autogen"`
+	SeriesUnmatched  int `json:"series_unmatched"`
+	CuratedCharts    int `json:"curated_charts"`
+	AutogenCharts    int `json:"autogen_charts"`
+	ChartDimensions  int `json:"chart_dimensions"`
+	AuthoredCharts   int `json:"authored_charts"`
+	PipelineExcluded int `json:"pipeline_excluded"`
+}
+
+type rawFamilyReport struct {
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+	Series    int    `json:"series"`
+	Shape     string `json:"shape,omitempty"`
+	Help      string `json:"help,omitempty"`
+	Quantiles int    `json:"quantiles,omitempty"`
+	Buckets   int    `json:"buckets,omitempty"`
+}
+
+type pipelineExcludedReport struct {
+	Name               string `json:"name"`
+	Type               string `json:"type"`
+	Shape              string `json:"shape,omitempty"`
+	Category           string `json:"category"`
+	RawLogicalSeries   int    `json:"raw_logical_series"`
+	WriterSourceSeries int    `json:"writer_source_series"`
+}
+
+type materializedChart struct {
+	TemplateID            string   `json:"template_id"`
+	IDFingerprint         string   `json:"id_fingerprint"`
+	Context               string   `json:"context"`
+	Title                 string   `json:"title"`
+	Family                string   `json:"family"`
+	Units                 string   `json:"units"`
+	Priority              int      `json:"priority"`
+	Autogen               bool     `json:"autogen"`
+	DimensionFingerprints []string `json:"dimension_fingerprints,omitempty"`
+}
+
+type deadChartReport struct {
+	Path     string `json:"path"`
+	Title    string `json:"title"`
+	Context  string `json:"context"`
+	Priority int    `json:"priority"`
+}
+
+type deadDimensionReport struct {
+	Path     string `json:"path"`
+	Selector string `json:"selector"`
+	Name     string `json:"name,omitempty"`
+}
+
+type dimensionMaterializationLossReport struct {
+	Path               string `json:"path"`
+	ObservedDimensions int    `json:"observed_dimensions"`
+	PlannedDimensions  int    `json:"planned_dimensions"`
+	Cause              string `json:"cause"`
+}
+
+type collisionReport struct {
+	RenderedIDFingerprint string   `json:"rendered_id_fingerprint"`
+	Charts                []string `json:"charts"`
+}
+
+type instanceMaterializationLossReport struct {
+	Path               string `json:"path"`
+	ObservedIdentities int    `json:"observed_identities"`
+	RenderedIDs        int    `json:"rendered_ids"`
+	Cause              string `json:"cause"`
+}
+
+type wireChartCollisionReport struct {
+	WireIDFingerprint string `json:"wire_id_fingerprint"`
+	Occurrences       int    `json:"occurrences"`
+}
+
+type wireContextCollisionReport struct {
+	WireContextFingerprint string   `json:"wire_context_fingerprint"`
+	RawContextFingerprints []string `json:"raw_context_fingerprints"`
+}
+
+type dimensionCollisionReport struct {
+	ChartIDFingerprint     string `json:"chart_id_fingerprint"`
+	DimensionIDFingerprint string `json:"dimension_id_fingerprint"`
+	Occurrences            int    `json:"occurrences"`
+}
+
+type finding struct {
+	Severity string `json:"severity"`
+	Code     string `json:"code"`
+	Path     string `json:"path,omitempty"`
+	Message  string `json:"message"`
+	Why      string `json:"why,omitempty"`
+}
+
+func newReport() report {
+	return report{
+		Verdict: verdictPass,
+		EvidenceLimits: []string{
+			"Validation proves behavior for the supplied dump and structured job policy, not metrics or label values absent from that evidence.",
+			"Observed planner and public-wire chart/context/dimension collisions are checked; possible collisions from unseen future values cannot be proven from one dump.",
+			"A lifecycle cap that accommodates this dump may still omit entities or dimensions in a larger configuration.",
+			"Exact candidate validation does not prove that profile.match uniquely auto-selects this exporter against unrelated endpoints.",
+			"Dashboard meaning, functional hierarchy, and operator usefulness require model judgment and review; this tool does not score taste.",
+		},
+	}
+}
+
+func (r *report) addError(code, path, message, why string) {
+	r.Verdict = verdictFail
+	r.Findings = append(r.Findings, finding{
+		Severity: "error",
+		Code:     code,
+		Path:     path,
+		Message:  message,
+		Why:      why,
+	})
+}
+
+func (r *report) addWarning(code, path, message, why string) {
+	r.Findings = append(r.Findings, finding{
+		Severity: "warning",
+		Code:     code,
+		Path:     path,
+		Message:  message,
+		Why:      why,
+	})
+}
+
+func writeJSONReport(w io.Writer, r report) error {
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(r)
+}
+
+func writeTextReport(w io.Writer, r report) error {
+	var b strings.Builder
+	fmt.Fprintf(&b, "VERDICT: %s\n", r.Verdict)
+	if r.Profile.Name != "" {
+		fmt.Fprintf(&b, "Profile: %s (match=%q, app=%q)\n", r.Profile.Name, r.Profile.Match, r.Profile.App)
+	}
+	fmt.Fprintf(
+		&b,
+		"Evidence: raw=%d families/%d logical series, writer=%d flattened series, planner=%d scanned\n",
+		r.Counts.RawFamilies,
+		r.Counts.RawLogicalSeries,
+		r.Counts.WriterSeries,
+		r.Counts.SeriesScanned,
+	)
+	fmt.Fprintf(
+		&b,
+		"Charts: authored=%d, curated=%d, autogen=%d, dimensions=%d\n",
+		r.Counts.AuthoredCharts,
+		r.Counts.CuratedCharts,
+		r.Counts.AutogenCharts,
+		r.Counts.ChartDimensions,
+	)
+	fmt.Fprintf(
+		&b,
+		"Routing: autogen_series=%d, unmatched_series=%d, dead_charts=%d, dead_dimensions=%d, dimension_losses=%d, collisions=%d\n",
+		r.Counts.SeriesAutogen,
+		r.Counts.SeriesUnmatched,
+		len(r.DeadCharts),
+		len(r.DeadDimensions),
+		len(r.DimensionLosses),
+		len(r.Collisions)+len(r.InstanceLosses)+len(r.ChartWireCollisions)+len(r.ContextCollisions)+len(r.DimensionCollisions),
+	)
+
+	if len(r.PipelineExcluded) > 0 {
+		fmt.Fprintln(&b, "\nRaw families wholly or partly absent after the real job/writer pipeline:")
+		for _, item := range r.PipelineExcluded {
+			shape := ""
+			if item.Shape != "" {
+				shape = " (" + item.Shape + ")"
+			}
+			fmt.Fprintf(
+				&b,
+				"  - %s: %s%s; logical_series raw=%d writer=%d\n",
+				item.Name,
+				item.Category,
+				shape,
+				item.RawLogicalSeries,
+				item.WriterSourceSeries,
+			)
+		}
+	}
+	if len(r.Charts) > 0 {
+		fmt.Fprintln(&b, "\nMaterialized charts:")
+		for _, chart := range r.Charts {
+			kind := "curated"
+			if chart.Autogen {
+				kind = "AUTOGEN"
+			}
+			fmt.Fprintf(
+				&b,
+				"  - [%s] %s context=%s priority=%d dims=%s\n",
+				kind,
+				chart.IDFingerprint,
+				chart.Context,
+				chart.Priority,
+				strings.Join(chart.DimensionFingerprints, ","),
+			)
+		}
+	}
+	if len(r.Findings) > 0 {
+		fmt.Fprintln(&b, "\nFindings:")
+		for _, item := range r.Findings {
+			location := ""
+			if item.Path != "" {
+				location = " [" + item.Path + "]"
+			}
+			fmt.Fprintf(&b, "  - %s %s%s: %s\n", strings.ToUpper(item.Severity), item.Code, location, item.Message)
+			if item.Why != "" {
+				fmt.Fprintf(&b, "    Why: %s\n", item.Why)
+			}
+		}
+	}
+	if len(r.EvidenceLimits) > 0 {
+		fmt.Fprintln(&b, "\nEvidence limits:")
+		for _, item := range r.EvidenceLimits {
+			fmt.Fprintf(&b, "  - %s\n", item)
+		}
+	}
+	_, err := io.WriteString(w, b.String())
+	return err
+}
+
+func sortReport(r *report) {
+	sort.Slice(r.RawFamilies, func(i, j int) bool { return r.RawFamilies[i].Name < r.RawFamilies[j].Name })
+	sort.Slice(r.PipelineExcluded, func(i, j int) bool { return r.PipelineExcluded[i].Name < r.PipelineExcluded[j].Name })
+	sort.Slice(r.Charts, func(i, j int) bool { return r.Charts[i].IDFingerprint < r.Charts[j].IDFingerprint })
+	sort.Slice(r.DeadCharts, func(i, j int) bool { return r.DeadCharts[i].Path < r.DeadCharts[j].Path })
+	sort.Slice(r.DeadDimensions, func(i, j int) bool { return r.DeadDimensions[i].Path < r.DeadDimensions[j].Path })
+	sort.Slice(r.DimensionLosses, func(i, j int) bool {
+		return r.DimensionLosses[i].Path < r.DimensionLosses[j].Path
+	})
+	sort.Slice(r.Collisions, func(i, j int) bool {
+		return r.Collisions[i].RenderedIDFingerprint < r.Collisions[j].RenderedIDFingerprint
+	})
+	sort.Slice(r.InstanceLosses, func(i, j int) bool {
+		return r.InstanceLosses[i].Path < r.InstanceLosses[j].Path
+	})
+	sort.Slice(r.ChartWireCollisions, func(i, j int) bool {
+		return r.ChartWireCollisions[i].WireIDFingerprint < r.ChartWireCollisions[j].WireIDFingerprint
+	})
+	sort.Slice(r.ContextCollisions, func(i, j int) bool {
+		return r.ContextCollisions[i].WireContextFingerprint < r.ContextCollisions[j].WireContextFingerprint
+	})
+	sort.Slice(r.DimensionCollisions, func(i, j int) bool {
+		if r.DimensionCollisions[i].ChartIDFingerprint != r.DimensionCollisions[j].ChartIDFingerprint {
+			return r.DimensionCollisions[i].ChartIDFingerprint < r.DimensionCollisions[j].ChartIDFingerprint
+		}
+		return r.DimensionCollisions[i].DimensionIDFingerprint < r.DimensionCollisions[j].DimensionIDFingerprint
+	})
+	sort.SliceStable(r.Findings, func(i, j int) bool {
+		if r.Findings[i].Severity != r.Findings[j].Severity {
+			return r.Findings[i].Severity == "error"
+		}
+		if r.Findings[i].Code != r.Findings[j].Code {
+			return r.Findings[i].Code < r.Findings[j].Code
+		}
+		return r.Findings[i].Path < r.Findings[j].Path
+	})
+}
