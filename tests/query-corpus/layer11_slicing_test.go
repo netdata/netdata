@@ -365,3 +365,33 @@ func TestLayer11TotalsMatchWhatWasPushed(t *testing.T) {
 	t.Logf("%d configurations checked (the rest upsample)", checked)
 	expectAgentStatus(t, "L11/totals-match-what-was-pushed", ok)
 }
+
+// fixture_T0 is the fixed corpus epoch, as an int64.
+func fixture_T0() int64 { return int64(fixture.T0) }
+
+// sliceTotalPoints is sliceTotal with the point count given explicitly.
+func sliceTotalPoints(t *testing.T, a sliceAxes, after, before, points int64) float64 {
+	t.Helper()
+	params := daemon.DataParamsTier(sliceContext(a.Shape, a.UE), a.Tier, after, before, points, "sum")
+	opts := "jsonwrap|unaligned"
+	if a.Option != "" {
+		opts += "|" + a.Option
+	}
+	params.Set("options", opts)
+
+	doc, err := td.DataV3(sliceHost(a.Shape, a.UE), params)
+	if err != nil {
+		t.Fatalf("%s: %v", a, err)
+	}
+	cols, err := canon.Columns(doc)
+	if err != nil {
+		t.Fatalf("%s: %v", a, err)
+	}
+	sum := 0.0
+	for _, pt := range cols["v"] {
+		if pt.Value != nil {
+			sum += *pt.Value
+		}
+	}
+	return sum
+}
