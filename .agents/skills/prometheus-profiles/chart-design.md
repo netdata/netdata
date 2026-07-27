@@ -50,9 +50,9 @@ If the sentence has several unrelated answers, split or redesign the chart.
 
 NIDL families are recursive navigation. Use them to tell a stable story:
 
-1. application capability or pipeline stage;
-2. subsystem or diagnostic lens;
-3. entity-specific detail where useful.
+1. application capability, operator-recognized function, or causal stage;
+2. its subsystem, causal substage, or explicit entity boundary;
+3. signal-role detail inside that domain owner where it improves diagnosis.
 
 This is guidance, not a fixed tree. The best hierarchy follows causal reasoning:
 traffic enters, work queues, execution consumes resources, output succeeds or
@@ -74,6 +74,30 @@ not gather every workload signal, every error, or every same-unit metric from
 unrelated functions into application-wide buckets. Shared role or unit tells
 how signals may be compared; it does not tell where the operator looks for
 their cause.
+
+Build the capability model before sorting metrics. Documentation and source
+should reveal what the application does, how work moves, where it can wait or
+fail, and which entities own those functions. Only then assign signals. If the
+tree is derived from metric names first, shared suffixes and units will tend to
+become false navigation categories.
+
+Use an operator-vocabulary test on the proposed first two levels:
+
+- Hide the chart and metric names and read only the family tree.
+- Ask whether those names teach an operator the application's functions and
+  causal path.
+- Treat `Latency`, `Workload`, `Errors`, `Distributions`, `Parameters`, metric
+  types, and units as warning signs when they own unrelated application-wide
+  signals. They describe how something was observed, not what caused it.
+- Allow a small cross-cutting SLI overview only when it answers one
+  service-level impact question. It must not become a route for leftover
+  coverage.
+
+Then audit every capability holistically. Its workload, outcomes, errors,
+latency, saturation, capacity, and resource pressure should be together or in
+nearby subfamilies when the exporter provides them. Scattering those lenses into
+global role sections makes operators jump between branches to explain one
+function.
 
 Entity level and functional hierarchy are independent axes. A service-level
 section can contain HTTP, process, runtime, and garbage-collection signals, but
@@ -219,7 +243,8 @@ available, and it cannot recover labels from writer-skipped `_info` metrics.
 Metrics belong together only when all of these are true:
 
 1. They answer one operator question.
-2. Their units mean the same thing.
+2. Their complete rendered units mean the same thing, including the counted or
+   measured object.
 3. Their chart algorithm is compatible.
 4. Their scale allows each signal to remain visible.
 5. Their dimension cardinality remains readable.
@@ -227,6 +252,12 @@ Metrics belong together only when all of these are true:
 Shared units are necessary, not sufficient. Requests/s and errors/s are related,
 but a tiny error rate can disappear under large traffic. Used bytes and queue
 bytes are both bytes, but they may describe unrelated resources.
+
+Do not use an umbrella noun to make unlike units appear compatible. Batches/s,
+records/s, retries/s, and bytes/s do not become a common `events/s` or
+`operations/s` axis. The noun identifies the observation population and is part
+of dimensional correctness. If the exact noun is unknown, research it; if the
+nouns differ, split the chart even when the counters advance together.
 
 A useful composition is often a bounded breakdown of one whole: response
 classes, cache hit/miss outcomes, pipeline phases, input/output directions, or
@@ -385,9 +416,11 @@ Use both channels deliberately:
 - allow a tie only when a total order is unnecessary and the fallback ordering
   is acceptable.
 
-A useful default story is health/workload → failures/latency → queueing/resource
-pressure → detailed internals. Change it when the application's actual failure
-modes demand another order.
+At the application level, order domain capabilities by the operator's causal
+journey. Within each capability, a useful local order is health/workload →
+failures/latency → queueing/resource pressure → detailed internals. Do not turn
+that local diagnostic sequence into application-wide `Workload`, `Latency`, or
+`Resources` branches.
 
 ## Protect identity and cardinality
 
@@ -412,6 +445,13 @@ contexts, and dimensions. Unseen future values remain a review risk.
 
 - **Families named Gauges/Counters/Histograms:** expose transport mechanics and
   force operators to reconstruct the application.
+- **Application-wide Workload/Latency/Errors/Distributions/Parameters
+  families:** expose diagnostic lenses or observation form instead of the
+  capability that owns the signal, forcing operators to join one causal story
+  across multiple branches.
+- **Repeated identical sibling family names:** render as the same navigation
+  path, so repetition does not express distinct semantic owners. Give the
+  branches domain names or nest them under their actual capability.
 - **One metric per chart by default:** loses useful comparison and creates a long
   dashboard; separate only when meaning/scale requires it.
 - **Everything on one chart:** hides smaller signals, mixes questions, and
@@ -436,6 +476,10 @@ After objective validation passes, review the dashboard design:
 - Can the first screen distinguish traffic loss, user-visible failure,
   queueing, and saturation?
 - Does navigation follow application capabilities and causal diagnosis?
+- Do the first two family levels pass the operator-vocabulary test without
+  relying on signal roles, metric forms, parameter kinds, or units?
+- Does each capability keep its available diagnostic lenses together rather
+  than scattering them into application-wide role sections?
 - Is each context homogeneous in entity type?
 - Does each displayed leaf family contain one effective entity identity?
 - Does descendant identity retain its parent labels?
@@ -443,6 +487,9 @@ After objective validation passes, review the dashboard design:
 - Are dimensions bounded comparable aspects?
 - Do sibling families share the intended parent identity?
 - Does every chart satisfy question, units, algorithm, scale, and cardinality?
+- Does every shared axis preserve the exact counted/measured noun, rather than
+  hiding unlike objects under `events`, `operations`, `items`, or
+  `observations`?
 - Are rare failures visible beside high-volume traffic?
 - Are titles and units mathematically true?
 - Is each exclusion justified by the capability lost?

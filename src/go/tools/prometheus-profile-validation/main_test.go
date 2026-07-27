@@ -1341,6 +1341,47 @@ template:
 	}
 }
 
+func TestValidateProfileWarnsWhenSiblingFamilyPathIsRepeated(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  groups:
+    - family: Storage
+      metrics: [app_reads]
+      charts:
+        - title: Reads
+          context: reads
+          units: operations/s
+          algorithm: incremental
+          priority: 100
+          dimensions:
+            - selector: app_reads
+              name: reads
+    - family: Storage
+      metrics: [app_writes]
+      charts:
+        - title: Writes
+          context: writes
+          units: operations/s
+          algorithm: incremental
+          priority: 110
+          dimensions:
+            - selector: app_writes
+              name: writes
+`
+	dump := "# TYPE app_reads counter\napp_reads 1\n# TYPE app_writes counter\napp_writes 2\n"
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("duplicate sibling family must remain an advisory\nreport:\n%s", result.stdout)
+	}
+	if !hasFinding(result.report, "duplicate_sibling_family", "warning") {
+		t.Fatalf("missing duplicate sibling family warning: %#v", result.report.Findings)
+	}
+}
+
 func TestValidateProfileRejectsMalformedAndEmptyDumps(t *testing.T) {
 	tests := map[string]string{
 		"malformed": "# TYPE app_temperature gauge\napp_temperature not-a-number\n",

@@ -486,6 +486,7 @@ func addDashboardHeuristics(spec *charttpl.Spec, r *report) {
 		return
 	}
 	addDisplayedFamilyIdentityHeuristics(spec, r)
+	addDuplicateSiblingFamilyWarnings(spec.Groups, "groups", r)
 
 	var walk func(group charttpl.Group, path string, parentDefault *charttpl.Instances)
 	walk = func(group charttpl.Group, path string, parentDefault *charttpl.Instances) {
@@ -530,6 +531,8 @@ func addDashboardHeuristics(spec *charttpl.Spec, r *report) {
 				)
 			}
 		}
+
+		addDuplicateSiblingFamilyWarnings(group.Groups, path+".groups", r)
 
 		if len(group.Groups) > 1 {
 			type childIdentity struct {
@@ -654,6 +657,33 @@ func addDisplayedFamilyIdentityHeuristics(spec *charttpl.Spec, r *report) {
 				strings.Join(detail, "; "),
 			),
 			"One displayed leaf should represent one entity type so its charts filter together. Move charts to explicit entity-level branches or use a common identity only when every selected series truly carries it.",
+		)
+	}
+}
+
+// addDuplicateSiblingFamilyWarnings reports repeated non-empty sibling family
+// names because they compose the same displayed navigation path. Repeating a
+// path can be valid source organization, but it cannot communicate distinct
+// semantic branches to the dashboard reader.
+func addDuplicateSiblingFamilyWarnings(groups []charttpl.Group, path string, r *report) {
+	positions := make(map[string][]int)
+	for i, group := range groups {
+		family := strings.TrimSpace(group.Family)
+		if family == "" {
+			continue
+		}
+		positions[family] = append(positions[family], i)
+	}
+	for _, family := range slices.Sorted(maps.Keys(positions)) {
+		indexes := positions[family]
+		if len(indexes) < 2 {
+			continue
+		}
+		r.addWarning(
+			"duplicate_sibling_family",
+			path,
+			fmt.Sprintf("sibling family %q is declared %d times at indexes %v", family, len(indexes), indexes),
+			"Identical sibling names compose the same displayed NIDL path, so repetition cannot express separate operator concepts. Give distinct domain branches explicit names, nest them under their semantic owner, or explain why one displayed path is intentional.",
 		)
 	}
 }

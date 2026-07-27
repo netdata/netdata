@@ -107,6 +107,8 @@ Warnings identify designs that deserve explanation but can be correct:
   unrelated endpoint;
 - duplicate priorities, whose runtime placement falls back to chart-ID order;
 - open-ended `instances.by_labels: ['*']` identity;
+- repeated non-empty sibling family names, which compose the same displayed
+  navigation path instead of distinct semantic branches;
 - displayed leaf families whose charts use different effective entity
   identities;
 - child group/chart identities that drop labels from an explicitly declared

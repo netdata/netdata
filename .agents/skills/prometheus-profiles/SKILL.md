@@ -18,6 +18,14 @@ Use model judgment for those decisions. Use deterministic tooling only for
 facts that code can prove. A schema-valid but poorly reasoned profile is not a
 good result; neither is a beautiful design that the runtime cannot materialize.
 
+A request to create a profile delegates routine research and dashboard-design
+judgment to the author. Complete the profile, job policy, reasoning summary, and
+validation without asking the user to choose ordinary family names, chart
+boundaries, identities, or priorities. Ask only when evidence cannot resolve a
+real product boundary, the requested evidence is unavailable, or the next step
+would change a production system. Otherwise, stopping for confirmation defeats
+the purpose of using model judgment.
+
 ## Ground in the current implementation
 
 Read these files **in full, without skimming, before authoring or materially
@@ -109,8 +117,24 @@ fixtures or documentation.
 
 ## Build the semantic inventory before the YAML
 
-Classify every observed writer-capable family before grouping it. The format is
-up to the author, but the reasoning must make these fields explicit:
+First build a source-backed domain map without using metric type, unit, or name
+shape as its organizing principle. Record:
+
+- what the application does in operator vocabulary;
+- its capabilities, subsystems, and causal or processing stages;
+- how work and failures propagate between them;
+- its entity types and containment relationships; and
+- the runtime/platform surfaces that support the application but are not one of
+  its domain capabilities.
+
+Why: starting from a sorted metric list invites the exporter to design the
+dashboard accidentally. A domain map provides independent semantic owners for
+the signals. Metrics can then explain the application instead of becoming the
+application's navigation.
+
+Classify every observed writer-capable family against that map before grouping
+it. The format is up to the author, but the reasoning must make these fields
+explicit:
 
 - **Operator capability:** the application function, subsystem, or causal stage
   this signal explains.
@@ -122,9 +146,10 @@ up to the author, but the reasoning must make these fields explicit:
   utilization, resource use, configuration, or another domain role.
 - **Observation population:** what one counter increment, histogram
   observation, summary observation, or gauge value represents.
-- **Unit algebra:** the raw unit, algorithm, conversion, and final rendered
-  unit. Name the counted object; `operations/s` and `items/s` are not
-  interchangeable merely because both are rates.
+- **Unit algebra:** the raw unit, algorithm, conversion, final rendered unit,
+  and exact counted or measured object. A broad noun such as `events`,
+  `operations`, `items`, or `observations` does not make different objects
+  interchangeable merely because all become rates.
 - **Label roles and cardinality:** identity, bounded dimension, promoted
   metadata, selector routing, or intentional aggregation.
 - **Evidence and uncertainty:** the observed or authoritative source supporting
@@ -149,6 +174,28 @@ Functional capability drives navigation. Signal role and unit constrain chart
 composition *inside* that story; they are not application-wide navigation
 categories. A top-level “Latency,” “Errors,” or “Bytes” section forces the
 operator to reconstruct the application's causal path.
+
+Before writing YAML, audit the first two levels of the proposed family tree:
+
+- Read only the family names, without metric names. They SHOULD describe what
+  the application does, where work is, or which domain entity owns it.
+- A family whose main meaning is `Latency`, `Workload`, `Errors`,
+  `Distributions`, `Parameters`, `Counters`, or a unit is an observability or
+  exposition taxonomy, not a domain owner. Move those signals under the
+  capability they explain. A deliberately small service-level SLI overview is
+  the exception, not a coverage bucket.
+- For each capability, check whether its available workload, outcomes, errors,
+  latency, saturation, capacity, and resource-pressure signals are close enough
+  to form one diagnosis. If they have been scattered into application-wide role
+  sections, the tree is not yet an operator mental model.
+- Every writer-capable signal MUST have a domain owner or a documented
+  service/runtime boundary before its signal role or unit affects placement.
+  “It is a histogram,” “it has the same units,” or “it is a request parameter”
+  is not an owner.
+
+This audit is a semantic guardrail, not a prescribed tree. Different authors may
+choose different defensible capability boundaries and orders; they must not
+replace application reasoning with a measurement taxonomy.
 
 See `chart-design.md` for the consequences and conflict-resolution guidance.
 See `metric-types.md` for what the collector actually writes for each
@@ -269,6 +316,10 @@ three charts for every histogram:
   are genuinely comparable.
 - Bucket shape, observation count, and observed-value sum remain different
   roles. Never combine them under one unit merely to reduce chart count.
+- Every dimension in one chart MUST have the same complete rendered unit
+  algebra, including the counted object. Renaming different objects to
+  `events/s`, `operations/s`, `items/s`, or `observations/s` does not make them
+  comparable; research the object and split the chart when the nouns differ.
 
 The operator question decides the chart boundary; zero autogen/unmatched
 decides whether every written series was routed. Conflating those decisions
@@ -340,11 +391,12 @@ Warnings are prompts for model review, not policy decisions. They include
 generic auto-selection signatures, observed labels with no authored role,
 the job-policy exclusion summary, observed per-rule allow/deny impact, unused
 metric declarations, authored/runtime heatmap divergence, ambiguous or
-physical-rate filled charts, mixed leaf identity, parent identity loss, and
-sibling identity mismatch. Each can be intentional, but its UX or diagnostic
-trade-off must be explained. Do not mechanically add identity, promotion, or
-dimensions merely to silence a label warning; explain intentional aggregation
-or an intentional entity-level boundary when it is the correct design.
+physical-rate filled charts, repeated sibling family paths, mixed leaf identity,
+parent identity loss, and sibling identity mismatch. Each can be intentional,
+but its UX or diagnostic trade-off must be explained. Do not mechanically add
+identity, promotion, or dimensions merely to silence a label warning; explain
+intentional aggregation or an intentional entity-level boundary when it is the
+correct design.
 
 The gate cannot judge whether the dashboard is useful, and it cannot prove
 behavior for unseen metrics or label values. Exact candidate selection also
@@ -359,6 +411,11 @@ Review the rendered design, not merely the YAML:
 
 - Does the first screen answer the most urgent operator questions?
 - Does the family tree follow application functions and entity hierarchy?
+- If only the first two family levels are read, do they teach the application's
+  capabilities and causal path rather than list signal roles, metric forms,
+  parameter kinds, or units?
+- Does each capability keep its available workload, outcomes, latency,
+  saturation, and pressure signals together enough for holistic diagnosis?
 - Does every context represent one homogeneous instance type?
 - Does each displayed leaf family contain one effective entity identity?
 - Are dimensions bounded aspects rather than hidden entity explosions?
@@ -368,6 +425,8 @@ Review the rendered design, not merely the YAML:
   is intended?
 - Do chart titles promise only what the selected data computes?
 - Are units, algorithms, and conversions honest?
+- Does every dimension on a shared axis count or measure the same object, with
+  no umbrella unit hiding different nouns?
 - Are distribution shape, observation count, and observed-value sum kept as
   different semantic/unit roles rather than combined under one chart unit?
 - Are smaller signals still visible, or flattened by a much larger dimension?

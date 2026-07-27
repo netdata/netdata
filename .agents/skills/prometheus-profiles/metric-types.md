@@ -75,6 +75,13 @@ Design behavior:
 - cumulative raw totals are rarely the useful live dashboard view. Do not label
   an incremental chart as a lifetime total.
 
+The counted object is part of the unit. Do not combine counters for batches,
+records, retries, and bytes by relabeling all of them `events/s`,
+`operations/s`, or `items/s`. Those umbrella nouns hide different observation
+populations rather than performing valid unit conversion. Research what one
+increment means, use that noun in the chart, and split unlike objects even when
+their algorithms and numeric scales happen to match.
+
 Apply unit algebra after the algorithm. A counter measured in seconds becomes
 seconds/second under `incremental`, not “CPU time.” For
 `process_cpu_seconds_total`, that dimensionless rate is CPU-core utilization
@@ -133,6 +140,10 @@ transport unit, not a population: requests, batches, database rows,
 transactions, and retries remain different things even when every selector
 ends in `_count`. The chart title and dimension names must describe the real
 population rather than relabel all observations as requests.
+
+The same rule applies outside distributions. A generic `events/s` unit cannot
+combine one counter whose increment is an operation with another whose
+increment is an item processed by that operation.
 
 Name what each `_sum` accumulates before combining sum rates. Equal
 `seconds/s` does not prove additivity or even the same population: an
