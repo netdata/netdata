@@ -100,4 +100,4 @@ This method is useful when you want to:
 
 ## Apply Your Changes
 
-After saving a configuration file, [restart or reload the Netdata Agent as appropriate for that file and platform](/docs/netdata-agent/start-stop-restart.md).
+After saving a configuration file, [restart the Netdata Agent as appropriate for that file and platform](/docs/netdata-agent/start-stop-restart.md).
