@@ -62,11 +62,18 @@ layers; each layer declares which entries it consumes:
 - Every layer's cases carry deterministic fixtures at a fixed 2023 epoch and
   hand-computable expectations (the driver computes them from the fixture
   definition — never from the engine under test).
-- Every bug found while building a layer is proven RED here first, then fixed
-  in its own focused branch/PR, then flipped GREEN here.
-- The manifest tracks case -> proves-what -> agent status -> cloud status ->
-  fixed-by.
+- Every bug found while building a layer is proven here first — a case that
+  states the contract and fails on the engine as it stands — then fixed in its
+  own focused branch/PR.
+- **A broken contract fails. Always.** On master, on a feature branch, whether
+  or not the break is already known. There is no recorded "expected failure"
+  anywhere in this suite: a corpus that reports success on a broken engine is
+  worse than no corpus, because it is the thing you would trust. The run ends
+  with the full list of contracts the engine does not hold, so the suite's
+  output IS the open-defect list.
+- The manifest tracks case -> proves-what -> cloud status -> fixed-by. It
+  records no expected outcome; only running a case can say whether it holds.
 
 The full developer contract — how to run the suite, author fixtures and
-oracles, add red cases, flip them green, and change pins safely — is
+oracles, add a case for a new bug, and change pins safely — is
 `.agents/skills/project-query-corpus/SKILL.md`.

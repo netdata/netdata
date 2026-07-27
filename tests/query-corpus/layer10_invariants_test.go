@@ -406,7 +406,7 @@ func TestLayer10NoHolesInsideData(t *testing.T) {
 	if skipped > 0 {
 		t.Logf("%d grouping(s) skipped as known-broken - see L10/single-point-buckets-answer", skipped)
 	}
-	expectAgentStatus(t, "L10/no-holes-inside-data", ok)
+	assertContract(t, "L10/no-holes-inside-data", ok)
 }
 
 // INV-1c: a bucket NARROWER than the stored data still answers.
@@ -467,7 +467,7 @@ func TestLayer10BucketsFinerThanStoredDataAnswer(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "L10/buckets-finer-than-stored-data-answer", ok)
+	assertContract(t, "L10/buckets-finer-than-stored-data-answer", ok)
 }
 
 // INV-2: an order statistic answers WITH the data, not past it.
@@ -521,7 +521,7 @@ func TestLayer10OrderStatisticsStayInRange(t *testing.T) {
 		t.Fatalf("no order-statistic buckets were checked")
 	}
 	t.Logf("%d bucket values checked against their dimension's range", checked)
-	expectAgentStatus(t, "L10/order-statistics-stay-in-range", ok)
+	assertContract(t, "L10/order-statistics-stay-in-range", ok)
 }
 
 // INV-3: what a dimension answers does not depend on its neighbours.
@@ -575,7 +575,7 @@ func TestLayer10DimensionsAreIndependent(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "L10/dimensions-are-independent", ok)
+	assertContract(t, "L10/dimensions-are-independent", ok)
 }
 
 // INV-4: an event does not happen twice because the chart was zoomed in.
@@ -627,7 +627,7 @@ func TestLayer10CountsDoNotInflateWithZoom(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "L10/counts-do-not-inflate-with-zoom", ok)
+	assertContract(t, "L10/counts-do-not-inflate-with-zoom", ok)
 }
 
 // INV-4b: a TOTAL over a fixed span is the same number at any resolution.
@@ -683,7 +683,7 @@ func TestLayer10TotalsAreExactAcrossZoom(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "L10/totals-are-exact-across-zoom", ok)
+	assertContract(t, "L10/totals-are-exact-across-zoom", ok)
 }
 
 // INV-1b: a bucket holding ONE collected sample still answers.
@@ -739,7 +739,7 @@ func TestLayer10SinglePointBucketsAnswer(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "L10/single-point-buckets-answer", ok)
+	assertContract(t, "L10/single-point-buckets-answer", ok)
 }
 
 // INV-5: a share of TIME over a fixed span is the same at every zoom.
@@ -808,7 +808,7 @@ func TestLayer10TimeSharesAreStableAcrossZoom(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "L10/time-shares-stable-across-zoom", ok)
+	assertContract(t, "L10/time-shares-stable-across-zoom", ok)
 }
 
 // INV-6: an alias is the same grouping, not a similar one.
@@ -863,7 +863,7 @@ func TestLayer10AliasesResolveToTheSameGrouping(t *testing.T) {
 		t.Fatalf("no aliases were checked")
 	}
 	t.Logf("%d aliases checked against their canonical name", checked)
-	expectAgentStatus(t, "L10/aliases-resolve-to-the-same-grouping", ok)
+	assertContract(t, "L10/aliases-resolve-to-the-same-grouping", ok)
 }
 
 // INV-7: asking twice answers twice the same.
@@ -908,7 +908,7 @@ func TestLayer10QueriesAreDeterministic(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "L10/queries-are-deterministic", ok)
+	assertContract(t, "L10/queries-are-deterministic", ok)
 }
 
 // INV-8: buckets come back in order, once each.
@@ -947,7 +947,7 @@ func TestLayer10BucketsAreOrderedAndUnique(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "L10/buckets-are-ordered-and-unique", ok)
+	assertContract(t, "L10/buckets-are-ordered-and-unique", ok)
 }
 
 // l10QueryCond runs a grouping that takes a condition.
@@ -1132,7 +1132,7 @@ func TestLayer10TotalsAreExactOverGapsAndOffGrid(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "L10/totals-exact-over-gaps-and-off-grid", ok)
+	assertContract(t, "L10/totals-exact-over-gaps-and-off-grid", ok)
 }
 
 // INV-9: options=anomaly-bit answers about ANOMALY RATES, never about the
@@ -1202,5 +1202,5 @@ func TestLayer10AnomalyBitAnswersAboutRates(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "L10/anomaly-bit-answers-about-rates", ok)
+	assertContract(t, "L10/anomaly-bit-answers-about-rates", ok)
 }

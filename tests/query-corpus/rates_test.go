@@ -240,6 +240,6 @@ func TestSumOverTimeVolume(t *testing.T) {
 		_, doc := sumQuery(t, "rates-incremental-ue5", "fixture.rates_incremental-ue5", 5, 5)
 		units := viewUnits(doc)
 		t.Logf("sum-over-time of a units/s rate reports units %q", units)
-		expectAgentStatus(t, "CASE-020/sum-over-time-units", units == "units")
+		assertContract(t, "CASE-020/sum-over-time-units", units == "units")
 	})
 }

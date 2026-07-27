@@ -56,7 +56,7 @@ func TestCase015LiveDisconnectDiscard(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectAgentStatus(t, "CASE-015/live-disconnect-discard", case015Settled(t, "c015-live", ch))
+	assertContract(t, "CASE-015/live-disconnect-discard", case015Settled(t, "c015-live", ch))
 }
 
 // TestCase015MidDialogueDisconnect declares retention and disconnects
@@ -142,5 +142,5 @@ func TestCase015ReplicationDisconnectDiscard(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectAgentStatus(t, "CASE-015/replication-disconnect-discard", case015Settled(t, "c015-repl", ch))
+	assertContract(t, "CASE-015/replication-disconnect-discard", case015Settled(t, "c015-repl", ch))
 }

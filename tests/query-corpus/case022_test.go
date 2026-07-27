@@ -269,5 +269,5 @@ func TestCase022TimeGroupLatest(t *testing.T) {
 		check(rowAr(respSlow, 0, pi) > 0, "slow plain ar = %v, want > 0 (engine-generic)", rowAr(respSlow, 0, pi))
 	}
 
-	expectAgentStatus(t, "CASE-022/time-group-latest", ok)
+	assertContract(t, "CASE-022/time-group-latest", ok)
 }

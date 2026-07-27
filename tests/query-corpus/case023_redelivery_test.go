@@ -133,7 +133,7 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 			group, empty, len(col))
 	}
 
-	expectAgentStatus(t, "CASE-023/redelivery", ok)
+	assertContract(t, "CASE-023/redelivery", ok)
 }
 
 // One counter reset, counted once — whatever the resolution asked for.
@@ -208,7 +208,7 @@ func TestCase023ResetCountedOnceAcrossWindows(t *testing.T) {
 		ok = false
 	}
 
-	expectAgentStatus(t, "CASE-023/reset-counted-once", ok)
+	assertContract(t, "CASE-023/reset-counted-once", ok)
 }
 
 // These groupings answer a question ABOUT the samples, so what makes a
@@ -283,5 +283,5 @@ func TestCase023NonzeroFollowsTheAnswer(t *testing.T) {
 		ok = false
 	}
 
-	expectAgentStatus(t, "CASE-023/nonzero-follows-answer", ok)
+	assertContract(t, "CASE-023/nonzero-follows-answer", ok)
 }

@@ -290,7 +290,7 @@ func TestLayer11SlicingIsAdditive(t *testing.T) {
 	}
 	t.Logf("%d configurations checked", len(configs))
 
-	expectAgentStatus(t, "L11/slicing-is-additive", ok)
+	assertContract(t, "L11/slicing-is-additive", ok)
 }
 
 // Conservation against the fixture's own arithmetic.
@@ -363,7 +363,7 @@ func TestLayer11TotalsMatchWhatWasPushed(t *testing.T) {
 		t.Fatalf("no configuration met the precondition - the check tested nothing")
 	}
 	t.Logf("%d configurations checked (the rest upsample)", checked)
-	expectAgentStatus(t, "L11/totals-match-what-was-pushed", ok)
+	assertContract(t, "L11/totals-match-what-was-pushed", ok)
 }
 
 // fixture_T0 is the fixed corpus epoch, as an int64.

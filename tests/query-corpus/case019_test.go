@@ -100,5 +100,5 @@ func TestCase019JsonNameEscaping(t *testing.T) {
 		invalid++
 	}
 
-	expectAgentStatus(t, "CASE-019/v1-json-name-escaping", invalid == 0)
+	assertContract(t, "CASE-019/v1-json-name-escaping", invalid == 0)
 }

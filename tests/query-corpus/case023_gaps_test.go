@@ -124,7 +124,7 @@ func TestCase023TrailingGapsRunToTheEnd(t *testing.T) {
 		t.Fatalf("only %d trailing buckets were examined, want at least 20", tail)
 	}
 
-	expectAgentStatus(t, "CASE-023/trailing-gaps", ok)
+	assertContract(t, "CASE-023/trailing-gaps", ok)
 }
 
 // A gap covers stored SLOTS, not seconds. On a metric collected every 10s,
@@ -198,7 +198,7 @@ func TestCase023GapWeightFollowsCollectionInterval(t *testing.T) {
 		t.Fatalf("no buckets carried a value")
 	}
 
-	expectAgentStatus(t, "CASE-023/gap-weight", ok)
+	assertContract(t, "CASE-023/gap-weight", ok)
 }
 
 // The denominator of percentage-of-time is the SELECTED duration, not the
@@ -294,7 +294,7 @@ func TestCase023PercentageOfTimeCountsTheWholeWindow(t *testing.T) {
 		ok = false
 	}
 
-	expectAgentStatus(t, "CASE-023/percentage-of-time-denominator", ok)
+	assertContract(t, "CASE-023/percentage-of-time-denominator", ok)
 }
 
 // The limit of the trailing-gap contract: a window that does not touch the
@@ -352,7 +352,7 @@ func TestCase023WindowOutsideRetention(t *testing.T) {
 	if err != nil {
 		t.Logf("a window entirely past the dimension's retention returned no dimension columns "+
 			"at all (%v), want %d buckets of 100%% gap", err, buckets)
-		expectAgentStatus(t, "CASE-023/window-outside-retention", false)
+		assertContract(t, "CASE-023/window-outside-retention", false)
 		return
 	}
 
@@ -360,7 +360,7 @@ func TestCase023WindowOutsideRetention(t *testing.T) {
 	if !has || len(col) == 0 {
 		t.Logf("a window entirely past the dimension's retention returned no rows for it at all, "+
 			"want %d buckets of 100%% gap", buckets)
-		expectAgentStatus(t, "CASE-023/window-outside-retention", false)
+		assertContract(t, "CASE-023/window-outside-retention", false)
 		return
 	}
 
@@ -376,5 +376,5 @@ func TestCase023WindowOutsideRetention(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "CASE-023/window-outside-retention", ok)
+	assertContract(t, "CASE-023/window-outside-retention", ok)
 }

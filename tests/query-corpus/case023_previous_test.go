@@ -106,7 +106,7 @@ func TestCase023PreviousSurvivesRedelivery(t *testing.T) {
 		t.Fatalf("the finer grid did not re-deliver: %d rows at 1/window vs %d at 5/window", one, five)
 	}
 
-	expectAgentStatus(t, "CASE-023/previous-survives-redelivery", ok)
+	assertContract(t, "CASE-023/previous-survives-redelivery", ok)
 }
 
 // The mirror image: a counter that DID restart must still be found, and the
@@ -195,5 +195,5 @@ func TestCase023PreviousFindsARealDropAtEveryZoom(t *testing.T) {
 		}
 	}
 
-	expectAgentStatus(t, "CASE-023/previous-drop-at-every-zoom", ok)
+	assertContract(t, "CASE-023/previous-drop-at-every-zoom", ok)
 }

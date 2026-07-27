@@ -76,11 +76,11 @@ func TestCase017TierBoundaryAbsorption(t *testing.T) {
 	absorbed := w100.Sum + w160.Sum
 	switch {
 	case tierValueMatch(got, clean, 0):
-		expectAgentStatus(t, "CASE-017/tier-boundary-absorption", true)
+		assertContract(t, "CASE-017/tier-boundary-absorption", true)
 	case tierValueMatch(got, absorbed, 0):
 		t.Logf("first bucket sum %v = window(T0+100) %v + window(T0+160) %v — pre-window data absorbed",
 			got, w100.Sum, w160.Sum)
-		expectAgentStatus(t, "CASE-017/tier-boundary-absorption", false)
+		assertContract(t, "CASE-017/tier-boundary-absorption", false)
 	default:
 		t.Fatalf("first bucket sum %v matches neither clean %v nor absorbed %v — new behavior, investigate",
 			got, clean, absorbed)
