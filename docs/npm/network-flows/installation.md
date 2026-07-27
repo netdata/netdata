@@ -161,9 +161,13 @@ If you select **Network Flows** on the Live tab and see the message **Connect th
 To use Network Flows from your standalone host:
 
 1. **Sign in to Netdata Cloud** at [app.netdata.cloud](https://app.netdata.cloud) and **claim/connect this agent** to your Netdata Cloud Space. The free Community tier is sufficient — sensitive functions are fully available on Community, no paid plan is required.
-2. Open Network Flows **through Netdata Cloud** (not the anonymous local dashboard URL). Cloud authenticates you as a member of the agent's Space and forwards the Function call to your local agent.
+2. After the agent is connected, open Network Flows either from the authenticated local Agent dashboard or through Netdata Cloud:
+   - **Local Agent dashboard:** stay on `http://<agent-ip>:19999` while signed in. Function query results travel directly from the Agent to your browser.
+   - **Netdata Cloud:** open the connected node and select Network Flows. Cloud proxies the Function request and response between your browser and the Agent.
 
-Connecting the agent to Netdata Cloud does **not** move or offload your flow data. Collection and storage stay entirely on the local agent, in its four-tier journal under `/var/cache/netdata/flows/` (raw + 1-minute + 5-minute + 1-hour rollups). Only authentication is handled through Netdata Cloud — the flow records themselves never leave the host. Fully anonymous or offline access to the Network Flows function is not possible; Cloud authentication is required.
+Connecting the agent does **not** move or offload its persistent flow storage. Collection and the four-tier journal (raw + 1-minute + 5-minute + 1-hour rollups) remain on the Agent under the configured `journal_dir`. The default relative directory is `${NETDATA_CACHE_DIR}/flows`, typically `/var/cache/netdata/flows/` for native packages; see [Configuration](/docs/npm/network-flows/configuration.md#journal-directory). When you use the Cloud dashboard, the Function query results transit Cloud on their way to your browser; when you use the authenticated local dashboard, they travel directly from the Agent to your browser.
+
+Fully anonymous or offline access to the Network Flows function is not possible; Netdata Cloud authentication is required for either dashboard path.
 
 See [Netdata Access Control and Feature Availability](/docs/netdata-oss-limitations.md) for the full Anonymous / Community / Paid access model.
 
