@@ -336,6 +336,15 @@ var manifest = map[string]ManifestCase{
 		Proves: "buckets come back in order, once each, for every grouping at every tier and every resolution: a repeated or out-of-order timestamp means the grid walk lost its place and every value after it is attributed to the wrong moment",
 		Agent:  Green,
 	},
+	// Layer 11 — the slicing matrix: the knobs that must not change a total.
+	"L11/slicing-is-additive": {
+		Proves: "cut a window in two and the halves total the whole, across a matrix covering every PAIR of: data shape (dense/gaps/sparse), collection interval (1s/10s), tier (0/1), chart points per stored record (1/3/10), window start offset from the storage grid (0/17/30s) and option flag (none/natural-points/absolute). The split introduces exactly one new edge, so a record straddling it is the one under test - counted in both halves the parts exceed the whole, dropped from both they fall short. Needs no oracle: the engine is compared with itself, three questions at a time. Every slicing defect this corpus has found was triggered by one or two of these knobs together, never three, which is why covering all pairs is the target. NOTE what this does NOT catch: additivity is scale-invariant, so a total inflated by a CONSTANT factor satisfies it (both halves and the whole inflate together). That is L11/totals-match-what-was-pushed's job - the two are complementary and neither is sufficient alone",
+		Agent:  Green,
+	},
+	"L11/totals-match-what-was-pushed": {
+		Proves: "a total equals what the fixture actually pushed into the window, at every tier and every zoom, for dense, gapped and sparse data at 1s and 10s collection intervals - conservation against arithmetic rather than against another query. A stored record straddling either end of the window is legitimately divided, so one record of slack is allowed at each edge; everything inside must be accounted exactly once",
+		Agent:  Red,
+	},
 	"L9/virtual-points": {
 		Proves: "the virtual-points view oracle is engine-EXACT (fixture/viewpoints.go, the rrd2rrdr_query_execute port): grid boundaries cutting sample intervals serve a linearly interpolated boundary point per line; only freshly fetched points ending inside the line are added whole (a pending straddler shifts to the interpolation anchor WITHOUT re-adding, keeping its original bounds); off-grid charts re-time onto the absolute grid with exact interpolated slots; upsampling serves interpolated sub-ue slots, with the query's FIRST straddler raw — tier0 has no backward plan expansion, so it has no anchor (the CASE-017 asymmetry)",
 		Agent:  Green,
