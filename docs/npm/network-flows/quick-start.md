@@ -16,7 +16,7 @@ Get flow monitoring running in 15 minutes. The path: install the plugin, configu
 
 - The Netdata Agent is running on the host that will collect flow data.
 - The [netflow plugin is installed](/docs/npm/network-flows/installation.md) on that host.
-- The Agent is connected to your Netdata Cloud Space and you are signed in. The free Community tier is sufficient; see the [Network Flows access requirement](/docs/npm/network-flows/installation.md#connect-this-agent-to-netdata-to-use-this-function).
+- The Agent is connected to your Netdata Cloud Space, you are signed in, and your Space role allows sensitive functions. The free Community tier is sufficient; see the [Network Flows access requirement](/docs/npm/network-flows/installation.md#connect-this-agent-to-netdata-to-use-this-function).
 - You can configure flow export on at least one router or switch.
 - The router can reach the agent's IP on the matching UDP listener port: `2055` for NetFlow/IPFIX, or `6343` for sFlow.
 

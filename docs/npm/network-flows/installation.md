@@ -160,7 +160,7 @@ If you select **Network Flows** on the Live tab and see the message **Connect th
 
 To use Network Flows from your standalone host:
 
-1. **Sign in to Netdata Cloud** at [app.netdata.cloud](https://app.netdata.cloud) and **claim/connect this agent** to your Netdata Cloud Space. The free Community tier is sufficient — sensitive functions are fully available on Community, no paid plan is required.
+1. **Sign in to Netdata Cloud** at [app.netdata.cloud](https://app.netdata.cloud) and **claim/connect this agent** to your Netdata Cloud Space. Your Space role must allow you to run sensitive functions; see the **Functions** table under [Detailed Permissions](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md#detailed-permissions). The free Community tier is sufficient — no paid plan is required.
 2. After the agent is connected, open Network Flows either from the authenticated local Agent dashboard or through Netdata Cloud:
    - **Local Agent dashboard:** stay on `http://<agent-ip>:19999` while signed in. Function query results travel directly from the Agent to your browser.
    - **Netdata Cloud:** open the connected node and select Network Flows. Cloud proxies the Function request and response between your browser and the Agent.
@@ -168,6 +168,8 @@ To use Network Flows from your standalone host:
 Connecting the agent does **not** move or offload its persistent flow storage. Collection and the four-tier journal (raw + 1-minute + 5-minute + 1-hour rollups) remain on the Agent under the configured `journal_dir`. The default relative directory is `${NETDATA_CACHE_DIR}/flows`, typically `/var/cache/netdata/flows/` for native packages; see [Configuration](/docs/npm/network-flows/configuration.md#journal-directory). When you use the Cloud dashboard, the Function query results transit Cloud on their way to your browser; when you use the authenticated local dashboard, they travel directly from the Agent to your browser.
 
 Anonymous dashboard access to the Network Flows function is not supported; Netdata Cloud authentication is required for either dashboard path.
+
+If the Agent is connected and you are signed in but receive an authorization error, confirm that you belong to its Space and that your role permits sensitive functions. This is different from the **Connect this agent to Netdata** message shown for an unclaimed Agent.
 
 See [Netdata Access Control and Feature Availability](/docs/netdata-oss-limitations.md) for the full Anonymous / Community / Paid access model.
 
