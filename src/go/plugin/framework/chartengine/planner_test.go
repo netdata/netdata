@@ -948,25 +948,7 @@ func runTestBuildPlanEnforcesMaxDimsDeterministically(t *testing.T) {
 	e, err := New()
 	require.NoError(t, err)
 
-	yaml := `
-version: v1
-groups:
-  - family: Service
-    metrics:
-      - svc_mode
-    charts:
-      - id: service_mode
-        title: Service mode
-        context: service_mode
-        units: state
-        lifecycle:
-          dimensions:
-            max_dims: 2
-        dimensions:
-          - selector: svc_mode
-            name_from_label: mode
-`
-	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+	require.NoError(t, e.LoadYAML([]byte(maxDimsTemplateYAML(2)), 1))
 
 	store := metrix.NewCollectorStore()
 	cc := mustCycleController(t, store)
