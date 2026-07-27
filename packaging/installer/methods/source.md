@@ -34,6 +34,17 @@ Additionally, the following build time features require additional dependencies:
         CMake can be instructed to fetch and build a usable version for Netdata.
 - Netdata Go collectors:
   - Go (the minimum required version is determined by the `go` directive in `src/go/go.mod`)
+- Netdata OpenTelemetry plugin (otel-plugin):
+  - Enabled by default in a direct CMake build (the `ENABLE_PLUGIN_OTEL` option follows
+    `DEFAULT_FEATURE_STATE`, which is `True`) on Linux and macOS.
+  - A working Rust toolchain (`rustc` and `cargo`), at the minimum version given by the
+    `rust-version` field in `src/crates/Cargo.toml`. When the plugin is enabled, CMake fetches
+    Corrosion at configure time and uses it to build the plugin; Corrosion requires `rustc` in
+    `PATH`, so a missing toolchain fails configuration with
+    `build/_deps/corrosion-src/cmake/FindRust.cmake: rustc not found in PATH`.
+  - To keep the plugin, install Rust (via `rustup` or your distribution's `rustc`/`cargo`
+    packages). To build without Rust, disable the plugin by passing `-DENABLE_PLUGIN_OTEL=Off`
+    to `cmake` when configuring.
 
 :::note
 
@@ -75,6 +86,12 @@ the use of an external build directory. To configure and build Netdata:
 1. Run `cmake -S . -B build -G Ninja` in the source tree. `build` can be replaced with whatever path you want for the build directory. If you wish to use Make instead of Ninja for the build, remove the `-G Ninja` from the command.
 2. Run `cmake --build build`, where `build` is the build directory. CMake’s `--parallel` option can be used to control the number of build jobs that are used.
 3. Run `cmake --install build`, where `build` is the build directory.
+
+If the `cmake -S . -B build` step fails with an error from
+`build/_deps/corrosion-src/cmake/FindRust.cmake` reporting `rustc not found in PATH`, the
+OpenTelemetry plugin is enabled by default and requires a Rust toolchain to build. See
+[Required dependencies](#required-dependencies) for how to install Rust, or pass
+`-DENABLE_PLUGIN_OTEL=Off` to `cmake` to configure without the plugin.
 
 ### Configure options
 
