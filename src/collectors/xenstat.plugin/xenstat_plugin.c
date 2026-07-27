@@ -439,8 +439,8 @@ static void xenstat_send_node_metrics() {
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
         );
-        printf("DIMENSION %s '' absolute 1 %d\n", "free", netdata_update_every * 1024 * 1024);
-        printf("DIMENSION %s '' absolute 1 %d\n", "used", netdata_update_every * 1024 * 1024);
+        printf("DIMENSION %s '' absolute 1 %d\n", "free", 1024 * 1024);
+        printf("DIMENSION %s '' absolute 1 %d\n", "used", 1024 * 1024);
         mem_chart_generated = 1;
     }
 
@@ -461,7 +461,7 @@ static void xenstat_send_node_metrics() {
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
         );
-        printf("DIMENSION %s '' absolute 1 %d\n", "domains", netdata_update_every);
+        printf("DIMENSION %s '' absolute 1 1\n", "domains");
         domains_chart_generated = 1;
     }
 
@@ -480,7 +480,7 @@ static void xenstat_send_node_metrics() {
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
         );
-        printf("DIMENSION %s '' absolute 1 %d\n", "cpus", netdata_update_every);
+        printf("DIMENSION %s '' absolute 1 1\n", "cpus");
         cpus_chart_generated = 1;
     }
 
@@ -499,7 +499,7 @@ static void xenstat_send_node_metrics() {
                , netdata_update_every
                , PLUGIN_XENSTAT_NAME
         );
-        printf("DIMENSION %s '' absolute 1 %d\n", "frequency", netdata_update_every * 1024 * 1024);
+        printf("DIMENSION %s '' absolute 1 1000000\n", "frequency");
         cpu_freq_chart_generated = 1;
     }
 
@@ -519,12 +519,12 @@ static void print_domain_states_chart_definition(char *type, int obsolete_flag) 
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION running '' absolute 1 %d\n", netdata_update_every);
-    printf("DIMENSION blocked '' absolute 1 %d\n", netdata_update_every);
-    printf("DIMENSION paused '' absolute 1 %d\n", netdata_update_every);
-    printf("DIMENSION shutdown '' absolute 1 %d\n", netdata_update_every);
-    printf("DIMENSION crashed '' absolute 1 %d\n", netdata_update_every);
-    printf("DIMENSION dying '' absolute 1 %d\n", netdata_update_every);
+    printf("DIMENSION running '' absolute 1 1\n");
+    printf("DIMENSION blocked '' absolute 1 1\n");
+    printf("DIMENSION paused '' absolute 1 1\n");
+    printf("DIMENSION shutdown '' absolute 1 1\n");
+    printf("DIMENSION crashed '' absolute 1 1\n");
+    printf("DIMENSION dying '' absolute 1 1\n");
 }
 
 static void print_domain_cpu_chart_definition(char *type, int obsolete_flag) {
@@ -535,7 +535,7 @@ static void print_domain_cpu_chart_definition(char *type, int obsolete_flag) {
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION used '' incremental 100 %d\n", netdata_update_every * 1000000000);
+    printf("DIMENSION used '' incremental 100 1000000000\n");
 }
 
 static void print_domain_mem_chart_definition(char *type, int obsolete_flag) {
@@ -546,8 +546,8 @@ static void print_domain_mem_chart_definition(char *type, int obsolete_flag) {
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION maximum '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
-    printf("DIMENSION current '' absolute 1 %d\n", netdata_update_every * 1024 * 1024);
+    printf("DIMENSION maximum '' absolute 1 %d\n", 1024 * 1024);
+    printf("DIMENSION current '' absolute 1 %d\n", 1024 * 1024);
 }
 
 static void print_domain_vcpu_chart_definition(char *type, struct domain_metrics *d, int obsolete_flag) {
@@ -563,7 +563,7 @@ static void print_domain_vcpu_chart_definition(char *type, struct domain_metrics
 
     for(vcpu_m = d->vcpu_root; vcpu_m; vcpu_m = vcpu_m->next) {
         if(likely(vcpu_m->updated && vcpu_m->online)) {
-            printf("DIMENSION vcpu%u '' incremental 100 %d\n", vcpu_m->id, netdata_update_every * 1000000000);
+            printf("DIMENSION vcpu%u '' incremental 100 1000000000\n", vcpu_m->id);
         }
     }
 }
@@ -578,7 +578,7 @@ static void print_domain_vbd_oo_chart_definition(char *type, unsigned int vbd, i
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION requests '' incremental 1 %d\n", netdata_update_every);
+    printf("DIMENSION requests '' incremental 1 1\n");
 }
 
 static void print_domain_vbd_requests_chart_definition(char *type, unsigned int vbd, int obsolete_flag) {
@@ -591,8 +591,8 @@ static void print_domain_vbd_requests_chart_definition(char *type, unsigned int 
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION read '' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION write '' incremental -1 %d\n", netdata_update_every);
+    printf("DIMENSION read '' incremental 1 1\n");
+    printf("DIMENSION write '' incremental -1 1\n");
 }
 
 static void print_domain_vbd_sectors_chart_definition(char *type, unsigned int vbd, int obsolete_flag) {
@@ -605,8 +605,8 @@ static void print_domain_vbd_sectors_chart_definition(char *type, unsigned int v
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION read '' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION write '' incremental -1 %d\n", netdata_update_every);
+    printf("DIMENSION read '' incremental 1 1\n");
+    printf("DIMENSION write '' incremental -1 1\n");
 }
 
 static void print_domain_network_bytes_chart_definition(char *type, unsigned int network, int obsolete_flag) {
@@ -619,8 +619,8 @@ static void print_domain_network_bytes_chart_definition(char *type, unsigned int
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION received '' incremental 8 %d\n", netdata_update_every * 1000);
-    printf("DIMENSION sent '' incremental -8 %d\n", netdata_update_every * 1000);
+    printf("DIMENSION received '' incremental 8 1000\n");
+    printf("DIMENSION sent '' incremental -8 1000\n");
 }
 
 static void print_domain_network_packets_chart_definition(char *type, unsigned int network, int obsolete_flag) {
@@ -633,8 +633,8 @@ static void print_domain_network_packets_chart_definition(char *type, unsigned i
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION received '' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION sent '' incremental -1 %d\n", netdata_update_every);
+    printf("DIMENSION received '' incremental 1 1\n");
+    printf("DIMENSION sent '' incremental -1 1\n");
 }
 
 static void print_domain_network_errors_chart_definition(char *type, unsigned int network, int obsolete_flag) {
@@ -647,8 +647,8 @@ static void print_domain_network_errors_chart_definition(char *type, unsigned in
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION received '' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION sent '' incremental -1 %d\n", netdata_update_every);
+    printf("DIMENSION received '' incremental 1 1\n");
+    printf("DIMENSION sent '' incremental -1 1\n");
 }
 
 static void print_domain_network_drops_chart_definition(char *type, unsigned int network, int obsolete_flag) {
@@ -661,8 +661,8 @@ static void print_domain_network_drops_chart_definition(char *type, unsigned int
                        , obsolete_flag ? "obsolete": "''"
                        , PLUGIN_XENSTAT_NAME
     );
-    printf("DIMENSION received '' incremental 1 %d\n", netdata_update_every);
-    printf("DIMENSION sent '' incremental -1 %d\n", netdata_update_every);
+    printf("DIMENSION received '' incremental 1 1\n");
+    printf("DIMENSION sent '' incremental -1 1\n");
 }
 
 static void xenstat_send_domain_metrics() {
