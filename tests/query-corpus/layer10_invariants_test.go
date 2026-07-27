@@ -984,3 +984,219 @@ func valueOf(p canon.Pt) any {
 	}
 	return *p.Value
 }
+
+// ---------------------------------------------------------------------------
+// The three shapes the sweep above does NOT reach, each added because a real
+// defect walked straight through it.
+//
+// The sweep reads one span that starts ON the tier grid, over a fixture with
+// no holes in it, never asking for anomaly rates. Every one of those choices
+// was deliberate and every one of them hid a bug:
+//
+//   - an unaligned span puts the first stored point ACROSS the first bucket's
+//     start, which is where an apportionment that clamps only against "what I
+//     already accounted for" hands the bucket everything from the point's own
+//     beginning instead of from the bucket's;
+//   - a fixture with holes is the only way to reach a point the engine does
+//     NOT trim - query_interpolate_point() trims a wide point to the bucket
+//     end only when the point before it is adjacent and numeric, which after
+//     a gap it is not;
+//   - options=anomaly-bit replaces the delivered value with an anomaly RATE
+//     while the stored statistics stay in the metric's own domain, so an
+//     aggregation reading the wrong one answers in the wrong units entirely.
+
+const (
+	l10GapContext = "fixture.l10gap"
+	l10GapSamples = 2400
+	l10GapValue   = 7
+	// collected for the first half of every minute, silent for the second
+	l10GapCollected = 30
+	l10GapPeriod    = 60
+)
+
+var l10GapReady bool
+
+func l10GapFixture(t *testing.T) {
+	t.Helper()
+	if l10GapReady {
+		return
+	}
+
+	ch := fixture.Chart{
+		ID: l10GapContext, Title: "holes", Units: "units",
+		Family: "fixture", Context: l10GapContext, UpdateEvery: 1,
+		Dimensions: []fixture.Dimension{{ID: "holes"}, {ID: "anom"}},
+	}
+	for i := 1; i <= l10GapSamples; i++ {
+		ts := fixture.T0 + int64(i)
+		if i%l10GapPeriod < l10GapCollected {
+			ch.Dimensions[0].Points = append(ch.Dimensions[0].Points,
+				fixture.Point{T: ts, Collected: strconv.Itoa(l10GapValue), Flags: stream.FlagNotAnomalous})
+		} else {
+			ch.Dimensions[0].Points = append(ch.Dimensions[0].Points,
+				fixture.Point{T: ts, Flags: stream.FlagEmpty})
+		}
+		// a large value that is NEVER anomalous: under options=anomaly-bit
+		// every answer about it has to come from the rate (0), so anything
+		// carrying this magnitude came from the metric instead
+		ch.Dimensions[1].Points = append(ch.Dimensions[1].Points,
+			fixture.Point{T: ts, Collected: "1000000", Flags: stream.FlagNotAnomalous})
+	}
+
+	pushLiveBurst(t, "l10gap", guid(231), ch)
+	if _, err := td.WaitRetention("l10gap", ch.Context, ch.FirstT(), ch.LastT(), 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	l10GapReady = true
+}
+
+// l10GapCollectedIn counts the samples the fixture actually pushed in
+// (after, before] - the oracle for what a sum over that span must be.
+func l10GapCollectedIn(after, before int64) int {
+	n := 0
+	for i := 1; i <= l10GapSamples; i++ {
+		ts := fixture.T0 + int64(i)
+		if ts > after && ts <= before && i%l10GapPeriod < l10GapCollected {
+			n++
+		}
+	}
+	return n
+}
+
+// INV-4c: a total is exact over a span with HOLES in it, and over a span that
+// does not start on the tier grid.
+//
+// Same rule as L10/totals-are-exact-across-zoom, on the two shapes that rule
+// never sees. A sum is the sum of the samples that were collected: gaps add
+// nothing, and where the span begins cannot change what is inside it.
+func TestLayer10TotalsAreExactOverGapsAndOffGrid(t *testing.T) {
+	l10GapFixture(t)
+	r, err := readGroupingRoster()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok := true
+	for _, span := range []struct {
+		after, before int64
+		what          string
+	}{
+		{int64(fixture.T0 + 40 + tier1Gran), int64(fixture.T0+40+tier1Gran) + 20*tier1Gran, "on the tier grid"},
+		{int64(fixture.T0 + 40 + tier1Gran + 30), int64(fixture.T0+40+tier1Gran+30) + 20*tier1Gran, "half a stored point off the grid"},
+		{int64(fixture.T0 + 40 + tier1Gran + 17), int64(fixture.T0+40+tier1Gran+17) + 20*tier1Gran, "seventeen seconds off the grid"},
+	} {
+		want := float64(l10GapCollectedIn(span.after, span.before) * l10GapValue)
+
+		for _, c := range r.Order {
+			if !groupingRules[c].totalExact {
+				continue
+			}
+			group := r.Canonical[c]
+
+			for _, tier := range []int{0, 1} {
+				for _, points := range []int64{20, 60, 300, 1200} {
+					params := daemon.DataParamsTier(l10GapContext, tier, span.after, span.before, points, group)
+					params.Set("options", "jsonwrap|unaligned")
+					doc, err := td.DataV3("l10gap", params)
+					if err != nil {
+						t.Fatalf("%s: %v", group, err)
+					}
+					cols, err := canon.Columns(doc)
+					if err != nil {
+						t.Fatalf("%s: %v", group, err)
+					}
+
+					got := 0.0
+					for _, pt := range cols["holes"] {
+						if pt.Value != nil {
+							got += *pt.Value
+						}
+					}
+					// a stored point straddling either end of the span is
+					// legitimately split, so allow one stored point of slack
+					// at each edge rather than demanding the exact integer
+					slack := float64(l10GapCollected*l10GapValue) * 1.05
+					if math.Abs(got-want) > slack {
+						t.Logf("invariant not met: %s (tier %d, %s) totals %.0f at %d buckets, "+
+							"but the span holds %.0f - the fixture collected %d samples of %d in it",
+							group, tier, span.what, got, points, want,
+							l10GapCollectedIn(span.after, span.before), l10GapValue)
+						ok = false
+					}
+				}
+			}
+		}
+	}
+
+	expectAgentStatus(t, "L10/totals-exact-over-gaps-and-off-grid", ok)
+}
+
+// INV-9: options=anomaly-bit answers about ANOMALY RATES, never about the
+// metric.
+//
+// The option replaces the delivered value with the stored window's anomaly
+// rate, a percentage, while min/max/sum/count go on describing the metric. An
+// aggregation that reaches past the delivered value into those statistics
+// answers in the metric's units - and the two domains are unrelated, so the
+// number it produces is not wrong by a little, it is meaningless.
+//
+// The fixture makes that impossible to miss: a dimension holding 1000000,
+// never anomalous. Every answer about it under anomaly-bit is an answer about
+// zero.
+func TestLayer10AnomalyBitAnswersAboutRates(t *testing.T) {
+	l10GapFixture(t)
+	r, err := readGroupingRoster()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	after := int64(fixture.T0 + 40 + tier1Gran)
+	before := after + 20*tier1Gran
+
+	ok := true
+	for _, c := range r.Order {
+		// The condition groupings are excluded, and not as a concession: they
+		// answer about a CONDITION applied to the rate, not about the rate.
+		// A never-anomalous series has rate 0, so `countif(=0)` reads 100%
+		// and is right to. Everything else answers WITH the rate, and the
+		// rate here is zero everywhere.
+		if k := groupingRules[c].kind; k == kindPercent || k == kindCount {
+			continue
+		}
+		group := r.Canonical[c]
+
+		for _, tier := range []int{0, 1} {
+			for _, points := range []int64{20, 300, 1200} {
+				params := daemon.DataParamsTier(l10GapContext, tier, after, before, points, group)
+				params.Set("options", "jsonwrap|unaligned|anomaly-bit")
+				doc, err := td.DataV3("l10gap", params)
+				if err != nil {
+					t.Fatalf("%s: %v", group, err)
+				}
+				cols, err := canon.Columns(doc)
+				if err != nil {
+					t.Fatalf("%s: %v", group, err)
+				}
+
+				for _, pt := range cols["anom"] {
+					if pt.Value == nil {
+						continue
+					}
+					// nothing in this series was ever anomalous, so every
+					// grouping of its anomaly rate is zero. A value anywhere
+					// near the metric's own magnitude came from the metric.
+					if math.Abs(*pt.Value) > 1e-6 {
+						t.Logf("invariant not met: %s (tier %d, points=%d) reads %v under "+
+							"options=anomaly-bit at t0%+d, on a dimension that was never anomalous - "+
+							"the metric itself holds %d, so this is an answer about the wrong domain",
+							group, tier, points, *pt.Value, pt.T-fixture.T0, 1000000)
+						ok = false
+						break
+					}
+				}
+			}
+		}
+	}
+
+	expectAgentStatus(t, "L10/anomaly-bit-answers-about-rates", ok)
+}
