@@ -18,10 +18,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+/* Maximum consecutive replace_generation() attempts before giving up permanently. */
+#define SHM_DNS_REPLACE_MAX_RETRIES 10
+
 struct shared_dns_memory {
     struct ebpfgo_dns_shared *data;
     uint32_t update_every_s;
     uint32_t publish_timeouts; /* consecutive publish-side sem_timedwait failures */
+    uint8_t replace_fail_count; /* consecutive replace_generation() failures after mapping loss */
     int shm_fd;
     sem_t *sem;
     bool shm_name_created; /* set when this context created/recreated the SHM name; triggers unlink on any exit */
@@ -182,8 +186,30 @@ void shared_dns_memory_publish(
     const struct ebpfgo_dns_flow_record *flows,
     uint32_t flow_count)
 {
-    if (!ctx || !ctx->data)
+    if (!ctx)
         return;
+
+    if (!ctx->data) {
+        /* replace_generation() failed on a previous cycle.  Retry up to
+         * SHM_DNS_REPLACE_MAX_RETRIES times so a transient ENOMEM or ENOSPC
+         * does not suspend publishing permanently. */
+        if (ctx->replace_fail_count >= SHM_DNS_REPLACE_MAX_RETRIES)
+            return;
+
+        if (!dns_shm_replace_generation(ctx, sizeof(struct ebpfgo_dns_shared))) {
+            if (++ctx->replace_fail_count >= SHM_DNS_REPLACE_MAX_RETRIES)
+                fprintf(stderr,
+                        "ebpf-go.plugin: dns shm: replace_generation failed %u consecutive times, publishing suspended permanently\n",
+                        (unsigned)ctx->replace_fail_count);
+            return;
+        }
+
+        fprintf(stderr,
+                "ebpf-go.plugin: dns shm: recovered after %u failed attempt(s)\n",
+                (unsigned)(ctx->replace_fail_count + 1));
+        ctx->replace_fail_count = 0;
+        ctx->publish_timeouts   = 0;
+    }
 
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {

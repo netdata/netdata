@@ -14,6 +14,9 @@
 #include <time.h>
 #include <unistd.h>
 
+/* Maximum consecutive replace_generation() attempts before giving up permanently. */
+#define SHM_PID_REPLACE_MAX_RETRIES 10
+
 struct shared_pid_memory {
     void *mapping;                    /* raw mmap base (for munmap and header access) */
     struct ebpfgo_shm_header *header; /* = mapping; holds per-module validity flags */
@@ -22,6 +25,7 @@ struct shared_pid_memory {
     size_t prev_count; /* entries written in the previous publish cycle */
     uint32_t update_every_s;
     uint32_t publish_timeouts; /* consecutive publish-side sem_timedwait failures */
+    uint8_t replace_fail_count; /* consecutive replace_generation() failures after mapping loss */
     int shm_fd;
     sem_t *sem;
     bool shm_name_created; /* set when this context created/recreated the SHM name; triggers unlink on any exit */
@@ -233,8 +237,30 @@ fail:
 
 int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_pid_stat *entries, size_t count, uint32_t flags)
 {
-    if (!ctx || !ctx->mapping)
+    if (!ctx)
         return -1;
+
+    if (!ctx->mapping) {
+        /* replace_generation() failed on a previous cycle.  Retry up to
+         * SHM_PID_REPLACE_MAX_RETRIES times so a transient ENOMEM or ENOSPC
+         * does not suspend publishing permanently. */
+        if (ctx->replace_fail_count >= SHM_PID_REPLACE_MAX_RETRIES)
+            return -1;
+
+        if (!pid_shm_replace_generation(ctx, shared_pid_memory_nbytes(ctx))) {
+            if (++ctx->replace_fail_count >= SHM_PID_REPLACE_MAX_RETRIES)
+                fprintf(stderr,
+                        "ebpf-go.plugin: pid shm: replace_generation failed %u consecutive times, publishing suspended permanently\n",
+                        (unsigned)ctx->replace_fail_count);
+            return -1;
+        }
+
+        fprintf(stderr,
+                "ebpf-go.plugin: pid shm: recovered after %u failed attempt(s)\n",
+                (unsigned)(ctx->replace_fail_count + 1));
+        ctx->replace_fail_count = 0;
+        ctx->publish_timeouts   = 0;
+    }
 
     if (count > ctx->total)
         count = ctx->total;
