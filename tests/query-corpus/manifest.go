@@ -312,6 +312,14 @@ var manifest = map[string]ManifestCase{
 		Proves: "an event does not happen twice because the chart was zoomed in: above tier 0 the same stored point is handed to every bucket it spans, and a grouping that counts occurrences may see its total collapse as a rollup loses ordering but may never see it grow. Swept over number-of-flaps and number-of-times at 1/2/3/5 buckets per stored window",
 		Agent:  Green,
 	},
+	"L10/totals-exact-over-gaps-and-off-grid": {
+		Proves: "a total is exact over a span with HOLES in it and over a span that does not start on the tier grid - the two shapes L10/totals-are-exact-across-zoom never sees, and the two that hid real defects. An unaligned span puts the first stored point ACROSS the first bucket's start, where an apportionment clamped only against what it already accounted for hands the bucket everything from the point's own beginning; and a fixture with holes is the only way to reach a point the engine does NOT trim, because query_interpolate_point() trims a wide point to the bucket end only when the point before it is adjacent and numeric, which after a gap it is not. RED on master for the same reason L10/totals-are-exact-across-zoom is: `sum` above tier 0 counts a stored point once per bucket it spans",
+		Agent:  Red,
+	},
+	"L10/anomaly-bit-answers-about-rates": {
+		Proves: "options=anomaly-bit answers about anomaly RATES, never about the metric: the option replaces the delivered value with the stored window's anomaly rate while min/max/sum/count go on describing the metric, so an aggregation that reaches past the delivered value into those statistics answers in unrelated units. Pinned with a dimension holding 1000000 that is never anomalous - every grouping of its anomaly rate is zero, so any value carrying that magnitude came from the wrong domain",
+		Agent:  Green,
+	},
 	"L10/time-shares-stable-across-zoom": {
 		Proves: "a share of TIME over a fixed span is the same at every zoom: the share of a window that satisfied a condition is a property of the data and the window, not of how many buckets the window was drawn with. This is the rule percentage-of-time(<previous) broke — 5% of the span at one bucket per stored window against 77% at five. percentage-of-samples is deliberately excluded: it answers about the samples it was handed and a re-delivery is another sample to it",
 		Agent:  Green,
