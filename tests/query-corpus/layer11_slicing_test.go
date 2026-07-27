@@ -18,7 +18,7 @@
 // This layer turns the knobs instead. It rests on one property that needs no
 // oracle at all:
 //
-//     ADDITIVITY - cut a window in two and the halves must total the whole.
+//	ADDITIVITY - cut a window in two and the halves must total the whole.
 //
 // The split introduces exactly one new edge, so any record straddling it is
 // the one under test: counted in both halves the parts exceed the whole,

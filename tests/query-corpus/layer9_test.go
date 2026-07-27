@@ -9,6 +9,7 @@
 //     sample (its remainder never reaches the next bucket);
 //   - off-grid charts re-time onto the absolute grid with interpolated
 //     values.
+//
 // Plus the window normalization knobs: relative windows resolve
 // against `before`, the (0,0) sentinels resolve to the full retention,
 // a points request beyond the db resolution serves natural points (no
