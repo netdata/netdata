@@ -100,18 +100,4 @@ This method is useful when you want to:
 
 ## Apply Your Changes
 
-Configuration changes do not take effect the moment you save the file. What you need to do next depends on which kind of file you edited.
-
-- **`netdata.conf` and collector configuration files**: Restart the Netdata Agent so it re-reads these files on startup.
-
-  ```bash
-  sudo systemctl restart netdata
-  ```
-
-- **Health and alert configuration files only**: Reload health without restarting the Agent. This avoids metric collection gaps.
-
-  ```bash
-  sudo netdatacli reload-health
-  ```
-
-For the full set of start, stop, restart, and reload commands — including non-systemd Linux variants and Windows/PowerShell equivalents — see [Service Control](/docs/netdata-agent/start-stop-restart.md).
+After saving a configuration file, [restart or reload the Netdata Agent as appropriate for that file and platform](/docs/netdata-agent/start-stop-restart.md).
