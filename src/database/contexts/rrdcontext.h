@@ -36,6 +36,7 @@ STRING *rrdmetric_acquired_name_dup(RRDMETRIC_ACQUIRED *rma);
 NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *rma);
 time_t rrdmetric_acquired_first_entry(RRDMETRIC_ACQUIRED *rma);
 time_t rrdmetric_acquired_last_entry(RRDMETRIC_ACQUIRED *rma);
+bool rrdmetric_acquired_stored_as_rates(RRDMETRIC_ACQUIRED *rma);
 bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE_ACQUIRED *ria);
 
 const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
