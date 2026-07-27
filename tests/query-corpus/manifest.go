@@ -277,6 +277,57 @@ var manifest = map[string]ManifestCase{
 		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) escape dimension names (was: raw between quotes — a double-quote in a name, or a label value via group_by=label, produced invalid JSON); the objectrows row keys are escaped like the header, and the google flavor (datatable+google_json) escapes the apostrophe of its single-quoted JavaScript labels while keeping the double quote raw",
 		Agent:  Green, FixedBy: "#23216",
 	},
+	// Layer 10 — the invariants every grouping owes, swept across all of
+	// them. The roster comes from the engine's own enum, so a grouping added
+	// without a classification fails the sweep by name.
+	"L10/roster-is-complete": {
+		Proves: "the sweep covers EVERY grouping the engine offers: the roster is parsed from the RRDR_TIME_GROUPING enum and the registry that names each value, so a grouping added to the enum without a line in layer 10's table fails here by name — an unknown time_group silently falls back to `average`, so a missing one would otherwise be tested by accident and pass",
+		Agent:  Green,
+	},
+	"L10/no-holes-inside-data": {
+		Proves: "every grouping answers in every bucket whose width was collected end to end: a bucket wide enough to hold several samples has something to say about them, and EMPTY says 'no data here', which is what an outage looks like. Swept at tier 0 and tier 1, at bucket widths from 10s to 300s, so a grouping that genuinely needs two samples is never asked for the impossible",
+		Agent:  Green,
+	},
+	"L10/buckets-finer-than-stored-data-answer": {
+		Proves: "a bucket NARROWER than the stored data still answers, for every grouping: above tier 0 a stored point covers many seconds, so a dashboard drawn finer gives the engine buckets that a single re-delivered point covers on its own. This is where number-of-flaps and number-of-times punched holes — they dropped the repeat entirely, sample count and all. L10/no-holes-inside-data cannot reach it: it deliberately uses buckets wide enough to hold several samples so a grouping needing two of them is not asked for the impossible, and that fairness is exactly what hides this case",
+		Agent:  Green,
+	},
+	"L10/order-statistics-stay-in-range": {
+		Proves: "a central tendency or order statistic answers WITH the data, never past it: average/min/max/median/trimmed-*/percentile*/extremes/latest/ses stay inside the range of the samples that fed the bucket, at every tier. A value outside it is a number the aggregation invented — from an interpolation it should not have used, or from state another point left behind. sum/incremental-sum/stddev/cv/des are excluded with reasons from what they mean, not from what the engine returns",
+		Agent:  Green,
+	},
+	"L10/dimensions-are-independent": {
+		Proves: "what a dimension answers does not depend on which dimensions were queried alongside it, for every grouping at every tier: the aggregations carry state across buckets on purpose (the predecessor of a condition, the flap state, the smoothing level) and the engine walks dimensions through ONE grouping instance, resetting between them — a reset that misses a field makes an answer depend on its neighbours and on the order they were walked in",
+		Agent:  Green,
+	},
+	"L10/totals-are-exact-across-zoom": {
+		Proves: "a TOTAL over a fixed span is the same number at any resolution: the total volume over an hour is a physical quantity and cannot depend on how many columns the chart was drawn with. `sum` breaks this above tier 0 — a stored point is delivered to every bucket it spans and `sum` fetches the WINDOW'S OWN SUM for it (TIER_QUERY_FETCH_SUM), so each bucket is handed the whole window's total and adds it again. On a constant 7 over 1200s (true total 8400) tier 1 reads 8400 at 20 buckets, 25200 at 60, 126000 at 300 and 504000 at 1200 — exactly the zoom factor. options=natural-points does not help. Same fault as the condition groupings had, in an aggregation nobody had written a case for",
+		Agent:  Red,
+	},
+	"L10/single-point-buckets-answer": {
+		Proves: "a bucket holding ONE collected sample still answers: one bucket per sample interval is the most natural resolution there is and a chart drawn at it must not come back blank. `incremental-sum` returns EMPTY for EVERY bucket there — the carry-over it is built around (flush does `first = last`) is destroyed at startup: the first bucket sets `first` and leaves `last` NAN, flush emits EMPTY and then copies that NAN back over the seed it just captured, so the chain never starts and every later bucket repeats it. One point per bucket is otherwise fully supported by add(), which is what makes this a latch bug rather than a limitation. NOTE: L3/sparse-buckets records the same behaviour as \"pinned current contract\" — the two entries disagree deliberately, and this one states why it is a defect",
+		Agent:  Red,
+	},
+	"L10/counts-do-not-inflate-with-zoom": {
+		Proves: "an event does not happen twice because the chart was zoomed in: above tier 0 the same stored point is handed to every bucket it spans, and a grouping that counts occurrences may see its total collapse as a rollup loses ordering but may never see it grow. Swept over number-of-flaps and number-of-times at 1/2/3/5 buckets per stored window",
+		Agent:  Green,
+	},
+	"L10/time-shares-stable-across-zoom": {
+		Proves: "a share of TIME over a fixed span is the same at every zoom: the share of a window that satisfied a condition is a property of the data and the window, not of how many buckets the window was drawn with. This is the rule percentage-of-time(<previous) broke — 5% of the span at one bucket per stored window against 77% at five. percentage-of-samples is deliberately excluded: it answers about the samples it was handed and a re-delivery is another sample to it",
+		Agent:  Green,
+	},
+	"L10/aliases-resolve-to-the-same-grouping": {
+		Proves: "an alias is the same grouping, not a similar one: avg/mean, incremental-sum, trimmed-mean, trimmed-median, percentile, rsd/coefficient-of-variation, ema/ewma and countif each answer bit-identically to their canonical name. Nothing else checks the registry's name->implementation mapping, so a copy-paste there would route a name to the wrong aggregation silently",
+		Agent:  Green,
+	},
+	"L10/queries-are-deterministic": {
+		Proves: "asking twice answers twice the same, for every grouping: the aggregations keep state for the length of a query, and any of it that outlives the query — a static, an arena not cleared, a field create() does not initialise — makes every answer a function of what was asked before it",
+		Agent:  Green,
+	},
+	"L10/buckets-are-ordered-and-unique": {
+		Proves: "buckets come back in order, once each, for every grouping at every tier and every resolution: a repeated or out-of-order timestamp means the grid walk lost its place and every value after it is attributed to the wrong moment",
+		Agent:  Green,
+	},
 	"L9/virtual-points": {
 		Proves: "the virtual-points view oracle is engine-EXACT (fixture/viewpoints.go, the rrd2rrdr_query_execute port): grid boundaries cutting sample intervals serve a linearly interpolated boundary point per line; only freshly fetched points ending inside the line are added whole (a pending straddler shifts to the interpolation anchor WITHOUT re-adding, keeping its original bounds); off-grid charts re-time onto the absolute grid with exact interpolated slots; upsampling serves interpolated sub-ue slots, with the query's FIRST straddler raw — tier0 has no backward plan expansion, so it has no anchor (the CASE-017 asymmetry)",
 		Agent:  Green,
