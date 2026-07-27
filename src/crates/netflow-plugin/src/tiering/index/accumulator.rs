@@ -2,7 +2,7 @@
 use super::super::model::OpenTierRow;
 use super::super::model::{FlowMetrics, TierFlowRef, TierKind};
 use super::super::rollup::{HOUR_BUCKET_USEC, bucket_start_usec};
-use crate::memory_estimation::{btree_container_overhead_bytes, hash_table_allocation_bytes};
+use crate::memory_estimation::{btree_container_overhead_bytes, hash_map_allocation_bytes};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::mem::size_of;
 
@@ -200,5 +200,5 @@ impl TierAccumulator {
 }
 
 fn metric_bucket_allocation_bytes(bucket: &MetricBucket) -> usize {
-    hash_table_allocation_bytes(bucket.capacity(), size_of::<(TierFlowRef, FlowMetrics)>())
+    hash_map_allocation_bytes(bucket.capacity(), size_of::<(TierFlowRef, FlowMetrics)>())
 }

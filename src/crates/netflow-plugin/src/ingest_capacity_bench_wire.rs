@@ -28,6 +28,8 @@ const INTERFACE_BASE: u32 = 10_000;
 const INTERFACE_RADIX: u64 = 50_000;
 const OUT_INTERFACE_BASE: u32 = INTERFACE_BASE + INTERFACE_RADIX as u32;
 pub(super) const MAX_WIRE_RECORDS: u64 = INTERFACE_RADIX * INTERFACE_RADIX;
+const MAX_V5_UNIQUE_RECORDS: u64 =
+    (u16::MAX as u64 - OUT_INTERFACE_BASE as u64 + 1) * INTERFACE_RADIX;
 
 const V5_HEADER_LEN: usize = 24;
 const V5_RECORD_LEN: usize = 48;
@@ -155,6 +157,15 @@ impl WireProtocol {
             records = records.saturating_add(1);
         }
         records
+    }
+
+    const fn max_records(self, cardinality: CardinalityProfile) -> u64 {
+        match (self, cardinality) {
+            (Self::NetFlowV5, CardinalityProfile::DurationBoundedAllUnique) => {
+                MAX_V5_UNIQUE_RECORDS
+            }
+            _ => MAX_WIRE_RECORDS,
+        }
     }
 }
 
@@ -315,9 +326,12 @@ impl WireWorkload {
         records: u64,
     ) -> Self {
         assert!(records > 0, "wire workload requires at least one record");
+        let max_records = protocol.max_records(cardinality);
         assert!(
-            records <= MAX_WIRE_RECORDS,
-            "wire workload record count {records} exceeds {MAX_WIRE_RECORDS}"
+            records <= max_records,
+            "wire workload record count {records} exceeds {max_records} for {} {}",
+            protocol.label(),
+            cardinality.label(),
         );
         Self {
             protocol,
@@ -733,6 +747,35 @@ mod tests {
                 profile.label()
             );
         }
+    }
+
+    #[test]
+    fn netflow_v5_unique_limit_preserves_interface_width() {
+        let workload = WireWorkload::new(
+            WireProtocol::NetFlowV5,
+            PacketShape::OneRecordPerDatagram,
+            CardinalityProfile::DurationBoundedAllUnique,
+            MAX_V5_UNIQUE_RECORDS,
+        );
+        let last = WireIdentity::from_ordinal(workload.records() - 1);
+        assert_eq!(last.out_if, u16::MAX as u32);
+
+        let overflow = std::panic::catch_unwind(|| {
+            WireWorkload::new(
+                WireProtocol::NetFlowV5,
+                PacketShape::OneRecordPerDatagram,
+                CardinalityProfile::DurationBoundedAllUnique,
+                MAX_V5_UNIQUE_RECORDS + 1,
+            )
+        });
+        assert!(overflow.is_err());
+
+        WireWorkload::new(
+            WireProtocol::NetFlowV5,
+            PacketShape::OneRecordPerDatagram,
+            CardinalityProfile::Repeating256,
+            MAX_WIRE_RECORDS,
+        );
     }
 
     #[test]

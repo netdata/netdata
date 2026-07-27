@@ -5,6 +5,7 @@ use super::capacity_bench_wire::{
 use super::resource_bench_support::{
     ProcSnapshot, cpu_percent_for_ticks, cpu_percent_of_one_core, take_proc_snapshot,
 };
+use super::test_support::write_unique_json;
 use super::*;
 use crate::query;
 use anyhow::{Context, Result, anyhow, bail};
@@ -443,11 +444,16 @@ fn bench_capacity_matrix() {
         cases,
         peak_searches,
     };
-    let path = std::env::temp_dir().join(format!(
-        "netflow-capacity-benchmark-{}.json",
-        report.created_unix_secs
-    ));
-    write_json(&path, &report).expect("write capacity benchmark report");
+    let path = write_unique_json(
+        &std::env::temp_dir(),
+        &format!(
+            "netflow-capacity-benchmark-{}-{}-",
+            report.created_unix_secs,
+            std::process::id()
+        ),
+        &report,
+    )
+    .expect("write capacity benchmark report");
     println!("NETFLOW_CAPACITY_BENCHMARK_REPORT={}", path.display());
     for case in &report.cases {
         println!(
@@ -489,11 +495,16 @@ fn bench_capacity_selected_case() {
     require_release_capacity_build();
     let spec = selected_capacity_case().expect("read selected capacity benchmark case");
     let report = run_capacity_case(spec);
-    let path = std::env::temp_dir().join(format!(
-        "netflow-capacity-selected-case-{}.json",
-        unix_secs()
-    ));
-    write_json(&path, &report).expect("write selected capacity case report");
+    let path = write_unique_json(
+        &std::env::temp_dir(),
+        &format!(
+            "netflow-capacity-selected-case-{}-{}-",
+            unix_secs(),
+            std::process::id()
+        ),
+        &report,
+    )
+    .expect("write selected capacity case report");
     println!("NETFLOW_CAPACITY_SELECTED_CASE_REPORT={}", path.display());
     println!("{report:#?}");
     assert_ne!(
@@ -541,11 +552,16 @@ fn bench_capacity_peak_matrix() {
         sender_cpu_list: std::env::var(SENDER_CPU_LIST_ENV).ok(),
         cases,
     };
-    let path = std::env::temp_dir().join(format!(
-        "netflow-capacity-peak-benchmark-{}.json",
-        report.created_unix_secs
-    ));
-    write_json(&path, &report).expect("write capacity peak benchmark report");
+    let path = write_unique_json(
+        &std::env::temp_dir(),
+        &format!(
+            "netflow-capacity-peak-benchmark-{}-{}-",
+            report.created_unix_secs,
+            std::process::id()
+        ),
+        &report,
+    )
+    .expect("write capacity peak benchmark report");
     println!("NETFLOW_CAPACITY_PEAK_BENCHMARK_REPORT={}", path.display());
     for case in &report.cases {
         println!(

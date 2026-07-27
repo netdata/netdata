@@ -611,10 +611,14 @@ where
                 .map(FieldStore::estimated_heap_bytes)
                 .sum::<usize>(),
             flow_lookup_bytes: hash_table_allocation_bytes(
-                self.flow_lookup.capacity(),
+                self.flow_lookup.num_buckets(),
                 size_of::<u32>(),
             ),
-            row_storage_bytes: self.flow_storage.estimated_heap_bytes(),
+            row_storage_bytes: self.flow_storage.estimated_heap_bytes().saturating_add(
+                self.implicit_default_field_ids
+                    .as_ref()
+                    .map_or(0, |field_ids| field_ids.len() * size_of::<FieldId>()),
+            ),
         }
     }
 }
@@ -798,7 +802,7 @@ impl TextFieldStore {
     }
 
     fn estimated_heap_bytes(&self) -> usize {
-        hash_table_allocation_bytes(self.lookup.capacity(), size_of::<u32>())
+        hash_table_allocation_bytes(self.lookup.num_buckets(), size_of::<u32>())
             + self.entries.capacity() * size_of::<TextEntry>()
             + self.arena.capacity()
     }
@@ -864,7 +868,7 @@ macro_rules! define_numeric_store {
             }
 
             fn estimated_heap_bytes(&self) -> usize {
-                hash_table_allocation_bytes(self.lookup.capacity(), size_of::<u32>())
+                hash_table_allocation_bytes(self.lookup.num_buckets(), size_of::<u32>())
                     + self.values.capacity() * size_of::<$ty>()
             }
         }
@@ -988,9 +992,9 @@ impl IpFieldStore {
     }
 
     fn estimated_heap_bytes(&self) -> usize {
-        hash_table_allocation_bytes(self.v4_lookup.capacity(), size_of::<u32>())
+        hash_table_allocation_bytes(self.v4_lookup.num_buckets(), size_of::<u32>())
             + self.v4_values.capacity() * size_of::<u32>()
-            + hash_table_allocation_bytes(self.v6_lookup.capacity(), size_of::<u32>())
+            + hash_table_allocation_bytes(self.v6_lookup.num_buckets(), size_of::<u32>())
             + self.v6_values.capacity() * size_of::<[u8; 16]>()
     }
 }
@@ -1413,6 +1417,23 @@ mod tests {
         assert!(
             hash_calls.get() > 0,
             "non-default values still use interning"
+        );
+    }
+
+    #[test]
+    fn implicit_default_field_ids_are_included_in_memory_breakdown() {
+        let index = FlowIndex::new_with_implicit_defaults([
+            FieldSpec::new("FLOW_VERSION", FieldKind::Text),
+            FieldSpec::new("PROTOCOL", FieldKind::U8),
+            FieldSpec::new("OUT_IF", FieldKind::U32),
+        ])
+        .expect("index");
+        let expected_retained_ids = 3 * size_of::<FieldId>();
+        let breakdown = index.estimated_memory_breakdown();
+
+        assert_eq!(
+            breakdown.row_storage_bytes,
+            index.flow_storage.estimated_heap_bytes() + expected_retained_ids
         );
     }
 

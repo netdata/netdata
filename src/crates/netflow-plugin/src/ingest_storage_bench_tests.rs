@@ -8,6 +8,7 @@ use super::capacity_bench_wire::{
     BENCHMARK_BYTES, BENCHMARK_PACKETS, CardinalityProfile, PacketShape, WireIdentity,
     WireProtocol, WireWorkload,
 };
+use super::test_support::write_unique_json;
 use super::*;
 use crate::tiering::FlowMetrics;
 use anyhow::{Context, Result, anyhow, bail};
@@ -30,6 +31,7 @@ const UNIQUE_TIER_COMPONENT_ROWS: u64 = 500_000;
 const UNIQUE_CHUNK_INPUT_RECORDS: u64 = 16_384;
 const HOUR_USEC: u64 = 60 * 60 * 1_000_000;
 const SENTINEL_IDENTITY_ORDINAL: u64 = 2_000_000_000;
+const STORAGE_BENCH_ROOT_ENV: &str = "NETFLOW_STORAGE_BENCH_ROOT";
 const STORAGE_ERROR_METRICS: &[&str] = &[
     "journal_write_errors",
     "journal_sync_errors",
@@ -194,17 +196,21 @@ struct ArtifactSnapshot {
 #[test]
 #[ignore = "manual four-tier allocated storage benchmark"]
 fn bench_allocated_storage_matrix() {
+    let artifact_root = storage_benchmark_root().expect("resolve storage benchmark root");
     let mut components = Vec::new();
     for profile in CardinalityProfile::ALL {
         for input_records_per_sec in STORAGE_RATES {
             for tier in storage_tiers() {
                 components.push(
-                    run_storage_component(StorageComponentCase {
-                        traffic: StorageTraffic::ORDINARY,
-                        profile,
-                        input_records_per_sec,
-                        tier,
-                    })
+                    run_storage_component(
+                        &artifact_root,
+                        StorageComponentCase {
+                            traffic: StorageTraffic::ORDINARY,
+                            profile,
+                            input_records_per_sec,
+                            tier,
+                        },
+                    )
                     .unwrap_or_else(|error| {
                         panic!(
                             "ordinary storage component {} {} {} records/s failed: {error:#}",
@@ -225,12 +231,15 @@ fn bench_allocated_storage_matrix() {
         for input_records_per_sec in STORAGE_RATES {
             for tier in storage_tiers() {
                 components.push(
-                    run_storage_component(StorageComponentCase {
-                        traffic: StorageTraffic::CiscoNsel,
-                        profile,
-                        input_records_per_sec,
-                        tier,
-                    })
+                    run_storage_component(
+                        &artifact_root,
+                        StorageComponentCase {
+                            traffic: StorageTraffic::CiscoNsel,
+                            profile,
+                            input_records_per_sec,
+                            tier,
+                        },
+                    )
                     .unwrap_or_else(|error| {
                         panic!(
                             "NSEL storage component {} {} {} records/s failed: {error:#}",
@@ -246,20 +255,20 @@ fn bench_allocated_storage_matrix() {
 
     let summaries = summarize_storage_components(&components)
         .expect("summarize completed storage component matrix");
-    let literal_validations = StorageTraffic::ALL
-        .into_iter()
-        .flat_map(|traffic| {
-            CardinalityProfile::ALL.into_iter().map(move |profile| {
-                run_literal_validation(traffic, profile).unwrap_or_else(|error| {
+    let mut literal_validations = Vec::new();
+    for traffic in StorageTraffic::ALL {
+        for profile in CardinalityProfile::ALL {
+            literal_validations.push(
+                run_literal_validation(&artifact_root, traffic, profile).unwrap_or_else(|error| {
                     panic!(
                         "literal {} storage validation {} failed: {error:#}",
                         traffic.label(),
                         profile.label()
                     )
-                })
-            })
-        })
-        .collect();
+                }),
+            );
+        }
+    }
     let report = StorageMatrixReport {
         methodology: "Each component uses production journal configuration and synthetic privacy-safe decoded records. Ordinary traffic is a mix of v5, v9, IPFIX, and sFlow; Cisco NSEL update events are measured separately because each event emits two directional rows. Completed archived .journal files plus their per-journal facet sidecars are synced and measured with st_blocks*512; active successor files and shared facet-state.bin are excluded. Raw components write real raw rows. Rollup components preserve the exact final rows and counters for their stated rate/cardinality; unique rows are committed in bounded chunks because no identity repeats across chunks. Each traffic/profile model is checked against a manageable literal all-tier run within 5%.",
         created_unix_secs: unix_secs(),
@@ -267,11 +276,16 @@ fn bench_allocated_storage_matrix() {
         summaries,
         literal_validations,
     };
-    let path = std::env::temp_dir().join(format!(
-        "netflow-storage-benchmark-{}.json",
-        report.created_unix_secs
-    ));
-    write_json(&path, &report).expect("write storage benchmark report");
+    let path = write_unique_json(
+        &artifact_root,
+        &format!(
+            "netflow-storage-benchmark-{}-{}-",
+            report.created_unix_secs,
+            std::process::id()
+        ),
+        &report,
+    )
+    .expect("write storage benchmark report");
     println!("NETFLOW_STORAGE_BENCHMARK_REPORT={}", path.display());
     for component in &report.components {
         println!(
@@ -287,17 +301,35 @@ fn bench_allocated_storage_matrix() {
 
 #[test]
 fn storage_component_smoke_measures_completed_archived_artifacts() {
-    let report = run_storage_component(StorageComponentCase {
-        traffic: StorageTraffic::ORDINARY,
-        profile: CardinalityProfile::Repeating256,
-        input_records_per_sec: 50_000,
-        tier: TierKind::Minute1,
-    })
+    let artifact_root = tempfile::tempdir().expect("create test artifact root");
+    let report = run_storage_component(
+        artifact_root.path(),
+        StorageComponentCase {
+            traffic: StorageTraffic::ORDINARY,
+            profile: CardinalityProfile::Repeating256,
+            input_records_per_sec: 50_000,
+            tier: TierKind::Minute1,
+        },
+    )
     .expect("run storage component smoke test");
 
     assert!(report.archived_journal_rows > 0, "{report:#?}");
     assert!(report.total.allocated_bytes > 0, "{report:#?}");
     assert!(report.allocated_bytes_per_archived_row > 0.0, "{report:#?}");
+}
+
+#[test]
+fn storage_reports_are_created_without_overwrite() {
+    let artifact_root = tempfile::tempdir().expect("create test artifact root");
+    let value = BTreeMap::from([("run", 1)]);
+    let first = write_unique_json(artifact_root.path(), "storage-report-", &value)
+        .expect("write first report");
+    let second = write_unique_json(artifact_root.path(), "storage-report-", &value)
+        .expect("write second report");
+
+    assert_ne!(first, second);
+    assert!(first.is_file());
+    assert!(second.is_file());
 }
 
 #[test]
@@ -348,10 +380,11 @@ fn nsel_storage_records_keep_the_decoder_direction_when_assigning_identities() {
 #[test]
 #[ignore = "manual literal storage-model validation"]
 fn bench_literal_storage_validation() {
+    let artifact_root = storage_benchmark_root().expect("resolve storage benchmark root");
     let profiles = literal_validation_profiles();
     for traffic in StorageTraffic::ALL {
         for profile in &profiles {
-            run_literal_validation(traffic, *profile).unwrap_or_else(|error| {
+            run_literal_validation(&artifact_root, traffic, *profile).unwrap_or_else(|error| {
                 panic!(
                     "validate {} {} storage model: {error:#}",
                     traffic.label(),
@@ -365,12 +398,16 @@ fn bench_literal_storage_validation() {
 #[test]
 #[ignore = "manual Cisco NSEL storage benchmark smoke test"]
 fn bench_nsel_storage_smoke() {
-    let report = run_storage_component(StorageComponentCase {
-        traffic: StorageTraffic::CiscoNsel,
-        profile: CardinalityProfile::Repeating256,
-        input_records_per_sec: 50_000,
-        tier: TierKind::Minute1,
-    })
+    let artifact_root = storage_benchmark_root().expect("resolve storage benchmark root");
+    let report = run_storage_component(
+        &artifact_root,
+        StorageComponentCase {
+            traffic: StorageTraffic::CiscoNsel,
+            profile: CardinalityProfile::Repeating256,
+            input_records_per_sec: 50_000,
+            tier: TierKind::Minute1,
+        },
+    )
     .expect("measure Cisco NSEL storage component");
     assert!(report.archived_journal_rows > 0, "{report:#?}");
 }
@@ -385,10 +422,13 @@ fn literal_validation_profiles() -> Vec<CardinalityProfile> {
     }
 }
 
-fn run_storage_component(case: StorageComponentCase) -> Result<StorageComponentReport> {
+fn run_storage_component(
+    artifact_root: &Path,
+    case: StorageComponentCase,
+) -> Result<StorageComponentReport> {
     let artifact = tempfile::Builder::new()
         .prefix("netflow-storage-bench-")
-        .tempdir_in(std::env::temp_dir())
+        .tempdir_in(artifact_root)
         .context("create storage benchmark artifact directory")?;
     let mut cfg = PluginConfig::default();
     cfg.journal.journal_dir = artifact.path().join("flows").to_string_lossy().to_string();
@@ -903,20 +943,24 @@ fn literal_input_rate(profile: CardinalityProfile) -> u64 {
 }
 
 fn run_literal_validation(
+    artifact_root: &Path,
     traffic: StorageTraffic,
     profile: CardinalityProfile,
 ) -> Result<LiteralValidationReport> {
     let input_records_per_sec = literal_input_rate(profile);
-    let literal = run_literal_storage(traffic, profile, input_records_per_sec)?;
+    let literal = run_literal_storage(artifact_root, traffic, profile, input_records_per_sec)?;
     let component = storage_tiers()
         .into_iter()
         .map(|tier| {
-            run_storage_component(StorageComponentCase {
-                traffic,
-                profile,
-                input_records_per_sec,
-                tier,
-            })
+            run_storage_component(
+                artifact_root,
+                StorageComponentCase {
+                    traffic,
+                    profile,
+                    input_records_per_sec,
+                    tier,
+                },
+            )
         })
         .collect::<Result<Vec<_>>>()?;
     let mut tiers = Vec::new();
@@ -978,13 +1022,14 @@ fn run_literal_validation(
 }
 
 fn run_literal_storage(
+    artifact_root: &Path,
     traffic: StorageTraffic,
     profile: CardinalityProfile,
     input_records_per_sec: u64,
 ) -> Result<Vec<LiteralTierReport>> {
     let artifact = tempfile::Builder::new()
         .prefix("netflow-storage-literal-")
-        .tempdir_in(std::env::temp_dir())
+        .tempdir_in(artifact_root)
         .context("create literal storage benchmark artifact directory")?;
     let mut cfg = PluginConfig::default();
     cfg.journal.journal_dir = artifact.path().join("flows").to_string_lossy().to_string();
@@ -1433,7 +1478,14 @@ fn unix_secs() -> u64 {
         .unwrap_or(0)
 }
 
-fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
-    let body = serde_json::to_vec_pretty(value).context("serialize benchmark report")?;
-    fs::write(path, body).with_context(|| format!("write {}", path.display()))
+fn storage_benchmark_root() -> Result<PathBuf> {
+    let root = std::env::var_os(STORAGE_BENCH_ROOT_ENV)
+        .ok_or_else(|| anyhow!("{STORAGE_BENCH_ROOT_ENV} must name the measured filesystem"))?;
+    if root.is_empty() {
+        bail!("{STORAGE_BENCH_ROOT_ENV} must not be empty");
+    }
+    let root = PathBuf::from(root);
+    fs::create_dir_all(&root)
+        .with_context(|| format!("create storage benchmark root {}", root.display()))?;
+    Ok(root)
 }
