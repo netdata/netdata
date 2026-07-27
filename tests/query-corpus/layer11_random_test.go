@@ -144,14 +144,14 @@ func shrinkCandidates(c sliceCase) []sliceCase {
 		}
 	}
 
-	add(func(s *sliceCase) { s.Axes.Shape = "dense" })     // the plainest data
-	add(func(s *sliceCase) { s.Axes.Option = "" })         // no option flag
-	add(func(s *sliceCase) { s.Axes.StartOffset = 0 })     // on the grid
-	add(func(s *sliceCase) { s.Axes.Tier = 0 })            // the simplest tier
-	add(func(s *sliceCase) { s.Axes.PointsPer = 1 })       // one point per record
-	add(func(s *sliceCase) { s.Points = 1 })               // a single bucket
-	add(func(s *sliceCase) { s.Points = s.Points / 2 })    // fewer buckets
-	add(func(s *sliceCase) {                               // half the window
+	add(func(s *sliceCase) { s.Axes.Shape = "dense" })  // the plainest data
+	add(func(s *sliceCase) { s.Axes.Option = "" })      // no option flag
+	add(func(s *sliceCase) { s.Axes.StartOffset = 0 })  // on the grid
+	add(func(s *sliceCase) { s.Axes.Tier = 0 })         // the simplest tier
+	add(func(s *sliceCase) { s.Axes.PointsPer = 1 })    // one point per record
+	add(func(s *sliceCase) { s.Points = 1 })            // a single bucket
+	add(func(s *sliceCase) { s.Points = s.Points / 2 }) // fewer buckets
+	add(func(s *sliceCase) {                            // half the window
 		s.Before = s.After + (s.Before-s.After)/2
 		s.Points = s.Points / 2
 	})

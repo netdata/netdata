@@ -208,6 +208,7 @@ func TestIncrementalRateUE10(t *testing.T) {
 //     [T0+30, T0+300], no ingestion-side snapping;
 //   - the VIEW re-grids to absolute ue multiples: each grid slot serves
 //     the sample it covers, re-timed to the slot end (T0+30i+10).
+//
 // Invisible whenever the epoch is ue-aligned — the authority for why
 // sweep fixtures pre-align their timestamps so oracles map 1:1.
 func TestOffGridTimestamps(t *testing.T) {

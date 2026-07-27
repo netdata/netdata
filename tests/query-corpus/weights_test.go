@@ -52,10 +52,11 @@ const (
 )
 
 // main weights fixture:
-//   flat:  constant 50 (equal averages → volume skips it);
-//   level: 10/11 alternating in baseline, constant 30 in highlight;
-//   split: 100/101 alternating in baseline, +3 ramp in highlight;
-//   anom:  constant 20, anomalous only in the highlight window.
+//
+//	flat:  constant 50 (equal averages → volume skips it);
+//	level: 10/11 alternating in baseline, constant 30 in highlight;
+//	split: 100/101 alternating in baseline, +3 ramp in highlight;
+//	anom:  constant 20, anomalous only in the highlight window.
 func weightsFixture() fixture.Chart {
 	dims := []fixture.Dimension{{ID: "flat"}, {ID: "level"}, {ID: "split"}, {ID: "anom"}}
 	val := func(id string, i int) string {
@@ -102,12 +103,13 @@ func weightsFixture() fixture.Chart {
 }
 
 // ks2 endpoints fixture:
-//   flat2: constant 50 — identical (all-zero) diffs both windows → d=0
-//          → weight exactly 0;
-//   jump:  0/1 alternation in baseline (diffs ±1e5), then a -5 ramp in
-//          the highlight (all consecutive diffs +5e5/+6e5, including
-//          the window-boundary pair) — every highlight diff exceeds
-//          every baseline diff → d=1 with n*d^2>=18 → weight exactly 1.
+//
+//	flat2: constant 50 — identical (all-zero) diffs both windows → d=0
+//	       → weight exactly 0;
+//	jump:  0/1 alternation in baseline (diffs ±1e5), then a -5 ramp in
+//	       the highlight (all consecutive diffs +5e5/+6e5, including
+//	       the window-boundary pair) — every highlight diff exceeds
+//	       every baseline diff → d=1 with n*d^2>=18 → weight exactly 1.
 func weightsKS2Fixture() fixture.Chart {
 	dims := []fixture.Dimension{{ID: "flat2"}, {ID: "jump"}}
 	val := func(id string, i int) string {

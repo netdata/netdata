@@ -33,8 +33,8 @@ package corpus
 import (
 	"fmt"
 	"math"
-	"sort"
 	"net/url"
+	"sort"
 	"strconv"
 	"testing"
 	"time"

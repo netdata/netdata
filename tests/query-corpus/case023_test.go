@@ -4,10 +4,11 @@
 // decided semantics BEFORE any engine code exists (the CASE-022 pattern).
 //
 // Four groupings answer the fleet questions the engine cannot express:
-//   percentage-of-samples  share of samples matching  (canonical; `countif` alias)
-//   percentage-of-time     share of TIME matching     (units "%")
-//   number-of-flaps        false->true transitions    (units "flaps")
-//   number-of-times        matching samples counted   (units "events")
+//
+//	percentage-of-samples  share of samples matching  (canonical; `countif` alias)
+//	percentage-of-time     share of TIME matching     (units "%")
+//	number-of-flaps        false->true transitions    (units "flaps")
+//	number-of-times        matching samples counted   (units "events")
 //
 // One shared expression grammar: the countif operators, plus gap tokens
 // (nan|null|gap|empty) and the predecessor keywords (previous|last).
