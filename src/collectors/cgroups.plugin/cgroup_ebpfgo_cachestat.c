@@ -175,8 +175,6 @@ static inline void cgroup_ebpfgo_cachestat_calculate(struct cgroup *cg)
 
 static void cgroup_ebpfgo_cachestat_sum_pids(struct cgroup *cg)
 {
-    char path_buf[FILENAME_MAX + 1];
-    procfile *ff = NULL;
     uint64_t mpa = 0;
     uint64_t mbd = 0;
     uint64_t apcl = 0;
@@ -194,12 +192,9 @@ static void cgroup_ebpfgo_cachestat_sum_pids(struct cgroup *cg)
     cg->cachestat.miss = 0;
     cg->cachestat.ct = 0;
 
-    ff = cgroup_ebpfgo_open_nonempty_procs_file(path_buf, sizeof(path_buf), cg->id);
+    procfile *ff = cg->ebpf_procs_ff;
     if (!ff)
         goto calculate;
-
-    /* cgroup_ebpfgo_open_nonempty_procs_file() returns a procfile that has already
-     * been procfile_readall()'d while selecting the best mount point. */
 
     for (size_t l = 0; l < procfile_lines(ff); l++) {
         pid_t pid = (pid_t)str2l(procfile_lineword(ff, l, 0));
@@ -228,9 +223,6 @@ static void cgroup_ebpfgo_cachestat_sum_pids(struct cgroup *cg)
     }
 
 calculate:
-    if (ff)
-        procfile_close(ff);
-
     cg->cachestat.current.mark_page_accessed = mpa;
     cg->cachestat.current.mark_buffer_dirty = mbd;
     cg->cachestat.current.add_to_page_cache_lru = apcl;
@@ -283,6 +275,27 @@ static void cgroup_ebpfgo_cachestat_update_single_chart(
 
     rrddim_set(chart, dimension, value);
     rrdset_done(chart);
+}
+
+void cgroup_ebpfgo_refresh_pid_lists(void)
+{
+    char path_buf[FILENAME_MAX + 1];
+    for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
+        if (unlikely(!cg->enabled || cg->pending_renames))
+            continue;
+        cg->ebpf_procs_ff = cgroup_ebpfgo_open_nonempty_procs_file(
+            path_buf, sizeof(path_buf), cg->id);
+    }
+}
+
+void cgroup_ebpfgo_release_pid_lists(void)
+{
+    for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
+        if (cg->ebpf_procs_ff) {
+            procfile_close(cg->ebpf_procs_ff);
+            cg->ebpf_procs_ff = NULL;
+        }
+    }
 }
 
 void cgroup_ebpfgo_cachestat_update_locked(void)

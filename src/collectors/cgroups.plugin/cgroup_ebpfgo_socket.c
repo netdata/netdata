@@ -25,17 +25,12 @@ static inline uint64_t cgroup_ebpfgo_socket_delta(uint64_t current, uint64_t pre
 
 static void cgroup_ebpfgo_socket_sum_pids(struct cgroup *cg)
 {
-    char path_buf[FILENAME_MAX + 1];
-
     cg->net.prev = cg->net.current;
     memset(&cg->net.current, 0, sizeof(cg->net.current));
 
-    procfile *ff = cgroup_ebpfgo_open_nonempty_procs_file(path_buf, sizeof(path_buf), cg->id);
+    procfile *ff = cg->ebpf_procs_ff;
     if (!ff)
         goto done;
-
-    /* cgroup_ebpfgo_open_nonempty_procs_file() returns a procfile that has
-     * already been procfile_readall()'d while selecting the best mount. */
 
     for (size_t l = 0; l < procfile_lines(ff); l++) {
         pid_t pid = (pid_t)str2l(procfile_lineword(ff, l, 0));
@@ -58,8 +53,6 @@ static void cgroup_ebpfgo_socket_sum_pids(struct cgroup *cg)
         cg->net.current.call_tcp_v4_connection += s->call_tcp_v4_connection;
         cg->net.current.call_tcp_v6_connection += s->call_tcp_v6_connection;
     }
-
-    procfile_close(ff);
 
 done:
     /* On the first sample, after a plugin restart, or after container

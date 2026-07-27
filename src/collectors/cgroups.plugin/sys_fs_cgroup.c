@@ -1468,10 +1468,16 @@ void cgroups_main(void *ptr) {
             break;
         }
 
+        if (cachestat_ok || socket_ok)
+            cgroup_ebpfgo_refresh_pid_lists();
+
         if (cachestat_ok)
             cgroup_ebpfgo_cachestat_update_locked();
         if (socket_ok)
             cgroup_ebpfgo_socket_update_locked();
+
+        if (cachestat_ok || socket_ok)
+            cgroup_ebpfgo_release_pid_lists();
 
         worker_is_busy(WORKER_CGROUPS_CHART);
 
