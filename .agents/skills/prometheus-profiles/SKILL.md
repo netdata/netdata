@@ -66,6 +66,34 @@ Why this is mandatory:
 When a reference and current source disagree, follow current source and repair
 the stale reference as coupled work.
 
+## Know when the profile is complete
+
+A profile is complete only when both its runtime behavior and its semantic
+design are proved. Do not describe or deliver a candidate as complete while any
+of these proofs fails:
+
+- **Domain proof:** source-backed capabilities, causal stages, entity
+  boundaries, and support subsystems explain what the application does
+  independently of its metric inventory.
+- **Navigation proof:** every first- and second-level family names the closest
+  domain owner of its charts. The author can state what work that owner
+  performs, receives, produces, stores, routes, or controls.
+- **Holistic-diagnosis proof:** available workload, outcome, error, latency,
+  saturation, capacity, and resource signals remain with the function that can
+  cause them, except for a deliberately small service-impact overview.
+- **Unit proof:** every dimension on one axis has the same rendered algebra and
+  the same counted or measured object.
+- **Evidence proof:** every writer-capable family is curated or excluded only
+  under one of the binding cases, with the lost operator question stated.
+- **Runtime proof:** the exact profile, dump, and job policy pass the objective
+  validator.
+
+Why: each proof catches a different failure class. Runtime coverage cannot prove
+that a `Latency` branch teaches causality; a good family tree cannot make
+operations and their produced items the same unit; a curated dashboard cannot
+recover a signal that job policy discarded. Model judgment chooses the design,
+but none of these contradictions is an acceptable exercise of judgment.
+
 ## Research the application from evidence
 
 Maintain three mental buckets:
@@ -132,6 +160,18 @@ dashboard accidentally. A domain map provides independent semantic owners for
 the signals. Metrics can then explain the application instead of becoming the
 application's navigation.
 
+Represent the important causal relationships, not just a bag of nouns. For each
+candidate navigation owner, be able to state:
+
+- what work or state it owns;
+- what it receives from and hands to adjacent owners;
+- what it can delay, reject, corrupt, exhaust, or saturate; and
+- which domain entity an operator filters there.
+
+If the only explanation is “these metrics all measure latency,” “these all
+count the same object,” or “these are distributions,” the candidate is a
+measurement category, not a causal owner.
+
 Classify every observed writer-capable family against that map before grouping
 it. The format is up to the author, but the reasoning must make these fields
 explicit:
@@ -196,6 +236,27 @@ Before writing YAML, audit the first two levels of the proposed family tree:
 This audit is a semantic guardrail, not a prescribed tree. Different authors may
 choose different defensible capability boundaries and orders; they must not
 replace application reasoning with a measurement taxonomy.
+
+Resolve signals that span the domain by causal ownership:
+
+- Put a stage-specific workload, outcome, latency, saturation, or resource
+  signal with the stage that produces, consumes, queues, or controls it.
+- Put a true end-to-end signal with the nearest lifecycle owner common to all
+  the stages it spans, usually the domain operation or service-impact view.
+- Put a client-requested limit or option with the intake/admission/operation
+  owner whose behavior it shapes, not in an application-wide `Parameters`
+  drawer.
+- Use a shared resource as a navigation owner only when operators manage it as
+  its own subsystem or entity. Otherwise keep pressure and consumption with the
+  capability that causes them.
+- Treat a domain object name with the same skepticism as a unit. Measurements
+  of an object at different lifecycle stages belong with those stages unless
+  the object itself is the filterable operator entity.
+
+Why: nearest ownership preserves causal adjacency without pretending every
+signal belongs to exactly one physical component. It also gives overlapping and
+end-to-end metrics a principled home instead of recreating global `Latency`,
+`Throughput`, `Parameters`, or `Resources` buckets.
 
 See `chart-design.md` for the consequences and conflict-resolution guidance.
 See `metric-types.md` for what the collector actually writes for each
@@ -320,6 +381,10 @@ three charts for every histogram:
   algebra, including the counted object. Renaming different objects to
   `events/s`, `operations/s`, `items/s`, or `observations/s` does not make them
   comparable; research the object and split the chart when the nouns differ.
+- An operation and the objects produced by that operation remain different
+  units. One operation may produce zero, one, or many objects; placing its
+  counter beside object counters under the object's unit invents a conversion
+  ratio that the exporter did not supply.
 
 The operator question decides the chart boundary; zero autogen/unmatched
 decides whether every written series was routed. Conflating those decisions

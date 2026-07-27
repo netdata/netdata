@@ -81,6 +81,13 @@ fail, and which entities own those functions. Only then assign signals. If the
 tree is derived from metric names first, shared suffixes and units will tend to
 become false navigation categories.
 
+Model the important nodes and hand-offs in that causal path. For every proposed
+first- or second-level family, state what work it owns, what it receives or
+produces, what condition it can cause, and which entity it scopes. A branch that
+can be justified only with “these charts are all latency,” “these metrics count
+the same object,” or “these are distributions” has no causal owner and fails the
+navigation proof.
+
 Use an operator-vocabulary test on the proposed first two levels:
 
 - Hide the chart and metric names and read only the family tree.
@@ -98,6 +105,24 @@ latency, saturation, capacity, and resource pressure should be together or in
 nearby subfamilies when the exporter provides them. Scattering those lenses into
 global role sections makes operators jump between branches to explain one
 function.
+
+Assign each signal to the closest defensible causal owner:
+
+- stage-local signals stay with the stage that produces, consumes, queues, or
+  controls them;
+- end-to-end signals stay with the nearest common lifecycle owner or a small
+  service-impact overview;
+- requested limits/options stay with intake, admission, or the operation they
+  shape;
+- resource pressure stays with its consuming capability unless the shared
+  resource is itself an operator-managed subsystem/entity; and
+- measurements of the same domain object stay separate when they describe
+  different lifecycle owners.
+
+This rule resolves overlap without pretending the system is a strict tree. A
+chart may compare adjacent stages when the operator question requires it, but
+its family still names their common domain owner rather than the chart's unit or
+signal role.
 
 Entity level and functional hierarchy are independent axes. A service-level
 section can contain HTTP, process, runtime, and garbage-collection signals, but
@@ -259,6 +284,11 @@ records/s, retries/s, and bytes/s do not become a common `events/s` or
 of dimensional correctness. If the exact noun is unknown, research it; if the
 nouns differ, split the chart even when the counters advance together.
 
+An operation counter is not the same unit as a counter of objects produced by
+that operation. Combining them under the object's unit silently assumes one
+object per operation; combining them under `events/s` hides the same false
+assumption. Keep both near their causal owner, but on honest axes.
+
 A useful composition is often a bounded breakdown of one whole: response
 classes, cache hit/miss outcomes, pipeline phases, input/output directions, or
 queue states. The comparison should reduce diagnostic time rather than save
@@ -312,6 +342,18 @@ not make the smaller line visible. Keeping the shared chart requires evidence
 that the UI still exposes meaningful movement or that the deployment range
 keeps the ratio readable. Otherwise use adjacent charts so the relationship
 remains clear without flattening the actionable signal.
+
+### One signal spans several capabilities
+
+Do not solve overlap by creating application-wide `Latency`, `Throughput`,
+`Parameters`, or `Resources` drawers. Place a stage-specific signal with that
+stage. Place a true end-to-end signal with the nearest common lifecycle owner.
+When one chart deliberately compares stages, put it at their nearest common
+domain owner and say what the comparison diagnoses.
+
+Why: the operator usually starts from the affected operation, then follows its
+causes. A global signal-role branch reverses that reasoning and forces the
+operator to remember which lines belong to which stage.
 
 ### Same metric, multiple entity levels
 
@@ -478,6 +520,8 @@ After objective validation passes, review the dashboard design:
 - Does navigation follow application capabilities and causal diagnosis?
 - Do the first two family levels pass the operator-vocabulary test without
   relying on signal roles, metric forms, parameter kinds, or units?
+- Can every first- and second-level family name the work/entity it owns, its
+  hand-offs, and the condition it can cause?
 - Does each capability keep its available diagnostic lenses together rather
   than scattering them into application-wide role sections?
 - Is each context homogeneous in entity type?

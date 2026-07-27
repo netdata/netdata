@@ -82,6 +82,11 @@ populations rather than performing valid unit conversion. Research what one
 increment means, use that noun in the chart, and split unlike objects even when
 their algorithms and numeric scales happen to match.
 
+An operation counter and a counter of objects produced by that operation are
+also different. One operation can produce zero, one, or many objects. A shared
+chart would assert a conversion ratio that the metrics do not compute, whether
+it is mislabeled with the object's unit or disguised as generic `events/s`.
+
 Apply unit algebra after the algorithm. A counter measured in seconds becomes
 seconds/second under `incremental`, not “CPU time.” For
 `process_cpu_seconds_total`, that dimensionless rate is CPU-core utilization
