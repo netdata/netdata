@@ -119,10 +119,7 @@ func runTestEnforceLifecycleCapsMixedPolicies(t *testing.T) {
 		"disabled_active",
 		"tpl.disabled",
 		meta,
-		program.LifecyclePolicy{
-			MaxInstances: 1,
-			Dimensions:   program.DimensionLifecyclePolicy{MaxDims: 1},
-		},
+		disabledLifecycle,
 	)
 	require.True(t, created)
 	disabledActive.lastSeenSuccessSeq = 1
@@ -139,7 +136,7 @@ func runTestEnforceLifecycleCapsMixedPolicies(t *testing.T) {
 		"disabled_stale",
 		"tpl.disabled",
 		meta,
-		program.LifecyclePolicy{MaxInstances: 1},
+		disabledLifecycle,
 	)
 	require.True(t, created)
 	disabledStale.lastSeenSuccessSeq = 1
