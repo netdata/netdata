@@ -187,6 +187,30 @@ chart count.
 Do not optimize for few charts. Optimize for a coherent operator scan with no
 important signal hidden.
 
+### Coverage is not one metric per chart
+
+Objective coverage asks whether every writer-surviving flattened series reaches
+an authored dimension. It does not prescribe a chart count or a chart boundary.
+
+- Route every gauge, counter, bucket, quantile, count, and sum role.
+- Compose compatible same-unit roles from related metric families when one
+  chart creates a useful comparison.
+- Split when the operator question, event population, rendered meaning, scale,
+  algorithm, or cardinality differs.
+- Do not create generic metric-type sections merely to prove that each
+  histogram produced separate bucket/count/sum charts.
+
+This separation preserves both completeness and design judgment: coverage
+prevents silent evidence loss, while composition determines whether the
+dashboard teaches the application and shortens diagnosis.
+
+Before merging dimensions, state in one sentence what comparison the chart
+answers and what one unit of every dimension represents. A long legend can be
+correct, but it is a warning sign when the sentence needs several unrelated
+clauses, when actual work is mixed with requested limits, or when a total is
+presented as one of its own phases. Move secondary comparisons into the causal
+family that owns them rather than turning Overview into a coverage inventory.
+
 ## Resolve common design conflicts
 
 ### Related signals, incompatible scale
@@ -261,8 +285,9 @@ dimensions may add to a total, but additive categories are not physical volume:
 stacking status classes, GC generations, request outcomes, or token sources
 turns diagnostic trends into an area-composition display the user did not ask
 for. Bandwidth remains a valid filled rate because the fill represents physical
-flow. The validator warns because unit strings are imperfect evidence; the
-authoring policy still governs the decision.
+flow. The validator rejects filled charts when units make the non-volume
+violation unambiguous and warns when physical-rate or ambiguous units still
+need design judgment.
 
 A negative multiplier is a presentation convention, not negative data. Use it
 only when the below-zero direction communicates a real pair such as inbound and
@@ -307,7 +332,9 @@ Use both channels deliberately:
   dashboard;
 - assign priorities that express the intended runtime presentation;
 - prefer unique increasing priorities when there is a total order;
-- allow a tie or divergence only when the UX is intentional and explainable.
+- never decrease priority as the file proceeds;
+- allow a tie only when a total order is unnecessary and the fallback ordering
+  is acceptable.
 
 A useful default story is health/workload → failures/latency → queueing/resource
 pressure → detailed internals. Change it when the application's actual failure

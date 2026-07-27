@@ -98,12 +98,18 @@ Important consequences:
 - The bare histogram base is not a flattened scalar dimension.
 - Bucket values presented to the template are non-overlapping ranges, even
   though Prometheus exposition buckets are cumulative. Histogram bucket charts
-  are forced to `heatmap`.
+  are forced to `heatmap`. Their dimension values are rates of observations in
+  each range, so use `units: observations/s` with inferred or explicit
+  `algorithm: incremental`; the bucket boundaries already communicate the
+  observed value's unit.
 - `+Inf` is synthesized from count by metrix after writer validation.
 - A histogram with no buckets is rejected as a family; `_count` and `_sum` are
   not independently rescued.
 
-There is no mandatory “four chart contract.” Choose charts from the operator
+Writer coverage and dashboard composition are different obligations. Every
+flattened bucket, count, and sum series that survives the writer must be routed
+to an authored dimension, but there is no mandatory “three charts per
+histogram” or “four chart contract.” Choose chart boundaries from operator
 questions:
 
 - A latency heatmap can show distribution shape and outliers.
@@ -113,6 +119,28 @@ questions:
   only when the measurement semantics support that inference.
 - An average would require `sum rate / count rate`. The current profile schema
   cannot compute it, so do not fake an average from `_sum` alone.
+
+Compatible roles from different related histograms may share a chart. For
+example, same-unit count rates may compare observations across causal phases,
+and same-unit duration-sum rates may compare accumulated work across those
+phases. This is valid only when the populations, rendered meanings, algorithms,
+and scales make one coherent operator comparison. It is not permission to
+collect unrelated histogram mechanics under generic “Counts” or “Sums”
+families.
+
+Name one observation before combining `_count` rates. `observations/s` is a
+transport unit, not a population: requests, token intervals, engine steps,
+database rows, and retries remain different things even when every selector
+ends in `_count`. The chart title and dimension names must describe the real
+population rather than relabel all observations as requests.
+
+Name what each `_sum` accumulates before combining sum rates. Equal
+`seconds/s` does not prove additivity or even the same population: an
+end-to-end duration can contain several phases, a time-to-first-result duration
+can overlap both queue and processing, and a per-item average observed once per
+request is not a phase duration. A useful comparison may show an explicit total
+beside compatible components, but it must not imply a decomposition the
+exporter does not guarantee.
 
 Do not assume component distributions replace a directly exported total
 distribution. Prefill/decode, read/write, or client/server histograms no longer
@@ -155,10 +183,11 @@ Writer safety changes what can be charted:
 Quantiles are not histogram buckets. Do not stack them and do not add them: p50,
 p90, and p99 are alternative distribution positions with the same units.
 
-As with histograms, count and sum are optional design surfaces, not an automatic
-set of required charts. They become unavailable when the writer rejects the
-summary; a dead-chart failure is the correct signal to obtain better evidence
-or remove the unsupported assumption.
+As with histograms, count and sum do not require dedicated per-family charts.
+When the writer accepts the summary, however, every flattened series still
+needs an authored route for a complete profile. They become unavailable when
+the writer rejects the summary; a dead-chart failure is the correct signal to
+obtain better evidence or remove the unsupported assumption.
 
 ## Info families
 

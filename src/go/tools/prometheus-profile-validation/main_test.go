@@ -76,7 +76,7 @@ template:
       context: latency
       units: observations/s
       algorithm: incremental
-      type: stacked
+      type: heatmap
       priority: 120
       dimensions:
         - selector: app_latency_seconds_bucket
@@ -683,31 +683,24 @@ func TestValidateProfileRequiresExplicitPositivePriority(t *testing.T) {
 	requireFinding(t, result, "priority_missing")
 }
 
-func TestValidateProfileKeepsPriorityOrderQualityAsReviewWarnings(t *testing.T) {
-	tests := map[string]struct {
-		profile string
-		code    string
-	}{
-		"duplicate": {
-			profile: strings.Replace(validProfile, "      priority: 110\n", "      priority: 100\n", 1),
-			code:    "priority_duplicate",
-		},
-		"source order": {
-			profile: strings.Replace(validProfile, "      priority: 110\n", "      priority: 90\n", 1),
-			code:    "priority_source_order",
-		},
+func TestValidateProfileKeepsPriorityTiesAsReviewWarnings(t *testing.T) {
+	profile := strings.Replace(validProfile, "      priority: 110\n", "      priority: 100\n", 1)
+	result := runValidation(t, profile, validDump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("priority ties preserve author judgment\nreport:\n%s", result.stdout)
 	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			result := runValidation(t, tc.profile, validDump, "")
-			if result.exitCode != 0 {
-				t.Fatalf("priority quality prompt must not replace author judgment\nreport:\n%s", result.stdout)
-			}
-			if !hasFinding(result.report, tc.code, "warning") {
-				t.Fatalf("missing priority review prompt %q: %#v", tc.code, result.report.Findings)
-			}
-		})
+	if !hasFinding(result.report, "priority_duplicate", "warning") {
+		t.Fatalf("missing priority tie review prompt: %#v", result.report.Findings)
 	}
+	if hasFinding(result.report, "priority_source_order", "error") {
+		t.Fatalf("a tie is not descending source order: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileRejectsDescendingPrioritySourceOrder(t *testing.T) {
+	profile := strings.Replace(validProfile, "      priority: 110\n", "      priority: 90\n", 1)
+	result := runValidation(t, profile, validDump, "")
+	requireFinding(t, result, "priority_source_order")
 }
 
 func TestValidateProfileReportsObservedDenyImpactWithoutLeakingLabels(t *testing.T) {
@@ -770,19 +763,84 @@ func TestValidateProfileWarnsOnUnusedMetricDeclaration(t *testing.T) {
 }
 
 func TestValidateProfileWarnsWhenAuthoredChartIntentDiffersFromVisualSemantics(t *testing.T) {
-	result := runValidation(t, validProfile, validDump, "")
+	profile := strings.Replace(validProfile, "      type: heatmap\n", "      type: line\n", 1)
+	result := runValidation(t, profile, validDump, "")
 	if result.exitCode != 0 {
 		t.Fatalf("visual-semantic review prompts are advisory\nreport:\n%s", result.stdout)
 	}
 	for _, code := range []string{
 		"distribution_role_mixing",
 		"histogram_type_runtime_override",
-		"rate_filled_type_review",
 	} {
 		if !hasFinding(result.report, code, "warning") {
 			t.Fatalf("missing review prompt %q: %#v", code, result.report.Findings)
 		}
 	}
+}
+
+func TestValidateProfileRejectsIncorrectHistogramBucketPresentation(t *testing.T) {
+	tests := map[string]struct {
+		profile string
+		code    string
+	}{
+		"units": {
+			profile: strings.Replace(
+				validProfile,
+				"      context: latency\n      units: observations/s\n",
+				"      context: latency\n      units: seconds\n",
+				1,
+			),
+			code: "histogram_bucket_units",
+		},
+		"algorithm": {
+			profile: strings.Replace(
+				validProfile,
+				"      context: latency\n      units: observations/s\n      algorithm: incremental\n",
+				"      context: latency\n      units: observations/s\n      algorithm: absolute\n",
+				1,
+			),
+			code: "histogram_bucket_algorithm",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			result := runValidation(t, tc.profile, validDump, "")
+			requireFinding(t, result, tc.code)
+		})
+	}
+}
+
+func TestValidateProfileRejectsChartWithEveryDimensionHidden(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  metrics: [app_current, app_capacity]
+  charts:
+    - title: Invisible
+      context: invisible
+      units: items
+      priority: 100
+      dimensions:
+        - selector: app_current
+          name: current
+          options:
+            hidden: true
+        - selector: app_capacity
+          name: capacity
+          options:
+            hidden: true
+`
+	dump := `
+# TYPE app_current gauge
+app_current 1
+# TYPE app_capacity gauge
+app_capacity 1000
+`
+	result := runValidation(t, profile, dump, "")
+	requireFinding(t, result, "all_dimensions_hidden")
 }
 
 func TestValidateProfileWarnsOnObservedAbsoluteDimensionScaleGap(t *testing.T) {
@@ -855,7 +913,7 @@ app_capacity 1000
 	}
 }
 
-func TestValidateProfileWarnsOnFilledNonVolumeGauge(t *testing.T) {
+func TestValidateProfileRejectsFilledNonVolumeGauge(t *testing.T) {
 	profile := `
 match: app_*
 app: app
@@ -879,11 +937,75 @@ app_waiting{reason="capacity"} 1
 app_waiting{reason="deferred"} 2
 `
 	result := runValidation(t, profile, dump, "")
+	requireFinding(t, result, "filled_nonvolume_units")
+}
+
+func TestValidateProfileKeepsPhysicalRateFillAsReviewWarning(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  metrics: [app_read_bytes_total, app_write_bytes_total]
+  charts:
+    - title: I/O
+      context: io
+      units: bytes/s
+      algorithm: incremental
+      type: area
+      priority: 100
+      dimensions:
+        - selector: app_read_bytes_total
+          name: read
+        - selector: app_write_bytes_total
+          name: write
+`
+	dump := `
+# TYPE app_read_bytes_total counter
+app_read_bytes_total 100
+# TYPE app_write_bytes_total counter
+app_write_bytes_total 50
+`
+	result := runValidation(t, profile, dump, "")
 	if result.exitCode != 0 {
-		t.Fatalf("filled-type review is advisory\nreport:\n%s", result.stdout)
+		t.Fatalf("physical flow fill remains a judgment-preserving review\nreport:\n%s", result.stdout)
 	}
-	if !hasFinding(result.report, "nonvolume_filled_type_review", "warning") {
-		t.Fatalf("missing non-volume filled-type prompt: %#v", result.report.Findings)
+	if !hasFinding(result.report, "rate_filled_type_review", "warning") {
+		t.Fatalf("missing physical-rate fill review prompt: %#v", result.report.Findings)
+	}
+}
+
+func TestValidateProfileAcceptsFilledPhysicalStorageUnit(t *testing.T) {
+	profile := `
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  metrics: [app_resident_memory_bytes]
+  charts:
+    - title: Resident Memory
+      context: resident_memory
+      units: MiB
+      type: area
+      priority: 100
+      dimensions:
+        - selector: app_resident_memory_bytes
+          name: resident
+          options:
+            divisor: 1048576
+`
+	dump := `
+# TYPE app_resident_memory_bytes gauge
+app_resident_memory_bytes 1048576
+`
+	result := runValidation(t, profile, dump, "")
+	if result.exitCode != 0 {
+		t.Fatalf("physical storage fill should pass\nreport:\n%s", result.stdout)
+	}
+	if hasFinding(result.report, "nonvolume_filled_type_review", "warning") {
+		t.Fatalf("MiB is an unambiguous physical storage unit: %#v", result.report.Findings)
 	}
 }
 

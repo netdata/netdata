@@ -80,7 +80,12 @@ For the supplied dump and job policy, a pass establishes that:
   and effective contexts do not normalize to empty;
 - observed dynamic dimension names do not collapse into duplicate emitted wire
   IDs or sanitize to an omitted empty ID;
-- every chart declares an explicit positive priority.
+- every chart declares an explicit positive priority and priorities do not
+  decrease in source order;
+- every chart has at least one visible dimension;
+- histogram bucket charts use observation-rate units and incremental semantics;
+  and
+- charts with unambiguously non-volume units do not use filled presentation.
 
 `pipeline_excluded` reports raw logical source series that are wholly or partly
 absent after job policy and writer processing. Categories are deliberately
@@ -100,7 +105,7 @@ Warnings identify designs that deserve explanation but can be correct:
 - profile `match` expressions that also accept common `go_*`, `http_*`,
   `process_*`, or `python_*` families and can therefore auto-select on an
   unrelated endpoint;
-- duplicate priorities or priority order that diverges from source order;
+- duplicate priorities, whose runtime placement falls back to chart-ID order;
 - open-ended `instances.by_labels: ['*']` identity;
 - sibling family subtrees with no common explicit identity label;
 - observed label keys that selected chart series carry but the chart neither
@@ -113,12 +118,11 @@ Warnings identify designs that deserve explanation but can be correct:
 - metric declarations unused by any authored dimension in their scope;
 - histogram bucket charts whose authored type differs from the compiler-forced
   heatmap;
-- `area`/`stacked` charts with rate-like units, where volume semantics may or
-  may not justify a filled visual;
+- `area`/`stacked` charts with physical-rate or ambiguous units, where volume
+  semantics may or may not justify a filled visual;
 - charts that mix distribution shape/count/sum roles under one unit;
 - absolute chart dimensions whose observed non-zero magnitudes differ by at
-  least 20x and may flatten the smaller signal;
-- filled/stacked charts with non-volume units, including non-rate gauges.
+  least 20x and may flatten the smaller signal.
 
 The validator does not turn these heuristics into policy. For example, sibling
 families can intentionally represent different entity levels, and tied
@@ -134,8 +138,10 @@ alone is not a collection boundary: use hierarchy and priority rather than
 discarding distinct writer-capable diagnostics.
 
 Hidden dimensions are excluded from the visible-scale comparison because they
-do not control the chart's default visible axis. Their discoverability and the
-choice to hide them remain semantic review questions.
+do not control the chart's default visible axis. A chart may hide supporting
+dimensions, but hiding every dimension is an objective failure because the
+chart has no visible answer. The discoverability of each remaining hidden
+dimension is still a semantic review question.
 
 ## Evidence boundary
 
@@ -153,7 +159,8 @@ This is an objective correctness gate, not a dashboard designer:
   classes, not every possible false-positive signature.
 - Writer-rejected source series are reported but are not profile coverage gaps,
   because chartengine never receives them.
-- A `PASS` does not establish that hierarchy, chart composition, titles, units,
+- A `PASS` enforces only the units and presentation cases listed above. It does
+  not establish that the remaining hierarchy, chart composition, titles, units,
   instance choices, or presentation order are useful to an operator.
 
 Each process validates one candidate. Production catalog and plugin

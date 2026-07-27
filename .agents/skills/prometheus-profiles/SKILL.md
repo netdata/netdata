@@ -200,17 +200,37 @@ Required authoring policy:
 
 - Every chart MUST have an explicit positive `priority`.
 - YAML family/chart order MUST mirror intended dashboard presentation order.
+- Explicit priorities MUST NOT decrease as the profile is read in YAML order.
 - Event, token, request, count, state, and time charts MUST use `line`.
   `area`/`stacked` MAY be used only when fill represents physical volume,
   space, bandwidth, or I/O rather than merely categories that add to a total.
 - Prefer unique, increasing priorities when the dashboard has a total order.
-  Treat duplicates or source-order divergence as review prompts, not automatic
-  proof that the design is wrong.
+  A deliberate tie is valid when a total order is unnecessary, but it deserves
+  review because runtime placement then falls back to unrelated chart IDs.
 
 Why: omitted or zero priorities all become `70000`; the planner does not derive
 priority from YAML order. Explicit values force the author to decide the
 operator journey. Matching source and presentation order makes that reasoning
-reviewable; a deliberate tie or divergence is valid when its UX is explained.
+reviewable; decreasing priorities contradict the journey expressed by the
+file.
+
+Coverage and chart composition are separate decisions. A complete profile MUST
+route every writer-surviving flattened bucket, count, sum, quantile, counter, and
+gauge series, but it MUST NOT mechanically create one chart for every metric or
+three charts for every histogram:
+
+- A dimension selector can curate a series inside a chart that also contains
+  compatible series from related families.
+- Same-unit count rates can share a chart when they compare one coherent
+  workload or causal question.
+- Same-unit sum rates can share a chart when their rendered meanings and scales
+  are genuinely comparable.
+- Bucket shape, observation count, and observed-value sum remain different
+  roles. Never combine them under one unit merely to reduce chart count.
+
+The operator question decides the chart boundary; zero autogen/unmatched
+decides whether every written series was routed. Conflating those decisions
+produces repetitive metric-type dashboards instead of useful comparisons.
 
 Keep contexts and IDs stable. Changing them creates new chart identities and
 can strand historical metadata. Different source charts that render the same
@@ -261,7 +281,11 @@ A `PASS` proves, for that evidence:
 - public chart emission finds no chart-ID, context, or dynamic-dimension
   normalization collision or omission;
 - required runtime coverage counters are present and valid;
-- every chart has an explicit positive priority.
+- every chart has an explicit positive priority and priorities do not decrease
+  in source order;
+- every chart exposes at least one visible dimension;
+- histogram bucket charts use incremental observation-rate semantics; and
+- unambiguously non-volume charts do not use filled presentation.
 
 The report lists raw families absent after selector/relabel/writer processing
 under `pipeline_excluded`; they are not misreported as chart coverage.
@@ -273,11 +297,12 @@ exclusion satisfies the policy above.
 Warnings are prompts for model review, not policy decisions. They include
 generic auto-selection signatures, observed labels with no authored role,
 the job-policy exclusion summary, observed per-rule allow/deny impact, unused
-metric declarations, authored/runtime heatmap divergence, filled non-volume
-charts, and sibling identity mismatch. Each can be intentional, but its UX or
-diagnostic trade-off must be explained. Do not mechanically add identity,
-promotion, or dimensions merely to silence a label warning; explain intentional
-aggregation when losing that comparison is the correct design.
+metric declarations, authored/runtime heatmap divergence, ambiguous or
+physical-rate filled charts, and sibling identity mismatch. Each can be
+intentional, but its UX or diagnostic trade-off must be explained. Do not
+mechanically add identity, promotion, or dimensions merely to silence a label
+warning; explain intentional aggregation when losing that comparison is the
+correct design.
 
 The gate cannot judge whether the dashboard is useful, and it cannot prove
 behavior for unseen metrics or label values. Exact candidate selection also
@@ -301,8 +326,8 @@ Review the rendered design, not merely the YAML:
 - Are distribution shape, observation count, and observed-value sum kept as
   different semantic/unit roles rather than combined under one chart unit?
 - Are smaller signals still visible, or flattened by a much larger dimension?
-- Are stacked/area charts limited to meaningful volumes/occupancy, with line
-  charts used for rates, counts, latency, and state?
+- Are stacked/area charts limited to physical volume, space, bandwidth, or I/O,
+  with line charts used for rates, counts, ratios, latency, and state?
 - Does each “by/per X” title identify the instance or dimension mechanism that
   actually preserves X, rather than aggregating it away?
 - Does each exclusion identify the lost operator question, authoritative

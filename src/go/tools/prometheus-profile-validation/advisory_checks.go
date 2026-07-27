@@ -8,6 +8,7 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -390,7 +391,8 @@ type metricDeclaration struct {
 }
 
 // addAuthoredProfileHeuristics checks source intent before collector merge or
-// compiler defaulting can hide it. Every result remains an advisory warning.
+// compiler defaulting can hide it. It reports objective presentation failures
+// as errors and leaves judgment-dependent findings as warnings.
 func addAuthoredProfileHeuristics(root charttpl.Group, r *report) {
 	var declarations []*metricDeclaration
 	var walk func(group charttpl.Group, path string, active map[string]*metricDeclaration)
@@ -439,7 +441,11 @@ func reviewAuthoredChart(
 	r *report,
 ) {
 	hasBucket := false
+	hasVisibleDimension := false
 	for _, dimension := range chart.Dimensions {
+		if dimension.Options == nil || !dimension.Options.Hidden {
+			hasVisibleDimension = true
+		}
 		compiled, err := metrixselector.ParseCompiled(dimension.Selector)
 		if err != nil {
 			continue // Authoritative template/compiler validation reports errors.
@@ -454,34 +460,73 @@ func reviewAuthoredChart(
 		}
 	}
 
-	if hasBucket && !strings.EqualFold(strings.TrimSpace(chart.Type), "heatmap") {
-		authoredType := strings.TrimSpace(chart.Type)
-		if authoredType == "" {
-			authoredType = "<default line>"
-		}
-		r.addWarning(
-			"histogram_type_runtime_override",
+	if !hasVisibleDimension {
+		r.addError(
+			"all_dimensions_hidden",
 			path,
-			fmt.Sprintf("chart %q selects histogram buckets but declares type %q", chart.Title, authoredType),
-			"The compiler forces bucket charts to heatmap. Declare heatmap explicitly so the authored design states the UI that actually runs.",
+			fmt.Sprintf("chart %q hides every authored dimension", chart.Title),
+			"A chart with no visible dimensions cannot answer an operator question. Keep at least one dimension visible; hidden dimensions may support a visible comparison but cannot replace it.",
 		)
 	}
 
+	if hasBucket {
+		if !strings.EqualFold(strings.TrimSpace(chart.Type), "heatmap") {
+			authoredType := strings.TrimSpace(chart.Type)
+			if authoredType == "" {
+				authoredType = "<default line>"
+			}
+			r.addWarning(
+				"histogram_type_runtime_override",
+				path,
+				fmt.Sprintf("chart %q selects histogram buckets but declares type %q", chart.Title, authoredType),
+				"The compiler forces bucket charts to heatmap. Declare heatmap explicitly so the authored design states the UI that actually runs.",
+			)
+		}
+		if strings.TrimSpace(chart.Units) != "observations/s" {
+			r.addError(
+				"histogram_bucket_units",
+				path,
+				fmt.Sprintf("chart %q selects histogram buckets but declares units %q", chart.Title, chart.Units),
+				"Metrix exposes non-overlapping bucket counters, so the heatmap intensity is an observation rate. Use units \"observations/s\"; the bucket boundaries already carry the observed value's unit.",
+			)
+		}
+		if algorithm := strings.TrimSpace(chart.Algorithm); algorithm != "" && algorithm != "incremental" {
+			r.addError(
+				"histogram_bucket_algorithm",
+				path,
+				fmt.Sprintf("chart %q selects histogram buckets but declares algorithm %q", chart.Title, chart.Algorithm),
+				"Histogram bucket values are counter-like totals after flattening and must render as change per second. Omit the algorithm for suffix inference or declare \"incremental\".",
+			)
+		}
+	}
+
 	chartType := strings.ToLower(strings.TrimSpace(chart.Type))
-	if (chartType == "area" || chartType == "stacked") && rateLikeUnits(chart.Units) {
-		r.addWarning(
-			"rate_filled_type_review",
-			path,
-			fmt.Sprintf("chart %q uses %s for rate-like units %q", chart.Title, chartType, chart.Units),
-			"Additive event, token, request, count, or time rates do not become physical volume merely because their dimensions sum. Use line unless the units represent physical volume, space, bandwidth, or I/O with meaningful fill.",
-		)
-	} else if (chartType == "area" || chartType == "stacked") && !physicalVolumeUnits(chart.Units) {
-		r.addWarning(
-			"nonvolume_filled_type_review",
-			path,
-			fmt.Sprintf("chart %q uses %s for non-volume units %q", chart.Title, chartType, chart.Units),
-			"Filled/stacked presentation is reserved for meaningful physical volume, space, bandwidth, or I/O. Counts, states, and arbitrary additive categories should normally remain lines.",
-		)
+	if chartType == "area" || chartType == "stacked" {
+		switch {
+		case physicalVolumeUnits(chart.Units):
+			if rateLikeUnits(chart.Units) {
+				r.addWarning(
+					"rate_filled_type_review",
+					path,
+					fmt.Sprintf("chart %q uses %s for physical rate units %q", chart.Title, chartType, chart.Units),
+					"Bandwidth and I/O can justify meaningful fill, but confirm that the dimensions represent physical flow or volume rather than unrelated rates sharing a unit.",
+				)
+			}
+		case unambiguouslyNonVolumeUnits(chart.Units):
+			r.addError(
+				"filled_nonvolume_units",
+				path,
+				fmt.Sprintf("chart %q uses %s for non-volume units %q", chart.Title, chartType, chart.Units),
+				"Event, token, request, count, state, and time values must use line. Additive categories do not become physical volume merely because they sum.",
+			)
+		default:
+			r.addWarning(
+				"nonvolume_filled_type_review",
+				path,
+				fmt.Sprintf("chart %q uses %s for units %q whose fill semantics are not mechanically clear", chart.Title, chartType, chart.Units),
+				"Use filled presentation only when the area represents physical volume, space, bandwidth, or I/O. Otherwise use line and preserve model judgment in the chart composition.",
+			)
+		}
 	}
 }
 
@@ -502,6 +547,66 @@ func physicalVolumeUnits(units string) bool {
 		"i/o",
 		"io/s",
 		"space",
+	} {
+		if strings.Contains(units, token) {
+			return true
+		}
+	}
+	for _, field := range strings.FieldsFunc(units, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}) {
+		switch field {
+		case "b", "kb", "kib", "mb", "mib", "gb", "gib", "tb", "tib", "pb", "pib":
+			return true
+		}
+	}
+	return false
+}
+
+func unambiguouslyNonVolumeUnits(units string) bool {
+	units = strings.ToLower(strings.TrimSpace(units))
+	for _, token := range []string{
+		"allocation",
+		"choice",
+		"collection",
+		"connection",
+		"core",
+		"count",
+		"cycle",
+		"descriptor",
+		"draft",
+		"error",
+		"event",
+		"file",
+		"hit",
+		"item",
+		"invocation",
+		"latency",
+		"miss",
+		"object",
+		"observation",
+		"operation",
+		"percent",
+		"preemption",
+		"process",
+		"query",
+		"queue",
+		"ratio",
+		"record",
+		"request",
+		"response",
+		"retry",
+		"sample",
+		"second",
+		"session",
+		"state",
+		"step",
+		"task",
+		"thread",
+		"time",
+		"token",
+		"utilization",
+		"worker",
 	} {
 		if strings.Contains(units, token) {
 			return true

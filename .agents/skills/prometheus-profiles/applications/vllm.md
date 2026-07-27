@@ -64,10 +64,17 @@ together.
   cannot prove that `model_name` alone remains unique in a multi-engine
   deployment. Decide whether engine belongs in instance identity from the
   deployment contract and expected cardinality; too few labels merge engines,
-  while unnecessary labels fragment one model.
+  while unnecessary labels fragment one model. When no authoritative
+  deployment contract proves a stable single engine, preserve `engine` in
+  identity rather than treating one observed value as evidence for aggregation.
 - HTTP/process/Python runtime families may not carry `model_name`; that is an
   observed label-contract question, not a universal rule. Place global runtime
   charts at service level rather than forcing a missing model identity.
+- One dump may show one HTTP `method` for each `handler`, but that correlation
+  does not prove a versioned functional dependency. Preserve both labels in
+  handler-level identity unless authoritative instrumentation or deployment
+  evidence guarantees the mapping; otherwise a future method is silently
+  merged into the same endpoint chart.
 - `_info` families such as cache configuration are skipped by the current
   Prometheus writer. Their labels cannot be promoted by a profile.
 
@@ -94,6 +101,56 @@ known vLLM surfaces and MUST NOT be deduplicated from their names alone:
 Verify the versioned HELP/source and observed bucket schemas. A representative
 dump showed the first two with different HELP semantics and different observed
 distributions despite equal observation counts.
+
+The `request_params_n` sum accumulates requested choice/completion counts, not
+tokens. Under incremental rendering its units are `choices/s` (or
+`completions/s` when that is the terminology established by the matching
+version), never `tokens/s`.
+
+Do not label every vLLM histogram count as requests:
+
+- `inter_token_latency_seconds_count` counts inter-token intervals;
+- `iteration_tokens_total_count` counts engine steps; and
+- request lifecycle, request parameter, and per-request token distributions
+  count request observations when the matching HELP/source establishes that
+  grain.
+
+The different populations can differ by orders of magnitude and do not belong
+on one request-rate chart merely because all flatten to `_count`.
+
+Likewise, distinguish requested capacity from completed work.
+`request_params_max_tokens_sum` and
+`request_max_num_generation_tokens_sum` accumulate requested token limits;
+`request_prompt_tokens_sum`, `request_generation_tokens_sum`, and
+`request_prefill_kv_computed_tokens_sum` accumulate observed token work.
+Comparing demand with work can be useful when the title states that question,
+but a generic token-throughput chart would falsely present requested limits as
+tokens processed.
+
+Speculative-decoding counters also have different unit algebras:
+
+- `spec_decode_num_drafts_total` counts draft operations and renders as
+  `drafts/s`;
+- `spec_decode_num_draft_tokens_total` counts proposed tokens and renders as
+  `tokens/s`; and
+- `spec_decode_num_accepted_tokens_total` and its per-position companion count
+  accepted tokens and render as `tokens/s`.
+
+Drafts and draft tokens are related but not interchangeable dimensions.
+
+## Version-sensitive metric semantics
+
+- `vllm:kv_cache_usage_perc` has been exported as a ratio whose HELP states that
+  `1` means 100 percent usage. For that contract, a percentage chart uses
+  `multiplier: 100`; dividing by 100 inverts the conversion. Re-verify HELP for
+  the supplied version before applying it.
+- `vllm:tool_call_parser_invocations_total` has been documented by exporter HELP
+  as incrementing once per choice for non-streaming requests but once per delta
+  for streaming requests. Those modes therefore have different observation
+  grains. Preserve `mode` in identity, dimensions, or separate charts instead
+  of summing it into one invocation rate. Preserve `request_type` when operators
+  need that bounded comparison; aggregating it removes routing-specific
+  diagnosis.
 
 Likewise, `vllm:request_inference_time_seconds` is the direct RUNNING-phase
 request distribution. Separate prefill and decode distributions do not

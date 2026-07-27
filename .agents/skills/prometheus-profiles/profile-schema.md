@@ -129,8 +129,21 @@ Priority behavior:
 - the planner materializes chart IDs in sorted ID order, not profile order.
 
 Therefore every chart needs an explicit positive priority. Keep source order
-aligned with intended presentation. Unique increasing values are usually the
-clearest total order, while intentional ties remain a design choice.
+aligned with intended presentation and never decrease priority as the profile
+proceeds. Unique increasing values are usually the clearest total order, while
+intentional ties remain a design choice because runtime placement then falls
+back to chart-ID ordering.
+
+Presentation invariants enforced by the validator:
+
+- Every chart needs at least one visible dimension. Hidden dimensions MAY
+  support a visible comparison but MUST NOT make the entire chart invisible.
+- A chart selecting a histogram `_bucket` MUST use
+  `units: observations/s`. It MUST use `algorithm: incremental` or omit the
+  algorithm so suffix inference selects incremental, and SHOULD declare
+  `type: heatmap` explicitly even though the compiler forces that runtime type.
+- Event, token, request, count, state, and time units MUST use `line`.
+  `area`/`stacked` require physical volume, space, bandwidth, or I/O semantics.
 
 ## Instances, dimensions, and labels
 

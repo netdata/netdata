@@ -231,6 +231,9 @@ packaging/tools/agent-events/go.sum
 
 **/.claude/settings.local.json
 .mcp.json
+
+# Go's default output for: cd src/go && go build ./tools/prometheus-profile-validation
+/src/go/prometheus-profile-validation
 .netdata-mcp-build.lock
 .users_cache.json
 .channels_cache_v2.json

@@ -833,12 +833,12 @@ func inspectAuthoredCharts(profile promprofiles.Profile, r *report) ([]authoredC
 				} else {
 					seenPriorities[chart.Priority] = chartPath
 				}
-				if previous != nil && chart.Priority <= previous.priority {
-					r.addWarning(
+				if previous != nil && chart.Priority < previous.priority {
+					r.addError(
 						"priority_source_order",
 						chartPath,
 						fmt.Sprintf("priority %d does not follow %d from %s", chart.Priority, previous.priority, previous.path),
-						"The profile should normally read in the same order the dashboard presents it. A deliberate divergence is valid, but it deserves review.",
+						"YAML family/chart order must mirror dashboard presentation order so the authored operator journey is reviewable. Reorder the source or correct the priorities; deliberate ties remain available when a total order is unnecessary.",
 					)
 				}
 			}
