@@ -167,7 +167,7 @@ To use Network Flows from your standalone host:
 
 Connecting the agent does **not** move or offload its persistent flow storage. Collection and the four-tier journal (raw + 1-minute + 5-minute + 1-hour rollups) remain on the Agent under the configured `journal_dir`. The default relative directory is `${NETDATA_CACHE_DIR}/flows`, typically `/var/cache/netdata/flows/` for native packages; see [Configuration](/docs/npm/network-flows/configuration.md#journal-directory). When you use the Cloud dashboard, the Function query results transit Cloud on their way to your browser; when you use the authenticated local dashboard, they travel directly from the Agent to your browser.
 
-Fully anonymous or offline access to the Network Flows function is not possible; Netdata Cloud authentication is required for either dashboard path.
+Anonymous dashboard access to the Network Flows function is not supported; Netdata Cloud authentication is required for either dashboard path.
 
 See [Netdata Access Control and Feature Availability](/docs/netdata-oss-limitations.md) for the full Anonymous / Community / Paid access model.
 
