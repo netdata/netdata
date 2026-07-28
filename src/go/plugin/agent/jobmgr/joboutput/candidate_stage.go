@@ -613,13 +613,14 @@ func (stage *PreparedJobCandidate) start() {
 			return
 		}
 	}
+	workerResult := make(chan stagedJobResult, 1)
 	attemptReady := make(chan jobmgr.ProcessAttempt, 1)
 	attempt, err := stage.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 		Identity: stage.identity,
 		Target:   stage.target,
 		Work: func(ctx context.Context) error {
 			owned := <-attemptReady
-			return stage.run(ctx, owned)
+			return stage.run(ctx, owned, workerResult)
 		},
 	})
 	if err != nil {
@@ -633,13 +634,30 @@ func (stage *PreparedJobCandidate) start() {
 	if cause := context.Cause(stage.ctx); cause != nil {
 		attempt.Cut(cause)
 	}
-	err = attempt.Await(context.Background())
-	stage.publish(stagedJobResult{err: err})
+	if err := attempt.Await(context.Background()); err != nil {
+		stage.publish(stagedJobResult{err: err})
+		return
+	}
+	stage.mu.Lock()
+	settled := stage.settled
+	stage.mu.Unlock()
+	if settled {
+		return
+	}
+	select {
+	case result := <-workerResult:
+		stage.publish(result)
+	default:
+		stage.publish(stagedJobResult{
+			err: errors.New("job output: candidate attempt settled without a result"),
+		})
+	}
 }
 
 func (stage *PreparedJobCandidate) run(
 	ctx context.Context,
 	attempt jobmgr.ProcessAttempt,
+	workerResult chan<- stagedJobResult,
 ) error {
 	stage.mu.Lock()
 	factory := stage.factory
@@ -650,8 +668,8 @@ func (stage *PreparedJobCandidate) run(
 	}
 	cloned, err := config.Clone()
 	if err != nil {
-		stage.publish(stagedJobResult{err: err})
-		return err
+		workerResult <- stagedJobResult{err: err}
+		return nil
 	}
 	candidate, err := factory.build(ctx, cloned)
 	factory = nil
@@ -659,24 +677,24 @@ func (stage *PreparedJobCandidate) run(
 	if err != nil {
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		err = errors.Join(err, cleanupErr)
-		stage.publish(stagedJobResult{err: err})
-		return err
+		workerResult <- stagedJobResult{err: err}
+		return nil
 	}
 	probeErr := probeConstructed(ctx, candidate, candidate.autoDetection)
 	if probeErr != nil {
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		if cleanupErr != nil {
 			err = errors.Join(probeErr, cleanupErr)
-			stage.publish(stagedJobResult{err: err})
-			return err
+			workerResult <- stagedJobResult{err: err}
+			return nil
 		}
 		var failure *autoDetectionFailure
 		if errors.As(probeErr, &failure) {
-			stage.publish(stagedJobResult{failure: failure})
+			workerResult <- stagedJobResult{failure: failure}
 			return nil
 		}
-		stage.publish(stagedJobResult{err: probeErr})
-		return probeErr
+		workerResult <- stagedJobResult{err: probeErr}
+		return nil
 	}
 	if err := attempt.Admit(); err != nil {
 		cleanupErr := cleanupConstructed(context.Background(), candidate)

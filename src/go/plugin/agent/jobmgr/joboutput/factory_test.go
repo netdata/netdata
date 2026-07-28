@@ -543,6 +543,50 @@ func TestFactoryCandidateStageSettlesWhileNonCooperativeProbeRemainsOwned(t *tes
 	require.EqualValues(t, 1, state.collectorCleanup)
 }
 
+func TestFactoryCandidateRejectsFailureReturnedAfterLogicalCut(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	state := &factoryTestState{}
+	creator := collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			return state.module(func(context.Context) error {
+				close(entered)
+				<-release
+				return errors.New("test: late probe failure")
+			}, false)
+		},
+	}
+	factory, _ := newFactoryTestHarness(t, creator, nil)
+	factory.config.Attempts = &delayedDispositionAuthority{}
+
+	stage, err := factory.newCandidate(factoryTestConfig(false), false)
+	require.NoError(t, err)
+	stage.Start()
+	<-entered
+	require.Eventually(t, func() bool {
+		stage.mu.Lock()
+		defer stage.mu.Unlock()
+		return stage.attempt != nil
+	}, time.Second, time.Millisecond)
+
+	stage.Cancel(jobmgr.ErrProcessAttemptSuperseded)
+	close(release)
+	<-stage.Ready()
+	prepared, failure, err := factory.PrepareCandidate(
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 1,
+		},
+		lifecycle.LongLivedPermit{},
+		stage,
+	)
+	require.False(t, prepared.Valid())
+	require.Nil(t, failure)
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptSuperseded)
+	stage.Release()
+	require.EqualValues(t, 1, state.collectorCleanup)
+}
+
 func TestFactoryCandidateIdentityRemainsExclusiveAcrossRunEpochs(t *testing.T) {
 	state := &factoryTestState{}
 	creator := collectorapi.Creator{

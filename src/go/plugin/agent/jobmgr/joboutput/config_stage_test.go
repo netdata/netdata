@@ -160,7 +160,7 @@ func TestConfigValidationSupersedesEarlierSameJobOperation(t *testing.T) {
 }
 
 func TestConfigOperationRejectsSuccessReturnedAfterLogicalCut(t *testing.T) {
-	attempts := &delayedConfigDispositionAuthority{}
+	attempts := &delayedDispositionAuthority{}
 	factory := &Factory{
 		config: FactoryConfig{
 			Epoch:    1,
@@ -203,9 +203,9 @@ type validationSupersedeAuthority struct {
 	started    atomic.Int32
 }
 
-type delayedConfigDispositionAuthority struct{}
+type delayedDispositionAuthority struct{}
 
-type delayedConfigDispositionAttempt struct {
+type delayedDispositionAttempt struct {
 	mu       sync.Mutex
 	cancel   context.CancelCauseFunc
 	cut      error
@@ -213,11 +213,11 @@ type delayedConfigDispositionAttempt struct {
 	released chan struct{}
 }
 
-func (*delayedConfigDispositionAuthority) StartProcessAttempt(
+func (*delayedDispositionAuthority) StartProcessAttempt(
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	ctx, cancel := context.WithCancelCause(context.Background())
-	attempt := &delayedConfigDispositionAttempt{
+	attempt := &delayedDispositionAttempt{
 		cancel:   cancel,
 		released: make(chan struct{}),
 	}
@@ -231,31 +231,31 @@ func (*delayedConfigDispositionAuthority) StartProcessAttempt(
 	return attempt, nil
 }
 
-func (*delayedConfigDispositionAuthority) SupersedeProcessAttempt(
+func (*delayedDispositionAuthority) SupersedeProcessAttempt(
 	context.Context,
 	jobmgr.ProcessAttemptIdentity,
 ) error {
 	return nil
 }
 
-func (*delayedConfigDispositionAuthority) CutProcessAttempt(
+func (*delayedDispositionAuthority) CutProcessAttempt(
 	jobmgr.ProcessAttemptIdentity,
 	error,
 ) bool {
 	return false
 }
 
-func (*delayedConfigDispositionAuthority) ProcessAttemptReleased(
+func (*delayedDispositionAuthority) ProcessAttemptReleased(
 	jobmgr.ProcessAttemptIdentity,
 ) (<-chan struct{}, bool) {
 	return nil, false
 }
 
-func (*delayedConfigDispositionAttempt) Admit() error {
+func (*delayedDispositionAttempt) Admit() error {
 	return nil
 }
 
-func (attempt *delayedConfigDispositionAttempt) Cut(cause error) bool {
+func (attempt *delayedDispositionAttempt) Cut(cause error) bool {
 	attempt.mu.Lock()
 	defer attempt.mu.Unlock()
 	if attempt.cut != nil {
@@ -266,7 +266,7 @@ func (attempt *delayedConfigDispositionAttempt) Cut(cause error) bool {
 	return true
 }
 
-func (attempt *delayedConfigDispositionAttempt) Await(ctx context.Context) error {
+func (attempt *delayedDispositionAttempt) Await(ctx context.Context) error {
 	select {
 	case <-attempt.released:
 	case <-ctx.Done():
@@ -281,7 +281,7 @@ func (attempt *delayedConfigDispositionAttempt) Await(ctx context.Context) error
 	return attempt.workErr
 }
 
-func (attempt *delayedConfigDispositionAttempt) Released() <-chan struct{} {
+func (attempt *delayedDispositionAttempt) Released() <-chan struct{} {
 	return attempt.released
 }
 
