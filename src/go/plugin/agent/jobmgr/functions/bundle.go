@@ -487,9 +487,6 @@ func (bundle *functionBundle) refreshAvailability() (bool, error) {
 	if bundle == nil {
 		return false, errors.New("jobmgr Function bundle: nil availability refresh")
 	}
-	if !bundle.pollable {
-		return false, nil
-	}
 	next := make(map[string]bool, len(bundle.methods))
 	for _, method := range bundle.methods {
 		available := true

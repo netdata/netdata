@@ -326,6 +326,44 @@ func BenchmarkClaimAuthorityAcquireCancel(b *testing.B) {
 	}
 }
 
+func BenchmarkClaimAuthorityYieldSettlement(b *testing.B) {
+	for _, waiters := range []int{0, 16, 256} {
+		b.Run(fmt.Sprintf("waiters-%d", waiters), func(b *testing.B) {
+			b.ReportAllocs()
+			b.ReportMetric(float64(waiters), "waiters/op")
+			for b.Loop() {
+				authority := newClaimAuthority()
+				probe := claimTestOperation(b, authority, 1, "probe", []string{"graph"})
+				probe.request.LaneKey = "job-a"
+				if granted, err := authority.acquire(probe); err != nil || !granted {
+					require.FailNowf(b, "benchmark failed", "probe acquire: granted=%v err=%v", granted, err)
+				}
+				for index := range waiters {
+					parent := claimTestOperation(
+						b,
+						authority,
+						lifecycle.OperationID(index+2),
+						fmt.Sprintf("parent-%d", index),
+						[]string{fmt.Sprintf("dependency-%d", index), "graph"},
+					)
+					parent.plan = WorkPlan{
+						Transaction: &ResourceTransactionPlan{
+							ID:               parent.UID,
+							PrepareComposite: unusedCompositeClaimYieldPrepare,
+						},
+					}
+					if granted, err := authority.acquire(parent); err != nil || granted {
+						require.FailNowf(b, "benchmark failed", "parent acquire: granted=%v err=%v", granted, err)
+					}
+				}
+				if _, err := authority.yield(probe, "graph", probe.request.LaneKey); err != nil {
+					require.FailNow(b, "benchmark failed", err)
+				}
+			}
+		})
+	}
+}
+
 func claimTestOperation(
 	tb testing.TB,
 	authority *claimAuthority,

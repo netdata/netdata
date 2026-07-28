@@ -119,6 +119,8 @@ A useful mental split for the rest of this document:
   do the collector-specific work, behind narrow ports.
 - **`lifecycle`** provides the neutral machinery the kernel delegates to
   (UID ownership, tasks, framing, and run control).
+- **`containment`** owns collector-derived work that may outlive a run because
+  it does not cooperate with cancellation.
 - **`composition`** wires them all together.
 
 ## The Concurrency Model
@@ -188,9 +190,10 @@ flowchart TD
    only the matching admission-fence claim is suspended; the parent's other
    claims remain held. `claim_authority.go`, `claim_yield.go`,
    `claim_yield_kernel.go`.
-5. **Run task** (off-loop): the actual blocking work — construct a collector,
-   run autodetection, call a Function handler, stop a job — runs on a
-   `TaskSupervisor` goroutine, never on the loop. `lifecycle/task.go`.
+5. **Run task** (off-loop): cooperative run-owned work executes through
+   `TaskSupervisor`; collector-derived work that may ignore cancellation
+   executes through the process containment authority. Neither executes on the
+   kernel loop. `lifecycle/task.go`, `containment/authority.go`.
 6. **Apply completion** (on-loop): the task radios its result back; the loop
    seals it and advances the lifecycle.
 7. **Frame**: the terminal response is committed to stdout through `FrameOwner`.
@@ -202,22 +205,50 @@ flowchart TD
   transition, and counter. The loop is the sole mutator. A test
   (`architecture_test.go`) even pins that on-loop actions are dispatched through
   the sanctioned kernel ownership funnel.
-- **Off-loop:** the actual collector / Function / stop / cleanup work, run by
-  `TaskSupervisor`. The loop and tasks talk only over channels.
+- **Run-owned off-loop:** cooperative tasks and permits belong to one run
+  generation and must drain before that run can quiesce.
+- **Process-owned off-loop:** contained attempts own their physical worker,
+  per-identity exclusion, and final cleanup across run rotation.
 
-### Two fairness rules worth knowing
+### Process containment authority
+
+Go cannot forcibly stop a goroutine. Job Manager therefore separates **logical
+settlement** from **physical release** for code that may ignore cancellation:
+
+- The process authority reserves a namespace plus an opaque memory-only
+  identity before starting work. At most one physical attempt exists for that
+  identity; unrelated identities remain independently admissible.
+- Caller cancellation is propagated first. Supersession waits up to two seconds
+  for cooperative exit; the attempt's default logical fuse is two minutes.
+- Crossing either boundary settles the caller and fences late results. The
+  authority retains the worker and everything it owns until its complete
+  cleanup returns or the plugin process exits.
+- Persistent file/discovery state keeps only its latest desired replacement and
+  retries after identity release. A synchronous DynCfg request instead returns a
+  retryable busy/contained response and is not applied later.
+- There is intentionally no process-wide slot limit: one permanently stuck
+  identity does not block another job. Distinct permanently stuck identities
+  can therefore accumulate retained workers; diagnostics report that state.
+
+The namespaces cover collector candidate preparation, installed collector
+runtimes, DynCfg tests, SecretStore preparation/tests, stable Function bundles,
+Function availability polls and invocations, and service-discovery
+materialization. `process_attempt.go`, `containment/authority.go`.
+
+### Fairness and timeout rules
 
 - **`TaskSupervisor` runs two independent classes** — framework-control work
   (lifecycle/DynCfg commands) and generic Function work — in strict round-robin.
   One class can never starve the other, and there is **no fixed "N active
   Functions" cap**. `lifecycle/task.go`.
-- **A timed-out task keeps its ownership.** If blocking work overruns its
-  deadline, the kernel only *cooperatively* cancels it; its claims, lane, and
-  resource authority stay held until it actually returns, because a late return
-  could still mutate that resource. Repeated overruns escalate to a fail-stop.
-  `kernel_disposal.go` and `kernel_runloop.go`.
+- **An ordinary timed-out run task keeps run ownership.** The kernel only
+  cooperatively cancels it; its claims, lane, and resource authority stay held
+  until it returns, and repeated overruns can escalate to fail-stop.
+- **A contained attempt keeps process ownership instead.** Its caller, claims,
+  and run may settle after the containment cut because late output and mutation
+  are fenced by the process-owned attempt boundary.
 
-Two more facts that catch newcomers:
+Additional facts that catch newcomers:
 
 - Lanes give per-resource *ordering*; **claims** give cross-resource *mutual
   exclusion*. Two independent lanes still serialize if they declare the same
@@ -257,6 +288,23 @@ Strict constructor/controller checks remain as defensive invariant enforcement:
 programmatic state that bypasses a production producer is still rejected rather
 than silently normalized or recovered after admission.
 
+### Service-discovery materialization
+
+Service-discovery configuration is materialized before a pipeline manager can
+start it. One contained attempt owns payload/descriptor parsing, user-config
+rendering, `ParseJSONConfig`, discoverer construction, and `pipeline.New`; the
+manager accepts only an already-prepared pipeline through
+`StartPrepared`/`RestartPrepared`.
+
+Different configuration identities materialize concurrently under one
+aggregate two-minute batch barrier. Results are applied serially after
+deterministic source-winner selection. File-backed stock/user state keeps one
+latest pending retry after a busy/contained result; synchronous DynCfg commands
+do not. The complete service-discovery DynCfg Function is also contained, so a
+non-cooperative command cannot pin the Function catalog or Job Manager run.
+`agent/discovery/sd/materialization.go`, `agent/discovery/sd/pending.go`,
+`composition/service_discovery.go`.
+
 ## How the Job Manager Manages Jobs
 
 A **job** is one running collector instance: a module plus a resolved config.
@@ -276,65 +324,78 @@ create-only at the daemon boundary. Removal targets only the current DynCfg
 override and does not immediately reactivate a masked lower-priority source.
 
 The central guarantee is that **reconfiguring a job never disrupts the running
-one until the replacement is proven ready**. Think of a stage crew swapping
-actors mid-play: the understudy is fully costumed and rehearsed offstage while
-the current actor keeps performing; only on cue does the current actor exit,
-and only then does the understudy audition live.
+one until the replacement is proven ready**. Candidate work is process-owned
+and run-detached; only a timely successful candidate can attach to the current
+run and compete for installed-runtime ownership.
 
 ```mermaid
 flowchart TD
     Cmd("add / update / discovered / retry")
-    Validate("Validate config<br/>throwaway probe")
-    Prepare("Prepare candidate<br/>construct + resolve secrets<br/>(current job still running)")
-    AutoD{"Managed autodetection<br/>yield global jobs claim"}
-    Apply("Apply")
-    StopOld("Stop + Finalize<br/>prior generation")
-    Live("Start + Publish<br/>new generation live")
-    Fail("Commit StatusFailed<br/>schedule retry")
+    Stage("Process-owned candidate<br/>clone · secrets · construct · Init")
+    AutoD{"Check + post-check<br/>yield global jobs claim"}
+    Reserve("Reserve inactive<br/>run permit")
+    Retire("Fence + detach<br/>prior generation")
+    Promote{"Acquire installed-runtime<br/>identity"}
+    Attach("Attach live projections<br/>activate permit + output")
+    Live("Start + publish Running")
+    Fail("Commit Failed / busy<br/>latest pending when persistent")
 
-    Cmd --> Validate --> Prepare --> AutoD
-    AutoD -->|"ok"| Apply --> StopOld --> Live
-    AutoD -->|"failed"| Fail
-    Fail -. "logical clock due" .-> Prepare
+    Cmd --> Stage --> AutoD
+    AutoD -->|"ready"| Reserve --> Retire --> Promote
+    Promote -->|"acquired"| Attach --> Live
+    AutoD -->|"failed / contained"| Fail
+    Promote -->|"old runtime retained"| Fail
+    Fail -. "identity release / retry due" .-> Stage
 
     classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
     classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
     classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
     class Cmd ext;
-    class Validate,Apply,StopOld,AutoD core;
-    class Prepare,Live,Fail job;
+    class AutoD,Reserve,Retire,Promote,Attach core;
+    class Stage,Live,Fail job;
 ```
 
-1. **Validate** — the config is checked with a short-lived throwaway module
-   probe, so a bad config is rejected without touching the live job.
-   `joboutput/config_factory.go`.
-2. **Prepare (non-disruptive)** — the `Factory` looks up the module creator,
-   resolves the config's secrets, builds a V1 or V2 collector, and hands back a
-   *candidate* holding a long-lived resource permit. The current job keeps
-   running.
-   `joboutput/factory.go`, `joboutput/generation.go`.
-3. **Managed autodetection (non-disruptive)** — the candidate runs its
-   `Check`/autodetect with the caller's task context before acceptance and while
-   the old generation is still live. Job Manager propagates caller cancellation
-   but does not invent a module-agnostic deadline. The transaction temporarily
-   yields the global `dyncfg:jobs` claim but retains its resource lane, so
-   unrelated job-graph work may proceed without allowing a duplicate probe for
-   the same job. On a clean failure the graph is committed truthfully as
-   `StatusFailed` (never a fake success) and a retry is scheduled. Failed
-   candidates are rejected and cleaned before the yielded claim is reacquired,
-   so collector cleanup cannot retain the global claim.
-4. **Apply** — after a successful probe, the kernel stops and finalizes the
-   prior generation, accepts the candidate, starts it, and publishes its
-   Functions. `joboutput/transaction.go`.
-5. **Emitting** — the collector writes protocol frames through a `FrameWriter`,
-   which commits whole frames through the one `FrameOwner`.
+1. **Stage config** — validation, DynCfg `test`, and configuration rendering
+   run as contained operations. A same-job validation supersedes the prior
+   candidate; an identical DynCfg test has its own raw-config-derived,
+   memory-only identity and returns busy rather than multiplying workers.
+   `joboutput/config_stage.go`.
+2. **Prepare candidate (non-disruptive)** — process authority reserves the
+   canonical job identity before cloning and secret resolution, then owns
+   collector construction, configuration application, `Init`, `Check`,
+   post-check validation, Function staging, and rejection cleanup. The
+   candidate has inactive output and private V2 runtime/vnode staging, but no
+   run permit or live run service. The incumbent keeps running.
+   `joboutput/candidate_stage.go`, `joboutput/runtime_staging.go`.
+3. **Settle autodetection** — caller cancellation is propagated and the
+   transaction temporarily yields the global `dyncfg:jobs` claim. The
+   process-owned fuse bounds logical waiting even if the collector does not
+   return. Late success cannot be admitted after a cut. A normal detection
+   failure commits `StatusFailed`; a busy/contained persistent source retains
+   only its latest desired retry, while synchronous DynCfg returns a retryable
+   error.
+4. **Reserve and retire** — only a timely successful candidate is wrapped in an
+   inactive run permit. Replacement then fences the incumbent's output and
+   detaches its run projections immediately; its physical managed loop, `Stop`,
+   Function drain, and collector cleanup remain process-owned until they return.
+5. **Promote, attach, and start** — the candidate acquires the separate
+   installed-runtime identity only after logical retirement. Candidate
+   `Init`/`Check` may overlap the incumbent, but two installed runtimes for one
+   job cannot. After promotion, the staged runtime/vnode/Function projections
+   attach, the permit and output gate activate, and the managed loop starts. If
+   the old runtime does not release within the supersession grace, the candidate
+   is rejected and the source-specific busy/pending policy applies.
+6. **Emit** — installation activates the generation output gate. Retirement
+   fences it before detaching projections, so a retained old runtime cannot
+   interleave late frames with its successor. Whole active frames still commit
+   through the process's one `FrameOwner`.
 
 ### Job generations and fencing
 
-Every job carries a monotonic **generation** number. A prepared candidate is
-consumed only if its generation matches the accepting transaction, and output
-flows only from the generation that has been accepted and started. This is how a
-slow stop of an old job can never interleave its frames with a new one.
+Every job carries a monotonic **generation** number. A staged result is consumed
+only by the matching transaction and run epoch. The process-owned attempt target
+rejects late work from a retired run, while the per-generation output gate
+allows frames only after installation and fences them at logical retirement.
 
 ### V1 vs V2
 
@@ -358,7 +419,27 @@ Instead, one per-run map + heap + dispatcher owns all pending retries
   restart through the ordinary command port — fire-and-forget — and keeps
   authority over that config/retry token until the resulting transaction
   settles.
-- Success, replacement, disable, removal, or shutdown invalidates the token.
+- A busy identity coalesces into one pending retry. Success, replacement,
+  disable, removal, or shutdown invalidates or replaces the token.
+
+### Stable Function bundles
+
+Collector callbacks are not called while rebuilding the shared Function
+catalog. Instead, each job (and each agent-level module) stages one stable
+process-owned handler bundle outside controller locks:
+
+- immutable catalog generations acquire cheap references to an existing bundle;
+- replacing one job never reconstructs handlers for its siblings;
+- retirement closes route admission first, then cleanup waits for every catalog
+  and in-flight invocation reference to drain;
+- availability polling and handler invocation run as contained attempts outside
+  the controller and process-control loops;
+- a call that crosses its caller deadline has late output fenced and quarantines
+  only its bundle until all retained calls return; unrelated bundles remain
+  available.
+
+`functions/bundle.go`, `functions/module_stage.go`,
+`functions/controller.go`.
 
 ## Secrets
 
@@ -412,18 +493,19 @@ generations** per `kind:name`. Each run receives a fresh Store epoch, but the
 process owns that epoch's preparations, generations, and reader scopes:
 
 1. A new generation is prepared *outside* publication, then committed by
-   compare-and-swap against the expected generation.
+   compare-and-swap against the expected generation. Provider construction,
+   configuration, and `Init` run as a process-owned contained attempt; distinct
+   startup identities prepare concurrently under one aggregate startup barrier.
 2. If any running jobs depend on that store key, they are restarted as **one
    composite command** — stop dependents → commit the new generation → start
    dependents. The parent retains `dyncfg:dependency-graph` throughout. Each
    start child temporarily yields only the `dyncfg:jobs` acquisition suffix
    while its probe runs, so unrelated job-graph work may proceed while
-   dependency mutations remain fenced. Restart recovery has both a bounded
-   aggregate cancellation budget and a fair-share per-child cancellation
-   budget; those budgets bound cooperative collector work, but cannot forcibly
-   stop collector lifecycle code that ignores context. A timed-out child is
-   operational failure only after it reaches a known terminal ownership state;
-   unresolved admitted ownership makes the run dirty.
+   dependency mutations remain fenced. A busy or contained replacement after
+   the store commit leaves the stopped job truthfully `Failed` and retains one
+   latest pending restart. That retry revalidates the store dependency, source
+   winner, desired config, resource absence, and run generation after physical
+   identity release.
    `secrets/restart.go`, `secrets/transaction.go`.
 3. The superseded generation is retired only after its last reader scope drains,
    so an in-flight resolution never sees credentials vanish mid-read.
@@ -465,14 +547,14 @@ Job Manager separates two lifetimes:
 
 - **The process is the building.** Built once by `composition.NewProcess`, it
   survives every reload: the stdin reader, the one `FrameOwner`, the UID ledger,
-  the frozen module registry, the secret resolver, the process-owned Store
-  epoch authority, the vnode registry, and the runtime metrics service.
+  the frozen module registry, the secret resolver, the process-attempt and Store
+  epoch authorities, the vnode registry, and the runtime metrics service.
 - **The run generation is the current tenant.** A complete, self-contained
   occupant built by `composition/run.go`: the kernel and its loop, the task
   supervisor, the run supervisor, the DynCfg graph, the run-owned SecretStore
-  controller/dependency projections, the Function catalog and publications,
-  the job factory, the autodetection scheduler, and the `jobmgr.runtime`
-  metrics.
+  controller/dependency projections, Function catalog projections and
+  publications, the job factory, the autodetection scheduler, and the
+  `jobmgr.runtime` metrics.
 
 A **SIGHUP reload evicts the whole tenant and moves a fresh one in without
 touching the building.**
@@ -481,42 +563,45 @@ touching the building.**
 flowchart TD
     HUP("SIGHUP → Restart")
     Seal("Seal Store epoch + ingress")
-    Cut("Publish stopping cut<br/>begin shutdown budget (10s)")
-    Drain("Drain admitted work<br/>protected chains finish")
-    Census("Require exact-zero census<br/>run finalizer")
+    Cut("Cut run-target attempts<br/>publish stopping cut")
+    Drain("Drain run-owned work<br/>within shutdown budget")
+    Census("Require exact-zero run census<br/>detach projections")
     Next("Construct + adopt<br/>next generation")
+    Retained("Process authority retains<br/>non-cooperative physical work")
 
     HUP --> Seal --> Cut --> Drain --> Census --> Next
+    Cut -. "physical release later" .-> Retained
 
     classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
     classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
     class HUP ext;
-    class Seal,Cut,Drain,Census,Next core;
+    class Seal,Cut,Drain,Census,Next,Retained core;
 ```
 
 The rotation is an acknowledged sequence (`composition/process.go` `rotate`):
 
-1. Seal stdin ingress so no new external command enters.
-2. Publish the generation-bound **stopping cut**, close external command
-   ingress, and start the single shutdown budget (default 10s).
-3. Drain every ownership action admitted before the cut; work whose
-   ownership-changing phase already started (accept/apply/stop chains) is
-   allowed to finish to a provable disposition.
-4. Withdraw Function publications, close the catalog, cancel and join inherited
-   work, stop long-lived resources, and run the finalizer — all executed inside
-   the kernel loop.
-5. Require a fully **drained authority census** (no active tasks, claims,
-   permits, or retained frame bytes). A dirty-run-only abandonment may drain an
-   otherwise unjoinable child, but it is recorded by ownership category,
-   diagnosed, and can never satisfy clean quiescence. Any live leftover or
-   abandonment marks the terminal state **dirty** rather than silently claiming
-   a clean handoff.
-6. Construct, start, and adopt the next generation.
+1. Seal the old Store epoch and stdin ingress so no new old-run mutation enters.
+2. Cut every process attempt targeting the run, fence generation output, publish
+   the run's stopping cut, and start the single shutdown budget.
+3. Drain run-owned tasks, claims, permits, retries, Function publications, and
+   projections. A process-owned worker that ignores cancellation remains in the
+   process census, not the retired run census.
+4. Require a fully drained **run authority census** and finish the run
+   finalizer. Live run-owned leftovers still make the terminal state dirty;
+   process-owned retained work does not fabricate run ownership.
+5. Construct, start, and adopt the next generation. Restart acknowledges only
+   after the successor run is running. If an old installed collector runtime is
+   still retained, its job remains unavailable/pending in the new run until the
+   physical identity releases.
+
+The process command receiver exists during initial startup and rotation.
+`Terminate` can cancel an active transition instead of waiting behind its
+startup barrier.
 
 **Termination** (SIGINT/SIGTERM) follows the same retirement path with no
-successor. Collector work still blocked at process exit is considered safe
-because process termination removes it; Job Manager does not add a second
-unbounded shutdown mechanism around that.
+successor, then begins process-authority shutdown. It reports retained physical
+work after the bounded shutdown budget rather than waiting forever; only actual
+process exit can reclaim a permanently blocked goroutine.
 
 ## Runtime Metrics
 
@@ -538,8 +623,9 @@ crosses a reload.
 | --- | --- |
 | `jobmgr` (root) | Command ports, the `CommandKernel` run loop, lanes, claims, composite child commands |
 | `jobmgr/lifecycle` | Neutral authorities: UID, operation, task, frame, run, resource, transaction |
-| `jobmgr/functions` | Function stdin ingress, routing catalog, handler generations, publication to Netdata |
-| `jobmgr/joboutput` | Collector construction, job generations, output frames, DynCfg jobs, autodetection retries, vnode snapshots |
+| `jobmgr/containment` | Process-lifetime attempts, per-identity exclusion, logical cuts, retained-work census |
+| `jobmgr/functions` | Function ingress, stable handler bundles, routing catalog, invocation containment, publication |
+| `jobmgr/joboutput` | Collector staging, installed runtimes, output fencing, DynCfg jobs, retries, vnodes |
 | `jobmgr/secrets` | Secret dependency index, store command adapter, dependent-restart transaction |
 | `jobmgr/discovery` | Discovery add/remove decisions and the configured-vnode authority |
 | `jobmgr/composition` | The only assembler; process construction and run-generation rotation |
@@ -586,6 +672,9 @@ black-box tests rather than an exact private-type or source-file manifest.
   - `discovery/` (decision, vnode) and `composition/{discovery,vnodes}.go`.
 - Change the ordering model (lanes, claims, command acceptance, deadlines):
   - `kernel*.go`, `claim_authority.go`, and `lifecycle/`.
+- Change process-lifetime containment, same-identity exclusion, or retained-work
+  accounting:
+  - `containment/authority.go` and `process_attempt.go`.
 - Change how the process is assembled, reloaded, or shut down:
   - `composition/` (process, run, public).
 - Change a package dependency or production construction boundary:
