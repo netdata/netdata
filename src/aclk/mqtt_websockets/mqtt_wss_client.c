@@ -613,39 +613,53 @@ int mqtt_wss_connect(
 static const char *mqtt_wss_error_tos(int ec)
 {
     switch(ec) {
+        // mqtt_wss_service_all()'s own codes
         case MWS_TIMED_OUT:
-            return "Error: Operation was not able to finish in time";
+            return "the flush budget expired with data still queued";
         case MWS_ERROR:
-            return "Unspecified Error";
+            return "unspecified error";
+
+        // propagated from mqtt_wss_service(), so a teardown failure names its real cause
+        case MQTT_WSS_ERR_CONN_DROP:
+            return "connection dropped";
+        case MQTT_WSS_ERR_PROTO_MQTT:
+            return "MQTT protocol error";
+        case MQTT_WSS_ERR_PROTO_WS:
+            return "WebSocket protocol error";
+        case MQTT_WSS_ERR_MSG_TOO_BIG:
+            return "message too big";
+        case MQTT_WSS_ERR_CANT_DO:
+            return "unsupported operation";
+        case MQTT_WSS_ERR_POLL_FAILED:
+            return "poll() failed";
+        case MQTT_WSS_ERR_REMOTE_CLOSED:
+            return "closed by remote end";
+        case MQTT_WSS_ERR_NO_IO_PROGRESS:
+            return "no I/O progress on a ready socket";
+
         default:
-            return "Unknown Error Code!";
+            return "unknown error code";
     }
-
 }
 
-// Exclusive boundary - this asks "has more than the window elapsed", unlike the budget helpers
-// which ask "is the budget spent".
-static bool mqtt_wss_io_watchdog_expired_at(usec_t last_io_progress_ut, usec_t now_ut) {
-    return clocks_usec_delta_or_zero(now_ut, last_io_progress_ut) >
-           (usec_t)MQTT_WSS_IO_WATCHDOG_SECS * USEC_PER_SEC;
-}
+#define MQTT_WSS_IO_WATCHDOG_UT ((usec_t)MQTT_WSS_IO_WATCHDOG_SECS * USEC_PER_SEC)
 
 typedef enum {
     MQTT_WSS_DROP_NONE = 0,
     MQTT_WSS_DROP_POLL_ERROR,
     MQTT_WSS_DROP_NO_IO_PROGRESS,
-} mqtt_wss_drop_reason_t;
+} MQTT_WSS_DROP_REASON;
 
 // POLLERR/POLLNVAL are unrecoverable -> drop now. POLLHUP is intentionally NOT a drop: it can
 // accompany still-readable data (a graceful close carrying a final frame), so the caller lets
 // it fall through to SSL_read(), which drains the remaining bytes and then reports the close
 // cleanly (SSL_ERROR_ZERO_RETURN). A dead socket that keeps signalling readiness without
 // progress is caught by the watchdog instead.
-static mqtt_wss_drop_reason_t mqtt_wss_drop_reason(short revents, usec_t last_io_progress_ut, usec_t now_ut) {
+static MQTT_WSS_DROP_REASON mqtt_wss_drop_reason(short revents, usec_t last_io_progress_ut, usec_t now_ut) {
     if (unlikely(revents & (POLLERR | POLLNVAL)))
         return MQTT_WSS_DROP_POLL_ERROR;
 
-    if (unlikely(mqtt_wss_io_watchdog_expired_at(last_io_progress_ut, now_ut)))
+    if (unlikely(aclk_usec_budget_spent(last_io_progress_ut, MQTT_WSS_IO_WATCHDOG_UT, now_ut)))
         return MQTT_WSS_DROP_NO_IO_PROGRESS;
 
     return MQTT_WSS_DROP_NONE;
@@ -655,7 +669,7 @@ static mqtt_wss_drop_reason_t mqtt_wss_drop_reason(short revents, usec_t last_io
 // what makes a watchdog drop distinguishable from a socket error in status and logs. A poll error
 // keeps reporting as MQTT_WSS_ERR_CONN_DROP (and therefore ACLK_STATUS_OFFLINE_SOCKET_ERROR);
 // MQTT_WSS_ERR_POLL_FAILED is reserved for the poll() syscall itself failing.
-static int mqtt_wss_err_from_drop_reason(mqtt_wss_drop_reason_t reason) {
+static int mqtt_wss_err_from_drop_reason(MQTT_WSS_DROP_REASON reason) {
     switch (reason) {
         case MQTT_WSS_DROP_POLL_ERROR:
             return MQTT_WSS_ERR_CONN_DROP;
@@ -683,8 +697,12 @@ static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
         // Cap each attempt so a congested socket gets many tries within the phase instead of
         // spending the whole budget inside one poll(). mqtt_wss_service() arms POLLOUT itself
         // from the write buffer, so nothing needs re-arming here.
-        if (mqtt_wss_service(client, MIN(remaining_ms, 100)))
-            return MWS_ERROR;
+        // Return the underlying cause rather than flattening to MWS_ERROR: every teardown
+        // failure used to log as "Unspecified Error". The two code spaces do not overlap -
+        // MQTT_WSS_ERR_* are negative, MWS_* are 0/1/2 - so the caller can stringify either.
+        const int rc = mqtt_wss_service(client, MIN(remaining_ms, 100));
+        if (rc)
+            return rc;
     }
     return MWS_OK;
 }
@@ -697,10 +715,8 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
     // send whatever was left at the time of calling this function
     int ret = mqtt_wss_service_all(client, timeout_ms / 4);
     if(ret)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-                  "Error while trying to send all remaining data in an attempt "
-                  "to gracefully disconnect! EC=%d Desc:\"%s\"",
-                  ret,
+        nd_log(NDLS_DAEMON, ret == MWS_TIMED_OUT ? NDLP_WARNING : NDLP_ERR,
+                  "Could not send all remaining data while gracefully disconnecting: %s",
                   mqtt_wss_error_tos(ret));
 
     // schedule and send MQTT disconnect
@@ -709,10 +725,8 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
 
     ret = mqtt_wss_service_all(client, timeout_ms / 4);
     if(ret)
-        nd_log(NDLS_DAEMON, NDLP_ERR,
-                  "Error while trying to send MQTT disconnect message in an attempt "
-                  "to gracefully disconnect! EC=%d Desc:\"%s\"",
-                  ret,
+        nd_log(NDLS_DAEMON, ret == MWS_TIMED_OUT ? NDLP_WARNING : NDLP_ERR,
+                  "Could not send the MQTT disconnect message while gracefully disconnecting: %s",
                   mqtt_wss_error_tos(ret));
 
     // send WebSockets close message
@@ -723,9 +737,7 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
         // Some MQTT/WSS servers will close socket on receipt of MQTT disconnect and
         // do not wait for WebSocket to be closed properly
         nd_log(NDLS_DAEMON, NDLP_WARNING,
-                 "Error while trying to send WebSocket disconnect message in an attempt "
-                 "to gracefully disconnect! EC=%d Desc:\"%s\".",
-                 ret,
+                 "Could not send the WebSocket close message while gracefully disconnecting: %s",
                  mqtt_wss_error_tos(ret));
     }
 
@@ -836,14 +848,15 @@ int mqtt_wss_client_timeout_unittest(void) {
                   "watchdog window is no longer derived from PING_TIMEOUT");
     MQTT_WSS_TEST(watchdog_ut > 0, "watchdog window is degenerate");
 
-    // the boundary is exclusive: expiry requires strictly more than the whole window
-    MQTT_WSS_TEST(!mqtt_wss_io_watchdog_expired_at(progress_ut, progress_ut + watchdog_ut),
-                  "expired exactly at the watchdog window boundary");
-    MQTT_WSS_TEST(mqtt_wss_io_watchdog_expired_at(progress_ut, progress_ut + watchdog_ut + 1),
-                  "did not expire past the watchdog window");
+    // the boundary is inclusive, the same convention as every other ACLK budget: the window is
+    // spent once exactly that much has elapsed
+    MQTT_WSS_TEST(!aclk_usec_budget_spent(progress_ut, watchdog_ut, progress_ut + watchdog_ut - 1),
+                  "expired 1us short of the watchdog window");
+    MQTT_WSS_TEST(aclk_usec_budget_spent(progress_ut, watchdog_ut, progress_ut + watchdog_ut),
+                  "did not expire exactly at the watchdog window boundary");
 
     // a backward monotonic reading must never be treated as elapsed time
-    MQTT_WSS_TEST(!mqtt_wss_io_watchdog_expired_at(progress_ut, progress_ut - 1),
+    MQTT_WSS_TEST(!aclk_usec_budget_spent(progress_ut, watchdog_ut, progress_ut - 1),
                   "backward clock reading expired the watchdog");
 
     // Drop decision: dispatch and precedence.
@@ -933,7 +946,6 @@ int mqtt_wss_client_timeout_unittest(void) {
     else
         fprintf(stderr, "mqtt wss timeout unittest: OK\n");
 
-#undef MQTT_WSS_TEST
 
     return errors;
 }
@@ -1056,7 +1068,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     // plaintext, and that is genuine progress the watchdog must not mistake for a spin.
     mqtt_wss_note_wire_progress(client);
 
-    const mqtt_wss_drop_reason_t drop =
+    const MQTT_WSS_DROP_REASON drop =
         mqtt_wss_drop_reason(client->poll_fds[POLLFD_SOCKET].revents,
                              client->last_io_progress_ut, now_monotonic_usec());
 
