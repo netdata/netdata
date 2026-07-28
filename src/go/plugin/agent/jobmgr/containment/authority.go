@@ -199,6 +199,19 @@ func callWork(
 	return work(ctx, admission)
 }
 
+func callContainmentFence(fence func()) (err error) {
+	if fence == nil {
+		return nil
+	}
+	defer func() {
+		if recover() != nil {
+			err = jobmgr.ErrProcessAttemptFencePanic
+		}
+	}()
+	fence()
+	return nil
+}
+
 // Admit atomically stops the preparation fuse. The identity remains occupied
 // until the complete physical worker and cleanup lifetime returns.
 func (attempt *attempt) Admit() error {
@@ -256,8 +269,9 @@ func (authority *Authority) cut(attempt *attempt, cause error, probingOnly bool)
 	authority.census.Contained++
 	attempt.timer.Stop()
 	attempt.cancel(cause)
-	if attempt.fence != nil {
-		attempt.fence()
+	fenceErr := callContainmentFence(attempt.fence)
+	if fenceErr != nil {
+		attempt.result = errors.Join(cause, fenceErr)
 	}
 	close(attempt.settled)
 	census := authority.census
@@ -266,6 +280,10 @@ func (authority *Authority) cut(attempt *attempt, cause error, probingOnly bool)
 	target := attempt.target
 	authority.mu.Unlock()
 
+	diagnosticErr := safeCutError(cause)
+	if fenceErr != nil {
+		diagnosticErr = errors.Join(diagnosticErr, fenceErr)
+	}
 	jobmgr.ObserveDiagnostic(authority.diagnostics, jobmgr.DiagnosticEvent{
 		Level:      jobmgr.DiagnosticError,
 		Name:       "job manager attempt contained",
@@ -274,7 +292,7 @@ func (authority *Authority) cut(attempt *attempt, cause error, probingOnly bool)
 		Generation: target,
 		Count:      census.Active,
 		Age:        age,
-		Err:        safeCutError(cause),
+		Err:        diagnosticErr,
 	})
 	return true
 }

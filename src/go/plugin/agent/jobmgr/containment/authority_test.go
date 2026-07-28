@@ -238,6 +238,48 @@ func TestAuthorityContainsPanicsWithoutPublishingPanicValues(t *testing.T) {
 	require.NotContains(t, diagnostics.String(), "provider-sensitive-panic")
 }
 
+func TestAuthorityContainsContainmentFencePanics(t *testing.T) {
+	diagnostics := &recordingAttemptDiagnostics{}
+	authority, err := newAuthority(diagnostics, policy{
+		fuse:              time.Second,
+		supersessionGrace: 10 * time.Millisecond,
+	})
+	require.NoError(t, err)
+
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseWork := func() {
+		releaseOnce.Do(func() { close(release) })
+	}
+	defer releaseWork()
+	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
+		Identity: testIdentity(jobmgr.ProcessAttemptFunctionPoll, "module/job", "module/job"),
+		OnContainment: func() {
+			panic("provider-sensitive-fence-panic")
+		},
+		Work: func(context.Context, jobmgr.ProcessAttemptAdmission) error {
+			<-release
+			return nil
+		},
+	})
+	require.NoError(t, err)
+
+	var cut bool
+	require.NotPanics(t, func() {
+		cut = attempt.Cut(jobmgr.ErrProcessAttemptSuperseded)
+	})
+	require.True(t, cut)
+	require.Equal(t, Census{Active: 1, Contained: 1}, authority.Census())
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptSuperseded)
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptFencePanic)
+
+	releaseWork()
+	<-attempt.Released()
+	require.Equal(t, Census{}, authority.Census())
+	require.Contains(t, diagnostics.String(), jobmgr.ErrProcessAttemptFencePanic.Error())
+	require.NotContains(t, diagnostics.String(), "provider-sensitive-fence-panic")
+}
+
 func TestAuthorityShutdownReportsBoundedRetainedSample(t *testing.T) {
 	diagnostics := &recordingAttemptDiagnostics{}
 	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, diagnostics)

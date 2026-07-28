@@ -305,6 +305,10 @@ quiet: entering `Contained`, releasing a contained worker, and a worker panic ea
 attempt that admits or returns in time emits none. In long-lived mode, `jobmgr.runtime` also projects the current census
 as aggregate process-attempt gauges.
 
+Containment fences execute synchronously before settlement becomes visible. They stay under the authority lock to
+preserve that ordering, but cross a panic boundary: a panic is redacted as `ErrProcessAttemptFencePanic`, joined with
+the original cut cause, and cannot strand the authority mutex.
+
 ### What the fuse actually bounds
 
 This is the subtlety that catches everyone:

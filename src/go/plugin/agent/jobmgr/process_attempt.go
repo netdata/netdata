@@ -15,6 +15,7 @@ var (
 	ErrProcessAttemptStopped     = errors.New("jobmgr containment: process authority stopped")
 	ErrProcessAttemptSettled     = errors.New("jobmgr containment: attempt already settled")
 	ErrProcessAttemptWorkerPanic = errors.New("jobmgr containment: worker panic")
+	ErrProcessAttemptFencePanic  = errors.New("jobmgr containment: containment fence panic")
 )
 
 type ProcessAttemptNamespace uint8
@@ -69,6 +70,7 @@ type ProcessAttemptPlan struct {
 
 	// OnContainment is a synchronous pre-settlement fence. It MUST be
 	// non-blocking and MUST NOT re-enter the attempt authority.
+	// Panics are recovered and reported through ErrProcessAttemptFencePanic.
 	OnContainment func()
 }
 
