@@ -71,6 +71,276 @@ func TestCreatorDeclaresFunctions(t *testing.T) {
 	}
 }
 
+func TestFactoryStagesFunctionsAfterManagedProbe(t *testing.T) {
+	tests := map[string]func(*factoryTestState) collectorapi.Creator{
+		"V1": func(state *factoryTestState) collectorapi.Creator {
+			return collectorapi.Creator{
+				Create: func() collectorapi.CollectorV1 {
+					module := state.module(func(context.Context) error {
+						state.events = append(state.events, "check")
+						return nil
+					}, false)
+					module.InitFunc = func(context.Context) error {
+						state.events = append(state.events, "init")
+						return nil
+					}
+					charts := collectorapi.Charts{}
+					module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+					return module
+				},
+				SharedFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{ID: "method"}}
+				},
+			}
+		},
+		"V2": func(state *factoryTestState) collectorapi.Creator {
+			return collectorapi.Creator{
+				CreateV2: func() collectorapi.CollectorV2 {
+					return &factoryTestV2{
+						state: state,
+						init: func(context.Context) error {
+							state.events = append(state.events, "init")
+							return nil
+						},
+						check: func(context.Context) error {
+							state.events = append(state.events, "check")
+							return nil
+						},
+						store:    metrix.NewCollectorStore(),
+						template: factoryTestChartTemplate,
+					}
+				},
+				SharedFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{ID: "method"}}
+				},
+			}
+		},
+	}
+	for name, create := range tests {
+		t.Run(name, func(t *testing.T) {
+			state := &factoryTestState{}
+			hooks := factoryTestHooks{
+				prepare: func(RuntimeJob) (StagedHandlerLifecycle, error) {
+					state.events = append(state.events, "stage")
+					return &factoryTestHandlers{state: state}, nil
+				},
+			}
+			factory, _ := newFactoryTestHarness(t, create(state), hooks)
+			permit, tasks := issueTestJobPermit(t, "module_job", 1)
+
+			prepared, failure, err := prepareFactoryTestCandidate(
+				context.Background(),
+				factory,
+				factoryTestConfig(false),
+				lifecycle.ResourceIdentity{
+					ID:         "module_job",
+					Generation: 1,
+				},
+				permit,
+			)
+			require.NoError(t, err)
+			require.Nil(t, failure)
+			require.Equal(t, []string{"init", "check", "stage"}, state.events)
+
+			require.NoError(t, prepared.Dispose(context.Background()))
+			requireFactoryAttemptsIdle(t, factory)
+			require.EqualValues(t, 1, state.handlerClose)
+			require.EqualValues(t, 1, state.collectorCleanup)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+		})
+	}
+}
+
+func TestFactoryDoesNotStageFunctionsAfterFailedManagedProbe(t *testing.T) {
+	probeErr := errors.New("probe failed")
+	tests := map[string]struct {
+		create     func(*factoryTestState) collectorapi.Creator
+		wantEvents []string
+	}{
+		"V1 init": {
+			create: func(state *factoryTestState) collectorapi.Creator {
+				return collectorapi.Creator{
+					Create: func() collectorapi.CollectorV1 {
+						module := state.module(func(context.Context) error {
+							state.events = append(state.events, "check")
+							return nil
+						}, false)
+						module.InitFunc = func(context.Context) error {
+							state.events = append(state.events, "init")
+							return probeErr
+						}
+						return module
+					},
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "method"}}
+					},
+				}
+			},
+			wantEvents: []string{"init"},
+		},
+		"V1 check": {
+			create: func(state *factoryTestState) collectorapi.Creator {
+				return collectorapi.Creator{
+					Create: func() collectorapi.CollectorV1 {
+						module := state.module(func(context.Context) error {
+							state.events = append(state.events, "check")
+							return probeErr
+						}, false)
+						module.InitFunc = func(context.Context) error {
+							state.events = append(state.events, "init")
+							return nil
+						}
+						return module
+					},
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "method"}}
+					},
+				}
+			},
+			wantEvents: []string{"init", "check"},
+		},
+		"V2 init": {
+			create: func(state *factoryTestState) collectorapi.Creator {
+				return collectorapi.Creator{
+					CreateV2: func() collectorapi.CollectorV2 {
+						return &factoryTestV2{
+							state: state,
+							init: func(context.Context) error {
+								state.events = append(state.events, "init")
+								return probeErr
+							},
+						}
+					},
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "method"}}
+					},
+				}
+			},
+			wantEvents: []string{"init"},
+		},
+		"V2 check": {
+			create: func(state *factoryTestState) collectorapi.Creator {
+				return collectorapi.Creator{
+					CreateV2: func() collectorapi.CollectorV2 {
+						return &factoryTestV2{
+							state: state,
+							init: func(context.Context) error {
+								state.events = append(state.events, "init")
+								return nil
+							},
+							check: func(context.Context) error {
+								state.events = append(state.events, "check")
+								return probeErr
+							},
+						}
+					},
+					SharedFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "method"}}
+					},
+				}
+			},
+			wantEvents: []string{"init", "check"},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			state := &factoryTestState{}
+			hooks := factoryTestHooks{
+				prepare: func(RuntimeJob) (StagedHandlerLifecycle, error) {
+					state.events = append(state.events, "stage")
+					return &factoryTestHandlers{state: state}, nil
+				},
+			}
+			factory, _ := newFactoryTestHarness(t, test.create(state), hooks)
+			permit, tasks := issueTestJobPermit(t, "module_job", 1)
+
+			prepared, failure, err := prepareFactoryTestCandidate(
+				context.Background(),
+				factory,
+				factoryTestConfig(false),
+				lifecycle.ResourceIdentity{
+					ID:         "module_job",
+					Generation: 1,
+				},
+				permit,
+			)
+			require.NoError(t, err)
+			require.False(t, prepared.Valid())
+			require.ErrorIs(t, failure, probeErr)
+			require.Equal(t, test.wantEvents, state.events)
+
+			require.NoError(t, permit.AbortUnused())
+			requireFactoryAttemptsIdle(t, factory)
+			require.Zero(t, state.handlerClose)
+			require.EqualValues(t, 1, state.collectorCleanup)
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+		})
+	}
+}
+
+func TestFactoryCleanHandlerStagingFailureRejectsOnlyCandidate(t *testing.T) {
+	state := &factoryTestState{}
+	stageErr := errors.New("handler staging failed")
+	creator := collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			module := state.module(nil, false)
+			charts := collectorapi.Charts{}
+			module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+			return module
+		},
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "method"}}
+		},
+	}
+	hooks := factoryTestHooks{
+		prepare: func(RuntimeJob) (StagedHandlerLifecycle, error) {
+			return nil, stageErr
+		},
+	}
+	factory, _ := newFactoryTestHarness(t, creator, hooks)
+	permit, tasks := issueTestJobPermit(t, "module_job", 1)
+
+	prepared, failure, err := prepareFactoryTestCandidate(
+		context.Background(),
+		factory,
+		factoryTestConfig(false),
+		lifecycle.ResourceIdentity{
+			ID:         "module_job",
+			Generation: 1,
+		},
+		permit,
+	)
+	require.NoError(t, err)
+	require.False(t, prepared.Valid())
+	require.ErrorIs(t, failure, stageErr)
+	require.False(t, lifecycle.OwnershipRetained(failure))
+	require.NoError(t, permit.AbortUnused())
+	requireFactoryAttemptsIdle(t, factory)
+	require.EqualValues(t, 1, state.collectorCleanup)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
+func TestFactoryCanonicalizesTypedNilLifecycleResults(t *testing.T) {
+	stageErr := errors.New("stage failed")
+	attachErr := errors.New("attach failed")
+	hooks := factoryTypedNilLifecycleHooks{
+		stageErr:  stageErr,
+		attachErr: attachErr,
+	}
+
+	staged, err := callStageHandlers(hooks, nil)
+	require.ErrorIs(t, err, stageErr)
+	require.True(t, staged == nil)
+
+	attached, err := callAttachHandlers(
+		hooks,
+		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		&factoryTestHandlers{state: &factoryTestState{}},
+	)
+	require.ErrorIs(t, err, attachErr)
+	require.True(t, attached == nil)
+}
+
 func TestNewFactoryRejectsMismatchedHandlerLifecycleDependencies(t *testing.T) {
 	hooks := factoryTestHooks{}
 	factory, _ := newFactoryTestHarness(t, collectorapi.Creator{}, hooks)
@@ -1070,12 +1340,15 @@ type factoryTestState struct {
 	collectorCleanup int
 	handlerClose     int
 	autoDetection    int
+	events           []string
 }
 
 type factoryTestV2 struct {
 	collectorapi.Base
 	OptionStr      string `yaml:"option_str"`
 	state          *factoryTestState
+	init           func(context.Context) error
+	check          func(context.Context) error
 	checkErr       error
 	collect        func(context.Context) error
 	exposeResolved bool
@@ -1084,9 +1357,17 @@ type factoryTestV2 struct {
 	template       string
 }
 
-func (*factoryTestV2) Init(context.Context) error { return nil }
+func (ft2 *factoryTestV2) Init(ctx context.Context) error {
+	if ft2.init != nil {
+		return ft2.init(ctx)
+	}
+	return nil
+}
 
-func (ft2 *factoryTestV2) Check(context.Context) error {
+func (ft2 *factoryTestV2) Check(ctx context.Context) error {
+	if ft2.check != nil {
+		return ft2.check(ctx)
+	}
 	if ft2.exposeResolved {
 		message := "check exposed " + ft2.OptionStr
 		if ft2.panicCheck {
@@ -1163,6 +1444,24 @@ func (factoryTestHooks) Attach(
 		return nil, errors.New("test staged handler is not attachable")
 	}
 	return handle, nil
+}
+
+type factoryTypedNilLifecycleHooks struct {
+	stageErr  error
+	attachErr error
+}
+
+func (hooks factoryTypedNilLifecycleHooks) Stage(RuntimeJob) (StagedHandlerLifecycle, error) {
+	var handle *factoryTestHandlers
+	return handle, hooks.stageErr
+}
+
+func (hooks factoryTypedNilLifecycleHooks) Attach(
+	lifecycle.ResourceIdentity,
+	StagedHandlerLifecycle,
+) (ProcessHandlerLifecycle, error) {
+	var handle *factoryTestHandlers
+	return handle, hooks.attachErr
 }
 
 type factoryTestHandlers struct {

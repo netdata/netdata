@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -44,10 +45,16 @@ type StagedHandlerLifecycle interface {
 }
 
 type JobHandlerStager interface {
+	// Stage returns any partially constructed lifecycle even when err is
+	// non-nil. A nil lifecycle means internal rollback completed; an
+	// unprovable rollback must mark err as retained ownership.
 	Stage(RuntimeJob) (StagedHandlerLifecycle, error)
 }
 
 type JobHandlerAttacher interface {
+	// Attach returns the lifecycle that owns a completed or partial transfer.
+	// An error with neither lifecycle nor retained ownership means staged
+	// ownership was not consumed.
 	Attach(lifecycle.ResourceIdentity, StagedHandlerLifecycle) (ProcessHandlerLifecycle, error)
 }
 
@@ -300,6 +307,7 @@ func (f *Factory) build(
 		retryAutoDetection: job.RetryAutoDetection,
 		finalCleanup:       cleanup.final,
 		resolvedReferences: redactLifecycle,
+		stageFunctions:     hasFunctions,
 		candidateJob:       job,
 		runtimeStage:       runtimeStage,
 		vnodeStage:         vnodeStage,
@@ -308,17 +316,31 @@ func (f *Factory) build(
 	if hasFunctions && f.config.HandlerStager == nil {
 		return constructed, errors.New("job output: function-bearing job has no handler lifecycle")
 	}
-	if hasFunctions {
-		handlers, prepareErr := callStageHandlers(f.config.HandlerStager, job)
-		constructed.StagedHandlers = handlers
-		if prepareErr != nil {
-			return constructed, prepareErr
-		}
-		if handlers == nil {
-			return constructed, errors.New("job output: nil prepared handler lifecycle")
-		}
-	}
 	return constructed, nil
+}
+
+func (f *Factory) stageCandidateHandlers(candidate *ConstructedJob) error {
+	if f == nil || candidate == nil || candidate.candidateJob == nil {
+		return errors.New("job output: invalid candidate handler staging")
+	}
+	if !candidate.stageFunctions {
+		return nil
+	}
+	if f.config.HandlerStager == nil || candidate.StagedHandlers != nil {
+		return errors.New("job output: invalid candidate handler lifecycle")
+	}
+	handlers, err := callStageHandlers(f.config.HandlerStager, candidate.candidateJob)
+	if handlers != nil {
+		candidate.StagedHandlers = handlers
+	}
+	if err != nil {
+		return err
+	}
+	if handlers == nil {
+		return errors.New("job output: nil prepared handler lifecycle")
+	}
+	candidate.stageFunctions = false
+	return nil
 }
 
 type factoryJobCleanup struct {
@@ -374,7 +396,11 @@ func callStageHandlers(
 			))
 		}
 	}()
-	return stager.Stage(job)
+	handlers, err = stager.Stage(job)
+	if nilInterfaceValue(handlers) {
+		handlers = nil
+	}
+	return handlers, err
 }
 
 func callAttachHandlers(
@@ -385,14 +411,31 @@ func callAttachHandlers(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			handlers = nil
-			err = fmt.Errorf(
+			err = lifecycle.RetainOwnership(fmt.Errorf(
 				"%w in handler attachment: %v",
 				lifecycle.ErrTaskPanic,
 				recovered,
-			)
+			))
 		}
 	}()
-	return attacher.Attach(identity, staged)
+	handlers, err = attacher.Attach(identity, staged)
+	if nilInterfaceValue(handlers) {
+		handlers = nil
+	}
+	return handlers, err
+}
+
+func nilInterfaceValue(value any) bool {
+	if value == nil {
+		return true
+	}
+	reflected := reflect.ValueOf(value)
+	switch reflected.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Slice:
+		return reflected.IsNil()
+	default:
+		return false
+	}
 }
 
 func (f *Factory) buildV1(

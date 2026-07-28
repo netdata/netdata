@@ -164,7 +164,11 @@ func (fjs functionJobStager) Stage(
 	if fjs.stager == nil || job == nil {
 		return nil, errors.New("jobmgr composition: invalid Function job staging")
 	}
-	return fjs.stager.StageJob(job)
+	handle, err := fjs.stager.StageJob(job)
+	if handle == nil {
+		return nil, err
+	}
+	return handle, err
 }
 
 type functionJobAttacher struct {
@@ -182,5 +186,9 @@ func (fja functionJobAttacher) Attach(
 	if !ok {
 		return nil, errors.New("jobmgr composition: foreign staged Function job")
 	}
-	return fja.controller.AttachJob(identity, handle)
+	attached, err := fja.controller.AttachJob(identity, handle)
+	if attached == nil {
+		return nil, err
+	}
+	return attached, err
 }

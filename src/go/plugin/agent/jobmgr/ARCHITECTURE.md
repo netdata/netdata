@@ -482,6 +482,7 @@ flowchart TD
     Cmd("add / update / discovered / retry")
     Stage("Process-owned candidate<br/>clone · secrets · construct · Init")
     AutoD{"Check + post-check<br/>yield global jobs claim"}
+    Functions("Stage job Functions<br/>from initialized collector")
     Keep("Reject / supersede / busy<br/>incumbent unchanged")
     Reserve("Reserve inactive<br/>run permit")
     Retire("Fence ordinary output + detach<br/>prior generation")
@@ -495,7 +496,9 @@ flowchart TD
     Stage -->|"busy / proposal rejected"| Keep
     Stage -->|"transient preparation<br/>failure / contained"| RetireFailed
     Stage --> AutoD
-    AutoD -->|"ready"| Reserve --> Retire --> Promote
+    AutoD -->|"ready"| Functions
+    Functions -->|"ready"| Reserve --> Retire --> Promote
+    Functions -->|"failed / contained"| RetireFailed
     Promote -->|"acquired"| Attach --> Live
     AutoD -->|"failed / contained"| RetireFailed --> Fail
     Promote -->|"old runtime retained"| Fail
@@ -505,7 +508,7 @@ flowchart TD
     classDef core fill:#fef3c7,stroke:#d97706,color:#0b1021;
     classDef job fill:#dcfce7,stroke:#16a34a,color:#0b1021;
     class Cmd ext;
-    class AutoD,Reserve,Retire,RetireFailed,Promote,Attach core;
+    class AutoD,Functions,Reserve,Retire,RetireFailed,Promote,Attach core;
     class Stage,Keep,Live,Fail job;
 ```
 
@@ -514,13 +517,17 @@ flowchart TD
    identity and returns busy rather than multiplying workers. `joboutput/config_stage.go`.
 2. **Prepare candidate (non-disruptive)** — the process authority reserves the canonical `job` identity before cloning
    and secret resolution, then owns collector construction, configuration application, `Init`, `Check`, post-check
-   validation, Function staging, and rejection cleanup. The candidate has inactive output and private V2 runtime/vnode
-   staging, but no run permit and no live run service. **The incumbent keeps running.**
+   validation, Function staging, and rejection cleanup. Function staging runs only after `Init` and `Check` succeed,
+   because instance handlers may be initialized by those callbacks. The candidate has inactive output and private V2
+   runtime/vnode staging, but no run permit and no live run service. **The incumbent keeps running.**
    `joboutput/candidate_stage.go`, `joboutput/runtime_staging.go`.
 3. **Settle autodetection** — caller cancellation is propagated and the transaction temporarily yields the global
    `dyncfg:jobs` claim. The process-owned fuse bounds logical waiting even if the collector never returns, and late
    success cannot be admitted after a cut. A normal detection failure commits `StatusFailed`; a busy/contained
    persistent source retains only its latest desired retry, while synchronous DynCfg returns a retryable error.
+   A normal `Init`, `Check`, validation, or Function-staging failure is isolated to that candidate after complete
+   rejection cleanup. Only a failed or unprovable cleanup retains process ownership and fails the run closed; one
+   collector's ordinary configuration or connectivity failure cannot dirty the Job Manager.
 4. **Reserve and retire** — only a timely successful candidate is wrapped in an inactive run permit. Replacement then
    fences the incumbent's ordinary output and detaches its run projections immediately; its physical managed loop,
    `Stop`, Function drain, and collector cleanup remain process-owned until they return.

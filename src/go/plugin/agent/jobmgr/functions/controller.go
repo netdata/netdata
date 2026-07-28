@@ -163,7 +163,10 @@ func (js *JobStager) StageJob(
 		candidateFunctionResource(job.FullName()),
 	); err != nil {
 		bundle.retire()
-		return nil, errors.Join(err, bundle.wait(context.Background()))
+		return nil, joinRetainedBundleCleanup(
+			err,
+			bundle.wait(context.Background()),
+		)
 	}
 	return &StagedJobHandle{
 		job:     job,
@@ -400,7 +403,10 @@ func cleanupControllerModulePlans(plans map[string]controllerModulePlan) (result
 		}
 		if plan.agentBundle != nil {
 			plan.agentBundle.retire()
-			result = errors.Join(result, plan.agentBundle.wait(context.Background()))
+			result = joinRetainedBundleCleanup(
+				result,
+				plan.agentBundle.wait(context.Background()),
+			)
 		}
 	}
 	return result

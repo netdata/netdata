@@ -191,13 +191,14 @@ func startModulePlanStage(
 			); bindErr != nil {
 				plan.agentBundle.retire()
 				cleanupErr := plan.agentBundle.wait(context.Background())
-				result <- modulePlanResult{err: errors.Join(bindErr, cleanupErr)}
-				return errors.Join(bindErr, cleanupErr)
+				bindErr = joinRetainedBundleCleanup(bindErr, cleanupErr)
+				result <- modulePlanResult{err: bindErr}
+				return bindErr
 			}
 			if admitErr := admission.Admit(); admitErr != nil {
 				plan.agentBundle.retire()
 				cleanupErr := plan.agentBundle.wait(context.Background())
-				return errors.Join(admitErr, cleanupErr)
+				return joinRetainedBundleCleanup(admitErr, cleanupErr)
 			}
 			if plan.agentBundle.handler != nil {
 				plan.owner = newModulePlanOwner()
@@ -215,7 +216,10 @@ func startModulePlanStage(
 			}
 			if !transfer.wasAccepted() {
 				plan.agentBundle.retire()
-				return plan.agentBundle.wait(context.Background())
+				return joinRetainedBundleCleanup(
+					nil,
+					plan.agentBundle.wait(context.Background()),
+				)
 			}
 			if plan.owner == nil {
 				return nil

@@ -4,6 +4,7 @@ package functions
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,6 +17,46 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/require"
 )
+
+func TestFunctionBundleRejectsTypedNilMethodHandler(t *testing.T) {
+	var handler *typedNilBundleTestHandler
+	bundle, err := newAgentFunctionBundle(
+		"module",
+		collectorapi.Creator{
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return handler
+			},
+		},
+		[]funcapi.FunctionConfig{{ID: "method"}},
+	)
+	if bundle != nil {
+		bundle.retire()
+		require.NoError(t, bundle.wait(context.Background()))
+	}
+	require.Nil(t, bundle)
+	require.ErrorContains(t, err, "nil method handler")
+}
+
+func TestFunctionBundleMarksFailedConstructionRollbackRetained(t *testing.T) {
+	bundle, err := newAgentFunctionBundle(
+		"module",
+		collectorapi.Creator{
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &failedRollbackBundleTestHandler{}
+			},
+		},
+		[]funcapi.FunctionConfig{{
+			ID: "method",
+			Available: func() bool {
+				panic("availability failed")
+			},
+		}},
+	)
+	require.Nil(t, bundle)
+	require.Error(t, err)
+	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
+	require.True(t, lifecycle.OwnershipRetained(err))
+}
 
 func TestFunctionBundleQuarantinesOnlyAfterRetainedInvocation(t *testing.T) {
 	attempts, err := containment.NewAuthority(nil)
@@ -77,6 +118,33 @@ func TestFunctionBundleQuarantinesOnlyAfterRetainedInvocation(t *testing.T) {
 
 	bundle.retire()
 	require.NoError(t, bundle.wait(context.Background()))
+}
+
+type typedNilBundleTestHandler struct{}
+
+func (*typedNilBundleTestHandler) MethodParams(
+	context.Context,
+	string,
+) ([]funcapi.ParamConfig, error) {
+	return nil, nil
+}
+
+func (*typedNilBundleTestHandler) Handle(
+	context.Context,
+	string,
+	funcapi.ResolvedParams,
+) *funcapi.FunctionResponse {
+	return &funcapi.FunctionResponse{Status: 200}
+}
+
+func (*typedNilBundleTestHandler) Cleanup(context.Context) {}
+
+type failedRollbackBundleTestHandler struct {
+	typedNilBundleTestHandler
+}
+
+func (*failedRollbackBundleTestHandler) Cleanup(context.Context) {
+	panic(errors.New("cleanup failed"))
 }
 
 func TestFunctionBundleQuarantineWaitsForEveryActiveInvocation(t *testing.T) {

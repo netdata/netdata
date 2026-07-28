@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -307,7 +308,7 @@ func newFunctionBundle(
 	creator collectorapi.Creator,
 	job collectorapi.RuntimeJob,
 	methods []funcapi.FunctionConfig,
-) (bundle *functionBundle, resultErr error) {
+) (*functionBundle, error) {
 	if module == "" ||
 		(kind != functionBundleAgent && kind != functionBundleJob) ||
 		kind == functionBundleAgent && job != nil ||
@@ -324,11 +325,11 @@ func newFunctionBundle(
 		if err != nil {
 			return nil, err
 		}
-		if handler == nil {
+		if nilMethodHandler(handler) {
 			return nil, errors.New("jobmgr Function bundle: collector returned a nil method handler")
 		}
 	}
-	bundle = &functionBundle{
+	bundle := &functionBundle{
 		kind:         kind,
 		module:       module,
 		job:          job,
@@ -345,19 +346,13 @@ func newFunctionBundle(
 	} else if callback, ok := job.Collector().(collectorapi.FunctionAvailability); ok && callback != nil {
 		bundle.pollable = true
 	}
-	transferred := false
-	defer func() {
-		if transferred {
-			return
-		}
-		bundle.retire()
-		resultErr = errors.Join(resultErr, bundle.wait(context.Background()))
-		bundle = nil
-	}()
 	if _, err := bundle.refreshAvailability(); err != nil {
-		return nil, err
+		bundle.retire()
+		return nil, joinRetainedBundleCleanup(
+			err,
+			bundle.wait(context.Background()),
+		)
 	}
-	transferred = true
 	return bundle, nil
 }
 
@@ -376,6 +371,27 @@ func callMethodHandler(
 		}
 	}()
 	return creator.MethodHandler(job), nil
+}
+
+func nilMethodHandler(handler funcapi.MethodHandler) bool {
+	if handler == nil {
+		return true
+	}
+	reflected := reflect.ValueOf(handler)
+	switch reflected.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Map, reflect.Pointer, reflect.Slice:
+		return reflected.IsNil()
+	default:
+		return false
+	}
+}
+
+func joinRetainedBundleCleanup(err, cleanupErr error) error {
+	err = errors.Join(err, cleanupErr)
+	if cleanupErr != nil {
+		err = lifecycle.RetainOwnership(err)
+	}
+	return err
 }
 
 func callInstanceFunctions(

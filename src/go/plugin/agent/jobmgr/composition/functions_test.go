@@ -125,6 +125,23 @@ func TestFunctionAssemblyLifecycle(t *testing.T) {
 	require.EqualValues(t, registration+"FUNCTION_DEL GLOBAL \"module:method\"\n\n", output.String())
 }
 
+func TestFunctionLifecycleAdaptersCanonicalizeConcreteNil(t *testing.T) {
+	staged, err := (functionJobStager{
+		stager: &functionadapter.JobStager{},
+	}).Stage(&assemblyTestJob{})
+	require.Error(t, err)
+	require.True(t, staged == nil)
+
+	attached, err := (functionJobAttacher{
+		controller: &functionadapter.Controller{},
+	}).Attach(
+		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		&functionadapter.StagedJobHandle{},
+	)
+	require.Error(t, err)
+	require.True(t, attached == nil)
+}
+
 func TestFunctionAssemblyStateGuards(t *testing.T) {
 	tests := map[string]struct {
 		run func(*FunctionAssembly, *assemblyMutationPort) error

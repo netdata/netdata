@@ -102,6 +102,7 @@ type ConstructedJob struct {
 	finalCleanup       func(context.Context) error // Cleanup() variant installed once the job is accepted
 	retryAutoDetection func() bool                 // whether a failed auto-detection should be rescheduled
 	resolvedReferences bool                        // lifecycle failures may contain resolved secret values
+	stageFunctions     bool                        // job Function lifecycle still needs post-probe staging
 	activateAttachment func() error                // binds staged capabilities immediately before acceptance
 	attach             func(lifecycle.ResourceIdentity, *stagedJobOwner) (ConstructedJob, error)
 	candidateJob       RuntimeJob
@@ -142,6 +143,7 @@ func prepareCandidateJob(
 		candidate.candidateJob == nil ||
 		candidate.candidateJob.FullName() != identity.ID ||
 		candidate.CollectorCleanup == nil ||
+		candidate.stageFunctions ||
 		owner == nil {
 		return PreparedJob{}, errors.New("job output: invalid candidate preparation")
 	}

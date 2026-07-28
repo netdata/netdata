@@ -703,9 +703,9 @@ func (pjc *preparedJobCandidate) run(
 		return nil
 	}
 	candidate, err := factory.build(ctx, cloned)
-	factory = nil
 	config = nil
 	if err != nil {
+		factory = nil
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		err = joinRetainedCleanup(err, cleanupErr)
 		workerResult <- stagedJobResult{err: err}
@@ -713,6 +713,7 @@ func (pjc *preparedJobCandidate) run(
 	}
 	probeErr := probeConstructed(ctx, candidate, candidate.autoDetection)
 	if probeErr != nil {
+		factory = nil
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		if cleanupErr != nil {
 			err = joinRetainedCleanup(probeErr, cleanupErr)
@@ -725,6 +726,20 @@ func (pjc *preparedJobCandidate) run(
 			return nil
 		}
 		workerResult <- stagedJobResult{err: probeErr}
+		return nil
+	}
+	stageErr := factory.stageCandidateHandlers(&candidate)
+	factory = nil
+	if stageErr != nil {
+		failure := autoDetectionFailureFor(candidate, stageErr)
+		cleanupErr := cleanupConstructed(context.Background(), candidate)
+		if lifecycle.OwnershipRetained(stageErr) || cleanupErr != nil {
+			workerResult <- stagedJobResult{
+				err: joinRetainedCleanup(stageErr, cleanupErr),
+			}
+			return nil
+		}
+		workerResult <- stagedJobResult{failure: failure}
 		return nil
 	}
 	if err := admission.Admit(); err != nil {
