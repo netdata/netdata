@@ -13,7 +13,8 @@ flowchart BT
     C2 -->|stream| P1
     C3 -->|stream| P1
     C1 & C2 & C3 -.->|failover| P2
-    P1 <-->|sync| P2
+    P1 -->|stream| P2
+    P2 -.->|failover| P1
     
     %% Style definitions
     classDef child fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
