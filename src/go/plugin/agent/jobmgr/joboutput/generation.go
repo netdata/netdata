@@ -228,13 +228,16 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 	)
 	if attachErr != nil {
 		if attached.CollectorCleanup != nil {
-			state.owner.Replace(attached)
+			attachErr = errors.Join(attachErr, state.owner.Replace(attached))
 		}
 		state.owner.Reject()
 		return nil, errors.Join(attachErr, state.permit.AbortUnused())
 	}
 	state.constructed = attached
-	state.owner.Replace(attached)
+	if err := state.owner.Replace(attached); err != nil {
+		state.owner.Reject()
+		return nil, errors.Join(err, state.permit.AbortUnused())
+	}
 	if state.constructed.activateAttachment != nil {
 		if err := callJobLifecycle("attachment activation", state.constructed.activateAttachment); err != nil {
 			state.owner.Reject()

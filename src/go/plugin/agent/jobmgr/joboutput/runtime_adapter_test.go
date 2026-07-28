@@ -11,12 +11,19 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		attempts.BeginShutdown()
+		require.NoError(t, attempts.Shutdown(context.Background()))
+	})
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
@@ -31,7 +38,17 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 		candidateJob:     job,
 		outputGate:       gate,
 	}
-	owner := newStagedJobOwner(candidate, nil, 0, jobmgr.ProcessAttemptIdentity{})
+	owner := newStagedJobOwner(
+		candidate,
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       job.FullName(),
+			Resource:  job.FullName(),
+		},
+	)
+	require.NoError(t, owner.Promote(t.Context()))
 	identity := lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}
 	attached, err := newProcessManagedJob(
 		JobVariantV1,
@@ -43,11 +60,7 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 	)
 	require.NoError(t, err)
 	attached.outputGate = gate
-	owner.Replace(attached)
-	ownerDone := make(chan error, 1)
-	go func() {
-		ownerDone <- owner.finish(context.Background())
-	}()
+	require.NoError(t, owner.Replace(attached))
 
 	permit, tasks := issueTestJobPermit(t, identity.ID, identity.Generation)
 	require.NoError(t, permit.ActivateExternal())
@@ -82,8 +95,8 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 		require.FailNow(t, "physical Stop did not start")
 	}
 	select {
-	case err := <-ownerDone:
-		require.FailNowf(t, "process owner released before physical Stop", "%v", err)
+	case <-owner.done:
+		require.FailNow(t, "process owner released before physical Stop")
 	default:
 	}
 	_, err = gate.Write([]byte("late\n"))
@@ -93,8 +106,58 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 
 	close(job.stopRelease)
-	require.NoError(t, <-ownerDone)
+	<-owner.done
 	require.EqualValues(t, 1, cleanups)
+}
+
+func TestProcessOwnedJobCannotAttachAfterTargetRetirementFinalizesCandidate(t *testing.T) {
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		attempts.BeginShutdown()
+		require.NoError(t, attempts.Shutdown(context.Background()))
+	})
+	frames, err := lifecycle.NewFrameOwner(io.Discard)
+	require.NoError(t, err)
+	gate, err := newGenerationOutputGate(frames)
+	require.NoError(t, err)
+	job := newBlockingStopManagedJob()
+	var cleanups int
+	candidate := ConstructedJob{
+		Variant:          JobVariantV1,
+		CollectorCleanup: func(context.Context) error { cleanups++; return nil },
+		candidateJob:     job,
+		outputGate:       gate,
+	}
+	owner := newStagedJobOwner(
+		candidate,
+		attempts,
+		1,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       job.FullName(),
+			Resource:  job.FullName(),
+		},
+	)
+
+	require.NoError(t, owner.Promote(t.Context()))
+	require.EqualValues(t, 1, attempts.CutTarget(1))
+	select {
+	case <-owner.done:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "retired candidate was not finalized")
+	}
+	require.EqualValues(t, 1, cleanups)
+
+	_, err = newProcessManagedJob(
+		JobVariantV1,
+		job,
+		lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1},
+		newTestScheduler(t),
+		candidate.CollectorCleanup,
+		owner,
+	)
+	require.Error(t, err)
 }
 
 func TestFrameWriterWholeCommit(t *testing.T) {

@@ -60,6 +60,7 @@ type stagedJobOwner struct {
 	attached        bool
 	started         bool
 	retiring        bool
+	finalized       bool
 
 	startRequests       chan stagedJobStartRequest
 	retire              chan struct{}
@@ -109,15 +110,20 @@ func newStagedJobOwner(
 	}
 }
 
-func (owner *stagedJobOwner) Replace(resources ConstructedJob) {
+func (owner *stagedJobOwner) Replace(resources ConstructedJob) error {
 	if owner == nil {
-		return
+		return errors.New("job output: nil staged job resource replacement")
 	}
 	owner.mu.Lock()
-	if !owner.decided {
-		owner.resources = resources
+	defer owner.mu.Unlock()
+	if owner.ownership != stagedJobOwnedByRuntime ||
+		!owner.attached ||
+		owner.decided ||
+		owner.finalized {
+		return errors.New("job output: invalid staged job resource replacement")
 	}
-	owner.mu.Unlock()
+	owner.resources = resources
+	return nil
 }
 
 func (owner *stagedJobOwner) BindAttachment() error {
@@ -126,7 +132,11 @@ func (owner *stagedJobOwner) BindAttachment() error {
 	}
 	owner.mu.Lock()
 	defer owner.mu.Unlock()
-	if owner.attached || owner.decided {
+	if owner.ownership != stagedJobOwnedByRuntime ||
+		owner.attached ||
+		owner.decided ||
+		owner.retiring ||
+		owner.finalized {
 		return errors.New("job output: invalid staged job attachment binding")
 	}
 	owner.attached = true
@@ -438,6 +448,11 @@ func (owner *stagedJobOwner) cutBeforeStart() {
 func (owner *stagedJobOwner) finalize() error {
 	<-owner.detached
 	owner.mu.Lock()
+	if owner.finalized {
+		owner.mu.Unlock()
+		return nil
+	}
+	owner.finalized = true
 	resources := owner.resources
 	owner.resources = ConstructedJob{}
 	owner.mu.Unlock()

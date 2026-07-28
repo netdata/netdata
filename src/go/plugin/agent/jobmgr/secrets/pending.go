@@ -18,6 +18,7 @@ type pendingStoreState struct {
 	release <-chan struct{}
 	update  chan struct{}
 	version uint64
+	running bool
 }
 
 func (c *Controller) allocateDesiredVersion() (uint64, error) {
@@ -49,10 +50,11 @@ func (c *Controller) retainPending(
 		c.mu.Unlock()
 		return
 	}
-	created := state == nil
-	if created {
+	start := state == nil
+	if start {
 		state = &pendingStoreState{
-			update: make(chan struct{}, 1),
+			update:  make(chan struct{}, 1),
+			running: true,
 		}
 		c.pending[key] = state
 	}
@@ -60,11 +62,18 @@ func (c *Controller) retainPending(
 	state.release = release
 	state.version = version
 	ctx := c.projectionCtx
-	if !created && len(state.update) == 0 {
-		state.update <- struct{}{}
+	if !start {
+		if state.running {
+			if len(state.update) == 0 {
+				state.update <- struct{}{}
+			}
+		} else {
+			state.running = true
+			start = true
+		}
 	}
 	c.mu.Unlock()
-	if created {
+	if start {
 		go c.pendingLoop(ctx, key, state)
 	}
 }
@@ -118,7 +127,20 @@ func (c *Controller) pendingLoop(
 				Generation: c.epoch,
 				Err:        err,
 			})
-			return
+			c.mu.Lock()
+			if c.pending[key] != state {
+				c.mu.Unlock()
+				return
+			}
+			select {
+			case <-state.update:
+				c.mu.Unlock()
+				continue
+			default:
+				state.running = false
+				c.mu.Unlock()
+				return
+			}
 		}
 	}
 }

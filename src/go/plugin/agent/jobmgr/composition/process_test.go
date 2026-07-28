@@ -220,7 +220,7 @@ func TestProcessTransitionCancellationClassificationRejectsMixedFailures(t *test
 	}
 }
 
-func TestProcessCoreServiceDiscoverySendsFunctionResultBeforeStatus(t *testing.T) {
+func TestProcessCoreServiceDiscoveryMutationSendsFunctionResultBeforeStatus(t *testing.T) {
 	reader, writer := io.Pipe()
 	output := newProcessSynchronizedBuffer()
 	services := testRunServiceDiscoveryServices(t)
@@ -243,13 +243,13 @@ func TestProcessCoreServiceDiscoverySendsFunctionResultBeforeStatus(t *testing.T
 
 	_, writeStringErr := io.WriteString(
 		writer,
-		"FUNCTION sd-get 30 \"config go.d:sd:test:job get\" 0xFFFF \"user=test\"\n",
+		"FUNCTION sd-enable 30 \"config go.d:sd:test:job enable\" 0xFFFF \"user=test\"\n",
 	)
 	require.NoError(t, writeStringErr)
 
 	output.waitContains(t, "CONFIG go.d:sd:test:job status running")
 	wire := output.String()
-	result := strings.Index(wire, "FUNCTION_RESULT_BEGIN sd-get 200 application/json")
+	result := strings.Index(wire, "FUNCTION_RESULT_BEGIN sd-enable 200 application/json")
 	notification := strings.Index(wire, "CONFIG go.d:sd:test:job status running")
 	require.False(t, result < 0 || notification < 0 || result >= notification)
 	controls.send(testProcessControl(processTerminate))
@@ -778,7 +778,7 @@ func (psd processServiceDiscovery) Run(ctx context.Context, _ chan<- []*confgrou
 		Path:              "/collectors/go.d/ServiceDiscovery",
 		SourceType:        "internal",
 		Source:            "internal",
-		SupportedCommands: "get",
+		SupportedCommands: "enable",
 	})
 	<-ctx.Done()
 	psd.registry.UnregisterPrefix("config", "go.d:sd:")

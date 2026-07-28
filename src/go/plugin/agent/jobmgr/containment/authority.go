@@ -158,13 +158,14 @@ const (
 // Authority owns the identity registry and the complete physical lifetime of
 // every worker it starts.
 type Authority struct {
-	mu          sync.Mutex
-	diagnostics jobmgr.DiagnosticObserver
-	policy      policy
-	attempts    map[identityKey]*Attempt
-	census      Census
-	stopping    bool
-	drained     chan struct{}
+	mu             sync.Mutex
+	diagnostics    jobmgr.DiagnosticObserver
+	policy         policy
+	attempts       map[identityKey]*Attempt
+	census         Census
+	retiredThrough uint64
+	stopping       bool
+	drained        chan struct{}
 }
 
 // Attempt is a process-owned worker and its logical settlement.
@@ -211,6 +212,10 @@ func (authority *Authority) Start(plan Plan) (*Attempt, error) {
 	if authority.stopping {
 		authority.mu.Unlock()
 		return nil, ErrAuthorityStopped
+	}
+	if plan.Target != 0 && plan.Target <= authority.retiredThrough {
+		authority.mu.Unlock()
+		return nil, ErrTargetRetired
 	}
 	key := plan.Identity.mapKey()
 	if authority.attempts[key] != nil {
@@ -427,11 +432,20 @@ func (attempt *Attempt) Await(ctx context.Context) error {
 	if attempt == nil || attempt.authority == nil || ctx == nil {
 		return errors.New("jobmgr containment: invalid attempt wait")
 	}
+	if err := ctx.Err(); err != nil {
+		attempt.Cut(err)
+		return err
+	}
 	select {
 	case <-attempt.settled:
 	case <-ctx.Done():
-		attempt.Cut(ctx.Err())
-		<-attempt.settled
+		err := ctx.Err()
+		attempt.Cut(err)
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		attempt.Cut(err)
+		return err
 	}
 	attempt.authority.mu.Lock()
 	defer attempt.authority.mu.Unlock()
@@ -553,9 +567,10 @@ func (authority *Authority) CutTarget(target uint64) int {
 		return 0
 	}
 	authority.mu.Lock()
+	authority.retiredThrough = max(authority.retiredThrough, target)
 	attempts := make([]*Attempt, 0)
 	for _, attempt := range authority.attempts {
-		if attempt.target == target {
+		if attempt.target != 0 && attempt.target <= authority.retiredThrough {
 			attempts = append(attempts, attempt)
 		}
 	}

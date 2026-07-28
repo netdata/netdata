@@ -40,10 +40,12 @@ type serviceDiscoveryBinding struct {
 }
 
 type serviceDiscoveryInvocation struct {
-	uid           string
-	result        *dyncfg.Result
-	notifications []byte
-	err           error
+	uid                  string
+	result               *dyncfg.Result
+	captureNotifications bool
+	notificationOverflow bool
+	notifications        []byte
+	err                  error
 }
 
 type preparedServiceDiscoveryTransaction struct {
@@ -212,6 +214,7 @@ func (psdt *preparedServiceDiscoveryTransaction) Apply(
 		ctx,
 		scope.ID,
 		function,
+		serviceDiscoveryMutationCommand(command),
 		func(callCtx context.Context) {
 			function.Context = callCtx
 			handler(callCtx, function)
@@ -273,6 +276,7 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 	ctx context.Context,
 	resource string,
 	function frameworkfunctions.Function,
+	captureNotifications bool,
 	call func(context.Context),
 ) (lifecycle.SealedResult, lifecycle.TaskCleanup, error) {
 	if sdb == nil || ctx == nil || sdb.attempts == nil ||
@@ -291,6 +295,7 @@ func (sdb *serviceDiscoveryBinding) invokeContained(
 		Work: func(attemptCtx context.Context) error {
 			result, cleanup, invokeErr := sdb.invoke(
 				function.UID,
+				captureNotifications,
 				func() { call(attemptCtx) },
 			)
 			resultCh <- serviceDiscoveryInvocationResult{
@@ -341,6 +346,7 @@ func serviceDiscoveryDiagnosticResource(resource string) string {
 
 func (sdb *serviceDiscoveryBinding) invoke(
 	uid string,
+	captureNotifications bool,
 	call func(),
 ) (lifecycle.SealedResult, lifecycle.TaskCleanup, error) {
 	if sdb == nil || lifecycle.ValidateUID(uid) != nil || call == nil {
@@ -348,7 +354,8 @@ func (sdb *serviceDiscoveryBinding) invoke(
 	}
 
 	invocation := &serviceDiscoveryInvocation{
-		uid: uid,
+		uid:                  uid,
+		captureNotifications: captureNotifications,
 	}
 	sdb.mu.Lock()
 	if sdb.dirty != nil || sdb.active != nil {
@@ -458,7 +465,7 @@ func (sdb *serviceDiscoveryBinding) emitNotification(emit func(dyncfg.Output)) {
 	sdb.mu.Lock()
 	// Keep the lock through a direct commit to linearize it with invocation-captured notifications.
 	// Supported output failures return as errors; this binding is not a panic-recovery boundary.
-	if sdb.active == nil {
+	if sdb.active == nil || !sdb.active.captureNotifications {
 		commitErr := sdb.frames.CommitBorrowedProtocolFrame(payload)
 		if commitErr != nil {
 			sdb.setDirtyLocked(commitErr)
@@ -466,8 +473,13 @@ func (sdb *serviceDiscoveryBinding) emitNotification(emit func(dyncfg.Output)) {
 		sdb.mu.Unlock()
 		return
 	}
+	if sdb.active.notificationOverflow {
+		sdb.mu.Unlock()
+		return
+	}
 	if len(payload) > lifecycle.MaximumOtherFrameBytes-len(sdb.active.notifications) {
 		boundErr := errors.New("jobmgr composition: service discovery notifications exceed frame bounds")
+		sdb.active.notificationOverflow = true
 		sdb.active.err = errors.Join(
 			sdb.active.err,
 			boundErr,

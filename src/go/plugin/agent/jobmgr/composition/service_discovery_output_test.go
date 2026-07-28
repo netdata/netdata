@@ -92,7 +92,7 @@ func TestServiceDiscoveryBindingCapturesTypedInvocationOutput(t *testing.T) {
 			require.NoError(t, err)
 			binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
 
-			result, cleanup, err := binding.invoke("uid", func() {
+			result, cleanup, err := binding.invoke("uid", true, func() {
 				test.emit(binding)
 			})
 			if test.wantError != "" {
@@ -127,6 +127,59 @@ func TestServiceDiscoveryBindingRoutesNotificationsOutsideInvocations(t *testing
 	assert.Equal(t, "CONFIG go.d:sd:type:gone delete\n\n", output.String())
 }
 
+func TestServiceDiscoveryReadOnlyInvocationDoesNotCaptureConfigNotifications(t *testing.T) {
+	var output bytes.Buffer
+	frames, err := lifecycle.NewFrameOwner(&output)
+	require.NoError(t, err)
+	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+	}()
+	binding.RegisterPrefix("config", "go.d:sd:", func(function frameworkfunctions.Function) {
+		close(entered)
+		<-release
+		binding.FunctionResult(dyncfg.Result{
+			UID:         function.UID,
+			Code:        200,
+			ContentType: "application/json",
+		})
+	})
+	transaction, err := binding.prepare(
+		t.Context(),
+		functionadapter.HandlerInput{
+			UID:    "read-only",
+			Method: "config",
+			Args:   []string{"go.d:sd:type:job", string(dyncfg.CommandGet)},
+		},
+		nil,
+		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
+		lifecycle.LongLivedPermit{},
+	)
+	require.NoError(t, err)
+	applied := make(chan error, 1)
+	go func() {
+		_, err := transaction.Apply(t.Context())
+		applied <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "read-only handler was not entered")
+	}
+
+	binding.ConfigDelete("go.d:sd:type:unrelated")
+	require.Equal(t, "CONFIG go.d:sd:type:unrelated delete\n\n", output.String())
+
+	close(release)
+	released = true
+	require.NoError(t, <-applied)
+}
+
 func TestServiceDiscoveryBindingRejectsResultOutsideInvocation(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
@@ -137,7 +190,7 @@ func TestServiceDiscoveryBindingRejectsResultOutsideInvocation(t *testing.T) {
 		Code:        200,
 		ContentType: "application/json",
 	})
-	_, _, err = binding.invoke("next", func() {})
+	_, _, err = binding.invoke("next", true, func() {})
 
 	require.ErrorContains(t, err, "result outside invocation")
 }

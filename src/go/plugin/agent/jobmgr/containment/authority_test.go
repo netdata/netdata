@@ -128,6 +128,55 @@ func TestAuthorityAdmissionStopsFuseButTargetCutStillContainsLifetime(t *testing
 	require.Equal(t, Census{}, authority.Census())
 }
 
+func TestAuthorityTargetCutPermanentlyRejectsRetiredTargets(t *testing.T) {
+	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, nil)
+
+	require.Zero(t, authority.CutTarget(23))
+	for _, target := range []uint64{22, 23} {
+		_, err := authority.Start(Plan{
+			Identity: testIdentity(
+				NamespaceJob,
+				fmt.Sprintf("module/job-%d", target),
+				fmt.Sprintf("module/job-%d", target),
+			),
+			Target: target,
+			Work:   func(context.Context) error { return nil },
+		})
+		require.ErrorIs(t, err, ErrTargetRetired)
+	}
+
+	successor, err := authority.Start(Plan{
+		Identity: testIdentity(NamespaceJob, "module/successor", "module/successor"),
+		Target:   24,
+		Work:     func(context.Context) error { return nil },
+	})
+	require.NoError(t, err)
+	require.NoError(t, successor.Await(context.Background()))
+	<-successor.Released()
+}
+
+func TestAuthorityCallerCancellationPrecedesUnobservedCompletion(t *testing.T) {
+	authority := newTestAuthority(t, time.Second, 10*time.Millisecond, nil)
+
+	for index := range 200 {
+		attempt, err := authority.Start(Plan{
+			Identity: testIdentity(
+				NamespaceFunctionInvocation,
+				fmt.Sprintf("function-%d", index),
+				fmt.Sprintf("function-%d", index),
+			),
+			Target: 1,
+			Work:   func(context.Context) error { return nil },
+		})
+		require.NoError(t, err)
+		<-attempt.Released()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		require.ErrorIs(t, attempt.Await(ctx), context.Canceled)
+	}
+}
+
 func TestAuthorityCompletionAndCutHaveOneTerminalOwner(t *testing.T) {
 	for range 200 {
 		authority := newTestAuthority(t, time.Second, 10*time.Millisecond, nil)

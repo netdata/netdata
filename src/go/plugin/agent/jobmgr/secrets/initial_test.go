@@ -5,6 +5,7 @@ package secrets
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -303,6 +304,78 @@ func TestInvalidStoreCommandClearsOlderPendingDesiredConfig(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 400, applied.ResultStatus())
 	require.False(t, controller.pendingVersion(pending.ExposedKey(), version))
+}
+
+func TestPendingStoreRestartsInactiveWorkerForLaterDesiredState(t *testing.T) {
+	controller, store := newSecretControllerTestHarness(t, nil)
+	diagnostics := &secretRecordingDiagnosticObserver{}
+	controller.diagnostics = diagnostics
+	controller.mu.Lock()
+	controller.commands = failingPendingRetryCommands{
+		err: errors.New("retry command failed"),
+	}
+	controller.mu.Unlock()
+	t.Cleanup(func() {
+		require.NoError(t, controller.CloseProjection())
+		require.NoError(t, store.Close(context.Background()))
+	})
+
+	config := secretTestConfig(confgroup.TypeDyncfg, "first")
+	firstVersion, err := controller.allocateDesiredVersion()
+	require.NoError(t, err)
+	firstRelease := make(chan struct{})
+	close(firstRelease)
+	controller.retainPending(config, firstVersion, firstRelease)
+	require.Eventually(t, func() bool {
+		return countSecretDiagnostics(
+			diagnostics.snapshot(),
+			"secret Store pending retry failed",
+		) == 1
+	}, time.Second, time.Millisecond)
+
+	config = secretTestConfig(confgroup.TypeDyncfg, "second")
+	secondVersion, err := controller.allocateDesiredVersion()
+	require.NoError(t, err)
+	secondRelease := make(chan struct{})
+	close(secondRelease)
+	controller.retainPending(config, secondVersion, secondRelease)
+	require.Eventually(t, func() bool {
+		return countSecretDiagnostics(
+			diagnostics.snapshot(),
+			"secret Store pending retry failed",
+		) == 2
+	}, time.Second, time.Millisecond)
+	require.True(t, controller.pendingVersion(config.ExposedKey(), secondVersion))
+}
+
+type failingPendingRetryCommands struct {
+	err error
+}
+
+func (commands failingPendingRetryCommands) SubmitPrepared(
+	context.Context,
+	jobmgr.Request,
+	jobmgr.WorkPlan,
+) error {
+	return commands.err
+}
+
+func (commands failingPendingRetryCommands) SubmitPreparedAndWait(
+	context.Context,
+	jobmgr.Request,
+	jobmgr.WorkPlan,
+) error {
+	return commands.err
+}
+
+func countSecretDiagnostics(events []jobmgr.DiagnosticEvent, name string) int {
+	count := 0
+	for _, event := range events {
+		if event.Name == name {
+			count++
+		}
+	}
+	return count
 }
 
 func TestFailedStoreUpdateReplacesFailedProjectionWhenNoActiveGenerationExists(t *testing.T) {
