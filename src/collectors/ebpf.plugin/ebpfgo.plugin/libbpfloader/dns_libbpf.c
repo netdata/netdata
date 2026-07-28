@@ -645,9 +645,17 @@ static void dns_drain_flow_socket(struct netdata_dns_runtime *rt)
  * Everything else is dropped in the kernel before recv() is called.
  *
  * Limitation: assumes no IPv4 options (IHL=5) and no IPv6 extension headers.
- * IPv4 with options or IPv6 with extension headers will be missed by the
- * filter; those packets are uncommon in DNS traffic in practice.
- * VLAN-tagged frames (802.1Q/802.1AD) are not supported and are dropped.
+ * For IPv4-with-options the filter reads transport ports at the wrong offset
+ * (fixed at 34 instead of 14+IHL) and typically drops the packet even though
+ * dns_parse_raw_packet handles variable IHL correctly.  DNS traffic never uses
+ * IPv4 options in practice, so this gap is theoretical only.
+ * The aggregate count socket (sock_fd, no filter) is unaffected; only per-query
+ * flow_fd tracking misses these packets.
+ * IPv6 with extension headers: both the filter and dns_parse_raw_packet read
+ * the same fixed next-header offset (20), so behaviour is consistent.
+ * VLAN-tagged frames (802.1Q/802.1AD) are not supported and are dropped by
+ * both the filter (EtherType != 0x0800/0x86DD) and dns_parse_raw_packet
+ * (same EtherType check, falls through to "return false").
  *
  * Opcode reference (raw values, no <linux/filter.h> dependency):
  *   0x28 = BPF_LD  | BPF_H | BPF_ABS  (load 16-bit half-word at abs offset)
