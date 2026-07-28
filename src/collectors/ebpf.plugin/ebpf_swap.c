@@ -286,50 +286,6 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
 
 static void ebpf_obsolete_specific_swap_charts(char *type, int update_every);
 
-/**
- * Obsolete apps charts
- *
- * Obsolete apps charts.
- *
- * @param em a pointer to the structure with the default values.
- */
-void ebpf_obsolete_swap_apps_charts(struct ebpf_module *em)
-{
-    struct ebpf_target *w;
-    int update_every = em->update_every;
-    netdata_mutex_lock(&collect_data_mutex);
-    for (w = apps_groups_root_target; w; w = w->next) {
-        if (unlikely(!(w->charts_created & (1 << EBPF_MODULE_SWAP_IDX))))
-            continue;
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_call_swap_readpage",
-            "Calls to function swap_readpage.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_call_swap_readpage",
-            20070,
-            update_every);
-
-        ebpf_write_chart_obsolete(
-            NETDATA_APP_FAMILY,
-            w->clean_name,
-            "_ebpf_call_swap_writepage",
-            "Calls to function swap_writepage.",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_CHART_TYPE_STACKED,
-            "app.ebpf_call_swap_writepage",
-            20071,
-            update_every);
-        w->charts_created &= ~(1 << EBPF_MODULE_SWAP_IDX);
-    }
-    netdata_mutex_unlock(&collect_data_mutex);
-}
-
 
 /**
  * Swap exit
