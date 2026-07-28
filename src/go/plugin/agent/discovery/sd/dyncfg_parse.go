@@ -8,8 +8,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-
-	"gopkg.in/yaml.v2"
 )
 
 // parseDyncfgPayload parses a dyncfg JSON payload into a runtime pipeline.Config.
@@ -69,27 +67,6 @@ func configToJSON(data []byte) ([]byte, error) {
 	bs, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("marshal json: %w", err)
-	}
-
-	return bs, nil
-}
-
-// userConfigFromPayload converts a JSON payload to YAML format for user editing.
-// The returned YAML always uses jobName (or "test") as the top-level pipeline name.
-func userConfigFromPayload(payload []byte, discovererType, jobName string) ([]byte, error) {
-	var cfg pipeline.Config
-	if err := json.Unmarshal(payload, &cfg); err != nil {
-		return nil, fmt.Errorf("unmarshal json: %w", err)
-	}
-
-	cfg.Name = jobName
-	if cfg.Name == "" {
-		cfg.Name = "test"
-	}
-
-	bs, err := yaml.Marshal(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("marshal yaml: %w", err)
 	}
 
 	return bs, nil

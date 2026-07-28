@@ -137,6 +137,8 @@ func TestServiceDiscovery_WindowsSourcePathIsPublished(t *testing.T) {
 func TestServiceDiscovery_UnpublishableConfigDoesNotEnterStateOrWaitGate(t *testing.T) {
 	var output bytes.Buffer
 	discovery, err := NewServiceDiscovery(Config{
+		Epoch:        1,
+		Attempts:     newTestAttemptAuthority(t),
 		PluginName:   testPluginName,
 		DyncfgOutput: dyncfg.NewProtocolOutput(&output),
 		Discoverers:  testDiscovererRegistry(),

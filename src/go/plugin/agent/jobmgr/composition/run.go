@@ -180,11 +180,14 @@ func newRunGeneration(
 		return nil, err
 	}
 	initialRoutes := []functionadapter.InitialRoute{dynCfgRoute, secretRoute, vnodeRoute}
+	config.Discovery.BuildContext.Epoch = config.Generation
+	config.Discovery.BuildContext.Attempts = config.Attempts
 	var serviceDiscovery *serviceDiscoveryBinding
 	if len(config.Discovery.BuildContext.Paths.ServiceDiscoveryConfigDir) != 0 {
 		serviceDiscovery, err = newServiceDiscoveryBinding(
 			config.Generation,
 			config.Jobs.PluginName,
+			config.Attempts,
 			config.Frames,
 			config.Diagnostics,
 		)

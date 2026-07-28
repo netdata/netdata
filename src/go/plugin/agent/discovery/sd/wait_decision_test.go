@@ -125,6 +125,8 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 	confProv := &mockConfigProvider{ch: make(chan confFile)}
 
 	sd := &ServiceDiscovery{
+		epoch:          1,
+		attempts:       newTestAttemptAuthority(t),
 		Logger:         logger.New(),
 		confProv:       confProv,
 		pluginName:     testPluginName,
@@ -161,7 +163,7 @@ func newWaitTestServiceDiscovery(t *testing.T) (*ServiceDiscovery, chan confFile
 	})
 
 	send := func(context.Context, []*confgroup.Group) {}
-	sd.mgr = NewPipelineManager(sd.Logger, sd.newPipeline, send)
+	sd.mgr = NewPipelineManager(sd.Logger, send)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	sd.ctx = ctx

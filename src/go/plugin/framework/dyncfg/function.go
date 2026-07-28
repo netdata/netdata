@@ -3,6 +3,7 @@
 package dyncfg
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -23,6 +24,13 @@ func NewFunction(fn functions.Function) Function {
 // UID returns the function's unique identifier.
 func (f Function) UID() string {
 	return f.fn.UID
+}
+
+func (f Function) Context() context.Context {
+	if f.fn.Context == nil {
+		return context.Background()
+	}
+	return f.fn.Context
 }
 
 // Source returns the function's source field.

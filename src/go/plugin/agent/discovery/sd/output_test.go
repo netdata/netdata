@@ -19,6 +19,8 @@ import (
 func TestDyncfgConfigReturnsAfterQueuedCommandCompletes(t *testing.T) {
 	var output bytes.Buffer
 	discovery, err := NewServiceDiscovery(Config{
+		Epoch:        1,
+		Attempts:     newTestAttemptAuthority(t),
 		PluginName:   "test",
 		DyncfgOutput: dyncfg.NewProtocolOutput(&output),
 		Discoverers:  NewRegistry(),
@@ -65,6 +67,8 @@ func TestDyncfgConfigReturnsAfterQueuedCommandCompletes(t *testing.T) {
 func TestDyncfgAdmissionRejectsCommandsAfterShutdown(t *testing.T) {
 	var output bytes.Buffer
 	discovery, err := NewServiceDiscovery(Config{
+		Epoch:        1,
+		Attempts:     newTestAttemptAuthority(t),
 		PluginName:   "test",
 		DyncfgOutput: dyncfg.NewProtocolOutput(&output),
 		Discoverers:  NewRegistry(),
@@ -97,6 +101,8 @@ func TestNewServiceDiscoveryUsesConfiguredDyncfgOutput(t *testing.T) {
 
 	var buf bytes.Buffer
 	sd, err := NewServiceDiscovery(Config{
+		Epoch:        1,
+		Attempts:     newTestAttemptAuthority(t),
 		PluginName:   pluginName,
 		DyncfgOutput: dyncfg.NewProtocolOutput(&buf),
 		Discoverers:  NewRegistry(),

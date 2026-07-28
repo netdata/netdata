@@ -7,8 +7,10 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -88,8 +90,7 @@ func TestServiceDiscoveryBindingCapturesTypedInvocationOutput(t *testing.T) {
 			var notifications bytes.Buffer
 			frames, err := lifecycle.NewFrameOwner(&notifications)
 			require.NoError(t, err)
-			binding, err := newServiceDiscoveryBinding(1, "go.d", frames, nil)
-			require.NoError(t, err)
+			binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
 
 			result, cleanup, err := binding.invoke("uid", func() {
 				test.emit(binding)
@@ -119,8 +120,7 @@ func TestServiceDiscoveryBindingRoutesNotificationsOutsideInvocations(t *testing
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
-	binding, err := newServiceDiscoveryBinding(1, "go.d", frames, nil)
-	require.NoError(t, err)
+	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
 
 	binding.ConfigDelete("go.d:sd:type:gone")
 
@@ -130,8 +130,7 @@ func TestServiceDiscoveryBindingRoutesNotificationsOutsideInvocations(t *testing
 func TestServiceDiscoveryBindingRejectsResultOutsideInvocation(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
-	binding, err := newServiceDiscoveryBinding(1, "go.d", frames, nil)
-	require.NoError(t, err)
+	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
 
 	binding.FunctionResult(dyncfg.Result{
 		UID:         "late",
@@ -202,8 +201,7 @@ func TestServiceDiscoveryTransactionDisposeDoesNotInvokeHandler(t *testing.T) {
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
 	require.NoError(t, err)
-	binding, err := newServiceDiscoveryBinding(1, "go.d", frames, nil)
-	require.NoError(t, err)
+	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
 
 	invoked := false
 	binding.RegisterPrefix("config", "go.d:sd:", func(function frameworkfunctions.Function) {
@@ -237,13 +235,85 @@ func TestServiceDiscoveryTransactionDisposeDoesNotInvokeHandler(t *testing.T) {
 	require.Empty(t, output.String())
 }
 
+func TestServiceDiscoveryTransactionContainsNonCooperativeHandler(t *testing.T) {
+	var output bytes.Buffer
+	frames, err := lifecycle.NewFrameOwner(&output)
+	require.NoError(t, err)
+	binding := newServiceDiscoveryTestBinding(t, 1, frames, nil)
+	attempts := binding.attempts.(*containment.Authority)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	binding.RegisterPrefix("config", "go.d:sd:", func(function frameworkfunctions.Function) {
+		close(entered)
+		<-release
+		binding.FunctionResult(dyncfg.Result{
+			UID:         function.UID,
+			Code:        200,
+			ContentType: "application/json",
+		})
+		binding.ConfigStatus("go.d:sd:type:job", dyncfg.StatusRunning)
+	})
+
+	transaction, err := binding.prepare(
+		context.Background(),
+		functionadapter.HandlerInput{
+			UID:    "blocked",
+			Method: "config",
+			Args:   []string{"go.d:sd:type:job", "enable"},
+		},
+		nil,
+		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
+		lifecycle.LongLivedPermit{},
+	)
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := transaction.Apply(ctx)
+		firstDone <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "service discovery handler was not entered")
+	}
+	cancel()
+	select {
+	case err := <-firstDone:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "canceled service discovery command did not settle")
+	}
+
+	busy, err := binding.prepare(
+		context.Background(),
+		functionadapter.HandlerInput{
+			UID:    "busy",
+			Method: "config",
+			Args:   []string{"go.d:sd:type:job", "enable"},
+		},
+		nil,
+		lifecycle.ResourceTransactionScope{ID: "go.d:sd:type:job"},
+		lifecycle.LongLivedPermit{},
+	)
+	require.NoError(t, err)
+	applied, err := busy.Apply(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 503, applied.ResultStatus())
+
+	close(release)
+	require.Eventually(t, func() bool {
+		return attempts.Census() == (containment.Census{})
+	}, time.Second, time.Millisecond)
+	require.Empty(t, output.String())
+}
+
 func TestServiceDiscoveryDiagnosticsFollowAppliedCommandWithoutPayload(t *testing.T) {
 	const payloadSentinel = "service-discovery-payload-must-not-appear"
 	diagnostics := &recordingCompositionDiagnosticObserver{}
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	require.NoError(t, err)
-	binding, err := newServiceDiscoveryBinding(3, "go.d", frames, diagnostics)
-	require.NoError(t, err)
+	binding := newServiceDiscoveryTestBinding(t, 3, frames, diagnostics)
 	binding.RegisterPrefix("config", "go.d:sd:", func(function frameworkfunctions.Function) {
 		binding.FunctionResult(dyncfg.Result{
 			UID:         function.UID,
@@ -286,4 +356,23 @@ func TestServiceDiscoveryDiagnosticsFollowAppliedCommandWithoutPayload(t *testin
 	require.EqualValues(t, 3, completed.Generation)
 	require.Equal(t, 200, completed.ResultStatus)
 	require.NotContains(t, fmt.Sprintf("%+v", events), payloadSentinel)
+}
+
+func newServiceDiscoveryTestBinding(
+	t *testing.T,
+	epoch uint64,
+	frames *lifecycle.FrameOwner,
+	diagnostics jobmgr.DiagnosticObserver,
+) *serviceDiscoveryBinding {
+	t.Helper()
+	attempts, err := containment.NewAuthority(diagnostics)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, attempts.Shutdown(ctx))
+	})
+	binding, err := newServiceDiscoveryBinding(epoch, "go.d", attempts, frames, diagnostics)
+	require.NoError(t, err)
+	return binding
 }

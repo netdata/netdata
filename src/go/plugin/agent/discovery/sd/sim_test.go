@@ -55,6 +55,8 @@ func (sim *discoverySimExt) run(t *testing.T) {
 	fact := &mockFactory{}
 	var buf bytes.Buffer
 	mgr := &ServiceDiscovery{
+		epoch:      1,
+		attempts:   newTestAttemptAuthority(t),
 		Logger:     logger.New(),
 		pluginName: testPluginName,
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
@@ -139,6 +141,8 @@ func (sim *discoverySim) run(t *testing.T) {
 	fact := &mockFactory{}
 	var buf bytes.Buffer
 	mgr := &ServiceDiscovery{
+		epoch:      1,
+		attempts:   newTestAttemptAuthority(t),
 		Logger:     logger.New(),
 		pluginName: testPluginName,
 		newPipeline: func(config pipeline.Config) (sdPipeline, error) {
