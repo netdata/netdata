@@ -111,9 +111,18 @@ func TestDNSParseRawPacketBoundaries(t *testing.T) {
 			want: false,
 		},
 		"truncated DNS payload still counted as DNS transport": {
-			// Valid Ethernet+IP+UDP headers, port 53, only 8 DNS bytes (need 12)
-			// dns_parse_payload returns false; dns_parse_raw_packet returns true.
-			pkt:  validDNSQuery[:14+20+8+8],
+			// Valid Ethernet+IP+UDP headers, port 53, only 8 DNS bytes (need 12).
+			// ipv4_total must be self-consistent with the slice length so the
+			// total-length clamp check does not reject the packet before the
+			// transport-layer DNS check: 20(IP)+8(UDP)+8(DNS)=36 → 14+36=50 bytes.
+			// dns_parse_payload returns false (msg_len=8 < 12); dns_parse_raw_packet
+			// returns true (valid transport frame, counted as aggregate DNS).
+			pkt: func() []byte {
+				p := append([]byte{}, validDNSQuery[:14+20+8+8]...)
+				p[16], p[17] = 0x00, 0x24 // IPv4 total-length = 36 (20+8+8)
+				p[38], p[39] = 0x00, 0x10 // UDP length = 16 (8+8)
+				return p
+			}(),
 			want: true,
 		},
 		"valid full DNS query": {

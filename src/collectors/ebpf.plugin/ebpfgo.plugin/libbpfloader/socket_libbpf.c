@@ -716,7 +716,8 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
 
     if (rt->pid_ht_drops > 0) {
         uint64_t now = socket_now_usec();
-        if (now == 0 || now - rt->pid_ht_drops_last_log_usec >= SOCKET_PID_HT_LOG_INTERVAL_USEC) {
+        if (now == 0 || rt->pid_ht_drops_last_log_usec == 0 ||
+            now - rt->pid_ht_drops_last_log_usec >= SOCKET_PID_HT_LOG_INTERVAL_USEC) {
             fprintf(stderr,
                     "ebpf-go.plugin: socket: pid hash table full, %u connection entries dropped this cycle\n",
                     rt->pid_ht_drops);
