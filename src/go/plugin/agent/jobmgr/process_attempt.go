@@ -21,6 +21,7 @@ type ProcessAttemptNamespace uint8
 
 const (
 	ProcessAttemptJob ProcessAttemptNamespace = iota + 1
+	ProcessAttemptJobRuntime
 	ProcessAttemptJobTest
 	ProcessAttemptStore
 	ProcessAttemptStoreTest

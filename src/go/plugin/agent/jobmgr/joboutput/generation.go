@@ -278,6 +278,12 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 	if err != nil {
 		return nil, err
 	}
+	if state.owner != nil {
+		if err := state.owner.Promote(ctx); err != nil {
+			state.owner.Reject()
+			return nil, errors.Join(err, state.permit.AbortUnused())
+		}
+	}
 	if state.constructed.attach != nil {
 		attached, attachErr := state.constructed.attach(
 			lifecycle.ResourceIdentity{

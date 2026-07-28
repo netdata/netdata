@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -136,7 +137,7 @@ func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 		candidateJob:     job,
 		outputGate:       gate,
 	}
-	owner := newStagedJobOwner(candidate)
+	owner := newStagedJobOwner(candidate, nil, 0, jobmgr.ProcessAttemptIdentity{})
 	identity := lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}
 	attached, err := newProcessManagedJob(
 		JobVariantV1,

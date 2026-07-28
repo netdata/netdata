@@ -8,23 +8,36 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 type ResourceTransactionSpec struct {
-	Scope            lifecycle.ResourceTransactionScope       // identity of current + successor slots this txn spans
-	Disposition      lifecycle.ResourceTransactionDisposition // Unchanged / Installed / Removed / Replaced
-	Current          lifecycle.ReadyResource                  // running resource to stop/finalize (Removed/Replaced)
-	Successor        lifecycle.PreparedResource               // prepared job to start/publish (Installed/Replaced)
-	UnusedPermit     lifecycle.LongLivedPermit                // permit to abort when a successor slot goes unused
-	Graph            *dyncfg.Graph                            // dyncfg graph whose postimage is committed on apply
-	Mutation         dyncfg.GraphMutation                     // prepared graph mutation (valid when MutationPrepared)
-	MutationPrepared bool                                     // Mutation is owned and must be committed or aborted
-	AfterGraphCommit func()                                   // fires after the primary graph commit
-	AfterApply       func()                                   // fires after the whole transaction applies
-	Result           lifecycle.SealedResult                   // sealed dyncfg response for the caller
-	Cleanup          lifecycle.TaskCleanup                    // protocol-frame cleanup emitted on success
+	Scope                  lifecycle.ResourceTransactionScope       // identity of current + successor slots this txn spans
+	Disposition            lifecycle.ResourceTransactionDisposition // Unchanged / Installed / Removed / Replaced
+	Current                lifecycle.ReadyResource                  // running resource to stop/finalize (Removed/Replaced)
+	Successor              lifecycle.PreparedResource               // prepared job to start/publish (Installed/Replaced)
+	UnusedPermit           lifecycle.LongLivedPermit                // permit to abort when a successor slot goes unused
+	Graph                  *dyncfg.Graph                            // dyncfg graph whose postimage is committed on apply
+	Mutation               dyncfg.GraphMutation                     // prepared graph mutation (valid when MutationPrepared)
+	MutationPrepared       bool                                     // Mutation is owned and must be committed or aborted
+	AfterGraphCommit       func()                                   // fires after the primary graph commit
+	AfterApply             func()                                   // fires after the whole transaction applies
+	ActivationBusyFallback *ResourceActivationBusyFallback          // postimage after incumbent removal + busy promotion
+	Result                 lifecycle.SealedResult                   // sealed dyncfg response for the caller
+	Cleanup                lifecycle.TaskCleanup                    // protocol-frame cleanup emitted on success
+}
+
+// ResourceActivationBusyFallback is the graph/resource outcome used when a
+// successor cannot acquire a still-live installed-runtime identity after the
+// incumbent has been logically removed.
+type ResourceActivationBusyFallback struct {
+	Change           dyncfg.GraphChange // failed or removed graph postimage
+	AfterGraphCommit func()             // commits source/dependency projections
+	AfterApply       func()             // records pending/retry state
+	Result           lifecycle.SealedResult
+	Cleanup          lifecycle.TaskCleanup
 }
 
 func resourceRemovalDisposition(current lifecycle.ReadyResource) lifecycle.ResourceTransactionDisposition {
@@ -301,6 +314,50 @@ func (prt *PreparedResourceTransaction) Apply(
 			}
 		}
 		if err != nil {
+			if spec.ActivationBusyFallback != nil &&
+				errors.Is(err, jobmgr.ErrProcessAttemptBusy) &&
+				current == nil {
+				fallback := spec.ActivationBusyFallback
+				spec.Result = fallback.Result
+				spec.Cleanup = fallback.Cleanup
+				if mutationOwned {
+					if abortErr := spec.Graph.Abort(spec.Mutation); abortErr != nil {
+						return lifecycle.AppliedResourceTransaction{}, abortErr
+					}
+					mutationOwned = false
+				}
+				fallbackMutation, mutationErr := spec.Graph.PrepareMutation(
+					[]dyncfg.GraphChange{fallback.Change},
+				)
+				switch {
+				case mutationErr == nil:
+					if commitErr := commitGraphMutation(spec.Graph, fallbackMutation); commitErr != nil {
+						return lifecycle.AppliedResourceTransaction{}, commitErr
+					}
+					if fallback.AfterGraphCommit != nil {
+						fallback.AfterGraphCommit()
+					}
+				case errors.Is(mutationErr, dyncfg.ErrGraphNoChange):
+				// The graph already represents the fallback outcome.
+				default:
+					return lifecycle.AppliedResourceTransaction{}, mutationErr
+				}
+				applied, applyErr := lifecycle.NewAppliedResourceTransaction(
+					spec.Scope,
+					ownershipDisposition,
+					nil,
+					fallback.Result,
+					fallback.Cleanup,
+				)
+				if applyErr != nil {
+					return lifecycle.AppliedResourceTransaction{}, applyErr
+				}
+				appliedSealed = true
+				if fallback.AfterApply != nil {
+					fallback.AfterApply()
+				}
+				return applied, nil
+			}
 			return lifecycle.AppliedResourceTransaction{}, err
 		}
 		if current == nil {
@@ -443,6 +500,17 @@ func validateResourceTransactionSpec(spec ResourceTransactionSpec) error {
 	}
 	if spec.Successor != nil && spec.UnusedPermit.Valid() {
 		return errors.New("job output: transaction owns both successor and unused permit")
+	}
+	if fallback := spec.ActivationBusyFallback; fallback != nil {
+		if spec.Successor == nil ||
+			spec.Graph == nil ||
+			fallback.Change.ID != spec.Scope.ID ||
+			fallback.Cleanup == nil {
+			return errors.New("job output: invalid activation-busy fallback")
+		}
+		if fallback.Change.Config != nil && fallback.Change.Config.ID != spec.Scope.ID {
+			return errors.New("job output: activation-busy fallback config differs from scope")
+		}
 	}
 	switch spec.Disposition {
 	case lifecycle.ResourceTransactionUnchanged:

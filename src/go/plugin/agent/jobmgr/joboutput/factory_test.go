@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -417,7 +418,11 @@ func TestFactoryCandidateStageOwnsProbeUntilInstallationAcknowledgement(t *testi
 	_, _, resource := applied.Ownership()
 	generation := resource.(*JobGeneration)
 	require.Positive(t, runtime.registrations)
-	released, ok := attempts.ProcessAttemptReleased(stage.identity)
+	released, ok := attempts.ProcessAttemptReleased(jobmgr.ProcessAttemptIdentity{
+		Namespace: jobmgr.ProcessAttemptJobRuntime,
+		Key:       stage.identity.Key,
+		Resource:  stage.identity.Resource,
+	})
 	require.True(t, ok)
 	stage.Release()
 
@@ -526,6 +531,121 @@ func TestFactoryCandidateIdentityRemainsExclusiveAcrossRunEpochs(t *testing.T) {
 	first.Release()
 	<-released
 	require.EqualValues(t, containment.Census{}, attempts.Census())
+}
+
+func TestFactoryReplacementCandidateCoexistsWithIncumbentUntilRuntimePromotion(t *testing.T) {
+	cleanupEntered := make(chan struct{})
+	cleanupRelease := make(chan struct{})
+	state := &factoryTestState{}
+	created := 0
+	creator := collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			current := created
+			created++
+			module := state.module(nil, false)
+			charts := collectorapi.Charts{}
+			module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+			if current == 0 {
+				module.CleanupFunc = func(context.Context) {
+					close(cleanupEntered)
+					<-cleanupRelease
+					state.collectorCleanup++
+				}
+			}
+			return module
+		},
+	}
+	firstFactory, _ := newFactoryTestHarness(t, creator, nil)
+	secondFactory, _ := newFactoryTestHarness(t, creator, nil)
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	firstFactory.config.Epoch = 1
+	firstFactory.config.Attempts = attempts
+	secondFactory.config.Epoch = 2
+	secondFactory.config.Attempts = attempts
+
+	firstStage, err := firstFactory.NewCandidate(factoryTestConfig(false))
+	require.NoError(t, err)
+	firstStage.Start()
+	<-firstStage.Ready()
+	firstPermit, firstTasks := issueTestJobPermit(t, "module_job", 1)
+	firstPrepared, failure, err := firstFactory.PrepareCandidate(
+		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		firstPermit,
+		firstStage,
+	)
+	require.NoError(t, err)
+	require.Nil(t, failure)
+	firstResource, err := firstPrepared.AcceptStart(context.Background(), 1)
+	require.NoError(t, err)
+	firstGeneration := firstResource.(*JobGeneration)
+	require.NoError(t, firstGeneration.Publish())
+	require.NoError(t, firstGeneration.reserveInstallation())
+	require.NoError(t, firstGeneration.acknowledgeInstallation())
+
+	secondStage, err := secondFactory.NewCandidate(factoryTestConfig(false))
+	require.NoError(t, err)
+	secondStage.Start()
+	<-secondStage.Ready()
+	secondPermit, secondTasks := issueTestJobPermit(t, "module_job", 2)
+	secondPrepared, failure, err := secondFactory.PrepareCandidate(
+		lifecycle.ResourceIdentity{ID: "module_job", Generation: 2},
+		secondPermit,
+		secondStage,
+	)
+	require.NoError(t, err)
+	require.Nil(t, failure)
+	require.EqualValues(t, containment.Census{
+		Active:   2,
+		Admitted: 2,
+	}, attempts.Census())
+
+	require.NoError(t, firstGeneration.Stop(context.Background()))
+	require.NoError(t, firstGeneration.Finalize())
+	<-cleanupEntered
+
+	type acceptedGeneration struct {
+		generation *JobGeneration
+		err        error
+	}
+	accepted := make(chan acceptedGeneration, 1)
+	go func() {
+		resource, acceptErr := secondPrepared.AcceptStart(context.Background(), 2)
+		generation, _ := resource.(*JobGeneration)
+		accepted <- acceptedGeneration{
+			generation: generation,
+			err:        acceptErr,
+		}
+	}()
+	select {
+	case result := <-accepted:
+		require.FailNowf(t, "test failed", "replacement did not wait for incumbent physical release: %v", result.err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(cleanupRelease)
+
+	var secondGeneration *JobGeneration
+	select {
+	case result := <-accepted:
+		require.NoError(t, result.err)
+		secondGeneration = result.generation
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "replacement did not promote after incumbent physical release")
+	}
+	require.NoError(t, secondGeneration.Publish())
+	require.NoError(t, secondGeneration.reserveInstallation())
+	require.NoError(t, secondGeneration.acknowledgeInstallation())
+	require.NoError(t, secondGeneration.Stop(context.Background()))
+	require.NoError(t, secondGeneration.Finalize())
+
+	firstStage.Release()
+	secondStage.Release()
+	require.Eventually(t, func() bool {
+		return attempts.Census() == (containment.Census{})
+	}, time.Second, time.Millisecond)
+	require.EqualValues(t, 2, state.collectorCleanup)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, firstTasks.LongLivedCensus())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, secondTasks.LongLivedCensus())
 }
 
 func TestFactoryProbeUsesYieldedContextWithoutInventingDeadline(t *testing.T) {

@@ -40,6 +40,7 @@ type Namespace uint8
 
 const (
 	NamespaceJob Namespace = iota + 1
+	NamespaceJobRuntime
 	NamespaceJobTest
 	NamespaceStore
 	NamespaceStoreTest
@@ -57,6 +58,8 @@ func (namespace Namespace) String() string {
 	switch namespace {
 	case NamespaceJob:
 		return "job"
+	case NamespaceJobRuntime:
+		return "job-runtime"
 	case NamespaceJobTest:
 		return "job-test"
 	case NamespaceStore:

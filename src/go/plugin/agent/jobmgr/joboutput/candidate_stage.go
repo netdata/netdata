@@ -49,34 +49,62 @@ type PreparedJobCandidate struct {
 type stagedJobOwner struct {
 	mu sync.Mutex
 
-	resources  ConstructedJob
-	installing bool
-	decided    bool
-	attached   bool
-	started    bool
-	retiring   bool
+	resources       ConstructedJob
+	attempts        jobmgr.ProcessAttemptAuthority
+	runtimeIdentity jobmgr.ProcessAttemptIdentity
+	target          uint64
+	ownership       stagedJobOwnership
+	installing      bool
+	decided         bool
+	attached        bool
+	started         bool
+	retiring        bool
 
-	startRequests chan stagedJobStartRequest
-	retire        chan struct{}
-	detached      chan struct{}
-	done          chan struct{}
-	retireOnce    sync.Once
-	detachOnce    sync.Once
-	doneOnce      sync.Once
+	startRequests       chan stagedJobStartRequest
+	retire              chan struct{}
+	detached            chan struct{}
+	done                chan struct{}
+	transferred         chan struct{}
+	rejectCandidate     chan struct{}
+	retireOnce          sync.Once
+	detachOnce          sync.Once
+	doneOnce            sync.Once
+	transferOnce        sync.Once
+	candidateRejectOnce sync.Once
 }
+
+type stagedJobOwnership uint8
+
+const (
+	stagedJobOwnedByCandidate stagedJobOwnership = iota + 1
+	stagedJobPromotionActive
+	stagedJobOwnedByRuntime
+	stagedJobOwnershipRejected
+)
 
 type stagedJobStartRequest struct {
 	ctx    context.Context
 	result chan<- error
 }
 
-func newStagedJobOwner(candidate ConstructedJob) *stagedJobOwner {
+func newStagedJobOwner(
+	candidate ConstructedJob,
+	attempts jobmgr.ProcessAttemptAuthority,
+	target uint64,
+	runtimeIdentity jobmgr.ProcessAttemptIdentity,
+) *stagedJobOwner {
 	return &stagedJobOwner{
-		resources:     candidate,
-		startRequests: make(chan stagedJobStartRequest),
-		retire:        make(chan struct{}),
-		detached:      make(chan struct{}),
-		done:          make(chan struct{}),
+		resources:       candidate,
+		attempts:        attempts,
+		runtimeIdentity: runtimeIdentity,
+		target:          target,
+		ownership:       stagedJobOwnedByCandidate,
+		startRequests:   make(chan stagedJobStartRequest),
+		retire:          make(chan struct{}),
+		detached:        make(chan struct{}),
+		done:            make(chan struct{}),
+		transferred:     make(chan struct{}),
+		rejectCandidate: make(chan struct{}),
 	}
 }
 
@@ -115,9 +143,82 @@ func (owner *stagedJobOwner) Reject() {
 	}
 	owner.decided = true
 	owner.installing = false
+	ownership := owner.ownership
+	if ownership == stagedJobOwnedByCandidate {
+		owner.ownership = stagedJobOwnershipRejected
+	}
 	owner.mu.Unlock()
 	owner.requestRetirement()
 	owner.Detached()
+	if ownership == stagedJobOwnedByCandidate {
+		owner.candidateRejectOnce.Do(func() {
+			close(owner.rejectCandidate)
+		})
+	}
+}
+
+func (owner *stagedJobOwner) Promote(ctx context.Context) error {
+	if owner == nil || ctx == nil {
+		return errors.New("job output: invalid staged job promotion")
+	}
+	owner.mu.Lock()
+	if owner.attempts == nil ||
+		owner.target == 0 ||
+		owner.runtimeIdentity.Namespace != jobmgr.ProcessAttemptJobRuntime ||
+		owner.runtimeIdentity.Key == "" ||
+		owner.runtimeIdentity.Resource == "" ||
+		owner.ownership != stagedJobOwnedByCandidate ||
+		owner.decided ||
+		owner.retiring {
+		owner.mu.Unlock()
+		return errors.New("job output: invalid staged job promotion")
+	}
+	owner.ownership = stagedJobPromotionActive
+	start := func() (jobmgr.ProcessAttempt, <-chan error, error) {
+		attemptReady := make(chan jobmgr.ProcessAttempt, 1)
+		admitted := make(chan error, 1)
+		attempt, err := owner.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+			Identity: owner.runtimeIdentity,
+			Target:   owner.target,
+			Work: func(ctx context.Context) error {
+				owned := <-attemptReady
+				admitErr := owned.Admit()
+				admitted <- admitErr
+				if admitErr != nil {
+					return admitErr
+				}
+				return owner.finish(ctx)
+			},
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		attemptReady <- attempt
+		return attempt, admitted, nil
+	}
+	_, admitted, err := start()
+	if errors.Is(err, jobmgr.ErrProcessAttemptBusy) {
+		err = owner.attempts.SupersedeProcessAttempt(ctx, owner.runtimeIdentity)
+		if err == nil {
+			_, admitted, err = start()
+		}
+	}
+	if err != nil {
+		owner.ownership = stagedJobOwnedByCandidate
+		owner.mu.Unlock()
+		return err
+	}
+	if err := <-admitted; err != nil {
+		owner.ownership = stagedJobOwnedByCandidate
+		owner.mu.Unlock()
+		return err
+	}
+	owner.ownership = stagedJobOwnedByRuntime
+	owner.transferOnce.Do(func() {
+		close(owner.transferred)
+	})
+	owner.mu.Unlock()
+	return nil
 }
 
 func (owner *stagedJobOwner) ReserveInstallation() error {
@@ -298,6 +399,29 @@ func (owner *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 		resultErr = errors.Join(resultErr, <-exited)
 	}
 	return errors.Join(resultErr, owner.finalize())
+}
+
+func (owner *stagedJobOwner) finishCandidate(ctx context.Context) error {
+	if owner == nil {
+		return nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	select {
+	case <-owner.transferred:
+		return nil
+	case <-owner.rejectCandidate:
+		return owner.finalize()
+	case <-ctx.Done():
+		owner.Reject()
+		select {
+		case <-owner.transferred:
+			return nil
+		case <-owner.rejectCandidate:
+			return owner.finalize()
+		}
+	}
 }
 
 func (owner *stagedJobOwner) cutBeforeStart() {
@@ -518,12 +642,21 @@ func (stage *PreparedJobCandidate) run(
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		return errors.Join(err, cleanupErr)
 	}
-	owner := newStagedJobOwner(candidate)
+	owner := newStagedJobOwner(
+		candidate,
+		stage.attempts,
+		stage.target,
+		jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptJobRuntime,
+			Key:       candidate.candidateJob.FullName(),
+			Resource:  candidateDiagnosticResource(candidate.candidateJob.FullName()),
+		},
+	)
 	stage.publish(stagedJobResult{
 		candidate: candidate,
 		owner:     owner,
 	})
-	return owner.finish(ctx)
+	return owner.finishCandidate(ctx)
 }
 
 func (stage *PreparedJobCandidate) publish(result stagedJobResult) {

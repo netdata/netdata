@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
@@ -261,6 +262,92 @@ func TestPreparedResourceTransactionAbortsGraphMutationOnPrecommitFailure(t *tes
 			require.NoError(t, graph.Abort(next))
 		})
 	}
+}
+
+func TestPreparedResourceTransactionCommitsBusyFallbackAfterIncumbentRemoval(t *testing.T) {
+	var events []string
+	currentIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
+	successorIdentity := lifecycle.ResourceIdentity{ID: "job", Generation: 2}
+	current := &transactionTestReadyResource{
+		identity: currentIdentity,
+		prefix:   "current",
+		events:   &events,
+	}
+	successor := &transactionTestPreparedResource{
+		identity:  successorIdentity,
+		events:    &events,
+		acceptErr: jobmgr.ErrProcessAttemptBusy,
+	}
+	graph, err := dyncfg.NewGraph([]dyncfg.GraphConfig{{
+		ID: "job", Module: "module", Name: "job", Status: dyncfg.StatusRunning.String(),
+		Payload: []byte(`{"version":1}`),
+	}})
+	require.NoError(t, err)
+	running := dyncfg.GraphConfig{
+		ID: "job", Module: "module", Name: "job", Status: dyncfg.StatusRunning.String(),
+		Payload: []byte(`{"version":2}`),
+	}
+	mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{ID: "job", Config: &running}})
+	require.NoError(t, err)
+	failed := running
+	failed.Status = dyncfg.StatusFailed.String()
+	result, err := lifecycle.NewSealedResult(200, "application/json", nil)
+	require.NoError(t, err)
+	busyResult, err := lifecycle.NewSealedResult(503, "application/json", nil)
+	require.NoError(t, err)
+	transactionScope := lifecycle.ResourceTransactionScope{
+		ID:        "job",
+		Current:   currentIdentity,
+		Successor: successorIdentity,
+	}
+	transaction, err := PrepareResourceTransaction(ResourceTransactionSpec{
+		Scope:            transactionScope,
+		Disposition:      lifecycle.ResourceTransactionReplaced,
+		Current:          current,
+		Successor:        successor,
+		Graph:            graph,
+		Mutation:         mutation,
+		MutationPrepared: true,
+		ActivationBusyFallback: &ResourceActivationBusyFallback{
+			Change: dyncfg.GraphChange{ID: "job", Config: &failed},
+			AfterGraphCommit: func() {
+				events = append(events, "fallback-graph-commit")
+			},
+			AfterApply: func() {
+				events = append(events, "fallback-after-apply")
+			},
+			Result:  busyResult,
+			Cleanup: func() error { return nil },
+		},
+		Result:  result,
+		Cleanup: func() error { return nil },
+	})
+	require.NoError(t, err)
+
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	scope, disposition, owned := applied.Ownership()
+	require.Equal(t, transactionScope, scope)
+	require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
+	require.Nil(t, owned)
+	require.Equal(t, 503, applied.ResultStatus())
+	record, ok := graph.Lookup("job")
+	require.True(t, ok)
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	require.Equal(t, `{"version":2}`, record.Payload())
+	require.Equal(t, []string{
+		"current-stop",
+		"current-finalize",
+		"successor-accept",
+		"fallback-graph-commit",
+		"fallback-after-apply",
+	}, events)
+
+	next := failed
+	next.Status = dyncfg.StatusRunning.String()
+	nextMutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{ID: "job", Config: &next}})
+	require.NoError(t, err)
+	require.NoError(t, graph.Abort(nextMutation))
 }
 
 func TestPreparedResourceTransactionAbortsGraphMutationOnPanic(t *testing.T) {
