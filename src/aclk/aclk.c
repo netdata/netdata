@@ -307,8 +307,9 @@ static void puback_callback(uint16_t packet_id)
 void aclk_graceful_disconnect(mqtt_wss_client client);
 
 // Single source for MQTT_WSS_ERR_* -> status, so a drop reports the same cause whether it happens
-// while waiting for CONNACK or on an established connection.
-static ACLK_STATUS aclk_status_from_mqtt_wss_rc(int rc)
+// while waiting for CONNACK or on an established connection. Non-static so it can be unit tested;
+// declared in aclk.h with a plain int so the header needs no mqtt_wss dependency.
+ACLK_STATUS aclk_status_from_mqtt_wss_rc(int rc)
 {
     switch (rc) {
         case MQTT_WSS_ERR_REMOTE_CLOSED:   return ACLK_STATUS_OFFLINE_CLOSED_BY_REMOTE;
@@ -438,11 +439,16 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Attempting to gracefully shutdown the MQTT/WSS connection");
 
-    // Split four ways inside mqtt_wss_disconnect(), so 1s per phase. Each phase bounds how long
-    // we keep flushing whatever is still queued in the WebSocket write buffer; it does not wait
-    // for the peer, and it returns immediately when the buffer is already empty (the normal
-    // case). Nothing forcibly kills this thread, so an oversized budget delays shutdown rather
-    // than being truncated - keep it small enough that a stalled link cannot hold up exit.
+    // Split four ways inside mqtt_wss_disconnect(), so 1s per phase, bounding how long we keep
+    // flushing whatever is still queued in the WebSocket write buffer. It returns immediately
+    // when the buffer is already empty, which is the normal case.
+    //
+    // Worst case this plus the loop above is ~6s. That overruns the 3s that
+    // service_wait_exit(SERVICE_ACLK, ...) allows in daemon-shutdown.c, which does not truncate
+    // us - it logs and moves on, and the following service_wait_exit(~0, 20s) reaps us - but the
+    // remaining teardown then runs concurrently with this thread, and the time still counts
+    // toward the 135s cumulative limit after which the shutdown watcher abort()s the process.
+    // So keep this bounded; do not grow it without re-checking those two limits.
     mqtt_wss_disconnect(client, 4000);
 }
 
@@ -808,8 +814,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         // A failure inside the service loop (watchdog drop, poll error, protocol error) carries a
         // specific cause; without this the status kept whatever the previous disconnect set.
         // Only that class is covered: the earlier setup failures (TCP connect, proxy, SSL setup,
-        // SNI, mqtt_ng_connect) return via mqtt_rc and still leave a stale status - see the
-        // follow-up issue for mapping those.
+        // SNI, mqtt_ng_connect) return via mqtt_rc and still leave a stale status.
         if (mqtt_service_rc)
             aclk_status_set(aclk_status_from_mqtt_wss_rc(mqtt_service_rc));
 

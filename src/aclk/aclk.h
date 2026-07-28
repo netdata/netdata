@@ -67,6 +67,10 @@ extern ACLK_STATUS aclk_status;
 extern const char *aclk_cloud_base_url;
 const char *aclk_status_to_string(void);
 
+// Maps an MQTT_WSS_ERR_* code to the status reported via aclk_status_to_string() and
+// /api/v3/info. Takes a plain int so this header needs no mqtt_wss_client.h dependency.
+ACLK_STATUS aclk_status_from_mqtt_wss_rc(int rc);
+
 extern int aclk_ctx_based;
 extern int aclk_disable_runtime;
 //extern int aclk_stats_enabled;

@@ -189,8 +189,9 @@ mqtt_wss_client mqtt_wss_new(
     client->sockfd = -1;
     client->poll_fds[POLLFD_SOCKET].fd = -1;
 
-    // never leave this at 0: the watchdog would read the delta as the machine's uptime and
-    // drop the very first serviced connection. mqtt_wss_connect() re-arms it per attempt.
+    // Defensive: mqtt_wss_connect() re-arms this per attempt and is the only path to a serviced
+    // connection, so a 0 here is not reachable today. Seeded anyway because the watchdog check is
+    // no longer gated on mqtt_connected, and a 0 would read as the machine's uptime.
     client->last_io_progress_ut = now_monotonic_usec();
 
     client->msg_callback = msg_callback;
@@ -468,12 +469,18 @@ int mqtt_wss_connect(
     };
 #endif
 
-    // free SSL structs from possible previous connections
-    if (client->ssl)
+    // Free SSL structs from possible previous connections. Clear the pointers as we go: the
+    // allocations below can fail and return early, and a stale non-NULL pointer here would be
+    // freed again on the next attempt or by mqtt_wss_destroy().
+    if (client->ssl) {
         SSL_free(client->ssl);
+        client->ssl = NULL;
+    }
 
-    if (client->ssl_ctx)
+    if (client->ssl_ctx) {
         SSL_CTX_free(client->ssl_ctx);
+        client->ssl_ctx = NULL;
+    }
 
     client->ssl_ctx = SSL_CTX_new(SSLv23_client_method());
     if (!client->ssl_ctx) {
@@ -644,6 +651,25 @@ static mqtt_wss_drop_reason_t mqtt_wss_drop_reason(short revents, usec_t last_io
     return MQTT_WSS_DROP_NONE;
 }
 
+// Separate from the logging switch so the drop -> error-code mapping is pinned by a test: this is
+// what makes a watchdog drop distinguishable from a socket error in status and logs. A poll error
+// keeps reporting as MQTT_WSS_ERR_CONN_DROP (and therefore ACLK_STATUS_OFFLINE_SOCKET_ERROR);
+// MQTT_WSS_ERR_POLL_FAILED is reserved for the poll() syscall itself failing.
+static int mqtt_wss_err_from_drop_reason(mqtt_wss_drop_reason_t reason) {
+    switch (reason) {
+        case MQTT_WSS_DROP_POLL_ERROR:
+            return MQTT_WSS_ERR_CONN_DROP;
+
+        case MQTT_WSS_DROP_NO_IO_PROGRESS:
+            return MQTT_WSS_ERR_NO_IO_PROGRESS;
+
+        case MQTT_WSS_DROP_NONE:
+            return MQTT_WSS_OK;
+    }
+
+    return MQTT_WSS_OK;
+}
+
 static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
 {
     const usec_t start_ut = now_monotonic_usec();
@@ -654,19 +680,9 @@ static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
         if (remaining_ms <= 0)
             return MWS_TIMED_OUT;
 
-        // Re-arm POLLOUT every iteration: mqtt_wss_service() clears events, and after a
-        // *successful partial* SSL_write() there is no WANT_WRITE for set_socket_pollfds() to
-        // re-arm from, so a once-only arming leaves poll() unable to wake on writability and
-        // the phase blocks with data still queued.
-        //
-        // Only when nothing else is already awaited: if SSL_write() asked for POLLIN (a TLS 1.3
-        // post-handshake message or a renegotiation), adding POLLOUT on a writable socket would
-        // make poll() return at once and spin this loop for the whole phase.
-        if (!(client->poll_fds[POLLFD_SOCKET].events & POLLIN))
-            client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
-
         // Cap each attempt so a congested socket gets many tries within the phase instead of
-        // spending the whole budget inside one poll().
+        // spending the whole budget inside one poll(). mqtt_wss_service() arms POLLOUT itself
+        // from the write buffer, so nothing needs re-arming here.
         if (mqtt_wss_service(client, MIN(remaining_ms, 100)))
             return MWS_ERROR;
     }
@@ -879,6 +895,39 @@ int mqtt_wss_client_timeout_unittest(void) {
     MQTT_WSS_TEST(!aclk_disconnect_action_is_connection_scoped(ACLK_NO_DISCONNECT),
                   "ACLK_NO_DISCONNECT classified as a pending request");
 
+    // The drop -> error-code -> status chain. This is the deliverable: without it a watchdog drop
+    // is indistinguishable from a socket error to an operator. Swapping either mapping's arms
+    // used to leave the whole suite green.
+    MQTT_WSS_TEST(mqtt_wss_err_from_drop_reason(MQTT_WSS_DROP_NO_IO_PROGRESS) ==
+                      MQTT_WSS_ERR_NO_IO_PROGRESS,
+                  "a watchdog drop did not map to MQTT_WSS_ERR_NO_IO_PROGRESS");
+    MQTT_WSS_TEST(mqtt_wss_err_from_drop_reason(MQTT_WSS_DROP_POLL_ERROR) == MQTT_WSS_ERR_CONN_DROP,
+                  "a poll-error drop did not map to MQTT_WSS_ERR_CONN_DROP");
+    MQTT_WSS_TEST(mqtt_wss_err_from_drop_reason(MQTT_WSS_DROP_NONE) == MQTT_WSS_OK,
+                  "no drop did not map to MQTT_WSS_OK");
+
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_NO_IO_PROGRESS) ==
+                      ACLK_STATUS_OFFLINE_NO_IO_PROGRESS,
+                  "a watchdog drop is not reported as its own status");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_REMOTE_CLOSED) ==
+                      ACLK_STATUS_OFFLINE_CLOSED_BY_REMOTE,
+                  "remote close is not reported as closed-by-remote");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_PROTO_MQTT) ==
+                      ACLK_STATUS_OFFLINE_MQTT_PROTOCOL_ERROR,
+                  "an MQTT protocol error is not reported as such");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_PROTO_WS) ==
+                      ACLK_STATUS_OFFLINE_WS_PROTOCOL_ERROR,
+                  "a WebSocket protocol error is not reported as such");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_MSG_TOO_BIG) ==
+                      ACLK_STATUS_OFFLINE_MESSAGE_TOO_BIG,
+                  "an oversized message is not reported as such");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_POLL_FAILED) ==
+                      ACLK_STATUS_OFFLINE_POLL_ERROR,
+                  "a failed poll() syscall is not reported as a poll error");
+    MQTT_WSS_TEST(aclk_status_from_mqtt_wss_rc(MQTT_WSS_ERR_CONN_DROP) ==
+                      ACLK_STATUS_OFFLINE_SOCKET_ERROR,
+                  "a connection drop is not reported as a socket error");
+
     if (errors)
         fprintf(stderr, "mqtt wss timeout unittest: %d ERROR(S)\n", errors);
     else
@@ -921,11 +970,6 @@ static int t_till_next_keepalive_ms(mqtt_wss_client client)
     return timeout_ms;
 }
 
-// TODO when entering mqtt_wss_service use out buffer size to arm POLLOUT. Without it a
-// *successful partial* SSL_write() leaves events cleared with bytes still queued (the success
-// branch sets nothing, and mqtt_didnt_finish_write covers only the WS-layer partial), so those
-// bytes wait for the poll timeout instead of writability. mqtt_wss_service_all() works around it
-// per-iteration for the teardown path only.
 int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 {
     char *ptr;
@@ -946,6 +990,12 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             send_keepalive = 1;
         }
     }
+
+    // Arm POLLOUT from the write buffer, not from the last SSL error: a *successful partial*
+    // SSL_write() leaves no WANT_WRITE for set_socket_pollfds() to re-arm from, so keying off the
+    // error would leave queued bytes waiting for the poll timeout instead of writability.
+    if (rbuf_bytes_available(client->ws_client->buf_write))
+        client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
 
 #ifdef MQTT_WSS_CPUSTATS
     t2 = now_monotonic_usec();
@@ -1006,19 +1056,27 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     // plaintext, and that is genuine progress the watchdog must not mistake for a spin.
     mqtt_wss_note_wire_progress(client);
 
-    switch (mqtt_wss_drop_reason(client->poll_fds[POLLFD_SOCKET].revents,
-                                 client->last_io_progress_ut, now_monotonic_usec())) {
+    const mqtt_wss_drop_reason_t drop =
+        mqtt_wss_drop_reason(client->poll_fds[POLLFD_SOCKET].revents,
+                             client->last_io_progress_ut, now_monotonic_usec());
+
+    switch (drop) {
         case MQTT_WSS_DROP_POLL_ERROR:
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "ACLK: socket poll() reported error (revents=0x%x); dropping connection",
                    (unsigned)client->poll_fds[POLLFD_SOCKET].revents);
-            return MQTT_WSS_ERR_CONN_DROP;
+            return mqtt_wss_err_from_drop_reason(drop);
 
         case MQTT_WSS_DROP_NO_IO_PROGRESS:
+            // report both revents: this branch is reached whenever poll() returned for *either*
+            // fd, so the socket may show 0 here and the wakeup pipe alone be responsible
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "ACLK: no I/O progress for %d seconds while poll() kept reporting readiness; "
-                   "dropping connection to break a CPU spin", MQTT_WSS_IO_WATCHDOG_SECS);
-            return MQTT_WSS_ERR_NO_IO_PROGRESS;
+                   "ACLK: no I/O progress for %d seconds while poll() kept returning "
+                   "(socket revents=0x%x, pipe revents=0x%x); dropping connection to break a "
+                   "CPU spin", MQTT_WSS_IO_WATCHDOG_SECS,
+                   (unsigned)client->poll_fds[POLLFD_SOCKET].revents,
+                   (unsigned)client->poll_fds[POLLFD_PIPE].revents);
+            return mqtt_wss_err_from_drop_reason(drop);
 
         case MQTT_WSS_DROP_NONE:
             break;
