@@ -6347,7 +6347,10 @@ static const char *nv_dns_rcode_name(uint16_t rcode)
     }
 }
 
-/* update_every matches the 20-second per-query ring TTL. */
+/* MUST equal DNS_FLOW_TTL_US (20 s) so consecutive NV snapshots cover
+ * non-overlapping time windows — each DNS query counted exactly once.
+ * The ebpf-go publisher runs at half this interval (dnsDefaultUpdateEvery=10)
+ * to keep SHM fresh mid-window; that cadence does not affect snapshot overlap. */
 #define NV_DNS_UPDATE_EVERY 20
 
 static BUFFER *network_viewer_dns_result(void)

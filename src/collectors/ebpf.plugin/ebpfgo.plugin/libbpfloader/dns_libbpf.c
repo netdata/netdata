@@ -77,7 +77,10 @@ struct netdata_sock_fprog {
 #define DNS_PENDING_CAP         512         /* max concurrent in-flight queries  */
 #define DNS_PENDING_TIMEOUT_US  5000000ULL  /* 5 s: unmatched query → timeout    */
 #define DNS_FLOW_RING_CAP       1000        /* ring capacity — matches SHM       */
-#define DNS_FLOW_TTL_US         (20ULL * 1000000ULL) /* 20 s live window         */
+#define DNS_FLOW_TTL_US         (20ULL * 1000000ULL) /* 20 s live window; MUST equal
+                                                       * NV_DNS_UPDATE_EVERY so consecutive
+                                                       * NV snapshots cover non-overlapping
+                                                       * windows (each query counted once). */
 #define DNS_DOMAIN_MAX          256
 #define DNS_PACKET_BUF          65536
 

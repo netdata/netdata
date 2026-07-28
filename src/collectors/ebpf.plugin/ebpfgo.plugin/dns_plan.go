@@ -6,7 +6,10 @@ import (
 
 const (
 	dnsKernelMask          uint32 = (1 << 12) - 1
-	dnsDefaultUpdateEvery         = 10
+	// dnsDefaultUpdateEvery is intentionally half of DNS_FLOW_TTL_US (20 s) so
+	// the SHM stays fresh mid-window; NV_DNS_UPDATE_EVERY must equal the TTL to
+	// keep consecutive NV snapshots non-overlapping (each query counted once).
+	dnsDefaultUpdateEvery = 10
 	dnsDefaultObjectFlavor        = "buffer"
 	// dnsMaxBaseSelector is the highest SelectKernelName index for which a
 	// base-flavor (no suffix) dns object file is shipped.
