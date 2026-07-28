@@ -31,7 +31,7 @@ and sampling rate information.
 For full documentation including how sFlow differs fundamentally from NetFlow (packet
 sampling vs aggregated flows), vendor configuration examples (Arista, Juniper, Aruba CX,
 Ruckus, hsflowd), and the limits of sampled data, see the
-[Network Flows Overview](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/).
+[Network Flows Overview](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/README.md).
 
 
 The plugin uses the same configurable UDP listener set as NetFlow/IPFIX. sFlow datagrams are identified by
@@ -130,7 +130,7 @@ protocols:
 
 ### Verifying sFlow is arriving and diagnosing failures
 
-See [Troubleshooting](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/troubleshooting) for
+See [Troubleshooting](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/troubleshooting.md) for
 the full diagnostic recipe. sFlow-specific gotchas: Netdata creates Network Flow rows
 from sFlow flow samples (`flow_sample` / `expanded_flow_sample`) only. Counter-only
 streams (`counters_sample` / `expanded_counters_sample`) are valid sFlow and increment
@@ -139,5 +139,5 @@ records for the Flow Explorer, Sankey, time-series, or maps. Bytes/packets are
 statistical estimates that won't match SNMP byte-for-byte, and VLAN information comes
 from `ExtendedSwitch` records only -- not from 802.1Q tags inside the sampled header.
 See also
-[Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality)
-and the sFlow section of [Anti-patterns](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/anti-patterns).
+[Validation and Data Quality](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/validation.md)
+and the sFlow section of [Anti-patterns](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/anti-patterns.md).

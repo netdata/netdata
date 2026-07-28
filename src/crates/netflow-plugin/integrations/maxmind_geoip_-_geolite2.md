@@ -47,7 +47,7 @@ bounded-cardinality geography columns.
 
 For the cross-cutting concept (resolver poll loop, multi-database composition,
 ASN provider chain, failure-modes table), see
-[IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment).
+[IP Intelligence](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md).
 
 
 You can use MaxMind in two ways:
@@ -170,7 +170,7 @@ format.)
 Override the default DB-IP auto-detection by pointing `asn_database` and
 `geo_database` at your MaxMind MMDB files. Both keys take a list -- you can
 chain MaxMind alongside other MMDB sources; see the
-[IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)
+[IP Intelligence](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md)
 page for the per-field "last non-empty wins" composition rule.
 
 
@@ -238,7 +238,7 @@ enrichment:
 
 ###### MaxMind ASN + DB-IP geo (mixed)
 
-Use MaxMind for ASN richness and keep the bundled DB-IP geo file. Both lookups run; the multi-DB composition rule is documented on the [IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment) page.
+Use MaxMind for ASN richness and keep the bundled DB-IP geo file. Both lookups run; the multi-DB composition rule is documented on the [IP Intelligence](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md) page.
 
 <details open><summary>Config</summary>
 
@@ -286,6 +286,6 @@ AS data.
 
 The plugin loads every configured MMDB. If you list both, the per-field
 "last non-empty wins" rule applies (see the
-[IP Intelligence](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/enrichment)
+[IP Intelligence](https://github.com/netdata/netdata/blob/master/docs/npm/network-flows/enrichment.md)
 concept page). Order matters: list the source whose values you want to win
 **last**.
