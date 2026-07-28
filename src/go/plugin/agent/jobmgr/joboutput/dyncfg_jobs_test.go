@@ -1329,36 +1329,36 @@ type runtimeBusyTestAuthority struct {
 	delegate jobmgr.ProcessAttemptAuthority
 }
 
-func (authority runtimeBusyTestAuthority) StartProcessAttempt(
+func (rbta runtimeBusyTestAuthority) StartProcessAttempt(
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
 		return nil, jobmgr.ErrProcessAttemptBusy
 	}
-	return authority.delegate.StartProcessAttempt(plan)
+	return rbta.delegate.StartProcessAttempt(plan)
 }
 
-func (authority runtimeBusyTestAuthority) SupersedeProcessAttempt(
+func (rbta runtimeBusyTestAuthority) SupersedeProcessAttempt(
 	ctx context.Context,
 	identity jobmgr.ProcessAttemptIdentity,
 ) error {
 	if identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
 		return jobmgr.ErrProcessAttemptBusy
 	}
-	return authority.delegate.SupersedeProcessAttempt(ctx, identity)
+	return rbta.delegate.SupersedeProcessAttempt(ctx, identity)
 }
 
-func (authority runtimeBusyTestAuthority) CutProcessAttempt(
+func (rbta runtimeBusyTestAuthority) CutProcessAttempt(
 	identity jobmgr.ProcessAttemptIdentity,
 	cause error,
 ) bool {
-	return authority.delegate.CutProcessAttempt(identity, cause)
+	return rbta.delegate.CutProcessAttempt(identity, cause)
 }
 
-func (authority runtimeBusyTestAuthority) ProcessAttemptReleased(
+func (rbta runtimeBusyTestAuthority) ProcessAttemptReleased(
 	identity jobmgr.ProcessAttemptIdentity,
 ) (<-chan struct{}, bool) {
-	return authority.delegate.ProcessAttemptReleased(identity)
+	return rbta.delegate.ProcessAttemptReleased(identity)
 }
 
 type nonRetryableAutoDetectionError struct{}

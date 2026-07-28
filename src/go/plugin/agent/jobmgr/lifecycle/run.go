@@ -59,19 +59,19 @@ type RunCensus struct {
 	RunFinalizerComplete   bool
 }
 
-func (census RunCensus) Drained() bool {
-	frameDrained := !census.Frame.Poisoned && !census.Frame.Busy &&
-		!census.Frame.PendingControl && census.Frame.RetainedBytes == 0
-	return census.KernelDrained &&
-		census.FunctionCatalogDrained && census.UIDActive == 0 &&
-		census.TransientActive == 0 && census.TransientPending == 0 &&
-		census.InheritedActive == 0 &&
-		census.LongLived == (LongLivedCensus{}) && frameDrained &&
-		census.RunFinalizerComplete
+func (rc RunCensus) Drained() bool {
+	frameDrained := !rc.Frame.Poisoned && !rc.Frame.Busy &&
+		!rc.Frame.PendingControl && rc.Frame.RetainedBytes == 0
+	return rc.KernelDrained &&
+		rc.FunctionCatalogDrained && rc.UIDActive == 0 &&
+		rc.TransientActive == 0 && rc.TransientPending == 0 &&
+		rc.InheritedActive == 0 &&
+		rc.LongLived == (LongLivedCensus{}) && frameDrained &&
+		rc.RunFinalizerComplete
 }
 
-func (census RunCensus) Quiescent() bool {
-	return census.Drained() && census.Abandoned.Empty()
+func (rc RunCensus) Quiescent() bool {
+	return rc.Drained() && rc.Abandoned.Empty()
 }
 
 type RunTerminalState struct {

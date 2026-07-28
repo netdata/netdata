@@ -69,52 +69,52 @@ type functionInvocationResult struct {
 	err    error
 }
 
-func (bundle *functionBundle) bindContainment(
+func (fb *functionBundle) bindContainment(
 	attempts jobmgr.ProcessAttemptAuthority,
 	target uint64,
 	key string,
 	resource string,
 ) error {
-	if bundle == nil ||
+	if fb == nil ||
 		attempts == nil ||
 		target == 0 ||
 		key == "" ||
 		resource == "" {
 		return errors.New("jobmgr Function bundle: invalid containment binding")
 	}
-	bundle.mu.Lock()
-	defer bundle.mu.Unlock()
-	if bundle.attempts != nil || bundle.identityKey != "" || bundle.target != 0 {
+	fb.mu.Lock()
+	defer fb.mu.Unlock()
+	if fb.attempts != nil || fb.identityKey != "" || fb.target != 0 {
 		return errors.New("jobmgr Function bundle: duplicate containment binding")
 	}
-	bundle.attempts = attempts
-	bundle.identityKey = key
-	bundle.resource = resource
-	bundle.target = target
+	fb.attempts = attempts
+	fb.identityKey = key
+	fb.resource = resource
+	fb.target = target
 	return nil
 }
 
-func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll, error) {
-	if bundle == nil {
+func (fb *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll, error) {
+	if fb == nil {
 		return functionAvailabilityPoll{}, errors.New("jobmgr Function bundle: nil availability poll")
 	}
-	bundle.mu.Lock()
-	if bundle.retired || !bundle.pollable {
-		bundle.mu.Unlock()
+	fb.mu.Lock()
+	if fb.retired || !fb.pollable {
+		fb.mu.Unlock()
 		return functionAvailabilityPoll{}, nil
 	}
-	if bundle.quarantined {
-		bundle.mu.Unlock()
+	if fb.quarantined {
+		fb.mu.Unlock()
 		return functionAvailabilityPoll{}, jobmgr.ErrProcessAttemptBusy
 	}
-	callback := &functionCallback{bundle: bundle}
-	bundle.activeCallbacks++
-	bundle.references++
-	attempts := bundle.attempts
-	key := bundle.identityKey
-	resource := bundle.resource
-	target := bundle.target
-	bundle.mu.Unlock()
+	callback := &functionCallback{bundle: fb}
+	fb.activeCallbacks++
+	fb.references++
+	attempts := fb.attempts
+	key := fb.identityKey
+	resource := fb.resource
+	target := fb.target
+	fb.mu.Unlock()
 	if attempts == nil {
 		callback.complete()
 		return functionAvailabilityPoll{}, errors.New("jobmgr Function bundle: availability containment is not bound")
@@ -130,7 +130,7 @@ func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll,
 		OnContainment: callback.quarantineIfActive,
 		Work: func(ctx context.Context, _ jobmgr.ProcessAttemptAdmission) error {
 			defer callback.complete()
-			availability, pollErr := bundle.evaluateAvailability()
+			availability, pollErr := fb.evaluateAvailability()
 			if cause := context.Cause(ctx); cause != nil {
 				return cause
 			}
@@ -158,38 +158,38 @@ func (bundle *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll,
 	return functionAvailabilityPoll{
 		attempt: attempt,
 		result:  result,
-		bundle:  bundle,
+		bundle:  fb,
 	}, nil
 }
 
-func (bundle *functionBundle) invoke(
+func (fb *functionBundle) invoke(
 	ctx context.Context,
 	call func(context.Context) (lifecycle.SealedResult, error),
 ) (lifecycle.SealedResult, error) {
-	if bundle == nil || ctx == nil || call == nil {
+	if fb == nil || ctx == nil || call == nil {
 		return functionErrorResult(503, "Function handler is unavailable")
 	}
-	bundle.mu.Lock()
-	if bundle.retired || bundle.quarantined {
-		bundle.mu.Unlock()
+	fb.mu.Lock()
+	if fb.retired || fb.quarantined {
+		fb.mu.Unlock()
 		return functionErrorResult(503, "Function handler is unavailable")
 	}
-	bundle.invocationID++
-	if bundle.invocationID == 0 {
-		bundle.quarantined = true
-		bundle.idExhausted = true
-		bundle.mu.Unlock()
+	fb.invocationID++
+	if fb.invocationID == 0 {
+		fb.quarantined = true
+		fb.idExhausted = true
+		fb.mu.Unlock()
 		return functionErrorResult(503, "Function handler is unavailable")
 	}
-	invocationID := bundle.invocationID
-	bundle.activeCallbacks++
-	bundle.references++
-	attempts := bundle.attempts
-	key := bundle.identityKey
-	resource := bundle.resource
-	target := bundle.target
-	callback := &functionCallback{bundle: bundle}
-	bundle.mu.Unlock()
+	invocationID := fb.invocationID
+	fb.activeCallbacks++
+	fb.references++
+	attempts := fb.attempts
+	key := fb.identityKey
+	resource := fb.resource
+	target := fb.target
+	callback := &functionCallback{bundle: fb}
+	fb.mu.Unlock()
 
 	result := make(chan functionInvocationResult, 1)
 	attempt, err := attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
@@ -233,31 +233,31 @@ func (bundle *functionBundle) invoke(
 	return response.result, response.err
 }
 
-func (callback *functionCallback) quarantineIfActive() {
-	if callback == nil || callback.bundle == nil {
+func (fc *functionCallback) quarantineIfActive() {
+	if fc == nil || fc.bundle == nil {
 		return
 	}
 	// Containment invokes this fence under the attempt-authority lock.
 	// Bundle admissions must therefore release bundle.mu before entering it.
-	bundle := callback.bundle
+	bundle := fc.bundle
 	bundle.mu.Lock()
-	if !callback.completed {
+	if !fc.completed {
 		bundle.quarantined = true
 	}
 	bundle.mu.Unlock()
 }
 
-func (callback *functionCallback) complete() {
-	if callback == nil || callback.bundle == nil {
+func (fc *functionCallback) complete() {
+	if fc == nil || fc.bundle == nil {
 		return
 	}
-	bundle := callback.bundle
+	bundle := fc.bundle
 	bundle.mu.Lock()
-	if callback.completed {
+	if fc.completed {
 		bundle.mu.Unlock()
 		return
 	}
-	callback.completed = true
+	fc.completed = true
 	if bundle.activeCallbacks <= 0 {
 		bundle.mu.Unlock()
 		panic("jobmgr Function bundle: active callback underflow")
@@ -428,106 +428,106 @@ func callFunctionAvailability(callback func() bool) (available bool, err error) 
 	return callback(), nil
 }
 
-func (bundle *functionBundle) acquire() error {
-	if bundle == nil {
+func (fb *functionBundle) acquire() error {
+	if fb == nil {
 		return errors.New("jobmgr Function bundle: nil acquire")
 	}
-	bundle.mu.Lock()
-	defer bundle.mu.Unlock()
-	if bundle.retired || bundle.references <= 0 {
+	fb.mu.Lock()
+	defer fb.mu.Unlock()
+	if fb.retired || fb.references <= 0 {
 		return errors.New("jobmgr Function bundle: acquire after retirement")
 	}
-	bundle.references++
+	fb.references++
 	return nil
 }
 
-func (bundle *functionBundle) release() {
-	if bundle == nil {
+func (fb *functionBundle) release() {
+	if fb == nil {
 		return
 	}
-	bundle.mu.Lock()
-	if bundle.references <= 0 {
-		bundle.mu.Unlock()
+	fb.mu.Lock()
+	if fb.references <= 0 {
+		fb.mu.Unlock()
 		panic("jobmgr Function bundle: reference underflow")
 	}
-	bundle.references--
-	start := bundle.startCleanupLocked()
-	bundle.mu.Unlock()
+	fb.references--
+	start := fb.startCleanupLocked()
+	fb.mu.Unlock()
 	if start {
-		go bundle.cleanup()
+		go fb.cleanup()
 	}
 }
 
-func (bundle *functionBundle) retire() {
-	if bundle == nil {
+func (fb *functionBundle) retire() {
+	if fb == nil {
 		return
 	}
-	bundle.mu.Lock()
-	if bundle.retired {
-		bundle.mu.Unlock()
+	fb.mu.Lock()
+	if fb.retired {
+		fb.mu.Unlock()
 		return
 	}
-	bundle.retired = true
-	bundle.references--
-	start := bundle.startCleanupLocked()
-	bundle.mu.Unlock()
+	fb.retired = true
+	fb.references--
+	start := fb.startCleanupLocked()
+	fb.mu.Unlock()
 	if start {
-		go bundle.cleanup()
+		go fb.cleanup()
 	}
 }
 
-func (bundle *functionBundle) startCleanupLocked() bool {
-	if !bundle.retired || bundle.references != 0 || bundle.cleanupStart {
+func (fb *functionBundle) startCleanupLocked() bool {
+	if !fb.retired || fb.references != 0 || fb.cleanupStart {
 		return false
 	}
-	bundle.cleanupStart = true
+	fb.cleanupStart = true
 	return true
 }
 
-func (bundle *functionBundle) cleanup() {
-	if bundle.handler != nil {
-		bundle.cleanupErr = callMethodCleanup(context.Background(), bundle.handler)
+func (fb *functionBundle) cleanup() {
+	if fb.handler != nil {
+		fb.cleanupErr = callMethodCleanup(context.Background(), fb.handler)
 	}
-	close(bundle.cleanupDone)
+	close(fb.cleanupDone)
 }
 
-func (bundle *functionBundle) wait(ctx context.Context) error {
-	if bundle == nil {
+func (fb *functionBundle) wait(ctx context.Context) error {
+	if fb == nil {
 		return nil
 	}
 	select {
-	case <-bundle.cleanupDone:
-		bundle.mu.Lock()
-		defer bundle.mu.Unlock()
-		return bundle.cleanupErr
+	case <-fb.cleanupDone:
+		fb.mu.Lock()
+		defer fb.mu.Unlock()
+		return fb.cleanupErr
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func (bundle *functionBundle) refreshAvailability() (bool, error) {
-	next, err := bundle.evaluateAvailability()
+func (fb *functionBundle) refreshAvailability() (bool, error) {
+	next, err := fb.evaluateAvailability()
 	if err != nil {
 		return false, err
 	}
-	return bundle.commitAvailability(next), nil
+	return fb.commitAvailability(next), nil
 }
 
-func (bundle *functionBundle) evaluateAvailability() (map[string]bool, error) {
-	if bundle == nil {
+func (fb *functionBundle) evaluateAvailability() (map[string]bool, error) {
+	if fb == nil {
 		return nil, errors.New("jobmgr Function bundle: nil availability refresh")
 	}
-	next := make(map[string]bool, len(bundle.methods))
-	for _, method := range bundle.methods {
+	next := make(map[string]bool, len(fb.methods))
+	for _, method := range fb.methods {
 		available := true
 		var err error
-		switch bundle.kind {
+		switch fb.kind {
 		case functionBundleAgent:
 			if method.Available != nil {
 				available, err = callFunctionAvailability(method.Available)
 			}
 		case functionBundleJob:
-			if callback, ok := bundle.job.Collector().(collectorapi.FunctionAvailability); ok && callback != nil {
+			if callback, ok := fb.job.Collector().(collectorapi.FunctionAvailability); ok && callback != nil {
 				available, err = callFunctionAvailability(func() bool {
 					return callback.FunctionAvailable(method.ID)
 				})
@@ -543,33 +543,33 @@ func (bundle *functionBundle) evaluateAvailability() (map[string]bool, error) {
 	return next, nil
 }
 
-func (bundle *functionBundle) commitAvailability(next map[string]bool) bool {
-	if bundle == nil {
+func (fb *functionBundle) commitAvailability(next map[string]bool) bool {
+	if fb == nil {
 		return false
 	}
-	bundle.mu.Lock()
-	defer bundle.mu.Unlock()
-	if bundle.retired {
+	fb.mu.Lock()
+	defer fb.mu.Unlock()
+	if fb.retired {
 		return false
 	}
-	changed := len(bundle.availability) != len(next)
+	changed := len(fb.availability) != len(next)
 	if !changed {
 		for method, available := range next {
-			if bundle.availability[method] != available {
+			if fb.availability[method] != available {
 				changed = true
 				break
 			}
 		}
 	}
-	bundle.availability = next
+	fb.availability = next
 	return changed
 }
 
-func (bundle *functionBundle) available(method string) bool {
-	if bundle == nil {
+func (fb *functionBundle) available(method string) bool {
+	if fb == nil {
 		return false
 	}
-	bundle.mu.Lock()
-	defer bundle.mu.Unlock()
-	return !bundle.retired && !bundle.quarantined && bundle.availability[method]
+	fb.mu.Lock()
+	defer fb.mu.Unlock()
+	return !fb.retired && !fb.quarantined && fb.availability[method]
 }

@@ -672,40 +672,40 @@ type gatedAwaitAuthority struct {
 	allowReturn chan struct{}
 }
 
-func (authority *gatedAwaitAuthority) StartProcessAttempt(
+func (gaa *gatedAwaitAuthority) StartProcessAttempt(
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
-	attempt, err := authority.delegate.StartProcessAttempt(plan)
+	attempt, err := gaa.delegate.StartProcessAttempt(plan)
 	if err != nil ||
-		plan.Identity.Namespace != authority.namespace ||
-		authority.started.Add(1) != authority.ordinal {
+		plan.Identity.Namespace != gaa.namespace ||
+		gaa.started.Add(1) != gaa.ordinal {
 		return attempt, err
 	}
 	return &gatedAwaitAttempt{
 		ProcessAttempt: attempt,
-		settled:        authority.settled,
-		allowReturn:    authority.allowReturn,
+		settled:        gaa.settled,
+		allowReturn:    gaa.allowReturn,
 	}, nil
 }
 
-func (authority *gatedAwaitAuthority) SupersedeProcessAttempt(
+func (gaa *gatedAwaitAuthority) SupersedeProcessAttempt(
 	ctx context.Context,
 	identity jobmgr.ProcessAttemptIdentity,
 ) error {
-	return authority.delegate.SupersedeProcessAttempt(ctx, identity)
+	return gaa.delegate.SupersedeProcessAttempt(ctx, identity)
 }
 
-func (authority *gatedAwaitAuthority) CutProcessAttempt(
+func (gaa *gatedAwaitAuthority) CutProcessAttempt(
 	identity jobmgr.ProcessAttemptIdentity,
 	cause error,
 ) bool {
-	return authority.delegate.CutProcessAttempt(identity, cause)
+	return gaa.delegate.CutProcessAttempt(identity, cause)
 }
 
-func (authority *gatedAwaitAuthority) ProcessAttemptReleased(
+func (gaa *gatedAwaitAuthority) ProcessAttemptReleased(
 	identity jobmgr.ProcessAttemptIdentity,
 ) (<-chan struct{}, bool) {
-	return authority.delegate.ProcessAttemptReleased(identity)
+	return gaa.delegate.ProcessAttemptReleased(identity)
 }
 
 type gatedAwaitAttempt struct {
@@ -715,15 +715,15 @@ type gatedAwaitAttempt struct {
 	once        sync.Once
 }
 
-func (attempt *gatedAwaitAttempt) Await(ctx context.Context) error {
-	err := attempt.ProcessAttempt.Await(ctx)
-	attempt.once.Do(func() { close(attempt.settled) })
-	<-attempt.allowReturn
+func (gat *gatedAwaitAttempt) Await(ctx context.Context) error {
+	err := gat.ProcessAttempt.Await(ctx)
+	gat.once.Do(func() { close(gat.settled) })
+	<-gat.allowReturn
 	return err
 }
 
-func (port *availabilityPublicationPort) Publish(record PublicationRecord) error {
-	port.published <- record
+func (app *availabilityPublicationPort) Publish(record PublicationRecord) error {
+	app.published <- record
 	return nil
 }
 

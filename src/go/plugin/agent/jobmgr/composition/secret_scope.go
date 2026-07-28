@@ -19,40 +19,40 @@ type processOwnedAtomicScope struct {
 	scope       secretresolver.AtomicScope
 }
 
-func (scope *processOwnedAtomicScope) Resolve(
+func (poas *processOwnedAtomicScope) Resolve(
 	ctx context.Context,
 	reference string,
 	original string,
 ) ([]byte, error) {
-	if scope == nil {
+	if poas == nil {
 		return nil, errors.New("jobmgr composition: invalid process-owned Store scope")
 	}
-	scope.mu.Lock()
-	defer scope.mu.Unlock()
-	if scope.scope == nil {
+	poas.mu.Lock()
+	defer poas.mu.Unlock()
+	if poas.scope == nil {
 		return nil, errors.New("jobmgr composition: invalid process-owned Store scope")
 	}
-	return scope.scope.Resolve(ctx, reference, original)
+	return poas.scope.Resolve(ctx, reference, original)
 }
 
-func (scope *processOwnedAtomicScope) Release(ctx context.Context) error {
-	if scope == nil {
+func (poas *processOwnedAtomicScope) Release(ctx context.Context) error {
+	if poas == nil {
 		return errors.New("jobmgr composition: invalid process-owned Store scope")
 	}
-	scope.mu.Lock()
-	if scope.generation == 0 || scope.scope == nil {
-		scope.mu.Unlock()
+	poas.mu.Lock()
+	if poas.generation == 0 || poas.scope == nil {
+		poas.mu.Unlock()
 		return errors.New("jobmgr composition: invalid process-owned Store scope")
 	}
-	owned := scope.scope
-	scope.scope = nil
-	scope.mu.Unlock()
+	owned := poas.scope
+	poas.scope = nil
+	poas.mu.Unlock()
 	err := owned.Release(ctx)
 	if err != nil {
-		jobmgr.ObserveDiagnostic(scope.diagnostics, jobmgr.DiagnosticEvent{
+		jobmgr.ObserveDiagnostic(poas.diagnostics, jobmgr.DiagnosticEvent{
 			Level:      jobmgr.DiagnosticError,
 			Name:       "secret Store scope release failed",
-			Generation: scope.generation,
+			Generation: poas.generation,
 			Err:        err,
 		})
 	}

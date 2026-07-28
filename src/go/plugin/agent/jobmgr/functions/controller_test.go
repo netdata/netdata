@@ -988,10 +988,10 @@ type blockingControllerTestHandler struct {
 	cleanupRelease <-chan struct{}
 }
 
-func (handler *blockingControllerTestHandler) Cleanup(ctx context.Context) {
-	close(handler.cleanupEntered)
-	<-handler.cleanupRelease
-	handler.controllerTestHandler.Cleanup(ctx)
+func (bcth *blockingControllerTestHandler) Cleanup(ctx context.Context) {
+	close(bcth.cleanupEntered)
+	<-bcth.cleanupRelease
+	bcth.controllerTestHandler.Cleanup(ctx)
 }
 
 type blockingWithdrawPublicationPort struct {

@@ -363,7 +363,7 @@ type busyPendingJobAuthority struct {
 	release <-chan struct{}
 }
 
-func (authority busyPendingJobAuthority) StartProcessAttempt(
+func (bpja busyPendingJobAuthority) StartProcessAttempt(
 	jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	return nil, errors.New("test: unexpected pending job attempt start")
@@ -383,28 +383,28 @@ func (busyPendingJobAuthority) CutProcessAttempt(
 	return false
 }
 
-func (authority busyPendingJobAuthority) ProcessAttemptReleased(
+func (bpja busyPendingJobAuthority) ProcessAttemptReleased(
 	jobmgr.ProcessAttemptIdentity,
 ) (<-chan struct{}, bool) {
-	return authority.release, true
+	return bpja.release, true
 }
 
 type unexpectedPendingJobAuthority struct {
 	calls atomic.Int32
 }
 
-func (authority *unexpectedPendingJobAuthority) StartProcessAttempt(
+func (upja *unexpectedPendingJobAuthority) StartProcessAttempt(
 	jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
-	authority.calls.Add(1)
+	upja.calls.Add(1)
 	return nil, errors.New("test: stale pending job started")
 }
 
-func (authority *unexpectedPendingJobAuthority) SupersedeProcessAttempt(
+func (upja *unexpectedPendingJobAuthority) SupersedeProcessAttempt(
 	context.Context,
 	jobmgr.ProcessAttemptIdentity,
 ) error {
-	authority.calls.Add(1)
+	upja.calls.Add(1)
 	return errors.New("test: stale pending job superseded")
 }
 

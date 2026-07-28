@@ -264,15 +264,15 @@ func (ts *TaskSupervisor) IssueLongLivedPermit(owner ResourceIdentity, plan Long
 	}, nil
 }
 
-func (registry *longLivedRegistry) allocateSlot() (LongLivedPermitRef, *longLivedSlot, error) {
-	next := registry.nextSlot + 1
+func (llr *longLivedRegistry) allocateSlot() (LongLivedPermitRef, *longLivedSlot, error) {
+	next := llr.nextSlot + 1
 	if next == 0 {
 		return 0, nil, errors.New("jobmgr long-lived permit: reference space exhausted")
 	}
-	registry.nextSlot = next
+	llr.nextSlot = next
 	ref := LongLivedPermitRef(next)
 	slot := &longLivedSlot{}
-	registry.slots[ref] = slot
+	llr.slots[ref] = slot
 	return ref, slot, nil
 }
 

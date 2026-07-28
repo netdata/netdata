@@ -104,12 +104,12 @@ type PreparedStoreOperation struct {
 	releaseOnce sync.Once
 }
 
-func (operations *StoreOperations) immediate(
+func (so *StoreOperations) immediate(
 	result storeOperationResult,
 ) *PreparedStoreOperation {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	return &PreparedStoreOperation{
-		operations: operations,
+		operations: so,
 		ctx:        ctx,
 		cancel:     cancel,
 		ready:      make(chan struct{}),
@@ -118,10 +118,10 @@ func (operations *StoreOperations) immediate(
 	}
 }
 
-func (operations *StoreOperations) prepare(
+func (so *StoreOperations) prepare(
 	spec storeOperationSpec,
 ) (*PreparedStoreOperation, error) {
-	if operations == nil ||
+	if so == nil ||
 		spec.target.key == "" ||
 		spec.mode < storeOperationMutation ||
 		spec.mode > storeOperationRemoval {
@@ -133,7 +133,7 @@ func (operations *StoreOperations) prepare(
 	input.Payload = append([]byte(nil), input.Payload...)
 	spec.input = input
 	return &PreparedStoreOperation{
-		operations: operations,
+		operations: so,
 		spec:       spec,
 		ctx:        ctx,
 		cancel:     cancel,
@@ -142,157 +142,157 @@ func (operations *StoreOperations) prepare(
 	}, nil
 }
 
-func (operation *PreparedStoreOperation) Start() {
-	if operation == nil {
+func (pso *PreparedStoreOperation) Start() {
+	if pso == nil {
 		return
 	}
-	operation.startOnce.Do(func() {
-		operation.mu.Lock()
-		operation.started = true
-		operation.mu.Unlock()
-		go operation.start()
+	pso.startOnce.Do(func() {
+		pso.mu.Lock()
+		pso.started = true
+		pso.mu.Unlock()
+		go pso.start()
 	})
 }
 
-func (operation *PreparedStoreOperation) Ready() <-chan struct{} {
-	if operation == nil {
+func (pso *PreparedStoreOperation) Ready() <-chan struct{} {
+	if pso == nil {
 		return nil
 	}
-	return operation.ready
+	return pso.ready
 }
 
-func (operation *PreparedStoreOperation) Cancel(cause error) {
-	if operation == nil {
+func (pso *PreparedStoreOperation) Cancel(cause error) {
+	if pso == nil {
 		return
 	}
 	if cause == nil {
 		cause = context.Canceled
 	}
-	operation.cancel(cause)
-	operation.mu.Lock()
-	attempt := operation.attempt
-	operation.mu.Unlock()
+	pso.cancel(cause)
+	pso.mu.Lock()
+	attempt := pso.attempt
+	pso.mu.Unlock()
 	if attempt != nil {
 		attempt.Cut(cause)
 	}
 }
 
-func (operation *PreparedStoreOperation) Release() {
-	if operation == nil {
+func (pso *PreparedStoreOperation) Release() {
+	if pso == nil {
 		return
 	}
-	operation.mu.Lock()
-	if operation.released {
-		operation.mu.Unlock()
+	pso.mu.Lock()
+	if pso.released {
+		pso.mu.Unlock()
 		return
 	}
-	operation.released = true
-	started := operation.started
-	operation.immediate = nil
-	operation.mu.Unlock()
-	operation.cancel(context.Canceled)
-	operation.releaseOnce.Do(func() {
-		close(operation.release)
+	pso.released = true
+	started := pso.started
+	pso.immediate = nil
+	pso.mu.Unlock()
+	pso.cancel(context.Canceled)
+	pso.releaseOnce.Do(func() {
+		close(pso.release)
 	})
 	if !started {
-		operation.publish(storeOperationResult{err: context.Canceled})
+		pso.publish(storeOperationResult{err: context.Canceled})
 	}
-	operation.clearUnownedResult()
+	pso.clearUnownedResult()
 }
 
-func (operation *PreparedStoreOperation) start() {
-	operation.mu.Lock()
-	immediate := operation.immediate
-	operation.immediate = nil
-	operation.mu.Unlock()
+func (pso *PreparedStoreOperation) start() {
+	pso.mu.Lock()
+	immediate := pso.immediate
+	pso.immediate = nil
+	pso.mu.Unlock()
 	if immediate != nil {
 		result := *immediate
-		operation.publish(result)
+		pso.publish(result)
 		return
 	}
-	if err := context.Cause(operation.ctx); err != nil {
-		operation.publish(storeOperationResult{err: err})
+	if err := context.Cause(pso.ctx); err != nil {
+		pso.publish(storeOperationResult{err: err})
 		return
 	}
-	if operation.spec.mode == storeOperationRemoval {
-		identity := operation.operations.identity(operation.spec.target.key, false, nil)
-		operation.mu.Lock()
-		operation.identity = identity
-		operation.mu.Unlock()
+	if pso.spec.mode == storeOperationRemoval {
+		identity := pso.operations.identity(pso.spec.target.key, false, nil)
+		pso.mu.Lock()
+		pso.identity = identity
+		pso.mu.Unlock()
 		// This logically contains and cancels physical preparation, which may
 		// continue until Released. prepareRemove commits the desired-version
 		// fence that invalidates older retained ADDs.
-		operation.operations.attempts.CutProcessAttempt(identity, jobmgr.ErrProcessAttemptSuperseded)
-		operation.publish(storeOperationResult{
-			desiredVersion: operation.spec.desiredVersion,
+		pso.operations.attempts.CutProcessAttempt(identity, jobmgr.ErrProcessAttemptSuperseded)
+		pso.publish(storeOperationResult{
+			desiredVersion: pso.spec.desiredVersion,
 			removal:        true,
 		})
 		return
 	}
 
-	config := operation.spec.config
+	config := pso.spec.config
 	if config == nil {
 		var err error
-		config, err = materializeSecretConfig(operation.spec.input, operation.spec.target)
+		config, err = materializeSecretConfig(pso.spec.input, pso.spec.target)
 		if err != nil {
-			operation.publish(storeOperationResult{
+			pso.publish(storeOperationResult{
 				err:            err,
-				desiredVersion: operation.spec.desiredVersion,
-				validationOnly: operation.spec.validationOnly,
+				desiredVersion: pso.spec.desiredVersion,
+				validationOnly: pso.spec.validationOnly,
 			})
 			return
 		}
 	}
 	identityPayload := []byte(nil)
-	if operation.spec.testIdentity {
+	if pso.spec.testIdentity {
 		identityPayload = fmt.Appendf(nil, "%016x", config.Hash())
 	}
-	operation.spec.input = CommandInput{}
-	identity := operation.operations.identity(
-		operation.spec.target.key,
-		operation.spec.testIdentity,
+	pso.spec.input = CommandInput{}
+	identity := pso.operations.identity(
+		pso.spec.target.key,
+		pso.spec.testIdentity,
 		identityPayload,
 	)
-	operation.mu.Lock()
-	operation.identity = identity
-	operation.mu.Unlock()
+	pso.mu.Lock()
+	pso.identity = identity
+	pso.mu.Unlock()
 
-	attempt, err := operation.startAttempt(identity, config)
+	attempt, err := pso.startAttempt(identity, config)
 	if err != nil {
-		released, _ := operation.operations.attempts.ProcessAttemptReleased(identity)
-		operation.publish(storeOperationResult{
+		released, _ := pso.operations.attempts.ProcessAttemptReleased(identity)
+		pso.publish(storeOperationResult{
 			config:         config,
 			release:        released,
 			err:            err,
-			expected:       operation.spec.expected,
-			desiredVersion: operation.spec.desiredVersion,
-			validationOnly: operation.spec.validationOnly,
+			expected:       pso.spec.expected,
+			desiredVersion: pso.spec.desiredVersion,
+			validationOnly: pso.spec.validationOnly,
 			retryable:      errors.Is(err, jobmgr.ErrProcessAttemptBusy),
 		})
 		return
 	}
-	operation.mu.Lock()
-	operation.attempt = attempt
-	operation.mu.Unlock()
-	if cause := context.Cause(operation.ctx); cause != nil {
+	pso.mu.Lock()
+	pso.attempt = attempt
+	pso.mu.Unlock()
+	if cause := context.Cause(pso.ctx); cause != nil {
 		attempt.Cut(cause)
 	}
-	operation.observeAttempt(attempt, config)
+	pso.observeAttempt(attempt, config)
 }
 
-func (operation *PreparedStoreOperation) startAttempt(
+func (pso *PreparedStoreOperation) startAttempt(
 	identity jobmgr.ProcessAttemptIdentity,
 	config secretstore.Config,
 ) (jobmgr.ProcessAttempt, error) {
 	start := func() (jobmgr.ProcessAttempt, error) {
-		attempt, err := operation.operations.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+		attempt, err := pso.operations.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
 			Identity: identity,
-			Target:   operation.operations.epoch,
+			Target:   pso.operations.epoch,
 			Work: func(
 				ctx context.Context,
 				admission jobmgr.ProcessAttemptAdmission,
 			) error {
-				return operation.runAttempt(ctx, admission, config)
+				return pso.runAttempt(ctx, admission, config)
 			},
 		})
 		if err != nil {
@@ -302,38 +302,38 @@ func (operation *PreparedStoreOperation) startAttempt(
 	}
 
 	attempt, err := start()
-	if !errors.Is(err, jobmgr.ErrProcessAttemptBusy) || !operation.spec.supersede {
+	if !errors.Is(err, jobmgr.ErrProcessAttemptBusy) || !pso.spec.supersede {
 		return attempt, err
 	}
-	if err := operation.operations.attempts.SupersedeProcessAttempt(operation.ctx, identity); err != nil {
+	if err := pso.operations.attempts.SupersedeProcessAttempt(pso.ctx, identity); err != nil {
 		return nil, err
 	}
 	return start()
 }
 
-func (operation *PreparedStoreOperation) runAttempt(
+func (pso *PreparedStoreOperation) runAttempt(
 	ctx context.Context,
 	admission jobmgr.ProcessAttemptAdmission,
 	config secretstore.Config,
 ) error {
 	result := storeOperationResult{
 		config:         config,
-		expected:       operation.spec.expected,
-		desiredVersion: operation.spec.desiredVersion,
-		validationOnly: operation.spec.validationOnly,
+		expected:       pso.spec.expected,
+		desiredVersion: pso.spec.desiredVersion,
+		validationOnly: pso.spec.validationOnly,
 	}
-	if operation.spec.mode == storeOperationValidation {
-		result.err = operation.operations.store.Validate(
+	if pso.spec.mode == storeOperationValidation {
+		result.err = pso.operations.store.Validate(
 			ctx,
-			operation.operations.creators,
+			pso.operations.creators,
 			config,
 		)
 	} else {
-		result.mutation, result.err = operation.operations.store.PrepareMutation(
+		result.mutation, result.err = pso.operations.store.PrepareMutation(
 			ctx,
-			operation.operations.creators,
+			pso.operations.creators,
 			config,
-			operation.spec.expected,
+			pso.spec.expected,
 		)
 	}
 	if err := admission.Admit(); err != nil {
@@ -342,24 +342,24 @@ func (operation *PreparedStoreOperation) runAttempt(
 		}
 		return err
 	}
-	operation.publish(result)
-	<-operation.release
-	operation.clearUnownedResult()
+	pso.publish(result)
+	<-pso.release
+	pso.clearUnownedResult()
 	return nil
 }
 
-func (operation *PreparedStoreOperation) observeAttempt(
+func (pso *PreparedStoreOperation) observeAttempt(
 	attempt jobmgr.ProcessAttempt,
 	config secretstore.Config,
 ) {
 	err := attempt.Await(context.Background())
-	operation.publish(storeOperationResult{
+	pso.publish(storeOperationResult{
 		config:         config,
 		release:        attempt.Released(),
 		err:            err,
-		expected:       operation.spec.expected,
-		desiredVersion: operation.spec.desiredVersion,
-		validationOnly: operation.spec.validationOnly,
+		expected:       pso.spec.expected,
+		desiredVersion: pso.spec.desiredVersion,
+		validationOnly: pso.spec.validationOnly,
 		retryable:      containmentRetryable(err),
 	})
 }
@@ -370,86 +370,86 @@ func containmentRetryable(err error) bool {
 		errors.Is(err, jobmgr.ErrProcessAttemptSuperseded)
 }
 
-func (operation *PreparedStoreOperation) publish(result storeOperationResult) {
+func (pso *PreparedStoreOperation) publish(result storeOperationResult) {
 	discard := false
 	published := false
-	operation.readyOnce.Do(func() {
+	pso.readyOnce.Do(func() {
 		published = true
-		operation.mu.Lock()
-		if operation.taken || operation.released {
+		pso.mu.Lock()
+		if pso.taken || pso.released {
 			discard = true
 		} else {
-			operation.result = result
+			pso.result = result
 		}
-		operation.settled = true
-		operation.spec.input = CommandInput{}
-		operation.spec.config = nil
-		operation.mu.Unlock()
-		close(operation.ready)
+		pso.settled = true
+		pso.spec.input = CommandInput{}
+		pso.spec.config = nil
+		pso.mu.Unlock()
+		close(pso.ready)
 	})
 	if !published || discard {
-		operation.releaseResult(result)
+		pso.releaseResult(result)
 	}
 }
 
-func (operation *PreparedStoreOperation) take() (storeOperationResult, error) {
-	if operation == nil {
+func (pso *PreparedStoreOperation) take() (storeOperationResult, error) {
+	if pso == nil {
 		return storeOperationResult{}, errors.New("jobmgr secrets: nil Store operation")
 	}
 	select {
-	case <-operation.ready:
+	case <-pso.ready:
 	default:
 		return storeOperationResult{}, errors.New("jobmgr secrets: Store operation is not ready")
 	}
-	operation.mu.Lock()
-	defer operation.mu.Unlock()
-	if !operation.settled || operation.taken {
+	pso.mu.Lock()
+	defer pso.mu.Unlock()
+	if !pso.settled || pso.taken {
 		return storeOperationResult{}, errors.New("jobmgr secrets: Store operation already consumed")
 	}
-	operation.taken = true
-	result := operation.result
-	operation.result = storeOperationResult{}
+	pso.taken = true
+	result := pso.result
+	pso.result = storeOperationResult{}
 	return result, nil
 }
 
-func (operation *PreparedStoreOperation) clearUnownedResult() {
-	operation.mu.Lock()
-	if operation.taken {
-		operation.mu.Unlock()
+func (pso *PreparedStoreOperation) clearUnownedResult() {
+	pso.mu.Lock()
+	if pso.taken {
+		pso.mu.Unlock()
 		return
 	}
-	result := operation.result
-	operation.result = storeOperationResult{}
-	operation.taken = true
-	operation.mu.Unlock()
-	operation.releaseResult(result)
+	result := pso.result
+	pso.result = storeOperationResult{}
+	pso.taken = true
+	pso.mu.Unlock()
+	pso.releaseResult(result)
 }
 
-func (operation *PreparedStoreOperation) releaseResult(result storeOperationResult) {
+func (pso *PreparedStoreOperation) releaseResult(result storeOperationResult) {
 	if result.mutation == nil {
 		return
 	}
 	if err := result.mutation.Abort(); err != nil {
-		operation.mu.Lock()
-		identity := operation.identity
-		operation.mu.Unlock()
-		jobmgr.ObserveDiagnostic(operation.operations.diagnostics, jobmgr.DiagnosticEvent{
+		pso.mu.Lock()
+		identity := pso.identity
+		pso.mu.Unlock()
+		jobmgr.ObserveDiagnostic(pso.operations.diagnostics, jobmgr.DiagnosticEvent{
 			Level:      jobmgr.DiagnosticError,
 			Name:       "secret Store staged mutation release failed",
 			Resource:   identity.Resource,
-			Generation: operation.operations.epoch,
+			Generation: pso.operations.epoch,
 			Err:        err,
 		})
 	}
 }
 
-func (operations *StoreOperations) identity(
+func (so *StoreOperations) identity(
 	key string,
 	test bool,
 	payload []byte,
 ) jobmgr.ProcessAttemptIdentity {
 	namespace := jobmgr.ProcessAttemptStore
-	opaque := fmt.Sprintf("%d/%s", operations.epoch, key)
+	opaque := fmt.Sprintf("%d/%s", so.epoch, key)
 	if test {
 		namespace = jobmgr.ProcessAttemptStoreTest
 		hash := sha256.Sum256(payload)

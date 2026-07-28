@@ -71,57 +71,57 @@ type processManagedLoopSupport struct {
 	released bool
 }
 
-func (support *processManagedLoopSupport) Start(ctx context.Context) error {
-	if support == nil || ctx == nil {
+func (pmls *processManagedLoopSupport) Start(ctx context.Context) error {
+	if pmls == nil || ctx == nil {
 		return errors.New("job output: invalid process-managed loop start")
 	}
-	support.mu.Lock()
-	if support.owner == nil || support.started || support.stopped || support.released {
-		support.mu.Unlock()
+	pmls.mu.Lock()
+	if pmls.owner == nil || pmls.started || pmls.stopped || pmls.released {
+		pmls.mu.Unlock()
 		return errors.New("job output: invalid process-managed loop state")
 	}
-	owner := support.owner
-	support.mu.Unlock()
+	owner := pmls.owner
+	pmls.mu.Unlock()
 	if err := owner.Start(ctx); err != nil {
 		owner.Retire()
 		return err
 	}
-	support.mu.Lock()
-	support.started = true
-	support.mu.Unlock()
+	pmls.mu.Lock()
+	pmls.started = true
+	pmls.mu.Unlock()
 	return nil
 }
 
-func (support *processManagedLoopSupport) Stop(context.Context) error {
-	if support == nil {
+func (pmls *processManagedLoopSupport) Stop(context.Context) error {
+	if pmls == nil {
 		return errors.New("job output: nil process-managed loop stop")
 	}
-	support.mu.Lock()
-	if !support.started || support.released {
-		support.mu.Unlock()
+	pmls.mu.Lock()
+	if !pmls.started || pmls.released {
+		pmls.mu.Unlock()
 		return errors.New("job output: invalid process-managed loop stop")
 	}
-	if support.stopped {
-		support.mu.Unlock()
+	if pmls.stopped {
+		pmls.mu.Unlock()
 		return nil
 	}
-	support.stopped = true
-	owner := support.owner
-	support.mu.Unlock()
+	pmls.stopped = true
+	owner := pmls.owner
+	pmls.mu.Unlock()
 	owner.Retire()
 	return nil
 }
 
-func (support *processManagedLoopSupport) Release(context.Context) error {
-	if support == nil {
+func (pmls *processManagedLoopSupport) Release(context.Context) error {
+	if pmls == nil {
 		return errors.New("job output: nil process-managed loop release")
 	}
-	support.mu.Lock()
-	defer support.mu.Unlock()
-	if !support.started || !support.stopped || support.released {
+	pmls.mu.Lock()
+	defer pmls.mu.Unlock()
+	if !pmls.started || !pmls.stopped || pmls.released {
 		return errors.New("job output: invalid process-managed loop release")
 	}
-	support.released = true
+	pmls.released = true
 	return nil
 }
 

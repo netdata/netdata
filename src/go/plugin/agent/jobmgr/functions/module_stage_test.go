@@ -214,11 +214,11 @@ func (*moduleStageBlockingHandler) Handle(
 	return &funcapi.FunctionResponse{Status: 200}
 }
 
-func (handler *moduleStageBlockingHandler) Cleanup(context.Context) {
-	handler.cleanupOnce.Do(func() {
-		close(handler.cleanupEntered)
+func (msbh *moduleStageBlockingHandler) Cleanup(context.Context) {
+	msbh.cleanupOnce.Do(func() {
+		close(msbh.cleanupEntered)
 	})
-	<-handler.cleanupRelease
+	<-msbh.cleanupRelease
 }
 
 type controlledModuleAdmissionAuthority struct {
@@ -244,7 +244,7 @@ func newControlledModuleAdmissionAuthority(
 	}
 }
 
-func (authority *controlledModuleAdmissionAuthority) StartProcessAttempt(
+func (cmaa *controlledModuleAdmissionAuthority) StartProcessAttempt(
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	work := plan.Work
@@ -254,44 +254,44 @@ func (authority *controlledModuleAdmissionAuthority) StartProcessAttempt(
 	) error {
 		return work(ctx, &controlledModuleAdmission{
 			ProcessAttemptAdmission: admission,
-			authority:               authority,
+			authority:               cmaa,
 		})
 	}
-	delegate, err := authority.delegate.StartProcessAttempt(plan)
+	delegate, err := cmaa.delegate.StartProcessAttempt(plan)
 	if err != nil {
 		return nil, err
 	}
-	authority.attempt = delegate
+	cmaa.attempt = delegate
 	return delegate, nil
 }
 
-func (authority *controlledModuleAdmissionAuthority) SupersedeProcessAttempt(
+func (cmaa *controlledModuleAdmissionAuthority) SupersedeProcessAttempt(
 	ctx context.Context,
 	identity jobmgr.ProcessAttemptIdentity,
 ) error {
-	return authority.delegate.SupersedeProcessAttempt(ctx, identity)
+	return cmaa.delegate.SupersedeProcessAttempt(ctx, identity)
 }
 
-func (authority *controlledModuleAdmissionAuthority) CutProcessAttempt(
+func (cmaa *controlledModuleAdmissionAuthority) CutProcessAttempt(
 	identity jobmgr.ProcessAttemptIdentity,
 	cause error,
 ) bool {
-	return authority.delegate.CutProcessAttempt(identity, cause)
+	return cmaa.delegate.CutProcessAttempt(identity, cause)
 }
 
-func (authority *controlledModuleAdmissionAuthority) ProcessAttemptReleased(
+func (cmaa *controlledModuleAdmissionAuthority) ProcessAttemptReleased(
 	identity jobmgr.ProcessAttemptIdentity,
 ) (<-chan struct{}, bool) {
-	return authority.delegate.ProcessAttemptReleased(identity)
+	return cmaa.delegate.ProcessAttemptReleased(identity)
 }
 
-func (admission *controlledModuleAdmission) Admit() error {
-	if err := admission.ProcessAttemptAdmission.Admit(); err != nil {
+func (cma *controlledModuleAdmission) Admit() error {
+	if err := cma.ProcessAttemptAdmission.Admit(); err != nil {
 		return err
 	}
-	admission.admitOnce.Do(func() {
-		close(admission.authority.admitted)
+	cma.admitOnce.Do(func() {
+		close(cma.authority.admitted)
 	})
-	<-admission.authority.allowAdmitReturn
+	<-cma.authority.allowAdmitReturn
 	return nil
 }

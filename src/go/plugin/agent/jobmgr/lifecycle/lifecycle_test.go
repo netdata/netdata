@@ -1399,10 +1399,10 @@ type protocolTestTransaction struct {
 	abort  func() error
 }
 
-func (transaction protocolTestTransaction) Commit() error {
-	return transaction.commit()
+func (ptt protocolTestTransaction) Commit() error {
+	return ptt.commit()
 }
 
-func (transaction protocolTestTransaction) Abort() error {
-	return transaction.abort()
+func (ptt protocolTestTransaction) Abort() error {
+	return ptt.abort()
 }

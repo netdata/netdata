@@ -33,14 +33,14 @@ type preparedSecretSpec struct {
 
 // commitEntryDisposition applies the entry side of a committed transaction:
 // delete the entry on removal, publish the committed entry, or do nothing.
-func (spec preparedSecretSpec) commitEntryDisposition() {
-	if spec.remove {
-		spec.controller.commitEntry(spec.storeKey, nil)
-	} else if spec.entry != nil {
-		spec.controller.commitEntry(spec.entry.config.ExposedKey(), spec.entry)
+func (pss preparedSecretSpec) commitEntryDisposition() {
+	if pss.remove {
+		pss.controller.commitEntry(pss.storeKey, nil)
+	} else if pss.entry != nil {
+		pss.controller.commitEntry(pss.entry.config.ExposedKey(), pss.entry)
 	}
-	if spec.commit != nil {
-		spec.commit()
+	if pss.commit != nil {
+		pss.commit()
 	}
 }
 

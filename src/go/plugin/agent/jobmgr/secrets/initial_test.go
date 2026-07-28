@@ -417,20 +417,20 @@ type failingPendingRetryCommands struct {
 	err error
 }
 
-func (commands failingPendingRetryCommands) SubmitPrepared(
+func (fprc failingPendingRetryCommands) SubmitPrepared(
 	context.Context,
 	jobmgr.Request,
 	jobmgr.WorkPlan,
 ) error {
-	return commands.err
+	return fprc.err
 }
 
-func (commands failingPendingRetryCommands) SubmitPreparedAndWait(
+func (fprc failingPendingRetryCommands) SubmitPreparedAndWait(
 	context.Context,
 	jobmgr.Request,
 	jobmgr.WorkPlan,
 ) error {
-	return commands.err
+	return fprc.err
 }
 
 func countSecretDiagnostics(events []jobmgr.DiagnosticEvent, name string) int {
@@ -816,26 +816,26 @@ type initialStoreTestCommands struct {
 	publishTemplates func() error
 }
 
-func (commands *initialStoreTestCommands) SubmitPrepared(
+func (istc *initialStoreTestCommands) SubmitPrepared(
 	ctx context.Context,
 	request jobmgr.Request,
 	plan jobmgr.WorkPlan,
 ) error {
-	return commands.SubmitPreparedAndWait(ctx, request, plan)
+	return istc.SubmitPreparedAndWait(ctx, request, plan)
 }
 
-func (commands *initialStoreTestCommands) SubmitPreparedAndWait(
+func (istc *initialStoreTestCommands) SubmitPreparedAndWait(
 	ctx context.Context,
 	request jobmgr.Request,
 	plan jobmgr.WorkPlan,
 ) error {
 	if request.LaneKey == secretBootResourceID {
-		return commands.publishTemplates()
+		return istc.publishTemplates()
 	}
-	commands.mu.Lock()
-	commands.nextGeneration++
-	generation := commands.nextGeneration
-	commands.mu.Unlock()
+	istc.mu.Lock()
+	istc.nextGeneration++
+	generation := istc.nextGeneration
+	istc.mu.Unlock()
 	scope := lifecycle.ResourceTransactionScope{
 		ID: request.LaneKey,
 		Successor: lifecycle.ResourceIdentity{
@@ -871,9 +871,9 @@ func newInitialStoreMaterializationGate() *initialStoreMaterializationGate {
 	}
 }
 
-func (gate *initialStoreMaterializationGate) release() {
-	gate.once.Do(func() {
-		close(gate.releaseC)
+func (ismg *initialStoreMaterializationGate) release() {
+	ismg.once.Do(func() {
+		close(ismg.releaseC)
 	})
 }
 
@@ -884,23 +884,23 @@ type initialStoreMaterializationStore struct {
 	}
 }
 
-func (store *initialStoreMaterializationStore) Configuration() any {
-	return &store.config
+func (isms *initialStoreMaterializationStore) Configuration() any {
+	return &isms.config
 }
 
-func (store *initialStoreMaterializationStore) Init(context.Context) error {
-	switch store.config.Value {
+func (isms *initialStoreMaterializationStore) Init(context.Context) error {
+	switch isms.config.Value {
 	case "blocked":
-		close(store.gate.blocked)
-		<-store.gate.releaseC
+		close(isms.gate.blocked)
+		<-isms.gate.releaseC
 	case "fast":
-		close(store.gate.fast)
+		close(isms.gate.fast)
 	}
 	return nil
 }
 
-func (store *initialStoreMaterializationStore) Publish() secretstore.PublishedStore {
-	return transactionTestPublished(store.config.Value)
+func (isms *initialStoreMaterializationStore) Publish() secretstore.PublishedStore {
+	return transactionTestPublished(isms.config.Value)
 }
 
 type countingStoreOperationProvider struct {
@@ -910,17 +910,17 @@ type countingStoreOperationProvider struct {
 	}
 }
 
-func (store *countingStoreOperationProvider) Configuration() any {
-	return &store.config
+func (csop *countingStoreOperationProvider) Configuration() any {
+	return &csop.config
 }
 
-func (store *countingStoreOperationProvider) Init(context.Context) error {
-	store.initializations.Add(1)
+func (csop *countingStoreOperationProvider) Init(context.Context) error {
+	csop.initializations.Add(1)
 	return nil
 }
 
-func (store *countingStoreOperationProvider) Publish() secretstore.PublishedStore {
-	return transactionTestPublished(store.config.Value)
+func (csop *countingStoreOperationProvider) Publish() secretstore.PublishedStore {
+	return transactionTestPublished(csop.config.Value)
 }
 
 type testIdentityStoreOperationProvider struct {
@@ -931,23 +931,23 @@ type testIdentityStoreOperationProvider struct {
 	}
 }
 
-func (store *testIdentityStoreOperationProvider) Configuration() any {
-	return &store.config
+func (tisop *testIdentityStoreOperationProvider) Configuration() any {
+	return &tisop.config
 }
 
-func (store *testIdentityStoreOperationProvider) Init(context.Context) error {
-	if store.config.Value == "blocked" {
+func (tisop *testIdentityStoreOperationProvider) Init(context.Context) error {
+	if tisop.config.Value == "blocked" {
 		select {
-		case store.entered <- struct{}{}:
+		case tisop.entered <- struct{}{}:
 		default:
 		}
-		<-store.gate
+		<-tisop.gate
 	}
 	return nil
 }
 
-func (store *testIdentityStoreOperationProvider) Publish() secretstore.PublishedStore {
-	return transactionTestPublished(store.config.Value)
+func (tisop *testIdentityStoreOperationProvider) Publish() secretstore.PublishedStore {
+	return transactionTestPublished(tisop.config.Value)
 }
 
 func secretInitialMaterializationConfig(name, value string) secretstore.Config {

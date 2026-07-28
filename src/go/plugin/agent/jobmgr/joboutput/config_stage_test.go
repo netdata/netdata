@@ -261,48 +261,48 @@ func (*delayedDispositionAttempt) Admit() error {
 	return nil
 }
 
-func (attempt *delayedDispositionAttempt) Cut(cause error) bool {
-	attempt.mu.Lock()
-	defer attempt.mu.Unlock()
-	if attempt.cut != nil {
+func (dda *delayedDispositionAttempt) Cut(cause error) bool {
+	dda.mu.Lock()
+	defer dda.mu.Unlock()
+	if dda.cut != nil {
 		return false
 	}
-	attempt.cut = cause
-	attempt.cancel(cause)
+	dda.cut = cause
+	dda.cancel(cause)
 	return true
 }
 
-func (attempt *delayedDispositionAttempt) Await(ctx context.Context) error {
+func (dda *delayedDispositionAttempt) Await(ctx context.Context) error {
 	select {
-	case <-attempt.released:
+	case <-dda.released:
 	case <-ctx.Done():
-		attempt.Cut(context.Cause(ctx))
-		<-attempt.released
+		dda.Cut(context.Cause(ctx))
+		<-dda.released
 	}
-	attempt.mu.Lock()
-	defer attempt.mu.Unlock()
-	if attempt.cut != nil {
-		return attempt.cut
+	dda.mu.Lock()
+	defer dda.mu.Unlock()
+	if dda.cut != nil {
+		return dda.cut
 	}
-	return attempt.workErr
+	return dda.workErr
 }
 
-func (attempt *delayedDispositionAttempt) Released() <-chan struct{} {
-	return attempt.released
+func (dda *delayedDispositionAttempt) Released() <-chan struct{} {
+	return dda.released
 }
 
-func (authority *validationSupersedeAuthority) StartProcessAttempt(
+func (vsa *validationSupersedeAuthority) StartProcessAttempt(
 	jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
-	authority.started.Add(1)
+	vsa.started.Add(1)
 	return nil, jobmgr.ErrProcessAttemptBusy
 }
 
-func (authority *validationSupersedeAuthority) SupersedeProcessAttempt(
+func (vsa *validationSupersedeAuthority) SupersedeProcessAttempt(
 	context.Context,
 	jobmgr.ProcessAttemptIdentity,
 ) error {
-	authority.superseded.Add(1)
+	vsa.superseded.Add(1)
 	return nil
 }
 

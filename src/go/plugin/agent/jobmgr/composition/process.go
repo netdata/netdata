@@ -33,8 +33,8 @@ func newProcessControls() processControls {
 	}
 }
 
-func (controls processControls) valid() bool {
-	return controls.restart != nil && controls.terminate != nil
+func (pc processControls) valid() bool {
+	return pc.restart != nil && pc.terminate != nil
 }
 
 type processInputCompletion struct {

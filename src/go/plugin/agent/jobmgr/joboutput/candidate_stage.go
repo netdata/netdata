@@ -109,122 +109,122 @@ func newStagedJobOwner(
 	}
 }
 
-func (owner *stagedJobOwner) Replace(resources ConstructedJob) error {
-	if owner == nil {
+func (sjo *stagedJobOwner) Replace(resources ConstructedJob) error {
+	if sjo == nil {
 		return errors.New("job output: nil staged job resource replacement")
 	}
-	owner.mu.Lock()
-	defer owner.mu.Unlock()
-	if owner.ownership != stagedJobOwnedByRuntime ||
-		!owner.attached ||
-		owner.decided ||
-		owner.finalized {
+	sjo.mu.Lock()
+	defer sjo.mu.Unlock()
+	if sjo.ownership != stagedJobOwnedByRuntime ||
+		!sjo.attached ||
+		sjo.decided ||
+		sjo.finalized {
 		return errors.New("job output: invalid staged job resource replacement")
 	}
-	owner.resources = resources
+	sjo.resources = resources
 	return nil
 }
 
 // AcceptResources linearizes permit activation with freezing the accepted
 // cleanup contract, then returns the same resource value to the generation.
-func (owner *stagedJobOwner) AcceptResources(
+func (sjo *stagedJobOwner) AcceptResources(
 	permit lifecycle.LongLivedPermit,
 ) (ConstructedJob, error) {
-	if owner == nil {
+	if sjo == nil {
 		return ConstructedJob{}, errors.New("job output: nil staged job acceptance")
 	}
-	owner.mu.Lock()
-	defer owner.mu.Unlock()
-	if owner.ownership != stagedJobOwnedByRuntime ||
-		!owner.attached ||
-		owner.decided ||
-		owner.retiring ||
-		owner.finalized {
+	sjo.mu.Lock()
+	defer sjo.mu.Unlock()
+	if sjo.ownership != stagedJobOwnedByRuntime ||
+		!sjo.attached ||
+		sjo.decided ||
+		sjo.retiring ||
+		sjo.finalized {
 		return ConstructedJob{}, errors.New("job output: invalid staged job acceptance")
 	}
 	if err := permit.ActivateExternal(); err != nil {
 		return ConstructedJob{}, err
 	}
-	resources := owner.resources
+	resources := sjo.resources
 	if resources.finalCleanup != nil {
 		resources.CollectorCleanup = resources.finalCleanup
 		resources.finalCleanup = nil
 	}
-	owner.resources = resources
+	sjo.resources = resources
 	return resources, nil
 }
 
-func (owner *stagedJobOwner) BindAttachment() error {
-	if owner == nil {
+func (sjo *stagedJobOwner) BindAttachment() error {
+	if sjo == nil {
 		return errors.New("job output: nil staged job owner")
 	}
-	owner.mu.Lock()
-	defer owner.mu.Unlock()
-	if owner.ownership != stagedJobOwnedByRuntime ||
-		owner.attached ||
-		owner.decided ||
-		owner.retiring ||
-		owner.finalized {
+	sjo.mu.Lock()
+	defer sjo.mu.Unlock()
+	if sjo.ownership != stagedJobOwnedByRuntime ||
+		sjo.attached ||
+		sjo.decided ||
+		sjo.retiring ||
+		sjo.finalized {
 		return errors.New("job output: invalid staged job attachment binding")
 	}
-	owner.attached = true
+	sjo.attached = true
 	return nil
 }
 
-func (owner *stagedJobOwner) Reject() {
-	if owner == nil {
+func (sjo *stagedJobOwner) Reject() {
+	if sjo == nil {
 		return
 	}
-	owner.mu.Lock()
-	if owner.decided {
-		owner.mu.Unlock()
+	sjo.mu.Lock()
+	if sjo.decided {
+		sjo.mu.Unlock()
 		return
 	}
-	owner.decided = true
-	owner.installing = false
-	ownership := owner.ownership
+	sjo.decided = true
+	sjo.installing = false
+	ownership := sjo.ownership
 	if ownership == stagedJobOwnedByCandidate {
-		owner.ownership = stagedJobOwnershipRejected
+		sjo.ownership = stagedJobOwnershipRejected
 	}
-	owner.mu.Unlock()
-	owner.requestRetirement()
-	owner.Detached()
+	sjo.mu.Unlock()
+	sjo.requestRetirement()
+	sjo.Detached()
 	if ownership == stagedJobOwnedByCandidate {
-		owner.candidateRejectOnce.Do(func() {
-			close(owner.rejectCandidate)
+		sjo.candidateRejectOnce.Do(func() {
+			close(sjo.rejectCandidate)
 		})
 	}
 }
 
-func (owner *stagedJobOwner) Promote(ctx context.Context) error {
-	if owner == nil || ctx == nil {
+func (sjo *stagedJobOwner) Promote(ctx context.Context) error {
+	if sjo == nil || ctx == nil {
 		return errors.New("job output: invalid staged job promotion")
 	}
-	owner.mu.Lock()
-	if owner.attempts == nil ||
-		owner.target == 0 ||
-		owner.runtimeIdentity.Namespace != jobmgr.ProcessAttemptJobRuntime ||
-		owner.runtimeIdentity.Key == "" ||
-		owner.runtimeIdentity.Resource == "" ||
-		owner.ownership != stagedJobOwnedByCandidate ||
-		owner.decided ||
-		owner.retiring {
-		owner.mu.Unlock()
+	sjo.mu.Lock()
+	if sjo.attempts == nil ||
+		sjo.target == 0 ||
+		sjo.runtimeIdentity.Namespace != jobmgr.ProcessAttemptJobRuntime ||
+		sjo.runtimeIdentity.Key == "" ||
+		sjo.runtimeIdentity.Resource == "" ||
+		sjo.ownership != stagedJobOwnedByCandidate ||
+		sjo.decided ||
+		sjo.retiring {
+		sjo.mu.Unlock()
 		return errors.New("job output: invalid staged job promotion")
 	}
-	owner.ownership = stagedJobPromotionActive
+	sjo.ownership = stagedJobPromotionActive
 	start := func() (jobmgr.ProcessAttempt, <-chan error, error) {
 		admitted := make(chan error, 1)
-		attempt, err := owner.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
-			Identity: owner.runtimeIdentity,
-			Target:   owner.target,
+		attempt, err := sjo.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+			Identity: sjo.runtimeIdentity,
+			Target:   sjo.target,
 			Work: func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
 				admitErr := admission.Admit()
 				admitted <- admitErr
 				if admitErr != nil {
 					return admitErr
 				}
-				return owner.finish(ctx)
+				return sjo.finish(ctx)
 			},
 		})
 		if err != nil {
@@ -234,58 +234,58 @@ func (owner *stagedJobOwner) Promote(ctx context.Context) error {
 	}
 	_, admitted, err := start()
 	if errors.Is(err, jobmgr.ErrProcessAttemptBusy) {
-		err = owner.attempts.SupersedeProcessAttempt(ctx, owner.runtimeIdentity)
+		err = sjo.attempts.SupersedeProcessAttempt(ctx, sjo.runtimeIdentity)
 		if err == nil {
 			_, admitted, err = start()
 		}
 	}
 	if err != nil {
-		owner.ownership = stagedJobOwnedByCandidate
-		owner.mu.Unlock()
+		sjo.ownership = stagedJobOwnedByCandidate
+		sjo.mu.Unlock()
 		return err
 	}
 	if err := <-admitted; err != nil {
-		owner.ownership = stagedJobOwnedByCandidate
-		owner.mu.Unlock()
+		sjo.ownership = stagedJobOwnedByCandidate
+		sjo.mu.Unlock()
 		return err
 	}
-	owner.ownership = stagedJobOwnedByRuntime
-	owner.transferOnce.Do(func() {
-		close(owner.transferred)
+	sjo.ownership = stagedJobOwnedByRuntime
+	sjo.transferOnce.Do(func() {
+		close(sjo.transferred)
 	})
-	owner.mu.Unlock()
+	sjo.mu.Unlock()
 	return nil
 }
 
-func (owner *stagedJobOwner) ReserveInstallation() error {
-	if owner == nil {
+func (sjo *stagedJobOwner) ReserveInstallation() error {
+	if sjo == nil {
 		return errors.New("job output: nil staged job installation")
 	}
-	owner.mu.Lock()
-	defer owner.mu.Unlock()
-	if owner.decided || owner.installing || owner.retiring {
+	sjo.mu.Lock()
+	defer sjo.mu.Unlock()
+	if sjo.decided || sjo.installing || sjo.retiring {
 		return errors.New("job output: staged job cannot begin installation")
 	}
-	owner.installing = true
+	sjo.installing = true
 	return nil
 }
 
-func (owner *stagedJobOwner) Install() error {
-	if owner == nil {
+func (sjo *stagedJobOwner) Install() error {
+	if sjo == nil {
 		return errors.New("job output: nil staged job installation")
 	}
-	owner.mu.Lock()
-	defer owner.mu.Unlock()
-	if owner.decided || !owner.installing {
+	sjo.mu.Lock()
+	defer sjo.mu.Unlock()
+	if sjo.decided || !sjo.installing {
 		return errors.New("job output: invalid staged job installation acknowledgement")
 	}
-	owner.installing = false
-	owner.decided = true
+	sjo.installing = false
+	sjo.decided = true
 	return nil
 }
 
-func (owner *stagedJobOwner) Start(ctx context.Context) error {
-	if owner == nil || ctx == nil {
+func (sjo *stagedJobOwner) Start(ctx context.Context) error {
+	if sjo == nil || ctx == nil {
 		return errors.New("job output: invalid process-owned job start")
 	}
 	result := make(chan error, 1)
@@ -294,10 +294,10 @@ func (owner *stagedJobOwner) Start(ctx context.Context) error {
 		result: result,
 	}
 	select {
-	case owner.startRequests <- request:
-	case <-owner.retire:
+	case sjo.startRequests <- request:
+	case <-sjo.retire:
 		return errors.New("job output: process-owned job is retiring")
-	case <-owner.done:
+	case <-sjo.done:
 		return errors.New("job output: process-owned job is released")
 	case <-ctx.Done():
 		return ctx.Err()
@@ -305,84 +305,84 @@ func (owner *stagedJobOwner) Start(ctx context.Context) error {
 	select {
 	case err := <-result:
 		return err
-	case <-owner.retire:
+	case <-sjo.retire:
 		return errors.New("job output: process-owned job retired during start")
-	case <-owner.done:
+	case <-sjo.done:
 		return errors.New("job output: process-owned job released during start")
 	case <-ctx.Done():
-		owner.requestRetirement()
+		sjo.requestRetirement()
 		return ctx.Err()
 	}
 }
 
-func (owner *stagedJobOwner) Retire() {
-	if owner == nil {
+func (sjo *stagedJobOwner) Retire() {
+	if sjo == nil {
 		return
 	}
-	owner.requestRetirement()
+	sjo.requestRetirement()
 }
 
-func (owner *stagedJobOwner) Detached() {
-	if owner == nil {
+func (sjo *stagedJobOwner) Detached() {
+	if sjo == nil {
 		return
 	}
-	owner.detachOnce.Do(func() {
-		owner.mu.Lock()
-		runtimeStage := owner.resources.runtimeStage
-		vnodeStage := owner.resources.vnodeStage
-		owner.mu.Unlock()
+	sjo.detachOnce.Do(func() {
+		sjo.mu.Lock()
+		runtimeStage := sjo.resources.runtimeStage
+		vnodeStage := sjo.resources.vnodeStage
+		sjo.mu.Unlock()
 		runtimeStage.close()
 		vnodeStage.close()
-		close(owner.detached)
+		close(sjo.detached)
 	})
 }
 
-func (owner *stagedJobOwner) requestRetirement() {
-	owner.mu.Lock()
-	owner.retiring = true
-	resources := owner.resources
-	owner.mu.Unlock()
+func (sjo *stagedJobOwner) requestRetirement() {
+	sjo.mu.Lock()
+	sjo.retiring = true
+	resources := sjo.resources
+	sjo.mu.Unlock()
 	resources.outputGate.Fence()
-	owner.retireOnce.Do(func() {
-		close(owner.retire)
+	sjo.retireOnce.Do(func() {
+		close(sjo.retire)
 	})
 }
 
-func (owner *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
-	if owner == nil {
+func (sjo *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
+	if sjo == nil {
 		return nil
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	defer owner.doneOnce.Do(func() {
-		close(owner.done)
+	defer sjo.doneOnce.Do(func() {
+		close(sjo.done)
 	})
 
 	var request stagedJobStartRequest
 	select {
-	case request = <-owner.startRequests:
-	case <-owner.retire:
-		return owner.finalize()
+	case request = <-sjo.startRequests:
+	case <-sjo.retire:
+		return sjo.finalize()
 	case <-ctx.Done():
-		owner.cutBeforeStart()
-		return owner.finalize()
+		sjo.cutBeforeStart()
+		return sjo.finalize()
 	}
 
-	owner.mu.Lock()
-	if owner.started {
-		owner.mu.Unlock()
+	sjo.mu.Lock()
+	if sjo.started {
+		sjo.mu.Unlock()
 		request.result <- errors.New("job output: duplicate process-owned job start")
-		return owner.finalize()
+		return sjo.finalize()
 	}
-	owner.started = true
-	resources := owner.resources
+	sjo.started = true
+	resources := sjo.resources
 	job := resources.candidateJob
-	owner.mu.Unlock()
+	sjo.mu.Unlock()
 	if job == nil {
 		request.result <- errors.New("job output: missing process-owned runtime job")
-		owner.requestRetirement()
-		return owner.finalize()
+		sjo.requestRetirement()
+		return sjo.finalize()
 	}
 
 	ready := make(chan struct{})
@@ -404,14 +404,14 @@ func (owner *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 			errors.New("job output: process-owned managed loop exited before readiness"),
 			resultErr,
 		)
-		owner.requestRetirement()
-	case <-owner.retire:
+		sjo.requestRetirement()
+	case <-sjo.retire:
 		request.result <- errors.New("job output: process-owned job retired before readiness")
 	case <-ctx.Done():
-		owner.Retire()
+		sjo.Retire()
 		request.result <- context.Cause(ctx)
 	case <-request.ctx.Done():
-		owner.Retire()
+		sjo.Retire()
 		request.result <- request.ctx.Err()
 	}
 
@@ -420,10 +420,10 @@ func (owner *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 		case loopErr := <-exited:
 			resultErr = errors.Join(resultErr, loopErr)
 			physicalExited = true
-			owner.Retire()
-		case <-owner.retire:
+			sjo.Retire()
+		case <-sjo.retire:
 		case <-ctx.Done():
-			owner.Retire()
+			sjo.Retire()
 		}
 	}
 	if !physicalExited {
@@ -434,53 +434,53 @@ func (owner *stagedJobOwner) finish(ctx context.Context) (resultErr error) {
 		resultErr = errors.Join(resultErr, stopErr)
 		resultErr = errors.Join(resultErr, <-exited)
 	}
-	return errors.Join(resultErr, owner.finalize())
+	return errors.Join(resultErr, sjo.finalize())
 }
 
-func (owner *stagedJobOwner) finishCandidate(ctx context.Context) error {
-	if owner == nil {
+func (sjo *stagedJobOwner) finishCandidate(ctx context.Context) error {
+	if sjo == nil {
 		return nil
 	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	select {
-	case <-owner.transferred:
+	case <-sjo.transferred:
 		return nil
-	case <-owner.rejectCandidate:
-		return owner.finalize()
+	case <-sjo.rejectCandidate:
+		return sjo.finalize()
 	case <-ctx.Done():
-		owner.Reject()
+		sjo.Reject()
 		select {
-		case <-owner.transferred:
+		case <-sjo.transferred:
 			return nil
-		case <-owner.rejectCandidate:
-			return owner.finalize()
+		case <-sjo.rejectCandidate:
+			return sjo.finalize()
 		}
 	}
 }
 
-func (owner *stagedJobOwner) cutBeforeStart() {
-	owner.Retire()
-	owner.mu.Lock()
-	attached := owner.attached
-	owner.mu.Unlock()
+func (sjo *stagedJobOwner) cutBeforeStart() {
+	sjo.Retire()
+	sjo.mu.Lock()
+	attached := sjo.attached
+	sjo.mu.Unlock()
 	if !attached {
-		owner.Detached()
+		sjo.Detached()
 	}
 }
 
-func (owner *stagedJobOwner) finalize() error {
-	<-owner.detached
-	owner.mu.Lock()
-	if owner.finalized {
-		owner.mu.Unlock()
+func (sjo *stagedJobOwner) finalize() error {
+	<-sjo.detached
+	sjo.mu.Lock()
+	if sjo.finalized {
+		sjo.mu.Unlock()
 		return nil
 	}
-	owner.finalized = true
-	resources := owner.resources
-	owner.resources = ConstructedJob{}
-	owner.mu.Unlock()
+	sjo.finalized = true
+	resources := sjo.resources
+	sjo.resources = ConstructedJob{}
+	sjo.mu.Unlock()
 	resources.outputGate.Fence()
 	return finalizeProcessOwnedConstructed(resources)
 }
@@ -569,131 +569,131 @@ func candidateDiagnosticResource(name string) string {
 	return name
 }
 
-func (stage *preparedJobCandidate) Start() {
-	if stage == nil {
+func (pjc *preparedJobCandidate) Start() {
+	if pjc == nil {
 		return
 	}
-	stage.startOnce.Do(func() {
-		stage.mu.Lock()
-		stage.started = true
-		stage.mu.Unlock()
-		go stage.start()
+	pjc.startOnce.Do(func() {
+		pjc.mu.Lock()
+		pjc.started = true
+		pjc.mu.Unlock()
+		go pjc.start()
 	})
 }
 
-func (stage *preparedJobCandidate) Ready() <-chan struct{} {
-	if stage == nil {
+func (pjc *preparedJobCandidate) Ready() <-chan struct{} {
+	if pjc == nil {
 		return nil
 	}
-	return stage.ready
+	return pjc.ready
 }
 
-func (stage *preparedJobCandidate) Cancel(cause error) {
-	if stage == nil {
+func (pjc *preparedJobCandidate) Cancel(cause error) {
+	if pjc == nil {
 		return
 	}
 	if cause == nil {
 		cause = context.Canceled
 	}
-	stage.cancel(cause)
-	stage.mu.Lock()
-	attempt := stage.attempt
-	stage.mu.Unlock()
+	pjc.cancel(cause)
+	pjc.mu.Lock()
+	attempt := pjc.attempt
+	pjc.mu.Unlock()
 	if attempt != nil {
 		attempt.Cut(cause)
 	}
 }
 
-func (stage *preparedJobCandidate) Release() {
-	if stage == nil {
+func (pjc *preparedJobCandidate) Release() {
+	if pjc == nil {
 		return
 	}
-	stage.mu.Lock()
-	if stage.released {
-		stage.mu.Unlock()
+	pjc.mu.Lock()
+	if pjc.released {
+		pjc.mu.Unlock()
 		return
 	}
-	stage.released = true
-	started := stage.started
-	taken := stage.taken
-	owner := stage.result.owner
-	attempt := stage.attempt
-	stage.config = nil
-	stage.factory = nil
-	stage.mu.Unlock()
+	pjc.released = true
+	started := pjc.started
+	taken := pjc.taken
+	owner := pjc.result.owner
+	attempt := pjc.attempt
+	pjc.config = nil
+	pjc.factory = nil
+	pjc.mu.Unlock()
 	if taken {
 		return
 	}
-	stage.cancel(context.Canceled)
+	pjc.cancel(context.Canceled)
 	if owner != nil {
 		owner.Reject()
 	} else if attempt != nil {
 		attempt.Cut(context.Canceled)
 	}
 	if !started {
-		stage.publish(stagedJobResult{err: context.Canceled})
+		pjc.publish(stagedJobResult{err: context.Canceled})
 	}
 }
 
-func (stage *preparedJobCandidate) start() {
-	if cause := context.Cause(stage.ctx); cause != nil {
-		stage.publish(stagedJobResult{err: cause})
+func (pjc *preparedJobCandidate) start() {
+	if cause := context.Cause(pjc.ctx); cause != nil {
+		pjc.publish(stagedJobResult{err: cause})
 		return
 	}
-	if err := stage.attempts.SupersedeProcessAttempt(stage.ctx, stage.identity); err != nil {
-		stage.publish(stagedJobResult{err: err})
+	if err := pjc.attempts.SupersedeProcessAttempt(pjc.ctx, pjc.identity); err != nil {
+		pjc.publish(stagedJobResult{err: err})
 		return
 	}
 	workerResult := make(chan stagedJobResult, 1)
-	attempt, err := stage.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
-		Identity: stage.identity,
-		Target:   stage.target,
+	attempt, err := pjc.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+		Identity: pjc.identity,
+		Target:   pjc.target,
 		Work: func(
 			ctx context.Context,
 			admission jobmgr.ProcessAttemptAdmission,
 		) error {
-			return stage.run(ctx, admission, workerResult)
+			return pjc.run(ctx, admission, workerResult)
 		},
 	})
 	if err != nil {
-		stage.publish(stagedJobResult{err: err})
+		pjc.publish(stagedJobResult{err: err})
 		return
 	}
-	stage.mu.Lock()
-	stage.attempt = attempt
-	stage.mu.Unlock()
-	if cause := context.Cause(stage.ctx); cause != nil {
+	pjc.mu.Lock()
+	pjc.attempt = attempt
+	pjc.mu.Unlock()
+	if cause := context.Cause(pjc.ctx); cause != nil {
 		attempt.Cut(cause)
 	}
 	if err := attempt.Await(context.Background()); err != nil {
-		stage.publish(stagedJobResult{err: err})
+		pjc.publish(stagedJobResult{err: err})
 		return
 	}
-	stage.mu.Lock()
-	settled := stage.settled
-	stage.mu.Unlock()
+	pjc.mu.Lock()
+	settled := pjc.settled
+	pjc.mu.Unlock()
 	if settled {
 		return
 	}
 	select {
 	case result := <-workerResult:
-		stage.publish(result)
+		pjc.publish(result)
 	default:
-		stage.publish(stagedJobResult{
+		pjc.publish(stagedJobResult{
 			err: errors.New("job output: candidate attempt settled without a result"),
 		})
 	}
 }
 
-func (stage *preparedJobCandidate) run(
+func (pjc *preparedJobCandidate) run(
 	ctx context.Context,
 	admission jobmgr.ProcessAttemptAdmission,
 	workerResult chan<- stagedJobResult,
 ) error {
-	stage.mu.Lock()
-	factory := stage.factory
-	config := stage.config
-	stage.mu.Unlock()
+	pjc.mu.Lock()
+	factory := pjc.factory
+	config := pjc.config
+	pjc.mu.Unlock()
 	if factory == nil || config == nil {
 		return context.Canceled
 	}
@@ -733,55 +733,55 @@ func (stage *preparedJobCandidate) run(
 	}
 	owner := newStagedJobOwner(
 		candidate,
-		stage.attempts,
-		stage.target,
+		pjc.attempts,
+		pjc.target,
 		jobmgr.ProcessAttemptIdentity{
 			Namespace: jobmgr.ProcessAttemptJobRuntime,
 			Key:       candidate.candidateJob.FullName(),
 			Resource:  candidateDiagnosticResource(candidate.candidateJob.FullName()),
 		},
 	)
-	stage.publish(stagedJobResult{
+	pjc.publish(stagedJobResult{
 		candidate: candidate,
 		owner:     owner,
 	})
 	return owner.finishCandidate(ctx)
 }
 
-func (stage *preparedJobCandidate) publish(result stagedJobResult) {
-	stage.readyOnce.Do(func() {
-		stage.mu.Lock()
-		if stage.released {
+func (pjc *preparedJobCandidate) publish(result stagedJobResult) {
+	pjc.readyOnce.Do(func() {
+		pjc.mu.Lock()
+		if pjc.released {
 			if result.owner != nil {
 				result.owner.Reject()
 			}
 		} else {
-			stage.result = result
+			pjc.result = result
 		}
-		stage.settled = true
-		stage.config = nil
-		stage.mu.Unlock()
-		close(stage.ready)
+		pjc.settled = true
+		pjc.config = nil
+		pjc.mu.Unlock()
+		close(pjc.ready)
 	})
 }
 
-func (stage *preparedJobCandidate) take() (stagedJobResult, error) {
-	if stage == nil {
+func (pjc *preparedJobCandidate) take() (stagedJobResult, error) {
+	if pjc == nil {
 		return stagedJobResult{}, errors.New("job output: nil candidate stage")
 	}
 	select {
-	case <-stage.ready:
+	case <-pjc.ready:
 	default:
 		return stagedJobResult{}, errors.New("job output: candidate stage is not ready")
 	}
-	stage.mu.Lock()
-	defer stage.mu.Unlock()
-	if !stage.settled || stage.taken {
+	pjc.mu.Lock()
+	defer pjc.mu.Unlock()
+	if !pjc.settled || pjc.taken {
 		return stagedJobResult{}, errors.New("job output: candidate stage already consumed")
 	}
-	stage.taken = true
-	result := stage.result
-	stage.result = stagedJobResult{}
+	pjc.taken = true
+	result := pjc.result
+	pjc.result = stagedJobResult{}
 	return result, nil
 }
 

@@ -169,37 +169,37 @@ type runtimeBusyPendingAuthority struct {
 	release  <-chan struct{}
 }
 
-func (authority runtimeBusyPendingAuthority) StartProcessAttempt(
+func (rbpa runtimeBusyPendingAuthority) StartProcessAttempt(
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
 	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
 		return nil, jobmgr.ErrProcessAttemptBusy
 	}
-	return authority.delegate.StartProcessAttempt(plan)
+	return rbpa.delegate.StartProcessAttempt(plan)
 }
 
-func (authority runtimeBusyPendingAuthority) SupersedeProcessAttempt(
+func (rbpa runtimeBusyPendingAuthority) SupersedeProcessAttempt(
 	ctx context.Context,
 	identity jobmgr.ProcessAttemptIdentity,
 ) error {
 	if identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
 		return jobmgr.ErrProcessAttemptBusy
 	}
-	return authority.delegate.SupersedeProcessAttempt(ctx, identity)
+	return rbpa.delegate.SupersedeProcessAttempt(ctx, identity)
 }
 
-func (authority runtimeBusyPendingAuthority) CutProcessAttempt(
+func (rbpa runtimeBusyPendingAuthority) CutProcessAttempt(
 	identity jobmgr.ProcessAttemptIdentity,
 	cause error,
 ) bool {
-	return authority.delegate.CutProcessAttempt(identity, cause)
+	return rbpa.delegate.CutProcessAttempt(identity, cause)
 }
 
-func (authority runtimeBusyPendingAuthority) ProcessAttemptReleased(
+func (rbpa runtimeBusyPendingAuthority) ProcessAttemptReleased(
 	identity jobmgr.ProcessAttemptIdentity,
 ) (<-chan struct{}, bool) {
 	if identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
-		return authority.release, true
+		return rbpa.release, true
 	}
-	return authority.delegate.ProcessAttemptReleased(identity)
+	return rbpa.delegate.ProcessAttemptReleased(identity)
 }

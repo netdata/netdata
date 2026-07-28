@@ -398,12 +398,12 @@ type transactionTestRuntime struct {
 	abortErr error
 }
 
-func (runtime transactionTestRuntime) Start(context.Context) error {
-	return runtime.startErr
+func (ttr transactionTestRuntime) Start(context.Context) error {
+	return ttr.startErr
 }
 
-func (runtime transactionTestRuntime) Abort(context.Context) error {
-	return runtime.abortErr
+func (ttr transactionTestRuntime) Abort(context.Context) error {
+	return ttr.abortErr
 }
 
 func (transactionTestRuntime) Stop(context.Context) error {

@@ -315,20 +315,20 @@ type recordingFrameState struct {
 	commitErr error
 }
 
-func (state *recordingFrameState) Commit() error {
-	*state.events = append(*state.events, "commit")
-	return state.commitErr
+func (rfs *recordingFrameState) Commit() error {
+	*rfs.events = append(*rfs.events, "commit")
+	return rfs.commitErr
 }
 
-func (state *recordingFrameState) Abort() error {
-	*state.events = append(*state.events, "abort")
+func (rfs *recordingFrameState) Abort() error {
+	*rfs.events = append(*rfs.events, "abort")
 	return nil
 }
 
 type frameWriteFunc func([]byte) (int, error)
 
-func (write frameWriteFunc) Write(payload []byte) (int, error) {
-	return write(payload)
+func (fwf frameWriteFunc) Write(payload []byte) (int, error) {
+	return fwf(payload)
 }
 
 type blockingStopManagedJob struct {

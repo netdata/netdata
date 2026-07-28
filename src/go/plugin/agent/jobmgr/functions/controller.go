@@ -130,15 +130,15 @@ func (c *Controller) JobStager() (*JobStager, error) {
 	}, nil
 }
 
-func (stager *JobStager) StageJob(
+func (js *JobStager) StageJob(
 	job collectorapi.RuntimeJob,
 ) (*StagedJobHandle, error) {
-	if stager == nil || job == nil || job.FullName() == "" ||
+	if js == nil || job == nil || job.FullName() == "" ||
 		job.ModuleName() == "" || job.Name() == "" ||
-		stager.attempts == nil || stager.epoch == 0 {
+		js.attempts == nil || js.epoch == 0 {
 		return nil, errors.New("jobmgr Function controller: invalid job preparation")
 	}
-	creator, ok := stager.modules.Lookup(job.ModuleName())
+	creator, ok := js.modules.Lookup(job.ModuleName())
 	if !ok {
 		return nil, errors.New("jobmgr Function controller: job module is not registered")
 	}
@@ -150,16 +150,16 @@ func (stager *JobStager) StageJob(
 	if err != nil {
 		return nil, err
 	}
-	shared := slices.Clone(stager.shared[job.ModuleName()])
+	shared := slices.Clone(js.shared[job.ModuleName()])
 	allMethods := append(shared, methods...)
 	bundle, err := newJobFunctionBundle(job.ModuleName(), creator, job, allMethods)
 	if err != nil {
 		return nil, err
 	}
 	if err := bundle.bindContainment(
-		stager.attempts,
-		stager.epoch,
-		fmt.Sprintf("%d/%s/job", stager.epoch, job.FullName()),
+		js.attempts,
+		js.epoch,
+		fmt.Sprintf("%d/%s/job", js.epoch, job.FullName()),
 		candidateFunctionResource(job.FullName()),
 	); err != nil {
 		bundle.retire()

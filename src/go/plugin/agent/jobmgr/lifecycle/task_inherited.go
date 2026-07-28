@@ -178,15 +178,15 @@ func (ts *TaskSupervisor) startInherited(
 	return ref, nil
 }
 
-func (registry *inheritedTaskRegistry) allocateSlot() (InheritedTaskRef, *inheritedTaskSlot, error) {
-	next := registry.nextSlot + 1
+func (itr *inheritedTaskRegistry) allocateSlot() (InheritedTaskRef, *inheritedTaskSlot, error) {
+	next := itr.nextSlot + 1
 	if next == 0 {
 		return 0, nil, errors.New("jobmgr task supervisor: inherited reference space exhausted")
 	}
-	registry.nextSlot = next
+	itr.nextSlot = next
 	ref := InheritedTaskRef(next)
 	slot := &inheritedTaskSlot{}
-	registry.slots[ref] = slot
+	itr.slots[ref] = slot
 	return ref, slot, nil
 }
 

@@ -101,7 +101,7 @@ func (f *Factory) attachment() factoryAttachment {
 	}
 }
 
-func (attachment factoryAttachment) attach(
+func (fa factoryAttachment) attach(
 	candidate ConstructedJob,
 	identity lifecycle.ResourceIdentity,
 	owner *stagedJobOwner,
@@ -109,21 +109,21 @@ func (attachment factoryAttachment) attach(
 	if !identity.Valid() ||
 		candidate.candidateJob == nil ||
 		owner == nil ||
-		attachment.scheduler == nil {
+		fa.scheduler == nil {
 		return candidate, errors.New("job output: invalid candidate attachment")
 	}
 	attached, err := newProcessManagedJob(
 		candidate.Variant,
 		candidate.candidateJob,
 		identity,
-		attachment.scheduler,
+		fa.scheduler,
 		candidate.CollectorCleanup,
 		owner,
 	)
 	if err != nil {
 		return candidate, err
 	}
-	attached.Observer = attachment.observer
+	attached.Observer = fa.observer
 	attached.resolvedReferences = candidate.resolvedReferences
 	attached.finalCleanup = candidate.finalCleanup
 	attached.runtimeStage = candidate.runtimeStage
@@ -136,13 +136,13 @@ func (attachment factoryAttachment) attach(
 		attached.activateAttachment = func() error {
 			var runtimeErr error
 			if candidate.runtimeStage != nil {
-				runtimeErr = candidate.runtimeStage.attach(attachment.runtime)
+				runtimeErr = candidate.runtimeStage.attach(fa.runtime)
 			}
 			if runtimeErr != nil {
 				return runtimeErr
 			}
 			if candidate.vnodeStage != nil {
-				if err := candidate.vnodeStage.attach(attachment.vnode); err != nil {
+				if err := candidate.vnodeStage.attach(fa.vnode); err != nil {
 					return err
 				}
 			}
@@ -154,7 +154,7 @@ func (attachment factoryAttachment) attach(
 	}
 	if candidate.StagedHandlers != nil {
 		handlers, attachErr := callAttachHandlers(
-			attachment.handlerAttacher,
+			fa.handlerAttacher,
 			identity,
 			candidate.StagedHandlers,
 		)

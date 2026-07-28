@@ -27,54 +27,54 @@ func newStagedVNodeLookup(name string, initial jobruntime.VnodeSnapshot) *staged
 	}
 }
 
-func (lookup *stagedVNodeLookup) Lookup(name string) (jobruntime.VnodeSnapshot, bool) {
-	if lookup == nil || name == "" {
+func (svnl *stagedVNodeLookup) Lookup(name string) (jobruntime.VnodeSnapshot, bool) {
+	if svnl == nil || name == "" {
 		return jobruntime.VnodeSnapshot{}, false
 	}
-	lookup.mu.Lock()
-	if lookup.closed {
-		lookup.mu.Unlock()
+	svnl.mu.Lock()
+	if svnl.closed {
+		svnl.mu.Unlock()
 		return jobruntime.VnodeSnapshot{}, false
 	}
-	live := lookup.live
+	live := svnl.live
 	if live == nil {
-		initial := lookup.initial
-		matches := name == lookup.name
-		lookup.mu.Unlock()
+		initial := svnl.initial
+		matches := name == svnl.name
+		svnl.mu.Unlock()
 		return initial, matches
 	}
-	lookup.mu.Unlock()
+	svnl.mu.Unlock()
 	return live(name)
 }
 
-func (lookup *stagedVNodeLookup) attach(
+func (svnl *stagedVNodeLookup) attach(
 	live func(string) (jobruntime.VnodeSnapshot, bool),
 ) error {
-	if lookup == nil {
+	if svnl == nil {
 		return nil
 	}
 	if live == nil {
 		return errors.New("job output: staged vnode lookup has no live attachment")
 	}
-	lookup.mu.Lock()
-	defer lookup.mu.Unlock()
-	if lookup.closed || lookup.live != nil {
+	svnl.mu.Lock()
+	defer svnl.mu.Unlock()
+	if svnl.closed || svnl.live != nil {
 		return errors.New("job output: invalid staged vnode attachment")
 	}
-	lookup.live = live
-	lookup.initial = jobruntime.VnodeSnapshot{}
+	svnl.live = live
+	svnl.initial = jobruntime.VnodeSnapshot{}
 	return nil
 }
 
-func (lookup *stagedVNodeLookup) close() {
-	if lookup == nil {
+func (svnl *stagedVNodeLookup) close() {
+	if svnl == nil {
 		return
 	}
-	lookup.mu.Lock()
-	lookup.closed = true
-	lookup.live = nil
-	lookup.initial = jobruntime.VnodeSnapshot{}
-	lookup.mu.Unlock()
+	svnl.mu.Lock()
+	svnl.closed = true
+	svnl.live = nil
+	svnl.initial = jobruntime.VnodeSnapshot{}
+	svnl.mu.Unlock()
 }
 
 // stagedRuntimeService gives V2 Init/Check a private runtime capability.
@@ -96,118 +96,118 @@ func newStagedRuntimeService() *stagedRuntimeService {
 	}
 }
 
-func (service *stagedRuntimeService) RegisterComponent(config runtimecomp.ComponentConfig) error {
-	if service == nil || config.Name == "" {
+func (srs *stagedRuntimeService) RegisterComponent(config runtimecomp.ComponentConfig) error {
+	if srs == nil || config.Name == "" {
 		return errors.New("job output: invalid staged runtime component")
 	}
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	if service.closed {
+	srs.mu.Lock()
+	defer srs.mu.Unlock()
+	if srs.closed {
 		return errors.New("job output: staged runtime service is closed")
 	}
-	if service.live != nil {
-		if err := service.live.RegisterComponent(config); err != nil {
+	if srs.live != nil {
+		if err := srs.live.RegisterComponent(config); err != nil {
 			return err
 		}
-		service.components[config.Name] = config
+		srs.components[config.Name] = config
 		return nil
 	}
-	if _, exists := service.components[config.Name]; exists {
+	if _, exists := srs.components[config.Name]; exists {
 		return errors.New("job output: duplicate staged runtime component")
 	}
-	service.components[config.Name] = config
+	srs.components[config.Name] = config
 	return nil
 }
 
-func (service *stagedRuntimeService) UnregisterComponent(name string) {
-	if service == nil || name == "" {
+func (srs *stagedRuntimeService) UnregisterComponent(name string) {
+	if srs == nil || name == "" {
 		return
 	}
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	if service.live != nil {
-		service.live.UnregisterComponent(name)
+	srs.mu.Lock()
+	defer srs.mu.Unlock()
+	if srs.live != nil {
+		srs.live.UnregisterComponent(name)
 	}
-	delete(service.components, name)
+	delete(srs.components, name)
 }
 
-func (service *stagedRuntimeService) QuarantineComponent(name string) {
-	if service == nil || name == "" {
+func (srs *stagedRuntimeService) QuarantineComponent(name string) {
+	if srs == nil || name == "" {
 		return
 	}
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	if service.live != nil {
-		service.live.QuarantineComponent(name)
+	srs.mu.Lock()
+	defer srs.mu.Unlock()
+	if srs.live != nil {
+		srs.live.QuarantineComponent(name)
 	}
-	delete(service.components, name)
+	delete(srs.components, name)
 }
 
-func (service *stagedRuntimeService) FinalizeComponent(name string) {
-	if service == nil || name == "" {
+func (srs *stagedRuntimeService) FinalizeComponent(name string) {
+	if srs == nil || name == "" {
 		return
 	}
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	if service.live != nil {
-		service.live.FinalizeComponent(name)
+	srs.mu.Lock()
+	defer srs.mu.Unlock()
+	if srs.live != nil {
+		srs.live.FinalizeComponent(name)
 	}
-	delete(service.components, name)
+	delete(srs.components, name)
 }
 
-func (service *stagedRuntimeService) RegisterProducer(name string, producer func() error) error {
-	if service == nil || name == "" || producer == nil {
+func (srs *stagedRuntimeService) RegisterProducer(name string, producer func() error) error {
+	if srs == nil || name == "" || producer == nil {
 		return errors.New("job output: invalid staged runtime producer")
 	}
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	if service.closed {
+	srs.mu.Lock()
+	defer srs.mu.Unlock()
+	if srs.closed {
 		return errors.New("job output: staged runtime service is closed")
 	}
-	if service.live != nil {
-		if err := service.live.RegisterProducer(name, producer); err != nil {
+	if srs.live != nil {
+		if err := srs.live.RegisterProducer(name, producer); err != nil {
 			return err
 		}
-		service.producers[name] = producer
+		srs.producers[name] = producer
 		return nil
 	}
-	if _, exists := service.producers[name]; exists {
+	if _, exists := srs.producers[name]; exists {
 		return errors.New("job output: duplicate staged runtime producer")
 	}
-	service.producers[name] = producer
+	srs.producers[name] = producer
 	return nil
 }
 
-func (service *stagedRuntimeService) UnregisterProducer(name string) {
-	if service == nil || name == "" {
+func (srs *stagedRuntimeService) UnregisterProducer(name string) {
+	if srs == nil || name == "" {
 		return
 	}
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	if service.live != nil {
-		service.live.UnregisterProducer(name)
+	srs.mu.Lock()
+	defer srs.mu.Unlock()
+	if srs.live != nil {
+		srs.live.UnregisterProducer(name)
 	}
-	delete(service.producers, name)
+	delete(srs.producers, name)
 }
 
-func (service *stagedRuntimeService) attach(live runtimecomp.Service) (resultErr error) {
-	if service == nil {
+func (srs *stagedRuntimeService) attach(live runtimecomp.Service) (resultErr error) {
+	if srs == nil {
 		return nil
 	}
 	if live == nil {
 		return errors.New("job output: staged runtime service has no live attachment")
 	}
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	if service.closed || service.attached || service.live != nil {
+	srs.mu.Lock()
+	defer srs.mu.Unlock()
+	if srs.closed || srs.attached || srs.live != nil {
 		return errors.New("job output: invalid staged runtime attachment")
 	}
-	componentNames := make([]string, 0, len(service.components))
-	for name := range service.components {
+	componentNames := make([]string, 0, len(srs.components))
+	for name := range srs.components {
 		componentNames = append(componentNames, name)
 	}
-	producerNames := make([]string, 0, len(service.producers))
-	for name := range service.producers {
+	producerNames := make([]string, 0, len(srs.producers))
+	for name := range srs.producers {
 		producerNames = append(producerNames, name)
 	}
 	slices.Sort(componentNames)
@@ -226,51 +226,51 @@ func (service *stagedRuntimeService) attach(live runtimecomp.Service) (resultErr
 		}
 	}()
 	for _, name := range componentNames {
-		if err := live.RegisterComponent(service.components[name]); err != nil {
+		if err := live.RegisterComponent(srs.components[name]); err != nil {
 			return err
 		}
 		registeredComponents = append(registeredComponents, name)
 	}
 	for _, name := range producerNames {
-		if err := live.RegisterProducer(name, service.producers[name]); err != nil {
+		if err := live.RegisterProducer(name, srs.producers[name]); err != nil {
 			return err
 		}
 		registeredProducers = append(registeredProducers, name)
 	}
-	service.live = live
-	service.attached = true
+	srs.live = live
+	srs.attached = true
 	return nil
 }
 
-func (service *stagedRuntimeService) close() {
-	if service == nil {
+func (srs *stagedRuntimeService) close() {
+	if srs == nil {
 		return
 	}
-	service.mu.Lock()
-	defer service.mu.Unlock()
-	if service.closed {
+	srs.mu.Lock()
+	defer srs.mu.Unlock()
+	if srs.closed {
 		return
 	}
-	service.closed = true
-	if service.live != nil {
-		producerNames := make([]string, 0, len(service.producers))
-		for name := range service.producers {
+	srs.closed = true
+	if srs.live != nil {
+		producerNames := make([]string, 0, len(srs.producers))
+		for name := range srs.producers {
 			producerNames = append(producerNames, name)
 		}
-		componentNames := make([]string, 0, len(service.components))
-		for name := range service.components {
+		componentNames := make([]string, 0, len(srs.components))
+		for name := range srs.components {
 			componentNames = append(componentNames, name)
 		}
 		slices.Sort(producerNames)
 		slices.Sort(componentNames)
 		for _, name := range producerNames {
-			service.live.UnregisterProducer(name)
+			srs.live.UnregisterProducer(name)
 		}
 		for _, name := range componentNames {
-			service.live.UnregisterComponent(name)
+			srs.live.UnregisterComponent(name)
 		}
 	}
-	clear(service.producers)
-	clear(service.components)
-	service.live = nil
+	clear(srs.producers)
+	clear(srs.components)
+	srs.live = nil
 }

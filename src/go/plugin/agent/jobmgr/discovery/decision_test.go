@@ -546,20 +546,20 @@ func newConcurrentDecisionTestCommands(blockedID string) *concurrentDecisionTest
 	}
 }
 
-func (commands *concurrentDecisionTestCommands) SubmitPreparedAndWait(
+func (cdtc *concurrentDecisionTestCommands) SubmitPreparedAndWait(
 	ctx context.Context,
 	request jobmgr.Request,
 	_ jobmgr.WorkPlan,
 ) error {
-	if request.LaneKey == commands.blockedID {
-		close(commands.blocked)
+	if request.LaneKey == cdtc.blockedID {
+		close(cdtc.blocked)
 		select {
-		case <-commands.release:
+		case <-cdtc.release:
 			return nil
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
-	close(commands.healthy)
+	close(cdtc.healthy)
 	return nil
 }

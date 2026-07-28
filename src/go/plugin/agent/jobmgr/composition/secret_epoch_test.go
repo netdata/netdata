@@ -13,15 +13,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func (epochs *processSecretEpochs) testLookup(
+func (es *processSecretEpochs) testLookup(
 	generation uint64,
 ) (*processSecretEpoch, bool) {
-	if epochs == nil || generation == 0 {
+	if es == nil || generation == 0 {
 		return nil, false
 	}
-	epochs.mu.Lock()
-	defer epochs.mu.Unlock()
-	epoch, ok := epochs.epochs[generation]
+	es.mu.Lock()
+	defer es.mu.Unlock()
+	epoch, ok := es.epochs[generation]
 	return epoch, ok
 }
 

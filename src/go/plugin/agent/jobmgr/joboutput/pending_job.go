@@ -55,53 +55,53 @@ func newPendingJobIndex() *pendingJobIndex {
 	}
 }
 
-func (index *pendingJobIndex) bind(
+func (pji *pendingJobIndex) bind(
 	commands jobmgr.PreparedCommandPort,
 	plan pendingJobPlanner,
 	run uint64,
 	failure func(error),
 ) error {
-	if index == nil || commands == nil || plan == nil || run == 0 || failure == nil {
+	if pji == nil || commands == nil || plan == nil || run == 0 || failure == nil {
 		return errors.New("job output: invalid pending-job binding")
 	}
-	index.mu.Lock()
-	if index.bound || index.closed {
-		index.mu.Unlock()
+	pji.mu.Lock()
+	if pji.bound || pji.closed {
+		pji.mu.Unlock()
 		return errors.New("job output: pending jobs already bound")
 	}
-	index.commands = commands
-	index.plan = plan
-	index.failure = failure
-	index.run = run
-	index.bound = true
-	index.mu.Unlock()
-	go index.join()
+	pji.commands = commands
+	pji.plan = plan
+	pji.failure = failure
+	pji.run = run
+	pji.bound = true
+	pji.mu.Unlock()
+	go pji.join()
 	return nil
 }
 
-func (index *pendingJobIndex) retain(
+func (pji *pendingJobIndex) retain(
 	config confgroup.Config,
 	release <-chan struct{},
 	baselineUID string,
 ) {
-	index.retainWithRequirement(config, release, baselineUID, false)
+	pji.retainWithRequirement(config, release, baselineUID, false)
 }
 
-func (index *pendingJobIndex) retainAbsent(
+func (pji *pendingJobIndex) retainAbsent(
 	config confgroup.Config,
 	release <-chan struct{},
 	baselineUID string,
 ) {
-	index.retainWithRequirement(config, release, baselineUID, true)
+	pji.retainWithRequirement(config, release, baselineUID, true)
 }
 
-func (index *pendingJobIndex) retainWithRequirement(
+func (pji *pendingJobIndex) retainWithRequirement(
 	config confgroup.Config,
 	release <-chan struct{},
 	baselineUID string,
 	requireAbsent bool,
 ) {
-	if index == nil || config == nil || config.FullName() == "" || config.UID() == "" {
+	if pji == nil || config == nil || config.FullName() == "" || config.UID() == "" {
 		return
 	}
 	cloned, err := config.Clone()
@@ -109,29 +109,29 @@ func (index *pendingJobIndex) retainWithRequirement(
 		return
 	}
 	id := cloned.FullName()
-	index.mu.Lock()
-	if !index.bound || index.closed || index.failed {
-		index.mu.Unlock()
+	pji.mu.Lock()
+	if !pji.bound || pji.closed || pji.failed {
+		pji.mu.Unlock()
 		return
 	}
-	index.version++
-	if index.version == 0 {
-		index.mu.Unlock()
-		index.fail(errors.New("job output: pending-job version wrapped"))
+	pji.version++
+	if pji.version == 0 {
+		pji.mu.Unlock()
+		pji.fail(errors.New("job output: pending-job version wrapped"))
 		return
 	}
 	token := pendingJobToken{
 		uid:           cloned.UID(),
 		baselineUID:   baselineUID,
-		version:       index.version,
+		version:       pji.version,
 		requireAbsent: requireAbsent,
 	}
-	if current := index.entries[id]; current != nil {
+	if current := pji.entries[id]; current != nil {
 		current.config = cloned
 		current.release = release
 		current.token = token
 		notifyPendingJob(current.update)
-		index.mu.Unlock()
+		pji.mu.Unlock()
 		return
 	}
 	entry := &pendingJob{
@@ -140,62 +140,62 @@ func (index *pendingJobIndex) retainWithRequirement(
 		update:  make(chan struct{}, 1),
 		token:   token,
 	}
-	index.entries[id] = entry
-	index.wg.Add(1)
-	index.mu.Unlock()
-	go index.runEntry(id, entry)
+	pji.entries[id] = entry
+	pji.wg.Add(1)
+	pji.mu.Unlock()
+	go pji.runEntry(id, entry)
 }
 
-func (index *pendingJobIndex) runEntry(id string, entry *pendingJob) {
-	defer index.wg.Done()
+func (pji *pendingJobIndex) runEntry(id string, entry *pendingJob) {
+	defer pji.wg.Done()
 	for {
-		index.mu.Lock()
-		if index.closed || index.failed || index.entries[id] != entry {
-			index.mu.Unlock()
+		pji.mu.Lock()
+		if pji.closed || pji.failed || pji.entries[id] != entry {
+			pji.mu.Unlock()
 			return
 		}
 		config := entry.config
 		release := entry.release
 		token := entry.token
 		update := entry.update
-		index.mu.Unlock()
+		pji.mu.Unlock()
 
 		if release != nil {
 			select {
 			case <-release:
 			case <-update:
 				continue
-			case <-index.stop:
+			case <-pji.stop:
 				return
 			}
 		}
-		if !index.isCurrent(id, token) {
+		if !pji.isCurrent(id, token) {
 			continue
 		}
-		if err := index.dispatch(config, token); err != nil {
-			if lifecycle.ContainsOnlyCurrentStoppingRejections(err, index.run) {
+		if err := pji.dispatch(config, token); err != nil {
+			if lifecycle.ContainsOnlyCurrentStoppingRejections(err, pji.run) {
 				return
 			}
-			index.fail(err)
+			pji.fail(err)
 			return
 		}
 		select {
 		case <-update:
-		case <-index.stop:
+		case <-pji.stop:
 			return
 		}
 	}
 }
 
-func (index *pendingJobIndex) dispatch(config confgroup.Config, token pendingJobToken) error {
-	work, err := index.plan(config, token)
+func (pji *pendingJobIndex) dispatch(config confgroup.Config, token pendingJobToken) error {
+	work, err := pji.plan(config, token)
 	if err != nil {
 		return err
 	}
-	return index.commands.SubmitPrepared(context.Background(), jobmgr.Request{
+	return pji.commands.SubmitPrepared(context.Background(), jobmgr.Request{
 		UID: fmt.Sprintf(
 			"jobmgr-pending-job-%d-%d",
-			index.run,
+			pji.run,
 			token.version,
 		),
 		LaneKey: config.FullName(),
@@ -204,68 +204,68 @@ func (index *pendingJobIndex) dispatch(config confgroup.Config, token pendingJob
 	}, work)
 }
 
-func (index *pendingJobIndex) isCurrent(id string, token pendingJobToken) bool {
-	if index == nil || id == "" || token.version == 0 {
+func (pji *pendingJobIndex) isCurrent(id string, token pendingJobToken) bool {
+	if pji == nil || id == "" || token.version == 0 {
 		return false
 	}
-	index.mu.Lock()
-	defer index.mu.Unlock()
-	entry := index.entries[id]
+	pji.mu.Lock()
+	defer pji.mu.Unlock()
+	entry := pji.entries[id]
 	return entry != nil && entry.token == token
 }
 
-func (index *pendingJobIndex) settle(id string, token pendingJobToken) {
-	if index == nil || id == "" || token.version == 0 {
+func (pji *pendingJobIndex) settle(id string, token pendingJobToken) {
+	if pji == nil || id == "" || token.version == 0 {
 		return
 	}
-	index.mu.Lock()
-	entry := index.entries[id]
+	pji.mu.Lock()
+	entry := pji.entries[id]
 	if entry != nil && entry.token == token {
-		delete(index.entries, id)
+		delete(pji.entries, id)
 		notifyPendingJob(entry.update)
 	}
-	index.mu.Unlock()
+	pji.mu.Unlock()
 }
 
-func (index *pendingJobIndex) cancel(id string) {
-	if index == nil || id == "" {
+func (pji *pendingJobIndex) cancel(id string) {
+	if pji == nil || id == "" {
 		return
 	}
-	index.mu.Lock()
-	entry := index.entries[id]
+	pji.mu.Lock()
+	entry := pji.entries[id]
 	if entry != nil {
-		delete(index.entries, id)
+		delete(pji.entries, id)
 		notifyPendingJob(entry.update)
 	}
-	index.mu.Unlock()
+	pji.mu.Unlock()
 }
 
-func (index *pendingJobIndex) stopWorker() {
-	if index == nil {
+func (pji *pendingJobIndex) stopWorker() {
+	if pji == nil {
 		return
 	}
-	index.mu.Lock()
-	if index.closed {
-		index.mu.Unlock()
+	pji.mu.Lock()
+	if pji.closed {
+		pji.mu.Unlock()
 		return
 	}
-	index.closed = true
-	for id, entry := range index.entries {
-		delete(index.entries, id)
+	pji.closed = true
+	for id, entry := range pji.entries {
+		delete(pji.entries, id)
 		notifyPendingJob(entry.update)
 	}
-	close(index.stop)
-	index.mu.Unlock()
+	close(pji.stop)
+	pji.mu.Unlock()
 }
 
-func (index *pendingJobIndex) wait(ctx context.Context) error {
-	if index == nil || ctx == nil {
+func (pji *pendingJobIndex) wait(ctx context.Context) error {
+	if pji == nil || ctx == nil {
 		return errors.New("job output: invalid pending-job wait")
 	}
-	index.mu.Lock()
-	bound := index.bound
-	done := index.done
-	index.mu.Unlock()
+	pji.mu.Lock()
+	bound := pji.bound
+	done := pji.done
+	pji.mu.Unlock()
 	if !bound {
 		return nil
 	}
@@ -277,14 +277,14 @@ func (index *pendingJobIndex) wait(ctx context.Context) error {
 	}
 }
 
-func (index *pendingJobIndex) joined() bool {
-	if index == nil {
+func (pji *pendingJobIndex) joined() bool {
+	if pji == nil {
 		return true
 	}
-	index.mu.Lock()
-	bound := index.bound
-	done := index.done
-	index.mu.Unlock()
+	pji.mu.Lock()
+	bound := pji.bound
+	done := pji.done
+	pji.mu.Unlock()
 	if !bound {
 		return true
 	}
@@ -296,30 +296,30 @@ func (index *pendingJobIndex) joined() bool {
 	}
 }
 
-func (index *pendingJobIndex) join() {
-	<-index.stop
-	index.wg.Wait()
-	close(index.done)
+func (pji *pendingJobIndex) join() {
+	<-pji.stop
+	pji.wg.Wait()
+	close(pji.done)
 }
 
-func (index *pendingJobIndex) fail(err error) {
+func (pji *pendingJobIndex) fail(err error) {
 	if err == nil {
 		return
 	}
-	index.failOnce.Do(func() {
-		index.mu.Lock()
-		index.failed = true
-		failure := index.failure
-		alreadyClosed := index.closed
+	pji.failOnce.Do(func() {
+		pji.mu.Lock()
+		pji.failed = true
+		failure := pji.failure
+		alreadyClosed := pji.closed
 		if !alreadyClosed {
-			index.closed = true
-			for id, entry := range index.entries {
-				delete(index.entries, id)
+			pji.closed = true
+			for id, entry := range pji.entries {
+				delete(pji.entries, id)
 				notifyPendingJob(entry.update)
 			}
-			close(index.stop)
+			close(pji.stop)
 		}
-		index.mu.Unlock()
+		pji.mu.Unlock()
 		if failure != nil {
 			failure(err)
 		}

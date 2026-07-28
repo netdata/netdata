@@ -25,10 +25,10 @@ func newModulePlanOwner() *modulePlanOwner {
 	}
 }
 
-func (owner *modulePlanOwner) Release() {
-	if owner != nil {
-		owner.once.Do(func() {
-			close(owner.done)
+func (mpo *modulePlanOwner) Release() {
+	if mpo != nil {
+		mpo.once.Do(func() {
+			close(mpo.done)
 		})
 	}
 }
@@ -59,37 +59,37 @@ func newModulePlanTransfer() *modulePlanTransfer {
 	}
 }
 
-func (transfer *modulePlanTransfer) Accept() bool {
-	return transfer.decide(true)
+func (mpt *modulePlanTransfer) Accept() bool {
+	return mpt.decide(true)
 }
 
-func (transfer *modulePlanTransfer) Abandon() {
-	transfer.decide(false)
+func (mpt *modulePlanTransfer) Abandon() {
+	mpt.decide(false)
 }
 
-func (transfer *modulePlanTransfer) decide(accept bool) bool {
-	if transfer == nil {
+func (mpt *modulePlanTransfer) decide(accept bool) bool {
+	if mpt == nil {
 		return false
 	}
-	transfer.mu.Lock()
-	defer transfer.mu.Unlock()
-	if transfer.complete {
-		return transfer.accepted
+	mpt.mu.Lock()
+	defer mpt.mu.Unlock()
+	if mpt.complete {
+		return mpt.accepted
 	}
-	transfer.accepted = accept
-	transfer.complete = true
-	close(transfer.decided)
-	return transfer.accepted
+	mpt.accepted = accept
+	mpt.complete = true
+	close(mpt.decided)
+	return mpt.accepted
 }
 
-func (transfer *modulePlanTransfer) wasAccepted() bool {
-	if transfer == nil {
+func (mpt *modulePlanTransfer) wasAccepted() bool {
+	if mpt == nil {
 		return false
 	}
-	<-transfer.decided
-	transfer.mu.Lock()
-	defer transfer.mu.Unlock()
-	return transfer.accepted
+	<-mpt.decided
+	mpt.mu.Lock()
+	defer mpt.mu.Unlock()
+	return mpt.accepted
 }
 
 func prepareContainedModulePlans(

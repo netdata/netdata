@@ -338,13 +338,13 @@ type sensitiveConfigFactoryScope struct {
 	releaseErr error
 }
 
-func (scope *sensitiveConfigFactoryScope) Resolve(context.Context, string, string) ([]byte, error) {
-	if scope.resolveErr != nil {
-		return nil, scope.resolveErr
+func (scfs *sensitiveConfigFactoryScope) Resolve(context.Context, string, string) ([]byte, error) {
+	if scfs.resolveErr != nil {
+		return nil, scfs.resolveErr
 	}
 	return []byte("resolved"), nil
 }
 
-func (scope *sensitiveConfigFactoryScope) Release(context.Context) error {
-	return scope.releaseErr
+func (scfs *sensitiveConfigFactoryScope) Release(context.Context) error {
+	return scfs.releaseErr
 }

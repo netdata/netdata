@@ -1122,9 +1122,9 @@ func newProcessBlockingStoreGate() *processBlockingStoreGate {
 	}
 }
 
-func (gate *processBlockingStoreGate) release() {
-	gate.once.Do(func() {
-		close(gate.releaseC)
+func (pbsg *processBlockingStoreGate) release() {
+	pbsg.once.Do(func() {
+		close(pbsg.releaseC)
 	})
 }
 
@@ -1135,25 +1135,25 @@ type processBlockingSecretStore struct {
 	}
 }
 
-func (store *processBlockingSecretStore) Configuration() any {
-	return &store.config
+func (pbss *processBlockingSecretStore) Configuration() any {
+	return &pbss.config
 }
 
-func (store *processBlockingSecretStore) Init(context.Context) error {
-	if store.config.Value != "blocked" {
+func (pbss *processBlockingSecretStore) Init(context.Context) error {
+	if pbss.config.Value != "blocked" {
 		return nil
 	}
 	select {
-	case <-store.gate.entered:
+	case <-pbss.gate.entered:
 	default:
-		close(store.gate.entered)
+		close(pbss.gate.entered)
 	}
-	<-store.gate.releaseC
+	<-pbss.gate.releaseC
 	return nil
 }
 
-func (store *processBlockingSecretStore) Publish() secretstore.PublishedStore {
-	return processPublishedSecret(store.config.Value)
+func (pbss *processBlockingSecretStore) Publish() secretstore.PublishedStore {
+	return processPublishedSecret(pbss.config.Value)
 }
 
 func (pss *processSecretStore) Configuration() any {

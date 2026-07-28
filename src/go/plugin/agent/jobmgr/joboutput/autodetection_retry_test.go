@@ -397,21 +397,21 @@ type autoDetectionRetryTestCommands struct {
 	notify    chan struct{}
 }
 
-func (artc *autoDetectionRetryTestCommands) SubmitPrepared(
+func (adrtc *autoDetectionRetryTestCommands) SubmitPrepared(
 	_ context.Context,
 	request jobmgr.Request,
 	plan jobmgr.WorkPlan,
 ) error {
-	artc.mu.Lock()
-	artc.submitted = append(artc.submitted, request)
-	artc.plans = append(artc.plans, plan)
-	if artc.notify == nil {
-		artc.notify = make(chan struct{}, 1)
+	adrtc.mu.Lock()
+	adrtc.submitted = append(adrtc.submitted, request)
+	adrtc.plans = append(adrtc.plans, plan)
+	if adrtc.notify == nil {
+		adrtc.notify = make(chan struct{}, 1)
 	}
-	notify := artc.notify
-	block := artc.block
-	err := artc.submitErr
-	artc.mu.Unlock()
+	notify := adrtc.notify
+	block := adrtc.block
+	err := adrtc.submitErr
+	adrtc.mu.Unlock()
 	select {
 	case notify <- struct{}{}:
 	default:
@@ -422,28 +422,28 @@ func (artc *autoDetectionRetryTestCommands) SubmitPrepared(
 	return err
 }
 
-func (artc *autoDetectionRetryTestCommands) SubmitPreparedAndWait(
+func (adrtc *autoDetectionRetryTestCommands) SubmitPreparedAndWait(
 	context.Context,
 	jobmgr.Request,
 	jobmgr.WorkPlan,
 ) error {
-	artc.mu.Lock()
-	artc.waited = true
-	artc.mu.Unlock()
+	adrtc.mu.Lock()
+	adrtc.waited = true
+	adrtc.mu.Unlock()
 	return nil
 }
 
-func (artc *autoDetectionRetryTestCommands) snapshot() ([]jobmgr.Request, []jobmgr.WorkPlan, bool) {
-	artc.mu.Lock()
-	defer artc.mu.Unlock()
-	return append([]jobmgr.Request(nil), artc.submitted...), append([]jobmgr.WorkPlan(nil), artc.plans...), artc.waited
+func (adrtc *autoDetectionRetryTestCommands) snapshot() ([]jobmgr.Request, []jobmgr.WorkPlan, bool) {
+	adrtc.mu.Lock()
+	defer adrtc.mu.Unlock()
+	return append([]jobmgr.Request(nil), adrtc.submitted...), append([]jobmgr.WorkPlan(nil), adrtc.plans...), adrtc.waited
 }
 
-func (artc *autoDetectionRetryTestCommands) waitForSubmissions(t *testing.T, want int) {
+func (adrtc *autoDetectionRetryTestCommands) waitForSubmissions(t *testing.T, want int) {
 	t.Helper()
 	if want == 0 {
 		select {
-		case <-artc.notification():
+		case <-adrtc.notification():
 			require.FailNow(t, "test failed", "unexpected retry submission")
 		case <-time.After(20 * time.Millisecond):
 		}
@@ -452,27 +452,27 @@ func (artc *autoDetectionRetryTestCommands) waitForSubmissions(t *testing.T, wan
 	timeout := time.NewTimer(time.Second)
 	defer timeout.Stop()
 	for {
-		artc.mu.Lock()
-		got := len(artc.submitted)
-		artc.mu.Unlock()
+		adrtc.mu.Lock()
+		got := len(adrtc.submitted)
+		adrtc.mu.Unlock()
 		if got >= want {
 			return
 		}
 		select {
-		case <-artc.notification():
+		case <-adrtc.notification():
 		case <-timeout.C:
 			require.FailNowf(t, "test failed", "retry submissions=%d want=%d", got, want)
 		}
 	}
 }
 
-func (artc *autoDetectionRetryTestCommands) notification() <-chan struct{} {
-	artc.mu.Lock()
-	defer artc.mu.Unlock()
-	if artc.notify == nil {
-		artc.notify = make(chan struct{}, 1)
+func (adrtc *autoDetectionRetryTestCommands) notification() <-chan struct{} {
+	adrtc.mu.Lock()
+	defer adrtc.mu.Unlock()
+	if adrtc.notify == nil {
+		adrtc.notify = make(chan struct{}, 1)
 	}
-	return artc.notify
+	return adrtc.notify
 }
 
 func autoDetectionRetryTestConfig(name string) confgroup.Config {

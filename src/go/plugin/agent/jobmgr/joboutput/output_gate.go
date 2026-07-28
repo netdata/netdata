@@ -45,37 +45,37 @@ func newGenerationOutputGate(owner *lifecycle.FrameOwner) (*generationOutputGate
 	}, nil
 }
 
-func (gate *generationOutputGate) Activate() error {
-	if gate == nil {
+func (gog *generationOutputGate) Activate() error {
+	if gog == nil {
 		return errors.New("job output: nil generation output gate")
 	}
-	gate.mu.Lock()
-	defer gate.mu.Unlock()
-	if gate.state != generationOutputInactive {
+	gog.mu.Lock()
+	defer gog.mu.Unlock()
+	if gog.state != generationOutputInactive {
 		return errors.New("job output: invalid generation output activation")
 	}
-	gate.state = generationOutputActive
+	gog.state = generationOutputActive
 	return nil
 }
 
-func (gate *generationOutputGate) Fence() {
-	if gate == nil {
+func (gog *generationOutputGate) Fence() {
+	if gog == nil {
 		return
 	}
-	gate.mu.Lock()
-	gate.state = generationOutputFenced
-	gate.mu.Unlock()
+	gog.mu.Lock()
+	gog.state = generationOutputFenced
+	gog.mu.Unlock()
 }
 
-func (gate *generationOutputGate) Write(payload []byte) (int, error) {
-	if gate == nil {
+func (gog *generationOutputGate) Write(payload []byte) (int, error) {
+	if gog == nil {
 		return 0, errGenerationOutputInactive
 	}
-	gate.mu.RLock()
-	defer gate.mu.RUnlock()
-	switch gate.state {
+	gog.mu.RLock()
+	defer gog.mu.RUnlock()
+	switch gog.state {
 	case generationOutputActive:
-		return gate.writer.Write(payload)
+		return gog.writer.Write(payload)
 	case generationOutputFenced:
 		return 0, errGenerationOutputFenced
 	default:
@@ -83,21 +83,21 @@ func (gate *generationOutputGate) Write(payload []byte) (int, error) {
 	}
 }
 
-func (gate *generationOutputGate) CommitJobOutput(
+func (gog *generationOutputGate) CommitJobOutput(
 	payload []byte,
 	transaction jobruntime.OutputStateTransaction,
 ) error {
 	if transaction == nil {
 		return errors.New("job output: invalid generation output transaction")
 	}
-	if gate == nil {
+	if gog == nil {
 		return errors.Join(errGenerationOutputInactive, transaction.Abort())
 	}
-	gate.mu.RLock()
-	defer gate.mu.RUnlock()
-	switch gate.state {
+	gog.mu.RLock()
+	defer gog.mu.RUnlock()
+	switch gog.state {
 	case generationOutputActive:
-		return gate.writer.CommitJobOutput(payload, transaction)
+		return gog.writer.CommitJobOutput(payload, transaction)
 	case generationOutputFenced:
 		return errors.Join(errGenerationOutputFenced, transaction.Abort())
 	default:
@@ -105,13 +105,13 @@ func (gate *generationOutputGate) CommitJobOutput(
 	}
 }
 
-func (gate *generationOutputGate) PoisonOutput(err error) {
-	if gate == nil ||
+func (gog *generationOutputGate) PoisonOutput(err error) {
+	if gog == nil ||
 		errors.Is(err, errGenerationOutputInactive) ||
 		errors.Is(err, errGenerationOutputFenced) {
 		return
 	}
-	gate.writer.PoisonOutput(err)
+	gog.writer.PoisonOutput(err)
 }
 
 // CleanupOutputGate is the process-lifetime output capability used only by
@@ -133,30 +133,30 @@ func NewCleanupOutputGate(owner *lifecycle.FrameOwner) (*CleanupOutputGate, erro
 	}, nil
 }
 
-func (gate *CleanupOutputGate) Fence() {
-	if gate == nil {
+func (cog *CleanupOutputGate) Fence() {
+	if cog == nil {
 		return
 	}
-	gate.mu.Lock()
-	gate.fenced = true
-	gate.mu.Unlock()
+	cog.mu.Lock()
+	cog.fenced = true
+	cog.mu.Unlock()
 }
 
-func (gate *CleanupOutputGate) Write(payload []byte) (int, error) {
-	if gate == nil {
+func (cog *CleanupOutputGate) Write(payload []byte) (int, error) {
+	if cog == nil {
 		return 0, errCleanupOutputFenced
 	}
-	gate.mu.RLock()
-	defer gate.mu.RUnlock()
-	if gate.fenced {
+	cog.mu.RLock()
+	defer cog.mu.RUnlock()
+	if cog.fenced {
 		return 0, errCleanupOutputFenced
 	}
-	return gate.writer.Write(payload)
+	return cog.writer.Write(payload)
 }
 
-func (gate *CleanupOutputGate) PoisonOutput(err error) {
-	if gate == nil || errors.Is(err, errCleanupOutputFenced) {
+func (cog *CleanupOutputGate) PoisonOutput(err error) {
+	if cog == nil || errors.Is(err, errCleanupOutputFenced) {
 		return
 	}
-	gate.writer.PoisonOutput(err)
+	cog.writer.PoisonOutput(err)
 }

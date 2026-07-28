@@ -63,18 +63,18 @@ func startShutdownProbe(ctx context.Context, ck *CommandKernel, uid string) (shu
 	}
 }
 
-func (probe shutdownProbe) waitCancellation(ctx context.Context) error {
+func (sp shutdownProbe) waitCancellation(ctx context.Context) error {
 	select {
-	case <-probe.cancelled:
+	case <-sp.cancelled:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 }
 
-func (probe shutdownProbe) waitSettlement(ctx context.Context) error {
+func (sp shutdownProbe) waitSettlement(ctx context.Context) error {
 	select {
-	case err := <-probe.settled:
+	case err := <-sp.settled:
 		return err
 	case <-ctx.Done():
 		return ctx.Err()

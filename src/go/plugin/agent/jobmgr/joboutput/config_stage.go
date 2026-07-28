@@ -88,102 +88,102 @@ func newPreparedConfigOperation(
 	}, nil
 }
 
-func (stage *preparedConfigOperation) Start() {
-	if stage == nil {
+func (pco *preparedConfigOperation) Start() {
+	if pco == nil {
 		return
 	}
-	stage.startOnce.Do(func() {
-		stage.mu.Lock()
-		stage.started = true
-		stage.mu.Unlock()
-		go stage.start()
+	pco.startOnce.Do(func() {
+		pco.mu.Lock()
+		pco.started = true
+		pco.mu.Unlock()
+		go pco.start()
 	})
 }
 
-func (stage *preparedConfigOperation) Ready() <-chan struct{} {
-	if stage == nil {
+func (pco *preparedConfigOperation) Ready() <-chan struct{} {
+	if pco == nil {
 		return nil
 	}
-	return stage.ready
+	return pco.ready
 }
 
-func (stage *preparedConfigOperation) Cancel(cause error) {
-	if stage == nil {
+func (pco *preparedConfigOperation) Cancel(cause error) {
+	if pco == nil {
 		return
 	}
 	if cause == nil {
 		cause = context.Canceled
 	}
-	stage.cancel(cause)
-	stage.mu.Lock()
-	attempt := stage.attempt
-	stage.mu.Unlock()
+	pco.cancel(cause)
+	pco.mu.Lock()
+	attempt := pco.attempt
+	pco.mu.Unlock()
 	if attempt != nil {
 		attempt.Cut(cause)
 	}
 }
 
-func (stage *preparedConfigOperation) Release() {
-	if stage == nil {
+func (pco *preparedConfigOperation) Release() {
+	if pco == nil {
 		return
 	}
-	stage.mu.Lock()
-	if stage.released {
-		stage.mu.Unlock()
+	pco.mu.Lock()
+	if pco.released {
+		pco.mu.Unlock()
 		return
 	}
-	stage.released = true
-	taken := stage.taken
-	started := stage.started
-	attempt := stage.attempt
-	stage.config = nil
-	stage.operation = nil
-	stage.mu.Unlock()
+	pco.released = true
+	taken := pco.taken
+	started := pco.started
+	attempt := pco.attempt
+	pco.config = nil
+	pco.operation = nil
+	pco.mu.Unlock()
 	if taken {
 		return
 	}
-	stage.Cancel(context.Canceled)
+	pco.Cancel(context.Canceled)
 	if !started {
-		stage.publish(configOperationResult{err: context.Canceled})
+		pco.publish(configOperationResult{err: context.Canceled})
 	} else if attempt != nil {
 		attempt.Cut(context.Canceled)
 	}
 }
 
-func (stage *preparedConfigOperation) Await(ctx context.Context) error {
-	if stage == nil || ctx == nil {
+func (pco *preparedConfigOperation) Await(ctx context.Context) error {
+	if pco == nil || ctx == nil {
 		return errors.New("job output: invalid config operation wait")
 	}
-	stage.Start()
+	pco.Start()
 	select {
-	case <-stage.Ready():
+	case <-pco.Ready():
 		return nil
 	case <-ctx.Done():
-		stage.Cancel(context.Cause(ctx))
+		pco.Cancel(context.Cause(ctx))
 		return context.Cause(ctx)
 	}
 }
 
-func (stage *preparedConfigOperation) start() {
-	if cause := context.Cause(stage.ctx); cause != nil {
-		stage.publish(configOperationResult{err: cause})
+func (pco *preparedConfigOperation) start() {
+	if cause := context.Cause(pco.ctx); cause != nil {
+		pco.publish(configOperationResult{err: cause})
 		return
 	}
-	if stage.supersede {
-		if err := stage.attempts.SupersedeProcessAttempt(stage.ctx, stage.identity); err != nil {
-			stage.publish(configOperationResult{err: err})
+	if pco.supersede {
+		if err := pco.attempts.SupersedeProcessAttempt(pco.ctx, pco.identity); err != nil {
+			pco.publish(configOperationResult{err: err})
 			return
 		}
 	}
 	workerResult := make(chan configOperationResult, 1)
-	attempt, err := stage.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
-		Identity: stage.identity,
-		Target:   stage.target,
+	attempt, err := pco.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
+		Identity: pco.identity,
+		Target:   pco.target,
 		Work: func(ctx context.Context, _ jobmgr.ProcessAttemptAdmission) error {
-			stage.mu.Lock()
-			config := stage.config
-			operation := stage.operation
-			stage.mu.Unlock()
+			pco.mu.Lock()
+			config := pco.config
+			operation := pco.operation
+			pco.mu.Unlock()
 			if config == nil || operation == nil {
 				return context.Canceled
 			}
@@ -199,52 +199,52 @@ func (stage *preparedConfigOperation) start() {
 		},
 	})
 	if err != nil {
-		stage.publish(configOperationResult{err: err})
+		pco.publish(configOperationResult{err: err})
 		return
 	}
-	stage.mu.Lock()
-	stage.attempt = attempt
-	stage.mu.Unlock()
-	if cause := context.Cause(stage.ctx); cause != nil {
+	pco.mu.Lock()
+	pco.attempt = attempt
+	pco.mu.Unlock()
+	if cause := context.Cause(pco.ctx); cause != nil {
 		attempt.Cut(cause)
 	}
 	if err := attempt.Await(context.Background()); err != nil {
-		stage.publish(configOperationResult{err: err})
+		pco.publish(configOperationResult{err: err})
 		return
 	}
-	stage.publish(<-workerResult)
+	pco.publish(<-workerResult)
 }
 
-func (stage *preparedConfigOperation) publish(result configOperationResult) {
-	stage.readyOnce.Do(func() {
-		stage.mu.Lock()
-		if !stage.released {
-			stage.result = result
+func (pco *preparedConfigOperation) publish(result configOperationResult) {
+	pco.readyOnce.Do(func() {
+		pco.mu.Lock()
+		if !pco.released {
+			pco.result = result
 		}
-		stage.settled = true
-		stage.config = nil
-		stage.mu.Unlock()
-		close(stage.ready)
+		pco.settled = true
+		pco.config = nil
+		pco.mu.Unlock()
+		close(pco.ready)
 	})
 }
 
-func (stage *preparedConfigOperation) take() ([]byte, error) {
-	if stage == nil {
+func (pco *preparedConfigOperation) take() ([]byte, error) {
+	if pco == nil {
 		return nil, errors.New("job output: nil config operation")
 	}
 	select {
-	case <-stage.ready:
+	case <-pco.ready:
 	default:
 		return nil, errors.New("job output: config operation is not ready")
 	}
-	stage.mu.Lock()
-	defer stage.mu.Unlock()
-	if !stage.settled || stage.taken {
+	pco.mu.Lock()
+	defer pco.mu.Unlock()
+	if !pco.settled || pco.taken {
 		return nil, errors.New("job output: config operation already consumed")
 	}
-	stage.taken = true
-	result := stage.result
-	stage.result = configOperationResult{}
+	pco.taken = true
+	result := pco.result
+	pco.result = configOperationResult{}
 	return result.payload, result.err
 }
 

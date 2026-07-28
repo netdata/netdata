@@ -111,12 +111,12 @@ func (tac TaskAbandonmentCensus) Empty() bool {
 	return tac == (TaskAbandonmentCensus{})
 }
 
-func (abandonment TaskAbandonment) OwnershipCount() int {
-	count := abandonment.LongLivedPermits
-	if abandonment.Outcome != TaskOutcomeNone {
+func (ta TaskAbandonment) OwnershipCount() int {
+	count := ta.LongLivedPermits
+	if ta.Outcome != TaskOutcomeNone {
 		count++
 	}
-	if abandonment.Cleanup {
+	if ta.Cleanup {
 		count++
 	}
 	return count

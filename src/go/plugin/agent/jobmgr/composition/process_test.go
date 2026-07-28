@@ -740,16 +740,16 @@ func (*processStartupControlStore) Configuration() any {
 	return &struct{}{}
 }
 
-func (store *processStartupControlStore) Init(ctx context.Context) error {
-	start := store.nextStart()
-	store.entered <- start
-	if start != store.blockStart {
+func (pscs *processStartupControlStore) Init(ctx context.Context) error {
+	start := pscs.nextStart()
+	pscs.entered <- start
+	if start != pscs.blockStart {
 		return nil
 	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-store.release:
+	case <-pscs.release:
 		return nil
 	}
 }
@@ -903,10 +903,10 @@ func newTestProcessControls(capacity int) processControls {
 	}
 }
 
-func (controls processControls) sendRestart(control processControl) {
-	controls.restart <- control
+func (pc processControls) sendRestart(control processControl) {
+	pc.restart <- control
 }
 
-func (controls processControls) sendTerminate(control processControl) {
-	controls.terminate <- control
+func (pc processControls) sendTerminate(control processControl) {
+	pc.terminate <- control
 }

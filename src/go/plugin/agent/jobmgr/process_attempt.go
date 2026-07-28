@@ -32,8 +32,8 @@ const (
 	ProcessAttemptServiceDiscovery
 )
 
-func (namespace ProcessAttemptNamespace) String() string {
-	switch namespace {
+func (pan ProcessAttemptNamespace) String() string {
+	switch pan {
 	case ProcessAttemptJob:
 		return "job"
 	case ProcessAttemptJobRuntime:

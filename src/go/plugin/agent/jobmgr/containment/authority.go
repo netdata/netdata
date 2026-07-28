@@ -63,8 +63,8 @@ type policy struct {
 	supersessionGrace time.Duration
 }
 
-func (value policy) valid() bool {
-	return value.fuse > 0 && value.supersessionGrace > 0
+func (p policy) valid() bool {
+	return p.fuse > 0 && p.supersessionGrace > 0
 }
 
 // Census is the exact process-owned attempt accounting.
@@ -134,27 +134,27 @@ func newAuthority(diagnostics jobmgr.DiagnosticObserver, policy policy) (*Author
 }
 
 // Start reserves identity before starting exactly one worker.
-func (authority *Authority) start(plan jobmgr.ProcessAttemptPlan) (*attempt, error) {
-	if authority == nil || !validIdentity(plan.Identity) || plan.Work == nil {
+func (a *Authority) start(plan jobmgr.ProcessAttemptPlan) (*attempt, error) {
+	if a == nil || !validIdentity(plan.Identity) || plan.Work == nil {
 		return nil, errors.New("jobmgr containment: invalid attempt plan")
 	}
-	authority.mu.Lock()
-	if authority.stopping {
-		authority.mu.Unlock()
+	a.mu.Lock()
+	if a.stopping {
+		a.mu.Unlock()
 		return nil, jobmgr.ErrProcessAttemptStopped
 	}
-	if plan.Target != 0 && plan.Target <= authority.retiredThrough {
-		authority.mu.Unlock()
+	if plan.Target != 0 && plan.Target <= a.retiredThrough {
+		a.mu.Unlock()
 		return nil, jobmgr.ErrProcessAttemptRetired
 	}
 	key := mapKey(plan.Identity)
-	if authority.attempts[key] != nil {
-		authority.mu.Unlock()
+	if a.attempts[key] != nil {
+		a.mu.Unlock()
 		return nil, jobmgr.ErrProcessAttemptBusy
 	}
 	ctx, cancel := context.WithCancelCause(context.Background())
 	attempt := &attempt{
-		authority: authority,
+		authority: a,
 		identity:  plan.Identity,
 		target:    plan.Target,
 		started:   time.Now(),
@@ -165,25 +165,25 @@ func (authority *Authority) start(plan jobmgr.ProcessAttemptPlan) (*attempt, err
 		settled:   make(chan struct{}),
 		released:  make(chan struct{}),
 	}
-	authority.attempts[key] = attempt
-	authority.census.Active++
-	authority.census.Probing++
-	attempt.timer = time.AfterFunc(authority.policy.fuse, attempt.cutFuse)
-	authority.mu.Unlock()
+	a.attempts[key] = attempt
+	a.census.Active++
+	a.census.Probing++
+	attempt.timer = time.AfterFunc(a.policy.fuse, attempt.cutFuse)
+	a.mu.Unlock()
 
 	go attempt.run(plan.Work)
 	return attempt, nil
 }
 
-func (authority *Authority) StartProcessAttempt(
+func (a *Authority) StartProcessAttempt(
 	plan jobmgr.ProcessAttemptPlan,
 ) (jobmgr.ProcessAttempt, error) {
-	return authority.start(plan)
+	return a.start(plan)
 }
 
-func (attempt *attempt) run(work func(context.Context, jobmgr.ProcessAttemptAdmission) error) {
-	err := callWork(attempt.ctx, attempt, work)
-	attempt.authority.finish(attempt, err)
+func (at *attempt) run(work func(context.Context, jobmgr.ProcessAttemptAdmission) error) {
+	err := callWork(at.ctx, at, work)
+	at.authority.finish(at, err)
 }
 
 func callWork(
@@ -214,59 +214,59 @@ func callContainmentFence(fence func()) (err error) {
 
 // Admit atomically stops the preparation fuse. The identity remains occupied
 // until the complete physical worker and cleanup lifetime returns.
-func (attempt *attempt) Admit() error {
-	if attempt == nil || attempt.authority == nil {
+func (at *attempt) Admit() error {
+	if at == nil || at.authority == nil {
 		return errors.New("jobmgr containment: invalid attempt admission")
 	}
-	authority := attempt.authority
+	authority := at.authority
 	authority.mu.Lock()
-	if attempt.state != attemptStateProbing {
+	if at.state != attemptStateProbing {
 		authority.mu.Unlock()
 		return jobmgr.ErrProcessAttemptSettled
 	}
-	attempt.state = attemptStateAdmitted
+	at.state = attemptStateAdmitted
 	authority.census.Probing--
 	authority.census.Admitted++
-	attempt.timer.Stop()
+	at.timer.Stop()
 	authority.mu.Unlock()
 	return nil
 }
 
 // Cut settles logical waiting immediately and cancels the worker. The identity
 // stays occupied until Work returns.
-func (attempt *attempt) Cut(cause error) bool {
-	if attempt == nil || attempt.authority == nil {
+func (at *attempt) Cut(cause error) bool {
+	if at == nil || at.authority == nil {
 		return false
 	}
 	if cause == nil {
 		cause = context.Canceled
 	}
-	return attempt.authority.cut(attempt, cause, false)
+	return at.authority.cut(at, cause, false)
 }
 
-func (attempt *attempt) cutFuse() {
-	attempt.authority.cut(attempt, jobmgr.ErrProcessAttemptDeadline, true)
+func (at *attempt) cutFuse() {
+	at.authority.cut(at, jobmgr.ErrProcessAttemptDeadline, true)
 }
 
-func (authority *Authority) cut(attempt *attempt, cause error, probingOnly bool) bool {
-	authority.mu.Lock()
-	if attempt.authority != authority ||
+func (a *Authority) cut(attempt *attempt, cause error, probingOnly bool) bool {
+	a.mu.Lock()
+	if attempt.authority != a ||
 		(probingOnly && attempt.state != attemptStateProbing) {
-		authority.mu.Unlock()
+		a.mu.Unlock()
 		return false
 	}
 	switch attempt.state {
 	case attemptStateProbing:
-		authority.census.Probing--
+		a.census.Probing--
 	case attemptStateAdmitted:
-		authority.census.Admitted--
+		a.census.Admitted--
 	default:
-		authority.mu.Unlock()
+		a.mu.Unlock()
 		return false
 	}
 	attempt.state = attemptStateContained
 	attempt.result = cause
-	authority.census.Contained++
+	a.census.Contained++
 	attempt.timer.Stop()
 	attempt.cancel(cause)
 	fenceErr := callContainmentFence(attempt.fence)
@@ -274,17 +274,17 @@ func (authority *Authority) cut(attempt *attempt, cause error, probingOnly bool)
 		attempt.result = errors.Join(cause, fenceErr)
 	}
 	close(attempt.settled)
-	census := authority.census
+	census := a.census
 	age := time.Since(attempt.started)
 	identity := attempt.identity
 	target := attempt.target
-	authority.mu.Unlock()
+	a.mu.Unlock()
 
 	diagnosticErr := safeCutError(cause)
 	if fenceErr != nil {
 		diagnosticErr = errors.Join(diagnosticErr, fenceErr)
 	}
-	jobmgr.ObserveDiagnostic(authority.diagnostics, jobmgr.DiagnosticEvent{
+	jobmgr.ObserveDiagnostic(a.diagnostics, jobmgr.DiagnosticEvent{
 		Level:      jobmgr.DiagnosticError,
 		Name:       "job manager attempt contained",
 		Resource:   identity.Resource,
@@ -314,8 +314,8 @@ func safeCutError(cause error) error {
 	}
 }
 
-func (authority *Authority) finish(attempt *attempt, result error) {
-	authority.mu.Lock()
+func (a *Authority) finish(attempt *attempt, result error) {
+	a.mu.Lock()
 	if attempt.timer != nil {
 		attempt.timer.Stop()
 	}
@@ -323,36 +323,36 @@ func (authority *Authority) finish(attempt *attempt, result error) {
 	previous := attempt.state
 	switch previous {
 	case attemptStateProbing:
-		authority.census.Probing--
+		a.census.Probing--
 		attempt.result = result
 		close(attempt.settled)
 	case attemptStateAdmitted:
-		authority.census.Admitted--
+		a.census.Admitted--
 		attempt.result = result
 		close(attempt.settled)
 	case attemptStateContained:
-		authority.census.Contained--
+		a.census.Contained--
 	case attemptStateReleased:
-		authority.mu.Unlock()
+		a.mu.Unlock()
 		return
 	}
 	attempt.state = attemptStateReleased
 	key := mapKey(attempt.identity)
-	if authority.attempts[key] == attempt {
-		delete(authority.attempts, key)
+	if a.attempts[key] == attempt {
+		delete(a.attempts, key)
 	}
-	authority.census.Active--
+	a.census.Active--
 	close(attempt.released)
-	if authority.stopping && authority.census.Active == 0 {
-		close(authority.drained)
+	if a.stopping && a.census.Active == 0 {
+		close(a.drained)
 	}
 	identity := attempt.identity
 	target := attempt.target
 	age := time.Since(attempt.started)
-	authority.mu.Unlock()
+	a.mu.Unlock()
 
 	if errors.Is(result, jobmgr.ErrProcessAttemptWorkerPanic) {
-		jobmgr.ObserveDiagnostic(authority.diagnostics, jobmgr.DiagnosticEvent{
+		jobmgr.ObserveDiagnostic(a.diagnostics, jobmgr.DiagnosticEvent{
 			Level:      jobmgr.DiagnosticError,
 			Name:       "job manager attempt worker panicked",
 			Resource:   identity.Resource,
@@ -363,7 +363,7 @@ func (authority *Authority) finish(attempt *attempt, result error) {
 		})
 	}
 	if previous == attemptStateContained {
-		jobmgr.ObserveDiagnostic(authority.diagnostics, jobmgr.DiagnosticEvent{
+		jobmgr.ObserveDiagnostic(a.diagnostics, jobmgr.DiagnosticEvent{
 			Level:      jobmgr.DiagnosticInfo,
 			Name:       "job manager contained attempt released",
 			Resource:   identity.Resource,
@@ -376,104 +376,104 @@ func (authority *Authority) finish(attempt *attempt, result error) {
 
 // Await returns the first logical disposition. Caller cancellation cuts the
 // attempt but never waits for physical worker return.
-func (attempt *attempt) Await(ctx context.Context) error {
-	if attempt == nil || attempt.authority == nil || ctx == nil {
+func (at *attempt) Await(ctx context.Context) error {
+	if at == nil || at.authority == nil || ctx == nil {
 		return errors.New("jobmgr containment: invalid attempt wait")
 	}
 	if err := ctx.Err(); err != nil {
-		attempt.Cut(err)
+		at.Cut(err)
 		return err
 	}
 	select {
-	case <-attempt.settled:
+	case <-at.settled:
 	case <-ctx.Done():
 		err := ctx.Err()
-		attempt.Cut(err)
+		at.Cut(err)
 		return err
 	}
 	if err := ctx.Err(); err != nil {
-		attempt.Cut(err)
+		at.Cut(err)
 		return err
 	}
-	attempt.authority.mu.Lock()
-	defer attempt.authority.mu.Unlock()
-	return attempt.result
+	at.authority.mu.Lock()
+	defer at.authority.mu.Unlock()
+	return at.result
 }
 
 // Released closes only after Work, including required cleanup, has returned.
-func (attempt *attempt) Released() <-chan struct{} {
-	if attempt == nil {
+func (at *attempt) Released() <-chan struct{} {
+	if at == nil {
 		return nil
 	}
-	return attempt.released
+	return at.released
 }
 
-func (attempt *attempt) stateSnapshot() attemptState {
-	if attempt == nil || attempt.authority == nil {
+func (at *attempt) stateSnapshot() attemptState {
+	if at == nil || at.authority == nil {
 		return 0
 	}
-	attempt.authority.mu.Lock()
-	defer attempt.authority.mu.Unlock()
-	return attempt.state
+	at.authority.mu.Lock()
+	defer at.authority.mu.Unlock()
+	return at.state
 }
 
-func (authority *Authority) Census() Census {
-	if authority == nil {
+func (a *Authority) Census() Census {
+	if a == nil {
 		return Census{}
 	}
-	authority.mu.Lock()
-	defer authority.mu.Unlock()
-	return authority.census
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.census
 }
 
 // CutProcessAttempt logically settles one identity without waiting for its
 // physical worker to return.
-func (authority *Authority) CutProcessAttempt(
+func (a *Authority) CutProcessAttempt(
 	identity jobmgr.ProcessAttemptIdentity,
 	cause error,
 ) bool {
-	if authority == nil || !validIdentity(identity) {
+	if a == nil || !validIdentity(identity) {
 		return false
 	}
-	authority.mu.Lock()
-	attempt := authority.attempts[mapKey(identity)]
-	authority.mu.Unlock()
+	a.mu.Lock()
+	attempt := a.attempts[mapKey(identity)]
+	a.mu.Unlock()
 	return attempt != nil && attempt.Cut(cause)
 }
 
 // ProcessAttemptReleased returns the current physical owner's release signal.
-func (authority *Authority) ProcessAttemptReleased(
+func (a *Authority) ProcessAttemptReleased(
 	identity jobmgr.ProcessAttemptIdentity,
 ) (<-chan struct{}, bool) {
-	if authority == nil || !validIdentity(identity) {
+	if a == nil || !validIdentity(identity) {
 		return nil, false
 	}
-	authority.mu.Lock()
-	attempt := authority.attempts[mapKey(identity)]
-	authority.mu.Unlock()
+	a.mu.Lock()
+	attempt := a.attempts[mapKey(identity)]
+	a.mu.Unlock()
 	if attempt == nil {
 		return nil, false
 	}
 	return attempt.Released(), true
 }
 
-// Supersede cancels one identity and waits only the fixed grace for physical
+// SupersedeProcessAttempt cancels one identity and waits only the fixed grace for physical
 // release. A still-live worker remains the exclusive owner.
-func (authority *Authority) SupersedeProcessAttempt(
+func (a *Authority) SupersedeProcessAttempt(
 	ctx context.Context,
 	identity jobmgr.ProcessAttemptIdentity,
 ) error {
-	if authority == nil || ctx == nil || !validIdentity(identity) {
+	if a == nil || ctx == nil || !validIdentity(identity) {
 		return errors.New("jobmgr containment: invalid supersession")
 	}
-	authority.mu.Lock()
-	attempt := authority.attempts[mapKey(identity)]
-	authority.mu.Unlock()
+	a.mu.Lock()
+	attempt := a.attempts[mapKey(identity)]
+	a.mu.Unlock()
 	if attempt == nil {
 		return nil
 	}
 	attempt.Cut(jobmgr.ErrProcessAttemptSuperseded)
-	timer := time.NewTimer(authority.policy.supersessionGrace)
+	timer := time.NewTimer(a.policy.supersessionGrace)
 	defer timer.Stop()
 	select {
 	case <-attempt.released:
@@ -486,19 +486,19 @@ func (authority *Authority) SupersedeProcessAttempt(
 }
 
 // CutTarget permanently fences every live attempt associated with target.
-func (authority *Authority) CutTarget(target uint64) int {
-	if authority == nil || target == 0 {
+func (a *Authority) CutTarget(target uint64) int {
+	if a == nil || target == 0 {
 		return 0
 	}
-	authority.mu.Lock()
-	authority.retiredThrough = max(authority.retiredThrough, target)
+	a.mu.Lock()
+	a.retiredThrough = max(a.retiredThrough, target)
 	attempts := make([]*attempt, 0)
-	for _, attempt := range authority.attempts {
-		if attempt.target != 0 && attempt.target <= authority.retiredThrough {
+	for _, attempt := range a.attempts {
+		if attempt.target != 0 && attempt.target <= a.retiredThrough {
 			attempts = append(attempts, attempt)
 		}
 	}
-	authority.mu.Unlock()
+	a.mu.Unlock()
 	cut := 0
 	for _, attempt := range attempts {
 		if attempt.Cut(jobmgr.ErrProcessAttemptRetired) {
@@ -508,26 +508,26 @@ func (authority *Authority) CutTarget(target uint64) int {
 	return cut
 }
 
-// Shutdown rejects new work, cancels every live identity, emits a bounded
+// BeginShutdown rejects new work, cancels every live identity, emits a bounded
 // retained sample, and waits only the caller's existing shutdown budget.
-func (authority *Authority) BeginShutdown() {
-	if authority == nil {
+func (a *Authority) BeginShutdown() {
+	if a == nil {
 		return
 	}
-	authority.mu.Lock()
-	first := !authority.stopping
+	a.mu.Lock()
+	first := !a.stopping
 	if first {
-		authority.stopping = true
-		if authority.census.Active == 0 {
-			close(authority.drained)
+		a.stopping = true
+		if a.census.Active == 0 {
+			close(a.drained)
 		}
 	}
-	attempts := make([]*attempt, 0, len(authority.attempts))
-	for _, attempt := range authority.attempts {
+	attempts := make([]*attempt, 0, len(a.attempts))
+	for _, attempt := range a.attempts {
 		attempts = append(attempts, attempt)
 	}
-	total := authority.census.Active
-	authority.mu.Unlock()
+	total := a.census.Active
+	a.mu.Unlock()
 
 	if !first {
 		return
@@ -546,7 +546,7 @@ func (authority *Authority) BeginShutdown() {
 		attempt.Cut(jobmgr.ErrProcessAttemptStopped)
 	}
 	if total > 0 {
-		jobmgr.ObserveDiagnostic(authority.diagnostics, jobmgr.DiagnosticEvent{
+		jobmgr.ObserveDiagnostic(a.diagnostics, jobmgr.DiagnosticEvent{
 			Level: jobmgr.DiagnosticError,
 			Name:  "job manager process retained attempts",
 			State: "stopping",
@@ -554,7 +554,7 @@ func (authority *Authority) BeginShutdown() {
 		})
 		limit := min(len(attempts), MaximumDiagnosticIdentitySample)
 		for _, attempt := range attempts[:limit] {
-			jobmgr.ObserveDiagnostic(authority.diagnostics, jobmgr.DiagnosticEvent{
+			jobmgr.ObserveDiagnostic(a.diagnostics, jobmgr.DiagnosticEvent{
 				Level:      jobmgr.DiagnosticWarning,
 				Name:       "job manager process retained attempt",
 				Resource:   attempt.identity.Resource,
@@ -568,14 +568,14 @@ func (authority *Authority) BeginShutdown() {
 
 // Shutdown rejects new work, cancels every live identity, emits a bounded
 // retained sample, and waits only the caller's existing shutdown budget.
-func (authority *Authority) Shutdown(ctx context.Context) error {
-	if authority == nil || ctx == nil {
+func (a *Authority) Shutdown(ctx context.Context) error {
+	if a == nil || ctx == nil {
 		return errors.New("jobmgr containment: invalid authority shutdown")
 	}
-	authority.BeginShutdown()
-	authority.mu.Lock()
-	drained := authority.drained
-	authority.mu.Unlock()
+	a.BeginShutdown()
+	a.mu.Lock()
+	drained := a.drained
+	a.mu.Unlock()
 	select {
 	case <-drained:
 		return nil

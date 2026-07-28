@@ -146,43 +146,43 @@ type stagedSecretTransaction struct {
 	stage      *secretadapter.PreparedStoreOperation
 }
 
-func (transaction *stagedSecretTransaction) Start() {
-	transaction.stage.Start()
+func (sst *stagedSecretTransaction) Start() {
+	sst.stage.Start()
 }
 
-func (transaction *stagedSecretTransaction) Ready() <-chan struct{} {
-	return transaction.stage.Ready()
+func (sst *stagedSecretTransaction) Ready() <-chan struct{} {
+	return sst.stage.Ready()
 }
 
-func (transaction *stagedSecretTransaction) Cancel(cause error) {
-	transaction.stage.Cancel(cause)
+func (sst *stagedSecretTransaction) Cancel(cause error) {
+	sst.stage.Cancel(cause)
 }
 
-func (transaction *stagedSecretTransaction) Release() {
-	transaction.stage.Release()
-	transaction.controller = nil
-	transaction.input = secretadapter.CommandInput{}
-	transaction.stage = nil
+func (sst *stagedSecretTransaction) Release() {
+	sst.stage.Release()
+	sst.controller = nil
+	sst.input = secretadapter.CommandInput{}
+	sst.stage = nil
 }
 
-func (transaction *stagedSecretTransaction) PrepareComposite(
+func (sst *stagedSecretTransaction) PrepareComposite(
 	ctx context.Context,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
 ) (jobmgr.PreparedCompositeResourceTransaction, error) {
-	if transaction == nil ||
-		transaction.controller == nil ||
-		transaction.stage == nil {
+	if sst == nil ||
+		sst.controller == nil ||
+		sst.stage == nil {
 		return nil, errors.New("jobmgr composition: invalid staged secret transaction")
 	}
-	prepared, err := transaction.controller.PrepareStaged(
+	prepared, err := sst.controller.PrepareStaged(
 		ctx,
-		transaction.input,
+		sst.input,
 		current,
 		scope,
 		permit,
-		transaction.stage,
+		sst.stage,
 	)
 	if prepared == nil {
 		return nil, err

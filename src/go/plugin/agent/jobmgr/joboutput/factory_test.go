@@ -1119,8 +1119,8 @@ type factoryTestRuntimeService struct {
 	registrations int
 }
 
-func (service *factoryTestRuntimeService) RegisterComponent(runtimecomp.ComponentConfig) error {
-	service.registrations++
+func (ftrs *factoryTestRuntimeService) RegisterComponent(runtimecomp.ComponentConfig) error {
+	ftrs.registrations++
 	return nil
 }
 
@@ -1252,28 +1252,28 @@ type factoryTestOutput struct {
 	bytes.Buffer
 }
 
-func (output *factoryTestOutput) Write(payload []byte) (int, error) {
-	output.mu.Lock()
-	defer output.mu.Unlock()
-	return output.Buffer.Write(payload)
+func (fto *factoryTestOutput) Write(payload []byte) (int, error) {
+	fto.mu.Lock()
+	defer fto.mu.Unlock()
+	return fto.Buffer.Write(payload)
 }
 
-func (output *factoryTestOutput) Len() int {
-	output.mu.Lock()
-	defer output.mu.Unlock()
-	return output.Buffer.Len()
+func (fto *factoryTestOutput) Len() int {
+	fto.mu.Lock()
+	defer fto.mu.Unlock()
+	return fto.Buffer.Len()
 }
 
-func (output *factoryTestOutput) String() string {
-	output.mu.Lock()
-	defer output.mu.Unlock()
-	return output.Buffer.String()
+func (fto *factoryTestOutput) String() string {
+	fto.mu.Lock()
+	defer fto.mu.Unlock()
+	return fto.Buffer.String()
 }
 
-func (output *factoryTestOutput) Bytes() []byte {
-	output.mu.Lock()
-	defer output.mu.Unlock()
-	return append([]byte(nil), output.Buffer.Bytes()...)
+func (fto *factoryTestOutput) Bytes() []byte {
+	fto.mu.Lock()
+	defer fto.mu.Unlock()
+	return append([]byte(nil), fto.Buffer.Bytes()...)
 }
 
 func prepareFactoryTestCandidate(
