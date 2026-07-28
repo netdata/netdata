@@ -79,8 +79,8 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
+func (c *Collector) Check(ctx context.Context) error {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -96,8 +96,8 @@ func (c *Collector) Charts() *Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		c.Error(err)
 		return nil
