@@ -260,10 +260,15 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 
 	require.NoError(t, generation.Wait(context.Background()))
 
+	want := []string{"publish", "result", "withdraw", "cleanup"}
+	require.Eventually(t, func() bool {
+		eventsMu.Lock()
+		defer eventsMu.Unlock()
+		return len(events) == len(want)
+	}, time.Second, time.Millisecond)
 	eventsMu.Lock()
 	got := append([]string(nil), events...)
 	eventsMu.Unlock()
-	want := []string{"publish", "result", "withdraw", "cleanup"}
 	require.EqualValues(t, len(want), len(got))
 	for index := range want {
 		require.EqualValues(t, want[index], got[index])

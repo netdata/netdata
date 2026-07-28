@@ -4,6 +4,7 @@ package functions
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -13,6 +14,23 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/require"
 )
+
+func TestContainedControllerConsumesPlanPublishedBeforeSuccessfulSettlement(t *testing.T) {
+	for index := range 64 {
+		t.Run(strconv.Itoa(index), func(t *testing.T) {
+			attempts, err := containment.NewAuthority(nil)
+			require.NoError(t, err)
+			controller, _, err := NewContainedController(
+				context.Background(),
+				1,
+				attempts,
+				collectorapi.Registry{"module": {}},
+			)
+			require.NoError(t, err)
+			require.NoError(t, controller.AbortConstruction(context.Background()))
+		})
+	}
+}
 
 func TestContainedControllerConstructionSettlesWhileModuleCallbackRemainsOwned(t *testing.T) {
 	entered := make(chan struct{})

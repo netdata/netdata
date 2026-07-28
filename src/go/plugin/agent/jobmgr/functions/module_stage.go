@@ -74,8 +74,12 @@ func prepareContainedModulePlans(
 		var result modulePlanResult
 		select {
 		case result = <-stage.result:
-		case err := <-stage.settled:
-			result.err = err
+		case settledErr := <-stage.settled:
+			if settledErr != nil {
+				result.err = settledErr
+			} else {
+				result = <-stage.result
+			}
 		case <-ctx.Done():
 			stage.attempt.Cut(ctx.Err())
 			result.err = ctx.Err()

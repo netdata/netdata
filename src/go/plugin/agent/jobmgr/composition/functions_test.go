@@ -19,13 +19,41 @@ import (
 )
 
 // stopFunctionAssembly runs the same shutdown sequence the kernel drives in
-// production: BeforeFunctionCatalogClose then FinalizeRun.
+// production: shutdown barrier, catalog drain, then run finalization.
 func stopFunctionAssembly(fa *FunctionAssembly, epoch uint64) error {
 	if fa == nil {
 		return nil
 	}
 	if err := fa.BeforeFunctionCatalogClose(context.Background(), epoch); err != nil {
 		return err
+	}
+	catalog, ok := fa.Catalog().(*functionadapter.Catalog)
+	if !ok {
+		return errors.New("unexpected Function catalog type")
+	}
+	if err := catalog.BeginClose(); err != nil {
+		return err
+	}
+	for {
+		cleanups, more, err := catalog.CloseStep(jobmgr.MaximumFunctionCloseQuantum)
+		if err != nil {
+			return err
+		}
+		for _, cleanup := range cleanups {
+			_, cleanupErr := cleanup.Work()(context.Background())
+			if err := catalog.CompleteCleanup(cleanup.Ref()); err != nil {
+				return errors.Join(cleanupErr, err)
+			}
+			if cleanupErr != nil {
+				return cleanupErr
+			}
+		}
+		if !more {
+			break
+		}
+	}
+	if !catalog.LifecycleDrained() {
+		return errors.New("Function catalog did not drain")
 	}
 	return fa.FinalizeRun(context.Background(), epoch)
 }
