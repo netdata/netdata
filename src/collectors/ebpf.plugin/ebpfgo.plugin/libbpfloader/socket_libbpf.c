@@ -733,14 +733,9 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
         /* Grow output array if needed. */
         if (count >= rt->per_pid_cap) {
             int newcap = rt->per_pid_cap * 2;
-            struct netdata_socket_per_pid_entry *tmp =
-                reallocz(rt->per_pid_entries, (size_t)newcap * sizeof(*tmp));
-            if (!tmp) {
-                /* Partial result is better than nothing. */
-                break;
-            }
-            rt->per_pid_entries = tmp;
-            rt->per_pid_cap     = newcap;
+            rt->per_pid_entries = reallocz(rt->per_pid_entries,
+                                           (size_t)newcap * sizeof(*rt->per_pid_entries));
+            rt->per_pid_cap = newcap;
         }
 
         rt->per_pid_entries[count++] = rt->pid_ht[i];
