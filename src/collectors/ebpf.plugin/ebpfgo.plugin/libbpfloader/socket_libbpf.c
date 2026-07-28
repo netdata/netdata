@@ -7,6 +7,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+/* Minimum gap between repeated pid-hash-table-full log lines (microseconds).
+ * Matches errorLogInterval in error_log.go so the C-side rate limit is
+ * consistent with the Go-side one used for all other error sites. */
+#define SOCKET_PID_HT_LOG_INTERVAL_USEC (60ULL * 1000000ULL)
+
+static uint64_t socket_now_usec(void)
+{
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
+}
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
@@ -162,6 +176,7 @@ struct netdata_ebpf_socket_runtime {
     uint32_t                             pid_ht_size;
     uint32_t                             pid_ht_mask;
     uint32_t                             pid_ht_drops; /* PIDs dropped when table full (per cycle) */
+    uint64_t                             pid_ht_drops_last_log_usec; /* last time the drops warning was emitted */
 
     /* Compact sorted output array from last per-PID snapshot (reused). */
     struct netdata_socket_per_pid_entry *per_pid_entries;
@@ -699,9 +714,15 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
         key = next;
     }
 
-    if (rt->pid_ht_drops > 0)
-        fprintf(stderr, "ebpf-go.plugin: socket: pid hash table full, %u connection entries dropped this cycle\n",
-                rt->pid_ht_drops);
+    if (rt->pid_ht_drops > 0) {
+        uint64_t now = socket_now_usec();
+        if (now == 0 || now - rt->pid_ht_drops_last_log_usec >= SOCKET_PID_HT_LOG_INTERVAL_USEC) {
+            fprintf(stderr,
+                    "ebpf-go.plugin: socket: pid hash table full, %u connection entries dropped this cycle\n",
+                    rt->pid_ht_drops);
+            rt->pid_ht_drops_last_log_usec = now;
+        }
+    }
 
     /* Compact non-empty hash-table entries into the sorted output array. */
     int count = 0;
