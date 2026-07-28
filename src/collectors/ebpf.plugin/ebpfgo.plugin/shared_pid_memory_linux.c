@@ -228,9 +228,17 @@ struct shared_pid_memory *shared_pid_memory_open(const char *shm_name, const cha
         if (ebpfgo_shm_sem_wait(ctx->sem)) {
             /* Acquired: zero the segment so surviving consumers see a clean
              * slate, then release.  Zeroing last_publish_ut makes any
-             * in-flight reader reject the data via is_live. */
+             * in-flight reader reject the data via is_live.
+             *
+             * A successful sem_wait proves the prior producer is dead: a live
+             * publisher holds the semaphore only during a brief memcpy window
+             * and releases it immediately after.  Having acquired exclusive
+             * access we are now the lifecycle owner and must unlink on close —
+             * without this the segment leaks permanently after every crash
+             * whose recovery happens to match the prior segment size. */
             memset(ctx->mapping, 0, length);
             sem_post(ctx->sem);
+            ctx->shm_name_created = true;
         } else {
             /* Timed out: a slow live holder and a crashed owner both produce
              * the same timeout; posting without ownership is unsafe.  Replace
