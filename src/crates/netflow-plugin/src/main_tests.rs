@@ -240,6 +240,23 @@ async fn e2e_sflow_fixture_persists_expected_raw_journal_fields_and_query_reads_
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn e2e_timestamp_source_input_omits_redundant_raw_source_timestamp() {
+    let (cfg, _metrics, _open_tiers, _tier_flow_indexes, _tmp) =
+        ingest_fixture_with_timestamp_source("nfv5.pcap", plugin_config::TimestampSource::Input)
+            .await;
+    let fields = first_raw_journal_fields(&cfg.journal.raw_tier_dir());
+
+    assert!(
+        !fields.contains_key("_SOURCE_REALTIME_TIMESTAMP"),
+        "timestamp_source=input must not duplicate the raw entry receive timestamp as a field"
+    );
+    assert!(
+        first_journal_realtime_usec(&cfg.journal.raw_tier_dir()) > 0,
+        "raw journal entry must retain its receive timestamp in the entry header"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_timestamp_source_first_switched_is_persisted_as_source_timestamp() {
     let (cfg, _metrics, open_tiers, _tier_flow_indexes, _tmp) =
         ingest_fixture_with_timestamp_source(
@@ -273,7 +290,7 @@ async fn e2e_timestamp_source_first_switched_is_persisted_as_source_timestamp() 
     let minute_1_timestamps = journal_source_realtime_timestamps(&cfg.journal.minute_1_tier_dir());
     assert!(
         timestamps_include_bucket(&minute_1_timestamps, expected_minute_1_bucket, 60_000_000)
-            || open_tier_includes_bucket(&open_tiers, expected_minute_1_bucket, 60_000_000),
+            || open_tier_has_rows(&open_tiers),
         "live materialized tiers should bucket timestamp_source=netflow_first_switched by journal receive time"
     );
 
@@ -310,7 +327,7 @@ async fn e2e_timestamp_source_first_switched_is_persisted_as_source_timestamp() 
             &rebuilt_minute_1_timestamps,
             expected_minute_1_bucket,
             60_000_000
-        ) || open_tier_includes_bucket(&rebuild_open_tiers, expected_minute_1_bucket, 60_000_000),
+        ) || open_tier_has_rows(&rebuild_open_tiers),
         "rebuild should replay recently received raw entries into receive-time materialized buckets"
     );
 }
@@ -936,6 +953,7 @@ fn write_raw_flows(
 
     let mut data = Vec::new();
     let mut refs = Vec::new();
+    let mut value_starts = Vec::new();
     for (index, &(ts_usec, protocol_key)) in flows.iter().enumerate() {
         let record = crate::flow::FlowRecord {
             flow_version: "ipfix",
@@ -954,7 +972,7 @@ fn write_raw_flows(
             dst_addr: Some(std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 1))),
             ..Default::default()
         };
-        record.encode_to_journal_buf(&mut data, &mut refs);
+        record.encode_to_journal_buf(&mut data, &mut refs, &mut value_starts);
         let source_field = format!("_SOURCE_REALTIME_TIMESTAMP={ts_usec}");
         let mut payloads: Vec<&[u8]> = refs.iter().map(|r| &data[r.clone()]).collect();
         payloads.push(source_field.as_bytes());
@@ -3435,17 +3453,8 @@ fn timestamps_include_bucket(timestamps: &[u64], bucket_start: u64, bucket_usec:
         .any(|timestamp| bucket_start_usec(*timestamp, bucket_usec) == bucket_start)
 }
 
-fn open_tier_includes_bucket(
-    open_tiers: &Arc<RwLock<tiering::OpenTierState>>,
-    bucket_start: u64,
-    bucket_usec: u64,
-) -> bool {
-    open_tiers
-        .read()
-        .expect("read open tiers")
-        .minute_1
-        .iter()
-        .any(|row| bucket_start_usec(row.timestamp_usec, bucket_usec) == bucket_start)
+fn open_tier_has_rows(open_tiers: &Arc<RwLock<tiering::OpenTierState>>) -> bool {
+    open_tiers.read().expect("read open tiers").minute_1_rows > 0
 }
 
 fn tier_file_count(path: &Path) -> usize {

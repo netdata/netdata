@@ -7,6 +7,7 @@ use crate::facet_catalog::{
     facet_field_spec, facet_field_spec_static,
 };
 use crate::flow::FlowRecord;
+use crate::memory_estimation::btree_container_overhead_bytes;
 use crate::query::{
     FACET_CACHE_JOURNAL_WINDOW_SIZE, FACET_VALUE_LIMIT, accumulate_simple_closed_file_facet_values,
     accumulate_targeted_facet_values, facet_field_requires_protocol_scan,
@@ -44,8 +45,6 @@ const FACET_STATE_HEADER_LEN: usize = 4 + 4 + 8 + 8;
 const MAX_FACET_STATE_PAYLOAD_LEN: usize = 128 * 1024 * 1024;
 const MAX_FACET_STATE_FILE_LEN: usize = FACET_STATE_HEADER_LEN + MAX_FACET_STATE_PAYLOAD_LEN;
 const FACET_AUTOCOMPLETE_LIMIT: usize = 100;
-const BTREE_ENTRY_OVERHEAD_BYTES: usize = size_of::<usize>() * 4;
-
 #[cfg(test)]
 static FACET_BEFORE_DISK_WRITE_HOOK: Mutex<Option<Arc<dyn Fn(&Path) + Send + Sync>>> =
     Mutex::new(None);
@@ -1200,10 +1199,6 @@ fn estimate_published_snapshot_bytes(snapshot: &FacetPublishedSnapshot) -> usize
             .sum::<usize>()
 }
 
-fn btree_container_overhead_bytes(len: usize) -> usize {
-    len.saturating_mul(BTREE_ENTRY_OVERHEAD_BYTES)
-}
-
 fn load_persisted_state(state_path: &Path) -> Option<PersistedFacetState> {
     let file_len = match fs::metadata(state_path) {
         Ok(metadata) => metadata.len(),
@@ -1382,6 +1377,7 @@ mod tests {
             .expect("create archived fragment journal writer");
         let mut encoded = Vec::new();
         let mut fields = Vec::new();
+        let mut value_starts = Vec::new();
 
         for (index, fragment_id) in fragment_ids.iter().copied().enumerate() {
             let record = FlowRecord {
@@ -1390,7 +1386,7 @@ mod tests {
                 ip_fragment_id: fragment_id,
                 ..FlowRecord::default()
             };
-            record.encode_to_journal_buf(&mut encoded, &mut fields);
+            record.encode_to_journal_buf(&mut encoded, &mut fields, &mut value_starts);
             let realtime_usec = 1_000_000 + index as u64;
             let source_realtime = format!("_SOURCE_REALTIME_TIMESTAMP={realtime_usec}");
             let mut payloads = fields

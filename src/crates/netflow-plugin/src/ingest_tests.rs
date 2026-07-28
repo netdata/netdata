@@ -657,7 +657,7 @@ fn ingest_service_protects_symlinked_decoder_state() {
 }
 
 #[test]
-fn refresh_open_tier_state_publishes_complete_snapshots_under_concurrent_reads() {
+fn refresh_open_tier_state_publishes_complete_counts_under_concurrent_reads() {
     const FLOW_COUNT: usize = 128;
     let (_tmp, mut service) = new_test_ingest_service(ConfigDecapsulationMode::None);
     let timestamp_usec = 90_000_000_u64;
@@ -689,18 +689,17 @@ fn refresh_open_tier_state_publishes_complete_snapshots_under_concurrent_reads()
         while !reader_stop.load(Ordering::Relaxed) {
             match open_tiers.try_read() {
                 Ok(state) => {
-                    let lens = (
-                        state.minute_1.len(),
-                        state.minute_5.len(),
-                        state.hour_1.len(),
-                    );
-                    let valid_empty = state.generation == 0 && lens == (0, 0, 0);
+                    let counts = state.counts();
+                    let heap_bytes = state.estimated_heap_bytes();
+                    let valid_empty =
+                        state.generation == 0 && counts == (0, 0, 0) && heap_bytes == 0;
                     let valid_complete = state.generation == generation
-                        && lens == (FLOW_COUNT, FLOW_COUNT, FLOW_COUNT);
+                        && counts == (FLOW_COUNT as u64, FLOW_COUNT as u64, FLOW_COUNT as u64)
+                        && heap_bytes > 0;
                     if !valid_empty && !valid_complete {
                         *reader_failure.lock().expect("record reader failure") = Some(format!(
-                            "observed partial open-tier state: generation={}, lens={:?}",
-                            state.generation, lens
+                            "observed partial open-tier state: generation={}, counts={:?}, heap_bytes={}",
+                            state.generation, counts, heap_bytes
                         ));
                         reader_stop.store(true, Ordering::Relaxed);
                         break;
@@ -734,17 +733,13 @@ fn refresh_open_tier_state_publishes_complete_snapshots_under_concurrent_reads()
 
     let state = service.open_tiers.read().expect("read final open tiers");
     assert_eq!(state.generation, generation);
-    assert_eq!(state.minute_1.len(), FLOW_COUNT);
-    assert_eq!(state.minute_5.len(), FLOW_COUNT);
-    assert_eq!(state.hour_1.len(), FLOW_COUNT);
+    assert_eq!(
+        state.counts(),
+        (FLOW_COUNT as u64, FLOW_COUNT as u64, FLOW_COUNT as u64)
+    );
     assert!(
-        state
-            .minute_1
-            .iter()
-            .chain(state.minute_5.iter())
-            .chain(state.hour_1.iter())
-            .all(|row| row.timestamp_usec == snapshot_usec),
-        "published rows must all come from the same refresh"
+        state.estimated_heap_bytes() > 0,
+        "published accumulator heap must be non-zero"
     );
 }
 

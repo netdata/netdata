@@ -62,11 +62,20 @@ mod bench_support;
 #[path = "ingest_bench_tests.rs"]
 mod bench_tests;
 #[cfg(test)]
+#[path = "ingest_capacity_bench_tests.rs"]
+mod capacity_bench_tests;
+#[cfg(test)]
+#[path = "ingest_capacity_bench_wire.rs"]
+mod capacity_bench_wire;
+#[cfg(test)]
 #[path = "ingest_resource_bench_support.rs"]
 mod resource_bench_support;
 #[cfg(test)]
 #[path = "ingest_resource_bench_tests.rs"]
 mod resource_bench_tests;
+#[cfg(test)]
+#[path = "ingest_storage_bench_tests.rs"]
+mod storage_bench_tests;
 #[cfg(test)]
 #[path = "ingest_test_support.rs"]
 mod test_support;

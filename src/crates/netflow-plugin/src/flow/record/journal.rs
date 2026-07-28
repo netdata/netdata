@@ -24,11 +24,13 @@ impl FlowRecord {
         &self,
         data: &mut Vec<u8>,
         refs: &mut Vec<std::ops::Range<usize>>,
+        value_starts: &mut Vec<usize>,
     ) {
         data.clear();
         refs.clear();
+        value_starts.clear();
 
-        let mut writer = JournalBufWriter::new(data, refs);
+        let mut writer = JournalBufWriter::new(data, refs, value_starts);
         encode_core_journal_fields(self, &mut writer);
         encode_network_journal_fields(self, &mut writer);
         encode_interface_journal_fields(self, &mut writer);

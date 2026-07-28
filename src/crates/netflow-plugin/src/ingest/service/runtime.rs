@@ -45,10 +45,19 @@ async fn recv_from_any_listener(
 }
 
 impl IngestService {
-    pub(crate) async fn run(mut self, shutdown: CancellationToken) -> Result<()> {
+    pub(crate) async fn run(self, shutdown: CancellationToken) -> Result<()> {
+        self.run_with_listener_ready(shutdown, |_| {}).await
+    }
+
+    async fn run_with_listener_ready(
+        mut self,
+        shutdown: CancellationToken,
+        listener_ready: impl FnOnce(&[UdpSocket]),
+    ) -> Result<()> {
         self.rebuild_materialized_from_raw().await?;
 
         let sockets = self.bind_listeners_and_start_workers().await?;
+        listener_ready(&sockets);
         let mut buffer = vec![0_u8; self.cfg.listener.max_packet_size];
         let mut next_socket_index = 0_usize;
         let mut entries_since_sync = 0_usize;
@@ -232,7 +241,7 @@ impl IngestService {
     ) -> bool {
         self.ingest_decoded_record_internal(
             receive_time_usec,
-            flow.source_realtime_usec.unwrap_or(receive_time_usec),
+            flow.source_realtime_usec,
             &flow.record,
             true,
         )
@@ -241,7 +250,7 @@ impl IngestService {
     fn ingest_decoded_record_internal(
         &mut self,
         receive_time_usec: u64,
-        source_realtime_usec: u64,
+        source_realtime_usec: Option<u64>,
         record: &crate::flow::FlowRecord,
         observe_tiers: bool,
     ) -> bool {
@@ -271,11 +280,10 @@ impl IngestService {
     fn write_raw_record_internal(
         &mut self,
         receive_time_usec: u64,
-        source_realtime_usec: u64,
+        source_realtime_usec: Option<u64>,
         record: &crate::flow::FlowRecord,
     ) -> std::result::Result<Option<String>, ()> {
-        let timestamps = EntryTimestamps::default()
-            .with_source_realtime_usec(source_realtime_usec)
+        let mut timestamps = EntryTimestamps::default()
             .with_entry_realtime_usec(receive_time_usec)
             .with_entry_monotonic_usec(match self.journal_host.monotonic_usec() {
                 Ok(value) => value,
@@ -287,6 +295,13 @@ impl IngestService {
                     return Err(());
                 }
             });
+        // The ENTRY header already stores receive time. Persist source time
+        // only when a selected exporter/flow timestamp differs from it.
+        if let Some(source_realtime_usec) =
+            source_realtime_usec.filter(|&value| value != receive_time_usec)
+        {
+            timestamps = timestamps.with_source_realtime_usec(source_realtime_usec);
+        }
 
         if let Err(err) =
             self.encode_buf
@@ -511,6 +526,28 @@ impl IngestService {
     }
 
     #[cfg(test)]
+    pub(crate) async fn run_with_listener_ready_for_test(
+        self,
+        shutdown: CancellationToken,
+        listener_ready: impl FnOnce(Vec<(std::net::SocketAddr, Option<usize>)>),
+    ) -> Result<()> {
+        self.run_with_listener_ready(shutdown, |sockets| {
+            listener_ready(
+                sockets
+                    .iter()
+                    .map(|socket| {
+                        (
+                            socket.local_addr().expect("read bound listener address"),
+                            socket2::SockRef::from(socket).recv_buffer_size().ok(),
+                        )
+                    })
+                    .collect(),
+            );
+        })
+        .await
+    }
+
+    #[cfg(test)]
     pub(crate) fn tier_commit_workers_started_for_test(&self) -> bool {
         !self.tier_worker_handles.is_empty()
     }
@@ -531,7 +568,7 @@ impl IngestService {
         receive_time_usec: u64,
         record: &crate::flow::FlowRecord,
     ) -> bool {
-        self.ingest_decoded_record_internal(receive_time_usec, receive_time_usec, record, true)
+        self.ingest_decoded_record_internal(receive_time_usec, None, record, true)
     }
 
     #[cfg(test)]
@@ -583,12 +620,7 @@ impl IngestService {
         mut entries_since_sync: usize,
     ) -> usize {
         for record in records {
-            if self.ingest_decoded_record_internal(
-                receive_time_usec,
-                receive_time_usec,
-                record,
-                true,
-            ) {
+            if self.ingest_decoded_record_internal(receive_time_usec, None, record, true) {
                 entries_since_sync += 1;
             }
         }
@@ -606,12 +638,7 @@ impl IngestService {
         run_tier_maintenance: bool,
     ) -> usize {
         for record in records {
-            if self.ingest_decoded_record_internal(
-                receive_time_usec,
-                receive_time_usec,
-                record,
-                observe_tiers,
-            ) {
+            if self.ingest_decoded_record_internal(receive_time_usec, None, record, observe_tiers) {
                 entries_since_sync += 1;
             }
         }

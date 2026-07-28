@@ -76,6 +76,13 @@ pub(super) fn cpu_percent_of_one_core(
         .user_ticks
         .saturating_add(end.system_ticks)
         .saturating_sub(start.user_ticks.saturating_add(start.system_ticks));
+    cpu_percent_for_ticks(cpu_ticks, elapsed)
+}
+
+pub(super) fn cpu_percent_for_ticks(cpu_ticks: u64, elapsed: Duration) -> f64 {
+    if elapsed.is_zero() {
+        return 0.0;
+    }
     let ticks_per_second = proc_ticks_per_second() as f64;
     let cpu_seconds = cpu_ticks as f64 / ticks_per_second;
     (cpu_seconds / elapsed.as_secs_f64()) * 100.0

@@ -7,6 +7,7 @@ use std::net::IpAddr;
 pub(crate) struct JournalEncodeBuffer {
     data: Vec<u8>,
     refs: Vec<std::ops::Range<usize>>,
+    value_starts: Vec<usize>,
     ibuf: itoa::Buffer,
 }
 
@@ -15,6 +16,7 @@ impl JournalEncodeBuffer {
         Self {
             data: Vec::with_capacity(4096),
             refs: Vec::with_capacity(64),
+            value_starts: Vec::with_capacity(64),
             ibuf: itoa::Buffer::new(),
         }
     }
@@ -28,14 +30,32 @@ impl JournalEncodeBuffer {
         journal: &mut journal_sdk_log_writer::Log,
         timestamps: journal_sdk_log_writer::EntryTimestamps,
     ) -> journal_sdk_log_writer::Result<()> {
-        record.encode_to_journal_buf(&mut self.data, &mut self.refs);
-        // 87 canonical fields — stack array avoids heap allocation.
-        let mut slices = [&[] as &[u8]; 87];
+        record.encode_to_journal_buf(&mut self.data, &mut self.refs, &mut self.value_starts);
+        debug_assert_eq!(self.refs.len(), self.value_starts.len());
+        self.debug_assert_unique_payloads();
+
+        // 87 canonical fields — stack array avoids heap allocation. The flow
+        // encoder already split each canonical field, so do not make the
+        // journal writer scan every `KEY=value` payload again.
+        let mut fields = [journal_sdk_log_writer::StructuredField::new(&[], &[]); 87];
         let n = self.refs.len().min(87);
-        for (i, r) in self.refs[..n].iter().enumerate() {
-            slices[i] = &self.data[r.clone()];
+        for (i, (range, value_start)) in self.refs[..n]
+            .iter()
+            .zip(&self.value_starts[..n])
+            .enumerate()
+        {
+            debug_assert!(range.start < *value_start);
+            debug_assert!(*value_start <= range.end);
+            fields[i] = journal_sdk_log_writer::StructuredField::new(
+                &self.data[range.start..(*value_start - 1)],
+                &self.data[*value_start..range.end],
+            );
         }
-        journal.write_entry_with_timestamps(&slices[..n], timestamps)
+        journal.write_fields_with_options(
+            &fields[..n],
+            timestamps,
+            journal_sdk_log_writer::EntryWriteOptions::default().trusted_unique_payloads(true),
+        )
     }
 
     #[allow(dead_code)]
@@ -50,6 +70,7 @@ impl JournalEncodeBuffer {
     pub(crate) fn clear(&mut self) {
         self.data.clear();
         self.refs.clear();
+        self.value_starts.clear();
     }
 
     pub(crate) fn push_str(&mut self, name: &str, value: &str) {
@@ -101,6 +122,22 @@ impl JournalEncodeBuffer {
     pub(super) fn encoded_len(&self) -> u64 {
         self.data.len() as u64
     }
+
+    #[cfg(debug_assertions)]
+    fn debug_assert_unique_payloads(&self) {
+        for (index, range) in self.refs.iter().enumerate() {
+            let payload = &self.data[range.clone()];
+            debug_assert!(
+                self.refs[..index]
+                    .iter()
+                    .all(|previous| &self.data[previous.clone()] != payload),
+                "canonical journal encoding emitted a duplicate payload"
+            );
+        }
+    }
+
+    #[cfg(not(debug_assertions))]
+    fn debug_assert_unique_payloads(&self) {}
 
     #[cfg(test)]
     pub(crate) fn debug_field_slices(&self) -> Vec<&[u8]> {

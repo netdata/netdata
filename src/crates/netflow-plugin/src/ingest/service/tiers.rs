@@ -130,20 +130,34 @@ impl IngestService {
             .map(|tier_flow_indexes| tier_flow_indexes.generation())
             .unwrap_or_default();
 
+        let mut minute_1_rows = 0;
+        let mut minute_5_rows = 0;
+        let mut hour_1_rows = 0;
+        let mut accumulator_heap_bytes = 0_usize;
+        for tier in MATERIALIZED_TIERS {
+            let Some(accumulator) = self.tier_accumulators.get(&tier) else {
+                continue;
+            };
+            let rows = accumulator.open_row_count(now_usec);
+            accumulator_heap_bytes =
+                accumulator_heap_bytes.saturating_add(accumulator.estimated_heap_bytes());
+            match tier {
+                TierKind::Minute1 => minute_1_rows = rows,
+                TierKind::Minute5 => minute_5_rows = rows,
+                TierKind::Hour1 => hour_1_rows = rows,
+                TierKind::Raw => unreachable!("raw tier is not materialized"),
+            }
+        }
+
         let Ok(mut guard) = self.open_tiers.write() else {
             return;
         };
-
-        guard.clear_retain_capacity();
-        guard.generation = generation;
-        if let Some(acc) = self.tier_accumulators.get(&TierKind::Minute1) {
-            acc.snapshot_open_rows_into(now_usec, &mut guard.minute_1);
-        }
-        if let Some(acc) = self.tier_accumulators.get(&TierKind::Minute5) {
-            acc.snapshot_open_rows_into(now_usec, &mut guard.minute_5);
-        }
-        if let Some(acc) = self.tier_accumulators.get(&TierKind::Hour1) {
-            acc.snapshot_open_rows_into(now_usec, &mut guard.hour_1);
-        }
+        guard.replace_snapshot(
+            generation,
+            minute_1_rows,
+            minute_5_rows,
+            hour_1_rows,
+            accumulator_heap_bytes,
+        );
     }
 }
