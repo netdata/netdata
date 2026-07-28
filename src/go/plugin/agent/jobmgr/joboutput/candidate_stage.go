@@ -465,7 +465,6 @@ func (f *Factory) newCandidate(
 		return nil, err
 	}
 	detached := f.config
-	detached.Tasks = nil
 	detached.RuntimeStaging = detached.Runtime != nil
 	detached.Runtime = nil
 	detached.HandlerAttacher = nil
@@ -775,7 +774,6 @@ func (f *Factory) PrepareCandidate(
 		result.candidate,
 		f.attachment(),
 		result.owner,
-		true,
 	)
 	if err != nil {
 		result.owner.Reject()

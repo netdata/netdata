@@ -686,7 +686,7 @@ func TestFactoryReplacementCandidateCoexistsWithIncumbentUntilRuntimePromotion(t
 	require.NoError(t, firstGeneration.reserveInstallation())
 	require.NoError(t, firstGeneration.acknowledgeInstallation())
 
-	secondStage, err := secondFactory.newCandidate(factoryTestConfig(false), false)
+	secondStage, err := secondFactory.NewSupersedingCandidate(factoryTestConfig(false))
 	require.NoError(t, err)
 	secondStage.Start()
 	<-secondStage.Ready()
@@ -1103,8 +1103,6 @@ func newFactoryTestHarness(t *testing.T, creator collectorapi.Creator, hooks Job
 	output := &bytes.Buffer{}
 	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
-	tasks, err := lifecycle.NewTaskSupervisor(frames)
-	require.NoError(t, err)
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
 	configModules, err := NewConfigModuleFactory(ConfigModuleFactoryConfig{
@@ -1129,7 +1127,6 @@ func newFactoryTestHarness(t *testing.T, creator collectorapi.Creator, hooks Job
 		Modules: collectorapi.Registry{
 			"module": creator,
 		},
-		Tasks:            tasks,
 		Frames:           frames,
 		ConfigModules:    configModules,
 		Vnodes:           vnoderegistry.New(),

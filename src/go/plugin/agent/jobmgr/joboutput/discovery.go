@@ -160,6 +160,12 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			change.pending.uid != change.Config.UID()) {
 		return dcjc.noopWithAfterApply(scope, current, permit, result, settlement)
 	}
+	// A child deadline can race with successful terminal settlement. Pending
+	// work retained after removal must not restart a job the child restored.
+	if change.pending.requireAbsent &&
+		(current != nil || !exists || record.Status != dyncfg.StatusFailed.String()) {
+		return dcjc.noopWithAfterApply(scope, current, permit, result, settlement)
+	}
 	if change.retry.generation != 0 {
 		currentToken := dcjc.scheduler.retries.isCurrent(scope.ID, change.retry)
 		validRecord := true
@@ -339,7 +345,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 				change.retry,
 				composeAfterApply(
 					pendingSettlement,
-					dcjc.retainPendingAfterApply(
+					dcjc.retainAbsentPendingAfterApply(
 						change.Config,
 						jobmgr.ProcessAttemptJob,
 						change.Config.UID(),
@@ -435,7 +441,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			cleanup:   failedCleanup,
 			afterApply: composeAfterApply(
 				settlement,
-				dcjc.retainPendingAfterApply(
+				dcjc.retainAbsentPendingAfterApply(
 					change.Config,
 					jobmgr.ProcessAttemptJobRuntime,
 					change.Config.UID(),

@@ -89,6 +89,81 @@ func TestSecretDependentStartCommitsFailedAndWaitsForBusyRuntimeRelease(t *testi
 	commands.waitForSubmissions(t, 1)
 }
 
+func TestSecretDependentStopCommitsFailedBeforeRestart(t *testing.T) {
+	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider(confgroup.TypeDyncfg)
+	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
+
+	work, stopState, err := controller.PlanSecretDependentStop(config.FullName())
+	require.NoError(t, err)
+	var events []string
+	scope := lifecycle.ResourceTransactionScope{
+		ID: config.FullName(),
+		Current: lifecycle.ResourceIdentity{
+			ID:         config.FullName(),
+			Generation: 1,
+		},
+	}
+	current := &transactionTestReadyResource{
+		identity: scope.Current,
+		prefix:   "current",
+		events:   &events,
+	}
+	transaction, err := work.Transaction.Prepare(
+		context.Background(),
+		current,
+		scope,
+		lifecycle.LongLivedPermit{},
+	)
+	require.NoError(t, err)
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, active := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
+	require.Nil(t, active)
+	stopped, err := stopState.Stopped()
+	require.NoError(t, err)
+	require.True(t, stopped)
+
+	record, exists := graph.Lookup(config.FullName())
+	require.True(t, exists)
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+}
+
+func TestSecretDependentStartRetainsAbsentPendingAfterExternalDeadline(t *testing.T) {
+	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+	release := make(chan struct{})
+	controller.factory.config.Attempts = busyPendingJobAuthority{release: release}
+	commands := &autoDetectionRetryTestCommands{}
+	require.NoError(t, controller.BindAutoDetectionRetries(commands, 9, func(error) {}))
+	t.Cleanup(func() {
+		controller.scheduler.StopAutoDetectionRetries()
+		require.NoError(t, controller.scheduler.WaitAutoDetectionRetries(context.Background()))
+	})
+
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider(confgroup.TypeDyncfg)
+	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusFailed)
+
+	_, startState, err := controller.PlanSecretDependentStart(config.FullName())
+	require.NoError(t, err)
+	startState.RetainPending()
+
+	controller.scheduler.pending.mu.Lock()
+	pending := controller.scheduler.pending.entries[config.FullName()]
+	controller.scheduler.pending.mu.Unlock()
+	require.NotNil(t, pending)
+	require.True(t, pending.token.requireAbsent)
+
+	close(release)
+	commands.waitForSubmissions(t, 1)
+}
+
 type runtimeBusyPendingAuthority struct {
 	delegate jobmgr.ProcessAttemptAuthority
 	release  <-chan struct{}

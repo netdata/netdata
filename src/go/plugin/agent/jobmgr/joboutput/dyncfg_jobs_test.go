@@ -1720,7 +1720,6 @@ func newDynCfgJobTestHarnessWithDiagnostics(
 			Epoch:            9,
 			Attempts:         attempts,
 			Modules:          modules,
-			Tasks:            supervisor,
 			Frames:           frames,
 			ConfigModules:    configModules,
 			Vnodes:           vnoderegistry.New(),

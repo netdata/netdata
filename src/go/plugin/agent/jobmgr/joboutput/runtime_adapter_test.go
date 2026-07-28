@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sync"
 	"testing"
 	"time"
 
@@ -16,111 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestManagedJobV1V2JoinBeforeCleanup(t *testing.T) {
-	tests := map[string]struct {
-		variant JobVariant
-	}{
-		"V1": {variant: JobVariantV1},
-		"V2": {variant: JobVariantV2},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			frame, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-			require.NoError(t, err)
-			tasks, err := lifecycle.NewTaskSupervisor(frame)
-			require.NoError(t, err)
-			job := newRecordingManagedJob()
-			constructed, err := newManagedJob(
-				test.variant,
-				job,
-				tasks,
-				lifecycle.ResourceIdentity{
-					ID:         "job",
-					Generation: 1,
-				},
-				newTestScheduler(t),
-				func(context.Context) error {
-					job.Cleanup()
-					return nil
-				},
-			)
-			require.NoError(t, err)
-
-			require.NoError(t, constructed.Runtime.Start(context.Background()))
-
-			job.waitStarted(t)
-
-			require.NoError(t, constructed.Runtime.Stop(context.Background()))
-
-			require.NoError(t, constructed.Runtime.ReleaseAfterCleanup(context.Background()))
-
-			require.NoError(t, constructed.CollectorCleanup(context.Background()))
-
-			got, want := job.snapshot(), []string{"start", "stop", "joined", "cleanup"}
-			require.True(t, equalStrings(got, want))
-
-			require.Zero(t, tasks.InheritedActive())
-		})
-	}
-}
-
-func TestManagedJobStartAcknowledgesLoopReadiness(t *testing.T) {
-	tests := map[string]struct {
-		variant JobVariant
-	}{
-		"V1": {variant: JobVariantV1},
-		"V2": {variant: JobVariantV2},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			frame, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-			require.NoError(t, err)
-			tasks, err := lifecycle.NewTaskSupervisor(frame)
-			require.NoError(t, err)
-			job := newRecordingManagedJob()
-			job.readyGate = make(chan struct{})
-			constructed, err := newManagedJob(
-				test.variant,
-				job,
-				tasks,
-				lifecycle.ResourceIdentity{
-					ID:         "job",
-					Generation: 1,
-				},
-				newTestScheduler(t),
-				func(context.Context) error {
-					job.Cleanup()
-					return nil
-				},
-			)
-			require.NoError(t, err)
-			started := make(chan error, 1)
-			go func() {
-				started <- constructed.Runtime.Start(context.Background())
-			}()
-			job.waitStarted(t)
-			select {
-			case err := <-started:
-				require.FailNowf(t, "test failed", "runtime acknowledged start before loop readiness: %v", err)
-			default:
-			}
-			close(job.readyGate)
-			select {
-			case err := <-started:
-				require.NoError(t, err)
-			case <-time.After(time.Second):
-				require.FailNow(t, "test failed", "runtime did not acknowledge loop readiness")
-			}
-
-			require.NoError(t, constructed.Runtime.Stop(context.Background()))
-
-			require.NoError(t, constructed.Runtime.ReleaseAfterCleanup(context.Background()))
-
-			require.NoError(t, constructed.CollectorCleanup(context.Background()))
-		})
-	}
-}
 
 func TestProcessOwnedJobRetirementDoesNotWaitForPhysicalStop(t *testing.T) {
 	var output bytes.Buffer
@@ -353,14 +247,6 @@ func (write frameWriteFunc) Write(payload []byte) (int, error) {
 	return write(payload)
 }
 
-type recordingManagedJob struct {
-	mu        sync.Mutex
-	events    []string
-	started   chan struct{}
-	stop      chan struct{}
-	readyGate chan struct{}
-}
-
 type blockingStopManagedJob struct {
 	started     chan struct{}
 	stopEntered chan struct{}
@@ -410,83 +296,6 @@ func (*blockingStopManagedJob) RetryAutoDetection() bool {
 }
 func (*blockingStopManagedJob) CleanupRejected() {}
 func (*blockingStopManagedJob) Tick(int)         {}
-
-func newRecordingManagedJob() *recordingManagedJob {
-	return &recordingManagedJob{
-		started: make(chan struct{}),
-		stop:    make(chan struct{}),
-	}
-}
-
-func (job *recordingManagedJob) StartManaged(ready chan<- struct{}) {
-	job.add("start")
-	close(job.started)
-	if job.readyGate != nil {
-		<-job.readyGate
-	}
-	close(ready)
-	<-job.stop
-	job.add("joined")
-}
-
-func (job *recordingManagedJob) Stop() {
-	job.add("stop")
-	close(job.stop)
-}
-
-func (job *recordingManagedJob) Cleanup() {
-	job.add("cleanup")
-}
-
-func (*recordingManagedJob) FullName() string { return "job" }
-func (*recordingManagedJob) ModuleName() string {
-	return "module"
-}
-func (*recordingManagedJob) Name() string       { return "job" }
-func (*recordingManagedJob) IsRunning() bool    { return true }
-func (job *recordingManagedJob) Collector() any { return job }
-func (*recordingManagedJob) AutoDetectionManaged(context.Context) error {
-	return nil
-}
-func (*recordingManagedJob) AutoDetectionEvery() int { return 0 }
-func (*recordingManagedJob) RetryAutoDetection() bool {
-	return false
-}
-func (*recordingManagedJob) CleanupRejected() {}
-func (*recordingManagedJob) Tick(int)         {}
-
-func (job *recordingManagedJob) add(event string) {
-	job.mu.Lock()
-	job.events = append(job.events, event)
-	job.mu.Unlock()
-}
-
-func (job *recordingManagedJob) snapshot() []string {
-	job.mu.Lock()
-	defer job.mu.Unlock()
-	return append([]string(nil), job.events...)
-}
-
-func (job *recordingManagedJob) waitStarted(t *testing.T) {
-	t.Helper()
-	select {
-	case <-job.started:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "managed job did not start")
-	}
-}
-
-func equalStrings(left, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for index := range left {
-		if left[index] != right[index] {
-			return false
-		}
-	}
-	return true
-}
 
 type testModuleReconciler struct{}
 

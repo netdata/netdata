@@ -337,15 +337,16 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 			release := make(chan struct{})
 			refs := make([]InheritedTaskRef, population)
 			owners := make([]ResourceIdentity, population)
+			permits := make([]LongLivedPermit, population)
 			for index := range population {
 				owners[index] = ResourceIdentity{
 					ID:         "owner-" + strconv.Itoa(index+1),
 					Generation: 1,
 				}
-				refs[index], err = supervisor.StartInherited(
-					context.Background(),
+				refs[index], permits[index] = startInheritedTestTask(
+					t,
+					supervisor,
 					owners[index],
-					InheritedV1Runtime,
 					func(ctx context.Context) error {
 						<-ctx.Done()
 						observed <- struct{}{}
@@ -353,8 +354,9 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 						return nil
 					},
 				)
-				require.NoError(t, err)
 			}
+			lateOwner := ResourceIdentity{ID: "late", Generation: 1}
+			latePermit := issueInheritedTestPermit(t, supervisor, lateOwner)
 
 			require.NoError(t, supervisor.SealInherited())
 
@@ -374,16 +376,15 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 				}
 			}
 
-			_, startInheritedErr := supervisor.StartInherited(
+			_, startInheritedErr := supervisor.StartInheritedWithPermit(
 				context.Background(),
-				ResourceIdentity{
-					ID:         "late",
-					Generation: 1,
-				},
-				InheritedV1Runtime,
+				lateOwner,
+				InheritedPipelineSupervisor,
+				latePermit,
 				func(context.Context) error { return nil },
 			)
 			require.Error(t, startInheritedErr)
+			require.NoError(t, latePermit.AbortUnused())
 
 			for index := range refs {
 				require.NoError(t, supervisor.CancelInherited(refs[index], owners[index]))
@@ -398,7 +399,7 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 				)
 				require.False(t, joinInheritedErr != nil || !joinInheritedJoined)
 
-				require.NoError(t, supervisor.ReleaseInherited(refs[index], owners[index]))
+				releaseInheritedTestTask(t, supervisor, refs[index], owners[index], permits[index])
 			}
 
 			require.Zero(t, supervisor.InheritedActive())

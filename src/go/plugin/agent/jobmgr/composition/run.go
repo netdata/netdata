@@ -235,7 +235,6 @@ func newRunGeneration(
 		PluginName:      config.Jobs.PluginName,
 		Attempts:        config.Attempts,
 		Modules:         config.Modules,
-		Tasks:           tasks,
 		Frames:          config.Frames,
 		ConfigModules:   configModules,
 		Runtime:         config.Jobs.Runtime,

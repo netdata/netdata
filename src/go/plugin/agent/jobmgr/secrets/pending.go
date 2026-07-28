@@ -94,6 +94,9 @@ func (c *Controller) pendingLoop(
 				return
 			}
 		} else {
+			// No release means there is no physical owner to await. Retry
+			// through SubmitPreparedAndWait, which serializes the next attempt
+			// on the resource lane; physical contention supplies a release.
 			select {
 			case <-update:
 			case <-ctx.Done():

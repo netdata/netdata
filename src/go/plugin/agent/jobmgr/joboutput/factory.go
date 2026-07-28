@@ -69,7 +69,6 @@ type FactoryConfig struct {
 	PluginName       string                                                            // owning plugin name stamped into job config
 	Attempts         jobmgr.ProcessAttemptAuthority                                    // process-owned candidate authority
 	Modules          ModuleCatalog                                                     // collector creator registry
-	Tasks            *lifecycle.TaskSupervisor                                         // supervisor owning inherited run-loop goroutines
 	Frames           *lifecycle.FrameOwner                                             // frame owner used as the collector output sink
 	ConfigModules    *ConfigModuleFactory                                              // resolved config application and short-lived probes
 	Runtime          runtimecomp.Service                                               // V2 runtime service dependency
@@ -90,7 +89,6 @@ type Factory struct {
 }
 
 type factoryAttachment struct {
-	tasks           *lifecycle.TaskSupervisor
 	runtime         runtimecomp.Service
 	vnode           func(string) (jobruntime.VnodeSnapshot, bool)
 	handlerAttacher JobHandlerAttacher
@@ -103,7 +101,6 @@ func (f *Factory) attachment() factoryAttachment {
 		return factoryAttachment{}
 	}
 	return factoryAttachment{
-		tasks:           f.config.Tasks,
 		runtime:         f.config.Runtime,
 		vnode:           f.config.Vnode,
 		handlerAttacher: f.config.HandlerAttacher,
@@ -119,31 +116,18 @@ func (attachment factoryAttachment) attach(
 ) (ConstructedJob, error) {
 	if !identity.Valid() ||
 		candidate.candidateJob == nil ||
-		(owner == nil && attachment.tasks == nil) ||
+		owner == nil ||
 		attachment.scheduler == nil {
 		return candidate, errors.New("job output: invalid candidate attachment")
 	}
-	var attached ConstructedJob
-	var err error
-	if owner == nil {
-		attached, err = newManagedJob(
-			candidate.Variant,
-			candidate.candidateJob,
-			attachment.tasks,
-			identity,
-			attachment.scheduler,
-			candidate.CollectorCleanup,
-		)
-	} else {
-		attached, err = newProcessManagedJob(
-			candidate.Variant,
-			candidate.candidateJob,
-			identity,
-			attachment.scheduler,
-			candidate.CollectorCleanup,
-			owner,
-		)
-	}
+	attached, err := newProcessManagedJob(
+		candidate.Variant,
+		candidate.candidateJob,
+		identity,
+		attachment.scheduler,
+		candidate.CollectorCleanup,
+		owner,
+	)
 	if err != nil {
 		return candidate, err
 	}
@@ -192,19 +176,18 @@ func (attachment factoryAttachment) attach(
 		if handlers == nil {
 			return attached, errors.New("job output: nil attached handler lifecycle")
 		}
-		if owner != nil {
-			if _, ok := handlers.(ProcessHandlerLifecycle); !ok {
-				return attached, errors.New("job output: attached handler lifecycle cannot detach")
-			}
+		if _, ok := handlers.(ProcessHandlerLifecycle); !ok {
+			return attached, errors.New("job output: attached handler lifecycle cannot detach")
 		}
 	}
 	return attached, nil
 }
 
 func NewFactory(config FactoryConfig) (*Factory, error) {
-	if config.PluginName == "" ||
+	if config.Epoch == 0 ||
+		config.PluginName == "" ||
+		config.Attempts == nil ||
 		config.Modules == nil ||
-		config.Tasks == nil ||
 		config.Frames == nil ||
 		config.ConfigModules == nil ||
 		config.Vnodes == nil ||

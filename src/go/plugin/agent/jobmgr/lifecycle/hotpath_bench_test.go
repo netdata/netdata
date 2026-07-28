@@ -117,10 +117,19 @@ func BenchmarkBInheritedTaskLifecycle(b *testing.B) {
 			ID:         "job",
 			Generation: generation,
 		}
-		ref, err := supervisor.StartInherited(
+		plan, err := NewPipelineLongLivedPlan([]string{"unused"})
+		if err != nil {
+			require.FailNow(b, "benchmark failed", err)
+		}
+		permit, err := supervisor.IssueLongLivedPermit(owner, plan)
+		if err != nil {
+			require.FailNow(b, "benchmark failed", err)
+		}
+		ref, err := supervisor.StartInheritedWithPermit(
 			context.Background(),
 			owner,
-			InheritedV1Runtime,
+			InheritedPipelineSupervisor,
+			permit,
 			func(ctx context.Context) error {
 				<-ctx.Done()
 				return nil
@@ -137,6 +146,9 @@ func BenchmarkBInheritedTaskLifecycle(b *testing.B) {
 			require.FailNowf(b, "benchmark failed", "joined=%v err=%v", joined, err)
 		}
 		if err := supervisor.ReleaseInherited(ref, owner); err != nil {
+			require.FailNow(b, "benchmark failed", err)
+		}
+		if err := permit.AbortUnused(); err != nil {
 			require.FailNow(b, "benchmark failed", err)
 		}
 	}
