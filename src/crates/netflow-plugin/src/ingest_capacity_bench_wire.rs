@@ -797,8 +797,33 @@ mod tests {
                         &packet.payload,
                         1_800_000_000_000_000,
                     );
-                    assert_eq!(batch.stats.parse_errors, 0, "{}", protocol.label());
-                    assert_eq!(batch.stats.missing_template_sets, 0, "{}", protocol.label());
+                    for (name, value) in [
+                        ("parse_errors", batch.stats.parse_errors),
+                        ("missing_template_sets", batch.stats.missing_template_sets),
+                        (
+                            "disabled_protocol_packets",
+                            batch.stats.disabled_protocol_packets,
+                        ),
+                        (
+                            "parser_source_evictions",
+                            batch.stats.parser_source_evictions,
+                        ),
+                        (
+                            "partial_counter_records",
+                            batch.stats.partial_counter_records,
+                        ),
+                        (
+                            "decapsulation_failed_records",
+                            batch.stats.decapsulation_failed_records,
+                        ),
+                        ("unsupported_data_sets", batch.stats.unsupported_data_sets),
+                        (
+                            "ipfix_zero_reverse_records",
+                            batch.stats.ipfix_zero_reverse_records,
+                        ),
+                    ] {
+                        assert_eq!(value, 0, "{}: {name}", protocol.label());
+                    }
                     if packet.kind == WireDatagramKind::Template {
                         assert!(batch.flows.is_empty());
                         continue;

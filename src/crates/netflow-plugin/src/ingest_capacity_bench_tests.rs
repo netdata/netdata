@@ -59,21 +59,14 @@ const PEAK_CARDINALITY_PROFILES: &[CardinalityProfile] = &[
     CardinalityProfile::DurationBoundedAllUnique,
 ];
 
-const ERROR_METRICS: &[&str] = &[
-    "udp_receive_errors",
-    "udp_socket_setup_errors",
-    "decoded_parse_errors",
+const NON_ERROR_NAMED_FAILURE_METRICS: &[&str] = &[
     "decoded_missing_template_sets",
-    "journal_write_errors",
-    "journal_sync_errors",
-    "raw_journal_sync_errors",
-    "facet_active_update_errors",
-    "facet_lifecycle_errors",
-    "facet_persist_errors",
-    "tier_write_errors",
-    "tier_journal_sync_errors",
-    "decoder_state_write_errors",
-    "decoder_state_move_errors",
+    "decoded_disabled_protocol_packets",
+    "decoded_parser_source_evictions",
+    "decoded_partial_counter_records",
+    "decoded_decapsulation_failed_records",
+    "decoded_unsupported_data_sets",
+    "decoded_ipfix_zero_reverse_records",
 ];
 
 const NSEL_UNEXPECTED_OUTCOMES: &[&str] = &[
@@ -1374,13 +1367,11 @@ fn validate_capacity_case(
             )),
         );
     }
-    for key in ERROR_METRICS {
-        if metric(key) != 0 {
-            return (
-                CapacityOutcome::CapacityFailure,
-                Some(format!("collector recorded {} {}", metric(key), key)),
-            );
-        }
+    if let Some((key, value)) = first_nonzero_failure_metric(&collector.metrics) {
+        return (
+            CapacityOutcome::CapacityFailure,
+            Some(format!("collector recorded {value} {key}")),
+        );
     }
 
     let expected_rows = workload.expected_raw_rows();
@@ -1496,6 +1487,15 @@ fn capacity_rates(
             / active_elapsed.as_secs_f64(),
         accepted_journal_rows_per_sec: accepted_active_rows as f64 / active_elapsed.as_secs_f64(),
         raw_logical_bytes_per_journal_row: raw_logical_bytes as f64 / all_rows as f64,
+    })
+}
+
+fn first_nonzero_failure_metric(metrics: &BTreeMap<String, u64>) -> Option<(&str, u64)> {
+    metrics.iter().find_map(|(key, value)| {
+        (*value != 0
+            && (key.ends_with("_errors")
+                || NON_ERROR_NAMED_FAILURE_METRICS.contains(&key.as_str())))
+        .then_some((key.as_str(), *value))
     })
 }
 
@@ -2201,6 +2201,34 @@ mod capacity_harness_policy_tests {
             sender_timeout(&spec),
             Duration::from_secs(3 + 3).saturating_add(CHILD_TIMEOUT_MARGIN)
         );
+    }
+
+    #[test]
+    fn failure_metric_policy_covers_all_decoder_exceptions() {
+        for key in [
+            "udp_receive_errors",
+            "udp_socket_setup_errors",
+            "decoded_parse_errors",
+            "decoded_missing_template_sets",
+            "decoded_disabled_protocol_packets",
+            "decoded_parser_source_evictions",
+            "decoded_partial_counter_records",
+            "decoded_decapsulation_failed_records",
+            "decoded_unsupported_data_sets",
+            "decoded_ipfix_zero_reverse_records",
+        ] {
+            let metrics = BTreeMap::from([(key.to_string(), 1)]);
+            assert_eq!(first_nonzero_failure_metric(&metrics), Some((key, 1)));
+        }
+
+        let future_error = BTreeMap::from([("future_pipeline_errors".to_string(), 2)]);
+        assert_eq!(
+            first_nonzero_failure_metric(&future_error),
+            Some(("future_pipeline_errors", 2))
+        );
+
+        let ordinary_metric = BTreeMap::from([("decoded_rows".to_string(), 3)]);
+        assert_eq!(first_nonzero_failure_metric(&ordinary_metric), None);
     }
 }
 
