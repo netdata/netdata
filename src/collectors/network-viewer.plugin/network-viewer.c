@@ -2173,13 +2173,13 @@ static void topology_render_state_init(NV_TOPOLOGY_RENDER_STATE *state, const NV
     topology_actor_id_for_host(ctx, state->host_actor_id, sizeof(state->host_actor_id));
 }
 
-static void network_viewer_finalize_response_buffer(BUFFER *wb, time_t now_s) {
-    buffer_json_member_add_time_t(wb, "expires", now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
+static void network_viewer_finalize_response_buffer(BUFFER *wb, time_t now_s, time_t expires_delta_s) {
+    buffer_json_member_add_time_t(wb, "expires", now_s + expires_delta_s);
     buffer_json_finalize(wb);
 
     wb->response_code = HTTP_RESP_OK;
     wb->content_type = CT_APPLICATION_JSON;
-    wb->expires = now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY;
+    wb->expires = now_s + expires_delta_s;
 }
 
 static BUFFER *network_viewer_json_error_response(int code, const char *message)
@@ -5767,7 +5767,7 @@ static BUFFER *network_viewer_topology_result(
             topology_abort_message(abort_status));
     }
 
-    network_viewer_finalize_response_buffer(wb, now_s);
+    network_viewer_finalize_response_buffer(wb, now_s, NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
     return wb;
 }
 
@@ -6292,7 +6292,7 @@ close_and_send:
         dictionary_destroy(st.container_field_snapshot);
     if(st.pid_starttime_cache)
         dictionary_destroy(st.pid_starttime_cache);
-    network_viewer_finalize_response_buffer(wb, now_s);
+    network_viewer_finalize_response_buffer(wb, now_s, NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
     return wb;
 }
 
@@ -6556,7 +6556,7 @@ static BUFFER *network_viewer_dns_result(void)
     }
     buffer_json_object_close(wb); // group_by
 
-    network_viewer_finalize_response_buffer(wb, now_s);
+    network_viewer_finalize_response_buffer(wb, now_s, NV_DNS_UPDATE_EVERY);
     freez(dns);
     return wb;
 }
@@ -6855,7 +6855,7 @@ static BUFFER *network_protocols_result(void) {
     }
     buffer_json_object_close(wb); // group_by
 
-    network_viewer_finalize_response_buffer(wb, now_s);
+    network_viewer_finalize_response_buffer(wb, now_s, NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
     return wb;
 }
 
