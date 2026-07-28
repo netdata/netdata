@@ -349,6 +349,53 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: "The socket module does not publish standalone Netdata charts. It registers the `network-protocols` on-demand function (FUNCTIONGLOBAL) consumed by the network-viewer. The function returns a table with two rows (TCP and UDP) and the following columns: `Transport` (TCP or UDP), `Family` (IPv4+IPv6 combined), `Received` (segments or datagrams/s), `Sent` (segments or datagrams/s), `Errors` (send/receive errors), `ConnActive` (active connections opened), `ConnEstablished` (currently established connections), `ConnPassive` (passive connections opened), `ConnReset` (reset connections), `SegsTotal` (total segments/s), `SegsRetransmitted` (retransmitted segments/s), `DatagramsNoPort` (datagrams with no destination port/s)."
+      description: |
+        This module does not publish standalone Netdata charts. It attaches to kernel TCP/UDP functions
+        and exposes the collected data through the on-demand `network-protocols` function
+        (FUNCTIONGLOBAL) consumed by the network-viewer.
+
+        > **Migration note** — Prior versions of `ebpf.plugin` published the following standalone charts
+        > that supported alerting and metric retention. These charts are **permanently removed**; the
+        > data is now available through the `network-protocols` on-demand function in network-viewer.
+        > On-demand function output does not support alerting or metric retention.
+        >
+        > Removed host-level charts: `ip.inbound_conn`, `ip.tcp_outbound_conn`, `ip.tcp_functions`,
+        > `ip.total_tcp_bandwidth`, `ip.tcp_error`, `ip.tcp_retransmit`, `ip.udp_functions`,
+        > `ip.total_udp_bandwidth`, `ip.udp_error`.
+        >
+        > Removed per-app charts: `app.ebpf_call_tcp_v4_connection`, `app.ebpf_call_tcp_v6_connection`,
+        > `app.ebpf_sock_total_bandwidth`, `app.ebpf_call_tcp_sendmsg`, `app.ebpf_call_tcp_cleanup_rbuf`,
+        > `app.ebpf_call_tcp_retransmit`, `app.ebpf_call_udp_sendmsg`, `app.ebpf_call_udp_recvmsg`.
+        >
+        > **Configuration changes from `network.conf`** — The `network.conf` file has been replaced by
+        > `socket.conf`. The following defaults changed silently:
+        >
+        > - `maps per core` changed from `no` to `yes`. Per-core BPF maps use more memory but reduce
+        >   contention on multi-core systems. To restore the previous behaviour add `maps per core = no`
+        >   to `socket.conf`.
+        > - `ebpf co-re tracing` changed from `probe` (kprobe/legacy BPF) to `trampoline` (auto-detected).
+        >   To force kprobes add `ebpf co-re tracing = probe` to `socket.conf`.
+        > - The `[network connections]` and `[service name]` sections from `network.conf` have no
+        >   equivalent in `socket.conf` and are not read; any per-port service name overrides are lost.
+
+        ### `network-protocols` function columns
+
+        The `network-protocols` function returns a table with one row per transport protocol and the
+        following columns:
+
+        | Column | Description |
+        |:-------|:------------|
+        | Transport | Protocol name (TCP or UDP) |
+        | Family | IP family (IPv4+IPv6 combined) |
+        | Received | Segments or datagrams received per second |
+        | Sent | Segments or datagrams sent per second |
+        | Errors | Send/receive errors per second |
+        | ConnActive | Active connections opened per second |
+        | ConnEstablished | Currently established connections |
+        | ConnPassive | Passive connections opened per second |
+        | ConnReset | Reset connections per second |
+        | SegsTotal | Total segments per second |
+        | SegsRetransmitted | Retransmitted segments per second |
+        | DatagramsNoPort | Datagrams with no destination port per second |
       availability: []
       scopes: []
