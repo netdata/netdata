@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -85,21 +86,52 @@ func (di *DecisionIndex) Apply(ctx context.Context, batch []*confgroup.Group) er
 		maps.Copy(affected, changed)
 	}
 	names := slices.Sorted(maps.Keys(affected))
-	for _, name := range names {
-		err := di.reconcile(ctx, name)
-		if err == nil {
-			delete(di.pending, name)
+	reconciliations := make([]decisionReconciliation, len(names))
+	for i, name := range names {
+		reconciliations[i] = di.prepareReconciliation(name)
+	}
+	var wg sync.WaitGroup
+	for i := range reconciliations {
+		reconciliation := &reconciliations[i]
+		if reconciliation.err != nil || !reconciliation.submit {
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			reconciliation.err = di.commands.SubmitPreparedAndWait(
+				ctx,
+				reconciliation.request,
+				reconciliation.plan,
+			)
+		}()
+	}
+	wg.Wait()
+
+	var resultErr error
+	for _, reconciliation := range reconciliations {
+		if reconciliation.err == nil {
+			delete(di.pending, reconciliation.fullName)
+			if reconciliation.submit {
+				di.acknowledge(reconciliation)
+			}
 			continue
 		}
 		if ctx.Err() != nil {
-			return errors.Join(ctx.Err(), err)
+			if resultErr == nil {
+				resultErr = errors.Join(ctx.Err(), reconciliation.err)
+			}
+			continue
 		}
-		if !jobmgr.IsProposalRejection(err) {
-			return err
+		if jobmgr.IsProposalRejection(reconciliation.err) {
+			di.quarantine(reconciliation.fullName, reconciliation.err)
+			continue
 		}
-		di.quarantine(name, err)
+		if resultErr == nil {
+			resultErr = reconciliation.err
+		}
 	}
-	return nil
+	return resultErr
 }
 
 func (di *DecisionIndex) quarantine(name string, err error) {
@@ -212,14 +244,25 @@ func (di *DecisionIndex) allowed(config confgroup.Config) bool {
 	return ok
 }
 
-func (di *DecisionIndex) reconcile(ctx context.Context, fullName string) error {
+type decisionReconciliation struct {
+	fullName string
+	next     confgroup.Config
+	hasNext  bool
+	submit   bool
+	request  jobmgr.Request
+	plan     jobmgr.WorkPlan
+	err      error
+}
+
+func (di *DecisionIndex) prepareReconciliation(fullName string) decisionReconciliation {
+	reconciliation := decisionReconciliation{fullName: fullName}
 	current, hasCurrent := di.acknowledged[fullName]
 	next, hasNext := di.selectConfig(fullName, current, hasCurrent)
 	if !hasCurrent && !hasNext {
-		return nil
+		return reconciliation
 	}
 	if hasCurrent && hasNext && current.UID() == next.UID() {
-		return nil
+		return reconciliation
 	}
 	var change DiscoveredChange
 	if hasNext {
@@ -234,31 +277,34 @@ func (di *DecisionIndex) reconcile(ctx context.Context, fullName string) error {
 	}
 	plan, err := di.plan(change)
 	if err != nil {
-		return err
+		reconciliation.err = err
+		return reconciliation
 	}
 	if di.revision == ^uint64(0) {
-		return errors.New("jobmgr discovery: decision revision wrapped")
+		reconciliation.err = errors.New("jobmgr discovery: decision revision wrapped")
+		return reconciliation
 	}
 	revision := di.revision + 1
 	di.revision = revision
-	if err := di.commands.SubmitPreparedAndWait(
-		ctx,
-		jobmgr.Request{
-			UID:     fmt.Sprintf("jobmgr-discovery-%d-%d", di.generation, revision),
-			LaneKey: fullName,
-			Source:  lifecycle.SourceJobManager,
-			Route:   "internal/discovery/reconcile",
-		},
-		plan,
-	); err != nil {
-		return err
+	reconciliation.next = next
+	reconciliation.hasNext = hasNext
+	reconciliation.submit = true
+	reconciliation.request = jobmgr.Request{
+		UID:     fmt.Sprintf("jobmgr-discovery-%d-%d", di.generation, revision),
+		LaneKey: fullName,
+		Source:  lifecycle.SourceJobManager,
+		Route:   "internal/discovery/reconcile",
 	}
-	if hasNext {
-		di.acknowledged[fullName] = next
+	reconciliation.plan = plan
+	return reconciliation
+}
+
+func (di *DecisionIndex) acknowledge(reconciliation decisionReconciliation) {
+	if reconciliation.hasNext {
+		di.acknowledged[reconciliation.fullName] = reconciliation.next
 	} else {
-		delete(di.acknowledged, fullName)
+		delete(di.acknowledged, reconciliation.fullName)
 	}
-	return nil
 }
 
 func (di *DecisionIndex) selectConfig(

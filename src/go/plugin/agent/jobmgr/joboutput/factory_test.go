@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -112,7 +113,6 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				}
 				return nil
 			},
-			wantRetained: true,
 		},
 		"function-bearing job without hooks": {
 			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
@@ -169,8 +169,9 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			hooks := test.configure(state, &creator)
 			factory, output := newFactoryTestHarness(t, creator, hooks)
 			permit, tasks := issueTestJobPermit(t, "module_job", 1)
-			prepared, err := factory.Prepare(
+			prepared, failure, err := prepareFactoryTestCandidate(
 				context.Background(),
+				factory,
 				factoryTestConfig(creator.FunctionOnly),
 				lifecycle.ResourceIdentity{
 					ID:         "module_job",
@@ -179,12 +180,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				permit,
 			)
 			if err == nil {
-				var failure *autoDetectionFailure
-				failure, err = factory.Probe(context.Background(), prepared)
-				if err != nil {
-					err = errors.Join(err, permit.AbortUnused())
-				}
-				if err == nil && failure != nil {
+				if failure != nil {
 					err = errors.Join(failure, permit.AbortUnused())
 				}
 				if err == nil {
@@ -234,8 +230,9 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			factory, output := newFactoryTestHarness(t, creator, test.hooks)
 			permit, tasks := issueTestJobPermit(t, "module_job", 1)
 
-			prepared, err := factory.Prepare(
+			prepared, failure, err := prepareFactoryTestCandidate(
 				context.Background(),
+				factory,
 				factoryTestConfig(test.functionOnly),
 				lifecycle.ResourceIdentity{
 					ID:         "module_job",
@@ -244,12 +241,7 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				permit,
 			)
 			if err == nil {
-				var failure *autoDetectionFailure
-				failure, err = factory.Probe(context.Background(), prepared)
-				if err != nil {
-					err = errors.Join(err, permit.AbortUnused())
-				}
-				if err == nil && failure != nil {
+				if failure != nil {
 					err = errors.Join(failure, permit.AbortUnused())
 				}
 				if err == nil {
@@ -267,7 +259,7 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 	}
 }
 
-func TestFactoryProbesAndRejectsBeforePreparedJobAcceptance(t *testing.T) {
+func TestFactoryCandidateProbesAndRejectsBeforeAttachment(t *testing.T) {
 	state := &factoryTestState{}
 	creator := collectorapi.Creator{
 		Create: func() collectorapi.CollectorV1 {
@@ -280,8 +272,9 @@ func TestFactoryProbesAndRejectsBeforePreparedJobAcceptance(t *testing.T) {
 	factory, _ := newFactoryTestHarness(t, creator, nil)
 	permit, tasks := issueTestJobPermit(t, "module_job", 1)
 
-	prepared, err := factory.Prepare(
+	prepared, failure, err := prepareFactoryTestCandidate(
 		context.Background(),
+		factory,
 		factoryTestConfig(false),
 		lifecycle.ResourceIdentity{
 			ID:         "module_job",
@@ -290,11 +283,7 @@ func TestFactoryProbesAndRejectsBeforePreparedJobAcceptance(t *testing.T) {
 		permit,
 	)
 	require.NoError(t, err)
-	require.Zero(t, state.autoDetection)
-	require.Zero(t, state.collectorCleanup)
-
-	failure, err := factory.Probe(context.Background(), prepared)
-	require.NoError(t, err)
+	require.False(t, prepared.Valid())
 	require.Error(t, failure)
 	require.NoError(t, permit.AbortUnused())
 	require.EqualValues(t, 1, state.autoDetection)
@@ -319,8 +308,9 @@ func TestFactoryProbeDoesNotActivateRunPermitOrLiveV2Runtime(t *testing.T) {
 	factory.config.Runtime = runtime
 	permit, tasks := issueTestJobPermit(t, "module_job", 1)
 
-	prepared, err := factory.Prepare(
+	prepared, failure, err := prepareFactoryTestCandidate(
 		context.Background(),
+		factory,
 		factoryTestConfig(false),
 		lifecycle.ResourceIdentity{
 			ID:         "module_job",
@@ -329,15 +319,18 @@ func TestFactoryProbeDoesNotActivateRunPermitOrLiveV2Runtime(t *testing.T) {
 		permit,
 	)
 	require.NoError(t, err)
+	require.Nil(t, failure)
 	// A candidate must leave the run-owned external facet reserved.
 	require.NoError(t, permit.ActivateExternal())
 	require.NoError(t, permit.ReleaseExternal())
 	require.NoError(t, permit.Return())
 	require.NoError(t, prepared.reject(context.Background()))
+	requireFactoryAttemptsIdle(t, factory)
 
 	permit, tasks = issueTestJobPermit(t, "module_job", 2)
-	prepared, err = factory.Prepare(
+	prepared, failure, err = prepareFactoryTestCandidate(
 		context.Background(),
+		factory,
 		factoryTestConfig(false),
 		lifecycle.ResourceIdentity{
 			ID:         "module_job",
@@ -346,13 +339,12 @@ func TestFactoryProbeDoesNotActivateRunPermitOrLiveV2Runtime(t *testing.T) {
 		permit,
 	)
 	require.NoError(t, err)
-	failure, err := factory.Probe(context.Background(), prepared)
-	require.NoError(t, err)
 	require.Nil(t, failure)
 	require.Zero(t, runtime.registrations)
 	require.Zero(t, tasks.Active())
 
 	require.NoError(t, prepared.Dispose(context.Background()))
+	requireFactoryAttemptsIdle(t, factory)
 	require.EqualValues(t, 2, state.collectorCleanup)
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
@@ -376,7 +368,7 @@ func TestFactoryCandidateStageOwnsProbeUntilInstallationAcknowledgement(t *testi
 	factory.config.Attempts = attempts
 	factory.config.Runtime = runtime
 
-	stage, err := factory.NewCandidate(factoryTestConfig(false))
+	stage, err := factory.newCandidate(factoryTestConfig(false), false)
 	require.NoError(t, err)
 	stage.Start()
 	<-stage.Ready()
@@ -434,6 +426,73 @@ func TestFactoryCandidateStageOwnsProbeUntilInstallationAcknowledgement(t *testi
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
+func TestFactoryAwaitCandidateYieldsGraphClaimForWholeMaterialization(t *testing.T) {
+	var outsideClaims atomic.Bool
+	var callbacks atomic.Int32
+	var violations atomic.Int32
+	state := &factoryTestState{}
+	creator := collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 {
+			callbacks.Add(1)
+			if !outsideClaims.Load() {
+				violations.Add(1)
+			}
+			module := state.module(func(context.Context) error {
+				callbacks.Add(1)
+				if !outsideClaims.Load() {
+					violations.Add(1)
+				}
+				return nil
+			}, false)
+			charts := collectorapi.Charts{}
+			module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+			return module
+		},
+	}
+	factory, _ := newFactoryTestHarness(t, creator, nil)
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	factory.config.Epoch = 1
+	factory.config.Attempts = attempts
+	factory.config.RunWithoutClaims = func(
+		ctx context.Context,
+		work func(context.Context) error,
+	) (error, error) {
+		outsideClaims.Store(true)
+		defer outsideClaims.Store(false)
+		return work(ctx), nil
+	}
+
+	stage, err := factory.newCandidate(factoryTestConfig(false), false)
+	require.NoError(t, err)
+	require.NoError(t, factory.AwaitCandidate(context.Background(), stage))
+	require.EqualValues(t, 2, callbacks.Load())
+	require.Zero(t, violations.Load())
+
+	permit, tasks := issueTestJobPermit(t, "module_job", 1)
+	prepared, failure, err := factory.PrepareCandidate(
+		lifecycle.ResourceIdentity{ID: "module_job", Generation: 1},
+		permit,
+		stage,
+	)
+	require.NoError(t, err)
+	require.Nil(t, failure)
+	stage.Release()
+	resource, err := prepared.AcceptStart(context.Background(), 1)
+	require.NoError(t, err)
+	generation := resource.(*JobGeneration)
+	require.NoError(t, generation.Publish())
+	require.NoError(t, generation.reserveInstallation())
+	require.NoError(t, generation.acknowledgeInstallation())
+	require.NoError(t, generation.Stop(context.Background()))
+	require.NoError(t, generation.Finalize())
+	require.Eventually(t, func() bool {
+		return attempts.Census() == (containment.Census{})
+	}, time.Second, time.Millisecond)
+	require.EqualValues(t, 1, state.collectorCleanup)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+}
+
 func TestFactoryCandidateStageSettlesWhileNonCooperativeProbeRemainsOwned(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
@@ -453,7 +512,7 @@ func TestFactoryCandidateStageSettlesWhileNonCooperativeProbeRemainsOwned(t *tes
 	factory.config.Epoch = 1
 	factory.config.Attempts = attempts
 
-	stage, err := factory.NewCandidate(factoryTestConfig(false))
+	stage, err := factory.newCandidate(factoryTestConfig(false), false)
 	require.NoError(t, err)
 	stage.Start()
 	<-entered
@@ -503,7 +562,7 @@ func TestFactoryCandidateIdentityRemainsExclusiveAcrossRunEpochs(t *testing.T) {
 	secondFactory.config.Epoch = 2
 	secondFactory.config.Attempts = attempts
 
-	first, err := firstFactory.NewCandidate(factoryTestConfig(false))
+	first, err := firstFactory.newCandidate(factoryTestConfig(false), false)
 	require.NoError(t, err)
 	first.Start()
 	<-first.Ready()
@@ -512,7 +571,7 @@ func TestFactoryCandidateIdentityRemainsExclusiveAcrossRunEpochs(t *testing.T) {
 		Admitted: 1,
 	}, attempts.Census())
 
-	second, err := secondFactory.NewCandidate(factoryTestConfig(false))
+	second, err := secondFactory.newCandidate(factoryTestConfig(false), false)
 	require.NoError(t, err)
 	require.Equal(t, first.identity.Key, second.identity.Key)
 	second.Start()
@@ -564,7 +623,7 @@ func TestFactoryReplacementCandidateCoexistsWithIncumbentUntilRuntimePromotion(t
 	secondFactory.config.Epoch = 2
 	secondFactory.config.Attempts = attempts
 
-	firstStage, err := firstFactory.NewCandidate(factoryTestConfig(false))
+	firstStage, err := firstFactory.newCandidate(factoryTestConfig(false), false)
 	require.NoError(t, err)
 	firstStage.Start()
 	<-firstStage.Ready()
@@ -583,7 +642,7 @@ func TestFactoryReplacementCandidateCoexistsWithIncumbentUntilRuntimePromotion(t
 	require.NoError(t, firstGeneration.reserveInstallation())
 	require.NoError(t, firstGeneration.acknowledgeInstallation())
 
-	secondStage, err := secondFactory.NewCandidate(factoryTestConfig(false))
+	secondStage, err := secondFactory.newCandidate(factoryTestConfig(false), false)
 	require.NoError(t, err)
 	secondStage.Start()
 	<-secondStage.Ready()
@@ -648,7 +707,7 @@ func TestFactoryReplacementCandidateCoexistsWithIncumbentUntilRuntimePromotion(t
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, secondTasks.LongLivedCensus())
 }
 
-func TestFactoryProbeUsesYieldedContextWithoutInventingDeadline(t *testing.T) {
+func TestFactoryCandidateUsesAuthorityContextWithoutInventingDeadline(t *testing.T) {
 	state := &factoryTestState{}
 	probeFailure := errors.New("probe failed")
 	var received context.Context
@@ -672,8 +731,9 @@ func TestFactoryProbeUsesYieldedContextWithoutInventingDeadline(t *testing.T) {
 		return work(yielded), nil
 	}
 	permit, tasks := issueTestJobPermit(t, "module_job", 1)
-	prepared, err := factory.Prepare(
+	prepared, failure, err := prepareFactoryTestCandidate(
 		parent,
+		factory,
 		factoryTestConfig(false),
 		lifecycle.ResourceIdentity{
 			ID:         "module_job",
@@ -682,12 +742,10 @@ func TestFactoryProbeUsesYieldedContextWithoutInventingDeadline(t *testing.T) {
 		permit,
 	)
 	require.NoError(t, err)
-
-	failure, err := factory.Probe(parent, prepared)
-	require.NoError(t, err)
+	require.False(t, prepared.Valid())
 	require.ErrorIs(t, failure, probeFailure)
-	require.Equal(t, yielded, received)
-	require.EqualValues(t, "yielded", received.Value(contextKey{}))
+	require.NotNil(t, received)
+	require.NotEqual(t, yielded, received)
 	_, hasDeadline := received.Deadline()
 	require.False(t, hasDeadline)
 	require.EqualValues(t, 1, state.collectorCleanup)
@@ -695,12 +753,14 @@ func TestFactoryProbeUsesYieldedContextWithoutInventingDeadline(t *testing.T) {
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
-func TestFactoryProbePropagatesCallerCancellation(t *testing.T) {
+func TestFactoryCandidatePropagatesCallerCancellation(t *testing.T) {
 	state := &factoryTestState{}
 	cancellation := errors.New("caller canceled")
+	entered := make(chan struct{})
 	creator := collectorapi.Creator{
 		Create: func() collectorapi.CollectorV1 {
 			return state.module(func(ctx context.Context) error {
+				close(entered)
 				<-ctx.Done()
 				return context.Cause(ctx)
 			}, false)
@@ -709,27 +769,40 @@ func TestFactoryProbePropagatesCallerCancellation(t *testing.T) {
 	factory, _ := newFactoryTestHarness(t, creator, nil)
 	permit, tasks := issueTestJobPermit(t, "module_job", 1)
 	parent, cancel := context.WithCancelCause(context.Background())
+	type candidateResult struct {
+		prepared PreparedJob
+		failure  *autoDetectionFailure
+		err      error
+	}
+	result := make(chan candidateResult, 1)
+	go func() {
+		prepared, failure, err := prepareFactoryTestCandidate(
+			parent,
+			factory,
+			factoryTestConfig(false),
+			lifecycle.ResourceIdentity{
+				ID:         "module_job",
+				Generation: 1,
+			},
+			permit,
+		)
+		result <- candidateResult{prepared: prepared, failure: failure, err: err}
+	}()
+	<-entered
 	cancel(cancellation)
-	prepared, err := factory.Prepare(
-		context.Background(),
-		factoryTestConfig(false),
-		lifecycle.ResourceIdentity{
-			ID:         "module_job",
-			Generation: 1,
-		},
-		permit,
-	)
-	require.NoError(t, err)
-
-	failure, err := factory.Probe(parent, prepared)
-	require.NoError(t, err)
-	require.ErrorIs(t, failure, cancellation)
+	got := <-result
+	require.False(t, got.prepared.Valid())
+	require.Nil(t, got.failure)
+	require.ErrorIs(t, got.err, cancellation)
+	require.Eventually(t, func() bool {
+		return factory.config.Attempts.(*containment.Authority).Census() == (containment.Census{})
+	}, time.Second, time.Millisecond)
 	require.EqualValues(t, 1, state.collectorCleanup)
 	require.NoError(t, permit.AbortUnused())
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
 
-func TestFactoryProbeRejectsFailedCandidateBeforeClaimReacquisition(t *testing.T) {
+func TestFactoryCandidateRejectsFailureBeforeClaimReacquisition(t *testing.T) {
 	cleanupDuringYield := make(chan bool, 1)
 	yielded := false
 	creator := collectorapi.Creator{
@@ -755,8 +828,9 @@ func TestFactoryProbeRejectsFailedCandidateBeforeClaimReacquisition(t *testing.T
 		return workErr, nil
 	}
 	permit, tasks := issueTestJobPermit(t, "module_job", 1)
-	prepared, err := factory.Prepare(
+	prepared, failure, err := prepareFactoryTestCandidate(
 		context.Background(),
+		factory,
 		factoryTestConfig(false),
 		lifecycle.ResourceIdentity{
 			ID:         "module_job",
@@ -765,9 +839,7 @@ func TestFactoryProbeRejectsFailedCandidateBeforeClaimReacquisition(t *testing.T
 		permit,
 	)
 	require.NoError(t, err)
-
-	failure, err := factory.Probe(context.Background(), prepared)
-	require.NoError(t, err)
+	require.False(t, prepared.Valid())
 	require.Error(t, failure)
 	require.True(t, <-cleanupDuringYield)
 	require.NoError(t, permit.AbortUnused())
@@ -816,8 +888,9 @@ func TestFactoryProbeRedactsResolvedValuesFromCollectorFailure(t *testing.T) {
 				config := factoryTestConfig(false)
 				config["option_str"] = "${fixture:value}"
 				config["option_int"] = 1
-				prepared, err := factory.Prepare(
+				prepared, failure, err := prepareFactoryTestCandidate(
 					context.Background(),
+					factory,
 					config,
 					lifecycle.ResourceIdentity{
 						ID:         "module_job",
@@ -826,9 +899,7 @@ func TestFactoryProbeRedactsResolvedValuesFromCollectorFailure(t *testing.T) {
 					permit,
 				)
 				require.NoError(t, err)
-
-				failure, err := factory.Probe(context.Background(), prepared)
-				require.NoError(t, err)
+				require.False(t, prepared.Valid())
 				require.Error(t, failure)
 				require.NotContains(t, failure.Error(), resolvedFixture)
 				require.Contains(t, failure.Error(), "redacted")
@@ -858,8 +929,9 @@ func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
 	}
 	factory, _ := newFactoryTestHarness(t, creator, nil)
 	permit, tasks := issueTestJobPermit(t, "module_job", 1)
-	prepared, err := factory.Prepare(
+	prepared, failure, err := prepareFactoryTestCandidate(
 		context.Background(),
+		factory,
 		factoryTestConfig(false),
 		lifecycle.ResourceIdentity{
 			ID:         "module_job",
@@ -868,10 +940,12 @@ func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
 		permit,
 	)
 	require.NoError(t, err)
+	require.Nil(t, failure)
 	for range 2 {
 		err = prepared.Dispose(context.Background())
 	}
 	require.Error(t, err)
+	requireFactoryAttemptsIdle(t, factory)
 	require.EqualValues(t, 1, state.collectorCleanup)
 	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 }
@@ -997,8 +1071,17 @@ func newFactoryTestHarness(t *testing.T, creator collectorapi.Creator, hooks Job
 		StoreScope: unavailableStoreScope,
 	})
 	require.NoError(t, err)
+	attempts, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, attempts.Shutdown(ctx))
+	})
 	factory, err := NewFactory(FactoryConfig{
 		PluginName: "test",
+		Epoch:      1,
+		Attempts:   attempts,
 		Modules: collectorapi.Registry{
 			"module": creator,
 		},
@@ -1013,6 +1096,33 @@ func newFactoryTestHarness(t *testing.T, creator collectorapi.Creator, hooks Job
 	})
 	require.NoError(t, err)
 	return factory, output
+}
+
+func prepareFactoryTestCandidate(
+	ctx context.Context,
+	factory *Factory,
+	config confgroup.Config,
+	identity lifecycle.ResourceIdentity,
+	permit lifecycle.LongLivedPermit,
+) (PreparedJob, *autoDetectionFailure, error) {
+	stage, err := factory.newCandidate(config, false)
+	if err != nil {
+		return PreparedJob{}, nil, err
+	}
+	defer stage.Release()
+	if err := factory.AwaitCandidate(ctx, stage); err != nil {
+		return PreparedJob{}, nil, err
+	}
+	return factory.PrepareCandidate(identity, permit, stage)
+}
+
+func requireFactoryAttemptsIdle(t *testing.T, factory *Factory) {
+	t.Helper()
+	attempts, ok := factory.config.Attempts.(*containment.Authority)
+	require.True(t, ok)
+	require.Eventually(t, func() bool {
+		return attempts.Census() == (containment.Census{})
+	}, time.Second, time.Millisecond)
 }
 
 func unavailableStoreScope([]string) (secretresolver.AtomicScope, error) {

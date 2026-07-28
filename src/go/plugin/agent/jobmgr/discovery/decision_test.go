@@ -6,7 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -418,6 +420,44 @@ func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
 	}
 }
 
+func TestDecisionIndexReconcilesDifferentIdentitiesConcurrently(t *testing.T) {
+	commands := newConcurrentDecisionTestCommands("module_job-a")
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(DiscoveredChange) (jobmgr.WorkPlan, error) {
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	configs := []confgroup.Config{
+		decisionTestConfig("job-a", confgroup.TypeStock, "source"),
+		decisionTestConfig("job-b", confgroup.TypeStock, "source"),
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- index.Apply(context.Background(), []*confgroup.Group{{
+			Source:  "source",
+			Configs: configs,
+		}})
+	}()
+
+	select {
+	case <-commands.blocked:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "blocked identity was not submitted")
+	}
+	select {
+	case <-commands.healthy:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "unrelated identity waited behind blocked identity")
+	}
+	close(commands.release)
+	require.NoError(t, <-done)
+	require.Equal(t, configs[0].UID(), index.acknowledged[configs[0].FullName()].UID())
+	require.Equal(t, configs[1].UID(), index.acknowledged[configs[1].FullName()].UID())
+}
+
 func BenchmarkBDecisionIndexApply(b *testing.B) {
 	index, err := NewDecisionIndex(DecisionConfig{
 		Generation: 1,
@@ -468,6 +508,7 @@ func decisionTestConfig(name string, sourceType string, source string) confgroup
 }
 
 type decisionTestCommands struct {
+	mu       sync.Mutex
 	err      error
 	requests []jobmgr.Request
 }
@@ -477,6 +518,8 @@ func (dtc *decisionTestCommands) SubmitPreparedAndWait(
 	request jobmgr.Request,
 	_ jobmgr.WorkPlan,
 ) error {
+	dtc.mu.Lock()
+	defer dtc.mu.Unlock()
 	dtc.requests = append(dtc.requests, request)
 	return dtc.err
 }
@@ -484,5 +527,39 @@ func (dtc *decisionTestCommands) SubmitPreparedAndWait(
 type decisionBenchmarkCommands struct{}
 
 func (decisionBenchmarkCommands) SubmitPreparedAndWait(context.Context, jobmgr.Request, jobmgr.WorkPlan) error {
+	return nil
+}
+
+type concurrentDecisionTestCommands struct {
+	blockedID string
+	blocked   chan struct{}
+	healthy   chan struct{}
+	release   chan struct{}
+}
+
+func newConcurrentDecisionTestCommands(blockedID string) *concurrentDecisionTestCommands {
+	return &concurrentDecisionTestCommands{
+		blockedID: blockedID,
+		blocked:   make(chan struct{}),
+		healthy:   make(chan struct{}),
+		release:   make(chan struct{}),
+	}
+}
+
+func (commands *concurrentDecisionTestCommands) SubmitPreparedAndWait(
+	ctx context.Context,
+	request jobmgr.Request,
+	_ jobmgr.WorkPlan,
+) error {
+	if request.LaneKey == commands.blockedID {
+		close(commands.blocked)
+		select {
+		case <-commands.release:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	close(commands.healthy)
 	return nil
 }

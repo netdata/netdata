@@ -139,14 +139,27 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 				if cloned.FullName() != id {
 					return nil, errors.New("job output: dependent start identity differs")
 				}
-				successor, prepareErr := dcjc.factory.Prepare(ctx, cloned, scope.Successor, permit)
+				successor, probeFailure, prepareErr := dcjc.prepareContainedJob(
+					ctx,
+					cloned,
+					scope.Successor,
+					permit,
+				)
 				if prepareErr != nil {
 					if ctx.Err() != nil || lifecycle.OwnershipRetained(prepareErr) {
 						return nil, prepareErr
 					}
-					state.setError(prepareErr)
 					postimage := graphConfig(record, dyncfg.StatusFailed)
-					return dcjc.prepareMutation(
+					var pending func()
+					if errors.Is(prepareErr, jobmgr.ErrProcessAttemptBusy) ||
+						errors.Is(prepareErr, jobmgr.ErrProcessAttemptDeadline) {
+						pending = dcjc.retainPendingAfterApply(
+							cloned,
+							jobmgr.ProcessAttemptJob,
+							cloned.UID(),
+						)
+					}
+					return dcjc.prepareMutationWithRetryAfterApply(
 						scope,
 						nil,
 						nil,
@@ -155,14 +168,17 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 						&postimage,
 						mustDynCfgMessage(204, ""),
 						dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
+						autoDetectionRetryToken{},
+						composeAfterApply(
+							func() {
+								state.setError(prepareErr)
+							},
+							pending,
+						),
 					)
 				}
 				postimage := graphConfig(record, dyncfg.StatusRunning)
 				failedPostimage := graphConfig(record, dyncfg.StatusFailed)
-				probeFailure, probeErr := dcjc.factory.Probe(ctx, successor)
-				if probeErr != nil {
-					return nil, probeErr
-				}
 				if probeFailure != nil {
 					return dcjc.prepareProbeFailure(
 						scope,
@@ -185,15 +201,31 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStart(
 						},
 					)
 				}
-				return dcjc.prepareMutation(
+				return dcjc.prepareMutationWithActivationBusy(
 					scope,
 					nil,
 					successor,
-					lifecycle.LongLivedPermit{},
 					lifecycle.ResourceTransactionInstalled,
 					&postimage,
 					mustDynCfgMessage(204, ""),
 					dcjc.configStatusCleanup(id, dyncfg.StatusRunning),
+					autoDetectionRetryToken{},
+					nil,
+					activationBusyPlan{
+						postimage: &failedPostimage,
+						result:    mustDynCfgMessage(204, ""),
+						cleanup:   dcjc.configStatusCleanup(id, dyncfg.StatusFailed),
+						afterApply: composeAfterApply(
+							func() {
+								state.setError(jobmgr.ErrProcessAttemptBusy)
+							},
+							dcjc.retainPendingAfterApply(
+								cloned,
+								jobmgr.ProcessAttemptJobRuntime,
+								cloned.UID(),
+							),
+						),
+					},
 				)
 			},
 		},

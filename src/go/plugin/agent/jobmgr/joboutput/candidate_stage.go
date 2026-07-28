@@ -26,13 +26,14 @@ type stagedJobResult struct {
 type PreparedJobCandidate struct {
 	mu sync.Mutex
 
-	factory  *Factory
-	attempts jobmgr.ProcessAttemptAuthority
-	identity jobmgr.ProcessAttemptIdentity
-	target   uint64
-	config   confgroup.Config
-	attempt  jobmgr.ProcessAttempt
-	result   stagedJobResult
+	factory   *Factory
+	attempts  jobmgr.ProcessAttemptAuthority
+	identity  jobmgr.ProcessAttemptIdentity
+	target    uint64
+	config    confgroup.Config
+	supersede bool
+	attempt   jobmgr.ProcessAttempt
+	result    stagedJobResult
 
 	ctx      context.Context
 	cancel   context.CancelCauseFunc
@@ -444,7 +445,14 @@ func (owner *stagedJobOwner) finalize() error {
 	return finalizeProcessOwnedConstructed(resources)
 }
 
-func (f *Factory) NewCandidate(config confgroup.Config) (*PreparedJobCandidate, error) {
+func (f *Factory) NewSupersedingCandidate(config confgroup.Config) (*PreparedJobCandidate, error) {
+	return f.newCandidate(config, true)
+}
+
+func (f *Factory) newCandidate(
+	config confgroup.Config,
+	supersede bool,
+) (*PreparedJobCandidate, error) {
 	if f == nil ||
 		config == nil ||
 		f.config.Epoch == 0 ||
@@ -486,12 +494,34 @@ func (f *Factory) NewCandidate(config confgroup.Config) (*PreparedJobCandidate, 
 			Key:       config.FullName(),
 			Resource:  candidateDiagnosticResource(config.FullName()),
 		},
-		target: f.config.Epoch,
-		config: config,
-		ctx:    ctx,
-		cancel: cancel,
-		ready:  make(chan struct{}),
+		target:    f.config.Epoch,
+		config:    config,
+		supersede: supersede,
+		ctx:       ctx,
+		cancel:    cancel,
+		ready:     make(chan struct{}),
 	}, nil
+}
+
+// AwaitCandidate starts process-owned materialization while the transaction's
+// graph claim is yielded, then returns only after the stage is logically
+// settled and the claim has been reacquired.
+func (f *Factory) AwaitCandidate(ctx context.Context, stage *PreparedJobCandidate) error {
+	if f == nil || ctx == nil || stage == nil || f.config.RunWithoutClaims == nil {
+		return errors.New("job output: invalid candidate wait")
+	}
+	waitErr, claimErr := f.config.RunWithoutClaims(ctx, func(yielded context.Context) error {
+		stage.Start()
+		select {
+		case <-stage.Ready():
+			return nil
+		case <-yielded.Done():
+			cause := context.Cause(yielded)
+			stage.Cancel(cause)
+			return cause
+		}
+	})
+	return errors.Join(waitErr, claimErr)
 }
 
 func candidateDiagnosticResource(name string) string {
@@ -552,11 +582,15 @@ func (stage *PreparedJobCandidate) Release() {
 	}
 	stage.released = true
 	started := stage.started
+	taken := stage.taken
 	owner := stage.result.owner
 	attempt := stage.attempt
 	stage.config = nil
 	stage.factory = nil
 	stage.mu.Unlock()
+	if taken {
+		return
+	}
 	stage.cancel(context.Canceled)
 	if owner != nil {
 		owner.Reject()
@@ -572,6 +606,12 @@ func (stage *PreparedJobCandidate) start() {
 	if cause := context.Cause(stage.ctx); cause != nil {
 		stage.publish(stagedJobResult{err: cause})
 		return
+	}
+	if stage.supersede {
+		if err := stage.attempts.SupersedeProcessAttempt(stage.ctx, stage.identity); err != nil {
+			stage.publish(stagedJobResult{err: err})
+			return
+		}
 	}
 	attemptReady := make(chan jobmgr.ProcessAttempt, 1)
 	attempt, err := stage.attempts.StartProcessAttempt(jobmgr.ProcessAttemptPlan{
@@ -692,7 +732,7 @@ func (stage *PreparedJobCandidate) take() (stagedJobResult, error) {
 	}
 	stage.taken = true
 	result := stage.result
-	stage.result.candidate = ConstructedJob{}
+	stage.result = stagedJobResult{}
 	return result, nil
 }
 
@@ -723,4 +763,24 @@ func (f *Factory) PrepareCandidate(
 		result.owner.Reject()
 	}
 	return prepared, nil, err
+}
+
+func (dcjc *DynCfgJobController) prepareContainedJob(
+	ctx context.Context,
+	config confgroup.Config,
+	identity lifecycle.ResourceIdentity,
+	permit lifecycle.LongLivedPermit,
+) (PreparedJob, *autoDetectionFailure, error) {
+	if dcjc == nil || dcjc.factory == nil {
+		return PreparedJob{}, nil, errors.New("job output: invalid contained job preparation")
+	}
+	stage, err := dcjc.factory.NewSupersedingCandidate(config)
+	if err != nil {
+		return PreparedJob{}, nil, err
+	}
+	defer stage.Release()
+	if err := dcjc.factory.AwaitCandidate(ctx, stage); err != nil {
+		return PreparedJob{}, nil, err
+	}
+	return dcjc.factory.PrepareCandidate(identity, permit, stage)
 }

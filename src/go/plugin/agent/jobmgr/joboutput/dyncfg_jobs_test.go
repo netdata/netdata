@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -1237,6 +1238,80 @@ func TestRunningUpdateTransientConstructionFailureCommitsFailedAndSchedulesRetry
 	commands.waitForSubmissions(t, 1)
 }
 
+func TestRunningUpdateCommitsFailedWhenInstalledRuntimeRemainsBusy(t *testing.T) {
+	controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+	delegate := controller.factory.config.Attempts.(*containment.Authority)
+	controller.factory.config.Attempts = runtimeBusyTestAuthority{delegate: delegate}
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		module := state.module(nil, false)
+		charts := collectorapi.Charts{}
+		module.ChartsFunc = func() *collectorapi.Charts { return &charts }
+		return module
+	}
+	controller.modules["module"] = creator
+
+	config := factoryTestConfig(false)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("user=test")
+	config.SetProvider(confgroup.TypeDyncfg)
+	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusRunning)
+	record, exists := graph.Lookup(config.FullName())
+	require.True(t, exists)
+
+	var events []string
+	currentIdentity := lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}
+	current := &transactionTestReadyResource{
+		identity: currentIdentity,
+		prefix:   "current",
+		events:   &events,
+	}
+	permit, tasks := issueTestJobPermit(t, config.FullName(), 2)
+	scope := lifecycle.ResourceTransactionScope{
+		ID:        config.FullName(),
+		Current:   currentIdentity,
+		Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 2},
+	}
+	target := dynCfgTarget{
+		module:     config.Module(),
+		name:       config.Name(),
+		resourceID: config.FullName(),
+		creator:    creator,
+	}
+	transaction, err := controller.prepareUpdate(
+		context.Background(),
+		DynCfgJobRequest{
+			Payload:      []byte(`{"option":"replacement"}`),
+			ContentType:  "application/json",
+			CallerSource: "user=test",
+			HasPayload:   true,
+		},
+		target,
+		record,
+		true,
+		current,
+		scope,
+		permit,
+	)
+	require.NoError(t, err)
+	applied, err := transaction.Apply(context.Background())
+	require.NoError(t, err)
+	_, disposition, active := applied.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
+	require.Nil(t, active)
+	require.Equal(t, 503, applied.ResultStatus())
+	record, exists = graph.Lookup(config.FullName())
+	require.True(t, exists)
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	require.Contains(t, record.Payload(), "replacement")
+	require.Equal(t, []string{"current-stop", "current-finalize"}, events)
+	require.Eventually(t, func() bool {
+		return tasks.LongLivedCensus() == (lifecycle.LongLivedCensus{}) &&
+			delegate.Census() == (containment.Census{})
+	}, time.Second, time.Millisecond)
+	require.EqualValues(t, 1, state.collectorCleanup)
+}
+
 func installFailingFixtureResolver(t *testing.T, controller *DynCfgJobController) {
 	t.Helper()
 	resolver, err := secretresolver.NewAtomicResolver(map[string]secretresolver.AtomicProvider{
@@ -1248,6 +1323,42 @@ func installFailingFixtureResolver(t *testing.T, controller *DynCfgJobController
 	})
 	require.NoError(t, err)
 	controller.factory.config.ConfigModules.config.Resolver = resolver
+}
+
+type runtimeBusyTestAuthority struct {
+	delegate jobmgr.ProcessAttemptAuthority
+}
+
+func (authority runtimeBusyTestAuthority) StartProcessAttempt(
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	if plan.Identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
+		return nil, jobmgr.ErrProcessAttemptBusy
+	}
+	return authority.delegate.StartProcessAttempt(plan)
+}
+
+func (authority runtimeBusyTestAuthority) SupersedeProcessAttempt(
+	ctx context.Context,
+	identity jobmgr.ProcessAttemptIdentity,
+) error {
+	if identity.Namespace == jobmgr.ProcessAttemptJobRuntime {
+		return jobmgr.ErrProcessAttemptBusy
+	}
+	return authority.delegate.SupersedeProcessAttempt(ctx, identity)
+}
+
+func (authority runtimeBusyTestAuthority) CutProcessAttempt(
+	identity jobmgr.ProcessAttemptIdentity,
+	cause error,
+) bool {
+	return authority.delegate.CutProcessAttempt(identity, cause)
+}
+
+func (authority runtimeBusyTestAuthority) ProcessAttemptReleased(
+	identity jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	return authority.delegate.ProcessAttemptReleased(identity)
 }
 
 type nonRetryableAutoDetectionError struct{}
@@ -1596,9 +1707,18 @@ func newDynCfgJobTestHarnessWithDiagnostics(
 		},
 	)
 	require.NoError(t, err)
+	attempts, err := containment.NewAuthority(diagnostics)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, attempts.Shutdown(shutdownCtx))
+	})
 	factory, err := NewFactory(
 		FactoryConfig{
 			PluginName:       "go.d",
+			Epoch:            9,
+			Attempts:         attempts,
 			Modules:          modules,
 			Tasks:            supervisor,
 			Frames:           frames,

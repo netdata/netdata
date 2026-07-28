@@ -4,8 +4,10 @@ package joboutput
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -32,7 +34,16 @@ func (dcjc *DynCfgJobController) prepareAdd(
 	if failure.valid {
 		return dcjc.noop(scope, current, lifecycle.LongLivedPermit{}, failure.result)
 	}
-	if err := dcjc.factory.ValidateConfig(ctx, config); err != nil {
+	if _, err := dcjc.runConfigOperation(ctx, config, configOperationValidate, true); err != nil {
+		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
+			errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+			return dcjc.noop(
+				scope,
+				current,
+				lifecycle.LongLivedPermit{},
+				mustDynCfgMessage(503, "config validation is busy; retry the command."),
+			)
+		}
 		return dcjc.noop(scope, current, lifecycle.LongLivedPermit{}, mustDynCfgMessage(400, err.Error()))
 	}
 	payload, err := yaml.Marshal(config)
@@ -132,9 +143,19 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		Payload: payload,
 	}
 	if record.Status == dyncfg.StatusDisabled.String() {
-		if err := dcjc.factory.ValidateConfig(ctx, config); err != nil {
+		if _, err := dcjc.runConfigOperation(ctx, config, configOperationValidate, true); err != nil {
 			if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 				return nil, err
+			}
+			if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
+				errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+				return dcjc.noop(
+					scope,
+					current,
+					permit,
+					mustDynCfgMessage(503, "config validation is busy; retry the command."),
+					dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusDisabled),
+				)
 			}
 			if classifyConstructionError(err) == constructionErrorOperational {
 				return nil, err
@@ -163,10 +184,40 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			cleanup,
 		)
 	}
-	successor, err := dcjc.factory.Prepare(ctx, config, scope.Successor, permit)
+	successor, probeFailure, err := dcjc.prepareContainedJob(
+		ctx,
+		config,
+		scope.Successor,
+		permit,
+	)
 	if err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
+		}
+		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
+			errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) {
+			return dcjc.noop(
+				scope,
+				current,
+				permit,
+				mustDynCfgMessage(503, "config update is busy; retry the command."),
+				dcjc.configStatusCleanup(target.resourceID, dyncfg.Status(record.Status)),
+			)
+		}
+		if errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+			failedPostimage := postimage
+			failedPostimage.Status = dyncfg.StatusFailed.String()
+			return dcjc.prepareTransientConstructionFailure(
+				scope,
+				current,
+				permit,
+				failedPostimage,
+				mustDynCfgMessage(503, "config update timed out; retry the command."),
+				dcjc.updateCleanup(target, request, oldConfig, failedPostimage, dyncfg.StatusFailed),
+				autoDetectionRetryToken{},
+				config,
+				err,
+			)
 		}
 		switch classifyConstructionError(err) {
 		case constructionErrorTransient:
@@ -200,10 +251,6 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 	failedPostimage := postimage
 	failedPostimage.Status = dyncfg.StatusFailed.String()
 	failedCleanup := dcjc.updateCleanup(target, request, oldConfig, failedPostimage, dyncfg.StatusFailed)
-	probeFailure, err := dcjc.factory.Probe(ctx, successor)
-	if err != nil {
-		return nil, err
-	}
 	if probeFailure != nil {
 		return dcjc.prepareProbeFailure(
 			scope,
@@ -221,15 +268,25 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			},
 		)
 	}
-	return dcjc.prepareMutation(
+	return dcjc.prepareMutationWithActivationBusy(
 		scope,
 		current,
 		successor,
-		lifecycle.LongLivedPermit{},
 		resourceInstallationDisposition(current),
 		&postimage,
 		mustDynCfgMessage(200, ""),
 		cleanup,
+		autoDetectionRetryToken{},
+		nil,
+		activationBusyPlan{
+			postimage: &failedPostimage,
+			result: mustDynCfgMessage(
+				503,
+				"config update is busy; retry the command.",
+			),
+			cleanup:    failedCleanup,
+			afterApply: dcjc.retrySettlement(scope.ID, autoDetectionRetryToken{}),
+		},
 	)
 }
 
@@ -336,10 +393,39 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 	if err != nil {
 		return nil, err
 	}
-	successor, err := dcjc.factory.Prepare(ctx, config, scope.Successor, permit)
+	successor, probeFailure, err := dcjc.prepareContainedJob(
+		ctx,
+		config,
+		scope.Successor,
+		permit,
+	)
 	if err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
+		}
+		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
+			errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) {
+			return dcjc.noop(
+				scope,
+				current,
+				permit,
+				mustDynCfgMessage(503, "job activation is busy; retry the command."),
+				dcjc.configStatusCleanup(target.resourceID, dyncfg.Status(record.Status)),
+			)
+		}
+		if errors.Is(err, jobmgr.ErrProcessAttemptDeadline) {
+			failedPostimage := graphConfig(record, dyncfg.StatusFailed)
+			return dcjc.prepareTransientConstructionFailure(
+				scope,
+				current,
+				permit,
+				failedPostimage,
+				mustDynCfgMessage(503, "job activation timed out; retry the command."),
+				dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusFailed),
+				autoDetectionRetryToken{},
+				config,
+				err,
+			)
 		}
 		switch classifyConstructionError(err) {
 		case constructionErrorTransient:
@@ -364,10 +450,6 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 	}
 	postimage := graphConfig(record, dyncfg.StatusRunning)
 	failedPostimage := graphConfig(record, dyncfg.StatusFailed)
-	probeFailure, err := dcjc.factory.Probe(ctx, successor)
-	if err != nil {
-		return nil, err
-	}
 	if probeFailure != nil {
 		return dcjc.prepareProbeFailure(
 			scope,
@@ -385,15 +467,25 @@ func (dcjc *DynCfgJobController) prepareRunningTransition(
 			},
 		)
 	}
-	return dcjc.prepareMutation(
+	return dcjc.prepareMutationWithActivationBusy(
 		scope,
 		current,
 		successor,
-		lifecycle.LongLivedPermit{},
 		disposition,
 		&postimage,
 		mustDynCfgMessage(200, ""),
 		dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusRunning),
+		autoDetectionRetryToken{},
+		nil,
+		activationBusyPlan{
+			postimage: &failedPostimage,
+			result: mustDynCfgMessage(
+				503,
+				"job activation is busy; retry the command.",
+			),
+			cleanup:    dcjc.configStatusCleanup(target.resourceID, dyncfg.StatusFailed),
+			afterApply: dcjc.retrySettlement(scope.ID, autoDetectionRetryToken{}),
+		},
 	)
 }
 

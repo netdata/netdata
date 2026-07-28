@@ -198,6 +198,9 @@ func TestSchedulerTickDoesNotBlockOnRetryAdmission(t *testing.T) {
 		func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
 			return jobmgr.WorkPlan{}, nil
 		},
+		func(confgroup.Config, pendingJobToken) (jobmgr.WorkPlan, error) {
+			return jobmgr.WorkPlan{}, nil
+		},
 		1,
 		func(error) {},
 	))
