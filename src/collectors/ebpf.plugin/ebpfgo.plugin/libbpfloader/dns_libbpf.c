@@ -146,32 +146,10 @@ struct netdata_dns_flow_ring {
 /* -------------------------------------------------------------------------
  * Runtime types
  * ---------------------------------------------------------------------- */
-enum netdata_dns_runtime_kind {
-    DNS_RUNTIME_BASE    = 0,
-    DNS_RUNTIME_RINGBUF = 1,
-};
-
-/* netdata_dns_event_t mirrors the BPF event layout confirmed from BPF bytecode:
- *   insn [180] MOV r2 = 56  → bpf_ringbuf_reserve size = 56 bytes */
-struct netdata_dns_event_t {
-    uint64_t ct;
-    uint32_t saddr[4];
-    uint32_t daddr[4];
-    uint32_t pkt_len;
-    uint16_t sport;
-    uint16_t dport;
-    uint8_t  protocol;
-    uint8_t  ip_version;
-    uint8_t  direction;
-    uint8_t  pad;
-    uint32_t _align_pad;
-};
-
 struct netdata_dns_runtime {
-    int kind;
     struct bpf_object *obj;
-    int sock_fd;   /* BPF-attached socket (base: carries packets; ringbuf: empty) */
-    int flow_fd;   /* dedicated AF_PACKET + classic-BPF socket (ringbuf mode only) */
+    int sock_fd;   /* AF_PACKET socket with eBPF program; passes packets only in base flavor */
+    int flow_fd;   /* AF_PACKET + classic cBPF socket; opened when the eBPF program drops packets */
     int per_query; /* when false, skip the flow socket and per-query tracking */
     uint64_t flow_drop_last_log_usec; /* last time flow socket drops were logged */
     struct netdata_dns_pending    pending[DNS_PENDING_CAP];
@@ -646,7 +624,7 @@ static void dns_drain_socket(struct netdata_dns_runtime *rt)
  * ---------------------------------------------------------------------- */
 static void dns_drain_flow_socket(struct netdata_dns_runtime *rt)
 {
-    if (!rt->per_query || rt->flow_fd < 0)
+    if (rt->flow_fd < 0)
         return;
 
     char    buf[DNS_PACKET_BUF];
@@ -700,9 +678,9 @@ static void dns_drain_flow_socket(struct netdata_dns_runtime *rt)
  *   0x15 = BPF_JMP | BPF_JEQ | BPF_K  (jump if A == K; jt/jf skip counts)
  *   0x06 = BPF_RET | BPF_K             (return K)
  *
- * NOTE: re-using socket__dns_filter_buffer here is NOT safe.  That program
- * always returns 0 (drop — userspace reads via ring buffer, not recv()),
- * so flow_fd would never deliver frames.
+ * NOTE: this socket uses classic cBPF (SO_ATTACH_FILTER), not an eBPF program.
+ * Attaching socket__dns_filter_buffer via SO_ATTACH_BPF would drop all packets
+ * (that program returns 0 on every frame) so recv() would receive nothing.
  * ---------------------------------------------------------------------- */
 static int dns_open_flow_socket(void)
 {
@@ -853,11 +831,8 @@ struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int 
 
     rt->obj = obj;
 
-    if (bpf_object__find_program_by_name(obj, "socket__dns_filter_buffer"))
-        rt->kind = DNS_RUNTIME_RINGBUF;
-    else if (bpf_object__find_program_by_name(obj, "socket__dns_filter"))
-        rt->kind = DNS_RUNTIME_BASE;
-    else {
+    if (!bpf_object__find_program_by_name(obj, "socket__dns_filter") &&
+        !bpf_object__find_program_by_name(obj, "socket__dns_filter_buffer")) {
         fprintf(stderr, "ebpf-go: dns: no recognized program in %s\n", path);
         bpf_object__close(obj);
         freez(rt);
@@ -891,14 +866,19 @@ int netdata_dns_runtime_attach(struct netdata_dns_runtime *rt)
         return -1;
     }
 
-    const char *prog_name = (rt->kind == DNS_RUNTIME_BASE)
+    /* Prefer the base program (passes packets to recv()); fall back to the
+     * ring-buffer program if the base is absent (older object files). */
+    const char *prog_name = bpf_object__find_program_by_name(rt->obj, "socket__dns_filter")
         ? "socket__dns_filter"
         : "socket__dns_filter_buffer";
 
     if (dns_attach_filter(rt, prog_name) < 0)
         return -1;
 
-    if (rt->kind == DNS_RUNTIME_RINGBUF && rt->per_query) {
+    /* socket__dns_filter_buffer returns 0 on every packet so recv() on sock_fd
+     * delivers nothing.  Open a separate cBPF socket for per-query tracking. */
+    bool prog_drops = strcmp(prog_name, "socket__dns_filter_buffer") == 0;
+    if (prog_drops && rt->per_query) {
         rt->flow_fd = dns_open_flow_socket();
         if (rt->flow_fd < 0)
             fprintf(stderr,
@@ -923,7 +903,7 @@ int netdata_dns_runtime_flow_snapshot(
     if (!rt || !out || max_records <= 0)
         return -1;
 
-    if (rt->kind == DNS_RUNTIME_RINGBUF)
+    if (rt->flow_fd >= 0)
         dns_drain_flow_socket(rt);
     else if (rt->sock_fd >= 0)
         dns_drain_socket(rt);

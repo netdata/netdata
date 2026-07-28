@@ -40,6 +40,18 @@ func tryLoadDNSPlan(plan LoadPlan, perQuery bool) (*DNSLegacyHandle, error) {
 }
 
 func LoadDNSLegacy(cfg DNSLegacyConfig) (*DNSLegacyHandle, error) {
+	versionStr, err := KernelVersionString()
+	if err != nil {
+		return nil, fmt.Errorf("kernel version string: %w", err)
+	}
+	rejected, err := KernelRejected(versionStr, filepath.Join(cfg.PluginsDir, "ebpf_kernel_reject_list.txt"))
+	if err != nil {
+		return nil, fmt.Errorf("kernel reject check: %w", err)
+	}
+	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), "ebpf-go.plugin"); err != nil {
+		return nil, err
+	}
+
 	plan := BuildDNSLegacyPlan(cfg)
 
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dns", dnsMaxBaseSelector)
