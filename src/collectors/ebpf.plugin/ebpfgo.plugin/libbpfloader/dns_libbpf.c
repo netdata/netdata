@@ -512,6 +512,12 @@ static bool dns_parse_raw_packet(
         int ihl = (buf[off] & 0x0f) * 4;
         if (ihl < 20 || off + ihl > (int)n)
             return false;
+        /* Clamp n to the IP total-length field so Ethernet padding bytes are
+         * excluded from all subsequent length checks and dns_parse_payload. */
+        uint16_t ipv4_total = dns_read_u16be(buf, off + 2);
+        if (off + (int)ipv4_total > (int)n)
+            return false;
+        n             = (ssize_t)(off + ipv4_total);
         ip_version    = 4;
         proto         = (uint8_t)buf[off + 9];
         memcpy(saddr, buf + off + 12, 4);
@@ -522,6 +528,12 @@ static bool dns_parse_raw_packet(
             return false;
         if ((buf[off] >> 4) != 6)
             return false;
+        /* Clamp n to the IPv6 payload-length field (bytes after the 40-byte
+         * fixed header) to exclude Ethernet padding. */
+        uint16_t ipv6_payload = dns_read_u16be(buf, off + 4);
+        if (off + 40 + (int)ipv6_payload > (int)n)
+            return false;
+        n             = (ssize_t)(off + 40 + ipv6_payload);
         ip_version    = 6;
         proto         = (uint8_t)buf[off + 6];
         memcpy(saddr, buf + off + 8,  16);
