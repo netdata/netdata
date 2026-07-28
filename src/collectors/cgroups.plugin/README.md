@@ -431,7 +431,11 @@ metrics.
 
 ### Resolving the error
 
-**1. Confirm the cgroup filesystem is mounted and visible.**
+The `<reason>` tells you which of the two cases below applies.
+
+**`No such file or directory` — the cgroup filesystem isn't mounted or visible to Netdata.**
+
+Confirm with:
 
 ```sh
 stat -fc %T /sys/fs/cgroup
@@ -439,33 +443,33 @@ stat -fc %T /sys/fs/cgroup
 
 This prints `cgroup2fs` for cgroup v2 or `tmpfs` for cgroup v1 (the same check
 documented under [Monitoring systemd services](#monitoring-systemd-services)). If
-the command fails or reports the path is missing, the cgroup filesystem is not
-mounted or is not visible to Netdata.
+the command fails or reports the path is missing:
 
-**2. Netdata running in a container.**
+- **On a host install**, the cgroup filesystem itself isn't mounted.
+- **In a container**, as noted in [Monitoring ephemeral containers](#monitoring-ephemeral-containers),
+  Netdata must see the host's `/proc` and `/sys` filesystems, which include
+  `/sys/fs/cgroup`. The official Netdata Docker image already binds these under
+  `/host` (for example `-v /sys:/host/sys:ro`) and sets the host prefix. If you
+  use a custom or reduced image, mount the host's `/sys` (matching the official
+  image) or `/sys/fs/cgroup` directly into the container.
 
-As noted in [Monitoring ephemeral containers](#monitoring-ephemeral-containers),
-Netdata inside a container must see the host's `/proc` and `/sys` filesystems,
-which include `/sys/fs/cgroup`. If those mounts are missing, the cgroup base
-path does not exist inside the container and the error reports
-`No such file or directory`.
+**`Permission denied` — usually not a plain Unix permissions problem.**
 
-The official Netdata Docker image already binds the host filesystem under
-`/host` (for example `-v /sys:/host/sys:ro`) and sets the host prefix so Netdata
-reads the host cgroups. If you use a custom or reduced container image, make
-sure the host cgroup filesystem is mounted into the container — either the host
-`/sys` (matching the official image) or the host `/sys/fs/cgroup` directly — and
-that the `netdata` user can read and traverse it.
+On most systems `/sys/fs/cgroup` is `0555 root:root` — world-readable and
+traversable — so a bare file-mode issue is uncommon in practice. Before
+assuming a permissions change will help, check for a Mandatory Access Control
+(MAC) denial:
 
-**3. Permission denied (EACCES).**
-
-If the error reason is `Permission denied`, the `netdata` user lacks read or
-traverse permission on the cgroup mount. Confirm the directory is accessible:
-
-```sh
-ls -ld /sys/fs/cgroup
-```
-
-On a host install, the Netdata installer grants the `netdata` user the access it
-needs. In a custom deployment, ensure the `netdata` user can read and traverse
-the cgroup base path.
+- Check whether SELinux or AppArmor is active (`getenforce`, or test for
+  `/sys/kernel/security/apparmor`) — the same check the
+  [Netdata support bundle](/packaging/installer/SUPPORT-BUNDLE.md) collects,
+  because MAC denials are a documented cause of silent collector failures.
+- If either is active, look for a denial referencing `/sys/fs/cgroup` in
+  `journalctl -k` (SELinux `avc:  denied` / AppArmor `apparmor="DENIED"`
+  entries) or `/var/log/audit/audit.log`. The
+  [`ebpf.plugin` SELinux section](/src/collectors/ebpf.plugin/README.md#selinux)
+  documents the same diagnose-then-`audit2allow` pattern for a denial on a
+  different resource class — apply the same approach here, adjusted to the
+  `dir`/`file` object classes involved in cgroup access.
+- Running `./netdata-support-bundle` from an install captures the MAC state
+  automatically.
