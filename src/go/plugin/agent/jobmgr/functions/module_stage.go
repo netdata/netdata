@@ -40,8 +40,55 @@ type modulePlanStage struct {
 }
 
 type modulePlanResult struct {
-	plan controllerModulePlan
-	err  error
+	plan     controllerModulePlan
+	transfer *modulePlanTransfer
+	err      error
+}
+
+type modulePlanTransfer struct {
+	mu       sync.Mutex
+	decided  chan struct{}
+	accepted bool
+	complete bool
+}
+
+func newModulePlanTransfer() *modulePlanTransfer {
+	return &modulePlanTransfer{
+		decided: make(chan struct{}),
+	}
+}
+
+func (transfer *modulePlanTransfer) Accept() bool {
+	return transfer.decide(true)
+}
+
+func (transfer *modulePlanTransfer) Abandon() {
+	transfer.decide(false)
+}
+
+func (transfer *modulePlanTransfer) decide(accept bool) bool {
+	if transfer == nil {
+		return false
+	}
+	transfer.mu.Lock()
+	defer transfer.mu.Unlock()
+	if transfer.complete {
+		return transfer.accepted
+	}
+	transfer.accepted = accept
+	transfer.complete = true
+	close(transfer.decided)
+	return transfer.accepted
+}
+
+func (transfer *modulePlanTransfer) wasAccepted() bool {
+	if transfer == nil {
+		return false
+	}
+	<-transfer.decided
+	transfer.mu.Lock()
+	defer transfer.mu.Unlock()
+	return transfer.accepted
 }
 
 func prepareContainedModulePlans(
@@ -84,12 +131,16 @@ func prepareContainedModulePlans(
 			stage.attempt.Cut(ctx.Err())
 			result.err = ctx.Err()
 		}
-		if result.err != nil {
-			for _, plan := range plans {
-				plan.owner.Release()
+		if result.err == nil && result.transfer != nil && !result.transfer.Accept() {
+			result.err = context.Cause(ctx)
+			if result.err == nil {
+				result.err = jobmgr.ErrProcessAttemptSettled
 			}
+		}
+		if result.err != nil {
+			cleanupErr := cleanupControllerModulePlans(plans)
 			releaseModulePlanStages(stages[index:])
-			return nil, result.err
+			return nil, errors.Join(result.err, cleanupErr)
 		}
 		plans[stage.module] = result.plan
 	}
@@ -112,7 +163,7 @@ func startModulePlanStage(
 			Resource:  candidateFunctionResource(module),
 		},
 		Target: epoch,
-		Work: func(context.Context) error {
+		Work: func(ctx context.Context) error {
 			owned := <-attemptReady
 			plan, buildErr := buildControllerModulePlan(module, creator)
 			if buildErr != nil {
@@ -135,14 +186,28 @@ func startModulePlanStage(
 				cleanupErr := plan.agentBundle.wait(context.Background())
 				return errors.Join(admitErr, cleanupErr)
 			}
-			if plan.agentBundle.handler == nil {
-				result <- modulePlanResult{plan: plan}
+			if plan.agentBundle.handler != nil {
+				plan.owner = newModulePlanOwner()
+			}
+			transfer := newModulePlanTransfer()
+			result <- modulePlanResult{
+				plan:     plan,
+				transfer: transfer,
+			}
+			select {
+			case <-transfer.decided:
+			case <-ctx.Done():
+				transfer.Abandon()
+				<-transfer.decided
+			}
+			if !transfer.wasAccepted() {
+				plan.agentBundle.retire()
+				return plan.agentBundle.wait(context.Background())
+			}
+			if plan.owner == nil {
 				return nil
 			}
-			owner := newModulePlanOwner()
-			plan.owner = owner
-			result <- modulePlanResult{plan: plan}
-			<-owner.done
+			<-plan.owner.done
 			plan.agentBundle.retire()
 			return plan.agentBundle.wait(context.Background())
 		},
@@ -198,13 +263,13 @@ func buildControllerModulePlan(
 func releaseModulePlanStages(stages []modulePlanStage) {
 	for index := range stages {
 		stage := &stages[index]
+		stage.attempt.Cut(context.Canceled)
 		select {
 		case result := <-stage.result:
-			if result.plan.owner != nil {
-				result.plan.owner.Release()
+			if result.transfer != nil {
+				result.transfer.Abandon()
 			}
 		default:
-			stage.attempt.Cut(context.Canceled)
 		}
 	}
 }

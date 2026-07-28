@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -119,6 +120,48 @@ func TestContainedControllerAbortDoesNotWaitForHandlerCleanup(t *testing.T) {
 	require.EqualValues(t, containment.Census{}, attempts.Census())
 }
 
+func TestContainedControllerCanceledAfterModuleAdmissionCleansAbandonedPlan(t *testing.T) {
+	delegate, err := containment.NewAuthority(nil)
+	require.NoError(t, err)
+	attempts := newControlledModuleAdmissionAuthority(delegate)
+	handler := &controllerTestHandler{}
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() {
+		_, _, buildErr := NewContainedController(
+			ctx,
+			1,
+			attempts,
+			collectorapi.Registry{
+				"module": {
+					AgentFunctions: func() []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "method"}}
+					},
+					MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+						return handler
+					},
+				},
+			},
+		)
+		result <- buildErr
+	}()
+
+	<-attempts.admitted
+	cancel()
+	require.ErrorIs(t, <-result, context.Canceled)
+	close(attempts.allowAdmitReturn)
+	require.Eventually(t, func() bool {
+		return handler.cleanupCount() == 1
+	}, time.Second, time.Millisecond)
+	select {
+	case <-attempts.attempt.Released():
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "abandoned module-plan attempt was not released")
+	}
+	require.EqualValues(t, containment.Census{}, delegate.Census())
+	require.NoError(t, delegate.Shutdown(context.Background()))
+}
+
 type moduleStageBlockingHandler struct {
 	cleanupEntered chan struct{}
 	cleanupRelease chan struct{}
@@ -145,4 +188,74 @@ func (handler *moduleStageBlockingHandler) Cleanup(context.Context) {
 		close(handler.cleanupEntered)
 	})
 	<-handler.cleanupRelease
+}
+
+type controlledModuleAdmissionAuthority struct {
+	delegate         *containment.Authority
+	admitted         chan struct{}
+	allowAdmitReturn chan struct{}
+	attempt          *controlledModuleAdmissionAttempt
+}
+
+type controlledModuleAdmissionAttempt struct {
+	jobmgr.ProcessAttempt
+
+	authority *controlledModuleAdmissionAuthority
+	admitOnce sync.Once
+}
+
+func newControlledModuleAdmissionAuthority(
+	delegate *containment.Authority,
+) *controlledModuleAdmissionAuthority {
+	return &controlledModuleAdmissionAuthority{
+		delegate:         delegate,
+		admitted:         make(chan struct{}),
+		allowAdmitReturn: make(chan struct{}),
+	}
+}
+
+func (authority *controlledModuleAdmissionAuthority) StartProcessAttempt(
+	plan jobmgr.ProcessAttemptPlan,
+) (jobmgr.ProcessAttempt, error) {
+	delegate, err := authority.delegate.StartProcessAttempt(plan)
+	if err != nil {
+		return nil, err
+	}
+	attempt := &controlledModuleAdmissionAttempt{
+		ProcessAttempt: delegate,
+		authority:      authority,
+	}
+	authority.attempt = attempt
+	return attempt, nil
+}
+
+func (authority *controlledModuleAdmissionAuthority) SupersedeProcessAttempt(
+	ctx context.Context,
+	identity jobmgr.ProcessAttemptIdentity,
+) error {
+	return authority.delegate.SupersedeProcessAttempt(ctx, identity)
+}
+
+func (authority *controlledModuleAdmissionAuthority) CutProcessAttempt(
+	identity jobmgr.ProcessAttemptIdentity,
+	cause error,
+) bool {
+	return authority.delegate.CutProcessAttempt(identity, cause)
+}
+
+func (authority *controlledModuleAdmissionAuthority) ProcessAttemptReleased(
+	identity jobmgr.ProcessAttemptIdentity,
+) (<-chan struct{}, bool) {
+	return authority.delegate.ProcessAttemptReleased(identity)
+}
+
+func (attempt *controlledModuleAdmissionAttempt) Admit() error {
+	if err := attempt.ProcessAttempt.Admit(); err != nil {
+		return err
+	}
+	attempt.admitOnce.Do(func() {
+		close(attempt.authority.admitted)
+	})
+	<-attempt.authority.allowAdmitReturn
+	return nil
 }
