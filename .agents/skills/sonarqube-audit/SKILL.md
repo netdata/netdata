@@ -179,6 +179,16 @@ Keep a record of profile decisions in a project-local doc under
 
 ## Recurring tips
 
+- Public SonarCloud projects allow unauthenticated PR issue reads through
+  `api/issues/search?componentKeys=<project>&pullRequest=<PR>&resolved=false`.
+  Use this only for read-only discovery when `.env` is unavailable; issue
+  transitions still require `SONAR_TOKEN`, and the token-safe wrappers remain
+  the preferred authenticated path.
+- The C analyzer can produce internally contradictory `S2259` paths around
+  project `likely()` / `unlikely()` wrappers, such as taking a branch guarded
+  by `pointer && pointer != PJERR` while simultaneously assuming the pointer is
+  null. Verify every control-flow path in source and mark only the individual
+  proven issue false positive; do not bulk-mark the whole rule family.
 - `api/issues/search` is paged at `ps=500` max. The `sq_paginate` helper
   in `_lib.sh` walks every page until `paging.total`; use it from any
   new script instead of re-implementing the loop.

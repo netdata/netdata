@@ -1,4 +1,5 @@
 #include "onewayalloc.h"
+#include "../libnetdata.h"
 
 typedef struct owa_page {
     size_t stats_pages;

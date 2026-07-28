@@ -275,13 +275,15 @@ static inline void set_host_node_id(RRDHOST *host, nd_uuid_t *node_id)
         return;
 
     if (unlikely(!node_id)) {
-        host->node_id = UUID_ZERO;
+        rrdhost_node_id_set(host, NULL);
         return;
     }
 
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
 
-    uuid_copy(host->node_id.uuid, *node_id);
+    ND_UUID new_node_id;
+    uuid_copy(new_node_id.uuid, *node_id);
+    rrdhost_node_id_set(host, &new_node_id);
 
     if (unlikely(!aclk_host_config))
         create_aclk_config(host, &host->host_id.uuid, node_id);

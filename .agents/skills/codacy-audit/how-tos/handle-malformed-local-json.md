@@ -3,7 +3,8 @@
 Use this when `analyze-local.sh` writes a `local-*.json` file but `jq` cannot
 parse it.
 
-1. Verify the dump before reading it as findings:
+1. Verify the dump before reading it as findings. A zero wrapper exit status
+   and the printed `wrote <path>` line do not prove that the tool succeeded:
 
    ```bash
    jq empty .local/audits/codacy/local-*.json
@@ -15,7 +16,8 @@ parse it.
    sed -n '1,80p' .local/audits/codacy/local-*.json
    ```
 
-3. Treat tool-runner logs as a local-analysis failure, not as Codacy findings.
+3. Treat tool-runner logs as a local-analysis failure, not as Codacy findings,
+   even when `analyze-local.sh` returned zero.
    A known failure mode is a Dockerized tool trying to read `/.codacyrc` as a
    file and reporting `read /.codacyrc: is a directory`.
 

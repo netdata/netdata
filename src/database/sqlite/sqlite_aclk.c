@@ -1035,8 +1035,11 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
 
     struct aclk_sync_cfg_t *expected = NULL;
     if (__atomic_compare_exchange_n(&host->aclk_host_config, &expected, aclk_host_config, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED)) {
-        if (node_id && UUIDiszero(host->node_id))
-            uuid_copy(host->node_id.uuid, *node_id);
+        if (node_id && UUIDiszero(host->node_id)) {
+            ND_UUID new_node_id;
+            uuid_copy(new_node_id.uuid, *node_id);
+            rrdhost_node_id_set(host, &new_node_id);
+        }
     }
     else {
         freez(aclk_host_config);

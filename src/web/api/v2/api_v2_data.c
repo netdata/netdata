@@ -218,8 +218,10 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
     int       timeout = (timeout_str && *timeout_str)?str2i(timeout_str): 0;
     time_t    resampling_time = (resampling_time_str && *resampling_time_str) ? str2l(resampling_time_str) : 0;
 
+    ONEWAYALLOC *owa = onewayalloc_create(0);
     QUERY_TARGET_REQUEST qtr = {
         .version = version,
+        .owa = owa,
         .scope_nodes = scope_nodes,
         .scope_contexts = scope_contexts,
         .scope_instances = scope_instances,
@@ -259,7 +261,6 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
         qtr.group_by[g] = group_by[g];
 
     QUERY_TARGET *qt = query_target_create(&qtr);
-    ONEWAYALLOC *owa = NULL;
 
     if(!qt) {
         buffer_sprintf(w->response.data, "Failed to prepare the query.");
@@ -302,7 +303,6 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
         buffer_strcat(w->response.data, "(");
     }
 
-    owa = onewayalloc_create(0);
     ret = data_query_execute(owa, w->response.data, qt, &last_timestamp_in_data);
 
     if(format == DATASOURCE_DATATABLE_JSONP) {

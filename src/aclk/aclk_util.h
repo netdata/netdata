@@ -123,5 +123,6 @@ int aclk_proxy_negotiation_connect(int sockfd, enum mqtt_wss_proxy_type proxy_ty
                                    const char *target_host, int target_port, int timeout_ms);
 void aclk_sensitive_memzero(void *ptr, size_t len);
 void aclk_sensitive_free(char **ptr);
+int aclk_util_unittest(void);
 
 #endif /* ACLK_UTIL_H */

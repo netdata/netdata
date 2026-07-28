@@ -2214,6 +2214,7 @@ static int test_query_window_resampling_boundaries(void) {
 
         QUERY_TARGET_REQUEST request = {
             .version = 1,
+            .owa = onewayalloc_create(0),
             .st = st,
             .after = 1000000000,
             .before = 1000000600,
@@ -2228,11 +2229,14 @@ static int test_query_window_resampling_boundaries(void) {
 
         QUERY_WINDOW_CHECK(!query_target_create(&request),
                            "query target accepted an unrepresentable resampling window");
+        onewayalloc_destroy(request.owa);
 
+        request.owa = onewayalloc_create(0);
         request.resampling_time = 60;
         QUERY_TARGET *qt = query_target_create(&request);
         QUERY_WINDOW_CHECK(qt, "query target pool did not recover after rejected window");
         query_target_release(qt);
+        onewayalloc_destroy(request.owa);
     }
 
 #undef QUERY_WINDOW_CHECK

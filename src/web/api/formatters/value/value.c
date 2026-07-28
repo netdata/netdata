@@ -79,8 +79,10 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
                             RRDR_OPTIONS options, RRDR_TIME_GROUPING time_group_method, const char *time_group_options,
                             size_t tier, time_t timeout, QUERY_SOURCE query_source, STORAGE_PRIORITY priority
 ) {
+    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
     QUERY_TARGET_REQUEST qtr = {
             .version = 1,
+            .owa = owa,
             .host = host,
             .rca = rca,
             .ria = ria,
@@ -97,7 +99,6 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
             .priority = priority,
     };
 
-    ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
     QUERY_TARGET *qt = query_target_create(&qtr);
     RRDR *r = rrd2rrdr(owa, qt);
 

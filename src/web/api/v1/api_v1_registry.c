@@ -39,7 +39,8 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
 */
     }
 
-    netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 registry with URL '%s'", w->id, url);
+    netdata_log_debug(
+        D_WEB_CLIENT, "%llu: API v1 registry request '%s'", w->id, buffer_tostring(w->url_for_logging));
 
     // TODO
     // The browser may send multiple cookies with our id
@@ -73,8 +74,6 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
         if (!name || !*name) continue;
         if (!value || !*value) continue;
 
-        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
-
         uint32_t hash = simple_hash(name);
 
         if(hash == hash_action && !strcmp(name, "action")) {
@@ -86,7 +85,7 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
             else if(vhash == hash_search && !strcmp(value, "search")) action = 'S';
             else if(vhash == hash_switch && !strcmp(value, "switch")) action = 'W';
 #ifdef NETDATA_INTERNAL_CHECKS
-            else netdata_log_error("unknown registry action '%s'", value);
+            else netdata_log_error("Unknown registry action.");
 #endif /* NETDATA_INTERNAL_CHECKS */
         }
         /*
@@ -116,7 +115,7 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
                 to_person_guid = value;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
-        else netdata_log_error("unused registry URL parameter '%s' with value '%s'", name, value);
+        else netdata_log_error("Unused registry URL parameter.");
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
 
@@ -145,7 +144,10 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
     switch(action) {
         case 'A':
             if(unlikely(!machine_guid || !machine_url || !url_name)) {
-                netdata_log_error("Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')", machine_guid ? machine_guid : "UNSET", machine_url ? machine_url : "UNSET", url_name ? url_name : "UNSET");
+                netdata_log_error(
+                    "Invalid registry access request: machine=%s, url=%s, name=%s.",
+                    machine_guid ? "set" : "missing", machine_url ? "set" : "missing",
+                    url_name ? "set" : "missing");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Access request.");
                 return HTTP_RESP_BAD_REQUEST;
@@ -156,7 +158,10 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
 
         case 'D':
             if(unlikely(!machine_guid || !machine_url || !delete_url)) {
-                netdata_log_error("Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
+                netdata_log_error(
+                    "Invalid registry delete request: machine=%s, url=%s, delete_url=%s.",
+                    machine_guid ? "set" : "missing", machine_url ? "set" : "missing",
+                    delete_url ? "set" : "missing");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Delete request.");
                 return HTTP_RESP_BAD_REQUEST;
@@ -167,7 +172,8 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
 
         case 'S':
             if(unlikely(!search_machine_guid)) {
-                netdata_log_error("Invalid registry request - search requires these parameters: for ('%s')", search_machine_guid?search_machine_guid:"UNSET");
+                netdata_log_error(
+                    "Invalid registry search request: for=%s.", search_machine_guid ? "set" : "missing");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Search request.");
                 return HTTP_RESP_BAD_REQUEST;
@@ -178,7 +184,10 @@ int api_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
 
         case 'W':
             if(unlikely(!machine_guid || !machine_url || !to_person_guid)) {
-                netdata_log_error("Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
+                netdata_log_error(
+                    "Invalid registry identity-switch request: machine=%s, url=%s, to=%s.",
+                    machine_guid ? "set" : "missing", machine_url ? "set" : "missing",
+                    to_person_guid ? "set" : "missing");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Switch request.");
                 return HTTP_RESP_BAD_REQUEST;

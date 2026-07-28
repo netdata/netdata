@@ -189,6 +189,24 @@ static STRING *string_index_search(const char *str, size_t length, uint8_t parti
     return string;
 }
 
+STRING *string_acquire_existing(const char *str, size_t len) {
+    if(unlikely(!str || !len || len > STRING_MAX_LENGTH || strnlen(str, len) != len))
+        return NULL;
+
+    uint8_t partition = string_partition_str(str);
+    STRING *string = string_index_search(str, len + 1, partition);
+    if(!string)
+        return NULL;
+
+    string_stats_atomic_increment(partition, active_references);
+
+#ifdef FSANITIZE_ADDRESS
+    stacktrace_array_add(&string->stacktraces, 0);
+#endif
+
+    return string;
+}
+
 // Insert a string to the index and return an ACQUIRED string entry,
 // or NULL if the call needs to be retried (a deleted entry with the same key is still in the index)
 // The returned entry is ACQUIRED, and it can either be:

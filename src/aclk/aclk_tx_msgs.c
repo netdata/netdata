@@ -76,7 +76,7 @@ static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obj
             aclk_size_add_overflow(&full_msg_len, sep_len) ||
             aclk_size_add_overflow(&full_msg_len, payload_len))) {
         json_object_put(msg);
-        return HTTP_RESP_CONTENT_TOO_LONG;
+        return HTTP_RESP_CONTENT_TOO_LARGE;
     }
 
     full_msg = mallocz(full_msg_len);
@@ -92,7 +92,7 @@ static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obj
     int rc = mqtt_wss_publish5(client, (char*)topic, NULL, full_msg, &freez_aclk_publish_msg, full_msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
     if (rc == MQTT_WSS_ERR_MSG_TOO_BIG)
-        return HTTP_RESP_CONTENT_TOO_LONG;
+        return HTTP_RESP_CONTENT_TOO_LARGE;
     if (rc != MQTT_WSS_OK)
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -201,7 +201,7 @@ short aclk_http_msg_v2(mqtt_wss_client client, const char *topic, const char *ms
     short rc = aclk_send_message_with_bin_payload(client, msg, topic, payload, payload_len);
 
     switch (rc) {
-        case HTTP_RESP_CONTENT_TOO_LONG:
+        case HTTP_RESP_CONTENT_TOO_LARGE:
             aclk_http_msg_v2_err(client, topic, msg_id, rc, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
             break;
         case HTTP_RESP_INTERNAL_SERVER_ERROR:
@@ -254,8 +254,8 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
             aclk_size_add_overflow(&total, http_headers_len) ||
             aclk_size_add_overflow(&total, body_len))) {
         json_object_put(msg);
-        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LONG, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
-        return HTTP_RESP_CONTENT_TOO_LONG;
+        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LARGE, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
+        return HTTP_RESP_CONTENT_TOO_LARGE;
     }
 
     char *raw = mallocz(total);
@@ -282,8 +282,8 @@ short aclk_http_msg_v2_direct(mqtt_wss_client client, const char *topic, const c
     int rc = mqtt_wss_publish5(client, (char *)topic, NULL, raw, &freez_aclk_publish_msg, total, MQTT_WSS_PUB_QOS1, &packet_id);
 
     if (rc == MQTT_WSS_ERR_MSG_TOO_BIG) {
-        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LONG, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
-        return HTTP_RESP_CONTENT_TOO_LONG;
+        aclk_http_msg_v2_err(client, topic, msg_id, HTTP_RESP_CONTENT_TOO_LARGE, CLOUD_EC_REQ_REPLY_TOO_BIG, CLOUD_EMSG_REQ_REPLY_TOO_BIG, NULL, 0);
+        return HTTP_RESP_CONTENT_TOO_LARGE;
     }
 
     if (rc != MQTT_WSS_OK) {

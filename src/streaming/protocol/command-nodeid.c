@@ -146,7 +146,7 @@ void stream_sender_get_node_and_claim_id_from_parent(struct sender_state *s, con
 
     bool node_id_updated = false;
     if(UUIDiszero(s->host->node_id) || update_node_id) {
-        s->host->node_id = node_id;
+        rrdhost_node_id_set(s->host, &node_id);
         node_id_updated = true;
     }
 

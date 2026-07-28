@@ -39,6 +39,14 @@ GitHub exposes no annotations and the local checkout has no `.env` with
 4. Ignore `deltaType == "Fixed"` entries for the current blocker. They are
    historical issue records that Codacy already considers resolved.
 
+5. Validate constant-condition reports against test intent. Cppcheck's
+   `knownConditionTrueFalse` pattern can legitimately identify a compile-time
+   result in a unit-test assertion whose purpose is to prove exactly that
+   result, such as verifying that a zero timeout disables expiration. This is
+   not a runtime defect; either mark the finding false positive or use a
+   semantically equivalent analyzer-friendly test shape if the PR gate cannot
+   accept administrative triage.
+
 Safety note: the public response can contain `commitInfo` fields with personal
 metadata. Keep raw dumps under `.local/audits/codacy/`, which is gitignored,
 and do not copy names or email addresses into committed artifacts.

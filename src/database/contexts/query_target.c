@@ -1232,6 +1232,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     //if(!service_running(ABILITY_DATA_QUERIES))
     //    return NULL;
 
+    internal_fatal(!qtr || !qtr->owa, "QUERY TARGET: caller-owned OWA is required");
+
     QUERY_TARGET *qt = query_target_get();
 
     if(!qtr->received_ut)
@@ -1295,27 +1297,29 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     RRDHOST *host = qt->request.host;
 
     // prepare all the patterns
-    qt->nodes.scope_pattern = string_to_simple_pattern(qtl.scope_nodes);
-    qt->nodes.pattern = string_to_simple_pattern(qtl.nodes);
+    qt->nodes.scope_pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.scope_nodes);
+    qt->nodes.pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.nodes);
 
-    qt->contexts.pattern = string_to_simple_pattern(qtl.contexts);
-    qt->contexts.scope_pattern = string_to_simple_pattern(qtl.scope_contexts);
+    qt->contexts.pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.contexts);
+    qt->contexts.scope_pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.scope_contexts);
 
-    qt->instances.pattern = string_to_simple_pattern(qtl.instances);
-    qt->instances.scope_pattern = string_to_simple_pattern(qtl.scope_instances);
-    qt->query.pattern = string_to_simple_pattern(qtl.dimensions);
-    qt->dimensions.scope_pattern = string_to_simple_pattern(qtl.scope_dimensions);
-    qt->instances.chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);
-    qt->instances.scope_chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);  // For now, using same as non-scope
-    qt->instances.labels_pattern = string_to_simple_pattern(qtl.labels);
-    qt->instances.scope_labels_pattern = string_to_simple_pattern(qtl.scope_labels);
-    qt->instances.alerts_pattern = string_to_simple_pattern(qtl.alerts);
+    qt->instances.pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.instances);
+    qt->instances.scope_pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.scope_instances);
+    qt->query.pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.dimensions);
+    qt->dimensions.scope_pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.scope_dimensions);
+    qt->instances.chart_label_key_pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.chart_label_key);
+    qt->instances.scope_chart_label_key_pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.chart_label_key);  // For now, using same as non-scope
+    qt->instances.labels_pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.labels);
+    qt->instances.scope_labels_pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.scope_labels);
+    qt->instances.alerts_pattern = string_to_simple_pattern_owa(qt->request.owa, qtl.alerts);
     
     // Pre-compile pattern arrays for labels
     if(qt->instances.labels_pattern)
-        qt->instances.labels_pa = pattern_array_add_simple_pattern(NULL, qt->instances.labels_pattern, ':');
+        qt->instances.labels_pa = pattern_array_add_simple_pattern(
+            NULL, qt->instances.labels_pattern, ':', qt->request.owa);
     if(qt->instances.scope_labels_pattern)
-        qt->instances.scope_labels_pa = pattern_array_add_simple_pattern(NULL, qt->instances.scope_labels_pattern, ':');
+        qt->instances.scope_labels_pa = pattern_array_add_simple_pattern(
+            NULL, qt->instances.scope_labels_pattern, ':', qt->request.owa);
 
     qtl.match_ids = qt->request.options & RRDR_OPTION_MATCH_IDS;
     qtl.match_names = qt->request.options & RRDR_OPTION_MATCH_NAMES;
@@ -1357,7 +1361,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         query_scope_foreach_host(qt->nodes.scope_pattern, qt->nodes.pattern,
                                  query_node_add, &qtl,
                                  &qt->versions,
-                                 qtl.host_node_id_str);
+                                 qtl.host_node_id_str,
+                                 qt->request.owa);
 
     // we need the available db retention for this call
     // so it has to be done last
