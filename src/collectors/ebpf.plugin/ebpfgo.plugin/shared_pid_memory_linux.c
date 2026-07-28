@@ -257,7 +257,7 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
 
         fprintf(stderr,
                 "ebpf-go.plugin: pid shm: recovered after %u failed attempt(s)\n",
-                (unsigned)(ctx->replace_fail_count + 1));
+                (unsigned)ctx->replace_fail_count);
         ctx->replace_fail_count = 0;
         ctx->publish_timeouts   = 0;
     }

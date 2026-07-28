@@ -206,7 +206,7 @@ void shared_dns_memory_publish(
 
         fprintf(stderr,
                 "ebpf-go.plugin: dns shm: recovered after %u failed attempt(s)\n",
-                (unsigned)(ctx->replace_fail_count + 1));
+                (unsigned)ctx->replace_fail_count);
         ctx->replace_fail_count = 0;
         ctx->publish_timeouts   = 0;
     }
