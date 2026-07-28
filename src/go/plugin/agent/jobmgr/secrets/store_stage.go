@@ -242,7 +242,7 @@ func (operation *PreparedStoreOperation) start() {
 	}
 	identityPayload := []byte(nil)
 	if operation.spec.testIdentity {
-		identityPayload = []byte(fmt.Sprintf("%016x", config.Hash()))
+		identityPayload = fmt.Appendf(nil, "%016x", config.Hash())
 	}
 	operation.spec.input = CommandInput{}
 	identity := operation.operations.identity(

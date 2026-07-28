@@ -96,15 +96,13 @@ func (di *DecisionIndex) Apply(ctx context.Context, batch []*confgroup.Group) er
 		if reconciliation.err != nil || !reconciliation.submit {
 			continue
 		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			reconciliation.err = di.commands.SubmitPreparedAndWait(
 				ctx,
 				reconciliation.request,
 				reconciliation.plan,
 			)
-		}()
+		})
 	}
 	wg.Wait()
 
