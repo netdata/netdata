@@ -853,7 +853,8 @@ int netdata_dns_runtime_attach(struct netdata_dns_runtime *rt)
 }
 
 /* Return per-query flow records that fall within the 20-second live window.
- * Drains pending BPF events before reading so the current cycle is included.
+ * Drains the AF_PACKET capture socket(s) before reading so the current cycle
+ * is included (both variants use recv() on AF_PACKET, not a BPF ring buffer).
  * Records are written into out[0..max_records-1].
  * Returns the number of records written, or -1 on error. When the runtime
  * was attached with per_query disabled, returns 0 (no flow socket was ever
