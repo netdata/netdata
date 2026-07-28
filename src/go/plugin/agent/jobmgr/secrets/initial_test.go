@@ -306,6 +306,101 @@ func TestInvalidStoreCommandClearsOlderPendingDesiredConfig(t *testing.T) {
 	require.False(t, controller.pendingVersion(pending.ExposedKey(), version))
 }
 
+func TestStoreUpdateWhilePriorGenerationRetiresIsRetryable(t *testing.T) {
+	controller, store := newSecretControllerTestHarness(t, nil)
+	require.NoError(t, controller.Bind(restartTestJobs{}))
+	controller.mu.Lock()
+	controller.commands = failingPendingRetryCommands{
+		err: errors.New("test: pending retry held"),
+	}
+	controller.mu.Unlock()
+	controller.setCommandsReady(true)
+
+	initial := secretTestConfig(confgroup.TypeUser, "initial")
+	mutation, err := store.PrepareMutation(t.Context(), controller.creators, initial, 0)
+	require.NoError(t, err)
+	result, err := mutation.Commit(t.Context())
+	require.NoError(t, err)
+	controller.commitEntry(initial.ExposedKey(), &secretEntry{
+		config: initial,
+		status: dyncfg.StatusRunning,
+	})
+
+	resourceID := secretResourceID(initial.ExposedKey())
+	initialResource, err := newStoreGenerationResource(
+		lifecycle.ResourceIdentity{ID: resourceID, Generation: 1},
+		store,
+		initial.ExposedKey(),
+		result.Generation,
+	)
+	require.NoError(t, err)
+	var active lifecycle.ReadyResource = initialResource
+	scope, err := store.AcquireScope([]string{initial.ExposedKey()})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, controller.CloseProjection())
+		require.NoError(t, scope.Release(context.Background()))
+		require.NoError(t, active.Finalize())
+		require.NoError(t, store.Close(context.Background()))
+	})
+
+	applyUpdate := func(value string, successor uint64) lifecycle.AppliedResourceTransaction {
+		input := CommandInput{
+			Args: []string{
+				"go.d:secretstore:vault:main",
+				string(dyncfg.CommandUpdate),
+			},
+			Payload:     []byte(`{"value":"` + value + `"}`),
+			ContentType: "application/json",
+			HasPayload:  true,
+		}
+		stage, stageErr := controller.Stage(input)
+		require.NoError(t, stageErr)
+		stage.Start()
+		select {
+		case <-stage.Ready():
+		case <-time.After(time.Second):
+			require.FailNow(t, "test failed", "Store update did not settle")
+		}
+		defer stage.Release()
+
+		prepared, prepareErr := controller.PrepareStaged(
+			t.Context(),
+			input,
+			active,
+			lifecycle.ResourceTransactionScope{
+				ID:      resourceID,
+				Current: active.Identity(),
+				Successor: lifecycle.ResourceIdentity{
+					ID:         resourceID,
+					Generation: successor,
+				},
+			},
+			lifecycle.LongLivedPermit{},
+			stage,
+		)
+		require.NoError(t, prepareErr)
+		applied, applyErr := prepared.Apply(t.Context())
+		require.NoError(t, applyErr)
+		return applied
+	}
+
+	first := applyUpdate("replacement", 2)
+	require.Equal(t, 200, first.ResultStatus())
+	_, disposition, next := first.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionReplaced, disposition)
+	require.NotNil(t, next)
+	active = next
+	require.EqualValues(t, 1, store.Census().Retiring)
+
+	second := applyUpdate("latest", 3)
+	require.Equal(t, 503, second.ResultStatus())
+	_, disposition, next = second.Ownership()
+	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
+	require.Same(t, active, next)
+	require.True(t, controller.pendingVersion(initial.ExposedKey(), 2))
+}
+
 func TestRemoveFailedAbsentDynCfgStoreWithdrawsPendingDesiredState(t *testing.T) {
 	controller, store := newSecretControllerTestHarness(t, nil)
 	require.NoError(t, controller.Bind(restartTestJobs{}))

@@ -422,10 +422,7 @@ func (f *Factory) buildV1(
 			if redactLifecycle {
 				cleanupErr = redactResolvedLifecycleError(cleanupErr)
 			}
-			err = errors.Join(err, cleanupErr)
-			if cleanupErr != nil {
-				err = lifecycle.RetainOwnership(err)
-			}
+			err = joinRetainedCleanup(err, cleanupErr)
 		}
 		if redactLifecycle && err != nil {
 			err = redactResolvedLifecycleError(err)
@@ -493,10 +490,7 @@ func (f *Factory) buildV2(
 			if redactLifecycle {
 				cleanupErr = redactResolvedLifecycleError(cleanupErr)
 			}
-			err = errors.Join(err, cleanupErr)
-			if cleanupErr != nil {
-				err = lifecycle.RetainOwnership(err)
-			}
+			err = joinRetainedCleanup(err, cleanupErr)
 		}
 		if err != nil && runtimeStage != nil {
 			runtimeStage.close()
@@ -553,6 +547,14 @@ func callFactoryModuleCleanup(ctx context.Context, cleanup func(context.Context)
 		cleanup(context.WithoutCancel(ctx))
 		return nil
 	})
+}
+
+func joinRetainedCleanup(err, cleanupErr error) error {
+	err = errors.Join(err, cleanupErr)
+	if cleanupErr != nil {
+		err = lifecycle.RetainOwnership(err)
+	}
+	return err
 }
 
 func (f *Factory) lookupVNode(config confgroup.Config) (jobruntime.VnodeSnapshot, error) {

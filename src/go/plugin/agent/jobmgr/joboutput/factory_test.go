@@ -136,6 +136,7 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				}
 				return nil
 			},
+			wantRetained: true,
 		},
 		"function-bearing job without hooks": {
 			configure: func(state *factoryTestState, creator *collectorapi.Creator) factoryTestJobHooks {

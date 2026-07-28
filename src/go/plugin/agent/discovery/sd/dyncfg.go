@@ -175,6 +175,9 @@ func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 
 // dyncfgSeqExec executes state-changing dyncfg commands serially.
 func (d *ServiceDiscovery) dyncfgSeqExec(fn dyncfg.Function) {
+	if dyncfgFunctionContext(fn).Err() != nil {
+		return
+	}
 	d.handler.SyncDecision(fn)
 
 	switch fn.Command() {

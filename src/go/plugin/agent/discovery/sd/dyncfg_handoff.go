@@ -11,8 +11,9 @@ import (
 const sdShuttingDownMsg = "Service discovery is shutting down."
 
 type pendingDyncfgFunction struct {
-	fn   dyncfg.Function
-	done chan struct{}
+	fn        dyncfg.Function
+	done      chan struct{}
+	abandoned bool
 }
 
 type dyncfgAdmission uint8
@@ -32,6 +33,7 @@ func (d *ServiceDiscovery) enqueueDyncfgFunction(fn dyncfg.Function) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	fnCtx := dyncfgFunctionContext(fn)
 	pending, admission := d.beginDyncfg(fn)
 	switch admission {
 	case dyncfgAdmissionDuplicate:
@@ -43,12 +45,31 @@ func (d *ServiceDiscovery) enqueueDyncfgFunction(fn dyncfg.Function) {
 	}
 	select {
 	case d.dyncfgCh <- fn:
-		<-pending.done
+	case <-fnCtx.Done():
+		d.cancelDyncfg(fn)
+		return
 	case <-ctx.Done():
 		if d.cancelDyncfg(fn) {
 			d.dyncfgApi.SendCodef(fn, 503, sdShuttingDownMsg)
 		}
+		return
 	}
+	select {
+	case <-pending.done:
+	case <-fnCtx.Done():
+		d.abandonDyncfg(fn)
+	case <-ctx.Done():
+		if d.abandonDyncfg(fn) {
+			d.dyncfgApi.SendCodef(fn, 503, sdShuttingDownMsg)
+		}
+	}
+}
+
+func dyncfgFunctionContext(fn dyncfg.Function) context.Context {
+	if ctx := fn.Context(); ctx != nil {
+		return ctx
+	}
+	return context.Background()
 }
 
 func (d *ServiceDiscovery) beginDyncfg(
@@ -106,6 +127,23 @@ func (d *ServiceDiscovery) cancelDyncfg(fn dyncfg.Function) bool {
 	return true
 }
 
+// abandonDyncfg preserves a queued UID until the run loop drains it. Removing
+// it here would let that stale command complete a newer request reusing the UID.
+func (d *ServiceDiscovery) abandonDyncfg(fn dyncfg.Function) bool {
+	if fn.UID() == "" {
+		return true
+	}
+	d.dyncfgMu.Lock()
+	defer d.dyncfgMu.Unlock()
+	pending, exists := d.dyncfgPending[fn.UID()]
+	if !exists {
+		return false
+	}
+	pending.abandoned = true
+	d.dyncfgPending[fn.UID()] = pending
+	return true
+}
+
 func (d *ServiceDiscovery) failPendingDyncfg() {
 	d.dyncfgMu.Lock()
 	d.dyncfgClosed = true
@@ -116,11 +154,13 @@ func (d *ServiceDiscovery) failPendingDyncfg() {
 	}
 	d.dyncfgMu.Unlock()
 	for _, command := range pending {
-		d.dyncfgApi.SendCodef(
-			command.fn,
-			503,
-			sdShuttingDownMsg,
-		)
+		if !command.abandoned && dyncfgFunctionContext(command.fn).Err() == nil {
+			d.dyncfgApi.SendCodef(
+				command.fn,
+				503,
+				sdShuttingDownMsg,
+			)
+		}
 		close(command.done)
 	}
 }

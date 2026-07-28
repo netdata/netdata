@@ -212,7 +212,7 @@ func (store *SecretStore) Config(key string) (Config, bool) {
 }
 
 // Retire removes the matching current generation from admission and releases
-// its carrier after all lexical readers have drained.
+// it after all lexical readers have drained.
 func (store *SecretStore) Retire(
 	ctx context.Context,
 	key string,

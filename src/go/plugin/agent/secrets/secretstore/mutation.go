@@ -5,8 +5,13 @@ package secretstore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 )
+
+// ErrMutationBusy reports transient generation ownership that prevents a
+// same-key mutation from being prepared.
+var ErrMutationBusy = errors.New("secretstore: mutation is busy")
 
 type preparationRef struct {
 	slot       uint32
@@ -211,7 +216,10 @@ func (store *SecretStore) reservePreparation(
 		current = record.current.generation
 	}
 	if record != nil && record.hasRetiring() {
-		return preparationRef{}, errors.New("secretstore: prior generation is still retiring")
+		return preparationRef{}, fmt.Errorf(
+			"%w: prior generation is still retiring",
+			ErrMutationBusy,
+		)
 	}
 	if current != expected {
 		return preparationRef{}, errors.New("secretstore: expected generation differs")

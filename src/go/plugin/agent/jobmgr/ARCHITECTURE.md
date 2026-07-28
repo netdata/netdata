@@ -339,7 +339,11 @@ Who admits, and who does not:
 - The authority retains the worker and everything it owns until its complete cleanup returns, or until the plugin
   process exits.
 - **Persistent** file/discovery state keeps only its latest desired replacement and retries after identity release.
-- A **synchronous** DynCfg request instead returns a retryable busy/contained response and is not applied later.
+- SecretStore add/update requests, including DynCfg, retain only their latest desired config after retryable
+  contention and apply it after the identity releases.
+- Other **synchronous** DynCfg requests are not retained or retried after a busy/contained response. Cancellation
+  prevents queued service-discovery mutations from starting; it does not roll back work that already began while its
+  request context was live.
 
 ### No process-wide slot limit
 

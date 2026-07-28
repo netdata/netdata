@@ -336,6 +336,7 @@ func (pso *PreparedStoreOperation) runAttempt(
 			pso.spec.expected,
 		)
 	}
+	result.retryable = containmentRetryable(result.err)
 	if err := admission.Admit(); err != nil {
 		if result.mutation != nil {
 			_ = result.mutation.Abort()
@@ -367,7 +368,8 @@ func (pso *PreparedStoreOperation) observeAttempt(
 func containmentRetryable(err error) bool {
 	return errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
 		errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
-		errors.Is(err, jobmgr.ErrProcessAttemptSuperseded)
+		errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) ||
+		errors.Is(err, secretstore.ErrMutationBusy)
 }
 
 func (pso *PreparedStoreOperation) publish(result storeOperationResult) {

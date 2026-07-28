@@ -110,7 +110,8 @@ func TestAuthorityFuseWinsLateCompletionAndRedactsDiagnostics(t *testing.T) {
 }
 
 func TestAuthorityAdmissionStopsFuseButTargetCutStillContainsLifetime(t *testing.T) {
-	authority := newTestAuthority(t, 20*time.Millisecond, 10*time.Millisecond, nil)
+	diagnostics := &recordingAttemptDiagnostics{}
+	authority := newTestAuthority(t, 20*time.Millisecond, 10*time.Millisecond, diagnostics)
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	attempt, err := authority.start(jobmgr.ProcessAttemptPlan{
@@ -131,10 +132,14 @@ func TestAuthorityAdmissionStopsFuseButTargetCutStillContainsLifetime(t *testing
 	require.EqualValues(t, 1, authority.CutTarget(23))
 	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptRetired)
 	require.Equal(t, Census{Active: 1, Contained: 1}, authority.Census())
+	events := diagnostics.Snapshot()
 
 	close(release)
 	<-attempt.Released()
 	require.Equal(t, Census{}, authority.Census())
+	require.Len(t, events, 1)
+	require.Equal(t, jobmgr.DiagnosticInfo, events[0].Level)
+	require.ErrorIs(t, events[0].Err, jobmgr.ErrProcessAttemptRetired)
 }
 
 func TestAuthorityTargetCutPermanentlyRejectsRetiredTargets(t *testing.T) {
@@ -266,12 +271,15 @@ func TestAuthorityContainsContainmentFencePanics(t *testing.T) {
 
 	var cut bool
 	require.NotPanics(t, func() {
-		cut = attempt.Cut(jobmgr.ErrProcessAttemptSuperseded)
+		cut = attempt.Cut(jobmgr.ErrProcessAttemptRetired)
 	})
 	require.True(t, cut)
 	require.Equal(t, Census{Active: 1, Contained: 1}, authority.Census())
-	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptSuperseded)
+	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptRetired)
 	require.ErrorIs(t, attempt.Await(context.Background()), jobmgr.ErrProcessAttemptFencePanic)
+	events := diagnostics.Snapshot()
+	require.Len(t, events, 1)
+	require.Equal(t, jobmgr.DiagnosticError, events[0].Level)
 
 	releaseWork()
 	<-attempt.Released()

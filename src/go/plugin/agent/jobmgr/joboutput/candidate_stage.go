@@ -707,7 +707,7 @@ func (pjc *preparedJobCandidate) run(
 	config = nil
 	if err != nil {
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
-		err = errors.Join(err, cleanupErr)
+		err = joinRetainedCleanup(err, cleanupErr)
 		workerResult <- stagedJobResult{err: err}
 		return nil
 	}
@@ -715,7 +715,7 @@ func (pjc *preparedJobCandidate) run(
 	if probeErr != nil {
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
 		if cleanupErr != nil {
-			err = errors.Join(probeErr, cleanupErr)
+			err = joinRetainedCleanup(probeErr, cleanupErr)
 			workerResult <- stagedJobResult{err: err}
 			return nil
 		}
@@ -729,7 +729,7 @@ func (pjc *preparedJobCandidate) run(
 	}
 	if err := admission.Admit(); err != nil {
 		cleanupErr := cleanupConstructed(context.Background(), candidate)
-		return errors.Join(err, cleanupErr)
+		return joinRetainedCleanup(err, cleanupErr)
 	}
 	owner := newStagedJobOwner(
 		candidate,

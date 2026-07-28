@@ -285,7 +285,7 @@ func (a *Authority) cut(attempt *attempt, cause error, probingOnly bool) bool {
 		diagnosticErr = errors.Join(diagnosticErr, fenceErr)
 	}
 	jobmgr.ObserveDiagnostic(a.diagnostics, jobmgr.DiagnosticEvent{
-		Level:      jobmgr.DiagnosticError,
+		Level:      cutDiagnosticLevel(cause, fenceErr),
 		Name:       "job manager attempt contained",
 		Resource:   identity.Resource,
 		State:      identity.Namespace.String(),
@@ -295,6 +295,13 @@ func (a *Authority) cut(attempt *attempt, cause error, probingOnly bool) bool {
 		Err:        diagnosticErr,
 	})
 	return true
+}
+
+func cutDiagnosticLevel(cause, fenceErr error) jobmgr.DiagnosticLevel {
+	if fenceErr == nil && errors.Is(cause, jobmgr.ErrProcessAttemptRetired) {
+		return jobmgr.DiagnosticInfo
+	}
+	return jobmgr.DiagnosticError
 }
 
 func safeCutError(cause error) error {
@@ -508,8 +515,8 @@ func (a *Authority) CutTarget(target uint64) int {
 	return cut
 }
 
-// BeginShutdown rejects new work, cancels every live identity, emits a bounded
-// retained sample, and waits only the caller's existing shutdown budget.
+// BeginShutdown rejects new work, cancels every live identity, and emits a
+// bounded retained sample. Shutdown performs the bounded wait.
 func (a *Authority) BeginShutdown() {
 	if a == nil {
 		return
